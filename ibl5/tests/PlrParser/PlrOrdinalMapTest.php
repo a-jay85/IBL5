@@ -16,10 +16,10 @@ class PlrOrdinalMapTest extends TestCase
 
     protected function setUp(): void
     {
+        // tempnam() is typed as non-falsy-string; a `=== false` guard here is
+        // statically dead (identical.alwaysFalse). A runtime failure surfaces as a
+        // TypeError on this string-typed property assignment, which fails the test.
         $this->tmpFile = tempnam(sys_get_temp_dir(), 'plr_map_test_');
-        if ($this->tmpFile === false) {
-            $this->fail('Could not create temp file');
-        }
     }
 
     protected function tearDown(): void

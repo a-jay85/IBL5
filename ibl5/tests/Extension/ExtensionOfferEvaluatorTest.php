@@ -161,9 +161,12 @@ class ExtensionOfferEvaluatorTest extends TestCase
 
     public function testCalculateCombinedModifierStartsAtOne(): void
     {
-        // With all default preferences (preference=1 yields 0 for each modifier), combined = 1.0
-        $teamFactors = ['wins' => 0, 'losses' => 0, 'tradition_wins' => 0, 'tradition_losses' => 0, 'money_committed_at_position' => 0];
-        $playerPreferences = ['winner' => 1, 'tradition' => 1, 'loyalty' => 1, 'playing_time' => 1];
+        // With all default preferences, modifier should be 1.0. Empty arrays are
+        // intentional: this exercises the production `?? default` coalescing for
+        // every missing key. The array{...} shape mismatch is a documented baseline
+        // defer, not a defect to "fix" by populating the arrays (that guts the test).
+        $teamFactors = [];
+        $playerPreferences = [];
 
         $result = $this->evaluator->calculateCombinedModifier($teamFactors, $playerPreferences);
 
@@ -587,18 +590,21 @@ class ExtensionOfferEvaluatorTest extends TestCase
 
     public function testCalculateWinnerModifierWithMissingTeamFactors(): void
     {
-        // wins=0, losses=0 → winDiff = 0 → modifier = 0.0
-        $result = $this->evaluator->calculateWinnerModifier(['wins' => 0, 'losses' => 0], ['winner' => 3]);
+        // Empty team factors → wins ?? 0, losses ?? 0 → winDiff = 0. Empty array is
+        // intentional (mutation-hardening of the `?? 0` defaults); the shape mismatch
+        // is a documented baseline defer, not a defect to "fix" by populating it.
+        $result = $this->evaluator->calculateWinnerModifier([], ['winner' => 3]);
 
         $this->assertSame(0.0, $result);
     }
 
     public function testCalculateWinnerModifierWithMissingPreference(): void
     {
-        // winner=1 → (1-1) = 0 → modifier = 0.0
+        // Missing 'winner' key → defaults to 1, so (1-1) = 0 → modifier = 0. Empty
+        // preference array is intentional (hardens the `?? 1` default); deferred shape.
         $result = $this->evaluator->calculateWinnerModifier(
             ['wins' => 50, 'losses' => 32],
-            ['winner' => 1]
+            []
         );
 
         $this->assertSame(0.0, $result);
@@ -606,24 +612,27 @@ class ExtensionOfferEvaluatorTest extends TestCase
 
     public function testCalculateTraditionModifierWithMissingTeamFactors(): void
     {
-        // tradition_wins=0, tradition_losses=0 → diff = 0 → modifier = 0.0
-        $result = $this->evaluator->calculateTraditionModifier(['tradition_wins' => 0, 'tradition_losses' => 0], ['tradition' => 3]);
+        // Empty team factors → tradition_wins/losses ?? 0 → diff = 0. Intentional
+        // (hardens the `?? 0` defaults); deferred shape.
+        $result = $this->evaluator->calculateTraditionModifier([], ['tradition' => 3]);
 
         $this->assertSame(0.0, $result);
     }
 
     public function testCalculateLoyaltyModifierWithMissingPreference(): void
     {
-        // loyalty=1 → (1-1) = 0 → modifier = 0.0
-        $result = $this->evaluator->calculateLoyaltyModifier(['loyalty' => 1]);
+        // Missing 'loyalty' key → defaults to 1, so (1-1) = 0. Empty array is
+        // intentional (hardens the `?? 1` default); deferred shape.
+        $result = $this->evaluator->calculateLoyaltyModifier([]);
 
         $this->assertSame(0.0, $result);
     }
 
     public function testCalculatePlayingTimeModifierWithMissingData(): void
     {
-        // money_committed=0, playing_time=1 → modifier = 0.0
-        $result = $this->evaluator->calculatePlayingTimeModifier(['money_committed_at_position' => 0], ['playing_time' => 1]);
+        // Missing money_committed → defaults to 0; missing playingTime → defaults to 1.
+        // Empty arrays are intentional (harden the `??` defaults); deferred shape.
+        $result = $this->evaluator->calculatePlayingTimeModifier([], []);
 
         $this->assertSame(0.0, $result);
     }

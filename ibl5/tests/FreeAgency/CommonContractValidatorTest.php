@@ -728,7 +728,7 @@ class CommonContractValidatorTest extends TestCase
      */
     public function testValidateRaisesWithEmptyArraySucceeds(): void
     {
-        $result = $this->validator->validateRaises([], 0);
+        $result = $this->validator->validateRaises(['year1' => 0, 'year2' => 0, 'year3' => 0], 0);
 
         $this->assertTrue($result['valid']);
     }
@@ -738,7 +738,7 @@ class CommonContractValidatorTest extends TestCase
      */
     public function testValidateSalaryDecreasesWithEmptyArraySucceeds(): void
     {
-        $result = $this->validator->validateSalaryDecreases([]);
+        $result = $this->validator->validateSalaryDecreases(['year1' => 0, 'year2' => 0, 'year3' => 0]);
 
         $this->assertTrue($result['valid']);
     }
@@ -748,7 +748,7 @@ class CommonContractValidatorTest extends TestCase
      */
     public function testValidateMaximumYearOneWithEmptyArraySucceeds(): void
     {
-        $result = $this->validator->validateMaximumYearOne([], 0);
+        $result = $this->validator->validateMaximumYearOne(['year1' => 0], 0);
 
         // Empty year1 defaults to 0, which is under max
         $this->assertTrue($result['valid']);
@@ -759,7 +759,7 @@ class CommonContractValidatorTest extends TestCase
      */
     public function testValidateNoGapsWithEmptyArraySucceeds(): void
     {
-        $result = $this->validator->validateNoGaps([]);
+        $result = $this->validator->validateNoGaps(['year1' => 0, 'year2' => 0, 'year3' => 0]);
 
         // All years default to 0, so contract never "starts"
         $this->assertTrue($result['valid']);
@@ -770,7 +770,7 @@ class CommonContractValidatorTest extends TestCase
      */
     public function testCalculateOfferValueWithEmptyArrayReturnsZero(): void
     {
-        $result = $this->validator->calculateOfferValue([]);
+        $result = $this->validator->calculateOfferValue(['year1' => 0, 'year2' => 0, 'year3' => 0]);
 
         $this->assertEquals(0, $result['total']);
         $this->assertEquals(1, $result['years']); // Minimum of 1

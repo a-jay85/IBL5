@@ -13,8 +13,6 @@ use TeamOffDefStats\Contracts\TeamOffDefStatsViewInterface;
  *
  * Verifies HTML rendering of league statistics tables including
  * team highlighting and proper output sanitization.
- *
- * @phpstan-import-type RenderData from \TeamOffDefStats\Contracts\TeamOffDefStatsViewInterface
  */
 class TeamOffDefStatsViewTest extends TestCase
 {
@@ -164,7 +162,6 @@ class TeamOffDefStatsViewTest extends TestCase
             'differentials' => [],
         ];
 
-        /** @var RenderData $data */
         $result = $this->view->render($data);
 
         $this->assertIsString($result);

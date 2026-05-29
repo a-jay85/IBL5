@@ -55,8 +55,8 @@ class TeamRepositoryTest extends TestCase
 
         $result = $this->repository->getTeamPowerData('Boston Celtics');
 
-        $this->assertEquals('Boston Celtics', $result['team_name']);
-        $this->assertEquals(50, $result['wins']);
+        $this->assertSame('Boston Celtics', $result['team_name']);
+        $this->assertSame(50, $result['wins']);
     }
 
     public function testGetTeamPowerDataReturnsNullWhenNoResults()

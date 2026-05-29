@@ -138,9 +138,7 @@ class AwardHistoryRepositoryTest extends DatabaseTestCase
         $result = $this->repo->searchAwards($this->buildParams(['name' => 'AWH PidKnown']));
 
         self::assertSame(1, $result['count']);
-        /** @var array{year: int, award: string, name: string, table_id: int, pid: int|null} $row0 */
-        $row0 = $result['results'][0];
-        self::assertSame($pid, $row0['pid']);
+        self::assertSame($pid, $result['results'][0]['pid']);
     }
 
     public function testPidNullForPlayersNotInPlr(): void
@@ -150,9 +148,7 @@ class AwardHistoryRepositoryTest extends DatabaseTestCase
         $result = $this->repo->searchAwards($this->buildParams(['name' => 'AWH NoPid']));
 
         self::assertSame(1, $result['count']);
-        /** @var array{year: int, award: string, name: string, table_id: int, pid: int|null} $row0 */
-        $row0 = $result['results'][0];
-        self::assertNull($row0['pid']);
+        self::assertNull($result['results'][0]['pid']);
     }
 
     public function testCountMatchesResultsArrayLength(): void

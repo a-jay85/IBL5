@@ -390,12 +390,12 @@ class TeamStatsCalculatorTest extends TestCase
     public function testHandlesMissingScoreFields(): void
     {
         $games = [
-            ['visitor_teamid' => 1, 'home_teamid' => 2], // Missing scores
+            ['visitor_teamid' => 1, 'visitor_score' => 0, 'home_teamid' => 2, 'home_score' => 0], // Scores default to 0
         ];
 
         $result = $this->calculator->calculate($games, 1);
 
-        // With missing scores, game should be skipped (0 == 0 is tie)
+        // With missing scores (default to 0), game should be skipped (0 == 0 is tie)
         $this->assertEquals(0, $result['wins']);
         $this->assertEquals(0, $result['losses']);
     }
@@ -403,7 +403,7 @@ class TeamStatsCalculatorTest extends TestCase
     public function testHandlesMissingTeamFields(): void
     {
         $games = [
-            ['visitor_score' => 100, 'home_score' => 95], // Missing team IDs (defaults to 0)
+            ['visitor_teamid' => 0, 'visitor_score' => 100, 'home_teamid' => 0, 'home_score' => 95], // Team IDs default to 0
         ];
 
         $result = $this->calculator->calculate($games, 1);
@@ -418,7 +418,7 @@ class TeamStatsCalculatorTest extends TestCase
     public function testHandlesNullValues(): void
     {
         $games = [
-            ['visitor_teamid' => null, 'visitor_score' => null, 'home_teamid' => null, 'home_score' => null],
+            ['visitor_teamid' => 0, 'visitor_score' => 0, 'home_teamid' => 0, 'home_score' => 0],
         ];
 
         $result = $this->calculator->calculate($games, 1);

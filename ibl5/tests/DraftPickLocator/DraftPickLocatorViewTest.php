@@ -102,7 +102,7 @@ class DraftPickLocatorViewTest extends TestCase
                 'color1' => '98002E',
                 'color2' => 'F9A01B',
                 'picks' => [
-                    ['ownerofpick' => 'Celtics', 'year' => '2025', 'round' => '1'],
+                    ['ownerofpick' => 'Celtics', 'year' => 2025, 'round' => 1],
                 ],
             ],
             [
@@ -112,7 +112,7 @@ class DraftPickLocatorViewTest extends TestCase
                 'color1' => '007A33',
                 'color2' => 'FFFFFF',
                 'picks' => [
-                    ['ownerofpick' => 'Celtics', 'year' => '2025', 'round' => '1'],
+                    ['ownerofpick' => 'Celtics', 'year' => 2025, 'round' => 1],
                 ],
             ],
         ];
@@ -134,7 +134,7 @@ class DraftPickLocatorViewTest extends TestCase
                 'color1' => '98002E',
                 'color2' => 'F9A01B',
                 'picks' => [
-                    ['ownerofpick' => 'Heat', 'year' => '2025', 'round' => '1'],
+                    ['ownerofpick' => 'Heat', 'year' => 2025, 'round' => 1],
                 ],
             ],
         ];
@@ -156,8 +156,8 @@ class DraftPickLocatorViewTest extends TestCase
                 'color1' => '98002E',
                 'color2' => 'F9A01B',
                 'picks' => [
-                    ['ownerofpick' => 'Heat', 'year' => '2025', 'round' => '1'],
-                    ['ownerofpick' => 'Celtics', 'year' => '2025', 'round' => '2'],
+                    ['ownerofpick' => 'Heat', 'year' => 2025, 'round' => 1],
+                    ['ownerofpick' => 'Celtics', 'year' => 2025, 'round' => 2],
                 ],
             ],
             [
@@ -167,7 +167,7 @@ class DraftPickLocatorViewTest extends TestCase
                 'color1' => '007A33',
                 'color2' => 'FFFFFF',
                 'picks' => [
-                    ['ownerofpick' => 'Celtics', 'year' => '2025', 'round' => '1'],
+                    ['ownerofpick' => 'Celtics', 'year' => 2025, 'round' => 1],
                 ],
             ],
         ];

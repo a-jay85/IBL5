@@ -242,7 +242,10 @@ final class SeasonLeaderboardsServiceTest extends TestCase
             'stl' => 10,
             'tvr' => 15,
             'blk' => 5,
-            'pf' => 20
+            'pf' => 20,
+            'team_city' => null,
+            'color1' => null,
+            'color2' => null,
         ];
 
         $stats = $this->service->processPlayerRow($row);
@@ -277,6 +280,9 @@ final class SeasonLeaderboardsServiceTest extends TestCase
             'tgm' => 0,
             'tga' => 0,
             'orb' => 0,
+            'team_city' => null,
+            'color1' => null,
+            'color2' => null,
             'reb' => 0,
             'ast' => 0,
             'stl' => 0,
@@ -314,7 +320,10 @@ final class SeasonLeaderboardsServiceTest extends TestCase
             'stl' => 0,
             'tvr' => 0,
             'blk' => 0,
-            'pf' => 0
+            'pf' => 0,
+            'team_city' => null,
+            'color1' => null,
+            'color2' => null,
         ];
 
         $stats = $this->service->processPlayerRow($row);
@@ -346,7 +355,10 @@ final class SeasonLeaderboardsServiceTest extends TestCase
             'stl' => 10,
             'tvr' => 15,
             'blk' => 5,
-            'pf' => 20
+            'pf' => 20,
+            'team_city' => null,
+            'color1' => null,
+            'color2' => null,
         ];
 
         $stats = $this->service->processPlayerRow($row);

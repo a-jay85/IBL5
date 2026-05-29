@@ -8,7 +8,6 @@ use PHPUnit\Framework\TestCase;
 use DepthChartEntry\DepthChartEntryProcessor;
 use DepthChartEntry\DepthChartEntryView;
 
-/** @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface */
 class DepthChartEntryProcessorTest extends TestCase
 {
     private $processor;
@@ -269,10 +268,6 @@ class DepthChartEntryProcessorTest extends TestCase
         $playerFromDb = [
             'pid' => 1,
             'name' => 'Test Player',
-            'nickname' => null,
-            'age' => null,
-            'teamid' => 1,
-            'teamname' => null,
             'pos' => 'PG',
             'injured' => 0,
             'stamina' => 50,
@@ -291,7 +286,6 @@ class DepthChartEntryProcessorTest extends TestCase
         ];
 
         ob_start();
-        /** @var PlayerRow $playerFromDb */
         $view->renderPlayerRow($playerFromDb, 1);
         $html = ob_get_clean();
 
@@ -405,10 +399,6 @@ class DepthChartEntryProcessorTest extends TestCase
         $dbPlayer = [
             'pid' => 1,
             'name' => 'Round Trip Player',
-            'nickname' => null,
-            'age' => null,
-            'teamid' => 1,
-            'teamname' => null,
             'pos' => 'SG',
             'injured' => 0,
             'stamina' => 60,
@@ -428,7 +418,6 @@ class DepthChartEntryProcessorTest extends TestCase
 
         // Step 2: Form displays these values (capture HTML)
         ob_start();
-        /** @var PlayerRow $dbPlayer */
         $view->renderPlayerRow($dbPlayer, 1);
         $formHtml = ob_get_clean();
 
@@ -479,10 +468,6 @@ class DepthChartEntryProcessorTest extends TestCase
         $dbPlayerAfterUpdate = [
             'pid' => 1,
             'name' => 'Round Trip Player',
-            'nickname' => null,
-            'age' => null,
-            'teamid' => 1,
-            'teamname' => null,
             'pos' => 'SG',
             'injured' => 0,
             'stamina' => 60,
@@ -501,7 +486,6 @@ class DepthChartEntryProcessorTest extends TestCase
         ];
 
         ob_start();
-        /** @var PlayerRow $dbPlayerAfterUpdate */
         $view->renderPlayerRow($dbPlayerAfterUpdate, 1);
         $reloadedFormHtml = ob_get_clean();
 
@@ -524,10 +508,6 @@ class DepthChartEntryProcessorTest extends TestCase
         $player = [
             'pid' => 1,
             'name' => 'Zero Settings Player',
-            'nickname' => null,
-            'age' => null,
-            'teamid' => 1,
-            'teamname' => null,
             'pos' => 'C',
             'injured' => 0,
             'stamina' => 50,
@@ -546,7 +526,6 @@ class DepthChartEntryProcessorTest extends TestCase
         ];
 
         ob_start();
-        /** @var PlayerRow $player */
         $view->renderPlayerRow($player, 1);
         $html = ob_get_clean();
 

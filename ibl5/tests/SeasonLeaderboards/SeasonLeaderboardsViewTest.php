@@ -42,7 +42,7 @@ final class SeasonLeaderboardsViewTest extends TestCase
         $stats = [
             'pid' => 123,
             'name' => 'Test Player',
-            'year' => '2024',
+            'year' => 2024,
             'teamname' => 'Test Team',
             'teamid' => 1,
             'team_city' => 'Test City',

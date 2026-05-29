@@ -19,6 +19,7 @@ use Repositories\Contracts\TeamIdentityRepositoryInterface;
 #[AllowMockObjectsWithoutExpectations]
 class DiscordIntegrationTest extends WideUnitTestCase
 {
+    /** @var TeamIdentityRepositoryInterface&\PHPUnit\Framework\MockObject\Stub */
     private TeamIdentityRepositoryInterface $mockCommonRepo;
 
     protected function setUp(): void

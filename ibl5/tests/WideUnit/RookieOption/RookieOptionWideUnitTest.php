@@ -224,8 +224,8 @@ class RookieOptionWideUnitTest extends WideUnitTestCase
         // Assert
         $this->assertFalse($ownershipResult->isValid());
         $this->assertNotNull($ownershipResult->getError());
-        $this->assertStringContainsString('not on your team', $ownershipResult->getError() ?? '');
-        $this->assertStringContainsString('Test Rookie', $ownershipResult->getError() ?? '');
+        $this->assertStringContainsString('not on your team', $ownershipResult->getError());
+        $this->assertStringContainsString('Test Rookie', $ownershipResult->getError());
 
         // Database should NOT be updated
         $this->assertQueryNotExecuted('UPDATE ibl_plr');

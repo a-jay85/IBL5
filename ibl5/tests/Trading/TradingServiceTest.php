@@ -769,9 +769,9 @@ class TradingServiceTest extends TestCase
             'userSendsCash' => [0, 0, 0, 0, 0, 0, 0],
             'partnerSendsCash' => [0, 0, 0, 0, 0, 0, 0],
             'check' => ['on', 'on'],   // Both players checked
-            'contract' => [1000, 1500], // Player salaries
-            'index' => [101, 102],      // Player IDs
-            'type' => [1, 1]            // Both are players
+            'contract' => ['1000', '1500'], // Player salaries
+            'index' => ['101', '102'],      // Player IDs
+            'type' => ['1', '1'],           // Both are players
         ];
 
         $result = $tradeOffer->createTradeOffer($tradeData);
@@ -815,9 +815,9 @@ class TradingServiceTest extends TestCase
             'userSendsCash' => [0, 200, 200, 0, 0, 0, 0],      // Atlanta sends cash
             'partnerSendsCash' => [0, 150, 150, 0, 0, 0, 0],   // Boston sends cash
             'check' => ['on', 'on'],   // Both players checked
-            'contract' => [2000, 1800], // Player salaries
-            'index' => [201, 202],      // Player IDs
-            'type' => [1, 1]            // Both are players
+            'contract' => ['2000', '1800'], // Player salaries
+            'index' => ['201', '202'],      // Player IDs
+            'type' => ['1', '1'],           // Both are players
         ];
 
         $result = $tradeOffer->createTradeOffer($tradeData);
@@ -868,9 +868,9 @@ class TradingServiceTest extends TestCase
             'userSendsCash' => [0, 0, 0, 0, 0, 0, 0],
             'partnerSendsCash' => [0, 0, 0, 0, 0, 0, 0],
             'check' => ['on', 'on'],   // Both picks checked
-            'contract' => [0, 0],       // Picks have no salary
-            'index' => [501, 502],      // Pick IDs
-            'type' => [0, 0]            // Both are picks (0 = pick)
+            'contract' => ['0', '0'],       // Picks have no salary
+            'index' => ['501', '502'],      // Pick IDs
+            'type' => ['0', '0'],           // Both are picks (0 = pick)
         ];
 
         $result = $tradeOffer->createTradeOffer($tradeData);

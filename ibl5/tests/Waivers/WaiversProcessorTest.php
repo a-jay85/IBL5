@@ -12,7 +12,6 @@ use Waivers\Contracts\WaiversValidatorInterface;
 use Player\Player;
 use Season\Season;
 
-/** @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface */
 #[AllowMockObjectsWithoutExpectations]
 class WaiversProcessorTest extends TestCase
 {
@@ -232,9 +231,8 @@ class WaiversProcessorTest extends TestCase
             'exp' => 8
         ];
         
-        /** @var PlayerRow $playerData */
         $contractData = $this->processor->determineContractData($playerData, $this->mockSeasonRegular);
-
+        
         $this->assertFalse($contractData['hasExistingContract']);
         $this->assertEquals(89, $contractData['salary']);
     }
@@ -249,9 +247,8 @@ class WaiversProcessorTest extends TestCase
             'salary_yr3' => 600
         ];
         
-        /** @var PlayerRow $playerData */
         $contractData = $this->processor->determineContractData($playerData, $this->mockSeasonRegular);
-
+        
         $this->assertTrue($contractData['hasExistingContract']);
         $this->assertEquals(500, $contractData['salary']);
     }
@@ -266,9 +263,8 @@ class WaiversProcessorTest extends TestCase
             'salary_yr3' => 600
         ];
         
-        /** @var PlayerRow $playerData */
         $contractData = $this->processor->determineContractData($playerData, $this->mockSeasonRegular);
-
+        
         $this->assertTrue($contractData['hasExistingContract']);
         $this->assertEquals(550, $contractData['salary']);
     }
@@ -306,7 +302,6 @@ class WaiversProcessorTest extends TestCase
             'exp' => 6
         ];
         
-        /** @var PlayerRow $playerData */
         $contractData = $this->processor->determineContractData($playerData, $this->mockSeasonFreeAgency);
         
         $this->assertFalse($contractData['hasExistingContract']);

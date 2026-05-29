@@ -80,21 +80,27 @@ test.describe('Career Leaderboards flow', () => {
     expect(rowCount).toBeLessThanOrEqual(3);
   });
 
-  test('board type drives query: Regular Season has rows, Playoff Totals has none', async ({ page }) => {
+  test('board type drives query: Regular Season returns more rows than Playoff Totals', async ({ page }) => {
     await page.locator('select[name="boards_type"]').selectOption('Regular Season Totals');
     await Promise.all([
       page.waitForResponse((r) => r.url().includes('CareerLeaderboards') && r.request().method() === 'POST'),
       page.locator('.ibl-filter-form__submit').click(),
     ]);
     await expect(page.locator('.ibl-data-table tbody tr').first()).toBeVisible();
+    const regularSeasonRows = await page.locator('.ibl-data-table tbody tr').count();
 
     await page.locator('select[name="boards_type"]').selectOption('Playoff Totals');
     await Promise.all([
       page.waitForResponse((r) => r.url().includes('CareerLeaderboards') && r.request().method() === 'POST'),
       page.locator('.ibl-filter-form__submit').click(),
     ]);
-    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
-    await expect(page.locator('.ibl-data-table tbody tr')).toHaveCount(0);
+    await expect(page.locator('.ibl-data-table tbody tr').first()).toBeVisible();
+    const playoffRows = await page.locator('.ibl-data-table tbody tr').count();
+
+    // Seed has 24 regular-season career rows vs 2 playoff career rows — switching
+    // board type re-runs against a different table, so the counts must differ.
+    expect(playoffRows).toBeGreaterThan(0);
+    expect(playoffRows).toBeLessThan(regularSeasonRows);
   });
 
   test('include/exclude retirees toggle changes results', async ({ page }) => {

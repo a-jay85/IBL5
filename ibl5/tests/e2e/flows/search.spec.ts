@@ -74,25 +74,25 @@ test.describe('Search flow', () => {
     await expect(compactResult.locator('.search-result__title')).toContainText('ibl_demo');
   });
 
-  test('comments radio shows empty state — comment system is removed', async ({ page }) => {
-    // searchComments() always returns empty; selecting comments type must yield the empty state
-    const commentsRadio = page.locator('input[name="type"][value="comments"]');
-    await commentsRadio.check();
-    await page.locator('input[name="query"]').fill('trade');
-    await page.locator('.ibl-search__btn').click();
+  test('comments search type shows empty state — comment system is removed', async ({ page }) => {
+    // The comments radio was removed from the form, but the backend type=comments
+    // branch still calls the stubbed searchComments() which always returns empty.
+    // Exercise it via query param to assert the empty-state path stays intact.
+    await page.goto('modules.php?name=Search&query=trade&type=comments');
 
     await page.waitForLoadState('domcontentloaded');
 
     await assertNoPhpErrors(page);
 
-    await expect(page.locator('.ibl-empty-state')).toBeVisible();
+    await expect(page.locator('.ibl-empty-state').first()).toBeVisible();
     await expect(page.locator('.search-result')).toHaveCount(0);
   });
 
-  test('category filter trades (catid=2) returns results without waive stories', async ({ page }) => {
+  test('topic filter Trades returns trade stories without waive stories', async ({ page }) => {
     await page.locator('input[name="query"]').fill('the');
-    // Select the Trades category (catid=2); catid=1 is waive moves
-    await page.locator('select[name="category"]').selectOption('2');
+    // Trades is the Topic dropdown (topic=2). Waive-move stories live under the
+    // IBL News topic (topic=1), so filtering to Trades must exclude them.
+    await page.locator('select[name="topic"]').selectOption('2');
     await page.locator('.ibl-search__btn').click();
 
     await page.waitForLoadState('domcontentloaded');

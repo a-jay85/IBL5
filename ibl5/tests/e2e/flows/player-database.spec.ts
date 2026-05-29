@@ -49,18 +49,20 @@ test.describe('Player Database flow', () => {
   });
 
   test('active-only excludes retirees', async ({ page }) => {
-    // Submit with active=1 (include retirees) — get total row count
-    await page.locator('input[name="active"][value="1"]').check();
+    // "Retirees?" is a <select name="active">: Yes=1 (include retirees, no filter),
+    // No=0 (exclude → ibl_plr.retired = 0). Retired players render as a separator
+    // row, so count whole tbody rows rather than a stat cell.
+    await page.locator('select[name="active"]').selectOption('1');
     await page.locator('.ibl-filter-form__submit').click();
     await expect(page.locator('table.sortable').first()).toBeVisible();
-    const allCount = await page.locator('table.sortable tbody tr td:nth-child(5)').count();
+    const allCount = await page.locator('table.sortable tbody tr').count();
 
     // Now navigate back and submit with active=0 (exclude retirees)
     await gotoWithRetry(page, 'modules.php?name=PlayerDatabase');
-    await page.locator('input[name="active"][value="0"]').check();
+    await page.locator('select[name="active"]').selectOption('0');
     await page.locator('.ibl-filter-form__submit').click();
     await expect(page.locator('table.sortable').first()).toBeVisible();
-    const activeOnlyCount = await page.locator('table.sortable tbody tr td:nth-child(5)').count();
+    const activeOnlyCount = await page.locator('table.sortable tbody tr').count();
 
     expect(activeOnlyCount).toBeLessThan(allCount);
   });
@@ -89,7 +91,7 @@ test.describe('Player Database flow', () => {
     }
   });
 
-  test('sort by Exp column produces non-decreasing order', async ({ page }) => {
+  test('sort by Exp column produces non-increasing order on first click', async ({ page }) => {
     // Submit empty search to get all results
     await page.locator('.ibl-filter-form__submit').click();
 
@@ -101,12 +103,13 @@ test.describe('Player Database flow', () => {
     const rowCount = await expCells.count();
     expect(rowCount, 'Need at least 2 rows to verify sort order is meaningful').toBeGreaterThanOrEqual(2);
 
-    // Click the Exp header to sort ascending
+    // jslib/sorttable.js sorts DESCENDING (highest first) on the initial click,
+    // tagging the header with sorttable_sorted_reverse.
     const expHeader = table.locator('thead th').filter({ hasText: 'Exp' });
     await expHeader.click();
-    await expect(expHeader).toHaveClass(/sorttable_sorted/);
+    await expect(expHeader).toHaveClass(/sorttable_sorted_reverse/);
 
-    // Read Exp values after sort and assert non-decreasing
+    // Read Exp values after sort and assert non-increasing
     const sortedValues: number[] = [];
     for (let i = 0; i < rowCount; i++) {
       const text = (await expCells.nth(i).textContent()) ?? '';
@@ -115,8 +118,8 @@ test.describe('Player Database flow', () => {
     for (let i = 1; i < sortedValues.length; i++) {
       expect(
         sortedValues[i],
-        `Exp column not sorted: row ${i} value ${sortedValues[i]} < row ${i - 1} value ${sortedValues[i - 1]}`,
-      ).toBeGreaterThanOrEqual(sortedValues[i - 1]);
+        `Exp column not sorted descending: row ${i} value ${sortedValues[i]} > row ${i - 1} value ${sortedValues[i - 1]}`,
+      ).toBeLessThanOrEqual(sortedValues[i - 1]);
     }
   });
 

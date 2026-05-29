@@ -1,4 +1,5 @@
-import { expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { expect } from '../fixtures/base';
 
 /**
  * Matcher for the HTMX `op=api` response URL. Accepts a substring, a RegExp,

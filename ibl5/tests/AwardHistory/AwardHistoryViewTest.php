@@ -174,7 +174,10 @@ final class AwardHistoryViewTest extends TestCase
 
     public function testRenderAwardRowHandlesMissingData(): void
     {
-        $award = ['year' => 0, 'award' => '', 'name' => ''];
+        // Null inputs are intentional (this test exercises the missing-data path);
+        // the array{} shape mismatch is a documented baseline defer, not a defect to
+        // "fix" by substituting non-null values (that would gut the test).
+        $award = ['year' => null, 'award' => null, 'name' => null];
 
         $result = $this->view->renderAwardRow($award, 0);
 

@@ -439,6 +439,12 @@ parameters:
 			path: tests/AwardHistory/AwardHistoryValidatorTest.php
 
 		-
+			rawMessage: 'Parameter #1 $award of method AwardHistory\AwardHistoryView::renderAwardRow() expects array{year: int, award: string, name: string, pid?: int}, array{year: null, award: null, name: null} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/AwardHistory/AwardHistoryViewTest.php
+
+		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
 			count: 13
@@ -2164,6 +2170,36 @@ parameters:
 			path: tests/FranchiseRecordBook/FranchiseRecordBookServiceTest.php
 
 		-
+			rawMessage: 'Parameter #1 $offer of method FreeAgency\CommonContractValidator::calculateOfferValue() expects array{year1: int, year2: int, year3: int, year4?: int, year5?: int, year6?: int}, array{} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/FreeAgency/CommonContractValidatorTest.php
+
+		-
+			rawMessage: 'Parameter #1 $offer of method FreeAgency\CommonContractValidator::validateMaximumYearOne() expects array{year1: int, year2?: int, year3?: int, year4?: int, year5?: int, year6?: int}, array{} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/FreeAgency/CommonContractValidatorTest.php
+
+		-
+			rawMessage: 'Parameter #1 $offer of method FreeAgency\CommonContractValidator::validateNoGaps() expects array{year1: int, year2: int, year3: int, year4?: int, year5?: int, year6?: int}, array{} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/FreeAgency/CommonContractValidatorTest.php
+
+		-
+			rawMessage: 'Parameter #1 $offer of method FreeAgency\CommonContractValidator::validateRaises() expects array{year1: int, year2: int, year3: int, year4?: int, year5?: int, year6?: int}, array{} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/FreeAgency/CommonContractValidatorTest.php
+
+		-
+			rawMessage: 'Parameter #1 $offer of method FreeAgency\CommonContractValidator::validateSalaryDecreases() expects array{year1: int, year2: int, year3: int, year4?: int, year5?: int, year6?: int}, array{} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/FreeAgency/CommonContractValidatorTest.php
+
+		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
 			count: 42
@@ -3755,6 +3791,12 @@ parameters:
 			path: tests/Player/PlayerDataConverterTest.php
 
 		-
+			rawMessage: 'Parameter #1 $playerID of static method Player\PlayerImageHelper::getImageUrl() expects int|string|null, float given.'
+			identifier: argument.type
+			count: 1
+			path: tests/Player/PlayerImageHelperTest.php
+
+		-
 			rawMessage: 'Method Tests\Player\PlayerInjuryCalculatorTest::testGetInjuryReturnDateCrossingMonth() has no return type specified.'
 			identifier: missingType.return
 			count: 1
@@ -4591,6 +4633,24 @@ parameters:
 			identifier: return.type
 			count: 1
 			path: tests/Standings/StandingsViewXssTest.php
+
+		-
+			rawMessage: 'Parameter #1 $games of method Statistics\TeamStatsCalculator::calculate() expects list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}>, array{array{visitor_score: 100, home_score: 95}} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/Statistics/TeamStatsCalculatorTest.php
+
+		-
+			rawMessage: 'Parameter #1 $games of method Statistics\TeamStatsCalculator::calculate() expects list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}>, array{array{visitor_teamid: 1, home_teamid: 2}} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/Statistics/TeamStatsCalculatorTest.php
+
+		-
+			rawMessage: 'Parameter #1 $games of method Statistics\TeamStatsCalculator::calculate() expects list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}>, array{array{visitor_teamid: null, visitor_score: null, home_teamid: null, home_score: null}} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/Statistics/TeamStatsCalculatorTest.php
 
 		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'

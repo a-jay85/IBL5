@@ -1,7 +1,7 @@
 {
     "phpstan-baseline.neon": [],
     "phpstan-tests-baseline.neon": {
-        "argument.type": 84,
+        "argument.type": 94,
         "array.duplicateKey": 9,
         "arrayFilter.strict": 3,
         "cast.useless": 6,

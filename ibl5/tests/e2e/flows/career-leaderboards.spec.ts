@@ -45,19 +45,56 @@ test.describe('Career Leaderboards flow', () => {
     await expect(sortedCol.first()).toBeVisible();
   });
 
-  test('changing board type works', async ({ page }) => {
-    const boardTypeSelect = page.locator('select[name="boards_type"]');
-    const options = boardTypeSelect.locator('option');
-    const optionCount = await options.count();
+  test('sort_cat changes the sorted column header', async ({ page }) => {
+    await page.locator('select[name="boards_type"]').selectOption('Regular Season Totals');
+    await page.locator('select[name="sort_cat"]').selectOption('Points');
+    await Promise.all([
+      page.waitForResponse((r) => r.url().includes('CareerLeaderboards') && r.request().method() === 'POST'),
+      page.locator('.ibl-filter-form__submit').click(),
+    ]);
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+    const firstSortedText = await page.locator('.ibl-data-table th.sorted-col').first().innerText();
+    expect(firstSortedText).toBe('PTS');
 
-    if (optionCount > 1) {
-      await boardTypeSelect.selectOption({ index: 1 });
-      await page.locator('.ibl-filter-form__submit').click();
+    await page.locator('select[name="sort_cat"]').selectOption('Total Rebounds');
+    await Promise.all([
+      page.waitForResponse((r) => r.url().includes('CareerLeaderboards') && r.request().method() === 'POST'),
+      page.locator('.ibl-filter-form__submit').click(),
+    ]);
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+    const secondSortedText = await page.locator('.ibl-data-table th.sorted-col').first().innerText();
+    expect(secondSortedText).toContain('REB');
+    expect(secondSortedText).not.toBe(firstSortedText);
+  });
 
-      await expect(page.locator('.ibl-data-table').first()).toBeVisible();
-      const rows = page.locator('.ibl-data-table').first().locator('tbody tr');
-      await expect(rows.first()).toBeVisible();
-    }
+  test('display limit caps row count', async ({ page }) => {
+    await page.locator('select[name="boards_type"]').selectOption('Regular Season Totals');
+    await page.locator('input[name="display"]').fill('3');
+    await Promise.all([
+      page.waitForResponse((r) => r.url().includes('CareerLeaderboards') && r.request().method() === 'POST'),
+      page.locator('.ibl-filter-form__submit').click(),
+    ]);
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+    const rowCount = await page.locator('.ibl-data-table tbody tr').count();
+    expect(rowCount).toBeGreaterThanOrEqual(1);
+    expect(rowCount).toBeLessThanOrEqual(3);
+  });
+
+  test('board type drives query: Regular Season has rows, Playoff Totals has none', async ({ page }) => {
+    await page.locator('select[name="boards_type"]').selectOption('Regular Season Totals');
+    await Promise.all([
+      page.waitForResponse((r) => r.url().includes('CareerLeaderboards') && r.request().method() === 'POST'),
+      page.locator('.ibl-filter-form__submit').click(),
+    ]);
+    await expect(page.locator('.ibl-data-table tbody tr').first()).toBeVisible();
+
+    await page.locator('select[name="boards_type"]').selectOption('Playoff Totals');
+    await Promise.all([
+      page.waitForResponse((r) => r.url().includes('CareerLeaderboards') && r.request().method() === 'POST'),
+      page.locator('.ibl-filter-form__submit').click(),
+    ]);
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+    await expect(page.locator('.ibl-data-table tbody tr')).toHaveCount(0);
   });
 
   test('include/exclude retirees toggle changes results', async ({ page }) => {

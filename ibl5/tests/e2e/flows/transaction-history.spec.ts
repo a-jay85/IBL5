@@ -70,22 +70,26 @@ test.describe('Transaction History flow', () => {
     await expect(page.locator('.txn-table')).toBeVisible();
   });
 
-  test('empty filter combination renders without PHP errors', async ({
-    page,
-  }) => {
-    // Use a very specific filter that likely returns no results
-    const yearSelect = page.locator('select[name="year"]');
-    const options = yearSelect.locator('option');
-    const optionCount = await options.count();
+  test('month filter shows only that month', async ({ page }) => {
+    // Navigate directly with year+month to get February 2026 transactions
+    await page.goto(`${BASE}&year=2026&month=2`);
 
-    if (optionCount > 2) {
-      // Get the oldest year value
-      const yearValue = await options.nth(optionCount - 1).getAttribute('value');
-      await page.goto(`${BASE}&year=${yearValue}&month=1&cat=6`);
+    // At least one row must be present — fails if filter is a no-op
+    await expect(page.locator('.txn-table tbody tr').first()).toBeVisible();
 
-      // Should show either table or empty state — no PHP errors either way
-      await assertNoPhpErrors(page);
+    // Every visible date cell must contain 'Feb' and '2026'
+    const dateCells = page.locator('td.date-cell');
+    const cellCount = await dateCells.count();
+    for (let i = 0; i < cellCount; i++) {
+      const text = await dateCells.nth(i).textContent();
+      expect(text, `date cell ${i} should contain 'Feb'`).toContain('Feb');
+      expect(text, `date cell ${i} should contain '2026'`).toContain('2026');
     }
+
+    // The March transaction must be absent
+    await expect(
+      page.locator('body'),
+    ).not.toContainText('changes position from SF');
   });
 
   test('no PHP errors on load and after filtering', async ({ page }) => {

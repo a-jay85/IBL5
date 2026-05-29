@@ -1,7 +1,18 @@
 import { test, expect } from '../fixtures/base';
+import type { Page } from '../fixtures/base';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { assertHtmxSwap } from '../helpers/htmx-swap';
 import { gotoWithRetry } from '../helpers/navigation';
 import { publicStorageState } from '../helpers/public-storage-state';
+
+/** Normalised stat-column header text of the first rendered table. */
+async function readHeaderText(page: Page): Promise<string> {
+  const text = await page
+    .locator('#league-starters-tables .ibl-data-table thead')
+    .first()
+    .textContent();
+  return (text ?? '').replace(/\s+/g, ' ').trim();
+}
 
 // League Starters — public page showing starting lineups by position.
 test.use({ storageState: publicStorageState() });
@@ -98,76 +109,53 @@ test.describe('HTMX tab switching', () => {
   });
 
   test('tab click swaps tables without full page reload', async ({ page }) => {
-    // Mark nav to verify it persists (proves no full reload)
-    await page.evaluate(() => {
-      const navEl = document.querySelector('nav.fixed');
-      if (navEl) navEl.setAttribute('data-htmx-marker', '1');
+    await assertHtmxSwap(page, {
+      trigger: () =>
+        page.locator('.ibl-tab[data-display="total_s"]').click(),
+      apiUrlPattern: (url) => url.includes('LeagueStarters'),
+      expectedUrl: /display=total_s/,
+      contentSelector: '#league-starters-tables .ibl-data-table',
     });
-
-    const tab = page.locator('.ibl-tab:not(.ibl-tab--active)').first();
-    await expect(tab).toBeVisible();
-
-    await Promise.all([
-      page.waitForResponse(
-        (r) =>
-          r.url().includes('LeagueStarters') &&
-          r.url().includes('op=api') &&
-          r.status() === 200,
-      ),
-      tab.click(),
-    ]);
-
-    await expect(
-      page.locator('#league-starters-tables .ibl-data-table').first(),
-    ).toBeVisible();
-
-    // Nav marker survived — no full page reload occurred
-    const marker = await page.evaluate(() =>
-      document.querySelector('nav.fixed')?.getAttribute('data-htmx-marker'),
-    );
-    expect(marker).toBe('1');
   });
 
   test('tab click updates URL', async ({ page }) => {
-    const tab = page.locator('.ibl-tab[data-display="avg_s"]');
-    await expect(tab).toBeVisible();
+    await assertHtmxSwap(page, {
+      trigger: () => page.locator('.ibl-tab[data-display="avg_s"]').click(),
+      apiUrlPattern: (url) => url.includes('LeagueStarters'),
+      expectedUrl: /display=avg_s/,
+      contentSelector: '#league-starters-tables .ibl-data-table',
+    });
 
-    await Promise.all([
-      page.waitForResponse(
-        (r) =>
-          r.url().includes('LeagueStarters') &&
-          r.url().includes('op=api') &&
-          r.status() === 200,
-      ),
-      tab.click(),
-    ]);
-
-    await page.waitForURL(/display=avg_s/);
     expect(page.url()).toContain('display=avg_s');
   });
 
-  test('all display modes load via HTMX', async ({ page }) => {
-    const modes = ['total_s', 'avg_s', 'per36mins'];
+  test('display mode tabs change the stat-column header set', async ({
+    page,
+  }) => {
+    // Default load is the ratings view.
+    const headersByMode: Record<string, string> = {
+      ratings: await readHeaderText(page),
+    };
 
-    for (const mode of modes) {
-      const tab = page.locator(`.ibl-tab[data-display="${mode}"]`);
-      await expect(tab).toBeVisible();
-
-      await Promise.all([
-        page.waitForResponse(
-          (r) =>
-            r.url().includes('LeagueStarters') &&
-            r.url().includes('op=api') &&
-            r.status() === 200,
-        ),
-        tab.click(),
-      ]);
-
-      await expect(
-        page.locator('#league-starters-tables .ibl-data-table').first(),
-      ).toBeVisible();
+    for (const mode of ['total_s', 'avg_s', 'per36mins']) {
+      await assertHtmxSwap(page, {
+        trigger: () =>
+          page.locator(`.ibl-tab[data-display="${mode}"]`).click(),
+        apiUrlPattern: (url) => url.includes('LeagueStarters'),
+        expectedUrl: new RegExp(`display=${mode}`),
+        contentSelector: '#league-starters-tables .ibl-data-table',
+      });
+      headersByMode[mode] = await readHeaderText(page);
       await assertNoPhpErrors(page, `after HTMX switch to ${mode}`);
     }
+
+    // Each display mode emits a distinct stat-column set. If the tab swap were
+    // a no-op the four headers would be identical, so this fails on no-op.
+    const headers = Object.values(headersByMode);
+    expect(new Set(headers).size).toBe(4);
+    // Mode-specific differentiators confirm the right table rendered.
+    expect(headersByMode.per36mins.toLowerCase()).toContain('36min');
+    expect(headersByMode.ratings).not.toBe(headersByMode.total_s);
   });
 });
 
@@ -177,20 +165,13 @@ test.describe('browser back/forward after HTMX tab switch', () => {
   test('back/forward works after tab switch', async ({ page }) => {
     await gotoWithRetry(page, 'modules.php?name=LeagueStarters');
 
-    const tab = page.locator('.ibl-tab[data-display="total_s"]');
-    await expect(tab).toBeVisible();
-
-    await Promise.all([
-      page.waitForResponse(
-        (r) =>
-          r.url().includes('LeagueStarters') &&
-          r.url().includes('op=api') &&
-          r.status() === 200,
-      ),
-      tab.click(),
-    ]);
-
-    await page.waitForURL(/display=total_s/);
+    await assertHtmxSwap(page, {
+      trigger: () =>
+        page.locator('.ibl-tab[data-display="total_s"]').click(),
+      apiUrlPattern: (url) => url.includes('LeagueStarters'),
+      expectedUrl: /display=total_s/,
+      contentSelector: '#league-starters-tables .ibl-data-table',
+    });
 
     await page.goBack();
     await page.waitForURL(/LeagueStarters/);

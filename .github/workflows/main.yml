@@ -136,7 +136,13 @@ jobs:
             npm run build
 
             echo "Registering slash commands..."
-            npm run deploy-commands
+            # Run the compiled output (node dist/...) instead of "tsx src/...".
+            # tsx transpiles TypeScript through esbuild at runtime; on this
+            # memory-tight server the esbuild service was getting SIGKILLed
+            # ("TransformError: The service was stopped"), failing the deploy.
+            # tsc already emits dist/deploy-commands.js in the build step above,
+            # so node runs it with no esbuild involved.
+            npm run deploy-commands:prod
 
             echo "Restarting IBLbot via PM2..."
             pm2 startOrRestart ecosystem.config.cjs --update-env

@@ -3,6 +3,12 @@ import type { Page, APIRequestContext } from '../fixtures/base';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 import { gotoWithRetry } from '../helpers/navigation';
 import { submitFormAndAssertEffect } from '../helpers/submit-form';
+import {
+  buildFormBody,
+  collectNewOfferIds,
+  rejectOfferSafe,
+  type FormData,
+} from '../helpers/trading';
 
 // Serial: tests create and consume trade offers sequentially.
 test.describe.configure({ mode: 'serial' });
@@ -10,23 +16,6 @@ test.describe.configure({ mode: 'serial' });
 // ---------------------------------------------------------------------------
 // Types and helpers
 // ---------------------------------------------------------------------------
-
-interface FormField {
-  index: string;
-  type: string;
-  contract: string;
-  hasCheckbox: boolean;
-}
-
-interface FormData {
-  offeringTeam: string;
-  listeningTeam: string;
-  switchCounter: number;
-  fieldsCounter: number;
-  cashStartYear: number;
-  cashEndYear: number;
-  fields: FormField[];
-}
 
 /**
  * Extract all form field data from the currently-loaded trade offer form.
@@ -189,45 +178,6 @@ async function getAcceptCsrfToken(page: Page): Promise<string> {
 }
 
 /**
- * Build the POST form body from extracted form data, checking specified indices.
- */
-function buildFormBody(
-  formData: FormData,
-  checkedIndices: number[],
-  userCash?: Record<number, number>,
-  partnerCash?: Record<number, number>,
-  csrfToken?: string,
-): Record<string, string> {
-  const body: Record<string, string> = {
-    offeringTeam: formData.offeringTeam,
-    listeningTeam: formData.listeningTeam,
-    switchCounter: String(formData.switchCounter),
-    fieldsCounter: String(formData.fieldsCounter),
-  };
-
-  if (csrfToken) {
-    body['_csrf_token'] = csrfToken;
-  }
-
-  for (let k = 0; k < formData.fieldsCounter; k++) {
-    const field = formData.fields[k];
-    body[`index${k}`] = field.index;
-    body[`type${k}`] = field.type;
-    body[`contract${k}`] = field.contract;
-    if (checkedIndices.includes(k)) {
-      body[`check${k}`] = 'on';
-    }
-  }
-
-  for (let i = 0; i < 7; i++) {
-    body[`userSendsCash${i}`] = String(userCash?.[i] ?? 0);
-    body[`partnerSendsCash${i}`] = String(partnerCash?.[i] ?? 0);
-  }
-
-  return body;
-}
-
-/**
  * Submit a trade offer via API POST. Returns the redirect Location header.
  */
 async function submitOffer(
@@ -239,50 +189,6 @@ async function submitOffer(
     { form: formBody, maxRedirects: 0 },
   );
   return response.headers()['location'] ?? '';
-}
-
-/**
- * Reject a trade offer via API POST for cleanup (best-effort).
- */
-async function rejectOfferSafe(
-  request: APIRequestContext,
-  offerId: number,
-  teamRejecting: string,
-  teamReceiving: string,
-): Promise<void> {
-  try {
-    await request.post('/ibl5/modules/Trading/rejecttradeoffer.php', {
-      form: {
-        offer: String(offerId),
-        teamRejecting,
-        teamReceiving,
-      },
-      maxRedirects: 0,
-    });
-  } catch {
-    // Best-effort cleanup — offer may already be processed
-  }
-}
-
-/**
- * Collect all offer IDs from the review page that are NOT in the exclusion set.
- */
-async function collectNewOfferIds(
-  page: Page,
-  excludeIds: Set<number>,
-): Promise<number[]> {
-  await gotoWithRetry(page, 'modules.php?name=Trading&op=reviewtrade');
-  const buttons = page.locator('[data-preview-offer]');
-  const count = await buttons.count();
-  const ids: number[] = [];
-  for (let i = 0; i < count; i++) {
-    const idStr = await buttons.nth(i).getAttribute('data-preview-offer');
-    const id = parseInt(idStr ?? '0', 10);
-    if (!excludeIds.has(id)) {
-      ids.push(id);
-    }
-  }
-  return ids;
 }
 
 /**

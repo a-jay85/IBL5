@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/auth';
 import { submitFormAndAssertEffect } from '../helpers/submit-form';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { offerForm } from '../helpers/free-agency';
 
 // Free Agency submission tests — create, amend, delete offers + quick offer buttons
 // + admin clear_offers (block.php).
@@ -27,9 +28,7 @@ test.afterAll(async ({ request }) => {
   await request.delete('test-state.php?action=reset-fa-offers');
 });
 
-// Helper: scope form inputs to the visible custom offer form (not hidden quick-offer forms)
-const offerForm = (page: import('@playwright/test').Page) =>
-  page.locator('form[name="FAOffer"]').filter({ has: page.locator('input[type="number"]') });
+// The `offerForm` locator helper is shared via helpers/free-agency.ts.
 
 test.describe('Free Agency -- submit and manage offers', () => {
   test.describe.configure({ mode: 'serial' });

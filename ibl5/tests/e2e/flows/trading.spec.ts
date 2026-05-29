@@ -2,25 +2,11 @@ import { test, expect } from '../fixtures/auth';
 import type { Page } from '../fixtures/base';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 import { gotoWithRetry } from '../helpers/navigation';
+import { navigateToTradeForm } from '../helpers/trading';
 
 // ---------------------------------------------------------------------------
 // Shared constants & helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Navigate to the trade offer form by picking the first available partner.
- */
-async function navigateToTradeForm(page: Page): Promise<void> {
-  await gotoWithRetry(page, 'modules.php?name=Trading');
-
-  const firstTeamLink = page.locator('.trading-team-select a').first();
-  await expect(firstTeamLink).toBeVisible();
-  // Use goto() with the href instead of click() — click() triggers navigation
-  // that can time out under concurrency with parallel workers.
-  const href = await firstTeamLink.getAttribute('href');
-  await page.goto(href!);
-  await expect(page.locator('form[name="Trade_Offer"]')).toBeVisible();
-}
 
 /**
  * Mock the roster-preview-api endpoint so tests don't depend on live data.

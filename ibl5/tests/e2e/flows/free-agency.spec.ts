@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/auth';
 import { test as publicTest, expect as publicExpect } from '../fixtures/public';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { offerForm } from '../helpers/free-agency';
 
 // Free Agency E2E tests — read-only rendering and validation.
 // Seed data provides 3 free agent players:
@@ -10,10 +11,7 @@ import { assertNoPhpErrors } from '../helpers/php-errors';
 // And 1 cash consideration (ibl_cash_considerations table):
 //   Cash from Trade on Metros (tid=1) → "Players Under Contract" (not FA tables)
 // Submission tests are in free-agency-submission.spec.ts.
-
-// Helper: scope form inputs to the visible custom offer form (not hidden quick-offer forms)
-const offerForm = (page: import('@playwright/test').Page) =>
-  page.locator('form[name="FAOffer"]').filter({ has: page.locator('input[type="number"]') });
+// The `offerForm` locator helper is shared via helpers/free-agency.ts.
 
 test.describe('Free Agency -- main page', () => {
   test.beforeEach(async ({ appState, page }) => {

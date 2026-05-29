@@ -8,15 +8,13 @@
 ├── .responsive-table  (adds mobile sticky columns)
 ├── .sticky-table  (adds sticky header + first column)
 ├── .league-stats-table  (league-wide stat styling)
-├── .compare-players-table  (player comparison)
 ├── .depth-chart-table  (depth chart form)
 ├── .contact-table  (contact list, max-width: 800px)
 ├── .voting-results-table  (vote counts, max-width: 420px)
 ├── .voting-form-table  (ballot with checkboxes/radios)
 ├── .draft-table  (draft selection form)
 ├── .draft-pick-table  (draft pick locator matrix, styled to match ibl-data-table)
-├── .draft-history-table  (mobile column constraints)
-└── .injury-table  (card layout on mobile)
+└── .draft-history-table  (mobile column constraints)
 ```
 
 ## Wrapper / Layout Classes
@@ -72,7 +70,6 @@ Affects ALL data tables site-wide:
 
 | Selector | View |
 |----------|------|
-| `.injury-table` | InjuriesView |
 | `.league-stats-table` | TeamOffDefStatsView |
 | `.depth-chart-table` | DepthChartEntryView |
 | `.draft-pick-table` | DraftPickLocatorView (styled to match `.ibl-data-table`, uses `.sticky-table`) |
@@ -86,7 +83,7 @@ These are used inside multiple table types.
 
 | Class | What It Styles | Where Used |
 |-------|---------------|------------|
-| `.ibl-team-cell` / `--colored` | Team logo + name flex cell | Standings, Free Agency, all team columns |
+| `.ibl-team-cell__name` / `__city` / `__logo` / `__text` / `--colored` | Team logo + name flex cell | Standings, Free Agency, all team columns |
 | `.ibl-player-cell` | Player photo + name flex cell | Rosters, draft, leaderboards |
 | `.ibl-stat-value` / `--highlight` / `--positive` / `--negative` | Right-aligned stat numbers | All stat display tables |
 | `.rank-cell` | Bold navy rank number | Leaderboards, standings |
@@ -104,7 +101,6 @@ These are used inside multiple table types.
 | `.ibl-table-row--highlight` | Orange accent background |
 | `.ibl-table-row--user-team` | Light yellow (#ffffcc) |
 | `.ibl-table-row--winner` | Bold weight, orange color |
-| `tr.ratings-highlight` | Team color highlight (15% mix, `.team-table` only) |
 | `tr.ratings-separator` | Zero-padding divider row (`.team-table` only) |
 
 ## HTML Structural Patterns
@@ -188,17 +184,17 @@ Module-specific table styles live in `design/components/tables/<feature>.css`. E
 |------|--------|
 | `tables/season-highs.css` | `.stat-table`, `.season-highs-discrepancy-panel` |
 | `tables/voting.css` | `.voting-results-table`, `.voting-form-table`, `.voting-submission-feedback` |
-| `tables/trading.css` | Trading module tables (`.trade-table`, `.trade-offer-table`, etc.) |
+| `tables/trading.css` | Trading module: `.ibl-data-table` rosters, `.trade-offer-card*`, `.trading-*` layout/roster selectors |
 | `tables/draft-history.css` | `.draft-history-table` |
 | `tables/league-stats.css` | `.league-stats-table` |
 | `tables/contact-list.css` | `.contact-table` |
-| `tables/transaction-history.css` | `.transaction-history-table` |
+| `tables/transaction-history.css` | `.txn-table` (on `.ibl-data-table`) |
 | `tables/depth-chart.css` | Depth Chart table mobile rules extracted from `tables.css` |
 | `tables/draft-pick-locator.css` | `.draft-pick-table` |
-| `tables/record-holders.css` | `.record-holders-table` |
+| `tables/record-holders.css` | `.record-table` / `--*col*` variants, `.record-category*`, `.record-section*` |
 | `tables/projected-draft-order.css` | `.projected-draft-order-table` |
 | `tables/player-movement.css` | `.player-movement-table` |
-| `tables/franchise-record-book.css` | `.record-book-*` selectors |
+| `tables/franchise-record-book.css` | `.record-book-section-title`, `.record-book-team-selector`, `.record-book-retired-cell` |
 | `tables/free-agency.css` | `.fa-table`, `.fa-*` selectors |
 
 ### When to add a new module file

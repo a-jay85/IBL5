@@ -163,14 +163,14 @@
      * the four buttons form a visually consistent row.
      */
     .team-action-link--discord {
-        background: #5865f2;
-        border-color: #4752c4;
+        background: var(--color-discord);
+        border-color: var(--color-discord-hover);
     }
 
     .team-action-link--discord:hover,
     .team-action-link--discord:focus-visible {
-        background: #4752c4;
-        border-color: #5865f2;
+        background: var(--color-discord-hover);
+        border-color: var(--color-discord);
     }
 }
 
@@ -298,7 +298,7 @@
 .mobile-section {
     opacity: 0;
     transform: translateX(20px);
-    transition: opacity 0.3s ease, transform 0.3s ease;
+    transition: opacity var(--transition-slow), transform var(--transition-slow);
 }
 
 .mobile-menu-open .mobile-section:nth-child(1) { transition-delay: 0.05s; }
@@ -507,7 +507,7 @@ span.nav-dropdown-item a:hover {
     justify-content: space-between;
     padding: 0.875rem 1.25rem;
     color: white;
-    transition: background-color 150ms ease;
+    transition: background-color var(--transition-fast);
 }
 
 .mobile-dropdown-btn:hover {
@@ -708,7 +708,7 @@ span.nav-dropdown-item a:hover {
     height: 28px;
     object-fit: contain;
     /* Closed state: delay fading back IN until the X has fully faded out. */
-    transition: opacity 160ms ease 160ms;
+    transition: opacity var(--transition-fast) 150ms;
 }
 
 .nav-hamburger-close-icon {
@@ -721,7 +721,7 @@ span.nav-dropdown-item a:hover {
     opacity: 0;
     pointer-events: none;
     /* Closed state: no delay — X fades OUT first when closing. */
-    transition: opacity 160ms ease;
+    transition: opacity var(--transition-fast);
 }
 
 #nav-hamburger[aria-expanded="true"] .nav-team-logo-hamburger {
@@ -733,7 +733,7 @@ span.nav-dropdown-item a:hover {
 #nav-hamburger[aria-expanded="true"] .nav-hamburger-close-icon {
     opacity: 1;
     /* Opening: X fades IN only after the logo has fully faded out. */
-    transition-delay: 160ms;
+    transition-delay: 150ms;
 }
 
 /* ==========================================================================
@@ -752,7 +752,7 @@ span.nav-dropdown-item a:hover {
     justify-content: center;
     color: white;
     border-radius: var(--radius-lg);
-    transition: background-color 150ms ease;
+    transition: background-color var(--transition-fast);
 }
 
 .nav-icon-btn:hover {
@@ -768,7 +768,7 @@ span.nav-dropdown-item a:hover {
     font-weight: 600;
     font-family: var(--font-display);
     color: var(--gray-300);
-    transition: color 200ms ease;
+    transition: color var(--transition-base);
 }
 
 .nav-trigger:hover {
@@ -781,7 +781,7 @@ span.nav-dropdown-item a:hover {
     transform: translateY(-0.25rem);
     opacity: 0;
     visibility: hidden;
-    transition: all 200ms ease;
+    transition: all var(--transition-base);
     z-index: 50;
 }
 
@@ -834,7 +834,7 @@ span.nav-dropdown-item a:hover {
     border-radius: var(--radius-xl);
     padding: 0.625rem 2rem 0.625rem 0.75rem;
     cursor: pointer;
-    transition: all 150ms ease;
+    transition: all var(--transition-fast);
 }
 
 .nav-select:hover {
@@ -868,7 +868,7 @@ span.nav-dropdown-item a:hover {
     border-radius: var(--radius-xl);
     padding: 0.625rem 0.75rem;
     cursor: pointer;
-    transition: all 150ms ease;
+    transition: all var(--transition-fast);
 }
 
 .nav-logout-btn:hover {
@@ -905,7 +905,7 @@ span.nav-dropdown-item a:hover {
     padding: 0.75rem 1rem 0.75rem 2.75rem;
     font-size: 1rem;
     color: white;
-    transition: all 150ms ease;
+    transition: all var(--transition-fast);
 }
 
 .nav-login-input::placeholder {
@@ -937,15 +937,15 @@ span.nav-dropdown-item a:hover {
     font-weight: 700;
     padding: 0.875rem 1rem;
     border-radius: var(--radius-xl);
-    box-shadow: 0 10px 15px -3px rgba(249, 115, 22, 0.25);
-    transition: all 200ms ease;
+    box-shadow: var(--shadow-accent-lift);
+    transition: all var(--transition-base);
     font-size: 1rem;
     letter-spacing: var(--tracking-display);
 }
 
 .nav-login-btn:hover {
     background: linear-gradient(to right, var(--accent-400), var(--accent-500));
-    box-shadow: 0 10px 15px -3px rgba(249, 115, 22, 0.4);
+    box-shadow: var(--shadow-accent-lift-strong);
 }
 
 .nav-login-btn:active {
@@ -971,7 +971,7 @@ span.nav-dropdown-item a:hover {
     background: rgba(255, 255, 255, 0.05);
     border-radius: var(--radius-md);
     cursor: pointer;
-    transition: all 150ms ease;
+    transition: all var(--transition-fast);
 }
 
 .nav-login-checkbox:checked {
@@ -997,12 +997,12 @@ span.nav-dropdown-item a:hover {
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 10px 15px -3px rgba(249, 115, 22, 0.25);
-    transition: box-shadow 150ms ease;
+    box-shadow: var(--shadow-accent-lift);
+    transition: box-shadow var(--transition-fast);
 }
 
 .group:hover .nav-logo-icon {
-    box-shadow: 0 10px 15px -3px rgba(249, 115, 22, 0.4);
+    box-shadow: var(--shadow-accent-lift-strong);
 }
 
 .nav-overlay {
@@ -1012,7 +1012,7 @@ span.nav-dropdown-item a:hover {
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
     z-index: 40;
-    transition: opacity 300ms ease;
+    transition: opacity var(--transition-slow);
 }
 
 .nav-desktop {

@@ -120,7 +120,7 @@
 
 /* Row styling */
 .ibl-data-table tbody tr {
-    transition: background-color 150ms ease;
+    transition: background-color var(--transition-fast);
 }
 
 .ibl-data-table tbody tr:nth-child(odd) {
@@ -140,7 +140,7 @@
     color: var(--gray-800);
     text-decoration: none;
     font-weight: 500;
-    transition: color 150ms ease;
+    transition: color var(--transition-fast);
 }
 
 .ibl-data-table a:hover {
@@ -788,7 +788,7 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
     background: linear-gradient(to right, transparent, rgba(0, 0, 0, 0.08));
     pointer-events: none;
     opacity: 1;
-    transition: opacity 0.3s ease;
+    transition: opacity var(--transition-slow);
     border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
     z-index: 2;
 }
@@ -1344,7 +1344,7 @@ td.ibl-team-cell--colored {
     border-radius: var(--radius-sm);
     opacity: 0;
     visibility: hidden;
-    transition: opacity 150ms ease, visibility 150ms ease;
+    transition: opacity var(--transition-fast), visibility var(--transition-fast);
     z-index: 100;
     pointer-events: none;
     margin-right: 8px;
@@ -1362,7 +1362,7 @@ td.ibl-team-cell--colored {
     border-left-color: var(--navy-900);
     opacity: 0;
     visibility: hidden;
-    transition: opacity 150ms ease, visibility 150ms ease;
+    transition: opacity var(--transition-fast), visibility var(--transition-fast);
     z-index: 100;
     margin-right: -2px;
 }

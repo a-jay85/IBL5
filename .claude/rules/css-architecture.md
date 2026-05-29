@@ -3,7 +3,7 @@ description: CSS architecture: all styles live in ibl5/design/components/; inlin
 paths:
   - "**/design/**/*.css"
   - "**/*View.php"
-last_verified: 2026-04-11
+last_verified: 2026-05-29
 ---
 
 # CSS Architecture Reference
@@ -121,8 +121,6 @@ These CSS selectors set `white-space: nowrap` — check them before debugging te
 | `cards.css` | `.ibl-card__meta` | Card metadata |
 | `player-cards.css` | `.stats-grid a`, `th`, `td` | Stats card cells |
 | `existing-components.css` | Various (7 selectors) | Legacy components |
-| `sco-parser.css` | `.sco-play-text` | Play-by-play text |
-| `saved-depth-charts.css` | `.saved-dc-table td` | Depth chart cells |
 
 ## Common Cell/Row Modifier Classes
 
@@ -134,7 +132,6 @@ These CSS selectors set `white-space: nowrap` — check them before debugging te
 | `.sticky-col` | Sticky first column (single) | `<td>`, `<th>` |
 | `.sticky-col-1/2/3` | Multi-column sticky | `<td>`, `<th>` |
 | `.sticky-corner` | Top-left corner cell (sticky header+col) | `<th>` |
-| `.ratings-highlight` | Team-colored highlight row | `<tr>` |
 | `.ratings-separator` | Zero-padding divider row | `<tr>` |
 | `.user-team-row` | Yellow highlight for user's team | `<tr>` |
 | `.drafted` | Grayed-out drafted player row | `<tr>` |

@@ -76,13 +76,13 @@ A:link,
 A:active,
 A:visited {
     background: none;
-    color: #363636;
+    color: var(--gray-700);
     text-decoration: underline;
 }
 
 A:hover {
     background: none;
-    color: #363636;
+    color: var(--gray-700);
     text-decoration: underline;
 }
 
@@ -108,7 +108,7 @@ A:hover {
 
 .storytitle {
     background: none;
-    color: #363636;
+    color: var(--gray-700);
     font-size: 1.5rem;
     font-weight: bold;
     font-family: var(--font-display);
@@ -117,7 +117,7 @@ A:hover {
 
 .storycat {
     background: none;
-    color: #363636;
+    color: var(--gray-700);
     font-size: 1rem;
     font-weight: bold;
     font-family: var(--font-display);

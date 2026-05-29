@@ -85,6 +85,10 @@
     --error-400: var(--color-error-400);
     --error-700: var(--color-error-700);
 
+    /* Discord brand */
+    --discord: var(--color-discord);
+    --discord-hover: var(--color-discord-hover);
+
     /* ========================================================================
        Typography
        ======================================================================== */
@@ -122,6 +126,8 @@
     --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
     --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
     --shadow-glow: 0 0 20px rgb(249 115 22 / 0.3);
+    --shadow-accent-lift: 0 10px 15px -3px rgba(249, 115, 22, 0.25);
+    --shadow-accent-lift-strong: 0 10px 15px -3px rgba(249, 115, 22, 0.4);
 
     /* ========================================================================
        Transitions

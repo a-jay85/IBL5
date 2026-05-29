@@ -446,7 +446,7 @@ a.last-sim-recap__player-name:hover { text-decoration: underline }
     display: block;
     width: 55%;
     height: var(--last-sim-recap-bar-h, 0px);
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     position: absolute;
     left: 22.5%;
 }
@@ -523,7 +523,7 @@ a.last-sim-recap__player-name:hover { text-decoration: underline }
     color: var(--gray-500);
     background: var(--gray-100);
     padding: 1px 5px;
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     letter-spacing: .06em;
     vertical-align: 3px;
 }
@@ -612,7 +612,7 @@ a.last-sim-recap__player-name:hover { text-decoration: underline }
     background: var(--navy-800);
     color: #fff;
     padding: 1px 6px;
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     letter-spacing: .1em;
     font-size: .667rem;
 }

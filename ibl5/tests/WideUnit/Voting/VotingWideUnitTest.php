@@ -281,7 +281,7 @@ class VotingWideUnitTest extends TestCase
             [
                 'title' => 'Test Category',
                 'rows' => [
-                    ['name' => 'Player One', 'votes' => 10],
+                    ['name' => 'Player One', 'votes' => 10, 'pid' => 0],
                 ],
             ],
         ];
@@ -308,8 +308,8 @@ class VotingWideUnitTest extends TestCase
             [
                 'title' => 'MVP Voting',
                 'rows' => [
-                    ['name' => 'Star Player', 'votes' => 25],
-                    ['name' => 'Runner Up', 'votes' => 18],
+                    ['name' => 'Star Player', 'votes' => 25, 'pid' => 0],
+                    ['name' => 'Runner Up', 'votes' => 18, 'pid' => 0],
                 ],
             ],
         ];
@@ -335,7 +335,7 @@ class VotingWideUnitTest extends TestCase
         $tables = [
             [
                 'title' => 'Category',
-                'rows' => [['name' => 'Player', 'votes' => 1]],
+                'rows' => [['name' => 'Player', 'votes' => 1, 'pid' => 0]],
             ],
         ];
 
@@ -404,9 +404,9 @@ class VotingWideUnitTest extends TestCase
             [
                 'title' => 'Styled Table',
                 'rows' => [
-                    ['name' => 'Row 1', 'votes' => 1],
-                    ['name' => 'Row 2', 'votes' => 2],
-                    ['name' => 'Row 3', 'votes' => 3],
+                    ['name' => 'Row 1', 'votes' => 1, 'pid' => 0],
+                    ['name' => 'Row 2', 'votes' => 2, 'pid' => 0],
+                    ['name' => 'Row 3', 'votes' => 3, 'pid' => 0],
                 ],
             ],
         ];
@@ -433,7 +433,7 @@ class VotingWideUnitTest extends TestCase
             [
                 'title' => 'Test',
                 'rows' => [
-                    ['name' => '<script>alert("xss")</script>', 'votes' => 1],
+                    ['name' => '<script>alert("xss")</script>', 'votes' => 1, 'pid' => 0],
                 ],
             ],
         ];
@@ -481,7 +481,7 @@ class VotingWideUnitTest extends TestCase
             [
                 'title' => 'Test',
                 'rows' => [
-                    ['name' => 'Player "The Great" Smith', 'votes' => 5],
+                    ['name' => 'Player "The Great" Smith', 'votes' => 5, 'pid' => 0],
                 ],
             ],
         ];
@@ -753,7 +753,7 @@ class VotingWideUnitTest extends TestCase
     {
         // Arrange
         $tables = [
-            ['title' => 'Test', 'rows' => [['name' => 'Player', 'votes' => 1]]],
+            ['title' => 'Test', 'rows' => [['name' => 'Player', 'votes' => 1, 'pid' => 0]]],
         ];
 
         // Act

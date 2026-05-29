@@ -98,7 +98,6 @@ class JsbImportRepositoryTest extends DatabaseTestCase
              WHERE season_year = ? AND transaction_month = ? AND transaction_day = ? AND transaction_type = ? AND pid = ? AND from_teamid = ? AND to_teamid = ?'
         );
         self::assertNotFalse($stmt);
-        $stmt->bind_param('iiiiiii', $sy, $tm, $td, $tt, $pid, $from, $to);
         $sy = 2099;
         $tm = 3;
         $td = 10;
@@ -106,6 +105,7 @@ class JsbImportRepositoryTest extends DatabaseTestCase
         $pid = 200050001;
         $from = 1;
         $to = 2;
+        $stmt->bind_param('iiiiiii', $sy, $tm, $td, $tt, $pid, $from, $to);
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
@@ -167,9 +167,9 @@ class JsbImportRepositoryTest extends DatabaseTestCase
 
         $stmt = $this->db->prepare('SELECT wins, source_file FROM ibl_jsb_history WHERE season_year = ? AND team_name = ?');
         self::assertNotFalse($stmt);
-        $stmt->bind_param('is', $sy, $tn);
         $sy = 2099;
         $tn = 'Stars';
+        $stmt->bind_param('is', $sy, $tn);
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
@@ -452,9 +452,9 @@ class JsbImportRepositoryTest extends DatabaseTestCase
         // 'Hornets' → 'Sting' resolves (CI seed uses 'Spurs' for teamid=10)
         $stmt = $this->db->prepare('UPDATE ibl_team_info SET team_name = ? WHERE teamid = ?');
         self::assertNotFalse($stmt);
-        $stmt->bind_param('si', $name, $teamid);
         $name = 'Sting';
         $teamid = 10;
+        $stmt->bind_param('si', $name, $teamid);
         $stmt->execute();
         $stmt->close();
 

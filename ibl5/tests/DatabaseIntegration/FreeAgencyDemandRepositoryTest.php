@@ -32,12 +32,12 @@ class FreeAgencyDemandRepositoryTest extends DatabaseTestCase
             'UPDATE ibl_team_info SET contract_wins = ?, contract_losses = ?, contract_avg_w = ?, contract_avg_l = ? WHERE team_name = ?'
         );
         self::assertNotFalse($stmt);
-        $stmt->bind_param('iiiis', $w, $l, $aw, $al, $tn);
         $w = 45;
         $l = 37;
         $aw = 42;
         $al = 40;
         $tn = 'Metros';
+        $stmt->bind_param('iiiis', $w, $l, $aw, $al, $tn);
         $stmt->execute();
         $stmt->close();
 

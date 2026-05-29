@@ -35,8 +35,8 @@ class PlrParserRepositoryTest extends DatabaseTestCase
 
         $stmt = $this->db->prepare('SELECT name, age, pos, teamid FROM ibl_plr WHERE pid = ?');
         self::assertNotFalse($stmt);
-        $stmt->bind_param('i', $pid);
         $pid = 200130001;
+        $stmt->bind_param('i', $pid);
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
@@ -59,8 +59,8 @@ class PlrParserRepositoryTest extends DatabaseTestCase
 
         $stmt = $this->db->prepare('SELECT name, age FROM ibl_plr WHERE pid = ?');
         self::assertNotFalse($stmt);
-        $stmt->bind_param('i', $pid);
         $pid = 200130002;
+        $stmt->bind_param('i', $pid);
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();

@@ -268,6 +268,10 @@ class DepthChartEntryProcessorTest extends TestCase
         $playerFromDb = [
             'pid' => 1,
             'name' => 'Test Player',
+            'nickname' => null,
+            'age' => null,
+            'teamid' => 1,
+            'teamname' => null,
             'pos' => 'PG',
             'injured' => 0,
             'stamina' => 50,
@@ -399,6 +403,10 @@ class DepthChartEntryProcessorTest extends TestCase
         $dbPlayer = [
             'pid' => 1,
             'name' => 'Round Trip Player',
+            'nickname' => null,
+            'age' => null,
+            'teamid' => 1,
+            'teamname' => null,
             'pos' => 'SG',
             'injured' => 0,
             'stamina' => 60,
@@ -468,6 +476,10 @@ class DepthChartEntryProcessorTest extends TestCase
         $dbPlayerAfterUpdate = [
             'pid' => 1,
             'name' => 'Round Trip Player',
+            'nickname' => null,
+            'age' => null,
+            'teamid' => 1,
+            'teamname' => null,
             'pos' => 'SG',
             'injured' => 0,
             'stamina' => 60,
@@ -508,6 +520,10 @@ class DepthChartEntryProcessorTest extends TestCase
         $player = [
             'pid' => 1,
             'name' => 'Zero Settings Player',
+            'nickname' => null,
+            'age' => null,
+            'teamid' => 1,
+            'teamname' => null,
             'pos' => 'C',
             'injured' => 0,
             'stamina' => 50,

@@ -33,8 +33,8 @@ class RookieOptionRepositoryTest extends DatabaseTestCase
 
         $stmt = $this->db->prepare('SELECT salary_yr4 FROM ibl_plr WHERE pid = ?');
         self::assertNotFalse($stmt);
-        $stmt->bind_param('i', $pid);
         $pid = 200150001;
+        $stmt->bind_param('i', $pid);
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
@@ -53,8 +53,8 @@ class RookieOptionRepositoryTest extends DatabaseTestCase
 
         $stmt = $this->db->prepare('SELECT salary_yr3 FROM ibl_plr WHERE pid = ?');
         self::assertNotFalse($stmt);
-        $stmt->bind_param('i', $pid);
         $pid = 200150002;
+        $stmt->bind_param('i', $pid);
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();

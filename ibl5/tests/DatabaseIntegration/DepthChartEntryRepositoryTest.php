@@ -65,6 +65,11 @@ class DepthChartEntryRepositoryTest extends DatabaseTestCase
             'c' => 0,
             'canPlayInGame' => 1,
             'min' => 32,
+            'of' => 0,
+            'df' => 0,
+            'oi' => 0,
+            'di' => 0,
+            'bh' => 0,
         ];
 
         $result = $this->repo->updatePlayerDepthChart('DC Update Plyr', $depthChartValues);
@@ -77,8 +82,8 @@ class DepthChartEntryRepositoryTest extends DatabaseTestCase
              FROM ibl_plr WHERE pid = ?'
         );
         self::assertNotFalse($stmt);
-        $stmt->bind_param('i', $pid);
         $pid = 200080005;
+        $stmt->bind_param('i', $pid);
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
@@ -106,6 +111,7 @@ class DepthChartEntryRepositoryTest extends DatabaseTestCase
         $result = $this->repo->updatePlayerDepthChart('DC Success Plyr', [
             'pg' => 1, 'sg' => 0, 'sf' => 0, 'pf' => 0, 'c' => 0,
             'canPlayInGame' => 1, 'min' => 20,
+            'of' => 0, 'df' => 0, 'oi' => 0, 'di' => 0, 'bh' => 0,
         ]);
 
         self::assertTrue($result);
@@ -121,8 +127,8 @@ class DepthChartEntryRepositoryTest extends DatabaseTestCase
 
         $stmt = $this->db->prepare('SELECT depth, sim_depth FROM ibl_team_info WHERE team_name = ?');
         self::assertNotFalse($stmt);
-        $stmt->bind_param('s', $tn);
         $tn = 'Metros';
+        $stmt->bind_param('s', $tn);
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();

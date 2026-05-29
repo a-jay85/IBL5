@@ -19,8 +19,9 @@ regexTarget = "line"
 regexes = [
   # Production DB password — rotated 2026-05 and scrubbed from HEAD (ADR-0034).
   # Survives in git history; rotation is the remediation, so the dead literal
-  # across old commits is noise.
-  '''whereWTFhappens19''',
+  # across old commits is noise. Written as a char-class pattern so the verbatim
+  # secret never reappears in the tracked tree (it still matches the old value).
+  '''where[A-Z]{3}happens\d+''',
 
   # Synthetic API keys used only in PHPUnit fixtures (never real credentials):
   # tests/Api/Middleware/ApiKeyAuthenticatorTest.php, tests/ApiKeys/*,

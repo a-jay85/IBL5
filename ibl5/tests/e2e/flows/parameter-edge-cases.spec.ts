@@ -21,15 +21,8 @@ test.describe('Parameter edge cases', () => {
     await assertNoPhpErrors(page, 'on Player with pid=0');
   });
 
-  test('non-existent module redirects to index', async ({ page }) => {
-    // PR2 module-dispatch lockdown: ModuleRegistry::isValid() blocks unknown
-    // module names at modules.php and redirects to index.php instead of
-    // letting the include fall through. The "doesn't exist" message no longer
-    // appears for unknown names.
-    await page.goto('modules.php?name=NonExistentModule');
-    await assertNoPhpErrors(page, 'on non-existent module');
-    await expect(page).toHaveURL(/index\.php($|\?)/);
-  });
+  // The unknown-module-redirect test was consolidated into
+  // smoke/module-routing.spec.ts (one canonical copy across the suite).
 
   test('DraftHistory with invalid teamID shows no PHP errors', async ({ page }) => {
     await page.goto('modules.php?name=DraftHistory&teamid=999');

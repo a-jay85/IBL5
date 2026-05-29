@@ -1,6 +1,5 @@
 // Do NOT swap page.goto for gotoWithRetry in this PR — that's a behavior
 // change; defer to a follow-up.
-// TODO: migrate vr-anchors-discriminate.spec.ts to consume vr-manifest.ts.
 import type { Locator, Page } from '@playwright/test';
 import { test as publicTest } from '../fixtures/public';
 import { test as authTest } from '../fixtures/auth';

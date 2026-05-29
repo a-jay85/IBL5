@@ -1,4 +1,6 @@
-// TODO: migrate vr-anchors-discriminate.spec.ts to consume this manifest to prevent drift.
+// Single source of truth for visual-regression coverage. Consumed by both
+// visual-regression.spec.ts (screenshot diffs) and vr-anchors-discriminate.spec.ts
+// (per-row anchor/content discrimination), so the two cannot drift apart.
 
 export type AuthMode = 'public' | 'auth' | 'auth-regular';
 export type Viewport = 'desktop' | 'mobile';
@@ -27,6 +29,13 @@ export type VrRow = {
   elementScreenshot?: boolean;
   dataDriven?: boolean;
   notes?: string;
+  // vr-anchors-discriminate.spec.ts only: skip the tbody-tr / form-input content
+  // check when the CI seed renders the anchor empty (anchor visibility is the
+  // strongest available check). The VR screenshot spec ignores this field.
+  skipContentCheck?: boolean;
+  // vr-anchors-discriminate.spec.ts only: per-row anchor-visibility timeout (ms)
+  // for slow-rendering pages. Falls back to the config default when unset.
+  timeout?: number;
 };
 
 const DEFAULT_STATE: StateVariant = { name: 'default', appState: {} };
@@ -41,7 +50,7 @@ export const VR_MANIFEST: VrRow[] = [
   { name: 'all-star-appearances', auth: 'public', url: 'modules.php?name=AllStarAppearances',
     anchor: '.ibl-data-table', viewports: ['desktop', 'mobile'] },
   { name: 'award-history', auth: 'public', url: 'modules.php?name=AwardHistory',
-    anchor: '.ibl-data-table', viewports: ['desktop', 'mobile'] },
+    anchor: '.ibl-data-table', viewports: ['desktop', 'mobile'], skipContentCheck: true },
   { name: 'career-leaderboards', auth: 'public', url: 'modules.php?name=CareerLeaderboards',
     anchor: 'form[name="CareerLeaderboards"]', viewports: ['desktop', 'mobile'] },
   { name: 'compare-players', auth: 'public', url: 'modules.php?name=ComparePlayers',
@@ -95,7 +104,7 @@ export const VR_MANIFEST: VrRow[] = [
   { name: 'season-archive', auth: 'public', url: 'modules.php?name=SeasonArchive',
     anchor: '.ibl-data-table', viewports: ['desktop', 'mobile'] },
   { name: 'season-highs', auth: 'public', url: 'modules.php?name=SeasonHighs',
-    anchor: '.ibl-data-table', viewports: ['desktop', 'mobile'] },
+    anchor: '.ibl-data-table', viewports: ['desktop', 'mobile'], timeout: 15_000 },
   { name: 'season-leaderboards', auth: 'public', url: 'modules.php?name=SeasonLeaderboards',
     anchor: '.ibl-data-table', elementScreenshot: true, viewports: ['desktop', 'mobile'] },
   { name: 'series-records', auth: 'public', url: 'modules.php?name=SeriesRecords',
@@ -127,7 +136,7 @@ export const VR_MANIFEST: VrRow[] = [
 
   // ── Auth modules ────────────────────────────────────────────
   { name: 'api-keys', auth: 'auth', url: 'modules.php?name=ApiKeys',
-    anchor: 'form[action*="ApiKeys"]', viewports: ['desktop', 'mobile'] },
+    anchor: 'form[action*="ApiKeys"]', viewports: ['desktop', 'mobile'], skipContentCheck: true },
   { name: 'cap-space', auth: 'auth', url: 'modules.php?name=CapSpace&teamid=1',
     anchor: '.ibl-data-table', viewports: ['desktop', 'mobile'] },
   { name: 'depth-chart-entry', auth: 'auth', url: 'modules.php?name=DepthChartEntry',

@@ -41,6 +41,8 @@ jobs:
               - 'ibl5/composer.lock'
               - 'ibl5/phpunit.xml'
               - 'ibl5/phpstan.neon'
+              - 'ibl5/phpstan-tests.neon'
+              - 'ibl5/phpstan-tests-baseline.neon'
               - 'ibl5/phpstan-rules/**'
               - 'ibl5/tests/DatabaseIntegration/Fixtures/**'
               - '.github/workflows/tests.yml'
@@ -284,6 +286,10 @@ jobs:
     - name: Run PHPStan
       working-directory: ibl5
       run: composer run analyse
+
+    - name: Run PHPStan (tests)
+      working-directory: ibl5
+      run: composer run analyse:tests
 
     - name: Check baseline drift
       working-directory: ibl5

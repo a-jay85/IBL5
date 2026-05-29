@@ -16,32 +16,9 @@ use League\LeagueContext;
  */
 class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepositoryInterface
 {
-    private string $histTable;
-    private string $jsbHistoryTable;
-    private string $jsbTransactionsTable;
-    private string $rcbAlltimeTable;
-    private string $rcbSeasonTable;
-    private string $plrTable;
-    private string $teamInfoTable;
-    private string $plbSnapshotsTable;
-    private string $draftResultsTable;
-    private string $retiredPlayersTable;
-    private string $hallOfFameTable;
-
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
-        $this->histTable = $this->resolveTable('ibl_hist');
-        $this->jsbHistoryTable = $this->resolveTable('ibl_jsb_history');
-        $this->jsbTransactionsTable = $this->resolveTable('ibl_jsb_transactions');
-        $this->rcbAlltimeTable = $this->resolveTable('ibl_rcb_alltime_records');
-        $this->rcbSeasonTable = $this->resolveTable('ibl_rcb_season_records');
-        $this->plrTable = $this->resolveTable('ibl_plr');
-        $this->teamInfoTable = $this->resolveTable('ibl_team_info');
-        $this->plbSnapshotsTable = $this->resolveTable('ibl_plb_snapshots');
-        $this->draftResultsTable = $this->resolveTable('ibl_jsb_draft_results');
-        $this->retiredPlayersTable = $this->resolveTable('ibl_jsb_retired_players');
-        $this->hallOfFameTable = $this->resolveTable('ibl_jsb_hall_of_fame');
     }
 
     /**
@@ -111,7 +88,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     public function upsertTransaction(array $record): int
     {
         return $this->execute(
-            "INSERT INTO {$this->jsbTransactionsTable}
+            "INSERT INTO `ibl_jsb_transactions`
                 (season_year, transaction_month, transaction_day, transaction_type,
                  pid, player_name, from_teamid, to_teamid,
                  injury_games_missed, injury_description, trade_group_id,
@@ -149,7 +126,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     public function upsertHistoryRecord(array $record): int
     {
         return $this->execute(
-            "INSERT INTO {$this->jsbHistoryTable}
+            "INSERT INTO `ibl_jsb_history`
                 (season_year, team_name, teamid, wins, losses, made_playoffs,
                  playoff_result, playoff_round_reached, won_championship, source_file)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -259,7 +236,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
 
         // Try direct lookup first
         $row = $this->fetchOne(
-            "SELECT teamid FROM {$this->teamInfoTable} WHERE team_name = ? LIMIT 1",
+            "SELECT teamid FROM `ibl_team_info` WHERE team_name = ? LIMIT 1",
             's',
             $teamName
         );
@@ -275,7 +252,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
         if (isset(self::TEAM_NAME_ALIASES[$teamName])) {
             $aliasName = self::TEAM_NAME_ALIASES[$teamName];
             $row = $this->fetchOne(
-                "SELECT teamid FROM {$this->teamInfoTable} WHERE team_name = ? LIMIT 1",
+                "SELECT teamid FROM `ibl_team_info` WHERE team_name = ? LIMIT 1",
                 's',
                 $aliasName
             );
@@ -290,7 +267,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
 
         // Try looking in hist table for historical team names
         $row = $this->fetchOne(
-            "SELECT teamid FROM {$this->histTable} WHERE team = ? AND teamid > 0 LIMIT 1",
+            "SELECT teamid FROM `ibl_hist` WHERE team = ? AND teamid > 0 LIMIT 1",
             's',
             $teamName
         );
@@ -314,7 +291,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     public function fetchMaxTradeGroupId(): int
     {
         $row = $this->fetchOne(
-            "SELECT COALESCE(MAX(trade_group_id), 0) AS max_id FROM {$this->jsbTransactionsTable}",
+            "SELECT COALESCE(MAX(trade_group_id), 0) AS max_id FROM `ibl_jsb_transactions`",
             ''
         );
 
@@ -333,7 +310,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     public function replaceRcbAlltimeRecords(array $records): int
     {
         return $this->transactional(function () use ($records): int {
-            $this->execute("DELETE FROM {$this->rcbAlltimeTable}");
+            $this->execute("DELETE FROM `ibl_rcb_alltime_records`");
 
             $total = 0;
             $columns = '(scope, teamid, record_type, stat_category, ranking,'
@@ -362,7 +339,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
                     $params[] = $r['source_file'];
                 }
                 $total += $this->execute(
-                    "INSERT INTO {$this->rcbAlltimeTable} {$columns} VALUES {$placeholders}",
+                    "INSERT INTO `ibl_rcb_alltime_records` {$columns} VALUES {$placeholders}",
                     $types,
                     ...$params
                 );
@@ -379,7 +356,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     {
         return $this->transactional(function () use ($seasonYear, $records): int {
             $this->execute(
-                "DELETE FROM {$this->rcbSeasonTable} WHERE season_year = ?",
+                "DELETE FROM `ibl_rcb_season_records` WHERE season_year = ?",
                 'i',
                 $seasonYear
             );
@@ -410,7 +387,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
                     $params[] = $r['source_file'];
                 }
                 $total += $this->execute(
-                    "INSERT INTO {$this->rcbSeasonTable} {$columns} VALUES {$placeholders}",
+                    "INSERT INTO `ibl_rcb_season_records` {$columns} VALUES {$placeholders}",
                     $types,
                     ...$params
                 );
@@ -429,7 +406,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     public function getPlayerName(int $pid): ?string
     {
         $row = $this->fetchOne(
-            "SELECT name FROM {$this->plrTable} WHERE pid = ? LIMIT 1",
+            "SELECT name FROM `ibl_plr` WHERE pid = ? LIMIT 1",
             'i',
             $pid
         );
@@ -447,7 +424,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     public function upsertPlbSnapshot(array $record): int
     {
         return $this->execute(
-            "INSERT INTO {$this->plbSnapshotsTable}
+            "INSERT INTO `ibl_plb_snapshots`
                 (season_year, sim_number, source_archive, teamid, slot_index,
                  pid, player_name, dc_minutes, dc_of, dc_df, dc_oi, dc_di, dc_bh)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -485,7 +462,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     public function upsertDraftResult(array $record): int
     {
         return $this->execute(
-            "INSERT INTO {$this->draftResultsTable}
+            "INSERT INTO `ibl_jsb_draft_results`
                 (draft_year, round, pick, team_name, pos, player_name, pid)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
@@ -510,7 +487,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     public function upsertRetiredPlayer(array $record): int
     {
         return $this->execute(
-            "INSERT INTO {$this->retiredPlayersTable}
+            "INSERT INTO `ibl_jsb_retired_players`
                 (jsb_pid, retirement_year, player_name, pid)
             VALUES (?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
@@ -530,7 +507,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     public function upsertHofInductee(array $record): int
     {
         return $this->execute(
-            "INSERT INTO {$this->hallOfFameTable}
+            "INSERT INTO `ibl_jsb_hall_of_fame`
                 (jsb_pid, player_name, pos, induction_year, pid)
             VALUES (?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
@@ -553,7 +530,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     public function hasChampionForSeason(int $seasonYear): bool
     {
         $row = $this->fetchOne(
-            "SELECT COUNT(*) AS cnt FROM {$this->jsbHistoryTable}
+            "SELECT COUNT(*) AS cnt FROM `ibl_jsb_history`
              WHERE season_year = ? AND won_championship = 1",
             'i',
             $seasonYear,

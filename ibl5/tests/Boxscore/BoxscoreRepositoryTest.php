@@ -31,6 +31,9 @@ class BoxscoreRepositoryTest extends TestCase
             ini_set('error_log', $this->previousErrorLog);
             $this->previousErrorLog = false;
         }
+        // setSharedLeagueContext() writes a static slot that leaks into every
+        // later test in the process; always clear it.
+        BoxscoreRepository::clearSharedLeagueContext();
         parent::tearDown();
     }
 
@@ -194,18 +197,14 @@ class BoxscoreRepositoryTest extends TestCase
 
     public function testOlympicsContextUsesOlympicsTables(): void
     {
-        $leagueContext = $this->createStub(LeagueContext::class);
-        $leagueContext->method('getTableName')->willReturnCallback(
-            static function (string $table): string {
-                return match ($table) {
-                    'ibl_box_scores' => 'ibl_olympics_box_scores',
-                    'ibl_box_scores_teams' => 'ibl_olympics_box_scores_teams',
-                    default => $table,
-                };
-            }
-        );
+        // Drive the production STATIC path: the repo gets no instance context;
+        // the backtick-quoted table names in its SQL are rewritten by
+        // executeQuery()->rewriteTableNames() because the shared context is Olympics.
+        $context = new LeagueContext();
+        $context->setLeague(LeagueContext::LEAGUE_OLYMPICS);
+        BoxscoreRepository::setSharedLeagueContext($context);
 
-        $repo = new BoxscoreRepository($this->mockDb, $leagueContext);
+        $repo = new BoxscoreRepository($this->mockDb);
         $this->mockDb->setReturnTrue(true);
 
         $repo->deletePreseasonBoxScores(2025);
@@ -218,18 +217,11 @@ class BoxscoreRepositoryTest extends TestCase
 
     public function testOlympicsContextInsertsIntoOlympicsTables(): void
     {
-        $leagueContext = $this->createStub(LeagueContext::class);
-        $leagueContext->method('getTableName')->willReturnCallback(
-            static function (string $table): string {
-                return match ($table) {
-                    'ibl_box_scores' => 'ibl_olympics_box_scores',
-                    'ibl_box_scores_teams' => 'ibl_olympics_box_scores_teams',
-                    default => $table,
-                };
-            }
-        );
+        $context = new LeagueContext();
+        $context->setLeague(LeagueContext::LEAGUE_OLYMPICS);
+        BoxscoreRepository::setSharedLeagueContext($context);
 
-        $repo = new BoxscoreRepository($this->mockDb, $leagueContext);
+        $repo = new BoxscoreRepository($this->mockDb);
         $this->mockDb->setReturnTrue(true);
 
         $repo->insertTeamBoxscore(

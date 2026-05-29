@@ -14,12 +14,9 @@ use LeagueConfig\Contracts\LeagueConfigRepositoryInterface;
  */
 class LeagueConfigRepository extends \BaseMysqliRepository implements LeagueConfigRepositoryInterface
 {
-    private string $table;
-
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
-        $this->table = $this->resolveTable('ibl_league_config');
     }
 
     /**
@@ -28,7 +25,7 @@ class LeagueConfigRepository extends \BaseMysqliRepository implements LeagueConf
     public function hasConfigForSeason(int $seasonEndingYear): bool
     {
         $row = $this->fetchOne(
-            "SELECT COUNT(*) AS total FROM {$this->table} WHERE season_ending_year = ?",
+            "SELECT COUNT(*) AS total FROM `ibl_league_config` WHERE season_ending_year = ?",
             'i',
             $seasonEndingYear,
         );
@@ -51,7 +48,7 @@ class LeagueConfigRepository extends \BaseMysqliRepository implements LeagueConf
         $affectedTotal = 0;
 
         $query = <<<SQL
-            INSERT INTO {$this->table}
+            INSERT INTO `ibl_league_config`
                 (season_ending_year, team_slot, team_name, conference, division,
                  playoff_qualifiers_per_conf, playoff_round1_format, playoff_round2_format,
                  playoff_round3_format, playoff_round4_format, team_count)
@@ -98,7 +95,7 @@ class LeagueConfigRepository extends \BaseMysqliRepository implements LeagueConf
     {
         /** @var list<LeagueConfigRow> */
         return $this->fetchAll(
-            "SELECT * FROM {$this->table} WHERE season_ending_year = ? ORDER BY team_slot ASC",
+            "SELECT * FROM `ibl_league_config` WHERE season_ending_year = ? ORDER BY team_slot ASC",
             'i',
             $seasonEndingYear,
         );

@@ -76,19 +76,18 @@ class ScheduleUpdater extends \BaseMysqliRepository {
      */
     private function preloadTeamNameMap(): void
     {
-        $teamInfoTable = $this->resolveTable('ibl_team_info');
         $isOlympics = $this->leagueContext !== null && $this->leagueContext->isOlympics();
 
         if ($isOlympics) {
             /** @var list<array{team_name: string, teamid: int, is_real_team: int}> $rows */
             $rows = $this->fetchAll(
-                "SELECT team_name, teamid, is_real_team FROM {$teamInfoTable}",
+                "SELECT team_name, teamid, is_real_team FROM `ibl_team_info`",
                 "",
             );
         } else {
             /** @var list<array{team_name: string, teamid: int}> $rows */
             $rows = $this->fetchAll(
-                "SELECT team_name, teamid FROM {$teamInfoTable} WHERE teamid BETWEEN 1 AND ?",
+                "SELECT team_name, teamid FROM `ibl_team_info` WHERE teamid BETWEEN 1 AND ?",
                 "i",
                 League::MAX_REAL_TEAMID,
             );
@@ -145,7 +144,7 @@ class ScheduleUpdater extends \BaseMysqliRepository {
      *
      * @return string Log of inserted playoff games
      */
-    private function insertPlayoffGamesFromScheduleHtm(string $scheduleTable): string
+    private function insertPlayoffGamesFromScheduleHtm(): string
     {
         $ibl5Root = \Bootstrap\AppPaths::root();
         $leagueDir = $this->leagueContext !== null ? $this->leagueContext->getCurrentLeague() : 'IBL';
@@ -189,7 +188,7 @@ class ScheduleUpdater extends \BaseMysqliRepository {
             $uuid = UuidGenerator::generateUuid();
 
             $this->execute(
-                "INSERT INTO {$scheduleTable} (
+                "INSERT INTO `ibl_schedule` (
                     season_year, box_id, game_date, visitor_teamid, visitor_score, home_teamid, home_score, uuid
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 "iisiiiis",
@@ -209,9 +208,7 @@ class ScheduleUpdater extends \BaseMysqliRepository {
     }
 
     public function update(): void {
-        $scheduleTable = $this->resolveTable('ibl_schedule');
-
-        echo "Updating the {$scheduleTable} database table...<p>";
+        echo "Updating the `ibl_schedule` database table...<p>";
 
         $log = '';
 
@@ -221,9 +218,9 @@ class ScheduleUpdater extends \BaseMysqliRepository {
         // sees only the games inserted so far — the early season, since inserts
         // run in date order. Wrapping it commits the new schedule all at once
         // and rolls the DELETE back if any insert fails.
-        $this->transactional(function () use (&$log, $scheduleTable): void {
-            $this->execute("DELETE FROM {$scheduleTable}", '');
-            $log .= "DELETE FROM {$scheduleTable}<p>";
+        $this->transactional(function () use (&$log): void {
+            $this->execute("DELETE FROM `ibl_schedule`", '');
+            $log .= "DELETE FROM `ibl_schedule`<p>";
 
             $this->preloadTeamNameMap();
 
@@ -302,7 +299,7 @@ class ScheduleUpdater extends \BaseMysqliRepository {
 
                 try {
                     $this->execute(
-                        "INSERT INTO {$scheduleTable} (
+                        "INSERT INTO `ibl_schedule` (
                             season_year,
                             box_id,
                             game_date,
@@ -331,11 +328,11 @@ class ScheduleUpdater extends \BaseMysqliRepository {
                 }
             }
 
-            $log .= $this->insertPlayoffGamesFromScheduleHtm($scheduleTable);
+            $log .= $this->insertPlayoffGamesFromScheduleHtm();
         });
 
-        \UI\DebugOutput::display($log, "{$scheduleTable} SQL Queries");
+        \UI\DebugOutput::display($log, "`ibl_schedule` SQL Queries");
 
-        echo "The {$scheduleTable} database table has been updated.<p>";
+        echo "The `ibl_schedule` database table has been updated.<p>";
     }
 }

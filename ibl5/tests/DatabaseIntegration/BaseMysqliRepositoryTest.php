@@ -37,23 +37,6 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
         new TestableBaseMysqliRepository($badDb);
     }
 
-    // ==================== resolveTable ====================
-
-    public function testResolveTableWithoutLeagueContext(): void
-    {
-        self::assertSame('ibl_standings', $this->repo->callResolveTable('ibl_standings'));
-    }
-
-    public function testResolveTableWithLeagueContext(): void
-    {
-        $context = $this->createStub(LeagueContext::class);
-        $context->method('getTableName')
-            ->willReturnCallback(static fn (string $table): string => str_replace('ibl_', 'ibl_olympics_', $table));
-
-        $repo = new TestableBaseMysqliRepository($this->db, $context);
-        self::assertSame('ibl_olympics_standings', $repo->callResolveTable('ibl_standings'));
-    }
-
     // ==================== executeQuery errors ====================
 
     public function testExecuteQueryThrowsOnTypeMismatch(): void
@@ -495,6 +478,26 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
         self::assertStringContainsString('`ibl_olympics_plr`', $result);
     }
 
+    public function testNonMappedTablesAreNeverRewrittenUnderOlympicsContext(): void
+    {
+        // Tables with no LeagueContext::TABLE_MAP entry have no Olympics
+        // equivalent (ibl_sim_dates, ibl_jsb_draft_results, ibl_jsb_retired_players,
+        // ibl_jsb_hall_of_fame, ibl_plb_snapshots). They must pass through the
+        // rewrite untouched even when backtick-quoted under Olympics, or queries
+        // would fatal on a non-existent table.
+        $context = $this->createStub(LeagueContext::class);
+        $context->method('isOlympics')->willReturn(true);
+        \BaseMysqliRepository::setSharedLeagueContext($context);
+
+        $repo = new TestableBaseMysqliRepository($this->db);
+
+        foreach (['ibl_sim_dates', 'ibl_jsb_draft_results', 'ibl_jsb_retired_players', 'ibl_jsb_hall_of_fame', 'ibl_plb_snapshots'] as $nonMapped) {
+            $query = "SELECT * FROM `{$nonMapped}` LIMIT 1";
+            $result = $repo->callRewriteTableNames($query);
+            self::assertSame($query, $result, "Non-mapped table '{$nonMapped}' must not be rewritten");
+        }
+    }
+
     public function testFetchAllRealTeamsUsesOlympicsTableWithOlympicsContext(): void
     {
         $context = $this->createStub(LeagueContext::class);
@@ -540,11 +543,6 @@ class TestableBaseMysqliRepository extends \BaseMysqliRepository
     public function callRewriteTableNames(string $query): string
     {
         return $this->rewriteTableNames($query);
-    }
-
-    public function callResolveTable(string $table): string
-    {
-        return $this->resolveTable($table);
     }
 
     public function callExecuteQuery(string $query, string $types = '', mixed ...$params): object

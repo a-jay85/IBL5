@@ -13,13 +13,12 @@ final class PreseasonCleanupRepository extends \BaseMysqliRepository
 {
     public function hasPreseasonBoxScores(int $beginningYear): bool
     {
-        $boxScoresTable = $this->resolveTable('ibl_box_scores_teams');
         $startDate = sprintf('%d-09-01', $beginningYear);
         $endDate = sprintf('%d-09-30', $beginningYear);
 
         /** @var array{cnt: int}|null $row */
         $row = $this->fetchOne(
-            "SELECT COUNT(*) AS cnt FROM {$boxScoresTable} WHERE game_date BETWEEN ? AND ?",
+            "SELECT COUNT(*) AS cnt FROM `ibl_box_scores_teams` WHERE game_date BETWEEN ? AND ?",
             "ss",
             $startDate,
             $endDate,

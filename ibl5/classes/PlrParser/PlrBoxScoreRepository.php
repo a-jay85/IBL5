@@ -14,16 +14,9 @@ use PlrParser\Contracts\PlrBoxScoreRepositoryInterface;
  */
 class PlrBoxScoreRepository extends \BaseMysqliRepository implements PlrBoxScoreRepositoryInterface
 {
-    private string $boxScoresTable;
-    private string $boxScoresTeamsTable;
-    private string $simDatesTable;
-
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
-        $this->boxScoresTable = $this->resolveTable('ibl_box_scores');
-        $this->boxScoresTeamsTable = $this->resolveTable('ibl_box_scores_teams');
-        $this->simDatesTable = $this->resolveTable('ibl_sim_dates');
     }
 
     /**
@@ -52,7 +45,7 @@ class PlrBoxScoreRepository extends \BaseMysqliRepository implements PlrBoxScore
                 SUM(game_tov) AS tov,
                 SUM(game_blk) AS blk,
                 SUM(game_pf) AS pf
-            FROM {$this->boxScoresTable}
+            FROM `ibl_box_scores`
             WHERE season_year = ?
               AND game_type = ?
               AND game_date <= ?
@@ -116,7 +109,7 @@ class PlrBoxScoreRepository extends \BaseMysqliRepository implements PlrBoxScore
                     + (game_stl >= 10)
                     + (game_blk >= 10)
                 ) >= 3 THEN 1 ELSE 0 END) AS triples
-            FROM {$this->boxScoresTable}
+            FROM `ibl_box_scores`
             WHERE season_year = ?
               AND game_type = ?
               AND game_date <= ?
@@ -151,7 +144,7 @@ class PlrBoxScoreRepository extends \BaseMysqliRepository implements PlrBoxScore
     {
         /** @var array{last_date: string|null}|null $row */
         $row = $this->fetchOne(
-            "SELECT MAX(game_date) AS last_date FROM {$this->boxScoresTable} WHERE season_year = ? AND game_type = ?",
+            "SELECT MAX(game_date) AS last_date FROM `ibl_box_scores` WHERE season_year = ? AND game_type = ?",
             'ii',
             $seasonYear,
             $gameType,
@@ -185,7 +178,7 @@ class PlrBoxScoreRepository extends \BaseMysqliRepository implements PlrBoxScore
                 SUM(game_tov) AS tov,
                 SUM(game_blk) AS blk,
                 SUM(game_pf) AS pf
-            FROM {$this->boxScoresTable}
+            FROM `ibl_box_scores`
             WHERE pid = ? AND season_year = ? AND game_type = 1
             GROUP BY game_date
             ORDER BY game_date
@@ -257,7 +250,7 @@ class PlrBoxScoreRepository extends \BaseMysqliRepository implements PlrBoxScore
                         PARTITION BY game_date, game_of_that_day, visitor_teamid, home_teamid
                         ORDER BY id
                     ) AS rn
-                FROM {$this->boxScoresTeamsTable}
+                FROM `ibl_box_scores_teams`
                 WHERE season_year = ?
                   AND game_type = ?
                   AND game_date <= ?
@@ -332,7 +325,7 @@ class PlrBoxScoreRepository extends \BaseMysqliRepository implements PlrBoxScore
 
         /** @var list<array{end_date: string}> $rows */
         $rows = $this->fetchAll(
-            "SELECT end_date FROM {$this->simDatesTable}
+            "SELECT end_date FROM `ibl_sim_dates`
              WHERE end_date BETWEEN ? AND ? ORDER BY sim",
             'ss',
             $start,

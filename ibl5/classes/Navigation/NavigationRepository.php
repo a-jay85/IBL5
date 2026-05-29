@@ -14,14 +14,23 @@ use Navigation\Contracts\NavigationRepositoryInterface;
  */
 class NavigationRepository extends \BaseMysqliRepository implements NavigationRepositoryInterface
 {
-    private string $teamInfoTable;
-    private string $standingsTable;
-
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
-        $this->teamInfoTable = $this->resolveTable('ibl_team_info');
-        $this->standingsTable = $this->resolveTable('ibl_standings');
+    }
+
+    /**
+     * Navigation is identity-scoped: resolveTeamId() reads the IBL-only
+     * gm_username column, and the team-nav dropdown intentionally stays on the
+     * IBL league (this repo receives no instance context in production, so its
+     * only Olympics signal would be the static shared context). Override the
+     * rewrite to a no-op so its backtick-quoted tables are never routed to the
+     * Olympics equivalents that lack those columns — the #878 regression.
+     * Olympics-aware nav is a separate feature decision.
+     */
+    protected function rewriteTableNames(string $query): string
+    {
+        return $query;
     }
 
     /** @see NavigationRepositoryInterface::resolveTeamId() */
@@ -29,7 +38,7 @@ class NavigationRepository extends \BaseMysqliRepository implements NavigationRe
     {
         $row = $this->fetchOne(
             "SELECT teamid
-             FROM {$this->teamInfoTable}
+             FROM `ibl_team_info`
              WHERE gm_username = ?
              LIMIT 1",
             's',
@@ -52,8 +61,8 @@ class NavigationRepository extends \BaseMysqliRepository implements NavigationRe
     {
         $rows = $this->fetchAll(
             "SELECT ti.teamid, ti.team_name, ti.team_city, s.division, s.conference
-             FROM {$this->teamInfoTable} ti
-             JOIN {$this->standingsTable} s ON ti.team_name = s.team_name
+             FROM `ibl_team_info` ti
+             JOIN `ibl_standings` s ON ti.team_name = s.team_name
              ORDER BY s.conference, s.division, ti.team_city",
             ''
         );

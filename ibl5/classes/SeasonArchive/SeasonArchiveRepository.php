@@ -27,14 +27,9 @@ use SeasonArchive\Contracts\SeasonArchiveRepositoryInterface;
  */
 class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArchiveRepositoryInterface
 {
-    private string $teamInfoTable;
-    private string $standingsTable;
-
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
-        $this->teamInfoTable = $this->resolveTable('ibl_team_info');
-        $this->standingsTable = $this->resolveTable('ibl_standings');
     }
 
     /**
@@ -182,7 +177,7 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
             JOIN `ibl_gm_tenures` gt ON ga.name = gt.gm_display_name
                 AND ga.year >= gt.start_season_year
                 AND (gt.end_season_year IS NULL OR ga.year <= gt.end_season_year)
-            JOIN {$this->teamInfoTable} ti ON gt.franchise_id = ti.teamid
+            JOIN `ibl_team_info` ti ON gt.franchise_id = ti.teamid
             ORDER BY ga.year ASC"
         );
     }
@@ -196,7 +191,7 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
         return $this->fetchAll(
             "SELECT gt.gm_display_name, gt.start_season_year, gt.end_season_year, ti.team_name
             FROM `ibl_gm_tenures` gt
-            JOIN {$this->teamInfoTable} ti ON gt.franchise_id = ti.teamid
+            JOIN `ibl_team_info` ti ON gt.franchise_id = ti.teamid
             ORDER BY gt.start_season_year ASC"
         );
     }
@@ -210,7 +205,7 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
         return $this->fetchAll(
             "SELECT hwl.year, hwl.currentname, hwl.namethatyear, hwl.wins, hwl.losses
             FROM `ibl_heat_win_loss` hwl
-            JOIN {$this->teamInfoTable} ti ON ti.team_name = hwl.currentname
+            JOIN `ibl_team_info` ti ON ti.team_name = hwl.currentname
             WHERE hwl.year = ?
                 AND ti.teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
             ORDER BY hwl.wins DESC, hwl.losses ASC",
@@ -267,7 +262,7 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
     public function getTeamConferences(): array
     {
         $rows = $this->fetchAll(
-            "SELECT team_name, conference FROM {$this->standingsTable} WHERE conference <> ''"
+            "SELECT team_name, conference FROM `ibl_standings` WHERE conference <> ''"
         );
 
         $map = [];

@@ -625,17 +625,11 @@ class StandingsUpdaterTest extends TestCase
 
     public function testOlympicsContextUpsertsOlympicsStandingsTable(): void
     {
+        // Drive the executeQuery() rewrite path: the repo's backtick-quoted
+        // tables are rewritten to Olympics equivalents when the context is
+        // Olympics (isOlympics() === true), via LeagueContext::TABLE_MAP.
         $olympicsContext = $this->createStub(\League\LeagueContext::class);
-        $olympicsContext->method('getTableName')->willReturnCallback(
-            static function (string $table): string {
-                return match ($table) {
-                    'ibl_standings' => 'ibl_olympics_standings',
-                    'ibl_schedule' => 'ibl_olympics_schedule',
-                    'ibl_league_config' => 'ibl_olympics_league_config',
-                    default => $table,
-                };
-            }
-        );
+        $olympicsContext->method('isOlympics')->willReturn(true);
 
         $olympicsRepo = new StandingsRepository($this->mockDb, $olympicsContext);
         $updater = new TestableStandingsUpdater($olympicsRepo, $this->mockSeason, true);
@@ -659,16 +653,7 @@ class StandingsUpdaterTest extends TestCase
     public function testOlympicsContextFetchTeamMapQueriesOlympicsLeagueConfig(): void
     {
         $olympicsContext = $this->createStub(\League\LeagueContext::class);
-        $olympicsContext->method('getTableName')->willReturnCallback(
-            static function (string $table): string {
-                return match ($table) {
-                    'ibl_standings' => 'ibl_olympics_standings',
-                    'ibl_schedule' => 'ibl_olympics_schedule',
-                    'ibl_league_config' => 'ibl_olympics_league_config',
-                    default => $table,
-                };
-            }
-        );
+        $olympicsContext->method('isOlympics')->willReturn(true);
 
         $olympicsRepo = new StandingsRepository($this->mockDb, $olympicsContext);
         $updater = new \Updater\StandingsUpdater($olympicsRepo, $this->mockSeason, true);

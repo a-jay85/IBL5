@@ -16,14 +16,9 @@ use LeagueSchedule\Contracts\LeagueScheduleRepositoryInterface;
  */
 class LeagueScheduleRepository extends \BaseMysqliRepository implements LeagueScheduleRepositoryInterface
 {
-    private string $scheduleTable;
-    private string $standingsTable;
-
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
-        $this->scheduleTable = $this->resolveTable('ibl_schedule');
-        $this->standingsTable = $this->resolveTable('ibl_standings');
     }
 
     /**
@@ -35,7 +30,7 @@ class LeagueScheduleRepository extends \BaseMysqliRepository implements LeagueSc
     {
         $query = "SELECT s.id, s.game_date, s.visitor_teamid, s.visitor_score, s.home_teamid, s.home_score, s.box_id,
                   bst.game_of_that_day
-                  FROM {$this->scheduleTable} s
+                  FROM `ibl_schedule` s
                   LEFT JOIN " . $this->gameOfThatDaySubquery() . " bst ON bst.game_date = s.game_date AND bst.visitor_teamid = s.visitor_teamid AND bst.home_teamid = s.home_teamid
                   WHERE s.season_year = ?
                   ORDER BY s.game_date ASC, s.id ASC";
@@ -57,7 +52,7 @@ class LeagueScheduleRepository extends \BaseMysqliRepository implements LeagueSc
     public function getTeamRecords(): array
     {
         $rows = $this->fetchAll(
-            "SELECT teamid, league_record FROM {$this->standingsTable} ORDER BY teamid ASC"
+            "SELECT teamid, league_record FROM `ibl_standings` ORDER BY teamid ASC"
         );
 
         /** @var array<int, string> $records */

@@ -27,21 +27,11 @@ use Standings\Contracts\StandingsRepositoryInterface;
  */
 class StandingsRepository extends \BaseMysqliRepository implements StandingsRepositoryInterface
 {
-    private string $standingsTable;
-    private string $powerTable;
-    private string $teamInfoTable;
-    private string $scheduleTable;
-    private string $leagueConfigTable;
     private string $teamAwardsTable;
 
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
-        $this->standingsTable = $this->resolveTable('ibl_standings');
-        $this->powerTable = $this->resolveTable('ibl_power');
-        $this->teamInfoTable = $this->resolveTable('ibl_team_info');
-        $this->scheduleTable = $this->resolveTable('ibl_schedule');
-        $this->leagueConfigTable = $this->resolveTable('ibl_league_config');
         $this->teamAwardsTable = 'ibl_team_awards';
     }
 
@@ -102,8 +92,8 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
             (s.away_wins + s.away_losses) AS awayGames,
             t.color1,
             t.color2
-            FROM {$this->standingsTable} s
-            JOIN {$this->teamInfoTable} t ON s.teamid = t.teamid
+            FROM `ibl_standings` s
+            JOIN `ibl_team_info` t ON s.teamid = t.teamid
             WHERE s.{$columns['grouping']} = ?
             ORDER BY s.{$columns['gbColumn']} ASC,
                 (COALESCE(s.clinched_league, 0) * 4
@@ -137,8 +127,8 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
                 (s.away_wins + s.away_losses) AS awayGames,
                 s.conference, s.division,
                 t.color1, t.color2
-            FROM {$this->standingsTable} s
-            JOIN {$this->teamInfoTable} t ON s.teamid = t.teamid",
+            FROM `ibl_standings` s
+            JOIN `ibl_team_info` t ON s.teamid = t.teamid",
             ""
         );
     }
@@ -152,7 +142,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
     {
         /** @var StreakRow|null */
         return $this->fetchOne(
-            "SELECT last_win, last_loss, streak_type, streak, ranking, sos, remaining_sos, sos_rank, remaining_sos_rank FROM {$this->powerTable} WHERE teamid = ?",
+            "SELECT last_win, last_loss, streak_type, streak, ranking, sos, remaining_sos, sos_rank, remaining_sos_rank FROM `ibl_power` WHERE teamid = ?",
             "i",
             $teamId
         );
@@ -196,7 +186,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
     {
         /** @var list<array{teamid: int, last_win: int, last_loss: int, streak_type: string, streak: int, ranking: int, sos: float|string, remaining_sos: float|string, sos_rank: int, remaining_sos_rank: int}> $rows */
         $rows = $this->fetchAll(
-            "SELECT teamid, last_win, last_loss, streak_type, streak, ranking, sos, remaining_sos, sos_rank, remaining_sos_rank FROM {$this->powerTable}",
+            "SELECT teamid, last_win, last_loss, streak_type, streak, ranking, sos, remaining_sos, sos_rank, remaining_sos_rank FROM `ibl_power`",
             ""
         );
 
@@ -269,7 +259,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
     public function upsertStandings(array $params): void
     {
         $this->execute(
-            "INSERT INTO {$this->standingsTable} (
+            "INSERT INTO `ibl_standings` (
                 teamid, team_name, league_record, wins, losses, pct, games_unplayed,
                 conference, conf_gb, conf_record,
                 division, div_gb, div_record,
@@ -339,7 +329,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
     public function updateMagicNumber(int $teamid, int $magicNumber, string $magicNumberColumn): void
     {
         $this->execute(
-            "UPDATE {$this->standingsTable} SET {$magicNumberColumn} = ? WHERE teamid = ?",
+            "UPDATE `ibl_standings` SET {$magicNumberColumn} = ? WHERE teamid = ?",
             "ii",
             $magicNumber,
             $teamid
@@ -352,7 +342,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
     public function updateClinchedFlag(string $teamName, string $clinchedColumn): void
     {
         $this->execute(
-            "UPDATE {$this->standingsTable} SET {$clinchedColumn} = 1 WHERE team_name = ?",
+            "UPDATE `ibl_standings` SET {$clinchedColumn} = 1 WHERE team_name = ?",
             "s",
             $teamName
         );
@@ -384,7 +374,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
         /** @var list<array{teamid: int, team_name: string, home_wins: int, home_losses: int, away_wins: int, away_losses: int}> */
         return $this->fetchAll(
             "SELECT teamid, team_name, home_wins, home_losses, away_wins, away_losses
-            FROM {$this->standingsTable}
+            FROM `ibl_standings`
             WHERE {$grouping} = ?
             ORDER BY pct DESC",
             "s",
@@ -403,7 +393,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
             /** @var list<array{teamid: int, team_name: string, wins: int}> */
             return $this->fetchAll(
                 "SELECT teamid, team_name, home_wins + away_wins AS wins
-                FROM {$this->standingsTable}
+                FROM `ibl_standings`
                 WHERE {$grouping} = ?
                 ORDER BY wins DESC
                 LIMIT 2",
@@ -415,7 +405,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
         /** @var list<array{teamid: int, team_name: string, wins: int}> */
         return $this->fetchAll(
             "SELECT teamid, team_name, home_wins + away_wins AS wins
-            FROM {$this->standingsTable}
+            FROM `ibl_standings`
             ORDER BY wins DESC
             LIMIT 2",
             ""
@@ -433,7 +423,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
             /** @var array{losses: int}|null */
             return $this->fetchOne(
                 "SELECT home_losses + away_losses AS losses
-                FROM {$this->standingsTable}
+                FROM `ibl_standings`
                 WHERE {$grouping} = ?
                     AND team_name <> ?
                 ORDER BY losses ASC
@@ -447,7 +437,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
         /** @var array{losses: int}|null */
         return $this->fetchOne(
             "SELECT home_losses + away_losses AS losses
-            FROM {$this->standingsTable}
+            FROM `ibl_standings`
             WHERE team_name <> ?
             ORDER BY losses ASC
             LIMIT 1",
@@ -463,13 +453,13 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
     {
         if ($grouping !== null && $grouping !== '' && $region !== null && $region !== '') {
             $result = $this->fetchOne(
-                "SELECT MAX(games_unplayed) AS maxLeft FROM {$this->standingsTable} WHERE {$grouping} = ?",
+                "SELECT MAX(games_unplayed) AS maxLeft FROM `ibl_standings` WHERE {$grouping} = ?",
                 "s",
                 $region
             );
         } else {
             $result = $this->fetchOne(
-                "SELECT MAX(games_unplayed) AS maxLeft FROM {$this->standingsTable}",
+                "SELECT MAX(games_unplayed) AS maxLeft FROM `ibl_standings`",
                 ""
             );
         }
@@ -489,7 +479,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
                     WHEN (visitor_teamid = ? AND visitor_score > home_score) OR (home_teamid = ? AND home_score > visitor_score) THEN 1
                     ELSE 0
                 END) AS team1_wins
-            FROM {$this->scheduleTable}
+            FROM `ibl_schedule`
             WHERE visitor_score > 0 AND home_score > 0
             AND game_date BETWEEN ? AND ?
             AND ((visitor_teamid = ? AND home_teamid = ?) OR (visitor_teamid = ? AND home_teamid = ?))",
@@ -522,7 +512,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
         /** @var list<array{team_slot: int, team_name: string, conference: string, division: string}> $rows */
         $rows = $this->fetchAll(
             "SELECT team_slot, team_name, conference, division
-            FROM {$this->leagueConfigTable}
+            FROM `ibl_league_config`
             WHERE season_ending_year = ?",
             "i",
             $seasonEndingYear
@@ -551,7 +541,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
         /** @var list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}> */
         return $this->fetchAll(
             "SELECT visitor_teamid, visitor_score, home_teamid, home_score
-            FROM {$this->scheduleTable}
+            FROM `ibl_schedule`
             WHERE visitor_score > 0 AND home_score > 0
             AND game_date BETWEEN ? AND ?
             ORDER BY game_date ASC",
@@ -571,7 +561,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
         /** @var list<array{team_name: string, wins: int}> */
         return $this->fetchAll(
             "SELECT team_name, home_wins + away_wins AS wins
-            FROM {$this->standingsTable}
+            FROM `ibl_standings`
             WHERE conference = ?
             ORDER BY wins DESC
             LIMIT 8",
@@ -590,7 +580,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
         /** @var list<array{losses: int}> */
         return $this->fetchAll(
             "SELECT home_losses + away_losses AS losses
-            FROM {$this->standingsTable}
+            FROM `ibl_standings`
             WHERE conference = ?
             ORDER BY losses DESC
             LIMIT 6",
@@ -609,10 +599,10 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
         /** @var list<array{teamid: int, game_count: int}> $rows */
         $rows = $this->fetchAll(
             "SELECT teamid, COUNT(*) AS game_count FROM (
-                SELECT visitor_teamid AS teamid FROM {$this->scheduleTable}
+                SELECT visitor_teamid AS teamid FROM `ibl_schedule`
                 WHERE game_date BETWEEN ? AND ?
                 UNION ALL
-                SELECT home_teamid AS teamid FROM {$this->scheduleTable}
+                SELECT home_teamid AS teamid FROM `ibl_schedule`
                 WHERE game_date BETWEEN ? AND ?
             ) AS all_games
             GROUP BY teamid",

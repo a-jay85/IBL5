@@ -14,14 +14,9 @@ use League\LeagueContext;
  */
 class ApiTeamRepository extends \BaseMysqliRepository
 {
-    private string $teamInfoTable;
-    private string $standingsTable;
-
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
-        $this->teamInfoTable = $this->resolveTable('ibl_team_info');
-        $this->standingsTable = $this->resolveTable('ibl_standings');
     }
 
     /**
@@ -38,8 +33,8 @@ class ApiTeamRepository extends \BaseMysqliRepository
             "SELECT t.teamid, t.uuid, t.team_city, t.team_name, t.owner_name, t.arena,
                     s.conference, s.division,
                     t.discord_id
-             FROM {$this->teamInfoTable} t
-             LEFT JOIN {$this->standingsTable} s ON t.teamid = s.teamid
+             FROM `ibl_team_info` t
+             LEFT JOIN `ibl_standings` s ON t.teamid = s.teamid
              WHERE t.teamid BETWEEN 1 AND ?
              ORDER BY {$orderBy}
              LIMIT ? OFFSET ?",
@@ -57,7 +52,7 @@ class ApiTeamRepository extends \BaseMysqliRepository
     {
         /** @var array{total: int}|null $row */
         $row = $this->fetchOne(
-            "SELECT COUNT(*) AS total FROM {$this->teamInfoTable} WHERE teamid BETWEEN 1 AND ?",
+            "SELECT COUNT(*) AS total FROM `ibl_team_info` WHERE teamid BETWEEN 1 AND ?",
             'i',
             League::MAX_REAL_TEAMID
         );
@@ -88,8 +83,8 @@ class ApiTeamRepository extends \BaseMysqliRepository
                     s.away_wins AS away_wins,
                     s.away_losses AS away_losses,
                     s.games_unplayed AS games_remaining
-             FROM {$this->teamInfoTable} t
-             LEFT JOIN {$this->standingsTable} s ON t.teamid = s.teamid
+             FROM `ibl_team_info` t
+             LEFT JOIN `ibl_standings` s ON t.teamid = s.teamid
              WHERE t.uuid = ?",
             's',
             $uuid

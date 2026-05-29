@@ -20,24 +20,9 @@ use League\LeagueContext;
  */
 class LastSimRecapRepository extends \BaseMysqliRepository implements LastSimRecapRepositoryInterface
 {
-    private string $simDatesTable;
-    private string $scheduleTable;
-    private string $boxScoresTable;
-    private string $boxScoresTeamsTable;
-    private string $transactionsTable;
-    private string $plrTable;
-    private string $teamInfoTable;
-
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
-        $this->simDatesTable = $this->resolveTable('ibl_sim_dates');
-        $this->scheduleTable = $this->resolveTable('ibl_schedule');
-        $this->boxScoresTable = $this->resolveTable('ibl_box_scores');
-        $this->boxScoresTeamsTable = $this->resolveTable('ibl_box_scores_teams');
-        $this->transactionsTable = $this->resolveTable('ibl_jsb_transactions');
-        $this->plrTable = $this->resolveTable('ibl_plr');
-        $this->teamInfoTable = $this->resolveTable('ibl_team_info');
     }
 
     /**
@@ -47,7 +32,7 @@ class LastSimRecapRepository extends \BaseMysqliRepository implements LastSimRec
     {
         /** @var array{sim:int,start_date:string|null,end_date:string|null}|null $row */
         $row = $this->fetchOne(
-            "SELECT sim, start_date, end_date FROM {$this->simDatesTable} ORDER BY sim DESC LIMIT 1"
+            "SELECT sim, start_date, end_date FROM `ibl_sim_dates` ORDER BY sim DESC LIMIT 1"
         );
 
         if ($row === null || $row['start_date'] === null || $row['end_date'] === null) {
@@ -69,7 +54,7 @@ class LastSimRecapRepository extends \BaseMysqliRepository implements LastSimRec
         /** @var list<array{id:int,box_id:int,game_date:string,visitor_teamid:int,visitor_score:int,home_teamid:int,home_score:int,season_year:int}> $rows */
         $rows = $this->fetchAll(
             "SELECT id, box_id, game_date, visitor_teamid, visitor_score, home_teamid, home_score, season_year
-             FROM {$this->scheduleTable}
+             FROM `ibl_schedule`
              WHERE game_date BETWEEN ? AND ?
                AND (visitor_teamid = ? OR home_teamid = ?)
              ORDER BY game_date ASC, id ASC",
@@ -114,7 +99,7 @@ class LastSimRecapRepository extends \BaseMysqliRepository implements LastSimRec
                     home_q1_points, home_q2_points, home_q3_points, home_q4_points, home_ot_points,
                     visitor_wins, visitor_losses, home_wins, home_losses,
                     COALESCE(game_of_that_day, 0) AS game_of_that_day
-             FROM {$this->boxScoresTeamsTable}
+             FROM `ibl_box_scores_teams`
              WHERE game_date = ? AND visitor_teamid = ? AND home_teamid = ?
              ORDER BY id ASC
              LIMIT 1",
@@ -180,8 +165,8 @@ class LastSimRecapRepository extends \BaseMysqliRepository implements LastSimRec
                        DATEDIFF(DATE_ADD({$dateExpr}, INTERVAL t.injury_games_missed DAY), ?) AS days_remaining,
                        DATE_FORMAT(DATE_ADD({$dateExpr}, INTERVAL t.injury_games_missed DAY), '%Y-%m-%d') AS return_date,
                        ({$dateExpr} = ?) AS is_new
-                FROM {$this->transactionsTable} t
-                JOIN {$this->plrTable} p ON p.pid = t.pid
+                FROM `ibl_jsb_transactions` t
+                JOIN `ibl_plr` p ON p.pid = t.pid
                 WHERE t.transaction_type = 1
                   AND t.pid IN ($placeholders)
                   AND t.injury_games_missed IS NOT NULL
@@ -226,7 +211,7 @@ class LastSimRecapRepository extends \BaseMysqliRepository implements LastSimRec
     {
         /** @var list<array{pid:int}> $rows */
         $rows = $this->fetchAll(
-            "SELECT pid FROM {$this->plrTable} WHERE teamid = ? AND retired = 0",
+            "SELECT pid FROM `ibl_plr` WHERE teamid = ? AND retired = 0",
             "i",
             $tid
         );
@@ -249,7 +234,7 @@ class LastSimRecapRepository extends \BaseMysqliRepository implements LastSimRec
                         WHEN pf_depth = 1 THEN 'PF'
                         WHEN c_depth  = 1 THEN 'C'
                     END AS pos
-             FROM {$this->plrTable}
+             FROM `ibl_plr`
              WHERE teamid = ?
                AND retired = 0
                AND (pg_depth = 1 OR sg_depth = 1 OR sf_depth = 1 OR pf_depth = 1 OR c_depth = 1)",
@@ -324,7 +309,7 @@ class LastSimRecapRepository extends \BaseMysqliRepository implements LastSimRec
     {
         /** @var array{game_date:string|null,visitor_teamid:int|null,home_teamid:int|null}|null $game */
         $game = $this->fetchOne(
-            "SELECT game_date, visitor_teamid, home_teamid FROM {$this->scheduleTable} WHERE id = ? LIMIT 1",
+            "SELECT game_date, visitor_teamid, home_teamid FROM `ibl_schedule` WHERE id = ? LIMIT 1",
             "i",
             $schedId
         );
@@ -336,7 +321,7 @@ class LastSimRecapRepository extends \BaseMysqliRepository implements LastSimRec
         /** @var list<array{pid:int,pos:string,game_min:int}> $rows */
         $rows = $this->fetchAll(
             "SELECT pid, pos, game_min
-             FROM {$this->boxScoresTable}
+             FROM `ibl_box_scores`
              WHERE game_date = ?
                AND visitor_teamid = ?
                AND home_teamid = ?
@@ -368,7 +353,7 @@ class LastSimRecapRepository extends \BaseMysqliRepository implements LastSimRec
     {
         /** @var array{game_date:string|null,visitor_teamid:int|null,home_teamid:int|null}|null $game */
         $game = $this->fetchOne(
-            "SELECT game_date, visitor_teamid, home_teamid FROM {$this->scheduleTable} WHERE id = ? LIMIT 1",
+            "SELECT game_date, visitor_teamid, home_teamid FROM `ibl_schedule` WHERE id = ? LIMIT 1",
             "i",
             $schedId
         );
@@ -380,7 +365,7 @@ class LastSimRecapRepository extends \BaseMysqliRepository implements LastSimRec
         /** @var array{pid:int,name:string,pos:string,calc_points:int|null,calc_rebounds:int|null,game_ast:int|null,game_stl:int|null,game_blk:int|null,game_min:int|null}|null $row */
         $row = $this->fetchOne(
             "SELECT pid, name, pos, calc_points, calc_rebounds, game_ast, game_stl, game_blk, game_min
-             FROM {$this->boxScoresTable}
+             FROM `ibl_box_scores`
              WHERE game_date = ?
                AND visitor_teamid = ?
                AND home_teamid = ?
@@ -432,7 +417,7 @@ class LastSimRecapRepository extends \BaseMysqliRepository implements LastSimRec
                       OR (home_teamid    = ? AND home_score    < visitor_score)
                     THEN 1 ELSE 0
                 END) AS losses
-             FROM {$this->scheduleTable}
+             FROM `ibl_schedule`
              WHERE (visitor_teamid = ? OR home_teamid = ?)
                AND game_date <= ?
                AND (visitor_score > 0 OR home_score > 0)",
@@ -453,7 +438,7 @@ class LastSimRecapRepository extends \BaseMysqliRepository implements LastSimRec
     {
         /** @var array{teamid:int,team_city:string,team_name:string}|null $row */
         $row = $this->fetchOne(
-            "SELECT teamid, team_city, team_name FROM {$this->teamInfoTable} WHERE teamid = ? LIMIT 1",
+            "SELECT teamid, team_city, team_name FROM `ibl_team_info` WHERE teamid = ? LIMIT 1",
             "i",
             $tid
         );

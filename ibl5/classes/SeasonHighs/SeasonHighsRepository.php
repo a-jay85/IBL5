@@ -20,20 +20,9 @@ use SeasonHighs\Contracts\SeasonHighsServiceInterface;
  */
 class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighsRepositoryInterface
 {
-    private string $boxScoresTable;
-    private string $boxScoresTeamsTable;
-    private string $teamInfoTable;
-    private string $scheduleTable;
-    private string $playerTable;
-
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
-        $this->boxScoresTable = $this->resolveTable('ibl_box_scores');
-        $this->boxScoresTeamsTable = $this->resolveTable('ibl_box_scores_teams');
-        $this->teamInfoTable = $this->resolveTable('ibl_team_info');
-        $this->scheduleTable = $this->resolveTable('ibl_schedule');
-        $this->playerTable = $this->resolveTable('ibl_plr');
     }
 
     /**
@@ -74,10 +63,10 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
                 bs.`game_date` AS `date`, sch.`box_id`,
                 COALESCE(bs.`game_of_that_day`, 0) AS game_of_that_day,
                 {$statExpression} AS `{$safeStatName}`
-                FROM {$this->boxScoresTable} bs
-                JOIN {$this->playerTable} p ON bs.pid = p.pid
-                LEFT JOIN {$this->teamInfoTable} t ON p.teamid = t.teamid
-                LEFT JOIN {$this->scheduleTable} sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
+                FROM `ibl_box_scores` bs
+                JOIN `ibl_plr` p ON bs.pid = p.pid
+                LEFT JOIN `ibl_team_info` t ON p.teamid = t.teamid
+                LEFT JOIN `ibl_schedule` sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
                 WHERE bs.`game_date` BETWEEN ? AND ?{$locationCondition}
                 ORDER BY `{$safeStatName}` DESC, bs.`game_date` ASC
                 LIMIT {$limit}";
@@ -89,9 +78,9 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
                 bs.`name`, bs.`game_date` AS `date`, sch.`box_id`,
                 COALESCE(bs.`game_of_that_day`, 0) AS game_of_that_day,
                 {$statExpression} AS `{$safeStatName}`
-                FROM {$this->boxScoresTeamsTable} bs
-                JOIN {$this->teamInfoTable} t ON bs.name = t.team_name
-                LEFT JOIN {$this->scheduleTable} sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
+                FROM `ibl_box_scores_teams` bs
+                JOIN `ibl_team_info` t ON bs.name = t.team_name
+                LEFT JOIN `ibl_schedule` sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
                 WHERE bs.`game_date` BETWEEN ? AND ?
                 ORDER BY `{$safeStatName}` DESC, bs.`game_date` ASC
                 LIMIT {$limit}";
@@ -154,10 +143,10 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
                     bs.`game_date` AS `date`, sch.`box_id`,
                     COALESCE(bs.`game_of_that_day`, 0) AS game_of_that_day,
                     ({$statExpression}) AS stat_value
-                    FROM {$this->boxScoresTable} bs
-                    JOIN {$this->playerTable} p ON bs.pid = p.pid
-                    LEFT JOIN {$this->teamInfoTable} t ON p.teamid = t.teamid
-                    LEFT JOIN {$this->scheduleTable} sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
+                    FROM `ibl_box_scores` bs
+                    JOIN `ibl_plr` p ON bs.pid = p.pid
+                    LEFT JOIN `ibl_team_info` t ON p.teamid = t.teamid
+                    LEFT JOIN `ibl_schedule` sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
                     WHERE bs.`game_date` BETWEEN ? AND ?{$locationCondition}
                     ORDER BY stat_value DESC, bs.`game_date` ASC
                     LIMIT {$safeLimit})";
@@ -166,9 +155,9 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
                     bs.`name`, bs.`game_date` AS `date`, sch.`box_id`,
                     COALESCE(bs.`game_of_that_day`, 0) AS game_of_that_day,
                     ({$statExpression}) AS stat_value
-                    FROM {$this->boxScoresTeamsTable} bs
-                    JOIN {$this->teamInfoTable} t ON bs.name = t.team_name
-                    LEFT JOIN {$this->scheduleTable} sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
+                    FROM `ibl_box_scores_teams` bs
+                    JOIN `ibl_team_info` t ON bs.name = t.team_name
+                    LEFT JOIN `ibl_schedule` sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
                     WHERE bs.`game_date` BETWEEN ? AND ?
                     ORDER BY stat_value DESC, bs.`game_date` ASC
                     LIMIT {$safeLimit})";

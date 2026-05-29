@@ -16,15 +16,11 @@ use Season\Contracts\SeasonQueryRepositoryInterface;
  */
 class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQueryRepositoryInterface
 {
-    private string $boxScoresTable;
-    private string $scheduleTable;
     private string $league;
 
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
-        $this->boxScoresTable = $this->resolveTable('ibl_box_scores');
-        $this->scheduleTable = $this->resolveTable('ibl_schedule');
         $this->league = $leagueContext !== null ? $leagueContext->getCurrentLeague() : LeagueContext::LEAGUE_IBL;
     }
 
@@ -99,7 +95,7 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
     {
         /** @var array{game_date: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT game_date FROM {$this->boxScoresTable} ORDER BY game_date ASC LIMIT 1"
+            "SELECT game_date FROM `ibl_box_scores` ORDER BY game_date ASC LIMIT 1"
         );
 
         return $result['game_date'] ?? '';
@@ -114,7 +110,7 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
     {
         /** @var array{game_date: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT game_date FROM {$this->boxScoresTable} ORDER BY game_date DESC LIMIT 1"
+            "SELECT game_date FROM `ibl_box_scores` ORDER BY game_date DESC LIMIT 1"
         );
 
         return $result['game_date'] ?? '';
@@ -173,7 +169,7 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
 
         /** @var array{max_date: string|null}|null $result */
         $result = $this->fetchOne(
-            "SELECT MAX(game_date) AS max_date FROM {$this->scheduleTable} WHERE game_date < ?",
+            "SELECT MAX(game_date) AS max_date FROM `ibl_schedule` WHERE game_date < ?",
             "s",
             $playoffsStart
         );

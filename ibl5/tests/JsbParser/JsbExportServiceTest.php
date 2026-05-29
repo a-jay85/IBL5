@@ -16,6 +16,7 @@ use PHPUnit\Framework\TestCase;
  */
 class JsbExportServiceTest extends TestCase
 {
+    /** @var JsbExportRepositoryInterface&\PHPUnit\Framework\MockObject\Stub */
     private JsbExportRepositoryInterface $stubRepo;
 
     protected function setUp(): void

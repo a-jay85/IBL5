@@ -15,9 +15,13 @@ use Updater\Steps\ImportLeagueConfigStep;
 
 class ImportLeagueConfigStepTest extends TestCase
 {
+    /** @var LeagueConfigRepository&\PHPUnit\Framework\MockObject\Stub */
     private LeagueConfigRepository $stubRepo;
+    /** @var LeagueConfigService&\PHPUnit\Framework\MockObject\Stub */
     private LeagueConfigService $stubService;
+    /** @var LeagueConfigView&\PHPUnit\Framework\MockObject\Stub */
     private LeagueConfigView $stubView;
+    /** @var JsbSourceResolverInterface&\PHPUnit\Framework\MockObject\Stub */
     private JsbSourceResolverInterface $stubResolver;
 
     protected function setUp(): void

@@ -12,7 +12,9 @@ use Updater\Steps\ExtractFromBackupStep;
 
 class ExtractFromBackupStepTest extends TestCase
 {
+    /** @var BackupArchiveLocatorInterface&\PHPUnit\Framework\MockObject\Stub */
     private BackupArchiveLocatorInterface $stubLocator;
+    /** @var Season&\PHPUnit\Framework\MockObject\Stub */
     private Season $stubSeason;
 
     protected function setUp(): void
@@ -80,6 +82,7 @@ class ExtractFromBackupStepTest extends TestCase
     public function testCustomBackupDirIsUsedWhenProvided(): void
     {
         $customDir = '/custom/olympics/backups';
+        /** @var BackupArchiveLocatorInterface&\PHPUnit\Framework\MockObject\MockObject */
         $mockLocator = $this->createMock(BackupArchiveLocatorInterface::class);
         $mockLocator->expects($this->once())
             ->method('findLatestArchive')

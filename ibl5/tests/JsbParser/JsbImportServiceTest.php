@@ -17,7 +17,9 @@ use PHPUnit\Framework\TestCase;
  */
 class JsbImportServiceTest extends TestCase
 {
+    /** @var JsbImportRepositoryInterface&\PHPUnit\Framework\MockObject\Stub */
     private JsbImportRepositoryInterface $stubRepo;
+    /** @var PlayerIdResolver&\PHPUnit\Framework\MockObject\Stub */
     private PlayerIdResolver $stubResolver;
 
     protected function setUp(): void

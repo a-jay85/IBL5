@@ -97,6 +97,28 @@ test.describe('Navigation bar smoke tests (public)', () => {
 
 });
 
+// Shared-layout Lighthouse fixes (issue #906): every page must expose exactly one
+// main landmark (role="main" on #site-content) and a favicon <link> in <head>.
+// Verified across the homepage and a module page (Schedule previously failed
+// landmark-one-main in the Lighthouse audit).
+test.describe('Shared layout landmark and favicon (public)', () => {
+  for (const path of ['index.php', 'modules.php?name=Schedule']) {
+    test(`exactly one main landmark on ${path}`, async ({ page }) => {
+      await page.goto(path);
+      await assertNoPhpErrors(page, `on ${path}`);
+      // Not zero (landmark present) and not duplicate (duplicate also fails the audit).
+      await expect(page.locator('main, [role="main"]')).toHaveCount(1);
+    });
+
+    test(`favicon link present in head on ${path}`, async ({ page }) => {
+      await page.goto(path);
+      await assertNoPhpErrors(page, `on ${path}`);
+      // Head links are never "visible"; assert attachment instead.
+      await expect(page.locator('link[rel="icon"]')).toBeAttached();
+    });
+  }
+});
+
 test.describe('Navigation bar smoke tests (mobile viewport)', () => {
   test.use({ navigationTimeout: 30_000 });
   test.use({ viewport: { width: 375, height: 812 } });

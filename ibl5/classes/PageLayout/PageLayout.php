@@ -166,9 +166,8 @@ class PageLayout
             echo "</SCRIPT>\n\n";
         }
 
-        if (file_exists("themes/$ThemeSel/images/favicon.ico")) {
-            echo "<link REL=\"shortcut icon\" HREF=\"themes/$ThemeSel/images/favicon.ico\" TYPE=\"image/x-icon\">\n";
-        }
+        // Root-absolute path so it resolves independently of the conditional <base href> and module depth.
+        echo "<link rel=\"icon\" href=\"/ibl5/favicon.ico\" type=\"image/x-icon\">\n";
         // Google Fonts (inlined from includes/custom_files/custom_head.php)
         echo '<link rel="preconnect" href="https://fonts.googleapis.com">';
         echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>';

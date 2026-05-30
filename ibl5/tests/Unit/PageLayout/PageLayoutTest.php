@@ -100,6 +100,43 @@ class PageLayoutTest extends TestCase
         self::assertStringContainsString('<title>', $output);
     }
 
+    public function testHeaderNonBoostedEmitsExpectedHeadResources(): void
+    {
+        // Characterization: lock the non-boosted <head> baseline before editing it.
+        unset($_SERVER['HTTP_HX_BOOSTED']);
+        ob_start();
+        PageLayout::header();
+        $output = (string) ob_get_clean();
+
+        self::assertStringContainsString('<title>', $output);
+        self::assertStringContainsString('StyleSheet', $output);
+        self::assertStringContainsString('fonts.googleapis.com/css2', $output);
+    }
+
+    public function testHeaderNonBoostedEmitsFaviconLink(): void
+    {
+        unset($_SERVER['HTTP_HX_BOOSTED']);
+        ob_start();
+        PageLayout::header();
+        $output = (string) ob_get_clean();
+
+        // Favicon emitted unconditionally with a root-absolute, depth-independent href.
+        self::assertStringContainsString('rel="icon"', $output);
+        self::assertStringContainsString('href="/ibl5/favicon.ico"', $output);
+    }
+
+    public function testHeaderNonBoostedFaviconHrefIsRootAbsolute(): void
+    {
+        unset($_SERVER['HTTP_HX_BOOSTED']);
+        ob_start();
+        PageLayout::header();
+        $output = (string) ob_get_clean();
+
+        // The old theme-relative favicon path must be gone (it resolved against <base href>/module depth).
+        self::assertStringNotContainsString('images/favicon.ico', $output);
+        self::assertStringNotContainsString('shortcut icon', $output);
+    }
+
     public function testHeaderNonBoostedSkipsRecordHitWhenNoDb(): void
     {
         unset($_SERVER['HTTP_HX_BOOSTED']);

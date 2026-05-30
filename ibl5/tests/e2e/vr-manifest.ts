@@ -170,7 +170,13 @@ export const VR_MANIFEST: VrRow[] = [
     notes: 'Admin-only documentation; static content.' },
   { name: 'trading', auth: 'auth', url: 'modules.php?name=Trading',
     anchor: '.trading-team-select',
-    states: [{ name: 'default', appState: { 'Allow Trades': 'Yes' } }],
+    // Pin the phase via cookie override (Season honors TestCookieOverrides).
+    // 'Allow Trades' alone is insufficient: areTradesAllowed() short-circuits to
+    // false in Playoffs *before* checking that setting, so a concurrent test that
+    // transiently writes DB phase=Playoffs (updater-awards, league-control-panel)
+    // would hide .trading-team-select. 'Free Agency' matches the CI seed default,
+    // so the screenshot baseline is unchanged while making this row immune.
+    states: [{ name: 'default', appState: { 'Current Season Phase': 'Free Agency', 'Allow Trades': 'Yes' } }],
     viewports: ['desktop', 'mobile'] },
   { name: 'training-camp-ratings-diff', auth: 'auth', url: 'modules.php?name=TrainingCampRatingsDiff',
     anchor: '.ratings-diff-page', viewports: ['desktop', 'mobile'],

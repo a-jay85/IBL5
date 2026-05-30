@@ -1,16 +1,28 @@
 import { test, expect } from '../fixtures/auth';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { setAward } from '../helpers/test-state';
 
 // Finals MVP flow — sets Finals MVP for the current season year.
 // Uses auth fixture (admin access required for leagueControlPanel.php).
 // The LCP reads settings from DB directly (not cookie overrides), so
 // the test uses the LCP's own Set Season Phase form to switch to Playoffs.
-// CI uses a fresh DB per run; local re-runs may need manual cleanup:
-//   DELETE FROM ibl_awards WHERE Award='IBL Finals MVP';
-//   UPDATE ibl_settings SET value='Free Agency' WHERE name='Current Season Phase';
+// This flow INSERTS a real 'IBL Finals MVP' award row for SEASON_YEAR; the
+// afterAll below deletes it so it cannot leak into concurrent workers. Without
+// cleanup it persisted in the shared DB and flipped updater-awards' hasFinalsMvp
+// (which reads ibl_awards directly, not via cookie override) — #906 follow-up.
+
+const SEASON_YEAR = 2026; // CI seed 'Current Season Ending Year'
 
 test.describe('LeagueControlPanel — Finals MVP flow', () => {
   test.describe.configure({ mode: 'serial' });
+
+  test.afterEach(async ({ request }) => {
+    // Remove the Finals MVP award this flow inserts so it cannot contaminate
+    // updater-awards (which requires the 2026 'IBL Finals MVP' row to be absent).
+    // afterEach (not afterAll) keeps the cross-worker contamination window to the
+    // single test that creates the award, rather than the whole serial describe.
+    await setAward(request, SEASON_YEAR, 'IBL Finals MVP', false);
+  });
 
   test('page loads without PHP errors', async ({ page }) => {
     await page.goto('leagueControlPanel.php');
@@ -40,8 +52,13 @@ test.describe('LeagueControlPanel — Finals MVP flow', () => {
     const mvpButton = page.locator('button[value="set_finals_mvp"]');
     await expect(mvpButton).toBeVisible();
 
-    // Step 3: Fill and submit Finals MVP
-    await mvpInput.fill('E2E Test MVP');
+    // Step 3: Fill and submit Finals MVP.
+    // Use the '__e2e_test' sentinel name so the afterEach cleanup (which deletes
+    // ibl_awards rows WHERE name='__e2e_test', matching test-state.php's
+    // set-award handler) actually removes this real, form-inserted award row.
+    // A human-readable name would slip past that name-scoped delete and leak the
+    // 2026 'IBL Finals MVP' award into updater-awards (which reads it by year+award).
+    await mvpInput.fill('__e2e_test');
     await Promise.all([
       page.waitForURL(/success=/),
       mvpButton.click(),
@@ -51,7 +68,7 @@ test.describe('LeagueControlPanel — Finals MVP flow', () => {
     await assertNoPhpErrors(page, 'after Finals MVP submission');
     await expect(page.locator('.ibl-alert--success')).toBeVisible();
     const body = await page.locator('body').textContent();
-    expect(body).toContain('E2E Test MVP');
+    expect(body).toContain('__e2e_test');
 
     // Step 5: Reload and verify input is hidden (hasFinalsMvp is now true)
     await page.reload();

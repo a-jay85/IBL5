@@ -79,7 +79,7 @@ final class EngineBundleRepository extends \BaseMysqliRepository implements Engi
     ): array {
         // Canonical "unplayed" convention: both scores 0 (see PowerRankingsUpdater
         // line 129, ScheduleHighlighter). box_id is NOT a played flag.
-        $sql = "SELECT season_year, game_date, visitor_teamid, home_teamid
+        $sql = "SELECT game_date, visitor_teamid, home_teamid
                 FROM `ibl_schedule`
                 WHERE visitor_score = 0 AND home_score = 0 AND season_year = ?";
         $types = 'i';

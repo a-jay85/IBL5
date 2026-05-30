@@ -58,9 +58,12 @@ if (!is_string($yearOpt) || !ctype_digit($yearOpt)) {
     exit(1);
 }
 
+// Only non-negative integers are valid for every option (game-type, seed,
+// league-id). Reject negatives — a negative seed would wrap to a garbage value
+// in the engine's uint64 seed field. Invalid input falls back to the default.
 $intOpt = static function (string $key) use ($opts): ?int {
     $v = $opts[$key] ?? null;
-    return is_string($v) && ($v === '0' || ctype_digit(ltrim($v, '-'))) ? (int) $v : null;
+    return is_string($v) && ctype_digit($v) ? (int) $v : null;
 };
 $strOpt = static function (string $key) use ($opts): ?string {
     $v = $opts[$key] ?? null;

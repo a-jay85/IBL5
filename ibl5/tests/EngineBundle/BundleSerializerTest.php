@@ -114,8 +114,8 @@ class BundleSerializerTest extends TestCase
     }
 
     /**
-     * Negative: a player row missing some fields must still emit all 45 keys
-     * (defaulted), never a silently-dropped key that would break the contract.
+     * Negative: a player row missing some fields must still emit all 44 contract
+     * keys (defaulted), never a silently-dropped key that would break the contract.
      */
     public function testMissingPlayerFieldsStillEmitAllContractKeys(): void
     {

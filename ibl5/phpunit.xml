@@ -213,6 +213,9 @@
         <testsuite name="JsbParser Module Tests">
             <directory>tests/JsbParser</directory>
         </testsuite>
+        <testsuite name="EngineBundle Module Tests">
+            <directory>tests/EngineBundle</directory>
+        </testsuite>
         <testsuite name="Migration Module Tests">
             <directory>tests/Migration</directory>
         </testsuite>

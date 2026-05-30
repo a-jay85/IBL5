@@ -56,8 +56,9 @@ type Event struct {
 }
 
 // PlayerBox is one player's stat line for one game. Fields map 1:1 to the RAW
-// columns of ibl_box_scores. A did-not-play row is expressed as GameMIN == 0
-// (the PR8 loader enforces that convention on write).
+// columns of ibl_box_scores. The engine establishes the did-not-play invariant
+// (a DNP row is emitted as GameMIN == 0 with all stats zero); the PR8 loader
+// persists that row as-is.
 type PlayerBox struct {
 	PID     int    `json:"pid"`
 	Pos     string `json:"pos"`
@@ -78,8 +79,9 @@ type PlayerBox struct {
 }
 
 // TeamBox is one team's totals for one game, mapping to ibl_box_scores_teams.
-// The two TeamBoxes in a GameResult are ordered visitor-first; the
-// visitor=lower-team-id dedupe convention is enforced by the PR8 loader.
+// The engine emits the two TeamBoxes in a GameResult visitor-first. Separately,
+// the PR8 loader enforces the database row-identity dedupe convention
+// (visitor = lower team id) when persisting the pair.
 type TeamBox struct {
 	TeamID int  `json:"team_id"`
 	IsHome bool `json:"is_home"`

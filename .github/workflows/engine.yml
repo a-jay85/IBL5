@@ -1,0 +1,74 @@
+name: Engine
+
+on:
+  push:
+    branches: [ master, develop ]
+    paths:
+      - 'engine/**'
+      - '.github/workflows/engine.yml'
+  pull_request:
+    branches: [ master, develop ]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      engine: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.engine == 'true' }}
+    steps:
+      - uses: dorny/paths-filter@v4
+        id: filter
+        if: github.event_name == 'pull_request'
+        with:
+          filters: |
+            engine:
+              - 'engine/**'
+              - '.github/workflows/engine.yml'
+
+  engine:
+    name: Go build, vet, test
+    needs: [changes]
+    if: needs.changes.outputs.engine == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: engine/go.mod
+
+      - name: Build
+        working-directory: engine
+        run: go build ./...
+
+      - name: Vet
+        working-directory: engine
+        run: go vet ./...
+
+      - name: Test
+        working-directory: engine
+        run: go test ./...
+
+  gate:
+    name: Engine
+    if: always()
+    needs: [changes, engine]
+    runs-on: ubuntu-latest
+    steps:
+      - run: exit 1
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')

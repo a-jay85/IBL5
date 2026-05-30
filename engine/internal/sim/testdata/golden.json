@@ -1,0 +1,179 @@
+{
+  "seed": 1988,
+  "games": [
+    {
+      "date": "1988-11-04",
+      "home_team_id": 3,
+      "visitor_team_id": 7,
+      "game_of_that_day": 1,
+      "sim_game_type": 2,
+      "events": [
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 720,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 700,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 1,
+          "clock_seconds": 700,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "period_boundary",
+          "period": 4,
+          "clock_seconds": 0
+        }
+      ],
+      "player_boxes": [
+        {
+          "pid": 101,
+          "pos": "PG",
+          "gameMIN": 36,
+          "game2GM": 1,
+          "game2GA": 2,
+          "gameFTM": 1,
+          "gameFTA": 2,
+          "game3GM": 0,
+          "game3GA": 1,
+          "gameORB": 1,
+          "gameDRB": 2,
+          "gameAST": 1,
+          "gameSTL": 1,
+          "gameTOV": 1,
+          "gameBLK": 0,
+          "gamePF": 1
+        },
+        {
+          "pid": 102,
+          "pos": "SG",
+          "gameMIN": 18,
+          "game2GM": 1,
+          "game2GA": 2,
+          "gameFTM": 1,
+          "gameFTA": 2,
+          "game3GM": 0,
+          "game3GA": 1,
+          "gameORB": 1,
+          "gameDRB": 2,
+          "gameAST": 1,
+          "gameSTL": 1,
+          "gameTOV": 1,
+          "gameBLK": 0,
+          "gamePF": 1
+        },
+        {
+          "pid": 103,
+          "pos": "C",
+          "gameMIN": 0,
+          "game2GM": 0,
+          "game2GA": 0,
+          "gameFTM": 0,
+          "gameFTA": 0,
+          "game3GM": 0,
+          "game3GA": 0,
+          "gameORB": 0,
+          "gameDRB": 0,
+          "gameAST": 0,
+          "gameSTL": 0,
+          "gameTOV": 0,
+          "gameBLK": 0,
+          "gamePF": 0
+        },
+        {
+          "pid": 201,
+          "pos": "SF",
+          "gameMIN": 34,
+          "game2GM": 1,
+          "game2GA": 2,
+          "gameFTM": 1,
+          "gameFTA": 2,
+          "game3GM": 0,
+          "game3GA": 1,
+          "gameORB": 1,
+          "gameDRB": 2,
+          "gameAST": 1,
+          "gameSTL": 1,
+          "gameTOV": 1,
+          "gameBLK": 0,
+          "gamePF": 1
+        },
+        {
+          "pid": 202,
+          "pos": "PF",
+          "gameMIN": 22,
+          "game2GM": 1,
+          "game2GA": 2,
+          "gameFTM": 1,
+          "gameFTA": 2,
+          "game3GM": 0,
+          "game3GA": 1,
+          "gameORB": 1,
+          "gameDRB": 2,
+          "gameAST": 1,
+          "gameSTL": 1,
+          "gameTOV": 1,
+          "gameBLK": 0,
+          "gamePF": 1
+        }
+      ],
+      "team_boxes": [
+        {
+          "team_id": 7,
+          "is_home": false,
+          "q1": 1,
+          "q2": 1,
+          "q3": 1,
+          "q4": 3,
+          "ot": [],
+          "game2GM": 2,
+          "game2GA": 4,
+          "gameFTM": 2,
+          "gameFTA": 4,
+          "game3GM": 0,
+          "game3GA": 2,
+          "gameORB": 2,
+          "gameDRB": 4,
+          "gameAST": 2,
+          "gameSTL": 2,
+          "gameTOV": 2,
+          "gameBLK": 0,
+          "gamePF": 2
+        },
+        {
+          "team_id": 3,
+          "is_home": true,
+          "q1": 1,
+          "q2": 1,
+          "q3": 1,
+          "q4": 3,
+          "ot": [],
+          "game2GM": 2,
+          "game2GA": 4,
+          "gameFTM": 2,
+          "gameFTA": 4,
+          "game3GM": 0,
+          "game3GA": 2,
+          "gameORB": 2,
+          "gameDRB": 4,
+          "gameAST": 2,
+          "gameSTL": 2,
+          "gameTOV": 2,
+          "gameBLK": 0,
+          "gamePF": 2
+        }
+      ]
+    }
+  ]
+}

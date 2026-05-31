@@ -69,7 +69,7 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPen
 		if gs.transitionShotRate <= 0 {
 			gs.transitionShotRate = resetTransitionShotRate(offense)
 		}
-		if transitionTriggers(offense, gs.rng) && gs.transitionStealSucceeds(defense) {
+		if transitionTriggers(offense, gs.gameType, gs.rng) && gs.transitionStealSucceeds(defense) {
 			return gs.runTransitionPossession(offense, defense, periodIdx)
 		}
 	}
@@ -82,7 +82,13 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPen
 		def := selectDefender(defense, pt, gs.rng)
 
 		penalty := positionPenalty(bh)
-		net := netAdvantage(pt, bh, def, penalty, false)
+		// Playoff net×1.25 lives in netAdvantage. NB: PR3a reuses sv2 (below) as
+		// BOTH the 2pt bucket weight AND the make-roll shot value, so the playoff
+		// multiplier amplifies the 2pt bucket weight too — whereas JSB feeds net
+		// only into shot_value (its 2pt bucket is the independent +0xD90 composite).
+		// Acceptable under the deferred bucket-EV calibration (ADR-0036); revisit
+		// when the play-outcome buckets are rescaled.
+		net := netAdvantage(pt, bh, def, penalty, false, gs.gameType)
 		mq := matchupQuality(bh.FGP, bh.energy, defense.players) // live energy (inert under current curve)
 
 		sv2 := applyClutch(shotValue2pt(net, bh.FGP, false), bh.Clutch, gs.period, scoreDiff)

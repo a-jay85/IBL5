@@ -92,10 +92,11 @@ func (t *teamState) addPeriodPoints(periodIdx, n int) {
 // gameState threads the per-game clock, period, event stream, and RNG through
 // the possession loop.
 type gameState struct {
-	rng    *rng.RNG
-	period int // 1-based; 1..4 regulation, 5+ overtime
-	clock  int // seconds remaining in the current period
-	events []result.Event
+	rng      *rng.RNG
+	gameType bundle.GameType // read-only; gates playoff (net×1.25, fast-break special_sub). Never serialized.
+	period   int             // 1-based; 1..4 regulation, 5+ overtime
+	clock    int             // seconds remaining in the current period
+	events   []result.Event
 
 	// madeFG is the live per-shooter made-field-goal tally, keyed by PID. It is
 	// decision state (the block-probability penalty reads it — block.go), kept

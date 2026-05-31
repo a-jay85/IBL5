@@ -24,7 +24,7 @@ func simGame(b bundle.Bundle, g bundle.Game, r *rng.RNG) (result.GameResult, int
 	visitor := newTeamState(b.Players, g.VisitorTeamID, false)
 	home := newTeamState(b.Players, g.HomeTeamID, true)
 
-	gs := &gameState{rng: r, madeFG: map[int]int{}}
+	gs := &gameState{rng: r, gameType: g.GameType, madeFG: map[int]int{}}
 
 	// Possession length is constant per game in PR3a (factor 1.0, no per-game
 	// stat aggregates yet): average the two teams' base times.

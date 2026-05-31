@@ -75,12 +75,46 @@ func TestTransitionTriggers_Boundary(t *testing.T) {
 
 	for seed := uint64(1); seed <= 200; seed++ {
 		r := rng.New(seed)
-		if transitionTriggers(onePlayerTeam(zero), r) {
+		if transitionTriggers(onePlayerTeam(zero), bundle.GameTypeRegular, r) {
 			t.Fatalf("seed %d: TransOff=0 must never trigger", seed)
 		}
-		if !transitionTriggers(onePlayerTeam(full), rng.New(seed)) {
+		if !transitionTriggers(onePlayerTeam(full), bundle.GameTypeRegular, rng.New(seed)) {
 			t.Fatalf("seed %d: TransOff=denom must always trigger", seed)
 		}
+	}
+}
+
+// --- playoff special_sub: trigger threshold is TransOff − 1 ------------------
+
+func TestTransitionTriggers_PlayoffSpecialSub(t *testing.T) {
+	// TransOff=1: regular triggers iff the roll lands its minimum (rand_int(1..20)
+	// ≤ 1); playoff subtracts 1 → threshold 0 → can NEVER trigger. This isolates
+	// the special_sub deterministically.
+	p := mkPlayer(1, 7, slotPG, 46)
+	p.TransOff = 1
+
+	var regHits, poHits, divergent int
+	for seed := uint64(1); seed <= 400; seed++ {
+		reg := transitionTriggers(onePlayerTeam(p), bundle.GameTypeRegular, rng.New(seed))
+		po := transitionTriggers(onePlayerTeam(p), bundle.GameTypePlayoff, rng.New(seed))
+		if reg {
+			regHits++
+		}
+		if po {
+			poHits++
+		}
+		if reg && !po {
+			divergent++ // same seed, regular fires but playoff (−1) does not
+		}
+	}
+	if poHits != 0 {
+		t.Errorf("playoff special_sub: TransOff=1 must NEVER trigger in playoffs, got %d hits", poHits)
+	}
+	if regHits == 0 {
+		t.Fatal("test setup: regular TransOff=1 never triggered across 400 seeds — cannot demonstrate special_sub")
+	}
+	if divergent == 0 {
+		t.Error("special_sub produced no observable divergence between regular and playoff")
 	}
 }
 

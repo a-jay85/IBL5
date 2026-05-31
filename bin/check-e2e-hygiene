@@ -235,6 +235,9 @@ run_pattern blocking "catch-false" \
 run_pattern blocking "test-skip" \
   '^\s*test\.skip\('
 
+run_pattern blocking "test-only" \
+  '(^|[^a-zA-Z0-9_.])(test|describe)(\.[a-zA-Z]+)?\.only\('
+
 run_pattern blocking "weak-gte-zero" \
   'toBeGreaterThanOrEqual\(0\)'
 

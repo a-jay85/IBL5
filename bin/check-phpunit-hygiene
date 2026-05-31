@@ -1,0 +1,141 @@
+#!/bin/bash
+# Scans PHPUnit tests for markTestSkipped(), banned by .claude/rules/phpunit-tests.md.
+# Silently-disabled tests are a hygiene anti-pattern: delete the test instead, or —
+# for a legitimate integration-availability skip — carry an inline allow marker.
+# Exits 0 (clean) or 1 (blocking violations found).
+set -euo pipefail
+
+ROOT=$(git rev-parse --show-toplevel)
+TESTS_DIR="$ROOT/ibl5/tests"
+
+usage() {
+  cat <<'EOF'
+Usage: bin/check-phpunit-hygiene [--pr] [--help|-h]
+
+Scans PHPUnit tests for markTestSkipped() — silently-disabled tests are banned.
+Delete the test instead, or carry an inline allow marker for a legitimate
+integration-availability skip (e.g. an external service unreachable).
+
+Modes:
+  (no args)  Scan all ibl5/tests/**/*.php
+  --pr       Scan only files changed vs origin/master
+
+Exception:
+  Per-line: // phpunit-hygiene-allow: <reason >= 20 chars>
+            (on the matched line or the immediately preceding line)
+
+See .claude/rules/phpunit-tests.md.
+EOF
+  exit 0
+}
+
+MODE="all"
+for arg in "$@"; do
+  case "$arg" in
+    --help|-h) usage ;;
+    --pr) MODE="pr" ;;
+    *) echo "Unknown argument: $arg" >&2; exit 2 ;;
+  esac
+done
+
+# --- Build file list ---
+if [ "$MODE" = "pr" ]; then
+  SCAN_FILES=()
+  while IFS= read -r f; do
+    [ -f "$ROOT/$f" ] && SCAN_FILES+=("$ROOT/$f")
+  done < <(git -C "$ROOT" diff origin/master --name-only -- 'ibl5/tests/**/*.php')
+else
+  SCAN_FILES=()
+  while IFS= read -r f; do
+    SCAN_FILES+=("$f")
+  done < <(find "$TESTS_DIR" -name '*.php' -type f | sort)
+fi
+
+if [ ${#SCAN_FILES[@]} -eq 0 ]; then
+  echo "PASS: no PHPUnit files to scan."
+  exit 0
+fi
+
+# --- Shared helper (mirrors bin/check-e2e-hygiene) ---
+has_inline_allow() {
+  local line="$1"
+  local file="$2"
+  local lineno="$3"
+
+  if echo "$line" | grep -qE '// phpunit-hygiene-allow: .{20,}'; then
+    return 0
+  fi
+  if [ "$lineno" -gt 1 ]; then
+    local prev
+    prev=$(sed -n "$((lineno - 1))p" "$file")
+    if echo "$prev" | grep -qE '// phpunit-hygiene-allow: .{20,}'; then
+      return 0
+    fi
+  fi
+  return 1
+}
+
+# --- Pattern runner (mirrors bin/check-e2e-hygiene) ---
+BLOCKING_HITS=()
+BLOCKING_TOTAL=0
+
+run_pattern() {
+  local severity="$1"
+  local label="$2"
+  shift 2
+  local grep_args=("$@")
+
+  for f in "${SCAN_FILES[@]}"; do
+    while IFS=: read -r line_num matched_line; do
+      [ -z "$line_num" ] && continue
+      if has_inline_allow "$matched_line" "$f" "$line_num"; then
+        continue
+      fi
+      local rel="${f#"$ROOT/"}"
+      local entry="[$label] $rel:$line_num: $matched_line"
+      if [ "$severity" = "blocking" ]; then
+        BLOCKING_HITS+=("$entry")
+        BLOCKING_TOTAL=$((BLOCKING_TOTAL + 1))
+      fi
+    done < <(grep -nE "${grep_args[@]}" "$f" 2>/dev/null || true)
+  done
+}
+
+# === BLOCKING patterns (exit 1 if any found) ===
+
+run_pattern blocking "mark-test-skipped" 'markTestSkipped\('
+
+# --- Report ---
+if [ "$BLOCKING_TOTAL" -eq 0 ]; then
+  echo "PASS: 0 blocking hits"
+  exit 0
+fi
+
+# Count unique files in blocking hits
+declare -a HIT_FILES=()
+for hit in "${BLOCKING_HITS[@]}"; do
+  local_file=$(echo "$hit" | sed 's/^\[[^]]*\] //' | cut -d: -f1)
+  found=false
+  for hf in "${HIT_FILES[@]+"${HIT_FILES[@]}"}"; do
+    if [ "$hf" = "$local_file" ]; then
+      found=true
+      break
+    fi
+  done
+  if [ "$found" = false ]; then
+    HIT_FILES+=("$local_file")
+  fi
+done
+
+echo "=== PHPUnit Hygiene Gate ==="
+echo ""
+for hit in "${BLOCKING_HITS[@]}"; do
+  echo "  $hit"
+done
+echo ""
+echo "FAIL: $BLOCKING_TOTAL blocking hits across ${#HIT_FILES[@]} files."
+echo "markTestSkipped() silently disables tests. Delete the test instead, or — for a"
+echo "legitimate integration-availability skip — add an inline marker on the matched"
+echo "or preceding line: // phpunit-hygiene-allow: <reason >= 20 chars>"
+echo "See .claude/rules/phpunit-tests.md."
+exit 1

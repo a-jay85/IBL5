@@ -27,6 +27,7 @@ class MailServiceSmtpIntegrationTest extends TestCase
     protected function setUp(): void
     {
         if (!$this->isMailpitReachable()) {
+            // phpunit-hygiene-allow: integration test skips when Mailpit SMTP is unreachable on localhost:1025
             $this->markTestSkipped('Mailpit is not reachable at localhost:1025');
         }
 

@@ -179,9 +179,28 @@ func TestSimulate_MinutesConservation(t *testing.T) {
 // rotationBundle's lone, foul-prone center has no backup, so it can never be
 // pulled for foul-trouble — it plays until it fouls out, then is removed for
 // good. Its minutes must stop short of a player who played the whole game.
+//
+// The seed is scanned deterministically rather than hardcoded: PR6's per-turnover
+// injury draws shifted the RNG sequence so the historical seed 1988 no longer
+// forces a foul-out. The test's intent is the foul-out → minutes-stop invariant,
+// not any particular seed, so it uses the first seed that produces a foul-out.
 func TestSimulate_FoulOutStopsMinutes(t *testing.T) {
-	res := Simulate(rotationBundle(), 1988)
-	g := res.Games[0]
+	var g result.GameResult
+	for seed := uint64(1); seed <= 200; seed++ {
+		res := Simulate(rotationBundle(), seed)
+		for _, pb := range res.Games[0].PlayerBoxes {
+			if pb.GamePF >= 6 {
+				g = res.Games[0]
+				break
+			}
+		}
+		if g.Date != "" {
+			break
+		}
+	}
+	if g.Date == "" {
+		t.Fatal("no seed in [1,200] produced a foul-out in the rotation game (fixture no longer forces one)")
+	}
 
 	maxMin := 0
 	var fouledOut []result.PlayerBox
@@ -194,7 +213,7 @@ func TestSimulate_FoulOutStopsMinutes(t *testing.T) {
 		}
 	}
 	if len(fouledOut) == 0 {
-		t.Fatal("no player fouled out in the rotation game (fixture/seed no longer forces a foul-out)")
+		t.Fatal("no player fouled out in the selected rotation game")
 	}
 	for _, pb := range fouledOut {
 		if pb.GameMIN == 0 {
@@ -570,4 +589,60 @@ func findBox(boxes []result.PlayerBox, pid int) *result.PlayerBox {
 		}
 	}
 	return nil
+}
+
+// --- matrix #16: injury rate over a season-sized run ------------------------
+//
+// Three assertions over a fixed-seed, season-sized schedule:
+//  1. Mechanical invariant (always true): injuries ≤ total turnovers — an injury
+//     can only fire on a turnover possession.
+//  2. Statistical, fixture-INDEPENDENT: the injury count is Binomial(turnovers,
+//     injuryProbability), so |injuries − p·turnovers| ≤ 4σ where σ =
+//     sqrt(p·(1−p)·turnovers). The fixed seed makes this deterministic; 4σ is a
+//     principled bound, not a cuff around the observed value.
+//  3. Calibration, fixture-DEPENDENT: injuries/game lands in the corpus band
+//     [0.15, 0.25]. This only holds because richBundle turns the ball over at a
+//     corpus-like ~34×/game (measured); it validates the calibrated constant
+//     against the ~0.2/game corpus rate.
+func TestSimulate_InjuryRateBand(t *testing.T) {
+	const n = 1200
+	base := richBundle()
+	sched := make([]bundle.Game, 0, n)
+	for i := 0; i < n; i++ {
+		sched = append(sched, base.Schedule[0])
+	}
+	base.Schedule = sched
+
+	res := Simulate(base, 1988)
+	var turnovers, injuries int
+	for _, g := range res.Games {
+		for _, e := range g.Events {
+			switch e.Kind {
+			case result.EventTurnover:
+				turnovers++
+			case result.EventInjury:
+				injuries++
+			}
+		}
+	}
+
+	if injuries > turnovers {
+		t.Fatalf("injuries (%d) exceed turnovers (%d) — impossible", injuries, turnovers)
+	}
+	if turnovers == 0 {
+		t.Fatal("no turnovers over a season-sized run")
+	}
+
+	expected := injuryProbability * float64(turnovers)
+	sigma := math.Sqrt(injuryProbability * (1 - injuryProbability) * float64(turnovers))
+	if math.Abs(float64(injuries)-expected) > 4*sigma {
+		t.Errorf("injuries = %d, expected ≈ %.1f ± %.1f (4σ) over %d turnovers — rate gate off",
+			injuries, expected, 4*sigma, turnovers)
+	}
+
+	perGame := float64(injuries) / float64(n)
+	if perGame < 0.15 || perGame > 0.25 {
+		t.Errorf("injuries/game = %.4f (%d over %d games), want corpus band [0.15, 0.25] "+
+			"(turnovers/game = %.2f)", perGame, injuries, n, float64(turnovers)/float64(n))
+	}
 }

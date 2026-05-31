@@ -153,3 +153,64 @@ func TestEvent_FreeThrowCounts(t *testing.T) {
 		t.Errorf("non-FT event must omit FT counts: %s", shot)
 	}
 }
+
+// --- matrix #5: EventInjury carries its fields; non-injury events omit them ---
+
+func TestEvent_InjuryCounts(t *testing.T) {
+	inj := Event{Kind: EventInjury, Period: 3, Clock: 240, TeamID: 7, PlayerID: 202,
+		Severity: 78, GamesMissed: 175}
+	data, err := json.Marshal(inj)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	if !strings.Contains(string(data), `"severity":78`) || !strings.Contains(string(data), `"games_missed":175`) {
+		t.Errorf("injury event missing severity/games_missed in JSON: %s", data)
+	}
+	var back Event
+	if err := json.Unmarshal(data, &back); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if back.PlayerID != 202 || back.TeamID != 7 || back.Severity != 78 || back.GamesMissed != 175 {
+		t.Errorf("injury fields lost: %+v", back)
+	}
+
+	// A non-injury event omits both fields entirely (omitempty, zero value).
+	shot, _ := json.Marshal(Event{Kind: EventShotMake, Period: 1, Clock: 700,
+		TeamID: 3, PlayerID: 101, ShotType: ShotTwoPoint})
+	if strings.Contains(string(shot), "severity") || strings.Contains(string(shot), "games_missed") {
+		t.Errorf("non-injury event must omit injury counts: %s", shot)
+	}
+}
+
+// --- matrix #6: Injury struct serializes; empty Injuries omits the key --------
+
+func TestInjury_StructAndOmitEmpty(t *testing.T) {
+	in := Injury{PID: 202, TeamID: 7, GamesMissed: 4, Severity: 2, Period: 2, Clock: 300}
+	data, err := json.Marshal(in)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	var back Injury
+	if err := json.Unmarshal(data, &back); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if back != in {
+		t.Errorf("Injury round-trip lost fields: got %+v want %+v", back, in)
+	}
+	// The clock tag is clock_seconds, matching the Event convention.
+	if !strings.Contains(string(data), `"clock_seconds":300`) || !strings.Contains(string(data), `"games_missed":4`) {
+		t.Errorf("Injury JSON missing expected tags: %s", data)
+	}
+
+	// A GameResult with no injuries omits the injuries key entirely (omitempty).
+	empty, _ := json.Marshal(GameResult{Date: "1988-11-04", HomeTeamID: 3, VisitorTeamID: 7})
+	if strings.Contains(string(empty), "injuries") {
+		t.Errorf("injury-free GameResult must omit the injuries key: %s", empty)
+	}
+	// A GameResult WITH injuries includes the key.
+	withInj, _ := json.Marshal(GameResult{Date: "1988-11-04", HomeTeamID: 3, VisitorTeamID: 7,
+		Injuries: []Injury{in}})
+	if !strings.Contains(string(withInj), `"injuries"`) {
+		t.Errorf("GameResult with injuries must include the key: %s", withInj)
+	}
+}

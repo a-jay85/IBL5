@@ -64,6 +64,7 @@ func newTeamState(allPlayers []bundle.Player, teamID int, isHome bool) *teamStat
 		energy:      make(map[int]float64),
 		minutes:     make(map[int]float64),
 		fouledOut:   make(map[int]bool),
+		injured:     make(map[int]bool),
 		fouls:       make(map[int]int),
 		quarters:    make([]int, 0, 4),
 	}

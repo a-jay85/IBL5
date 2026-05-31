@@ -64,10 +64,15 @@ type teamState struct {
 	// players who hit the 6th foul and can never re-enter. fouls is the live
 	// per-player personal-foul tally read by checkSubstitutions for foul-out /
 	// foul-trouble decisions — decision state kept live (like the score), NOT the
-	// output: the box GamePF is derived from EventFoul by aggregateBoxes.
+	// output: the box GamePF is derived from EventFoul by aggregateBoxes. injured
+	// mirrors fouledOut: players hurt mid-game who can never re-enter (set by
+	// maybeInjure, read by checkSubstitutions for permanent removal). No
+	// games-missed is stored — EventInjury carries it and the Injuries slice
+	// derives from the event stream, so the boolean is all removal needs.
 	energy    map[int]float64
 	minutes   map[int]float64
 	fouledOut map[int]bool
+	injured   map[int]bool
 	fouls     map[int]int
 
 	score    int

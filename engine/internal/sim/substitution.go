@@ -39,6 +39,8 @@ func foulThreshold(period, clock int) int {
 // this is a hard invariant, enforced by the rng-free signature.
 //
 // Per on-court player, in slot order, the first matching trigger fires:
+//   - Injury (marked by maybeInjure): permanent removal, same swap-or-play-short
+//     behavior as foul-out. Highest priority; an injured player never stays.
 //   - Foul-out (PF > 5): permanent removal. Swap in the best eligible backup at
 //     the slot if one exists; otherwise the player is removed and the team plays
 //     short (the possession loop already tolerates < 5).
@@ -50,11 +52,14 @@ func foulThreshold(period, clock int) int {
 func checkSubstitutions(t *teamState, period, clock int, emit func(result.Event)) {
 	threshold := foulThreshold(period, clock)
 
-	// Backups may not be anyone currently on court or already fouled out; as the
-	// sweep brings players in, they too become unavailable.
-	taken := make(map[int]bool, len(t.players)+len(t.fouledOut))
+	// Backups may not be anyone currently on court, already fouled out, or
+	// injured; as the sweep brings players in, they too become unavailable.
+	taken := make(map[int]bool, len(t.players)+len(t.fouledOut)+len(t.injured))
 	for pid := range t.fouledOut {
 		taken[pid] = true
+	}
+	for pid := range t.injured {
+		taken[pid] = true // an injured player must never re-enter as a backup
 	}
 	for i := range t.players {
 		taken[t.players[i].PID] = true
@@ -65,13 +70,16 @@ func checkSubstitutions(t *teamState, period, clock int, emit func(result.Event)
 		out := t.players[i]
 		pf := t.fouls[out.PID]
 
-		foulOut := pf > foulOutLimit
-		foulTrouble := !foulOut && pf >= threshold
-		fatigued := !foulOut && !foulTrouble && t.energy[out.PID] < 0
+		// Injury and foul-out are both permanent removals and rank highest; an
+		// injured player (already marked by maybeInjure) is never re-added to next.
+		inj := t.injured[out.PID]
+		foulOut := !inj && pf > foulOutLimit
+		foulTrouble := !inj && !foulOut && pf >= threshold
+		fatigued := !inj && !foulOut && !foulTrouble && t.energy[out.PID] < 0
 
 		if foulOut {
 			t.fouledOut[out.PID] = true
-		} else if !foulTrouble && !fatigued {
+		} else if !inj && !foulTrouble && !fatigued {
 			next = append(next, out) // no trigger: stays on court
 			continue
 		}
@@ -81,7 +89,7 @@ func checkSubstitutions(t *teamState, period, clock int, emit func(result.Event)
 			ok = false // fatigue sub needs a strictly fresher option
 		}
 		if !ok {
-			if foulOut {
+			if foulOut || inj {
 				continue // removed; team plays short (no replacement available)
 			}
 			next = append(next, out) // foul-trouble/fatigue with no backup: stay

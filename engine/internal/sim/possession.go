@@ -127,6 +127,7 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPen
 				Kind: result.EventTurnover, Period: gs.period, Clock: gs.clock,
 				TeamID: offense.teamID, PlayerID: bh.PID,
 			})
+			gs.maybeInjure(offense, bh)                 // per-turnover injury check on the committer
 			return gs.creditSteal(offense, defense, bh) // steal → fast-break pending
 		}
 	}

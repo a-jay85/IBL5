@@ -162,3 +162,66 @@ func TestCheckSubstitutions_FatiguedFresherBackupSwaps(t *testing.T) {
 		t.Errorf("events = %d, want 2 (out + in)", len(events))
 	}
 }
+
+// --- matrix #9: injured player removed at next sweep, best backup swapped in --
+
+func TestCheckSubstitutions_InjuredRemovedSwapsBackup(t *testing.T) {
+	tm := subTeam()
+	tm.injured[1] = true // PG injured mid-game (already marked by maybeInjure)
+
+	var events []result.Event
+	checkSubstitutions(tm, 1, 600, func(e result.Event) { events = append(events, e) })
+
+	if len(events) != 2 {
+		t.Fatalf("events = %d, want exactly 2 (out + in)", len(events))
+	}
+	if events[0].PlayerID != 1 || events[1].PlayerID != 11 {
+		t.Errorf("swap order = out %d / in %d, want 1 / 11", events[0].PlayerID, events[1].PlayerID)
+	}
+	on := onCourtPIDs(tm)
+	if on[1] || !on[11] {
+		t.Errorf("after injury: on-court = %v, want 11 in / 1 out", on)
+	}
+}
+
+// --- matrix #10: injured player never eligible as a backup (barred via taken) -
+
+func TestCheckSubstitutions_InjuredPermanent(t *testing.T) {
+	tm := subTeam()
+	tm.injured[1] = true
+	checkSubstitutions(tm, 1, 600, func(result.Event) {}) // 1 out (injured), 11 in
+
+	// Now injure the replacement too. PID 1 is barred (injured), so 11 is removed
+	// and the team plays short — 1 must NOT return.
+	tm.injured[11] = true
+	checkSubstitutions(tm, 1, 600, func(result.Event) {})
+
+	on := onCourtPIDs(tm)
+	if on[1] {
+		t.Error("injured PID 1 re-entered the lineup as a backup")
+	}
+	if on[11] {
+		t.Error("injured PID 11 still on court")
+	}
+}
+
+// --- matrix #11: injury with no available backup → team plays short, no panic -
+
+func TestCheckSubstitutions_InjuredNoBackupPlaysShort(t *testing.T) {
+	tm := subTeam()
+	tm.injured[5] = true // C has no backup
+
+	before := len(tm.players)
+	var events []result.Event
+	checkSubstitutions(tm, 1, 600, func(e result.Event) { events = append(events, e) })
+
+	if len(tm.players) != before-1 {
+		t.Errorf("players = %d, want %d (C removed, no replacement)", len(tm.players), before-1)
+	}
+	if onCourtPIDs(tm)[5] {
+		t.Error("injured C (PID 5) still on court")
+	}
+	if len(events) != 0 {
+		t.Errorf("events = %d, want 0 (no replacement to swap in)", len(events))
+	}
+}

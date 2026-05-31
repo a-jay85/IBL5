@@ -1,6 +1,4 @@
 <script lang='ts'>
-	import type { IblPlayer } from '$lib/models/IblPlayer';
-
     let leaderStat = 'Points Per Game';
     let player = [{
         id: '1',

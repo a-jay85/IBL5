@@ -3,7 +3,7 @@ description: CSS architecture: all styles live in ibl5/design/components/; inlin
 paths:
   - "**/design/**/*.css"
   - "**/*View.php"
-last_verified: 2026-05-29
+last_verified: 2026-05-31
 ---
 
 # CSS Architecture Reference
@@ -74,7 +74,7 @@ Need a data table?
 - **`base.css` scopes `overflow-x: auto` to `table:not(.ibl-data-table)`** in `@layer base`. Modern `.ibl-data-table` tables are unaffected. Sticky variants still set `overflow: visible` to override `.ibl-data-table`'s own `overflow: hidden` (used for border-radius clipping).
 - **Rounded corners require `overflow: hidden`** to clip, but that breaks sticky. Solution: set `overflow: visible` on the table and apply `border-radius` directly to corner cells. For Pattern 4, corner `th` cells also need `box-shadow` in `var(--page-bg, #eeeeee)` to mask rows scrolling behind the rounded corners.
 - **`--page-bg` CSS variable** is set on `<body>` by `theme.php` from `$bgcolor1` (dev: `#BBBBBB`, prod: `#EEEEEE`).
-- **`css:watch` may not rebuild.** After editing CSS, verify the compiled output contains your new rules: `grep -c "your-class" themes/IBL/style/style.css`. If 0, manually rebuild.
+- **`css:watch` may not rebuild.** After editing CSS, verify the compiled output contains your new rules: `grep -c "your-class" themes/IBL/style/style.css`. If 0, manually rebuild (this is the sanctioned recovery case — see `.claude/rules/css-auto-rebuild.md`).
 
 ## Overflow Rules
 

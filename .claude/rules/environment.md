@@ -3,7 +3,7 @@ description: Environment setup: CSS build, IBLbot, and environment-specific gotc
 paths:
   - "**/design/**/*.css"
   - "**/IBLbot/**/*"
-last_verified: 2026-04-25
+last_verified: 2026-05-31
 ---
 
 # Environment Commands
@@ -14,12 +14,13 @@ last_verified: 2026-04-25
 # DEVELOPMENT: Auto-rebuilds on save
 bun run css:watch
 
-# LOCAL BUILDS: Rebuild CSS without minification (for commits)
+# RECOVERY: one-off rebuild when the watcher misses a change (e.g. after a branch switch)
 bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css
 ```
 
+- See `.claude/rules/css-auto-rebuild.md` — this is the sanctioned recovery exception to the no-manual-build rule, not a routine step.
 - **NEVER use `--minify` locally.** Minification is handled by GitHub Actions on merge/push.
-- **NEVER commit `themes/IBL/style/style.css`.** It is gitignored and built on production. Only commit the source CSS files in `design/`.
+- The compiled `themes/IBL/style/style.css` is `.gitignore`-enforced (built on production) — only commit the source CSS files in `design/`.
 
 ## IBLbot (Discord Bot)
 

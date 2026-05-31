@@ -28,6 +28,7 @@ jobs:
     outputs:
       src: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.src == 'true' }}
       shell: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.shell == 'true' }}
+      ibl6: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.ibl6 == 'true' }}
     steps:
       - uses: dorny/paths-filter@v4
         id: filter
@@ -49,6 +50,9 @@ jobs:
             shell:
               - 'bin/**'
               - 'ibl5/bin/**'
+              - '.github/workflows/tests.yml'
+            ibl6:
+              - 'IBL6/**'
               - '.github/workflows/tests.yml'
 
   test:
@@ -189,6 +193,41 @@ jobs:
     - name: Audit JS dependencies
       working-directory: ibl5
       run: npm audit --audit-level=high
+
+  ibl6-checks:
+    name: IBL6 Type Check & Unit Tests
+    needs: [changes]
+    if: needs.changes.outputs.ibl6 == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+
+    - name: Setup Node
+      uses: actions/setup-node@v6
+      with:
+        node-version: '22'
+        cache: 'npm'
+        cache-dependency-path: IBL6/package-lock.json
+
+    - name: Install dependencies
+      working-directory: IBL6
+      run: npm ci
+
+    - name: Type check (svelte-check)
+      working-directory: IBL6
+      run: npm run check
+
+    # vite.config forces vitest browser mode (provider: playwright, chromium),
+    # so the runner needs the browser binary before test:unit.
+    - name: Install Playwright Chromium
+      working-directory: IBL6
+      run: npx playwright install chromium --with-deps
+
+    - name: Unit tests (vitest)
+      working-directory: IBL6
+      run: npm run test:unit -- --run
 
   db-integration:
     name: Database Integration Tests
@@ -473,7 +512,7 @@ jobs:
   gate:
     name: Tests and Analysis
     if: always()
-    needs: [changes, test, audit-php, audit-js, db-integration, phpstan, phpunit-hygiene, shellcheck, host-mariadb-guard, update-baselines]
+    needs: [changes, test, audit-php, audit-js, ibl6-checks, db-integration, phpstan, phpunit-hygiene, shellcheck, host-mariadb-guard, update-baselines]
     runs-on: ubuntu-latest
     steps:
       - run: exit 1

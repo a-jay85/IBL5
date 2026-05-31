@@ -1,15 +1,19 @@
 package sim
 
+import "github.com/a-jay85/IBL5/engine/internal/bundle"
+
 // netAdvantage is the core probability driver for a 2-point attempt:
 //
 //	net = offense_rating − position_penalty − defense_rating
 //
 // offense/defense are the ODPT pair for the chosen play type (outside → OO/OD,
 // drive → DO/DD, post → PO/PD). The shot-clock modifier subtracts 4.0 (a
-// rushed, end-of-clock look); the regular modifier is ×1.0. The playoff ×1.25
-// and ASG modes are deferred to PR7. Net may go negative — that is meaningful
-// (a bad matchup) and must not underflow.
-func netAdvantage(pt playType, handler, defender onCourt, penalty float64, shotClock bool) float64 {
+// rushed, end-of-clock look). Playoff games (gt == GameTypePlayoff) amplify the
+// net advantage ×1.25 (00_MASTER_REFERENCE.md L1022-1027); all other game types
+// ×1.0. Net may go negative — that is meaningful (a bad matchup) and must not
+// underflow; the playoff multiplier is applied to the signed net (it amplifies
+// both good and bad matchups, as in the decompile).
+func netAdvantage(pt playType, handler, defender onCourt, penalty float64, shotClock bool, gt bundle.GameType) float64 {
 	var off, def float64
 	switch pt {
 	case playOutside:
@@ -24,6 +28,8 @@ func netAdvantage(pt playType, handler, defender onCourt, penalty float64, shotC
 	if shotClock {
 		net -= 4.0
 	}
-	net *= 1.0 // regular-game modifier; playoff ×1.25 deferred to PR7
+	if isPlayoff(gt) {
+		net *= playoffNetMultiplier
+	}
 	return net
 }

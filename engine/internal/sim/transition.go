@@ -1,6 +1,7 @@
 package sim
 
 import (
+	"github.com/a-jay85/IBL5/engine/internal/bundle"
 	"github.com/a-jay85/IBL5/engine/internal/result"
 	"github.com/a-jay85/IBL5/engine/internal/rng"
 )
@@ -35,14 +36,22 @@ func resetTransitionShotRate(breakingTeam *teamState) float64 {
 
 // transitionTriggers is Stage 2 (L878-896): pick a random on-court starter and
 // fire the break iff a 1..transitionTriggerDenom roll falls at or under that
-// starter's TransOff rating. A failed check means the possession proceeds as a
-// normal half-court play despite the pending flag.
-func transitionTriggers(offense *teamState, r *rng.RNG) bool {
+// starter's TransOff rating, minus the playoff special_sub. A failed check means
+// the possession proceeds as a normal half-court play despite the pending flag.
+// In playoff games the effective threshold is TransOff − 1 (special_sub), so
+// fast breaks fire slightly less often (coaching_mod is 0 — neutral coaching).
+// The two RNG draws (starter pick, then trigger roll) are unchanged in count and
+// order, so determinism is preserved for non-playoff games.
+func transitionTriggers(offense *teamState, gt bundle.GameType, r *rng.RNG) bool {
 	if len(offense.players) == 0 {
 		return false
 	}
 	p := offense.players[r.IntN(len(offense.players))]
-	return r.IntN(transitionTriggerDenom)+1 <= p.TransOff
+	specialSub := 0
+	if isPlayoff(gt) {
+		specialSub = playoffFastBreakSub
+	}
+	return r.IntN(transitionTriggerDenom)+1 <= p.TransOff-specialSub
 }
 
 // transitionStealSucceeds is Stage 3 (L900-914): P(success) = rate / (rate + blk)

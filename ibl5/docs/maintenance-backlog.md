@@ -1617,6 +1617,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** New `BanDirectMysqliQueryRule` flagging `->query()` on `\mysqli` outside `BaseMysqliRepository`/`Database\MySQL`.
 **Est. effort:** M (needs type-scope check)
 **Risk if untouched:** Silent `false` on failures vs typed exception.
+**Status:** Rule landed (2026-05-31) — `BanDirectMysqliQueryRule` (`ibl.directMysqliQuery`). Flags `->query()` on a `\mysqli`-typed receiver outside the DB-access boundary; allowlist: `BaseMysqliRepository.php` + `Database/MySQL.php`. 7 baseline occurrences across the 3 Updater steps. Refactoring them to `execute()` deferred.
 
 ### 10.13 SQL ORDER BY / Table-Name Interpolation Without Whitelist Enforcement
 **Location:** `AwardHistory/AwardHistoryRepository.php:59`, `Statistics/TeamStatsCalculator.php:52,194`, `SeasonLeaderboards/SeasonLeaderboardsRepository.php:80`
@@ -1624,6 +1625,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** New `BanSqlStringInterpolationRule` — flag SQL strings (`SELECT|INSERT|UPDATE|DELETE|FROM|JOIN|ORDER BY`) with interpolated vars; allow `QueryConditions::toWhereClause()`.
 **Est. effort:** M
 **Risk if untouched:** Pattern is contagious; first user-controlled use is a real injection.
+**Status:** Rule landed (2026-05-31) — `BanSqlStringInterpolationRule` (`ibl.sqlStringInterpolation`). Flags `InterpolatedString` SQL literals via an anchored SQL-statement pattern, so prose mentioning SQL keywords as English words is NOT matched. `SeasonLeaderboards:80` is dot-concatenation, correctly NOT a site. Plan estimated 3 sites; the rule found 66 genuine interpolated-SQL sites across ~40 files (32 baseline entries) — all baselined. Refactoring (e.g. AwardHistory `$sortColumn` → match-validated enum) deferred to a separate plan.
 
 ### 10.14 `time()` / `date()` / `strtotime()` — No Clock Abstraction
 **Location:** `Draft/DraftSelectionHandler.php:60`, `Cache/PageCache.php:87,112`, `Cache/DatabaseCache.php:52,83`, `Security/CsrfGuard.php:98,209,263`, `LeagueSchedule/LeagueScheduleView.php:89-121`, several more
@@ -1631,6 +1633,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Introduce `Services\ClockInterface::now(): int` first; then `BanDirectTimeCallsRule`; allow `NukeCompat`, `LegacyFunctions`, Clock impl.
 **Est. effort:** L
 **Risk if untouched:** CSRF expiry, cache TTL, draft timestamps not unit-testable.
+**Status:** Still open — explicitly deferred by `maintenance-25` (which landed the SQL/time-axis rules 10.12/10.13/10.19/10.21/10.24). `ClockInterface`/`SystemClock` exist at `classes/Api/Middleware/{Contracts/ClockInterface,SystemClock}.php` but are scoped to Api/Middleware; ~64 direct `time()`/`date()`/`strtotime()` sites across 8+ files. Wiring a global Clock + banning direct calls is its own L-effort plan.
 
 ### 10.15 `echo ob_get_clean()` Anti-Pattern in `DebugOutput`
 **Location:** `UI/DebugOutput.php:61,79`
@@ -1664,6 +1667,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** New `BanDuplicateModifierMethodRule` — flag methods named `calculate*Modifier` outside `ContractRules`.
 **Est. effort:** S
 **Risk if untouched:** Formula drift root cause re-introducible.
+**Status:** Rule landed (2026-05-31) — `BanDuplicateModifierMethodRule` (`ibl.duplicateModifierMethod`). Flags `/^calculate.+Modifier$/` methods outside `ContractRules.php`; skips interface/abstract declarations and suffixless `calculateModifier()` helpers (`NegotiationDemandCalculator`/`FreeAgencyDemandCalculator` are NOT matched). 5 baseline sites (`ExtensionOfferEvaluator`); delegating them to `ContractRules` deferred.
 
 ### 10.20 `assertNotNull` on Known-Non-Null Value Slips Through
 **Location:** `RequireMeaningfulAssertionsRule` is AST-only
@@ -1678,6 +1682,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Extend `BanInconsistentColumnNamesRule` to match unbackticked occurrences too.
 **Est. effort:** M
 **Risk if untouched:** Column renames leave silent runtime errors.
+**Status:** Rule landed (2026-05-31) — `BanBareColumnIdentifierRule` (`ibl.bareColumnIdentifier`). NOT an extension of `BanInconsistentColumnNamesRule` (global `name`/`value` matching would false-positive every table). New rule narrowly targets bare `ibl_<table>.<column>` qualified refs — the `ibl_` prefix disambiguates them; bare unqualified columns, alias-qualified columns (`p.name`), and `ibl_plr.*` are NOT flagged. Zero false positives in a trial `composer run analyse` → ships blocking (no advisory downgrade needed). 23 baseline occurrences across 3 files (`FreeAgencyAdminRepository`, `PlayerDatabaseRepository`, `Team`).
 
 ### 10.22 `json_decode` Without `JSON_THROW_ON_ERROR`
 **Location:** `Cache/DatabaseCache.php:52`, `Utilities/TestCookieOverrides.php`, `Negotiation/NegotiationRepository.php`, `Trading/TradeQueueProcessor.php`
@@ -1701,6 +1706,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Extend check to `phpstan-rules/`.
 **Est. effort:** S
 **Risk if untouched:** Rule files self-exempt; coercion bugs in rules.
+**Status:** Completed (2026-05-31) — `RequireStrictTypesRule` scope extended to also cover `phpstan-rules/`. All rule files already declare `strict_types` — no baseline change. Modifies an existing rule (no new file) so `adr-check` does not fire.
 
 ### 10.25 Baseline Burn-Down Targets (no new rule)
 **Location:** `phpstan-baseline.neon` — `ibl.unescapedOutput` (0), `ibl.cookieBeforeHeader` (0 — zero-floored), `ibl.inlineCss` (0 — now inline `@phpstan-ignore`), `ibl.deprecatedHtmlTag` (0) — all zero as of 2026-05-29 audit (was 17/0/6/3)

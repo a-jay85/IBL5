@@ -1,6 +1,54 @@
 parameters:
 	ignoreErrors:
 		-
+			rawMessage: Hardcoded environment string "localhost" is banned. Inject an environment/config flag instead of branching on a literal host name.
+			identifier: ibl.hardcodedEnvString
+			count: 1
+			path: classes/Debug/DebugSession.php
+
+		-
+			rawMessage: Hardcoded environment string "127.0.0.1" is banned. Inject an environment/config flag instead of branching on a literal host name.
+			identifier: ibl.hardcodedEnvString
+			count: 1
+			path: classes/Extension/ExtensionService.php
+
+		-
+			rawMessage: Hardcoded environment string "localhost" is banned. Inject an environment/config flag instead of branching on a literal host name.
+			identifier: ibl.hardcodedEnvString
+			count: 1
+			path: classes/Extension/ExtensionService.php
+
+		-
+			rawMessage: Hardcoded environment string "localhost" is banned. Inject an environment/config flag instead of branching on a literal host name.
+			identifier: ibl.hardcodedEnvString
+			count: 1
+			path: classes/Navigation/Views/DesktopNavView.php
+
+		-
+			rawMessage: Hardcoded environment string "iblhoops.net" is banned. Inject an environment/config flag instead of branching on a literal host name.
+			identifier: ibl.hardcodedEnvString
+			count: 1
+			path: classes/PageLayout/PageLayout.php
+
+		-
+			rawMessage: Hardcoded environment string "localhost" is banned. Inject an environment/config flag instead of branching on a literal host name.
+			identifier: ibl.hardcodedEnvString
+			count: 1
+			path: classes/Trading/TradeOfferRepository.php
+
+		-
+			rawMessage: Hardcoded environment string "127.0.0.1" is banned. Inject an environment/config flag instead of branching on a literal host name.
+			identifier: ibl.hardcodedEnvString
+			count: 1
+			path: classes/Trading/TradeProcessor.php
+
+		-
+			rawMessage: Hardcoded environment string "localhost" is banned. Inject an environment/config flag instead of branching on a literal host name.
+			identifier: ibl.hardcodedEnvString
+			count: 1
+			path: classes/Trading/TradeProcessor.php
+
+		-
 			rawMessage: 'header() is banned outside Bootstrap classes, Responders, and HTMX ApiHandlers. Route response headers through a Responder (composed by the Controller/ApiHandler).'
 			identifier: ibl.directHeader
 			count: 1

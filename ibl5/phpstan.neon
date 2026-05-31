@@ -136,3 +136,7 @@ services:
         class: PHPStanRules\BanDirectHeaderCallRule
         tags:
             - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanHardcodedEnvironmentStringsRule
+        tags:
+            - phpstan.rules.rule

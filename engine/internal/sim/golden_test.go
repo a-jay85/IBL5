@@ -57,3 +57,18 @@ func TestGolden(t *testing.T) {
 		t.Errorf("output does not match golden.json.\n--- got ---\n%s\n--- want ---\n%s", got, want)
 	}
 }
+
+// #26 — determinism: the same seed must reproduce byte-identical output, and a
+// different seed must change it (otherwise the seed flow is dead).
+func TestDeterminism(t *testing.T) {
+	b := richBundle()
+	a1 := encode(t, Simulate(b, 1988))
+	a2 := encode(t, Simulate(b, 1988))
+	if !bytes.Equal(a1, a2) {
+		t.Error("same seed produced different output")
+	}
+	b3 := encode(t, Simulate(b, 1989))
+	if bytes.Equal(a1, b3) {
+		t.Error("different seeds produced identical output")
+	}
+}

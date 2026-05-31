@@ -69,8 +69,9 @@ type gameState struct {
 
 	// transitionShotRate is the Stage-3 decaying team shot-rate threshold for
 	// fast-break steal-success (00_MASTER_REFERENCE.md L900-914). It is seeded
-	// once per period at the first fast break and decays by transitionShotRateDecay
-	// on each successful break (floor transitionShotRateFloor), so fast-break
+	// once per period on the first possession that carries the fast-break pending
+	// flag (before Stage 2/3 are tested) and decays by transitionShotRateDecay on
+	// each successful break (floor transitionShotRateFloor), so fast-break
 	// frequency falls as the period progresses. playPeriod resets it to 0 at the
 	// top of each period.
 	transitionShotRate float64

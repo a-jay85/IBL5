@@ -3,9 +3,11 @@ package sim
 import "github.com/a-jay85/IBL5/engine/internal/result"
 
 const (
-	// blockFraction is the ceiling P(block) for a fully-rated front-contesting
-	// blocker against a cold shooter. It also reads as the rough share of 2pt/3pt
-	// misses that are blocked. Documented validation-phase stand-in.
+	// blockFraction is the pre-modifier ceiling for P(block): a fully-rated blocker
+	// against a cold shooter starts here, before the front-contest reduction and
+	// the per-made-FG penalty bring it down (so the attainable peak is slightly
+	// under this value). It also reads as the rough share of 2pt/3pt misses that
+	// are blocked. Documented validation-phase stand-in.
 	blockFraction = 0.06
 
 	// blockRatingScale maps a BLK rating to the [0, blockFraction] base: a rating

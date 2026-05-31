@@ -1,6 +1,6 @@
 ---
 description: Frontmatter schema, 60-day staleness policy, on-touch verification rule, and dead-reference rules enforced by bin/check-docs
-last_verified: 2026-05-28
+last_verified: 2026-05-31
 paths: "**/*.md"
 ---
 
@@ -24,6 +24,8 @@ paths: "glob-or-list"  # only meaningful for .claude/rules/*
 ## On-Touch Rule
 
 When editing any in-scope `.md` file, verify its content still matches reality, confirm the `description` field accurately reflects the content, and bump `last_verified` to today — all in the same edit.
+
+This is enforced in CI by `bin/check-docs --since=<base-ref>`, which fails any PR that changes an in-scope `.md` body without bumping `last_verified` (a base-vs-head value comparison, never date-equality-to-today, so a PR opened one day and merged later does not false-fail).
 
 ## Dead-Reference Rule
 

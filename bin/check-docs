@@ -446,6 +446,10 @@ function checkChanged(string $base, string $repoRoot, \DateTimeImmutable $today)
     $changedRel = [];
     $diffCode = 0;
     exec($diffCmd, $changedRel, $diffCode);
+    if ($diffCode !== 0) {
+        fwrite(STDERR, sprintf("check-docs: unable to diff against base ref '%s' (git exit %d). Is it a valid commit? In CI, ensure fetch-depth: 0.\n", $base, $diffCode));
+        exit(2);
+    }
 
     // Intersect with the in-scope set so scoping/exclusions are reused, not
     // re-implemented.

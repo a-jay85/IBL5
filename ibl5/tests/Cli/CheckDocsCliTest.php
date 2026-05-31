@@ -234,4 +234,14 @@ final class CheckDocsCliTest extends TestCase
         $this->assertSame(1, $code, $output);
         $this->assertStringContainsString('last_verified not bumped', $output);
     }
+
+    #[Test]
+    public function sinceBadRefExitsTwo(): void
+    {
+        $this->commitFile('ibl5/docs/sample.md', $this->doc($this->freshDate()), 'base');
+
+        [$code, $output] = $this->runScript('--since=deadbeef123nonexistent');
+        $this->assertSame(2, $code, $output);
+        $this->assertStringContainsString('unable to diff against base ref', $output);
+    }
 }

@@ -140,3 +140,7 @@ services:
         class: PHPStanRules\BanHardcodedEnvironmentStringsRule
         tags:
             - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanDirectMysqliQueryRule
+        tags:
+            - phpstan.rules.rule

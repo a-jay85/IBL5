@@ -1,6 +1,7 @@
 {
     "phpstan-baseline.neon": {
         "ibl.directHeader": 1,
+        "ibl.directMysqliQuery": 3,
         "ibl.hardcodedEnvString": 8
     },
     "phpstan-tests-baseline.neon": {

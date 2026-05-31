@@ -53,3 +53,21 @@ parameters:
 			identifier: ibl.directHeader
 			count: 1
 			path: classes/Trading/TradingController.php
+
+		-
+			rawMessage: 'Direct \mysqli::query() is banned outside the DB-access boundary. Use a BaseMysqliRepository helper (execute()/fetchOne()/fetchAll()) instead — raw query() bypasses prepared-statement parameterization.'
+			identifier: ibl.directMysqliQuery
+			count: 2
+			path: classes/Updater/Steps/RefreshIblHistStep.php
+
+		-
+			rawMessage: 'Direct \mysqli::query() is banned outside the DB-access boundary. Use a BaseMysqliRepository helper (execute()/fetchOne()/fetchAll()) instead — raw query() bypasses prepared-statement parameterization.'
+			identifier: ibl.directMysqliQuery
+			count: 2
+			path: classes/Updater/Steps/RefreshPlayoffSeriesResultsStep.php
+
+		-
+			rawMessage: 'Direct \mysqli::query() is banned outside the DB-access boundary. Use a BaseMysqliRepository helper (execute()/fetchOne()/fetchAll()) instead — raw query() bypasses prepared-statement parameterization.'
+			identifier: ibl.directMysqliQuery
+			count: 3
+			path: classes/Updater/Steps/RefreshTeamSeasonRecordsStep.php

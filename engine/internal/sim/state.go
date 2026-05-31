@@ -61,10 +61,14 @@ type teamState struct {
 	// energy/minutes are keyed by PID for every eligible player (on court or
 	// bench). energy may go negative (drain is unfloored); minutes accumulates
 	// on-court seconds and is finalized into GameMIN at game end. fouledOut marks
-	// players who hit the 6th foul and can never re-enter.
+	// players who hit the 6th foul and can never re-enter. fouls is the live
+	// per-player personal-foul tally read by checkSubstitutions for foul-out /
+	// foul-trouble decisions — decision state kept live (like the score), NOT the
+	// output: the box GamePF is derived from EventFoul by aggregateBoxes.
 	energy    map[int]float64
 	minutes   map[int]float64
 	fouledOut map[int]bool
+	fouls     map[int]int
 
 	score    int
 	quarters []int // points per period in order; index 0 = Q1
@@ -87,6 +91,12 @@ type gameState struct {
 	period int // 1-based; 1..4 regulation, 5+ overtime
 	clock  int // seconds remaining in the current period
 	events []result.Event
+
+	// madeFG is the live per-shooter made-field-goal tally, keyed by PID. It is
+	// decision state (the block-probability penalty reads it — block.go), kept
+	// live like the score, NOT part of the output contract. The box score's
+	// Game2GM/Game3GM are now derived from the event stream by aggregateBoxes.
+	madeFG map[int]int
 
 	// transitionShotRate is the Stage-3 decaying team shot-rate threshold for
 	// fast-break steal-success (00_MASTER_REFERENCE.md L900-914). It is seeded

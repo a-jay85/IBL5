@@ -91,6 +91,9 @@ func TestBoxDerivation_DeferredStats(t *testing.T) {
 	}
 }
 
+// freeThrows no longer writes box rows: it emits an EventFoul on the defender and
+// an EventFreeThrow carrying FTAttempts/FTMade (aggregateBoxes derives GamePF /
+// GameFTA / GameFTM from those), and moves only the live score.
 func TestFreeThrows_ChargesDefenderAndShooter(t *testing.T) {
 	b := richBundle()
 	offense := newTeamState(b.Players, 7, false)
@@ -101,18 +104,39 @@ func TestFreeThrows_ChargesDefenderAndShooter(t *testing.T) {
 
 	gs.freeThrows(offense, defense, shooter, defender, 2, 0)
 
-	if got := defense.box(defender.PID).GamePF; got != 1 {
-		t.Errorf("defender PF = %d, want 1", got)
+	var foul, ft *result.Event
+	for i := range gs.events {
+		switch gs.events[i].Kind {
+		case result.EventFoul:
+			foul = &gs.events[i]
+		case result.EventFreeThrow:
+			ft = &gs.events[i]
+		}
 	}
-	sb := offense.box(shooter.PID)
-	if sb.GameFTA != 2 {
-		t.Errorf("shooter FTA = %d, want 2", sb.GameFTA)
+	if foul == nil {
+		t.Fatal("no EventFoul emitted")
 	}
-	if sb.GameFTM < 0 || sb.GameFTM > 2 {
-		t.Errorf("shooter FTM = %d, want 0..2", sb.GameFTM)
+	if foul.TeamID != defense.teamID || foul.PlayerID != defender.PID {
+		t.Errorf("foul = %+v, want TeamID=%d PlayerID=%d", *foul, defense.teamID, defender.PID)
 	}
-	// Points scored equal makes.
-	if offense.score != sb.GameFTM {
-		t.Errorf("score %d != FTM %d", offense.score, sb.GameFTM)
+	if ft == nil {
+		t.Fatal("no EventFreeThrow emitted")
+	}
+	if ft.TeamID != offense.teamID || ft.PlayerID != shooter.PID {
+		t.Errorf("free throw = %+v, want TeamID=%d PlayerID=%d", *ft, offense.teamID, shooter.PID)
+	}
+	if ft.FTAttempts != 2 {
+		t.Errorf("FTAttempts = %d, want 2", ft.FTAttempts)
+	}
+	if ft.FTMade < 0 || ft.FTMade > 2 {
+		t.Errorf("FTMade = %d, want 0..2", ft.FTMade)
+	}
+	// The shooter still scores his makes via the live score path.
+	if offense.score != ft.FTMade {
+		t.Errorf("score %d != FTMade %d", offense.score, ft.FTMade)
+	}
+	// No box row is mutated by the helper.
+	if offense.box(shooter.PID).GameFTA != 0 || defense.box(defender.PID).GamePF != 0 {
+		t.Error("freeThrows must not write box rows (box is event-derived)")
 	}
 }

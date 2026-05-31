@@ -16,13 +16,15 @@ const (
 // simGame plays one scheduled game: four regulation quarters plus overtime
 // while tied, alternating possessions and decrementing the clock by a tempo-
 // derived possession length. It returns the full event stream and box scores
-// (visitor team first) plus the count of fast-break possessions that fired
-// (internal observability for tests; not part of the result contract).
-func simGame(b bundle.Bundle, g bundle.Game, r *rng.RNG) (result.GameResult, int) {
+// (visitor team first), the count of fast-break possessions that fired, and the
+// two live teamStates — the latter two are internal observability for tests (the
+// live quarter tally lets the conservation test cross-check the event-derived
+// box), not part of the result contract.
+func simGame(b bundle.Bundle, g bundle.Game, r *rng.RNG) (result.GameResult, int, *teamState, *teamState) {
 	visitor := newTeamState(b.Players, g.VisitorTeamID, false)
 	home := newTeamState(b.Players, g.HomeTeamID, true)
 
-	gs := &gameState{rng: r}
+	gs := &gameState{rng: r, madeFG: map[int]int{}}
 
 	// Possession length is constant per game in PR3a (factor 1.0, no per-game
 	// stat aggregates yet): average the two teams' base times.
@@ -73,6 +75,11 @@ func simGame(b bundle.Bundle, g bundle.Game, r *rng.RNG) (result.GameResult, int
 	visitor.finalizeMinutes()
 	home.finalizeMinutes()
 
+	// The box score is derived purely from the event stream, joined with each
+	// team's roster metadata (PID/Pos set at construction, GameMIN by
+	// finalizeMinutes). The live teamState.boxes carry only that metadata now.
+	playerBoxes, teamBoxes := aggregateBoxes(gs.events, rosterMetaOf(visitor), rosterMetaOf(home))
+
 	gr := result.GameResult{
 		Date:          g.Date,
 		HomeTeamID:    g.HomeTeamID,
@@ -80,8 +87,18 @@ func simGame(b bundle.Bundle, g bundle.Game, r *rng.RNG) (result.GameResult, int
 		GameOfThatDay: 1,
 		SimGameType:   int(g.GameType),
 		Events:        gs.events,
-		PlayerBoxes:   append(visitor.playerBoxes(), home.playerBoxes()...),
-		TeamBoxes:     []result.TeamBox{visitor.teamBox(), home.teamBox()},
+		PlayerBoxes:   playerBoxes,
+		TeamBoxes:     teamBoxes,
 	}
-	return gr, gs.transitions
+	return gr, gs.transitions, visitor, home
+}
+
+// rosterMetaOf snapshots a team's roster metadata (identity, position, finalized
+// minutes) in bundle order for the box aggregator.
+func rosterMetaOf(t *teamState) rosterMeta {
+	rm := rosterMeta{teamID: t.teamID, isHome: t.isHome, players: make([]playerMeta, 0, len(t.boxes))}
+	for _, b := range t.boxes {
+		rm.players = append(rm.players, playerMeta{PID: b.PID, Pos: b.Pos, GameMIN: b.GameMIN})
+	}
+	return rm
 }

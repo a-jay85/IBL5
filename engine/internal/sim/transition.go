@@ -123,7 +123,6 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 			gs.freeThrows(offense, defense, bh, def, 2, periodIdx)
 			return false
 		case outcomeTurnover:
-			offense.box(bh.PID).GameTOV++
 			gs.emit(result.Event{
 				Kind: result.EventTurnover, Period: gs.period, Clock: gs.clock,
 				TeamID: offense.teamID, PlayerID: bh.PID,

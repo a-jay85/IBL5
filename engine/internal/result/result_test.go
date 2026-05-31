@@ -109,3 +109,47 @@ func TestEvent_KindsCarryRequiredFields(t *testing.T) {
 		t.Errorf("steal lost defender: %+v", steal)
 	}
 }
+
+// #3 — EventFreeThrow carries ft_attempts/ft_made for box reconstruction; the
+// fields are omitempty, so non-FT events never emit them, and a 0-made trip
+// round-trips ft_made == 0.
+func TestEvent_FreeThrowCounts(t *testing.T) {
+	// A made 1-of-2 trip emits both counts.
+	ft := Event{Kind: EventFreeThrow, Period: 4, Clock: 60, TeamID: 7, PlayerID: 202,
+		ShotType: ShotFreeThrow, FTAttempts: 2, FTMade: 1}
+	data, err := json.Marshal(ft)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	if !strings.Contains(string(data), `"ft_attempts":2`) || !strings.Contains(string(data), `"ft_made":1`) {
+		t.Errorf("free throw missing counts in JSON: %s", data)
+	}
+	var back Event
+	if err := json.Unmarshal(data, &back); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if back.FTAttempts != 2 || back.FTMade != 1 {
+		t.Errorf("counts lost: FTAttempts=%d FTMade=%d", back.FTAttempts, back.FTMade)
+	}
+
+	// A 0-of-2 trip omits ft_made (omitempty) but still round-trips to 0.
+	zeroMade, _ := json.Marshal(Event{Kind: EventFreeThrow, Period: 1, Clock: 700,
+		TeamID: 7, PlayerID: 202, ShotType: ShotFreeThrow, FTAttempts: 2, FTMade: 0})
+	if strings.Contains(string(zeroMade), "ft_made") {
+		t.Errorf("ft_made should be omitted when 0: %s", zeroMade)
+	}
+	var backZero Event
+	if err := json.Unmarshal(zeroMade, &backZero); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if backZero.FTMade != 0 || backZero.FTAttempts != 2 {
+		t.Errorf("0-made trip lost counts: FTAttempts=%d FTMade=%d", backZero.FTAttempts, backZero.FTMade)
+	}
+
+	// A non-FT event omits both fields entirely.
+	shot, _ := json.Marshal(Event{Kind: EventShotMake, Period: 1, Clock: 700,
+		TeamID: 3, PlayerID: 101, ShotType: ShotTwoPoint})
+	if strings.Contains(string(shot), "ft_attempts") || strings.Contains(string(shot), "ft_made") {
+		t.Errorf("non-FT event must omit FT counts: %s", shot)
+	}
+}

@@ -463,9 +463,97 @@ func TestSimulate_StealBlockCreditedToDefenders(t *testing.T) {
 // TestRunTransitionPossession_NeverThreePoint (#10).
 func TestSimulate_TransitionsOccur(t *testing.T) {
 	b := richBundle()
-	_, transitions := simGame(b, b.Schedule[0], rng.New(1988))
+	_, transitions, _, _ := simGame(b, b.Schedule[0], rng.New(1988))
 	if transitions == 0 {
 		t.Error("no fast-break possessions fired over a full game")
+	}
+}
+
+// --- matrix #11: event-derived box conserves against the live tally ----------
+//
+// The box score is now derived purely from the event stream (aggregateBoxes),
+// while the live teamState.quarters tally is still accumulated for in-game
+// clutch/OT decisions. This proves the two agree end-to-end: the output TeamBox
+// quarters (event-derived) equal the live tally bucketed Q1–Q4/OT, and the usual
+// invariants hold (quarters == points, team == Σ player rows, made ≤ attempted,
+// no negatives).
+func TestSimulate_EventDerivedConservation(t *testing.T) {
+	b := richBundle()
+	teamByPID := map[int]int{}
+	for _, p := range b.Players {
+		teamByPID[p.PID] = p.TeamID
+	}
+	gr, _, visitor, home := simGame(b, b.Schedule[0], rng.New(1988))
+
+	for ti, tb := range gr.TeamBoxes {
+		live := visitor
+		teamID := gr.VisitorTeamID
+		if ti == 1 {
+			live, teamID = home, gr.HomeTeamID
+		}
+
+		// Event-derived quarters must equal the live possession-time tally exactly,
+		// including overtime periods.
+		wantQ := live.quarters
+		gotQ := append([]int{tb.Q1, tb.Q2, tb.Q3, tb.Q4}, tb.OT...)
+		for len(gotQ) > 0 && gotQ[len(gotQ)-1] == 0 && len(gotQ) > len(wantQ) {
+			gotQ = gotQ[:len(gotQ)-1] // trim trailing unreached regulation quarters
+		}
+		if len(gotQ) < len(wantQ) {
+			t.Fatalf("team %d: event-derived quarters %v shorter than live tally %v", teamID, gotQ, wantQ)
+		}
+		for i, want := range wantQ {
+			if gotQ[i] != want {
+				t.Errorf("team %d Q%d: event-derived %d != live tally %d", teamID, i+1, gotQ[i], want)
+			}
+		}
+		for i := len(wantQ); i < len(gotQ); i++ {
+			if gotQ[i] != 0 {
+				t.Errorf("team %d: event-derived quarter %d = %d past live tally (want 0)", teamID, i+1, gotQ[i])
+			}
+		}
+
+		// team == Σ player rows; made ≤ attempted; no negatives.
+		var sum result.TeamBox
+		for _, pb := range gr.PlayerBoxes {
+			if teamByPID[pb.PID] != teamID {
+				continue
+			}
+			if pb.Game2GM > pb.Game2GA || pb.Game3GM > pb.Game3GA || pb.GameFTM > pb.GameFTA {
+				t.Errorf("player %d: made > attempted (%+v)", pb.PID, pb)
+			}
+			if anyNegative(pb) {
+				t.Errorf("player %d: negative stat (%+v)", pb.PID, pb)
+			}
+			sum.Game2GM += pb.Game2GM
+			sum.Game2GA += pb.Game2GA
+			sum.Game3GM += pb.Game3GM
+			sum.Game3GA += pb.Game3GA
+			sum.GameFTM += pb.GameFTM
+			sum.GameFTA += pb.GameFTA
+			sum.GameSTL += pb.GameSTL
+			sum.GameBLK += pb.GameBLK
+			sum.GameTOV += pb.GameTOV
+			sum.GamePF += pb.GamePF
+			sum.GameORB += pb.GameORB
+			sum.GameDRB += pb.GameDRB
+		}
+		if sum.Game2GM != tb.Game2GM || sum.Game3GM != tb.Game3GM || sum.GameFTM != tb.GameFTM ||
+			sum.Game2GA != tb.Game2GA || sum.Game3GA != tb.Game3GA || sum.GameFTA != tb.GameFTA ||
+			sum.GameSTL != tb.GameSTL || sum.GameBLK != tb.GameBLK || sum.GameTOV != tb.GameTOV ||
+			sum.GamePF != tb.GamePF || sum.GameORB != tb.GameORB || sum.GameDRB != tb.GameDRB {
+			t.Errorf("team %d: team box != sum of player rows", teamID)
+		}
+
+		// quarters == points.
+		pts := 2*tb.Game2GM + 3*tb.Game3GM + tb.GameFTM
+		q := tb.Q1 + tb.Q2 + tb.Q3 + tb.Q4
+		for _, ot := range tb.OT {
+			q += ot
+		}
+		if q != pts {
+			t.Errorf("team %d: quarters %d != points %d", teamID, q, pts)
+		}
 	}
 }
 

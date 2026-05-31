@@ -42,9 +42,10 @@ func bestDepthPos(p bundle.Player) string {
 
 // newTeamState builds a team's live state: its starters, a box-score row for
 // every rostered player in bundle order (DNP rows carry GameMIN == 0 with all
-// stats zero), a PID index for stat accumulation, the eligible-roster candidate
-// pool for substitutions, and the live energy/minutes maps (seeded to each
-// eligible player's Stamina ceiling / 0 seconds). GameMIN is now accumulated
+// stats zero), a PID index over those rows (roster-metadata lookups; stats are
+// event-derived by aggregateBoxes), the eligible-roster candidate pool for
+// substitutions, and the live energy/minutes maps (seeded to each eligible
+// player's Stamina ceiling / 0 seconds). GameMIN is now accumulated
 // on-court time finalized at game end (see finalizeMinutes) — every player,
 // starter or bench, begins at 0; only seconds actually spent on court count.
 func newTeamState(allPlayers []bundle.Player, teamID int, isHome bool) *teamState {
@@ -63,6 +64,7 @@ func newTeamState(allPlayers []bundle.Player, teamID int, isHome bool) *teamStat
 		energy:      make(map[int]float64),
 		minutes:     make(map[int]float64),
 		fouledOut:   make(map[int]bool),
+		fouls:       make(map[int]int),
 		quarters:    make([]int, 0, 4),
 	}
 	for _, p := range allPlayers {
@@ -104,52 +106,7 @@ func (t *teamState) finalizeMinutes() {
 	}
 }
 
-// box returns the mutable box-score row for a PID (nil if not on the team).
+// box returns the box-score row for a PID (nil if not on the team). After PR5 the
+// row carries only roster metadata (PID/Pos/GameMIN); its stat counters are
+// derived from the event stream by aggregateBoxes. Tests still assert through it.
 func (t *teamState) box(pid int) *result.PlayerBox { return t.byPID[pid] }
-
-// playerBoxes returns the team's player rows in bundle order.
-func (t *teamState) playerBoxes() []result.PlayerBox {
-	out := make([]result.PlayerBox, len(t.boxes))
-	for i, b := range t.boxes {
-		out[i] = *b
-	}
-	return out
-}
-
-// teamBox rolls the player rows up into team totals and lays the running
-// quarter scores into Q1–Q4 (+ OT). GameSTL/GameBLK/GameAST stay 0 here because
-// no player row ever sets them (steal/block attribution is PR3b; assists are
-// commentary-only, master-reference L1098).
-func (t *teamState) teamBox() result.TeamBox {
-	tb := result.TeamBox{TeamID: t.teamID, IsHome: t.isHome, OT: []int{}}
-	for _, b := range t.boxes {
-		tb.Game2GM += b.Game2GM
-		tb.Game2GA += b.Game2GA
-		tb.GameFTM += b.GameFTM
-		tb.GameFTA += b.GameFTA
-		tb.Game3GM += b.Game3GM
-		tb.Game3GA += b.Game3GA
-		tb.GameORB += b.GameORB
-		tb.GameDRB += b.GameDRB
-		tb.GameAST += b.GameAST
-		tb.GameSTL += b.GameSTL
-		tb.GameTOV += b.GameTOV
-		tb.GameBLK += b.GameBLK
-		tb.GamePF += b.GamePF
-	}
-	for i, pts := range t.quarters {
-		switch i {
-		case 0:
-			tb.Q1 = pts
-		case 1:
-			tb.Q2 = pts
-		case 2:
-			tb.Q3 = pts
-		case 3:
-			tb.Q4 = pts
-		default:
-			tb.OT = append(tb.OT, pts)
-		}
-	}
-	return tb
-}

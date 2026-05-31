@@ -123,7 +123,6 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPen
 			gs.freeThrows(offense, defense, bh, def, 2, periodIdx)
 			return false
 		case outcomeTurnover:
-			offense.box(bh.PID).GameTOV++
 			gs.emit(result.Event{
 				Kind: result.EventTurnover, Period: gs.period, Clock: gs.clock,
 				TeamID: offense.teamID, PlayerID: bh.PID,
@@ -135,16 +134,11 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPen
 }
 
 // shotAttempt records a field-goal attempt of the given type, rolls make/miss,
-// and credits points/box stats. It returns (made, ended): ended is always true
-// for a single attempt; made distinguishes a basket from a miss so the caller
-// can route a miss to the rebound phase.
+// and scores points on a make. It emits the attempt event (the box-score
+// Game2GA/Game3GA counters are derived from it by aggregateBoxes). It returns
+// (made, ended): ended is always true for a single attempt; made distinguishes a
+// basket from a miss so the caller can route a miss to the rebound phase.
 func (gs *gameState) shotAttempt(offense, defense *teamState, shooter onCourt, shotValue float64, st result.ShotType, periodIdx int) (made, ended bool) {
-	box := offense.box(shooter.PID)
-	if st == result.ShotThree {
-		box.Game3GA++
-	} else {
-		box.Game2GA++
-	}
 	gs.emit(result.Event{
 		Kind: result.EventShotAttempt, Period: gs.period, Clock: gs.clock,
 		TeamID: offense.teamID, PlayerID: shooter.PID, ShotType: st,
@@ -162,15 +156,9 @@ func (gs *gameState) shotAttempt(offense, defense *teamState, shooter onCourt, s
 	return false, true
 }
 
-// madeFieldGoal records a guaranteed made 2pt (the and-one basket): attempt +
-// make + points.
+// madeFieldGoal records a guaranteed made 2pt (the and-one basket): it emits the
+// attempt event then credits the make.
 func (gs *gameState) madeFieldGoal(offense *teamState, shooter onCourt, st result.ShotType, periodIdx int) {
-	box := offense.box(shooter.PID)
-	if st == result.ShotThree {
-		box.Game3GA++
-	} else {
-		box.Game2GA++
-	}
 	gs.emit(result.Event{
 		Kind: result.EventShotAttempt, Period: gs.period, Clock: gs.clock,
 		TeamID: offense.teamID, PlayerID: shooter.PID, ShotType: st,
@@ -178,18 +166,20 @@ func (gs *gameState) madeFieldGoal(offense *teamState, shooter onCourt, st resul
 	gs.creditMadeFieldGoal(offense, shooter, st, periodIdx)
 }
 
-// creditMadeFieldGoal increments the made counter, scores the points, and emits
-// the make event.
+// creditMadeFieldGoal scores the points (live score, read for clutch/OT), bumps
+// the live per-shooter made-FG tally (read by the block-probability penalty),
+// and emits the make event. The box-score Game2GM/Game3GM counters are derived
+// from that event by aggregateBoxes — no box row is written here.
 func (gs *gameState) creditMadeFieldGoal(offense *teamState, shooter onCourt, st result.ShotType, periodIdx int) {
-	box := offense.box(shooter.PID)
 	pts := 2
 	if st == result.ShotThree {
-		box.Game3GM++
 		pts = 3
-	} else {
-		box.Game2GM++
 	}
 	offense.addPeriodPoints(periodIdx, pts)
+	if gs.madeFG == nil {
+		gs.madeFG = map[int]int{}
+	}
+	gs.madeFG[shooter.PID]++
 	gs.emit(result.Event{
 		Kind: result.EventShotMake, Period: gs.period, Clock: gs.clock,
 		TeamID: offense.teamID, PlayerID: shooter.PID, ShotType: st,
@@ -197,21 +187,21 @@ func (gs *gameState) creditMadeFieldGoal(offense *teamState, shooter onCourt, st
 }
 
 // freeThrows charges the foul to the contesting defender and resolves n
-// free-throw attempts for the shooter, scoring each make.
+// free-throw attempts for the shooter, scoring each make. It emits the foul and
+// free-throw events (the latter carrying FTAttempts/FTMade so aggregateBoxes can
+// reconstruct GamePF/GameFTA/GameFTM); only the live score is mutated here.
 func (gs *gameState) freeThrows(offense, defense *teamState, shooter, defender onCourt, n, periodIdx int) {
-	defense.box(defender.PID).GamePF++
+	defense.fouls[defender.PID]++ // live PF tally for foul-out/trouble subs (box PF is event-derived)
 	gs.emit(result.Event{
 		Kind: result.EventFoul, Period: gs.period, Clock: gs.clock,
 		TeamID: defense.teamID, PlayerID: defender.PID,
 	})
-	box := offense.box(shooter.PID)
 	made := shootFreeThrows(shooter, n, gs.rng)
-	box.GameFTA += n
-	box.GameFTM += made
 	offense.addPeriodPoints(periodIdx, made)
 	gs.emit(result.Event{
 		Kind: result.EventFreeThrow, Period: gs.period, Clock: gs.clock,
 		TeamID: offense.teamID, PlayerID: shooter.PID, ShotType: result.ShotFreeThrow,
+		FTAttempts: n, FTMade: made,
 	})
 }
 
@@ -223,7 +213,6 @@ func (gs *gameState) rebound(offense, defense *teamState, periodIdx int) (bool, 
 	defStr := teamReboundStrength(defense, false)
 	if gs.rng.Float64() < orebProbability(offStr, defStr) {
 		reb := selectRebounder(offense, true, gs.rng)
-		offense.box(reb.PID).GameORB++
 		gs.emit(result.Event{
 			Kind: result.EventRebound, Period: gs.period, Clock: gs.clock,
 			TeamID: offense.teamID, PlayerID: reb.PID, OffensiveRebound: true,
@@ -231,7 +220,6 @@ func (gs *gameState) rebound(offense, defense *teamState, periodIdx int) (bool, 
 		return true, reb
 	}
 	reb := selectRebounder(defense, false, gs.rng)
-	defense.box(reb.PID).GameDRB++
 	gs.emit(result.Event{
 		Kind: result.EventRebound, Period: gs.period, Clock: gs.clock,
 		TeamID: defense.teamID, PlayerID: reb.PID, OffensiveRebound: false,

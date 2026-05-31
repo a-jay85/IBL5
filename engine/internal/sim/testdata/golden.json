@@ -2802,7 +2802,8 @@
           "clock_seconds": 434,
           "team_id": 3,
           "player_id": 201,
-          "shot_type": "ft"
+          "shot_type": "ft",
+          "ft_attempts": 2
         },
         {
           "kind": "possession_start",
@@ -5369,7 +5370,8 @@
           "clock_seconds": 382,
           "team_id": 3,
           "player_id": 201,
-          "shot_type": "ft"
+          "shot_type": "ft",
+          "ft_attempts": 2
         },
         {
           "kind": "possession_start",

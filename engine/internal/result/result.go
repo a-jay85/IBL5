@@ -53,6 +53,13 @@ type Event struct {
 	// OffensiveRebound distinguishes an offensive (true) from a defensive
 	// (false) rebound. Only meaningful when Kind == EventRebound.
 	OffensiveRebound bool `json:"offensive_rebound,omitempty"`
+
+	// FTAttempts / FTMade carry the free-throw counts for a single trip to the
+	// line. Meaningful only when Kind == EventFreeThrow; a zero value is *not
+	// applicable* for every other kind (omitted via omitempty). They let the box
+	// aggregator reconstruct GameFTA/GameFTM exactly from the event stream.
+	FTAttempts int `json:"ft_attempts,omitempty"`
+	FTMade     int `json:"ft_made,omitempty"`
 }
 
 // PlayerBox is one player's stat line for one game. Fields map 1:1 to the RAW

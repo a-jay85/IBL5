@@ -41,7 +41,18 @@ func simGame(b bundle.Bundle, g bundle.Game, r *rng.RNG) (result.GameResult, int
 		gs.transitionShotRate = 0 // Stage-3 decay resets per period ("within a period")
 		pending := false
 		for gs.clock > 0 {
+			// Dead-ball substitution sweep for both teams before the possession
+			// (foul-out / foul-trouble / fatigue). Zero RNG — see checkSubstitutions.
+			checkSubstitutions(offense, period, gs.clock, gs.emit)
+			checkSubstitutions(defense, period, gs.clock, gs.emit)
+
 			pending = possession(gs, offense, defense, period-1, pending)
+
+			// Both fives were on the floor: drain on-court energy + accrue minutes,
+			// recover the benches.
+			offense.drainAndRecover(step)
+			defense.drainAndRecover(step)
+
 			offense, defense = defense, offense
 			gs.clock -= step
 		}
@@ -49,11 +60,18 @@ func simGame(b bundle.Bundle, g bundle.Game, r *rng.RNG) (result.GameResult, int
 	}
 
 	for period := 1; period <= regulationPeriods; period++ {
+		if period == 3 { // halftime: full energy restore for both teams
+			visitor.restoreFull()
+			home.restoreFull()
+		}
 		playPeriod(period, quarterSeconds)
 	}
 	for ot := 1; ot <= maxOvertime && visitor.score == home.score; ot++ {
 		playPeriod(regulationPeriods+ot, otSeconds)
 	}
+
+	visitor.finalizeMinutes()
+	home.finalizeMinutes()
 
 	gr := result.GameResult{
 		Date:          g.Date,

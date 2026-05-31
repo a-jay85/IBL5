@@ -63,7 +63,7 @@ func checkSubstitutions(t *teamState, period, clock int, emit func(result.Event)
 	next := make([]onCourt, 0, len(t.players))
 	for i := range t.players {
 		out := t.players[i]
-		pf := t.box(out.PID).GamePF
+		pf := t.fouls[out.PID]
 
 		foulOut := pf > foulOutLimit
 		foulTrouble := !foulOut && pf >= threshold

@@ -48,17 +48,15 @@ func blockProbability(defender onCourt, shooterMadeFG int) float64 {
 	return base
 }
 
-// creditBlock rolls for a block on a missed field goal. On a block it credits
-// GameBLK to the contesting DEFENDER and emits EventBlock (TeamID = offense,
-// PlayerID = shooter, DefenderID = blocker). It never changes make/miss and
-// never touches the rebound path — the miss still flows to the rebound phase
-// unchanged. The caller must only invoke this on a 2pt/3pt miss (never a free
-// throw).
+// creditBlock rolls for a block on a missed field goal. On a block it emits
+// EventBlock (TeamID = offense, PlayerID = shooter, DefenderID = blocker) — from
+// which aggregateBoxes credits GameBLK to the contesting DEFENDER. The block
+// penalty reads the live per-shooter made-FG tally (gs.madeFG), not a box row,
+// so it stays correct after box stats became event-derived. It never changes
+// make/miss and never touches the rebound path — the miss still flows to the
+// rebound phase unchanged. The caller must only invoke this on a 2pt/3pt miss.
 func (gs *gameState) creditBlock(offense, defense *teamState, shooter, defender onCourt) {
-	sb := offense.box(shooter.PID)
-	madeFG := sb.Game2GM + sb.Game3GM
-	if gs.rng.Float64() < blockProbability(defender, madeFG) {
-		defense.box(defender.PID).GameBLK++
+	if gs.rng.Float64() < blockProbability(defender, gs.madeFG[shooter.PID]) {
 		gs.emit(result.Event{
 			Kind: result.EventBlock, Period: gs.period, Clock: gs.clock,
 			TeamID: offense.teamID, PlayerID: shooter.PID, DefenderID: defender.PID,

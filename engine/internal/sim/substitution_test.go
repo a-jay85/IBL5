@@ -54,7 +54,7 @@ func TestFoulThreshold_PhaseTable(t *testing.T) {
 
 func TestCheckSubstitutions_FoulOutEmitsOutThenIn(t *testing.T) {
 	tm := subTeam()
-	tm.box(1).GamePF = 6 // PG over the foul-out limit
+	tm.fouls[1] = 6 // PG over the foul-out limit (live tally drives subs; box PF is event-derived)
 
 	var events []result.Event
 	checkSubstitutions(tm, 1, 600, func(e result.Event) { events = append(events, e) })
@@ -86,12 +86,12 @@ func TestCheckSubstitutions_FoulOutEmitsOutThenIn(t *testing.T) {
 
 func TestCheckSubstitutions_FoulOutPermanent(t *testing.T) {
 	tm := subTeam()
-	tm.box(1).GamePF = 6
+	tm.fouls[1] = 6
 	checkSubstitutions(tm, 1, 600, func(result.Event) {}) // 1 out, 11 in
 
 	// Now foul out the replacement too. No other PG backup exists (1 is barred),
 	// so 11 is removed and the team plays short — 1 must NOT return.
-	tm.box(11).GamePF = 6
+	tm.fouls[11] = 6
 	checkSubstitutions(tm, 1, 600, func(result.Event) {})
 
 	on := onCourtPIDs(tm)
@@ -110,7 +110,7 @@ func TestCheckSubstitutions_FoulOutPermanent(t *testing.T) {
 
 func TestCheckSubstitutions_FoulOutNoBackupPlaysShort(t *testing.T) {
 	tm := subTeam()
-	tm.box(5).GamePF = 6 // C has no backup
+	tm.fouls[5] = 6 // C has no backup
 
 	before := len(tm.players)
 	var events []result.Event

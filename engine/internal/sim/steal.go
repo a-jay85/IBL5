@@ -47,18 +47,16 @@ func selectStealer(defense *teamState, r *rng.RNG) (onCourt, bool) {
 	return defense.players[len(defense.players)-1], true
 }
 
-// creditSteal resolves whether a turnover (already credited to the victim) was a
-// forced steal. On a steal it credits GameSTL to the stealing DEFENDER and emits
-// EventSteal (TeamID = offense, PlayerID = victim, DefenderID = stealer), then
+// creditSteal resolves whether a turnover was a forced steal. On a steal it
+// emits EventSteal (TeamID = offense, PlayerID = victim, DefenderID = stealer) —
+// from which aggregateBoxes credits GameSTL to the stealing DEFENDER — then
 // returns true so the caller sets the fast-break pending flag. On an unforced
-// turnover it returns false and credits no stealer. It never alters the victim's
-// GameTOV (the caller credited it).
+// turnover it returns false and emits no steal event.
 func (gs *gameState) creditSteal(offense, defense *teamState, victim onCourt) bool {
 	if gs.rng.Float64() >= stealFraction {
 		return false // unforced turnover: no stealer
 	}
 	stealer, _ := selectStealer(defense, gs.rng)
-	defense.box(stealer.PID).GameSTL++
 	gs.emit(result.Event{
 		Kind: result.EventSteal, Period: gs.period, Clock: gs.clock,
 		TeamID: offense.teamID, PlayerID: victim.PID, DefenderID: stealer.PID,

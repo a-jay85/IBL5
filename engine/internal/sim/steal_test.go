@@ -16,26 +16,20 @@ func twoTeams() (*teamState, *teamState) {
 
 // --- matrix #3: steal credits a defender; victim keeps the turnover ----------
 
+// creditSteal no longer writes box rows: it emits a single EventSteal crediting a
+// defender (PlayerID = victim, DefenderID = stealer) — aggregateBoxes derives the
+// victim's GameTOV (from the caller's EventTurnover) and the stealer's GameSTL.
 func TestCreditSteal_CreditsDefenderVictimKeepsTOV(t *testing.T) {
 	// Find a seed whose first Float64 falls under stealFraction so creditSteal
 	// resolves to a steal (the probabilities cannot be forced to an exact value).
 	for seed := uint64(1); seed < 200; seed++ {
 		offense, defense := twoTeams()
 		victim := offense.players[0]
-		offense.box(victim.PID).GameTOV++ // caller credits the TOV first
 		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500}
 
 		before := len(gs.events)
 		if !gs.creditSteal(offense, defense, victim) {
 			continue // this seed was an unforced turnover; try the next
-		}
-
-		// Victim retains the turnover; no steal is credited to the victim.
-		if got := offense.box(victim.PID).GameTOV; got != 1 {
-			t.Fatalf("victim GameTOV = %d, want 1 (kept)", got)
-		}
-		if offense.box(victim.PID).GameSTL != 0 {
-			t.Fatalf("victim must not be credited a steal")
 		}
 
 		// Exactly one EventSteal, crediting a defender.
@@ -55,12 +49,16 @@ func TestCreditSteal_CreditsDefenderVictimKeepsTOV(t *testing.T) {
 		if ev.PlayerID != victim.PID {
 			t.Errorf("EventSteal PlayerID = %d, want victim %d", ev.PlayerID, victim.PID)
 		}
-		// DefenderID is the stealer and must be on the defending team with a STL credit.
+		// DefenderID is the stealer and must be on the defending team.
 		if defense.box(ev.DefenderID) == nil {
 			t.Fatalf("DefenderID %d is not on the defending team", ev.DefenderID)
 		}
-		if defense.box(ev.DefenderID).GameSTL != 1 {
-			t.Errorf("stealer %d GameSTL = %d, want 1", ev.DefenderID, defense.box(ev.DefenderID).GameSTL)
+		if ev.DefenderID == victim.PID {
+			t.Error("stealer must not be the victim")
+		}
+		// The helper writes no box rows (steal/turnover are event-derived).
+		if defense.box(ev.DefenderID).GameSTL != 0 {
+			t.Error("creditSteal must not write GameSTL (box is event-derived)")
 		}
 		return
 	}
@@ -93,7 +91,6 @@ func TestCreditSteal_SplitIsReal(t *testing.T) {
 	for seed := uint64(1); seed <= 400; seed++ {
 		offense, defense := twoTeams()
 		victim := offense.players[0]
-		offense.box(victim.PID).GameTOV++
 		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500}
 		if gs.creditSteal(offense, defense, victim) {
 			steals++

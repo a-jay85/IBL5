@@ -66,6 +66,19 @@ type gameState struct {
 	period int // 1-based; 1..4 regulation, 5+ overtime
 	clock  int // seconds remaining in the current period
 	events []result.Event
+
+	// transitionShotRate is the Stage-3 decaying team shot-rate threshold for
+	// fast-break steal-success (00_MASTER_REFERENCE.md L900-914). It is seeded
+	// once per period at the first fast break and decays by transitionShotRateDecay
+	// on each successful break (floor transitionShotRateFloor), so fast-break
+	// frequency falls as the period progresses. playPeriod resets it to 0 at the
+	// top of each period.
+	transitionShotRate float64
+
+	// transitions counts fast-break possessions that actually fired this game
+	// (Stage 2 and Stage 3 both passed). It is internal observability for tests;
+	// it is never serialized into the result contract.
+	transitions int
 }
 
 func (g *gameState) emit(e result.Event) { g.events = append(g.events, e) }

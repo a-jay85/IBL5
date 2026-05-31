@@ -15,9 +15,10 @@ const (
 
 // simGame plays one scheduled game: four regulation quarters plus overtime
 // while tied, alternating possessions and decrementing the clock by a tempo-
-// derived possession length. It returns the full event stream and box scores,
-// visitor team first.
-func simGame(b bundle.Bundle, g bundle.Game, r *rng.RNG) result.GameResult {
+// derived possession length. It returns the full event stream and box scores
+// (visitor team first) plus the count of fast-break possessions that fired
+// (internal observability for tests; not part of the result contract).
+func simGame(b bundle.Bundle, g bundle.Game, r *rng.RNG) (result.GameResult, int) {
 	visitor := newTeamState(b.Players, g.VisitorTeamID, false)
 	home := newTeamState(b.Players, g.HomeTeamID, true)
 
@@ -37,8 +38,10 @@ func simGame(b bundle.Bundle, g bundle.Game, r *rng.RNG) result.GameResult {
 	playPeriod := func(period, seconds int) {
 		gs.period = period
 		gs.clock = seconds
+		gs.transitionShotRate = 0 // Stage-3 decay resets per period ("within a period")
+		pending := false
 		for gs.clock > 0 {
-			possession(gs, offense, defense, period-1)
+			pending = possession(gs, offense, defense, period-1, pending)
 			offense, defense = defense, offense
 			gs.clock -= step
 		}
@@ -62,5 +65,5 @@ func simGame(b bundle.Bundle, g bundle.Game, r *rng.RNG) result.GameResult {
 		PlayerBoxes:   append(visitor.playerBoxes(), home.playerBoxes()...),
 		TeamBoxes:     []result.TeamBox{visitor.teamBox(), home.teamBox()},
 	}
-	return gr
+	return gr, gs.transitions
 }

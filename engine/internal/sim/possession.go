@@ -50,15 +50,31 @@ func turnoverThreshold(tvr int) float64 { return float64(tvr) * turnoverPropensi
 // matchup resolution, the play-outcome path, and any free throws or rebounds.
 // Offensive rebounds continue the trip; a made shot, defensive rebound, or
 // turnover ends it. The caller flips possession after every trip.
-func possession(gs *gameState, offense, defense *teamState, periodIdx int) {
+//
+// fbPending is the fast-break flag set by the prior possession (its defensive
+// rebound or steal). It is consumed unconditionally: when Stage 2 (TransOff
+// trigger) and Stage 3 (steal-success) both pass, the possession runs as a fast
+// break; otherwise it falls through to the normal half-court loop. The named
+// return fbNext re-arms the flag when THIS possession ends via a defensive
+// rebound or a steal (the team that gained the ball gets the next break).
+func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPending bool) (fbNext bool) {
 	if len(offense.players) == 0 || len(defense.players) == 0 {
-		return
+		return false
 	}
-	bh := selectBallHandler(offense, gs.rng)
 	gs.emit(result.Event{
 		Kind: result.EventPossessionStart, Period: gs.period, Clock: gs.clock, TeamID: offense.teamID,
 	})
 
+	if fbPending {
+		if gs.transitionShotRate <= 0 {
+			gs.transitionShotRate = resetTransitionShotRate(offense)
+		}
+		if transitionTriggers(offense, gs.rng) && gs.transitionStealSucceeds(defense) {
+			return gs.runTransitionPossession(offense, defense, periodIdx)
+		}
+	}
+
+	bh := selectBallHandler(offense, gs.rng)
 	for trip := 0; trip <= maxOffensiveRebounds; trip++ {
 		scoreDiff := offense.score - defense.score
 		matched := defenderAtSlot(defense, bh.slot)
@@ -80,41 +96,42 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int) {
 
 		switch selectOutcome(in, false, false, false, gs.rng) {
 		case outcome2pt:
-			if made, ended := gs.shotAttempt(offense, defense, bh, sv2, result.ShotTwoPoint, periodIdx); ended {
-				if !made {
-					if cont, next := gs.rebound(offense, defense, periodIdx); cont {
-						bh = next
-						continue
-					}
+			if made, _ := gs.shotAttempt(offense, defense, bh, sv2, result.ShotTwoPoint, periodIdx); !made {
+				gs.creditBlock(offense, defense, bh, def)
+				if cont, next := gs.rebound(offense, defense, periodIdx); cont {
+					bh = next
+					continue
 				}
-				return
+				return true // defensive rebound → fast-break pending
 			}
+			return false // made shot
 		case outcome3pt:
-			if made, ended := gs.shotAttempt(offense, defense, bh, shotValue3pt(), result.ShotThree, periodIdx); ended {
-				if !made {
-					if cont, next := gs.rebound(offense, defense, periodIdx); cont {
-						bh = next
-						continue
-					}
+			if made, _ := gs.shotAttempt(offense, defense, bh, shotValue3pt(), result.ShotThree, periodIdx); !made {
+				gs.creditBlock(offense, defense, bh, def)
+				if cont, next := gs.rebound(offense, defense, periodIdx); cont {
+					bh = next
+					continue
 				}
-				return
+				return true // defensive rebound → fast-break pending
 			}
+			return false // made shot
 		case outcomeAndOne:
 			gs.madeFieldGoal(offense, bh, result.ShotTwoPoint, periodIdx)
 			gs.freeThrows(offense, defense, bh, def, 1, periodIdx)
-			return
+			return false
 		case outcomeFoulOnly:
 			gs.freeThrows(offense, defense, bh, def, 2, periodIdx)
-			return
+			return false
 		case outcomeTurnover:
 			offense.box(bh.PID).GameTOV++
 			gs.emit(result.Event{
 				Kind: result.EventTurnover, Period: gs.period, Clock: gs.clock,
 				TeamID: offense.teamID, PlayerID: bh.PID,
 			})
-			return
+			return gs.creditSteal(offense, defense, bh) // steal → fast-break pending
 		}
 	}
+	return false
 }
 
 // shotAttempt records a field-goal attempt of the given type, rolls make/miss,

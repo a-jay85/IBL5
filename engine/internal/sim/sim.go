@@ -28,7 +28,8 @@ func Simulate(b bundle.Bundle, seed uint64) result.Result {
 	r := rng.New(seed)
 	res := result.Result{Seed: seed, Games: make([]result.GameResult, 0, len(b.Schedule))}
 	for _, g := range b.Schedule {
-		res.Games = append(res.Games, simGame(b, g, r))
+		gr, _ := simGame(b, g, r)
+		res.Games = append(res.Games, gr)
 	}
 	return res
 }

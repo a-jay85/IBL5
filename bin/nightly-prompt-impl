@@ -64,7 +64,37 @@ If `bin/check-plan-staleness` exits non-zero, the plan is STALE. Take the skip-w
 3. Write a STALENESS-specific report to `$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-<slug>.md` (derive `<slug>` from the plan title). The title and body must make it visibly a **staleness skip** — clearly distinct wording from the ambiguity skip — and must list the specific unresolved repo paths the helper emitted.
 4. STOP.
 
-If `bin/check-plan-staleness` exits 0, the plan is fresh — continue to Step 3.
+If `bin/check-plan-staleness` exits 0, the plan is fresh — continue to Step 2.6.
+
+## Step 2.6: Already-Merged Guard (run BEFORE any worktree is created)
+
+This gate is DISTINCT from the Step 2.5 staleness gate and the Step 3 ambiguity skip. It catches plans whose work is **already implemented and merged on master** — the deliverables shipped under a prior PR, so re-running the plan would push an empty branch (see the 2026-05-31 `roster-transaction-mutation-coverage` skip / PR #895). Catching it here, before a worktree exists, avoids a wasted worktree and an empty push. This is the CHEAP heuristic layer; Step 6.5 is the certain backstop.
+
+Master was already freshly pulled in Step 2.5. Cross-reference the plan title against merged PRs:
+
+```bash
+PLAN_TITLE=$(grep -m1 '^# ' "$PLAN_PATH" | sed 's/^#[[:space:]]*//')
+gh pr list --state merged --limit 10 --search "$PLAN_TITLE in:title" \
+    --json number,title,mergedAt
+```
+
+If that returns nothing, also try the plan-slug words (hyphens → spaces) — plan titles and merged-PR titles often differ in wording (plan `roster-transaction-mutation-coverage` → PR "Roster & transaction mutation coverage + dead-test fixes"):
+
+```bash
+SLUG_WORDS=$(basename "$PLAN_FILE" .md | tr '-' ' ')
+gh pr list --state merged --limit 10 --search "$SLUG_WORDS in:title" \
+    --json number,title,mergedAt
+```
+
+Read the candidate PRs and JUDGE: does a merged PR clearly implement THIS plan's deliverables? This is a SEMANTIC match, not a string match — a renamed or renumbered artifact still counts (PR #895 shipped with different pids and dropped a phase, but it WAS this plan). If you are unsure, do NOT skip on this gate alone — let implementation proceed and rely on the Step 6.5 empty-diff backstop, which is the certain check.
+
+If a merged PR clearly implements this plan, take the already-merged skip:
+
+1. `mv "$NIGHTLY_DIR/queue/$PLAN_FILE" "$NIGHTLY_DIR/skipped/"`
+2. Write an ALREADY-MERGED report to `$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-<slug>.md` (derive `<slug>` from the plan title). Title and body must make it visibly an **already-merged skip** — wording clearly distinct from the staleness and ambiguity skips — name the merged PR (number + title), and cite which plan deliverables you confirmed present on master.
+3. STOP — no worktree, no handoff.
+
+If no merged PR clearly matches, continue to Step 3.
 
 ## Step 3: Validate the Plan
 
@@ -118,7 +148,7 @@ cd /Users/ajaynicolas/GitHub/IBL5/worktrees/<slug>
 git log --oneline origin/master..HEAD
 ```
 
-- If the branch is already merged on origin/master (git log shows nothing or branch doesn't exist on remote), this is a stale worktree. Remove it with `bin/wt-rm <slug>` and start fresh (run the "Fresh start" path above).
+- If the branch is already merged on origin/master (git log shows nothing or branch doesn't exist on remote), this is a stale worktree. Remove it with `bin/wt-remove <slug>` and start fresh (run the "Fresh start" path above).
 - If there are commits ahead of master, this is a partial implementation. Read the commit messages and the plan to determine what steps are already complete. Continue from where the previous session left off — do NOT redo completed work.
 - If the worktree exists but has no commits ahead of master (just created, never committed), treat it as a fresh worktree and start implementation from Step 6.
 
@@ -145,6 +175,28 @@ git push origin <slug>
 ```
 
 If implementation requires information you do not have — external resources, unclear requirements, missing context — do NOT guess. Move the plan to skipped/ with a report explaining what information is needed, and STOP.
+
+## Step 6.5: Empty-Diff Backstop (run AFTER implementation, BEFORE the handoff)
+
+This is the certain, zero-cost backstop to the Step 2.6 heuristic. If implementing the plan produced **no net change** vs master, the work was already merged and the Step 2.6 title search missed it (squash-rename, title drift). Do not write a handoff for an empty branch — an empty branch must never reach the post-plan agent.
+
+```bash
+cd /Users/ajaynicolas/GitHub/IBL5/worktrees/<slug>
+git fetch origin master
+AHEAD=$(git rev-list origin/master..HEAD)
+DIRTY=$(git status --porcelain)
+```
+
+If BOTH `$AHEAD` and `$DIRTY` are empty (no commits ahead of master, clean working tree), the branch is identical to master — the plan is already merged. Take the already-merged skip:
+
+1. Delete the pushed remote branch if `bin/wt-new` created one: `git push origin --delete <slug> || true`
+2. `bin/wt-remove <slug>` to remove the empty worktree and local branch.
+3. `mv "$NIGHTLY_DIR/queue/$PLAN_FILE" "$NIGHTLY_DIR/skipped/"`
+4. Write an ALREADY-MERGED report to `$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-<slug>.md` — same already-merged wording as Step 2.6, and note that the **empty-diff backstop** caught it (the title cross-reference did not).
+5. Do NOT write a handoff file.
+6. STOP.
+
+Otherwise (there are commits ahead or a dirty tree), proceed to Step 7.
 
 ## Step 7: Write Handoff File
 

@@ -1,7 +1,7 @@
 ---
 description: Playwright E2E testing rules, Docker requirements, and actionability pitfalls.
 paths: ibl5/tests/e2e/**/*.ts
-last_verified: 2026-05-28
+last_verified: 2026-05-31
 ---
 
 # Playwright E2E Testing Rules
@@ -36,7 +36,7 @@ This runs with `--workers=1 --retries=2` (CI-matching retries, single worker). U
 
 1. **Verify Docker is running:** `docker compose ps` — if no containers are up, run `docker compose up -d`
 2. **Verify `.env.test` exists** with valid credentials — copy from `.env.test.example` if missing
-3. **Rebuild CSS after branch switches:** `css:watch` may not detect source changes from `git checkout`. Run `bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css`
+3. **Rebuild CSS after branch switches:** `css:watch` may not detect source changes from `git checkout`. Run `bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css`. See `.claude/rules/css-auto-rebuild.md` — this is the sanctioned recovery exception to the no-manual-build rule, not a routine step.
 
 ## Test Categories
 
@@ -364,7 +364,7 @@ The E2E tests run in GitHub Actions via `.github/workflows/e2e-tests.yml`. Key d
 ## Worktree & Environment Gotchas
 
 - **`bin/e2e-wt.sh <name>` runs Playwright from the worktree's `ibl5/` dir** — test files and `BASE_URL` both resolve to the worktree, so TS test changes are picked up without any extra steps.
-- **Rebuild CSS after switching branches.** `css:watch` may not detect source file changes from `git checkout`. Run `bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css` after switching.
+- **Rebuild CSS after switching branches.** `css:watch` may not detect source file changes from `git checkout`. Run `bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css` after switching. See `.claude/rules/css-auto-rebuild.md` — this is the sanctioned recovery exception to the no-manual-build rule, not a routine step.
 - **E2E tests that submit login/registration forms can trigger auth throttling.** The `auth_users_throttling` table accumulates failed attempts. If `auth.setup.ts` fails with "Too many login attempts", clear: `DELETE FROM auth_users_throttling WHERE 1=1;`. CI is unaffected (fresh DB per run).
 
 ## Completion Criteria

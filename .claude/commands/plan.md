@@ -3,7 +3,7 @@ description: "Plan an implementation task: enforces a verification matrix, direc
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
-last_verified: 2026-05-28
+last_verified: 2026-05-31
 
 ---
 
@@ -68,6 +68,7 @@ The Plan agent MUST produce:
 - File paths for every test to be written or modified
 - A **Reuse** note in each implementation step that should call existing code: name the exact helper/service/repository method to use (from Step 2 findings) so the impl agent reuses rather than reinvents. Omit only when the step genuinely introduces new infrastructure.
 - For every behavior-changing step, at least one **negative-path, boundary, or failure-case** matrix row — not only the happy path (e.g. "rejects over-cap trade", "returns null for unknown player", "empty roster"). Happy-path-only coverage is insufficient.
+- When the plan emits a `## Critical Files` section, **annotate every entry that will NOT be changed** (references, templates, verify-only, files read for context) with a short parenthetical or em-dash note — e.g. `` `path` (read-only reference) `` or `` `path` — template for X ``. post-plan's Phase 5.0 file-conformance check treats a **bare** (unannotated) Critical File as a must-appear change target and blocks auto-merge if it never lands in the diff; annotating the non-changed entries keeps that gate false-positive-free.
 
 Conditionally — include a section **only when it applies**; never emit an empty header:
 - **Approach** (non-trivial changes only): one short paragraph naming the chosen design and the main alternative rejected, with the reason. Skip for trivial single-file edits.

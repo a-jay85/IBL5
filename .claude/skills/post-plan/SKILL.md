@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-05-29
+last_verified: 2026-05-31
 ---
 
 # Post-Plan Orchestrator
@@ -291,7 +291,7 @@ Both comments end with: `Generated with [Claude Code](https://claude.ai/code)` a
 
 ## Phase 5: Final Verification
 
-### Phase 5.0: Plan→test conformance — skip if `PLAN_FOUND=none` or `! $HAS_MATRIX`
+### Phase 5.0: Plan→test & Plan→file conformance — skip if `PLAN_FOUND=none` or `! $HAS_MATRIX`
 
 At Phase 5.0 START, clear the conformance bridge file so each run begins from a clean slate (an empty file means "nothing unresolved"):
 
@@ -311,7 +311,24 @@ For each `MISSING:` test the impl silently dropped planned coverage — now like
 
 A `MISSING:` item is **resolved** when its test was authored-and-run-green OR was explicitly cut-from-implementation with a PR comment noting the cut. An item that is neither — a planned test the diff never wrote and which you did not author or explicitly cut — is **unresolved**.
 
-At Phase 5.0 END, append each remaining **UNRESOLVED** `MISSING:` item (path + reason) to `/tmp/post-plan-missing-tests-$PPID`, one per line. Authored-green or cut-with-comment items are NOT written. This bridge file is consulted by the Phase 6.5 auto-merge gate.
+**Plan→file conformance.** The same failure mode that drops a planned test also drops a planned *non-test* edit: an impl agent can end its turn with a summary claiming files were changed that never landed in the commit (PR #923 claimed workflow + rule edits that were absent). The test-path check above only covers test files, so additionally verify every **must-appear** file in the plan's `## Critical Files` section actually shows up in the diff. A Critical File is **must-appear iff it is bare** — after stripping all backticked tokens from the bullet, no descriptive prose (no letters) remains. **Any annotation exempts it** — a parenthetical `(read-only reference)` / `(new)` / `(verify only)` or an em-dash `— reference: …` note all mark an entry the impl was not required to change. This bare-vs-annotated rule is annotation-syntax-agnostic (no brittle keyword list) and the safe direction for a merge gate: it under-blocks a forgotten-to-annotate reference rather than over-blocking a good PR. Plans with no `## Critical Files` section produce an empty loop and are silently skipped.
+
+```bash
+# Reuses /tmp/post-plan-changed-$PPID (written above) and $PLAN_FILE.
+awk '/^## *Critical Files/{f=1;next} /^## /{f=0} f' "$PLAN_FILE" \
+  | grep -E '^[[:space:]]*-[[:space:]]*`' | while IFS= read -r LINE; do
+    CF=$(printf '%s\n' "$LINE" | grep -oE '`[^`]+`' | head -1 | tr -d '`')   # primary path only; inline `pattern from X` refs ignored
+    [ -z "$CF" ] && continue
+    REST=$(printf '%s\n' "$LINE" | sed -E 's/`[^`]*`//g' | sed -E 's/^[[:space:]]*-[[:space:]]*//')
+    printf '%s\n' "$REST" | grep -qiE '[a-z]' && continue                    # annotated => exempt
+    grep -qF "$CF" /tmp/post-plan-changed-$PPID \
+      || echo "MISSING-FILE: $CF (plan Critical File never appeared in the diff)"
+done
+```
+
+For each `MISSING-FILE:`, the impl dropped a planned change. Either (a) make the change now — the plan's implementation steps describe it (this is the #923 remedy: finish the work), run any relevant check, and checkpoint (commit + push) — or (b) if the file was legitimately cut from scope, or is a reference the plan author forgot to annotate, note that in a PR comment. A `MISSING-FILE:` item is **resolved** by (a) or (b); otherwise **unresolved**.
+
+At Phase 5.0 END, append each remaining **UNRESOLVED** `MISSING:` and `MISSING-FILE:` item (label + path + reason) to `/tmp/post-plan-missing-tests-$PPID`, one per line. Authored-green / implemented-and-checkpointed / cut-with-comment items are NOT written. This bridge file is consulted by the Phase 6.5 auto-merge gate.
 
 **PHPUnit + PHPStan — direct Bash (no agent):** **Skip if** `! $HAS_PHP`. The PostToolUse hook already ran both during edits, and a PHP-less diff cannot regress either suite. Run both as direct Bash calls with `run_in_background: true` so they execute in parallel with the E2E agent below. Output is ~5 lines each — agent overhead (~25K tokens) is never justified.
 
@@ -420,7 +437,7 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 
 **Already merged?** If `gh pr view --json state --jq '.state'` returns `MERGED`, there is nothing to arm — skip to Phase 7 (which will early-exit).
 
-**All four** conditions must be true: (1) PR says "No manual testing needed", (2) no review/audit findings scored >= 80, (3) no unresolved `MISSING:` planned-test items remain from Phase 5.0 — i.e. `/tmp/post-plan-missing-tests-$PPID` is absent or empty. Phase 5.0 is skipped entirely when `PLAN_FOUND=none` or `! $HAS_MATRIX`, so this bridge file frequently never exists; **absent/empty = PASS (non-blocking)**. Only a non-empty file blocks: `[ -s /tmp/post-plan-missing-tests-$PPID ]` → condition (3) fails. (4) Phase 5's local verification did not deterministically fail — i.e. `PHASE5_VERIFY_STATUS` is `pass` or `skipped`, **not** `fail`. This is the condition #887 lacked: it armed auto-merge with red E2E because no gate checked Phase 5's result.
+**All four** conditions must be true: (1) PR says "No manual testing needed", (2) no review/audit findings scored >= 80, (3) no unresolved `MISSING:` planned-test items NOR `MISSING-FILE:` planned-file items remain from Phase 5.0 — i.e. `/tmp/post-plan-missing-tests-$PPID` is absent or empty. Phase 5.0 is skipped entirely when `PLAN_FOUND=none` or `! $HAS_MATRIX`, so this bridge file frequently never exists; **absent/empty = PASS (non-blocking)**. Only a non-empty file blocks: `[ -s /tmp/post-plan-missing-tests-$PPID ]` → condition (3) fails. (4) Phase 5's local verification did not deterministically fail — i.e. `PHASE5_VERIFY_STATUS` is `pass` or `skipped`, **not** `fail`. This is the condition #887 lacked: it armed auto-merge with red E2E because no gate checked Phase 5's result.
 
 **Condition (4) blocks on the VALUE, not file presence** — the status file is non-empty for `pass` and `skipped` too (it always contains `PHASE5_VERIFY_STATUS=...`), so the `[ -s ... ]` idiom condition (3) uses would wrongly block every `pass`/`skipped`. Block only on the literal `fail` value; **absent file OR `pass` OR `skipped` = PASS (non-blocking)** — a `skipped` status (docs-only / PHP-less PR with no mapped E2E) must NOT block, or every such PR would stop arming, a regression worse than #887:
 
@@ -431,7 +448,7 @@ grep -q 'PHASE5_VERIFY_STATUS=fail' /tmp/post-plan-phase5-status-$PPID 2>/dev/nu
 
 If met: `gh pr merge --squash --auto --delete-branch`. The `--auto` flag queues the merge — it does **not** merge now, it arms; GitHub executes it once all required status checks pass. Do not sync local to master here; the merge has not happened yet.
 
-If not met: do **not** arm auto-merge. Report which condition(s) blocked — the user merges manually after review. When condition (3) is the blocker, cite which planned test is missing by `cat`-ing the bridge file (`cat /tmp/post-plan-missing-tests-$PPID`) into the report. When condition (4) is the blocker, report which Phase 5 track failed (PHPUnit / PHPStan / E2E). Continue to Phase 7 regardless, to monitor and fix CI — the fix-and-rerun there clears the red track so a later run can arm.
+If not met: do **not** arm auto-merge. Report which condition(s) blocked — the user merges manually after review. When condition (3) is the blocker, cite which planned test (`MISSING:`) or planned Critical File (`MISSING-FILE:`) is missing by `cat`-ing the bridge file (`cat /tmp/post-plan-missing-tests-$PPID`) into the report. When condition (4) is the blocker, report which Phase 5 track failed (PHPUnit / PHPStan / E2E). Continue to Phase 7 regardless, to monitor and fix CI — the fix-and-rerun there clears the red track so a later run can arm.
 
 ---
 

@@ -1,2 +1,7 @@
 parameters:
-	ignoreErrors: []
+	ignoreErrors:
+		-
+			rawMessage: 'header() is banned outside Bootstrap classes, Responders, and HTMX ApiHandlers. Route response headers through a Responder (composed by the Controller/ApiHandler).'
+			identifier: ibl.directHeader
+			count: 1
+			path: classes/Trading/TradingController.php

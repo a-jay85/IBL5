@@ -132,3 +132,7 @@ services:
         class: PHPStanRules\BanRawHtmlEscapeFunctionsRule
         tags:
             - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanDirectHeaderCallRule
+        tags:
+            - phpstan.rules.rule

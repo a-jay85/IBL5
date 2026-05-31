@@ -28,23 +28,44 @@ const (
 	playPost                    // PO vs PD
 )
 
-// onCourt is one starter plus the per-game values PR3a holds constant. Energy
-// equals base stamina (no drain/recovery until PR4), so fatigue is effectively
-// 1.0 for every player all game.
+// onCourt is one player currently on the floor plus the per-game live values.
+// energy is the player's current energy (drained on court, recovered on the
+// bench); fatigue is fatigueFactor(energy), refreshed each possession. Under the
+// committed fatigue curve fatigue is identically 1.0 for any energy ≥ 0 and
+// clamps to 1.0 for negative energy too — see fatigueFactor — so live energy is
+// behaviorally inert today, but the wiring is faithful for when the curve is
+// repaired.
 type onCourt struct {
 	bundle.Player
 	slot    int
+	energy  int
 	fatigue float64
 }
 
-// teamState is one team's live game state: its five starters, running score,
-// quarter splits, and a box-score row per rostered player (including DNPs).
+// teamState is one team's live game state: its current on-court players, running
+// score, quarter splits, a box-score row per rostered player (including DNPs),
+// and the live energy/minutes/foul-out bookkeeping the substitution system reads.
 type teamState struct {
-	teamID   int
-	isHome   bool
-	players  []onCourt           // starters, ordered by slot (1..5); may be < 5
-	boxes    []*result.PlayerBox // one per rostered player, in bundle order
-	byPID    map[int]*result.PlayerBox
+	teamID  int
+	isHome  bool
+	players []onCourt           // on-court players, ordered by slot (1..5); may be < 5
+	boxes   []*result.PlayerBox // one per rostered player, in bundle order
+	byPID   map[int]*result.PlayerBox
+
+	// roster is the team's eligible players (TeamID match, dc_can_play_in_game
+	// != 0), in bundle order — the candidate pool for substitution backups.
+	// playerByPID indexes it for O(1) sub-in lookups.
+	roster      []bundle.Player
+	playerByPID map[int]bundle.Player
+
+	// energy/minutes are keyed by PID for every eligible player (on court or
+	// bench). energy may go negative (drain is unfloored); minutes accumulates
+	// on-court seconds and is finalized into GameMIN at game end. fouledOut marks
+	// players who hit the 6th foul and can never re-enter.
+	energy    map[int]float64
+	minutes   map[int]float64
+	fouledOut map[int]bool
+
 	score    int
 	quarters []int // points per period in order; index 0 = Q1
 }

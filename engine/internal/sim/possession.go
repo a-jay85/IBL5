@@ -83,7 +83,7 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPen
 
 		penalty := positionPenalty(bh)
 		net := netAdvantage(pt, bh, def, penalty, false)
-		mq := matchupQuality(bh.FGP, bh.Stamina, defense.players)
+		mq := matchupQuality(bh.FGP, bh.energy, defense.players) // live energy (inert under current curve)
 
 		sv2 := applyClutch(shotValue2pt(net, bh.FGP, false), bh.Clutch, gs.period, scoreDiff)
 		in := outcomeInputs{
@@ -149,7 +149,9 @@ func (gs *gameState) shotAttempt(offense, defense *teamState, shooter onCourt, s
 		Kind: result.EventShotAttempt, Period: gs.period, Clock: gs.clock,
 		TeamID: offense.teamID, PlayerID: shooter.PID, ShotType: st,
 	})
-	if rollMake(shotValue, shooter.fatigue, gs.rng) {
+	// FG make uses BASE stamina fatigue (per spec, distinct from the live-energy
+	// outcome weights/selectors); under the current curve this is ≈1.0 anyway.
+	if rollMake(shotValue, fatigueFactor(shooter.Stamina), gs.rng) {
 		gs.creditMadeFieldGoal(offense, shooter, st, periodIdx)
 		return true, true
 	}

@@ -8233,7 +8233,7 @@
         {
           "pid": 101,
           "pos": "PG",
-          "gameMIN": 36,
+          "gameMIN": 49,
           "game2GM": 0,
           "game2GA": 6,
           "gameFTM": 0,
@@ -8251,7 +8251,7 @@
         {
           "pid": 102,
           "pos": "SG",
-          "gameMIN": 18,
+          "gameMIN": 49,
           "game2GM": 0,
           "game2GA": 7,
           "gameFTM": 0,
@@ -8287,7 +8287,7 @@
         {
           "pid": 201,
           "pos": "SF",
-          "gameMIN": 34,
+          "gameMIN": 49,
           "game2GM": 0,
           "game2GA": 11,
           "gameFTM": 0,
@@ -8305,7 +8305,7 @@
         {
           "pid": 202,
           "pos": "PF",
-          "gameMIN": 22,
+          "gameMIN": 49,
           "game2GM": 0,
           "game2GA": 6,
           "gameFTM": 0,

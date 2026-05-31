@@ -3,9 +3,42 @@ package sim
 import (
 	"testing"
 
+	"github.com/a-jay85/IBL5/engine/internal/bundle"
 	"github.com/a-jay85/IBL5/engine/internal/result"
 	"github.com/a-jay85/IBL5/engine/internal/rng"
 )
+
+// --- matrix #1/#8: GameMIN is accumulated on-court time, not static dc_minutes
+//
+// PR4a/PR3a set a starter's GameMIN to clamp(dc_minutes,0,48) at construction.
+// PR4b replaces that: every player starts at 0 and accrues real on-court seconds
+// finalized to rounded minutes at game end. A DNP (dc_can_play_in_game == 0)
+// never accrues and stays 0.
+func TestTeamState_GameMINIsAccumulatedNotStatic(t *testing.T) {
+	players := []bundle.Player{
+		{PID: 1, TeamID: 7, DCPGDepth: 1, DCMinutes: 32, Stamina: 50, DCCanPlayInGame: 1},
+		{PID: 2, TeamID: 7, DCCDepth: 1, DCMinutes: 40, Stamina: 50, DCCanPlayInGame: 0}, // DNP
+	}
+	tm := newTeamState(players, 7, true)
+
+	// Starter begins at 0 — NOT the old static clamp(dc_minutes)=32.
+	if got := tm.box(1).GameMIN; got != 0 {
+		t.Errorf("pre-game starter GameMIN = %d, want 0 (no longer seeded from dc_minutes)", got)
+	}
+
+	// PID 1 is the only on-court player; accrue 120 possessions × 15s = 1800s.
+	for i := 0; i < 120; i++ {
+		tm.drainAndRecover(15)
+	}
+	tm.finalizeMinutes()
+
+	if got := tm.box(1).GameMIN; got != 30 { // round(1800/60) = 30, distinct from dc_minutes 32
+		t.Errorf("accumulated GameMIN = %d, want 30 (real on-court time, not dc_minutes 32)", got)
+	}
+	if got := tm.box(2).GameMIN; got != 0 {
+		t.Errorf("DNP GameMIN = %d, want 0", got)
+	}
+}
 
 // --- matrix #1/#2: box derivation rules (PR3b contract) ---------------------
 //

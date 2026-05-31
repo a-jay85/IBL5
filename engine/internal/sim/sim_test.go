@@ -1,6 +1,7 @@
 package sim
 
 import (
+	"math"
 	"testing"
 
 	"github.com/a-jay85/IBL5/engine/internal/bundle"
@@ -41,10 +42,10 @@ func mkPlayer(pid, team, slot, fgp int) bundle.Player {
 	return p
 }
 
-// oc wraps a bundle.Player as an on-court starter at the given slot, with the
-// PR3a constant-energy fatigue.
+// oc wraps a bundle.Player as an on-court player at the given slot, with live
+// energy seeded to base stamina (the tip-off rest value).
 func oc(slot int, p bundle.Player) onCourt {
-	return onCourt{Player: p, slot: slot, fatigue: fatigueFactor(p.Stamina)}
+	return onCourt{Player: p, slot: slot, energy: p.Stamina, fatigue: fatigueFactor(p.Stamina)}
 }
 
 // richBundle is an asymmetric, fully-rated two-team fixture (5 starters each)
@@ -69,6 +70,158 @@ func richBundle() bundle.Bundle {
 		Schedule: []bundle.Game{
 			{HomeTeamID: 3, VisitorTeamID: 7, Date: "1988-11-04", GameType: bundle.GameTypeRegular},
 		},
+	}
+}
+
+// rotationBundle is a full-game fixture with a real bench: each team has a
+// starter + one backup (depth 2) at PG/SG/SF/PF, and a single high-foul center
+// with NO backup. Low Stamina (40) drives fatigue subs at PG-PF; the un-backed,
+// foul-prone center accumulates personal fouls until it fouls out (it can never
+// be pulled for foul-trouble, having no replacement). Home shoots better so the
+// game resolves to a winner.
+func rotationBundle() bundle.Bundle {
+	var players []bundle.Player
+	pid := 100
+	mk := func(team, slot, fgp, depth, foul int) bundle.Player {
+		pid++
+		p := mkPlayer(pid, team, slot, fgp)
+		setDepthAt(&p, slot, depth)
+		p.Foul = foul
+		p.Stamina = 40
+		return p
+	}
+	for _, tm := range []struct{ id, fgp int }{{7, 44}, {3, 52}} {
+		for slot := slotPG; slot <= slotPF; slot++ {
+			players = append(players, mk(tm.id, slot, tm.fgp, 1, 40)) // starter
+			players = append(players, mk(tm.id, slot, tm.fgp, 2, 40)) // backup
+		}
+		players = append(players, mk(tm.id, slotC, tm.fgp, 1, 99)) // lone, foul-prone C
+	}
+	return bundle.Bundle{
+		Seed:    1988,
+		Teams:   []bundle.Team{{TeamID: 3, Name: "Heat"}, {TeamID: 7, Name: "Lakers"}},
+		Players: players,
+		Schedule: []bundle.Game{
+			{HomeTeamID: 3, VisitorTeamID: 7, Date: "1988-11-04", GameType: bundle.GameTypeRegular},
+		},
+	}
+}
+
+// setDepthAt sets a player's depth ordinal at the given slot (setSlot only sets
+// depth 1; this allows bench depths).
+func setDepthAt(p *bundle.Player, slot, depth int) {
+	switch slot {
+	case slotPG:
+		p.DCPGDepth = depth
+	case slotSG:
+		p.DCSGDepth = depth
+	case slotSF:
+		p.DCSFDepth = depth
+	case slotPF:
+		p.DCPFDepth = depth
+	case slotC:
+		p.DCCDepth = depth
+	}
+}
+
+// --- matrix #15: substitutions fire over a full rotation game ---------------
+
+func TestSimulate_SubstitutionsFire(t *testing.T) {
+	res := Simulate(rotationBundle(), 1988)
+	subs := 0
+	for _, e := range res.Games[0].Events {
+		if e.Kind == result.EventSubstitution {
+			subs++
+		}
+	}
+	if subs == 0 {
+		t.Error("no EventSubstitution fired over a full rotation game")
+	}
+	if subs%2 != 0 {
+		t.Errorf("substitution events = %d, want even (each swap is an out+in pair)", subs)
+	}
+}
+
+// --- matrix #16: minutes conservation (iron-man richBundle, no subs) ---------
+//
+// In richBundle every team has exactly 5 eligible players, so no substitution or
+// foul-out can occur: all 10 players are on court for every possession of the
+// game. Each therefore accrues `step` seconds per game-possession, so GameMIN ==
+// round(totalPossessions × step / 60) for every player. The expected value is
+// derived from the ACTUAL possession count and the engine's own step, never an
+// assumed number.
+func TestSimulate_MinutesConservation(t *testing.T) {
+	b := richBundle()
+	v := newTeamState(b.Players, 7, false)
+	h := newTeamState(b.Players, 3, true)
+	step := possessionTime((teamBaseTime(v.players) + teamBaseTime(h.players)) / 2.0)
+
+	res := Simulate(b, 1988)
+	g := res.Games[0]
+	totalPoss := 0
+	for _, e := range g.Events {
+		if e.Kind == result.EventPossessionStart {
+			totalPoss++
+		}
+	}
+	wantMin := int(math.Round(float64(totalPoss*step) / 60.0))
+
+	for _, pb := range g.PlayerBoxes {
+		if pb.GameMIN != wantMin {
+			t.Errorf("player %d GameMIN = %d, want %d (round(%d poss × %d step / 60))",
+				pb.PID, pb.GameMIN, wantMin, totalPoss, step)
+		}
+	}
+}
+
+// --- matrix #17: a fouled-out player stops accruing minutes -----------------
+//
+// rotationBundle's lone, foul-prone center has no backup, so it can never be
+// pulled for foul-trouble — it plays until it fouls out, then is removed for
+// good. Its minutes must stop short of a player who played the whole game.
+func TestSimulate_FoulOutStopsMinutes(t *testing.T) {
+	res := Simulate(rotationBundle(), 1988)
+	g := res.Games[0]
+
+	maxMin := 0
+	var fouledOut []result.PlayerBox
+	for _, pb := range g.PlayerBoxes {
+		if pb.GameMIN > maxMin {
+			maxMin = pb.GameMIN
+		}
+		if pb.GamePF >= 6 {
+			fouledOut = append(fouledOut, pb)
+		}
+	}
+	if len(fouledOut) == 0 {
+		t.Fatal("no player fouled out in the rotation game (fixture/seed no longer forces a foul-out)")
+	}
+	for _, pb := range fouledOut {
+		if pb.GameMIN == 0 {
+			t.Errorf("fouled-out player %d has 0 minutes (never played?)", pb.PID)
+		}
+		if pb.GameMIN >= maxMin {
+			t.Errorf("fouled-out player %d GameMIN = %d, want < whole-game max %d (minutes did not stop)",
+				pb.PID, pb.GameMIN, maxMin)
+		}
+	}
+}
+
+// --- matrix #18: bench players who entered have minutes ---------------------
+//
+// rotationBundle dresses 9 players per team (18 total) but starts only 5 per
+// team (10). If more than 10 players have GameMIN > 0, bench players entered via
+// substitution and accrued time.
+func TestSimulate_BenchPlayersEnter(t *testing.T) {
+	res := Simulate(rotationBundle(), 1988)
+	played := 0
+	for _, pb := range res.Games[0].PlayerBoxes {
+		if pb.GameMIN > 0 {
+			played++
+		}
+	}
+	if played <= 10 {
+		t.Errorf("players with minutes = %d, want > 10 (bench entered)", played)
 	}
 }
 

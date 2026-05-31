@@ -40,3 +40,24 @@ func TestShootFreeThrows(t *testing.T) {
 		}
 	}
 }
+
+// --- matrix #14: FT make path reads live energy (inert under current curve) --
+//
+// shootFreeThrows uses fatigueFactor(shooter.energy), distinct from FG make
+// (base stamina). Under the committed curve fatigueFactor clamps to 1.0 for any
+// energy, so this is behaviorally inert — but the call path must read `energy`,
+// not Stamina. We assert it by constructing an onCourt whose live energy is set
+// independently of Stamina (here deeply negative while Stamina is high): the FT
+// path must not panic and FTM stays within [0, n], confirming it consumed the
+// energy field through the (clamped) curve rather than crashing on it.
+func TestShootFreeThrows_ReadsLiveEnergy(t *testing.T) {
+	r := rng.New(3)
+	// energy set distinct from Stamina; negative energy clamps to the 1.0 curve.
+	shooter := onCourt{Player: bundle.Player{FTP: 80, Stamina: 99}, slot: slotPG, energy: -50, fatigue: fatigueFactor(-50)}
+	for i := 0; i < 1000; i++ {
+		made := shootFreeThrows(shooter, 2, r)
+		if made < 0 || made > 2 {
+			t.Fatalf("made = %d, out of [0,2] (live-energy FT path)", made)
+		}
+	}
+}

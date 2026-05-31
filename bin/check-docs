@@ -61,10 +61,15 @@ Options:
   --include-memory   Also scan Claude Code memory for this repo
                      (auto-derived from the main repo path; works from
                      worktrees). Off in CI.
+  --since=<ref>      Changed-files (PR) mode: every in-scope .md whose body
+                     changed vs <ref> must also bump last_verified. Each
+                     changed file is also run through the full-scan checks
+                     (future-date, staleness, dead-ref). Pure base-vs-head
+                     value comparison — never date-equality-to-today.
   --verbose, -v      Show passing files too.
   --help, -h         Show this message.
 
-Exit 0 on success, 1 on any validation failure.
+Exit 0 on success, 1 on any validation failure, 2 on a usage error.
 
 USAGE;
 }
@@ -412,10 +417,101 @@ function fixDates(array $files, \DateTimeImmutable $today): int
     return $updated;
 }
 
+/**
+ * Changed-files (PR) mode. For each in-scope .md that changed between $base and
+ * HEAD, fail when its body changed but the parsed `last_verified` value did NOT
+ * change (the On-Touch Rule), and additionally run the full-scan checkFile()
+ * rules (future-date, staleness, dead-ref, missing frontmatter).
+ *
+ * The bump check compares the parsed frontmatter VALUE base-vs-head — never
+ * date-equality-to-today — so a PR opened Monday and merged Wednesday does not
+ * false-fail, and body text that literally contains `last_verified:` (e.g. inside
+ * a code fence) cannot trip the check. The value comparison subsumes every case:
+ * body-changed-not-bumped fails (values equal), date-bumped passes (values
+ * differ), newly-added-with-date passes (base null != date), added-without-date
+ * fails (null === null).
+ *
+ * @return list<string> diagnostic lines, each prefixed with the repo-relative path.
+ */
+function checkChanged(string $base, string $repoRoot, \DateTimeImmutable $today): array
+{
+    $escapedRoot = escapeshellarg($repoRoot);
+    $escapedBase = escapeshellarg($base);
+
+    $diffCmd = sprintf(
+        'git -C %s diff --name-only --diff-filter=AM %s...HEAD 2>/dev/null',
+        $escapedRoot,
+        $escapedBase
+    );
+    $changedRel = [];
+    $diffCode = 0;
+    exec($diffCmd, $changedRel, $diffCode);
+    if ($diffCode !== 0) {
+        fwrite(STDERR, sprintf("check-docs: unable to diff against base ref '%s' (git exit %d). Is it a valid commit? In CI, ensure fetch-depth: 0.\n", $base, $diffCode));
+        exit(2);
+    }
+
+    // Intersect with the in-scope set so scoping/exclusions are reused, not
+    // re-implemented.
+    $inScopeSet = [];
+    foreach (collectFiles($repoRoot, false) as $abs) {
+        $inScopeSet[$abs] = true;
+    }
+
+    $issues = [];
+    foreach ($changedRel as $rel) {
+        $rel = trim($rel);
+        if ($rel === '') {
+            continue;
+        }
+        $abs = $repoRoot . '/' . $rel;
+        if (!isset($inScopeSet[$abs])) {
+            continue;
+        }
+
+        $headContent = is_file($abs) ? file_get_contents($abs) : false;
+        $headFm = $headContent !== false ? parseFrontmatter($headContent) : null;
+
+        // Base blob: command fails when the file did not exist at $base (added)
+        // => treat base frontmatter as null.
+        $showCmd = sprintf('git -C %s show %s:%s 2>/dev/null', $escapedRoot, $escapedBase, escapeshellarg($rel));
+        $baseOut = [];
+        $baseCode = 0;
+        exec($showCmd, $baseOut, $baseCode);
+        $baseFm = $baseCode === 0 ? parseFrontmatter(implode("\n", $baseOut)) : null;
+
+        $headLv = $headFm['last_verified'] ?? null;
+        $baseLv = $baseFm['last_verified'] ?? null;
+
+        if ($headLv === $baseLv) {
+            $issues[] = sprintf(
+                '%s: body changed but last_verified not bumped (still %s)',
+                $rel,
+                $headLv ?? '(none)'
+            );
+        }
+
+        foreach (checkFile($abs, $repoRoot, $today) as $fileIssue) {
+            $issues[] = sprintf('%s: %s', $rel, $fileIssue);
+        }
+    }
+
+    return $issues;
+}
+
 // --- main ---
 
-$opts = ['fix_dates' => false, 'include_memory' => false, 'verbose' => false];
+$opts = ['fix_dates' => false, 'include_memory' => false, 'verbose' => false, 'since' => null];
 foreach (array_slice($argv, 1) as $arg) {
+    if (str_starts_with($arg, '--since=')) {
+        $opts['since'] = substr($arg, strlen('--since='));
+        if (trim($opts['since']) === '') {
+            fwrite(STDERR, "check-docs: --since= requires a base ref (e.g. --since=master or --since=<sha>)\n");
+            fwrite(STDERR, usage());
+            exit(2);
+        }
+        continue;
+    }
     switch ($arg) {
         case '--fix-dates':
             $opts['fix_dates'] = true;
@@ -440,6 +536,21 @@ foreach (array_slice($argv, 1) as $arg) {
 
 $root = repoRoot();
 $today = new \DateTimeImmutable('today');
+
+if ($opts['since'] !== null) {
+    $issues = checkChanged($opts['since'], $root, $today);
+    if ($issues === []) {
+        echo "On-touch doc check passed (changed files vs {$opts['since']}).\n";
+        exit(0);
+    }
+    echo "On-touch doc check FAILED:\n";
+    foreach ($issues as $issue) {
+        echo "     - {$issue}\n";
+    }
+    echo "\n" . count($issues) . " issue(s) in changed docs.\n";
+    exit(1);
+}
+
 $files = collectFiles($root, $opts['include_memory']);
 sort($files);
 

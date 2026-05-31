@@ -111,6 +111,30 @@ func aggregateBoxes(events []result.Event, visitor, home rosterMeta) ([]result.P
 	return boxes, teams
 }
 
+// aggregateInjuries folds the event stream into the derived Injuries slice, a
+// sibling of aggregateBoxes' fold: each EventInjury becomes one Injury carrying
+// the injured player, team, severity, games-missed, and game clock. It returns
+// nil when there are no EventInjury events — combined with json:"injuries,
+// omitempty" this drops the key entirely on injury-free games, keeping the
+// zero-turnover golden byte-stable.
+func aggregateInjuries(events []result.Event) []result.Injury {
+	var injuries []result.Injury
+	for _, e := range events {
+		if e.Kind != result.EventInjury {
+			continue
+		}
+		injuries = append(injuries, result.Injury{
+			PID:         e.PlayerID,
+			TeamID:      e.TeamID,
+			GamesMissed: e.GamesMissed,
+			Severity:    e.Severity,
+			Period:      e.Period,
+			Clock:       e.Clock,
+		})
+	}
+	return injuries
+}
+
 // rollupTeam sums the team's player rows into one TeamBox and lays its scoring
 // out by period (Q1–Q4, then OT in order). Points bucket from EventShotMake (2
 // or 3 by ShotType) and EventFreeThrow (FTMade). A period is "reached" by any

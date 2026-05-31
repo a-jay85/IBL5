@@ -26,6 +26,7 @@ const (
 	EventSubstitution    EventKind = "substitution"
 	EventFreeThrow       EventKind = "free_throw"
 	EventPeriodBoundary  EventKind = "period_boundary"
+	EventInjury          EventKind = "injury"
 )
 
 // ShotType classifies a shot attempt; carried on shot_attempt/make/miss events.
@@ -60,6 +61,14 @@ type Event struct {
 	// aggregator reconstruct GameFTA/GameFTM exactly from the event stream.
 	FTAttempts int `json:"ft_attempts,omitempty"`
 	FTMade     int `json:"ft_made,omitempty"`
+
+	// Severity / GamesMissed carry the in-game injury outcome for a single
+	// turnover. Meaningful only when Kind == EventInjury; a zero value is *not
+	// applicable* for every other kind (omitted via omitempty), exactly like the
+	// FTAttempts/FTMade convention above. The derived Injuries slice is folded
+	// from these fields by aggregateInjuries.
+	Severity    int `json:"severity,omitempty"`
+	GamesMissed int `json:"games_missed,omitempty"`
 }
 
 // PlayerBox is one player's stat line for one game. Fields map 1:1 to the RAW
@@ -114,6 +123,20 @@ type TeamBox struct {
 	GamePF  int `json:"gamePF"`
 }
 
+// Injury is one in-game injury, derived from an EventInjury in the event stream.
+// GamesMissed is the load-bearing value the PR8 loader persists to
+// ibl_jsb_transactions.injury_games_missed; Severity is retained for diagnostics
+// and validation. The 306-entry JSB description text table is deliberately not
+// modeled (PR8 leaves injury_description NULL).
+type Injury struct {
+	PID         int `json:"pid"`
+	TeamID      int `json:"team_id"`
+	GamesMissed int `json:"games_missed"`
+	Severity    int `json:"severity"`
+	Period      int `json:"period"`
+	Clock       int `json:"clock_seconds"`
+}
+
 // GameResult is the engine's full output for one scheduled game. SimGameType
 // echoes the JSB-scale input game-type (2-6) for the loader's routing; it is
 // NOT the ibl_box_scores.game_type generated column (which the database derives
@@ -128,6 +151,11 @@ type GameResult struct {
 	Events      []Event     `json:"events"`
 	PlayerBoxes []PlayerBox `json:"player_boxes"`
 	TeamBoxes   []TeamBox   `json:"team_boxes"` // visitor first, then home
+
+	// Injuries derives from the EventInjury stream (aggregateInjuries). omitempty
+	// is MANDATORY: an injury-free game (e.g. the zero-turnover golden) must omit
+	// the key entirely so the golden snapshot stays byte-stable.
+	Injuries []Injury `json:"injuries,omitempty"`
 }
 
 // Result is the engine's complete output for one bundle: one GameResult per

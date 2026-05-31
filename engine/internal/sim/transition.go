@@ -127,6 +127,7 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 				Kind: result.EventTurnover, Period: gs.period, Clock: gs.clock,
 				TeamID: offense.teamID, PlayerID: bh.PID,
 			})
+			gs.maybeInjure(offense, bh) // per-turnover injury check on the committer
 			return gs.creditSteal(offense, defense, bh)
 		}
 	}

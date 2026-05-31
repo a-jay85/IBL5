@@ -89,6 +89,7 @@ func simGame(b bundle.Bundle, g bundle.Game, r *rng.RNG) (result.GameResult, int
 		Events:        gs.events,
 		PlayerBoxes:   playerBoxes,
 		TeamBoxes:     teamBoxes,
+		Injuries:      aggregateInjuries(gs.events),
 	}
 	return gr, gs.transitions, visitor, home
 }

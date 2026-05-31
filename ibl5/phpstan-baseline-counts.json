@@ -1,5 +1,8 @@
 {
-    "phpstan-baseline.neon": [],
+    "phpstan-baseline.neon": {
+        "ibl.directHeader": 1,
+        "ibl.hardcodedEnvString": 8
+    },
     "phpstan-tests-baseline.neon": {
         "argument.type": 94,
         "array.duplicateKey": 9,

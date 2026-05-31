@@ -128,3 +128,15 @@ services:
         class: PHPStanRules\BanServiceExtendsBaseRepositoryRule
         tags:
             - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanRawHtmlEscapeFunctionsRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanDirectHeaderCallRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanHardcodedEnvironmentStringsRule
+        tags:
+            - phpstan.rules.rule

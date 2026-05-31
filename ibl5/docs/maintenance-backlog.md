@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-05-29
+last_verified: 2026-05-31
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -1594,6 +1594,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** New `BanRawHtmlEscapeFunctionsRule`; allow `HtmlSanitizer.php`, `LegacyFunctions.php`.
 **Est. effort:** S
 **Risk if untouched:** Double-encoding or missed XSS vectors.
+**Status:** Rule landed (2026-05-31) — `BanRawHtmlEscapeFunctionsRule` (`ibl.rawHtmlEscape`). 0 baseline violations. `HtmlSanitizer.php` allowlisted (canonical escaper). `DebugOutput.php` allowlisted, NOT collapsed to `HtmlSanitizer::e()`: `e()` applies `stripslashes()`, which would mangle debug dumps — the raw call is a deliberate two-step `<br>`-restore pattern from PR #360.
 
 ### 10.10 `HtmlSanitizer::trusted()` Is a 70-Site Escape Hatch
 **Location:** 70 calls across `FreeAgencyView`, `FreeAgencyOfferView`, `TradingView`, `WaiversView`
@@ -1608,6 +1609,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** New `BanDirectHeaderCallRule`; allow `*Responder.php`, Bootstrap, `PageLayout.php`, `*ApiHandler.php`.
 **Est. effort:** S
 **Risk if untouched:** Post-redirect logging never runs.
+**Status:** Rule landed (2026-05-31) — `BanDirectHeaderCallRule` (`ibl.directHeader`). Allowlist by suffix: `Bootstrap.php` / `Responder.php` / `ApiHandler.php`, plus exact `HtmxHelper.php` (same allowlist shape as `BanEchoInNonViewClassesRule`). 1 baseline entry: `TradingController.php:94` (raw `header()` for JSON content-type — should route through `JsonResponder`; existing debt).
 
 ### 10.12 Direct `$db->query()` in Updater Steps
 **Location:** `Updater/Steps/RefreshTeamSeasonRecordsStep.php:38,41,45`, `RefreshPlayoffSeriesResultsStep.php:38,41`, `RefreshIblHistStep.php:36,39`
@@ -1691,6 +1693,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** New `BanHardcodedEnvironmentStringsRule`; allow Bootstrap, config files, `.example` files, stubs.
 **Est. effort:** S
 **Risk if untouched:** Production/test divergence silent.
+**Status:** Rule landed (2026-05-31) — `BanHardcodedEnvironmentStringsRule` (`ibl.hardcodedEnvString`). Matches `String_` literals `localhost` / `127.0.0.1` / `iblhoops.net` / `www.iblhoops.net` / `main.localhost`. Allowlist: `Bootstrap.php` suffix + `DevAutoLogin.php` + `Discord.php`. 8 baseline entries across 6 existing env-branching classes (`DebugSession`, `ExtensionService`, `Navigation/Views/DesktopNavView`, `PageLayout`, `TradeOfferRepository`, `TradeProcessor`). Config-injection fix of those sites deferred to a separate plan; rule lands to stop new ones.
 
 ### 10.24 `RequireStrictTypesRule` Doesn't Cover `phpstan-rules/` Itself
 **Location:** `phpstan-rules/RequireStrictTypesRule.php` — `str_contains($file, '/classes/')` skips PHPStan rule files

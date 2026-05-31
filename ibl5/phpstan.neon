@@ -148,3 +148,7 @@ services:
         class: PHPStanRules\BanSqlStringInterpolationRule
         tags:
             - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanDuplicateModifierMethodRule
+        tags:
+            - phpstan.rules.rule

@@ -42,9 +42,10 @@ func bestDepthPos(p bundle.Player) string {
 
 // newTeamState builds a team's live state: its starters, a box-score row for
 // every rostered player in bundle order (DNP rows carry GameMIN == 0 with all
-// stats zero), a PID index for stat accumulation, the eligible-roster candidate
-// pool for substitutions, and the live energy/minutes maps (seeded to each
-// eligible player's Stamina ceiling / 0 seconds). GameMIN is now accumulated
+// stats zero), a PID index over those rows (roster-metadata lookups; stats are
+// event-derived by aggregateBoxes), the eligible-roster candidate pool for
+// substitutions, and the live energy/minutes maps (seeded to each eligible
+// player's Stamina ceiling / 0 seconds). GameMIN is now accumulated
 // on-court time finalized at game end (see finalizeMinutes) — every player,
 // starter or bench, begins at 0; only seconds actually spent on court count.
 func newTeamState(allPlayers []bundle.Player, teamID int, isHome bool) *teamState {

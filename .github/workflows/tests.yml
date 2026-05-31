@@ -295,6 +295,18 @@ jobs:
       working-directory: ibl5
       run: php bin/check-baseline-drift
 
+  phpunit-hygiene:
+    name: PHPUnit hygiene gate
+    needs: [changes]
+    if: needs.changes.outputs.src == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Ban silently-disabled tests (markTestSkipped)
+        run: bin/check-phpunit-hygiene --pr
+
   shellcheck:
     name: ShellCheck (bash 3.2 compat)
     needs: [changes]
@@ -461,7 +473,7 @@ jobs:
   gate:
     name: Tests and Analysis
     if: always()
-    needs: [changes, test, audit-php, audit-js, db-integration, phpstan, shellcheck, host-mariadb-guard, update-baselines]
+    needs: [changes, test, audit-php, audit-js, db-integration, phpstan, phpunit-hygiene, shellcheck, host-mariadb-guard, update-baselines]
     runs-on: ubuntu-latest
     steps:
       - run: exit 1

@@ -69,7 +69,7 @@ is_skipped() {
   local file="$1"
   local rel
   rel="${file#"$ROOT/"}"
-  for pat in "${SKIP_PATHS[@]}"; do
+  for pat in "${SKIP_PATHS[@]+"${SKIP_PATHS[@]}"}"; do
     # shellcheck disable=SC2254
     case "$rel" in
       $pat) return 0 ;;

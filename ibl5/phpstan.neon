@@ -140,3 +140,19 @@ services:
         class: PHPStanRules\BanHardcodedEnvironmentStringsRule
         tags:
             - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanDirectMysqliQueryRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanSqlStringInterpolationRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanDuplicateModifierMethodRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanBareColumnIdentifierRule
+        tags:
+            - phpstan.rules.rule

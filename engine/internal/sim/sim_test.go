@@ -5,6 +5,7 @@ import (
 
 	"github.com/a-jay85/IBL5/engine/internal/bundle"
 	"github.com/a-jay85/IBL5/engine/internal/result"
+	"github.com/a-jay85/IBL5/engine/internal/rng"
 )
 
 // --- shared test helpers (package sim) -------------------------------------
@@ -30,8 +31,8 @@ func setSlot(p *bundle.Player, slot int) {
 func mkPlayer(pid, team, slot, fgp int) bundle.Player {
 	p := bundle.Player{
 		PID: pid, TeamID: team,
-		OO: 6, DriveOff: 5, PO: 5, OD: 5, DD: 5, PD: 5, TD: 5,
-		FGP: fgp, FTP: 75, TGA: 25, FGA: 60, ORB: 20, DRB: 35,
+		OO: 6, DriveOff: 5, PO: 5, OD: 5, DD: 5, PD: 5, TD: 5, TransOff: 7,
+		FGP: fgp, FTP: 75, TGA: 25, FGA: 60, FTA: 20, ORB: 20, DRB: 35,
 		STL: 30, TVR: 40, BLK: 20, Foul: 30,
 		Stamina: 50, Clutch: 5, Consistency: 5,
 		DCMinutes: 32, DCCanPlayInGame: 1,
@@ -253,6 +254,65 @@ func TestSimulate_PossessionBalance(t *testing.T) {
 	// Strict alternation should keep the two within a small margin.
 	if diff > (v+h)/10+2 {
 		t.Errorf("possession imbalance: visitor %d, home %d", v, h)
+	}
+}
+
+// --- matrix #20/#21: steal & block attribution over a full game -------------
+
+func TestSimulate_StealBlockCreditedToDefenders(t *testing.T) {
+	b := richBundle()
+	teamByPID := map[int]int{}
+	for _, p := range b.Players {
+		teamByPID[p.PID] = p.TeamID
+	}
+	res := Simulate(b, 1988)
+	g := res.Games[0]
+
+	var totalSTL, totalBLK int
+	for _, pb := range g.PlayerBoxes {
+		totalSTL += pb.GameSTL
+		totalBLK += pb.GameBLK
+	}
+	if totalSTL == 0 {
+		t.Error("total STL == 0 over a full game")
+	}
+	if totalBLK == 0 {
+		t.Error("total BLK == 0 over a full game")
+	}
+
+	// Every steal/block event credits a player on the team that is NOT on offense
+	// (the event's TeamID is the offense), i.e. a defender.
+	steals, blocks := 0, 0
+	for _, e := range g.Events {
+		switch e.Kind {
+		case result.EventSteal:
+			steals++
+			if teamByPID[e.DefenderID] == e.TeamID {
+				t.Errorf("steal credited to offensive player %d (team %d)", e.DefenderID, e.TeamID)
+			}
+		case result.EventBlock:
+			blocks++
+			if teamByPID[e.DefenderID] == e.TeamID {
+				t.Errorf("block credited to offensive player %d (team %d)", e.DefenderID, e.TeamID)
+			}
+		}
+	}
+	if steals == 0 || blocks == 0 {
+		t.Errorf("event stream had %d steals, %d blocks; want both > 0", steals, blocks)
+	}
+}
+
+// --- matrix #22: transition possessions occur over a full game ---------------
+//
+// Fast-break possessions leave no distinct marker in the (frozen) result
+// contract, so the count is observed through simGame's internal return. The
+// guarantee that a transition is never a 3pt attempt is proven structurally by
+// TestRunTransitionPossession_NeverThreePoint (#10).
+func TestSimulate_TransitionsOccur(t *testing.T) {
+	b := richBundle()
+	_, transitions := simGame(b, b.Schedule[0], rng.New(1988))
+	if transitions == 0 {
+		t.Error("no fast-break possessions fired over a full game")
 	}
 }
 

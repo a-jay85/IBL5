@@ -39,6 +39,19 @@ final class RequireStrictTypesRuleTest extends RuleTestCase
         );
     }
 
+    public function testFlagsFileMissingStrictTypesDeclarationInsidePhpstanRulesDirectory(): void
+    {
+        $this->analyse(
+            [__DIR__ . '/Fixtures/phpstan-rules/MissingStrictTypesRuleFixture.php'],
+            [
+                [
+                    'Missing declare(strict_types=1) at the top of the file.',
+                    3,
+                ],
+            ],
+        );
+    }
+
     public function testAllowsFileOutsideClassesDirectoryEvenWithoutStrictTypes(): void
     {
         $this->analyse(

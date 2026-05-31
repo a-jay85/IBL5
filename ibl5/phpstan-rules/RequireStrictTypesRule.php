@@ -13,7 +13,8 @@ use PHPStan\Rules\Rule;
 use PHPStan\Rules\RuleErrorBuilder;
 
 /**
- * Enforces declare(strict_types=1) at the top of every PHP file in classes/.
+ * Enforces declare(strict_types=1) at the top of every PHP file in classes/
+ * and phpstan-rules/ (the rule files enforce strictness, so they must comply too).
  *
  * @implements Rule<FileNode>
  */
@@ -32,8 +33,11 @@ final class RequireStrictTypesRule implements Rule
     {
         $file = $scope->getFile();
 
-        // Only enforce in classes/ directory
-        if (!str_contains($file, DIRECTORY_SEPARATOR . 'classes' . DIRECTORY_SEPARATOR)) {
+        // Enforce in classes/ and phpstan-rules/ (the rule files must also comply).
+        if (
+            !str_contains($file, DIRECTORY_SEPARATOR . 'classes' . DIRECTORY_SEPARATOR)
+            && !str_contains($file, DIRECTORY_SEPARATOR . 'phpstan-rules' . DIRECTORY_SEPARATOR)
+        ) {
             return [];
         }
 

@@ -2,7 +2,8 @@
     "phpstan-baseline.neon": {
         "ibl.directHeader": 1,
         "ibl.directMysqliQuery": 3,
-        "ibl.hardcodedEnvString": 8
+        "ibl.hardcodedEnvString": 8,
+        "ibl.sqlStringInterpolation": 32
     },
     "phpstan-tests-baseline.neon": {
         "argument.type": 94,

@@ -144,3 +144,7 @@ services:
         class: PHPStanRules\BanDirectMysqliQueryRule
         tags:
             - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanSqlStringInterpolationRule
+        tags:
+            - phpstan.rules.rule

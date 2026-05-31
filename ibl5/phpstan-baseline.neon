@@ -1,10 +1,76 @@
 parameters:
 	ignoreErrors:
 		-
+			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringInterpolation
+			count: 2
+			path: classes/Api/Repository/ApiGameRepository.php
+
+		-
+			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringInterpolation
+			count: 2
+			path: classes/Api/Repository/ApiLeadersRepository.php
+
+		-
+			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringInterpolation
+			count: 2
+			path: classes/Api/Repository/ApiPlayerRepository.php
+
+		-
+			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringInterpolation
+			count: 1
+			path: classes/Api/Repository/ApiTeamRepository.php
+
+		-
+			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringInterpolation
+			count: 1
+			path: classes/AwardHistory/AwardHistoryRepository.php
+
+		-
+			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringInterpolation
+			count: 1
+			path: classes/BaseMysqliRepository.php
+
+		-
+			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringInterpolation
+			count: 1
+			path: classes/BasketballStats/Tables/PeriodAverages.php
+
+		-
+			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringInterpolation
+			count: 1
+			path: classes/Bootstrap/ConfigBootstrap.php
+
+		-
+			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringInterpolation
+			count: 2
+			path: classes/Boxscore/Boxscore.php
+
+		-
+			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringInterpolation
+			count: 2
+			path: classes/CareerLeaderboards/CareerLeaderboardsRepository.php
+
+		-
 			rawMessage: Hardcoded environment string "localhost" is banned. Inject an environment/config flag instead of branching on a literal host name.
 			identifier: ibl.hardcodedEnvString
 			count: 1
 			path: classes/Debug/DebugSession.php
+
+		-
+			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringInterpolation
+			count: 1
+			path: classes/EngineBundle/EngineBundleRepository.php
 
 		-
 			rawMessage: Hardcoded environment string "127.0.0.1" is banned. Inject an environment/config flag instead of branching on a literal host name.
@@ -19,6 +85,36 @@ parameters:
 			path: classes/Extension/ExtensionService.php
 
 		-
+			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringInterpolation
+			count: 2
+			path: classes/JsbParser/JsbImportRepository.php
+
+		-
+			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringInterpolation
+			count: 4
+			path: classes/JsbParser/PlayerIdResolver.php
+
+		-
+			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringInterpolation
+			count: 1
+			path: classes/LastSimRecap/LastSimRecapRepository.php
+
+		-
+			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringInterpolation
+			count: 1
+			path: classes/League/League.php
+
+		-
+			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringInterpolation
+			count: 1
+			path: classes/Migration/SchemaValidator.php
+
+		-
 			rawMessage: Hardcoded environment string "localhost" is banned. Inject an environment/config flag instead of branching on a literal host name.
 			identifier: ibl.hardcodedEnvString
 			count: 1
@@ -29,6 +125,90 @@ parameters:
 			identifier: ibl.hardcodedEnvString
 			count: 1
 			path: classes/PageLayout/PageLayout.php
+
+		-
+			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringInterpolation
+			count: 3
+			path: classes/Player/Stats/PlayerStatsRepository.php
+
+		-
+			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringInterpolation
+			count: 1
+			path: classes/PlayerDatabase/PlayerDatabaseRepository.php
+
+		-
+			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringInterpolation
+			count: 1
+			path: classes/PlrParser/PlrParserRepository.php
+
+		-
+			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringInterpolation
+			count: 1
+			path: classes/ProjectedDraftOrder/ProjectedDraftOrderRepository.php
+
+		-
+			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringInterpolation
+			count: 5
+			path: classes/RecordHolders/RecordHoldersRepository.php
+
+		-
+			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringInterpolation
+			count: 1
+			path: classes/RookieOption/RookieOptionRepository.php
+
+		-
+			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringInterpolation
+			count: 4
+			path: classes/Search/SearchRepository.php
+
+		-
+			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringInterpolation
+			count: 2
+			path: classes/SeasonHighs/SeasonHighsRepository.php
+
+		-
+			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringInterpolation
+			count: 1
+			path: classes/SeasonLeaderboards/SeasonLeaderboardsRepository.php
+
+		-
+			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringInterpolation
+			count: 10
+			path: classes/Standings/StandingsRepository.php
+
+		-
+			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringInterpolation
+			count: 2
+			path: classes/Statistics/TeamStatsCalculator.php
+
+		-
+			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringInterpolation
+			count: 2
+			path: classes/TeamOffDefStats/TeamOffDefStatsRepository.php
+
+		-
+			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringInterpolation
+			count: 2
+			path: classes/Topics/TopicsRepository.php
+
+		-
+			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringInterpolation
+			count: 1
+			path: classes/Trading/BuyoutLedgerRepository.php
 
 		-
 			rawMessage: Hardcoded environment string "localhost" is banned. Inject an environment/config flag instead of branching on a literal host name.
@@ -55,6 +235,12 @@ parameters:
 			path: classes/Trading/TradingController.php
 
 		-
+			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringInterpolation
+			count: 1
+			path: classes/TransactionHistory/TransactionHistoryRepository.php
+
+		-
 			rawMessage: 'Direct \mysqli::query() is banned outside the DB-access boundary. Use a BaseMysqliRepository helper (execute()/fetchOne()/fetchAll()) instead — raw query() bypasses prepared-statement parameterization.'
 			identifier: ibl.directMysqliQuery
 			count: 2
@@ -71,3 +257,9 @@ parameters:
 			identifier: ibl.directMysqliQuery
 			count: 3
 			path: classes/Updater/Steps/RefreshTeamSeasonRecordsStep.php
+
+		-
+			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringInterpolation
+			count: 4
+			path: classes/Voting/VotingRepository.php

@@ -115,6 +115,36 @@ parameters:
 			path: classes/Extension/ExtensionService.php
 
 		-
+			rawMessage: 'Table-qualified column ''ibl_fa_offers.name'' must be wrapped in backticks (`ibl_fa_offers`.`name`) for PHPStan rename safety.'
+			identifier: ibl.bareColumnIdentifier
+			count: 1
+			path: classes/FreeAgency/FreeAgencyAdminRepository.php
+
+		-
+			rawMessage: 'Table-qualified column ''ibl_fa_offers.perceivedvalue'' must be wrapped in backticks (`ibl_fa_offers`.`perceivedvalue`) for PHPStan rename safety.'
+			identifier: ibl.bareColumnIdentifier
+			count: 1
+			path: classes/FreeAgency/FreeAgencyAdminRepository.php
+
+		-
+			rawMessage: 'Table-qualified column ''ibl_fa_offers.pid'' must be wrapped in backticks (`ibl_fa_offers`.`pid`) for PHPStan rename safety.'
+			identifier: ibl.bareColumnIdentifier
+			count: 1
+			path: classes/FreeAgency/FreeAgencyAdminRepository.php
+
+		-
+			rawMessage: 'Table-qualified column ''ibl_plr.bird'' must be wrapped in backticks (`ibl_plr`.`bird`) for PHPStan rename safety.'
+			identifier: ibl.bareColumnIdentifier
+			count: 1
+			path: classes/FreeAgency/FreeAgencyAdminRepository.php
+
+		-
+			rawMessage: 'Table-qualified column ''ibl_plr.pid'' must be wrapped in backticks (`ibl_plr`.`pid`) for PHPStan rename safety.'
+			identifier: ibl.bareColumnIdentifier
+			count: 1
+			path: classes/FreeAgency/FreeAgencyAdminRepository.php
+
+		-
 			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringInterpolation
 			count: 2
@@ -165,6 +195,54 @@ parameters:
 		-
 			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringInterpolation
+			count: 1
+			path: classes/PlayerDatabase/PlayerDatabaseRepository.php
+
+		-
+			rawMessage: 'Table-qualified column ''ibl_plr.age'' must be wrapped in backticks (`ibl_plr`.`age`) for PHPStan rename safety.'
+			identifier: ibl.bareColumnIdentifier
+			count: 1
+			path: classes/PlayerDatabase/PlayerDatabaseRepository.php
+
+		-
+			rawMessage: 'Table-qualified column ''ibl_plr.bird'' must be wrapped in backticks (`ibl_plr`.`bird`) for PHPStan rename safety.'
+			identifier: ibl.bareColumnIdentifier
+			count: 2
+			path: classes/PlayerDatabase/PlayerDatabaseRepository.php
+
+		-
+			rawMessage: 'Table-qualified column ''ibl_plr.college'' must be wrapped in backticks (`ibl_plr`.`college`) for PHPStan rename safety.'
+			identifier: ibl.bareColumnIdentifier
+			count: 1
+			path: classes/PlayerDatabase/PlayerDatabaseRepository.php
+
+		-
+			rawMessage: 'Table-qualified column ''ibl_plr.exp'' must be wrapped in backticks (`ibl_plr`.`exp`) for PHPStan rename safety.'
+			identifier: ibl.bareColumnIdentifier
+			count: 2
+			path: classes/PlayerDatabase/PlayerDatabaseRepository.php
+
+		-
+			rawMessage: 'Table-qualified column ''ibl_plr.name'' must be wrapped in backticks (`ibl_plr`.`name`) for PHPStan rename safety.'
+			identifier: ibl.bareColumnIdentifier
+			count: 1
+			path: classes/PlayerDatabase/PlayerDatabaseRepository.php
+
+		-
+			rawMessage: 'Table-qualified column ''ibl_plr.pid'' must be wrapped in backticks (`ibl_plr`.`pid`) for PHPStan rename safety.'
+			identifier: ibl.bareColumnIdentifier
+			count: 1
+			path: classes/PlayerDatabase/PlayerDatabaseRepository.php
+
+		-
+			rawMessage: 'Table-qualified column ''ibl_plr.pos'' must be wrapped in backticks (`ibl_plr`.`pos`) for PHPStan rename safety.'
+			identifier: ibl.bareColumnIdentifier
+			count: 1
+			path: classes/PlayerDatabase/PlayerDatabaseRepository.php
+
+		-
+			rawMessage: 'Table-qualified column ''ibl_plr.retired'' must be wrapped in backticks (`ibl_plr`.`retired`) for PHPStan rename safety.'
+			identifier: ibl.bareColumnIdentifier
 			count: 1
 			path: classes/PlayerDatabase/PlayerDatabaseRepository.php
 
@@ -221,6 +299,30 @@ parameters:
 			identifier: ibl.sqlStringInterpolation
 			count: 2
 			path: classes/Statistics/TeamStatsCalculator.php
+
+		-
+			rawMessage: 'Table-qualified column ''ibl_standings.league_record'' must be wrapped in backticks (`ibl_standings`.`league_record`) for PHPStan rename safety.'
+			identifier: ibl.bareColumnIdentifier
+			count: 2
+			path: classes/Team/Team.php
+
+		-
+			rawMessage: 'Table-qualified column ''ibl_standings.teamid'' must be wrapped in backticks (`ibl_standings`.`teamid`) for PHPStan rename safety.'
+			identifier: ibl.bareColumnIdentifier
+			count: 2
+			path: classes/Team/Team.php
+
+		-
+			rawMessage: 'Table-qualified column ''ibl_team_info.team_name'' must be wrapped in backticks (`ibl_team_info`.`team_name`) for PHPStan rename safety.'
+			identifier: ibl.bareColumnIdentifier
+			count: 1
+			path: classes/Team/Team.php
+
+		-
+			rawMessage: 'Table-qualified column ''ibl_team_info.teamid'' must be wrapped in backticks (`ibl_team_info`.`teamid`) for PHPStan rename safety.'
+			identifier: ibl.bareColumnIdentifier
+			count: 3
+			path: classes/Team/Team.php
 
 		-
 			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'

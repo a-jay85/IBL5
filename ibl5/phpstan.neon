@@ -152,3 +152,7 @@ services:
         class: PHPStanRules\BanDuplicateModifierMethodRule
         tags:
             - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanBareColumnIdentifierRule
+        tags:
+            - phpstan.rules.rule

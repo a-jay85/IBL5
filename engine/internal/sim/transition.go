@@ -94,7 +94,7 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 		def := selectDefender(defense, pt, gs.rng)
 
 		net := transitionNet(def)
-		mq := matchupQuality(bh.FGP, bh.Stamina, defense.players)
+		mq := matchupQuality(bh.FGP, bh.energy, defense.players) // live energy (inert under current curve)
 		sv2 := applyClutch(shotValue2pt(net, bh.FGP, false), bh.Clutch, gs.period, scoreDiff)
 		in := outcomeInputs{
 			twoPtWeight:      sv2 * bh.fatigue,

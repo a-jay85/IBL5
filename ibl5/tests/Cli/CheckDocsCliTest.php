@@ -244,4 +244,14 @@ final class CheckDocsCliTest extends TestCase
         $this->assertSame(2, $code, $output);
         $this->assertStringContainsString('unable to diff against base ref', $output);
     }
+
+    #[Test]
+    public function sinceEmptyRefExitsTwo(): void
+    {
+        $this->commitFile('ibl5/docs/sample.md', $this->doc($this->freshDate()), 'base');
+
+        [$code, $output] = $this->runScript('--since=');
+        $this->assertSame(2, $code, $output);
+        $this->assertStringContainsString('requires a base ref', $output);
+    }
 }

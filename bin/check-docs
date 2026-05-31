@@ -505,6 +505,11 @@ $opts = ['fix_dates' => false, 'include_memory' => false, 'verbose' => false, 's
 foreach (array_slice($argv, 1) as $arg) {
     if (str_starts_with($arg, '--since=')) {
         $opts['since'] = substr($arg, strlen('--since='));
+        if (trim($opts['since']) === '') {
+            fwrite(STDERR, "check-docs: --since= requires a base ref (e.g. --since=master or --since=<sha>)\n");
+            fwrite(STDERR, usage());
+            exit(2);
+        }
         continue;
     }
     switch ($arg) {

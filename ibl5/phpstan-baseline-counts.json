@@ -27,7 +27,6 @@
         "missingType.property": 25,
         "missingType.return": 219,
         "new.deprecatedClass": 2,
-        "offsetAccess.notFound": 1,
         "phpunit.assertCount": 3,
         "phpunit.assertEquals": 52,
         "phpunit.covers": 3,

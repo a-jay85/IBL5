@@ -25,7 +25,7 @@ interface AwardHistoryRepositoryInterface
      *     sortby: int
      * } $params Validated parameters from AwardHistoryValidatorInterface
      * @return array{
-     *     results: array<int, array{year: int, award: string, name: string, table_id: int}>,
+     *     results: array<int, array{year: int, award: string, name: string, table_id: int, pid: int|null}>,
      *     count: int
      * } Search results:
      *     - results: array of award records from `ibl_awards` table
@@ -48,7 +48,8 @@ interface AwardHistoryRepositoryInterface
      *  - award: varchar(128) - Award name/type
      *  - name: varchar(32) - Player name
      *  - table_id: int(11) AUTO_INCREMENT PRIMARY KEY
-     * 
+     *  - pid: int(11)|null - Player id from LEFT JOIN ibl_plr on name (null if no matching player)
+     *
      * Examples:
      *  $result = $repo->searchAwards(['name' => 'Smith', 'award' => null, 'year' => null, 'sortby' => 1]);
      *  // Returns all awards for players with 'Smith' in name, sorted by name

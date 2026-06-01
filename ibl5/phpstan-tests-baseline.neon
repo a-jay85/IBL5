@@ -883,12 +883,6 @@ parameters:
 			path: tests/DatabaseIntegration/AwardGenerationServiceIntegrationTest.php
 
 		-
-			rawMessage: 'Offset ''pid'' does not exist on array{year: int, award: string, name: string, table_id: int}.'
-			identifier: offsetAccess.notFound
-			count: 2
-			path: tests/DatabaseIntegration/AwardHistoryRepositoryTest.php
-
-		-
 			rawMessage: 'Parameter #1 $params of method AwardHistory\AwardHistoryRepository::searchAwards() expects array{name: string|null, award: string|null, year: int|null, sortby: int}, array<string, mixed> given.'
 			identifier: argument.type
 			count: 15

@@ -219,6 +219,16 @@ class LastSimRecapServiceTest extends TestCase
         self::assertSame(33, $pfStarter->youPid);
     }
 
+    /**
+     * @param array{sim: int, startDate: string, endDate: string}|null $window
+     * @param list<array{schedId:int,boxId:int,date:string,visitor:int,vScore:int,home:int,hScore:int,year:int}> $games
+     * @param array<int, array<string, mixed>> $quarterLines
+     * @param array<int, list<int>> $rosterByTid
+     * @param array<string, list<array<string, mixed>>> $injuriesByPidAndDate
+     * @param array<int, array{PG:int,SG:int,SF:int,PF:int,C:int}> $lastSimStarters
+     * @param array<string, array{PG:int,SG:int,SF:int,PF:int,C:int}> $starterSnapshots
+     * @param array<string, array<string, int|string>> $playerLines
+     */
     private function buildRepo(
         ?array $window = ['sim' => 1, 'startDate' => '2030-03-01', 'endDate' => '2030-03-31'],
         array $games = [],
@@ -241,6 +251,17 @@ class LastSimRecapServiceTest extends TestCase
             $window, $games, $quarterLines, $rosterByTid,
             $injuriesByPidAndDate, $lastSimStarters, $starterSnapshots, $playerLines, $teamInfo,
         ) implements LastSimRecapRepositoryInterface {
+            /**
+             * @param array{sim: int, startDate: string, endDate: string}|null $window
+             * @param list<array{schedId:int,boxId:int,date:string,visitor:int,vScore:int,home:int,hScore:int,year:int}> $games
+             * @param array<int, array<string, mixed>> $quarterLines
+             * @param array<int, list<int>> $rosterByTid
+             * @param array<string, list<array<string, mixed>>> $injuriesByPidAndDate
+             * @param array<int, array{PG:int,SG:int,SF:int,PF:int,C:int}> $lastSimStarters
+             * @param array<string, array{PG:int,SG:int,SF:int,PF:int,C:int}> $starterSnapshots
+             * @param array<string, array<string, int|string>> $playerLines
+             * @param array<int, array{tid:int,city:string,name:string}> $teamInfo
+             */
             public function __construct(
                 private ?array $window,
                 private array $games,
@@ -253,6 +274,7 @@ class LastSimRecapServiceTest extends TestCase
                 private array $teamInfo,
             ) {}
 
+            /** @return array{sim: int, startDate: string, endDate: string}|null */
             public function getLastSimWindow(): ?array { return $this->window; }
             public function getGamesForTeamInWindow(int $tid, string $startDate, string $endDate): array { return $this->games; }
             public function getTeamBoxscoreLines(int $visitor, int $home, string $date): ?array {

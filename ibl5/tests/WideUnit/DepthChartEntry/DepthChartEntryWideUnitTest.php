@@ -682,6 +682,8 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
 
     /**
      * Create valid POST data for Regular Season (12 active, 3+ per position)
+     *
+     * @return array<string, string>
      */
     private function createValidRegularSeasonPostData(): array
     {
@@ -727,6 +729,8 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
 
     /**
      * Create valid POST data for Playoffs with specified active count
+     *
+     * @return array<string, string>
      */
     private function createValidPlayoffsPostData(int $activeCount): array
     {
@@ -772,6 +776,8 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
 
     /**
      * Create playoffs POST data with minimal position depth (2 per position)
+     *
+     * @return array<string, string>
      */
     private function createPlayoffsPostDataWithMinimalDepth(): array
     {
@@ -815,6 +821,8 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
 
     /**
      * Create single player POST data
+     *
+     * @return array<string, string>
      */
     private function createSinglePlayerPostData(string $name, int $index): array
     {
@@ -838,6 +846,8 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
 
     /**
      * Create POST data with specific active player count
+     *
+     * @return array<string, string>
      */
     private function createPostDataWithActiveCount(int $activeCount): array
     {
@@ -865,6 +875,8 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
 
     /**
      * Create POST data with insufficient position depth
+     *
+     * @return array<string, string>
      */
     private function createPostDataWithInsufficientPositionDepth(string $position): array
     {
@@ -890,6 +902,8 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
 
     /**
      * Create POST data where one player starts at multiple positions
+     *
+     * @return array<string, string>
      */
     private function createPostDataWithMultipleStarter(): array
     {
@@ -905,6 +919,8 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
 
     /**
      * Create POST data with multiple validation issues
+     *
+     * @return array<string, string>
      */
     private function createPostDataWithMultipleIssues(): array
     {

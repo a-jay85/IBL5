@@ -127,13 +127,19 @@ class BaseMysqliRepositoryHelpersTest extends DatabaseTestCase
  */
 class TestableRepository extends \BaseMysqliRepository
 {
-    /** @param list<int|string> $ids */
+    /**
+     * @param list<int|string> $ids
+     * @return list<array<string, mixed>>
+     */
     public function callFetchAllInList(string $query, string $type, array $ids): array
     {
         return $this->fetchAllInList($query, $type, $ids);
     }
 
-    /** @param list<int|string> $ids */
+    /**
+     * @param list<int|string> $ids
+     * @return list<array<string, mixed>>
+     */
     public function callFetchAllInListWithPrefix(
         string $query,
         string $type,
@@ -163,7 +169,10 @@ class QueryCountingRepository extends \BaseMysqliRepository
         return parent::fetchAll($query, $types, ...$params);
     }
 
-    /** @param list<int|string> $ids */
+    /**
+     * @param list<int|string> $ids
+     * @return list<array<string, mixed>>
+     */
     public function callFetchAllInList(string $query, string $type, array $ids): array
     {
         return $this->fetchAllInList($query, $type, $ids);

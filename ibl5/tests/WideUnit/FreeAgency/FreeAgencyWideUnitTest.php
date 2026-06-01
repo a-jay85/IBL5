@@ -712,6 +712,8 @@ class FreeAgencyWideUnitTest extends WideUnitTestCase
 
     /**
      * Base free agent player data for all scenarios
+     *
+     * @return array<string, mixed>
      */
     private function getBaseFreeAgentData(): array
     {

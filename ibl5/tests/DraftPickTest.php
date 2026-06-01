@@ -101,6 +101,10 @@ class DraftPickTest extends TestCase
     // HELPER METHODS
     // ============================================
 
+    /**
+     * @param array<string, mixed> $overrides
+     * @return array<string, mixed>
+     */
     private function createValidDraftPickRow(array $overrides = []): array
     {
         return array_merge([

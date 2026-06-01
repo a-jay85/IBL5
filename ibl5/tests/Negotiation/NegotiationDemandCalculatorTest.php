@@ -23,8 +23,8 @@ use Tests\WideUnit\Mocks\TestDataFactory;
  */
 class NegotiationDemandCalculatorTest extends TestCase
 {
-    private $mockDb;
-    private $calculator;
+    private ?MockDatabase $mockDb;
+    private ?NegotiationDemandCalculator $calculator;
 
     protected function setUp(): void
     {
@@ -42,7 +42,7 @@ class NegotiationDemandCalculatorTest extends TestCase
      * @group calculation
      * @group base-demands
      */
-    public function testCalculatesDemandsForAveragePlayer()
+    public function testCalculatesDemandsForAveragePlayer(): void
     {
         // Arrange
         $player = $this->createPlayerWithRatings(50); // Average ratings
@@ -129,7 +129,7 @@ class NegotiationDemandCalculatorTest extends TestCase
         $this->assertEqualsWithDelta($demands['year5'] - $demands['year4'], $raise, 1);
     }
 
-    public function testCalculatesHigherDemandsForBetterPlayer()
+    public function testCalculatesHigherDemandsForBetterPlayer(): void
     {
         // Arrange
         $averagePlayer = $this->createPlayerWithRatings(50);
@@ -150,7 +150,7 @@ class NegotiationDemandCalculatorTest extends TestCase
      * @group calculation
      * @group base-demands
      */
-    public function testCalculatesLowerDemandsForWorsePlayer()
+    public function testCalculatesLowerDemandsForWorsePlayer(): void
     {
         // Arrange
         $averagePlayer = $this->createPlayerWithRatings(50);
@@ -171,7 +171,7 @@ class NegotiationDemandCalculatorTest extends TestCase
      * @group calculation
      * @group modifiers
      */
-    public function testModifierReducesDemandsForWinningTeam()
+    public function testModifierReducesDemandsForWinningTeam(): void
     {
         // Arrange
         $player = $this->createPlayerWithHighWinnerPreference();

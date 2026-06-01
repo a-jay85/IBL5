@@ -12,7 +12,9 @@ class MockPreparedStatement
 {
     private ?MockDatabase $mockDb;
     private string $query;
+    /** @var array<int, mixed> */
     private array $boundParams = [];
+    /** @var list<string> */
     private array $paramTypes = [];
     public string|int $affected_rows = 0;
     public string $error = '';
@@ -51,6 +53,9 @@ class MockPreparedStatement
     /**
      * Execute the prepared statement
      * Stores the result for later retrieval via get_result()
+     */
+    /**
+     * @param list<mixed>|null $params
      */
     public function execute(?array $params = null): bool
     {

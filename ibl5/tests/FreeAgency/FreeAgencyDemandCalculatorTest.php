@@ -11,13 +11,19 @@ use Player\Player;
 
 /**
  * Mock repository for testing without database dependencies.
+ *
+ * @phpstan-import-type TeamPerformanceRow from \FreeAgency\Contracts\FreeAgencyDemandRepositoryInterface
+ * @phpstan-import-type PlayerDemandsRow from \FreeAgency\Contracts\FreeAgencyDemandRepositoryInterface
  */
 class MockDemandRepository implements FreeAgencyDemandRepositoryInterface
 {
+    /** @var TeamPerformanceRow */
     public array $teamPerformance = [];
     public int $positionSalaryCommitment = 0;
+    /** @var PlayerDemandsRow */
     public array $playerDemands = [];
 
+    /** @return TeamPerformanceRow */
     public function getTeamPerformance(string $teamName): array
     {
         return $this->teamPerformance;
@@ -28,6 +34,7 @@ class MockDemandRepository implements FreeAgencyDemandRepositoryInterface
         return $this->positionSalaryCommitment;
     }
 
+    /** @return PlayerDemandsRow */
     public function getPlayerDemands(int $playerID): array
     {
         return $this->playerDemands;

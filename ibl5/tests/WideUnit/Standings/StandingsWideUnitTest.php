@@ -941,6 +941,8 @@ class StandingsWideUnitTest extends WideUnitTestCase
 
     /**
      * Create a standings row matching ibl_standings structure
+     *
+     * @return array<string, mixed>
      */
     private function createStandingsRow(
         int $teamId,

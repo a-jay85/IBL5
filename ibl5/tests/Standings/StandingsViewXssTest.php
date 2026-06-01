@@ -12,7 +12,8 @@ use Standings\StandingsView;
 final class StandingsViewXssTest extends TestCase
 {
     /**
-     * @return array{teamid: int, team_name: string, league_record: string, pct: string, gamesBack: string, conf_record: string, div_record: string, home_record: string, away_record: string, games_unplayed: int, magicNumber: int, clinched_conference: int, clinched_division: int, clinched_playoffs: int, clinched_league: int, wins: int, homeGames: int, awayGames: int, color1: string, color2: string}
+     * @param array<string, mixed> $overrides
+     * @return array<string, mixed>
      */
     private function makeStandingsRow(array $overrides = []): array
     {

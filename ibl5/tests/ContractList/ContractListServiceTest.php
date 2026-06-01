@@ -141,6 +141,7 @@ class ContractListServiceTest extends TestCase
     }
 
     /**
+     * @param array<string, mixed> $overrides
      * @return array{pid: int, name: string, pos: string, teamname: string, teamid: int, cy: int, cyt: int, salary_yr1: int, salary_yr2: int, salary_yr3: int, salary_yr4: int, salary_yr5: int, salary_yr6: int, bird: string, team_city: string|null, color1: string|null, color2: string|null}
      */
     private static function createPlayerContract(array $overrides = []): array

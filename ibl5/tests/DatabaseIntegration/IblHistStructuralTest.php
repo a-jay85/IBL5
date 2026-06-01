@@ -94,7 +94,7 @@ final class IblHistStructuralTest extends DatabaseTestCase
         if ($result === false || $result === true) {
             self::fail('Query failed: ' . $this->db->error . ' — ' . $sql);
         }
-        /** @var array<string, mixed>|null $row */
+        /** @var array<string, float|int|string|null>|null $row */
         $row = $result->fetch_assoc();
         $result->free();
         return $row;

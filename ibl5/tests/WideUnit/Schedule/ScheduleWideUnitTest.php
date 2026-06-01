@@ -49,6 +49,8 @@ class ScheduleWideUnitTest extends WideUnitTestCase
 
     /**
      * Get default team data for all team IDs used in tests
+     *
+     * @return list<array<string, mixed>>
      */
     private function getDefaultTeamData(): array
     {
@@ -868,6 +870,8 @@ class ScheduleWideUnitTest extends WideUnitTestCase
 
     /**
      * Create a schedule row matching ibl_schedule structure
+     *
+     * @return array<string, mixed>
      */
     private function createScheduleRow(
         int $visitorId,
@@ -926,6 +930,8 @@ class ScheduleWideUnitTest extends WideUnitTestCase
     /**
      * Create a processed game row for view testing
      * Matches the structure returned by TeamScheduleService::getProcessedSchedule()
+     *
+     * @return array<string, mixed>
      */
     private function createProcessedGameRow(
         string $month,

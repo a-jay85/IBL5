@@ -148,8 +148,13 @@ class GameTest extends TestCase
     // HELPER METHODS
     // ============================================
 
+    /**
+     * @param array<string, mixed> $overrides
+     * @return array{game_date: string, box_id: int, visitor_teamid: int, home_teamid: int, visitor_score: int, home_score: int}
+     */
     private function createValidScheduleRow(array $overrides = []): array
     {
+        /** @var array{game_date: string, box_id: int, visitor_teamid: int, home_teamid: int, visitor_score: int, home_score: int} */
         return array_merge([
             'game_date' => '2025-01-15',
             'box_id' => 1001,

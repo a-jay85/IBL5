@@ -224,6 +224,7 @@ class LeagueScheduleViewTest extends TestCase
 
     /**
      * @param array<string, array{label: string, dates: array<string, list<array<string, mixed>>>}> $gamesByMonth
+     * @return array{gamesByMonth: array<string, array{label: string, dates: array<string, list<array<string, mixed>>>}>, firstUnplayedId: string|null, isPlayoffPhase: bool, playoffMonthKey: string|null, simLengthDays: int}
      */
     private function createPageData(
         array $gamesByMonth = [],

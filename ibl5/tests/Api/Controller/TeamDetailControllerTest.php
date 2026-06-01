@@ -12,6 +12,9 @@ class TeamDetailControllerTest extends WideUnitTestCase
 {
     private const TEAM_UUID = 'team-uuid-abc';
 
+    /**
+     * @return array<string, mixed>
+     */
     private function teamRow(): array
     {
         return [

@@ -189,6 +189,8 @@ class NegotiationWideUnitTest extends WideUnitTestCase
 
     /**
      * Base negotiation data for all scenarios
+     *
+     * @return array<string, mixed>
      */
     private function getBaseNegotiationData(): array
     {

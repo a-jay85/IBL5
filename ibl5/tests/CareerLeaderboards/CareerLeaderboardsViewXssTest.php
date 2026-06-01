@@ -19,10 +19,12 @@ final class CareerLeaderboardsViewXssTest extends TestCase
     }
 
     /**
+     * @param array<string, mixed> $overrides
      * @return array{pid: int, name: string, games: int, minutes: string, fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, tgp: string, orb: string, drb: string, reb: string, ast: string, stl: string, tvr: string, blk: string, pf: string, pts: string}
      */
     private function makeStats(array $overrides = []): array
     {
+        /** @var array{pid: int, name: string, games: int, minutes: string, fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, tgp: string, orb: string, drb: string, reb: string, ast: string, stl: string, tvr: string, blk: string, pf: string, pts: string} */
         return array_merge([
             'pid' => 1,
             'name' => 'Safe Player',

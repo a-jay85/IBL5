@@ -19,6 +19,7 @@ final class DepthChartEntryViewXssTest extends TestCase
     }
 
     /**
+     * @param array<string, mixed> $overrides
      * @return array<string, mixed>
      */
     private function makePlayer(array $overrides = []): array

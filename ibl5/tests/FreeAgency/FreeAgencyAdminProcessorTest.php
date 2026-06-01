@@ -550,7 +550,7 @@ class FreeAgencyAdminProcessorTest extends TestCase
     }
 
     /**
-     * @return array{name: string, pid: int, team: string, teamid: int, offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, bird: int, MLE: int, LLE: int, random: int, perceivedvalue: float}
+     * @return array{name: string, pid: int, team: string, teamid: int, offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, bird: int, mle: int, lle: int, random: int, perceivedvalue: float}
      */
     private function makeOfferRow(
         string $name,

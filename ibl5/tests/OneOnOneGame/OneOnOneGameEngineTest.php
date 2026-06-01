@@ -313,6 +313,8 @@ final class OneOnOneGameEngineTest extends TestCase
 
     /**
      * Create mock player data array for testing
+     *
+     * @return array<string, mixed>
      */
     private function createMockPlayerData(string $name): array
     {

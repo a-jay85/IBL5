@@ -24,6 +24,10 @@ services:
     environment:
       DB_HOST: mariadb
       E2E_TESTING: 1
+      # Enables the out-of-band engine shadow spawn (ADR-0037). Safe stack-wide:
+      # the run is detached/non-blocking, idempotent (per-game dedupe), and
+      # flock-guarded against overlap; only the spawn E2E hits the update endpoint.
+      ENGINE_SHADOW_ENABLED: "1"
     volumes:
       - ./ibl5:/var/www/html/ibl5
     ports:

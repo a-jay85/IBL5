@@ -477,6 +477,31 @@ if ($method === 'GET' && $action === 'count-demands') {
     exit;
 }
 
+// GET ?action=engine-binary-ready — whether the jsbsim binary is installed and
+// executable in this image. The detached-spawn E2E skips when it is absent (the
+// prebaked :latest image may predate the binary — cf. prebaked-image rebuild lag).
+if ($method === 'GET' && $action === 'engine-binary-ready') {
+    $binary = __DIR__ . '/bin/jsbsim';
+    echo json_encode(['ready' => is_file($binary) && is_executable($binary)]);
+    $db->close();
+    exit;
+}
+
+// GET ?action=count-shadow-rows — return row counts for the engine shadow tables,
+// so the detached-spawn E2E can poll until the background run lands rows.
+if ($method === 'GET' && $action === 'count-shadow-rows') {
+    $players = $db->query('SELECT COUNT(*) AS cnt FROM ibl_box_scores_engine_shadow');
+    $teams = $db->query('SELECT COUNT(*) AS cnt FROM ibl_box_scores_engine_shadow_teams');
+    $playersRow = $players ? $players->fetch_assoc() : null;
+    $teamsRow = $teams ? $teams->fetch_assoc() : null;
+    echo json_encode([
+        'players' => $playersRow !== null ? (int) $playersRow['cnt'] : 0,
+        'teams' => $teamsRow !== null ? (int) $teamsRow['cnt'] : 0,
+    ]);
+    $db->close();
+    exit;
+}
+
 // DELETE ?action=reset-allstar-names — delete and re-insert the ASG seed rows
 // (delete+insert is idempotent even after partial renames)
 if ($method === 'DELETE' && $action === 'reset-allstar-names') {

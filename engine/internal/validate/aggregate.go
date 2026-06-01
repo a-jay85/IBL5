@@ -36,6 +36,13 @@ var statNames = []string{
 	"reb", "ast", "stl", "tov", "blk", "pf",
 }
 
+// StatNames returns a copy of the fixed, ordered set of compared aggregates, so
+// downstream consumers (e.g. the jsbcalibrate harness) can iterate stats in the
+// same deterministic order the reports use without depending on map iteration.
+func StatNames() []string {
+	return append([]string(nil), statNames...)
+}
+
 // TeamStat is one team's compared aggregates for one game, normalized to a
 // single basis so the engine side and the .sco side are directly comparable.
 type TeamStat struct {

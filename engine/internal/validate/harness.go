@@ -188,7 +188,7 @@ func ValidateCorpus(dir string, runs int, baseSeed uint64, gameType bundle.GameT
 				continue
 			}
 			consumed[schIdx] = true
-			gr := validateGame(b, b.Schedule[schIdx], sg, runs, baseSeed+uint64(gameIndex*runs))
+			gr := validateGame(b, b.Schedule[schIdx], sg, runs, baseSeed+uint64(gameIndex*runs), gameType)
 			rep.Games = append(rep.Games, gr)
 			if !gr.Pass {
 				rep.Pass = false
@@ -215,12 +215,12 @@ func matchSchedule(sched []backup.SchGame, consumed []bool, sg backup.ScoGame) i
 }
 
 // validateGame simulates one matchup `runs` times and compares the aggregated
-// per-team engine means against the .sco ground truth.
-func validateGame(b bundle.Bundle, g bundle.Game, sg backup.ScoGame, runs int, baseSeed uint64) GameReport {
+// per-team engine means against the .sco ground truth, using gameType's bands.
+func validateGame(b bundle.Bundle, g bundle.Game, sg backup.ScoGame, runs int, baseSeed uint64, gameType bundle.GameType) GameReport {
 	visMean, homeMean := simulateGameMeans(b, g, runs, baseSeed)
 	visSco := teamStatFromSco(sg, g.VisitorTeamID)
 	homeSco := teamStatFromSco(sg, g.HomeTeamID)
-	return compareGame(g.VisitorTeamID, g.HomeTeamID, sg.Date, visSco, homeSco, visMean, homeMean)
+	return compareGame(gameType, g.VisitorTeamID, g.HomeTeamID, sg.Date, visSco, homeSco, visMean, homeMean)
 }
 
 // simulateGameMeans runs the engine on the single matchup g for `runs` seeds

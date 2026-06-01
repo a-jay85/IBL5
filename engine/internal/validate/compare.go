@@ -3,6 +3,8 @@ package validate
 import (
 	"fmt"
 	"math"
+
+	"github.com/a-jay85/IBL5/engine/internal/bundle"
 )
 
 // StatRow is the comparison of one stat for one team in one game.
@@ -59,8 +61,9 @@ func toleranceFor(b Band, engineMean float64) float64 {
 // observed engine means for the same matchup. visMean/homeMean are keyed by
 // statNames (from mean()); visSco/homeSco are the .sco-derived TeamStats. Rows
 // are emitted in a fixed order — visitor stats then home stats, each in
-// statNames order — so the report is deterministic.
-func compareGame(visitorTeamID, homeTeamID int, date string, visSco, homeSco TeamStat, visMean, homeMean map[string]float64) GameReport {
+// statNames order — so the report is deterministic. gameType selects the band
+// table, since regular/playoff/all-star tolerances differ.
+func compareGame(gameType bundle.GameType, visitorTeamID, homeTeamID int, date string, visSco, homeSco TeamStat, visMean, homeMean map[string]float64) GameReport {
 	gr := GameReport{
 		VisitorTeamID: visitorTeamID,
 		HomeTeamID:    homeTeamID,
@@ -76,7 +79,7 @@ func compareGame(visitorTeamID, homeTeamID int, date string, visSco, homeSco Tea
 		{homeTeamID, homeSco, homeMean},
 	} {
 		for _, name := range statNames {
-			b := bandFor(name)
+			b := bandFor(gameType, name)
 			scoVal := float64(side.sco.value(name))
 			engineMean := side.means[name]
 			pass, detail := compareStat(name, scoVal, engineMean, b)

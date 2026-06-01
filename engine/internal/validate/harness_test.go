@@ -24,7 +24,7 @@ func TestCompareGame_FailsOnOutOfBandStat(t *testing.T) {
 	visSco := TeamStat{Points: 200, FGM: 40, REB: 45}
 	homeSco := TeamStat{Points: 100, FGM: 40, REB: 45}
 
-	gr := compareGame(7, 3, "10-01", visSco, homeSco, visMean, homeMean)
+	gr := compareGame(bundle.GameTypeRegular, 7, 3, "10-01", visSco, homeSco, visMean, homeMean)
 	if gr.Pass {
 		t.Fatal("compareGame should FAIL when visitor points are far out of band")
 	}
@@ -106,6 +106,35 @@ func TestValidateCorpus_InBandPassesAndDeterministic(t *testing.T) {
 	WriteReport(&b2, rep2)
 	if b1.String() != b2.String() {
 		t.Error("two WriteReport outputs differ (non-deterministic)")
+	}
+}
+
+// Characterization (Row #1): the bands→game-type-keyed refactor must not change
+// observable behavior. ValidateCorpus stamped with GameTypeRegular must route
+// every stat to the regular band table — i.e. each StatRow.Tolerance equals the
+// tolerance recomputed from bandFor(GameTypeRegular, stat) at that row's engine
+// mean. A threading bug (wrong/empty game-type table) would produce a different
+// tolerance and fail here.
+func TestValidateCorpus_RegularBandsCharacterization(t *testing.T) {
+	dir := t.TempDir()
+	const seed = uint64(1000)
+	buildCorpus(t, dir, true, testRuns, seed)
+
+	rep, err := ValidateCorpus(dir, testRuns, seed, bundle.GameTypeRegular)
+	if err != nil {
+		t.Fatalf("ValidateCorpus: %v", err)
+	}
+	if len(rep.Games) == 0 {
+		t.Fatal("expected at least one validated game")
+	}
+	for _, g := range rep.Games {
+		for _, r := range g.Rows {
+			want := toleranceFor(bandFor(bundle.GameTypeRegular, r.Stat), r.EngineMean)
+			if r.Tolerance != want {
+				t.Errorf("team=%d stat=%s tolerance=%.4f, want %.4f (regular band table)",
+					r.TeamID, r.Stat, r.Tolerance, want)
+			}
+		}
 	}
 }
 

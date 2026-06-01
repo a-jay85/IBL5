@@ -30,13 +30,13 @@ func TestRealArchive_CalibrateEndToEnd(t *testing.T) {
 	runs := envInt("JSB_ARCHIVE_RUNS", 20)
 	stride := envInt("JSB_ARCHIVE_STRIDE", 50)
 
-	reports, skips, err := CollectReports(dir, Options{
+	reports, skips, err := CollectSeasonReports(dir, Options{
 		Runs:         runs,
 		SampleStride: stride,
 		Progress:     os.Stderr,
 	})
 	if err != nil {
-		t.Fatalf("CollectReports over real archive: %v", err)
+		t.Fatalf("CollectSeasonReports over real archive: %v", err)
 	}
 	t.Logf("reports=%d skips=%d (runs=%d stride=%d)", len(reports), len(skips), runs, stride)
 	if len(reports) == 0 {

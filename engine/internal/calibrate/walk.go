@@ -17,9 +17,15 @@ import (
 // trusted archive. The real .sco is ~8 MB; this leaves ample headroom.
 const maxEntryBytes = 128 << 20
 
-// tripleMembers are the three backup files (matched case-insensitively by
-// basename) that make up a JSB snapshot the validation harness consumes.
-var tripleMembers = []string{"ibl5.plr", "ibl5.sch", "ibl5.sco"}
+// canonicalMember maps a lowercased triple-member basename to the canonical
+// name it is extracted as. Writing canonical names (not the zip's own casing)
+// guarantees a stable stem for validate.findTriples and a known path for the
+// season reader's backup.ReadSco.
+var canonicalMember = map[string]string{
+	"ibl5.plr": "IBL5.plr",
+	"ibl5.sch": "IBL5.sch",
+	"ibl5.sco": "IBL5.sco",
+}
 
 // ValidateFunc is the seam to internal/validate.ValidateCorpus, injected so the
 // walk's extraction/inference/skip logic is unit-testable without running the
@@ -52,10 +58,7 @@ type Skip struct {
 // Skips for snapshots that could not be validated. A hard filesystem error
 // (e.g. an unreadable root) is returned as err; per-zip problems become Skips.
 func CollectReports(root string, opts Options) ([]validate.Report, []Skip, error) {
-	validateFn := opts.Validate
-	if validateFn == nil {
-		validateFn = validate.ValidateCorpus
-	}
+	validateFn := resolveValidate(opts)
 	progress := opts.Progress
 	if progress == nil {
 		progress = io.Discard
@@ -65,32 +68,16 @@ func CollectReports(root string, opts Options) ([]validate.Report, []Skip, error
 		stride = 1
 	}
 
-	var files []string
-	if err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if !d.IsDir() {
-			files = append(files, path)
-		}
-		return nil
-	}); err != nil {
-		return nil, nil, fmt.Errorf("calibrate: walk %q: %w", root, err)
+	zips, skips, err := listArchiveZips(root)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	var (
 		reports    []validate.Report
-		skips      []Skip
 		qualifying int
 	)
-	for _, path := range files {
-		ext := strings.ToLower(filepath.Ext(path))
-		if ext != ".zip" {
-			if isUnsupportedArchive(ext) {
-				skips = append(skips, Skip{path, "unsupported archive format (cannot read " + ext + ")"})
-			}
-			continue
-		}
+	for _, path := range zips {
 		gt, ok := inferGameType(path, opts.IncludeOlympics)
 		if !ok {
 			skips = append(skips, Skip{path, "olympics snapshot excluded (use --include-olympics)"})
@@ -159,18 +146,19 @@ func extractTriple(zipPath, destDir string) (bool, error) {
 
 	got := map[string]bool{}
 	for _, f := range zr.File {
-		base := filepath.Base(f.Name)
-		if !isTripleMember(base) {
+		canon, ok := canonicalMember[strings.ToLower(filepath.Base(f.Name))]
+		if !ok {
 			continue
 		}
-		dest := filepath.Join(destDir, base)
-		if err := extractOne(f, dest); err != nil {
+		// Basename-only join (canon is a literal constant) keeps extraction
+		// inside destDir — zip-slip safe even for a crafted entry name.
+		if err := extractOne(f, filepath.Join(destDir, canon)); err != nil {
 			return false, err
 		}
-		got[strings.ToLower(base)] = true
+		got[canon] = true
 	}
-	for _, m := range tripleMembers {
-		if !got[m] {
+	for _, canon := range canonicalMember {
+		if !got[canon] {
 			return false, nil
 		}
 	}
@@ -195,14 +183,34 @@ func extractOne(f *zip.File, dest string) error {
 	return out.Close()
 }
 
-func isTripleMember(base string) bool {
-	lb := strings.ToLower(base)
-	for _, m := range tripleMembers {
-		if lb == m {
-			return true
+// listArchiveZips walks root and returns every *.zip path in deterministic
+// (lexical) order, plus a Skip for each non-zip archive it cannot read (so a
+// .rar is surfaced, not silently ignored like ordinary junk). A hard filesystem
+// error (e.g. an unreadable root) is returned as err.
+func listArchiveZips(root string) ([]string, []Skip, error) {
+	var files []string
+	if err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() {
+			files = append(files, path)
+		}
+		return nil
+	}); err != nil {
+		return nil, nil, fmt.Errorf("calibrate: walk %q: %w", root, err)
+	}
+	var zips []string
+	var skips []Skip
+	for _, path := range files {
+		switch ext := strings.ToLower(filepath.Ext(path)); {
+		case ext == ".zip":
+			zips = append(zips, path)
+		case isUnsupportedArchive(ext):
+			skips = append(skips, Skip{path, "unsupported archive format (cannot read " + ext + ")"})
 		}
 	}
-	return false
+	return zips, skips, nil
 }
 
 // isUnsupportedArchive reports whether ext names an archive format the walk

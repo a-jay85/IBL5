@@ -37,19 +37,29 @@ func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
 
-// collectFunc is the seam to calibrate.CollectReports, injected so the CLI's
+// collectFunc is the seam to a calibrate collector, injected so the CLI's
 // flag/mode/encoding paths are testable without walking a real archive.
 type collectFunc func(root string, opts calibrate.Options) ([]validate.Report, []calibrate.Skip, error)
 
-func run(args []string, stdout, stderr io.Writer) int {
-	return runWith(args, stdout, stderr, calibrate.CollectReports)
+// collectors holds the two selection strategies the CLI can dispatch to.
+type collectors struct {
+	season collectFunc // set-difference per season (clean regular + playoff buckets)
+	flat   collectFunc // every zip independently, type by filename
 }
 
-func runWith(args []string, stdout, stderr io.Writer, collect collectFunc) int {
+func run(args []string, stdout, stderr io.Writer) int {
+	return runWith(args, stdout, stderr, collectors{
+		season: calibrate.CollectSeasonReports,
+		flat:   calibrate.CollectReports,
+	})
+}
+
+func runWith(args []string, stdout, stderr io.Writer, c collectors) int {
 	fs := flag.NewFlagSet("jsbcalibrate", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	archive := fs.String("archive", "", "root dir of JSB backup zips (required)")
 	mode := fs.String("mode", "calibrate", "calibrate | gate")
+	selection := fs.String("selection", "season", "snapshot selection: season (one regular snapshot/season, clean regular bucket) | flat (every zip, type by filename)")
 	runs := fs.Int("runs", 50, "seeded engine runs per corpus game")
 	seed := fs.Uint64("seed", 0, "base seed; per-game seeds derive deterministically from it")
 	stride := fs.Int("sample-stride", 1, "process every Nth qualifying snapshot")
@@ -65,6 +75,16 @@ func runWith(args []string, stdout, stderr io.Writer, collect collectFunc) int {
 	}
 	if *mode != "calibrate" && *mode != "gate" {
 		_, _ = fmt.Fprintf(stderr, "jsbcalibrate: invalid --mode %q (valid: calibrate, gate)\n", *mode)
+		return 2
+	}
+	var collect collectFunc
+	switch *selection {
+	case "season":
+		collect = c.season
+	case "flat":
+		collect = c.flat
+	default:
+		_, _ = fmt.Fprintf(stderr, "jsbcalibrate: invalid --selection %q (valid: season, flat)\n", *selection)
 		return 2
 	}
 

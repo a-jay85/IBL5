@@ -11,12 +11,14 @@ import (
 	"github.com/a-jay85/IBL5/engine/internal/validate"
 )
 
-// stubCollect returns canned reports/skips regardless of args, so the CLI's
-// flag/mode/encoding paths are exercised without walking a real archive.
-func stubCollect(reports []validate.Report, skips []calibrate.Skip) collectFunc {
-	return func(string, calibrate.Options) ([]validate.Report, []calibrate.Skip, error) {
+// stubCollectors returns canned reports/skips from both selection strategies,
+// so the CLI's flag/mode/encoding paths are exercised without walking a real
+// archive.
+func stubCollectors(reports []validate.Report, skips []calibrate.Skip) collectors {
+	fn := func(string, calibrate.Options) ([]validate.Report, []calibrate.Skip, error) {
 		return reports, skips, nil
 	}
+	return collectors{season: fn, flat: fn}
 }
 
 func reportWith(gt bundle.GameType, rows ...validate.StatRow) validate.Report {
@@ -30,7 +32,7 @@ func TestRun_CalibrateEmitsJSON(t *testing.T) {
 		validate.StatRow{Stat: "points", ScoVal: 110, EngineMean: 100, Pass: true},
 	)}
 	var out, errBuf bytes.Buffer
-	code := runWith([]string{"--archive", "/x", "--mode", "calibrate"}, &out, &errBuf, stubCollect(reports, nil))
+	code := runWith([]string{"--archive", "/x", "--mode", "calibrate"}, &out, &errBuf, stubCollectors(reports, nil))
 	if code != 0 {
 		t.Fatalf("exit = %d, want 0 (stderr: %s)", code, errBuf.String())
 	}
@@ -53,7 +55,7 @@ func TestRun_GateFailsBelowMinRate(t *testing.T) {
 	reports := []validate.Report{reportWith(bundle.GameTypeRegular, rows...)}
 
 	var out, errBuf bytes.Buffer
-	code := runWith([]string{"--archive", "/x", "--mode", "gate", "--min-rate", "0.9"}, &out, &errBuf, stubCollect(reports, nil))
+	code := runWith([]string{"--archive", "/x", "--mode", "gate", "--min-rate", "0.9"}, &out, &errBuf, stubCollectors(reports, nil))
 	if code == 0 {
 		t.Fatalf("exit = 0, want nonzero (rate 0.5 < 0.9)")
 	}
@@ -72,7 +74,7 @@ func TestRun_GatePasses(t *testing.T) {
 		validate.StatRow{Stat: "points", Pass: true},
 	)}
 	var out, errBuf bytes.Buffer
-	code := runWith([]string{"--archive", "/x", "--mode", "gate"}, &out, &errBuf, stubCollect(reports, nil))
+	code := runWith([]string{"--archive", "/x", "--mode", "gate"}, &out, &errBuf, stubCollectors(reports, nil))
 	if code != 0 {
 		t.Fatalf("exit = %d, want 0 (stderr: %s)", code, errBuf.String())
 	}
@@ -81,7 +83,7 @@ func TestRun_GatePasses(t *testing.T) {
 // Row #15 (negative): a missing --archive is a usage error (exit 2).
 func TestRun_MissingArchive(t *testing.T) {
 	var out, errBuf bytes.Buffer
-	if code := runWith(nil, &out, &errBuf, stubCollect(nil, nil)); code != 2 {
+	if code := runWith(nil, &out, &errBuf, stubCollectors(nil, nil)); code != 2 {
 		t.Fatalf("exit = %d, want 2", code)
 	}
 	if !strings.Contains(errBuf.String(), "--archive") {
@@ -92,7 +94,7 @@ func TestRun_MissingArchive(t *testing.T) {
 // Negative: an invalid --mode is a usage error (exit 2).
 func TestRun_InvalidMode(t *testing.T) {
 	var out, errBuf bytes.Buffer
-	code := runWith([]string{"--archive", "/x", "--mode", "bogus"}, &out, &errBuf, stubCollect(nil, nil))
+	code := runWith([]string{"--archive", "/x", "--mode", "bogus"}, &out, &errBuf, stubCollectors(nil, nil))
 	if code != 2 {
 		t.Fatalf("exit = %d, want 2", code)
 	}
@@ -101,10 +103,22 @@ func TestRun_InvalidMode(t *testing.T) {
 	}
 }
 
+// Negative: an invalid --selection is a usage error (exit 2).
+func TestRun_InvalidSelection(t *testing.T) {
+	var out, errBuf bytes.Buffer
+	code := runWith([]string{"--archive", "/x", "--selection", "bogus"}, &out, &errBuf, stubCollectors(nil, nil))
+	if code != 2 {
+		t.Fatalf("exit = %d, want 2", code)
+	}
+	if !strings.Contains(errBuf.String(), "invalid --selection") {
+		t.Errorf("expected an invalid --selection message, got: %q", errBuf.String())
+	}
+}
+
 // Negative: an archive that yields no reports exits 1 with a diagnostic.
 func TestRun_NoReports(t *testing.T) {
 	var out, errBuf bytes.Buffer
-	code := runWith([]string{"--archive", "/x"}, &out, &errBuf, stubCollect(nil, nil))
+	code := runWith([]string{"--archive", "/x"}, &out, &errBuf, stubCollectors(nil, nil))
 	if code != 1 {
 		t.Fatalf("exit = %d, want 1", code)
 	}

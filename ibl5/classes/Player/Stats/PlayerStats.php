@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Player\Stats;
 
 use BasketballStats\StatsFormatter;
-use Player\Player;
 use Player\Stats\Contracts\PlayerStatsInterface;
 use Player\Stats\Contracts\PlayerStatsRepositoryInterface;
 
@@ -83,8 +82,6 @@ class PlayerStats implements PlayerStatsInterface
     public int $seasonPlayoffHighAssists;
     public int $seasonPlayoffHighSteals;
     public int $seasonPlayoffHighBlocks;
-    public int $seasonPlayoffDoubleDoubles;
-    public int $seasonPlayoffTripleDoubles;
 
     public int $careerSeasonHighPoints;
     public int $careerSeasonHighRebounds;
@@ -99,8 +96,6 @@ class PlayerStats implements PlayerStatsInterface
     public int $careerPlayoffHighAssists;
     public int $careerPlayoffHighSteals;
     public int $careerPlayoffHighBlocks;
-    public int $careerPlayoffDoubleDoubles;
-    public int $careerPlayoffTripleDoubles;
 
     public int $careerGamesPlayed;
     public int $careerMinutesPlayed;
@@ -153,17 +148,6 @@ class PlayerStats implements PlayerStatsInterface
         $repository = new PlayerStatsRepository($db);
         $instance = new self($repository);
         $instance->loadByID($playerID);
-        return $instance;
-    }
-
-    /**
-     * @see PlayerStatsInterface::withPlayerObject()
-     */
-    public static function withPlayerObject(\mysqli $db, Player $player): PlayerStatsInterface
-    {
-        $repository = new PlayerStatsRepository($db);
-        $instance = new self($repository);
-        $instance->loadByID($player->getPlayerID() ?? 0);
         return $instance;
     }
 
@@ -277,8 +261,6 @@ class PlayerStats implements PlayerStatsInterface
         $this->seasonPlayoffHighAssists = (int) ($plrRow['sp_ast'] ?? 0);
         $this->seasonPlayoffHighSteals = (int) ($plrRow['sp_stl'] ?? 0);
         $this->seasonPlayoffHighBlocks = (int) ($plrRow['sp_blk'] ?? 0);
-        $this->seasonPlayoffDoubleDoubles = 0;
-        $this->seasonPlayoffTripleDoubles = 0;
 
         $this->careerSeasonHighPoints = (int) ($plrRow['ch_pts'] ?? 0);
         $this->careerSeasonHighRebounds = (int) ($plrRow['ch_reb'] ?? 0);
@@ -293,8 +275,6 @@ class PlayerStats implements PlayerStatsInterface
         $this->careerPlayoffHighAssists = (int) ($plrRow['cp_ast'] ?? 0);
         $this->careerPlayoffHighSteals = (int) ($plrRow['cp_stl'] ?? 0);
         $this->careerPlayoffHighBlocks = (int) ($plrRow['cp_blk'] ?? 0);
-        $this->careerPlayoffDoubleDoubles = 0;
-        $this->careerPlayoffTripleDoubles = 0;
 
         $this->careerGamesPlayed = (int) ($plrRow['car_gm'] ?? 0);
         $this->careerMinutesPlayed = (int) ($plrRow['car_min'] ?? 0);

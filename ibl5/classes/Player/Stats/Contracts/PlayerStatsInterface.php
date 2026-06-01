@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Player\Stats\Contracts;
 
-use Player\Player;
-
 /**
  * PlayerStatsInterface - Contract for player statistics data object
  *
@@ -42,15 +40,6 @@ interface PlayerStatsInterface
      * @return self Populated PlayerStats instance
      */
     public static function withPlayerID(\mysqli $db, int $playerID): self;
-
-    /**
-     * Create a PlayerStats instance from a Player object
-     * 
-     * @param \mysqli $db Database connection
-     * @param Player $player Player object to load stats for
-     * @return self Populated PlayerStats instance
-     */
-    public static function withPlayerObject(\mysqli $db, Player $player): self;
 
     /**
      * Create a PlayerStats instance from a current player database row

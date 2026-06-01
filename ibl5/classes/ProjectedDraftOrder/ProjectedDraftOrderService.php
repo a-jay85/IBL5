@@ -365,7 +365,7 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
             return $pctDiff;
         }
 
-        return $this->applyTiebreakers($a, $b, $h2h, $pointDiffs, 'better_wins');
+        return $this->applyTiebreakers($a, $b, $h2h, $pointDiffs);
     }
 
     /**
@@ -469,9 +469,8 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
      * @param StandingsRow $b
      * @param array<int, array<int, int>> $h2h
      * @param array<int, float> $pointDiffs
-     * @param 'better_wins' $direction
      */
-    private function applyTiebreakers(array $a, array $b, array $h2h, array $pointDiffs, string $direction): int
+    private function applyTiebreakers(array $a, array $b, array $h2h, array $pointDiffs): int
     {
         // 1. Head-to-head record (pairwise)
         $aWinsVsB = $h2h[$a['teamid']][$b['teamid']] ?? 0;

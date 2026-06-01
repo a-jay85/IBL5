@@ -14,11 +14,6 @@ use Security\HtmlSanitizer;
  */
 class PlayerDatabaseView implements PlayerDatabaseViewInterface
 {
-    /** @phpstan-ignore-next-line constructor.unusedParameter */
-    public function __construct(PlayerDatabaseService $service)
-    {
-    }
-
     /**
      * @see PlayerDatabaseViewInterface::renderSearchForm()
      *

@@ -6,11 +6,7 @@ namespace Tests\PlayerDatabase;
 
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
-use PlayerDatabase\PlayerDatabaseService;
-use PlayerDatabase\PlayerDatabaseValidator;
-use PlayerDatabase\PlayerDatabaseRepository;
 use PlayerDatabase\PlayerDatabaseView;
-use Player\PlayerRepository;
 use Player\PlayerData;
 
 /**
@@ -22,15 +18,10 @@ use Player\PlayerData;
 final class PlayerDatabaseViewTest extends TestCase
 {
     private PlayerDatabaseView $view;
-    private PlayerDatabaseService $service;
 
     protected function setUp(): void
     {
-        $validator = new PlayerDatabaseValidator();
-        $mockSearchRepository = $this->createMock(PlayerDatabaseRepository::class);
-        $mockPlayerRepository = $this->createMock(PlayerRepository::class);
-        $this->service = new PlayerDatabaseService($validator, $mockSearchRepository, $mockPlayerRepository);
-        $this->view = new PlayerDatabaseView($this->service);
+        $this->view = new PlayerDatabaseView();
     }
 
     // ========== Search Form Rendering Tests ==========

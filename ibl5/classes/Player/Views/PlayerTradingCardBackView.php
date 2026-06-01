@@ -95,15 +95,11 @@ class PlayerTradingCardBackView
             )
             . self::renderHighsRow('Double-Doubles',
                 $playerStats->seasonDoubleDoubles,
-                $playerStats->careerDoubleDoubles,
-                $playerStats->seasonPlayoffDoubleDoubles,
-                $playerStats->careerPlayoffDoubleDoubles
+                $playerStats->careerDoubleDoubles
             )
             . self::renderHighsRow('Triple-Doubles',
                 $playerStats->seasonTripleDoubles,
-                $playerStats->careerTripleDoubles,
-                $playerStats->seasonPlayoffTripleDoubles,
-                $playerStats->careerPlayoffTripleDoubles
+                $playerStats->careerTripleDoubles
             );
 
         $allStarPills = self::renderAllStarPill('All-Star Games', $allStarGames)
@@ -147,13 +143,13 @@ class PlayerTradingCardBackView
         string $label,
         ?int $regSeasonValue,
         ?int $regCareerValue,
-        ?int $playoffSeasonValue,
-        ?int $playoffCareerValue
+        ?int $playoffSeasonValue = null,
+        ?int $playoffCareerValue = null
     ): string {
         $regSeason = (string) ($regSeasonValue ?? 0);
         $regCareer = (string) ($regCareerValue ?? 0);
-        $playoffSeason = (string) ($playoffSeasonValue ?? 0);
-        $playoffCareer = (string) ($playoffCareerValue ?? 0);
+        $playoffSeason = $playoffSeasonValue !== null ? (string) $playoffSeasonValue : '';
+        $playoffCareer = $playoffCareerValue !== null ? (string) $playoffCareerValue : '';
         
         return <<<HTML
 <tr>

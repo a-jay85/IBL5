@@ -39,13 +39,6 @@ class PlayerFacadeGettersTest extends TestCase
         self::assertNull($player->getPlrRow());
     }
 
-    public function testGetTeamCityReturnsNullWhenPlayerDataNotLoaded(): void
-    {
-        $player = new Player();
-
-        self::assertNull($player->getTeamCity());
-    }
-
     public function testGetTeamColor1ReturnsNullWhenPlayerDataNotLoaded(): void
     {
         $player = new Player();

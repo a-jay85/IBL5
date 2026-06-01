@@ -39,7 +39,7 @@ $validator = new \PlayerDatabase\PlayerDatabaseValidator();
 $repository = new \PlayerDatabase\PlayerDatabaseRepository($mysqli_db);
 $playerRepository = new \Player\PlayerRepository($mysqli_db);
 $service = new \PlayerDatabase\PlayerDatabaseService($validator, $repository, $playerRepository);
-$view = new \PlayerDatabase\PlayerDatabaseView($service);
+$view = new \PlayerDatabase\PlayerDatabaseView();
 
 // Get and validate search parameters from POST
 $searchResult = $service->search($_POST);

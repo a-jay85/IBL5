@@ -3481,13 +3481,13 @@ parameters:
 		-
 			rawMessage: 'Parameter #1 $player1Data of method OneOnOneGame\OneOnOneGameEngine::simulateGame() expects array{pid: int, name: string, oo: int, r_drive_off: int, po: int, od: int, dd: int, pd: int, ...}, array given.'
 			identifier: argument.type
-			count: 7
+			count: 12
 			path: tests/OneOnOneGame/OneOnOneGameEngineTest.php
 
 		-
 			rawMessage: 'Parameter #2 $player2Data of method OneOnOneGame\OneOnOneGameEngine::simulateGame() expects array{pid: int, name: string, oo: int, r_drive_off: int, po: int, od: int, dd: int, pd: int, ...}, array given.'
 			identifier: argument.type
-			count: 7
+			count: 12
 			path: tests/OneOnOneGame/OneOnOneGameEngineTest.php
 
 		-
@@ -4121,7 +4121,7 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 3
+			count: 2
 			path: tests/PlrParser/PlrParserServiceTest.php
 
 		-
@@ -4853,7 +4853,7 @@ parameters:
 		-
 			rawMessage: 'Parameter #1 $data of method TeamOffDefStats\TeamOffDefStatsView::render() expects array{teams: list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, offense_totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, offense_averages: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}, defense_totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, ...}>, league: array{totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, averages: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}, games: int}, differentials: list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, differentials: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}}>}, array given.'
 			identifier: argument.type
-			count: 9
+			count: 10
 			path: tests/TeamOffDefStats/TeamOffDefStatsViewTest.php
 
 		-

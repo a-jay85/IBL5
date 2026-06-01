@@ -18,16 +18,13 @@ use Season\Season;
 class PlrParserService implements PlrParserServiceInterface
 {
     private PlrParserRepositoryInterface $repository;
-    private \Repositories\Contracts\TeamIdentityRepositoryInterface $commonRepository;
     private Season $season;
 
     public function __construct(
         PlrParserRepositoryInterface $repository,
-        \Repositories\Contracts\TeamIdentityRepositoryInterface $commonRepository,
         Season $season,
     ) {
         $this->repository = $repository;
-        $this->commonRepository = $commonRepository;
         $this->season = $season;
     }
 
@@ -184,10 +181,6 @@ class PlrParserService implements PlrParserServiceInterface
             ? (int) (100 - round($personalFoulsPerMinute / $maxFoulRatio * 100, 0))
             : 0;
 
-        // Team name for historical stats
-        $teamid = (int) $raw['teamid'];
-        $teamName = $this->commonRepository->getTeamnameFromTeamID($teamid) ?? '';
-
         return array_merge($raw, [
             'seasonFGM' => $seasonFGM,
             'seasonFGA' => $seasonFGA,
@@ -202,7 +195,6 @@ class PlrParserService implements PlrParserServiceInterface
             'heightIN' => $heightIN,
             'draftYear' => $draftYear,
             'ratingFOUL' => $ratingFOUL,
-            'teamName' => $teamName,
         ]);
     }
 

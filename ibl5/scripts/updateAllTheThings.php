@@ -104,10 +104,6 @@ try {
     echo $view->renderInitStatus('mainfile.php loaded');
     flush();
 
-    $commonRepository = new \Repositories\TeamIdentityRepository($mysqli_db);
-    echo $view->renderInitStatus('CommonRepository initialized');
-    flush();
-
     $season = new \Season\Season($mysqli_db);
 
     // Season year override for historical imports (e.g., Olympics 2003)
@@ -132,7 +128,7 @@ try {
     $lgeView = new LeagueConfig\LeagueConfigView();
 
     $plrRepo = new PlrParser\PlrParserRepository($mysqli_db, $leagueContext);
-    $plrService = new PlrParser\PlrParserService($plrRepo, $commonRepository, $season);
+    $plrService = new PlrParser\PlrParserService($plrRepo, $season);
 
     $boxscoreProcessor = new Boxscore\BoxscoreProcessor($mysqli_db, null, $season, $leagueContext);
     $boxscoreRepo = new Boxscore\BoxscoreRepository($mysqli_db, $leagueContext);

@@ -14,7 +14,6 @@ use PlrParser\PlrParserRepository;
 use PlrParser\PlrParserService;
 use SavedDepthChart\SavedDepthChartRepository;
 use Season\Season;
-use Repositories\TeamIdentityRepository;
 use Tests\DatabaseIntegration\DatabaseTestCase;
 use Updater\Contracts\JsbSourceResolverInterface;
 use Updater\Steps;
@@ -255,9 +254,8 @@ abstract class PipelineIntegrationTestCase extends DatabaseTestCase
     ): UpdaterService {
         $service = new UpdaterService();
 
-        $commonRepo = new TeamIdentityRepository($this->db);
         $plrRepo = new PlrParserRepository($this->db);
-        $plrService = new PlrParserService($plrRepo, $commonRepo, $season);
+        $plrService = new PlrParserService($plrRepo, $season);
 
         $boxscoreProcessor = new BoxscoreProcessor($this->db, null, $season);
         $boxscoreRepo = new BoxscoreRepository($this->db);

@@ -116,9 +116,8 @@ $resolver = new JsbParser\PlayerIdResolver($mysqli_db);
 $jsbService = new JsbParser\JsbImportService($repository, $resolver);
 $boxscoreProcessor = new Boxscore\BoxscoreProcessor($mysqli_db);
 $plrRepo = new PlrParser\PlrParserRepository($mysqli_db);
-$commonRepo = new Repositories\TeamIdentityRepository($mysqli_db);
 $season = new Season\Season($mysqli_db);
-$plrService = new PlrParser\PlrParserService($plrRepo, $commonRepo, $season);
+$plrService = new PlrParser\PlrParserService($plrRepo, $season);
 $lgeRepo = new LeagueConfig\LeagueConfigRepository($mysqli_db);
 $lgeService = new LeagueConfig\LeagueConfigService($lgeRepo);
 

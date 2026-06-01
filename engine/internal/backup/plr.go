@@ -17,7 +17,21 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"unicode"
 )
+
+// trimPad strips leading/trailing field padding. Real backup files pad fixed-
+// width fields with spaces in most records but with NUL bytes (0x00) in the
+// trailing padding records of a .sco corpus, so trimming whitespace alone leaves
+// "\x00\x00" in a numeric/name field and turns a padding record into a parse
+// error. Treating NUL as padding (alongside any Unicode space) lets those
+// records collapse to "" and be skipped, matching how space-padded records are
+// already handled.
+func trimPad(s string) string {
+	return strings.TrimFunc(s, func(r rune) bool {
+		return r == 0 || unicode.IsSpace(r)
+	})
+}
 
 // .plr 607-byte record offsets, transcribed verbatim from
 // ibl5/classes/PlrParser/PlrLineParser.php (the authoritative reader). Only the
@@ -257,7 +271,7 @@ func decodeCP1252(s string) string {
 			} // 0 = undefined CP1252 code point; drop it (iconv //IGNORE)
 		}
 	}
-	return strings.TrimSpace(b.String())
+	return trimPad(b.String())
 }
 
 // cp1252High maps the 0x80-0x9F range where CP1252 diverges from Latin-1. A 0

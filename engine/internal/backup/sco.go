@@ -19,6 +19,14 @@ const (
 	scoSlotSize     = 53
 	scoSlotCount    = 30
 	scoVisitorSlots = 15 // slots 0..14 visitor, 15..29 home
+
+	// scoContentSize is the live portion of a record: the game-info header plus
+	// the 30 player/team slots, before the trailing padding that rounds each
+	// record up to scoRecordSize. Real .sco files write this padding between
+	// records but omit it after the LAST record, so the file can end with a
+	// content-only (1,648-byte) final record. ReadSco tolerates that tail as long
+	// as the full content is present.
+	scoContentSize = scoGameInfoSize + scoSlotCount*scoSlotSize // 1648
 )
 
 // Game-info sub-offsets, from Boxscore::fillGameInfo. Team IDs and the date are
@@ -121,10 +129,18 @@ func ReadSco(r io.Reader) ([]ScoGame, error) {
 	games := make([]ScoGame, 0)
 	recIdx := 0
 	for off := scoHeaderSize; off < len(data); off, recIdx = off+scoRecordSize, recIdx+1 {
-		if off+scoRecordSize > len(data) {
-			return nil, fmt.Errorf("%w: record %d at offset %d has only %d of %d bytes", ErrShortRecord, recIdx, off, len(data)-off, scoRecordSize)
+		end := off + scoRecordSize
+		if end > len(data) {
+			// The final record may omit its trailing padding. Decode it as long as
+			// the full game-info + slot content is present; anything shorter is a
+			// genuinely truncated record.
+			if len(data)-off >= scoContentSize {
+				end = len(data)
+			} else {
+				return nil, fmt.Errorf("%w: record %d at offset %d has only %d of %d bytes", ErrShortRecord, recIdx, off, len(data)-off, scoRecordSize)
+			}
 		}
-		rec := string(data[off : off+scoRecordSize])
+		rec := string(data[off:end])
 		game, ok, err := decodeScoRecord(rec, recIdx)
 		if err != nil {
 			return nil, err
@@ -261,7 +277,7 @@ func scoSlice(s string, off, width int) string {
 }
 
 func scoInt(s string, off, width, recIdx int) (int, error) {
-	t := strings.TrimSpace(scoSlice(s, off, width))
+	t := trimPad(scoSlice(s, off, width))
 	if t == "" {
 		return 0, nil
 	}

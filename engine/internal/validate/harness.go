@@ -132,7 +132,7 @@ func readFile[T any](path string, read func(io.Reader) ([]T, error)) ([]T, error
 	if err != nil {
 		return nil, fmt.Errorf("validate: open %q: %w", path, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	out, err := read(f)
 	if err != nil {
 		return nil, fmt.Errorf("validate: parse %q: %w", path, err)

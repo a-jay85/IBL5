@@ -53,20 +53,20 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 	if *corpus == "" {
-		fmt.Fprintln(stderr, "jsbvalidate: --corpus <dir> is required")
+		_, _ = fmt.Fprintln(stderr, "jsbvalidate: --corpus <dir> is required")
 		return 2
 	}
 	switch *gameType {
 	case 2, 3, 4, 5, 6: // regular / regular-alt / playoff / all-star A / all-star B
 	default:
-		fmt.Fprintf(stderr, "jsbvalidate: invalid --game-type %d (valid: 2,3 regular; 4 playoff; 5,6 all-star)\n", *gameType)
+		_, _ = fmt.Fprintf(stderr, "jsbvalidate: invalid --game-type %d (valid: 2,3 regular; 4 playoff; 5,6 all-star)\n", *gameType)
 		return 2
 	}
 	gt := bundle.GameType(*gameType)
 
 	rep, err := validate.ValidateCorpus(*corpus, *runs, *seed, gt)
 	if err != nil {
-		fmt.Fprintln(stderr, "jsbvalidate:", err)
+		_, _ = fmt.Fprintln(stderr, "jsbvalidate:", err)
 		return 1
 	}
 	validate.WriteReport(stdout, rep)

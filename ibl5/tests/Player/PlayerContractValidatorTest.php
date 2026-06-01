@@ -346,7 +346,7 @@ class PlayerContractValidatorTest extends TestCase
         );
     }
 
-    private function createMockSeason(int $endingYear): Season&\PHPUnit\Framework\MockObject\MockObject
+    private function createMockSeason(int $endingYear): Season&\PHPUnit\Framework\MockObject\Stub
     {
         $season = $this->createStub(Season::class);
         $season->endingYear = $endingYear;

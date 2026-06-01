@@ -9,6 +9,11 @@ use LastSimRecap\LastSimRecapService;
 use PHPUnit\Framework\TestCase;
 use Repositories\Contracts\PlayerLookupRepositoryInterface;
 
+/**
+ * @phpstan-import-type TeamBoxscoreLines from LastSimRecapRepositoryInterface
+ * @phpstan-import-type InjuryRow from LastSimRecapRepositoryInterface
+ * @phpstan-import-type PlayerLine from LastSimRecapRepositoryInterface
+ */
 class LastSimRecapServiceTest extends TestCase
 {
     private PlayerLookupRepositoryInterface $playerLookup;
@@ -156,7 +161,7 @@ class LastSimRecapServiceTest extends TestCase
                 '1|2030-05-01' => ['PG' => 101, 'SG' => 102, 'SF' => 103, 'PF' => 104, 'C' => 105],
             ],
             playerLines: [
-                '101|500' => ['pid' => 101, 'name' => 'Star Player', 'pos' => 'PG', 'pts' => 0, 'minutes' => 0],
+                '101|500' => ['pid' => 101, 'name' => 'Star Player', 'pos' => 'PG', 'pts' => 0, 'reb' => 0, 'ast' => 0, 'stl' => 0, 'blk' => 0, 'minutes' => 0],
             ],
         );
         $svc = new LastSimRecapService($repo, $this->playerLookup);
@@ -222,12 +227,12 @@ class LastSimRecapServiceTest extends TestCase
     /**
      * @param array{sim: int, startDate: string, endDate: string}|null $window
      * @param list<array{schedId:int,boxId:int,date:string,visitor:int,vScore:int,home:int,hScore:int,year:int}> $games
-     * @param array<int, array<string, mixed>> $quarterLines
+     * @param array<int, TeamBoxscoreLines> $quarterLines
      * @param array<int, list<int>> $rosterByTid
-     * @param array<string, list<array<string, mixed>>> $injuriesByPidAndDate
+     * @param array<string, list<InjuryRow>> $injuriesByPidAndDate
      * @param array<int, array{PG:int,SG:int,SF:int,PF:int,C:int}> $lastSimStarters
      * @param array<string, array{PG:int,SG:int,SF:int,PF:int,C:int}> $starterSnapshots
-     * @param array<string, array<string, int|string>> $playerLines
+     * @param array<string, PlayerLine> $playerLines
      */
     private function buildRepo(
         ?array $window = ['sim' => 1, 'startDate' => '2030-03-01', 'endDate' => '2030-03-31'],
@@ -254,12 +259,12 @@ class LastSimRecapServiceTest extends TestCase
             /**
              * @param array{sim: int, startDate: string, endDate: string}|null $window
              * @param list<array{schedId:int,boxId:int,date:string,visitor:int,vScore:int,home:int,hScore:int,year:int}> $games
-             * @param array<int, array<string, mixed>> $quarterLines
+             * @param array<int, array{visQ:array{0:int,1:int,2:int,3:int},homeQ:array{0:int,1:int,2:int,3:int},visOT:int,homeOT:int,visitorPreWins:int,visitorPreLosses:int,homePreWins:int,homePreLosses:int,gameOfThatDay:int}> $quarterLines
              * @param array<int, list<int>> $rosterByTid
-             * @param array<string, list<array<string, mixed>>> $injuriesByPidAndDate
+             * @param array<string, list<array{pid:int,name:string,pos:string,date:string,injuryDescription:string,injuryGamesMissed:int,daysRemaining:int,returnDate:string,isNew:bool}>> $injuriesByPidAndDate
              * @param array<int, array{PG:int,SG:int,SF:int,PF:int,C:int}> $lastSimStarters
              * @param array<string, array{PG:int,SG:int,SF:int,PF:int,C:int}> $starterSnapshots
-             * @param array<string, array<string, int|string>> $playerLines
+             * @param array<string, array{pid:int,name:string,pos:string,pts:int,reb:int,ast:int,stl:int,blk:int,minutes:int}> $playerLines
              * @param array<int, array{tid:int,city:string,name:string}> $teamInfo
              */
             public function __construct(

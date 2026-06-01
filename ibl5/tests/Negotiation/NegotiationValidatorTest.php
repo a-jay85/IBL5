@@ -21,7 +21,7 @@ use Tests\WideUnit\Mocks\TestDataFactory;
 class NegotiationValidatorTest extends TestCase
 {
     private MockDatabase $mockDb;
-    private NegotiationValidator $validator;
+    private ?NegotiationValidator $validator;
     private \Season\Season $mockSeason;
 
     protected function setUp(): void

@@ -39,7 +39,7 @@ class TeamOlympicsLoadTest extends DatabaseTestCase
             'owner_email' => 'gm@test',
         ]);
 
-        $context = $this->createStub(LeagueContext::class);
+        $context = self::createStub(LeagueContext::class);
         $context->method('isOlympics')->willReturn(true);
         \BaseMysqliRepository::setSharedLeagueContext($context);
 

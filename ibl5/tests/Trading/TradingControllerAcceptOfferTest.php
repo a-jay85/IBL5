@@ -35,13 +35,13 @@ class TradingControllerAcceptOfferTest extends TestCase
         ?TradeProcessorInterface $processor = null,
     ): TradingController {
         return new TradingController(
-            $this->createStub(TradingServiceInterface::class),
-            $processor ?? $this->createStub(TradeProcessorInterface::class),
-            $offerRepo ?? $this->createStub(TradeOfferRepositoryInterface::class),
-            $this->createStub(TradeOfferInterface::class),
-            $this->createStub(TradingViewInterface::class),
-            $this->createStub(TeamIdentityRepositoryInterface::class),
-            $this->createStub(\Utilities\NukeCompat::class),
+            self::createStub(TradingServiceInterface::class),
+            $processor ?? self::createStub(TradeProcessorInterface::class),
+            $offerRepo ?? self::createStub(TradeOfferRepositoryInterface::class),
+            self::createStub(TradeOfferInterface::class),
+            self::createStub(TradingViewInterface::class),
+            self::createStub(TeamIdentityRepositoryInterface::class),
+            self::createStub(\Utilities\NukeCompat::class),
             $this->mockDb,
         );
     }

@@ -34,7 +34,7 @@ abstract class DatabaseTestCase extends TestCase
         $this->db->real_connect($host, $user, $pass, $name);
 
         if ($this->db->connect_errno !== 0) {
-            $this->fail('Database connection failed: ' . $this->db->connect_error);
+            self::fail('Database connection failed: ' . $this->db->connect_error);
         }
 
         $this->db->begin_transaction();

@@ -88,7 +88,7 @@ class NavigationViewsXssTest extends TestCase
             currentLeague: 'ibl',
         );
 
-        $menuBuilder = $this->createStub(NavigationMenuBuilderInterface::class);
+        $menuBuilder = self::createStub(NavigationMenuBuilderInterface::class);
         $menuBuilder->method('getMenuStructure')->willReturn([]);
         $menuBuilder->method('getMyTeamMenu')->willReturn(null);
         $menuBuilder->method('getAccountMenu')->willReturn([

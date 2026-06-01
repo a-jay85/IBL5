@@ -16,7 +16,7 @@ final class CookieDecodeTest extends TestCase
 
     public function testCookieDecodeReturnsArrayWhenAuthenticated(): void
     {
-        $mockAuth = $this->createStub(AuthServiceInterface::class);
+        $mockAuth = self::createStub(AuthServiceInterface::class);
         $mockAuth->method('getCookieArray')->willReturn([1, 'testuser', '0', 'email@test.com']);
 
         $GLOBALS['authService'] = $mockAuth;
@@ -31,7 +31,7 @@ final class CookieDecodeTest extends TestCase
 
     public function testCookieDecodeReturnsNullWhenNotAuthenticated(): void
     {
-        $mockAuth = $this->createStub(AuthServiceInterface::class);
+        $mockAuth = self::createStub(AuthServiceInterface::class);
         $mockAuth->method('getCookieArray')->willReturn(null);
 
         $GLOBALS['authService'] = $mockAuth;
@@ -45,7 +45,7 @@ final class CookieDecodeTest extends TestCase
     public function testCookieDecodeSetsGlobalCookieArray(): void
     {
         $expected = [1, 'testuser', '0', 'email@test.com'];
-        $mockAuth = $this->createStub(AuthServiceInterface::class);
+        $mockAuth = self::createStub(AuthServiceInterface::class);
         $mockAuth->method('getCookieArray')->willReturn($expected);
 
         $GLOBALS['authService'] = $mockAuth;

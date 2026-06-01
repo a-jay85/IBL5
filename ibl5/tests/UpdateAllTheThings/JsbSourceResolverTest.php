@@ -19,8 +19,8 @@ class JsbSourceResolverTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->stubLocator = $this->createStub(BackupArchiveLocatorInterface::class);
-        $this->stubExtractor = $this->createStub(ArchiveExtractorInterface::class);
+        $this->stubLocator = self::createStub(BackupArchiveLocatorInterface::class);
+        $this->stubExtractor = self::createStub(ArchiveExtractorInterface::class);
         $this->tempDir = sys_get_temp_dir() . '/jsb_resolver_test_' . uniqid();
         mkdir($this->tempDir, 0777, true);
     }

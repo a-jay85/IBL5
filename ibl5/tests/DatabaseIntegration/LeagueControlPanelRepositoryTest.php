@@ -398,7 +398,7 @@ class LeagueControlPanelRepositoryTest extends DatabaseTestCase
 
     public function testUpdateSettingOnlyUpdatesCorrectLeagueRow(): void
     {
-        $olympicsContext = $this->createStub(LeagueContext::class);
+        $olympicsContext = self::createStub(LeagueContext::class);
         $olympicsContext->method('getCurrentLeague')->willReturn(LeagueContext::LEAGUE_OLYMPICS);
         $olympicsRepo = new LeagueControlPanelRepository($this->db, $olympicsContext);
 
@@ -413,7 +413,7 @@ class LeagueControlPanelRepositoryTest extends DatabaseTestCase
         $this->repo->setShowDraftLink('On');
         self::assertSame('On', $this->repo->getSetting('Show Draft Link'));
 
-        $olympicsContext = $this->createStub(LeagueContext::class);
+        $olympicsContext = self::createStub(LeagueContext::class);
         $olympicsContext->method('getCurrentLeague')->willReturn(LeagueContext::LEAGUE_OLYMPICS);
         $olympicsRepo = new LeagueControlPanelRepository($this->db, $olympicsContext);
 

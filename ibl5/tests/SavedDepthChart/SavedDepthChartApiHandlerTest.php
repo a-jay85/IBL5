@@ -18,7 +18,7 @@ class SavedDepthChartApiHandlerTest extends WideUnitTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->handler = new SavedDepthChartApiHandler($this->mockDb, $this->createStub(TeamIdentityRepositoryInterface::class));
+        $this->handler = new SavedDepthChartApiHandler($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class));
     }
 
     public function testHandleUnknownActionReturnsError(): void

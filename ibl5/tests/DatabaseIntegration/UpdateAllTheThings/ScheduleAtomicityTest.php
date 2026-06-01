@@ -97,7 +97,7 @@ class ScheduleAtomicityTest extends PipelineIntegrationTestCase
 
     private function makeScheduleUpdater(Season $season, string $schPath): \Updater\ScheduleUpdater
     {
-        $schResolver = $this->createStub(JsbSourceResolverInterface::class);
+        $schResolver = self::createStub(JsbSourceResolverInterface::class);
         $schResolver->method('getContents')->willReturnCallback(
             static function (string $ext) use ($schPath): ?string {
                 if ($ext === 'sch' && is_file($schPath)) {

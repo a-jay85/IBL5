@@ -235,7 +235,7 @@ class FreeAgencyCapCalculatorTest extends TestCase
         ]);
 
         $team = $this->createMockTeamEntity();
-        $mockSeason = $this->createStub(Season::class);
+        $mockSeason = self::createStub(Season::class);
         $mockTeamQueryRepo = $this->createMockTeamQueryRepo([], []);
         $calculator = new FreeAgencyCapCalculator($this->mockDb, $team, $mockSeason, $mockTeamQueryRepo);
 
@@ -258,7 +258,7 @@ class FreeAgencyCapCalculatorTest extends TestCase
         ]);
 
         $team = $this->createMockTeamEntity();
-        $mockSeason = $this->createStub(Season::class);
+        $mockSeason = self::createStub(Season::class);
         $mockTeamQueryRepo = $this->createMockTeamQueryRepo([], []);
         $calculator = new FreeAgencyCapCalculator($this->mockDb, $team, $mockSeason, $mockTeamQueryRepo);
 
@@ -303,7 +303,7 @@ class FreeAgencyCapCalculatorTest extends TestCase
         ];
 
         $team = $this->createMockTeamEntity();
-        $mockSeason = $this->createStub(Season::class);
+        $mockSeason = self::createStub(Season::class);
         $mockTeamQueryRepo = $this->createMockTeamQueryRepo($players, []);
         $calculator = new FreeAgencyCapCalculator($this->mockDb, $team, $mockSeason, $mockTeamQueryRepo);
 

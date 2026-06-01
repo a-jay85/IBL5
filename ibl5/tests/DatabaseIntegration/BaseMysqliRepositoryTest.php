@@ -296,7 +296,7 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
 
     public function testRewriteTableNamesNoOpForIblContext(): void
     {
-        $context = $this->createStub(LeagueContext::class);
+        $context = self::createStub(LeagueContext::class);
         $context->method('isOlympics')->willReturn(false);
 
         $repo = new TestableBaseMysqliRepository($this->db, $context);
@@ -306,7 +306,7 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
 
     public function testRewriteTableNamesRewritesAllSixteenTablesForOlympics(): void
     {
-        $context = $this->createStub(LeagueContext::class);
+        $context = self::createStub(LeagueContext::class);
         $context->method('isOlympics')->willReturn(true);
 
         $repo = new TestableBaseMysqliRepository($this->db, $context);
@@ -343,7 +343,7 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
 
     public function testRewriteTableNamesHandlesSubstringCollisions(): void
     {
-        $context = $this->createStub(LeagueContext::class);
+        $context = self::createStub(LeagueContext::class);
         $context->method('isOlympics')->willReturn(true);
 
         $repo = new TestableBaseMysqliRepository($this->db, $context);
@@ -367,7 +367,7 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
         // rewritten alongside its FROM clause. The previous backtick-only
         // str_replace left it dangling, so rewriting `FROM `ibl_plr`` while
         // leaving `ibl_plr.name` produced "Unknown table 'ibl_plr'".
-        $context = $this->createStub(LeagueContext::class);
+        $context = self::createStub(LeagueContext::class);
         $context->method('isOlympics')->willReturn(true);
 
         $repo = new TestableBaseMysqliRepository($this->db, $context);
@@ -391,7 +391,7 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
         // `gm_username` column does not exist on ibl_olympics_team_info.
         // Backtick-quoting is the opt-in signal; bare references must NOT be
         // rewritten.
-        $context = $this->createStub(LeagueContext::class);
+        $context = self::createStub(LeagueContext::class);
         $context->method('isOlympics')->willReturn(true);
 
         $repo = new TestableBaseMysqliRepository($this->db, $context);
@@ -409,7 +409,7 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
 
     public function testRewriteTableNamesIsIdempotent(): void
     {
-        $context = $this->createStub(LeagueContext::class);
+        $context = self::createStub(LeagueContext::class);
         $context->method('isOlympics')->willReturn(true);
 
         $repo = new TestableBaseMysqliRepository($this->db, $context);
@@ -427,7 +427,7 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
     {
         // Gold-standard regression: the exact Team::load() shape that fataled in
         // CI ("Unknown table 'ibl5.ibl_team_info'"). After rewriting it must run.
-        $context = $this->createStub(LeagueContext::class);
+        $context = self::createStub(LeagueContext::class);
         $context->method('isOlympics')->willReturn(true);
 
         $repo = new TestableBaseMysqliRepository($this->db, $context);
@@ -466,7 +466,7 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
 
     public function testRewriteTableNamesUsesSharedContextFallback(): void
     {
-        $context = $this->createStub(LeagueContext::class);
+        $context = self::createStub(LeagueContext::class);
         $context->method('isOlympics')->willReturn(true);
 
         \BaseMysqliRepository::setSharedLeagueContext($context);
@@ -485,7 +485,7 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
         // ibl_jsb_hall_of_fame, ibl_plb_snapshots). They must pass through the
         // rewrite untouched even when backtick-quoted under Olympics, or queries
         // would fatal on a non-existent table.
-        $context = $this->createStub(LeagueContext::class);
+        $context = self::createStub(LeagueContext::class);
         $context->method('isOlympics')->willReturn(true);
         \BaseMysqliRepository::setSharedLeagueContext($context);
 
@@ -500,7 +500,7 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
 
     public function testFetchAllRealTeamsUsesOlympicsTableWithOlympicsContext(): void
     {
-        $context = $this->createStub(LeagueContext::class);
+        $context = self::createStub(LeagueContext::class);
         $context->method('isOlympics')->willReturn(true);
 
         $repo = new TestableBaseMysqliRepository($this->db, $context);

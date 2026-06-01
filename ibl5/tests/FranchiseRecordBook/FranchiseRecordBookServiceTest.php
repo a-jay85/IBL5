@@ -20,7 +20,7 @@ class FranchiseRecordBookServiceTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->repository = $this->createStub(FranchiseRecordBookRepositoryInterface::class);
+        $this->repository = self::createStub(FranchiseRecordBookRepositoryInterface::class);
         $this->service = new FranchiseRecordBookService($this->repository);
     }
 

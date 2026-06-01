@@ -23,7 +23,7 @@ class NewsModuleIntegrationTest extends TestCase
     public function testServiceReturnsNullForUnknownTeam(): void
     {
         $repo = $this->repoWithGames([]);
-        $playerLookup = $this->createStub(PlayerLookupRepositoryInterface::class);
+        $playerLookup = self::createStub(PlayerLookupRepositoryInterface::class);
         $playerLookup->method('getPlayerByID')->willReturn(null);
         $svc = new LastSimRecapService($repo, $playerLookup);
 
@@ -33,7 +33,7 @@ class NewsModuleIntegrationTest extends TestCase
     public function testServiceReturnsEmptySlateForTeamWithNoGames(): void
     {
         $repo = $this->repoWithGames([]);
-        $playerLookup = $this->createStub(PlayerLookupRepositoryInterface::class);
+        $playerLookup = self::createStub(PlayerLookupRepositoryInterface::class);
         $playerLookup->method('getPlayerByID')->willReturn(null);
         $svc = new LastSimRecapService($repo, $playerLookup);
 
@@ -54,7 +54,7 @@ class NewsModuleIntegrationTest extends TestCase
                 'year' => 2026,
             ],
         ]);
-        $playerLookup = $this->createStub(PlayerLookupRepositoryInterface::class);
+        $playerLookup = self::createStub(PlayerLookupRepositoryInterface::class);
         $playerLookup->method('getPlayerByID')->willReturn(null);
         $svc = new LastSimRecapService($repo, $playerLookup);
 

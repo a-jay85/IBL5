@@ -35,12 +35,12 @@ class NegotiationWideUnitTest extends WideUnitTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->mockSeason = $this->createStub(\Season\Season::class);
+        $this->mockSeason = self::createStub(\Season\Season::class);
         $this->mockSeason->phase = 'Regular Season';
         $this->mockSeason->endingYear = 2026;
         $this->mockSeason->beginningYear = 2025;
         $db = $this->mockDb;
-        $commonRepo = $this->createStub(SalaryCapRepositoryInterface::class);
+        $commonRepo = self::createStub(SalaryCapRepositoryInterface::class);
         $this->service = new NegotiationService(
             $db,
             new NegotiationRepository($db, $commonRepo),

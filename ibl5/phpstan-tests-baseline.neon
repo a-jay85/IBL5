@@ -31,99 +31,9 @@ parameters:
 			path: tests/AllStarAppearances/AllStarAppearancesViewTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
-			identifier: staticMethod.dynamicCall
-			count: 3
-			path: tests/Api/Controller/GameBoxscoreControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::isArray().'
-			identifier: staticMethod.dynamicCall
-			count: 3
-			path: tests/Api/Controller/GameBoxscoreControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
-			identifier: staticMethod.dynamicCall
-			count: 3
-			path: tests/Api/Controller/GameDetailControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::isArray().'
-			identifier: staticMethod.dynamicCall
-			count: 3
-			path: tests/Api/Controller/GameDetailControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::anything().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Api/Controller/GameListControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/Api/Controller/GameListControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::isArray().'
-			identifier: staticMethod.dynamicCall
-			count: 3
-			path: tests/Api/Controller/GameListControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
-			identifier: staticMethod.dynamicCall
-			count: 3
-			path: tests/Api/Controller/InjuriesControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::isArray().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/Api/Controller/InjuriesControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::anything().'
-			identifier: staticMethod.dynamicCall
-			count: 3
-			path: tests/Api/Controller/LeadersControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
-			identifier: staticMethod.dynamicCall
-			count: 4
-			path: tests/Api/Controller/LeadersControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::isArray().'
-			identifier: staticMethod.dynamicCall
-			count: 5
-			path: tests/Api/Controller/LeadersControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
-			identifier: staticMethod.dynamicCall
-			count: 3
-			path: tests/Api/Controller/PlayerDetailControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::isArray().'
-			identifier: staticMethod.dynamicCall
-			count: 3
-			path: tests/Api/Controller/PlayerDetailControllerTest.php
-
-		-
 			rawMessage: 'Call to function array_filter() requires parameter #2 to be passed to avoid loose comparison semantics.'
 			identifier: arrayFilter.strict
 			count: 1
-			path: tests/Api/Controller/PlayerExportControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 3
 			path: tests/Api/Controller/PlayerExportControllerTest.php
 
 		-
@@ -131,138 +41,6 @@ parameters:
 			identifier: ternary.shortNotAllowed
 			count: 1
 			path: tests/Api/Controller/PlayerExportControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
-			identifier: staticMethod.dynamicCall
-			count: 4
-			path: tests/Api/Controller/PlayerHistoryControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::isArray().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/Api/Controller/PlayerHistoryControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Api/Controller/PlayerListControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::isArray().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/Api/Controller/PlayerListControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::anything().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Api/Controller/PlayerStatsControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Api/Controller/PlayerStatsControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::isArray().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/Api/Controller/PlayerStatsControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/Api/Controller/SeasonControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::isArray().'
-			identifier: staticMethod.dynamicCall
-			count: 4
-			path: tests/Api/Controller/SeasonControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/Api/Controller/StandingsControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::isArray().'
-			identifier: staticMethod.dynamicCall
-			count: 3
-			path: tests/Api/Controller/StandingsControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
-			identifier: staticMethod.dynamicCall
-			count: 3
-			path: tests/Api/Controller/TeamDetailControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::isArray().'
-			identifier: staticMethod.dynamicCall
-			count: 3
-			path: tests/Api/Controller/TeamDetailControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/Api/Controller/TeamListControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::isArray().'
-			identifier: staticMethod.dynamicCall
-			count: 4
-			path: tests/Api/Controller/TeamListControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Api/Controller/TeamRosterControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::isArray().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/Api/Controller/TeamRosterControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::stringContains().'
-			identifier: staticMethod.dynamicCall
-			count: 5
-			path: tests/Api/Controller/TradeAcceptControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 5
-			path: tests/Api/Controller/TradeAcceptControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::stringContains().'
-			identifier: staticMethod.dynamicCall
-			count: 4
-			path: tests/Api/Controller/TradeDeclineControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 4
-			path: tests/Api/Controller/TradeDeclineControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 10
-			path: tests/Api/Middleware/RateLimiterTest.php
 
 		-
 			rawMessage: Casting to string something that's already string.
@@ -301,18 +79,6 @@ parameters:
 			path: tests/Api/Transformer/TeamTransformerTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::anything().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/ApiKeys/ApiKeysServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 6
-			path: tests/ApiKeys/ApiKeysServiceTest.php
-
-		-
 			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertInstanceOf() with ''Auth\\Contracts\\AuthRepositoryInterface'' and Auth\AuthRepository will always evaluate to true.'
 			identifier: staticMethod.alreadyNarrowedType
 			count: 1
@@ -331,12 +97,6 @@ parameters:
 			path: tests/Auth/AuthServiceTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Auth/AuthServiceUsernameTest.php
-
-		-
 			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertSame() with 42 and 42 will always evaluate to true.'
 			identifier: staticMethod.alreadyNarrowedType
 			count: 1
@@ -349,28 +109,10 @@ parameters:
 			path: tests/AwardHistory/AwardHistoryViewTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/Bootstrap/Api/ApiKeyAuthBootstrapTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/Bootstrap/Api/ApiRoutingBootstrapTest.php
-
-		-
 			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertInstanceOf() with ''Bootstrap\\Contracts\\BootstrapStepInterface'' and Bootstrap\RateLimitingBootstrap will always evaluate to true.'
 			identifier: staticMethod.alreadyNarrowedType
 			count: 1
 			path: tests/Bootstrap/Api/RateLimitingBootstrapTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Bootstrap/Api/RequestParsingBootstrapTest.php
 
 		-
 			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertInstanceOf() with ''Bootstrap\\Contracts\\ContainerInterface'' and Bootstrap\Contracts\ContainerInterface will always evaluate to true.'
@@ -403,18 +145,6 @@ parameters:
 			path: tests/Bootstrap/ApplicationTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/Bootstrap/AuthUsernameAccessorTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 3
-			path: tests/Bootstrap/CookieDecodeTest.php
-
-		-
 			rawMessage: Function check_html not found.
 			identifier: function.notFound
 			count: 2
@@ -433,12 +163,6 @@ parameters:
 			path: tests/Bootstrap/SecurityBootstrapTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Bootstrap/SecurityBootstrapTest.php
-
-		-
 			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertInstanceOf() with ''Bootstrap\\Application'' and Bootstrap\Application will always evaluate to true.'
 			identifier: staticMethod.alreadyNarrowedType
 			count: 1
@@ -448,12 +172,6 @@ parameters:
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Boxscore\\Contracts\\BoxscoreProcessorInterface'' and Boxscore\BoxscoreProcessor will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 2
-			path: tests/Boxscore/BoxscoreProcessorTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 12
 			path: tests/Boxscore/BoxscoreProcessorTest.php
 
 		-
@@ -491,12 +209,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: tests/CapSpace/CapSpaceViewTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 7
-			path: tests/CareerLeaderboards/CachedCareerLeaderboardsRepositoryTest.php
 
 		-
 			rawMessage: Short ternary operator is not allowed. Use null coalesce operator if applicable or consider using long ternary.
@@ -673,12 +385,6 @@ parameters:
 			path: tests/ContractRulesTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/DatabaseIntegration/AwardGenerationServiceIntegrationTest.php
-
-		-
 			rawMessage: 'You should use assertCount($expectedCount, $variable) instead of assertSame($expectedCount, count($variable)).'
 			identifier: phpunit.assertCount
 			count: 1
@@ -689,12 +395,6 @@ parameters:
 			identifier: argument.type
 			count: 15
 			path: tests/DatabaseIntegration/AwardHistoryRepositoryTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 10
-			path: tests/DatabaseIntegration/BaseMysqliRepositoryTest.php
 
 		-
 			rawMessage: Casting to int something that's already int.
@@ -733,12 +433,6 @@ parameters:
 			path: tests/DatabaseIntegration/CrossTableColumnNamingTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::fail().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/DatabaseIntegration/DatabaseTestCase.php
-
-		-
 			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertTrue() with true will always evaluate to true.'
 			identifier: staticMethod.alreadyNarrowedType
 			count: 1
@@ -749,12 +443,6 @@ parameters:
 			identifier: argument.type
 			count: 8
 			path: tests/DatabaseIntegration/FreeAgencyRepositoryTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/DatabaseIntegration/LeagueControlPanelRepositoryTest.php
 
 		-
 			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertNotNull() with int will always evaluate to true.'
@@ -811,39 +499,15 @@ parameters:
 			path: tests/DatabaseIntegration/TeamOffDefStatsRepositoryTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/DatabaseIntegration/TeamOlympicsLoadTest.php
-
-		-
 			rawMessage: Casting to int something that's already int.
 			identifier: cast.useless
 			count: 1
 			path: tests/DatabaseIntegration/UpdateAllTheThings/PipelineIntegrationTestCase.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/DatabaseIntegration/UpdateAllTheThings/PipelineIntegrationTestCase.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/DatabaseIntegration/UpdateAllTheThings/ScheduleAtomicityTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''DepthChartEntry\\DepthChartEntryApiHandler'' and DepthChartEntry\DepthChartEntryApiHandler will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryApiHandlerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
 			path: tests/DepthChartEntry/DepthChartEntryApiHandlerTest.php
 
 		-
@@ -857,18 +521,6 @@ parameters:
 			identifier: method.alreadyNarrowedType
 			count: 3
 			path: tests/DepthChartEntry/DepthChartEntryControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 5
-			path: tests/DepthChartEntry/DepthChartEntryControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 3
-			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
 
 		-
 			rawMessage: 'Parameter #1 $player of method DepthChartEntry\DepthChartEntryView::renderPlayerRow() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ..., ...<string, mixed>}, array{pid: 1, name: ''Round Trip Player'', pos: ''SG'', injured: 0, stamina: 60, dc_pg_depth: 0, dc_sg_depth: 1, dc_sf_depth: 2, ...} given.'
@@ -967,12 +619,6 @@ parameters:
 			path: tests/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php
-
-		-
 			rawMessage: 'Parameter #1 $depthChartData of method DepthChartEntry\DepthChartEntryValidator::validate() expects array{playerData: list<array{name: string, pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, ...}>, activePlayers: int, pos_1: int, pos_2: int, pos_3: int, pos_4: int, pos_5: int, hasStarterAtMultiplePositions: bool, ...}, array{activePlayers: 10, pos_1: 2, pos_2: 2, pos_3: 2, pos_4: 2, pos_5: 2, hasStarterAtMultiplePositions: false, nameOfProblemStarter: ''''} given.'
 			identifier: argument.type
 			count: 1
@@ -1021,18 +667,6 @@ parameters:
 			path: tests/DepthChartEntry/DepthChartEntryValidatorTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryViewTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryViewXssTest.php
-
-		-
 			rawMessage: @@covers value \Discord references an invalid class or function.
 			identifier: phpunit.covers
 			count: 1
@@ -1063,28 +697,10 @@ parameters:
 			path: tests/Discord/DiscordIntegrationTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Discord/DiscordIntegrationTest.php
-
-		-
 			rawMessage: 'Construct empty() is not allowed. Use more strict comparison.'
 			identifier: empty.notAllowed
 			count: 4
 			path: tests/Discord/DiscordTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Discord/DiscordTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/Draft/DraftRepositoryTest.php
 
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Draft\\Contracts\\DraftSelectionHandlerInterface'' and Draft\DraftSelectionHandler will always evaluate to true.'
@@ -1096,12 +712,6 @@ parameters:
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Draft\\DraftSelectionHandler'' and Draft\DraftSelectionHandler will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 3
-			path: tests/Draft/DraftSelectionHandlerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
 			path: tests/Draft/DraftSelectionHandlerTest.php
 
 		-
@@ -1127,12 +737,6 @@ parameters:
 			identifier: method.alreadyNarrowedType
 			count: 1
 			path: tests/DraftHistory/DraftHistoryApiHandlerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/DraftHistory/DraftHistoryRepositoryTest.php
 
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''DraftHistory\\Contracts\\DraftHistoryViewInterface'' and DraftHistory\DraftHistoryView will always evaluate to true.'
@@ -1357,12 +961,6 @@ parameters:
 			path: tests/Extension/ExtensionRepositoryTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::fail().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Extension/ExtensionRepositoryTest.php
-
-		-
 			rawMessage: 'Array has 2 duplicate keys with value ''teamid'' (''teamid'', ''teamid'').'
 			identifier: array.duplicateKey
 			count: 1
@@ -1389,12 +987,6 @@ parameters:
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Extension\\ExtensionService'' and Extension\ExtensionService will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/Extension/ExtensionServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
 			count: 1
 			path: tests/Extension/ExtensionServiceTest.php
 
@@ -1438,12 +1030,6 @@ parameters:
 			path: tests/FranchiseRecordBook/FranchiseRecordBookApiHandlerTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/FranchiseRecordBook/FranchiseRecordBookServiceTest.php
-
-		-
 			rawMessage: 'Parameter #1 $offer of method FreeAgency\CommonContractValidator::calculateOfferValue() expects array{year1: int, year2: int, year3: int, year4?: int, year5?: int, year6?: int}, array{} given.'
 			identifier: argument.type
 			count: 1
@@ -1472,12 +1058,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: tests/FreeAgency/CommonContractValidatorTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 12
-			path: tests/FreeAgency/FreeAgencyAdminProcessorTest.php
 
 		-
 			rawMessage: 'Parameter #2 $signings of method FreeAgency\FreeAgencyAdminProcessor::executeSignings() expects list<array{playerId: int, teamId: int, teamName: string, offers: array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int}, offerYears: int, usedMle: bool, usedLle: bool}>, array{array{playerId: int, teamId: int, teamName: string, offers: array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int}, offerYears: int, offerTotal: float, usedMle: bool, usedLle: bool}} given.'
@@ -1510,28 +1090,10 @@ parameters:
 			path: tests/FreeAgency/FreeAgencyAdminRepositoryTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 3
-			path: tests/FreeAgency/FreeAgencyCapCalculatorTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''FreeAgency\\FreeAgencyController'' and FreeAgency\FreeAgencyController will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
 			path: tests/FreeAgency/FreeAgencyControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 5
-			path: tests/FreeAgency/FreeAgencyControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/FreeAgency/FreeAgencyDemandCalculatorTest.php
 
 		-
 			rawMessage: 'Property Tests\FreeAgency\MockDemandRepository::$playerDemands (array{dem1: int, dem2: int, dem3: int, dem4: int, dem5: int, dem6: int}) does not accept default value of type array{}.'
@@ -1544,12 +1106,6 @@ parameters:
 			identifier: property.defaultValue
 			count: 1
 			path: tests/FreeAgency/FreeAgencyDemandCalculatorTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/FreeAgency/FreeAgencyOfferValidatorTest.php
 
 		-
 			rawMessage: 'Array has 2 duplicate keys with value ''r_tvr'' (''r_tvr'', ''r_tvr'').'
@@ -1567,12 +1123,6 @@ parameters:
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''FreeAgency\\FreeAgencyProcessor'' and FreeAgency\FreeAgencyProcessor will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 2
-			path: tests/FreeAgency/FreeAgencyProcessorTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 13
 			path: tests/FreeAgency/FreeAgencyProcessorTest.php
 
 		-
@@ -1603,12 +1153,6 @@ parameters:
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Player\\Player'' and Player\Player will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
-			path: tests/FreeAgency/FreeAgencyServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 27
 			path: tests/FreeAgency/FreeAgencyServiceTest.php
 
 		-
@@ -1645,12 +1189,6 @@ parameters:
 			rawMessage: Access to an undefined property PHPUnit\Framework\MockObject\Stub&Player\Player::$yearsOfExperience.
 			identifier: property.notFound
 			count: 2
-			path: tests/FreeAgency/FreeAgencyViewXssTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 4
 			path: tests/FreeAgency/FreeAgencyViewXssTest.php
 
 		-
@@ -1798,24 +1336,6 @@ parameters:
 			path: tests/JsbParser/HofFileParserTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/JsbParser/JsbExportServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/JsbParser/JsbImportServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::fail().'
-			identifier: staticMethod.dynamicCall
-			count: 5
-			path: tests/JsbParser/SchFileParserTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with 1000000 and 1000000 will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -1858,12 +1378,6 @@ parameters:
 			path: tests/JsbParser/ScoFileParserTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/LastSimRecap/LastSimRecapServiceTest.php
-
-		-
 			rawMessage: 'Call to function array_filter() requires parameter #2 to be passed to avoid loose comparison semantics.'
 			identifier: arrayFilter.strict
 			count: 1
@@ -1874,12 +1388,6 @@ parameters:
 			identifier: staticMethod.alreadyNarrowedType
 			count: 1
 			path: tests/LastSimRecap/LastSimRecapViewTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 3
-			path: tests/LastSimRecap/NewsModuleIntegrationTest.php
 
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with ''ibl'' and ''ibl'' will always evaluate to true.'
@@ -1912,57 +1420,15 @@ parameters:
 			path: tests/LeagueConfig/LeagueConfigRepositoryTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::fail().'
-			identifier: staticMethod.dynamicCall
-			count: 3
-			path: tests/LeagueConfig/LeagueConfigServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::isArray().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/LeagueConfig/LeagueConfigServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::isInt().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/LeagueConfig/LeagueConfigServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 9
-			path: tests/LeagueConfig/LeagueConfigServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::fail().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/LeagueConfig/LgeFileParserTest.php
-
-		-
 			rawMessage: 'You should use assertCount($expectedCount, $variable) instead of assertSame($expectedCount, count($variable)).'
 			identifier: phpunit.assertCount
 			count: 1
 			path: tests/LeagueConfig/LgeFileParserTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 3
-			path: tests/LeagueControlPanel/AwardGenerationServiceTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''LeagueControlPanel\\Contracts\\LeagueControlPanelProcessorInterface'' and LeagueControlPanel\LeagueControlPanelProcessor will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
-			path: tests/LeagueControlPanel/LeagueControlPanelProcessorTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 37
 			path: tests/LeagueControlPanel/LeagueControlPanelProcessorTest.php
 
 		-
@@ -1985,21 +1451,9 @@ parameters:
 			path: tests/LeagueControlPanel/LeagueControlPanelRepositoryTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 4
-			path: tests/LeagueControlPanel/LeagueControlPanelRepositoryTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''LeagueControlPanel\\Contracts\\LeagueControlPanelServiceInterface'' and LeagueControlPanel\LeagueControlPanelService will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
-			path: tests/LeagueControlPanel/LeagueControlPanelServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 6
 			path: tests/LeagueControlPanel/LeagueControlPanelServiceTest.php
 
 		-
@@ -2021,12 +1475,6 @@ parameters:
 			path: tests/LeagueSchedule/LeagueScheduleServiceTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 28
-			path: tests/LeagueSchedule/LeagueScheduleServiceTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''LeagueSchedule\\Contracts\\LeagueScheduleViewInterface'' and LeagueSchedule\LeagueScheduleView will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -2045,12 +1493,6 @@ parameters:
 			path: tests/LeagueStarters/LeagueStartersApiHandlerTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/LeagueStarters/LeagueStartersApiHandlerTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''LeagueStarters\\Contracts\\LeagueStartersServiceInterface'' and LeagueStarters\LeagueStartersService will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -2060,12 +1502,6 @@ parameters:
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''LeagueStarters\\LeagueStartersService'' and LeagueStarters\LeagueStartersService will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
-			path: tests/LeagueStarters/LeagueStartersServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 4
 			path: tests/LeagueStarters/LeagueStartersServiceTest.php
 
 		-
@@ -2135,82 +1571,16 @@ parameters:
 			path: tests/Logging/LoggerFactoryTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::fail().'
-			identifier: staticMethod.dynamicCall
-			count: 6
-			path: tests/Mail/MailServiceSmtpIntegrationTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::markTestSkipped().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Mail/MailServiceSmtpIntegrationTest.php
-
-		-
 			rawMessage: Short ternary operator is not allowed. Use null coalesce operator if applicable or consider using long ternary.
 			identifier: ternary.shortNotAllowed
 			count: 3
 			path: tests/Migration/MigrationFileIntegrityTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::fail().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Migration/MigrationRunnerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/Migration/MigrationRunnerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Module/EntryPoints/ApiKeysEntryPointTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 3
-			path: tests/Module/EntryPoints/ModuleEntryPointTestCase.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Module/EntryPoints/StandingsEntryPointTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Module/EntryPoints/TeamEntryPointTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 4
-			path: tests/Module/ModuleAccessControlTest.php
-
-		-
 			rawMessage: Short ternary operator is not allowed. Use null coalesce operator if applicable or consider using long ternary.
 			identifier: ternary.shortNotAllowed
 			count: 1
 			path: tests/Module/ModuleRegistryTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Navigation/Views/NavigationViewsXssTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Negotiation/NegotiationDemandCalculatorTest.php
 
 		-
 			rawMessage: 'Parameter #2 $teamFactors of method Negotiation\NegotiationDemandCalculator::calculateDemands() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{} given.'
@@ -2237,12 +1607,6 @@ parameters:
 			path: tests/Negotiation/NegotiationRepositoryTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 9
-			path: tests/Negotiation/NegotiationRepositoryTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Negotiation\\Contracts\\NegotiationServiceInterface'' and Negotiation\NegotiationService will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -2255,18 +1619,6 @@ parameters:
 			path: tests/Negotiation/NegotiationServiceTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Negotiation/NegotiationValidatorTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''NextSim\\Contracts\\NextSimServiceInterface'' and NextSim\NextSimService will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -2275,12 +1627,6 @@ parameters:
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''NextSim\\NextSimService'' and NextSim\NextSimService will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/NextSim/NextSimServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
 			count: 1
 			path: tests/NextSim/NextSimServiceTest.php
 
@@ -2327,12 +1673,6 @@ parameters:
 			path: tests/NextSim/NextSimViewTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 6
-			path: tests/NextSim/NextSimViewTest.php
-
-		-
 			rawMessage: Access to an undefined property PHPUnit\Framework\MockObject\Stub&Player\Player::$age.
 			identifier: property.notFound
 			count: 1
@@ -2360,12 +1700,6 @@ parameters:
 			rawMessage: Access to an undefined property PHPUnit\Framework\MockObject\Stub&Player\Player::$position.
 			identifier: property.notFound
 			count: 1
-			path: tests/NextSim/NextSimViewXssTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 5
 			path: tests/NextSim/NextSimViewXssTest.php
 
 		-
@@ -2429,18 +1763,6 @@ parameters:
 			path: tests/PageLayout/PageLayoutHeaderSideEffectTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/PageLayout/PageLayoutHeaderSideEffectTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Player/PlayerContractValidatorTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Player\\PlayerData'' and Player\PlayerData will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -2451,30 +1773,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: tests/Player/PlayerImageHelperTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/Player/PlayerPageControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/Player/PlayerPageServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Player/PlayerRepositoryFieldMapTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Player/PlayerStatsTest.php
 
 		-
 			rawMessage: 'Property Tests\Player\PlayerViewFactoryTest::$mockDb is never read, only written.'
@@ -2489,20 +1787,8 @@ parameters:
 			path: tests/Player/Stats/Views/PlayerHeatAveragesViewTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/Player/Stats/Views/PlayerHeatAveragesViewTest.php
-
-		-
 			rawMessage: 'Call to internal method PHPUnit\Framework\TestCase::addToAssertionCount() from outside its root namespace PHPUnit.'
 			identifier: method.internal
-			count: 1
-			path: tests/Player/Stats/Views/PlayerHeatTotalsViewTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
 			count: 1
 			path: tests/Player/Stats/Views/PlayerHeatTotalsViewTest.php
 
@@ -2513,20 +1799,8 @@ parameters:
 			path: tests/Player/Stats/Views/PlayerOlympicAveragesViewTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/Player/Stats/Views/PlayerOlympicAveragesViewTest.php
-
-		-
 			rawMessage: 'Call to internal method PHPUnit\Framework\TestCase::addToAssertionCount() from outside its root namespace PHPUnit.'
 			identifier: method.internal
-			count: 1
-			path: tests/Player/Stats/Views/PlayerOlympicTotalsViewTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
 			count: 1
 			path: tests/Player/Stats/Views/PlayerOlympicTotalsViewTest.php
 
@@ -2537,20 +1811,8 @@ parameters:
 			path: tests/Player/Stats/Views/PlayerPlayoffAveragesViewTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/Player/Stats/Views/PlayerPlayoffAveragesViewTest.php
-
-		-
 			rawMessage: 'Call to internal method PHPUnit\Framework\TestCase::addToAssertionCount() from outside its root namespace PHPUnit.'
 			identifier: method.internal
-			count: 1
-			path: tests/Player/Stats/Views/PlayerPlayoffTotalsViewTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
 			count: 1
 			path: tests/Player/Stats/Views/PlayerPlayoffTotalsViewTest.php
 
@@ -2561,12 +1823,6 @@ parameters:
 			path: tests/Player/Stats/Views/PlayerSeasonTableRendererTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/Player/Views/CardBaseStylesXssTest.php
-
-		-
 			rawMessage: '''
 				Call to deprecated method getStyles() of class Player\Views\PlayerStatsCardView:
 				CSS is now centralized in design/components/player-cards.css.
@@ -2575,18 +1831,6 @@ parameters:
 			identifier: staticMethod.deprecated
 			count: 1
 			path: tests/Player/Views/PlayerStatsCardViewTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::anything().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/PlayerDatabase/PlayerDatabaseRepositoryTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
-			identifier: staticMethod.dynamicCall
-			count: 8
-			path: tests/PlayerDatabase/PlayerDatabaseRepositoryTest.php
 
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''PlayerMovement\\Contracts\\PlayerMovementRepositoryInterface'' and PlayerMovement\PlayerMovementRepository will always evaluate to true.'
@@ -2619,24 +1863,6 @@ parameters:
 			path: tests/PlrParser/PlrParserRepositoryTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/PlrParser/PlrParserServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/PlrParser/PlrParserServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/PlrParser/PlrReconstructionServiceTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''BaseMysqliRepository'' and ProjectedDraftOrder\ProjectedDraftOrderRepository will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -2655,45 +1881,15 @@ parameters:
 			path: tests/ProjectedDraftOrder/ProjectedDraftOrderServiceTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/ProjectedDraftOrder/ProjectedDraftOrderServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/ProjectedDraftOrder/ProjectedDraftOrderServiceTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''ProjectedDraftOrder\\Contracts\\ProjectedDraftOrderViewInterface'' and ProjectedDraftOrder\ProjectedDraftOrderView will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
 			path: tests/ProjectedDraftOrder/ProjectedDraftOrderViewTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/RecordHolders/CachedRecordHoldersServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/RecordHolders/RecordBreakingDetectorTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertNotFalse() with int|string|null will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 2
-			path: tests/RecordHolders/RecordHoldersServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
 			path: tests/RecordHolders/RecordHoldersServiceTest.php
 
 		-
@@ -2706,12 +1902,6 @@ parameters:
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''RookieOption\\RookieOptionController'' and RookieOption\RookieOptionController will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
-			path: tests/RookieOption/RookieOptionControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
 			path: tests/RookieOption/RookieOptionControllerTest.php
 
 		-
@@ -2743,18 +1933,6 @@ parameters:
 			identifier: property.notFound
 			count: 1
 			path: tests/RookieOption/RookieOptionValidatorTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 5
-			path: tests/RookieOption/RookieOptionValidatorTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/SavedDepthChart/SavedDepthChartApiHandlerTest.php
 
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''SavedDepthChart\\Contracts\\SavedDepthChartServiceInterface'' and SavedDepthChart\SavedDepthChartService will always evaluate to true.'
@@ -2799,18 +1977,6 @@ parameters:
 			path: tests/SeasonArchive/SeasonArchiveServiceTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/SeasonArchive/SeasonArchiveServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/SeasonArchive/SeasonArchiveServiceTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''SeasonArchive\\Contracts\\SeasonArchiveViewInterface'' and SeasonArchive\SeasonArchiveView will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -2823,22 +1989,10 @@ parameters:
 			path: tests/SeasonHighs/SeasonHighsServiceTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 16
-			path: tests/SeasonHighs/SeasonHighsServiceTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''SeasonHighs\\Contracts\\SeasonHighsViewInterface'' and SeasonHighs\SeasonHighsView will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
 			path: tests/SeasonHighs/SeasonHighsViewTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/SeasonLeaderboards/CachedSeasonLeaderboardsRepositoryTest.php
 
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''BaseMysqliRepository'' and SeasonLeaderboards\SeasonLeaderboardsRepository will always evaluate to true.'
@@ -2857,24 +2011,6 @@ parameters:
 			identifier: method.alreadyNarrowedType
 			count: 1
 			path: tests/SeasonLeaderboards/SeasonLeaderboardsRepositoryTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/SeasonLeaderboards/SeasonLeaderboardsServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/SeasonLeaderboards/SeasonLeaderboardsViewTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/SeasonLeaderboards/SeasonLeaderboardsViewXssTest.php
 
 		-
 			rawMessage: 'Call to function property_exists() with Tests\WideUnit\Mocks\Season and ''showDraftLink'' will always evaluate to true.'
@@ -2943,12 +2079,6 @@ parameters:
 			path: tests/SeasonTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/SeasonTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''SeriesRecords\\Contracts\\SeriesRecordsControllerInterface'' and SeriesRecords\SeriesRecordsController will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -2958,12 +2088,6 @@ parameters:
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''SeriesRecords\\SeriesRecordsController'' and SeriesRecords\SeriesRecordsController will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
-			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
 			path: tests/SeriesRecords/SeriesRecordsControllerTest.php
 
 		-
@@ -2985,28 +2109,10 @@ parameters:
 			path: tests/SeriesRecords/SeriesRecordsRepositoryTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Settings/SettingsServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Standings/OlympicsStandingsViewTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Standings\\Contracts\\StandingsRepositoryInterface'' and Standings\StandingsRepository will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
 			path: tests/Standings/StandingsRepositoryTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/Standings/StandingsViewXssTest.php
 
 		-
 			rawMessage: 'Parameter #1 $games of method Statistics\TeamStatsCalculator::calculate() expects list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}>, array{array{visitor_score: 100, home_score: 95}} given.'
@@ -3039,32 +2145,14 @@ parameters:
 			path: tests/Team/TeamControllerTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 6
-			path: tests/Team/TeamControllerTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Team\\Contracts\\TeamServiceInterface'' and Team\TeamService will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
 			path: tests/Team/TeamServiceTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Team/TeamServiceTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Team\\Contracts\\TeamTableServiceInterface'' and Team\TeamTableService will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/Team/TeamTableServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
 			count: 1
 			path: tests/Team/TeamTableServiceTest.php
 
@@ -3171,12 +2259,6 @@ parameters:
 			path: tests/TeamSchedule/TeamScheduleServiceTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/TeamSchedule/TeamScheduleServiceTest.php
-
-		-
 			rawMessage: 'Parameter #2 $games of method TeamSchedule\TeamScheduleView::render() expects list<array{game: LeagueSchedule\Game, currentMonth: string, opposingTeam: Team\Team, opponentText: string, highlight: string, gameResult: string, wins: int, losses: int, ...}>, array{array<string, mixed>, array<string, mixed>} given.'
 			identifier: argument.type
 			count: 1
@@ -3231,12 +2313,6 @@ parameters:
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Trading/CashTransactionHandlerTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Trading\\Contracts\\TradeCashRepositoryInterface'' and Trading\TradeCashRepository will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -3247,24 +2323,6 @@ parameters:
 			identifier: method.alreadyNarrowedType
 			count: 1
 			path: tests/Trading/TradeCashRepositoryTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::anything().'
-			identifier: staticMethod.dynamicCall
-			count: 3
-			path: tests/Trading/TradeOfferTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Trading/TradeOfferTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 15
-			path: tests/Trading/TradeOfferTest.php
 
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Trading\\Contracts\\TradeProcessorInterface'' and Trading\TradeProcessor will always evaluate to true.'
@@ -3279,26 +2337,8 @@ parameters:
 			path: tests/Trading/TradeProcessorTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Trading/TradeProcessorTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 7
-			path: tests/Trading/TradeQueueProcessorTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertTrue() with true will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/Trading/TradeRosterPreviewApiHandlerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
 			count: 1
 			path: tests/Trading/TradeRosterPreviewApiHandlerTest.php
 
@@ -3339,21 +2379,9 @@ parameters:
 			path: tests/Trading/TradingControllerAcceptOfferTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 7
-			path: tests/Trading/TradingControllerAcceptOfferTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Trading\\TradingController'' and Trading\TradingController will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
-			path: tests/Trading/TradingControllerOfferTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 8
 			path: tests/Trading/TradingControllerOfferTest.php
 
 		-
@@ -3369,28 +2397,10 @@ parameters:
 			path: tests/Trading/TradingControllerRejectOfferTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 7
-			path: tests/Trading/TradingControllerRejectOfferTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Trading\\Contracts\\TradingControllerInterface'' and Trading\TradingController will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
 			path: tests/Trading/TradingControllerReviewTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 8
-			path: tests/Trading/TradingControllerReviewTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 9
-			path: tests/Trading/TradingControllerRosterPreviewTest.php
 
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Trading\\Contracts\\TradingControllerInterface'' and Trading\TradingController will always evaluate to true.'
@@ -3402,12 +2412,6 @@ parameters:
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Trading\\TradingController'' and Trading\TradingController will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
-			path: tests/Trading/TradingControllerSubmitOfferTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 7
 			path: tests/Trading/TradingControllerSubmitOfferTest.php
 
 		-
@@ -3471,28 +2475,10 @@ parameters:
 			path: tests/Trading/TradingRepositoryTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 69
-			path: tests/Trading/TradingServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/Trading/TradingViewTest.php
-
-		-
 			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertInstanceOf() with ''TrainingCampRatingsDiff\\Contracts\\TrainingCampRatingsDiffRepositoryInterface'' and TrainingCampRatingsDiff\TrainingCampRatingsDiffRepository will always evaluate to true.'
 			identifier: staticMethod.alreadyNarrowedType
 			count: 1
 			path: tests/TrainingCampRatingsDiff/TrainingCampRatingsDiffRepositoryTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/TrainingCampRatingsDiff/TrainingCampRatingsDiffServiceTest.php
 
 		-
 			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertInstanceOf() with ''TrainingCampRatingsDiff\\Contracts\\TrainingCampRatingsDiffViewInterface'' and TrainingCampRatingsDiff\TrainingCampRatingsDiffView will always evaluate to true.'
@@ -3505,12 +2491,6 @@ parameters:
 			identifier: method.alreadyNarrowedType
 			count: 1
 			path: tests/TransactionHistory/TransactionHistoryViewTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 11
-			path: tests/UI/Tables/PlayerRowTransformerTest.php
 
 		-
 			rawMessage: 'Parameter #2 $result of static method UI\Tables\PlayerRowTransformer::resolveWithStats() expects iterable<int, array<string, mixed>|Player\Player>, array<int, stdClass> given.'
@@ -3543,51 +2523,15 @@ parameters:
 			path: tests/Unit/BulkImport/ArchiveExtractorTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Unit/BulkImport/BackupArchiveLocatorTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 7
-			path: tests/Unit/BulkImport/BulkImportRunnerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::anything().'
-			identifier: staticMethod.dynamicCall
-			count: 3
-			path: tests/Unit/BulkImport/FileTypeHandlerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 4
-			path: tests/Unit/BulkImport/FileTypeHandlerTest.php
-
-		-
 			rawMessage: 'You should use assertCount($expectedCount, $variable) instead of assertSame($expectedCount, count($variable)).'
 			identifier: phpunit.assertCount
 			count: 1
 			path: tests/Unit/BulkImport/JsbFileTypeTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/UpdateAllTheThings/JsbSourceResolverTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Updater\\PowerRankingsUpdater'' and Updater\PowerRankingsUpdater will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 2
-			path: tests/UpdateAllTheThings/PowerRankingsUpdaterTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
 			path: tests/UpdateAllTheThings/PowerRankingsUpdaterTest.php
 
 		-
@@ -3597,21 +2541,9 @@ parameters:
 			path: tests/UpdateAllTheThings/ScheduleUpdaterTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/UpdateAllTheThings/ScheduleUpdaterTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Updater\\StandingsUpdater'' and Updater\StandingsUpdater will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 2
-			path: tests/UpdateAllTheThings/StandingsUpdaterTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 3
 			path: tests/UpdateAllTheThings/StandingsUpdaterTest.php
 
 		-
@@ -3627,33 +2559,15 @@ parameters:
 			path: tests/UpdateAllTheThings/Steps/EndOfSeasonImportStepTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 3
-			path: tests/UpdateAllTheThings/Steps/EndOfSeasonImportStepTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Updater\\Contracts\\PipelineStepInterface'' and Updater\Steps\ExtendDepthChartsStep will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
 			path: tests/UpdateAllTheThings/Steps/ExtendDepthChartsStepTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 3
-			path: tests/UpdateAllTheThings/Steps/ExtendDepthChartsStepTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Updater\\Contracts\\PipelineStepInterface'' and Updater\Steps\ExtractFromBackupStep will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
-			path: tests/UpdateAllTheThings/Steps/ExtractFromBackupStepTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
 			path: tests/UpdateAllTheThings/Steps/ExtractFromBackupStepTest.php
 
 		-
@@ -3669,21 +2583,9 @@ parameters:
 			path: tests/UpdateAllTheThings/Steps/ImportLeagueConfigStepTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 4
-			path: tests/UpdateAllTheThings/Steps/ImportLeagueConfigStepTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Updater\\Contracts\\PipelineStepInterface'' and Updater\Steps\ParseJsbFilesStep will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
-			path: tests/UpdateAllTheThings/Steps/ParseJsbFilesStepTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
 			path: tests/UpdateAllTheThings/Steps/ParseJsbFilesStepTest.php
 
 		-
@@ -3693,21 +2595,9 @@ parameters:
 			path: tests/UpdateAllTheThings/Steps/ParsePlayerFileStepTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/UpdateAllTheThings/Steps/ParsePlayerFileStepTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Updater\\Contracts\\PipelineStepInterface'' and Updater\Steps\ProcessAllStarGamesStep will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
-			path: tests/UpdateAllTheThings/Steps/ProcessAllStarGamesStepTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 4
 			path: tests/UpdateAllTheThings/Steps/ProcessAllStarGamesStepTest.php
 
 		-
@@ -3717,21 +2607,9 @@ parameters:
 			path: tests/UpdateAllTheThings/Steps/ProcessBoxscoresStepTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 3
-			path: tests/UpdateAllTheThings/Steps/ProcessBoxscoresStepTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Updater\\Contracts\\PipelineStepInterface'' and Updater\Steps\RefreshIblHistStep will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
-			path: tests/UpdateAllTheThings/Steps/RefreshIblHistStepTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
 			path: tests/UpdateAllTheThings/Steps/RefreshIblHistStepTest.php
 
 		-
@@ -3741,21 +2619,9 @@ parameters:
 			path: tests/UpdateAllTheThings/Steps/RefreshPlayoffSeriesResultsStepTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/UpdateAllTheThings/Steps/RefreshPlayoffSeriesResultsStepTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Updater\\Contracts\\PipelineStepInterface'' and Updater\Steps\RefreshTeamSeasonRecordsStep will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
-			path: tests/UpdateAllTheThings/Steps/RefreshTeamSeasonRecordsStepTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
 			path: tests/UpdateAllTheThings/Steps/RefreshTeamSeasonRecordsStepTest.php
 
 		-
@@ -3771,21 +2637,9 @@ parameters:
 			path: tests/UpdateAllTheThings/Steps/SnapshotPlrStepTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 3
-			path: tests/UpdateAllTheThings/Steps/SnapshotPlrStepTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Updater\\Contracts\\PipelineStepInterface'' and Updater\Steps\UpdatePowerRankingsStep will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
-			path: tests/UpdateAllTheThings/Steps/UpdatePowerRankingsStepTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 3
 			path: tests/UpdateAllTheThings/Steps/UpdatePowerRankingsStepTest.php
 
 		-
@@ -3795,33 +2649,15 @@ parameters:
 			path: tests/UpdateAllTheThings/Steps/UpdateScheduleStepTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 3
-			path: tests/UpdateAllTheThings/Steps/UpdateScheduleStepTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Updater\\Contracts\\PipelineStepInterface'' and Updater\Steps\UpdateStandingsStep will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
 			path: tests/UpdateAllTheThings/Steps/UpdateStandingsStepTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 3
-			path: tests/UpdateAllTheThings/Steps/UpdateStandingsStepTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Updater\\Contracts\\UpdaterServiceInterface'' and Updater\UpdaterService will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
-			path: tests/UpdateAllTheThings/UpdaterServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 12
 			path: tests/UpdateAllTheThings/UpdaterServiceTest.php
 
 		-
@@ -3837,39 +2673,9 @@ parameters:
 			path: tests/Updater/ScheduleUpdaterTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 3
-			path: tests/Updater/ScheduleUpdaterTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 11
-			path: tests/Updater/UpdaterControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 6
-			path: tests/Updater/UpdaterServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Validation/CommonValidatorTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Voting\\Contracts\\VotingBallotServiceInterface'' and Voting\VotingBallotService will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
-			path: tests/Voting/VotingBallotServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 16
 			path: tests/Voting/VotingBallotServiceTest.php
 
 		-
@@ -3877,12 +2683,6 @@ parameters:
 			identifier: method.alreadyNarrowedType
 			count: 1
 			path: tests/Voting/VotingBallotViewTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 19
-			path: tests/Voting/VotingSubmissionServiceTest.php
 
 		-
 			rawMessage: 'Parameter #2 $ballot of method Voting\VotingSubmissionService::submitEoyVote() expects array{mvp_1: string, mvp_2: string, mvp_3: string, six_1: string, six_2: string, six_3: string, roy_1: string, roy_2: string, ...}, array{mvp_1: string, mvp_2: string, mvp_3: string, six_1: string, six_2: string, six_3: string, roy_1: string, roy_2: string, ..., ...<string, ''John Doe, My Team''>} given.'
@@ -3903,12 +2703,6 @@ parameters:
 			path: tests/Voting/VotingSubmissionViewTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 4
-			path: tests/VotingResults/VotingResultsServiceTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Waivers\\Contracts\\WaiversControllerInterface'' and Waivers\WaiversController will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -3925,18 +2719,6 @@ parameters:
 			identifier: method.alreadyNarrowedType
 			count: 1
 			path: tests/Waivers/WaiversControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 7
-			path: tests/Waivers/WaiversControllerTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 6
-			path: tests/Waivers/WaiversProcessorTest.php
 
 		-
 			rawMessage: 'Parameter #1 $playerData of method Waivers\WaiversProcessor::determineContractData() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ..., ...<string, mixed>}, array{salary_yr1: 0, exp: 8} given.'
@@ -3963,21 +2745,9 @@ parameters:
 			path: tests/Waivers/WaiversProcessorTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 6
-			path: tests/Waivers/WaiversProcessorWriteTest.php
-
-		-
 			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertInstanceOf() with ''Waivers\\Contracts\\WaiversServiceInterface'' and Waivers\WaiversService will always evaluate to true.'
 			identifier: staticMethod.alreadyNarrowedType
 			count: 1
-			path: tests/Waivers/WaiversServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 5
 			path: tests/Waivers/WaiversServiceTest.php
 
 		-
@@ -4023,12 +2793,6 @@ parameters:
 			path: tests/WideUnit/Draft/DraftWideUnitTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/WideUnit/Draft/DraftWideUnitTest.php
-
-		-
 			rawMessage: 'Array has 2 duplicate keys with value ''teamid'' (''teamid'', ''teamid'').'
 			identifier: array.duplicateKey
 			count: 1
@@ -4051,12 +2815,6 @@ parameters:
 			identifier: property.deprecatedClass
 			count: 1
 			path: tests/WideUnit/Extension/ExtensionWideUnitTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/WideUnit/FreeAgency/FreeAgencyWideUnitTest.php
 
 		-
 			rawMessage: 'Construct empty() is not allowed. Use more strict comparison.'
@@ -4097,12 +2855,6 @@ parameters:
 		-
 			rawMessage: 'Array has 2 duplicate keys with value ''teamid'' (''teamid'', ''teamid'').'
 			identifier: array.duplicateKey
-			count: 1
-			path: tests/WideUnit/ModifierConsistencyTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
 			count: 1
 			path: tests/WideUnit/ModifierConsistencyTest.php
 
@@ -4149,18 +2901,6 @@ parameters:
 			path: tests/WideUnit/ModifierConsistencyTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/WideUnit/Negotiation/NegotiationWideUnitTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/WideUnit/Schedule/ScheduleWideUnitTest.php
-
-		-
 			rawMessage: 'Parameter #2 $games of method TeamSchedule\TeamScheduleView::render() expects list<array{game: LeagueSchedule\Game, currentMonth: string, opposingTeam: Team\Team, opponentText: string, highlight: string, gameResult: string, wins: int, losses: int, ...}>, array{array<string, mixed>, array<string, mixed>} given.'
 			identifier: argument.type
 			count: 1
@@ -4171,12 +2911,6 @@ parameters:
 			identifier: argument.type
 			count: 3
 			path: tests/WideUnit/Schedule/ScheduleWideUnitTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/WideUnit/Trading/TradeWideUnitTest.php
 
 		-
 			rawMessage: 'Parameter #1 $data of method Tests\WideUnit\Mocks\MockDatabase::setMockData() expects list<array<string, mixed>>, array{array{salary_yr1: 1000, salary_yr2: 1500, salary_yr3: 0, salary_yr4: 0, salary_yr5: 0, salary_yr6: 0, 0: 1000, 1: 1500, ...}} given.'
@@ -4203,20 +2937,8 @@ parameters:
 			path: tests/WideUnit/Voting/VotingWideUnitTest.php
 
 		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 7
-			path: tests/WideUnit/Waivers/WaiversWideUnitTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertTrue() with true will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/WideUnit/WideUnitTestCase.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::fail().'
-			identifier: staticMethod.dynamicCall
 			count: 1
 			path: tests/WideUnit/WideUnitTestCase.php
 
@@ -4237,33 +2959,3 @@ parameters:
 			identifier: method.alreadyNarrowedType
 			count: 1
 			path: tests/YourAccount/YourAccountRepositoryTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/YourAccount/YourAccountRepositoryTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::anything().'
-			identifier: staticMethod.dynamicCall
-			count: 3
-			path: tests/YourAccount/YourAccountServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::logicalAnd().'
-			identifier: staticMethod.dynamicCall
-			count: 2
-			path: tests/YourAccount/YourAccountServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::stringContains().'
-			identifier: staticMethod.dynamicCall
-			count: 9
-			path: tests/YourAccount/YourAccountServiceTest.php
-
-		-
-			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
-			identifier: staticMethod.dynamicCall
-			count: 3
-			path: tests/YourAccount/YourAccountServiceTest.php

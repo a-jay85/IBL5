@@ -15,7 +15,7 @@ final class SecurityBootstrapTest extends TestCase
         $_SERVER['HTTP_USER_AGENT'] = 'Mozilla/5.0';
         $_SERVER['HTTP_ACCEPT_ENCODING'] = 'gzip, deflate, br';
 
-        $container = $this->createStub(\Bootstrap\Contracts\ContainerInterface::class);
+        $container = self::createStub(\Bootstrap\Contracts\ContainerInterface::class);
         $bootstrap = new SecurityBootstrap();
 
         // redirectFacebookBot calls exit() on FB UA — use a normal UA

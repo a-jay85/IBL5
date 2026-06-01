@@ -28,14 +28,14 @@ class RookieOptionControllerTest extends TestCase
 
     public function testCanBeInstantiated(): void
     {
-        $controller = new RookieOptionController($this->mockDb, $this->createStub(TeamIdentityRepositoryInterface::class));
+        $controller = new RookieOptionController($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class));
 
         $this->assertInstanceOf(RookieOptionController::class, $controller);
     }
 
     public function testImplementsInterface(): void
     {
-        $controller = new RookieOptionController($this->mockDb, $this->createStub(TeamIdentityRepositoryInterface::class));
+        $controller = new RookieOptionController($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class));
 
         $this->assertInstanceOf(RookieOptionControllerInterface::class, $controller);
     }

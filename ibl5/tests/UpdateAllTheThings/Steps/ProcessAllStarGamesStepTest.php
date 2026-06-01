@@ -25,10 +25,10 @@ class ProcessAllStarGamesStepTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->stubProcessor = $this->createStub(BoxscoreProcessor::class);
-        $this->stubRepo = $this->createStub(BoxscoreRepository::class);
-        $this->stubView = $this->createStub(BoxscoreView::class);
-        $this->stubResolver = $this->createStub(JsbSourceResolverInterface::class);
+        $this->stubProcessor = self::createStub(BoxscoreProcessor::class);
+        $this->stubRepo = self::createStub(BoxscoreRepository::class);
+        $this->stubView = self::createStub(BoxscoreView::class);
+        $this->stubResolver = self::createStub(JsbSourceResolverInterface::class);
     }
 
     public function testImplementsPipelineStepInterface(): void

@@ -49,7 +49,7 @@ class TeamListControllerTest extends WideUnitTestCase
         $responder->expects($this->once())
             ->method('success')
             ->with(
-                $this->callback(function (array $data): bool {
+                self::callback(function (array $data): bool {
                     if (count($data) !== 1) {
                         return false;
                     }
@@ -63,9 +63,9 @@ class TeamListControllerTest extends WideUnitTestCase
                         && $first['conference'] === 'Eastern'
                         && $first['division'] === 'Atlantic';
                 }),
-                $this->isArray(),
+                self::isArray(),
                 200,
-                $this->isArray()
+                self::isArray()
             );
 
         $controller->handle([], [], $responder);
@@ -100,13 +100,13 @@ class TeamListControllerTest extends WideUnitTestCase
         $responder->expects($this->once())
             ->method('success')
             ->with(
-                $this->isArray(),
-                $this->callback(function (array $meta): bool {
+                self::isArray(),
+                self::callback(function (array $meta): bool {
                     return ($meta['sort'] ?? '') === 'team_name'
                         && ($meta['order'] ?? '') === 'asc';
                 }),
                 200,
-                $this->isArray()
+                self::isArray()
             );
 
         $controller->handle([], [], $responder);

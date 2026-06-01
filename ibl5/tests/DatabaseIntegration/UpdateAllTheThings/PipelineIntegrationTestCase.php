@@ -267,7 +267,7 @@ abstract class PipelineIntegrationTestCase extends DatabaseTestCase
         $jsbResolver = new PlayerIdResolver($this->db);
         $jsbService = new JsbImportService($jsbRepo, $jsbResolver);
 
-        $schResolver = $this->createStub(JsbSourceResolverInterface::class);
+        $schResolver = self::createStub(JsbSourceResolverInterface::class);
         $schResolver->method('getContents')->willReturnCallback(
             static function (string $ext) use ($schPath): ?string {
                 if ($ext === 'sch' && is_file($schPath)) {
@@ -286,7 +286,7 @@ abstract class PipelineIntegrationTestCase extends DatabaseTestCase
         // Step 1: ImportLeagueConfigStep — SKIPPED (pre-seeded via seedLeagueConfig)
 
         $tempDir = $this->tempDir;
-        $jsbFileResolver = $this->createStub(JsbSourceResolverInterface::class);
+        $jsbFileResolver = self::createStub(JsbSourceResolverInterface::class);
         $jsbFileResolver->method('getContents')->willReturnCallback(
             static function (string $ext) use ($tempDir): ?string {
                 $path = $tempDir . '/IBL5.' . $ext;

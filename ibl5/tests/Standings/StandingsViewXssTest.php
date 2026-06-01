@@ -46,7 +46,7 @@ final class StandingsViewXssTest extends TestCase
         $xss = '<script>alert(1)</script>';
         $escaped = '&lt;script&gt;';
 
-        $stubRepo = $this->createStub(StandingsRepositoryInterface::class);
+        $stubRepo = self::createStub(StandingsRepositoryInterface::class);
         $stubRepo->method('getStandingsByRegion')->willReturn([
             $this->makeStandingsRow(['team_name' => $xss]),
         ]);
@@ -54,7 +54,7 @@ final class StandingsViewXssTest extends TestCase
         $stubRepo->method('getAllPythagoreanStats')->willReturn([]);
         $stubRepo->method('getSeriesRecords')->willReturn([]);
 
-        $stubSeriesService = $this->createStub(SeriesRecordsServiceInterface::class);
+        $stubSeriesService = self::createStub(SeriesRecordsServiceInterface::class);
         $stubSeriesService->method('buildSeriesMatrix')->willReturn([]);
 
         $view = new StandingsView($stubRepo, 2025, $stubSeriesService);

@@ -18,7 +18,7 @@ class PlayerOlympicAveragesViewTest extends TestCase
 
     public function testRenderAveragesMatchesSnapshot(): void
     {
-        $repository = $this->createStub(PlayerStatsRepository::class);
+        $repository = self::createStub(PlayerStatsRepository::class);
         $repository->method('getOlympicsStats')->willReturn(TournamentViewFixtures::twoSeasonRows());
         $repository->method('getOlympicsCareerAverages')->willReturn(TournamentViewFixtures::careerAveragesRow());
 
@@ -30,7 +30,7 @@ class PlayerOlympicAveragesViewTest extends TestCase
 
     public function testRenderAveragesWithNoCareerRow(): void
     {
-        $repository = $this->createStub(PlayerStatsRepository::class);
+        $repository = self::createStub(PlayerStatsRepository::class);
         $repository->method('getOlympicsStats')->willReturn(TournamentViewFixtures::twoSeasonRows());
         $repository->method('getOlympicsCareerAverages')->willReturn(null);
 

@@ -23,7 +23,7 @@ final class PageLayoutHeaderSideEffectTest extends TestCase
     {
         $expectedCookie = [1, 'testuser', '0', 'email@test.com'];
 
-        $mockAuth = $this->createStub(AuthServiceInterface::class);
+        $mockAuth = self::createStub(AuthServiceInterface::class);
         $mockAuth->method('getCookieArray')->willReturn($expectedCookie);
         $mockAuth->method('isAuthenticated')->willReturn(true);
         $GLOBALS['authService'] = $mockAuth;
@@ -37,7 +37,7 @@ final class PageLayoutHeaderSideEffectTest extends TestCase
 
     public function testCookieDecodeReturnsNullForUnauthenticatedUser(): void
     {
-        $mockAuth = $this->createStub(AuthServiceInterface::class);
+        $mockAuth = self::createStub(AuthServiceInterface::class);
         $mockAuth->method('getCookieArray')->willReturn(null);
         $mockAuth->method('isAuthenticated')->willReturn(false);
         $GLOBALS['authService'] = $mockAuth;

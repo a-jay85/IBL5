@@ -13,7 +13,7 @@ class UpdateStandingsStepTest extends TestCase
 {
     public function testImplementsPipelineStepInterface(): void
     {
-        $stubUpdater = $this->createStub(StandingsUpdater::class);
+        $stubUpdater = self::createStub(StandingsUpdater::class);
         $step = new UpdateStandingsStep($stubUpdater);
 
         $this->assertInstanceOf(PipelineStepInterface::class, $step);
@@ -21,7 +21,7 @@ class UpdateStandingsStepTest extends TestCase
 
     public function testGetLabelReturnsExpectedLabel(): void
     {
-        $stubUpdater = $this->createStub(StandingsUpdater::class);
+        $stubUpdater = self::createStub(StandingsUpdater::class);
         $step = new UpdateStandingsStep($stubUpdater);
 
         $this->assertSame('Standings updated', $step->getLabel());
@@ -41,7 +41,7 @@ class UpdateStandingsStepTest extends TestCase
 
     public function testExecuteCapturesOutputBufferLog(): void
     {
-        $stubUpdater = $this->createStub(StandingsUpdater::class);
+        $stubUpdater = self::createStub(StandingsUpdater::class);
         $stubUpdater->method('update')->willReturnCallback(static function (): void {
             echo '<p>Computing standings...</p>';
         });

@@ -19,8 +19,8 @@ class UpdaterControllerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->stubService = $this->createStub(UpdaterService::class);
-        $this->stubView = $this->createStub(UpdaterViewInterface::class);
+        $this->stubService = self::createStub(UpdaterService::class);
+        $this->stubView = self::createStub(UpdaterViewInterface::class);
 
         $this->stubService->method('getSuccessCount')->willReturn(0);
         $this->stubService->method('getErrorCount')->willReturn(0);
@@ -50,7 +50,7 @@ class UpdaterControllerTest extends TestCase
 
     public function testRunOutputsSummary(): void
     {
-        $mockService = $this->createStub(UpdaterService::class);
+        $mockService = self::createStub(UpdaterService::class);
         $mockService->method('getSuccessCount')->willReturn(5);
         $mockService->method('getErrorCount')->willReturn(2);
 
@@ -72,7 +72,7 @@ class UpdaterControllerTest extends TestCase
     #[DataProvider('stepProgressLabelProvider')]
     public function testGetStepProgressLabelMapsKnownLabels(string $stepLabel, string $expectedProgress): void
     {
-        $step = $this->createStub(PipelineStepInterface::class);
+        $step = self::createStub(PipelineStepInterface::class);
         $step->method('getLabel')->willReturn($stepLabel);
 
         $mockView = $this->createMock(UpdaterViewInterface::class);
@@ -86,7 +86,7 @@ class UpdaterControllerTest extends TestCase
             ->with($expectedProgress)
             ->willReturn('<start>');
 
-        $mockService = $this->createStub(UpdaterService::class);
+        $mockService = self::createStub(UpdaterService::class);
         $mockService->method('getSuccessCount')->willReturn(0);
         $mockService->method('getErrorCount')->willReturn(0);
         $mockService->method('run')->willReturnCallback(
@@ -137,12 +137,12 @@ class UpdaterControllerTest extends TestCase
             ->with('Test step', 'detail text')
             ->willReturn('<done>');
 
-        $service = $this->createStub(UpdaterService::class);
+        $service = self::createStub(UpdaterService::class);
         $service->method('getSuccessCount')->willReturn(0);
         $service->method('getErrorCount')->willReturn(0);
         $service->method('run')->willReturnCallback(
             function (callable $onStart, callable $onComplete) use ($result): array {
-                $step = $this->createStub(PipelineStepInterface::class);
+                $step = self::createStub(PipelineStepInterface::class);
                 $step->method('getLabel')->willReturn('Test step');
                 $onStart($step);
                 $onComplete($result);
@@ -169,12 +169,12 @@ class UpdaterControllerTest extends TestCase
             ->with('Failed step', 'Something broke')
             ->willReturn('<error>');
 
-        $service = $this->createStub(UpdaterService::class);
+        $service = self::createStub(UpdaterService::class);
         $service->method('getSuccessCount')->willReturn(0);
         $service->method('getErrorCount')->willReturn(0);
         $service->method('run')->willReturnCallback(
             function (callable $onStart, callable $onComplete) use ($result): array {
-                $step = $this->createStub(PipelineStepInterface::class);
+                $step = self::createStub(PipelineStepInterface::class);
                 $step->method('getLabel')->willReturn('Failed step');
                 $onStart($step);
                 $onComplete($result);
@@ -324,12 +324,12 @@ class UpdaterControllerTest extends TestCase
 
     private function stubServiceWithResult(StepResult $result): UpdaterService
     {
-        $service = $this->createStub(UpdaterService::class);
+        $service = self::createStub(UpdaterService::class);
         $service->method('getSuccessCount')->willReturn(0);
         $service->method('getErrorCount')->willReturn(0);
         $service->method('run')->willReturnCallback(
             function (callable $onStart, callable $onComplete) use ($result): array {
-                $step = $this->createStub(PipelineStepInterface::class);
+                $step = self::createStub(PipelineStepInterface::class);
                 $step->method('getLabel')->willReturn($result->label);
                 $onStart($step);
                 $onComplete($result);

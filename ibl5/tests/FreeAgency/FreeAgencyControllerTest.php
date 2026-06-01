@@ -23,14 +23,14 @@ class FreeAgencyControllerTest extends TestCase
         $mockDb = new MockDatabase();
 
         $loginBoxCalled = false;
-        $nukeCompat = $this->createStub(\Utilities\NukeCompat::class);
+        $nukeCompat = self::createStub(\Utilities\NukeCompat::class);
         $nukeCompat->method('isUser')->willReturn(false);
         $nukeCompat->method('loginBox')->willReturnCallback(function () use (&$loginBoxCalled): void {
             $loginBoxCalled = true;
         });
 
-        $commonRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
-        $authService = $this->createStub(\Auth\AuthService::class);
+        $commonRepo = self::createStub(TeamIdentityRepositoryInterface::class);
+        $authService = self::createStub(\Auth\AuthService::class);
         $controller = new FreeAgencyController($mockDb, $commonRepo, $authService, $nukeCompat);
         $controller->handleRequest(null, '', 0);
 
@@ -40,8 +40,8 @@ class FreeAgencyControllerTest extends TestCase
     public function testControllerCanBeInstantiated(): void
     {
         $mockDb = new MockDatabase();
-        $commonRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
-        $authService = $this->createStub(\Auth\AuthService::class);
+        $commonRepo = self::createStub(TeamIdentityRepositoryInterface::class);
+        $authService = self::createStub(\Auth\AuthService::class);
         $controller = new FreeAgencyController($mockDb, $commonRepo, $authService);
 
         $this->assertInstanceOf(FreeAgencyController::class, $controller);

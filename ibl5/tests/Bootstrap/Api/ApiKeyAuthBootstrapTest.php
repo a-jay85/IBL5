@@ -17,8 +17,8 @@ final class ApiKeyAuthBootstrapTest extends TestCase
         $_GET['key'] = '';
 
         $container = new Container();
-        $container->set('api.responder', $this->createStub(JsonResponder::class));
-        $container->set(\mysqli::class, $this->createStub(\mysqli::class));
+        $container->set('api.responder', self::createStub(JsonResponder::class));
+        $container->set(\mysqli::class, self::createStub(\mysqli::class));
 
         $step = new ApiKeyAuthBootstrap();
         $step->boot($container);

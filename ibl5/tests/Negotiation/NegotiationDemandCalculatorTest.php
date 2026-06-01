@@ -29,7 +29,7 @@ class NegotiationDemandCalculatorTest extends TestCase
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->calculator = new NegotiationDemandCalculator($this->mockDb, $this->createStub(SalaryCapRepositoryInterface::class));
+        $this->calculator = new NegotiationDemandCalculator($this->mockDb, self::createStub(SalaryCapRepositoryInterface::class));
     }
 
     protected function tearDown(): void

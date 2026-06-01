@@ -96,7 +96,7 @@ class LeagueControlPanelRepositoryTest extends TestCase
 
     private function createMockDatabase(): \mysqli
     {
-        return $this->createStub(\mysqli::class);
+        return self::createStub(\mysqli::class);
     }
 
     /**
@@ -104,7 +104,7 @@ class LeagueControlPanelRepositoryTest extends TestCase
      */
     private function createMockDatabaseWithPreparedStatement(array|null $returnData): \mysqli
     {
-        $mockResult = $this->createStub(\mysqli_result::class);
+        $mockResult = self::createStub(\mysqli_result::class);
 
         if ($returnData === null) {
             $mockResult->method('fetch_assoc')->willReturn(null);
@@ -116,13 +116,13 @@ class LeagueControlPanelRepositoryTest extends TestCase
             $mockResult->method('fetch_assoc')->willReturnOnConsecutiveCalls(...array_merge($returnData, [null]));
         }
 
-        $stubStmt = $this->createStub(\mysqli_stmt::class);
+        $stubStmt = self::createStub(\mysqli_stmt::class);
         $stubStmt->method('bind_param')->willReturn(true);
         $stubStmt->method('execute')->willReturn(true);
         $stubStmt->method('get_result')->willReturn($mockResult);
         $stubStmt->method('close')->willReturn(true);
 
-        $stubDb = $this->createStub(\mysqli::class);
+        $stubDb = self::createStub(\mysqli::class);
         $stubDb->method('prepare')->willReturn($stubStmt);
 
         return $stubDb;

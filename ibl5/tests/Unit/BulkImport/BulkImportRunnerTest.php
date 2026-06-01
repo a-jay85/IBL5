@@ -40,11 +40,11 @@ class BulkImportRunnerTest extends TestCase
         $this->backupsDir = sys_get_temp_dir() . '/ibl5_runner_test_' . bin2hex(random_bytes(8));
         mkdir($this->backupsDir, 0700, true);
 
-        $this->stubExtractor = $this->createStub(ArchiveExtractorInterface::class);
-        $this->stubJsb = $this->createStub(JsbImportServiceInterface::class);
-        $stubBoxscore = $this->createStub(BoxscoreProcessor::class);
-        $stubPlr = $this->createStub(PlrParserServiceInterface::class);
-        $stubLge = $this->createStub(LeagueConfigService::class);
+        $this->stubExtractor = self::createStub(ArchiveExtractorInterface::class);
+        $this->stubJsb = self::createStub(JsbImportServiceInterface::class);
+        $stubBoxscore = self::createStub(BoxscoreProcessor::class);
+        $stubPlr = self::createStub(PlrParserServiceInterface::class);
+        $stubLge = self::createStub(LeagueConfigService::class);
 
         $this->handler = new FileTypeHandler(
             $this->stubJsb,
@@ -53,8 +53,8 @@ class BulkImportRunnerTest extends TestCase
             $stubLge,
         );
 
-        $this->stubResolver = $this->createStub(PlayerIdResolver::class);
-        $stubDb = $this->createStub(\mysqli::class);
+        $this->stubResolver = self::createStub(PlayerIdResolver::class);
+        $stubDb = self::createStub(\mysqli::class);
 
         $this->runner = new BulkImportRunner(
             $this->stubExtractor,

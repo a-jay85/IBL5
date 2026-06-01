@@ -24,9 +24,9 @@ class SnapshotPlrStepTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->stubJsbRepo = $this->createStub(JsbImportRepositoryInterface::class);
-        $this->stubPlrService = $this->createStub(PlrParserServiceInterface::class);
-        $this->stubResolver = $this->createStub(JsbSourceResolverInterface::class);
+        $this->stubJsbRepo = self::createStub(JsbImportRepositoryInterface::class);
+        $this->stubPlrService = self::createStub(PlrParserServiceInterface::class);
+        $this->stubResolver = self::createStub(JsbSourceResolverInterface::class);
     }
 
     private function createStep(): SnapshotPlrStep

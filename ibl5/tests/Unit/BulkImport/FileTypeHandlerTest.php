@@ -37,10 +37,10 @@ class FileTypeHandlerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->stubJsb = $this->createStub(JsbImportServiceInterface::class);
-        $this->stubBoxscore = $this->createStub(BoxscoreProcessor::class);
-        $this->stubPlr = $this->createStub(PlrParserServiceInterface::class);
-        $this->stubLge = $this->createStub(LeagueConfigService::class);
+        $this->stubJsb = self::createStub(JsbImportServiceInterface::class);
+        $this->stubBoxscore = self::createStub(BoxscoreProcessor::class);
+        $this->stubPlr = self::createStub(PlrParserServiceInterface::class);
+        $this->stubLge = self::createStub(LeagueConfigService::class);
 
         $this->handler = new FileTypeHandler(
             $this->stubJsb,
@@ -121,9 +121,9 @@ class FileTypeHandlerTest extends TestCase
         $mockJsb->expects($this->once())
             ->method('processRcbFile')
             ->with(
-                $this->anything(),
-                $this->anything(),
-                $this->anything(),
+                self::anything(),
+                self::anything(),
+                self::anything(),
                 false,
             )
             ->willReturn($expected);

@@ -28,14 +28,14 @@ class SeriesRecordsControllerTest extends TestCase
 
     public function testCanBeInstantiated(): void
     {
-        $controller = new SeriesRecordsController($this->mockDb, $this->createStub(TeamIdentityRepositoryInterface::class));
+        $controller = new SeriesRecordsController($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class));
 
         $this->assertInstanceOf(SeriesRecordsController::class, $controller);
     }
 
     public function testImplementsInterface(): void
     {
-        $controller = new SeriesRecordsController($this->mockDb, $this->createStub(TeamIdentityRepositoryInterface::class));
+        $controller = new SeriesRecordsController($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class));
 
         $this->assertInstanceOf(SeriesRecordsControllerInterface::class, $controller);
     }

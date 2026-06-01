@@ -109,7 +109,7 @@ class UpdaterServiceTest extends TestCase
 
     public function testFailedStepIncrementsErrorCount(): void
     {
-        $step = $this->createStub(PipelineStepInterface::class);
+        $step = self::createStub(PipelineStepInterface::class);
         $step->method('getLabel')->willReturn('Failing step');
         $step->method('execute')->willReturn(StepResult::failure('Failing step', 'Something broke'));
         $this->service->addStep($step);
@@ -128,7 +128,7 @@ class UpdaterServiceTest extends TestCase
         $this->service->addStep($this->createSuccessStep('OK 1'));
         $this->service->addStep($this->createSuccessStep('OK 2'));
 
-        $failStep = $this->createStub(PipelineStepInterface::class);
+        $failStep = self::createStub(PipelineStepInterface::class);
         $failStep->method('getLabel')->willReturn('Fail');
         $failStep->method('execute')->willReturn(StepResult::failure('Fail', 'error'));
         $this->service->addStep($failStep);
@@ -144,7 +144,7 @@ class UpdaterServiceTest extends TestCase
 
     public function testThrowingStepProducesFailureResult(): void
     {
-        $step = $this->createStub(PipelineStepInterface::class);
+        $step = self::createStub(PipelineStepInterface::class);
         $step->method('getLabel')->willReturn('Boom');
         $step->method('execute')->willThrowException(new \RuntimeException('Unexpected error'));
         $this->service->addStep($step);
@@ -162,7 +162,7 @@ class UpdaterServiceTest extends TestCase
 
     public function testThrowingStepStillCallsOnStepComplete(): void
     {
-        $step = $this->createStub(PipelineStepInterface::class);
+        $step = self::createStub(PipelineStepInterface::class);
         $step->method('getLabel')->willReturn('Boom');
         $step->method('execute')->willThrowException(new \RuntimeException('err'));
         $this->service->addStep($step);
@@ -209,7 +209,7 @@ class UpdaterServiceTest extends TestCase
 
     public function testStepLabelUsedInExceptionWrapping(): void
     {
-        $step = $this->createStub(PipelineStepInterface::class);
+        $step = self::createStub(PipelineStepInterface::class);
         $step->method('getLabel')->willReturn('Custom Label');
         $step->method('execute')->willThrowException(new \RuntimeException('msg'));
         $this->service->addStep($step);
@@ -224,7 +224,7 @@ class UpdaterServiceTest extends TestCase
 
     private function createSuccessStep(string $label): PipelineStepInterface
     {
-        $step = $this->createStub(PipelineStepInterface::class);
+        $step = self::createStub(PipelineStepInterface::class);
         $step->method('getLabel')->willReturn($label);
         $step->method('execute')->willReturn(StepResult::success($label));
         return $step;

@@ -18,7 +18,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
     {
         $this->mockDb = new MockDatabase();
 
-        $this->stubTradeAssetRepo = $this->createStub(TradeAssetRepositoryInterface::class);
+        $this->stubTradeAssetRepo = self::createStub(TradeAssetRepositoryInterface::class);
     }
 
     protected function tearDown(): void

@@ -15,7 +15,7 @@ final class VotingResultsServiceTest extends TestCase
 {
     public function testGetAllStarResultsReturnsFourCategoriesWithCorrectTitles(): void
     {
-        $repository = $this->createStub(VotingRepositoryInterface::class);
+        $repository = self::createStub(VotingRepositoryInterface::class);
         $repository->method('fetchAllStarTotals')->willReturn([]);
 
         $service = new VotingResultsService($repository);
@@ -30,7 +30,7 @@ final class VotingResultsServiceTest extends TestCase
 
     public function testGetAllStarResultsReturnsRowsFromRepository(): void
     {
-        $repository = $this->createStub(VotingRepositoryInterface::class);
+        $repository = self::createStub(VotingRepositoryInterface::class);
         $repository->method('fetchAllStarTotals')->willReturnOnConsecutiveCalls(
             [
                 ['name' => 'Mason Lee', 'votes' => 5, 'pid' => 101],
@@ -53,7 +53,7 @@ final class VotingResultsServiceTest extends TestCase
 
     public function testGetEndOfYearResultsReturnsFourCategoriesWithCorrectTitles(): void
     {
-        $repository = $this->createStub(VotingRepositoryInterface::class);
+        $repository = self::createStub(VotingRepositoryInterface::class);
         $repository->method('fetchEndOfYearTotals')->willReturn([]);
 
         $service = new VotingResultsService($repository);
@@ -68,7 +68,7 @@ final class VotingResultsServiceTest extends TestCase
 
     public function testGetEndOfYearResultsReturnsRowsFromRepository(): void
     {
-        $repository = $this->createStub(VotingRepositoryInterface::class);
+        $repository = self::createStub(VotingRepositoryInterface::class);
         $repository->method('fetchEndOfYearTotals')->willReturnOnConsecutiveCalls(
             [
                 ['name' => 'Alana Cruz', 'votes' => 21, 'pid' => 200],

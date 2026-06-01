@@ -51,7 +51,7 @@ class TeamDetailControllerTest extends WideUnitTestCase
         $responder->expects($this->once())
             ->method('success')
             ->with(
-                $this->callback(function (array $data): bool {
+                self::callback(function (array $data): bool {
                     return $data['uuid'] === self::TEAM_UUID
                         && $data['city'] === 'Boston'
                         && $data['name'] === 'Celtics'
@@ -61,9 +61,9 @@ class TeamDetailControllerTest extends WideUnitTestCase
                         && $data['record']['home'] === '30-11'
                         && $data['standings']['win_percentage'] === 0.61;
                 }),
-                $this->isArray(),
+                self::isArray(),
                 200,
-                $this->callback(function (array $headers): bool {
+                self::callback(function (array $headers): bool {
                     return isset($headers['ETag'])
                         && $headers['Cache-Control'] === 'public, max-age=60';
                 })
@@ -114,10 +114,10 @@ class TeamDetailControllerTest extends WideUnitTestCase
         $responder->expects($this->once())
             ->method('success')
             ->with(
-                $this->isArray(),
-                $this->isArray(),
+                self::isArray(),
+                self::isArray(),
                 200,
-                $this->callback(function (array $headers) use ($expectedTag): bool {
+                self::callback(function (array $headers) use ($expectedTag): bool {
                     return $headers['ETag'] === $expectedTag;
                 })
             );

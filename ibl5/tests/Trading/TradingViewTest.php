@@ -473,7 +473,7 @@ class TradingViewTest extends TestCase
 
     public function testRenderTradesClosedShowsMessage(): void
     {
-        $season = $this->createStub(Season::class);
+        $season = self::createStub(Season::class);
         $season->method('areWaiversAllowed')->willReturn(false);
 
         $html = $this->view->renderTradesClosed($season);
@@ -484,7 +484,7 @@ class TradingViewTest extends TestCase
 
     public function testRenderTradesClosedShowsWaiverLinksWhenOpen(): void
     {
-        $season = $this->createStub(Season::class);
+        $season = self::createStub(Season::class);
         $season->method('areWaiversAllowed')->willReturn(true);
 
         $html = $this->view->renderTradesClosed($season);

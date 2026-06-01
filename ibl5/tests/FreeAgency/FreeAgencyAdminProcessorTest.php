@@ -48,7 +48,7 @@ class FreeAgencyAdminProcessorTest extends TestCase
             $this->makeSigning(1, 10, 'Miami', 500, 600, 0, 0, 0, 0, 2, false, false),
         ];
 
-        $stub = $this->createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
         $stub->method('executeSigningsTransactionally')
             ->willReturn(['successCount' => 1, 'errorCount' => 1]);
 
@@ -80,7 +80,7 @@ class FreeAgencyAdminProcessorTest extends TestCase
 
     public function testExecuteSigningsNoOperations(): void
     {
-        $stub = $this->createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
         $processor = new FreeAgencyAdminProcessor($stub, $this->mockDb);
 
         $result = $processor->executeSignings(1, [], 'FA Day 1', '', '');
@@ -112,7 +112,7 @@ class FreeAgencyAdminProcessorTest extends TestCase
 
     public function testProcessDayEmptyOffersReturnsEmptyResults(): void
     {
-        $stub = $this->createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
         $stub->method('getAllOffersWithBirdYears')->willReturn([]);
         $stub->method('getPlayerDemandsBatch')->willReturn([]);
 
@@ -136,7 +136,7 @@ class FreeAgencyAdminProcessorTest extends TestCase
     {
         $offer = $this->makeOfferRow('Player A', 100, 'Miami', 1, 200, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.0);
 
-        $stub = $this->createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
         $stub->method('getAllOffersWithBirdYears')->willReturn([$offer]);
         // Demands: dem1=1000, rest 0 → total=1000, years=1
         // day 1: demands = (1000/1)*((11-1)/10) = 1000
@@ -167,7 +167,7 @@ class FreeAgencyAdminProcessorTest extends TestCase
         // perceivedValue 800.0 > 200.0 → signing
         $offer = $this->makeOfferRow('Star Player', 100, 'Miami', 1, 500, 550, 600, 0, 0, 0, 0, 0, 0, 0, 800.0);
 
-        $stub = $this->createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
         $stub->method('getAllOffersWithBirdYears')->willReturn([$offer]);
         $stub->method('getPlayerDemandsBatch')->willReturn([
             100 => ['dem1' => 200, 'dem2' => 200, 'dem3' => 200, 'dem4' => 0, 'dem5' => 0, 'dem6' => 0],
@@ -203,7 +203,7 @@ class FreeAgencyAdminProcessorTest extends TestCase
         // 150 > 100 → not auto-rejected; 150 <= 200 → rejected
         $offer = $this->makeOfferRow('Player B', 200, 'Chicago', 2, 400, 0, 0, 0, 0, 0, 0, 0, 0, 0, 150.0);
 
-        $stub = $this->createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
         $stub->method('getAllOffersWithBirdYears')->willReturn([$offer]);
         $stub->method('getPlayerDemandsBatch')->willReturn([
             200 => ['dem1' => 200, 'dem2' => 0, 'dem3' => 0, 'dem4' => 0, 'dem5' => 0, 'dem6' => 0],
@@ -232,7 +232,7 @@ class FreeAgencyAdminProcessorTest extends TestCase
         $offer1 = $this->makeOfferRow('Star Player', 100, 'Miami', 1, 500, 550, 600, 0, 0, 0, 0, 0, 0, 0, 800.0);
         $offer2 = $this->makeOfferRow('Star Player', 100, 'Chicago', 2, 400, 450, 500, 0, 0, 0, 0, 0, 0, 0, 600.0);
 
-        $stub = $this->createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
         $stub->method('getAllOffersWithBirdYears')->willReturn([$offer1, $offer2]);
         $stub->method('getPlayerDemandsBatch')->willReturn([
             100 => ['dem1' => 200, 'dem2' => 200, 'dem3' => 200, 'dem4' => 0, 'dem5' => 0, 'dem6' => 0],
@@ -261,7 +261,7 @@ class FreeAgencyAdminProcessorTest extends TestCase
         $offerChicago = $this->makeOfferRow('Star Player', 100, 'Chicago', 2, 400, 450, 500, 0, 0, 0, 0, 0, 0, 0, 600.0);
         $offerBoston = $this->makeOfferRow('Star Player', 100, 'Boston', 3, 300, 350, 400, 0, 0, 0, 0, 0, 0, 0, 500.0);
 
-        $stub = $this->createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
         $stub->method('getAllOffersWithBirdYears')->willReturn([$offerMiami, $offerChicago, $offerBoston]);
         $stub->method('getPlayerDemandsBatch')->willReturn([
             100 => ['dem1' => 200, 'dem2' => 200, 'dem3' => 200, 'dem4' => 0, 'dem5' => 0, 'dem6' => 0],
@@ -298,7 +298,7 @@ class FreeAgencyAdminProcessorTest extends TestCase
         $offerMiami = $this->makeOfferRow('Player B', 200, 'Miami', 1, 400, 0, 0, 0, 0, 0, 0, 0, 0, 0, 600.0);
         $offerChicago = $this->makeOfferRow('Player B', 200, 'Chicago', 2, 300, 0, 0, 0, 0, 0, 0, 0, 0, 0, 500.0);
 
-        $stub = $this->createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
         $stub->method('getAllOffersWithBirdYears')->willReturn([$offerMiami, $offerChicago]);
         $stub->method('getPlayerDemandsBatch')->willReturn([
             200 => ['dem1' => 800, 'dem2' => 0, 'dem3' => 0, 'dem4' => 0, 'dem5' => 0, 'dem6' => 0],
@@ -342,7 +342,7 @@ class FreeAgencyAdminProcessorTest extends TestCase
         //         500.0 > 100 → not auto-reject; 500 > 200 → signing
         $offer = $this->makeOfferRow('Player C', 300, 'Miami', 1, 400, 0, 0, 0, 0, 0, 0, 0, 0, 0, 500.0);
 
-        $stub = $this->createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
         $stub->method('getAllOffersWithBirdYears')->willReturn([$offer]);
         $stub->method('getPlayerDemandsBatch')->willReturn([
             300 => ['dem1' => 2000, 'dem2' => 0, 'dem3' => 0, 'dem4' => 0, 'dem5' => 0, 'dem6' => 0],
@@ -373,7 +373,7 @@ class FreeAgencyAdminProcessorTest extends TestCase
         // Any perceivedValue > 0 → signing
         $offer = $this->makeOfferRow('No Demand Player', 400, 'Miami', 1, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 50.0);
 
-        $stub = $this->createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
         $stub->method('getAllOffersWithBirdYears')->willReturn([$offer]);
         $stub->method('getPlayerDemandsBatch')->willReturn([]); // empty — no demands for pid 400
 
@@ -400,7 +400,7 @@ class FreeAgencyAdminProcessorTest extends TestCase
         $offerB = $this->makeOfferRow('Player B', 200, 'Chicago', 2, 400, 0, 0, 0, 0, 0, 0, 0, 0, 0, 150.0);
         $offerC = $this->makeOfferRow('Player C', 300, 'Boston', 3, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.0);
 
-        $stub = $this->createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
         $stub->method('getAllOffersWithBirdYears')->willReturn([$offerA, $offerB, $offerC]);
         $stub->method('getPlayerDemandsBatch')->willReturn([
             100 => ['dem1' => 200, 'dem2' => 200, 'dem3' => 200, 'dem4' => 0, 'dem5' => 0, 'dem6' => 0],

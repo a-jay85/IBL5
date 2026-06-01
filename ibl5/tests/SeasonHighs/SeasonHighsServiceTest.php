@@ -17,7 +17,7 @@ class SeasonHighsServiceTest extends TestCase
 {
     public function testImplementsServiceInterface(): void
     {
-        $repo = $this->createStub(SeasonHighsRepositoryInterface::class);
+        $repo = self::createStub(SeasonHighsRepositoryInterface::class);
         $season = $this->createStubSeason(2024, 2025);
         $service = new SeasonHighsService($repo, $season);
 
@@ -26,7 +26,7 @@ class SeasonHighsServiceTest extends TestCase
 
     public function testGetSeasonHighsDataReturnsExpectedStructure(): void
     {
-        $repo = $this->createStub(SeasonHighsRepositoryInterface::class);
+        $repo = self::createStub(SeasonHighsRepositoryInterface::class);
         $repo->method('getSeasonHighsBatch')->willReturnCallback(self::emptyBatchFor(...));
         $season = $this->createStubSeason(2024, 2025);
         $service = new SeasonHighsService($repo, $season);
@@ -39,7 +39,7 @@ class SeasonHighsServiceTest extends TestCase
 
     public function testGetSeasonHighsDataReturnsNineStatCategories(): void
     {
-        $repo = $this->createStub(SeasonHighsRepositoryInterface::class);
+        $repo = self::createStub(SeasonHighsRepositoryInterface::class);
         $repo->method('getSeasonHighsBatch')->willReturnCallback(self::emptyBatchFor(...));
         $season = $this->createStubSeason(2024, 2025);
         $service = new SeasonHighsService($repo, $season);
@@ -52,7 +52,7 @@ class SeasonHighsServiceTest extends TestCase
 
     public function testGetSeasonHighsDataIncludesPointsStat(): void
     {
-        $repo = $this->createStub(SeasonHighsRepositoryInterface::class);
+        $repo = self::createStub(SeasonHighsRepositoryInterface::class);
         $repo->method('getSeasonHighsBatch')->willReturnCallback(self::emptyBatchFor(...));
         $season = $this->createStubSeason(2024, 2025);
         $service = new SeasonHighsService($repo, $season);
@@ -79,7 +79,7 @@ class SeasonHighsServiceTest extends TestCase
 
     public function testRegularSeasonUsesCorrectDateRange(): void
     {
-        $repo = $this->createStub(SeasonHighsRepositoryInterface::class);
+        $repo = self::createStub(SeasonHighsRepositoryInterface::class);
         $repo->method('getSeasonHighsBatch')
             ->willReturnCallback(function (array $stats, string $suffix, string $start, string $end): array {
                 // Regular season: Nov 2024 to May 2025
@@ -95,7 +95,7 @@ class SeasonHighsServiceTest extends TestCase
 
     public function testPlayoffsUsesCorrectDateRange(): void
     {
-        $repo = $this->createStub(SeasonHighsRepositoryInterface::class);
+        $repo = self::createStub(SeasonHighsRepositoryInterface::class);
         $repo->method('getSeasonHighsBatch')
             ->willReturnCallback(function (array $stats, string $suffix, string $start, string $end): array {
                 // Playoffs: June 2025
@@ -111,7 +111,7 @@ class SeasonHighsServiceTest extends TestCase
 
     public function testSeasonHighsHandlesEntriesWithoutBoxId(): void
     {
-        $repo = $this->createStub(SeasonHighsRepositoryInterface::class);
+        $repo = self::createStub(SeasonHighsRepositoryInterface::class);
         $repo->method('getSeasonHighsBatch')
             ->willReturnCallback(function (array $stats): array {
                 $result = [];
@@ -149,7 +149,7 @@ class SeasonHighsServiceTest extends TestCase
 
     public function testGetHomeAwayHighsReturnsHomeAndAwayKeys(): void
     {
-        $repo = $this->createStub(SeasonHighsRepositoryInterface::class);
+        $repo = self::createStub(SeasonHighsRepositoryInterface::class);
         $repo->method('getSeasonHighsBatch')->willReturnCallback(self::emptyBatchFor(...));
         $season = $this->createStubSeason(2024, 2025);
         $service = new SeasonHighsService($repo, $season);
@@ -162,7 +162,7 @@ class SeasonHighsServiceTest extends TestCase
 
     public function testGetHomeAwayHighsHasEightStatCategories(): void
     {
-        $repo = $this->createStub(SeasonHighsRepositoryInterface::class);
+        $repo = self::createStub(SeasonHighsRepositoryInterface::class);
         $repo->method('getSeasonHighsBatch')->willReturnCallback(self::emptyBatchFor(...));
         $season = $this->createStubSeason(2024, 2025);
         $service = new SeasonHighsService($repo, $season);
@@ -229,7 +229,7 @@ class SeasonHighsServiceTest extends TestCase
 
     public function testValidateAgainstRcbReturnsEmptyWhenRcbEmpty(): void
     {
-        $repo = $this->createStub(SeasonHighsRepositoryInterface::class);
+        $repo = self::createStub(SeasonHighsRepositoryInterface::class);
         $repo->method('getRcbSeasonHighs')->willReturn([]);
         $season = $this->createStubSeason(2024, 2025);
         $service = new SeasonHighsService($repo, $season);
@@ -242,7 +242,7 @@ class SeasonHighsServiceTest extends TestCase
 
     public function testValidateAgainstRcbReturnsEmptyWhenBoxScoreEmpty(): void
     {
-        $repo = $this->createStub(SeasonHighsRepositoryInterface::class);
+        $repo = self::createStub(SeasonHighsRepositoryInterface::class);
         $repo->method('getRcbSeasonHighs')->willReturn([
             ['stat_category' => 'pts', 'ranking' => 1, 'player_name' => 'Test Player', 'player_position' => 'SF', 'stat_value' => 40, 'record_season_year' => 2024],
         ]);
@@ -257,7 +257,7 @@ class SeasonHighsServiceTest extends TestCase
 
     public function testValidateAgainstRcbDetectsValueDiscrepancy(): void
     {
-        $repo = $this->createStub(SeasonHighsRepositoryInterface::class);
+        $repo = self::createStub(SeasonHighsRepositoryInterface::class);
         $repo->method('getRcbSeasonHighs')->willReturn([
             ['stat_category' => 'pts', 'ranking' => 1, 'player_name' => 'Test Player', 'player_position' => 'SF', 'stat_value' => 50, 'record_season_year' => 2024],
         ]);
@@ -279,7 +279,7 @@ class SeasonHighsServiceTest extends TestCase
 
     public function testValidateAgainstRcbDetectsPlayerDiscrepancy(): void
     {
-        $repo = $this->createStub(SeasonHighsRepositoryInterface::class);
+        $repo = self::createStub(SeasonHighsRepositoryInterface::class);
         $repo->method('getRcbSeasonHighs')->willReturn([
             ['stat_category' => 'pts', 'ranking' => 1, 'player_name' => 'Other Player', 'player_position' => 'PG', 'stat_value' => 40, 'record_season_year' => 2024],
         ]);
@@ -299,7 +299,7 @@ class SeasonHighsServiceTest extends TestCase
 
     public function testValidateAgainstRcbAcceptsMatchingData(): void
     {
-        $repo = $this->createStub(SeasonHighsRepositoryInterface::class);
+        $repo = self::createStub(SeasonHighsRepositoryInterface::class);
         $repo->method('getRcbSeasonHighs')->willReturn([
             ['stat_category' => 'pts', 'ranking' => 1, 'player_name' => 'Test Player', 'player_position' => 'SF', 'stat_value' => 40, 'record_season_year' => 2024],
         ]);
@@ -317,7 +317,7 @@ class SeasonHighsServiceTest extends TestCase
 
     public function testValidateAgainstRcbHandlesTruncatedNames(): void
     {
-        $repo = $this->createStub(SeasonHighsRepositoryInterface::class);
+        $repo = self::createStub(SeasonHighsRepositoryInterface::class);
         $repo->method('getRcbSeasonHighs')->willReturn([
             ['stat_category' => 'pts', 'ranking' => 1, 'player_name' => 'Test Play', 'player_position' => 'SF', 'stat_value' => 40, 'record_season_year' => 2024],
         ]);
@@ -360,7 +360,7 @@ class SeasonHighsServiceTest extends TestCase
      */
     private function createStubSeason(int $beginningYear, int $endingYear): Season
     {
-        $season = $this->createStub(Season::class);
+        $season = self::createStub(Season::class);
         $season->beginningYear = $beginningYear;
         $season->endingYear = $endingYear;
 

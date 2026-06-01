@@ -20,8 +20,8 @@ class ParseJsbFilesStepTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->stubService = $this->createStub(JsbImportService::class);
-        $this->stubResolver = $this->createStub(JsbSourceResolverInterface::class);
+        $this->stubService = self::createStub(JsbImportService::class);
+        $this->stubResolver = self::createStub(JsbSourceResolverInterface::class);
     }
 
     private function createStep(): ParseJsbFilesStep

@@ -27,11 +27,11 @@ class TradingControllerReviewTest extends TestCase
     {
         $this->mockDb = new MockDatabase();
 
-        $this->stubService = $this->createStub(TradingServiceInterface::class);
-        $this->stubProcessor = $this->createStub(TradeProcessorInterface::class);
-        $this->stubOfferRepo = $this->createStub(TradeOfferRepositoryInterface::class);
-        $this->stubTradeOffer = $this->createStub(TradeOfferInterface::class);
-        $this->stubTeamIdentityRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
+        $this->stubService = self::createStub(TradingServiceInterface::class);
+        $this->stubProcessor = self::createStub(TradeProcessorInterface::class);
+        $this->stubOfferRepo = self::createStub(TradeOfferRepositoryInterface::class);
+        $this->stubTradeOffer = self::createStub(TradeOfferInterface::class);
+        $this->stubTeamIdentityRepo = self::createStub(TeamIdentityRepositoryInterface::class);
     }
 
     private function buildController(
@@ -44,9 +44,9 @@ class TradingControllerReviewTest extends TestCase
             $this->stubProcessor,
             $this->stubOfferRepo,
             $this->stubTradeOffer,
-            $view ?? $this->createStub(TradingViewInterface::class),
+            $view ?? self::createStub(TradingViewInterface::class),
             $this->stubTeamIdentityRepo,
-            $nukeCompat ?? $this->createStub(\Utilities\NukeCompat::class),
+            $nukeCompat ?? self::createStub(\Utilities\NukeCompat::class),
             $this->mockDb,
         );
     }
@@ -54,7 +54,7 @@ class TradingControllerReviewTest extends TestCase
     public function testRedirectsToLoginWhenUserNotAuthenticated(): void
     {
         $loginBoxCalled = false;
-        $nukeCompat = $this->createStub(\Utilities\NukeCompat::class);
+        $nukeCompat = self::createStub(\Utilities\NukeCompat::class);
         $nukeCompat->method('isUser')->willReturn(false);
         $nukeCompat->method('loginBox')->willReturnCallback(function () use (&$loginBoxCalled): void {
             $loginBoxCalled = true;

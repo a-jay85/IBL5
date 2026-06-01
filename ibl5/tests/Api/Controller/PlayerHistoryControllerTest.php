@@ -71,7 +71,7 @@ class PlayerHistoryControllerTest extends WideUnitTestCase
         $responder->expects($this->once())
             ->method('success')
             ->with(
-                $this->callback(function (array $data): bool {
+                self::callback(function (array $data): bool {
                     if (count($data) !== 2) {
                         return false;
                     }
@@ -101,11 +101,11 @@ class PlayerHistoryControllerTest extends WideUnitTestCase
                         && $first['stats']['personal_fouls'] === 170
                         && $first['salary'] === 4500000;
                 }),
-                $this->callback(function (array $meta): bool {
+                self::callback(function (array $meta): bool {
                     return $meta['total'] === 2;
                 }),
                 200,
-                $this->callback(function (array $headers): bool {
+                self::callback(function (array $headers): bool {
                     return isset($headers['ETag'])
                         && $headers['Cache-Control'] === 'public, max-age=60';
                 })
@@ -156,12 +156,12 @@ class PlayerHistoryControllerTest extends WideUnitTestCase
         $responder->expects($this->once())
             ->method('success')
             ->with(
-                $this->isArray(),
-                $this->callback(function (array $meta): bool {
+                self::isArray(),
+                self::callback(function (array $meta): bool {
                     return $meta['total'] === 2;
                 }),
                 200,
-                $this->isArray()
+                self::isArray()
             );
 
         $controller->handle(['uuid' => self::PLAYER_UUID], [], $responder);

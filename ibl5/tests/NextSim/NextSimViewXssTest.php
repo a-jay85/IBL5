@@ -23,12 +23,12 @@ final class NextSimViewXssTest extends TestCase
 
     protected function setUp(): void
     {
-        $mockSeason = $this->createStub(Season::class);
+        $mockSeason = self::createStub(Season::class);
         $mockSeason->lastSimEndDate = '2025-01-01';
 
         $this->view = new NextSimView($mockSeason);
 
-        $this->userTeam = $this->createStub(Team::class);
+        $this->userTeam = self::createStub(Team::class);
         $this->userTeam->teamid = 1;
         $this->userTeam->name = 'Safe Team';
         $this->userTeam->color1 = 'FF0000';
@@ -37,7 +37,7 @@ final class NextSimViewXssTest extends TestCase
 
         $this->userStarters = [];
         foreach (\JSB::PLAYER_POSITIONS as $position) {
-            $player = $this->createStub(Player::class);
+            $player = self::createStub(Player::class);
             $player->playerID = 100;
             $player->decoratedName = 'Safe Player';
             $player->position = $position;
@@ -53,14 +53,14 @@ final class NextSimViewXssTest extends TestCase
         $xss = '<script>alert(1)</script>';
         $escaped = '&lt;script&gt;';
 
-        $oppTeam = $this->createStub(Team::class);
+        $oppTeam = self::createStub(Team::class);
         $oppTeam->teamid = 2;
         $oppTeam->name = $xss;
         $oppTeam->color1 = '00FF00';
         $oppTeam->color2 = 'FFFF00';
         $oppTeam->seasonRecord = '5-5';
 
-        $game = $this->createStub(Game::class);
+        $game = self::createStub(Game::class);
         $game->date = '2025-01-02';
 
         $games = [

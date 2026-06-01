@@ -20,8 +20,8 @@ class ParsePlayerFileStepTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->stubService = $this->createStub(PlrParserServiceInterface::class);
-        $this->stubResolver = $this->createStub(JsbSourceResolverInterface::class);
+        $this->stubService = self::createStub(PlrParserServiceInterface::class);
+        $this->stubResolver = self::createStub(JsbSourceResolverInterface::class);
     }
 
     public function testImplementsPipelineStepInterface(): void

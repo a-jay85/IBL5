@@ -37,7 +37,7 @@ final class VotingSubmissionServiceTest extends TestCase
         $ballot = self::validEoyBallot();
         $ballot[$field] = 'Star Player, My Team';
 
-        $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
+        $service = new VotingSubmissionService(self::createStub(VotingRepositoryInterface::class));
         $result = $service->submitEoyVote('My Team', $ballot);
 
         $this->assertTrue($result->hasErrors());
@@ -62,7 +62,7 @@ final class VotingSubmissionServiceTest extends TestCase
         $ballot = self::validEoyBallot();
         $ballot[$field] = 'John Doe, My Team';
 
-        $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
+        $service = new VotingSubmissionService(self::createStub(VotingRepositoryInterface::class));
         $result = $service->submitEoyVote('My Team', $ballot);
 
         $this->assertTrue($result->hasErrors());
@@ -86,7 +86,7 @@ final class VotingSubmissionServiceTest extends TestCase
         $ballot = self::validEoyBallot();
         $ballot['mvp_1'] = '';
 
-        $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
+        $service = new VotingSubmissionService(self::createStub(VotingRepositoryInterface::class));
         $result = $service->submitEoyVote('Other Team', $ballot);
 
         $this->assertTrue($result->hasErrors());
@@ -98,7 +98,7 @@ final class VotingSubmissionServiceTest extends TestCase
         $ballot = self::validEoyBallot();
         $ballot['six_2'] = '';
 
-        $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
+        $service = new VotingSubmissionService(self::createStub(VotingRepositoryInterface::class));
         $result = $service->submitEoyVote('Other Team', $ballot);
 
         $this->assertTrue($result->hasErrors());
@@ -110,7 +110,7 @@ final class VotingSubmissionServiceTest extends TestCase
         $ballot = self::validEoyBallot();
         $ballot['roy_3'] = '';
 
-        $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
+        $service = new VotingSubmissionService(self::createStub(VotingRepositoryInterface::class));
         $result = $service->submitEoyVote('Other Team', $ballot);
 
         $this->assertTrue($result->hasErrors());
@@ -122,7 +122,7 @@ final class VotingSubmissionServiceTest extends TestCase
         $ballot = self::validEoyBallot();
         $ballot['gm_1'] = '';
 
-        $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
+        $service = new VotingSubmissionService(self::createStub(VotingRepositoryInterface::class));
         $result = $service->submitEoyVote('Other Team', $ballot);
 
         $this->assertTrue($result->hasErrors());
@@ -137,7 +137,7 @@ final class VotingSubmissionServiceTest extends TestCase
         $ballot['mvp_1'] = 'Same Player, Knicks';
         $ballot['mvp_2'] = 'Same Player, Knicks';
 
-        $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
+        $service = new VotingSubmissionService(self::createStub(VotingRepositoryInterface::class));
         $result = $service->submitEoyVote('Other Team', $ballot);
 
         $this->assertTrue($result->hasErrors());
@@ -150,7 +150,7 @@ final class VotingSubmissionServiceTest extends TestCase
         $ballot['six_1'] = 'Same Bench, Hawks';
         $ballot['six_3'] = 'Same Bench, Hawks';
 
-        $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
+        $service = new VotingSubmissionService(self::createStub(VotingRepositoryInterface::class));
         $result = $service->submitEoyVote('Other Team', $ballot);
 
         $this->assertTrue($result->hasErrors());
@@ -163,7 +163,7 @@ final class VotingSubmissionServiceTest extends TestCase
         $ballot['roy_2'] = 'Same Rookie, Nets';
         $ballot['roy_3'] = 'Same Rookie, Nets';
 
-        $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
+        $service = new VotingSubmissionService(self::createStub(VotingRepositoryInterface::class));
         $result = $service->submitEoyVote('Other Team', $ballot);
 
         $this->assertTrue($result->hasErrors());
@@ -176,7 +176,7 @@ final class VotingSubmissionServiceTest extends TestCase
         $ballot['gm_1'] = 'Same GM, Celtics';
         $ballot['gm_2'] = 'Same GM, Celtics';
 
-        $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
+        $service = new VotingSubmissionService(self::createStub(VotingRepositoryInterface::class));
         $result = $service->submitEoyVote('Other Team', $ballot);
 
         $this->assertTrue($result->hasErrors());
@@ -193,7 +193,7 @@ final class VotingSubmissionServiceTest extends TestCase
         $ballot['roy_1'] = 'Same Rookie, Nets';
         $ballot['roy_2'] = 'Same Rookie, Nets'; // duplicate
 
-        $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
+        $service = new VotingSubmissionService(self::createStub(VotingRepositoryInterface::class));
         $result = $service->submitEoyVote('Other Team', $ballot);
 
         $this->assertTrue($result->hasErrors());
@@ -266,7 +266,7 @@ final class VotingSubmissionServiceTest extends TestCase
         $ballot = self::validAsgBallot();
         $ballot['east_f1'] = 'Star Player, My Team';
 
-        $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
+        $service = new VotingSubmissionService(self::createStub(VotingRepositoryInterface::class));
         $result = $service->submitAsgVote('My Team', $ballot, self::validAsgRawPost());
 
         $this->assertTrue($result->hasErrors());
@@ -280,7 +280,7 @@ final class VotingSubmissionServiceTest extends TestCase
         $ballot = self::validAsgBallot();
         $ballot['west_f3'] = '';
 
-        $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
+        $service = new VotingSubmissionService(self::createStub(VotingRepositoryInterface::class));
         $result = $service->submitAsgVote('Other Team', $ballot, self::validAsgRawPost());
 
         $this->assertTrue($result->hasErrors());
@@ -296,7 +296,7 @@ final class VotingSubmissionServiceTest extends TestCase
         $rawPost = self::validAsgRawPost();
         $rawPost['ECF'] = ['p1', 'p2', 'p3', 'p4', 'p5']; // 5 is too many
 
-        $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
+        $service = new VotingSubmissionService(self::createStub(VotingRepositoryInterface::class));
         $result = $service->submitAsgVote('Other Team', $ballot, $rawPost);
 
         $this->assertTrue($result->hasErrors());
@@ -312,7 +312,7 @@ final class VotingSubmissionServiceTest extends TestCase
         $ballot['east_f1'] = 'Star, My Team'; // self-vote
         $ballot['west_b2'] = '';              // missing
 
-        $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
+        $service = new VotingSubmissionService(self::createStub(VotingRepositoryInterface::class));
         $result = $service->submitAsgVote('My Team', $ballot, self::validAsgRawPost());
 
         $this->assertTrue($result->hasErrors());
@@ -373,7 +373,7 @@ final class VotingSubmissionServiceTest extends TestCase
     public function testEoySuccessEmitsAuditLog(): void
     {
         $ballot = self::validEoyBallot();
-        $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
+        $service = new VotingSubmissionService(self::createStub(VotingRepositoryInterface::class));
         $service->submitEoyVote('Test Team', $ballot);
 
         $this->assertAuditLogEmitted('eoy_vote_submitted');
@@ -388,7 +388,7 @@ final class VotingSubmissionServiceTest extends TestCase
         $ballot = self::validEoyBallot();
         $ballot['mvp_1'] = '';
 
-        $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
+        $service = new VotingSubmissionService(self::createStub(VotingRepositoryInterface::class));
         $service->submitEoyVote('Other Team', $ballot);
 
         $this->assertAuditLogNotEmitted('eoy_vote_submitted');
@@ -397,7 +397,7 @@ final class VotingSubmissionServiceTest extends TestCase
     public function testAsgSuccessEmitsAuditLog(): void
     {
         $ballot = self::validAsgBallot();
-        $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
+        $service = new VotingSubmissionService(self::createStub(VotingRepositoryInterface::class));
         $service->submitAsgVote('Test Team', $ballot, self::validAsgRawPost());
 
         $this->assertAuditLogEmitted('asg_vote_submitted');
@@ -412,7 +412,7 @@ final class VotingSubmissionServiceTest extends TestCase
         $ballot = self::validAsgBallot();
         $ballot['east_f1'] = '';
 
-        $service = new VotingSubmissionService($this->createStub(VotingRepositoryInterface::class));
+        $service = new VotingSubmissionService(self::createStub(VotingRepositoryInterface::class));
         $service->submitAsgVote('Other Team', $ballot, self::validAsgRawPost());
 
         $this->assertAuditLogNotEmitted('asg_vote_submitted');

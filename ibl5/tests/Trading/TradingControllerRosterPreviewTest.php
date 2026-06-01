@@ -33,13 +33,13 @@ class TradingControllerRosterPreviewTest extends TestCase
         ?TeamIdentityRepositoryInterface $teamIdentityRepo = null,
     ): TradingController {
         return new TradingController(
-            $this->createStub(TradingServiceInterface::class),
-            $this->createStub(TradeProcessorInterface::class),
-            $this->createStub(TradeOfferRepositoryInterface::class),
-            $this->createStub(TradeOfferInterface::class),
-            $this->createStub(TradingViewInterface::class),
-            $teamIdentityRepo ?? $this->createStub(TeamIdentityRepositoryInterface::class),
-            $nukeCompat ?? $this->createStub(\Utilities\NukeCompat::class),
+            self::createStub(TradingServiceInterface::class),
+            self::createStub(TradeProcessorInterface::class),
+            self::createStub(TradeOfferRepositoryInterface::class),
+            self::createStub(TradeOfferInterface::class),
+            self::createStub(TradingViewInterface::class),
+            $teamIdentityRepo ?? self::createStub(TeamIdentityRepositoryInterface::class),
+            $nukeCompat ?? self::createStub(\Utilities\NukeCompat::class),
             $this->mockDb,
         );
     }
@@ -58,7 +58,7 @@ class TradingControllerRosterPreviewTest extends TestCase
 
     public function testReturnsEmptyHtmlJsonWhenNotAuthenticated(): void
     {
-        $nukeCompat = $this->createStub(\Utilities\NukeCompat::class);
+        $nukeCompat = self::createStub(\Utilities\NukeCompat::class);
         $nukeCompat->method('isUser')->willReturn(false);
 
         $controller = $this->buildController(nukeCompat: $nukeCompat);
@@ -73,7 +73,7 @@ class TradingControllerRosterPreviewTest extends TestCase
 
     public function testDelegatesHandlerForAuthenticatedUser(): void
     {
-        $nukeCompat = $this->createStub(\Utilities\NukeCompat::class);
+        $nukeCompat = self::createStub(\Utilities\NukeCompat::class);
         $nukeCompat->method('isUser')->willReturn(true);
         $nukeCompat->method('cookieDecode')->willReturn(['', 'testuser']);
 

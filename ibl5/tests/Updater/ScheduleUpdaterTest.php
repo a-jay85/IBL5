@@ -29,12 +29,12 @@ class ScheduleUpdaterTest extends TestCase
         bool $olympics = false,
         ?JsbSourceResolverInterface $sourceResolver = null,
     ): TestableScheduleUpdater {
-        $season = $this->createStub(Season::class);
+        $season = self::createStub(Season::class);
         $season->endingYear = $endingYear;
         $season->beginningYear = $endingYear - 1;
         $season->phase = $phase;
 
-        $leagueContext = $this->createStub(LeagueContext::class);
+        $leagueContext = self::createStub(LeagueContext::class);
         $leagueContext->method('getCurrentLeague')->willReturn($olympics ? 'olympics' : 'IBL');
         $leagueContext->method('isOlympics')->willReturn($olympics);
         $leagueContext->method('getTableName')->willReturnCallback(
@@ -106,7 +106,7 @@ class ScheduleUpdaterTest extends TestCase
     private function createUpdaterForFullRun(array $teams, array $games): TestableScheduleUpdater
     {
         $this->mockDb->setMockData($teams);
-        $resolver = $this->createStub(JsbSourceResolverInterface::class);
+        $resolver = self::createStub(JsbSourceResolverInterface::class);
         $resolver->method('getContents')->willReturn($this->buildSchBytes($games));
 
         return $this->createUpdater(sourceResolver: $resolver);

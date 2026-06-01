@@ -29,9 +29,9 @@ class YourAccountServiceTest extends TestCase
     {
         $this->setUpAuthLogCapture();
 
-        $this->stubAuthService = $this->createStub(AuthServiceInterface::class);
-        $this->stubCommonRepository = $this->createStub(TeamIdentityRepositoryInterface::class);
-        $this->stubMailService = $this->createStub(MailServiceInterface::class);
+        $this->stubAuthService = self::createStub(AuthServiceInterface::class);
+        $this->stubCommonRepository = self::createStub(TeamIdentityRepositoryInterface::class);
+        $this->stubMailService = self::createStub(MailServiceInterface::class);
 
         $this->service = $this->buildService();
     }
@@ -151,7 +151,7 @@ class YourAccountServiceTest extends TestCase
             ->with(
                 'user@test.com',
                 'New User Account Activation',
-                $this->stringContains('newuser'),
+                self::stringContains('newuser'),
                 'admin@iblhoops.net',
             );
 
@@ -288,15 +288,15 @@ class YourAccountServiceTest extends TestCase
         $mockMail->expects($this->once())
             ->method('send')
             ->with(
-                $this->anything(),
-                $this->anything(),
-                $this->logicalAnd(
-                    $this->stringContains('confirm_email'),
-                    $this->stringContains('my-selector'),
-                    $this->stringContains('my-token'),
-                    $this->stringContains('https://iblhoops.net'),
+                self::anything(),
+                self::anything(),
+                self::logicalAnd(
+                    self::stringContains('confirm_email'),
+                    self::stringContains('my-selector'),
+                    self::stringContains('my-token'),
+                    self::stringContains('https://iblhoops.net'),
                 ),
-                $this->anything(),
+                self::anything(),
             );
 
         $this->service = $this->buildService(authService: $mockAuth, mailService: $mockMail);
@@ -381,11 +381,11 @@ class YourAccountServiceTest extends TestCase
             ->method('send')
             ->with(
                 'user@test.com',
-                $this->stringContains('Password Reset'),
-                $this->logicalAnd(
-                    $this->stringContains('sel-reset'),
-                    $this->stringContains('tok-reset'),
-                    $this->stringContains('reset_password'),
+                self::stringContains('Password Reset'),
+                self::logicalAnd(
+                    self::stringContains('sel-reset'),
+                    self::stringContains('tok-reset'),
+                    self::stringContains('reset_password'),
                 ),
                 'admin@iblhoops.net',
             );

@@ -16,7 +16,7 @@ class SettingsServiceTest extends TestCase
         string $showDraftLink = 'Off',
         string $freeAgencyNotificationsState = ''
     ): Season {
-        $season = $this->createStub(Season::class);
+        $season = self::createStub(Season::class);
         $season->allowTrades = $allowTrades;
         $season->allowWaivers = $allowWaivers;
         $season->showDraftLink = $showDraftLink;

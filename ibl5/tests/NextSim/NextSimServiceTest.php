@@ -23,7 +23,7 @@ class NextSimServiceTest extends TestCase
     {
         $this->mockDb = new MockDatabase();
         $GLOBALS['mysqli_db'] = $this->mockDb;
-        $this->stubRepository = $this->createStub(TeamScheduleRepositoryInterface::class);
+        $this->stubRepository = self::createStub(TeamScheduleRepositoryInterface::class);
     }
 
     protected function tearDown(): void

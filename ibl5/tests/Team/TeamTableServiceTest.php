@@ -145,7 +145,7 @@ class TeamTableServiceTest extends TestCase
 
     private function createSeasonStub(string $phase): Season
     {
-        $season = $this->createStub(Season::class);
+        $season = self::createStub(Season::class);
         $season->phase = $phase;
         return $season;
     }

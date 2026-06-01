@@ -37,7 +37,7 @@ final class RecordBreakingDetectorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->mockRepository = $this->createStub(RecordHoldersRepositoryInterface::class);
+        $this->mockRepository = self::createStub(RecordHoldersRepositoryInterface::class);
         $this->detector = new RecordBreakingDetector($this->mockRepository);
     }
 

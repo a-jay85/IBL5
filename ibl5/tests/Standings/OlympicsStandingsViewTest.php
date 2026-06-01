@@ -18,7 +18,7 @@ class OlympicsStandingsViewTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->stubRepository = $this->createStub(StandingsRepositoryInterface::class);
+        $this->stubRepository = self::createStub(StandingsRepositoryInterface::class);
     }
 
     /**

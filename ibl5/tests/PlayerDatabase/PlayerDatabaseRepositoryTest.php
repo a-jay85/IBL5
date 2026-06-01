@@ -33,7 +33,7 @@ final class PlayerDatabaseRepositoryTest extends TestCase
 
         $this->mockDb->expects($this->once())
             ->method('prepare')
-            ->with($this->callback(function ($query) {
+            ->with(self::callback(function ($query) {
                 $q = str_replace('`', '', $query);
                 return strpos($q, 'SELECT ibl_plr.*') !== false
                     && strpos($q, 'LEFT JOIN ibl_team_info') !== false
@@ -109,7 +109,7 @@ final class PlayerDatabaseRepositoryTest extends TestCase
 
         $this->mockDb->expects($this->once())
             ->method('prepare')
-            ->with($this->callback(function ($query) {
+            ->with(self::callback(function ($query) {
                 return strpos($query, 'retired = 0') !== false;
             }))
             ->willReturn($mockStmt);
@@ -142,7 +142,7 @@ final class PlayerDatabaseRepositoryTest extends TestCase
 
         $this->mockDb->expects($this->once())
             ->method('prepare')
-            ->with($this->callback(function ($query) {
+            ->with(self::callback(function ($query) {
                 return strpos($query, 'name LIKE ?') !== false;
             }))
             ->willReturn($mockStmt);
@@ -164,7 +164,7 @@ final class PlayerDatabaseRepositoryTest extends TestCase
 
         $this->mockDb->expects($this->once())
             ->method('prepare')
-            ->with($this->callback(function ($query) {
+            ->with(self::callback(function ($query) {
                 return strpos($query, 'college LIKE ?') !== false;
             }))
             ->willReturn($mockStmt);
@@ -186,7 +186,7 @@ final class PlayerDatabaseRepositoryTest extends TestCase
 
         $this->mockDb->expects($this->once())
             ->method('prepare')
-            ->with($this->callback(function ($query) {
+            ->with(self::callback(function ($query) {
                 return strpos($query, 'pos = ?') !== false;
             }))
             ->willReturn($mockStmt);
@@ -208,7 +208,7 @@ final class PlayerDatabaseRepositoryTest extends TestCase
 
         $this->mockDb->expects($this->once())
             ->method('prepare')
-            ->with($this->callback(function ($query) {
+            ->with(self::callback(function ($query) {
                 return strpos($query, 'age <= ?') !== false;
             }))
             ->willReturn($mockStmt);
@@ -230,7 +230,7 @@ final class PlayerDatabaseRepositoryTest extends TestCase
 
         $this->mockDb->expects($this->once())
             ->method('prepare')
-            ->with($this->callback(function ($query) {
+            ->with(self::callback(function ($query) {
                 return strpos($query, 'oo >= ?') !== false;
             }))
             ->willReturn($mockStmt);
@@ -258,7 +258,7 @@ final class PlayerDatabaseRepositoryTest extends TestCase
 
         $this->mockDb->expects($this->once())
             ->method('prepare')
-            ->with($this->callback(function ($query) {
+            ->with(self::callback(function ($query) {
                 return strpos($query, 'WHERE pid = ?') !== false;
             }))
             ->willReturn($mockStmt);
@@ -316,7 +316,7 @@ final class PlayerDatabaseRepositoryTest extends TestCase
         if ($expectedBindTypes !== null) {
             $mockStmt->expects($this->once())
                 ->method('bind_param')
-                ->with($expectedBindTypes, $this->anything())
+                ->with($expectedBindTypes, self::anything())
                 ->willReturn(true);
         }
 

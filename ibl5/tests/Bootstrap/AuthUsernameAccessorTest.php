@@ -17,7 +17,7 @@ final class AuthUsernameAccessorTest extends TestCase
 
     public function testAuthUsernameResolvesToUsernameWhenAuthenticated(): void
     {
-        $mockAuth = $this->createStub(AuthServiceInterface::class);
+        $mockAuth = self::createStub(AuthServiceInterface::class);
         $mockAuth->method('getUsername')->willReturn('testuser');
 
         $container = new Container();
@@ -29,7 +29,7 @@ final class AuthUsernameAccessorTest extends TestCase
 
     public function testAuthUsernameResolvesToEmptyStringWhenNotAuthenticated(): void
     {
-        $mockAuth = $this->createStub(AuthServiceInterface::class);
+        $mockAuth = self::createStub(AuthServiceInterface::class);
         $mockAuth->method('getUsername')->willReturn(null);
 
         $container = new Container();

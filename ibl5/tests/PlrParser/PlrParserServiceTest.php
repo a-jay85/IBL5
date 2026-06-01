@@ -24,9 +24,9 @@ class PlrParserServiceTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->stubRepository = $this->createStub(PlrParserRepositoryInterface::class);
+        $this->stubRepository = self::createStub(PlrParserRepositoryInterface::class);
 
-        $this->stubSeason = $this->createStub(Season::class);
+        $this->stubSeason = self::createStub(Season::class);
         $this->stubSeason->endingYear = 2026;
 
         $this->service = new PlrParserService(
@@ -733,7 +733,7 @@ class PlrParserServiceTest extends TestCase
         $mockRepo = $this->createMock(PlrParserRepositoryInterface::class);
         $mockRepo->expects($this->once())
             ->method('upsertSnapshot')
-            ->with($this->callback(static function (array $data): bool {
+            ->with(self::callback(static function (array $data): bool {
                 // Season stats
                 return array_key_exists('stats_gs', $data)
                     && array_key_exists('stats_pts', $data)

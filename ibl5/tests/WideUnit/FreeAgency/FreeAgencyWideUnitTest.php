@@ -32,7 +32,7 @@ class FreeAgencyWideUnitTest extends WideUnitTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->processor = new FreeAgencyProcessor($this->mockDb, $this->createStub(TeamIdentityRepositoryInterface::class));
+        $this->processor = new FreeAgencyProcessor($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class));
 
         // Prevent Discord notifications during tests
         $_SERVER['SERVER_NAME'] = 'localhost';

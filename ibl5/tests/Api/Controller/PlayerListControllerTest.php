@@ -86,7 +86,7 @@ class PlayerListControllerTest extends WideUnitTestCase
         $responder->expects($this->once())
             ->method('success')
             ->with(
-                $this->callback(function (array $data): bool {
+                self::callback(function (array $data): bool {
                     if (count($data) !== 1) {
                         return false;
                     }
@@ -105,9 +105,9 @@ class PlayerListControllerTest extends WideUnitTestCase
                         && $first['stats']['games_played'] === 55
                         && $first['stats']['points_per_game'] === 27.5;
                 }),
-                $this->isArray(),
+                self::isArray(),
                 200,
-                $this->isArray()
+                self::isArray()
             );
 
         $controller->handle([], [], $responder);

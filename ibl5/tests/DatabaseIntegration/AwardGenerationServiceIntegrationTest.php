@@ -29,7 +29,7 @@ class AwardGenerationServiceIntegrationTest extends DatabaseTestCase
         parent::setUp();
 
         $repository = new LeagueControlPanelRepository($this->db);
-        $this->stubVoting = $this->createStub(VotingResultsServiceInterface::class);
+        $this->stubVoting = self::createStub(VotingResultsServiceInterface::class);
         $this->service = new AwardGenerationService($repository, $this->stubVoting);
 
         $this->tempDir = sys_get_temp_dir() . '/award_gen_int_' . uniqid();

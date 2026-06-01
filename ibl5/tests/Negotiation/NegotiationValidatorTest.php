@@ -27,7 +27,7 @@ class NegotiationValidatorTest extends TestCase
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->mockSeason = $this->createStub(\Season\Season::class);
+        $this->mockSeason = self::createStub(\Season\Season::class);
         $this->mockSeason->phase = 'Regular Season';
         $this->mockSeason->endingYear = 2026;
         $this->mockSeason->beginningYear = 2025;

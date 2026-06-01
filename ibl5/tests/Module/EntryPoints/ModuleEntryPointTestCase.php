@@ -156,7 +156,7 @@ abstract class ModuleEntryPointTestCase extends WideUnitTestCase
     private function setDefaultGlobals(): void
     {
         // Auth stub — unauthenticated by default
-        $authStub = $this->createStub(\Auth\Contracts\AuthServiceInterface::class);
+        $authStub = self::createStub(\Auth\Contracts\AuthServiceInterface::class);
         $authStub->method('isAuthenticated')->willReturn(false);
         $authStub->method('isAdmin')->willReturn(false);
         $authStub->method('getCookieArray')->willReturn(null);
@@ -164,7 +164,7 @@ abstract class ModuleEntryPointTestCase extends WideUnitTestCase
 
         // League context stub. getConfig() must return the keys callers read
         // (notably 'images_path' for views that render team logos).
-        $lcStub = $this->createStub(\League\LeagueContext::class);
+        $lcStub = self::createStub(\League\LeagueContext::class);
         $lcStub->method('getConfig')->willReturn([
             'title' => 'Internet Basketball League',
             'short_name' => 'IBL',
@@ -228,7 +228,7 @@ abstract class ModuleEntryPointTestCase extends WideUnitTestCase
      */
     protected function authenticateAs(string $username): void
     {
-        $authStub = $this->createStub(\Auth\Contracts\AuthServiceInterface::class);
+        $authStub = self::createStub(\Auth\Contracts\AuthServiceInterface::class);
         $authStub->method('isAuthenticated')->willReturn(true);
         $authStub->method('isAdmin')->willReturn(false);
         $authStub->method('getCookieArray')->willReturn([$username, $username, '']);

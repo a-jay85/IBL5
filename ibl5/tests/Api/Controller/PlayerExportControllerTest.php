@@ -72,7 +72,7 @@ class PlayerExportControllerTest extends WideUnitTestCase
         ]);
 
         $controller = new PlayerExportController($this->mockDb);
-        $responder = $this->createStub(JsonResponder::class);
+        $responder = self::createStub(JsonResponder::class);
 
         $output = $this->captureOutput(function () use ($controller, $responder): void {
             $controller->handle([], [], $responder);
@@ -92,7 +92,7 @@ class PlayerExportControllerTest extends WideUnitTestCase
         ]);
 
         $controller = new PlayerExportController($this->mockDb);
-        $responder = $this->createStub(JsonResponder::class);
+        $responder = self::createStub(JsonResponder::class);
 
         $output = $this->captureOutput(function () use ($controller, $responder): void {
             $controller->handle([], [], $responder);
@@ -118,7 +118,7 @@ class PlayerExportControllerTest extends WideUnitTestCase
         ]);
 
         $controller = new PlayerExportController($this->mockDb);
-        $responder = $this->createStub(JsonResponder::class);
+        $responder = self::createStub(JsonResponder::class);
 
         $output = $this->captureOutput(function () use ($controller, $responder): void {
             $controller->handle([], [], $responder);

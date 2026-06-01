@@ -40,14 +40,14 @@ class UpdaterServiceTest extends TestCase
     {
         $executionOrder = [];
 
-        $step1 = $this->createStub(PipelineStepInterface::class);
+        $step1 = self::createStub(PipelineStepInterface::class);
         $step1->method('getLabel')->willReturn('Step 1');
         $step1->method('execute')->willReturnCallback(static function () use (&$executionOrder): StepResult {
             $executionOrder[] = 'Step 1';
             return StepResult::success('Step 1');
         });
 
-        $step2 = $this->createStub(PipelineStepInterface::class);
+        $step2 = self::createStub(PipelineStepInterface::class);
         $step2->method('getLabel')->willReturn('Step 2');
         $step2->method('execute')->willReturnCallback(static function () use (&$executionOrder): StepResult {
             $executionOrder[] = 'Step 2';
@@ -69,7 +69,7 @@ class UpdaterServiceTest extends TestCase
     {
         $events = [];
 
-        $step = $this->createStub(PipelineStepInterface::class);
+        $step = self::createStub(PipelineStepInterface::class);
         $step->method('getLabel')->willReturn('Test Step');
         $step->method('execute')->willReturnCallback(static function () use (&$events): StepResult {
             $events[] = 'execute';
@@ -92,15 +92,15 @@ class UpdaterServiceTest extends TestCase
 
     public function testRunCountsSuccessesAndErrors(): void
     {
-        $successStep = $this->createStub(PipelineStepInterface::class);
+        $successStep = self::createStub(PipelineStepInterface::class);
         $successStep->method('getLabel')->willReturn('Success');
         $successStep->method('execute')->willReturn(StepResult::success('Success'));
 
-        $failStep = $this->createStub(PipelineStepInterface::class);
+        $failStep = self::createStub(PipelineStepInterface::class);
         $failStep->method('getLabel')->willReturn('Fail');
         $failStep->method('execute')->willReturn(StepResult::failure('Fail', 'Error'));
 
-        $skipStep = $this->createStub(PipelineStepInterface::class);
+        $skipStep = self::createStub(PipelineStepInterface::class);
         $skipStep->method('getLabel')->willReturn('Skip');
         $skipStep->method('execute')->willReturn(StepResult::skipped('Skip', 'No file'));
 
@@ -120,11 +120,11 @@ class UpdaterServiceTest extends TestCase
 
     public function testRunContinuesAfterStepFailure(): void
     {
-        $failStep = $this->createStub(PipelineStepInterface::class);
+        $failStep = self::createStub(PipelineStepInterface::class);
         $failStep->method('getLabel')->willReturn('Failing');
         $failStep->method('execute')->willReturn(StepResult::failure('Failing', 'Boom'));
 
-        $afterStep = $this->createStub(PipelineStepInterface::class);
+        $afterStep = self::createStub(PipelineStepInterface::class);
         $afterStep->method('getLabel')->willReturn('After');
         $afterStep->method('execute')->willReturn(StepResult::success('After'));
 
@@ -143,11 +143,11 @@ class UpdaterServiceTest extends TestCase
 
     public function testRunCatchesExceptionsAndContinues(): void
     {
-        $throwingStep = $this->createStub(PipelineStepInterface::class);
+        $throwingStep = self::createStub(PipelineStepInterface::class);
         $throwingStep->method('getLabel')->willReturn('Thrower');
         $throwingStep->method('execute')->willThrowException(new \RuntimeException('Database gone'));
 
-        $afterStep = $this->createStub(PipelineStepInterface::class);
+        $afterStep = self::createStub(PipelineStepInterface::class);
         $afterStep->method('getLabel')->willReturn('After');
         $afterStep->method('execute')->willReturn(StepResult::success('After'));
 
@@ -168,7 +168,7 @@ class UpdaterServiceTest extends TestCase
 
     public function testRunResetsCountsBetweenRuns(): void
     {
-        $step = $this->createStub(PipelineStepInterface::class);
+        $step = self::createStub(PipelineStepInterface::class);
         $step->method('getLabel')->willReturn('Test');
         $step->method('execute')->willReturn(StepResult::success('Test'));
 
@@ -194,7 +194,7 @@ class UpdaterServiceTest extends TestCase
     public function testRunReturnsResultsInStepOrder(): void
     {
         for ($i = 1; $i <= 3; $i++) {
-            $step = $this->createStub(PipelineStepInterface::class);
+            $step = self::createStub(PipelineStepInterface::class);
             $step->method('getLabel')->willReturn('Step ' . $i);
             $step->method('execute')->willReturn(StepResult::success('Step ' . $i));
             $this->service->addStep($step);

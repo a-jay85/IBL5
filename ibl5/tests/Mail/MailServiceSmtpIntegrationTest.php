@@ -28,7 +28,7 @@ class MailServiceSmtpIntegrationTest extends TestCase
     {
         if (!$this->isMailpitReachable()) {
             // phpunit-hygiene-allow: integration test skips when Mailpit SMTP is unreachable on localhost:1025
-            $this->markTestSkipped('Mailpit is not reachable at localhost:1025');
+            self::markTestSkipped('Mailpit is not reachable at localhost:1025');
         }
 
         $this->deleteAllMailpitMessages();
@@ -131,19 +131,19 @@ class MailServiceSmtpIntegrationTest extends TestCase
     {
         $ch = curl_init(self::MAILPIT_API_URL . '/messages');
         if ($ch === false) {
-            $this->fail('Failed to initialize curl for Mailpit API');
+            self::fail('Failed to initialize curl for Mailpit API');
         }
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         $response = curl_exec($ch);
         unset($ch);
 
         if (!is_string($response)) {
-            $this->fail('Mailpit API returned non-string response');
+            self::fail('Mailpit API returned non-string response');
         }
 
         $data = json_decode($response, true);
         if (!is_array($data) || !isset($data['messages'])) {
-            $this->fail('Mailpit API returned unexpected format');
+            self::fail('Mailpit API returned unexpected format');
         }
 
         /** @var list<array{ID: string, Subject: string, From: array{Address: string, Name: string}, To: list<array{Address: string, Name: string}>}> */
@@ -157,19 +157,19 @@ class MailServiceSmtpIntegrationTest extends TestCase
     {
         $ch = curl_init(self::MAILPIT_API_URL . '/message/' . $id);
         if ($ch === false) {
-            $this->fail('Failed to initialize curl for Mailpit message API');
+            self::fail('Failed to initialize curl for Mailpit message API');
         }
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         $response = curl_exec($ch);
         unset($ch);
 
         if (!is_string($response)) {
-            $this->fail('Mailpit message API returned non-string response');
+            self::fail('Mailpit message API returned non-string response');
         }
 
         $data = json_decode($response, true);
         if (!is_array($data)) {
-            $this->fail('Mailpit message API returned unexpected format');
+            self::fail('Mailpit message API returned unexpected format');
         }
 
         /** @var array{Text: string, HTML: string} */

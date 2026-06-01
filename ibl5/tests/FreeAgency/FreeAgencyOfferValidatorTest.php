@@ -571,7 +571,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
 
     private function createTeamStub(int $hasMLE = 0, int $hasLLE = 0, int $teamid = 1): Team
     {
-        $team = $this->createStub(Team::class);
+        $team = self::createStub(Team::class);
         $team->has_mle = $hasMLE;
         $team->has_lle = $hasLLE;
         $team->teamid = $teamid;
@@ -583,7 +583,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
      */
     private function createRepositoryStub(bool $pendingMle = false, bool $pendingLle = false): FreeAgencyRepositoryInterface
     {
-        $repository = $this->createStub(FreeAgencyRepositoryInterface::class);
+        $repository = self::createStub(FreeAgencyRepositoryInterface::class);
         $repository->method('hasPendingMleOffer')->willReturn($pendingMle);
         $repository->method('hasPendingLleOffer')->willReturn($pendingLle);
         return $repository;

@@ -25,8 +25,8 @@ class AwardGenerationServiceTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->stubRepository = $this->createStub(LeagueControlPanelRepositoryInterface::class);
-        $this->stubVotingService = $this->createStub(VotingResultsServiceInterface::class);
+        $this->stubRepository = self::createStub(LeagueControlPanelRepositoryInterface::class);
+        $this->stubVotingService = self::createStub(VotingResultsServiceInterface::class);
         $this->service = new AwardGenerationService($this->stubRepository, $this->stubVotingService);
         $this->tempDir = sys_get_temp_dir() . '/award_gen_test_' . uniqid();
         mkdir($this->tempDir);
@@ -101,7 +101,7 @@ class AwardGenerationServiceTest extends TestCase
     public function testInsertsGmOfTheYear(): void
     {
         $mockRepository = $this->createMock(LeagueControlPanelRepositoryInterface::class);
-        $stubVotingService = $this->createStub(VotingResultsServiceInterface::class);
+        $stubVotingService = self::createStub(VotingResultsServiceInterface::class);
         $service = new AwardGenerationService($mockRepository, $stubVotingService);
 
         $stubVotingService->method('getEndOfYearResults')->willReturn([

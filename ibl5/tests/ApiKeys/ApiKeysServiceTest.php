@@ -41,7 +41,7 @@ class ApiKeysServiceTest extends TestCase
 
     public function testGenerateKeyForUserThrowsWhenActiveKeyExists(): void
     {
-        $stubRepo = $this->createStub(ApiKeysRepositoryInterface::class);
+        $stubRepo = self::createStub(ApiKeysRepositoryInterface::class);
         $stubRepo->method('findByUserId')->willReturn([
             'key_prefix' => 'ibl_test',
             'permission_level' => 'public',
@@ -84,7 +84,7 @@ class ApiKeysServiceTest extends TestCase
 
         $mockRepo->expects($this->once())
             ->method('createKey')
-            ->with(42, $this->anything(), $this->anything(), 'someGM');
+            ->with(42, self::anything(), self::anything(), 'someGM');
 
         $service = new ApiKeysService($mockRepo);
         $service->generateKeyForUser(42, 'someGM');
@@ -103,7 +103,7 @@ class ApiKeysServiceTest extends TestCase
 
     public function testGetUserKeyStatusReturnsNullWhenNoKey(): void
     {
-        $stubRepo = $this->createStub(ApiKeysRepositoryInterface::class);
+        $stubRepo = self::createStub(ApiKeysRepositoryInterface::class);
         $stubRepo->method('findByUserId')->willReturn(null);
 
         $service = new ApiKeysService($stubRepo);
@@ -112,7 +112,7 @@ class ApiKeysServiceTest extends TestCase
 
     public function testGetUserKeyStatusReturnsNullForInactiveKey(): void
     {
-        $stubRepo = $this->createStub(ApiKeysRepositoryInterface::class);
+        $stubRepo = self::createStub(ApiKeysRepositoryInterface::class);
         $stubRepo->method('findByUserId')->willReturn([
             'key_prefix' => 'ibl_test',
             'permission_level' => 'public',
@@ -136,7 +136,7 @@ class ApiKeysServiceTest extends TestCase
             'created_at' => '2026-01-01 00:00:00',
             'last_used_at' => '2026-03-20 10:00:00',
         ];
-        $stubRepo = $this->createStub(ApiKeysRepositoryInterface::class);
+        $stubRepo = self::createStub(ApiKeysRepositoryInterface::class);
         $stubRepo->method('findByUserId')->willReturn($keyData);
 
         $service = new ApiKeysService($stubRepo);
@@ -165,7 +165,7 @@ class ApiKeysServiceTest extends TestCase
 
     public function testGenerateKeyEmitsAuditLogWithKeyPrefixNotRawKey(): void
     {
-        $stubRepo = $this->createStub(ApiKeysRepositoryInterface::class);
+        $stubRepo = self::createStub(ApiKeysRepositoryInterface::class);
         $stubRepo->method('findByUserId')->willReturn(null);
 
         $service = new ApiKeysService($stubRepo);
@@ -183,7 +183,7 @@ class ApiKeysServiceTest extends TestCase
 
     public function testRevokeKeyEmitsAuditLog(): void
     {
-        $stubRepo = $this->createStub(ApiKeysRepositoryInterface::class);
+        $stubRepo = self::createStub(ApiKeysRepositoryInterface::class);
 
         $service = new ApiKeysService($stubRepo);
         $service->revokeKeyForUser(5);

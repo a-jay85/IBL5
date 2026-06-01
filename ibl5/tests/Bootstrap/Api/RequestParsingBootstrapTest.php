@@ -16,7 +16,7 @@ final class RequestParsingBootstrapTest extends TestCase
     protected function setUp(): void
     {
         $this->container = new Container();
-        $this->container->set('api.responder', $this->createStub(JsonResponder::class));
+        $this->container->set('api.responder', self::createStub(JsonResponder::class));
     }
 
     public function testGetRequestSetsMethodAndRoute(): void

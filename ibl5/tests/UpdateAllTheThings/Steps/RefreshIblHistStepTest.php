@@ -12,13 +12,13 @@ class RefreshIblHistStepTest extends TestCase
 {
     public function testImplementsPipelineStepInterface(): void
     {
-        $stub = $this->createStub(\mysqli::class);
+        $stub = self::createStub(\mysqli::class);
         $this->assertInstanceOf(PipelineStepInterface::class, new RefreshIblHistStep($stub));
     }
 
     public function testGetLabelReturnsExpectedLabel(): void
     {
-        $stub = $this->createStub(\mysqli::class);
+        $stub = self::createStub(\mysqli::class);
         $this->assertSame('ibl_hist refreshed', (new RefreshIblHistStep($stub))->getLabel());
     }
 }

@@ -258,6 +258,6 @@ class ExtensionRepositoryTest extends TestCase
                 return;
             }
         }
-        $this->fail("Expected a query containing '{$substring}' but none was found. Queries: " . implode("\n", $queries));
+        self::fail("Expected a query containing '{$substring}' but none was found. Queries: " . implode("\n", $queries));
     }
 }

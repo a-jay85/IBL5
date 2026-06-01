@@ -17,7 +17,7 @@ class LeagueControlPanelServiceTest extends TestCase
 {
     public function testImplementsInterface(): void
     {
-        $stub = $this->createStub(LeagueControlPanelRepositoryInterface::class);
+        $stub = self::createStub(LeagueControlPanelRepositoryInterface::class);
         $stub->method('getBulkSettings')->willReturn([]);
         $stub->method('getSimLengthInDays')->willReturn(3);
 
@@ -28,7 +28,7 @@ class LeagueControlPanelServiceTest extends TestCase
 
     public function testGetPanelDataReturnsCompleteShape(): void
     {
-        $stub = $this->createStub(LeagueControlPanelRepositoryInterface::class);
+        $stub = self::createStub(LeagueControlPanelRepositoryInterface::class);
         $stub->method('getBulkSettings')->willReturn([
             'Current Season Phase' => 'Regular Season',
             'Allow Trades' => 'Yes',
@@ -55,7 +55,7 @@ class LeagueControlPanelServiceTest extends TestCase
 
     public function testGetPanelDataDefaultsForMissingSettings(): void
     {
-        $stub = $this->createStub(LeagueControlPanelRepositoryInterface::class);
+        $stub = self::createStub(LeagueControlPanelRepositoryInterface::class);
         $stub->method('getBulkSettings')->willReturn([]);
         $stub->method('getSimLengthInDays')->willReturn(3);
 
@@ -74,7 +74,7 @@ class LeagueControlPanelServiceTest extends TestCase
 
     public function testGetPanelDataCastsEndingYearToInt(): void
     {
-        $stub = $this->createStub(LeagueControlPanelRepositoryInterface::class);
+        $stub = self::createStub(LeagueControlPanelRepositoryInterface::class);
         $stub->method('getBulkSettings')->willReturn([
             'Current Season Ending Year' => '2025',
         ]);
@@ -88,7 +88,7 @@ class LeagueControlPanelServiceTest extends TestCase
 
     public function testGetPanelDataOlympicsReturnsDefaultsForIblOnlySettings(): void
     {
-        $stub = $this->createStub(LeagueControlPanelRepositoryInterface::class);
+        $stub = self::createStub(LeagueControlPanelRepositoryInterface::class);
         $stub->method('getBulkSettings')->willReturn([
             'Current Season Phase' => 'Regular Season',
             'Current Season Ending Year' => '2026',
@@ -107,7 +107,7 @@ class LeagueControlPanelServiceTest extends TestCase
 
     public function testGetPanelDataOlympicsReturnsFalseForHasFinalsMvp(): void
     {
-        $stub = $this->createStub(LeagueControlPanelRepositoryInterface::class);
+        $stub = self::createStub(LeagueControlPanelRepositoryInterface::class);
         $stub->method('getBulkSettings')->willReturn([
             'Current Season Ending Year' => '2026',
         ]);

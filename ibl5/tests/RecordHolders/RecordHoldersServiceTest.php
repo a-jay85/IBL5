@@ -17,7 +17,7 @@ final class RecordHoldersServiceTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->mockRepository = $this->createStub(RecordHoldersRepositoryInterface::class);
+        $this->mockRepository = self::createStub(RecordHoldersRepositoryInterface::class);
         $this->service = new RecordHoldersService($this->mockRepository);
     }
 

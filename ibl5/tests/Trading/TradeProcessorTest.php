@@ -21,7 +21,7 @@ class TradeProcessorTest extends TestCase
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->mockCommonRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
+        $this->mockCommonRepo = self::createStub(TeamIdentityRepositoryInterface::class);
     }
 
     // ============================================

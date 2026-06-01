@@ -39,10 +39,10 @@ class DraftSelectionHandlerTest extends TestCase
     private function setupMockDependencies(): void
     {
         // Stub CommonMysqliRepository (no expectations needed)
-        $this->mockCommonRepository = $this->createStub(TeamIdentityRepositoryInterface::class);
+        $this->mockCommonRepository = self::createStub(TeamIdentityRepositoryInterface::class);
 
         // Mock Season object
-        $this->mockSeason = $this->createStub(Season::class);
+        $this->mockSeason = self::createStub(Season::class);
         $this->mockSeason->beginningYear = 2024;
         $this->mockSeason->endingYear = 2025;
         $this->mockSeason->phase = 'Draft';

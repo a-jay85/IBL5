@@ -13,7 +13,7 @@ class UpdateScheduleStepTest extends TestCase
 {
     public function testImplementsPipelineStepInterface(): void
     {
-        $stubUpdater = $this->createStub(ScheduleUpdater::class);
+        $stubUpdater = self::createStub(ScheduleUpdater::class);
         $step = new UpdateScheduleStep($stubUpdater);
 
         $this->assertInstanceOf(PipelineStepInterface::class, $step);
@@ -21,7 +21,7 @@ class UpdateScheduleStepTest extends TestCase
 
     public function testGetLabelReturnsExpectedLabel(): void
     {
-        $stubUpdater = $this->createStub(ScheduleUpdater::class);
+        $stubUpdater = self::createStub(ScheduleUpdater::class);
         $step = new UpdateScheduleStep($stubUpdater);
 
         $this->assertSame('Schedule updated', $step->getLabel());
@@ -41,7 +41,7 @@ class UpdateScheduleStepTest extends TestCase
 
     public function testExecuteCapturesOutputBufferLog(): void
     {
-        $stubUpdater = $this->createStub(ScheduleUpdater::class);
+        $stubUpdater = self::createStub(ScheduleUpdater::class);
         $stubUpdater->method('update')->willReturnCallback(static function (): void {
             echo '<p>Updating schedule...</p>';
         });

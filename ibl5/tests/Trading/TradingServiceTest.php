@@ -159,9 +159,9 @@ class TradingServiceTest extends TestCase
     public function testGetTradeReviewPageDataReturnsEmptyOffersWhenNoneExist(): void
     {
         $mockOfferRepo = $this->createMock(TradeOfferRepositoryInterface::class);
-        $mockAssetRepo = $this->createStub(TradeAssetRepositoryInterface::class);
+        $mockAssetRepo = self::createStub(TradeAssetRepositoryInterface::class);
         $mockFormRepo = $this->createMock(TradeFormRepositoryInterface::class);
-        $mockCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
+        $mockCashRepo = self::createStub(TradeCashRepositoryInterface::class);
         $mockCommon = $this->createMock(TeamIdentityRepositoryInterface::class);
 
         $mockCommon->expects($this->atLeastOnce())->method('getTeamnameFromUsername')
@@ -184,9 +184,9 @@ class TradingServiceTest extends TestCase
     public function testGetTradeReviewPageDataFiltersToUserTeamOnly(): void
     {
         $mockOfferRepo = $this->createMock(TradeOfferRepositoryInterface::class);
-        $mockAssetRepo = $this->createStub(TradeAssetRepositoryInterface::class);
+        $mockAssetRepo = self::createStub(TradeAssetRepositoryInterface::class);
         $mockFormRepo = $this->createMock(TradeFormRepositoryInterface::class);
-        $mockCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
+        $mockCashRepo = self::createStub(TradeCashRepositoryInterface::class);
         $mockCommon = $this->createMock(TeamIdentityRepositoryInterface::class);
 
         $mockCommon->expects($this->atLeastOnce())->method('getTeamnameFromUsername')
@@ -213,9 +213,9 @@ class TradingServiceTest extends TestCase
     public function testGetTradeReviewPageDataSetsHasHammerCorrectly(): void
     {
         $mockOfferRepo = $this->createMock(TradeOfferRepositoryInterface::class);
-        $mockAssetRepo = $this->createStub(TradeAssetRepositoryInterface::class);
+        $mockAssetRepo = self::createStub(TradeAssetRepositoryInterface::class);
         $mockFormRepo = $this->createMock(TradeFormRepositoryInterface::class);
-        $mockCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
+        $mockCashRepo = self::createStub(TradeCashRepositoryInterface::class);
         $mockCommon = $this->createMock(TeamIdentityRepositoryInterface::class);
 
         $mockCommon->expects($this->atLeastOnce())->method('getTeamnameFromUsername')
@@ -242,9 +242,9 @@ class TradingServiceTest extends TestCase
     public function testGetTradeReviewPageDataBuildsTeamListExcludingFreeAgents(): void
     {
         $mockOfferRepo = $this->createMock(TradeOfferRepositoryInterface::class);
-        $mockAssetRepo = $this->createStub(TradeAssetRepositoryInterface::class);
+        $mockAssetRepo = self::createStub(TradeAssetRepositoryInterface::class);
         $mockFormRepo = $this->createMock(TradeFormRepositoryInterface::class);
-        $mockCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
+        $mockCashRepo = self::createStub(TradeCashRepositoryInterface::class);
         $mockCommon = $this->createMock(TeamIdentityRepositoryInterface::class);
 
         $mockCommon->expects($this->atLeastOnce())->method('getTeamnameFromUsername')
@@ -272,11 +272,11 @@ class TradingServiceTest extends TestCase
 
     public function testCashWithMultipleYearsProducesMultipleItems(): void
     {
-        $mockOfferRepo = $this->createStub(TradeOfferRepositoryInterface::class);
-        $mockAssetRepo = $this->createStub(TradeAssetRepositoryInterface::class);
-        $mockFormRepo = $this->createStub(TradeFormRepositoryInterface::class);
-        $mockCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
-        $mockCommon = $this->createStub(TeamIdentityRepositoryInterface::class);
+        $mockOfferRepo = self::createStub(TradeOfferRepositoryInterface::class);
+        $mockAssetRepo = self::createStub(TradeAssetRepositoryInterface::class);
+        $mockFormRepo = self::createStub(TradeFormRepositoryInterface::class);
+        $mockCashRepo = self::createStub(TradeCashRepositoryInterface::class);
+        $mockCommon = self::createStub(TeamIdentityRepositoryInterface::class);
 
         $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
         $mockCommon->method('getTidFromTeamname')->willReturn(1);
@@ -301,11 +301,11 @@ class TradingServiceTest extends TestCase
 
     public function testCashZeroAmountYearsAreOmitted(): void
     {
-        $mockOfferRepo = $this->createStub(TradeOfferRepositoryInterface::class);
-        $mockAssetRepo = $this->createStub(TradeAssetRepositoryInterface::class);
-        $mockFormRepo = $this->createStub(TradeFormRepositoryInterface::class);
-        $mockCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
-        $mockCommon = $this->createStub(TeamIdentityRepositoryInterface::class);
+        $mockOfferRepo = self::createStub(TradeOfferRepositoryInterface::class);
+        $mockAssetRepo = self::createStub(TradeAssetRepositoryInterface::class);
+        $mockFormRepo = self::createStub(TradeFormRepositoryInterface::class);
+        $mockCashRepo = self::createStub(TradeCashRepositoryInterface::class);
+        $mockCommon = self::createStub(TeamIdentityRepositoryInterface::class);
 
         $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
         $mockCommon->method('getTidFromTeamname')->willReturn(1);
@@ -329,11 +329,11 @@ class TradingServiceTest extends TestCase
 
     public function testCashYearLabelsAreCorrectlyComputed(): void
     {
-        $mockOfferRepo = $this->createStub(TradeOfferRepositoryInterface::class);
-        $mockAssetRepo = $this->createStub(TradeAssetRepositoryInterface::class);
-        $mockFormRepo = $this->createStub(TradeFormRepositoryInterface::class);
-        $mockCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
-        $mockCommon = $this->createStub(TeamIdentityRepositoryInterface::class);
+        $mockOfferRepo = self::createStub(TradeOfferRepositoryInterface::class);
+        $mockAssetRepo = self::createStub(TradeAssetRepositoryInterface::class);
+        $mockFormRepo = self::createStub(TradeFormRepositoryInterface::class);
+        $mockCashRepo = self::createStub(TradeCashRepositoryInterface::class);
+        $mockCommon = self::createStub(TeamIdentityRepositoryInterface::class);
 
         $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
         $mockCommon->method('getTidFromTeamname')->willReturn(1);
@@ -371,11 +371,11 @@ class TradingServiceTest extends TestCase
 
     public function testCashAllZeroProducesNoItems(): void
     {
-        $mockOfferRepo = $this->createStub(TradeOfferRepositoryInterface::class);
-        $mockAssetRepo = $this->createStub(TradeAssetRepositoryInterface::class);
-        $mockFormRepo = $this->createStub(TradeFormRepositoryInterface::class);
-        $mockCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
-        $mockCommon = $this->createStub(TeamIdentityRepositoryInterface::class);
+        $mockOfferRepo = self::createStub(TradeOfferRepositoryInterface::class);
+        $mockAssetRepo = self::createStub(TradeAssetRepositoryInterface::class);
+        $mockFormRepo = self::createStub(TradeFormRepositoryInterface::class);
+        $mockCashRepo = self::createStub(TradeCashRepositoryInterface::class);
+        $mockCommon = self::createStub(TeamIdentityRepositoryInterface::class);
 
         $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
         $mockCommon->method('getTidFromTeamname')->willReturn(1);
@@ -397,11 +397,11 @@ class TradingServiceTest extends TestCase
 
     public function testCashNullDetailsProducesNoItems(): void
     {
-        $mockOfferRepo = $this->createStub(TradeOfferRepositoryInterface::class);
-        $mockAssetRepo = $this->createStub(TradeAssetRepositoryInterface::class);
-        $mockFormRepo = $this->createStub(TradeFormRepositoryInterface::class);
-        $mockCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
-        $mockCommon = $this->createStub(TeamIdentityRepositoryInterface::class);
+        $mockOfferRepo = self::createStub(TradeOfferRepositoryInterface::class);
+        $mockAssetRepo = self::createStub(TradeAssetRepositoryInterface::class);
+        $mockFormRepo = self::createStub(TradeFormRepositoryInterface::class);
+        $mockCashRepo = self::createStub(TradeCashRepositoryInterface::class);
+        $mockCommon = self::createStub(TeamIdentityRepositoryInterface::class);
 
         $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
         $mockCommon->method('getTidFromTeamname')->willReturn(1);
@@ -420,11 +420,11 @@ class TradingServiceTest extends TestCase
 
     public function testCashDescriptionIncludesTeamNames(): void
     {
-        $mockOfferRepo = $this->createStub(TradeOfferRepositoryInterface::class);
-        $mockAssetRepo = $this->createStub(TradeAssetRepositoryInterface::class);
-        $mockFormRepo = $this->createStub(TradeFormRepositoryInterface::class);
-        $mockCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
-        $mockCommon = $this->createStub(TeamIdentityRepositoryInterface::class);
+        $mockOfferRepo = self::createStub(TradeOfferRepositoryInterface::class);
+        $mockAssetRepo = self::createStub(TradeAssetRepositoryInterface::class);
+        $mockFormRepo = self::createStub(TradeFormRepositoryInterface::class);
+        $mockCashRepo = self::createStub(TradeCashRepositoryInterface::class);
+        $mockCommon = self::createStub(TeamIdentityRepositoryInterface::class);
 
         $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
         $mockCommon->method('getTidFromTeamname')->willReturn(1);
@@ -453,11 +453,11 @@ class TradingServiceTest extends TestCase
 
     public function testGetTradeReviewPageDataCollectsPlayerPids(): void
     {
-        $mockOfferRepo = $this->createStub(TradeOfferRepositoryInterface::class);
-        $mockAssetRepo = $this->createStub(TradeAssetRepositoryInterface::class);
-        $mockFormRepo = $this->createStub(TradeFormRepositoryInterface::class);
-        $mockCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
-        $mockCommon = $this->createStub(TeamIdentityRepositoryInterface::class);
+        $mockOfferRepo = self::createStub(TradeOfferRepositoryInterface::class);
+        $mockAssetRepo = self::createStub(TradeAssetRepositoryInterface::class);
+        $mockFormRepo = self::createStub(TradeFormRepositoryInterface::class);
+        $mockCashRepo = self::createStub(TradeCashRepositoryInterface::class);
+        $mockCommon = self::createStub(TeamIdentityRepositoryInterface::class);
 
         $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
         $mockCommon->method('getTidFromTeamname')->willReturn(1);
@@ -482,11 +482,11 @@ class TradingServiceTest extends TestCase
 
     public function testGetTradeReviewPageDataEnrichesTeamIds(): void
     {
-        $mockOfferRepo = $this->createStub(TradeOfferRepositoryInterface::class);
-        $mockAssetRepo = $this->createStub(TradeAssetRepositoryInterface::class);
-        $mockFormRepo = $this->createStub(TradeFormRepositoryInterface::class);
-        $mockCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
-        $mockCommon = $this->createStub(TeamIdentityRepositoryInterface::class);
+        $mockOfferRepo = self::createStub(TradeOfferRepositoryInterface::class);
+        $mockAssetRepo = self::createStub(TradeAssetRepositoryInterface::class);
+        $mockFormRepo = self::createStub(TradeFormRepositoryInterface::class);
+        $mockCashRepo = self::createStub(TradeCashRepositoryInterface::class);
+        $mockCommon = self::createStub(TeamIdentityRepositoryInterface::class);
 
         $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
         $mockCommon->method('getTidFromTeamname')->willReturn(1);
@@ -512,11 +512,11 @@ class TradingServiceTest extends TestCase
 
     public function testGetTradeReviewPageDataIncludesCashPreviewData(): void
     {
-        $mockOfferRepo = $this->createStub(TradeOfferRepositoryInterface::class);
-        $mockAssetRepo = $this->createStub(TradeAssetRepositoryInterface::class);
-        $mockFormRepo = $this->createStub(TradeFormRepositoryInterface::class);
-        $mockCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
-        $mockCommon = $this->createStub(TeamIdentityRepositoryInterface::class);
+        $mockOfferRepo = self::createStub(TradeOfferRepositoryInterface::class);
+        $mockAssetRepo = self::createStub(TradeAssetRepositoryInterface::class);
+        $mockFormRepo = self::createStub(TradeFormRepositoryInterface::class);
+        $mockCashRepo = self::createStub(TradeCashRepositoryInterface::class);
+        $mockCommon = self::createStub(TeamIdentityRepositoryInterface::class);
 
         $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
         $mockCommon->method('getTidFromTeamname')->willReturn(1);
@@ -545,11 +545,11 @@ class TradingServiceTest extends TestCase
 
     public function testGetTradeReviewPageDataPreviewDataIncludesSeasonInfo(): void
     {
-        $mockOfferRepo = $this->createStub(TradeOfferRepositoryInterface::class);
-        $mockAssetRepo = $this->createStub(TradeAssetRepositoryInterface::class);
-        $mockFormRepo = $this->createStub(TradeFormRepositoryInterface::class);
-        $mockCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
-        $mockCommon = $this->createStub(TeamIdentityRepositoryInterface::class);
+        $mockOfferRepo = self::createStub(TradeOfferRepositoryInterface::class);
+        $mockAssetRepo = self::createStub(TradeAssetRepositoryInterface::class);
+        $mockFormRepo = self::createStub(TradeFormRepositoryInterface::class);
+        $mockCashRepo = self::createStub(TradeCashRepositoryInterface::class);
+        $mockCommon = self::createStub(TeamIdentityRepositoryInterface::class);
 
         $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
         $mockCommon->method('getTidFromTeamname')->willReturn(1);
@@ -578,18 +578,18 @@ class TradingServiceTest extends TestCase
 
     private function createServiceWithStubs(): TradingService
     {
-        $stubOfferRepo = $this->createStub(TradeOfferRepositoryInterface::class);
-        $stubAssetRepo = $this->createStub(TradeAssetRepositoryInterface::class);
-        $stubFormRepo = $this->createStub(TradeFormRepositoryInterface::class);
-        $stubCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
-        $stubCommon = $this->createStub(TeamIdentityRepositoryInterface::class);
+        $stubOfferRepo = self::createStub(TradeOfferRepositoryInterface::class);
+        $stubAssetRepo = self::createStub(TradeAssetRepositoryInterface::class);
+        $stubFormRepo = self::createStub(TradeFormRepositoryInterface::class);
+        $stubCashRepo = self::createStub(TradeCashRepositoryInterface::class);
+        $stubCommon = self::createStub(TeamIdentityRepositoryInterface::class);
 
         return new TradingService($stubOfferRepo, $stubAssetRepo, $stubFormRepo, $stubCommon, $this->mockDb, $stubCashRepo);
     }
 
     private function createSeasonStub(string $phase): Season
     {
-        $season = $this->createStub(Season::class);
+        $season = self::createStub(Season::class);
         $season->phase = $phase;
         $season->endingYear = 2025;
         $season->beginningYear = 2024;
@@ -640,7 +640,7 @@ class TradingServiceTest extends TestCase
         $db->onQuery('ibl_cash_considerations', []);
         $_SERVER['SERVER_NAME'] = 'localhost';
 
-        $commonRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
+        $commonRepo = self::createStub(TeamIdentityRepositoryInterface::class);
         $tradeOffer = new \Trading\TradeOffer($db, $commonRepo, 'localhost');
 
         // Prepare trade data: Team A offers to Team B
@@ -706,7 +706,7 @@ class TradingServiceTest extends TestCase
         $db->onQuery('ibl_cash_considerations', []);
         $_SERVER['SERVER_NAME'] = 'localhost';
 
-        $commonRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
+        $commonRepo = self::createStub(TeamIdentityRepositoryInterface::class);
         $tradeOffer = new \Trading\TradeOffer($db, $commonRepo, 'localhost');
 
         // Team A offers cash to Team B
@@ -759,7 +759,7 @@ class TradingServiceTest extends TestCase
     {
         $db = new QueryAwareMockDatabase();
         $_SERVER['SERVER_NAME'] = 'localhost';
-        $commonRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
+        $commonRepo = self::createStub(TeamIdentityRepositoryInterface::class);
         $tradeOffer = new \Trading\TradeOffer($db, $commonRepo, 'localhost');
 
         // Team A sends Player 1 to Team B
@@ -805,7 +805,7 @@ class TradingServiceTest extends TestCase
     {
         $db = new QueryAwareMockDatabase();
         $_SERVER['SERVER_NAME'] = 'localhost';
-        $commonRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
+        $commonRepo = self::createStub(TeamIdentityRepositoryInterface::class);
         $tradeOffer = new \Trading\TradeOffer($db, $commonRepo, 'localhost');
 
         // Team A sends Player 1 + cash to Team B
@@ -858,7 +858,7 @@ class TradingServiceTest extends TestCase
     {
         $db = new QueryAwareMockDatabase();
         $_SERVER['SERVER_NAME'] = 'localhost';
-        $commonRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
+        $commonRepo = self::createStub(TeamIdentityRepositoryInterface::class);
         $tradeOffer = new \Trading\TradeOffer($db, $commonRepo, 'localhost');
 
         // Team A sends 2025 1st round pick to Team B

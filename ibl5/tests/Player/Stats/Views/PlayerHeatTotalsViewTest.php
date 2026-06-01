@@ -18,7 +18,7 @@ class PlayerHeatTotalsViewTest extends TestCase
 
     public function testRenderTotalsMatchesSnapshot(): void
     {
-        $repository = $this->createStub(PlayerStatsRepository::class);
+        $repository = self::createStub(PlayerStatsRepository::class);
         $repository->method('getHeatStats')->willReturn(TournamentViewFixtures::twoSeasonRows());
 
         $view = new PlayerHeatTotalsView($repository, new PlayerSeasonTableRenderer());

@@ -58,7 +58,7 @@ final class CachedSeasonLeaderboardsRepositoryTest extends TestCase
 
     public function testReturnsAllRowsWithoutFilteringOrSorting(): void
     {
-        $stubInner = $this->createStub(SeasonLeaderboardsRepositoryInterface::class);
+        $stubInner = self::createStub(SeasonLeaderboardsRepositoryInterface::class);
         $repository = new CachedSeasonLeaderboardsRepository($stubInner, $this->cache);
 
         $rows = [
@@ -135,7 +135,7 @@ final class CachedSeasonLeaderboardsRepositoryTest extends TestCase
 
     public function testInvalidateCacheDeletesAllThreeKeys(): void
     {
-        $stubInner = $this->createStub(SeasonLeaderboardsRepositoryInterface::class);
+        $stubInner = self::createStub(SeasonLeaderboardsRepositoryInterface::class);
         $repository = new CachedSeasonLeaderboardsRepository($stubInner, $this->cache);
 
         $this->cache->set('season_leaderboards:leaders', [['pid' => 1]], 86400);

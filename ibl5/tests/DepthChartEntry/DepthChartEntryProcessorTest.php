@@ -262,7 +262,7 @@ class DepthChartEntryProcessorTest extends TestCase
      */
     public function testFormDisplaysCorrectDatabaseValuesForAllSettings(): void
     {
-        $view = new DepthChartEntryView($this->createStub(\League\LeagueContext::class), new \DepthChartEntry\DepthChartEntryService());
+        $view = new DepthChartEntryView(self::createStub(\League\LeagueContext::class), new \DepthChartEntry\DepthChartEntryService());
 
         // Simulate a player record from the database with various depth values
         $playerFromDb = [
@@ -393,7 +393,7 @@ class DepthChartEntryProcessorTest extends TestCase
      */
     public function testCompleteRoundTripPreservesPositionDepthValues(): void
     {
-        $view = new DepthChartEntryView($this->createStub(\League\LeagueContext::class), new \DepthChartEntry\DepthChartEntryService());
+        $view = new DepthChartEntryView(self::createStub(\League\LeagueContext::class), new \DepthChartEntry\DepthChartEntryService());
 
         // Step 1: Player has these values in database
         $dbPlayer = [
@@ -502,7 +502,7 @@ class DepthChartEntryProcessorTest extends TestCase
      */
     public function testZeroValuesAreHandledCorrectly(): void
     {
-        $view = new DepthChartEntryView($this->createStub(\League\LeagueContext::class), new \DepthChartEntry\DepthChartEntryService());
+        $view = new DepthChartEntryView(self::createStub(\League\LeagueContext::class), new \DepthChartEntry\DepthChartEntryService());
 
         // Player with all zero position depths except C=1
         $player = [

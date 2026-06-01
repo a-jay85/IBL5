@@ -17,7 +17,7 @@ class DiscordTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->mockCommonRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
+        $this->mockCommonRepo = self::createStub(TeamIdentityRepositoryInterface::class);
     }
 
     /**

@@ -22,6 +22,9 @@ class TestableBoxscoreProcessor extends BoxscoreProcessor
         return $this->processGameUpsert($boxscoreGameInfo);
     }
 
+    /**
+     * @return list<string>
+     */
     public function exposedUpdateSimDates(string $phase): array
     {
         return $this->updateSimDates($phase);

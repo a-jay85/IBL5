@@ -34,7 +34,7 @@ class ExtensionValidatorTest extends TestCase
      * @group validation
      * @group zero-amounts
      */
-    public function testRejectsZeroAmountInYear1()
+    public function testRejectsZeroAmountInYear1(): void
     {
         // Arrange
         $offer = [
@@ -58,7 +58,7 @@ class ExtensionValidatorTest extends TestCase
      * @group validation
      * @group zero-amounts
      */
-    public function testRejectsZeroAmountInYear2()
+    public function testRejectsZeroAmountInYear2(): void
     {
         // Arrange
         $offer = [
@@ -81,7 +81,7 @@ class ExtensionValidatorTest extends TestCase
      * @group validation
      * @group zero-amounts
      */
-    public function testRejectsZeroAmountInYear3()
+    public function testRejectsZeroAmountInYear3(): void
     {
         // Arrange
         $offer = [
@@ -104,7 +104,7 @@ class ExtensionValidatorTest extends TestCase
      * @group validation
      * @group zero-amounts
      */
-    public function testAcceptsZeroAmountsInYears4And5()
+    public function testAcceptsZeroAmountsInYears4And5(): void
     {
         // Arrange
         $offer = [
@@ -126,7 +126,7 @@ class ExtensionValidatorTest extends TestCase
      * @group validation
      * @group extension-usage
      */
-    public function testRejectsExtensionWhenAlreadyUsedThisSeason()
+    public function testRejectsExtensionWhenAlreadyUsedThisSeason(): void
     {
         // Arrange - Create a mock team object with used extension flag
         $team = (object) [
@@ -146,7 +146,7 @@ class ExtensionValidatorTest extends TestCase
      * @group validation
      * @group extension-usage
      */
-    public function testRejectsExtensionWhenAlreadyUsedThisSim()
+    public function testRejectsExtensionWhenAlreadyUsedThisSim(): void
     {
         // Arrange - Create a mock team object with used extension flag
         $team = (object) [
@@ -166,7 +166,7 @@ class ExtensionValidatorTest extends TestCase
      * @group validation
      * @group extension-usage
      */
-    public function testAcceptsExtensionWhenNotYetUsed()
+    public function testAcceptsExtensionWhenNotYetUsed(): void
     {
         // Arrange - Create a mock team object with no extensions used
         $team = (object) [
@@ -185,7 +185,7 @@ class ExtensionValidatorTest extends TestCase
      * @group validation
      * @group maximum-offer
      */
-    public function testRejectsOfferOverMaximumFor0To6YearsExperience()
+    public function testRejectsOfferOverMaximumFor0To6YearsExperience(): void
     {
         // Arrange
         $offer = ['year1' => 1200]; // Max is 1063 for 0-6 years
@@ -203,7 +203,7 @@ class ExtensionValidatorTest extends TestCase
      * @group validation
      * @group maximum-offer
      */
-    public function testAcceptsOfferAtMaximumFor0To6YearsExperience()
+    public function testAcceptsOfferAtMaximumFor0To6YearsExperience(): void
     {
         // Arrange
         $offer = ['year1' => 1063]; // Exactly at max for 0-6 years
@@ -220,7 +220,7 @@ class ExtensionValidatorTest extends TestCase
      * @group validation
      * @group maximum-offer
      */
-    public function testRejectsOfferOverMaximumFor7To9YearsExperience()
+    public function testRejectsOfferOverMaximumFor7To9YearsExperience(): void
     {
         // Arrange
         $offer = ['year1' => 1300]; // Max is 1275 for 7-9 years
@@ -237,7 +237,7 @@ class ExtensionValidatorTest extends TestCase
      * @group validation
      * @group maximum-offer
      */
-    public function testAcceptsOfferAtMaximumFor10PlusYearsExperience()
+    public function testAcceptsOfferAtMaximumFor10PlusYearsExperience(): void
     {
         // Arrange
         $offer = ['year1' => 1451]; // Max for 10+ years
@@ -252,9 +252,11 @@ class ExtensionValidatorTest extends TestCase
 
     /**
      * @group validation
-     * @group raises     */
+     * @group raises
+     * @param array<string, int> $offer
+     */
         #[DataProvider('invalidRaiseProvider')]
-    public function testRejectsIllegalRaises($offer, $birdYears, $expectedErrorYear)
+    public function testRejectsIllegalRaises(array $offer, int $birdYears, int $expectedErrorYear): void
     {
         // Act
         $result = $this->contractValidator->validateRaises($offer, $birdYears);
@@ -269,7 +271,7 @@ class ExtensionValidatorTest extends TestCase
      * @group validation
      * @group raises
      */
-    public function testAcceptsLegalRaisesWithoutBirdRights()
+    public function testAcceptsLegalRaisesWithoutBirdRights(): void
     {
         // Arrange - 10% max raise without Bird rights
         $offer = [
@@ -292,7 +294,7 @@ class ExtensionValidatorTest extends TestCase
      * @group validation
      * @group raises
      */
-    public function testAcceptsLegalRaisesWithBirdRights()
+    public function testAcceptsLegalRaisesWithBirdRights(): void
     {
         // Arrange - 12.5% max raise with Bird rights
         $offer = [
@@ -313,9 +315,11 @@ class ExtensionValidatorTest extends TestCase
 
     /**
      * @group validation
-     * @group salary-decrease     */
+     * @group salary-decrease
+     * @param array<string, int> $offer
+     */
         #[DataProvider('salaryDecreaseProvider')]
-    public function testRejectsSalaryDecreasesBetweenYears($offer, $expectedErrorYear)
+    public function testRejectsSalaryDecreasesBetweenYears(array $offer, int $expectedErrorYear): void
     {
         // Act
         $result = $this->contractValidator->validateSalaryDecreases($offer);
@@ -329,7 +333,7 @@ class ExtensionValidatorTest extends TestCase
      * @group validation
      * @group salary-decrease
      */
-    public function testAcceptsConstantOrIncreasingSalaries()
+    public function testAcceptsConstantOrIncreasingSalaries(): void
     {
         // Arrange
         $offer = [
@@ -349,8 +353,10 @@ class ExtensionValidatorTest extends TestCase
 
     /**
      * Data provider for invalid raises
+     *
+     * @return array<string, array{array<string, int>, int, int}>
      */
-    public static function invalidRaiseProvider()
+    public static function invalidRaiseProvider(): array
     {
         return [
             'Year 2 excessive raise without Bird rights' => [
@@ -402,8 +408,10 @@ class ExtensionValidatorTest extends TestCase
 
     /**
      * Data provider for salary decreases
+     *
+     * @return array<string, array{array<string, int>, int}>
      */
-    public static function salaryDecreaseProvider()
+    public static function salaryDecreaseProvider(): array
     {
         return [
             'Year 2 decrease' => [

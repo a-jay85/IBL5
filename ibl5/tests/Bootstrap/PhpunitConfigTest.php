@@ -101,6 +101,10 @@ class PhpunitConfigTest extends TestCase
         return $dirs;
     }
 
+    /**
+     * @param list<string> $registeredDirs
+     * @param list<string> $registeredFiles
+     */
     private function isDirectoryCovered(string $dir, array $registeredDirs, array $registeredFiles): bool
     {
         foreach ($registeredDirs as $registered) {

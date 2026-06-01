@@ -244,6 +244,7 @@ class SearchViewTest extends TestCase
     }
 
     /**
+     * @param array<string, mixed> $overrides
      * @return array{query: string, type: string, topic: int, category: int, author: string, days: int, min: int, offset: int, topicText: string, topics: list<array{topicId: int, topicText: string}>, categories: list<array{catId: int, title: string}>, authors: list<string>, results: list<mixed>|null, hasMore: bool, isAdmin: bool, adminFile: string, articleComm: bool, error: string}
      */
     private static function createPageData(array $overrides = []): array

@@ -225,6 +225,9 @@ final class OneOnOneGameServiceTest extends TestCase
 
     // ========== Helper Methods ==========
 
+    /**
+     * @return array<string, mixed>
+     */
     private function createMockPlayerData(int $pid, string $name): array
     {
         return [

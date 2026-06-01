@@ -107,6 +107,7 @@ class GMContactListViewTest extends TestCase
     }
 
     /**
+     * @param array<string, mixed> $overrides
      * @return array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, owner_name: string, discord_id: int|null}
      */
     private static function createContact(array $overrides = []): array

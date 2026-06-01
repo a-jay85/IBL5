@@ -393,6 +393,8 @@ class DraftWideUnitTest extends WideUnitTestCase
 
     /**
      * Base draft data for all scenarios
+     *
+     * @return array<string, mixed>
      */
     private function getBaseDraftData(): array
     {

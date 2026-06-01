@@ -550,11 +550,13 @@ class TestableBaseMysqliRepository extends \BaseMysqliRepository
         return $this->executeQuery($query, $types, ...$params);
     }
 
+    /** @return array<string, mixed>|null */
     public function callFetchOne(string $query, string $types = '', mixed ...$params): ?array
     {
         return $this->fetchOne($query, $types, ...$params);
     }
 
+    /** @return array<int, array<string, mixed>> */
     public function callFetchAll(string $query, string $types = '', mixed ...$params): array
     {
         return $this->fetchAll($query, $types, ...$params);
@@ -565,6 +567,7 @@ class TestableBaseMysqliRepository extends \BaseMysqliRepository
         return $this->execute($query, $types, ...$params);
     }
 
+    /** @return list<array<string, mixed>> */
     public function callFetchAllRealTeams(string $orderBy = 'team_name ASC'): array
     {
         return $this->fetchAllRealTeams($orderBy);

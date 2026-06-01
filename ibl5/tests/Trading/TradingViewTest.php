@@ -654,6 +654,9 @@ class TradingViewTest extends TestCase
     // HELPERS
     // ============================================
 
+    /**
+     * @return array<string, mixed>
+     */
     private function createTradeOfferPageData(): array
     {
         return [
@@ -680,6 +683,9 @@ class TradingViewTest extends TestCase
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function createTradeReviewPageData(): array
     {
         return [

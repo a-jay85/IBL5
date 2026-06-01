@@ -120,6 +120,7 @@ final class MergeMasterToProdCliTest extends TestCase
     }
 
     /**
+     * @param array<string, string> $env
      * @return array{output: string, exit: int}
      */
     private function runScript(array $env = []): array

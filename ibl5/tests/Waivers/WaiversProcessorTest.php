@@ -51,6 +51,8 @@ class WaiversProcessorTest extends TestCase
     /**
      * Helper method to create a mock Player object with contract properties
      * Maps array keys to Player getter methods.
+     *
+     * @param array<string, int> $properties
      */
     private function createMockPlayer(array $properties): Player
     {
@@ -80,7 +82,7 @@ class WaiversProcessorTest extends TestCase
         return $player;
     }
     
-    public function testCalculateVeteranMinimumSalaryFor10PlusYears()
+    public function testCalculateVeteranMinimumSalaryFor10PlusYears(): void
     {
         $salary = $this->processor->calculateVeteranMinimumSalary(10);
         $this->assertEquals(103, $salary);
@@ -89,49 +91,49 @@ class WaiversProcessorTest extends TestCase
         $this->assertEquals(103, $salary);
     }
     
-    public function testCalculateVeteranMinimumSalaryFor9Years()
+    public function testCalculateVeteranMinimumSalaryFor9Years(): void
     {
         $salary = $this->processor->calculateVeteranMinimumSalary(9);
         $this->assertEquals(100, $salary);
     }
     
-    public function testCalculateVeteranMinimumSalaryFor8Years()
+    public function testCalculateVeteranMinimumSalaryFor8Years(): void
     {
         $salary = $this->processor->calculateVeteranMinimumSalary(8);
         $this->assertEquals(89, $salary);
     }
     
-    public function testCalculateVeteranMinimumSalaryFor7Years()
+    public function testCalculateVeteranMinimumSalaryFor7Years(): void
     {
         $salary = $this->processor->calculateVeteranMinimumSalary(7);
         $this->assertEquals(82, $salary);
     }
     
-    public function testCalculateVeteranMinimumSalaryFor6Years()
+    public function testCalculateVeteranMinimumSalaryFor6Years(): void
     {
         $salary = $this->processor->calculateVeteranMinimumSalary(6);
         $this->assertEquals(76, $salary);
     }
     
-    public function testCalculateVeteranMinimumSalaryFor5Years()
+    public function testCalculateVeteranMinimumSalaryFor5Years(): void
     {
         $salary = $this->processor->calculateVeteranMinimumSalary(5);
         $this->assertEquals(70, $salary);
     }
     
-    public function testCalculateVeteranMinimumSalaryFor4Years()
+    public function testCalculateVeteranMinimumSalaryFor4Years(): void
     {
         $salary = $this->processor->calculateVeteranMinimumSalary(4);
         $this->assertEquals(64, $salary);
     }
     
-    public function testCalculateVeteranMinimumSalaryFor3Years()
+    public function testCalculateVeteranMinimumSalaryFor3Years(): void
     {
         $salary = $this->processor->calculateVeteranMinimumSalary(3);
         $this->assertEquals(61, $salary);
     }
     
-    public function testCalculateVeteranMinimumSalaryForRookies()
+    public function testCalculateVeteranMinimumSalaryForRookies(): void
     {
         $salary = $this->processor->calculateVeteranMinimumSalary(0);
         $this->assertEquals(35, $salary);
@@ -143,7 +145,7 @@ class WaiversProcessorTest extends TestCase
         $this->assertEquals(51, $salary);
     }
     
-    public function testGetPlayerContractDisplayWithNoSalary()
+    public function testGetPlayerContractDisplayWithNoSalary(): void
     {
         $player = $this->createMockPlayer([
             'salary_yr1' => 0,
@@ -154,7 +156,7 @@ class WaiversProcessorTest extends TestCase
         $this->assertEquals('70', $contract);
     }
     
-    public function testGetPlayerContractDisplayWithExistingContract()
+    public function testGetPlayerContractDisplayWithExistingContract(): void
     {
         $player = $this->createMockPlayer([
             'salary_yr1' => 500,
@@ -168,7 +170,7 @@ class WaiversProcessorTest extends TestCase
         $this->assertEquals('500 550 600', $contract);
     }
     
-    public function testGetPlayerContractDisplayWithPartialContract()
+    public function testGetPlayerContractDisplayWithPartialContract(): void
     {
         $player = $this->createMockPlayer([
             'salary_yr1' => 500,
@@ -182,7 +184,7 @@ class WaiversProcessorTest extends TestCase
         $this->assertEquals('550 600', $contract);
     }
     
-    public function testGetPlayerContractDisplayWithOneYearRemaining()
+    public function testGetPlayerContractDisplayWithOneYearRemaining(): void
     {
         $player = $this->createMockPlayer([
             'salary_yr1' => 500,
@@ -195,7 +197,7 @@ class WaiversProcessorTest extends TestCase
         $this->assertEquals('600', $contract);
     }
     
-    public function testGetWaiverWaitTimeReturnsEmptyWhenCleared()
+    public function testGetWaiverWaitTimeReturnsEmptyWhenCleared(): void
     {
         $dropTime = time() - 90000; // More than 24 hours ago
         $currentTime = time();
@@ -204,7 +206,7 @@ class WaiversProcessorTest extends TestCase
         $this->assertEquals('', $waitTime);
     }
     
-    public function testGetWaiverWaitTimeCalculatesRemainingTime()
+    public function testGetWaiverWaitTimeCalculatesRemainingTime(): void
     {
         $currentTime = time();
         $dropTime = $currentTime - 3600; // 1 hour ago
@@ -214,7 +216,7 @@ class WaiversProcessorTest extends TestCase
         $this->assertStringContainsString('23 h', $waitTime); // Should be 23 hours remaining
     }
     
-    public function testGetWaiverWaitTimeWithMinutes()
+    public function testGetWaiverWaitTimeWithMinutes(): void
     {
         $currentTime = time();
         $dropTime = $currentTime - 82800; // 23 hours ago
@@ -224,7 +226,7 @@ class WaiversProcessorTest extends TestCase
         $this->assertStringContainsString('1 h', $waitTime); // Should be 1 hour remaining
     }
     
-    public function testDetermineContractDataForNewContract()
+    public function testDetermineContractDataForNewContract(): void
     {
         $playerData = [
             'salary_yr1' => 0,
@@ -237,7 +239,7 @@ class WaiversProcessorTest extends TestCase
         $this->assertEquals(89, $contractData['salary']);
     }
     
-    public function testDetermineContractDataForExistingContract()
+    public function testDetermineContractDataForExistingContract(): void
     {
         $playerData = [
             'salary_yr1' => 500,
@@ -253,7 +255,7 @@ class WaiversProcessorTest extends TestCase
         $this->assertEquals(500, $contractData['salary']);
     }
     
-    public function testDetermineContractDataForMidContract()
+    public function testDetermineContractDataForMidContract(): void
     {
         $playerData = [
             'salary_yr1' => 500,
@@ -269,7 +271,7 @@ class WaiversProcessorTest extends TestCase
         $this->assertEquals(550, $contractData['salary']);
     }
     
-    public function testGetPlayerContractDisplayWithMissingExperience()
+    public function testGetPlayerContractDisplayWithMissingExperience(): void
     {
         $player = $this->createMockPlayer([
             'salary_yr1' => 0,
@@ -281,7 +283,7 @@ class WaiversProcessorTest extends TestCase
         $this->assertEquals('35', $contract);
     }
     
-    public function testGetPlayerContractDisplayWithEmptyContract()
+    public function testGetPlayerContractDisplayWithEmptyContract(): void
     {
         $player = $this->createMockPlayer([
             'salary_yr1' => 0,
@@ -294,7 +296,7 @@ class WaiversProcessorTest extends TestCase
         $this->assertEquals('35', $contract); // Should use vet min calculation for rookie (first year minimum)
     }
     
-    public function testDetermineContractDataForNewContractDuringFreeAgency()
+    public function testDetermineContractDataForNewContractDuringFreeAgency(): void
     {
         $playerData = [
             'salary_yr1' => 0,
@@ -308,7 +310,7 @@ class WaiversProcessorTest extends TestCase
         $this->assertEquals(82, $contractData['salary']);
     }
     
-    public function testGetPlayerContractDisplayDuringFreeAgency()
+    public function testGetPlayerContractDisplayDuringFreeAgency(): void
     {
         $player = $this->createMockPlayer([
             'salary_yr1' => 0,
@@ -320,7 +322,7 @@ class WaiversProcessorTest extends TestCase
         $this->assertEquals('70', $contract);
     }
     
-    public function testGetPlayerContractDisplayWithExistingContractDuringFreeAgency()
+    public function testGetPlayerContractDisplayWithExistingContractDuringFreeAgency(): void
     {
         $player = $this->createMockPlayer([
             'salary_yr1' => 0,

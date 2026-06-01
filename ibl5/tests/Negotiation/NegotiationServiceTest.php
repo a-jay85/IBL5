@@ -112,6 +112,10 @@ class NegotiationServiceTest extends TestCase
     /**
      * Get complete player data with all required fields
      */
+    /**
+     * @param array<string, mixed> $overrides
+     * @return array<string, mixed>
+     */
     private function getCompletePlayerData(array $overrides = []): array
     {
         return array_merge([

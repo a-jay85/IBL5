@@ -19,12 +19,6 @@ parameters:
 			path: tests/AllStarAppearances/AllStarAppearancesViewTest.php
 
 		-
-			rawMessage: 'Method Tests\AllStarAppearances\AllStarAppearancesViewTest::createAppearance() has parameter $overrides with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/AllStarAppearances/AllStarAppearancesViewTest.php
-
-		-
 			rawMessage: 'Parameter #1 $appearances of method AllStarAppearances\AllStarAppearancesView::render() expects array<int, array{name: string, appearances: int}>, array{array{name: string, pid: int, appearances: int}, array{name: string, pid: int, appearances: int}} given.'
 			identifier: argument.type
 			count: 1
@@ -49,24 +43,6 @@ parameters:
 			path: tests/Api/Controller/GameBoxscoreControllerTest.php
 
 		-
-			rawMessage: 'Method Tests\Api\Controller\GameBoxscoreControllerTest::gameRow() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Api/Controller/GameBoxscoreControllerTest.php
-
-		-
-			rawMessage: 'Method Tests\Api\Controller\GameBoxscoreControllerTest::playerBoxscoreRow() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Api/Controller/GameBoxscoreControllerTest.php
-
-		-
-			rawMessage: 'Method Tests\Api\Controller\GameBoxscoreControllerTest::teamBoxscoreRow() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Api/Controller/GameBoxscoreControllerTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
 			identifier: staticMethod.dynamicCall
 			count: 3
@@ -76,12 +52,6 @@ parameters:
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::isArray().'
 			identifier: staticMethod.dynamicCall
 			count: 3
-			path: tests/Api/Controller/GameDetailControllerTest.php
-
-		-
-			rawMessage: 'Method Tests\Api\Controller\GameDetailControllerTest::gameRow() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
 			path: tests/Api/Controller/GameDetailControllerTest.php
 
 		-
@@ -145,12 +115,6 @@ parameters:
 			path: tests/Api/Controller/PlayerDetailControllerTest.php
 
 		-
-			rawMessage: 'Method Tests\Api\Controller\PlayerDetailControllerTest::playerRow() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Api/Controller/PlayerDetailControllerTest.php
-
-		-
 			rawMessage: 'Call to function array_filter() requires parameter #2 to be passed to avoid loose comparison semantics.'
 			identifier: arrayFilter.strict
 			count: 1
@@ -160,12 +124,6 @@ parameters:
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 3
-			path: tests/Api/Controller/PlayerExportControllerTest.php
-
-		-
-			rawMessage: 'Method Tests\Api\Controller\PlayerExportControllerTest::playerRow() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
 			path: tests/Api/Controller/PlayerExportControllerTest.php
 
 		-
@@ -187,18 +145,6 @@ parameters:
 			path: tests/Api/Controller/PlayerHistoryControllerTest.php
 
 		-
-			rawMessage: 'Method Tests\Api\Controller\PlayerHistoryControllerTest::historyRow() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Api/Controller/PlayerHistoryControllerTest.php
-
-		-
-			rawMessage: 'Method Tests\Api\Controller\PlayerHistoryControllerTest::twoHistoryRows() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Api/Controller/PlayerHistoryControllerTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
 			identifier: staticMethod.dynamicCall
 			count: 1
@@ -208,12 +154,6 @@ parameters:
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::isArray().'
 			identifier: staticMethod.dynamicCall
 			count: 2
-			path: tests/Api/Controller/PlayerListControllerTest.php
-
-		-
-			rawMessage: 'Method Tests\Api\Controller\PlayerListControllerTest::playerRow() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
 			path: tests/Api/Controller/PlayerListControllerTest.php
 
 		-
@@ -271,12 +211,6 @@ parameters:
 			path: tests/Api/Controller/TeamDetailControllerTest.php
 
 		-
-			rawMessage: 'Method Tests\Api\Controller\TeamDetailControllerTest::teamRow() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Api/Controller/TeamDetailControllerTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
 			identifier: staticMethod.dynamicCall
 			count: 2
@@ -289,12 +223,6 @@ parameters:
 			path: tests/Api/Controller/TeamListControllerTest.php
 
 		-
-			rawMessage: 'Method Tests\Api\Controller\TeamListControllerTest::teamRow() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Api/Controller/TeamListControllerTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::callback().'
 			identifier: staticMethod.dynamicCall
 			count: 1
@@ -304,12 +232,6 @@ parameters:
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::isArray().'
 			identifier: staticMethod.dynamicCall
 			count: 2
-			path: tests/Api/Controller/TeamRosterControllerTest.php
-
-		-
-			rawMessage: 'Method Tests\Api\Controller\TeamRosterControllerTest::playerRow() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
 			path: tests/Api/Controller/TeamRosterControllerTest.php
 
 		-
@@ -523,18 +445,6 @@ parameters:
 			path: tests/Bootstrap/AuthUsernameAccessorTest.php
 
 		-
-			rawMessage: Property Tests\Bootstrap\ConfigBootstrapExtractRequestTest::$originalGlobals type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Bootstrap/ConfigBootstrapExtractRequestTest.php
-
-		-
-			rawMessage: Property Tests\Bootstrap\ConfigBootstrapExtractRequestTest::$originalRequest type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Bootstrap/ConfigBootstrapExtractRequestTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 3
@@ -551,18 +461,6 @@ parameters:
 			identifier: function.notFound
 			count: 1
 			path: tests/Bootstrap/FilterFunctionTest.php
-
-		-
-			rawMessage: 'Method Tests\Bootstrap\PhpunitConfigTest::isDirectoryCovered() has parameter $registeredDirs with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Bootstrap/PhpunitConfigTest.php
-
-		-
-			rawMessage: 'Method Tests\Bootstrap\PhpunitConfigTest::isDirectoryCovered() has parameter $registeredFiles with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Bootstrap/PhpunitConfigTest.php
 
 		-
 			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertTrue() with true will always evaluate to true.'
@@ -595,12 +493,6 @@ parameters:
 			path: tests/Boxscore/BoxscoreProcessorTest.php
 
 		-
-			rawMessage: 'Method Tests\Boxscore\TestableBoxscoreProcessor::exposedUpdateSimDates() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Boxscore/BoxscoreProcessorTest.php
-
-		-
 			rawMessage: Short ternary operator is not allowed. Use null coalesce operator if applicable or consider using long ternary.
 			identifier: ternary.shortNotAllowed
 			count: 1
@@ -625,15 +517,9 @@ parameters:
 			path: tests/Cache/PageCacheTest.php
 
 		-
-			rawMessage: 'Method Tests\CapSpace\TestableCapSpaceService::publicProcessTeamCapData() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/CapSpace/CapSpaceServiceTest.php
-
-		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
-			count: 8
+			count: 9
 			path: tests/CapSpace/CapSpaceServiceTest.php
 
 		-
@@ -667,40 +553,10 @@ parameters:
 			path: tests/CareerLeaderboards/CareerLeaderboardsServiceTest.php
 
 		-
-			rawMessage: 'Method Tests\CareerLeaderboards\CareerLeaderboardsViewXssTest::makeStats() has parameter $overrides with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/CareerLeaderboards/CareerLeaderboardsViewXssTest.php
-
-		-
-			rawMessage: 'Method Tests\CareerLeaderboards\CareerLeaderboardsViewXssTest::makeStats() should return array{pid: int, name: string, games: int, minutes: string, fgm: string, fga: string, fgp: string, ftm: string, ...} but returns array{pid: mixed, name: mixed, games: mixed, minutes: mixed, fgm: mixed, fga: mixed, fgp: mixed, ftm: mixed, ..., ...}.'
-			identifier: return.type
-			count: 1
-			path: tests/CareerLeaderboards/CareerLeaderboardsViewXssTest.php
-
-		-
 			rawMessage: Short ternary operator is not allowed. Use null coalesce operator if applicable or consider using long ternary.
 			identifier: ternary.shortNotAllowed
 			count: 1
 			path: tests/Cli/CheckDestructiveMigrationsCliTest.php
-
-		-
-			rawMessage: 'Method Tests\Cli\CheckMasterCiGreenCliTest::runScript() has parameter $args with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Cli/CheckMasterCiGreenCliTest.php
-
-		-
-			rawMessage: 'Method Tests\Cli\CheckMasterCiGreenCliTest::runScript() has parameter $env with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Cli/CheckMasterCiGreenCliTest.php
-
-		-
-			rawMessage: 'Method Tests\Cli\CheckMasterCiGreenCliTest::writeFixture() has parameter $checkRuns with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Cli/CheckMasterCiGreenCliTest.php
 
 		-
 			rawMessage: 'Call to function array_filter() requires parameter #2 to be passed to avoid loose comparison semantics.'
@@ -751,12 +607,6 @@ parameters:
 			path: tests/Cli/LighthouseThresholdsTest.php
 
 		-
-			rawMessage: 'Method Tests\Cli\MergeMasterToProdCliTest::runScript() has parameter $env with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Cli/MergeMasterToProdCliTest.php
-
-		-
 			rawMessage: Short ternary operator is not allowed. Use null coalesce operator if applicable or consider using long ternary.
 			identifier: ternary.shortNotAllowed
 			count: 6
@@ -793,19 +643,7 @@ parameters:
 			path: tests/ComparePlayers/ComparePlayersServiceTest.php
 
 		-
-			rawMessage: 'Method Tests\ComparePlayers\ComparePlayersViewTest::getPlayerTemplate() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/ComparePlayers/ComparePlayersViewTest.php
-
-		-
-			rawMessage: 'Method Tests\ComparePlayers\ComparePlayersViewTest::getValidComparisonData() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/ComparePlayers/ComparePlayersViewTest.php
-
-		-
-			rawMessage: 'Parameter #1 $comparisonData of method ComparePlayers\ComparePlayersView::renderComparisonResults() expects array{player1: array<string, mixed>, player2: array<string, mixed>}, array given.'
+			rawMessage: 'Parameter #1 $comparisonData of method ComparePlayers\ComparePlayersView::renderComparisonResults() expects array{player1: array<string, mixed>, player2: array<string, mixed>}, array<string, array{pid: int, teamid: int, name: string, pos: string, age: int, r_fga: int, r_fgp: int, r_fta: int, ...}> given.'
 			identifier: argument.type
 			count: 7
 			path: tests/ComparePlayers/ComparePlayersViewTest.php
@@ -817,20 +655,8 @@ parameters:
 			path: tests/ContractList/ContractListServiceTest.php
 
 		-
-			rawMessage: 'Method Tests\ContractList\ContractListServiceTest::createPlayerContract() has parameter $overrides with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/ContractList/ContractListServiceTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''ContractList\\Contracts\\ContractListViewInterface'' and ContractList\ContractListView will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/ContractList/ContractListViewTest.php
-
-		-
-			rawMessage: 'Method Tests\ContractList\ContractListViewTest::createContract() has parameter $overrides with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
 			count: 1
 			path: tests/ContractList/ContractListViewTest.php
 
@@ -889,45 +715,9 @@ parameters:
 			path: tests/DatabaseIntegration/AwardHistoryRepositoryTest.php
 
 		-
-			rawMessage: 'Method Tests\DatabaseIntegration\QueryCountingRepository::callFetchAllInList() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/DatabaseIntegration/BaseMysqliRepositoryHelpersTest.php
-
-		-
-			rawMessage: 'Method Tests\DatabaseIntegration\TestableRepository::callFetchAllInList() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/DatabaseIntegration/BaseMysqliRepositoryHelpersTest.php
-
-		-
-			rawMessage: 'Method Tests\DatabaseIntegration\TestableRepository::callFetchAllInListWithPrefix() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/DatabaseIntegration/BaseMysqliRepositoryHelpersTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 10
-			path: tests/DatabaseIntegration/BaseMysqliRepositoryTest.php
-
-		-
-			rawMessage: 'Method Tests\DatabaseIntegration\TestableBaseMysqliRepository::callFetchAll() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/DatabaseIntegration/BaseMysqliRepositoryTest.php
-
-		-
-			rawMessage: 'Method Tests\DatabaseIntegration\TestableBaseMysqliRepository::callFetchAllRealTeams() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/DatabaseIntegration/BaseMysqliRepositoryTest.php
-
-		-
-			rawMessage: 'Method Tests\DatabaseIntegration\TestableBaseMysqliRepository::callFetchOne() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
 			path: tests/DatabaseIntegration/BaseMysqliRepositoryTest.php
 
 		-
@@ -983,12 +773,6 @@ parameters:
 			identifier: argument.type
 			count: 8
 			path: tests/DatabaseIntegration/FreeAgencyRepositoryTest.php
-
-		-
-			rawMessage: 'PHPDoc tag @var with type array<string, mixed>|null is not subtype of type array<string, float|int|string|null>|false|null.'
-			identifier: varTag.type
-			count: 1
-			path: tests/DatabaseIntegration/IblHistStructuralTest.php
 
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
@@ -1075,12 +859,6 @@ parameters:
 			path: tests/DatabaseIntegration/UpdateAllTheThings/ScheduleAtomicityTest.php
 
 		-
-			rawMessage: 'Method Tests\DatabaseIntegration\VotingRepositoryTest::fetchRow() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/DatabaseIntegration/VotingRepositoryTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''DepthChartEntry\\DepthChartEntryApiHandler'' and DepthChartEntry\DepthChartEntryApiHandler will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -1117,97 +895,13 @@ parameters:
 			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
 
 		-
-			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryProcessorTest::testBlankMinutesSubmissionIsConvertedToZero() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryProcessorTest::testCompleteRoundTripPreservesPositionDepthValues() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryProcessorTest::testCountsAllPositionTypesCorrectly() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryProcessorTest::testCsvExportMatchesProcessedValuesForAllSettings() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryProcessorTest::testDetectsMultipleStartingPositions() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryProcessorTest::testExcludesInjuredPlayersFromPositionCount() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryProcessorTest::testFormDisplaysCorrectDatabaseValuesForAllSettings() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryProcessorTest::testGeneratesCsvContentCorrectly() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryProcessorTest::testGeneratesCsvWithSpecialCharacters() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryProcessorTest::testHandlesMissingOptionalFields() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryProcessorTest::testProcessesSubmissionCorrectly() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryProcessorTest::testRoleFieldsAreHardcodedToZero() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryProcessorTest::testSanitizesInputWithMaliciousData() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryProcessorTest::testZeroValuesAreHandledCorrectly() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
-
-		-
 			rawMessage: 'Parameter #1 $player of method DepthChartEntry\DepthChartEntryView::renderPlayerRow() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ..., ...<string, mixed>}, array{pid: 1, name: ''Round Trip Player'', pos: ''SG'', injured: 0, stamina: 60, dc_pg_depth: 0, dc_sg_depth: 1, dc_sf_depth: 2, ...} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
 
 		-
-			rawMessage: 'Parameter #1 $player of method DepthChartEntry\DepthChartEntryView::renderPlayerRow() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ..., ...<string, mixed>}, array{pid: 1, name: ''Round Trip Player'', pos: ''SG'', injured: 0, stamina: 60, dc_pg_depth: mixed, dc_sg_depth: mixed, dc_sf_depth: mixed, ...} given.'
+			rawMessage: 'Parameter #1 $player of method DepthChartEntry\DepthChartEntryView::renderPlayerRow() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ..., ...<string, mixed>}, array{pid: 1, name: ''Round Trip Player'', pos: ''SG'', injured: 0, stamina: 60, dc_pg_depth: int, dc_sg_depth: int, dc_sf_depth: int, ...} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
@@ -1225,34 +919,34 @@ parameters:
 			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
 
 		-
-			rawMessage: Property Tests\DepthChartEntry\DepthChartEntryProcessorTest::$processor has no type specified.
-			identifier: missingType.property
+			rawMessage: 'Parameter #1 $playerData of method DepthChartEntry\DepthChartEntryProcessor::generateCsvContent() expects list<array{name: string, pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, ...}>, array{array{name: ''Player 1'', pg: 1, sg: 0, sf: 0, pf: 0, c: 0, canPlayInGame: 1, min: 30, ...}, array{name: ''Player 2'', pg: 0, sg: 1, sf: 0, pf: 0, c: 0, canPlayInGame: 1, min: 25, ...}} given.'
+			identifier: argument.type
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
 
 		-
-			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryRepositoryTest::testBindParamOrderMatchesUpdateStatementOrder() has no return type specified.'
-			identifier: missingType.return
+			rawMessage: 'Parameter #1 $playerData of method DepthChartEntry\DepthChartEntryProcessor::generateCsvContent() expects list<array{name: string, pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, ...}>, array{array{name: ''Player One'', pg: ''1'', sg: ''0'', sf: ''0'', pf: ''0'', c: ''0'', canPlayInGame: ''1'', min: ''30'', ...}} given.'
+			identifier: argument.type
 			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryRepositoryTest.php
+			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
 
 		-
-			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryRepositoryTest::testCompleteDataFlowFromFormToDatabase() has no return type specified.'
-			identifier: missingType.return
+			rawMessage: 'Parameter #1 $playerData of method DepthChartEntry\DepthChartEntryProcessor::generateCsvContent() expects list<array{name: string, pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, ...}>, array{array{name: ''Player, Jr.'', pg: 1, sg: 0, sf: 0, pf: 0, c: 0, canPlayInGame: 1, min: 30, ...}} given.'
+			identifier: argument.type
 			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryRepositoryTest.php
+			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
 
 		-
-			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryRepositoryTest::testDatabaseUpdateQueryMapsFieldsCorrectly() has no return type specified.'
-			identifier: missingType.return
+			rawMessage: 'Parameter #1 $playerData of method DepthChartEntry\DepthChartEntryProcessor::generateCsvContent() expects list<array{name: string, pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, ...}>, array{array{name: ''Test Player'', pg: 1, sg: 2, sf: 0, pf: 3, c: 0, canPlayInGame: 1, min: 30, ...}} given.'
+			identifier: argument.type
 			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryRepositoryTest.php
+			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
 
 		-
-			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryRepositoryTest::testRoleColumnsAreHardcodedToZeroInSql() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryRepositoryTest.php
+			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
+			identifier: phpunit.assertEquals
+			count: 38
+			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
 
 		-
 			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ..., ...<string, mixed>}, array{pg: ''1'', sg: ''0'', sf: ''2'', pf: ''0'', c: ''0'', canPlayInGame: ''1'', min: ''30''} given.'
@@ -1291,75 +985,57 @@ parameters:
 			path: tests/DepthChartEntry/DepthChartEntrySubmissionHandlerTest.php
 
 		-
-			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryValidatorTest::testEdgeCaseExactlyAtMaximumActivePlayers() has no return type specified.'
-			identifier: missingType.return
+			rawMessage: 'Parameter #1 $depthChartData of method DepthChartEntry\DepthChartEntryValidator::validate() expects array{playerData: list<array{name: string, pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, ...}>, activePlayers: int, pos_1: int, pos_2: int, pos_3: int, pos_4: int, pos_5: int, hasStarterAtMultiplePositions: bool, ...}, array{activePlayers: 10, pos_1: 2, pos_2: 2, pos_3: 2, pos_4: 2, pos_5: 2, hasStarterAtMultiplePositions: false, nameOfProblemStarter: ''''} given.'
+			identifier: argument.type
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntryValidatorTest.php
 
 		-
-			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryValidatorTest::testEdgeCaseExactlyAtMinimumRequirements() has no return type specified.'
-			identifier: missingType.return
+			rawMessage: 'Parameter #1 $depthChartData of method DepthChartEntry\DepthChartEntryValidator::validate() expects array{playerData: list<array{name: string, pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, ...}>, activePlayers: int, pos_1: int, pos_2: int, pos_3: int, pos_4: int, pos_5: int, hasStarterAtMultiplePositions: bool, ...}, array{activePlayers: 10, pos_1: 3, pos_2: 3, pos_3: 3, pos_4: 3, pos_5: 3, hasStarterAtMultiplePositions: false, nameOfProblemStarter: ''''} given.'
+			identifier: argument.type
+			count: 2
+			path: tests/DepthChartEntry/DepthChartEntryValidatorTest.php
+
+		-
+			rawMessage: 'Parameter #1 $depthChartData of method DepthChartEntry\DepthChartEntryValidator::validate() expects array{playerData: list<array{name: string, pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, ...}>, activePlayers: int, pos_1: int, pos_2: int, pos_3: int, pos_4: int, pos_5: int, hasStarterAtMultiplePositions: bool, ...}, array{activePlayers: 11, pos_1: 2, pos_2: 2, pos_3: 2, pos_4: 2, pos_5: 2, hasStarterAtMultiplePositions: false, nameOfProblemStarter: ''''} given.'
+			identifier: argument.type
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntryValidatorTest.php
 
 		-
-			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryValidatorTest::testFailsValidationWithInsufficientPositionDepth() has no return type specified.'
-			identifier: missingType.return
+			rawMessage: 'Parameter #1 $depthChartData of method DepthChartEntry\DepthChartEntryValidator::validate() expects array{playerData: list<array{name: string, pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, ...}>, activePlayers: int, pos_1: int, pos_2: int, pos_3: int, pos_4: int, pos_5: int, hasStarterAtMultiplePositions: bool, ...}, array{activePlayers: 12, pos_1: 3, pos_2: 3, pos_3: 1, pos_4: 3, pos_5: 3, hasStarterAtMultiplePositions: false, nameOfProblemStarter: ''''} given.'
+			identifier: argument.type
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntryValidatorTest.php
 
 		-
-			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryValidatorTest::testFailsValidationWithMultipleStartingPositions() has no return type specified.'
-			identifier: missingType.return
+			rawMessage: 'Parameter #1 $depthChartData of method DepthChartEntry\DepthChartEntryValidator::validate() expects array{playerData: list<array{name: string, pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, ...}>, activePlayers: int, pos_1: int, pos_2: int, pos_3: int, pos_4: int, pos_5: int, hasStarterAtMultiplePositions: bool, ...}, array{activePlayers: 12, pos_1: 3, pos_2: 3, pos_3: 3, pos_4: 3, pos_5: 3, hasStarterAtMultiplePositions: false, nameOfProblemStarter: ''''} given.'
+			identifier: argument.type
+			count: 3
+			path: tests/DepthChartEntry/DepthChartEntryValidatorTest.php
+
+		-
+			rawMessage: 'Parameter #1 $depthChartData of method DepthChartEntry\DepthChartEntryValidator::validate() expects array{playerData: list<array{name: string, pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, ...}>, activePlayers: int, pos_1: int, pos_2: int, pos_3: int, pos_4: int, pos_5: int, hasStarterAtMultiplePositions: bool, ...}, array{activePlayers: 12, pos_1: 3, pos_2: 3, pos_3: 3, pos_4: 3, pos_5: 3, hasStarterAtMultiplePositions: true, nameOfProblemStarter: ''John Doe''} given.'
+			identifier: argument.type
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntryValidatorTest.php
 
 		-
-			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryValidatorTest::testFailsValidationWithTooFewActivePlayers() has no return type specified.'
-			identifier: missingType.return
+			rawMessage: 'Parameter #1 $depthChartData of method DepthChartEntry\DepthChartEntryValidator::validate() expects array{playerData: list<array{name: string, pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, ...}>, activePlayers: int, pos_1: int, pos_2: int, pos_3: int, pos_4: int, pos_5: int, hasStarterAtMultiplePositions: bool, ...}, array{activePlayers: 13, pos_1: 3, pos_2: 3, pos_3: 3, pos_4: 3, pos_5: 3, hasStarterAtMultiplePositions: false, nameOfProblemStarter: ''''} given.'
+			identifier: argument.type
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntryValidatorTest.php
 
 		-
-			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryValidatorTest::testFailsValidationWithTooManyActivePlayers() has no return type specified.'
-			identifier: missingType.return
+			rawMessage: 'Parameter #1 $depthChartData of method DepthChartEntry\DepthChartEntryValidator::validate() expects array{playerData: list<array{name: string, pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, ...}>, activePlayers: int, pos_1: int, pos_2: int, pos_3: int, pos_4: int, pos_5: int, hasStarterAtMultiplePositions: bool, ...}, array{activePlayers: 8, pos_1: 1, pos_2: 1, pos_3: 3, pos_4: 3, pos_5: 3, hasStarterAtMultiplePositions: true, nameOfProblemStarter: ''John Doe''} given.'
+			identifier: argument.type
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntryValidatorTest.php
 
 		-
-			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryValidatorTest::testPlayoffsAllowsFewerActivePlayers() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryValidatorTest::testReturnsFormattedErrorMessages() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryValidatorTest::testValidatesActivePlayerCountPositionDepthAndMultiStarter() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryValidatorTest::testValidatesSuccessfullyWithValidPlayoffsData() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryValidatorTest::testValidatesSuccessfullyWithValidRegularSeasonData() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryValidatorTest.php
-
-		-
-			rawMessage: Property Tests\DepthChartEntry\DepthChartEntryValidatorTest::$validator has no type specified.
-			identifier: missingType.property
-			count: 1
+			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
+			identifier: phpunit.assertEquals
+			count: 8
 			path: tests/DepthChartEntry/DepthChartEntryValidatorTest.php
 
 		-
@@ -1371,12 +1047,6 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryViewXssTest.php
-
-		-
-			rawMessage: 'Method Tests\DepthChartEntry\DepthChartEntryViewXssTest::makePlayer() has parameter $overrides with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
 			count: 1
 			path: tests/DepthChartEntry/DepthChartEntryViewXssTest.php
 
@@ -1423,152 +1093,14 @@ parameters:
 			path: tests/Discord/DiscordTest.php
 
 		-
-			rawMessage: 'Method Tests\Draft\DraftProcessorTest::testCreateDraftAnnouncementFormatsCorrectly() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Draft/DraftProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\Draft\DraftProcessorTest::testCreateDraftAnnouncementHandlesApostrophes() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Draft/DraftProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\Draft\DraftProcessorTest::testCreateDraftAnnouncementWithSecondRound() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Draft/DraftProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\Draft\DraftProcessorTest::testCreateNextTeamMessageWhenDraftComplete() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Draft/DraftProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\Draft\DraftProcessorTest::testCreateNextTeamMessageWithTeamOnClock() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Draft/DraftProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\Draft\DraftProcessorTest::testGetDatabaseErrorMessageContainsErrorAndLink() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Draft/DraftProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\Draft\DraftProcessorTest::testGetSuccessMessageContainsAnnouncementAndLink() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Draft/DraftProcessorTest.php
-
-		-
-			rawMessage: Property Tests\Draft\DraftProcessorTest::$processor has no type specified.
-			identifier: missingType.property
-			count: 1
-			path: tests/Draft/DraftProcessorTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 2
 			path: tests/Draft/DraftRepositoryTest.php
 
 		-
-			rawMessage: 'Method Tests\Draft\DraftRepositoryTest::testCreatePlayerFromDraftClassHandlesApostrophes() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Draft/DraftRepositoryTest.php
-
-		-
-			rawMessage: 'Method Tests\Draft\DraftRepositoryTest::testCreatePlayerFromDraftClassReturnsFalseWhenPlayerNotInDraftClass() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Draft/DraftRepositoryTest.php
-
-		-
-			rawMessage: 'Method Tests\Draft\DraftRepositoryTest::testCreatePlayerFromDraftClassReturnsFalseWhenTeamNotFound() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Draft/DraftRepositoryTest.php
-
-		-
-			rawMessage: 'Method Tests\Draft\DraftRepositoryTest::testCreatePlayerFromDraftClassSucceeds() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Draft/DraftRepositoryTest.php
-
-		-
-			rawMessage: 'Method Tests\Draft\DraftRepositoryTest::testCreatePlayerFromDraftClassTruncatesLongNames() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Draft/DraftRepositoryTest.php
-
-		-
-			rawMessage: 'Method Tests\Draft\DraftRepositoryTest::testGetCurrentDraftSelectionReturnsNullWhenNoResults() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Draft/DraftRepositoryTest.php
-
-		-
-			rawMessage: 'Method Tests\Draft\DraftRepositoryTest::testGetCurrentDraftSelectionReturnsPlayerName() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Draft/DraftRepositoryTest.php
-
-		-
-			rawMessage: 'Method Tests\Draft\DraftRepositoryTest::testIsPlayerAlreadyDraftedEscapesPlayerName() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Draft/DraftRepositoryTest.php
-
-		-
-			rawMessage: 'Method Tests\Draft\DraftRepositoryTest::testIsPlayerAlreadyDraftedReturnsFalseWhenNotDrafted() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Draft/DraftRepositoryTest.php
-
-		-
-			rawMessage: 'Method Tests\Draft\DraftRepositoryTest::testIsPlayerAlreadyDraftedReturnsFalseWhenPlayerNotFound() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Draft/DraftRepositoryTest.php
-
-		-
-			rawMessage: 'Method Tests\Draft\DraftRepositoryTest::testIsPlayerAlreadyDraftedReturnsTrueWhenDrafted() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Draft/DraftRepositoryTest.php
-
-		-
-			rawMessage: 'Method Tests\Draft\DraftRepositoryTest::testUpdateDraftTableExecutesCorrectQuery() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Draft/DraftRepositoryTest.php
-
-		-
-			rawMessage: 'Method Tests\Draft\DraftRepositoryTest::testUpdateDraftTableHandlesApostrophes() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Draft/DraftRepositoryTest.php
-
-		-
-			rawMessage: 'Method Tests\Draft\DraftRepositoryTest::testUpdateRookieTableExecutesCorrectQuery() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Draft/DraftRepositoryTest.php
-
-		-
-			rawMessage: Property Tests\Draft\DraftRepositoryTest::$mockDb has no type specified.
-			identifier: missingType.property
-			count: 1
-			path: tests/Draft/DraftRepositoryTest.php
-
-		-
-			rawMessage: Property Tests\Draft\DraftRepositoryTest::$repository has no type specified.
-			identifier: missingType.property
+			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
+			identifier: phpunit.assertEquals
 			count: 1
 			path: tests/Draft/DraftRepositoryTest.php
 
@@ -1591,68 +1123,8 @@ parameters:
 			path: tests/Draft/DraftSelectionHandlerTest.php
 
 		-
-			rawMessage: 'Method Tests\Draft\DraftValidatorTest::testClearErrorsRemovesAllErrors() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Draft/DraftValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Draft\DraftValidatorTest::testValidateFailsWhenPickAlreadyUsed() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Draft/DraftValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Draft\DraftValidatorTest::testValidateFailsWhenPlayerAlreadyDrafted() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Draft/DraftValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Draft\DraftValidatorTest::testValidateFailsWithEmptyPlayerName() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Draft/DraftValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Draft\DraftValidatorTest::testValidateFailsWithNullPlayerName() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Draft/DraftValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Draft\DraftValidatorTest::testValidateFailsWithPlayerAlreadyDraftedEvenIfPickNotUsed() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Draft/DraftValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Draft\DraftValidatorTest::testValidateResetsPreviousErrors() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Draft/DraftValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Draft\DraftValidatorTest::testValidateSucceedsWhenPlayerNotAlreadyDrafted() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Draft/DraftValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Draft\DraftValidatorTest::testValidateSucceedsWithEmptyStringCurrentSelection() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Draft/DraftValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Draft\DraftValidatorTest::testValidateSucceedsWithValidSelection() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Draft/DraftValidatorTest.php
-
-		-
-			rawMessage: Property Tests\Draft\DraftValidatorTest::$validator has no type specified.
-			identifier: missingType.property
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertEmpty() with non-empty-array<int, string> will always evaluate to false.'
+			identifier: method.impossibleType
 			count: 1
 			path: tests/Draft/DraftValidatorTest.php
 
@@ -1687,18 +1159,6 @@ parameters:
 			path: tests/DraftHistory/DraftHistoryViewTest.php
 
 		-
-			rawMessage: 'Method Tests\DraftHistory\DraftHistoryViewTest::createTeamPick() has parameter $overrides with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/DraftHistory/DraftHistoryViewTest.php
-
-		-
-			rawMessage: 'Method Tests\DraftHistory\DraftHistoryViewTest::createYearPick() has parameter $overrides with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/DraftHistory/DraftHistoryViewTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''DraftPickLocator\\DraftPickLocatorService'' and DraftPickLocator\DraftPickLocatorService will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -1725,18 +1185,6 @@ parameters:
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Draft\\DraftPick'' and Draft\DraftPick will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/DraftPickTest.php
-
-		-
-			rawMessage: 'Method Tests\DraftPickTest::createValidDraftPickRow() has parameter $overrides with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/DraftPickTest.php
-
-		-
-			rawMessage: 'Method Tests\DraftPickTest::createValidDraftPickRow() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
 			count: 1
 			path: tests/DraftPickTest.php
 
@@ -1996,146 +1444,14 @@ parameters:
 			path: tests/Extension/ExtensionServiceTest.php
 
 		-
-			rawMessage: 'Method Tests\Extension\ExtensionServiceTest::getFullMockData() has parameter $overrides with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Extension/ExtensionServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\Extension\ExtensionValidatorTest::invalidRaiseProvider() has no return type specified.'
-			identifier: missingType.return
+			rawMessage: 'Parameter #1 $offer of method FreeAgency\CommonContractValidator::validateRaises() expects array{year1: int, year2: int, year3: int, year4?: int, year5?: int, year6?: int}, array<string, int> given.'
+			identifier: argument.type
 			count: 1
 			path: tests/Extension/ExtensionValidatorTest.php
 
 		-
-			rawMessage: 'Method Tests\Extension\ExtensionValidatorTest::salaryDecreaseProvider() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Extension/ExtensionValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Extension\ExtensionValidatorTest::testAcceptsConstantOrIncreasingSalaries() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Extension/ExtensionValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Extension\ExtensionValidatorTest::testAcceptsExtensionWhenNotYetUsed() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Extension/ExtensionValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Extension\ExtensionValidatorTest::testAcceptsLegalRaisesWithBirdRights() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Extension/ExtensionValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Extension\ExtensionValidatorTest::testAcceptsLegalRaisesWithoutBirdRights() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Extension/ExtensionValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Extension\ExtensionValidatorTest::testAcceptsOfferAtMaximumFor0To6YearsExperience() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Extension/ExtensionValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Extension\ExtensionValidatorTest::testAcceptsOfferAtMaximumFor10PlusYearsExperience() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Extension/ExtensionValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Extension\ExtensionValidatorTest::testAcceptsZeroAmountsInYears4And5() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Extension/ExtensionValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Extension\ExtensionValidatorTest::testRejectsExtensionWhenAlreadyUsedThisSeason() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Extension/ExtensionValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Extension\ExtensionValidatorTest::testRejectsExtensionWhenAlreadyUsedThisSim() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Extension/ExtensionValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Extension\ExtensionValidatorTest::testRejectsIllegalRaises() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Extension/ExtensionValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Extension\ExtensionValidatorTest::testRejectsIllegalRaises() has parameter $birdYears with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: tests/Extension/ExtensionValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Extension\ExtensionValidatorTest::testRejectsIllegalRaises() has parameter $expectedErrorYear with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: tests/Extension/ExtensionValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Extension\ExtensionValidatorTest::testRejectsIllegalRaises() has parameter $offer with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: tests/Extension/ExtensionValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Extension\ExtensionValidatorTest::testRejectsOfferOverMaximumFor0To6YearsExperience() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Extension/ExtensionValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Extension\ExtensionValidatorTest::testRejectsOfferOverMaximumFor7To9YearsExperience() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Extension/ExtensionValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Extension\ExtensionValidatorTest::testRejectsSalaryDecreasesBetweenYears() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Extension/ExtensionValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Extension\ExtensionValidatorTest::testRejectsSalaryDecreasesBetweenYears() has parameter $expectedErrorYear with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: tests/Extension/ExtensionValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Extension\ExtensionValidatorTest::testRejectsSalaryDecreasesBetweenYears() has parameter $offer with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: tests/Extension/ExtensionValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Extension\ExtensionValidatorTest::testRejectsZeroAmountInYear1() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Extension/ExtensionValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Extension\ExtensionValidatorTest::testRejectsZeroAmountInYear2() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Extension/ExtensionValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Extension\ExtensionValidatorTest::testRejectsZeroAmountInYear3() has no return type specified.'
-			identifier: missingType.return
+			rawMessage: 'Parameter #1 $offer of method FreeAgency\CommonContractValidator::validateSalaryDecreases() expects array{year1: int, year2: int, year3: int, year4?: int, year5?: int, year6?: int}, array<string, int> given.'
+			identifier: argument.type
 			count: 1
 			path: tests/Extension/ExtensionValidatorTest.php
 
@@ -2206,12 +1522,6 @@ parameters:
 			path: tests/FreeAgency/FreeAgencyAdminProcessorTest.php
 
 		-
-			rawMessage: 'Method Tests\FreeAgency\FreeAgencyAdminProcessorTest::makeOfferRow() should return array{name: string, pid: int, team: string, teamid: int, offer1: int, offer2: int, offer3: int, offer4: int, ...} but returns array{name: string, pid: int, team: string, teamid: int, offer1: int, offer2: int, offer3: int, offer4: int, ...}.'
-			identifier: return.type
-			count: 1
-			path: tests/FreeAgency/FreeAgencyAdminProcessorTest.php
-
-		-
 			rawMessage: 'Parameter #2 $signings of method FreeAgency\FreeAgencyAdminProcessor::executeSignings() expects list<array{playerId: int, teamId: int, teamName: string, offers: array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int}, offerYears: int, usedMle: bool, usedLle: bool}>, array{array{playerId: int, teamId: int, teamName: string, offers: array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int}, offerYears: int, offerTotal: float, usedMle: bool, usedLle: bool}} given.'
 			identifier: argument.type
 			count: 3
@@ -2248,12 +1558,6 @@ parameters:
 			path: tests/FreeAgency/FreeAgencyCapCalculatorTest.php
 
 		-
-			rawMessage: Property Tests\FreeAgency\FreeAgencyCapCalculatorTest::$mockDb has no type specified.
-			identifier: missingType.property
-			count: 1
-			path: tests/FreeAgency/FreeAgencyCapCalculatorTest.php
-
-		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
 			count: 17
@@ -2278,26 +1582,14 @@ parameters:
 			path: tests/FreeAgency/FreeAgencyDemandCalculatorTest.php
 
 		-
-			rawMessage: 'Method Tests\FreeAgency\MockDemandRepository::getPlayerDemands() should return array{dem1: int, dem2: int, dem3: int, dem4: int, dem5: int, dem6: int} but returns array.'
-			identifier: return.type
+			rawMessage: 'Property Tests\FreeAgency\MockDemandRepository::$playerDemands (array{dem1: int, dem2: int, dem3: int, dem4: int, dem5: int, dem6: int}) does not accept default value of type array{}.'
+			identifier: property.defaultValue
 			count: 1
 			path: tests/FreeAgency/FreeAgencyDemandCalculatorTest.php
 
 		-
-			rawMessage: 'Method Tests\FreeAgency\MockDemandRepository::getTeamPerformance() should return array{wins: int, losses: int, tradWins: int, tradLosses: int} but returns array.'
-			identifier: return.type
-			count: 1
-			path: tests/FreeAgency/FreeAgencyDemandCalculatorTest.php
-
-		-
-			rawMessage: Property Tests\FreeAgency\MockDemandRepository::$playerDemands type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/FreeAgency/FreeAgencyDemandCalculatorTest.php
-
-		-
-			rawMessage: Property Tests\FreeAgency\MockDemandRepository::$teamPerformance type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
+			rawMessage: 'Property Tests\FreeAgency\MockDemandRepository::$teamPerformance (array{wins: int, losses: int, tradWins: int, tradLosses: int}) does not accept default value of type array{}.'
+			identifier: property.defaultValue
 			count: 1
 			path: tests/FreeAgency/FreeAgencyDemandCalculatorTest.php
 
@@ -2428,20 +1720,8 @@ parameters:
 			path: tests/FreeAgencyPreview/FreeAgencyPreviewServiceTest.php
 
 		-
-			rawMessage: 'Method Tests\FreeAgencyPreview\FreeAgencyPreviewServiceTest::createActivePlayer() has parameter $overrides with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/FreeAgencyPreview/FreeAgencyPreviewServiceTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''FreeAgencyPreview\\Contracts\\FreeAgencyPreviewViewInterface'' and FreeAgencyPreview\FreeAgencyPreviewView will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/FreeAgencyPreview/FreeAgencyPreviewViewTest.php
-
-		-
-			rawMessage: 'Method Tests\FreeAgencyPreview\FreeAgencyPreviewViewTest::createFreeAgent() has parameter $overrides with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
 			count: 1
 			path: tests/FreeAgencyPreview/FreeAgencyPreviewViewTest.php
 
@@ -2452,26 +1732,8 @@ parameters:
 			path: tests/GMContactList/GMContactListViewTest.php
 
 		-
-			rawMessage: 'Method Tests\GMContactList\GMContactListViewTest::createContact() has parameter $overrides with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/GMContactList/GMContactListViewTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''LeagueSchedule\\Game'' and LeagueSchedule\Game will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/GameTest.php
-
-		-
-			rawMessage: 'Method Tests\GameTest::createValidScheduleRow() has parameter $overrides with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/GameTest.php
-
-		-
-			rawMessage: 'Method Tests\GameTest::createValidScheduleRow() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
 			count: 1
 			path: tests/GameTest.php
 
@@ -2512,21 +1774,9 @@ parameters:
 			path: tests/JsbParser/JsbExportServiceTest.php
 
 		-
-			rawMessage: 'Method Tests\JsbParser\JsbExportServiceTest::buildPlrContent() has parameter $records with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/JsbParser/JsbExportServiceTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 2
-			path: tests/JsbParser/JsbImportServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\JsbParser\JsbImportServiceTest::buildTrnFile() has parameter $records with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
 			path: tests/JsbParser/JsbImportServiceTest.php
 
 		-
@@ -2584,114 +1834,6 @@ parameters:
 			path: tests/LastSimRecap/LastSimRecapServiceTest.php
 
 		-
-			rawMessage: 'Method LastSimRecap\Contracts\LastSimRecapRepositoryInterface@anonymous/LastSimRecap/LastSimRecapServiceTest.php:240::__construct() has parameter $games with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/LastSimRecap/LastSimRecapServiceTest.php
-
-		-
-			rawMessage: 'Method LastSimRecap\Contracts\LastSimRecapRepositoryInterface@anonymous/LastSimRecap/LastSimRecapServiceTest.php:240::__construct() has parameter $injuriesByPidAndDate with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/LastSimRecap/LastSimRecapServiceTest.php
-
-		-
-			rawMessage: 'Method LastSimRecap\Contracts\LastSimRecapRepositoryInterface@anonymous/LastSimRecap/LastSimRecapServiceTest.php:240::__construct() has parameter $lastSimStarters with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/LastSimRecap/LastSimRecapServiceTest.php
-
-		-
-			rawMessage: 'Method LastSimRecap\Contracts\LastSimRecapRepositoryInterface@anonymous/LastSimRecap/LastSimRecapServiceTest.php:240::__construct() has parameter $playerLines with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/LastSimRecap/LastSimRecapServiceTest.php
-
-		-
-			rawMessage: 'Method LastSimRecap\Contracts\LastSimRecapRepositoryInterface@anonymous/LastSimRecap/LastSimRecapServiceTest.php:240::__construct() has parameter $quarterLines with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/LastSimRecap/LastSimRecapServiceTest.php
-
-		-
-			rawMessage: 'Method LastSimRecap\Contracts\LastSimRecapRepositoryInterface@anonymous/LastSimRecap/LastSimRecapServiceTest.php:240::__construct() has parameter $rosterByTid with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/LastSimRecap/LastSimRecapServiceTest.php
-
-		-
-			rawMessage: 'Method LastSimRecap\Contracts\LastSimRecapRepositoryInterface@anonymous/LastSimRecap/LastSimRecapServiceTest.php:240::__construct() has parameter $starterSnapshots with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/LastSimRecap/LastSimRecapServiceTest.php
-
-		-
-			rawMessage: 'Method LastSimRecap\Contracts\LastSimRecapRepositoryInterface@anonymous/LastSimRecap/LastSimRecapServiceTest.php:240::__construct() has parameter $teamInfo with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/LastSimRecap/LastSimRecapServiceTest.php
-
-		-
-			rawMessage: 'Method LastSimRecap\Contracts\LastSimRecapRepositoryInterface@anonymous/LastSimRecap/LastSimRecapServiceTest.php:240::__construct() has parameter $window with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/LastSimRecap/LastSimRecapServiceTest.php
-
-		-
-			rawMessage: 'Method LastSimRecap\Contracts\LastSimRecapRepositoryInterface@anonymous/LastSimRecap/LastSimRecapServiceTest.php:240::getLastSimWindow() should return array{sim: int, startDate: string, endDate: string}|null but returns array|null.'
-			identifier: return.type
-			count: 1
-			path: tests/LastSimRecap/LastSimRecapServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\LastSimRecap\LastSimRecapServiceTest::buildRepo() has parameter $games with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/LastSimRecap/LastSimRecapServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\LastSimRecap\LastSimRecapServiceTest::buildRepo() has parameter $injuriesByPidAndDate with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/LastSimRecap/LastSimRecapServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\LastSimRecap\LastSimRecapServiceTest::buildRepo() has parameter $lastSimStarters with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/LastSimRecap/LastSimRecapServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\LastSimRecap\LastSimRecapServiceTest::buildRepo() has parameter $playerLines with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/LastSimRecap/LastSimRecapServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\LastSimRecap\LastSimRecapServiceTest::buildRepo() has parameter $quarterLines with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/LastSimRecap/LastSimRecapServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\LastSimRecap\LastSimRecapServiceTest::buildRepo() has parameter $rosterByTid with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/LastSimRecap/LastSimRecapServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\LastSimRecap\LastSimRecapServiceTest::buildRepo() has parameter $starterSnapshots with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/LastSimRecap/LastSimRecapServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\LastSimRecap\LastSimRecapServiceTest::buildRepo() has parameter $window with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/LastSimRecap/LastSimRecapServiceTest.php
-
-		-
 			rawMessage: 'Call to function array_filter() requires parameter #2 to be passed to avoid loose comparison semantics.'
 			identifier: arrayFilter.strict
 			count: 1
@@ -2710,18 +1852,6 @@ parameters:
 			path: tests/LastSimRecap/NewsModuleIntegrationTest.php
 
 		-
-			rawMessage: 'Method LastSimRecap\Contracts\LastSimRecapRepositoryInterface@anonymous/LastSimRecap/NewsModuleIntegrationTest.php:72::__construct() has parameter $games with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/LastSimRecap/NewsModuleIntegrationTest.php
-
-		-
-			rawMessage: 'Method Tests\LastSimRecap\NewsModuleIntegrationTest::repoWithGames() has parameter $games with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/LastSimRecap/NewsModuleIntegrationTest.php
-
-		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
 			count: 17
@@ -2734,9 +1864,9 @@ parameters:
 			path: tests/League/LeagueContextTest.php
 
 		-
-			rawMessage: Property Tests\League\LeagueContextTest::$leagueContext has no type specified.
-			identifier: missingType.property
-			count: 1
+			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
+			identifier: phpunit.assertEquals
+			count: 18
 			path: tests/League/LeagueContextTest.php
 
 		-
@@ -2867,13 +1997,7 @@ parameters:
 			path: tests/LeagueSchedule/LeagueScheduleViewTest.php
 
 		-
-			rawMessage: 'Method Tests\LeagueSchedule\LeagueScheduleViewTest::createPageData() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/LeagueSchedule/LeagueScheduleViewTest.php
-
-		-
-			rawMessage: 'Parameter #1 $pageData of method LeagueSchedule\LeagueScheduleView::render() expects array{gamesByMonth: array<string, array{label: string, dates: array<string, list<array{date: string, visitor: int, visitorScore: int, visitorTeam: string, visitorRecord: string, home: int, homeScore: int, homeTeam: string, ...}>>}>, firstUnplayedId: string|null, isPlayoffPhase: bool, playoffMonthKey: string|null, simLengthDays: int}, array given.'
+			rawMessage: 'Parameter #1 $pageData of method LeagueSchedule\LeagueScheduleView::render() expects array{gamesByMonth: array<string, array{label: string, dates: array<string, list<array{date: string, visitor: int, visitorScore: int, visitorTeam: string, visitorRecord: string, home: int, homeScore: int, homeTeam: string, ...}>>}>, firstUnplayedId: string|null, isPlayoffPhase: bool, playoffMonthKey: string|null, simLengthDays: int}, array{gamesByMonth: array<string, array{label: string, dates: array<string, list<array<string, mixed>>>}>, firstUnplayedId: string|null, isPlayoffPhase: bool, playoffMonthKey: string|null, simLengthDays: int} given.'
 			identifier: argument.type
 			count: 10
 			path: tests/LeagueSchedule/LeagueScheduleViewTest.php
@@ -3005,12 +2129,6 @@ parameters:
 			path: tests/Module/EntryPoints/ModuleEntryPointTestCase.php
 
 		-
-			rawMessage: 'Method Tests\Module\EntryPoints\PlayerEntryPointTest::seedShowpageMocks() has parameter $playerOverrides with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Module/EntryPoints/PlayerEntryPointTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 1
@@ -3047,178 +2165,16 @@ parameters:
 			path: tests/Negotiation/NegotiationDemandCalculatorTest.php
 
 		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationDemandCalculatorTest::createPlayerWithRatings() has parameter $overrides with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Negotiation/NegotiationDemandCalculatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationDemandCalculatorTest::getDefaultTeamFactors() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Negotiation/NegotiationDemandCalculatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationDemandCalculatorTest::testCalculatesCorrectNumberOfYears() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationDemandCalculatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationDemandCalculatorTest::testCalculatesDemandsForAveragePlayer() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationDemandCalculatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationDemandCalculatorTest::testCalculatesHigherDemandsForBetterPlayer() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationDemandCalculatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationDemandCalculatorTest::testCalculatesLowerDemandsForWorsePlayer() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationDemandCalculatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationDemandCalculatorTest::testHandlesZeroMarketMaximum() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationDemandCalculatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationDemandCalculatorTest::testModifierIncreasesDemandsWhenPositionCrowded() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationDemandCalculatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationDemandCalculatorTest::testModifierReducesDemandsForHighTraditionTeam() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationDemandCalculatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationDemandCalculatorTest::testModifierReducesDemandsForLoyalPlayer() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationDemandCalculatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationDemandCalculatorTest::testModifierReducesDemandsForWinningTeam() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationDemandCalculatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationDemandCalculatorTest::testTotalMatchesSumOfYears() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationDemandCalculatorTest.php
-
-		-
-			rawMessage: Property Tests\Negotiation\NegotiationDemandCalculatorTest::$calculator has no type specified.
-			identifier: missingType.property
-			count: 1
-			path: tests/Negotiation/NegotiationDemandCalculatorTest.php
-
-		-
-			rawMessage: Property Tests\Negotiation\NegotiationDemandCalculatorTest::$mockDb has no type specified.
-			identifier: missingType.property
-			count: 1
-			path: tests/Negotiation/NegotiationDemandCalculatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationOfferViewTest::getDefaultDemands() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Negotiation/NegotiationOfferViewTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationOfferViewTest::testDisplaysBirdRightsMessageWhenApplicable() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationOfferViewTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationOfferViewTest::testDisplaysCapSpaceInformation() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationOfferViewTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationOfferViewTest::testDisplaysNonBirdRightsMessageWhenNotApplicable() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationOfferViewTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationOfferViewTest::testEscapesErrorMessage() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationOfferViewTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationOfferViewTest::testEscapesPlayerNameInForm() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationOfferViewTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationOfferViewTest::testEscapesTeamNameInForm() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationOfferViewTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationOfferViewTest::testFormContainsAllHiddenFields() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationOfferViewTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationOfferViewTest::testHeaderReturnsStaticTitle() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationOfferViewTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationOfferViewTest::testRendersErrorMessage() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationOfferViewTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationOfferViewTest::testRendersHeader() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationOfferViewTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationOfferViewTest::testRendersNegotiationFormWithAllFields() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationOfferViewTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationOfferViewTest::testShowsEditableFieldsWhenDemandsUnderMax() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationOfferViewTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationOfferViewTest::testShowsMaxSalaryFieldsWhenDemandsExceedMax() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationOfferViewTest.php
-
-		-
-			rawMessage: 'Parameter #2 $demands of static method Negotiation\NegotiationOfferView::renderNegotiationForm() expects array{year1: float|int, year2: float|int, year3: float|int, year4: float|int, year5: float|int, year6: int, years: int, total: float|int, ...}, array given.'
+			rawMessage: 'Parameter #2 $teamFactors of method Negotiation\NegotiationDemandCalculator::calculateDemands() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{} given.'
 			identifier: argument.type
-			count: 6
-			path: tests/Negotiation/NegotiationOfferViewTest.php
+			count: 1
+			path: tests/Negotiation/NegotiationDemandCalculatorTest.php
+
+		-
+			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
+			identifier: phpunit.assertEquals
+			count: 12
+			path: tests/Negotiation/NegotiationDemandCalculatorTest.php
 
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''BaseMysqliRepository'' and Negotiation\NegotiationRepository will always evaluate to true.'
@@ -3269,86 +2225,8 @@ parameters:
 			path: tests/Negotiation/NegotiationServiceTest.php
 
 		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationServiceTest::getCompletePlayerData() has parameter $overrides with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationServiceTest::getCompletePlayerData() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Negotiation/NegotiationServiceTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/Negotiation/NegotiationValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationValidatorTest::testAcceptsPlayerInLastContractYear() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationValidatorTest::testAcceptsPlayerOnUsersTeamWhenEligible() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationValidatorTest::testAcceptsPlayerWithNoNextYearSalary() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationValidatorTest::testAcceptsWhenFreeAgencyModuleNotFound() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationValidatorTest::testAcceptsWhenFreeAgencyNotActive() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationValidatorTest::testRejectsDuringFreeAgency() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationValidatorTest::testRejectsPlayerNotEligibleForRenegotiation() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationValidatorTest::testRejectsPlayerNotOnUsersTeam() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Negotiation\NegotiationValidatorTest::testRejectsRookieOptionedPlayerInOptionYear() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Negotiation/NegotiationValidatorTest.php
-
-		-
-			rawMessage: Property Tests\Negotiation\NegotiationValidatorTest::$mockSeason has no type specified.
-			identifier: missingType.property
-			count: 1
-			path: tests/Negotiation/NegotiationValidatorTest.php
-
-		-
-			rawMessage: Property Tests\Negotiation\NegotiationValidatorTest::$validator has no type specified.
-			identifier: missingType.property
 			count: 1
 			path: tests/Negotiation/NegotiationValidatorTest.php
 
@@ -3467,19 +2345,13 @@ parameters:
 			path: tests/OneOnOneGame/OneOnOneGameEngineTest.php
 
 		-
-			rawMessage: 'Method Tests\OneOnOneGame\OneOnOneGameEngineTest::createMockPlayerData() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/OneOnOneGame/OneOnOneGameEngineTest.php
-
-		-
-			rawMessage: 'Parameter #1 $player1Data of method OneOnOneGame\OneOnOneGameEngine::simulateGame() expects array{pid: int, name: string, oo: int, r_drive_off: int, po: int, od: int, dd: int, pd: int, ...}, array given.'
+			rawMessage: 'Parameter #1 $player1Data of method OneOnOneGame\OneOnOneGameEngine::simulateGame() expects array{pid: int, name: string, oo: int, r_drive_off: int, po: int, od: int, dd: int, pd: int, ...}, array<string, mixed> given.'
 			identifier: argument.type
 			count: 12
 			path: tests/OneOnOneGame/OneOnOneGameEngineTest.php
 
 		-
-			rawMessage: 'Parameter #2 $player2Data of method OneOnOneGame\OneOnOneGameEngine::simulateGame() expects array{pid: int, name: string, oo: int, r_drive_off: int, po: int, od: int, dd: int, pd: int, ...}, array given.'
+			rawMessage: 'Parameter #2 $player2Data of method OneOnOneGame\OneOnOneGameEngine::simulateGame() expects array{pid: int, name: string, oo: int, r_drive_off: int, po: int, od: int, dd: int, pd: int, ...}, array<string, mixed> given.'
 			identifier: argument.type
 			count: 12
 			path: tests/OneOnOneGame/OneOnOneGameEngineTest.php
@@ -3533,12 +2405,6 @@ parameters:
 			path: tests/OneOnOneGame/OneOnOneGameServiceTest.php
 
 		-
-			rawMessage: 'Method Tests\OneOnOneGame\OneOnOneGameServiceTest::createMockPlayerData() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/OneOnOneGame/OneOnOneGameServiceTest.php
-
-		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
 			count: 3
@@ -3563,69 +2429,9 @@ parameters:
 			path: tests/PageLayout/PageLayoutHeaderSideEffectTest.php
 
 		-
-			rawMessage: 'Method Tests\Player\PlayerContractCalculatorTest::testGetCurrentSeasonSalaryForYear0() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerContractCalculatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerContractCalculatorTest::testGetCurrentSeasonSalaryForYear1() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerContractCalculatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerContractCalculatorTest::testGetCurrentSeasonSalaryForYear2() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerContractCalculatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerContractCalculatorTest::testGetCurrentSeasonSalaryForYear7() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerContractCalculatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerContractCalculatorTest::testGetLongBuyoutArray() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerContractCalculatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerContractCalculatorTest::testGetNextSeasonSalary() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerContractCalculatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerContractCalculatorTest::testGetRemainingContractArray() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerContractCalculatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerContractCalculatorTest::testGetRemainingContractArrayWithZeroValues() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerContractCalculatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerContractCalculatorTest::testGetShortBuyoutArray() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerContractCalculatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerContractCalculatorTest::testGetTotalRemainingSalary() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerContractCalculatorTest.php
-
-		-
-			rawMessage: Property Tests\Player\PlayerContractCalculatorTest::$calculator has no type specified.
-			identifier: missingType.property
-			count: 1
+			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
+			identifier: phpunit.assertEquals
+			count: 24
 			path: tests/Player/PlayerContractCalculatorTest.php
 
 		-
@@ -3635,147 +2441,9 @@ parameters:
 			path: tests/Player/PlayerContractValidatorTest.php
 
 		-
-			rawMessage: 'Method Tests\Player\PlayerContractValidatorTest::createMockSeason() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerContractValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerContractValidatorTest::createMockSeason() has parameter $endingYear with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: tests/Player/PlayerContractValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerContractValidatorTest::testCanRenegotiateContractWhenInLastYear() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerContractValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerContractValidatorTest::testCanRenegotiateContractWhenYear1WithNoYear2() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerContractValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerContractValidatorTest::testCanRenegotiateContractWhenYear2WithNoYear3() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerContractValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerContractValidatorTest::testCanRenegotiateWhenRookieOptionedButNotInOptionYear() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerContractValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerContractValidatorTest::testCanRookieOptionFirstRoundDuringFreeAgency() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerContractValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerContractValidatorTest::testCanRookieOptionFirstRoundDuringPreseason() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerContractValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerContractValidatorTest::testCanRookieOptionSecondRoundDuringFreeAgency() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerContractValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerContractValidatorTest::testCanRookieOptionSecondRoundDuringHEAT() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerContractValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerContractValidatorTest::testCannotRenegotiateContractWhenYearHasNext() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerContractValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerContractValidatorTest::testCannotRenegotiateWhenRookieOptionedFirstRoundInOptionYear() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerContractValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerContractValidatorTest::testCannotRenegotiateWhenRookieOptionedSecondRoundInOptionYear() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerContractValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerContractValidatorTest::testCannotRookieOptionDuringRegularSeason() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerContractValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerContractValidatorTest::testCannotRookieOptionSecondRoundWithMoreThanThreeYearsExperience() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerContractValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerContractValidatorTest::testCannotRookieOptionWithExactlyFourYearsExperience() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerContractValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerContractValidatorTest::testCannotRookieOptionWithMoreThanThreeYearsExperience() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerContractValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerContractValidatorTest::testGetFinalYearRookieContractSalaryFirstRound() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerContractValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerContractValidatorTest::testGetFinalYearRookieContractSalaryNotDraftPick() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerContractValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerContractValidatorTest::testGetFinalYearRookieContractSalarySecondRound() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerContractValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerContractValidatorTest::testWasNotRookieOptioned() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerContractValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerContractValidatorTest::testWasRookieOptionedFirstRound() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerContractValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerContractValidatorTest::testWasRookieOptionedSecondRound() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerContractValidatorTest.php
-
-		-
-			rawMessage: Property Tests\Player\PlayerContractValidatorTest::$validator has no type specified.
-			identifier: missingType.property
-			count: 1
+			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
+			identifier: phpunit.assertEquals
+			count: 3
 			path: tests/Player/PlayerContractValidatorTest.php
 
 		-
@@ -3791,33 +2459,9 @@ parameters:
 			path: tests/Player/PlayerImageHelperTest.php
 
 		-
-			rawMessage: 'Method Tests\Player\PlayerInjuryCalculatorTest::testGetInjuryReturnDateCrossingMonth() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerInjuryCalculatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerInjuryCalculatorTest::testGetInjuryReturnDateWithInjury() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerInjuryCalculatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerInjuryCalculatorTest::testGetInjuryReturnDateWithOneDayInjury() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerInjuryCalculatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerInjuryCalculatorTest::testGetInjuryReturnDateWithoutInjury() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerInjuryCalculatorTest.php
-
-		-
-			rawMessage: Property Tests\Player\PlayerInjuryCalculatorTest::$calculator has no type specified.
-			identifier: missingType.property
-			count: 1
+			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
+			identifier: phpunit.assertEquals
+			count: 24
 			path: tests/Player/PlayerInjuryCalculatorTest.php
 
 		-
@@ -3827,111 +2471,9 @@ parameters:
 			path: tests/Player/PlayerPageControllerTest.php
 
 		-
-			rawMessage: 'Method Tests\Player\PlayerPageControllerTest::playerStatsRow() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Player/PlayerPageControllerTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 2
-			path: tests/Player/PlayerPageServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerPageServiceTest::testCanShowRenegotiationButtonReturnsFalseWhenCannotRenegotiate() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerPageServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerPageServiceTest::testCanShowRenegotiationButtonReturnsFalseWhenDraftPhase() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerPageServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerPageServiceTest::testCanShowRenegotiationButtonReturnsFalseWhenExtensionUsed() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerPageServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerPageServiceTest::testCanShowRenegotiationButtonReturnsFalseWhenFreeAgencyPhase() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerPageServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerPageServiceTest::testCanShowRenegotiationButtonReturnsFalseWhenNotOwnerOfPlayer() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerPageServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerPageServiceTest::testCanShowRenegotiationButtonReturnsFalseWhenRookieOptioned() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerPageServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerPageServiceTest::testCanShowRenegotiationButtonReturnsFalseWhenTeamIsFreeAgents() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerPageServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerPageServiceTest::testCanShowRenegotiationButtonReturnsTrueWhenAllConditionsMet() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerPageServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerPageServiceTest::testCanShowRookieOptionButtonReturnsFalseWhenCannotRookieOption() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerPageServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerPageServiceTest::testCanShowRookieOptionButtonReturnsFalseWhenNotOwnerOfPlayer() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerPageServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerPageServiceTest::testCanShowRookieOptionButtonReturnsFalseWhenTeamIsFreeAgents() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerPageServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerPageServiceTest::testCanShowRookieOptionButtonReturnsTrueWhenAllConditionsMet() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerPageServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerPageServiceTest::testShouldShowRookieOptionUsedMessageReturnsFalseWhenNotRookieOptioned() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerPageServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\Player\PlayerPageServiceTest::testShouldShowRookieOptionUsedMessageReturnsTrueWhenRookieOptioned() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Player/PlayerPageServiceTest.php
-
-		-
-			rawMessage: Property Tests\Player\PlayerPageServiceTest::$db has no type specified.
-			identifier: missingType.property
-			count: 1
-			path: tests/Player/PlayerPageServiceTest.php
-
-		-
-			rawMessage: Property Tests\Player\PlayerPageServiceTest::$service has no type specified.
-			identifier: missingType.property
-			count: 1
 			path: tests/Player/PlayerPageServiceTest.php
 
 		-
@@ -4161,36 +2703,6 @@ parameters:
 			path: tests/ProjectedDraftOrder/ProjectedDraftOrderViewTest.php
 
 		-
-			rawMessage: 'Method Tests\ProjectedDraftOrder\ProjectedDraftOrderViewTest::emptyDraftOrder() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/ProjectedDraftOrder/ProjectedDraftOrderViewTest.php
-
-		-
-			rawMessage: 'Method Tests\ProjectedDraftOrder\ProjectedDraftOrderViewTest::sampleDraftOrder() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/ProjectedDraftOrder/ProjectedDraftOrderViewTest.php
-
-		-
-			rawMessage: 'Method Tests\ProjectedDraftOrder\ProjectedDraftOrderViewTest::sampleDraftOrderWithPlayoffSeparator() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/ProjectedDraftOrder/ProjectedDraftOrderViewTest.php
-
-		-
-			rawMessage: 'Parameter #1 $draftOrder of method ProjectedDraftOrder\ProjectedDraftOrderView::render() expects array{round1: list<array{pick: int, teamId: int, teamName: string, wins: int, losses: int, color1: string, color2: string, ownerId: int, ...}>, round2: list<array{pick: int, teamId: int, teamName: string, wins: int, losses: int, color1: string, color2: string, ownerId: int, ...}>}, array given.'
-			identifier: argument.type
-			count: 35
-			path: tests/ProjectedDraftOrder/ProjectedDraftOrderViewTest.php
-
-		-
-			rawMessage: 'Parameter #1 $draftOrder of method ProjectedDraftOrder\ProjectedDraftOrderView::render() expects array{round1: list<array{pick: int, teamId: int, teamName: string, wins: int, losses: int, color1: string, color2: string, ownerId: int, ...}>, round2: list<array{pick: int, teamId: int, teamName: string, wins: int, losses: int, color1: string, color2: string, ownerId: int, ...}>}, non-empty-array given.'
-			identifier: argument.type
-			count: 12
-			path: tests/ProjectedDraftOrder/ProjectedDraftOrderViewTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 1
@@ -4251,30 +2763,6 @@ parameters:
 			path: tests/RookieOption/RookieOptionFormViewXssTest.php
 
 		-
-			rawMessage: 'Method Tests\RookieOption\RookieOptionRepositoryTest::testUpdatePlayerRookieOptionFirstRound() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/RookieOption/RookieOptionRepositoryTest.php
-
-		-
-			rawMessage: 'Method Tests\RookieOption\RookieOptionRepositoryTest::testUpdatePlayerRookieOptionSecondRound() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/RookieOption/RookieOptionRepositoryTest.php
-
-		-
-			rawMessage: Property Tests\RookieOption\RookieOptionRepositoryTest::$mockDb has no type specified.
-			identifier: missingType.property
-			count: 1
-			path: tests/RookieOption/RookieOptionRepositoryTest.php
-
-		-
-			rawMessage: Property Tests\RookieOption\RookieOptionRepositoryTest::$repository has no type specified.
-			identifier: missingType.property
-			count: 1
-			path: tests/RookieOption/RookieOptionRepositoryTest.php
-
-		-
 			rawMessage: Access to an undefined property PHPUnit\Framework\MockObject\MockObject&Player\Player::$name.
 			identifier: property.notFound
 			count: 1
@@ -4325,12 +2813,6 @@ parameters:
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Search\\Contracts\\SearchViewInterface'' and Search\SearchView will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/Search/SearchViewTest.php
-
-		-
-			rawMessage: 'Method Tests\Search\SearchViewTest::createPageData() has parameter $overrides with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Search/SearchViewTest.php
 
@@ -4389,12 +2871,6 @@ parameters:
 			path: tests/SeasonHighs/SeasonHighsViewTest.php
 
 		-
-			rawMessage: 'Method Tests\SeasonHighs\SeasonHighsViewTest::createHighEntry() has parameter $overrides with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/SeasonHighs/SeasonHighsViewTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 2
@@ -4425,12 +2901,6 @@ parameters:
 			path: tests/SeasonLeaderboards/SeasonLeaderboardsServiceTest.php
 
 		-
-			rawMessage: 'Method Tests\SeasonLeaderboards\SeasonLeaderboardsServiceTest::buildServiceWithRows() has parameter $rows with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/SeasonLeaderboards/SeasonLeaderboardsServiceTest.php
-
-		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
 			count: 18
@@ -4445,18 +2915,6 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/SeasonLeaderboards/SeasonLeaderboardsViewXssTest.php
-
-		-
-			rawMessage: 'Method Tests\SeasonLeaderboards\SeasonLeaderboardsViewXssTest::makeStats() has parameter $overrides with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/SeasonLeaderboards/SeasonLeaderboardsViewXssTest.php
-
-		-
-			rawMessage: 'Method Tests\SeasonLeaderboards\SeasonLeaderboardsViewXssTest::makeStats() should return array{pid: int, name: string, year: int, teamname: string, teamid: int, team_city: string, color1: string, color2: string, ...} but returns array{pid: mixed, name: mixed, year: mixed, teamname: mixed, teamid: mixed, team_city: mixed, color1: mixed, color2: mixed, ..., ...}.'
-			identifier: return.type
 			count: 1
 			path: tests/SeasonLeaderboards/SeasonLeaderboardsViewXssTest.php
 
@@ -4593,12 +3051,6 @@ parameters:
 			path: tests/Standings/OlympicsStandingsViewTest.php
 
 		-
-			rawMessage: 'Method Tests\Standings\OlympicsStandingsViewTest::makeBulkRow() has parameter $overrides with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Standings/OlympicsStandingsViewTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Standings\\Contracts\\StandingsRepositoryInterface'' and Standings\StandingsRepository will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -4614,18 +3066,6 @@ parameters:
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 2
-			path: tests/Standings/StandingsViewXssTest.php
-
-		-
-			rawMessage: 'Method Tests\Standings\StandingsViewXssTest::makeStandingsRow() has parameter $overrides with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Standings/StandingsViewXssTest.php
-
-		-
-			rawMessage: 'Method Tests\Standings\StandingsViewXssTest::makeStandingsRow() should return array{teamid: int, team_name: string, league_record: string, pct: string, gamesBack: string, conf_record: string, div_record: string, home_record: string, ...} but returns array{teamid: mixed, team_name: mixed, league_record: mixed, pct: mixed, gamesBack: mixed, conf_record: mixed, div_record: mixed, home_record: mixed, ..., ...}.'
-			identifier: return.type
-			count: 1
 			path: tests/Standings/StandingsViewXssTest.php
 
 		-
@@ -4671,36 +3111,6 @@ parameters:
 			path: tests/Team/TeamControllerTest.php
 
 		-
-			rawMessage: 'Method Tests\Team\TeamRepositoryTest::testGetFreeAgencyRosterExecutesQuery() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Team/TeamRepositoryTest.php
-
-		-
-			rawMessage: 'Method Tests\Team\TeamRepositoryTest::testGetHistoricalRosterExecutesQuery() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Team/TeamRepositoryTest.php
-
-		-
-			rawMessage: 'Method Tests\Team\TeamRepositoryTest::testGetRosterUnderContractExecutesQuery() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Team/TeamRepositoryTest.php
-
-		-
-			rawMessage: 'Method Tests\Team\TeamRepositoryTest::testGetTeamPowerDataReturnsData() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Team/TeamRepositoryTest.php
-
-		-
-			rawMessage: 'Method Tests\Team\TeamRepositoryTest::testGetTeamPowerDataReturnsNullWhenNoResults() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Team/TeamRepositoryTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Team\\Contracts\\TeamServiceInterface'' and Team\TeamService will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -4731,19 +3141,7 @@ parameters:
 			path: tests/Team/TeamViewTest.php
 
 		-
-			rawMessage: 'Method Tests\Team\TeamViewTest::createPageData() has parameter $overrides with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Team/TeamViewTest.php
-
-		-
-			rawMessage: 'Method Tests\Team\TeamViewTest::createPageData() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Team/TeamViewTest.php
-
-		-
-			rawMessage: 'Parameter #1 $pageData of method Team\TeamView::render() expects array{teamid: int, team: Team\Team, imagesPath: string, yr: string|null, display: string, insertyear: string, isActualTeam: bool, tableOutput: string, ...}, array given.'
+			rawMessage: 'Parameter #1 $pageData of method Team\TeamView::render() expects array{teamid: int, team: Team\Team, imagesPath: string, yr: string|null, display: string, insertyear: string, isActualTeam: bool, tableOutput: string, ...}, array<string, mixed> given.'
 			identifier: argument.type
 			count: 23
 			path: tests/Team/TeamViewTest.php
@@ -4757,18 +3155,6 @@ parameters:
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''TeamOffDefStats\\Contracts\\TeamOffDefStatsServiceInterface'' and TeamOffDefStats\TeamOffDefStatsService will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/TeamOffDefStats/TeamOffDefStatsServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\TeamOffDefStats\TeamOffDefStatsServiceTest::createProcessedTeamData() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/TeamOffDefStats/TeamOffDefStatsServiceTest.php
-
-		-
-			rawMessage: 'Method Tests\TeamOffDefStats\TeamOffDefStatsServiceTest::createRawTeamRow() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
 			count: 1
 			path: tests/TeamOffDefStats/TeamOffDefStatsServiceTest.php
 
@@ -4797,13 +3183,7 @@ parameters:
 			path: tests/TeamOffDefStats/TeamOffDefStatsServiceTest.php
 
 		-
-			rawMessage: 'Parameter #1 $processedStats of method TeamOffDefStats\TeamOffDefStatsService::calculateLeagueTotals() expects list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, offense_totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, offense_averages: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}, defense_totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, ...}>, array{array} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/TeamOffDefStats/TeamOffDefStatsServiceTest.php
-
-		-
-			rawMessage: 'Parameter #1 $rawStats of method TeamOffDefStats\TeamOffDefStatsService::processTeamStats() expects list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, offense_games: int|null, offense_fgm: int|null, offense_fga: int|null, ...}>, array{array} given.'
+			rawMessage: 'Parameter #1 $processedStats of method TeamOffDefStats\TeamOffDefStatsService::calculateLeagueTotals() expects list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, offense_totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, offense_averages: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}, defense_totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, ...}>, array{array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, offense_games: int, defense_games: int, offense_totals: array<string, string>, ...}} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/TeamOffDefStats/TeamOffDefStatsServiceTest.php
@@ -4821,45 +3201,33 @@ parameters:
 			path: tests/TeamOffDefStats/TeamOffDefStatsViewTest.php
 
 		-
-			rawMessage: 'Method Tests\TeamOffDefStats\TeamOffDefStatsViewTest::createMinimalViewData() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/TeamOffDefStats/TeamOffDefStatsViewTest.php
-
-		-
-			rawMessage: 'Method Tests\TeamOffDefStats\TeamOffDefStatsViewTest::createTeamData() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/TeamOffDefStats/TeamOffDefStatsViewTest.php
-
-		-
-			rawMessage: 'Method Tests\TeamOffDefStats\TeamOffDefStatsViewTest::createViewDataWithTeams() has parameter $teamConfigs with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/TeamOffDefStats/TeamOffDefStatsViewTest.php
-
-		-
-			rawMessage: 'Method Tests\TeamOffDefStats\TeamOffDefStatsViewTest::createViewDataWithTeams() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/TeamOffDefStats/TeamOffDefStatsViewTest.php
-
-		-
-			rawMessage: 'Parameter #1 $data of method TeamOffDefStats\TeamOffDefStatsView::render() expects array{teams: list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, offense_totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, offense_averages: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}, defense_totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, ...}>, league: array{totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, averages: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}, games: int}, differentials: list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, differentials: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}}>}, array given.'
-			identifier: argument.type
-			count: 10
-			path: tests/TeamOffDefStats/TeamOffDefStatsViewTest.php
-
-		-
 			rawMessage: 'Parameter #1 $data of method TeamOffDefStats\TeamOffDefStatsView::render() expects array{teams: list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, offense_totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, offense_averages: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}, defense_totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, ...}>, league: array{totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, averages: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}, games: int}, differentials: list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, differentials: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}}>}, array{teams: array{}, league: array{totals: array{}, averages: array{}}, differentials: array{}} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/TeamOffDefStats/TeamOffDefStatsViewTest.php
 
 		-
-			rawMessage: 'Parameter #1 $data of method TeamOffDefStats\TeamOffDefStatsView::render() expects array{teams: list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, offense_totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, offense_averages: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}, defense_totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, ...}>, league: array{totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, averages: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}, games: int}, differentials: list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, differentials: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}}>}, non-empty-array given.'
+			rawMessage: 'Parameter #1 $data of method TeamOffDefStats\TeamOffDefStatsView::render() expects array{teams: list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, offense_totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, offense_averages: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}, defense_totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, ...}>, league: array{totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, averages: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}, games: int}, differentials: list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, differentials: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}}>}, array{teams: list<mixed>, league: array{totals: array<string, string>, averages: array<string, string>, games: int}, differentials: array<string, mixed>} given.'
 			identifier: argument.type
-			count: 3
+			count: 10
+			path: tests/TeamOffDefStats/TeamOffDefStatsViewTest.php
+
+		-
+			rawMessage: 'Parameter #1 $data of method TeamOffDefStats\TeamOffDefStatsView::render() expects array{teams: list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, offense_totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, offense_averages: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}, defense_totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, ...}>, league: array{totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, averages: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}, games: int}, differentials: list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, differentials: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}}>}, array{teams: list<mixed>, league: array{totals: array<string, string>, averages: array<string, string>, games: int}, differentials: array{array{teamid: 1, team_city: ''Boston'', team_name: ''Celtics'', color1: ''#007A33'', color2: ''#FFFFFF'', differentials: array{fgm: ''5.00'', fga: ''3.50'', fgp: ''0.025'', ftm: ''2.00'', fta: ''1.50'', ftp: ''0.015'', tgm: ''1.50'', tga: ''2.00'', ...}}}} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/TeamOffDefStats/TeamOffDefStatsViewTest.php
+
+		-
+			rawMessage: 'Parameter #1 $data of method TeamOffDefStats\TeamOffDefStatsView::render() expects array{teams: list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, offense_totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, offense_averages: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}, defense_totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, ...}>, league: array{totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, averages: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}, games: int}, differentials: list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, differentials: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}}>}, array{teams: list<mixed>, league: array{totals: array<string, string>, averages: non-empty-array<string, string>, games: int}, differentials: array<string, mixed>} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/TeamOffDefStats/TeamOffDefStatsViewTest.php
+
+		-
+			rawMessage: 'Parameter #1 $data of method TeamOffDefStats\TeamOffDefStatsView::render() expects array{teams: list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, offense_totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, offense_averages: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}, defense_totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, ...}>, league: array{totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, averages: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}, games: int}, differentials: list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, differentials: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}}>}, array{teams: list<mixed>, league: array{totals: non-empty-array<string, string>, averages: array<string, string>, games: int}, differentials: array<string, mixed>} given.'
+			identifier: argument.type
+			count: 1
 			path: tests/TeamOffDefStats/TeamOffDefStatsViewTest.php
 
 		-
@@ -4881,19 +3249,13 @@ parameters:
 			path: tests/TeamSchedule/TeamScheduleServiceTest.php
 
 		-
-			rawMessage: 'Method Tests\TeamSchedule\TeamScheduleViewTest::createMockGame() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/TeamSchedule/TeamScheduleViewTest.php
-
-		-
-			rawMessage: 'Parameter #2 $games of method TeamSchedule\TeamScheduleView::render() expects list<array{game: LeagueSchedule\Game, currentMonth: string, opposingTeam: Team\Team, opponentText: string, highlight: string, gameResult: string, wins: int, losses: int, ...}>, array{array, array} given.'
+			rawMessage: 'Parameter #2 $games of method TeamSchedule\TeamScheduleView::render() expects list<array{game: LeagueSchedule\Game, currentMonth: string, opposingTeam: Team\Team, opponentText: string, highlight: string, gameResult: string, wins: int, losses: int, ...}>, array{array<string, mixed>, array<string, mixed>} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/TeamSchedule/TeamScheduleViewTest.php
 
 		-
-			rawMessage: 'Parameter #2 $games of method TeamSchedule\TeamScheduleView::render() expects list<array{game: LeagueSchedule\Game, currentMonth: string, opposingTeam: Team\Team, opponentText: string, highlight: string, gameResult: string, wins: int, losses: int, ...}>, array{array} given.'
+			rawMessage: 'Parameter #2 $games of method TeamSchedule\TeamScheduleView::render() expects list<array{game: LeagueSchedule\Game, currentMonth: string, opposingTeam: Team\Team, opponentText: string, highlight: string, gameResult: string, wins: int, losses: int, ...}>, array{array<string, mixed>} given.'
 			identifier: argument.type
 			count: 3
 			path: tests/TeamSchedule/TeamScheduleViewTest.php
@@ -4925,12 +3287,6 @@ parameters:
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Topics\\Contracts\\TopicsViewInterface'' and Topics\TopicsView will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/Topics/TopicsViewTest.php
-
-		-
-			rawMessage: 'Method Tests\Topics\TopicsViewTest::createTopic() has parameter $overrides with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Topics/TopicsViewTest.php
 
@@ -5031,123 +3387,27 @@ parameters:
 			path: tests/Trading/TradeRosterPreviewApiHandlerTest.php
 
 		-
-			rawMessage: 'Method Tests\Trading\TradeValidatorTest::invalidCashAmountProvider() has no return type specified.'
-			identifier: missingType.return
+			rawMessage: 'Parameter #1 $tradeData of method Trading\TradeValidator::validateSalaryCaps() expects array{userCurrentSeasonCapTotal: int, partnerCurrentSeasonCapTotal: int, userCapSentToPartner: int, partnerCapSentToUser: int}, array<string, int> given.'
+			identifier: argument.type
 			count: 1
 			path: tests/Trading/TradeValidatorTest.php
 
 		-
-			rawMessage: 'Method Tests\Trading\TradeValidatorTest::nonTradeablePlayerProvider() has no return type specified.'
-			identifier: missingType.return
+			rawMessage: 'Parameter #1 $tradeData of method Trading\TradeValidator::validateSalaryCaps() expects array{userCurrentSeasonCapTotal: int, partnerCurrentSeasonCapTotal: int, userCapSentToPartner: int, partnerCapSentToUser: int}, array{userCurrentSeasonCapTotal: 5000, userCapSentToPartner: 100} given.'
+			identifier: argument.type
 			count: 1
 			path: tests/Trading/TradeValidatorTest.php
 
 		-
-			rawMessage: 'Method Tests\Trading\TradeValidatorTest::salaryCapViolationProvider() has no return type specified.'
-			identifier: missingType.return
+			rawMessage: 'Parameter #1 $tradeData of method Trading\TradeValidator::validateSalaryCaps() expects array{userCurrentSeasonCapTotal: int, partnerCurrentSeasonCapTotal: int, userCapSentToPartner: int, partnerCapSentToUser: int}, array{} given.'
+			identifier: argument.type
 			count: 1
 			path: tests/Trading/TradeValidatorTest.php
 
 		-
-			rawMessage: 'Method Tests\Trading\TradeValidatorTest::testCalculatesCurrentSeasonCashConsiderationsCorrectly() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Trading/TradeValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Trading\TradeValidatorTest::testDeterminesPlayerTradabilityCorrectly() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Trading/TradeValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Trading\TradeValidatorTest::testPreventsTradingIneligiblePlayers() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Trading/TradeValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Trading\TradeValidatorTest::testPreventsTradingIneligiblePlayers() has parameter $expectedResult with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: tests/Trading/TradeValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Trading\TradeValidatorTest::testPreventsTradingIneligiblePlayers() has parameter $mockData with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: tests/Trading/TradeValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Trading\TradeValidatorTest::testPreventsTradingIneligiblePlayers() has parameter $reason with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: tests/Trading/TradeValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Trading\TradeValidatorTest::testRejectsCashAmountsBelowMinimum() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Trading/TradeValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Trading\TradeValidatorTest::testRejectsCashAmountsBelowMinimum() has parameter $expectedErrorText with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: tests/Trading/TradeValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Trading\TradeValidatorTest::testRejectsCashAmountsBelowMinimum() has parameter $partnerCash with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: tests/Trading/TradeValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Trading\TradeValidatorTest::testRejectsCashAmountsBelowMinimum() has parameter $userCash with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: tests/Trading/TradeValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Trading\TradeValidatorTest::testRejectsTradesExceedingSalaryCaps() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Trading/TradeValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Trading\TradeValidatorTest::testRejectsTradesExceedingSalaryCaps() has parameter $expectedErrorCount with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: tests/Trading/TradeValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Trading\TradeValidatorTest::testRejectsTradesExceedingSalaryCaps() has parameter $tradeData with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: tests/Trading/TradeValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Trading\TradeValidatorTest::testValidatesMinimumCashAmountsSuccessfully() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Trading/TradeValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Trading\TradeValidatorTest::testValidatesSalaryeCapsWithinLimits() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Trading/TradeValidatorTest.php
-
-		-
-			rawMessage: Property Tests\Trading\TradeValidatorTest::$mockDb has no type specified.
-			identifier: missingType.property
-			count: 1
-			path: tests/Trading/TradeValidatorTest.php
-
-		-
-			rawMessage: Property Tests\Trading\TradeValidatorTest::$validator has no type specified.
-			identifier: missingType.property
-			count: 1
+			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
+			identifier: phpunit.assertEquals
+			count: 19
 			path: tests/Trading/TradeValidatorTest.php
 
 		-
@@ -5301,27 +3561,9 @@ parameters:
 			path: tests/Trading/TradingServiceTest.php
 
 		-
-			rawMessage: 'Method Tests\Trading\TradingServiceTest::createPlayerRow() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Trading/TradingServiceTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 2
-			path: tests/Trading/TradingViewTest.php
-
-		-
-			rawMessage: 'Method Tests\Trading\TradingViewTest::createTradeOfferPageData() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Trading/TradingViewTest.php
-
-		-
-			rawMessage: 'Method Tests\Trading\TradingViewTest::createTradeReviewPageData() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
 			path: tests/Trading/TradingViewTest.php
 
 		-
@@ -5433,21 +3675,9 @@ parameters:
 			path: tests/UpdateAllTheThings/PowerRankingsUpdaterTest.php
 
 		-
-			rawMessage: 'Method Tests\UpdateAllTheThings\TestablePowerRankingsUpdater::publicCalculateTeamStats() has parameter $games with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/UpdateAllTheThings/PowerRankingsUpdaterTest.php
-
-		-
-			rawMessage: 'Method Tests\UpdateAllTheThings\TestablePowerRankingsUpdater::publicCalculateTeamStats() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/UpdateAllTheThings/PowerRankingsUpdaterTest.php
-
-		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
-			count: 3
+			count: 37
 			path: tests/UpdateAllTheThings/PowerRankingsUpdaterTest.php
 
 		-
@@ -5793,18 +4023,6 @@ parameters:
 			path: tests/Voting/VotingSubmissionViewTest.php
 
 		-
-			rawMessage: Property Tests\VotingResults\StubVotingResultsService::$allStarResponse type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/VotingResults/VotingResultsControllerTest.php
-
-		-
-			rawMessage: Property Tests\VotingResults\StubVotingResultsService::$endOfYearResponse type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/VotingResults/VotingResultsControllerTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 4
@@ -5838,156 +4056,6 @@ parameters:
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 6
-			path: tests/Waivers/WaiversProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversProcessorTest::createMockPlayer() has parameter $properties with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Waivers/WaiversProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversProcessorTest::testCalculateVeteranMinimumSalaryFor10PlusYears() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversProcessorTest::testCalculateVeteranMinimumSalaryFor3Years() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversProcessorTest::testCalculateVeteranMinimumSalaryFor4Years() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversProcessorTest::testCalculateVeteranMinimumSalaryFor5Years() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversProcessorTest::testCalculateVeteranMinimumSalaryFor6Years() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversProcessorTest::testCalculateVeteranMinimumSalaryFor7Years() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversProcessorTest::testCalculateVeteranMinimumSalaryFor8Years() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversProcessorTest::testCalculateVeteranMinimumSalaryFor9Years() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversProcessorTest::testCalculateVeteranMinimumSalaryForRookies() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversProcessorTest::testDetermineContractDataForExistingContract() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversProcessorTest::testDetermineContractDataForMidContract() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversProcessorTest::testDetermineContractDataForNewContract() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversProcessorTest::testDetermineContractDataForNewContractDuringFreeAgency() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversProcessorTest::testGetPlayerContractDisplayDuringFreeAgency() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversProcessorTest::testGetPlayerContractDisplayWithEmptyContract() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversProcessorTest::testGetPlayerContractDisplayWithExistingContract() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversProcessorTest::testGetPlayerContractDisplayWithExistingContractDuringFreeAgency() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversProcessorTest::testGetPlayerContractDisplayWithMissingExperience() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversProcessorTest::testGetPlayerContractDisplayWithNoSalary() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversProcessorTest::testGetPlayerContractDisplayWithOneYearRemaining() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversProcessorTest::testGetPlayerContractDisplayWithPartialContract() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversProcessorTest::testGetWaiverWaitTimeCalculatesRemainingTime() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversProcessorTest::testGetWaiverWaitTimeReturnsEmptyWhenCleared() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversProcessorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversProcessorTest::testGetWaiverWaitTimeWithMinutes() has no return type specified.'
-			identifier: missingType.return
-			count: 1
 			path: tests/Waivers/WaiversProcessorTest.php
 
 		-
@@ -6027,42 +4095,6 @@ parameters:
 			path: tests/Waivers/WaiversProcessorWriteTest.php
 
 		-
-			rawMessage: 'Method Tests\Waivers\WaiversRepositoryTest::testDropPlayerToWaiversExecutesCorrectQuery() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversRepositoryTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversRepositoryTest::testSignPlayerFromWaiversWithExistingContract() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversRepositoryTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversRepositoryTest::testSignPlayerFromWaiversWithNewContract() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversRepositoryTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversRepositoryTest::testSignPlayerFromWaiversWithNewContractDuringFreeAgency() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversRepositoryTest.php
-
-		-
-			rawMessage: Property Tests\Waivers\WaiversRepositoryTest::$mockDb has no type specified.
-			identifier: missingType.property
-			count: 1
-			path: tests/Waivers/WaiversRepositoryTest.php
-
-		-
-			rawMessage: Property Tests\Waivers\WaiversRepositoryTest::$repository has no type specified.
-			identifier: missingType.property
-			count: 1
-			path: tests/Waivers/WaiversRepositoryTest.php
-
-		-
 			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertInstanceOf() with ''Waivers\\Contracts\\WaiversServiceInterface'' and Waivers\WaiversService will always evaluate to true.'
 			identifier: staticMethod.alreadyNarrowedType
 			count: 1
@@ -6075,87 +4107,15 @@ parameters:
 			path: tests/Waivers/WaiversServiceTest.php
 
 		-
-			rawMessage: 'Method Tests\Waivers\WaiversValidatorTest::testClearErrorsRemovesAllErrors() has no return type specified.'
-			identifier: missingType.return
-			count: 1
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertEmpty() with non-empty-array<int, string> will always evaluate to false.'
+			identifier: method.impossibleType
+			count: 2
 			path: tests/Waivers/WaiversValidatorTest.php
 
 		-
-			rawMessage: 'Method Tests\Waivers\WaiversValidatorTest::testValidateAddEdgeCaseAtExactCap() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversValidatorTest::testValidateAddFailsOverCapWithNonVetMin() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversValidatorTest::testValidateAddFailsWith12PlusHealthyPlayersOverCap() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversValidatorTest::testValidateAddFailsWithFullRoster() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversValidatorTest::testValidateAddFailsWithNullPlayerID() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversValidatorTest::testValidateAddFailsWithZeroPlayerID() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversValidatorTest::testValidateAddSucceedsOverCapWithVetMin() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversValidatorTest::testValidateAddSucceedsWith12HealthyPlayersUnderCap() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversValidatorTest::testValidateAddSucceedsWithNormalConditions() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversValidatorTest::testValidateDropFailsWithFullRosterOverCap() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversValidatorTest::testValidateDropSucceedsWithFullRosterUnderCap() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversValidatorTest.php
-
-		-
-			rawMessage: 'Method Tests\Waivers\WaiversValidatorTest::testValidateDropSucceedsWithNormalRosterAndSalary() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/Waivers/WaiversValidatorTest.php
-
-		-
-			rawMessage: Property Tests\Waivers\WaiversValidatorTest::$validator has no type specified.
-			identifier: missingType.property
-			count: 1
+			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
+			identifier: phpunit.assertEquals
+			count: 2
 			path: tests/Waivers/WaiversValidatorTest.php
 
 		-
@@ -6189,54 +4149,6 @@ parameters:
 			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
 
 		-
-			rawMessage: 'Method Tests\WideUnit\DepthChartEntry\DepthChartEntryWideUnitTest::createPlayoffsPostDataWithMinimalDepth() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
-
-		-
-			rawMessage: 'Method Tests\WideUnit\DepthChartEntry\DepthChartEntryWideUnitTest::createPostDataWithActiveCount() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
-
-		-
-			rawMessage: 'Method Tests\WideUnit\DepthChartEntry\DepthChartEntryWideUnitTest::createPostDataWithInsufficientPositionDepth() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
-
-		-
-			rawMessage: 'Method Tests\WideUnit\DepthChartEntry\DepthChartEntryWideUnitTest::createPostDataWithMultipleIssues() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
-
-		-
-			rawMessage: 'Method Tests\WideUnit\DepthChartEntry\DepthChartEntryWideUnitTest::createPostDataWithMultipleStarter() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
-
-		-
-			rawMessage: 'Method Tests\WideUnit\DepthChartEntry\DepthChartEntryWideUnitTest::createSinglePlayerPostData() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
-
-		-
-			rawMessage: 'Method Tests\WideUnit\DepthChartEntry\DepthChartEntryWideUnitTest::createValidPlayoffsPostData() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
-
-		-
-			rawMessage: 'Method Tests\WideUnit\DepthChartEntry\DepthChartEntryWideUnitTest::createValidRegularSeasonPostData() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
-
-		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
 			count: 37
@@ -6255,12 +4167,6 @@ parameters:
 			path: tests/WideUnit/Draft/DraftWideUnitTest.php
 
 		-
-			rawMessage: 'Method Tests\WideUnit\Draft\DraftWideUnitTest::getBaseDraftData() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Draft/DraftWideUnitTest.php
-
-		-
 			rawMessage: 'Array has 2 duplicate keys with value ''teamid'' (''teamid'', ''teamid'').'
 			identifier: array.duplicateKey
 			count: 1
@@ -6272,12 +4178,6 @@ parameters:
 				Use ExtensionService instead
 			'''
 			identifier: new.deprecatedClass
-			count: 1
-			path: tests/WideUnit/Extension/ExtensionWideUnitTest.php
-
-		-
-			rawMessage: 'Method Tests\WideUnit\Extension\ExtensionWideUnitTest::getBasePlayerData() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
 			count: 1
 			path: tests/WideUnit/Extension/ExtensionWideUnitTest.php
 
@@ -6303,196 +4203,10 @@ parameters:
 			path: tests/WideUnit/FreeAgency/FreeAgencyWideUnitTest.php
 
 		-
-			rawMessage: 'Method Tests\WideUnit\FreeAgency\FreeAgencyWideUnitTest::getBaseFreeAgentData() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/FreeAgency/FreeAgencyWideUnitTest.php
-
-		-
-			rawMessage: 'Method Tests\WideUnit\Mocks\Discord::postToChannel() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: tests/WideUnit/Mocks/Discord.php
-
-		-
-			rawMessage: 'Method Tests\WideUnit\Mocks\Discord::postToChannel() has parameter $channel with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: tests/WideUnit/Mocks/Discord.php
-
-		-
-			rawMessage: 'Method Tests\WideUnit\Mocks\Discord::postToChannel() has parameter $message with no type specified.'
-			identifier: missingType.parameter
-			count: 1
-			path: tests/WideUnit/Mocks/Discord.php
-
-		-
 			rawMessage: 'Construct empty() is not allowed. Use more strict comparison.'
 			identifier: empty.notAllowed
 			count: 6
 			path: tests/WideUnit/Mocks/MockDatabase.php
-
-		-
-			rawMessage: 'Method Tests\WideUnit\Mocks\MockDatabase::getExecutedQueries() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Mocks/MockDatabase.php
-
-		-
-			rawMessage: 'Method Tests\WideUnit\Mocks\MockDatabase::setMockData() has parameter $data with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Mocks/MockDatabase.php
-
-		-
-			rawMessage: 'Method Tests\WideUnit\Mocks\MockDatabase::setMockPythagoreanData() has parameter $data with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Mocks/MockDatabase.php
-
-		-
-			rawMessage: 'Method Tests\WideUnit\Mocks\MockDatabase::setMockTeamData() has parameter $data with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Mocks/MockDatabase.php
-
-		-
-			rawMessage: 'Method Tests\WideUnit\Mocks\MockDatabase::setMockTradeInfo() has parameter $data with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Mocks/MockDatabase.php
-
-		-
-			rawMessage: 'Method Tests\WideUnit\Mocks\MockDatabase::setVotingResultsQueue() has parameter $resultsQueue with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Mocks/MockDatabase.php
-
-		-
-			rawMessage: 'Method Tests\WideUnit\Mocks\MockDatabase::sql_fetch_assoc() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Mocks/MockDatabase.php
-
-		-
-			rawMessage: 'Method Tests\WideUnit\Mocks\MockDatabase::sql_fetchrow() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Mocks/MockDatabase.php
-
-		-
-			rawMessage: Property Tests\WideUnit\Mocks\MockDatabase::$executedQueries type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Mocks/MockDatabase.php
-
-		-
-			rawMessage: Property Tests\WideUnit\Mocks\MockDatabase::$mockData type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Mocks/MockDatabase.php
-
-		-
-			rawMessage: Property Tests\WideUnit\Mocks\MockDatabase::$mockPythagoreanData type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Mocks/MockDatabase.php
-
-		-
-			rawMessage: Property Tests\WideUnit\Mocks\MockDatabase::$mockTeamData type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Mocks/MockDatabase.php
-
-		-
-			rawMessage: Property Tests\WideUnit\Mocks\MockDatabase::$mockTradeInfo type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Mocks/MockDatabase.php
-
-		-
-			rawMessage: Property Tests\WideUnit\Mocks\MockDatabase::$votingResultsQueue type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Mocks/MockDatabase.php
-
-		-
-			rawMessage: 'Method Tests\WideUnit\Mocks\MockDatabaseResult::__construct() has parameter $data with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Mocks/MockDatabaseResult.php
-
-		-
-			rawMessage: 'Method Tests\WideUnit\Mocks\MockDatabaseResult::fetchAssoc() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Mocks/MockDatabaseResult.php
-
-		-
-			rawMessage: 'Method Tests\WideUnit\Mocks\MockDatabaseResult::fetchRow() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Mocks/MockDatabaseResult.php
-
-		-
-			rawMessage: 'Method Tests\WideUnit\Mocks\MockDatabaseResult::fetch_assoc() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Mocks/MockDatabaseResult.php
-
-		-
-			rawMessage: Property Tests\WideUnit\Mocks\MockDatabaseResult::$data type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Mocks/MockDatabaseResult.php
-
-		-
-			rawMessage: 'Class Tests\WideUnit\Mocks\MockMysqliResult implements generic interface Iterator but does not specify its types: TKey, TValue'
-			identifier: missingType.generics
-			count: 1
-			path: tests/WideUnit/Mocks/MockMysqliResult.php
-
-		-
-			rawMessage: 'Method Tests\WideUnit\Mocks\MockMysqliResult::fetch_array() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Mocks/MockMysqliResult.php
-
-		-
-			rawMessage: 'Method Tests\WideUnit\Mocks\MockMysqliResult::fetch_assoc() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Mocks/MockMysqliResult.php
-
-		-
-			rawMessage: Property Tests\WideUnit\Mocks\MockMysqliResult::$data type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Mocks/MockMysqliResult.php
-
-		-
-			rawMessage: Property Tests\WideUnit\Mocks\MockMysqliResult::$lengths type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Mocks/MockMysqliResult.php
-
-		-
-			rawMessage: Property Tests\WideUnit\Mocks\MockMysqliResult::$mockResult has no type specified.
-			identifier: missingType.property
-			count: 1
-			path: tests/WideUnit/Mocks/MockMysqliResult.php
-
-		-
-			rawMessage: 'Method Tests\WideUnit\Mocks\MockPreparedStatement::execute() has parameter $params with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Mocks/MockPreparedStatement.php
-
-		-
-			rawMessage: Property Tests\WideUnit\Mocks\MockPreparedStatement::$boundParams type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Mocks/MockPreparedStatement.php
 
 		-
 			rawMessage: 'Property Tests\WideUnit\Mocks\MockPreparedStatement::$mockDb (Tests\WideUnit\Mocks\MockDatabase|null) is never assigned null so it can be removed from the property type.'
@@ -6503,12 +4217,6 @@ parameters:
 		-
 			rawMessage: 'Property Tests\WideUnit\Mocks\MockPreparedStatement::$paramTypes is never read, only written.'
 			identifier: property.onlyWritten
-			count: 1
-			path: tests/WideUnit/Mocks/MockPreparedStatement.php
-
-		-
-			rawMessage: Property Tests\WideUnit\Mocks\MockPreparedStatement::$paramTypes type has no value type specified in iterable type array.
-			identifier: missingType.iterableValue
 			count: 1
 			path: tests/WideUnit/Mocks/MockPreparedStatement.php
 
@@ -6591,12 +4299,6 @@ parameters:
 			path: tests/WideUnit/Negotiation/NegotiationWideUnitTest.php
 
 		-
-			rawMessage: 'Method Tests\WideUnit\Negotiation\NegotiationWideUnitTest::getBaseNegotiationData() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Negotiation/NegotiationWideUnitTest.php
-
-		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
 			count: 5
@@ -6609,31 +4311,13 @@ parameters:
 			path: tests/WideUnit/Schedule/ScheduleWideUnitTest.php
 
 		-
-			rawMessage: 'Method Tests\WideUnit\Schedule\ScheduleWideUnitTest::createProcessedGameRow() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Schedule/ScheduleWideUnitTest.php
-
-		-
-			rawMessage: 'Method Tests\WideUnit\Schedule\ScheduleWideUnitTest::createScheduleRow() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Schedule/ScheduleWideUnitTest.php
-
-		-
-			rawMessage: 'Method Tests\WideUnit\Schedule\ScheduleWideUnitTest::getDefaultTeamData() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Schedule/ScheduleWideUnitTest.php
-
-		-
-			rawMessage: 'Parameter #2 $games of method TeamSchedule\TeamScheduleView::render() expects list<array{game: LeagueSchedule\Game, currentMonth: string, opposingTeam: Team\Team, opponentText: string, highlight: string, gameResult: string, wins: int, losses: int, ...}>, array{array, array} given.'
+			rawMessage: 'Parameter #2 $games of method TeamSchedule\TeamScheduleView::render() expects list<array{game: LeagueSchedule\Game, currentMonth: string, opposingTeam: Team\Team, opponentText: string, highlight: string, gameResult: string, wins: int, losses: int, ...}>, array{array<string, mixed>, array<string, mixed>} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/WideUnit/Schedule/ScheduleWideUnitTest.php
 
 		-
-			rawMessage: 'Parameter #2 $games of method TeamSchedule\TeamScheduleView::render() expects list<array{game: LeagueSchedule\Game, currentMonth: string, opposingTeam: Team\Team, opponentText: string, highlight: string, gameResult: string, wins: int, losses: int, ...}>, array{array} given.'
+			rawMessage: 'Parameter #2 $games of method TeamSchedule\TeamScheduleView::render() expects list<array{game: LeagueSchedule\Game, currentMonth: string, opposingTeam: Team\Team, opponentText: string, highlight: string, gameResult: string, wins: int, losses: int, ...}>, array{array<string, mixed>} given.'
 			identifier: argument.type
 			count: 3
 			path: tests/WideUnit/Schedule/ScheduleWideUnitTest.php
@@ -6645,14 +4329,20 @@ parameters:
 			path: tests/WideUnit/Schedule/ScheduleWideUnitTest.php
 
 		-
-			rawMessage: 'Method Tests\WideUnit\Standings\StandingsWideUnitTest::createStandingsRow() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Standings/StandingsWideUnitTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
+			count: 1
+			path: tests/WideUnit/Trading/TradeWideUnitTest.php
+
+		-
+			rawMessage: 'Parameter #1 $data of method Tests\WideUnit\Mocks\MockDatabase::setMockData() expects list<array<string, mixed>>, array{array{salary_yr1: 1000, salary_yr2: 1500, salary_yr3: 0, salary_yr4: 0, salary_yr5: 0, salary_yr6: 0, 0: 1000, 1: 1500, ...}} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/WideUnit/Trading/TradeWideUnitTest.php
+
+		-
+			rawMessage: 'Parameter #1 $data of method Tests\WideUnit\Mocks\MockDatabase::setMockData() expects list<array<string, mixed>>, array{array{salary_yr1: 500, salary_yr2: 0, salary_yr3: 0, salary_yr4: 0, salary_yr5: 0, salary_yr6: 0, 0: 500, 1: 0, ...}} given.'
+			identifier: argument.type
 			count: 1
 			path: tests/WideUnit/Trading/TradeWideUnitTest.php
 
@@ -6681,18 +4371,6 @@ parameters:
 			path: tests/WideUnit/Waivers/WaiversWideUnitTest.php
 
 		-
-			rawMessage: 'Method Tests\WideUnit\Waivers\WaiversWideUnitTest::getBasePlayerData() has parameter $overrides with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Waivers/WaiversWideUnitTest.php
-
-		-
-			rawMessage: 'Method Tests\WideUnit\Waivers\WaiversWideUnitTest::getBasePlayerData() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/WideUnit/Waivers/WaiversWideUnitTest.php
-
-		-
 			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
 			identifier: phpunit.assertEquals
 			count: 7
@@ -6707,12 +4385,6 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\Assert::fail().'
 			identifier: staticMethod.dynamicCall
-			count: 1
-			path: tests/WideUnit/WideUnitTestCase.php
-
-		-
-			rawMessage: 'Method Tests\WideUnit\WideUnitTestCase::getExecutedQueries() return type has no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
 			count: 1
 			path: tests/WideUnit/WideUnitTestCase.php
 

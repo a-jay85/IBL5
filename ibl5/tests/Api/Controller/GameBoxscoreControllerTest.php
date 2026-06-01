@@ -16,6 +16,9 @@ class GameBoxscoreControllerTest extends WideUnitTestCase
     private const HOME_TEAM_ID = 14;
     private const GAME_DATE = '2026-03-20';
 
+    /**
+     * @return array<string, mixed>
+     */
     private function gameRow(string $status = 'completed'): array
     {
         return [
@@ -42,6 +45,9 @@ class GameBoxscoreControllerTest extends WideUnitTestCase
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function teamBoxscoreRow(string $name): array
     {
         return [
@@ -82,6 +88,9 @@ class GameBoxscoreControllerTest extends WideUnitTestCase
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function playerBoxscoreRow(
         string $uuid,
         string $name,

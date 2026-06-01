@@ -32,7 +32,7 @@ class NegotiationOfferViewTest extends TestCase
      * @group view
      * @group rendering
      */
-    public function testRendersNegotiationFormWithAllFields()
+    public function testRendersNegotiationFormWithAllFields(): void
     {
         // Arrange
         $player = $this->createTestPlayer();
@@ -68,7 +68,7 @@ class NegotiationOfferViewTest extends TestCase
      * @group view
      * @group rendering
      */
-    public function testFormContainsAllHiddenFields()
+    public function testFormContainsAllHiddenFields(): void
     {
         // Arrange
         $player = $this->createTestPlayer(['pid' => 123, 'teamname' => 'Seattle Supersonics']);
@@ -95,7 +95,7 @@ class NegotiationOfferViewTest extends TestCase
      * @group view
      * @group security
      */
-    public function testEscapesPlayerNameInForm()
+    public function testEscapesPlayerNameInForm(): void
     {
         // Arrange
         $player = $this->createTestPlayer(['name' => "O'Neal <script>alert('xss')</script>"]);
@@ -116,7 +116,7 @@ class NegotiationOfferViewTest extends TestCase
      * @group view
      * @group security
      */
-    public function testEscapesTeamNameInForm()
+    public function testEscapesTeamNameInForm(): void
     {
         // Arrange
         $player = $this->createTestPlayer(['teamname' => "Team <img src=x onerror=alert(1)>"]);
@@ -137,7 +137,7 @@ class NegotiationOfferViewTest extends TestCase
      * @group view
      * @group rendering
      */
-    public function testShowsEditableFieldsWhenDemandsUnderMax()
+    public function testShowsEditableFieldsWhenDemandsUnderMax(): void
     {
         // Arrange
         $player = $this->createTestPlayer();
@@ -169,7 +169,7 @@ class NegotiationOfferViewTest extends TestCase
      * @group view
      * @group rendering
      */
-    public function testShowsMaxSalaryFieldsWhenDemandsExceedMax()
+    public function testShowsMaxSalaryFieldsWhenDemandsExceedMax(): void
     {
         // Arrange
         $player = $this->createTestPlayer(['bird' => 2]); // No Bird rights
@@ -199,7 +199,7 @@ class NegotiationOfferViewTest extends TestCase
      * @group view
      * @group rendering
      */
-    public function testDisplaysBirdRightsMessageWhenApplicable()
+    public function testDisplaysBirdRightsMessageWhenApplicable(): void
     {
         // Arrange
         $player = $this->createTestPlayer(['bird' => 3]); // Has Bird rights
@@ -218,7 +218,7 @@ class NegotiationOfferViewTest extends TestCase
      * @group view
      * @group rendering
      */
-    public function testDisplaysNonBirdRightsMessageWhenNotApplicable()
+    public function testDisplaysNonBirdRightsMessageWhenNotApplicable(): void
     {
         // Arrange
         $player = $this->createTestPlayer(['bird' => 2]); // No Bird rights
@@ -237,7 +237,7 @@ class NegotiationOfferViewTest extends TestCase
      * @group view
      * @group rendering
      */
-    public function testDisplaysCapSpaceInformation()
+    public function testDisplaysCapSpaceInformation(): void
     {
         // Arrange
         $player = $this->createTestPlayer();
@@ -256,7 +256,7 @@ class NegotiationOfferViewTest extends TestCase
      * @group view
      * @group error-rendering
      */
-    public function testRendersErrorMessage()
+    public function testRendersErrorMessage(): void
     {
         // Arrange
         $errorMessage = "This is a test error";
@@ -274,7 +274,7 @@ class NegotiationOfferViewTest extends TestCase
      * @group error-rendering
      * @group security
      */
-    public function testEscapesErrorMessage()
+    public function testEscapesErrorMessage(): void
     {
         // Arrange
         $errorMessage = "<script>alert('xss')</script>";
@@ -291,7 +291,7 @@ class NegotiationOfferViewTest extends TestCase
      * @group view
      * @group header-rendering
      */
-    public function testRendersHeader()
+    public function testRendersHeader(): void
     {
         // Arrange
         $player = $this->createTestPlayer();
@@ -308,7 +308,7 @@ class NegotiationOfferViewTest extends TestCase
      * @group view
      * @group header-rendering
      */
-    public function testHeaderReturnsStaticTitle()
+    public function testHeaderReturnsStaticTitle(): void
     {
         // Arrange
         $player = $this->createTestPlayer();
@@ -342,6 +342,9 @@ class NegotiationOfferViewTest extends TestCase
 
     /**
      * Helper to get default demands array
+     */
+    /**
+     * @return array{year1: int, year2: int, year3: int, year4: int, year5: int, year6: int, years: int, total: int, modifier: float}
      */
     private function getDefaultDemands(): array
     {

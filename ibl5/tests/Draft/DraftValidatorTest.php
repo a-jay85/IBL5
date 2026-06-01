@@ -10,14 +10,14 @@ use Draft\DraftValidator;
 
 class DraftValidatorTest extends TestCase
 {
-    private $validator;
+    private DraftValidator $validator;
 
     protected function setUp(): void
     {
         $this->validator = new DraftValidator();
     }
 
-    public function testValidateSucceedsWithValidSelection()
+    public function testValidateSucceedsWithValidSelection(): void
     {
         $result = $this->validator->validateDraftSelection('John Doe', null);
         
@@ -25,7 +25,7 @@ class DraftValidatorTest extends TestCase
         $this->assertEmpty($this->validator->getErrors());
     }
 
-    public function testValidateSucceedsWithEmptyStringCurrentSelection()
+    public function testValidateSucceedsWithEmptyStringCurrentSelection(): void
     {
         $result = $this->validator->validateDraftSelection('John Doe', '');
         
@@ -33,7 +33,7 @@ class DraftValidatorTest extends TestCase
         $this->assertEmpty($this->validator->getErrors());
     }
 
-    public function testValidateFailsWithNullPlayerName()
+    public function testValidateFailsWithNullPlayerName(): void
     {
         $result = $this->validator->validateDraftSelection(null, null);
         
@@ -43,7 +43,7 @@ class DraftValidatorTest extends TestCase
         $this->assertStringContainsString("didn't select a player", $errors[0]);
     }
 
-    public function testValidateFailsWithEmptyPlayerName()
+    public function testValidateFailsWithEmptyPlayerName(): void
     {
         $result = $this->validator->validateDraftSelection('', null);
         
@@ -53,7 +53,7 @@ class DraftValidatorTest extends TestCase
         $this->assertStringContainsString("didn't select a player", $errors[0]);
     }
 
-    public function testValidateFailsWhenPickAlreadyUsed()
+    public function testValidateFailsWhenPickAlreadyUsed(): void
     {
         $result = $this->validator->validateDraftSelection('John Doe', 'Jane Smith');
         
@@ -63,7 +63,7 @@ class DraftValidatorTest extends TestCase
         $this->assertStringContainsString("already drafted", $errors[0]);
     }
 
-    public function testClearErrorsRemovesAllErrors()
+    public function testClearErrorsRemovesAllErrors(): void
     {
         $this->validator->validateDraftSelection(null, null);
         $this->assertNotEmpty($this->validator->getErrors());
@@ -73,7 +73,7 @@ class DraftValidatorTest extends TestCase
         $this->assertEmpty($this->validator->getErrors());
     }
 
-    public function testValidateResetsPreviousErrors()
+    public function testValidateResetsPreviousErrors(): void
     {
         // First validation should fail
         $this->validator->validateDraftSelection(null, null);
@@ -86,7 +86,7 @@ class DraftValidatorTest extends TestCase
         $this->assertEmpty($this->validator->getErrors());
     }
 
-    public function testValidateFailsWhenPlayerAlreadyDrafted()
+    public function testValidateFailsWhenPlayerAlreadyDrafted(): void
     {
         $result = $this->validator->validateDraftSelection('John Doe', null, true);
         
@@ -96,7 +96,7 @@ class DraftValidatorTest extends TestCase
         $this->assertStringContainsString("already been drafted by another team", $errors[0]);
     }
 
-    public function testValidateSucceedsWhenPlayerNotAlreadyDrafted()
+    public function testValidateSucceedsWhenPlayerNotAlreadyDrafted(): void
     {
         $result = $this->validator->validateDraftSelection('John Doe', null, false);
         
@@ -104,7 +104,7 @@ class DraftValidatorTest extends TestCase
         $this->assertEmpty($this->validator->getErrors());
     }
 
-    public function testValidateFailsWithPlayerAlreadyDraftedEvenIfPickNotUsed()
+    public function testValidateFailsWithPlayerAlreadyDraftedEvenIfPickNotUsed(): void
     {
         $result = $this->validator->validateDraftSelection('John Doe', '', true);
 

@@ -433,6 +433,8 @@ class TeamOffDefStatsServiceTest extends TestCase
 
     /**
      * Create a raw team stats row for testing
+     *
+     * @return array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, offense_games: int, offense_fgm: int, offense_fga: int, offense_ftm: int, offense_fta: int, offense_tgm: int, offense_tga: int, offense_orb: int, offense_reb: int, offense_ast: int, offense_stl: int, offense_tvr: int, offense_blk: int, offense_pf: int, defense_games: int, defense_fgm: int, defense_fga: int, defense_ftm: int, defense_fta: int, defense_tgm: int, defense_tga: int, defense_orb: int, defense_reb: int, defense_ast: int, defense_stl: int, defense_tvr: int, defense_blk: int, defense_pf: int}
      */
     private function createRawTeamRow(int $teamId, string $city, string $name): array
     {
@@ -475,6 +477,8 @@ class TeamOffDefStatsServiceTest extends TestCase
 
     /**
      * Create a processed team data structure for testing
+     *
+     * @return array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, offense_games: int, defense_games: int, offense_totals: array<string, string>, offense_averages: array<string, string>, defense_totals: array<string, string>, defense_averages: array<string, string>, raw_offense: array<string, int>, raw_defense: array<string, int>}
      */
     private function createProcessedTeamData(int $teamId, string $city, string $name): array
     {

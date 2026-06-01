@@ -35,6 +35,9 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
         $this->assertStringContainsString('No player selected', $output);
     }
 
+    /**
+     * @param array<string, mixed> $playerOverrides
+     */
     private function seedShowpageMocks(array $playerOverrides = []): void
     {
         $player = TestDataFactory::createPlayer(array_merge(

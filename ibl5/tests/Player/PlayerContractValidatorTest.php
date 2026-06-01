@@ -11,14 +11,14 @@ use Season\Season;
 
 class PlayerContractValidatorTest extends TestCase
 {
-    private $validator;
+    private PlayerContractValidator $validator;
 
     protected function setUp(): void
     {
         $this->validator = new PlayerContractValidator();
     }
 
-    public function testCanRenegotiateContractWhenInLastYear()
+    public function testCanRenegotiateContractWhenInLastYear(): void
     {
         $playerData = new PlayerData();
         $playerData->contractCurrentYear = 6;
@@ -28,7 +28,7 @@ class PlayerContractValidatorTest extends TestCase
         $this->assertTrue($result);
     }
 
-    public function testCanRenegotiateContractWhenYear1WithNoYear2()
+    public function testCanRenegotiateContractWhenYear1WithNoYear2(): void
     {
         $playerData = new PlayerData();
         $playerData->contractCurrentYear = 1;
@@ -39,7 +39,7 @@ class PlayerContractValidatorTest extends TestCase
         $this->assertTrue($result);
     }
 
-    public function testCanRenegotiateContractWhenYear2WithNoYear3()
+    public function testCanRenegotiateContractWhenYear2WithNoYear3(): void
     {
         $playerData = new PlayerData();
         $playerData->contractCurrentYear = 2;
@@ -50,7 +50,7 @@ class PlayerContractValidatorTest extends TestCase
         $this->assertTrue($result);
     }
 
-    public function testCannotRenegotiateContractWhenYearHasNext()
+    public function testCannotRenegotiateContractWhenYearHasNext(): void
     {
         $playerData = new PlayerData();
         $playerData->contractCurrentYear = 2;
@@ -61,7 +61,7 @@ class PlayerContractValidatorTest extends TestCase
         $this->assertFalse($result);
     }
 
-    public function testCanRookieOptionFirstRoundDuringFreeAgency()
+    public function testCanRookieOptionFirstRoundDuringFreeAgency(): void
     {
         $playerData = new PlayerData();
         $playerData->draftRound = 1;
@@ -73,7 +73,7 @@ class PlayerContractValidatorTest extends TestCase
         $this->assertTrue($result);
     }
 
-    public function testCanRookieOptionSecondRoundDuringFreeAgency()
+    public function testCanRookieOptionSecondRoundDuringFreeAgency(): void
     {
         $playerData = new PlayerData();
         $playerData->draftRound = 2;
@@ -85,7 +85,7 @@ class PlayerContractValidatorTest extends TestCase
         $this->assertTrue($result);
     }
 
-    public function testCanRookieOptionFirstRoundDuringPreseason()
+    public function testCanRookieOptionFirstRoundDuringPreseason(): void
     {
         $playerData = new PlayerData();
         $playerData->draftRound = 1;
@@ -97,7 +97,7 @@ class PlayerContractValidatorTest extends TestCase
         $this->assertTrue($result);
     }
 
-    public function testCanRookieOptionSecondRoundDuringHEAT()
+    public function testCanRookieOptionSecondRoundDuringHEAT(): void
     {
         $playerData = new PlayerData();
         $playerData->draftRound = 2;
@@ -109,7 +109,7 @@ class PlayerContractValidatorTest extends TestCase
         $this->assertTrue($result);
     }
 
-    public function testCannotRookieOptionDuringRegularSeason()
+    public function testCannotRookieOptionDuringRegularSeason(): void
     {
         $playerData = new PlayerData();
         $playerData->draftRound = 1;
@@ -121,7 +121,7 @@ class PlayerContractValidatorTest extends TestCase
         $this->assertFalse($result);
     }
 
-    public function testWasRookieOptionedFirstRound()
+    public function testWasRookieOptionedFirstRound(): void
     {
         $playerData = new PlayerData();
         $playerData->yearsOfExperience = 4;
@@ -134,7 +134,7 @@ class PlayerContractValidatorTest extends TestCase
         $this->assertTrue($result);
     }
 
-    public function testWasRookieOptionedSecondRound()
+    public function testWasRookieOptionedSecondRound(): void
     {
         $playerData = new PlayerData();
         $playerData->yearsOfExperience = 3;
@@ -147,7 +147,7 @@ class PlayerContractValidatorTest extends TestCase
         $this->assertTrue($result);
     }
 
-    public function testWasNotRookieOptioned()
+    public function testWasNotRookieOptioned(): void
     {
         $playerData = new PlayerData();
         $playerData->yearsOfExperience = 4;
@@ -160,7 +160,7 @@ class PlayerContractValidatorTest extends TestCase
         $this->assertFalse($result);
     }
 
-    public function testCannotRenegotiateWhenRookieOptionedFirstRoundInOptionYear()
+    public function testCannotRenegotiateWhenRookieOptionedFirstRoundInOptionYear(): void
     {
         $playerData = new PlayerData();
         $playerData->draftRound = 1;
@@ -175,7 +175,7 @@ class PlayerContractValidatorTest extends TestCase
         $this->assertFalse($result, 'First round rookie optioned player in year 4 should not be able to renegotiate');
     }
 
-    public function testCannotRenegotiateWhenRookieOptionedSecondRoundInOptionYear()
+    public function testCannotRenegotiateWhenRookieOptionedSecondRoundInOptionYear(): void
     {
         $playerData = new PlayerData();
         $playerData->draftRound = 2;
@@ -190,7 +190,7 @@ class PlayerContractValidatorTest extends TestCase
         $this->assertFalse($result, 'Second round rookie optioned player in year 3 should not be able to renegotiate');
     }
 
-    public function testCanRenegotiateWhenRookieOptionedButNotInOptionYear()
+    public function testCanRenegotiateWhenRookieOptionedButNotInOptionYear(): void
     {
         // This test demonstrates a player who WAS rookie optioned in a previous year
         // but is now past the rookie option year
@@ -208,7 +208,7 @@ class PlayerContractValidatorTest extends TestCase
         $this->assertTrue($result, 'Rookie optioned player can renegotiate after the option year when no next year salary');
     }
 
-    public function testGetFinalYearRookieContractSalaryFirstRound()
+    public function testGetFinalYearRookieContractSalaryFirstRound(): void
     {
         $playerData = new PlayerData();
         $playerData->draftRound = 1;
@@ -220,7 +220,7 @@ class PlayerContractValidatorTest extends TestCase
         $this->assertEquals(150, $result, 'First round picks have 3-year contracts (salary_yr3 is final year)');
     }
 
-    public function testGetFinalYearRookieContractSalarySecondRound()
+    public function testGetFinalYearRookieContractSalarySecondRound(): void
     {
         $playerData = new PlayerData();
         $playerData->draftRound = 2;
@@ -232,7 +232,7 @@ class PlayerContractValidatorTest extends TestCase
         $this->assertEquals(100, $result, 'Second round picks have 2-year contracts (salary_yr2 is final year)');
     }
 
-    public function testGetFinalYearRookieContractSalaryNotDraftPick()
+    public function testGetFinalYearRookieContractSalaryNotDraftPick(): void
     {
         $playerData = new PlayerData();
         $playerData->draftRound = 0; // Not a draft pick
@@ -244,7 +244,7 @@ class PlayerContractValidatorTest extends TestCase
         $this->assertEquals(0, $result, 'Non-draft picks should return 0');
     }
 
-    public function testCannotRookieOptionWithMoreThanThreeYearsExperience()
+    public function testCannotRookieOptionWithMoreThanThreeYearsExperience(): void
     {
         $playerData = new PlayerData();
         $playerData->draftRound = 1;
@@ -256,7 +256,7 @@ class PlayerContractValidatorTest extends TestCase
         $this->assertFalse($result, 'Players with more than 3 years of experience should not be eligible');
     }
 
-    public function testCannotRookieOptionSecondRoundWithMoreThanThreeYearsExperience()
+    public function testCannotRookieOptionSecondRoundWithMoreThanThreeYearsExperience(): void
     {
         $playerData = new PlayerData();
         $playerData->draftRound = 2;
@@ -268,7 +268,7 @@ class PlayerContractValidatorTest extends TestCase
         $this->assertFalse($result, 'Second round players with more than 3 years of experience should not be eligible');
     }
 
-    public function testCannotRookieOptionWithExactlyFourYearsExperience()
+    public function testCannotRookieOptionWithExactlyFourYearsExperience(): void
     {
         $playerData = new PlayerData();
         $playerData->draftRound = 1;
@@ -346,7 +346,7 @@ class PlayerContractValidatorTest extends TestCase
         );
     }
 
-    private function createMockSeason($endingYear)
+    private function createMockSeason(int $endingYear): Season&\PHPUnit\Framework\MockObject\Stub
     {
         $season = $this->createStub(Season::class);
         $season->endingYear = $endingYear;

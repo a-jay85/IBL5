@@ -10,9 +10,13 @@ namespace Tests\WideUnit\Mocks;
  */
 class MockDatabaseResult
 {
+    /** @var list<array<string, mixed>> */
     private array $data;
     private int $position = 0;
-    
+
+    /**
+     * @param list<array<string, mixed>> $data
+     */
     public function __construct(array $data = [])
     {
         $this->data = $data;
@@ -29,6 +33,9 @@ class MockDatabaseResult
         return isset($this->data[$row][$field]) ? $this->data[$row][$field] : null;
     }
     
+    /**
+     * @return array<int|string, mixed>|false
+     */
     public function fetchRow(): array|false
     {
         if ($this->position < count($this->data)) {
@@ -42,7 +49,10 @@ class MockDatabaseResult
         }
         return false;
     }
-    
+
+    /**
+     * @return array<string, mixed>|false
+     */
     public function fetchAssoc(): array|false
     {
         if ($this->position < count($this->data)) {
@@ -55,6 +65,8 @@ class MockDatabaseResult
      * MySQLi-style fetch_assoc method (snake_case alias)
      * Used by VotingResultsService which expects mysqli result interface
      * Returns null instead of false to match mysqli_result::fetch_assoc()
+     *
+     * @return array<string, mixed>|null|false
      */
     public function fetch_assoc(): array|null|false
     {

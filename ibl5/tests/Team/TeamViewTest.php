@@ -23,6 +23,10 @@ class TeamViewTest extends TestCase
         $this->view = new TeamView();
     }
 
+    /**
+     * @param array<string, mixed> $overrides
+     * @return array<string, mixed>
+     */
     private function createPageData(array $overrides = []): array
     {
         $team = new \stdClass();

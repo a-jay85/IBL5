@@ -21,6 +21,9 @@ final class SeasonLeaderboardsServiceTest extends TestCase
         $this->service = new SeasonLeaderboardsService($this->stubRepo);
     }
 
+    /**
+     * @param list<array<string, mixed>> $rows
+     */
     private function buildServiceWithRows(array $rows): SeasonLeaderboardsService
     {
         $stub = $this->createStub(SeasonLeaderboardsRepositoryInterface::class);

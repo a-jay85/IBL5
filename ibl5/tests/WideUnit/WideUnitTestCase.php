@@ -89,6 +89,8 @@ abstract class WideUnitTestCase extends TestCase
 
     /**
      * Get all queries executed during the test
+     *
+     * @return list<string>
      */
     protected function getExecutedQueries(): array
     {

@@ -13,6 +13,9 @@ class GameDetailControllerTest extends WideUnitTestCase
     private const GAME_UUID = 'game-uuid-abc123';
     private const UPDATED_AT = '2026-03-15 10:00:00';
 
+    /**
+     * @return array<string, mixed>
+     */
     private function gameRow(): array
     {
         return [

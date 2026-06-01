@@ -758,6 +758,9 @@ class WaiversWideUnitTest extends WideUnitTestCase
 
     /**
      * Create base player data for waiver tests
+     *
+     * @param array<string, mixed> $overrides
+     * @return array<string, mixed>
      */
     private function getBasePlayerData(array $overrides = []): array
     {

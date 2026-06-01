@@ -67,9 +67,15 @@ class NewsModuleIntegrationTest extends TestCase
         self::assertSame('Cavaliers', $slate->teamName);
     }
 
+    /**
+     * @param list<array{schedId:int,boxId:int,date:string,visitor:int,vScore:int,home:int,hScore:int,year:int}> $games
+     */
     private function repoWithGames(array $games): LastSimRecapRepositoryInterface
     {
         return new class($games) implements LastSimRecapRepositoryInterface {
+            /**
+             * @param list<array{schedId:int,boxId:int,date:string,visitor:int,vScore:int,home:int,hScore:int,year:int}> $games
+             */
             public function __construct(private array $games) {}
             public function getLastSimWindow(): array {
                 return ['sim' => 1, 'startDate' => '2026-05-01', 'endDate' => '2026-05-13'];

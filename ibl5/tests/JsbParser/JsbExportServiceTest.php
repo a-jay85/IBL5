@@ -71,6 +71,9 @@ class JsbExportServiceTest extends TestCase
         return $record;
     }
 
+    /**
+     * @param list<string> $records
+     */
     private function buildPlrContent(array $records): string
     {
         return implode("\r\n", $records) . "\r\n";

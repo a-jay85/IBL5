@@ -14,7 +14,7 @@ class Discord
         return '123456789';
     }
     
-    public static function postToChannel($channel, $message)
+    public static function postToChannel(string $channel, string $message): bool
     {
         return true;
     }

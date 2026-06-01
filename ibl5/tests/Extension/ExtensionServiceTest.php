@@ -327,6 +327,7 @@ class ExtensionServiceTest extends TestCase
     }
 
     /**
+     * @param array<string, mixed> $overrides
      * @return array<string, mixed>
      */
     private function getFullMockData(array $overrides = []): array

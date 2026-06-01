@@ -8,14 +8,18 @@ namespace Tests\WideUnit\Mocks;
  * Mock mysqli_result class for testing
  * Cannot extend mysqli_result directly due to readonly properties
  * Implements Iterator to support foreach loops (like mysqli_result in PHP 8+)
+ *
+ * @implements \Iterator<int, array<string, mixed>>
  */
 class MockMysqliResult implements \Iterator
 {
-    private $mockResult;
+    private MockDatabaseResult $mockResult;
+    /** @var list<array<string, mixed>> */
     private array $data;
     private int $position = 0;
     public int $current_field = 0;
     public int $field_count = 0;
+    /** @var list<int>|null */
     public ?array $lengths = null;
     public int|string $num_rows = 0;
     public int $type = 0;
@@ -33,11 +37,17 @@ class MockMysqliResult implements \Iterator
         $this->mockResult = new MockDatabaseResult($this->data);
     }
 
+    /**
+     * @return array<string, mixed>|null|false
+     */
     public function fetch_assoc(): array|null|false
     {
         return $this->mockResult->fetchAssoc();
     }
 
+    /**
+     * @return array<string, mixed>|null|false
+     */
     public function fetch_array(int $mode = MYSQLI_BOTH): array|null|false
     {
         return $this->mockResult->fetchAssoc();

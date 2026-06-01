@@ -10,14 +10,14 @@ use DepthChartEntry\DepthChartEntryView;
 
 class DepthChartEntryProcessorTest extends TestCase
 {
-    private $processor;
-    
+    private DepthChartEntryProcessor $processor;
+
     protected function setUp(): void
     {
         $this->processor = new DepthChartEntryProcessor();
     }
-    
-    public function testProcessesSubmissionCorrectly()
+
+    public function testProcessesSubmissionCorrectly(): void
     {
         $postData = [
             'Name1' => 'Player One',
@@ -54,7 +54,7 @@ class DepthChartEntryProcessorTest extends TestCase
         $this->assertEquals(0, $result['playerData'][0]['bh']);
     }
     
-    public function testDetectsMultipleStartingPositions()
+    public function testDetectsMultipleStartingPositions(): void
     {
         $postData = [
             'Name1' => 'Player One',
@@ -74,7 +74,7 @@ class DepthChartEntryProcessorTest extends TestCase
         $this->assertEquals('Player One', $result['nameOfProblemStarter']);
     }
     
-    public function testExcludesInjuredPlayersFromPositionCount()
+    public function testExcludesInjuredPlayersFromPositionCount(): void
     {
         $postData = [
             'Name1' => 'Player One',
@@ -94,7 +94,7 @@ class DepthChartEntryProcessorTest extends TestCase
         $this->assertEquals(1, $result['activePlayers']);  // Still counts as active
     }
     
-    public function testGeneratesCsvContentCorrectly()
+    public function testGeneratesCsvContentCorrectly(): void
     {
         $playerData = [
             [
@@ -122,7 +122,7 @@ class DepthChartEntryProcessorTest extends TestCase
     
 
     
-    public function testSanitizesInputWithMaliciousData()
+    public function testSanitizesInputWithMaliciousData(): void
     {
         $postData = [
             'Name1' => '<script>alert("XSS")</script>Player One',
@@ -160,7 +160,7 @@ class DepthChartEntryProcessorTest extends TestCase
         $this->assertEquals(0, $result['playerData'][0]['bh']);
     }
     
-    public function testHandlesMissingOptionalFields()
+    public function testHandlesMissingOptionalFields(): void
     {
         $postData = [
             'Name1' => 'Player One',
@@ -181,7 +181,7 @@ class DepthChartEntryProcessorTest extends TestCase
         $this->assertEquals(0, $result['playerData'][0]['injury']);
     }
     
-    public function testBlankMinutesSubmissionIsConvertedToZero()
+    public function testBlankMinutesSubmissionIsConvertedToZero(): void
     {
         // A blank <input type="number"> POSTs as an empty string. The processor
         // must coerce this to 0 so the depth chart writes a numeric value
@@ -204,7 +204,7 @@ class DepthChartEntryProcessorTest extends TestCase
         $this->assertSame(0, $result['playerData'][0]['min']);
     }
 
-    public function testGeneratesCsvWithSpecialCharacters()
+    public function testGeneratesCsvWithSpecialCharacters(): void
     {
         $playerData = [
             [
@@ -230,7 +230,7 @@ class DepthChartEntryProcessorTest extends TestCase
         $this->assertStringContainsString('1,0,0,0,0,1,30,0,0,0,0,0', $csv);
     }
     
-    public function testCountsAllPositionTypesCorrectly()
+    public function testCountsAllPositionTypesCorrectly(): void
     {
         $postData = [
             'Name1' => 'Player One',
@@ -260,7 +260,7 @@ class DepthChartEntryProcessorTest extends TestCase
      * Tests data consistency for position depth fields (pg, sg, sf, pf, c)
      * Tests DepthChartEntryProcessor and DepthChartEntryView together.
      */
-    public function testFormDisplaysCorrectDatabaseValuesForAllSettings()
+    public function testFormDisplaysCorrectDatabaseValuesForAllSettings(): void
     {
         $view = new DepthChartEntryView($this->createStub(\League\LeagueContext::class), new \DepthChartEntry\DepthChartEntryService());
 
@@ -306,7 +306,7 @@ class DepthChartEntryProcessorTest extends TestCase
     /**
      * Test that role fields (OF, DF, OI, DI, BH) are hardcoded to 0 regardless of input
      */
-    public function testRoleFieldsAreHardcodedToZero()
+    public function testRoleFieldsAreHardcodedToZero(): void
     {
         // Even if POST data contains OF/DF/OI/DI/BH keys, the processor ignores them
         $postData = [
@@ -340,7 +340,7 @@ class DepthChartEntryProcessorTest extends TestCase
     /**
      * Test that CSV export correctly represents all processed values
      */
-    public function testCsvExportMatchesProcessedValuesForAllSettings()
+    public function testCsvExportMatchesProcessedValuesForAllSettings(): void
     {
         $playerData = [
             [
@@ -391,7 +391,7 @@ class DepthChartEntryProcessorTest extends TestCase
      * Test the complete round-trip for a player:
      * Form display -> User sees values -> Submits -> CSV generated -> Form reloaded
      */
-    public function testCompleteRoundTripPreservesPositionDepthValues()
+    public function testCompleteRoundTripPreservesPositionDepthValues(): void
     {
         $view = new DepthChartEntryView($this->createStub(\League\LeagueContext::class), new \DepthChartEntry\DepthChartEntryService());
 
@@ -500,7 +500,7 @@ class DepthChartEntryProcessorTest extends TestCase
      * Test for a specific edge case: when position depth values are 0,
      * ensure they're not confused with empty/null/false
      */
-    public function testZeroValuesAreHandledCorrectly()
+    public function testZeroValuesAreHandledCorrectly(): void
     {
         $view = new DepthChartEntryView($this->createStub(\League\LeagueContext::class), new \DepthChartEntry\DepthChartEntryService());
 

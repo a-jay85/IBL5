@@ -14,6 +14,9 @@ class TeamRosterControllerTest extends WideUnitTestCase
     private const PLAYER_UUID = 'player-uuid-001';
     private const UPDATED_AT = '2026-01-15 12:00:00';
 
+    /**
+     * @return array<string, mixed>
+     */
     private function playerRow(): array
     {
         return [

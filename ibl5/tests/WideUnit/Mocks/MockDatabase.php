@@ -32,13 +32,19 @@ class MockDatabase extends \mysqli
         parent::__construct();
     }
 
+    /** @var list<array<string, mixed>> */
     private array $mockData = [];
+    /** @var list<array<string, mixed>> */
     private array $mockTradeInfo = [];
+    /** @var list<array<string, mixed>> */
     private array $mockTeamData = [];
+    /** @var array<string, mixed> */
     private array $mockPythagoreanData = [];
+    /** @var list<list<array<string, mixed>>> */
     private array $votingResultsQueue = [];
     private ?int $numRows = null;
     private bool $returnTrue = true;
+    /** @var list<string> */
     private array $executedQueries = [];
     /**
      * Ordered log of SQL queries AND transaction lifecycle markers
@@ -273,6 +279,9 @@ class MockDatabase extends \mysqli
         return null;
     }
     
+    /**
+     * @return array<int|string, mixed>|false
+     */
     public function sql_fetchrow(object $result): array|false
     {
         if ($result instanceof MockDatabaseResult) {
@@ -280,7 +289,10 @@ class MockDatabase extends \mysqli
         }
         return false;
     }
-    
+
+    /**
+     * @return array<string, mixed>|false
+     */
     public function sql_fetch_assoc(object $result): array|false
     {
         if ($result instanceof MockDatabaseResult) {
@@ -307,11 +319,17 @@ class MockDatabase extends \mysqli
         return $this->affectedRows;
     }
     
+    /**
+     * @param list<array<string, mixed>> $data
+     */
     public function setMockData(array $data): void
     {
         $this->mockData = $data;
     }
-    
+
+    /**
+     * @param list<array<string, mixed>> $data
+     */
     public function setMockTradeInfo(array $data): void
     {
         $this->mockTradeInfo = $data;
@@ -322,6 +340,8 @@ class MockDatabase extends \mysqli
     /**
      * Set mock team data for team queries (ibl_team_info)
      * Used when tests need Team::initialize() to return valid team objects
+     *
+     * @param list<array<string, mixed>> $data
      */
     public function setMockTeamData(array $data): void
     {
@@ -331,6 +351,8 @@ class MockDatabase extends \mysqli
     /**
      * Set mock pythagorean stats data for offense/defense stats queries
      * Used when tests need StandingsRepository::getTeamPythagoreanStats() to return valid data
+     *
+     * @param array<string, mixed> $data
      */
     public function setMockPythagoreanData(array $data): void
     {
@@ -341,6 +363,8 @@ class MockDatabase extends \mysqli
      * Set voting results queue for ASG/EOY voting queries
      * Each element is returned for consecutive sql_query() calls to voting tables
      * Used when tests need VotingResultsService to return voting data
+     *
+     * @param list<list<array<string, mixed>>> $resultsQueue
      */
     public function setVotingResultsQueue(array $resultsQueue): void
     {
@@ -371,6 +395,9 @@ class MockDatabase extends \mysqli
         $this->failOnNthInsert = $n;
     }
     
+    /**
+     * @return list<string>
+     */
     public function getExecutedQueries(): array
     {
         return array_map(

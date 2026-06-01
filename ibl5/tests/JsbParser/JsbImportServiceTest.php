@@ -219,6 +219,9 @@ class JsbImportServiceTest extends TestCase
 
     // ── processTrnFile ───────────────────────────────────────────
 
+    /**
+     * @param array<int, string> $records
+     */
     private function buildTrnFile(int $recordCount, array $records = []): string
     {
         $data = str_repeat(' ', TrnFileParser::FILE_SIZE);

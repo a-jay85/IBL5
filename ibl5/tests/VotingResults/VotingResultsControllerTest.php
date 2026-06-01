@@ -72,7 +72,9 @@ final class VotingResultsControllerTest extends TestCase
 
 final class StubVotingResultsService extends VotingResultsService
 {
+    /** @var list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}> */
     public array $allStarResponse = [['title' => 'All-Star', 'rows' => []]];
+    /** @var list<array{title: string, rows: list<array{name: string, votes: int, pid: int}>}> */
     public array $endOfYearResponse = [['title' => 'End-Of-Year', 'rows' => []]];
     public int $allStarCalls = 0;
     public int $endOfYearCalls = 0;

@@ -596,6 +596,9 @@ class TradingServiceTest extends TestCase
         return $season;
     }
 
+    /**
+     * @return array{pos: string, name: string, pid: int, ordinal: int, cy: int, salary_yr1: int, salary_yr2: int, salary_yr3: int, salary_yr4: int, salary_yr5: int, salary_yr6: int}
+     */
     private function createPlayerRow(
         int $cy = 1,
         int $salaryYr1 = 0,

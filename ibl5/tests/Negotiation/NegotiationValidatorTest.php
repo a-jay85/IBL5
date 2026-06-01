@@ -21,8 +21,8 @@ use Tests\WideUnit\Mocks\TestDataFactory;
 class NegotiationValidatorTest extends TestCase
 {
     private MockDatabase $mockDb;
-    private $validator;
-    private $mockSeason;
+    private ?NegotiationValidator $validator;
+    private \Season\Season $mockSeason;
 
     protected function setUp(): void
     {
@@ -43,7 +43,7 @@ class NegotiationValidatorTest extends TestCase
      * @group validation
      * @group team-ownership
      */
-    public function testRejectsPlayerNotOnUsersTeam()
+    public function testRejectsPlayerNotOnUsersTeam(): void
     {
         // Arrange
         $player = $this->createMockPlayer('Test Player', 'Seattle Supersonics');
@@ -61,7 +61,7 @@ class NegotiationValidatorTest extends TestCase
      * @group validation
      * @group team-ownership
      */
-    public function testAcceptsPlayerOnUsersTeamWhenEligible()
+    public function testAcceptsPlayerOnUsersTeamWhenEligible(): void
     {
         // Arrange
         $player = Player::withPlrRow($this->mockDb, TestDataFactory::createPlayer([
@@ -90,7 +90,7 @@ class NegotiationValidatorTest extends TestCase
      * @group validation
      * @group contract-eligibility
      */
-    public function testRejectsPlayerNotEligibleForRenegotiation()
+    public function testRejectsPlayerNotEligibleForRenegotiation(): void
     {
         // Arrange - player has multiple years left on contract
         $player = Player::withPlrRow($this->mockDb, TestDataFactory::createPlayer([
@@ -120,7 +120,7 @@ class NegotiationValidatorTest extends TestCase
      * @group validation
      * @group contract-eligibility
      */
-    public function testAcceptsPlayerInLastContractYear()
+    public function testAcceptsPlayerInLastContractYear(): void
     {
         // Arrange
         $player = Player::withPlrRow($this->mockDb, TestDataFactory::createPlayer([
@@ -149,7 +149,7 @@ class NegotiationValidatorTest extends TestCase
      * @group validation
      * @group contract-eligibility
      */
-    public function testAcceptsPlayerWithNoNextYearSalary()
+    public function testAcceptsPlayerWithNoNextYearSalary(): void
     {
         // Arrange
         $player = Player::withPlrRow($this->mockDb, TestDataFactory::createPlayer([
@@ -178,7 +178,7 @@ class NegotiationValidatorTest extends TestCase
      * @group validation
      * @group rookie-option
      */
-    public function testRejectsRookieOptionedPlayerInOptionYear()
+    public function testRejectsRookieOptionedPlayerInOptionYear(): void
     {
         // Arrange - First round rookie optioned player in year 4
         $player = Player::withPlrRow($this->mockDb, TestDataFactory::createPlayer([
@@ -208,7 +208,7 @@ class NegotiationValidatorTest extends TestCase
      * @group validation
      * @group free-agency
      */
-    public function testRejectsDuringFreeAgency()
+    public function testRejectsDuringFreeAgency(): void
     {
         // Arrange
         $this->mockSeason->phase = 'Free Agency';
@@ -225,7 +225,7 @@ class NegotiationValidatorTest extends TestCase
      * @group validation
      * @group free-agency
      */
-    public function testAcceptsWhenFreeAgencyNotActive()
+    public function testAcceptsWhenFreeAgencyNotActive(): void
     {
         // Arrange — default phase is Regular Season (set in setUp)
 
@@ -240,7 +240,7 @@ class NegotiationValidatorTest extends TestCase
      * @group validation
      * @group free-agency
      */
-    public function testAcceptsWhenFreeAgencyModuleNotFound()
+    public function testAcceptsWhenFreeAgencyModuleNotFound(): void
     {
         // Arrange - no data returned (module doesn't exist)
         $this->mockDb->setMockData([]);

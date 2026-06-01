@@ -23,8 +23,8 @@ use Tests\WideUnit\Mocks\TestDataFactory;
  */
 class NegotiationDemandCalculatorTest extends TestCase
 {
-    private $mockDb;
-    private $calculator;
+    private ?MockDatabase $mockDb;
+    private ?NegotiationDemandCalculator $calculator;
 
     protected function setUp(): void
     {
@@ -42,7 +42,7 @@ class NegotiationDemandCalculatorTest extends TestCase
      * @group calculation
      * @group base-demands
      */
-    public function testCalculatesDemandsForAveragePlayer()
+    public function testCalculatesDemandsForAveragePlayer(): void
     {
         // Arrange
         $player = $this->createPlayerWithRatings(50); // Average ratings
@@ -129,7 +129,7 @@ class NegotiationDemandCalculatorTest extends TestCase
         $this->assertEqualsWithDelta($demands['year5'] - $demands['year4'], $raise, 1);
     }
 
-    public function testCalculatesHigherDemandsForBetterPlayer()
+    public function testCalculatesHigherDemandsForBetterPlayer(): void
     {
         // Arrange
         $averagePlayer = $this->createPlayerWithRatings(50);
@@ -150,7 +150,7 @@ class NegotiationDemandCalculatorTest extends TestCase
      * @group calculation
      * @group base-demands
      */
-    public function testCalculatesLowerDemandsForWorsePlayer()
+    public function testCalculatesLowerDemandsForWorsePlayer(): void
     {
         // Arrange
         $averagePlayer = $this->createPlayerWithRatings(50);
@@ -171,7 +171,7 @@ class NegotiationDemandCalculatorTest extends TestCase
      * @group calculation
      * @group modifiers
      */
-    public function testModifierReducesDemandsForWinningTeam()
+    public function testModifierReducesDemandsForWinningTeam(): void
     {
         // Arrange
         $player = $this->createPlayerWithHighWinnerPreference();
@@ -206,7 +206,7 @@ class NegotiationDemandCalculatorTest extends TestCase
      * @group calculation
      * @group modifiers
      */
-    public function testModifierReducesDemandsForHighTraditionTeam()
+    public function testModifierReducesDemandsForHighTraditionTeam(): void
     {
         // Arrange
         $player = $this->createPlayerWithHighTraditionPreference();
@@ -240,7 +240,7 @@ class NegotiationDemandCalculatorTest extends TestCase
      * @group calculation
      * @group modifiers
      */
-    public function testModifierReducesDemandsForLoyalPlayer()
+    public function testModifierReducesDemandsForLoyalPlayer(): void
     {
         // Arrange
         $mercenaryPlayer = $this->createPlayerWithRatings(50, ['loyalty' => 1]);
@@ -262,7 +262,7 @@ class NegotiationDemandCalculatorTest extends TestCase
      * @group calculation
      * @group modifiers
      */
-    public function testModifierIncreasesDemandsWhenPositionCrowded()
+    public function testModifierIncreasesDemandsWhenPositionCrowded(): void
     {
         // Arrange
         $player = $this->createPlayerWithHighPlayingTimePreference();
@@ -286,7 +286,7 @@ class NegotiationDemandCalculatorTest extends TestCase
      * @group calculation
      * @group years
      */
-    public function testCalculatesCorrectNumberOfYears()
+    public function testCalculatesCorrectNumberOfYears(): void
     {
         // Arrange
         $player = $this->createPlayerWithRatings(50);
@@ -304,7 +304,7 @@ class NegotiationDemandCalculatorTest extends TestCase
      * @group calculation
      * @group total
      */
-    public function testTotalMatchesSumOfYears()
+    public function testTotalMatchesSumOfYears(): void
     {
         // Arrange
         $player = $this->createPlayerWithRatings(50);
@@ -324,7 +324,7 @@ class NegotiationDemandCalculatorTest extends TestCase
      * @group calculation
      * @group edge-cases
      */
-    public function testHandlesZeroMarketMaximum()
+    public function testHandlesZeroMarketMaximum(): void
     {
         // Arrange - Some stats might have 0 max in an empty database
         $player = $this->createPlayerWithRatings(50);
@@ -344,6 +344,7 @@ class NegotiationDemandCalculatorTest extends TestCase
     /**
      * Helper to create a player with uniform ratings
      */
+    /** @param array<string, mixed> $overrides */
     private function createPlayerWithRatings(int $rating, array $overrides = []): Player
     {
         $row = TestDataFactory::createPlayer(array_merge([
@@ -403,6 +404,9 @@ class NegotiationDemandCalculatorTest extends TestCase
 
     /**
      * Helper to get default team factors
+     */
+    /**
+     * @return array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}
      */
     private function getDefaultTeamFactors(): array
     {

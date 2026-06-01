@@ -150,6 +150,8 @@ final class CheckMasterCiGreenCliTest extends TestCase
     }
 
     /**
+     * @param list<string> $args
+     * @param array<string, string> $env
      * @return array{output: string, exit: int}
      */
     private function runScript(array $args = [], array $env = []): array
@@ -187,6 +189,9 @@ final class CheckMasterCiGreenCliTest extends TestCase
         chmod($this->shimDir . '/gh', 0755);
     }
 
+    /**
+     * @param list<array<string, mixed>> $checkRuns
+     */
     private function writeFixture(array $checkRuns): string
     {
         $path = $this->tmpDir . '/fixture-' . bin2hex(random_bytes(4)) . '.json';

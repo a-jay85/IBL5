@@ -26,7 +26,7 @@ use Tests\WideUnit\Mocks\MockDatabase;
 #[AllowMockObjectsWithoutExpectations]
 class FreeAgencyCapCalculatorTest extends TestCase
 {
-    private $mockDb;
+    private MockDatabase $mockDb;
     private FreeAgencyCapCalculator $calculator;
 
     /** @var TeamQueryRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject */

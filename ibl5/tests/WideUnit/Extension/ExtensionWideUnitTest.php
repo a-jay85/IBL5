@@ -990,6 +990,9 @@ class ExtensionWideUnitTest extends WideUnitTestCase
      * Helper method that returns base Player data fields to avoid duplication
      * and ensure all required fields are present in mock data
      */
+    /**
+     * @return array<string, mixed>
+     */
     private function getBasePlayerData(): array
     {
         return [

@@ -153,6 +153,7 @@ class VotingRepositoryTest extends DatabaseTestCase
 
     // ==================== Helpers ====================
 
+    /** @return array<string, mixed> */
     private function fetchRow(string $table, string $keyColumn, string $keyValue): array
     {
         $stmt = $this->db->prepare("SELECT * FROM `{$table}` WHERE `{$keyColumn}` = ?");

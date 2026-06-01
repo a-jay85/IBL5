@@ -184,6 +184,8 @@ class TeamScheduleViewTest extends TestCase
      * Create a mock game row for testing
      *
      * Returns the full data structure expected by TeamScheduleView
+     *
+     * @return array<string, mixed>
      */
     private function createMockGame(
         string $month,

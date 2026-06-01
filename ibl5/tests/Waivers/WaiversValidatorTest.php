@@ -11,14 +11,14 @@ use Waivers\WaiversValidator;
 
 class WaiversValidatorTest extends TestCase
 {
-    private $validator;
-    
+    private WaiversValidator $validator;
+
     protected function setUp(): void
     {
         $this->validator = new WaiversValidator();
     }
-    
-    public function testValidateDropSucceedsWithNormalRosterAndSalary()
+
+    public function testValidateDropSucceedsWithNormalRosterAndSalary(): void
     {
         $result = $this->validator->validateDrop(
             10, // roster slots
@@ -29,7 +29,7 @@ class WaiversValidatorTest extends TestCase
         $this->assertEmpty($this->validator->getErrors());
     }
     
-    public function testValidateDropFailsWithFullRosterOverCap()
+    public function testValidateDropFailsWithFullRosterOverCap(): void
     {
         $result = $this->validator->validateDrop(
             13, // more than 2 roster slots (12+ players)
@@ -43,7 +43,7 @@ class WaiversValidatorTest extends TestCase
         $this->assertStringContainsString("over the hard cap", $errors[0]);
     }
     
-    public function testValidateDropSucceedsWithFullRosterUnderCap()
+    public function testValidateDropSucceedsWithFullRosterUnderCap(): void
     {
         $result = $this->validator->validateDrop(
             13, // more than 2 roster slots
@@ -54,7 +54,7 @@ class WaiversValidatorTest extends TestCase
         $this->assertEmpty($this->validator->getErrors());
     }
     
-    public function testValidateAddFailsWithNullPlayerID()
+    public function testValidateAddFailsWithNullPlayerID(): void
     {
         $result = $this->validator->validateAdd(
             null,  // no player selected
@@ -69,7 +69,7 @@ class WaiversValidatorTest extends TestCase
         $this->assertStringContainsString("didn't select a valid player", $errors[0]);
     }
     
-    public function testValidateAddFailsWithZeroPlayerID()
+    public function testValidateAddFailsWithZeroPlayerID(): void
     {
         $result = $this->validator->validateAdd(
             0,     // invalid player ID
@@ -84,7 +84,7 @@ class WaiversValidatorTest extends TestCase
         $this->assertStringContainsString("didn't select a valid player", $errors[0]);
     }
     
-    public function testValidateAddFailsWithFullRoster()
+    public function testValidateAddFailsWithFullRoster(): void
     {
         $result = $this->validator->validateAdd(
             123,   // valid player ID
@@ -99,7 +99,7 @@ class WaiversValidatorTest extends TestCase
         $this->assertStringContainsString("full roster", $errors[0]);
     }
     
-    public function testValidateAddFailsWith12PlusHealthyPlayersOverCap()
+    public function testValidateAddFailsWith12PlusHealthyPlayersOverCap(): void
     {
         $result = $this->validator->validateAdd(
             123,   // valid player ID
@@ -115,7 +115,7 @@ class WaiversValidatorTest extends TestCase
         $this->assertStringContainsString("over the hard cap", $errors[0]);
     }
     
-    public function testValidateAddSucceedsWith12HealthyPlayersUnderCap()
+    public function testValidateAddSucceedsWith12HealthyPlayersUnderCap(): void
     {
         $result = $this->validator->validateAdd(
             123,   // valid player ID
@@ -128,7 +128,7 @@ class WaiversValidatorTest extends TestCase
         $this->assertEmpty($this->validator->getErrors());
     }
     
-    public function testValidateAddFailsOverCapWithNonVetMin()
+    public function testValidateAddFailsOverCapWithNonVetMin(): void
     {
         $result = $this->validator->validateAdd(
             123,   // valid player ID
@@ -144,7 +144,7 @@ class WaiversValidatorTest extends TestCase
         $this->assertStringContainsString("veteran minimum", $errors[0]);
     }
     
-    public function testValidateAddSucceedsOverCapWithVetMin()
+    public function testValidateAddSucceedsOverCapWithVetMin(): void
     {
         $result = $this->validator->validateAdd(
             123,   // valid player ID
@@ -157,7 +157,7 @@ class WaiversValidatorTest extends TestCase
         $this->assertEmpty($this->validator->getErrors());
     }
     
-    public function testValidateAddSucceedsWithNormalConditions()
+    public function testValidateAddSucceedsWithNormalConditions(): void
     {
         $result = $this->validator->validateAdd(
             123,   // valid player ID
@@ -170,7 +170,7 @@ class WaiversValidatorTest extends TestCase
         $this->assertEmpty($this->validator->getErrors());
     }
     
-    public function testClearErrorsRemovesAllErrors()
+    public function testClearErrorsRemovesAllErrors(): void
     {
         // First create an error
         $this->validator->validateAdd(null, 5, 6000, 100);
@@ -181,7 +181,7 @@ class WaiversValidatorTest extends TestCase
         $this->assertEmpty($this->validator->getErrors());
     }
     
-    public function testValidateAddEdgeCaseAtExactCap()
+    public function testValidateAddEdgeCaseAtExactCap(): void
     {
         $result = $this->validator->validateAdd(
             123,   // valid player ID

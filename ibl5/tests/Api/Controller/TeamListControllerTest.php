@@ -13,6 +13,9 @@ class TeamListControllerTest extends WideUnitTestCase
     private const UPDATED_AT = '2026-01-15 12:00:00';
     private const TEAM_UUID = 'team-uuid-001';
 
+    /**
+     * @return array<string, mixed>
+     */
     private function teamRow(): array
     {
         return [

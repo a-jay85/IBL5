@@ -68,8 +68,11 @@ const (
 	slotPF      = 51 // width 2
 )
 
-// ErrShortRecord reports a .sco input that ends mid-record (truncated header or
-// a trailing partial 2,000-byte record). It names the offending record index.
+// ErrShortRecord reports a .sco input that ends mid-record: a truncated header,
+// or a trailing record shorter than the game-info + slot content
+// (scoContentSize). A trailing record that carries full content but omits its
+// padding is NOT an error — real files end that way (see ReadSco). It names the
+// offending record index.
 var ErrShortRecord = errors.New("backup: truncated .sco record")
 
 // ScoBox is one slot's stat line from a .sco game. TwoGM/TwoGA are 2-point-only
@@ -115,7 +118,9 @@ type ScoGame struct {
 // 1,000,000-byte header, then decodes each 2,000-byte record. Records with no
 // non-empty player slot are padding and are skipped (mirroring the PHP
 // gameLinesProcessed > 0 gate), so the real sparse corpus does not emit phantom
-// games. A truncated header or trailing partial record yields ErrShortRecord; a
+// games. The LAST record may omit its trailing padding (real files end after
+// the scoContentSize content); it is still decoded. A truncated header, or a
+// trailing record shorter than scoContentSize, yields ErrShortRecord; a
 // non-numeric slot field yields ErrBadField — never a panic.
 func ReadSco(r io.Reader) ([]ScoGame, error) {
 	data, err := io.ReadAll(r)

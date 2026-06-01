@@ -71,6 +71,10 @@ ibl5/tests/e2e/**/*-win32.png
 # Legacy spreadsheets (kept on disk, not in git)
 ibl5/spreadsheets/
 
+# Native engine binary — compiled in the Docker image stage, copied into place
+# by docker/entrypoint.sh at container start. Never committed.
+ibl5/bin/jsbsim
+
 # JSB sim files — source of truth is ibl5/backups/{season}/*.zip
 # (extracted at runtime by ExtractFromBackupStep)
 ibl5/*.lge

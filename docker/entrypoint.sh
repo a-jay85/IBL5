@@ -47,6 +47,15 @@ fi
 mkdir -p "$LOGS_DIR"
 chown www-data:www-data "$LOGS_DIR"
 
+# Materialize the native engine binary into the bind-mounted app dir. The image
+# builds it to /opt/ibl5-bin/jsbsim (outside the mount); copy it into ibl5/bin so
+# it's visible despite the mount shadowing image-built paths under ibl5/. Guarded
+# so a PHP-only image (no engine stage) still boots.
+if [ -f /opt/ibl5-bin/jsbsim ]; then
+    cp /opt/ibl5-bin/jsbsim "$APP_DIR/bin/jsbsim" && chmod +x "$APP_DIR/bin/jsbsim"
+    echo "[entrypoint] Installed native engine binary at ibl5/bin/jsbsim."
+fi
+
 # Auto-create mail config for Docker (Mailpit SMTP) if none exists.
 MAIL_CONFIG="$APP_DIR/config/mail.config.php"
 if [ ! -f "$MAIL_CONFIG" ]; then

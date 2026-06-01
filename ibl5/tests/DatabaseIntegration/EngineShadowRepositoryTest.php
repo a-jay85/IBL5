@@ -43,15 +43,32 @@ final class EngineShadowRepositoryTest extends DatabaseTestCase
     }
 
     #[Test]
-    public function resolvesTeamIdsForKnownPidsOnly(): void
+    public function getAllTeamIdsByPidMapsRosteredPids(): void
     {
         $this->insertTestPlayer(701, 'Known Player', ['teamid' => 5]);
+        $this->insertTestPlayer(702, 'Other Player', ['teamid' => 9]);
         $repo = new EngineShadowRepository($this->db);
 
-        $map = $repo->getTeamIdsForPids([701, 7029999]);
+        $map = $repo->getAllTeamIdsByPid();
 
         self::assertSame(5, $map[701] ?? null);
-        self::assertArrayNotHasKey(7029999, $map, 'unknown pid must not appear in the map');
+        self::assertSame(9, $map[702] ?? null);
+    }
+
+    #[Test]
+    public function getAllTeamIdsByPidExcludesUnrosteredPids(): void
+    {
+        // ibl_plr.teamid is NOT NULL, so the map only ever contains rostered pids;
+        // a pid absent from ibl_plr is absent from the map. This is exactly the
+        // omission that drives the loader's NULL-stamp for an unmapped engine pid
+        // (boundary mirror of EngineShadowLoaderTest's pid-999 NULL-teamid case).
+        $this->insertTestPlayer(704, 'Rostered Player', ['teamid' => 6]);
+        $repo = new EngineShadowRepository($this->db);
+
+        $map = $repo->getAllTeamIdsByPid();
+
+        self::assertSame(6, $map[704] ?? null, 'a rostered pid maps to its teamid');
+        self::assertArrayNotHasKey(88888888, $map, 'a pid absent from ibl_plr must not appear in the map');
     }
 
     #[Test]

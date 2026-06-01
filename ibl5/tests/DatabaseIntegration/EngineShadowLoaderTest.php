@@ -25,6 +25,7 @@ final class EngineShadowLoaderTest extends DatabaseTestCase
     private const GAME_DATE = '2026-03-10';
     private const VISITOR_TID = 3;
     private const HOME_TID = 1;
+    private const SEED = 12345;
 
     protected function setUp(): void
     {
@@ -38,12 +39,11 @@ final class EngineShadowLoaderTest extends DatabaseTestCase
     #[Test]
     public function writesPlayerRowsWithResolvedTeamId(): void
     {
-        $loader = new EngineShadowLoader(new EngineShadowRepository($this->db));
-        $result = $loader->load($this->resultJson());
+        $this->loadFixtureGame();
 
-        self::assertSame(1, $result->gamesLoaded);
-        self::assertSame(4, $result->playerRowsInserted);
-        self::assertSame(2, $result->teamRowsInserted);
+        // loadOneGame is void; assert the written rows by querying the table.
+        self::assertSame(4, $this->countShadowRowsForGame('ibl_box_scores_engine_shadow'));
+        self::assertSame(2, $this->countShadowRowsForGame('ibl_box_scores_engine_shadow_teams'));
 
         $star = $this->fetchPlayerRow(901);
         self::assertSame(self::VISITOR_TID, (int) $star['teamid']);
@@ -62,8 +62,7 @@ final class EngineShadowLoaderTest extends DatabaseTestCase
     #[Test]
     public function teamRowsUseActualVisitorHomeAndInsertVisitorFirst(): void
     {
-        $loader = new EngineShadowLoader(new EngineShadowRepository($this->db));
-        $loader->load($this->resultJson());
+        $this->loadFixtureGame();
 
         $rows = $this->fetchTeamRowsOrdered();
         self::assertCount(2, $rows);
@@ -101,8 +100,7 @@ final class EngineShadowLoaderTest extends DatabaseTestCase
             'injuries' => $this->countRows('ibl_jsb_transactions'),
         ];
 
-        $loader = new EngineShadowLoader(new EngineShadowRepository($this->db));
-        $loader->load($this->resultJson());
+        $this->loadFixtureGame();
 
         self::assertSame($before['players'], $this->countRows('ibl_box_scores'), 'canonical player boxscores changed');
         self::assertSame($before['teams'], $this->countRows('ibl_box_scores_teams'), 'canonical team boxscores changed');
@@ -125,9 +123,10 @@ final class EngineShadowLoaderTest extends DatabaseTestCase
         };
 
         $canonicalTeamsBefore = $this->countRows('ibl_box_scores_teams');
+        $pidMap = (new EngineShadowRepository($this->db))->getAllTeamIdsByPid();
 
         try {
-            (new EngineShadowLoader($failingRepo))->load($this->resultJson());
+            (new EngineShadowLoader($failingRepo))->loadOneGame($this->fixtureGame(), self::SEED, $pidMap);
             self::fail('Expected the forced team-insert failure to propagate');
         } catch (\RuntimeException $e) {
             self::assertStringContainsString('forced team insert failure', $e->getMessage());
@@ -145,13 +144,10 @@ final class EngineShadowLoaderTest extends DatabaseTestCase
     #[Test]
     public function reRunReplacesRowsRatherThanAppending(): void
     {
-        $loader = new EngineShadowLoader(new EngineShadowRepository($this->db));
+        $this->loadFixtureGame();
+        $this->loadFixtureGame(); // same game again
 
-        $loader->load($this->resultJson());
-        $loader->load($this->resultJson()); // same game again
-
-        // Count the TABLE, not the loader return (which is 4/2 on every run
-        // regardless of dedupe). A broken dedupe leaves 8/4 here.
+        // Count the TABLE: a broken dedupe leaves 8/4 here.
         self::assertSame(4, $this->countShadowRowsForGame('ibl_box_scores_engine_shadow'), 'player rows doubled — dedupe failed');
         self::assertSame(2, $this->countShadowRowsForGame('ibl_box_scores_engine_shadow_teams'), 'team rows doubled — dedupe failed');
     }
@@ -171,10 +167,30 @@ final class EngineShadowLoaderTest extends DatabaseTestCase
 
         // Load the fixture game twice; dedupe is scoped to the fixture's keys only.
         $loader = new EngineShadowLoader($repo);
-        $loader->load($this->resultJson());
-        $loader->load($this->resultJson());
+        $pidMap = $repo->getAllTeamIdsByPid();
+        $loader->loadOneGame($this->fixtureGame(), self::SEED, $pidMap);
+        $loader->loadOneGame($this->fixtureGame(), self::SEED, $pidMap);
 
         self::assertSame(1, $this->countPlayerRowsForDate('2089-05-05'), 'unrelated game rows must be untouched by dedupe');
+    }
+
+    /**
+     * Drive the fixture's single game through loadOneGame with the live pid map
+     * — the streaming entry point that replaces the removed whole-blob load().
+     */
+    private function loadFixtureGame(): void
+    {
+        $repo = new EngineShadowRepository($this->db);
+        (new EngineShadowLoader($repo))->loadOneGame($this->fixtureGame(), self::SEED, $repo->getAllTeamIdsByPid());
+    }
+
+    /** @return array<string, mixed> the fixture's single decoded game */
+    private function fixtureGame(): array
+    {
+        /** @var array{games: list<array<string, mixed>>} $decoded */
+        $decoded = json_decode($this->resultJson(), true, 512, JSON_THROW_ON_ERROR);
+
+        return $decoded['games'][0];
     }
 
     private function countPlayerRowsForDate(string $date): int

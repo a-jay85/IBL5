@@ -12,16 +12,20 @@ use EngineRunner\EngineRunnerException;
 interface EngineRunnerInterface
 {
     /**
-     * Execute the engine: write the bundle JSON to stdin, return the Result JSON
-     * from stdout.
+     * Execute the engine and stream its NDJSON output one game at a time, at
+     * constant memory: the engine's stdout is spooled to a temp file (PHP never
+     * holds the multi-hundred-MB payload), then read line by line. The first line
+     * is the header {"seed":N}; each subsequent non-empty line is one compact
+     * GameResult, decoded and handed to $onGame.
      *
-     * @param string   $bundleJson the engine input bundle (from EngineBundleService)
-     * @param int|null $seed       optional seed override (>= 0); null uses the bundle's own seed
+     * @param string                                       $bundleJson the engine input bundle (from EngineBundleService)
+     * @param callable(array<string, mixed>, int): void    $onGame     invoked once per game with (decoded game array, seed)
+     * @param int|null                                     $seed       optional seed override (>= 0); null uses the bundle's own seed
      *
-     * @return string the engine's Result JSON (validated as decodable)
+     * @return int the number of games processed (callback invocations)
      *
      * @throws EngineRunnerException on missing/invalid binary, nonzero exit,
-     *                               empty stdout, or malformed JSON output
+     *                               a missing/malformed header line, or a malformed game line
      */
-    public function run(string $bundleJson, ?int $seed = null): string;
+    public function runStreaming(string $bundleJson, callable $onGame, ?int $seed = null): int;
 }

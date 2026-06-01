@@ -10,77 +10,53 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Non-DB unit tests for EngineShadowLoader's parsing/branch logic, using a
- * recording repository (real loader logic runs; writes captured in-memory). These
- * cover the malformed-input and edge branches the DB-integration suite's
+ * Non-DB unit tests for EngineShadowLoader's per-game parsing/branch logic, using
+ * a recording repository (real loader logic runs; writes captured in-memory).
+ * These cover the malformed-input and edge branches the DB-integration suite's
  * well-formed fixture does not exercise.
+ *
+ * Note: whole-stream concerns (empty games, non-array game entries, blank lines)
+ * now live in EngineRunner's streaming layer — EngineRunnerTest covers them. This
+ * suite drives one decoded game at a time through loadOneGame().
  */
 final class EngineShadowLoaderUnitTest extends TestCase
 {
     #[Test]
-    public function emptyGamesProducesZeroCounts(): void
-    {
-        $result = (new EngineShadowLoader($this->recordingRepo()))->load('{"seed":1,"games":[]}');
-
-        self::assertSame(0, $result->gamesLoaded);
-        self::assertSame(0, $result->playerRowsInserted);
-        self::assertSame(0, $result->teamRowsInserted);
-    }
-
-    #[Test]
-    public function nonArrayGameEntriesAreSkipped(): void
-    {
-        $json = (string) json_encode(['seed' => 1, 'games' => ['garbage', 42, null]]);
-
-        $result = (new EngineShadowLoader($this->recordingRepo()))->load($json);
-
-        self::assertSame(0, $result->gamesLoaded);
-    }
-
-    #[Test]
     public function nonArrayPlayerBoxesAreSkippedButValidOnesCounted(): void
     {
         $repo = $this->recordingRepo();
-        $json = (string) json_encode([
-            'seed' => 1,
-            'games' => [[
-                'date' => '2026-03-10', 'home_team_id' => 1, 'visitor_team_id' => 3,
-                'game_of_that_day' => 1, 'sim_game_type' => 2,
-                'player_boxes' => ['garbage', ['pid' => 901, 'pos' => 'PG'], null],
-                'team_boxes' => [
-                    ['team_id' => 3, 'is_home' => false, 'q1' => 1, 'q2' => 1, 'q3' => 1, 'q4' => 1, 'ot' => []],
-                    ['team_id' => 1, 'is_home' => true, 'q1' => 1, 'q2' => 1, 'q3' => 1, 'q4' => 1, 'ot' => []],
-                ],
-            ]],
-        ]);
+        $game = [
+            'date' => '2026-03-10', 'home_team_id' => 1, 'visitor_team_id' => 3,
+            'game_of_that_day' => 1, 'sim_game_type' => 2,
+            'player_boxes' => ['garbage', ['pid' => 901, 'pos' => 'PG'], null],
+            'team_boxes' => [
+                ['team_id' => 3, 'is_home' => false, 'q1' => 1, 'q2' => 1, 'q3' => 1, 'q4' => 1, 'ot' => []],
+                ['team_id' => 1, 'is_home' => true, 'q1' => 1, 'q2' => 1, 'q3' => 1, 'q4' => 1, 'ot' => []],
+            ],
+        ];
 
-        $result = (new EngineShadowLoader($repo))->load($json);
+        (new EngineShadowLoader($repo))->loadOneGame($game, 1, []);
 
-        self::assertSame(1, $result->gamesLoaded);
-        self::assertSame(1, $result->playerRowsInserted, 'only the valid player_box should be inserted');
-        self::assertSame(2, $result->teamRowsInserted);
+        self::assertSame(1, $repo->playerInserts, 'only the valid player_box should be inserted');
+        self::assertSame(2, $repo->teamInserts);
     }
 
     #[Test]
     public function missingHomeTeamBoxYieldsNoTeamRows(): void
     {
         $repo = $this->recordingRepo();
-        $json = (string) json_encode([
-            'seed' => 1,
-            'games' => [[
-                'date' => '2026-03-10', 'home_team_id' => 1, 'visitor_team_id' => 3,
-                'game_of_that_day' => 1, 'sim_game_type' => 2,
-                'player_boxes' => [],
-                'team_boxes' => [
-                    ['team_id' => 3, 'is_home' => false, 'q1' => 1, 'q2' => 1, 'q3' => 1, 'q4' => 1, 'ot' => []],
-                ], // only the visitor box — no home box
-            ]],
-        ]);
+        $game = [
+            'date' => '2026-03-10', 'home_team_id' => 1, 'visitor_team_id' => 3,
+            'game_of_that_day' => 1, 'sim_game_type' => 2,
+            'player_boxes' => [],
+            'team_boxes' => [
+                ['team_id' => 3, 'is_home' => false, 'q1' => 1, 'q2' => 1, 'q3' => 1, 'q4' => 1, 'ot' => []],
+            ], // only the visitor box — no home box
+        ];
 
-        $result = (new EngineShadowLoader($repo))->load($json);
+        (new EngineShadowLoader($repo))->loadOneGame($game, 1, []);
 
-        self::assertSame(1, $result->gamesLoaded);
-        self::assertSame(0, $result->teamRowsInserted, 'a game missing one team box writes no team rows');
+        self::assertSame(0, $repo->teamInserts, 'a game missing one team box writes no team rows');
     }
 
     #[Test]
@@ -91,15 +67,20 @@ final class EngineShadowLoaderUnitTest extends TestCase
         // (the loader calls it with the summed value) so PHPStan keeps the property.
         $repo = new class (new \mysqli()) extends EngineShadowRepository {
             public int $capturedVisitorOt = -1;
-
-            public function getTeamIdsForPids(array $pids): array
-            {
-                return [];
-            }
+            public int $teamInserts = 0;
 
             public function transaction(callable $fn): mixed
             {
                 return $fn();
+            }
+
+            public function deleteShadowGame(
+                string $gameDate,
+                int $visitorTeamId,
+                int $homeTeamId,
+                int $gameOfThatDay,
+            ): int {
+                return 0;
             }
 
             protected function execute(string $query, string $types = '', mixed ...$params): int
@@ -118,48 +99,59 @@ final class EngineShadowLoaderUnitTest extends TestCase
                 if ($this->capturedVisitorOt === -1) {
                     $this->capturedVisitorOt = $visitorOt;
                 }
+                $this->teamInserts++;
                 return 1;
             }
         };
-        $json = (string) json_encode([
-            'seed' => 1,
-            'games' => [[
-                'date' => '2026-03-10', 'home_team_id' => 1, 'visitor_team_id' => 3,
-                'game_of_that_day' => 1, 'sim_game_type' => 2,
-                'player_boxes' => [],
-                'team_boxes' => [
-                    ['team_id' => 3, 'is_home' => false, 'q1' => 1, 'q2' => 1, 'q3' => 1, 'q4' => 1, 'ot' => 99],
-                    ['team_id' => 1, 'is_home' => true, 'q1' => 1, 'q2' => 1, 'q3' => 1, 'q4' => 1, 'ot' => []],
-                ],
-            ]],
-        ]);
+        $game = [
+            'date' => '2026-03-10', 'home_team_id' => 1, 'visitor_team_id' => 3,
+            'game_of_that_day' => 1, 'sim_game_type' => 2,
+            'player_boxes' => [],
+            'team_boxes' => [
+                ['team_id' => 3, 'is_home' => false, 'q1' => 1, 'q2' => 1, 'q3' => 1, 'q4' => 1, 'ot' => 99],
+                ['team_id' => 1, 'is_home' => true, 'q1' => 1, 'q2' => 1, 'q3' => 1, 'q4' => 1, 'ot' => []],
+            ],
+        ];
 
-        $result = (new EngineShadowLoader($repo))->load($json);
+        (new EngineShadowLoader($repo))->loadOneGame($game, 1, []);
 
-        self::assertSame(2, $result->teamRowsInserted);
+        self::assertSame(2, $repo->teamInserts);
         self::assertSame(0, $repo->capturedVisitorOt, 'non-array ot must sum to 0');
     }
 
     /**
      * Recording repository: the loader's real insert methods run (building SQL +
-     * params), execute() is a no-op, and transaction() runs the callable directly
-     * — all without a DB. Counts are read back from the loader's return value.
+     * params), execute() counts inserts by table name, transaction() runs the
+     * callable directly, and the dedupe delete is a no-op so it does not inflate
+     * the insert counters — all without a DB.
      */
     private function recordingRepo(): EngineShadowRepository
     {
         return new class (new \mysqli()) extends EngineShadowRepository {
-            public function getTeamIdsForPids(array $pids): array
-            {
-                return [];
-            }
+            public int $playerInserts = 0;
+            public int $teamInserts = 0;
 
             public function transaction(callable $fn): mixed
             {
                 return $fn();
             }
 
+            public function deleteShadowGame(
+                string $gameDate,
+                int $visitorTeamId,
+                int $homeTeamId,
+                int $gameOfThatDay,
+            ): int {
+                return 0;
+            }
+
             protected function execute(string $query, string $types = '', mixed ...$params): int
             {
+                if (str_contains($query, 'engine_shadow_teams')) {
+                    $this->teamInserts++;
+                } elseif (str_contains($query, 'engine_shadow')) {
+                    $this->playerInserts++;
+                }
                 return 1;
             }
         };

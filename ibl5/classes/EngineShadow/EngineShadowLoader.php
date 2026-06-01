@@ -24,33 +24,32 @@ final class EngineShadowLoader
     ) {
     }
 
-    public function load(string $resultJson): EngineShadowLoadResult
+    /**
+     * The full ibl_plr pid => teamid map, fetched once and reused across every
+     * streamed game. Delegated to the repository so the step can resolve the map
+     * without depending on EngineShadowRepository directly.
+     *
+     * @return array<int, int>
+     */
+    public function getTeamIdMap(): array
     {
-        /** @var array<string, mixed> $decoded */
-        $decoded = json_decode($resultJson, true, 512, JSON_THROW_ON_ERROR);
+        return $this->repository->getAllTeamIdsByPid();
+    }
 
-        $seed = $this->intVal($decoded, 'seed');
-        $games = $this->arrVal($decoded, 'games');
-
-        $pidTeamMap = $this->repository->getTeamIdsForPids($this->collectPids($games));
-
-        $gamesLoaded = 0;
-        $playerRows = 0;
-        $teamRows = 0;
-
-        foreach ($games as $game) {
-            if (!is_array($game)) {
-                continue;
-            }
-            [$pCount, $tCount] = $this->repository->transaction(
-                fn (): array => $this->loadGame($game, $seed, $pidTeamMap)
-            );
-            $gamesLoaded++;
-            $playerRows += $pCount;
-            $teamRows += $tCount;
-        }
-
-        return new EngineShadowLoadResult($gamesLoaded, $playerRows, $teamRows);
+    /**
+     * Persist exactly one streamed game inside its own per-game transaction, so a
+     * mid-game failure rolls back that game alone (and never touches canonical).
+     * The pid => teamid map is fetched once by the caller (see getTeamIdMap) and
+     * passed in, so no per-game DB lookup occurs.
+     *
+     * @param array<array-key, mixed> $game
+     * @param array<int, int>         $pidTeamMap
+     */
+    public function loadOneGame(array $game, int $seed, array $pidTeamMap): void
+    {
+        $this->repository->transaction(
+            fn (): array => $this->loadGame($game, $seed, $pidTeamMap)
+        );
     }
 
     /**
@@ -222,28 +221,6 @@ final class EngineShadowLoader
             $seed,
             $simGameType,
         );
-    }
-
-    /**
-     * @param list<mixed> $games
-     *
-     * @return list<int>
-     */
-    private function collectPids(array $games): array
-    {
-        $pids = [];
-        foreach ($games as $game) {
-            if (!is_array($game)) {
-                continue;
-            }
-            foreach ($this->arrVal($game, 'player_boxes') as $pb) {
-                if (is_array($pb)) {
-                    $pids[] = $this->intVal($pb, 'pid');
-                }
-            }
-        }
-
-        return $pids;
     }
 
     /**

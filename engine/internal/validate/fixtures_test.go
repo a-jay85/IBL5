@@ -256,7 +256,7 @@ func assembleSynthBundle(t *testing.T, plrPath, schPath string) bundle.Bundle {
 	if err != nil {
 		t.Fatalf("open .plr: %v", err)
 	}
-	defer pf.Close()
+	defer func() { _ = pf.Close() }()
 	players, err := backup.ReadPlr(pf)
 	if err != nil {
 		t.Fatalf("read .plr: %v", err)
@@ -265,7 +265,7 @@ func assembleSynthBundle(t *testing.T, plrPath, schPath string) bundle.Bundle {
 	if err != nil {
 		t.Fatalf("open .sch: %v", err)
 	}
-	defer sf.Close()
+	defer func() { _ = sf.Close() }()
 	sched, err := backup.ReadSch(sf)
 	if err != nil {
 		t.Fatalf("read .sch: %v", err)

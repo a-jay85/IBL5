@@ -19,7 +19,7 @@ class CommonValidatorTest extends TestCase
 
     private function createPlayerStub(?string $teamName, ?string $position = null, ?string $name = null): Player
     {
-        $player = $this->createStub(Player::class);
+        $player = self::createStub(Player::class);
         $player->method('getTeamName')->willReturn($teamName);
         $player->method('getPosition')->willReturn($position);
         $player->method('getName')->willReturn($name);

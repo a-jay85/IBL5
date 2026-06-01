@@ -20,7 +20,7 @@ class LastSimRecapServiceTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->playerLookup = $this->createStub(PlayerLookupRepositoryInterface::class);
+        $this->playerLookup = self::createStub(PlayerLookupRepositoryInterface::class);
         $this->playerLookup->method('getPlayerByID')->willReturn(null);
     }
 

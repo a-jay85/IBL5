@@ -86,7 +86,7 @@ class TeamRosterControllerTest extends WideUnitTestCase
         $responder->expects($this->once())
             ->method('success')
             ->with(
-                $this->callback(function (array $data): bool {
+                self::callback(function (array $data): bool {
                     if (count($data) !== 1) {
                         return false;
                     }
@@ -102,9 +102,9 @@ class TeamRosterControllerTest extends WideUnitTestCase
                         && $first['stats']['games_played'] === 60
                         && $first['stats']['points_per_game'] === 29.4;
                 }),
-                $this->isArray(),
+                self::isArray(),
                 200,
-                $this->isArray()
+                self::isArray()
             );
 
         $controller->handle(['uuid' => self::TEAM_UUID], [], $responder);

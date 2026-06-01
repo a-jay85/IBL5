@@ -561,7 +561,7 @@ class StandingsUpdaterTest extends TestCase
 
     public function testOlympicsSkipsTeamAwardUpsert(): void
     {
-        $olympicsContext = $this->createStub(\League\LeagueContext::class);
+        $olympicsContext = self::createStub(\League\LeagueContext::class);
         $olympicsContext->method('getTableName')->willReturnCallback(
             static function (string $table): string {
                 return match ($table) {
@@ -628,7 +628,7 @@ class StandingsUpdaterTest extends TestCase
         // Drive the executeQuery() rewrite path: the repo's backtick-quoted
         // tables are rewritten to Olympics equivalents when the context is
         // Olympics (isOlympics() === true), via LeagueContext::TABLE_MAP.
-        $olympicsContext = $this->createStub(\League\LeagueContext::class);
+        $olympicsContext = self::createStub(\League\LeagueContext::class);
         $olympicsContext->method('isOlympics')->willReturn(true);
 
         $olympicsRepo = new StandingsRepository($this->mockDb, $olympicsContext);
@@ -652,7 +652,7 @@ class StandingsUpdaterTest extends TestCase
 
     public function testOlympicsContextFetchTeamMapQueriesOlympicsLeagueConfig(): void
     {
-        $olympicsContext = $this->createStub(\League\LeagueContext::class);
+        $olympicsContext = self::createStub(\League\LeagueContext::class);
         $olympicsContext->method('isOlympics')->willReturn(true);
 
         $olympicsRepo = new StandingsRepository($this->mockDb, $olympicsContext);

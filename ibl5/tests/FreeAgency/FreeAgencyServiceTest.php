@@ -28,9 +28,9 @@ class FreeAgencyServiceTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->stubRepo = $this->createStub(FreeAgencyRepositoryInterface::class);
-        $this->stubDemandRepo = $this->createStub(FreeAgencyDemandRepositoryInterface::class);
-        $this->stubTeamQueryRepo = $this->createStub(TeamQueryRepositoryInterface::class);
+        $this->stubRepo = self::createStub(FreeAgencyRepositoryInterface::class);
+        $this->stubDemandRepo = self::createStub(FreeAgencyDemandRepositoryInterface::class);
+        $this->stubTeamQueryRepo = self::createStub(TeamQueryRepositoryInterface::class);
         $this->stubTeamQueryRepo->method('getRosterUnderContractOrderedByOrdinal')->willReturn([]);
         $this->stubTeamQueryRepo->method('getFreeAgencyOffers')->willReturn([]);
         $this->mockDb = new MockDatabase();
@@ -42,7 +42,7 @@ class FreeAgencyServiceTest extends TestCase
     {
         $this->stubRepo->method('getExistingOffer')->willReturn(null);
 
-        $service = new FreeAgencyService($this->stubRepo, $this->stubDemandRepo, $this->createStub(\mysqli::class), $this->stubTeamQueryRepo);
+        $service = new FreeAgencyService($this->stubRepo, $this->stubDemandRepo, self::createStub(\mysqli::class), $this->stubTeamQueryRepo);
         $result = $service->getExistingOffer(1, 100);
 
         $this->assertSame(0, $result['offer1']);
@@ -61,7 +61,7 @@ class FreeAgencyServiceTest extends TestCase
             'offer6' => 250,
         ]);
 
-        $service = new FreeAgencyService($this->stubRepo, $this->stubDemandRepo, $this->createStub(\mysqli::class), $this->stubTeamQueryRepo);
+        $service = new FreeAgencyService($this->stubRepo, $this->stubDemandRepo, self::createStub(\mysqli::class), $this->stubTeamQueryRepo);
         $result = $service->getExistingOffer(1, 100);
 
         $this->assertSame(500, $result['offer1']);
@@ -83,7 +83,7 @@ class FreeAgencyServiceTest extends TestCase
             'offer6' => null,
         ]);
 
-        $service = new FreeAgencyService($this->stubRepo, $this->stubDemandRepo, $this->createStub(\mysqli::class), $this->stubTeamQueryRepo);
+        $service = new FreeAgencyService($this->stubRepo, $this->stubDemandRepo, self::createStub(\mysqli::class), $this->stubTeamQueryRepo);
         $result = $service->getExistingOffer(1, 100);
 
         $this->assertSame(500, $result['offer1']);
@@ -105,7 +105,7 @@ class FreeAgencyServiceTest extends TestCase
             'offer6' => '250',
         ]);
 
-        $service = new FreeAgencyService($this->stubRepo, $this->stubDemandRepo, $this->createStub(\mysqli::class), $this->stubTeamQueryRepo);
+        $service = new FreeAgencyService($this->stubRepo, $this->stubDemandRepo, self::createStub(\mysqli::class), $this->stubTeamQueryRepo);
         $result = $service->getExistingOffer(1, 100);
 
         foreach ($result as $value) {
@@ -121,11 +121,11 @@ class FreeAgencyServiceTest extends TestCase
 
         $service = new FreeAgencyService($this->stubRepo, $this->stubDemandRepo, $this->mockDb, $this->stubTeamQueryRepo);
 
-        $team = $this->createStub(Team::class);
+        $team = self::createStub(Team::class);
         $team->name = 'Test Team';
         $team->teamid = 1;
 
-        $season = $this->createStub(\Season\Season::class);
+        $season = self::createStub(\Season\Season::class);
 
         $result = $service->getMainPageData($team, $season);
 
@@ -150,11 +150,11 @@ class FreeAgencyServiceTest extends TestCase
 
         $service = new FreeAgencyService($this->stubRepo, $this->stubDemandRepo, $this->mockDb, $this->stubTeamQueryRepo);
 
-        $team = $this->createStub(Team::class);
+        $team = self::createStub(Team::class);
         $team->name = 'Test Team';
         $team->teamid = 1;
 
-        $season = $this->createStub(\Season\Season::class);
+        $season = self::createStub(\Season\Season::class);
 
         $result = $service->getMainPageData($team, $season);
 
@@ -168,11 +168,11 @@ class FreeAgencyServiceTest extends TestCase
 
         $service = new FreeAgencyService($this->stubRepo, $this->stubDemandRepo, $this->mockDb, $this->stubTeamQueryRepo);
 
-        $team = $this->createStub(Team::class);
+        $team = self::createStub(Team::class);
         $team->name = 'Test Team';
         $team->teamid = 1;
 
-        $season = $this->createStub(\Season\Season::class);
+        $season = self::createStub(\Season\Season::class);
 
         $result = $service->getMainPageData($team, $season);
 
@@ -197,11 +197,11 @@ class FreeAgencyServiceTest extends TestCase
 
         $service = new FreeAgencyService($this->stubRepo, $this->stubDemandRepo, $this->mockDb, $this->stubTeamQueryRepo);
 
-        $team = $this->createStub(Team::class);
+        $team = self::createStub(Team::class);
         $team->name = 'Test Team';
         $team->teamid = 1;
 
-        $season = $this->createStub(\Season\Season::class);
+        $season = self::createStub(\Season\Season::class);
 
         $result = $service->getNegotiationData(1, $team, $season);
 
@@ -226,11 +226,11 @@ class FreeAgencyServiceTest extends TestCase
 
         $service = new FreeAgencyService($this->stubRepo, $this->stubDemandRepo, $this->mockDb, $this->stubTeamQueryRepo);
 
-        $team = $this->createStub(Team::class);
+        $team = self::createStub(Team::class);
         $team->name = 'Test Team';
         $team->teamid = 1;
 
-        $season = $this->createStub(\Season\Season::class);
+        $season = self::createStub(\Season\Season::class);
 
         $result = $service->getNegotiationData(1, $team, $season);
 
@@ -252,11 +252,11 @@ class FreeAgencyServiceTest extends TestCase
 
         $service = new FreeAgencyService($this->stubRepo, $this->stubDemandRepo, $this->mockDb, $this->stubTeamQueryRepo);
 
-        $team = $this->createStub(Team::class);
+        $team = self::createStub(Team::class);
         $team->name = 'Test Team';
         $team->teamid = 1;
 
-        $season = $this->createStub(\Season\Season::class);
+        $season = self::createStub(\Season\Season::class);
 
         $result = $service->getNegotiationData(1, $team, $season);
 
@@ -288,11 +288,11 @@ class FreeAgencyServiceTest extends TestCase
 
         $service = new FreeAgencyService($this->stubRepo, $this->stubDemandRepo, $this->mockDb, $this->stubTeamQueryRepo);
 
-        $team = $this->createStub(Team::class);
+        $team = self::createStub(Team::class);
         $team->name = 'Test Team';
         $team->teamid = 1;
 
-        $season = $this->createStub(\Season\Season::class);
+        $season = self::createStub(\Season\Season::class);
 
         $result = $service->getNegotiationData(1, $team, $season);
 
@@ -309,7 +309,7 @@ class FreeAgencyServiceTest extends TestCase
 
     public function testGetMainPageDataPartitionsRosterIntoContractedAndUnsigned(): void
     {
-        $teamQueryRepo = $this->createStub(TeamQueryRepositoryInterface::class);
+        $teamQueryRepo = self::createStub(TeamQueryRepositoryInterface::class);
 
         $contractedPlayer = $this->getBasePlayerData();
         $contractedPlayer['pid'] = 10;
@@ -337,11 +337,11 @@ class FreeAgencyServiceTest extends TestCase
 
         $service = new FreeAgencyService($this->stubRepo, $this->stubDemandRepo, $this->mockDb, $teamQueryRepo);
 
-        $team = $this->createStub(Team::class);
+        $team = self::createStub(Team::class);
         $team->name = 'Test Team';
         $team->teamid = 1;
 
-        $season = $this->createStub(\Season\Season::class);
+        $season = self::createStub(\Season\Season::class);
         $season->phase = 'Free Agency';
         $season->endingYear = 2026;
 
@@ -355,7 +355,7 @@ class FreeAgencyServiceTest extends TestCase
 
     public function testGetMainPageDataPreBuildsOfferPlayers(): void
     {
-        $teamQueryRepo = $this->createStub(TeamQueryRepositoryInterface::class);
+        $teamQueryRepo = self::createStub(TeamQueryRepositoryInterface::class);
         $teamQueryRepo->method('getRosterUnderContractOrderedByOrdinal')->willReturn([]);
         $teamQueryRepo->method('getFreeAgencyOffers')->willReturn([
             ['pid' => 5, 'teamid' => 1, 'team' => 'Test', 'name' => 'Offered', 'offer1' => 400, 'offer2' => 350, 'offer3' => 0, 'offer4' => 0, 'offer5' => 0, 'offer6' => 0],
@@ -367,11 +367,11 @@ class FreeAgencyServiceTest extends TestCase
 
         $service = new FreeAgencyService($this->stubRepo, $this->stubDemandRepo, $this->mockDb, $teamQueryRepo);
 
-        $team = $this->createStub(Team::class);
+        $team = self::createStub(Team::class);
         $team->name = 'Test Team';
         $team->teamid = 1;
 
-        $season = $this->createStub(\Season\Season::class);
+        $season = self::createStub(\Season\Season::class);
 
         $result = $service->getMainPageData($team, $season);
 

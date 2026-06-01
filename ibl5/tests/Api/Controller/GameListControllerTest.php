@@ -45,7 +45,7 @@ class GameListControllerTest extends WideUnitTestCase
         $responder->expects($this->once())
             ->method('success')
             ->with(
-                $this->callback(function (array $data): bool {
+                self::callback(function (array $data): bool {
                     if (count($data) !== 1) {
                         return false;
                     }
@@ -55,9 +55,9 @@ class GameListControllerTest extends WideUnitTestCase
                         && $first['visitor']['name'] === 'Celtics'
                         && $first['home']['name'] === 'Jazz';
                 }),
-                $this->isArray(),
+                self::isArray(),
                 200,
-                $this->isArray()
+                self::isArray()
             );
 
         $controller->handle([], [], $responder);
@@ -89,13 +89,13 @@ class GameListControllerTest extends WideUnitTestCase
         $responder->expects($this->once())
             ->method('success')
             ->with(
-                $this->anything(),
-                $this->callback(function (array $meta): bool {
+                self::anything(),
+                self::callback(function (array $meta): bool {
                     return ($meta['sort'] ?? '') === 'game_date'
                         && ($meta['order'] ?? '') === 'desc';
                 }),
                 200,
-                $this->isArray()
+                self::isArray()
             );
 
         $controller->handle([], [], $responder);

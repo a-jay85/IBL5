@@ -14,10 +14,10 @@ class ModuleAccessControlTest extends TestCase
 {
     private function createAccessControl(string $phase, string $triviaMode = 'Off'): ModuleAccessControl
     {
-        $season = $this->createStub(Season::class);
+        $season = self::createStub(Season::class);
         $season->phase = $phase;
 
-        $leagueContext = $this->createStub(LeagueContext::class);
+        $leagueContext = self::createStub(LeagueContext::class);
         $leagueContext->method('isModuleEnabled')->willReturn(true);
 
         $mockDb = new MockDatabase();
@@ -30,10 +30,10 @@ class ModuleAccessControlTest extends TestCase
 
     private function createAccessControlWithDisabledModule(string $phase, string $disabledModule): ModuleAccessControl
     {
-        $season = $this->createStub(Season::class);
+        $season = self::createStub(Season::class);
         $season->phase = $phase;
 
-        $leagueContext = $this->createStub(LeagueContext::class);
+        $leagueContext = self::createStub(LeagueContext::class);
         $leagueContext->method('isModuleEnabled')->willReturnCallback(
             static fn (string $module): bool => $module !== $disabledModule
         );

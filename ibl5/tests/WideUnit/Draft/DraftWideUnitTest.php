@@ -36,11 +36,11 @@ class DraftWideUnitTest extends WideUnitTestCase
         parent::setUp();
 
         // Stub CommonMysqliRepository (no expectations needed)
-        $this->mockCommonRepository = $this->createStub(TeamIdentityRepositoryInterface::class);
+        $this->mockCommonRepository = self::createStub(TeamIdentityRepositoryInterface::class);
         $this->mockCommonRepository->method('getTidFromTeamname')->willReturn(1);
 
         // Create mock Season
-        $this->mockSeason = $this->createStub(Season::class);
+        $this->mockSeason = self::createStub(Season::class);
         $this->mockSeason->endingYear = 2025;
         $this->mockSeason->freeAgencyNotificationsState = 'Off';
 

@@ -14,7 +14,7 @@ class VotingBallotServiceTest extends TestCase
 {
     public function testImplementsInterface(): void
     {
-        $db = $this->createStub(\mysqli::class);
+        $db = self::createStub(\mysqli::class);
         $service = new VotingBallotService($db);
 
         $this->assertInstanceOf(VotingBallotServiceInterface::class, $service);
@@ -22,12 +22,12 @@ class VotingBallotServiceTest extends TestCase
 
     public function testGetBallotDataReturnsASGCategoriesForRegularSeason(): void
     {
-        $db = $this->createStub(\mysqli::class);
+        $db = self::createStub(\mysqli::class);
 
-        $season = $this->createStub(Season::class);
+        $season = self::createStub(Season::class);
         $season->phase = 'Regular Season';
 
-        $league = $this->createStub(League::class);
+        $league = self::createStub(League::class);
         $league->method('getAllStarCandidatesResult')->willReturn([]);
 
         $service = new VotingBallotService($db);
@@ -42,12 +42,12 @@ class VotingBallotServiceTest extends TestCase
 
     public function testGetBallotDataReturnsEOYCategoriesForPlayoffs(): void
     {
-        $db = $this->createStub(\mysqli::class);
+        $db = self::createStub(\mysqli::class);
 
-        $season = $this->createStub(Season::class);
+        $season = self::createStub(Season::class);
         $season->phase = 'Playoffs';
 
-        $league = $this->createStub(League::class);
+        $league = self::createStub(League::class);
         $league->method('getMVPCandidatesResult')->willReturn([]);
         $league->method('getSixthPersonOfTheYearCandidatesResult')->willReturn([]);
         $league->method('getRookieOfTheYearCandidatesResult')->willReturn([]);
@@ -65,12 +65,12 @@ class VotingBallotServiceTest extends TestCase
 
     public function testASGCategoryTitlesAreCorrect(): void
     {
-        $db = $this->createStub(\mysqli::class);
+        $db = self::createStub(\mysqli::class);
 
-        $season = $this->createStub(Season::class);
+        $season = self::createStub(Season::class);
         $season->phase = 'Regular Season';
 
-        $league = $this->createStub(League::class);
+        $league = self::createStub(League::class);
         $league->method('getAllStarCandidatesResult')->willReturn([]);
 
         $service = new VotingBallotService($db);
@@ -84,12 +84,12 @@ class VotingBallotServiceTest extends TestCase
 
     public function testEOYCategoryTitlesAreCorrect(): void
     {
-        $db = $this->createStub(\mysqli::class);
+        $db = self::createStub(\mysqli::class);
 
-        $season = $this->createStub(Season::class);
+        $season = self::createStub(Season::class);
         $season->phase = 'Draft';
 
-        $league = $this->createStub(League::class);
+        $league = self::createStub(League::class);
         $league->method('getMVPCandidatesResult')->willReturn([]);
         $league->method('getSixthPersonOfTheYearCandidatesResult')->willReturn([]);
         $league->method('getRookieOfTheYearCandidatesResult')->willReturn([]);
@@ -106,12 +106,12 @@ class VotingBallotServiceTest extends TestCase
 
     public function testGMCandidatesAreBuiltCorrectly(): void
     {
-        $db = $this->createStub(\mysqli::class);
+        $db = self::createStub(\mysqli::class);
 
-        $season = $this->createStub(Season::class);
+        $season = self::createStub(Season::class);
         $season->phase = 'Playoffs';
 
-        $league = $this->createStub(League::class);
+        $league = self::createStub(League::class);
         $league->method('getMVPCandidatesResult')->willReturn([]);
         $league->method('getSixthPersonOfTheYearCandidatesResult')->willReturn([]);
         $league->method('getRookieOfTheYearCandidatesResult')->willReturn([]);

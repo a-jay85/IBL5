@@ -18,7 +18,7 @@ class TrainingCampRatingsDiffServiceTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->stubRepo = $this->createStub(TrainingCampRatingsDiffRepositoryInterface::class);
+        $this->stubRepo = self::createStub(TrainingCampRatingsDiffRepositoryInterface::class);
         $this->service  = new TrainingCampRatingsDiffService($this->stubRepo);
     }
 

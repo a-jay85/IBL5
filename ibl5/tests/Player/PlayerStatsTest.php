@@ -17,7 +17,7 @@ class PlayerStatsTest extends TestCase
 
     protected function setUp(): void
     {
-        $repo = $this->createStub(PlayerStatsRepositoryInterface::class);
+        $repo = self::createStub(PlayerStatsRepositoryInterface::class);
         $this->stats = new TestablePlayerStats($repo);
     }
 

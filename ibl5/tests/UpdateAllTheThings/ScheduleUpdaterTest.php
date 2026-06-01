@@ -248,7 +248,7 @@ class ScheduleUpdaterTest extends TestCase
      */
     public function testIsRealTeamGameFiltersPlaceholderTeamsForOlympics(): void
     {
-        $olympicsContext = $this->createStub(LeagueContext::class);
+        $olympicsContext = self::createStub(LeagueContext::class);
         $olympicsContext->method('getCurrentLeague')->willReturn(LeagueContext::LEAGUE_OLYMPICS);
         $olympicsContext->method('isOlympics')->willReturn(true);
         $olympicsContext->method('getTableName')->willReturnCallback(
@@ -293,7 +293,7 @@ class ScheduleUpdaterTest extends TestCase
      */
     public function testOlympicsContextTruncatesOlympicsScheduleTable(): void
     {
-        $olympicsContext = $this->createStub(LeagueContext::class);
+        $olympicsContext = self::createStub(LeagueContext::class);
         $olympicsContext->method('getCurrentLeague')->willReturn(LeagueContext::LEAGUE_OLYMPICS);
         $olympicsContext->method('isOlympics')->willReturn(true);
         $olympicsContext->method('getTableName')->willReturnCallback(

@@ -19,8 +19,8 @@ class ExtractFromBackupStepTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->stubLocator = $this->createStub(BackupArchiveLocatorInterface::class);
-        $this->stubSeason = $this->createStub(Season::class);
+        $this->stubLocator = self::createStub(BackupArchiveLocatorInterface::class);
+        $this->stubSeason = self::createStub(Season::class);
         $this->stubSeason->beginningYear = 2025;
         $this->stubSeason->endingYear = 2026;
     }

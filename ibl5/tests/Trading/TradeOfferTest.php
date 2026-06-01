@@ -35,8 +35,8 @@ class TradeOfferTest extends TestCase
         ?TradeCashRepositoryInterface $cashRepo = null,
         ?BuyoutLedgerRepositoryInterface $cashConsiderationRepo = null,
     ): TradeOffer {
-        $cashRepoStub = $cashRepo ?? $this->createStub(TradeCashRepositoryInterface::class);
-        $cashConsiderationRepoStub = $cashConsiderationRepo ?? $this->createStub(BuyoutLedgerRepositoryInterface::class);
+        $cashRepoStub = $cashRepo ?? self::createStub(TradeCashRepositoryInterface::class);
+        $cashConsiderationRepoStub = $cashConsiderationRepo ?? self::createStub(BuyoutLedgerRepositoryInterface::class);
 
         return new class ($offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season, $discord, $cashRepoStub, $cashConsiderationRepoStub) extends TradeOffer {
             // @phpstan-ignore constructor.missingParentCall (intentional: TradeOffer's real constructor wires concrete Season/TradeValidator/CashTransactionHandler/Discord against a live DB; this double skips it to inject test stubs directly)
@@ -93,11 +93,11 @@ class TradeOfferTest extends TestCase
     private function makeStubs(): array
     {
         $offerRepository = $this->createMock(TradeOfferRepositoryInterface::class);
-        $assetRepository = $this->createStub(TradeAssetRepositoryInterface::class);
-        $validator = $this->createStub(TradeValidator::class);
-        $cashHandler = $this->createStub(CashTransactionHandler::class);
-        $commonRepo = $this->createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
-        $season = $this->createStub(Season::class);
+        $assetRepository = self::createStub(TradeAssetRepositoryInterface::class);
+        $validator = self::createStub(TradeValidator::class);
+        $cashHandler = self::createStub(CashTransactionHandler::class);
+        $commonRepo = self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+        $season = self::createStub(Season::class);
 
         return [$offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season];
     }
@@ -238,11 +238,11 @@ class TradeOfferTest extends TestCase
     public function testCreateTradeOfferCountsUserPlayersSent(): void
     {
         $offerRepository = $this->createMock(TradeOfferRepositoryInterface::class);
-        $assetRepository = $this->createStub(TradeAssetRepositoryInterface::class);
+        $assetRepository = self::createStub(TradeAssetRepositoryInterface::class);
         $validator = $this->createMock(TradeValidator::class);
-        $cashHandler = $this->createStub(CashTransactionHandler::class);
-        $commonRepo = $this->createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
-        $season = $this->createStub(Season::class);
+        $cashHandler = self::createStub(CashTransactionHandler::class);
+        $commonRepo = self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+        $season = self::createStub(Season::class);
 
         $offerRepository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
         $validator->expects($this->once())->method('validateMinimumCashAmounts')->willReturn(['valid' => true, 'error' => null]);
@@ -268,8 +268,8 @@ class TradeOfferTest extends TestCase
 
         $validator->expects($this->once())->method('validateRosterLimits')
             ->with(
-                $this->anything(),
-                $this->anything(),
+                self::anything(),
+                self::anything(),
                 2, // 2 user players sent (indices 0,1 < switchCounter=2)
                 1, // 1 partner player sent (index 2 >= switchCounter=2)
             )
@@ -392,7 +392,7 @@ class TradeOfferTest extends TestCase
 
         // Discord should never be called
         $discord = $this->createMock(Discord::class);
-        $discord->expects($this->never())->method($this->anything());
+        $discord->expects($this->never())->method(self::anything());
 
         $offer = $this->makeTradeOffer($offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season, $discord);
         $result = $offer->createTradeOffer($this->makeTradeData());
@@ -403,11 +403,11 @@ class TradeOfferTest extends TestCase
     public function testCreateTradeOfferSelfTradeZeroesCapSent(): void
     {
         $offerRepository = $this->createMock(TradeOfferRepositoryInterface::class);
-        $assetRepository = $this->createStub(TradeAssetRepositoryInterface::class);
+        $assetRepository = self::createStub(TradeAssetRepositoryInterface::class);
         $validator = $this->createMock(TradeValidator::class);
-        $cashHandler = $this->createStub(CashTransactionHandler::class);
-        $commonRepo = $this->createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
-        $season = $this->createStub(Season::class);
+        $cashHandler = self::createStub(CashTransactionHandler::class);
+        $commonRepo = self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+        $season = self::createStub(Season::class);
 
         $offerRepository->expects($this->once())->method('generateNextTradeOfferId')->willReturn(1);
         $validator->expects($this->once())->method('validateMinimumCashAmounts')->willReturn(['valid' => true, 'error' => null]);
@@ -419,7 +419,7 @@ class TradeOfferTest extends TestCase
 
         // Cap validation: for self-trade, sent amounts should be zeroed
         $validator->expects($this->once())->method('validateSalaryCaps')
-            ->with($this->callback(static function (array $capData): bool {
+            ->with(self::callback(static function (array $capData): bool {
                 return $capData['userCapSentToPartner'] === 0
                     && $capData['partnerCapSentToUser'] === 0;
             }))

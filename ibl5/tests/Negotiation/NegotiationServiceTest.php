@@ -64,7 +64,7 @@ class NegotiationServiceTest extends TestCase
 
     public function testProcessNegotiationReturnsHtmlOutput(): void
     {
-        $mockSeason = $this->createStub(\Season\Season::class);
+        $mockSeason = self::createStub(\Season\Season::class);
         $mockSeason->phase = 'Regular Season';
         $mockSeason->endingYear = 2026;
         $mockSeason->beginningYear = 2025;
@@ -100,7 +100,7 @@ class NegotiationServiceTest extends TestCase
 
     private function buildService(?\Season\Season $season = null): NegotiationService
     {
-        $commonRepo = $this->createStub(SalaryCapRepositoryInterface::class);
+        $commonRepo = self::createStub(SalaryCapRepositoryInterface::class);
         return new NegotiationService(
             $this->mockDb,
             new NegotiationRepository($this->mockDb, $commonRepo),

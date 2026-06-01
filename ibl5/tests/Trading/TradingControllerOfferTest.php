@@ -27,13 +27,13 @@ class TradingControllerOfferTest extends TestCase
         ?\Utilities\NukeCompat $nukeCompat = null,
     ): TradingController {
         return new TradingController(
-            $this->createStub(TradingServiceInterface::class),
-            $this->createStub(TradeProcessorInterface::class),
-            $this->createStub(TradeOfferRepositoryInterface::class),
-            $this->createStub(TradeOfferInterface::class),
-            $this->createStub(TradingViewInterface::class),
-            $this->createStub(TeamIdentityRepositoryInterface::class),
-            $nukeCompat ?? $this->createStub(\Utilities\NukeCompat::class),
+            self::createStub(TradingServiceInterface::class),
+            self::createStub(TradeProcessorInterface::class),
+            self::createStub(TradeOfferRepositoryInterface::class),
+            self::createStub(TradeOfferInterface::class),
+            self::createStub(TradingViewInterface::class),
+            self::createStub(TeamIdentityRepositoryInterface::class),
+            $nukeCompat ?? self::createStub(\Utilities\NukeCompat::class),
             $this->mockDb,
         );
     }
@@ -41,7 +41,7 @@ class TradingControllerOfferTest extends TestCase
     public function testRedirectsToLoginWhenUserNotAuthenticated(): void
     {
         $loginBoxCalled = false;
-        $nukeCompat = $this->createStub(\Utilities\NukeCompat::class);
+        $nukeCompat = self::createStub(\Utilities\NukeCompat::class);
         $nukeCompat->method('isUser')->willReturn(false);
         $nukeCompat->method('loginBox')->willReturnCallback(function () use (&$loginBoxCalled): void {
             $loginBoxCalled = true;

@@ -18,7 +18,7 @@ class CardBaseStylesXssTest extends TestCase
 
     public function testPreparePlayerDataEscapesPlayerName(): void
     {
-        $player = $this->createStub(Player::class);
+        $player = self::createStub(Player::class);
         $player->method('getName')->willReturn(self::XSS_PAYLOAD);
         $player->method('getNickname')->willReturn('');
         $player->method('getPosition')->willReturn('PG');
@@ -42,7 +42,7 @@ class CardBaseStylesXssTest extends TestCase
 
     public function testPreparePlayerDataEscapesNickname(): void
     {
-        $player = $this->createStub(Player::class);
+        $player = self::createStub(Player::class);
         $player->method('getName')->willReturn('Normal Name');
         $player->method('getNickname')->willReturn(self::XSS_PAYLOAD);
         $player->method('getPosition')->willReturn('PG');

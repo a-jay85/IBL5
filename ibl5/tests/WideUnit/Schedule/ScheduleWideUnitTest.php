@@ -899,7 +899,7 @@ class ScheduleWideUnitTest extends WideUnitTestCase
      */
     private function createMockSeason(string $projectedNextSimEndDate): Season
     {
-        $season = $this->createStub(Season::class);
+        $season = self::createStub(Season::class);
         $season->projectedNextSimEndDate = date_create($projectedNextSimEndDate);
         // lastSimEndDate is stored as string (DATE column format) in the Season class
         $lastSimEndDate = date_create($projectedNextSimEndDate)->modify('-7 days');

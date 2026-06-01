@@ -56,7 +56,7 @@ class StandingsControllerTest extends WideUnitTestCase
         $responder->expects($this->once())
             ->method('success')
             ->with(
-                $this->callback(function (array $data): bool {
+                self::callback(function (array $data): bool {
                     if (count($data) !== 1) {
                         return false;
                     }
@@ -67,9 +67,9 @@ class StandingsControllerTest extends WideUnitTestCase
                         && $first['record']['league'] === '40-22'
                         && $first['clinched']['division'] === true;
                 }),
-                $this->isArray(),
+                self::isArray(),
                 200,
-                $this->isArray()
+                self::isArray()
             );
 
         $controller->handle([], [], $responder);
@@ -86,11 +86,11 @@ class StandingsControllerTest extends WideUnitTestCase
             ->method('success')
             ->with(
                 [],
-                $this->callback(function (array $meta): bool {
+                self::callback(function (array $meta): bool {
                     return ($meta['conference'] ?? null) === 'Eastern';
                 }),
                 200,
-                $this->isArray()
+                self::isArray()
             );
 
         $controller->handle(['conference' => 'East'], [], $responder);

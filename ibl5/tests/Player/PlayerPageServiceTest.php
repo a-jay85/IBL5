@@ -19,7 +19,7 @@ class PlayerPageServiceTest extends TestCase
     {
         // Mock database connection
         $this->db = new MockDatabase();
-        $this->service = new PlayerPageService($this->db, $this->createStub(TeamIdentityRepositoryInterface::class));
+        $this->service = new PlayerPageService($this->db, self::createStub(TeamIdentityRepositoryInterface::class));
     }
 
     public function testCanShowRenegotiationButtonReturnsTrueWhenAllConditionsMet(): void
@@ -185,7 +185,7 @@ class PlayerPageServiceTest extends TestCase
         bool $canRookieOpt = false
     ): Player {
         // Use createStub since we're only configuring return values, not verifying expectations
-        $stub = $this->createStub(Player::class);
+        $stub = self::createStub(Player::class);
 
         $stub->method('wasRookieOptioned')->willReturn($wasRookieOptioned);
         $stub->method('canRenegotiateContract')->willReturn($canRenegotiate);

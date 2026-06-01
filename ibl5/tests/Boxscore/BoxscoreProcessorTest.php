@@ -175,7 +175,7 @@ class BoxscoreProcessorTest extends TestCase
             ['sim' => 1, 'start_date' => '2025-01-01', 'end_date' => '2025-01-07'],
         ]);
 
-        $leagueContext = $this->createStub(\League\LeagueContext::class);
+        $leagueContext = self::createStub(\League\LeagueContext::class);
         $processor = new BoxscoreProcessor($this->mockDb, null, null, $leagueContext);
 
         $this->assertInstanceOf(BoxscoreProcessorInterface::class, $processor);
@@ -189,7 +189,7 @@ class BoxscoreProcessorTest extends TestCase
             ['sim' => 1, 'start_date' => '2025-01-01', 'end_date' => '2025-01-07'],
         ]);
 
-        $olympicsContext = $this->createStub(\League\LeagueContext::class);
+        $olympicsContext = self::createStub(\League\LeagueContext::class);
         $olympicsContext->method('isOlympics')->willReturn(true);
         $olympicsContext->method('getTableName')->willReturnArgument(0);
 
@@ -395,7 +395,7 @@ class BoxscoreProcessorTest extends TestCase
         // with the current mock Season. Let's create a custom Season mock.
 
         // Actually, the simplest fix: create a stub for Season with custom behavior.
-        $seasonStub = $this->createStub(Season::class);
+        $seasonStub = self::createStub(Season::class);
         $seasonStub->lastSimEndDate = '2025-12-01';
         $seasonStub->lastSimNumber = 3;
         $seasonStub->lastSimStartDate = '2025-11-25';
@@ -421,7 +421,7 @@ class BoxscoreProcessorTest extends TestCase
         $mockDb->setReturnTrue(true);
 
         $repository = new BoxscoreRepository($mockDb);
-        $seasonStub = $this->createStub(Season::class);
+        $seasonStub = self::createStub(Season::class);
         $seasonStub->lastSimEndDate = '';
         $seasonStub->method('getFirstBoxScoreDate')->willReturn('2025-11-01');
         $seasonStub->method('getLastBoxScoreDate')->willReturn('2025-11-08');
@@ -446,7 +446,7 @@ class BoxscoreProcessorTest extends TestCase
         $mockDb->setReturnTrue(true);
 
         $repository = new BoxscoreRepository($mockDb);
-        $seasonStub = $this->createStub(Season::class);
+        $seasonStub = self::createStub(Season::class);
         $seasonStub->lastSimEndDate = '2025-12-01';
         $seasonStub->lastSimStartDate = '2025-11-25';
         $seasonStub->method('getLastBoxScoreDate')->willReturn('2025-12-01');
@@ -474,7 +474,7 @@ class BoxscoreProcessorTest extends TestCase
         $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', []);
 
         $repository = new BoxscoreRepository($mockDb);
-        $seasonStub = $this->createStub(Season::class);
+        $seasonStub = self::createStub(Season::class);
         $seasonStub->lastSimEndDate = '';
         $seasonStub->method('getLastBoxScoreDate')->willReturn('2026-01-11');
         $seasonStub->method('getFirstBoxScoreDate')->willReturn('2026-01-11');
@@ -505,7 +505,7 @@ class BoxscoreProcessorTest extends TestCase
         $mockDb->onQuery('(?s)COUNT.*teamid IS NULL', [['cnt' => 0]]);
 
         $repository = new BoxscoreRepository($mockDb);
-        $seasonStub = $this->createStub(Season::class);
+        $seasonStub = self::createStub(Season::class);
         $seasonStub->lastSimEndDate = '';
 
         $scoFile = $this->buildScoFileWithOneGame($this->buildGameInfoLine(3, 10));
@@ -531,7 +531,7 @@ class BoxscoreProcessorTest extends TestCase
         ]]);
 
         $repository = new BoxscoreRepository($mockDb);
-        $seasonStub = $this->createStub(Season::class);
+        $seasonStub = self::createStub(Season::class);
         $seasonStub->lastSimEndDate = '';
 
         $scoFile = $this->buildScoFileWithOneGame($this->buildGameInfoLine(3, 10));
@@ -552,7 +552,7 @@ class BoxscoreProcessorTest extends TestCase
         $mockDb->setReturnTrue(true);
 
         $repository = new BoxscoreRepository($mockDb);
-        $seasonStub = $this->createStub(Season::class);
+        $seasonStub = self::createStub(Season::class);
         $seasonStub->method('getLastBoxScoreDate')->willReturn('2026-01-15');
 
         $processor = new BoxscoreProcessor($mockDb, $repository, $seasonStub);
@@ -568,7 +568,7 @@ class BoxscoreProcessorTest extends TestCase
         $mockDb->setReturnTrue(true);
 
         $repository = new BoxscoreRepository($mockDb);
-        $seasonStub = $this->createStub(Season::class);
+        $seasonStub = self::createStub(Season::class);
         $seasonStub->method('getLastBoxScoreDate')->willReturn('');
 
         $processor = new BoxscoreProcessor($mockDb, $repository, $seasonStub);
@@ -584,7 +584,7 @@ class BoxscoreProcessorTest extends TestCase
         $mockDb->setReturnTrue(true);
 
         $repository = new BoxscoreRepository($mockDb);
-        $seasonStub = $this->createStub(Season::class);
+        $seasonStub = self::createStub(Season::class);
         $seasonStub->lastSimEndDate = '';
 
         $processor = new BoxscoreProcessor($mockDb, $repository, $seasonStub);
@@ -602,7 +602,7 @@ class BoxscoreProcessorTest extends TestCase
         $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', []);
 
         $repository = new BoxscoreRepository($mockDb);
-        $seasonStub = $this->createStub(Season::class);
+        $seasonStub = self::createStub(Season::class);
         $seasonStub->lastSimEndDate = '';
         $seasonStub->method('getLastBoxScoreDate')->willReturn('2026-01-11');
         $seasonStub->method('getFirstBoxScoreDate')->willReturn('2026-01-11');

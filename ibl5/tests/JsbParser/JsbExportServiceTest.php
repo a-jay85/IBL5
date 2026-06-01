@@ -21,7 +21,7 @@ class JsbExportServiceTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->stubRepo = $this->createStub(JsbExportRepositoryInterface::class);
+        $this->stubRepo = self::createStub(JsbExportRepositoryInterface::class);
     }
 
     private function makeService(): JsbExportService

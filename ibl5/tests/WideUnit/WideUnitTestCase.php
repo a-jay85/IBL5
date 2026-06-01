@@ -128,7 +128,7 @@ abstract class WideUnitTestCase extends TestCase
         
         foreach ($queries as $query) {
             if (stripos($query, $querySubstring) !== false) {
-                $this->fail(
+                self::fail(
                     "Query containing '$querySubstring' was executed but should not have been.\n" .
                     "Matched query: $query"
                 );

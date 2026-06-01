@@ -15,7 +15,7 @@ final class ApiRoutingBootstrapTest extends TestCase
     public function testValidRouteStoresControllerAndParams(): void
     {
         $container = new Container();
-        $container->set('api.responder', $this->createStub(JsonResponder::class));
+        $container->set('api.responder', self::createStub(JsonResponder::class));
         $container->set('api.route', 'teams');
         $container->set('api.method', 'GET');
 
@@ -30,7 +30,7 @@ final class ApiRoutingBootstrapTest extends TestCase
     public function testUnknownRouteTerminates(): void
     {
         $container = new Container();
-        $container->set('api.responder', $this->createStub(JsonResponder::class));
+        $container->set('api.responder', self::createStub(JsonResponder::class));
         $container->set('api.route', 'nonexistent/endpoint');
         $container->set('api.method', 'GET');
 

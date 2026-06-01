@@ -23,7 +23,7 @@ class ApiKeysEntryPointTest extends ModuleEntryPointTestCase
     {
         $this->authenticateAs($username);
 
-        $authStub = $this->createStub(\Auth\Contracts\AuthServiceInterface::class);
+        $authStub = self::createStub(\Auth\Contracts\AuthServiceInterface::class);
         $authStub->method('isAuthenticated')->willReturn(true);
         $authStub->method('isAdmin')->willReturn(false);
         $authStub->method('getCookieArray')->willReturn([$username, $username, '']);

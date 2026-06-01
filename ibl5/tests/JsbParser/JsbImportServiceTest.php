@@ -24,8 +24,8 @@ class JsbImportServiceTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->stubRepo = $this->createStub(JsbImportRepositoryInterface::class);
-        $this->stubResolver = $this->createStub(PlayerIdResolver::class);
+        $this->stubRepo = self::createStub(JsbImportRepositoryInterface::class);
+        $this->stubResolver = self::createStub(PlayerIdResolver::class);
     }
 
     private function makeService(?PlayerIdResolver $resolver = null): JsbImportService

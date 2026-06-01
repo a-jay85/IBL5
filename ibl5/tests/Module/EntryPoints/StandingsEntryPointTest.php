@@ -35,7 +35,7 @@ class StandingsEntryPointTest extends ModuleEntryPointTestCase
     {
         \League\OlympicsTeamFilter::resetCache();
 
-        $lcStub = $this->createStub(\League\LeagueContext::class);
+        $lcStub = self::createStub(\League\LeagueContext::class);
         $lcStub->method('isOlympics')->willReturn(true);
         $lcStub->method('getCurrentLeague')->willReturn('olympics');
         $lcStub->method('getConfig')->willReturn([

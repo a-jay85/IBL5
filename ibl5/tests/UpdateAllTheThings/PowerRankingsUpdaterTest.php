@@ -264,7 +264,7 @@ class PowerRankingsUpdaterTest extends TestCase
 
     public function testConstructorAcceptsOptionalLeagueContext(): void
     {
-        $leagueContext = $this->createStub(\League\LeagueContext::class);
+        $leagueContext = self::createStub(\League\LeagueContext::class);
         $updater = new PowerRankingsUpdater($this->mockDb, $this->mockSeason, null, $leagueContext);
         $this->assertInstanceOf(PowerRankingsUpdater::class, $updater);
     }

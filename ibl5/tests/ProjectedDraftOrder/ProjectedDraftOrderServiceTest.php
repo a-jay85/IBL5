@@ -23,7 +23,7 @@ class ProjectedDraftOrderServiceTest extends TestCase
     protected function setUp(): void
     {
         $this->setUpAuditLogCapture();
-        $this->stubRepository = $this->createStub(ProjectedDraftOrderRepositoryInterface::class);
+        $this->stubRepository = self::createStub(ProjectedDraftOrderRepositoryInterface::class);
         $this->service = new ProjectedDraftOrderService($this->stubRepository);
     }
 
@@ -508,7 +508,7 @@ class ProjectedDraftOrderServiceTest extends TestCase
             ->method('saveFinalDraftOrder')
             ->with(
                 2026,
-                $this->callback(static function (array $picks) use ($reversedLottery): bool {
+                self::callback(static function (array $picks) use ($reversedLottery): bool {
                     // 28 round-1 + 28 round-2 = 56 total
                     if (count($picks) !== 56) {
                         return false;
@@ -621,7 +621,7 @@ class ProjectedDraftOrderServiceTest extends TestCase
     public function testSaveLotteryOrderEmitsAuditLog(): void
     {
         $standings = $this->buildFullLeagueStandings();
-        $stubRepo = $this->createStub(ProjectedDraftOrderRepositoryInterface::class);
+        $stubRepo = self::createStub(ProjectedDraftOrderRepositoryInterface::class);
         $stubRepo->method('getAllTeamsWithStandings')->willReturn($standings);
         $stubRepo->method('getPlayedGames')->willReturn([]);
         $stubRepo->method('getPickOwnership')->willReturn([]);

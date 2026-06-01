@@ -86,7 +86,7 @@ class LeagueStartersServiceTest extends TestCase
 
     public function testBatchLoadReturnsCorrectPositionBuckets(): void
     {
-        $mockRepo = $this->createStub(LeagueStartersRepositoryInterface::class);
+        $mockRepo = self::createStub(LeagueStartersRepositoryInterface::class);
         $mockRepo->method('getAllStartersWithTeamData')->willReturn([
             $this->makeStarterRow(101, 1, 'PG', 'Test Team'),
             $this->makeStarterRow(102, 1, 'SG', 'Test Team'),
@@ -115,7 +115,7 @@ class LeagueStartersServiceTest extends TestCase
 
     public function testMissingSlotsUsePlaceholder(): void
     {
-        $mockRepo = $this->createStub(LeagueStartersRepositoryInterface::class);
+        $mockRepo = self::createStub(LeagueStartersRepositoryInterface::class);
         $mockRepo->method('getAllStartersWithTeamData')->willReturn([
             $this->makeStarterRow(101, 1, 'PG', 'Test Team'),
         ]);
@@ -139,7 +139,7 @@ class LeagueStartersServiceTest extends TestCase
 
     public function testPlaceholderSetsTeamProperties(): void
     {
-        $mockRepo = $this->createStub(LeagueStartersRepositoryInterface::class);
+        $mockRepo = self::createStub(LeagueStartersRepositoryInterface::class);
         $mockRepo->method('getAllStartersWithTeamData')->willReturn([]);
         $mockRepo->method('getPlaceholderRow')->willReturn(
             TestDataFactory::createPlayer(['pid' => 4040404, 'teamid' => 0, 'name' => 'Placeholder', 'loyalty' => 0, 'playing_time' => 0, 'winner' => 0, 'tradition' => 0, 'security' => 0])
@@ -160,7 +160,7 @@ class LeagueStartersServiceTest extends TestCase
 
     public function testPlaceholderLoadedOnlyOnce(): void
     {
-        $mockRepo = $this->createStub(LeagueStartersRepositoryInterface::class);
+        $mockRepo = self::createStub(LeagueStartersRepositoryInterface::class);
         $mockRepo->method('getAllStartersWithTeamData')->willReturn([]);
         $mockRepo->method('getPlaceholderRow')->willReturn(
             TestDataFactory::createPlayer(['pid' => 4040404, 'teamid' => 0, 'name' => 'Placeholder', 'loyalty' => 0, 'playing_time' => 0, 'winner' => 0, 'tradition' => 0, 'security' => 0])

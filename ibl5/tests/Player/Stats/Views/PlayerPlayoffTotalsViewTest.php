@@ -18,7 +18,7 @@ class PlayerPlayoffTotalsViewTest extends TestCase
 
     public function testRenderTotalsMatchesSnapshot(): void
     {
-        $repository = $this->createStub(PlayerStatsRepository::class);
+        $repository = self::createStub(PlayerStatsRepository::class);
         $repository->method('getPlayoffStats')->willReturn(TournamentViewFixtures::twoSeasonRows());
 
         $view = new PlayerPlayoffTotalsView($repository, new PlayerSeasonTableRenderer());

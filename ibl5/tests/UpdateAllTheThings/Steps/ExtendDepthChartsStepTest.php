@@ -13,7 +13,7 @@ class ExtendDepthChartsStepTest extends TestCase
 {
     public function testImplementsPipelineStepInterface(): void
     {
-        $stubRepo = $this->createStub(SavedDepthChartRepository::class);
+        $stubRepo = self::createStub(SavedDepthChartRepository::class);
         $step = new ExtendDepthChartsStep($stubRepo, '2026-02-27', 15);
 
         $this->assertInstanceOf(PipelineStepInterface::class, $step);
@@ -21,7 +21,7 @@ class ExtendDepthChartsStepTest extends TestCase
 
     public function testGetLabelReturnsExpectedLabel(): void
     {
-        $stubRepo = $this->createStub(SavedDepthChartRepository::class);
+        $stubRepo = self::createStub(SavedDepthChartRepository::class);
         $step = new ExtendDepthChartsStep($stubRepo, '2026-02-27', 15);
 
         $this->assertSame('Saved depth charts updated', $step->getLabel());
@@ -44,7 +44,7 @@ class ExtendDepthChartsStepTest extends TestCase
 
     public function testExecuteCapturesOutputBufferLog(): void
     {
-        $stubRepo = $this->createStub(SavedDepthChartRepository::class);
+        $stubRepo = self::createStub(SavedDepthChartRepository::class);
         $stubRepo->method('extendActiveDepthCharts')->willReturnCallback(static function (): int {
             echo '<p>Extending DCs...</p>';
             return 3;

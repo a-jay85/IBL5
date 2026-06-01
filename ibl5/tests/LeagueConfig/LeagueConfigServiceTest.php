@@ -14,13 +14,13 @@ class LeagueConfigServiceTest extends TestCase
     {
         $lgeFile = dirname(__DIR__, 2) . '/IBL5.lge';
         if (!file_exists($lgeFile)) {
-            $this->fail("Test .lge file not found at: {$lgeFile}");
+            self::fail("Test .lge file not found at: {$lgeFile}");
         }
 
         $mockRepository = $this->createMock(LeagueConfigRepositoryInterface::class);
         $mockRepository->expects($this->once())
             ->method('upsertSeasonConfig')
-            ->with($this->isInt(), $this->isArray())
+            ->with(self::isInt(), self::isArray())
             ->willReturn(28);
 
         $service = new LeagueConfigService($mockRepository);
@@ -41,7 +41,7 @@ class LeagueConfigServiceTest extends TestCase
 
     public function testProcessLgeFileReturnsErrorForMissingFile(): void
     {
-        $stubRepository = $this->createStub(LeagueConfigRepositoryInterface::class);
+        $stubRepository = self::createStub(LeagueConfigRepositoryInterface::class);
         $service = new LeagueConfigService($stubRepository);
 
         $result = $service->processLgeFile('/nonexistent/IBL5.lge');
@@ -56,7 +56,7 @@ class LeagueConfigServiceTest extends TestCase
 
     public function testCrossCheckReturnsEmptyWhenAllMatch(): void
     {
-        $stubRepo = $this->createStub(LeagueConfigRepositoryInterface::class);
+        $stubRepo = self::createStub(LeagueConfigRepositoryInterface::class);
         $stubRepo->method('getConfigForSeason')->willReturn([
             ['team_slot' => 1, 'team_name' => 'Miami'],
             ['team_slot' => 2, 'team_name' => 'New York'],
@@ -74,7 +74,7 @@ class LeagueConfigServiceTest extends TestCase
 
     public function testCrossCheckReturnsErrorWhenNoConfigFound(): void
     {
-        $stubRepo = $this->createStub(LeagueConfigRepositoryInterface::class);
+        $stubRepo = self::createStub(LeagueConfigRepositoryInterface::class);
         $stubRepo->method('getConfigForSeason')->willReturn([]);
 
         $service = new LeagueConfigService($stubRepo);
@@ -86,7 +86,7 @@ class LeagueConfigServiceTest extends TestCase
 
     public function testCrossCheckReturnsErrorWhenNoFranchiseDataFound(): void
     {
-        $stubRepo = $this->createStub(LeagueConfigRepositoryInterface::class);
+        $stubRepo = self::createStub(LeagueConfigRepositoryInterface::class);
         $stubRepo->method('getConfigForSeason')->willReturn([
             ['team_slot' => 1, 'team_name' => 'Miami'],
         ]);
@@ -101,7 +101,7 @@ class LeagueConfigServiceTest extends TestCase
 
     public function testCrossCheckDetectsMissingSlotInFranchiseMap(): void
     {
-        $stubRepo = $this->createStub(LeagueConfigRepositoryInterface::class);
+        $stubRepo = self::createStub(LeagueConfigRepositoryInterface::class);
         $stubRepo->method('getConfigForSeason')->willReturn([
             ['team_slot' => 1, 'team_name' => 'Miami'],
             ['team_slot' => 99, 'team_name' => 'Phantom Team'],
@@ -120,7 +120,7 @@ class LeagueConfigServiceTest extends TestCase
 
     public function testCrossCheckDetectsNameMismatch(): void
     {
-        $stubRepo = $this->createStub(LeagueConfigRepositoryInterface::class);
+        $stubRepo = self::createStub(LeagueConfigRepositoryInterface::class);
         $stubRepo->method('getConfigForSeason')->willReturn([
             ['team_slot' => 1, 'team_name' => 'Miami Heat'],
         ]);
@@ -140,7 +140,7 @@ class LeagueConfigServiceTest extends TestCase
     {
         $lgeFile = dirname(__DIR__, 2) . '/IBL5.lge';
         if (!file_exists($lgeFile)) {
-            $this->fail("Test .lge file not found at: {$lgeFile}");
+            self::fail("Test .lge file not found at: {$lgeFile}");
         }
 
         $data = file_get_contents($lgeFile);
@@ -149,7 +149,7 @@ class LeagueConfigServiceTest extends TestCase
         $mockRepository = $this->createMock(LeagueConfigRepositoryInterface::class);
         $mockRepository->expects($this->once())
             ->method('upsertSeasonConfig')
-            ->with($this->isInt(), $this->isArray())
+            ->with(self::isInt(), self::isArray())
             ->willReturn(28);
 
         $service = new LeagueConfigService($mockRepository);
@@ -162,7 +162,7 @@ class LeagueConfigServiceTest extends TestCase
 
     public function testProcessLgeDataReturnsErrorForInvalidSize(): void
     {
-        $stubRepository = $this->createStub(LeagueConfigRepositoryInterface::class);
+        $stubRepository = self::createStub(LeagueConfigRepositoryInterface::class);
         $service = new LeagueConfigService($stubRepository);
 
         $result = $service->processLgeData('too short');
@@ -178,13 +178,13 @@ class LeagueConfigServiceTest extends TestCase
     {
         $lgeFile = dirname(__DIR__, 2) . '/IBL5.lge';
         if (!file_exists($lgeFile)) {
-            $this->fail("Test .lge file not found at: {$lgeFile}");
+            self::fail("Test .lge file not found at: {$lgeFile}");
         }
 
         $data = file_get_contents($lgeFile);
         self::assertIsString($data);
 
-        $stubRepository = $this->createStub(LeagueConfigRepositoryInterface::class);
+        $stubRepository = self::createStub(LeagueConfigRepositoryInterface::class);
         $stubRepository->method('upsertSeasonConfig')->willReturn(28);
 
         $service = new LeagueConfigService($stubRepository);
@@ -197,7 +197,7 @@ class LeagueConfigServiceTest extends TestCase
 
     public function testCrossCheckDetectsFranchiseNotInLgeFile(): void
     {
-        $stubRepo = $this->createStub(LeagueConfigRepositoryInterface::class);
+        $stubRepo = self::createStub(LeagueConfigRepositoryInterface::class);
         $stubRepo->method('getConfigForSeason')->willReturn([
             ['team_slot' => 1, 'team_name' => 'Miami'],
         ]);

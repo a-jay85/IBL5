@@ -18,7 +18,7 @@ class PlayerPageControllerTest extends WideUnitTestCase
     {
         parent::setUp();
 
-        $this->stubRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
+        $this->stubRepo = self::createStub(TeamIdentityRepositoryInterface::class);
         $this->stubRepo->method('getTeamnameFromUsername')->willReturn('Heat');
         $this->stubRepo->method('getTeamnameFromTeamID')->willReturn('Heat');
 
@@ -192,7 +192,7 @@ class PlayerPageControllerTest extends WideUnitTestCase
         $this->mockDb->onQuery('ibl_hist', [$histRow]);
         $this->mockDb->setMockData([$retiredRow]);
 
-        $this->stubRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
+        $this->stubRepo = self::createStub(TeamIdentityRepositoryInterface::class);
         $this->stubRepo->method('getTeamnameFromUsername')->willReturn('Free Agents');
 
         $controller = new PlayerPageController($this->mockDb, $this->stubRepo);

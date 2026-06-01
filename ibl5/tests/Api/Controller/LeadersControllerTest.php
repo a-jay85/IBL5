@@ -52,7 +52,7 @@ class LeadersControllerTest extends WideUnitTestCase
         $responder->expects($this->once())
             ->method('success')
             ->with(
-                $this->callback(function (array $data): bool {
+                self::callback(function (array $data): bool {
                     if (count($data) !== 1) {
                         return false;
                     }
@@ -62,9 +62,9 @@ class LeadersControllerTest extends WideUnitTestCase
                         && $first['team']['name'] === 'Celtics'
                         && $first['season'] === 2007;
                 }),
-                $this->isArray(),
+                self::isArray(),
                 200,
-                $this->isArray()
+                self::isArray()
             );
 
         $controller->handle([], [], $responder);
@@ -80,12 +80,12 @@ class LeadersControllerTest extends WideUnitTestCase
         $responder->expects($this->once())
             ->method('success')
             ->with(
-                $this->anything(),
-                $this->callback(function (array $meta): bool {
+                self::anything(),
+                self::callback(function (array $meta): bool {
                     return ($meta['category'] ?? '') === 'rpg';
                 }),
                 200,
-                $this->isArray()
+                self::isArray()
             );
 
         $controller->handle([], ['category' => 'rpg'], $responder);
@@ -101,12 +101,12 @@ class LeadersControllerTest extends WideUnitTestCase
         $responder->expects($this->once())
             ->method('success')
             ->with(
-                $this->anything(),
-                $this->callback(function (array $meta): bool {
+                self::anything(),
+                self::callback(function (array $meta): bool {
                     return ($meta['category'] ?? '') === 'ppg';
                 }),
                 200,
-                $this->isArray()
+                self::isArray()
             );
 
         $controller->handle([], [], $responder);
@@ -122,12 +122,12 @@ class LeadersControllerTest extends WideUnitTestCase
         $responder->expects($this->once())
             ->method('success')
             ->with(
-                $this->anything(),
-                $this->callback(function (array $meta): bool {
+                self::anything(),
+                self::callback(function (array $meta): bool {
                     return ($meta['category'] ?? '') === 'ppg';
                 }),
                 200,
-                $this->isArray()
+                self::isArray()
             );
 
         $controller->handle([], ['category' => 'invalid'], $responder);

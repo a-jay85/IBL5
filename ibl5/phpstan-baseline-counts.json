@@ -32,7 +32,6 @@
         "property.unusedType": 1,
         "staticMethod.alreadyNarrowedType": 37,
         "staticMethod.deprecated": 1,
-        "staticMethod.dynamicCall": 218,
         "ternary.shortNotAllowed": 10
     }
 }

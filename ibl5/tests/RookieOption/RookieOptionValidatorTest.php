@@ -27,7 +27,7 @@ class RookieOptionValidatorTest extends TestCase
      */
     public function testValidatePlayerOwnershipSuccess(): void
     {
-        $mockPlayer = $this->createStub(Player::class);
+        $mockPlayer = self::createStub(Player::class);
         $mockPlayer->method('getTeamName')->willReturn('Test Team');
         $mockPlayer->method('getPosition')->willReturn('PG');
         $mockPlayer->method('getName')->willReturn('Test Player');
@@ -43,7 +43,7 @@ class RookieOptionValidatorTest extends TestCase
      */
     public function testValidatePlayerOwnershipFailure(): void
     {
-        $mockPlayer = $this->createStub(Player::class);
+        $mockPlayer = self::createStub(Player::class);
         $mockPlayer->method('getTeamName')->willReturn('Other Team');
         $mockPlayer->method('getPosition')->willReturn('SG');
         $mockPlayer->method('getName')->willReturn('Other Player');
@@ -61,7 +61,7 @@ class RookieOptionValidatorTest extends TestCase
      */
     public function testValidateEligibilityNotEligible(): void
     {
-        $mockPlayer = $this->createStub(Player::class);
+        $mockPlayer = self::createStub(Player::class);
         $mockPlayer->method('getPosition')->willReturn('SF');
         $mockPlayer->method('getName')->willReturn('Ineligible Player');
         $mockPlayer->method('canRookieOption')
@@ -81,7 +81,7 @@ class RookieOptionValidatorTest extends TestCase
      */
     public function testValidateEligibilityFirstRoundSuccess(): void
     {
-        $mockPlayer = $this->createStub(Player::class);
+        $mockPlayer = self::createStub(Player::class);
         $mockPlayer->method('getPosition')->willReturn('PF');
         $mockPlayer->method('getName')->willReturn('Eligible Player');
         $mockPlayer->method('canRookieOption')
@@ -101,7 +101,7 @@ class RookieOptionValidatorTest extends TestCase
      */
     public function testValidateEligibilitySecondRoundSuccess(): void
     {
-        $mockPlayer = $this->createStub(Player::class);
+        $mockPlayer = self::createStub(Player::class);
         $mockPlayer->method('getPosition')->willReturn('C');
         $mockPlayer->method('getName')->willReturn('Second Round Player');
         $mockPlayer->method('canRookieOption')

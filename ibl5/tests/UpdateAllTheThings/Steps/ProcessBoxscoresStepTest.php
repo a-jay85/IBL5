@@ -22,9 +22,9 @@ class ProcessBoxscoresStepTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->stubProcessor = $this->createStub(BoxscoreProcessor::class);
-        $this->stubView = $this->createStub(BoxscoreView::class);
-        $this->stubResolver = $this->createStub(JsbSourceResolverInterface::class);
+        $this->stubProcessor = self::createStub(BoxscoreProcessor::class);
+        $this->stubView = self::createStub(BoxscoreView::class);
+        $this->stubResolver = self::createStub(JsbSourceResolverInterface::class);
     }
 
     public function testImplementsPipelineStepInterface(): void

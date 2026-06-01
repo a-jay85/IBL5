@@ -15,7 +15,7 @@ class TradeQueueProcessorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->stubCommonRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
+        $this->stubCommonRepo = self::createStub(TeamIdentityRepositoryInterface::class);
     }
 
     // ============================================
@@ -24,7 +24,7 @@ class TradeQueueProcessorTest extends TestCase
 
     public function testEmptyQueueReturnsZeroCounts(): void
     {
-        $stub = $this->createStub(TradeExecutionRepositoryInterface::class);
+        $stub = self::createStub(TradeExecutionRepositoryInterface::class);
         $stub->method('getQueuedTrades')->willReturn([]);
         $processor = new TradeQueueProcessor($stub, $this->stubCommonRepo);
 
@@ -119,7 +119,7 @@ class TradeQueueProcessorTest extends TestCase
     {
         $trade = $this->makeQueuedTrade(2, 'pick_transfer', ['pick_id' => 10, 'new_owner' => 'Miami', 'new_owner_id' => 7], 'Pick to Miami');
 
-        $stub = $this->createStub(TradeExecutionRepositoryInterface::class);
+        $stub = self::createStub(TradeExecutionRepositoryInterface::class);
         $stub->method('getQueuedTrades')->willReturn([$trade]);
         $stub->method('executeQueuedPickTransfer')->willReturn(0);
 
@@ -134,7 +134,7 @@ class TradeQueueProcessorTest extends TestCase
     {
         $trade = $this->makeQueuedTrade(3, 'pick_transfer', ['pick_id' => 10], 'Missing owner');
 
-        $stub = $this->createStub(TradeExecutionRepositoryInterface::class);
+        $stub = self::createStub(TradeExecutionRepositoryInterface::class);
         $stub->method('getQueuedTrades')->willReturn([$trade]);
 
         $processor = new TradeQueueProcessor($stub, $this->stubCommonRepo);
@@ -157,7 +157,7 @@ class TradeQueueProcessorTest extends TestCase
             'tradeline' => 'Bad trade',
         ];
 
-        $stub = $this->createStub(TradeExecutionRepositoryInterface::class);
+        $stub = self::createStub(TradeExecutionRepositoryInterface::class);
         $stub->method('getQueuedTrades')->willReturn([$trade]);
 
         $processor = new TradeQueueProcessor($stub, $this->stubCommonRepo);
@@ -171,7 +171,7 @@ class TradeQueueProcessorTest extends TestCase
     {
         $trade = $this->makeQueuedTrade(1, 'salary_adjustment', ['amount' => 100], 'Unknown op');
 
-        $stub = $this->createStub(TradeExecutionRepositoryInterface::class);
+        $stub = self::createStub(TradeExecutionRepositoryInterface::class);
         $stub->method('getQueuedTrades')->willReturn([$trade]);
 
         $processor = new TradeQueueProcessor($stub, $this->stubCommonRepo);
@@ -193,7 +193,7 @@ class TradeQueueProcessorTest extends TestCase
             $this->makeQueuedTrade(3, 'pick_transfer', ['pick_id' => 5, 'new_owner' => 'LA', 'new_owner_id' => 6], 'Trade 3'),
         ];
 
-        $stub = $this->createStub(TradeExecutionRepositoryInterface::class);
+        $stub = self::createStub(TradeExecutionRepositoryInterface::class);
         $stub->method('getQueuedTrades')->willReturn($trades);
         $stub->method('executeQueuedPlayerTransfer')
             ->willReturnMap([

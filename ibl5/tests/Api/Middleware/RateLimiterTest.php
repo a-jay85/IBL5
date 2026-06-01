@@ -44,7 +44,7 @@ class RateLimiterTest extends TestCase
 
     public function testAllowsRequestAtExactLimit(): void
     {
-        $stubRepo = $this->createStub(RateLimitRepository::class);
+        $stubRepo = self::createStub(RateLimitRepository::class);
         $rateLimiter = new RateLimiter($stubRepo);
         $apiKey = $this->makeApiKey();
 
@@ -56,8 +56,8 @@ class RateLimiterTest extends TestCase
 
     public function testRejectsRequestOverLimit(): void
     {
-        $stubRepo = $this->createStub(RateLimitRepository::class);
-        $fixedClock = $this->createStub(ClockInterface::class);
+        $stubRepo = self::createStub(RateLimitRepository::class);
+        $fixedClock = self::createStub(ClockInterface::class);
         $fixedClock->method('now')->willReturn(1_700_000_000);
 
         $rateLimiter = new RateLimiter($stubRepo, $fixedClock);
@@ -75,7 +75,7 @@ class RateLimiterTest extends TestCase
 
     public function testElevatedTierHasHigherLimit(): void
     {
-        $stubRepo = $this->createStub(RateLimitRepository::class);
+        $stubRepo = self::createStub(RateLimitRepository::class);
         $rateLimiter = new RateLimiter($stubRepo);
         $apiKey = $this->makeApiKey('elevated');
 
@@ -87,7 +87,7 @@ class RateLimiterTest extends TestCase
 
     public function testElevatedTierRejectsOver300(): void
     {
-        $stubRepo = $this->createStub(RateLimitRepository::class);
+        $stubRepo = self::createStub(RateLimitRepository::class);
         $rateLimiter = new RateLimiter($stubRepo);
         $apiKey = $this->makeApiKey('elevated');
 
@@ -117,7 +117,7 @@ class RateLimiterTest extends TestCase
 
     public function testUnknownTierDefaultsToStandard(): void
     {
-        $stubRepo = $this->createStub(RateLimitRepository::class);
+        $stubRepo = self::createStub(RateLimitRepository::class);
         $rateLimiter = new RateLimiter($stubRepo);
         $apiKey = $this->makeApiKey('unknown_tier');
 
@@ -156,7 +156,7 @@ class RateLimiterTest extends TestCase
 
     public function testLimitHeadersAdvertisesStandardLimit(): void
     {
-        $rateLimiter = new RateLimiter($this->createStub(RateLimitRepository::class));
+        $rateLimiter = new RateLimiter(self::createStub(RateLimitRepository::class));
         $this->assertSame(
             ['X-RateLimit-Limit' => '60'],
             $rateLimiter->limitHeaders($this->makeApiKey('standard')),
@@ -165,7 +165,7 @@ class RateLimiterTest extends TestCase
 
     public function testLimitHeadersAdvertisesElevatedLimit(): void
     {
-        $rateLimiter = new RateLimiter($this->createStub(RateLimitRepository::class));
+        $rateLimiter = new RateLimiter(self::createStub(RateLimitRepository::class));
         $this->assertSame(
             ['X-RateLimit-Limit' => '300'],
             $rateLimiter->limitHeaders($this->makeApiKey('elevated')),
@@ -174,13 +174,13 @@ class RateLimiterTest extends TestCase
 
     public function testLimitHeadersAreEmptyForUnlimitedTier(): void
     {
-        $rateLimiter = new RateLimiter($this->createStub(RateLimitRepository::class));
+        $rateLimiter = new RateLimiter(self::createStub(RateLimitRepository::class));
         $this->assertSame([], $rateLimiter->limitHeaders($this->makeApiKey('unlimited')));
     }
 
     public function testLimitHeadersUnknownTierDefaultsToStandard(): void
     {
-        $rateLimiter = new RateLimiter($this->createStub(RateLimitRepository::class));
+        $rateLimiter = new RateLimiter(self::createStub(RateLimitRepository::class));
         $this->assertSame(
             ['X-RateLimit-Limit' => '60'],
             $rateLimiter->limitHeaders($this->makeApiKey('mystery_tier')),

@@ -39,14 +39,14 @@ class NegotiationRepositoryTest extends TestCase
 
     public function testRepositoryCanBeInstantiated(): void
     {
-        $repository = new NegotiationRepository($this->mockDb, $this->createStub(SalaryCapRepositoryInterface::class));
+        $repository = new NegotiationRepository($this->mockDb, self::createStub(SalaryCapRepositoryInterface::class));
         
         $this->assertInstanceOf(NegotiationRepository::class, $repository);
     }
 
     public function testRepositoryImplementsCorrectInterface(): void
     {
-        $repository = new NegotiationRepository($this->mockDb, $this->createStub(SalaryCapRepositoryInterface::class));
+        $repository = new NegotiationRepository($this->mockDb, self::createStub(SalaryCapRepositoryInterface::class));
         
         $this->assertInstanceOf(
             \Negotiation\Contracts\NegotiationRepositoryInterface::class,
@@ -56,7 +56,7 @@ class NegotiationRepositoryTest extends TestCase
 
     public function testRepositoryExtendsBaseMysqliRepository(): void
     {
-        $repository = new NegotiationRepository($this->mockDb, $this->createStub(SalaryCapRepositoryInterface::class));
+        $repository = new NegotiationRepository($this->mockDb, self::createStub(SalaryCapRepositoryInterface::class));
         
         $this->assertInstanceOf(
             \BaseMysqliRepository::class,
@@ -70,7 +70,7 @@ class NegotiationRepositoryTest extends TestCase
 
     public function testGetTeamPerformanceReturnsDefaultsWhenNoData(): void
     {
-        $repository = new NegotiationRepository($this->mockDb, $this->createStub(SalaryCapRepositoryInterface::class));
+        $repository = new NegotiationRepository($this->mockDb, self::createStub(SalaryCapRepositoryInterface::class));
         $this->mockDb->setMockData([]);
 
         $result = $repository->getTeamPerformance('Test Team');
@@ -84,7 +84,7 @@ class NegotiationRepositoryTest extends TestCase
 
     public function testGetTeamPerformanceReturnsTeamData(): void
     {
-        $repository = new NegotiationRepository($this->mockDb, $this->createStub(SalaryCapRepositoryInterface::class));
+        $repository = new NegotiationRepository($this->mockDb, self::createStub(SalaryCapRepositoryInterface::class));
         $this->mockDb->setMockData([
             [
                 'contract_wins' => 50,
@@ -107,7 +107,7 @@ class NegotiationRepositoryTest extends TestCase
 
     public function testGetPositionSalaryCommitmentReturnsZeroWhenNoPlayers(): void
     {
-        $repository = new NegotiationRepository($this->mockDb, $this->createStub(SalaryCapRepositoryInterface::class));
+        $repository = new NegotiationRepository($this->mockDb, self::createStub(SalaryCapRepositoryInterface::class));
         $this->mockDb->setMockData([]);
 
         $result = $repository->getPositionSalaryCommitment('Test Team', 'G', 'Excluded Player');
@@ -122,7 +122,7 @@ class NegotiationRepositoryTest extends TestCase
 
     public function testGetTeamCapSpaceNextSeasonReturnsHardCapWhenNoSalaryData(): void
     {
-        $commonRepo = $this->createStub(SalaryCapRepositoryInterface::class);
+        $commonRepo = self::createStub(SalaryCapRepositoryInterface::class);
         $commonRepo->method('getTeamCapSpaceNextSeason')->willReturn(League::HARD_CAP_MAX);
         $repository = new NegotiationRepository($this->mockDb, $commonRepo);
 
@@ -133,7 +133,7 @@ class NegotiationRepositoryTest extends TestCase
 
     public function testGetTeamCapSpaceNextSeasonReturnsCapMinusSalary(): void
     {
-        $commonRepo = $this->createStub(SalaryCapRepositoryInterface::class);
+        $commonRepo = self::createStub(SalaryCapRepositoryInterface::class);
         $commonRepo->method('getTeamCapSpaceNextSeason')->willReturn(League::HARD_CAP_MAX - 5000);
         $repository = new NegotiationRepository($this->mockDb, $commonRepo);
 
@@ -148,7 +148,7 @@ class NegotiationRepositoryTest extends TestCase
 
     public function testMultipleRepositoriesCanBeInstantiated(): void
     {
-        $commonRepo = $this->createStub(SalaryCapRepositoryInterface::class);
+        $commonRepo = self::createStub(SalaryCapRepositoryInterface::class);
         $repo1 = new NegotiationRepository($this->mockDb, $commonRepo);
         $repo2 = new NegotiationRepository($this->mockDb, $commonRepo);
         

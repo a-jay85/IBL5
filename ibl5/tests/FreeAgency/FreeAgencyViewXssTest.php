@@ -16,7 +16,7 @@ class FreeAgencyViewXssTest extends TestCase
     {
         $xssPayload = '<script>alert("xss")</script>';
 
-        $player = $this->createStub(Player::class);
+        $player = self::createStub(Player::class);
         $player->position = 'PG';
         $player->name = 'Test Player';
         $player->playerID = 1;
@@ -24,7 +24,7 @@ class FreeAgencyViewXssTest extends TestCase
         $player->birdYears = 0;
         $player->yearsOfExperience = 5;
 
-        $team = $this->createStub(Team::class);
+        $team = self::createStub(Team::class);
         $team->name = 'TestTeam';
         $team->teamid = 1;
 
@@ -57,7 +57,7 @@ class FreeAgencyViewXssTest extends TestCase
 
     public function testNegotiationViewShowsNoSpotsWarningWithXssTeam(): void
     {
-        $player = $this->createStub(Player::class);
+        $player = self::createStub(Player::class);
         $player->position = 'SG';
         $player->name = '<img src=x onerror=alert(1)>';
         $player->playerID = 2;
@@ -65,7 +65,7 @@ class FreeAgencyViewXssTest extends TestCase
         $player->birdYears = 0;
         $player->yearsOfExperience = 3;
 
-        $team = $this->createStub(Team::class);
+        $team = self::createStub(Team::class);
         $team->name = 'TestTeam';
         $team->teamid = 1;
 

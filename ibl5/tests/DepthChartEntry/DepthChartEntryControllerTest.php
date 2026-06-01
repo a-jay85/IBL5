@@ -26,7 +26,7 @@ class DepthChartEntryControllerTest extends TestCase
     {
         $this->mockDb = new MockDatabase();
         $GLOBALS['mysqli_db'] = $this->mockDb;
-        $this->stubCommonRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
+        $this->stubCommonRepo = self::createStub(TeamIdentityRepositoryInterface::class);
     }
 
     protected function tearDown(): void
@@ -40,14 +40,14 @@ class DepthChartEntryControllerTest extends TestCase
 
     public function testControllerCanBeInstantiated(): void
     {
-        $controller = new DepthChartEntryController($this->mockDb, $this->stubCommonRepo, $this->createStub(\League\LeagueContext::class));
+        $controller = new DepthChartEntryController($this->mockDb, $this->stubCommonRepo, self::createStub(\League\LeagueContext::class));
         
         $this->assertInstanceOf(DepthChartEntryController::class, $controller);
     }
 
     public function testControllerImplementsCorrectInterface(): void
     {
-        $controller = new DepthChartEntryController($this->mockDb, $this->stubCommonRepo, $this->createStub(\League\LeagueContext::class));
+        $controller = new DepthChartEntryController($this->mockDb, $this->stubCommonRepo, self::createStub(\League\LeagueContext::class));
         
         $this->assertInstanceOf(
             \DepthChartEntry\Contracts\DepthChartEntryControllerInterface::class,
@@ -61,8 +61,8 @@ class DepthChartEntryControllerTest extends TestCase
 
     public function testMultipleControllersCanBeInstantiated(): void
     {
-        $controller1 = new DepthChartEntryController($this->mockDb, $this->stubCommonRepo, $this->createStub(\League\LeagueContext::class));
-        $controller2 = new DepthChartEntryController($this->mockDb, $this->stubCommonRepo, $this->createStub(\League\LeagueContext::class));
+        $controller1 = new DepthChartEntryController($this->mockDb, $this->stubCommonRepo, self::createStub(\League\LeagueContext::class));
+        $controller2 = new DepthChartEntryController($this->mockDb, $this->stubCommonRepo, self::createStub(\League\LeagueContext::class));
 
         $this->assertInstanceOf(DepthChartEntryController::class, $controller1);
         $this->assertInstanceOf(DepthChartEntryController::class, $controller2);

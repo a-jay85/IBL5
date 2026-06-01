@@ -29,7 +29,7 @@ class LgeFileParserTest extends TestCase
     {
         $path = self::lgeFile();
         if (!file_exists($path)) {
-            $this->fail("Test .lge file not found at: {$path}");
+            self::fail("Test .lge file not found at: {$path}");
         }
         return $path;
     }

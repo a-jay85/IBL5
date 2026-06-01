@@ -96,7 +96,7 @@ class ModifierConsistencyTest extends TestCase
             ],
         ]);
 
-        $calculator = new NegotiationDemandCalculator($mockDb, $this->createStub(SalaryCapRepositoryInterface::class));
+        $calculator = new NegotiationDemandCalculator($mockDb, self::createStub(SalaryCapRepositoryInterface::class));
 
         $expectedWinner = \ContractRules::calculateWinnerModifier(self::WINS, self::LOSSES, self::WINNER_PREF);
         $expectedTradition = \ContractRules::calculateTraditionModifier(self::TRAD_WINS, self::TRAD_LOSSES, self::TRADITION_PREF);

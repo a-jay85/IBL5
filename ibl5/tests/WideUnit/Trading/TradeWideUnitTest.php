@@ -33,7 +33,7 @@ class TradeWideUnitTest extends WideUnitTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $commonRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
+        $commonRepo = self::createStub(TeamIdentityRepositoryInterface::class);
         $this->processor = new TradeProcessor($this->mockDb, $commonRepo);
         
         // Prevent Discord notifications during tests

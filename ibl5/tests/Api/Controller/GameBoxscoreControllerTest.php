@@ -154,7 +154,7 @@ class GameBoxscoreControllerTest extends WideUnitTestCase
         $responder->expects($this->once())
             ->method('success')
             ->with(
-                $this->callback(function (array $data): bool {
+                self::callback(function (array $data): bool {
                     return isset($data['game'], $data['visitor'], $data['home'])
                         && $data['game']['uuid'] === self::GAME_UUID
                         && $data['game']['status'] === 'completed'
@@ -163,9 +163,9 @@ class GameBoxscoreControllerTest extends WideUnitTestCase
                         && count($data['visitor']['players']) === 2
                         && count($data['home']['players']) === 2;
                 }),
-                $this->isArray(),
+                self::isArray(),
                 200,
-                $this->callback(function (array $headers): bool {
+                self::callback(function (array $headers): bool {
                     return isset($headers['ETag'])
                         && $headers['Cache-Control'] === 'public, max-age=60';
                 })
@@ -237,7 +237,7 @@ class GameBoxscoreControllerTest extends WideUnitTestCase
         $responder->expects($this->once())
             ->method('success')
             ->with(
-                $this->callback(function (array $data): bool {
+                self::callback(function (array $data): bool {
                     $visitorPlayers = $data['visitor']['players'] ?? [];
                     $homePlayers = $data['home']['players'] ?? [];
 
@@ -254,9 +254,9 @@ class GameBoxscoreControllerTest extends WideUnitTestCase
                         && in_array('Home Player One', $homeNames, true)
                         && in_array('Home Player Two', $homeNames, true);
                 }),
-                $this->isArray(),
+                self::isArray(),
                 200,
-                $this->isArray()
+                self::isArray()
             );
 
         $controller->handle(['uuid' => self::GAME_UUID], [], $responder);

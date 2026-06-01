@@ -13,24 +13,24 @@ class TradeDeclineControllerTest extends WideUnitTestCase
 {
     public function testReturns400WhenOfferIdMissing(): void
     {
-        $controller = new TradeDeclineController($this->mockDb, $this->createStub(TeamIdentityRepositoryInterface::class));
+        $controller = new TradeDeclineController($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
             ->method('error')
-            ->with(400, 'bad_request', $this->stringContains('offerId'));
+            ->with(400, 'bad_request', self::stringContains('offerId'));
 
         $controller->handle([], [], $responder, ['discord_user_id' => '123']);
     }
 
     public function testReturns400WhenDiscordUserIdMissing(): void
     {
-        $controller = new TradeDeclineController($this->mockDb, $this->createStub(TeamIdentityRepositoryInterface::class));
+        $controller = new TradeDeclineController($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
             ->method('error')
-            ->with(400, 'bad_request', $this->stringContains('discord_user_id'));
+            ->with(400, 'bad_request', self::stringContains('discord_user_id'));
 
         $controller->handle(['offerId' => '42'], [], $responder, []);
     }
@@ -39,12 +39,12 @@ class TradeDeclineControllerTest extends WideUnitTestCase
     {
         $this->mockDb->setMockData([]);
 
-        $controller = new TradeDeclineController($this->mockDb, $this->createStub(TeamIdentityRepositoryInterface::class));
+        $controller = new TradeDeclineController($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
             ->method('error')
-            ->with(404, 'not_found', $this->stringContains('not found'));
+            ->with(404, 'not_found', self::stringContains('not found'));
 
         $controller->handle(
             ['offerId' => '999'],
@@ -72,12 +72,12 @@ class TradeDeclineControllerTest extends WideUnitTestCase
             ],
         ]);
 
-        $controller = new TradeDeclineController($this->mockDb, $this->createStub(TeamIdentityRepositoryInterface::class));
+        $controller = new TradeDeclineController($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
             ->method('error')
-            ->with(403, 'forbidden', $this->stringContains('not authorized'));
+            ->with(403, 'forbidden', self::stringContains('not authorized'));
 
         $controller->handle(
             ['offerId' => '42'],

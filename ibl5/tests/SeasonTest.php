@@ -211,7 +211,7 @@ class SeasonTest extends \PHPUnit\Framework\TestCase
     #[\PHPUnit\Framework\Attributes\DataProvider('tradesAllowedProvider')]
     public function testAreTradesAllowed(string $phase, string $allowTrades, bool $expected): void
     {
-        $season = new \Tests\WideUnit\Mocks\Season($this->createStub(\mysqli::class));
+        $season = new \Tests\WideUnit\Mocks\Season(self::createStub(\mysqli::class));
         $season->phase = $phase;
         $season->allowTrades = $allowTrades;
 

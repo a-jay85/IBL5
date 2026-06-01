@@ -366,7 +366,7 @@ class PlrReconstructionServiceTest extends TestCase
         array $teamStats = [],
         array $teamPlayoffStats = [],
     ): PlrBoxScoreRepositoryInterface {
-        $repo = $this->createStub(PlrBoxScoreRepositoryInterface::class);
+        $repo = self::createStub(PlrBoxScoreRepositoryInterface::class);
         $repo->method('sumStatsByGameTypeThroughDate')->willReturnCallback(
             static function (int $seasonYear, int $gameType, string $endDate) use ($regular, $playoffs): array {
                 return $gameType === PlrBoxScoreRepositoryInterface::GAME_TYPE_REGULAR_SEASON

@@ -25,7 +25,7 @@ class DiscordIntegrationTest extends WideUnitTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->mockCommonRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
+        $this->mockCommonRepo = self::createStub(TeamIdentityRepositoryInterface::class);
     }
 
     // ============================================

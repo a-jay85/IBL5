@@ -37,12 +37,12 @@ class WaiversWideUnitTest extends WideUnitTestCase
     {
         parent::setUp();
         $this->repository = new WaiversRepository($this->mockDb);
-        $repoStub = $this->createStub(\Waivers\Contracts\WaiversRepositoryInterface::class);
-        $teamIdentityRepoStub = $this->createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
-        $playerLookupRepoStub = $this->createStub(\Repositories\Contracts\PlayerLookupRepositoryInterface::class);
-        $validatorStub = $this->createStub(\Waivers\Contracts\WaiversValidatorInterface::class);
-        $newsServiceStub = $this->createStub(\Topics\News\NewsRepository::class);
-        $dbStub = $this->createStub(\mysqli::class);
+        $repoStub = self::createStub(\Waivers\Contracts\WaiversRepositoryInterface::class);
+        $teamIdentityRepoStub = self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+        $playerLookupRepoStub = self::createStub(\Repositories\Contracts\PlayerLookupRepositoryInterface::class);
+        $validatorStub = self::createStub(\Waivers\Contracts\WaiversValidatorInterface::class);
+        $newsServiceStub = self::createStub(\Topics\News\NewsRepository::class);
+        $dbStub = self::createStub(\mysqli::class);
         $this->processor = new WaiversProcessor($repoStub, $teamIdentityRepoStub, $playerLookupRepoStub, $validatorStub, $newsServiceStub, $dbStub);
         $this->validator = new WaiversValidator();
 
@@ -793,7 +793,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
      */
     private function createMockSeason(string $phase): Season
     {
-        $stubSeason = $this->createStub(Season::class);
+        $stubSeason = self::createStub(Season::class);
         $stubSeason->phase = $phase;
         $stubSeason->method('isOffseasonPhase')->willReturn(
             $phase === 'Draft' || $phase === 'Free Agency'

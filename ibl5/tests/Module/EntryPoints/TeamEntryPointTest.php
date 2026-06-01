@@ -15,7 +15,7 @@ class TeamEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->onQuery('ibl_schedule', []);
         $this->mockDb->onQuery('ibl_sim_dates', []);
 
-        $lcStub = $this->createStub(\League\LeagueContext::class);
+        $lcStub = self::createStub(\League\LeagueContext::class);
         $lcStub->method('getConfig')->willReturn(['images_path' => 'images/']);
         $GLOBALS['leagueContext'] = $lcStub;
     }

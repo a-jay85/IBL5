@@ -17,7 +17,7 @@ class BackupArchiveLocatorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->stubExtractor = $this->createStub(ArchiveExtractorInterface::class);
+        $this->stubExtractor = self::createStub(ArchiveExtractorInterface::class);
         $this->locator = new BackupArchiveLocator($this->stubExtractor);
 
         $this->tmpDir = sys_get_temp_dir() . '/backup-locator-test-' . uniqid();

@@ -136,7 +136,7 @@ final class MigrationRunnerTest extends TestCase
     public function testRunPendingThrowsOnMissingFile(): void
     {
         // Use a fake file resolver that reports a file that doesn't exist on disk
-        $fakeResolver = $this->createStub(MigrationFileResolver::class);
+        $fakeResolver = self::createStub(MigrationFileResolver::class);
         $fakeResolver->method('getAvailableMigrations')
             ->willReturn(['001_ghost.sql']);
         $fakeResolver->method('getFullPath')
@@ -161,7 +161,7 @@ final class MigrationRunnerTest extends TestCase
 
         try {
             $runner->runPending();
-            $this->fail('Expected RuntimeException');
+            self::fail('Expected RuntimeException');
         } catch (\RuntimeException) {
             // First migration failed, second should not have been attempted
             $this->assertCount(1, $this->executedSql);
@@ -190,7 +190,7 @@ final class MigrationRunnerTest extends TestCase
      */
     private function createStubRepository(bool $failOnSql = false): MigrationRepositoryInterface
     {
-        $stub = $this->createStub(MigrationRepositoryInterface::class);
+        $stub = self::createStub(MigrationRepositoryInterface::class);
 
         $stub->method('getRanMigrations')
             ->willReturnCallback(fn(): array => $this->ranMigrations);

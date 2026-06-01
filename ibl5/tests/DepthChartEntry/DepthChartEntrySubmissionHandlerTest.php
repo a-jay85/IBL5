@@ -27,7 +27,7 @@ class DepthChartEntrySubmissionHandlerTest extends TestCase
     {
         $this->mockDb = new MockDatabase();
         $GLOBALS['mysqli_db'] = $this->mockDb;
-        $this->stubCommonRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
+        $this->stubCommonRepo = self::createStub(TeamIdentityRepositoryInterface::class);
     }
 
     protected function tearDown(): void

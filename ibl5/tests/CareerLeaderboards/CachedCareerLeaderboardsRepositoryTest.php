@@ -59,7 +59,7 @@ final class CachedCareerLeaderboardsRepositoryTest extends TestCase
 
     public function testSortsByRequestedColumnDesc(): void
     {
-        $stubInner = $this->createStub(CareerLeaderboardsRepositoryInterface::class);
+        $stubInner = self::createStub(CareerLeaderboardsRepositoryInterface::class);
         $repository = new CachedCareerLeaderboardsRepository($stubInner, $this->cache);
 
         $rows = [
@@ -79,7 +79,7 @@ final class CachedCareerLeaderboardsRepositoryTest extends TestCase
 
     public function testActiveOnlyFilterExcludesRetiredPlayers(): void
     {
-        $stubInner = $this->createStub(CareerLeaderboardsRepositoryInterface::class);
+        $stubInner = self::createStub(CareerLeaderboardsRepositoryInterface::class);
         $repository = new CachedCareerLeaderboardsRepository($stubInner, $this->cache);
 
         $rows = [
@@ -98,7 +98,7 @@ final class CachedCareerLeaderboardsRepositoryTest extends TestCase
 
     public function testLimitRestrictsResultCount(): void
     {
-        $stubInner = $this->createStub(CareerLeaderboardsRepositoryInterface::class);
+        $stubInner = self::createStub(CareerLeaderboardsRepositoryInterface::class);
         $repository = new CachedCareerLeaderboardsRepository($stubInner, $this->cache);
 
         $rows = $this->createSampleRows();
@@ -111,7 +111,7 @@ final class CachedCareerLeaderboardsRepositoryTest extends TestCase
 
     public function testZeroLimitReturnsAllRows(): void
     {
-        $stubInner = $this->createStub(CareerLeaderboardsRepositoryInterface::class);
+        $stubInner = self::createStub(CareerLeaderboardsRepositoryInterface::class);
         $repository = new CachedCareerLeaderboardsRepository($stubInner, $this->cache);
 
         $rows = $this->createSampleRows();
@@ -166,7 +166,7 @@ final class CachedCareerLeaderboardsRepositoryTest extends TestCase
 
     public function testInvalidateCacheDeletesAllTwelveKeys(): void
     {
-        $stubInner = $this->createStub(CareerLeaderboardsRepositoryInterface::class);
+        $stubInner = self::createStub(CareerLeaderboardsRepositoryInterface::class);
         $repository = new CachedCareerLeaderboardsRepository($stubInner, $this->cache);
 
         // Pre-populate cache
@@ -191,7 +191,7 @@ final class CachedCareerLeaderboardsRepositoryTest extends TestCase
 
     public function testTiesResolveByPidAscAsInt(): void
     {
-        $stubInner = $this->createStub(CareerLeaderboardsRepositoryInterface::class);
+        $stubInner = self::createStub(CareerLeaderboardsRepositoryInterface::class);
         $repository = new CachedCareerLeaderboardsRepository($stubInner, $this->cache);
 
         $rows = [
@@ -210,7 +210,7 @@ final class CachedCareerLeaderboardsRepositoryTest extends TestCase
 
     public function testCombinesActiveFilterSortAndLimit(): void
     {
-        $stubInner = $this->createStub(CareerLeaderboardsRepositoryInterface::class);
+        $stubInner = self::createStub(CareerLeaderboardsRepositoryInterface::class);
         $repository = new CachedCareerLeaderboardsRepository($stubInner, $this->cache);
 
         $rows = [

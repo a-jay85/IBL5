@@ -18,13 +18,13 @@ class WaiversControllerTest extends TestCase
 
     protected function setUp(): void
     {
-        $serviceStub = $this->createStub(WaiversServiceInterface::class);
-        $processorStub = $this->createStub(WaiversProcessorInterface::class);
-        $viewStub = $this->createStub(WaiversViewInterface::class);
-        $teamIdentityRepoStub = $this->createStub(TeamIdentityRepositoryInterface::class);
-        $salaryCapRepoStub = $this->createStub(SalaryCapRepositoryInterface::class);
-        $nukeCompatStub = $this->createStub(\Utilities\NukeCompat::class);
-        $dbStub = $this->createStub(\mysqli::class);
+        $serviceStub = self::createStub(WaiversServiceInterface::class);
+        $processorStub = self::createStub(WaiversProcessorInterface::class);
+        $viewStub = self::createStub(WaiversViewInterface::class);
+        $teamIdentityRepoStub = self::createStub(TeamIdentityRepositoryInterface::class);
+        $salaryCapRepoStub = self::createStub(SalaryCapRepositoryInterface::class);
+        $nukeCompatStub = self::createStub(\Utilities\NukeCompat::class);
+        $dbStub = self::createStub(\mysqli::class);
 
         $this->controller = new WaiversController(
             $serviceStub,

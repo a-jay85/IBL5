@@ -26,10 +26,10 @@ class ImportLeagueConfigStepTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->stubRepo = $this->createStub(LeagueConfigRepository::class);
-        $this->stubService = $this->createStub(LeagueConfigService::class);
-        $this->stubView = $this->createStub(LeagueConfigView::class);
-        $this->stubResolver = $this->createStub(JsbSourceResolverInterface::class);
+        $this->stubRepo = self::createStub(LeagueConfigRepository::class);
+        $this->stubService = self::createStub(LeagueConfigService::class);
+        $this->stubView = self::createStub(LeagueConfigView::class);
+        $this->stubResolver = self::createStub(JsbSourceResolverInterface::class);
     }
 
     public function testImplementsPipelineStepInterface(): void

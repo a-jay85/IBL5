@@ -33,13 +33,13 @@ class TradingControllerSubmitOfferTest extends TestCase
     private function buildController(): TradingController
     {
         return new TradingController(
-            $this->createStub(TradingServiceInterface::class),
-            $this->createStub(TradeProcessorInterface::class),
-            $this->createStub(TradeOfferRepositoryInterface::class),
-            $this->createStub(TradeOfferInterface::class),
-            $this->createStub(TradingViewInterface::class),
-            $this->createStub(TeamIdentityRepositoryInterface::class),
-            $this->createStub(\Utilities\NukeCompat::class),
+            self::createStub(TradingServiceInterface::class),
+            self::createStub(TradeProcessorInterface::class),
+            self::createStub(TradeOfferRepositoryInterface::class),
+            self::createStub(TradeOfferInterface::class),
+            self::createStub(TradingViewInterface::class),
+            self::createStub(TeamIdentityRepositoryInterface::class),
+            self::createStub(\Utilities\NukeCompat::class),
             $this->mockDb,
         );
     }

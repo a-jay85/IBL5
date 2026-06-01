@@ -255,7 +255,7 @@ class SchFileParserTest extends TestCase
     {
         $schFile = dirname(__DIR__, 2) . '/IBL5.sch';
         if (!file_exists($schFile)) {
-            $this->fail("Test .sch file not found at: {$schFile}");
+            self::fail("Test .sch file not found at: {$schFile}");
         }
 
         $data = file_get_contents($schFile);
@@ -279,7 +279,7 @@ class SchFileParserTest extends TestCase
     {
         $schFile = dirname(__DIR__, 2) . '/IBL5.sch';
         if (!file_exists($schFile)) {
-            $this->fail("Test .sch file not found at: {$schFile}");
+            self::fail("Test .sch file not found at: {$schFile}");
         }
 
         $games = SchFileParser::parseFile($schFile);
@@ -315,7 +315,7 @@ class SchFileParserTest extends TestCase
     {
         $schFile = dirname(__DIR__, 2) . '/IBL5.sch';
         if (!file_exists($schFile)) {
-            $this->fail("Test .sch file not found at: {$schFile}");
+            self::fail("Test .sch file not found at: {$schFile}");
         }
 
         $games = SchFileParser::parseFile($schFile);
@@ -347,7 +347,7 @@ class SchFileParserTest extends TestCase
     {
         $schFile = dirname(__DIR__, 2) . '/IBL5.sch';
         if (!file_exists($schFile)) {
-            $this->fail("Test .sch file not found at: {$schFile}");
+            self::fail("Test .sch file not found at: {$schFile}");
         }
 
         $games = SchFileParser::parseFile($schFile);
@@ -364,7 +364,7 @@ class SchFileParserTest extends TestCase
     {
         $schFile = dirname(__DIR__, 2) . '/IBL5.sch';
         if (!file_exists($schFile)) {
-            $this->fail("Test .sch file not found at: {$schFile}");
+            self::fail("Test .sch file not found at: {$schFile}");
         }
 
         $games = SchFileParser::parseFile($schFile);

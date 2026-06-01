@@ -15,7 +15,7 @@ final class SeasonLeaderboardsServiceTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->stubRepo = $this->createStub(SeasonLeaderboardsRepositoryInterface::class);
+        $this->stubRepo = self::createStub(SeasonLeaderboardsRepositoryInterface::class);
         $this->stubRepo->method('getSeasonLeaders')
             ->willReturn(['results' => [], 'count' => 0]);
         $this->service = new SeasonLeaderboardsService($this->stubRepo);
@@ -26,7 +26,7 @@ final class SeasonLeaderboardsServiceTest extends TestCase
      */
     private function buildServiceWithRows(array $rows): SeasonLeaderboardsService
     {
-        $stub = $this->createStub(SeasonLeaderboardsRepositoryInterface::class);
+        $stub = self::createStub(SeasonLeaderboardsRepositoryInterface::class);
         $stub->method('getSeasonLeaders')
             ->willReturn(['results' => $rows, 'count' => count($rows)]);
         return new SeasonLeaderboardsService($stub);

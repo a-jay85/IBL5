@@ -11,7 +11,7 @@ class YourAccountRepositoryTest extends TestCase
 {
     public function testRepositoryCanBeInstantiated(): void
     {
-        $stub = $this->createStub(\mysqli::class);
+        $stub = self::createStub(\mysqli::class);
         $repo = new YourAccountRepository($stub);
         $this->assertInstanceOf(YourAccountRepository::class, $repo);
     }

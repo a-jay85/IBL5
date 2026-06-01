@@ -92,7 +92,7 @@ final class CachedRecordHoldersServiceTest extends TestCase
 
     public function testInvalidateCacheDeletesCacheEntry(): void
     {
-        $stubInner = $this->createStub(RecordHoldersServiceInterface::class);
+        $stubInner = self::createStub(RecordHoldersServiceInterface::class);
         $service = new CachedRecordHoldersService($stubInner, $this->cache);
 
         $records = $this->createSampleRecords();

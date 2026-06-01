@@ -18,7 +18,7 @@ class DraftRepositoryTest extends TestCase
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->mockCommonRepository = $this->createStub(TeamIdentityRepositoryInterface::class);
+        $this->mockCommonRepository = self::createStub(TeamIdentityRepositoryInterface::class);
         $this->mockCommonRepository->method('getTidFromTeamname')->willReturn(1);
         $this->repository = new DraftRepository($this->mockDb, $this->mockCommonRepository);
     }
@@ -196,7 +196,7 @@ class DraftRepositoryTest extends TestCase
 
     public function testCreatePlayerFromDraftClassReturnsFalseWhenTeamNotFound(): void
     {
-        $stubNoTeam = $this->createStub(TeamIdentityRepositoryInterface::class);
+        $stubNoTeam = self::createStub(TeamIdentityRepositoryInterface::class);
         $stubNoTeam->method('getTidFromTeamname')->willReturn(null);
         $repository = new DraftRepository($this->mockDb, $stubNoTeam);
 

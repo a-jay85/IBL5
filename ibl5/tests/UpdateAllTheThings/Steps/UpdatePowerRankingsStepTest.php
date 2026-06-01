@@ -13,7 +13,7 @@ class UpdatePowerRankingsStepTest extends TestCase
 {
     public function testImplementsPipelineStepInterface(): void
     {
-        $stubUpdater = $this->createStub(PowerRankingsUpdater::class);
+        $stubUpdater = self::createStub(PowerRankingsUpdater::class);
         $step = new UpdatePowerRankingsStep($stubUpdater);
 
         $this->assertInstanceOf(PipelineStepInterface::class, $step);
@@ -21,7 +21,7 @@ class UpdatePowerRankingsStepTest extends TestCase
 
     public function testGetLabelReturnsExpectedLabel(): void
     {
-        $stubUpdater = $this->createStub(PowerRankingsUpdater::class);
+        $stubUpdater = self::createStub(PowerRankingsUpdater::class);
         $step = new UpdatePowerRankingsStep($stubUpdater);
 
         $this->assertSame('Power rankings updated', $step->getLabel());
@@ -41,7 +41,7 @@ class UpdatePowerRankingsStepTest extends TestCase
 
     public function testExecuteCapturesOutputBufferLog(): void
     {
-        $stubUpdater = $this->createStub(PowerRankingsUpdater::class);
+        $stubUpdater = self::createStub(PowerRankingsUpdater::class);
         $stubUpdater->method('update')->willReturnCallback(static function (): void {
             echo '<p>Calculating power rankings...</p>';
         });

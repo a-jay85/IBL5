@@ -14,7 +14,7 @@ final class AuthServiceUsernameTest extends TestCase
 
     protected function setUp(): void
     {
-        $stubRepo = $this->createStub(AuthRepositoryInterface::class);
+        $stubRepo = self::createStub(AuthRepositoryInterface::class);
         $this->authService = new AuthService($stubRepo);
 
         if (session_status() === PHP_SESSION_NONE) {

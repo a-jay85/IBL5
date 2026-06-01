@@ -57,7 +57,7 @@ class SeasonControllerTest extends WideUnitTestCase
         $responder->expects($this->once())
             ->method('success')
             ->with(
-                $this->callback(function (array $data): bool {
+                self::callback(function (array $data): bool {
                     return $data['phase'] === self::PHASE
                         && $data['last_sim']['number'] === self::SIM_NUMBER
                         && $data['last_sim']['phase_sim_number'] === self::PHASE_SIM_NUMBER
@@ -65,9 +65,9 @@ class SeasonControllerTest extends WideUnitTestCase
                         && $data['last_sim']['end_date'] === self::SIM_END_DATE
                         && $data['projected_next_sim_end_date'] === self::PROJECTED_NEXT_SIM_END_DATE;
                 }),
-                $this->isArray(),
+                self::isArray(),
                 200,
-                $this->isArray()
+                self::isArray()
             );
 
         $controller->handle([], [], $responder);
@@ -99,10 +99,10 @@ class SeasonControllerTest extends WideUnitTestCase
         $responder->expects($this->once())
             ->method('success')
             ->with(
-                $this->isArray(),
-                $this->isArray(),
+                self::isArray(),
+                self::isArray(),
                 200,
-                $this->callback(function (array $headers) use ($expectedTag): bool {
+                self::callback(function (array $headers) use ($expectedTag): bool {
                     return isset($headers['ETag'])
                         && $headers['ETag'] === $expectedTag
                         && $headers['Cache-Control'] === 'public, max-age=60';

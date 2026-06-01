@@ -15,7 +15,7 @@ class LeagueScheduleServiceTest extends TestCase
 {
     public function testImplementsInterface(): void
     {
-        $mockRepo = $this->createStub(LeagueScheduleRepositoryInterface::class);
+        $mockRepo = self::createStub(LeagueScheduleRepositoryInterface::class);
         $service = new LeagueScheduleService($mockRepo);
 
         $this->assertInstanceOf(LeagueScheduleServiceInterface::class, $service);
@@ -23,18 +23,18 @@ class LeagueScheduleServiceTest extends TestCase
 
     public function testGetSchedulePageDataReturnsExpectedStructure(): void
     {
-        $mockRepo = $this->createStub(LeagueScheduleRepositoryInterface::class);
+        $mockRepo = self::createStub(LeagueScheduleRepositoryInterface::class);
         $mockRepo->method('getAllGamesWithBoxScoreInfo')->willReturn([]);
         $mockRepo->method('getTeamRecords')->willReturn([]);
 
-        $season = $this->createStub(Season::class);
+        $season = self::createStub(Season::class);
         $season->projectedNextSimEndDate = new \DateTime('2025-11-15');
         $season->phase = 'Regular Season';
 
-        $league = $this->createStub(League::class);
+        $league = self::createStub(League::class);
         $league->method('getSimLengthInDays')->willReturn(7);
 
-        $commonRepo = $this->createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+        $commonRepo = self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
 
         $service = new LeagueScheduleService($mockRepo);
         $result = $service->getSchedulePageData($season, $league, $commonRepo);
@@ -53,7 +53,7 @@ class LeagueScheduleServiceTest extends TestCase
 
     public function testOrganizesGamesByMonth(): void
     {
-        $mockRepo = $this->createStub(LeagueScheduleRepositoryInterface::class);
+        $mockRepo = self::createStub(LeagueScheduleRepositoryInterface::class);
         $mockRepo->method('getAllGamesWithBoxScoreInfo')->willReturn([
             [
                 'id' => 1,
@@ -83,14 +83,14 @@ class LeagueScheduleServiceTest extends TestCase
             4 => '18-17',
         ]);
 
-        $season = $this->createStub(Season::class);
+        $season = self::createStub(Season::class);
         $season->projectedNextSimEndDate = new \DateTime('2025-10-15');
         $season->phase = 'Regular Season';
 
-        $league = $this->createStub(League::class);
+        $league = self::createStub(League::class);
         $league->method('getSimLengthInDays')->willReturn(7);
 
-        $commonRepo = $this->createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+        $commonRepo = self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
         $commonRepo->method('getTeamnameFromTeamID')->willReturnMap([
             [1, 'Team A'],
             [2, 'Team B'],
@@ -109,7 +109,7 @@ class LeagueScheduleServiceTest extends TestCase
 
     public function testIdentifiesUpcomingGames(): void
     {
-        $mockRepo = $this->createStub(LeagueScheduleRepositoryInterface::class);
+        $mockRepo = self::createStub(LeagueScheduleRepositoryInterface::class);
         $mockRepo->method('getAllGamesWithBoxScoreInfo')->willReturn([
             [
                 'id' => 1,
@@ -124,14 +124,14 @@ class LeagueScheduleServiceTest extends TestCase
         ]);
         $mockRepo->method('getTeamRecords')->willReturn([]);
 
-        $season = $this->createStub(Season::class);
+        $season = self::createStub(Season::class);
         $season->projectedNextSimEndDate = new \DateTime('2025-11-15');
         $season->phase = 'Regular Season';
 
-        $league = $this->createStub(League::class);
+        $league = self::createStub(League::class);
         $league->method('getSimLengthInDays')->willReturn(7);
 
-        $commonRepo = $this->createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+        $commonRepo = self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
         $commonRepo->method('getTeamnameFromTeamID')->willReturn('Team');
 
         $service = new LeagueScheduleService($mockRepo);
@@ -145,7 +145,7 @@ class LeagueScheduleServiceTest extends TestCase
 
     public function testPlayoffPhaseReordersMonths(): void
     {
-        $mockRepo = $this->createStub(LeagueScheduleRepositoryInterface::class);
+        $mockRepo = self::createStub(LeagueScheduleRepositoryInterface::class);
         $mockRepo->method('getAllGamesWithBoxScoreInfo')->willReturn([
             [
                 'id' => 1,
@@ -170,14 +170,14 @@ class LeagueScheduleServiceTest extends TestCase
         ]);
         $mockRepo->method('getTeamRecords')->willReturn([]);
 
-        $season = $this->createStub(Season::class);
+        $season = self::createStub(Season::class);
         $season->projectedNextSimEndDate = new \DateTime('2025-10-15');
         $season->phase = 'Playoffs';
 
-        $league = $this->createStub(League::class);
+        $league = self::createStub(League::class);
         $league->method('getSimLengthInDays')->willReturn(7);
 
-        $commonRepo = $this->createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+        $commonRepo = self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
         $commonRepo->method('getTeamnameFromTeamID')->willReturn('Team');
 
         $service = new LeagueScheduleService($mockRepo);
@@ -194,7 +194,7 @@ class LeagueScheduleServiceTest extends TestCase
 
     public function testVisitorWonAndHomeWonFlags(): void
     {
-        $mockRepo = $this->createStub(LeagueScheduleRepositoryInterface::class);
+        $mockRepo = self::createStub(LeagueScheduleRepositoryInterface::class);
         $mockRepo->method('getAllGamesWithBoxScoreInfo')->willReturn([
             [
                 'id' => 1,
@@ -209,14 +209,14 @@ class LeagueScheduleServiceTest extends TestCase
         ]);
         $mockRepo->method('getTeamRecords')->willReturn([]);
 
-        $season = $this->createStub(Season::class);
+        $season = self::createStub(Season::class);
         $season->projectedNextSimEndDate = new \DateTime('2025-10-15');
         $season->phase = 'Regular Season';
 
-        $league = $this->createStub(League::class);
+        $league = self::createStub(League::class);
         $league->method('getSimLengthInDays')->willReturn(7);
 
-        $commonRepo = $this->createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+        $commonRepo = self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
         $commonRepo->method('getTeamnameFromTeamID')->willReturn('Team');
 
         $service = new LeagueScheduleService($mockRepo);
@@ -236,15 +236,15 @@ class LeagueScheduleServiceTest extends TestCase
             ->willReturn([]);
         $mockRepo->method('getTeamRecords')->willReturn([]);
 
-        $season = $this->createStub(Season::class);
+        $season = self::createStub(Season::class);
         $season->endingYear = 2026;
         $season->projectedNextSimEndDate = new \DateTime('2025-11-15');
         $season->phase = 'Regular Season';
 
-        $league = $this->createStub(League::class);
+        $league = self::createStub(League::class);
         $league->method('getSimLengthInDays')->willReturn(7);
 
-        $commonRepo = $this->createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+        $commonRepo = self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
 
         $service = new LeagueScheduleService($mockRepo);
         $service->getSchedulePageData($season, $league, $commonRepo);
@@ -252,18 +252,18 @@ class LeagueScheduleServiceTest extends TestCase
 
     public function testRegularSeasonIsNotPlayoffPhase(): void
     {
-        $mockRepo = $this->createStub(LeagueScheduleRepositoryInterface::class);
+        $mockRepo = self::createStub(LeagueScheduleRepositoryInterface::class);
         $mockRepo->method('getAllGamesWithBoxScoreInfo')->willReturn([]);
         $mockRepo->method('getTeamRecords')->willReturn([]);
 
-        $season = $this->createStub(Season::class);
+        $season = self::createStub(Season::class);
         $season->projectedNextSimEndDate = new \DateTime('2025-11-15');
         $season->phase = 'Regular Season';
 
-        $league = $this->createStub(League::class);
+        $league = self::createStub(League::class);
         $league->method('getSimLengthInDays')->willReturn(7);
 
-        $commonRepo = $this->createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+        $commonRepo = self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
 
         $service = new LeagueScheduleService($mockRepo);
         $result = $service->getSchedulePageData($season, $league, $commonRepo);

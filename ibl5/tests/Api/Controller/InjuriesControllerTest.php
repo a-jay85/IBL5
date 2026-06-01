@@ -32,7 +32,7 @@ class InjuriesControllerTest extends WideUnitTestCase
         $responder->expects($this->once())
             ->method('success')
             ->with(
-                $this->callback(function (array $data): bool {
+                self::callback(function (array $data): bool {
                     if (count($data) !== 1) {
                         return false;
                     }
@@ -41,11 +41,11 @@ class InjuriesControllerTest extends WideUnitTestCase
                         && $first['player']['name'] === 'Kevin Martin'
                         && $first['injury']['days_remaining'] === 5;
                 }),
-                $this->callback(function (array $meta): bool {
+                self::callback(function (array $meta): bool {
                     return ($meta['total'] ?? 0) === 1;
                 }),
                 200,
-                $this->isArray()
+                self::isArray()
             );
 
         $controller->handle([], [], $responder);
@@ -62,11 +62,11 @@ class InjuriesControllerTest extends WideUnitTestCase
             ->method('success')
             ->with(
                 [],
-                $this->callback(function (array $meta): bool {
+                self::callback(function (array $meta): bool {
                     return ($meta['total'] ?? -1) === 0;
                 }),
                 200,
-                $this->isArray()
+                self::isArray()
             );
 
         $controller->handle([], [], $responder);

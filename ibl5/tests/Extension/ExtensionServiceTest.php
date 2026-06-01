@@ -270,7 +270,7 @@ class ExtensionServiceTest extends TestCase
         ]);
         $this->mockDb->setMockData([$mockData]);
 
-        $stubTeamQueryRepo = $this->createStub(TeamQueryRepositoryInterface::class);
+        $stubTeamQueryRepo = self::createStub(TeamQueryRepositoryInterface::class);
 
         $playerRow = $mockData;
         $playerRow['pid'] = $extendedPlayerPid;

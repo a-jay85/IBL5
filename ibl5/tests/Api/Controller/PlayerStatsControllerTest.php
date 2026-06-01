@@ -19,7 +19,7 @@ class PlayerStatsControllerTest extends WideUnitTestCase
 
         $responder->expects($this->once())
             ->method('error')
-            ->with(404, 'not_found', $this->anything());
+            ->with(404, 'not_found', self::anything());
 
         $controller->handle(['uuid' => 'nonexistent-uuid'], [], $responder);
     }
@@ -61,15 +61,15 @@ class PlayerStatsControllerTest extends WideUnitTestCase
         $responder->expects($this->once())
             ->method('success')
             ->with(
-                $this->callback(function (array $data): bool {
+                self::callback(function (array $data): bool {
                     return $data['uuid'] === 'player-uuid-123'
                         && $data['career_totals']['games'] === 500
                         && $data['career_averages']['points_per_game'] === 24.0
                         && $data['draft']['year'] === 2010;
                 }),
-                $this->isArray(),
+                self::isArray(),
                 200,
-                $this->isArray()
+                self::isArray()
             );
 
         $controller->handle(['uuid' => 'player-uuid-123'], [], $responder);

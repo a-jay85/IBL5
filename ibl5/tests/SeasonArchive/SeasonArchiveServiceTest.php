@@ -402,7 +402,7 @@ class SeasonArchiveServiceTest extends TestCase
         // Verify that getPlayerIdsByNames is called with all collected names
         $this->mockRepository->expects($this->once())
             ->method('getPlayerIdsByNames')
-            ->with($this->callback(static function (array $names): bool {
+            ->with(self::callback(static function (array $names): bool {
                 return in_array('MVP Player', $names, true)
                     && in_array('Team Player', $names, true)
                     && in_array('Roster Player', $names, true);
@@ -444,7 +444,7 @@ class SeasonArchiveServiceTest extends TestCase
 
         $this->mockRepository->expects($this->once())
             ->method('getPlayerIdsByNames')
-            ->with($this->callback(static function (array $names) use ($expectedNames): bool {
+            ->with(self::callback(static function (array $names) use ($expectedNames): bool {
                 foreach ($expectedNames as $expected) {
                     if (!in_array($expected, $names, true)) {
                         return false;
@@ -460,7 +460,7 @@ class SeasonArchiveServiceTest extends TestCase
 
     public function testAccumulatorResetsBetweenCalls(): void
     {
-        $stubRepo = $this->createStub(SeasonArchiveRepositoryInterface::class);
+        $stubRepo = self::createStub(SeasonArchiveRepositoryInterface::class);
         $stubRepo->method('getTeamConferences')->willReturn([]);
         $stubRepo->method('getPlayoffResultsByYear')->willReturn([]);
         $stubRepo->method('getTeamAwardsByYear')->willReturn([]);

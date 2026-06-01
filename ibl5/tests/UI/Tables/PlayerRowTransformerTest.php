@@ -15,7 +15,7 @@ class PlayerRowTransformerTest extends TestCase
 {
     public function testResolveWithStatsReturnsEmptyForEmptyInput(): void
     {
-        $db = $this->createStub(\mysqli::class);
+        $db = self::createStub(\mysqli::class);
 
         $result = PlayerRowTransformer::resolveWithStats($db, [], '');
 
@@ -24,7 +24,7 @@ class PlayerRowTransformerTest extends TestCase
 
     public function testResolvePlayersReturnsEmptyForEmptyInput(): void
     {
-        $db = $this->createStub(\mysqli::class);
+        $db = self::createStub(\mysqli::class);
 
         $result = PlayerRowTransformer::resolvePlayers($db, [], '');
 
@@ -33,9 +33,9 @@ class PlayerRowTransformerTest extends TestCase
 
     public function testResolvePlayersFiltersOutPipeNames(): void
     {
-        $db = $this->createStub(\mysqli::class);
+        $db = self::createStub(\mysqli::class);
 
-        $player = $this->createStub(Player::class);
+        $player = self::createStub(Player::class);
         $player->method('getName')->willReturn('|Placeholder');
 
         $result = PlayerRowTransformer::resolvePlayers($db, [$player], '');
@@ -45,9 +45,9 @@ class PlayerRowTransformerTest extends TestCase
 
     public function testResolvePlayersAcceptsPlayerInstances(): void
     {
-        $db = $this->createStub(\mysqli::class);
+        $db = self::createStub(\mysqli::class);
 
-        $player = $this->createStub(Player::class);
+        $player = self::createStub(Player::class);
         $player->method('getName')->willReturn('John Doe');
 
         $result = PlayerRowTransformer::resolvePlayers($db, [$player], '');
@@ -58,7 +58,7 @@ class PlayerRowTransformerTest extends TestCase
 
     public function testResolveWithStatsSkipsNonArrayNonPlayerForCurrentSeason(): void
     {
-        $db = $this->createStub(\mysqli::class);
+        $db = self::createStub(\mysqli::class);
 
         // Pass an iterable with a non-array/non-Player element
         $result = PlayerRowTransformer::resolveWithStats($db, [new \stdClass()], '');
@@ -68,9 +68,9 @@ class PlayerRowTransformerTest extends TestCase
 
     public function testResolvePlayersSkipsNonArrayForHistorical(): void
     {
-        $db = $this->createStub(\mysqli::class);
+        $db = self::createStub(\mysqli::class);
 
-        $player = $this->createStub(Player::class);
+        $player = self::createStub(Player::class);
 
         // For historical ($yr !== ""), non-array items should be skipped
         $result = PlayerRowTransformer::resolvePlayers($db, [$player], '2024');
@@ -80,9 +80,9 @@ class PlayerRowTransformerTest extends TestCase
 
     public function testResolveWithStatsSkipsNonArrayForHistorical(): void
     {
-        $db = $this->createStub(\mysqli::class);
+        $db = self::createStub(\mysqli::class);
 
-        $player = $this->createStub(Player::class);
+        $player = self::createStub(Player::class);
 
         // For historical ($yr !== ""), non-array items should be skipped
         $result = PlayerRowTransformer::resolveWithStats($db, [$player], '2024');

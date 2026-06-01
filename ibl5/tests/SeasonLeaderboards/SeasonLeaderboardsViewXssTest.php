@@ -15,7 +15,7 @@ final class SeasonLeaderboardsViewXssTest extends TestCase
 
     protected function setUp(): void
     {
-        $stubRepo = $this->createStub(SeasonLeaderboardsRepositoryInterface::class);
+        $stubRepo = self::createStub(SeasonLeaderboardsRepositoryInterface::class);
         $service = new SeasonLeaderboardsService($stubRepo);
         $this->view = new SeasonLeaderboardsView($service);
     }

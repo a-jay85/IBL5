@@ -43,6 +43,7 @@ test.describe('Engine shadow: out-of-band spawn on admin update', () => {
     const readyResp = await request.get('test-state.php?action=engine-binary-ready');
     expect(readyResp.ok()).toBeTruthy();
     const { ready } = (await readyResp.json()) as { ready: boolean };
+    // e2e-hygiene-allow: integration-availability skip — the prebaked :latest image may predate the NDJSON engine binary; green-or-skip until master rebuilds (cf. reference_prebaked_php_image_rebuild_lag)
     test.skip(!ready, 'jsbsim binary not installed in this image (prebaked :latest may predate it)');
 
     const before = await countShadowRows(request);
@@ -64,6 +65,7 @@ test.describe('Engine shadow: out-of-band spawn on admin update', () => {
     }
 
     // Green-or-skip: no rows ⇒ binary stale/absent or seed has no unplayed games.
+    // e2e-hygiene-allow: best-effort spawn net — a present-but-stale binary or a seed with no unplayed games yields no rows; skip rather than red (DB-integration RunService tests are the primary coverage)
     test.skip(
       after.players <= before.players,
       'shadow rows never landed — binary stale/absent or seed has no unplayed games',

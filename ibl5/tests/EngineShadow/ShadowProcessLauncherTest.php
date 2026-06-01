@@ -107,6 +107,7 @@ final class ShadowProcessLauncherTest extends TestCase
     public function launchReturnsImmediatelyWhileChildRunsDetached(): void
     {
         if (!is_file('/usr/bin/setsid') || !is_file('/usr/local/bin/php')) {
+            // phpunit-hygiene-allow: integration-availability skip — real setsid+php-cli exist only in the Linux container/CI, not the macOS host; runs for real in CI
             self::markTestSkipped('Real-spawn detachment proof requires Linux setsid + php-cli (CI/container only).');
         }
 

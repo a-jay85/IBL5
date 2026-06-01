@@ -11,8 +11,8 @@ use Tests\WideUnit\Mocks\MockDatabase;
 
 class DraftRepositoryTest extends TestCase
 {
-    private $repository;
-    private $mockDb;
+    private DraftRepository $repository;
+    private MockDatabase $mockDb;
     private TeamIdentityRepositoryInterface $mockCommonRepository;
 
     protected function setUp(): void
@@ -23,7 +23,7 @@ class DraftRepositoryTest extends TestCase
         $this->repository = new DraftRepository($this->mockDb, $this->mockCommonRepository);
     }
 
-    public function testGetCurrentDraftSelectionReturnsPlayerName()
+    public function testGetCurrentDraftSelectionReturnsPlayerName(): void
     {
         $this->mockDb->setMockData([
             ['player' => 'John Doe']
@@ -34,7 +34,7 @@ class DraftRepositoryTest extends TestCase
         $this->assertEquals('John Doe', $result);
     }
 
-    public function testGetCurrentDraftSelectionReturnsNullWhenNoResults()
+    public function testGetCurrentDraftSelectionReturnsNullWhenNoResults(): void
     {
         $this->mockDb->setMockData([]);
         $this->mockDb->setNumRows(0);
@@ -44,7 +44,7 @@ class DraftRepositoryTest extends TestCase
         $this->assertNull($result);
     }
 
-    public function testUpdateDraftTableExecutesCorrectQuery()
+    public function testUpdateDraftTableExecutesCorrectQuery(): void
     {
         $this->mockDb->setReturnTrue(true);
 
@@ -63,7 +63,7 @@ class DraftRepositoryTest extends TestCase
         $this->assertStringContainsString('2024-01-15 10:30:00', $queries[0]);
     }
 
-    public function testUpdateDraftTableHandlesApostrophes()
+    public function testUpdateDraftTableHandlesApostrophes(): void
     {
         $this->mockDb->setReturnTrue(true);
 
@@ -79,7 +79,7 @@ class DraftRepositoryTest extends TestCase
         $this->assertStringContainsString("D\\'Angelo Russell", $queries[0]);
     }
 
-    public function testUpdateRookieTableExecutesCorrectQuery()
+    public function testUpdateRookieTableExecutesCorrectQuery(): void
     {
         $this->mockDb->setReturnTrue(true);
 
@@ -100,7 +100,7 @@ class DraftRepositoryTest extends TestCase
     // Tests for getTeamDiscordID have been moved to CommonRepositoryTest
     // as this method now delegates to CommonRepository
 
-    public function testIsPlayerAlreadyDraftedReturnsTrueWhenDrafted()
+    public function testIsPlayerAlreadyDraftedReturnsTrueWhenDrafted(): void
     {
         // ibl_draft_class.drafted is INT(11); native types return PHP int.
         $this->mockDb->setMockData([
@@ -112,7 +112,7 @@ class DraftRepositoryTest extends TestCase
         $this->assertTrue($result);
     }
 
-    public function testIsPlayerAlreadyDraftedReturnsFalseWhenNotDrafted()
+    public function testIsPlayerAlreadyDraftedReturnsFalseWhenNotDrafted(): void
     {
         $this->mockDb->setMockData([
             ['drafted' => '0']
@@ -123,7 +123,7 @@ class DraftRepositoryTest extends TestCase
         $this->assertFalse($result);
     }
 
-    public function testIsPlayerAlreadyDraftedReturnsFalseWhenPlayerNotFound()
+    public function testIsPlayerAlreadyDraftedReturnsFalseWhenPlayerNotFound(): void
     {
         $this->mockDb->setMockData([]);
         $this->mockDb->setNumRows(0);
@@ -133,7 +133,7 @@ class DraftRepositoryTest extends TestCase
         $this->assertFalse($result);
     }
 
-    public function testIsPlayerAlreadyDraftedEscapesPlayerName()
+    public function testIsPlayerAlreadyDraftedEscapesPlayerName(): void
     {
         $this->mockDb->setMockData([
             ['drafted' => '0']
@@ -146,7 +146,7 @@ class DraftRepositoryTest extends TestCase
         $this->assertStringContainsString('ibl_draft_class', $queries[0]);
     }
 
-    public function testCreatePlayerFromDraftClassSucceeds()
+    public function testCreatePlayerFromDraftClassSucceeds(): void
     {
         // Set up mock to return different data for different queries
         // First call: team ID lookup returns teamid
@@ -194,7 +194,7 @@ class DraftRepositoryTest extends TestCase
         $this->assertTrue($hasInsertQuery);
     }
 
-    public function testCreatePlayerFromDraftClassReturnsFalseWhenTeamNotFound()
+    public function testCreatePlayerFromDraftClassReturnsFalseWhenTeamNotFound(): void
     {
         $stubNoTeam = $this->createStub(TeamIdentityRepositoryInterface::class);
         $stubNoTeam->method('getTidFromTeamname')->willReturn(null);
@@ -205,7 +205,7 @@ class DraftRepositoryTest extends TestCase
         $this->assertFalse($result);
     }
 
-    public function testCreatePlayerFromDraftClassHandlesApostrophes()
+    public function testCreatePlayerFromDraftClassHandlesApostrophes(): void
     {
         $draftClassData = [
             'name' => "D'Angelo Russell",
@@ -246,7 +246,7 @@ class DraftRepositoryTest extends TestCase
         $this->assertStringContainsString("D\\'Angelo Russell", $insertQuery);
     }
 
-    public function testCreatePlayerFromDraftClassTruncatesLongNames()
+    public function testCreatePlayerFromDraftClassTruncatesLongNames(): void
     {
         $longName = 'Christopher Emmanuel Paul Jr. III';
         $draftClassData = [
@@ -291,7 +291,7 @@ class DraftRepositoryTest extends TestCase
         $this->assertStringContainsString($truncatedName, $insertQuery);
     }
 
-    public function testCreatePlayerFromDraftClassReturnsFalseWhenPlayerNotInDraftClass()
+    public function testCreatePlayerFromDraftClassReturnsFalseWhenPlayerNotInDraftClass(): void
     {
         // Mock CommonRepository getTidFromTeamname to return valid team ID
         // But then mock the draft class query to return no results

@@ -10,20 +10,20 @@ use Tests\WideUnit\Mocks\MockDatabase;
 
 class WaiversRepositoryTest extends TestCase
 {
-    private $mockDb;
-    private $repository;
-    
+    private MockDatabase $mockDb;
+    private WaiversRepository $repository;
+
     protected function setUp(): void
     {
         // Create MockDatabase that duck-types mysqli for testing
         $this->mockDb = new MockDatabase();
         $this->repository = new WaiversRepository($this->mockDb);
     }
-    
+
     // Tests for getUserByUsername, getTeamByName, getTeamTotalSalary, and getPlayerByID
     // have been moved to CommonRepositoryTest as these methods now delegate to CommonRepository
-    
-    public function testDropPlayerToWaiversExecutesCorrectQuery()
+
+    public function testDropPlayerToWaiversExecutesCorrectQuery(): void
     {
         $this->mockDb->setReturnTrue(true);
         
@@ -41,7 +41,7 @@ class WaiversRepositoryTest extends TestCase
         $this->assertStringContainsString('WHERE pid = 123', $queries[0]);
     }
     
-    public function testSignPlayerFromWaiversWithNewContract()
+    public function testSignPlayerFromWaiversWithNewContract(): void
     {
         $this->mockDb->setReturnTrue(true);
         
@@ -76,7 +76,7 @@ class WaiversRepositoryTest extends TestCase
         $this->assertStringContainsString('= 0', $queries[0]);
     }
     
-    public function testSignPlayerFromWaiversWithExistingContract()
+    public function testSignPlayerFromWaiversWithExistingContract(): void
     {
         $this->mockDb->setReturnTrue(true);
         
@@ -106,7 +106,7 @@ class WaiversRepositoryTest extends TestCase
         $this->assertStringNotContainsString('salary_yr1', $queries[0]);
     }
     
-    public function testSignPlayerFromWaiversWithNewContractDuringFreeAgency()
+    public function testSignPlayerFromWaiversWithNewContractDuringFreeAgency(): void
     {
         $this->mockDb->setReturnTrue(true);
         

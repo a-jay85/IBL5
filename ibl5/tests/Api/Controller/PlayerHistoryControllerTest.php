@@ -14,6 +14,9 @@ class PlayerHistoryControllerTest extends WideUnitTestCase
     private const UPDATED_AT_1 = '2026-05-01 12:00:00';
     private const UPDATED_AT_2 = '2025-05-01 12:00:00';
 
+    /**
+     * @return array<string, mixed>
+     */
     private function historyRow(int $year, string $updatedAt): array
     {
         return [
@@ -47,6 +50,9 @@ class PlayerHistoryControllerTest extends WideUnitTestCase
         ];
     }
 
+    /**
+     * @return list<array<string, mixed>>
+     */
     private function twoHistoryRows(): array
     {
         return [

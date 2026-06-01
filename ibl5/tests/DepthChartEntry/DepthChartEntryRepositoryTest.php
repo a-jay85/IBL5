@@ -263,7 +263,7 @@ class DepthChartEntryRepositoryTest extends TestCase
      * Documents the required field-to-column correspondence for the UPDATE query.
      * Role columns (dc_of, dc_df, dc_oi, dc_di, dc_bh) are hardcoded to 0 in SQL.
      */
-    public function testDatabaseUpdateQueryMapsFieldsCorrectly()
+    public function testDatabaseUpdateQueryMapsFieldsCorrectly(): void
     {
         // The processed data uses these lowercase keys for bound parameters
         $boundFields = [
@@ -320,7 +320,7 @@ class DepthChartEntryRepositoryTest extends TestCase
     /**
      * Tests that role columns are hardcoded to 0 — they no longer receive bound values.
      */
-    public function testRoleColumnsAreHardcodedToZeroInSql()
+    public function testRoleColumnsAreHardcodedToZeroInSql(): void
     {
         // The processed data no longer includes of/df/oi/di/bh as bound params
         $depthChartValues = [
@@ -356,7 +356,7 @@ class DepthChartEntryRepositoryTest extends TestCase
     /**
      * Tests the complete data flow to ensure no data loss or transformation errors.
      */
-    public function testCompleteDataFlowFromFormToDatabase()
+    public function testCompleteDataFlowFromFormToDatabase(): void
     {
         // Step 1: User submits form with these POST values (all lowercase)
         $postFieldNames = [
@@ -452,7 +452,7 @@ class DepthChartEntryRepositoryTest extends TestCase
      * matches the order of columns in the UPDATE statement.
      * Role columns (dc_of through dc_bh) are hardcoded to 0 and not bound.
      */
-    public function testBindParamOrderMatchesUpdateStatementOrder()
+    public function testBindParamOrderMatchesUpdateStatementOrder(): void
     {
         // The UPDATE statement has bound columns in this order:
         $boundColumnOrder = [

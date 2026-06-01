@@ -9,7 +9,9 @@ use PHPUnit\Framework\TestCase;
 
 final class ConfigBootstrapExtractRequestTest extends TestCase
 {
+    /** @var array<string, mixed> */
     private array $originalRequest;
+    /** @var array<string, mixed> */
     private array $originalGlobals;
 
     protected function setUp(): void

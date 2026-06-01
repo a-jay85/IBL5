@@ -12,8 +12,8 @@ use League\LeagueContext;
  */
 class LeagueContextTest extends TestCase
 {
-    private $leagueContext;
-    
+    private LeagueContext $leagueContext;
+
     protected function setUp(): void
     {
         $this->leagueContext = new LeagueContext();

@@ -10,6 +10,9 @@ use Tests\WideUnit\WideUnitTestCase;
 
 class PlayerExportControllerTest extends WideUnitTestCase
 {
+    /**
+     * @return array<string, mixed>
+     */
     private function playerRow(int $pid, string $name, string $position): array
     {
         return [

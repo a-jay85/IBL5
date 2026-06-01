@@ -280,6 +280,8 @@ class TeamOffDefStatsViewTest extends TestCase
 
     /**
      * Create minimal view data for basic tests
+     *
+     * @return array{teams: list<mixed>, league: array{totals: array<string, string>, averages: array<string, string>, games: int}, differentials: array<string, mixed>}
      */
     private function createMinimalViewData(): array
     {
@@ -330,6 +332,9 @@ class TeamOffDefStatsViewTest extends TestCase
 
     /**
      * Create view data with specified teams
+     *
+     * @param list<array{teamid: int, team_city: string, team_name: string}> $teamConfigs
+     * @return array{teams: list<mixed>, league: array{totals: array<string, string>, averages: array<string, string>, games: int}, differentials: array<string, mixed>}
      */
     private function createViewDataWithTeams(array $teamConfigs): array
     {
@@ -349,6 +354,8 @@ class TeamOffDefStatsViewTest extends TestCase
 
     /**
      * Create a team data structure for testing
+     *
+     * @return array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, offense_totals: array<string, string>, offense_averages: array<string, string>, defense_totals: array<string, string>, defense_averages: array<string, string>, raw_offense: list<mixed>, raw_defense: list<mixed>, offense_games: int, defense_games: int}
      */
     private function createTeamData(int $teamId, string $city, string $name): array
     {

@@ -17,6 +17,9 @@ use Season\Season;
  */
 class TestableCapSpaceService extends CapSpaceService
 {
+    /**
+     * @return array{team: Team, teamId: int, teamName: string, teamCity: string, color1: string, color2: string, availableSalary: array{year1: int, year2: int, year3: int, year4: int, year5: int, year6: int}, positionSalaries: array<string, int>, freeAgencySlots: int, has_mle: bool, has_lle: bool}
+     */
     public function publicProcessTeamCapData(Team $team, Season $season): array
     {
         return $this->processTeamCapData($team, $season);

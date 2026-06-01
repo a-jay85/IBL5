@@ -9,14 +9,14 @@ use Draft\DraftProcessor;
 
 class DraftProcessorTest extends TestCase
 {
-    private $processor;
+    private DraftProcessor $processor;
 
     protected function setUp(): void
     {
         $this->processor = new DraftProcessor();
     }
 
-    public function testCreateDraftAnnouncementFormatsCorrectly()
+    public function testCreateDraftAnnouncementFormatsCorrectly(): void
     {
         $message = $this->processor->createDraftAnnouncement(
             5,          // pick number
@@ -33,7 +33,7 @@ class DraftProcessorTest extends TestCase
         $this->assertStringContainsString('**John Doe!**', $message);
     }
 
-    public function testCreateDraftAnnouncementWithSecondRound()
+    public function testCreateDraftAnnouncementWithSecondRound(): void
     {
         $message = $this->processor->createDraftAnnouncement(
             35,         // pick number
@@ -49,7 +49,7 @@ class DraftProcessorTest extends TestCase
         $this->assertStringContainsString('**Jane Smith!**', $message);
     }
 
-    public function testCreateNextTeamMessageWithTeamOnClock()
+    public function testCreateNextTeamMessageWithTeamOnClock(): void
     {
         $baseMessage = 'Draft announcement';
         $message = $this->processor->createNextTeamMessage(
@@ -64,7 +64,7 @@ class DraftProcessorTest extends TestCase
         $this->assertStringContainsString('Draft', $message);
     }
 
-    public function testCreateNextTeamMessageWhenDraftComplete()
+    public function testCreateNextTeamMessageWhenDraftComplete(): void
     {
         $baseMessage = 'Draft announcement';
         $message = $this->processor->createNextTeamMessage(
@@ -79,7 +79,7 @@ class DraftProcessorTest extends TestCase
         $this->assertStringContainsString('🏁', $message);
     }
 
-    public function testGetSuccessMessageContainsAnnouncementAndLink()
+    public function testGetSuccessMessageContainsAnnouncementAndLink(): void
     {
         $announcement = 'Test announcement';
         $message = $this->processor->getSuccessMessage($announcement);
@@ -89,7 +89,7 @@ class DraftProcessorTest extends TestCase
         $this->assertStringContainsString('name=Draft', $message);
     }
 
-    public function testGetDatabaseErrorMessageContainsErrorAndLink()
+    public function testGetDatabaseErrorMessageContainsErrorAndLink(): void
     {
         $message = $this->processor->getDatabaseErrorMessage();
 
@@ -99,7 +99,7 @@ class DraftProcessorTest extends TestCase
         $this->assertStringContainsString('name=Draft', $message);
     }
 
-    public function testCreateDraftAnnouncementHandlesApostrophes()
+    public function testCreateDraftAnnouncementHandlesApostrophes(): void
     {
         $message = $this->processor->createDraftAnnouncement(
             10,

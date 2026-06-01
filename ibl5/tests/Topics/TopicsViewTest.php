@@ -187,6 +187,7 @@ class TopicsViewTest extends TestCase
     }
 
     /**
+     * @param array<string, mixed> $overrides
      * @return array{topicId: int, topicName: string, topicImage: string, topicText: string, storyCount: int, totalReads: int, recentArticles: array<int, array{sid: int, title: string, catId: int, catTitle: string}>}
      */
     private static function createTopic(array $overrides = []): array

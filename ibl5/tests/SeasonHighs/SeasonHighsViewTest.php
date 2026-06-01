@@ -206,6 +206,7 @@ class SeasonHighsViewTest extends TestCase
     }
 
     /**
+     * @param array<string, mixed> $overrides
      * @return array{name: string, date: string, value: int, pid?: int, teamid?: int, teamname?: string, color1?: string, color2?: string, boxId?: int, gameOfThatDay?: int}
      */
     private static function createHighEntry(array $overrides = []): array

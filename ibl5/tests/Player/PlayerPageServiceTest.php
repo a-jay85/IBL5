@@ -12,8 +12,8 @@ use Tests\WideUnit\Mocks\MockDatabase;
 
 class PlayerPageServiceTest extends TestCase
 {
-    private $db;
-    private $service;
+    private MockDatabase $db;
+    private PlayerPageService $service;
 
     protected function setUp(): void
     {
@@ -22,7 +22,7 @@ class PlayerPageServiceTest extends TestCase
         $this->service = new PlayerPageService($this->db, $this->createStub(TeamIdentityRepositoryInterface::class));
     }
 
-    public function testCanShowRenegotiationButtonReturnsTrueWhenAllConditionsMet()
+    public function testCanShowRenegotiationButtonReturnsTrueWhenAllConditionsMet(): void
     {
         $player = $this->createMockPlayer(false, true);
         $userTeam = $this->createMockTeam('Test Team', 0);
@@ -33,7 +33,7 @@ class PlayerPageServiceTest extends TestCase
         $this->assertTrue($result, 'Should show renegotiation button when all conditions are met');
     }
 
-    public function testCanShowRenegotiationButtonReturnsFalseWhenRookieOptioned()
+    public function testCanShowRenegotiationButtonReturnsFalseWhenRookieOptioned(): void
     {
         $player = $this->createMockPlayer(true, true);
         $userTeam = $this->createMockTeam('Test Team', 0);
@@ -44,7 +44,7 @@ class PlayerPageServiceTest extends TestCase
         $this->assertFalse($result, 'Should not show renegotiation button when player was rookie optioned');
     }
 
-    public function testCanShowRenegotiationButtonReturnsFalseWhenTeamIsFreeAgents()
+    public function testCanShowRenegotiationButtonReturnsFalseWhenTeamIsFreeAgents(): void
     {
         $player = $this->createMockPlayer(false, true);
         $userTeam = $this->createMockTeam('Free Agents', 0);
@@ -55,7 +55,7 @@ class PlayerPageServiceTest extends TestCase
         $this->assertFalse($result, 'Should not show renegotiation button when user team is Free Agents');
     }
 
-    public function testCanShowRenegotiationButtonReturnsFalseWhenExtensionUsed()
+    public function testCanShowRenegotiationButtonReturnsFalseWhenExtensionUsed(): void
     {
         $player = $this->createMockPlayer(false, true);
         $userTeam = $this->createMockTeam('Test Team', 1);
@@ -66,7 +66,7 @@ class PlayerPageServiceTest extends TestCase
         $this->assertFalse($result, 'Should not show renegotiation button when extension already used this season');
     }
 
-    public function testCanShowRenegotiationButtonReturnsFalseWhenCannotRenegotiate()
+    public function testCanShowRenegotiationButtonReturnsFalseWhenCannotRenegotiate(): void
     {
         $player = $this->createMockPlayer(false, false);
         $userTeam = $this->createMockTeam('Test Team', 0);
@@ -77,7 +77,7 @@ class PlayerPageServiceTest extends TestCase
         $this->assertFalse($result, 'Should not show renegotiation button when player cannot renegotiate');
     }
 
-    public function testCanShowRenegotiationButtonReturnsFalseWhenNotOwnerOfPlayer()
+    public function testCanShowRenegotiationButtonReturnsFalseWhenNotOwnerOfPlayer(): void
     {
         $player = $this->createMockPlayer(false, true, 99);
         $userTeam = $this->createMockTeam('Test Team', 0, 1);
@@ -88,7 +88,7 @@ class PlayerPageServiceTest extends TestCase
         $this->assertFalse($result, 'Should not show renegotiation button when user does not own the player');
     }
 
-    public function testCanShowRenegotiationButtonReturnsFalseWhenDraftPhase()
+    public function testCanShowRenegotiationButtonReturnsFalseWhenDraftPhase(): void
     {
         $player = $this->createMockPlayer(false, true);
         $userTeam = $this->createMockTeam('Test Team', 0);
@@ -99,7 +99,7 @@ class PlayerPageServiceTest extends TestCase
         $this->assertFalse($result, 'Should not show renegotiation button during Draft phase');
     }
 
-    public function testCanShowRenegotiationButtonReturnsFalseWhenFreeAgencyPhase()
+    public function testCanShowRenegotiationButtonReturnsFalseWhenFreeAgencyPhase(): void
     {
         $player = $this->createMockPlayer(false, true);
         $userTeam = $this->createMockTeam('Test Team', 0);
@@ -110,7 +110,7 @@ class PlayerPageServiceTest extends TestCase
         $this->assertFalse($result, 'Should not show renegotiation button during Free Agency phase');
     }
 
-    public function testShouldShowRookieOptionUsedMessageReturnsTrueWhenRookieOptioned()
+    public function testShouldShowRookieOptionUsedMessageReturnsTrueWhenRookieOptioned(): void
     {
         $player = $this->createMockPlayer(true, false);
 
@@ -119,7 +119,7 @@ class PlayerPageServiceTest extends TestCase
         $this->assertTrue($result, 'Should show message when player was rookie optioned');
     }
 
-    public function testShouldShowRookieOptionUsedMessageReturnsFalseWhenNotRookieOptioned()
+    public function testShouldShowRookieOptionUsedMessageReturnsFalseWhenNotRookieOptioned(): void
     {
         $player = $this->createMockPlayer(false, false);
 
@@ -128,7 +128,7 @@ class PlayerPageServiceTest extends TestCase
         $this->assertFalse($result, 'Should not show message when player was not rookie optioned');
     }
 
-    public function testCanShowRookieOptionButtonReturnsTrueWhenAllConditionsMet()
+    public function testCanShowRookieOptionButtonReturnsTrueWhenAllConditionsMet(): void
     {
         $player = $this->createMockPlayer(false, true, 1, true);
 
@@ -140,7 +140,7 @@ class PlayerPageServiceTest extends TestCase
         $this->assertTrue($result, 'Should show rookie option button when all conditions are met');
     }
 
-    public function testCanShowRookieOptionButtonReturnsFalseWhenTeamIsFreeAgents()
+    public function testCanShowRookieOptionButtonReturnsFalseWhenTeamIsFreeAgents(): void
     {
         $player = $this->createMockPlayer(false, true, 1, true);
 
@@ -152,7 +152,7 @@ class PlayerPageServiceTest extends TestCase
         $this->assertFalse($result, 'Should not show rookie option button when user team is Free Agents');
     }
 
-    public function testCanShowRookieOptionButtonReturnsFalseWhenCannotRookieOption()
+    public function testCanShowRookieOptionButtonReturnsFalseWhenCannotRookieOption(): void
     {
         $player = $this->createMockPlayer(false, true, 1, false);
 
@@ -164,7 +164,7 @@ class PlayerPageServiceTest extends TestCase
         $this->assertFalse($result, 'Should not show rookie option button when player cannot use rookie option');
     }
 
-    public function testCanShowRookieOptionButtonReturnsFalseWhenNotOwnerOfPlayer()
+    public function testCanShowRookieOptionButtonReturnsFalseWhenNotOwnerOfPlayer(): void
     {
         $player = $this->createMockPlayer(false, true, 99, true);
 

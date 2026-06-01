@@ -159,6 +159,7 @@ class DraftHistoryViewTest extends TestCase
     }
 
     /**
+     * @param array<string, mixed> $overrides
      * @return array{pid: int, name: string, pos: string, draftround: int, draftpickno: int, draftedby: string, college: string, teamid: int|null, team_city: string|null, color1: string|null, color2: string|null}
      */
     private static function createYearPick(array $overrides = []): array
@@ -213,6 +214,7 @@ class DraftHistoryViewTest extends TestCase
     }
 
     /**
+     * @param array<string, mixed> $overrides
      * @return array{pid: int, name: string, pos: string, draftround: int, draftpickno: int, draftyear: int, college: string, retired: int}
      */
     private static function createTeamPick(array $overrides = []): array

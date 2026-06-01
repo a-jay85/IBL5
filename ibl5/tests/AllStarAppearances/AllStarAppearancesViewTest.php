@@ -106,6 +106,7 @@ class AllStarAppearancesViewTest extends TestCase
     }
 
     /**
+     * @param array<string, mixed> $overrides
      * @return array{name: string, pid: int, appearances: int}
      */
     private static function createAppearance(array $overrides = []): array

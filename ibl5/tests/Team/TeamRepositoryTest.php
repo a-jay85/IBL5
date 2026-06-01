@@ -24,7 +24,7 @@ class TeamRepositoryTest extends TestCase
         $this->repository = new TeamRepository($this->db);
     }
 
-    public function testGetTeamPowerDataReturnsData()
+    public function testGetTeamPowerDataReturnsData(): void
     {
         $mockData = [[
             'teamid' => 1,
@@ -59,7 +59,7 @@ class TeamRepositoryTest extends TestCase
         $this->assertSame(50, $result['wins']);
     }
 
-    public function testGetTeamPowerDataReturnsNullWhenNoResults()
+    public function testGetTeamPowerDataReturnsNullWhenNoResults(): void
     {
         $this->db->setMockData([]);
         $this->db->setNumRows(0);
@@ -69,7 +69,7 @@ class TeamRepositoryTest extends TestCase
         $this->assertNull($result);
     }
 
-    public function testGetRosterUnderContractExecutesQuery()
+    public function testGetRosterUnderContractExecutesQuery(): void
     {
         // Arrange - Set up mock data in correct sort order
         $mockData = [
@@ -88,7 +88,7 @@ class TeamRepositoryTest extends TestCase
         $this->assertNotEmpty($queries, 'Should execute database query');
     }
 
-    public function testGetFreeAgencyRosterExecutesQuery()
+    public function testGetFreeAgencyRosterExecutesQuery(): void
     {
         // Arrange
         $this->db->setMockData([]);
@@ -102,7 +102,7 @@ class TeamRepositoryTest extends TestCase
         $this->assertNotEmpty($queries, 'Should execute database query');
     }
 
-    public function testGetHistoricalRosterExecutesQuery()
+    public function testGetHistoricalRosterExecutesQuery(): void
     {
         // Arrange
         $this->db->setMockData([]);

@@ -22,8 +22,8 @@ use Tests\WideUnit\Mocks\MockPreparedStatement;
  */
 class TradeValidatorTest extends TestCase
 {
-    private $validator;
-    private $mockDb;
+    private ?\Trading\TradeValidator $validator;
+    private ?MockDatabase $mockDb;
 
     protected function setUp(): void
     {
@@ -41,7 +41,7 @@ class TradeValidatorTest extends TestCase
      * @group validation
      * @group cash
      */
-    public function testValidatesMinimumCashAmountsSuccessfully()
+    public function testValidatesMinimumCashAmountsSuccessfully(): void
     {
         // Arrange
         $userCash = [1 => 100, 2 => 200, 3 => 0, 4 => 0, 5 => 0, 6 => 0];
@@ -57,9 +57,12 @@ class TradeValidatorTest extends TestCase
 
     /**
      * @group validation
-     * @group cash     */
+     * @group cash
+     * @param array<int, int> $userCash
+     * @param array<int, int> $partnerCash
+     */
         #[DataProvider('invalidCashAmountProvider')]
-    public function testRejectsCashAmountsBelowMinimum($userCash, $partnerCash, $expectedErrorText)
+    public function testRejectsCashAmountsBelowMinimum(array $userCash, array $partnerCash, string $expectedErrorText): void
     {
         // Act
         $result = $this->validator->validateMinimumCashAmounts($userCash, $partnerCash);
@@ -73,7 +76,7 @@ class TradeValidatorTest extends TestCase
      * @group validation
      * @group salary-cap
      */
-    public function testValidatesSalaryeCapsWithinLimits()
+    public function testValidatesSalaryeCapsWithinLimits(): void
     {
         // Arrange
         $tradeData = [
@@ -95,9 +98,11 @@ class TradeValidatorTest extends TestCase
 
     /**
      * @group validation
-     * @group salary-cap     */
+     * @group salary-cap
+     * @param array<string, int> $tradeData
+     */
         #[DataProvider('salaryCapViolationProvider')]
-    public function testRejectsTradesExceedingSalaryCaps($tradeData, $expectedErrorCount)
+    public function testRejectsTradesExceedingSalaryCaps(array $tradeData, int $expectedErrorCount): void
     {
         // Act
         $result = $this->validator->validateSalaryCaps($tradeData);
@@ -110,7 +115,7 @@ class TradeValidatorTest extends TestCase
     /**
      * @group cash-considerations
      */
-    public function testCalculatesCurrentSeasonCashConsiderationsCorrectly()
+    public function testCalculatesCurrentSeasonCashConsiderationsCorrectly(): void
     {
         // Arrange
         $userCash = [1 => 100, 2 => 200, 3 => 0, 4 => 0, 5 => 0, 6 => 0];
@@ -129,7 +134,7 @@ class TradeValidatorTest extends TestCase
     /**
      * @group player-validation
      */
-    public function testDeterminesPlayerTradabilityCorrectly()
+    public function testDeterminesPlayerTradabilityCorrectly(): void
     {
         // Arrange - Valid tradeable player
         $playerId = 12345;
@@ -145,9 +150,11 @@ class TradeValidatorTest extends TestCase
     }
 
     /**
-     * @group player-validation     */
+     * @group player-validation
+     * @param list<array<string, int>> $mockData
+     */
         #[DataProvider('nonTradeablePlayerProvider')]
-    public function testPreventsTradingIneligiblePlayers($mockData, $expectedResult, $reason)
+    public function testPreventsTradingIneligiblePlayers(array $mockData, bool $expectedResult, string $reason): void
     {
         // Arrange
         $playerId = 12345;
@@ -162,8 +169,10 @@ class TradeValidatorTest extends TestCase
 
     /**
      * Data provider for invalid cash amounts
+     *
+     * @return array<string, array{array<int, int>, array<int, int>, string}>
      */
-    public static function invalidCashAmountProvider()
+    public static function invalidCashAmountProvider(): array
     {
         return [
             'User cash below minimum' => [
@@ -181,8 +190,10 @@ class TradeValidatorTest extends TestCase
 
     /**
      * Data provider for salary cap violations
+     *
+     * @return array<string, array{array<string, int>, int}>
      */
-    public static function salaryCapViolationProvider()
+    public static function salaryCapViolationProvider(): array
     {
         return [
             'User exceeds hard cap' => [
@@ -208,8 +219,10 @@ class TradeValidatorTest extends TestCase
 
     /**
      * Data provider for non-tradeable players
+     *
+     * @return array<string, array{list<array<string, int>>, bool, string}>
      */
-    public static function nonTradeablePlayerProvider()
+    public static function nonTradeablePlayerProvider(): array
     {
         return [
             'Waived player' => [

@@ -11,14 +11,14 @@ use Player\PlayerData;
 
 class PlayerInjuryCalculatorTest extends TestCase
 {
-    private $calculator;
+    private PlayerInjuryCalculator $calculator;
 
     protected function setUp(): void
     {
         $this->calculator = new PlayerInjuryCalculator();
     }
 
-    public function testGetInjuryReturnDateWithInjury()
+    public function testGetInjuryReturnDateWithInjury(): void
     {
         $playerData = new PlayerData();
         $playerData->daysRemainingForInjury = 5;
@@ -28,7 +28,7 @@ class PlayerInjuryCalculatorTest extends TestCase
         $this->assertEquals('2024-01-07', $result);
     }
 
-    public function testGetInjuryReturnDateWithoutInjury()
+    public function testGetInjuryReturnDateWithoutInjury(): void
     {
         $playerData = new PlayerData();
         $playerData->daysRemainingForInjury = 0;
@@ -38,7 +38,7 @@ class PlayerInjuryCalculatorTest extends TestCase
         $this->assertEquals("", $result);
     }
 
-    public function testGetInjuryReturnDateWithOneDayInjury()
+    public function testGetInjuryReturnDateWithOneDayInjury(): void
     {
         $playerData = new PlayerData();
         $playerData->daysRemainingForInjury = 1;
@@ -48,7 +48,7 @@ class PlayerInjuryCalculatorTest extends TestCase
         $this->assertEquals('2024-01-03', $result);
     }
 
-    public function testGetInjuryReturnDateCrossingMonth()
+    public function testGetInjuryReturnDateCrossingMonth(): void
     {
         $playerData = new PlayerData();
         $playerData->daysRemainingForInjury = 10;

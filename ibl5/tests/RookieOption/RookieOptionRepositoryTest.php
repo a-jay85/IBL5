@@ -13,19 +13,19 @@ use Tests\WideUnit\Mocks\MockDatabase;
  */
 class RookieOptionRepositoryTest extends TestCase
 {
-    private $repository;
-    private $mockDb;
-    
+    private RookieOptionRepository $repository;
+    private MockDatabase $mockDb;
+
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
         $this->repository = new RookieOptionRepository($this->mockDb);
     }
-    
+
     /**
      * Test updating player rookie option for first round pick
      */
-    public function testUpdatePlayerRookieOptionFirstRound()
+    public function testUpdatePlayerRookieOptionFirstRound(): void
     {
         $this->mockDb->setReturnTrue(true);
         $this->mockDb->setAffectedRows(1);
@@ -45,7 +45,7 @@ class RookieOptionRepositoryTest extends TestCase
     /**
      * Test updating player rookie option for second round pick
      */
-    public function testUpdatePlayerRookieOptionSecondRound()
+    public function testUpdatePlayerRookieOptionSecondRound(): void
     {
         $this->mockDb->setReturnTrue(true);
         $this->mockDb->setAffectedRows(1);

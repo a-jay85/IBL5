@@ -225,7 +225,7 @@ class TradeWideUnitTest extends WideUnitTestCase
         $this->assertStringContainsString('Spurs', $result['storytext']);
 
         // Verify two INSERT queries for positive and negative cash entries in ibl_cash_considerations
-        $this->assertEquals(2, $this->countQueriesMatching('INSERT INTO ibl_cash_considerations'));
+        $this->assertSame(2, $this->countQueriesMatching('INSERT INTO ibl_cash_considerations'));
     }
 
     // ========== MULTI-ASSET TRADES ==========

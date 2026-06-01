@@ -85,64 +85,64 @@ class WaiversProcessorTest extends TestCase
     public function testCalculateVeteranMinimumSalaryFor10PlusYears(): void
     {
         $salary = $this->processor->calculateVeteranMinimumSalary(10);
-        $this->assertEquals(103, $salary);
+        $this->assertSame(103, $salary);
         
         $salary = $this->processor->calculateVeteranMinimumSalary(15);
-        $this->assertEquals(103, $salary);
+        $this->assertSame(103, $salary);
     }
     
     public function testCalculateVeteranMinimumSalaryFor9Years(): void
     {
         $salary = $this->processor->calculateVeteranMinimumSalary(9);
-        $this->assertEquals(100, $salary);
+        $this->assertSame(100, $salary);
     }
     
     public function testCalculateVeteranMinimumSalaryFor8Years(): void
     {
         $salary = $this->processor->calculateVeteranMinimumSalary(8);
-        $this->assertEquals(89, $salary);
+        $this->assertSame(89, $salary);
     }
     
     public function testCalculateVeteranMinimumSalaryFor7Years(): void
     {
         $salary = $this->processor->calculateVeteranMinimumSalary(7);
-        $this->assertEquals(82, $salary);
+        $this->assertSame(82, $salary);
     }
     
     public function testCalculateVeteranMinimumSalaryFor6Years(): void
     {
         $salary = $this->processor->calculateVeteranMinimumSalary(6);
-        $this->assertEquals(76, $salary);
+        $this->assertSame(76, $salary);
     }
     
     public function testCalculateVeteranMinimumSalaryFor5Years(): void
     {
         $salary = $this->processor->calculateVeteranMinimumSalary(5);
-        $this->assertEquals(70, $salary);
+        $this->assertSame(70, $salary);
     }
     
     public function testCalculateVeteranMinimumSalaryFor4Years(): void
     {
         $salary = $this->processor->calculateVeteranMinimumSalary(4);
-        $this->assertEquals(64, $salary);
+        $this->assertSame(64, $salary);
     }
     
     public function testCalculateVeteranMinimumSalaryFor3Years(): void
     {
         $salary = $this->processor->calculateVeteranMinimumSalary(3);
-        $this->assertEquals(61, $salary);
+        $this->assertSame(61, $salary);
     }
     
     public function testCalculateVeteranMinimumSalaryForRookies(): void
     {
         $salary = $this->processor->calculateVeteranMinimumSalary(0);
-        $this->assertEquals(35, $salary);
+        $this->assertSame(35, $salary);
         
         $salary = $this->processor->calculateVeteranMinimumSalary(1);
-        $this->assertEquals(35, $salary);
+        $this->assertSame(35, $salary);
         
         $salary = $this->processor->calculateVeteranMinimumSalary(2);
-        $this->assertEquals(51, $salary);
+        $this->assertSame(51, $salary);
     }
     
     public function testGetPlayerContractDisplayWithNoSalary(): void
@@ -153,7 +153,7 @@ class WaiversProcessorTest extends TestCase
         ]);
         
         $contract = $this->processor->getPlayerContractDisplay($player, $this->mockSeasonRegular);
-        $this->assertEquals('70', $contract);
+        $this->assertSame('70', $contract);
     }
     
     public function testGetPlayerContractDisplayWithExistingContract(): void
@@ -167,7 +167,7 @@ class WaiversProcessorTest extends TestCase
         ]);
         
         $contract = $this->processor->getPlayerContractDisplay($player, $this->mockSeasonRegular);
-        $this->assertEquals('500 550 600', $contract);
+        $this->assertSame('500 550 600', $contract);
     }
     
     public function testGetPlayerContractDisplayWithPartialContract(): void
@@ -181,7 +181,7 @@ class WaiversProcessorTest extends TestCase
         ]);
         
         $contract = $this->processor->getPlayerContractDisplay($player, $this->mockSeasonRegular);
-        $this->assertEquals('550 600', $contract);
+        $this->assertSame('550 600', $contract);
     }
     
     public function testGetPlayerContractDisplayWithOneYearRemaining(): void
@@ -194,7 +194,7 @@ class WaiversProcessorTest extends TestCase
         ]);
         
         $contract = $this->processor->getPlayerContractDisplay($player, $this->mockSeasonRegular);
-        $this->assertEquals('600', $contract);
+        $this->assertSame('600', $contract);
     }
     
     public function testGetWaiverWaitTimeReturnsEmptyWhenCleared(): void
@@ -203,7 +203,7 @@ class WaiversProcessorTest extends TestCase
         $currentTime = time();
         
         $waitTime = $this->processor->getWaiverWaitTime($dropTime, $currentTime);
-        $this->assertEquals('', $waitTime);
+        $this->assertSame('', $waitTime);
     }
     
     public function testGetWaiverWaitTimeCalculatesRemainingTime(): void
@@ -236,7 +236,7 @@ class WaiversProcessorTest extends TestCase
         $contractData = $this->processor->determineContractData($playerData, $this->mockSeasonRegular);
         
         $this->assertFalse($contractData['hasExistingContract']);
-        $this->assertEquals(89, $contractData['salary']);
+        $this->assertSame(89, $contractData['salary']);
     }
     
     public function testDetermineContractDataForExistingContract(): void
@@ -252,7 +252,7 @@ class WaiversProcessorTest extends TestCase
         $contractData = $this->processor->determineContractData($playerData, $this->mockSeasonRegular);
         
         $this->assertTrue($contractData['hasExistingContract']);
-        $this->assertEquals(500, $contractData['salary']);
+        $this->assertSame(500, $contractData['salary']);
     }
     
     public function testDetermineContractDataForMidContract(): void
@@ -268,7 +268,7 @@ class WaiversProcessorTest extends TestCase
         $contractData = $this->processor->determineContractData($playerData, $this->mockSeasonRegular);
         
         $this->assertTrue($contractData['hasExistingContract']);
-        $this->assertEquals(550, $contractData['salary']);
+        $this->assertSame(550, $contractData['salary']);
     }
     
     public function testGetPlayerContractDisplayWithMissingExperience(): void
@@ -280,7 +280,7 @@ class WaiversProcessorTest extends TestCase
         
         $contract = $this->processor->getPlayerContractDisplay($player, $this->mockSeasonRegular);
         // With rookie experience (0), should return vet min for 0 experience = 35 (first year minimum)
-        $this->assertEquals('35', $contract);
+        $this->assertSame('35', $contract);
     }
     
     public function testGetPlayerContractDisplayWithEmptyContract(): void
@@ -293,7 +293,7 @@ class WaiversProcessorTest extends TestCase
         ]);
         
         $contract = $this->processor->getPlayerContractDisplay($player, $this->mockSeasonRegular);
-        $this->assertEquals('35', $contract); // Should use vet min calculation for rookie (first year minimum)
+        $this->assertSame('35', $contract); // Should use vet min calculation for rookie (first year minimum)
     }
     
     public function testDetermineContractDataForNewContractDuringFreeAgency(): void
@@ -307,7 +307,7 @@ class WaiversProcessorTest extends TestCase
         $contractData = $this->processor->determineContractData($playerData, $this->mockSeasonFreeAgency);
         
         $this->assertFalse($contractData['hasExistingContract']);
-        $this->assertEquals(82, $contractData['salary']);
+        $this->assertSame(82, $contractData['salary']);
     }
     
     public function testGetPlayerContractDisplayDuringFreeAgency(): void
@@ -319,7 +319,7 @@ class WaiversProcessorTest extends TestCase
         ]);
         
         $contract = $this->processor->getPlayerContractDisplay($player, $this->mockSeasonFreeAgency);
-        $this->assertEquals('70', $contract);
+        $this->assertSame('70', $contract);
     }
     
     public function testGetPlayerContractDisplayWithExistingContractDuringFreeAgency(): void
@@ -334,7 +334,7 @@ class WaiversProcessorTest extends TestCase
         ]);
 
         $contract = $this->processor->getPlayerContractDisplay($player, $this->mockSeasonFreeAgency);
-        $this->assertEquals('500 550 600', $contract);
+        $this->assertSame('500 550 600', $contract);
     }
 
     // ── Mutation hardening: null experience paths ────────────
@@ -348,7 +348,7 @@ class WaiversProcessorTest extends TestCase
 
         $contract = $this->processor->getPlayerContractDisplay($player, $this->mockSeasonRegular);
         // Null experience defaults to 0 (rookie) → vet min for rookies
-        $this->assertEquals('35', $contract);
+        $this->assertSame('35', $contract);
     }
 
     public function testGetPlayerContractDisplayDuringFreeAgencyWithNullExperience(): void
@@ -360,7 +360,7 @@ class WaiversProcessorTest extends TestCase
 
         $contract = $this->processor->getPlayerContractDisplay($player, $this->mockSeasonFreeAgency);
         // Offseason bumps experience by 1: 0 + 1 = 1 → vet min for 1 year
-        $this->assertEquals('35', $contract);
+        $this->assertSame('35', $contract);
     }
 
 }

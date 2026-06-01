@@ -44,10 +44,10 @@ final class AwardHistoryValidatorTest extends TestCase
         
         $result = $this->validator->validateSearchParams($params);
         
-        $this->assertEquals('Johnson', $result['name']);
-        $this->assertEquals('MVP', $result['award']);
-        $this->assertEquals(2025, $result['year']);
-        $this->assertEquals(1, $result['sortby']);
+        $this->assertSame('Johnson', $result['name']);
+        $this->assertSame('MVP', $result['award']);
+        $this->assertSame(2025, $result['year']);
+        $this->assertSame(1, $result['sortby']);
     }
 
     public function testValidateSearchParamsWithEmptyData(): void
@@ -57,7 +57,7 @@ final class AwardHistoryValidatorTest extends TestCase
         $this->assertNull($result['name']);
         $this->assertNull($result['award']);
         $this->assertNull($result['year']);
-        $this->assertEquals(3, $result['sortby']); // Default to year
+        $this->assertSame(3, $result['sortby']); // Default to year
     }
 
     public function testValidateSearchParamsStripsHtmlTags(): void
@@ -69,8 +69,8 @@ final class AwardHistoryValidatorTest extends TestCase
         
         $result = $this->validator->validateSearchParams($params);
         
-        $this->assertEquals('alert("XSS")Johnson', $result['name']);
-        $this->assertEquals('MVP', $result['award']);
+        $this->assertSame('alert("XSS")Johnson', $result['name']);
+        $this->assertSame('MVP', $result['award']);
     }
 
     // ==================== validateStringParam Tests ====================
@@ -78,13 +78,13 @@ final class AwardHistoryValidatorTest extends TestCase
     public function testValidateStringParamWithValidString(): void
     {
         $result = $this->validator->validateStringParam('Johnson');
-        $this->assertEquals('Johnson', $result);
+        $this->assertSame('Johnson', $result);
     }
 
     public function testValidateStringParamTrimsWhitespace(): void
     {
         $result = $this->validator->validateStringParam('  Johnson  ');
-        $this->assertEquals('Johnson', $result);
+        $this->assertSame('Johnson', $result);
     }
 
     public function testValidateStringParamWithNull(): void
@@ -108,7 +108,7 @@ final class AwardHistoryValidatorTest extends TestCase
     public function testValidateStringParamRemovesHtmlTags(): void
     {
         $result = $this->validator->validateStringParam('<script>evil</script>');
-        $this->assertEquals('evil', $result);
+        $this->assertSame('evil', $result);
     }
 
     // ==================== validateYearParam Tests ====================
@@ -116,13 +116,13 @@ final class AwardHistoryValidatorTest extends TestCase
     public function testValidateYearParamWithValidYear(): void
     {
         $result = $this->validator->validateYearParam('2025');
-        $this->assertEquals(2025, $result);
+        $this->assertSame(2025, $result);
     }
 
     public function testValidateYearParamWithInteger(): void
     {
         $result = $this->validator->validateYearParam(2024);
-        $this->assertEquals(2024, $result);
+        $this->assertSame(2024, $result);
     }
 
     public function testValidateYearParamWithNull(): void
@@ -160,48 +160,48 @@ final class AwardHistoryValidatorTest extends TestCase
     public function testValidateSortParamWithValidOption1(): void
     {
         $result = $this->validator->validateSortParam('1');
-        $this->assertEquals(1, $result);
+        $this->assertSame(1, $result);
     }
 
     public function testValidateSortParamWithValidOption2(): void
     {
         $result = $this->validator->validateSortParam('2');
-        $this->assertEquals(2, $result);
+        $this->assertSame(2, $result);
     }
 
     public function testValidateSortParamWithValidOption3(): void
     {
         $result = $this->validator->validateSortParam('3');
-        $this->assertEquals(3, $result);
+        $this->assertSame(3, $result);
     }
 
     public function testValidateSortParamWithNull(): void
     {
         $result = $this->validator->validateSortParam(null);
-        $this->assertEquals(3, $result); // Default to year
+        $this->assertSame(3, $result); // Default to year
     }
 
     public function testValidateSortParamWithEmptyString(): void
     {
         $result = $this->validator->validateSortParam('');
-        $this->assertEquals(3, $result);
+        $this->assertSame(3, $result);
     }
 
     public function testValidateSortParamWithInvalidNumber(): void
     {
         $result = $this->validator->validateSortParam('5');
-        $this->assertEquals(3, $result);
+        $this->assertSame(3, $result);
     }
 
     public function testValidateSortParamWithNonNumeric(): void
     {
         $result = $this->validator->validateSortParam('abc');
-        $this->assertEquals(3, $result);
+        $this->assertSame(3, $result);
     }
 
     public function testValidateSortParamWithZero(): void
     {
         $result = $this->validator->validateSortParam('0');
-        $this->assertEquals(3, $result);
+        $this->assertSame(3, $result);
     }
 }

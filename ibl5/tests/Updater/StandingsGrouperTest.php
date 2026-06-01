@@ -17,61 +17,61 @@ class StandingsGrouperTest extends TestCase
         $result = StandingsGrouper::getGroupingsFor('Eastern');
         
         $this->assertIsArray($result);
-        $this->assertEquals('conference', $result['grouping']);
-        $this->assertEquals('conf_gb', $result['groupingGB']);
-        $this->assertEquals('conf_magic_number', $result['groupingMagicNumber']);
+        $this->assertSame('conference', $result['grouping']);
+        $this->assertSame('conf_gb', $result['groupingGB']);
+        $this->assertSame('conf_magic_number', $result['groupingMagicNumber']);
     }
 
     public function testGetGroupingsForWesternConference(): void
     {
         $result = StandingsGrouper::getGroupingsFor('Western');
         
-        $this->assertEquals('conference', $result['grouping']);
-        $this->assertEquals('conf_gb', $result['groupingGB']);
-        $this->assertEquals('conf_magic_number', $result['groupingMagicNumber']);
+        $this->assertSame('conference', $result['grouping']);
+        $this->assertSame('conf_gb', $result['groupingGB']);
+        $this->assertSame('conf_magic_number', $result['groupingMagicNumber']);
     }
 
     public function testGetGroupingsForAtlanticDivision(): void
     {
         $result = StandingsGrouper::getGroupingsFor('Atlantic');
         
-        $this->assertEquals('division', $result['grouping']);
-        $this->assertEquals('div_gb', $result['groupingGB']);
-        $this->assertEquals('div_magic_number', $result['groupingMagicNumber']);
+        $this->assertSame('division', $result['grouping']);
+        $this->assertSame('div_gb', $result['groupingGB']);
+        $this->assertSame('div_magic_number', $result['groupingMagicNumber']);
     }
 
     public function testGetGroupingsForCentralDivision(): void
     {
         $result = StandingsGrouper::getGroupingsFor('Central');
         
-        $this->assertEquals('division', $result['grouping']);
-        $this->assertEquals('div_gb', $result['groupingGB']);
-        $this->assertEquals('div_magic_number', $result['groupingMagicNumber']);
+        $this->assertSame('division', $result['grouping']);
+        $this->assertSame('div_gb', $result['groupingGB']);
+        $this->assertSame('div_magic_number', $result['groupingMagicNumber']);
     }
 
     public function testGetGroupingsForMidwestDivision(): void
     {
         $result = StandingsGrouper::getGroupingsFor('Midwest');
         
-        $this->assertEquals('division', $result['grouping']);
-        $this->assertEquals('div_gb', $result['groupingGB']);
-        $this->assertEquals('div_magic_number', $result['groupingMagicNumber']);
+        $this->assertSame('division', $result['grouping']);
+        $this->assertSame('div_gb', $result['groupingGB']);
+        $this->assertSame('div_magic_number', $result['groupingMagicNumber']);
     }
 
     public function testGetGroupingsForPacificDivision(): void
     {
         $result = StandingsGrouper::getGroupingsFor('Pacific');
         
-        $this->assertEquals('division', $result['grouping']);
-        $this->assertEquals('div_gb', $result['groupingGB']);
-        $this->assertEquals('div_magic_number', $result['groupingMagicNumber']);
+        $this->assertSame('division', $result['grouping']);
+        $this->assertSame('div_gb', $result['groupingGB']);
+        $this->assertSame('div_magic_number', $result['groupingMagicNumber']);
     }
 
     public function testGetGroupingsForUnknownRegionDefaultsToConference(): void
     {
         $result = StandingsGrouper::getGroupingsFor('Unknown');
         
-        $this->assertEquals('conference', $result['grouping']);
+        $this->assertSame('conference', $result['grouping']);
     }
 
     public function testIsConferenceReturnsTrueForConferences(): void

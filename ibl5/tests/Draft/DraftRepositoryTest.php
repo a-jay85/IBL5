@@ -31,7 +31,7 @@ class DraftRepositoryTest extends TestCase
 
         $result = $this->repository->getCurrentDraftSelection(1, 5);
 
-        $this->assertEquals('John Doe', $result);
+        $this->assertSame('John Doe', $result);
     }
 
     public function testGetCurrentDraftSelectionReturnsNullWhenNoResults(): void

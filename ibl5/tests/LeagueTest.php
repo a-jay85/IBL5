@@ -76,17 +76,17 @@ class LeagueTest extends TestCase
 
     public function testSoftCapMaxIsCorrect(): void
     {
-        $this->assertEquals(5000, League::SOFT_CAP_MAX);
+        $this->assertSame(5000, League::SOFT_CAP_MAX);
     }
 
     public function testHardCapMaxIsCorrect(): void
     {
-        $this->assertEquals(7000, League::HARD_CAP_MAX);
+        $this->assertSame(7000, League::HARD_CAP_MAX);
     }
 
     public function testFreeAgentsTeamIdIsZero(): void
     {
-        $this->assertEquals(0, League::FREE_AGENTS_TEAMID);
+        $this->assertSame(0, League::FREE_AGENTS_TEAMID);
     }
 
     public function testSpecialTeamIdConstants(): void
@@ -129,7 +129,7 @@ class LeagueTest extends TestCase
         
         $result = $league->formatTidsForSqlQuery([1, 2, 3]);
         
-        $this->assertEquals("1','2','3", $result);
+        $this->assertSame("1','2','3", $result);
     }
 
     public function testFormatTidsForSqlQueryHandlesSingleTeam(): void
@@ -138,7 +138,7 @@ class LeagueTest extends TestCase
         
         $result = $league->formatTidsForSqlQuery([5]);
         
-        $this->assertEquals('5', $result);
+        $this->assertSame('5', $result);
     }
 
     public function testFormatTidsForSqlQueryHandlesEmptyArray(): void
@@ -147,7 +147,7 @@ class LeagueTest extends TestCase
         
         $result = $league->formatTidsForSqlQuery([]);
         
-        $this->assertEquals('', $result);
+        $this->assertSame('', $result);
     }
 
     // ============================================

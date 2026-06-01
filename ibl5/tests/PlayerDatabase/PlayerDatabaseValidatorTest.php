@@ -25,18 +25,18 @@ final class PlayerDatabaseValidatorTest extends TestCase
 
     public function testValidatePositionAcceptsValidPositions(): void
     {
-        $this->assertEquals('PG', $this->validator->validatePosition('PG'));
-        $this->assertEquals('SG', $this->validator->validatePosition('SG'));
-        $this->assertEquals('SF', $this->validator->validatePosition('SF'));
-        $this->assertEquals('PF', $this->validator->validatePosition('PF'));
-        $this->assertEquals('C', $this->validator->validatePosition('C'));
+        $this->assertSame('PG', $this->validator->validatePosition('PG'));
+        $this->assertSame('SG', $this->validator->validatePosition('SG'));
+        $this->assertSame('SF', $this->validator->validatePosition('SF'));
+        $this->assertSame('PF', $this->validator->validatePosition('PF'));
+        $this->assertSame('C', $this->validator->validatePosition('C'));
     }
 
     public function testValidatePositionNormalizesCase(): void
     {
-        $this->assertEquals('PG', $this->validator->validatePosition('pg'));
-        $this->assertEquals('SF', $this->validator->validatePosition('sf'));
-        $this->assertEquals('C', $this->validator->validatePosition('c'));
+        $this->assertSame('PG', $this->validator->validatePosition('pg'));
+        $this->assertSame('SF', $this->validator->validatePosition('sf'));
+        $this->assertSame('C', $this->validator->validatePosition('c'));
     }
 
     public function testValidatePositionRejectsInvalidPositions(): void
@@ -56,10 +56,10 @@ final class PlayerDatabaseValidatorTest extends TestCase
 
     public function testValidateIntegerParamAcceptsValidIntegers(): void
     {
-        $this->assertEquals(0, $this->validator->validateIntegerParam(0));
-        $this->assertEquals(5, $this->validator->validateIntegerParam(5));
-        $this->assertEquals(99, $this->validator->validateIntegerParam(99));
-        $this->assertEquals(25, $this->validator->validateIntegerParam('25'));
+        $this->assertSame(0, $this->validator->validateIntegerParam(0));
+        $this->assertSame(5, $this->validator->validateIntegerParam(5));
+        $this->assertSame(99, $this->validator->validateIntegerParam(99));
+        $this->assertSame(25, $this->validator->validateIntegerParam('25'));
     }
 
     public function testValidateIntegerParamRejectsNegativeNumbers(): void
@@ -84,14 +84,14 @@ final class PlayerDatabaseValidatorTest extends TestCase
 
     public function testValidateStringParamAcceptsValidStrings(): void
     {
-        $this->assertEquals('Jordan', $this->validator->validateStringParam('Jordan'));
-        $this->assertEquals('UCLA', $this->validator->validateStringParam('UCLA'));
+        $this->assertSame('Jordan', $this->validator->validateStringParam('Jordan'));
+        $this->assertSame('UCLA', $this->validator->validateStringParam('UCLA'));
     }
 
     public function testValidateStringParamTrimsWhitespace(): void
     {
-        $this->assertEquals('Test', $this->validator->validateStringParam('  Test  '));
-        $this->assertEquals('Name', $this->validator->validateStringParam('Name '));
+        $this->assertSame('Test', $this->validator->validateStringParam('  Test  '));
+        $this->assertSame('Name', $this->validator->validateStringParam('Name '));
     }
 
     public function testValidateStringParamLimitsLength(): void
@@ -113,10 +113,10 @@ final class PlayerDatabaseValidatorTest extends TestCase
 
     public function testValidateBooleanParamAcceptsValidValues(): void
     {
-        $this->assertEquals(0, $this->validator->validateBooleanParam(0));
-        $this->assertEquals(1, $this->validator->validateBooleanParam(1));
-        $this->assertEquals(0, $this->validator->validateBooleanParam('0'));
-        $this->assertEquals(1, $this->validator->validateBooleanParam('1'));
+        $this->assertSame(0, $this->validator->validateBooleanParam(0));
+        $this->assertSame(1, $this->validator->validateBooleanParam(1));
+        $this->assertSame(0, $this->validator->validateBooleanParam('0'));
+        $this->assertSame(1, $this->validator->validateBooleanParam('1'));
     }
 
     public function testValidateBooleanParamRejectsInvalidValues(): void

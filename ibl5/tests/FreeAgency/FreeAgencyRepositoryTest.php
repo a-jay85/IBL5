@@ -87,7 +87,7 @@ class FreeAgencyRepositoryTest extends TestCase
 
         $this->assertIsArray($result);
         $this->assertArrayHasKey('offer1', $result);
-        $this->assertEquals(500, $result['offer1']);
+        $this->assertSame(500, $result['offer1']);
     }
 
     // ============================================

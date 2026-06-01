@@ -29,12 +29,12 @@ class DraftPickTest extends TestCase
         $row = $this->createValidDraftPickRow();
         $draftPick = new DraftPick($row);
         
-        $this->assertEquals(1, $draftPick->pickID);
-        $this->assertEquals('Current Owner', $draftPick->owner);
-        $this->assertEquals('Original Team', $draftPick->originalTeam);
+        $this->assertSame(1, $draftPick->pickID);
+        $this->assertSame('Current Owner', $draftPick->owner);
+        $this->assertSame('Original Team', $draftPick->originalTeam);
         $this->assertEquals(2025, $draftPick->year);
         $this->assertEquals(1, $draftPick->round);
-        $this->assertEquals('Lottery protected', $draftPick->notes);
+        $this->assertSame('Lottery protected', $draftPick->notes);
     }
 
     // ============================================
@@ -46,7 +46,7 @@ class DraftPickTest extends TestCase
         $row = $this->createValidDraftPickRow(['pickid' => 42]);
         $draftPick = new DraftPick($row);
         
-        $this->assertEquals(42, $draftPick->pickID);
+        $this->assertSame(42, $draftPick->pickID);
     }
 
     public function testOwnerIsAccessible(): void
@@ -54,7 +54,7 @@ class DraftPickTest extends TestCase
         $row = $this->createValidDraftPickRow(['ownerofpick' => 'Boston']);
         $draftPick = new DraftPick($row);
         
-        $this->assertEquals('Boston', $draftPick->owner);
+        $this->assertSame('Boston', $draftPick->owner);
     }
 
     public function testOriginalTeamIsAccessible(): void
@@ -62,7 +62,7 @@ class DraftPickTest extends TestCase
         $row = $this->createValidDraftPickRow(['teampick' => 'Los Angeles']);
         $draftPick = new DraftPick($row);
         
-        $this->assertEquals('Los Angeles', $draftPick->originalTeam);
+        $this->assertSame('Los Angeles', $draftPick->originalTeam);
     }
 
     public function testYearIsAccessible(): void
@@ -86,7 +86,7 @@ class DraftPickTest extends TestCase
         $row = $this->createValidDraftPickRow(['notes' => 'Top 5 protected']);
         $draftPick = new DraftPick($row);
         
-        $this->assertEquals('Top 5 protected', $draftPick->notes);
+        $this->assertSame('Top 5 protected', $draftPick->notes);
     }
 
     public function testEmptyNotesIsAccessible(): void
@@ -94,7 +94,7 @@ class DraftPickTest extends TestCase
         $row = $this->createValidDraftPickRow(['notes' => '']);
         $draftPick = new DraftPick($row);
         
-        $this->assertEquals('', $draftPick->notes);
+        $this->assertSame('', $draftPick->notes);
     }
 
     // ============================================

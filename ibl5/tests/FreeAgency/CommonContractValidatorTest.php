@@ -516,9 +516,9 @@ class CommonContractValidatorTest extends TestCase
 
         $result = $this->validator->calculateOfferValue($offer);
 
-        $this->assertEquals(1650, $result['total']);
-        $this->assertEquals(3, $result['years']);
-        $this->assertEquals(550.0, $result['averagePerYear']);
+        $this->assertSame(1650, $result['total']);
+        $this->assertSame(3, $result['years']);
+        $this->assertSame(550.0, $result['averagePerYear']);
     }
 
     /**
@@ -537,9 +537,9 @@ class CommonContractValidatorTest extends TestCase
 
         $result = $this->validator->calculateOfferValue($offer);
 
-        $this->assertEquals(6000, $result['total']);
-        $this->assertEquals(5, $result['years']);
-        $this->assertEquals(1200.0, $result['averagePerYear']);
+        $this->assertSame(6000, $result['total']);
+        $this->assertSame(5, $result['years']);
+        $this->assertSame(1200.0, $result['averagePerYear']);
     }
 
     /**
@@ -558,9 +558,9 @@ class CommonContractValidatorTest extends TestCase
 
         $result = $this->validator->calculateOfferValue($offer);
 
-        $this->assertEquals(7500, $result['total']);
-        $this->assertEquals(6, $result['years']);
-        $this->assertEquals(1250.0, $result['averagePerYear']);
+        $this->assertSame(7500, $result['total']);
+        $this->assertSame(6, $result['years']);
+        $this->assertSame(1250.0, $result['averagePerYear']);
     }
 
     /**
@@ -579,9 +579,9 @@ class CommonContractValidatorTest extends TestCase
 
         $result = $this->validator->calculateOfferValue($offer);
 
-        $this->assertEquals(800, $result['total']);
-        $this->assertEquals(1, $result['years']);
-        $this->assertEquals(800.0, $result['averagePerYear']);
+        $this->assertSame(800, $result['total']);
+        $this->assertSame(1, $result['years']);
+        $this->assertSame(800.0, $result['averagePerYear']);
     }
 
     /**
@@ -600,9 +600,9 @@ class CommonContractValidatorTest extends TestCase
 
         $result = $this->validator->calculateOfferValue($offer);
 
-        $this->assertEquals(0, $result['total']);
-        $this->assertEquals(1, $result['years']); // Minimum of 1 year
-        $this->assertEquals(0.0, $result['averagePerYear']);
+        $this->assertSame(0, $result['total']);
+        $this->assertSame(1, $result['years']); // Minimum of 1 year
+        $this->assertSame(0.0, $result['averagePerYear']);
     }
 
     /**
@@ -619,8 +619,8 @@ class CommonContractValidatorTest extends TestCase
 
         $result = $this->validator->calculateOfferValue($offer);
 
-        $this->assertEquals(1650, $result['total']);
-        $this->assertEquals(3, $result['years']);
+        $this->assertSame(1650, $result['total']);
+        $this->assertSame(3, $result['years']);
         $this->assertEqualsWithDelta(550.0, $result['averagePerYear'], 0.01);
     }
 
@@ -640,9 +640,9 @@ class CommonContractValidatorTest extends TestCase
 
         $result = $this->validator->calculateOfferValue($offer);
 
-        $this->assertEquals(3300, $result['total']);
-        $this->assertEquals(3, $result['years']);
-        $this->assertEquals(1100.0, $result['averagePerYear']);
+        $this->assertSame(3300, $result['total']);
+        $this->assertSame(3, $result['years']);
+        $this->assertSame(1100.0, $result['averagePerYear']);
     }
 
     // ==================== Integration Tests ====================
@@ -680,8 +680,8 @@ class CommonContractValidatorTest extends TestCase
 
         // Calculate value
         $value = $this->validator->calculateOfferValue($offer);
-        $this->assertEquals(1650, $value['total']);
-        $this->assertEquals(3, $value['years']);
+        $this->assertSame(1650, $value['total']);
+        $this->assertSame(3, $value['years']);
     }
 
     /**
@@ -713,8 +713,8 @@ class CommonContractValidatorTest extends TestCase
 
         // Check value
         $value = $this->validator->calculateOfferValue($offer);
-        $this->assertEquals(6250, $value['total']);
-        $this->assertEquals(5, $value['years']);
+        $this->assertSame(6250, $value['total']);
+        $this->assertSame(5, $value['years']);
     }
 
     // --- Merged from CommonContractValidatorEdgeCaseTest ---
@@ -775,9 +775,9 @@ class CommonContractValidatorTest extends TestCase
     {
         $result = $this->validator->calculateOfferValue([]);
 
-        $this->assertEquals(0, $result['total']);
-        $this->assertEquals(1, $result['years']); // Minimum of 1
-        $this->assertEquals(0.0, $result['averagePerYear']);
+        $this->assertSame(0, $result['total']);
+        $this->assertSame(1, $result['years']); // Minimum of 1
+        $this->assertSame(0.0, $result['averagePerYear']);
     }
 
     // ============================================
@@ -1155,9 +1155,9 @@ class CommonContractValidatorTest extends TestCase
 
         $result = $this->validator->calculateOfferValue($offer);
 
-        $this->assertEquals(500, $result['total']);
-        $this->assertEquals(1, $result['years']);
-        $this->assertEquals(500.0, $result['averagePerYear']);
+        $this->assertSame(500, $result['total']);
+        $this->assertSame(1, $result['years']);
+        $this->assertSame(500.0, $result['averagePerYear']);
     }
 
     /**
@@ -1173,9 +1173,9 @@ class CommonContractValidatorTest extends TestCase
 
         $result = $this->validator->calculateOfferValue($offer);
 
-        $this->assertEquals(0, $result['total']);
-        $this->assertEquals(1, $result['years']); // Minimum of 1
-        $this->assertEquals(0.0, $result['averagePerYear']);
+        $this->assertSame(0, $result['total']);
+        $this->assertSame(1, $result['years']); // Minimum of 1
+        $this->assertSame(0.0, $result['averagePerYear']);
     }
 
     /**
@@ -1194,9 +1194,9 @@ class CommonContractValidatorTest extends TestCase
 
         $result = $this->validator->calculateOfferValue($offer);
 
-        $this->assertEquals(3300000, $result['total']);
-        $this->assertEquals(3, $result['years']);
-        $this->assertEquals(1100000.0, $result['averagePerYear']);
+        $this->assertSame(3300000, $result['total']);
+        $this->assertSame(3, $result['years']);
+        $this->assertSame(1100000.0, $result['averagePerYear']);
     }
 
     /**
@@ -1212,8 +1212,8 @@ class CommonContractValidatorTest extends TestCase
 
         $result = $this->validator->calculateOfferValue($offer);
 
-        $this->assertEquals(300, $result['total']);
-        $this->assertEquals(3, $result['years']);
+        $this->assertSame(300, $result['total']);
+        $this->assertSame(3, $result['years']);
         $this->assertEqualsWithDelta(100.0, $result['averagePerYear'], 0.001);
     }
 
@@ -1230,9 +1230,9 @@ class CommonContractValidatorTest extends TestCase
 
         $result = $this->validator->calculateOfferValue($offer);
 
-        $this->assertEquals(600, $result['total']);
-        $this->assertEquals(3, $result['years']);
-        $this->assertEquals(200.0, $result['averagePerYear']);
+        $this->assertSame(600, $result['total']);
+        $this->assertSame(3, $result['years']);
+        $this->assertSame(200.0, $result['averagePerYear']);
     }
 
     // ============================================
@@ -1250,7 +1250,7 @@ class CommonContractValidatorTest extends TestCase
         $offer = ['year1' => $year1, 'year2' => $year2, 'year3' => 0];
         $result = $this->validator->validateRaises($offer, $birdYears);
 
-        $this->assertEquals($expectedValid, $result['valid']);
+        $this->assertSame($expectedValid, $result['valid']);
     }
 
     public static function raisePercentageBoundaryProvider(): array

@@ -68,7 +68,7 @@ class PowerRankingsUpdaterTest extends TestCase
         
         $result = $this->powerRankingsUpdater->publicDetermineMonth();
         
-        $this->assertEquals(Season::IBL_PRESEASON_MONTH, $result);
+        $this->assertSame(Season::IBL_PRESEASON_MONTH, $result);
     }
 
     public function testDetermineMonthForHEAT(): void
@@ -77,7 +77,7 @@ class PowerRankingsUpdaterTest extends TestCase
         
         $result = $this->powerRankingsUpdater->publicDetermineMonth();
         
-        $this->assertEquals(Season::IBL_HEAT_MONTH, $result);
+        $this->assertSame(Season::IBL_HEAT_MONTH, $result);
     }
 
     public function testDetermineMonthForRegularSeason(): void
@@ -86,7 +86,7 @@ class PowerRankingsUpdaterTest extends TestCase
         
         $result = $this->powerRankingsUpdater->publicDetermineMonth();
         
-        $this->assertEquals(Season::IBL_REGULAR_SEASON_STARTING_MONTH, $result);
+        $this->assertSame(Season::IBL_REGULAR_SEASON_STARTING_MONTH, $result);
     }
 
     public function testCalculateTeamStatsInitializesCorrectly(): void
@@ -105,8 +105,8 @@ class PowerRankingsUpdaterTest extends TestCase
         $this->assertArrayHasKey('streak', $result);
         $this->assertArrayHasKey('streakType', $result);
         
-        $this->assertEquals(0, $result['wins']);
-        $this->assertEquals(0, $result['losses']);
+        $this->assertSame(0, $result['wins']);
+        $this->assertSame(0, $result['losses']);
     }
 
     public function testCalculateTeamStatsWithWinningGame(): void
@@ -119,12 +119,12 @@ class PowerRankingsUpdaterTest extends TestCase
         
         $result = $this->powerRankingsUpdater->publicCalculateTeamStats($mockGames, 1);
         
-        $this->assertEquals(1, $result['wins']);
-        $this->assertEquals(0, $result['losses']);
-        $this->assertEquals(0, $result['homeWins']);
-        $this->assertEquals(1, $result['awayWins']);
-        $this->assertEquals('W', $result['streakType']);
-        $this->assertEquals(1, $result['streak']);
+        $this->assertSame(1, $result['wins']);
+        $this->assertSame(0, $result['losses']);
+        $this->assertSame(0, $result['homeWins']);
+        $this->assertSame(1, $result['awayWins']);
+        $this->assertSame('W', $result['streakType']);
+        $this->assertSame(1, $result['streak']);
     }
 
     public function testCalculateTeamStatsWithLosingGame(): void
@@ -137,12 +137,12 @@ class PowerRankingsUpdaterTest extends TestCase
         
         $result = $this->powerRankingsUpdater->publicCalculateTeamStats($mockGames, 1);
         
-        $this->assertEquals(0, $result['wins']);
-        $this->assertEquals(1, $result['losses']);
-        $this->assertEquals(0, $result['homeLosses']);
-        $this->assertEquals(1, $result['awayLosses']);
-        $this->assertEquals('L', $result['streakType']);
-        $this->assertEquals(1, $result['streak']);
+        $this->assertSame(0, $result['wins']);
+        $this->assertSame(1, $result['losses']);
+        $this->assertSame(0, $result['homeLosses']);
+        $this->assertSame(1, $result['awayLosses']);
+        $this->assertSame('L', $result['streakType']);
+        $this->assertSame(1, $result['streak']);
     }
 
     public function testCalculateTeamStatsWithHomeGame(): void
@@ -155,9 +155,9 @@ class PowerRankingsUpdaterTest extends TestCase
         
         $result = $this->powerRankingsUpdater->publicCalculateTeamStats($mockGames, 1);
         
-        $this->assertEquals(1, $result['wins']);
-        $this->assertEquals(1, $result['homeWins']);
-        $this->assertEquals(0, $result['awayWins']);
+        $this->assertSame(1, $result['wins']);
+        $this->assertSame(1, $result['homeWins']);
+        $this->assertSame(0, $result['awayWins']);
     }
 
     public function testCalculateTeamStatsTracksWinningStreak(): void
@@ -172,9 +172,9 @@ class PowerRankingsUpdaterTest extends TestCase
         
         $result = $this->powerRankingsUpdater->publicCalculateTeamStats($mockGames, 1);
         
-        $this->assertEquals(3, $result['wins']);
-        $this->assertEquals('W', $result['streakType']);
-        $this->assertEquals(3, $result['streak']);
+        $this->assertSame(3, $result['wins']);
+        $this->assertSame('W', $result['streakType']);
+        $this->assertSame(3, $result['streak']);
     }
 
     public function testCalculateTeamStatsTracksLosingStreak(): void
@@ -188,10 +188,10 @@ class PowerRankingsUpdaterTest extends TestCase
         
         $result = $this->powerRankingsUpdater->publicCalculateTeamStats($mockGames, 1);
         
-        $this->assertEquals(0, $result['wins']);
-        $this->assertEquals(2, $result['losses']);
-        $this->assertEquals('L', $result['streakType']);
-        $this->assertEquals(2, $result['streak']);
+        $this->assertSame(0, $result['wins']);
+        $this->assertSame(2, $result['losses']);
+        $this->assertSame('L', $result['streakType']);
+        $this->assertSame(2, $result['streak']);
     }
 
     public function testCalculateTeamStatsHandlesStreakChange(): void
@@ -205,10 +205,10 @@ class PowerRankingsUpdaterTest extends TestCase
         
         $result = $this->powerRankingsUpdater->publicCalculateTeamStats($mockGames, 1);
         
-        $this->assertEquals(1, $result['wins']);
-        $this->assertEquals(1, $result['losses']);
-        $this->assertEquals('L', $result['streakType']);
-        $this->assertEquals(1, $result['streak']);
+        $this->assertSame(1, $result['wins']);
+        $this->assertSame(1, $result['losses']);
+        $this->assertSame('L', $result['streakType']);
+        $this->assertSame(1, $result['streak']);
     }
 
     public function testCalculateTeamStatsIgnoresTies(): void
@@ -219,8 +219,8 @@ class PowerRankingsUpdaterTest extends TestCase
         
         $result = $this->powerRankingsUpdater->publicCalculateTeamStats($mockGames, 1);
         
-        $this->assertEquals(0, $result['wins']);
-        $this->assertEquals(0, $result['losses']);
+        $this->assertSame(0, $result['wins']);
+        $this->assertSame(0, $result['losses']);
     }
 
     public function testUpdateResetsDepthChartStatus(): void
@@ -256,10 +256,10 @@ class PowerRankingsUpdaterTest extends TestCase
         
         $result = $this->powerRankingsUpdater->publicCalculateTeamStats($mockGames, 1);
         
-        $this->assertEquals(7, $result['wins']);
-        $this->assertEquals(8, $result['losses']);
-        $this->assertEquals(7, $result['winsInLast10Games']);
-        $this->assertEquals(3, $result['lossesInLast10Games']);
+        $this->assertSame(7, $result['wins']);
+        $this->assertSame(8, $result['losses']);
+        $this->assertSame(7, $result['winsInLast10Games']);
+        $this->assertSame(3, $result['lossesInLast10Games']);
     }
 
     public function testConstructorAcceptsOptionalLeagueContext(): void

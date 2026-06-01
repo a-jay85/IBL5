@@ -422,7 +422,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
 
         // Assert
         $this->assertTrue($result['hasExistingContract']);
-        $this->assertEquals(500, $result['salary']);
+        $this->assertSame(500, $result['salary']);
     }
 
     /**
@@ -450,7 +450,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $this->assertFalse($result['hasExistingContract']);
         // Veteran minimum for 3 years experience
         $expectedVetMin = \ContractRules::getVeteranMinimumSalary(3);
-        $this->assertEquals($expectedVetMin, $result['salary']);
+        $this->assertSame($expectedVetMin, $result['salary']);
     }
 
     /**
@@ -476,7 +476,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
 
         // Assert - Should use salary_yr2 (next season) during Free Agency
         $this->assertTrue($result['hasExistingContract']);
-        $this->assertEquals(450, $result['salary']);
+        $this->assertSame(450, $result['salary']);
     }
 
     // ========== WAIVER WAIT TIME TESTS ==========
@@ -570,7 +570,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
 
         // Assert
         $expectedVetMin = \ContractRules::getVeteranMinimumSalary(0);
-        $this->assertEquals($expectedVetMin, $result);
+        $this->assertSame($expectedVetMin, $result);
     }
 
     /**
@@ -585,7 +585,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
 
         // Assert
         $expectedVetMin = \ContractRules::getVeteranMinimumSalary(10);
-        $this->assertEquals($expectedVetMin, $result);
+        $this->assertSame($expectedVetMin, $result);
     }
 
     // ========== VALIDATOR ERROR CLEARING TESTS ==========
@@ -676,7 +676,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
 
         // Assert
         $this->assertFalse($result['hasExistingContract']);
-        $this->assertEquals(\ContractRules::getVeteranMinimumSalary(5), $result['salary']);
+        $this->assertSame(\ContractRules::getVeteranMinimumSalary(5), $result['salary']);
     }
 
     /**
@@ -702,7 +702,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
 
         // Assert
         $this->assertTrue($result['hasExistingContract']);
-        $this->assertEquals(550, $result['salary']);
+        $this->assertSame(550, $result['salary']);
     }
 
     /**

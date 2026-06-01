@@ -43,22 +43,22 @@ final class CareerLeaderboardsServiceTest extends TestCase
         $stats = $this->service->processPlayerRow($row, 'totals');
 
         // Check basic info
-        $this->assertEquals(123, $stats['pid']);
-        $this->assertEquals('Test Player', $stats['name']);
+        $this->assertSame(123, $stats['pid']);
+        $this->assertSame('Test Player', $stats['name']);
 
         // Check totals formatting (should use number_format)
         $this->assertEquals('82', $stats['games']);
-        $this->assertEquals('3,000', $stats['minutes']);
-        $this->assertEquals('500', $stats['fgm']);
-        $this->assertEquals('1,000', $stats['fga']);
+        $this->assertSame('3,000', $stats['minutes']);
+        $this->assertSame('500', $stats['fgm']);
+        $this->assertSame('1,000', $stats['fga']);
         
         // Check defensive rebounds (reb - orb = 500 - 100 = 400)
-        $this->assertEquals('400', $stats['drb']);
+        $this->assertSame('400', $stats['drb']);
 
         // Check percentages (0-1 range with 3 decimals)
-        $this->assertEquals('0.500', $stats['fgp']); // 500/1000
-        $this->assertEquals('0.800', $stats['ftp']); // 200/250
-        $this->assertEquals('0.375', $stats['tgp']); // 150/400
+        $this->assertSame('0.500', $stats['fgp']); // 500/1000
+        $this->assertSame('0.800', $stats['ftp']); // 200/250
+        $this->assertSame('0.375', $stats['tgp']); // 150/400
     }
 
     public function testProcessPlayerRowWithAverages(): void
@@ -91,22 +91,22 @@ final class CareerLeaderboardsServiceTest extends TestCase
         $stats = $this->service->processPlayerRow($row, 'averages');
 
         // Check basic info
-        $this->assertEquals(456, $stats['pid']);
-        $this->assertEquals('Average Player*', $stats['name']); // Has asterisk for retired
+        $this->assertSame(456, $stats['pid']);
+        $this->assertSame('Average Player*', $stats['name']); // Has asterisk for retired
 
         // Check averages formatting (should use 2 decimal places)
         $this->assertEquals('82', $stats['games']); // Games are rounded
-        $this->assertEquals('36.50', $stats['minutes']);
-        $this->assertEquals('6.10', $stats['fgm']);
-        $this->assertEquals('12.20', $stats['fga']);
+        $this->assertSame('36.50', $stats['minutes']);
+        $this->assertSame('6.10', $stats['fgm']);
+        $this->assertSame('12.20', $stats['fga']);
         
         // Check defensive rebounds (reb - orb = 6.1 - 1.2 = 4.9)
-        $this->assertEquals('4.90', $stats['drb']);
+        $this->assertSame('4.90', $stats['drb']);
 
         // Check percentages (pre-calculated in db, formatted with decimals)
-        $this->assertEquals('0.500', $stats['fgp']);
-        $this->assertEquals('0.800', $stats['ftp']);
-        $this->assertEquals('0.375', $stats['tgp']);
+        $this->assertSame('0.500', $stats['fgp']);
+        $this->assertSame('0.800', $stats['ftp']);
+        $this->assertSame('0.375', $stats['tgp']);
     }
 
     public function testProcessPlayerRowHandlesZeroAttempts(): void
@@ -136,9 +136,9 @@ final class CareerLeaderboardsServiceTest extends TestCase
         $stats = $this->service->processPlayerRow($row, 'totals');
 
         // Check that percentages default to 0.000
-        $this->assertEquals('0.000', $stats['fgp']);
-        $this->assertEquals('0.000', $stats['ftp']);
-        $this->assertEquals('0.000', $stats['tgp']);
+        $this->assertSame('0.000', $stats['fgp']);
+        $this->assertSame('0.000', $stats['ftp']);
+        $this->assertSame('0.000', $stats['tgp']);
     }
 
     public function testProcessPlayerRowMarksRetiredPlayers(): void
@@ -168,7 +168,7 @@ final class CareerLeaderboardsServiceTest extends TestCase
         $stats = $this->service->processPlayerRow($row, 'totals');
 
         // Check that retired players have asterisk
-        $this->assertEquals('Retired Legend*', $stats['name']);
+        $this->assertSame('Retired Legend*', $stats['name']);
     }
 
     public function testGetBoardTypes(): void
@@ -178,17 +178,17 @@ final class CareerLeaderboardsServiceTest extends TestCase
         $this->assertIsArray($boardTypes);
         $this->assertCount(12, $boardTypes);
         $this->assertArrayHasKey('ibl_hist', $boardTypes);
-        $this->assertEquals('Regular Season Totals', $boardTypes['ibl_hist']);
+        $this->assertSame('Regular Season Totals', $boardTypes['ibl_hist']);
         $this->assertArrayHasKey('ibl_season_career_avgs', $boardTypes);
-        $this->assertEquals('Regular Season Averages', $boardTypes['ibl_season_career_avgs']);
+        $this->assertSame('Regular Season Averages', $boardTypes['ibl_season_career_avgs']);
         $this->assertArrayHasKey('ibl_rookie_career_totals', $boardTypes);
-        $this->assertEquals('Rookie Game Totals', $boardTypes['ibl_rookie_career_totals']);
+        $this->assertSame('Rookie Game Totals', $boardTypes['ibl_rookie_career_totals']);
         $this->assertArrayHasKey('ibl_sophomore_career_totals', $boardTypes);
-        $this->assertEquals('Sophomore Game Totals', $boardTypes['ibl_sophomore_career_totals']);
+        $this->assertSame('Sophomore Game Totals', $boardTypes['ibl_sophomore_career_totals']);
         $this->assertArrayHasKey('ibl_allstar_career_totals', $boardTypes);
-        $this->assertEquals('All-Star Game Totals', $boardTypes['ibl_allstar_career_totals']);
+        $this->assertSame('All-Star Game Totals', $boardTypes['ibl_allstar_career_totals']);
         $this->assertArrayHasKey('ibl_allstar_career_avgs', $boardTypes);
-        $this->assertEquals('All-Star Game Averages', $boardTypes['ibl_allstar_career_avgs']);
+        $this->assertSame('All-Star Game Averages', $boardTypes['ibl_allstar_career_avgs']);
     }
 
     public function testGetSortCategories(): void
@@ -198,10 +198,10 @@ final class CareerLeaderboardsServiceTest extends TestCase
         $this->assertIsArray($sortCategories);
         $this->assertCount(20, $sortCategories);
         $this->assertArrayHasKey('drb', $sortCategories);
-        $this->assertEquals('Defensive Rebounds', $sortCategories['drb']);
+        $this->assertSame('Defensive Rebounds', $sortCategories['drb']);
         $this->assertArrayHasKey('pts', $sortCategories);
-        $this->assertEquals('Points', $sortCategories['pts']);
+        $this->assertSame('Points', $sortCategories['pts']);
         $this->assertArrayHasKey('fgpct', $sortCategories);
-        $this->assertEquals('FG Percentage (avgs only)', $sortCategories['fgpct']);
+        $this->assertSame('FG Percentage (avgs only)', $sortCategories['fgpct']);
     }
 }

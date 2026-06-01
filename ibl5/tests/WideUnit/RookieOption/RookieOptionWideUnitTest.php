@@ -80,7 +80,7 @@ class RookieOptionWideUnitTest extends WideUnitTestCase
         // Assert
         $this->assertTrue($ownershipResult->isValid(), 'Ownership validation should pass');
         $this->assertTrue($eligibilityResult['valid'], 'Eligibility validation should pass');
-        $this->assertEquals(175, $eligibilityResult['finalYearSalary'], 'Should return salary_yr3 for first round');
+        $this->assertSame(175, $eligibilityResult['finalYearSalary'], 'Should return salary_yr3 for first round');
         $this->assertTrue($updateResult, 'Database update should succeed');
 
         // Assert - Correct contract year updated (salary_yr4 for first round)
@@ -156,7 +156,7 @@ class RookieOptionWideUnitTest extends WideUnitTestCase
         // Assert
         $this->assertTrue($ownershipResult->isValid());
         $this->assertTrue($eligibilityResult['valid']);
-        $this->assertEquals(110, $eligibilityResult['finalYearSalary'], 'Should return salary_yr2 for second round');
+        $this->assertSame(110, $eligibilityResult['finalYearSalary'], 'Should return salary_yr2 for second round');
         $this->assertTrue($updateResult);
 
         // Assert - Correct contract year updated (salary_yr3 for second round)
@@ -457,7 +457,7 @@ class RookieOptionWideUnitTest extends WideUnitTestCase
         // Assert - All steps succeeded
         $this->assertTrue($step1->isValid(), 'Step 1: Ownership validation');
         $this->assertTrue($step2['valid'], 'Step 2: Eligibility validation');
-        $this->assertEquals(250, $step2['finalYearSalary'], 'Step 2: Final year salary');
+        $this->assertSame(250, $step2['finalYearSalary'], 'Step 2: Final year salary');
         $this->assertTrue($step3, 'Step 3: Database update');
 
         // Verify database was updated correctly
@@ -501,7 +501,7 @@ class RookieOptionWideUnitTest extends WideUnitTestCase
         // Assert
         $this->assertTrue($step1->isValid());
         $this->assertTrue($step2['valid']);
-        $this->assertEquals(108, $step2['finalYearSalary']);
+        $this->assertSame(108, $step2['finalYearSalary']);
         $this->assertTrue($step3);
         $this->assertQueryExecuted('salary_yr3');
     }
@@ -638,7 +638,7 @@ class RookieOptionWideUnitTest extends WideUnitTestCase
         // Assert - All should be valid (canRookieOption returns true)
         foreach ($results as $phase => $result) {
             $this->assertTrue($result['valid'], "Should be valid during {$phase}");
-            $this->assertEquals(175, $result['finalYearSalary'], "Final year salary should be 175 during {$phase}");
+            $this->assertSame(175, $result['finalYearSalary'], "Final year salary should be 175 during {$phase}");
         }
     }
 

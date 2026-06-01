@@ -119,12 +119,12 @@ class TeamOffDefStatsServiceTest extends TestCase
 
         // Verify points calculation: (2 * fgm) + ftm + tgm
         $expectedOffensePoints = StatsFormatter::calculatePoints(100, 50, 30);
-        $this->assertEquals(280, $expectedOffensePoints);
-        $this->assertEquals(280, $team['raw_offense']['pts']);
+        $this->assertSame(280, $expectedOffensePoints);
+        $this->assertSame(280, $team['raw_offense']['pts']);
 
         $expectedDefensePoints = StatsFormatter::calculatePoints(90, 45, 25);
-        $this->assertEquals(250, $expectedDefensePoints);
-        $this->assertEquals(250, $team['raw_defense']['pts']);
+        $this->assertSame(250, $expectedDefensePoints);
+        $this->assertSame(250, $team['raw_defense']['pts']);
     }
 
     /**
@@ -174,10 +174,10 @@ class TeamOffDefStatsServiceTest extends TestCase
         $averages = $result[0]['offense_averages'];
 
         // FGM per game: 355 / 10 = 35.5
-        $this->assertEquals('35.5', $averages['fgm']);
+        $this->assertSame('35.5', $averages['fgm']);
 
         // FG%: 355 / 750 = 0.473
-        $this->assertEquals('0.473', $averages['fgp']);
+        $this->assertSame('0.473', $averages['fgp']);
     }
 
     /**
@@ -227,8 +227,8 @@ class TeamOffDefStatsServiceTest extends TestCase
         $result = $this->service->processTeamStats($rawStats);
 
         $this->assertCount(1, $result);
-        $this->assertEquals('0.0', $result[0]['offense_averages']['fgm']);
-        $this->assertEquals('0.000', $result[0]['offense_averages']['fgp']);
+        $this->assertSame('0.0', $result[0]['offense_averages']['fgm']);
+        $this->assertSame('0.000', $result[0]['offense_averages']['fgp']);
     }
 
     /**
@@ -277,7 +277,7 @@ class TeamOffDefStatsServiceTest extends TestCase
         $result = $this->service->processTeamStats($rawStats);
 
         $this->assertCount(1, $result);
-        $this->assertEquals(0, $result[0]['raw_offense']['fgm']);
+        $this->assertSame(0, $result[0]['raw_offense']['fgm']);
     }
 
     // ========================================
@@ -319,13 +319,13 @@ class TeamOffDefStatsServiceTest extends TestCase
         $result = $this->service->calculateLeagueTotals($processedStats);
 
         // Total FGM should be 100 + 120 = 220
-        $this->assertEquals('220', $result['totals']['fgm']);
+        $this->assertSame('220', $result['totals']['fgm']);
 
         // Total games should be 20
-        $this->assertEquals(20, $result['games']);
+        $this->assertSame(20, $result['games']);
 
         // Average FGM should be 220 / 20 = 11.0
-        $this->assertEquals('11.0', $result['averages']['fgm']);
+        $this->assertSame('11.0', $result['averages']['fgm']);
     }
 
     /**
@@ -335,9 +335,9 @@ class TeamOffDefStatsServiceTest extends TestCase
     {
         $result = $this->service->calculateLeagueTotals([]);
 
-        $this->assertEquals(0, $result['games']);
-        $this->assertEquals('0', $result['totals']['fgm']);
-        $this->assertEquals('0.0', $result['averages']['fgm']);
+        $this->assertSame(0, $result['games']);
+        $this->assertSame('0', $result['totals']['fgm']);
+        $this->assertSame('0.0', $result['averages']['fgm']);
     }
 
     // ========================================
@@ -395,10 +395,10 @@ class TeamOffDefStatsServiceTest extends TestCase
         $diffs = $result[0]['differentials'];
 
         // FGM per game: (400/10) - (350/10) = 40 - 35 = 5.00
-        $this->assertEquals('5.00', $diffs['fgm']);
+        $this->assertSame('5.00', $diffs['fgm']);
 
         // Points per game: (1100/10) - (970/10) = 110 - 97 = 13.00
-        $this->assertEquals('13.00', $diffs['pts']);
+        $this->assertSame('13.00', $diffs['pts']);
     }
 
     /**
@@ -424,7 +424,7 @@ class TeamOffDefStatsServiceTest extends TestCase
         $diffs = $result[0]['differentials'];
 
         // FGM per game: (300/10) - (350/10) = 30 - 35 = -5.00
-        $this->assertEquals('-5.00', $diffs['fgm']);
+        $this->assertSame('-5.00', $diffs['fgm']);
     }
 
     // ========================================

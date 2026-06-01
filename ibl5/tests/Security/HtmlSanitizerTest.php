@@ -21,7 +21,7 @@ class HtmlSanitizerTest extends TestCase
         
         // Should remove backslash and properly encode for HTML
         // Note: ENT_HTML5 encodes apostrophes as &apos;
-        $this->assertEquals("Jermaine O&apos;Neal", $result);
+        $this->assertSame("Jermaine O&apos;Neal", $result);
     }
 
     /**
@@ -35,7 +35,7 @@ class HtmlSanitizerTest extends TestCase
         $result = HtmlSanitizer::safeHtmlOutput($dbValue);
         
         // Should remove backslash and properly encode for HTML
-        $this->assertEquals("John &quot;The Rock&quot; Johnson", $result);
+        $this->assertSame("John &quot;The Rock&quot; Johnson", $result);
     }
 
     /**
@@ -49,7 +49,7 @@ class HtmlSanitizerTest extends TestCase
         $result = HtmlSanitizer::safeHtmlOutput($dbValue);
         
         // Should handle both apostrophes and ampersands
-        $this->assertEquals("O&apos;Brien &amp; D&apos;Angelo", $result);
+        $this->assertSame("O&apos;Brien &amp; D&apos;Angelo", $result);
     }
 
     /**
@@ -63,7 +63,7 @@ class HtmlSanitizerTest extends TestCase
         $result = HtmlSanitizer::safeHtmlOutput($dbValue);
         
         // Should encode HTML tags and handle escaped quotes
-        $this->assertEquals("&lt;script&gt;alert(&apos;xss&apos;)&lt;/script&gt;", $result);
+        $this->assertSame("&lt;script&gt;alert(&apos;xss&apos;)&lt;/script&gt;", $result);
     }
 
     /**
@@ -77,7 +77,7 @@ class HtmlSanitizerTest extends TestCase
         $result = HtmlSanitizer::safeHtmlOutput($dbValue);
         
         // Should be safe for use in HTML attributes
-        $this->assertEquals("Jermaine O&apos;Neal", $result);
+        $this->assertSame("Jermaine O&apos;Neal", $result);
         
         // Verify it's safe in an HTML attribute context
         $html = "<input type='hidden' value='$result'>";
@@ -95,7 +95,7 @@ class HtmlSanitizerTest extends TestCase
         
         $result = HtmlSanitizer::safeHtmlOutput($dbValue);
         
-        $this->assertEquals("John Smith", $result);
+        $this->assertSame("John Smith", $result);
     }
 
     /**
@@ -109,7 +109,7 @@ class HtmlSanitizerTest extends TestCase
         $result = HtmlSanitizer::safeHtmlOutput($dbValue);
         
         // stripslashes will remove single backslash
-        $this->assertEquals("PlayernName", $result);
+        $this->assertSame("PlayernName", $result);
     }
 
     /**
@@ -122,7 +122,7 @@ class HtmlSanitizerTest extends TestCase
         
         $result = HtmlSanitizer::safeHtmlOutput($dbValue);
         
-        $this->assertEquals("José García", $result);
+        $this->assertSame("José García", $result);
     }
 
     /**
@@ -153,7 +153,7 @@ class HtmlSanitizerTest extends TestCase
         $result = HtmlSanitizer::safeHtmlOutput($dbValue, ENT_NOQUOTES | ENT_HTML5);
         
         // With ENT_NOQUOTES, quotes should not be encoded
-        $this->assertEquals("Test 'with' \"quotes\"", $result);
+        $this->assertSame("Test 'with' \"quotes\"", $result);
     }
 
     /**
@@ -166,7 +166,7 @@ class HtmlSanitizerTest extends TestCase
         $result = HtmlSanitizer::safeHtmlOutput($dbValue);
         
         // Should encode < and > symbols
-        $this->assertEquals("Score: 5 &lt; 10 &amp;&amp; 10 &gt; 5", $result);
+        $this->assertSame("Score: 5 &lt; 10 &amp;&amp; 10 &gt; 5", $result);
     }
 
     /**
@@ -176,7 +176,7 @@ class HtmlSanitizerTest extends TestCase
     {
         $result = HtmlSanitizer::safeHtmlOutput("");
 
-        $this->assertEquals("", $result);
+        $this->assertSame("", $result);
     }
 
     /**

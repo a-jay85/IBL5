@@ -133,7 +133,7 @@ final class OneOnOneGameViewTest extends TestCase
     {
         $html = $this->view->renderErrors([]);
 
-        $this->assertEquals('', $html);
+        $this->assertSame('', $html);
     }
 
     public function testRenderErrorsDisplaysAllErrors(): void

@@ -111,8 +111,8 @@ class CapSpaceServiceTest extends TestCase
 
         $result = $this->service->getDisplayYears($mockSeason);
 
-        $this->assertEquals(2024, $result['beginningYear']);
-        $this->assertEquals(2025, $result['endingYear']);
+        $this->assertSame(2024, $result['beginningYear']);
+        $this->assertSame(2025, $result['endingYear']);
     }
 
     public function testGetDisplayYearsForFreeAgency(): void
@@ -121,8 +121,8 @@ class CapSpaceServiceTest extends TestCase
 
         $result = $this->service->getDisplayYears($mockSeason);
 
-        $this->assertEquals(2025, $result['beginningYear']);
-        $this->assertEquals(2026, $result['endingYear']);
+        $this->assertSame(2025, $result['beginningYear']);
+        $this->assertSame(2026, $result['endingYear']);
     }
 
     public function testGetDisplayYearsForPlayoffs(): void
@@ -131,8 +131,8 @@ class CapSpaceServiceTest extends TestCase
 
         $result = $this->service->getDisplayYears($mockSeason);
 
-        $this->assertEquals(2024, $result['beginningYear']);
-        $this->assertEquals(2025, $result['endingYear']);
+        $this->assertSame(2024, $result['beginningYear']);
+        $this->assertSame(2025, $result['endingYear']);
     }
 
     public function testGetDisplayYearsForDraftPhaseShiftsYearsForward(): void
@@ -142,8 +142,8 @@ class CapSpaceServiceTest extends TestCase
         $result = $this->service->getDisplayYears($mockSeason);
 
         // Draft is an offseason phase — years shift forward by 1
-        $this->assertEquals(2025, $result['beginningYear']);
-        $this->assertEquals(2026, $result['endingYear']);
+        $this->assertSame(2025, $result['beginningYear']);
+        $this->assertSame(2026, $result['endingYear']);
     }
 
     public function testFreeAgencySlotsCalculation(): void
@@ -159,7 +159,7 @@ class CapSpaceServiceTest extends TestCase
 
         $result = $this->service->publicProcessTeamCapData($mockTeam, $mockSeason);
 
-        $this->assertEquals(10, $result['freeAgencySlots']);
+        $this->assertSame(10, $result['freeAgencySlots']);
     }
 
     public function testAvailableSalaryStructure(): void

@@ -151,7 +151,7 @@ class PlayerStatsRepositoryTest extends TestCase
         $result = $this->repository->getSeasonCareerAverages('Test Player');
         
         $this->assertIsArray($result);
-        $this->assertEquals(500, $result['games']);
+        $this->assertSame(500, $result['games']);
     }
 
     public function testGetPlayoffCareerAveragesReturnsNullWhenNoData(): void
@@ -199,7 +199,7 @@ class PlayerStatsRepositoryTest extends TestCase
         $result = $this->repository->getSeasonCareerAveragesById(1);
         
         $this->assertIsArray($result);
-        $this->assertEquals(1, $result['pid']);
-        $this->assertEquals(500, $result['games']);
+        $this->assertSame(1, $result['pid']);
+        $this->assertSame(500, $result['games']);
     }
 }

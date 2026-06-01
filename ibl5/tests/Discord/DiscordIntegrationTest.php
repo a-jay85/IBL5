@@ -68,7 +68,7 @@ class DiscordIntegrationTest extends WideUnitTestCase
         $discord = new Discord($this->mockCommonRepo);
         $result = $discord->getDiscordIDFromTeamname('Test Team');
 
-        $this->assertEquals('123456789012345678', $result);
+        $this->assertSame('123456789012345678', $result);
     }
 
     /**
@@ -81,7 +81,7 @@ class DiscordIntegrationTest extends WideUnitTestCase
         $discord = new Discord($this->mockCommonRepo);
         $result = $discord->getDiscordIDFromTeamname('NonExistent Team');
 
-        $this->assertEquals('', $result);
+        $this->assertSame('', $result);
     }
 
     /**
@@ -94,7 +94,7 @@ class DiscordIntegrationTest extends WideUnitTestCase
         $discord = new Discord($this->mockCommonRepo);
         $result = $discord->getDiscordIDFromTeamname('Team With Null ID');
 
-        $this->assertEquals('', $result);
+        $this->assertSame('', $result);
     }
 
     /**
@@ -122,7 +122,7 @@ class DiscordIntegrationTest extends WideUnitTestCase
         $discord = new Discord($this->mockCommonRepo);
         $result = $discord->getDiscordIDFromTeamname("Team's Name");
 
-        $this->assertEquals('999888777666555444', $result);
+        $this->assertSame('999888777666555444', $result);
     }
 
     /**
@@ -203,7 +203,7 @@ class DiscordIntegrationTest extends WideUnitTestCase
         $channelWithHash = '#transactions';
         $channelWithoutHash = ltrim($channelWithHash, '#');
 
-        $this->assertEquals('transactions', $channelWithoutHash);
+        $this->assertSame('transactions', $channelWithoutHash);
     }
 
     /**
@@ -214,7 +214,7 @@ class DiscordIntegrationTest extends WideUnitTestCase
         $channel = 'transactions';
         $channelKey = ltrim($channel, '#');
 
-        $this->assertEquals('transactions', $channelKey);
+        $this->assertSame('transactions', $channelKey);
     }
 
     /**
@@ -290,7 +290,7 @@ class DiscordIntegrationTest extends WideUnitTestCase
         $discordId = '123456789012345678';
         $mention = "<@!{$discordId}>";
 
-        $this->assertEquals('<@!123456789012345678>', $mention);
+        $this->assertSame('<@!123456789012345678>', $mention);
     }
 
     /**
@@ -301,7 +301,7 @@ class DiscordIntegrationTest extends WideUnitTestCase
         $channelId = '987654321098765432';
         $mention = "<#{$channelId}>";
 
-        $this->assertEquals('<#987654321098765432>', $mention);
+        $this->assertSame('<#987654321098765432>', $mention);
     }
 
     /**
@@ -312,7 +312,7 @@ class DiscordIntegrationTest extends WideUnitTestCase
         $roleId = '555555555555555555';
         $mention = "<@&{$roleId}>";
 
-        $this->assertEquals('<@&555555555555555555>', $mention);
+        $this->assertSame('<@&555555555555555555>', $mention);
     }
 
     /**

@@ -16,15 +16,15 @@ final class OneOnOneGamePlayerStatsTest extends TestCase
     {
         $stats = new OneOnOneGamePlayerStats();
 
-        $this->assertEquals(0, $stats->fieldGoalsMade);
-        $this->assertEquals(0, $stats->fieldGoalsAttempted);
-        $this->assertEquals(0, $stats->threePointersMade);
-        $this->assertEquals(0, $stats->threePointersAttempted);
-        $this->assertEquals(0, $stats->offensiveRebounds);
-        $this->assertEquals(0, $stats->totalRebounds);
-        $this->assertEquals(0, $stats->steals);
-        $this->assertEquals(0, $stats->blocks);
-        $this->assertEquals(0, $stats->turnovers);
-        $this->assertEquals(0, $stats->fouls);
+        $this->assertSame(0, $stats->fieldGoalsMade);
+        $this->assertSame(0, $stats->fieldGoalsAttempted);
+        $this->assertSame(0, $stats->threePointersMade);
+        $this->assertSame(0, $stats->threePointersAttempted);
+        $this->assertSame(0, $stats->offensiveRebounds);
+        $this->assertSame(0, $stats->totalRebounds);
+        $this->assertSame(0, $stats->steals);
+        $this->assertSame(0, $stats->blocks);
+        $this->assertSame(0, $stats->turnovers);
+        $this->assertSame(0, $stats->fouls);
     }
 }

@@ -78,8 +78,8 @@ class NegotiationRepositoryTest extends TestCase
         $this->assertIsArray($result);
         $this->assertArrayHasKey('contract_wins', $result);
         $this->assertArrayHasKey('contract_losses', $result);
-        $this->assertEquals(41, $result['contract_wins']);
-        $this->assertEquals(41, $result['contract_losses']);
+        $this->assertSame(41, $result['contract_wins']);
+        $this->assertSame(41, $result['contract_losses']);
     }
 
     public function testGetTeamPerformanceReturnsTeamData(): void
@@ -97,8 +97,8 @@ class NegotiationRepositoryTest extends TestCase
         $result = $repository->getTeamPerformance('Test Team');
 
         $this->assertIsArray($result);
-        $this->assertEquals(50, $result['contract_wins']);
-        $this->assertEquals(32, $result['contract_losses']);
+        $this->assertSame(50, $result['contract_wins']);
+        $this->assertSame(32, $result['contract_losses']);
     }
 
     // ============================================
@@ -113,7 +113,7 @@ class NegotiationRepositoryTest extends TestCase
         $result = $repository->getPositionSalaryCommitment('Test Team', 'G', 'Excluded Player');
 
         $this->assertIsInt($result);
-        $this->assertEquals(0, $result);
+        $this->assertSame(0, $result);
     }
 
     // ============================================

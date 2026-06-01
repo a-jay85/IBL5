@@ -192,8 +192,8 @@ final class OneOnOneGameEngineTest extends TestCase
 
         $result = $this->engine->simulateGame($player1Data, $player2Data, 'TestOwner');
 
-        $this->assertEquals('Michael Jordan', $result->player1Name);
-        $this->assertEquals('LeBron James', $result->player2Name);
+        $this->assertSame('Michael Jordan', $result->player1Name);
+        $this->assertSame('LeBron James', $result->player2Name);
     }
 
     public function testSimulateGameSetsOwner(): void
@@ -203,7 +203,7 @@ final class OneOnOneGameEngineTest extends TestCase
 
         $result = $this->engine->simulateGame($player1Data, $player2Data, 'GameOwner');
 
-        $this->assertEquals('GameOwner', $result->owner);
+        $this->assertSame('GameOwner', $result->owner);
     }
 
     public function testSimulateGameEndsAt21Points(): void

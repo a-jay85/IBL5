@@ -33,8 +33,8 @@ class DateParserTest extends TestCase
         );
 
         $this->assertIsArray($result);
-        $this->assertEquals(11, $result['month']);
-        $this->assertEquals(1, $result['day']);
+        $this->assertSame(11, $result['month']);
+        $this->assertSame(1, $result['day']);
     }
 
     public function testExtractDateReturnsNullForEmptyString(): void
@@ -76,8 +76,8 @@ class DateParserTest extends TestCase
         );
 
         $this->assertIsArray($result);
-        $this->assertEquals(6, $result['month']);
-        $this->assertEquals(15, $result['day']);
+        $this->assertSame(6, $result['month']);
+        $this->assertSame(15, $result['day']);
     }
 
     public function testExtractDateHandlesPostDateWithDifferentDays(): void
@@ -90,8 +90,8 @@ class DateParserTest extends TestCase
             'IBL'
         );
 
-        $this->assertEquals(6, $result['month']);
-        $this->assertEquals(1, $result['day']);
+        $this->assertSame(6, $result['month']);
+        $this->assertSame(1, $result['day']);
     }
 
     // Year Determination Based on Month
@@ -107,7 +107,7 @@ class DateParserTest extends TestCase
             'IBL'
         );
 
-        $this->assertEquals(2023, $result['year']);
+        $this->assertSame(2023, $result['year']);
     }
 
     public function testExtractDateUsesEndingYearForWinterMonths(): void
@@ -121,7 +121,7 @@ class DateParserTest extends TestCase
             'IBL'
         );
 
-        $this->assertEquals(2024, $result['year']);
+        $this->assertSame(2024, $result['year']);
     }
 
     public function testExtractDateUsesEndingYearForSpringMonths(): void
@@ -135,7 +135,7 @@ class DateParserTest extends TestCase
             'IBL'
         );
 
-        $this->assertEquals(2024, $result['year']);
+        $this->assertSame(2024, $result['year']);
     }
 
     // Preseason Phase
@@ -151,7 +151,7 @@ class DateParserTest extends TestCase
         );
 
         $this->assertIsArray($result);
-        $this->assertEquals(2023, $result['year']);
+        $this->assertSame(2023, $result['year']);
     }
 
     public function testExtractDatePreseasonRemapsNovemberToSeptember(): void
@@ -165,8 +165,8 @@ class DateParserTest extends TestCase
         );
 
         $this->assertIsArray($result);
-        $this->assertEquals(9, $result['month']);
-        $this->assertEquals(2023, $result['year']);
+        $this->assertSame(9, $result['month']);
+        $this->assertSame(2023, $result['year']);
     }
 
     public function testExtractDatePreseasonRemapsDecemberToOctober(): void
@@ -180,8 +180,8 @@ class DateParserTest extends TestCase
         );
 
         $this->assertIsArray($result);
-        $this->assertEquals(10, $result['month']);
-        $this->assertEquals(2023, $result['year']);
+        $this->assertSame(10, $result['month']);
+        $this->assertSame(2023, $result['year']);
     }
 
     public function testExtractDateSeptemberRoutesToBeginningYear(): void
@@ -195,8 +195,8 @@ class DateParserTest extends TestCase
         );
 
         $this->assertIsArray($result);
-        $this->assertEquals(9, $result['month']);
-        $this->assertEquals(2023, $result['year']);
+        $this->assertSame(9, $result['month']);
+        $this->assertSame(2023, $result['year']);
     }
 
     // Date Format Output
@@ -244,7 +244,7 @@ class DateParserTest extends TestCase
         );
 
         $this->assertIsArray($result);
-        $this->assertEquals(Season::IBL_OLYMPICS_MONTH, $result['month']);
+        $this->assertSame(Season::IBL_OLYMPICS_MONTH, $result['month']);
     }
 
     public function testExtractDateOlympicsCaseInsensitive(): void
@@ -257,7 +257,7 @@ class DateParserTest extends TestCase
             'OLYMPICS'
         );
 
-        $this->assertEquals(Season::IBL_OLYMPICS_MONTH, $result['month']);
+        $this->assertSame(Season::IBL_OLYMPICS_MONTH, $result['month']);
     }
 
     // Edge Cases
@@ -272,7 +272,7 @@ class DateParserTest extends TestCase
             'IBL'
         );
 
-        $this->assertEquals(5, $result['day']);
+        $this->assertSame(5, $result['day']);
     }
 
     public function testExtractDateHandlesDoubleDigitDay(): void
@@ -285,6 +285,6 @@ class DateParserTest extends TestCase
             'IBL'
         );
 
-        $this->assertEquals(25, $result['day']);
+        $this->assertSame(25, $result['day']);
     }
 }

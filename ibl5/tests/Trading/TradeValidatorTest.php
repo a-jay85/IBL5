@@ -92,8 +92,8 @@ class TradeValidatorTest extends TestCase
         // Assert
         $this->assertTrue($result['valid'], 'Valid salary caps should pass validation');
         $this->assertEmpty($result['errors'], 'No errors should be returned for valid caps');
-        $this->assertEquals(4900, $result['userPostTradeCapTotal']); // 5000 - 500 + 400
-        $this->assertEquals(5600, $result['partnerPostTradeCapTotal']); // 5500 - 400 + 500
+        $this->assertSame(4900, $result['userPostTradeCapTotal']); // 5000 - 500 + 400
+        $this->assertSame(5600, $result['partnerPostTradeCapTotal']); // 5500 - 400 + 500
     }
 
     /**
@@ -125,8 +125,8 @@ class TradeValidatorTest extends TestCase
         $result = $this->validator->getCurrentSeasonCashConsiderations($userCash, $partnerCash);
 
         // Assert
-        $this->assertEquals(100, $result['cashSentToThem']);
-        $this->assertEquals(150, $result['cashSentToMe']);
+        $this->assertSame(100, $result['cashSentToThem']);
+        $this->assertSame(150, $result['cashSentToMe']);
         $this->assertArrayHasKey('cashSentToThem', $result);
         $this->assertArrayHasKey('cashSentToMe', $result);
     }
@@ -164,7 +164,7 @@ class TradeValidatorTest extends TestCase
         $result = $this->validator->canPlayerBeTraded($playerId);
 
         // Assert
-        $this->assertEquals($expectedResult, $result, $reason);
+        $this->assertSame($expectedResult, $result, $reason);
     }
 
     /**
@@ -402,7 +402,7 @@ class TradeValidatorTest extends TestCase
         $result = $this->validator->validateSalaryCaps($tradeData);
 
         $this->assertTrue($result['valid']);
-        $this->assertEquals(League::HARD_CAP_MAX, $result['userPostTradeCapTotal']);
+        $this->assertSame(League::HARD_CAP_MAX, $result['userPostTradeCapTotal']);
     }
 
     /**
@@ -420,7 +420,7 @@ class TradeValidatorTest extends TestCase
         $result = $this->validator->validateSalaryCaps($tradeData);
 
         $this->assertFalse($result['valid']);
-        $this->assertEquals(League::HARD_CAP_MAX + 1, $result['userPostTradeCapTotal']);
+        $this->assertSame(League::HARD_CAP_MAX + 1, $result['userPostTradeCapTotal']);
     }
 
     /**
@@ -438,8 +438,8 @@ class TradeValidatorTest extends TestCase
         $result = $this->validator->validateSalaryCaps($tradeData);
 
         $this->assertTrue($result['valid']);
-        $this->assertEquals(League::HARD_CAP_MAX, $result['userPostTradeCapTotal']);
-        $this->assertEquals(League::HARD_CAP_MAX, $result['partnerPostTradeCapTotal']);
+        $this->assertSame(League::HARD_CAP_MAX, $result['userPostTradeCapTotal']);
+        $this->assertSame(League::HARD_CAP_MAX, $result['partnerPostTradeCapTotal']);
     }
 
     /**
@@ -497,8 +497,8 @@ class TradeValidatorTest extends TestCase
         // User: 5000 - 100 + 0 = 4900
         // Partner: 0 - 0 + 100 = 100
         $this->assertTrue($result['valid']);
-        $this->assertEquals(4900, $result['userPostTradeCapTotal']);
-        $this->assertEquals(100, $result['partnerPostTradeCapTotal']);
+        $this->assertSame(4900, $result['userPostTradeCapTotal']);
+        $this->assertSame(100, $result['partnerPostTradeCapTotal']);
     }
 
     /**
@@ -510,8 +510,8 @@ class TradeValidatorTest extends TestCase
 
         // All values default to 0, so both teams at 0
         $this->assertTrue($result['valid']);
-        $this->assertEquals(0, $result['userPostTradeCapTotal']);
-        $this->assertEquals(0, $result['partnerPostTradeCapTotal']);
+        $this->assertSame(0, $result['userPostTradeCapTotal']);
+        $this->assertSame(0, $result['partnerPostTradeCapTotal']);
     }
 
     // ============================================
@@ -717,8 +717,8 @@ class TradeValidatorTest extends TestCase
     {
         $result = $this->validator->getCurrentSeasonCashConsiderations([], []);
 
-        $this->assertEquals(0, $result['cashSentToThem']);
-        $this->assertEquals(0, $result['cashSentToMe']);
+        $this->assertSame(0, $result['cashSentToThem']);
+        $this->assertSame(0, $result['cashSentToMe']);
     }
 
     /**
@@ -733,8 +733,8 @@ class TradeValidatorTest extends TestCase
         $result = $this->validator->getCurrentSeasonCashConsiderations($userCash, $partnerCash);
 
         // Should return year 1 values (0) since we're in Regular Season by default
-        $this->assertEquals(0, $result['cashSentToThem']);
-        $this->assertEquals(0, $result['cashSentToMe']);
+        $this->assertSame(0, $result['cashSentToThem']);
+        $this->assertSame(0, $result['cashSentToMe']);
     }
 
     // ============================================
@@ -756,7 +756,7 @@ class TradeValidatorTest extends TestCase
         $result = $this->validator->validateSalaryCaps($tradeData);
 
         $this->assertFalse($result['valid']);
-        $this->assertEquals(999999, $result['userPostTradeCapTotal']);
+        $this->assertSame(999999, $result['userPostTradeCapTotal']);
     }
 
     /**
@@ -794,7 +794,7 @@ class TradeValidatorTest extends TestCase
 
         $result = $this->validator->validateSalaryCaps($tradeData);
 
-        $this->assertEquals($expectedValid, $result['valid']);
+        $this->assertSame($expectedValid, $result['valid']);
     }
 
     public static function boundaryCapValuesProvider(): array

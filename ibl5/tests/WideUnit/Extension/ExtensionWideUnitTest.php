@@ -359,7 +359,7 @@ class ExtensionWideUnitTest extends WideUnitTestCase
 
         // Assert
         $this->assertTrue($result['success']);
-        $this->assertEquals(3, $result['extensionYears']);
+        $this->assertSame(3, $result['extensionYears']);
     }
 
     /**
@@ -388,7 +388,7 @@ class ExtensionWideUnitTest extends WideUnitTestCase
 
         // Assert
         $this->assertTrue($result['success']);
-        $this->assertEquals(5, $result['extensionYears']);
+        $this->assertSame(5, $result['extensionYears']);
     }
 
     /**

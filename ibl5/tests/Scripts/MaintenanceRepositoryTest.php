@@ -39,7 +39,7 @@ class MaintenanceRepositoryTest extends TestCase
 
         $this->assertIsArray($result);
         $this->assertCount(2, $result);
-        $this->assertEquals('Boston', $result[0]['team_name']);
+        $this->assertSame('Boston', $result[0]['team_name']);
     }
 
     public function testGetAllTeamsExcludesFreeAgents(): void
@@ -63,7 +63,7 @@ class MaintenanceRepositoryTest extends TestCase
 
         $this->assertIsArray($result);
         $this->assertCount(2, $result);
-        $this->assertEquals(50, $result[0]['wins']);
+        $this->assertSame(50, $result[0]['wins']);
     }
 
     public function testGetTeamRecentCompleteSeasonsUsesLimit(): void
@@ -97,7 +97,7 @@ class MaintenanceRepositoryTest extends TestCase
 
         $result = $this->repository->getSetting('League File Name');
 
-        $this->assertEquals('IBL5', $result);
+        $this->assertSame('IBL5', $result);
     }
 
     public function testGetSettingReturnsNullWhenNotFound(): void

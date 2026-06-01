@@ -222,12 +222,12 @@ class ScheduleWideUnitTest extends WideUnitTestCase
 
         // Assert - After 3 wins, should show 3-0
         $this->assertCount(3, $processed);
-        $this->assertEquals(1, $processed[0]['wins']);
-        $this->assertEquals(0, $processed[0]['losses']);
-        $this->assertEquals(2, $processed[1]['wins']);
-        $this->assertEquals(0, $processed[1]['losses']);
-        $this->assertEquals(3, $processed[2]['wins']);
-        $this->assertEquals(0, $processed[2]['losses']);
+        $this->assertSame(1, $processed[0]['wins']);
+        $this->assertSame(0, $processed[0]['losses']);
+        $this->assertSame(2, $processed[1]['wins']);
+        $this->assertSame(0, $processed[1]['losses']);
+        $this->assertSame(3, $processed[2]['wins']);
+        $this->assertSame(0, $processed[2]['losses']);
     }
 
     /**
@@ -252,10 +252,10 @@ class ScheduleWideUnitTest extends WideUnitTestCase
 
         // Assert
         $this->assertCount(2, $processed);
-        $this->assertEquals(0, $processed[0]['wins']);
-        $this->assertEquals(1, $processed[0]['losses']);
-        $this->assertEquals(0, $processed[1]['wins']);
-        $this->assertEquals(2, $processed[1]['losses']);
+        $this->assertSame(0, $processed[0]['wins']);
+        $this->assertSame(1, $processed[0]['losses']);
+        $this->assertSame(0, $processed[1]['wins']);
+        $this->assertSame(2, $processed[1]['losses']);
     }
 
     /**
@@ -281,12 +281,12 @@ class ScheduleWideUnitTest extends WideUnitTestCase
 
         // Assert
         $this->assertCount(3, $processed);
-        $this->assertEquals(1, $processed[0]['wins']);
-        $this->assertEquals(0, $processed[0]['losses']);
-        $this->assertEquals(1, $processed[1]['wins']);
-        $this->assertEquals(1, $processed[1]['losses']);
-        $this->assertEquals(2, $processed[2]['wins']);
-        $this->assertEquals(1, $processed[2]['losses']);
+        $this->assertSame(1, $processed[0]['wins']);
+        $this->assertSame(0, $processed[0]['losses']);
+        $this->assertSame(1, $processed[1]['wins']);
+        $this->assertSame(1, $processed[1]['losses']);
+        $this->assertSame(2, $processed[2]['wins']);
+        $this->assertSame(1, $processed[2]['losses']);
     }
 
     // ========== SERVICE STREAK CALCULATION TESTS ==========
@@ -314,9 +314,9 @@ class ScheduleWideUnitTest extends WideUnitTestCase
         $processed = $this->service->getProcessedSchedule($teamId, $season);
 
         // Assert
-        $this->assertEquals('W 1', $processed[0]['streak']);
-        $this->assertEquals('W 2', $processed[1]['streak']);
-        $this->assertEquals('W 3', $processed[2]['streak']);
+        $this->assertSame('W 1', $processed[0]['streak']);
+        $this->assertSame('W 2', $processed[1]['streak']);
+        $this->assertSame('W 3', $processed[2]['streak']);
     }
 
     /**
@@ -341,8 +341,8 @@ class ScheduleWideUnitTest extends WideUnitTestCase
         $processed = $this->service->getProcessedSchedule($teamId, $season);
 
         // Assert
-        $this->assertEquals('L 1', $processed[0]['streak']);
-        $this->assertEquals('L 2', $processed[1]['streak']);
+        $this->assertSame('L 1', $processed[0]['streak']);
+        $this->assertSame('L 2', $processed[1]['streak']);
     }
 
     /**
@@ -369,10 +369,10 @@ class ScheduleWideUnitTest extends WideUnitTestCase
         $processed = $this->service->getProcessedSchedule($teamId, $season);
 
         // Assert
-        $this->assertEquals('W 1', $processed[0]['streak']);
-        $this->assertEquals('W 2', $processed[1]['streak']);
-        $this->assertEquals('L 1', $processed[2]['streak']); // Reset
-        $this->assertEquals('L 2', $processed[3]['streak']);
+        $this->assertSame('W 1', $processed[0]['streak']);
+        $this->assertSame('W 2', $processed[1]['streak']);
+        $this->assertSame('L 1', $processed[2]['streak']); // Reset
+        $this->assertSame('L 2', $processed[3]['streak']);
     }
 
     // ========== SERVICE UNPLAYED GAME TESTS ==========
@@ -425,14 +425,14 @@ class ScheduleWideUnitTest extends WideUnitTestCase
         $processed = $this->service->getProcessedSchedule($teamId, $season);
 
         // Assert - Played game has values
-        $this->assertEquals('W', $processed[0]['gameResult']);
-        $this->assertEquals(1, $processed[0]['wins']);
-        $this->assertEquals('green', $processed[0]['winLossColor']);
+        $this->assertSame('W', $processed[0]['gameResult']);
+        $this->assertSame(1, $processed[0]['wins']);
+        $this->assertSame('green', $processed[0]['winLossColor']);
 
         // Unplayed game has empty values
-        $this->assertEquals('', $processed[1]['gameResult']);
-        $this->assertEquals(0, $processed[1]['wins']);
-        $this->assertEquals('', $processed[1]['winLossColor']);
+        $this->assertSame('', $processed[1]['gameResult']);
+        $this->assertSame(0, $processed[1]['wins']);
+        $this->assertSame('', $processed[1]['winLossColor']);
     }
 
     // ========== SERVICE NEXT-SIM HIGHLIGHTING TESTS ==========
@@ -460,8 +460,8 @@ class ScheduleWideUnitTest extends WideUnitTestCase
         $processed = $this->service->getProcessedSchedule($teamId, $season);
 
         // Assert
-        $this->assertEquals('next-sim', $processed[0]['highlight']);
-        $this->assertEquals('next-sim', $processed[1]['highlight']);
+        $this->assertSame('next-sim', $processed[0]['highlight']);
+        $this->assertSame('next-sim', $processed[1]['highlight']);
     }
 
     /**
@@ -487,8 +487,8 @@ class ScheduleWideUnitTest extends WideUnitTestCase
         $processed = $this->service->getProcessedSchedule($teamId, $season);
 
         // Assert
-        $this->assertEquals('', $processed[0]['highlight']);
-        $this->assertEquals('', $processed[1]['highlight']);
+        $this->assertSame('', $processed[0]['highlight']);
+        $this->assertSame('', $processed[1]['highlight']);
     }
 
     /**
@@ -512,7 +512,7 @@ class ScheduleWideUnitTest extends WideUnitTestCase
         $processed = $this->service->getProcessedSchedule($teamId, $season);
 
         // Assert - Played games don't have highlight regardless of date
-        $this->assertEquals('', $processed[0]['highlight']);
+        $this->assertSame('', $processed[0]['highlight']);
     }
 
     // ========== SERVICE MONTH GROUPING TESTS ==========
@@ -538,8 +538,8 @@ class ScheduleWideUnitTest extends WideUnitTestCase
         $processed = $this->service->getProcessedSchedule($teamId, $season);
 
         // Assert
-        $this->assertEquals('January', $processed[0]['currentMonth']);
-        $this->assertEquals('February', $processed[1]['currentMonth']);
+        $this->assertSame('January', $processed[0]['currentMonth']);
+        $this->assertSame('February', $processed[1]['currentMonth']);
     }
 
     // ========== SERVICE OPPONENT IDENTIFICATION TESTS ==========
@@ -612,7 +612,7 @@ class ScheduleWideUnitTest extends WideUnitTestCase
         $processed = $this->service->getProcessedSchedule($teamId, $season);
 
         // Assert
-        $this->assertEquals('green', $processed[0]['winLossColor']);
+        $this->assertSame('green', $processed[0]['winLossColor']);
     }
 
     /**
@@ -635,7 +635,7 @@ class ScheduleWideUnitTest extends WideUnitTestCase
         $processed = $this->service->getProcessedSchedule($teamId, $season);
 
         // Assert
-        $this->assertEquals('red', $processed[0]['winLossColor']);
+        $this->assertSame('red', $processed[0]['winLossColor']);
     }
 
     // ========== VIEW RENDERING TESTS ==========
@@ -812,28 +812,28 @@ class ScheduleWideUnitTest extends WideUnitTestCase
         $this->assertCount(5, $processed);
 
         // Game 1: Win (1-0)
-        $this->assertEquals('W', $processed[0]['gameResult']);
-        $this->assertEquals(1, $processed[0]['wins']);
-        $this->assertEquals(0, $processed[0]['losses']);
+        $this->assertSame('W', $processed[0]['gameResult']);
+        $this->assertSame(1, $processed[0]['wins']);
+        $this->assertSame(0, $processed[0]['losses']);
 
         // Game 2: Loss (1-1)
-        $this->assertEquals('L', $processed[1]['gameResult']);
-        $this->assertEquals(1, $processed[1]['wins']);
-        $this->assertEquals(1, $processed[1]['losses']);
+        $this->assertSame('L', $processed[1]['gameResult']);
+        $this->assertSame(1, $processed[1]['wins']);
+        $this->assertSame(1, $processed[1]['losses']);
 
         // Game 3: Win (2-1)
-        $this->assertEquals('W', $processed[2]['gameResult']);
-        $this->assertEquals(2, $processed[2]['wins']);
-        $this->assertEquals(1, $processed[2]['losses']);
+        $this->assertSame('W', $processed[2]['gameResult']);
+        $this->assertSame(2, $processed[2]['wins']);
+        $this->assertSame(1, $processed[2]['losses']);
 
         // Game 4: Loss (2-2)
-        $this->assertEquals('L', $processed[3]['gameResult']);
-        $this->assertEquals(2, $processed[3]['wins']);
-        $this->assertEquals(2, $processed[3]['losses']);
+        $this->assertSame('L', $processed[3]['gameResult']);
+        $this->assertSame(2, $processed[3]['wins']);
+        $this->assertSame(2, $processed[3]['losses']);
 
         // Game 5: Unplayed - should be highlighted (date is before Feb 5)
         $this->assertTrue($processed[4]['isUnplayed']);
-        $this->assertEquals('next-sim', $processed[4]['highlight']);
+        $this->assertSame('next-sim', $processed[4]['highlight']);
     }
 
     /**

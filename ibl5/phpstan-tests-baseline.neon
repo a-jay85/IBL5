@@ -343,46 +343,10 @@ parameters:
 			path: tests/Auth/DevAutoLoginTest.php
 
 		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 5
-			path: tests/AwardHistory/AwardHistoryRepositoryTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 5
-			path: tests/AwardHistory/AwardHistoryServiceTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 20
-			path: tests/AwardHistory/AwardHistoryValidatorTest.php
-
-		-
 			rawMessage: 'Parameter #1 $award of method AwardHistory\AwardHistoryView::renderAwardRow() expects array{year: int, award: string, name: string, pid?: int}, array{year: null, award: null, name: null} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/AwardHistory/AwardHistoryViewTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 13
-			path: tests/BasketballStats/SalaryConverterTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 50
-			path: tests/BasketballStats/StatsFormatterTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 34
-			path: tests/BasketballStats/StatsSanitizerTest.php
 
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
@@ -517,12 +481,6 @@ parameters:
 			path: tests/Cache/PageCacheTest.php
 
 		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 9
-			path: tests/CapSpace/CapSpaceServiceTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''CapSpace\\Contracts\\CapSpaceViewInterface'' and CapSpace\Contracts\CapSpaceViewInterface will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -539,18 +497,6 @@ parameters:
 			identifier: staticMethod.dynamicCall
 			count: 7
 			path: tests/CareerLeaderboards/CachedCareerLeaderboardsRepositoryTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 17
-			path: tests/CareerLeaderboards/CareerLeaderboardsRepositoryTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 31
-			path: tests/CareerLeaderboards/CareerLeaderboardsServiceTest.php
 
 		-
 			rawMessage: Short ternary operator is not allowed. Use null coalesce operator if applicable or consider using long ternary.
@@ -679,7 +625,37 @@ parameters:
 			path: tests/ContractRulesTest.php
 
 		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with 0.1 and 0.1 will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/ContractRulesTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with 0.125 and 0.125 will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/ContractRulesTest.php
+
+		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with 100 and 100 will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/ContractRulesTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with 1063 and 1063 will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/ContractRulesTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with 1275 and 1275 will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/ContractRulesTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with 145 and 145 will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
 			path: tests/ContractRulesTest.php
@@ -691,9 +667,9 @@ parameters:
 			path: tests/ContractRulesTest.php
 
 		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 47
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with 3 and 3 will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
 			path: tests/ContractRulesTest.php
 
 		-
@@ -897,13 +873,7 @@ parameters:
 		-
 			rawMessage: 'Parameter #1 $player of method DepthChartEntry\DepthChartEntryView::renderPlayerRow() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ..., ...<string, mixed>}, array{pid: 1, name: ''Round Trip Player'', pos: ''SG'', injured: 0, stamina: 60, dc_pg_depth: 0, dc_sg_depth: 1, dc_sf_depth: 2, ...} given.'
 			identifier: argument.type
-			count: 1
-			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $player of method DepthChartEntry\DepthChartEntryView::renderPlayerRow() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ..., ...<string, mixed>}, array{pid: 1, name: ''Round Trip Player'', pos: ''SG'', injured: 0, stamina: 60, dc_pg_depth: int, dc_sg_depth: int, dc_sf_depth: int, ...} given.'
-			identifier: argument.type
-			count: 1
+			count: 2
 			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
 
 		-
@@ -943,10 +913,28 @@ parameters:
 			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
 
 		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 38
-			path: tests/DepthChartEntry/DepthChartEntryProcessorTest.php
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with arguments ''Test Player'', ''Test Player'' and ''Eighth param should…'' will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/DepthChartEntry/DepthChartEntryRepositoryTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with arguments 1, 1 and ''First param should…'' will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/DepthChartEntry/DepthChartEntryRepositoryTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with arguments 2, 2 and ''Second param should…'' will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/DepthChartEntry/DepthChartEntryRepositoryTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with arguments 30, 30 and ''Seventh param…'' will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/DepthChartEntry/DepthChartEntryRepositoryTest.php
 
 		-
 			rawMessage: 'Parameter #2 $depthChartValues of method DepthChartEntry\DepthChartEntryRepository::updatePlayerDepthChart() expects array{pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, ..., ...<string, mixed>}, array{pg: ''1'', sg: ''0'', sf: ''2'', pf: ''0'', c: ''0'', canPlayInGame: ''1'', min: ''30''} given.'
@@ -955,9 +943,9 @@ parameters:
 			path: tests/DepthChartEntry/DepthChartEntryRepositoryTest.php
 
 		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 13
+			rawMessage: 'You should use assertCount($expectedCount, $variable) instead of assertSame($expectedCount, count($variable)).'
+			identifier: phpunit.assertCount
+			count: 6
 			path: tests/DepthChartEntry/DepthChartEntryRepositoryTest.php
 
 		-
@@ -1033,12 +1021,6 @@ parameters:
 			path: tests/DepthChartEntry/DepthChartEntryValidatorTest.php
 
 		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 8
-			path: tests/DepthChartEntry/DepthChartEntryValidatorTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 1
@@ -1063,6 +1045,18 @@ parameters:
 			path: tests/Discord/DiscordIntegrationTest.php
 
 		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with ''<@…'' and ''<@…'' will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 2
+			path: tests/Discord/DiscordIntegrationTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with ''<…'' and ''<…'' will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Discord/DiscordIntegrationTest.php
+
+		-
 			rawMessage: 'Construct empty() is not allowed. Use more strict comparison.'
 			identifier: empty.notAllowed
 			count: 2
@@ -1072,12 +1066,6 @@ parameters:
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 1
-			path: tests/Discord/DiscordIntegrationTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 9
 			path: tests/Discord/DiscordIntegrationTest.php
 
 		-
@@ -1096,12 +1084,6 @@ parameters:
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 2
-			path: tests/Draft/DraftRepositoryTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 1
 			path: tests/Draft/DraftRepositoryTest.php
 
 		-
@@ -1165,12 +1147,6 @@ parameters:
 			path: tests/DraftPickLocator/DraftPickLocatorServiceTest.php
 
 		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 4
-			path: tests/DraftPickLocator/DraftPickLocatorServiceTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''DraftPickLocator\\Contracts\\DraftPickLocatorViewInterface'' and DraftPickLocator\Contracts\DraftPickLocatorViewInterface will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -1186,12 +1162,6 @@ parameters:
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Draft\\DraftPick'' and Draft\DraftPick will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
-			path: tests/DraftPickTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 9
 			path: tests/DraftPickTest.php
 
 		-
@@ -1381,12 +1351,6 @@ parameters:
 			path: tests/Extension/ExtensionOfferEvaluatorTest.php
 
 		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 5
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
 			rawMessage: 'Call to internal method PHPUnit\Framework\TestCase::addToAssertionCount() from outside its root namespace PHPUnit.'
 			identifier: method.internal
 			count: 1
@@ -1510,12 +1474,6 @@ parameters:
 			path: tests/FreeAgency/CommonContractValidatorTest.php
 
 		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 42
-			path: tests/FreeAgency/CommonContractValidatorTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 12
@@ -1555,12 +1513,6 @@ parameters:
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 3
-			path: tests/FreeAgency/FreeAgencyCapCalculatorTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 17
 			path: tests/FreeAgency/FreeAgencyCapCalculatorTest.php
 
 		-
@@ -1642,12 +1594,6 @@ parameters:
 			path: tests/FreeAgency/FreeAgencyRepositoryTest.php
 
 		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 1
-			path: tests/FreeAgency/FreeAgencyRepositoryTest.php
-
-		-
 			rawMessage: 'Array has 2 duplicate keys with value ''r_tvr'' (''r_tvr'', ''r_tvr'').'
 			identifier: array.duplicateKey
 			count: 1
@@ -1708,9 +1654,99 @@ parameters:
 			path: tests/FreeAgency/FreeAgencyViewXssTest.php
 
 		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 28
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with 0 and 0 will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/FreeAgency/OfferTypeTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with 1 and 1 will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/FreeAgency/OfferTypeTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with 145 and 145 will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/FreeAgency/OfferTypeTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with 2 and 2 will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/FreeAgency/OfferTypeTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with 3 and 3 will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/FreeAgency/OfferTypeTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with 4 and 4 will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/FreeAgency/OfferTypeTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with 5 and 5 will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/FreeAgency/OfferTypeTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with 6 and 6 will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/FreeAgency/OfferTypeTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with 7 and 7 will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/FreeAgency/OfferTypeTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with 8 and 8 will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/FreeAgency/OfferTypeTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with arguments 450, 450 and ''Year 1 MLE should…'' will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/FreeAgency/OfferTypeTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with arguments 495, 495 and ''Year 2 MLE should…'' will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/FreeAgency/OfferTypeTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with arguments 540, 540 and ''Year 3 MLE should…'' will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/FreeAgency/OfferTypeTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with arguments 585, 585 and ''Year 4 MLE should…'' will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/FreeAgency/OfferTypeTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with arguments 630, 630 and ''Year 5 MLE should…'' will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/FreeAgency/OfferTypeTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with arguments 675, 675 and ''Year 6 MLE should…'' will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
 			path: tests/FreeAgency/OfferTypeTest.php
 
 		-
@@ -1735,12 +1771,6 @@ parameters:
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''LeagueSchedule\\Game'' and LeagueSchedule\Game will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
-			path: tests/GameTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 12
 			path: tests/GameTest.php
 
 		-
@@ -1852,21 +1882,27 @@ parameters:
 			path: tests/LastSimRecap/NewsModuleIntegrationTest.php
 
 		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 17
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with ''ibl'' and ''ibl'' will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/League/LeagueContextIntegrationTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with ''ibl_league'' and ''ibl_league'' will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/League/LeagueContextIntegrationTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with ''olympics'' and ''olympics'' will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
 			path: tests/League/LeagueContextIntegrationTest.php
 
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertNotSame() with arguments ''ibl_box_scores''|''ibl_box_scores_teams''|''ibl_hist''|''ibl_jsb_history''|''ibl_jsb_transactions''|''ibl_league_config''|''ibl_plr''|''ibl_plr_snapshots''|''ibl_power''|''ibl_rcb_alltime…''|''ibl_rcb_season…''|''ibl_saved_depth…''|''ibl_schedule''|''ibl_standings''|''ibl_team_info'', ''ibl_olympics_box…''|''ibl_olympics_hist''|''ibl_olympics_jsb…''|''ibl_olympics_league…''|''ibl_olympics_plr''|''ibl_olympics_plr…''|''ibl_olympics_power''|''ibl_olympics_rcb…''|''ibl_olympics_saved…''|''ibl_olympics…''|''ibl_olympics_team…'' and ''\''ibl_box_scores\''…''|''\''ibl_box_scores…''|''\''ibl_hist\'' must map…''|''\''ibl_jsb_history\''…''|''\''ibl_jsb…''|''\''ibl_league_config\''…''|''\''ibl_plr\'' must map…''|''\''ibl_plr_snapshots\''…''|''\''ibl_power\'' must…''|''\''ibl_rcb_alltime…''|''\''ibl_rcb_season…''|''\''ibl_saved_depth…''|''\''ibl_schedule\'' must…''|''\''ibl_standings\''…''|''\''ibl_team_info\''…'' will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
-			path: tests/League/LeagueContextTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 18
 			path: tests/League/LeagueContextTest.php
 
 		-
@@ -2045,6 +2081,24 @@ parameters:
 			path: tests/LeagueTest.php
 
 		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with 0 and 0 will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/LeagueTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with 5000 and 5000 will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/LeagueTest.php
+
+		-
+			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertSame() with 7000 and 7000 will always evaluate to true.'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/LeagueTest.php
+
+		-
 			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertSame() with 40 and 40 will always evaluate to true.'
 			identifier: staticMethod.alreadyNarrowedType
 			count: 1
@@ -2066,12 +2120,6 @@ parameters:
 			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertSame() with 51 and 51 will always evaluate to true.'
 			identifier: staticMethod.alreadyNarrowedType
 			count: 1
-			path: tests/LeagueTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 6
 			path: tests/LeagueTest.php
 
 		-
@@ -2171,12 +2219,6 @@ parameters:
 			path: tests/Negotiation/NegotiationDemandCalculatorTest.php
 
 		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 12
-			path: tests/Negotiation/NegotiationDemandCalculatorTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''BaseMysqliRepository'' and Negotiation\NegotiationRepository will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -2198,12 +2240,6 @@ parameters:
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 9
-			path: tests/Negotiation/NegotiationRepositoryTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 5
 			path: tests/Negotiation/NegotiationRepositoryTest.php
 
 		-
@@ -2357,18 +2393,6 @@ parameters:
 			path: tests/OneOnOneGame/OneOnOneGameEngineTest.php
 
 		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 3
-			path: tests/OneOnOneGame/OneOnOneGameEngineTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 10
-			path: tests/OneOnOneGame/OneOnOneGamePlayerStatsTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''BaseMysqliRepository'' and OneOnOneGame\OneOnOneGameRepository will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -2393,28 +2417,10 @@ parameters:
 			path: tests/OneOnOneGame/OneOnOneGameResultTest.php
 
 		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 14
-			path: tests/OneOnOneGame/OneOnOneGameResultTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''OneOnOneGame\\OneOnOneGameResult'' and OneOnOneGame\OneOnOneGameResult will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
 			path: tests/OneOnOneGame/OneOnOneGameServiceTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 3
-			path: tests/OneOnOneGame/OneOnOneGameServiceTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 1
-			path: tests/OneOnOneGame/OneOnOneGameViewTest.php
 
 		-
 			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertSame() with ''testuser'' and ''testuser'' will always evaluate to true.'
@@ -2429,21 +2435,9 @@ parameters:
 			path: tests/PageLayout/PageLayoutHeaderSideEffectTest.php
 
 		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 24
-			path: tests/Player/PlayerContractCalculatorTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 1
-			path: tests/Player/PlayerContractValidatorTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 3
 			path: tests/Player/PlayerContractValidatorTest.php
 
 		-
@@ -2457,12 +2451,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: tests/Player/PlayerImageHelperTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 24
-			path: tests/Player/PlayerInjuryCalculatorTest.php
 
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
@@ -2481,12 +2469,6 @@ parameters:
 			identifier: staticMethod.dynamicCall
 			count: 1
 			path: tests/Player/PlayerRepositoryFieldMapTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 3
-			path: tests/Player/PlayerStatsRepositoryTest.php
 
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
@@ -2605,18 +2587,6 @@ parameters:
 			identifier: staticMethod.dynamicCall
 			count: 8
 			path: tests/PlayerDatabase/PlayerDatabaseRepositoryTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 2
-			path: tests/PlayerDatabase/PlayerDatabaseServiceTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 20
-			path: tests/PlayerDatabase/PlayerDatabaseValidatorTest.php
 
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''PlayerMovement\\Contracts\\PlayerMovementRepositoryInterface'' and PlayerMovement\PlayerMovementRepository will always evaluate to true.'
@@ -2799,12 +2769,6 @@ parameters:
 			path: tests/Scripts/MaintenanceRepositoryTest.php
 
 		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 3
-			path: tests/Scripts/MaintenanceRepositoryTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Search\\Contracts\\SearchRepositoryInterface'' and Search\SearchRepository will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -2901,12 +2865,6 @@ parameters:
 			path: tests/SeasonLeaderboards/SeasonLeaderboardsServiceTest.php
 
 		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 18
-			path: tests/SeasonLeaderboards/SeasonLeaderboardsServiceTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 1
@@ -2991,12 +2949,6 @@ parameters:
 			path: tests/SeasonTest.php
 
 		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 11
-			path: tests/Security/HtmlSanitizerTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''SeriesRecords\\Contracts\\SeriesRecordsControllerInterface'' and SeriesRecords\SeriesRecordsController will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -3033,12 +2985,6 @@ parameters:
 			path: tests/SeriesRecords/SeriesRecordsRepositoryTest.php
 
 		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 13
-			path: tests/SeriesRecords/SeriesRecordsServiceTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 1
@@ -3054,12 +3000,6 @@ parameters:
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Standings\\Contracts\\StandingsRepositoryInterface'' and Standings\StandingsRepository will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
-			path: tests/Standings/StandingsRepositoryTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 2
 			path: tests/Standings/StandingsRepositoryTest.php
 
 		-
@@ -3084,12 +3024,6 @@ parameters:
 			rawMessage: 'Parameter #1 $games of method Statistics\TeamStatsCalculator::calculate() expects list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}>, array{array{visitor_teamid: null, visitor_score: null, home_teamid: null, home_score: null}} given.'
 			identifier: argument.type
 			count: 1
-			path: tests/Statistics/TeamStatsCalculatorTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 84
 			path: tests/Statistics/TeamStatsCalculatorTest.php
 
 		-
@@ -3186,12 +3120,6 @@ parameters:
 			rawMessage: 'Parameter #1 $processedStats of method TeamOffDefStats\TeamOffDefStatsService::calculateLeagueTotals() expects list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, offense_totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, offense_averages: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}, defense_totals: array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, ...}, ...}>, array{array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, offense_games: int, defense_games: int, offense_totals: array<string, string>, ...}} given.'
 			identifier: argument.type
 			count: 1
-			path: tests/TeamOffDefStats/TeamOffDefStatsServiceTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 18
 			path: tests/TeamOffDefStats/TeamOffDefStatsServiceTest.php
 
 		-
@@ -3309,12 +3237,6 @@ parameters:
 			path: tests/Trading/CashTransactionHandlerTest.php
 
 		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 4
-			path: tests/Trading/CashTransactionHandlerTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Trading\\Contracts\\TradeCashRepositoryInterface'' and Trading\TradeCashRepository will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -3402,12 +3324,6 @@ parameters:
 			rawMessage: 'Parameter #1 $tradeData of method Trading\TradeValidator::validateSalaryCaps() expects array{userCurrentSeasonCapTotal: int, partnerCurrentSeasonCapTotal: int, userCapSentToPartner: int, partnerCapSentToUser: int}, array{} given.'
 			identifier: argument.type
 			count: 1
-			path: tests/Trading/TradeValidatorTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 19
 			path: tests/Trading/TradeValidatorTest.php
 
 		-
@@ -3675,12 +3591,6 @@ parameters:
 			path: tests/UpdateAllTheThings/PowerRankingsUpdaterTest.php
 
 		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 37
-			path: tests/UpdateAllTheThings/PowerRankingsUpdaterTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''Updater\\ScheduleUpdater'' and Updater\ScheduleUpdater will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 2
@@ -3921,18 +3831,6 @@ parameters:
 			path: tests/UpdateAllTheThings/UpdaterViewTest.php
 
 		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 20
-			path: tests/Updater/DateParserTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 16
-			path: tests/Updater/RecordParserTest.php
-
-		-
 			rawMessage: Casting to int something that's already int.
 			identifier: cast.useless
 			count: 1
@@ -3945,18 +3843,6 @@ parameters:
 			path: tests/Updater/ScheduleUpdaterTest.php
 
 		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 4
-			path: tests/Updater/SeasonPhaseHelperTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 19
-			path: tests/Updater/StandingsGrouperTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 11
@@ -3967,12 +3853,6 @@ parameters:
 			identifier: staticMethod.dynamicCall
 			count: 6
 			path: tests/Updater/UpdaterServiceTest.php
-
-		-
-			rawMessage: 'You should use assertNotSame() instead of assertNotEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 1
-			path: tests/Utilities/UuidGeneratorTest.php
 
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
@@ -4083,12 +3963,6 @@ parameters:
 			path: tests/Waivers/WaiversProcessorTest.php
 
 		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 27
-			path: tests/Waivers/WaiversProcessorTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 6
@@ -4109,12 +3983,6 @@ parameters:
 		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertEmpty() with non-empty-array<int, string> will always evaluate to false.'
 			identifier: method.impossibleType
-			count: 2
-			path: tests/Waivers/WaiversValidatorTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
 			count: 2
 			path: tests/Waivers/WaiversValidatorTest.php
 
@@ -4146,12 +4014,6 @@ parameters:
 			rawMessage: 'Loose comparison via "==" between int<1, 8> and int is not allowed.'
 			identifier: equal.notAllowed
 			count: 4
-			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 37
 			path: tests/WideUnit/DepthChartEntry/DepthChartEntryWideUnitTest.php
 
 		-
@@ -4188,12 +4050,6 @@ parameters:
 			'''
 			identifier: property.deprecatedClass
 			count: 1
-			path: tests/WideUnit/Extension/ExtensionWideUnitTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 2
 			path: tests/WideUnit/Extension/ExtensionWideUnitTest.php
 
 		-
@@ -4299,12 +4155,6 @@ parameters:
 			path: tests/WideUnit/Negotiation/NegotiationWideUnitTest.php
 
 		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 5
-			path: tests/WideUnit/RookieOption/RookieOptionWideUnitTest.php
-
-		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
 			count: 1
@@ -4320,12 +4170,6 @@ parameters:
 			rawMessage: 'Parameter #2 $games of method TeamSchedule\TeamScheduleView::render() expects list<array{game: LeagueSchedule\Game, currentMonth: string, opposingTeam: Team\Team, opponentText: string, highlight: string, gameResult: string, wins: int, losses: int, ...}>, array{array<string, mixed>} given.'
 			identifier: argument.type
 			count: 3
-			path: tests/WideUnit/Schedule/ScheduleWideUnitTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 53
 			path: tests/WideUnit/Schedule/ScheduleWideUnitTest.php
 
 		-
@@ -4347,12 +4191,6 @@ parameters:
 			path: tests/WideUnit/Trading/TradeWideUnitTest.php
 
 		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
-			count: 1
-			path: tests/WideUnit/Trading/TradeWideUnitTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertTrue() with true will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 7
@@ -4367,12 +4205,6 @@ parameters:
 		-
 			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
 			identifier: staticMethod.dynamicCall
-			count: 7
-			path: tests/WideUnit/Waivers/WaiversWideUnitTest.php
-
-		-
-			rawMessage: 'You should use assertSame() instead of assertEquals(), because both values are scalars of the same type'
-			identifier: phpunit.assertEquals
 			count: 7
 			path: tests/WideUnit/Waivers/WaiversWideUnitTest.php
 

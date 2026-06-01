@@ -6,6 +6,7 @@ namespace Tests\DatabaseIntegration;
 
 use EngineShadow\EngineShadowLoader;
 use EngineShadow\EngineShadowRepository;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 
 /**
@@ -18,6 +19,7 @@ use PHPUnit\Framework\Attributes\Test;
  * visitor > home, the exact case the CI seed exercises (ibl_schedule 2026-03-10,
  * 3@1) and the case a lower-id swap would corrupt.
  */
+#[Group('database')]
 final class EngineShadowLoaderTest extends DatabaseTestCase
 {
     private const GAME_DATE = '2026-03-10';
@@ -150,8 +152,9 @@ final class EngineShadowLoaderTest extends DatabaseTestCase
         $date = self::GAME_DATE;
         $stmt->bind_param('is', $pid, $date);
         $stmt->execute();
-        /** @var array<string, mixed>|null $row */
-        $row = $stmt->get_result()->fetch_assoc();
+        $result = $stmt->get_result();
+        self::assertInstanceOf(\mysqli_result::class, $result);
+        $row = $result->fetch_assoc();
         $stmt->close();
         self::assertIsArray($row, "no shadow player row for pid $pid");
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 
 /**
@@ -14,6 +15,7 @@ use PHPUnit\Framework\Attributes\Test;
  * columns (calc_*, game_type, season_year) and NO foreign keys — the trimmed,
  * droppable shape PR8 depends on.
  */
+#[Group('database')]
 final class EngineShadowSchemaTest extends DatabaseTestCase
 {
     private const PLAYER_TABLE = 'ibl_box_scores_engine_shadow';

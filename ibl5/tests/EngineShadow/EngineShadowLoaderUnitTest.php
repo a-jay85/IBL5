@@ -87,7 +87,40 @@ final class EngineShadowLoaderUnitTest extends TestCase
     public function nonArrayOtIsTreatedAsZero(): void
     {
         // ot as a scalar (not a list) must not fatal — sumOt returns 0, row still writes.
-        $repo = $this->recordingRepo();
+        // Inline anonymous repo captures the bound visitor_ot via insertShadowTeamBox
+        // (the loader calls it with the summed value) so PHPStan keeps the property.
+        $repo = new class (new \mysqli()) extends EngineShadowRepository {
+            public int $capturedVisitorOt = -1;
+
+            public function getTeamIdsForPids(array $pids): array
+            {
+                return [];
+            }
+
+            public function transaction(callable $fn): mixed
+            {
+                return $fn();
+            }
+
+            protected function execute(string $query, string $types = '', mixed ...$params): int
+            {
+                return 1;
+            }
+
+            public function insertShadowTeamBox(
+                string $gameDate, int $visitorTeamId, int $homeTeamId, int $gameOfThatDay, int $teamId,
+                int $game2gm, int $game2ga, int $gameFtm, int $gameFta, int $game3gm, int $game3ga,
+                int $gameOrb, int $gameDrb, int $gameAst, int $gameStl, int $gameTov, int $gameBlk, int $gamePf,
+                int $visitorQ1, int $visitorQ2, int $visitorQ3, int $visitorQ4, int $visitorOt,
+                int $homeQ1, int $homeQ2, int $homeQ3, int $homeQ4, int $homeOt,
+                int $simSeed, int $simGameType,
+            ): int {
+                if ($this->capturedVisitorOt === -1) {
+                    $this->capturedVisitorOt = $visitorOt;
+                }
+                return 1;
+            }
+        };
         $json = (string) json_encode([
             'seed' => 1,
             'games' => [[
@@ -104,19 +137,17 @@ final class EngineShadowLoaderUnitTest extends TestCase
         $result = (new EngineShadowLoader($repo))->load($json);
 
         self::assertSame(2, $result->teamRowsInserted);
-        self::assertSame(0, $repo->lastVisitorOt, 'non-array ot must sum to 0');
+        self::assertSame(0, $repo->capturedVisitorOt, 'non-array ot must sum to 0');
     }
 
     /**
      * Recording repository: the loader's real insert methods run (building SQL +
-     * params), execute() is a no-op that captures counts and the last visitor OT
-     * binding, and transaction() runs the callable directly — all without a DB.
+     * params), execute() is a no-op, and transaction() runs the callable directly
+     * — all without a DB. Counts are read back from the loader's return value.
      */
     private function recordingRepo(): EngineShadowRepository
     {
         return new class (new \mysqli()) extends EngineShadowRepository {
-            public int $lastVisitorOt = -1;
-
             public function getTeamIdsForPids(array $pids): array
             {
                 return [];
@@ -125,44 +156,6 @@ final class EngineShadowLoaderUnitTest extends TestCase
             public function transaction(callable $fn): mixed
             {
                 return $fn();
-            }
-
-            public function insertShadowTeamBox(
-                string $gameDate,
-                int $visitorTeamId,
-                int $homeTeamId,
-                int $gameOfThatDay,
-                int $teamId,
-                int $game2gm,
-                int $game2ga,
-                int $gameFtm,
-                int $gameFta,
-                int $game3gm,
-                int $game3ga,
-                int $gameOrb,
-                int $gameDrb,
-                int $gameAst,
-                int $gameStl,
-                int $gameTov,
-                int $gameBlk,
-                int $gamePf,
-                int $visitorQ1,
-                int $visitorQ2,
-                int $visitorQ3,
-                int $visitorQ4,
-                int $visitorOt,
-                int $homeQ1,
-                int $homeQ2,
-                int $homeQ3,
-                int $homeQ4,
-                int $homeOt,
-                int $simSeed,
-                int $simGameType,
-            ): int {
-                if ($this->lastVisitorOt === -1) {
-                    $this->lastVisitorOt = $visitorOt;
-                }
-                return 1;
             }
 
             protected function execute(string $query, string $types = '', mixed ...$params): int

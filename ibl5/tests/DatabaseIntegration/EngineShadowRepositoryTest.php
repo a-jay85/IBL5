@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\DatabaseIntegration;
 
 use EngineShadow\EngineShadowRepository;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 
 /**
@@ -12,6 +13,7 @@ use PHPUnit\Framework\Attributes\Test;
  * value round-trips intact rather than corrupting the statement — a string-built
  * query would either error or store something different.
  */
+#[Group('database')]
 final class EngineShadowRepositoryTest extends DatabaseTestCase
 {
     #[Test]

@@ -46,7 +46,7 @@ final class PlayerDatabaseServiceTest extends TestCase
         $result = $this->service->search([]);
 
         $this->assertEmpty($result['players']);
-        $this->assertEquals(0, $result['count']);
+        $this->assertSame(0, $result['count']);
         $this->assertArrayHasKey('params', $result);
     }
 
@@ -90,7 +90,7 @@ final class PlayerDatabaseServiceTest extends TestCase
         $this->assertCount(2, $result['players']);
         $this->assertInstanceOf(PlayerData::class, $result['players'][0]);
         $this->assertInstanceOf(PlayerData::class, $result['players'][1]);
-        $this->assertEquals(2, $result['count']);
+        $this->assertSame(2, $result['count']);
     }
 
     public function testSearchCallsPlayerRepositoryFillFromCurrentRowForEachPlayer(): void

@@ -25,7 +25,7 @@ class PlayerInjuryCalculatorTest extends TestCase
         
         $result = $this->calculator->getInjuryReturnDate($playerData, '2024-01-01');
         
-        $this->assertEquals('2024-01-07', $result);
+        $this->assertSame('2024-01-07', $result);
     }
 
     public function testGetInjuryReturnDateWithoutInjury(): void
@@ -35,7 +35,7 @@ class PlayerInjuryCalculatorTest extends TestCase
         
         $result = $this->calculator->getInjuryReturnDate($playerData, '2024-01-01');
         
-        $this->assertEquals("", $result);
+        $this->assertSame("", $result);
     }
 
     public function testGetInjuryReturnDateWithOneDayInjury(): void
@@ -45,7 +45,7 @@ class PlayerInjuryCalculatorTest extends TestCase
         
         $result = $this->calculator->getInjuryReturnDate($playerData, '2024-01-01');
         
-        $this->assertEquals('2024-01-03', $result);
+        $this->assertSame('2024-01-03', $result);
     }
 
     public function testGetInjuryReturnDateCrossingMonth(): void
@@ -55,7 +55,7 @@ class PlayerInjuryCalculatorTest extends TestCase
 
         $result = $this->calculator->getInjuryReturnDate($playerData, '2024-01-25');
 
-        $this->assertEquals('2024-02-05', $result);
+        $this->assertSame('2024-02-05', $result);
     }
 
     // --- Merged from PlayerInjuryCalculatorEdgeCaseTest ---
@@ -71,7 +71,7 @@ class PlayerInjuryCalculatorTest extends TestCase
 
         $result = $this->calculator->getInjuryReturnDate($playerData, '2024-01-15');
 
-        $this->assertEquals('', $result);
+        $this->assertSame('', $result);
     }
 
     public function testReturnsEmptyStringForLargeNegativeDaysRemaining(): void
@@ -81,7 +81,7 @@ class PlayerInjuryCalculatorTest extends TestCase
 
         $result = $this->calculator->getInjuryReturnDate($playerData, '2024-01-15');
 
-        $this->assertEquals('', $result);
+        $this->assertSame('', $result);
     }
 
     // ============================================
@@ -96,7 +96,7 @@ class PlayerInjuryCalculatorTest extends TestCase
         $result = $this->calculator->getInjuryReturnDate($playerData, '2024-01-01');
 
         // 365 + 1 = 366 days from Jan 1, 2024 (leap year)
-        $this->assertEquals('2025-01-01', $result);
+        $this->assertSame('2025-01-01', $result);
     }
 
     public function testHandlesMultiYearInjury(): void
@@ -109,7 +109,7 @@ class PlayerInjuryCalculatorTest extends TestCase
         // 730 + 1 = 731 days from Jan 1, 2024
         // 2024 has 366 days (leap year), so Jan 1, 2025 is 366 days later
         // Then 731 - 366 = 365 more days = Jan 1, 2026
-        $this->assertEquals('2026-01-01', $result);
+        $this->assertSame('2026-01-01', $result);
     }
 
     public function testHandlesVeryLargeInjuryValue(): void
@@ -135,7 +135,7 @@ class PlayerInjuryCalculatorTest extends TestCase
         $result = $this->calculator->getInjuryReturnDate($playerData, '2024-12-25');
 
         // 10 + 1 = 11 days from Dec 25 = Jan 5
-        $this->assertEquals('2025-01-05', $result);
+        $this->assertSame('2025-01-05', $result);
     }
 
     public function testCrossesYearBoundaryFromDecember31(): void
@@ -146,7 +146,7 @@ class PlayerInjuryCalculatorTest extends TestCase
         $result = $this->calculator->getInjuryReturnDate($playerData, '2024-12-31');
 
         // 1 + 1 = 2 days from Dec 31 = Jan 2
-        $this->assertEquals('2025-01-02', $result);
+        $this->assertSame('2025-01-02', $result);
     }
 
     public function testExactlyOneDayToJanuary1(): void
@@ -156,7 +156,7 @@ class PlayerInjuryCalculatorTest extends TestCase
 
         $result = $this->calculator->getInjuryReturnDate($playerData, '2024-12-31');
 
-        $this->assertEquals('', $result);
+        $this->assertSame('', $result);
     }
 
     // ============================================
@@ -172,7 +172,7 @@ class PlayerInjuryCalculatorTest extends TestCase
 
         // 5 + 1 = 6 days from Feb 27, 2024 (leap year)
         // Feb 27 -> Feb 28 -> Feb 29 -> Mar 1 -> Mar 2 -> Mar 3 -> Mar 4
-        $this->assertEquals('2024-03-04', $result);
+        $this->assertSame('2024-03-04', $result);
     }
 
     public function testCrossesFebruaryInNonLeapYear(): void
@@ -184,7 +184,7 @@ class PlayerInjuryCalculatorTest extends TestCase
 
         // 5 + 1 = 6 days from Feb 26, 2023 (non-leap year)
         // Feb 26 -> Feb 27 -> Feb 28 -> Mar 1 -> Mar 2 -> Mar 3 -> Mar 4
-        $this->assertEquals('2023-03-04', $result);
+        $this->assertSame('2023-03-04', $result);
     }
 
     public function testStartsOnLeapDay(): void
@@ -195,7 +195,7 @@ class PlayerInjuryCalculatorTest extends TestCase
         $result = $this->calculator->getInjuryReturnDate($playerData, '2024-02-29');
 
         // 3 + 1 = 4 days from Feb 29
-        $this->assertEquals('2024-03-04', $result);
+        $this->assertSame('2024-03-04', $result);
     }
 
     // ============================================
@@ -214,7 +214,7 @@ class PlayerInjuryCalculatorTest extends TestCase
             $this->assertNotEmpty($result);
             $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}$/', $result);
         } else {
-            $this->assertEquals('', $result);
+            $this->assertSame('', $result);
         }
     }
 
@@ -241,7 +241,7 @@ class PlayerInjuryCalculatorTest extends TestCase
         $result = $this->calculator->getInjuryReturnDate($playerData, '2024-04-28');
 
         // 5 + 1 = 6 days from April 28 (30-day month)
-        $this->assertEquals('2024-05-04', $result);
+        $this->assertSame('2024-05-04', $result);
     }
 
     public function testCrossesMonth31DayBoundary(): void
@@ -252,7 +252,7 @@ class PlayerInjuryCalculatorTest extends TestCase
         $result = $this->calculator->getInjuryReturnDate($playerData, '2024-03-29');
 
         // 5 + 1 = 6 days from March 29 (31-day month)
-        $this->assertEquals('2024-04-04', $result);
+        $this->assertSame('2024-04-04', $result);
     }
 
     // ============================================
@@ -278,7 +278,7 @@ class PlayerInjuryCalculatorTest extends TestCase
         $result = $this->calculator->getInjuryReturnDate($playerData, '2024-01-01');
 
         // Jan 1 + 2 days = Jan 3
-        $this->assertEquals('2024-01-03', $result);
+        $this->assertSame('2024-01-03', $result);
         $this->assertStringContainsString('-01-', $result);
     }
 
@@ -295,7 +295,7 @@ class PlayerInjuryCalculatorTest extends TestCase
         $result = $this->calculator->getInjuryReturnDate($playerData, '2024-01-10');
 
         // Expected: Jan 10 + 6 days = Jan 16
-        $this->assertEquals('2024-01-16', $result);
+        $this->assertSame('2024-01-16', $result);
     }
 
     public function testTwoDaysRemainingMeansThreeDaysFromNow(): void
@@ -306,7 +306,7 @@ class PlayerInjuryCalculatorTest extends TestCase
 
         $result = $this->calculator->getInjuryReturnDate($playerData, '2024-01-01');
 
-        $this->assertEquals('2024-01-04', $result);
+        $this->assertSame('2024-01-04', $result);
     }
 
     // ============================================
@@ -320,7 +320,7 @@ class PlayerInjuryCalculatorTest extends TestCase
 
         $result = $this->calculator->getInjuryReturnDate($playerData, '2024-01-01');
 
-        $this->assertEquals('2024-01-12', $result);
+        $this->assertSame('2024-01-12', $result);
     }
 
     public function testHandlesDecember31StartDate(): void
@@ -330,7 +330,7 @@ class PlayerInjuryCalculatorTest extends TestCase
 
         $result = $this->calculator->getInjuryReturnDate($playerData, '2024-12-31');
 
-        $this->assertEquals('2025-01-11', $result);
+        $this->assertSame('2025-01-11', $result);
     }
 
     // ============================================
@@ -346,7 +346,7 @@ class PlayerInjuryCalculatorTest extends TestCase
 
         // 60 + 1 = 61 days from Jan 15
         // Jan has 16 remaining days, Feb has 29 (leap), need 16 more in March
-        $this->assertEquals('2024-03-16', $result);
+        $this->assertSame('2024-03-16', $result);
     }
 
     public function testSpansQuarter(): void
@@ -358,6 +358,6 @@ class PlayerInjuryCalculatorTest extends TestCase
 
         // 90 + 1 = 91 days from Jan 1
         // Jan 31 + Feb 29 + Mar 31 = 91 days = April 1
-        $this->assertEquals('2024-04-01', $result);
+        $this->assertSame('2024-04-01', $result);
     }
 }

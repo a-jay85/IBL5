@@ -65,8 +65,8 @@ class DraftPickLocatorServiceTest extends TestCase
         $result = $this->service->getAllTeamsWithPicks();
 
         $this->assertCount(1, $result);
-        $this->assertEquals('Celtics', $result[0]['teamName']);
-        $this->assertEquals('Boston', $result[0]['teamCity']);
+        $this->assertSame('Celtics', $result[0]['teamName']);
+        $this->assertSame('Boston', $result[0]['teamCity']);
         $this->assertArrayHasKey('picks', $result[0]);
     }
 
@@ -81,8 +81,8 @@ class DraftPickLocatorServiceTest extends TestCase
 
         $result = $this->service->getAllTeamsWithPicks();
 
-        $this->assertEquals('00FF00', $result[0]['color1']);
-        $this->assertEquals('FFFFFF', $result[0]['color2']);
+        $this->assertSame('00FF00', $result[0]['color1']);
+        $this->assertSame('FFFFFF', $result[0]['color2']);
     }
 
     public function testGetAllTeamsWithPicksConvertsTeamIdToInt(): void

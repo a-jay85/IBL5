@@ -82,10 +82,10 @@ class FreeAgencyCapCalculatorTest extends TestCase
 
         // Assert - Should have full cap space and max roster spots (ALL 6 years)
         for ($i = 0; $i < 6; $i++) {
-            $this->assertEquals(0, $result['totalSalaries'][$i], "totalSalaries year $i should be 0");
-            $this->assertEquals(League::SOFT_CAP_MAX, $result['softCapSpace'][$i], "softCapSpace year $i");
-            $this->assertEquals(League::HARD_CAP_MAX, $result['hardCapSpace'][$i], "hardCapSpace year $i");
-            $this->assertEquals(Team::ROSTER_SPOTS_MAX, $result['rosterSpots'][$i], "rosterSpots year $i");
+            $this->assertSame(0, $result['totalSalaries'][$i], "totalSalaries year $i should be 0");
+            $this->assertSame(League::SOFT_CAP_MAX, $result['softCapSpace'][$i], "softCapSpace year $i");
+            $this->assertSame(League::HARD_CAP_MAX, $result['hardCapSpace'][$i], "hardCapSpace year $i");
+            $this->assertSame(Team::ROSTER_SPOTS_MAX, $result['rosterSpots'][$i], "rosterSpots year $i");
         }
     }
 
@@ -117,19 +117,19 @@ class FreeAgencyCapCalculatorTest extends TestCase
         $result = $calculator->calculateTeamCapMetrics();
 
         // Assert - Offers should count toward cap and roster spots (ALL 6 years)
-        $this->assertEquals(800, $result['totalSalaries'][0]);
-        $this->assertEquals(850, $result['totalSalaries'][1]);
-        $this->assertEquals(900, $result['totalSalaries'][2]);
-        $this->assertEquals(0, $result['totalSalaries'][3]);
-        $this->assertEquals(0, $result['totalSalaries'][4]);
-        $this->assertEquals(0, $result['totalSalaries'][5]);
+        $this->assertSame(800, $result['totalSalaries'][0]);
+        $this->assertSame(850, $result['totalSalaries'][1]);
+        $this->assertSame(900, $result['totalSalaries'][2]);
+        $this->assertSame(0, $result['totalSalaries'][3]);
+        $this->assertSame(0, $result['totalSalaries'][4]);
+        $this->assertSame(0, $result['totalSalaries'][5]);
 
-        $this->assertEquals(Team::ROSTER_SPOTS_MAX - 1, $result['rosterSpots'][0]);
-        $this->assertEquals(Team::ROSTER_SPOTS_MAX - 1, $result['rosterSpots'][1]);
-        $this->assertEquals(Team::ROSTER_SPOTS_MAX - 1, $result['rosterSpots'][2]);
-        $this->assertEquals(Team::ROSTER_SPOTS_MAX, $result['rosterSpots'][3]);
-        $this->assertEquals(Team::ROSTER_SPOTS_MAX, $result['rosterSpots'][4]);
-        $this->assertEquals(Team::ROSTER_SPOTS_MAX, $result['rosterSpots'][5]);
+        $this->assertSame(Team::ROSTER_SPOTS_MAX - 1, $result['rosterSpots'][0]);
+        $this->assertSame(Team::ROSTER_SPOTS_MAX - 1, $result['rosterSpots'][1]);
+        $this->assertSame(Team::ROSTER_SPOTS_MAX - 1, $result['rosterSpots'][2]);
+        $this->assertSame(Team::ROSTER_SPOTS_MAX, $result['rosterSpots'][3]);
+        $this->assertSame(Team::ROSTER_SPOTS_MAX, $result['rosterSpots'][4]);
+        $this->assertSame(Team::ROSTER_SPOTS_MAX, $result['rosterSpots'][5]);
     }
 
     /**
@@ -215,7 +215,7 @@ class FreeAgencyCapCalculatorTest extends TestCase
         for ($i = 0; $i < 6; $i++) {
             $expectedHardCap = $result['softCapSpace'][$i] + $buffer;
 
-            $this->assertEquals(
+            $this->assertSame(
                 $expectedHardCap,
                 $result['hardCapSpace'][$i],
                 "Hard cap should be soft cap + buffer for year " . ($i + 1)

@@ -15,13 +15,13 @@ final class CareerLeaderboardsRepositoryTest extends TestCase
         $mockDb = new MockDatabase();
         $repository = new CareerLeaderboardsRepository($mockDb);
 
-        $this->assertEquals('totals', $repository->getTableType('ibl_hist'));
-        $this->assertEquals('totals', $repository->getTableType('ibl_playoff_career_totals'));
-        $this->assertEquals('totals', $repository->getTableType('ibl_heat_career_totals'));
-        $this->assertEquals('totals', $repository->getTableType('ibl_olympics_career_totals'));
-        $this->assertEquals('totals', $repository->getTableType('ibl_rookie_career_totals'));
-        $this->assertEquals('totals', $repository->getTableType('ibl_sophomore_career_totals'));
-        $this->assertEquals('totals', $repository->getTableType('ibl_allstar_career_totals'));
+        $this->assertSame('totals', $repository->getTableType('ibl_hist'));
+        $this->assertSame('totals', $repository->getTableType('ibl_playoff_career_totals'));
+        $this->assertSame('totals', $repository->getTableType('ibl_heat_career_totals'));
+        $this->assertSame('totals', $repository->getTableType('ibl_olympics_career_totals'));
+        $this->assertSame('totals', $repository->getTableType('ibl_rookie_career_totals'));
+        $this->assertSame('totals', $repository->getTableType('ibl_sophomore_career_totals'));
+        $this->assertSame('totals', $repository->getTableType('ibl_allstar_career_totals'));
     }
 
     public function testGetTableTypeIdentifiesAverages(): void
@@ -29,11 +29,11 @@ final class CareerLeaderboardsRepositoryTest extends TestCase
         $mockDb = new MockDatabase();
         $repository = new CareerLeaderboardsRepository($mockDb);
 
-        $this->assertEquals('averages', $repository->getTableType('ibl_season_career_avgs'));
-        $this->assertEquals('averages', $repository->getTableType('ibl_playoff_career_avgs'));
-        $this->assertEquals('averages', $repository->getTableType('ibl_heat_career_avgs'));
-        $this->assertEquals('averages', $repository->getTableType('ibl_olympics_career_avgs'));
-        $this->assertEquals('averages', $repository->getTableType('ibl_allstar_career_avgs'));
+        $this->assertSame('averages', $repository->getTableType('ibl_season_career_avgs'));
+        $this->assertSame('averages', $repository->getTableType('ibl_playoff_career_avgs'));
+        $this->assertSame('averages', $repository->getTableType('ibl_heat_career_avgs'));
+        $this->assertSame('averages', $repository->getTableType('ibl_olympics_career_avgs'));
+        $this->assertSame('averages', $repository->getTableType('ibl_allstar_career_avgs'));
     }
 
     public function testGetLeaderboardsRejectsInvalidTableName(): void
@@ -84,7 +84,7 @@ final class CareerLeaderboardsRepositoryTest extends TestCase
         $this->assertIsArray($result);
         $this->assertArrayHasKey('results', $result);
         $this->assertArrayHasKey('count', $result);
-        $this->assertEquals(2, $result['count']);
+        $this->assertSame(2, $result['count']);
     }
 
     public function testGetLeaderboardsAcceptsValidSortColumns(): void
@@ -105,7 +105,7 @@ final class CareerLeaderboardsRepositoryTest extends TestCase
         
         $this->assertIsArray($result);
         $this->assertArrayHasKey('count', $result);
-        $this->assertEquals(5, $result['count']);
+        $this->assertSame(5, $result['count']);
     }
 
     public function testGetLeaderboardsBuildsCorrectQueryForHistTable(): void
@@ -129,7 +129,7 @@ final class CareerLeaderboardsRepositoryTest extends TestCase
         
         // Verify we got results with correct count
         $this->assertIsArray($result);
-        $this->assertEquals(10, $result['count']);
+        $this->assertSame(10, $result['count']);
         
         // Check that queries were executed
         $queries = $mockDb->getExecutedQueries();
@@ -167,7 +167,7 @@ final class CareerLeaderboardsRepositoryTest extends TestCase
         
         // Verify query returns results with correct count
         $this->assertIsArray($result);
-        $this->assertEquals(20, $result['count']);
+        $this->assertSame(20, $result['count']);
     }
 
     public function testGetLeaderboardsHandlesUnlimitedRecords(): void
@@ -186,6 +186,6 @@ final class CareerLeaderboardsRepositoryTest extends TestCase
         
         // Verify we can get unlimited records with limit 0
         $this->assertIsArray($result);
-        $this->assertEquals(5, $result['count']);
+        $this->assertSame(5, $result['count']);
     }
 }

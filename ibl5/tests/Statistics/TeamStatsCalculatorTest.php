@@ -38,8 +38,8 @@ class TeamStatsCalculatorTest extends TestCase
         $this->assertArrayHasKey('streak', $result);
         $this->assertArrayHasKey('streakType', $result);
 
-        $this->assertEquals(0, $result['wins']);
-        $this->assertEquals(0, $result['losses']);
+        $this->assertSame(0, $result['wins']);
+        $this->assertSame(0, $result['losses']);
     }
 
     public function testCalculateWithAwayWin(): void
@@ -50,12 +50,12 @@ class TeamStatsCalculatorTest extends TestCase
 
         $result = $this->calculator->calculate($games, 1);
 
-        $this->assertEquals(1, $result['wins']);
-        $this->assertEquals(0, $result['losses']);
-        $this->assertEquals(1, $result['awayWins']);
-        $this->assertEquals(0, $result['homeWins']);
-        $this->assertEquals('W', $result['streakType']);
-        $this->assertEquals(1, $result['streak']);
+        $this->assertSame(1, $result['wins']);
+        $this->assertSame(0, $result['losses']);
+        $this->assertSame(1, $result['awayWins']);
+        $this->assertSame(0, $result['homeWins']);
+        $this->assertSame('W', $result['streakType']);
+        $this->assertSame(1, $result['streak']);
     }
 
     public function testCalculateWithHomeLoss(): void
@@ -66,12 +66,12 @@ class TeamStatsCalculatorTest extends TestCase
 
         $result = $this->calculator->calculate($games, 1);
 
-        $this->assertEquals(0, $result['wins']);
-        $this->assertEquals(1, $result['losses']);
-        $this->assertEquals(0, $result['awayLosses']);
-        $this->assertEquals(1, $result['homeLosses']);
-        $this->assertEquals('L', $result['streakType']);
-        $this->assertEquals(1, $result['streak']);
+        $this->assertSame(0, $result['wins']);
+        $this->assertSame(1, $result['losses']);
+        $this->assertSame(0, $result['awayLosses']);
+        $this->assertSame(1, $result['homeLosses']);
+        $this->assertSame('L', $result['streakType']);
+        $this->assertSame(1, $result['streak']);
     }
 
     public function testCalculateWithHomeWin(): void
@@ -82,10 +82,10 @@ class TeamStatsCalculatorTest extends TestCase
 
         $result = $this->calculator->calculate($games, 1);
 
-        $this->assertEquals(1, $result['wins']);
-        $this->assertEquals(0, $result['losses']);
-        $this->assertEquals(1, $result['homeWins']);
-        $this->assertEquals('W', $result['streakType']);
+        $this->assertSame(1, $result['wins']);
+        $this->assertSame(0, $result['losses']);
+        $this->assertSame(1, $result['homeWins']);
+        $this->assertSame('W', $result['streakType']);
     }
 
     public function testCalculateWithAwayLoss(): void
@@ -96,10 +96,10 @@ class TeamStatsCalculatorTest extends TestCase
 
         $result = $this->calculator->calculate($games, 1);
 
-        $this->assertEquals(0, $result['wins']);
-        $this->assertEquals(1, $result['losses']);
-        $this->assertEquals(1, $result['awayLosses']);
-        $this->assertEquals('L', $result['streakType']);
+        $this->assertSame(0, $result['wins']);
+        $this->assertSame(1, $result['losses']);
+        $this->assertSame(1, $result['awayLosses']);
+        $this->assertSame('L', $result['streakType']);
     }
 
     public function testCalculateStreakIncrementsForConsecutiveWins(): void
@@ -112,9 +112,9 @@ class TeamStatsCalculatorTest extends TestCase
 
         $result = $this->calculator->calculate($games, 1);
 
-        $this->assertEquals(3, $result['wins']);
-        $this->assertEquals(3, $result['streak']);
-        $this->assertEquals('W', $result['streakType']);
+        $this->assertSame(3, $result['wins']);
+        $this->assertSame(3, $result['streak']);
+        $this->assertSame('W', $result['streakType']);
     }
 
     public function testCalculateStreakResetsOnLoss(): void
@@ -126,10 +126,10 @@ class TeamStatsCalculatorTest extends TestCase
 
         $result = $this->calculator->calculate($games, 1);
 
-        $this->assertEquals(1, $result['wins']);
-        $this->assertEquals(1, $result['losses']);
-        $this->assertEquals(1, $result['streak']);
-        $this->assertEquals('L', $result['streakType']);
+        $this->assertSame(1, $result['wins']);
+        $this->assertSame(1, $result['losses']);
+        $this->assertSame(1, $result['streak']);
+        $this->assertSame('L', $result['streakType']);
     }
 
     public function testCalculateLast10GamesTracking(): void
@@ -142,9 +142,9 @@ class TeamStatsCalculatorTest extends TestCase
 
         $result = $this->calculator->calculate($games, 1);
 
-        $this->assertEquals(15, $result['wins']);
-        $this->assertEquals(10, $result['winsInLast10Games']);
-        $this->assertEquals(0, $result['lossesInLast10Games']);
+        $this->assertSame(15, $result['wins']);
+        $this->assertSame(10, $result['winsInLast10Games']);
+        $this->assertSame(0, $result['lossesInLast10Games']);
     }
 
     public function testCalculateSkipsTiedGames(): void
@@ -156,8 +156,8 @@ class TeamStatsCalculatorTest extends TestCase
 
         $result = $this->calculator->calculate($games, 1);
 
-        $this->assertEquals(1, $result['wins']);
-        $this->assertEquals(0, $result['losses']);
+        $this->assertSame(1, $result['wins']);
+        $this->assertSame(0, $result['losses']);
     }
 
     public function testCalculateRankingScore(): void
@@ -167,26 +167,26 @@ class TeamStatsCalculatorTest extends TestCase
         // Total win points = 50 + 10 = 60
         // Total loss points = 25 + 5 = 30
         // Ranking = (60 / 90) * 100 = 66.7
-        $this->assertEquals(66.7, $result);
+        $this->assertSame(66.7, $result);
     }
 
     public function testCalculateRankingScoreWithZeroValues(): void
     {
         $result = TeamStatsCalculator::calculateRankingScore(0, 0, 0, 0);
-        $this->assertEquals(0.0, $result);
+        $this->assertSame(0.0, $result);
     }
 
     public function testCalculateGamesBack(): void
     {
         // 10 wins, 5 losses: (10/2) - (5/2) = 5 - 2.5 = 2.5
         $result = TeamStatsCalculator::calculateGamesBack(10, 5);
-        $this->assertEquals(2.5, $result);
+        $this->assertSame(2.5, $result);
     }
 
     public function testCalculateGamesBackWithEvenRecord(): void
     {
         $result = TeamStatsCalculator::calculateGamesBack(10, 10);
-        $this->assertEquals(0.0, $result);
+        $this->assertSame(0.0, $result);
     }
 
     // --- Merged from TeamStatsCalculatorEdgeCaseTest ---
@@ -203,7 +203,7 @@ class TeamStatsCalculatorTest extends TestCase
         // Total win points = 3000 + 82 = 3082
         // Total loss points = 0 + 0 = 0
         // Ranking = (3082 / 3082) * 100 = 100.0
-        $this->assertEquals(100.0, $result);
+        $this->assertSame(100.0, $result);
     }
 
     public function testRankingScoreWithAllLosses(): void
@@ -214,7 +214,7 @@ class TeamStatsCalculatorTest extends TestCase
         // Total win points = 0
         // Total loss points = 3000 + 82 = 3082
         // Ranking = 0 / 3082 * 100 = 0.0
-        $this->assertEquals(0.0, $result);
+        $this->assertSame(0.0, $result);
     }
 
     public function testRankingScoreWithVeryLargeValues(): void
@@ -236,7 +236,7 @@ class TeamStatsCalculatorTest extends TestCase
         // Total win points = 0 + 1 = 1
         // Total loss points = 0 + 2 = 2
         // Ranking = (1 / 3) * 100 = 33.333...
-        $this->assertEquals(33.3, $result);
+        $this->assertSame(33.3, $result);
     }
 
     public function testRankingScoreExact50Percent(): void
@@ -246,7 +246,7 @@ class TeamStatsCalculatorTest extends TestCase
 
         // Total win = 1041, Total loss = 1041
         // Ranking = 1041 / 2082 * 100 = 50.0
-        $this->assertEquals(50.0, $result);
+        $this->assertSame(50.0, $result);
     }
 
     public function testRankingScoreNear50Percent(): void
@@ -271,7 +271,7 @@ class TeamStatsCalculatorTest extends TestCase
         $result = TeamStatsCalculator::calculateGamesBack(5, 10);
 
         // (5/2) - (10/2) = 2.5 - 5 = -2.5
-        $this->assertEquals(-2.5, $result);
+        $this->assertSame(-2.5, $result);
     }
 
     public function testGamesBackWithVeryLargeDifferential(): void
@@ -279,7 +279,7 @@ class TeamStatsCalculatorTest extends TestCase
         // Huge differential
         $result = TeamStatsCalculator::calculateGamesBack(82, 0);
 
-        $this->assertEquals(41.0, $result);
+        $this->assertSame(41.0, $result);
     }
 
     public function testGamesBackWithOddNumbers(): void
@@ -288,7 +288,7 @@ class TeamStatsCalculatorTest extends TestCase
         $result = TeamStatsCalculator::calculateGamesBack(7, 4);
 
         // (7/2) - (4/2) = 3.5 - 2 = 1.5
-        $this->assertEquals(1.5, $result);
+        $this->assertSame(1.5, $result);
     }
 
     public function testGamesBackWithZeroWins(): void
@@ -296,7 +296,7 @@ class TeamStatsCalculatorTest extends TestCase
         $result = TeamStatsCalculator::calculateGamesBack(0, 10);
 
         // (0/2) - (10/2) = 0 - 5 = -5
-        $this->assertEquals(-5.0, $result);
+        $this->assertSame(-5.0, $result);
     }
 
     public function testGamesBackWithZeroLosses(): void
@@ -304,14 +304,14 @@ class TeamStatsCalculatorTest extends TestCase
         $result = TeamStatsCalculator::calculateGamesBack(10, 0);
 
         // (10/2) - (0/2) = 5 - 0 = 5
-        $this->assertEquals(5.0, $result);
+        $this->assertSame(5.0, $result);
     }
 
     public function testGamesBackWithBothZero(): void
     {
         $result = TeamStatsCalculator::calculateGamesBack(0, 0);
 
-        $this->assertEquals(0.0, $result);
+        $this->assertSame(0.0, $result);
     }
 
     // ============================================
@@ -328,8 +328,8 @@ class TeamStatsCalculatorTest extends TestCase
 
         $result = $this->calculator->calculate($games, 1);
 
-        $this->assertEquals(15, $result['streak']);
-        $this->assertEquals('W', $result['streakType']);
+        $this->assertSame(15, $result['streak']);
+        $this->assertSame('W', $result['streakType']);
     }
 
     public function testLongLossStreak(): void
@@ -342,8 +342,8 @@ class TeamStatsCalculatorTest extends TestCase
 
         $result = $this->calculator->calculate($games, 1);
 
-        $this->assertEquals(15, $result['streak']);
-        $this->assertEquals('L', $result['streakType']);
+        $this->assertSame(15, $result['streak']);
+        $this->assertSame('L', $result['streakType']);
     }
 
     public function testAlternatingWinsAndLosses(): void
@@ -358,10 +358,10 @@ class TeamStatsCalculatorTest extends TestCase
 
         $result = $this->calculator->calculate($games, 1);
 
-        $this->assertEquals(2, $result['wins']);
-        $this->assertEquals(2, $result['losses']);
-        $this->assertEquals(1, $result['streak']); // Current streak is 1
-        $this->assertEquals('L', $result['streakType']); // Last game was loss
+        $this->assertSame(2, $result['wins']);
+        $this->assertSame(2, $result['losses']);
+        $this->assertSame(1, $result['streak']); // Current streak is 1
+        $this->assertSame('L', $result['streakType']); // Last game was loss
     }
 
     public function testStreakResetsCorrectlyAfterMultipleConsecutive(): void
@@ -377,10 +377,10 @@ class TeamStatsCalculatorTest extends TestCase
 
         $result = $this->calculator->calculate($games, 1);
 
-        $this->assertEquals(3, $result['wins']);
-        $this->assertEquals(1, $result['losses']);
-        $this->assertEquals(1, $result['streak']);
-        $this->assertEquals('L', $result['streakType']);
+        $this->assertSame(3, $result['wins']);
+        $this->assertSame(1, $result['losses']);
+        $this->assertSame(1, $result['streak']);
+        $this->assertSame('L', $result['streakType']);
     }
 
     // ============================================
@@ -396,8 +396,8 @@ class TeamStatsCalculatorTest extends TestCase
         $result = $this->calculator->calculate($games, 1);
 
         // With missing scores, game should be skipped (0 == 0 is tie)
-        $this->assertEquals(0, $result['wins']);
-        $this->assertEquals(0, $result['losses']);
+        $this->assertSame(0, $result['wins']);
+        $this->assertSame(0, $result['losses']);
     }
 
     public function testHandlesMissingTeamFields(): void
@@ -411,8 +411,8 @@ class TeamStatsCalculatorTest extends TestCase
         // When team IDs default to 0 and teamid=1, falls into else branch
         // Treats game as if team 1 is home team
         // homeScore (95) > awayScore (100) is false, so it's a loss
-        $this->assertEquals(0, $result['wins']);
-        $this->assertEquals(1, $result['losses']);
+        $this->assertSame(0, $result['wins']);
+        $this->assertSame(1, $result['losses']);
     }
 
     public function testHandlesNullValues(): void
@@ -440,8 +440,8 @@ class TeamStatsCalculatorTest extends TestCase
 
         $result = $this->calculator->calculate($games, 1);
 
-        $this->assertEquals(10, $result['wins']);
-        $this->assertEquals(10, $result['winsInLast10Games']);
+        $this->assertSame(10, $result['wins']);
+        $this->assertSame(10, $result['winsInLast10Games']);
     }
 
     public function testLast10GamesWithLessThan10Games(): void
@@ -453,8 +453,8 @@ class TeamStatsCalculatorTest extends TestCase
 
         $result = $this->calculator->calculate($games, 1);
 
-        $this->assertEquals(5, $result['wins']);
-        $this->assertEquals(5, $result['winsInLast10Games']);
+        $this->assertSame(5, $result['wins']);
+        $this->assertSame(5, $result['winsInLast10Games']);
     }
 
     public function testLast10GamesWithExactly11Games(): void
@@ -469,10 +469,10 @@ class TeamStatsCalculatorTest extends TestCase
 
         $result = $this->calculator->calculate($games, 1);
 
-        $this->assertEquals(10, $result['wins']);
-        $this->assertEquals(1, $result['losses']);
-        $this->assertEquals(10, $result['winsInLast10Games']);
-        $this->assertEquals(0, $result['lossesInLast10Games']);
+        $this->assertSame(10, $result['wins']);
+        $this->assertSame(1, $result['losses']);
+        $this->assertSame(10, $result['winsInLast10Games']);
+        $this->assertSame(0, $result['lossesInLast10Games']);
     }
 
     // ============================================
@@ -488,9 +488,9 @@ class TeamStatsCalculatorTest extends TestCase
 
         $result = $this->calculator->calculate($games, 1);
 
-        $this->assertEquals(5, $result['wins']);
-        $this->assertEquals(5, $result['homeWins']);
-        $this->assertEquals(0, $result['awayWins']);
+        $this->assertSame(5, $result['wins']);
+        $this->assertSame(5, $result['homeWins']);
+        $this->assertSame(0, $result['awayWins']);
     }
 
     public function testAllAwayGames(): void
@@ -502,9 +502,9 @@ class TeamStatsCalculatorTest extends TestCase
 
         $result = $this->calculator->calculate($games, 1);
 
-        $this->assertEquals(5, $result['wins']);
-        $this->assertEquals(0, $result['homeWins']);
-        $this->assertEquals(5, $result['awayWins']);
+        $this->assertSame(5, $result['wins']);
+        $this->assertSame(0, $result['homeWins']);
+        $this->assertSame(5, $result['awayWins']);
     }
 
     // ============================================
@@ -520,9 +520,9 @@ class TeamStatsCalculatorTest extends TestCase
 
         $result = $this->calculator->calculate($games, 1);
 
-        $this->assertEquals(1, $result['wins']);
+        $this->assertSame(1, $result['wins']);
         // winPoints defaults to 0 when db doesn't support fetchOne
-        $this->assertEquals(0, $result['winPoints']);
+        $this->assertSame(0, $result['winPoints']);
     }
 
     public function testLossPointsDefaultToZeroWithMockDb(): void
@@ -534,9 +534,9 @@ class TeamStatsCalculatorTest extends TestCase
 
         $result = $this->calculator->calculate($games, 1);
 
-        $this->assertEquals(1, $result['losses']);
+        $this->assertSame(1, $result['losses']);
         // lossPoints defaults to 0 when db doesn't support fetchOne
-        $this->assertEquals(0, $result['lossPoints']);
+        $this->assertSame(0, $result['lossPoints']);
     }
 
     // ============================================
@@ -548,7 +548,7 @@ class TeamStatsCalculatorTest extends TestCase
     {
         $result = TeamStatsCalculator::calculateRankingScore($wins, $losses, $winPts, $lossPts);
 
-        $this->assertEquals($expected, $result);
+        $this->assertSame($expected, $result);
     }
 
     public static function rankingScoreBoundaryProvider(): array
@@ -568,7 +568,7 @@ class TeamStatsCalculatorTest extends TestCase
     {
         $result = TeamStatsCalculator::calculateGamesBack($wins, $losses);
 
-        $this->assertEquals($expected, $result);
+        $this->assertSame($expected, $result);
     }
 
     public static function gamesBackProvider(): array

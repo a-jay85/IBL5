@@ -41,8 +41,8 @@ class DepthChartEntryRepositoryTest extends TestCase
 
         $this->assertIsArray($result);
         $this->assertCount(2, $result);
-        $this->assertEquals('Player One', $result[0]['name']);
-        $this->assertEquals('Player Two', $result[1]['name']);
+        $this->assertSame('Player One', $result[0]['name']);
+        $this->assertSame('Player Two', $result[1]['name']);
     }
 
     public function testGetPlayersOnTeamReturnsEmptyArrayForNoPlayers(): void
@@ -290,9 +290,9 @@ class DepthChartEntryRepositoryTest extends TestCase
         // Hardcoded columns (always 0 in SQL, not bound)
         $hardcodedColumns = ['dc_of', 'dc_df', 'dc_oi', 'dc_di', 'dc_bh'];
 
-        $this->assertEquals(7, count($boundDatabaseColumns), 'Should have 7 bound database columns');
-        $this->assertEquals(7, count($boundFields), 'Should have 7 bound fields');
-        $this->assertEquals(5, count($hardcodedColumns), 'Should have 5 hardcoded columns');
+        $this->assertSame(7, count($boundDatabaseColumns), 'Should have 7 bound database columns');
+        $this->assertSame(7, count($boundFields), 'Should have 7 bound fields');
+        $this->assertSame(5, count($hardcodedColumns), 'Should have 5 hardcoded columns');
 
         // The bind_param order: 7 integers + 1 string (player name) = "iiiiiiis"
         $expectedBindParamTypes = 'iiiiiiis';
@@ -307,14 +307,14 @@ class DepthChartEntryRepositoryTest extends TestCase
             'Test Player'                   // position 8: name (WHERE clause)
         ];
 
-        $this->assertEquals(8, count($expectedBindParamValues), 'Should have 8 bind parameters (7 updates + 1 WHERE)');
-        $this->assertEquals(8, strlen($expectedBindParamTypes), 'Bind param type string should have 8 characters');
+        $this->assertSame(8, count($expectedBindParamValues), 'Should have 8 bind parameters (7 updates + 1 WHERE)');
+        $this->assertSame(8, strlen($expectedBindParamTypes), 'Bind param type string should have 8 characters');
 
         // Verify the values are what we expect
-        $this->assertEquals(1, $expectedBindParamValues[0], 'First param should be pg value');
-        $this->assertEquals(2, $expectedBindParamValues[1], 'Second param should be sg value');
-        $this->assertEquals(30, $expectedBindParamValues[6], 'Seventh param should be min value');
-        $this->assertEquals('Test Player', $expectedBindParamValues[7], 'Eighth param should be player name');
+        $this->assertSame(1, $expectedBindParamValues[0], 'First param should be pg value');
+        $this->assertSame(2, $expectedBindParamValues[1], 'Second param should be sg value');
+        $this->assertSame(30, $expectedBindParamValues[6], 'Seventh param should be min value');
+        $this->assertSame('Test Player', $expectedBindParamValues[7], 'Eighth param should be player name');
     }
 
     /**
@@ -386,8 +386,8 @@ class DepthChartEntryRepositoryTest extends TestCase
         $hardcodedColumns = ['dc_of', 'dc_df', 'dc_oi', 'dc_di', 'dc_bh'];
 
         // Verify the counts match
-        $this->assertEquals(count($processedBoundKeys), count($boundDatabaseColumns), 'Number of bound keys should match bound database columns');
-        $this->assertEquals(5, count($hardcodedColumns), 'Should have 5 hardcoded columns');
+        $this->assertSame(count($processedBoundKeys), count($boundDatabaseColumns), 'Number of bound keys should match bound database columns');
+        $this->assertSame(5, count($hardcodedColumns), 'Should have 5 hardcoded columns');
 
         // Verify the mapping chain for position depth fields
         $completeChain = [

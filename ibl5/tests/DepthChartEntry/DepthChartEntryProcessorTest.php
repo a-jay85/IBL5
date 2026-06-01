@@ -43,15 +43,15 @@ class DepthChartEntryProcessorTest extends TestCase
         $result = $this->processor->processSubmission($postData, 15);
 
         $this->assertEquals(2, count($result['playerData']));
-        $this->assertEquals(2, $result['activePlayers']);
-        $this->assertEquals(2, $result['pos_1']);  // Both players have pg > 0
+        $this->assertSame(2, $result['activePlayers']);
+        $this->assertSame(2, $result['pos_1']);  // Both players have pg > 0
         $this->assertFalse($result['hasStarterAtMultiplePositions']);
         // Role slots are hardcoded to 0
-        $this->assertEquals(0, $result['playerData'][0]['of']);
-        $this->assertEquals(0, $result['playerData'][0]['df']);
-        $this->assertEquals(0, $result['playerData'][0]['oi']);
-        $this->assertEquals(0, $result['playerData'][0]['di']);
-        $this->assertEquals(0, $result['playerData'][0]['bh']);
+        $this->assertSame(0, $result['playerData'][0]['of']);
+        $this->assertSame(0, $result['playerData'][0]['df']);
+        $this->assertSame(0, $result['playerData'][0]['oi']);
+        $this->assertSame(0, $result['playerData'][0]['di']);
+        $this->assertSame(0, $result['playerData'][0]['bh']);
     }
     
     public function testDetectsMultipleStartingPositions(): void
@@ -71,7 +71,7 @@ class DepthChartEntryProcessorTest extends TestCase
         $result = $this->processor->processSubmission($postData, 15);
 
         $this->assertTrue($result['hasStarterAtMultiplePositions']);
-        $this->assertEquals('Player One', $result['nameOfProblemStarter']);
+        $this->assertSame('Player One', $result['nameOfProblemStarter']);
     }
     
     public function testExcludesInjuredPlayersFromPositionCount(): void
@@ -90,8 +90,8 @@ class DepthChartEntryProcessorTest extends TestCase
 
         $result = $this->processor->processSubmission($postData, 15);
 
-        $this->assertEquals(0, $result['pos_1']);  // Injured player not counted
-        $this->assertEquals(1, $result['activePlayers']);  // Still counts as active
+        $this->assertSame(0, $result['pos_1']);  // Injured player not counted
+        $this->assertSame(1, $result['activePlayers']);  // Still counts as active
     }
     
     public function testGeneratesCsvContentCorrectly(): void
@@ -143,21 +143,21 @@ class DepthChartEntryProcessorTest extends TestCase
         $this->assertStringNotContainsString('</script>', $result['playerData'][0]['name']);
 
         // Depth values should be capped at 5
-        $this->assertEquals(5, $result['playerData'][0]['pg']);
-        $this->assertEquals(0, $result['playerData'][0]['sg']);
+        $this->assertSame(5, $result['playerData'][0]['pg']);
+        $this->assertSame(0, $result['playerData'][0]['sg']);
 
         // Active should be 0 (invalid value)
-        $this->assertEquals(0, $result['playerData'][0]['canPlayInGame']);
+        $this->assertSame(0, $result['playerData'][0]['canPlayInGame']);
 
         // Minutes should be capped at 40
-        $this->assertEquals(40, $result['playerData'][0]['min']);
+        $this->assertSame(40, $result['playerData'][0]['min']);
 
         // Role slots are hardcoded to 0 regardless of input
-        $this->assertEquals(0, $result['playerData'][0]['of']);
-        $this->assertEquals(0, $result['playerData'][0]['df']);
-        $this->assertEquals(0, $result['playerData'][0]['oi']);
-        $this->assertEquals(0, $result['playerData'][0]['di']);
-        $this->assertEquals(0, $result['playerData'][0]['bh']);
+        $this->assertSame(0, $result['playerData'][0]['of']);
+        $this->assertSame(0, $result['playerData'][0]['df']);
+        $this->assertSame(0, $result['playerData'][0]['oi']);
+        $this->assertSame(0, $result['playerData'][0]['di']);
+        $this->assertSame(0, $result['playerData'][0]['bh']);
     }
     
     public function testHandlesMissingOptionalFields(): void
@@ -177,8 +177,8 @@ class DepthChartEntryProcessorTest extends TestCase
         $result = $this->processor->processSubmission($postData, 15);
 
         $this->assertEquals(1, count($result['playerData']));
-        $this->assertEquals('Player One', $result['playerData'][0]['name']);
-        $this->assertEquals(0, $result['playerData'][0]['injury']);
+        $this->assertSame('Player One', $result['playerData'][0]['name']);
+        $this->assertSame(0, $result['playerData'][0]['injury']);
     }
     
     public function testBlankMinutesSubmissionIsConvertedToZero(): void
@@ -247,11 +247,11 @@ class DepthChartEntryProcessorTest extends TestCase
         $result = $this->processor->processSubmission($postData, 15);
 
         // Position depth counting restored — counts non-injured players with depth > 0
-        $this->assertEquals(1, $result['pos_1']);
-        $this->assertEquals(1, $result['pos_2']);
-        $this->assertEquals(1, $result['pos_3']);
-        $this->assertEquals(1, $result['pos_4']);
-        $this->assertEquals(1, $result['pos_5']);
+        $this->assertSame(1, $result['pos_1']);
+        $this->assertSame(1, $result['pos_2']);
+        $this->assertSame(1, $result['pos_3']);
+        $this->assertSame(1, $result['pos_4']);
+        $this->assertSame(1, $result['pos_5']);
     }
 
     // --- Merged from DepthChartEntryDataConsistencyTest ---
@@ -330,11 +330,11 @@ class DepthChartEntryProcessorTest extends TestCase
         $player = $result['playerData'][0];
 
         // All role fields are hardcoded to 0 — dead storage in JSB
-        $this->assertEquals(0, $player['of'], 'OF should always be 0');
-        $this->assertEquals(0, $player['df'], 'DF should always be 0');
-        $this->assertEquals(0, $player['oi'], 'OI should always be 0');
-        $this->assertEquals(0, $player['di'], 'DI should always be 0');
-        $this->assertEquals(0, $player['bh'], 'BH should always be 0');
+        $this->assertSame(0, $player['of'], 'OF should always be 0');
+        $this->assertSame(0, $player['df'], 'DF should always be 0');
+        $this->assertSame(0, $player['oi'], 'OI should always be 0');
+        $this->assertSame(0, $player['di'], 'DI should always be 0');
+        $this->assertSame(0, $player['bh'], 'BH should always be 0');
     }
 
     /**
@@ -451,14 +451,14 @@ class DepthChartEntryProcessorTest extends TestCase
         $this->assertStringContainsString('name="c1"', $formHtml);
 
         // Processed data should match POST data for position depth
-        $this->assertEquals(0, $processedPlayer['pg'], 'Processed PG should be 0');
-        $this->assertEquals(1, $processedPlayer['sg'], 'Processed SG should be 1');
-        $this->assertEquals(2, $processedPlayer['sf'], 'Processed SF should be 2');
-        $this->assertEquals(0, $processedPlayer['pf'], 'Processed PF should be 0');
-        $this->assertEquals(3, $processedPlayer['c'], 'Processed C should be 3');
+        $this->assertSame(0, $processedPlayer['pg'], 'Processed PG should be 0');
+        $this->assertSame(1, $processedPlayer['sg'], 'Processed SG should be 1');
+        $this->assertSame(2, $processedPlayer['sf'], 'Processed SF should be 2');
+        $this->assertSame(0, $processedPlayer['pf'], 'Processed PF should be 0');
+        $this->assertSame(3, $processedPlayer['c'], 'Processed C should be 3');
         // Role fields always 0
-        $this->assertEquals(0, $processedPlayer['of']);
-        $this->assertEquals(0, $processedPlayer['df']);
+        $this->assertSame(0, $processedPlayer['of']);
+        $this->assertSame(0, $processedPlayer['df']);
 
         // CSV should match processed data
         $this->assertStringContainsString('Round Trip Player,0,1,2,0,3,1,35,0,0,0,0,0', $csv, 'CSV should match processed data exactly');

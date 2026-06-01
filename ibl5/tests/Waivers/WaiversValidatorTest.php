@@ -585,7 +585,7 @@ class WaiversValidatorTest extends TestCase
             $playerSalary
         );
 
-        $this->assertEquals($expectedResult, $result);
+        $this->assertSame($expectedResult, $result);
     }
 
     public static function rosterSlotBoundaryProvider(): array
@@ -619,7 +619,7 @@ class WaiversValidatorTest extends TestCase
             $playerSalary
         );
 
-        $this->assertEquals($expectedResult, $result);
+        $this->assertSame($expectedResult, $result);
     }
 
     public static function salaryBoundaryProvider(): array

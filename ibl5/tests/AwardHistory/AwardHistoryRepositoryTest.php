@@ -44,7 +44,7 @@ final class AwardHistoryRepositoryTest extends TestCase
         $this->assertIsArray($result);
         $this->assertArrayHasKey('results', $result);
         $this->assertArrayHasKey('count', $result);
-        $this->assertEquals(2, $result['count']);
+        $this->assertSame(2, $result['count']);
     }
 
     public function testSearchAwardsWithNameFilter(): void
@@ -63,7 +63,7 @@ final class AwardHistoryRepositoryTest extends TestCase
         ]);
 
         $this->assertIsArray($result);
-        $this->assertEquals(1, $result['count']);
+        $this->assertSame(1, $result['count']);
     }
 
     public function testSearchAwardsWithAwardFilter(): void
@@ -83,7 +83,7 @@ final class AwardHistoryRepositoryTest extends TestCase
         ]);
 
         $this->assertIsArray($result);
-        $this->assertEquals(2, $result['count']);
+        $this->assertSame(2, $result['count']);
     }
 
     public function testSearchAwardsWithYearFilter(): void
@@ -102,7 +102,7 @@ final class AwardHistoryRepositoryTest extends TestCase
         ]);
 
         $this->assertIsArray($result);
-        $this->assertEquals(1, $result['count']);
+        $this->assertSame(1, $result['count']);
     }
 
     public function testSearchAwardsWithMultipleFilters(): void
@@ -138,7 +138,7 @@ final class AwardHistoryRepositoryTest extends TestCase
         ]);
 
         $this->assertIsArray($result);
-        $this->assertEquals(0, $result['count']);
+        $this->assertSame(0, $result['count']);
         $this->assertEmpty($result['results']);
     }
 

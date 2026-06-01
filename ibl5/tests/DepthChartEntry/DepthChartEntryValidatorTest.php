@@ -71,7 +71,7 @@ class DepthChartEntryValidatorTest extends TestCase
         
         $this->assertFalse($result);
         $this->assertNotEmpty($this->validator->getErrors());
-        $this->assertEquals('active_players_min', $this->validator->getErrors()[0]['type']);
+        $this->assertSame('active_players_min', $this->validator->getErrors()[0]['type']);
     }
     
     public function testFailsValidationWithTooManyActivePlayers(): void
@@ -91,7 +91,7 @@ class DepthChartEntryValidatorTest extends TestCase
         
         $this->assertFalse($result);
         $this->assertNotEmpty($this->validator->getErrors());
-        $this->assertEquals('active_players_max', $this->validator->getErrors()[0]['type']);
+        $this->assertSame('active_players_max', $this->validator->getErrors()[0]['type']);
     }
     
     public function testReturnsFormattedErrorMessages(): void
@@ -133,10 +133,10 @@ class DepthChartEntryValidatorTest extends TestCase
         $errors = $this->validator->getErrors();
         // Should have: active_players_min + 2 position_depth + multiple_starting_positions
         $this->assertCount(4, $errors);
-        $this->assertEquals('active_players_min', $errors[0]['type']);
-        $this->assertEquals('position_depth', $errors[1]['type']);
-        $this->assertEquals('position_depth', $errors[2]['type']);
-        $this->assertEquals('multiple_starting_positions', $errors[3]['type']);
+        $this->assertSame('active_players_min', $errors[0]['type']);
+        $this->assertSame('position_depth', $errors[1]['type']);
+        $this->assertSame('position_depth', $errors[2]['type']);
+        $this->assertSame('multiple_starting_positions', $errors[3]['type']);
     }
     
     public function testEdgeCaseExactlyAtMinimumRequirements(): void
@@ -214,7 +214,7 @@ class DepthChartEntryValidatorTest extends TestCase
         $this->assertFalse($result);
         $errors = $this->validator->getErrors();
         $this->assertCount(1, $errors);
-        $this->assertEquals('position_depth', $errors[0]['type']);
+        $this->assertSame('position_depth', $errors[0]['type']);
         $this->assertStringContainsString('SF', $errors[0]['message']);
     }
 
@@ -236,7 +236,7 @@ class DepthChartEntryValidatorTest extends TestCase
         $this->assertFalse($result);
         $errors = $this->validator->getErrors();
         $this->assertCount(1, $errors);
-        $this->assertEquals('multiple_starting_positions', $errors[0]['type']);
+        $this->assertSame('multiple_starting_positions', $errors[0]['type']);
         $this->assertStringContainsString('John Doe', $errors[0]['message']);
     }
 }

@@ -82,23 +82,23 @@ class SeriesRecordsServiceTest extends TestCase
 
     public function testGetRecordStatusReturnsWinningWhenWinsGreater(): void
     {
-        $this->assertEquals('winning', $this->service->getRecordStatus(10, 5));
-        $this->assertEquals('winning', $this->service->getRecordStatus(1, 0));
-        $this->assertEquals('winning', $this->service->getRecordStatus(100, 99));
+        $this->assertSame('winning', $this->service->getRecordStatus(10, 5));
+        $this->assertSame('winning', $this->service->getRecordStatus(1, 0));
+        $this->assertSame('winning', $this->service->getRecordStatus(100, 99));
     }
 
     public function testGetRecordStatusReturnsLosingWhenLossesGreater(): void
     {
-        $this->assertEquals('losing', $this->service->getRecordStatus(5, 10));
-        $this->assertEquals('losing', $this->service->getRecordStatus(0, 1));
-        $this->assertEquals('losing', $this->service->getRecordStatus(99, 100));
+        $this->assertSame('losing', $this->service->getRecordStatus(5, 10));
+        $this->assertSame('losing', $this->service->getRecordStatus(0, 1));
+        $this->assertSame('losing', $this->service->getRecordStatus(99, 100));
     }
 
     public function testGetRecordStatusReturnsTiedWhenEqual(): void
     {
-        $this->assertEquals('tied', $this->service->getRecordStatus(5, 5));
-        $this->assertEquals('tied', $this->service->getRecordStatus(0, 0));
-        $this->assertEquals('tied', $this->service->getRecordStatus(100, 100));
+        $this->assertSame('tied', $this->service->getRecordStatus(5, 5));
+        $this->assertSame('tied', $this->service->getRecordStatus(0, 0));
+        $this->assertSame('tied', $this->service->getRecordStatus(100, 100));
     }
 
     // =========================================================================
@@ -107,22 +107,22 @@ class SeriesRecordsServiceTest extends TestCase
 
     public function testGetRecordBackgroundColorReturnsGreenForWinning(): void
     {
-        $this->assertEquals('#8f8', $this->service->getRecordBackgroundColor(10, 5));
+        $this->assertSame('#8f8', $this->service->getRecordBackgroundColor(10, 5));
     }
 
     public function testGetRecordBackgroundColorReturnsRedForLosing(): void
     {
-        $this->assertEquals('#f88', $this->service->getRecordBackgroundColor(5, 10));
+        $this->assertSame('#f88', $this->service->getRecordBackgroundColor(5, 10));
     }
 
     public function testGetRecordBackgroundColorReturnsGrayForTied(): void
     {
-        $this->assertEquals('#bbb', $this->service->getRecordBackgroundColor(5, 5));
+        $this->assertSame('#bbb', $this->service->getRecordBackgroundColor(5, 5));
     }
 
     public function testGetRecordBackgroundColorHandlesZeroZero(): void
     {
-        $this->assertEquals('#bbb', $this->service->getRecordBackgroundColor(0, 0));
+        $this->assertSame('#bbb', $this->service->getRecordBackgroundColor(0, 0));
     }
 
     // =========================================================================

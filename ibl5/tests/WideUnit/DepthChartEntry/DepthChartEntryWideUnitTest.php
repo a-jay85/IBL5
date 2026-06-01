@@ -85,7 +85,7 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
         $this->assertTrue($historyResult, 'Team history update should succeed');
 
         // Assert - Correct queries executed
-        $this->assertEquals(12, $this->countQueriesMatching('UPDATE ibl_plr'));
+        $this->assertSame(12, $this->countQueriesMatching('UPDATE ibl_plr'));
         $this->assertQueryExecuted('UPDATE ibl_team_info');
         $this->assertQueryExecuted('depth = NOW()');
     }
@@ -117,20 +117,20 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
         $updateResult = $this->repository->updatePlayerDepthChart($playerData['name'], $playerData);
 
         // Assert - Processed values match what was submitted
-        $this->assertEquals('John Smith', $playerData['name']);
-        $this->assertEquals(1, $playerData['pg']);
-        $this->assertEquals(2, $playerData['sg']);
-        $this->assertEquals(0, $playerData['sf']);
-        $this->assertEquals(3, $playerData['pf']);
-        $this->assertEquals(0, $playerData['c']);
-        $this->assertEquals(1, $playerData['canPlayInGame']);
-        $this->assertEquals(32, $playerData['min']);
+        $this->assertSame('John Smith', $playerData['name']);
+        $this->assertSame(1, $playerData['pg']);
+        $this->assertSame(2, $playerData['sg']);
+        $this->assertSame(0, $playerData['sf']);
+        $this->assertSame(3, $playerData['pf']);
+        $this->assertSame(0, $playerData['c']);
+        $this->assertSame(1, $playerData['canPlayInGame']);
+        $this->assertSame(32, $playerData['min']);
         // Role fields hardcoded to 0
-        $this->assertEquals(0, $playerData['of']);
-        $this->assertEquals(0, $playerData['df']);
-        $this->assertEquals(0, $playerData['oi']);
-        $this->assertEquals(0, $playerData['di']);
-        $this->assertEquals(0, $playerData['bh']);
+        $this->assertSame(0, $playerData['of']);
+        $this->assertSame(0, $playerData['df']);
+        $this->assertSame(0, $playerData['oi']);
+        $this->assertSame(0, $playerData['di']);
+        $this->assertSame(0, $playerData['bh']);
 
         // Assert - Database update succeeded and included correct data
         $this->assertTrue($updateResult);
@@ -204,7 +204,7 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
         $this->assertFalse($isValid);
         $errors = $this->validator->getErrors();
         $this->assertNotEmpty($errors);
-        $this->assertEquals('active_players_min', $errors[0]['type']);
+        $this->assertSame('active_players_min', $errors[0]['type']);
         $this->assertStringContainsString('at least 12 active players', $errors[0]['message']);
         $this->assertStringContainsString('you have 10', $errors[0]['message']);
     }
@@ -227,7 +227,7 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
         $this->assertFalse($isValid);
         $errors = $this->validator->getErrors();
         $this->assertNotEmpty($errors);
-        $this->assertEquals('active_players_max', $errors[0]['type']);
+        $this->assertSame('active_players_max', $errors[0]['type']);
         $this->assertStringContainsString('more than 12', $errors[0]['message']);
     }
 
@@ -249,7 +249,7 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
         $this->assertFalse($isValid);
         $errors = $this->validator->getErrors();
         $this->assertNotEmpty($errors);
-        $this->assertEquals('position_depth', $errors[0]['type']);
+        $this->assertSame('position_depth', $errors[0]['type']);
         $this->assertStringContainsString('PG', $errors[0]['message']);
     }
 
@@ -275,7 +275,7 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
         $multiStarterErrors = array_filter($errors, static fn (array $e): bool => $e['type'] === 'multiple_starting_positions');
         $this->assertNotEmpty($multiStarterErrors, 'Should have a multiple_starting_positions error');
         $this->assertTrue($result['hasStarterAtMultiplePositions']);
-        $this->assertEquals('Multi Starter', $result['nameOfProblemStarter']);
+        $this->assertSame('Multi Starter', $result['nameOfProblemStarter']);
     }
 
     /**
@@ -321,7 +321,7 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
         // Assert
         $this->assertTrue($isValid, 'Playoffs should allow 10 active players');
         $this->assertEmpty($this->validator->getErrors());
-        $this->assertEquals(10, $result['activePlayers']);
+        $this->assertSame(10, $result['activePlayers']);
     }
 
     /**
@@ -415,8 +415,8 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
 
         // Assert
         $this->assertCount(2, $result);
-        $this->assertEquals('Player One', $result[0]['name']);
-        $this->assertEquals('Player Two', $result[1]['name']);
+        $this->assertSame('Player One', $result[0]['name']);
+        $this->assertSame('Player Two', $result[1]['name']);
         $this->assertQueryExecuted('SELECT * FROM ibl_plr');
         $this->assertQueryExecuted("teamid = $teamId");
     }
@@ -509,7 +509,7 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
 
         // Assert
         $this->assertTrue($allSuccess);
-        $this->assertEquals(3, $this->countQueriesMatching('UPDATE ibl_plr'));
+        $this->assertSame(3, $this->countQueriesMatching('UPDATE ibl_plr'));
     }
 
     // ========== INPUT SANITIZATION ==========
@@ -534,7 +534,7 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
         $result = $this->processor->processSubmission($postData, 15);
 
         // Assert - HTML tags stripped
-        $this->assertEquals('alert("xss")John Smith', $result['playerData'][0]['name']);
+        $this->assertSame('alert("xss")John Smith', $result['playerData'][0]['name']);
     }
 
     /**
@@ -560,15 +560,15 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
         $player = $result['playerData'][0];
 
         // Assert - Values clamped to valid ranges
-        $this->assertEquals(5, $player['pg'], 'PG depth should clamp to 5');
-        $this->assertEquals(0, $player['sg'], 'SG depth should clamp to 0');
-        $this->assertEquals(0, $player['canPlayInGame'], 'Active should be 0 or 1');
-        $this->assertEquals(40, $player['min'], 'Minutes should clamp to 40');
+        $this->assertSame(5, $player['pg'], 'PG depth should clamp to 5');
+        $this->assertSame(0, $player['sg'], 'SG depth should clamp to 0');
+        $this->assertSame(0, $player['canPlayInGame'], 'Active should be 0 or 1');
+        $this->assertSame(40, $player['min'], 'Minutes should clamp to 40');
         // Role fields hardcoded to 0 regardless of input
-        $this->assertEquals(0, $player['of'], 'OF should always be 0');
-        $this->assertEquals(0, $player['df'], 'DF should always be 0');
-        $this->assertEquals(0, $player['oi'], 'OI should always be 0');
-        $this->assertEquals(0, $player['di'], 'DI should always be 0');
+        $this->assertSame(0, $player['of'], 'OF should always be 0');
+        $this->assertSame(0, $player['df'], 'DF should always be 0');
+        $this->assertSame(0, $player['oi'], 'OI should always be 0');
+        $this->assertSame(0, $player['di'], 'DI should always be 0');
     }
 
     /**
@@ -593,11 +593,11 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
         $this->repository->updatePlayerDepthChart($player['name'], $player);
 
         // Assert - Role fields always 0
-        $this->assertEquals(0, $player['of']);
-        $this->assertEquals(0, $player['df']);
-        $this->assertEquals(0, $player['oi']);
-        $this->assertEquals(0, $player['di']);
-        $this->assertEquals(0, $player['bh']);
+        $this->assertSame(0, $player['of']);
+        $this->assertSame(0, $player['df']);
+        $this->assertSame(0, $player['oi']);
+        $this->assertSame(0, $player['di']);
+        $this->assertSame(0, $player['bh']);
 
         // Assert - Database update still executed
         $this->assertQueryExecuted('UPDATE ibl_plr');
@@ -625,7 +625,7 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
 
         // Should have active_players_min + position_depth errors for positions below 3
         $this->assertNotEmpty($errors);
-        $this->assertEquals('active_players_min', $errors[0]['type']);
+        $this->assertSame('active_players_min', $errors[0]['type']);
         // Additional position_depth errors may follow depending on depth distribution
     }
 

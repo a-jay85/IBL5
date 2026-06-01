@@ -38,7 +38,7 @@ class LeagueContextTest extends TestCase
     public function testGetCurrentLeagueDefaultsToIbl(): void
     {
         $result = $this->leagueContext->getCurrentLeague();
-        $this->assertEquals('ibl', $result);
+        $this->assertSame('ibl', $result);
     }
 
     /**
@@ -51,7 +51,7 @@ class LeagueContextTest extends TestCase
         $_COOKIE['ibl_league'] = 'ibl';
         
         $result = $this->leagueContext->getCurrentLeague();
-        $this->assertEquals('olympics', $result);
+        $this->assertSame('olympics', $result);
     }
 
     /**
@@ -63,7 +63,7 @@ class LeagueContextTest extends TestCase
         $_COOKIE['ibl_league'] = 'ibl';
         
         $result = $this->leagueContext->getCurrentLeague();
-        $this->assertEquals('olympics', $result);
+        $this->assertSame('olympics', $result);
     }
 
     /**
@@ -74,7 +74,7 @@ class LeagueContextTest extends TestCase
         $_COOKIE['ibl_league'] = 'olympics';
         
         $result = $this->leagueContext->getCurrentLeague();
-        $this->assertEquals('olympics', $result);
+        $this->assertSame('olympics', $result);
     }
 
     /**
@@ -87,7 +87,7 @@ class LeagueContextTest extends TestCase
         $_COOKIE['ibl_league'] = 'olympics';
         
         $result = $this->leagueContext->getCurrentLeague();
-        $this->assertEquals('olympics', $result);
+        $this->assertSame('olympics', $result);
     }
 
     /**
@@ -100,7 +100,7 @@ class LeagueContextTest extends TestCase
         $_COOKIE['ibl_league'] = 'invalid';
         
         $result = $this->leagueContext->getCurrentLeague();
-        $this->assertEquals('ibl', $result);
+        $this->assertSame('ibl', $result);
     }
 
     /**
@@ -113,7 +113,7 @@ class LeagueContextTest extends TestCase
         // setLeague stores the selection in-memory (not $_SESSION) so it is
         // immediately observable for the rest of the request without leaking
         // into the shared E2E server session.
-        $this->assertEquals('ibl', $this->leagueContext->getCurrentLeague());
+        $this->assertSame('ibl', $this->leagueContext->getCurrentLeague());
         $this->assertArrayNotHasKey('current_league', $_SESSION);
     }
 
@@ -124,7 +124,7 @@ class LeagueContextTest extends TestCase
     {
         $this->leagueContext->setLeague('olympics');
 
-        $this->assertEquals('olympics', $this->leagueContext->getCurrentLeague());
+        $this->assertSame('olympics', $this->leagueContext->getCurrentLeague());
         $this->assertArrayNotHasKey('current_league', $_SESSION);
     }
 
@@ -263,10 +263,10 @@ class LeagueContextTest extends TestCase
         
         $config = $this->leagueContext->getConfig();
         
-        $this->assertEquals('Internet Basketball League', $config['title']);
-        $this->assertEquals('IBL', $config['short_name']);
-        $this->assertEquals('#1a365d', $config['primary_color']);
-        $this->assertEquals('images/ibl/logo.png', $config['logo_path']);
+        $this->assertSame('Internet Basketball League', $config['title']);
+        $this->assertSame('IBL', $config['short_name']);
+        $this->assertSame('#1a365d', $config['primary_color']);
+        $this->assertSame('images/ibl/logo.png', $config['logo_path']);
     }
 
     /**
@@ -278,10 +278,10 @@ class LeagueContextTest extends TestCase
         
         $config = $this->leagueContext->getConfig();
         
-        $this->assertEquals('IBL Olympics', $config['title']);
-        $this->assertEquals('Olympics', $config['short_name']);
-        $this->assertEquals('#c53030', $config['primary_color']);
-        $this->assertEquals('images/olympics/logo.png', $config['logo_path']);
+        $this->assertSame('IBL Olympics', $config['title']);
+        $this->assertSame('Olympics', $config['short_name']);
+        $this->assertSame('#c53030', $config['primary_color']);
+        $this->assertSame('images/olympics/logo.png', $config['logo_path']);
     }
 
     /**
@@ -292,8 +292,8 @@ class LeagueContextTest extends TestCase
         // Don't set any league, should default to ibl
         $config = $this->leagueContext->getConfig();
 
-        $this->assertEquals('Internet Basketball League', $config['title']);
-        $this->assertEquals('IBL', $config['short_name']);
+        $this->assertSame('Internet Basketball League', $config['title']);
+        $this->assertSame('IBL', $config['short_name']);
     }
 
     // ---- isOlympics() tests ----

@@ -24,22 +24,22 @@ class ContractRulesTest extends TestCase
 
     public function testStandardRaisePercentageIs10Percent(): void
     {
-        $this->assertEquals(0.10, ContractRules::STANDARD_RAISE_PERCENTAGE);
+        $this->assertSame(0.10, ContractRules::STANDARD_RAISE_PERCENTAGE);
     }
 
     public function testBirdRightsRaisePercentageIs12Point5Percent(): void
     {
-        $this->assertEquals(0.125, ContractRules::BIRD_RIGHTS_RAISE_PERCENTAGE);
+        $this->assertSame(0.125, ContractRules::BIRD_RIGHTS_RAISE_PERCENTAGE);
     }
 
     public function testBirdRightsThresholdIs3Years(): void
     {
-        $this->assertEquals(3, ContractRules::BIRD_RIGHTS_THRESHOLD);
+        $this->assertSame(3, ContractRules::BIRD_RIGHTS_THRESHOLD);
     }
 
     public function testLleOfferIs145(): void
     {
-        $this->assertEquals(145, ContractRules::LLE_OFFER);
+        $this->assertSame(145, ContractRules::LLE_OFFER);
     }
 
     public function testMleOffersHas6Years(): void
@@ -52,7 +52,7 @@ class ContractRulesTest extends TestCase
         $offers = ContractRules::MLE_OFFERS;
         for ($i = 1; $i < count($offers); $i++) {
             $actualRaise = $offers[$i] - $offers[$i - 1];
-            $this->assertEquals(45, $actualRaise, "Year " . ($i + 1) . " raise should be 45");
+            $this->assertSame(45, $actualRaise, "Year " . ($i + 1) . " raise should be 45");
         }
     }
 
@@ -92,16 +92,16 @@ class ContractRulesTest extends TestCase
 
     public function testGetMaxRaisePercentageReturnsStandardForNoBirdRights(): void
     {
-        $this->assertEquals(0.10, ContractRules::getMaxRaisePercentage(0));
-        $this->assertEquals(0.10, ContractRules::getMaxRaisePercentage(1));
-        $this->assertEquals(0.10, ContractRules::getMaxRaisePercentage(2));
+        $this->assertSame(0.10, ContractRules::getMaxRaisePercentage(0));
+        $this->assertSame(0.10, ContractRules::getMaxRaisePercentage(1));
+        $this->assertSame(0.10, ContractRules::getMaxRaisePercentage(2));
     }
 
     public function testGetMaxRaisePercentageReturnsBirdRightsForThreePlusYears(): void
     {
-        $this->assertEquals(0.125, ContractRules::getMaxRaisePercentage(3));
-        $this->assertEquals(0.125, ContractRules::getMaxRaisePercentage(5));
-        $this->assertEquals(0.125, ContractRules::getMaxRaisePercentage(10));
+        $this->assertSame(0.125, ContractRules::getMaxRaisePercentage(3));
+        $this->assertSame(0.125, ContractRules::getMaxRaisePercentage(5));
+        $this->assertSame(0.125, ContractRules::getMaxRaisePercentage(10));
     }
 
     // ============================================
@@ -110,60 +110,60 @@ class ContractRulesTest extends TestCase
 
     public function testGetVeteranMinimumSalaryForRookie(): void
     {
-        $this->assertEquals(35, ContractRules::getVeteranMinimumSalary(1));
+        $this->assertSame(35, ContractRules::getVeteranMinimumSalary(1));
     }
 
     public function testGetVeteranMinimumSalaryForSecondYear(): void
     {
-        $this->assertEquals(51, ContractRules::getVeteranMinimumSalary(2));
+        $this->assertSame(51, ContractRules::getVeteranMinimumSalary(2));
     }
 
     public function testGetVeteranMinimumSalaryForThirdYear(): void
     {
-        $this->assertEquals(61, ContractRules::getVeteranMinimumSalary(3));
+        $this->assertSame(61, ContractRules::getVeteranMinimumSalary(3));
     }
 
     public function testGetVeteranMinimumSalaryForFourthYear(): void
     {
-        $this->assertEquals(64, ContractRules::getVeteranMinimumSalary(4));
+        $this->assertSame(64, ContractRules::getVeteranMinimumSalary(4));
     }
 
     public function testGetVeteranMinimumSalaryForFifthYear(): void
     {
-        $this->assertEquals(70, ContractRules::getVeteranMinimumSalary(5));
+        $this->assertSame(70, ContractRules::getVeteranMinimumSalary(5));
     }
 
     public function testGetVeteranMinimumSalaryForSixthYear(): void
     {
-        $this->assertEquals(76, ContractRules::getVeteranMinimumSalary(6));
+        $this->assertSame(76, ContractRules::getVeteranMinimumSalary(6));
     }
 
     public function testGetVeteranMinimumSalaryForSeventhYear(): void
     {
-        $this->assertEquals(82, ContractRules::getVeteranMinimumSalary(7));
+        $this->assertSame(82, ContractRules::getVeteranMinimumSalary(7));
     }
 
     public function testGetVeteranMinimumSalaryForEighthYear(): void
     {
-        $this->assertEquals(89, ContractRules::getVeteranMinimumSalary(8));
+        $this->assertSame(89, ContractRules::getVeteranMinimumSalary(8));
     }
 
     public function testGetVeteranMinimumSalaryForNinthYear(): void
     {
-        $this->assertEquals(100, ContractRules::getVeteranMinimumSalary(9));
+        $this->assertSame(100, ContractRules::getVeteranMinimumSalary(9));
     }
 
     public function testGetVeteranMinimumSalaryForTenPlusYears(): void
     {
-        $this->assertEquals(103, ContractRules::getVeteranMinimumSalary(10));
-        $this->assertEquals(103, ContractRules::getVeteranMinimumSalary(15));
-        $this->assertEquals(103, ContractRules::getVeteranMinimumSalary(20));
+        $this->assertSame(103, ContractRules::getVeteranMinimumSalary(10));
+        $this->assertSame(103, ContractRules::getVeteranMinimumSalary(15));
+        $this->assertSame(103, ContractRules::getVeteranMinimumSalary(20));
     }
 
     public function testGetVeteranMinimumSalaryForZeroExperience(): void
     {
         // Should default to year 1 minimum
-        $this->assertEquals(35, ContractRules::getVeteranMinimumSalary(0));
+        $this->assertSame(35, ContractRules::getVeteranMinimumSalary(0));
     }
 
     // ============================================
@@ -172,33 +172,33 @@ class ContractRulesTest extends TestCase
 
     public function testGetMaxContractSalaryForRookie(): void
     {
-        $this->assertEquals(1063, ContractRules::getMaxContractSalary(0));
+        $this->assertSame(1063, ContractRules::getMaxContractSalary(0));
     }
 
     public function testGetMaxContractSalaryFor6YearVeteran(): void
     {
-        $this->assertEquals(1063, ContractRules::getMaxContractSalary(6));
+        $this->assertSame(1063, ContractRules::getMaxContractSalary(6));
     }
 
     public function testGetMaxContractSalaryFor7YearVeteran(): void
     {
-        $this->assertEquals(1275, ContractRules::getMaxContractSalary(7));
+        $this->assertSame(1275, ContractRules::getMaxContractSalary(7));
     }
 
     public function testGetMaxContractSalaryFor8YearVeteran(): void
     {
-        $this->assertEquals(1275, ContractRules::getMaxContractSalary(8));
+        $this->assertSame(1275, ContractRules::getMaxContractSalary(8));
     }
 
     public function testGetMaxContractSalaryFor9YearVeteran(): void
     {
-        $this->assertEquals(1275, ContractRules::getMaxContractSalary(9));
+        $this->assertSame(1275, ContractRules::getMaxContractSalary(9));
     }
 
     public function testGetMaxContractSalaryFor10PlusYearVeteran(): void
     {
-        $this->assertEquals(1451, ContractRules::getMaxContractSalary(10));
-        $this->assertEquals(1451, ContractRules::getMaxContractSalary(15));
+        $this->assertSame(1451, ContractRules::getMaxContractSalary(10));
+        $this->assertSame(1451, ContractRules::getMaxContractSalary(15));
     }
 
     // ============================================
@@ -209,7 +209,7 @@ class ContractRulesTest extends TestCase
     {
         $offers = ContractRules::getMLEOffers(1);
         $this->assertCount(1, $offers);
-        $this->assertEquals(450, $offers[0]);
+        $this->assertSame(450, $offers[0]);
     }
 
     public function testGetMleOffersFor2Years(): void
@@ -318,7 +318,7 @@ class ContractRulesTest extends TestCase
         $raisePercentage = ContractRules::getMaxRaisePercentage($birdYears);
 
         // Assert - Should return 0.125 (12.5%) with Bird rights
-        $this->assertEquals(0.125, $raisePercentage);
+        $this->assertSame(0.125, $raisePercentage);
     }
 
     /**
@@ -333,7 +333,7 @@ class ContractRulesTest extends TestCase
         $raisePercentage = ContractRules::getMaxRaisePercentage($birdYears);
 
         // Assert - Should return 0.10 (10%) without Bird rights
-        $this->assertEquals(0.10, $raisePercentage);
+        $this->assertSame(0.10, $raisePercentage);
     }
 
     /**
@@ -354,10 +354,10 @@ class ContractRulesTest extends TestCase
         $year4 = $maxContract + ($maxRaise * 3);
 
         // Assert - Verify calculations
-        $this->assertEquals(1275, $year1);
-        $this->assertEquals(1275 + 159, $year2); // 1275 * 0.125 = 159.375 floors to 159
-        $this->assertEquals(1275 + (159 * 2), $year3);
-        $this->assertEquals(1275 + (159 * 3), $year4);
+        $this->assertSame(1275, $year1);
+        $this->assertSame(1275 + 159, $year2); // 1275 * 0.125 = 159.375 floors to 159
+        $this->assertSame(1275 + (159 * 2), $year3);
+        $this->assertSame(1275 + (159 * 3), $year4);
     }
 
     /**
@@ -378,10 +378,10 @@ class ContractRulesTest extends TestCase
         $year4 = $maxContract + ($maxRaise * 3);
 
         // Assert - Verify calculations
-        $this->assertEquals(1063, $year1);
-        $this->assertEquals(1063 + 106, $year2); // 1063 * 0.10 = 106.3 floors to 106
-        $this->assertEquals(1063 + (106 * 2), $year3);
-        $this->assertEquals(1063 + (106 * 3), $year4);
+        $this->assertSame(1063, $year1);
+        $this->assertSame(1063 + 106, $year2); // 1063 * 0.10 = 106.3 floors to 106
+        $this->assertSame(1063 + (106 * 2), $year3);
+        $this->assertSame(1063 + (106 * 3), $year4);
     }
 
     /**
@@ -397,12 +397,12 @@ class ContractRulesTest extends TestCase
         // Test with Bird rights
         $maxRaise = ContractRules::calculateMaxRaise(1000, 3);
         // Assert - Should be 125 (floor(1000 * 0.125) = 125)
-        $this->assertEquals(125, $maxRaise);
+        $this->assertSame(125, $maxRaise);
 
         // Test without Bird rights
         $maxRaise = ContractRules::calculateMaxRaise(1000, 2);
         // Assert - Should be 100 (floor(1000 * 0.10) = 100)
-        $this->assertEquals(100, $maxRaise);
+        $this->assertSame(100, $maxRaise);
     }
 
     /**
@@ -441,10 +441,10 @@ class ContractRulesTest extends TestCase
         $oneYearOffer = array_slice($maxSalaries, 0, 1);
 
         // Assert - First year should be 1451, not 1632
-        $this->assertEquals(1451, $maxContract);
-        $this->assertEquals(181, $maxRaise); // floor(1451 * 0.125) = floor(181.375) = 181
+        $this->assertSame(1451, $maxContract);
+        $this->assertSame(181, $maxRaise); // floor(1451 * 0.125) = floor(181.375) = 181
         $this->assertEquals([1451], $oneYearOffer);
-        $this->assertEquals(1451, $oneYearOffer[0]);
+        $this->assertSame(1451, $oneYearOffer[0]);
     }
 
     // ============================================

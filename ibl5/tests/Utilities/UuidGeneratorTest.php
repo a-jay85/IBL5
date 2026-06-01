@@ -90,7 +90,7 @@ class UuidGeneratorTest extends TestCase
         $uuid1 = UuidGenerator::generateUuid();
         $uuid2 = UuidGenerator::generateUuid();
         
-        $this->assertNotEquals($uuid1, $uuid2);
+        $this->assertNotSame($uuid1, $uuid2);
     }
 
     // Case Sensitivity

@@ -19,15 +19,15 @@ class OfferTypeTest extends TestCase
      */
     public function testOfferTypeConstants(): void
     {
-        $this->assertEquals(0, OfferType::CUSTOM);
-        $this->assertEquals(1, OfferType::MLE_1_YEAR);
-        $this->assertEquals(2, OfferType::MLE_2_YEAR);
-        $this->assertEquals(3, OfferType::MLE_3_YEAR);
-        $this->assertEquals(4, OfferType::MLE_4_YEAR);
-        $this->assertEquals(5, OfferType::MLE_5_YEAR);
-        $this->assertEquals(6, OfferType::MLE_6_YEAR);
-        $this->assertEquals(7, OfferType::LOWER_LEVEL_EXCEPTION);
-        $this->assertEquals(8, OfferType::VETERAN_MINIMUM);
+        $this->assertSame(0, OfferType::CUSTOM);
+        $this->assertSame(1, OfferType::MLE_1_YEAR);
+        $this->assertSame(2, OfferType::MLE_2_YEAR);
+        $this->assertSame(3, OfferType::MLE_3_YEAR);
+        $this->assertSame(4, OfferType::MLE_4_YEAR);
+        $this->assertSame(5, OfferType::MLE_5_YEAR);
+        $this->assertSame(6, OfferType::MLE_6_YEAR);
+        $this->assertSame(7, OfferType::LOWER_LEVEL_EXCEPTION);
+        $this->assertSame(8, OfferType::VETERAN_MINIMUM);
     }
 
     /**
@@ -45,7 +45,7 @@ class OfferTypeTest extends TestCase
      */
     public function testLLEOfferConstant(): void
     {
-        $this->assertEquals(145, \ContractRules::LLE_OFFER);
+        $this->assertSame(145, \ContractRules::LLE_OFFER);
     }
 
     /**
@@ -124,15 +124,15 @@ class OfferTypeTest extends TestCase
      */
     public function testGetNameReturnsCorrectNames(): void
     {
-        $this->assertEquals('Custom Offer', OfferType::getName(OfferType::CUSTOM));
-        $this->assertEquals('1-Year MLE', OfferType::getName(OfferType::MLE_1_YEAR));
-        $this->assertEquals('2-Year MLE', OfferType::getName(OfferType::MLE_2_YEAR));
-        $this->assertEquals('3-Year MLE', OfferType::getName(OfferType::MLE_3_YEAR));
-        $this->assertEquals('4-Year MLE', OfferType::getName(OfferType::MLE_4_YEAR));
-        $this->assertEquals('5-Year MLE', OfferType::getName(OfferType::MLE_5_YEAR));
-        $this->assertEquals('6-Year MLE', OfferType::getName(OfferType::MLE_6_YEAR));
-        $this->assertEquals('Lower-Level Exception', OfferType::getName(OfferType::LOWER_LEVEL_EXCEPTION));
-        $this->assertEquals("Veteran's Minimum", OfferType::getName(OfferType::VETERAN_MINIMUM));
+        $this->assertSame('Custom Offer', OfferType::getName(OfferType::CUSTOM));
+        $this->assertSame('1-Year MLE', OfferType::getName(OfferType::MLE_1_YEAR));
+        $this->assertSame('2-Year MLE', OfferType::getName(OfferType::MLE_2_YEAR));
+        $this->assertSame('3-Year MLE', OfferType::getName(OfferType::MLE_3_YEAR));
+        $this->assertSame('4-Year MLE', OfferType::getName(OfferType::MLE_4_YEAR));
+        $this->assertSame('5-Year MLE', OfferType::getName(OfferType::MLE_5_YEAR));
+        $this->assertSame('6-Year MLE', OfferType::getName(OfferType::MLE_6_YEAR));
+        $this->assertSame('Lower-Level Exception', OfferType::getName(OfferType::LOWER_LEVEL_EXCEPTION));
+        $this->assertSame("Veteran's Minimum", OfferType::getName(OfferType::VETERAN_MINIMUM));
     }
 
     /**
@@ -140,9 +140,9 @@ class OfferTypeTest extends TestCase
      */
     public function testGetNameReturnsUnknownForInvalidTypes(): void
     {
-        $this->assertEquals('Unknown', OfferType::getName(99));
-        $this->assertEquals('Unknown', OfferType::getName(-1));
-        $this->assertEquals('Unknown', OfferType::getName(10));
+        $this->assertSame('Unknown', OfferType::getName(99));
+        $this->assertSame('Unknown', OfferType::getName(-1));
+        $this->assertSame('Unknown', OfferType::getName(10));
     }
 
     /**
@@ -153,12 +153,12 @@ class OfferTypeTest extends TestCase
         $offers = \ContractRules::MLE_OFFERS;
         
         // Verify the exact MLE amounts
-        $this->assertEquals(450, $offers[0], 'Year 1 MLE should be $450');
-        $this->assertEquals(495, $offers[1], 'Year 2 MLE should be $495');
-        $this->assertEquals(540, $offers[2], 'Year 3 MLE should be $540');
-        $this->assertEquals(585, $offers[3], 'Year 4 MLE should be $585');
-        $this->assertEquals(630, $offers[4], 'Year 5 MLE should be $630');
-        $this->assertEquals(675, $offers[5], 'Year 6 MLE should be $675');
+        $this->assertSame(450, $offers[0], 'Year 1 MLE should be $450');
+        $this->assertSame(495, $offers[1], 'Year 2 MLE should be $495');
+        $this->assertSame(540, $offers[2], 'Year 3 MLE should be $540');
+        $this->assertSame(585, $offers[3], 'Year 4 MLE should be $585');
+        $this->assertSame(630, $offers[4], 'Year 5 MLE should be $630');
+        $this->assertSame(675, $offers[5], 'Year 6 MLE should be $675');
     }
 
     /**

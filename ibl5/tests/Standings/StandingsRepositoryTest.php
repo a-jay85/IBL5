@@ -123,8 +123,8 @@ class StandingsRepositoryTest extends TestCase
         $this->assertIsArray($result);
         $this->assertArrayHasKey('pointsScored', $result);
         $this->assertArrayHasKey('pointsAllowed', $result);
-        $this->assertEquals(2800, $result['pointsScored']);
-        $this->assertEquals(2500, $result['pointsAllowed']);
+        $this->assertSame(2800, $result['pointsScored']);
+        $this->assertSame(2500, $result['pointsAllowed']);
     }
 
     public function testGetSeriesRecordsReturnsRows(): void

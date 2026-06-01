@@ -140,7 +140,7 @@ class CashTransactionHandlerTest extends TestCase
         $result = $this->createLegacyMockCashHandler()->calculateContractTotalYears($cashDistribution);
 
         // Assert
-        $this->assertEquals($expectedYears, $result, $description);
+        $this->assertSame($expectedYears, $result, $description);
     }
 
     /**
@@ -165,7 +165,7 @@ class CashTransactionHandlerTest extends TestCase
             $result = $cashHandler->hasCashInTrade($cashAmounts);
 
             // Assert
-            $this->assertEquals($expected, $result, "Failed for scenario: $scenario");
+            $this->assertSame($expected, $result, "Failed for scenario: $scenario");
         }
     }
 
@@ -276,7 +276,7 @@ class CashTransactionHandlerTest extends TestCase
             $result = $cashHandler->calculateContractTotalYears($cashYear);
 
             // Assert
-            $this->assertEquals($expectedYears, $result, "Failed for edge case: $case");
+            $this->assertSame($expectedYears, $result, "Failed for edge case: $case");
         }
     }
 
@@ -340,7 +340,7 @@ class CashTransactionHandlerTest extends TestCase
         $transactionResult = $cashHandler->createCashTransaction($fromTeamName, $toTeamName, $cashYear, $seasonEndingYear);
 
         // Assert - Verify the complete workflow
-        $this->assertEquals(3, $contractYears, 'Should calculate 3 contract years');
+        $this->assertSame(3, $contractYears, 'Should calculate 3 contract years');
         $this->assertTrue($hasCash, 'Should detect cash in trade');
         $this->assertTrue($transactionResult['success'], 'Transaction should succeed');
         $this->assertStringContainsString('250 in cash', $transactionResult['tradeLine']);

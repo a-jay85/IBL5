@@ -253,17 +253,17 @@ final class SeasonLeaderboardsServiceTest extends TestCase
 
         $stats = $this->service->processPlayerRow($row);
 
-        $this->assertEquals(123, $stats['pid']);
-        $this->assertEquals('Test Player', $stats['name']);
-        $this->assertEquals(2024, $stats['year']);
-        $this->assertEquals(135, $stats['points']);
-        $this->assertEquals('30.0', $stats['mpg']);
-        $this->assertEquals('5.0', $stats['fgmpg']);
-        $this->assertEquals('13.5', $stats['ppg']);
-        $this->assertEquals('5.0', $stats['drebpg']);
-        $this->assertEquals('0.500', $stats['fgp']);
-        $this->assertEquals('0.800', $stats['ftp']);
-        $this->assertEquals('0.375', $stats['tgp']);
+        $this->assertSame(123, $stats['pid']);
+        $this->assertSame('Test Player', $stats['name']);
+        $this->assertSame(2024, $stats['year']);
+        $this->assertSame(135, $stats['points']);
+        $this->assertSame('30.0', $stats['mpg']);
+        $this->assertSame('5.0', $stats['fgmpg']);
+        $this->assertSame('13.5', $stats['ppg']);
+        $this->assertSame('5.0', $stats['drebpg']);
+        $this->assertSame('0.500', $stats['fgp']);
+        $this->assertSame('0.800', $stats['ftp']);
+        $this->assertSame('0.375', $stats['tgp']);
     }
 
     public function testProcessPlayerRowHandlesZeroGames(): void
@@ -296,9 +296,9 @@ final class SeasonLeaderboardsServiceTest extends TestCase
 
         $stats = $this->service->processPlayerRow($row);
 
-        $this->assertEquals('0.0', $stats['mpg']);
-        $this->assertEquals('0.0', $stats['ppg']);
-        $this->assertEquals('0.0', $stats['qa']);
+        $this->assertSame('0.0', $stats['mpg']);
+        $this->assertSame('0.0', $stats['ppg']);
+        $this->assertSame('0.0', $stats['qa']);
     }
 
     public function testProcessPlayerRowHandlesZeroAttempts(): void
@@ -331,9 +331,9 @@ final class SeasonLeaderboardsServiceTest extends TestCase
 
         $stats = $this->service->processPlayerRow($row);
 
-        $this->assertEquals('0.000', $stats['fgp']);
-        $this->assertEquals('0.000', $stats['ftp']);
-        $this->assertEquals('0.000', $stats['tgp']);
+        $this->assertSame('0.000', $stats['fgp']);
+        $this->assertSame('0.000', $stats['ftp']);
+        $this->assertSame('0.000', $stats['tgp']);
     }
 
     public function testQualityAssessmentCalculation(): void
@@ -366,7 +366,7 @@ final class SeasonLeaderboardsServiceTest extends TestCase
 
         $stats = $this->service->processPlayerRow($row);
 
-        $this->assertEquals('23.5', $stats['qa']);
+        $this->assertSame('23.5', $stats['qa']);
     }
 
     public function testGetSortOptions(): void

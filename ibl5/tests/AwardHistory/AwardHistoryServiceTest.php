@@ -63,7 +63,7 @@ final class AwardHistoryServiceTest extends TestCase
         $result = $this->service->search([]);
 
         $this->assertEmpty($result['awards']);
-        $this->assertEquals(0, $result['count']);
+        $this->assertSame(0, $result['count']);
     }
 
     public function testSearchWithValidParamsCallsRepository(): void
@@ -84,7 +84,7 @@ final class AwardHistoryServiceTest extends TestCase
         $rawParams = ['aw_name' => 'Johnson', 'aw_Award' => 'MVP', 'aw_year' => '2025', 'aw_sortby' => '1'];
         $result = $this->service->search($rawParams);
 
-        $this->assertEquals(1, $result['count']);
+        $this->assertSame(1, $result['count']);
         $this->assertCount(1, $result['awards']);
     }
 
@@ -128,8 +128,8 @@ final class AwardHistoryServiceTest extends TestCase
         $this->assertArrayHasKey(1, $options);
         $this->assertArrayHasKey(2, $options);
         $this->assertArrayHasKey(3, $options);
-        $this->assertEquals('Name', $options[1]);
-        $this->assertEquals('Award Name', $options[2]);
-        $this->assertEquals('Year', $options[3]);
+        $this->assertSame('Name', $options[1]);
+        $this->assertSame('Award Name', $options[2]);
+        $this->assertSame('Year', $options[3]);
     }
 }

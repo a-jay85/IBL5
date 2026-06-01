@@ -25,7 +25,7 @@ class SalaryConverterTest extends TestCase
     {
         $result = SalaryConverter::convertToMillions(0);
 
-        $this->assertEquals(0.0, $result);
+        $this->assertSame(0.0, $result);
         $this->assertIsFloat($result);
     }
 
@@ -37,7 +37,7 @@ class SalaryConverterTest extends TestCase
         // 500 thousands = 5.0 in display format
         $result = SalaryConverter::convertToMillions(500);
 
-        $this->assertEquals(5.0, $result);
+        $this->assertSame(5.0, $result);
     }
 
     /**
@@ -48,7 +48,7 @@ class SalaryConverterTest extends TestCase
         // Vet min is around 260 thousands = 2.6 in display format
         $result = SalaryConverter::convertToMillions(260);
 
-        $this->assertEquals(2.6, $result);
+        $this->assertSame(2.6, $result);
     }
 
     /**
@@ -59,7 +59,7 @@ class SalaryConverterTest extends TestCase
         // Typical rookie contract around 700 thousands = 7.0 in display format
         $result = SalaryConverter::convertToMillions(700);
 
-        $this->assertEquals(7.0, $result);
+        $this->assertSame(7.0, $result);
     }
 
     /**
@@ -70,7 +70,7 @@ class SalaryConverterTest extends TestCase
         // Max contract around 4500 thousands = 45.0 in display format
         $result = SalaryConverter::convertToMillions(4500);
 
-        $this->assertEquals(45.0, $result);
+        $this->assertSame(45.0, $result);
     }
 
     /**
@@ -81,7 +81,7 @@ class SalaryConverterTest extends TestCase
         // Supermax around 5000 thousands = 50.0 in display format
         $result = SalaryConverter::convertToMillions(5000);
 
-        $this->assertEquals(50.0, $result);
+        $this->assertSame(50.0, $result);
     }
 
     /**
@@ -102,7 +102,7 @@ class SalaryConverterTest extends TestCase
         // 50 thousands = 0.5 in display format
         $result = SalaryConverter::convertToMillions(50);
 
-        $this->assertEquals(0.5, $result);
+        $this->assertSame(0.5, $result);
     }
 
     /**
@@ -113,7 +113,7 @@ class SalaryConverterTest extends TestCase
         // 333 thousands = 3.33 in display format
         $result = SalaryConverter::convertToMillions(333);
 
-        $this->assertEquals(3.33, $result);
+        $this->assertSame(3.33, $result);
     }
 
     /**
@@ -124,7 +124,7 @@ class SalaryConverterTest extends TestCase
         // Hard cap is 7000 thousands = 70.0 in display format
         $result = SalaryConverter::convertToMillions(7000);
 
-        $this->assertEquals(70.0, $result);
+        $this->assertSame(70.0, $result);
     }
 
     /**
@@ -135,7 +135,7 @@ class SalaryConverterTest extends TestCase
         // 1 thousand = 0.01 in display format
         $result = SalaryConverter::convertToMillions(1);
 
-        $this->assertEquals(0.01, $result);
+        $this->assertSame(0.01, $result);
     }
 
     /**
@@ -146,7 +146,7 @@ class SalaryConverterTest extends TestCase
         // 123 thousands = 1.23 in display format
         $result = SalaryConverter::convertToMillions(123);
 
-        $this->assertEquals(1.23, $result);
+        $this->assertSame(1.23, $result);
     }
 
     /**
@@ -157,7 +157,7 @@ class SalaryConverterTest extends TestCase
         // Team salary total around 8250 thousands = 82.5 in display format
         $result = SalaryConverter::convertToMillions(8250);
 
-        $this->assertEquals(82.5, $result);
+        $this->assertSame(82.5, $result);
     }
 
     /**
@@ -176,7 +176,7 @@ class SalaryConverterTest extends TestCase
 
         foreach ($testCases as $input => $expected) {
             $result = SalaryConverter::convertToMillions($input);
-            $this->assertEquals($expected, $result, "Failed for input: $input");
+            $this->assertSame($expected, $result, "Failed for input: $input");
         }
     }
 }

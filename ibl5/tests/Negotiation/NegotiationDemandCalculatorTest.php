@@ -65,7 +65,7 @@ class NegotiationDemandCalculatorTest extends TestCase
         $this->assertArrayHasKey('modifier', $demands);
         
         // Year 6 should always be 0 for extensions
-        $this->assertEquals(0, $demands['year6']);
+        $this->assertSame(0, $demands['year6']);
         
         // Demands should increase each year (10% raise)
         $this->assertGreaterThan($demands['year1'], $demands['year2']);
@@ -104,7 +104,7 @@ class NegotiationDemandCalculatorTest extends TestCase
         $this->assertEquals(954, $demands['year3']);
         $this->assertEquals(1033, $demands['year4']);
         $this->assertEquals(1112, $demands['year5']);
-        $this->assertEquals(0, $demands['year6']);
+        $this->assertSame(0, $demands['year6']);
 
         // Assert total and years
         $this->assertEquals(4769, $demands['total']);
@@ -297,7 +297,7 @@ class NegotiationDemandCalculatorTest extends TestCase
         $demands = $this->calculator->calculateDemands($player, $teamFactors);
 
         // Assert - Should demand 5 years (dem1-dem5 all non-zero, dem6 is 0)
-        $this->assertEquals(5, $demands['years']);
+        $this->assertSame(5, $demands['years']);
     }
 
     /**
@@ -317,7 +317,7 @@ class NegotiationDemandCalculatorTest extends TestCase
         // Assert
         $expectedTotal = $demands['year1'] + $demands['year2'] + $demands['year3'] + 
                         $demands['year4'] + $demands['year5'];
-        $this->assertEquals($expectedTotal, $demands['total']);
+        $this->assertSame($expectedTotal, $demands['total']);
     }
 
     /**
@@ -569,7 +569,7 @@ class NegotiationDemandCalculatorTest extends TestCase
         // Should handle division by zero gracefully
         // With minimal preferences (all 1), factors are (pref-1) * coeff = 0
         $this->assertIsArray($demands);
-        $this->assertEquals(1.0, $demands['modifier']);
+        $this->assertSame(1.0, $demands['modifier']);
     }
 
     public function testHandlesMissingTeamFactors(): void
@@ -669,7 +669,7 @@ class NegotiationDemandCalculatorTest extends TestCase
         $demands = $this->calculator->calculateDemands($player, $teamFactors);
 
         // With all preferences at 1, modifier should be exactly 1.0
-        $this->assertEquals(1.0, $demands['modifier']);
+        $this->assertSame(1.0, $demands['modifier']);
     }
 
     // ============================================
@@ -696,7 +696,7 @@ class NegotiationDemandCalculatorTest extends TestCase
         $demands = $this->calculator->calculateDemands($player, $teamFactors);
 
         // Extensions are max 5 years
-        $this->assertEquals(0, $demands['year6']);
+        $this->assertSame(0, $demands['year6']);
     }
 
     // ============================================
@@ -735,9 +735,9 @@ class NegotiationDemandCalculatorTest extends TestCase
         $expectedTotal = $demands['year1'] + $demands['year2'] + $demands['year3']
                        + $demands['year4'] + $demands['year5'];
 
-        $this->assertEquals($expectedTotal, $demands['total']);
+        $this->assertSame($expectedTotal, $demands['total']);
         // Year6 is not included in total
-        $this->assertEquals(0, $demands['year6']);
+        $this->assertSame(0, $demands['year6']);
     }
 
     // ============================================
@@ -961,9 +961,9 @@ class NegotiationDemandCalculatorTest extends TestCase
         $this->setupMarketMaximums(100);
         $breakdown = $this->calculator->calculateDemandsWithBreakdown($player, $teamFactors);
 
-        $this->assertEquals($demands['year1'], $breakdown['demands']['year1']);
-        $this->assertEquals($demands['total'], $breakdown['demands']['total']);
-        $this->assertEquals($demands['modifier'], $breakdown['demands']['modifier']);
+        $this->assertSame($demands['year1'], $breakdown['demands']['year1']);
+        $this->assertSame($demands['total'], $breakdown['demands']['total']);
+        $this->assertSame($demands['modifier'], $breakdown['demands']['modifier']);
     }
 
     public function testBreakdownModifiersListAllFourComponents(): void

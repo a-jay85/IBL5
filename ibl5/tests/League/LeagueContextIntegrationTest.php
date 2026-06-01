@@ -47,7 +47,7 @@ class LeagueContextIntegrationTest extends TestCase
      */
     public function testLeagueIblConstantValue(): void
     {
-        $this->assertEquals('ibl', LeagueContext::LEAGUE_IBL);
+        $this->assertSame('ibl', LeagueContext::LEAGUE_IBL);
     }
 
     /**
@@ -55,7 +55,7 @@ class LeagueContextIntegrationTest extends TestCase
      */
     public function testLeagueOlympicsConstantValue(): void
     {
-        $this->assertEquals('olympics', LeagueContext::LEAGUE_OLYMPICS);
+        $this->assertSame('olympics', LeagueContext::LEAGUE_OLYMPICS);
     }
 
     /**
@@ -63,7 +63,7 @@ class LeagueContextIntegrationTest extends TestCase
      */
     public function testCookieNameConstantValue(): void
     {
-        $this->assertEquals('ibl_league', LeagueContext::COOKIE_NAME);
+        $this->assertSame('ibl_league', LeagueContext::COOKIE_NAME);
     }
 
     /**
@@ -81,8 +81,8 @@ class LeagueContextIntegrationTest extends TestCase
      */
     public function testConstantValuesAreLowercase(): void
     {
-        $this->assertEquals(strtolower(LeagueContext::LEAGUE_IBL), LeagueContext::LEAGUE_IBL);
-        $this->assertEquals(strtolower(LeagueContext::LEAGUE_OLYMPICS), LeagueContext::LEAGUE_OLYMPICS);
+        $this->assertSame(strtolower(LeagueContext::LEAGUE_IBL), LeagueContext::LEAGUE_IBL);
+        $this->assertSame(strtolower(LeagueContext::LEAGUE_OLYMPICS), LeagueContext::LEAGUE_OLYMPICS);
     }
 
     // ============================================
@@ -206,7 +206,7 @@ class LeagueContextIntegrationTest extends TestCase
 
         $config = $this->leagueContext->getConfig();
 
-        $this->assertEquals('#1a365d', $config['primary_color']);
+        $this->assertSame('#1a365d', $config['primary_color']);
     }
 
     /**
@@ -218,7 +218,7 @@ class LeagueContextIntegrationTest extends TestCase
 
         $config = $this->leagueContext->getConfig();
 
-        $this->assertEquals('#c53030', $config['primary_color']);
+        $this->assertSame('#c53030', $config['primary_color']);
     }
 
     /**
@@ -230,7 +230,7 @@ class LeagueContextIntegrationTest extends TestCase
 
         $config = $this->leagueContext->getConfig();
 
-        $this->assertEquals('images/', $config['images_path']);
+        $this->assertSame('images/', $config['images_path']);
     }
 
     /**
@@ -242,7 +242,7 @@ class LeagueContextIntegrationTest extends TestCase
 
         $config = $this->leagueContext->getConfig();
 
-        $this->assertEquals('images/olympics/', $config['images_path']);
+        $this->assertSame('images/olympics/', $config['images_path']);
     }
 
     // ============================================
@@ -364,7 +364,7 @@ class LeagueContextIntegrationTest extends TestCase
             }
         }
 
-        $this->assertEquals(9, $disabledCount, "Should have exactly 9 IBL-only modules");
+        $this->assertSame(9, $disabledCount, "Should have exactly 9 IBL-only modules");
     }
 
     // ============================================
@@ -381,7 +381,7 @@ class LeagueContextIntegrationTest extends TestCase
     {
         $this->leagueContext->setLeague('olympics');
 
-        $this->assertEquals('olympics', $this->leagueContext->getCurrentLeague());
+        $this->assertSame('olympics', $this->leagueContext->getCurrentLeague());
         $this->assertArrayNotHasKey('current_league', $_SESSION);
     }
 
@@ -392,7 +392,7 @@ class LeagueContextIntegrationTest extends TestCase
     {
         $this->leagueContext->setLeague('ibl');
 
-        $this->assertEquals('ibl', $this->leagueContext->getCurrentLeague());
+        $this->assertSame('ibl', $this->leagueContext->getCurrentLeague());
         $this->assertArrayNotHasKey('current_league', $_SESSION);
     }
 
@@ -461,7 +461,7 @@ class LeagueContextIntegrationTest extends TestCase
 
         $result = $this->leagueContext->getCurrentLeague();
 
-        $this->assertEquals('ibl', $result);
+        $this->assertSame('ibl', $result);
     }
 
     /**
@@ -475,7 +475,7 @@ class LeagueContextIntegrationTest extends TestCase
 
         $result = $this->leagueContext->getCurrentLeague();
 
-        $this->assertEquals('olympics', $result);
+        $this->assertSame('olympics', $result);
     }
 
     /**
@@ -489,7 +489,7 @@ class LeagueContextIntegrationTest extends TestCase
 
         $result = $this->leagueContext->getCurrentLeague();
 
-        $this->assertEquals('olympics', $result);
+        $this->assertSame('olympics', $result);
     }
 
     /**
@@ -503,7 +503,7 @@ class LeagueContextIntegrationTest extends TestCase
 
         $result = $this->leagueContext->getCurrentLeague();
 
-        $this->assertEquals('ibl', $result); // Default
+        $this->assertSame('ibl', $result); // Default
     }
 
     /**
@@ -517,7 +517,7 @@ class LeagueContextIntegrationTest extends TestCase
 
         $result = $this->leagueContext->getCurrentLeague();
 
-        $this->assertEquals('ibl', $result); // Default
+        $this->assertSame('ibl', $result); // Default
     }
 
     // ============================================

@@ -160,8 +160,8 @@ final class OneOnOneGameServiceTest extends TestCase
         $result = $this->service->playGame(1, 2, 'Owner');
 
         $this->assertInstanceOf(OneOnOneGameResult::class, $result);
-        $this->assertEquals('Player One', $result->player1Name);
-        $this->assertEquals('Player Two', $result->player2Name);
+        $this->assertSame('Player One', $result->player1Name);
+        $this->assertSame('Player Two', $result->player2Name);
     }
 
     public function testPlayGameSavesGameToRepository(): void
@@ -185,7 +185,7 @@ final class OneOnOneGameServiceTest extends TestCase
 
         $result = $this->service->playGame(1, 2, 'Owner');
 
-        $this->assertEquals(42, $result->gameId);
+        $this->assertSame(42, $result->gameId);
     }
 
     // ========== Audit Logging ==========

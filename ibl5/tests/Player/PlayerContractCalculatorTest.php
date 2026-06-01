@@ -27,7 +27,7 @@ class PlayerContractCalculatorTest extends TestCase
         
         $result = $this->calculator->getCurrentSeasonSalary($playerData);
         
-        $this->assertEquals(1000, $result);
+        $this->assertSame(1000, $result);
     }
 
     public function testGetCurrentSeasonSalaryForYear2(): void
@@ -40,7 +40,7 @@ class PlayerContractCalculatorTest extends TestCase
         
         $result = $this->calculator->getCurrentSeasonSalary($playerData);
         
-        $this->assertEquals(1100, $result);
+        $this->assertSame(1100, $result);
     }
 
     public function testGetCurrentSeasonSalaryForYear0(): void
@@ -51,7 +51,7 @@ class PlayerContractCalculatorTest extends TestCase
         
         $result = $this->calculator->getCurrentSeasonSalary($playerData);
         
-        $this->assertEquals(1000, $result);
+        $this->assertSame(1000, $result);
     }
 
     public function testGetCurrentSeasonSalaryForYear7(): void
@@ -61,7 +61,7 @@ class PlayerContractCalculatorTest extends TestCase
         
         $result = $this->calculator->getCurrentSeasonSalary($playerData);
         
-        $this->assertEquals(0, $result);
+        $this->assertSame(0, $result);
     }
 
     public function testGetNextSeasonSalary(): void
@@ -72,7 +72,7 @@ class PlayerContractCalculatorTest extends TestCase
         
         $result = $this->calculator->getNextSeasonSalary($playerData);
         
-        $this->assertEquals(1200, $result);
+        $this->assertSame(1200, $result);
     }
 
     public function testGetRemainingContractArray(): void
@@ -111,7 +111,7 @@ class PlayerContractCalculatorTest extends TestCase
         
         $result = $this->calculator->getTotalRemainingSalary($playerData);
         
-        $this->assertEquals(3300, $result);
+        $this->assertSame(3300, $result);
     }
 
     public function testGetLongBuyoutArray(): void
@@ -164,7 +164,7 @@ class PlayerContractCalculatorTest extends TestCase
 
         $result = $this->calculator->getCurrentSeasonSalary($playerData);
 
-        $this->assertEquals(0, $result);
+        $this->assertSame(0, $result);
     }
 
     public function testGetCurrentSeasonSalaryYear0WithNullSalaryReturnsZero(): void
@@ -186,7 +186,7 @@ class PlayerContractCalculatorTest extends TestCase
 
         $result = $this->calculator->getCurrentSeasonSalary($playerData);
 
-        $this->assertEquals(5000, $result);
+        $this->assertSame(5000, $result);
     }
 
     public function testGetCurrentSeasonSalaryForYear8(): void
@@ -196,7 +196,7 @@ class PlayerContractCalculatorTest extends TestCase
 
         $result = $this->calculator->getCurrentSeasonSalary($playerData);
 
-        $this->assertEquals(0, $result);
+        $this->assertSame(0, $result);
     }
 
     public function testGetCurrentSeasonSalaryForYear100(): void
@@ -206,7 +206,7 @@ class PlayerContractCalculatorTest extends TestCase
 
         $result = $this->calculator->getCurrentSeasonSalary($playerData);
 
-        $this->assertEquals(0, $result);
+        $this->assertSame(0, $result);
     }
 
     // ============================================
@@ -222,7 +222,7 @@ class PlayerContractCalculatorTest extends TestCase
         $result = $this->calculator->getNextSeasonSalary($playerData);
 
         // Year 6 + 1 = Year 7, which returns 0
-        $this->assertEquals(0, $result);
+        $this->assertSame(0, $result);
     }
 
     public function testGetNextSeasonSalaryFromYear0(): void
@@ -234,7 +234,7 @@ class PlayerContractCalculatorTest extends TestCase
         $result = $this->calculator->getNextSeasonSalary($playerData);
 
         // Year 0 + 1 = Year 1
-        $this->assertEquals(1000, $result);
+        $this->assertSame(1000, $result);
     }
 
     public function testGetNextSeasonSalaryFromYear5(): void
@@ -246,7 +246,7 @@ class PlayerContractCalculatorTest extends TestCase
 
         $result = $this->calculator->getNextSeasonSalary($playerData);
 
-        $this->assertEquals(5000, $result);
+        $this->assertSame(5000, $result);
     }
 
     // ============================================
@@ -281,8 +281,8 @@ class PlayerContractCalculatorTest extends TestCase
 
         // Offset 5, only years 5-6 plus padding
         $this->assertCount(6, $result);
-        $this->assertEquals(5000, $result[0]); // Year 6
-        $this->assertEquals(0, $result[1]); // Padding
+        $this->assertSame(5000, $result[0]); // Year 6
+        $this->assertSame(0, $result[1]); // Padding
     }
 
     public function testGetFutureSalariesFromYear6(): void
@@ -366,8 +366,8 @@ class PlayerContractCalculatorTest extends TestCase
         $result = $this->calculator->getRemainingContractArray($playerData);
 
         $this->assertCount(6, $result);
-        $this->assertEquals(1000, $result[1]);
-        $this->assertEquals(1500, $result[6]);
+        $this->assertSame(1000, $result[1]);
+        $this->assertSame(1500, $result[6]);
     }
 
     public function testGetRemainingContractArrayCurrentYearGreaterThanTotalYears(): void
@@ -478,7 +478,7 @@ class PlayerContractCalculatorTest extends TestCase
 
         $result = $this->calculator->getTotalRemainingSalary($playerData);
 
-        $this->assertEquals(0, $result);
+        $this->assertSame(0, $result);
     }
 
     public function testGetTotalRemainingSalaryWithLargeValues(): void
@@ -492,7 +492,7 @@ class PlayerContractCalculatorTest extends TestCase
 
         $result = $this->calculator->getTotalRemainingSalary($playerData);
 
-        $this->assertEquals(21000, $result);
+        $this->assertSame(21000, $result);
     }
 
     // ============================================
@@ -536,7 +536,7 @@ class PlayerContractCalculatorTest extends TestCase
 
         // Each year should get rounded value
         $expectedPerYear = (int) round(1000 / 6); // 167
-        $this->assertEquals($expectedPerYear, $result[1]);
+        $this->assertSame($expectedPerYear, $result[1]);
         $this->assertCount(6, $result);
     }
 
@@ -615,7 +615,7 @@ class PlayerContractCalculatorTest extends TestCase
 
         $result = $this->calculator->getCurrentSeasonSalary($playerData);
 
-        $this->assertEquals($expectedSalary, $result);
+        $this->assertSame($expectedSalary, $result);
     }
 
     public static function yearBoundaryProvider(): array
@@ -652,10 +652,10 @@ class PlayerContractCalculatorTest extends TestCase
         $longBuyout = $this->calculator->getLongBuyoutArray($playerData);
         $shortBuyout = $this->calculator->getShortBuyoutArray($playerData);
 
-        $this->assertEquals(0, $currentSalary);
-        $this->assertEquals(0, $nextSalary);
+        $this->assertSame(0, $currentSalary);
+        $this->assertSame(0, $nextSalary);
         $this->assertEquals([1 => 0], $remainingArray);
-        $this->assertEquals(0, $totalRemaining);
+        $this->assertSame(0, $totalRemaining);
         $this->assertCount(6, $longBuyout);
         $this->assertCount(2, $shortBuyout);
     }

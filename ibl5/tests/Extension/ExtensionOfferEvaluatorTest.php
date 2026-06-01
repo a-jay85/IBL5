@@ -256,8 +256,8 @@ class ExtensionOfferEvaluatorTest extends TestCase
         $result = $this->contractValidator->calculateOfferValue($offer);
 
         // Assert
-        $this->assertEquals(3300, $result['total']); // 1000 + 1100 + 1200
-        $this->assertEquals(3, $result['years']);
+        $this->assertSame(3300, $result['total']); // 1000 + 1100 + 1200
+        $this->assertSame(3, $result['years']);
         $this->assertEquals(1100, $result['averagePerYear']); // 3300 / 3
     }
 
@@ -280,8 +280,8 @@ class ExtensionOfferEvaluatorTest extends TestCase
         $result = $this->contractValidator->calculateOfferValue($offer);
 
         // Assert
-        $this->assertEquals(6000, $result['total']);
-        $this->assertEquals(5, $result['years']);
+        $this->assertSame(6000, $result['total']);
+        $this->assertSame(5, $result['years']);
         $this->assertEquals(1200, $result['averagePerYear']);
     }
 
@@ -565,7 +565,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
         $this->assertIsArray($demands);
         $this->assertArrayHasKey('total', $demands);
         $this->assertArrayHasKey('years', $demands);
-        $this->assertEquals(5, $demands['years']); // Extensions are 5 years max
+        $this->assertSame(5, $demands['years']); // Extensions are 5 years max
     }
 
     /**

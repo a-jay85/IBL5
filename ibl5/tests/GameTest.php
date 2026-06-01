@@ -29,12 +29,12 @@ class GameTest extends TestCase
         $row = $this->createValidScheduleRow();
         $game = new Game($row);
         
-        $this->assertEquals('2025-01-15', $game->date);
-        $this->assertEquals(1001, $game->boxScoreID);
-        $this->assertEquals(1, $game->visitor_teamid);
-        $this->assertEquals(2, $game->home_teamid);
-        $this->assertEquals(98, $game->visitorScore);
-        $this->assertEquals(105, $game->homeScore);
+        $this->assertSame('2025-01-15', $game->date);
+        $this->assertSame(1001, $game->boxScoreID);
+        $this->assertSame(1, $game->visitor_teamid);
+        $this->assertSame(2, $game->home_teamid);
+        $this->assertSame(98, $game->visitorScore);
+        $this->assertSame(105, $game->homeScore);
     }
 
     // ============================================
@@ -49,7 +49,7 @@ class GameTest extends TestCase
         ]);
         $game = new Game($row);
         
-        $this->assertEquals(2, $game->winningTeamID); // Home team
+        $this->assertSame(2, $game->winningTeamID); // Home team
         $this->assertFalse($game->isUnplayed);
     }
 
@@ -61,7 +61,7 @@ class GameTest extends TestCase
         ]);
         $game = new Game($row);
         
-        $this->assertEquals(1, $game->winningTeamID); // Visitor team
+        $this->assertSame(1, $game->winningTeamID); // Visitor team
         $this->assertFalse($game->isUnplayed);
     }
 
@@ -87,7 +87,7 @@ class GameTest extends TestCase
         
         $opposingTeamId = $game->getOpposingTeamID(1); // User is visitor (team 1)
         
-        $this->assertEquals(2, $opposingTeamId); // Opposing is home (team 2)
+        $this->assertSame(2, $opposingTeamId); // Opposing is home (team 2)
     }
 
     public function testGetOpposingTeamIdReturnsVisitorTeamForHome(): void
@@ -97,7 +97,7 @@ class GameTest extends TestCase
         
         $opposingTeamId = $game->getOpposingTeamID(2); // User is home (team 2)
         
-        $this->assertEquals(1, $opposingTeamId); // Opposing is visitor (team 1)
+        $this->assertSame(1, $opposingTeamId); // Opposing is visitor (team 1)
     }
 
     // ============================================
@@ -111,7 +111,7 @@ class GameTest extends TestCase
         
         $prefix = $game->getUserTeamLocationPrefix(1); // User is visitor
         
-        $this->assertEquals('@', $prefix);
+        $this->assertSame('@', $prefix);
     }
 
     public function testGetUserTeamLocationPrefixReturnsVsForHome(): void
@@ -121,7 +121,7 @@ class GameTest extends TestCase
         
         $prefix = $game->getUserTeamLocationPrefix(2); // User is home
         
-        $this->assertEquals('vs', $prefix);
+        $this->assertSame('vs', $prefix);
     }
 
     // ============================================

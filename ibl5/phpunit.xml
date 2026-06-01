@@ -216,6 +216,12 @@
         <testsuite name="EngineBundle Module Tests">
             <directory>tests/EngineBundle</directory>
         </testsuite>
+        <testsuite name="EngineRunner Module Tests">
+            <directory>tests/EngineRunner</directory>
+        </testsuite>
+        <testsuite name="EngineShadow Module Tests">
+            <directory>tests/EngineShadow</directory>
+        </testsuite>
         <testsuite name="Migration Module Tests">
             <directory>tests/Migration</directory>
         </testsuite>

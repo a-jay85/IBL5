@@ -242,6 +242,12 @@
         <testsuite name="Updater Module Tests">
             <directory>tests/Updater</directory>
         </testsuite>
+        <testsuite name="EngineRunner Module Tests">
+            <directory>tests/EngineRunner</directory>
+        </testsuite>
+        <testsuite name="EngineShadow Module Tests">
+            <directory>tests/EngineShadow</directory>
+        </testsuite>
         <testsuite name="Bootstrap Module Tests">
             <directory>tests/Bootstrap</directory>
         </testsuite>

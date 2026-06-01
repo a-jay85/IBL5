@@ -1,3 +1,13 @@
+# ── Engine builder stage ────────────────────────────────────────────────────
+# Compile the native Go sim binary used by the PR8 shadow loader. Pinned to the
+# engine/go.mod toolchain so the build matches CI. The binary is copied to a path
+# OUTSIDE the ibl5 bind-mount; the entrypoint materializes it into ibl5/bin at
+# container start (the bind mount would otherwise shadow an image-built path).
+FROM golang:1.26.3 AS engine-builder
+WORKDIR /src/engine
+COPY engine/ /src/engine
+RUN CGO_ENABLED=0 go build -o /opt/jsbsim ./cmd/jsbsim
+
 FROM php:8.5-apache
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -10,6 +20,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY docker/opcache.ini $PHP_INI_DIR/conf.d/opcache.ini
 COPY docker/error-reporting.ini $PHP_INI_DIR/conf.d/error-reporting.ini
+
+# Native engine binary, staged outside the ibl5 bind-mount. entrypoint.sh copies
+# it into ibl5/bin/jsbsim (which IS bind-mounted) before Apache starts.
+COPY --from=engine-builder /opt/jsbsim /opt/ibl5-bin/jsbsim
 
 RUN a2enmod rewrite headers
 

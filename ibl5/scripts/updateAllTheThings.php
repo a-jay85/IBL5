@@ -215,6 +215,25 @@ try {
         $boxscoreProcessor, $boxscoreView, $sourceResolver,
     ));
 
+    // Shadow sim: run the native Go engine in parallel with the canonical .sco
+    // import and write its output to droppable shadow tables for comparison.
+    // Default OFF — never slows or risks the canonical import until fidelity is
+    // validated. IBL-only (the engine bundle is IBL-scoped).
+    if (!$isOlympics) {
+        $engineShadowEnabled = filter_var(
+            getenv('ENGINE_SHADOW_ENABLED') ?: '',
+            FILTER_VALIDATE_BOOLEAN,
+        );
+        $bundleRepo = new EngineBundle\EngineBundleRepository($mysqli_db, $leagueContext);
+        $bundleService = new EngineBundle\EngineBundleService($bundleRepo, new EngineBundle\BundleSerializer());
+        $engineRunner = new EngineRunner\EngineRunner();
+        $engineShadowRepo = new EngineShadow\EngineShadowRepository($mysqli_db, $leagueContext);
+        $engineShadowLoader = new EngineShadow\EngineShadowLoader($engineShadowRepo);
+        $updaterService->addStep(new Updater\Steps\EngineShadowStep(
+            $bundleService, $engineRunner, $engineShadowLoader, $season->endingYear, $engineShadowEnabled,
+        ));
+    }
+
     // IBL-only: All-Star games don't exist in Olympics
     if (!$isOlympics) {
         $updaterService->addStep(new Updater\Steps\ProcessAllStarGamesStep(

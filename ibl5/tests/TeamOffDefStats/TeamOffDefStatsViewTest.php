@@ -75,6 +75,20 @@ class TeamOffDefStatsViewTest extends TestCase
     }
 
     /**
+     * Test that the League-wide Statistics heading is a well-formed <h2>
+     * and does not contain a malformed </h1> closing tag.
+     */
+    public function testRenderLeagueWideHeadingClosesWithH2(): void
+    {
+        $data = $this->createMinimalViewData();
+
+        $result = $this->view->render($data);
+
+        $this->assertStringContainsString('<h2 class="ibl-title">League-wide Statistics</h2>', $result);
+        $this->assertStringNotContainsString('League-wide Statistics</h1>', $result);
+    }
+
+    /**
      * Test that team rows include data-team-id for client-side highlighting
      */
     public function testRenderIncludesDataTeamIdAttribute(): void

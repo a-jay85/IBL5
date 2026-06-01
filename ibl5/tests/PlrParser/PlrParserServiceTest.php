@@ -19,9 +19,6 @@ class PlrParserServiceTest extends TestCase
     /** @var PlrParserRepositoryInterface&\PHPUnit\Framework\MockObject\Stub */
     private PlrParserRepositoryInterface $stubRepository;
 
-    /** @var \Repositories\Contracts\TeamIdentityRepositoryInterface&\PHPUnit\Framework\MockObject\Stub */
-    private \Repositories\Contracts\TeamIdentityRepositoryInterface $stubCommonRepo;
-
     /** @var Season&\PHPUnit\Framework\MockObject\Stub */
     private Season $stubSeason;
 
@@ -29,15 +26,11 @@ class PlrParserServiceTest extends TestCase
     {
         $this->stubRepository = $this->createStub(PlrParserRepositoryInterface::class);
 
-        $this->stubCommonRepo = $this->createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
-        $this->stubCommonRepo->method('getTeamnameFromTeamID')->willReturn('Test Team');
-
         $this->stubSeason = $this->createStub(Season::class);
         $this->stubSeason->endingYear = 2026;
 
         $this->service = new PlrParserService(
             $this->stubRepository,
-            $this->stubCommonRepo,
             $this->stubSeason,
         );
     }
@@ -303,6 +296,43 @@ class PlrParserServiceTest extends TestCase
         $this->assertSame(100, $derived['ratingFOUL']);
     }
 
+    /**
+     * The discarded teamName N+1 lookup was removed: computeDerivedFields no
+     * longer emits a 'teamName' key. Consumers JOIN on teamid for the name.
+     */
+    public function testComputeDerivedFieldsDoesNotEmitTeamNameKey(): void
+    {
+        $raw = $this->buildRawParsedData(['teamid' => 5]);
+
+        $derived = $this->service->computeDerivedFields($raw, 0.1);
+
+        $this->assertArrayNotHasKey('teamName', $derived);
+        // teamid is still carried through (consumers JOIN for the name).
+        $this->assertSame(5, $derived['teamid']);
+    }
+
+    /**
+     * Guard the persisted derived columns: removing the teamName lookup must
+     * not alter any other derived field that upsert/snapshot payloads read.
+     */
+    public function testComputeDerivedFieldsPreservesPersistedColumns(): void
+    {
+        $raw = $this->buildRawParsedData();
+
+        $derived = $this->service->computeDerivedFields($raw, 0.1);
+
+        foreach (
+            [
+                'seasonFGM', 'seasonFGA', 'seasonREB', 'seasonPTS',
+                'careerFGM', 'careerFGA', 'careerREB', 'careerPTS',
+                'currentSeasonSalary', 'heightFT', 'heightIN',
+                'draftYear', 'ratingFOUL',
+            ] as $key
+        ) {
+            $this->assertArrayHasKey($key, $derived);
+        }
+    }
+
     public function testComputeDerivedFieldsFoulRatingWithZeroMaxRatio(): void
     {
         $raw = $this->buildRawParsedData([
@@ -362,7 +392,7 @@ class PlrParserServiceTest extends TestCase
         $mockRepo = $this->createMock(PlrParserRepositoryInterface::class);
         $mockRepo->expects($this->once())->method('upsertPlayer');
 
-        $service = new PlrParserService($mockRepo, $this->stubCommonRepo, $this->stubSeason);
+        $service = new PlrParserService($mockRepo, $this->stubSeason);
         $result = $service->processPlrFile($tmpFile);
 
         $this->assertSame(1, $result->playersUpserted);
@@ -377,7 +407,7 @@ class PlrParserServiceTest extends TestCase
         $mockRepo = $this->createMock(PlrParserRepositoryInterface::class);
         $mockRepo->expects($this->never())->method('upsertPlayer');
 
-        $service = new PlrParserService($mockRepo, $this->stubCommonRepo, $this->stubSeason);
+        $service = new PlrParserService($mockRepo, $this->stubSeason);
         $result = $service->processPlrFile($tmpFile);
 
         $this->assertSame(0, $result->playersUpserted);
@@ -392,7 +422,7 @@ class PlrParserServiceTest extends TestCase
         $mockRepo = $this->createMock(PlrParserRepositoryInterface::class);
         $mockRepo->expects($this->once())->method('upsertPlayer');
 
-        $service = new PlrParserService($mockRepo, $this->stubCommonRepo, $this->stubSeason);
+        $service = new PlrParserService($mockRepo, $this->stubSeason);
         $result = $service->processPlrData($data);
 
         $this->assertSame(1, $result->playersUpserted);
@@ -408,7 +438,7 @@ class PlrParserServiceTest extends TestCase
         $mockRepo = $this->createMock(PlrParserRepositoryInterface::class);
         $mockRepo->expects($this->never())->method('upsertPlayer');
 
-        $service = new PlrParserService($mockRepo, $this->stubCommonRepo, $this->stubSeason);
+        $service = new PlrParserService($mockRepo, $this->stubSeason);
         $result = $service->processPlrData($line . "\r\n");
 
         $this->assertSame(0, $result->playersUpserted);
@@ -422,7 +452,7 @@ class PlrParserServiceTest extends TestCase
         $mockRepo = $this->createMock(PlrParserRepositoryInterface::class);
         $mockRepo->expects($this->exactly(2))->method('upsertPlayer');
 
-        $service = new PlrParserService($mockRepo, $this->stubCommonRepo, $this->stubSeason);
+        $service = new PlrParserService($mockRepo, $this->stubSeason);
         $result = $service->processPlrData($data);
 
         $this->assertSame(2, $result->playersUpserted);
@@ -682,7 +712,7 @@ class PlrParserServiceTest extends TestCase
         $mockRepo->expects($this->once())->method('upsertSnapshot');
         $mockRepo->expects($this->never())->method('upsertPlayer');
 
-        $service = new PlrParserService($mockRepo, $this->stubCommonRepo, $this->stubSeason);
+        $service = new PlrParserService($mockRepo, $this->stubSeason);
         $result = $service->processPlrFileForYear(
             $tmpFile,
             2001,
@@ -729,7 +759,7 @@ class PlrParserServiceTest extends TestCase
                     && array_key_exists('unk_548', $data);
             }));
 
-        $service = new PlrParserService($mockRepo, $this->stubCommonRepo, $this->stubSeason);
+        $service = new PlrParserService($mockRepo, $this->stubSeason);
         $result = $service->processPlrFileForYear(
             $tmpFile,
             2001,
@@ -751,7 +781,7 @@ class PlrParserServiceTest extends TestCase
         $mockRepo->expects($this->once())->method('upsertPlayer');
         $mockRepo->expects($this->never())->method('upsertSnapshot');
 
-        $service = new PlrParserService($mockRepo, $this->stubCommonRepo, $this->stubSeason);
+        $service = new PlrParserService($mockRepo, $this->stubSeason);
         $result = $service->processPlrFileForYear($tmpFile, 2001, PlrImportMode::Live);
 
         $this->assertSame(1, $result->playersUpserted);
@@ -767,7 +797,7 @@ class PlrParserServiceTest extends TestCase
         $mockRepo->expects($this->once())->method('upsertSnapshot');
         $mockRepo->expects($this->never())->method('upsertPlayer');
 
-        $service = new PlrParserService($mockRepo, $this->stubCommonRepo, $this->stubSeason);
+        $service = new PlrParserService($mockRepo, $this->stubSeason);
         $result = $service->processPlrDataForYear(
             $data,
             2001,
@@ -788,7 +818,7 @@ class PlrParserServiceTest extends TestCase
         $mockRepo->expects($this->once())->method('upsertPlayer');
         $mockRepo->expects($this->never())->method('upsertSnapshot');
 
-        $service = new PlrParserService($mockRepo, $this->stubCommonRepo, $this->stubSeason);
+        $service = new PlrParserService($mockRepo, $this->stubSeason);
         $result = $service->processPlrDataForYear($data, 2001, PlrImportMode::Live);
 
         $this->assertSame(1, $result->playersUpserted);

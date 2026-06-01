@@ -77,6 +77,10 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
         // Coin flip to determine starting possession
         $coinFlip = rand(1, 2);
         $possession = $coinFlip; // 1 = player1, 2 = player2
+
+        // Reset per-game possession state so a prior simulateGame() call on this
+        // same instance cannot leak a stale possession into this run.
+        $this->currentPossession = $possession;
         $result->coinFlipResult = $this->textGenerator->getCoinFlipText(
             $coinFlip === 1,
             $result->player1Name,

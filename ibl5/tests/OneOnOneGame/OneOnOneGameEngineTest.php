@@ -261,6 +261,54 @@ final class OneOnOneGameEngineTest extends TestCase
         }
     }
 
+    /**
+     * Characterization: with the RNG seeded to a fixed value, a single
+     * simulateGame() run is fully deterministic — re-seeding to the same value
+     * reproduces a byte-identical play-by-play. Locks current behavior.
+     */
+    public function testSimulateGameIsDeterministicForFixedSeed(): void
+    {
+        $player1Data = $this->createMockPlayerData('Player One');
+        $player2Data = $this->createMockPlayerData('Player Two');
+
+        mt_srand(424242);
+        $first = $this->engine->simulateGame($player1Data, $player2Data, 'Owner');
+
+        mt_srand(424242);
+        $second = $this->engine->simulateGame($player1Data, $player2Data, 'Owner');
+
+        $this->assertSame($first->player1Score, $second->player1Score);
+        $this->assertSame($first->player2Score, $second->player2Score);
+        $this->assertSame($first->playByPlay, $second->playByPlay);
+    }
+
+    /**
+     * Repeated-invocation boundary: running simulateGame() twice on the same
+     * instance must not carry possession (or any per-game state) from the first
+     * run into the next. A run made after an intervening "dirtying" run, with
+     * the RNG re-seeded, reproduces the original run exactly — proving the
+     * per-game possession state is reset on each call, not stale.
+     */
+    public function testSimulateGameDoesNotLeakStateBetweenRuns(): void
+    {
+        $player1Data = $this->createMockPlayerData('Player One');
+        $player2Data = $this->createMockPlayerData('Player Two');
+
+        mt_srand(424242);
+        $first = $this->engine->simulateGame($player1Data, $player2Data, 'Owner');
+
+        // Intervening run on the same instance dirties any per-game state.
+        $this->engine->simulateGame($player1Data, $player2Data, 'Owner');
+
+        // Re-seeding to the original seed must reproduce the first run exactly.
+        mt_srand(424242);
+        $afterReset = $this->engine->simulateGame($player1Data, $player2Data, 'Owner');
+
+        $this->assertSame($first->player1Score, $afterReset->player1Score);
+        $this->assertSame($first->player2Score, $afterReset->player2Score);
+        $this->assertSame($first->playByPlay, $afterReset->playByPlay);
+    }
+
     // ========== Helper Methods ==========
 
     /**

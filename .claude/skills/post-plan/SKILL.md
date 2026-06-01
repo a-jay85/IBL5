@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-05-31
+last_verified: 2026-06-01
 ---
 
 # Post-Plan Orchestrator
@@ -14,7 +14,7 @@ Execute all phases below **sequentially in a single response**. Do NOT stop, ask
 
 **Phase 11 (Background Process Cleanup) is MANDATORY and must ALWAYS be the last thing you execute before ending your turn.** No phase — including Phase 9 (Retrospective) — is a valid stopping point. If you reach Phase 9 and have nothing to save, continue directly to Phase 10 and Phase 11. Ending your turn before Phase 11 leaves background processes alive, which prevents the `claude` process from exiting and triggers a stall-kill in the nightly runner.
 
-Phase numbers below are local to this skill. The variables computed in Phase 3 (`HAS_PHP`, `NON_CODE_ONLY`, `DOCS_ONLY`, `CSS_ONLY`, `MIGRATION_ONLY`, `HAS_MODIFIED`, `HAS_COMMENTS_IN_DIFF`, `DIFF`, etc.) are consulted by every downstream phase to gate sub-agent launches — never recompute them locally.
+Phase numbers below are local to this skill. The variables computed in Phase 3 (`HAS_PHP`, `NON_CODE_ONLY`, `DOCS_ONLY`, `CSS_ONLY`, `MIGRATION_ONLY`, `HAS_MODIFIED`, `HAS_COMMENTS_IN_DIFF`, `HAS_GO`, `GO_TOUCHED`, `ENGINE_ONLY`, `GOLDEN_CHANGED`, `DIFF`, etc.) are consulted by every downstream phase to gate sub-agent launches — never recompute them locally.
 
 ## Incremental Checkpoints
 
@@ -105,6 +105,12 @@ COUNT_E2E_SPECS=$(echo "$FILES" | grep -cE '^ibl5/tests/e2e/.*\.ts$' || true)
 COUNT_LOCK=$(echo "$FILES" | grep -cE '(composer|package|bun)\.lock$' || true)
 COUNT_SNAPSHOT=$(echo "$FILES" | grep -cE '__snapshots__/|\.snap$' || true)
 COUNT_NON_CODE=$(( COUNT_MD + COUNT_LOCK + COUNT_SNAPSHOT ))
+# Go engine (repo-root engine/, NOT under ibl5/). Anchored at ^engine/ so other
+# worktree checkouts under worktrees/<slug>/engine/*.go never false-positive —
+# PR file lists are repo-root-relative.
+COUNT_GO=$(echo "$FILES" | grep -cE '^engine/.*\.go$' || true)
+COUNT_IBL5=$(echo "$FILES" | grep -cE '^ibl5/' || true)
+GO_TOUCHED_COUNT=$(echo "$FILES" | grep -cE '^engine/' || true)
 
 # Derived flags (true/false strings for readable gates downstream)
 HAS_PHP=$([ "$COUNT_PHP" -gt 0 ] && echo true || echo false)
@@ -112,6 +118,14 @@ HAS_CSS=$([ "$COUNT_CSS" -gt 0 ] && echo true || echo false)
 HAS_MIGRATION=$([ "$COUNT_MIGRATION" -gt 0 ] && echo true || echo false)
 HAS_TEST=$([ "$COUNT_TEST" -gt 0 ] && echo true || echo false)
 HAS_E2E_SPECS=$([ "$COUNT_E2E_SPECS" -gt 0 ] && echo true || echo false)
+HAS_GO=$([ "$COUNT_GO" -gt 0 ] && echo true || echo false)
+GO_TOUCHED=$([ "$GO_TOUCHED_COUNT" -gt 0 ] && echo true || echo false)
+# Engine-only = engine files touched and NOT a single ibl5/PHP file in the diff.
+# Drives Agent A skip (Phase 4B) and the Phase 10 Path A guard.
+ENGINE_ONLY=$([ "$GO_TOUCHED" = true ] && [ "$COUNT_PHP" -eq 0 ] && [ "$COUNT_IBL5" -eq 0 ] && echo true || echo false)
+# Golden-snapshot change — INDEPENDENT of HAS_GO (golden.json is not a .go file).
+# Drives the Phase 6.5 headless auto-merge block.
+GOLDEN_CHANGED=$(echo "$FILES" | grep -qxF 'engine/internal/sim/testdata/golden.json' && echo true || echo false)
 
 # E2E spec module extraction (drives Agent D cross-reference)
 E2E_SPEC_MODULES=""
@@ -179,6 +193,7 @@ echo "  total=$COUNT_TOTAL php=$COUNT_PHP css=$COUNT_CSS md=$COUNT_MD migration=
 echo "  DOCS_ONLY=$DOCS_ONLY CSS_ONLY=$CSS_ONLY MIGRATION_ONLY=$MIGRATION_ONLY TEST_ONLY=$TEST_ONLY NON_CODE_ONLY=$NON_CODE_ONLY"
 echo "  HAS_PHP=$HAS_PHP HAS_CSS=$HAS_CSS HAS_MODIFIED=$HAS_MODIFIED HAS_COMMENTS_IN_DIFF=$HAS_COMMENTS_IN_DIFF LINES_PHP_CHANGED=$LINES_PHP_CHANGED"
 echo "  HAS_E2E_SPECS=$HAS_E2E_SPECS HAS_E2E_PROD_OVERLAP=$HAS_E2E_PROD_OVERLAP"
+echo "  HAS_GO=$HAS_GO GO_TOUCHED=$GO_TOUCHED ENGINE_ONLY=$ENGINE_ONLY GOLDEN_CHANGED=$GOLDEN_CHANGED COUNT_GO=$COUNT_GO"
 echo "  E2E_SPEC_MODULES=$(echo $E2E_SPEC_MODULES | tr '\n' ' ')"
 echo "  DIFF_FILE=$DIFF_FILE ($(wc -c < "$DIFF_FILE") bytes)"
 ```
@@ -221,7 +236,7 @@ Pass each agent: PR metadata, file list, and filtered `$DIFF`. **No agent calls 
 
 **Launch gates** (consult Phase 3 variables — skip the launch entirely, don't let the agent exit early):
 
-- Agent A: skip if `$NON_CODE_ONLY`. If `$MIGRATION_ONLY`, instruct agent to skip Section 2 (bug detection). If `! $HAS_PHP`, instruct agent to skip Section 3 (DB performance).
+- Agent A: skip if `$NON_CODE_ONLY` or `$ENGINE_ONLY`. (Agent A is a "Senior PHP Architect"; a pure-Go engine diff has no PHP architecture to review — skipping avoids low-signal PHP-rubric review of Go code. A **mixed** PR — `HAS_PHP=true`, `ENGINE_ONLY=false` — still launches Agent A to review the PHP portion.) If `$MIGRATION_ONLY`, instruct agent to skip Section 2 (bug detection). If `! $HAS_PHP`, instruct agent to skip Section 3 (DB performance).
 - Agent B: skip if BOTH sub-gates fail: (`! $HAS_PHP` or `$LINES_PHP_CHANGED <= 50`) AND (`$NON_CODE_ONLY` or `! $HAS_COMMENTS_IN_DIFF`). If only one sub-gate passes, instruct agent to run only that section.
 - Agent C: skip if `$NON_CODE_ONLY` or `! $HAS_MODIFIED` or `$LINES_PHP_CHANGED <= 50`
 - Agent D: skip if `! $HAS_E2E_SPECS`. When launched, pre-slice the diff into two temp files before forwarding to the agent:
@@ -340,6 +355,25 @@ cd <worktree>/ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-sum
 cd <worktree>/ibl5 && composer run analyse
 ```
 
+**Go engine track — direct Bash (no agent):** **Skip if** `! $HAS_GO`. Runs **alongside** the PHP tracks (additive — a mixed PHP+Go PR runs both). All commands target the repo-root engine module; the `make` targets are defined in `engine/Makefile`.
+
+1. **Format + tests/golden/coverage (load-bearing local gate):**
+   ```bash
+   make -C <worktree>/engine fmt-check
+   make -C <worktree>/engine cover
+   ```
+   `cover` runs `go test ./...` — which includes `TestGolden`, the byte-for-byte snapshot comparison at `engine/internal/sim/testdata/golden.json` — and enforces the coverage floor (`COVER_MIN`). The Go toolchain is always present, so these always run. A non-zero exit from either is a **deterministic Go-track failure**.
+2. **Lint (conditional — CI is the fallback gate):**
+   ```bash
+   if command -v golangci-lint >/dev/null 2>&1; then
+       make -C <worktree>/engine lint
+   else
+       echo "golangci-lint not on PATH — deferring lint to engine.yml CI job (Phase 7)"
+   fi
+   ```
+   golangci-lint is not preinstalled in a fresh nightly env. A missing linter is **not** a Go-track `fail` — the `engine.yml` CI job enforces lint and is watched in Phase 7.
+3. If `fmt-check` or `cover` fails: fix in worktree, commit, push, and re-run the Go track (same fix-and-rerun discipline as the PHP tracks). **Never** resolve a red `TestGolden` by running `make -C <worktree>/engine golden-update` unless the output change was intentional and is called out in the PR — a silent regenerate masks a behavior regression (see Phase 6.5 condition (5)).
+
 **E2E agent (Haiku):**
 
 Steps:
@@ -358,18 +392,19 @@ If either fails, fix in worktree, commit, push, and re-run the failing track.
 
 ### Phase 5 END: emit `PHASE5_VERIFY_STATUS`
 
-**After** the fix-and-rerun loop above has resolved (every launched track green) or given up (a deterministic failure survives), aggregate the three Phase 5 tracks — PHPUnit, PHPStan (both direct Bash, skipped when `! $HAS_PHP`), and the E2E Haiku sub-agent — into one status. The E2E track runs in a sub-agent whose shell state does not persist, so you (Opus) read its reported pass/fail from context, combine it with the PHPUnit/PHPStan results, and write the flag. Persist it for durability across the per-phase cap (same `$PPID` temp-file pattern Phase 3 / Phase 5.0 use):
+**After** the fix-and-rerun loop above has resolved (every launched track green) or given up (a deterministic failure survives), aggregate the Phase 5 tracks — PHPUnit, PHPStan (both direct Bash, skipped when `! $HAS_PHP`), the **Go engine track** (direct Bash, skipped when `! $HAS_GO`), and the E2E Haiku sub-agent — into one status. The E2E track runs in a sub-agent whose shell state does not persist, so you (Opus) read its reported pass/fail from context, combine it with the PHPUnit/PHPStan/Go results, and write the flag. Persist it for durability across the per-phase cap (same `$PPID` temp-file pattern Phase 3 / Phase 5.0 use):
 
 ```bash
-# PHASE5_VERIFY_STATUS: pass = every launched track green (or only-flaky-on-retry);
-#                       fail = a deterministic failure survived the fix-and-rerun loop;
-#                       skipped = no track ran (e.g. ! $HAS_PHP and E2E mapped to nothing).
+# PHASE5_VERIFY_STATUS: pass = at least one track ran and every launched track is green (or only-flaky-on-retry);
+#                       fail = a deterministic failure survived the fix-and-rerun loop in ANY launched track (PHPUnit, PHPStan, Go, or E2E);
+#                       skipped = no track ran at all (e.g. docs-only / CSS-only PR: ! $HAS_PHP and ! $HAS_GO and E2E mapped to nothing).
 echo "PHASE5_VERIFY_STATUS=$PHASE5_VERIFY_STATUS" > /tmp/post-plan-phase5-status-$PPID
 ```
 
 Rules for the value:
 - A flaky failure (e.g. shared-session/CSRF) that passes on retry **with no code change** counts as `pass` — only a deterministic failure surviving the loop is `fail`.
-- `skipped` is NOT `fail`: when no track ran (PHP-less PR whose E2E mapped to nothing — `bin/e2e-for-pr` exit 0 with empty stdout), the value is `skipped`.
+- `fail` if **any** launched track failed deterministically — the Go track (a red `cover`/`TestGolden`/coverage-floor) counts exactly like a red PHPUnit. An **engine-only** PR with the Go track green is `pass`, **not** `skipped` (this is the core fix: an engine PR is now verified, so it no longer slips through Phase 6.5 as `skipped`).
+- `skipped` is NOT `fail`: the value is `skipped` only when **no** track ran at all — a docs-only / CSS-only PR with no PHP, no Go, and E2E mapped to nothing (`bin/e2e-for-pr` exit 0 with empty stdout).
 - Record the status **after** the loop resolves or gives up — never mid-fix.
 
 ---
@@ -438,7 +473,7 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 
 **Already merged?** If `gh pr view --json state --jq '.state'` returns `MERGED`, there is nothing to arm — skip to Phase 7 (which will early-exit).
 
-**All four** conditions must be true: (1) PR says "No manual testing needed", (2) no review/audit findings scored >= 80, (3) no unresolved `MISSING:` planned-test items NOR `MISSING-FILE:` planned-file items remain from Phase 5.0 — i.e. `/tmp/post-plan-missing-tests-$PPID` is absent or empty. Phase 5.0 is skipped entirely when `PLAN_FOUND=none` or `! $HAS_MATRIX`, so this bridge file frequently never exists; **absent/empty = PASS (non-blocking)**. Only a non-empty file blocks: `[ -s /tmp/post-plan-missing-tests-$PPID ]` → condition (3) fails. (4) Phase 5's local verification did not deterministically fail — i.e. `PHASE5_VERIFY_STATUS` is `pass` or `skipped`, **not** `fail`. This is the condition #887 lacked: it armed auto-merge with red E2E because no gate checked Phase 5's result.
+**All five** conditions must be true: (1) PR says "No manual testing needed", (2) no review/audit findings scored >= 80, (3) no unresolved `MISSING:` planned-test items NOR `MISSING-FILE:` planned-file items remain from Phase 5.0 — i.e. `/tmp/post-plan-missing-tests-$PPID` is absent or empty. Phase 5.0 is skipped entirely when `PLAN_FOUND=none` or `! $HAS_MATRIX`, so this bridge file frequently never exists; **absent/empty = PASS (non-blocking)**. Only a non-empty file blocks: `[ -s /tmp/post-plan-missing-tests-$PPID ]` → condition (3) fails. (4) Phase 5's local verification did not deterministically fail — i.e. `PHASE5_VERIFY_STATUS` is `pass` or `skipped`, **not** `fail`. This is the condition #887 lacked: it armed auto-merge with red E2E because no gate checked Phase 5's result. (5) golden-snapshot safety: a change to `engine/internal/sim/testdata/golden.json` does NOT auto-ship unattended (see below).
 
 **Condition (4) blocks on the VALUE, not file presence** — the status file is non-empty for `pass` and `skipped` too (it always contains `PHASE5_VERIFY_STATUS=...`), so the `[ -s ... ]` idiom condition (3) uses would wrongly block every `pass`/`skipped`. Block only on the literal `fail` value; **absent file OR `pass` OR `skipped` = PASS (non-blocking)** — a `skipped` status (docs-only / PHP-less PR with no mapped E2E) must NOT block, or every such PR would stop arming, a regression worse than #887:
 
@@ -447,9 +482,19 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 grep -q 'PHASE5_VERIFY_STATUS=fail' /tmp/post-plan-phase5-status-$PPID 2>/dev/null && echo "BLOCKED: Phase 5 deterministic failure"
 ```
 
+**Condition (5) — golden-snapshot safety (headless only).** If `$GOLDEN_CHANGED` is `true` AND `$CLAUDE_HEADLESS` is set, **block** auto-merge: a change to `engine/internal/sim/testdata/golden.json` means the engine's simulation output changed, and a snapshot change with no human present is exactly when not to auto-ship (an agent can turn a red `TestGolden` green by regenerating the snapshot, silently masking a regression). In **interactive** mode (`$CLAUDE_HEADLESS` unset), do **not** block — emit a prominent warning with the same text so the human confirms intent before merging. This condition is independent of `HAS_GO` (a golden-only diff is `HAS_GO=false` but must still trigger it):
+
+```bash
+# condition (5): blocks ONLY when golden changed AND running headless (nightly autonomous)
+[ "$GOLDEN_CHANGED" = true ] && [ -n "$CLAUDE_HEADLESS" ] \
+  && echo "BLOCKED: golden.json (simulation behavior) changed in headless mode — confirm this was an intentional 'make -C engine golden-update', not a masked regression"
+```
+
 If met: `gh pr merge --squash --auto --delete-branch`. The `--auto` flag queues the merge — it does **not** merge now, it arms; GitHub executes it once all required status checks pass. Do not sync local to master here; the merge has not happened yet.
 
-If not met: do **not** arm auto-merge. Report which condition(s) blocked — the user merges manually after review. When condition (3) is the blocker, cite which planned test (`MISSING:`) or planned Critical File (`MISSING-FILE:`) is missing by `cat`-ing the bridge file (`cat /tmp/post-plan-missing-tests-$PPID`) into the report. When condition (4) is the blocker, report which Phase 5 track failed (PHPUnit / PHPStan / E2E). Continue to Phase 7 regardless, to monitor and fix CI — the fix-and-rerun there clears the red track so a later run can arm.
+If not met: do **not** arm auto-merge. Report which condition(s) blocked — the user merges manually after review. When condition (3) is the blocker, cite which planned test (`MISSING:`) or planned Critical File (`MISSING-FILE:`) is missing by `cat`-ing the bridge file (`cat /tmp/post-plan-missing-tests-$PPID`) into the report. When condition (4) is the blocker, report which Phase 5 track failed (PHPUnit / PHPStan / Go / E2E). When condition (5) is the blocker (headless + golden changed), report that the golden snapshot changed and the merge needs a human to confirm the behavior change was intentional. Continue to Phase 7 regardless, to monitor and fix CI — the fix-and-rerun there clears the red track so a later run can arm.
+
+**Interactive golden warning:** Whenever `$GOLDEN_CHANGED` is `true` and `$CLAUDE_HEADLESS` is unset (so condition (5) did not block), still surface the warning prominently in the report — "⚠️ golden.json changed: simulation behavior changed. Confirm this was an intentional `make -C engine golden-update`, not a masked regression." — so the human reviews intent before the queued merge fires.
 
 ---
 
@@ -484,7 +529,7 @@ Auto-merge was already armed (or deliberately not armed) in Phase 6.5 — this p
 
 ## Phase 9: Retrospective
 
-Before saving any memory, ask: **"Can this be a PHPStan rule instead?"** If the mistake is mechanical and deterministic, it belongs in `ibl5/phpstan-rules/` as a new custom rule — open a TODO comment in the plan file rather than a memory entry. Memories are for things a linter cannot express (architectural judgment, environment quirks, incident context).
+Before saving any memory, ask: **"Can this be a PHPStan rule instead?"** If the mistake is mechanical and deterministic, it belongs in `ibl5/phpstan-rules/` as a new custom rule — open a TODO comment in the plan file rather than a memory entry. (For an **engine-side** learning, the analog is: "Can this be a `golangci-lint` linter or a `go vet` rule?" — a mechanical, deterministic Go mistake belongs in `engine/.golangci.yml` config or a custom analyzer, not memory.) Memories are for things a linter cannot express (architectural judgment, environment quirks, incident context).
 
 Save to memory only if something was learned that would **prevent a bug** in a future session AND cannot be mechanized AND isn't already in MEMORY.md, CLAUDE.md, `.claude/rules/`, or an existing PHPStan rule. Read the target memory file first to avoid duplicates. If nothing qualifies, skip silently.
 
@@ -501,6 +546,8 @@ PR_STATE=$(gh pr view <PR_NUMBER> --json state --jq '.state')
 ```
 
 ### Path A: Main-stack rebuild (when `$PR_STATE` = `MERGED`)
+
+**Skip the rebuild if `$ENGINE_ONLY`** — an engine-only change touches no `ibl5/` PHP and cannot affect the rendered app, so tearing down and re-streaming prod data adds nothing. Print "Engine-only change — skipping Path A main-stack rebuild." and end Phase 10.
 
 The PR has been merged (either auto-merge fired during CI watch, or it was already merged before post-plan started). Run `cd <repo-root> && git checkout master && git pull origin master` to sync local, then rebuild the main Docker stack with fresh prod data.
 

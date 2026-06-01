@@ -178,12 +178,6 @@ class Player implements PlayerInterface
         return $this->playerData?->teamName;
     }
 
-    /** @see PlayerInterface::getTeamCity() */
-    public function getTeamCity(): ?string
-    {
-        return null;
-    }
-
     /** @see PlayerInterface::getTeamColor1() */
     public function getTeamColor1(): ?string
     {

@@ -20,7 +20,6 @@ class PlayerInterfaceContractTest extends TestCase
         'getHistoricalYear',
         'getTeamid',
         'getTeamName',
-        'getTeamCity',
         'getTeamColor1',
         'getTeamColor2',
         'getPosition',

@@ -37,8 +37,6 @@ interface PlayerInterface
 
     public function getTeamName(): ?string;
 
-    public function getTeamCity(): ?string;
-
     public function getTeamColor1(): ?string;
 
     public function getTeamColor2(): ?string;

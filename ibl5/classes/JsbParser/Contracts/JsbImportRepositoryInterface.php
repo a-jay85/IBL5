@@ -52,14 +52,6 @@ interface JsbImportRepositoryInterface
     public function upsertAward(int $year, string $award, string $name): int;
 
     /**
-     * Resolve a JSB team ID to a database teamid.
-     *
-     * @param int $jsbTeamId JSB engine team ID (0-28)
-     * @return int|null Database teamid, or null if not found
-     */
-    public function resolveTeamId(int $jsbTeamId): ?int;
-
-    /**
      * Resolve a team name to a database teamid.
      *
      * @param string $teamName Team name from .car/.his files

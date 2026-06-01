@@ -88,7 +88,6 @@ class PlayerFacadePropertyValuesTest extends DatabaseTestCase
         $player = Player::withPlayerID($this->db, self::TEST_PID);
 
         self::assertNull($player->getPlrRow());
-        self::assertNull($player->getTeamCity());
     }
 
     public function testCalculatedGettersReturnValues(): void

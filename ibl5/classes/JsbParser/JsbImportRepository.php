@@ -213,19 +213,6 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     }
 
     /**
-     * @see JsbImportRepositoryInterface::resolveTeamId()
-     */
-    public function resolveTeamId(int $jsbTeamId): ?int
-    {
-        // JSB team IDs 0-28 map directly to database teamids
-        // But team names may differ (renamed franchises)
-        if ($jsbTeamId >= 0 && $jsbTeamId <= 28) {
-            return $jsbTeamId;
-        }
-        return null;
-    }
-
-    /**
      * @see JsbImportRepositoryInterface::resolveTeamIdByName()
      */
     public function resolveTeamIdByName(string $teamName): ?int

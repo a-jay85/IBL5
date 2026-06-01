@@ -1,6 +1,6 @@
-// Package backup reads the JSB 5.60 backup file triple — .plr (binary roster),
-// .sch (binary schedule), and .sco (ASCII box-score corpus) — into in-memory
-// structs, and assembles a .plr+.sch pair into a bundle.Bundle so a historical
+// Package backup reads the JSB 5.60 backup file triple — .plr (roster), .sch
+// (schedule), and .sco (box-score corpus), all fixed-width ASCII — into
+// in-memory structs, and assembles a .plr+.sch pair into a bundle.Bundle so a historical
 // backup can drive the native engine through the same stdin→stdout contract the
 // DB-built bundle uses. This is the input/ground-truth side of the offline
 // fidelity harness (PR9); the distributional comparison itself is PR9b.
@@ -79,8 +79,10 @@ const (
 	offRatingPD = 603 // post defense
 	offRatingTD = 605 // transition defense
 
-	// A record shorter than this cannot carry a player slot; matches the
-	// strlen($line) < 200 guard in PlrLineParser::parse (blank/short padding).
+	// A record shorter than this cannot carry the identity/ratings fields, so it
+	// is blank/short padding and skipped. PlrLineParser::parse has no explicit
+	// length guard (it relies on the pid==0 / ordinal>1440 checks below); this is
+	// an added defense so a truncated line can never reach a field slice.
 	plrMinRecordLen = 200
 	plrMaxOrdinal   = 1440
 )

@@ -185,8 +185,14 @@ func decodeScoRecord(rec string, recIdx int) (ScoGame, bool, error) {
 		return ScoGame{}, false, nil // padding record
 	}
 
-	// Calendar month: raw + 10, wrapping past December (matches the non-playoff
-	// branch of Boxscore::fillGameInfo). Date is an opaque validation label.
+	// Calendar month: raw + 10, wrapping once past December (Oct=10…Sep=9). This
+	// mirrors only the regular-season branch of Boxscore::fillGameInfo; the PHP's
+	// playoff/HEAT/preseason month hacks need season context the .sco does not
+	// carry, so the Date is a best-effort regular-season label and may be wrong
+	// for playoff/HEAT records (which the .sco does not mark). Date is an opaque
+	// validation label — PR9b joins games on team IDs + score, never by parsing
+	// this string — so a mislabeled playoff date does not affect the harness.
+	// The load-bearing fields (team IDs, scores, box stats) are always correct.
 	month := monthRaw + 10
 	if month > 12 {
 		month -= 12

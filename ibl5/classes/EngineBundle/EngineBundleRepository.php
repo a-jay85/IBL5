@@ -76,6 +76,7 @@ final class EngineBundleRepository extends \BaseMysqliRepository implements Engi
         ?string $startDate = null,
         ?string $endDate = null,
         int $gameType = 2,
+        ?int $limit = null,
     ): array {
         // Canonical "unplayed" convention: both scores 0 (see PowerRankingsUpdater
         // line 129, ScheduleHighlighter). box_id is NOT a played flag.
@@ -97,6 +98,14 @@ final class EngineBundleRepository extends \BaseMysqliRepository implements Engi
             $params[] = $endDate;
         }
         $sql .= " ORDER BY game_date, id";
+
+        // Cap per-run work to the earliest $limit games (bound, never interpolated)
+        // so callers can keep a single sim run within memory bounds.
+        if ($limit !== null) {
+            $sql .= " LIMIT ?";
+            $types .= 'i';
+            $params[] = $limit;
+        }
 
         $rows = $this->fetchAll($sql, $types, ...$params);
 

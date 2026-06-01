@@ -41,6 +41,7 @@ final class EngineBundleService
      * @param int         $gameType   JSB game-type flag stamped on every game (default regular)
      * @param int|null    $seed       explicit seed, or null to generate one in [0, PHP_INT_MAX]
      * @param int         $leagueId   league id recorded in the bundle
+     * @param int|null    $maxGames   cap the unplayed-game window to the earliest N games, or null for all
      *
      * @throws EmptyScheduleException when the window yields no games to simulate
      * @throws EmptyRosterException   when no rosterable players exist
@@ -52,8 +53,9 @@ final class EngineBundleService
         int $gameType = self::DEFAULT_GAME_TYPE,
         ?int $seed = null,
         int $leagueId = self::DEFAULT_LEAGUE_ID,
+        ?int $maxGames = null,
     ): string {
-        $schedule = $this->repository->getUnplayedGames($seasonYear, $startDate, $endDate, $gameType);
+        $schedule = $this->repository->getUnplayedGames($seasonYear, $startDate, $endDate, $gameType, $maxGames);
         if ($schedule === []) {
             throw new EmptyScheduleException(
                 "No unplayed games to simulate for season $seasonYear in the given window.",

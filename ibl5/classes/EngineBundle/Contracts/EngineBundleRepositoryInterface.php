@@ -40,6 +40,7 @@ interface EngineBundleRepositoryInterface
      * @param string|null $startDate  inclusive lower bound (Y-m-d) or null
      * @param string|null $endDate    inclusive upper bound (Y-m-d) or null
      * @param int         $gameType   JSB game-type flag stamped on each Game (caller decides; default regular)
+     * @param int|null    $limit      max rows to return (earliest first by game_date, id), or null for all
      * @return list<Game>
      */
     public function getUnplayedGames(
@@ -47,5 +48,6 @@ interface EngineBundleRepositoryInterface
         ?string $startDate = null,
         ?string $endDate = null,
         int $gameType = 2,
+        ?int $limit = null,
     ): array;
 }

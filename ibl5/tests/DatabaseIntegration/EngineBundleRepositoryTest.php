@@ -132,6 +132,50 @@ class EngineBundleRepositoryTest extends DatabaseTestCase
         self::assertLessThan(2, count($games));
     }
 
+    // ── getUnplayedGames LIMIT cap ───────────────────────────────────
+
+    public function testGetUnplayedGamesLimitReturnsEarliestN(): void
+    {
+        // 5 unplayed games across distinct dates in an isolated future year.
+        $this->insertScheduleRow(2095, '2095-01-05', 2, 0, 1, 0);
+        $this->insertScheduleRow(2095, '2095-01-10', 4, 0, 3, 0);
+        $this->insertScheduleRow(2095, '2095-01-15', 6, 0, 5, 0);
+        $this->insertScheduleRow(2095, '2095-01-20', 8, 0, 7, 0);
+        $this->insertScheduleRow(2095, '2095-01-25', 10, 0, 9, 0);
+
+        $games = $this->repo->getUnplayedGames(2095, null, null, 2, 3);
+
+        // Exactly N, and the earliest 3 by game_date, id (ordering preserved under LIMIT).
+        self::assertCount(3, $games);
+        self::assertSame('2095-01-05', $games[0]->date);
+        self::assertSame('2095-01-10', $games[1]->date);
+        self::assertSame('2095-01-15', $games[2]->date);
+    }
+
+    public function testGetUnplayedGamesLimitLargerThanAvailableReturnsAll(): void
+    {
+        $this->insertScheduleRow(2094, '2094-01-05', 2, 0, 1, 0);
+        $this->insertScheduleRow(2094, '2094-01-10', 4, 0, 3, 0);
+        $this->insertScheduleRow(2094, '2094-01-15', 6, 0, 5, 0);
+        $this->insertScheduleRow(2094, '2094-01-20', 8, 0, 7, 0);
+        $this->insertScheduleRow(2094, '2094-01-25', 10, 0, 9, 0);
+
+        self::assertCount(5, $this->repo->getUnplayedGames(2094, null, null, 2, 50));
+    }
+
+    public function testGetUnplayedGamesNullLimitReturnsAll(): void
+    {
+        // Negative: limit omitted/null ⇒ unlimited behavior preserved.
+        $this->insertScheduleRow(2093, '2093-01-05', 2, 0, 1, 0);
+        $this->insertScheduleRow(2093, '2093-01-10', 4, 0, 3, 0);
+        $this->insertScheduleRow(2093, '2093-01-15', 6, 0, 5, 0);
+        $this->insertScheduleRow(2093, '2093-01-20', 8, 0, 7, 0);
+        $this->insertScheduleRow(2093, '2093-01-25', 10, 0, 9, 0);
+
+        self::assertCount(5, $this->repo->getUnplayedGames(2093));
+        self::assertCount(5, $this->repo->getUnplayedGames(2093, null, null, 2, null));
+    }
+
     // ── getTeams ─────────────────────────────────────────────────────
 
     public function testGetTeamsConcatenatesCityAndName(): void

@@ -74,7 +74,7 @@ class EngineBundleServiceTest extends TestCase
         $repo = $this->createMock(EngineBundleRepositoryInterface::class);
         $repo->expects($this->once())
             ->method('getUnplayedGames')
-            ->with(2026, null, null, 4)
+            ->with(2026, null, null, 4, null)
             ->willReturn([$this->aGame(4)]);
         $repo->method('getPlayers')->willReturn([$this->aPlayer()]);
         $repo->method('getTeams')->willReturn([]);
@@ -83,6 +83,39 @@ class EngineBundleServiceTest extends TestCase
         /** @var list<array<string, mixed>> $schedule */
         $schedule = $decoded['schedule'];
         self::assertSame(4, $schedule[0]['game_type']);
+    }
+
+    // ── maxGames cap passthrough ─────────────────────────────────────
+
+    public function testForwardsMaxGamesToRepository(): void
+    {
+        // The cap is the 5th positional arg of getUnplayedGames; the service
+        // threads buildBundleJson's $maxGames straight through.
+        $repo = $this->createMock(EngineBundleRepositoryInterface::class);
+        $repo->expects($this->once())
+            ->method('getUnplayedGames')
+            ->with(2026, null, null, 2, 7)
+            ->willReturn([$this->aGame()]);
+        $repo->method('getPlayers')->willReturn([$this->aPlayer()]);
+        $repo->method('getTeams')->willReturn([]);
+
+        $service = new EngineBundleService($repo, new BundleSerializer());
+        $service->buildBundleJson(2026, null, null, 2, null, 1, 7);
+    }
+
+    public function testOmittingMaxGamesForwardsNull(): void
+    {
+        // Negative/default: no cap passed ⇒ null reaches the repo (unlimited).
+        $repo = $this->createMock(EngineBundleRepositoryInterface::class);
+        $repo->expects($this->once())
+            ->method('getUnplayedGames')
+            ->with(2026, null, null, 2, null)
+            ->willReturn([$this->aGame()]);
+        $repo->method('getPlayers')->willReturn([$this->aPlayer()]);
+        $repo->method('getTeams')->willReturn([]);
+
+        $service = new EngineBundleService($repo, new BundleSerializer());
+        $service->buildBundleJson(2026);
     }
 
     public function testDefaultGameTypeIsRegularSeason(): void

@@ -36,7 +36,7 @@ jobs:
               - '.github/workflows/engine.yml'
 
   engine:
-    name: Go build, vet, test
+    name: Go build, vet, lint, test
     needs: [changes]
     if: needs.changes.outputs.engine == 'true'
     runs-on: ubuntu-latest
@@ -56,13 +56,44 @@ jobs:
         working-directory: engine
         run: go build ./...
 
+      # Fail if any Go file is not gofmt-formatted. Code is currently clean.
+      - name: Gofmt check
+        working-directory: engine
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "The following files are not gofmt-formatted:"
+            echo "$unformatted"
+            exit 1
+          fi
+
       - name: Vet
         working-directory: engine
         run: go vet ./...
 
-      - name: Test
+      # Pinned version = deterministic gate (same philosophy as the go.mod
+      # toolchain pin). Bump deliberately; never float to latest.
+      - name: Lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v2.12.2
+          working-directory: engine
+
+      # Run tests with coverage and enforce a floor. The floor is a ratchet:
+      # current total is 95.3%; raise this as coverage improves, never lower it.
+      # Kept in sync with COVER_MIN in engine/Makefile.
+      - name: Test with coverage floor
         working-directory: engine
-        run: go test ./...
+        env:
+          COVER_MIN: "90.0"
+        run: |
+          go test -coverprofile=cover.out ./...
+          total="$(go tool cover -func=cover.out | awk '/^total:/ {gsub(/%/, "", $3); print $3}')"
+          echo "total coverage: $total% (floor: $COVER_MIN%)"
+          if awk "BEGIN { exit !($total < $COVER_MIN) }"; then
+            echo "coverage $total% is below floor $COVER_MIN%"
+            exit 1
+          fi
 
   gate:
     name: Engine

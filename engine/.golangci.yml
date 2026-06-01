@@ -1,0 +1,23 @@
+# golangci-lint config for the JSB native engine.
+# Conservative, high-signal correctness linters only — no opinionated style
+# linters (lll, wsl, funlen, gochecknoglobals, exhaustruct, etc.), which would
+# generate noise without catching bugs in a byte-golden simulation engine.
+#
+# Pinned to schema version 2 (golangci-lint v2.x). CI pins the binary version
+# in .github/workflows/engine.yml so the gate is deterministic — same
+# philosophy as the toolchain pin in go.mod.
+version: "2"
+
+linters:
+  # The "standard" set is errcheck, govet, ineffassign, staticcheck, unused —
+  # exactly the correctness-focused linters we want.
+  default: standard
+
+  settings:
+    govet:
+      # fieldalignment reorders struct fields to save memory. In a byte-golden
+      # engine, struct layout changes are high-risk and the memory win is
+      # irrelevant, so we never want it. It is not in govet's default analyzer
+      # set, but disable it explicitly to document the intent.
+      disable:
+        - fieldalignment

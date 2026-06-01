@@ -11,20 +11,48 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Non-DB unit tests for EngineShadowLoader's per-game parsing/branch logic, using
- * a recording repository (real loader logic runs; writes captured in-memory).
- * These cover the malformed-input and edge branches the DB-integration suite's
- * well-formed fixture does not exercise.
+ * an in-line recording repository (real loader logic runs; writes captured
+ * in-memory). These cover the malformed-input and edge branches the DB-integration
+ * suite's well-formed fixture does not exercise.
  *
- * Note: whole-stream concerns (empty games, non-array game entries, blank lines)
- * now live in EngineRunner's streaming layer — EngineRunnerTest covers them. This
- * suite drives one decoded game at a time through loadOneGame().
+ * The recording repo is declared inline as a local variable in each test (not via
+ * a typed helper) so PHPStan retains the anonymous-class type and sees the counter
+ * properties. Whole-stream concerns (empty games, non-array game entries, blank
+ * lines) now live in EngineRunner's streaming layer — EngineRunnerTest covers them.
  */
 final class EngineShadowLoaderUnitTest extends TestCase
 {
     #[Test]
     public function nonArrayPlayerBoxesAreSkippedButValidOnesCounted(): void
     {
-        $repo = $this->recordingRepo();
+        $repo = new class (new \mysqli()) extends EngineShadowRepository {
+            public int $playerInserts = 0;
+            public int $teamInserts = 0;
+
+            public function transaction(callable $fn): mixed
+            {
+                return $fn();
+            }
+
+            public function deleteShadowGame(
+                string $gameDate,
+                int $visitorTeamId,
+                int $homeTeamId,
+                int $gameOfThatDay,
+            ): int {
+                return 0;
+            }
+
+            protected function execute(string $query, string $types = '', mixed ...$params): int
+            {
+                if (str_contains($query, 'engine_shadow_teams')) {
+                    $this->teamInserts++;
+                } elseif (str_contains($query, 'engine_shadow')) {
+                    $this->playerInserts++;
+                }
+                return 1;
+            }
+        };
         $game = [
             'date' => '2026-03-10', 'home_team_id' => 1, 'visitor_team_id' => 3,
             'game_of_that_day' => 1, 'sim_game_type' => 2,
@@ -44,7 +72,34 @@ final class EngineShadowLoaderUnitTest extends TestCase
     #[Test]
     public function missingHomeTeamBoxYieldsNoTeamRows(): void
     {
-        $repo = $this->recordingRepo();
+        $repo = new class (new \mysqli()) extends EngineShadowRepository {
+            public int $playerInserts = 0;
+            public int $teamInserts = 0;
+
+            public function transaction(callable $fn): mixed
+            {
+                return $fn();
+            }
+
+            public function deleteShadowGame(
+                string $gameDate,
+                int $visitorTeamId,
+                int $homeTeamId,
+                int $gameOfThatDay,
+            ): int {
+                return 0;
+            }
+
+            protected function execute(string $query, string $types = '', mixed ...$params): int
+            {
+                if (str_contains($query, 'engine_shadow_teams')) {
+                    $this->teamInserts++;
+                } elseif (str_contains($query, 'engine_shadow')) {
+                    $this->playerInserts++;
+                }
+                return 1;
+            }
+        };
         $game = [
             'date' => '2026-03-10', 'home_team_id' => 1, 'visitor_team_id' => 3,
             'game_of_that_day' => 1, 'sim_game_type' => 2,
@@ -117,43 +172,5 @@ final class EngineShadowLoaderUnitTest extends TestCase
 
         self::assertSame(2, $repo->teamInserts);
         self::assertSame(0, $repo->capturedVisitorOt, 'non-array ot must sum to 0');
-    }
-
-    /**
-     * Recording repository: the loader's real insert methods run (building SQL +
-     * params), execute() counts inserts by table name, transaction() runs the
-     * callable directly, and the dedupe delete is a no-op so it does not inflate
-     * the insert counters — all without a DB.
-     */
-    private function recordingRepo(): EngineShadowRepository
-    {
-        return new class (new \mysqli()) extends EngineShadowRepository {
-            public int $playerInserts = 0;
-            public int $teamInserts = 0;
-
-            public function transaction(callable $fn): mixed
-            {
-                return $fn();
-            }
-
-            public function deleteShadowGame(
-                string $gameDate,
-                int $visitorTeamId,
-                int $homeTeamId,
-                int $gameOfThatDay,
-            ): int {
-                return 0;
-            }
-
-            protected function execute(string $query, string $types = '', mixed ...$params): int
-            {
-                if (str_contains($query, 'engine_shadow_teams')) {
-                    $this->teamInserts++;
-                } elseif (str_contains($query, 'engine_shadow')) {
-                    $this->playerInserts++;
-                }
-                return 1;
-            }
-        };
     }
 }

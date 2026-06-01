@@ -253,31 +253,23 @@ try {
         $updaterService->addStep(new Updater\Steps\RefreshIblHistStep($mysqli_db));
     }
 
-    // Shadow sim: run the native Go engine over the full season and write its
-    // output to droppable shadow tables for engine-vs-JSB comparison. Default OFF —
-    // never slows or risks the canonical import until fidelity is validated. IBL-only
-    // (the engine bundle is IBL-scoped). Registered LAST so that even a catastrophic
-    // engine fatal skips nothing downstream — shadow reads inputs and writes only
-    // shadow tables, so nothing else depends on it. The engine streams its NDJSON
-    // output one game at a time, so peak PHP memory is one game regardless of season
-    // size — no per-run game cap is needed.
-    if (!$isOlympics) {
-        $engineShadowEnabled = filter_var(
-            getenv('ENGINE_SHADOW_ENABLED') ?: '',
-            FILTER_VALIDATE_BOOLEAN,
-        );
-        $bundleRepo = new EngineBundle\EngineBundleRepository($mysqli_db, $leagueContext);
-        $bundleService = new EngineBundle\EngineBundleService($bundleRepo, new EngineBundle\BundleSerializer());
-        $engineRunner = new EngineRunner\EngineRunner();
-        $engineShadowRepo = new EngineShadow\EngineShadowRepository($mysqli_db, $leagueContext);
-        $engineShadowLoader = new EngineShadow\EngineShadowLoader($engineShadowRepo);
-        $updaterService->addStep(new Updater\Steps\EngineShadowStep(
-            $bundleService, $engineRunner, $engineShadowLoader, $season->endingYear, $engineShadowEnabled,
-        ));
-    }
-
     $controller = new Updater\UpdaterController($updaterService, $view);
     $controller->run();
+
+    // Shadow sim: run the native Go engine over the full season and write its output
+    // to droppable shadow tables for engine-vs-JSB comparison. Default OFF. Spawned
+    // OUT-OF-BAND as a detached process (see ADR-0037) so a long/heavy/crashing
+    // full-season run can never block or break this synchronous admin request —
+    // shadow only READS inputs and writes droppable diagnostic tables. IBL-only (the
+    // engine bundle is IBL-scoped), so the gate stays !$isOlympics. Fire-and-forget:
+    // the admin request returns immediately and the shadow process outlives it.
+    if (!$isOlympics && filter_var(getenv('ENGINE_SHADOW_ENABLED') ?: '', FILTER_VALIDATE_BOOLEAN)) {
+        $shadowLauncher = new EngineShadow\ShadowProcessLauncher(
+            $basePath . '/scripts/runEngineShadow.php',
+            sys_get_temp_dir() . '/ibl5-engine-shadow.log',
+        );
+        $shadowLauncher->launch(); // detached; never blocks or aborts the request
+    }
 
 } catch (\Exception $e) {
     $safeMessage = \Security\HtmlSanitizer::safeHtmlOutput($e->getMessage());

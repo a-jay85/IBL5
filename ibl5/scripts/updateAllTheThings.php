@@ -253,14 +253,14 @@ try {
         $updaterService->addStep(new Updater\Steps\RefreshIblHistStep($mysqli_db));
     }
 
-    // Shadow sim: run the native Go engine over a bounded game window and write its
+    // Shadow sim: run the native Go engine over the full season and write its
     // output to droppable shadow tables for engine-vs-JSB comparison. Default OFF —
     // never slows or risks the canonical import until fidelity is validated. IBL-only
-    // (the engine bundle is IBL-scoped). Registered LAST so that even a catastrophic,
-    // uncatchable engine fatal (e.g. OOM, an E_ERROR the step's catch can't trap)
-    // skips nothing downstream — shadow reads inputs and writes only shadow tables,
-    // so nothing else depends on it. The per-run game cap (EngineShadowStep::
-    // SHADOW_MAX_GAMES_PER_RUN) keeps a single run within the PHP memory limit.
+    // (the engine bundle is IBL-scoped). Registered LAST so that even a catastrophic
+    // engine fatal skips nothing downstream — shadow reads inputs and writes only
+    // shadow tables, so nothing else depends on it. The engine streams its NDJSON
+    // output one game at a time, so peak PHP memory is one game regardless of season
+    // size — no per-run game cap is needed.
     if (!$isOlympics) {
         $engineShadowEnabled = filter_var(
             getenv('ENGINE_SHADOW_ENABLED') ?: '',

@@ -13,7 +13,7 @@ use Updater\Contracts\PipelineStepInterface;
 use Updater\StepResult;
 
 /**
- * SHADOW step: run the native Go engine over the season window and persist its
+ * SHADOW step: run the native Go engine over the full season and persist its
  * output to the shadow box-score tables for engine-vs-JSB comparison.
  *
  * Additive and isolated: it runs AFTER the canonical ProcessBoxscoresStep, never
@@ -21,17 +21,13 @@ use Updater\StepResult;
  * the flag is off it skips immediately; when the engine or loader fails it returns
  * a failure WITHOUT aborting the pipeline or affecting canonical data. The bundle
  * is built by reusing EngineBundleService (PR2) — this step assembles nothing.
+ *
+ * Memory: the engine streams its output as NDJSON and the runner hands one game at
+ * a time to the loader, so peak PHP memory is one game (~0.44MB) plus the pid map
+ * — no per-run game cap is needed regardless of season size.
  */
 final class EngineShadowStep implements PipelineStepInterface
 {
-    /**
-     * Per-run cap on shadowed games. The engine slurps its whole Result JSON
-     * into a 128MB PHP process; an unbounded season window (hundreds of games,
-     * ~360MB result) OOMs with an uncatchable E_ERROR. 20 games (~9MB result)
-     * was proven safe under 128MB with margin. Public so tests can reference it.
-     */
-    public const SHADOW_MAX_GAMES_PER_RUN = 20;
-
     public function __construct(
         private readonly EngineBundleService $bundleService,
         private readonly EngineRunnerInterface $runner,
@@ -53,17 +49,21 @@ final class EngineShadowStep implements PipelineStepInterface
         }
 
         try {
-            $bundleJson = $this->bundleService->buildBundleJson(
-                $this->seasonYear,
-                maxGames: self::SHADOW_MAX_GAMES_PER_RUN,
-            );
+            $bundleJson = $this->bundleService->buildBundleJson($this->seasonYear);
         } catch (EmptyScheduleException | EmptyRosterException $e) {
             return StepResult::skipped($this->getLabel(), 'Nothing to shadow-sim: ' . $e->getMessage());
         }
 
         try {
-            $resultJson = $this->runner->run($bundleJson);
-            $result = $this->loader->load($resultJson);
+            // Fetch the pid map once, then stream the engine's NDJSON one game at a
+            // time into the loader. Peak memory is one game, not the whole result.
+            $pidMap = $this->loader->getTeamIdMap();
+            $games = $this->runner->runStreaming(
+                $bundleJson,
+                function (array $game, int $seed) use ($pidMap): void {
+                    $this->loader->loadOneGame($game, $seed, $pidMap);
+                },
+            );
         } catch (\Throwable $e) {
             // Isolation: the shadow run is best-effort. Any engine/loader failure
             // (nonzero exit, malformed JSON, a DB write error) degrades to a step
@@ -74,12 +74,7 @@ final class EngineShadowStep implements PipelineStepInterface
 
         return StepResult::success(
             $this->getLabel(),
-            detail: sprintf(
-                '%d games → %d player rows, %d team rows (shadow)',
-                $result->gamesLoaded,
-                $result->playerRowsInserted,
-                $result->teamRowsInserted,
-            ),
+            detail: sprintf('%d games (shadow)', $games),
         );
     }
 }

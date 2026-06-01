@@ -1,17 +1,21 @@
 // Command jsbsim runs the JSB-compatible basketball simulation engine.
 //
 // It reads a simulation input bundle as JSON on stdin and writes the result as
-// JSON on stdout. The engine is a pure transform: it touches no database, no
+// NDJSON on stdout. The engine is a pure transform: it touches no database, no
 // network, and no files beyond stdin/stdout. The PHP side builds the bundle
 // (from the database, or from a historical backup .plr for validation) and
 // loads the result into the IBL5 updateAllTheThings pipeline.
 //
+// Output is newline-delimited JSON: a header line {"seed":N} followed by one
+// compact GameResult per line. This lets the PHP loader stream one game at a
+// time at constant memory instead of decoding a single multi-hundred-MB object.
+//
 // Usage:
 //
-//	jsbsim [--seed N] < bundle.json > result.json
+//	jsbsim [--seed N] < bundle.json > result.ndjson
 //
 // --seed N (N >= 0) overrides the seed carried in the bundle; the seed actually
-// used is echoed in the output so any run can be replayed.
+// used is echoed on the header line so any run can be replayed.
 package main
 
 import (
@@ -58,10 +62,17 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 
 	res := sim.Simulate(b, seed)
 
+	// NDJSON: header line {"seed":N}, then one compact GameResult per line. A
+	// non-indented json.Encoder appends '\n' after each value, so each game is
+	// single-line. A no-games bundle emits the header line and zero game lines.
+	if _, err := fmt.Fprintf(stdout, "{\"seed\":%d}\n", res.Seed); err != nil {
+		return fmt.Errorf("encoding header: %w", err)
+	}
 	enc := json.NewEncoder(stdout)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(res); err != nil {
-		return fmt.Errorf("encoding result: %w", err)
+	for i := range res.Games {
+		if err := enc.Encode(&res.Games[i]); err != nil {
+			return fmt.Errorf("encoding game: %w", err)
+		}
 	}
 	return nil
 }

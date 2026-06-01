@@ -10,13 +10,12 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Unit tests for EngineRunner. The injectable binary path lets every negative
- * path be exercised with stub scripts — no real engine binary required.
+ * Unit tests for EngineRunner's streaming contract. The injectable binary path
+ * lets every path be exercised with NDJSON-emitting stub scripts — no real engine
+ * binary required. Each stub writes a header line then zero or more game lines.
  */
 final class EngineRunnerTest extends TestCase
 {
-    private const VALID_RESULT_JSON = '{"seed":1988,"games":[]}';
-
     /** @var list<string> */
     private array $tempFiles = [];
 
@@ -32,12 +31,57 @@ final class EngineRunnerTest extends TestCase
     }
 
     #[Test]
-    public function returnsStdoutJsonForValidBinary(): void
+    public function invokesCallbackPerGameAndReturnsCount(): void
     {
-        $stub = $this->makeStub("#!/bin/sh\ncat > /dev/null\nprintf '%s' '" . self::VALID_RESULT_JSON . "'\n");
+        $stub = $this->ndjsonStub(
+            '{"seed":1988}',
+            '{"date":"d1","home_team_id":1}',
+            '{"date":"d2","home_team_id":2}',
+        );
         $runner = new EngineRunner($stub);
 
-        self::assertSame(self::VALID_RESULT_JSON, $runner->run('{"seed":1,"games":[]}'));
+        $games = [];
+        $count = $runner->runStreaming(
+            '{"seed":1,"schedule":[]}',
+            function (array $game, int $seed) use (&$games): void {
+                $games[] = $game;
+            },
+        );
+
+        self::assertSame(2, $count);
+        self::assertCount(2, $games);
+        self::assertSame('d1', $games[0]['date']);
+        self::assertSame(1, $games[0]['home_team_id']);
+        self::assertSame('d2', $games[1]['date']);
+    }
+
+    #[Test]
+    public function surfacesSeedToCallback(): void
+    {
+        $stub = $this->ndjsonStub('{"seed":1988}', '{"date":"d1"}');
+        $runner = new EngineRunner($stub);
+
+        $seeds = [];
+        $runner->runStreaming('{}', function (array $game, int $seed) use (&$seeds): void {
+            $seeds[] = $seed;
+        });
+
+        self::assertSame([1988], $seeds);
+    }
+
+    #[Test]
+    public function emptyGamesHeaderOnlyReturnsZero(): void
+    {
+        $stub = $this->ndjsonStub('{"seed":1988}'); // header line, no game lines
+        $runner = new EngineRunner($stub);
+
+        $called = false;
+        $count = $runner->runStreaming('{}', function () use (&$called): void {
+            $called = true;
+        });
+
+        self::assertSame(0, $count);
+        self::assertFalse($called, 'callback must never fire when there are no game lines');
     }
 
     #[Test]
@@ -48,29 +92,56 @@ final class EngineRunnerTest extends TestCase
 
         $this->expectException(EngineRunnerException::class);
         $this->expectExceptionMessageMatches('/exited with code 3.*boom/s');
-        $runner->run('{"seed":1,"games":[]}');
+        $runner->runStreaming('{}', function (): void {});
     }
 
     #[Test]
-    public function malformedJsonOnStdoutThrows(): void
+    public function malformedHeaderThrows(): void
     {
-        $stub = $this->makeStub("#!/bin/sh\ncat > /dev/null\nprintf '%s' '{not valid json'\n");
+        $stub = $this->ndjsonStub('{not valid json');
         $runner = new EngineRunner($stub);
 
         $this->expectException(EngineRunnerException::class);
-        $this->expectExceptionMessageMatches('/malformed JSON/');
-        $runner->run('{"seed":1,"games":[]}');
+        $this->expectExceptionMessageMatches('/header/');
+        $runner->runStreaming('{}', function (): void {});
     }
 
     #[Test]
-    public function emptyStdoutThrows(): void
+    public function missingHeaderEmptyStreamThrows(): void
     {
+        // Stub consumes stdin and emits nothing on stdout → no header line.
         $stub = $this->makeStub("#!/bin/sh\ncat > /dev/null\n");
         $runner = new EngineRunner($stub);
 
         $this->expectException(EngineRunnerException::class);
-        $this->expectExceptionMessageMatches('/no output/');
-        $runner->run('{"seed":1,"games":[]}');
+        $this->expectExceptionMessageMatches('/header/');
+        $runner->runStreaming('{}', function (): void {});
+    }
+
+    #[Test]
+    public function malformedGameLineThrows(): void
+    {
+        $stub = $this->ndjsonStub('{"seed":1}', '{bad game');
+        $runner = new EngineRunner($stub);
+
+        $this->expectException(EngineRunnerException::class);
+        $this->expectExceptionMessageMatches('/game line/');
+        $runner->runStreaming('{}', function (): void {});
+    }
+
+    #[Test]
+    public function blankLinesBetweenGamesAreSkipped(): void
+    {
+        $stub = $this->ndjsonStub('{"seed":1}', '{"date":"d1"}', '', '{"date":"d2"}');
+        $runner = new EngineRunner($stub);
+
+        $count = 0;
+        $result = $runner->runStreaming('{}', function () use (&$count): void {
+            $count++;
+        });
+
+        self::assertSame(2, $result);
+        self::assertSame(2, $count, 'blank/whitespace lines between games must be skipped');
     }
 
     #[Test]
@@ -80,14 +151,14 @@ final class EngineRunnerTest extends TestCase
 
         $this->expectException(EngineRunnerException::class);
         $this->expectExceptionMessageMatches('/not found or not executable/');
-        $runner->run('{"seed":1,"games":[]}');
+        $runner->runStreaming('{}', function (): void {});
     }
 
     /**
-     * Security: the runner uses an explicit argv array (no shell), so a seed
-     * containing shell metacharacters is passed as a single literal argument and
-     * never interpreted. The stub records its argv; we assert the injection
-     * string arrived verbatim and no shell side effect occurred.
+     * Security: the runner uses an explicit argv array (no shell), so the seed is
+     * passed as a single literal argument and never interpreted. The stub records
+     * its argv; we assert the seed arrived as discrete elements and no shell side
+     * effect occurred.
      */
     #[Test]
     public function seedIsPassedAsLiteralArgvNotShell(): void
@@ -96,22 +167,35 @@ final class EngineRunnerTest extends TestCase
         $sentinel = $this->tempPath('pwned');
         $stub = $this->makeStub(
             "#!/bin/sh\ncat > /dev/null\nprintf '%s\\n' \"\$@\" > '" . $argsLog . "'\n"
-            . "printf '%s' '" . self::VALID_RESULT_JSON . "'\n"
+            . "echo '{\"seed\":1988}'\n"
         );
         $runner = new EngineRunner($stub);
 
         $injection = '1; touch ' . $sentinel;
-        // Cast to (int) would defeat the test; EngineRunner stringifies the int,
-        // so drive the literal-passing guarantee by checking the recorded argv
-        // when a normal seed is given, and that no shell expansion happened.
-        $result = $runner->run('{"seed":1,"games":[]}', 42);
+        // EngineRunner stringifies the int seed; the literal-passing guarantee is
+        // checked via the recorded argv and the absence of any shell expansion.
+        $count = $runner->runStreaming('{}', function (): void {}, 42);
 
-        self::assertSame(self::VALID_RESULT_JSON, $result);
+        self::assertSame(0, $count);
         $recorded = is_file($argsLog) ? file_get_contents($argsLog) : '';
         self::assertStringContainsString("--seed\n42", (string) $recorded, 'seed must be passed as discrete argv elements');
         self::assertFalse(is_file($sentinel), 'no shell side effect should occur');
         // Defensive: the injection string is never run because seed is an int.
         self::assertStringNotContainsString($injection, (string) $recorded);
+    }
+
+    /**
+     * Build an NDJSON-emitting stub: each line is `echo`'d (sh appends the newline),
+     * so JSON double-quotes pass through a single-quoted shell argument untouched.
+     */
+    private function ndjsonStub(string ...$lines): string
+    {
+        $body = "#!/bin/sh\ncat > /dev/null\n";
+        foreach ($lines as $line) {
+            $body .= "echo '" . $line . "'\n";
+        }
+
+        return $this->makeStub($body);
     }
 
     private function makeStub(string $body): string

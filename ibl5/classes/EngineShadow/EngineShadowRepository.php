@@ -40,27 +40,18 @@ class EngineShadowRepository extends \BaseMysqliRepository
     }
 
     /**
-     * Resolve teamid for each pid from ibl_plr (mirrors how the canonical .sco
-     * import stamps a player's team). Returns pid => teamid; pids absent from
-     * ibl_plr are omitted (the loader stamps NULL for those).
-     *
-     * @param list<int> $pids
+     * Build the full ibl_plr pid => teamid map in one query (mirrors how the
+     * canonical .sco import stamps a player's team). The map is season-size-
+     * independent (one row per player, ~1.5K rows), so a single fetch feeds the
+     * whole streaming run — no per-game lookups. Rows with a NULL teamid are
+     * omitted (the loader stamps NULL for any pid absent from the map).
      *
      * @return array<int, int>
      */
-    public function getTeamIdsForPids(array $pids): array
+    public function getAllTeamIdsByPid(): array
     {
-        $unique = array_values(array_unique($pids));
-        if ($unique === []) {
-            return [];
-        }
-
         /** @var list<array{pid: int, teamid: int|null}> $rows */
-        $rows = $this->fetchAllInList(
-            'SELECT pid, teamid FROM `ibl_plr` WHERE pid IN ({IN})',
-            'i',
-            $unique,
-        );
+        $rows = $this->fetchAll('SELECT pid, teamid FROM `ibl_plr`');
 
         $map = [];
         foreach ($rows as $row) {

@@ -31,7 +31,7 @@ final class EngineShadowStepTest extends TestCase
     public function flagOffSkipsWithoutRunningEngine(): void
     {
         $runner = $this->createMock(EngineRunnerInterface::class);
-        $runner->expects(self::never())->method('run');
+        $runner->expects(self::never())->method('runStreaming');
 
         $step = new EngineShadowStep(
             $this->bundleServiceThatWouldSucceed(),
@@ -54,7 +54,7 @@ final class EngineShadowStepTest extends TestCase
         $repo->method('getUnplayedGames')->willReturn([]); // → EmptyScheduleException
 
         $runner = $this->createMock(EngineRunnerInterface::class);
-        $runner->expects(self::never())->method('run');
+        $runner->expects(self::never())->method('runStreaming');
 
         $step = new EngineShadowStep(
             new EngineBundleService($repo, new BundleSerializer()),
@@ -100,7 +100,8 @@ final class EngineShadowStepTest extends TestCase
             public int $playerInserts = 0;
             public int $teamInserts = 0;
 
-            public function getTeamIdsForPids(array $pids): array
+            // The step resolves the pid map via the loader → repository.
+            public function getAllTeamIdsByPid(): array
             {
                 return [901 => 3];
             }
@@ -131,24 +132,27 @@ final class EngineShadowStepTest extends TestCase
             }
         };
 
-        $resultJson = (string) json_encode([
-            'seed' => 7,
-            'games' => [[
-                'date' => '2026-03-10', 'home_team_id' => 1, 'visitor_team_id' => 3,
-                'game_of_that_day' => 1, 'sim_game_type' => 2,
-                'player_boxes' => [
-                    ['pid' => 901, 'pos' => 'PG', 'gameMIN' => 30, 'game2GM' => 5],
-                    ['pid' => 902, 'pos' => 'C', 'gameMIN' => 28, 'game2GM' => 6],
-                ],
-                'team_boxes' => [
-                    ['team_id' => 3, 'is_home' => false, 'q1' => 28, 'q2' => 26, 'q3' => 24, 'q4' => 25, 'ot' => [3]],
-                    ['team_id' => 1, 'is_home' => true, 'q1' => 30, 'q2' => 27, 'q3' => 26, 'q4' => 24, 'ot' => []],
-                ],
-            ]],
-        ], JSON_THROW_ON_ERROR);
+        // One streamed game, handed to the loader's callback once.
+        $game = [
+            'date' => '2026-03-10', 'home_team_id' => 1, 'visitor_team_id' => 3,
+            'game_of_that_day' => 1, 'sim_game_type' => 2,
+            'player_boxes' => [
+                ['pid' => 901, 'pos' => 'PG', 'gameMIN' => 30, 'game2GM' => 5],
+                ['pid' => 902, 'pos' => 'C', 'gameMIN' => 28, 'game2GM' => 6],
+            ],
+            'team_boxes' => [
+                ['team_id' => 3, 'is_home' => false, 'q1' => 28, 'q2' => 26, 'q3' => 24, 'q4' => 25, 'ot' => [3]],
+                ['team_id' => 1, 'is_home' => true, 'q1' => 30, 'q2' => 27, 'q3' => 26, 'q4' => 24, 'ot' => []],
+            ],
+        ];
 
         $runner = self::createStub(EngineRunnerInterface::class);
-        $runner->method('run')->willReturn($resultJson);
+        $runner->method('runStreaming')->willReturnCallback(
+            function (string $bundleJson, callable $onGame) use ($game): int {
+                $onGame($game, 7);
+                return 1;
+            }
+        );
 
         $step = new EngineShadowStep(
             $this->bundleServiceThatWouldSucceed(),
@@ -164,16 +168,14 @@ final class EngineShadowStepTest extends TestCase
         self::assertSame(2, $fakeRepo->playerInserts);
         self::assertSame(2, $fakeRepo->teamInserts);
         self::assertStringContainsString('1 games', $result->detail);
-        self::assertStringContainsString('2 player rows', $result->detail);
-        self::assertStringContainsString('2 team rows', $result->detail);
     }
 
     #[Test]
-    public function passesGameCapThroughServiceToRepository(): void
+    public function buildsFullSeasonBundleWithoutCap(): void
     {
-        // EngineBundleService is final (cannot be mocked), so assert the cap on
-        // the seam below it: a createMock repo proves step → service → repo
-        // threads SHADOW_MAX_GAMES_PER_RUN as getUnplayedGames' 5th arg.
+        // The cap is gone: getUnplayedGames must be called with a null 5th arg
+        // (full season), not a per-run cap. EngineBundleService is final, so assert
+        // on the repo seam below it.
         $repo = $this->createMock(EngineBundleRepositoryInterface::class);
         $repo->expects($this->once())
             ->method('getUnplayedGames')
@@ -182,16 +184,16 @@ final class EngineShadowStepTest extends TestCase
                 null,
                 null,
                 EngineBundleService::DEFAULT_GAME_TYPE,
-                EngineShadowStep::SHADOW_MAX_GAMES_PER_RUN,
+                null,
             )
             ->willReturn([new Game(1, 3, '2026-03-10', 2)]);
         $repo->method('getPlayers')->willReturn([new Player(['pid' => 1])]);
         $repo->method('getTeams')->willReturn([new Team(1, 'Team One')]);
 
-        // Empty-games result ⇒ the loader (unconnected mysqli) is a clean no-op:
-        // collectPids([]) → getTeamIdsForPids([]) short-circuits before any DB.
+        // Runner streams zero games ⇒ loadOneGame never fires; the loader's pid-map
+        // fetch is stubbed to [] by loaderWithoutDb so no DB is touched.
         $runner = self::createStub(EngineRunnerInterface::class);
-        $runner->method('run')->willReturn('{"seed":1,"games":[]}');
+        $runner->method('runStreaming')->willReturn(0);
 
         $step = new EngineShadowStep(
             new EngineBundleService($repo, new BundleSerializer()),
@@ -210,7 +212,7 @@ final class EngineShadowStepTest extends TestCase
     public function runnerFailureReturnsFailureWithoutThrowing(): void
     {
         $runner = self::createStub(EngineRunnerInterface::class);
-        $runner->method('run')->willThrowException(new EngineRunnerException('binary not found'));
+        $runner->method('runStreaming')->willThrowException(new EngineRunnerException('binary not found'));
 
         $step = new EngineShadowStep(
             $this->bundleServiceThatWouldSucceed(),
@@ -242,12 +244,20 @@ final class EngineShadowStepTest extends TestCase
     }
 
     /**
-     * Real loader wired to a repository with an unconnected mysqli — never
-     * exercised in these flag/failure tests (the loader is reached only on the
-     * success path, which is covered by the DB-integration suite).
+     * Real loader wired to a repository with an unconnected mysqli. The step now
+     * calls getTeamIdMap() (→ getAllTeamIdsByPid) inside its try BEFORE runStreaming,
+     * so the repo must answer the pid-map query without a DB — overridden to [].
+     * loadOneGame is never reached in these flag/failure/no-game tests.
      */
     private function loaderWithoutDb(): EngineShadowLoader
     {
-        return new EngineShadowLoader(new EngineShadowRepository(new \mysqli()));
+        $repo = new class (new \mysqli()) extends EngineShadowRepository {
+            public function getAllTeamIdsByPid(): array
+            {
+                return [];
+            }
+        };
+
+        return new EngineShadowLoader($repo);
     }
 }

@@ -110,6 +110,16 @@ final class EngineShadowStepTest extends TestCase
                 return $fn();
             }
 
+            // Dedupe delete is a no-op here so execute() counts only inserts.
+            public function deleteShadowGame(
+                string $gameDate,
+                int $visitorTeamId,
+                int $homeTeamId,
+                int $gameOfThatDay,
+            ): int {
+                return 0;
+            }
+
             protected function execute(string $query, string $types = '', mixed ...$params): int
             {
                 if (str_contains($query, 'engine_shadow_teams')) {
@@ -156,6 +166,44 @@ final class EngineShadowStepTest extends TestCase
         self::assertStringContainsString('1 games', $result->detail);
         self::assertStringContainsString('2 player rows', $result->detail);
         self::assertStringContainsString('2 team rows', $result->detail);
+    }
+
+    #[Test]
+    public function passesGameCapThroughServiceToRepository(): void
+    {
+        // EngineBundleService is final (cannot be mocked), so assert the cap on
+        // the seam below it: a createMock repo proves step → service → repo
+        // threads SHADOW_MAX_GAMES_PER_RUN as getUnplayedGames' 5th arg.
+        $repo = $this->createMock(EngineBundleRepositoryInterface::class);
+        $repo->expects($this->once())
+            ->method('getUnplayedGames')
+            ->with(
+                self::SEASON_YEAR,
+                null,
+                null,
+                EngineBundleService::DEFAULT_GAME_TYPE,
+                EngineShadowStep::SHADOW_MAX_GAMES_PER_RUN,
+            )
+            ->willReturn([new Game(1, 3, '2026-03-10', 2)]);
+        $repo->method('getPlayers')->willReturn([new Player(['pid' => 1])]);
+        $repo->method('getTeams')->willReturn([new Team(1, 'Team One')]);
+
+        // Empty-games result ⇒ the loader (unconnected mysqli) is a clean no-op:
+        // collectPids([]) → getTeamIdsForPids([]) short-circuits before any DB.
+        $runner = self::createStub(EngineRunnerInterface::class);
+        $runner->method('run')->willReturn('{"seed":1,"games":[]}');
+
+        $step = new EngineShadowStep(
+            new EngineBundleService($repo, new BundleSerializer()),
+            $runner,
+            $this->loaderWithoutDb(),
+            self::SEASON_YEAR,
+            enabled: true,
+        );
+
+        $result = $step->execute();
+
+        self::assertTrue($result->success);
     }
 
     #[Test]

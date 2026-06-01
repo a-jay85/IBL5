@@ -142,6 +142,56 @@ final class EngineShadowLoaderTest extends DatabaseTestCase
         self::assertSame($canonicalTeamsBefore, $this->countRows('ibl_box_scores_teams'));
     }
 
+    #[Test]
+    public function reRunReplacesRowsRatherThanAppending(): void
+    {
+        $loader = new EngineShadowLoader(new EngineShadowRepository($this->db));
+
+        $loader->load($this->resultJson());
+        $loader->load($this->resultJson()); // same game again
+
+        // Count the TABLE, not the loader return (which is 4/2 on every run
+        // regardless of dedupe). A broken dedupe leaves 8/4 here.
+        self::assertSame(4, $this->countShadowRowsForGame('ibl_box_scores_engine_shadow'), 'player rows doubled — dedupe failed');
+        self::assertSame(2, $this->countShadowRowsForGame('ibl_box_scores_engine_shadow_teams'), 'team rows doubled — dedupe failed');
+    }
+
+    #[Test]
+    public function reRunDedupeLeavesUnrelatedGameIntact(): void
+    {
+        $repo = new EngineShadowRepository($this->db);
+
+        // Pre-seed an unrelated game (different date AND keys) directly.
+        $repo->insertShadowPlayerBox(
+            '2089-05-05', 6, 5, 1,
+            42, 5, 'PG',
+            30, 5, 10, 4, 5, 2, 6, 2, 6, 5, 2, 2, 1, 3,
+            999, 2,
+        );
+
+        // Load the fixture game twice; dedupe is scoped to the fixture's keys only.
+        $loader = new EngineShadowLoader($repo);
+        $loader->load($this->resultJson());
+        $loader->load($this->resultJson());
+
+        self::assertSame(1, $this->countPlayerRowsForDate('2089-05-05'), 'unrelated game rows must be untouched by dedupe');
+    }
+
+    private function countPlayerRowsForDate(string $date): int
+    {
+        $stmt = $this->db->prepare(
+            "SELECT COUNT(*) AS cnt FROM `ibl_box_scores_engine_shadow` WHERE game_date = ?"
+        );
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('s', $date);
+        $stmt->execute();
+        /** @var array{cnt: int} $row */
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        return (int) $row['cnt'];
+    }
+
     /** @return array<string, mixed> */
     private function fetchPlayerRow(int $pid): array
     {

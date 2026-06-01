@@ -73,6 +73,40 @@ class EngineShadowRepository extends \BaseMysqliRepository
     }
 
     /**
+     * Delete any existing shadow rows for one game (from BOTH shadow tables) so a
+     * re-run replaces rather than appends. Called by the loader at the top of each
+     * per-game transaction, so the delete+insert for a game is atomic. Identity
+     * keys are bound (`siii`) — never interpolated. Returns total rows removed.
+     */
+    public function deleteShadowGame(
+        string $gameDate,
+        int $visitorTeamId,
+        int $homeTeamId,
+        int $gameOfThatDay,
+    ): int {
+        $deleted = $this->execute(
+            "DELETE FROM `ibl_box_scores_engine_shadow`
+             WHERE game_date = ? AND visitor_teamid = ? AND home_teamid = ? AND game_of_that_day = ?",
+            'siii',
+            $gameDate,
+            $visitorTeamId,
+            $homeTeamId,
+            $gameOfThatDay,
+        );
+        $deleted += $this->execute(
+            "DELETE FROM `ibl_box_scores_engine_shadow_teams`
+             WHERE game_date = ? AND visitor_teamid = ? AND home_teamid = ? AND game_of_that_day = ?",
+            'siii',
+            $gameDate,
+            $visitorTeamId,
+            $homeTeamId,
+            $gameOfThatDay,
+        );
+
+        return $deleted;
+    }
+
+    /**
      * Insert one engine player box row. teamid/pos are nullable (a pid missing
      * from ibl_plr yields a NULL teamid).
      */

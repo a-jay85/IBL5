@@ -24,6 +24,14 @@ use Updater\StepResult;
  */
 final class EngineShadowStep implements PipelineStepInterface
 {
+    /**
+     * Per-run cap on shadowed games. The engine slurps its whole Result JSON
+     * into a 128MB PHP process; an unbounded season window (hundreds of games,
+     * ~360MB result) OOMs with an uncatchable E_ERROR. 20 games (~9MB result)
+     * was proven safe under 128MB with margin. Public so tests can reference it.
+     */
+    public const SHADOW_MAX_GAMES_PER_RUN = 20;
+
     public function __construct(
         private readonly EngineBundleService $bundleService,
         private readonly EngineRunnerInterface $runner,
@@ -45,7 +53,10 @@ final class EngineShadowStep implements PipelineStepInterface
         }
 
         try {
-            $bundleJson = $this->bundleService->buildBundleJson($this->seasonYear);
+            $bundleJson = $this->bundleService->buildBundleJson(
+                $this->seasonYear,
+                maxGames: self::SHADOW_MAX_GAMES_PER_RUN,
+            );
         } catch (EmptyScheduleException | EmptyRosterException $e) {
             return StepResult::skipped($this->getLabel(), 'Nothing to shadow-sim: ' . $e->getMessage());
         }

@@ -67,6 +67,11 @@ final class EngineShadowLoader
         $gameOfThatDay = $this->intVal($game, 'game_of_that_day');
         $simGameType = $this->intVal($game, 'sim_game_type');
 
+        // Re-runs replace, not append: clear any prior shadow rows for this game
+        // first. Runs inside the per-game transaction() wrapper from load(), so a
+        // mid-game failure rolls the delete back too (atomic delete+insert).
+        $this->repository->deleteShadowGame($date, $visitorTeamId, $homeTeamId, $gameOfThatDay);
+
         $playerRows = 0;
         foreach ($this->arrVal($game, 'player_boxes') as $pb) {
             if (!is_array($pb)) {

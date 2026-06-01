@@ -19,6 +19,14 @@ const (
 	scoSlotSize     = 53
 	scoSlotCount    = 30
 	scoVisitorSlots = 15 // slots 0..14 visitor, 15..29 home
+
+	// scoContentSize is the live portion of a record: the game-info header plus
+	// the 30 player/team slots, before the trailing padding that rounds each
+	// record up to scoRecordSize. Real .sco files write this padding between
+	// records but omit it after the LAST record, so the file can end with a
+	// content-only (1,648-byte) final record. ReadSco tolerates that tail as long
+	// as the full content is present.
+	scoContentSize = scoGameInfoSize + scoSlotCount*scoSlotSize // 1648
 )
 
 // Game-info sub-offsets, from Boxscore::fillGameInfo. Team IDs and the date are
@@ -60,8 +68,11 @@ const (
 	slotPF      = 51 // width 2
 )
 
-// ErrShortRecord reports a .sco input that ends mid-record (truncated header or
-// a trailing partial 2,000-byte record). It names the offending record index.
+// ErrShortRecord reports a .sco input that ends mid-record: a truncated header,
+// or a trailing record shorter than the game-info + slot content
+// (scoContentSize). A trailing record that carries full content but omits its
+// padding is NOT an error — real files end that way (see ReadSco). It names the
+// offending record index.
 var ErrShortRecord = errors.New("backup: truncated .sco record")
 
 // ScoBox is one slot's stat line from a .sco game. TwoGM/TwoGA are 2-point-only
@@ -107,7 +118,9 @@ type ScoGame struct {
 // 1,000,000-byte header, then decodes each 2,000-byte record. Records with no
 // non-empty player slot are padding and are skipped (mirroring the PHP
 // gameLinesProcessed > 0 gate), so the real sparse corpus does not emit phantom
-// games. A truncated header or trailing partial record yields ErrShortRecord; a
+// games. The LAST record may omit its trailing padding (real files end after
+// the scoContentSize content); it is still decoded. A truncated header, or a
+// trailing record shorter than scoContentSize, yields ErrShortRecord; a
 // non-numeric slot field yields ErrBadField — never a panic.
 func ReadSco(r io.Reader) ([]ScoGame, error) {
 	data, err := io.ReadAll(r)
@@ -121,10 +134,18 @@ func ReadSco(r io.Reader) ([]ScoGame, error) {
 	games := make([]ScoGame, 0)
 	recIdx := 0
 	for off := scoHeaderSize; off < len(data); off, recIdx = off+scoRecordSize, recIdx+1 {
-		if off+scoRecordSize > len(data) {
-			return nil, fmt.Errorf("%w: record %d at offset %d has only %d of %d bytes", ErrShortRecord, recIdx, off, len(data)-off, scoRecordSize)
+		end := off + scoRecordSize
+		if end > len(data) {
+			// The final record may omit its trailing padding. Decode it as long as
+			// the full game-info + slot content is present; anything shorter is a
+			// genuinely truncated record.
+			if len(data)-off >= scoContentSize {
+				end = len(data)
+			} else {
+				return nil, fmt.Errorf("%w: record %d at offset %d has only %d of %d bytes", ErrShortRecord, recIdx, off, len(data)-off, scoRecordSize)
+			}
 		}
-		rec := string(data[off : off+scoRecordSize])
+		rec := string(data[off:end])
 		game, ok, err := decodeScoRecord(rec, recIdx)
 		if err != nil {
 			return nil, err
@@ -261,7 +282,7 @@ func scoSlice(s string, off, width int) string {
 }
 
 func scoInt(s string, off, width, recIdx int) (int, error) {
-	t := strings.TrimSpace(scoSlice(s, off, width))
+	t := trimPad(scoSlice(s, off, width))
 	if t == "" {
 		return 0, nil
 	}

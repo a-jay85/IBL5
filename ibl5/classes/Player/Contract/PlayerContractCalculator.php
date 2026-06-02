@@ -33,27 +33,14 @@ class PlayerContractCalculator implements PlayerContractCalculatorInterface
      */
     private function getSalaryForYear(PlayerData $playerData, int $year): int
     {
-        // Year 0 defaults to year 1
+        // Year 0 defaults to year 1 (this caller's special case — the shared
+        // PlayerData::salaryForContractYear() helper returns 0 for year 0).
         if ($year === 0) {
             return $playerData->contractYear1Salary ?? 0;
         }
 
-        // Year 7 or beyond means no salary (off the books)
-        if ($year >= 7) {
-            return 0;
-        }
-
-        // Map contract year to specific property (years 1-6)
-        $salaryMap = [
-            1 => $playerData->contractYear1Salary,
-            2 => $playerData->contractYear2Salary,
-            3 => $playerData->contractYear3Salary,
-            4 => $playerData->contractYear4Salary,
-            5 => $playerData->contractYear5Salary,
-            6 => $playerData->contractYear6Salary,
-        ];
-
-        return $salaryMap[$year] ?? 0;
+        // Years 1-6 map to their slot; year 7+ and negatives fall through to 0.
+        return $playerData->salaryForContractYear($year);
     }
 
     /**

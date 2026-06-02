@@ -225,4 +225,29 @@ class PlayerData
     public function __construct()
     {
     }
+
+    /**
+     * Look up the salary for a given contract year (1-6) from this player's
+     * `contractYear1Salary`..`contractYear6Salary` slots.
+     *
+     * Centralizes the duplicated `match ($cy) { 1 => $this->contractYear1Salary ... }`
+     * salary-slot lookup used by PlayerContractCalculator and
+     * PlayerContractValidator. Returns 0 for any contract year outside the 1-6
+     * range; callers that treat year 0 as year 1 (e.g. the current-season walk)
+     * must apply that mapping before calling this method.
+     *
+     * @param int $contractYear Contract year to read (1-6)
+     */
+    public function salaryForContractYear(int $contractYear): int
+    {
+        return match ($contractYear) {
+            1 => $this->contractYear1Salary ?? 0,
+            2 => $this->contractYear2Salary ?? 0,
+            3 => $this->contractYear3Salary ?? 0,
+            4 => $this->contractYear4Salary ?? 0,
+            5 => $this->contractYear5Salary ?? 0,
+            6 => $this->contractYear6Salary ?? 0,
+            default => 0,
+        };
+    }
 }

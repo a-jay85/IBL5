@@ -91,6 +91,39 @@ class PlrFieldSerializerTest extends TestCase
         $this->assertSame($ascii, PlrFieldSerializer::toCP1252($ascii));
     }
 
+    public function testToUtf8ConvertsAccentedCharacters(): void
+    {
+        // José in CP1252 (é = 0xe9) → José in UTF-8 (é = 0xc3 0xa9)
+        $cp1252 = "Jos\xe9";
+        $this->assertSame("Jos\xc3\xa9", PlrFieldSerializer::toUtf8($cp1252));
+    }
+
+    public function testToUtf8PreservesAscii(): void
+    {
+        $ascii = 'John Smith';
+        $this->assertSame($ascii, PlrFieldSerializer::toUtf8($ascii));
+    }
+
+    public function testToUtf8MapsUndefinedCp1252ByteToUnicode(): void
+    {
+        // 0x81 is an undefined slot in CP1252. This locks the *consolidated*
+        // decode behavior: mb_convert_encoding maps it to U+0081 (UTF-8
+        // 0xc2 0x81), whereas the old iconv('CP1252','UTF-8//IGNORE') variant
+        // silently dropped the byte ("AB"). Standardizing on this output is the
+        // point of the consolidation (PR 3). The is_string() fallback in toUtf8
+        // is defensive — mb_convert_encoding never returns false for these
+        // hardcoded encodings, so no input can exercise it.
+        $this->assertSame("A\xc2\x81B", PlrFieldSerializer::toUtf8("A\x81B"));
+    }
+
+    public function testRoundTripPreservesAccents(): void
+    {
+        // José García round-trips UTF-8 → CP1252 → UTF-8 unchanged.
+        $utf8 = "Jos\xc3\xa9 Garc\xc3\xada";
+        $cp1252 = PlrFieldSerializer::toCP1252($utf8);
+        $this->assertSame($utf8, PlrFieldSerializer::toUtf8($cp1252));
+    }
+
     public function testFormatIntProducesCorrectLength(): void
     {
         for ($width = 1; $width <= 6; $width++) {

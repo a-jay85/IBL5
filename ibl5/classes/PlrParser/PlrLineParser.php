@@ -29,8 +29,7 @@ class PlrLineParser implements PlrLineParserInterface
 
         // Extract name and convert from Windows 1252 to UTF-8 to preserve accent marks
         $nameRaw = trim(substr($line, 4, 32));
-        $nameConverted = iconv('CP1252', 'UTF-8//IGNORE', $nameRaw);
-        $name = $nameConverted !== false ? $nameConverted : $nameRaw;
+        $name = PlrFieldSerializer::toUtf8($nameRaw);
 
         return [
             'ordinal' => $ordinal,

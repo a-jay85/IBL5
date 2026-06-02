@@ -80,7 +80,7 @@ final class PlrOrdinalMap
             }
 
             $rawName = trim(substr($line, self::NAME_OFFSET, self::NAME_WIDTH));
-            $name = mb_convert_encoding($rawName, 'UTF-8', 'Windows-1252');
+            $name = PlrFieldSerializer::toUtf8($rawName);
 
             $map[$ordinal] = [
                 'pid' => $pid,

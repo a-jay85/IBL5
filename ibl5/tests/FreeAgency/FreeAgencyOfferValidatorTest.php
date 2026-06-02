@@ -352,6 +352,103 @@ class FreeAgencyOfferValidatorTest extends TestCase
     }
 
     // ================================================================
+    // CHARACTERIZATION (PR5 dedup) — exact error strings + year-6 coverage
+    // Locks current validateRaisesAndContinuity() behavior before delegating
+    // gaps/raises to CommonContractValidator. These must stay byte-identical
+    // through the refactor.
+    // ================================================================
+
+    public function testGapErrorMessageExactString(): void
+    {
+        $validator = new FreeAgencyOfferValidator();
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 500,
+            'offer2' => 0,
+            'offer3' => 600,
+        ]));
+
+        $this->assertFalse($result['valid']);
+        $this->assertSame(
+            'Sorry, you cannot have gaps in contract years. You offered 0 in year 2 but offered 600 in year 3.',
+            $result['error']
+        );
+    }
+
+    public function testSalaryDecreaseErrorMessageExactString(): void
+    {
+        $validator = new FreeAgencyOfferValidator();
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 500,
+            'offer2' => 400,
+        ]));
+
+        $this->assertFalse($result['valid']);
+        $this->assertSame(
+            'Sorry, you cannot decrease salary in later years of a contract. You offered 400 in year 2, which is less than you offered in year 1, 500.',
+            $result['error']
+        );
+    }
+
+    public function testRaiseErrorMessageExactString(): void
+    {
+        $validator = new FreeAgencyOfferValidator();
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 500,
+            'offer2' => 600,
+            'birdYears' => 0,
+        ]));
+
+        $this->assertFalse($result['valid']);
+        $this->assertSame(
+            'Sorry, you tried to offer a larger raise than is permitted. Your first year offer was 500 which means the maximum raise allowed each year is 50. Your offer in Year 2 was 600, which is more than your Year 1 offer, 500, plus the max increase of 50. Given your offer in Year 1, the most you can offer in Year 2 is 550.',
+            $result['error']
+        );
+    }
+
+    /**
+     * Regression guard: a decrease in the SIXTH contract year must be rejected.
+     * CommonContractValidator::validateSalaryDecreases() only scans years 1-5,
+     * so the decrease check stays LOCAL in validateRaisesAndContinuity() to
+     * preserve year-6 coverage. Naive full delegation would make this VALID.
+     */
+    public function testRejectsSalaryDecreaseInYear6(): void
+    {
+        $validator = new FreeAgencyOfferValidator();
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 500,
+            'offer2' => 500,
+            'offer3' => 500,
+            'offer4' => 500,
+            'offer5' => 500,
+            'offer6' => 400, // decrease in the final year
+        ]));
+
+        $this->assertFalse($result['valid']);
+        $this->assertStringContainsString('decrease', strtolower($result['error']));
+    }
+
+    /**
+     * Multi-violation precedence is intentionally NOT locked: delegating gaps
+     * and raises to CommonContractValidator runs the checks as independent
+     * passes rather than the original year-major interleaved loop, so the
+     * SPECIFIC error returned for an offer containing several violations may
+     * change (e.g. gap vs decrease). Only the rejection itself is guaranteed.
+     */
+    public function testMultiViolationOfferIsStillRejected(): void
+    {
+        $validator = new FreeAgencyOfferValidator();
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 500,
+            'offer2' => 400, // decrease
+            'offer3' => 400,
+            'offer4' => 0,
+            'offer5' => 300, // gap after year 4
+        ]));
+
+        $this->assertFalse($result['valid']);
+    }
+
+    // ================================================================
     // MLE/LLE AVAILABILITY
     // ================================================================
 

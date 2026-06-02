@@ -24,6 +24,8 @@ use PHPUnit\Framework\TestCase;
  * To update a contract after an intentional breaking change:
  * 1. Update the corresponding SCHEMA constant in this file
  * 2. The PR diff makes the breaking change visible to reviewers
+ *
+ * @phpstan-import-type InjuredPlayerRow from \Api\Repository\ApiInjuriesRepository
  */
 class ApiContractTest extends TestCase
 {
@@ -416,7 +418,7 @@ class ApiContractTest extends TestCase
         ];
     }
 
-    /** @return array<string, mixed> */
+    /** @return InjuredPlayerRow */
     private function mockInjuryRow(): array
     {
         return [

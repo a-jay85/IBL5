@@ -185,17 +185,17 @@ class AwardHistoryRepositoryTest extends DatabaseTestCase
     }
 
     /**
-     * @param array<string, mixed> $overrides
-     * @return array<string, mixed>
+     * @param array{year?: int|null, award?: string|null, name?: string|null, sortby?: int} $overrides
+     * @return array{name: string|null, award: string|null, year: int|null, sortby: int}
      */
     private function buildParams(array $overrides = []): array
     {
-        return array_merge([
-            'year' => null,
-            'award' => null,
-            'name' => null,
-            'sortby' => 3,
-        ], $overrides);
+        return [
+            'year' => $overrides['year'] ?? null,
+            'award' => $overrides['award'] ?? null,
+            'name' => $overrides['name'] ?? null,
+            'sortby' => $overrides['sortby'] ?? 3,
+        ];
     }
 
     /**

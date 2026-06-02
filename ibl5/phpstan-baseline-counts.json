@@ -8,7 +8,7 @@
         "ibl.sqlStringInterpolation": 32
     },
     "phpstan-tests-baseline.neon": {
-        "argument.type": 111,
+        "argument.type": 105,
         "array.duplicateKey": 9,
         "arrayFilter.strict": 3,
         "cast.useless": 6,

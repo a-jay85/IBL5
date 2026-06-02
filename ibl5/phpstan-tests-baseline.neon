@@ -61,18 +61,6 @@ parameters:
 			path: tests/Api/Transformer/GameTransformerTest.php
 
 		-
-			rawMessage: 'Parameter #1 $row of method Api\Transformer\InjuryTransformer::transform() expects array{player_uuid: string, pid: int, name: string, pos: string, injured: int, teamid: int|null, team_uuid: string|null, team_city: string|null, ...}, array<string, mixed> given.'
-			identifier: argument.type
-			count: 4
-			path: tests/Api/Transformer/InjuryTransformerTest.php
-
-		-
-			rawMessage: 'Parameter #1 $row of method Api\Transformer\InjuryTransformer::transform() expects array{player_uuid: string, pid: int, name: string, pos: string, injured: int, teamid: int|null, team_uuid: string|null, team_city: string|null, ...}, non-empty-array<string, mixed> given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Api/Transformer/InjuryTransformerTest.php
-
-		-
 			rawMessage: 'Parameter #1 $row of method Api\Transformer\TeamTransformer::transformDetail() expects array{teamid: int, uuid: string, team_city: string, team_name: string, owner_name: string, arena: string, conference: string|null, division: string|null, ...}, non-empty-array<string, mixed> given.'
 			identifier: argument.type
 			count: 2
@@ -389,12 +377,6 @@ parameters:
 			identifier: phpunit.assertCount
 			count: 1
 			path: tests/DatabaseIntegration/AwardGenerationServiceIntegrationTest.php
-
-		-
-			rawMessage: 'Parameter #1 $params of method AwardHistory\AwardHistoryRepository::searchAwards() expects array{name: string|null, award: string|null, year: int|null, sortby: int}, array<string, mixed> given.'
-			identifier: argument.type
-			count: 15
-			path: tests/DatabaseIntegration/AwardHistoryRepositoryTest.php
 
 		-
 			rawMessage: Casting to int something that's already int.
@@ -1715,18 +1697,6 @@ parameters:
 			path: tests/OneOnOneGame/OneOnOneGameEngineTest.php
 
 		-
-			rawMessage: 'Parameter #1 $player1Data of method OneOnOneGame\OneOnOneGameEngine::simulateGame() expects array{pid: int, name: string, oo: int, r_drive_off: int, po: int, od: int, dd: int, pd: int, ...}, array<string, mixed> given.'
-			identifier: argument.type
-			count: 12
-			path: tests/OneOnOneGame/OneOnOneGameEngineTest.php
-
-		-
-			rawMessage: 'Parameter #2 $player2Data of method OneOnOneGame\OneOnOneGameEngine::simulateGame() expects array{pid: int, name: string, oo: int, r_drive_off: int, po: int, od: int, dd: int, pd: int, ...}, array<string, mixed> given.'
-			identifier: argument.type
-			count: 12
-			path: tests/OneOnOneGame/OneOnOneGameEngineTest.php
-
-		-
 			rawMessage: 'Call to method PHPUnit\Framework\Assert::assertInstanceOf() with ''BaseMysqliRepository'' and OneOnOneGame\OneOnOneGameRepository will always evaluate to true.'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -2497,12 +2467,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: tests/UI/Tables/PlayerRowTransformerTest.php
-
-		-
-			rawMessage: 'Parameter #1 $row of method Api\Transformer\InjuryTransformer::transform() expects array{player_uuid: string, pid: int, name: string, pos: string, injured: int, teamid: int|null, team_uuid: string|null, team_city: string|null, ...}, array<string, mixed> given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Unit/Api/ApiContractTest.php
 
 		-
 			rawMessage: 'Parameter #1 $row of method Api\Transformer\TeamTransformer::transformDetail() expects array{teamid: int, uuid: string, team_city: string, team_name: string, owner_name: string, arena: string, conference: string|null, division: string|null, ...}, array<string, mixed> given.'

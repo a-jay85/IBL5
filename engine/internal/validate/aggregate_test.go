@@ -79,3 +79,37 @@ func TestMean(t *testing.T) {
 		t.Errorf("mean(nil) = %v, want empty", got)
 	}
 }
+
+// pts builds a slice of TeamStats carrying only points, one per seeded run.
+func pts(points ...int) []TeamStat {
+	out := make([]TeamStat, len(points))
+	for i, p := range points {
+		out[i] = TeamStat{Points: p}
+	}
+	return out
+}
+
+func TestHomeWinFraction(t *testing.T) {
+	cases := []struct {
+		name      string
+		home, vis []TeamStat
+		want      float64
+	}{
+		{"all home wins", pts(110, 100, 95), pts(100, 90, 80), 1.0},
+		{"all visitor wins", pts(90, 80), pts(100, 95), 0.0},
+		{"three of five home", pts(101, 101, 101, 99, 99), pts(100, 100, 100, 100, 100), 0.6},
+		// run0 ties (100==100 → 0.5), run1 home wins (110>100 → 1.0) → 1.5/2.
+		{"tie counts half", pts(100, 110), pts(100, 100), 0.75},
+		// n==0 guard (unreachable in the harness, runs>=1): no information → 0.5.
+		{"empty guard", nil, nil, 0.5},
+		// mismatched lengths pair by the shorter (only run0 compared: 110>100).
+		{"pairs by min length", pts(110, 90), pts(100), 1.0},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := homeWinFraction(c.home, c.vis); got != c.want {
+				t.Errorf("homeWinFraction = %v, want %v", got, c.want)
+			}
+		})
+	}
+}

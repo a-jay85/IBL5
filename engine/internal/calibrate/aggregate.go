@@ -66,12 +66,14 @@ type GameTypeCalibration struct {
 // CalibrationReport is the full calibrate-mode output: proposed per-game-type
 // bands derived at the requested residual coverage. Buckets are sorted by game
 // type for determinism. HomeMargins carries the per-game-type home-court-margin
-// readout (the HCA fidelity signal); it rides along on the same run so one
-// calibrate pass yields both bands and margins.
+// readout (the HCA fidelity signal) and SeasonAggregates carries the team-level
+// season standings/pace fidelity readout; both ride along on the same run so one
+// calibrate pass yields bands, margins, and season aggregates.
 type CalibrationReport struct {
-	Coverage    float64                 `json:"coverage"`
-	Buckets     []GameTypeCalibration   `json:"buckets"`
-	HomeMargins []HomeMarginCalibration `json:"home_margins"`
+	Coverage         float64                 `json:"coverage"`
+	Buckets          []GameTypeCalibration   `json:"buckets"`
+	HomeMargins      []HomeMarginCalibration `json:"home_margins"`
+	SeasonAggregates SeasonAggregateReport   `json:"season_aggregates"`
 }
 
 // Calibrate derives, per (game type, stat), a tolerance band whose absolute
@@ -95,6 +97,7 @@ func Calibrate(reports []validate.Report, coverage float64) CalibrationReport {
 		rep.Buckets = append(rep.Buckets, gc)
 	}
 	rep.HomeMargins = CollectHomeMargins(reports)
+	rep.SeasonAggregates = CollectSeasonAggregates(reports)
 	return rep
 }
 

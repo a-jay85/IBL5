@@ -158,6 +158,7 @@ func collectSeasonReports(seasons []season, opts Options, validateFn, validateUn
 			skips = append(skips, *skip)
 			continue
 		}
+		rep.Label = s.name
 		_, _ = fmt.Fprintf(progress, "regular %s games=%d\n", s.regularZip, len(rep.Games))
 		reports = append(reports, *rep)
 
@@ -170,6 +171,7 @@ func collectSeasonReports(seasons []season, opts Options, validateFn, validateUn
 				skips = append(skips, *pskip)
 				continue
 			}
+			prep.Label = s.name + " (playoffs)"
 			_, _ = fmt.Fprintf(progress, "playoff %s games=%d excluded=%d\n", s.finalsZip, len(prep.Games), len(prep.Excluded))
 			reports = append(reports, *prep)
 		}

@@ -165,3 +165,26 @@ func TestGate_PassesAtOrAboveMinRate(t *testing.T) {
 		t.Errorf("gate should PASS when every stat is 100%% in band: %+v", res.Buckets)
 	}
 }
+
+// Row #12: calibrate also surfaces the team-level season aggregates (standings
+// detail + per-game-type residuals) from the same run as bands + home-margins.
+func TestCalibrate_PopulatesSeasonAggregates(t *testing.T) {
+	rep := Calibrate([]validate.Report{
+		aggReport("04-05", bundle.GameTypeRegular, wfGame(7, 3, 0.6, 105, 108, 100, 99)),
+	}, 0.95)
+
+	if len(rep.SeasonAggregates.Seasons) != 1 {
+		t.Fatalf("Seasons len = %d, want 1: %+v", len(rep.SeasonAggregates.Seasons), rep.SeasonAggregates.Seasons)
+	}
+	sa := rep.SeasonAggregates.Seasons[0]
+	if sa.Label != "04-05" || sa.GameType != int(bundle.GameTypeRegular) {
+		t.Errorf("season header = %+v, want label 04-05 / regular", sa)
+	}
+	if len(rep.SeasonAggregates.Residuals) != 1 || rep.SeasonAggregates.Residuals[0].GameType != int(bundle.GameTypeRegular) {
+		t.Errorf("residuals = %+v, want one regular bucket", rep.SeasonAggregates.Residuals)
+	}
+	// Bands and home-margins are surfaced from the same call.
+	if len(rep.Buckets) != 1 || len(rep.HomeMargins) != 1 {
+		t.Errorf("expected bands + home-margins from the same call: buckets=%d margins=%d", len(rep.Buckets), len(rep.HomeMargins))
+	}
+}

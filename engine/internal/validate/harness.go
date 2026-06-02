@@ -15,7 +15,9 @@ import (
 )
 
 // ErrNoCorpus reports a corpus directory that contains no complete
-// .plr/.sch/.sco triple — an empty dir, or files that do not share a stem.
+// .plr/.sch/.sco triple — an empty dir, or files that do not share a stem. The
+// .plb depth-chart file is an OPTIONAL fourth member (supplies per-player
+// dc_minutes); its absence is reported via Report.MissingPlb, never required.
 var ErrNoCorpus = errors.New("validate: no .plr/.sch/.sco triple found in corpus dir")
 
 // UnmatchedGame is a .sco ground-truth game that could not be paired with a
@@ -58,14 +60,21 @@ type Report struct {
 	Games     []GameReport
 	Unmatched []UnmatchedGame
 	Excluded  []ExcludedGame
+	// MissingPlb lists the stems whose snapshot had no .plb depth chart, so every
+	// player's dc_minutes defaulted to 0. Reported for visibility (never silently
+	// zeroed); it does NOT affect Pass — a snapshot is still validatable on team
+	// stats without the per-player minutes signal.
+	MissingPlb []string
 }
 
-// triple names one backup file set sharing a stem within the corpus dir.
+// triple names one backup file set sharing a stem within the corpus dir. plr/
+// sch/sco are required; plb is the optional depth-chart member ("" if absent).
 type triple struct {
 	stem string
 	plr  string
 	sch  string
 	sco  string
+	plb  string
 }
 
 // findTriples groups the .plr/.sch/.sco files in dir by shared stem and returns
@@ -99,6 +108,8 @@ func findTriples(dir string) ([]triple, error) {
 			get(stem).sch = full
 		case ".sco":
 			get(stem).sco = full
+		case ".plb":
+			get(stem).plb = full
 		}
 	}
 	stems := make([]string, 0, len(byStem))
@@ -135,11 +146,35 @@ func readTriple(t triple, gameType bundle.GameType) (bundle.Bundle, []backup.Sch
 	if err != nil {
 		return bundle.Bundle{}, nil, nil, err
 	}
-	b, err := backup.ToBundle(players, sched, backup.AssembleOptions{GameType: gameType})
+	// The .plb is optional; a missing one yields a nil map -> dc_minutes 0.
+	var minutes map[int]int
+	if t.plb != "" {
+		minutes, err = readPlb(t.plb)
+		if err != nil {
+			return bundle.Bundle{}, nil, nil, err
+		}
+	}
+	b, err := backup.ToBundle(players, sched, backup.AssembleOptions{GameType: gameType, Minutes: minutes})
 	if err != nil {
 		return bundle.Bundle{}, nil, nil, fmt.Errorf("validate: assemble %q: %w", t.stem, err)
 	}
 	return b, sched, scoGames, nil
+}
+
+// readPlb opens a .plb depth-chart file and parses it into an ordinal->minutes
+// map. It cannot use the generic readFile helper (which returns []T); the
+// error-wrapping mirrors readFile so a malformed .plb is diagnosable by path.
+func readPlb(path string) (map[int]int, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("validate: open %q: %w", path, err)
+	}
+	defer func() { _ = f.Close() }()
+	m, err := backup.ReadPlb(f)
+	if err != nil {
+		return nil, fmt.Errorf("validate: parse %q: %w", path, err)
+	}
+	return m, nil
 }
 
 // readFile opens path and applies a backup reader, wrapping any error with the
@@ -187,6 +222,9 @@ func ValidateCorpus(dir string, runs int, baseSeed uint64, gameType bundle.GameT
 		b, sched, scoGames, err := readTriple(t, gameType)
 		if err != nil {
 			return Report{}, err
+		}
+		if t.plb == "" {
+			rep.MissingPlb = append(rep.MissingPlb, t.stem)
 		}
 		consumed := make([]bool, len(sched))
 		for _, sg := range scoGames {
@@ -250,6 +288,9 @@ func ValidateUnscheduled(dir string, runs int, baseSeed uint64, gameType bundle.
 		b, sched, scoGames, err := readTriple(t, gameType)
 		if err != nil {
 			return Report{}, err
+		}
+		if t.plb == "" {
+			rep.MissingPlb = append(rep.MissingPlb, t.stem)
 		}
 		hasLineup := lineupTeams(b)
 		consumed := make([]bool, len(sched))

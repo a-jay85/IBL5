@@ -363,3 +363,68 @@ func TestValidateUnscheduled_GuardsAndEmptyDir(t *testing.T) {
 		t.Fatalf("empty dir error = %v, want ErrNoCorpus", err)
 	}
 }
+
+// writePlb writes a minimal valid .plb (one 360-char line) at path. Content is
+// irrelevant to findTriples (which groups by extension) and parses to all-zero
+// minutes for ReadPlb; the valid length keeps it from being skipped as padding.
+func writePlb(t *testing.T, path string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(strings.Repeat("0", 360)), 0o644); err != nil {
+		t.Fatalf("write .plb: %v", err)
+	}
+}
+
+// Row 8: findTriples returns a complete triple with plb=="" when no .plb is
+// present, and picks up the .plb path once one sharing the stem is added.
+func TestFindTriples_PlbOptional(t *testing.T) {
+	dir := t.TempDir()
+	buildCorpus(t, dir, true, testRuns, 1)
+
+	triples, err := findTriples(dir)
+	if err != nil {
+		t.Fatalf("findTriples: %v", err)
+	}
+	if len(triples) != 1 {
+		t.Fatalf("triples = %d, want 1", len(triples))
+	}
+	if triples[0].plb != "" {
+		t.Errorf("plb = %q, want empty (no .plb yet)", triples[0].plb)
+	}
+
+	writePlb(t, dir+"/synth.plb")
+	triples, err = findTriples(dir)
+	if err != nil {
+		t.Fatalf("findTriples after .plb: %v", err)
+	}
+	if len(triples) != 1 {
+		t.Fatalf("triples = %d, want 1", len(triples))
+	}
+	if triples[0].plb == "" {
+		t.Error("plb path empty after writing synth.plb")
+	}
+}
+
+// Row 9: a snapshot missing its .plb is reported in Report.MissingPlb (rendered
+// as a MISSING_PLB line) and validation still runs with zero minutes — the
+// missing depth chart does NOT force the report to FAIL.
+func TestValidateCorpus_MissingPlbReported(t *testing.T) {
+	dir := t.TempDir()
+	const seed = uint64(2000)
+	buildCorpus(t, dir, true, testRuns, seed) // in-band, no .plb
+
+	rep, err := ValidateCorpus(dir, testRuns, seed, bundle.GameTypeRegular)
+	if err != nil {
+		t.Fatalf("ValidateCorpus: %v", err)
+	}
+	if len(rep.MissingPlb) != 1 || rep.MissingPlb[0] != "synth" {
+		t.Fatalf("MissingPlb = %v, want [synth]", rep.MissingPlb)
+	}
+	if !rep.Pass {
+		t.Error("a missing .plb must NOT force FAIL (in-band corpus should still pass)")
+	}
+	var buf bytes.Buffer
+	WriteReport(&buf, rep)
+	if !strings.Contains(buf.String(), "MISSING_PLB stem=synth") {
+		t.Errorf("report should render a MISSING_PLB line:\n%s", buf.String())
+	}
+}

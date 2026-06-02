@@ -174,6 +174,42 @@ func TestExtractTriple_ZipSlipSafe(t *testing.T) {
 	}
 }
 
+// Row 10: IBL5.plb is extracted when present, but it is OPTIONAL — a zip lacking
+// it still yields found=true (only the .plr/.sch/.sco triple is required).
+func TestExtractTriple_PlbOptional(t *testing.T) {
+	// (a) zip WITH a .plb: extracted, found=true.
+	withPlb := fullTriple()
+	withPlb["IBL5.plb"] = "plb-bytes"
+	zipA := filepath.Join(t.TempDir(), "with_reg-sim.zip")
+	makeZip(t, zipA, withPlb)
+	destA := t.TempDir()
+	found, err := extractTriple(zipA, destA)
+	if err != nil {
+		t.Fatalf("extractTriple with .plb: %v", err)
+	}
+	if !found {
+		t.Error("found = false, want true (required triple present)")
+	}
+	if _, err := os.Stat(filepath.Join(destA, "IBL5.plb")); err != nil {
+		t.Errorf("IBL5.plb should be extracted when present: %v", err)
+	}
+
+	// (b) zip WITHOUT a .plb: still found=true, and no .plb written.
+	zipB := filepath.Join(t.TempDir(), "without_reg-sim.zip")
+	makeZip(t, zipB, fullTriple())
+	destB := t.TempDir()
+	found, err = extractTriple(zipB, destB)
+	if err != nil {
+		t.Fatalf("extractTriple without .plb: %v", err)
+	}
+	if !found {
+		t.Error("found = false, want true (.plb is optional)")
+	}
+	if _, err := os.Stat(filepath.Join(destB, "IBL5.plb")); !os.IsNotExist(err) {
+		t.Errorf("IBL5.plb should be absent, stat err = %v", err)
+	}
+}
+
 // Row (sample-stride): with stride 2 over four qualifying zips, only the 1st and
 // 3rd are processed.
 func TestCollectReports_SampleStride(t *testing.T) {

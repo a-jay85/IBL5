@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-06-01
+last_verified: 2026-06-02
 ---
 
 # Post-Plan Orchestrator
@@ -30,6 +30,26 @@ fi
 ```
 
 Phase 2 makes the initial commit and opens the PR. Phases that may modify files after Phase 2 (Phase 4D follow-up fixes if review identifies real bugs, Phase 5 fix-and-rerun loops, Phase 6 test writing, Phase 7 CI fixes) MUST checkpoint before continuing. The squash-merge armed in Phase 6.5 collapses the chain.
+
+---
+
+## Phase 0: Fresh-Session Cost Advisory (interactive only, non-blocking)
+
+The single exception to the "never stop or ask" rule above is that this phase may emit **one** advisory line — it still does **not** stop, wait, or return control. Run the gate, emit at most one line, then continue straight into Phase 1.
+
+```bash
+# Interactive only. In nightly/headless mode this skill is already invoked as a
+# fresh `claude -p` session (the cheap path), so the advisory must NEVER fire there.
+[ -n "$CLAUDE_HEADLESS" ] && echo "ADVISORY=skip-headless" || echo "ADVISORY=eligible-interactive"
+```
+
+If `ADVISORY=skip-headless`, skip this phase entirely and go to Phase 1.
+
+Otherwise, self-assess the one thing only you can know: **did you perform a substantial implementation earlier in this same conversation** (you wrote the code across many turns and/or multiple files), rather than opening this session fresh just to run post-plan? Every phase below re-pays cache-read on that whole implementation context, so an inline run after a long session costs several times a fresh one. If so — and only if so — emit exactly this line, then continue:
+
+> 💡 Large in-session context detected — post-plan re-reads it on every phase. To save roughly half the cost on big sessions, you can interrupt now and re-run `/post-plan` in a **fresh** session on this branch (it auto-resolves the plan from the slug and fetches the diff itself). Continuing in this session…
+
+Do **not** wait for a response, and do **not** abort on your own — the human decides. If the implementation was trivial, or this is already a fresh post-plan-only session, emit nothing and proceed silently. Either way, fall through to Phase 1 in the same response.
 
 ---
 

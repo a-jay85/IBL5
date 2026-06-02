@@ -1,0 +1,327 @@
+{
+  "coverage": 0.95,
+  "buckets": [
+    {
+      "game_type": 2,
+      "stats": [
+        {
+          "stat": "points",
+          "n": 35782,
+          "mean_engine": 93.94234307752554,
+          "p50_abs_resid": 23.799999999999997,
+          "p90_abs_resid": 42.16,
+          "p95_abs_resid": 47.2,
+          "p99_abs_resid": 57.34,
+          "proposed_rel_pct": 0.5127745405647692,
+          "proposed_abs_floor": 48,
+          "in_band_rate": 0.9588899446649153
+        },
+        {
+          "stat": "fgm",
+          "n": 35782,
+          "mean_engine": 43.28254932647729,
+          "p50_abs_resid": 5.439999999999998,
+          "p90_abs_resid": 12.560000000000002,
+          "p95_abs_resid": 14.719999999999999,
+          "p99_abs_resid": 19.04,
+          "proposed_rel_pct": 0.34383688600556084,
+          "proposed_abs_floor": 15,
+          "in_band_rate": 0.9577161701414119
+        },
+        {
+          "stat": "fga",
+          "n": 35782,
+          "mean_engine": 92.86439885976131,
+          "p50_abs_resid": 8.519999999999996,
+          "p90_abs_resid": 19.480000000000004,
+          "p95_abs_resid": 22.900000000000006,
+          "p99_abs_resid": 29.739999999999995,
+          "proposed_rel_pct": 0.2518958803033408,
+          "proposed_abs_floor": 23,
+          "in_band_rate": 0.9548935218825108
+        },
+        {
+          "stat": "ftm",
+          "n": 35782,
+          "mean_engine": 3.149756302051271,
+          "p50_abs_resid": 12.36,
+          "p90_abs_resid": 21.34,
+          "p95_abs_resid": 24.240000000000002,
+          "p99_abs_resid": 29.759999999999998,
+          "proposed_rel_pct": 7.843537414965986,
+          "proposed_abs_floor": 25,
+          "in_band_rate": 0.9669945782795819
+        },
+        {
+          "stat": "fta",
+          "n": 35782,
+          "mean_engine": 4.203962886367471,
+          "p50_abs_resid": 15.82,
+          "p90_abs_resid": 26.72,
+          "p95_abs_resid": 30.1,
+          "p99_abs_resid": 36.74,
+          "proposed_rel_pct": 7.293838862559243,
+          "proposed_abs_floor": 31,
+          "in_band_rate": 0.9653736515566486
+        },
+        {
+          "stat": "tgm",
+          "n": 35782,
+          "mean_engine": 4.227488122519688,
+          "p50_abs_resid": 2.34,
+          "p90_abs_resid": 6.12,
+          "p95_abs_resid": 7.38,
+          "p99_abs_resid": 9.84,
+          "proposed_rel_pct": 1.8350515463917527,
+          "proposed_abs_floor": 8,
+          "in_band_rate": 0.9752389469565703
+        },
+        {
+          "stat": "tga",
+          "n": 35782,
+          "mean_engine": 12.112342518584864,
+          "p50_abs_resid": 5,
+          "p90_abs_resid": 11.5,
+          "p95_abs_resid": 13.58,
+          "p99_abs_resid": 18,
+          "proposed_rel_pct": 1.203065134099617,
+          "proposed_abs_floor": 14,
+          "in_band_rate": 0.9703202727628416
+        },
+        {
+          "stat": "reb",
+          "n": 35782,
+          "mean_engine": 49.58184953328476,
+          "p50_abs_resid": 5.140000000000001,
+          "p90_abs_resid": 12.68,
+          "p95_abs_resid": 15.200000000000003,
+          "p99_abs_resid": 20.200000000000003,
+          "proposed_rel_pct": 0.3074484944532489,
+          "proposed_abs_floor": 16,
+          "in_band_rate": 0.9637247778212509
+        },
+        {
+          "stat": "ast",
+          "n": 35782,
+          "mean_engine": 0,
+          "p50_abs_resid": 20,
+          "p90_abs_resid": 28,
+          "p95_abs_resid": 31,
+          "p99_abs_resid": 35,
+          "proposed_rel_pct": 0.15,
+          "proposed_abs_floor": 31,
+          "in_band_rate": 0.9629143144597843
+        },
+        {
+          "stat": "stl",
+          "n": 35782,
+          "mean_engine": 15.560174389357753,
+          "p50_abs_resid": 7.16,
+          "p90_abs_resid": 11.58,
+          "p95_abs_resid": 12.64,
+          "p99_abs_resid": 14.48,
+          "proposed_rel_pct": 0.7986577181208053,
+          "proposed_abs_floor": 13,
+          "in_band_rate": 0.9698451735509475
+        },
+        {
+          "stat": "tov",
+          "n": 35782,
+          "mean_engine": 28.28834665474256,
+          "p50_abs_resid": 14.559999999999999,
+          "p90_abs_resid": 20.46,
+          "p95_abs_resid": 22.08,
+          "p99_abs_resid": 24.78,
+          "proposed_rel_pct": 0.7447118891320205,
+          "proposed_abs_floor": 23,
+          "in_band_rate": 0.9721088815605612
+        },
+        {
+          "stat": "blk",
+          "n": 35782,
+          "mean_engine": 0.982189927896706,
+          "p50_abs_resid": 4.58,
+          "p90_abs_resid": 8.94,
+          "p95_abs_resid": 10.26,
+          "p99_abs_resid": 13.18,
+          "proposed_rel_pct": 9.15625,
+          "proposed_abs_floor": 11,
+          "in_band_rate": 0.9734223911463864
+        },
+        {
+          "stat": "pf",
+          "n": 35782,
+          "mean_engine": 4.033671678497572,
+          "p50_abs_resid": 14.34,
+          "p90_abs_resid": 20.7,
+          "p95_abs_resid": 22.5,
+          "p99_abs_resid": 26.2,
+          "proposed_rel_pct": 5.75,
+          "proposed_abs_floor": 23,
+          "in_band_rate": 0.9668827902297245
+        }
+      ]
+    },
+    {
+      "game_type": 4,
+      "stats": [
+        {
+          "stat": "points",
+          "n": 2184,
+          "mean_engine": 93.06518315018334,
+          "p50_abs_resid": 23.319999999999993,
+          "p90_abs_resid": 40.620000000000005,
+          "p95_abs_resid": 45.36,
+          "p99_abs_resid": 54.7,
+          "proposed_rel_pct": 0.4997744700045105,
+          "proposed_abs_floor": 46,
+          "in_band_rate": 0.9610805860805861
+        },
+        {
+          "stat": "fgm",
+          "n": 2184,
+          "mean_engine": 42.97086996336996,
+          "p50_abs_resid": 5.119999999999997,
+          "p90_abs_resid": 11.899999999999999,
+          "p95_abs_resid": 13.979999999999997,
+          "p99_abs_resid": 18.42,
+          "proposed_rel_pct": 0.326579835986493,
+          "proposed_abs_floor": 14,
+          "in_band_rate": 0.9546703296703297
+        },
+        {
+          "stat": "fga",
+          "n": 2184,
+          "mean_engine": 91.17488095238117,
+          "p50_abs_resid": 8.540000000000006,
+          "p90_abs_resid": 19.180000000000007,
+          "p95_abs_resid": 22.299999999999997,
+          "p99_abs_resid": 28.099999999999994,
+          "proposed_rel_pct": 0.24943719045475007,
+          "proposed_abs_floor": 23,
+          "in_band_rate": 0.9587912087912088
+        },
+        {
+          "stat": "ftm",
+          "n": 2184,
+          "mean_engine": 3.1111355311355333,
+          "p50_abs_resid": 12.52,
+          "p90_abs_resid": 21.46,
+          "p95_abs_resid": 24.3,
+          "p99_abs_resid": 30.34,
+          "proposed_rel_pct": 8.027777777777779,
+          "proposed_abs_floor": 25,
+          "in_band_rate": 0.9661172161172161
+        },
+        {
+          "stat": "fta",
+          "n": 2184,
+          "mean_engine": 4.143992673992675,
+          "p50_abs_resid": 16.22,
+          "p90_abs_resid": 26.52,
+          "p95_abs_resid": 30.02,
+          "p99_abs_resid": 36.96,
+          "proposed_rel_pct": 7.413461538461538,
+          "proposed_abs_floor": 31,
+          "in_band_rate": 0.9684065934065934
+        },
+        {
+          "stat": "tgm",
+          "n": 2184,
+          "mean_engine": 4.012307692307686,
+          "p50_abs_resid": 2.04,
+          "p90_abs_resid": 5.6,
+          "p95_abs_resid": 6.82,
+          "p99_abs_resid": 9.34,
+          "proposed_rel_pct": 1.777777777777778,
+          "proposed_abs_floor": 7,
+          "in_band_rate": 0.9702380952380952
+        },
+        {
+          "stat": "tga",
+          "n": 2184,
+          "mean_engine": 11.494963369963392,
+          "p50_abs_resid": 4.5600000000000005,
+          "p90_abs_resid": 11.14,
+          "p95_abs_resid": 12.86,
+          "p99_abs_resid": 17.6,
+          "proposed_rel_pct": 1.2239263803680982,
+          "proposed_abs_floor": 13,
+          "in_band_rate": 0.9720695970695971
+        },
+        {
+          "stat": "reb",
+          "n": 2184,
+          "mean_engine": 48.204010989010975,
+          "p50_abs_resid": 5.119999999999997,
+          "p90_abs_resid": 12.240000000000002,
+          "p95_abs_resid": 14.780000000000001,
+          "p99_abs_resid": 19.92,
+          "proposed_rel_pct": 0.30748422001803427,
+          "proposed_abs_floor": 15,
+          "in_band_rate": 0.956959706959707
+        },
+        {
+          "stat": "ast",
+          "n": 2184,
+          "mean_engine": 0,
+          "p50_abs_resid": 20,
+          "p90_abs_resid": 28,
+          "p95_abs_resid": 31,
+          "p99_abs_resid": 37,
+          "proposed_rel_pct": 0.15,
+          "proposed_abs_floor": 31,
+          "in_band_rate": 0.9629120879120879
+        },
+        {
+          "stat": "stl",
+          "n": 2184,
+          "mean_engine": 15.231703296703257,
+          "p50_abs_resid": 6.26,
+          "p90_abs_resid": 10.8,
+          "p95_abs_resid": 12,
+          "p99_abs_resid": 13.6,
+          "proposed_rel_pct": 0.7575757575757576,
+          "proposed_abs_floor": 12,
+          "in_band_rate": 0.9610805860805861
+        },
+        {
+          "stat": "tov",
+          "n": 2184,
+          "mean_engine": 27.722545787545773,
+          "p50_abs_resid": 14,
+          "p90_abs_resid": 19.9,
+          "p95_abs_resid": 21.34,
+          "p99_abs_resid": 23.84,
+          "proposed_rel_pct": 0.7461928934010152,
+          "proposed_abs_floor": 22,
+          "in_band_rate": 0.9734432234432234
+        },
+        {
+          "stat": "blk",
+          "n": 2184,
+          "mean_engine": 1.0292765567765576,
+          "p50_abs_resid": 5,
+          "p90_abs_resid": 9.56,
+          "p95_abs_resid": 10.94,
+          "p99_abs_resid": 13.44,
+          "proposed_rel_pct": 9.576923076923077,
+          "proposed_abs_floor": 11,
+          "in_band_rate": 0.9674908424908425
+        },
+        {
+          "stat": "pf",
+          "n": 2184,
+          "mean_engine": 3.985119047619051,
+          "p50_abs_resid": 14.52,
+          "p90_abs_resid": 20.88,
+          "p95_abs_resid": 22.6,
+          "p99_abs_resid": 25.96,
+          "proposed_rel_pct": 5.914893617021278,
+          "proposed_abs_floor": 23,
+          "in_band_rate": 0.9661172161172161
+        }
+      ]
+    }
+  ]
+}

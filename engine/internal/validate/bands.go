@@ -9,59 +9,93 @@ type Band struct {
 	AbsFloor float64 // absolute floor so small means still get a usable band
 }
 
-// placeholderBands is the per-stat starting tolerance, shared across every game
-// type until corpus calibration replaces it (see the box below).
-//
 // ┌──────────────────────────────────────────────────────────────────────────┐
-// │ STARTING BANDS — NOT AUTHORITATIVE. These ±15% relative / per-stat floor   │
-// │ values are a defensible placeholder, NOT grounded in measured corpus       │
-// │ variance. They MUST be calibrated by running `jsbcalibrate` against the    │
-// │ real 5.60 backup archive (ibl5/backups) and widening/tightening each band  │
-// │ to absorb (a) the single-.sco-draw sampling noise (one .sco line is one    │
-// │ draw from jumpshot.exe's own distribution) AND (b) the engine-vs-jumpshot  │
-// │ model gap, WITHOUT making any band so wide it can never fail. Until         │
-// │ calibrated, the tagged corpus suite is a DIAGNOSTIC, not a merge gate.     │
+// │ CALIBRATED BANDS — provenance below. These are NOT a fidelity proof.       │
 // │                                                                            │
-// │ Note also: the backup-driven sim runs with no per-player minutes/stamina   │
-// │ signal (the .plr carries none — see backup.ToBundle), so the engine-side   │
-// │ distribution is wider than a DB-driven sim's; the bands must absorb that   │
-// │ too.                                                                       │
+// │ Derived by running jsbcalibrate in --mode calibrate against the real 5.60  │
+// │ backup archive and transcribing the proposed per-game-type bands:          │
+// │                                                                            │
+// │   engine git SHA : eee188415be48489ca91e4f650f1f1ec232a0dd3 (master base)  │
+// │   seed           : 20240601                                                │
+// │   coverage       : 0.95 (bands cover the 95th abs-residual percentile)     │
+// │   selection      : season  (one clean regular snapshot/season + playoffs)  │
+// │   runs           : 50       (seeded engine runs per corpus game)           │
+// │   sample-stride  : 1        (every selected season; ~20 seasons)           │
+// │   corpus         : ibl5/backups (olympics excluded)                        │
+// │   date           : 2026-06-01                                              │
+// │   n observations : 35782 regular (gt 2), 2184 playoff (gt 4)               │
+// │                                                                            │
+// │ Audit artifact (the raw CalibrationReport JSON) is committed at            │
+// │   internal/validate/testdata/calibration-5.60-20240601.json                │
+// │ for documentation ONLY. The band VALUES live hardcoded in this file;       │
+// │ nothing reads that JSON at runtime. Re-running calibration regenerates     │
+// │ the JSON; the literals below must then be re-transcribed by hand.          │
+// │                                                                            │
+// │ HCA CAVEAT: bands are calibrated against the CURRENT engine, which has NO  │
+// │ home-court advantage. RE-CALIBRATE when HCA lands.                         │
+// │                                                                            │
+// │ DOCUMENTED CURRENT GAP (AbsFloor > engine mean — band is wide because the  │
+// │ engine under-models the stat at this build stage, NOT a useful tolerance): │
+// │ ftm, fta, tgm, tga, ast, blk, pf. In particular `ast` is structurally 0 in │
+// │ the engine (commentary-only, master-reference L1098), so its band absorbs  │
+// │ the full .sco assist total as the gap. These wide bands are the recorded   │
+// │ baseline of the engine-vs-jumpshot model gap; band WIDTH is the fidelity   │
+// │ signal, and the bands tighten as the engine matures.                       │
 // └──────────────────────────────────────────────────────────────────────────┘
-var placeholderBands = map[string]Band{
-	"points": {RelPct: 0.15, AbsFloor: 8},
-	"fgm":    {RelPct: 0.15, AbsFloor: 5},
-	"fga":    {RelPct: 0.15, AbsFloor: 6},
-	"ftm":    {RelPct: 0.15, AbsFloor: 3},
-	"fta":    {RelPct: 0.15, AbsFloor: 4},
-	"tgm":    {RelPct: 0.15, AbsFloor: 3},
-	"tga":    {RelPct: 0.15, AbsFloor: 4},
-	"reb":    {RelPct: 0.15, AbsFloor: 4},
-	"ast":    {RelPct: 0.15, AbsFloor: 4},
-	"stl":    {RelPct: 0.15, AbsFloor: 3},
-	"tov":    {RelPct: 0.15, AbsFloor: 3},
-	"blk":    {RelPct: 0.15, AbsFloor: 3},
-	"pf":     {RelPct: 0.15, AbsFloor: 4},
+
+// regularBands holds the calibrated regular-season (game_type 2) tolerances.
+var regularBands = map[string]Band{
+	"points": {RelPct: 0.512775, AbsFloor: 48},
+	"fgm":    {RelPct: 0.343837, AbsFloor: 15},
+	"fga":    {RelPct: 0.251896, AbsFloor: 23},
+	"ftm":    {RelPct: 7.843537, AbsFloor: 25},
+	"fta":    {RelPct: 7.293839, AbsFloor: 31},
+	"tgm":    {RelPct: 1.835052, AbsFloor: 8},
+	"tga":    {RelPct: 1.203065, AbsFloor: 14},
+	"reb":    {RelPct: 0.307448, AbsFloor: 16},
+	"ast":    {RelPct: 0.15, AbsFloor: 31},
+	"stl":    {RelPct: 0.798658, AbsFloor: 13},
+	"tov":    {RelPct: 0.744712, AbsFloor: 23},
+	"blk":    {RelPct: 9.15625, AbsFloor: 11},
+	"pf":     {RelPct: 5.75, AbsFloor: 23},
 }
 
-// bands is the SINGLE source of truth for tolerance calibration, now keyed by
-// game type: regular, playoff, and all-star ground truth differ systematically
-// (pace, defense, shot mix), so each game type carries its own band table.
-//
-// Every game type is currently seeded with an identical clone of
-// placeholderBands. The jsbcalibrate harness (cmd/jsbcalibrate) emits per-game-
-// type calibrated values derived from the real backup archive; replacing a game
-// type's entry with those values is a data-only follow-up edit. Edit ONLY this
-// table (or placeholderBands) to recalibrate.
+// playoffBands holds the calibrated playoff (game_type 4) tolerances.
+var playoffBands = map[string]Band{
+	"points": {RelPct: 0.499774, AbsFloor: 46},
+	"fgm":    {RelPct: 0.32658, AbsFloor: 14},
+	"fga":    {RelPct: 0.249437, AbsFloor: 23},
+	"ftm":    {RelPct: 8.027778, AbsFloor: 25},
+	"fta":    {RelPct: 7.413462, AbsFloor: 31},
+	"tgm":    {RelPct: 1.777778, AbsFloor: 7},
+	"tga":    {RelPct: 1.223926, AbsFloor: 13},
+	"reb":    {RelPct: 0.307484, AbsFloor: 15},
+	"ast":    {RelPct: 0.15, AbsFloor: 31},
+	"stl":    {RelPct: 0.757576, AbsFloor: 12},
+	"tov":    {RelPct: 0.746193, AbsFloor: 22},
+	"blk":    {RelPct: 9.576923, AbsFloor: 11},
+	"pf":     {RelPct: 5.914894, AbsFloor: 23},
+}
+
+// bands is the SINGLE source of truth for tolerance calibration, keyed by game
+// type. Regular and playoff carry their own calibrated tables; the alt/all-star
+// types inherit a copy of the calibrated Regular table (see buildBands).
 var bands = buildBands()
 
 func buildBands() map[bundle.GameType]map[string]Band {
-	out := make(map[bundle.GameType]map[string]Band)
+	out := map[bundle.GameType]map[string]Band{
+		bundle.GameTypeRegular: regularBands,
+		bundle.GameTypePlayoff: playoffBands,
+	}
+	// The season collector skips olympics and inferGameType never emits 5, so the
+	// corpus produces NO all-star/alt snapshots — these buckets are uncalibrated.
+	// They inherit a copy of the calibrated Regular table: non-authoritative,
+	// flagged for future calibration when an all-star/alt corpus exists.
 	for _, gt := range []bundle.GameType{
-		bundle.GameTypeRegular, bundle.GameTypeRegularAlt,
-		bundle.GameTypePlayoff, bundle.GameTypeAllStarA, bundle.GameTypeAllStarB,
+		bundle.GameTypeRegularAlt, bundle.GameTypeAllStarA, bundle.GameTypeAllStarB,
 	} {
-		m := make(map[string]Band, len(placeholderBands))
-		for k, v := range placeholderBands {
+		m := make(map[string]Band, len(regularBands))
+		for k, v := range regularBands {
 			m[k] = v
 		}
 		out[gt] = m

@@ -54,7 +54,7 @@ func TestOffQualityWithHCA_SubtractionSign(t *testing.T) {
 	home := offQualityWithHCA(off, hcaMagnitude)  // +0.2 per player → Σ shrinks
 	away := offQualityWithHCA(off, -hcaMagnitude) // −0.2 per player → Σ grows
 
-	wantNeutral := 5 * floor1(6) * offQualityRatingScale // 5 × 6 × 0.08 = 2.4
+	wantNeutral := 5 * floor1(6) * offQualityRatingScale // 5 × 6 × 0.059 = 1.77
 	if math.Abs(neutral-wantNeutral) > teamQualityEps {
 		t.Errorf("offQualityWithHCA(neutral) = %.4f, want %.4f", neutral, wantNeutral)
 	}
@@ -76,13 +76,13 @@ func TestOffQualityWithHCA_SubtractionSign(t *testing.T) {
 // --- matrix #3 (boundary): offQuality floor prevents a non-positive divisor --
 
 func TestOffQualityWithHCA_Floor(t *testing.T) {
-	// A single unrated player (floor1(0)=1 → 0.08) minus the +0.2 home delta is
+	// A single unrated player (floor1(0)=1 → 0.059) minus the +0.2 home delta is
 	// negative; the floor must clamp it to offQualityFloor so foul/offQ stays
 	// well-defined (no divide-by-zero, no sign flip).
 	one := []onCourt{oc(slotPG, mkPlayer(1, 3, slotPG, 0))}
 	one[0].OO = 0
 	got := offQualityWithHCA(one, hcaMagnitude)
-	raw := floor1(0)*offQualityRatingScale - hcaMagnitude // 0.08 − 0.2 = −0.12
+	raw := floor1(0)*offQualityRatingScale - hcaMagnitude // 0.059 − 0.2 = −0.141
 	if raw >= offQualityFloor {
 		t.Fatalf("test setup: raw %.4f should be below the floor %.4f", raw, offQualityFloor)
 	}

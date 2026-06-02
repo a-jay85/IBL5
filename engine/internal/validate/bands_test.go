@@ -76,8 +76,9 @@ func TestBandFor_UnknownStatGetsGenericBand(t *testing.T) {
 
 // Sanity-bound ceilings: generous round backstops against a decimal-place
 // transcription error from the calibration JSON — NOT a fidelity claim. The
-// landed maxima (2026-06-01 run) are RelPct≈9.58 and AbsFloor=48; these ceilings
-// sit well above so a misplaced decimal (e.g. 95.8 or 480) trips the test.
+// landed maxima (2026-06-02 post-HCA run) are RelPct≈10.32 (blk, gt 4) and
+// AbsFloor=48 (points, gt 2); these ceilings sit well above so a misplaced
+// decimal (e.g. 103.2 or 480) trips the test.
 const (
 	relCeiling      = 50.0
 	absFloorCeiling = 100.0

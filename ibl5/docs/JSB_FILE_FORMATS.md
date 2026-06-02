@@ -1,6 +1,6 @@
 ---
 description: Jump Shot Basketball binary file format specifications.
-last_verified: 2026-04-11
+last_verified: 2026-06-02
 ---
 
 # Jump Shot Basketball (JSB) Engine File Format Specifications
@@ -155,7 +155,7 @@ Backing for the JSB simulation engine's "real-life" tendencies — these are the
 | 135 | 1 | `PFDepth` |
 | 136 | 1 | `CDepth` |
 | 137 | 1 | `canPlayInGame` |
-| 138 | 2 | Unknown |
+| 138 | 2 | Matchup composite rating (0-99, engine default 50; loaded to struct +0x210, feeds matchup-quality calc FUN_004e3860). Parsed as `unk_138`. |
 | 140 | 4 | `injuryDaysLeft` |
 
 #### Season Stats (144-207) — reconstructed from `ibl_box_scores`

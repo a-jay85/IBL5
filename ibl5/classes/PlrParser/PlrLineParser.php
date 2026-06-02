@@ -72,7 +72,9 @@ class PlrLineParser implements PlrLineParserInterface
             'PFDepth' => (int) substr($line, 135, 1),
             'CDepth' => (int) substr($line, 136, 1),
             'canPlayInGame' => (int) substr($line, 137, 1),
-            // Unknown gap: offset 138-139 (2 bytes)
+            // Matchup composite rating: offset 138-139 (2 bytes), 0-99, engine default 50.
+            // Loaded to engine struct +0x210; feeds matchup-quality calc (FUN_004e3860).
+            // Key retained as unk_138 for backward compat with the parser repository/schema.
             'unk_138' => (int) substr($line, 138, 2),
             'injuryDaysLeft' => (int) substr($line, 140, 4),
             'seasonGamesStarted' => (int) substr($line, 144, 4),

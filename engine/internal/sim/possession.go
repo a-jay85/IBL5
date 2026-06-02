@@ -6,9 +6,11 @@ import "github.com/a-jay85/IBL5/engine/internal/result"
 // trip, guaranteeing the inner loop terminates even on a pathological roster.
 const maxOffensiveRebounds = 8
 
-// andOneBaseShare is the made-base term of the and-one bucket weight as a
-// fraction of the player's 2pt make value (and-ones are a small minority of
-// scoring plays). PR3a rating-derived stand-in for the per-game double +0xDE0.
+// andOneBaseShare is the made-base term of the OLD O(100) and-one bucket weight
+// (a fraction of the player's 2pt make value). The live buckets now use the
+// net-free O(1) helpers in bucketweights.go; this const is retained solely for
+// the pre-rescale characterization test (bucketweights_test.go), which
+// reconstructs the old assembly to document the O(100) HCA no-op.
 const andOneBaseShare = 0.05
 
 // turnoverPropensityScale maps a ball-handler's TVR rating to the turnover
@@ -82,21 +84,19 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPen
 		def := selectDefender(defense, pt, gs.rng)
 
 		penalty := positionPenalty(bh)
-		// Playoff net×1.25 lives in netAdvantage. NB: PR3a reuses sv2 (below) as
-		// BOTH the 2pt bucket weight AND the make-roll shot value, so the playoff
-		// multiplier amplifies the 2pt bucket weight too — whereas JSB feeds net
-		// only into shot_value (its 2pt bucket is the independent +0xD90 composite).
-		// Acceptable under the deferred bucket-EV calibration (ADR-0036); revisit
-		// when the play-outcome buckets are rescaled.
+		// Playoff net×1.25 lives in netAdvantage and feeds shot_value only — matching
+		// JSB, where net enters solely via shot_value (+0xD90 is an independent
+		// offensive-rate composite). The 2pt bucket weight is now net-free (see
+		// bucketweights.go), so the playoff multiplier no longer amplifies it.
 		net := netAdvantage(pt, bh, def, penalty, false, gs.gameType)
 		mq := matchupQuality(bh.FGP, bh.energy, defense.players) // live energy (inert under current curve)
 
 		sv2 := applyClutch(shotValue2pt(net, bh.FGP, false), bh.Clutch, gs.period, scoreDiff)
 		in := outcomeInputs{
-			twoPtWeight:      sv2 * bh.fatigue,
-			threePtWeight:    shotValue3pt() * bh.fatigue * threePtPropensity(bh),
-			andOneWeight:     mq*0.25 + base2pt(bh.FGP)*andOneBaseShare,
-			foulOnlyWeight:   (2.0 - bh.fatigue) * floor1(bh.Foul),
+			twoPtWeight:      twoPtBucketWeight(bh),
+			threePtWeight:    threePtBucketWeight(bh),
+			andOneWeight:     andOneBucketWeight(mq, bh),
+			foulOnlyWeight:   foulBucketWeight(net, bh),
 			turnoverDefValue: turnoverThreshold(bh.TVR) * turnoverThreshold(bh.TVR),
 		}
 

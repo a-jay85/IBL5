@@ -23,11 +23,15 @@ const turnoverDenom = 1793.0 // rand_int(1,1793) ≤ sqrt(def_value) → turnove
 
 // outcomeInputs holds the four play-outcome bucket weights plus the turnover
 // defensive value. In JSB these are copied ball-handler per-game doubles
-// (+0xD90 / +0xDB0 / +0xDE0 / +0xDF8) populated by per-half setup. PR3a has no
-// per-game doubles, so each is a documented rating-derived stand-in (assembled
-// in possession.go): 2pt = shot_value₂×fatigue, 3pt = shot_value₃×fatigue×3pt-
-// propensity, and-one = matchup_quality×0.25 + made-base, foul = (2−fatigue)×
-// defender-foul. The turnover value derives from ball-handler ball-security.
+// (+0xD90 / +0xDB0 / +0xDE0 / +0xDF8) populated by per-half setup. The engine has
+// no per-game doubles, so each is a documented rating-derived stand-in on a
+// comparable O(1) basis (assembled in possession.go via bucketweights.go):
+// 2pt ≈0.75 net-free FGA/ORB/FTA composite (dominant — field goals stay the
+// majority path), 3pt ≈0.17 folded 3pt-propensity, and-one ≈0.035 matchup_quality
+// ×0.25 + made-rate (floored 0.03), foul ≈0.05 floor + net term (the only bucket
+// consuming net — where a future HCA nudge lands). The four-bucket total is O(1),
+// which is what makes a ±0.2 HCA perturbation expressible (see bucketweights.go).
+// The turnover value derives from ball-handler ball-security (unchanged).
 type outcomeInputs struct {
 	twoPtWeight      float64
 	threePtWeight    float64

@@ -47,6 +47,8 @@ type ExcludedGame struct {
 
 // Report is the harness's full result over a corpus directory. Pass is true
 // only when every game's every stat passed AND no .sco game was left unmatched.
+// Excluded games (ValidateUnscheduled's rosterless sim-validity skips) are a
+// third outcome that does NOT affect Pass — they are reported for visibility.
 // Same (dir, runs, baseSeed, gameType) always yields an identical Report.
 type Report struct {
 	Runs      int

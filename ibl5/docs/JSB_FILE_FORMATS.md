@@ -139,9 +139,24 @@ Backing for the JSB simulation engine's "real-life" tendencies — these are the
 | 104 | 4 | `realLifeBLK` |
 | 108 | 4 | `realLifePF` |
 
-#### Unknown region (112-127)
+#### ODPT Ratings — Runtime Copy (112-127)
 
-16 bytes of unmapped data. Not parsed or written by any code today.
+8 × 2-byte fields. This is the **runtime-struct copy of the ODPT ratings** that
+also appear (grouped, for display/export) at offsets 591-607. Here they are
+stored **paired**: OO, OD, DO, DD, PO, PD, TO, TD. Verified against the 591-607
+block across all 657 `IBL5.plr` players (5238/5256 field comparisons match; the
+~18 exceptions are a few divergent records). Parsed as `unk_112`..`unk_126`.
+
+| Offset | Width | Field |
+|--------|-------|-------|
+| 112 | 2 | `ratingOO` (runtime copy) |
+| 114 | 2 | `ratingOD` (runtime copy) |
+| 116 | 2 | `ratingDO` (runtime copy) |
+| 118 | 2 | `ratingDD` (runtime copy) |
+| 120 | 2 | `ratingPO` (runtime copy) |
+| 122 | 2 | `ratingPD` (runtime copy) |
+| 124 | 2 | `ratingTO` (runtime copy) |
+| 126 | 2 | `ratingTD` (runtime copy) |
 
 #### Clutch / Consistency / Depth Chart (128-140)
 
@@ -222,16 +237,28 @@ Same structure as regular-season stats; reconstructed from `game_type = 2`.
 | 288 | 2 | `bird` |
 | 290 | 2 | `currentContractYear` (`cy`) |
 | 292 | 2 | `totalContractYears` (`cyt`) |
-| 294 | 4 | Unknown |
+| 294 | 2 | Development/peak-age metadata (`unk_294`) — see note below |
+| 296 | 2 | Development/peak-age metadata (`unk_296`) — see note below |
 | 298 | 4 | Contract salary year 1 (`cy1`) |
 | 302 | 4 | `cy2` |
 | 306 | 4 | `cy3` |
 | 310 | 4 | `cy4` |
 | 314 | 4 | `cy5` |
 | 318 | 4 | `cy6` |
-| 322 | 4 | Unknown |
+| 322 | 2 | Development/peak-age metadata (`unk_322`) — see note below |
+| 324 | 2 | Development/peak-age metadata (`unk_324`) — see note below |
 | 326 | 2 | `draftRound` |
 | 328 | 2 | `draftPickNumber` |
+
+**Development/peak-age metadata (294-296, 322-324):** These map to engine struct
+offsets in the +0x6BC..+0x714 region — development metadata (+0x700, default 1)
+and peak-age tracking (+0x6FC/+0x704/+0x714, where `+0x7D8 = (peak == current)`
+is the peak flag). They feed the off-season development engine (FUN_00467260)
+and aging model (FUN_00412700), **not** the per-possession simulation, and are
+not GM-controlled inputs. PLR byte boundaries here don't align cleanly to the
+IBL's 2-byte parse stride (the engine reads mixed 2/4-byte fields sequentially),
+so the four `unk_*` keys are intermediate dev-system state preserved on
+writeback.
 
 #### Derived Team Fields (330-340)
 
@@ -243,7 +270,20 @@ Auto-updated by `PlrFileWriter::applyDerivedTidFields()` whenever `tid` changes.
 | 331 | 2 | `contractOwnedBy` (equals tid) |
 | 333 | 2 | `currentTeamIndex` (tid − 1, or −1 for free agents) |
 | 335 | 2 | `previousTeamIndex` (previous tid − 1) |
-| 337 | 4 | Unknown |
+| 337 | 4 | Reserved / unused — always `"0000"`. See note below. (Parsed as `unk_337` + `unk_339`.) |
+
+**Offset 337-340 (reserved):** Empirically `"0000"` (zero-padded, value 0) for
+**100% of players in JSB-native default rosters** (`default_*.plr`, multiple
+files) and 656/657 players in `IBL5.plr`. The single non-zero `IBL5.plr` record
+(`"5006"`) is an isolated anomaly — that row is otherwise well-formed (correct
+length, sane name/pid/tid/position), so its cause is unknown, not a length
+misalignment. Because the engine's own authored rosters never populate this
+field, it is a reserved/unused slot with no gameplay effect; any loader read of
+it is inert. Preserved byte-for-byte on writeback.
+
+Note: the `"0000"` zero-padding contradicts the space-padded-integer encoding
+used elsewhere (see Encoding Notes) — consistent with this not being a live
+integer field; always-zero makes the distinction moot.
 
 #### Single-Season Highs (341-363)
 
@@ -305,9 +345,21 @@ Width 5 each. Monotonic within a season: `career_new[X] = career_base[X] + max(0
 | 502 | `careerBLK` |
 | 507 | `careerPF` |
 
-#### Unknown region (512-549)
+#### Affiliation / Confidence / Energy Reset (512-549)
 
-38 bytes of unmapped data.
+Parsed as 2-byte `unk_512`..`unk_548`, but the engine reads this region in
+**wider, misaligned strides** (the IBL 2-byte split is a boundary artifact):
+
+| Engine offset | Width | Struct dest | Contents |
+|---------------|-------|-------------|----------|
+| 512-543 | 32 | +0x20 (bool) | Player affiliation/type string — compared against a string constant; only the boolean result (`== 0`) is stored |
+| 544 | 1 | (none) | Skip byte — not stored in any struct field |
+| 545 | 1 | +0x14 | Confidence (scale 1-9, default 5 when 0) — vestigial |
+| 546-548 | 3 | +0x18 | Energy reset marker (default 100 when 0) — initialization field |
+
+**IBL impact:** minimal — the 32-byte affiliation string collapses to a single
+boolean, confidence is vestigial, and the energy reset is an init constant. None
+require reimplementation. Bytes 549+ are slack to the 550 height field.
 
 #### Height / Weight / Ratings (550-606)
 

@@ -137,10 +137,12 @@ class PlrLineParser implements PlrLineParserInterface
             'draftRound' => (int) substr($line, 326, 2),
             'draftPickNumber' => (int) substr($line, 328, 2),
             'freeAgentSigningFlag' => (int) substr($line, 330, 1),
-            // Unknown gap: offsets 331-340 (10 bytes)
+            // Derived team fields (331-336): raw-captured here; PlrFileWriter writes
+            // these as contractOwnedBy (331), currentTeamIndex (333), previousTeamIndex (335).
             'unk_331' => (int) substr($line, 331, 2),
             'unk_333' => (int) substr($line, 333, 2),
             'unk_335' => (int) substr($line, 335, 2),
+            // Reserved/unused (337-340): always "0000" in JSB-native rosters and IBL exports.
             'unk_337' => (int) substr($line, 337, 2),
             'unk_339' => (int) substr($line, 339, 2),
             'seasonHighPTS' => (int) substr($line, 341, 2),

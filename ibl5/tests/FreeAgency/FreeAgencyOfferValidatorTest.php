@@ -7,6 +7,7 @@ namespace Tests\FreeAgency;
 use PHPUnit\Framework\TestCase;
 use FreeAgency\FreeAgencyOfferValidator;
 use FreeAgency\OfferType;
+use FreeAgency\Contracts\CommonContractValidatorInterface;
 use FreeAgency\Contracts\FreeAgencyRepositoryInterface;
 use Team\Team;
 
@@ -446,6 +447,47 @@ class FreeAgencyOfferValidatorTest extends TestCase
         ]));
 
         $this->assertFalse($result['valid']);
+    }
+
+    // ================================================================
+    // DELEGATION to CommonContractValidator (PR5)
+    // ================================================================
+
+    public function testDelegatesGapCheckToInjectedContractValidator(): void
+    {
+        $contractValidator = $this->createMock(CommonContractValidatorInterface::class);
+        $contractValidator->expects($this->once())
+            ->method('validateNoGaps')
+            ->willReturn(['valid' => false, 'error' => 'SENTINEL GAP ERROR']);
+        // Raises must not be evaluated once a gap is found.
+        $contractValidator->expects($this->never())->method('validateRaises');
+
+        $validator = new FreeAgencyOfferValidator(null, null, 0, $contractValidator);
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 500,
+            'offer2' => 550,
+        ]));
+
+        $this->assertFalse($result['valid']);
+        $this->assertSame('SENTINEL GAP ERROR', $result['error']);
+    }
+
+    public function testDelegatesRaiseCheckToInjectedContractValidator(): void
+    {
+        $contractValidator = $this->createMock(CommonContractValidatorInterface::class);
+        $contractValidator->method('validateNoGaps')->willReturn(['valid' => true, 'error' => null]);
+        $contractValidator->expects($this->once())
+            ->method('validateRaises')
+            ->willReturn(['valid' => false, 'error' => 'SENTINEL RAISE ERROR']);
+
+        $validator = new FreeAgencyOfferValidator(null, null, 0, $contractValidator);
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 500,
+            'offer2' => 550,
+        ]));
+
+        $this->assertFalse($result['valid']);
+        $this->assertSame('SENTINEL RAISE ERROR', $result['error']);
     }
 
     // ================================================================

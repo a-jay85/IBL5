@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FreeAgency;
 
+use FreeAgency\Contracts\CommonContractValidatorInterface;
 use FreeAgency\Contracts\FreeAgencyOfferValidatorInterface;
 use FreeAgency\Contracts\FreeAgencyRepositoryInterface;
 use League\League;
@@ -26,15 +27,18 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
     private ?Team $team;
     private ?FreeAgencyRepositoryInterface $repository;
     private int $playerId;
+    private CommonContractValidatorInterface $contractValidator;
 
     public function __construct(
         ?Team $team = null,
         ?FreeAgencyRepositoryInterface $repository = null,
-        int $playerId = 0
+        int $playerId = 0,
+        ?CommonContractValidatorInterface $contractValidator = null
     ) {
         $this->team = $team;
         $this->repository = $repository;
         $this->playerId = $playerId;
+        $this->contractValidator = $contractValidator ?? new CommonContractValidator();
     }
 
     /**
@@ -249,10 +253,7 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
      */
     private function validateRaisesAndContinuity(): array
     {
-        $maxRaise = \ContractRules::calculateMaxRaise($this->offerData['offer1'], $this->offerData['birdYears']);
-        $contractEnded = false;
-
-        // Build array of offer values for easy indexed access
+        // Build array of offer values keyed year1..year6 for the shared validator.
         $offers = [
             1 => $this->offerData['offer1'],
             2 => $this->offerData['offer2'],
@@ -261,42 +262,39 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
             5 => $this->offerData['offer5'],
             6 => $this->offerData['offer6'],
         ];
+        $offer = [
+            'year1' => $offers[1], 'year2' => $offers[2], 'year3' => $offers[3],
+            'year4' => $offers[4], 'year5' => $offers[5], 'year6' => $offers[6],
+        ];
 
-        // Check each year's raise and continuity
+        // Gaps first: CommonContractValidator::validateRaises() has no "previous
+        // year > 0" guard, so a gap (0 followed by a non-zero year) must be
+        // reported before raises are evaluated.
+        $gapResult = $this->contractValidator->validateNoGaps($offer);
+        if ($gapResult['valid'] === false) {
+            return ['valid' => false, 'error' => $gapResult['error'] ?? ''];
+        }
+
+        // Decreases stay local: CommonContractValidator::validateSalaryDecreases()
+        // only scans years 1-5, so delegating would stop rejecting a decrease in
+        // the sixth year. This loop preserves the original year-2..6 coverage and
+        // error wording (locked by characterization tests).
         for ($year = 2; $year <= 6; $year++) {
             $currentOffer = $offers[$year];
             $previousOffer = $offers[$year - 1];
 
-            // Check if contract ended
-            if ($previousOffer === 0) {
-                $contractEnded = true;
-            }
-
-            // Cannot resume contract after it ends
-            if ($contractEnded && $currentOffer > 0) {
-                return [
-                    'valid' => false,
-                    'error' => "Sorry, you cannot have gaps in contract years. You offered 0 in year " . ($year - 1) . " but offered {$currentOffer} in year {$year}."
-                ];
-            }
-
-            // Check salary decrease (original: cannot decrease except to $0 termination)
             if ($currentOffer > 0 && $previousOffer > 0 && $currentOffer < $previousOffer) {
                 return [
                     'valid' => false,
                     'error' => "Sorry, you cannot decrease salary in later years of a contract. You offered {$currentOffer} in year {$year}, which is less than you offered in year " . ($year - 1) . ", {$previousOffer}."
                 ];
             }
+        }
 
-            // Check raise amount
-            if ($currentOffer > 0 && $previousOffer > 0 && $currentOffer > $previousOffer + $maxRaise) {
-                $legalOffer = $previousOffer + $maxRaise;
-
-                return [
-                    'valid' => false,
-                    'error' => "Sorry, you tried to offer a larger raise than is permitted. Your first year offer was " . (int) $this->offerData['offer1'] . " which means the maximum raise allowed each year is {$maxRaise}. Your offer in Year {$year} was {$currentOffer}, which is more than your Year " . ($year - 1) . " offer, {$previousOffer}, plus the max increase of {$maxRaise}. Given your offer in Year " . ($year - 1) . ", the most you can offer in Year {$year} is {$legalOffer}."
-                ];
-            }
+        // Raises: identical formula and message to the shared validator.
+        $raiseResult = $this->contractValidator->validateRaises($offer, $this->offerData['birdYears']);
+        if ($raiseResult['valid'] === false) {
+            return ['valid' => false, 'error' => $raiseResult['error'] ?? ''];
         }
 
         return ['valid' => true];

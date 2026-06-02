@@ -110,15 +110,17 @@ class BuyoutLedgerRepository extends BaseMysqliRepository implements BuyoutLedge
      */
     public static function salaryForContractYear(array $row, int $contractYear): int
     {
-        return match ($contractYear) {
-            1 => (int) ($row['salary_yr1'] ?? 0),
-            2 => (int) ($row['salary_yr2'] ?? 0),
-            3 => (int) ($row['salary_yr3'] ?? 0),
-            4 => (int) ($row['salary_yr4'] ?? 0),
-            5 => (int) ($row['salary_yr5'] ?? 0),
-            6 => (int) ($row['salary_yr6'] ?? 0),
+        $value = match ($contractYear) {
+            1 => $row['salary_yr1'] ?? 0,
+            2 => $row['salary_yr2'] ?? 0,
+            3 => $row['salary_yr3'] ?? 0,
+            4 => $row['salary_yr4'] ?? 0,
+            5 => $row['salary_yr5'] ?? 0,
+            6 => $row['salary_yr6'] ?? 0,
             default => 0,
         };
+
+        return is_numeric($value) ? (int) $value : 0;
     }
 
     /**
@@ -138,7 +140,8 @@ class BuyoutLedgerRepository extends BaseMysqliRepository implements BuyoutLedge
     {
         $total = 0;
         foreach ($rows as $row) {
-            $cy = (int) ($row['cy'] ?? 1);
+            $cyRaw = $row['cy'] ?? 1;
+            $cy = is_numeric($cyRaw) ? (int) $cyRaw : 1;
             if ($advancesContractYears) {
                 $cy++;
             }

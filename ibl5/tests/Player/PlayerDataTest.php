@@ -47,10 +47,29 @@ class PlayerDataTest extends TestCase
         ];
     }
 
-    public function testSalaryForContractYearReturnsZeroWhenSlotIsNull(): void
+    /**
+     * Contract-year slots default to null on a fresh PlayerData; every arm must
+     * coalesce null to 0 rather than returning null. Covering each year (not
+     * just year 1) locks the `?? 0` on every match arm.
+     */
+    #[DataProvider('nullSlotYearProvider')]
+    public function testSalaryForContractYearReturnsZeroWhenSlotIsNull(int $contractYear): void
     {
-        // Contract-year slots default to null on a fresh PlayerData; the helper
-        // must coalesce null to 0 rather than returning null.
-        $this->assertSame(0, (new PlayerData())->salaryForContractYear(1));
+        $this->assertSame(0, (new PlayerData())->salaryForContractYear($contractYear));
+    }
+
+    /**
+     * @return array<string, array{int}>
+     */
+    public static function nullSlotYearProvider(): array
+    {
+        return [
+            'year 1 null' => [1],
+            'year 2 null' => [2],
+            'year 3 null' => [3],
+            'year 4 null' => [4],
+            'year 5 null' => [5],
+            'year 6 null' => [6],
+        ];
     }
 }

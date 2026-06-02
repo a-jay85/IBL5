@@ -74,6 +74,15 @@ class BuyoutLedgerRepositoryTest extends TestCase
         $this->assertSame(250, BuyoutLedgerRepository::salaryForContractYear($row, 1));
     }
 
+    public function testSalaryForContractYearReturnsZeroForNonNumericSlot(): void
+    {
+        // A non-numeric slot must fall through is_numeric() to 0, not a partial
+        // (int) cast — '5abc' would cast to 5, so the else-branch must win.
+        $row = ['salary_yr1' => '5abc'];
+
+        $this->assertSame(0, BuyoutLedgerRepository::salaryForContractYear($row, 1));
+    }
+
     // ================================================================
     // sumCurrentSeasonSalaryFromRows()
     // ================================================================

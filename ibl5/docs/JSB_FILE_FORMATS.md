@@ -18,6 +18,7 @@ Reverse-engineered specifications for the binary and text data files produced by
 - [IBL5.rcb — Record Book](#ibl5rcb--record-book)
 - [IBL5.trn — Transactions](#ibl5trn--transactions)
 - [IBL5.asw — All-Star Weekend](#ibl5asw--all-star-weekend)
+- [IBL5.eng — League Tuning File](#ibl5eng--league-tuning-file)
 - [Shared Conventions](#shared-conventions)
 
 ---
@@ -793,6 +794,41 @@ Scores correspond to Section 5 participants. Values are the **raw count of three
 | 111 | Empty slot |
 
 Later rounds (semifinals, finals) appear to be stored in descending score order rather than participant order.
+
+---
+
+## IBL5.eng — League Tuning File
+
+**Size:** 1,000 bytes | **Format:** Tab-indexed CSV text, space-padded | **Encoding:** Latin-1
+
+A small league-level file present in every sim archive. Holds 9 league-baseline values, one per **volume** stat category. It is a frozen tuning cache: JSB reads it at league-load and writes it back, but **the simulation never reads these values** (see Engine behavior). IBL's `IBL5.eng` has been byte-identical 1993–2007 (md5 `bb48a8622601e8783e0a2553838cb442`); JSB 5.99 ships a different default.
+
+### Structure
+
+Ten lines of the form `<index><TAB><label>, <value>`. Line 10 is empty; the remainder of the file is space padding to exactly 1,000 bytes.
+
+| Line | Label | Default value | Maps to `.plr` rating (offset) |
+|------|-------|--------------|--------------------------------|
+| 1 | `2ga` | 301 | `rating2GA` (555) |
+| 2 | `fta` | 142 | `ratingFTA` (561) |
+| 3 | `3ga` | 128 | `rating3GA` (567) |
+| 4 | `orb` | 137 | `ratingORB` (573) |
+| 5 | `drb` | 157 | `ratingDRB` (576) |
+| 6 | `ast` | 170 | `ratingAST` (579) |
+| 7 | `stl` | 58 | `ratingSTL` (582) |
+| 8 | `to` | 116 | `ratingTVR` (585) |
+| 9 | `blk` | 93 | `ratingBLK` (588) |
+
+The 9 categories are exactly the 9 **volume** rating categories carried per-player in `.plr` — the make-% ratings (2GP/FTP/3GP) are absent. Values shown are the canonical IBL defaults.
+
+### Engine behavior (JSB 5.60 decompile)
+
+- **Read** at league-load by `FUN_00492230` → stored at game-struct offsets `0xce638…0xce770`.
+- **Written** by `FUN_0048a970` (`"2ga, %d"` …). Read-vs-write is gated by a mode flag inside dispatcher `FUN_004385f0`.
+- Recomputed (as per-position maxima) only during **player-data import** (`FUN_004a4d50` / `FUN_004a6f70`).
+- **Not consumed by simulation:** no per-possession function references these fields — they are a load → save round-trip cache. The values are an inherited default, not engine-authored (the per-48-minute rate machine that exists produces ~27-magnitude numbers, not 301). Treat as informational only, not engine-fidelity calibration.
+
+Full reverse-engineering trace lives in the JSB 5.60 master reference (`00_MASTER_REFERENCE.md`, ".ENG File" section).
 
 ---
 

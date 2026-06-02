@@ -40,9 +40,14 @@ jobs:
     outputs:
       # 'false' on skip paths (stale guard) because skipped != failure
       ibl6_failed: ${{ steps.ibl6.outcome == 'failure' }}
-      # 'true' when the IBL5 smoke was INCONCLUSIVE (prober WAF-blocked, exit 3).
-      # Routes to notify-inconclusive instead of gating auto-rollback.
+      # 'true' when the IBL5 smoke was INCONCLUSIVE — either the on-box prober
+      # hit a uniform WAF-class block (remote exit 3) or the production box was
+      # unreachable over SSH (exit 255). Routes to notify-inconclusive instead
+      # of gating auto-rollback.
       ibl5_inconclusive: ${{ steps.ibl5.outputs.inconclusive }}
+      # Why: 'waf' (remote uniform WAF-class block) or 'ssh-unreachable'
+      # (could not reach the production box). Selects the inconclusive DM text.
+      ibl5_inconclusive_reason: ${{ steps.ibl5.outputs.inconclusive_reason }}
 
     steps:
       - uses: actions/checkout@v6
@@ -75,22 +80,63 @@ jobs:
         if: github.event_name == 'workflow_run' && steps.guard.outputs.stale != 'true'
         run: sleep 15
 
-      - name: Run IBL5 smoke checks (gates auto-rollback)
+      # The gating IBL5 probe runs ON the production box over the same SSH
+      # channel the notify jobs use, so the request originates from the box's
+      # own (whitelisted) IP — never a foreign runner IP the per-IP WAF bans
+      # (ADR-0039).
+      - name: Setup SSH for on-box smoke
+        if: steps.guard.outputs.stale != 'true'
+        run: |
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -p ${{ secrets.PORT }} ${{ secrets.HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+        env:
+          DEPLOY_KEY: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Run IBL5 smoke checks on-box via SSH (gates auto-rollback)
         id: ibl5
         if: steps.guard.outputs.stale != 'true'
         run: |
-          chmod +x bin/smoke-prod
-          # Capture the exit code without tripping `bash -e`. Exit 3 means the
-          # run was INCONCLUSIVE (prober WAF-blocked, not a real regression):
-          # surface it as an output and exit 0 so smoke.result == 'success' and
-          # the rollback gate's `failure` condition is false by construction.
-          # A real failure (exit 1) still propagates and gates auto-rollback.
+          # Pipe bin/smoke-prod to `bash -s` on the production box (the script
+          # isn't deployed) so it curls the public hostname from the box's OWN
+          # egress IP — exercising the real vhost+cert+PHP stack while bypassing
+          # the per-IP WAF that bans datacenter runners. (Loopback via
+          # --resolve 127.0.0.1 was rejected: the box serves a non-matching
+          # default-vhost cert there — see ADR-0039.) A real break (5xx / conn-
+          # refused) is still heterogeneous and gates auto-rollback as before.
+          #
+          # bin/smoke-prod only ever exits 0/1/2/3, so 255 is unambiguously an
+          # SSH-level failure (box/network unreachable):
+          #   0   pass            -> step succeeds
+          #   1   real failure    -> propagate, gates auto-rollback
+          #   3   WAF-uniform     -> INCONCLUSIVE (notify-only, no rollback)
+          #   255 box unreachable -> INCONCLUSIVE (reverting cannot fix an
+          #                          unreachable box, and a redeploy needs it too)
+          # The `< bin/smoke-prod` redirect lives INSIDE run_smoke so the
+          # 255-retry re-opens stdin; outside it, the retry would feed empty
+          # stdin to `bash -s` and silently "pass".
+          run_smoke() {
+            ssh -o ConnectTimeout=10 -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy \
+              ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
+              "env SMOKE_INTERCHECK_DELAY=0 bash -s -- --scope=ibl5 $BASE_URL" \
+              < bin/smoke-prod
+          }
           set +e
-          bin/smoke-prod --scope=ibl5 "$BASE_URL"
+          run_smoke
           code=$?
+          if [ "$code" -eq 255 ]; then
+            echo "SSH unreachable (255) — retrying once after 5s"
+            sleep 5
+            run_smoke
+            code=$?
+          fi
           set -e
           if [ "$code" -eq 3 ]; then
-            echo "inconclusive=true" >> "$GITHUB_OUTPUT"
+            { echo "inconclusive=true"; echo "inconclusive_reason=waf"; } >> "$GITHUB_OUTPUT"
+            exit 0
+          elif [ "$code" -eq 255 ]; then
+            { echo "inconclusive=true"; echo "inconclusive_reason=ssh-unreachable"; } >> "$GITHUB_OUTPUT"
             exit 0
           fi
           exit "$code"
@@ -286,9 +332,10 @@ jobs:
     name: Notify Smoke Inconclusive
     runs-on: ubuntu-latest
     needs: smoke
-    # Fire ONLY when IBL5 smoke was inconclusive (prober WAF-blocked, exit 3).
-    # Both conjuncts are required: a plain success lacks ibl5_inconclusive, and
-    # a real failure sets smoke.result == 'failure' (→ rollback path, not here).
+    # Fire ONLY when IBL5 smoke was inconclusive (on-box prober WAF-blocked, or
+    # the box was unreachable over SSH). Both conjuncts are required: a plain
+    # success lacks ibl5_inconclusive, and a real failure sets smoke.result ==
+    # 'failure' (→ rollback path, not here).
     if: >-
       always() &&
       needs.smoke.outputs.ibl5_inconclusive == 'true' &&
@@ -308,9 +355,14 @@ jobs:
       - name: Send Discord DM
         env:
           OWNER_DISCORD_ID: ${{ secrets.OWNER_DISCORD_ID }}
+          INCONCLUSIVE_REASON: ${{ needs.smoke.outputs.ibl5_inconclusive_reason }}
         run: |
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          MSG=$(printf 'IBL5 smoke INCONCLUSIVE (uniform WAF-class block — likely runner-IP). NO rollback; production untouched. Run: %s' "$RUN_URL")
+          if [ "$INCONCLUSIVE_REASON" = "ssh-unreachable" ]; then
+            MSG=$(printf 'IBL5 smoke INCONCLUSIVE — could not reach the production box over SSH; deploy verdict unknown. NO rollback; production untouched — please check the host. Run: %s' "$RUN_URL")
+          else
+            MSG=$(printf 'IBL5 smoke INCONCLUSIVE (on-box prober hit a uniform WAF-class block). NO rollback; production untouched. Run: %s' "$RUN_URL")
+          fi
 
           PAYLOAD=$(jq -n --arg id "$OWNER_DISCORD_ID" --arg msg "$MSG" \
             '{content: {receivingUserDiscordID: $id, message: $msg}}')

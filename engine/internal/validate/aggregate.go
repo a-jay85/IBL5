@@ -170,3 +170,29 @@ func mean(samples []TeamStat) map[string]float64 {
 	}
 	return out
 }
+
+// homeWinFraction returns the fraction of seeded runs in which the home team
+// outscored the visitor, pairing samples by run index (homeSamples[i] and
+// visSamples[i] come from the same seed). A tied run counts 0.5 so the estimate
+// stays unbiased — a tie is reachable only after the 20-overtime termination
+// ceiling (sim/gameloop.go), so it is rare but possible. n == 0 is unreachable
+// (the harness guards runs >= 1) and yields 0.5 (no information).
+func homeWinFraction(homeSamples, visSamples []TeamStat) float64 {
+	n := len(homeSamples)
+	if len(visSamples) < n {
+		n = len(visSamples)
+	}
+	if n == 0 {
+		return 0.5
+	}
+	wins := 0.0
+	for i := 0; i < n; i++ {
+		switch {
+		case homeSamples[i].Points > visSamples[i].Points:
+			wins++
+		case homeSamples[i].Points == visSamples[i].Points:
+			wins += 0.5
+		}
+	}
+	return wins / float64(n)
+}

@@ -26,6 +26,14 @@ type GameReport struct {
 	Date          string
 	Pass          bool
 	Rows          []StatRow
+	// EngineHomeWinFraction is the fraction of seeded runs in which the home team
+	// outscored the visitor (a tied run counts 0.5). It is a runs-stable estimate
+	// of P(home win) — unlike a single mean-margin sign, which rounds every game
+	// to a 0/1 win and inflates favorites' records as √N (see memory
+	// reference_jsb_winshare_runs_artifact). Consumed by the season-aggregate
+	// collector; it is not part of the Pass verdict and is not printed by
+	// WriteReport (keeping the text report byte-identical).
+	EngineHomeWinFraction float64
 }
 
 // compareStat decides whether a single .sco value is within tolerance of the

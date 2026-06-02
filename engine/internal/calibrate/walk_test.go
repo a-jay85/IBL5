@@ -235,6 +235,24 @@ func TestCollectReports_BadRoot(t *testing.T) {
 	}
 }
 
+// Row #6: the flat collector stamps each report's Label with the snapshot
+// basename (extension stripped).
+func TestCollectReports_StampsLabel(t *testing.T) {
+	root := t.TempDir()
+	makeZip(t, filepath.Join(root, "02-03_41_reg-sim35.zip"), fullTriple())
+	rv := &recordingValidate{t: t}
+	reports, _, err := CollectReports(root, Options{Runs: 1, Validate: rv.fn})
+	if err != nil {
+		t.Fatalf("CollectReports: %v", err)
+	}
+	if len(reports) != 1 {
+		t.Fatalf("reports = %d, want 1", len(reports))
+	}
+	if reports[0].Label != "02-03_41_reg-sim35" {
+		t.Errorf("label = %q, want %q", reports[0].Label, "02-03_41_reg-sim35")
+	}
+}
+
 func equalStrings(a, b []string) bool {
 	if len(a) != len(b) {
 		return false

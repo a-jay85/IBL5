@@ -103,6 +103,7 @@ func CollectReports(root string, opts Options) ([]validate.Report, []Skip, error
 			skips = append(skips, *skip)
 			continue
 		}
+		rep.Label = strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 		_, _ = fmt.Fprintf(progress, "processed %s game_type=%d games=%d\n", path, int(gt), len(rep.Games))
 		reports = append(reports, *rep)
 	}

@@ -163,3 +163,43 @@ func TestRun_NoReports(t *testing.T) {
 		t.Errorf("expected a 'no snapshots' message, got: %q", errBuf.String())
 	}
 }
+
+// Row #13: calibrate mode emits the season_aggregates readout (standings detail
+// + residuals) from the same run; gate mode does NOT carry it.
+func TestRun_CalibrateEmitsSeasonAggregates(t *testing.T) {
+	reports := []validate.Report{{
+		Label:    "04-05",
+		GameType: bundle.GameTypeRegular,
+		Games: []validate.GameReport{{
+			HomeTeamID:            7,
+			VisitorTeamID:         3,
+			EngineHomeWinFraction: 0.6,
+			Rows: []validate.StatRow{
+				{TeamID: 3, Stat: "points", ScoVal: 99, EngineMean: 100},
+				{TeamID: 7, Stat: "points", ScoVal: 108, EngineMean: 105},
+			},
+		}},
+	}}
+
+	var out, errBuf bytes.Buffer
+	if code := runWith([]string{"--archive", "/x", "--mode", "calibrate"}, &out, &errBuf, stubCollectors(reports, nil)); code != 0 {
+		t.Fatalf("exit = %d, want 0 (stderr: %s)", code, errBuf.String())
+	}
+	var rep calibrate.CalibrationReport
+	if err := json.Unmarshal(out.Bytes(), &rep); err != nil {
+		t.Fatalf("stdout is not a CalibrationReport JSON: %v\n%s", err, out.String())
+	}
+	if len(rep.SeasonAggregates.Seasons) != 1 || rep.SeasonAggregates.Seasons[0].Label != "04-05" {
+		t.Fatalf("season_aggregates.seasons = %+v, want one labeled 04-05", rep.SeasonAggregates.Seasons)
+	}
+	if len(rep.SeasonAggregates.Residuals) != 1 {
+		t.Errorf("season_aggregates.residuals = %+v, want one bucket", rep.SeasonAggregates.Residuals)
+	}
+
+	// Gate mode encodes a GateResult, which has no season_aggregates field.
+	var gout, gerr bytes.Buffer
+	_ = runWith([]string{"--archive", "/x", "--mode", "gate", "--min-rate", "0"}, &gout, &gerr, stubCollectors(reports, nil))
+	if strings.Contains(gout.String(), "season_aggregates") {
+		t.Errorf("gate output should not carry season_aggregates:\n%s", gout.String())
+	}
+}

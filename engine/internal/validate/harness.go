@@ -65,6 +65,11 @@ type Report struct {
 	// zeroed); it does NOT affect Pass — a snapshot is still validatable on team
 	// stats without the per-player minutes signal.
 	MissingPlb []string
+	// Label is an optional human identifier for the snapshot/season this report
+	// covers (e.g. "04-05" or "04-05 (playoffs)"), stamped by the calibrate
+	// collectors so the season-aggregate output is attributable. Default "";
+	// additive and NOT printed by WriteReport (the text report stays byte-stable).
+	Label string
 }
 
 // triple names one backup file set sharing a stem within the corpus dir. plr/
@@ -354,17 +359,21 @@ func matchSchedule(sched []backup.SchGame, consumed []bool, sg backup.ScoGame) i
 // validateGame simulates one matchup `runs` times and compares the aggregated
 // per-team engine means against the .sco ground truth, using gameType's bands.
 func validateGame(b bundle.Bundle, g bundle.Game, sg backup.ScoGame, runs int, baseSeed uint64, gameType bundle.GameType) GameReport {
-	visMean, homeMean := simulateGameMeans(b, g, runs, baseSeed)
+	visMean, homeMean, homeWinFrac := simulateGameMeans(b, g, runs, baseSeed)
 	visSco := teamStatFromSco(sg, g.VisitorTeamID)
 	homeSco := teamStatFromSco(sg, g.HomeTeamID)
-	return compareGame(gameType, g.VisitorTeamID, g.HomeTeamID, sg.Date, visSco, homeSco, visMean, homeMean)
+	gr := compareGame(gameType, g.VisitorTeamID, g.HomeTeamID, sg.Date, visSco, homeSco, visMean, homeMean)
+	gr.EngineHomeWinFraction = homeWinFrac
+	return gr
 }
 
 // simulateGameMeans runs the engine on the single matchup g for `runs` seeds
 // (baseSeed+0 .. baseSeed+runs-1) and returns the per-team mean TeamStat keyed
-// by statNames. Each run is an independent single-game sub-bundle so one game's
-// distribution is isolated from the rest of the schedule.
-func simulateGameMeans(b bundle.Bundle, g bundle.Game, runs int, baseSeed uint64) (visMean, homeMean map[string]float64) {
+// by statNames, plus the home team's win fraction over those runs (the
+// runs-stable P(home win) estimate the season-aggregate layer needs). Each run
+// is an independent single-game sub-bundle so one game's distribution is
+// isolated from the rest of the schedule.
+func simulateGameMeans(b bundle.Bundle, g bundle.Game, runs int, baseSeed uint64) (visMean, homeMean map[string]float64, homeWinFrac float64) {
 	sub := bundle.Bundle{
 		LeagueID: b.LeagueID,
 		Teams:    b.Teams,
@@ -386,5 +395,5 @@ func simulateGameMeans(b bundle.Bundle, g bundle.Game, runs int, baseSeed uint64
 			}
 		}
 	}
-	return mean(visSamples), mean(homeSamples)
+	return mean(visSamples), mean(homeSamples), homeWinFraction(homeSamples, visSamples)
 }

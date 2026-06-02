@@ -176,3 +176,29 @@ func TestCollectSeasonReports_SampleStride(t *testing.T) {
 		t.Fatalf("reports = %d, want 2 (every 2nd of 4)", len(reports))
 	}
 }
+
+// Row #6: the season collector stamps each report's Label — the season name for
+// the regular bucket, "<name> (playoffs)" for the playoff bucket.
+func TestCollectSeasonReports_StampsLabel(t *testing.T) {
+	root := neutralTempDir(t)
+	makeZip(t, filepath.Join(root, "02-03", "02-03_41_reg-sim35.zip"), fullTriple())
+	makeZip(t, filepath.Join(root, "02-03", "02-03_47_finals.zip"), fullTriple())
+
+	rvReg := &recordingValidate{t: t}
+	rvPof := &recordingValidate{t: t}
+	reports, _, err := CollectSeasonReports(root, Options{
+		Runs: 1, Validate: rvReg.fn, ValidateUnscheduled: rvPof.fn,
+	})
+	if err != nil {
+		t.Fatalf("CollectSeasonReports: %v", err)
+	}
+	if len(reports) != 2 {
+		t.Fatalf("reports = %d, want 2", len(reports))
+	}
+	if reports[0].Label != "02-03" {
+		t.Errorf("regular label = %q, want %q", reports[0].Label, "02-03")
+	}
+	if reports[1].Label != "02-03 (playoffs)" {
+		t.Errorf("playoff label = %q, want %q", reports[1].Label, "02-03 (playoffs)")
+	}
+}

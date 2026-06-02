@@ -109,6 +109,28 @@ func TestValidateCorpus_InBandPassesAndDeterministic(t *testing.T) {
 	}
 }
 
+// Row #4: validateGame stamps each GameReport with the home win-fraction over
+// the seeded runs — a real value in [0,1]. Determinism across runs is already
+// covered by the reflect.DeepEqual report comparison above (the field is part
+// of the report); here we assert it is populated and well-formed.
+func TestValidateCorpus_PopulatesHomeWinFraction(t *testing.T) {
+	dir := t.TempDir()
+	const seed = uint64(1000)
+	buildCorpus(t, dir, true, testRuns, seed)
+
+	rep, err := ValidateCorpus(dir, testRuns, seed, bundle.GameTypeRegular)
+	if err != nil {
+		t.Fatalf("ValidateCorpus: %v", err)
+	}
+	if len(rep.Games) != 1 {
+		t.Fatalf("games = %d, want 1", len(rep.Games))
+	}
+	wf := rep.Games[0].EngineHomeWinFraction
+	if wf < 0 || wf > 1 {
+		t.Errorf("EngineHomeWinFraction = %v, want a fraction in [0,1]", wf)
+	}
+}
+
 // Characterization (Row #1): the bands→game-type-keyed refactor must not change
 // observable behavior. ValidateCorpus stamped with GameTypeRegular must route
 // every stat to the regular band table — i.e. each StatRow.Tolerance equals the

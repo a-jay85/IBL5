@@ -11,6 +11,8 @@ use OneOnOneGame\OneOnOneGameResult;
 
 /**
  * Tests for OneOnOneGameEngine
+ *
+ * @phpstan-import-type PlayerGameData from \OneOnOneGame\Contracts\OneOnOneGameEngineInterface
  */
 final class OneOnOneGameEngineTest extends TestCase
 {
@@ -314,7 +316,7 @@ final class OneOnOneGameEngineTest extends TestCase
     /**
      * Create mock player data array for testing
      *
-     * @return array<string, mixed>
+     * @return PlayerGameData
      */
     private function createMockPlayerData(string $name): array
     {

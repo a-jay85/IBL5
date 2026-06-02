@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace JsbParser;
 
 use JsbParser\Contracts\RcbFileParserInterface;
+use PlrParser\PlrFieldSerializer;
 
 /**
  * Parser for JSB .rcb (Record Book) text files.
@@ -95,9 +96,7 @@ class RcbFileParser implements RcbFileParserInterface
      */
     private static function toUtf8(string $cp1252String): string
     {
-        $result = mb_convert_encoding($cp1252String, 'UTF-8', 'Windows-1252');
-
-        return is_string($result) ? $result : $cp1252String;
+        return PlrFieldSerializer::toUtf8($cp1252String);
     }
 
     /**

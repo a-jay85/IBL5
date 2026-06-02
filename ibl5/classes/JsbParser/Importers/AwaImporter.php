@@ -8,6 +8,7 @@ use JsbParser\AwaFileParser;
 use JsbParser\CarFileParser;
 use JsbParser\Contracts\JsbImportRepositoryInterface;
 use JsbParser\JsbImportResult;
+use PlrParser\PlrFieldSerializer;
 
 class AwaImporter
 {
@@ -42,7 +43,7 @@ class AwaImporter
         /** @var array<int, string> $pidNameMap */
         $pidNameMap = [];
         foreach ($carParsed['players'] as $player) {
-            $name = mb_convert_encoding($player['name'], 'UTF-8', 'Windows-1252');
+            $name = PlrFieldSerializer::toUtf8($player['name']);
             $pidNameMap[$player['block_index']] = $name;
         }
 

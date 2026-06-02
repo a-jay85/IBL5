@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace JsbParser;
 
 use JsbParser\Contracts\DraFileParserInterface;
+use PlrParser\PlrFieldSerializer;
 
 /**
  * Parser for JSB .dra (Draft Results) text files.
@@ -98,7 +99,7 @@ class DraFileParser implements DraFileParserInterface
                         $playerName = trim(substr($remainder, 2));
 
                         // Convert CP1252 to UTF-8
-                        $playerName = mb_convert_encoding($playerName, 'UTF-8', 'Windows-1252');
+                        $playerName = PlrFieldSerializer::toUtf8($playerName);
 
                         $currentPicks[] = [
                             'round' => $currentRound,

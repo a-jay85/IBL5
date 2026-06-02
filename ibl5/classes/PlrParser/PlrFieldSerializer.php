@@ -58,4 +58,16 @@ class PlrFieldSerializer implements PlrFieldSerializerInterface
         }
         return $result;
     }
+
+    /**
+     * @see PlrFieldSerializerInterface::toUtf8()
+     */
+    public static function toUtf8(string $cp1252String): string
+    {
+        $result = mb_convert_encoding($cp1252String, 'UTF-8', 'Windows-1252');
+        if (!is_string($result)) {
+            return $cp1252String;
+        }
+        return $result;
+    }
 }

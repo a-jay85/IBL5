@@ -41,4 +41,17 @@ interface PlrFieldSerializerInterface
      * @return string The CP1252 encoded string
      */
     public static function toCP1252(string $utf8String): string;
+
+    /**
+     * Convert a Windows-1252 (CP1252) encoded string to UTF-8.
+     *
+     * The canonical read-direction decode for the JSB parser cluster: all .plr,
+     * .rcb, .dra, and .awa name fields route through here so the decode semantics
+     * stay consistent (mb_convert_encoding with a null-safe fallback). Must be
+     * called after fixed-width substr/trim extraction, never on whole-file bytes.
+     *
+     * @param string $cp1252String The Windows-1252 (CP1252) encoded string
+     * @return string The UTF-8 encoded string
+     */
+    public static function toUtf8(string $cp1252String): string;
 }

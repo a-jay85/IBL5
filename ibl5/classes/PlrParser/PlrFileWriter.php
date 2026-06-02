@@ -330,8 +330,7 @@ class PlrFileWriter implements PlrFileWriterInterface
     public static function readPlayerName(string $line): string
     {
         $nameRaw = trim(substr($line, 4, 32));
-        $converted = iconv('CP1252', 'UTF-8//IGNORE', $nameRaw);
-        return is_string($converted) ? $converted : $nameRaw;
+        return PlrFieldSerializer::toUtf8($nameRaw);
     }
 
     /**

@@ -100,6 +100,29 @@ func TestCalibrate_SegmentsByGameType(t *testing.T) {
 	}
 }
 
+// Calibrate surfaces HomeMargins alongside Buckets from a single call: a Regular
+// report with paired home/visitor "points" rows yields one margin bucket (gap ≈0
+// when the engine agrees with .sco) AND the usual per-stat band buckets.
+// (ptsGame/marginReport are defined in homemargin_test.go, same package.)
+func TestCalibrate_PopulatesHomeMargins(t *testing.T) {
+	rep := Calibrate([]validate.Report{
+		marginReport(bundle.GameTypeRegular, ptsGame(7, 3, 105, 105, 100, 100)),
+	}, 0.95)
+
+	if len(rep.HomeMargins) != 1 {
+		t.Fatalf("HomeMargins len = %d, want 1: %+v", len(rep.HomeMargins), rep.HomeMargins)
+	}
+	if rep.HomeMargins[0].GameType != int(bundle.GameTypeRegular) {
+		t.Errorf("HomeMargins GameType = %d, want %d", rep.HomeMargins[0].GameType, int(bundle.GameTypeRegular))
+	}
+	if math.Abs(rep.HomeMargins[0].MarginGap) > 1e-9 {
+		t.Errorf("MarginGap = %v, want ≈0", rep.HomeMargins[0].MarginGap)
+	}
+	if len(rep.Buckets) != 1 || rep.Buckets[0].GameType != int(bundle.GameTypeRegular) {
+		t.Errorf("Buckets = %+v, want one regular bucket (surfaced from the same call)", rep.Buckets)
+	}
+}
+
 // Gate: a bucket below min-rate flips the overall verdict to fail; a bucket at
 // or above passes.
 func TestGate_FailsBelowMinRate(t *testing.T) {

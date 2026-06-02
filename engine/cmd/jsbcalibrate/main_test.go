@@ -45,6 +45,43 @@ func TestRun_CalibrateEmitsJSON(t *testing.T) {
 	}
 }
 
+// calibrate mode also emits the per-game-type home_margins readout (the HCA
+// signal) alongside buckets, from the same run. Home pts Engine=108/Sco=110
+// (TeamID 7), visitor Engine=100/Sco=100 (TeamID 3) → engine margin 8, sco
+// margin 10, gap −2.
+func TestRun_CalibrateEmitsHomeMargins(t *testing.T) {
+	reports := []validate.Report{{
+		GameType: bundle.GameTypeRegular,
+		Games: []validate.GameReport{{
+			HomeTeamID:    7,
+			VisitorTeamID: 3,
+			Rows: []validate.StatRow{
+				{TeamID: 3, Stat: "points", ScoVal: 100, EngineMean: 100},
+				{TeamID: 7, Stat: "points", ScoVal: 110, EngineMean: 108},
+			},
+		}},
+	}}
+	var out, errBuf bytes.Buffer
+	code := runWith([]string{"--archive", "/x", "--mode", "calibrate"}, &out, &errBuf, stubCollectors(reports, nil))
+	if code != 0 {
+		t.Fatalf("exit = %d, want 0 (stderr: %s)", code, errBuf.String())
+	}
+	var rep calibrate.CalibrationReport
+	if err := json.Unmarshal(out.Bytes(), &rep); err != nil {
+		t.Fatalf("stdout is not a CalibrationReport JSON: %v\n%s", err, out.String())
+	}
+	if len(rep.HomeMargins) != 1 {
+		t.Fatalf("home_margins len = %d, want 1: %+v", len(rep.HomeMargins), rep.HomeMargins)
+	}
+	hm := rep.HomeMargins[0]
+	if hm.GameType != int(bundle.GameTypeRegular) {
+		t.Errorf("home_margins GameType = %d, want %d", hm.GameType, int(bundle.GameTypeRegular))
+	}
+	if hm.MarginGap != -2 {
+		t.Errorf("MarginGap = %v, want -2", hm.MarginGap)
+	}
+}
+
 // Row #14 (negative): gate mode exits nonzero when a stat's in-band rate is
 // below --min-rate, and the JSON reports pass=false.
 func TestRun_GateFailsBelowMinRate(t *testing.T) {

@@ -22,16 +22,19 @@ const (
 const turnoverDenom = 1793.0 // rand_int(1,1793) ≤ sqrt(def_value) → turnover
 
 // outcomeInputs holds the four play-outcome bucket weights plus the turnover
-// defensive value. In JSB these are copied ball-handler per-game doubles
-// (+0xD90 / +0xDB0 / +0xDE0 / +0xDF8) populated by per-half setup. The engine has
-// no per-game doubles, so each is a documented rating-derived stand-in on a
-// comparable O(1) basis (assembled in possession.go via bucketweights.go):
-// 2pt ≈0.75 net-free FGA/ORB/FTA composite (dominant — field goals stay the
-// majority path), 3pt ≈0.17 folded 3pt-propensity, and-one ≈0.035 matchup_quality
-// ×0.25 + made-rate (floored 0.03), foul ≈0.05 floor + net term (the only bucket
-// consuming net — where a future HCA nudge lands). The four-bucket total is O(1),
-// which is what makes a ±0.2 HCA perturbation expressible (see bucketweights.go).
-// The turnover value derives from ball-handler ball-security (unchanged).
+// defensive value. They are assembled in possession.go / transition.go from the
+// faithful bucket-weight helpers (bucketweights.go, teamquality.go): 2pt = the
+// recovered +0xD90 Branch-A offensive-rate composite (O(10s), net-free, dominant
+// so field goals stay the majority path); 3pt = the 2pt composite × 3pt propensity;
+// and-one = matchup×0.25 + made-rate, floored to 0.03; foul = the 0.6 floor
+// modulated by the team-quality divisor (foul/offQ)×(defQ − teamDef×5/6) and the
+// site-2 HCA nudge. Home-court advantage is applied at the two modeled JSB sites in
+// the assembly: site 2 adds +hcaDelta to the 2pt bucket and (inside
+// foulBucketWeight) subtracts it from the foul bucket; site 3 shrinks the home
+// offQuality divisor, growing the home foul bucket — the dominant home-favorable
+// term. The turnover value derives from ball-handler ball-security. weight() clamps
+// any negative bucket to 0; the selector, allowedPaths, and turnover override are
+// HCA-agnostic (the deltas live in the assembly, as in JSB's selector).
 type outcomeInputs struct {
 	twoPtWeight      float64
 	threePtWeight    float64

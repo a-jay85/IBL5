@@ -73,6 +73,73 @@ func richBundle() bundle.Bundle {
 	}
 }
 
+// symmetricBundle is a two-team fixture where BOTH teams carry identical ratings,
+// so any home/away scoring difference is attributable purely to home-court
+// advantage (never talent). richBundle is asymmetric by design (FGP 50 vs 46) and
+// cannot isolate HCA. Home team is 3 (HomeTeamID), away team is 7 (matching the
+// richBundle/twoTeams visitor=7 convention).
+func symmetricBundle() bundle.Bundle {
+	var players []bundle.Player
+	pid := 100
+	for _, teamID := range []int{7, 3} {
+		for slot := slotPG; slot <= slotC; slot++ {
+			pid++
+			players = append(players, mkPlayer(pid, teamID, slot, 48))
+		}
+	}
+	return bundle.Bundle{
+		Seed:    1988,
+		Teams:   []bundle.Team{{TeamID: 3, Name: "Home"}, {TeamID: 7, Name: "Away"}},
+		Players: players,
+		Schedule: []bundle.Game{
+			{HomeTeamID: 3, VisitorTeamID: 7, Date: "1988-11-04", GameType: bundle.GameTypeRegular},
+		},
+	}
+}
+
+// teamPoints reconstructs a team's total points from its box (2×2GM + 3×3GM + FTM).
+func teamPoints(tb result.TeamBox) int {
+	return 2*tb.Game2GM + 3*tb.Game3GM + tb.GameFTM
+}
+
+// homeAwayMargins runs the symmetric fixture over seeds [1,n] at the given game
+// type and returns the per-game home−away point margins (TeamBoxes[0]=visitor/away,
+// [1]=home), plus cumulative home/away totals and home-win count.
+func homeAwayMargins(t *testing.T, gt bundle.GameType, n int) (margins []float64, homeTotal, awayTotal, homeWins int) {
+	t.Helper()
+	base := symmetricBundle()
+	base.Schedule[0].GameType = gt
+	margins = make([]float64, 0, n)
+	for seed := uint64(1); seed <= uint64(n); seed++ {
+		g := Simulate(base, seed).Games[0]
+		ap := teamPoints(g.TeamBoxes[0])
+		hp := teamPoints(g.TeamBoxes[1])
+		margins = append(margins, float64(hp-ap))
+		homeTotal += hp
+		awayTotal += ap
+		if hp > ap {
+			homeWins++
+		}
+	}
+	return
+}
+
+// meanSE returns the sample mean and the standard error of the mean.
+func meanSE(xs []float64) (mean, se float64) {
+	n := float64(len(xs))
+	for _, x := range xs {
+		mean += x
+	}
+	mean /= n
+	var ss float64
+	for _, x := range xs {
+		d := x - mean
+		ss += d * d
+	}
+	sd := math.Sqrt(ss / (n - 1))
+	return mean, sd / math.Sqrt(n)
+}
+
 // rotationBundle is a full-game fixture with a real bench: each team has a
 // starter + one backup (depth 2) at PG/SG/SF/PF, and a single high-foul center
 // with NO backup. Low Stamina (40) drives fatigue subs at PG-PF; the un-backed,
@@ -644,5 +711,114 @@ func TestSimulate_InjuryRateBand(t *testing.T) {
 	if perGame < 0.15 || perGame > 0.25 {
 		t.Errorf("injuries/game = %.4f (%d over %d games), want corpus band [0.15, 0.25] "+
 			"(turnovers/game = %.2f)", perGame, injuries, n, float64(turnovers)/float64(n))
+	}
+}
+
+// --- matrix #11: non-degeneracy boundary guard ------------------------------
+//
+// The faithful foul bucket (0.6 floor + quality divisor) is non-degenerate on a
+// realistically-rated fixture: it must NOT reproduce the #952-rejected regime
+// (FTA>FGA, whole-team foul-outs, blocks→0). This guards the magnitude choice
+// against that regression on richBundle (the only degenerate case is an all-zero-
+// rated lineup, which real rosters never are — see teamquality.go). Thresholds are
+// grounded in the instrumented richBundle run: FGA ≈ 91-112, FTA ≈ 16-36 per team.
+func TestSimulate_NonDegeneracy(t *testing.T) {
+	for _, seed := range []uint64{1, 42, 1988, 1989, 99999} {
+		g := Simulate(richBundle(), seed).Games[0]
+		var totalBLK int
+		for _, tb := range g.TeamBoxes {
+			fga := tb.Game2GA + tb.Game3GA
+			if tb.GameFTA >= fga {
+				t.Errorf("seed %d team %d: FTA (%d) ≥ FGA (%d) — degenerate foul-heavy regime",
+					seed, tb.TeamID, tb.GameFTA, fga)
+			}
+			totalBLK += tb.GameBLK
+		}
+		if totalBLK == 0 {
+			t.Errorf("seed %d: total blocks == 0 — degenerate (no contested shots)", seed)
+		}
+
+		// No full-team foul-out: every team must keep ≥1 non-fouled-out player all
+		// game (a fouled-out player has GamePF ≥ 6).
+		teamByPID := map[int]int{}
+		for _, p := range richBundle().Players {
+			teamByPID[p.PID] = p.TeamID
+		}
+		active := map[int]int{}
+		for _, pb := range g.PlayerBoxes {
+			if pb.GamePF < 6 {
+				active[teamByPID[pb.PID]]++
+			}
+		}
+		for _, tb := range g.TeamBoxes {
+			if active[tb.TeamID] == 0 {
+				t.Errorf("seed %d team %d: every player fouled out — full-team foul-out cascade", seed, tb.TeamID)
+			}
+		}
+	}
+}
+
+// --- matrix #7: DIRECTIONAL HCA (the centerpiece) ---------------------------
+//
+// On the symmetric fixture (identical ratings both teams) with HCA active
+// (regular game_type), the only source of a home/away difference is home-court
+// advantage. The faithful mechanism (site-3 offQuality divisor shrinking for the
+// home team → larger home foul bucket → more trips to the higher-EV foul line,
+// dominating the anti-home site-2 nudge) must make the home team score MORE.
+//
+// The assertion is the SIGN (home-favorable), grounded in the sites-2+3 mechanism,
+// NOT an assumed magnitude (the exact ~55% home-edge is corpus-deferred). It must
+// clear 0 by ≥3σ so the sign is statistically robust, and the per-game margin is
+// reported for the dev calibration trail. PR7a shipped the wrong sign — this test
+// is the guard against that regression.
+//
+// Source: symmetricBundle() (sim_test.go), seeds [1,2000], game_type regular.
+func TestSimulate_HomeCourtAdvantage_Directional(t *testing.T) {
+	const n = 2000
+	margins, homeTotal, awayTotal, homeWins := homeAwayMargins(t, bundle.GameTypeRegular, n)
+	mean, se := meanSE(margins)
+	winRate := float64(homeWins) / float64(n)
+
+	t.Logf("HCA directional (symmetric fixture, regular game_type, n=%d):", n)
+	t.Logf("  home total=%d away total=%d (diff %+d)", homeTotal, awayTotal, homeTotal-awayTotal)
+	t.Logf("  mean margin=%+.4f pts/game  SE=%.4f  (mean/SE=%.2fσ)", mean, se, mean/se)
+	t.Logf("  home win-rate=%.4f over %d games", winRate, n)
+
+	if homeTotal <= awayTotal {
+		t.Errorf("home total points %d ≤ away %d — HCA not home-favorable (PR7a sign regression)", homeTotal, awayTotal)
+	}
+	if mean <= 3*se {
+		t.Errorf("mean home margin %.4f not ≥ 3σ above 0 (SE=%.4f) — sign not statistically robust", mean, se)
+	}
+	if winRate <= 0.50 {
+		t.Errorf("home win-rate %.4f ≤ 0.50 — HCA not home-favorable", winRate)
+	}
+}
+
+// --- matrix #8: ASG-neutral (negative case) ---------------------------------
+//
+// With an all-star game_type (5/6) the HCA magnitude is zeroed, so the symmetric
+// fixture must return to symmetry: the mean margin sits within sampling noise of 0
+// and the home win-rate ≈ 0.50. This proves (a) HCA is correctly gated off for
+// ASG, and (b) the home edge in the directional test is HCA-driven, not a fixture
+// artifact (the same fixture is symmetric here).
+func TestSimulate_HomeCourtAdvantage_ASGNeutral(t *testing.T) {
+	const n = 2000
+	margins, homeTotal, awayTotal, homeWins := homeAwayMargins(t, bundle.GameTypeAllStarA, n)
+	mean, se := meanSE(margins)
+	winRate := float64(homeWins) / float64(n)
+
+	t.Logf("ASG-neutral (symmetric fixture, all-star game_type, n=%d):", n)
+	t.Logf("  home total=%d away total=%d (diff %+d)", homeTotal, awayTotal, homeTotal-awayTotal)
+	t.Logf("  mean margin=%+.4f pts/game  SE=%.4f  (mean/SE=%.2fσ)", mean, se, mean/se)
+	t.Logf("  home win-rate=%.4f over %d games", winRate, n)
+
+	// Symmetry: the mean margin must be within 3σ of 0 (no systematic edge either
+	// way), and the win-rate near 0.50.
+	if math.Abs(mean) > 3*se {
+		t.Errorf("ASG mean margin %.4f exceeds 3σ (SE=%.4f) — HCA not zeroed for all-star games", mean, se)
+	}
+	if winRate < 0.47 || winRate > 0.53 {
+		t.Errorf("ASG home win-rate %.4f outside [0.47,0.53] — symmetry not restored", winRate)
 	}
 }

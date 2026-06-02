@@ -1,97 +1,117 @@
 package sim
 
-// O(1) play-outcome bucket-weight helpers — decoupled from the per-mille make-roll
-// path (shotdecision.go). Each function is a documented stand-in for the
-// corresponding JSB 5.60 per-game double (+0xD90/DB0/DE0/DF8), NOT the literal §4
-// formula. Faithful reconstruction is deferred: D70 reads CEngine team/league
-// aggregates absent from the bundle, and four .rdata scale constants are unresolved.
-// Exact magnitudes are subject to corpus calibration (post-HCA landing).
+// Play-outcome bucket-weight helpers — the faithful JSB 5.60 basis recovered in
+// COMPOSITE_DOUBLES_TRACE.md (2nd-pass RESOLUTION) and 00_MASTER_REFERENCE.md
+// (L1340 team-quality helpers, L653-690 HCA sites). Each helper is decoupled from
+// the per-mille make-roll path (shotdecision.go): the buckets pick the shot PATH;
+// shot_decision later rolls make/miss inside the 2pt/3pt paths.
 //
-// SCALE RATIONALE (decided at impl time, overriding the plan's pinned Decision #1
-// "all four buckets the same O(1) order / foul ≈33–40% share"):
+// FAITHFUL STRUCTURE (this PR, landing HCA on top of #952's O(1) rescale):
 //
-//   - The plan's reason to exist is to make HCA's ±0.2 foul-bucket nudge
-//     EXPRESSIBLE — i.e. a +0.2 perturbation must move foul-path SELECTION by a
-//     non-negligible amount. That property depends ONLY on the four-bucket TOTAL
-//     being O(1) (so +0.2 is a meaningful fraction of the total), NOT on the foul
-//     bucket being a large SHARE. The shift from +0.2 is
-//     (f+0.2)/(T+0.2) − f/T, driven by absolute T, not by f/T. With T≈1.0 even a
-//     ~5%-share foul bucket shifts foul-path selection ≈16pp from +0.2 (see
-//     bucketweights_test.go TestBucketWeights_FoulScaleShift) — a LARGER margin
-//     than the plan's 37%-share design (~6pp).
-//   - The plan's "same order / foul 33–40%" magnitudes (2pt 0.5 / 3pt 0.4 /
-//     and-one 0.3 / foul 0.7) were empirically degenerate: they invert the
-//     field-goal-to-foul ratio (FG paths a minority), producing FTA>FGA, whole
-//     teams fouling out, blocks→0, and minutes>48. That is the OPPOSITE of the
-//     plan's stated "anchored to realistic path-selection frequencies."
+//   - 2pt (twoPtBucketWeight) = the recovered +0xD90 Branch-A cold composite
+//     (jsb560_decompiled.c:91078-91086): an offensive-rate composite, O(10s). This
+//     is the dominant, field-goal-heavy path. Net-free (net lives only in
+//     shot_value, not the bucket — so the playoff ×1.25 multiplier never amplifies
+//     the bucket).
+//   - 3pt (threePtBucketWeight) = the 2pt composite × the player's 3pt propensity.
+//     JSB's +0xDB0 is DEAD (always 0) and 3pt is decided upstream in the ball-
+//     handler stage (COMPOSITE_DOUBLES_TRACE.md §RESOLUTION); the Go engine folds
+//     3pt into the play-outcome pick at the propensity rate — functionally
+//     equivalent, kept on the same O(10s) basis as 2pt so 3pt does not vanish.
+//   - and-one (andOneBucketWeight) = matchup×0.25 + made-rate, floored to 0.03
+//     (the verbatim JSB floor, _DAT…→0.03). A small minority of plays, as in JSB.
+//   - foul (foulBucketWeight) = the 0.6 FLOOR (the +0xDE0 composite is dead/always
+//     0; the bucket floors to 0.6), modulated by the team-quality divisor
+//     foul = (foul/offQ)×(defQ − teamDef×5/6) + foul, then the site-2 HCA nudge
+//     foul −= hcaDelta. offQ (offQualityWithHCA, teamquality.go) shrinks for the
+//     home team, growing foul/offQ — the dominant home-favorable mechanism. With
+//     2pt at O(10s) the 0.6-floored foul bucket settles at a realistic minority
+//     share (no whole-team foul-outs, FTA < FGA), so the sim stays non-degenerate.
 //
-// So these stand-ins keep the 2pt bucket DOMINANT (a realistic field-goal-heavy
-// mix that approximately preserves the old green path ratios 0.75 : 0.17 : 0.04 :
-// 0.05), all on a comparable O(1) basis. This satisfies the plan's REAL structural
-// goal — the 2pt bucket is net-free, decoupled from sv2/the make-roll path, so the
-// playoff ×1.25 multiplier no longer amplifies it — without the degeneracy.
+// FAITHFULNESS / STAND-INS: the formula SHAPES (+0xD90 Branch-A, the 0.6 foul
+// floor + quality divisor, the per-lineup off/def sums, the ±0.2 HCA) are ported
+// exactly. Their numeric inputs are documented VALIDATION-PHASE STAND-INS: the
+// per-48 rate inputs D88/DB8 derive from r_fga/r_orb (the bundle carries no season
+// GP/FGA sums), D70 stands in for the CEngine team/league FTA-weighted aggregate
+// absent from the bundle, and the off/def per-player doubles (teamquality.go) have
+// unpinned source offsets. The four unresolved .rdata scale constants
+// (_DAT_0066d318/d310/d320/00669ad0) gate only the +0xD90 Branch-B usage-shrink
+// (deferred), NOT this Branch-A cold composite. Numeric corpus calibration of the
+// stand-in magnitudes — and JSB's exact ~55% home-edge magnitude — is deferred
+// (dev/nightly, no automated optimizer); THIS PR proves only the home-favorable
+// SIGN, the invariant PR7a got wrong.
 
-// twoPtBucketWeightScale maps the FGA/ORB/FTA composite to a comparable O(1)
-// magnitude (≈0.75 under richBundle ratings: FGA≈60, ORB≈20, FTA≈20 → composite
-// 80). Stand-in for +0xD90 whose inputs include CEngine team/league aggregates not
-// yet available. Kept dominant so field-goal attempts remain the majority path.
-const twoPtBucketWeightScale = 107.0
+const (
+	// +0xD90 Branch-A per-48 rate stand-ins (COMPOSITE_DOUBLES_TRACE.md §1, §4).
+	// Each maps a 0-99 rating to a per-48 rate analog; the bundle has no season
+	// GP/FGA sums so these are documented stand-ins for the recovered season-rate
+	// doubles. fgaRateScale: r_fga 60 → ~18 FGA/48; orbRateScale: r_orb 20 → ~3
+	// ORB/48; ftaRateScale: the team-relative FTA-weighted D70 stand-in, r_fta 20 →
+	// ~6 (the real D70 reads CEngine team/league aggregates absent from the bundle).
+	fgaRateScale = 0.30
+	orbRateScale = 0.15
+	ftaRateScale = 0.30
 
-// threePtBucketScale maps threePtPropensity() to a comparable O(1) magnitude
-// (≈0.17 at richBundle propensity ≈0.294, preserving the old 3pt:2pt ratio ≈0.23).
-// Structurally, 3pt remains folded into the play-outcome pick here, whereas JSB
-// resolves it upstream via the ball-handler gate (+0xDB0 is always 0 in the
-// decompile); functionally equivalent per §4 of 00_MASTER_REFERENCE.md.
-const threePtBucketScale = 0.58
+	// +0xD90 Branch-A pinned constants (COMPOSITE_DOUBLES_TRACE.md §5): the 0.5
+	// (_DAT_00669ef0) and 0.25 (_DAT_00669f58) factors in the make-share weighting.
+	d90MakeShareHalf    = 0.5
+	d90MakeShareQuarter = 0.25
 
-// andOneMadeRateScale maps the player's FGP rating to a made-rate proxy for the
-// and-one stand-in. Target ≈0.035 at FGP=50 (and-ones are a small minority of
-// scoring plays); the mq term (≈−0.02 under default ratings) contributes ≈−0.005,
-// so the made-rate term carries the bucket to its small realistic share.
-const andOneMadeRateScale = 0.0008
+	// foulFloor is the foul bucket's 0.6 floor (COMPOSITE_DOUBLES_TRACE.md
+	// §RESOLUTION: the +0xDE0 composite is dead/always-0, so the foul bucket floors
+	// to 0.6 before the quality-divisor + HCA adjustments).
+	foulFloor = 0.6
 
-// foulNetScale maps net advantage to the adjustable portion of the foul bucket
-// weight (above the floor). Net is the ONLY bucket input that consumes net — this
-// is where a future HCA nudge lands. Net≈0 yields the floor; net≈1 adds ≈0.01.
-const foulNetScale = 0.01
+	// foulDivisorTeamDefCoef = 5/6 (_DAT_0066d3a0 = 0.8333), the coefficient on the
+	// team-defense baseline in the foul divisor numerator (defQ − teamDef×5/6).
+	foulDivisorTeamDefCoef = 0.8333333333
 
-// andOneBucketFloor is the minimum and-one weight. Ensures the and-one path
-// cannot be zeroed by a negative matchup quality.
-const andOneBucketFloor = 0.03
+	// andOneBucketFloor is the verbatim JSB and-one floor (0.03). Ensures the
+	// and-one path cannot be zeroed by a negative matchup quality. Unchanged from
+	// the faithful #952 basis.
+	andOneBucketFloor = 0.03
 
-// foulOnlyBucketFloor is the base foul-only weight before the net adjustment.
-// Kept small (foul-path share ≈5%, matching the old green basis) so the simulation
-// stays realistic (no whole-team foul-outs). The +0.2 HCA perturbation is still
-// expressible because the FOUR-BUCKET TOTAL is O(1) (≈1.0), not because the foul
-// SHARE is large — see the scale rationale block above.
-const foulOnlyBucketFloor = 0.04
+	// andOneMadeRateScale maps the player's FGP rating to a made-rate proxy for the
+	// and-one stand-in (a small minority of scoring plays). Unchanged from #952.
+	andOneMadeRateScale = 0.0008
+)
 
-// twoPtBucketWeight is a net-free O(1) composite over offensive rate analogs
-// r_fga, r_orb, r_fta. Stand-in for JSB +0xD90 (CEngine aggregates unavailable).
-// Net is intentionally absent: in JSB, net lives only in shot_value; the 2pt
-// bucket weight is an independent offensive-rate composite. This cleanly retires
-// the old sv2-reuse entanglement and means the playoff ×1.25 multiplier no longer
-// amplifies the 2pt bucket weight. Kept dominant so field-goal attempts remain the
+// twoPtBucketWeight is the recovered +0xD90 Branch-A cold composite
+// (jsb560_decompiled.c:91078-91086, COMPOSITE_DOUBLES_TRACE.md §4):
+//
+//	D90 = D88 − (D88/(D70+D88)) × DB8 × ((D88/(DB8+D88)) × 0.5 + 0.25)
+//
+// where D88 = per-48 FGA rate, DB8 = per-48 ORB rate, D70 = the team-relative
+// FTA-weighted rate (documented stand-ins, see the rate-scale constants above).
+// It is net-free: in JSB net enters only via shot_value, so the playoff ×1.25
+// multiplier never amplifies this bucket. The composite is O(10s), keeping the
+// 0.6-floored foul bucket a realistic minority share and field-goal attempts the
 // majority path.
 func twoPtBucketWeight(p onCourt) float64 {
-	fga := floor1(p.FGA)
-	orb := floor1(p.ORB)
-	fta := floor1(p.FTA)
-	return (fga + orb*0.5 + fta*0.5) / twoPtBucketWeightScale
+	d88 := floor1(p.FGA) * fgaRateScale
+	db8 := floor1(p.ORB) * orbRateScale
+	d70 := floor1(p.FTA) * ftaRateScale
+	if d70+d88 <= 0 {
+		return d88
+	}
+	makeShare := (d88/(db8+d88))*d90MakeShareHalf + d90MakeShareQuarter
+	return d88 - (d88/(d70+d88))*db8*makeShare
 }
 
-// threePtBucketWeight is a comparable O(1) restatement of 3pt propensity.
-// 3pt remains folded into the play-outcome pick (structurally differs from JSB
-// but is functionally equivalent per §4 of the RE doc; upstream-gate restructure
-// is a separate follow-on change).
+// threePtBucketWeight keeps the 3pt path on the same O(10s) basis as the 2pt
+// composite, scaled by the player's 3pt propensity. JSB's +0xDB0 is dead and 3pt
+// is gated upstream in the ball-handler stage; folding it into the play-outcome
+// pick at the propensity rate is functionally equivalent (COMPOSITE_DOUBLES_
+// TRACE.md §RESOLUTION). Scaling off the 2pt composite (rather than a fixed O(1)
+// constant) prevents 3pt attempts from vanishing now that 2pt is O(10s).
 func threePtBucketWeight(p onCourt) float64 {
-	return threePtPropensity(p) * threePtBucketScale
+	return twoPtBucketWeight(p) * threePtPropensity(p)
 }
 
-// andOneBucketWeight is an O(1) matchup×0.25 + made-rate stand-in, floored to
-// andOneBucketFloor. The mq term (≈−0.02 under default ratings) contributes
-// negligible negative weight; the made-rate term carries the bucket above the
-// floor. Stand-in for JSB +0xDE0 (per-game double player_double not yet pinned).
+// andOneBucketWeight is the matchup×0.25 + made-rate stand-in, floored to
+// andOneBucketFloor (0.03, the verbatim JSB floor). The mq term (≈−0.02 under
+// default ratings) contributes negligible negative weight; the made-rate term
+// carries the bucket above the floor. Unchanged from the faithful #952 basis.
 func andOneBucketWeight(mq float64, p onCourt) float64 {
 	w := mq*0.25 + float64(floor1(p.FGP))*andOneMadeRateScale
 	if w < andOneBucketFloor {
@@ -100,17 +120,30 @@ func andOneBucketWeight(mq float64, p onCourt) float64 {
 	return w
 }
 
-// foulBucketWeight is floored at foulOnlyBucketFloor, then adjusted by a
-// net-based stand-in. Net is the ONLY bucket that consumes net advantage (matching
-// JSB: net → shot_value only, except the foul bucket also reads off_quality via
-// net). off_quality player_double is not yet pinned — a net × foulNetScale stand-in
-// is used. Kept small (≈0.05 under realistic matchups) so the sim stays realistic;
-// a future +0.2 HCA perturbation is still a non-negligible swing on foul-path
-// selection frequency because the four-bucket TOTAL is O(1) (see scale rationale).
-func foulBucketWeight(net float64, p onCourt) float64 {
-	w := foulOnlyBucketFloor + net*foulNetScale
-	if w < foulOnlyBucketFloor {
-		return foulOnlyBucketFloor
-	}
-	return w
+// foulBucketWeight is the recovered faithful foul bucket (COMPOSITE_DOUBLES_
+// TRACE.md §RESOLUTION, 00_MASTER_REFERENCE.md L1340): the 0.6 floor, modulated by
+// the team-quality divisor and the site-2 HCA nudge:
+//
+//	foul = 0.6
+//	foul = (foul / offQ) × (defQ − teamDef×5/6) + foul   // site-3 divisor
+//	foul −= hcaDelta                                       // site-2 nudge
+//
+// offQ = offQualityWithHCA(offense, hcaDelta) is the foul-bucket divisor; it
+// shrinks for the home team (each player's term reduced by +0.2), so foul/offQ —
+// and thus the home foul bucket — GROWS. That multiplicative divisor growth is the
+// dominant home-favorable term; it dominates the (anti-home) additive site-2 nudge
+// (foul −= +0.2 for home), which is near-negligible against the divisor-adjusted
+// bucket. This is the net-home-favorable composition PR7a got wrong (it shipped
+// site-2 alone, anti-home). defQ = defMatchupQuality(defenders). offQualityFloor
+// (teamquality.go) guards the division. The faithful divisor replaces #952's
+// net×scale foul stand-in — so the foul bucket no longer reads net and the playoff
+// ×1.25 multiplier no longer leaks into it. weight() clamps any negative result to
+// 0.
+func foulBucketWeight(offense, defenders []onCourt, hcaDelta float64) float64 {
+	foul := foulFloor
+	offQ := offQualityWithHCA(offense, hcaDelta)
+	defQ := defMatchupQuality(defenders)
+	foul = (foul/offQ)*(defQ-teamDefBaseline*foulDivisorTeamDefCoef) + foul
+	foul -= hcaDelta
+	return foul
 }

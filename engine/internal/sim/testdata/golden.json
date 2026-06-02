@@ -19,138 +19,27 @@
           "period": 1,
           "clock_seconds": 720,
           "team_id": 3,
-          "player_id": 202,
-          "shot_type": "3pt"
+          "player_id": 204,
+          "shot_type": "2pt"
         },
         {
           "kind": "shot_make",
           "period": 1,
           "clock_seconds": 720,
           "team_id": 3,
-          "player_id": 202,
-          "shot_type": "3pt"
-        },
-        {
-          "kind": "possession_start",
-          "period": 1,
-          "clock_seconds": 707,
-          "team_id": 7
-        },
-        {
-          "kind": "foul",
-          "period": 1,
-          "clock_seconds": 707,
-          "team_id": 3,
-          "player_id": 202
-        },
-        {
-          "kind": "free_throw",
-          "period": 1,
-          "clock_seconds": 707,
-          "team_id": 7,
-          "player_id": 101,
-          "shot_type": "ft",
-          "ft_attempts": 2
-        },
-        {
-          "kind": "possession_start",
-          "period": 1,
-          "clock_seconds": 694,
-          "team_id": 3
-        },
-        {
-          "kind": "shot_attempt",
-          "period": 1,
-          "clock_seconds": 694,
-          "team_id": 3,
-          "player_id": 202,
-          "shot_type": "3pt"
-        },
-        {
-          "kind": "shot_miss",
-          "period": 1,
-          "clock_seconds": 694,
-          "team_id": 3,
-          "player_id": 202,
-          "shot_type": "3pt"
-        },
-        {
-          "kind": "rebound",
-          "period": 1,
-          "clock_seconds": 694,
-          "team_id": 7,
-          "player_id": 102
-        },
-        {
-          "kind": "possession_start",
-          "period": 1,
-          "clock_seconds": 681,
-          "team_id": 7
-        },
-        {
-          "kind": "foul",
-          "period": 1,
-          "clock_seconds": 681,
-          "team_id": 3,
-          "player_id": 202
-        },
-        {
-          "kind": "free_throw",
-          "period": 1,
-          "clock_seconds": 681,
-          "team_id": 7,
-          "player_id": 102,
-          "shot_type": "ft",
-          "ft_attempts": 2
-        },
-        {
-          "kind": "possession_start",
-          "period": 1,
-          "clock_seconds": 668,
-          "team_id": 3
-        },
-        {
-          "kind": "shot_attempt",
-          "period": 1,
-          "clock_seconds": 668,
-          "team_id": 3,
-          "player_id": 202,
+          "player_id": 204,
           "shot_type": "2pt"
         },
         {
-          "kind": "shot_make",
-          "period": 1,
-          "clock_seconds": 668,
-          "team_id": 3,
-          "player_id": 202,
-          "shot_type": "2pt"
-        },
-        {
-          "kind": "foul",
-          "period": 1,
-          "clock_seconds": 668,
-          "team_id": 7,
-          "player_id": 102
-        },
-        {
-          "kind": "free_throw",
-          "period": 1,
-          "clock_seconds": 668,
-          "team_id": 3,
-          "player_id": 202,
-          "shot_type": "ft",
-          "ft_attempts": 1
-        },
-        {
           "kind": "possession_start",
           "period": 1,
-          "clock_seconds": 655,
+          "clock_seconds": 706,
           "team_id": 7
         },
         {
           "kind": "shot_attempt",
           "period": 1,
-          "clock_seconds": 655,
+          "clock_seconds": 706,
           "team_id": 7,
           "player_id": 102,
           "shot_type": "3pt"
@@ -158,7 +47,7 @@
         {
           "kind": "shot_miss",
           "period": 1,
-          "clock_seconds": 655,
+          "clock_seconds": 706,
           "team_id": 7,
           "player_id": 102,
           "shot_type": "3pt"
@@ -166,303 +55,327 @@
         {
           "kind": "rebound",
           "period": 1,
-          "clock_seconds": 655,
+          "clock_seconds": 706,
           "team_id": 3,
-          "player_id": 202
+          "player_id": 204
         },
         {
           "kind": "possession_start",
           "period": 1,
-          "clock_seconds": 642,
+          "clock_seconds": 692,
+          "team_id": 3
+        },
+        {
+          "kind": "turnover",
+          "period": 1,
+          "clock_seconds": 692,
+          "team_id": 3,
+          "player_id": 203
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 678,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 678,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 1,
+          "clock_seconds": 678,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 1,
+          "clock_seconds": 678,
+          "team_id": 3,
+          "player_id": 201
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 664,
           "team_id": 3
         },
         {
           "kind": "shot_attempt",
           "period": 1,
-          "clock_seconds": 642,
+          "clock_seconds": 664,
           "team_id": 3,
-          "player_id": 202,
+          "player_id": 205,
           "shot_type": "2pt"
         },
         {
           "kind": "shot_miss",
           "period": 1,
-          "clock_seconds": 642,
+          "clock_seconds": 664,
           "team_id": 3,
-          "player_id": 202,
+          "player_id": 205,
           "shot_type": "2pt"
         },
         {
           "kind": "rebound",
           "period": 1,
-          "clock_seconds": 642,
+          "clock_seconds": 664,
           "team_id": 3,
-          "player_id": 201,
+          "player_id": 203,
           "offensive_rebound": true
         },
         {
           "kind": "shot_attempt",
           "period": 1,
-          "clock_seconds": 642,
+          "clock_seconds": 664,
           "team_id": 3,
-          "player_id": 201,
+          "player_id": 203,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 1,
+          "clock_seconds": 664,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 1,
+          "clock_seconds": 664,
+          "team_id": 7,
+          "player_id": 101
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 650,
+          "team_id": 7
+        },
+        {
+          "kind": "foul",
+          "period": 1,
+          "clock_seconds": 650,
+          "team_id": 3,
+          "player_id": 201
+        },
+        {
+          "kind": "free_throw",
+          "period": 1,
+          "clock_seconds": 650,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "ft",
+          "ft_attempts": 2,
+          "ft_made": 1
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 636,
+          "team_id": 3
+        },
+        {
+          "kind": "turnover",
+          "period": 1,
+          "clock_seconds": 636,
+          "team_id": 3,
+          "player_id": 202
+        },
+        {
+          "kind": "steal",
+          "period": 1,
+          "clock_seconds": 636,
+          "team_id": 3,
+          "player_id": 202,
+          "defender_id": 102
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 622,
+          "team_id": 7
+        },
+        {
+          "kind": "turnover",
+          "period": 1,
+          "clock_seconds": 622,
+          "team_id": 7,
+          "player_id": 104
+        },
+        {
+          "kind": "steal",
+          "period": 1,
+          "clock_seconds": 622,
+          "team_id": 7,
+          "player_id": 104,
+          "defender_id": 203
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 608,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 608,
+          "team_id": 3,
+          "player_id": 205,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 1,
+          "clock_seconds": 608,
+          "team_id": 3,
+          "player_id": 205,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 1,
+          "clock_seconds": 608,
+          "team_id": 3,
+          "player_id": 204,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 608,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 1,
+          "clock_seconds": 608,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 1,
+          "clock_seconds": 608,
+          "team_id": 7,
+          "player_id": 103
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 594,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 594,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 1,
+          "clock_seconds": 594,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 1,
+          "clock_seconds": 594,
+          "team_id": 3,
+          "player_id": 204
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 580,
+          "team_id": 3
+        },
+        {
+          "kind": "foul",
+          "period": 1,
+          "clock_seconds": 580,
+          "team_id": 7,
+          "player_id": 105
+        },
+        {
+          "kind": "free_throw",
+          "period": 1,
+          "clock_seconds": 580,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "ft",
+          "ft_attempts": 2,
+          "ft_made": 1
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 566,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 566,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 1,
+          "clock_seconds": 566,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 552,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 552,
+          "team_id": 3,
+          "player_id": 203,
           "shot_type": "3pt"
         },
         {
           "kind": "shot_make",
           "period": 1,
-          "clock_seconds": 642,
+          "clock_seconds": 552,
           "team_id": 3,
-          "player_id": 201,
-          "shot_type": "3pt"
-        },
-        {
-          "kind": "possession_start",
-          "period": 1,
-          "clock_seconds": 629,
-          "team_id": 7
-        },
-        {
-          "kind": "shot_attempt",
-          "period": 1,
-          "clock_seconds": 629,
-          "team_id": 7,
-          "player_id": 101,
-          "shot_type": "3pt"
-        },
-        {
-          "kind": "shot_miss",
-          "period": 1,
-          "clock_seconds": 629,
-          "team_id": 7,
-          "player_id": 101,
-          "shot_type": "3pt"
-        },
-        {
-          "kind": "rebound",
-          "period": 1,
-          "clock_seconds": 629,
-          "team_id": 7,
-          "player_id": 101,
-          "offensive_rebound": true
-        },
-        {
-          "kind": "foul",
-          "period": 1,
-          "clock_seconds": 629,
-          "team_id": 3,
-          "player_id": 202
-        },
-        {
-          "kind": "free_throw",
-          "period": 1,
-          "clock_seconds": 629,
-          "team_id": 7,
-          "player_id": 101,
-          "shot_type": "ft",
-          "ft_attempts": 2
-        },
-        {
-          "kind": "possession_start",
-          "period": 1,
-          "clock_seconds": 616,
-          "team_id": 3
-        },
-        {
-          "kind": "shot_attempt",
-          "period": 1,
-          "clock_seconds": 616,
-          "team_id": 3,
-          "player_id": 201,
-          "shot_type": "3pt"
-        },
-        {
-          "kind": "shot_miss",
-          "period": 1,
-          "clock_seconds": 616,
-          "team_id": 3,
-          "player_id": 201,
-          "shot_type": "3pt"
-        },
-        {
-          "kind": "rebound",
-          "period": 1,
-          "clock_seconds": 616,
-          "team_id": 3,
-          "player_id": 201,
-          "offensive_rebound": true
-        },
-        {
-          "kind": "shot_attempt",
-          "period": 1,
-          "clock_seconds": 616,
-          "team_id": 3,
-          "player_id": 201,
-          "shot_type": "2pt"
-        },
-        {
-          "kind": "shot_miss",
-          "period": 1,
-          "clock_seconds": 616,
-          "team_id": 3,
-          "player_id": 201,
-          "shot_type": "2pt"
-        },
-        {
-          "kind": "rebound",
-          "period": 1,
-          "clock_seconds": 616,
-          "team_id": 7,
-          "player_id": 102
-        },
-        {
-          "kind": "possession_start",
-          "period": 1,
-          "clock_seconds": 603,
-          "team_id": 7
-        },
-        {
-          "kind": "shot_attempt",
-          "period": 1,
-          "clock_seconds": 603,
-          "team_id": 7,
-          "player_id": 102,
-          "shot_type": "3pt"
-        },
-        {
-          "kind": "shot_miss",
-          "period": 1,
-          "clock_seconds": 603,
-          "team_id": 7,
-          "player_id": 102,
-          "shot_type": "3pt"
-        },
-        {
-          "kind": "rebound",
-          "period": 1,
-          "clock_seconds": 603,
-          "team_id": 3,
-          "player_id": 202
-        },
-        {
-          "kind": "possession_start",
-          "period": 1,
-          "clock_seconds": 590,
-          "team_id": 3
-        },
-        {
-          "kind": "foul",
-          "period": 1,
-          "clock_seconds": 590,
-          "team_id": 7,
-          "player_id": 102
-        },
-        {
-          "kind": "free_throw",
-          "period": 1,
-          "clock_seconds": 590,
-          "team_id": 3,
-          "player_id": 202,
-          "shot_type": "ft",
-          "ft_attempts": 2
-        },
-        {
-          "kind": "possession_start",
-          "period": 1,
-          "clock_seconds": 577,
-          "team_id": 7
-        },
-        {
-          "kind": "foul",
-          "period": 1,
-          "clock_seconds": 577,
-          "team_id": 3,
-          "player_id": 202
-        },
-        {
-          "kind": "free_throw",
-          "period": 1,
-          "clock_seconds": 577,
-          "team_id": 7,
-          "player_id": 102,
-          "shot_type": "ft",
-          "ft_attempts": 2
-        },
-        {
-          "kind": "possession_start",
-          "period": 1,
-          "clock_seconds": 564,
-          "team_id": 3
-        },
-        {
-          "kind": "shot_attempt",
-          "period": 1,
-          "clock_seconds": 564,
-          "team_id": 3,
-          "player_id": 202,
-          "shot_type": "2pt"
-        },
-        {
-          "kind": "shot_miss",
-          "period": 1,
-          "clock_seconds": 564,
-          "team_id": 3,
-          "player_id": 202,
-          "shot_type": "2pt"
-        },
-        {
-          "kind": "rebound",
-          "period": 1,
-          "clock_seconds": 564,
-          "team_id": 7,
-          "player_id": 102
-        },
-        {
-          "kind": "possession_start",
-          "period": 1,
-          "clock_seconds": 551,
-          "team_id": 7
-        },
-        {
-          "kind": "shot_attempt",
-          "period": 1,
-          "clock_seconds": 551,
-          "team_id": 7,
-          "player_id": 102,
-          "shot_type": "3pt"
-        },
-        {
-          "kind": "shot_make",
-          "period": 1,
-          "clock_seconds": 551,
-          "team_id": 7,
-          "player_id": 102,
+          "player_id": 203,
           "shot_type": "3pt"
         },
         {
           "kind": "possession_start",
           "period": 1,
           "clock_seconds": 538,
-          "team_id": 3
+          "team_id": 7
         },
         {
-          "kind": "shot_attempt",
-          "period": 1,
-          "clock_seconds": 538,
-          "team_id": 3,
-          "player_id": 202,
-          "shot_type": "3pt"
-        },
-        {
-          "kind": "shot_miss",
-          "period": 1,
-          "clock_seconds": 538,
-          "team_id": 3,
-          "player_id": 202,
-          "shot_type": "3pt"
-        },
-        {
-          "kind": "rebound",
+          "kind": "turnover",
           "period": 1,
           "clock_seconds": 538,
           "team_id": 7,
@@ -471,146 +384,146 @@
         {
           "kind": "possession_start",
           "period": 1,
-          "clock_seconds": 525,
-          "team_id": 7
-        },
-        {
-          "kind": "foul",
-          "period": 1,
-          "clock_seconds": 525,
-          "team_id": 3,
-          "player_id": 202
-        },
-        {
-          "kind": "free_throw",
-          "period": 1,
-          "clock_seconds": 525,
-          "team_id": 7,
-          "player_id": 101,
-          "shot_type": "ft",
-          "ft_attempts": 2
-        },
-        {
-          "kind": "possession_start",
-          "period": 1,
-          "clock_seconds": 512,
-          "team_id": 3
-        },
-        {
-          "kind": "foul",
-          "period": 1,
-          "clock_seconds": 512,
-          "team_id": 7,
-          "player_id": 102
-        },
-        {
-          "kind": "free_throw",
-          "period": 1,
-          "clock_seconds": 512,
-          "team_id": 3,
-          "player_id": 201,
-          "shot_type": "ft",
-          "ft_attempts": 2
-        },
-        {
-          "kind": "possession_start",
-          "period": 1,
-          "clock_seconds": 499,
-          "team_id": 7
-        },
-        {
-          "kind": "foul",
-          "period": 1,
-          "clock_seconds": 499,
-          "team_id": 3,
-          "player_id": 201
-        },
-        {
-          "kind": "free_throw",
-          "period": 1,
-          "clock_seconds": 499,
-          "team_id": 7,
-          "player_id": 102,
-          "shot_type": "ft",
-          "ft_attempts": 2
-        },
-        {
-          "kind": "possession_start",
-          "period": 1,
-          "clock_seconds": 486,
+          "clock_seconds": 524,
           "team_id": 3
         },
         {
           "kind": "shot_attempt",
           "period": 1,
-          "clock_seconds": 486,
+          "clock_seconds": 524,
           "team_id": 3,
-          "player_id": 201,
-          "shot_type": "3pt"
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 1,
+          "clock_seconds": 524,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 510,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 510,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
         },
         {
           "kind": "shot_miss",
           "period": 1,
-          "clock_seconds": 486,
-          "team_id": 3,
-          "player_id": 201,
-          "shot_type": "3pt"
+          "clock_seconds": 510,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
         },
         {
           "kind": "rebound",
           "period": 1,
-          "clock_seconds": 486,
+          "clock_seconds": 510,
+          "team_id": 7,
+          "player_id": 105,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "turnover",
+          "period": 1,
+          "clock_seconds": 510,
+          "team_id": 7,
+          "player_id": 105
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 496,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 496,
+          "team_id": 3,
+          "player_id": 205,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 1,
+          "clock_seconds": 496,
+          "team_id": 3,
+          "player_id": 205,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 1,
+          "clock_seconds": 496,
           "team_id": 7,
           "player_id": 102
         },
         {
           "kind": "possession_start",
           "period": 1,
-          "clock_seconds": 473,
+          "clock_seconds": 482,
           "team_id": 7
         },
         {
-          "kind": "foul",
+          "kind": "shot_attempt",
           "period": 1,
-          "clock_seconds": 473,
-          "team_id": 3,
-          "player_id": 201
+          "clock_seconds": 482,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "3pt"
         },
         {
-          "kind": "free_throw",
+          "kind": "shot_miss",
           "period": 1,
-          "clock_seconds": 473,
+          "clock_seconds": 482,
           "team_id": 7,
-          "player_id": 102,
-          "shot_type": "ft",
-          "ft_attempts": 2
+          "player_id": 104,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 1,
+          "clock_seconds": 482,
+          "team_id": 3,
+          "player_id": 203
         },
         {
           "kind": "possession_start",
           "period": 1,
-          "clock_seconds": 460,
+          "clock_seconds": 468,
           "team_id": 3
         },
         {
           "kind": "shot_attempt",
           "period": 1,
-          "clock_seconds": 460,
+          "clock_seconds": 468,
           "team_id": 3,
           "player_id": 202,
-          "shot_type": "2pt"
+          "shot_type": "3pt"
         },
         {
           "kind": "shot_miss",
           "period": 1,
-          "clock_seconds": 460,
+          "clock_seconds": 468,
           "team_id": 3,
           "player_id": 202,
-          "shot_type": "2pt"
+          "shot_type": "3pt"
         },
         {
           "kind": "rebound",
           "period": 1,
-          "clock_seconds": 460,
+          "clock_seconds": 468,
           "team_id": 3,
           "player_id": 201,
           "offensive_rebound": true
@@ -618,235 +531,203 @@
         {
           "kind": "shot_attempt",
           "period": 1,
-          "clock_seconds": 460,
+          "clock_seconds": 468,
           "team_id": 3,
           "player_id": 201,
-          "shot_type": "3pt"
+          "shot_type": "2pt"
         },
         {
           "kind": "shot_make",
           "period": 1,
-          "clock_seconds": 460,
+          "clock_seconds": 468,
           "team_id": 3,
           "player_id": 201,
-          "shot_type": "3pt"
+          "shot_type": "2pt"
         },
         {
           "kind": "possession_start",
           "period": 1,
-          "clock_seconds": 447,
+          "clock_seconds": 454,
+          "team_id": 7
+        },
+        {
+          "kind": "turnover",
+          "period": 1,
+          "clock_seconds": 454,
+          "team_id": 7,
+          "player_id": 105
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 440,
+          "team_id": 3
+        },
+        {
+          "kind": "foul",
+          "period": 1,
+          "clock_seconds": 440,
+          "team_id": 7,
+          "player_id": 104
+        },
+        {
+          "kind": "free_throw",
+          "period": 1,
+          "clock_seconds": 440,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "ft",
+          "ft_attempts": 2,
+          "ft_made": 2
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 426,
           "team_id": 7
         },
         {
           "kind": "shot_attempt",
           "period": 1,
-          "clock_seconds": 447,
+          "clock_seconds": 426,
           "team_id": 7,
-          "player_id": 101,
-          "shot_type": "3pt"
+          "player_id": 103,
+          "shot_type": "2pt"
         },
         {
           "kind": "shot_miss",
           "period": 1,
-          "clock_seconds": 447,
+          "clock_seconds": 426,
           "team_id": 7,
-          "player_id": 101,
-          "shot_type": "3pt"
+          "player_id": 103,
+          "shot_type": "2pt"
         },
         {
           "kind": "rebound",
           "period": 1,
-          "clock_seconds": 447,
+          "clock_seconds": 426,
           "team_id": 7,
-          "player_id": 101,
+          "player_id": 103,
           "offensive_rebound": true
         },
         {
-          "kind": "foul",
-          "period": 1,
-          "clock_seconds": 447,
-          "team_id": 3,
-          "player_id": 202
-        },
-        {
-          "kind": "free_throw",
-          "period": 1,
-          "clock_seconds": 447,
-          "team_id": 7,
-          "player_id": 101,
-          "shot_type": "ft",
-          "ft_attempts": 2
-        },
-        {
-          "kind": "possession_start",
-          "period": 1,
-          "clock_seconds": 434,
-          "team_id": 3
-        },
-        {
           "kind": "shot_attempt",
           "period": 1,
-          "clock_seconds": 434,
-          "team_id": 3,
-          "player_id": 201,
+          "clock_seconds": 426,
+          "team_id": 7,
+          "player_id": 103,
           "shot_type": "2pt"
         },
         {
           "kind": "shot_make",
           "period": 1,
-          "clock_seconds": 434,
-          "team_id": 3,
-          "player_id": 201,
-          "shot_type": "2pt"
-        },
-        {
-          "kind": "foul",
-          "period": 1,
-          "clock_seconds": 434,
+          "clock_seconds": 426,
           "team_id": 7,
-          "player_id": 102
-        },
-        {
-          "kind": "free_throw",
-          "period": 1,
-          "clock_seconds": 434,
-          "team_id": 3,
-          "player_id": 201,
-          "shot_type": "ft",
-          "ft_attempts": 1
+          "player_id": 103,
+          "shot_type": "2pt"
         },
         {
           "kind": "possession_start",
           "period": 1,
-          "clock_seconds": 421,
-          "team_id": 7
+          "clock_seconds": 412,
+          "team_id": 3
         },
         {
           "kind": "shot_attempt",
           "period": 1,
-          "clock_seconds": 421,
-          "team_id": 7,
-          "player_id": 102,
+          "clock_seconds": 412,
+          "team_id": 3,
+          "player_id": 204,
           "shot_type": "2pt"
         },
         {
           "kind": "shot_make",
           "period": 1,
-          "clock_seconds": 421,
-          "team_id": 7,
-          "player_id": 102,
+          "clock_seconds": 412,
+          "team_id": 3,
+          "player_id": 204,
           "shot_type": "2pt"
         },
         {
-          "kind": "foul",
-          "period": 1,
-          "clock_seconds": 421,
-          "team_id": 3,
-          "player_id": 201
-        },
-        {
-          "kind": "free_throw",
-          "period": 1,
-          "clock_seconds": 421,
-          "team_id": 7,
-          "player_id": 102,
-          "shot_type": "ft",
-          "ft_attempts": 1
-        },
-        {
           "kind": "possession_start",
           "period": 1,
-          "clock_seconds": 408,
-          "team_id": 3
-        },
-        {
-          "kind": "foul",
-          "period": 1,
-          "clock_seconds": 408,
-          "team_id": 7,
-          "player_id": 102
-        },
-        {
-          "kind": "free_throw",
-          "period": 1,
-          "clock_seconds": 408,
-          "team_id": 3,
-          "player_id": 201,
-          "shot_type": "ft",
-          "ft_attempts": 2
-        },
-        {
-          "kind": "possession_start",
-          "period": 1,
-          "clock_seconds": 395,
+          "clock_seconds": 398,
           "team_id": 7
+        },
+        {
+          "kind": "turnover",
+          "period": 1,
+          "clock_seconds": 398,
+          "team_id": 7,
+          "player_id": 103
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 384,
+          "team_id": 3
         },
         {
           "kind": "shot_attempt",
           "period": 1,
-          "clock_seconds": 395,
-          "team_id": 7,
-          "player_id": 102,
-          "shot_type": "3pt"
+          "clock_seconds": 384,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "2pt"
         },
         {
           "kind": "shot_miss",
           "period": 1,
-          "clock_seconds": 395,
-          "team_id": 7,
-          "player_id": 102,
-          "shot_type": "3pt"
+          "clock_seconds": 384,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "2pt"
         },
         {
           "kind": "rebound",
           "period": 1,
-          "clock_seconds": 395,
+          "clock_seconds": 384,
           "team_id": 3,
-          "player_id": 201
+          "player_id": 203,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "turnover",
+          "period": 1,
+          "clock_seconds": 384,
+          "team_id": 3,
+          "player_id": 203
+        },
+        {
+          "kind": "steal",
+          "period": 1,
+          "clock_seconds": 384,
+          "team_id": 3,
+          "player_id": 203,
+          "defender_id": 105
         },
         {
           "kind": "possession_start",
           "period": 1,
-          "clock_seconds": 382,
-          "team_id": 3
-        },
-        {
-          "kind": "foul",
-          "period": 1,
-          "clock_seconds": 382,
-          "team_id": 7,
-          "player_id": 102
-        },
-        {
-          "kind": "free_throw",
-          "period": 1,
-          "clock_seconds": 382,
-          "team_id": 3,
-          "player_id": 201,
-          "shot_type": "ft",
-          "ft_attempts": 2
-        },
-        {
-          "kind": "possession_start",
-          "period": 1,
-          "clock_seconds": 369,
+          "clock_seconds": 370,
           "team_id": 7
         },
         {
           "kind": "foul",
           "period": 1,
-          "clock_seconds": 369,
+          "clock_seconds": 370,
           "team_id": 3,
-          "player_id": 201
+          "player_id": 204
         },
         {
           "kind": "free_throw",
           "period": 1,
-          "clock_seconds": 369,
+          "clock_seconds": 370,
           "team_id": 7,
-          "player_id": 101,
+          "player_id": 105,
           "shot_type": "ft",
-          "ft_attempts": 2
+          "ft_attempts": 2,
+          "ft_made": 1
         },
         {
           "kind": "possession_start",
@@ -855,223 +736,2235 @@
           "team_id": 3
         },
         {
-          "kind": "foul",
-          "period": 1,
-          "clock_seconds": 356,
-          "team_id": 7,
-          "player_id": 101
-        },
-        {
-          "kind": "free_throw",
+          "kind": "shot_attempt",
           "period": 1,
           "clock_seconds": 356,
           "team_id": 3,
-          "player_id": 201,
-          "shot_type": "ft",
-          "ft_attempts": 2
-        },
-        {
-          "kind": "possession_start",
-          "period": 1,
-          "clock_seconds": 343,
-          "team_id": 7
-        },
-        {
-          "kind": "shot_attempt",
-          "period": 1,
-          "clock_seconds": 343,
-          "team_id": 7,
-          "player_id": 101,
+          "player_id": 205,
           "shot_type": "2pt"
         },
         {
           "kind": "shot_miss",
           "period": 1,
-          "clock_seconds": 343,
-          "team_id": 7,
-          "player_id": 101,
+          "clock_seconds": 356,
+          "team_id": 3,
+          "player_id": 205,
           "shot_type": "2pt"
         },
         {
           "kind": "rebound",
           "period": 1,
-          "clock_seconds": 343,
-          "team_id": 7,
-          "player_id": 101,
-          "offensive_rebound": true
-        },
-        {
-          "kind": "shot_attempt",
-          "period": 1,
-          "clock_seconds": 343,
-          "team_id": 7,
-          "player_id": 101,
-          "shot_type": "3pt"
-        },
-        {
-          "kind": "shot_make",
-          "period": 1,
-          "clock_seconds": 343,
-          "team_id": 7,
-          "player_id": 101,
-          "shot_type": "3pt"
-        },
-        {
-          "kind": "possession_start",
-          "period": 1,
-          "clock_seconds": 330,
-          "team_id": 3
-        },
-        {
-          "kind": "shot_attempt",
-          "period": 1,
-          "clock_seconds": 330,
-          "team_id": 3,
-          "player_id": 201,
-          "shot_type": "3pt"
-        },
-        {
-          "kind": "shot_miss",
-          "period": 1,
-          "clock_seconds": 330,
-          "team_id": 3,
-          "player_id": 201,
-          "shot_type": "3pt"
-        },
-        {
-          "kind": "rebound",
-          "period": 1,
-          "clock_seconds": 330,
+          "clock_seconds": 356,
           "team_id": 3,
           "player_id": 201,
           "offensive_rebound": true
         },
         {
-          "kind": "foul",
-          "period": 1,
-          "clock_seconds": 330,
-          "team_id": 7,
-          "player_id": 101
-        },
-        {
-          "kind": "free_throw",
-          "period": 1,
-          "clock_seconds": 330,
-          "team_id": 3,
-          "player_id": 201,
-          "shot_type": "ft",
-          "ft_attempts": 2
-        },
-        {
-          "kind": "possession_start",
-          "period": 1,
-          "clock_seconds": 317,
-          "team_id": 7
-        },
-        {
           "kind": "shot_attempt",
           "period": 1,
-          "clock_seconds": 317,
-          "team_id": 7,
-          "player_id": 101,
+          "clock_seconds": 356,
+          "team_id": 3,
+          "player_id": 201,
           "shot_type": "2pt"
         },
         {
           "kind": "shot_make",
           "period": 1,
-          "clock_seconds": 317,
-          "team_id": 7,
-          "player_id": 101,
-          "shot_type": "2pt"
-        },
-        {
-          "kind": "foul",
-          "period": 1,
-          "clock_seconds": 317,
+          "clock_seconds": 356,
           "team_id": 3,
-          "player_id": 201
-        },
-        {
-          "kind": "free_throw",
-          "period": 1,
-          "clock_seconds": 317,
-          "team_id": 7,
-          "player_id": 101,
-          "shot_type": "ft",
-          "ft_attempts": 1
+          "player_id": 201,
+          "shot_type": "2pt"
         },
         {
           "kind": "possession_start",
           "period": 1,
-          "clock_seconds": 304,
+          "clock_seconds": 342,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 342,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 1,
+          "clock_seconds": 342,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 328,
           "team_id": 3
         },
         {
           "kind": "shot_attempt",
           "period": 1,
-          "clock_seconds": 304,
+          "clock_seconds": 328,
           "team_id": 3,
           "player_id": 201,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 1,
+          "clock_seconds": 328,
+          "team_id": 3,
+          "player_id": 201,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 1,
+          "clock_seconds": 328,
+          "team_id": 3,
+          "player_id": 204,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 328,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 1,
+          "clock_seconds": 328,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 314,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 314,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 1,
+          "clock_seconds": 314,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 300,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 300,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 1,
+          "clock_seconds": 300,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 1,
+          "clock_seconds": 300,
+          "team_id": 7,
+          "player_id": 105
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 286,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 286,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 1,
+          "clock_seconds": 286,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 1,
+          "clock_seconds": 286,
+          "team_id": 7,
+          "player_id": 103,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 286,
+          "team_id": 7,
+          "player_id": 103,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 1,
+          "clock_seconds": 286,
+          "team_id": 7,
+          "player_id": 103,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 272,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 272,
+          "team_id": 3,
+          "player_id": 202,
           "shot_type": "3pt"
         },
         {
           "kind": "shot_miss",
           "period": 1,
-          "clock_seconds": 304,
+          "clock_seconds": 272,
           "team_id": 3,
-          "player_id": 201,
+          "player_id": 202,
           "shot_type": "3pt"
         },
         {
           "kind": "rebound",
           "period": 1,
-          "clock_seconds": 304,
+          "clock_seconds": 272,
+          "team_id": 7,
+          "player_id": 105
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 258,
+          "team_id": 7
+        },
+        {
+          "kind": "turnover",
+          "period": 1,
+          "clock_seconds": 258,
+          "team_id": 7,
+          "player_id": 102
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 244,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 244,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 1,
+          "clock_seconds": 244,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 1,
+          "clock_seconds": 244,
           "team_id": 3,
           "player_id": 201,
           "offensive_rebound": true
         },
         {
-          "kind": "foul",
+          "kind": "turnover",
           "period": 1,
-          "clock_seconds": 304,
-          "team_id": 7,
-          "player_id": 101
+          "clock_seconds": 244,
+          "team_id": 3,
+          "player_id": 201
         },
         {
-          "kind": "free_throw",
+          "kind": "steal",
           "period": 1,
-          "clock_seconds": 304,
+          "clock_seconds": 244,
           "team_id": 3,
           "player_id": 201,
-          "shot_type": "ft",
-          "ft_attempts": 2
+          "defender_id": 105
         },
         {
           "kind": "possession_start",
           "period": 1,
-          "clock_seconds": 291,
+          "clock_seconds": 230,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 230,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 1,
+          "clock_seconds": 230,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 1,
+          "clock_seconds": 230,
+          "team_id": 3,
+          "player_id": 202
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 216,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 216,
+          "team_id": 3,
+          "player_id": 201,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 1,
+          "clock_seconds": 216,
+          "team_id": 3,
+          "player_id": 201,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 202,
+          "team_id": 7
+        },
+        {
+          "kind": "turnover",
+          "period": 1,
+          "clock_seconds": 202,
+          "team_id": 7,
+          "player_id": 102
+        },
+        {
+          "kind": "steal",
+          "period": 1,
+          "clock_seconds": 202,
+          "team_id": 7,
+          "player_id": 102,
+          "defender_id": 201
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 188,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 188,
+          "team_id": 3,
+          "player_id": 201,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 1,
+          "clock_seconds": 188,
+          "team_id": 3,
+          "player_id": 201,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 1,
+          "clock_seconds": 188,
+          "team_id": 7,
+          "player_id": 102
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 174,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 174,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 1,
+          "clock_seconds": 174,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 1,
+          "clock_seconds": 174,
+          "team_id": 3,
+          "player_id": 203
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 160,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 160,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 1,
+          "clock_seconds": 160,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 146,
           "team_id": 7
         },
         {
           "kind": "foul",
           "period": 1,
-          "clock_seconds": 291,
+          "clock_seconds": 146,
           "team_id": 3,
-          "player_id": 201
+          "player_id": 204
         },
         {
           "kind": "free_throw",
           "period": 1,
-          "clock_seconds": 291,
+          "clock_seconds": 146,
+          "team_id": 7,
+          "player_id": 103,
+          "shot_type": "ft",
+          "ft_attempts": 2,
+          "ft_made": 1
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 132,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 132,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 1,
+          "clock_seconds": 132,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 1,
+          "clock_seconds": 132,
+          "team_id": 3,
+          "player_id": 203,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 132,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 1,
+          "clock_seconds": 132,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 1,
+          "clock_seconds": 132,
+          "team_id": 3,
+          "player_id": 204,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 132,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 1,
+          "clock_seconds": 132,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 1,
+          "clock_seconds": 132,
+          "team_id": 7,
+          "player_id": 105
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 118,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 118,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 1,
+          "clock_seconds": 118,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 104,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 104,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 1,
+          "clock_seconds": 104,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 90,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 90,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 1,
+          "clock_seconds": 90,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 1,
+          "clock_seconds": 90,
+          "team_id": 3,
+          "player_id": 205
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 76,
+          "team_id": 3
+        },
+        {
+          "kind": "turnover",
+          "period": 1,
+          "clock_seconds": 76,
+          "team_id": 3,
+          "player_id": 201
+        },
+        {
+          "kind": "steal",
+          "period": 1,
+          "clock_seconds": 76,
+          "team_id": 3,
+          "player_id": 201,
+          "defender_id": 103
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 62,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 62,
+          "team_id": 7,
+          "player_id": 103,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 1,
+          "clock_seconds": 62,
+          "team_id": 7,
+          "player_id": 103,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 48,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 48,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 1,
+          "clock_seconds": 48,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 34,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 34,
           "team_id": 7,
           "player_id": 101,
-          "shot_type": "ft",
-          "ft_attempts": 2
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 1,
+          "clock_seconds": 34,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 20,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 20,
+          "team_id": 3,
+          "player_id": 201,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 1,
+          "clock_seconds": 20,
+          "team_id": 3,
+          "player_id": 201,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 1,
+          "clock_seconds": 20,
+          "team_id": 7,
+          "player_id": 105
+        },
+        {
+          "kind": "possession_start",
+          "period": 1,
+          "clock_seconds": 6,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 1,
+          "clock_seconds": 6,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 1,
+          "clock_seconds": 6,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 1,
+          "clock_seconds": 6,
+          "team_id": 3,
+          "player_id": 203
         },
         {
           "kind": "period_boundary",
           "period": 1,
           "clock_seconds": 0
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 720,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 720,
+          "team_id": 3,
+          "player_id": 205,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 2,
+          "clock_seconds": 720,
+          "team_id": 3,
+          "player_id": 205,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 706,
+          "team_id": 7
+        },
+        {
+          "kind": "turnover",
+          "period": 2,
+          "clock_seconds": 706,
+          "team_id": 7,
+          "player_id": 102
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 692,
+          "team_id": 3
+        },
+        {
+          "kind": "foul",
+          "period": 2,
+          "clock_seconds": 692,
+          "team_id": 7,
+          "player_id": 101
+        },
+        {
+          "kind": "free_throw",
+          "period": 2,
+          "clock_seconds": 692,
+          "team_id": 3,
+          "player_id": 201,
+          "shot_type": "ft",
+          "ft_attempts": 2,
+          "ft_made": 2
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 678,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 678,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 2,
+          "clock_seconds": 678,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 664,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 664,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 2,
+          "clock_seconds": 664,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 2,
+          "clock_seconds": 664,
+          "team_id": 3,
+          "player_id": 202,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 664,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 2,
+          "clock_seconds": 664,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 650,
+          "team_id": 7
+        },
+        {
+          "kind": "turnover",
+          "period": 2,
+          "clock_seconds": 650,
+          "team_id": 7,
+          "player_id": 103
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 636,
+          "team_id": 3
+        },
+        {
+          "kind": "turnover",
+          "period": 2,
+          "clock_seconds": 636,
+          "team_id": 3,
+          "player_id": 202
+        },
+        {
+          "kind": "steal",
+          "period": 2,
+          "clock_seconds": 636,
+          "team_id": 3,
+          "player_id": 202,
+          "defender_id": 104
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 622,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 622,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 2,
+          "clock_seconds": 622,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 608,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 608,
+          "team_id": 3,
+          "player_id": 205,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 2,
+          "clock_seconds": 608,
+          "team_id": 3,
+          "player_id": 205,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 594,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 594,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 2,
+          "clock_seconds": 594,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 2,
+          "clock_seconds": 594,
+          "team_id": 3,
+          "player_id": 205
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 580,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 580,
+          "team_id": 3,
+          "player_id": 201,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 2,
+          "clock_seconds": 580,
+          "team_id": 3,
+          "player_id": 201,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 566,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 566,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 2,
+          "clock_seconds": 566,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 2,
+          "clock_seconds": 566,
+          "team_id": 7,
+          "player_id": 102,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 566,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 2,
+          "clock_seconds": 566,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 2,
+          "clock_seconds": 566,
+          "team_id": 7,
+          "player_id": 101,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 566,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 2,
+          "clock_seconds": 566,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 552,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 552,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 2,
+          "clock_seconds": 552,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 2,
+          "clock_seconds": 552,
+          "team_id": 3,
+          "player_id": 204,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 552,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 2,
+          "clock_seconds": 552,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 538,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 538,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 2,
+          "clock_seconds": 538,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 2,
+          "clock_seconds": 538,
+          "team_id": 3,
+          "player_id": 205
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 524,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 524,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 2,
+          "clock_seconds": 524,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 510,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 510,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 2,
+          "clock_seconds": 510,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 2,
+          "clock_seconds": 510,
+          "team_id": 7,
+          "player_id": 104,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 510,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 2,
+          "clock_seconds": 510,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 2,
+          "clock_seconds": 510,
+          "team_id": 3,
+          "player_id": 204
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 496,
+          "team_id": 3
+        },
+        {
+          "kind": "foul",
+          "period": 2,
+          "clock_seconds": 496,
+          "team_id": 7,
+          "player_id": 103
+        },
+        {
+          "kind": "free_throw",
+          "period": 2,
+          "clock_seconds": 496,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "ft",
+          "ft_attempts": 2,
+          "ft_made": 1
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 482,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 482,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 2,
+          "clock_seconds": 482,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 2,
+          "clock_seconds": 482,
+          "team_id": 3,
+          "player_id": 202
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 468,
+          "team_id": 3
+        },
+        {
+          "kind": "foul",
+          "period": 2,
+          "clock_seconds": 468,
+          "team_id": 7,
+          "player_id": 104
+        },
+        {
+          "kind": "free_throw",
+          "period": 2,
+          "clock_seconds": 468,
+          "team_id": 3,
+          "player_id": 201,
+          "shot_type": "ft",
+          "ft_attempts": 2,
+          "ft_made": 1
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 454,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 454,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 2,
+          "clock_seconds": 454,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 440,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 440,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 2,
+          "clock_seconds": 440,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "block",
+          "period": 2,
+          "clock_seconds": 440,
+          "team_id": 3,
+          "player_id": 204,
+          "defender_id": 102
+        },
+        {
+          "kind": "rebound",
+          "period": 2,
+          "clock_seconds": 440,
+          "team_id": 7,
+          "player_id": 104
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 426,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 426,
+          "team_id": 7,
+          "player_id": 103,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 2,
+          "clock_seconds": 426,
+          "team_id": 7,
+          "player_id": 103,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 412,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 412,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 2,
+          "clock_seconds": 412,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 398,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 398,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 2,
+          "clock_seconds": 398,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 2,
+          "clock_seconds": 398,
+          "team_id": 7,
+          "player_id": 104,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 398,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 2,
+          "clock_seconds": 398,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 384,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 384,
+          "team_id": 3,
+          "player_id": 205,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 2,
+          "clock_seconds": 384,
+          "team_id": 3,
+          "player_id": 205,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 2,
+          "clock_seconds": 384,
+          "team_id": 7,
+          "player_id": 103
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 370,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 370,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 2,
+          "clock_seconds": 370,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 356,
+          "team_id": 3
+        },
+        {
+          "kind": "foul",
+          "period": 2,
+          "clock_seconds": 356,
+          "team_id": 7,
+          "player_id": 104
+        },
+        {
+          "kind": "free_throw",
+          "period": 2,
+          "clock_seconds": 356,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "ft",
+          "ft_attempts": 2
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 342,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 342,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 2,
+          "clock_seconds": 342,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "block",
+          "period": 2,
+          "clock_seconds": 342,
+          "team_id": 7,
+          "player_id": 101,
+          "defender_id": 202
+        },
+        {
+          "kind": "rebound",
+          "period": 2,
+          "clock_seconds": 342,
+          "team_id": 3,
+          "player_id": 205
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 328,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 328,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 2,
+          "clock_seconds": 328,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 2,
+          "clock_seconds": 328,
+          "team_id": 7,
+          "player_id": 103
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 314,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 314,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 2,
+          "clock_seconds": 314,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 300,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 300,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 2,
+          "clock_seconds": 300,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 286,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 286,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 2,
+          "clock_seconds": 286,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 2,
+          "clock_seconds": 286,
+          "team_id": 3,
+          "player_id": 204
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 272,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 272,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 2,
+          "clock_seconds": 272,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 258,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 258,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 2,
+          "clock_seconds": 258,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 244,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 244,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 2,
+          "clock_seconds": 244,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 2,
+          "clock_seconds": 244,
+          "team_id": 7,
+          "player_id": 101
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 230,
+          "team_id": 7
+        },
+        {
+          "kind": "foul",
+          "period": 2,
+          "clock_seconds": 230,
+          "team_id": 3,
+          "player_id": 205
+        },
+        {
+          "kind": "free_throw",
+          "period": 2,
+          "clock_seconds": 230,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "ft",
+          "ft_attempts": 2,
+          "ft_made": 1
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 216,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 216,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 2,
+          "clock_seconds": 216,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 202,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 202,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 2,
+          "clock_seconds": 202,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 188,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 188,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 2,
+          "clock_seconds": 188,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 174,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 174,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 2,
+          "clock_seconds": 174,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "foul",
+          "period": 2,
+          "clock_seconds": 174,
+          "team_id": 3,
+          "player_id": 205
+        },
+        {
+          "kind": "free_throw",
+          "period": 2,
+          "clock_seconds": 174,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "ft",
+          "ft_attempts": 1,
+          "ft_made": 1
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 160,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 160,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 2,
+          "clock_seconds": 160,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 2,
+          "clock_seconds": 160,
+          "team_id": 7,
+          "player_id": 105
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 146,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 146,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 2,
+          "clock_seconds": 146,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 132,
+          "team_id": 3
+        },
+        {
+          "kind": "foul",
+          "period": 2,
+          "clock_seconds": 132,
+          "team_id": 7,
+          "player_id": 102
+        },
+        {
+          "kind": "free_throw",
+          "period": 2,
+          "clock_seconds": 132,
+          "team_id": 3,
+          "player_id": 201,
+          "shot_type": "ft",
+          "ft_attempts": 2,
+          "ft_made": 1
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 118,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 118,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 2,
+          "clock_seconds": 118,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 2,
+          "clock_seconds": 118,
+          "team_id": 7,
+          "player_id": 105,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 118,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 2,
+          "clock_seconds": 118,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 104,
+          "team_id": 3
+        },
+        {
+          "kind": "foul",
+          "period": 2,
+          "clock_seconds": 104,
+          "team_id": 7,
+          "player_id": 105
+        },
+        {
+          "kind": "free_throw",
+          "period": 2,
+          "clock_seconds": 104,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "ft",
+          "ft_attempts": 2,
+          "ft_made": 1
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 90,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 90,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 2,
+          "clock_seconds": 90,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 2,
+          "clock_seconds": 90,
+          "team_id": 7,
+          "player_id": 104,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "foul",
+          "period": 2,
+          "clock_seconds": 90,
+          "team_id": 3,
+          "player_id": 203
+        },
+        {
+          "kind": "free_throw",
+          "period": 2,
+          "clock_seconds": 90,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "ft",
+          "ft_attempts": 2,
+          "ft_made": 1
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 76,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 76,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 2,
+          "clock_seconds": 76,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 2,
+          "clock_seconds": 76,
+          "team_id": 3,
+          "player_id": 202,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 76,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 2,
+          "clock_seconds": 76,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 62,
+          "team_id": 7
+        },
+        {
+          "kind": "turnover",
+          "period": 2,
+          "clock_seconds": 62,
+          "team_id": 7,
+          "player_id": 105
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 48,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 48,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 2,
+          "clock_seconds": 48,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 2,
+          "clock_seconds": 48,
+          "team_id": 7,
+          "player_id": 104
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 34,
+          "team_id": 7
+        },
+        {
+          "kind": "foul",
+          "period": 2,
+          "clock_seconds": 34,
+          "team_id": 3,
+          "player_id": 202
+        },
+        {
+          "kind": "free_throw",
+          "period": 2,
+          "clock_seconds": 34,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "ft",
+          "ft_attempts": 2,
+          "ft_made": 2
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 20,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 20,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 2,
+          "clock_seconds": 20,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 2,
+          "clock_seconds": 6,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 2,
+          "clock_seconds": 6,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 2,
+          "clock_seconds": 6,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 2,
+          "clock_seconds": 6,
+          "team_id": 3,
+          "player_id": 202
         },
         {
           "kind": "period_boundary",
@@ -1079,9 +2972,3061 @@
           "clock_seconds": 0
         },
         {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 720,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 720,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 3,
+          "clock_seconds": 720,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 3,
+          "clock_seconds": 720,
+          "team_id": 3,
+          "player_id": 203,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 720,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 3,
+          "clock_seconds": 720,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 706,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 706,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 3,
+          "clock_seconds": 706,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 692,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 692,
+          "team_id": 3,
+          "player_id": 201,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 3,
+          "clock_seconds": 692,
+          "team_id": 3,
+          "player_id": 201,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 3,
+          "clock_seconds": 692,
+          "team_id": 3,
+          "player_id": 205,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "foul",
+          "period": 3,
+          "clock_seconds": 692,
+          "team_id": 7,
+          "player_id": 103
+        },
+        {
+          "kind": "free_throw",
+          "period": 3,
+          "clock_seconds": 692,
+          "team_id": 3,
+          "player_id": 205,
+          "shot_type": "ft",
+          "ft_attempts": 2,
+          "ft_made": 1
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 678,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 678,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 3,
+          "clock_seconds": 678,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 3,
+          "clock_seconds": 678,
+          "team_id": 3,
+          "player_id": 204
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 664,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 664,
+          "team_id": 3,
+          "player_id": 205,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 3,
+          "clock_seconds": 664,
+          "team_id": 3,
+          "player_id": 205,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 650,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 650,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 3,
+          "clock_seconds": 650,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 3,
+          "clock_seconds": 650,
+          "team_id": 3,
+          "player_id": 201
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 636,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 636,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 3,
+          "clock_seconds": 636,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 622,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 622,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 3,
+          "clock_seconds": 622,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 3,
+          "clock_seconds": 622,
+          "team_id": 7,
+          "player_id": 102,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 622,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 3,
+          "clock_seconds": 622,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 608,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 608,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 3,
+          "clock_seconds": 608,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 3,
+          "clock_seconds": 608,
+          "team_id": 3,
+          "player_id": 202,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "turnover",
+          "period": 3,
+          "clock_seconds": 608,
+          "team_id": 3,
+          "player_id": 202
+        },
+        {
+          "kind": "steal",
+          "period": 3,
+          "clock_seconds": 608,
+          "team_id": 3,
+          "player_id": 202,
+          "defender_id": 105
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 594,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 594,
+          "team_id": 7,
+          "player_id": 103,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 3,
+          "clock_seconds": 594,
+          "team_id": 7,
+          "player_id": 103,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 3,
+          "clock_seconds": 594,
+          "team_id": 7,
+          "player_id": 103,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 594,
+          "team_id": 7,
+          "player_id": 103,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 3,
+          "clock_seconds": 594,
+          "team_id": 7,
+          "player_id": 103,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 580,
+          "team_id": 3
+        },
+        {
+          "kind": "turnover",
+          "period": 3,
+          "clock_seconds": 580,
+          "team_id": 3,
+          "player_id": 204
+        },
+        {
+          "kind": "steal",
+          "period": 3,
+          "clock_seconds": 580,
+          "team_id": 3,
+          "player_id": 204,
+          "defender_id": 105
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 566,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 566,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 3,
+          "clock_seconds": 566,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 552,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 552,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 3,
+          "clock_seconds": 552,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 3,
+          "clock_seconds": 552,
+          "team_id": 7,
+          "player_id": 103
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 538,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 538,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 3,
+          "clock_seconds": 538,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 3,
+          "clock_seconds": 538,
+          "team_id": 3,
+          "player_id": 201
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 524,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 524,
+          "team_id": 3,
+          "player_id": 201,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 3,
+          "clock_seconds": 524,
+          "team_id": 3,
+          "player_id": 201,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 510,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 510,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 3,
+          "clock_seconds": 510,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 3,
+          "clock_seconds": 510,
+          "team_id": 7,
+          "player_id": 104,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "turnover",
+          "period": 3,
+          "clock_seconds": 510,
+          "team_id": 7,
+          "player_id": 104
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 496,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 496,
+          "team_id": 3,
+          "player_id": 201,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 3,
+          "clock_seconds": 496,
+          "team_id": 3,
+          "player_id": 201,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 482,
+          "team_id": 7
+        },
+        {
+          "kind": "turnover",
+          "period": 3,
+          "clock_seconds": 482,
+          "team_id": 7,
+          "player_id": 105
+        },
+        {
+          "kind": "steal",
+          "period": 3,
+          "clock_seconds": 482,
+          "team_id": 7,
+          "player_id": 105,
+          "defender_id": 201
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 468,
+          "team_id": 3
+        },
+        {
+          "kind": "turnover",
+          "period": 3,
+          "clock_seconds": 468,
+          "team_id": 3,
+          "player_id": 205
+        },
+        {
+          "kind": "steal",
+          "period": 3,
+          "clock_seconds": 468,
+          "team_id": 3,
+          "player_id": 205,
+          "defender_id": 104
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 454,
+          "team_id": 7
+        },
+        {
+          "kind": "turnover",
+          "period": 3,
+          "clock_seconds": 454,
+          "team_id": 7,
+          "player_id": 104
+        },
+        {
+          "kind": "steal",
+          "period": 3,
+          "clock_seconds": 454,
+          "team_id": 7,
+          "player_id": 104,
+          "defender_id": 201
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 440,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 440,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 3,
+          "clock_seconds": 440,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 3,
+          "clock_seconds": 440,
+          "team_id": 3,
+          "player_id": 203,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "turnover",
+          "period": 3,
+          "clock_seconds": 440,
+          "team_id": 3,
+          "player_id": 203
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 426,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 426,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 3,
+          "clock_seconds": 426,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 412,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 412,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 3,
+          "clock_seconds": 412,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 398,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 398,
+          "team_id": 7,
+          "player_id": 103,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 3,
+          "clock_seconds": 398,
+          "team_id": 7,
+          "player_id": 103,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 3,
+          "clock_seconds": 398,
+          "team_id": 7,
+          "player_id": 101,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "turnover",
+          "period": 3,
+          "clock_seconds": 398,
+          "team_id": 7,
+          "player_id": 101
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 384,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 384,
+          "team_id": 3,
+          "player_id": 201,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 3,
+          "clock_seconds": 384,
+          "team_id": 3,
+          "player_id": 201,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 3,
+          "clock_seconds": 384,
+          "team_id": 7,
+          "player_id": 104
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 370,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 370,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 3,
+          "clock_seconds": 370,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "block",
+          "period": 3,
+          "clock_seconds": 370,
+          "team_id": 7,
+          "player_id": 105,
+          "defender_id": 205
+        },
+        {
+          "kind": "rebound",
+          "period": 3,
+          "clock_seconds": 370,
+          "team_id": 3,
+          "player_id": 204
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 356,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 356,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 3,
+          "clock_seconds": 356,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 3,
+          "clock_seconds": 356,
+          "team_id": 7,
+          "player_id": 105
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 342,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 342,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 3,
+          "clock_seconds": 342,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 3,
+          "clock_seconds": 342,
+          "team_id": 3,
+          "player_id": 205
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 328,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 328,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 3,
+          "clock_seconds": 328,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 3,
+          "clock_seconds": 328,
+          "team_id": 3,
+          "player_id": 202,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 328,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 3,
+          "clock_seconds": 328,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 314,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 314,
+          "team_id": 7,
+          "player_id": 103,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 3,
+          "clock_seconds": 314,
+          "team_id": 7,
+          "player_id": 103,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 300,
+          "team_id": 3
+        },
+        {
+          "kind": "turnover",
+          "period": 3,
+          "clock_seconds": 300,
+          "team_id": 3,
+          "player_id": 201
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 286,
+          "team_id": 7
+        },
+        {
+          "kind": "turnover",
+          "period": 3,
+          "clock_seconds": 286,
+          "team_id": 7,
+          "player_id": 102
+        },
+        {
+          "kind": "steal",
+          "period": 3,
+          "clock_seconds": 286,
+          "team_id": 7,
+          "player_id": 102,
+          "defender_id": 201
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 272,
+          "team_id": 3
+        },
+        {
+          "kind": "foul",
+          "period": 3,
+          "clock_seconds": 272,
+          "team_id": 7,
+          "player_id": 104
+        },
+        {
+          "kind": "free_throw",
+          "period": 3,
+          "clock_seconds": 272,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "ft",
+          "ft_attempts": 2,
+          "ft_made": 1
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 258,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 258,
+          "team_id": 7,
+          "player_id": 103,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 3,
+          "clock_seconds": 258,
+          "team_id": 7,
+          "player_id": 103,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 3,
+          "clock_seconds": 258,
+          "team_id": 3,
+          "player_id": 202
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 244,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 244,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 3,
+          "clock_seconds": 244,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 3,
+          "clock_seconds": 244,
+          "team_id": 7,
+          "player_id": 102
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 230,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 230,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 3,
+          "clock_seconds": 230,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 3,
+          "clock_seconds": 230,
+          "team_id": 3,
+          "player_id": 205
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 216,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 216,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 3,
+          "clock_seconds": 216,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 202,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 202,
+          "team_id": 7,
+          "player_id": 103,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 3,
+          "clock_seconds": 202,
+          "team_id": 7,
+          "player_id": 103,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 188,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 188,
+          "team_id": 3,
+          "player_id": 205,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 3,
+          "clock_seconds": 188,
+          "team_id": 3,
+          "player_id": 205,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 174,
+          "team_id": 7
+        },
+        {
+          "kind": "foul",
+          "period": 3,
+          "clock_seconds": 174,
+          "team_id": 3,
+          "player_id": 203
+        },
+        {
+          "kind": "free_throw",
+          "period": 3,
+          "clock_seconds": 174,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "ft",
+          "ft_attempts": 2,
+          "ft_made": 1
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 160,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 160,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 3,
+          "clock_seconds": 160,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 146,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 146,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 3,
+          "clock_seconds": 146,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 3,
+          "clock_seconds": 146,
+          "team_id": 7,
+          "player_id": 104,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 146,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 3,
+          "clock_seconds": 146,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 3,
+          "clock_seconds": 146,
+          "team_id": 7,
+          "player_id": 102,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 146,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 3,
+          "clock_seconds": 146,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 3,
+          "clock_seconds": 146,
+          "team_id": 7,
+          "player_id": 105,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 146,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 3,
+          "clock_seconds": 146,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 3,
+          "clock_seconds": 146,
+          "team_id": 3,
+          "player_id": 202
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 132,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 132,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 3,
+          "clock_seconds": 132,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 3,
+          "clock_seconds": 132,
+          "team_id": 3,
+          "player_id": 205,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 132,
+          "team_id": 3,
+          "player_id": 205,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 3,
+          "clock_seconds": 132,
+          "team_id": 3,
+          "player_id": 205,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 118,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 118,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 3,
+          "clock_seconds": 118,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 104,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 104,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 3,
+          "clock_seconds": 104,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 90,
+          "team_id": 7
+        },
+        {
+          "kind": "turnover",
+          "period": 3,
+          "clock_seconds": 90,
+          "team_id": 7,
+          "player_id": 103
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 76,
+          "team_id": 3
+        },
+        {
+          "kind": "turnover",
+          "period": 3,
+          "clock_seconds": 76,
+          "team_id": 3,
+          "player_id": 202
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 62,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 62,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 3,
+          "clock_seconds": 62,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 3,
+          "clock_seconds": 62,
+          "team_id": 3,
+          "player_id": 201
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 48,
+          "team_id": 3
+        },
+        {
+          "kind": "foul",
+          "period": 3,
+          "clock_seconds": 48,
+          "team_id": 7,
+          "player_id": 101
+        },
+        {
+          "kind": "free_throw",
+          "period": 3,
+          "clock_seconds": 48,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "ft",
+          "ft_attempts": 2,
+          "ft_made": 2
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 34,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 34,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 3,
+          "clock_seconds": 34,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 20,
+          "team_id": 3
+        },
+        {
+          "kind": "foul",
+          "period": 3,
+          "clock_seconds": 20,
+          "team_id": 7,
+          "player_id": 105
+        },
+        {
+          "kind": "free_throw",
+          "period": 3,
+          "clock_seconds": 20,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "ft",
+          "ft_attempts": 2,
+          "ft_made": 2
+        },
+        {
+          "kind": "possession_start",
+          "period": 3,
+          "clock_seconds": 6,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 3,
+          "clock_seconds": 6,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 3,
+          "clock_seconds": 6,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
           "kind": "period_boundary",
           "period": 3,
           "clock_seconds": 0
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 720,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 720,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 4,
+          "clock_seconds": 720,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 4,
+          "clock_seconds": 720,
+          "team_id": 3,
+          "player_id": 203,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "turnover",
+          "period": 4,
+          "clock_seconds": 720,
+          "team_id": 3,
+          "player_id": 203
+        },
+        {
+          "kind": "steal",
+          "period": 4,
+          "clock_seconds": 720,
+          "team_id": 3,
+          "player_id": 203,
+          "defender_id": 105
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 706,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 706,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 4,
+          "clock_seconds": 706,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 4,
+          "clock_seconds": 706,
+          "team_id": 7,
+          "player_id": 105,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 706,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 4,
+          "clock_seconds": 706,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 4,
+          "clock_seconds": 706,
+          "team_id": 7,
+          "player_id": 102,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 706,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 4,
+          "clock_seconds": 706,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 4,
+          "clock_seconds": 706,
+          "team_id": 7,
+          "player_id": 103,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 706,
+          "team_id": 7,
+          "player_id": 103,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 4,
+          "clock_seconds": 706,
+          "team_id": 7,
+          "player_id": 103,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 692,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 692,
+          "team_id": 3,
+          "player_id": 205,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 4,
+          "clock_seconds": 692,
+          "team_id": 3,
+          "player_id": 205,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 4,
+          "clock_seconds": 692,
+          "team_id": 3,
+          "player_id": 202,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "turnover",
+          "period": 4,
+          "clock_seconds": 692,
+          "team_id": 3,
+          "player_id": 202
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 678,
+          "team_id": 7
+        },
+        {
+          "kind": "foul",
+          "period": 4,
+          "clock_seconds": 678,
+          "team_id": 3,
+          "player_id": 204
+        },
+        {
+          "kind": "free_throw",
+          "period": 4,
+          "clock_seconds": 678,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "ft",
+          "ft_attempts": 2,
+          "ft_made": 2
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 664,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 664,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 4,
+          "clock_seconds": 664,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 650,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 650,
+          "team_id": 7,
+          "player_id": 103,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 4,
+          "clock_seconds": 650,
+          "team_id": 7,
+          "player_id": 103,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 4,
+          "clock_seconds": 650,
+          "team_id": 3,
+          "player_id": 203
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 636,
+          "team_id": 3
+        },
+        {
+          "kind": "foul",
+          "period": 4,
+          "clock_seconds": 636,
+          "team_id": 7,
+          "player_id": 102
+        },
+        {
+          "kind": "free_throw",
+          "period": 4,
+          "clock_seconds": 636,
+          "team_id": 3,
+          "player_id": 205,
+          "shot_type": "ft",
+          "ft_attempts": 2,
+          "ft_made": 2
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 622,
+          "team_id": 7
+        },
+        {
+          "kind": "foul",
+          "period": 4,
+          "clock_seconds": 622,
+          "team_id": 3,
+          "player_id": 203
+        },
+        {
+          "kind": "free_throw",
+          "period": 4,
+          "clock_seconds": 622,
+          "team_id": 7,
+          "player_id": 103,
+          "shot_type": "ft",
+          "ft_attempts": 2,
+          "ft_made": 2
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 608,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 608,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 4,
+          "clock_seconds": 608,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 594,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 594,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 4,
+          "clock_seconds": 594,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 4,
+          "clock_seconds": 594,
+          "team_id": 3,
+          "player_id": 202
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 580,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 580,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 4,
+          "clock_seconds": 580,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 4,
+          "clock_seconds": 580,
+          "team_id": 3,
+          "player_id": 201,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 580,
+          "team_id": 3,
+          "player_id": 201,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 4,
+          "clock_seconds": 580,
+          "team_id": 3,
+          "player_id": 201,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 566,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 566,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 4,
+          "clock_seconds": 566,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 4,
+          "clock_seconds": 566,
+          "team_id": 7,
+          "player_id": 102,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "foul",
+          "period": 4,
+          "clock_seconds": 566,
+          "team_id": 3,
+          "player_id": 203
+        },
+        {
+          "kind": "free_throw",
+          "period": 4,
+          "clock_seconds": 566,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "ft",
+          "ft_attempts": 2,
+          "ft_made": 2
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 552,
+          "team_id": 3
+        },
+        {
+          "kind": "foul",
+          "period": 4,
+          "clock_seconds": 552,
+          "team_id": 7,
+          "player_id": 103
+        },
+        {
+          "kind": "free_throw",
+          "period": 4,
+          "clock_seconds": 552,
+          "team_id": 3,
+          "player_id": 205,
+          "shot_type": "ft",
+          "ft_attempts": 2,
+          "ft_made": 2
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 538,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 538,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 4,
+          "clock_seconds": 538,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 4,
+          "clock_seconds": 538,
+          "team_id": 3,
+          "player_id": 202
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 524,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 524,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 4,
+          "clock_seconds": 524,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 4,
+          "clock_seconds": 524,
+          "team_id": 7,
+          "player_id": 102
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 510,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 510,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 4,
+          "clock_seconds": 510,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 4,
+          "clock_seconds": 510,
+          "team_id": 3,
+          "player_id": 202
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 496,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 496,
+          "team_id": 3,
+          "player_id": 205,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 4,
+          "clock_seconds": 496,
+          "team_id": 3,
+          "player_id": 205,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 482,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 482,
+          "team_id": 7,
+          "player_id": 103,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 4,
+          "clock_seconds": 482,
+          "team_id": 7,
+          "player_id": 103,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 468,
+          "team_id": 3
+        },
+        {
+          "kind": "foul",
+          "period": 4,
+          "clock_seconds": 468,
+          "team_id": 7,
+          "player_id": 103
+        },
+        {
+          "kind": "free_throw",
+          "period": 4,
+          "clock_seconds": 468,
+          "team_id": 3,
+          "player_id": 201,
+          "shot_type": "ft",
+          "ft_attempts": 2,
+          "ft_made": 1
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 454,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 454,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 4,
+          "clock_seconds": 454,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 4,
+          "clock_seconds": 454,
+          "team_id": 3,
+          "player_id": 201
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 440,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 440,
+          "team_id": 3,
+          "player_id": 205,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 4,
+          "clock_seconds": 440,
+          "team_id": 3,
+          "player_id": 205,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 4,
+          "clock_seconds": 440,
+          "team_id": 7,
+          "player_id": 101
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 426,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 426,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 4,
+          "clock_seconds": 426,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 412,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 412,
+          "team_id": 3,
+          "player_id": 201,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 4,
+          "clock_seconds": 412,
+          "team_id": 3,
+          "player_id": 201,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 4,
+          "clock_seconds": 412,
+          "team_id": 7,
+          "player_id": 103
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 398,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 398,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 4,
+          "clock_seconds": 398,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 4,
+          "clock_seconds": 398,
+          "team_id": 7,
+          "player_id": 101,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 398,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 4,
+          "clock_seconds": 398,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 384,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 384,
+          "team_id": 3,
+          "player_id": 205,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 4,
+          "clock_seconds": 384,
+          "team_id": 3,
+          "player_id": 205,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 370,
+          "team_id": 7
+        },
+        {
+          "kind": "turnover",
+          "period": 4,
+          "clock_seconds": 370,
+          "team_id": 7,
+          "player_id": 103
+        },
+        {
+          "kind": "steal",
+          "period": 4,
+          "clock_seconds": 370,
+          "team_id": 7,
+          "player_id": 103,
+          "defender_id": 201
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 356,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 356,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 4,
+          "clock_seconds": 356,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 342,
+          "team_id": 7
+        },
+        {
+          "kind": "turnover",
+          "period": 4,
+          "clock_seconds": 342,
+          "team_id": 7,
+          "player_id": 101
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 328,
+          "team_id": 3
+        },
+        {
+          "kind": "turnover",
+          "period": 4,
+          "clock_seconds": 328,
+          "team_id": 3,
+          "player_id": 204
+        },
+        {
+          "kind": "steal",
+          "period": 4,
+          "clock_seconds": 328,
+          "team_id": 3,
+          "player_id": 204,
+          "defender_id": 104
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 314,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 314,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 4,
+          "clock_seconds": 314,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 4,
+          "clock_seconds": 314,
+          "team_id": 3,
+          "player_id": 201
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 300,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 300,
+          "team_id": 3,
+          "player_id": 205,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 4,
+          "clock_seconds": 300,
+          "team_id": 3,
+          "player_id": 205,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 286,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 286,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 4,
+          "clock_seconds": 286,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 272,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 272,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 4,
+          "clock_seconds": 272,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 4,
+          "clock_seconds": 272,
+          "team_id": 7,
+          "player_id": 102
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 258,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 258,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 4,
+          "clock_seconds": 258,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 4,
+          "clock_seconds": 258,
+          "team_id": 7,
+          "player_id": 101,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 258,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 4,
+          "clock_seconds": 258,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 4,
+          "clock_seconds": 258,
+          "team_id": 3,
+          "player_id": 204
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 244,
+          "team_id": 3
+        },
+        {
+          "kind": "turnover",
+          "period": 4,
+          "clock_seconds": 244,
+          "team_id": 3,
+          "player_id": 202
+        },
+        {
+          "kind": "steal",
+          "period": 4,
+          "clock_seconds": 244,
+          "team_id": 3,
+          "player_id": 202,
+          "defender_id": 101
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 230,
+          "team_id": 7
+        },
+        {
+          "kind": "foul",
+          "period": 4,
+          "clock_seconds": 230,
+          "team_id": 3,
+          "player_id": 201
+        },
+        {
+          "kind": "free_throw",
+          "period": 4,
+          "clock_seconds": 230,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "ft",
+          "ft_attempts": 2,
+          "ft_made": 1
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 216,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 216,
+          "team_id": 3,
+          "player_id": 201,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 4,
+          "clock_seconds": 216,
+          "team_id": 3,
+          "player_id": 201,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 4,
+          "clock_seconds": 216,
+          "team_id": 3,
+          "player_id": 203,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "foul",
+          "period": 4,
+          "clock_seconds": 216,
+          "team_id": 7,
+          "player_id": 103
+        },
+        {
+          "kind": "free_throw",
+          "period": 4,
+          "clock_seconds": 216,
+          "team_id": 3,
+          "player_id": 203,
+          "shot_type": "ft",
+          "ft_attempts": 2
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 202,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 202,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 4,
+          "clock_seconds": 202,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 4,
+          "clock_seconds": 202,
+          "team_id": 7,
+          "player_id": 101,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 202,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 4,
+          "clock_seconds": 202,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 188,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 188,
+          "team_id": 3,
+          "player_id": 201,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 4,
+          "clock_seconds": 188,
+          "team_id": 3,
+          "player_id": 201,
+          "shot_type": "3pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 174,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 174,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 4,
+          "clock_seconds": 174,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 160,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 160,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 4,
+          "clock_seconds": 160,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 4,
+          "clock_seconds": 160,
+          "team_id": 7,
+          "player_id": 101
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 146,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 146,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 4,
+          "clock_seconds": 146,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 4,
+          "clock_seconds": 146,
+          "team_id": 3,
+          "player_id": 205
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 132,
+          "team_id": 3
+        },
+        {
+          "kind": "foul",
+          "period": 4,
+          "clock_seconds": 132,
+          "team_id": 7,
+          "player_id": 102
+        },
+        {
+          "kind": "free_throw",
+          "period": 4,
+          "clock_seconds": 132,
+          "team_id": 3,
+          "player_id": 205,
+          "shot_type": "ft",
+          "ft_attempts": 2,
+          "ft_made": 2
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 118,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 118,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 4,
+          "clock_seconds": 118,
+          "team_id": 7,
+          "player_id": 101,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 104,
+          "team_id": 3
+        },
+        {
+          "kind": "turnover",
+          "period": 4,
+          "clock_seconds": 104,
+          "team_id": 3,
+          "player_id": 204
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 90,
+          "team_id": 7
+        },
+        {
+          "kind": "turnover",
+          "period": 4,
+          "clock_seconds": 90,
+          "team_id": 7,
+          "player_id": 103
+        },
+        {
+          "kind": "steal",
+          "period": 4,
+          "clock_seconds": 90,
+          "team_id": 7,
+          "player_id": 103,
+          "defender_id": 205
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 76,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 76,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_make",
+          "period": 4,
+          "clock_seconds": 76,
+          "team_id": 3,
+          "player_id": 204,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 62,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 62,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 4,
+          "clock_seconds": 62,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 4,
+          "clock_seconds": 62,
+          "team_id": 3,
+          "player_id": 204
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 48,
+          "team_id": 3
+        },
+        {
+          "kind": "foul",
+          "period": 4,
+          "clock_seconds": 48,
+          "team_id": 7,
+          "player_id": 101
+        },
+        {
+          "kind": "free_throw",
+          "period": 4,
+          "clock_seconds": 48,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "ft",
+          "ft_attempts": 2,
+          "ft_made": 1
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 34,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 34,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 4,
+          "clock_seconds": 34,
+          "team_id": 7,
+          "player_id": 102,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "block",
+          "period": 4,
+          "clock_seconds": 34,
+          "team_id": 7,
+          "player_id": 102,
+          "defender_id": 201
+        },
+        {
+          "kind": "rebound",
+          "period": 4,
+          "clock_seconds": 34,
+          "team_id": 7,
+          "player_id": 105,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 34,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 4,
+          "clock_seconds": 34,
+          "team_id": 7,
+          "player_id": 105,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 4,
+          "clock_seconds": 34,
+          "team_id": 7,
+          "player_id": 105,
+          "offensive_rebound": true
+        },
+        {
+          "kind": "turnover",
+          "period": 4,
+          "clock_seconds": 34,
+          "team_id": 7,
+          "player_id": 105
+        },
+        {
+          "kind": "steal",
+          "period": 4,
+          "clock_seconds": 34,
+          "team_id": 7,
+          "player_id": 105,
+          "defender_id": 204
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 20,
+          "team_id": 3
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 20,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 4,
+          "clock_seconds": 20,
+          "team_id": 3,
+          "player_id": 202,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 4,
+          "clock_seconds": 20,
+          "team_id": 7,
+          "player_id": 101
+        },
+        {
+          "kind": "possession_start",
+          "period": 4,
+          "clock_seconds": 6,
+          "team_id": 7
+        },
+        {
+          "kind": "shot_attempt",
+          "period": 4,
+          "clock_seconds": 6,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "shot_miss",
+          "period": 4,
+          "clock_seconds": 6,
+          "team_id": 7,
+          "player_id": 104,
+          "shot_type": "2pt"
+        },
+        {
+          "kind": "rebound",
+          "period": 4,
+          "clock_seconds": 6,
+          "team_id": 3,
+          "player_id": 203
         },
         {
           "kind": "period_boundary",
@@ -1094,40 +6039,94 @@
           "pid": 101,
           "pos": "PG",
           "gameMIN": 49,
-          "game2GM": 1,
-          "game2GA": 2,
-          "gameFTM": 0,
-          "gameFTA": 13,
-          "game3GM": 1,
-          "game3GA": 3,
-          "gameORB": 3,
-          "gameDRB": 0,
+          "game2GM": 9,
+          "game2GA": 16,
+          "gameFTM": 1,
+          "gameFTA": 2,
+          "game3GM": 0,
+          "game3GA": 1,
+          "gameORB": 5,
+          "gameDRB": 5,
           "gameAST": 0,
-          "gameSTL": 0,
-          "gameTOV": 0,
+          "gameSTL": 1,
+          "gameTOV": 2,
           "gameBLK": 0,
           "gamePF": 3
         },
         {
           "pid": 102,
           "pos": "SG",
-          "gameMIN": 6,
-          "game2GM": 1,
-          "game2GA": 1,
-          "gameFTM": 0,
-          "gameFTA": 9,
+          "gameMIN": 49,
+          "game2GM": 6,
+          "game2GA": 16,
+          "gameFTM": 4,
+          "gameFTA": 4,
           "game3GM": 1,
-          "game3GA": 4,
-          "gameORB": 0,
+          "game3GA": 6,
+          "gameORB": 5,
           "gameDRB": 5,
           "gameAST": 0,
-          "gameSTL": 0,
-          "gameTOV": 0,
-          "gameBLK": 0,
-          "gamePF": 6
+          "gameSTL": 1,
+          "gameTOV": 5,
+          "gameBLK": 1,
+          "gamePF": 3
         },
         {
           "pid": 103,
+          "pos": "SF",
+          "gameMIN": 49,
+          "game2GM": 9,
+          "game2GA": 13,
+          "gameFTM": 3,
+          "gameFTA": 4,
+          "game3GM": 0,
+          "game3GA": 1,
+          "gameORB": 4,
+          "gameDRB": 5,
+          "gameAST": 0,
+          "gameSTL": 1,
+          "gameTOV": 5,
+          "gameBLK": 0,
+          "gamePF": 5
+        },
+        {
+          "pid": 104,
+          "pos": "PF",
+          "gameMIN": 49,
+          "game2GM": 6,
+          "game2GA": 17,
+          "gameFTM": 2,
+          "gameFTA": 3,
+          "game3GM": 0,
+          "game3GA": 3,
+          "gameORB": 5,
+          "gameDRB": 3,
+          "gameAST": 0,
+          "gameSTL": 3,
+          "gameTOV": 3,
+          "gameBLK": 0,
+          "gamePF": 4
+        },
+        {
+          "pid": 105,
+          "pos": "C",
+          "gameMIN": 49,
+          "game2GM": 7,
+          "game2GA": 22,
+          "gameFTM": 6,
+          "gameFTA": 10,
+          "game3GM": 1,
+          "game3GA": 3,
+          "gameORB": 6,
+          "gameDRB": 6,
+          "gameAST": 0,
+          "gameSTL": 5,
+          "gameTOV": 5,
+          "gameBLK": 0,
+          "gamePF": 3
+        },
+        {
+          "pid": 106,
           "pos": "C",
           "gameMIN": 0,
           "game2GM": 0,
@@ -1146,84 +6145,138 @@
         },
         {
           "pid": 201,
-          "pos": "SF",
-          "gameMIN": 7,
-          "game2GM": 1,
-          "game2GA": 2,
-          "gameFTM": 0,
-          "gameFTA": 13,
-          "game3GM": 2,
-          "game3GA": 6,
-          "gameORB": 5,
-          "gameDRB": 1,
+          "pos": "PG",
+          "gameMIN": 49,
+          "game2GM": 7,
+          "game2GA": 14,
+          "gameFTM": 5,
+          "gameFTA": 8,
+          "game3GM": 1,
+          "game3GA": 1,
+          "gameORB": 4,
+          "gameDRB": 6,
           "gameAST": 0,
-          "gameSTL": 0,
-          "gameTOV": 0,
-          "gameBLK": 0,
-          "gamePF": 6
+          "gameSTL": 5,
+          "gameTOV": 3,
+          "gameBLK": 1,
+          "gamePF": 2
         },
         {
           "pid": 202,
-          "pos": "PF",
-          "gameMIN": 5,
-          "game2GM": 1,
-          "game2GA": 4,
-          "gameFTM": 0,
-          "gameFTA": 3,
+          "pos": "SG",
+          "gameMIN": 49,
+          "game2GM": 9,
+          "game2GA": 14,
+          "gameFTM": 7,
+          "gameFTA": 12,
           "game3GM": 1,
-          "game3GA": 3,
-          "gameORB": 0,
-          "gameDRB": 2,
+          "game3GA": 5,
+          "gameORB": 5,
+          "gameDRB": 8,
           "gameAST": 0,
           "gameSTL": 0,
-          "gameTOV": 0,
+          "gameTOV": 6,
+          "gameBLK": 1,
+          "gamePF": 1
+        },
+        {
+          "pid": 203,
+          "pos": "SF",
+          "gameMIN": 49,
+          "game2GM": 5,
+          "game2GA": 14,
+          "gameFTM": 3,
+          "gameFTA": 6,
+          "game3GM": 1,
+          "game3GA": 4,
+          "gameORB": 7,
+          "gameDRB": 5,
+          "gameAST": 0,
+          "gameSTL": 1,
+          "gameTOV": 4,
           "gameBLK": 0,
-          "gamePF": 6
+          "gamePF": 4
+        },
+        {
+          "pid": 204,
+          "pos": "PF",
+          "gameMIN": 49,
+          "game2GM": 13,
+          "game2GA": 22,
+          "gameFTM": 1,
+          "gameFTA": 2,
+          "game3GM": 0,
+          "game3GA": 2,
+          "gameORB": 4,
+          "gameDRB": 8,
+          "gameAST": 0,
+          "gameSTL": 1,
+          "gameTOV": 3,
+          "gameBLK": 0,
+          "gamePF": 3
+        },
+        {
+          "pid": 205,
+          "pos": "C",
+          "gameMIN": 49,
+          "game2GM": 8,
+          "game2GA": 14,
+          "gameFTM": 7,
+          "gameFTA": 8,
+          "game3GM": 0,
+          "game3GA": 1,
+          "gameORB": 2,
+          "gameDRB": 7,
+          "gameAST": 0,
+          "gameSTL": 1,
+          "gameTOV": 1,
+          "gameBLK": 1,
+          "gamePF": 2
         }
       ],
       "team_boxes": [
         {
           "team_id": 7,
           "is_home": false,
-          "q1": 10,
-          "q2": 0,
-          "q3": 0,
-          "q4": 0,
+          "q1": 19,
+          "q2": 32,
+          "q3": 22,
+          "q4": 23,
           "ot": [],
-          "game2GM": 2,
-          "game2GA": 3,
-          "gameFTM": 0,
-          "gameFTA": 22,
+          "game2GM": 37,
+          "game2GA": 84,
+          "gameFTM": 16,
+          "gameFTA": 23,
           "game3GM": 2,
-          "game3GA": 7,
-          "gameORB": 3,
-          "gameDRB": 5,
+          "game3GA": 14,
+          "gameORB": 25,
+          "gameDRB": 24,
           "gameAST": 0,
-          "gameSTL": 0,
-          "gameTOV": 0,
-          "gameBLK": 0,
-          "gamePF": 9
+          "gameSTL": 11,
+          "gameTOV": 20,
+          "gameBLK": 1,
+          "gamePF": 18
         },
         {
           "team_id": 3,
           "is_home": true,
-          "q1": 13,
-          "q2": 0,
-          "q3": 0,
-          "q4": 0,
+          "q1": 26,
+          "q2": 33,
+          "q3": 30,
+          "q4": 27,
           "ot": [],
-          "game2GM": 2,
-          "game2GA": 6,
-          "gameFTM": 0,
-          "gameFTA": 16,
+          "game2GM": 42,
+          "game2GA": 78,
+          "gameFTM": 23,
+          "gameFTA": 36,
           "game3GM": 3,
-          "game3GA": 9,
-          "gameORB": 5,
-          "gameDRB": 3,
+          "game3GA": 13,
+          "gameORB": 22,
+          "gameDRB": 34,
           "gameAST": 0,
-          "gameSTL": 0,
-          "gameTOV": 0,
-          "gameBLK": 0,
+          "gameSTL": 8,
+          "gameTOV": 17,
+          "gameBLK": 3,
           "gamePF": 12
         }
       ]

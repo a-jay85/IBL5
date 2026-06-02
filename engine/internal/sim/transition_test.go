@@ -44,6 +44,42 @@ func TestRunTransitionPossession_NeverThreePoint(t *testing.T) {
 	}
 }
 
+// --- matrix #6: HCA is wired at the transition (fast-break) assembly site -----
+//
+// The transition possession path is the SECOND of the two outcomeInputs assembly
+// sites. This proves HCA threads into it: with identical-rated teams (symmetric
+// fixture), a HOME offense must draw more free throws over many fast breaks than an
+// AWAY offense (the foul-bucket divisor shrinks for the home team). The only
+// difference between the two cases is offense.isHome → hcaDelta; ratings are equal.
+func TestRunTransitionPossession_HomeGrowsFoulBucket(t *testing.T) {
+	b := symmetricBundle()
+
+	countFTA := func(offTeam, defTeam int, isHome bool) int {
+		var fta int
+		for seed := uint64(1); seed <= 3000; seed++ {
+			offense := newTeamState(b.Players, offTeam, isHome)
+			defense := newTeamState(b.Players, defTeam, !isHome)
+			gs := &gameState{rng: rng.New(seed), gameType: bundle.GameTypeRegular, period: 1, clock: 500}
+			gs.transitionShotRate = resetTransitionShotRate(offense)
+			gs.runTransitionPossession(offense, defense, 0)
+			for _, e := range gs.events {
+				if e.Kind == result.EventFreeThrow {
+					fta += e.FTAttempts
+				}
+			}
+		}
+		return fta
+	}
+
+	homeFTA := countFTA(3, 7, true)  // team 3 on offense, isHome=true
+	awayFTA := countFTA(7, 3, false) // team 7 on offense, isHome=false (identical ratings)
+
+	t.Logf("transition FTA over 3000 fast breaks: home=%d away=%d (home−away=%+d)", homeFTA, awayFTA, homeFTA-awayFTA)
+	if homeFTA <= awayFTA {
+		t.Errorf("home transition FTA %d ≤ away %d — HCA not wired at the transition assembly site", homeFTA, awayFTA)
+	}
+}
+
 // --- matrix #11: transitionNet = 5.0 − floor1(TD), no position penalty --------
 
 func TestTransitionNet(t *testing.T) {

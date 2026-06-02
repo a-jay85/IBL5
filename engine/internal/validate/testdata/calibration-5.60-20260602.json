@@ -1,0 +1,349 @@
+{
+  "coverage": 0.95,
+  "buckets": [
+    {
+      "game_type": 2,
+      "stats": [
+        {
+          "stat": "points",
+          "n": 35782,
+          "mean_engine": 94.0512671175449,
+          "p50_abs_resid": 23.819999999999993,
+          "p90_abs_resid": 42.260000000000005,
+          "p95_abs_resid": 47.42,
+          "p99_abs_resid": 57.18000000000001,
+          "proposed_rel_pct": 0.5164369034994698,
+          "proposed_abs_floor": 48,
+          "in_band_rate": 0.9585545805153429
+        },
+        {
+          "stat": "fgm",
+          "n": 35782,
+          "mean_engine": 32.33786596612804,
+          "p50_abs_resid": 14.96,
+          "p90_abs_resid": 24.36,
+          "p95_abs_resid": 26.94,
+          "p99_abs_resid": 32.04,
+          "proposed_rel_pct": 1.0085470085470087,
+          "proposed_abs_floor": 27,
+          "in_band_rate": 0.9668827902297245
+        },
+        {
+          "stat": "fga",
+          "n": 35782,
+          "mean_engine": 73.25584651500688,
+          "p50_abs_resid": 24.819999999999993,
+          "p90_abs_resid": 41.54,
+          "p95_abs_resid": 46.04,
+          "p99_abs_resid": 54.98,
+          "proposed_rel_pct": 0.7803157541148807,
+          "proposed_abs_floor": 47,
+          "in_band_rate": 0.9651221284444693
+        },
+        {
+          "stat": "ftm",
+          "n": 35782,
+          "mean_engine": 24.903062433625518,
+          "p50_abs_resid": 8.46,
+          "p90_abs_resid": 25.62,
+          "p95_abs_resid": 30.799999999999997,
+          "p99_abs_resid": 39.98,
+          "proposed_rel_pct": 0.7944535073409462,
+          "proposed_abs_floor": 31,
+          "in_band_rate": 0.9861941758426024
+        },
+        {
+          "stat": "fta",
+          "n": 35782,
+          "mean_engine": 34.081138561287894,
+          "p50_abs_resid": 11.82,
+          "p90_abs_resid": 35.88,
+          "p95_abs_resid": 42.88,
+          "p99_abs_resid": 56.3,
+          "proposed_rel_pct": 0.775939331265081,
+          "proposed_abs_floor": 43,
+          "in_band_rate": 0.9817506008607679
+        },
+        {
+          "stat": "tgm",
+          "n": 35782,
+          "mean_engine": 4.472472751662843,
+          "p50_abs_resid": 2.2199999999999998,
+          "p90_abs_resid": 5.86,
+          "p95_abs_resid": 7.04,
+          "p99_abs_resid": 9.58,
+          "proposed_rel_pct": 1.75,
+          "proposed_abs_floor": 8,
+          "in_band_rate": 0.9788720585769382
+        },
+        {
+          "stat": "tga",
+          "n": 35782,
+          "mean_engine": 12.814125537980114,
+          "p50_abs_resid": 4.5,
+          "p90_abs_resid": 10.9,
+          "p95_abs_resid": 12.98,
+          "p99_abs_resid": 17.44,
+          "proposed_rel_pct": 1.1551724137931034,
+          "proposed_abs_floor": 13,
+          "in_band_rate": 0.968755240064837
+        },
+        {
+          "stat": "reb",
+          "n": 35782,
+          "mean_engine": 40.91798054887942,
+          "p50_abs_resid": 9.299999999999997,
+          "p90_abs_resid": 18.939999999999998,
+          "p95_abs_resid": 21.799999999999997,
+          "p99_abs_resid": 27.6,
+          "proposed_rel_pct": 0.5503875968992247,
+          "proposed_abs_floor": 22,
+          "in_band_rate": 0.9591135207646303
+        },
+        {
+          "stat": "ast",
+          "n": 35782,
+          "mean_engine": 0,
+          "p50_abs_resid": 20,
+          "p90_abs_resid": 28,
+          "p95_abs_resid": 31,
+          "p99_abs_resid": 35,
+          "proposed_rel_pct": 0.15,
+          "proposed_abs_floor": 31,
+          "in_band_rate": 0.9629143144597843
+        },
+        {
+          "stat": "stl",
+          "n": 35782,
+          "mean_engine": 15.065244536359055,
+          "p50_abs_resid": 6.68,
+          "p90_abs_resid": 11.06,
+          "p95_abs_resid": 12.120000000000001,
+          "p99_abs_resid": 13.899999999999999,
+          "proposed_rel_pct": 0.7919556171983356,
+          "proposed_abs_floor": 13,
+          "in_band_rate": 0.9783690123525796
+        },
+        {
+          "stat": "tov",
+          "n": 35782,
+          "mean_engine": 27.392384998043617,
+          "p50_abs_resid": 13.66,
+          "p90_abs_resid": 19.5,
+          "p95_abs_resid": 21.06,
+          "p99_abs_resid": 23.72,
+          "proposed_rel_pct": 0.7357992073976222,
+          "proposed_abs_floor": 22,
+          "in_band_rate": 0.972779609859706
+        },
+        {
+          "stat": "blk",
+          "n": 35782,
+          "mean_engine": 0.8281728243250785,
+          "p50_abs_resid": 4.74,
+          "p90_abs_resid": 9.12,
+          "p95_abs_resid": 10.42,
+          "p99_abs_resid": 13.3,
+          "proposed_rel_pct": 9.843373493975903,
+          "proposed_abs_floor": 11,
+          "in_band_rate": 0.966240008943044
+        },
+        {
+          "stat": "pf",
+          "n": 35782,
+          "mean_engine": 17.135309932368244,
+          "p50_abs_resid": 5.9399999999999995,
+          "p90_abs_resid": 13.18,
+          "p95_abs_resid": 15.58,
+          "p99_abs_resid": 20.86,
+          "proposed_rel_pct": 1.3504273504273505,
+          "proposed_abs_floor": 16,
+          "in_band_rate": 0.9848247722318484
+        }
+      ]
+    },
+    {
+      "game_type": 4,
+      "stats": [
+        {
+          "stat": "points",
+          "n": 2184,
+          "mean_engine": 93.07404761904738,
+          "p50_abs_resid": 23.519999999999996,
+          "p90_abs_resid": 40.900000000000006,
+          "p95_abs_resid": 45.8,
+          "p99_abs_resid": 55.040000000000006,
+          "proposed_rel_pct": 0.4983083615273078,
+          "proposed_abs_floor": 46,
+          "in_band_rate": 0.9583333333333334
+        },
+        {
+          "stat": "fgm",
+          "n": 2184,
+          "mean_engine": 32.08896520146515,
+          "p50_abs_resid": 14.619999999999997,
+          "p90_abs_resid": 23.9,
+          "p95_abs_resid": 26.16,
+          "p99_abs_resid": 31.46,
+          "proposed_rel_pct": 1.0191285866099893,
+          "proposed_abs_floor": 27,
+          "in_band_rate": 0.9743589743589743
+        },
+        {
+          "stat": "fga",
+          "n": 2184,
+          "mean_engine": 71.89053113553106,
+          "p50_abs_resid": 25.28,
+          "p90_abs_resid": 41.62,
+          "p95_abs_resid": 45.94,
+          "p99_abs_resid": 54.120000000000005,
+          "proposed_rel_pct": 0.8125723100655612,
+          "proposed_abs_floor": 46,
+          "in_band_rate": 0.9656593406593407
+        },
+        {
+          "stat": "ftm",
+          "n": 2184,
+          "mean_engine": 24.598855311355305,
+          "p50_abs_resid": 7.84,
+          "p90_abs_resid": 26.22,
+          "p95_abs_resid": 31.659999999999997,
+          "p99_abs_resid": 40.2,
+          "proposed_rel_pct": 0.7947454844006568,
+          "proposed_abs_floor": 32,
+          "in_band_rate": 0.9862637362637363
+        },
+        {
+          "stat": "fta",
+          "n": 2184,
+          "mean_engine": 33.540109890109875,
+          "p50_abs_resid": 10.64,
+          "p90_abs_resid": 36.74,
+          "p95_abs_resid": 43.58,
+          "p99_abs_resid": 55.86,
+          "proposed_rel_pct": 0.7786794540759867,
+          "proposed_abs_floor": 44,
+          "in_band_rate": 0.9821428571428571
+        },
+        {
+          "stat": "tgm",
+          "n": 2184,
+          "mean_engine": 4.297261904761904,
+          "p50_abs_resid": 1.9400000000000004,
+          "p90_abs_resid": 5.38,
+          "p95_abs_resid": 6.42,
+          "p99_abs_resid": 9.1,
+          "proposed_rel_pct": 1.6785714285714284,
+          "proposed_abs_floor": 7,
+          "in_band_rate": 0.9784798534798534
+        },
+        {
+          "stat": "tga",
+          "n": 2184,
+          "mean_engine": 12.28978937728939,
+          "p50_abs_resid": 3.92,
+          "p90_abs_resid": 10.24,
+          "p95_abs_resid": 12.24,
+          "p99_abs_resid": 17.22,
+          "proposed_rel_pct": 1.153558052434457,
+          "proposed_abs_floor": 13,
+          "in_band_rate": 0.978021978021978
+        },
+        {
+          "stat": "reb",
+          "n": 2184,
+          "mean_engine": 39.801565934065884,
+          "p50_abs_resid": 10.200000000000003,
+          "p90_abs_resid": 19.619999999999997,
+          "p95_abs_resid": 22.42,
+          "p99_abs_resid": 27.479999999999997,
+          "proposed_rel_pct": 0.5845070422535212,
+          "proposed_abs_floor": 23,
+          "in_band_rate": 0.961996336996337
+        },
+        {
+          "stat": "ast",
+          "n": 2184,
+          "mean_engine": 0,
+          "p50_abs_resid": 20,
+          "p90_abs_resid": 28,
+          "p95_abs_resid": 31,
+          "p99_abs_resid": 37,
+          "proposed_rel_pct": 0.15,
+          "proposed_abs_floor": 31,
+          "in_band_rate": 0.9629120879120879
+        },
+        {
+          "stat": "stl",
+          "n": 2184,
+          "mean_engine": 14.758031135531139,
+          "p50_abs_resid": 5.76,
+          "p90_abs_resid": 10.32,
+          "p95_abs_resid": 11.38,
+          "p99_abs_resid": 13.3,
+          "proposed_rel_pct": 0.7518610421836228,
+          "proposed_abs_floor": 12,
+          "in_band_rate": 0.9720695970695971
+        },
+        {
+          "stat": "tov",
+          "n": 2184,
+          "mean_engine": 26.843782051282,
+          "p50_abs_resid": 13.02,
+          "p90_abs_resid": 18.96,
+          "p95_abs_resid": 20.38,
+          "p99_abs_resid": 23.16,
+          "proposed_rel_pct": 0.7356495468277946,
+          "proposed_abs_floor": 21,
+          "in_band_rate": 0.9716117216117216
+        },
+        {
+          "stat": "blk",
+          "n": 2184,
+          "mean_engine": 0.8662179487179502,
+          "p50_abs_resid": 5.16,
+          "p90_abs_resid": 9.66,
+          "p95_abs_resid": 11.2,
+          "p99_abs_resid": 13.78,
+          "proposed_rel_pct": 10.320754716981131,
+          "proposed_abs_floor": 12,
+          "in_band_rate": 0.9720695970695971
+        },
+        {
+          "stat": "pf",
+          "n": 2184,
+          "mean_engine": 16.85675824175824,
+          "p50_abs_resid": 6.2,
+          "p90_abs_resid": 13.26,
+          "p95_abs_resid": 15.66,
+          "p99_abs_resid": 21.159999999999997,
+          "proposed_rel_pct": 1.4456521739130435,
+          "proposed_abs_floor": 16,
+          "in_band_rate": 0.9871794871794872
+        }
+      ]
+    }
+  ],
+  "home_margins": [
+    {
+      "game_type": 2,
+      "n": 17891,
+      "engine_home_margin": 4.174244033312866,
+      "sco_home_margin": 4.070873623609637,
+      "margin_gap": 0.10337040970322953,
+      "engine_home_win_share": 0.8173942205578224,
+      "sco_home_win_share": 0.5890671287239394,
+      "win_share_gap": 0.228327091833883
+    },
+    {
+      "game_type": 4,
+      "n": 1092,
+      "engine_home_margin": 4.234835164835168,
+      "sco_home_margin": 4.327838827838828,
+      "margin_gap": -0.09300366300365948,
+      "engine_home_win_share": 0.8470695970695971,
+      "sco_home_win_share": 0.6144688644688645,
+      "win_share_gap": 0.23260073260073255
+    }
+  ]
+}

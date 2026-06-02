@@ -211,12 +211,19 @@ func TestSimulate_SubstitutionsFire(t *testing.T) {
 
 // --- matrix #16: minutes conservation (iron-man richBundle, no subs) ---------
 //
-// In richBundle every team has exactly 5 eligible players, so no substitution or
-// foul-out can occur: all 10 players are on court for every possession of the
-// game. Each therefore accrues `step` seconds per game-possession, so GameMIN ==
-// round(totalPossessions × step / 60) for every player. The expected value is
-// derived from the ACTUAL possession count and the engine's own step, never an
-// assumed number.
+// In richBundle every team has exactly 5 eligible players, so no SUBSTITUTION can
+// occur: a player only leaves the court by fouling out. Every player who does NOT
+// foul out is therefore on court for every possession and accrues `step` seconds
+// per game-possession, so GameMIN == round(totalPossessions × step / 60). The
+// expected value is derived from the ACTUAL possession count and the engine's own
+// step, never an assumed number.
+//
+// A player who DOES foul out (GamePF >= 6) leaves early and accrues fewer minutes.
+// The CALIBRATED post-HCA foul rate (offQualityRatingScale lowered to match the
+// corpus home margin) makes a foul-out reachable in this iron-man fixture, so the
+// conservation assertion is split: full minutes for everyone who finishes, and
+// strictly-not-more for anyone who fouls out (its exact short-minutes value is
+// locked by TestSimulate_FoulOutStopsMinutes).
 func TestSimulate_MinutesConservation(t *testing.T) {
 	b := richBundle()
 	v := newTeamState(b.Players, 7, false)
@@ -234,6 +241,13 @@ func TestSimulate_MinutesConservation(t *testing.T) {
 	wantMin := int(math.Round(float64(totalPoss*step) / 60.0))
 
 	for _, pb := range g.PlayerBoxes {
+		if pb.GamePF >= 6 {
+			// Fouled out → left the court early → cannot have accrued the full game.
+			if pb.GameMIN > wantMin {
+				t.Errorf("fouled-out player %d GameMIN = %d, want <= full-game %d", pb.PID, pb.GameMIN, wantMin)
+			}
+			continue
+		}
 		if pb.GameMIN != wantMin {
 			t.Errorf("player %d GameMIN = %d, want %d (round(%d poss × %d step / 60))",
 				pb.PID, pb.GameMIN, wantMin, totalPoss, step)

@@ -18,13 +18,15 @@ package sim
 //
 // FAITHFULNESS: the SHAPE (per-lineup summation, the def cap, the per-player HCA
 // subtraction that shrinks the home divisor) is ported exactly. The per-player
-// summed values are documented VALIDATION-PHASE STAND-INS — the exact per-game
-// player-double source offsets are unpinned (00_MASTER_REFERENCE.md L1340,
-// "source offsets validation-phase"). Their magnitudes are chosen so the fixed
-// ±hcaMagnitude per-player HCA subtraction is a meaningful fraction of the divisor
-// (the home-favorable mechanism is expressible) while keeping the foul bucket a
-// realistic minority share; numeric corpus calibration of these magnitudes against
-// the .sco archive is deferred (dev/nightly, no automated optimizer).
+// summed values are documented STAND-INS — the exact per-game player-double source
+// offsets are unpinned (00_MASTER_REFERENCE.md L1340, "source offsets validation-
+// phase"). offQualityRatingScale (the divisor's per-player slope, and therefore the
+// fraction the fixed ±hcaMagnitude subtraction occupies) is now CALIBRATED against
+// the real 5.60 .sco archive: it sets the size of the home-court margin, which was
+// tuned to match the corpus home-minus-visitor point margin (see the const comment
+// and bands.go provenance). The def-side stand-ins keep the foul bucket a realistic
+// minority share; their exact magnitudes remain corpus-deferred (they shape the
+// foul rate, not the home/away margin).
 
 const (
 	// offQualityRatingScale maps a player's outside-offense rating (OO) to the
@@ -33,13 +35,22 @@ const (
 	// = ±1.0 across the lineup) is then a meaningful fraction of the divisor — the
 	// faithful-O(1)-basis property COMPOSITE_DOUBLES_TRACE.md requires for HCA to land
 	// correctly-signed. The cost (documented) is brittleness at LOW ratings: for an
-	// average OO below ≈3 the home divisor Σ−1.0 hits offQualityFloor, so the HCA
+	// average OO below ≈4 the home divisor Σ−1.0 hits offQualityFloor, so the HCA
 	// magnitude saturates and inflates for poor offensive teams. That is a magnitude
 	// artifact, not a sign error (the home-favorable SIGN holds at every rating, and
 	// FTA stays < FGA on any realistically-rated roster — only an ALL-zero-rated
-	// lineup degenerates, which real rosters never are). The exact magnitude is
-	// corpus-deferred. Documented stand-in.
-	offQualityRatingScale = 0.08
+	// lineup degenerates, which real rosters never are).
+	//
+	// CALIBRATED 2026-06-02 against the real 5.60 .sco archive (jsbcalibrate
+	// --mode calibrate, ibl5/backups, ~20 seasons). 0.059 is the value at which the
+	// engine's mean home-minus-visitor point margin matches the corpus within ±0.5
+	// pts for BOTH regular (gt 2) and playoff (gt 4) games — the HCA-magnitude
+	// fidelity target. Lowering the scale grows the home margin (the fixed 1.0 HCA
+	// subtraction becomes a larger fraction of the shrinking divisor); raising it
+	// shrinks the margin. hcaMagnitude (gametype.go = 0.2) is the faithful decompiled
+	// constant and is NOT a tuning knob — the magnitude is reached via this scale's
+	// ratio to that fixed 0.2. See bands.go provenance for the calibration run.
+	offQualityRatingScale = 0.059
 
 	// offQualityFloor is the ε floor on the offQuality divisor: it guarantees the
 	// foul-bucket division (foul/offQ) can never divide by zero or flip sign even on

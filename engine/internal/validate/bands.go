@@ -15,74 +15,80 @@ type Band struct {
 // │ Derived by running jsbcalibrate in --mode calibrate against the real 5.60  │
 // │ backup archive and transcribing the proposed per-game-type bands:          │
 // │                                                                            │
-// │   engine git SHA : eee188415be48489ca91e4f650f1f1ec232a0dd3 (master base)  │
+// │   engine base    : 325621864 (hca-margin-instrument / PR #956)             │
+// │   calibrated knob: offQualityRatingScale = 0.059 (this PR; teamquality.go) │
 // │   seed           : 20240601                                                │
 // │   coverage       : 0.95 (bands cover the 95th abs-residual percentile)     │
 // │   selection      : season  (one clean regular snapshot/season + playoffs)  │
 // │   runs           : 50       (seeded engine runs per corpus game)           │
 // │   sample-stride  : 1        (every selected season; ~20 seasons)           │
 // │   corpus         : ibl5/backups (olympics excluded)                        │
-// │   date           : 2026-06-01                                              │
-// │   n observations : 35782 regular (gt 2), 2184 playoff (gt 4)               │
+// │   date           : 2026-06-02                                              │
+// │   n observations : 35782 stat-rows regular (gt 2), 2184 playoff (gt 4) —   │
+// │                    SAME corpus as #951 (2 rows/game; 17891 / 1092 games    │
+// │                    feed the per-game home-margin readout)                  │
 // │                                                                            │
 // │ Audit artifact (the raw CalibrationReport JSON) is committed at            │
-// │   internal/validate/testdata/calibration-5.60-20240601.json                │
+// │   internal/validate/testdata/calibration-5.60-20260602.json                │
 // │ for documentation ONLY. The band VALUES live hardcoded in this file;       │
 // │ nothing reads that JSON at runtime. Re-running calibration regenerates     │
 // │ the JSON; the literals below must then be re-transcribed by hand.          │
 // │                                                                            │
-// │ HCA CAVEAT: bands are calibrated against the CURRENT engine, which has NO  │
-// │ home-court advantage. RE-CALIBRATE when HCA lands.                         │
-// │                                                                            │
-// │ PLAY-OUTCOME RESCALE CAVEAT (PR9): these bands were calibrated against the │
-// │ OLD O(100) play-outcome bucket weights. PR9 rescaled those buckets onto a  │
-// │ comparable O(1) basis (net-free 2pt composite), shifting the path-selection│
-// │ mix — notably foul / and-one / FT path frequencies. The ftm, fta, and pf   │
-// │ observed-vs-engine gaps therefore move. Bands are STALE; do NOT re-run the │
-// │ 53GB calibration here. Re-calibrate ONCE, after HCA also lands (calibrate  │
-// │ once, not twice). No band VALUES change in PR9.                            │
+// │ HCA IS NOW ACTIVE (faithful home-court advantage landed in #955; its       │
+// │ magnitude is calibrated here). These bands reflect the calibrated quality- │
+// │ stand-in scale: at offQualityRatingScale=0.059 the engine's mean home-     │
+// │ minus-visitor point margin matches the corpus within ±0.5 pts for both     │
+// │ game types (gt 2 gap +0.10, gt 4 gap −0.09). NOTE on the margin instrument:│
+// │ its home WIN-SHARE is only comparable to .sco at --runs 1 (engine win-     │
+// │ share = P(mean-over-N-runs margin>0) inflates as √N; .sco is a single      │
+// │ realization). At runs=1 the win-share gap is +1.7pp (gt 2) / −0.6pp (gt 4),│
+// │ within ±3pp; the runs=50 artifact's win_share_gap (~+23pp) is that √N      │
+// │ measurement artifact, NOT a model gap. Bands are unaffected — they come    │
+// │ from per-stat residuals (runs-stable), not from win-share.                 │
 // │                                                                            │
 // │ DOCUMENTED CURRENT GAP (AbsFloor > engine mean — band is wide because the  │
 // │ engine under-models the stat at this build stage, NOT a useful tolerance): │
-// │ ftm, fta, tgm, tga, ast, blk, pf. In particular `ast` is structurally 0 in │
+// │ ftm, fta, tgm, tga, ast, blk. In particular `ast` is structurally 0 in     │
 // │ the engine (commentary-only, master-reference L1098), so its band absorbs  │
-// │ the full .sco assist total as the gap. These wide bands are the recorded   │
-// │ baseline of the engine-vs-jumpshot model gap; band WIDTH is the fidelity   │
-// │ signal, and the bands tighten as the engine matures.                       │
+// │ the full .sco assist total as the gap. (pf is no longer in this set — the  │
+// │ calibrated foul rate brought its engine mean ≈17 above the abs floor.)     │
+// │ These wide bands are the recorded baseline of the engine-vs-jumpshot model │
+// │ gap; band WIDTH is the fidelity signal, and the bands tighten as the       │
+// │ engine matures.                                                            │
 // └──────────────────────────────────────────────────────────────────────────┘
 
 // regularBands holds the calibrated regular-season (game_type 2) tolerances.
 var regularBands = map[string]Band{
-	"points": {RelPct: 0.512775, AbsFloor: 48},
-	"fgm":    {RelPct: 0.343837, AbsFloor: 15},
-	"fga":    {RelPct: 0.251896, AbsFloor: 23},
-	"ftm":    {RelPct: 7.843537, AbsFloor: 25},
-	"fta":    {RelPct: 7.293839, AbsFloor: 31},
-	"tgm":    {RelPct: 1.835052, AbsFloor: 8},
-	"tga":    {RelPct: 1.203065, AbsFloor: 14},
-	"reb":    {RelPct: 0.307448, AbsFloor: 16},
+	"points": {RelPct: 0.516437, AbsFloor: 48},
+	"fgm":    {RelPct: 1.008547, AbsFloor: 27},
+	"fga":    {RelPct: 0.780316, AbsFloor: 47},
+	"ftm":    {RelPct: 0.794454, AbsFloor: 31},
+	"fta":    {RelPct: 0.775939, AbsFloor: 43},
+	"tgm":    {RelPct: 1.75, AbsFloor: 8},
+	"tga":    {RelPct: 1.155172, AbsFloor: 13},
+	"reb":    {RelPct: 0.550388, AbsFloor: 22},
 	"ast":    {RelPct: 0.15, AbsFloor: 31},
-	"stl":    {RelPct: 0.798658, AbsFloor: 13},
-	"tov":    {RelPct: 0.744712, AbsFloor: 23},
-	"blk":    {RelPct: 9.15625, AbsFloor: 11},
-	"pf":     {RelPct: 5.75, AbsFloor: 23},
+	"stl":    {RelPct: 0.791956, AbsFloor: 13},
+	"tov":    {RelPct: 0.735799, AbsFloor: 22},
+	"blk":    {RelPct: 9.843373, AbsFloor: 11},
+	"pf":     {RelPct: 1.350427, AbsFloor: 16},
 }
 
 // playoffBands holds the calibrated playoff (game_type 4) tolerances.
 var playoffBands = map[string]Band{
-	"points": {RelPct: 0.499774, AbsFloor: 46},
-	"fgm":    {RelPct: 0.32658, AbsFloor: 14},
-	"fga":    {RelPct: 0.249437, AbsFloor: 23},
-	"ftm":    {RelPct: 8.027778, AbsFloor: 25},
-	"fta":    {RelPct: 7.413462, AbsFloor: 31},
-	"tgm":    {RelPct: 1.777778, AbsFloor: 7},
-	"tga":    {RelPct: 1.223926, AbsFloor: 13},
-	"reb":    {RelPct: 0.307484, AbsFloor: 15},
+	"points": {RelPct: 0.498308, AbsFloor: 46},
+	"fgm":    {RelPct: 1.019129, AbsFloor: 27},
+	"fga":    {RelPct: 0.812572, AbsFloor: 46},
+	"ftm":    {RelPct: 0.794745, AbsFloor: 32},
+	"fta":    {RelPct: 0.778679, AbsFloor: 44},
+	"tgm":    {RelPct: 1.678571, AbsFloor: 7},
+	"tga":    {RelPct: 1.153558, AbsFloor: 13},
+	"reb":    {RelPct: 0.584507, AbsFloor: 23},
 	"ast":    {RelPct: 0.15, AbsFloor: 31},
-	"stl":    {RelPct: 0.757576, AbsFloor: 12},
-	"tov":    {RelPct: 0.746193, AbsFloor: 22},
-	"blk":    {RelPct: 9.576923, AbsFloor: 11},
-	"pf":     {RelPct: 5.914894, AbsFloor: 23},
+	"stl":    {RelPct: 0.751861, AbsFloor: 12},
+	"tov":    {RelPct: 0.73565, AbsFloor: 21},
+	"blk":    {RelPct: 10.320755, AbsFloor: 12},
+	"pf":     {RelPct: 1.445652, AbsFloor: 16},
 }
 
 // bands is the SINGLE source of truth for tolerance calibration, keyed by game

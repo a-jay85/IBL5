@@ -6,7 +6,6 @@ namespace Tests\UpdateAllTheThings\Steps;
 
 use PHPUnit\Framework\TestCase;
 use Tests\WideUnit\Mocks\MockDatabase;
-use Updater\Contracts\PipelineStepInterface;
 use Updater\Steps\AutoSeedOlympicsTeamInfoStep;
 
 class AutoSeedOlympicsTeamInfoStepTest extends TestCase
@@ -21,12 +20,6 @@ class AutoSeedOlympicsTeamInfoStepTest extends TestCase
     protected function tearDown(): void
     {
         $this->mockDb->clearQueryPatterns();
-    }
-
-    public function testImplementsPipelineStepInterface(): void
-    {
-        $step = new AutoSeedOlympicsTeamInfoStep($this->mockDb, 2003, null);
-        $this->assertInstanceOf(PipelineStepInterface::class, $step);
     }
 
     public function testFirstUploadWithoutParamFails(): void

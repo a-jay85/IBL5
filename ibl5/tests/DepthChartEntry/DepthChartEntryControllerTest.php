@@ -38,23 +38,6 @@ class DepthChartEntryControllerTest extends TestCase
     // CONSTRUCTOR TESTS
     // ============================================
 
-    public function testControllerCanBeInstantiated(): void
-    {
-        $controller = new DepthChartEntryController($this->mockDb, $this->stubCommonRepo, self::createStub(\League\LeagueContext::class));
-        
-        $this->assertInstanceOf(DepthChartEntryController::class, $controller);
-    }
-
-    public function testControllerImplementsCorrectInterface(): void
-    {
-        $controller = new DepthChartEntryController($this->mockDb, $this->stubCommonRepo, self::createStub(\League\LeagueContext::class));
-        
-        $this->assertInstanceOf(
-            \DepthChartEntry\Contracts\DepthChartEntryControllerInterface::class,
-            $controller
-        );
-    }
-
     // ============================================
     // MULTIPLE INSTANCES TEST
     // ============================================
@@ -64,8 +47,6 @@ class DepthChartEntryControllerTest extends TestCase
         $controller1 = new DepthChartEntryController($this->mockDb, $this->stubCommonRepo, self::createStub(\League\LeagueContext::class));
         $controller2 = new DepthChartEntryController($this->mockDb, $this->stubCommonRepo, self::createStub(\League\LeagueContext::class));
 
-        $this->assertInstanceOf(DepthChartEntryController::class, $controller1);
-        $this->assertInstanceOf(DepthChartEntryController::class, $controller2);
         $this->assertNotSame($controller1, $controller2);
     }
 

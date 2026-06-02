@@ -164,17 +164,17 @@ final class ArchiveExtractorTest extends TestCase
             self::assertFalse($missing);
         } finally {
             // Cleanup temp directory
-            array_map('unlink', glob($tmpDir . '/*') ?: []);
+            $files = glob($tmpDir . '/*');
+            array_map('unlink', $files ? $files : []);
             rmdir($tmpDir);
         }
     }
 
     public function testCleanupTempNonExistentFileDoesNotError(): void
     {
-        $this->extractor->cleanupTemp('/tmp/does_not_exist_' . uniqid());
+        $this->expectNotToPerformAssertions();
 
-        // No exception = pass
-        self::assertTrue(true);
+        $this->extractor->cleanupTemp('/tmp/does_not_exist_' . uniqid());
     }
 
     // ── findLastArchive + findHeatEndArchive (filesystem integration) ──────
@@ -197,7 +197,8 @@ final class ArchiveExtractorTest extends TestCase
             self::assertNotNull($result);
             self::assertStringEndsWith('00-01_33_finals.zip', $result);
         } finally {
-            array_map('unlink', glob($tmpDir . '/*') ?: []);
+            $files = glob($tmpDir . '/*');
+            array_map('unlink', $files ? $files : []);
             rmdir($tmpDir);
         }
     }
@@ -236,7 +237,8 @@ final class ArchiveExtractorTest extends TestCase
             self::assertNotNull($result);
             self::assertStringEndsWith('00-01_05_heat-end.zip', $result);
         } finally {
-            array_map('unlink', glob($tmpDir . '/*') ?: []);
+            $files = glob($tmpDir . '/*');
+            array_map('unlink', $files ? $files : []);
             rmdir($tmpDir);
         }
     }
@@ -263,7 +265,8 @@ final class ArchiveExtractorTest extends TestCase
             // Should pick the highest-sequenced heat archive
             self::assertStringEndsWith('93-94_06_heat-pool2.zip', $result);
         } finally {
-            array_map('unlink', glob($tmpDir . '/*') ?: []);
+            $files = glob($tmpDir . '/*');
+            array_map('unlink', $files ? $files : []);
             rmdir($tmpDir);
         }
     }
@@ -281,7 +284,8 @@ final class ArchiveExtractorTest extends TestCase
 
             self::assertNull($this->extractor->findHeatEndArchive($tmpDir));
         } finally {
-            array_map('unlink', glob($tmpDir . '/*') ?: []);
+            $files = glob($tmpDir . '/*');
+            array_map('unlink', $files ? $files : []);
             rmdir($tmpDir);
         }
     }
@@ -322,7 +326,8 @@ final class ArchiveExtractorTest extends TestCase
             self::assertSame(2001, $result[0]['ending_year']);
             self::assertStringEndsWith('00-01_05_heat-end.zip', $result[0]['path']);
         } finally {
-            array_map('unlink', glob($tmpDir . '/*') ?: []);
+            $files = glob($tmpDir . '/*');
+            array_map('unlink', $files ? $files : []);
             rmdir($tmpDir);
         }
     }
@@ -349,7 +354,8 @@ final class ArchiveExtractorTest extends TestCase
             self::assertCount(1, $result);
             self::assertSame('reg-sim01', $result[0]['phase']);
         } finally {
-            array_map('unlink', glob($tmpDir . '/*') ?: []);
+            $files = glob($tmpDir . '/*');
+            array_map('unlink', $files ? $files : []);
             rmdir($tmpDir);
         }
     }
@@ -397,7 +403,8 @@ final class ArchiveExtractorTest extends TestCase
             $result = $this->extractor->extractToString($zipPath, 'IBL5.plr');
             self::assertSame('test player data content', $result);
         } finally {
-            array_map('unlink', glob($tmpDir . '/*') ?: []);
+            $files = glob($tmpDir . '/*');
+            array_map('unlink', $files ? $files : []);
             rmdir($tmpDir);
         }
     }
@@ -417,7 +424,8 @@ final class ArchiveExtractorTest extends TestCase
             $result = $this->extractor->extractToString($zipPath, 'IBL5.plr');
             self::assertFalse($result);
         } finally {
-            array_map('unlink', glob($tmpDir . '/*') ?: []);
+            $files = glob($tmpDir . '/*');
+            array_map('unlink', $files ? $files : []);
             rmdir($tmpDir);
         }
     }

@@ -6,7 +6,6 @@ namespace Tests\LeagueControlPanel;
 
 use League\LeagueContext;
 use LeagueControlPanel\Contracts\AwardGenerationServiceInterface;
-use LeagueControlPanel\Contracts\LeagueControlPanelProcessorInterface;
 use LeagueControlPanel\Contracts\LeagueControlPanelRepositoryInterface;
 use LeagueControlPanel\LeagueControlPanelProcessor;
 use Logging\LoggerFactory;
@@ -38,15 +37,6 @@ class LeagueControlPanelProcessorTest extends TestCase
             unlink($htm);
         }
         LoggerFactory::reset();
-    }
-
-    public function testImplementsInterface(): void
-    {
-        $stub = self::createStub(LeagueControlPanelRepositoryInterface::class);
-        $awardStub = self::createStub(AwardGenerationServiceInterface::class);
-        $processor = new LeagueControlPanelProcessor($stub, $awardStub);
-
-        $this->assertInstanceOf(LeagueControlPanelProcessorInterface::class, $processor);
     }
 
     public function testDispatchUnknownActionReturnsFailure(): void

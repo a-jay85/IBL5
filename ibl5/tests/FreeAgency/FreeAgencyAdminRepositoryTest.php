@@ -30,27 +30,6 @@ class FreeAgencyAdminRepositoryTest extends TestCase
     }
 
     // ============================================
-    // CONSTRUCTOR TESTS
-    // ============================================
-
-    public function testRepositoryCanBeInstantiated(): void
-    {
-        $repository = new FreeAgencyAdminRepository($this->mockDb);
-
-        $this->assertInstanceOf(FreeAgencyAdminRepository::class, $repository);
-    }
-
-    public function testRepositoryImplementsCorrectInterface(): void
-    {
-        $repository = new FreeAgencyAdminRepository($this->mockDb);
-
-        $this->assertInstanceOf(
-            \FreeAgency\Contracts\FreeAgencyAdminRepositoryInterface::class,
-            $repository
-        );
-    }
-
-    // ============================================
     // GET ALL OFFERS WITH BIRD YEARS TESTS
     // ============================================
 
@@ -161,10 +140,16 @@ class FreeAgencyAdminRepositoryTest extends TestCase
     {
         $repository = new FreeAgencyAdminRepository($this->mockDb);
 
-        // Should not throw
         $repository->clearAllOffers();
 
-        // Verify DELETE query was executed (void return, just confirm no exception)
-        $this->assertTrue(true);
+        // Verify a query against the offers table was executed (void return).
+        $tableHit = false;
+        foreach ($this->mockDb->getExecutedQueries() as $query) {
+            if (str_contains($query, 'ibl_fa_offers')) {
+                $tableHit = true;
+                break;
+            }
+        }
+        $this->assertTrue($tableHit, 'clearAllOffers should execute a query against ibl_fa_offers');
     }
 }

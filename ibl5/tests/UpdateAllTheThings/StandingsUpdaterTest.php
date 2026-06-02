@@ -614,13 +614,13 @@ class StandingsUpdaterTest extends TestCase
     public function testConstructorAcceptsOptionalIsOlympicsFlag(): void
     {
         $updater = new \Updater\StandingsUpdater($this->repository, $this->mockSeason, true);
-        $this->assertInstanceOf(\Updater\StandingsUpdater::class, $updater);
+        $this->assertIsObject($updater);
     }
 
     public function testConstructorDefaultsToNonOlympics(): void
     {
         $updater = new \Updater\StandingsUpdater($this->repository, $this->mockSeason);
-        $this->assertInstanceOf(\Updater\StandingsUpdater::class, $updater);
+        $this->assertIsObject($updater);
     }
 
     public function testOlympicsContextUpsertsOlympicsStandingsTable(): void

@@ -61,15 +61,6 @@ class TeamViewTest extends TestCase
     }
 
     // ============================================
-    // INTERFACE IMPLEMENTATION
-    // ============================================
-
-    public function testImplementsInterface(): void
-    {
-        $this->assertInstanceOf(TeamViewInterface::class, $this->view);
-    }
-
-    // ============================================
     // RENDER TESTS
     // ============================================
 

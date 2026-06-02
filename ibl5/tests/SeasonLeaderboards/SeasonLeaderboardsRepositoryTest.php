@@ -26,30 +26,6 @@ class SeasonLeaderboardsRepositoryTest extends TestCase
         unset($GLOBALS['mysqli_db']);
     }
 
-    public function testRepositoryCanBeInstantiated(): void
-    {
-        $repository = new SeasonLeaderboardsRepository($this->mockDb);
-
-        $this->assertInstanceOf(SeasonLeaderboardsRepository::class, $repository);
-    }
-
-    public function testRepositoryImplementsCorrectInterface(): void
-    {
-        $repository = new SeasonLeaderboardsRepository($this->mockDb);
-
-        $this->assertInstanceOf(
-            \SeasonLeaderboards\Contracts\SeasonLeaderboardsRepositoryInterface::class,
-            $repository
-        );
-    }
-
-    public function testRepositoryExtendsBaseMysqliRepository(): void
-    {
-        $repository = new SeasonLeaderboardsRepository($this->mockDb);
-
-        $this->assertInstanceOf(\BaseMysqliRepository::class, $repository);
-    }
-
 
 
     public function testMultipleRepositoriesCanBeInstantiated(): void

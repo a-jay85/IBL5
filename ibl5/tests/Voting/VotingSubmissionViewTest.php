@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Voting;
 
 use PHPUnit\Framework\TestCase;
-use Voting\Contracts\VotingSubmissionViewInterface;
 use Voting\VotingSubmissionView;
 
 /**
@@ -18,11 +17,6 @@ final class VotingSubmissionViewTest extends TestCase
     protected function setUp(): void
     {
         $this->view = new VotingSubmissionView();
-    }
-
-    public function testImplementsInterface(): void
-    {
-        $this->assertInstanceOf(VotingSubmissionViewInterface::class, $this->view);
     }
 
     // ==================== Error Rendering ====================

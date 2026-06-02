@@ -18,13 +18,6 @@ class PlayerMovementRepositoryTest extends TestCase
         $this->mockDb = new MockDatabase();
     }
 
-    public function testImplementsInterface(): void
-    {
-        $repository = new PlayerMovementRepository($this->mockDb);
-
-        $this->assertInstanceOf(PlayerMovementRepositoryInterface::class, $repository);
-    }
-
     public function testGetPlayerMovementsReturnsEmptyArrayWhenNoMovements(): void
     {
         $this->mockDb->setMockData([]);

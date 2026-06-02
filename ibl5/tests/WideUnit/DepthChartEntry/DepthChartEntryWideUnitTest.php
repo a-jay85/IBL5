@@ -931,10 +931,10 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
         for ($i = 1; $i <= 8; $i++) {
             $postData["Name{$i}"] = "Player {$i}";
             $postData["pg{$i}"] = ($i <= 2) ? '1' : '0'; // Only 2 PG
-            $postData["sg{$i}"] = ($i == 3 || $i == 4 || $i == 5) ? '1' : '0';
-            $postData["sf{$i}"] = ($i == 6) ? '1' : '0';
-            $postData["pf{$i}"] = ($i == 7) ? '1' : '0';
-            $postData["c{$i}"] = ($i == 8) ? '1' : '0';
+            $postData["sg{$i}"] = ($i === 3 || $i === 4 || $i === 5) ? '1' : '0';
+            $postData["sf{$i}"] = ($i === 6) ? '1' : '0';
+            $postData["pf{$i}"] = ($i === 7) ? '1' : '0';
+            $postData["c{$i}"] = ($i === 8) ? '1' : '0';
             $postData["canPlayInGame{$i}"] = '1';
             $postData["min{$i}"] = '25';
             $postData["OF{$i}"] = '0';

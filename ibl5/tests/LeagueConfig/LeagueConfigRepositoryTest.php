@@ -11,13 +11,6 @@ use Tests\WideUnit\WideUnitTestCase;
 
 class LeagueConfigRepositoryTest extends WideUnitTestCase
 {
-    public function testImplementsRepositoryInterface(): void
-    {
-        $repository = new LeagueConfigRepository($this->mockDb);
-
-        $this->assertInstanceOf(LeagueConfigRepositoryInterface::class, $repository);
-    }
-
     public function testHasConfigForSeasonReturnsFalse(): void
     {
         $this->mockDb->setMockData([]);

@@ -132,7 +132,7 @@ final class RecordHoldersServiceTest extends TestCase
         $regSeason = $result['playerSingleGame']['regularSeason'];
         // First category should have a [tie] label
         $firstKey = array_key_first($regSeason);
-        $this->assertNotFalse($firstKey);
+        $this->assertNotNull($firstKey);
         $this->assertStringContainsString('[tie]', $firstKey);
         $this->assertCount(2, $regSeason[$firstKey]);
     }
@@ -150,7 +150,7 @@ final class RecordHoldersServiceTest extends TestCase
 
         $regSeason = $result['playerSingleGame']['regularSeason'];
         $firstKey = array_key_first($regSeason);
-        $this->assertNotFalse($firstKey);
+        $this->assertNotNull($firstKey);
         $this->assertStringNotContainsString('[tie]', $firstKey);
     }
 

@@ -28,11 +28,6 @@ class DraftPickLocatorServiceTest extends TestCase
     // CONSTRUCTOR TESTS
     // ============================================
 
-    public function testServiceCanBeInstantiated(): void
-    {
-        $this->assertInstanceOf(DraftPickLocatorService::class, $this->service);
-    }
-
     // ============================================
     // GET ALL TEAMS WITH PICKS TESTS
     // ============================================

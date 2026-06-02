@@ -175,8 +175,8 @@ class ComparePlayersServiceTest extends TestCase
         $service = new ComparePlayersService($mockRepo);
         $result = $service->comparePlayers("Shaquille O'Neal", "Tim Duncan");
 
-        // Should handle apostrophes without errors
-        $this->assertTrue($result === null || is_array($result));
+        // Should handle apostrophes without errors; both players found so result is an array
+        $this->assertIsArray($result);
     }
 
     public function testComparePlayersRejectsSpacesOnlyForPlayer1(): void

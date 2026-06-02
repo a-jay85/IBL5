@@ -14,7 +14,7 @@ use Repositories\Contracts\TeamIdentityRepositoryInterface;
  *
  * Tests message processing logic and Discord class delegation to CommonMysqliRepository.
  *
- * @covers \Discord
+ * @covers \Discord\Discord
  */
 #[AllowMockObjectsWithoutExpectations]
 class DiscordIntegrationTest extends WideUnitTestCase
@@ -26,32 +26,6 @@ class DiscordIntegrationTest extends WideUnitTestCase
     {
         parent::setUp();
         $this->mockCommonRepo = self::createStub(TeamIdentityRepositoryInterface::class);
-    }
-
-    // ============================================
-    // CONSTRUCTOR TESTS
-    // ============================================
-
-    /**
-     * Test Discord class can be instantiated with mock common repo
-     */
-    public function testConstructorAcceptsMockCommonRepo(): void
-    {
-        $discord = new Discord($this->mockCommonRepo);
-
-        $this->assertInstanceOf(Discord::class, $discord);
-    }
-
-    /**
-     * Test constructor loads config without throwing exception
-     */
-    public function testConstructorLoadsConfig(): void
-    {
-        // If config is not available, this should still work
-        // because the example config should exist
-        $discord = new Discord($this->mockCommonRepo);
-
-        $this->assertInstanceOf(Discord::class, $discord);
     }
 
     // ============================================
@@ -278,43 +252,6 @@ class DiscordIntegrationTest extends WideUnitTestCase
         }
     }
 
-    // ============================================
-    // DISCORD MENTION FORMAT TESTS
-    // ============================================
-
-    /**
-     * Test Discord user mention format
-     */
-    public function testDiscordUserMentionFormat(): void
-    {
-        $discordId = '123456789012345678';
-        $mention = "<@!{$discordId}>";
-
-        $this->assertSame('<@!123456789012345678>', $mention);
-    }
-
-    /**
-     * Test Discord channel mention format
-     */
-    public function testDiscordChannelMentionFormat(): void
-    {
-        $channelId = '987654321098765432';
-        $mention = "<#{$channelId}>";
-
-        $this->assertSame('<#987654321098765432>', $mention);
-    }
-
-    /**
-     * Test Discord role mention format
-     */
-    public function testDiscordRoleMentionFormat(): void
-    {
-        $roleId = '555555555555555555';
-        $mention = "<@&{$roleId}>";
-
-        $this->assertSame('<@&555555555555555555>', $mention);
-    }
-
     /**
      * Test trade message with Discord mentions
      */
@@ -343,7 +280,7 @@ class DiscordIntegrationTest extends WideUnitTestCase
         $fromTeam = 'Miami';
         $toTeam = 'Los Angeles';
 
-        if (!empty($fromDiscordId) && !empty($toDiscordId)) {
+        if ($fromDiscordId !== '' && $toDiscordId !== '') {
             $message = "<@!{$fromDiscordId}> and <@!{$toDiscordId}> agreed to a trade";
         } else {
             $message = "{$fromTeam} and {$toTeam} agreed to a trade";

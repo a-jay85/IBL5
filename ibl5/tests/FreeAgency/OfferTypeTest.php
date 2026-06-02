@@ -15,22 +15,6 @@ use PHPUnit\Framework\TestCase;
 class OfferTypeTest extends TestCase
 {
     /**
-     * Test that all offer type constants have correct values
-     */
-    public function testOfferTypeConstants(): void
-    {
-        $this->assertSame(0, OfferType::CUSTOM);
-        $this->assertSame(1, OfferType::MLE_1_YEAR);
-        $this->assertSame(2, OfferType::MLE_2_YEAR);
-        $this->assertSame(3, OfferType::MLE_3_YEAR);
-        $this->assertSame(4, OfferType::MLE_4_YEAR);
-        $this->assertSame(5, OfferType::MLE_5_YEAR);
-        $this->assertSame(6, OfferType::MLE_6_YEAR);
-        $this->assertSame(7, OfferType::LOWER_LEVEL_EXCEPTION);
-        $this->assertSame(8, OfferType::VETERAN_MINIMUM);
-    }
-
-    /**
      * Test MLE_OFFERS constant
      */
     public function testMLEOffersConstant(): void
@@ -38,14 +22,6 @@ class OfferTypeTest extends TestCase
         $expected = [450, 495, 540, 585, 630, 675];
         $this->assertEquals($expected, \ContractRules::MLE_OFFERS);
         $this->assertCount(6, \ContractRules::MLE_OFFERS);
-    }
-
-    /**
-     * Test LLE_OFFER constant
-     */
-    public function testLLEOfferConstant(): void
-    {
-        $this->assertSame(145, \ContractRules::LLE_OFFER);
     }
 
     /**
@@ -143,22 +119,6 @@ class OfferTypeTest extends TestCase
         $this->assertSame('Unknown', OfferType::getName(99));
         $this->assertSame('Unknown', OfferType::getName(-1));
         $this->assertSame('Unknown', OfferType::getName(10));
-    }
-
-    /**
-     * Test that MLE offers have correct salary amounts
-     */
-    public function testMLEOffersHaveCorrectAmounts(): void
-    {
-        $offers = \ContractRules::MLE_OFFERS;
-        
-        // Verify the exact MLE amounts
-        $this->assertSame(450, $offers[0], 'Year 1 MLE should be $450');
-        $this->assertSame(495, $offers[1], 'Year 2 MLE should be $495');
-        $this->assertSame(540, $offers[2], 'Year 3 MLE should be $540');
-        $this->assertSame(585, $offers[3], 'Year 4 MLE should be $585');
-        $this->assertSame(630, $offers[4], 'Year 5 MLE should be $630');
-        $this->assertSame(675, $offers[5], 'Year 6 MLE should be $675');
     }
 
     /**

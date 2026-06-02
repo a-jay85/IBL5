@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\PlayerMovement;
 
 use PlayerMovement\PlayerMovementView;
-use PlayerMovement\Contracts\PlayerMovementViewInterface;
 use PHPUnit\Framework\TestCase;
 
 class PlayerMovementViewTest extends TestCase
@@ -15,11 +14,6 @@ class PlayerMovementViewTest extends TestCase
     protected function setUp(): void
     {
         $this->view = new PlayerMovementView();
-    }
-
-    public function testImplementsInterface(): void
-    {
-        $this->assertInstanceOf(PlayerMovementViewInterface::class, $this->view);
     }
 
     public function testRenderReturnsHtmlWithTitle(): void

@@ -20,11 +20,6 @@ class SeasonHighsViewTest extends TestCase
         $this->view = new SeasonHighsView();
     }
 
-    public function testImplementsViewInterface(): void
-    {
-        $this->assertInstanceOf(SeasonHighsViewInterface::class, $this->view);
-    }
-
     public function testRenderShowsTitle(): void
     {
         $html = $this->view->render('Regular Season', self::createEmptyData());

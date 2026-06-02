@@ -37,13 +37,4 @@ class FreeAgencyControllerTest extends TestCase
         $this->assertTrue($loginBoxCalled);
     }
 
-    public function testControllerCanBeInstantiated(): void
-    {
-        $mockDb = new MockDatabase();
-        $commonRepo = self::createStub(TeamIdentityRepositoryInterface::class);
-        $authService = self::createStub(\Auth\AuthService::class);
-        $controller = new FreeAgencyController($mockDb, $commonRepo, $authService);
-
-        $this->assertInstanceOf(FreeAgencyController::class, $controller);
-    }
 }

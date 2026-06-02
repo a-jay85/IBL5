@@ -94,9 +94,7 @@ class PlayerFacadePropertyValuesTest extends DatabaseTestCase
     {
         $player = Player::withPlayerID($this->db, self::TEST_PID);
 
-        self::assertNotNull($player->getCurrentSeasonSalary());
         self::assertNotNull($player->getDecoratedName());
-        self::assertNotNull($player->getNameStatusClass());
     }
 
     public function testColorGettersReadFromPlayerData(): void

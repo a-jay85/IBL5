@@ -34,12 +34,13 @@ class CsvResponderTest extends TestCase
         fclose($handle);
 
         $this->assertIsString($output);
-        $lines = explode("\n", trim((string) $output));
+        $lines = explode("\n", trim($output));
         $this->assertCount(3, $lines);
         $this->assertSame('Name,Age,Position', $lines[0]);
 
         $parsed = str_getcsv($lines[1], ',', '"', '\\');
         $this->assertSame('LeBron James', $parsed[0]);
+
         $this->assertSame('39', $parsed[1]);
         $this->assertSame('SF', $parsed[2]);
     }
@@ -61,7 +62,7 @@ class CsvResponderTest extends TestCase
         fclose($handle);
 
         $this->assertIsString($output);
-        $this->assertStringContainsString('"James, LeBron"', (string) $output);
+        $this->assertStringContainsString('"James, LeBron"', $output);
     }
 
     public function testRenderRowsHandlesEmptyValues(): void
@@ -81,7 +82,7 @@ class CsvResponderTest extends TestCase
         fclose($handle);
 
         $this->assertIsString($output);
-        $lines = explode("\n", trim((string) $output));
+        $lines = explode("\n", trim($output));
         $parsed = str_getcsv($lines[1], ',', '"', '\\');
         $this->assertSame('Free Agent', $parsed[0]);
         $this->assertSame('', $parsed[1]);

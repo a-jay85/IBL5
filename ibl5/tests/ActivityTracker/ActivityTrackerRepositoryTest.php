@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\ActivityTracker;
 
 use ActivityTracker\ActivityTrackerRepository;
-use ActivityTracker\Contracts\ActivityTrackerRepositoryInterface;
 use PHPUnit\Framework\TestCase;
 use Tests\WideUnit\Mocks\MockDatabase;
 
@@ -16,13 +15,6 @@ class ActivityTrackerRepositoryTest extends TestCase
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-    }
-
-    public function testImplementsInterface(): void
-    {
-        $repository = new ActivityTrackerRepository($this->mockDb);
-
-        $this->assertInstanceOf(ActivityTrackerRepositoryInterface::class, $repository);
     }
 
     public function testGetTeamActivityReturnsEmptyArrayWhenNoTeams(): void

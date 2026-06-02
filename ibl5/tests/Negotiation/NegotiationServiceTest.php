@@ -39,13 +39,6 @@ class NegotiationServiceTest extends TestCase
     // CONSTRUCTOR TESTS
     // ============================================
 
-    public function testServiceCanBeInstantiated(): void
-    {
-        $service = $this->buildService();
-
-        $this->assertInstanceOf(NegotiationService::class, $service);
-    }
-
     // ============================================
     // PROCESS NEGOTIATION ERROR HANDLING TESTS
     // ============================================
@@ -83,16 +76,6 @@ class NegotiationServiceTest extends TestCase
     // ============================================
     // INTERFACE COMPLIANCE TESTS
     // ============================================
-
-    public function testServiceImplementsCorrectInterface(): void
-    {
-        $service = $this->buildService();
-
-        $this->assertInstanceOf(
-            \Negotiation\Contracts\NegotiationServiceInterface::class,
-            $service
-        );
-    }
 
     // ============================================
     // HELPER METHODS

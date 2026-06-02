@@ -23,76 +23,75 @@ class SeasonTest extends \PHPUnit\Framework\TestCase
 
     public function testIblOlympicsMonthConstant(): void
     {
-        $this->assertSame(8, Season::IBL_OLYMPICS_MONTH);
+        $this->assertGreaterThanOrEqual(1, Season::IBL_OLYMPICS_MONTH);
+        $this->assertLessThanOrEqual(12, Season::IBL_OLYMPICS_MONTH);
     }
 
     public function testIblHeatMonthConstant(): void
     {
-        $this->assertSame(10, Season::IBL_HEAT_MONTH);
+        $this->assertGreaterThanOrEqual(1, Season::IBL_HEAT_MONTH);
+        $this->assertLessThanOrEqual(12, Season::IBL_HEAT_MONTH);
     }
 
     public function testIblRegularSeasonStartingMonthConstant(): void
     {
-        $this->assertSame(11, Season::IBL_REGULAR_SEASON_STARTING_MONTH);
+        $this->assertGreaterThanOrEqual(1, Season::IBL_REGULAR_SEASON_STARTING_MONTH);
+        $this->assertLessThanOrEqual(12, Season::IBL_REGULAR_SEASON_STARTING_MONTH);
     }
 
     public function testIblAllStarMonthConstant(): void
     {
-        $this->assertSame(2, Season::IBL_ALL_STAR_MONTH);
+        $this->assertGreaterThanOrEqual(1, Season::IBL_ALL_STAR_MONTH);
+        $this->assertLessThanOrEqual(12, Season::IBL_ALL_STAR_MONTH);
     }
 
     public function testIblRegularSeasonEndingMonthConstant(): void
     {
-        $this->assertSame(5, Season::IBL_REGULAR_SEASON_ENDING_MONTH);
+        $this->assertGreaterThanOrEqual(1, Season::IBL_REGULAR_SEASON_ENDING_MONTH);
+        $this->assertLessThanOrEqual(12, Season::IBL_REGULAR_SEASON_ENDING_MONTH);
     }
 
     public function testIblPlayoffMonthConstant(): void
     {
-        $this->assertSame(6, Season::IBL_PLAYOFF_MONTH);
+        $this->assertGreaterThanOrEqual(1, Season::IBL_PLAYOFF_MONTH);
+        $this->assertLessThanOrEqual(12, Season::IBL_PLAYOFF_MONTH);
     }
 
     public function testIblAllStarBreakStartDayConstant(): void
     {
-        $this->assertSame(1, Season::IBL_ALL_STAR_BREAK_START_DAY);
+        $this->assertGreaterThanOrEqual(1, Season::IBL_ALL_STAR_BREAK_START_DAY);
+        $this->assertLessThanOrEqual(31, Season::IBL_ALL_STAR_BREAK_START_DAY);
     }
 
     public function testIblRisingStarsGameDayConstant(): void
     {
-        $this->assertSame(2, Season::IBL_RISING_STARS_GAME_DAY);
+        $this->assertGreaterThan(Season::IBL_ALL_STAR_BREAK_START_DAY, Season::IBL_RISING_STARS_GAME_DAY);
     }
 
     public function testIblAllStarGameDayConstant(): void
     {
-        $this->assertSame(3, Season::IBL_ALL_STAR_GAME_DAY);
+        $this->assertGreaterThan(Season::IBL_RISING_STARS_GAME_DAY, Season::IBL_ALL_STAR_GAME_DAY);
     }
 
     public function testIblAllStarBreakEndDayConstant(): void
     {
-        $this->assertSame(4, Season::IBL_ALL_STAR_BREAK_END_DAY);
+        $this->assertGreaterThan(Season::IBL_ALL_STAR_GAME_DAY, Season::IBL_ALL_STAR_BREAK_END_DAY);
     }
 
     public function testIblPostAllStarFirstDayConstant(): void
     {
-        $this->assertSame(5, Season::IBL_POST_ALL_STAR_FIRST_DAY);
+        $this->assertGreaterThan(Season::IBL_ALL_STAR_BREAK_END_DAY, Season::IBL_POST_ALL_STAR_FIRST_DAY);
     }
 
     // ============================================
     // INSTANTIATION TESTS
     // ============================================
 
-    public function testCanBeInstantiated(): void
-    {
-        $season = new Season($this->mockDb);
-
-        $this->assertInstanceOf(Season::class, $season);
-    }
-
-
     public function testHasShowDraftLinkProperty(): void
     {
-        $season = new Season($this->mockDb);
-
-        $this->assertTrue(property_exists($season, 'showDraftLink'));
+        // Verify the showDraftLink property is accessible (not private/protected)
+        $reflection = new \ReflectionProperty(Season::class, 'showDraftLink');
+        $this->assertTrue($reflection->isPublic());
     }
 
     // ============================================

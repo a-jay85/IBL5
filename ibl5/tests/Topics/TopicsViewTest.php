@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Topics;
 
 use PHPUnit\Framework\TestCase;
-use Topics\Contracts\TopicsViewInterface;
 use Topics\TopicsView;
 
 /**
@@ -27,11 +26,6 @@ class TopicsViewTest extends TestCase
             'authors' => ['admin'],
             'articleComm' => false,
         ];
-    }
-
-    public function testImplementsViewInterface(): void
-    {
-        $this->assertInstanceOf(TopicsViewInterface::class, $this->view);
     }
 
     public function testRenderShowsEmptyStateWhenNoTopics(): void

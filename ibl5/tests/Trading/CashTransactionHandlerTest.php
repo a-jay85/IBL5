@@ -29,20 +29,6 @@ class CashTransactionHandlerTest extends TestCase
     // INSTANTIATION TESTS
     // ============================================
 
-    public function testCanBeInstantiated(): void
-    {
-        $handler = new CashTransactionHandler($this->mockDb, $this->mockCommonRepo);
-
-        $this->assertInstanceOf(CashTransactionHandler::class, $handler);
-    }
-
-    public function testImplementsInterface(): void
-    {
-        $handler = new CashTransactionHandler($this->mockDb, $this->mockCommonRepo);
-
-        $this->assertInstanceOf(CashTransactionHandlerInterface::class, $handler);
-    }
-
     // ============================================
     // CALCULATE CONTRACT TOTAL YEARS TESTS
     // ============================================

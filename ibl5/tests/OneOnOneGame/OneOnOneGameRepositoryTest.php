@@ -26,32 +26,6 @@ class OneOnOneGameRepositoryTest extends TestCase
         unset($GLOBALS['mysqli_db']);
     }
 
-    public function testRepositoryCanBeInstantiated(): void
-    {
-        $repository = new OneOnOneGameRepository($this->mockDb);
-
-        $this->assertInstanceOf(OneOnOneGameRepository::class, $repository);
-    }
-
-    public function testRepositoryImplementsCorrectInterface(): void
-    {
-        $repository = new OneOnOneGameRepository($this->mockDb);
-
-        $this->assertInstanceOf(
-            \OneOnOneGame\Contracts\OneOnOneGameRepositoryInterface::class,
-            $repository
-        );
-    }
-
-    public function testRepositoryExtendsBaseMysqliRepository(): void
-    {
-        $repository = new OneOnOneGameRepository($this->mockDb);
-
-        $this->assertInstanceOf(\BaseMysqliRepository::class, $repository);
-    }
-
-
-
     public function testMultipleRepositoriesCanBeInstantiated(): void
     {
         $repo1 = new OneOnOneGameRepository($this->mockDb);

@@ -78,7 +78,7 @@ class JsbFileTypeTest extends TestCase
             JsbFileType::cases(),
         );
 
-        $this->assertSame(count($orders), count(array_unique($orders)));
+        $this->assertCount(count(array_unique($orders)), $orders);
     }
 
     public function testSupportsVerifyTrueForCumulativeTypes(): void

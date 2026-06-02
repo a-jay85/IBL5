@@ -24,14 +24,6 @@ class TeamOffDefStatsServiceTest extends TestCase
         $this->service = new TeamOffDefStatsService();
     }
 
-    /**
-     * Test that service implements the interface
-     */
-    public function testImplementsInterface(): void
-    {
-        $this->assertInstanceOf(TeamOffDefStatsServiceInterface::class, $this->service);
-    }
-
     // ========================================
     // processTeamStats() Tests
     // ========================================

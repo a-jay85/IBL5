@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Auth;
 
 use Auth\AuthRepository;
-use Auth\Contracts\AuthRepositoryInterface;
 use Tests\WideUnit\WideUnitTestCase;
 
 class AuthRepositoryTest extends WideUnitTestCase
@@ -16,11 +15,6 @@ class AuthRepositoryTest extends WideUnitTestCase
     {
         parent::setUp();
         $this->repo = new AuthRepository($this->mockDb);
-    }
-
-    public function testImplementsInterface(): void
-    {
-        self::assertInstanceOf(AuthRepositoryInterface::class, $this->repo);
     }
 
     public function testFindUserRolesByUsernameHit(): void

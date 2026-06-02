@@ -32,23 +32,6 @@ class LeagueStartersServiceTest extends TestCase
     // CONSTRUCTOR TESTS
     // ============================================
 
-    public function testServiceCanBeInstantiated(): void
-    {
-        $service = new LeagueStartersService($this->mockDb, $this->mockLeague);
-
-        $this->assertInstanceOf(LeagueStartersService::class, $service);
-    }
-
-    public function testServiceImplementsCorrectInterface(): void
-    {
-        $service = new LeagueStartersService($this->mockDb, $this->mockLeague);
-
-        $this->assertInstanceOf(
-            \LeagueStarters\Contracts\LeagueStartersServiceInterface::class,
-            $service
-        );
-    }
-
     // ============================================
     // GET ALL STARTERS BY POSITION TESTS
     // ============================================

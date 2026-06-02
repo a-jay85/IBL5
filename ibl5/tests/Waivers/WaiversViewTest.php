@@ -6,7 +6,6 @@ namespace Tests\Waivers;
 
 use PHPUnit\Framework\TestCase;
 use Waivers\WaiversView;
-use Waivers\Contracts\WaiversViewInterface;
 
 /**
  * WaiversViewTest - Tests for WaiversView
@@ -18,24 +17,6 @@ class WaiversViewTest extends TestCase
     protected function setUp(): void
     {
         $this->view = new WaiversView();
-    }
-
-    // ============================================
-    // INSTANTIATION TESTS
-    // ============================================
-
-    public function testCanBeInstantiated(): void
-    {
-        $view = new WaiversView();
-
-        $this->assertInstanceOf(WaiversView::class, $view);
-    }
-
-    public function testImplementsInterface(): void
-    {
-        $view = new WaiversView();
-
-        $this->assertInstanceOf(WaiversViewInterface::class, $view);
     }
 
     // ============================================

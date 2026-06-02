@@ -122,8 +122,6 @@ class RookieOptionValidatorTest extends TestCase
     public function testValidateEligibilityZeroSalary(): void
     {
         $mockPlayer = $this->createMock(Player::class);
-        $mockPlayer->position = 'PG';
-        $mockPlayer->name = 'Zero Salary Player';
         $mockPlayer->method('canRookieOption')
             ->willReturn(true);
         $mockPlayer->method('getFinalYearRookieContractSalary')

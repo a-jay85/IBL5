@@ -33,27 +33,6 @@ class TeamScheduleServiceTest extends TestCase
     }
 
     // ============================================
-    // CONSTRUCTOR TESTS
-    // ============================================
-
-    public function testServiceCanBeInstantiated(): void
-    {
-        $service = new TeamScheduleService($this->mockDb, $this->stubRepository);
-
-        $this->assertInstanceOf(TeamScheduleService::class, $service);
-    }
-
-    public function testServiceImplementsCorrectInterface(): void
-    {
-        $service = new TeamScheduleService($this->mockDb, $this->stubRepository);
-
-        $this->assertInstanceOf(
-            \TeamSchedule\Contracts\TeamScheduleServiceInterface::class,
-            $service
-        );
-    }
-
-    // ============================================
     // MULTIPLE INSTANCES TEST
     // ============================================
 

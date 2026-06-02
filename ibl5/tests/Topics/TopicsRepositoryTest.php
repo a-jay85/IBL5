@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Topics;
 
 use Tests\WideUnit\WideUnitTestCase;
-use Topics\Contracts\TopicsRepositoryInterface;
 use Topics\TopicsRepository;
 
 /**
@@ -19,11 +18,6 @@ class TopicsRepositoryTest extends WideUnitTestCase
     {
         parent::setUp();
         $this->repository = new TopicsRepository($this->mockDb);
-    }
-
-    public function testImplementsRepositoryInterface(): void
-    {
-        $this->assertInstanceOf(TopicsRepositoryInterface::class, $this->repository);
     }
 
     public function testGetTopicsWithArticlesReturnsEmptyWhenNoTopics(): void

@@ -7,7 +7,6 @@ namespace Tests\UpdateAllTheThings\Steps;
 use BulkImport\Contracts\BackupArchiveLocatorInterface;
 use PHPUnit\Framework\TestCase;
 use Season\Season;
-use Updater\Contracts\PipelineStepInterface;
 use Updater\Steps\ExtractFromBackupStep;
 
 class ExtractFromBackupStepTest extends TestCase
@@ -23,17 +22,6 @@ class ExtractFromBackupStepTest extends TestCase
         $this->stubSeason = self::createStub(Season::class);
         $this->stubSeason->beginningYear = 2025;
         $this->stubSeason->endingYear = 2026;
-    }
-
-    public function testImplementsPipelineStepInterface(): void
-    {
-        $step = new ExtractFromBackupStep(
-            $this->stubLocator,
-            $this->stubSeason,
-            '/tmp',
-        );
-
-        $this->assertInstanceOf(PipelineStepInterface::class, $step);
     }
 
     public function testGetLabelReturnsExpectedLabel(): void

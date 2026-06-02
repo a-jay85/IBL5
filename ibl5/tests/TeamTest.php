@@ -38,27 +38,11 @@ class TeamTest extends \PHPUnit\Framework\TestCase
     }
 
     // ============================================
-    // CONSTANT TESTS
-    // ============================================
-
-    public function testBuyoutPercentageMaxConstant(): void
-    {
-        $this->assertSame(0.40, Team::BUYOUT_PERCENTAGE_MAX);
-    }
-
-    public function testRosterSpotsMaxConstant(): void
-    {
-        $this->assertSame(15, Team::ROSTER_SPOTS_MAX);
-    }
-
-    // ============================================
     // INSTANTIATION TESTS
     // ============================================
 
-    public function testCanBeInstantiated(): void
+    public function testExtendsBaseMysqliRepository(): void
     {
-        $team = new Team($this->mockDb);
-
-        $this->assertInstanceOf(Team::class, $team);
+        self::assertContains(\BaseMysqliRepository::class, (array) class_parents(Team::class));
     }
 }

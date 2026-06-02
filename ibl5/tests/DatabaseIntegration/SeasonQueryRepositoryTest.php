@@ -109,8 +109,6 @@ class SeasonQueryRepositoryTest extends DatabaseTestCase
 
         if ($date !== null) {
             self::assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}$/', $date);
-        } else {
-            self::assertNull($date);
         }
     }
 

@@ -47,8 +47,8 @@ final class MergeMasterToProdCliTest extends TestCase
         self::assertSame(0, $result['exit'], "Expected exit 0, got: {$result['output']}");
         self::assertStringContainsString('Done. Pushed master and production.', $result['output']);
 
-        $masterSha = trim(shell_exec('git -C ' . escapeshellarg($this->originDir) . ' rev-parse master') ?: '');
-        $prodSha = trim(shell_exec('git -C ' . escapeshellarg($this->originDir) . ' rev-parse production') ?: '');
+        $masterSha = trim((string) shell_exec('git -C ' . escapeshellarg($this->originDir) . ' rev-parse master'));
+        $prodSha = trim((string) shell_exec('git -C ' . escapeshellarg($this->originDir) . ' rev-parse production'));
         self::assertSame($masterSha, $prodSha, 'production should match master after merge');
     }
 
@@ -85,14 +85,14 @@ final class MergeMasterToProdCliTest extends TestCase
         file_put_contents($binDir . '/check-master-ci-green', "#!/bin/bash\nexit 1\n");
         chmod($binDir . '/check-master-ci-green', 0755);
 
-        $prodShaBefore = trim(shell_exec('git -C ' . escapeshellarg($this->originDir) . ' rev-parse production') ?: '');
+        $prodShaBefore = trim((string) shell_exec('git -C ' . escapeshellarg($this->originDir) . ' rev-parse production'));
 
         $result = $this->runScript();
 
         self::assertNotSame(0, $result['exit'], 'Should fail when CI is red');
         self::assertStringContainsString('not green on CI', $result['output']);
 
-        $prodShaAfter = trim(shell_exec('git -C ' . escapeshellarg($this->originDir) . ' rev-parse production') ?: '');
+        $prodShaAfter = trim((string) shell_exec('git -C ' . escapeshellarg($this->originDir) . ' rev-parse production'));
         self::assertSame($prodShaBefore, $prodShaAfter, 'production should not have changed');
     }
 
@@ -108,14 +108,14 @@ final class MergeMasterToProdCliTest extends TestCase
         exec('git -C ' . escapeshellarg($prodClone) . ' commit -m "diverge production" 2>&1');
         exec('git -C ' . escapeshellarg($prodClone) . ' push origin production 2>&1');
 
-        $prodShaBefore = trim(shell_exec('git -C ' . escapeshellarg($this->originDir) . ' rev-parse production') ?: '');
+        $prodShaBefore = trim((string) shell_exec('git -C ' . escapeshellarg($this->originDir) . ' rev-parse production'));
 
         $result = $this->runScript();
 
         self::assertNotSame(0, $result['exit'], 'Should fail when production has diverged');
         self::assertStringContainsString('fast-forward failed', $result['output']);
 
-        $prodShaAfter = trim(shell_exec('git -C ' . escapeshellarg($this->originDir) . ' rev-parse production') ?: '');
+        $prodShaAfter = trim((string) shell_exec('git -C ' . escapeshellarg($this->originDir) . ' rev-parse production'));
         self::assertSame($prodShaBefore, $prodShaAfter, 'production should not have changed');
     }
 

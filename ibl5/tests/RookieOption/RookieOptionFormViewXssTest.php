@@ -18,9 +18,9 @@ final class RookieOptionFormViewXssTest extends TestCase
         $escaped = '&lt;script&gt;';
 
         $player = $this->createMock(Player::class);
-        $player->playerID = 1;
-        $player->name = $xss;
-        $player->position = $xss;
+        $player->method('getPlayerID')->willReturn(1);
+        $player->method('getName')->willReturn($xss);
+        $player->method('getPosition')->willReturn($xss);
 
         $view = new RookieOptionFormView();
         $output = $view->renderForm($player, $xss, 100);

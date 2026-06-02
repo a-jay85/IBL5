@@ -44,18 +44,14 @@ final class SecurityBootstrapTest extends TestCase
 
     public function testIncludeSafeBlocksNonPhpExtension(): void
     {
+        $this->expectNotToPerformAssertions();
         SecurityBootstrap::includeSafe('malicious.sh');
-
-        // Nothing should happen — non-.php files are rejected
-        self::assertTrue(true);
     }
 
     public function testIncludeSafeBlocksSpecialCharactersInFilename(): void
     {
+        $this->expectNotToPerformAssertions();
         SecurityBootstrap::includeSafe('file;rm -rf.php');
-
-        // Special chars in filename are rejected by the regex
-        self::assertTrue(true);
     }
 
     public function testIncludeSafeAllowsValidPhpFile(): void
@@ -84,16 +80,13 @@ final class SecurityBootstrapTest extends TestCase
 
     public function testIncludeSafeHandlesEmptyString(): void
     {
-        // Empty string should not cause errors
+        $this->expectNotToPerformAssertions();
         SecurityBootstrap::includeSafe('');
-        self::assertTrue(true);
     }
 
     public function testIncludeSafeStripsNullBytes(): void
     {
+        $this->expectNotToPerformAssertions();
         SecurityBootstrap::includeSafe("dir\0/../test.php");
-
-        // Null byte injection should be neutralized
-        self::assertTrue(true);
     }
 }

@@ -21,24 +21,6 @@ class DraftViewTest extends TestCase
     }
 
     // ============================================
-    // INSTANTIATION TESTS
-    // ============================================
-
-    public function testCanBeInstantiated(): void
-    {
-        $view = new DraftView();
-
-        $this->assertInstanceOf(DraftView::class, $view);
-    }
-
-    public function testImplementsInterface(): void
-    {
-        $view = new DraftView();
-
-        $this->assertInstanceOf(DraftViewInterface::class, $view);
-    }
-
-    // ============================================
     // RENDER VALIDATION ERROR TESTS
     // ============================================
 

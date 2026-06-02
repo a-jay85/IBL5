@@ -54,7 +54,8 @@ abstract class WideUnitTestCase extends TestCase
      */
     protected function suppressErrorLog(): void
     {
-        $this->previousErrorLog = ini_get('error_log') ?: '';
+        $result = ini_get('error_log');
+        $this->previousErrorLog = $result !== false ? $result : '';
         ini_set('error_log', '/dev/null');
     }
 
@@ -125,17 +126,17 @@ abstract class WideUnitTestCase extends TestCase
     protected function assertQueryNotExecuted(string $querySubstring): void
     {
         $queries = $this->getExecutedQueries();
-        
-        foreach ($queries as $query) {
-            if (stripos($query, $querySubstring) !== false) {
-                self::fail(
-                    "Query containing '$querySubstring' was executed but should not have been.\n" .
-                    "Matched query: $query"
-                );
-            }
-        }
-        
-        $this->assertTrue(true); // No matching query found, assertion passes
+
+        $matches = array_filter(
+            $queries,
+            static fn (string $q): bool => stripos($q, $querySubstring) !== false,
+        );
+
+        self::assertEmpty(
+            $matches,
+            "Query containing '$querySubstring' was executed but should not have been.\n" .
+            "Matched query: " . (count($matches) > 0 ? reset($matches) : ''),
+        );
     }
 
     /**

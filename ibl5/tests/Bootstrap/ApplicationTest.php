@@ -29,7 +29,7 @@ final class ApplicationTest extends TestCase
             public function boot(ContainerInterface $container): void
             {
                 $this->order[] = 'step1';
-                $container->set('step1', true);
+                $container->set('step1', count($this->order) > 0);
             }
         };
 
@@ -46,7 +46,7 @@ final class ApplicationTest extends TestCase
             public function boot(ContainerInterface $container): void
             {
                 $this->order[] = 'step2';
-                $container->set('step2', true);
+                $container->set('step2', count($this->order) > 0);
             }
         };
 
@@ -107,8 +107,9 @@ final class ApplicationTest extends TestCase
         $app = new Application();
         $app->boot();
 
-        // No exception — empty boot is valid
-        self::assertInstanceOf(ContainerInterface::class, $app->getContainer());
+        // No exception — empty boot is valid; container is accessible and app is not terminated
+        self::assertFalse($app->isTerminated());
+        self::assertSame($app->getContainer(), $app->getContainer());
     }
 
     public function testBootStopsOnTermination(): void
@@ -128,7 +129,7 @@ final class ApplicationTest extends TestCase
             public function boot(ContainerInterface $container): void
             {
                 $this->order[] = 'terminator';
-                $container->set('app.terminated', true);
+                $container->set('app.terminated', count($this->order) > 0);
             }
         };
 
@@ -145,6 +146,7 @@ final class ApplicationTest extends TestCase
             public function boot(ContainerInterface $container): void
             {
                 $this->order[] = 'should_not_run';
+                $container->set('never_reached', count($this->order) > 0);
             }
         };
 

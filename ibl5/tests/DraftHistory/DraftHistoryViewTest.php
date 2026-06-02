@@ -23,11 +23,6 @@ class DraftHistoryViewTest extends TestCase
         $this->view = new DraftHistoryView();
     }
 
-    public function testImplementsViewInterface(): void
-    {
-        $this->assertInstanceOf(DraftHistoryViewInterface::class, $this->view);
-    }
-
     public function testRenderOutputsTable(): void
     {
         $html = $this->view->render(2024, 1988, 2024, [self::createYearPick()]);

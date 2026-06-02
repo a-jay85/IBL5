@@ -15,15 +15,6 @@ use Season\Season;
  */
 class SeasonHighsServiceTest extends TestCase
 {
-    public function testImplementsServiceInterface(): void
-    {
-        $repo = self::createStub(SeasonHighsRepositoryInterface::class);
-        $season = $this->createStubSeason(2024, 2025);
-        $service = new SeasonHighsService($repo, $season);
-
-        $this->assertInstanceOf(SeasonHighsServiceInterface::class, $service);
-    }
-
     public function testGetSeasonHighsDataReturnsExpectedStructure(): void
     {
         $repo = self::createStub(SeasonHighsRepositoryInterface::class);

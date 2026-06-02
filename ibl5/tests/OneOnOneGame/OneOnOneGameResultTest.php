@@ -6,7 +6,6 @@ namespace Tests\OneOnOneGame;
 
 use PHPUnit\Framework\TestCase;
 use OneOnOneGame\OneOnOneGameResult;
-use OneOnOneGame\OneOnOneGamePlayerStats;
 
 /**
  * Tests for OneOnOneGameResult DTO
@@ -24,8 +23,6 @@ final class OneOnOneGameResultTest extends TestCase
         $this->assertSame(0, $result->player2Score);
         $this->assertSame('', $result->playByPlay);
         $this->assertSame('', $result->owner);
-        $this->assertInstanceOf(OneOnOneGamePlayerStats::class, $result->player1Stats);
-        $this->assertInstanceOf(OneOnOneGamePlayerStats::class, $result->player2Stats);
     }
 
     public function testGetWinnerNameReturnsPlayer1WhenPlayer1Wins(): void

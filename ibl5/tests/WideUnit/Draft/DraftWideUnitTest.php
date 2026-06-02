@@ -58,7 +58,6 @@ class DraftWideUnitTest extends WideUnitTestCase
     {
         unset($this->handler);
         unset($this->mockCommonRepository);
-        unset($this->mockSharedFunctions);
         unset($this->mockSeason);
         unset($_SERVER['SERVER_NAME']);
         parent::tearDown();

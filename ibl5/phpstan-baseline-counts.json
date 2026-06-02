@@ -8,30 +8,6 @@
         "ibl.sqlStringInterpolation": 32
     },
     "phpstan-tests-baseline.neon": {
-        "argument.type": 77,
-        "array.duplicateKey": 9,
-        "arrayFilter.strict": 3,
-        "cast.useless": 6,
-        "classConstant.unused": 1,
-        "empty.notAllowed": 4,
-        "equal.notAllowed": 3,
-        "function.alreadyNarrowedType": 4,
-        "function.notFound": 2,
-        "ibl.meaninglessAssertion": 3,
-        "method.alreadyNarrowedType": 240,
-        "method.impossibleType": 2,
-        "method.internal": 8,
-        "method.templateTypeNotInParameter": 2,
-        "new.deprecatedClass": 2,
-        "phpunit.assertCount": 4,
-        "phpunit.covers": 3,
-        "property.defaultValue": 2,
-        "property.deprecatedClass": 1,
-        "property.notFound": 23,
-        "property.onlyWritten": 7,
-        "property.unusedType": 1,
-        "staticMethod.alreadyNarrowedType": 37,
-        "staticMethod.deprecated": 1,
-        "ternary.shortNotAllowed": 10
+        "argument.type": 77
     }
 }

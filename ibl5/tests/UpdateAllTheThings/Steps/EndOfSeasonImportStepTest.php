@@ -40,7 +40,10 @@ class EndOfSeasonImportStepTest extends TestCase
 
     public function testImplementsPipelineStepInterface(): void
     {
-        $this->assertInstanceOf(PipelineStepInterface::class, $this->createStep());
+        self::assertContains(
+            PipelineStepInterface::class,
+            (array) class_implements(EndOfSeasonImportStep::class)
+        );
     }
 
     public function testGetLabelReturnsExpectedLabel(): void

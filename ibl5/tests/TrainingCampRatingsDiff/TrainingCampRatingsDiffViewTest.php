@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\TrainingCampRatingsDiff;
 
 use PHPUnit\Framework\TestCase;
-use TrainingCampRatingsDiff\Contracts\TrainingCampRatingsDiffViewInterface;
 use TrainingCampRatingsDiff\RatingDelta;
 use TrainingCampRatingsDiff\RatingRow;
 use TrainingCampRatingsDiff\TrainingCampRatingsDiffService;
@@ -104,15 +103,6 @@ class TrainingCampRatingsDiffViewTest extends TestCase
             sumAbsDelta: $maxAbs,
             isNewPlayer: false,
         );
-    }
-
-    // ---------------------------------------------------------------------------
-    // Interface implementation
-    // ---------------------------------------------------------------------------
-
-    public function test_view_implements_interface(): void
-    {
-        self::assertInstanceOf(TrainingCampRatingsDiffViewInterface::class, $this->view);
     }
 
     // ---------------------------------------------------------------------------

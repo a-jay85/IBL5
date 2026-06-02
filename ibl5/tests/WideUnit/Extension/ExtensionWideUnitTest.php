@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\WideUnit\Extension;
 
 use Tests\WideUnit\WideUnitTestCase;
-use Extension\ExtensionProcessor;
+use Extension\ExtensionService;
 
 /**
  * Integration tests for complete contract extension workflows
@@ -23,12 +23,12 @@ use Extension\ExtensionProcessor;
  */
 class ExtensionWideUnitTest extends WideUnitTestCase
 {
-    private ExtensionProcessor $extensionProcessor;
+    private ExtensionService $extensionProcessor;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->extensionProcessor = new ExtensionProcessor($this->mockDb);
+        $this->extensionProcessor = new ExtensionService($this->mockDb);
     }
 
     protected function tearDown(): void
@@ -1047,7 +1047,6 @@ class ExtensionWideUnitTest extends WideUnitTestCase
             'retired' => 0,
             'droptime' => 0,
             // Team info fields
-            'teamid' => 1,
             'team_city' => 'Test',
             'team_name' => 'Team',
             'color1' => 'Blue',

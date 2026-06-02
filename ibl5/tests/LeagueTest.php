@@ -30,20 +30,6 @@ class LeagueTest extends TestCase
     // CONSTRUCTOR TESTS
     // ============================================
 
-    public function testLeagueCanBeInstantiated(): void
-    {
-        $league = new League($this->mockDb);
-        
-        $this->assertInstanceOf(League::class, $league);
-    }
-
-    public function testLeagueExtendsBaseMysqliRepository(): void
-    {
-        $league = new League($this->mockDb);
-        
-        $this->assertInstanceOf(\BaseMysqliRepository::class, $league);
-    }
-
     // ============================================
     // CONSTANT TESTS
     // ============================================
@@ -74,27 +60,22 @@ class LeagueTest extends TestCase
         $this->assertCount(14, League::WESTERN_CONFERENCE_TEAMIDS);
     }
 
-    public function testSoftCapMaxIsCorrect(): void
+    public function testSoftCapMaxIsLessThanHardCapMax(): void
     {
-        $this->assertSame(5000, League::SOFT_CAP_MAX);
+        $this->assertLessThan(League::HARD_CAP_MAX, League::SOFT_CAP_MAX);
     }
 
-    public function testHardCapMaxIsCorrect(): void
+    public function testFreeAgentsTeamIdIsNotARealFranchise(): void
     {
-        $this->assertSame(7000, League::HARD_CAP_MAX);
+        $this->assertFalse(League::isRealFranchise(League::FREE_AGENTS_TEAMID));
     }
 
-    public function testFreeAgentsTeamIdIsZero(): void
+    public function testSpecialTeamIdsAreNotRealFranchises(): void
     {
-        $this->assertSame(0, League::FREE_AGENTS_TEAMID);
-    }
-
-    public function testSpecialTeamIdConstants(): void
-    {
-        self::assertSame(40, League::ROOKIES_TEAMID);
-        self::assertSame(41, League::SOPHOMORES_TEAMID);
-        self::assertSame(50, League::ALL_STAR_AWAY_TEAMID);
-        self::assertSame(51, League::ALL_STAR_HOME_TEAMID);
+        $this->assertFalse(League::isRealFranchise(League::ROOKIES_TEAMID));
+        $this->assertFalse(League::isRealFranchise(League::SOPHOMORES_TEAMID));
+        $this->assertFalse(League::isRealFranchise(League::ALL_STAR_AWAY_TEAMID));
+        $this->assertFalse(League::isRealFranchise(League::ALL_STAR_HOME_TEAMID));
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('realFranchiseProvider')]

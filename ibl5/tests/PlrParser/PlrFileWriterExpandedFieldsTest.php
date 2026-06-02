@@ -10,11 +10,11 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * @covers \PlrParser\PlrFileWriter
- *
  * Guards the season-stat entries that were added to FIELD_MAP for PlrReconstructionService.
  * These guards exist so a rogue copy-paste can't silently reintroduce an offset collision
  * between contract fields (298-321) and the season-stat block (144-207).
+ *
+ * @covers \PlrParser\PlrFileWriter
  */
 class PlrFileWriterExpandedFieldsTest extends TestCase
 {

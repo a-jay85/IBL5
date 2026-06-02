@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Logging;
 
-use Logging\Contracts\LoggerFactoryInterface;
 use Logging\DiscordWebhookHandler;
 use Logging\LoggerFactory;
 use Logging\PiiRedactionProcessor;
@@ -13,20 +12,12 @@ use Monolog\Handler\RotatingFileHandler;
 use Monolog\Handler\TestHandler;
 use Monolog\Logger;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\LoggerInterface;
 
 class LoggerFactoryTest extends TestCase
 {
     protected function tearDown(): void
     {
         LoggerFactory::reset();
-    }
-
-    public function testChannelReturnsLoggerInterface(): void
-    {
-        $factory = LoggerFactory::forTests();
-
-        $this->assertInstanceOf(LoggerInterface::class, $factory->channel('db'));
     }
 
     public function testSameChannelReturnsSameInstance(): void
@@ -63,14 +54,6 @@ class LoggerFactoryTest extends TestCase
         $this->assertInstanceOf(NullHandler::class, $handlers[0]);
     }
 
-    public function testFromConfigLoadsDefaults(): void
-    {
-        $factory = LoggerFactory::fromConfig();
-
-        $logger = $factory->channel('app');
-        $this->assertInstanceOf(LoggerInterface::class, $logger);
-    }
-
     public function testResetClearsSingleton(): void
     {
         $factory1 = LoggerFactory::forTests();
@@ -89,14 +72,11 @@ class LoggerFactoryTest extends TestCase
         LoggerFactory::reset();
 
         $logger = LoggerFactory::getChannel('fallback');
-        $this->assertInstanceOf(LoggerInterface::class, $logger);
-    }
 
-    public function testImplementsLoggerFactoryInterface(): void
-    {
-        $factory = LoggerFactory::forTests();
-
-        $this->assertInstanceOf(LoggerFactoryInterface::class, $factory);
+        /** @var \Monolog\Logger $monologLogger */
+        $monologLogger = $logger;
+        $this->assertCount(1, $monologLogger->getHandlers());
+        $this->assertInstanceOf(NullHandler::class, $monologLogger->getHandlers()[0]);
     }
 
     public function testChannelNameSetOnLogger(): void

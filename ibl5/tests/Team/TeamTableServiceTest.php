@@ -6,7 +6,6 @@ namespace Tests\Team;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Team\Contracts\TeamTableServiceInterface;
 use League\League;
 use Team\TeamTableService;
 use Season\Season;
@@ -27,11 +26,6 @@ class TeamTableServiceTest extends TestCase
         $this->mockDb = new MockDatabase();
         $repository = new \Team\TeamRepository($this->mockDb);
         $this->service = new TeamTableService($this->mockDb, $repository);
-    }
-
-    public function testImplementsInterface(): void
-    {
-        $this->assertInstanceOf(TeamTableServiceInterface::class, $this->service);
     }
 
     // ============================================

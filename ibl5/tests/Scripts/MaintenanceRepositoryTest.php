@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Scripts;
 
 use Scripts\MaintenanceRepository;
-use Scripts\Contracts\MaintenanceRepositoryInterface;
 use PHPUnit\Framework\TestCase;
 use Tests\WideUnit\Mocks\MockDatabase;
 
@@ -21,11 +20,6 @@ class MaintenanceRepositoryTest extends TestCase
     {
         $this->mockDb = new MockDatabase();
         $this->repository = new MaintenanceRepository($this->mockDb);
-    }
-
-    public function testImplementsInterface(): void
-    {
-        $this->assertInstanceOf(MaintenanceRepositoryInterface::class, $this->repository);
     }
 
     public function testGetAllTeamsReturnsArray(): void

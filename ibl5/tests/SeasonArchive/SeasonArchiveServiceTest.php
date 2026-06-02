@@ -8,7 +8,6 @@ use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use SeasonArchive\SeasonArchiveService;
 use SeasonArchive\Contracts\SeasonArchiveRepositoryInterface;
-use SeasonArchive\Contracts\SeasonArchiveServiceInterface;
 
 /**
  * SeasonArchiveServiceTest - Tests for SeasonArchiveService business logic
@@ -27,11 +26,6 @@ class SeasonArchiveServiceTest extends TestCase
         $this->mockRepository = $this->createMock(SeasonArchiveRepositoryInterface::class);
         $this->mockRepository->method('getTeamConferences')->willReturn([]);
         $this->service = new SeasonArchiveService($this->mockRepository);
-    }
-
-    public function testImplementsSeasonArchiveServiceInterface(): void
-    {
-        $this->assertInstanceOf(SeasonArchiveServiceInterface::class, $this->service);
     }
 
     public function testBuildSeasonLabelForSeasonOne(): void

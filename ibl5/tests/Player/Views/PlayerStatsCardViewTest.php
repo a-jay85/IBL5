@@ -20,13 +20,6 @@ class PlayerStatsCardViewTest extends TestCase
     // PlayerStatsCardView Tests
     // =========================================================================
 
-    public function testGetStylesReturnsEmptyString(): void
-    {
-        $styles = PlayerStatsCardView::getStyles();
-
-        $this->assertSame('', $styles);
-    }
-
     public function testWrapAddsCardWrapper(): void
     {
         $tableContent = '<table><tr><td>Test</td></tr></table>';

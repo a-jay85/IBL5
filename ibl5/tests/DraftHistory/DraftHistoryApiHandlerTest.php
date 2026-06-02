@@ -29,13 +29,6 @@ class DraftHistoryApiHandlerTest extends WideUnitTestCase
         parent::tearDown();
     }
 
-    public function testCanBeInstantiated(): void
-    {
-        $handler = new DraftHistoryApiHandler($GLOBALS['mysqli_db']);
-
-        $this->assertInstanceOf(DraftHistoryApiHandler::class, $handler);
-    }
-
     public function testHandleWithNoYearParamProducesOutput(): void
     {
         $_GET = [];

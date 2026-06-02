@@ -45,15 +45,12 @@ class TradingControllerRejectOfferTest extends TestCase
         );
     }
 
-    public function testCanBeInstantiated(): void
-    {
-        $controller = $this->buildController();
-        $this->assertInstanceOf(TradingController::class, $controller);
-    }
-
     public function testImplementsInterface(): void
     {
         $controller = $this->buildController();
-        $this->assertInstanceOf(\Trading\Contracts\TradingControllerInterface::class, $controller);
+        self::assertContains(
+            \Trading\Contracts\TradingControllerInterface::class,
+            (array) class_implements($controller)
+        );
     }
 }

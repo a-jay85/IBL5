@@ -7,37 +7,19 @@ namespace Tests\Team;
 use PHPUnit\Framework\TestCase;
 use Team\TeamController;
 use Team\Contracts\TeamControllerInterface;
-use Repositories\Contracts\TeamIdentityRepositoryInterface;
-use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
  * TeamControllerTest - Tests for TeamController
  */
 class TeamControllerTest extends TestCase
 {
-    private MockDatabase $mockDb;
-
-    protected function setUp(): void
-    {
-        $this->mockDb = new MockDatabase();
-    }
-
     // ============================================
     // INSTANTIATION TESTS
     // ============================================
 
-    public function testCanBeInstantiated(): void
+    public function testImplementsTeamControllerInterface(): void
     {
-        $controller = new TeamController($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class), self::createStub(\Auth\AuthService::class), self::createStub(\League\LeagueContext::class));
-
-        $this->assertInstanceOf(TeamController::class, $controller);
-    }
-
-    public function testImplementsInterface(): void
-    {
-        $controller = new TeamController($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class), self::createStub(\Auth\AuthService::class), self::createStub(\League\LeagueContext::class));
-
-        $this->assertInstanceOf(TeamControllerInterface::class, $controller);
+        self::assertContains(TeamControllerInterface::class, (array) class_implements(TeamController::class));
     }
 
 }

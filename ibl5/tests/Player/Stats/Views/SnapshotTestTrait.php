@@ -12,7 +12,7 @@ trait SnapshotTestTrait
 
         if (!file_exists($snapshotPath)) {
             file_put_contents($snapshotPath, $actual);
-            $this->addToAssertionCount(1);
+            $this->assertFileExists($snapshotPath);
             return;
         }
 

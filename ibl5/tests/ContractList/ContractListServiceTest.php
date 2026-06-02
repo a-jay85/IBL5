@@ -6,7 +6,6 @@ namespace Tests\ContractList;
 
 use ContractList\ContractListService;
 use ContractList\Contracts\ContractListRepositoryInterface;
-use ContractList\Contracts\ContractListServiceInterface;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 
@@ -24,11 +23,6 @@ class ContractListServiceTest extends TestCase
     {
         $this->mockRepository = $this->createMock(ContractListRepositoryInterface::class);
         $this->service = new ContractListService($this->mockRepository);
-    }
-
-    public function testImplementsServiceInterface(): void
-    {
-        $this->assertInstanceOf(ContractListServiceInterface::class, $this->service);
     }
 
     public function testGetContractsWithCalculationsReturnsExpectedStructure(): void

@@ -177,16 +177,6 @@ final class OneOnOneGameEngineTest extends TestCase
 
     // ========== Game Simulation Tests ==========
 
-    public function testSimulateGameReturnsGameResult(): void
-    {
-        $player1Data = $this->createMockPlayerData('Player One');
-        $player2Data = $this->createMockPlayerData('Player Two');
-
-        $result = $this->engine->simulateGame($player1Data, $player2Data, 'TestOwner');
-
-        $this->assertInstanceOf(OneOnOneGameResult::class, $result);
-    }
-
     public function testSimulateGameSetsPlayerNames(): void
     {
         $player1Data = $this->createMockPlayerData('Michael Jordan');

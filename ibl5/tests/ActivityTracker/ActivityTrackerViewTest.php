@@ -17,11 +17,6 @@ class ActivityTrackerViewTest extends TestCase
         $this->view = new ActivityTrackerView();
     }
 
-    public function testImplementsInterface(): void
-    {
-        $this->assertInstanceOf(ActivityTrackerViewInterface::class, $this->view);
-    }
-
     public function testRenderReturnsHtmlWithTitle(): void
     {
         $html = $this->view->render([]);

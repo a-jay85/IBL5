@@ -12,8 +12,10 @@ class RefreshPlayoffSeriesResultsStepTest extends TestCase
 {
     public function testImplementsPipelineStepInterface(): void
     {
-        $stub = self::createStub(\mysqli::class);
-        $this->assertInstanceOf(PipelineStepInterface::class, new RefreshPlayoffSeriesResultsStep($stub));
+        self::assertContains(
+            PipelineStepInterface::class,
+            (array) class_implements(RefreshPlayoffSeriesResultsStep::class)
+        );
     }
 
     public function testGetLabelReturnsExpectedLabel(): void

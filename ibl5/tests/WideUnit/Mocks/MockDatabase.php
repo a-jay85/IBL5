@@ -166,12 +166,12 @@ class MockDatabase extends \mysqli
         // Special handling for trade info queries (support both direct and prepared statement patterns)
         if (stripos($normalized, 'ibl_trade_info') !== false &&
             stripos($normalized, 'tradeofferid') !== false &&
-            !empty($this->mockTradeInfo)) {
+            $this->mockTradeInfo !== []) {
             return new MockDatabaseResult($this->mockTradeInfo);
         }
 
         // Special handling for team info queries - return mock team data if available
-        if (stripos($normalized, 'ibl_team_info') !== false && !empty($this->mockTeamData)) {
+        if (stripos($normalized, 'ibl_team_info') !== false && $this->mockTeamData !== []) {
             // Try to match by teamid if specified in query
             if (preg_match('/teamid\s*=\s*[\'"]?(\d+)[\'"]?/i', $normalized, $matches)) {
                 $searchId = (int)$matches[1];
@@ -199,7 +199,7 @@ class MockDatabase extends \mysqli
         if (stripos($normalized, 'ibl_team_offense_stats') !== false ||
             stripos($normalized, 'ibl_team_defense_stats') !== false ||
             (stripos($normalized, 'off_fgm') !== false && stripos($normalized, 'def_fgm') !== false)) {
-            if (!empty($this->mockPythagoreanData)) {
+            if ($this->mockPythagoreanData !== []) {
                 $data = $this->mockPythagoreanData;
                 // Translate base keys to aliased JOIN keys if needed
                 if (isset($data['fgm']) && !isset($data['off_fgm'])) {
@@ -221,7 +221,7 @@ class MockDatabase extends \mysqli
         if (stripos($normalized, 'MAX(') !== false && stripos($normalized, 'ibl_plr') !== false
             && stripos($normalized, 'ibl_rcb') === false) {
             // If mock data has the correct aliased keys, use it directly
-            if (!empty($this->mockData) && isset($this->mockData[0]['fga'])) {
+            if ($this->mockData !== [] && isset($this->mockData[0]['fga'])) {
                 return new MockDatabaseResult($this->mockData);
             }
             // Return safe defaults (1 for each market maximum stat)
@@ -239,7 +239,7 @@ class MockDatabase extends \mysqli
         // Returns results from queue for consecutive queries
         if ((stripos($normalized, 'ibl_votes_ASG') !== false ||
              stripos($normalized, 'ibl_votes_EOY') !== false) &&
-            !empty($this->votingResultsQueue)) {
+            $this->votingResultsQueue !== []) {
             $data = array_shift($this->votingResultsQueue);
             return new MockDatabaseResult($data ?? []);
         }
@@ -262,7 +262,7 @@ class MockDatabase extends \mysqli
             }
             
             // If we found matching row(s), return them; otherwise return all mockData (for backward compatibility)
-            if (!empty($filteredData)) {
+            if ($filteredData !== []) {
                 return new MockDatabaseResult($filteredData);
             }
         }

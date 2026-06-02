@@ -22,7 +22,7 @@ class DraftValidatorTest extends TestCase
         $result = $this->validator->validateDraftSelection('John Doe', null);
         
         $this->assertTrue($result);
-        $this->assertEmpty($this->validator->getErrors());
+        $this->assertSame([], $this->validator->getErrors());
     }
 
     public function testValidateSucceedsWithEmptyStringCurrentSelection(): void
@@ -30,7 +30,7 @@ class DraftValidatorTest extends TestCase
         $result = $this->validator->validateDraftSelection('John Doe', '');
         
         $this->assertTrue($result);
-        $this->assertEmpty($this->validator->getErrors());
+        $this->assertSame([], $this->validator->getErrors());
     }
 
     public function testValidateFailsWithNullPlayerName(): void
@@ -70,7 +70,7 @@ class DraftValidatorTest extends TestCase
         
         $this->validator->clearErrors();
         
-        $this->assertEmpty($this->validator->getErrors());
+        $this->assertSame([], $this->validator->getErrors());
     }
 
     public function testValidateResetsPreviousErrors(): void
@@ -83,7 +83,7 @@ class DraftValidatorTest extends TestCase
         $result = $this->validator->validateDraftSelection('John Doe', null);
         
         $this->assertTrue($result);
-        $this->assertEmpty($this->validator->getErrors());
+        $this->assertSame([], $this->validator->getErrors());
     }
 
     public function testValidateFailsWhenPlayerAlreadyDrafted(): void
@@ -101,7 +101,7 @@ class DraftValidatorTest extends TestCase
         $result = $this->validator->validateDraftSelection('John Doe', null, false);
         
         $this->assertTrue($result);
-        $this->assertEmpty($this->validator->getErrors());
+        $this->assertSame([], $this->validator->getErrors());
     }
 
     public function testValidateFailsWithPlayerAlreadyDraftedEvenIfPickNotUsed(): void
@@ -185,7 +185,7 @@ class DraftValidatorTest extends TestCase
         $result = $this->validator->validateDraftSelection("Patrick O'Brien", null);
 
         $this->assertTrue($result);
-        $this->assertEmpty($this->validator->getErrors());
+        $this->assertSame([], $this->validator->getErrors());
     }
 
     /**
@@ -447,7 +447,7 @@ class DraftValidatorTest extends TestCase
 
         // Successful validation
         $this->validator->validateDraftSelection('John Doe', null);
-        $this->assertEmpty($this->validator->getErrors());
+        $this->assertSame([], $this->validator->getErrors());
     }
 
     // ============================================

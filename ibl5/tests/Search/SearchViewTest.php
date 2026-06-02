@@ -175,11 +175,6 @@ class SearchViewTest extends TestCase
         $this->view = new SearchView();
     }
 
-    public function testImplementsViewInterface(): void
-    {
-        $this->assertInstanceOf(SearchViewInterface::class, $this->view);
-    }
-
     public function testRenderShowsSearchForm(): void
     {
         $html = $this->view->render(self::createPageData());

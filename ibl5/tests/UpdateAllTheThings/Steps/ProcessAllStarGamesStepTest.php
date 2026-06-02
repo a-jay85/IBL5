@@ -9,7 +9,6 @@ use Boxscore\BoxscoreRepository;
 use Boxscore\BoxscoreView;
 use PHPUnit\Framework\TestCase;
 use Updater\Contracts\JsbSourceResolverInterface;
-use Updater\Contracts\PipelineStepInterface;
 use Updater\Steps\ProcessAllStarGamesStep;
 
 class ProcessAllStarGamesStepTest extends TestCase
@@ -29,18 +28,6 @@ class ProcessAllStarGamesStepTest extends TestCase
         $this->stubRepo = self::createStub(BoxscoreRepository::class);
         $this->stubView = self::createStub(BoxscoreView::class);
         $this->stubResolver = self::createStub(JsbSourceResolverInterface::class);
-    }
-
-    public function testImplementsPipelineStepInterface(): void
-    {
-        $step = new ProcessAllStarGamesStep(
-            $this->stubProcessor,
-            $this->stubRepo,
-            $this->stubView,
-            $this->stubResolver,
-        );
-
-        $this->assertInstanceOf(PipelineStepInterface::class, $step);
     }
 
     public function testGetLabelReturnsExpectedLabel(): void

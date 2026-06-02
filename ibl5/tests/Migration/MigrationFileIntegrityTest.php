@@ -70,9 +70,11 @@ final class MigrationFileIntegrityTest extends TestCase
 
     public function testAllMigrationFilesAreNonEmpty(): void
     {
+        $sqlFiles = glob($this->migrationsDir . '/*.sql');
+        $phpFiles = glob($this->migrationsDir . '/*.php');
         $files = array_merge(
-            glob($this->migrationsDir . '/*.sql') ?: [],
-            glob($this->migrationsDir . '/*.php') ?: []
+            $sqlFiles ? $sqlFiles : [],
+            $phpFiles ? $phpFiles : []
         );
 
         self::assertNotEmpty($files, 'No migration files found');
@@ -135,7 +137,8 @@ final class MigrationFileIntegrityTest extends TestCase
             $assertedColumns[] = $assertion->toKey();
         }
 
-        $files = glob($this->migrationsDir . '/*.sql') ?: [];
+        $sqlFiles = glob($this->migrationsDir . '/*.sql');
+        $files = $sqlFiles ? $sqlFiles : [];
         sort($files);
 
         // First pass: build a rename chain map keyed by "table.old_column" →

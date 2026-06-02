@@ -26,9 +26,10 @@ class ParsePlayerFileStepTest extends TestCase
 
     public function testImplementsPipelineStepInterface(): void
     {
-        $step = new ParsePlayerFileStep($this->stubService, $this->stubResolver);
-
-        $this->assertInstanceOf(PipelineStepInterface::class, $step);
+        self::assertContains(
+            PipelineStepInterface::class,
+            (array) class_implements(ParsePlayerFileStep::class)
+        );
     }
 
     public function testGetLabelReturnsExpectedLabel(): void

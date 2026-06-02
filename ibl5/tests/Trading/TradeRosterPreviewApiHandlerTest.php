@@ -181,10 +181,10 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
 
         $handler = new TradeRosterPreviewApiHandler($this->mockDb, $this->stubTradeAssetRepo);
 
-        $this->captureOutput(fn () => $handler->handle());
+        $output = $this->captureOutput(fn () => $handler->handle());
 
-        // Verify the handler doesn't throw an exception
-        $this->assertTrue(true);
+        // Verify the handler outputs valid JSON
+        $this->assertJson($output);
     }
 
     public function testHandleAcceptsEmptyAddPids(): void

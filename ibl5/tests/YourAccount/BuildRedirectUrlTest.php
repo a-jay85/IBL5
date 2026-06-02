@@ -99,7 +99,7 @@ class BuildRedirectUrlTest extends TestCase
         $result = buildRedirectUrl();
 
         $this->assertSame('modules.php?name=Trading&op=list', $result);
-        $this->assertStringNotContainsString('foo', (string) $result);
+        $this->assertStringNotContainsString('foo', $result);
     }
 
     public function testEncodesSpecialCharacters(): void

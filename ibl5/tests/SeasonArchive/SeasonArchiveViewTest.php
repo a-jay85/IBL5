@@ -6,7 +6,6 @@ namespace Tests\SeasonArchive;
 
 use PHPUnit\Framework\TestCase;
 use SeasonArchive\SeasonArchiveView;
-use SeasonArchive\Contracts\SeasonArchiveViewInterface;
 
 /**
  * SeasonArchiveViewTest - Tests for SeasonArchiveView HTML rendering
@@ -20,11 +19,6 @@ class SeasonArchiveViewTest extends TestCase
     protected function setUp(): void
     {
         $this->view = new SeasonArchiveView();
-    }
-
-    public function testImplementsSeasonArchiveViewInterface(): void
-    {
-        $this->assertInstanceOf(SeasonArchiveViewInterface::class, $this->view);
     }
 
     public function testRenderIndexContainsTableStructure(): void

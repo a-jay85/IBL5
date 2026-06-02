@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\UpdateAllTheThings\Steps;
 
 use PHPUnit\Framework\TestCase;
-use Updater\Contracts\PipelineStepInterface;
 use Updater\Steps\GenerateSeasonAwardsStep;
 
 class GenerateSeasonAwardsStepTest extends TestCase
@@ -26,11 +25,6 @@ class GenerateSeasonAwardsStepTest extends TestCase
             $awardsAlreadyGenerated,
             $leadersHtmExists,
         );
-    }
-
-    public function testImplementsPipelineStepInterface(): void
-    {
-        $this->assertInstanceOf(PipelineStepInterface::class, $this->createStep());
     }
 
     public function testGetLabelReturnsExpectedLabel(): void

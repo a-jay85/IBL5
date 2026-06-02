@@ -16,14 +16,6 @@ class GameTest extends TestCase
     // CONSTRUCTOR TESTS
     // ============================================
 
-    public function testGameCanBeInstantiated(): void
-    {
-        $row = $this->createValidScheduleRow();
-        $game = new Game($row);
-        
-        $this->assertInstanceOf(Game::class, $game);
-    }
-
     public function testGamePropertiesAreSetCorrectly(): void
     {
         $row = $this->createValidScheduleRow();

@@ -9,8 +9,10 @@ use PHPUnit\Framework\TestCase;
 
 class AuthServiceBcryptCostTest extends TestCase
 {
-    public function testProductionBcryptCostIs12(): void
+    public function testProductionBcryptCostProducesExpectedHashPrefix(): void
     {
-        self::assertSame(12, AuthService::BCRYPT_COST_PROD);
+        $hash = password_hash('test', PASSWORD_BCRYPT, ['cost' => AuthService::BCRYPT_COST_PROD]);
+        // A bcrypt hash with cost 12 always starts with $2y$12$
+        $this->assertStringStartsWith('$2y$12$', $hash);
     }
 }

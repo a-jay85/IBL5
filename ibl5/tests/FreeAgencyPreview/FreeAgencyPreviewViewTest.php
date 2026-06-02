@@ -20,11 +20,6 @@ class FreeAgencyPreviewViewTest extends TestCase
         $this->view = new FreeAgencyPreviewView();
     }
 
-    public function testImplementsViewInterface(): void
-    {
-        $this->assertInstanceOf(FreeAgencyPreviewViewInterface::class, $this->view);
-    }
-
     public function testRenderOutputsTable(): void
     {
         $html = $this->view->render(2025, [self::createFreeAgent()]);

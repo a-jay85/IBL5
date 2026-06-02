@@ -16,14 +16,6 @@ class DraftPickTest extends TestCase
     // CONSTRUCTOR TESTS
     // ============================================
 
-    public function testDraftPickCanBeInstantiated(): void
-    {
-        $row = $this->createValidDraftPickRow();
-        $draftPick = new DraftPick($row);
-        
-        $this->assertInstanceOf(DraftPick::class, $draftPick);
-    }
-
     public function testDraftPickPropertiesAreSetCorrectly(): void
     {
         $row = $this->createValidDraftPickRow();

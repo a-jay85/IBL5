@@ -18,10 +18,10 @@ use Player\Player;
 class MockDemandRepository implements FreeAgencyDemandRepositoryInterface
 {
     /** @var TeamPerformanceRow */
-    public array $teamPerformance = [];
+    public array $teamPerformance = ['wins' => 41, 'losses' => 41, 'tradWins' => 500, 'tradLosses' => 500];
     public int $positionSalaryCommitment = 0;
     /** @var PlayerDemandsRow */
-    public array $playerDemands = [];
+    public array $playerDemands = ['dem1' => 0, 'dem2' => 0, 'dem3' => 0, 'dem4' => 0, 'dem5' => 0, 'dem6' => 0];
 
     /** @return TeamPerformanceRow */
     public function getTeamPerformance(string $teamName): array

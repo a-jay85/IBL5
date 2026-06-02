@@ -32,7 +32,6 @@ final class PageLayoutHeaderSideEffectTest extends TestCase
         cookiedecode($GLOBALS['user']);
 
         self::assertSame($expectedCookie, $GLOBALS['cookie']);
-        self::assertSame('testuser', $GLOBALS['cookie'][1]);
     }
 
     public function testCookieDecodeReturnsNullForUnauthenticatedUser(): void

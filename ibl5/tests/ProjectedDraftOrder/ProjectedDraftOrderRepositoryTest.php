@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\ProjectedDraftOrder;
 
-use ProjectedDraftOrder\Contracts\ProjectedDraftOrderRepositoryInterface;
 use ProjectedDraftOrder\ProjectedDraftOrderRepository;
 use PHPUnit\Framework\TestCase;
 use Tests\WideUnit\Mocks\MockDatabase;
@@ -21,11 +20,6 @@ class ProjectedDraftOrderRepositoryTest extends TestCase
     {
         $this->db = new MockDatabase();
         $this->repository = new ProjectedDraftOrderRepository($this->db);
-    }
-
-    public function testImplementsRepositoryInterface(): void
-    {
-        $this->assertInstanceOf(ProjectedDraftOrderRepositoryInterface::class, $this->repository);
     }
 
     public function testGetAllTeamsWithStandingsReturnsArray(): void
@@ -137,10 +131,5 @@ class ProjectedDraftOrderRepositoryTest extends TestCase
         $queries = $this->db->getExecutedQueries();
         $deleteQueries = array_filter($queries, static fn (string $q): bool => str_contains($q, 'DELETE FROM ibl_draft'));
         $this->assertCount(2, $deleteQueries);
-    }
-
-    public function testExtendsBaseMysqliRepository(): void
-    {
-        $this->assertInstanceOf(\BaseMysqliRepository::class, $this->repository);
     }
 }

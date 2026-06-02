@@ -13,16 +13,6 @@ use Tests\WideUnit\WideUnitTestCase;
  */
 class LeagueStartersApiHandlerTest extends WideUnitTestCase
 {
-    public function testCanBeInstantiated(): void
-    {
-        $handler = new LeagueStartersApiHandler(
-            $this->mockDb,
-            self::createStub(TeamIdentityRepositoryInterface::class),
-            self::createStub(\Auth\AuthService::class)
-        );
-
-        $this->assertInstanceOf(LeagueStartersApiHandler::class, $handler);
-    }
 
     public function testValidDisplayModesContainsAllExpectedModes(): void
     {

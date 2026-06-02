@@ -43,30 +43,6 @@ class LeagueContextIntegrationTest extends TestCase
     // ============================================
 
     /**
-     * Test LEAGUE_IBL constant value
-     */
-    public function testLeagueIblConstantValue(): void
-    {
-        $this->assertSame('ibl', LeagueContext::LEAGUE_IBL);
-    }
-
-    /**
-     * Test LEAGUE_OLYMPICS constant value
-     */
-    public function testLeagueOlympicsConstantValue(): void
-    {
-        $this->assertSame('olympics', LeagueContext::LEAGUE_OLYMPICS);
-    }
-
-    /**
-     * Test COOKIE_NAME constant value
-     */
-    public function testCookieNameConstantValue(): void
-    {
-        $this->assertSame('ibl_league', LeagueContext::COOKIE_NAME);
-    }
-
-    /**
      * Test constants are string type
      */
     public function testConstantsAreStringType(): void

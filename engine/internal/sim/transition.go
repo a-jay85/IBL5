@@ -105,11 +105,17 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 		net := transitionNet(def)
 		mq := matchupQuality(bh.FGP, bh.energy, defense.players) // live energy (inert under current curve)
 		sv2 := applyClutch(shotValue2pt(net, bh.FGP, false), bh.Clutch, gs.period, scoreDiff)
+		// Play-outcome buckets use the same net-free O(1) helpers as the half-court
+		// path (bucketweights.go) — the second of the two outcomeInputs assembly
+		// sites. sv2 (above) keeps feeding shotAttempt on the 2pt path ONLY; it no
+		// longer doubles as the 2pt bucket weight, so clutch no longer leaks into
+		// bucket selection and a future HCA nudge on the foul bucket is expressible
+		// here too (it would have been a no-op against the old O(100) sv2 weight).
 		in := outcomeInputs{
-			twoPtWeight:      sv2 * bh.fatigue,
-			threePtWeight:    0, // a fast break is never a 3pt attempt
-			andOneWeight:     mq*0.25 + base2pt(bh.FGP)*andOneBaseShare,
-			foulOnlyWeight:   (2.0 - bh.fatigue) * floor1(bh.Foul),
+			twoPtWeight:      twoPtBucketWeight(bh),
+			threePtWeight:    0, // a fast break is never a 3pt attempt (allowedPaths excludes it)
+			andOneWeight:     andOneBucketWeight(mq, bh),
+			foulOnlyWeight:   foulBucketWeight(net, bh),
 			turnoverDefValue: turnoverThreshold(bh.TVR) * turnoverThreshold(bh.TVR),
 		}
 

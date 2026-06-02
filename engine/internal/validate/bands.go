@@ -34,6 +34,14 @@ type Band struct {
 // │ HCA CAVEAT: bands are calibrated against the CURRENT engine, which has NO  │
 // │ home-court advantage. RE-CALIBRATE when HCA lands.                         │
 // │                                                                            │
+// │ PLAY-OUTCOME RESCALE CAVEAT (PR9): these bands were calibrated against the │
+// │ OLD O(100) play-outcome bucket weights. PR9 rescaled those buckets onto a  │
+// │ comparable O(1) basis (net-free 2pt composite), shifting the path-selection│
+// │ mix — notably foul / and-one / FT path frequencies. The ftm, fta, and pf   │
+// │ observed-vs-engine gaps therefore move. Bands are STALE; do NOT re-run the │
+// │ 53GB calibration here. Re-calibrate ONCE, after HCA also lands (calibrate  │
+// │ once, not twice). No band VALUES change in PR9.                            │
+// │                                                                            │
 // │ DOCUMENTED CURRENT GAP (AbsFloor > engine mean — band is wide because the  │
 // │ engine under-models the stat at this build stage, NOT a useful tolerance): │
 // │ ftm, fta, tgm, tga, ast, blk, pf. In particular `ast` is structurally 0 in │

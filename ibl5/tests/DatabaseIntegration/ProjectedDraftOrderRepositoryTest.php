@@ -167,10 +167,8 @@ class ProjectedDraftOrderRepositoryTest extends DatabaseTestCase
             }
         }
         self::assertNotNull($metros);
-        // assertEquals (loose): the repo's SUM() aggregate is returned by mysqli as a
-        // numeric string, so a strict assertSame against a float literal would fail.
-        self::assertEquals(205.0, $metros['pointsFor']); // 110 + 95
-        self::assertEquals(190.0, $metros['pointsAgainst']); // 90 + 100
+        self::assertSame(205.0, (float) $metros['pointsFor']); /** @phpstan-ignore cast.useless (mysqli returns SUM as numeric-string; @var float annotation overstates the type) */ // 110 + 95
+        self::assertSame(190.0, (float) $metros['pointsAgainst']); /** @phpstan-ignore cast.useless (mysqli returns SUM as numeric-string; @var float annotation overstates the type) */ // 90 + 100
     }
 
     public function testIsDraftOrderFinalizedReturnsFalse(): void

@@ -41,6 +41,12 @@ func WriteReport(w io.Writer, rep Report) {
 		p("EXCLUDED stem=%s visitor=%d home=%d date=%s: %s\n",
 			e.Stem, e.VisitorTeamID, e.HomeTeamID, e.Date, e.Reason)
 	}
+	// MISSING_PLB lines surface snapshots whose depth chart was absent (minutes
+	// defaulted to 0). Emitted only when present, so a snapshot that has its .plb
+	// renders byte-identically; this is visibility only and does not affect Pass.
+	for _, stem := range rep.MissingPlb {
+		p("MISSING_PLB stem=%s: no .plb depth chart — dc_minutes defaulted to 0\n", stem)
+	}
 	result := "PASS"
 	if !rep.Pass {
 		result = "FAIL"

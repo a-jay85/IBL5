@@ -13,6 +13,7 @@ Reverse-engineered specifications for the binary and text data files produced by
 
 - [IBL5.car — Career Statistics](#ibl5car--career-statistics)
 - [IBL5.plr — Player Records](#ibl5plr--player-records)
+- [IBL5.plb — Depth Charts](#ibl5plb--depth-charts)
 - [IBL5.his — Historical Results](#ibl5his--historical-results)
 - [IBL5.rcb — Record Book](#ibl5rcb--record-book)
 - [IBL5.trn — Transactions](#ibl5trn--transactions)
@@ -170,8 +171,10 @@ block across all 657 `IBL5.plr` players (5238/5256 field comparisons match; the
 | 135 | 1 | `PFDepth` |
 | 136 | 1 | `CDepth` |
 | 137 | 1 | `canPlayInGame` |
-| 138 | 2 | Matchup composite rating (0-99, engine default 50; loaded to struct +0x210, feeds matchup-quality calc FUN_004e3860). Parsed as `unk_138`. |
+| 138 | 2 | Matchup composite rating (0-99, engine default 50; loaded to struct +0x210, feeds matchup-quality calc FUN_004e3860). Parsed as `unk_138`. Observed constant `39` in IBL data; **not** the stamina rating — see note. |
 | 140 | 4 | `injuryDaysLeft` |
+
+> **Note — stamina is not a per-player `.plr` field.** A prior hypothesis placed the stamina/"conditioning" rating at offset 138, but offset 138 is the matchup composite rating (above), not stamina. Stamina is absent from the `.plr` entirely: the DB `ibl_plr.stamina` (varied ~0–33) matches no `.plr` offset under any encoding (the `.plr` was verified same-season as the DB via exact per-pid age match), and `PlrFileWriter` writes no stamina field. JSB zeroes the energy ceiling on `.plr` load and sets it at runtime from the conditioning roll, whose `.plr` source (offset 546, 3 chars) is a constant `100` across all players. So there is no per-player stamina/energy differentiation stored in the `.plr`; the engine-faithful energy ceiling is the uniform constant 100. The Go backup assembler (`engine/internal/backup/assemble.go`) sets `Stamina = 100` accordingly rather than reading a `.plr` field.
 
 #### Season Stats (144-207) — reconstructed from `ibl_box_scores`
 
@@ -433,6 +436,40 @@ Franchise rows are indexed by position: ordinal 1441 = team ID 1, ordinal 1468 =
 - **Left-justified strings** with space padding (player names, team names).
 - **CP1252** for non-ASCII characters (accented names). Readers must `iconv('CP1252', 'UTF-8//IGNORE', $raw)` before display.
 - **CRLF** line endings between records. Player records are *exactly* 607 bytes; franchise team rows are 607-608 bytes (variable trailing tail). `PlrFileWriter::applyChangesToRecord()` asserts length invariance.
+
+---
+
+## IBL5.plb — Depth Charts
+
+**Format:** Fixed-width ASCII, CRLF-separated lines | **Encoding:** ASCII
+
+Carries each GM's submitted depth-chart settings — most importantly the per-player **target minutes** (`dc_minutes`), the only per-player minutes signal the engine consumes (`engine/internal/sim/lineup.go` uses it for lineup/rotation selection). The DB-driven production bundle sources these from the depth-chart tables; the backup harness sources them from this file.
+
+### Structure
+
+- **One line per team**, line index 0–31. Only lines 0–27 (`teamid = lineIndex + 1`, teams 1–28) are real IBL franchises; lines beyond are skipped.
+- **30 slots per line**, 12 chars each (≥ 360 chars per usable line; shorter lines are blank/padding and skipped).
+- Each slot maps to a player by roster ordinal: **`ordinal = (teamid - 1) * 30 + slotIndex + 1`**, joining onto the `.plr` ordinal (offset 0).
+
+### Per-slot layout (12 chars)
+
+| Offset | Width | Field | Used by engine? |
+|--------|-------|-------|-----------------|
+| 0 | 2 | `dc_minutes` | **Yes** — lineup/rotation selection |
+| 2 | 2 | `dc_of` | No (dead field) |
+| 4 | 2 | `dc_df` | No (dead field) |
+| 6 | 2 | `dc_oi` | No (dead field) |
+| 8 | 2 | `dc_di` | No (dead field) |
+| 10 | 2 | `dc_bh` | No (dead field) |
+
+A team's `dc_minutes` across its playing slots sums to ≈ 240 (5 players × 48 minutes).
+
+### Readers
+
+- **PHP (authoritative):** `classes/JsbParser/PlbFileParser.php`; slot→player resolution in `classes/PlrParser/PlrOrdinalMap.php`.
+- **Go (backup harness):** `engine/internal/backup/plb.go` (`ReadPlb` → ordinal→minutes map, wired into the bundle by `engine/internal/backup/assemble.go`).
+
+The `dc_of/df/oi/di/bh` fields are parsed by the PHP importer (for DB storage) but **not** by the Go reader — the engine never reads them.
 
 ---
 

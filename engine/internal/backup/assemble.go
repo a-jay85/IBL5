@@ -19,6 +19,10 @@ type AssembleOptions struct {
 	LeagueID int
 	Seed     uint64
 	GameType bundle.GameType // 0 -> GameTypeRegular (2)
+	// Minutes maps a player ordinal -> dc_minutes, parsed from the snapshot's
+	// .plb depth-chart file (see ReadPlb). A nil map means no .plb was present:
+	// every player's DCMinutes falls back to 0, the historical behavior.
+	Minutes map[int]int
 }
 
 // ToBundle assembles a parsed .plr roster and .sch schedule into a
@@ -29,16 +33,22 @@ type AssembleOptions struct {
 // deterministic. An empty roster or schedule, or a schedule referencing a team
 // with no roster players, is a typed error rather than a silent empty bundle.
 //
-// Fields the engine reads that the .plr format does not store are zeroed here:
-//   - r_foul   — no foul rating in the .plr ratings block
-//   - stamina  — an ibl_plr column, but not present in the .plr file layout
-//   - dc_minutes — sourced from the DB depth chart, not the .plr
+// Two engine inputs are NOT per-player fields of the .plr text record and are
+// supplied here instead of read from it:
+//   - stamina — the energy ceiling. The .plr does not carry a per-player stamina
+//     rating (verified: DB ibl_plr.stamina matches no .plr offset, and JSB zeroes
+//     the ceiling on .plr load, then sets it from the conditioning roll whose
+//     .plr source is a constant 100 across all players). So the faithful ceiling
+//     is the uniform constant 100, which we assign directly rather than reading
+//     the variable-width .plr tail block. See ibl5/docs/JSB_FILE_FORMATS.md.
+//   - dc_minutes — the GM depth-chart minutes, sourced from the snapshot's .plb
+//     file via opts.Minutes (keyed by player Ordinal). A nil map -> 0 (no .plb).
 //
-// The dc_of/df/oi/di/bh depth fields are also zero, which is correct (not a
-// gap): they are dead on IBL5 data and the engine deliberately never reads them
-// (see internal/sim/lineup.go). This means a backup-driven sim runs with no
-// per-player minutes/stamina signal; PR9b accounts for that when choosing
-// tolerance bands. PR9a only proves the bundle is structurally engine-valid.
+// Still zeroed (correct, not a gap):
+//   - r_foul — no foul rating in the .plr ratings block.
+//   - dc_of/df/oi/di/bh — dead on IBL5 data; the engine deliberately never reads
+//     them (see internal/sim/lineup.go), and the .plb carries them but we do not
+//     wire them since populating dead fields only churns output.
 func ToBundle(players []PlrPlayer, sched []SchGame, opts AssembleOptions) (bundle.Bundle, error) {
 	if len(players) == 0 {
 		return bundle.Bundle{}, fmt.Errorf("backup: assemble: %w", bundle.ErrEmptyRoster)
@@ -56,7 +66,7 @@ func ToBundle(players []PlrPlayer, sched []SchGame, opts AssembleOptions) (bundl
 	bundlePlayers := make([]bundle.Player, 0, len(players))
 	for _, p := range players {
 		rosterTeams[p.TeamID] = true
-		bundlePlayers = append(bundlePlayers, toBundlePlayer(p))
+		bundlePlayers = append(bundlePlayers, toBundlePlayer(p, opts.Minutes))
 	}
 
 	scheduleTeams := make(map[int]bool, 32)
@@ -99,8 +109,9 @@ func ToBundle(players []PlrPlayer, sched []SchGame, opts AssembleOptions) (bundl
 
 // toBundlePlayer maps a .plr record onto bundle.Player. The ODPT pairing
 // follows the .plr rating names: DO=drive offense -> r_drive_off,
-// TO=transition offense -> r_trans_off.
-func toBundlePlayer(p PlrPlayer) bundle.Player {
+// TO=transition offense -> r_trans_off. minutes maps player ordinal ->
+// dc_minutes from the .plb (nil -> 0).
+func toBundlePlayer(p PlrPlayer, minutes map[int]int) bundle.Player {
 	return bundle.Player{
 		PID:    p.PID,
 		Name:   p.Name,
@@ -136,7 +147,9 @@ func toBundlePlayer(p PlrPlayer) bundle.Player {
 		Skill:       p.Skill,
 		Intangibles: p.Intangibles,
 		Peak:        p.Peak,
-		// Stamina: no .plr source -> 0.
+		// Stamina is the energy ceiling. The .plr carries no per-player stamina;
+		// JSB's faithful ceiling is the uniform constant 100 (see ToBundle doc).
+		Stamina: 100,
 
 		DCPGDepth:       p.PGDepth,
 		DCSGDepth:       p.SGDepth,
@@ -144,6 +157,8 @@ func toBundlePlayer(p PlrPlayer) bundle.Player {
 		DCPFDepth:       p.PFDepth,
 		DCCDepth:        p.CDepth,
 		DCCanPlayInGame: p.CanPlayInGame,
-		// DCMinutes and DCOf/Df/Oi/Di/Bh: no .plr source -> 0 (see ToBundle doc).
+		// DCMinutes from the .plb (keyed by Ordinal; missing/nil -> 0). DCOf/Df/
+		// Oi/Di/Bh stay 0 — dead fields the engine never reads (see ToBundle doc).
+		DCMinutes: minutes[p.Ordinal],
 	}
 }

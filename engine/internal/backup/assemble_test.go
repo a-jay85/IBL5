@@ -135,6 +135,78 @@ func TestToBundle_Errors(t *testing.T) {
 	}
 }
 
+// Row 6 (characterization): with a nil Minutes map (no .plb), every assembled
+// player's DCMinutes falls back to 0 — locks the historical behavior across the
+// toBundlePlayer signature change.
+func TestToBundle_NoPlb_ZeroMinutes(t *testing.T) {
+	players := append(teamRoster(1), teamRoster(2)...)
+	sched := []SchGame{{VisitorTeamID: 1, HomeTeamID: 2, Month: 11, Day: 2}}
+	b, err := ToBundle(players, sched, AssembleOptions{}) // nil Minutes
+	if err != nil {
+		t.Fatalf("ToBundle: %v", err)
+	}
+	for _, p := range b.Players {
+		if p.DCMinutes != 0 {
+			t.Errorf("player pid=%d DCMinutes = %d, want 0 (no .plb)", p.PID, p.DCMinutes)
+		}
+	}
+}
+
+// Row 7: a populated Minutes map sets Player.DCMinutes by Ordinal (missing
+// ordinal -> 0), AND every assembled player's Stamina is the uniform energy
+// ceiling 100 (previously unasserted — the zeroed default never had a test).
+func TestToBundle_StaminaAndMinutes(t *testing.T) {
+	players := append(teamRoster(1), teamRoster(2)...)
+	sched := []SchGame{{VisitorTeamID: 1, HomeTeamID: 2, Month: 11, Day: 2}}
+	// teamRoster's makePlayer sets Ordinal == PID; team1 -> 101..105, team2 -> 201..205.
+	minutes := map[int]int{101: 40, 102: 16, 201: 38}
+	b, err := ToBundle(players, sched, AssembleOptions{Minutes: minutes})
+	if err != nil {
+		t.Fatalf("ToBundle: %v", err)
+	}
+	byPID := map[int]bundle.Player{}
+	for _, p := range b.Players {
+		byPID[p.PID] = p
+	}
+	for pid, want := range map[int]int{101: 40, 102: 16, 201: 38, 105: 0 /* no map entry */} {
+		if got := byPID[pid].DCMinutes; got != want {
+			t.Errorf("pid %d DCMinutes = %d, want %d", pid, got, want)
+		}
+	}
+	for _, p := range b.Players {
+		if p.Stamina != 100 {
+			t.Errorf("player pid=%d Stamina = %d, want 100 (uniform energy ceiling)", p.PID, p.Stamina)
+		}
+	}
+}
+
+// Row 5: a Minutes map carrying an ordinal that matches no player is harmless —
+// the orphan key is ignored and real players still map correctly.
+func TestToBundle_PlbOrdinalNoMatch(t *testing.T) {
+	players := append(teamRoster(1), teamRoster(2)...)
+	sched := []SchGame{{VisitorTeamID: 1, HomeTeamID: 2, Month: 11, Day: 2}}
+	minutes := map[int]int{9999: 30, 101: 22} // ordinal 9999 matches no player
+	b, err := ToBundle(players, sched, AssembleOptions{Minutes: minutes})
+	if err != nil {
+		t.Fatalf("ToBundle with orphan ordinal: %v", err)
+	}
+	var found bool
+	for _, p := range b.Players {
+		if p.PID == 101 {
+			found = true
+			if p.DCMinutes != 22 {
+				t.Errorf("pid 101 DCMinutes = %d, want 22", p.DCMinutes)
+			}
+		}
+		if p.DCMinutes == 30 {
+			t.Errorf("orphan ordinal 9999 leaked onto pid=%d", p.PID)
+		}
+	}
+	if !found {
+		t.Fatal("pid 101 missing from assembled bundle")
+	}
+}
+
 // Row #13: ReadPlr/ReadSch/ToBundle are pure — identical bytes produce
 // byte-identical structs and bundles across runs (no map-order or time leak).
 func TestToBundle_Deterministic(t *testing.T) {

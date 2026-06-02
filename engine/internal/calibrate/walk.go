@@ -17,15 +17,22 @@ import (
 // trusted archive. The real .sco is ~8 MB; this leaves ample headroom.
 const maxEntryBytes = 128 << 20
 
-// canonicalMember maps a lowercased triple-member basename to the canonical
-// name it is extracted as. Writing canonical names (not the zip's own casing)
-// guarantees a stable stem for validate.findTriples and a known path for the
-// season reader's backup.ReadSco.
+// canonicalMember maps a lowercased member basename to the canonical name it is
+// extracted as. Writing canonical names (not the zip's own casing) guarantees a
+// stable stem for validate.findTriples and a known path for the season reader's
+// backup.ReadSco. IBL5.plb (depth chart) is extracted when present but is NOT
+// required (see requiredMembers) — a snapshot lacking it validates with zero
+// minutes, reported by the harness as MissingPlb.
 var canonicalMember = map[string]string{
 	"ibl5.plr": "IBL5.plr",
 	"ibl5.sch": "IBL5.sch",
 	"ibl5.sco": "IBL5.sco",
+	"ibl5.plb": "IBL5.plb",
 }
+
+// requiredMembers are the canonical members that MUST all be present for a
+// snapshot to be validatable. The optional IBL5.plb is intentionally absent.
+var requiredMembers = []string{"IBL5.plr", "IBL5.sch", "IBL5.sco"}
 
 // ValidateFunc is the seam to internal/validate.ValidateCorpus, injected so the
 // walk's extraction/inference/skip logic is unit-testable without running the
@@ -134,9 +141,10 @@ func processZip(path string, gt bundle.GameType, runs int, seed uint64, validate
 	return &rep, nil
 }
 
-// extractTriple writes the three triple members from zipPath into destDir,
-// returning found=true only when all three are present. Entries are written by
-// BASENAME ONLY (filepath.Base), so a crafted entry name like "../../IBL5.plr"
+// extractTriple writes the canonical members from zipPath into destDir,
+// returning found=true only when all requiredMembers are present (the optional
+// IBL5.plb is extracted when present but never gates found). Entries are written
+// by BASENAME ONLY (filepath.Base), so a crafted entry name like "../../IBL5.plr"
 // cannot escape destDir (zip-slip safe) even though the archive is trusted.
 func extractTriple(zipPath, destDir string) (bool, error) {
 	zr, err := zip.OpenReader(zipPath)
@@ -158,7 +166,7 @@ func extractTriple(zipPath, destDir string) (bool, error) {
 		}
 		got[canon] = true
 	}
-	for _, canon := range canonicalMember {
+	for _, canon := range requiredMembers {
 		if !got[canon] {
 			return false, nil
 		}

@@ -26,6 +26,49 @@ func TestIsPlayoff(t *testing.T) {
 	}
 }
 
+// isASG is true ONLY for game_type 5/6 (the all-star games that zero HCA).
+func TestIsASG(t *testing.T) {
+	cases := []struct {
+		gt   bundle.GameType
+		want bool
+	}{
+		{bundle.GameTypeRegular, false},    // 2
+		{bundle.GameTypeRegularAlt, false}, // 3
+		{bundle.GameTypePlayoff, false},    // 4
+		{bundle.GameTypeAllStarA, true},    // 5
+		{bundle.GameTypeAllStarB, true},    // 6
+	}
+	for _, c := range cases {
+		if got := isASG(c.gt); got != c.want {
+			t.Errorf("isASG(%d) = %v, want %v", int(c.gt), got, c.want)
+		}
+	}
+}
+
+// hcaDelta is +0.2 for the home team and −0.2 for the away team in any non-ASG
+// game, and 0 for either team in an all-star game (HCA magnitude zeroed).
+func TestHCADelta(t *testing.T) {
+	cases := []struct {
+		gt   bundle.GameType
+		home float64
+		away float64
+	}{
+		{bundle.GameTypeRegular, hcaMagnitude, -hcaMagnitude},
+		{bundle.GameTypeRegularAlt, hcaMagnitude, -hcaMagnitude},
+		{bundle.GameTypePlayoff, hcaMagnitude, -hcaMagnitude},
+		{bundle.GameTypeAllStarA, 0, 0},
+		{bundle.GameTypeAllStarB, 0, 0},
+	}
+	for _, c := range cases {
+		if got := hcaDelta(c.gt, true); got != c.home {
+			t.Errorf("hcaDelta(%d, home) = %v, want %v", int(c.gt), got, c.home)
+		}
+		if got := hcaDelta(c.gt, false); got != c.away {
+			t.Errorf("hcaDelta(%d, away) = %v, want %v", int(c.gt), got, c.away)
+		}
+	}
+}
+
 // gameWithType returns the richBundle plus a Game scheduled with the given type.
 func gameWithType(gt bundle.GameType) (bundle.Bundle, bundle.Game) {
 	b := richBundle()

@@ -6,13 +6,6 @@ import "github.com/a-jay85/IBL5/engine/internal/result"
 // trip, guaranteeing the inner loop terminates even on a pathological roster.
 const maxOffensiveRebounds = 8
 
-// andOneBaseShare is the made-base term of the OLD O(100) and-one bucket weight
-// (a fraction of the player's 2pt make value). The live buckets now use the
-// net-free O(1) helpers in bucketweights.go; this const is retained solely for
-// the pre-rescale characterization test (bucketweights_test.go), which
-// reconstructs the old assembly to document the O(100) HCA no-op.
-const andOneBaseShare = 0.05
-
 // turnoverPropensityScale maps a ball-handler's TVR rating to the turnover
 // roll threshold: sqrt(turnoverDefValue) ≈ TVR × scale, compared to
 // rand_int(1,1793). The scale is chosen so a typical handler turns the ball
@@ -92,11 +85,17 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPen
 		mq := matchupQuality(bh.FGP, bh.energy, defense.players) // live energy (inert under current curve)
 
 		sv2 := applyClutch(shotValue2pt(net, bh.FGP, false), bh.Clutch, gs.period, scoreDiff)
+		// Home-court advantage, applied at the two modeled JSB sites (delta = +0.2
+		// home / −0.2 away, 0 for ASG). Site 2: the made-shot (2pt) bucket gains
+		// +delta, the foul bucket loses delta (handled inside foulBucketWeight).
+		// Site 3: each offensive player's offQuality term is reduced by delta inside
+		// foulBucketWeight's divisor — the dominant, home-favorable term.
+		hca := hcaDelta(gs.gameType, offense.isHome)
 		in := outcomeInputs{
-			twoPtWeight:      twoPtBucketWeight(bh),
+			twoPtWeight:      twoPtBucketWeight(bh) + hca,
 			threePtWeight:    threePtBucketWeight(bh),
 			andOneWeight:     andOneBucketWeight(mq, bh),
-			foulOnlyWeight:   foulBucketWeight(net, bh),
+			foulOnlyWeight:   foulBucketWeight(offense.players, defense.players, hca),
 			turnoverDefValue: turnoverThreshold(bh.TVR) * turnoverThreshold(bh.TVR),
 		}
 

@@ -1,2 +1,5 @@
 # Compiled binary output (see Makefile `build` target).
 /bin/
+
+# Coverage profile (see Makefile `cover` target).
+/cover.out

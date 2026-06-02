@@ -1,6 +1,7 @@
 package sim
 
 import (
+	"math"
 	"testing"
 
 	"github.com/a-jay85/IBL5/engine/internal/rng"
@@ -17,158 +18,126 @@ func pathCounts(in outcomeInputs, n int, seed uint64) map[outcomeCode]int {
 	return counts
 }
 
-// assembleRichBundleInputs builds an outcomeInputs using the NEW O(1) helpers
-// for a representative richBundle ball-handler/defender pair.
-//
-// Source: richBundle() in sim_test.go (seed 1988). Home team (TeamID=3, FGP=50)
-// starter at slotPG: FGA=60, ORB=20, FTA=20, FGP=50, TGA=25, Foul=30, Stamina=50.
-// net ≈ 1.0 (OO=6 minus OD=5 minus position_penalty≈0 for a PG). TVR=40 excluded
-// from the bucket weight assembly (turnoverDefValue is separate and set to 0 here
+// assembleInputs reproduces the possession.go bucket assembly for a representative
+// symmetric-fixture ball-handler/lineup at the given HCA delta (turnover disabled
 // so path-selection tests are not diluted by the independent turnover override).
-func assembleRichBundleInputs() outcomeInputs {
-	bh := oc(slotPG, mkPlayer(1, 3, slotPG, 50))
-	// net: OO=6 − OD=5 − penalty≈0 for a PG with default ratings ≈ 1.0
-	net := 1.0
-	mq := matchupQuality(bh.FGP, bh.energy, []onCourt{oc(slotPG, mkPlayer(2, 7, slotPG, 46))})
+//
+// Source: a slotPG starter (mkPlayer defaults: FGA=60, ORB=20, FTA=20, FGP=48,
+// OO=6) with five-man home (team 3) offense and five-man away (team 7) defense.
+func assembleInputs(hca float64) outcomeInputs {
+	bh := oc(slotPG, mkPlayer(1, 3, slotPG, 48))
+	offense := fiveStarters(3)
+	defenders := fiveStarters(7)
+	mq := matchupQuality(bh.FGP, bh.energy, defenders)
 	return outcomeInputs{
-		twoPtWeight:      twoPtBucketWeight(bh),
+		twoPtWeight:      twoPtBucketWeight(bh) + hca,
 		threePtWeight:    threePtBucketWeight(bh),
 		andOneWeight:     andOneBucketWeight(mq, bh),
-		foulOnlyWeight:   foulBucketWeight(net, bh),
-		turnoverDefValue: 0, // disabled: isolates path-selection from turnover override
-	}
-}
-
-// --- matrix #1: characterization — current (pre-rescale) assembled path
-//
-// This test characterizes the path-selection distribution BEFORE possession.go
-// is rewired. It calls the weight-assembly expressions from possession.go:95-100
-// directly, using the same richBundle representative pair, so the shift after the
-// rewire is intentional and reviewable.
-//
-// Current (O(100)) weights at richBundle home PG (FGP=50, seed 1988):
-//
-//	sv2 ≈ 450 + net*500/233 ≈ 452, fatigue≈1.0
-//	twoPt ≈ 452,  threePt ≈ 349.5*0.294 ≈ 103,  andOne ≈ 22.5,  foul ≈ 30
-//	foul share ≈ 30 / (452+103+22.5+30) ≈ 4.9%
-//
-// Recorded here as the pre-rescale baseline; the post-rescale Phase 4 test
-// demonstrates the ≥5pp shift in foul-path selection that was impossible at O(100).
-func TestBucketWeights_Characterization(t *testing.T) {
-	bh := oc(slotPG, mkPlayer(1, 3, slotPG, 50))
-	mq := matchupQuality(bh.FGP, bh.energy, []onCourt{oc(slotPG, mkPlayer(2, 7, slotPG, 46))})
-	net := 1.0 // OO=6 − OD=5 − penalty≈0
-
-	// Re-create the OLD O(100) assembly from possession.go:95-100 (pre-rescale).
-	sv2 := shotValue2pt(net, bh.FGP, false) // ≈ 452
-	oldIn := outcomeInputs{
-		twoPtWeight:      sv2 * bh.fatigue,
-		threePtWeight:    shotValue3pt() * bh.fatigue * threePtPropensity(bh),
-		andOneWeight:     mq*0.25 + base2pt(bh.FGP)*andOneBaseShare,
-		foulOnlyWeight:   (2.0 - bh.fatigue) * floor1(bh.Foul),
+		foulOnlyWeight:   foulBucketWeight(offense, defenders, hca),
 		turnoverDefValue: 0,
 	}
-
-	const n = 200_000
-	const seed = uint64(1988)
-	oldCounts := pathCounts(oldIn, n, seed)
-	oldFoulFrac := float64(oldCounts[outcomeFoulOnly]) / n
-
-	// Pre-rescale foul share at O(100) weights is small (≈5%) — that is the
-	// documented no-op that prevents HCA from landing.
-	if oldFoulFrac >= 0.08 {
-		t.Errorf("pre-rescale foul share = %.3f, want < 0.08 (characterization: O(100) no-op confirmed)", oldFoulFrac)
-	}
-	t.Logf("pre-rescale path distribution (n=%d, seed %d):", n, seed)
-	t.Logf("  2pt=%.3f  3pt=%.3f  and-one=%.3f  foul=%.3f",
-		float64(oldCounts[outcome2pt])/n,
-		float64(oldCounts[outcome3pt])/n,
-		float64(oldCounts[outcomeAndOne])/n,
-		float64(oldCounts[outcomeFoulOnly])/n,
-	)
-	t.Logf("  weights: 2pt=%.2f  3pt=%.2f  and-one=%.2f  foul=%.2f",
-		oldIn.twoPtWeight, oldIn.threePtWeight, oldIn.andOneWeight, oldIn.foulOnlyWeight)
 }
 
-// --- matrix #2: scale property — +0.2 on foul shifts selection by ≥5pp
-
-// TestBucketWeights_FoulScaleShift proves that the O(1) rescale makes HCA's
-// ±0.2 perturbation expressible. At O(100) the same +0.2 produced a ≤0.5pp shift
-// (the documented no-op). After rescale the FOUR-BUCKET TOTAL is O(1) (≈1.0), so
-// +0.2 is a meaningful fraction of the total and shifts foul-path selection by a
-// non-negligible amount (≈16pp) — even though the foul bucket is only a realistic
-// ≈5% SHARE. The expressibility property depends on the total being O(1), NOT on a
-// large foul share: the shift (f+0.2)/(T+0.2) − f/T is driven by absolute T. This
-// is why the realistic 2pt-dominant mix clears the bar with a LARGER margin than
-// the plan's rejected 37%-foul-share design (~6pp) would have. See the scale
-// rationale in bucketweights.go.
+// --- matrix #2: characterization — assembled foul-path mix, home vs away -----
 //
-// Source: assembleRichBundleInputs() (richBundle home PG, FGP=50, seed 1988).
-// turnoverDefValue=0 so the independent turnover override does not dilute the
-// measured foul-path frequency.
-//
-// Zero production HCA wiring — the +0.2 perturbation is applied in-test only.
-func TestBucketWeights_FoulScaleShift(t *testing.T) {
-	in := assembleRichBundleInputs()
-
+// Records the post-change path-selection distribution on the symmetric pair, so
+// the magnitude shift from #952 is reviewable, and confirms the two structural
+// invariants the design rests on: (a) the foul path is a realistic minority share
+// (2pt-dominant, non-degenerate), and (b) the home assembly selects the foul path
+// MORE than the away assembly — the faithful HCA mechanism at the bucket level.
+func TestBucketWeights_FoulPathMix(t *testing.T) {
 	const n = 200_000
 	const seed = uint64(1988)
 
-	// Baseline: foul-path selection frequency from the O(1) helpers.
-	baseCounts := pathCounts(in, n, seed)
-	baseFoulFrac := float64(baseCounts[outcomeFoulOnly]) / n
+	homeIn := assembleInputs(hcaMagnitude)
+	awayIn := assembleInputs(-hcaMagnitude)
 
-	// Perturbed: +0.2 added to foulOnlyWeight only (future HCA hook, not wired here).
-	perturbed := in
-	perturbed.foulOnlyWeight += 0.2
-	perturbedCounts := pathCounts(perturbed, n, seed)
-	perturbedFoulFrac := float64(perturbedCounts[outcomeFoulOnly]) / n
+	homeCounts := pathCounts(homeIn, n, seed)
+	awayCounts := pathCounts(awayIn, n, seed)
+	homeFoul := float64(homeCounts[outcomeFoulOnly]) / n
+	awayFoul := float64(awayCounts[outcomeFoulOnly]) / n
 
-	shift := perturbedFoulFrac - baseFoulFrac
+	t.Logf("assembled path mix (n=%d, seed %d):", n, seed)
+	t.Logf("  home weights: 2pt=%.3f 3pt=%.3f and-one=%.3f foul=%.3f",
+		homeIn.twoPtWeight, homeIn.threePtWeight, homeIn.andOneWeight, homeIn.foulOnlyWeight)
+	t.Logf("  home foul-frac=%.4f  away foul-frac=%.4f  (home−away=%+.4f)", homeFoul, awayFoul, homeFoul-awayFoul)
 
-	// The shift must be non-negligible (≥5pp). At O(100) the same +0.2 produced
-	// ≤0.5pp (the HCA no-op documented in PR9's rationale).
-	const minShift = 0.05
-	if shift < minShift {
-		t.Errorf(
-			"foul-path shift from +0.2 perturbation = %.4f (%.2fpp), want ≥ %.2fpp.\n"+
-				"  base foul frac=%.4f, perturbed foul frac=%.4f\n"+
-				"  weights before: 2pt=%.3f 3pt=%.3f and-one=%.3f foul=%.3f",
-			shift, shift*100, minShift*100,
-			baseFoulFrac, perturbedFoulFrac,
-			in.twoPtWeight, in.threePtWeight, in.andOneWeight, in.foulOnlyWeight,
-		)
+	// Realistic minority: the foul path must be a small share (2pt-dominant), the
+	// non-degeneracy property the magnitudes are chosen to preserve.
+	if homeFoul < 0.02 || homeFoul > 0.25 {
+		t.Errorf("home foul share = %.4f, want a realistic minority in [0.02, 0.25]", homeFoul)
 	}
-
-	// Also verify old O(100) basis produces the no-op (contrast assertion).
-	bh := oc(slotPG, mkPlayer(1, 3, slotPG, 50))
-	mq := matchupQuality(bh.FGP, bh.energy, []onCourt{oc(slotPG, mkPlayer(2, 7, slotPG, 46))})
-	sv2 := shotValue2pt(1.0, bh.FGP, false)
-	oldIn := outcomeInputs{
-		twoPtWeight:      sv2 * bh.fatigue,
-		threePtWeight:    shotValue3pt() * bh.fatigue * threePtPropensity(bh),
-		andOneWeight:     mq*0.25 + base2pt(bh.FGP)*andOneBaseShare,
-		foulOnlyWeight:   (2.0 - bh.fatigue) * floor1(bh.Foul),
-		turnoverDefValue: 0,
+	// HCA: home selects the (higher-EV) foul path more than away.
+	if homeFoul <= awayFoul {
+		t.Errorf("home foul-frac %.4f ≤ away %.4f — HCA not home-favorable at the bucket level", homeFoul, awayFoul)
 	}
-	oldBase := pathCounts(oldIn, n, seed)
-	oldPerturbed := oldIn
-	oldPerturbed.foulOnlyWeight += 0.2
-	oldPert := pathCounts(oldPerturbed, n, seed)
-	oldShift := float64(oldPert[outcomeFoulOnly])/n - float64(oldBase[outcomeFoulOnly])/n
-
-	if oldShift > 0.005 {
-		t.Errorf("old O(100) foul shift should be ≤0.5pp, got %.4f (%.2fpp)", oldShift, oldShift*100)
-	}
-
-	t.Logf("O(1) foul shift: %.4f (%.2fpp); O(100) foul shift: %.4f (%.2fpp)",
-		shift, shift*100, oldShift, oldShift*100)
-	t.Logf("O(1) base weights: 2pt=%.3f 3pt=%.3f and-one=%.3f foul=%.3f total=%.3f",
-		in.twoPtWeight, in.threePtWeight, in.andOneWeight, in.foulOnlyWeight,
-		in.twoPtWeight+in.threePtWeight+in.andOneWeight+in.foulOnlyWeight)
 }
 
-// --- matrix #3: direction — EV(foul) > EV(2pt) from outcome realizations
+// --- matrix #4: 2pt bucket = the recovered +0xD90 Branch-A composite ---------
+//
+// Verifies twoPtBucketWeight matches the hand-computed +0xD90 Branch-A formula at
+// known per-48 rate inputs, and that the composite is O(10s) so the 0.6-floored
+// foul bucket stays a minority share (2pt dominant).
+func TestBucketWeights_TwoPtComposite(t *testing.T) {
+	p := oc(slotPG, mkPlayer(1, 3, slotPG, 48)) // FGA=60, ORB=20, FTA=20
+
+	// Hand-compute D90 = D88 − (D88/(D70+D88))·DB8·((D88/(DB8+D88))·0.5 + 0.25).
+	d88 := 60.0 * fgaRateScale // 18.0
+	db8 := 20.0 * orbRateScale // 3.0
+	d70 := 20.0 * ftaRateScale // 6.0
+	makeShare := (d88/(db8+d88))*d90MakeShareHalf + d90MakeShareQuarter
+	want := d88 - (d88/(d70+d88))*db8*makeShare // ≈ 16.4732
+
+	if got := twoPtBucketWeight(p); math.Abs(got-want) > 1e-9 {
+		t.Errorf("twoPtBucketWeight = %.6f, want recovered D90 = %.6f", got, want)
+	}
+
+	// 2pt must dominate the foul bucket (foul is a realistic minority).
+	off := fiveStarters(3)
+	def := fiveStarters(7)
+	foul := foulBucketWeight(off, def, 0)
+	if twoPtBucketWeight(p) <= foul {
+		t.Errorf("2pt bucket %.3f not dominant over foul %.3f", twoPtBucketWeight(p), foul)
+	}
+	t.Logf("2pt composite=%.4f foul(neutral)=%.4f 3pt=%.4f", twoPtBucketWeight(p), foul, threePtBucketWeight(p))
+}
+
+// --- matrix #5: faithful foul bucket = 0.6 floor + quality divisor + HCA -----
+//
+// Verifies the foul bucket equals the hand-computed 0.6 floor + divisor at neutral
+// HCA, GROWS when offQ shrinks (the home delta), and stays finite at the offQ
+// boundary (a floored, near-zero divisor must not divide-by-zero or produce NaN).
+func TestBucketWeights_FoulDivisor(t *testing.T) {
+	off := fiveStarters(3)
+	def := fiveStarters(7)
+
+	// Neutral: foul = 0.6 + (0.6/offQ)·(defQ − teamDef×5/6).
+	offQ := offQualityWithHCA(off, 0)
+	defQ := defMatchupQuality(def)
+	wantNeutral := (foulFloor/offQ)*(defQ-teamDefBaseline*foulDivisorTeamDefCoef) + foulFloor
+	if got := foulBucketWeight(off, def, 0); math.Abs(got-wantNeutral) > 1e-9 {
+		t.Errorf("foulBucketWeight(neutral) = %.6f, want 0.6 floor + divisor = %.6f", got, wantNeutral)
+	}
+
+	// HCA: home (offQ shrinks) → foul grows; away (offQ grows) → foul shrinks.
+	home := foulBucketWeight(off, def, hcaMagnitude)
+	neutral := foulBucketWeight(off, def, 0)
+	away := foulBucketWeight(off, def, -hcaMagnitude)
+	if !(home > neutral && neutral > away) {
+		t.Errorf("foul bucket not monotone in HCA: home=%.4f neutral=%.4f away=%.4f (want home>neutral>away)", home, neutral, away)
+	}
+
+	// Boundary: a single unrated offensive player forces offQ to its floor; the foul
+	// bucket must stay finite (no divide-by-zero / NaN / Inf).
+	tinyOff := []onCourt{oc(slotPG, mkPlayer(1, 3, slotPG, 0))}
+	tinyOff[0].OO = 0
+	got := foulBucketWeight(tinyOff, def, hcaMagnitude)
+	if math.IsNaN(got) || math.IsInf(got, 0) {
+		t.Errorf("foulBucketWeight at the offQ floor produced a non-finite value: %v", got)
+	}
+}
+
+// --- matrix #9: direction — EV(foul) > EV(2pt) from outcome realizations
 
 // TestBucketWeights_FoulEVExceedsTwoPt locks the expected-value ordering so the
 // rescale cannot accidentally invert the HCA story. EV is computed from outcome

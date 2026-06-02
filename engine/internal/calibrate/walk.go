@@ -34,12 +34,13 @@ type ValidateFunc func(dir string, runs int, seed uint64, gt bundle.GameType) (v
 
 // Options configures an archive walk.
 type Options struct {
-	Runs            int          // seeded engine runs per corpus game
-	Seed            uint64       // base seed
-	SampleStride    int          // process every Nth qualifying snapshot (<1 -> 1)
-	IncludeOlympics bool         // include olympics/ snapshots (game-type 6)
-	Validate        ValidateFunc // nil -> validate.ValidateCorpus
-	Progress        io.Writer    // nil -> io.Discard; one line per processed snapshot
+	Runs                int          // seeded engine runs per corpus game
+	Seed                uint64       // base seed
+	SampleStride        int          // process every Nth qualifying snapshot (<1 -> 1)
+	IncludeOlympics     bool         // include olympics/ snapshots (game-type 6)
+	Validate            ValidateFunc // nil -> validate.ValidateCorpus (regular/scheduled bucket)
+	ValidateUnscheduled ValidateFunc // nil -> validate.ValidateUnscheduled (playoff bucket)
+	Progress            io.Writer    // nil -> io.Discard; one line per processed snapshot
 }
 
 // Skip records a snapshot (or archive entry) that was not turned into a Report,

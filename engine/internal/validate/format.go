@@ -34,9 +34,21 @@ func WriteReport(w io.Writer, rep Report) {
 		p("UNMATCHED stem=%s visitor=%d home=%d scores=%d-%d: %s\n",
 			u.Stem, u.VisitorTeamID, u.HomeTeamID, u.VisitorScore, u.HomeScore, u.Reason)
 	}
+	// EXCLUDED lines (ValidateUnscheduled's sim-validity guard) are emitted only
+	// when present, and the RESULT line gains its count only then, so a
+	// ValidateCorpus report (always zero-excluded) renders byte-identically.
+	for _, e := range rep.Excluded {
+		p("EXCLUDED stem=%s visitor=%d home=%d date=%s: %s\n",
+			e.Stem, e.VisitorTeamID, e.HomeTeamID, e.Date, e.Reason)
+	}
 	result := "PASS"
 	if !rep.Pass {
 		result = "FAIL"
+	}
+	if len(rep.Excluded) > 0 {
+		p("RESULT: %s (%d games, %d unmatched, %d excluded)\n",
+			result, len(rep.Games), len(rep.Unmatched), len(rep.Excluded))
+		return
 	}
 	p("RESULT: %s (%d games, %d unmatched)\n",
 		result, len(rep.Games), len(rep.Unmatched))

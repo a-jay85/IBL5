@@ -17,24 +17,27 @@ import (
 // the season-grouped collector:
 //
 //  1. Processing every snapshot would double-count early games (re-counted in
-//     each later cumulative snapshot). So per season we take ONE snapshot.
+//     each later cumulative snapshot). So per season we take ONE snapshot per
+//     bucket: the last regular-type snapshot for the regular bucket, and the
+//     finals (last overall) snapshot for the playoff bucket.
 //
-//  2. Only REGULAR-season games can be validated today. The harness pairs each
-//     .sco game to a .sch schedule entry to build the matchup; playoff (and
-//     all-star) games are NOT in the .sch — playoff brackets are scheduled
-//     dynamically, so those .sco games are unmatched and dropped. Validating
-//     them would require synthesizing the matchup from the .sco's own team IDs,
-//     a PR9b harness-contract change tracked separately. Until then this
-//     collector emits the clean REGULAR bucket only: the season's last
-//     regular-type snapshot (complete regular season, zero unmatched games).
+//  2. REGULAR games are validated via validate.ValidateCorpus, which pairs each
+//     .sco game to a .sch schedule entry. PLAYOFF games are NOT in the .sch
+//     (playoff brackets are scheduled dynamically, from Schedule.htm in prod),
+//     so they are validated via validate.ValidateUnscheduled — the complement
+//     path that synthesizes each unmatched .sco game's matchup from its own
+//     team IDs (PR9d). All-star/Olympics calibration is still out of scope:
+//     Olympics national-team rosters are not a clean .plr-franchise sim.
 
-// season is one season's selected regular snapshot. olympics seasons are
-// recorded so they can be reported as skipped (out of scope, same unmatched
-// constraint as playoffs).
+// season is one season's selected snapshots. olympics seasons are recorded so
+// they can be reported as skipped (out of scope — national-team rosters need
+// separate handling). finalsZip is the last snapshot overall (lexical/sim-step
+// order); when it differs from regularZip it carries the playoff games.
 type season struct {
 	name       string
 	olympics   bool
 	regularZip string // last regular-type snapshot; "" if the season has none
+	finalsZip  string // last snapshot overall; "" if the season has none
 }
 
 // seasonName is the path segment immediately under root (e.g. "02-03", or
@@ -53,14 +56,18 @@ func isOlympicsPath(path string) bool {
 	return strings.Contains(strings.ToLower(filepath.ToSlash(path)), "olympics")
 }
 
-// groupSeasons buckets zip paths into seasons, selecting each season's last
-// regular-type snapshot by lexical (sim-step) order — valid because the
-// archive's NN index is zero-padded, so the names sort by sim step. Olympics
-// snapshots are flagged (and skipped: not yet supported, see the note above).
+// groupSeasons buckets zip paths into seasons, selecting two snapshots per
+// season by lexical (sim-step) order — valid because the archive's NN index is
+// zero-padded, so the names sort by sim step: the last regular-type snapshot
+// (regularZip, the complete regular season) and the last snapshot overall
+// (finalsZip, which carries the playoff games when a finals snapshot exists).
+// Olympics snapshots are flagged (and skipped: not yet supported, see the note
+// above).
 func groupSeasons(zipPaths []string, root string) ([]season, []Skip) {
 	type acc struct {
 		olympics   bool
 		regularZip string
+		finalsZip  string
 	}
 	m := map[string]*acc{}
 	var skips []Skip
@@ -73,11 +80,15 @@ func groupSeasons(zipPaths []string, root string) ([]season, []Skip) {
 		}
 		if isOlympicsPath(p) {
 			a.olympics = true
-			skips = append(skips, Skip{p, "olympics/playoff not yet supported (unscheduled games — see season.go)"})
+			skips = append(skips, Skip{p, "olympics not yet supported (national-team rosters — see season.go)"})
 			continue
 		}
-		// Only regular-type snapshots seed the regular bucket; a playoff/finals
-		// snapshot is ignored here (its playoff games are unmatched anyway).
+		// The last snapshot overall is the finals snapshot (playoff bucket); the
+		// last regular-type snapshot seeds the regular bucket. When the season has
+		// no finals snapshot, finalsZip == regularZip and no playoff bucket forms.
+		if p > a.finalsZip {
+			a.finalsZip = p
+		}
 		if gt, _ := inferGameType(p, false); gt == bundle.GameTypeRegular && p > a.regularZip {
 			a.regularZip = p
 		}
@@ -91,29 +102,33 @@ func groupSeasons(zipPaths []string, root string) ([]season, []Skip) {
 	seasons := make([]season, 0, len(names))
 	for _, n := range names {
 		a := m[n]
-		seasons = append(seasons, season{name: n, olympics: a.olympics, regularZip: a.regularZip})
+		seasons = append(seasons, season{name: n, olympics: a.olympics, regularZip: a.regularZip, finalsZip: a.finalsZip})
 	}
 	return seasons, skips
 }
 
 // CollectSeasonReports is the calibration-correct collector: it groups the
-// archive into seasons and validates ONE snapshot per season — the last
-// regular-type snapshot, the complete regular season — as the clean regular
-// bucket. --sample-stride thins by season. Playoff/all-star are out of scope
-// until the harness can validate unscheduled games.
+// archive into seasons and, per season, validates the last regular-type
+// snapshot as the REGULAR bucket and (when a distinct finals snapshot exists)
+// its unmatched .sco games as the PLAYOFF bucket. --sample-stride thins by
+// season; both buckets for a selected season are produced together. All-star
+// and Olympics remain out of scope.
 func CollectSeasonReports(root string, opts Options) ([]validate.Report, []Skip, error) {
 	zips, zskips, err := listArchiveZips(root)
 	if err != nil {
 		return nil, nil, err
 	}
 	seasons, gskips := groupSeasons(zips, root)
-	reports, pskips := collectSeasonReports(seasons, opts, resolveValidate(opts))
+	reports, pskips := collectSeasonReports(seasons, opts, resolveValidate(opts), resolveValidateUnscheduled(opts))
 	skips := append(append(zskips, gskips...), pskips...)
 	return reports, skips, nil
 }
 
 // collectSeasonReports is the injected-dependency core of CollectSeasonReports.
-func collectSeasonReports(seasons []season, opts Options, validateFn ValidateFunc) ([]validate.Report, []Skip) {
+// validateFn handles the regular (scheduled) bucket; validateUnscheduledFn
+// handles the playoff (unscheduled) bucket — both seams so the season grouping
+// and bucket selection are unit-testable without running the engine.
+func collectSeasonReports(seasons []season, opts Options, validateFn, validateUnscheduledFn ValidateFunc) ([]validate.Report, []Skip) {
 	progress := opts.Progress
 	if progress == nil {
 		progress = io.Discard
@@ -145,6 +160,19 @@ func collectSeasonReports(seasons []season, opts Options, validateFn ValidateFun
 		}
 		_, _ = fmt.Fprintf(progress, "regular %s games=%d\n", s.regularZip, len(rep.Games))
 		reports = append(reports, *rep)
+
+		// Playoff bucket: the finals snapshot's unmatched .sco games, validated
+		// via the unscheduled path. Only when a distinct finals snapshot exists
+		// (otherwise finalsZip == regularZip = no playoffs captured).
+		if s.finalsZip != "" && s.finalsZip != s.regularZip {
+			prep, pskip := processZip(s.finalsZip, bundle.GameTypePlayoff, opts.Runs, opts.Seed, validateUnscheduledFn)
+			if pskip != nil {
+				skips = append(skips, *pskip)
+				continue
+			}
+			_, _ = fmt.Fprintf(progress, "playoff %s games=%d excluded=%d\n", s.finalsZip, len(prep.Games), len(prep.Excluded))
+			reports = append(reports, *prep)
+		}
 	}
 	return reports, skips
 }
@@ -155,4 +183,13 @@ func resolveValidate(opts Options) ValidateFunc {
 		return opts.Validate
 	}
 	return validate.ValidateCorpus
+}
+
+// resolveValidateUnscheduled returns opts.ValidateUnscheduled or the real
+// validate.ValidateUnscheduled default (the playoff-bucket seam).
+func resolveValidateUnscheduled(opts Options) ValidateFunc {
+	if opts.ValidateUnscheduled != nil {
+		return opts.ValidateUnscheduled
+	}
+	return validate.ValidateUnscheduled
 }

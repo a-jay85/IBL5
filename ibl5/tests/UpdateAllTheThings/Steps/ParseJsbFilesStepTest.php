@@ -31,7 +31,10 @@ class ParseJsbFilesStepTest extends TestCase
 
     public function testImplementsPipelineStepInterface(): void
     {
-        $this->assertInstanceOf(PipelineStepInterface::class, $this->createStep());
+        self::assertContains(
+            PipelineStepInterface::class,
+            (array) class_implements(ParseJsbFilesStep::class)
+        );
     }
 
     public function testGetLabelReturnsExpectedLabel(): void

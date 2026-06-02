@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\ContractList;
 
 use ContractList\ContractListView;
-use ContractList\Contracts\ContractListViewInterface;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -18,11 +17,6 @@ class ContractListViewTest extends TestCase
     protected function setUp(): void
     {
         $this->view = new ContractListView();
-    }
-
-    public function testImplementsViewInterface(): void
-    {
-        $this->assertInstanceOf(ContractListViewInterface::class, $this->view);
     }
 
     public function testRenderOutputsTable(): void

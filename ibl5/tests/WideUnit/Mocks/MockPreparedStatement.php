@@ -10,12 +10,10 @@ namespace Tests\WideUnit\Mocks;
  */
 class MockPreparedStatement
 {
-    private ?MockDatabase $mockDb;
+    private MockDatabase $mockDb;
     private string $query;
     /** @var array<int, mixed> */
     private array $boundParams = [];
-    /** @var list<string> */
-    private array $paramTypes = [];
     public string|int $affected_rows = 0;
     public string $error = '';
     public int $errno = 0;
@@ -25,9 +23,7 @@ class MockPreparedStatement
 
     /**
      * @param MockDatabase|null $mockDb Mock database instance to use.
-     *                                  If null (or omitted), a new MockDatabase
-     *                                  instance will be created for this statement,
-     *                                  rather than using any shared instance.
+     *                                  If null, a new MockDatabase instance is created.
      * @param string $query             The SQL query string for this mock statement.
      */
     public function __construct(?MockDatabase $mockDb, string $query = '')
@@ -43,7 +39,6 @@ class MockPreparedStatement
      */
     public function bind_param(string $types, &...$params): bool
     {
-        $this->paramTypes = str_split($types);
         foreach ($params as $index => $param) {
             $this->boundParams[$index] = $param;
         }

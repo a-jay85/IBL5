@@ -6,7 +6,6 @@ namespace Tests\Player;
 
 use PHPUnit\Framework\TestCase;
 use Player\PlayerDataConverter;
-use Player\PlayerData;
 
 /**
  * PlayerDataConverterTest - Tests for PlayerDataConverter
@@ -16,15 +15,6 @@ class PlayerDataConverterTest extends TestCase
     // ============================================
     // ARRAY TO PLAYER DATA TESTS
     // ============================================
-
-    public function testArrayToPlayerDataReturnsPlayerDataObject(): void
-    {
-        $playerData = ['cy' => 1, 'cyt' => 3, 'salary_yr1' => 5000000];
-
-        $result = PlayerDataConverter::arrayToPlayerData($playerData);
-
-        $this->assertInstanceOf(PlayerData::class, $result);
-    }
 
     public function testArrayToPlayerDataSetsContractCurrentYear(): void
     {

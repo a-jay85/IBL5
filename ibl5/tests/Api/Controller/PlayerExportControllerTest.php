@@ -99,7 +99,8 @@ class PlayerExportControllerTest extends WideUnitTestCase
         });
 
         $output = ltrim($output, "\xEF\xBB\xBF");
-        $firstLine = strtok($output, "\n") ?: '';
+        $strtokResult = strtok($output, "\n");
+        $firstLine = $strtokResult !== false ? $strtokResult : '';
 
         // Verify key column headers from PlayerExportTransformer::HEADERS
         $this->assertStringContainsString('PID', $firstLine);
@@ -139,7 +140,7 @@ class PlayerExportControllerTest extends WideUnitTestCase
         $this->assertStringContainsString('SF', $output);
 
         // Output must have at least 3 lines: header + 2 player rows
-        $lines = array_filter(explode("\n", trim($output)));
+        $lines = array_filter(explode("\n", trim($output)), static fn (string $l): bool => $l !== '');
         $this->assertGreaterThanOrEqual(3, count($lines));
     }
 

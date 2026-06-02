@@ -75,7 +75,7 @@ class DiscordTest extends TestCase
         $storytext = "Trade details here";
         
         // Simulate the TradeProcessor logic
-        if (!empty($fromDiscordId) && !empty($toDiscordId)) {
+        if ($fromDiscordId !== '' && $toDiscordId !== '') {
             $discordText = "<@!$fromDiscordId> and <@!$toDiscordId> agreed to a trade:\n" . $storytext;
         } else {
             $discordText = "Team A and Team B agreed to a trade:\n" . $storytext;
@@ -97,7 +97,7 @@ class DiscordTest extends TestCase
         $storytext = "Trade details here";
         
         // Simulate the TradeProcessor logic
-        if (!empty($fromDiscordId) && !empty($toDiscordId)) {
+        if ($fromDiscordId !== '' && $toDiscordId !== '') {
             $discordText = "<@!$fromDiscordId> and <@!$toDiscordId> agreed to a trade:\n" . $storytext;
         } else {
             $discordText = "Team A and Team B agreed to a trade:\n" . $storytext;

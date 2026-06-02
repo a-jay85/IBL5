@@ -6,7 +6,6 @@ namespace Tests\UpdateAllTheThings;
 
 use PHPUnit\Framework\TestCase;
 use Updater\Contracts\PipelineStepInterface;
-use Updater\Contracts\UpdaterServiceInterface;
 use Updater\StepResult;
 use Updater\UpdaterService;
 
@@ -17,11 +16,6 @@ class UpdaterServiceTest extends TestCase
     protected function setUp(): void
     {
         $this->service = new UpdaterService();
-    }
-
-    public function testImplementsUpdaterServiceInterface(): void
-    {
-        $this->assertInstanceOf(UpdaterServiceInterface::class, $this->service);
     }
 
     public function testRunWithNoStepsReturnsEmptyResults(): void

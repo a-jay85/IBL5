@@ -4,18 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Bootstrap;
 
-use Bootstrap\Application;
 use Bootstrap\TestApplicationFactory;
 use PHPUnit\Framework\TestCase;
 
 final class TestApplicationFactoryTest extends TestCase
 {
-    public function testBuildReturnsApplication(): void
-    {
-        $app = TestApplicationFactory::build(__DIR__ . '/../..');
-        self::assertInstanceOf(Application::class, $app);
-    }
-
     public function testBuildRegistersThreeSteps(): void
     {
         $app = TestApplicationFactory::build(__DIR__ . '/../..');

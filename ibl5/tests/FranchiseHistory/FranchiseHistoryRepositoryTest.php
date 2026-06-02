@@ -31,11 +31,6 @@ class FranchiseHistoryRepositoryTest extends TestCase
         $this->repository = new FranchiseHistoryRepository($this->mockDb);
     }
 
-    public function testImplementsFranchiseHistoryRepositoryInterface(): void
-    {
-        $this->assertInstanceOf(FranchiseHistoryRepositoryInterface::class, $this->repository);
-    }
-
     /**
      * Verify that titles are sourced from vw_franchise_summary
      *

@@ -13,14 +13,6 @@ use Season\Season;
 
 class LeagueScheduleServiceTest extends TestCase
 {
-    public function testImplementsInterface(): void
-    {
-        $mockRepo = self::createStub(LeagueScheduleRepositoryInterface::class);
-        $service = new LeagueScheduleService($mockRepo);
-
-        $this->assertInstanceOf(LeagueScheduleServiceInterface::class, $service);
-    }
-
     public function testGetSchedulePageDataReturnsExpectedStructure(): void
     {
         $mockRepo = self::createStub(LeagueScheduleRepositoryInterface::class);

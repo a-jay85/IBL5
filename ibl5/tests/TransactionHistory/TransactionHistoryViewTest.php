@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\TransactionHistory;
 
 use PHPUnit\Framework\TestCase;
-use TransactionHistory\Contracts\TransactionHistoryViewInterface;
 use TransactionHistory\TransactionHistoryView;
 
 /**
@@ -18,11 +17,6 @@ class TransactionHistoryViewTest extends TestCase
     protected function setUp(): void
     {
         $this->view = new TransactionHistoryView();
-    }
-
-    public function testImplementsViewInterface(): void
-    {
-        $this->assertInstanceOf(TransactionHistoryViewInterface::class, $this->view);
     }
 
     public function testRenderOutputsTable(): void

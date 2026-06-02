@@ -5,20 +5,11 @@ declare(strict_types=1);
 namespace Tests\UpdateAllTheThings\Steps;
 
 use PHPUnit\Framework\TestCase;
-use Updater\Contracts\PipelineStepInterface;
 use Updater\PowerRankingsUpdater;
 use Updater\Steps\UpdatePowerRankingsStep;
 
 class UpdatePowerRankingsStepTest extends TestCase
 {
-    public function testImplementsPipelineStepInterface(): void
-    {
-        $stubUpdater = self::createStub(PowerRankingsUpdater::class);
-        $step = new UpdatePowerRankingsStep($stubUpdater);
-
-        $this->assertInstanceOf(PipelineStepInterface::class, $step);
-    }
-
     public function testGetLabelReturnsExpectedLabel(): void
     {
         $stubUpdater = self::createStub(PowerRankingsUpdater::class);

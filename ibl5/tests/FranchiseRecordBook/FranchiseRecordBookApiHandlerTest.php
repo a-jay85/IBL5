@@ -26,13 +26,6 @@ class FranchiseRecordBookApiHandlerTest extends WideUnitTestCase
         parent::tearDown();
     }
 
-    public function testCanBeInstantiated(): void
-    {
-        $handler = new FranchiseRecordBookApiHandler($GLOBALS['mysqli_db']);
-
-        $this->assertInstanceOf(FranchiseRecordBookApiHandler::class, $handler);
-    }
-
     public function testHandleWithNoTeamIdRendersLeagueWideView(): void
     {
         $_GET = [];

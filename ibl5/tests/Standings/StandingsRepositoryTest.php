@@ -17,14 +17,6 @@ use Standings\Contracts\StandingsRepositoryInterface;
 #[AllowMockObjectsWithoutExpectations]
 class StandingsRepositoryTest extends TestCase
 {
-    public function testImplementsStandingsRepositoryInterface(): void
-    {
-        $mockDb = $this->createMockDatabase();
-        $repository = new StandingsRepository($mockDb);
-
-        $this->assertInstanceOf(StandingsRepositoryInterface::class, $repository);
-    }
-
     public function testGetStandingsByRegionThrowsExceptionForInvalidRegion(): void
     {
         $mockDb = $this->createMockDatabase();

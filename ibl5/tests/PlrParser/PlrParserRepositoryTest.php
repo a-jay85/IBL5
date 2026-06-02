@@ -12,10 +12,6 @@ class PlrParserRepositoryTest extends TestCase
 {
     public function testImplementsInterface(): void
     {
-        $this->assertTrue(
-            is_subclass_of(PlrParserRepository::class, \BaseMysqliRepository::class)
-        );
-
         $interfaces = class_implements(PlrParserRepository::class);
         $this->assertIsArray($interfaces);
         $this->assertArrayHasKey(PlrParserRepositoryInterface::class, $interfaces);

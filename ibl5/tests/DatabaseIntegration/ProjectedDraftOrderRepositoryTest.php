@@ -167,8 +167,8 @@ class ProjectedDraftOrderRepositoryTest extends DatabaseTestCase
             }
         }
         self::assertNotNull($metros);
-        self::assertSame(205.0, (float) $metros['pointsFor']); // 110 + 95
-        self::assertSame(190.0, (float) $metros['pointsAgainst']); // 90 + 100
+        self::assertSame(205.0, (float) $metros['pointsFor']); /** @phpstan-ignore cast.useless (mysqli returns SUM as numeric-string; @var float annotation overstates the type) */ // 110 + 95
+        self::assertSame(190.0, (float) $metros['pointsAgainst']); /** @phpstan-ignore cast.useless (mysqli returns SUM as numeric-string; @var float annotation overstates the type) */ // 90 + 100
     }
 
     public function testIsDraftOrderFinalizedReturnsFalse(): void

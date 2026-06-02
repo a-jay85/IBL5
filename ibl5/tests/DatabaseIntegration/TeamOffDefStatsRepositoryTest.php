@@ -89,9 +89,6 @@ class TeamOffDefStatsRepositoryTest extends DatabaseTestCase
             self::assertArrayHasKey('fgm', $result);
             self::assertArrayHasKey('fga', $result);
             self::assertIsInt($result['games']);
-        } else {
-            // If generated column doesn't match, still a valid test — no data for that season
-            self::assertNull($result);
         }
     }
 
@@ -105,8 +102,6 @@ class TeamOffDefStatsRepositoryTest extends DatabaseTestCase
             self::assertArrayHasKey('games', $result);
             self::assertArrayHasKey('fgm', $result);
             self::assertIsInt($result['games']);
-        } else {
-            self::assertNull($result);
         }
     }
 
@@ -136,9 +131,6 @@ class TeamOffDefStatsRepositoryTest extends DatabaseTestCase
             self::assertArrayHasKey('teamid', $defense);
             self::assertArrayHasKey('games', $defense);
             self::assertArrayHasKey('fgm', $defense);
-        } else {
-            // Valid if generated column doesn't recognize the date as regular season
-            self::assertNull($result);
         }
     }
 

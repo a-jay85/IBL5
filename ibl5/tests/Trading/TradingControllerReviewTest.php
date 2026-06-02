@@ -68,7 +68,9 @@ class TradingControllerReviewTest extends TestCase
 
     public function testImplementsInterface(): void
     {
-        $controller = $this->buildController();
-        $this->assertInstanceOf(\Trading\Contracts\TradingControllerInterface::class, $controller);
+        self::assertContains(
+            \Trading\Contracts\TradingControllerInterface::class,
+            (array) class_implements(TradingController::class)
+        );
     }
 }

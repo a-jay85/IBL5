@@ -23,33 +23,40 @@ final class CrossTableColumnNamingTest extends DatabaseTestCase
 {
     public function testLiveTablesUseStatsTvr(): void
     {
-        $this->fetchAll(
-            "SELECT stats_tvr FROM ibl_plr LIMIT 1"
-        );
-        $this->fetchAll(
-            "SELECT stats_tvr FROM ibl_plr_snapshots LIMIT 1"
-        );
-        $this->fetchAll(
-            "SELECT stats_tvr FROM ibl_olympics_plr LIMIT 1"
-        );
-        self::assertTrue(true, 'All live-layer tables have stats_tvr.');
+        $r1 = $this->fetchAll("SELECT stats_tvr FROM ibl_plr LIMIT 1");
+
+        $r2 = $this->fetchAll("SELECT stats_tvr FROM ibl_plr_snapshots LIMIT 1");
+
+        $r3 = $this->fetchAll("SELECT stats_tvr FROM ibl_olympics_plr LIMIT 1");
+
+        // If any column is missing, fetchAll() throws and the test fails loudly.
+
+        self::assertIsArray($r1);
+
+        self::assertIsArray($r2);
+
+        self::assertIsArray($r3);
     }
 
     public function testLiveTablesUseRThreeGaRThreeGp(): void
     {
-        $this->fetchAll(
-            "SELECT r_3ga, r_3gp FROM ibl_plr LIMIT 1"
-        );
-        $this->fetchAll(
-            "SELECT r_3ga, r_3gp FROM ibl_plr_snapshots LIMIT 1"
-        );
-        $this->fetchAll(
-            "SELECT r_3ga, r_3gp FROM ibl_olympics_plr LIMIT 1"
-        );
-        $this->fetchAll(
-            "SELECT r_3ga, r_3gp FROM ibl_draft_class LIMIT 1"
-        );
-        self::assertTrue(true, 'Live + draft_class tables have r_3ga / r_3gp.');
+        $r1 = $this->fetchAll("SELECT r_3ga, r_3gp FROM ibl_plr LIMIT 1");
+
+        $r2 = $this->fetchAll("SELECT r_3ga, r_3gp FROM ibl_plr_snapshots LIMIT 1");
+
+        $r3 = $this->fetchAll("SELECT r_3ga, r_3gp FROM ibl_olympics_plr LIMIT 1");
+
+        $r4 = $this->fetchAll("SELECT r_3ga, r_3gp FROM ibl_draft_class LIMIT 1");
+
+        // If any column is missing, fetchAll() throws and the test fails loudly.
+
+        self::assertIsArray($r1);
+
+        self::assertIsArray($r2);
+
+        self::assertIsArray($r3);
+
+        self::assertIsArray($r4);
     }
 
     public function testTeamIdFamilyIsUnified(): void
@@ -78,18 +85,26 @@ final class CrossTableColumnNamingTest extends DatabaseTestCase
         $this->fetchAll("SELECT home_teamid, visitor_teamid FROM ibl_box_scores_teams LIMIT 1");
         $this->fetchAll("SELECT home_teamid, visitor_teamid FROM ibl_olympics_box_scores LIMIT 1");
         $this->fetchAll("SELECT home_teamid, visitor_teamid FROM ibl_olympics_box_scores_teams LIMIT 1");
-        $this->fetchAll("SELECT owner_teamid, teampick_teamid FROM ibl_draft_picks LIMIT 1");
-
-        self::assertTrue(true, 'Team-id family is fully unified after migration 114.');
+        $rows = $this->fetchAll("SELECT owner_teamid, teampick_teamid FROM ibl_draft_picks LIMIT 1");
+        // If any column is missing, fetchAll() throws and the test fails loudly.
+        self::assertIsArray($rows);
     }
 
     public function testCareerStatsUseUnifiedNames(): void
     {
-        $this->fetchAll("SELECT car_tvr, car_3gm, car_3ga FROM ibl_plr LIMIT 1");
-        $this->fetchAll("SELECT car_tvr, car_3gm, car_3ga FROM ibl_plr_snapshots LIMIT 1");
-        $this->fetchAll("SELECT car_tvr, car_3gm, car_3ga FROM ibl_olympics_plr LIMIT 1");
+        $r1 = $this->fetchAll("SELECT car_tvr, car_3gm, car_3ga FROM ibl_plr LIMIT 1");
 
-        self::assertTrue(true, 'Career stat columns unified: car_tvr, car_3gm, car_3ga.');
+        $r2 = $this->fetchAll("SELECT car_tvr, car_3gm, car_3ga FROM ibl_plr_snapshots LIMIT 1");
+
+        $r3 = $this->fetchAll("SELECT car_tvr, car_3gm, car_3ga FROM ibl_olympics_plr LIMIT 1");
+
+        // If any column is missing, fetchAll() throws and the test fails loudly.
+
+        self::assertIsArray($r1);
+
+        self::assertIsArray($r2);
+
+        self::assertIsArray($r3);
     }
 
     public function testOldCareerStatNamesAreGone(): void
@@ -189,9 +204,7 @@ final class CrossTableColumnNamingTest extends DatabaseTestCase
     }
 
     /**
-     * @template T of array<string, mixed>
-     * @param string $sql
-     * @return list<T>
+     * @return list<array<string, mixed>>
      */
     private function fetchAll(string $sql): array
     {
@@ -199,7 +212,7 @@ final class CrossTableColumnNamingTest extends DatabaseTestCase
         if ($result === false || $result === true) {
             self::fail('Query failed: ' . $this->db->error . ' — ' . $sql);
         }
-        /** @var list<T> $rows */
+        /** @var list<array<string, mixed>> $rows */
         $rows = $result->fetch_all(MYSQLI_ASSOC);
         $result->free();
         return $rows;

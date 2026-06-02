@@ -286,15 +286,4 @@ class DepthChartEntryServiceTest extends TestCase
         $this->assertSame(0, $override[300]['dc_can_play_in_game']);
     }
 
-    // ============================================
-    // Interface compliance
-    // ============================================
-
-    public function testServiceImplementsInterface(): void
-    {
-        $this->assertInstanceOf(
-            \DepthChartEntry\Contracts\DepthChartEntryServiceInterface::class,
-            $this->service,
-        );
-    }
 }

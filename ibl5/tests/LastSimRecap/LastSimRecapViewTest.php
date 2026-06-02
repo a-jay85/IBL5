@@ -161,11 +161,11 @@ class LastSimRecapViewTest extends TestCase
         // Capture every style="..." attribute and ensure each only contains
         // `--`-prefixed declarations (CSS custom properties).
         if (preg_match_all('/style="([^"]+)"/i', $html, $matches) === 0) {
-            self::assertTrue(true); // no inline styles at all is fine
+            self::assertStringNotContainsString('style="', $html);
             return;
         }
         foreach ($matches[1] as $declList) {
-            foreach (array_filter(array_map('trim', explode(';', $declList))) as $decl) {
+            foreach (array_filter(array_map('trim', explode(';', $declList)), static fn (string $s): bool => $s !== '') as $decl) {
                 self::assertStringStartsWith('--', $decl, "Inline style must be a custom property: '{$decl}'");
             }
         }

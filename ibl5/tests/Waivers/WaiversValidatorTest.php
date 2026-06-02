@@ -527,11 +527,13 @@ class WaiversValidatorTest extends TestCase
     {
         // First validation fails
         $this->validator->validateAdd(null, 5, 6000, 100);
-        $this->assertNotEmpty($this->validator->getErrors());
+        $errorsAfterFailedAdd = $this->validator->getErrors();
+        $this->assertNotEmpty($errorsAfterFailedAdd);
 
         // Second validation succeeds - errors should be cleared
         $this->validator->validateAdd(123, 5, 6000, 100);
-        $this->assertEmpty($this->validator->getErrors());
+        $errorsAfterCleanAdd = $this->validator->getErrors();
+        $this->assertEmpty($errorsAfterCleanAdd);
     }
 
     /**
@@ -541,11 +543,13 @@ class WaiversValidatorTest extends TestCase
     {
         // Add validation fails
         $this->validator->validateAdd(null, 5, 6000, 100);
-        $this->assertNotEmpty($this->validator->getErrors());
+        $errorsAfterFailedAdd = $this->validator->getErrors();
+        $this->assertNotEmpty($errorsAfterFailedAdd);
 
         // Drop validation succeeds - should clear errors
         $this->validator->validateDrop(2, 6000);
-        $this->assertEmpty($this->validator->getErrors());
+        $errorsAfterCleanDrop = $this->validator->getErrors();
+        $this->assertEmpty($errorsAfterCleanDrop);
     }
 
     /**

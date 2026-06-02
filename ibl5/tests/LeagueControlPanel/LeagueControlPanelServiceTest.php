@@ -6,7 +6,6 @@ namespace Tests\LeagueControlPanel;
 
 use League\LeagueContext;
 use LeagueControlPanel\Contracts\LeagueControlPanelRepositoryInterface;
-use LeagueControlPanel\Contracts\LeagueControlPanelServiceInterface;
 use LeagueControlPanel\LeagueControlPanelService;
 use PHPUnit\Framework\TestCase;
 
@@ -15,16 +14,6 @@ use PHPUnit\Framework\TestCase;
  */
 class LeagueControlPanelServiceTest extends TestCase
 {
-    public function testImplementsInterface(): void
-    {
-        $stub = self::createStub(LeagueControlPanelRepositoryInterface::class);
-        $stub->method('getBulkSettings')->willReturn([]);
-        $stub->method('getSimLengthInDays')->willReturn(3);
-
-        $service = new LeagueControlPanelService($stub);
-
-        $this->assertInstanceOf(LeagueControlPanelServiceInterface::class, $service);
-    }
 
     public function testGetPanelDataReturnsCompleteShape(): void
     {

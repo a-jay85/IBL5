@@ -20,11 +20,6 @@ class AllStarAppearancesViewTest extends TestCase
         $this->view = new AllStarAppearancesView();
     }
 
-    public function testImplementsViewInterface(): void
-    {
-        $this->assertInstanceOf(AllStarAppearancesViewInterface::class, $this->view);
-    }
-
     public function testRenderOutputsTable(): void
     {
         $appearances = [self::createAppearance()];

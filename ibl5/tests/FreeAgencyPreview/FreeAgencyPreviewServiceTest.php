@@ -26,11 +26,6 @@ class FreeAgencyPreviewServiceTest extends TestCase
         $this->service = new FreeAgencyPreviewService($this->mockRepository);
     }
 
-    public function testImplementsServiceInterface(): void
-    {
-        $this->assertInstanceOf(FreeAgencyPreviewServiceInterface::class, $this->service);
-    }
-
     public function testExcludesPlayersWithNonZeroNextYearSalary(): void
     {
         $this->mockRepository->method('getActivePlayers')->willReturn([

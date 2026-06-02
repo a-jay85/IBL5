@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\LeagueSchedule;
 
 use LeagueSchedule\LeagueScheduleView;
-use LeagueSchedule\Contracts\LeagueScheduleViewInterface;
 use PHPUnit\Framework\TestCase;
 
 class LeagueScheduleViewTest extends TestCase
@@ -15,11 +14,6 @@ class LeagueScheduleViewTest extends TestCase
     protected function setUp(): void
     {
         $this->view = new LeagueScheduleView();
-    }
-
-    public function testImplementsInterface(): void
-    {
-        $this->assertInstanceOf(LeagueScheduleViewInterface::class, $this->view);
     }
 
     public function testRenderReturnsHtmlWithScheduleContainer(): void

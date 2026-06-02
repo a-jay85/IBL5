@@ -174,7 +174,7 @@ class AwardGenerationServiceIntegrationTest extends DatabaseTestCase
         $this->service->generateSeasonAwards(8888, $leadersPath);
 
         $allLeague = $this->queryAwardsLike(8888, 'All-League%');
-        $this->assertSame(15, count($allLeague), 'Expected 15 All-League awards (3 teams × 5)');
+        $this->assertCount(15, $allLeague, 'Expected 15 All-League awards (3 teams × 5)');
     }
 
     // --- Voting stubs ---

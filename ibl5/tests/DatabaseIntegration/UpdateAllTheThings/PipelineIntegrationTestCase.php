@@ -174,7 +174,7 @@ abstract class PipelineIntegrationTestCase extends DatabaseTestCase
     protected function buildSchFile(array $games = []): string
     {
         $empty = str_repeat('0   0     ', SchFileParser::SLOTS_PER_DATE);
-        $data = str_repeat($empty, (int) (SchFileParser::FILE_SIZE / (SchFileParser::SLOTS_PER_DATE * SchFileParser::RECORD_SIZE)));
+        $data = str_repeat($empty, SchFileParser::FILE_SIZE / (SchFileParser::SLOTS_PER_DATE * SchFileParser::RECORD_SIZE));
 
         foreach ($games as $game) {
             $offset = ($game['date_slot'] * SchFileParser::SLOTS_PER_DATE + $game['game_index']) * SchFileParser::RECORD_SIZE;

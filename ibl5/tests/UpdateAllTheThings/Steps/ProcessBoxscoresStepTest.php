@@ -8,7 +8,6 @@ use Boxscore\BoxscoreProcessor;
 use Boxscore\BoxscoreView;
 use PHPUnit\Framework\TestCase;
 use Updater\Contracts\JsbSourceResolverInterface;
-use Updater\Contracts\PipelineStepInterface;
 use Updater\Steps\ProcessBoxscoresStep;
 
 class ProcessBoxscoresStepTest extends TestCase
@@ -25,13 +24,6 @@ class ProcessBoxscoresStepTest extends TestCase
         $this->stubProcessor = self::createStub(BoxscoreProcessor::class);
         $this->stubView = self::createStub(BoxscoreView::class);
         $this->stubResolver = self::createStub(JsbSourceResolverInterface::class);
-    }
-
-    public function testImplementsPipelineStepInterface(): void
-    {
-        $step = new ProcessBoxscoresStep($this->stubProcessor, $this->stubView, $this->stubResolver);
-
-        $this->assertInstanceOf(PipelineStepInterface::class, $step);
     }
 
     public function testGetLabelReturnsExpectedLabel(): void

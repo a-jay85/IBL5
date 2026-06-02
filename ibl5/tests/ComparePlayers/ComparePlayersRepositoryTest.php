@@ -33,25 +33,20 @@ class ComparePlayersRepositoryTest extends TestCase
     {
         $result = $this->repository->getAllPlayerNames();
 
-        // If empty, that's valid (mock database returns empty)
-        if (!empty($result)) {
-            $sorted = $result;
-            sort($sorted);
-            
-            $this->assertEquals($sorted, $result);
-        } else {
-            // Mock database returns empty, which is acceptable
-            $this->assertEmpty($result);
-        }
+        // Mock database returns empty — verify that empty array is returned correctly
+        $this->assertSame([], $result);
     }
 
     public function testGetAllPlayerNamesExcludesInactivePlayers(): void
     {
         $result = $this->repository->getAllPlayerNames();
 
-        // All returned players should be from active roster (ordinal != 0)
+        // The query filters ordinal != 0; mock database returns empty array
         $this->assertIsArray($result);
-        // The query filters ordinal != 0, so this test verifies the method completes
+        // Each returned player name is a string (verifies item type when present)
+        foreach ($result as $name) {
+            $this->assertIsString($name);
+        }
     }
 
     public function testGetPlayerByNameReturnsPlayerData(): void
@@ -59,16 +54,8 @@ class ComparePlayersRepositoryTest extends TestCase
         $playerName = 'Michael Jordan';
         $result = $this->repository->getPlayerByName($playerName);
 
-        if ($result !== null) {
-            $this->assertIsArray($result);
-            $this->assertArrayHasKey('pid', $result);
-            $this->assertArrayHasKey('name', $result);
-            $this->assertArrayHasKey('pos', $result);
-            $this->assertArrayHasKey('age', $result);
-        } else {
-            // Player doesn't exist in test database, which is valid
-            $this->assertNull($result);
-        }
+        // Mock database returns null for this player
+        $this->assertNull($result);
     }
 
     public function testGetPlayerByNameReturnsNullForNonExistentPlayer(): void
@@ -80,11 +67,10 @@ class ComparePlayersRepositoryTest extends TestCase
 
     public function testGetPlayerByNameHandlesApostrophes(): void
     {
-        // Test that apostrophes don't cause SQL errors
+        // Test that apostrophes don't cause SQL errors — mock returns null (no data)
         $result = $this->repository->getPlayerByName("O'Neal");
 
-        // Should return null or player data, but not throw exception
-        $this->assertTrue($result === null || is_array($result));
+        $this->assertNull($result);
     }
 
     public function testGetPlayerByNameHandlesSpecialCharacters(): void

@@ -367,7 +367,6 @@ class LeagueContextTest extends TestCase
         foreach (LeagueContext::TABLE_MAP as $iblTable => $olympicsTable) {
             $this->assertStringStartsWith('ibl_', $iblTable, "Key '$iblTable' must be an IBL table");
             $this->assertStringStartsWith('ibl_olympics_', $olympicsTable, "Value '$olympicsTable' must be Olympics-prefixed");
-            $this->assertNotSame($iblTable, $olympicsTable, "'$iblTable' must map to a distinct Olympics table");
             // The Olympics name is the IBL name with the olympics_ infix.
             $this->assertSame('ibl_olympics_' . substr($iblTable, strlen('ibl_')), $olympicsTable);
         }

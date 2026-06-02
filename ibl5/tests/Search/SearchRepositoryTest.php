@@ -21,11 +21,6 @@ class SearchRepositoryTest extends WideUnitTestCase
         $this->repository = new SearchRepository($this->mockDb);
     }
 
-    public function testImplementsRepositoryInterface(): void
-    {
-        $this->assertInstanceOf(SearchRepositoryInterface::class, $this->repository);
-    }
-
     public function testSearchStoriesReturnsEmptyForShortQuery(): void
     {
         $result = $this->repository->searchStories('ab');

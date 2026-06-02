@@ -171,7 +171,7 @@ class LgeFileParserTest extends TestCase
         $this->assertArrayHasKey('teams', $result);
         $this->assertArrayHasKey('season', $result);
 
-        $this->assertSame(28, count($result['teams']));
+        $this->assertCount(28, $result['teams']);
         $this->assertSame(28, $result['season']['team_count']);
     }
 

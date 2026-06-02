@@ -10,7 +10,6 @@ use LeagueConfig\LeagueConfigService;
 use LeagueConfig\LeagueConfigView;
 use PHPUnit\Framework\TestCase;
 use Updater\Contracts\JsbSourceResolverInterface;
-use Updater\Contracts\PipelineStepInterface;
 use Updater\Steps\ImportLeagueConfigStep;
 
 class ImportLeagueConfigStepTest extends TestCase
@@ -30,13 +29,6 @@ class ImportLeagueConfigStepTest extends TestCase
         $this->stubService = self::createStub(LeagueConfigService::class);
         $this->stubView = self::createStub(LeagueConfigView::class);
         $this->stubResolver = self::createStub(JsbSourceResolverInterface::class);
-    }
-
-    public function testImplementsPipelineStepInterface(): void
-    {
-        $step = $this->createStep();
-
-        $this->assertInstanceOf(PipelineStepInterface::class, $step);
     }
 
     public function testGetLabelReturnsExpectedLabel(): void

@@ -20,11 +20,6 @@ class LeagueControlPanelViewTest extends TestCase
         $this->view = new LeagueControlPanelView();
     }
 
-    public function testImplementsInterface(): void
-    {
-        $this->assertInstanceOf(LeagueControlPanelViewInterface::class, $this->view);
-    }
-
     public function testRenderContainsLeagueSwitcher(): void
     {
         $html = $this->renderWithDefaults();

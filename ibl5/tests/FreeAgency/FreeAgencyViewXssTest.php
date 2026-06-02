@@ -17,12 +17,12 @@ class FreeAgencyViewXssTest extends TestCase
         $xssPayload = '<script>alert("xss")</script>';
 
         $player = self::createStub(Player::class);
-        $player->position = 'PG';
-        $player->name = 'Test Player';
-        $player->playerID = 1;
-        $player->teamName = 'TestTeam';
-        $player->birdYears = 0;
-        $player->yearsOfExperience = 5;
+        $player->method('getPosition')->willReturn('PG');
+        $player->method('getName')->willReturn('Test Player');
+        $player->method('getPlayerID')->willReturn(1);
+        $player->method('getTeamName')->willReturn('TestTeam');
+        $player->method('getBirdYears')->willReturn(0);
+        $player->method('getYearsOfExperience')->willReturn(5);
 
         $team = self::createStub(Team::class);
         $team->name = 'TestTeam';
@@ -57,13 +57,15 @@ class FreeAgencyViewXssTest extends TestCase
 
     public function testNegotiationViewShowsNoSpotsWarningWithXssTeam(): void
     {
+        $xssName = '<img src=x onerror=alert(1)>';
+
         $player = self::createStub(Player::class);
-        $player->position = 'SG';
-        $player->name = '<img src=x onerror=alert(1)>';
-        $player->playerID = 2;
-        $player->teamName = 'TestTeam';
-        $player->birdYears = 0;
-        $player->yearsOfExperience = 3;
+        $player->method('getPosition')->willReturn('SG');
+        $player->method('getName')->willReturn($xssName);
+        $player->method('getPlayerID')->willReturn(2);
+        $player->method('getTeamName')->willReturn('TestTeam');
+        $player->method('getBirdYears')->willReturn(0);
+        $player->method('getYearsOfExperience')->willReturn(3);
 
         $team = self::createStub(Team::class);
         $team->name = 'TestTeam';

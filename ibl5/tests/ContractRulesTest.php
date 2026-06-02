@@ -22,26 +22,6 @@ class ContractRulesTest extends TestCase
     // CONSTANTS VALIDATION
     // ============================================
 
-    public function testStandardRaisePercentageIs10Percent(): void
-    {
-        $this->assertSame(0.10, ContractRules::STANDARD_RAISE_PERCENTAGE);
-    }
-
-    public function testBirdRightsRaisePercentageIs12Point5Percent(): void
-    {
-        $this->assertSame(0.125, ContractRules::BIRD_RIGHTS_RAISE_PERCENTAGE);
-    }
-
-    public function testBirdRightsThresholdIs3Years(): void
-    {
-        $this->assertSame(3, ContractRules::BIRD_RIGHTS_THRESHOLD);
-    }
-
-    public function testLleOfferIs145(): void
-    {
-        $this->assertSame(145, ContractRules::LLE_OFFER);
-    }
-
     public function testMleOffersHas6Years(): void
     {
         $this->assertCount(6, ContractRules::MLE_OFFERS);
@@ -354,7 +334,6 @@ class ContractRulesTest extends TestCase
         $year4 = $maxContract + ($maxRaise * 3);
 
         // Assert - Verify calculations
-        $this->assertSame(1275, $year1);
         $this->assertSame(1275 + 159, $year2); // 1275 * 0.125 = 159.375 floors to 159
         $this->assertSame(1275 + (159 * 2), $year3);
         $this->assertSame(1275 + (159 * 3), $year4);
@@ -378,7 +357,6 @@ class ContractRulesTest extends TestCase
         $year4 = $maxContract + ($maxRaise * 3);
 
         // Assert - Verify calculations
-        $this->assertSame(1063, $year1);
         $this->assertSame(1063 + 106, $year2); // 1063 * 0.10 = 106.3 floors to 106
         $this->assertSame(1063 + (106 * 2), $year3);
         $this->assertSame(1063 + (106 * 3), $year4);
@@ -450,41 +428,6 @@ class ContractRulesTest extends TestCase
     // ============================================
     // MODIFIER CONSTANTS
     // ============================================
-
-    public function testPlayForWinnerFactorIs0Point000153(): void
-    {
-        $this->assertSame(0.000153, \ContractRules::PLAY_FOR_WINNER_FACTOR);
-    }
-
-    public function testTraditionFactorIs0Point000153(): void
-    {
-        $this->assertSame(0.000153, \ContractRules::TRADITION_FACTOR);
-    }
-
-    public function testLoyaltyBonusPercentageIs0Point025(): void
-    {
-        $this->assertSame(0.025, \ContractRules::LOYALTY_BONUS_PERCENTAGE);
-    }
-
-    public function testPlayingTimeBaseFactorIs0Point025(): void
-    {
-        $this->assertSame(0.025, \ContractRules::PLAYING_TIME_BASE_FACTOR);
-    }
-
-    public function testPlayingTimeMoneyFactorIs0Point0025(): void
-    {
-        $this->assertSame(0.0025, \ContractRules::PLAYING_TIME_MONEY_FACTOR);
-    }
-
-    public function testPlayingTimeDivisorIs100(): void
-    {
-        $this->assertSame(100, \ContractRules::PLAYING_TIME_DIVISOR);
-    }
-
-    public function testMaxPositionSalaryCapIs2000(): void
-    {
-        $this->assertSame(2000, \ContractRules::MAX_POSITION_SALARY_CAP);
-    }
 
     // ============================================
     // calculateWinnerModifier

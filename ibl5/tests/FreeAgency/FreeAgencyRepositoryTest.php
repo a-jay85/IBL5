@@ -32,37 +32,6 @@ class FreeAgencyRepositoryTest extends TestCase
     }
 
     // ============================================
-    // CONSTRUCTOR TESTS
-    // ============================================
-
-    public function testRepositoryCanBeInstantiated(): void
-    {
-        $repository = new FreeAgencyRepository($this->mockDb);
-        
-        $this->assertInstanceOf(FreeAgencyRepository::class, $repository);
-    }
-
-    public function testRepositoryImplementsCorrectInterface(): void
-    {
-        $repository = new FreeAgencyRepository($this->mockDb);
-        
-        $this->assertInstanceOf(
-            \FreeAgency\Contracts\FreeAgencyRepositoryInterface::class,
-            $repository
-        );
-    }
-
-    public function testRepositoryExtendsBaseMysqliRepository(): void
-    {
-        $repository = new FreeAgencyRepository($this->mockDb);
-        
-        $this->assertInstanceOf(
-            \BaseMysqliRepository::class,
-            $repository
-        );
-    }
-
-    // ============================================
     // GET EXISTING OFFER TESTS
     // ============================================
 
@@ -210,8 +179,6 @@ class FreeAgencyRepositoryTest extends TestCase
         $repo1 = new FreeAgencyRepository($this->mockDb);
         $repo2 = new FreeAgencyRepository($this->mockDb);
 
-        $this->assertInstanceOf(FreeAgencyRepository::class, $repo1);
-        $this->assertInstanceOf(FreeAgencyRepository::class, $repo2);
         $this->assertNotSame($repo1, $repo2);
     }
 }

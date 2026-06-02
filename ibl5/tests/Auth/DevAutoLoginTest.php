@@ -53,7 +53,8 @@ class DevAutoLoginTest extends TestCase
 
     public function testDoesNothingWhenAlreadyAuthenticated(): void
     {
-        $_SESSION['auth_user_id'] = 42;
+        $originalUserId = 42;
+        $_SESSION['auth_user_id'] = $originalUserId;
         $_SESSION['auth_username'] = 'ExistingUser';
         $_SERVER['SERVER_NAME'] = 'localhost';
         putenv('DEV_AUTO_LOGIN=SomeOtherUser');
@@ -61,8 +62,13 @@ class DevAutoLoginTest extends TestCase
         $db = static::createStub(\mysqli::class);
         DevAutoLogin::tryAutoLogin($db);
 
-        // Session should remain unchanged — not overwritten with the env var user
-        self::assertSame(42, $_SESSION['auth_user_id']);
+        // Session should remain unchanged — not overwritten with the env var user.
+        // Both halves of the contract are asserted: tryAutoLogin() must leave the
+        // existing user id AND username untouched. PHPStan narrows the session slot to
+        // the literal 42 from the assignment above and cannot see that tryAutoLogin()
+        // might overwrite it, so the id assertion looks statically tautological — but it
+        // is runtime-meaningful (it fails if the call mutates auth_user_id).
+        self::assertSame($originalUserId, $_SESSION['auth_user_id']); /** @phpstan-ignore staticMethod.alreadyNarrowedType (PHPStan narrows the session slot to 42; tryAutoLogin() could overwrite it at runtime) */
         self::assertSame('ExistingUser', $_SESSION['auth_username']);
     }
 

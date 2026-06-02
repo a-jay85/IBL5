@@ -37,11 +37,6 @@ class BoxscoreRepositoryTest extends TestCase
         parent::tearDown();
     }
 
-    public function testImplementsInterface(): void
-    {
-        $this->assertInstanceOf(BoxscoreRepositoryInterface::class, $this->repository);
-    }
-
     public function testDeletePreseasonBoxScoresExecutesTwoQueries(): void
     {
         $this->mockDb->setReturnTrue(true);
@@ -93,7 +88,8 @@ class BoxscoreRepositoryTest extends TestCase
     public function testDeleteThrowsExceptionOnFailure(): void
     {
         $this->mockDb->setReturnTrue(false);
-        $this->previousErrorLog = ini_get('error_log') ?: '';
+        $errorLog = ini_get('error_log');
+        $this->previousErrorLog = $errorLog ? $errorLog : '';
         ini_set('error_log', '/dev/null');
 
         $this->expectException(\RuntimeException::class);
@@ -192,7 +188,7 @@ class BoxscoreRepositoryTest extends TestCase
     public function testConstructorAcceptsNullLeagueContext(): void
     {
         $repo = new BoxscoreRepository($this->mockDb, null);
-        $this->assertInstanceOf(BoxscoreRepositoryInterface::class, $repo);
+        $this->assertContains(BoxscoreRepositoryInterface::class, (array) class_implements($repo));
     }
 
     public function testOlympicsContextUsesOlympicsTables(): void

@@ -4,27 +4,19 @@ declare(strict_types=1);
 
 namespace Tests\LeagueControlPanel;
 
-use LeagueControlPanel\Contracts\LeagueControlPanelRepositoryInterface;
 use LeagueControlPanel\LeagueControlPanelRepository;
 use PHPUnit\Framework\TestCase;
 
 /**
- * @covers \LeagueControlPanel\LeagueControlPanelRepository
- *
  * Note: Write methods (updateSetting, setSeasonPhase, etc.) cannot be unit-tested
  * with mocked mysqli because $stmt->affected_rows is a virtual property inaccessible
  * on PHPUnit mocks. Write behavior is tested through LeagueControlPanelProcessorTest
  * via the interface mock.
+ *
+ * @covers \LeagueControlPanel\LeagueControlPanelRepository
  */
 class LeagueControlPanelRepositoryTest extends TestCase
 {
-    public function testImplementsInterface(): void
-    {
-        $mockDb = $this->createMockDatabase();
-        $repository = new LeagueControlPanelRepository($mockDb);
-
-        $this->assertInstanceOf(LeagueControlPanelRepositoryInterface::class, $repository);
-    }
 
     public function testGetSettingReturnsValue(): void
     {

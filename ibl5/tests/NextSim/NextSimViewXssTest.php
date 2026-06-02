@@ -7,7 +7,6 @@ namespace Tests\NextSim;
 use LeagueSchedule\Game;
 use NextSim\NextSimView;
 use PHPUnit\Framework\TestCase;
-use Player\Player;
 use Season\Season;
 use Team\Team;
 
@@ -17,9 +16,6 @@ final class NextSimViewXssTest extends TestCase
 
     /** @var Team&\PHPUnit\Framework\MockObject\Stub */
     private Team $userTeam;
-
-    /** @var array<string, Player&\PHPUnit\Framework\MockObject\Stub> */
-    private array $userStarters;
 
     protected function setUp(): void
     {
@@ -34,18 +30,6 @@ final class NextSimViewXssTest extends TestCase
         $this->userTeam->color1 = 'FF0000';
         $this->userTeam->color2 = '0000FF';
         $this->userTeam->seasonRecord = '10-5';
-
-        $this->userStarters = [];
-        foreach (\JSB::PLAYER_POSITIONS as $position) {
-            $player = self::createStub(Player::class);
-            $player->playerID = 100;
-            $player->decoratedName = 'Safe Player';
-            $player->position = $position;
-            $player->age = 25;
-            $player->daysRemainingForInjury = 0;
-            $player->method('getInjuryReturnDate')->willReturn('');
-            $this->userStarters[$position] = $player;
-        }
     }
 
     public function testOpposingTeamNameInScheduleStripIsEscaped(): void

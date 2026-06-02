@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\SavedDepthChart;
 
-use SavedDepthChart\Contracts\SavedDepthChartServiceInterface;
 use SavedDepthChart\SavedDepthChartService;
 use Tests\WideUnit\WideUnitTestCase;
 use Season\Season;
@@ -20,11 +19,6 @@ class SavedDepthChartServiceTest extends WideUnitTestCase
     {
         parent::setUp();
         $this->service = new SavedDepthChartService($this->mockDb);
-    }
-
-    public function testImplementsServiceInterface(): void
-    {
-        $this->assertInstanceOf(SavedDepthChartServiceInterface::class, $this->service);
     }
 
     public function testBuildPlayerSnapshotReturnsCorrectStructure(): void

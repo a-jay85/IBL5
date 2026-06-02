@@ -6,7 +6,6 @@ namespace Tests\FranchiseHistory;
 
 use PHPUnit\Framework\TestCase;
 use FranchiseHistory\FranchiseHistoryView;
-use FranchiseHistory\Contracts\FranchiseHistoryViewInterface;
 
 /**
  * FranchiseHistoryViewTest - Tests for FranchiseHistoryView HTML rendering
@@ -15,16 +14,11 @@ use FranchiseHistory\Contracts\FranchiseHistoryViewInterface;
  */
 class FranchiseHistoryViewTest extends TestCase
 {
-    private FranchiseHistoryViewInterface $view;
+    private FranchiseHistoryView $view;
 
     protected function setUp(): void
     {
         $this->view = new FranchiseHistoryView();
-    }
-
-    public function testImplementsFranchiseHistoryViewInterface(): void
-    {
-        $this->assertInstanceOf(FranchiseHistoryViewInterface::class, $this->view);
     }
 
     public function testRenderReturnsString(): void

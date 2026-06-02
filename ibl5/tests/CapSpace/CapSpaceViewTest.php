@@ -22,11 +22,6 @@ class CapSpaceViewTest extends TestCase
         $this->view = new CapSpaceView();
     }
 
-    public function testImplementsCapSpaceViewInterface(): void
-    {
-        $this->assertInstanceOf(CapSpaceViewInterface::class, $this->view);
-    }
-
     public function testRenderReturnsString(): void
     {
         $result = $this->view->render([], 2024, 2025);

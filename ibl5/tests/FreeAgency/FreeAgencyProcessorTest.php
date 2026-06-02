@@ -294,25 +294,6 @@ class FreeAgencyProcessorTest extends TestCase
     }
 
     // ================================================================
-    // CONSTRUCTOR COMPATIBILITY
-    // ================================================================
-
-    public function testProcessorAcceptsDatabaseAndCommonRepoInConstructor(): void
-    {
-        $processor = new FreeAgencyProcessor($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class));
-        $this->assertInstanceOf(FreeAgencyProcessor::class, $processor);
-    }
-
-    public function testProcessorAcceptsOptionalDIParams(): void
-    {
-        $calculator = new StubDemandCalculator();
-        $repository = new CapturingRepository();
-
-        $processor = new FreeAgencyProcessor($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class), $calculator, $repository);
-        $this->assertInstanceOf(FreeAgencyProcessor::class, $processor);
-    }
-
-    // ================================================================
     // OFFER DELETION
     // ================================================================
 
@@ -515,7 +496,6 @@ class FreeAgencyProcessorTest extends TestCase
             'r_blk' => 50,
             'r_foul' => 50,
             'r_ass' => 50,
-            'r_tvr' => 50,
             'r_low' => 50,
             'r_def' => 50,
             'r_dis' => 50,
@@ -545,7 +525,6 @@ class FreeAgencyProcessorTest extends TestCase
             // Team info fields
             'team_name' => 'Test Team',
             'team_city' => 'Test City',
-            'teamid' => 1,
             'color1' => '#000000',
             'color2' => '#FFFFFF',
             'arena' => 'Test Arena',

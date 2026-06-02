@@ -375,12 +375,12 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
     {
         $result = $this->repo->getLastAnnouncedDate();
 
-        // Returns null if no cache entry, or a date string if one exists
-        if ($result !== null) {
-            self::assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}$/', $result);
-        } else {
-            self::assertNull($result);
-        }
+        // Contract: null when no cache entry, else a YYYY-MM-DD date string.
+        // Single path-independent assertion so the test is meaningful on any seed.
+        self::assertTrue(
+            $result === null || preg_match('/^\d{4}-\d{2}-\d{2}$/', $result) === 1,
+            'Expected null or a YYYY-MM-DD date string, got: ' . var_export($result, true)
+        );
     }
 
     public function testMarkAnnouncementsProcessedAndRetrieve(): void

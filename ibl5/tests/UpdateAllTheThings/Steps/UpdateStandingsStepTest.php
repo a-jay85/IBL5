@@ -13,10 +13,10 @@ class UpdateStandingsStepTest extends TestCase
 {
     public function testImplementsPipelineStepInterface(): void
     {
-        $stubUpdater = self::createStub(StandingsUpdater::class);
-        $step = new UpdateStandingsStep($stubUpdater);
-
-        $this->assertInstanceOf(PipelineStepInterface::class, $step);
+        self::assertContains(
+            PipelineStepInterface::class,
+            (array) class_implements(UpdateStandingsStep::class)
+        );
     }
 
     public function testGetLabelReturnsExpectedLabel(): void

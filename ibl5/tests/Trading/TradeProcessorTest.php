@@ -7,7 +7,6 @@ namespace Tests\Trading;
 use PHPUnit\Framework\TestCase;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Trading\TradeProcessor;
-use Trading\Contracts\TradeProcessorInterface;
 use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
@@ -22,24 +21,6 @@ class TradeProcessorTest extends TestCase
     {
         $this->mockDb = new MockDatabase();
         $this->mockCommonRepo = self::createStub(TeamIdentityRepositoryInterface::class);
-    }
-
-    // ============================================
-    // INSTANTIATION TESTS
-    // ============================================
-
-    public function testCanBeInstantiated(): void
-    {
-        $processor = new TradeProcessor($this->mockDb, $this->mockCommonRepo);
-
-        $this->assertInstanceOf(TradeProcessor::class, $processor);
-    }
-
-    public function testImplementsInterface(): void
-    {
-        $processor = new TradeProcessor($this->mockDb, $this->mockCommonRepo);
-
-        $this->assertInstanceOf(TradeProcessorInterface::class, $processor);
     }
 
     // ============================================

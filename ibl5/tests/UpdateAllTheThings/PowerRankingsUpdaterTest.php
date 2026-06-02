@@ -266,12 +266,12 @@ class PowerRankingsUpdaterTest extends TestCase
     {
         $leagueContext = self::createStub(\League\LeagueContext::class);
         $updater = new PowerRankingsUpdater($this->mockDb, $this->mockSeason, null, $leagueContext);
-        $this->assertInstanceOf(PowerRankingsUpdater::class, $updater);
+        self::assertSame('Updater\\PowerRankingsUpdater', get_class($updater));
     }
 
     public function testConstructorAcceptsNullLeagueContext(): void
     {
         $updater = new PowerRankingsUpdater($this->mockDb, $this->mockSeason, null, null);
-        $this->assertInstanceOf(PowerRankingsUpdater::class, $updater);
+        self::assertSame('Updater\\PowerRankingsUpdater', get_class($updater));
     }
 }

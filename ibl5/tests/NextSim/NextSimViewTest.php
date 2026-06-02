@@ -6,7 +6,6 @@ namespace Tests\NextSim;
 
 use PHPUnit\Framework\TestCase;
 use NextSim\NextSimView;
-use NextSim\Contracts\NextSimViewInterface;
 use Player\Player;
 use Team\Team;
 use Season\Season;
@@ -45,20 +44,15 @@ class NextSimViewTest extends TestCase
         $this->userStarters = [];
         foreach (\JSB::PLAYER_POSITIONS as $position) {
             $player = self::createStub(Player::class);
-            $player->playerID = 100;
-            $player->name = 'User ' . $position;
-            $player->decoratedName = 'User ' . $position;
-            $player->position = $position;
-            $player->age = 25;
-            $player->daysRemainingForInjury = 0;
+            $player->method('getPlayerID')->willReturn(100);
+            $player->method('getName')->willReturn('User ' . $position);
+            $player->method('getDecoratedName')->willReturn('User ' . $position);
+            $player->method('getPosition')->willReturn($position);
+            $player->method('getAge')->willReturn(25);
+            $player->method('getDaysRemainingForInjury')->willReturn(0);
             $player->method('getInjuryReturnDate')->willReturn('');
             $this->userStarters[$position] = $player;
         }
-    }
-
-    public function testImplementsNextSimViewInterface(): void
-    {
-        $this->assertInstanceOf(NextSimViewInterface::class, $this->view);
     }
 
     public function testRenderReturnsString(): void
@@ -226,12 +220,12 @@ class NextSimViewTest extends TestCase
         $oppStarters = [];
         foreach (\JSB::PLAYER_POSITIONS as $position) {
             $player = self::createStub(Player::class);
-            $player->playerID = 200;
-            $player->name = 'Opp ' . $position;
-            $player->decoratedName = 'Opp ' . $position;
-            $player->position = $position;
-            $player->age = 27;
-            $player->daysRemainingForInjury = 0;
+            $player->method('getPlayerID')->willReturn(200);
+            $player->method('getName')->willReturn('Opp ' . $position);
+            $player->method('getDecoratedName')->willReturn('Opp ' . $position);
+            $player->method('getPosition')->willReturn($position);
+            $player->method('getAge')->willReturn(27);
+            $player->method('getDaysRemainingForInjury')->willReturn(0);
             $player->method('getInjuryReturnDate')->willReturn('');
             $oppStarters[$position] = $player;
         }

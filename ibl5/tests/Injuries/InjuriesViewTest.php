@@ -22,11 +22,6 @@ class InjuriesViewTest extends TestCase
         $this->view = new InjuriesView();
     }
 
-    public function testImplementsInjuriesViewInterface(): void
-    {
-        $this->assertInstanceOf(InjuriesViewInterface::class, $this->view);
-    }
-
     public function testRenderReturnsString(): void
     {
         $result = $this->view->render([]);

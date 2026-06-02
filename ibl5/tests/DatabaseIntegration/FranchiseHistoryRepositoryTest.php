@@ -178,13 +178,15 @@ class FranchiseHistoryRepositoryTest extends DatabaseTestCase
     {
         $result = $this->repo->getAllFranchiseHistory(9999);
 
+        $foundZeroGamesTeam = false;
         foreach ($result as $row) {
             if ($row['totalgames'] === 0) {
                 self::assertNull($row['five_season_winpct']);
+                $foundZeroGamesTeam = true;
                 break;
             }
         }
-        // If all teams have games, this test just passes — it's a structural check
-        self::assertTrue(true);
+        // Assert the result set is non-empty (structural check)
+        self::assertNotEmpty($result);
     }
 }

@@ -55,20 +55,6 @@ class VotingWideUnitTest extends TestCase
      * @group voting
      * @group service
      */
-    public function testGetAllStarResultsQueriesASGTable(): void
-    {
-        // Act
-        $this->service->getAllStarResults();
-
-        // Assert
-        $this->assertTrue(true); // Service delegates to repository; DB behavior tested separately
-    }
-
-    /**
-     * @group integration
-     * @group voting
-     * @group service
-     */
     public function testGetAllStarResultsReturnsAllFourCategories(): void
     {
         // Arrange - Queue results for 4 categories
@@ -134,23 +120,6 @@ class VotingWideUnitTest extends TestCase
     }
 
     // ========== SERVICE - END-OF-YEAR VOTING TESTS ==========
-
-    /**
-     * @group integration
-     * @group voting
-     * @group service
-     */
-    public function testGetEndOfYearResultsQueriesEOYTable(): void
-    {
-        // Arrange
-        $this->queueVotingResults([[], [], [], []]);
-
-        // Act
-        $this->service->getEndOfYearResults();
-
-        // Assert
-        $this->assertTrue(true); // Service delegates to repository; DB behavior tested separately
-    }
 
     /**
      * @group integration
@@ -514,7 +483,6 @@ class VotingWideUnitTest extends TestCase
         $html = $controller->render();
 
         // Assert - Should query ASG table, not EOY
-        $this->assertTrue(true); // Service delegates to repository; DB behavior tested separately
         $this->assertStringContainsString('Eastern Conference Frontcourt', $html);
     }
 
@@ -537,7 +505,6 @@ class VotingWideUnitTest extends TestCase
         $html = $controller->render();
 
         // Assert - Should query EOY table
-        $this->assertTrue(true); // Service delegates to repository; DB behavior tested separately
         $this->assertStringContainsString('Most Valuable Player', $html);
     }
 
@@ -556,8 +523,8 @@ class VotingWideUnitTest extends TestCase
         // Act
         $html = $controller->render();
 
-        // Assert
-        $this->assertTrue(true); // Service delegates to repository; DB behavior tested separately
+        // Assert - Free Agency phase routes to the End-of-Year view
+        $this->assertStringContainsString('Most Valuable Player', $html);
     }
 
     /**
@@ -579,7 +546,6 @@ class VotingWideUnitTest extends TestCase
         $html = $controller->renderAllStarView();
 
         // Assert - Should render All-Star despite Playoffs phase
-        $this->assertTrue(true); // Service delegates to repository; DB behavior tested separately
         $this->assertStringContainsString('Eastern Conference', $html);
     }
 
@@ -602,7 +568,6 @@ class VotingWideUnitTest extends TestCase
         $html = $controller->renderEndOfYearView();
 
         // Assert - Should render EOY despite Regular Season phase
-        $this->assertTrue(true); // Service delegates to repository; DB behavior tested separately
         $this->assertStringContainsString('Most Valuable Player', $html);
     }
 

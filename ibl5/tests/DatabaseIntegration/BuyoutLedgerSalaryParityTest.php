@@ -166,7 +166,9 @@ class BuyoutLedgerSalaryParityTest extends DatabaseTestCase
      */
     public function testViewSalaryEqualsPlrPlusCashForAllTeams(): void
     {
-        /** @var list<array{teamid: int, plr_salary: int, cash_salary: int, view_salary: int}> $rows */
+        // mysqli returns COALESCE(SUM(...)) aggregates as numeric strings, so the
+        // (int) casts below are load-bearing, not redundant.
+        /** @var list<array{teamid: string, plr_salary: string, cash_salary: string, view_salary: string}> $rows */
         $rows = $this->fetchAll("
             WITH plr_totals AS (
                 SELECT teamid,
@@ -201,7 +203,7 @@ class BuyoutLedgerSalaryParityTest extends DatabaseTestCase
         self::assertNotEmpty($rows, 'Expected team salary data');
 
         foreach ($rows as $row) {
-            $teamid = (int) $row['teamid'];
+            $teamid = $row['teamid'];
             $plr = (int) $row['plr_salary'];
             $cash = (int) $row['cash_salary'];
             $view = (int) $row['view_salary'];

@@ -146,7 +146,7 @@ class ModifierConsistencyTest extends TestCase
                 'winner' => self::WINNER_PREF, 'tradition' => self::TRADITION_PREF,
                 'loyalty' => self::LOYALTY_PREF, 'playing_time' => self::PLAYING_TIME_PREF,
                 'security' => 1,
-                'teamid' => 1, 'team_city' => 'Test', 'team_name' => 'Team',
+                'team_city' => 'Test', 'team_name' => 'Team',
                 'color1' => 'Blue', 'color2' => 'White',
                 'league_record' => '0-0',
             ],

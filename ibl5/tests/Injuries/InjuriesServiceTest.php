@@ -30,23 +30,6 @@ class InjuriesServiceTest extends TestCase
     // CONSTRUCTOR TESTS
     // ============================================
 
-    public function testServiceCanBeInstantiated(): void
-    {
-        $service = new InjuriesService($this->mockDb);
-
-        $this->assertInstanceOf(InjuriesService::class, $service);
-    }
-
-    public function testServiceImplementsCorrectInterface(): void
-    {
-        $service = new InjuriesService($this->mockDb);
-
-        $this->assertInstanceOf(
-            \Injuries\Contracts\InjuriesServiceInterface::class,
-            $service
-        );
-    }
-
     // ============================================
     // GET INJURED PLAYERS TESTS
     // ============================================

@@ -32,11 +32,6 @@ class ProjectedDraftOrderServiceTest extends TestCase
         $this->tearDownAuditLogCapture();
     }
 
-    public function testImplementsServiceInterface(): void
-    {
-        $this->assertInstanceOf(ProjectedDraftOrderServiceInterface::class, $this->service);
-    }
-
     public function testReturnsTwoRoundsWithCorrectKeys(): void
     {
         $this->configureStubWithFullLeague();

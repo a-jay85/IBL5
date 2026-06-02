@@ -6,7 +6,6 @@ namespace Tests\Extension;
 
 use PHPUnit\Framework\TestCase;
 use Extension\ExtensionOfferEvaluator;
-use Extension\Contracts\ExtensionOfferEvaluatorInterface;
 use FreeAgency\CommonContractValidator;
 use BasketballStats\SalaryConverter;
 
@@ -22,24 +21,6 @@ class ExtensionOfferEvaluatorTest extends TestCase
     {
         $this->evaluator = new ExtensionOfferEvaluator();
         $this->contractValidator = new CommonContractValidator();
-    }
-
-    // ============================================
-    // INSTANTIATION TESTS
-    // ============================================
-
-    public function testCanBeInstantiated(): void
-    {
-        $evaluator = new ExtensionOfferEvaluator();
-
-        $this->assertInstanceOf(ExtensionOfferEvaluator::class, $evaluator);
-    }
-
-    public function testImplementsInterface(): void
-    {
-        $evaluator = new ExtensionOfferEvaluator();
-
-        $this->assertInstanceOf(ExtensionOfferEvaluatorInterface::class, $evaluator);
     }
 
     // ============================================

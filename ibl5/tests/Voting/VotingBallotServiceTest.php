@@ -12,14 +12,6 @@ use Season\Season;
 
 class VotingBallotServiceTest extends TestCase
 {
-    public function testImplementsInterface(): void
-    {
-        $db = self::createStub(\mysqli::class);
-        $service = new VotingBallotService($db);
-
-        $this->assertInstanceOf(VotingBallotServiceInterface::class, $service);
-    }
-
     public function testGetBallotDataReturnsASGCategoriesForRegularSeason(): void
     {
         $db = self::createStub(\mysqli::class);

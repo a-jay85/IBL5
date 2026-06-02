@@ -22,11 +22,6 @@ class DraftPickLocatorViewTest extends TestCase
         $this->view = new DraftPickLocatorView();
     }
 
-    public function testImplementsDraftPickLocatorViewInterface(): void
-    {
-        $this->assertInstanceOf(DraftPickLocatorViewInterface::class, $this->view);
-    }
-
     public function testRenderReturnsString(): void
     {
         $result = $this->view->render([], 2025);

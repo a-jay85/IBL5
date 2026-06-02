@@ -77,26 +77,24 @@ final class RatingColumnSemanticParityTest extends DatabaseTestCase
         // Smoke-check that the olympics hist rename also applied. Pulls one row
         // that touches all three renamed columns; any missing column would
         // throw during the SELECT, failing the test loudly.
-        $this->fetchAll(
+        $rows = $this->fetchAll(
             "SELECT r_trans_off, r_drive_off, r_tvr FROM ibl_olympics_hist LIMIT 1"
         );
-        self::assertTrue(true, 'ibl_olympics_hist has all three renamed columns.');
+        self::assertIsArray($rows);
     }
 
     public function testSimDatesUsesSnakeCaseColumns(): void
     {
         // Migration 113 renamed `Start Date` / `End Date` → start_date / end_date.
         // A column-missing regression would throw during the SELECT.
-        $this->fetchAll(
+        $rows = $this->fetchAll(
             "SELECT start_date, end_date FROM ibl_sim_dates LIMIT 1"
         );
-        self::assertTrue(true, 'ibl_sim_dates has snake_case start_date/end_date columns.');
+        self::assertIsArray($rows);
     }
 
     /**
-     * @template T of array<string, mixed>
-     * @param string $sql
-     * @return list<T>
+     * @return list<array<string, mixed>>
      */
     private function fetchAll(string $sql): array
     {
@@ -104,7 +102,7 @@ final class RatingColumnSemanticParityTest extends DatabaseTestCase
         if ($result === false || $result === true) {
             self::fail('Query failed: ' . $this->db->error . ' — ' . $sql);
         }
-        /** @var list<T> $rows */
+        /** @var list<array<string, mixed>> $rows */
         $rows = $result->fetch_all(MYSQLI_ASSOC);
         $result->free();
         return $rows;

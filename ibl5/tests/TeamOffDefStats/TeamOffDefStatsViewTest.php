@@ -24,14 +24,6 @@ class TeamOffDefStatsViewTest extends TestCase
     }
 
     /**
-     * Test that view implements the interface
-     */
-    public function testImplementsInterface(): void
-    {
-        $this->assertInstanceOf(TeamOffDefStatsViewInterface::class, $this->view);
-    }
-
-    /**
      * Test render returns string
      */
     public function testRenderReturnsString(): void

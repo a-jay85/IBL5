@@ -52,8 +52,9 @@ final class ModuleRegistryTest extends TestCase
     public function testEveryModuleDirectoryIsRegistered(): void
     {
         $modulesDir = __DIR__ . '/../../modules';
+        $entries = scandir($modulesDir);
         $dirs = array_filter(
-            scandir($modulesDir) ?: [],
+            $entries ? $entries : [],
             static fn(string $d): bool => $d !== '.' && $d !== '..' && is_dir($modulesDir . '/' . $d)
         );
 

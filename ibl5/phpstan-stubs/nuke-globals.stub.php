@@ -93,3 +93,17 @@ function is_admin(mixed $admin = null): int { return 0; }
  * @return string
  */
 function filter(mixed $what, string $strip = '', string $type = ''): string { return ''; }
+
+
+/**
+ * PHP-Nuke check_html function — strips disallowed HTML tags.
+ * @return string
+ */
+function check_html(string $str, string $strip = ''): string { return ''; }
+
+
+/**
+ * PHP-Nuke check_words function — applies the word censor list.
+ * @return string
+ */
+function check_words(string $Message): string { return ''; }

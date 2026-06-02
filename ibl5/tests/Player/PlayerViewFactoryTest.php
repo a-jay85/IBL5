@@ -33,10 +33,7 @@ use Player\Views\PlayerOneOnOneView;
 #[AllowMockObjectsWithoutExpectations]
 class PlayerViewFactoryTest extends TestCase
 {
-    /** @var \mysqli&\PHPUnit\Framework\MockObject\MockObject */
-    private \mysqli $mockDb;
-    
-    /** @var PlayerRepository&\PHPUnit\Framework\MockObject\MockObject */
+/** @var PlayerRepository&\PHPUnit\Framework\MockObject\MockObject */
     private PlayerRepository $mockRepository;
     
     /** @var PlayerStatsRepository&\PHPUnit\Framework\MockObject\MockObject */
@@ -49,10 +46,7 @@ class PlayerViewFactoryTest extends TestCase
 
     protected function setUp(): void
     {
-        // Create mock database connection
-        $this->mockDb = $this->createMock(\mysqli::class);
-        
-        // Create mock repositories
+// Create mock repositories
         $this->mockRepository = $this->createMock(PlayerRepository::class);
         $this->mockStatsRepository = $this->createMock(PlayerStatsRepository::class);
         $this->mockCommonRepository = $this->createMock(TeamIdentityRepositoryInterface::class);

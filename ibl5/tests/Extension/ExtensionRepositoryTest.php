@@ -252,12 +252,16 @@ class ExtensionRepositoryTest extends TestCase
     private function assertQueryExecuted(string $substring): void
     {
         $queries = $this->mockDb->getExecutedQueries();
+        $found = false;
         foreach ($queries as $query) {
             if (str_contains($query, $substring)) {
-                $this->addToAssertionCount(1);
-                return;
+                $found = true;
+                break;
             }
         }
-        self::fail("Expected a query containing '{$substring}' but none was found. Queries: " . implode("\n", $queries));
+        self::assertTrue(
+            $found,
+            "Expected a query containing '{$substring}' but none was found. Queries: " . implode("\n", $queries)
+        );
     }
 }

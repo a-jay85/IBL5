@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\TrainingCampRatingsDiff;
 
 use PHPUnit\Framework\TestCase;
-use TrainingCampRatingsDiff\Contracts\TrainingCampRatingsDiffRepositoryInterface;
 use TrainingCampRatingsDiff\TrainingCampRatingsDiffRepository;
 use Tests\WideUnit\Mocks\MockDatabase;
 
@@ -16,13 +15,6 @@ class TrainingCampRatingsDiffRepositoryTest extends TestCase
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-    }
-
-    public function testImplementsInterface(): void
-    {
-        $repository = new TrainingCampRatingsDiffRepository($this->mockDb);
-
-        self::assertInstanceOf(TrainingCampRatingsDiffRepositoryInterface::class, $repository);
     }
 
     public function testGetLatestEndOfSeasonYearReturnsNullWhenNoSnapshotsExist(): void

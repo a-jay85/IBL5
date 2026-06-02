@@ -207,9 +207,8 @@ final class CheckDestructiveMigrationsCliTest extends TestCase
         $stagedResult = $this->runScript(['--staged']);
         self::assertSame(1, $stagedResult['exit'], 'staged mode should detect');
 
-        $baseSha = trim(shell_exec(
-            'git -C ' . escapeshellarg($this->tmpDir) . ' rev-parse HEAD'
-        ) ?: '');
+        $rawSha = shell_exec('git -C ' . escapeshellarg($this->tmpDir) . ' rev-parse HEAD');
+        $baseSha = trim($rawSha !== false && $rawSha !== null ? $rawSha : '');
 
         $this->runInDir('git commit -m "add destructive migration"');
 

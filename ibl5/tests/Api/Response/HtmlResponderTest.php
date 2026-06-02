@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Api\Response;
 
-use Api\Response\Contracts\HtmlResponderInterface;
 use Api\Response\HtmlResponder;
 use PHPUnit\Framework\TestCase;
 
@@ -15,11 +14,6 @@ class HtmlResponderTest extends TestCase
     protected function setUp(): void
     {
         $this->responder = new HtmlResponder();
-    }
-
-    public function testImplementsInterface(): void
-    {
-        $this->assertInstanceOf(HtmlResponderInterface::class, $this->responder);
     }
 
     public function testHtmlOutputsContentVerbatim(): void

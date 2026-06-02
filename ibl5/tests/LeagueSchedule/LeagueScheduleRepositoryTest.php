@@ -18,13 +18,6 @@ class LeagueScheduleRepositoryTest extends TestCase
         $this->mockDb = new MockDatabase();
     }
 
-    public function testImplementsInterface(): void
-    {
-        $repository = new LeagueScheduleRepository($this->mockDb);
-
-        $this->assertInstanceOf(LeagueScheduleRepositoryInterface::class, $repository);
-    }
-
     public function testGetAllGamesWithBoxScoreInfoReturnsEmptyArrayWhenNoGames(): void
     {
         $this->mockDb->setMockData([]);

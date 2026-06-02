@@ -19,7 +19,10 @@ class VotingBallotViewTest extends TestCase
 
     public function testImplementsInterface(): void
     {
-        $this->assertInstanceOf(VotingBallotViewInterface::class, $this->view);
+        self::assertContains(
+            VotingBallotViewInterface::class,
+            (array) class_implements(VotingBallotView::class)
+        );
     }
 
     public function testRenderBallotFormContainsFormElement(): void

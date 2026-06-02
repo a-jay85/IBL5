@@ -159,7 +159,6 @@ final class OneOnOneGameServiceTest extends TestCase
 
         $result = $this->service->playGame(1, 2, 'Owner');
 
-        $this->assertInstanceOf(OneOnOneGameResult::class, $result);
         $this->assertSame('Player One', $result->player1Name);
         $this->assertSame('Player Two', $result->player2Name);
     }

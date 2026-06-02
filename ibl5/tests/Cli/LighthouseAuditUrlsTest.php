@@ -30,7 +30,10 @@ final class LighthouseAuditUrlsTest extends TestCase
     public function testOutputContainsAllModules(): void
     {
         $output = $this->runScript([]);
-        $lines = array_filter(explode("\n", trim($output)));
+        $lines = array_filter(
+            explode("\n", trim($output)),
+            static fn (string $line): bool => $line !== ''
+        );
 
         $moduleCount = count(ModuleRegistry::getAllModules());
         $subPageCount = 8;

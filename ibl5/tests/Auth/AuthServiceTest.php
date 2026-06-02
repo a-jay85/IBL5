@@ -171,11 +171,6 @@ class AuthServiceTest extends TestCase
         self::assertNull($this->authService->getLastError());
     }
 
-    public function testImplementsAuthServiceInterface(): void
-    {
-        self::assertInstanceOf(\Auth\Contracts\AuthServiceInterface::class, $this->authService);
-    }
-
     public function testHashPasswordStillWorks(): void
     {
         $hash = $this->authService->hashPassword('test-password');

@@ -32,20 +32,11 @@ class TradeCashRepositoryTest extends TestCase
     // CONSTRUCTOR TESTS
     // ============================================
 
-    public function testRepositoryCanBeInstantiated(): void
-    {
-        $repository = new TradeCashRepository($this->mockDb);
-
-        $this->assertInstanceOf(TradeCashRepository::class, $repository);
-    }
-
     public function testRepositoryImplementsCorrectInterface(): void
     {
-        $repository = new TradeCashRepository($this->mockDb);
-
-        $this->assertInstanceOf(
+        self::assertContains(
             \Trading\Contracts\TradeCashRepositoryInterface::class,
-            $repository
+            (array) class_implements(TradeCashRepository::class)
         );
     }
 

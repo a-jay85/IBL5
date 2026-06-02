@@ -35,23 +35,6 @@ class NextSimServiceTest extends TestCase
     // CONSTRUCTOR TESTS
     // ============================================
 
-    public function testServiceCanBeInstantiated(): void
-    {
-        $service = new NextSimService($this->mockDb, $this->stubRepository);
-
-        $this->assertInstanceOf(NextSimService::class, $service);
-    }
-
-    public function testServiceImplementsCorrectInterface(): void
-    {
-        $service = new NextSimService($this->mockDb, $this->stubRepository);
-
-        $this->assertInstanceOf(
-            \NextSim\Contracts\NextSimServiceInterface::class,
-            $service
-        );
-    }
-
     // ============================================
     // MULTIPLE INSTANCES TEST
     // ============================================

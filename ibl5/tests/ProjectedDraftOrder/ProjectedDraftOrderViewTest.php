@@ -20,11 +20,6 @@ class ProjectedDraftOrderViewTest extends TestCase
         $this->view = new ProjectedDraftOrderView();
     }
 
-    public function testImplementsViewInterface(): void
-    {
-        $this->assertInstanceOf(ProjectedDraftOrderViewInterface::class, $this->view);
-    }
-
     public function testRenderReturnsString(): void
     {
         $result = $this->view->render($this->emptyDraftOrder(), 2026);

@@ -46,7 +46,8 @@ class BoxscoreProcessorTest extends TestCase
     {
         $this->mockDb = new MockDatabase();
         // Suppress error logs from Season constructor DB calls
-        $this->previousErrorLog = ini_get('error_log') ?: '';
+        $logResult = ini_get('error_log');
+        $this->previousErrorLog = $logResult !== false ? $logResult : '';
         ini_set('error_log', '/dev/null');
     }
 
@@ -62,19 +63,6 @@ class BoxscoreProcessorTest extends TestCase
             $this->previousErrorLog = false;
         }
         parent::tearDown();
-    }
-
-    public function testImplementsInterface(): void
-    {
-        $this->mockDb->setReturnTrue(true);
-        $this->mockDb->setMockData([
-            ['name' => 'Current Season Phase', 'value' => 'Regular Season'],
-            ['sim' => 1, 'start_date' => '2025-01-01', 'end_date' => '2025-01-07'],
-        ]);
-
-        $processor = new BoxscoreProcessor($this->mockDb);
-
-        $this->assertInstanceOf(BoxscoreProcessorInterface::class, $processor);
     }
 
     public function testProcessScoFileReturnsErrorForMissingFile(): void
@@ -178,7 +166,9 @@ class BoxscoreProcessorTest extends TestCase
         $leagueContext = self::createStub(\League\LeagueContext::class);
         $processor = new BoxscoreProcessor($this->mockDb, null, null, $leagueContext);
 
-        $this->assertInstanceOf(BoxscoreProcessorInterface::class, $processor);
+        // Verify the processor works with a league context by processing a missing file
+        $result = $processor->processScoFile('/nonexistent/file.sco', 2025, 'Regular Season');
+        $this->assertFalse($result['success']);
     }
 
     public function testOlympicsContextSkipsAllStarGames(): void

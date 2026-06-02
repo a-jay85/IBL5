@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\GMContactList;
 
-use GMContactList\Contracts\GMContactListViewInterface;
 use GMContactList\GMContactListView;
 use PHPUnit\Framework\TestCase;
 
@@ -15,11 +14,6 @@ class GMContactListViewTest extends TestCase
     protected function setUp(): void
     {
         $this->view = new GMContactListView();
-    }
-
-    public function testImplementsInterface(): void
-    {
-        $this->assertInstanceOf(GMContactListViewInterface::class, $this->view);
     }
 
     public function testRenderOutputsTable(): void

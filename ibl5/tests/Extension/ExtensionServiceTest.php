@@ -6,7 +6,6 @@ namespace Tests\Extension;
 
 use PHPUnit\Framework\TestCase;
 use Extension\ExtensionService;
-use Extension\Contracts\ExtensionProcessorInterface;
 use Extension\Contracts\ExtensionRepositoryInterface;
 use Extension\Contracts\ExtensionValidatorInterface;
 use Extension\Contracts\ExtensionOfferEvaluatorInterface;
@@ -29,24 +28,6 @@ class ExtensionServiceTest extends TestCase
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-    }
-
-    // ============================================
-    // INSTANTIATION TESTS
-    // ============================================
-
-    public function testCanBeInstantiated(): void
-    {
-        $service = new ExtensionService($this->mockDb);
-
-        $this->assertInstanceOf(ExtensionService::class, $service);
-    }
-
-    public function testImplementsProcessorInterface(): void
-    {
-        $service = new ExtensionService($this->mockDb);
-
-        $this->assertInstanceOf(ExtensionProcessorInterface::class, $service);
     }
 
     // ============================================
@@ -314,18 +295,6 @@ class ExtensionServiceTest extends TestCase
         $this->assertContains($teammatePid, $capturedPids, 'Teammate should remain in position salary calculation');
     }
 
-    // ============================================
-    // BACKWARD COMPATIBILITY
-    // ============================================
-
-    public function testExtensionProcessorAliasWorks(): void
-    {
-        $processor = new \Extension\ExtensionProcessor($this->mockDb);
-
-        $this->assertInstanceOf(ExtensionService::class, $processor);
-        $this->assertInstanceOf(ExtensionProcessorInterface::class, $processor);
-    }
-
     /**
      * @param array<string, mixed> $overrides
      * @return array<string, mixed>
@@ -353,7 +322,7 @@ class ExtensionServiceTest extends TestCase
             'cy' => 1, 'cyt' => 1,
             'salary_yr1' => 800, 'salary_yr2' => 0, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0,
             'winner' => 3, 'tradition' => 3, 'loyalty' => 3, 'playing_time' => 3, 'security' => 3,
-            'teamid' => 1, 'team_city' => 'Miami', 'team_name' => 'Cyclones',
+            'team_city' => 'Miami', 'team_name' => 'Cyclones',
             'color1' => 'Blue', 'color2' => 'White',
             'arena' => 'Test Arena', 'capacity' => 20000,
             'owner_name' => 'Test Owner', 'owner_email' => 'owner@test.com',

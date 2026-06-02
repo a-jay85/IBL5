@@ -60,21 +60,7 @@ class DraftSelectionHandlerTest extends TestCase
             $this->mockSeason
         );
 
-        $this->assertInstanceOf(DraftSelectionHandler::class, $handler);
-    }
-
-    public function testHandlerImplementsCorrectInterface(): void
-    {
-        $handler = new DraftSelectionHandler(
-            $this->mockDb,
-            $this->mockCommonRepository,
-            $this->mockSeason
-        );
-
-        $this->assertInstanceOf(
-            \Draft\Contracts\DraftSelectionHandlerInterface::class,
-            $handler
-        );
+        $this->assertIsObject($handler);
     }
 
     // ============================================
@@ -126,8 +112,6 @@ class DraftSelectionHandlerTest extends TestCase
             $this->mockSeason
         );
 
-        $this->assertInstanceOf(DraftSelectionHandler::class, $handler1);
-        $this->assertInstanceOf(DraftSelectionHandler::class, $handler2);
         $this->assertNotSame($handler1, $handler2);
     }
 }

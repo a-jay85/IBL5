@@ -6,19 +6,10 @@ namespace Tests\UpdateAllTheThings\Steps;
 
 use PHPUnit\Framework\TestCase;
 use SavedDepthChart\SavedDepthChartRepository;
-use Updater\Contracts\PipelineStepInterface;
 use Updater\Steps\ExtendDepthChartsStep;
 
 class ExtendDepthChartsStepTest extends TestCase
 {
-    public function testImplementsPipelineStepInterface(): void
-    {
-        $stubRepo = self::createStub(SavedDepthChartRepository::class);
-        $step = new ExtendDepthChartsStep($stubRepo, '2026-02-27', 15);
-
-        $this->assertInstanceOf(PipelineStepInterface::class, $step);
-    }
-
     public function testGetLabelReturnsExpectedLabel(): void
     {
         $stubRepo = self::createStub(SavedDepthChartRepository::class);

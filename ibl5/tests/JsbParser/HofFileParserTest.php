@@ -12,7 +12,6 @@ use PHPUnit\Framework\TestCase;
  */
 class HofFileParserTest extends TestCase
 {
-    private const FILE_SIZE = 7000;
     private const BLOCK_SIZE = 500;
 
     /**

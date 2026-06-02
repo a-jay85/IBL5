@@ -30,11 +30,6 @@ class SeasonArchiveRepositoryTest extends TestCase
         $this->repository = new SeasonArchiveRepository($this->mockDb);
     }
 
-    public function testImplementsSeasonArchiveRepositoryInterface(): void
-    {
-        $this->assertInstanceOf(SeasonArchiveRepositoryInterface::class, $this->repository);
-    }
-
     public function testRepositoryQueriesAwardsTable(): void
     {
         $reflectionClass = new \ReflectionClass($this->repository);

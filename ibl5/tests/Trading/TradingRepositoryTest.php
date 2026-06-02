@@ -37,30 +37,19 @@ class TradingRepositoryTest extends TestCase
     // TRADE OFFER REPOSITORY - CONSTRUCTOR TESTS
     // ============================================
 
-    public function testTradeOfferRepositoryCanBeInstantiated(): void
-    {
-        $repository = new TradeOfferRepository($this->mockDb, 'localhost');
-
-        $this->assertInstanceOf(TradeOfferRepository::class, $repository);
-    }
-
     public function testTradeOfferRepositoryImplementsCorrectInterface(): void
     {
-        $repository = new TradeOfferRepository($this->mockDb, 'localhost');
-
-        $this->assertInstanceOf(
+        self::assertContains(
             \Trading\Contracts\TradeOfferRepositoryInterface::class,
-            $repository
+            (array) class_implements(TradeOfferRepository::class)
         );
     }
 
     public function testTradeOfferRepositoryExtendsBaseMysqliRepository(): void
     {
-        $repository = new TradeOfferRepository($this->mockDb, 'localhost');
-
-        $this->assertInstanceOf(
+        self::assertContains(
             \BaseMysqliRepository::class,
-            $repository
+            (array) class_parents(TradeOfferRepository::class)
         );
     }
 
@@ -68,30 +57,19 @@ class TradingRepositoryTest extends TestCase
     // TRADE ASSET REPOSITORY - CONSTRUCTOR TESTS
     // ============================================
 
-    public function testTradeAssetRepositoryCanBeInstantiated(): void
-    {
-        $repository = new TradeAssetRepository($this->mockDb);
-
-        $this->assertInstanceOf(TradeAssetRepository::class, $repository);
-    }
-
     public function testTradeAssetRepositoryImplementsCorrectInterface(): void
     {
-        $repository = new TradeAssetRepository($this->mockDb);
-
-        $this->assertInstanceOf(
+        self::assertContains(
             \Trading\Contracts\TradeAssetRepositoryInterface::class,
-            $repository
+            (array) class_implements(TradeAssetRepository::class)
         );
     }
 
     public function testTradeAssetRepositoryExtendsBaseMysqliRepository(): void
     {
-        $repository = new TradeAssetRepository($this->mockDb);
-
-        $this->assertInstanceOf(
+        self::assertContains(
             \BaseMysqliRepository::class,
-            $repository
+            (array) class_parents(TradeAssetRepository::class)
         );
     }
 
@@ -99,30 +77,19 @@ class TradingRepositoryTest extends TestCase
     // TRADE FORM REPOSITORY - CONSTRUCTOR TESTS
     // ============================================
 
-    public function testTradeFormRepositoryCanBeInstantiated(): void
-    {
-        $repository = new TradeFormRepository($this->mockDb);
-
-        $this->assertInstanceOf(TradeFormRepository::class, $repository);
-    }
-
     public function testTradeFormRepositoryImplementsCorrectInterface(): void
     {
-        $repository = new TradeFormRepository($this->mockDb);
-
-        $this->assertInstanceOf(
+        self::assertContains(
             \Trading\Contracts\TradeFormRepositoryInterface::class,
-            $repository
+            (array) class_implements(TradeFormRepository::class)
         );
     }
 
     public function testTradeFormRepositoryExtendsBaseMysqliRepository(): void
     {
-        $repository = new TradeFormRepository($this->mockDb);
-
-        $this->assertInstanceOf(
+        self::assertContains(
             \BaseMysqliRepository::class,
-            $repository
+            (array) class_parents(TradeFormRepository::class)
         );
     }
 
@@ -208,21 +175,5 @@ class TradingRepositoryTest extends TestCase
 
         $this->assertIsArray($result);
         $this->assertEmpty($result);
-    }
-
-    // ============================================
-    // MULTIPLE INSTANCES TEST
-    // ============================================
-
-    public function testMultipleRepositoriesCanBeInstantiated(): void
-    {
-        $repo1 = new TradeOfferRepository($this->mockDb, 'localhost');
-        $repo2 = new TradeAssetRepository($this->mockDb);
-        $repo3 = new TradeFormRepository($this->mockDb);
-
-        $this->assertInstanceOf(TradeOfferRepository::class, $repo1);
-        $this->assertInstanceOf(TradeAssetRepository::class, $repo2);
-        $this->assertInstanceOf(TradeFormRepository::class, $repo3);
-        $this->assertNotSame($repo1, $repo2);
     }
 }

@@ -10,7 +10,6 @@ use PlrParser\Contracts\PlrParserServiceInterface;
 use PlrParser\PlrImportMode;
 use PlrParser\PlrParseResult;
 use Updater\Contracts\JsbSourceResolverInterface;
-use Updater\Contracts\PipelineStepInterface;
 use Updater\Steps\SnapshotPlrStep;
 
 class SnapshotPlrStepTest extends TestCase
@@ -37,11 +36,6 @@ class SnapshotPlrStepTest extends TestCase
             2026,
             $this->stubResolver,
         );
-    }
-
-    public function testImplementsPipelineStepInterface(): void
-    {
-        $this->assertInstanceOf(PipelineStepInterface::class, $this->createStep());
     }
 
     public function testGetLabelReturnsExpectedLabel(): void

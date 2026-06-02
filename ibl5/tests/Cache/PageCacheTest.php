@@ -191,7 +191,8 @@ final class PageCacheTest extends TestCase
         $count = PageCache::purge();
 
         self::assertSame(3, $count);
-        self::assertSame([], glob($this->tempDir . '/*.html') ?: []);
+        $htmlFiles = glob($this->tempDir . '/*.html');
+        self::assertSame([], $htmlFiles ? $htmlFiles : []);
     }
 
     public function testPurgeReturnsZeroOnEmptyCache(): void

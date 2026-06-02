@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\DepthChartEntry;
 
 use DepthChartEntry\DepthChartEntryApiHandler;
-use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Tests\WideUnit\WideUnitTestCase;
 
 /**
@@ -15,17 +14,6 @@ use Tests\WideUnit\WideUnitTestCase;
  */
 class DepthChartEntryApiHandlerTest extends WideUnitTestCase
 {
-    public function testCanBeInstantiated(): void
-    {
-        $handler = new DepthChartEntryApiHandler(
-            $this->mockDb,
-            self::createStub(TeamIdentityRepositoryInterface::class),
-            self::createStub(\League\LeagueContext::class)
-        );
-
-        $this->assertInstanceOf(DepthChartEntryApiHandler::class, $handler);
-    }
-
     public function testValidDisplayModesIncludePlayoffs(): void
     {
         $reflection = new \ReflectionClass(DepthChartEntryApiHandler::class);

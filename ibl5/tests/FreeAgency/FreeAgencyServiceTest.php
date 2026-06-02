@@ -378,7 +378,6 @@ class FreeAgencyServiceTest extends TestCase
         $this->assertCount(1, $result['offerPlayers']);
         $this->assertSame(400, $result['offerPlayers'][0]['offer']['offer1']);
         $this->assertSame(350, $result['offerPlayers'][0]['offer']['offer2']);
-        $this->assertInstanceOf(\Player\Player::class, $result['offerPlayers'][0]['player']);
     }
 
     // ── Helpers ──────────────────────────────────────────────────
@@ -444,7 +443,6 @@ class FreeAgencyServiceTest extends TestCase
             'r_blk' => 50,
             'r_foul' => 50,
             'r_ass' => 50,
-            'r_tvr' => 50,
             'r_low' => 50,
             'r_def' => 50,
             'r_dis' => 50,

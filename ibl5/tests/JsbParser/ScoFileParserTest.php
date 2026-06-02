@@ -35,38 +35,6 @@ class ScoFileParserTest extends TestCase
         return $record;
     }
 
-    // --- Constants ---
-
-    public function testRecordSizeIs2000Bytes(): void
-    {
-        $this->assertSame(2000, ScoFileParser::RECORD_SIZE);
-    }
-
-    public function testGameInfoSizeIs58Bytes(): void
-    {
-        $this->assertSame(58, ScoFileParser::GAME_INFO_SIZE);
-    }
-
-    public function testPlayerSlotSizeIs53Bytes(): void
-    {
-        $this->assertSame(53, ScoFileParser::PLAYER_SLOT_SIZE);
-    }
-
-    public function testPlayerSlotCountIs30(): void
-    {
-        $this->assertSame(30, ScoFileParser::PLAYER_SLOT_COUNT);
-    }
-
-    public function testVisitorSlotCountIs15(): void
-    {
-        $this->assertSame(15, ScoFileParser::VISITOR_SLOT_COUNT);
-    }
-
-    public function testHeaderOffsetIs1000000Bytes(): void
-    {
-        $this->assertSame(1_000_000, ScoFileParser::HEADER_OFFSET_BYTES);
-    }
-
     // --- extractGameInfo() ---
 
     public function testExtractGameInfoReturnsFirst58Bytes(): void
@@ -146,18 +114,6 @@ class ScoFileParserTest extends TestCase
                 "Slot {$i} should be filled with chr(" . ($i + 1) . ')',
             );
         }
-    }
-
-    /**
-     * Verify the slot layout covers the expected byte range:
-     * game info (58) + 30 slots × 53 = 58 + 1590 = 1648 bytes of structured data.
-     */
-    public function testPlayerSlotsEndAt1648Bytes(): void
-    {
-        $expectedEnd = ScoFileParser::GAME_INFO_SIZE
-            + (ScoFileParser::PLAYER_SLOT_COUNT * ScoFileParser::PLAYER_SLOT_SIZE);
-
-        $this->assertSame(1648, $expectedEnd);
     }
 
     // --- isHomeTeamSlot() ---

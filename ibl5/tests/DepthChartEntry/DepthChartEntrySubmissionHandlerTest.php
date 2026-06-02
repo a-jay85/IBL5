@@ -36,27 +36,6 @@ class DepthChartEntrySubmissionHandlerTest extends TestCase
     }
 
     // ============================================
-    // CONSTRUCTOR / INTERFACE
-    // ============================================
-
-    public function testHandlerCanBeInstantiated(): void
-    {
-        $handler = new DepthChartEntrySubmissionHandler($this->mockDb, $this->stubCommonRepo);
-
-        $this->assertInstanceOf(DepthChartEntrySubmissionHandler::class, $handler);
-    }
-
-    public function testHandlerImplementsCorrectInterface(): void
-    {
-        $handler = new DepthChartEntrySubmissionHandler($this->mockDb, $this->stubCommonRepo);
-
-        $this->assertInstanceOf(
-            \DepthChartEntry\Contracts\DepthChartEntrySubmissionHandlerInterface::class,
-            $handler
-        );
-    }
-
-    // ============================================
     // EMPTY TEAM NAME — returns failure result
     // ============================================
 
@@ -106,8 +85,6 @@ class DepthChartEntrySubmissionHandlerTest extends TestCase
         $handler1 = new DepthChartEntrySubmissionHandler($this->mockDb, $this->stubCommonRepo);
         $handler2 = new DepthChartEntrySubmissionHandler($this->mockDb, $this->stubCommonRepo);
 
-        $this->assertInstanceOf(DepthChartEntrySubmissionHandler::class, $handler1);
-        $this->assertInstanceOf(DepthChartEntrySubmissionHandler::class, $handler2);
         $this->assertNotSame($handler1, $handler2);
     }
 }

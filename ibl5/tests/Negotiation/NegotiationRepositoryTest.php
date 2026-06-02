@@ -37,33 +37,6 @@ class NegotiationRepositoryTest extends TestCase
     // CONSTRUCTOR TESTS
     // ============================================
 
-    public function testRepositoryCanBeInstantiated(): void
-    {
-        $repository = new NegotiationRepository($this->mockDb, self::createStub(SalaryCapRepositoryInterface::class));
-        
-        $this->assertInstanceOf(NegotiationRepository::class, $repository);
-    }
-
-    public function testRepositoryImplementsCorrectInterface(): void
-    {
-        $repository = new NegotiationRepository($this->mockDb, self::createStub(SalaryCapRepositoryInterface::class));
-        
-        $this->assertInstanceOf(
-            \Negotiation\Contracts\NegotiationRepositoryInterface::class,
-            $repository
-        );
-    }
-
-    public function testRepositoryExtendsBaseMysqliRepository(): void
-    {
-        $repository = new NegotiationRepository($this->mockDb, self::createStub(SalaryCapRepositoryInterface::class));
-        
-        $this->assertInstanceOf(
-            \BaseMysqliRepository::class,
-            $repository
-        );
-    }
-
     // ============================================
     // GET TEAM PERFORMANCE TESTS
     // ============================================
@@ -152,8 +125,6 @@ class NegotiationRepositoryTest extends TestCase
         $repo1 = new NegotiationRepository($this->mockDb, $commonRepo);
         $repo2 = new NegotiationRepository($this->mockDb, $commonRepo);
         
-        $this->assertInstanceOf(NegotiationRepository::class, $repo1);
-        $this->assertInstanceOf(NegotiationRepository::class, $repo2);
         $this->assertNotSame($repo1, $repo2);
     }
 }

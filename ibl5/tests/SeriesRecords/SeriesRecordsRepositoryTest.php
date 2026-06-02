@@ -26,32 +26,6 @@ class SeriesRecordsRepositoryTest extends TestCase
         unset($GLOBALS['mysqli_db']);
     }
 
-    public function testRepositoryCanBeInstantiated(): void
-    {
-        $repository = new SeriesRecordsRepository($this->mockDb);
-
-        $this->assertInstanceOf(SeriesRecordsRepository::class, $repository);
-    }
-
-    public function testRepositoryImplementsCorrectInterface(): void
-    {
-        $repository = new SeriesRecordsRepository($this->mockDb);
-
-        $this->assertInstanceOf(
-            \SeriesRecords\Contracts\SeriesRecordsRepositoryInterface::class,
-            $repository
-        );
-    }
-
-    public function testRepositoryExtendsBaseMysqliRepository(): void
-    {
-        $repository = new SeriesRecordsRepository($this->mockDb);
-
-        $this->assertInstanceOf(\BaseMysqliRepository::class, $repository);
-    }
-
-
-
     public function testMultipleRepositoriesCanBeInstantiated(): void
     {
         $repo1 = new SeriesRecordsRepository($this->mockDb);

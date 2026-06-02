@@ -227,3 +227,139 @@ func TestValidateCorpus_UnmatchedScoGame(t *testing.T) {
 		t.Errorf("report should render an UNMATCHED line and a FAIL result:\n%s", buf.String())
 	}
 }
+
+// Row #2: ValidateUnscheduled simulates an unmatched .sco game between two
+// rostered franchises (7 vs 3) under the given game type — the matchup is
+// synthesized from the .sco's own team IDs, and the game lands in Report.Games
+// (NOT Unmatched, NOT Excluded). The matched (scheduled) game is skipped.
+// Pass is intentionally NOT asserted: to be unmatched the .sco scores must
+// differ from the only rostered matchup's .sch scores, so the synthesized game
+// is points-out-of-band by construction (advisor guidance).
+func TestValidateUnscheduled_SimulatesUnmatchedGame(t *testing.T) {
+	dir := t.TempDir()
+	const seed = uint64(1000)
+	extra := scoGameSpec{
+		visTID: 7, homeTID: 3, visScore: 77, homeScore: 77,
+		visBoxes:  []scoBoxSpec{{pid: 1, name: "VIS"}},
+		homeBoxes: []scoBoxSpec{{pid: 2, name: "HOME"}},
+	}
+	buildCorpus(t, dir, true, testRuns, seed, extra)
+
+	rep, err := ValidateUnscheduled(dir, testRuns, seed, bundle.GameTypePlayoff)
+	if err != nil {
+		t.Fatalf("ValidateUnscheduled: %v", err)
+	}
+	if len(rep.Games) != 1 {
+		t.Fatalf("games = %d, want 1 (the unmatched game, simulated)", len(rep.Games))
+	}
+	if len(rep.Unmatched) != 0 || len(rep.Excluded) != 0 {
+		t.Fatalf("unmatched=%d excluded=%d, want 0 / 0", len(rep.Unmatched), len(rep.Excluded))
+	}
+	if rep.GameType != bundle.GameTypePlayoff {
+		t.Errorf("report game type = %d, want playoff (4)", int(rep.GameType))
+	}
+	g := rep.Games[0]
+	if g.VisitorTeamID != 7 || g.HomeTeamID != 3 || g.Date != "10-01" {
+		t.Errorf("synthesized game = visitor=%d home=%d date=%q, want 7/3/10-01", g.VisitorTeamID, g.HomeTeamID, g.Date)
+	}
+}
+
+// Row #3: ValidateUnscheduled is deterministic — two runs over the same corpus
+// yield an identical Report and identical rendered bytes.
+func TestValidateUnscheduled_Deterministic(t *testing.T) {
+	dir := t.TempDir()
+	const seed = uint64(1000)
+	extra := scoGameSpec{
+		visTID: 7, homeTID: 3, visScore: 77, homeScore: 77,
+		visBoxes:  []scoBoxSpec{{pid: 1, name: "VIS"}},
+		homeBoxes: []scoBoxSpec{{pid: 2, name: "HOME"}},
+	}
+	buildCorpus(t, dir, true, testRuns, seed, extra)
+
+	rep1, err := ValidateUnscheduled(dir, testRuns, seed, bundle.GameTypePlayoff)
+	if err != nil {
+		t.Fatalf("ValidateUnscheduled: %v", err)
+	}
+	rep2, err := ValidateUnscheduled(dir, testRuns, seed, bundle.GameTypePlayoff)
+	if err != nil {
+		t.Fatalf("ValidateUnscheduled (2nd): %v", err)
+	}
+	if !reflect.DeepEqual(rep1, rep2) {
+		t.Error("two ValidateUnscheduled runs produced different Reports (non-deterministic)")
+	}
+	var b1, b2 bytes.Buffer
+	WriteReport(&b1, rep1)
+	WriteReport(&b2, rep2)
+	if b1.String() != b2.String() {
+		t.Error("two WriteReport outputs differ (non-deterministic)")
+	}
+}
+
+// Row #4 (negative): the sim-validity guard. An unmatched .sco game whose team
+// ID has no .plr roster (team 11, absent from starterSpecs) is recorded in
+// Report.Excluded with a reason and never simulated. The box slot is filled so
+// ReadSco does not drop the record as padding (advisor guidance).
+func TestValidateUnscheduled_RosterlessTeamExcluded(t *testing.T) {
+	dir := t.TempDir()
+	const seed = uint64(1000)
+	rosterless := scoGameSpec{
+		visTID: 11, homeTID: 3, visScore: 88, homeScore: 88,
+		visBoxes:  []scoBoxSpec{{pid: 9, name: "GHOST"}},
+		homeBoxes: []scoBoxSpec{{pid: 2, name: "HOME"}},
+	}
+	buildCorpus(t, dir, true, testRuns, seed, rosterless)
+
+	rep, err := ValidateUnscheduled(dir, testRuns, seed, bundle.GameTypePlayoff)
+	if err != nil {
+		t.Fatalf("ValidateUnscheduled: %v", err)
+	}
+	if len(rep.Games) != 0 {
+		t.Fatalf("games = %d, want 0 (the rosterless game must not be simulated)", len(rep.Games))
+	}
+	if len(rep.Excluded) != 1 {
+		t.Fatalf("excluded = %d, want 1", len(rep.Excluded))
+	}
+	if e := rep.Excluded[0]; e.VisitorTeamID != 11 || e.HomeTeamID != 3 || e.Reason == "" {
+		t.Errorf("excluded game = %+v, want visitor=11 home=3 with a reason", e)
+	}
+
+	// The exclusion is surfaced in the rendered report, not dropped.
+	var buf bytes.Buffer
+	WriteReport(&buf, rep)
+	if !strings.Contains(buf.String(), "EXCLUDED") || !strings.Contains(buf.String(), "excluded)") {
+		t.Errorf("report should render an EXCLUDED line and excluded count:\n%s", buf.String())
+	}
+}
+
+// Row #5 (boundary): a corpus whose only .sco game IS scheduled (matches the
+// .sch) has no unmatched games, so ValidateUnscheduled returns zero Games, zero
+// Excluded, and Pass true — it never touches ValidateCorpus's domain.
+func TestValidateUnscheduled_NoUnmatchedGames(t *testing.T) {
+	dir := t.TempDir()
+	const seed = uint64(1000)
+	buildCorpus(t, dir, true, testRuns, seed) // only the matched game, no extras
+
+	rep, err := ValidateUnscheduled(dir, testRuns, seed, bundle.GameTypePlayoff)
+	if err != nil {
+		t.Fatalf("ValidateUnscheduled: %v", err)
+	}
+	if len(rep.Games) != 0 || len(rep.Excluded) != 0 {
+		t.Fatalf("games=%d excluded=%d, want 0 / 0", len(rep.Games), len(rep.Excluded))
+	}
+	if !rep.Pass {
+		t.Error("a corpus with no unmatched games must PASS (nothing failed)")
+	}
+}
+
+// ValidateUnscheduled shares ValidateCorpus's guards: runs<=0 is an error, and
+// an empty corpus dir yields ErrNoCorpus (never a panic or a vacuous PASS).
+func TestValidateUnscheduled_GuardsAndEmptyDir(t *testing.T) {
+	dir := t.TempDir()
+	buildCorpus(t, dir, true, testRuns, 1)
+	if _, err := ValidateUnscheduled(dir, 0, 1, bundle.GameTypePlayoff); err == nil {
+		t.Error("runs=0 should be an error")
+	}
+	if _, err := ValidateUnscheduled(t.TempDir(), testRuns, 1, bundle.GameTypePlayoff); !errors.Is(err, ErrNoCorpus) {
+		t.Fatalf("empty dir error = %v, want ErrNoCorpus", err)
+	}
+}

@@ -31,6 +31,20 @@ type UnmatchedGame struct {
 	Reason        string
 }
 
+// ExcludedGame is an unmatched .sco game that ValidateUnscheduled could not
+// simulate because a participating team has no .plr roster in the bundle, so the
+// engine cannot build a lineup. It is reported (never silently dropped) so a
+// malformed/edge .sco surfaces; unlike an UnmatchedGame in ValidateCorpus it
+// does NOT force the Report to FAIL — it is an expected defensive skip, and the
+// Phase-4 archive scan (not this report's Pass) asserts zero exclusions.
+type ExcludedGame struct {
+	Stem          string
+	VisitorTeamID int
+	HomeTeamID    int
+	Date          string
+	Reason        string
+}
+
 // Report is the harness's full result over a corpus directory. Pass is true
 // only when every game's every stat passed AND no .sco game was left unmatched.
 // Same (dir, runs, baseSeed, gameType) always yields an identical Report.
@@ -41,6 +55,7 @@ type Report struct {
 	Pass      bool
 	Games     []GameReport
 	Unmatched []UnmatchedGame
+	Excluded  []ExcludedGame
 }
 
 // triple names one backup file set sharing a stem within the corpus dir.
@@ -197,6 +212,85 @@ func ValidateCorpus(dir string, runs int, baseSeed uint64, gameType bundle.GameT
 		}
 	}
 	return rep, nil
+}
+
+// ValidateUnscheduled is the exact complement of ValidateCorpus: it simulates
+// the .sco games that have NO .sch match — playoff games, which are never in the
+// binary .sch (the production playoff schedule is parsed from Schedule.htm). A
+// .sco game carries its own VisitorTeamID/HomeTeamID/Date, and the engine
+// derives lineups from the .plr rosters, so an unmatched game's matchup is
+// synthesized directly (no schedule needed) and simulated under gameType.
+//
+// matchSchedule decides "unmatched" with the SAME predicate ValidateCorpus uses
+// to decide "matched" (consuming each .sch entry once), so the two paths are
+// exact complements over a corpus's .sco games.
+//
+// Sim-validity guard: a synthesized game whose visitor or home team has no .plr
+// roster cannot be given a lineup, so it is skipped and recorded in
+// Report.Excluded (never silently dropped). On a real finals snapshot this set
+// is empty — the All-Star/Rising-Stars games live in the 1,000,000-byte .sco
+// header that backup.ReadSco skips wholesale, so they never reach the harness.
+//
+// Determinism: same (dir, runs, baseSeed, gameType) yields a byte-identical
+// Report. .sco games are kept in file order; the per-game seed advances by a
+// monotonic index over INCLUDED (simulated) games only.
+func ValidateUnscheduled(dir string, runs int, baseSeed uint64, gameType bundle.GameType) (Report, error) {
+	if runs <= 0 {
+		return Report{}, fmt.Errorf("validate: runs must be >= 1, got %d", runs)
+	}
+	triples, err := findTriples(dir)
+	if err != nil {
+		return Report{}, err
+	}
+	rep := Report{Runs: runs, BaseSeed: baseSeed, GameType: gameType, Pass: true}
+	gameIndex := 0
+	for _, t := range triples {
+		b, sched, scoGames, err := readTriple(t, gameType)
+		if err != nil {
+			return Report{}, err
+		}
+		hasLineup := lineupTeams(b)
+		consumed := make([]bool, len(sched))
+		for _, sg := range scoGames {
+			if schIdx := matchSchedule(sched, consumed, sg); schIdx >= 0 {
+				consumed[schIdx] = true
+				continue // scheduled game — ValidateCorpus's domain, not ours
+			}
+			if !hasLineup[sg.VisitorTeamID] || !hasLineup[sg.HomeTeamID] {
+				rep.Excluded = append(rep.Excluded, ExcludedGame{
+					Stem:          t.stem,
+					VisitorTeamID: sg.VisitorTeamID,
+					HomeTeamID:    sg.HomeTeamID,
+					Date:          sg.Date,
+					Reason:        "no .plr roster for a participating team — cannot build a lineup",
+				})
+				continue
+			}
+			g := bundle.Game{
+				VisitorTeamID: sg.VisitorTeamID,
+				HomeTeamID:    sg.HomeTeamID,
+				Date:          sg.Date,
+				GameType:      gameType,
+			}
+			gr := validateGame(b, g, sg, runs, baseSeed+uint64(gameIndex*runs), gameType)
+			rep.Games = append(rep.Games, gr)
+			if !gr.Pass {
+				rep.Pass = false
+			}
+			gameIndex++
+		}
+	}
+	return rep, nil
+}
+
+// lineupTeams returns the set of team IDs with at least one player in the
+// bundle, i.e. the teams the engine can build a lineup for.
+func lineupTeams(b bundle.Bundle) map[int]bool {
+	set := make(map[int]bool)
+	for _, p := range b.Players {
+		set[p.TeamID] = true
+	}
+	return set
 }
 
 // matchSchedule returns the index of the first unconsumed schedule game whose

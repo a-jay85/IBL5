@@ -70,8 +70,8 @@ class ExtensionOfferEvaluatorTest extends TestCase
 
     public function testCalculateWinnerModifierWithWinningTeam(): void
     {
-        $teamFactors = ['wins' => 50, 'losses' => 32];
-        $playerPreferences = ['winner' => 3];
+        $teamFactors = ['wins' => 50, 'losses' => 32, 'tradition_wins' => 0, 'tradition_losses' => 0, 'money_committed_at_position' => 0];
+        $playerPreferences = ['winner' => 3, 'tradition' => 1, 'loyalty' => 1, 'playing_time' => 1];
 
         $result = $this->evaluator->calculateWinnerModifier($teamFactors, $playerPreferences);
 
@@ -81,8 +81,8 @@ class ExtensionOfferEvaluatorTest extends TestCase
 
     public function testCalculateWinnerModifierWithLosingTeam(): void
     {
-        $teamFactors = ['wins' => 20, 'losses' => 62];
-        $playerPreferences = ['winner' => 3];
+        $teamFactors = ['wins' => 20, 'losses' => 62, 'tradition_wins' => 0, 'tradition_losses' => 0, 'money_committed_at_position' => 0];
+        $playerPreferences = ['winner' => 3, 'tradition' => 1, 'loyalty' => 1, 'playing_time' => 1];
 
         $result = $this->evaluator->calculateWinnerModifier($teamFactors, $playerPreferences);
 
@@ -92,8 +92,8 @@ class ExtensionOfferEvaluatorTest extends TestCase
 
     public function testCalculateWinnerModifierWithDefaultPreference(): void
     {
-        $teamFactors = ['wins' => 50, 'losses' => 32];
-        $playerPreferences = ['winner' => 1]; // Default preference
+        $teamFactors = ['wins' => 50, 'losses' => 32, 'tradition_wins' => 0, 'tradition_losses' => 0, 'money_committed_at_position' => 0];
+        $playerPreferences = ['winner' => 1, 'tradition' => 1, 'loyalty' => 1, 'playing_time' => 1]; // Default preference
 
         $result = $this->evaluator->calculateWinnerModifier($teamFactors, $playerPreferences);
 
@@ -107,8 +107,8 @@ class ExtensionOfferEvaluatorTest extends TestCase
 
     public function testCalculateTraditionModifierWithStrongTradition(): void
     {
-        $teamFactors = ['tradition_wins' => 1000, 'tradition_losses' => 500];
-        $playerPreferences = ['tradition' => 3];
+        $teamFactors = ['wins' => 0, 'losses' => 0, 'tradition_wins' => 1000, 'tradition_losses' => 500, 'money_committed_at_position' => 0];
+        $playerPreferences = ['winner' => 1, 'tradition' => 3, 'loyalty' => 1, 'playing_time' => 1];
 
         $result = $this->evaluator->calculateTraditionModifier($teamFactors, $playerPreferences);
 
@@ -122,7 +122,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
 
     public function testCalculateLoyaltyModifierWithHighLoyalty(): void
     {
-        $playerPreferences = ['loyalty' => 5];
+        $playerPreferences = ['winner' => 1, 'tradition' => 1, 'loyalty' => 5, 'playing_time' => 1];
 
         $result = $this->evaluator->calculateLoyaltyModifier($playerPreferences);
 
@@ -132,7 +132,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
 
     public function testCalculateLoyaltyModifierWithDefaultLoyalty(): void
     {
-        $playerPreferences = ['loyalty' => 1];
+        $playerPreferences = ['winner' => 1, 'tradition' => 1, 'loyalty' => 1, 'playing_time' => 1];
 
         $result = $this->evaluator->calculateLoyaltyModifier($playerPreferences);
 
@@ -145,8 +145,8 @@ class ExtensionOfferEvaluatorTest extends TestCase
 
     public function testCalculatePlayingTimeModifierWithHighMoneyCommitted(): void
     {
-        $teamFactors = ['money_committed_at_position' => 50000000];
-        $playerPreferences = ['playing_time' => 5];
+        $teamFactors = ['wins' => 0, 'losses' => 0, 'tradition_wins' => 0, 'tradition_losses' => 0, 'money_committed_at_position' => 50000000];
+        $playerPreferences = ['winner' => 1, 'tradition' => 1, 'loyalty' => 1, 'playing_time' => 5];
 
         $result = $this->evaluator->calculatePlayingTimeModifier($teamFactors, $playerPreferences);
 
@@ -294,10 +294,16 @@ class ExtensionOfferEvaluatorTest extends TestCase
         // Arrange
         $teamFactors = [
             'wins' => 60,
-            'losses' => 22
+            'losses' => 22,
+            'tradition_wins' => 0,
+            'tradition_losses' => 0,
+            'money_committed_at_position' => 0
         ];
         $playerPreferences = [
-            'winner' => 5 // High winner preference
+            'winner' => 5, // High winner preference
+            'tradition' => 1,
+            'loyalty' => 1,
+            'playing_time' => 1
         ];
 
         // Act
@@ -315,11 +321,17 @@ class ExtensionOfferEvaluatorTest extends TestCase
     {
         // Arrange
         $teamFactors = [
+            'wins' => 0,
+            'losses' => 0,
             'tradition_wins' => 60,
-            'tradition_losses' => 22
+            'tradition_losses' => 22,
+            'money_committed_at_position' => 0
         ];
         $playerPreferences = [
-            'tradition' => 4 // Moderate tradition preference
+            'winner' => 1,
+            'tradition' => 4, // Moderate tradition preference
+            'loyalty' => 1,
+            'playing_time' => 1
         ];
 
         // Act
@@ -337,7 +349,10 @@ class ExtensionOfferEvaluatorTest extends TestCase
     {
         // Arrange
         $playerPreferences = [
-            'loyalty' => 5 // High loyalty
+            'winner' => 1,
+            'tradition' => 1,
+            'loyalty' => 5, // High loyalty
+            'playing_time' => 1
         ];
 
         // Act
@@ -360,9 +375,16 @@ class ExtensionOfferEvaluatorTest extends TestCase
     {
         // Arrange
         $teamFactors = [
+            'wins' => 0,
+            'losses' => 0,
+            'tradition_wins' => 0,
+            'tradition_losses' => 0,
             'money_committed_at_position' => 5000 // High money at position
         ];
         $playerPreferences = [
+            'winner' => 1,
+            'tradition' => 1,
+            'loyalty' => 1,
             'playing_time' => 5 // High playing time preference
         ];
 
@@ -385,15 +407,12 @@ class ExtensionOfferEvaluatorTest extends TestCase
             'losses' => 32,
             'tradition_wins' => 2500,
             'tradition_losses' => 2000,
-            'coach_rating' => 80,
             'money_committed_at_position' => 3000
         ];
         $playerPreferences = [
             'winner' => 3,
             'tradition' => 3,
-            'coach' => 3,
             'loyalty' => 3,
-            'security' => 3,
             'playing_time' => 3
         ];
 
@@ -593,7 +612,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
         // Empty team factors → wins ?? 0, losses ?? 0 → winDiff = 0. Empty array is
         // intentional (mutation-hardening of the `?? 0` defaults); the shape mismatch
         // is a documented baseline defer, not a defect to "fix" by populating it.
-        $result = $this->evaluator->calculateWinnerModifier([], ['winner' => 3]);
+        $result = $this->evaluator->calculateWinnerModifier([], ['winner' => 3, 'tradition' => 1, 'loyalty' => 1, 'playing_time' => 1]);
 
         $this->assertSame(0.0, $result);
     }
@@ -603,7 +622,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
         // Missing 'winner' key → defaults to 1, so (1-1) = 0 → modifier = 0. Empty
         // preference array is intentional (hardens the `?? 1` default); deferred shape.
         $result = $this->evaluator->calculateWinnerModifier(
-            ['wins' => 50, 'losses' => 32],
+            ['wins' => 50, 'losses' => 32, 'tradition_wins' => 0, 'tradition_losses' => 0, 'money_committed_at_position' => 0],
             []
         );
 
@@ -614,7 +633,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
     {
         // Empty team factors → tradition_wins/losses ?? 0 → diff = 0. Intentional
         // (hardens the `?? 0` defaults); deferred shape.
-        $result = $this->evaluator->calculateTraditionModifier([], ['tradition' => 3]);
+        $result = $this->evaluator->calculateTraditionModifier([], ['winner' => 1, 'tradition' => 3, 'loyalty' => 1, 'playing_time' => 1]);
 
         $this->assertSame(0.0, $result);
     }
@@ -648,8 +667,8 @@ class ExtensionOfferEvaluatorTest extends TestCase
     public function testPlayingTimeModifierExactValueAtMc500(): void
     {
         $result = $this->evaluator->calculatePlayingTimeModifier(
-            ['money_committed_at_position' => 500],
-            ['playing_time' => 5]
+            ['wins' => 0, 'losses' => 0, 'tradition_wins' => 0, 'tradition_losses' => 0, 'money_committed_at_position' => 500],
+            ['winner' => 1, 'tradition' => 1, 'loyalty' => 1, 'playing_time' => 5]
         );
 
         $this->assertEqualsWithDelta(0.05, $result, 0.000001);
@@ -662,8 +681,8 @@ class ExtensionOfferEvaluatorTest extends TestCase
     public function testPlayingTimeModifierExactValueAtMc1500(): void
     {
         $result = $this->evaluator->calculatePlayingTimeModifier(
-            ['money_committed_at_position' => 1500],
-            ['playing_time' => 5]
+            ['wins' => 0, 'losses' => 0, 'tradition_wins' => 0, 'tradition_losses' => 0, 'money_committed_at_position' => 1500],
+            ['winner' => 1, 'tradition' => 1, 'loyalty' => 1, 'playing_time' => 5]
         );
 
         $this->assertEqualsWithDelta(-0.05, $result, 0.000001);
@@ -676,8 +695,8 @@ class ExtensionOfferEvaluatorTest extends TestCase
     public function testWinnerModifierExactValueWithRawDifferential(): void
     {
         $result = $this->evaluator->calculateWinnerModifier(
-            ['wins' => 60, 'losses' => 22],
-            ['winner' => 5]
+            ['wins' => 60, 'losses' => 22, 'tradition_wins' => 0, 'tradition_losses' => 0, 'money_committed_at_position' => 0],
+            ['winner' => 5, 'tradition' => 1, 'loyalty' => 1, 'playing_time' => 1]
         );
 
         $this->assertEqualsWithDelta(0.023256, $result, 0.000001);
@@ -690,8 +709,8 @@ class ExtensionOfferEvaluatorTest extends TestCase
     public function testTraditionModifierExactValueWithRawDifferential(): void
     {
         $result = $this->evaluator->calculateTraditionModifier(
-            ['tradition_wins' => 700, 'tradition_losses' => 300],
-            ['tradition' => 5]
+            ['wins' => 0, 'losses' => 0, 'tradition_wins' => 700, 'tradition_losses' => 300, 'money_committed_at_position' => 0],
+            ['winner' => 1, 'tradition' => 5, 'loyalty' => 1, 'playing_time' => 1]
         );
 
         $this->assertEqualsWithDelta(0.2448, $result, 0.000001);

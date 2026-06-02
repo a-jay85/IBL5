@@ -7,6 +7,9 @@ namespace Tests\Api\Transformer;
 use Api\Transformer\InjuryTransformer;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * @phpstan-import-type InjuredPlayerRow from \Api\Repository\ApiInjuriesRepository
+ */
 class InjuryTransformerTest extends TestCase
 {
     private InjuryTransformer $transformer;
@@ -17,7 +20,7 @@ class InjuryTransformerTest extends TestCase
     }
 
     /**
-     * @return array<string, mixed>
+     * @return InjuredPlayerRow
      */
     private function makeInjuryRow(): array
     {

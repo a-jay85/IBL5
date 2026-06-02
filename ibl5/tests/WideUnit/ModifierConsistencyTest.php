@@ -40,8 +40,8 @@ class ModifierConsistencyTest extends TestCase
 
         $evaluator = new ExtensionOfferEvaluator();
         $extensionResult = $evaluator->calculateWinnerModifier(
-            ['wins' => self::WINS, 'losses' => self::LOSSES],
-            ['winner' => self::WINNER_PREF]
+            ['wins' => self::WINS, 'losses' => self::LOSSES, 'tradition_wins' => 0, 'tradition_losses' => 0, 'money_committed_at_position' => 0],
+            ['winner' => self::WINNER_PREF, 'tradition' => 1, 'loyalty' => 1, 'playing_time' => 1]
         );
 
         $this->assertEqualsWithDelta($expected, $extensionResult, 0.000001, 'Extension winner modifier diverged from ContractRules');
@@ -53,8 +53,8 @@ class ModifierConsistencyTest extends TestCase
 
         $evaluator = new ExtensionOfferEvaluator();
         $extensionResult = $evaluator->calculateTraditionModifier(
-            ['tradition_wins' => self::TRAD_WINS, 'tradition_losses' => self::TRAD_LOSSES],
-            ['tradition' => self::TRADITION_PREF]
+            ['wins' => 0, 'losses' => 0, 'tradition_wins' => self::TRAD_WINS, 'tradition_losses' => self::TRAD_LOSSES, 'money_committed_at_position' => 0],
+            ['winner' => 1, 'tradition' => self::TRADITION_PREF, 'loyalty' => 1, 'playing_time' => 1]
         );
 
         $this->assertEqualsWithDelta($expected, $extensionResult, 0.000001, 'Extension tradition modifier diverged from ContractRules');
@@ -65,7 +65,7 @@ class ModifierConsistencyTest extends TestCase
         $expected = \ContractRules::calculateLoyaltyModifier(self::LOYALTY_PREF);
 
         $evaluator = new ExtensionOfferEvaluator();
-        $extensionResult = $evaluator->calculateLoyaltyModifier(['loyalty' => self::LOYALTY_PREF]);
+        $extensionResult = $evaluator->calculateLoyaltyModifier(['winner' => 1, 'tradition' => 1, 'loyalty' => self::LOYALTY_PREF, 'playing_time' => 1]);
 
         $this->assertEqualsWithDelta($expected, $extensionResult, 0.000001, 'Extension loyalty modifier diverged from ContractRules');
     }
@@ -76,8 +76,8 @@ class ModifierConsistencyTest extends TestCase
 
         $evaluator = new ExtensionOfferEvaluator();
         $extensionResult = $evaluator->calculatePlayingTimeModifier(
-            ['money_committed_at_position' => self::MONEY_COMMITTED],
-            ['playing_time' => self::PLAYING_TIME_PREF]
+            ['wins' => 0, 'losses' => 0, 'tradition_wins' => 0, 'tradition_losses' => 0, 'money_committed_at_position' => self::MONEY_COMMITTED],
+            ['winner' => 1, 'tradition' => 1, 'loyalty' => 1, 'playing_time' => self::PLAYING_TIME_PREF]
         );
 
         $this->assertEqualsWithDelta($expected, $extensionResult, 0.000001, 'Extension playing time modifier diverged from ContractRules');

@@ -40,6 +40,9 @@ jobs:
     outputs:
       # 'false' on skip paths (stale guard) because skipped != failure
       ibl6_failed: ${{ steps.ibl6.outcome == 'failure' }}
+      # 'true' when the IBL5 smoke was INCONCLUSIVE (prober WAF-blocked, exit 3).
+      # Routes to notify-inconclusive instead of gating auto-rollback.
+      ibl5_inconclusive: ${{ steps.ibl5.outputs.inconclusive }}
 
     steps:
       - uses: actions/checkout@v6
@@ -73,10 +76,24 @@ jobs:
         run: sleep 15
 
       - name: Run IBL5 smoke checks (gates auto-rollback)
+        id: ibl5
         if: steps.guard.outputs.stale != 'true'
         run: |
           chmod +x bin/smoke-prod
+          # Capture the exit code without tripping `bash -e`. Exit 3 means the
+          # run was INCONCLUSIVE (prober WAF-blocked, not a real regression):
+          # surface it as an output and exit 0 so smoke.result == 'success' and
+          # the rollback gate's `failure` condition is false by construction.
+          # A real failure (exit 1) still propagates and gates auto-rollback.
+          set +e
           bin/smoke-prod --scope=ibl5 "$BASE_URL"
+          code=$?
+          set -e
+          if [ "$code" -eq 3 ]; then
+            echo "inconclusive=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          exit "$code"
 
       - name: Run IBL6 smoke checks (notify-only)
         id: ibl6
@@ -114,12 +131,35 @@ jobs:
           COMMIT_SHA=$(git log -1 --pretty=%H)
           echo "commit_sha=$COMMIT_SHA" >> "$GITHUB_OUTPUT"
           echo "commit_msg=$COMMIT_MSG" >> "$GITHUB_OUTPUT"
+
+          # Loop-guard: never revert a revert (would ping-pong production).
           if echo "$COMMIT_MSG" | grep -q "^Revert "; then
             echo "should_revert=false" >> "$GITHUB_OUTPUT"
+            echo "skip_reason=already-revert" >> "$GITHUB_OUTPUT"
             echo "HEAD is already a revert commit — skipping to prevent loop"
-          else
-            echo "should_revert=true" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+
+          # Docs-only guard: a deploy that changed only docs/markdown cannot
+          # break runtime, so a smoke failure on it is never that commit's
+          # fault. Defense-in-depth alongside the exit-3 inconclusive path,
+          # for a non-uniform failure that coincides with a docs-only deploy.
+          if [ "$(git cat-file -p HEAD | grep -c '^parent ')" -gt 1 ]; then
+            DIFF_BASE="HEAD^1"
+          else
+            DIFF_BASE="HEAD~1"
+          fi
+          CHANGED=$(git diff --name-only "$DIFF_BASE" HEAD)
+          NON_DOCS=$(echo "$CHANGED" | grep -vE '(\.md$|^docs/|^ibl5/docs/)' || true)
+          if [ -n "$CHANGED" ] && [ -z "$NON_DOCS" ]; then
+            echo "should_revert=false" >> "$GITHUB_OUTPUT"
+            echo "skip_reason=docs-only" >> "$GITHUB_OUTPUT"
+            echo "HEAD changed only docs/markdown — skipping revert"
+            exit 0
+          fi
+
+          echo "should_revert=true" >> "$GITHUB_OUTPUT"
+          echo "skip_reason=" >> "$GITHUB_OUTPUT"
 
       - name: Revert production commit
         id: revert
@@ -148,13 +188,16 @@ jobs:
           COMMIT_MSG: ${{ steps.check.outputs.commit_msg }}
           COMMIT_SHA: ${{ steps.check.outputs.commit_sha }}
           SHOULD_REVERT: ${{ steps.check.outputs.should_revert }}
+          SKIP_REASON: ${{ steps.check.outputs.skip_reason }}
           REVERT_OUTCOME: ${{ steps.revert.outcome }}
           OWNER_DISCORD_ID: ${{ secrets.OWNER_DISCORD_ID }}
         run: |
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           SHORT_SHA="${COMMIT_SHA:0:7}"
 
-          if [ "$SHOULD_REVERT" = "false" ]; then
+          if [ "$SHOULD_REVERT" = "false" ] && [ "$SKIP_REASON" = "docs-only" ]; then
+            MSG=$(printf 'Production smoke test FAILED on a docs-only deploy (%s) — NOT reverting (cannot affect runtime). Likely transient/prober; please check.\n\nRun: %s' "$SHORT_SHA" "$RUN_URL")
+          elif [ "$SHOULD_REVERT" = "false" ]; then
             MSG=$(printf 'Production smoke test FAILED but HEAD is already a revert — manual intervention required.\n\nCommit: %s\nRun: %s' "$SHORT_SHA" "$RUN_URL")
           elif [ "$REVERT_OUTCOME" = "failure" ]; then
             MSG=$(printf 'Production smoke test FAILED and auto-revert FAILED (push rejected?) — manual intervention required.\n\nCommit: %s\nRun: %s' "$SHORT_SHA" "$RUN_URL")
@@ -211,6 +254,7 @@ jobs:
     if: >-
       always() &&
       needs.smoke.outputs.ibl6_failed == 'true' &&
+      needs.smoke.outputs.ibl5_inconclusive != 'true' &&
       needs.smoke.result == 'success'
     timeout-minutes: 5
 
@@ -230,6 +274,43 @@ jobs:
         run: |
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           MSG=$(printf 'IBL6 smoke FAILED; IBL5 unaffected. No rollback.\n\nRun: %s' "$RUN_URL")
+
+          PAYLOAD=$(jq -n --arg id "$OWNER_DISCORD_ID" --arg msg "$MSG" \
+            '{content: {receivingUserDiscordID: $id, message: $msg}}')
+
+          echo "$PAYLOAD" | ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
+            'curl -s --max-time 10 -X POST http://localhost:50000/discordDM -H "Content-Type: application/json" -d @-' \
+            || echo "IBLbot notification failed (bot may be down)"
+
+  notify-inconclusive:
+    name: Notify Smoke Inconclusive
+    runs-on: ubuntu-latest
+    needs: smoke
+    # Fire ONLY when IBL5 smoke was inconclusive (prober WAF-blocked, exit 3).
+    # Both conjuncts are required: a plain success lacks ibl5_inconclusive, and
+    # a real failure sets smoke.result == 'failure' (→ rollback path, not here).
+    if: >-
+      always() &&
+      needs.smoke.outputs.ibl5_inconclusive == 'true' &&
+      needs.smoke.result == 'success'
+    timeout-minutes: 5
+
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -p ${{ secrets.PORT }} ${{ secrets.HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+        env:
+          DEPLOY_KEY: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Send Discord DM
+        env:
+          OWNER_DISCORD_ID: ${{ secrets.OWNER_DISCORD_ID }}
+        run: |
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          MSG=$(printf 'IBL5 smoke INCONCLUSIVE (uniform WAF-class block — likely runner-IP). NO rollback; production untouched. Run: %s' "$RUN_URL")
 
           PAYLOAD=$(jq -n --arg id "$OWNER_DISCORD_ID" --arg msg "$MSG" \
             '{content: {receivingUserDiscordID: $id, message: $msg}}')

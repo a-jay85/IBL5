@@ -12,8 +12,12 @@
 #
 # Exit code:
 #   0 — all in-scope checks passed
-#   1 — one or more in-scope checks failed
+#   1 — one or more in-scope checks failed (real failure: heterogeneous, 5xx, or bad body)
 #   2 — usage error (bad arguments)
+#   3 — inconclusive: every in-scope check failed with an identical WAF-class
+#       status (403/415/429). The prober was almost certainly blocked (e.g.
+#       LiteSpeed banned the runner IP), NOT a real regression — callers
+#       (.github/workflows/smoke-prod.yml) MUST NOT auto-rollback on this code.
 #
 # Environment variables:
 #   SMOKE_IBL6_URL          Override the IBL6 probe URL (default: https://ibl6.iblhoops.net/)
@@ -91,6 +95,19 @@ IBL6_PASS=0
 IBL6_FAIL=0
 ERRORS=""
 
+# WAF-uniformity trackers (drive the exit-3 "inconclusive" classification).
+# A real regression is heterogeneous (some 200, a 5xx, or a 200-with-bad-body);
+# a uniform non-5xx WAF-class code across every check means the prober itself
+# was blocked, not the app. WAF_CODES is the set of statuses LiteSpeed returns
+# when it bans/blocks a client. UNIFORM_WAF starts true and is cleared the
+# moment uniformity is broken (a pass, a non-WAF status, a second WAF code, or
+# any body failure).
+WAF_CODES="403 415 429"
+STATUS_FAILS=0       # count of HTTP-status failures (any code)
+WAF_STATUS_FAILS=0   # subset of STATUS_FAILS whose code is in WAF_CODES
+WAF_CODE=""          # the single WAF code observed so far
+UNIFORM_WAF=1        # 1 while every failure is the same WAF-class status
+
 TMPFILE=$(mktemp)
 trap 'rm -f "$TMPFILE"' EXIT
 
@@ -116,6 +133,17 @@ check() {
     if ! echo "$accept" | grep -qw "$status"; then
         eval "${category}_FAIL=\$(( ${category}_FAIL + 1 ))"
         ERRORS="${ERRORS}\n  FAIL: $name — HTTP $status (expected $accept)"
+        STATUS_FAILS=$(( STATUS_FAILS + 1 ))
+        if echo "$WAF_CODES" | grep -qw "$status"; then
+            WAF_STATUS_FAILS=$(( WAF_STATUS_FAILS + 1 ))
+            if [ -z "$WAF_CODE" ]; then
+                WAF_CODE="$status"
+            elif [ "$status" != "$WAF_CODE" ]; then
+                UNIFORM_WAF=0   # a second distinct WAF code breaks uniformity
+            fi
+        else
+            UNIFORM_WAF=0       # a non-WAF status (e.g. 5xx) is a real failure
+        fi
         return
     fi
 
@@ -123,18 +151,35 @@ check() {
         if grep -qiE "Fatal error|Parse error|Warning:|Uncaught|Stack trace:" "$TMPFILE"; then
             eval "${category}_FAIL=\$(( ${category}_FAIL + 1 ))"
             ERRORS="${ERRORS}\n  FAIL: $name — PHP error detected"
+            UNIFORM_WAF=0       # acceptable status but a bad body — real failure
             return
         fi
 
         if ! grep -qi "$expect" "$TMPFILE"; then
             eval "${category}_FAIL=\$(( ${category}_FAIL + 1 ))"
             ERRORS="${ERRORS}\n  FAIL: $name — missing expected content: $expect"
+            UNIFORM_WAF=0       # acceptable status but missing content — real failure
             return
         fi
     fi
 
     eval "${category}_PASS=\$(( ${category}_PASS + 1 ))"
+    UNIFORM_WAF=0               # any pass means the prober reached the app
     echo "  OK: $name"
+}
+
+# A scope is "inconclusive" (exit 3) iff it ran >=2 checks, none passed, every
+# failure was an HTTP-status failure (no body failures), and all those statuses
+# were the same WAF-class code. Conservative by design: it never suppresses a
+# heterogeneous outage, a 5xx, or a 200-with-bad-body. Args: total pass fail.
+is_inconclusive() {
+    local total="$1" pass="$2" fail="$3"
+    [ "$total" -ge 2 ] || return 1
+    [ "$pass" -eq 0 ] || return 1
+    [ "$STATUS_FAILS" -eq "$fail" ] || return 1
+    [ "$WAF_STATUS_FAILS" -eq "$STATUS_FAILS" ] || return 1
+    [ "$UNIFORM_WAF" -eq 1 ] || return 1
+    return 0
 }
 
 # --- Run checks ------------------------------------------------------------------
@@ -192,13 +237,34 @@ else
     fi
 fi
 
-if [ "$SCOPE" = "ibl5" ] && [ "$IBL5_FAIL" -gt 0 ]; then
-    echo -e "\nFailures:$ERRORS"
-    exit 1
-elif [ "$SCOPE" = "ibl6" ] && [ "$IBL6_FAIL" -gt 0 ]; then
-    echo -e "\nFailures:$ERRORS"
-    exit 1
-elif [ "$SCOPE" = "all" ] && [ "$TOTAL_FAIL" -gt 0 ]; then
-    echo -e "\nFailures:$ERRORS"
-    exit 1
+# Exit 3 (inconclusive) MUST be tested before exit 1: an inconclusive run has
+# every check failed, so the "*_FAIL > 0 -> exit 1" branch would otherwise
+# shadow it. IBL6 has a single check, so its scope can never be inconclusive
+# (the >=2-checks guard fails) and its existing notify-only behavior is intact.
+INCONCLUSIVE_MSG="\nINCONCLUSIVE: uniform HTTP $WAF_CODE across all checks — prober likely WAF-blocked (no auto-rollback).$ERRORS"
+
+if [ "$SCOPE" = "ibl5" ]; then
+    if is_inconclusive "$((IBL5_PASS + IBL5_FAIL))" "$IBL5_PASS" "$IBL5_FAIL"; then
+        echo -e "$INCONCLUSIVE_MSG"
+        exit 3
+    elif [ "$IBL5_FAIL" -gt 0 ]; then
+        echo -e "\nFailures:$ERRORS"
+        exit 1
+    fi
+elif [ "$SCOPE" = "ibl6" ]; then
+    if is_inconclusive "$((IBL6_PASS + IBL6_FAIL))" "$IBL6_PASS" "$IBL6_FAIL"; then
+        echo -e "$INCONCLUSIVE_MSG"
+        exit 3
+    elif [ "$IBL6_FAIL" -gt 0 ]; then
+        echo -e "\nFailures:$ERRORS"
+        exit 1
+    fi
+elif [ "$SCOPE" = "all" ]; then
+    if is_inconclusive "$((TOTAL_PASS + TOTAL_FAIL))" "$TOTAL_PASS" "$TOTAL_FAIL"; then
+        echo -e "$INCONCLUSIVE_MSG"
+        exit 3
+    elif [ "$TOTAL_FAIL" -gt 0 ]; then
+        echo -e "\nFailures:$ERRORS"
+        exit 1
+    fi
 fi

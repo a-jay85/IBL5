@@ -763,25 +763,7 @@ parameters:
 			path: tests/Extension/ExtensionOfferEvaluatorTest.php
 
 		-
-			rawMessage: 'Parameter #1 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateLoyaltyModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{loyalty: 1} given.'
-			identifier: argument.type
-			count: 2
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateLoyaltyModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{loyalty: 5} given.'
-			identifier: argument.type
-			count: 2
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
 			rawMessage: 'Parameter #1 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateLoyaltyModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculateCombinedModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{wins: 50, losses: 32, tradition_wins: 2500, tradition_losses: 2000, coach_rating: 80, money_committed_at_position: 3000} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/Extension/ExtensionOfferEvaluatorTest.php
@@ -793,49 +775,7 @@ parameters:
 			path: tests/Extension/ExtensionOfferEvaluatorTest.php
 
 		-
-			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculatePlayingTimeModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{money_committed_at_position: 1500} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculatePlayingTimeModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{money_committed_at_position: 50000000} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculatePlayingTimeModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{money_committed_at_position: 5000} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculatePlayingTimeModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{money_committed_at_position: 500} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
 			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculatePlayingTimeModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculateTraditionModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{tradition_wins: 1000, tradition_losses: 500} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculateTraditionModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{tradition_wins: 60, tradition_losses: 22} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculateTraditionModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{tradition_wins: 700, tradition_losses: 300} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/Extension/ExtensionOfferEvaluatorTest.php
@@ -847,31 +787,7 @@ parameters:
 			path: tests/Extension/ExtensionOfferEvaluatorTest.php
 
 		-
-			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculateWinnerModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{wins: 20, losses: 62} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculateWinnerModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{wins: 50, losses: 32} given.'
-			identifier: argument.type
-			count: 3
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculateWinnerModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{wins: 60, losses: 22} given.'
-			identifier: argument.type
-			count: 2
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
 			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculateWinnerModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
-			rawMessage: 'Parameter #2 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateCombinedModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{winner: 3, tradition: 3, coach: 3, loyalty: 3, security: 3, playing_time: 3} given.'
 			identifier: argument.type
 			count: 1
 			path: tests/Extension/ExtensionOfferEvaluatorTest.php
@@ -883,51 +799,9 @@ parameters:
 			path: tests/Extension/ExtensionOfferEvaluatorTest.php
 
 		-
-			rawMessage: 'Parameter #2 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculatePlayingTimeModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{playing_time: 5} given.'
-			identifier: argument.type
-			count: 4
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
 			rawMessage: 'Parameter #2 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculatePlayingTimeModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{} given.'
 			identifier: argument.type
 			count: 1
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
-			rawMessage: 'Parameter #2 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateTraditionModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{tradition: 3} given.'
-			identifier: argument.type
-			count: 2
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
-			rawMessage: 'Parameter #2 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateTraditionModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{tradition: 4} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
-			rawMessage: 'Parameter #2 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateTraditionModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{tradition: 5} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
-			rawMessage: 'Parameter #2 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateWinnerModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{winner: 1} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
-			rawMessage: 'Parameter #2 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateWinnerModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{winner: 3} given.'
-			identifier: argument.type
-			count: 3
-			path: tests/Extension/ExtensionOfferEvaluatorTest.php
-
-		-
-			rawMessage: 'Parameter #2 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateWinnerModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{winner: 5} given.'
-			identifier: argument.type
-			count: 2
 			path: tests/Extension/ExtensionOfferEvaluatorTest.php
 
 		-
@@ -2819,48 +2693,6 @@ parameters:
 		-
 			rawMessage: 'Array has 2 duplicate keys with value ''teamid'' (''teamid'', ''teamid'').'
 			identifier: array.duplicateKey
-			count: 1
-			path: tests/WideUnit/ModifierConsistencyTest.php
-
-		-
-			rawMessage: 'Parameter #1 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateLoyaltyModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{loyalty: 4} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/WideUnit/ModifierConsistencyTest.php
-
-		-
-			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculatePlayingTimeModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{money_committed_at_position: 800} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/WideUnit/ModifierConsistencyTest.php
-
-		-
-			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculateTraditionModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{tradition_wins: 700, tradition_losses: 300} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/WideUnit/ModifierConsistencyTest.php
-
-		-
-			rawMessage: 'Parameter #1 $teamFactors of method Extension\ExtensionOfferEvaluator::calculateWinnerModifier() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{wins: 60, losses: 22} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/WideUnit/ModifierConsistencyTest.php
-
-		-
-			rawMessage: 'Parameter #2 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculatePlayingTimeModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{playing_time: 5} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/WideUnit/ModifierConsistencyTest.php
-
-		-
-			rawMessage: 'Parameter #2 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateTraditionModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{tradition: 3} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/WideUnit/ModifierConsistencyTest.php
-
-		-
-			rawMessage: 'Parameter #2 $playerPreferences of method Extension\ExtensionOfferEvaluator::calculateWinnerModifier() expects array{winner: int, tradition: int, loyalty: int, playing_time: int}, array{winner: 5} given.'
-			identifier: argument.type
 			count: 1
 			path: tests/WideUnit/ModifierConsistencyTest.php
 

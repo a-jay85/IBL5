@@ -248,31 +248,14 @@ class TradeOffer implements TradeOfferInterface
     private function sumCashRecordSalaries(int $teamId): int
     {
         $cashRecords = $this->cashConsiderationRepository->getTeamCashForSalary($teamId);
+
+        // Playoffs counts as offseason for trade cap math (contract years have
+        // effectively rolled over), unlike the FA cap calculation.
         $isOffseason = $this->season->phase === 'Playoffs'
             || $this->season->phase === 'Draft'
             || $this->season->phase === 'Free Agency';
 
-        $total = 0;
-        foreach ($cashRecords as $record) {
-            $cy = $record['cy'] ?? 1;
-            if ($isOffseason) {
-                $cy++;
-            }
-            if ($cy === 0) {
-                $cy = 1;
-            }
-            $total += match ($cy) {
-                1 => $record['salary_yr1'],
-                2 => $record['salary_yr2'],
-                3 => $record['salary_yr3'],
-                4 => $record['salary_yr4'],
-                5 => $record['salary_yr5'],
-                6 => $record['salary_yr6'],
-                default => 0,
-            };
-        }
-
-        return $total;
+        return BuyoutLedgerRepository::sumCurrentSeasonSalaryFromRows($cashRecords, $isOffseason);
     }
 
     /**

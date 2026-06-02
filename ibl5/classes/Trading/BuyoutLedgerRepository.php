@@ -97,6 +97,61 @@ class BuyoutLedgerRepository extends BaseMysqliRepository implements BuyoutLedge
     }
 
     /**
+     * Look up the salary for a given contract year from a cash-consideration
+     * row keyed `salary_yr1`..`salary_yr6`.
+     *
+     * Centralizes the duplicated `match ($cy) { 1 => $row['salary_yr1'] ... }`
+     * salary-slot lookup used by the cap/cash walks (TeamQueryRepository,
+     * FreeAgencyCapCalculator, and {@see self::sumCurrentSeasonSalaryFromRows()}).
+     * Returns 0 for any contract year outside the 1-6 range.
+     *
+     * @param array<string, mixed> $row Row exposing salary_yr1..salary_yr6
+     * @param int $contractYear Contract year to read (1-6)
+     */
+    public static function salaryForContractYear(array $row, int $contractYear): int
+    {
+        return match ($contractYear) {
+            1 => (int) ($row['salary_yr1'] ?? 0),
+            2 => (int) ($row['salary_yr2'] ?? 0),
+            3 => (int) ($row['salary_yr3'] ?? 0),
+            4 => (int) ($row['salary_yr4'] ?? 0),
+            5 => (int) ($row['salary_yr5'] ?? 0),
+            6 => (int) ($row['salary_yr6'] ?? 0),
+            default => 0,
+        };
+    }
+
+    /**
+     * Sum the current-season salary across cash-consideration rows.
+     *
+     * For each row the contract year (`cy`) is read, advanced by one when the
+     * league's contract years have already rolled over (offseason), clamped up
+     * to year 1, and the matching salary slot is added. The offseason predicate
+     * is caller-supplied rather than baked in because it differs by context —
+     * the Playoffs phase counts as offseason for trade cap math but not for the
+     * free-agency cap calculation.
+     *
+     * @param array<int, array<string, mixed>> $rows Cash-consideration rows (cy + salary_yr1..6)
+     * @param bool $advancesContractYears Whether the current contract year has rolled over (offseason)
+     */
+    public static function sumCurrentSeasonSalaryFromRows(array $rows, bool $advancesContractYears): int
+    {
+        $total = 0;
+        foreach ($rows as $row) {
+            $cy = (int) ($row['cy'] ?? 1);
+            if ($advancesContractYears) {
+                $cy++;
+            }
+            if ($cy === 0) {
+                $cy = 1;
+            }
+            $total += self::salaryForContractYear($row, $cy);
+        }
+
+        return $total;
+    }
+
+    /**
      * @see BuyoutLedgerRepositoryInterface::deleteExpiredCashConsiderations()
      */
     public function deleteExpiredCashConsiderations(): int

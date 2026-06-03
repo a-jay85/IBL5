@@ -29,8 +29,12 @@ class TeamCapCalculatorTest extends DatabaseTestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // $this->repo is used only to fetch raw roster rows for the salary-sum
+        // cases. The calculator is built with just the connection so its default
+        // TeamQueryRepository / BuyoutLedgerRepository collaborators are exercised
+        // end-to-end against the real schema.
         $this->repo = new TeamQueryRepository($this->db);
-        $this->calculator = new TeamCapCalculator($this->db, $this->repo);
+        $this->calculator = new TeamCapCalculator($this->db);
     }
 
     // --- Salary Cap ---

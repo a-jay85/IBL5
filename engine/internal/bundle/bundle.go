@@ -87,6 +87,19 @@ type Player struct {
 	BLK  int `json:"r_blk"`
 	Foul int `json:"r_foul"`
 
+	// Real-life / previous-season counting-stat sums — the engine's per-48-MINUTE
+	// shot-volume rate inputs (D88/DB8/D70 = (stat/MIN)×48) for the 2pt-bucket
+	// composite. JSON tags match the PHP PlrParserService rl_* derived columns so the
+	// production bundle-builder (a follow-on PR) maps 1:1. The Go backup assembler
+	// populates them from the static real-life .plr block (offsets 52-111). Absent/
+	// zero MINUTES — a player with no prior-season reference, or a production bundle
+	// not yet wired — falls back to the rating stand-in (sim/bucketweights.go).
+	// RealLifeFGA is total FG attempts (incl. 3PA).
+	RealLifeMIN int `json:"rl_min"`
+	RealLifeFGA int `json:"rl_fga"`
+	RealLifeFTA int `json:"rl_fta"`
+	RealLifeORB int `json:"rl_orb"`
+
 	// Attributes.
 	Age         int `json:"age"`
 	Stamina     int `json:"stamina"`

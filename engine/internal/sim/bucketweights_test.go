@@ -163,3 +163,94 @@ func TestBucketWeights_FoulEVExceedsTwoPt(t *testing.T) {
 	}
 	t.Logf("EV(foul)=%.3f EV(2pt)=%.3f — foul is the higher-EV path (locks HCA directionality)", evFoul, ev2pt)
 }
+
+// --- ADR-0040 (A): real per-48 volume rates replace the rating stand-ins -------
+
+// Row 8 (characterization): with no real-life minutes (RealLifeMIN==0) the bucket
+// equals the current stand-in composite, byte-for-byte — the no-reference fallback
+// the change preserves. Setting the sums but leaving MIN==0 must NOT engage the real
+// path (MIN is the gate and divisor).
+func TestBucketWeights_RealLifeFallbackUnchanged(t *testing.T) {
+	p := oc(slotPG, mkPlayer(1, 3, slotPG, 48)) // RealLifeMIN==0 → fallback
+
+	d88 := floor1(p.FGA) * fgaRateScale
+	db8 := floor1(p.ORB) * orbRateScale
+	d70 := floor1(p.FTA) * ftaRateScale
+	makeShare := (d88/(db8+d88))*d90MakeShareHalf + d90MakeShareQuarter
+	want := d88 - (d88/(d70+d88))*db8*makeShare
+
+	if got := twoPtBucketWeight(p); math.Abs(got-want) > 1e-9 {
+		t.Errorf("fallback weight = %.6f, want stand-in composite = %.6f", got, want)
+	}
+
+	// Sums present but MIN==0 → still the fallback (MIN gates the real path).
+	p2 := p
+	p2.RealLifeFGA = 9999
+	if got := twoPtBucketWeight(p2); math.Abs(got-want) > 1e-9 {
+		t.Errorf("MIN==0 with sums set engaged the real path: got %.6f, want %.6f", got, want)
+	}
+}
+
+// Row 9: with real-life minutes the bucket equals the hand-computed +0xD90 over the
+// faithful per-48-MINUTE rates (stat/MIN)×48 (D70 scaled by d70LeagueScalar). The
+// magnitude lands in the O(10s) stand-in regime (d88 ≈ 25.6), not the O(100s) the
+// per-48-games divisor would give.
+func TestBucketWeights_RealLifeComposite(t *testing.T) {
+	pl := mkPlayer(1, 3, slotPG, 48)
+	pl.RealLifeMIN = 2400 // ~34 min/game over 70 games
+	pl.RealLifeFGA = 1280 // d88 = 1280/2400*48 = 25.6
+	pl.RealLifeORB = 160  // db8 = 160/2400*48  = 3.2
+	pl.RealLifeFTA = 320  // d70 = 320/2400*48  = 6.4 (×1.0)
+	p := oc(slotPG, pl)
+
+	d88 := per48Min(1280, 2400)
+	db8 := per48Min(160, 2400)
+	d70 := per48Min(320, 2400) * d70LeagueScalar
+	makeShare := (d88/(db8+d88))*d90MakeShareHalf + d90MakeShareQuarter
+	want := d88 - (d88/(d70+d88))*db8*makeShare
+
+	if got := twoPtBucketWeight(p); math.Abs(got-want) > 1e-9 {
+		t.Errorf("real-rate composite = %.6f, want %.6f", got, want)
+	}
+	if want > 50 {
+		t.Errorf("real-rate 2pt bucket = %.2f is O(100s) — the per-48-minute scale must stay O(10s)", want)
+	}
+}
+
+// Row 10: two players with IDENTICAL FGA ratings but DIFFERENT real-life FGA rates
+// produce different 2pt weights — the volume signal the compressed rating stand-in
+// flattened away (the dispersion mechanism, ADR-0040). Both also differ from the
+// rating-only stand-in.
+func TestBucketWeights_RealRateDisperses(t *testing.T) {
+	lo := mkPlayer(1, 3, slotPG, 48) // FGA rating 60
+	lo.RealLifeMIN, lo.RealLifeFGA, lo.RealLifeFTA, lo.RealLifeORB = 2400, 800, 200, 80
+	hi := mkPlayer(2, 3, slotPG, 48) // SAME FGA rating 60
+	hi.RealLifeMIN, hi.RealLifeFGA, hi.RealLifeFTA, hi.RealLifeORB = 2400, 1600, 200, 80
+
+	wLo := twoPtBucketWeight(oc(slotPG, lo))
+	wHi := twoPtBucketWeight(oc(slotPG, hi))
+	if !(wHi > wLo) {
+		t.Errorf("higher real FGA rate should give a larger 2pt weight: hi=%.4f lo=%.4f", wHi, wLo)
+	}
+
+	standin := twoPtBucketWeight(oc(slotPG, mkPlayer(3, 3, slotPG, 48))) // RealLifeMIN==0
+	if math.Abs(wLo-standin) < 1e-9 {
+		t.Errorf("real-rate weight %.4f indistinguishable from compressed stand-in %.4f", wLo, standin)
+	}
+}
+
+// Row 11 (boundary): RealLifeMIN>0 with FGA==0 ∧ ORB==0 (played, only ever shot FTs)
+// must yield a finite weight, not the 0/0 NaN the real-rate path reopens (the guard).
+// The faithful limiting value is d88 == 0.
+func TestBucketWeights_RealLifeZeroFGA(t *testing.T) {
+	pl := mkPlayer(1, 3, slotPG, 48)
+	pl.RealLifeMIN, pl.RealLifeFGA, pl.RealLifeORB, pl.RealLifeFTA = 1200, 0, 0, 300
+	got := twoPtBucketWeight(oc(slotPG, pl))
+
+	if math.IsNaN(got) || math.IsInf(got, 0) {
+		t.Fatalf("FGA==0 ∧ ORB==0 produced a non-finite weight: %v", got)
+	}
+	if got != 0 {
+		t.Errorf("zero-FGA limit = %v, want 0 (d88)", got)
+	}
+}

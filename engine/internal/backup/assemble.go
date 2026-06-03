@@ -44,6 +44,12 @@ type AssembleOptions struct {
 //   - dc_minutes — the GM depth-chart minutes, sourced from the snapshot's .plb
 //     file via opts.Minutes (keyed by player Ordinal). A nil map -> 0 (no .plb).
 //
+// The real-life / previous-season counting-stat sums (RealLifeMIN/FGA/FTA/ORB) ARE
+// per-player .plr fields (static block at offsets 52-111, parsed by ReadPlr) and
+// are mapped straight through; they feed the engine's per-48-minute shot-volume
+// rate composite (sim/bucketweights.go). On the PHP production path the same bundle
+// fields come from PlrParserService's rl_* columns (a follow-on PR).
+//
 // Still zeroed (correct, not a gap):
 //   - r_foul — no foul rating in the .plr ratings block.
 //   - dc_of/df/oi/di/bh — dead on IBL5 data; the engine deliberately never reads
@@ -139,6 +145,12 @@ func toBundlePlayer(p PlrPlayer, minutes map[int]int) bundle.Player {
 		TVR: p.RatingTVR,
 		BLK: p.RatingBLK,
 		// Foul: no .plr source -> 0.
+
+		// Real-life / previous-season sums -> the per-48-minute rate composite inputs.
+		RealLifeMIN: p.RealLifeMIN,
+		RealLifeFGA: p.RealLifeFGA,
+		RealLifeFTA: p.RealLifeFTA,
+		RealLifeORB: p.RealLifeORB,
 
 		Age:         p.Age,
 		Clutch:      p.Clutch,

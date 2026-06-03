@@ -50,15 +50,29 @@ package sim
 // SIGN, the invariant PR7a got wrong.
 
 const (
-	// +0xD90 Branch-A per-48 rate stand-ins (COMPOSITE_DOUBLES_TRACE.md §1, §4).
-	// Each maps a 0-99 rating to a per-48 rate analog; the bundle has no season
-	// GP/FGA sums so these are documented stand-ins for the recovered season-rate
-	// doubles. fgaRateScale: r_fga 60 → ~18 FGA/48; orbRateScale: r_orb 20 → ~3
-	// ORB/48; ftaRateScale: the team-relative FTA-weighted D70 stand-in, r_fta 20 →
-	// ~6 (the real D70 reads CEngine team/league aggregates absent from the bundle).
+	// +0xD90 Branch-A per-48 rate FALLBACK stand-ins (COMPOSITE_DOUBLES_TRACE.md
+	// §1, §4). Used only when the bundle carries no real-life minutes
+	// (RealLifeMIN == 0): a player with no prior-season reference, or a production
+	// bundle whose PHP builder is not yet wired. Each maps a 0-99 rating to a per-48
+	// rate analog: fgaRateScale r_fga 60 → ~18 FGA/48; orbRateScale r_orb 20 → ~3
+	// ORB/48; ftaRateScale r_fta 20 → ~6. The PRIMARY path now computes the real
+	// per-48-MINUTE rates (stat/MIN)×48 from the bundle's real-life sums — see
+	// twoPtBucketWeight. The compressed-rating stand-in is why team offense did not
+	// disperse (ADR-0040); these constants survive only as the no-reference fallback.
+	// (The stand-in scales target this same ~18-FGA/48 O(10s) magnitude, which is why
+	// the real rate must be per-48-MINUTES — per-48-GAMES would be ~55× larger and
+	// collapse the foul/FTA mix; see twoPtBucketWeight.)
 	fgaRateScale = 0.30
 	orbRateScale = 0.15
 	ftaRateScale = 0.30
+
+	// d70LeagueScalar carries D70's league-relative factor
+	// ((C[+0x6938]×5 − C[+0x68D8]×0.5)/(C[+0x6728]×5), COMPOSITE_DOUBLES_TRACE.md §3),
+	// which reads runtime CEngine LEAGUE aggregates absent from the IBL data path
+	// (ADR-0040 negative finding 2 — the "loader-populated, not modeled" class, like
+	// league_baseline). It is a uniform league scalar, so it degrades to a documented
+	// calibrated constant: 1.0 (neutral) here, corpus-tunable on PR2's instrument.
+	d70LeagueScalar = 1.0
 
 	// +0xD90 Branch-A pinned constants (COMPOSITE_DOUBLES_TRACE.md §5): the 0.5
 	// (_DAT_00669ef0) and 0.25 (_DAT_00669f58) factors in the make-share weighting.
@@ -84,22 +98,52 @@ const (
 	andOneMadeRateScale = 0.0008
 )
 
+// per48Min is the per-48-MINUTE season rate (stat / minutes) × 48 (_DAT_00669ed0 =
+// 48.0). The divisor is season minutes by elimination — a games-scale divisor
+// collapses the play-outcome mix; see plr.go's offRealLifeMIN note for the .sco
+// evidence and the open decompile-identity caveat. Callers guard minutes > 0.
+func per48Min(stat, minutes int) float64 {
+	return float64(stat) / float64(minutes) * 48.0
+}
+
 // twoPtBucketWeight is the recovered +0xD90 Branch-A cold composite
 // (jsb560_decompiled.c:91078-91086, COMPOSITE_DOUBLES_TRACE.md §4):
 //
 //	D90 = D88 − (D88/(D70+D88)) × DB8 × ((D88/(DB8+D88)) × 0.5 + 0.25)
 //
-// where D88 = per-48 FGA rate, DB8 = per-48 ORB rate, D70 = the team-relative
-// FTA-weighted rate (documented stand-ins, see the rate-scale constants above).
+// where D88 = per-48 FGA rate, DB8 = per-48 ORB rate, D70 = the FTA-weighted rate.
+// The composite formula is unchanged; what changed (ADR-0040, candidate A) is its
+// INPUTS. When the bundle carries the real-life minutes (RealLifeMIN > 0) D88/DB8/
+// D70 are the FAITHFUL per-48-MINUTE rates (stat/MIN)×48 — the wide team-to-team
+// spread 5.60 disperses team offense on, in the same O(10s) magnitude as the
+// stand-in (a high-volume player ≈ 27 FGA/48). Absent them (rookie / unwired
+// production bundle) it falls back to the compressed rating stand-in (fgaRateScale
+// etc.), the behavior this PR preserves byte-for-byte for the no-reference case.
+// (Using minutes, not games, is load-bearing: per-48-GAMES would be ~55× larger,
+// driving the 2pt bucket to O(100s) and collapsing the foul/FTA play-outcome share
+// to ~0 — verified degenerate against the .sco corpus.)
+//
 // It is net-free: in JSB net enters only via shot_value, so the playoff ×1.25
 // multiplier never amplifies this bucket. The composite is O(10s), keeping the
 // 0.6-floored foul bucket a realistic minority share and field-goal attempts the
 // majority path.
 func twoPtBucketWeight(p onCourt) float64 {
-	d88 := floor1(p.FGA) * fgaRateScale
-	db8 := floor1(p.ORB) * orbRateScale
-	d70 := floor1(p.FTA) * ftaRateScale
-	if d70+d88 <= 0 {
+	var d88, db8, d70 float64
+	if p.RealLifeMIN > 0 {
+		d88 = per48Min(p.RealLifeFGA, p.RealLifeMIN)
+		db8 = per48Min(p.RealLifeORB, p.RealLifeMIN)
+		d70 = per48Min(p.RealLifeFTA, p.RealLifeMIN) * d70LeagueScalar
+	} else {
+		d88 = floor1(p.FGA) * fgaRateScale
+		db8 = floor1(p.ORB) * orbRateScale
+		d70 = floor1(p.FTA) * ftaRateScale
+	}
+	// Guard both composite divisions. The real-rate path can yield d88 == 0 (a
+	// player who took no FGs) where the stand-in's floor1 always made d88 > 0; with
+	// d88 == 0 the faithful composite limit is d88 (the subtracted term carries d88
+	// as a factor), and without this guard makeShare's d88/(db8+d88) is 0/0 = NaN
+	// when db8 is also 0 — a NaN that would silently poison the weighted pick.
+	if d88 <= 0 || d70+d88 <= 0 {
 		return d88
 	}
 	makeShare := (d88/(db8+d88))*d90MakeShareHalf + d90MakeShareQuarter

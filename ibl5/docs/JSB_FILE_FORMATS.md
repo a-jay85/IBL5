@@ -1,6 +1,6 @@
 ---
 description: Jump Shot Basketball binary file format specifications.
-last_verified: 2026-06-02
+last_verified: 2026-06-03
 ---
 
 # Jump Shot Basketball (JSB) Engine File Format Specifications
@@ -122,6 +122,8 @@ Field offsets and widths below are the authoritative spec used by `classes/PlrPa
 #### Real-Life / Previous Season Stats (52-111)
 
 Backing for the JSB simulation engine's "real-life" tendencies — these are the reference stats used by the engine when simulating games, independent of the in-game season totals.
+
+**Live engine input (native Go engine).** The +0xD90 2pt-bucket composite (`engine/internal/sim/bucketweights.go`) reads `realLifeMIN/FGA/FTA/ORB` as its per-48-**minute** shot-volume rates `(stat/MIN)×48` (D88/DB8/D70) — the faithful basis on which JSB disperses team offense (ADR-0040). `realLifeMIN` (offset 56) is the divisor: per-48-**minutes**, not per-48-games — the latter is ~55× larger and collapses the foul/FTA play-outcome mix (verified against the `.sco` corpus, jumpshot 5.60's own output). `realLifeFGA` is **total** FG attempts (incl. 3PA; `realLife3GA` is the 3PA subset). The Go reader is `engine/internal/backup/plr.go` (offsets transcribed from `classes/PlrParser/PlrLineParser.php`); on the production path the same values arrive as PlrParserService's `rl_*` columns. A player with zero real-life minutes (e.g. a rookie) makes the engine fall back to a compressed rating stand-in.
 
 | Offset | Width | Field |
 |--------|-------|-------|

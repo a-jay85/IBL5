@@ -54,6 +54,33 @@ const (
 	offPeak    = 46 // width 4
 	offPos     = 50 // width 2 — PG/SG/SF/PF/" C"
 
+	// Real-life / previous-season counting-stat sums (width 4 each), the engine's
+	// per-48-MINUTE shot-volume rate inputs (D88/DB8/D70 in sim/bucketweights.go).
+	// Offsets transcribed from PlrLineParser.php 42-55. This is the STATIC reference
+	// block JSB reads for "real-life tendencies" (ibl5/docs/JSB_FILE_FORMATS.md, the
+	// 52-111 block), distinct from the in-game season totals (144-207).
+	//
+	// The rate is (stat / divisor) × 48 — the per-48 convention (_DAT_00669ed0 = 48.0).
+	// The divisor is season MINUTES (offRealLifeMIN), established by elimination, not by
+	// a clean decompile trace: a games-magnitude divisor (GP +0x144 or GS +0x148, both
+	// ≈ 75-82) drives the 2pt bucket to O(100s) and collapses the foul/FTA play-outcome
+	// mix to ~0, while a minutes-magnitude divisor (≈ 2500) reproduces jumpshot 5.60's
+	// FTA/PF against the .sco corpus (5.60's own output) — and MIN (+0x14C) is the only
+	// minutes-magnitude field in the stat block. COMPOSITE_DOUBLES_TRACE.md §1 labels
+	// the divisor "ΣGP" and its §2 stat-offset map is flagged PARTIAL; the divisor
+	// temporary is reused across blocks, so the exact accumulator identity is NOT
+	// cleanly pinned — but games-scale is empirically excluded, leaving minutes.
+	//
+	// offRealLifeFGA is TOTAL field-goal attempts (incl. 3PA, standard FG naming;
+	// verified FGA>=3GA across all 657 records of a real .plr) — it IS the decompile's
+	// FGA_total, so D88 reads it directly. Only the four fields the 2pt-bucket
+	// composite consumes are mapped; the Branch-B usage-shrink's team DRB/AST rates
+	// (offsets 88/92) are a separate follow-on input and are not parsed here.
+	offRealLifeMIN = 56 // width 4 — minutes played (the per-48 rate divisor)
+	offRealLifeFGA = 64 // width 4 — total FG attempts (D88)
+	offRealLifeFTA = 72 // width 4 — FT attempts (D70 per-player part)
+	offRealLifeORB = 84 // width 4 — offensive rebounds (DB8)
+
 	// Clutch / consistency / depth chart.
 	offClutch        = 128 // width 2
 	offConsistency   = 130 // width 2
@@ -131,6 +158,15 @@ type PlrPlayer struct {
 	PFDepth int
 	CDepth  int
 
+	// Real-life / previous-season counting-stat sums — the per-48-MINUTE rate inputs
+	// the 2pt-bucket composite reads ((stat/MIN)×48; RealLifeFGA is total FG attempts
+	// incl. 3PA). Zero MINUTES means no prior-season reference (e.g. a rookie); the
+	// engine falls back to the rating stand-in (sim/bucketweights.go twoPtBucketWeight).
+	RealLifeMIN int
+	RealLifeFGA int
+	RealLifeFTA int
+	RealLifeORB int
+
 	// Main ratings (0-99).
 	RatingFGA int
 	RatingFGP int
@@ -202,6 +238,8 @@ func ReadPlr(r io.Reader) ([]PlrPlayer, error) {
 			{&p.CanPlayInGame, offCanPlayInGame, 1},
 			{&p.PGDepth, offPGDepth, 1}, {&p.SGDepth, offSGDepth, 1}, {&p.SFDepth, offSFDepth, 1},
 			{&p.PFDepth, offPFDepth, 1}, {&p.CDepth, offCDepth, 1},
+			{&p.RealLifeMIN, offRealLifeMIN, 4}, {&p.RealLifeFGA, offRealLifeFGA, 4},
+			{&p.RealLifeFTA, offRealLifeFTA, 4}, {&p.RealLifeORB, offRealLifeORB, 4},
 			{&p.RatingFGA, offRating2GA, 3}, {&p.RatingFGP, offRating2GP, 3},
 			{&p.RatingFTA, offRatingFTA, 3}, {&p.RatingFTP, offRatingFTP, 3},
 			{&p.Rating3GA, offRating3GA, 3}, {&p.Rating3GP, offRating3GP, 3},

@@ -67,6 +67,32 @@ func TestDecode_RoundTripPopulatesAllFields(t *testing.T) {
 	}
 }
 
+// Row 4 (boundary) — a bundle whose player omits the rl_* keys decodes with
+// RealLife*==0 (production-omission tolerated → the engine falls back to the
+// rating stand-in); when the keys ARE present they bind by tag.
+func TestDecode_RealLifeAbsentZero(t *testing.T) {
+	// validBundleJSON carries no rl_* keys.
+	b, err := Decode([]byte(validBundleJSON))
+	if err != nil {
+		t.Fatalf("Decode: %v", err)
+	}
+	if p := b.Players[0]; p.RealLifeMIN != 0 || p.RealLifeFGA != 0 || p.RealLifeFTA != 0 || p.RealLifeORB != 0 {
+		t.Errorf("absent rl_* should default to 0, got MIN=%d FGA=%d FTA=%d ORB=%d",
+			p.RealLifeMIN, p.RealLifeFGA, p.RealLifeFTA, p.RealLifeORB)
+	}
+
+	withRL := `{"seed":1,"players":[{"pid":1,"teamid":3,"rl_min":2520,"rl_fga":1400,"rl_fta":360,"rl_orb":120}],` +
+		`"schedule":[{"home_team_id":3,"visitor_team_id":7,"date":"d","game_type":2}]}`
+	b2, err := Decode([]byte(withRL))
+	if err != nil {
+		t.Fatalf("Decode withRL: %v", err)
+	}
+	if p := b2.Players[0]; p.RealLifeMIN != 2520 || p.RealLifeFGA != 1400 || p.RealLifeFTA != 360 || p.RealLifeORB != 120 {
+		t.Errorf("rl_* decode = MIN%d FGA%d FTA%d ORB%d, want 2520/1400/360/120",
+			p.RealLifeMIN, p.RealLifeFGA, p.RealLifeFTA, p.RealLifeORB)
+	}
+}
+
 // #3 (boundary) — an unknown game_type value is rejected at decode time.
 func TestDecode_RejectsUnknownGameType(t *testing.T) {
 	for _, gt := range []int{0, 1, 7, 99} {

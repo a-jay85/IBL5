@@ -142,3 +142,40 @@ func TestReadPlr_EmptyAndBlank(t *testing.T) {
 		}
 	}
 }
+
+// Row 2: ReadPlr parses the static real-life / previous-season block into
+// RealLifeMIN/FGA/FTA/ORB. Offsets restated literally (56/64/72/84) so the test
+// cross-checks the map rather than echoing plr.go's constants.
+func TestReadPlr_RealLifeBlock(t *testing.T) {
+	buf := []byte(newPlrRecord(1, 100, 1, 25, "Volume Shooter", "SG", 75, 6, 5))
+	plrField(buf, 56, itoaPad(2520, 4)) // realLifeMIN (the per-48 rate divisor)
+	plrField(buf, 64, itoaPad(1400, 4)) // realLifeFGA (total FG attempts)
+	plrField(buf, 72, itoaPad(360, 4))  // realLifeFTA
+	plrField(buf, 84, itoaPad(120, 4))  // realLifeORB
+
+	players, err := ReadPlr(strings.NewReader(string(buf) + "\r\n"))
+	if err != nil {
+		t.Fatalf("ReadPlr: %v", err)
+	}
+	p := players[0]
+	if p.RealLifeMIN != 2520 || p.RealLifeFGA != 1400 || p.RealLifeFTA != 360 || p.RealLifeORB != 120 {
+		t.Errorf("real-life block = MIN%d FGA%d FTA%d ORB%d, want 2520/1400/360/120",
+			p.RealLifeMIN, p.RealLifeFGA, p.RealLifeFTA, p.RealLifeORB)
+	}
+}
+
+// Row 3: a non-numeric real-life field yields ErrBadField naming the offset
+// (boundary — the same guard every numeric field uses, now over the new block).
+func TestReadPlr_RealLifeBadField(t *testing.T) {
+	buf := []byte(newPlrRecord(1, 100, 1, 25, "Bad RL", "PG", 70, 5, 5))
+	plrField(buf, 56, itoaPad(2520, 4))
+	copy(buf[64:68], "XXXX") // realLifeFGA non-numeric
+
+	_, err := ReadPlr(strings.NewReader(string(buf) + "\r\n"))
+	if !errors.Is(err, ErrBadField) {
+		t.Fatalf("err = %v, want ErrBadField", err)
+	}
+	if !strings.Contains(err.Error(), "64") {
+		t.Errorf("error should name offset 64: %v", err)
+	}
+}

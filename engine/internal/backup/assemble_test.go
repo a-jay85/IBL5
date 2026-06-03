@@ -113,6 +113,51 @@ func TestToBundle_RoundTripAndSimulate(t *testing.T) {
 	}
 }
 
+// Row 5 (characterization): a PlrPlayer with no real-life sums assembles to bundle
+// RealLife*==0 — locks the zero mapping across the struct change (the no-reference
+// case the engine falls back to the rating stand-in for).
+func TestToBundle_NoRealLife_Zero(t *testing.T) {
+	players := append(teamRoster(1), teamRoster(2)...) // makePlayer sets no real-life sums
+	sched := []SchGame{{VisitorTeamID: 1, HomeTeamID: 2, Month: 11, Day: 2, Played: true}}
+
+	b, err := ToBundle(players, sched, AssembleOptions{})
+	if err != nil {
+		t.Fatalf("ToBundle: %v", err)
+	}
+	for _, p := range b.Players {
+		if p.RealLifeMIN != 0 || p.RealLifeFGA != 0 || p.RealLifeFTA != 0 || p.RealLifeORB != 0 {
+			t.Fatalf("player %d real-life not zero: %+v", p.PID, p)
+		}
+	}
+}
+
+// Row 6: populated real-life sums on the PlrPlayer map straight through to
+// bundle.Player.RealLife* by field.
+func TestToBundle_RealLifeWired(t *testing.T) {
+	roster := teamRoster(1)
+	roster[0].RealLifeMIN = 2520
+	roster[0].RealLifeFGA = 1400
+	roster[0].RealLifeFTA = 360
+	roster[0].RealLifeORB = 120
+	players := append(roster, teamRoster(2)...)
+	sched := []SchGame{{VisitorTeamID: 1, HomeTeamID: 2, Month: 11, Day: 2, Played: true}}
+
+	b, err := ToBundle(players, sched, AssembleOptions{})
+	if err != nil {
+		t.Fatalf("ToBundle: %v", err)
+	}
+	var got bundle.Player
+	for _, p := range b.Players {
+		if p.PID == roster[0].PID {
+			got = p
+		}
+	}
+	if got.RealLifeMIN != 2520 || got.RealLifeFGA != 1400 || got.RealLifeFTA != 360 || got.RealLifeORB != 120 {
+		t.Errorf("wired real-life = MIN%d FGA%d FTA%d ORB%d, want 2520/1400/360/120",
+			got.RealLifeMIN, got.RealLifeFGA, got.RealLifeFTA, got.RealLifeORB)
+	}
+}
+
 // Row #12: an unknown team and empty inputs are typed errors, not silent empty
 // bundles.
 func TestToBundle_Errors(t *testing.T) {

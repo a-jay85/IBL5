@@ -177,16 +177,43 @@ final class SeasonLeaderboardsServiceTest extends TestCase
     }
 
     /**
+     * Characterization: PPG sorts by points-PER-GAME, not raw points. Games
+     * differ per player so the ordering distinguishes pts/games from any other
+     * combination of the two operands (guards the division in the PPG arm).
+     */
+    public function testSortsByPpgPerGameWithVaryingGames(): void
+    {
+        $service = $this->buildServiceWithRows([
+            // pts=1000, games=100 -> 10.0 ppg
+            $this->createRow(1, 'Volume', 2024, 1, 100, 1000, fgm: 500),
+            // pts=600,  games=20  -> 30.0 ppg (fewest points, fewest games, best rate)
+            $this->createRow(2, 'Efficient', 2024, 2, 20, 200, fgm: 300),
+            // pts=800,  games=40  -> 20.0 ppg
+            $this->createRow(3, 'Middle', 2024, 3, 40, 400, fgm: 400),
+        ]);
+
+        $result = $service->getFilteredLeaderboard(['sortby' => 'PPG']);
+
+        $this->assertSame(2, $result['results'][0]['pid']);
+        $this->assertSame(3, $result['results'][1]['pid']);
+        $this->assertSame(1, $result['results'][2]['pid']);
+    }
+
+    /**
      * Characterization: an unrecognized sort key falls through the match's
-     * default arm, which sorts by the inline points-per-game formula
-     * (2*fgm + ftm + tgm) / games — identical to PPG.
+     * default arm, which sorts by the points-per-game formula
+     * calculatePoints(fgm, ftm, tgm) / games — identical to PPG. Games differ
+     * per player so the assertion pins the division (not raw points).
      */
     public function testUnknownSortKeyFallsBackToPpgFormula(): void
     {
         $service = $this->buildServiceWithRows([
-            $this->createRow(1, 'Low', 2024, 1, 80, 800, fgm: 200, ftm: 100, tgm: 50),
-            $this->createRow(2, 'High', 2024, 2, 80, 800, fgm: 500, ftm: 200, tgm: 100),
-            $this->createRow(3, 'Mid', 2024, 3, 80, 800, fgm: 350, ftm: 150, tgm: 75),
+            // pts=1000, games=100 -> 10.0 ppg
+            $this->createRow(1, 'Volume', 2024, 1, 100, 1000, fgm: 500),
+            // pts=600,  games=20  -> 30.0 ppg
+            $this->createRow(2, 'Efficient', 2024, 2, 20, 200, fgm: 300),
+            // pts=800,  games=40  -> 20.0 ppg
+            $this->createRow(3, 'Middle', 2024, 3, 40, 400, fgm: 400),
         ]);
 
         $result = $service->getFilteredLeaderboard(['sortby' => 'NOT_A_REAL_STAT']);

@@ -56,6 +56,33 @@ func TestGroupSeasons_SelectsLastRegular(t *testing.T) {
 	}
 }
 
+// Row #1 (characterization, pre-impl): the CURRENT collector selects the
+// regular bucket purely by LEXICAL order — the lexically-greatest regular-type
+// snapshot wins, with no awareness of how many games its .sco actually holds.
+// This locks the bug before the fix: on the real archive (06-07, 90-91, …) the
+// lexically-last regular snapshot is a PARTIAL mid-season backup, yet it is
+// selected over an earlier, more-complete one. Here reg-sim85 sorts last and is
+// chosen even though (in reality) reg-sim15 is the complete cumulative snapshot.
+func TestGroupSeasons_LexicalLastSelection_Characterization(t *testing.T) {
+	root := "/b"
+	zips := []string{
+		"/b/06-07/06-07_25_reg-sim15.zip", // earlier; the complete cumulative snapshot in reality
+		"/b/06-07/06-07_95_reg-sim85.zip", // lexically last; a partial mid-season backup in reality
+	}
+	seasons, skips := groupSeasons(zips, root)
+	if len(skips) != 0 {
+		t.Fatalf("unexpected skips: %v", skips)
+	}
+	if len(seasons) != 1 {
+		t.Fatalf("seasons = %d, want 1", len(seasons))
+	}
+	// Current behavior: lexically-last regular snapshot is the regular bucket,
+	// regardless of completeness.
+	if s := seasons[0]; s.regularZip != "/b/06-07/06-07_95_reg-sim85.zip" {
+		t.Errorf("regularZip = %q, want lexically-last %q", s.regularZip, "/b/06-07/06-07_95_reg-sim85.zip")
+	}
+}
+
 // Row (negative): Olympics snapshots are flagged and recorded as Skips (not yet
 // supported — national-team rosters), never selected as a regular/finals snapshot.
 func TestGroupSeasons_OlympicsSkipped(t *testing.T) {

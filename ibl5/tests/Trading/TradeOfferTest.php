@@ -443,6 +443,49 @@ class TradeOfferTest extends TestCase
         $this->assertTrue($result['success']);
     }
 
+    // ── Constructor injection (real ctor, no anonymous subclass) ──
+
+    /**
+     * The real constructor accepts every collaborator as an injected double and
+     * wires them in place of its internal `new`s — provable without a live DB.
+     */
+    public function testConstructableWithInjectedCollaborators(): void
+    {
+        $offerRepository = $this->createMock(TradeOfferRepositoryInterface::class);
+        $offerRepository->expects($this->once())
+            ->method('generateNextTradeOfferId')
+            ->willReturn(99);
+
+        $assetRepository = self::createStub(TradeAssetRepositoryInterface::class);
+        $cashRepository = self::createStub(TradeCashRepositoryInterface::class);
+        $cashConsiderationRepository = self::createStub(BuyoutLedgerRepositoryInterface::class);
+        $season = self::createStub(Season::class);
+        $commonRepo = self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+
+        // Injected validator short-circuits createTradeOffer, proving it is the
+        // collaborator actually consulted (not an internally-constructed one).
+        $validator = self::createStub(TradeValidator::class);
+        $validator->method('validateMinimumCashAmounts')
+            ->willReturn(['valid' => false, 'error' => 'injected validator reached']);
+
+        $offer = new TradeOffer(
+            new MockDatabase(),
+            $commonRepo,
+            '',
+            $offerRepository,
+            $assetRepository,
+            $cashRepository,
+            $cashConsiderationRepository,
+            $season,
+            $validator,
+        );
+
+        $result = $offer->createTradeOffer($this->makeTradeData());
+
+        $this->assertFalse($result['success']);
+        $this->assertSame('injected validator reached', $result['error']);
+    }
+
     public function testCreateTradeOfferNullDiscordSkipsNotification(): void
     {
         [$offerRepository, $assetRepository, $validator, $cashHandler, $commonRepo, $season] = $this->makeStubs();

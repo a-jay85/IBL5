@@ -46,17 +46,21 @@ class TradeProcessor implements TradeProcessorInterface
         TeamIdentityRepositoryInterface $commonRepository,
         string $serverName = '',
         ?TradeOfferRepositoryInterface $offerRepository = null,
-        ?TradeAssetRepositoryInterface $assetRepository = null
+        ?TradeAssetRepositoryInterface $assetRepository = null,
+        ?TradeCashRepositoryInterface $cashRepository = null,
+        ?BuyoutLedgerRepositoryInterface $cashConsiderationRepository = null,
+        ?TradeExecutionRepositoryInterface $executionRepository = null,
+        ?Season $season = null
     ) {
         $this->db = $db;
         $this->commonRepository = $commonRepository;
         $this->serverName = $serverName;
         $this->offerRepository = $offerRepository ?? new TradeOfferRepository($db, $serverName);
         $this->assetRepository = $assetRepository ?? new TradeAssetRepository($db);
-        $this->cashRepository = new TradeCashRepository($db);
-        $this->cashConsiderationRepository = new BuyoutLedgerRepository($db);
-        $this->executionRepository = new TradeExecutionRepository($db);
-        $this->season = new Season($db);
+        $this->cashRepository = $cashRepository ?? new TradeCashRepository($db);
+        $this->cashConsiderationRepository = $cashConsiderationRepository ?? new BuyoutLedgerRepository($db);
+        $this->executionRepository = $executionRepository ?? new TradeExecutionRepository($db);
+        $this->season = $season ?? new Season($db);
         $this->cashHandler = new CashTransactionHandler($db, $this->commonRepository, $this->cashConsiderationRepository, $this->cashRepository);
         $this->newsService = new \Topics\News\NewsRepository($db);
 

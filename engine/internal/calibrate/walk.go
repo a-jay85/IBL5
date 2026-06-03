@@ -2,6 +2,7 @@ package calibrate
 
 import (
 	"archive/zip"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -9,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/a-jay85/IBL5/engine/internal/backup"
 	"github.com/a-jay85/IBL5/engine/internal/bundle"
 	"github.com/a-jay85/IBL5/engine/internal/validate"
 )
@@ -39,6 +41,12 @@ var requiredMembers = []string{"IBL5.plr", "IBL5.sch", "IBL5.sco"}
 // engine. A nil Options.Validate defaults to validate.ValidateCorpus.
 type ValidateFunc func(dir string, runs int, seed uint64, gt bundle.GameType) (validate.Report, error)
 
+// CountScoFunc is the seam to countScoGames, injected (via Options.CountSco) so
+// the season collector's max-games selection and medGP floor are unit-testable
+// without building multi-megabyte .sco fixtures. A nil Options.CountSco defaults
+// to countScoGames.
+type CountScoFunc func(zipPath string) (games, teams int, err error)
+
 // Options configures an archive walk.
 type Options struct {
 	Runs                int          // seeded engine runs per corpus game
@@ -47,6 +55,7 @@ type Options struct {
 	IncludeOlympics     bool         // include olympics/ snapshots (game-type 6)
 	Validate            ValidateFunc // nil -> validate.ValidateCorpus (regular/scheduled bucket)
 	ValidateUnscheduled ValidateFunc // nil -> validate.ValidateUnscheduled (playoff bucket)
+	CountSco            CountScoFunc // nil -> countScoGames (season: .sco game/team counter)
 	Progress            io.Writer    // nil -> io.Discard; one line per processed snapshot
 }
 
@@ -191,6 +200,47 @@ func extractOne(f *zip.File, dest string) error {
 		return err
 	}
 	return out.Close()
+}
+
+// countScoGames opens zipPath, extracts ONLY its IBL5.sco member (matched by
+// basename, case-insensitively, like extractTriple), parses it with
+// backup.ReadSco, and returns the cumulative game count and the number of
+// distinct team IDs (the union of every game's visitor and home team). It is the
+// cheap pre-sim completeness probe the season collector uses to pick the
+// most-complete regular snapshot and to floor out partial seasons: a snapshot's
+// .sco is CUMULATIVE, so its game count is the season-to-date total. The .sco
+// stream is bounded by maxEntryBytes (zip-bomb safe even for a trusted archive).
+// A zip with no IBL5.sco, or a malformed .sco, yields an error — never a panic.
+// Errors are returned unprefixed; the caller (selectMostComplete) stamps the
+// failing path onto the Skip, so the path appears exactly once in CLI output.
+func countScoGames(zipPath string) (games, teams int, err error) {
+	zr, err := zip.OpenReader(zipPath)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer func() { _ = zr.Close() }()
+
+	for _, f := range zr.File {
+		if !strings.EqualFold(filepath.Base(f.Name), "IBL5.sco") {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			return 0, 0, err
+		}
+		scoGames, err := backup.ReadSco(io.LimitReader(rc, maxEntryBytes))
+		_ = rc.Close()
+		if err != nil {
+			return 0, 0, err
+		}
+		seen := map[int]struct{}{}
+		for _, g := range scoGames {
+			seen[g.VisitorTeamID] = struct{}{}
+			seen[g.HomeTeamID] = struct{}{}
+		}
+		return len(scoGames), len(seen), nil
+	}
+	return 0, 0, errors.New("no IBL5.sco member")
 }
 
 // listArchiveZips walks root and returns every *.zip path in deterministic

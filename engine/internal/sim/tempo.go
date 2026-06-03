@@ -32,12 +32,27 @@ const (
 // 28 teams, 2026-06); they center a league-average roster at baseTimeMid.
 const (
 	// offVolumeScale: seconds the base_time shortens per unit of offensive volume
-	// composite above neutral. Sized so the real offensive spread (sd ≈ 13.8, full
-	// range ≈ ±28) maps across most of [13,16] without the bulk of teams
-	// saturating — the volume→count channel's strength. The DOMINANT term, and the
-	// primary corpus-calibration knob (raise to widen the FGA channel, lower to
-	// narrow it toward real Var(lnFGA)).
-	offVolumeScale = 0.055
+	// composite above neutral — the channel's strength, and the primary
+	// corpus-calibration knob.
+	//
+	// CALIBRATED CONSERVATIVELY to 0.02 (2026-06, ibl5/backups, realarchive
+	// diagnostic). The orientation is correct — archive roster
+	// corr(volume composite, FGP) = +0.55 (TestRealArchive_VolumeFGPCoupling),
+	// confirming the trace §3.1 assumption that high-volume teams are more
+	// efficient. But an offVolumeScale=0/0.02/0.04/0.055 sweep at fixed
+	// stride/runs shows the channel MONOTONICALLY widens engine Var(lnFGA) and
+	// deepens the (still-negative) Cov(lnFGA,lnPPS) — it ADDS a dispersion source
+	// rather than REPLACING one (ADR-0042's requirement), because the offsetting
+	// empty-FGA reduction (the "which within-possession source carries the
+	// miss-driven FGA" split) is NOT isolated — it remains ADR-0042's bounded,
+	// sim-instrumentation open item, and tuning a constant against the size-
+	// dominated by-origin decomposition would be porting a guessed lever. 0.02 is
+	// the largest scale whose marginal effect on Var(lnFGA)/Cov stays within corpus
+	// sampling noise vs the scale=0 reference, so the channel ships present,
+	// directionally faithful, and fully instrumented (origin tags +
+	// decomposeByOrigin) without regressing the corpus. Raising it toward real
+	// Var(lnPF) is deferred until the empty-FGA source is isolated.
+	offVolumeScale = 0.02
 	// defRatingScale: seconds base_time LENGTHENS per unit of defensive composite
 	// above neutral — a stronger defense slows the pace, as in the original port.
 	// Kept minor (def sd ≈ 1.4 → ≈ ±0.12s, the trace's ~0.8% defense-pace term);

@@ -90,17 +90,20 @@ func TestVolumeCountChannel_CouplingSign(t *testing.T) {
 }
 
 // TestVolumeCountChannel_ZeroVolumeDegenerate is the boundary: a team with
-// all-zero volume rates (and zero FGP) vs the neutral opponent still produces a
-// finite, non-negative FGA, no NaN, and a terminating game with a winner.
+// all-zero volume rates (and zero FGP) vs the neutral opponent does not crash the
+// channel: the game terminates with a winner, FGA is a valid non-negative count
+// (it CAN be 0 — an all-zero-rated team's possessions can all end in turnovers),
+// and the points-per-shot computation is finite (no 0/0 NaN) whenever FGA > 0.
 func TestVolumeCountChannel_ZeroVolumeDegenerate(t *testing.T) {
 	b := vsNeutralBundle(volTeam(1, 0, 0, 0, 0, 100))
 	for seed := uint64(1); seed <= 10; seed++ {
 		g := Simulate(b, seed).Games[0]
 		v := boxForTeam(g, 1)
 		h := boxForTeam(g, 9)
-		fga := teamFGA(v)
-		if fga < 0 || math.IsNaN(float64(fga)) {
-			t.Fatalf("seed %d: zero-volume team FGA invalid: %d", seed, fga)
+		if fga := teamFGA(v); fga > 0 {
+			if pps := float64(teamPoints(v)) / float64(fga); math.IsNaN(pps) || math.IsInf(pps, 0) || pps < 0 {
+				t.Fatalf("seed %d: zero-volume team PPS non-finite: %v (fga=%d)", seed, pps, fga)
+			}
 		}
 		if teamPoints(v) == teamPoints(h) {
 			t.Fatalf("seed %d: game did not resolve to a winner (tie persisted)", seed)

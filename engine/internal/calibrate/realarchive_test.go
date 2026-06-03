@@ -86,9 +86,11 @@ func TestRealArchive_CalibrateEndToEnd(t *testing.T) {
 		t.Error("sample contained playoff games but produced no playoff (game_type=4) bucket (PR9d)")
 	}
 
-	// ADR-0042 REPORTED diagnostic (never a gate): the volume→count channel should
-	// narrow Engine Var(lnFGA) toward Real and flip Cov(lnFGA,lnPPS) toward +; the
-	// by-origin decomposition names the dominant empty-FGA source (Lever-2 target).
+	// ADR-0042 REPORTED diagnostic (never a gate): the volume→count channel's
+	// effect on Engine Var(lnFGA) and Cov(lnFGA,lnPPS) vs the Real targets, plus
+	// the engine-only by-origin FGA decomposition. OBSERVED at offVolumeScale=0.02:
+	// the channel widens Var(lnFGA) and does NOT flip Cov — the empty-FGA source it
+	// would need to REPLACE is not isolated (ADR-0042's bounded open item).
 	agg := CollectSeasonAggregates(reports)
 	for _, fs := range agg.Fidelity {
 		t.Logf("FIDELITY gt=%d N=%d | VarLnFGA real=%.5f engine=%.5f | Cov(lnFGA,lnPPS) real=%+.5f engine=%+.5f | VarLnPF real=%.5f engine=%.5f",
@@ -98,6 +100,65 @@ func TestRealArchive_CalibrateEndToEnd(t *testing.T) {
 		t.Logf("FGA-ORIGIN gt=%d N=%d | VarTotal=%.4f | share initial=%.3f oreb=%.3f transition=%.3f | cov init=%.4f oreb=%.4f trans=%.4f",
 			od.GameType, od.N, od.VarTotal, od.ShareInitial, od.ShareOreb, od.ShareTransition, od.CovInitial, od.CovOreb, od.CovTransition)
 	}
+	// Cov(FGA_origin, PPS) telemetry: Cov(FGA_total,PPS) = Σ_o Cov(FGA_o, PPS)
+	// (exact, since FGA_total = Σ FGA_o). NOTE: these magnitudes are dominated by
+	// each origin's FGA SIZE (initial ≈ 68% of FGA), so they do NOT isolate which
+	// origin is intrinsically empty — reported telemetry only, not a lever pick.
+	for _, gt := range []int{2, 4} {
+		ci, co, ct, tot, n := covOriginPPS(agg.Seasons, gt)
+		if n == 0 {
+			continue
+		}
+		t.Logf("COV(FGA_origin,PPS) gt=%d N=%d | total=%+.5f = init %+.5f + oreb %+.5f + trans %+.5f", gt, n, tot, ci, co, ct)
+	}
+}
+
+// covOriginPPS computes the within-season-demeaned Cov(FGA_origin, engine PPS)
+// for each shot origin across a game type's (season, team) rows. The three sum to
+// Cov(FGA_total, PPS); the most-negative origin is the Lever-2 calibration target
+// (the FGA source dragging efficiency down). Reported diagnostic only.
+func covOriginPPS(seasons []SeasonAggregate, gameType int) (covInit, covOreb, covTrans, covTotal float64, n int) {
+	type row struct {
+		season                 string
+		init, oreb, trans, pps float64
+	}
+	var rows []row
+	sumI := map[string]float64{}
+	sumO := map[string]float64{}
+	sumT := map[string]float64{}
+	sumP := map[string]float64{}
+	cnt := map[string]float64{}
+	for _, sa := range seasons {
+		if sa.GameType != gameType {
+			continue
+		}
+		for _, ts := range sa.Teams {
+			if ts.EngineFGAPerG <= 0 {
+				continue
+			}
+			r := row{sa.Label, ts.EngineFGAInitialPerG, ts.EngineFGAOrebPerG, ts.EngineFGATransitionPerG, ts.EnginePointsForPG / ts.EngineFGAPerG}
+			rows = append(rows, r)
+			sumI[r.season] += r.init
+			sumO[r.season] += r.oreb
+			sumT[r.season] += r.trans
+			sumP[r.season] += r.pps
+			cnt[r.season]++
+		}
+	}
+	n = len(rows)
+	if n == 0 {
+		return 0, 0, 0, 0, 0
+	}
+	for _, r := range rows {
+		c := cnt[r.season]
+		rp := r.pps - sumP[r.season]/c
+		covInit += (r.init - sumI[r.season]/c) * rp
+		covOreb += (r.oreb - sumO[r.season]/c) * rp
+		covTrans += (r.trans - sumT[r.season]/c) * rp
+	}
+	fn := float64(n)
+	covInit, covOreb, covTrans = covInit/fn, covOreb/fn, covTrans/fn
+	return covInit, covOreb, covTrans, covInit + covOreb + covTrans, n
 }
 
 func envInt(key string, def int) int {

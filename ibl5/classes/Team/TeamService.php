@@ -7,6 +7,7 @@ namespace Team;
 use League\League;
 use Team\Contracts\TeamServiceInterface;
 use Team\Contracts\TeamRepositoryInterface;
+use Team\Contracts\TeamQueryRepositoryInterface;
 use Team\Views\AwardsView;
 use Team\Views\BannersView;
 use Team\Views\CurrentSeasonView;
@@ -37,12 +38,21 @@ class TeamService implements TeamServiceInterface
     private \mysqli $db;
     private TeamRepositoryInterface $repository;
     private \League\LeagueContext $leagueContext;
+    private TeamQueryRepositoryInterface $teamQueryRepository;
+    private League $league;
 
-    public function __construct(\mysqli $db, TeamRepositoryInterface $repository, \League\LeagueContext $leagueContext)
-    {
+    public function __construct(
+        \mysqli $db,
+        TeamRepositoryInterface $repository,
+        \League\LeagueContext $leagueContext,
+        ?TeamQueryRepositoryInterface $teamQueryRepository = null,
+        ?League $league = null
+    ) {
         $this->db = $db;
         $this->repository = $repository;
         $this->leagueContext = $leagueContext;
+        $this->teamQueryRepository = $teamQueryRepository ?? new TeamQueryRepository($db);
+        $this->league = $league ?? new League($db);
     }
 
     /**
@@ -456,11 +466,9 @@ class TeamService implements TeamServiceInterface
      */
     private function prepareDraftPicksData(Team $team): array
     {
-        $teamQueryRepo = new TeamQueryRepository($this->db);
-        $resultPicks = $teamQueryRepo->getDraftPicks($team->teamid);
+        $resultPicks = $this->teamQueryRepository->getDraftPicks($team->teamid);
 
-        $league = new League($this->db);
-        $allTeamsResult = $league->getAllTeamsResult();
+        $allTeamsResult = $this->league->getAllTeamsResult();
 
         /** @var array<string, Team> $teamsArray */
         $teamsArray = [];

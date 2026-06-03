@@ -417,9 +417,8 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
     /**
      * @see TeamQueryRepositoryInterface::canAddBuyoutWithoutExceedingBuyoutLimit()
      */
-    public function canAddBuyoutWithoutExceedingBuyoutLimit(int $teamId, int $buyoutValue): bool
+    public function canAddBuyoutWithoutExceedingBuyoutLimit(int $teamId, int $buyoutValue, Season $season): bool
     {
-        $season = new Season($this->db);
         $buyoutsResult = $this->getBuyouts($teamId);
         $totalCurrentSeasonBuyouts = BuyoutLedgerRepository::sumCurrentSeasonSalaryFromRows(
             $buyoutsResult,

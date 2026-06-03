@@ -44,17 +44,21 @@ class TradeOffer implements TradeOfferInterface
         TeamIdentityRepositoryInterface $commonRepository,
         string $serverName = '',
         ?TradeOfferRepositoryInterface $offerRepository = null,
-        ?TradeAssetRepositoryInterface $assetRepository = null
+        ?TradeAssetRepositoryInterface $assetRepository = null,
+        ?TradeCashRepositoryInterface $cashRepository = null,
+        ?BuyoutLedgerRepositoryInterface $cashConsiderationRepository = null,
+        ?Season $season = null,
+        ?TradeValidator $validator = null
     ) {
         $this->db = $db;
         $this->commonRepository = $commonRepository;
         $this->offerRepository = $offerRepository ?? new TradeOfferRepository($db, $serverName);
         $this->assetRepository = $assetRepository ?? new TradeAssetRepository($db);
-        $this->cashRepository = new TradeCashRepository($db);
-        $this->cashConsiderationRepository = new BuyoutLedgerRepository($db);
-        $this->season = new Season($db);
+        $this->cashRepository = $cashRepository ?? new TradeCashRepository($db);
+        $this->cashConsiderationRepository = $cashConsiderationRepository ?? new BuyoutLedgerRepository($db);
+        $this->season = $season ?? new Season($db);
         $this->cashHandler = new CashTransactionHandler($db, $this->commonRepository, $this->cashConsiderationRepository, $this->cashRepository);
-        $this->validator = new TradeValidator($db);
+        $this->validator = $validator ?? new TradeValidator($db);
 
         // Initialize Discord with error handling (may fail if column doesn't exist)
         try {

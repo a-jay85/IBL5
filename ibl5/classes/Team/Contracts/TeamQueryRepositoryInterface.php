@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Team\Contracts;
 
-use Player\Player;
 use Season\Season;
 
 /**
@@ -117,52 +116,4 @@ interface TeamQueryRepositoryInterface
      * @return list<PlayerRow> Array of player rows
      */
     public function getRosterUnderContractOrderedByOrdinal(int $teamId): array;
-
-    /**
-     * Get salary cap array for all contract years
-     *
-     * @return array<string, int> Array of salary cap spent by year
-     */
-    public function getSalaryCapArray(string $teamName, int $teamId, Season $season): array;
-
-    /**
-     * Get total current season salaries from player result array
-     *
-     * @param list<PlayerRow> $result Array of player rows
-     * @return int Total current season salaries
-     */
-    public function getTotalCurrentSeasonSalaries(array $result): int;
-
-    /**
-     * Get total next season salaries from player result array
-     *
-     * @param list<array<string, mixed>> $result Array of player rows
-     * @return int Total next season salaries
-     */
-    public function getTotalNextSeasonSalaries(array $result): int;
-
-    /**
-     * Check if team can add contract without going over hard cap
-     *
-     * @param int $contractValue Contract value to add
-     * @return bool True if under hard cap, false otherwise
-     */
-    public function canAddContractWithoutGoingOverHardCap(int $teamId, int $contractValue): bool;
-
-    /**
-     * Check if team can add buyout without exceeding buyout limit
-     *
-     * @param int $buyoutValue Buyout value to add
-     * @param Season $season Current season (used to determine contract-year rollover)
-     * @return bool True if under buyout limit, false otherwise
-     */
-    public function canAddBuyoutWithoutExceedingBuyoutLimit(int $teamId, int $buyoutValue, Season $season): bool;
-
-    /**
-     * Convert player result array into Player objects
-     *
-     * @param list<PlayerRow> $result Array of player rows
-     * @return array<int, Player> Array of Player objects indexed by player ID
-     */
-    public function convertPlrResultIntoPlayerArray(array $result): array;
 }

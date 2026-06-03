@@ -11,6 +11,7 @@ use Extension\Contracts\ExtensionRepositoryInterface;
 use Extension\Contracts\ExtensionValidatorInterface;
 use Extension\Contracts\ExtensionOfferEvaluatorInterface;
 use FreeAgency\CommonContractValidator;
+use Team\Contracts\TeamCapCalculatorInterface;
 use Team\Contracts\TeamQueryRepositoryInterface;
 use Team\Team;
 use Discord\Discord;
@@ -38,6 +39,7 @@ class ExtensionService implements ExtensionProcessorInterface
     private ExtensionOfferEvaluatorInterface $evaluator;
     private CommonContractValidator $contractValidator;
     private TeamQueryRepositoryInterface $teamQueryRepo;
+    private TeamCapCalculatorInterface $teamCapCalculator;
     private string $serverName;
 
     /**
@@ -46,6 +48,7 @@ class ExtensionService implements ExtensionProcessorInterface
      * @param ExtensionValidatorInterface|null $validator Optional validator injection
      * @param ExtensionOfferEvaluatorInterface|null $evaluator Optional evaluator injection
      * @param TeamQueryRepositoryInterface|null $teamQueryRepo Optional team query repo injection
+     * @param TeamCapCalculatorInterface|null $teamCapCalculator Optional team cap calculator injection
      */
     public function __construct(
         \mysqli $db,
@@ -53,7 +56,8 @@ class ExtensionService implements ExtensionProcessorInterface
         ?ExtensionRepositoryInterface $repository = null,
         ?ExtensionValidatorInterface $validator = null,
         ?ExtensionOfferEvaluatorInterface $evaluator = null,
-        ?TeamQueryRepositoryInterface $teamQueryRepo = null
+        ?TeamQueryRepositoryInterface $teamQueryRepo = null,
+        ?TeamCapCalculatorInterface $teamCapCalculator = null
     ) {
         $this->db = $db;
         $this->serverName = $serverName;
@@ -62,6 +66,7 @@ class ExtensionService implements ExtensionProcessorInterface
         $this->evaluator = $evaluator ?? new ExtensionOfferEvaluator();
         $this->contractValidator = new CommonContractValidator();
         $this->teamQueryRepo = $teamQueryRepo ?? new \Team\TeamQueryRepository($db);
+        $this->teamCapCalculator = $teamCapCalculator ?? new \Team\TeamCapCalculator($db, $this->teamQueryRepo);
     }
 
     /**
@@ -172,7 +177,7 @@ class ExtensionService implements ExtensionProcessorInterface
             $posResult,
             static fn(array $row): bool => $row['pid'] !== $player->getPlayerID()
         );
-        $moneyCommitted = $this->teamQueryRepo->getTotalNextSeasonSalaries(array_values($filteredResult));
+        $moneyCommitted = $this->teamCapCalculator->getTotalNextSeasonSalaries(array_values($filteredResult));
 
         $traditionData = $this->repository->getTeamTraditionData($team->name);
 

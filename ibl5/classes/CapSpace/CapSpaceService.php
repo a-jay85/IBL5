@@ -6,6 +6,7 @@ namespace CapSpace;
 
 use CapSpace\Contracts\CapSpaceRepositoryInterface;
 use League\League;
+use Team\Contracts\TeamCapCalculatorInterface;
 use Team\Contracts\TeamQueryRepositoryInterface;
 use Team\Team;
 use Season\Season;
@@ -28,6 +29,7 @@ class CapSpaceService
     private CapSpaceRepositoryInterface $repository;
     private \mysqli $db;
     private TeamQueryRepositoryInterface $teamQueryRepo;
+    private TeamCapCalculatorInterface $teamCapCalculator;
 
     /**
      * Constructor
@@ -35,12 +37,14 @@ class CapSpaceService
      * @param CapSpaceRepositoryInterface $repository Data repository
      * @param \mysqli $db Database connection for Team initialization
      * @param TeamQueryRepositoryInterface|null $teamQueryRepo Team query repository (created internally if not provided)
+     * @param TeamCapCalculatorInterface|null $teamCapCalculator Team cap calculator (created internally if not provided)
      */
-    public function __construct(CapSpaceRepositoryInterface $repository, \mysqli $db, ?TeamQueryRepositoryInterface $teamQueryRepo = null)
+    public function __construct(CapSpaceRepositoryInterface $repository, \mysqli $db, ?TeamQueryRepositoryInterface $teamQueryRepo = null, ?TeamCapCalculatorInterface $teamCapCalculator = null)
     {
         $this->repository = $repository;
         $this->db = $db;
         $this->teamQueryRepo = $teamQueryRepo ?? new \Team\TeamQueryRepository($db);
+        $this->teamCapCalculator = $teamCapCalculator ?? new \Team\TeamCapCalculator($db, $this->teamQueryRepo);
     }
 
     /**
@@ -71,7 +75,7 @@ class CapSpaceService
      */
     protected function processTeamCapData(Team $team, Season $season): array
     {
-        $salaryCapSpent = $this->teamQueryRepo->getSalaryCapArray($team->name, $team->teamid, $season);
+        $salaryCapSpent = $this->teamCapCalculator->getSalaryCapArray($team->name, $team->teamid, $season);
         $freeAgencySlots = 15;
 
         // Calculate available salary for each year
@@ -96,7 +100,7 @@ class CapSpaceService
         $positionSalaries = [];
         foreach (\JSB::PLAYER_POSITIONS as $position) {
             $positionPlayers = $playersByPosition[$position] ?? [];
-            $positionSalaries[$position] = $this->teamQueryRepo->getTotalNextSeasonSalaries($positionPlayers);
+            $positionSalaries[$position] = $this->teamCapCalculator->getTotalNextSeasonSalaries($positionPlayers);
         }
 
         // Calculate roster slots used

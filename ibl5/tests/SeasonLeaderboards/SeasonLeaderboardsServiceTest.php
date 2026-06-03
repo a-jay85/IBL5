@@ -155,6 +155,47 @@ final class SeasonLeaderboardsServiceTest extends TestCase
         $this->assertSame(2, $result['results'][0]['pid']);
     }
 
+    /**
+     * Characterization: QA sort order is driven by the inline points term
+     * (2*fgm + ftm + tgm) inside the QA-per-game computation. Negative/positive
+     * QA terms are neutralized (fga=fgm, fta=ftm, all other counting stats 0)
+     * so ordering reflects the points formula alone.
+     */
+    public function testSortsByQualityAssessmentDesc(): void
+    {
+        $service = $this->buildServiceWithRows([
+            $this->createRow(1, 'Low QA', 2024, 1, 80, 800, fgm: 200, fga: 200, ftm: 100, fta: 100, tgm: 50),
+            $this->createRow(2, 'High QA', 2024, 2, 80, 800, fgm: 500, fga: 500, ftm: 200, fta: 200, tgm: 100),
+            $this->createRow(3, 'Mid QA', 2024, 3, 80, 800, fgm: 350, fga: 350, ftm: 150, fta: 150, tgm: 75),
+        ]);
+
+        $result = $service->getFilteredLeaderboard(['sortby' => 'QA']);
+
+        $this->assertSame(2, $result['results'][0]['pid']);
+        $this->assertSame(3, $result['results'][1]['pid']);
+        $this->assertSame(1, $result['results'][2]['pid']);
+    }
+
+    /**
+     * Characterization: an unrecognized sort key falls through the match's
+     * default arm, which sorts by the inline points-per-game formula
+     * (2*fgm + ftm + tgm) / games — identical to PPG.
+     */
+    public function testUnknownSortKeyFallsBackToPpgFormula(): void
+    {
+        $service = $this->buildServiceWithRows([
+            $this->createRow(1, 'Low', 2024, 1, 80, 800, fgm: 200, ftm: 100, tgm: 50),
+            $this->createRow(2, 'High', 2024, 2, 80, 800, fgm: 500, ftm: 200, tgm: 100),
+            $this->createRow(3, 'Mid', 2024, 3, 80, 800, fgm: 350, ftm: 150, tgm: 75),
+        ]);
+
+        $result = $service->getFilteredLeaderboard(['sortby' => 'NOT_A_REAL_STAT']);
+
+        $this->assertSame(2, $result['results'][0]['pid']);
+        $this->assertSame(3, $result['results'][1]['pid']);
+        $this->assertSame(1, $result['results'][2]['pid']);
+    }
+
     // --- getFilteredLeaderboard: limit tests ---
 
     public function testLimitRestrictsResultCount(): void

@@ -90,19 +90,23 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPen
 		net := netAdvantage(pt, bh, def, penalty, false, gs.gameType)
 		mq := matchupQuality(bh.FGP, bh.energy, defense.players) // live energy (inert under current curve)
 
-		sv2 := applyClutch(shotValue2pt(net, bh.FGP, false), bh.Clutch, gs.period, scoreDiff)
+		// Make/foul/turnover arms route through the gameState freeze wrappers
+		// (freeze.go): live values in the normal/baseline path, league-mean
+		// substitutes when an arm is frozen for the ADR-0043 attribution.
+		sv2 := applyClutch(gs.makeValue2pt(net, bh.FGP), bh.Clutch, gs.period, scoreDiff)
 		// Home-court advantage, applied at the two modeled JSB sites (delta = +0.2
 		// home / −0.2 away, 0 for ASG). Site 2: the made-shot (2pt) bucket gains
 		// +delta, the foul bucket loses delta (handled inside foulBucketWeight).
 		// Site 3: each offensive player's offQuality term is reduced by delta inside
 		// foulBucketWeight's divisor — the dominant, home-favorable term.
 		hca := hcaDelta(gs.gameType, offense.isHome)
+		turnLinear := gs.turnThreshLinear(bh.TVR)
 		in := outcomeInputs{
 			twoPtWeight:      twoPtBucketWeight(bh) + hca,
 			threePtWeight:    threePtBucketWeight(bh),
 			andOneWeight:     andOneBucketWeight(mq, bh),
-			foulOnlyWeight:   foulBucketWeight(offense.players, defense.players, hca),
-			turnoverDefValue: turnoverThreshold(bh.TVR) * turnoverThreshold(bh.TVR),
+			foulOnlyWeight:   gs.foulWeight(offense.players, defense.players, hca),
+			turnoverDefValue: turnLinear * turnLinear,
 		}
 
 		switch selectOutcome(in, false, false, false, gs.rng) {
@@ -223,7 +227,9 @@ func (gs *gameState) freeThrows(offense, defense *teamState, shooter, defender o
 func (gs *gameState) rebound(offense, defense *teamState, periodIdx int) (bool, onCourt) {
 	offStr := teamReboundStrength(offense, true)
 	defStr := teamReboundStrength(defense, false)
-	if gs.rng.Float64() < orebProbability(offStr, defStr) {
+	// ORB-continuation arm routes through the freeze wrapper (freeze.go); shared by
+	// the half-court and transition rebound paths, so one site covers both.
+	if gs.rng.Float64() < gs.orebProb(offStr, defStr) {
 		reb := selectRebounder(offense, true, gs.rng)
 		gs.emit(result.Event{
 			Kind: result.EventRebound, Period: gs.period, Clock: gs.clock,

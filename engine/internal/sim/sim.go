@@ -25,11 +25,24 @@ import (
 // Simulate runs the engine over every game in the bundle and returns a
 // deterministic Result keyed to the given seed.
 func Simulate(b bundle.Bundle, seed uint64) result.Result {
+	res, _ := SimulateWith(b, seed, Options{}) // zero Options never errors (validate is a no-op)
+	return res
+}
+
+// SimulateWith is Simulate plus a freeze/accumulation Options (freeze.go): the
+// empty-FGA source-isolation diagnostic uses it to harvest league-mean derived
+// values (Options.Accum) and to re-run with one or more mechanism arms frozen
+// (Options.Freeze). A zero Options is byte-identical to Simulate. It returns an
+// error only when the config freezes an arm with no precomputed mean.
+func SimulateWith(b bundle.Bundle, seed uint64, opts Options) (result.Result, error) {
+	if err := opts.validate(); err != nil {
+		return result.Result{}, err
+	}
 	r := rng.New(seed)
 	res := result.Result{Seed: seed, Games: make([]result.GameResult, 0, len(b.Schedule))}
 	for _, g := range b.Schedule {
-		gr, _, _, _ := simGame(b, g, r)
+		gr, _, _, _ := simGameWith(b, g, r, opts)
 		res.Games = append(res.Games, gr)
 	}
-	return res
+	return res, nil
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Api;
 
 use Api\Router;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 class RouterTest extends TestCase
@@ -14,6 +15,20 @@ class RouterTest extends TestCase
     protected function setUp(): void
     {
         $this->router = new Router();
+    }
+
+    public function testMatchesHealth(): void
+    {
+        $result = $this->router->match('health', 'GET');
+
+        $this->assertNotNull($result);
+        $this->assertSame('Api\Controller\HealthController', $result['controller']);
+        $this->assertSame([], $result['params']);
+    }
+
+    public function testHealthIsListedAsPublicRoute(): void
+    {
+        $this->assertContains('health', Router::PUBLIC_ROUTES);
     }
 
     public function testMatchesPlayersExport(): void
@@ -183,6 +198,47 @@ class RouterTest extends TestCase
         $this->assertNotNull($result);
         $this->assertSame('Api\Controller\InjuriesController', $result['controller']);
         $this->assertSame([], $result['params']);
+    }
+
+    /**
+     * Characterization: lock the full set of resolvable GET routes so inserting a
+     * new route cannot silently alter dispatch of an existing one.
+     *
+     */
+    #[DataProvider('currentGetRouteProvider')]
+    public function testCurrentGetRouteSetResolves(string $path, string $expectedController): void
+    {
+        $result = $this->router->match($path, 'GET');
+
+        $this->assertNotNull($result);
+        $this->assertSame($expectedController, $result['controller']);
+    }
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function currentGetRouteProvider(): array
+    {
+        $uuid = '479337fd-bb40-11f0-a2a0-2c44fd7a1534';
+
+        return [
+            'players/export'      => ['players/export', 'Api\Controller\PlayerExportController'],
+            'players/{uuid}/stats' => ['players/' . $uuid . '/stats', 'Api\Controller\PlayerStatsController'],
+            'players/{uuid}/history' => ['players/' . $uuid . '/history', 'Api\Controller\PlayerHistoryController'],
+            'players/{uuid}'      => ['players/' . $uuid, 'Api\Controller\PlayerDetailController'],
+            'players'             => ['players', 'Api\Controller\PlayerListController'],
+            'teams/{uuid}/roster' => ['teams/' . $uuid . '/roster', 'Api\Controller\TeamRosterController'],
+            'teams/{uuid}'        => ['teams/' . $uuid, 'Api\Controller\TeamDetailController'],
+            'teams'               => ['teams', 'Api\Controller\TeamListController'],
+            'standings/{conference}' => ['standings/East', 'Api\Controller\StandingsController'],
+            'standings'           => ['standings', 'Api\Controller\StandingsController'],
+            'games/{uuid}/boxscore' => ['games/' . $uuid . '/boxscore', 'Api\Controller\GameBoxscoreController'],
+            'games/{uuid}'        => ['games/' . $uuid, 'Api\Controller\GameDetailController'],
+            'games'               => ['games', 'Api\Controller\GameListController'],
+            'stats/leaders'       => ['stats/leaders', 'Api\Controller\LeadersController'],
+            'injuries'            => ['injuries', 'Api\Controller\InjuriesController'],
+            'season'              => ['season', 'Api\Controller\SeasonController'],
+        ];
     }
 
     public function testReturnsNullForUnknownRoute(): void

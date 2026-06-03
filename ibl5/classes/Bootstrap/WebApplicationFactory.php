@@ -26,6 +26,7 @@ final class WebApplicationFactory
         $app->addStep(new HeadersBootstrap());
         $app->addStep(new LeagueBootstrap());
         $app->addStep(new ConfigBootstrap($basePath));
+        $app->addStep(new ErrorHandlerBootstrap(ErrorHandlerBootstrap::MODE_WEB));
         $app->addStep(new AuthBootstrap($basePath));
         $app->addStep(new DemoModeBootstrap($basePath));
         return $app;

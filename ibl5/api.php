@@ -26,6 +26,10 @@ $app->getContainer()->set('api.controllerFactory', static function (): \Closure 
         /** @var \mysqli $db */
         $db = $GLOBALS['mysqli_db'];
 
+        if ($controllerClass === \Api\Controller\HealthController::class) {
+            return new \Api\Controller\HealthController(new \Api\Repository\HealthRepository($db));
+        }
+
         $tradeControllers = [
             \Api\Controller\TradeAcceptController::class,
             \Api\Controller\TradeDeclineController::class,

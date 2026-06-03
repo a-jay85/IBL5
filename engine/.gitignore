@@ -3,3 +3,8 @@
 
 # Coverage profile (see Makefile `cover` target).
 /cover.out
+
+# Raw season-aggregate calibration run-output (preserved locally, not committed;
+# the committable follow-up is a derived thresholds gate, not the 366KB dump).
+# Scoped to NOT touch the tracked calibration-5.60-*.json reference baseline.
+/internal/validate/testdata/calibration-season-aggregate-*.json

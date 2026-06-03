@@ -2,10 +2,68 @@ package calibrate
 
 import (
 	"math"
+	"path/filepath"
 	"testing"
 
+	"github.com/a-jay85/IBL5/engine/internal/backup"
+	"github.com/a-jay85/IBL5/engine/internal/bundle"
 	"github.com/a-jay85/IBL5/engine/internal/result"
 )
+
+// synthPlr builds one starter PlrPlayer at the given depth-chart position.
+func synthPlr(ord, pid, team int, posDepth string, fgp int) backup.PlrPlayer {
+	p := backup.PlrPlayer{
+		Ordinal: ord, PID: pid, TeamID: team, Age: 25, Peak: 27, CanPlayInGame: 1,
+		RatingFGA: 60, RatingFGP: fgp, RatingFTA: 20, RatingFTP: 75,
+		Rating3GA: 25, Rating3GP: 35, RatingORB: 20, RatingDRB: 35,
+		RatingAST: 30, RatingSTL: 30, RatingTVR: 40, RatingBLK: 20,
+		RatingOO: 6, RatingOD: 5, RatingDO: 5, RatingDD: 5,
+		RatingPO: 5, RatingPD: 5, RatingTO: 7, RatingTD: 5,
+		Clutch: 5, Consistency: 5,
+	}
+	switch posDepth {
+	case "PG":
+		p.PGDepth = 1
+	case "SG":
+		p.SGDepth = 1
+	case "SF":
+		p.SFDepth = 1
+	case "PF":
+		p.PFDepth = 1
+	case "C":
+		p.CDepth = 1
+	}
+	return p
+}
+
+// synthBundle assembles a minimal two-team, multi-game regular-season bundle via
+// the real backup.ToBundle path — sim-able, with the two teams rated differently so
+// the cross-team decomposition is non-degenerate.
+func synthBundle(t *testing.T) bundle.Bundle {
+	t.Helper()
+	pos := []string{"PG", "SG", "SF", "PF", "C"}
+	var players []backup.PlrPlayer
+	ord := 0
+	for _, tm := range []struct{ id, fgp int }{{3, 50}, {7, 44}} {
+		for i, ps := range pos {
+			ord++
+			players = append(players, synthPlr(ord, 100+ord, tm.id, ps, tm.fgp-i))
+		}
+	}
+	var sched []backup.SchGame
+	for d := 1; d <= 6; d++ {
+		g := backup.SchGame{VisitorTeamID: 7, HomeTeamID: 3, Month: 11, Day: d}
+		if d%2 == 0 {
+			g.VisitorTeamID, g.HomeTeamID = 3, 7
+		}
+		sched = append(sched, g)
+	}
+	b, err := backup.ToBundle(players, sched, backup.AssembleOptions{GameType: bundle.GameTypeRegular})
+	if err != nil {
+		t.Fatalf("ToBundle: %v", err)
+	}
+	return b
+}
 
 // matrix #7 — mechanism-rate folding correctness.
 //
@@ -186,5 +244,89 @@ func checkFinite(t *testing.T, label string, v float64) {
 	t.Helper()
 	if math.IsNaN(v) || math.IsInf(v, 0) {
 		t.Errorf("%s = %v, want finite", label, v)
+	}
+}
+
+// TestCollectFreezeAttribution_Synthetic drives the lattice end-to-end on synthetic
+// bundles via the injected seam (no archive zips): it exercises the per-season
+// baseline + 15 frozen passes, the engine runner, the row appenders, and the
+// report assembly, asserting a complete, finite report.
+func TestCollectFreezeAttribution_Synthetic(t *testing.T) {
+	b := synthBundle(t)
+	loadFn := func(string) (bundle.Bundle, *Skip) { return b, nil }
+	countFn := func(string) (int, int, error) { return 1148, 28, nil } // proxy medGP 82 ≥ floor
+
+	seasons := []season{
+		{name: "A", regularCandidates: []string{"A_reg-sim.zip"}, finalsZip: "A_reg-sim.zip"},
+		{name: "B", regularCandidates: []string{"B_reg-sim.zip"}, finalsZip: "B_reg-sim.zip"},
+	}
+	rep, skips := collectFreezeAttribution(seasons, Options{Runs: 2, SampleStride: 1}, 1, loadFn, countFn)
+
+	if rep.NumSeasons != 2 {
+		t.Errorf("NumSeasons = %d, want 2 (skips: %v)", rep.NumSeasons, skips)
+	}
+	if len(rep.Configs) != 16 {
+		t.Errorf("len(Configs) = %d, want 16", len(rep.Configs))
+	}
+	if len(rep.Arms) != numArms {
+		t.Errorf("len(Arms) = %d, want %d", len(rep.Arms), numArms)
+	}
+	checkFinite(t, "baseline cov", rep.BaselineCovLnFGALnPPS)
+	checkFinite(t, "all-frozen cov", rep.AllFrozenCovLnFGALnPPS)
+	checkFinite(t, "residual frac", rep.ResidualFracOfBaseline)
+	for _, a := range rep.Arms {
+		checkFinite(t, "arm "+a.Arm+" dVarFGA", a.DVarLnFGA)
+		checkFinite(t, "arm "+a.Arm+" dCovPF", a.DCovLnFGALnPF)
+		checkFinite(t, "arm "+a.Arm+" dCovPPS", a.DCovLnFGALnPPS)
+		checkFinite(t, "arm "+a.Arm+" collapseFrac", a.CovPPSCollapseFrac)
+	}
+	// The no-freeze config (mask 0) is the reference; the all-frozen config is mask 15.
+	if rep.Configs[0].Mask != 0 || rep.Configs[15].Mask != 15 {
+		t.Errorf("config masks not in order: [0]=%d [15]=%d", rep.Configs[0].Mask, rep.Configs[15].Mask)
+	}
+}
+
+// TestLoadSeasonBundle_Errors covers loadSeasonBundle's failure paths (the happy
+// path needs real .plr bytes and is covered by the archive diagnostic).
+func TestLoadSeasonBundle_Errors(t *testing.T) {
+	// Non-existent zip → extract error.
+	if _, skip := loadSeasonBundle(filepath.Join(t.TempDir(), "nope.zip")); skip == nil {
+		t.Error("loadSeasonBundle on a missing zip: got nil Skip, want an extract error")
+	}
+
+	// Zip missing IBL5.sco → not found.
+	noSco := filepath.Join(t.TempDir(), "partial_reg-sim.zip")
+	makeZip(t, noSco, map[string]string{"IBL5.plr": "x", "IBL5.sch": "y"})
+	if _, skip := loadSeasonBundle(noSco); skip == nil {
+		t.Error("loadSeasonBundle on a zip missing IBL5.sco: got nil Skip, want a missing-member error")
+	}
+
+	// Full triple but unparseable .plr bytes → readBackup parse error.
+	bad := filepath.Join(t.TempDir(), "bad_reg-sim.zip")
+	makeZip(t, bad, fullTriple())
+	if _, skip := loadSeasonBundle(bad); skip == nil {
+		t.Error("loadSeasonBundle on unparseable .plr bytes: got nil Skip, want a parse error")
+	}
+}
+
+// TestCollectFreezeAttribution_PublicWrapper covers the real-archive entrypoint over
+// a synthetic root: fake .sco bytes fail the selection count, so no season qualifies
+// — the wrapper returns an empty report plus skips, never an error.
+func TestCollectFreezeAttribution_PublicWrapper(t *testing.T) {
+	root := t.TempDir()
+	makeZip(t, filepath.Join(root, "02-03", "02-03_08_reg-sim01.zip"), fullTriple())
+
+	rep, skips, err := CollectFreezeAttribution(root, Options{Runs: 1, SampleStride: 1}, 1)
+	if err != nil {
+		t.Fatalf("CollectFreezeAttribution: %v", err)
+	}
+	if rep.NumSeasons != 0 {
+		t.Errorf("NumSeasons = %d, want 0 (fake .sco cannot be counted)", rep.NumSeasons)
+	}
+	if len(skips) == 0 {
+		t.Error("want at least one Skip for the uncountable snapshot")
+	}
+	if len(rep.Configs) != 16 {
+		t.Errorf("len(Configs) = %d, want 16 even with no seasons", len(rep.Configs))
 	}
 }

@@ -109,7 +109,16 @@ func CollectFreezeAttribution(root string, opts Options, baseSeed uint64) (Freez
 		return FreezeAttributionReport{}, nil, err
 	}
 	seasons, gskips := groupSeasons(zips, root)
-	countFn := resolveCountSco(opts)
+	rep, pskips := collectFreezeAttribution(seasons, opts, baseSeed, loadSeasonBundle, resolveCountSco(opts))
+	return rep, append(append(zskips, gskips...), pskips...), nil
+}
+
+// collectFreezeAttribution is the injected-dependency core of
+// CollectFreezeAttribution: loadFn assembles a season's bundle from its regular
+// snapshot, countFn counts a candidate's .sco games/teams for the medGP floor.
+// Both are seams so the lattice is unit-testable on synthetic bundles without real
+// archive zips (mirrors collectSeasonReports).
+func collectFreezeAttribution(seasons []season, opts Options, baseSeed uint64, loadFn func(string) (bundle.Bundle, *Skip), countFn CountScoFunc) (FreezeAttributionReport, []Skip) {
 	progress := opts.Progress
 	if progress == nil {
 		progress = io.Discard
@@ -118,7 +127,7 @@ func CollectFreezeAttribution(root string, opts Options, baseSeed uint64) (Freez
 	if stride < 1 {
 		stride = 1
 	}
-	skips := append(zskips, gskips...)
+	var skips []Skip
 
 	var configRows [16][]decompRow
 	var mechRows []mechRateRow
@@ -145,36 +154,45 @@ func CollectFreezeAttribution(root string, opts Options, baseSeed uint64) (Freez
 			continue
 		}
 
-		b, skip := loadSeasonBundle(regularZip)
+		b, skip := loadFn(regularZip)
 		if skip != nil {
 			skips = append(skips, *skip)
 			continue
 		}
 
-		// Baseline pass (mask 0): harvest per-season league means + mech rates.
+		// Baseline pass (mask 0): harvest per-season league means + mech rates. A sim
+		// error (an unsatisfiable freeze config never happens here; only a malformed
+		// bundle could) is recorded as a Skip, not fatal to the whole run.
 		acc := &sim.FreezeAccum{}
 		mech := map[int]*mechAcc{}
 		baseStats, err := simSeasonStats(b, sim.Options{Accum: acc}, opts.Runs, baseSeed, mech)
 		if err != nil {
-			return FreezeAttributionReport{}, nil, fmt.Errorf("baseline sim %q: %w", regularZip, err)
+			skips = append(skips, Skip{regularZip, "baseline sim: " + err.Error()})
+			continue
 		}
 		means := acc.Means()
 		appendDecompRows(&configRows[0], s.name, baseStats)
 		appendMechRows(&mechRows, s.name, baseStats, mech)
 
 		// Frozen configs (mask 1..15) using this season's means.
+		failed := false
 		for mask := 1; mask < 16; mask++ {
 			st, err := simSeasonStats(b, sim.Options{Freeze: cfgFromMask(mask, means)}, opts.Runs, baseSeed, nil)
 			if err != nil {
-				return FreezeAttributionReport{}, nil, fmt.Errorf("frozen sim %q mask %d: %w", regularZip, mask, err)
+				skips = append(skips, Skip{regularZip, fmt.Sprintf("frozen sim mask %d: %s", mask, err.Error())})
+				failed = true
+				break
 			}
 			appendDecompRows(&configRows[mask], s.name, st)
+		}
+		if failed {
+			continue
 		}
 		nSeasons++
 		_, _ = fmt.Fprintf(progress, "freeze-lattice %s teams=%d\n", regularZip, len(baseStats))
 	}
 
-	return buildFreezeReport(configRows, mechRows, nSeasons, opts.Runs), skips, nil
+	return buildFreezeReport(configRows, mechRows, nSeasons, opts.Runs), skips
 }
 
 // buildFreezeReport decomposes every config, runs the Shapley attribution and the

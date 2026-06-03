@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Api\Controller;
 
 use Api\Contracts\ControllerInterface;
+use Api\Repository\HealthRepository;
 use Api\Response\JsonResponder;
 
 /**
@@ -19,11 +20,11 @@ use Api\Response\JsonResponder;
  */
 class HealthController implements ControllerInterface
 {
-    private \mysqli $db;
+    private HealthRepository $healthRepository;
 
-    public function __construct(\mysqli $db)
+    public function __construct(HealthRepository $healthRepository)
     {
-        $this->db = $db;
+        $this->healthRepository = $healthRepository;
     }
 
     /**
@@ -31,7 +32,7 @@ class HealthController implements ControllerInterface
      */
     public function handle(array $params, array $query, JsonResponder $responder, ?array $body = null): void
     {
-        $dbOk = $this->isDatabaseReachable();
+        $dbOk = $this->healthRepository->isReachable();
 
         $responder->raw(
             [
@@ -41,21 +42,5 @@ class HealthController implements ControllerInterface
             ],
             $dbOk ? 200 : 503
         );
-    }
-
-    /**
-     * Run a lightweight no-schema probe against the DB handle.
-     *
-     * A thrown exception (mysqli reports failures as exceptions under
-     * MYSQLI_REPORT_STRICT) means the connection is unusable.
-     */
-    private function isDatabaseReachable(): bool
-    {
-        try {
-            $this->db->query('SELECT 1');
-            return true;
-        } catch (\Throwable) {
-            return false;
-        }
     }
 }

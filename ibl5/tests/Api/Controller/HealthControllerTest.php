@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Api\Controller;
 
 use Api\Controller\HealthController;
+use Api\Repository\HealthRepository;
 use Api\Response\JsonResponder;
 use PHPUnit\Framework\TestCase;
 
@@ -12,8 +13,8 @@ class HealthControllerTest extends TestCase
 {
     public function testReturnsOkAndHttp200WhenDatabaseReachable(): void
     {
-        $db = $this->createStub(\mysqli::class);
-        $db->method('query')->willReturn(true);
+        $healthRepo = $this->createStub(HealthRepository::class);
+        $healthRepo->method('isReachable')->willReturn(true);
 
         $responder = $this->createMock(JsonResponder::class);
         $responder->expects($this->once())
@@ -28,13 +29,13 @@ class HealthControllerTest extends TestCase
                 200
             );
 
-        (new HealthController($db))->handle([], [], $responder);
+        (new HealthController($healthRepo))->handle([], [], $responder);
     }
 
-    public function testReturnsDegradedAndHttp503WhenSelectThrows(): void
+    public function testReturnsDegradedAndHttp503WhenRepositoryNotReachable(): void
     {
-        $db = $this->createStub(\mysqli::class);
-        $db->method('query')->willThrowException(new \mysqli_sql_exception('connection lost'));
+        $healthRepo = $this->createStub(HealthRepository::class);
+        $healthRepo->method('isReachable')->willReturn(false);
 
         $responder = $this->createMock(JsonResponder::class);
         $responder->expects($this->once())
@@ -48,6 +49,6 @@ class HealthControllerTest extends TestCase
                 503
             );
 
-        (new HealthController($db))->handle([], [], $responder);
+        (new HealthController($healthRepo))->handle([], [], $responder);
     }
 }

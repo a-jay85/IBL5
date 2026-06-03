@@ -175,8 +175,7 @@ class TeamCapCalculator implements TeamCapCalculatorInterface
     {
         $array = [];
         foreach ($result as $plrRow) {
-            $playerID = (int) $plrRow['pid'];
-            $array[$playerID] = Player::withPlrRow($this->db, $plrRow);
+            $array[$plrRow['pid']] = Player::withPlrRow($this->db, $plrRow);
         }
         return $array;
     }

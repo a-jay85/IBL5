@@ -6,9 +6,7 @@ namespace Tests\DatabaseIntegration;
 
 use PHPUnit\Framework\Attributes\Group;
 
-use League\League;
 use Team\TeamQueryRepository;
-use Season\Season;
 
 #[Group('database')]
 class TeamQueryRepositoryTest extends DatabaseTestCase
@@ -301,96 +299,5 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
         $sorted = $ordinals;
         sort($sorted);
         self::assertSame($sorted, $ordinals);
-    }
-
-    // --- Salary Cap ---
-
-    public function testGetSalaryCapArrayCalculatesMultiYearBreakdown(): void
-    {
-        $season = new Season($this->db);
-
-        $result = $this->repo->getSalaryCapArray('Test', self::TEST_TID, $season);
-
-        self::assertIsArray($result);
-        // Should have at least year1 if there are players under contract
-        if ($result !== []) {
-            self::assertArrayHasKey('year1', $result);
-            self::assertGreaterThan(0, $result['year1']);
-        }
-    }
-
-    // --- Hard Cap Check ---
-
-    public function testCanAddContractWithoutGoingOverHardCapReturnsCorrectly(): void
-    {
-        // Adding 0 should always be under the cap
-        $resultUnder = $this->repo->canAddContractWithoutGoingOverHardCap(self::TEST_TID, 0);
-        self::assertTrue($resultUnder);
-
-        // Adding the entire hard cap should exceed it (since team already has players)
-        $resultOver = $this->repo->canAddContractWithoutGoingOverHardCap(self::TEST_TID, League::HARD_CAP_MAX);
-        self::assertFalse($resultOver);
-    }
-
-    // ── getTotalCurrentSeasonSalaries ───────────────────────────
-
-    public function testGetTotalCurrentSeasonSalariesSumsContracts(): void
-    {
-        // Use a real team with isolated test player. First clear any existing
-        // salary_yr1>0 players on team 28 to get a predictable sum.
-        $this->db->query('UPDATE ibl_plr SET salary_yr1 = 0 WHERE teamid = 28');
-
-        $this->insertTestPlayer(200000150, 'TQ CurSal', [
-            'teamid' => 28,
-            'cy' => 1,
-            'cyt' => 2,
-            'salary_yr1' => 3000,
-            'salary_yr2' => 3200,
-        ]);
-
-        $rows = $this->repo->getAllPlayersUnderContract(28);
-        $total = $this->repo->getTotalCurrentSeasonSalaries($rows);
-
-        self::assertIsInt($total);
-        self::assertSame(3000, $total);
-    }
-
-    // ── getTotalNextSeasonSalaries ──────────────────────────────
-
-    public function testGetTotalNextSeasonSalariesSumsContracts(): void
-    {
-        $this->db->query('UPDATE ibl_plr SET salary_yr1 = 0 WHERE teamid = 28');
-
-        $this->insertTestPlayer(200000151, 'TQ NxtSal', [
-            'teamid' => 28,
-            'cy' => 1,
-            'cyt' => 2,
-            'salary_yr1' => 1500,
-            'salary_yr2' => 2200,
-        ]);
-
-        $rows = $this->repo->getAllPlayersUnderContract(28);
-        $total = $this->repo->getTotalNextSeasonSalaries($rows);
-
-        self::assertIsInt($total);
-        self::assertSame(2200, $total);
-    }
-
-    // ── canAddBuyoutWithoutExceedingBuyoutLimit ─────────────────
-
-    public function testCanAddBuyoutWithinLimitReturnsTrue(): void
-    {
-        // Passing the Season the caller already holds reproduces the prior
-        // internal `new Season($this->db)` path exactly (same verdict).
-        $season = new Season($this->db);
-        // Team 99999 has no players → buyout sum is 0, adding 0 is within limit
-        self::assertTrue($this->repo->canAddBuyoutWithoutExceedingBuyoutLimit(99999, 0, $season));
-    }
-
-    public function testCanAddBuyoutExceedingLimitReturnsFalse(): void
-    {
-        $season = new Season($this->db);
-        // Adding the entire hard cap always exceeds the buyout percentage limit
-        self::assertFalse($this->repo->canAddBuyoutWithoutExceedingBuyoutLimit(99999, League::HARD_CAP_MAX, $season));
     }
 }

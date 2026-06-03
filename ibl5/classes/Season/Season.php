@@ -172,10 +172,33 @@ class Season
      *
      * During offseason phases, salary/roster displays shift to show next season's
      * contracts instead of the current (now-expired) season's contracts.
+     *
+     * NOTE: This is a narrower set than {@see advancesContractYears()} — it
+     * deliberately EXCLUDES Playoffs. The two concepts are distinct; do not
+     * conflate them.
      */
     public function isOffseasonPhase(): bool
     {
         return $this->phase === 'Draft' || $this->phase === 'Free Agency';
+    }
+
+    /**
+     * Check if the current phase advances contract years for trade cap math.
+     *
+     * During Playoffs, Draft, and Free Agency the contract years have
+     * effectively rolled over, so trade-related calculations (roster counting,
+     * queueing, cash considerations, cash-record sums) shift to the next
+     * season's contracts.
+     *
+     * NOTE: This is a wider set than {@see isOffseasonPhase()} — it INCLUDES
+     * Playoffs, which `isOffseasonPhase()` excludes. Reusing `isOffseasonPhase()`
+     * here would silently drop Playoffs from trade cap math.
+     */
+    public function advancesContractYears(): bool
+    {
+        return $this->phase === 'Playoffs'
+            || $this->phase === 'Draft'
+            || $this->phase === 'Free Agency';
     }
 
     /**

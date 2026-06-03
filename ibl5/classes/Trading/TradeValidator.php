@@ -99,9 +99,7 @@ class TradeValidator implements TradeValidatorInterface
         int $userPlayersSent,
         int $partnerPlayersSent
     ): array {
-        $isOffseason = $this->season->phase === "Playoffs"
-            || $this->season->phase === "Draft"
-            || $this->season->phase === "Free Agency";
+        $isOffseason = $this->season->advancesContractYears();
 
         $userCurrentRoster = $this->formRepository->getTeamPlayerCount($userTeamId, $isOffseason);
         $partnerCurrentRoster = $this->formRepository->getTeamPlayerCount($partnerTeamId, $isOffseason);
@@ -150,11 +148,7 @@ class TradeValidator implements TradeValidatorInterface
     public function getCurrentSeasonCashConsiderations(array $userSendsCash, array $partnerSendsCash): array
     {
         // If the current season phase shifts cap situations to next season, evaluate next season's cap limits.
-        if (
-            $this->season->phase === "Playoffs"
-            || $this->season->phase === "Draft"
-            || $this->season->phase === "Free Agency"
-        ) {
+        if ($this->season->advancesContractYears()) {
             $cashSentToThemThisSeason = $userSendsCash[2] ?? 0;
             $cashSentToMeThisSeason = $partnerSendsCash[2] ?? 0;
         } else {

@@ -251,9 +251,7 @@ class TradeOffer implements TradeOfferInterface
 
         // Playoffs counts as offseason for trade cap math (contract years have
         // effectively rolled over), unlike the FA cap calculation.
-        $isOffseason = $this->season->phase === 'Playoffs'
-            || $this->season->phase === 'Draft'
-            || $this->season->phase === 'Free Agency';
+        $isOffseason = $this->season->advancesContractYears();
 
         return BuyoutLedgerRepository::sumCurrentSeasonSalaryFromRows($cashRecords, $isOffseason);
     }

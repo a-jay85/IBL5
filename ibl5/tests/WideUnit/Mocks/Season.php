@@ -86,6 +86,18 @@ class Season
     }
 
     /**
+     * Check if the current phase advances contract years (mock implementation)
+     *
+     * @see Season::advancesContractYears()
+     */
+    public function advancesContractYears(): bool
+    {
+        return $this->phase === 'Playoffs'
+            || $this->phase === 'Draft'
+            || $this->phase === 'Free Agency';
+    }
+
+    /**
      * Check if trades are currently allowed (mock implementation)
      *
      * @see Season::areTradesAllowed()

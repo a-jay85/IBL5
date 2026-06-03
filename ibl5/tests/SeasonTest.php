@@ -237,4 +237,61 @@ class SeasonTest extends \PHPUnit\Framework\TestCase
             'playoffs always blocked with No setting' => ['Playoffs', 'No', false],
         ];
     }
+
+    // --- advancesContractYears() (trade contract-advancement predicate) ---
+
+    /**
+     * The contract-advancement predicate is true for Playoffs, Draft, and Free
+     * Agency, and false for every other phase. Locks the {Playoffs, Draft, Free
+     * Agency} set — including Playoffs — for trade cap math.
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('advancesContractYearsProvider')]
+    public function testAdvancesContractYears(string $phase, bool $expected): void
+    {
+        $season = new \Tests\WideUnit\Mocks\Season(self::createStub(\mysqli::class));
+        $season->phase = $phase;
+
+        $this->assertSame($expected, $season->advancesContractYears());
+    }
+
+    /**
+     * @return array<string, array{string, bool}>
+     */
+    public static function advancesContractYearsProvider(): array
+    {
+        return [
+            // Contract years advance (next-season cap math)
+            'Playoffs advances' => ['Playoffs', true],
+            'Draft advances' => ['Draft', true],
+            'Free Agency advances' => ['Free Agency', true],
+            // Negative/boundary: these phases do NOT advance contract years
+            'Preseason does not advance' => ['Preseason', false],
+            'Regular Season does not advance' => ['Regular Season', false],
+            'HEAT does not advance' => ['HEAT', false],
+        ];
+    }
+
+    /**
+     * Regression guard: advancesContractYears() must differ from
+     * isOffseasonPhase() during Playoffs. Reusing isOffseasonPhase() for trade
+     * cap math would silently drop Playoffs — the exact bug this dedup avoids.
+     */
+    public function testAdvancesContractYearsIncludesPlayoffsUnlikeIsOffseasonPhase(): void
+    {
+        $season = new \Tests\WideUnit\Mocks\Season(self::createStub(\mysqli::class));
+        $season->phase = 'Playoffs';
+
+        // Playoffs: the two predicates DISAGREE — this is the whole point.
+        $this->assertTrue($season->advancesContractYears(), 'Playoffs advances contract years');
+        $this->assertFalse($season->isOffseasonPhase(), 'Playoffs is NOT an offseason phase');
+
+        // Draft / Free Agency: the two predicates AGREE (both true).
+        $season->phase = 'Draft';
+        $this->assertTrue($season->advancesContractYears());
+        $this->assertTrue($season->isOffseasonPhase());
+
+        $season->phase = 'Free Agency';
+        $this->assertTrue($season->advancesContractYears());
+        $this->assertTrue($season->isOffseasonPhase());
+    }
 }

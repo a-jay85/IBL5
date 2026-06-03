@@ -203,3 +203,44 @@ func TestRun_CalibrateEmitsSeasonAggregates(t *testing.T) {
 		t.Errorf("gate output should not carry season_aggregates:\n%s", gout.String())
 	}
 }
+
+// Row #6: calibrate mode emits season_aggregates.fidelity as a per-game-type
+// array, deterministically ordered ascending by game type (regular 2 before
+// playoff 4), serialized automatically alongside seasons + residuals.
+func TestRun_CalibrateEmitsFidelityOrdered(t *testing.T) {
+	reports := []validate.Report{
+		{Label: "playoffs", GameType: bundle.GameTypePlayoff, Games: []validate.GameReport{{
+			HomeTeamID: 3, VisitorTeamID: 1, EngineHomeWinFraction: 0.7,
+			Rows: []validate.StatRow{
+				{TeamID: 1, Stat: "points", ScoVal: 92, EngineMean: 95},
+				{TeamID: 3, Stat: "points", ScoVal: 100, EngineMean: 99},
+			},
+		}}},
+		{Label: "04-05", GameType: bundle.GameTypeRegular, Games: []validate.GameReport{{
+			HomeTeamID: 7, VisitorTeamID: 3, EngineHomeWinFraction: 0.6,
+			Rows: []validate.StatRow{
+				{TeamID: 3, Stat: "points", ScoVal: 99, EngineMean: 100},
+				{TeamID: 7, Stat: "points", ScoVal: 108, EngineMean: 105},
+			},
+		}}},
+	}
+
+	var out, errBuf bytes.Buffer
+	if code := runWith([]string{"--archive", "/x", "--mode", "calibrate"}, &out, &errBuf, stubCollectors(reports, nil)); code != 0 {
+		t.Fatalf("exit = %d, want 0 (stderr: %s)", code, errBuf.String())
+	}
+	if !strings.Contains(out.String(), `"fidelity"`) {
+		t.Fatalf("encoded report missing season_aggregates.fidelity:\n%s", out.String())
+	}
+	var rep calibrate.CalibrationReport
+	if err := json.Unmarshal(out.Bytes(), &rep); err != nil {
+		t.Fatalf("stdout is not a CalibrationReport JSON: %v\n%s", err, out.String())
+	}
+	fid := rep.SeasonAggregates.Fidelity
+	if len(fid) != 2 {
+		t.Fatalf("fidelity = %+v, want two game-type entries", fid)
+	}
+	if fid[0].GameType != int(bundle.GameTypeRegular) || fid[1].GameType != int(bundle.GameTypePlayoff) {
+		t.Errorf("fidelity not sorted ascending by game type: %+v", fid)
+	}
+}

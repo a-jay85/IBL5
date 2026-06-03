@@ -63,12 +63,53 @@ type StandingsResidual struct {
 	PointDiffP99 float64 `json:"point_diff_resid_p99"`
 }
 
+// FidelitySummary is the per-game-type LEVEL + DISPERSION readout: the three
+// orthogonal axes the cutover verdict turned on (memory
+// reference_jsb_season_aggregate_verdict), pooled across every clean (season,
+// team) row of one game type. Where StandingsResidual reports the SIZE of the
+// per-team gaps, this reports their SHAPE — absolute scoring level, whether
+// ratings drive scoring at all, and whether the engine compresses the
+// team-to-team spread:
+//
+//   - LevelGapPF        mean(engine_PF_pg − sco_PF_pg): absolute scoring level
+//     (era-flatness). Negative ⇒ the engine under-scores the league.
+//   - PFCorr            Pearson r(engine_PF_pg, sco_PF_pg): FLAT OFFENSE — r≈0
+//     means team ratings don't drive scoring.
+//   - PFDispersionRatio stdev(engine_PF_pg) / stdev(sco_PF_pg): COMPRESSION —
+//     <1 means the engine flattens the team-to-team scoring spread.
+//   - Wins* / PointDiff* the same corr + dispersion on expected-wins vs .sco
+//     wins (standings ranking + spread) and on PF−PA per game (margin).
+//
+// EVERY metric here is runs-stable. LevelGapPF and the PF / point-diff stats are
+// linear means of EngineMean; Wins* is built on EngineExpectedWins = Σ P(win),
+// which converges as runs grow rather than rounding each game to a 0/1 win. This
+// is the OPPOSITE of a home win-SHARE, whose value inflates as √N with the run
+// count and so is deliberately NOT reported here (see TeamStanding and memory
+// reference_jsb_winshare_runs_artifact). A future reader must not "fix" the
+// expected-wins metric into a win-share — that reintroduces the √N artifact.
+//
+// On a degenerate input (a single team, or a constant column — either side's
+// stdev is 0) corr and dispersion_ratio are defined as 0, never NaN/Inf. N is
+// the number of contributing (season, team) rows.
+type FidelitySummary struct {
+	GameType                 int     `json:"game_type"`
+	N                        int     `json:"n"`
+	LevelGapPF               float64 `json:"level_gap_pf"`
+	PFCorr                   float64 `json:"pf_corr"`
+	PFDispersionRatio        float64 `json:"pf_dispersion_ratio"`
+	WinsCorr                 float64 `json:"wins_corr"`
+	WinsDispersionRatio      float64 `json:"wins_dispersion_ratio"`
+	PointDiffCorr            float64 `json:"point_diff_corr"`
+	PointDiffDispersionRatio float64 `json:"point_diff_dispersion_ratio"`
+}
+
 // SeasonAggregateReport is the full season-aggregate readout: the per-season
-// standings detail plus the per-game-type residual rollup that is the actual
-// fidelity signal.
+// standings detail, the per-game-type residual rollup (gap SIZE), and the
+// per-game-type fidelity summary (gap SHAPE — level/correlation/dispersion).
 type SeasonAggregateReport struct {
 	Seasons   []SeasonAggregate   `json:"seasons"`
 	Residuals []StandingsResidual `json:"residuals"`
+	Fidelity  []FidelitySummary   `json:"fidelity"`
 }
 
 // teamAcc accumulates one team's running season sums while CollectSeasonAggregates
@@ -203,7 +244,138 @@ func CollectSeasonAggregates(reports []validate.Report) SeasonAggregateReport {
 			PointDiffP99: percentile(ra.pointDiff, 0.99),
 		})
 	}
+	out.Fidelity = collectFidelitySummaries(out.Seasons)
 	return out
+}
+
+// fidAcc pools one game type's paired engine/.sco per-team series across the
+// already-rolled-up season aggregates.
+type fidAcc struct {
+	engPF, scoPF     []float64
+	engWins, scoWins []float64
+	engDiff, scoDiff []float64
+}
+
+// collectFidelitySummaries pools every (season, team) row by game type and
+// computes the level + dispersion fidelity metrics. It walks the BUILT
+// SeasonAggregates (the rolled-up standings), not the raw reports, so it adds no
+// sim cost and reuses TeamStanding's already-per-game-normalized fields. A game
+// type with no team rows yields no FidelitySummary; summaries are emitted in
+// ascending game-type order for deterministic output.
+func collectFidelitySummaries(seasons []SeasonAggregate) []FidelitySummary {
+	byType := map[bundle.GameType]*fidAcc{}
+	for _, sa := range seasons {
+		gt := bundle.GameType(sa.GameType)
+		fa := byType[gt]
+		if fa == nil {
+			fa = &fidAcc{}
+			byType[gt] = fa
+		}
+		for _, ts := range sa.Teams {
+			fa.engPF = append(fa.engPF, ts.EnginePointsForPG)
+			fa.scoPF = append(fa.scoPF, ts.ScoPointsForPG)
+			fa.engWins = append(fa.engWins, ts.EngineExpectedWins)
+			fa.scoWins = append(fa.scoWins, float64(ts.ScoWins))
+			fa.engDiff = append(fa.engDiff, ts.EnginePointDiffPG)
+			fa.scoDiff = append(fa.scoDiff, ts.ScoPointDiffPG)
+		}
+	}
+
+	var out []FidelitySummary
+	for _, gt := range sortedFidGameTypes(byType) {
+		fa := byType[gt]
+		// LevelGapPF = mean(engPF − scoPF) = mean(engPF) − mean(scoPF) exactly
+		// (same N), the absolute scoring-level gap.
+		out = append(out, FidelitySummary{
+			GameType:                 int(gt),
+			N:                        len(fa.engPF),
+			LevelGapPF:               mean(fa.engPF) - mean(fa.scoPF),
+			PFCorr:                   pearson(fa.engPF, fa.scoPF),
+			PFDispersionRatio:        dispersionRatio(fa.engPF, fa.scoPF),
+			WinsCorr:                 pearson(fa.engWins, fa.scoWins),
+			WinsDispersionRatio:      dispersionRatio(fa.engWins, fa.scoWins),
+			PointDiffCorr:            pearson(fa.engDiff, fa.scoDiff),
+			PointDiffDispersionRatio: dispersionRatio(fa.engDiff, fa.scoDiff),
+		})
+	}
+	return out
+}
+
+// sortedFidGameTypes returns the fidelity game types in ascending order.
+func sortedFidGameTypes(byType map[bundle.GameType]*fidAcc) []bundle.GameType {
+	gts := make([]bundle.GameType, 0, len(byType))
+	for gt := range byType {
+		gts = append(gts, gt)
+	}
+	sort.Slice(gts, func(i, j int) bool { return gts[i] < gts[j] })
+	return gts
+}
+
+// mean returns the arithmetic mean of xs, or 0 for an empty slice.
+func mean(xs []float64) float64 {
+	if len(xs) == 0 {
+		return 0
+	}
+	var s float64
+	for _, x := range xs {
+		s += x
+	}
+	return s / float64(len(xs))
+}
+
+// pstdev returns the POPULATION standard deviation of xs (divisor N), or 0 for
+// an empty slice. Population is correct here: the pooled rows are the whole set
+// being described, not a sample of a larger one — and the N cancels in
+// dispersionRatio anyway, so the sample-vs-population choice is immaterial to
+// the ratio it feeds.
+func pstdev(xs []float64) float64 {
+	n := len(xs)
+	if n == 0 {
+		return 0
+	}
+	m := mean(xs)
+	var ss float64
+	for _, x := range xs {
+		d := x - m
+		ss += d * d
+	}
+	return math.Sqrt(ss / float64(n))
+}
+
+// pearson returns the Pearson correlation r between paired series xs and ys. It
+// returns 0 — defined, never NaN/Inf — when the series are empty, length-
+// mismatched, or either side has zero variance (a constant column or a single
+// point), the degenerate cases the fidelity readout must tolerate.
+func pearson(xs, ys []float64) float64 {
+	n := len(xs)
+	if n == 0 || n != len(ys) {
+		return 0
+	}
+	mx, my := mean(xs), mean(ys)
+	var sxy, sxx, syy float64
+	for i := 0; i < n; i++ {
+		dx := xs[i] - mx
+		dy := ys[i] - my
+		sxy += dx * dy
+		sxx += dx * dx
+		syy += dy * dy
+	}
+	if sxx == 0 || syy == 0 {
+		return 0
+	}
+	return sxy / math.Sqrt(sxx*syy)
+}
+
+// dispersionRatio returns stdev(engine) / stdev(sco) — the spread-compression
+// signal (<1 ⇒ the engine flattens the spread). It returns 0, never a
+// divide-by-zero, when the .sco side has zero spread (a single team / constant
+// column).
+func dispersionRatio(engine, sco []float64) float64 {
+	ss := pstdev(sco)
+	if ss == 0 {
+		return 0
+	}
+	return pstdev(engine) / ss
 }
 
 // team returns the accumulator for id, creating it on first sight.

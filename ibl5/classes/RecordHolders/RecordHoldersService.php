@@ -66,39 +66,6 @@ class RecordHoldersService implements RecordHoldersServiceInterface
     ];
 
     /**
-     * Stat SQL expressions for player single-game records.
-     *
-     * @var array<string, string>
-     */
-    private const PLAYER_STAT_EXPRESSIONS = [
-        'Most Points in a Single Game' => 'bs.calc_points',
-        'Most Rebounds in a Single Game' => 'bs.calc_rebounds',
-        'Most Assists in a Single Game' => 'bs.game_ast',
-        'Most Steals in a Single Game' => 'bs.game_stl',
-        'Most Blocks in a Single Game' => 'bs.game_blk',
-        'Most Turnovers in a Single Game' => 'bs.game_tov',
-        'Most Field Goals in a Single Game' => 'bs.calc_fg_made',
-        'Most Free Throws in a Single Game' => 'bs.game_ftm',
-        'Most Three Pointers in a Single Game' => 'bs.game_3gm',
-    ];
-
-    /**
-     * Stat SQL expressions for team single-game records.
-     *
-     * @var array<string, string>
-     */
-    private const TEAM_STAT_EXPRESSIONS = [
-        'Most Points in a Single Game' => 'bs.calc_points',
-        'Most Rebounds in a Single Game' => 'bs.calc_rebounds',
-        'Most Assists in a Single Game' => 'bs.game_ast',
-        'Most Steals in a Single Game' => 'bs.game_stl',
-        'Most Blocks in a Single Game' => 'bs.game_blk',
-        'Most Field Goals in a Single Game' => 'bs.calc_fg_made',
-        'Most Free Throws in a Single Game' => 'bs.game_ftm',
-        'Most Three Pointers in a Single Game' => 'bs.game_3gm',
-    ];
-
-    /**
      * Full-season stat columns in ibl_hist and the games column to divide by.
      *
      * @var array<string, array{statColumn: string, gamesColumn: string}>
@@ -109,21 +76,6 @@ class RecordHoldersService implements RecordHoldersServiceInterface
         'Highest Assist Average in a Regular Season' => ['statColumn' => 'ast', 'gamesColumn' => 'games'],
         'Highest Steals Average in a Regular Season' => ['statColumn' => 'stl', 'gamesColumn' => 'games'],
         'Highest Blocks Average in a Regular Season' => ['statColumn' => 'blk', 'gamesColumn' => 'games'],
-    ];
-
-    /**
-     * Date filters for game types.
-     *
-     * Regular season: Nov-May (months 11,12,1,2,3,4,5)
-     * Playoffs: June (month 6)
-     * HEAT: October (month 10)
-     *
-     * @var array<string, string>
-     */
-    private const DATE_FILTERS = [
-        'regularSeason' => 'bs.game_type = 1',
-        'playoffs' => 'bs.game_type = 2',
-        'heat' => 'bs.game_type = 3',
     ];
 
     public function __construct(RecordHoldersRepositoryInterface $repository)
@@ -161,9 +113,9 @@ class RecordHoldersService implements RecordHoldersServiceInterface
      */
     private function getPlayerSingleGameRecords(string $gameType): array
     {
-        $dateFilter = self::DATE_FILTERS[$gameType] ?? self::DATE_FILTERS['regularSeason'];
+        $dateFilter = RecordStatDefinitions::DATE_FILTERS[$gameType] ?? RecordStatDefinitions::DATE_FILTERS['regularSeason'];
 
-        $batchResults = $this->repository->getTopPlayerSingleGameBatch(self::PLAYER_STAT_EXPRESSIONS, $dateFilter);
+        $batchResults = $this->repository->getTopPlayerSingleGameBatch(self::playerStatExpressions(), $dateFilter);
 
         $records = [];
         foreach ($batchResults as $category => $dbRecords) {
@@ -318,12 +270,12 @@ class RecordHoldersService implements RecordHoldersServiceInterface
     private function getTeamGameRecords(): array
     {
         $records = [];
-        $dateFilter = self::DATE_FILTERS['regularSeason'];
+        $dateFilter = RecordStatDefinitions::DATE_FILTERS['regularSeason'];
 
         // Build batch config for all team stats (8 DESC + 1 ASC = 9 queries → 1)
         /** @var array<string, array{expression: string, order: string}> $batchConfig */
         $batchConfig = [];
-        foreach (self::TEAM_STAT_EXPRESSIONS as $category => $expression) {
+        foreach (self::teamStatExpressions() as $category => $expression) {
             $batchConfig[$category] = ['expression' => $expression, 'order' => 'DESC'];
         }
         $batchConfig['Fewest Points in a Single Game'] = [
@@ -610,6 +562,42 @@ class RecordHoldersService implements RecordHoldersServiceInterface
     private static function teamAbbreviationByName(string $teamName): string
     {
         return self::teamAbbreviation(self::teamIdByName($teamName));
+    }
+
+    /**
+     * Player single-game stat expressions, keyed by record label (all 9 stats).
+     *
+     * Mapped from the canonical RecordStatDefinitions registry.
+     *
+     * @return array<string, string>
+     */
+    private static function playerStatExpressions(): array
+    {
+        $map = [];
+        foreach (RecordStatDefinitions::STATS as $def) {
+            $map[$def['recordLabel']] = $def['expression'];
+        }
+        return $map;
+    }
+
+    /**
+     * Team single-game stat expressions, keyed by record label (the 8-stat team
+     * subset — turnovers excluded).
+     *
+     * Mapped from the canonical RecordStatDefinitions registry.
+     *
+     * @return array<string, string>
+     */
+    private static function teamStatExpressions(): array
+    {
+        $map = [];
+        foreach (RecordStatDefinitions::STATS as $def) {
+            if ($def['teamKey'] === null) {
+                continue;
+            }
+            $map[$def['recordLabel']] = $def['expression'];
+        }
+        return $map;
     }
 
     /**

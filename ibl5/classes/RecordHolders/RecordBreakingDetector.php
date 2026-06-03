@@ -25,40 +25,6 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
     private const SITE_BASE_URL = 'https://iblhoops.net';
 
     /**
-     * Player single-game stat expressions and labels.
-     *
-     * @var array<string, array{expression: string, unit: string}>
-     */
-    private const PLAYER_STATS = [
-        'points' => ['expression' => 'bs.calc_points', 'unit' => 'points'],
-        'rebounds' => ['expression' => 'bs.calc_rebounds', 'unit' => 'rebounds'],
-        'assists' => ['expression' => 'bs.game_ast', 'unit' => 'assists'],
-        'steals' => ['expression' => 'bs.game_stl', 'unit' => 'steals'],
-        'blocks' => ['expression' => 'bs.game_blk', 'unit' => 'blocks'],
-        'turnovers' => ['expression' => 'bs.game_tov', 'unit' => 'turnovers'],
-        'fg_made' => ['expression' => 'bs.calc_fg_made', 'unit' => 'field goals'],
-        'ft_made' => ['expression' => 'bs.game_ftm', 'unit' => 'free throws'],
-        '3pt_made' => ['expression' => 'bs.game_3gm', 'unit' => 'three pointers'],
-    ];
-
-    /**
-     * Team single-game stat expressions, labels, and sort directions.
-     *
-     * @var array<string, array{expression: string, unit: string, order: string}>
-     */
-    private const TEAM_STATS = [
-        'team_points' => ['expression' => 'bs.calc_points', 'unit' => 'points', 'order' => 'DESC'],
-        'team_rebounds' => ['expression' => 'bs.calc_rebounds', 'unit' => 'rebounds', 'order' => 'DESC'],
-        'team_assists' => ['expression' => 'bs.game_ast', 'unit' => 'assists', 'order' => 'DESC'],
-        'team_steals' => ['expression' => 'bs.game_stl', 'unit' => 'steals', 'order' => 'DESC'],
-        'team_blocks' => ['expression' => 'bs.game_blk', 'unit' => 'blocks', 'order' => 'DESC'],
-        'team_fg_made' => ['expression' => 'bs.calc_fg_made', 'unit' => 'field goals', 'order' => 'DESC'],
-        'team_ft_made' => ['expression' => 'bs.game_ftm', 'unit' => 'free throws', 'order' => 'DESC'],
-        'team_3pt_made' => ['expression' => 'bs.game_3gm', 'unit' => 'three pointers', 'order' => 'DESC'],
-        'team_fewest_points' => ['expression' => 'bs.calc_points', 'unit' => 'points', 'order' => 'ASC'],
-    ];
-
-    /**
      * @var array<string, string>
      */
     private const GAME_TYPE_LABELS = [
@@ -94,33 +60,56 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
             $dateFilter = $this->getDateFilterForType($gameType);
             $gameTypeLabel = self::GAME_TYPE_LABELS[$gameType] ?? 'regular season';
 
-            // Player single-game records
+            // Player single-game records — one query for all stats in the
+            // canonical registry, keyed by stat key.
             $expressions = [];
-            foreach (self::PLAYER_STATS as $key => $stat) {
-                $expressions[$key] = $stat['expression'];
+            foreach (RecordStatDefinitions::STATS as $key => $def) {
+                $expressions[$key] = $def['expression'];
             }
             $allPlayerRecords = $this->repository->getTopPlayerSingleGameBatch($expressions, $dateFilter);
 
-            foreach (self::PLAYER_STATS as $key => $stat) {
+            foreach (RecordStatDefinitions::STATS as $key => $def) {
                 $topRecords = $allPlayerRecords[$key] ?? [];
-                $newAnnouncements = $this->detectPlayerRecords($topRecords, $targetDates, $stat['unit'], $gameTypeLabel);
+                $newAnnouncements = $this->detectPlayerRecords($topRecords, $targetDates, $def['unit'], $gameTypeLabel);
                 array_push($announcements, ...$newAnnouncements);
             }
 
-            // Team single-game records
+            // Team single-game records — the 8 team stats (DESC) plus a synthetic
+            // "fewest points" (ASC) that reuses the points expression.
             /** @var array<string, array{expression: string, order: string}> $teamBatchConfig */
             $teamBatchConfig = [];
-            foreach (self::TEAM_STATS as $key => $stat) {
-                $teamBatchConfig[$key] = ['expression' => $stat['expression'], 'order' => $stat['order']];
+            foreach (RecordStatDefinitions::STATS as $def) {
+                $teamKey = $def['teamKey'];
+                if ($teamKey === null) {
+                    continue;
+                }
+                $teamBatchConfig[$teamKey] = ['expression' => $def['expression'], 'order' => 'DESC'];
             }
+            $teamBatchConfig['team_fewest_points'] = [
+                'expression' => RecordStatDefinitions::STATS['points']['expression'],
+                'order' => 'ASC',
+            ];
             $allTeamRecords = $this->repository->getTopTeamSingleGameBatch($teamBatchConfig, $dateFilter);
 
-            foreach (self::TEAM_STATS as $key => $stat) {
-                $topRecords = $allTeamRecords[$key] ?? [];
-                $isAscending = $stat['order'] === 'ASC';
-                $newAnnouncements = $this->detectTeamRecords($topRecords, $targetDates, $stat['unit'], $gameTypeLabel, $isAscending);
+            foreach (RecordStatDefinitions::STATS as $def) {
+                $teamKey = $def['teamKey'];
+                if ($teamKey === null) {
+                    continue;
+                }
+                $topRecords = $allTeamRecords[$teamKey] ?? [];
+                $newAnnouncements = $this->detectTeamRecords($topRecords, $targetDates, $def['unit'], $gameTypeLabel, false);
                 array_push($announcements, ...$newAnnouncements);
             }
+
+            $fewestRecords = $allTeamRecords['team_fewest_points'] ?? [];
+            $fewestAnnouncements = $this->detectTeamRecords(
+                $fewestRecords,
+                $targetDates,
+                RecordStatDefinitions::STATS['points']['unit'],
+                $gameTypeLabel,
+                true
+            );
+            array_push($announcements, ...$fewestAnnouncements);
         }
 
         // Quadruple doubles (not filtered by game type)
@@ -438,12 +427,7 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
      */
     private function getDateFilterForType(string $gameType): string
     {
-        $filters = [
-            'regularSeason' => 'bs.game_type = 1',
-            'playoffs' => 'bs.game_type = 2',
-            'heat' => 'bs.game_type = 3',
-        ];
-
-        return $filters[$gameType] ?? $filters['regularSeason'];
+        return RecordStatDefinitions::DATE_FILTERS[$gameType]
+            ?? RecordStatDefinitions::DATE_FILTERS['regularSeason'];
     }
 }

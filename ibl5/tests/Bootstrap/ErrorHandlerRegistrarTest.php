@@ -16,8 +16,8 @@ class ErrorHandlerRegistrarTest extends TestCase
         $logger->expects($this->once())
             ->method('error')
             ->with(
-                $this->isString(),
-                $this->callback(static function (array $context): bool {
+                self::isString(),
+                self::callback(static function (array $context): bool {
                     return $context['exception'] === \RuntimeException::class
                         && $context['message'] === 'boom'
                         && is_string($context['file'])
@@ -42,8 +42,8 @@ class ErrorHandlerRegistrarTest extends TestCase
         $logger->expects($this->once())
             ->method('error')
             ->with(
-                $this->isString(),
-                $this->callback(static function (array $context): bool {
+                self::isString(),
+                self::callback(static function (array $context): bool {
                     return $context['type'] === E_ERROR
                         && $context['message'] === 'Allowed memory exhausted';
                 })

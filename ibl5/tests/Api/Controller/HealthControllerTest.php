@@ -13,14 +13,14 @@ class HealthControllerTest extends TestCase
 {
     public function testReturnsOkAndHttp200WhenDatabaseReachable(): void
     {
-        $healthRepo = $this->createStub(HealthRepository::class);
+        $healthRepo = self::createStub(HealthRepository::class);
         $healthRepo->method('isReachable')->willReturn(true);
 
         $responder = $this->createMock(JsonResponder::class);
         $responder->expects($this->once())
             ->method('raw')
             ->with(
-                $this->callback(static function (array $body): bool {
+                self::callback(static function (array $body): bool {
                     return $body['status'] === 'ok'
                         && $body['db'] === true
                         && is_string($body['checkedAt'])
@@ -34,14 +34,14 @@ class HealthControllerTest extends TestCase
 
     public function testReturnsDegradedAndHttp503WhenRepositoryNotReachable(): void
     {
-        $healthRepo = $this->createStub(HealthRepository::class);
+        $healthRepo = self::createStub(HealthRepository::class);
         $healthRepo->method('isReachable')->willReturn(false);
 
         $responder = $this->createMock(JsonResponder::class);
         $responder->expects($this->once())
             ->method('raw')
             ->with(
-                $this->callback(static function (array $body): bool {
+                self::callback(static function (array $body): bool {
                     return $body['status'] === 'degraded'
                         && $body['db'] === false
                         && is_string($body['checkedAt']);

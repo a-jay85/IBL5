@@ -71,6 +71,12 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPen
 
 	bh := selectBallHandler(offense, gs.rng)
 	for trip := 0; trip <= maxOffensiveRebounds; trip++ {
+		// trip 0 is the initial attempt; trip > 0 is reached only via a `continue`
+		// after an offensive rebound, so the attempt is a putback continuation.
+		origin := result.OriginInitial
+		if trip > 0 {
+			origin = result.OriginOffReb
+		}
 		scoreDiff := offense.score - defense.score
 		matched := defenderAtSlot(defense, bh.slot)
 		pt := selectShotType(bh, matched, gs.rng)
@@ -101,7 +107,7 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPen
 
 		switch selectOutcome(in, false, false, false, gs.rng) {
 		case outcome2pt:
-			if made, _ := gs.shotAttempt(offense, defense, bh, sv2, result.ShotTwoPoint, periodIdx); !made {
+			if made, _ := gs.shotAttempt(offense, defense, bh, sv2, result.ShotTwoPoint, origin, periodIdx); !made {
 				gs.creditBlock(offense, defense, bh, def)
 				if cont, next := gs.rebound(offense, defense, periodIdx); cont {
 					bh = next
@@ -111,7 +117,7 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPen
 			}
 			return false // made shot
 		case outcome3pt:
-			if made, _ := gs.shotAttempt(offense, defense, bh, shotValue3pt(), result.ShotThree, periodIdx); !made {
+			if made, _ := gs.shotAttempt(offense, defense, bh, shotValue3pt(), result.ShotThree, origin, periodIdx); !made {
 				gs.creditBlock(offense, defense, bh, def)
 				if cont, next := gs.rebound(offense, defense, periodIdx); cont {
 					bh = next
@@ -121,7 +127,7 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPen
 			}
 			return false // made shot
 		case outcomeAndOne:
-			gs.madeFieldGoal(offense, bh, result.ShotTwoPoint, periodIdx)
+			gs.madeFieldGoal(offense, bh, result.ShotTwoPoint, origin, periodIdx)
 			gs.freeThrows(offense, defense, bh, def, 1, periodIdx)
 			return false
 		case outcomeFoulOnly:
@@ -144,39 +150,39 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPen
 // Game2GA/Game3GA counters are derived from it by aggregateBoxes). It returns
 // (made, ended): ended is always true for a single attempt; made distinguishes a
 // basket from a miss so the caller can route a miss to the rebound phase.
-func (gs *gameState) shotAttempt(offense, defense *teamState, shooter onCourt, shotValue float64, st result.ShotType, periodIdx int) (made, ended bool) {
+func (gs *gameState) shotAttempt(offense, defense *teamState, shooter onCourt, shotValue float64, st result.ShotType, origin result.ShotOrigin, periodIdx int) (made, ended bool) {
 	gs.emit(result.Event{
 		Kind: result.EventShotAttempt, Period: gs.period, Clock: gs.clock,
-		TeamID: offense.teamID, PlayerID: shooter.PID, ShotType: st,
+		TeamID: offense.teamID, PlayerID: shooter.PID, ShotType: st, Origin: origin,
 	})
 	// FG make uses BASE stamina fatigue (per spec, distinct from the live-energy
 	// outcome weights/selectors); under the current curve this is ≈1.0 anyway.
 	if rollMake(shotValue, fatigueFactor(shooter.Stamina), gs.rng) {
-		gs.creditMadeFieldGoal(offense, shooter, st, periodIdx)
+		gs.creditMadeFieldGoal(offense, shooter, st, origin, periodIdx)
 		return true, true
 	}
 	gs.emit(result.Event{
 		Kind: result.EventShotMiss, Period: gs.period, Clock: gs.clock,
-		TeamID: offense.teamID, PlayerID: shooter.PID, ShotType: st,
+		TeamID: offense.teamID, PlayerID: shooter.PID, ShotType: st, Origin: origin,
 	})
 	return false, true
 }
 
 // madeFieldGoal records a guaranteed made 2pt (the and-one basket): it emits the
 // attempt event then credits the make.
-func (gs *gameState) madeFieldGoal(offense *teamState, shooter onCourt, st result.ShotType, periodIdx int) {
+func (gs *gameState) madeFieldGoal(offense *teamState, shooter onCourt, st result.ShotType, origin result.ShotOrigin, periodIdx int) {
 	gs.emit(result.Event{
 		Kind: result.EventShotAttempt, Period: gs.period, Clock: gs.clock,
-		TeamID: offense.teamID, PlayerID: shooter.PID, ShotType: st,
+		TeamID: offense.teamID, PlayerID: shooter.PID, ShotType: st, Origin: origin,
 	})
-	gs.creditMadeFieldGoal(offense, shooter, st, periodIdx)
+	gs.creditMadeFieldGoal(offense, shooter, st, origin, periodIdx)
 }
 
 // creditMadeFieldGoal scores the points (live score, read for clutch/OT), bumps
 // the live per-shooter made-FG tally (read by the block-probability penalty),
 // and emits the make event. The box-score Game2GM/Game3GM counters are derived
 // from that event by aggregateBoxes — no box row is written here.
-func (gs *gameState) creditMadeFieldGoal(offense *teamState, shooter onCourt, st result.ShotType, periodIdx int) {
+func (gs *gameState) creditMadeFieldGoal(offense *teamState, shooter onCourt, st result.ShotType, origin result.ShotOrigin, periodIdx int) {
 	pts := 2
 	if st == result.ShotThree {
 		pts = 3
@@ -188,7 +194,7 @@ func (gs *gameState) creditMadeFieldGoal(offense *teamState, shooter onCourt, st
 	gs.madeFG[shooter.PID]++
 	gs.emit(result.Event{
 		Kind: result.EventShotMake, Period: gs.period, Clock: gs.clock,
-		TeamID: offense.teamID, PlayerID: shooter.PID, ShotType: st,
+		TeamID: offense.teamID, PlayerID: shooter.PID, ShotType: st, Origin: origin,
 	})
 }
 

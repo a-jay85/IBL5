@@ -37,6 +37,12 @@ type TeamStanding struct {
 	// when the snapshot carried no "fga" rows for the team.
 	EngineFGAPerG float64 `json:"engine_fga_per_g"`
 	ScoFGAPerG    float64 `json:"sco_fga_per_g"`
+	// Engine-only by-origin FGA/game (ADR-0042 empty-FGA split). No .sco
+	// counterpart (real box scores carry no origin tag); reported, never gated.
+	// The three sum to EngineFGAPerG (every attempt has exactly one origin).
+	EngineFGAInitialPerG    float64 `json:"engine_fga_initial_per_g"`
+	EngineFGAOrebPerG       float64 `json:"engine_fga_oreb_per_g"`
+	EngineFGATransitionPerG float64 `json:"engine_fga_transition_per_g"`
 }
 
 // SeasonAggregate is one report (one season bucket) rolled up per team, plus the
@@ -160,6 +166,27 @@ type SeasonAggregateReport struct {
 	Seasons   []SeasonAggregate   `json:"seasons"`
 	Residuals []StandingsResidual `json:"residuals"`
 	Fidelity  []FidelitySummary   `json:"fidelity"`
+	// FGAOriginDecomp is the engine-only ADR-0042 empty-FGA-split diagnostic: per
+	// game type, how each shot ORIGIN (initial / oreb-continuation / transition)
+	// contributes to the team-to-team FGA variance. Reported, never gated (no .sco
+	// side); the dominant origin is the Lever-2 calibration target.
+	FGAOriginDecomp []OriginDecomp `json:"fga_origin_decomp"`
+}
+
+// OriginDecomp is one game type's by-origin FGA-variance attribution (see
+// decomposeByOrigin). CovInitial+CovOreb+CovTransition == VarTotal; the *Share
+// fields are each contribution as a fraction of VarTotal (0 when VarTotal==0),
+// the legible "which origin drives the FGA spread" readout.
+type OriginDecomp struct {
+	GameType        int     `json:"game_type"`
+	N               int     `json:"n"`
+	VarTotal        float64 `json:"var_total_fga"`
+	CovInitial      float64 `json:"cov_initial"`
+	CovOreb         float64 `json:"cov_oreb"`
+	CovTransition   float64 `json:"cov_transition"`
+	ShareInitial    float64 `json:"share_initial"`
+	ShareOreb       float64 `json:"share_oreb"`
+	ShareTransition float64 `json:"share_transition"`
 }
 
 // teamAcc accumulates one team's running season sums while CollectSeasonAggregates
@@ -175,6 +202,9 @@ type teamAcc struct {
 	engFGA     float64 // Σ total FGA (2pt+3pt) over fgaGP games, engine side
 	scoFGA     float64 // Σ total FGA over fgaGP games, .sco side
 	fgaGP      int     // games where BOTH teams had an "fga" row (FGA divisor)
+	// Engine-only by-origin FGA sums over gp games (the ADR-0042 empty-FGA split;
+	// no .sco counterpart). Divided by gp for the per-game means in TeamStanding.
+	engFGAInit, engFGAOreb, engFGATrans float64
 }
 
 // residAcc collects one game type's per-(season,team) residuals across reports.
@@ -261,6 +291,17 @@ func CollectSeasonAggregates(reports []validate.Report) SeasonAggregateReport {
 				v.scoFGA += visFGA.ScoVal
 				v.fgaGP++
 			}
+
+			// Engine-only by-origin FGA (reported, never gated). Indexing a nil
+			// EngineOriginFGA map yields the zero OriginFGA — safe.
+			ho := g.EngineOriginFGA[g.HomeTeamID]
+			h.engFGAInit += ho.Initial
+			h.engFGAOreb += ho.Oreb
+			h.engFGATrans += ho.Transition
+			vo := g.EngineOriginFGA[g.VisitorTeamID]
+			v.engFGAInit += vo.Initial
+			v.engFGAOreb += vo.Oreb
+			v.engFGATrans += vo.Transition
 		}
 
 		if numGames == 0 {
@@ -279,18 +320,21 @@ func CollectSeasonAggregates(reports []validate.Report) SeasonAggregateReport {
 			t := acc[id]
 			gp := float64(t.gp)
 			ts := TeamStanding{
-				TeamID:                id,
-				GamesPlayed:           t.gp,
-				EngineExpectedWins:    t.engWins,
-				ScoWins:               t.scoWins,
-				EnginePointsForPG:     t.engFor / gp,
-				ScoPointsForPG:        t.scoFor / gp,
-				EnginePointsAgainstPG: t.engAgainst / gp,
-				ScoPointsAgainstPG:    t.scoAgainst / gp,
-				EnginePointDiffPG:     (t.engFor - t.engAgainst) / gp,
-				ScoPointDiffPG:        (t.scoFor - t.scoAgainst) / gp,
-				EngineFGAPerG:         perGame(t.engFGA, t.fgaGP),
-				ScoFGAPerG:            perGame(t.scoFGA, t.fgaGP),
+				TeamID:                  id,
+				GamesPlayed:             t.gp,
+				EngineExpectedWins:      t.engWins,
+				ScoWins:                 t.scoWins,
+				EnginePointsForPG:       t.engFor / gp,
+				ScoPointsForPG:          t.scoFor / gp,
+				EnginePointsAgainstPG:   t.engAgainst / gp,
+				ScoPointsAgainstPG:      t.scoAgainst / gp,
+				EnginePointDiffPG:       (t.engFor - t.engAgainst) / gp,
+				ScoPointDiffPG:          (t.scoFor - t.scoAgainst) / gp,
+				EngineFGAPerG:           perGame(t.engFGA, t.fgaGP),
+				ScoFGAPerG:              perGame(t.scoFGA, t.fgaGP),
+				EngineFGAInitialPerG:    perGame(t.engFGAInit, t.gp),
+				EngineFGAOrebPerG:       perGame(t.engFGAOreb, t.gp),
+				EngineFGATransitionPerG: perGame(t.engFGATrans, t.gp),
 			}
 			sa.Teams = append(sa.Teams, ts)
 			ra.wins = append(ra.wins, math.Abs(ts.EngineExpectedWins-float64(ts.ScoWins)))
@@ -317,7 +361,56 @@ func CollectSeasonAggregates(reports []validate.Report) SeasonAggregateReport {
 		})
 	}
 	out.Fidelity = collectFidelitySummaries(out.Seasons)
+	out.FGAOriginDecomp = collectOriginDecomp(out.Seasons)
 	return out
+}
+
+// collectOriginDecomp pools every (season, team) row's engine by-origin FGA/game
+// by game type and runs the by-origin variance attribution (decomposeByOrigin).
+// Engine-only; emitted in ascending game-type order for deterministic output.
+func collectOriginDecomp(seasons []SeasonAggregate) []OriginDecomp {
+	byType := map[bundle.GameType][]originRow{}
+	for _, sa := range seasons {
+		gt := bundle.GameType(sa.GameType)
+		for _, ts := range sa.Teams {
+			byType[gt] = append(byType[gt], originRow{
+				season:     sa.Label,
+				fgaInitial: ts.EngineFGAInitialPerG,
+				fgaOreb:    ts.EngineFGAOrebPerG,
+				fgaT:       ts.EngineFGATransitionPerG,
+			})
+		}
+	}
+	gts := make([]bundle.GameType, 0, len(byType))
+	for gt := range byType {
+		gts = append(gts, gt)
+	}
+	sort.Slice(gts, func(i, j int) bool { return gts[i] < gts[j] })
+	var out []OriginDecomp
+	for _, gt := range gts {
+		rows := byType[gt]
+		varTotal, ci, co, ct := decomposeByOrigin(rows)
+		out = append(out, OriginDecomp{
+			GameType:        int(gt),
+			N:               len(rows),
+			VarTotal:        varTotal,
+			CovInitial:      ci,
+			CovOreb:         co,
+			CovTransition:   ct,
+			ShareInitial:    originShare(ci, varTotal),
+			ShareOreb:       originShare(co, varTotal),
+			ShareTransition: originShare(ct, varTotal),
+		})
+	}
+	return out
+}
+
+// originShare returns c/total, or 0 when total == 0 (never a divide-by-zero).
+func originShare(c, total float64) float64 {
+	if total == 0 {
+		return 0
+	}
+	return c / total
 }
 
 // fidAcc pools one game type's paired engine/.sco per-team series across the
@@ -583,6 +676,63 @@ func decomposeLogVariance(rows []decompRow) (varPF, varFGA, varPPS, cov float64)
 		sCov += rFGA * rPPS
 	}
 	return ssPF / n, ssFGA / n, ssPPS / n, sCov / n
+}
+
+// originRow is one (season, team) engine FGA-per-game observation split by shot
+// ORIGIN (initial / oreb-continuation / transition). Engine-only — real .sco box
+// scores carry no origin tag.
+type originRow struct {
+	season                    string
+	fgaInitial, fgaOreb, fgaT float64
+}
+
+// decomposeByOrigin attributes the within-season cross-team variance of total
+// engine FGA-per-game to its three shot ORIGINS via the exact covariance identity
+//
+//	Var(FGA_total) = Σ_o Cov(FGA_o, FGA_total),   FGA_total = Σ_o FGA_o
+//
+// so covInitial + covOreb + covTransition == varTotal to float tolerance (the
+// test asserts this). Each contribution is the within-season-demeaned covariance
+// of that origin's per-game FGA with the team total: the larger it is, the more
+// that origin's cross-team variation drives the team-to-team FGA spread — the
+// ADR-0042 empty-FGA-split diagnostic, whose dominant origin is the Lever-2
+// calibration target. The total is taken as the SUM of the three components (not
+// a separate field) so the identity holds by construction even if a caller's
+// "total" ever disagreed with its parts. Within-season demeaned to match
+// decomposeLogVariance's era handling. Empty input, or a single-team season
+// (residuals all 0), yields zeros — never NaN/Inf.
+func decomposeByOrigin(rows []originRow) (varTotal, covInitial, covOreb, covTransition float64) {
+	n := float64(len(rows))
+	if n == 0 {
+		return 0, 0, 0, 0
+	}
+	type acc struct{ init, oreb, trans, total, cnt float64 }
+	sums := map[string]*acc{}
+	for _, r := range rows {
+		a := sums[r.season]
+		if a == nil {
+			a = &acc{}
+			sums[r.season] = a
+		}
+		a.init += r.fgaInitial
+		a.oreb += r.fgaOreb
+		a.trans += r.fgaT
+		a.total += r.fgaInitial + r.fgaOreb + r.fgaT
+		a.cnt++
+	}
+	for _, r := range rows {
+		a := sums[r.season]
+		c := a.cnt
+		rt := (r.fgaInitial + r.fgaOreb + r.fgaT) - a.total/c
+		ri := r.fgaInitial - a.init/c
+		ro := r.fgaOreb - a.oreb/c
+		rtr := r.fgaT - a.trans/c
+		varTotal += rt * rt
+		covInitial += ri * rt
+		covOreb += ro * rt
+		covTransition += rtr * rt
+	}
+	return varTotal / n, covInitial / n, covOreb / n, covTransition / n
 }
 
 // team returns the accumulator for id, creating it on first sight.

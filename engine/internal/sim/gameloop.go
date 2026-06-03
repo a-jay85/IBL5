@@ -26,8 +26,13 @@ func simGame(b bundle.Bundle, g bundle.Game, r *rng.RNG) (result.GameResult, int
 
 	gs := &gameState{rng: r, gameType: g.GameType, madeFG: map[int]int{}}
 
-	// Possession length is constant per game in PR3a (factor 1.0, no per-game
-	// stat aggregates yet): average the two teams' base times.
+	// One shared possession length per game: the average of the two teams' base
+	// times (factor 1.0). Each team's base_time now carries its offensive volume
+	// composite (the ADR-0042 volume→count channel, tempo.go). Under strict
+	// alternation a shared-average step and a per-team step yield the SAME
+	// possession COUNT per team (clock / avg(BT_v, BT_h)), so no per-possession
+	// step is needed; the season-level FGA channel emerges because a high-volume
+	// team's games average faster across its varied opponents.
 	baseTime := (teamBaseTime(visitor.players) + teamBaseTime(home.players)) / 2.0
 	step := possessionTime(baseTime)
 

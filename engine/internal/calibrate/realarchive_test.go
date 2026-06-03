@@ -85,6 +85,19 @@ func TestRealArchive_CalibrateEndToEnd(t *testing.T) {
 	if playoffGamesSampled > 0 && !sawPlayoff {
 		t.Error("sample contained playoff games but produced no playoff (game_type=4) bucket (PR9d)")
 	}
+
+	// ADR-0042 REPORTED diagnostic (never a gate): the volume→count channel should
+	// narrow Engine Var(lnFGA) toward Real and flip Cov(lnFGA,lnPPS) toward +; the
+	// by-origin decomposition names the dominant empty-FGA source (Lever-2 target).
+	agg := CollectSeasonAggregates(reports)
+	for _, fs := range agg.Fidelity {
+		t.Logf("FIDELITY gt=%d N=%d | VarLnFGA real=%.5f engine=%.5f | Cov(lnFGA,lnPPS) real=%+.5f engine=%+.5f | VarLnPF real=%.5f engine=%.5f",
+			fs.GameType, fs.N, fs.RealVarLnFGA, fs.EngineVarLnFGA, fs.RealCovLnFGALnPPS, fs.EngineCovLnFGALnPPS, fs.RealVarLnPF, fs.EngineVarLnPF)
+	}
+	for _, od := range agg.FGAOriginDecomp {
+		t.Logf("FGA-ORIGIN gt=%d N=%d | VarTotal=%.4f | share initial=%.3f oreb=%.3f transition=%.3f | cov init=%.4f oreb=%.4f trans=%.4f",
+			od.GameType, od.N, od.VarTotal, od.ShareInitial, od.ShareOreb, od.ShareTransition, od.CovInitial, od.CovOreb, od.CovTransition)
+	}
 }
 
 func envInt(key string, def int) int {

@@ -117,6 +117,13 @@ type gameState struct {
 	// (Stage 2 and Stage 3 both passed). It is internal observability for tests;
 	// it is never serialized into the result contract.
 	transitions int
+
+	// freeze / accum drive the empty-FGA source-isolation diagnostic (freeze.go,
+	// ADR-0043). freeze is the per-arm counterfactual config (zero value = live
+	// engine); accum, when non-nil, harvests league-mean derived values during a
+	// no-freeze baseline pass. Both are internal observability — never serialized.
+	freeze FreezeConfig
+	accum  *FreezeAccum
 }
 
 func (g *gameState) emit(e result.Event) { g.events = append(g.events, e) }

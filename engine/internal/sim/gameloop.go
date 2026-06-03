@@ -21,10 +21,18 @@ const (
 // live quarter tally lets the conservation test cross-check the event-derived
 // box), not part of the result contract.
 func simGame(b bundle.Bundle, g bundle.Game, r *rng.RNG) (result.GameResult, int, *teamState, *teamState) {
+	return simGameWith(b, g, r, Options{})
+}
+
+// simGameWith is simGame plus the freeze/accumulation Options (freeze.go). A zero
+// Options leaves every possession decision byte-identical to simGame; a non-zero
+// Options either harvests league-mean derived values (opts.Accum) or substitutes a
+// frozen league mean at one or more mechanism arms (opts.Freeze).
+func simGameWith(b bundle.Bundle, g bundle.Game, r *rng.RNG, opts Options) (result.GameResult, int, *teamState, *teamState) {
 	visitor := newTeamState(b.Players, g.VisitorTeamID, false)
 	home := newTeamState(b.Players, g.HomeTeamID, true)
 
-	gs := &gameState{rng: r, gameType: g.GameType, madeFG: map[int]int{}}
+	gs := &gameState{rng: r, gameType: g.GameType, madeFG: map[int]int{}, freeze: opts.Freeze, accum: opts.Accum}
 
 	// One shared possession length per game: the average of the two teams' base
 	// times (factor 1.0). Each team's base_time now carries its offensive volume

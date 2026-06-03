@@ -104,7 +104,10 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 
 		net := transitionNet(def)
 		mq := matchupQuality(bh.FGP, bh.energy, defense.players) // live energy (inert under current curve)
-		sv2 := applyClutch(shotValue2pt(net, bh.FGP, false), bh.Clutch, gs.period, scoreDiff)
+		// Make/foul/turnover arms route through the gameState freeze wrappers
+		// (freeze.go) on the transition path too, so a frozen Make/Foul/TVR arm
+		// applies to fast-break FGA — not only the half-court loop.
+		sv2 := applyClutch(gs.makeValue2pt(net, bh.FGP), bh.Clutch, gs.period, scoreDiff)
 		// Play-outcome buckets use the same faithful helpers as the half-court path
 		// (bucketweights.go) — the second of the two outcomeInputs assembly sites. sv2
 		// (above) feeds shotAttempt on the 2pt path ONLY; it does not double as the
@@ -112,12 +115,13 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 		// buckets, site 3 on the offQuality divisor inside foulBucketWeight), so a
 		// home fast-break possession also grows the foul bucket.
 		hca := hcaDelta(gs.gameType, offense.isHome)
+		turnLinear := gs.turnThreshLinear(bh.TVR)
 		in := outcomeInputs{
 			twoPtWeight:      twoPtBucketWeight(bh) + hca,
 			threePtWeight:    0, // a fast break is never a 3pt attempt (allowedPaths excludes it)
 			andOneWeight:     andOneBucketWeight(mq, bh),
-			foulOnlyWeight:   foulBucketWeight(offense.players, defense.players, hca),
-			turnoverDefValue: turnoverThreshold(bh.TVR) * turnoverThreshold(bh.TVR),
+			foulOnlyWeight:   gs.foulWeight(offense.players, defense.players, hca),
+			turnoverDefValue: turnLinear * turnLinear,
 		}
 
 		switch selectOutcome(in, false, false, true, gs.rng) {

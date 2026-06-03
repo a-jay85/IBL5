@@ -31,6 +31,12 @@ type TeamStanding struct {
 	ScoPointsAgainstPG    float64 `json:"sco_points_against_pg"`
 	EnginePointDiffPG     float64 `json:"engine_point_diff_pg"` // PF−PA; runs-stable, the team-level margin_gap analog
 	ScoPointDiffPG        float64 `json:"sco_point_diff_pg"`
+	// FGA-per-game = total field-goal attempts (2pt+3pt, see fgaFor) per game.
+	// These feed the volume/efficiency dispersion decomposition (memory-grounded:
+	// reference_sco_fgm_is_2pt notes the 2pt-only fact is the raw slot only). 0
+	// when the snapshot carried no "fga" rows for the team.
+	EngineFGAPerG float64 `json:"engine_fga_per_g"`
+	ScoFGAPerG    float64 `json:"sco_fga_per_g"`
 }
 
 // SeasonAggregate is one report (one season bucket) rolled up per team, plus the
@@ -80,6 +86,37 @@ type StandingsResidual struct {
 //   - Wins* / PointDiff* the same corr + dispersion on expected-wins vs .sco
 //     wins (standings ranking + spread) and on PF−PA per game (margin).
 //
+// The volume/efficiency block answers WHICH CHANNEL drives — and which the
+// engine compresses — for team scoring, decomposing PF = FGA × PPS (PPS :=
+// PF/FGA, points per total field-goal attempt). The GAP ratios are the
+// PFDispersionRatio analog on each channel; the Real* TARGET terms decompose the
+// REAL (.sco) scoring spread itself:
+//
+//   - VolumeDispersionRatio     stdev(engine FGA/g) / stdev(sco FGA/g): GAP — is
+//     the engine's team-to-team SHOT-VOLUME spread compressed?
+//   - EfficiencyDispersionRatio stdev(engine PPS) / stdev(sco PPS): GAP — is the
+//     engine's team-to-team EFFICIENCY spread compressed?
+//   - Real{VarLnPF,VarLnFGA,VarLnPPS,CovLnFGALnPPS} and the parallel
+//     Engine{...} block: the exact log-variance identity
+//     Var(lnPF)=Var(lnFGA)+Var(lnPPS)+2·Cov on the .sco side and the engine side,
+//     each demeaned WITHIN season (so cross-era pace shifts do not leak into the
+//     volume share). These eight terms are the TARGET-vs-GAP decomposition. From
+//     them a reviewer derives the artifact-free, shared-term-free headlines in the
+//     DIRECTLY-OBSERVED variables lnPF, lnFGA (PPS is a derived quotient, lnPPS =
+//     lnPF − lnFGA, so it shares the FGA term — do NOT headline the PPS
+//     correlation):
+//     Cov(lnPF,lnFGA)        = VarLnFGA + CovLnFGALnPPS
+//     volume share of scoring = Cov(lnPF,lnFGA) / VarLnPF
+//     scoring-on-volume slope = Cov(lnPF,lnFGA) / VarLnFGA  ("+10% shots ⇒ +N% pts")
+//     The diagnostic finding (2026-06-03 corpus): the engine deviates on THREE
+//     axes — Engine VarLnFGA ≈2.6× Real and VarLnPPS ≈2.0× Real (both marginals
+//     too WIDE) AND the covariance is wrong-signed (real + / engine −), the
+//     cancellation that COMPRESSES total scoring (slope real ≈1.20, engine ≈0.24).
+//     Matching real dispersion needs the positive covariance AND narrower
+//     marginals (covariance alone overshoots ~2.3×); the slope is a diagnostic, not
+//     a target. A volume-marginal fix (ADR-0040 candidate A) pushes the wrong axis
+//     and was null on dispersion (over-dispersion pre-dates A).
+//
 // EVERY metric here is runs-stable. LevelGapPF and the PF / point-diff stats are
 // linear means of EngineMean; Wins* is built on EngineExpectedWins = Σ P(win),
 // which converges as runs grow rather than rounding each game to a 0/1 win. This
@@ -101,6 +138,19 @@ type FidelitySummary struct {
 	WinsDispersionRatio      float64 `json:"wins_dispersion_ratio"`
 	PointDiffCorr            float64 `json:"point_diff_corr"`
 	PointDiffDispersionRatio float64 `json:"point_diff_dispersion_ratio"`
+	// Volume/efficiency channel decomposition (see the type doc). GAP ratios use
+	// the same raw pooling as PFDispersionRatio; the Real* TARGET terms are
+	// within-season demeaned. All 0 (never NaN/Inf) on degenerate input.
+	VolumeDispersionRatio     float64 `json:"volume_dispersion_ratio"`
+	EfficiencyDispersionRatio float64 `json:"efficiency_dispersion_ratio"`
+	RealVarLnPF               float64 `json:"real_var_ln_pf"`
+	RealVarLnFGA              float64 `json:"real_var_ln_fga"`
+	RealVarLnPPS              float64 `json:"real_var_ln_pps"`
+	RealCovLnFGALnPPS         float64 `json:"real_cov_ln_fga_ln_pps"`
+	EngineVarLnPF             float64 `json:"engine_var_ln_pf"`
+	EngineVarLnFGA            float64 `json:"engine_var_ln_fga"`
+	EngineVarLnPPS            float64 `json:"engine_var_ln_pps"`
+	EngineCovLnFGALnPPS       float64 `json:"engine_cov_ln_fga_ln_pps"`
 }
 
 // SeasonAggregateReport is the full season-aggregate readout: the per-season
@@ -122,6 +172,9 @@ type teamAcc struct {
 	engAgainst float64
 	scoFor     float64
 	scoAgainst float64
+	engFGA     float64 // Σ total FGA (2pt+3pt) over fgaGP games, engine side
+	scoFGA     float64 // Σ total FGA over fgaGP games, .sco side
+	fgaGP      int     // games where BOTH teams had an "fga" row (FGA divisor)
 }
 
 // residAcc collects one game type's per-(season,team) residuals across reports.
@@ -170,6 +223,14 @@ func CollectSeasonAggregates(reports []validate.Report) SeasonAggregateReport {
 			engPace += homePts.EngineMean + visPts.EngineMean
 			scoPace += homePts.ScoVal + visPts.ScoVal
 
+			// Volume: accumulate total FGA only when BOTH sides carry an "fga"
+			// row, mirroring the both-sides points guard. In the real pipeline
+			// compareGame always emits "fga" alongside "points", so fgaGP == gp;
+			// the guard keeps the FGA-per-game divisor correct if it ever does not.
+			homeFGA, okHF := fgaFor(g, g.HomeTeamID)
+			visFGA, okVF := fgaFor(g, g.VisitorTeamID)
+			hasFGA := okHF && okVF
+
 			h := team(acc, g.HomeTeamID)
 			h.gp++
 			h.engWins += g.EngineHomeWinFraction
@@ -190,6 +251,15 @@ func CollectSeasonAggregates(reports []validate.Report) SeasonAggregateReport {
 			v.scoAgainst += homePts.ScoVal
 			if visPts.ScoVal > homePts.ScoVal {
 				v.scoWins++
+			}
+
+			if hasFGA {
+				h.engFGA += homeFGA.EngineMean
+				h.scoFGA += homeFGA.ScoVal
+				h.fgaGP++
+				v.engFGA += visFGA.EngineMean
+				v.scoFGA += visFGA.ScoVal
+				v.fgaGP++
 			}
 		}
 
@@ -219,6 +289,8 @@ func CollectSeasonAggregates(reports []validate.Report) SeasonAggregateReport {
 				ScoPointsAgainstPG:    t.scoAgainst / gp,
 				EnginePointDiffPG:     (t.engFor - t.engAgainst) / gp,
 				ScoPointDiffPG:        (t.scoFor - t.scoAgainst) / gp,
+				EngineFGAPerG:         perGame(t.engFGA, t.fgaGP),
+				ScoFGAPerG:            perGame(t.scoFGA, t.fgaGP),
 			}
 			sa.Teams = append(sa.Teams, ts)
 			ra.wins = append(ra.wins, math.Abs(ts.EngineExpectedWins-float64(ts.ScoWins)))
@@ -254,6 +326,8 @@ type fidAcc struct {
 	engPF, scoPF     []float64
 	engWins, scoWins []float64
 	engDiff, scoDiff []float64
+	engFGA, scoFGA   []float64 // per-team total-FGA/g, parallel to engPF/scoPF
+	season           []string  // per-row season label, for within-season demean
 }
 
 // collectFidelitySummaries pools every (season, team) row by game type and
@@ -278,27 +352,79 @@ func collectFidelitySummaries(seasons []SeasonAggregate) []FidelitySummary {
 			fa.scoWins = append(fa.scoWins, float64(ts.ScoWins))
 			fa.engDiff = append(fa.engDiff, ts.EnginePointDiffPG)
 			fa.scoDiff = append(fa.scoDiff, ts.ScoPointDiffPG)
+			fa.engFGA = append(fa.engFGA, ts.EngineFGAPerG)
+			fa.scoFGA = append(fa.scoFGA, ts.ScoFGAPerG)
+			fa.season = append(fa.season, sa.Label)
 		}
 	}
 
 	var out []FidelitySummary
 	for _, gt := range sortedFidGameTypes(byType) {
 		fa := byType[gt]
+		// GAP: engine-vs-sco efficiency (PPS=PF/FGA) spread. PPS rows where FGA<=0
+		// are dropped (no divide-by-zero); the paired engine/sco PPS stay aligned.
+		engPPS, scoPPS := pairedPPS(fa)
+		// TARGET vs GAP: within-season-demeaned log-variance decomposition of the
+		// REAL (.sco) scoring spread and, in parallel, the ENGINE one. The two
+		// covariances are the lever: real volume↔efficiency reinforce (+), the
+		// engine anti-couples them (−), collapsing total scoring despite wider
+		// marginals.
+		varPF, varFGA, varPPS, cov := decomposeLogVariance(decompRows(fa, false))
+		eVarPF, eVarFGA, eVarPPS, eCov := decomposeLogVariance(decompRows(fa, true))
 		// LevelGapPF = mean(engPF − scoPF) = mean(engPF) − mean(scoPF) exactly
 		// (same N), the absolute scoring-level gap.
 		out = append(out, FidelitySummary{
-			GameType:                 int(gt),
-			N:                        len(fa.engPF),
-			LevelGapPF:               mean(fa.engPF) - mean(fa.scoPF),
-			PFCorr:                   pearson(fa.engPF, fa.scoPF),
-			PFDispersionRatio:        dispersionRatio(fa.engPF, fa.scoPF),
-			WinsCorr:                 pearson(fa.engWins, fa.scoWins),
-			WinsDispersionRatio:      dispersionRatio(fa.engWins, fa.scoWins),
-			PointDiffCorr:            pearson(fa.engDiff, fa.scoDiff),
-			PointDiffDispersionRatio: dispersionRatio(fa.engDiff, fa.scoDiff),
+			GameType:                  int(gt),
+			N:                         len(fa.engPF),
+			LevelGapPF:                mean(fa.engPF) - mean(fa.scoPF),
+			PFCorr:                    pearson(fa.engPF, fa.scoPF),
+			PFDispersionRatio:         dispersionRatio(fa.engPF, fa.scoPF),
+			WinsCorr:                  pearson(fa.engWins, fa.scoWins),
+			WinsDispersionRatio:       dispersionRatio(fa.engWins, fa.scoWins),
+			PointDiffCorr:             pearson(fa.engDiff, fa.scoDiff),
+			PointDiffDispersionRatio:  dispersionRatio(fa.engDiff, fa.scoDiff),
+			VolumeDispersionRatio:     dispersionRatio(fa.engFGA, fa.scoFGA),
+			EfficiencyDispersionRatio: dispersionRatio(engPPS, scoPPS),
+			RealVarLnPF:               varPF,
+			RealVarLnFGA:              varFGA,
+			RealVarLnPPS:              varPPS,
+			RealCovLnFGALnPPS:         cov,
+			EngineVarLnPF:             eVarPF,
+			EngineVarLnFGA:            eVarFGA,
+			EngineVarLnPPS:            eVarPPS,
+			EngineCovLnFGALnPPS:       eCov,
 		})
 	}
 	return out
+}
+
+// pairedPPS builds the engine/.sco points-per-FGA series, aligned and dropping
+// any row where EITHER side's FGA is non-positive (PPS undefined). Keeping the
+// pair aligned means dispersionRatio compares the same teams on both sides.
+func pairedPPS(fa *fidAcc) (eng, sco []float64) {
+	for i := range fa.scoFGA {
+		if fa.engFGA[i] <= 0 || fa.scoFGA[i] <= 0 {
+			continue
+		}
+		eng = append(eng, fa.engPF[i]/fa.engFGA[i])
+		sco = append(sco, fa.scoPF[i]/fa.scoFGA[i])
+	}
+	return eng, sco
+}
+
+// decompRows packages the per-(season,team) PF/FGA pairs for the within-season
+// log-variance decomposition — the engine side when useEngine, else the .sco
+// (real) side.
+func decompRows(fa *fidAcc, useEngine bool) []decompRow {
+	rows := make([]decompRow, len(fa.scoPF))
+	for i := range fa.scoPF {
+		if useEngine {
+			rows[i] = decompRow{season: fa.season[i], pf: fa.engPF[i], fga: fa.engFGA[i]}
+		} else {
+			rows[i] = decompRow{season: fa.season[i], pf: fa.scoPF[i], fga: fa.scoFGA[i]}
+		}
+	}
+	return rows
 }
 
 // sortedFidGameTypes returns the fidelity game types in ascending order.
@@ -376,6 +502,87 @@ func dispersionRatio(engine, sco []float64) float64 {
 		return 0
 	}
 	return pstdev(engine) / ss
+}
+
+// perGame returns sum/games, or 0 when games == 0 (no contributing games — never
+// a divide-by-zero).
+func perGame(sum float64, games int) float64 {
+	if games == 0 {
+		return 0
+	}
+	return sum / float64(games)
+}
+
+// decompRow is one (season, team) scoring observation for the log-variance
+// decomposition: total points and total FGA per game, tagged by season.
+type decompRow struct {
+	season  string
+	pf, fga float64
+}
+
+// decomposeLogVariance splits the real team-scoring spread into a VOLUME term
+// and an EFFICIENCY term via the EXACT identity
+//
+//	Var(lnPF) = Var(lnFGA) + Var(lnPPS) + 2·Cov(lnFGA, lnPPS),   PPS := PF/FGA
+//
+// which holds pointwise because lnPF = lnFGA + lnPPS, so the returned terms close
+// to floating tolerance by construction (the test asserts this). lnPPS is taken
+// as lnPF − lnFGA, never recomputed from a separate PF/FGA division, so the
+// identity cannot drift.
+//
+// Each of lnPF/lnFGA/lnPPS is DEMEANED WITHIN its season before the variance is
+// taken: the corpus spans 24→26→28-team eras whose league pace differs, and raw
+// pooling would bank that cross-era level shift as VOLUME variance and bias the
+// verdict toward volume. Within-season residuals are globally mean-zero (each
+// season's residuals sum to 0), so the divisor-N sums below are population
+// variances/covariance over the pooled residuals.
+//
+// Rows with pf<=0 or fga<=0 are dropped (ln undefined) — no NaN/Inf. Empty input,
+// or a single-team season (its residuals are all exactly 0), yields 0 variance,
+// never NaN.
+func decomposeLogVariance(rows []decompRow) (varPF, varFGA, varPPS, cov float64) {
+	type logRow struct {
+		season             string
+		lnPF, lnFGA, lnPPS float64
+	}
+	valid := make([]logRow, 0, len(rows))
+	for _, r := range rows {
+		if r.pf <= 0 || r.fga <= 0 {
+			continue // ln undefined — skip, never NaN/Inf
+		}
+		lnPF := math.Log(r.pf)
+		lnFGA := math.Log(r.fga)
+		valid = append(valid, logRow{r.season, lnPF, lnFGA, lnPF - lnFGA})
+	}
+	n := float64(len(valid))
+	if n == 0 {
+		return 0, 0, 0, 0
+	}
+
+	// Per-season sums → per-season means for the within-season demean.
+	sumPF := map[string]float64{}
+	sumFGA := map[string]float64{}
+	sumPPS := map[string]float64{}
+	cnt := map[string]float64{}
+	for _, v := range valid {
+		sumPF[v.season] += v.lnPF
+		sumFGA[v.season] += v.lnFGA
+		sumPPS[v.season] += v.lnPPS
+		cnt[v.season]++
+	}
+
+	var ssPF, ssFGA, ssPPS, sCov float64
+	for _, v := range valid {
+		c := cnt[v.season]
+		rPF := v.lnPF - sumPF[v.season]/c
+		rFGA := v.lnFGA - sumFGA[v.season]/c
+		rPPS := v.lnPPS - sumPPS[v.season]/c
+		ssPF += rPF * rPF
+		ssFGA += rFGA * rFGA
+		ssPPS += rPPS * rPPS
+		sCov += rFGA * rPPS
+	}
+	return ssPF / n, ssFGA / n, ssPPS / n, sCov / n
 }
 
 // team returns the accumulator for id, creating it on first sight.

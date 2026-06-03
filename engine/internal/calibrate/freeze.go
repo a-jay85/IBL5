@@ -543,7 +543,7 @@ func covWithinSeason(n int, seasonOf func(int) string, rateOf, aOf, bOf func(int
 	if n == 0 {
 		return 0, 0
 	}
-	var sumR, sumA, sumB map[string]float64 = map[string]float64{}, map[string]float64{}, map[string]float64{}
+	sumR, sumA, sumB := map[string]float64{}, map[string]float64{}, map[string]float64{}
 	cnt := map[string]float64{}
 	for i := 0; i < n; i++ {
 		s := seasonOf(i)

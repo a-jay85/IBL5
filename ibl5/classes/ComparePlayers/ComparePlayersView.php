@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ComparePlayers;
 
+use BasketballStats\StatsFormatter;
 use ComparePlayers\Contracts\ComparePlayersViewInterface;
 use Player\PlayerImageHelper;
 use UI\TeamCellHelper;
@@ -196,7 +197,7 @@ class ComparePlayersView implements ComparePlayersViewInterface
         $fgm = (int)$player['stats_fgm'];
         $ftm = (int)$player['stats_ftm'];
         $tgm = (int)$player['stats_3gm'];
-        $pts = 2 * $fgm + $ftm + $tgm;
+        $pts = StatsFormatter::calculatePoints($fgm, $ftm, $tgm);
 
         $posSafe = HtmlSanitizer::safeHtmlOutput($player['pos']);
         $output = '<tr>';

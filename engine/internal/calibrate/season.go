@@ -18,8 +18,11 @@ import (
 //
 //  1. Processing every snapshot would double-count early games (re-counted in
 //     each later cumulative snapshot). So per season we take ONE snapshot per
-//     bucket: the last regular-type snapshot for the regular bucket, and the
-//     finals (last overall) snapshot for the playoff bucket.
+//     bucket: the MOST-COMPLETE regular-type snapshot for the regular bucket
+//     (the candidate whose .sco holds the most games — see collectSeasonReports;
+//     lexical-last is NOT a reliable completeness signal, since a misclassified
+//     or partial mid-season backup can sort last), and the finals (last overall)
+//     snapshot for the playoff bucket.
 //
 //  2. REGULAR games are validated via validate.ValidateCorpus, which pairs each
 //     .sco game to a .sch schedule entry. PLAYOFF games are NOT in the .sch
@@ -29,15 +32,26 @@ import (
 //     team IDs (PR9d). All-star/Olympics calibration is still out of scope:
 //     Olympics national-team rosters are not a clean .plr-franchise sim.
 
+// minSeasonMedianGP is the proxy-medGP floor below which a season is treated as
+// incomplete in the archive and skipped (rather than reported as if complete).
+// Every complete season has medGP≈82 regardless of era (each team plays 82
+// games), so a floor of 70 drops genuinely-partial seasons (07-08 preseason-only,
+// 06-07/90-91/91-92/92-93 mid-season-truncated backups) without dropping any
+// complete one. proxyMedGP = 2 * games / distinctTeams, computed pre-sim from the
+// chosen snapshot's .sco so a doomed season costs one cheap .sco read, not a sim.
+const minSeasonMedianGP = 70
+
 // season is one season's selected snapshots. olympics seasons are recorded so
 // they can be reported as skipped (out of scope — national-team rosters need
-// separate handling). finalsZip is the last snapshot overall (lexical/sim-step
-// order); when it differs from regularZip it carries the playoff games.
+// separate handling). regularCandidates holds EVERY regular-type snapshot for
+// the season (in lexical order); collectSeasonReports picks the most-complete one
+// by .sco game count. finalsZip is the last snapshot overall (lexical/sim-step
+// order); it carries the playoff games when it is a playoff-typed snapshot.
 type season struct {
-	name       string
-	olympics   bool
-	regularZip string // last regular-type snapshot; "" if the season has none
-	finalsZip  string // last snapshot overall; "" if the season has none
+	name              string
+	olympics          bool
+	regularCandidates []string // every regular-type snapshot; empty if the season has none
+	finalsZip         string   // last snapshot overall; "" if the season has none
 }
 
 // seasonName is the path segment immediately under root (e.g. "02-03", or
@@ -56,18 +70,19 @@ func isOlympicsPath(path string) bool {
 	return strings.Contains(strings.ToLower(filepath.ToSlash(path)), "olympics")
 }
 
-// groupSeasons buckets zip paths into seasons, selecting two snapshots per
-// season by lexical (sim-step) order — valid because the archive's NN index is
-// zero-padded, so the names sort by sim step: the last regular-type snapshot
-// (regularZip, the complete regular season) and the last snapshot overall
-// (finalsZip, which carries the playoff games when a finals snapshot exists).
-// Olympics snapshots are flagged (and skipped: not yet supported, see the note
-// above).
+// groupSeasons buckets zip paths into seasons. It collects EVERY regular-type
+// snapshot per season (regularCandidates, in lexical order) — collectSeasonReports
+// then picks the most-complete one by .sco game count — and the last snapshot
+// overall (finalsZip, which carries the playoff games when it is a playoff-typed
+// snapshot). The archive's NN index is zero-padded, so lexical order is sim-step
+// order; that still seeds finalsZip, but the regular bucket no longer trusts it
+// for completeness (a partial backup can sort last). Olympics snapshots are
+// flagged (and skipped: not yet supported, see the note above).
 func groupSeasons(zipPaths []string, root string) ([]season, []Skip) {
 	type acc struct {
-		olympics   bool
-		regularZip string
-		finalsZip  string
+		olympics          bool
+		regularCandidates []string
+		finalsZip         string
 	}
 	m := map[string]*acc{}
 	var skips []Skip
@@ -83,14 +98,14 @@ func groupSeasons(zipPaths []string, root string) ([]season, []Skip) {
 			skips = append(skips, Skip{p, "olympics not yet supported (national-team rosters — see season.go)"})
 			continue
 		}
-		// The last snapshot overall is the finals snapshot (playoff bucket); the
-		// last regular-type snapshot seeds the regular bucket. When the season has
-		// no finals snapshot, finalsZip == regularZip and no playoff bucket forms.
+		// The last snapshot overall is the finals snapshot (playoff bucket); every
+		// regular-type snapshot is a regular-bucket candidate. zipPaths is lexical,
+		// so regularCandidates accumulates in lexical order.
 		if p > a.finalsZip {
 			a.finalsZip = p
 		}
-		if gt, _ := inferGameType(p, false); gt == bundle.GameTypeRegular && p > a.regularZip {
-			a.regularZip = p
+		if gt, _ := inferGameType(p, false); gt == bundle.GameTypeRegular {
+			a.regularCandidates = append(a.regularCandidates, p)
 		}
 	}
 
@@ -102,33 +117,37 @@ func groupSeasons(zipPaths []string, root string) ([]season, []Skip) {
 	seasons := make([]season, 0, len(names))
 	for _, n := range names {
 		a := m[n]
-		seasons = append(seasons, season{name: n, olympics: a.olympics, regularZip: a.regularZip, finalsZip: a.finalsZip})
+		seasons = append(seasons, season{name: n, olympics: a.olympics, regularCandidates: a.regularCandidates, finalsZip: a.finalsZip})
 	}
 	return seasons, skips
 }
 
 // CollectSeasonReports is the calibration-correct collector: it groups the
-// archive into seasons and, per season, validates the last regular-type
-// snapshot as the REGULAR bucket and (when a distinct finals snapshot exists)
-// its unmatched .sco games as the PLAYOFF bucket. --sample-stride thins by
-// season; both buckets for a selected season are produced together. All-star
-// and Olympics remain out of scope.
+// archive into seasons and, per season, validates the MOST-COMPLETE regular-type
+// snapshot as the REGULAR bucket and (when a distinct playoff snapshot exists)
+// its unmatched .sco games as the PLAYOFF bucket. A season whose best regular
+// snapshot is still incomplete (proxy medGP below minSeasonMedianGP) is skipped
+// rather than reported as if complete. --sample-stride thins by season; both
+// buckets for a selected season are produced together. All-star and Olympics
+// remain out of scope.
 func CollectSeasonReports(root string, opts Options) ([]validate.Report, []Skip, error) {
 	zips, zskips, err := listArchiveZips(root)
 	if err != nil {
 		return nil, nil, err
 	}
 	seasons, gskips := groupSeasons(zips, root)
-	reports, pskips := collectSeasonReports(seasons, opts, resolveValidate(opts), resolveValidateUnscheduled(opts))
+	reports, pskips := collectSeasonReports(seasons, opts, resolveValidate(opts), resolveValidateUnscheduled(opts), resolveCountSco(opts))
 	skips := append(append(zskips, gskips...), pskips...)
 	return reports, skips, nil
 }
 
 // collectSeasonReports is the injected-dependency core of CollectSeasonReports.
 // validateFn handles the regular (scheduled) bucket; validateUnscheduledFn
-// handles the playoff (unscheduled) bucket — both seams so the season grouping
-// and bucket selection are unit-testable without running the engine.
-func collectSeasonReports(seasons []season, opts Options, validateFn, validateUnscheduledFn ValidateFunc) ([]validate.Report, []Skip) {
+// handles the playoff (unscheduled) bucket; countFn counts each regular
+// candidate's .sco games/teams for the max-games selection and medGP floor — all
+// seams so the season grouping and bucket selection are unit-testable without
+// running the engine or building multi-megabyte .sco fixtures.
+func collectSeasonReports(seasons []season, opts Options, validateFn, validateUnscheduledFn ValidateFunc, countFn CountScoFunc) ([]validate.Report, []Skip) {
 	progress := opts.Progress
 	if progress == nil {
 		progress = io.Discard
@@ -142,7 +161,7 @@ func collectSeasonReports(seasons []season, opts Options, validateFn, validateUn
 	var skips []Skip
 	selected := 0
 	for _, s := range seasons {
-		if s.olympics || s.regularZip == "" {
+		if s.olympics || len(s.regularCandidates) == 0 {
 			if !s.olympics {
 				skips = append(skips, Skip{s.name, "season has no regular-type snapshot"})
 			}
@@ -153,30 +172,73 @@ func collectSeasonReports(seasons []season, opts Options, validateFn, validateUn
 		if idx%stride != 0 {
 			continue
 		}
-		rep, skip := processZip(s.regularZip, bundle.GameTypeRegular, opts.Runs, opts.Seed, validateFn)
+
+		// Pick the most-complete regular snapshot by .sco game count (cumulative,
+		// so most games = furthest into the season), and compute the pre-sim proxy
+		// medGP from it. A candidate whose .sco cannot be counted is recorded as a
+		// Skip but does not disqualify the season — a later candidate may count.
+		regularZip, games, teams, cskips := selectMostComplete(s.regularCandidates, countFn)
+		skips = append(skips, cskips...)
+		if regularZip == "" {
+			skips = append(skips, Skip{s.name, "season has no readable regular snapshot"})
+			continue
+		}
+		if proxyMedGP := 2 * float64(games) / float64(max(teams, 1)); proxyMedGP < minSeasonMedianGP {
+			skips = append(skips, Skip{s.name, fmt.Sprintf(
+				"regular season incomplete in archive (proxy medGP %.0f < floor %d)", proxyMedGP, minSeasonMedianGP)})
+			continue
+		}
+
+		rep, skip := processZip(regularZip, bundle.GameTypeRegular, opts.Runs, opts.Seed, validateFn)
 		if skip != nil {
 			skips = append(skips, *skip)
 			continue
 		}
 		rep.Label = s.name
-		_, _ = fmt.Fprintf(progress, "regular %s games=%d\n", s.regularZip, len(rep.Games))
+		_, _ = fmt.Fprintf(progress, "regular %s games=%d\n", regularZip, len(rep.Games))
 		reports = append(reports, *rep)
 
-		// Playoff bucket: the finals snapshot's unmatched .sco games, validated
-		// via the unscheduled path. Only when a distinct finals snapshot exists
-		// (otherwise finalsZip == regularZip = no playoffs captured).
-		if s.finalsZip != "" && s.finalsZip != s.regularZip {
-			prep, pskip := processZip(s.finalsZip, bundle.GameTypePlayoff, opts.Runs, opts.Seed, validateUnscheduledFn)
-			if pskip != nil {
-				skips = append(skips, *pskip)
-				continue
+		// Playoff bucket: the finals snapshot's unmatched .sco games, validated via
+		// the unscheduled path. Only when finalsZip is a genuinely playoff-typed
+		// snapshot — never a regular snapshot that merely sorts last (which, after
+		// max-games selection, can differ from the chosen regular snapshot).
+		if s.finalsZip != "" {
+			if gt, _ := inferGameType(s.finalsZip, false); gt == bundle.GameTypePlayoff {
+				prep, pskip := processZip(s.finalsZip, bundle.GameTypePlayoff, opts.Runs, opts.Seed, validateUnscheduledFn)
+				if pskip != nil {
+					skips = append(skips, *pskip)
+					continue
+				}
+				prep.Label = s.name + " (playoffs)"
+				_, _ = fmt.Fprintf(progress, "playoff %s games=%d excluded=%d\n", s.finalsZip, len(prep.Games), len(prep.Excluded))
+				reports = append(reports, *prep)
 			}
-			prep.Label = s.name + " (playoffs)"
-			_, _ = fmt.Fprintf(progress, "playoff %s games=%d excluded=%d\n", s.finalsZip, len(prep.Games), len(prep.Excluded))
-			reports = append(reports, *prep)
 		}
 	}
 	return reports, skips
+}
+
+// selectMostComplete counts each candidate's .sco and returns the path with the
+// most games (the cumulative-completeness signal), along with that snapshot's
+// game and distinct-team counts. Candidates whose .sco cannot be counted are
+// returned as Skips and excluded from the running max; if none can be counted,
+// best is "". Ties keep the first (lexically-earliest) candidate.
+func selectMostComplete(candidates []string, countFn CountScoFunc) (best string, games, teams int, skips []Skip) {
+	games = -1
+	for _, c := range candidates {
+		g, t, err := countFn(c)
+		if err != nil {
+			skips = append(skips, Skip{c, "count .sco: " + err.Error()})
+			continue
+		}
+		if g > games {
+			best, games, teams = c, g, t
+		}
+	}
+	if best == "" {
+		return "", 0, 0, skips
+	}
+	return best, games, teams, skips
 }
 
 // resolveValidate returns opts.Validate or the real ValidateCorpus default.
@@ -194,4 +256,13 @@ func resolveValidateUnscheduled(opts Options) ValidateFunc {
 		return opts.ValidateUnscheduled
 	}
 	return validate.ValidateUnscheduled
+}
+
+// resolveCountSco returns opts.CountSco or the real countScoGames default (the
+// season-selection .sco game/team counter seam).
+func resolveCountSco(opts Options) CountScoFunc {
+	if opts.CountSco != nil {
+		return opts.CountSco
+	}
+	return countScoGames
 }

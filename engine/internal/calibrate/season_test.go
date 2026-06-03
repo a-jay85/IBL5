@@ -1,12 +1,30 @@
 package calibrate
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/a-jay85/IBL5/engine/internal/bundle"
 )
+
+// okCount is a CountScoFunc stub reporting a complete season (1148 games / 28
+// teams → medGP≈82) for any path, so the public CollectSeasonReports tests that
+// build placeholder "sco-bytes" zips clear the medGP floor without a real .sco.
+func okCount(string) (int, int, error) { return 1148, 28, nil }
+
+// countMap is a CountScoFunc stub returning per-path (games, teams) from a map;
+// an unknown path returns (0, 0) (medGP 0 → below the floor).
+func countMap(m map[string][2]int) CountScoFunc {
+	return func(p string) (int, int, error) {
+		if gt, ok := m[p]; ok {
+			return gt[0], gt[1], nil
+		}
+		return 0, 0, nil
+	}
+}
 
 // neutralTempDir returns a temp dir whose path contains none of the substrings
 // inferGameType keys on ("finals"/"playoff"/"olympics"). t.TempDir() embeds the
@@ -23,11 +41,11 @@ func neutralTempDir(t *testing.T) string {
 	return dir
 }
 
-// Row #6: groupSeasons picks each season's last regular-type snapshot for the
-// regular bucket AND its last snapshot overall (the finals) for the playoff
-// bucket; the finals selection is distinct from the regular one when a playoff
-// snapshot exists. Olympics are flagged+skipped (out of scope).
-func TestGroupSeasons_SelectsLastRegular(t *testing.T) {
+// groupSeasons collects EVERY regular-type snapshot per season (in lexical
+// order) as a candidate, and the last snapshot overall (the finals) for the
+// playoff bucket. The most-complete candidate is chosen later, in
+// collectSeasonReports. Olympics are flagged+skipped (out of scope).
+func TestGroupSeasons_CollectsRegularCandidates(t *testing.T) {
 	root := "/b"
 	zips := []string{
 		"/b/02-03/02-03_08_reg-sim01.zip",
@@ -42,44 +60,61 @@ func TestGroupSeasons_SelectsLastRegular(t *testing.T) {
 	if len(seasons) != 2 {
 		t.Fatalf("seasons = %d, want 2", len(seasons))
 	}
-	// Sorted by name: 02-03 then 88-89. The last regular snapshot is the regular
-	// bucket; the finals snapshot is the (distinct) playoff bucket.
+	// Sorted by name: 02-03 then 88-89. Both reg-sim snapshots are regular
+	// candidates (the finals is NOT); the finals snapshot is the playoff bucket.
+	wantCands := []string{"/b/02-03/02-03_08_reg-sim01.zip", "/b/02-03/02-03_41_reg-sim35.zip"}
 	if s := seasons[0]; s.name != "02-03" ||
-		s.regularZip != "/b/02-03/02-03_41_reg-sim35.zip" ||
+		!equalStrings(s.regularCandidates, wantCands) ||
 		s.finalsZip != "/b/02-03/02-03_47_finals.zip" {
 		t.Errorf("02-03 selection wrong: %+v", s)
 	}
-	// 88-89 has no finals snapshot: finalsZip == regularZip, so no playoff bucket.
-	if s := seasons[1]; s.regularZip != "/b/88-89/88-89_30_reg-sim20.zip" ||
-		s.finalsZip != s.regularZip {
-		t.Errorf("88-89 selection wrong (expected no distinct finals): %+v", s)
+	// 88-89 has no finals snapshot: finalsZip == its only regular snapshot (which,
+	// being regular-typed, forms no playoff bucket in collectSeasonReports).
+	if s := seasons[1]; !equalStrings(s.regularCandidates, []string{"/b/88-89/88-89_30_reg-sim20.zip"}) ||
+		s.finalsZip != "/b/88-89/88-89_30_reg-sim20.zip" {
+		t.Errorf("88-89 selection wrong: %+v", s)
 	}
 }
 
-// Row #1 (characterization, pre-impl): the CURRENT collector selects the
-// regular bucket purely by LEXICAL order — the lexically-greatest regular-type
-// snapshot wins, with no awareness of how many games its .sco actually holds.
-// This locks the bug before the fix: on the real archive (06-07, 90-91, …) the
-// lexically-last regular snapshot is a PARTIAL mid-season backup, yet it is
-// selected over an earlier, more-complete one. Here reg-sim85 sorts last and is
-// chosen even though (in reality) reg-sim15 is the complete cumulative snapshot.
-func TestGroupSeasons_LexicalLastSelection_Characterization(t *testing.T) {
-	root := "/b"
-	zips := []string{
-		"/b/06-07/06-07_25_reg-sim15.zip", // earlier; the complete cumulative snapshot in reality
-		"/b/06-07/06-07_95_reg-sim85.zip", // lexically last; a partial mid-season backup in reality
+// Row #2 (post-impl): selection picks the candidate whose .sco holds the MOST
+// games — the cumulative-completeness signal — regardless of path sort order.
+// Here the 1148-game candidate sorts in the MIDDLE (reg-sim15), between a
+// 549-game first (reg-sim05) and a 49-game last (reg-sim85), so a max-games
+// pick is observably different from both a first- and a last-by-path pick. This
+// is the fix for the lexical-last bug locked by the pre-impl characterization.
+func TestCollectSeasonReports_SelectsMostCompleteRegular(t *testing.T) {
+	root := neutralTempDir(t)
+	first := filepath.Join(root, "06-07", "06-07_10_reg-sim05.zip")  // sorts first; 549 games
+	middle := filepath.Join(root, "06-07", "06-07_25_reg-sim15.zip") // sorts middle; 1148 games (max)
+	last := filepath.Join(root, "06-07", "06-07_95_reg-sim85.zip")   // sorts last; 49 games
+	for _, p := range []string{first, middle, last} {
+		makeZip(t, p, fullTriple())
 	}
-	seasons, skips := groupSeasons(zips, root)
-	if len(skips) != 0 {
-		t.Fatalf("unexpected skips: %v", skips)
+
+	var progress bytes.Buffer
+	rv := &recordingValidate{t: t}
+	reports, skips, err := CollectSeasonReports(root, Options{
+		Runs:     1,
+		Validate: rv.fn,
+		Progress: &progress,
+		CountSco: countMap(map[string][2]int{
+			first:  {549, 28},
+			middle: {1148, 28},
+			last:   {49, 28},
+		}),
+	})
+	if err != nil {
+		t.Fatalf("CollectSeasonReports: %v", err)
 	}
-	if len(seasons) != 1 {
-		t.Fatalf("seasons = %d, want 1", len(seasons))
+	if len(reports) != 1 || rv.calls != 1 {
+		t.Fatalf("reports=%d calls=%d, want 1 / 1 (skips=%v)", len(reports), rv.calls, skips)
 	}
-	// Current behavior: lexically-last regular snapshot is the regular bucket,
-	// regardless of completeness.
-	if s := seasons[0]; s.regularZip != "/b/06-07/06-07_95_reg-sim85.zip" {
-		t.Errorf("regularZip = %q, want lexically-last %q", s.regularZip, "/b/06-07/06-07_95_reg-sim85.zip")
+	out := progress.String()
+	if !strings.Contains(out, "regular "+middle+" ") {
+		t.Errorf("progress did not select the max-games (middle) candidate:\n%s", out)
+	}
+	if strings.Contains(out, first) || strings.Contains(out, last) {
+		t.Errorf("progress selected a non-max candidate:\n%s", out)
 	}
 }
 
@@ -92,22 +127,22 @@ func TestGroupSeasons_OlympicsSkipped(t *testing.T) {
 	if len(skips) != 2 {
 		t.Fatalf("olympics skips = %d, want 2", len(skips))
 	}
-	if len(seasons) != 1 || !seasons[0].olympics || seasons[0].regularZip != "" || seasons[0].finalsZip != "" {
+	if len(seasons) != 1 || !seasons[0].olympics || len(seasons[0].regularCandidates) != 0 || seasons[0].finalsZip != "" {
 		t.Fatalf("olympics season wrong: %+v", seasons)
 	}
 }
 
 // recordingValidate (defined in walk_test.go) records each validate call.
 
-// Row: collectSeasonReports validates one regular report per season (the last
-// regular snapshot) under GameTypeRegular.
+// Row: collectSeasonReports validates one regular report per season (the
+// most-complete regular snapshot) under GameTypeRegular.
 func TestCollectSeasonReports_RegularPerSeason(t *testing.T) {
 	root := neutralTempDir(t)
 	makeZip(t, filepath.Join(root, "02-03", "02-03_41_reg-sim35.zip"), fullTriple())
 	makeZip(t, filepath.Join(root, "88-89", "88-89_30_reg-sim20.zip"), fullTriple())
 
 	rv := &recordingValidate{t: t}
-	reports, skips, err := CollectSeasonReports(root, Options{Runs: 1, Validate: rv.fn})
+	reports, skips, err := CollectSeasonReports(root, Options{Runs: 1, Validate: rv.fn, CountSco: okCount})
 	if err != nil {
 		t.Fatalf("CollectSeasonReports: %v", err)
 	}
@@ -123,10 +158,10 @@ func TestCollectSeasonReports_RegularPerSeason(t *testing.T) {
 
 // Row (negative): a season with no regular-type snapshot is skipped.
 func TestCollectSeasonReports_NoRegularSnapshotSkips(t *testing.T) {
-	seasons := []season{{name: "x", regularZip: ""}}
+	seasons := []season{{name: "x", regularCandidates: nil}}
 	rvReg := &recordingValidate{t: t}
 	rvPof := &recordingValidate{t: t}
-	reports, skips := collectSeasonReports(seasons, Options{Runs: 1}, rvReg.fn, rvPof.fn)
+	reports, skips := collectSeasonReports(seasons, Options{Runs: 1}, rvReg.fn, rvPof.fn, okCount)
 	if len(reports) != 0 || rvReg.calls != 0 || rvPof.calls != 0 || len(skips) != 1 {
 		t.Fatalf("want zero reports/calls and one skip; reports=%d reg=%d pof=%d skips=%v",
 			len(reports), rvReg.calls, rvPof.calls, skips)
@@ -144,7 +179,7 @@ func TestCollectSeasonReports_RegularAndPlayoffBuckets(t *testing.T) {
 	rvReg := &recordingValidate{t: t}
 	rvPof := &recordingValidate{t: t}
 	reports, skips, err := CollectSeasonReports(root, Options{
-		Runs: 1, Validate: rvReg.fn, ValidateUnscheduled: rvPof.fn,
+		Runs: 1, Validate: rvReg.fn, ValidateUnscheduled: rvPof.fn, CountSco: okCount,
 	})
 	if err != nil {
 		t.Fatalf("CollectSeasonReports: %v", err)
@@ -177,7 +212,7 @@ func TestCollectSeasonReports_NoFinalsEmitsOnlyRegular(t *testing.T) {
 	rvReg := &recordingValidate{t: t}
 	rvPof := &recordingValidate{t: t}
 	reports, skips, err := CollectSeasonReports(root, Options{
-		Runs: 1, Validate: rvReg.fn, ValidateUnscheduled: rvPof.fn,
+		Runs: 1, Validate: rvReg.fn, ValidateUnscheduled: rvPof.fn, CountSco: okCount,
 	})
 	if err != nil {
 		t.Fatalf("CollectSeasonReports: %v", err)
@@ -195,7 +230,7 @@ func TestCollectSeasonReports_SampleStride(t *testing.T) {
 		makeZip(t, filepath.Join(root, n, n+"_reg-sim.zip"), fullTriple())
 	}
 	rv := &recordingValidate{t: t}
-	reports, _, err := CollectSeasonReports(root, Options{Runs: 1, SampleStride: 2, Validate: rv.fn})
+	reports, _, err := CollectSeasonReports(root, Options{Runs: 1, SampleStride: 2, Validate: rv.fn, CountSco: okCount})
 	if err != nil {
 		t.Fatalf("CollectSeasonReports: %v", err)
 	}
@@ -214,7 +249,7 @@ func TestCollectSeasonReports_StampsLabel(t *testing.T) {
 	rvReg := &recordingValidate{t: t}
 	rvPof := &recordingValidate{t: t}
 	reports, _, err := CollectSeasonReports(root, Options{
-		Runs: 1, Validate: rvReg.fn, ValidateUnscheduled: rvPof.fn,
+		Runs: 1, Validate: rvReg.fn, ValidateUnscheduled: rvPof.fn, CountSco: okCount,
 	})
 	if err != nil {
 		t.Fatalf("CollectSeasonReports: %v", err)
@@ -227,5 +262,51 @@ func TestCollectSeasonReports_StampsLabel(t *testing.T) {
 	}
 	if reports[1].Label != "02-03 (playoffs)" {
 		t.Errorf("playoff label = %q, want %q", reports[1].Label, "02-03 (playoffs)")
+	}
+}
+
+// Rows #3 & #4: the medGP sanity floor. A season whose best regular candidate has
+// proxy medGP (2*games/teams) below minSeasonMedianGP (70) is skipped with a Skip
+// and produces NO report; a complete season (medGP≈82) is kept. The boundary is
+// exact: 70.0 is kept (not < 70), 69.9 is skipped.
+func TestCollectSeasonReports_MedGPFloor(t *testing.T) {
+	cases := []struct {
+		name       string
+		games      int
+		teams      int
+		wantReport bool
+	}{
+		{"below-floor", 49, 28, false},          // medGP 3.5  — row #3 (49 games / 28 teams)
+		{"just-below-boundary", 979, 28, false}, // medGP 69.93 — just under the floor
+		{"at-boundary", 980, 28, true},          // medGP 70.0  — exactly at the floor (kept)
+		{"above-floor", 1148, 28, true},         // medGP 82    — row #4 (complete season)
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root := neutralTempDir(t)
+			zipPath := filepath.Join(root, "06-07", "06-07_50_reg-sim40.zip")
+			makeZip(t, zipPath, fullTriple())
+			seasons := []season{{name: "06-07", regularCandidates: []string{zipPath}}}
+
+			rvReg := &recordingValidate{t: t}
+			rvPof := &recordingValidate{t: t}
+			reports, skips := collectSeasonReports(
+				seasons, Options{Runs: 1}, rvReg.fn, rvPof.fn,
+				countMap(map[string][2]int{zipPath: {tc.games, tc.teams}}),
+			)
+			if tc.wantReport {
+				if len(reports) != 1 || rvReg.calls != 1 {
+					t.Fatalf("reports=%d calls=%d, want 1/1 (medGP above floor) skips=%v", len(reports), rvReg.calls, skips)
+				}
+				return
+			}
+			// Below the floor: no report, no validate call, and a Skip naming the season.
+			if len(reports) != 0 || rvReg.calls != 0 {
+				t.Fatalf("reports=%d calls=%d, want 0/0 (medGP below floor)", len(reports), rvReg.calls)
+			}
+			if len(skips) != 1 || skips[0].Path != "06-07" || !strings.Contains(skips[0].Reason, "incomplete") {
+				t.Fatalf("want one incomplete-season skip for 06-07, got %v", skips)
+			}
+		})
 	}
 }

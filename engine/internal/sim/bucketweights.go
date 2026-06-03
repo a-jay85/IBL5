@@ -34,9 +34,14 @@ package sim
 // per-48 rate inputs D88/DB8 derive from r_fga/r_orb (the bundle carries no season
 // GP/FGA sums), D70 stands in for the CEngine team/league FTA-weighted aggregate
 // absent from the bundle, and the off/def per-player doubles (teamquality.go) have
-// unpinned source offsets. The four unresolved .rdata scale constants
-// (_DAT_0066d318/d310/d320/00669ad0) gate only the +0xD90 Branch-B usage-shrink
-// (deferred), NOT this Branch-A cold composite. Numeric corpus calibration of the
+// unpinned source offsets. The .rdata scale constants are now pinned
+// (COMPOSITE_DOUBLES_TRACE.md §5, 2026-06-02): _DAT_0066d318=0.2 and
+// _DAT_0066d310=0.04 form the Branch-B usage target
+// in_f0 = player[+0x1E8] × (DRB-rate + AST-rate) × 0.2 × 0.04, which gates the
+// +0xD90 Branch-B usage-shrink — still deferred (this port implements only
+// Branch-A). _DAT_0066d320=1/3000 (:90985) and _DAT_00669ad0=20000 (:6537) were
+// formerly grouped here but are unrelated to the shrink. NONE affect this Branch-A
+// cold composite. Numeric corpus calibration of the
 // stand-in magnitudes — and JSB's exact ~55% home-edge magnitude — is deferred
 // (dev/nightly, no automated optimizer); THIS PR proves only the home-favorable
 // SIGN, the invariant PR7a got wrong.

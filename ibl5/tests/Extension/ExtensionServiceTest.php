@@ -10,6 +10,7 @@ use Extension\Contracts\ExtensionRepositoryInterface;
 use Extension\Contracts\ExtensionValidatorInterface;
 use Extension\Contracts\ExtensionOfferEvaluatorInterface;
 use Player\Player;
+use Team\Contracts\TeamCapCalculatorInterface;
 use Team\Contracts\TeamQueryRepositoryInterface;
 use Team\Team;
 use Tests\WideUnit\Mocks\MockDatabase;
@@ -265,8 +266,11 @@ class ExtensionServiceTest extends TestCase
         $stubTeamQueryRepo->method('getPlayersUnderContractByPosition')
             ->willReturn([$playerRow, $teammateRow]);
 
+        // getTotalNextSeasonSalaries now lives on TeamCapCalculator — capture the
+        // rows it receives there to assert the extended player was filtered out.
         $capturedRows = null;
-        $stubTeamQueryRepo->method('getTotalNextSeasonSalaries')
+        $stubTeamCapCalculator = self::createStub(TeamCapCalculatorInterface::class);
+        $stubTeamCapCalculator->method('getTotalNextSeasonSalaries')
             ->willReturnCallback(function (array $rows) use (&$capturedRows): int {
                 $capturedRows = $rows;
                 return 500;
@@ -278,7 +282,8 @@ class ExtensionServiceTest extends TestCase
             null,
             null,
             null,
-            $stubTeamQueryRepo
+            $stubTeamQueryRepo,
+            $stubTeamCapCalculator
         );
 
         $result = $service->processExtension([

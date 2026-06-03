@@ -8,6 +8,7 @@ use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use CapSpace\CapSpaceService;
 use CapSpace\Contracts\CapSpaceRepositoryInterface;
+use Team\Contracts\TeamCapCalculatorInterface;
 use Team\Contracts\TeamQueryRepositoryInterface;
 use Team\Team;
 use Season\Season;
@@ -43,6 +44,9 @@ class CapSpaceServiceTest extends TestCase
     /** @var TeamQueryRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject */
     private TeamQueryRepositoryInterface $mockTeamQueryRepo;
 
+    /** @var TeamCapCalculatorInterface&\PHPUnit\Framework\MockObject\MockObject */
+    private TeamCapCalculatorInterface $mockTeamCapCalculator;
+
     private TestableCapSpaceService $service;
 
     protected function setUp(): void
@@ -50,7 +54,8 @@ class CapSpaceServiceTest extends TestCase
         $this->mockRepository = $this->createMock(CapSpaceRepositoryInterface::class);
         $this->mockDb = $this->createMock(\mysqli::class);
         $this->mockTeamQueryRepo = $this->createMock(TeamQueryRepositoryInterface::class);
-        $this->service = new TestableCapSpaceService($this->mockRepository, $this->mockDb, $this->mockTeamQueryRepo);
+        $this->mockTeamCapCalculator = $this->createMock(TeamCapCalculatorInterface::class);
+        $this->service = new TestableCapSpaceService($this->mockRepository, $this->mockDb, $this->mockTeamQueryRepo, $this->mockTeamCapCalculator);
     }
 
     /**
@@ -201,7 +206,7 @@ class CapSpaceServiceTest extends TestCase
      */
     private function setupTeamQueryRepoDefaults(): void
     {
-        $this->mockTeamQueryRepo->method('getSalaryCapArray')->willReturn([
+        $this->mockTeamCapCalculator->method('getSalaryCapArray')->willReturn([
             'year1' => 0,
             'year2' => 0,
             'year3' => 0,
@@ -210,7 +215,7 @@ class CapSpaceServiceTest extends TestCase
             'year6' => 0,
         ]);
         $this->mockTeamQueryRepo->method('getAllPlayersUnderContract')->willReturn([]);
-        $this->mockTeamQueryRepo->method('getTotalNextSeasonSalaries')->willReturn(0);
+        $this->mockTeamCapCalculator->method('getTotalNextSeasonSalaries')->willReturn(0);
     }
 
     /**

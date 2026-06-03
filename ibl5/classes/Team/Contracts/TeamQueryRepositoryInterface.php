@@ -153,9 +153,10 @@ interface TeamQueryRepositoryInterface
      * Check if team can add buyout without exceeding buyout limit
      *
      * @param int $buyoutValue Buyout value to add
+     * @param Season $season Current season (used to determine contract-year rollover)
      * @return bool True if under buyout limit, false otherwise
      */
-    public function canAddBuyoutWithoutExceedingBuyoutLimit(int $teamId, int $buyoutValue): bool;
+    public function canAddBuyoutWithoutExceedingBuyoutLimit(int $teamId, int $buyoutValue, Season $season): bool;
 
     /**
      * Convert player result array into Player objects

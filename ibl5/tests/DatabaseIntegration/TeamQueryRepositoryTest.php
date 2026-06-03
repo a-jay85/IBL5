@@ -380,13 +380,17 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
 
     public function testCanAddBuyoutWithinLimitReturnsTrue(): void
     {
+        // Passing the Season the caller already holds reproduces the prior
+        // internal `new Season($this->db)` path exactly (same verdict).
+        $season = new Season($this->db);
         // Team 99999 has no players → buyout sum is 0, adding 0 is within limit
-        self::assertTrue($this->repo->canAddBuyoutWithoutExceedingBuyoutLimit(99999, 0));
+        self::assertTrue($this->repo->canAddBuyoutWithoutExceedingBuyoutLimit(99999, 0, $season));
     }
 
     public function testCanAddBuyoutExceedingLimitReturnsFalse(): void
     {
+        $season = new Season($this->db);
         // Adding the entire hard cap always exceeds the buyout percentage limit
-        self::assertFalse($this->repo->canAddBuyoutWithoutExceedingBuyoutLimit(99999, League::HARD_CAP_MAX));
+        self::assertFalse($this->repo->canAddBuyoutWithoutExceedingBuyoutLimit(99999, League::HARD_CAP_MAX, $season));
     }
 }

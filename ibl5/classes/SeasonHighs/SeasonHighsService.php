@@ -27,6 +27,12 @@ class SeasonHighsService implements SeasonHighsServiceInterface
     /**
      * Stat definitions with SQL expressions and display names.
      *
+     * The POINTS expression computes the same total-points quantity as the
+     * canonical PHP helper BasketballStats\StatsFormatter::calculatePoints();
+     * it is decomposed here as 2*2gm + ftm + 3*3gm because the box-score columns
+     * split 2-pointers (`game_2gm`) and 3-pointers (`game_3gm`). SQL-side copy —
+     * keep in sync with the canonical definition.
+     *
      * @var array<string, string>
      */
     private const STATS = [
@@ -43,6 +49,9 @@ class SeasonHighsService implements SeasonHighsServiceInterface
 
     /**
      * Stats used for home/away highs (no TURNOVERS — RCB doesn't track it).
+     *
+     * POINTS mirrors BasketballStats\StatsFormatter::calculatePoints() (SQL-side
+     * copy; see the STATS docblock above for the 2pt/3pt decomposition rationale).
      *
      * @var array<string, string>
      */

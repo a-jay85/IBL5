@@ -254,7 +254,7 @@ class SeasonLeaderboardsService implements SeasonLeaderboardsServiceInterface
         $tga = $row['tga'];
 
         return match ($sortBy) {
-            'PPG' => (2 * $fgm + $ftm + $tgm) / $games,
+            'PPG' => StatsFormatter::calculatePoints($fgm, $ftm, $tgm) / $games,
             'REB' => $row['reb'] / $games,
             'OREB' => $row['orb'] / $games,
             'DREB' => ($row['reb'] - $row['orb']) / $games,
@@ -275,7 +275,7 @@ class SeasonLeaderboardsService implements SeasonLeaderboardsServiceInterface
             'TGP' => $tga > 0 ? $tgm / $tga : 0.0,
             'GAMES' => $games,
             'MIN' => $row['minutes'] / $games,
-            default => (2 * $fgm + $ftm + $tgm) / $games,
+            default => StatsFormatter::calculatePoints($fgm, $ftm, $tgm) / $games,
         };
     }
 
@@ -290,7 +290,7 @@ class SeasonLeaderboardsService implements SeasonLeaderboardsServiceInterface
         $fta = $row['fta'];
         $tgm = $row['tgm'];
 
-        $pts = 2 * $fgm + $ftm + $tgm;
+        $pts = StatsFormatter::calculatePoints($fgm, $ftm, $tgm);
         $positive = $pts + $row['reb'] + (2 * $row['ast']) + (2 * $row['stl']) + (2 * $row['blk']);
         $negative = ($fga - $fgm) + ($fta - $ftm) + $row['tvr'] + $row['pf'];
 

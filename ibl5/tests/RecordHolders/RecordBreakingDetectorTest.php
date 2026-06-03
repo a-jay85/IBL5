@@ -328,6 +328,96 @@ final class RecordBreakingDetectorTest extends TestCase
         $this->assertEmpty($result);
     }
 
+    // --- Canonical stat-definition characterization ---
+
+    /**
+     * Characterization (single-source guard): the exact player stat-expression
+     * map and the per-game-type date filters this detector hands to the
+     * repository. Captures live arguments so the assertion is byte-identical to
+     * what the SQL layer receives — the values the RecordStatDefinitions
+     * refactor must preserve.
+     */
+    public function testProducesCanonicalPlayerExpressionsAndDateFilters(): void
+    {
+        /** @var list<array<string, string>> $playerExpressionCalls */
+        $playerExpressionCalls = [];
+        /** @var list<string> $playerDateFilters */
+        $playerDateFilters = [];
+
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')
+            ->willReturnCallback(
+                function (array $expressions, string $dateFilter) use (&$playerExpressionCalls, &$playerDateFilters): array {
+                    $playerExpressionCalls[] = $expressions;
+                    $playerDateFilters[] = $dateFilter;
+                    return $this->buildPlayerBatchResult([]);
+                }
+            );
+        $this->mockRepository->method('getTopTeamSingleGameBatch')->willReturn($this->buildTeamBatchResult([]));
+        $this->mockRepository->method('getQuadrupleDoubles')->willReturn([]);
+
+        // One date per game type: regular season (Jan), playoffs (Jun), HEAT (Oct).
+        $this->detector->detectAndAnnounce(['2007-01-15', '2007-06-15', '2006-10-10']);
+
+        $expectedExpressions = [
+            'points' => 'bs.calc_points',
+            'rebounds' => 'bs.calc_rebounds',
+            'assists' => 'bs.game_ast',
+            'steals' => 'bs.game_stl',
+            'blocks' => 'bs.game_blk',
+            'turnovers' => 'bs.game_tov',
+            'fg_made' => 'bs.calc_fg_made',
+            'ft_made' => 'bs.game_ftm',
+            '3pt_made' => 'bs.game_3gm',
+        ];
+
+        $this->assertCount(3, $playerExpressionCalls);
+        foreach ($playerExpressionCalls as $expressions) {
+            $this->assertSame($expectedExpressions, $expressions);
+        }
+
+        $uniqueFilters = array_values(array_unique($playerDateFilters));
+        sort($uniqueFilters);
+        $this->assertSame(['bs.game_type = 1', 'bs.game_type = 2', 'bs.game_type = 3'], $uniqueFilters);
+    }
+
+    /**
+     * Characterization (single-source guard): the exact team batch config
+     * (8 DESC stats + ASC "team_fewest_points") this detector hands to the
+     * repository, including sort order per stat.
+     */
+    public function testProducesCanonicalTeamBatchConfig(): void
+    {
+        /** @var list<array<string, array{expression: string, order: string}>> $teamConfigs */
+        $teamConfigs = [];
+
+        $this->mockRepository->method('getTopTeamSingleGameBatch')
+            ->willReturnCallback(
+                function (array $config, string $dateFilter) use (&$teamConfigs): array {
+                    $teamConfigs[] = $config;
+                    return $this->buildTeamBatchResult([]);
+                }
+            );
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')->willReturn($this->buildPlayerBatchResult([]));
+        $this->mockRepository->method('getQuadrupleDoubles')->willReturn([]);
+
+        $this->detector->detectAndAnnounce(['2007-01-15']);
+
+        $expectedConfig = [
+            'team_points' => ['expression' => 'bs.calc_points', 'order' => 'DESC'],
+            'team_rebounds' => ['expression' => 'bs.calc_rebounds', 'order' => 'DESC'],
+            'team_assists' => ['expression' => 'bs.game_ast', 'order' => 'DESC'],
+            'team_steals' => ['expression' => 'bs.game_stl', 'order' => 'DESC'],
+            'team_blocks' => ['expression' => 'bs.game_blk', 'order' => 'DESC'],
+            'team_fg_made' => ['expression' => 'bs.calc_fg_made', 'order' => 'DESC'],
+            'team_ft_made' => ['expression' => 'bs.game_ftm', 'order' => 'DESC'],
+            'team_3pt_made' => ['expression' => 'bs.game_3gm', 'order' => 'DESC'],
+            'team_fewest_points' => ['expression' => 'bs.calc_points', 'order' => 'ASC'],
+        ];
+
+        $this->assertCount(1, $teamConfigs);
+        $this->assertSame($expectedConfig, $teamConfigs[0]);
+    }
+
     // --- Helper methods ---
 
     /**

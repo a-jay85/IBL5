@@ -110,6 +110,10 @@ class SeasonLeaderboardsRepository extends \BaseMysqliRepository implements Seas
      */
     private function getSortColumn(string $sortBy): string
     {
+        // The points sub-expression `2*fgm+ftm+tgm` (PPG and QA below) mirrors the
+        // canonical PHP definition in BasketballStats\StatsFormatter::calculatePoints().
+        // It is duplicated here only because ORDER BY runs SQL-side, where that PHP
+        // helper cannot be called; keep the two in sync.
         $sortMap = [
             'PPG' => '((2*`fgm`+`ftm`+`tgm`)/`games`)',
             'REB' => '((`reb`)/`games`)',

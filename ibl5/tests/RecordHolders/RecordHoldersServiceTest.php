@@ -50,6 +50,102 @@ final class RecordHoldersServiceTest extends TestCase
         $this->assertCount(9, $regSeason);
     }
 
+    /**
+     * Characterization (single-source guard): the exact player stat-expression
+     * map and the per-game-type date filters this service hands to the
+     * repository. Captures the live arguments so the assertion is byte-identical
+     * to what the SQL layer receives — the values the RecordStatDefinitions
+     * refactor must preserve.
+     */
+    public function testProducesCanonicalPlayerExpressionsAndDateFilters(): void
+    {
+        /** @var list<array<string, string>> $playerExpressionCalls */
+        $playerExpressionCalls = [];
+        /** @var list<string> $playerDateFilters */
+        $playerDateFilters = [];
+
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')
+            ->willReturnCallback(
+                function (array $expressions, string $dateFilter) use (&$playerExpressionCalls, &$playerDateFilters): array {
+                    $playerExpressionCalls[] = $expressions;
+                    $playerDateFilters[] = $dateFilter;
+                    return $this->buildBatchPlayerResult([]);
+                }
+            );
+        $this->configureOtherMocksEmpty();
+
+        $this->service->getAllRecords();
+
+        $expectedExpressions = [
+            'Most Points in a Single Game' => 'bs.calc_points',
+            'Most Rebounds in a Single Game' => 'bs.calc_rebounds',
+            'Most Assists in a Single Game' => 'bs.game_ast',
+            'Most Steals in a Single Game' => 'bs.game_stl',
+            'Most Blocks in a Single Game' => 'bs.game_blk',
+            'Most Turnovers in a Single Game' => 'bs.game_tov',
+            'Most Field Goals in a Single Game' => 'bs.calc_fg_made',
+            'Most Free Throws in a Single Game' => 'bs.game_ftm',
+            'Most Three Pointers in a Single Game' => 'bs.game_3gm',
+        ];
+
+        // Called once per game type: regularSeason, playoffs, heat (in that order).
+        $this->assertCount(3, $playerExpressionCalls);
+        foreach ($playerExpressionCalls as $expressions) {
+            $this->assertSame($expectedExpressions, $expressions);
+        }
+        $this->assertSame(['bs.game_type = 1', 'bs.game_type = 2', 'bs.game_type = 3'], $playerDateFilters);
+    }
+
+    /**
+     * Characterization (single-source guard): the exact team batch config
+     * (8 DESC stats + inline ASC "Fewest Points") and the regular-season date
+     * filter the service hands to the repository.
+     */
+    public function testProducesCanonicalTeamBatchConfig(): void
+    {
+        /** @var array<string, array{expression: string, order: string}>|null $teamConfig */
+        $teamConfig = null;
+        /** @var string|null $teamDateFilter */
+        $teamDateFilter = null;
+
+        $this->mockRepository->method('getTopTeamSingleGameBatch')
+            ->willReturnCallback(
+                function (array $config, string $dateFilter) use (&$teamConfig, &$teamDateFilter): array {
+                    $teamConfig = $config;
+                    $teamDateFilter = $dateFilter;
+                    return $this->buildBatchTeamResult([]);
+                }
+            );
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')->willReturn($this->buildBatchPlayerResult([]));
+        $this->mockRepository->method('getTopSeasonAverageBatch')->willReturn($this->buildBatchSeasonResult([]));
+        $this->mockRepository->method('getQuadrupleDoubles')->willReturn([]);
+        $this->mockRepository->method('getMostAllStarAppearances')->willReturn([]);
+        $this->mockRepository->method('getTopTeamHalfScore')->willReturn([]);
+        $this->mockRepository->method('getLargestMarginOfVictory')->willReturn([]);
+        $this->mockRepository->method('getBestWorstSeasonRecord')->willReturn([]);
+        $this->mockRepository->method('getLongestStreak')->willReturn([]);
+        $this->mockRepository->method('getBestWorstSeasonStart')->willReturn([]);
+        $this->mockRepository->method('getMostPlayoffAppearances')->willReturn([]);
+        $this->mockRepository->method('getMostTitlesByType')->willReturn([]);
+
+        $this->service->getAllRecords();
+
+        $expectedConfig = [
+            'Most Points in a Single Game' => ['expression' => 'bs.calc_points', 'order' => 'DESC'],
+            'Most Rebounds in a Single Game' => ['expression' => 'bs.calc_rebounds', 'order' => 'DESC'],
+            'Most Assists in a Single Game' => ['expression' => 'bs.game_ast', 'order' => 'DESC'],
+            'Most Steals in a Single Game' => ['expression' => 'bs.game_stl', 'order' => 'DESC'],
+            'Most Blocks in a Single Game' => ['expression' => 'bs.game_blk', 'order' => 'DESC'],
+            'Most Field Goals in a Single Game' => ['expression' => 'bs.calc_fg_made', 'order' => 'DESC'],
+            'Most Free Throws in a Single Game' => ['expression' => 'bs.game_ftm', 'order' => 'DESC'],
+            'Most Three Pointers in a Single Game' => ['expression' => 'bs.game_3gm', 'order' => 'DESC'],
+            'Fewest Points in a Single Game' => ['expression' => 'bs.calc_points', 'order' => 'ASC'],
+        ];
+
+        $this->assertSame($expectedConfig, $teamConfig);
+        $this->assertSame('bs.game_type = 1', $teamDateFilter);
+    }
+
     public function testFormatsPlayerRecordCorrectly(): void
     {
         $playerRecord = [

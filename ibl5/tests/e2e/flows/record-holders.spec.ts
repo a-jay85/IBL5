@@ -35,4 +35,23 @@ test.describe('Record Holders flow', () => {
   test('no PHP errors', async ({ page }) => {
     await assertNoPhpErrors(page, 'on Record Holders page');
   });
+
+  // The five record sections render unconditionally (the card titles are emitted
+  // before any data loop in RecordHoldersView), so these assertions are
+  // independent of how sparse the CI seed's box-score data is. This confirms the
+  // page still composes after the RecordStatDefinitions query-source refactor.
+  test('all five record sections render', async ({ page }) => {
+    const sectionTitles = [
+      'Player, Regular Season (Single Game)',
+      'Player, Regular Season (Full Season) [minimum 50 games]',
+      'Player, Playoffs',
+      'Player, H.E.A.T.',
+      'Team Records',
+    ];
+    for (const title of sectionTitles) {
+      await expect(
+        page.locator('.ibl-card__title', { hasText: title }),
+      ).toBeVisible();
+    }
+  });
 });

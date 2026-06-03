@@ -155,6 +155,74 @@ final class SeasonLeaderboardsServiceTest extends TestCase
         $this->assertSame(2, $result['results'][0]['pid']);
     }
 
+    /**
+     * Characterization: QA sort order is driven by the inline points term
+     * (2*fgm + ftm + tgm) inside the QA-per-game computation. Negative/positive
+     * QA terms are neutralized (fga=fgm, fta=ftm, all other counting stats 0)
+     * so ordering reflects the points formula alone.
+     */
+    public function testSortsByQualityAssessmentDesc(): void
+    {
+        $service = $this->buildServiceWithRows([
+            $this->createRow(1, 'Low QA', 2024, 1, 80, 800, fgm: 200, fga: 200, ftm: 100, fta: 100, tgm: 50),
+            $this->createRow(2, 'High QA', 2024, 2, 80, 800, fgm: 500, fga: 500, ftm: 200, fta: 200, tgm: 100),
+            $this->createRow(3, 'Mid QA', 2024, 3, 80, 800, fgm: 350, fga: 350, ftm: 150, fta: 150, tgm: 75),
+        ]);
+
+        $result = $service->getFilteredLeaderboard(['sortby' => 'QA']);
+
+        $this->assertSame(2, $result['results'][0]['pid']);
+        $this->assertSame(3, $result['results'][1]['pid']);
+        $this->assertSame(1, $result['results'][2]['pid']);
+    }
+
+    /**
+     * Characterization: PPG sorts by points-PER-GAME, not raw points. Games
+     * differ per player so the ordering distinguishes pts/games from any other
+     * combination of the two operands (guards the division in the PPG arm).
+     */
+    public function testSortsByPpgPerGameWithVaryingGames(): void
+    {
+        $service = $this->buildServiceWithRows([
+            // pts=1000, games=100 -> 10.0 ppg
+            $this->createRow(1, 'Volume', 2024, 1, 100, 1000, fgm: 500),
+            // pts=600,  games=20  -> 30.0 ppg (fewest points, fewest games, best rate)
+            $this->createRow(2, 'Efficient', 2024, 2, 20, 200, fgm: 300),
+            // pts=800,  games=40  -> 20.0 ppg
+            $this->createRow(3, 'Middle', 2024, 3, 40, 400, fgm: 400),
+        ]);
+
+        $result = $service->getFilteredLeaderboard(['sortby' => 'PPG']);
+
+        $this->assertSame(2, $result['results'][0]['pid']);
+        $this->assertSame(3, $result['results'][1]['pid']);
+        $this->assertSame(1, $result['results'][2]['pid']);
+    }
+
+    /**
+     * Characterization: an unrecognized sort key falls through the match's
+     * default arm, which sorts by the points-per-game formula
+     * calculatePoints(fgm, ftm, tgm) / games — identical to PPG. Games differ
+     * per player so the assertion pins the division (not raw points).
+     */
+    public function testUnknownSortKeyFallsBackToPpgFormula(): void
+    {
+        $service = $this->buildServiceWithRows([
+            // pts=1000, games=100 -> 10.0 ppg
+            $this->createRow(1, 'Volume', 2024, 1, 100, 1000, fgm: 500),
+            // pts=600,  games=20  -> 30.0 ppg
+            $this->createRow(2, 'Efficient', 2024, 2, 20, 200, fgm: 300),
+            // pts=800,  games=40  -> 20.0 ppg
+            $this->createRow(3, 'Middle', 2024, 3, 40, 400, fgm: 400),
+        ]);
+
+        $result = $service->getFilteredLeaderboard(['sortby' => 'NOT_A_REAL_STAT']);
+
+        $this->assertSame(2, $result['results'][0]['pid']);
+        $this->assertSame(3, $result['results'][1]['pid']);
+        $this->assertSame(1, $result['results'][2]['pid']);
+    }
+
     // --- getFilteredLeaderboard: limit tests ---
 
     public function testLimitRestrictsResultCount(): void

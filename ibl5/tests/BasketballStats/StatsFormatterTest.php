@@ -93,10 +93,14 @@ final class StatsFormatterTest extends TestCase
         
         // Test with zeros
         $this->assertSame(0, StatsFormatter::calculatePoints(0, 0, 0));
-        
+
         // Test with nulls
         $this->assertSame(20, StatsFormatter::calculatePoints(10, null, null));
         $this->assertSame(5, StatsFormatter::calculatePoints(null, 5, null));
+
+        // Boundary: a fully null/empty stat line yields 0 points — this is the
+        // behavior the inlined `2*fgm+ftm+tgm` copies relied on (null-coalesced).
+        $this->assertSame(0, StatsFormatter::calculatePoints(null, null, null));
     }
 
     public function testSafeDivide(): void

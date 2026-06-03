@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Injuries;
 
+use Injuries\Contracts\InjuriesRepositoryInterface;
 use Injuries\Contracts\InjuriesServiceInterface;
-use League\League;
 use Player\Player;
 use Team\Team;
 use Season\Season;
@@ -17,16 +17,17 @@ use Season\Season;
  */
 class InjuriesService implements InjuriesServiceInterface
 {
-    private League $league;
     private \mysqli $db;
+    private InjuriesRepositoryInterface $injuriesRepository;
 
     /**
-     * @param \mysqli $db Database connection
+     * @param \mysqli $db Database connection (still required for Player/Team/Season hydration)
+     * @param InjuriesRepositoryInterface|null $injuriesRepository Source of injured-player rows; defaults to the League-backed repository
      */
-    public function __construct(\mysqli $db)
+    public function __construct(\mysqli $db, ?InjuriesRepositoryInterface $injuriesRepository = null)
     {
         $this->db = $db;
-        $this->league = new League($db);
+        $this->injuriesRepository = $injuriesRepository ?? new InjuriesRepository($db);
     }
 
     /**
@@ -37,7 +38,7 @@ class InjuriesService implements InjuriesServiceInterface
         $season = new Season($this->db);
         $injuredPlayers = [];
 
-        $injuredRows = $this->league->getInjuredPlayersResult();
+        $injuredRows = $this->injuriesRepository->getInjuredPlayers();
 
         foreach ($injuredRows as $injuredPlayerRow) {
             $player = Player::withPlrRow($this->db, $injuredPlayerRow);

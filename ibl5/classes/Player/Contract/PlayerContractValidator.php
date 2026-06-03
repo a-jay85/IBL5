@@ -191,14 +191,6 @@ class PlayerContractValidator implements PlayerContractValidatorInterface
      */
     private function getContractYearSalary(PlayerData $playerData, int $year): int
     {
-        return match ($year) {
-            1 => $playerData->contractYear1Salary ?? 0,
-            2 => $playerData->contractYear2Salary ?? 0,
-            3 => $playerData->contractYear3Salary ?? 0,
-            4 => $playerData->contractYear4Salary ?? 0,
-            5 => $playerData->contractYear5Salary ?? 0,
-            6 => $playerData->contractYear6Salary ?? 0,
-            default => 0,
-        };
+        return $playerData->salaryForContractYear($year);
     }
 }

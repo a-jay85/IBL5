@@ -246,6 +246,57 @@ class FreeAgencyCapCalculatorTest extends TestCase
     }
 
     /**
+     * CHARACTERIZATION (PR5 dedup): the cy-offset walk that spreads a cash
+     * record across future years. Locks behavior before the inner salary-slot
+     * lookup is replaced with BuyoutLedgerRepository::salaryForContractYear().
+     *
+     * @group cap-calculator
+     */
+    public function testCashConsiderationMultiYearWalkCharacterization(): void
+    {
+        $this->mockDb->onQuery('ibl_cash_considerations', [
+            ['cy' => 1, 'salary_yr1' => 100, 'salary_yr2' => 200, 'salary_yr3' => 300, 'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0],
+        ]);
+
+        $team = $this->createMockTeamEntity();
+        $mockSeason = self::createStub(Season::class); // in-season: isOffseasonPhase() === false
+        $mockTeamQueryRepo = $this->createMockTeamQueryRepo([], []);
+        $calculator = new FreeAgencyCapCalculator($this->mockDb, $team, $mockSeason, $mockTeamQueryRepo);
+
+        $result = $calculator->calculateTeamCapMetrics();
+
+        $this->assertSame(100, $result['totalSalaries'][0], 'Year 1 slot');
+        $this->assertSame(200, $result['totalSalaries'][1], 'Year 2 slot');
+        $this->assertSame(300, $result['totalSalaries'][2], 'Year 3 slot');
+        $this->assertSame(0, $result['totalSalaries'][3], 'Year 4 slot empty');
+    }
+
+    /**
+     * CHARACTERIZATION (PR5 dedup): in the offseason the current contract year
+     * advances by one, so a cy=1 record contributes its year-2 salary to the
+     * current season slot.
+     *
+     * @group cap-calculator
+     */
+    public function testCashConsiderationOffseasonShiftCharacterization(): void
+    {
+        $this->mockDb->onQuery('ibl_cash_considerations', [
+            ['cy' => 1, 'salary_yr1' => 100, 'salary_yr2' => 200, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0],
+        ]);
+
+        $team = $this->createMockTeamEntity();
+        $mockSeason = self::createStub(Season::class);
+        $mockSeason->method('isOffseasonPhase')->willReturn(true);
+        $mockTeamQueryRepo = $this->createMockTeamQueryRepo([], []);
+        $calculator = new FreeAgencyCapCalculator($this->mockDb, $team, $mockSeason, $mockTeamQueryRepo);
+
+        $result = $calculator->calculateTeamCapMetrics();
+
+        $this->assertSame(200, $result['totalSalaries'][0], 'Offseason advances cy by one: year-2 salary lands in the current slot');
+        $this->assertSame(0, $result['totalSalaries'][1], 'Nothing left after the shift');
+    }
+
+    /**
      * @group cap-calculator
      * @group placeholder
      */

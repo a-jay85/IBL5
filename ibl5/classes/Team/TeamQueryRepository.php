@@ -359,15 +359,7 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
                 if (!isset($salaryCapSpent[$key])) {
                     $salaryCapSpent[$key] = 0;
                 }
-                $salaryCapSpent[$key] += match ($yearUnderContract) {
-                    1 => $cashRow['salary_yr1'],
-                    2 => $cashRow['salary_yr2'],
-                    3 => $cashRow['salary_yr3'],
-                    4 => $cashRow['salary_yr4'],
-                    5 => $cashRow['salary_yr5'],
-                    6 => $cashRow['salary_yr6'],
-                    default => 0,
-                };
+                $salaryCapSpent[$key] += BuyoutLedgerRepository::salaryForContractYear($cashRow, $yearUnderContract);
                 $yearUnderContract++;
                 $i++;
             }
@@ -429,25 +421,10 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
     {
         $season = new Season($this->db);
         $buyoutsResult = $this->getBuyouts($teamId);
-        $totalCurrentSeasonBuyouts = 0;
-        foreach ($buyoutsResult as $buyout) {
-            $cy = $buyout['cy'];
-            if ($season->isOffseasonPhase()) {
-                $cy++;
-            }
-            if ($cy === 0) {
-                $cy = 1;
-            }
-            $totalCurrentSeasonBuyouts += match ($cy) {
-                1 => $buyout['salary_yr1'],
-                2 => $buyout['salary_yr2'],
-                3 => $buyout['salary_yr3'],
-                4 => $buyout['salary_yr4'],
-                5 => $buyout['salary_yr5'],
-                6 => $buyout['salary_yr6'],
-                default => 0,
-            };
-        }
+        $totalCurrentSeasonBuyouts = BuyoutLedgerRepository::sumCurrentSeasonSalaryFromRows(
+            $buyoutsResult,
+            $season->isOffseasonPhase()
+        );
         $projectedTotalCurrentSeasonBuyouts = $totalCurrentSeasonBuyouts + $buyoutValue;
         $buyoutLimit = League::HARD_CAP_MAX * Team::BUYOUT_PERCENTAGE_MAX;
 

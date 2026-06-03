@@ -68,7 +68,7 @@ func TestCreditBlock_NeverFlipsMake(t *testing.T) {
 	defender := defense.players[0]
 	// Pre-credit a made shot, as the half-court loop would on a make.
 	gs := &gameState{rng: rng.New(1), period: 1, clock: 500}
-	gs.creditMadeFieldGoal(offense, shooter, result.ShotTwoPoint, 0)
+	gs.creditMadeFieldGoal(offense, shooter, result.ShotTwoPoint, result.OriginInitial, 0)
 	made0 := gs.madeFG[shooter.PID]
 	score0 := offense.score
 

@@ -18,6 +18,16 @@ type StatRow struct {
 	Detail     string
 }
 
+// OriginFGA is one team's engine mean field-goal attempts per game split by shot
+// ORIGIN (ADR-0042 empty-FGA-split diagnostic). Engine-only: real .sco box
+// scores carry no origin tag, so this has no .sco counterpart and is never
+// compared, banded, or part of the Pass verdict — it is reported, never gated.
+type OriginFGA struct {
+	Initial    float64
+	Oreb       float64
+	Transition float64
+}
+
 // GameReport is the full comparison for one corpus game: every stat for both
 // teams. Pass is true only when every row passes.
 type GameReport struct {
@@ -26,6 +36,10 @@ type GameReport struct {
 	Date          string
 	Pass          bool
 	Rows          []StatRow
+	// EngineOriginFGA maps each team ID to its engine mean by-origin FGA/game.
+	// Engine-only (see OriginFGA); additive, not printed by WriteReport, not part
+	// of Pass — feeds the season-aggregate by-origin variance decomposition.
+	EngineOriginFGA map[int]OriginFGA
 	// EngineHomeWinFraction is the fraction of seeded runs in which the home team
 	// outscored the visitor (a tied run counts 0.5). It is a runs-stable estimate
 	// of P(home win) — unlike a single mean-margin sign, which rounds every game

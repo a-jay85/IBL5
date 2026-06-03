@@ -155,6 +155,10 @@ func rotationBundle() bundle.Bundle {
 		setDepthAt(&p, slot, depth)
 		p.Foul = foul
 		p.Stamina = 40
+		// Real-mean shot-volume rates (composite ≈ 161) so the fixture runs at a
+		// representative pace under the volume→count channel (tempo.go) instead of
+		// clamping to the slow base_time rail — keeps foul-outs/subs mid-game.
+		p.FGA, p.TGA, p.FTA = 95, 40, 26
 		return p
 	}
 	for _, tm := range []struct{ id, fgp int }{{7, 44}, {3, 52}} {

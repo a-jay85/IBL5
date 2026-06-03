@@ -38,6 +38,22 @@ const (
 	ShotFreeThrow ShotType = "ft"
 )
 
+// ShotOrigin tags WHERE in the possession a field-goal attempt arose, so the
+// calibrate harness can decompose team FGA variance by source (the ADR-0042
+// "empty-FGA split": which within-possession source — offensive-rebound
+// continuation, transition, or the initial attempt — carries the miss-driven
+// FGA variance). Meaningful only on EventShotAttempt / EventShotMake /
+// EventShotMiss. The zero value is the empty string; every shot event carries
+// an explicit non-empty origin (OriginInitial included), so a missing tag is a
+// bug, never a defaulted "initial".
+type ShotOrigin string
+
+const (
+	OriginInitial    ShotOrigin = "initial"           // first attempt of a half-court trip
+	OriginOffReb     ShotOrigin = "oreb_continuation" // a putback after an offensive rebound (trip > 0)
+	OriginTransition ShotOrigin = "transition"        // a fast-break attempt
+)
+
 // Event is one structured per-possession event. Which fields are meaningful
 // depends on Kind; a zero value means "not applicable to this event kind".
 type Event struct {
@@ -50,6 +66,14 @@ type Event struct {
 	DefenderID int `json:"defender_id,omitempty"` // opposing player for steals/blocks
 
 	ShotType ShotType `json:"shot_type,omitempty"`
+
+	// Origin tags the within-possession source of a field-goal attempt
+	// (OriginInitial / OriginOffReb / OriginTransition). Meaningful only on
+	// EventShotAttempt / EventShotMake / EventShotMiss. omitempty keeps it off
+	// every non-shot event; because OriginInitial is a non-empty string it still
+	// serializes on initial shots (omitempty drops only the "" zero value, which
+	// no shot event carries).
+	Origin ShotOrigin `json:"shot_origin,omitempty"`
 
 	// OffensiveRebound distinguishes an offensive (true) from a defensive
 	// (false) rebound. Only meaningful when Kind == EventRebound.

@@ -11,6 +11,7 @@ import (
 
 	"github.com/a-jay85/IBL5/engine/internal/backup"
 	"github.com/a-jay85/IBL5/engine/internal/bundle"
+	"github.com/a-jay85/IBL5/engine/internal/result"
 	"github.com/a-jay85/IBL5/engine/internal/sim"
 )
 
@@ -359,11 +360,12 @@ func matchSchedule(sched []backup.SchGame, consumed []bool, sg backup.ScoGame) i
 // validateGame simulates one matchup `runs` times and compares the aggregated
 // per-team engine means against the .sco ground truth, using gameType's bands.
 func validateGame(b bundle.Bundle, g bundle.Game, sg backup.ScoGame, runs int, baseSeed uint64, gameType bundle.GameType) GameReport {
-	visMean, homeMean, homeWinFrac := simulateGameMeans(b, g, runs, baseSeed)
+	visMean, homeMean, homeWinFrac, originFGA := simulateGameMeans(b, g, runs, baseSeed)
 	visSco := teamStatFromSco(sg, g.VisitorTeamID)
 	homeSco := teamStatFromSco(sg, g.HomeTeamID)
 	gr := compareGame(gameType, g.VisitorTeamID, g.HomeTeamID, sg.Date, visSco, homeSco, visMean, homeMean)
 	gr.EngineHomeWinFraction = homeWinFrac
+	gr.EngineOriginFGA = originFGA
 	return gr
 }
 
@@ -373,7 +375,7 @@ func validateGame(b bundle.Bundle, g bundle.Game, sg backup.ScoGame, runs int, b
 // runs-stable P(home win) estimate the season-aggregate layer needs). Each run
 // is an independent single-game sub-bundle so one game's distribution is
 // isolated from the rest of the schedule.
-func simulateGameMeans(b bundle.Bundle, g bundle.Game, runs int, baseSeed uint64) (visMean, homeMean map[string]float64, homeWinFrac float64) {
+func simulateGameMeans(b bundle.Bundle, g bundle.Game, runs int, baseSeed uint64) (visMean, homeMean map[string]float64, homeWinFrac float64, originFGA map[int]OriginFGA) {
 	sub := bundle.Bundle{
 		LeagueID: b.LeagueID,
 		Teams:    b.Teams,
@@ -382,9 +384,11 @@ func simulateGameMeans(b bundle.Bundle, g bundle.Game, runs int, baseSeed uint64
 	}
 	visSamples := make([]TeamStat, 0, runs)
 	homeSamples := make([]TeamStat, 0, runs)
+	originTotals := map[int]*OriginFGA{} // Σ by-origin FGA across runs, per team
 	for run := 0; run < runs; run++ {
 		res := sim.Simulate(sub, baseSeed+uint64(run))
 		gr := res.Games[0]
+		accumulateOriginFGA(originTotals, gr.Events)
 		for _, tb := range gr.TeamBoxes {
 			ts := teamStatFromBox(tb)
 			switch tb.TeamID {
@@ -395,5 +399,34 @@ func simulateGameMeans(b bundle.Bundle, g bundle.Game, runs int, baseSeed uint64
 			}
 		}
 	}
-	return mean(visSamples), mean(homeSamples), homeWinFraction(homeSamples, visSamples)
+	originFGA = make(map[int]OriginFGA, len(originTotals))
+	rf := float64(runs)
+	for id, o := range originTotals {
+		originFGA[id] = OriginFGA{Initial: o.Initial / rf, Oreb: o.Oreb / rf, Transition: o.Transition / rf}
+	}
+	return mean(visSamples), mean(homeSamples), homeWinFraction(homeSamples, visSamples), originFGA
+}
+
+// accumulateOriginFGA folds one game's shot-attempt events into per-team by-origin
+// FGA counters (every EventShotAttempt carries exactly one origin; see
+// result.ShotOrigin).
+func accumulateOriginFGA(into map[int]*OriginFGA, events []result.Event) {
+	for _, e := range events {
+		if e.Kind != result.EventShotAttempt {
+			continue
+		}
+		o := into[e.TeamID]
+		if o == nil {
+			o = &OriginFGA{}
+			into[e.TeamID] = o
+		}
+		switch e.Origin {
+		case result.OriginInitial:
+			o.Initial++
+		case result.OriginOffReb:
+			o.Oreb++
+		case result.OriginTransition:
+			o.Transition++
+		}
+	}
 }

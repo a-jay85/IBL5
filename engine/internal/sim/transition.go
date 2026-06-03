@@ -122,7 +122,11 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 
 		switch selectOutcome(in, false, false, true, gs.rng) {
 		case outcome2pt:
-			if made, _ := gs.shotAttempt(offense, defense, bh, sv2, result.ShotTwoPoint, periodIdx); !made {
+			// Every shot on a fired fast break is tagged transition — including a
+			// putback after an offensive rebound within the break (the possession
+			// ORIGIN is the fast break, so the half-court oreb_continuation bucket
+			// stays half-court-only for the ADR-0042 empty-FGA split).
+			if made, _ := gs.shotAttempt(offense, defense, bh, sv2, result.ShotTwoPoint, result.OriginTransition, periodIdx); !made {
 				gs.creditBlock(offense, defense, bh, def)
 				if cont, next := gs.rebound(offense, defense, periodIdx); cont {
 					bh = next
@@ -132,7 +136,7 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 			}
 			return false // made shot
 		case outcomeAndOne:
-			gs.madeFieldGoal(offense, bh, result.ShotTwoPoint, periodIdx)
+			gs.madeFieldGoal(offense, bh, result.ShotTwoPoint, result.OriginTransition, periodIdx)
 			gs.freeThrows(offense, defense, bh, def, 1, periodIdx)
 			return false
 		case outcomeFoulOnly:

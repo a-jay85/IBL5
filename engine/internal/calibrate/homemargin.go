@@ -115,3 +115,20 @@ func pointsFor(g validate.GameReport, teamID int) (validate.StatRow, bool) {
 	}
 	return validate.StatRow{}, false
 }
+
+// fgaFor returns the "fga" StatRow for the given team in a game and whether it
+// was found. NOTE: at this validation-aggregate layer the "fga" stat is ALREADY
+// total field-goal attempts (2pt + 3pt summed), on BOTH the engine side
+// (TeamStat.FGA = Game2GA + Game3GA) and the .sco side (TwoGA + ThreeGA) — see
+// validate/aggregate.go:28-33. The raw .sco 53-byte slot stores 2pt-only
+// (memory reference_sco_fgm_is_2pt), but that re-summing happens one layer down;
+// here "fga" is total FGA. Do NOT add the "tga" row on top — that double-counts
+// threes. The harness emits exactly one "fga" row per team (compareGame).
+func fgaFor(g validate.GameReport, teamID int) (validate.StatRow, bool) {
+	for _, r := range g.Rows {
+		if r.Stat == "fga" && r.TeamID == teamID {
+			return r, true
+		}
+	}
+	return validate.StatRow{}, false
+}

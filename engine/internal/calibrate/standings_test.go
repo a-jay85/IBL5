@@ -367,3 +367,234 @@ func TestCollectFidelitySummaries_RunsStableIntensiveNotInflating(t *testing.T) 
 		t.Fatalf("Σ expected-wins not 10× — the pooling did not actually scale the data, so the invariance proves nothing")
 	}
 }
+
+// ─── Volume / efficiency channel decomposition (matrix rows 1-6) ───────────────
+
+// fgaRows returns two "fga" StatRows (visitor then home) to append to a wfGame.
+func fgaRows(visID, homeID int, visE, visS, homeE, homeS float64) []validate.StatRow {
+	return []validate.StatRow{
+		{TeamID: visID, Stat: "fga", ScoVal: visS, EngineMean: visE},
+		{TeamID: homeID, Stat: "fga", ScoVal: homeS, EngineMean: homeE},
+	}
+}
+
+// Row #1 (pre-impl characterization): the additive FGA extension does not perturb
+// any existing TeamStanding / FidelitySummary field, and the new FGA fields
+// default to 0 when a snapshot carries no "fga" rows (the wfGame shape).
+func TestCollectSeasonAggregates_ExistingFieldsUnchangedByFGAExtension(t *testing.T) {
+	rep := aggReport("s1", bundle.GameTypeRegular,
+		wfGame(1, 2, 1.0, 110, 108, 100, 99),
+		wfGame(2, 1, 0.0, 95, 96, 105, 107),
+	)
+	got := CollectSeasonAggregates([]validate.Report{rep})
+	t1 := standingFor(t, got.Seasons[0], 1)
+	// Existing fields keep their hand-computed values (cf. RollsUpPerTeam).
+	if t1.EnginePointsForPG != 107.5 || t1.EnginePointsAgainstPG != 97.5 || t1.EnginePointDiffPG != 10 || t1.ScoPointDiffPG != 10 {
+		t.Errorf("existing fields perturbed by FGA extension: %+v", t1)
+	}
+	// New fields default to 0 with no "fga" rows present.
+	if t1.EngineFGAPerG != 0 || t1.ScoFGAPerG != 0 {
+		t.Errorf("FGA fields = %v/%v, want 0 (no fga rows in fixture)", t1.EngineFGAPerG, t1.ScoFGAPerG)
+	}
+	fs := collectFidelitySummaries(got.Seasons)
+	if fs[0].PFDispersionRatio == 0 && fs[0].LevelGapPF == 0 {
+		t.Fatalf("existing fidelity metrics vanished: %+v", fs[0])
+	}
+	if fs[0].VolumeDispersionRatio != 0 || fs[0].EfficiencyDispersionRatio != 0 ||
+		fs[0].RealVarLnPF != 0 || fs[0].RealVarLnFGA != 0 || fs[0].RealVarLnPPS != 0 || fs[0].RealCovLnFGALnPPS != 0 {
+		t.Errorf("FGA-derived metrics = %+v, want all 0 with no fga data", fs[0])
+	}
+}
+
+// Row #2: fgaFor returns the team's "fga" row (already total FG, see fgaFor doc)
+// and false when absent; the both-sides guard accumulates volume only for games
+// where BOTH teams have an "fga" row, and divides by that fgaGP, not gp.
+func TestFgaFor_AndBothSidesGuard(t *testing.T) {
+	t.Run("fgaFor lookup", func(t *testing.T) {
+		g := validate.GameReport{HomeTeamID: 1, VisitorTeamID: 2, Rows: []validate.StatRow{
+			{TeamID: 1, Stat: "points", ScoVal: 100},
+			{TeamID: 1, Stat: "fga", ScoVal: 88, EngineMean: 85},
+			{TeamID: 2, Stat: "points", ScoVal: 95},
+		}}
+		if r, ok := fgaFor(g, 1); !ok || r.ScoVal != 88 || r.EngineMean != 85 {
+			t.Errorf("fgaFor(1) = %+v ok=%v, want ScoVal 88 / EngineMean 85", r, ok)
+		}
+		if _, ok := fgaFor(g, 2); ok {
+			t.Errorf("fgaFor(2) ok=true, want false (no fga row for team 2)")
+		}
+	})
+
+	t.Run("both-sides guard + fgaGP divisor", func(t *testing.T) {
+		// g1 has fga on both sides; g2 (also a played game) has fga on home only.
+		// Both count for points (gp=2) but only g1 contributes volume → the divisor
+		// is fgaGP=1, so ScoFGAPerG = 88, NOT (88+200)/2 and NOT 88/2.
+		g1 := wfGame(1, 2, 1.0, 110, 108, 100, 99)
+		g1.Rows = append(g1.Rows, fgaRows(2, 1, 80, 80, 88, 88)...)
+		g2 := wfGame(1, 2, 1.0, 110, 108, 100, 99)
+		g2.Rows = append(g2.Rows, validate.StatRow{TeamID: 1, Stat: "fga", ScoVal: 200, EngineMean: 200})
+		got := CollectSeasonAggregates([]validate.Report{aggReport("s1", bundle.GameTypeRegular, g1, g2)})
+		t1 := standingFor(t, got.Seasons[0], 1)
+		if t1.GamesPlayed != 2 {
+			t.Fatalf("gp = %d, want 2 (both games played)", t1.GamesPlayed)
+		}
+		if t1.ScoFGAPerG != 88 {
+			t.Errorf("ScoFGAPerG = %v, want 88 (only the both-sides game, divided by fgaGP=1)", t1.ScoFGAPerG)
+		}
+	})
+}
+
+// Row #3: volume_dispersion_ratio and efficiency_dispersion_ratio are the
+// PFDispersionRatio analog on each channel — 0.5 when the engine spread is half
+// the .sco spread.
+func TestCollectFidelitySummaries_VolumeAndEfficiencyDispersion(t *testing.T) {
+	t.Run("volume", func(t *testing.T) {
+		// engine FGA {99,101} pop-stdev 1; sco FGA {98,102} pop-stdev 2 → 0.5.
+		fs := collectFidelitySummaries([]SeasonAggregate{regSeason(
+			TeamStanding{TeamID: 1, EngineFGAPerG: 99, ScoFGAPerG: 98, EnginePointsForPG: 100, ScoPointsForPG: 100},
+			TeamStanding{TeamID: 2, EngineFGAPerG: 101, ScoFGAPerG: 102, EnginePointsForPG: 100, ScoPointsForPG: 100},
+		)})
+		if math.Abs(fs[0].VolumeDispersionRatio-0.5) > 1e-9 {
+			t.Errorf("VolumeDispersionRatio = %v, want 0.5", fs[0].VolumeDispersionRatio)
+		}
+	})
+	t.Run("efficiency", func(t *testing.T) {
+		// FGA=100 for all → PPS=PF/100. engine PF {99,101}→PPS stdev 0.01; sco PF
+		// {98,102}→PPS stdev 0.02 → ratio 0.5 (PPS, not raw PF).
+		fs := collectFidelitySummaries([]SeasonAggregate{regSeason(
+			TeamStanding{TeamID: 1, EngineFGAPerG: 100, ScoFGAPerG: 100, EnginePointsForPG: 99, ScoPointsForPG: 98},
+			TeamStanding{TeamID: 2, EngineFGAPerG: 100, ScoFGAPerG: 100, EnginePointsForPG: 101, ScoPointsForPG: 102},
+		)})
+		if math.Abs(fs[0].EfficiencyDispersionRatio-0.5) > 1e-9 {
+			t.Errorf("EfficiencyDispersionRatio = %v, want 0.5", fs[0].EfficiencyDispersionRatio)
+		}
+	})
+}
+
+// Row #4: decomposeLogVariance closes the identity Var(lnPF)=Var(lnFGA)+
+// Var(lnPPS)+2·Cov to floating tolerance, and within-season demeaning yields a
+// SMALLER volume variance than raw pooling on a cross-era-pace-shifted corpus
+// (the era level shift leaks into volume only when not demeaned).
+func TestDecomposeLogVariance_IdentityAndWithinSeasonDemean(t *testing.T) {
+	// Season A is a low-pace era (~80 FGA), season B a high-pace era (~100 FGA);
+	// each season's internal spread is small relative to the cross-era gap.
+	rows := []decompRow{
+		{season: "A", pf: 80, fga: 80}, {season: "A", pf: 88, fga: 84},
+		{season: "B", pf: 104, fga: 100}, {season: "B", pf: 112, fga: 104},
+	}
+	varPF, varFGA, varPPS, cov := decomposeLogVariance(rows)
+	if math.Abs(varPF-(varFGA+varPPS+2*cov)) > 1e-9 {
+		t.Errorf("identity broken: varPF %v != varFGA %v + varPPS %v + 2·cov %v", varPF, varFGA, varPPS, cov)
+	}
+	if varFGA < 0 || varPPS < 0 {
+		t.Errorf("variances must be non-negative: varFGA %v varPPS %v", varFGA, varPPS)
+	}
+	// Raw pooling: drop the season tags (all one bucket) → the era shift is banked
+	// as volume variance.
+	pooled := make([]decompRow, len(rows))
+	for i, r := range rows {
+		pooled[i] = decompRow{season: "", pf: r.pf, fga: r.fga}
+	}
+	_, rawVarFGA, _, _ := decomposeLogVariance(pooled)
+	if rawVarFGA <= varFGA {
+		t.Errorf("raw-pooled varFGA %v should EXCEED within-season varFGA %v (cross-era pace leaks into volume when not demeaned)", rawVarFGA, varFGA)
+	}
+}
+
+// Row #4b (the lever): the engine-side decomposition closes its own identity AND
+// the instrument detects the volume→scoring COUPLING SIGN — the axis the audit
+// turns on. The fixture gives the real (.sco) side a POSITIVE coupling (more
+// shots → more points, super-proportional) and the engine side a NEGATIVE one
+// (more shots → fewer points); the derived Cov(lnPF,lnFGA) = VarLnFGA +
+// CovLnFGALnPPS (stated in the directly-observed lnPF/lnFGA, no shared-term
+// artifact) must flip sign between the two sides.
+func TestCollectFidelitySummaries_EngineSideCouplingSign(t *testing.T) {
+	fs := collectFidelitySummaries([]SeasonAggregate{regSeason(
+		// sco: FGA 80/90/100 → PF 80/99/120  (positive coupling, slope > 1)
+		// eng: FGA 80/90/100 → PF 100/95/90   (negative coupling)
+		TeamStanding{TeamID: 1, ScoFGAPerG: 80, ScoPointsForPG: 80, EngineFGAPerG: 80, EnginePointsForPG: 100},
+		TeamStanding{TeamID: 2, ScoFGAPerG: 90, ScoPointsForPG: 99, EngineFGAPerG: 90, EnginePointsForPG: 95},
+		TeamStanding{TeamID: 3, ScoFGAPerG: 100, ScoPointsForPG: 120, EngineFGAPerG: 100, EnginePointsForPG: 90},
+	)})[0]
+	if math.Abs(fs.RealVarLnPF-(fs.RealVarLnFGA+fs.RealVarLnPPS+2*fs.RealCovLnFGALnPPS)) > 1e-9 {
+		t.Errorf("real identity broken: %+v", fs)
+	}
+	if math.Abs(fs.EngineVarLnPF-(fs.EngineVarLnFGA+fs.EngineVarLnPPS+2*fs.EngineCovLnFGALnPPS)) > 1e-9 {
+		t.Errorf("engine identity broken: %+v", fs)
+	}
+	realCovPFFGA := fs.RealVarLnFGA + fs.RealCovLnFGALnPPS    // = Cov(lnPF, lnFGA)
+	engCovPFFGA := fs.EngineVarLnFGA + fs.EngineCovLnFGALnPPS // = Cov(lnPF, lnFGA)
+	if realCovPFFGA <= 0 {
+		t.Errorf("real Cov(lnPF,lnFGA) = %v, want > 0 (shots and scoring reinforce)", realCovPFFGA)
+	}
+	if engCovPFFGA >= 0 {
+		t.Errorf("engine Cov(lnPF,lnFGA) = %v, want < 0 (engine anti-couples shots and scoring)", engCovPFFGA)
+	}
+}
+
+// Row #5 (boundary — the double-count trap): the volume channel reads the "fga"
+// row AS-IS (already total FG at this layer, see fgaFor) and must NOT add the
+// "tga" row. A game with fga=90 and tga=30 → volume 90, never 120 (fga+tga,
+// double-counting threes) and never 60. Guards the next dev who "fixes" the
+// instrument per the raw-slot 2pt-only memory by summing tga (memory
+// reference_sco_fgm_is_2pt — that fact is the raw slot only).
+func TestVolume_ReadsFgaRowAsIs_NeverAddsTga(t *testing.T) {
+	g := wfGame(1, 2, 1.0, 110, 108, 100, 99)
+	g.Rows = append(g.Rows,
+		validate.StatRow{TeamID: 1, Stat: "fga", ScoVal: 90, EngineMean: 90},
+		validate.StatRow{TeamID: 2, Stat: "fga", ScoVal: 90, EngineMean: 90},
+		validate.StatRow{TeamID: 1, Stat: "tga", ScoVal: 30, EngineMean: 30},
+		validate.StatRow{TeamID: 2, Stat: "tga", ScoVal: 30, EngineMean: 30},
+	)
+	got := CollectSeasonAggregates([]validate.Report{aggReport("s1", bundle.GameTypeRegular, g)})
+	t1 := standingFor(t, got.Seasons[0], 1)
+	if t1.ScoFGAPerG != 90 {
+		t.Errorf("ScoFGAPerG = %v, want 90 (fga row as-is; NOT 120 by adding tga, NOT 60)", t1.ScoFGAPerG)
+	}
+	if t1.EngineFGAPerG != 90 {
+		t.Errorf("EngineFGAPerG = %v, want 90 (fga row as-is)", t1.EngineFGAPerG)
+	}
+}
+
+// Row #6 (negative/boundary): a zero-FGA team yields finite, identity-closing
+// decomposition terms (the row is dropped, no NaN/Inf/divide-by-zero), the
+// efficiency ratio skips it, and a single-team season demeans to exactly 0
+// variance.
+func TestDecomposeAndPPS_DegenerateInputsAreFinite(t *testing.T) {
+	t.Run("zero-FGA row dropped, terms finite + identity holds", func(t *testing.T) {
+		varPF, varFGA, varPPS, cov := decomposeLogVariance([]decompRow{
+			{season: "A", pf: 100, fga: 0}, // dropped: ln(0) undefined
+			{season: "A", pf: 100, fga: 90},
+			{season: "A", pf: 110, fga: 95},
+		})
+		for name, v := range map[string]float64{"varPF": varPF, "varFGA": varFGA, "varPPS": varPPS, "cov": cov} {
+			if math.IsNaN(v) || math.IsInf(v, 0) {
+				t.Errorf("%s = %v, want finite", name, v)
+			}
+		}
+		if math.Abs(varPF-(varFGA+varPPS+2*cov)) > 1e-9 {
+			t.Errorf("identity broken on surviving rows")
+		}
+	})
+	t.Run("efficiency ratio skips zero-FGA team, finite", func(t *testing.T) {
+		fs := collectFidelitySummaries([]SeasonAggregate{regSeason(
+			TeamStanding{TeamID: 1, EngineFGAPerG: 0, ScoFGAPerG: 0, EnginePointsForPG: 100, ScoPointsForPG: 100},
+			TeamStanding{TeamID: 2, EngineFGAPerG: 100, ScoFGAPerG: 100, EnginePointsForPG: 99, ScoPointsForPG: 98},
+			TeamStanding{TeamID: 3, EngineFGAPerG: 100, ScoFGAPerG: 100, EnginePointsForPG: 101, ScoPointsForPG: 102},
+		)})
+		if e := fs[0].EfficiencyDispersionRatio; math.IsNaN(e) || math.IsInf(e, 0) {
+			t.Errorf("EfficiencyDispersionRatio = %v, want finite (zero-FGA team skipped)", e)
+		}
+	})
+	t.Run("single-team season → zero variance", func(t *testing.T) {
+		v1, v2, v3, c := decomposeLogVariance([]decompRow{{season: "A", pf: 100, fga: 90}})
+		if v1 != 0 || v2 != 0 || v3 != 0 || c != 0 {
+			t.Errorf("single-row decomposition = %v/%v/%v/%v, want all 0 (within-season residual is 0)", v1, v2, v3, c)
+		}
+	})
+	t.Run("empty input → zero", func(t *testing.T) {
+		v1, v2, v3, c := decomposeLogVariance(nil)
+		if v1 != 0 || v2 != 0 || v3 != 0 || c != 0 {
+			t.Errorf("empty decomposition = %v/%v/%v/%v, want all 0", v1, v2, v3, c)
+		}
+	})
+}

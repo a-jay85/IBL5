@@ -244,3 +244,47 @@ func TestRun_CalibrateEmitsFidelityOrdered(t *testing.T) {
 		t.Errorf("fidelity not sorted ascending by game type: %+v", fid)
 	}
 }
+
+// Row #7: calibrate mode emits the volume/efficiency channel-decomposition fields
+// (volume_dispersion_ratio, efficiency_dispersion_ratio, the four real_* terms)
+// in season_aggregates.fidelity[], end-to-end through the encoder, with "fga"
+// rows feeding a non-zero volume spread.
+func TestRun_CalibrateEmitsChannelDecompositionFields(t *testing.T) {
+	game := func(date string, homeFGA, visFGA float64) validate.GameReport {
+		return validate.GameReport{
+			HomeTeamID: 7, VisitorTeamID: 3, EngineHomeWinFraction: 0.6, Date: date,
+			Rows: []validate.StatRow{
+				{TeamID: 3, Stat: "points", ScoVal: 99, EngineMean: 100},
+				{TeamID: 7, Stat: "points", ScoVal: 108, EngineMean: 105},
+				{TeamID: 3, Stat: "fga", ScoVal: visFGA, EngineMean: visFGA},
+				{TeamID: 7, Stat: "fga", ScoVal: homeFGA, EngineMean: homeFGA},
+			},
+		}
+	}
+	// Two seasons so the within-season demean has >1 season to pool over.
+	reports := []validate.Report{
+		{Label: "04-05", GameType: bundle.GameTypeRegular, Games: []validate.GameReport{game("d1", 90, 80)}},
+		{Label: "05-06", GameType: bundle.GameTypeRegular, Games: []validate.GameReport{game("d2", 94, 84)}},
+	}
+
+	var out, errBuf bytes.Buffer
+	if code := runWith([]string{"--archive", "/x", "--mode", "calibrate"}, &out, &errBuf, stubCollectors(reports, nil)); code != 0 {
+		t.Fatalf("exit = %d, want 0 (stderr: %s)", code, errBuf.String())
+	}
+	for _, field := range []string{
+		`"volume_dispersion_ratio"`, `"efficiency_dispersion_ratio"`,
+		`"real_var_ln_pf"`, `"real_var_ln_fga"`, `"real_var_ln_pps"`, `"real_cov_ln_fga_ln_pps"`,
+		`"engine_var_ln_pf"`, `"engine_var_ln_fga"`, `"engine_var_ln_pps"`, `"engine_cov_ln_fga_ln_pps"`,
+	} {
+		if !strings.Contains(out.String(), field) {
+			t.Errorf("encoded fidelity missing %s:\n%s", field, out.String())
+		}
+	}
+	var rep calibrate.CalibrationReport
+	if err := json.Unmarshal(out.Bytes(), &rep); err != nil {
+		t.Fatalf("stdout is not a CalibrationReport JSON: %v", err)
+	}
+	if len(rep.SeasonAggregates.Fidelity) == 0 {
+		t.Fatal("no fidelity entries emitted")
+	}
+}

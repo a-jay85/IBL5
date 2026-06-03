@@ -30,6 +30,7 @@ final class RecordStatDefinitionsTest extends TestCase
             '3pt_made'  => ['teamKey' => 'team_3pt_made', 'expression' => 'bs.game_3gm',      'unit' => 'three pointers', 'recordLabel' => 'Most Three Pointers in a Single Game'],
         ];
 
+        // @phpstan-ignore method.alreadyNarrowedType (const value is statically known; assertion still guards against future edits)
         $this->assertSame($expected, RecordStatDefinitions::STATS);
     }
 
@@ -45,6 +46,7 @@ final class RecordStatDefinitionsTest extends TestCase
 
     public function testDateFiltersMapGameTypesToBoxScoreGameType(): void
     {
+        // @phpstan-ignore method.alreadyNarrowedType (const value is statically known; assertion still guards against future edits)
         $this->assertSame([
             'regularSeason' => 'bs.game_type = 1',
             'playoffs'      => 'bs.game_type = 2',

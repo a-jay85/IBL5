@@ -280,9 +280,7 @@ class TradeProcessor implements TradeProcessorInterface
      */
     protected function shouldQueueTrades(): bool
     {
-        return $this->season->phase === "Playoffs"
-            || $this->season->phase === "Draft"
-            || $this->season->phase === "Free Agency";
+        return $this->season->advancesContractYears();
     }
 
     /**

@@ -589,7 +589,10 @@ class TradingServiceTest extends TestCase
 
     private function createSeasonStub(string $phase): Season
     {
-        $season = self::createStub(Season::class);
+        // Use the real mock Season (not a PHPUnit stub) so its phase-derived
+        // methods — e.g. advancesContractYears() — return correct values for the
+        // configured phase without re-encoding the phase set in test config.
+        $season = new \Tests\WideUnit\Mocks\Season($this->mockDb);
         $season->phase = $phase;
         $season->endingYear = 2025;
         $season->beginningYear = 2024;

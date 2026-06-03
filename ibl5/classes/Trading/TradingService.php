@@ -83,7 +83,7 @@ class TradingService implements TradingServiceInterface
         // Calculate cash exchange year range
         $currentSeasonEndingYear = $season->endingYear;
         $cashStartYear = 1;
-        if ($this->isOffseasonPhase($season->phase)) {
+        if ($season->advancesContractYears()) {
             $cashStartYear = 2;
         }
 
@@ -159,7 +159,7 @@ class TradingService implements TradingServiceInterface
             $contractYear = is_int($contractYearRaw) ? $contractYearRaw : 0;
 
             // Adjust contract year based on season phase
-            if ($this->isOffseasonPhase($season->phase)) {
+            if ($season->advancesContractYears()) {
                 $contractYear++;
             }
             if ($contractYear === 0) {
@@ -358,16 +358,6 @@ class TradingService implements TradingServiceInterface
     }
 
     /**
-     * Check if the season is in an offseason phase where contract years advance
-     */
-    private function isOffseasonPhase(string $phase): bool
-    {
-        return $phase === 'Playoffs'
-            || $phase === 'Draft'
-            || $phase === 'Free Agency';
-    }
-
-    /**
      * Enrich trade offers with preview data (team IDs, colors, cash amounts)
      *
      * @param array<int, array{from: string, to: string, approval: string, oppositeTeam: string, hasHammer: bool, items: list<array{type: string, description: string, notes: string|null, from: string, to: string}>, previewData: array{fromPids: list<int>, toPids: list<int>}}> $tradeOffers
@@ -386,7 +376,7 @@ class TradingService implements TradingServiceInterface
         }
 
         $cashStartYear = 1;
-        if ($this->isOffseasonPhase($season->phase)) {
+        if ($season->advancesContractYears()) {
             $cashStartYear = 2;
         }
 

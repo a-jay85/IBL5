@@ -39,9 +39,12 @@ package sim
 // _DAT_0066d310=0.04 form the Branch-B usage target
 // in_f0 = player[+0x1E8] × (DRB-rate + AST-rate) × 0.2 × 0.04, which gates the
 // +0xD90 Branch-B usage-shrink — still deferred (this port implements only
-// Branch-A). _DAT_0066d320=1/3000 (:90985) and _DAT_00669ad0=20000 (:6537) were
-// formerly grouped here but are unrelated to the shrink. NONE affect this Branch-A
-// cold composite. Numeric corpus calibration of the
+// Branch-A). All three Branch-B inputs are now identified: player[+0x1E8] is the
+// TO (Transition Offense) ODPT rating = bundle r_trans_off (already available);
+// the DRB/AST team rates live in the .plr team-summary rows (gp/drb/ast at
+// 148/184/188) and would need bundle wiring. _DAT_0066d320=1/3000 (:90985) and
+// _DAT_00669ad0=20000 (:6537) were formerly grouped here but are unrelated to the
+// shrink. NONE affect this Branch-A cold composite. Numeric corpus calibration of the
 // stand-in magnitudes — and JSB's exact ~55% home-edge magnitude — is deferred
 // (dev/nightly, no automated optimizer); THIS PR proves only the home-favorable
 // SIGN, the invariant PR7a got wrong.

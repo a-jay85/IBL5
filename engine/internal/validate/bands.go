@@ -21,18 +21,19 @@ type Band struct {
 // │   coverage       : 0.95 (bands cover the 95th abs-residual percentile)     │
 // │   selection      : season  (one clean regular snapshot/season + playoffs)  │
 // │   runs           : 50       (seeded engine runs per corpus game)           │
-// │   sample-stride  : 1        (every selected season; ~20 seasons)           │
+// │   sample-stride  : 1        (every selected season; 18 reg + 12 PO)        │
 // │   corpus         : ibl5/backups (olympics excluded)                        │
 // │   date           : 2026-06-02                                              │
-// │   n observations : 35782 stat-rows regular (gt 2), 2184 playoff (gt 4) —   │
-// │                    SAME corpus as #951 (2 rows/game; 17891 / 1092 games    │
-// │                    feed the per-game home-margin readout)                  │
+// │   n observations : 39686 points-rows regular (gt 2), 2018 playoff (gt 4) - │
+// │                    PR1 clean corpus (regenerated; 2 rows/game; 19843 /     │
+// │                    1009 games feed the per-game home-margin readout)       │
 // │                                                                            │
 // │ Audit artifact (the raw CalibrationReport JSON) is committed at            │
 // │   internal/validate/testdata/calibration-5.60-20260602.json                │
-// │ for documentation ONLY. The band VALUES live hardcoded in this file;       │
-// │ nothing reads that JSON at runtime. Re-running calibration regenerates     │
-// │ the JSON; the literals below must then be re-transcribed by hand.          │
+// │ for documentation ONLY; nothing reads it at runtime. It was regenerated    │
+// │ on PR1's clean most-complete-snapshot corpus, adding season-aggregate +    │
+// │ level/dispersion fidelity diagnostics, so its buckets reflect that         │
+// │ corpus. Band literals below stay #957-derived, not re-transcribed here.    │
 // │                                                                            │
 // │ HCA IS NOW ACTIVE (faithful home-court advantage landed in #955; its       │
 // │ magnitude is calibrated here). These bands reflect the calibrated quality- │

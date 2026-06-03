@@ -188,3 +188,182 @@ func TestCollectSeasonAggregates_Deterministic(t *testing.T) {
 		t.Errorf("residuals not sorted by game type: %+v", a.Residuals)
 	}
 }
+
+// regSeason builds a one-game-type SeasonAggregate from explicit per-team rows,
+// so the fidelity-metric tests control the exact PF/wins/point-diff inputs.
+func regSeason(teams ...TeamStanding) SeasonAggregate {
+	return SeasonAggregate{GameType: int(bundle.GameTypeRegular), Teams: teams}
+}
+
+// assertAllFinite fails if any fidelity metric is NaN or ±Inf.
+func assertAllFinite(t *testing.T, fs FidelitySummary) {
+	t.Helper()
+	for name, v := range map[string]float64{
+		"level_gap_pf": fs.LevelGapPF, "pf_corr": fs.PFCorr, "pf_dispersion_ratio": fs.PFDispersionRatio,
+		"wins_corr": fs.WinsCorr, "wins_dispersion_ratio": fs.WinsDispersionRatio,
+		"point_diff_corr": fs.PointDiffCorr, "point_diff_dispersion_ratio": fs.PointDiffDispersionRatio,
+	} {
+		if math.IsNaN(v) || math.IsInf(v, 0) {
+			t.Errorf("%s = %v, want a finite number (no NaN/Inf)", name, v)
+		}
+	}
+}
+
+// Row #1: the flat-offense signature. Engine PF is the SAME for every team while
+// the .sco PF varies across the league → ratings don't drive engine scoring, so
+// pf_corr is ≈0 (and the engine's zero spread gives a dispersion ratio of 0).
+func TestCollectFidelitySummaries_FlatOffenseYieldsZeroPFCorr(t *testing.T) {
+	sa := regSeason(
+		TeamStanding{TeamID: 1, EnginePointsForPG: 100, ScoPointsForPG: 90},
+		TeamStanding{TeamID: 2, EnginePointsForPG: 100, ScoPointsForPG: 100},
+		TeamStanding{TeamID: 3, EnginePointsForPG: 100, ScoPointsForPG: 110},
+		TeamStanding{TeamID: 4, EnginePointsForPG: 100, ScoPointsForPG: 120},
+	)
+	fs := collectFidelitySummaries([]SeasonAggregate{sa})
+	if len(fs) != 1 {
+		t.Fatalf("summaries = %+v, want one game-type entry", fs)
+	}
+	if math.Abs(fs[0].PFCorr) > 1e-9 {
+		t.Errorf("PFCorr = %v, want ≈0 (flat offense: engine PF constant across teams)", fs[0].PFCorr)
+	}
+	if fs[0].PFDispersionRatio != 0 {
+		t.Errorf("PFDispersionRatio = %v, want 0 (engine PF has zero spread)", fs[0].PFDispersionRatio)
+	}
+}
+
+// Row #2: pf_dispersion_ratio is stdev(engine)/stdev(sco) — <1 when the engine
+// compresses the spread, exactly 1 when the spreads match (independent of level).
+func TestCollectFidelitySummaries_PFDispersionRatio(t *testing.T) {
+	// engine {99,101} pop-stdev 1; sco {98,102} pop-stdev 2 → ratio 0.5.
+	compressed := collectFidelitySummaries([]SeasonAggregate{regSeason(
+		TeamStanding{TeamID: 1, EnginePointsForPG: 99, ScoPointsForPG: 98},
+		TeamStanding{TeamID: 2, EnginePointsForPG: 101, ScoPointsForPG: 102},
+	)})
+	if math.Abs(compressed[0].PFDispersionRatio-0.5) > 1e-9 {
+		t.Errorf("compressed ratio = %v, want 0.5 (engine spread half of sco)", compressed[0].PFDispersionRatio)
+	}
+	// engine {95,105} pop-stdev 5; sco {93,103} pop-stdev 5 → ratio 1, even
+	// though the LEVEL differs (engine mean 100 vs sco mean 98).
+	equal := collectFidelitySummaries([]SeasonAggregate{regSeason(
+		TeamStanding{TeamID: 1, EnginePointsForPG: 95, ScoPointsForPG: 93},
+		TeamStanding{TeamID: 2, EnginePointsForPG: 105, ScoPointsForPG: 103},
+	)})
+	if math.Abs(equal[0].PFDispersionRatio-1) > 1e-9 {
+		t.Errorf("equal-spread ratio = %v, want 1", equal[0].PFDispersionRatio)
+	}
+}
+
+// Row #3: level_gap_pf is the hand-computed mean(engine_PF − sco_PF).
+func TestCollectFidelitySummaries_LevelGapPF(t *testing.T) {
+	// mean(engine) = 98, mean(sco) = 115 → level gap −17 (engine under-scores).
+	fs := collectFidelitySummaries([]SeasonAggregate{regSeason(
+		TeamStanding{TeamID: 1, EnginePointsForPG: 100, ScoPointsForPG: 110},
+		TeamStanding{TeamID: 2, EnginePointsForPG: 96, ScoPointsForPG: 120},
+	)})
+	if math.Abs(fs[0].LevelGapPF-(-17)) > 1e-9 {
+		t.Errorf("LevelGapPF = %v, want -17 (mean engine 98 − mean sco 115)", fs[0].LevelGapPF)
+	}
+}
+
+// Row #4 (boundary): degenerate inputs — a single team, or a constant .sco
+// column — yield corr=0 and dispersion_ratio=0, never NaN/Inf/divide-by-zero.
+// level_gap stays defined (it's a plain mean). Empty input yields no summary.
+func TestCollectFidelitySummaries_DegenerateInputsAreDefined(t *testing.T) {
+	t.Run("single team", func(t *testing.T) {
+		fs := collectFidelitySummaries([]SeasonAggregate{regSeason(
+			TeamStanding{TeamID: 1, EnginePointsForPG: 100, ScoPointsForPG: 105, EngineExpectedWins: 41, ScoWins: 50, EnginePointDiffPG: 2, ScoPointDiffPG: 5},
+		)})
+		assertAllFinite(t, fs[0])
+		if fs[0].PFCorr != 0 || fs[0].PFDispersionRatio != 0 {
+			t.Errorf("single-team PF corr/ratio = %v/%v, want 0/0", fs[0].PFCorr, fs[0].PFDispersionRatio)
+		}
+		if fs[0].WinsCorr != 0 || fs[0].PointDiffDispersionRatio != 0 {
+			t.Errorf("single-team wins/point-diff corr/ratio = %v/%v, want 0/0", fs[0].WinsCorr, fs[0].PointDiffDispersionRatio)
+		}
+		if fs[0].LevelGapPF != -5 {
+			t.Errorf("LevelGapPF = %v, want -5 (still defined for one team)", fs[0].LevelGapPF)
+		}
+	})
+	t.Run("constant sco column", func(t *testing.T) {
+		fs := collectFidelitySummaries([]SeasonAggregate{regSeason(
+			TeamStanding{TeamID: 1, EnginePointsForPG: 98, ScoPointsForPG: 100},
+			TeamStanding{TeamID: 2, EnginePointsForPG: 102, ScoPointsForPG: 100},
+		)})
+		assertAllFinite(t, fs[0])
+		if fs[0].PFDispersionRatio != 0 {
+			t.Errorf("PFDispersionRatio = %v, want 0 (sco zero variance, no divide-by-zero)", fs[0].PFDispersionRatio)
+		}
+		if fs[0].PFCorr != 0 {
+			t.Errorf("PFCorr = %v, want 0 (sco zero variance, no NaN)", fs[0].PFCorr)
+		}
+	})
+	t.Run("empty input", func(t *testing.T) {
+		if fs := collectFidelitySummaries(nil); len(fs) != 0 {
+			t.Errorf("empty input → %+v, want no summaries", fs)
+		}
+	})
+}
+
+// replicateSeasons returns k back-to-back copies of each season — the pooling /
+// more-runs analog for the runs-stability test. collectFidelitySummaries only
+// reads Teams, so sharing the underlying slice across copies is safe.
+func replicateSeasons(seasons []SeasonAggregate, k int) []SeasonAggregate {
+	var out []SeasonAggregate
+	for i := 0; i < k; i++ {
+		out = append(out, seasons...)
+	}
+	return out
+}
+
+// sumExpectedWins is an EXTENSIVE Σ (a win-share-style total) used only to
+// contrast against the intensive fidelity metrics: it grows with the pool size,
+// they do not.
+func sumExpectedWins(seasons []SeasonAggregate) float64 {
+	var s float64
+	for _, sa := range seasons {
+		for _, ts := range sa.Teams {
+			s += ts.EngineExpectedWins
+		}
+	}
+	return s
+}
+
+// Row #5 (runs-stability): at this pure-function layer "runs-stable" means the
+// metrics are INTENSIVE — pooling more identically-distributed rows (the analog
+// of averaging an engine stat over more runs) leaves level_gap and the
+// dispersion ratios unchanged. That is exactly the property separating them from
+// a home win-SHARE, an EXTENSIVE sum that inflates as √N with the run count
+// (memory reference_jsb_winshare_runs_artifact). Below, the raw Σ expected-wins
+// grows 10× with the pool while the dispersion ratio and level gap hold — so a
+// future regression that swapped an intensive metric for an extensive sum (e.g.
+// "fixing" expected-wins into a win-share) would fail here. The literal
+// runs=1-vs-runs=50 comparison over real data lives in matrix row #7 (the
+// real-archive run) and the committed calibration artifact.
+func TestCollectFidelitySummaries_RunsStableIntensiveNotInflating(t *testing.T) {
+	base := []SeasonAggregate{regSeason(
+		TeamStanding{TeamID: 1, EnginePointsForPG: 96, ScoPointsForPG: 92, EngineExpectedWins: 30, ScoWins: 28, EnginePointDiffPG: -4, ScoPointDiffPG: -8},
+		TeamStanding{TeamID: 2, EnginePointsForPG: 104, ScoPointsForPG: 112, EngineExpectedWins: 52, ScoWins: 55, EnginePointDiffPG: 4, ScoPointDiffPG: 8},
+	)}
+	pooled := replicateSeasons(base, 10)
+
+	small := collectFidelitySummaries(base)[0]
+	big := collectFidelitySummaries(pooled)[0]
+
+	if big.N != 10*small.N {
+		t.Fatalf("pooled N = %d, want 10× base N %d (pooling must really scale the data)", big.N, small.N)
+	}
+	if math.Abs(big.LevelGapPF-small.LevelGapPF) > 1e-9 {
+		t.Errorf("LevelGapPF drifted under pooling: %v vs %v (not runs-stable)", big.LevelGapPF, small.LevelGapPF)
+	}
+	if math.Abs(big.PFDispersionRatio-small.PFDispersionRatio) > 1e-9 {
+		t.Errorf("PFDispersionRatio drifted under pooling: %v vs %v (not runs-stable)", big.PFDispersionRatio, small.PFDispersionRatio)
+	}
+	if math.Abs(big.WinsDispersionRatio-small.WinsDispersionRatio) > 1e-9 {
+		t.Errorf("WinsDispersionRatio drifted under pooling: %v vs %v (not runs-stable)", big.WinsDispersionRatio, small.WinsDispersionRatio)
+	}
+	// The contrast that makes the above non-vacuous: an EXTENSIVE statistic over
+	// the same data DID grow 10×, so the intensive metrics' invariance is real.
+	if math.Abs(sumExpectedWins(pooled)-10*sumExpectedWins(base)) > 1e-9 {
+		t.Fatalf("Σ expected-wins not 10× — the pooling did not actually scale the data, so the invariance proves nothing")
+	}
+}

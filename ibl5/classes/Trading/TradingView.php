@@ -21,6 +21,20 @@ use Season\Season;
 class TradingView implements TradingViewInterface
 {
     /**
+     * Result-code → alert config map shared by the trade-offer form and the
+     * trade-review page (both render the same set of trade outcome banners).
+     *
+     * @var array<string, array{class: string, message: string}>
+     */
+    private const TRADE_ALERT_MAP = [
+        'offer_sent' => ['class' => 'ibl-alert--success', 'message' => 'Trade offer sent!'],
+        'trade_accepted' => ['class' => 'ibl-alert--success', 'message' => 'Trade accepted!'],
+        'trade_rejected' => ['class' => 'ibl-alert--info', 'message' => 'Trade offer rejected.'],
+        'accept_error' => ['class' => 'ibl-alert--error', 'message' => 'Error processing trade.'],
+        'already_processed' => ['class' => 'ibl-alert--warning', 'message' => 'This trade has already been accepted, declined, or withdrawn.'],
+    ];
+
+    /**
      * @see TradingViewInterface::renderTradeOfferForm()
      *
      * @param array<string, mixed> $pageData
@@ -65,13 +79,7 @@ class TradingView implements TradingViewInterface
         $k--;
 
         ob_start();
-        echo \UI\AlertRenderer::fromCode($pageData['result'] ?? null, [
-            'offer_sent' => ['class' => 'ibl-alert--success', 'message' => 'Trade offer sent!'],
-            'trade_accepted' => ['class' => 'ibl-alert--success', 'message' => 'Trade accepted!'],
-            'trade_rejected' => ['class' => 'ibl-alert--info', 'message' => 'Trade offer rejected.'],
-            'accept_error' => ['class' => 'ibl-alert--error', 'message' => 'Error processing trade.'],
-            'already_processed' => ['class' => 'ibl-alert--warning', 'message' => 'This trade has already been accepted, declined, or withdrawn.'],
-        ], $pageData['error'] ?? null);
+        echo \UI\AlertRenderer::fromCode($pageData['result'] ?? null, self::TRADE_ALERT_MAP, $pageData['error'] ?? null);
         ?>
 <form name="Trade_Offer" method="post" action="/ibl5/modules/Trading/maketradeoffer.php">
     <?= \Security\CsrfGuard::generateToken('trade_offer') ?>
@@ -222,13 +230,7 @@ $tradeConfig = [
         $reviewConfigs = [];
 
         ob_start();
-        echo \UI\AlertRenderer::fromCode($pageData['result'] ?? null, [
-            'offer_sent' => ['class' => 'ibl-alert--success', 'message' => 'Trade offer sent!'],
-            'trade_accepted' => ['class' => 'ibl-alert--success', 'message' => 'Trade accepted!'],
-            'trade_rejected' => ['class' => 'ibl-alert--info', 'message' => 'Trade offer rejected.'],
-            'accept_error' => ['class' => 'ibl-alert--error', 'message' => 'Error processing trade.'],
-            'already_processed' => ['class' => 'ibl-alert--warning', 'message' => 'This trade has already been accepted, declined, or withdrawn.'],
-        ], $pageData['error'] ?? null);
+        echo \UI\AlertRenderer::fromCode($pageData['result'] ?? null, self::TRADE_ALERT_MAP, $pageData['error'] ?? null);
         ?>
 <div class="trading-layout__header">
     <h2 class="ibl-title">Trading</h2>

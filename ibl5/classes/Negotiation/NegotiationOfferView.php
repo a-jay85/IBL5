@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Negotiation;
 
+use FreeAgency\FreeAgencyFormComponents;
 use League\League;
 use Negotiation\Contracts\NegotiationDemandCalculatorInterface;
 use Negotiation\Contracts\NegotiationOfferViewInterface;
@@ -63,7 +64,7 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
     <div class="ibl-card__body">
         <div class="offer-player-info">
             <img src="<?= HtmlSanitizer::e(PlayerImageHelper::getImageUrl($player->getPlayerID())) ?>" alt="<?= HtmlSanitizer::trusted($playerName) ?>" class="offer-player-img">
-            <?= HtmlSanitizer::trusted(self::renderPlayerRatings($player)) ?>
+            <?= HtmlSanitizer::trusted(FreeAgencyFormComponents::renderPlayerRatings($player)) ?>
         </div>
     </div>
 </div>
@@ -228,69 +229,4 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
         return '<h2 class="ibl-title">Contract Extension</h2>';
     }
 
-    /**
-     * Render player ratings table (21-column layout matching FA pattern)
-     *
-     * @param Player $player The player object
-     * @return string HTML ratings table
-     */
-    private static function renderPlayerRatings(Player $player): string
-    {
-        ob_start();
-        ?>
-<table class="ibl-data-table offer-ratings">
-    <thead>
-        <tr>
-            <th>2ga</th>
-            <th>2gp</th>
-            <th>fta</th>
-            <th>ftp</th>
-            <th>3ga</th>
-            <th>3gp</th>
-            <th>orb</th>
-            <th>drb</th>
-            <th>ast</th>
-            <th>stl</th>
-            <th>tvr</th>
-            <th>blk</th>
-            <th>foul</th>
-            <th>oo</th>
-            <th>do</th>
-            <th>po</th>
-            <th>to</th>
-            <th>od</th>
-            <th>dd</th>
-            <th>pd</th>
-            <th>td</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td><?= (int) $player->getRatingFieldGoalAttempts() ?></td>
-            <td><?= (int) $player->getRatingFieldGoalPercentage() ?></td>
-            <td><?= (int) $player->getRatingFreeThrowAttempts() ?></td>
-            <td><?= (int) $player->getRatingFreeThrowPercentage() ?></td>
-            <td><?= (int) $player->getRatingThreePointAttempts() ?></td>
-            <td><?= (int) $player->getRatingThreePointPercentage() ?></td>
-            <td><?= (int) $player->getRatingOffensiveRebounds() ?></td>
-            <td><?= (int) $player->getRatingDefensiveRebounds() ?></td>
-            <td><?= (int) $player->getRatingAssists() ?></td>
-            <td><?= (int) $player->getRatingSteals() ?></td>
-            <td><?= (int) $player->getRatingTurnovers() ?></td>
-            <td><?= (int) $player->getRatingBlocks() ?></td>
-            <td><?= (int) $player->getRatingFouls() ?></td>
-            <td><?= (int) $player->getRatingOutsideOffense() ?></td>
-            <td><?= (int) $player->getRatingDriveOffense() ?></td>
-            <td><?= (int) $player->getRatingPostOffense() ?></td>
-            <td><?= (int) $player->getRatingTransitionOffense() ?></td>
-            <td><?= (int) $player->getRatingOutsideDefense() ?></td>
-            <td><?= (int) $player->getRatingDriveDefense() ?></td>
-            <td><?= (int) $player->getRatingPostDefense() ?></td>
-            <td><?= (int) $player->getRatingTransitionDefense() ?></td>
-        </tr>
-    </tbody>
-</table>
-        <?php
-        return (string) ob_get_clean();
-    }
 }

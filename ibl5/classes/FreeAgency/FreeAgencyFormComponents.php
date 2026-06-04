@@ -37,9 +37,14 @@ class FreeAgencyFormComponents
     }
 
     /**
-     *renderPlayerRatings()
+     * Render the 21-column player ratings table.
+     *
+     * Shared by the Free Agency offer page and the Negotiation extension
+     * page (NegotiationOfferView), which render an identical ratings table.
+     *
+     * @param \Player\Player $player Player whose ratings to render
      */
-    public function renderPlayerRatings(): string
+    public static function renderPlayerRatings(\Player\Player $player): string
     {
         ob_start();
         ?>
@@ -71,27 +76,27 @@ class FreeAgencyFormComponents
     </thead>
     <tbody>
         <tr>
-            <td><?= (int) $this->player->getRatingFieldGoalAttempts() ?></td>
-            <td><?= (int) $this->player->getRatingFieldGoalPercentage() ?></td>
-            <td><?= (int) $this->player->getRatingFreeThrowAttempts() ?></td>
-            <td><?= (int) $this->player->getRatingFreeThrowPercentage() ?></td>
-            <td><?= (int) $this->player->getRatingThreePointAttempts() ?></td>
-            <td><?= (int) $this->player->getRatingThreePointPercentage() ?></td>
-            <td><?= (int) $this->player->getRatingOffensiveRebounds() ?></td>
-            <td><?= (int) $this->player->getRatingDefensiveRebounds() ?></td>
-            <td><?= (int) $this->player->getRatingAssists() ?></td>
-            <td><?= (int) $this->player->getRatingSteals() ?></td>
-            <td><?= (int) $this->player->getRatingTurnovers() ?></td>
-            <td><?= (int) $this->player->getRatingBlocks() ?></td>
-            <td><?= (int) $this->player->getRatingFouls() ?></td>
-            <td><?= (int) $this->player->getRatingOutsideOffense() ?></td>
-            <td><?= (int) $this->player->getRatingDriveOffense() ?></td>
-            <td><?= (int) $this->player->getRatingPostOffense() ?></td>
-            <td><?= (int) $this->player->getRatingTransitionOffense() ?></td>
-            <td><?= (int) $this->player->getRatingOutsideDefense() ?></td>
-            <td><?= (int) $this->player->getRatingDriveDefense() ?></td>
-            <td><?= (int) $this->player->getRatingPostDefense() ?></td>
-            <td><?= (int) $this->player->getRatingTransitionDefense() ?></td>
+            <td><?= (int) $player->getRatingFieldGoalAttempts() ?></td>
+            <td><?= (int) $player->getRatingFieldGoalPercentage() ?></td>
+            <td><?= (int) $player->getRatingFreeThrowAttempts() ?></td>
+            <td><?= (int) $player->getRatingFreeThrowPercentage() ?></td>
+            <td><?= (int) $player->getRatingThreePointAttempts() ?></td>
+            <td><?= (int) $player->getRatingThreePointPercentage() ?></td>
+            <td><?= (int) $player->getRatingOffensiveRebounds() ?></td>
+            <td><?= (int) $player->getRatingDefensiveRebounds() ?></td>
+            <td><?= (int) $player->getRatingAssists() ?></td>
+            <td><?= (int) $player->getRatingSteals() ?></td>
+            <td><?= (int) $player->getRatingTurnovers() ?></td>
+            <td><?= (int) $player->getRatingBlocks() ?></td>
+            <td><?= (int) $player->getRatingFouls() ?></td>
+            <td><?= (int) $player->getRatingOutsideOffense() ?></td>
+            <td><?= (int) $player->getRatingDriveOffense() ?></td>
+            <td><?= (int) $player->getRatingPostOffense() ?></td>
+            <td><?= (int) $player->getRatingTransitionOffense() ?></td>
+            <td><?= (int) $player->getRatingOutsideDefense() ?></td>
+            <td><?= (int) $player->getRatingDriveDefense() ?></td>
+            <td><?= (int) $player->getRatingPostDefense() ?></td>
+            <td><?= (int) $player->getRatingTransitionDefense() ?></td>
         </tr>
     </tbody>
 </table>

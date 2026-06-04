@@ -77,7 +77,7 @@ class FreeAgencyOfferView
     <div class="ibl-card__body">
         <div class="offer-player-info">
             <img src="<?= HtmlSanitizer::e(PlayerImageHelper::getImageUrl($player->getPlayerID())) ?>" alt="<?= HtmlSanitizer::e($player->getName() ?? '') ?>" class="offer-player-img">
-            <?= HtmlSanitizer::trusted($this->formComponents->renderPlayerRatings()) ?>
+            <?= HtmlSanitizer::trusted(FreeAgencyFormComponents::renderPlayerRatings($player)) ?>
         </div>
     </div>
 </div>

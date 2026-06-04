@@ -65,6 +65,25 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
     }
 
     /**
+     * Clamp a raw depth-chart slot value into the valid 0..5 range.
+     *
+     * Shared by the desktop row and mobile card renderers, which both read
+     * the same nullable DB column and constrain it before indexing labels
+     * or rendering the select.
+     */
+    private function clampDepthValue(mixed $raw): int
+    {
+        $value = (int) $raw;
+        if ($value < 0) {
+            $value = 0;
+        }
+        if ($value > 5) {
+            $value = 5;
+        }
+        return $value;
+    }
+
+    /**
      * Render the help section explaining how depth charts work.
      */
     public function renderHelpSection(): void
@@ -180,13 +199,7 @@ the earlier slot in that order claims them.</p>
         echo '</td>';
 
         foreach (self::POSITION_SLOTS as $slot) {
-            $dcValue = (int) ($player[$slot['dbKey']] ?? 0);
-            if ($dcValue < 0) {
-                $dcValue = 0;
-            }
-            if ($dcValue > 5) {
-                $dcValue = 5;
-            }
+            $dcValue = $this->clampDepthValue($player[$slot['dbKey']] ?? 0);
             $fieldName = $slot['field'] . $depthCount;
             $ariaLabel = $slot['label'] . ' depth for ' . $playerName;
 
@@ -357,13 +370,7 @@ JAVASCRIPT;
 
         $depthLabels = ['No', '1st', '2nd', '3rd', '4th', 'ok'];
         foreach (self::POSITION_SLOTS as $slot) {
-            $dcValue = (int) ($player[$slot['dbKey']] ?? 0);
-            if ($dcValue < 0) {
-                $dcValue = 0;
-            }
-            if ($dcValue > 5) {
-                $dcValue = 5;
-            }
+            $dcValue = $this->clampDepthValue($player[$slot['dbKey']] ?? 0);
             $fieldName = $slot['field'] . $depthCount;
             $valueLabel = $depthLabels[$dcValue];
             $slotAriaRaw = $slot['label'] . ' depth for ' . $playerName;

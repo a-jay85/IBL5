@@ -322,6 +322,37 @@ class NegotiationOfferViewTest extends TestCase
     }
 
     /**
+     * The ratings table is now a single shared static
+     * (FreeAgencyFormComponents::renderPlayerRatings) consumed by both the
+     * Free Agency offer page and the Negotiation extension page. The
+     * Negotiation page must embed that exact shared markup verbatim, so the
+     * dedup cannot silently diverge the two render paths.
+     *
+     * @group view
+     * @group rendering
+     */
+    public function testRatingsTableRenderedFromSharedComponentVerbatim(): void
+    {
+        $player = $this->createTestPlayer();
+        $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
+
+        $sharedRatings = \FreeAgency\FreeAgencyFormComponents::renderPlayerRatings($player);
+        $negotiationHtml = NegotiationOfferView::renderNegotiationForm(
+            $player,
+            $this->getDefaultDemands(),
+            1000,
+            $maxYearOneSalary
+        );
+
+        // Sanity: the shared markup is the 21-column ratings table.
+        $this->assertStringContainsString('offer-ratings', $sharedRatings);
+        $this->assertSame(21, substr_count($sharedRatings, '<th>'));
+
+        // The Negotiation page embeds the shared table byte-for-byte.
+        $this->assertStringContainsString($sharedRatings, $negotiationHtml);
+    }
+
+    /**
      * Helper to create a test player using Player::withPlrRow and TestDataFactory
      *
      * @param array<string, mixed> $overrides

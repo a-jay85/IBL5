@@ -603,4 +603,71 @@ class DepthChartEntryViewTest extends TestCase
         $this->assertNotEmpty($matches);
         $this->assertMatchesRegularExpression('/value="0" SELECTED[^>]*>No<\/option>/', $matches[1]);
     }
+
+    // =====================================================================
+    // Depth-value clamping (shared clampDepthValue, 0..5)
+    // =====================================================================
+
+    public function testDepthValueClampsNegativeToZero(): void
+    {
+        $player = $this->buildTestPlayer();
+        $player['dc_pg_depth'] = -1;
+
+        ob_start();
+        $this->view->renderPlayerRow($player, 1);
+        $output = (string) ob_get_clean();
+
+        preg_match('/<select name="pg1"[^>]*>(.*?)<\/select>/s', $output, $matches);
+        $this->assertNotEmpty($matches);
+        $this->assertMatchesRegularExpression('/value="0" SELECTED[^>]*>No<\/option>/', $matches[1]);
+    }
+
+    public function testDepthValueClampsAboveFiveToFive(): void
+    {
+        $player = $this->buildTestPlayer();
+        $player['dc_sg_depth'] = 6;
+
+        ob_start();
+        $this->view->renderPlayerRow($player, 1);
+        $output = (string) ob_get_clean();
+
+        preg_match('/<select name="sg1"[^>]*>(.*?)<\/select>/s', $output, $matches);
+        $this->assertNotEmpty($matches);
+        $this->assertMatchesRegularExpression('/value="5" SELECTED[^>]*>ok<\/option>/', $matches[1]);
+    }
+
+    public function testDepthValuePassesValidRangeThrough(): void
+    {
+        $player = $this->buildTestPlayer();
+        $player['dc_sf_depth'] = 3;
+        $player['dc_c_depth'] = 5;
+
+        ob_start();
+        $this->view->renderPlayerRow($player, 1);
+        $output = (string) ob_get_clean();
+
+        preg_match('/<select name="sf1"[^>]*>(.*?)<\/select>/s', $output, $matches);
+        $this->assertNotEmpty($matches);
+        $this->assertMatchesRegularExpression('/value="3" SELECTED[^>]*>3rd<\/option>/', $matches[1]);
+
+        preg_match('/<select name="c1"[^>]*>(.*?)<\/select>/s', $output, $matches);
+        $this->assertNotEmpty($matches);
+        $this->assertMatchesRegularExpression('/value="5" SELECTED[^>]*>ok<\/option>/', $matches[1]);
+    }
+
+    public function testMobileDepthValueClampsAboveFiveToFive(): void
+    {
+        $player = $this->buildTestPlayer();
+        $player['dc_sg_depth'] = 6;
+
+        ob_start();
+        $this->view->renderMobileView([$player], ['PG', 'SG', 'SF', 'PF', 'C']);
+        $output = (string) ob_get_clean();
+
+        // Mobile card uses the same clamp before indexing the depth label and
+        // rendering the (disabled) select.
+        preg_match('/<select name="sg1"[^>]*>(.*?)<\/select>/s', $output, $matches);
+        $this->assertNotEmpty($matches);
+        $this->assertMatchesRegularExpression('/value="5" SELECTED[^>]*>ok<\/option>/', $matches[1]);
+    }
 }

@@ -34,7 +34,7 @@ func mkPlayer(pid, team, slot, fgp int) bundle.Player {
 		PID: pid, TeamID: team,
 		OO: 6, DriveOff: 5, PO: 5, OD: 5, DD: 5, PD: 5, TD: 5, TransOff: 7,
 		FGP: fgp, FTP: 75, TGA: 25, FGA: 60, FTA: 20, ORB: 20, DRB: 35,
-		STL: 30, TVR: 40, BLK: 20, Foul: 30,
+		STL: 30, TVR: 70, BLK: 20, Foul: 30,
 		Stamina: 50, Clutch: 5, Consistency: 5,
 		DCMinutes: 32, DCCanPlayInGame: 1,
 	}
@@ -821,7 +821,11 @@ func TestSimulate_HomeCourtAdvantage_Directional(t *testing.T) {
 // ASG, and (b) the home edge in the directional test is HCA-driven, not a fixture
 // artifact (the same fixture is symmetric here).
 func TestSimulate_HomeCourtAdvantage_ASGNeutral(t *testing.T) {
-	const n = 2000
+	// n is large so the symmetric fixture's true zero margin is well estimated and
+	// the test is robust to RNG-stream shifts (the ADR-0045 turnover draw reshuffles
+	// which seeds produce which games; at n=2000 a single seed range can land ~3σ
+	// off zero, at n=8000 the margin converges to ≈0 / win-rate ≈0.50).
+	const n = 8000
 	margins, homeTotal, awayTotal, homeWins := homeAwayMargins(t, bundle.GameTypeAllStarA, n)
 	mean, se := meanSE(margins)
 	winRate := float64(homeWins) / float64(n)

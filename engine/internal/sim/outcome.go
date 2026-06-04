@@ -16,10 +16,10 @@ const (
 	outcome3pt      outcomeCode = 2 // 3-point attempt (make/miss rolled after)
 	outcomeAndOne   outcomeCode = 3 // made 2pt + 1 FT
 	outcomeFoulOnly outcomeCode = 4 // FTs, no field-goal attempt
-	outcomeTurnover outcomeCode = 5 // change of possession (no stealer in PR3a)
+	outcomeTurnover outcomeCode = 5 // independent unforced change of possession (no stealer)
 )
 
-const turnoverDenom = 1793.0 // rand_int(1,1793) ≤ sqrt(def_value) → turnover
+const turnoverDenom = 1793.0 // rand_int(1,1793) ≤ sqrt(energyCeiling) → unforced turnover
 
 // outcomeInputs holds the four play-outcome bucket weights plus the turnover
 // defensive value. They are assembled in possession.go / transition.go from the
@@ -32,9 +32,12 @@ const turnoverDenom = 1793.0 // rand_int(1,1793) ≤ sqrt(def_value) → turnove
 // the assembly: site 2 adds +hcaDelta to the 2pt bucket and (inside
 // foulBucketWeight) subtracts it from the foul bucket; site 3 shrinks the home
 // offQuality divisor, growing the home foul bucket — the dominant home-favorable
-// term. The turnover value derives from ball-handler ball-security. weight() clamps
-// any negative bucket to 0; the selector, allowedPaths, and turnover override are
-// HCA-agnostic (the deltas live in the assembly, as in JSB's selector).
+// term. turnoverDefValue is the per-player [2,5] energy ceiling (JSB +0xDF8,
+// energyCeiling) feeding the negligible INDEPENDENT turnover check — the dominant
+// steal-driven turnover is rolled separately (steal.go), before this selector.
+// weight() clamps any negative bucket to 0; the selector, allowedPaths, and
+// turnover override are HCA-agnostic (the deltas live in the assembly, as in JSB's
+// selector).
 type outcomeInputs struct {
 	twoPtWeight      float64
 	threePtWeight    float64
@@ -103,7 +106,8 @@ func selectOutcome(in outcomeInputs, forcedMake, shotClock, stealPlay bool, r *r
 	}
 
 	// Independent turnover check (overrides the path roll). forced_make never
-	// turns over. PR3a credits no stealer — the possession just flips.
+	// turns over. This is the negligible [2,5]-energy unforced flip; it credits no
+	// stealer (the dominant steal-driven turnover is handled before this selector).
 	if !forcedMake {
 		tRoll := r.IntN(int(turnoverDenom)) + 1 // 1..1793
 		if float64(tRoll) <= math.Sqrt(in.turnoverDefValue) {

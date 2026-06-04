@@ -27,7 +27,10 @@ func TestFreeze_SubstitutesAndAccumulates(t *testing.T) {
 	acc := &FreezeAccum{}
 	base := &gameState{accum: acc}
 	wantOreb := orebProbability(100, 100) // 0.5
-	wantTurn := turnoverThreshold(40)     // linear threshold
+	// float64 vars force runtime (not constant-folded) evaluation, matching the
+	// wrapper's accumulated rounding exactly.
+	careless, pressure := 60.0, 100.0
+	wantTurn := stealTurnoverScale * careless * pressure // below the clamp
 	wantMake := shotValue2pt(5, 50, false)
 	off := []onCourt{oc(slotPG, mkPlayer(1, 7, slotPG, 46))}
 	def := []onCourt{oc(slotPG, mkPlayer(2, 3, slotPG, 50))}
@@ -36,8 +39,8 @@ func TestFreeze_SubstitutesAndAccumulates(t *testing.T) {
 	if got := base.orebProb(100, 100); got != wantOreb {
 		t.Errorf("baseline orebProb = %v, want live %v", got, wantOreb)
 	}
-	if got := base.turnThreshLinear(40); got != wantTurn {
-		t.Errorf("baseline turnThreshLinear = %v, want live %v", got, wantTurn)
+	if got := base.turnoverProb(60, 100); got != wantTurn {
+		t.Errorf("baseline turnoverProb = %v, want live %v", got, wantTurn)
 	}
 	if got := base.makeValue2pt(5, 50); got != wantMake {
 		t.Errorf("baseline makeValue2pt = %v, want live %v", got, wantMake)
@@ -47,7 +50,7 @@ func TestFreeze_SubstitutesAndAccumulates(t *testing.T) {
 	}
 
 	m := acc.Means()
-	if m.OrebProb != wantOreb || m.TurnThresh != wantTurn || m.MakeVal2pt != wantMake || m.FoulWeight != wantFoul {
+	if m.OrebProb != wantOreb || m.TurnProb != wantTurn || m.MakeVal2pt != wantMake || m.FoulWeight != wantFoul {
 		t.Errorf("Means() = %+v, want {Oreb:%v Turn:%v Make:%v Foul:%v}", m, wantOreb, wantTurn, wantMake, wantFoul)
 	}
 	if acc.orebN != 1 || acc.turnN != 1 || acc.makeN != 1 || acc.foulN != 1 {
@@ -66,12 +69,13 @@ func TestFreeze_NoCrossConfound(t *testing.T) {
 	def := []onCourt{oc(slotPG, mkPlayer(2, 3, slotPG, 50))}
 
 	liveOreb := orebProbability(120, 80)
-	liveTurn := turnoverThreshold(40)
+	careless, pressure := 60.0, 100.0
+	liveTurn := stealTurnoverScale * careless * pressure // runtime eval, below the clamp
 	liveMake := shotValue2pt(5, 50, false)
 	liveFoul := foulBucketWeight(off, def, 0)
 
 	// Sentinel means, deliberately distinct from the live values so a leak is visible.
-	means := FreezeMeans{OrebProb: 0.31, TurnThresh: 7.0, FoulWeight: 0.13, MakeVal2pt: 111.0}
+	means := FreezeMeans{OrebProb: 0.31, TurnProb: 0.07, FoulWeight: 0.13, MakeVal2pt: 111.0}
 
 	cases := []struct {
 		name string
@@ -86,7 +90,7 @@ func TestFreeze_NoCrossConfound(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			gs := &gameState{freeze: c.cfg}
 			gotOreb := gs.orebProb(120, 80)
-			gotTurn := gs.turnThreshLinear(40)
+			gotTurn := gs.turnoverProb(60, 100)
 			gotMake := gs.makeValue2pt(5, 50)
 			gotFoul := gs.foulWeight(off, def, 0)
 
@@ -96,7 +100,7 @@ func TestFreeze_NoCrossConfound(t *testing.T) {
 				wantOreb = means.OrebProb
 			}
 			if c.cfg.TVR {
-				wantTurn = means.TurnThresh
+				wantTurn = means.TurnProb
 			}
 			if c.cfg.Make {
 				wantMake = means.MakeVal2pt
@@ -108,7 +112,7 @@ func TestFreeze_NoCrossConfound(t *testing.T) {
 				t.Errorf("orebProb = %v, want %v", gotOreb, wantOreb)
 			}
 			if gotTurn != wantTurn {
-				t.Errorf("turnThreshLinear = %v, want %v", gotTurn, wantTurn)
+				t.Errorf("turnoverProb = %v, want %v", gotTurn, wantTurn)
 			}
 			if gotMake != wantMake {
 				t.Errorf("makeValue2pt = %v, want %v", gotMake, wantMake)
@@ -145,7 +149,7 @@ func TestFreeze_MisconfigErrors(t *testing.T) {
 	// A fully-specified config validates and runs.
 	good := FreezeConfig{
 		ORB: true, TVR: true, Foul: true, Make: true,
-		Means: FreezeMeans{OrebProb: 0.5, TurnThresh: 200, FoulWeight: 0.6, MakeVal2pt: 450},
+		Means: FreezeMeans{OrebProb: 0.5, TurnProb: 0.15, FoulWeight: 0.6, MakeVal2pt: 450},
 	}
 	if _, err := SimulateWith(b, 1, Options{Freeze: good}); err != nil {
 		t.Errorf("SimulateWith with a fully-specified freeze: got error %v, want nil", err)

@@ -34,6 +34,37 @@ func TestShotValue_Assembly(t *testing.T) {
 	}
 }
 
+// --- ADR-0045 matrix #6: 2pt make-value calibration ------------------------
+
+// The 2pt make-value is calibrated (fgpToPermille=10.7, leagueBaseline=248) so an
+// average shooter's neutral-net value lands near 498‰ (≈49.8% 2pt, the .sco level),
+// while the 3pt channel — independent of net and of fgpToPermille — is untouched.
+func TestShotValue2pt_Calibration(t *testing.T) {
+	// Formula: base2pt = FGP × fgpToPermille (per-mille).
+	if got := base2pt(50); got != 50*fgpToPermille {
+		t.Errorf("base2pt(50) = %v, want %v", got, 50*fgpToPermille)
+	}
+	// The archive proves the in-game 2pt% lands ≈50% (matrix #9). Here we assert the
+	// make-value for an average shooter (FGP 47) with a small positive net sits in a
+	// realistic ~44–56% band — neither degenerate-low (the pre-0045 underfit) nor
+	// absurd-high.
+	if v := shotValue2pt(5, 47, false); v < 440 || v > 560 {
+		t.Errorf("avg-FGP 2pt make-value = %.1f‰, want a realistic ~44–56%% band", v)
+	}
+	// Boundary FGP=0 → base2pt 0; a neutral-net value stays ≥ 0 (no underflow).
+	if got := base2pt(0); got != 0 {
+		t.Errorf("base2pt(0) = %v, want 0", got)
+	}
+	if v := shotValue2pt(0, 0, false); v < 0 {
+		t.Errorf("shotValue2pt(0,0) = %v, want ≥ 0 (no underflow)", v)
+	}
+	// The 3pt make-value is unchanged by the 2pt recalibration (depends only on
+	// leagueBaseline, which is set so 3pt% stays faithful ≈37.5%).
+	if got := shotValue3pt(); got != leagueBaseline*1.5 {
+		t.Errorf("3pt value = %v, want %v (unchanged by 2pt recalibration)", got, leagueBaseline*1.5)
+	}
+}
+
 // --- matrix #16: boundaries — 3pt ignores net, rand bounds, clutch gate ----
 
 func TestShotValue3pt_IgnoresNet(t *testing.T) {

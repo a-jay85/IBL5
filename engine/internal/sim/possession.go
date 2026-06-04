@@ -6,14 +6,37 @@ import "github.com/a-jay85/IBL5/engine/internal/result"
 // trip, guaranteeing the inner loop terminates even on a pathological roster.
 const maxOffensiveRebounds = 8
 
-// turnoverPropensityScale maps a ball-handler's TVR rating to the turnover
-// roll threshold: sqrt(turnoverDefValue) ≈ TVR × scale, compared to
-// rand_int(1,1793). The scale is chosen so a typical handler turns the ball
-// over at a plausible rate; absolute turnover frequency is a validation-phase
-// calibration item (the real engine's local_44 is a per-game double of
-// unpinned scale). turnoverDefValue is squared so the spec's sqrt() recovers
-// this linear threshold.
-const turnoverPropensityScale = 5.8
+// energyCeilingMin/Max are the JSB +0xDF8 clamp bounds [2,5]: the dc-minutes
+// energy parameter that feeds the INDEPENDENT turnover roll. Because it lands in
+// [2,5], rand(1,1793) ≤ sqrt(value) fires only ~0.1%/poss — the independent check
+// is negligible by design and the dominant turnover source is steal-driven
+// (steal.go). 00_MASTER_REFERENCE.md +0xDF8 / lines 9617-9623.
+const (
+	energyCeilingMin = 2.0
+	energyCeilingMax = 5.0
+)
+
+// energyCeiling is the per-player JSB +0xDF8 value fed to the independent turnover
+// roll: (48 − min(dc_minutes, 28)) × 0.03 × conditioning + 1, clamped [2,5], where
+// conditioning is the stamina rating normalized to ~[0,1]. It is derived from
+// existing bundle fields (no new field invented). The exact upstream conditioning
+// term is validation-phase; what matters for fidelity is that the value lands in
+// [2,5], keeping the independent check negligible (matching JSB).
+func energyCeiling(p onCourt) float64 {
+	dcMin := p.DCMinutes
+	if dcMin > 28 {
+		dcMin = 28
+	}
+	conditioning := float64(p.Stamina) / 100.0
+	v := float64(48-dcMin)*0.03*conditioning + 1.0
+	if v < energyCeilingMin {
+		return energyCeilingMin
+	}
+	if v > energyCeilingMax {
+		return energyCeilingMax
+	}
+	return v
+}
 
 // defenderAtSlot returns the defender sharing the ball-handler's slot, falling
 // back to the first defender when no exact match exists (short lineup).
@@ -36,10 +59,6 @@ func threePtPropensity(p onCourt) float64 {
 	}
 	return float64(p.TGA) / float64(denom)
 }
-
-// turnoverThreshold is the linear turnover roll threshold for a TVR rating; the
-// caller squares it so the outcome selector's sqrt() recovers this value.
-func turnoverThreshold(tvr int) float64 { return float64(tvr) * turnoverPropensityScale }
 
 // possession resolves one offensive trip: ball-handler selection, shot-type and
 // matchup resolution, the play-outcome path, and any free throws or rebounds.
@@ -77,6 +96,13 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPen
 		if trip > 0 {
 			origin = result.OriginOffReb
 		}
+		// Dominant, steal-driven turnover (ADR-0045): a successful steal IS the
+		// turnover and ends the trip, crediting the stealing defender and arming the
+		// defense's fast break. Rolled before the shot path; the negligible
+		// independent [2,5] check stays inside selectOutcome below.
+		if gs.stealTurnover(offense, defense, bh) {
+			return true // steal → fast-break pending for the defense
+		}
 		scoreDiff := offense.score - defense.score
 		matched := defenderAtSlot(defense, bh.slot)
 		pt := selectShotType(bh, matched, gs.rng)
@@ -100,13 +126,12 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPen
 		// Site 3: each offensive player's offQuality term is reduced by delta inside
 		// foulBucketWeight's divisor — the dominant, home-favorable term.
 		hca := hcaDelta(gs.gameType, offense.isHome)
-		turnLinear := gs.turnThreshLinear(bh.TVR)
 		in := outcomeInputs{
 			twoPtWeight:      twoPtBucketWeight(bh) + hca,
 			threePtWeight:    threePtBucketWeight(bh),
 			andOneWeight:     andOneBucketWeight(mq, bh),
 			foulOnlyWeight:   gs.foulWeight(offense.players, defense.players, hca),
-			turnoverDefValue: turnLinear * turnLinear,
+			turnoverDefValue: energyCeiling(bh),
 		}
 
 		switch selectOutcome(in, false, false, false, gs.rng) {
@@ -138,12 +163,15 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPen
 			gs.freeThrows(offense, defense, bh, def, 2, periodIdx)
 			return false
 		case outcomeTurnover:
+			// The negligible independent [2,5] check (energyCeiling): an UNFORCED
+			// change of possession — no stealer, no fast break (the dominant
+			// steal-driven turnover is handled by stealTurnover at the top of the trip).
 			gs.emit(result.Event{
 				Kind: result.EventTurnover, Period: gs.period, Clock: gs.clock,
 				TeamID: offense.teamID, PlayerID: bh.PID,
 			})
-			gs.maybeInjure(offense, bh)                 // per-turnover injury check on the committer
-			return gs.creditSteal(offense, defense, bh) // steal → fast-break pending
+			gs.maybeInjure(offense, bh) // per-turnover injury check on the committer
+			return false
 		}
 	}
 	return false

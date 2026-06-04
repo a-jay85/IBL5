@@ -3,6 +3,7 @@ package sim
 import (
 	"testing"
 
+	"github.com/a-jay85/IBL5/engine/internal/bundle"
 	"github.com/a-jay85/IBL5/engine/internal/rng"
 )
 
@@ -26,6 +27,10 @@ func TestSelectOutcome_Proportional(t *testing.T) {
 	}
 }
 
+// TestSelectOutcome_TurnoverFormula characterizes the selector's INDEPENDENT
+// turnover gate (rand_int(1,1793) ≤ sqrt(turnoverDefValue)). The gate FORM is
+// unchanged by ADR-0045 — only the value fed to it changed (the [2,5] energy
+// ceiling, not the old (TVR×5.8)²). This locks the gate's boundary behavior.
 func TestSelectOutcome_TurnoverFormula(t *testing.T) {
 	r := rng.New(4)
 	// sqrt(turnoverDefValue) = 1793 ≥ every rand_int(1,1793) → always turnover.
@@ -40,6 +45,55 @@ func TestSelectOutcome_TurnoverFormula(t *testing.T) {
 	for i := 0; i < 3000; i++ {
 		if selectOutcome(never, false, false, false, r) == outcomeTurnover {
 			t.Fatal("zero def value should never turn over")
+		}
+	}
+}
+
+// --- matrix #2: independent check fed the [2,5] energy ceiling → negligible ----
+
+// Fed the JSB +0xDF8 energy value [2,5], the independent check fires ~0.1%/poss:
+// at value=2, P = sqrt(2)/1793 ≈ 0.079%; at value=5, P = sqrt(5)/1793 ≈ 0.125%.
+// This is the fidelity property — the independent check is negligible and the
+// dominant turnover source is steal-driven (steal.go).
+func TestSelectOutcome_IndependentCheckNegligible(t *testing.T) {
+	r := rng.New(9)
+	const n = 400000
+	rate := func(val float64) float64 {
+		in := outcomeInputs{twoPtWeight: 100, turnoverDefValue: val}
+		to := 0
+		for i := 0; i < n; i++ {
+			if selectOutcome(in, false, false, false, r) == outcomeTurnover {
+				to++
+			}
+		}
+		return float64(to) / n
+	}
+	p2 := rate(energyCeilingMin) // value=2 → ≈0.079%
+	p5 := rate(energyCeilingMax) // value=5 → ≈0.125%
+	// Both negligible (< 0.3%), and value=5 fires more often than value=2.
+	if p2 > 0.003 || p5 > 0.003 {
+		t.Errorf("independent check not negligible: p(2)=%.4f%% p(5)=%.4f%% (want < 0.3%%)", p2*100, p5*100)
+	}
+	if p5 <= p2 {
+		t.Errorf("value=5 should fire more than value=2: p(2)=%.4f%% p(5)=%.4f%%", p2*100, p5*100)
+	}
+}
+
+// energyCeiling clamps the per-player JSB +0xDF8 value to [2,5] regardless of
+// dc_minutes / stamina, keeping the independent check negligible.
+func TestEnergyCeiling_ClampedToRange(t *testing.T) {
+	// A rested, low-minutes, max-stamina player would compute high → clamps to 5 max.
+	hi := mkPlayer(1, 7, slotPG, 50)
+	hi.DCMinutes = 0
+	hi.Stamina = 99
+	// A heavy-minutes, low-stamina player computes low → clamps to 2 min.
+	lo := mkPlayer(2, 7, slotPG, 50)
+	lo.DCMinutes = 48
+	lo.Stamina = 10
+	for _, p := range []bundle.Player{hi, lo} {
+		v := energyCeiling(oc(slotPG, p))
+		if v < energyCeilingMin || v > energyCeilingMax {
+			t.Errorf("energyCeiling = %v, want within [%v, %v]", v, energyCeilingMin, energyCeilingMax)
 		}
 	}
 }

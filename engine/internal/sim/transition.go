@@ -97,6 +97,11 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 	gs.transitions++
 	bh := selectBallHandler(offense, gs.rng)
 	for trip := 0; trip <= maxOffensiveRebounds; trip++ {
+		// Steal-driven turnover on the break too (ADR-0045), mirroring the half-court
+		// path so fast-break possessions use the same model.
+		if gs.stealTurnover(offense, defense, bh) {
+			return true // steal → fast-break pending for the defense
+		}
 		scoreDiff := offense.score - defense.score
 		matched := defenderAtSlot(defense, bh.slot)
 		pt := selectShotType(bh, matched, gs.rng)
@@ -115,13 +120,12 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 		// buckets, site 3 on the offQuality divisor inside foulBucketWeight), so a
 		// home fast-break possession also grows the foul bucket.
 		hca := hcaDelta(gs.gameType, offense.isHome)
-		turnLinear := gs.turnThreshLinear(bh.TVR)
 		in := outcomeInputs{
 			twoPtWeight:      twoPtBucketWeight(bh) + hca,
 			threePtWeight:    0, // a fast break is never a 3pt attempt (allowedPaths excludes it)
 			andOneWeight:     andOneBucketWeight(mq, bh),
 			foulOnlyWeight:   gs.foulWeight(offense.players, defense.players, hca),
-			turnoverDefValue: turnLinear * turnLinear,
+			turnoverDefValue: energyCeiling(bh),
 		}
 
 		switch selectOutcome(in, false, false, true, gs.rng) {
@@ -147,12 +151,14 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 			gs.freeThrows(offense, defense, bh, def, 2, periodIdx)
 			return false
 		case outcomeTurnover:
+			// Negligible independent [2,5] check: unforced change of possession, no
+			// stealer (steal-driven turnovers are rolled at the top of the trip).
 			gs.emit(result.Event{
 				Kind: result.EventTurnover, Period: gs.period, Clock: gs.clock,
 				TeamID: offense.teamID, PlayerID: bh.PID,
 			})
 			gs.maybeInjure(offense, bh) // per-turnover injury check on the committer
-			return gs.creditSteal(offense, defense, bh)
+			return false
 		}
 	}
 	return false

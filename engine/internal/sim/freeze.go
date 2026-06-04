@@ -9,8 +9,9 @@ import "fmt"
 // freeze lattice substitutes a league-mean scalar at one mechanism's derived-rate
 // output point — removing that mechanism's cross-team variance — and measures how
 // the covariance responds. Four mechanisms (arms) are freezable: the offensive-
-// rebound continuation probability, the turnover threshold, the foul-only bucket
-// weight, and the 2pt make-value. Injection is at the derived-VALUE output (not the
+// rebound continuation probability, the steal-driven turnover probability, the
+// foul-only bucket weight, and the 2pt make-value. Injection is at the
+// derived-VALUE output (not the
 // rating inputs), so freezing one arm cannot spill into a sibling mechanism (e.g.
 // clamping rebound ratings would also alter defensive rebounding).
 //
@@ -22,10 +23,10 @@ import "fmt"
 // (all arms false) is the no-freeze baseline — behaviorally identical to the live
 // engine.
 type FreezeConfig struct {
-	ORB  bool // freeze P(offensive rebound)        — orebProbability output
-	TVR  bool // freeze the turnover LINEAR threshold — turnoverThreshold output
-	Foul bool // freeze the foul-only bucket weight   — foulBucketWeight output
-	Make bool // freeze the 2pt make-value            — shotValue2pt output (pre-clutch)
+	ORB  bool // freeze P(offensive rebound)             — orebProbability output
+	TVR  bool // freeze the steal-driven turnover prob.  — turnoverProb output
+	Foul bool // freeze the foul-only bucket weight      — foulBucketWeight output
+	Make bool // freeze the 2pt make-value               — shotValue2pt output (pre-clutch)
 
 	Means FreezeMeans // per-season-bucket league means substituted for frozen arms
 }
@@ -34,7 +35,7 @@ type FreezeConfig struct {
 // (harvested by a no-freeze baseline pass via FreezeAccum). Each is the mean of the
 // ACTUAL derived quantity at its call site, never an event-rate proxy:
 //   - OrebProb:   mean orebProbability output ∈ [0.25, 0.75]
-//   - TurnThresh: mean turnoverThreshold(TVR) LINEAR threshold (before squaring)
+//   - TurnProb:   mean per-possession steal-driven turnoverProb output ∈ [0, maxTurnoverProb]
 //   - FoulWeight: mean foulBucketWeight output
 //   - MakeVal2pt: mean PRE-clutch shotValue2pt output (per-mille)
 //
@@ -42,7 +43,7 @@ type FreezeConfig struct {
 // so it carries no cross-team variance and the Make arm freezes only the 2pt channel.
 type FreezeMeans struct {
 	OrebProb   float64
-	TurnThresh float64
+	TurnProb   float64
 	FoulWeight float64
 	MakeVal2pt float64
 }
@@ -72,7 +73,7 @@ func (a *FreezeAccum) Means() FreezeMeans {
 		m.OrebProb = a.orebSum / float64(a.orebN)
 	}
 	if a.turnN > 0 {
-		m.TurnThresh = a.turnSum / float64(a.turnN)
+		m.TurnProb = a.turnSum / float64(a.turnN)
 	}
 	if a.foulN > 0 {
 		m.FoulWeight = a.foulSum / float64(a.foulN)
@@ -93,15 +94,15 @@ type Options struct {
 // validate rejects a config that freezes an arm with no precomputed (zero) mean — a
 // misconfiguration that would otherwise silently substitute 0, which is degenerate
 // for every arm (orebProb 0 disables offensive rebounds; makeVal 0 makes every shot
-// miss; foulWeight 0 removes the foul path; turnThresh 0 removes turnovers). Every
-// real derived value is strictly positive, so a zero frozen mean can only mean
-// "unset".
+// miss; foulWeight 0 removes the foul path; turnProb 0 removes steal-driven
+// turnovers). Every real derived value is strictly positive, so a zero frozen mean
+// can only mean "unset".
 func (o Options) validate() error {
 	if o.Freeze.ORB && o.Freeze.Means.OrebProb == 0 {
 		return fmt.Errorf("sim: freeze ORB requested but Means.OrebProb is unset (0)")
 	}
-	if o.Freeze.TVR && o.Freeze.Means.TurnThresh == 0 {
-		return fmt.Errorf("sim: freeze TVR requested but Means.TurnThresh is unset (0)")
+	if o.Freeze.TVR && o.Freeze.Means.TurnProb == 0 {
+		return fmt.Errorf("sim: freeze TVR requested but Means.TurnProb is unset (0)")
 	}
 	if o.Freeze.Foul && o.Freeze.Means.FoulWeight == 0 {
 		return fmt.Errorf("sim: freeze Foul requested but Means.FoulWeight is unset (0)")
@@ -132,20 +133,29 @@ func (gs *gameState) orebProb(off, def float64) float64 {
 	return p
 }
 
-// turnThreshLinear returns the LINEAR turnover threshold for a TVR rating (the value
-// the outcome selector squares, then sqrt-recovers). Frozen → the league-mean linear
-// threshold, making the per-possession turnover probability league-uniform. The
-// caller squares the return exactly as before so selectOutcome's sqrt is unchanged.
-func (gs *gameState) turnThreshLinear(tvr int) float64 {
-	t := turnoverThreshold(tvr)
+// turnoverProb returns the per-possession steal-driven turnover probability from
+// offensive carelessness × defensive steal pressure (steal.go), scaled by
+// stealTurnoverScale and clamped to [0, maxTurnoverProb]. Frozen (TVR arm) → the
+// league-mean probability, making the turnover rate league-uniform so the freeze
+// lattice can measure how collapsing the STL→steal→fast-break coupling moves
+// Cov(lnFGA,lnPPS) (the ADR-0045 Cov re-run). The caller draws its gs.rng.Float64()
+// roll unconditionally, so live and frozen passes consume the RNG identically.
+func (gs *gameState) turnoverProb(careless, pressure float64) float64 {
+	p := stealTurnoverScale * careless * pressure
+	if p < 0 {
+		p = 0
+	}
+	if p > maxTurnoverProb {
+		p = maxTurnoverProb
+	}
 	if gs.accum != nil {
-		gs.accum.turnSum += t
+		gs.accum.turnSum += p
 		gs.accum.turnN++
 	}
 	if gs.freeze.TVR {
-		return gs.freeze.Means.TurnThresh
+		return gs.freeze.Means.TurnProb
 	}
-	return t
+	return p
 }
 
 // foulWeight returns the foul-only bucket weight; frozen → the league-mean foul

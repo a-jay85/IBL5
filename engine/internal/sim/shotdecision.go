@@ -2,17 +2,19 @@ package sim
 
 import "github.com/a-jay85/IBL5/engine/internal/rng"
 
-// PR3a calibration constants. The decompile assembles shot_value on a per-mille
-// scale (the make roll compares it to rand_int(1,1000)) using league_baseline
-// (CEngine+0x6638, the historical league-wide 2P%) and per-player per-game
-// bases (player[+0xD64] 2pt, +0xD68 FT). None of those league/per-game values
-// exist before validation phase, so PR3a derives them from the bundle's FGP/FTP
-// ratings and a named league baseline chosen to yield realistic splits
-// (~45% 2P / ~35% 3P / ~75% FT). These are documented stand-ins, refined when
-// the engine is validated against the historical .sco corpus.
+// Make-value calibration constants. The decompile assembles shot_value on a
+// per-mille scale (the make roll compares it to rand_int(1,1000)) using
+// league_baseline (CEngine+0x6638, the historical league-wide 2P%) and per-player
+// per-game bases (player[+0xD64] 2pt, +0xD68 FT). None of those league/per-game
+// values exist before validation phase, so the engine derives them from the
+// bundle's FGP/FTP ratings and a named league baseline. fgpToPermille and
+// leagueBaseline were calibrated against the .sco archive (ADR-0045): 2pt% ≈ 49.8%
+// and 3pt% ≈ 37.2% (the JSB 3pt make = baseline×1.5, so leagueBaseline = sco 3pt%
+// × 666.7 ≈ 248). Documented validation-phase stand-ins, same class as
+// offVolumeScale / foulCompress.
 const (
-	leagueBaseline = 233.0 // per-mille; 3pt make = baseline×1.5 ≈ 350‰ (~35%)
-	fgpToPermille  = 9.0   // base 2pt make = FGP × this (FGP 50 → 450‰)
+	leagueBaseline = 250.0 // per-mille; 3pt make = baseline×1.5 = 375‰ (~37.5%, sco-implied)
+	fgpToPermille  = 9.4   // base 2pt make = FGP × this (calibrated to 2pt% ≈ 50%)
 	ftpToPermille  = 10.0  // FT make = FTP × this  (FTP 75 → 750‰)
 
 	netToShotValue   = 500.0 // _DAT_00669ef0 (0.5) × _DAT_0066ac40 (1000.0)

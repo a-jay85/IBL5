@@ -349,8 +349,68 @@ class FreeAgencyServiceTest extends TestCase
 
         $this->assertCount(1, $result['playersUnderContract']);
         $this->assertCount(1, $result['unsignedFreeAgents']);
-        $this->assertSame(10, $result['playersUnderContract'][0]->getPlayerID());
+        $this->assertSame(10, $result['playersUnderContract'][0]['player']->getPlayerID());
         $this->assertSame(20, $result['unsignedFreeAgents'][0]->getPlayerID());
+    }
+
+    /**
+     * The contract-management decision (rookie option / extension / none) moved
+     * out of FreeAgencyView into the Service: each playersUnderContract entry
+     * now carries a precomputed `contractAction` scalar.
+     *
+     * Only 'rookie_option' and null are reachable for contracted players — an
+     * extension-eligible player has an empty next contract year, which makes it
+     * a free agent, so the partition routes it into unsignedFreeAgents and it
+     * never receives an 'extension' action here. (The View's preserved
+     * 'extension' arm is locked separately in FreeAgencyViewTest.)
+     */
+    public function testGetMainPageDataComputesContractAction(): void
+    {
+        $rookie = $this->getBasePlayerData();
+        $rookie['pid'] = 30;
+        $rookie['cy'] = 1;
+        $rookie['draftround'] = 1;
+        $rookie['exp'] = 3;
+        $rookie['salary_yr1'] = 500;
+        $rookie['salary_yr2'] = 500;
+        $rookie['salary_yr3'] = 500;
+        $rookie['salary_yr4'] = 0;
+
+        $plain = $this->getBasePlayerData();
+        $plain['pid'] = 31;
+        $plain['cy'] = 2;
+        $plain['draftround'] = 0;
+        $plain['exp'] = 5;
+        $plain['salary_yr1'] = 500;
+        $plain['salary_yr2'] = 500;
+        $plain['salary_yr3'] = 500;
+
+        $teamQueryRepo = self::createStub(TeamQueryRepositoryInterface::class);
+        $teamQueryRepo->method('getRosterUnderContractOrderedByOrdinal')->willReturn([$rookie, $plain]);
+        $teamQueryRepo->method('getFreeAgencyOffers')->willReturn([]);
+        $this->stubRepo->method('getAllPlayersExcludingTeam')->willReturn([]);
+
+        $service = new FreeAgencyService($this->stubRepo, $this->stubDemandRepo, $this->mockDb, $teamQueryRepo);
+
+        $team = self::createStub(Team::class);
+        $team->name = 'Test Team';
+        $team->teamid = 1;
+
+        $season = self::createStub(\Season\Season::class);
+        $season->phase = 'Preseason';
+        $season->endingYear = 2026;
+
+        $result = $service->getMainPageData($team, $season);
+
+        $byPid = [];
+        foreach ($result['playersUnderContract'] as $entry) {
+            $byPid[$entry['player']->getPlayerID()] = $entry['contractAction'];
+        }
+
+        $this->assertArrayHasKey(30, $byPid);
+        $this->assertArrayHasKey(31, $byPid);
+        $this->assertSame('rookie_option', $byPid[30]);
+        $this->assertNull($byPid[31]);
     }
 
     public function testGetMainPageDataPreBuildsOfferPlayers(): void

@@ -32,7 +32,7 @@ interface FreeAgencyServiceInterface
      *     season: Season,
      *     allOtherPlayers: list<\Player\Player>,
      *     teamColorsByTeamId: array<int, array{color1: string, color2: string}>,
-     *     playersUnderContract: list<\Player\Player>,
+     *     playersUnderContract: list<array{player: \Player\Player, contractAction: 'rookie_option'|'extension'|null}>,
      *     unsignedFreeAgents: list<\Player\Player>,
      *     offerPlayers: list<array{player: \Player\Player, offer: array<string, int>}>,
      *     cashPlayers: list<array{player: \Player\Player, label: string}>

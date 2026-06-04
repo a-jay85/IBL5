@@ -26,7 +26,7 @@ class FreeAgencyView
     }
 
     /**
-     * @param array{team: Team, season: Season, capMetrics: CapMetrics, allOtherPlayers: list<Player>, teamColorsByTeamId: array<int, array{color1: string, color2: string}>, playersUnderContract: list<Player>, unsignedFreeAgents: list<Player>, offerPlayers: list<array{player: Player, offer: array<string, int>}>, cashPlayers: list<array{player: Player, label: string}>} $mainPageData
+     * @param array{team: Team, season: Season, capMetrics: CapMetrics, allOtherPlayers: list<Player>, teamColorsByTeamId: array<int, array{color1: string, color2: string}>, playersUnderContract: list<array{player: Player, contractAction: 'rookie_option'|'extension'|null}>, unsignedFreeAgents: list<Player>, offerPlayers: list<array{player: Player, offer: array<string, int>}>, cashPlayers: list<array{player: Player, label: string}>} $mainPageData
      */
     public function render(array $mainPageData, ?string $result = null): string
     {
@@ -70,7 +70,7 @@ class FreeAgencyView
      * @param Team $team Team object
      * @param Season $season Season object
      * @param CapMetrics $capMetrics Cap metrics from service
-     * @param list<Player> $players Pre-built contracted player objects
+     * @param list<array{player: Player, contractAction: 'rookie_option'|'extension'|null}> $players Pre-built contracted player entries with their resolved contract action
      * @param list<array{player: Player, label: string}> $cashPlayers Pre-built cash consideration players
      * @return string HTML table
      */
@@ -84,8 +84,9 @@ class FreeAgencyView
     <?= HtmlSanitizer::trusted($this->renderColgroups(false, false)) ?>
     <?= HtmlSanitizer::trusted($this->renderTableHeader('Players Under Contract', false, $team, false, false, $season)) ?>
     <tbody>
-        <?php foreach ($players as $player): ?>
+        <?php foreach ($players as $entry): ?>
             <?php
+            $player = $entry['player'];
             if (!$player->isPlayerFreeAgent($season) || $player->isSalaryPlaceholder()):
                 $futureSalaries = $player->getFutureSalaries();
                 $playerName = $player->getName() ?? '';
@@ -94,9 +95,12 @@ class FreeAgencyView
                 }
             ?>
         <?php
-        $hasRookieOption = $player->canRookieOption($season->phase);
-        $isExtensionPhase = in_array($season->phase, ['Preseason', 'Regular Season', 'Playoffs'], true);
-        $hasExtension = !$hasRookieOption && $isExtensionPhase && $player->canRenegotiateContract();
+        // The contract-management action ('rookie_option' | 'extension' | null)
+        // is decided in FreeAgencyService; the View only maps it to a hint URL
+        // and label below. 'extension' is unreachable for a contracted player
+        // (an extension-eligible player is a free agent and never enters this
+        // table) but is preserved to keep behavior identical.
+        $contractAction = $entry['contractAction'];
         ?>
         <tr>
             <td><?= HtmlSanitizer::e($player->getPosition() ?? '') ?></td>
@@ -104,15 +108,17 @@ class FreeAgencyView
             <td><?= HtmlSanitizer::e($player->getAge() ?? 0) ?></td>
             <?= HtmlSanitizer::trusted($this->renderPlayerRatings($player)) ?>
             <td class="col-salary"><?= HtmlSanitizer::e($futureSalaries[0]) ?></td>
-            <?php if ($hasRookieOption): ?>
-                <?php $actionUrl = 'modules.php?name=Player&amp;pa=rookieoption&amp;pid=' . ($player->getPlayerID() ?? 0) . '&amp;from=fa'; $actionLabel = 'Rookie Option'; ?>
-                <td class="col-salary contract-hint-cell" tabindex="0"><?= HtmlSanitizer::e($futureSalaries[1]) ?><a href="<?= HtmlSanitizer::trusted($actionUrl) ?>" class="contract-hint-link" data-no-abbreviate><?= HtmlSanitizer::e($actionLabel) ?></a></td>
-                <td class="col-salary contract-hint-cell" tabindex="0"><?= HtmlSanitizer::e($futureSalaries[2]) ?></td>
-                <td class="col-salary contract-hint-cell" tabindex="0"><?= HtmlSanitizer::e($futureSalaries[3]) ?></td>
-                <td class="col-salary contract-hint-cell" tabindex="0"><?= HtmlSanitizer::e($futureSalaries[4]) ?></td>
-                <td class="col-salary contract-hint-cell" tabindex="0"><?= HtmlSanitizer::e($futureSalaries[5]) ?></td>
-            <?php elseif ($hasExtension): ?>
-                <?php $actionUrl = 'modules.php?name=Player&amp;pa=negotiate&amp;pid=' . ($player->getPlayerID() ?? 0); $actionLabel = 'Contract Extension'; ?>
+            <?php if ($contractAction !== null): ?>
+                <?php
+                $actionUrl = match ($contractAction) {
+                    'rookie_option' => 'modules.php?name=Player&amp;pa=rookieoption&amp;pid=' . ($player->getPlayerID() ?? 0) . '&amp;from=fa',
+                    'extension' => 'modules.php?name=Player&amp;pa=negotiate&amp;pid=' . ($player->getPlayerID() ?? 0),
+                };
+                $actionLabel = match ($contractAction) {
+                    'rookie_option' => 'Rookie Option',
+                    'extension' => 'Contract Extension',
+                };
+                ?>
                 <td class="col-salary contract-hint-cell" tabindex="0"><?= HtmlSanitizer::e($futureSalaries[1]) ?><a href="<?= HtmlSanitizer::trusted($actionUrl) ?>" class="contract-hint-link" data-no-abbreviate><?= HtmlSanitizer::e($actionLabel) ?></a></td>
                 <td class="col-salary contract-hint-cell" tabindex="0"><?= HtmlSanitizer::e($futureSalaries[2]) ?></td>
                 <td class="col-salary contract-hint-cell" tabindex="0"><?= HtmlSanitizer::e($futureSalaries[3]) ?></td>

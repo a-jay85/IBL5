@@ -47,7 +47,7 @@ interface TradingViewInterface
     /**
      * Render team selection links for trading partner selection
      *
-     * @param list<array{name: string, city: string, fullName: string, teamid: int, color1: string, color2: string}> $teams Array of team data from TradingService
+     * @param list<array{name: string, city: string, fullName: string, teamid: int, color1: string, color2: string, mobileOrder: int}> $teams Conference-split, sorted, interleaved team data from TradingService::buildTeamList()
      * @return string HTML table of team links
      */
     public function renderTeamSelectionLinks(array $teams): string;

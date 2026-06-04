@@ -112,7 +112,7 @@ class TradingService implements TradingServiceInterface
     /**
      * @see TradingServiceInterface::getTradeReviewPageData()
      *
-     * @return array{userTeam: string, userTeamId: int, tradeOffers: array<int, array{from: string, to: string, approval: string, oppositeTeam: string, hasHammer: bool, items: list<array{type: string, description: string, notes: string|null, from: string, to: string}>, previewData: array{fromPids: list<int>, toPids: list<int>, fromTeamId: int, toTeamId: int, fromColor1: string, toColor1: string, fromCash: array<int, int>, toCash: array<int, int>, cashStartYear: int, cashEndYear: int, seasonEndingYear: int}}>, teams: list<array{name: string, city: string, fullName: string, teamid: int, color1: string, color2: string}>}
+     * @return array{userTeam: string, userTeamId: int, tradeOffers: array<int, array{from: string, to: string, approval: string, oppositeTeam: string, hasHammer: bool, items: list<array{type: string, description: string, notes: string|null, from: string, to: string}>, previewData: array{fromPids: list<int>, toPids: list<int>, fromTeamId: int, toTeamId: int, fromColor1: string, toColor1: string, fromCash: array<int, int>, toCash: array<int, int>, cashStartYear: int, cashEndYear: int, seasonEndingYear: int}}>, teams: list<array{name: string, city: string, fullName: string, teamid: int, color1: string, color2: string, mobileOrder: int}>}
      */
     public function getTradeReviewPageData(string $username): array
     {
@@ -429,10 +429,18 @@ class TradingService implements TradingServiceInterface
     }
 
     /**
-     * Build filtered team list for team selection UI (excludes Free Agents)
+     * Build the team-selection sidebar list (excludes Free Agents).
+     *
+     * Returns teams split by conference, sorted by city for the desktop
+     * column order, then interleaved (West[0], East[0], West[1], East[1], …).
+     * Each entry also carries a `mobileOrder` slot — the name-sorted position
+     * the View injects as a `--mobile-order` CSS custom property so the
+     * single-column mobile layout reorders without re-querying. This ordering
+     * presentation logic lives here (not the View) so the View is pure
+     * iteration.
      *
      * @param list<TeamWithCityRow> $allTeams Raw team rows from repository
-     * @return list<array{name: string, city: string, fullName: string, teamid: int, color1: string, color2: string}>
+     * @return list<array{name: string, city: string, fullName: string, teamid: int, color1: string, color2: string, mobileOrder: int}>
      */
     private function buildTeamList(array $allTeams): array
     {
@@ -455,6 +463,48 @@ class TradingService implements TradingServiceInterface
             ];
         }
 
-        return $teams;
+        // Split by conference.
+        $western = [];
+        $eastern = [];
+        foreach ($teams as $team) {
+            if (in_array($team['teamid'], League::WESTERN_CONFERENCE_TEAMIDS, true)) {
+                $western[] = $team;
+            } else {
+                $eastern[] = $team;
+            }
+        }
+
+        // Assign mobile-order slots by team name (West even, East odd) onto a
+        // freshly-rebuilt entry so the slot rides along through the city sort.
+        usort($western, static fn(array $a, array $b): int => strcasecmp($a['name'], $b['name']));
+        $westernOrdered = [];
+        foreach ($western as $i => $team) {
+            $team['mobileOrder'] = $i * 2;
+            $westernOrdered[] = $team;
+        }
+        usort($eastern, static fn(array $a, array $b): int => strcasecmp($a['name'], $b['name']));
+        $easternOrdered = [];
+        foreach ($eastern as $i => $team) {
+            $team['mobileOrder'] = $i * 2 + 1;
+            $easternOrdered[] = $team;
+        }
+
+        // Sort by city for desktop display.
+        usort($westernOrdered, static fn(array $a, array $b): int => strcasecmp($a['city'], $b['city']));
+        usort($easternOrdered, static fn(array $a, array $b): int => strcasecmp($a['city'], $b['city']));
+
+        // Interleave: West[0], East[0], West[1], East[1], ...
+        $interleaved = [];
+        $count = max(count($westernOrdered), count($easternOrdered));
+        for ($i = 0; $i < $count; $i++) {
+            if (isset($westernOrdered[$i])) {
+                $interleaved[] = $westernOrdered[$i];
+            }
+            if (isset($easternOrdered[$i])) {
+                $interleaved[] = $easternOrdered[$i];
+            }
+        }
+
+        return $interleaved;
     }
 }

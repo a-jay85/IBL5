@@ -5,8 +5,15 @@ declare(strict_types=1);
 namespace Tests\Trading;
 
 use PHPUnit\Framework\TestCase;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
+use Trading\Contracts\TradeAssetRepositoryInterface;
+use Trading\Contracts\TradeCashRepositoryInterface;
+use Trading\Contracts\TradeFormRepositoryInterface;
+use Trading\Contracts\TradeOfferRepositoryInterface;
+use Trading\TradingService;
 use Trading\TradingView;
 use Season\Season;
+use Tests\WideUnit\Mocks\MockDatabase;
 
 class TradingViewTest extends TestCase
 {
@@ -322,7 +329,7 @@ class TradingViewTest extends TestCase
     {
         $pageData = $this->createTradeReviewPageData();
         $pageData['teams'] = [
-            ['name' => 'Heat', 'city' => 'Miami', 'fullName' => 'Miami Heat', 'teamid' => 5, 'color1' => '98002E', 'color2' => 'FFFFFF'],
+            ['name' => 'Heat', 'city' => 'Miami', 'fullName' => 'Miami Heat', 'teamid' => 5, 'color1' => '98002E', 'color2' => 'FFFFFF', 'mobileOrder' => 0],
         ];
 
         $html = $this->view->renderTradeReview($pageData);
@@ -499,9 +506,11 @@ class TradingViewTest extends TestCase
 
     public function testRenderTeamSelectionLinksShowsAllTeams(): void
     {
+        // The View now consumes a pre-ordered list carrying mobileOrder
+        // (conference split/sort/interleave moved to TradingService::buildTeamList).
         $teams = [
-            ['name' => 'Lakers', 'city' => 'Los Angeles', 'fullName' => 'Los Angeles Lakers', 'teamid' => 1, 'color1' => '552583', 'color2' => 'FDB927'],
-            ['name' => 'Celtics', 'city' => 'Boston', 'fullName' => 'Boston Celtics', 'teamid' => 2, 'color1' => '007A33', 'color2' => 'FFFFFF'],
+            ['name' => 'Lakers', 'city' => 'Los Angeles', 'fullName' => 'Los Angeles Lakers', 'teamid' => 1, 'color1' => '552583', 'color2' => 'FDB927', 'mobileOrder' => 0],
+            ['name' => 'Celtics', 'city' => 'Boston', 'fullName' => 'Boston Celtics', 'teamid' => 2, 'color1' => '007A33', 'color2' => 'FFFFFF', 'mobileOrder' => 1],
         ];
 
         $html = $this->view->renderTeamSelectionLinks($teams);
@@ -515,7 +524,7 @@ class TradingViewTest extends TestCase
     public function testRenderTeamSelectionLinksReturnsTableWithHeader(): void
     {
         $teams = [
-            ['name' => 'Heat', 'city' => 'Miami', 'fullName' => 'Miami Heat', 'teamid' => 3, 'color1' => '98002E', 'color2' => 'FFFFFF'],
+            ['name' => 'Heat', 'city' => 'Miami', 'fullName' => 'Miami Heat', 'teamid' => 3, 'color1' => '98002E', 'color2' => 'FFFFFF', 'mobileOrder' => 0],
         ];
 
         $html = $this->view->renderTeamSelectionLinks($teams);
@@ -523,6 +532,61 @@ class TradingViewTest extends TestCase
         $this->assertStringContainsString('West', $html);
         $this->assertStringContainsString('East', $html);
         $this->assertStringContainsString('trading-team-select', $html);
+    }
+
+    public function testTeamSelectionSidebarGoldenUnchanged(): void
+    {
+        // Characterization across the service→view seam: the conference
+        // split/sort/interleave + mobileOrder computation moves from the View
+        // into TradingService::buildTeamList(), but the rendered sidebar must
+        // stay byte-identical. The golden was captured before the move; the
+        // test pipes getTradeReviewPageData() → renderTeamSelectionLinks() so
+        // the internal 'teams' shape change is invisible.
+        $service = $this->buildServiceWithTeams($this->sidebarTeamRows());
+        $pageData = $service->getTradeReviewPageData('testuser');
+        $html = $this->view->renderTeamSelectionLinks($pageData['teams']);
+
+        $goldenPath = __DIR__ . '/fixtures/trading-team-sidebar.golden.html';
+
+        $this->assertStringEqualsFile($goldenPath, $html);
+    }
+
+    /**
+     * Raw getAllTeamsWithCity() rows spanning both conferences with distinct
+     * names and cities, so name-sort (mobileOrder) and city-sort (desktop
+     * column order) produce a non-trivial, deterministic interleave.
+     * West teamids per League::WESTERN_CONFERENCE_TEAMIDS: 6, 13, 24.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function sidebarTeamRows(): array
+    {
+        return [
+            ['team_name' => 'Jazz', 'team_city' => 'Salt Lake', 'teamid' => 13, 'color1' => '002B5C', 'color2' => 'F9A01B'],
+            ['team_name' => 'Celtics', 'team_city' => 'Boston', 'teamid' => 1, 'color1' => '007A33', 'color2' => 'BA9653'],
+            ['team_name' => 'Nuggets', 'team_city' => 'Denver', 'teamid' => 6, 'color1' => '0E2240', 'color2' => 'FEC524'],
+            ['team_name' => 'Bulls', 'team_city' => 'Chicago', 'teamid' => 7, 'color1' => 'CE1141', 'color2' => '000000'],
+            ['team_name' => 'Warriors', 'team_city' => 'Golden State', 'teamid' => 24, 'color1' => '1D428A', 'color2' => 'FFC72C'],
+            ['team_name' => 'Nets', 'team_city' => 'Brooklyn', 'teamid' => 2, 'color1' => '000000', 'color2' => 'FFFFFF'],
+        ];
+    }
+
+    /**
+     * @param list<array<string, mixed>> $teamRows
+     */
+    private function buildServiceWithTeams(array $teamRows): TradingService
+    {
+        $offerRepo = self::createStub(TradeOfferRepositoryInterface::class);
+        $offerRepo->method('getAllTradeOffers')->willReturn([]);
+        $assetRepo = self::createStub(TradeAssetRepositoryInterface::class);
+        $cashRepo = self::createStub(TradeCashRepositoryInterface::class);
+        $formRepo = self::createStub(TradeFormRepositoryInterface::class);
+        $formRepo->method('getAllTeamsWithCity')->willReturn($teamRows);
+        $common = self::createStub(TeamIdentityRepositoryInterface::class);
+        $common->method('getTeamnameFromUsername')->willReturn('Jazz');
+        $common->method('getTidFromTeamname')->willReturn(13);
+
+        return new TradingService($offerRepo, $assetRepo, $formRepo, $common, new MockDatabase(), $cashRepo);
     }
 
     // ============================================

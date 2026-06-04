@@ -49,8 +49,16 @@ class SeasonLeaderboardsRepository extends \BaseMysqliRepository implements Seas
 
         $sortBy = $this->getSortColumn((string) ($filters['sortby'] ?? 'PPG'));
 
-        // NOTE: $sortBy is validated in getSortColumn() against a strict whitelist
-        $query = "SELECT h.*, t.team_city, t.color1, t.color2
+        // NOTE: $sortBy is validated in getSortColumn() against a strict whitelist.
+        // Columns are listed explicitly (not `h.*`) to match the HistRow contract:
+        // `ibl_hist` has 57 columns but only these 20 are consumed. Selecting `h.*`
+        // tripled the cached blob (5.1MB -> 1.95MB after trimming) and its decode
+        // cost on every page load. See CachedSeasonLeaderboardsRepository.
+        $query = "SELECT
+                h.pid, h.name, h.year, h.team, h.teamid, h.games, h.minutes,
+                h.fgm, h.fga, h.ftm, h.fta, h.tgm, h.tga,
+                h.orb, h.reb, h.ast, h.stl, h.tvr, h.blk, h.pf,
+                t.team_city, t.color1, t.color2
             FROM `ibl_hist` h
             LEFT JOIN `ibl_team_info` t ON h.teamid = t.teamid
             WHERE {$where->toWhereClause()} ORDER BY $sortBy DESC, h.pid ASC"

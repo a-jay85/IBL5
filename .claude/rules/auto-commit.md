@@ -1,6 +1,6 @@
 ---
 description: Auto-commit after completing changes; amend when fixing unpushed work
-last_verified: 2026-05-24
+last_verified: 2026-06-04
 ---
 
 # Auto-Commit
@@ -13,6 +13,7 @@ Do NOT auto-commit when:
 - You're mid-task with more phases to complete (commit at logical checkpoints instead)
 - The user is asking a question or exploring options (no files changed)
 - You're inside `/post-plan` (it handles commits internally)
+- You just finished implementing a `/plan` (the plan workflow is active, or you're in a plan worktree) — do NOT commit. STOP and hand off; the separate `/post-plan` session commits the working tree (its Phase 2) and ships.
 
 ## Amend vs new commit
 

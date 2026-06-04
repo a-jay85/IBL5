@@ -1,30 +1,18 @@
 ---
-description: Auto-commit after completing changes; amend when fixing unpushed work
+description: Commit after a unit of work (Stop hook reminds you); amend when fixing unpushed work
 last_verified: 2026-06-04
 ---
 
 # Auto-Commit
 
-## After completing changes
-
-When you finish making changes in response to a user prompt, invoke `/commit-commands:commit` without waiting to be asked. This applies to implementation work, bug fixes, refactors, config changes — any prompt that results in file edits.
-
-Do NOT auto-commit when:
-- You're mid-task with more phases to complete (commit at logical checkpoints instead)
-- The user is asking a question or exploring options (no files changed)
-- You're inside `/post-plan` (it handles commits internally)
-- You just finished implementing a `/plan` (the plan workflow is active, or you're in a plan worktree) — do NOT commit. STOP and hand off; the separate `/post-plan` session commits the working tree (its Phase 2) and ships.
+The `$HOME/.claude/hooks/auto-commit-reminder.sh` Stop hook delivers the "commit when done" reminder at runtime: it fires at turn-end when the main checkout has uncommitted changes and no plan workflow is active, and stays silent in worktrees and during `/post-plan` (those hand off / commit internally). When reminded — or whenever a prompt finishes a unit of work (impl, fix, refactor, config, docs) — invoke `/commit-commands:commit`. Skip it when mid-task or when the user is only exploring.
 
 ## Amend vs new commit
 
-**Amend** (`--amend` flag or interactive amend) when ALL of these are true:
-- Your immediately preceding commit in this conversation is what you're fixing
-- The user asked for a correction, tweak, or "actually do X instead"
-- The commit has NOT been pushed yet
+The hook does not decide this — you do.
 
-**New commit** when ANY of these are true:
-- The work is a distinct logical change from the previous commit
-- The previous commit has already been pushed
-- You're unsure — default to new commit (safer)
+**Amend** (`--amend`) when ALL hold: the immediately preceding commit in this conversation is what you're fixing; the user asked for a correction/tweak; it's NOT pushed yet.
 
-The heuristic is simple: same task + unpushed + correcting yourself = amend.
+**New commit** when ANY hold: distinct logical change; previous commit already pushed; you're unsure (default to new — safer).
+
+Heuristic: same task + unpushed + correcting yourself = amend.

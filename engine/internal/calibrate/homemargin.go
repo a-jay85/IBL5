@@ -132,3 +132,19 @@ func fgaFor(g validate.GameReport, teamID int) (validate.StatRow, bool) {
 	}
 	return validate.StatRow{}, false
 }
+
+// ftaFor returns the "fta" StatRow for the given team in a game and whether it
+// was found — the free-throw-attempt accessor mirroring fgaFor. "fta" is emitted
+// on BOTH the engine side and the .sco side (validate.statNames; aggregate.go),
+// so the team-to-team FTA-rate dispersion is directly comparable — the
+// independent corpus-calibration target for foulCompress (the foul-bucket
+// compression knob, see sim/teamquality.go). The harness emits exactly one "fta"
+// row per team (compareGame).
+func ftaFor(g validate.GameReport, teamID int) (validate.StatRow, bool) {
+	for _, r := range g.Rows {
+		if r.Stat == "fta" && r.TeamID == teamID {
+			return r, true
+		}
+	}
+	return validate.StatRow{}, false
+}

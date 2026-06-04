@@ -73,7 +73,10 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
      */
     private function clampDepthValue(mixed $raw): int
     {
-        $value = (int) $raw;
+        // The slot value comes from a nullable DB column reached through a
+        // dynamic key, so it arrives as mixed; narrow before casting to keep
+        // the cast well-typed (a non-numeric value clamps to 0, as before).
+        $value = is_numeric($raw) ? (int) $raw : 0;
         if ($value < 0) {
             $value = 0;
         }

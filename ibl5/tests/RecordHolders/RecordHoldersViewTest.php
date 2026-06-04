@@ -611,7 +611,15 @@ final class RecordHoldersViewTest extends TestCase
      * player single-game (regular/playoffs/heat), full-season, quadruple
      * doubles, all-star, team game, team season, and franchise.
      *
-     * @return array<string, mixed>
+     * @return array{
+     *     playerSingleGame: array{regularSeason: array<string, list<mixed>>, playoffs: array<string, list<mixed>>, heat: array<string, list<mixed>>},
+     *     quadrupleDoubles: list<mixed>,
+     *     allStarRecord: array{name: string, pid: int|null, teams: string, teamTids: string, amount: int, years: string},
+     *     playerFullSeason: array<string, list<mixed>>,
+     *     teamGameRecords: array<string, list<mixed>>,
+     *     teamSeasonRecords: array<string, list<mixed>>,
+     *     teamFranchise: array<string, list<mixed>>
+     * }
      */
     private function createComprehensiveRecords(): array
     {

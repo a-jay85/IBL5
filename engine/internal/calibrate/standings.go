@@ -37,6 +37,13 @@ type TeamStanding struct {
 	// when the snapshot carried no "fga" rows for the team.
 	EngineFGAPerG float64 `json:"engine_fga_per_g"`
 	ScoFGAPerG    float64 `json:"sco_fga_per_g"`
+	// FTA-per-game = total free-throw attempts per game, engine vs .sco. The
+	// foul-bucket compression target: foulCompress (sim/teamquality.go) narrows the
+	// team-to-team quality spread that drives the foul rate, so its independent
+	// corpus target is the FTA-rate dispersion (FTADispersionRatio → 1.0). 0 when
+	// the snapshot carried no "fta" rows for the team (same both-sides guard as FGA).
+	EngineFTAPerG float64 `json:"engine_fta_per_g"`
+	ScoFTAPerG    float64 `json:"sco_fta_per_g"`
 	// Engine-only by-origin FGA/game (ADR-0042 empty-FGA split). No .sco
 	// counterpart (real box scores carry no origin tag); reported, never gated.
 	// The three sum to EngineFGAPerG (every attempt has exactly one origin).
@@ -149,14 +156,21 @@ type FidelitySummary struct {
 	// within-season demeaned. All 0 (never NaN/Inf) on degenerate input.
 	VolumeDispersionRatio     float64 `json:"volume_dispersion_ratio"`
 	EfficiencyDispersionRatio float64 `json:"efficiency_dispersion_ratio"`
-	RealVarLnPF               float64 `json:"real_var_ln_pf"`
-	RealVarLnFGA              float64 `json:"real_var_ln_fga"`
-	RealVarLnPPS              float64 `json:"real_var_ln_pps"`
-	RealCovLnFGALnPPS         float64 `json:"real_cov_ln_fga_ln_pps"`
-	EngineVarLnPF             float64 `json:"engine_var_ln_pf"`
-	EngineVarLnFGA            float64 `json:"engine_var_ln_fga"`
-	EngineVarLnPPS            float64 `json:"engine_var_ln_pps"`
-	EngineCovLnFGALnPPS       float64 `json:"engine_cov_ln_fga_ln_pps"`
+	// FTADispersionRatio = stdev(engine FTA/g) / stdev(sco FTA/g): the GAP analog
+	// on the free-throw-volume channel — is the engine's team-to-team FTA spread
+	// compressed (<1) or too wide (>1)? This is foulCompress's INDEPENDENT
+	// calibration target (Constraint 1): foulCompress is tuned so this ratio → 1.0,
+	// never tuned toward the emergent Cov(lnFGA,lnPPS) sign. 0 (never NaN/Inf) on
+	// degenerate input, exactly like VolumeDispersionRatio.
+	FTADispersionRatio  float64 `json:"fta_dispersion_ratio"`
+	RealVarLnPF         float64 `json:"real_var_ln_pf"`
+	RealVarLnFGA        float64 `json:"real_var_ln_fga"`
+	RealVarLnPPS        float64 `json:"real_var_ln_pps"`
+	RealCovLnFGALnPPS   float64 `json:"real_cov_ln_fga_ln_pps"`
+	EngineVarLnPF       float64 `json:"engine_var_ln_pf"`
+	EngineVarLnFGA      float64 `json:"engine_var_ln_fga"`
+	EngineVarLnPPS      float64 `json:"engine_var_ln_pps"`
+	EngineCovLnFGALnPPS float64 `json:"engine_cov_ln_fga_ln_pps"`
 }
 
 // SeasonAggregateReport is the full season-aggregate readout: the per-season
@@ -202,6 +216,9 @@ type teamAcc struct {
 	engFGA     float64 // Σ total FGA (2pt+3pt) over fgaGP games, engine side
 	scoFGA     float64 // Σ total FGA over fgaGP games, .sco side
 	fgaGP      int     // games where BOTH teams had an "fga" row (FGA divisor)
+	engFTA     float64 // Σ total FTA over ftaGP games, engine side
+	scoFTA     float64 // Σ total FTA over ftaGP games, .sco side
+	ftaGP      int     // games where BOTH teams had an "fta" row (FTA divisor)
 	// Engine-only by-origin FGA sums over gp games (the ADR-0042 empty-FGA split;
 	// no .sco counterpart). Divided by gp for the per-game means in TeamStanding.
 	engFGAInit, engFGAOreb, engFGATrans float64
@@ -261,6 +278,12 @@ func CollectSeasonAggregates(reports []validate.Report) SeasonAggregateReport {
 			visFGA, okVF := fgaFor(g, g.VisitorTeamID)
 			hasFGA := okHF && okVF
 
+			// FTA accumulates on the same both-sides guard as FGA — the foulCompress
+			// dispersion target (FTADispersionRatio).
+			homeFTA, okHT := ftaFor(g, g.HomeTeamID)
+			visFTA, okVT := ftaFor(g, g.VisitorTeamID)
+			hasFTA := okHT && okVT
+
 			h := team(acc, g.HomeTeamID)
 			h.gp++
 			h.engWins += g.EngineHomeWinFraction
@@ -290,6 +313,15 @@ func CollectSeasonAggregates(reports []validate.Report) SeasonAggregateReport {
 				v.engFGA += visFGA.EngineMean
 				v.scoFGA += visFGA.ScoVal
 				v.fgaGP++
+			}
+
+			if hasFTA {
+				h.engFTA += homeFTA.EngineMean
+				h.scoFTA += homeFTA.ScoVal
+				h.ftaGP++
+				v.engFTA += visFTA.EngineMean
+				v.scoFTA += visFTA.ScoVal
+				v.ftaGP++
 			}
 
 			// Engine-only by-origin FGA (reported, never gated). Indexing a nil
@@ -332,6 +364,8 @@ func CollectSeasonAggregates(reports []validate.Report) SeasonAggregateReport {
 				ScoPointDiffPG:          (t.scoFor - t.scoAgainst) / gp,
 				EngineFGAPerG:           perGame(t.engFGA, t.fgaGP),
 				ScoFGAPerG:              perGame(t.scoFGA, t.fgaGP),
+				EngineFTAPerG:           perGame(t.engFTA, t.ftaGP),
+				ScoFTAPerG:              perGame(t.scoFTA, t.ftaGP),
 				EngineFGAInitialPerG:    perGame(t.engFGAInit, t.gp),
 				EngineFGAOrebPerG:       perGame(t.engFGAOreb, t.gp),
 				EngineFGATransitionPerG: perGame(t.engFGATrans, t.gp),
@@ -420,6 +454,7 @@ type fidAcc struct {
 	engWins, scoWins []float64
 	engDiff, scoDiff []float64
 	engFGA, scoFGA   []float64 // per-team total-FGA/g, parallel to engPF/scoPF
+	engFTA, scoFTA   []float64 // per-team total-FTA/g, parallel to engPF/scoPF
 	season           []string  // per-row season label, for within-season demean
 }
 
@@ -447,6 +482,8 @@ func collectFidelitySummaries(seasons []SeasonAggregate) []FidelitySummary {
 			fa.scoDiff = append(fa.scoDiff, ts.ScoPointDiffPG)
 			fa.engFGA = append(fa.engFGA, ts.EngineFGAPerG)
 			fa.scoFGA = append(fa.scoFGA, ts.ScoFGAPerG)
+			fa.engFTA = append(fa.engFTA, ts.EngineFTAPerG)
+			fa.scoFTA = append(fa.scoFTA, ts.ScoFTAPerG)
 			fa.season = append(fa.season, sa.Label)
 		}
 	}
@@ -478,6 +515,7 @@ func collectFidelitySummaries(seasons []SeasonAggregate) []FidelitySummary {
 			PointDiffDispersionRatio:  dispersionRatio(fa.engDiff, fa.scoDiff),
 			VolumeDispersionRatio:     dispersionRatio(fa.engFGA, fa.scoFGA),
 			EfficiencyDispersionRatio: dispersionRatio(engPPS, scoPPS),
+			FTADispersionRatio:        dispersionRatio(fa.engFTA, fa.scoFTA),
 			RealVarLnPF:               varPF,
 			RealVarLnFGA:              varFGA,
 			RealVarLnPPS:              varPPS,

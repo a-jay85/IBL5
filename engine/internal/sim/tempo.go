@@ -52,6 +52,18 @@ const (
 	// directionally faithful, and fully instrumented (origin tags +
 	// decomposeByOrigin) without regressing the corpus. Raising it toward real
 	// Var(lnPF) is deferred until the empty-FGA source is isolated.
+	//
+	// LEVER-2 RE-TEST (2026-06-03, ADR-0044): the Lever-2 pair proposed RAISING
+	// this concurrently with foulCompress (the idea: foulCompress cuts the
+	// negative-Cov foul-arm dispersion, freeing room to add make-coupled volume
+	// dispersion here). The archive sweep REFUTED the raise on its OWN target:
+	// after foulCompress=0.45, EngineVarLnFGA (0.00265 gt2) is still ABOVE real
+	// (0.00141) — foulCompress narrows it but never undershoots, so there is no
+	// room to refill. A 0.02→0.14 sweep (fc=0.45) only widens VarLnFGA further
+	// from real (0.00265→0.00392) and does NOT improve Cov (−0.00176→−0.00189) —
+	// raising it would be tuning toward the emergent Cov flip at the expense of
+	// VarLnFGA→real, the metric-gaming Constraint 1/ADR-0041 forbid. So it stays
+	// at the ADR-0042 minimal-presence floor 0.02.
 	offVolumeScale = 0.02
 	// defRatingScale: seconds base_time LENGTHENS per unit of defensive composite
 	// above neutral — a stronger defense slows the pace, as in the original port.

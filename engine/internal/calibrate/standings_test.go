@@ -598,3 +598,114 @@ func TestDecomposeAndPPS_DegenerateInputsAreFinite(t *testing.T) {
 		}
 	})
 }
+
+// ─── FTA-rate dispersion (the foulCompress calibration target, matrix 13-14) ────
+
+// ftaRows returns two "fta" StatRows (visitor then home) to append to a wfGame,
+// mirroring fgaRows.
+func ftaRows(visID, homeID int, visE, visS, homeE, homeS float64) []validate.StatRow {
+	return []validate.StatRow{
+		{TeamID: visID, Stat: "fta", ScoVal: visS, EngineMean: visE},
+		{TeamID: homeID, Stat: "fta", ScoVal: homeS, EngineMean: homeE},
+	}
+}
+
+// Row #13a: the additive FTA extension does not perturb any existing
+// TeamStanding / FidelitySummary field (including the FGA block from the prior
+// extension), and the new FTA fields default to 0 when a snapshot carries no
+// "fta" rows.
+func TestCollectSeasonAggregates_ExistingFieldsUnchangedByFTAExtension(t *testing.T) {
+	rep := aggReport("s1", bundle.GameTypeRegular,
+		wfGame(1, 2, 1.0, 110, 108, 100, 99),
+		wfGame(2, 1, 0.0, 95, 96, 105, 107),
+	)
+	got := CollectSeasonAggregates([]validate.Report{rep})
+	t1 := standingFor(t, got.Seasons[0], 1)
+	// Existing fields keep their hand-computed values (cf. RollsUpPerTeam).
+	if t1.EnginePointsForPG != 107.5 || t1.EnginePointsAgainstPG != 97.5 || t1.EnginePointDiffPG != 10 || t1.ScoPointDiffPG != 10 {
+		t.Errorf("existing fields perturbed by FTA extension: %+v", t1)
+	}
+	// Both FGA (prior extension) and FTA (this one) default to 0 with no rows.
+	if t1.EngineFGAPerG != 0 || t1.ScoFGAPerG != 0 || t1.EngineFTAPerG != 0 || t1.ScoFTAPerG != 0 {
+		t.Errorf("volume fields = FGA %v/%v FTA %v/%v, want all 0 (no rows in fixture)", t1.EngineFGAPerG, t1.ScoFGAPerG, t1.EngineFTAPerG, t1.ScoFTAPerG)
+	}
+	fs := collectFidelitySummaries(got.Seasons)
+	if fs[0].PFDispersionRatio == 0 && fs[0].LevelGapPF == 0 {
+		t.Fatalf("existing fidelity metrics vanished: %+v", fs[0])
+	}
+	if fs[0].FTADispersionRatio != 0 {
+		t.Errorf("FTADispersionRatio = %v, want 0 with no fta data", fs[0].FTADispersionRatio)
+	}
+}
+
+// Row #13b: fta_dispersion_ratio is the VolumeDispersionRatio analog on the
+// free-throw channel — 0.5 when the engine FTA spread is half the .sco spread,
+// independent of the FGA channel; and it stays 0 (never NaN/Inf) on a single-team
+// / constant column.
+func TestCollectFidelitySummaries_FTADispersion(t *testing.T) {
+	t.Run("ratio", func(t *testing.T) {
+		// engine FTA {99,101} pop-stdev 1; sco FTA {98,102} pop-stdev 2 → 0.5. FGA
+		// set non-degenerate so the row is otherwise ordinary; FTA is independent.
+		fs := collectFidelitySummaries([]SeasonAggregate{regSeason(
+			TeamStanding{TeamID: 1, EngineFTAPerG: 99, ScoFTAPerG: 98, EngineFGAPerG: 100, ScoFGAPerG: 100, EnginePointsForPG: 100, ScoPointsForPG: 100},
+			TeamStanding{TeamID: 2, EngineFTAPerG: 101, ScoFTAPerG: 102, EngineFGAPerG: 100, ScoFGAPerG: 100, EnginePointsForPG: 100, ScoPointsForPG: 100},
+		)})
+		if math.Abs(fs[0].FTADispersionRatio-0.5) > 1e-9 {
+			t.Errorf("FTADispersionRatio = %v, want 0.5", fs[0].FTADispersionRatio)
+		}
+	})
+	t.Run("degenerate single team → 0, finite", func(t *testing.T) {
+		fs := collectFidelitySummaries([]SeasonAggregate{regSeason(
+			TeamStanding{TeamID: 1, EngineFTAPerG: 25, ScoFTAPerG: 22, EnginePointsForPG: 100, ScoPointsForPG: 100},
+		)})
+		if e := fs[0].FTADispersionRatio; math.IsNaN(e) || math.IsInf(e, 0) || e != 0 {
+			t.Errorf("single-team FTADispersionRatio = %v, want 0 (sco zero spread)", e)
+		}
+	})
+	t.Run("constant sco column → 0", func(t *testing.T) {
+		fs := collectFidelitySummaries([]SeasonAggregate{regSeason(
+			TeamStanding{TeamID: 1, EngineFTAPerG: 20, ScoFTAPerG: 24, EnginePointsForPG: 100, ScoPointsForPG: 100},
+			TeamStanding{TeamID: 2, EngineFTAPerG: 28, ScoFTAPerG: 24, EnginePointsForPG: 100, ScoPointsForPG: 100},
+		)})
+		if fs[0].FTADispersionRatio != 0 {
+			t.Errorf("FTADispersionRatio = %v, want 0 (sco constant, no divide-by-zero)", fs[0].FTADispersionRatio)
+		}
+	})
+}
+
+// Row #14: ftaFor returns the team's "fta" row and false when absent; the
+// both-sides guard accumulates FTA only for games where BOTH teams have an "fta"
+// row, divided by that ftaGP (not gp) — mirroring fgaFor / the FGA guard.
+func TestFtaFor_AndBothSidesGuard(t *testing.T) {
+	t.Run("ftaFor lookup", func(t *testing.T) {
+		g := validate.GameReport{HomeTeamID: 1, VisitorTeamID: 2, Rows: []validate.StatRow{
+			{TeamID: 1, Stat: "points", ScoVal: 100},
+			{TeamID: 1, Stat: "fta", ScoVal: 24, EngineMean: 22},
+			{TeamID: 2, Stat: "points", ScoVal: 95},
+		}}
+		if r, ok := ftaFor(g, 1); !ok || r.ScoVal != 24 || r.EngineMean != 22 {
+			t.Errorf("ftaFor(1) = %+v ok=%v, want ScoVal 24 / EngineMean 22", r, ok)
+		}
+		if _, ok := ftaFor(g, 2); ok {
+			t.Errorf("ftaFor(2) ok=true, want false (no fta row for team 2)")
+		}
+	})
+
+	t.Run("both-sides guard + ftaGP divisor", func(t *testing.T) {
+		// g1 has fta on both sides; g2 (also played) has fta on home only. Both
+		// count for points (gp=2) but only g1 contributes FTA → divisor ftaGP=1, so
+		// ScoFTAPerG = 24, NOT (24+50)/2 and NOT 24/2.
+		g1 := wfGame(1, 2, 1.0, 110, 108, 100, 99)
+		g1.Rows = append(g1.Rows, ftaRows(2, 1, 20, 20, 24, 24)...)
+		g2 := wfGame(1, 2, 1.0, 110, 108, 100, 99)
+		g2.Rows = append(g2.Rows, validate.StatRow{TeamID: 1, Stat: "fta", ScoVal: 50, EngineMean: 50})
+		got := CollectSeasonAggregates([]validate.Report{aggReport("s1", bundle.GameTypeRegular, g1, g2)})
+		t1 := standingFor(t, got.Seasons[0], 1)
+		if t1.GamesPlayed != 2 {
+			t.Fatalf("gp = %d, want 2 (both games played)", t1.GamesPlayed)
+		}
+		if t1.ScoFTAPerG != 24 {
+			t.Errorf("ScoFTAPerG = %v, want 24 (only the both-sides game, divided by ftaGP=1)", t1.ScoFTAPerG)
+		}
+	})
+}

@@ -42,15 +42,22 @@ const (
 	// lineup degenerates, which real rosters never are).
 	//
 	// CALIBRATED 2026-06-02 against the real 5.60 .sco archive (jsbcalibrate
-	// --mode calibrate, ibl5/backups, ~20 seasons). 0.059 is the value at which the
-	// engine's mean home-minus-visitor point margin matches the corpus within ±0.5
-	// pts for BOTH regular (gt 2) and playoff (gt 4) games — the HCA-magnitude
-	// fidelity target. Lowering the scale grows the home margin (the fixed 1.0 HCA
-	// subtraction becomes a larger fraction of the shrinking divisor); raising it
-	// shrinks the margin. hcaMagnitude (gametype.go = 0.2) is the faithful decompiled
+	// --mode calibrate, ibl5/backups, ~20 seasons) as 0.059 — the value at which the
+	// engine's mean home-minus-visitor point margin matched the corpus within ±0.5
+	// pts. RE-TUNED 2026-06-04 to 0.0565 (ADR-0044, Lever-2): foulCompress=0.45 net-
+	// weakens the home foul advantage, regressing the gt-2 margin to −0.70 (stride=1),
+	// so the scale steps down one notch to restore it to −0.30 (back in ±0.5,
+	// ≈ the pre-foulCompress −0.35 baseline). Lowering the scale grows the home margin
+	// (the fixed 1.0 HCA subtraction becomes a larger fraction of the shrinking
+	// divisor); raising it shrinks the margin. CAUTION: the margin is steeply
+	// sensitive here (0.059→0.052 swings gt-2 from −0.70 to +0.79 — the documented
+	// low-rating brittleness), so the step is small and gt-4 (pre-existing out of band
+	// at master) is not chased. This scale ALSO sets the offQ divisor that scales the
+	// FTA dispersion, so it is non-orthogonal with foulCompress on (margin, FTADisp)
+	// — see ADR-0044. hcaMagnitude (gametype.go = 0.2) is the faithful decompiled
 	// constant and is NOT a tuning knob — the magnitude is reached via this scale's
 	// ratio to that fixed 0.2. See bands.go provenance for the calibration run.
-	offQualityRatingScale = 0.059
+	offQualityRatingScale = 0.0565
 
 	// offQualityFloor is the ε floor on the offQuality divisor: it guarantees the
 	// foul-bucket division (foul/offQ) can never divide by zero or flip sign even on

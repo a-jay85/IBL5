@@ -5,7 +5,8 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-WORKTREES_DIR="$REPO_ROOT/worktrees"
+source "$REPO_ROOT/bin/lib/git-helpers.sh"
+WORKTREES_DIR="$(worktrees_parent_dir "$REPO_ROOT")"
 
 if [ ! -d "$WORKTREES_DIR" ]; then
     echo "No worktrees directory found."

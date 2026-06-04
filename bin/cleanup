@@ -11,6 +11,8 @@ source "$(dirname "$0")/lib/wt-guards.sh"
 # Resolve to the main repo root, even when run from a worktree.
 # git worktree list always shows the main checkout first.
 REPO_ROOT="$(git worktree list --porcelain | head -1 | sed 's/^worktree //')"
+source "$(dirname "$0")/lib/git-helpers.sh"
+WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
 TARGET_NAME=""
 ALL=false
 DRY_RUN=false
@@ -264,14 +266,15 @@ if [ "$ALL" = true ]; then
     shopt -s nocasematch
     while IFS= read -r wt_path; do
         [[ "$wt_path" == "$REPO_ROOT" ]] && continue
-        # Process worktrees under worktrees/ or .claude/worktrees/
-        [[ "$wt_path" == "$REPO_ROOT/worktrees/"* || "$wt_path" == "$REPO_ROOT/.claude/worktrees/"* ]] || continue
+        # Process worktrees under the external root, the legacy in-repo worktrees/
+        # (un-migrated), or .claude/worktrees/ (EnterWorktree-native).
+        [[ "$wt_path" == "$WT_PARENT/"* || "$wt_path" == "$REPO_ROOT/worktrees/"* || "$wt_path" == "$REPO_ROOT/.claude/worktrees/"* ]] || continue
         check_worktree "$wt_path"
     done < <(git -C "$REPO_ROOT" worktree list --porcelain | awk '/^worktree / { print substr($0, 10) }')
     shopt -u nocasematch
 
     # Clean up orphaned directories (exist on disk but not registered with git)
-    for wt_root in "$REPO_ROOT/worktrees" "$REPO_ROOT/.claude/worktrees"; do
+    for wt_root in "$WT_PARENT" "$REPO_ROOT/worktrees" "$REPO_ROOT/.claude/worktrees"; do
         [ -d "$wt_root" ] || continue
         for dir in "$wt_root"/*/; do
             [ -d "$dir" ] || continue
@@ -443,11 +446,14 @@ if [ "$ALL" = true ]; then
     if command -v docker &>/dev/null; then
         # Collect slugs from all remaining worktrees' .wt-slug files
         active_slugs=""
-        for wt_dir in "$REPO_ROOT"/worktrees/*/; do
-            [ -d "$wt_dir" ] || continue
-            if [ -f "$wt_dir/.wt-slug" ]; then
-                active_slugs="$active_slugs $(cat "$wt_dir/.wt-slug")"
-            fi
+        for wt_root in "$WT_PARENT" "$REPO_ROOT/worktrees" "$REPO_ROOT/.claude/worktrees"; do
+            [ -d "$wt_root" ] || continue
+            for wt_dir in "$wt_root"/*/; do
+                [ -d "$wt_dir" ] || continue
+                if [ -f "$wt_dir/.wt-slug" ]; then
+                    active_slugs="$active_slugs $(cat "$wt_dir/.wt-slug")"
+                fi
+            done
         done
 
         # Scan all Docker containers for worktree compose projects
@@ -549,7 +555,10 @@ if [ "$ALL" = true ]; then
             | sort -u)
     fi
 else
-    WT_PATH="$REPO_ROOT/worktrees/$TARGET_NAME"
+    WT_PATH="$WT_PARENT/$TARGET_NAME"
+    if [ ! -d "$WT_PATH" ]; then
+        WT_PATH="$REPO_ROOT/worktrees/$TARGET_NAME"
+    fi
     if [ ! -d "$WT_PATH" ]; then
         WT_PATH="$REPO_ROOT/.claude/worktrees/$TARGET_NAME"
     fi

@@ -12,6 +12,8 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$REPO_ROOT/bin/lib/db-helpers.sh"
+source "$REPO_ROOT/bin/lib/git-helpers.sh"
+WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
 
 WORKTREE_NAME=""
 NO_RUN=false
@@ -35,7 +37,7 @@ if [ -z "$WORKTREE_NAME" ]; then
     DB_SEED="$REPO_ROOT/ibl5/tests/DatabaseIntegration/Fixtures/db-seed.sql"
     PHP_WORKDIR="/var/www/html/ibl5"
 else
-    WORKTREE_PATH="$REPO_ROOT/worktrees/$WORKTREE_NAME"
+    WORKTREE_PATH="$WT_PARENT/$WORKTREE_NAME"
     if [ ! -d "$WORKTREE_PATH" ]; then
         echo "Error: Worktree not found at $WORKTREE_PATH" >&2
         exit 1

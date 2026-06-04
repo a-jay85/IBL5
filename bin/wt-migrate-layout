@@ -1,0 +1,106 @@
+#!/bin/bash
+# Relocate existing in-repo worktrees (legacy $REPO_ROOT/worktrees/<name>) to the
+# external canonical-case root ($WT_PARENT/<name>). Once a worktree lives outside
+# the repo tree, the repo-root .claude/rules is no longer a filesystem ancestor of
+# its files, so rules stop being injected twice.
+# See ibl5/docs/decisions/0046-worktrees-outside-repo.md.
+#
+# Safe by default: skips any worktree that is actively in use or has uncommitted /
+# untracked work. Tears down its Docker stack first, then `git worktree move`.
+# Idempotent: only legacy in-repo worktrees are considered; re-running is a no-op.
+#
+# Usage: bin/wt-migrate-layout [--dry-run]
+
+set -euo pipefail
+
+source "$(dirname "$0")/lib/wt-guards.sh"
+source "$(dirname "$0")/lib/git-helpers.sh"
+
+# git worktree list always shows the main checkout first.
+REPO_ROOT="$(git worktree list --porcelain | head -1 | sed 's/^worktree //')"
+WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
+LEGACY_DIR="$REPO_ROOT/worktrees"
+DRY_RUN=false
+
+for arg in "$@"; do
+    case "$arg" in
+        --dry-run) DRY_RUN=true ;;
+        -*) echo "Unknown option: $arg" >&2; exit 1 ;;
+        *) echo "Unexpected argument: $arg" >&2; exit 1 ;;
+    esac
+done
+
+MOVED=0
+SKIPPED=0
+
+echo "Migrating worktrees: $LEGACY_DIR -> $WT_PARENT"
+[ "$DRY_RUN" = true ] && echo "DRY RUN — no changes will be made"
+echo ""
+
+# Iterate git-registered worktrees physically under the legacy in-repo dir.
+# nocasematch: a worktree may be registered under github/ vs GitHub/ on APFS.
+shopt -s nocasematch
+while IFS= read -r wt_path; do
+    [[ "$wt_path" == "$REPO_ROOT" ]] && continue
+    [[ "$wt_path" == "$LEGACY_DIR/"* ]] || continue
+
+    name="$(basename "$wt_path")"
+    target="$WT_PARENT/$name"
+
+    if [ -e "$target" ]; then
+        echo "  SKIP   $name — target already exists ($target)"
+        SKIPPED=$((SKIPPED + 1))
+        continue
+    fi
+
+    # Safety gates — never relocate live or dirty work.
+    if is_worktree_in_use "$wt_path"; then
+        echo "  SKIP   $name — actively in use (processes in directory)"
+        SKIPPED=$((SKIPPED + 1))
+        continue
+    fi
+    if has_uncommitted_changes "$wt_path"; then
+        echo "  SKIP   $name — uncommitted changes (commit first)"
+        SKIPPED=$((SKIPPED + 1))
+        continue
+    fi
+    if has_untracked_files "$wt_path"; then
+        echo "  SKIP   $name — untracked files (commit or remove first)"
+        SKIPPED=$((SKIPPED + 1))
+        continue
+    fi
+
+    if [ "$DRY_RUN" = true ]; then
+        echo "  WOULD  $name -> $target"
+        MOVED=$((MOVED + 1))
+        continue
+    fi
+
+    # Tear down Docker (if running) so no bind-mount holds the path during the move.
+    if [ -f "$wt_path/.wt-slug" ]; then
+        echo "  ...tearing down Docker for $name"
+        "$REPO_ROOT/bin/wt-down" "$name" || true
+    fi
+
+    # Docker on macOS sets deny-delete ACLs on bind-mount dirs; clear before moving.
+    chmod -R -N "$wt_path" 2>/dev/null || true
+
+    mkdir -p "$WT_PARENT"
+    if git -C "$REPO_ROOT" worktree move "$wt_path" "$target"; then
+        echo "  MOVED  $name -> $target"
+        MOVED=$((MOVED + 1))
+    else
+        echo "  FAILED $name — git worktree move failed; left in place" >&2
+        SKIPPED=$((SKIPPED + 1))
+    fi
+done < <(git -C "$REPO_ROOT" worktree list --porcelain | awk '/^worktree / { print substr($0, 10) }')
+shopt -u nocasematch
+
+echo ""
+echo "Done: $MOVED moved, $SKIPPED skipped."
+if [ "$DRY_RUN" = false ] && [ "$MOVED" -gt 0 ]; then
+    echo ""
+    echo "Symlinks (vendor, config.php, .env*) target the main checkout by absolute path"
+    echo "and survive the move. Re-run 'bin/wt-up <name>' to restart a Docker preview."
+fi
+exit 0

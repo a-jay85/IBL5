@@ -15,6 +15,8 @@ set -euo pipefail
 
 # Always resolve to the main repo root, even when run from a worktree.
 REPO_ROOT="$(cd "$(dirname "$0")/.." && dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
+source "$REPO_ROOT/bin/lib/git-helpers.sh"
+WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
 
 # --- Parse arguments ---
 WORKTREE_NAME=""
@@ -38,7 +40,7 @@ if [ -z "$WORKTREE_NAME" ]; then
     exit 1
 fi
 
-WORKTREE_PATH="$REPO_ROOT/worktrees/$WORKTREE_NAME"
+WORKTREE_PATH="$WT_PARENT/$WORKTREE_NAME"
 
 # --- Pre-flight checks ---
 if [ ! -d "$WORKTREE_PATH" ]; then

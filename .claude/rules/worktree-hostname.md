@@ -1,6 +1,6 @@
 ---
 description: How to derive the correct Docker hostname for the current worktree or main repo. Prevents using stale slugs.
-last_verified: 2026-05-24
+last_verified: 2026-06-04
 ---
 
 # Worktree Hostname
@@ -11,12 +11,14 @@ When working in the main checkout (`/Users/ajaynicolas/GitHub/IBL5/ibl5/`), the 
 
 ## Worktrees
 
-Worktrees live at `worktrees/<slug>/ibl5/`. The Docker hostname is `<slug>.localhost`.
+Worktrees live OUTSIDE the repo at `IBL5-worktrees/<slug>/ibl5/` — a canonical-case
+sibling of the main checkout (see `ibl5/docs/decisions/0046-worktrees-outside-repo.md`
+for why). The Docker hostname is `<slug>.localhost`.
 
 To derive the slug at runtime from anywhere inside a worktree:
 
 ```bash
-basename "$(dirname "$(git rev-parse --show-toplevel)")"
+basename "$(git rev-parse --show-toplevel)"
 ```
 
 This returns the worktree directory name, which matches the Traefik route configured by `bin/wt-up`.

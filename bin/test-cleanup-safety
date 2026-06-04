@@ -90,6 +90,7 @@ new_env() {
 # so Check 2 (tracked + ancestor + remote-gone) marks it merged.
 add_merged_wt() {
     local main="$1" name="$2"
+    local wt_path="${3:-$main/worktrees/$name}"   # default: legacy in-repo location
     git -C "$main" checkout -q -b "$name" master
     printf 'x\n' > "$main/$name.txt"
     git -C "$main" add "$name.txt"
@@ -99,7 +100,7 @@ add_merged_wt() {
     git -C "$main" merge -q --ff-only "$name"
     git -C "$main" push -q origin master 2>/dev/null
     git -C "$main" push -q origin --delete "$name" 2>/dev/null
-    git -C "$main" worktree add -q "$main/worktrees/$name" "$name" 2>/dev/null
+    git -C "$main" worktree add -q "$wt_path" "$name" 2>/dev/null
 }
 
 # run_cleanup <main> [extra-flags...] — run the cleanup under test, in dry-run,
@@ -240,6 +241,52 @@ if has_untracked_files "$hu"; then
     pass "helper-untracked-nonignored-detected"
 else
     failcase "helper-untracked-nonignored-detected"
+fi
+
+# ----------------------------------------------------------------------------
+# External layout (ADR-0046): worktrees now live OUTSIDE the repo at the
+# canonical-case sibling <parent>/IBL5-worktrees/<name>. cleanup must process
+# them — and apply the same safety guards — at the external root, not only the
+# legacy in-repo worktrees/ dir.
+# ----------------------------------------------------------------------------
+# A merged-clean worktree at the external root IS still cleaned.
+e="$(new_env)"
+add_merged_wt "$e" "extfeat" "${e%/main}/IBL5-worktrees/extfeat"
+out="$(run_cleanup "$e")"
+assert_match "external-merged-clean-cleaned" 'WOULD clean: extfeat' "$out"
+
+# Safety extends to the external root: a merged worktree with an untracked file
+# is SKIPPED (defect-1 guard), not removed.
+e="$(new_env)"
+add_merged_wt "$e" "extfeat" "${e%/main}/IBL5-worktrees/extfeat"
+printf 'draft\n' > "${e%/main}/IBL5-worktrees/extfeat/scratch.md"   # untracked
+out="$(run_cleanup "$e")"
+assert_match "external-untracked-skipped" 'SKIP extfeat: has untracked files' "$out"
+
+# ----------------------------------------------------------------------------
+# Helper unit: git-helpers.sh resolvers. worktrees_parent_dir returns an external
+# sibling (never nested under the repo); is_in_worktree distinguishes the main
+# checkout from a linked worktree (layout-independent — survives the move).
+# ----------------------------------------------------------------------------
+# shellcheck source=bin/lib/git-helpers.sh
+. "$SCRIPT_DIR/lib/git-helpers.sh"
+hg="$(new_env)"
+wtp="$(worktrees_parent_dir "$hg")"
+case "$wtp" in
+    "$hg"/*)          failcase "helper-worktrees-parent-external — nested under repo: $wtp" ;;
+    */IBL5-worktrees) pass "helper-worktrees-parent-external" ;;
+    *)                failcase "helper-worktrees-parent-external — unexpected: $wtp" ;;
+esac
+if is_in_worktree "$hg"; then
+    failcase "helper-is-in-worktree-main-false"
+else
+    pass "helper-is-in-worktree-main-false"
+fi
+git -C "$hg" worktree add -q -b probe "${hg%/main}/IBL5-worktrees/probe" master 2>/dev/null
+if is_in_worktree "${hg%/main}/IBL5-worktrees/probe"; then
+    pass "helper-is-in-worktree-wt-true"
+else
+    failcase "helper-is-in-worktree-wt-true"
 fi
 
 if [ "$FAILED" -ne 0 ]; then

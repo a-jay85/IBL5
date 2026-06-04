@@ -226,29 +226,44 @@ class RecordHoldersView implements RecordHoldersViewInterface
     // ---------------------------------------------------------------
 
     /**
+     * Render the shared category-block scaffold: a `.record-category` wrapper
+     * with a heading and a `.record-table` whose layout is fixed by a modifier
+     * class. Every per-category block differs only in that modifier, its
+     * colgroup, its header cells, and its pre-rendered body rows.
+     */
+    private function renderCategoryTable(string $category, string $modifierClass, string $colgroup, string $thead, string $rows): string
+    {
+        $output = '<div class="record-category">';
+        $output .= $this->renderCategoryHeading($category);
+        $output .= '<table class="ibl-data-table record-table ibl-table-subheading ' . $modifierClass . '" data-no-responsive>';
+        $output .= '<colgroup>' . $colgroup . '</colgroup>';
+        $output .= '<thead><tr>' . $thead . '</tr></thead>';
+        $output .= '<tbody>' . $rows . '</tbody></table></div>';
+
+        return $output;
+    }
+
+    /**
      * Render a player single-game category block (heading + mini-table).
      *
      * @param list<FormattedPlayerRecord> $categoryRecords
      */
     private function renderPlayerCategoryBlock(string $category, array $categoryRecords, bool $multiLineAmount = false): string
     {
-        $statLabel = $this->getStatColumnLabel($category);
+        $safeStatLabel = HtmlSanitizer::safeHtmlOutput($this->getStatColumnLabel($category));
 
-        $output = '<div class="record-category">';
-        $output .= $this->renderCategoryHeading($category);
-        $output .= '<table class="ibl-data-table record-table ibl-table-subheading record-table--5col" data-no-responsive>';
-        $output .= '<colgroup><col class="col-player"><col class="col-team"><col class="col-date"><col class="col-opponent"><col class="col-amount"></colgroup>';
-        $safeStatLabel = HtmlSanitizer::safeHtmlOutput($statLabel);
-        $output .= '<thead><tr><th>Player</th><th>Team</th><th>Date</th><th>Opponent</th><th>' . $safeStatLabel . '</th></tr></thead>';
-        $output .= '<tbody>';
-
+        $rows = '';
         foreach ($categoryRecords as $record) {
-            $output .= $this->renderPlayerRecordRow($record, $multiLineAmount);
+            $rows .= $this->renderPlayerRecordRow($record, $multiLineAmount);
         }
 
-        $output .= '</tbody></table></div>';
-
-        return $output;
+        return $this->renderCategoryTable(
+            $category,
+            'record-table--5col',
+            '<col class="col-player"><col class="col-team"><col class="col-date"><col class="col-opponent"><col class="col-amount">',
+            '<th>Player</th><th>Team</th><th>Date</th><th>Opponent</th><th>' . $safeStatLabel . '</th>',
+            $rows
+        );
     }
 
     /**
@@ -258,16 +273,9 @@ class RecordHoldersView implements RecordHoldersViewInterface
      */
     private function renderSeasonCategoryBlock(string $category, array $categoryRecords): string
     {
-        $statLabel = $this->getStatColumnLabel($category);
+        $safeStatLabel = HtmlSanitizer::safeHtmlOutput($this->getStatColumnLabel($category));
 
-        $output = '<div class="record-category">';
-        $output .= $this->renderCategoryHeading($category);
-        $output .= '<table class="ibl-data-table record-table ibl-table-subheading record-table--4col-season" data-no-responsive>';
-        $output .= '<colgroup><col class="col-player"><col class="col-team"><col class="col-season"><col class="col-amount"></colgroup>';
-        $safeStatLabel = HtmlSanitizer::safeHtmlOutput($statLabel);
-        $output .= '<thead><tr><th>Player</th><th>Team</th><th>Season</th><th>' . $safeStatLabel . '</th></tr></thead>';
-        $output .= '<tbody>';
-
+        $rows = '';
         foreach ($categoryRecords as $record) {
             $safeName = HtmlSanitizer::safeHtmlOutput($record['name']);
             $safeTeam = HtmlSanitizer::safeHtmlOutput($record['teamAbbr']);
@@ -279,17 +287,21 @@ class RecordHoldersView implements RecordHoldersViewInterface
 
             $seasonLink = '<a href="' . TeamCellHelper::teamPageUrl($teamTid, $teamYr) . '">' . $safeSeason . '</a>';
 
-            $output .= '<tr>';
-            $output .= PlayerImageHelper::renderLargePlayerCell($pid, $record['name']);
-            $output .= '<td><a href="modules.php?name=Team&amp;op=team&amp;teamid=' . $teamTid . '&amp;yr=' . $teamYr . '"><img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '"></a></td>';
-            $output .= '<td>' . $seasonLink . '</td>';
-            $output .= '<td class="ibl-stat-highlight">' . $safeAmount . '</td>';
-            $output .= '</tr>';
+            $rows .= '<tr>';
+            $rows .= PlayerImageHelper::renderLargePlayerCell($pid, $record['name']);
+            $rows .= '<td><a href="modules.php?name=Team&amp;op=team&amp;teamid=' . $teamTid . '&amp;yr=' . $teamYr . '"><img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '"></a></td>';
+            $rows .= '<td>' . $seasonLink . '</td>';
+            $rows .= '<td class="ibl-stat-highlight">' . $safeAmount . '</td>';
+            $rows .= '</tr>';
         }
 
-        $output .= '</tbody></table></div>';
-
-        return $output;
+        return $this->renderCategoryTable(
+            $category,
+            'record-table--4col-season',
+            '<col class="col-player"><col class="col-team"><col class="col-season"><col class="col-amount">',
+            '<th>Player</th><th>Team</th><th>Season</th><th>' . $safeStatLabel . '</th>',
+            $rows
+        );
     }
 
     /**
@@ -299,23 +311,20 @@ class RecordHoldersView implements RecordHoldersViewInterface
      */
     private function renderTeamGameCategoryBlock(string $category, array $categoryRecords): string
     {
-        $statLabel = $this->getStatColumnLabel($category);
+        $safeStatLabel = HtmlSanitizer::safeHtmlOutput($this->getStatColumnLabel($category));
 
-        $output = '<div class="record-category">';
-        $output .= $this->renderCategoryHeading($category);
-        $output .= '<table class="ibl-data-table record-table ibl-table-subheading record-table--4col-team" data-no-responsive>';
-        $output .= '<colgroup><col class="col-team"><col class="col-date"><col class="col-opponent"><col class="col-amount"></colgroup>';
-        $safeStatLabel = HtmlSanitizer::safeHtmlOutput($statLabel);
-        $output .= '<thead><tr><th>Team</th><th>Date</th><th>Opponent</th><th>' . $safeStatLabel . '</th></tr></thead>';
-        $output .= '<tbody>';
-
+        $rows = '';
         foreach ($categoryRecords as $record) {
-            $output .= $this->renderTeamGameRow($record);
+            $rows .= $this->renderTeamGameRow($record);
         }
 
-        $output .= '</tbody></table></div>';
-
-        return $output;
+        return $this->renderCategoryTable(
+            $category,
+            'record-table--4col-team',
+            '<col class="col-team"><col class="col-date"><col class="col-opponent"><col class="col-amount">',
+            '<th>Team</th><th>Date</th><th>Opponent</th><th>' . $safeStatLabel . '</th>',
+            $rows
+        );
     }
 
     /**
@@ -325,16 +334,9 @@ class RecordHoldersView implements RecordHoldersViewInterface
      */
     private function renderTeamSeasonCategoryBlock(string $category, array $categoryRecords): string
     {
-        $statLabel = $this->getStatColumnLabel($category);
+        $safeStatLabel = HtmlSanitizer::safeHtmlOutput($this->getStatColumnLabel($category));
 
-        $output = '<div class="record-category">';
-        $output .= $this->renderCategoryHeading($category);
-        $output .= '<table class="ibl-data-table record-table ibl-table-subheading record-table--3col-team-season" data-no-responsive>';
-        $output .= '<colgroup><col class="col-team"><col class="col-season"><col class="col-amount"></colgroup>';
-        $safeStatLabel = HtmlSanitizer::safeHtmlOutput($statLabel);
-        $output .= '<thead><tr><th>Team</th><th>Season</th><th>' . $safeStatLabel . '</th></tr></thead>';
-        $output .= '<tbody>';
-
+        $rows = '';
         foreach ($categoryRecords as $record) {
             $safeTeam = HtmlSanitizer::safeHtmlOutput($record['teamAbbr']);
             $safeSeason = HtmlSanitizer::safeHtmlOutput($record['season']);
@@ -344,17 +346,21 @@ class RecordHoldersView implements RecordHoldersViewInterface
 
             $seasonLink = '<a href="' . TeamCellHelper::teamPageUrl($teamTid, $teamYr) . '">' . $safeSeason . '</a>';
 
-            $output .= '<tr>';
+            $rows .= '<tr>';
             $teamLabel = $safeTeam !== '' ? $safeTeam : 'Team';
-            $output .= '<td><a href="' . TeamCellHelper::teamPageUrl($teamTid, $teamYr) . '" aria-label="' . $teamLabel . '"><img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '"></a></td>';
-            $output .= '<td>' . $seasonLink . '</td>';
-            $output .= '<td class="ibl-stat-highlight">' . $safeAmount . '</td>';
-            $output .= '</tr>';
+            $rows .= '<td><a href="' . TeamCellHelper::teamPageUrl($teamTid, $teamYr) . '" aria-label="' . $teamLabel . '"><img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '"></a></td>';
+            $rows .= '<td>' . $seasonLink . '</td>';
+            $rows .= '<td class="ibl-stat-highlight">' . $safeAmount . '</td>';
+            $rows .= '</tr>';
         }
 
-        $output .= '</tbody></table></div>';
-
-        return $output;
+        return $this->renderCategoryTable(
+            $category,
+            'record-table--3col-team-season',
+            '<col class="col-team"><col class="col-season"><col class="col-amount">',
+            '<th>Team</th><th>Season</th><th>' . $safeStatLabel . '</th>',
+            $rows
+        );
     }
 
     /**
@@ -364,16 +370,9 @@ class RecordHoldersView implements RecordHoldersViewInterface
      */
     private function renderFranchiseCategoryBlock(string $category, array $categoryRecords): string
     {
-        $statLabel = $this->getStatColumnLabel($category);
+        $safeStatLabel = HtmlSanitizer::safeHtmlOutput($this->getStatColumnLabel($category));
 
-        $output = '<div class="record-category">';
-        $output .= $this->renderCategoryHeading($category);
-        $output .= '<table class="ibl-data-table record-table ibl-table-subheading record-table--3col-franchise" data-no-responsive>';
-        $output .= '<colgroup><col class="col-team"><col class="col-amount"><col class="col-years"></colgroup>';
-        $safeStatLabel = HtmlSanitizer::safeHtmlOutput($statLabel);
-        $output .= '<thead><tr><th>Team</th><th>' . $safeStatLabel . '</th><th>Years</th></tr></thead>';
-        $output .= '<tbody>';
-
+        $rows = '';
         foreach ($categoryRecords as $record) {
             $safeTeam = HtmlSanitizer::safeHtmlOutput($record['teamAbbr']);
             $safeAmount = HtmlSanitizer::safeHtmlOutput($record['amount']);
@@ -382,16 +381,20 @@ class RecordHoldersView implements RecordHoldersViewInterface
             // Link each year to the team's history page for that season
             $yearsLinked = $this->renderFranchiseYearLinks($record['years'], $teamTid);
 
-            $output .= '<tr>';
-            $output .= '<td><a href="' . TeamCellHelper::teamPageUrl($teamTid) . '"><img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '"></a></td>';
-            $output .= '<td class="ibl-stat-highlight">' . $safeAmount . '</td>';
-            $output .= '<td>' . $yearsLinked . '</td>';
-            $output .= '</tr>';
+            $rows .= '<tr>';
+            $rows .= '<td><a href="' . TeamCellHelper::teamPageUrl($teamTid) . '"><img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '"></a></td>';
+            $rows .= '<td class="ibl-stat-highlight">' . $safeAmount . '</td>';
+            $rows .= '<td>' . $yearsLinked . '</td>';
+            $rows .= '</tr>';
         }
 
-        $output .= '</tbody></table></div>';
-
-        return $output;
+        return $this->renderCategoryTable(
+            $category,
+            'record-table--3col-franchise',
+            '<col class="col-team"><col class="col-amount"><col class="col-years">',
+            '<th>Team</th><th>' . $safeStatLabel . '</th><th>Years</th>',
+            $rows
+        );
     }
 
     // ---------------------------------------------------------------

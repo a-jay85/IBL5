@@ -12,6 +12,7 @@ use PHPUnit\Framework\TestCase;
 use Team\Contracts\TeamQueryRepositoryInterface;
 use Team\Team;
 use Tests\WideUnit\Mocks\MockDatabase;
+use Tests\WideUnit\Mocks\TestDataFactory;
 
 /**
  * @covers \FreeAgency\FreeAgencyService
@@ -143,8 +144,8 @@ class FreeAgencyServiceTest extends TestCase
     public function testGetMainPageDataIncludesAllOtherPlayers(): void
     {
         $testPlayers = [
-            ['pid' => 1, 'name' => 'Player A'],
-            ['pid' => 2, 'name' => 'Player B'],
+            TestDataFactory::createPlayer(['pid' => 1, 'name' => 'Player A']),
+            TestDataFactory::createPlayer(['pid' => 2, 'name' => 'Player B']),
         ];
         $this->stubRepo->method('getAllPlayersExcludingTeam')->willReturn($testPlayers);
 

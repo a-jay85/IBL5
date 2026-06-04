@@ -26,7 +26,10 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
     {
         $badDb = new \mysqli();
         try {
-            $badDb->real_connect('db', 'nonexistent_user_xyz', 'wrong', 'x');
+            // Deliberate bad connection: host 'db' is unresolvable on the CI
+            // runner (DB_HOST=127.0.0.1) and emits a real_connect() warning we
+            // expect — suppress it so failOnWarning gates only genuine warnings.
+            @$badDb->real_connect('db', 'nonexistent_user_xyz', 'wrong', 'x');
         } catch (\mysqli_sql_exception) {
             // connect_errno is now set
         }

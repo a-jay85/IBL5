@@ -418,6 +418,39 @@ function fixDates(array $files, \DateTimeImmutable $today): int
 }
 
 /**
+ * Default-tz calendar date (Y-m-d) of the most recent commit in $base..HEAD that
+ * touched $rel — the date the change was committed. Read from the author
+ * timestamp (%at), an absolute instant, then formatted in the same default
+ * timezone as $today so the two share one frame.
+ *
+ * Immutable per commit, so comparing last_verified against it is independent of
+ * when CI runs: a same-day re-edit of a doc already verified today passes without
+ * waiting for UTC rollover, and a PR spanning midnight never false-fails (the trap
+ * equality-to-today would create). Returns null when the date can't be read, so
+ * the caller falls back to the strict value comparison (fail-closed).
+ */
+function editCommitDate(string $repoRoot, string $base, string $rel): ?string
+{
+    $cmd = sprintf(
+        'git -C %s log -1 --format=%%at %s..HEAD -- %s 2>/dev/null',
+        escapeshellarg($repoRoot),
+        escapeshellarg($base),
+        escapeshellarg($rel)
+    );
+    $out = [];
+    $code = 0;
+    exec($cmd, $out, $code);
+    $ts = trim(implode('', $out));
+    if ($code !== 0 || $ts === '' || ctype_digit($ts) === false) {
+        return null;
+    }
+
+    return (new \DateTimeImmutable('@' . $ts))
+        ->setTimezone(new \DateTimeZone(date_default_timezone_get()))
+        ->format('Y-m-d');
+}
+
+/**
  * Changed-files (PR) mode. For each in-scope .md that changed between $base and
  * HEAD, fail when its body changed but the parsed `last_verified` value did NOT
  * change (the On-Touch Rule), and additionally run the full-scan checkFile()
@@ -426,10 +459,16 @@ function fixDates(array $files, \DateTimeImmutable $today): int
  * The bump check compares the parsed frontmatter VALUE base-vs-head — never
  * date-equality-to-today — so a PR opened Monday and merged Wednesday does not
  * false-fail, and body text that literally contains `last_verified:` (e.g. inside
- * a code fence) cannot trip the check. The value comparison subsumes every case:
- * body-changed-not-bumped fails (values equal), date-bumped passes (values
- * differ), newly-added-with-date passes (base null != date), added-without-date
- * fails (null === null).
+ * a code fence) cannot trip the check. One escape sits on top of the value
+ * compare: when head and base values are EQUAL, the file still passes if that
+ * value equals the edit's commit date (editCommitDate) — a same-day re-edit of a
+ * doc already verified today, which cannot bump higher without becoming a future
+ * date. The escape keys off the immutable commit date, not the CI wall clock, so
+ * it does not reintroduce the midnight false-fail. Cases: body-changed-not-bumped
+ * fails (values equal AND lv predates the edit), date-bumped passes (values
+ * differ), same-day re-edit passes (value == commit date), newly-added-with-date
+ * passes (base null != date), added-without-date fails (null === null, null !=
+ * commit date).
  *
  * @return list<string> diagnostic lines, each prefixed with the repo-relative path.
  */
@@ -483,7 +522,12 @@ function checkChanged(string $base, string $repoRoot, \DateTimeImmutable $today)
         $headLv = $headFm['last_verified'] ?? null;
         $baseLv = $baseFm['last_verified'] ?? null;
 
-        if ($headLv === $baseLv) {
+        // Body changed but the date did not move from base. Allow it only when
+        // the kept date is itself the commit date of this edit — a same-day
+        // re-verify of a doc already verified today, which cannot bump higher
+        // without going into the future. Otherwise it is an un-bumped stale date.
+        $verifiedAtEdit = $headLv !== null && $headLv === editCommitDate($repoRoot, $base, $rel);
+        if ($headLv === $baseLv && !$verifiedAtEdit) {
             $issues[] = sprintf(
                 '%s: body changed but last_verified not bumped (still %s)',
                 $rel,

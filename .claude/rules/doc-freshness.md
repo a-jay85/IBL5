@@ -1,6 +1,6 @@
 ---
 description: Frontmatter schema, 60-day staleness policy, on-touch verification rule, and dead-reference rules enforced by bin/check-docs
-last_verified: 2026-05-31
+last_verified: 2026-06-04
 paths: "**/*.md"
 ---
 
@@ -25,7 +25,7 @@ paths: "glob-or-list"  # only meaningful for .claude/rules/*
 
 When editing any in-scope `.md` file, verify its content still matches reality, confirm the `description` field accurately reflects the content, and bump `last_verified` to today — all in the same edit.
 
-This is enforced in CI by `bin/check-docs --since=<base-ref>`, which fails any PR that changes an in-scope `.md` body without bumping `last_verified` (a base-vs-head value comparison, never date-equality-to-today, so a PR opened one day and merged later does not false-fail).
+This is enforced in CI by `bin/check-docs --since=<base-ref>`, which fails any PR that changes an in-scope `.md` body without bumping `last_verified` (a base-vs-head value comparison, never date-equality-to-today, so a PR opened one day and merged later does not false-fail). Exception: if the doc was already verified earlier the **same day**, the value cannot bump higher without going into the future — so an unchanged value still passes when it equals the edit's git commit date. That escape keys off the immutable commit date, not the CI clock, so it does not reintroduce a midnight false-fail. The practical effect: a same-UTC-day re-edit of a doc verified earlier that day does not have to wait for UTC rollover. Trade-off: at one-day granularity the escape cannot tell a genuine same-day re-verification from a same-day edit that skipped re-checking — an accepted loosening, since the alternative (a hard same-day deadlock) was worse.
 
 ## Dead-Reference Rule
 

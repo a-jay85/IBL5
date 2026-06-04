@@ -39,7 +39,7 @@ class FreeAgencyService implements FreeAgencyServiceInterface
     /**
      * @see FreeAgencyServiceInterface::getMainPageData()
      *
-     * @return array{capMetrics: array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>}, team: Team, season: Season, allOtherPlayers: list<Player>, teamColorsByTeamId: array<int, array{color1: string, color2: string}>, playersUnderContract: list<Player>, unsignedFreeAgents: list<Player>, offerPlayers: list<array{player: Player, offer: array<string, int>}>, cashPlayers: list<array{player: Player, label: string}>}
+     * @return array{capMetrics: array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>}, team: Team, season: Season, allOtherPlayers: list<Player>, teamColorsByTeamId: array<int, array{color1: string, color2: string}>, playersUnderContract: list<array{player: Player, contractAction: 'rookie_option'|'extension'|null}>, unsignedFreeAgents: list<Player>, offerPlayers: list<array{player: Player, offer: array<string, int>}>, cashPlayers: list<array{player: Player, label: string}>}
      */
     public function getMainPageData(Team $team, Season $season): array
     {
@@ -82,7 +82,7 @@ class FreeAgencyService implements FreeAgencyServiceInterface
     }
 
     /**
-     * @return array{playersUnderContract: list<Player>, unsignedFreeAgents: list<Player>}
+     * @return array{playersUnderContract: list<array{player: Player, contractAction: 'rookie_option'|'extension'|null}>, unsignedFreeAgents: list<Player>}
      */
     private function buildRosterPartition(int $teamId, Season $season): array
     {
@@ -95,7 +95,10 @@ class FreeAgencyService implements FreeAgencyServiceInterface
             if ($player->isPlayerFreeAgent($season) && !$player->isSalaryPlaceholder()) {
                 $unsigned[] = $player;
             } else {
-                $contracted[] = $player;
+                $contracted[] = [
+                    'player' => $player,
+                    'contractAction' => $this->resolveContractAction($player, $season),
+                ];
             }
         }
 
@@ -103,6 +106,35 @@ class FreeAgencyService implements FreeAgencyServiceInterface
             'playersUnderContract' => $contracted,
             'unsignedFreeAgents' => $unsigned,
         ];
+    }
+
+    /**
+     * Resolve the contract-management action offered for a player in the
+     * Players-Under-Contract table: exercise a rookie option, open a contract
+     * extension, or none. This mirrors the View's prior inline decision
+     * verbatim — in particular `canRenegotiateContract()` is called with no
+     * season argument, matching the original render path (passing the season
+     * would apply an offseason year-shift and change which players qualify).
+     *
+     * Only 'rookie_option' and null are reachable here: an extension-eligible
+     * player has an empty next contract year, which makes it a free agent, so
+     * the partition above routes it into the unsigned-FA list before this runs.
+     * The 'extension' branch is preserved to keep behavior byte-identical.
+     *
+     * @return 'rookie_option'|'extension'|null
+     */
+    private function resolveContractAction(Player $player, Season $season): ?string
+    {
+        if ($player->canRookieOption($season->phase)) {
+            return 'rookie_option';
+        }
+
+        $isExtensionPhase = in_array($season->phase, ['Preseason', 'Regular Season', 'Playoffs'], true);
+        if ($isExtensionPhase && $player->canRenegotiateContract()) {
+            return 'extension';
+        }
+
+        return null;
     }
 
     /**

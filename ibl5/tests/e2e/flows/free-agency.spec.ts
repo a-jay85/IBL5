@@ -10,6 +10,11 @@ import { offerForm } from '../helpers/free-agency';
 //   pid=12: FA Forward on Stars (tid=2, exp=3, bird=2) → "All Other Free Agents"
 // And 1 cash consideration (ibl_cash_considerations table):
 //   Cash from Trade on Metros (tid=1) → "Players Under Contract" (not FA tables)
+// Players-Under-Contract action column (rookie option vs none), user team Metros (tid=1):
+//   pid=200000032 "Rookie Option Target": round-1, exp=2, salary_yr4=0 →
+//     canRookieOption() true in Free Agency phase → row renders a Rookie Option link.
+//   pid=1 "Test Player": round-1 but exp=5 (>3) → not rookie-eligible; Free Agency
+//     offers no extensions (isExtensionPhase false) → contractAction null, no action link.
 // Submission tests are in free-agency-submission.spec.ts.
 // The `offerForm` locator helper is shared via helpers/free-agency.ts.
 
@@ -70,6 +75,37 @@ test.describe('Free Agency -- main page', () => {
   test('negotiate links present for free agents', async ({ page }) => {
     const count = await page.locator('a[href*="pa=negotiate"]').count();
     expect(count).toBeGreaterThan(0);
+  });
+
+  // Matrix #7 — the contract-action decision moved from FreeAgencyView into
+  // FreeAgencyService (PR 9). These two tests pin the rendered outcome of both
+  // reachable arms ('rookie_option' and null) on the live page. The 'extension'
+  // arm is unreachable in Free Agency phase, so only these two states exist here.
+  test('rookie-option-eligible contracted player renders a Rookie Option action link', async ({ page }) => {
+    const underContract = page.locator('[aria-label="Players under contract"]');
+    // pid=200000032 "Rookie Option Target" (Metros, round-1, exp=2, salary_yr4=0)
+    // is rookie-option-eligible in Free Agency phase. Scope to its pid so other
+    // eligible roster players (if any) don't make the locator ambiguous.
+    const rookieLink = underContract.locator(
+      'a.contract-hint-link[href*="pa=rookieoption"][href*="pid=200000032"]',
+    );
+    // The hint link is hover/tap-revealed (hidden until interaction), so assert it
+    // is present in the DOM with the right target — not visible.
+    await expect(rookieLink).toBeAttached();
+    await expect(rookieLink).toHaveText('Rookie Option');
+    const href = await rookieLink.getAttribute('href');
+    expect(href).toContain('from=fa');
+  });
+
+  test('contracted player ineligible for rookie option renders no action link', async ({ page }) => {
+    const underContract = page.locator('[aria-label="Players under contract"]');
+    // pid=1 "Test Player" (Metros, exp=5 > 3) is not rookie-eligible and Free
+    // Agency offers no extensions → its row carries no contract-hint-link.
+    const row = underContract.locator('tr', {
+      has: page.locator('a[href*="pa=showpage"][href$="pid=1"]'),
+    });
+    await expect(row).toBeVisible();
+    await expect(row.locator('a.contract-hint-link')).toHaveCount(0);
   });
 
   test('unsigned free agents section shows bird rights notation', async ({ page }) => {

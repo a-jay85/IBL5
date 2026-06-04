@@ -77,7 +77,7 @@ interface TradingServiceInterface
      *             seasonEndingYear: int
      *         }
      *     }>,
-     *     teams: list<array{name: string, city: string, fullName: string, teamid: int, color1: string, color2: string}>
+     *     teams: list<array{name: string, city: string, fullName: string, teamid: int, color1: string, color2: string, mobileOrder: int}>
      * }
      */
     public function getTradeReviewPageData(string $username): array;

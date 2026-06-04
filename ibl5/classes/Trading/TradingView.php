@@ -21,6 +21,20 @@ use Season\Season;
 class TradingView implements TradingViewInterface
 {
     /**
+     * Result-code → alert config map shared by the trade-offer form and the
+     * trade-review page (both render the same set of trade outcome banners).
+     *
+     * @var array<string, array{class: string, message: string}>
+     */
+    private const TRADE_ALERT_MAP = [
+        'offer_sent' => ['class' => 'ibl-alert--success', 'message' => 'Trade offer sent!'],
+        'trade_accepted' => ['class' => 'ibl-alert--success', 'message' => 'Trade accepted!'],
+        'trade_rejected' => ['class' => 'ibl-alert--info', 'message' => 'Trade offer rejected.'],
+        'accept_error' => ['class' => 'ibl-alert--error', 'message' => 'Error processing trade.'],
+        'already_processed' => ['class' => 'ibl-alert--warning', 'message' => 'This trade has already been accepted, declined, or withdrawn.'],
+    ];
+
+    /**
      * @see TradingViewInterface::renderTradeOfferForm()
      *
      * @param array<string, mixed> $pageData
@@ -65,13 +79,7 @@ class TradingView implements TradingViewInterface
         $k--;
 
         ob_start();
-        echo \UI\AlertRenderer::fromCode($pageData['result'] ?? null, [
-            'offer_sent' => ['class' => 'ibl-alert--success', 'message' => 'Trade offer sent!'],
-            'trade_accepted' => ['class' => 'ibl-alert--success', 'message' => 'Trade accepted!'],
-            'trade_rejected' => ['class' => 'ibl-alert--info', 'message' => 'Trade offer rejected.'],
-            'accept_error' => ['class' => 'ibl-alert--error', 'message' => 'Error processing trade.'],
-            'already_processed' => ['class' => 'ibl-alert--warning', 'message' => 'This trade has already been accepted, declined, or withdrawn.'],
-        ], $pageData['error'] ?? null);
+        echo \UI\AlertRenderer::fromCode($pageData['result'] ?? null, self::TRADE_ALERT_MAP, $pageData['error'] ?? null);
         ?>
 <form name="Trade_Offer" method="post" action="/ibl5/modules/Trading/maketradeoffer.php">
     <?= \Security\CsrfGuard::generateToken('trade_offer') ?>
@@ -211,7 +219,7 @@ $tradeConfig = [
      */
     public function renderTradeReview(array $pageData): string
     {
-        /** @var array{userTeam: string, userTeamId: int, tradeOffers: array<int, array{from: string, to: string, approval: string, oppositeTeam: string, hasHammer: bool, items: list<array{type: string, description: string, notes: string|null, from: string, to: string}>, previewData: array{fromPids: list<int>, toPids: list<int>, fromTeamId: int, toTeamId: int, fromColor1: string, toColor1: string, fromCash: array<int, int>, toCash: array<int, int>, cashStartYear: int, cashEndYear: int, seasonEndingYear: int}}>, teams: list<array{name: string, city: string, fullName: string, teamid: int, color1: string, color2: string}>, result?: string, error?: string} $pageData */
+        /** @var array{userTeam: string, userTeamId: int, tradeOffers: array<int, array{from: string, to: string, approval: string, oppositeTeam: string, hasHammer: bool, items: list<array{type: string, description: string, notes: string|null, from: string, to: string}>, previewData: array{fromPids: list<int>, toPids: list<int>, fromTeamId: int, toTeamId: int, fromColor1: string, toColor1: string, fromCash: array<int, int>, toCash: array<int, int>, cashStartYear: int, cashEndYear: int, seasonEndingYear: int}}>, teams: list<array{name: string, city: string, fullName: string, teamid: int, color1: string, color2: string, mobileOrder: int}>, result?: string, error?: string} $pageData */
 
         $userTeam = HtmlSanitizer::safeHtmlOutput($pageData['userTeam']);
         $userTeamId = $pageData['userTeamId'];
@@ -222,13 +230,7 @@ $tradeConfig = [
         $reviewConfigs = [];
 
         ob_start();
-        echo \UI\AlertRenderer::fromCode($pageData['result'] ?? null, [
-            'offer_sent' => ['class' => 'ibl-alert--success', 'message' => 'Trade offer sent!'],
-            'trade_accepted' => ['class' => 'ibl-alert--success', 'message' => 'Trade accepted!'],
-            'trade_rejected' => ['class' => 'ibl-alert--info', 'message' => 'Trade offer rejected.'],
-            'accept_error' => ['class' => 'ibl-alert--error', 'message' => 'Error processing trade.'],
-            'already_processed' => ['class' => 'ibl-alert--warning', 'message' => 'This trade has already been accepted, declined, or withdrawn.'],
-        ], $pageData['error'] ?? null);
+        echo \UI\AlertRenderer::fromCode($pageData['result'] ?? null, self::TRADE_ALERT_MAP, $pageData['error'] ?? null);
         ?>
 <div class="trading-layout__header">
     <h2 class="ibl-title">Trading</h2>
@@ -290,52 +292,10 @@ $tradeConfig = [
     /**
      * @see TradingViewInterface::renderTeamSelectionLinks()
      *
-     * @param list<array{name: string, city: string, fullName: string, teamid: int, color1: string, color2: string}> $teams
+     * @param list<array{name: string, city: string, fullName: string, teamid: int, color1: string, color2: string, mobileOrder: int}> $teams Conference-split, sorted, interleaved team list from TradingService::buildTeamList()
      */
     public function renderTeamSelectionLinks(array $teams): string
     {
-        /** @var list<array{name: string, city: string, fullName: string, teamid: int, color1: string, color2: string}> $teams */
-
-        // Split by conference
-        $western = [];
-        $eastern = [];
-        foreach ($teams as $team) {
-            if (in_array($team['teamid'], League::WESTERN_CONFERENCE_TEAMIDS, true)) {
-                $western[] = $team;
-            } else {
-                $eastern[] = $team;
-            }
-        }
-
-        // Compute mobile order (by team name) before sorting by city for desktop
-        $mobileOrder = [];
-        $byName = $western;
-        usort($byName, static fn(array $a, array $b): int => strcasecmp($a['name'], $b['name']));
-        foreach ($byName as $i => $team) {
-            $mobileOrder[$team['teamid']] = $i * 2; // even slots for West
-        }
-        $byName = $eastern;
-        usort($byName, static fn(array $a, array $b): int => strcasecmp($a['name'], $b['name']));
-        foreach ($byName as $i => $team) {
-            $mobileOrder[$team['teamid']] = $i * 2 + 1; // odd slots for East
-        }
-
-        // Sort by city for desktop display
-        usort($western, static fn(array $a, array $b): int => strcasecmp($a['city'], $b['city']));
-        usort($eastern, static fn(array $a, array $b): int => strcasecmp($a['city'], $b['city']));
-
-        // Interleave: West[0], East[0], West[1], East[1], ...
-        $interleaved = [];
-        $count = max(count($western), count($eastern));
-        for ($i = 0; $i < $count; $i++) {
-            if (isset($western[$i])) {
-                $interleaved[] = $western[$i];
-            }
-            if (isset($eastern[$i])) {
-                $interleaved[] = $eastern[$i];
-            }
-        }
-
         ob_start();
         ?>
 <table class="ibl-data-table trading-team-select">
@@ -346,7 +306,7 @@ $tradeConfig = [
         </tr>
     </thead>
     <tbody>
-<?php foreach ($interleaved as $team): ?>
+<?php foreach ($teams as $team): ?>
         <?php
         $teamId = $team['teamid'];
         $teamName = HtmlSanitizer::safeHtmlOutput($team['name']);
@@ -354,7 +314,7 @@ $tradeConfig = [
         $cityHtml = HtmlSanitizer::safeHtmlOutput($team['city']);
         $nameHtml = '<span class="ibl-team-cell__city">' . $cityHtml . ' </span>' . $teamName;
         $cell = TeamCellHelper::renderTeamCell($teamId, $team['fullName'], $team['color1'], $team['color2'], '', $partnerUrl, $nameHtml);
-        $cell = str_replace('style="', 'style="--mobile-order: ' . $mobileOrder[$teamId] . '; ', $cell);
+        $cell = str_replace('style="', 'style="--mobile-order: ' . $team['mobileOrder'] . '; ', $cell);
         ?>
         <tr>
             <?= HtmlSanitizer::trusted($cell) ?>

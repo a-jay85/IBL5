@@ -156,6 +156,55 @@ class TradingServiceTest extends TestCase
     // GROUP TRADE OFFERS TESTS (via getTradeReviewPageData)
     // ============================================
 
+    /**
+     * The team-selection sidebar's conference split / city-sort / interleave /
+     * mobile-order computation moved from TradingView into the Service's
+     * buildTeamList(); assert the resulting 'teams' list here (buildTeamList is
+     * private, so we observe it through getTradeReviewPageData()['teams']).
+     *
+     * Fixture (6 teams). West per League::WESTERN_CONFERENCE_TEAMIDS = {6,13,24}:
+     *   Denver Nuggets(6), Salt Lake Jazz(13), Golden State Warriors(24).
+     * East: Boston Celtics(1), Brooklyn Nets(2), Chicago Bulls(7).
+     *
+     * Desktop order = city-sorted per conference, then interleaved
+     * (West[0],East[0],…): West by city = Denver(6),Golden State(24),Salt Lake(13);
+     * East by city = Boston(1),Brooklyn(2),Chicago(7) ⇒ [6,1,24,2,13,7].
+     * mobileOrder = name-sorted slot: West names Jazz(13),Nuggets(6),Warriors(24)
+     * ⇒ 13→0,6→2,24→4; East names Bulls(7),Celtics(1),Nets(2) ⇒ 7→1,1→3,2→5.
+     */
+    public function testGetTradeReviewPageDataBuildsConferenceOrderedTeamList(): void
+    {
+        $teamRows = [
+            ['team_name' => 'Jazz', 'team_city' => 'Salt Lake', 'teamid' => 13, 'color1' => '002B5C', 'color2' => 'F9A01B'],
+            ['team_name' => 'Celtics', 'team_city' => 'Boston', 'teamid' => 1, 'color1' => '007A33', 'color2' => 'BA9653'],
+            ['team_name' => 'Nuggets', 'team_city' => 'Denver', 'teamid' => 6, 'color1' => '0E2240', 'color2' => 'FEC524'],
+            ['team_name' => 'Bulls', 'team_city' => 'Chicago', 'teamid' => 7, 'color1' => 'CE1141', 'color2' => '000000'],
+            ['team_name' => 'Warriors', 'team_city' => 'Golden State', 'teamid' => 24, 'color1' => '1D428A', 'color2' => 'FFC72C'],
+            ['team_name' => 'Nets', 'team_city' => 'Brooklyn', 'teamid' => 2, 'color1' => '000000', 'color2' => 'FFFFFF'],
+        ];
+
+        $offerRepo = self::createStub(TradeOfferRepositoryInterface::class);
+        $offerRepo->method('getAllTradeOffers')->willReturn([]);
+        $assetRepo = self::createStub(TradeAssetRepositoryInterface::class);
+        $cashRepo = self::createStub(TradeCashRepositoryInterface::class);
+        $formRepo = self::createStub(TradeFormRepositoryInterface::class);
+        $formRepo->method('getAllTeamsWithCity')->willReturn($teamRows);
+        $common = self::createStub(TeamIdentityRepositoryInterface::class);
+        $common->method('getTeamnameFromUsername')->willReturn('Jazz');
+        $common->method('getTidFromTeamname')->willReturn(13);
+
+        $service = new TradingService($offerRepo, $assetRepo, $formRepo, $common, $this->mockDb, $cashRepo);
+        $teams = $service->getTradeReviewPageData('testuser')['teams'];
+
+        $this->assertSame([6, 1, 24, 2, 13, 7], array_column($teams, 'teamid'));
+
+        $mobileOrderByTeamId = [];
+        foreach ($teams as $team) {
+            $mobileOrderByTeamId[$team['teamid']] = $team['mobileOrder'];
+        }
+        $this->assertSame([6 => 2, 1 => 3, 24 => 4, 2 => 5, 13 => 0, 7 => 1], $mobileOrderByTeamId);
+    }
+
     public function testGetTradeReviewPageDataReturnsEmptyOffersWhenNoneExist(): void
     {
         $mockOfferRepo = $this->createMock(TradeOfferRepositoryInterface::class);

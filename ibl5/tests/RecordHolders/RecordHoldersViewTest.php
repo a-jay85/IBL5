@@ -593,6 +593,138 @@ final class RecordHoldersViewTest extends TestCase
     }
 
     /**
+     * Characterization: the full rendered page (all five category-block
+     * renderers + all-star) must stay byte-identical across the
+     * renderCategoryTable extraction. Golden captured from pre-extraction
+     * behavior; a single shared helper must reproduce it exactly.
+     */
+    public function testRenderGoldenOutputUnchanged(): void
+    {
+        $html = $this->view->render($this->createComprehensiveRecords());
+        $goldenPath = __DIR__ . '/fixtures/recordholders-golden.html';
+
+        $this->assertStringEqualsFile($goldenPath, $html);
+    }
+
+    /**
+     * Build a records fixture exercising every category-block renderer:
+     * player single-game (regular/playoffs/heat), full-season, quadruple
+     * doubles, all-star, team game, team season, and franchise.
+     *
+     * @return array{
+     *     playerSingleGame: array{regularSeason: array<string, list<mixed>>, playoffs: array<string, list<mixed>>, heat: array<string, list<mixed>>},
+     *     quadrupleDoubles: list<mixed>,
+     *     allStarRecord: array{name: string, pid: int|null, teams: string, teamTids: string, amount: int, years: string},
+     *     playerFullSeason: array<string, list<mixed>>,
+     *     teamGameRecords: array<string, list<mixed>>,
+     *     teamSeasonRecords: array<string, list<mixed>>,
+     *     teamFranchise: array<string, list<mixed>>
+     * }
+     */
+    private function createComprehensiveRecords(): array
+    {
+        return [
+            'playerSingleGame' => [
+                'regularSeason' => [
+                    'Most Points in a Single Game' => [$this->createPlayerRecord()],
+                ],
+                'playoffs' => [
+                    'Most Rebounds in a Single Game' => [[
+                        'pid' => 304,
+                        'name' => 'Mitch Richmond',
+                        'teamAbbr' => 'mia',
+                        'teamTid' => 2,
+                        'teamYr' => '1994',
+                        'boxScoreUrl' => '1994-05-01-game-7/boxscore',
+                        'dateDisplay' => 'May 1, 1994',
+                        'oppAbbr' => 'nyk',
+                        'oppTid' => 18,
+                        'oppYr' => '1994',
+                        'amount' => '30',
+                    ]],
+                ],
+                'heat' => [
+                    'Most Assists in a Single Game' => [[
+                        'pid' => 511,
+                        'name' => 'John Stockton',
+                        'teamAbbr' => 'uta',
+                        'teamTid' => 13,
+                        'teamYr' => '1998',
+                        'boxScoreUrl' => '',
+                        'dateDisplay' => 'February 14, 1998',
+                        'oppAbbr' => 'lal',
+                        'oppTid' => 12,
+                        'oppYr' => '1998',
+                        'amount' => '25',
+                    ]],
+                ],
+            ],
+            'quadrupleDoubles' => [[
+                'pid' => 33,
+                'name' => 'Hakeem Olajuwon',
+                'teamAbbr' => 'hou',
+                'teamTid' => 9,
+                'teamYr' => '1990',
+                'boxScoreUrl' => '',
+                'dateDisplay' => 'March 29, 1990',
+                'oppAbbr' => 'mil',
+                'oppTid' => 15,
+                'oppYr' => '1990',
+                'amount' => '18pts/16reb/10ast/11blk',
+            ]],
+            'allStarRecord' => [
+                'name' => 'Mitch Richmond',
+                'pid' => 304,
+                'teams' => 'sac,gsw',
+                'teamTids' => '21,24',
+                'amount' => 6,
+                'years' => '1993, 1994, 1995',
+            ],
+            'playerFullSeason' => [
+                'Highest Scoring Average in a Regular Season' => [[
+                    'pid' => 304,
+                    'name' => 'Mitch Richmond',
+                    'teamAbbr' => 'mia',
+                    'teamTid' => 2,
+                    'teamYr' => '1994',
+                    'season' => '1993-94',
+                    'amount' => '34.2',
+                ]],
+            ],
+            'teamGameRecords' => [
+                'Most Points in a Single Game' => [[
+                    'teamAbbr' => 'uta',
+                    'teamTid' => 13,
+                    'teamYr' => '2000',
+                    'boxScoreUrl' => '',
+                    'dateDisplay' => 'November 30, 1999',
+                    'oppAbbr' => 'gsw',
+                    'oppTid' => 24,
+                    'oppYr' => '2000',
+                    'amount' => '180',
+                ]],
+            ],
+            'teamSeasonRecords' => [
+                'Best Season Record' => [[
+                    'teamAbbr' => 'chi',
+                    'teamTid' => 7,
+                    'teamYr' => '1993',
+                    'season' => '1992-93',
+                    'amount' => '71-11',
+                ]],
+            ],
+            'teamFranchise' => [
+                'Most Playoff Appearances' => [[
+                    'teamAbbr' => 'bkn',
+                    'teamTid' => 4,
+                    'amount' => '7',
+                    'years' => '1989, 1990, 1991',
+                ]],
+            ],
+        ];
+    }
+
+    /**
      * Create a sample player record for testing.
      *
      * @return array{pid: int, name: string, teamAbbr: string, teamTid: int, teamYr: string, boxScoreUrl: string, dateDisplay: string, oppAbbr: string, oppTid: int, oppYr: string, amount: string}

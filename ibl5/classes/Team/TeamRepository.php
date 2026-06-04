@@ -175,14 +175,7 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     public function getRegularSeasonHistory(string $teamName): array
     {
         /** @var list<WinLossRow> */
-        return $this->fetchAll(
-            "SELECT `year`, currentname, namethatyear, wins, losses
-             FROM `ibl_team_season_records`
-             WHERE currentname = ? AND game_type = 1
-             ORDER BY `year` DESC",
-            "s",
-            $teamName
-        );
+        return $this->getSeasonHistory($teamName, 1);
     }
 
     /**
@@ -192,13 +185,29 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     public function getHEATHistory(string $teamName): array
     {
         /** @var list<HEATWinLossRow> */
+        return $this->getSeasonHistory($teamName, 3);
+    }
+
+    /**
+     * Fetch a team's season win-loss history for a single game type.
+     *
+     * Regular-season and H.E.A.T. histories differ only by the `game_type`
+     * filter, so both public methods delegate here.
+     *
+     * @param int $gameType 1 = regular season, 3 = H.E.A.T.
+     * @return list<WinLossRow>
+     */
+    private function getSeasonHistory(string $teamName, int $gameType): array
+    {
+        /** @var list<WinLossRow> */
         return $this->fetchAll(
             "SELECT `year`, currentname, namethatyear, wins, losses
              FROM `ibl_team_season_records`
-             WHERE currentname = ? AND game_type = 3
+             WHERE currentname = ? AND game_type = ?
              ORDER BY `year` DESC",
-            "s",
-            $teamName
+            "si",
+            $teamName,
+            $gameType
         );
     }
 

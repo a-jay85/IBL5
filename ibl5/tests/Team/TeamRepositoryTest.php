@@ -110,9 +110,55 @@ class TeamRepositoryTest extends TestCase
         
         // Act
         $result = $this->repository->getHistoricalRoster(2, '2023');
-        
-        // Assert - Verify query was executed  
+
+        // Assert - Verify query was executed
         $queries = $this->db->getExecutedQueries();
         $this->assertNotEmpty($queries, 'Should execute database query');
+    }
+
+    // ── Season history (regular vs H.E.A.T.) ─────────────────────
+    // Both methods delegate to a shared getSeasonHistory(teamName, gameType);
+    // these characterize that game_type 1 maps to regular-season rows and
+    // game_type 3 maps to H.E.A.T. rows, by routing on the resolved filter.
+
+    public function testGetRegularSeasonHistoryReturnsRegularSeasonRows(): void
+    {
+        $regularRows = [
+            ['year' => 2024, 'currentname' => 'Miami HEAT', 'namethatyear' => 'Miami HEAT', 'wins' => 50, 'losses' => 32],
+            ['year' => 2023, 'currentname' => 'Miami HEAT', 'namethatyear' => 'Miami HEAT', 'wins' => 44, 'losses' => 38],
+        ];
+        $this->db->onQuery('game_type = 1', $regularRows);
+
+        $result = $this->repository->getRegularSeasonHistory('Miami HEAT');
+
+        $this->assertSame($regularRows, $result);
+    }
+
+    public function testGetHEATHistoryReturnsHeatRows(): void
+    {
+        $heatRows = [
+            ['year' => 2024, 'currentname' => 'Miami HEAT', 'namethatyear' => 'Miami HEAT', 'wins' => 6, 'losses' => 1],
+        ];
+        $this->db->onQuery('game_type = 3', $heatRows);
+
+        $result = $this->repository->getHEATHistory('Miami HEAT');
+
+        $this->assertSame($heatRows, $result);
+    }
+
+    public function testSeasonHistoryMethodsRouteToDistinctGameTypes(): void
+    {
+        // Regression: the two methods must not collapse onto the same game_type.
+        $regularRows = [
+            ['year' => 2024, 'currentname' => 'Miami HEAT', 'namethatyear' => 'Miami HEAT', 'wins' => 50, 'losses' => 32],
+        ];
+        $heatRows = [
+            ['year' => 2024, 'currentname' => 'Miami HEAT', 'namethatyear' => 'Miami HEAT', 'wins' => 6, 'losses' => 1],
+        ];
+        $this->db->onQuery('game_type = 1', $regularRows);
+        $this->db->onQuery('game_type = 3', $heatRows);
+
+        $this->assertSame($regularRows, $this->repository->getRegularSeasonHistory('Miami HEAT'));
+        $this->assertSame($heatRows, $this->repository->getHEATHistory('Miami HEAT'));
     }
 }

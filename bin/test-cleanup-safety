@@ -1,0 +1,253 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-cleanup-safety — regression test for bin/cleanup's safety guards.
+#
+# bin/cleanup is invoked (with --all) by bin/merge-master-to-prod, which
+# advances master and THEN sweeps worktrees — manufacturing the precondition
+# for cleanup's "merged" heuristics to misfire on fresh worktrees. This test
+# pins the four guards that keep that sweep from destroying in-progress work:
+#
+#   defect1  untracked files (invisible to git diff) are NEVER discarded/removed
+#   defect2  generated-file discard is OFF unless --discard-generated is passed
+#   defect3  a fresh local branch with no own-commits is NOT deemed "merged"
+#   defect4  orphan-dedupe matches a worktree registered under a different-cased
+#            path (case-insensitive FS only; skipped on case-sensitive FS)
+#
+# It also pins the POSITIVE case: a genuinely-merged clean worktree is STILL
+# cleaned, so the hardening did not neuter cleanup.
+#
+# Every assertion runs `bin/cleanup --all --dry-run` against a throwaway git
+# repo built under a mktemp dir, so nothing real is touched. A stub `gh` forces
+# Check 1 (PR-state) to no-op, making the merged-detection deterministic.
+#
+# Run: bin/test-cleanup-safety  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+CLEANUP="$SCRIPT_DIR/cleanup"
+TMP="$(mktemp -d)"
+trap 'chmod -R u+w "$TMP" 2>/dev/null; rm -rf "$TMP" 2>/dev/null' EXIT
+
+FAILED=0
+
+# A stub gh that always fails, so cleanup's `gh pr view` yields no PR state and
+# Check 1 is skipped. Keeps merged-detection on the deterministic Check 2/3.
+STUBBIN="$TMP/stubbin"
+mkdir -p "$STUBBIN"
+printf '#!/bin/sh\nexit 1\n' > "$STUBBIN/gh"
+chmod +x "$STUBBIN/gh"
+
+pass()     { echo "ok: $1"; }
+failcase() { echo "FAIL: $1"; FAILED=1; }
+
+# assert_match <name> <regex> <haystack>
+assert_match() {
+    if printf '%s' "$3" | grep -qE "$2"; then
+        pass "$1"
+    else
+        failcase "$1 — expected to match: $2"
+        printf '%s\n' "$3" | sed 's/^/    /'
+    fi
+}
+
+# assert_absent <name> <regex> <haystack>
+assert_absent() {
+    if printf '%s' "$3" | grep -qE "$2"; then
+        failcase "$1 — expected NOT to match: $2"
+        printf '%s\n' "$3" | sed 's/^/    /'
+    else
+        pass "$1"
+    fi
+}
+
+# new_env — build a unique <TMP>/env.XXXX/{origin.git,main}; echo the main path.
+# All git output is silenced so command substitution captures ONLY the path
+# (a stray git status line would otherwise corrupt the returned path). The
+# initial commit tracks README.md and CLAUDE.md (the latter is the allowlisted
+# "generated" file the discard logic targets).
+new_env() {
+    local base
+    base="$(mktemp -d "$TMP/env.XXXXXX")"
+    git init -q --bare "$base/origin.git" >/dev/null 2>&1
+    git clone -q "$base/origin.git" "$base/main" >/dev/null 2>&1
+    git -C "$base/main" config user.email t@example.com >/dev/null 2>&1
+    git -C "$base/main" config user.name tester >/dev/null 2>&1
+    git -C "$base/main" config commit.gpgsign false >/dev/null 2>&1
+    printf 'init\n'  > "$base/main/README.md"
+    printf 'rules\n' > "$base/main/CLAUDE.md"
+    git -C "$base/main" add README.md CLAUDE.md >/dev/null 2>&1
+    git -C "$base/main" commit -qm init >/dev/null 2>&1
+    git -C "$base/main" branch -q -M master >/dev/null 2>&1
+    git -C "$base/main" push -q -u origin master >/dev/null 2>&1
+    echo "$base/main"
+}
+
+# add_merged_wt <main> <name> — create a Check-2-merged worktree on branch
+# <name>: a real own-commit, pushed (sets upstream), ff-merged into master,
+# then its remote branch deleted. cleanup's fetch --prune drops origin/<name>,
+# so Check 2 (tracked + ancestor + remote-gone) marks it merged.
+add_merged_wt() {
+    local main="$1" name="$2"
+    git -C "$main" checkout -q -b "$name" master
+    printf 'x\n' > "$main/$name.txt"
+    git -C "$main" add "$name.txt"
+    git -C "$main" commit -qm "feat-$name"
+    git -C "$main" push -q -u origin "$name" 2>/dev/null
+    git -C "$main" checkout -q master
+    git -C "$main" merge -q --ff-only "$name"
+    git -C "$main" push -q origin master 2>/dev/null
+    git -C "$main" push -q origin --delete "$name" 2>/dev/null
+    git -C "$main" worktree add -q "$main/worktrees/$name" "$name" 2>/dev/null
+}
+
+# run_cleanup <main> [extra-flags...] — run the cleanup under test, in dry-run,
+# from inside <main> (so REPO_ROOT resolves to the scratch repo). Echoes output.
+run_cleanup() {
+    local main="$1"; shift
+    ( cd "$main" && PATH="$STUBBIN:$PATH" "$CLEANUP" --all --dry-run "$@" 2>&1 )
+}
+
+# ----------------------------------------------------------------------------
+# Positive (characterization): a genuinely-merged CLEAN worktree is STILL cleaned.
+# Must pass both before and after the hardening — proves cleanup is not neutered.
+# ----------------------------------------------------------------------------
+e="$(new_env)"
+add_merged_wt "$e" "feat"
+out="$(run_cleanup "$e")"
+assert_match "positive-merged-clean-still-cleaned" 'WOULD clean: feat' "$out"
+
+# ----------------------------------------------------------------------------
+# Check 3 is now CONSERVATIVE (the core defect-3 fix). A local-only branch whose
+# own commit landed on master via ff-merge (master then advanced past it) is an
+# ancestor of origin/master with NO commit distinguishable from master — the
+# EXACT same graph shape as a fresh never-committed branch (defect 3 / Case A).
+# Because the two are graph-indistinguishable, safety requires skipping BOTH:
+# this row asserts the ambiguous "merged-looking" shape is now SKIPPED, where
+# the OLD code aggressively cleaned it (the fresh-branch destruction path).
+# Genuinely-merged local work is reclaimed by Check 1 (PR MERGED) in real use —
+# we accept leaving a rare no-PR merged branch over risking in-progress work.
+# ----------------------------------------------------------------------------
+e="$(new_env)"
+git -C "$e" worktree add -q -b own "$e/worktrees/own" master 2>/dev/null
+printf 'own-work\n' > "$e/worktrees/own/own.txt"
+git -C "$e/worktrees/own" add own.txt
+git -C "$e/worktrees/own" commit -qm own-commit
+git -C "$e" merge -q --ff-only own          # master -> own's tip
+printf 'later\n' > "$e/after.txt"           # advance master PAST own
+git -C "$e" add after.txt
+git -C "$e" commit -qm after-own
+git -C "$e" push -q origin master 2>/dev/null
+out="$(run_cleanup "$e")"
+assert_match "check3-conservative-ambiguous-shape-skipped" \
+    "SKIP own: branch 'own' not merged to master" "$out"
+
+# ----------------------------------------------------------------------------
+# Defect 1: merged worktree whose only change is an UNTRACKED (non-ignored)
+# file is SKIPPED, not reset/removed.
+# ----------------------------------------------------------------------------
+e="$(new_env)"
+add_merged_wt "$e" "feat"
+printf 'draft\n' > "$e/worktrees/feat/docs-decision-0044.md"   # untracked
+out="$(run_cleanup "$e")"
+assert_match "defect1-untracked-skipped" 'SKIP feat: has untracked files' "$out"
+
+# ----------------------------------------------------------------------------
+# Defect 2: merged worktree with only an allowlisted CLAUDE.md diff is SKIPPED
+# WITHOUT --discard-generated, and cleaned WITH it. Same prepared env, two runs
+# (dry-run mutates nothing) — so the flag is the only difference.
+# ----------------------------------------------------------------------------
+e="$(new_env)"
+add_merged_wt "$e" "feat"
+printf 'rules-changed\n' > "$e/worktrees/feat/CLAUDE.md"        # tracked, allowlisted
+out="$(run_cleanup "$e")"
+assert_match "defect2-discardable-skipped-by-default" \
+    'SKIP feat: has discardable changes' "$out"
+out="$(run_cleanup "$e" --discard-generated)"
+assert_match "defect2-discardable-cleaned-with-flag" 'WOULD clean: feat' "$out"
+
+# ----------------------------------------------------------------------------
+# Defect 3: a fresh local-only branch (forked from master, master then advanced,
+# zero own-commits) is NOT deemed merged by Check 3 → SKIPPED as "not merged".
+# ----------------------------------------------------------------------------
+e="$(new_env)"
+git -C "$e" worktree add -q -b fresh "$e/worktrees/fresh" master 2>/dev/null
+printf 'c2\n' > "$e/advance.txt"
+git -C "$e" add advance.txt
+git -C "$e" commit -qm advance-master
+git -C "$e" push -q origin master 2>/dev/null
+out="$(run_cleanup "$e")"
+assert_match "defect3-fresh-branch-not-merged" \
+    "SKIP fresh: branch 'fresh' not merged to master" "$out"
+
+# ----------------------------------------------------------------------------
+# Defect 4 (env-gated): a worktree git-registered under a different-cased path
+# than REPO_ROOT must be recognized by the orphan-dedupe and NOT re-processed
+# down the orphan rm -rf branch. Only reproducible on a case-insensitive FS;
+# on a case-sensitive FS the differently-cased dir does not exist, so skip.
+# ----------------------------------------------------------------------------
+: > "$TMP/CaseProbe"
+if [ -e "$TMP/caseprobe" ]; then
+    rm -f "$TMP/CaseProbe"
+    e="$(new_env)"                                  # main at <base>/main (lowercase)
+    upper="${e%/main}/Main"                          # same dir on case-insensitive FS
+    git -C "$upper" worktree add -q -b orphancs "$upper/worktrees/orphancs" master 2>/dev/null
+    # Confirm the mismatch was actually recorded (git did not canonicalize casing).
+    reg="$(cd "$e" && git worktree list --porcelain | grep '/Main/worktrees/orphancs' || true)"
+    if [ -n "$reg" ]; then
+        out="$(run_cleanup "$e")"
+        assert_absent "defect4-cased-worktree-not-treated-as-orphan" \
+            'WOULD remove orphan: orphancs' "$out"
+    else
+        pass "defect4-cased-worktree-not-treated-as-orphan (skipped: FS canonicalized casing)"
+    fi
+else
+    rm -f "$TMP/CaseProbe"
+    pass "defect4-cased-worktree-not-treated-as-orphan (skipped: case-sensitive FS)"
+fi
+
+# ----------------------------------------------------------------------------
+# Helper unit: has_untracked_files sees an untracked non-ignored file, ignores
+# a clean tree, and respects .gitignore (--exclude-standard).
+# ----------------------------------------------------------------------------
+# shellcheck source=bin/lib/wt-guards.sh
+. "$SCRIPT_DIR/lib/wt-guards.sh"
+hu="$TMP/huf"
+git init -q "$hu"
+git -C "$hu" config user.email t@example.com
+git -C "$hu" config user.name tester
+git -C "$hu" config commit.gpgsign false
+printf 'seed\n' > "$hu/seed.txt"
+git -C "$hu" add seed.txt
+git -C "$hu" commit -qm seed
+if has_untracked_files "$hu"; then
+    failcase "helper-clean-tree-has-no-untracked"
+else
+    pass "helper-clean-tree-has-no-untracked"
+fi
+printf 'ignored\n' > "$hu/.gitignore"
+printf 'junk\n'    > "$hu/build.log"
+git -C "$hu" add .gitignore
+git -C "$hu" commit -qm gitignore
+echo "*.log" > "$hu/.gitignore"
+git -C "$hu" add .gitignore
+git -C "$hu" commit -qm ignore-logs
+if has_untracked_files "$hu"; then
+    failcase "helper-gitignored-only-has-no-untracked"
+else
+    pass "helper-gitignored-only-has-no-untracked"
+fi
+printf 'real\n' > "$hu/new-real-file.md"
+if has_untracked_files "$hu"; then
+    pass "helper-untracked-nonignored-detected"
+else
+    failcase "helper-untracked-nonignored-detected"
+fi
+
+if [ "$FAILED" -ne 0 ]; then
+    echo "RESULT: FAILED"
+    exit 1
+fi
+echo "RESULT: all passed"
+exit 0

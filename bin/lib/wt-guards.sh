@@ -93,3 +93,18 @@ has_uncommitted_changes() {
     if [ "$rc" -eq 1 ]; then return 0; fi
     return 1
 }
+
+# Check if a directory has untracked (but not gitignored) files.
+# Returns 0 (has untracked work) or 1 (none / not a valid git repo).
+# has_uncommitted_changes is git-diff-based and NEVER sees untracked files;
+# callers that gate destructive actions on "is there work here?" must check
+# BOTH. --exclude-standard is load-bearing: without it gitignored build
+# artifacts/logs would trip the guard and falsely flag nearly every worktree.
+has_untracked_files() {
+    local dir="${1:-.}"
+    local out
+    # A broken/missing gitdir yields empty output (treated as "no untracked"),
+    # mirroring has_uncommitted_changes's exit-128 tolerance.
+    out=$(git -C "$dir" ls-files --others --exclude-standard 2>/dev/null)
+    [ -n "$out" ]
+}

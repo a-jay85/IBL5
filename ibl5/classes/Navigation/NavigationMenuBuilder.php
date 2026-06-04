@@ -208,8 +208,13 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
             ['label' => 'Depth Chart Entry', 'url' => 'modules.php?name=DepthChartEntry'],
             ['label' => 'Trading', 'url' => 'modules.php?name=Trading&op=reviewtrade'],
             ['label' => 'Voting', 'url' => 'modules.php?name=Voting'],
-            ['label' => 'Draft History', 'url' => 'modules.php?name=DraftHistory&teamid=' . $teamId],
         ];
+
+        if ($this->config->isAdmin) {
+            $links[] = ['label' => 'Voting Results', 'url' => 'modules.php?name=VotingResults'];
+        }
+
+        $links[] = ['label' => 'Draft History', 'url' => 'modules.php?name=DraftHistory&teamid=' . $teamId];
 
         if ($this->areWaiversAllowed()) {
             $links[] = ['rawHtml' => 'Waivers: <a href="modules.php?name=Waivers&amp;action=add">Add</a> | <a href="modules.php?name=Waivers&amp;action=waive">Waive</a>'];

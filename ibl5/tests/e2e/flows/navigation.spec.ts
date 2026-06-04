@@ -32,6 +32,25 @@ test.describe('Navigation bar (authenticated, desktop)', () => {
     await expect(teamPageLink).toBeVisible();
   });
 
+  test('my team dropdown shows admin-only Voting Results link', async ({ page }) => {
+    // The default auth fixture is the CI main user: roles_mask=1 (ADMIN,
+    // setup-docker-e2e action.yml ~L128) and gm_username on team Metros
+    // (action.yml ~L133). So isLoggedIn && teamId !== null && isAdmin all
+    // hold — the My Team menu renders AND the admin-gated link appears.
+    await page.goto('index.php');
+    const nav = desktopNav(page);
+    await nav.getByRole('button', { name: 'My Team' }).click();
+
+    const votingResultsLink = nav.locator('.nav-dropdown-item', {
+      hasText: 'Voting Results',
+    }).first();
+    await expect(votingResultsLink).toBeVisible();
+    await expect(votingResultsLink).toHaveAttribute(
+      'href',
+      /modules\.php\?name=VotingResults/,
+    );
+  });
+
   test('my team dropdown shows logout footer', async ({ page }) => {
     await page.goto('index.php');
     const nav = desktopNav(page);

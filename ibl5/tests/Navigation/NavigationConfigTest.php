@@ -30,6 +30,7 @@ class NavigationConfigTest extends TestCase
             showDraftLink: 'On',
             serverName: 'localhost',
             requestUri: '/ibl5/index.php',
+            isAdmin: true,
         );
 
         $this->assertTrue($config->isLoggedIn);
@@ -42,6 +43,7 @@ class NavigationConfigTest extends TestCase
         $this->assertSame('On', $config->showDraftLink);
         $this->assertSame('localhost', $config->serverName);
         $this->assertSame('/ibl5/index.php', $config->requestUri);
+        $this->assertTrue($config->isAdmin);
     }
 
     public function testMinimalDefaults(): void
@@ -62,6 +64,7 @@ class NavigationConfigTest extends TestCase
         $this->assertSame('', $config->showDraftLink);
         $this->assertNull($config->serverName);
         $this->assertNull($config->requestUri);
+        $this->assertFalse($config->isAdmin);
     }
 
     public function testReadonlyProperties(): void

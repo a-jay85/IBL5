@@ -33,6 +33,7 @@ final class NavigationConfig
         public readonly ?string $requestUri = null,
         public readonly bool $isDraftOrderFinalized = false,
         public readonly bool $isDebugAdmin = false,
+        public readonly bool $isAdmin = false,
         public readonly bool $debugViewAllExtensions = false,
     ) {
         $this->teamsData = $teamsData;

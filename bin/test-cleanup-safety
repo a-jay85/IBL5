@@ -226,13 +226,10 @@ if has_untracked_files "$hu"; then
 else
     pass "helper-clean-tree-has-no-untracked"
 fi
-printf 'ignored\n' > "$hu/.gitignore"
-printf 'junk\n'    > "$hu/build.log"
+echo '*.log' > "$hu/.gitignore"     # ignore build.log via a real glob pattern
+printf 'junk\n' > "$hu/build.log"   # untracked but gitignored
 git -C "$hu" add .gitignore
 git -C "$hu" commit -qm gitignore
-echo "*.log" > "$hu/.gitignore"
-git -C "$hu" add .gitignore
-git -C "$hu" commit -qm ignore-logs
 if has_untracked_files "$hu"; then
     failcase "helper-gitignored-only-has-no-untracked"
 else

@@ -1,5 +1,5 @@
 ---
-description: Replaces the mis-ported independent-turnover check (which jammed (TVR×5.8)² into the [2,5] energy slot, firing ~24%/poss) with the faithful JSB two-part model — a negligible [2,5]-energy independent check plus a dominant steal-driven turnover tied to offensive carelessness × defensive STL — and recalibrates the 2pt make-value. Closes the season scoring-level deficit; records the Cov re-run.
+description: Replaces the mis-ported independent-turnover check (which jammed (TVR×5.8)² into the [2,5] energy slot, firing ~24%/poss) with the faithful JSB two-part model — a negligible [2,5]-energy independent check plus a dominant steal-driven turnover tied to offensive carelessness × defensive STL — and recalibrates the 2pt make-value. Closes the season scoring-level deficit; records the Cov re-run, with a full-precision (18-season/20-run) addendum confirming the Cov null (no flip; wrong sign lives in the non-arm residual; Control-B structural-vs-noise left to a 2nd seed).
 last_verified: 2026-06-04
 ---
 
@@ -141,13 +141,60 @@ non-arm residual — the steal-driven turnover participates but is not the missi
 lever. (At this reduced resolution the all-frozen ≤ baseline sanity, Control B, is
 tripped by a ~4% margin — a low-runs noise artifact and/or the turnover arm's new
 positive contribution, which the broken-engine premise did not anticipate; a
-full-precision run is the proper settle and is left as follow-up.)
+full-precision run is the proper settle — see the **Full-precision settle**
+addendum below.)
 
 A Cov flip toward + was the win condition, but a **null is a valid, publishable
 result** (it would say the volume-coupling lives elsewhere), and this PR does **not**
 block on a flip. Caveat: the repurposed TVR arm now conflates offense-carelessness
 and defense-STL variance in one frozen scalar, so a null could reflect low cross-team
 **input** variance rather than a wrong model.
+
+### Full-precision settle (2026-06-04 addendum)
+
+The reduced-scope re-run above left Control B's trip ("is the all-frozen `|Cov|` >
+baseline a low-runs artifact, or the turnover arm's new positive contribution?") for
+a full-precision settle. That run is now done: `JSB_ARCHIVE_RUNS=20
+JSB_ARCHIVE_STRIDE=1` over the full archive (18 seasons, N=484 pooled gt-2 team-rows),
+artifact `calibration-5.60-20260604-freeze-attribution.json`.
+
+**The NULL holds, and is now robust.** Baseline engine `Cov(lnFGA,lnPPS) = −0.00122`
+— still the ADR-0042 wrong (negative) sign, **no flip**, stable against the reduced
+run's −0.0013. Control A (baseline negative, in the ~1e-3 band) is solid. The
+marginals confirm and improve on the ADR-0044/0045 picture: `Var(lnPPS)` 0.00158 ≈
+real 0.00145 (fixed); `Var(lnFGA)` **narrowed further to 0.00179** (was 0.00269 at
+ADR-0044; real 0.00133 — the turnover fix pulled it from ~2.0× to ~1.35× too wide);
+`Var(lnPF)` 0.00094 still ~3.5× too narrow (real 0.00332) — the collapsed
+total-scoring spread is unchanged precisely because Cov did not flip.
+
+**The wrong sign still lives ~entirely outside the four instrumented arms.** Arm
+collapse fractions: TVR **−0.178** (freezing it *raises* `|Cov|` — the steal-driven
+turnover adds positive cov, as designed), Foul **+0.163** (adds negative cov), ORB
+−0.033, Make +0.021. The two large arms are opposite-signed and **nearly cancel**;
+all-four-frozen `Cov = −0.00125`, residual-frac **1.028** of baseline. So the four
+arms are **exhausted** — none is the missing lever — and the volume-coupling lever
+search (the ADR-0042 follow-on) is confirmed pointed at the **non-arm residual**
+(pace / shot-mix / FT / rebound-count), consistent with ADR-0043's ~48% non-arm share.
+
+**Control B (structural vs. noise) is NOT settled by one seed — left open,
+deliberately.** The trip shrank from ~4% (reduced) to **2.8%** (full-precision) — it
+converged *toward* 1.0, not away. residual-frac 1.028 is a small difference of two
+large opposite-signed arms (TVR −0.178, Foul +0.163): the noise-dominated regime,
+measured at a **single seed**. The harness pools all rows into one covariance and
+stores no per-run values, so a run-to-run σ is not recoverable from the artifact. A
+2.8% one-seed excess is therefore **not** sufficient to declare Control B's premise
+("freezing arms never ADDS covariance") stale — even though post-ADR-0045 the TVR arm
+genuinely does add positive cov, which *would* push residual-frac ≥ 1. The clean
+discriminator is **one more full-precision seed** (`JSB_ARCHIVE_SEED=…`): two seeds at
+~1.02–1.03 ⇒ structural (then relax Control B to a band, do **not** invert); scatter
+across 1.0 ⇒ noise. **Control B's assertion is left unchanged pending that second
+seed** — it is a pre-registered control, and ADR-0041's anti-metric-gaming discipline
+forbids loosening a control on one-seed evidence.
+
+**Net settle.** The Cov flip is a confirmed null at full precision; ADR-0045's
+steal-driven turnover behaves as designed (a genuine positive-cov arm) but is not the
+missing coupling; the next lever lives in the non-arm residual. The only open thread
+is the 2.8% Control-B excess, which one additional seed resolves.
 
 ## Alternatives Considered
 

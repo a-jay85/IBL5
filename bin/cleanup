@@ -14,6 +14,7 @@ REPO_ROOT="$(git worktree list --porcelain | head -1 | sed 's/^worktree //')"
 TARGET_NAME=""
 ALL=false
 DRY_RUN=false
+DISCARD_GENERATED=false
 CLEANED=0
 SKIPPED=0
 
@@ -21,14 +22,15 @@ for arg in "$@"; do
     case "$arg" in
         --all) ALL=true ;;
         --dry-run) DRY_RUN=true ;;
+        --discard-generated) DISCARD_GENERATED=true ;;
         -*) echo "Unknown option: $arg" >&2; exit 1 ;;
         *) TARGET_NAME="$arg" ;;
     esac
 done
 
 if [ -z "$TARGET_NAME" ] && [ "$ALL" = false ]; then
-    echo "Usage: bin/wt-cleanup <worktree-name> [--dry-run]" >&2
-    echo "       bin/wt-cleanup --all [--dry-run]" >&2
+    echo "Usage: bin/wt-cleanup <worktree-name> [--dry-run] [--discard-generated]" >&2
+    echo "       bin/wt-cleanup --all [--dry-run] [--discard-generated]" >&2
     exit 1
 fi
 
@@ -154,15 +156,30 @@ check_worktree() {
         fi
     fi
 
-    # Check 3: Local-only (never pushed), ancestor of master, with unique commits.
-    # Catches agent worktrees whose work landed on master via another branch.
+    # Check 3: Local-only (never pushed) branch whose OWN commits landed on
+    # master via another branch. Catches agent worktrees whose work was
+    # cherry-picked/squashed onto master.
+    #
+    # The tip != master-tip test is NOT a valid "has merged work" signal: a
+    # fresh branch created from an older master commit (tip == fork point) is
+    # an ancestor of the now-advanced master with tip != master tip, yet has
+    # NO work of its own — it is in-progress, not merged. merge-master-to-prod
+    # advances master then runs `cleanup --all`, manufacturing exactly this
+    # state for every fresh worktree. Require the branch to have at least one
+    # commit beyond its fork-point instead; if the fork-point can't be resolved
+    # or the branch has zero own-commits, treat as NOT merged (conservative —
+    # genuinely-merged work is caught by Check 1's PR MERGED signal anyway).
     if [ "$is_merged" = false ]; then
         local local_tracking
         local_tracking=$(git -C "$REPO_ROOT" config "branch.$branch.remote" 2>/dev/null || true)
         if [ -z "$local_tracking" ] \
-           && git -C "$REPO_ROOT" merge-base --is-ancestor "$branch" origin/master 2>/dev/null \
-           && [ "$(git -C "$REPO_ROOT" rev-parse "$branch")" != "$(git -C "$REPO_ROOT" rev-parse origin/master)" ]; then
-            is_merged=true
+           && git -C "$REPO_ROOT" merge-base --is-ancestor "$branch" origin/master 2>/dev/null; then
+            local fork_point
+            fork_point=$(git -C "$REPO_ROOT" merge-base --fork-point origin/master "$branch" 2>/dev/null || true)
+            if [ -n "$fork_point" ] \
+               && git -C "$REPO_ROOT" rev-list "$fork_point..$branch" 2>/dev/null | grep -q .; then
+                is_merged=true
+            fi
         fi
     fi
 
@@ -183,9 +200,22 @@ check_worktree() {
             return
         fi
 
+        # Untracked files are real work product the diff-based checks never see
+        # (an untracked-only ADR draft, a new test file). NEVER discard or
+        # remove a worktree carrying them — reset --hard is a no-op on untracked
+        # anyway, so the only safe action is to leave it.
+        if has_untracked_files "$wt_path"; then
+            echo "  SKIP $wt_name: has untracked files"
+            SKIPPED=$((SKIPPED + 1))
+            return
+        fi
+
         if has_uncommitted_changes "$wt_path"; then
-            # On merged branches, discard changes to generated/worktree-local
-            # files that are never real work product.
+            # On merged branches, dirt confined to generated/worktree-local
+            # files (never real work product) MAY be discarded — but only when
+            # --discard-generated is passed. Auto-discarding is destructive if
+            # merged-detection is ever wrong, so it defaults OFF; that keeps
+            # merge-master-to-prod's `cleanup --all` (no flag) non-destructive.
             local dirty_files
             dirty_files=$(git -C "$wt_path" diff --name-only 2>/dev/null; \
                           git -C "$wt_path" diff --cached --name-only 2>/dev/null)
@@ -193,13 +223,17 @@ check_worktree() {
             local non_discardable
             non_discardable=$(echo "$dirty_files" \
                 | grep -v -E '^(CLAUDE\.md|ibl5/bun\.lock)$' || true)
-            if [ -z "$non_discardable" ]; then
+            if [ -n "$non_discardable" ]; then
+                echo "  SKIP $wt_name: has uncommitted changes"
+                SKIPPED=$((SKIPPED + 1))
+                return
+            elif [ "$DISCARD_GENERATED" = true ]; then
                 echo "  Discarding generated files: $dirty_files"
                 if [ "$DRY_RUN" = false ]; then
                     git -C "$wt_path" reset --hard HEAD 2>/dev/null || true
                 fi
             else
-                echo "  SKIP $wt_name: has uncommitted changes"
+                echo "  SKIP $wt_name: has discardable changes (pass --discard-generated to discard)"
                 SKIPPED=$((SKIPPED + 1))
                 return
             fi
@@ -244,7 +278,22 @@ if [ "$ALL" = true ]; then
             dir="${dir%/}"
             dir_name="$(basename "$dir")"
 
-            if git -C "$REPO_ROOT" worktree list --porcelain | grep -q "^worktree $dir$"; then
+            # Already handled by the registered-worktree pass above? Compare
+            # case-insensitively: git may register a worktree under a different-
+            # cased path (e.g. /Users/.../github/... vs REPO_ROOT's .../GitHub/...)
+            # on a case-insensitive FS. A case-sensitive grep would miss it and
+            # mis-process the live worktree down the orphan rm -rf branch.
+            registered=false
+            dir_lc=$(printf '%s' "$dir" | tr '[:upper:]' '[:lower:]')
+            while IFS= read -r reg_path; do
+                reg_lc=$(printf '%s' "$reg_path" | tr '[:upper:]' '[:lower:]')
+                if [ "$reg_lc" = "$dir_lc" ]; then
+                    registered=true
+                    break
+                fi
+            done < <(git -C "$REPO_ROOT" worktree list --porcelain \
+                | awk '/^worktree / { print substr($0, 10) }')
+            if [ "$registered" = true ]; then
                 continue  # registered with git, already handled above
             fi
 
@@ -258,11 +307,14 @@ if [ "$ALL" = true ]; then
                 continue
             fi
 
-            # Safety: skip if this is a real git worktree with uncommitted changes.
-            # Only trust git diff if the directory has its own .git file —
-            # without one, git walks up to the main repo and reports false positives.
-            if [ -e "$dir/.git" ] && has_uncommitted_changes "$dir"; then
-                echo "  SKIP orphan $dir_name: has uncommitted changes"
+            # Safety: skip if this is a real git worktree with uncommitted OR
+            # untracked work. Only trust git here if the directory has its own
+            # .git file — without one, git walks up to the main repo and reports
+            # false positives. has_untracked_files is checked too because git
+            # diff never sees untracked files (e.g. an untracked ADR draft).
+            if [ -e "$dir/.git" ] \
+               && { has_uncommitted_changes "$dir" || has_untracked_files "$dir"; }; then
+                echo "  SKIP orphan $dir_name: has uncommitted or untracked changes"
                 echo "           To remove: rm -rf $dir"
                 SKIPPED=$((SKIPPED + 1))
                 continue
@@ -351,18 +403,23 @@ if [ "$ALL" = true ]; then
             fi
         fi
 
-        # Check 3: Local-only branch fully merged into origin/master.
-        # Catches branches that were never pushed (no tracking config, no PR)
-        # but whose work landed on master via another branch or local merge.
-        # Requires strict ancestry (branch tip != master tip) to avoid nuking
-        # a freshly created branch used as a name reservation.
+        # Check 3: Local-only branch whose OWN commits landed on origin/master
+        # via another branch or local merge. Catches branches never pushed (no
+        # tracking config, no PR). The tip != master-tip test is NOT a valid
+        # signal — a freshly created branch (tip == fork point) off an older
+        # master is an ancestor of the advanced master with tip != master tip,
+        # yet has no work of its own. Require at least one commit beyond the
+        # fork-point; conservative when the fork-point can't be resolved.
         if [ "$should_delete" = false ]; then
             local_tracking=$(git -C "$REPO_ROOT" config "branch.$bare_branch.remote" 2>/dev/null || true)
             if [ -z "$local_tracking" ] \
-               && git -C "$REPO_ROOT" merge-base --is-ancestor "$bare_branch" origin/master 2>/dev/null \
-               && [ "$(git -C "$REPO_ROOT" rev-parse "$bare_branch")" != "$(git -C "$REPO_ROOT" rev-parse origin/master)" ]; then
-                should_delete=true
-                delete_reason="local-only, merged into master"
+               && git -C "$REPO_ROOT" merge-base --is-ancestor "$bare_branch" origin/master 2>/dev/null; then
+                bare_fork_point=$(git -C "$REPO_ROOT" merge-base --fork-point origin/master "$bare_branch" 2>/dev/null || true)
+                if [ -n "$bare_fork_point" ] \
+                   && git -C "$REPO_ROOT" rev-list "$bare_fork_point..$bare_branch" 2>/dev/null | grep -q .; then
+                    should_delete=true
+                    delete_reason="local-only, merged into master"
+                fi
             fi
         fi
 

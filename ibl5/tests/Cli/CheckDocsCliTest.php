@@ -186,6 +186,22 @@ final class CheckDocsCliTest extends TestCase
     }
 
     #[Test]
+    public function sinceBodyChangedSameDayAsVerifiedExitsZero(): void
+    {
+        // A doc already verified today (e.g. by an earlier same-day merge) whose
+        // body is edited again the same day. last_verified cannot be bumped higher
+        // without becoming a future date, so the commit-date escape must pass it —
+        // no waiting for UTC rollover. The kept date equals the edit's commit date.
+        $today = (new \DateTimeImmutable('today'))->format('Y-m-d');
+        $this->commitFile('ibl5/docs/sample.md', $this->doc($today, 'Original body.'), 'base verified today');
+        $base = $this->currentSha();
+        $this->commitFile('ibl5/docs/sample.md', $this->doc($today, 'Edited body, same day.'), 'edit body same day');
+
+        [$code, $output] = $this->runScript('--since=' . $base);
+        $this->assertSame(0, $code, $output);
+    }
+
+    #[Test]
     public function sinceOutOfScopeChangeExitsZero(): void
     {
         $date = $this->freshDate();

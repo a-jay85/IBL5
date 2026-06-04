@@ -108,6 +108,7 @@ function themeheader()
         requestUri: $_SERVER['REQUEST_URI'] ?? null,
         isDraftOrderFinalized: $isDraftOrderFinalized,
         isDebugAdmin: $debugSession->isDebugAdmin(),
+        isAdmin: is_admin() === 1,
         debugViewAllExtensions: $debugSession->isViewAllExtensionsEnabled(),
     );
 

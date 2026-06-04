@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/auth-regular';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { desktopNav } from '../helpers/navigation';
 
 /**
  * Tier 2 role-gating coverage: exercises the production gate paths that
@@ -245,5 +246,24 @@ test.describe('GM-only pages: non-admin / no-team behavior', () => {
     const response = await page.goto('modules.php?name=DepthChartEntry');
     expect(response?.status()).toBe(200);
     await assertNoPhpErrors(page, 'on DepthChartEntry as non-admin');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Block G — nav: admin-only "Voting Results" link is never shown to a non-admin
+//
+// The auth-regular user is roles_mask=0 with no ibl_team_info row
+// (ci-seed.sql:1929), so getMyTeamMenu() returns null and the My Team menu
+// does not render at all — the link is absent because no admin session ever
+// emits it. The precise "menu present, Voting shown, Voting Results hidden"
+// isolation is carried by NavigationMenuBuilderTest (admin=false + teamId set).
+// ---------------------------------------------------------------------------
+
+test.describe('Nav: Voting Results link hidden for non-admin', () => {
+  test('rendered desktop nav has no Voting Results link', async ({ page }) => {
+    await page.goto('index.php');
+    await expect(
+      desktopNav(page).getByRole('link', { name: 'Voting Results' }),
+    ).toHaveCount(0);
   });
 });

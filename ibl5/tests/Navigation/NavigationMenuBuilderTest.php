@@ -19,6 +19,7 @@ class NavigationMenuBuilderTest extends TestCase
         string $allowWaivers = 'No',
         string $showDraftLink = 'Off',
         bool $isDraftOrderFinalized = false,
+        bool $isAdmin = false,
     ): NavigationConfig {
         return new NavigationConfig(
             isLoggedIn: $isLoggedIn,
@@ -29,6 +30,7 @@ class NavigationMenuBuilderTest extends TestCase
             allowWaivers: $allowWaivers,
             showDraftLink: $showDraftLink,
             isDraftOrderFinalized: $isDraftOrderFinalized,
+            isAdmin: $isAdmin,
         );
     }
 
@@ -96,6 +98,69 @@ class NavigationMenuBuilderTest extends TestCase
     {
         $builder = new NavigationMenuBuilder($this->createConfig(isLoggedIn: true, teamId: null));
         $this->assertNull($builder->getMyTeamMenu());
+    }
+
+    public function testVotingResultsLinkVisibleForAdminAndPositionedAfterVoting(): void
+    {
+        $builder = new NavigationMenuBuilder($this->createConfig(isLoggedIn: true, teamId: 5, isAdmin: true));
+        $menu = $builder->getMyTeamMenu();
+        $this->assertNotNull($menu);
+
+        $labels = array_map(
+            static fn (array $link): string => $link['label'] ?? '',
+            $menu['links']
+        );
+
+        $votingResults = array_filter(
+            $menu['links'],
+            static fn (array $link): bool => ($link['label'] ?? '') === 'Voting Results'
+        );
+        $this->assertCount(1, $votingResults, 'Voting Results link should be present for admins');
+        $this->assertSame(
+            'modules.php?name=VotingResults',
+            array_values($votingResults)[0]['url'] ?? null
+        );
+
+        // Relative-position assertion: the Draft/Free Agency branches array_unshift()
+        // (prepend), so absolute indices shift — only the relative ordering is invariant.
+        $votingIdx = array_search('Voting', $labels, true);
+        $votingResultsIdx = array_search('Voting Results', $labels, true);
+        $draftHistoryIdx = array_search('Draft History', $labels, true);
+        $this->assertIsInt($votingIdx);
+        $this->assertIsInt($votingResultsIdx);
+        $this->assertIsInt($draftHistoryIdx);
+        $this->assertSame($votingIdx + 1, $votingResultsIdx, 'Voting Results should sit directly after Voting');
+        $this->assertSame($votingResultsIdx + 1, $draftHistoryIdx, 'Voting Results should sit directly before Draft History');
+    }
+
+    public function testVotingResultsLinkHiddenForNonAdmin(): void
+    {
+        $builder = new NavigationMenuBuilder($this->createConfig(isLoggedIn: true, teamId: 5, isAdmin: false));
+        $menu = $builder->getMyTeamMenu();
+        $this->assertNotNull($menu);
+
+        $labels = array_map(
+            static fn (array $link): string => $link['label'] ?? '',
+            $menu['links']
+        );
+
+        // The menu still renders (Voting present); only the admin-gated link is hidden.
+        $this->assertContains('Voting', $labels);
+        $this->assertNotContains('Voting Results', $labels);
+    }
+
+    public function testVotingResultsLinkAbsentInOlympicsTeamMenuForAdmin(): void
+    {
+        $builder = new NavigationMenuBuilder($this->createConfig(currentLeague: 'olympics', isAdmin: true));
+        $menu = $builder->getMyTeamMenu();
+        $this->assertNotNull($menu);
+
+        $labels = array_map(
+            static fn (array $link): string => $link['label'] ?? '',
+            $menu['links']
+        );
+
+        $this->assertNotContains('Voting Results', $labels);
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('draftLinkProvider')]

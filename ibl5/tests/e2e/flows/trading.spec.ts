@@ -84,6 +84,44 @@ test.describe('Trading flow', () => {
     await expect(checkboxes.first()).toBeVisible();
   });
 
+  // Matrix #8 — conference split / city-sort / interleave + mobileOrder slot moved
+  // from TradingView::renderTeamSelectionLinks into TradingService::buildTeamList()
+  // (PR 9 step 4). The View is now pure iteration; these tests pin the rendered
+  // sidebar against the seed roster of real franchises.
+  test('team-selection sidebar renders every real franchise under West/East headers', async ({ page }) => {
+    const sidebar = page.locator('.trading-team-select');
+    await expect(sidebar).toBeVisible();
+    await expect(sidebar.locator('thead th')).toHaveText(['West', 'East']);
+    // ci-seed.sql ibl_team_info seeds 28 real franchises (teamid 1..28); buildTeamList
+    // emits one cell per real team (Free Agents / special teams excluded).
+    await expect(sidebar.locator('td.ibl-team-cell--colored')).toHaveCount(28);
+  });
+
+  test('team-selection sidebar interleaves teams in West, East, West, East order', async ({ page }) => {
+    // League::WESTERN/EASTERN_CONFERENCE_TEAMIDS (14 each, balanced) → buildTeamList
+    // interleaves West[0], East[0], West[1], East[1], … so DOM cell parity encodes
+    // conference: even index = West, odd index = East. teamid is read from the cell
+    // logo src (images/logo/new{teamid}.png).
+    const WEST = new Set([6, 13, 14, 15, 16, 17, 18, 19, 20, 21, 23, 24, 26, 28]);
+    const EAST = new Set([1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 22, 25, 27]);
+
+    const teamIds = await page
+      .locator('.trading-team-select td.ibl-team-cell--colored img.ibl-team-cell__logo')
+      .evaluateAll((imgs) =>
+        imgs.map((img) => {
+          const match = (img.getAttribute('src') ?? '').match(/new(\d+)\.png/);
+          return match ? Number(match[1]) : -1;
+        }),
+      );
+
+    expect(teamIds).toHaveLength(28);
+    teamIds.forEach((id, index) => {
+      const expectedConference = index % 2 === 0 ? WEST : EAST;
+      const label = index % 2 === 0 ? 'West' : 'East';
+      expect(expectedConference.has(id), `sidebar cell ${index} (team ${id}) must be ${label}`).toBe(true);
+    });
+  });
+
 });
 
 // ===========================================================================

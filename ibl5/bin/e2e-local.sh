@@ -10,11 +10,14 @@ IBL5_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Worktree-footgun guard: this is the MAIN-checkout runner — it seeds ibl5_e2e_test,
 # injects the .e2e-active guard into the symlink-resolved MAIN config.php, and runs
-# Playwright against http://main.localhost/ibl5/ (the dev/main stack). A worktree copy
-# physically lives at .../worktrees/<slug>/ibl5, so $IBL5_DIR (the script's own resolved
-# path) is the deterministic, cwd-independent detection key. Fire before any DB/config
-# side effect. (CONFIG_DIR is readlink-resolved back to main, so it can't be used here.)
-if [[ "$IBL5_DIR" == */worktrees/* ]]; then
+# Playwright against http://main.localhost/ibl5/ (the dev/main stack). A worktree's
+# checkout is a linked worktree, so its git-dir (.git/worktrees/<name>) differs from
+# its git-common-dir (.git) — a layout-independent, cwd-independent detection key that
+# survives worktrees moving out of the repo tree. Fire before any DB/config side effect.
+# (CONFIG_DIR is readlink-resolved back to main, so it can't be used here.)
+E2E_GIT_DIR="$(git -C "$IBL5_DIR" rev-parse --absolute-git-dir 2>/dev/null || true)"
+E2E_GIT_COMMON="$(git -C "$IBL5_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+if [ -n "$E2E_GIT_DIR" ] && [ "$E2E_GIT_DIR" != "$E2E_GIT_COMMON" ]; then
     echo "ERROR: e2e-local.sh is the MAIN-checkout E2E runner and serves http://main.localhost/ibl5/." >&2
     echo "       You are inside a worktree — it would seed ibl5_e2e_test but Playwright would hit the MAIN stack, not this worktree's <slug>.localhost DB." >&2
     echo "       Use the worktree-correct path instead:" >&2

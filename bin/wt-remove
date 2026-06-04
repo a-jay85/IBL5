@@ -11,6 +11,8 @@ set -euo pipefail
 source "$(dirname "$0")/lib/wt-guards.sh"
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+source "$REPO_ROOT/bin/lib/git-helpers.sh"
+WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
 
 NAME=""
 FORCE=false
@@ -34,7 +36,7 @@ WT_PATH=$(get_worktree_path "$NAME")
 # Fall back to the conventional location if git doesn't know the branch
 # (e.g., branch already deleted but directory remains).
 if [ -z "$WT_PATH" ]; then
-    WT_PATH="$REPO_ROOT/worktrees/$NAME"
+    WT_PATH="$WT_PARENT/$NAME"
 fi
 
 if [ ! -d "$WT_PATH" ]; then

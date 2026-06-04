@@ -7,6 +7,8 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+source "$REPO_ROOT/bin/lib/git-helpers.sh"
+WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
 MAIN_IBL5="$REPO_ROOT/ibl5"
 NAME=""
 BASE_BRANCH="master"
@@ -33,12 +35,12 @@ done
 if [ -z "$NAME" ]; then
     echo "Usage: bin/wt-new <name> [--base <branch>]" >&2
     echo "" >&2
-    echo "Creates a git worktree at worktrees/<name> with symlinks and CSS." >&2
+    echo "Creates a git worktree outside the repo (sibling IBL5-worktrees/<name>) with symlinks and CSS." >&2
     echo "Does NOT start Docker — use bin/wt-up <name> for browser preview." >&2
     exit 1
 fi
 
-WT_ROOT="$REPO_ROOT/worktrees/$NAME"
+WT_ROOT="$WT_PARENT/$NAME"
 WT_IBL5="$WT_ROOT/ibl5"
 
 if [ -d "$WT_ROOT" ]; then

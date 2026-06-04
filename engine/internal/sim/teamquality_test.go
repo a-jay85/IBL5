@@ -60,6 +60,23 @@ func TestCompressQuality(t *testing.T) {
 			}
 		}
 	})
+	// Concrete LITERAL anchors (expected values hand-computed independently of the
+	// implementation), so a broken compressQuality formula fails here even though the
+	// formula-mirroring composition tests below would still pass.
+	t.Run("concrete literals", func(t *testing.T) {
+		for _, tc := range []struct {
+			total, neutral, factor, want float64
+		}{
+			{10, 0, 0.5, 5.0},         // 0 + 0.5·(10−0)
+			{10, 4, 0.5, 7.0},         // 4 + 0.5·(10−4)
+			{2, 8, 0.25, 6.5},         // 8 + 0.25·(2−8) = 8 − 1.5
+			{6.25, 8.21, 0.45, 7.328}, // the committed def OD=5 pre-cap value
+		} {
+			if got := compressQuality(tc.total, tc.neutral, tc.factor); math.Abs(got-tc.want) > 1e-9 {
+				t.Errorf("compressQuality(%v,%v,%v) = %v, want %v", tc.total, tc.neutral, tc.factor, got, tc.want)
+			}
+		}
+	})
 }
 
 // --- matrix #3,7: defMatchupQuality — compose(compress, cap) -----------------

@@ -17,7 +17,11 @@ one: it CANCELS the two too-wide marginals, so the engine's **total** scoring
 spread `Var(lnPF) = Var(lnFGA) + Var(lnPPS) + 2·Cov` collapses to ~3.4× too NARROW.
 ADR-0042 named the mechanism (a missing volume-rate→shot-COUNT pathway); ADR-0043's
 freeze lattice attributed the wrong-signed covariance, finding the **foul-only arm is
-47.6% of |Cov|** — the single largest contributor.
+47.6% of |Cov|** — the single largest *arm* — alongside a co-equal **47.8% non-arm
+residual** (pace / shot-mix / FT / rebound-count) and minor TVR/ORB/make arms (the
+three figures are distinct decomposition components, not a partition summing to 100%).
+The non-arm residual is the key constraint on this PR: even a full cut of the foul arm
+leaves it, so `Cov` cannot reach the real *positive* value from this lever alone.
 
 ADR-0043's pre-registered follow-on was a **Lever-2 pair**:
 
@@ -151,8 +155,12 @@ The honest verdict (all from→to read at one config, never across mixed run/str
   `EfficiencyDispersionRatio` 1.70→1.17.
 - **`Var(lnFGA)` narrows** toward real (≈2.6×→≈1.9× too wide); `VolumeDispersionRatio`
   ≈1.0.
-- **`Cov(lnFGA,lnPPS)` moves toward + but does NOT flip** (roughly halved): the
-  ADR-0043 foul arm is cut, but the 47.8% non-arm residual keeps it negative.
+- **`Cov(lnFGA,lnPPS)` moves toward + but does NOT flip** (gt 2: −0.00271→−0.00167,
+  roughly halved). The aggregate move is consistent with a partial cut of the 47.6%
+  foul arm; the 47.8% non-arm residual keeps `Cov` negative. NOTE this per-arm
+  attribution is **inferred from the aggregate move, not measured** — a fresh
+  freeze-lattice re-attribution at `fc=0.45` (matrix row 22) was not run, and is now
+  only informational since Lever-2(2) is refuted and no sign flip is on the table.
 - **`Var(lnPF)` is essentially UNCHANGED at ~3.4× too NARROW.** This is the key honest
   finding: the marginal-narrowing and the Cov-toward-zero move OPPOSE each other in the
   identity `Var(lnPF)=Var(lnFGA)+Var(lnPPS)+2·Cov`, so the collapsed total-scoring
@@ -164,6 +172,16 @@ The honest verdict (all from→to read at one config, never across mixed run/str
 This is a valid, shippable partial verdict (Constraint 3): a real fix to two of the
 three axes' marginals, an honest null on the total-spread magnitude, continuing the
 0040→0043 chain.
+
+**Absolute LEVEL preserved (not just dispersion).** `foul/offQ` is convex, so by Jensen
+the mean-preserving offQ compression shifts the *mean* foul rate, not only its spread:
+mean engine FTA/g drops 31.40→**29.84** at `foulCompress=0.45` (scale 0.059). The
+`offQualityRatingScale` step (tuned to the margin) lifts it back to **31.41** — ≈ the
+baseline 31.40 — because mean FTA and the home margin both rise as the scale falls. So
+the committed FTA *level* is flat, mean points (94.6→95.0) and `LevelGapPF` (−21.3→−21.6,
+the pre-existing under-scoring) are flat, and the committed validate bands are not
+materially stale for `--mode gate`. This level check is reported because a
+dispersion-only verification would have missed a Jensen level shift entirely.
 
 **HCA margin (Constraint 2).** `foulCompress=0.45` regresses the gt-2 home margin out
 of band (the compression net-weakens the home foul advantage), restored with one

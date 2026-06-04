@@ -29,7 +29,7 @@ echo "Rebasing worktrees onto origin/master..."
 
 while IFS= read -r wt_path; do
     [[ "$wt_path" == "$REPO_ROOT" ]] && continue
-    [[ "$wt_path" == "$WT_PARENT/"* ]] || continue
+    [[ "$wt_path" == "$WT_PARENT/"* ]] || [[ "$wt_path" == "$REPO_ROOT/worktrees/"* ]] || continue
 
     wt_name=$(basename "$wt_path")
     branch=$(git -C "$wt_path" branch --show-current 2>/dev/null || true)

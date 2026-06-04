@@ -8,7 +8,7 @@
 #   bin/e2e-wt.sh my-feature --grep "trading"
 #
 # Prerequisites:
-#   1. Worktree exists at worktrees/<name>
+#   1. Worktree exists at IBL5-worktrees/<name> (or legacy worktrees/<name>)
 #   2. Docker env running via: bin/wt-up <name> --seed
 
 set -euo pipefail

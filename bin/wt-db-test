@@ -37,7 +37,10 @@ fi
 
 WORKTREE_PATH="$WT_PARENT/$WORKTREE_NAME"
 if [ ! -d "$WORKTREE_PATH" ]; then
-    echo "Error: Worktree not found at $WORKTREE_PATH" >&2
+    WORKTREE_PATH="$REPO_ROOT/worktrees/$WORKTREE_NAME"  # legacy fallback (pre-migration)
+fi
+if [ ! -d "$WORKTREE_PATH" ]; then
+    echo "Error: Worktree not found at $WT_PARENT/$WORKTREE_NAME (nor legacy $REPO_ROOT/worktrees/$WORKTREE_NAME)" >&2
     exit 1
 fi
 

@@ -2181,6 +2181,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Standardize career tables to `tinyint(1) NOT NULL DEFAULT 0`.
 **Est. effort:** S
 **Risk if untouched:** `=== 0` checks may fail silently.
+**Status:** Completed (maintenance-27, migration 135) — `retired` on `ibl_olympics_career_avgs`/`_totals` is now `tinyint(1) NOT NULL DEFAULT 0`.
 
 ### 15.5 `HasMLE` / `HasLLE` / `Used_Extension_*` Booleans Stored as `int(11)`
 **Location:** `ibl_team_info` lines 2351-2354
@@ -2188,6 +2189,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Downsize to `tinyint(1) NOT NULL DEFAULT 0`.
 **Est. effort:** S
 **Risk if untouched:** Storage inefficiency; cognitive overhead.
+**Status:** Completed (maintenance-27, migration 135) — `has_mle`, `has_lle`, `used_extension_this_chunk`, `used_extension_this_season` on `ibl_team_info` are now `tinyint(1)`; existing nullability preserved (`used_extension_this_season` stays nullable).
 
 ### 15.6 Awards Tables — Mixed Case in PK and Column Names
 **Location:** `ibl_awards.table_ID`, `Award`; `ibl_gm_awards.table_ID`, `Award`; `ibl_team_awards.Award`, `ID`
@@ -2216,6 +2218,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Add `FOREIGN KEY (tradeofferid) REFERENCES ibl_trade_offers (id) ON DELETE CASCADE ON UPDATE CASCADE`.
 **Est. effort:** S
 **Risk if untouched:** Orphaned line items after offer deletion; phantom trade history.
+**Status:** Completed (migration 067 `fk_trade_info_offer`) — verified 2026-06-05 against the migrated schema: `ibl_trade_info.tradeofferid` has an FK to `ibl_trade_offers.id`. No new work in maintenance-27.
 
 ### 15.10 `ibl_box_scores.teamID` Lacks FK
 **Location:** `ibl_box_scores.teamID` line 324
@@ -2293,6 +2296,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Convert to matching ENUM or add CHECK constraint.
 **Est. effort:** S
 **Risk if untouched:** Position data diverges from canonical player record; position breakdowns include garbage.
+**Status:** Completed (maintenance-27, migration 135) — `pos` on `ibl_box_scores` and `ibl_olympics_box_scores` (Olympics parity pair) is now `enum('PG','SG','SF','PF','C','G','F','GF','')`, matching `ibl_plr.pos`. Out-of-range values error under `STRICT_ALL_TABLES`.
 
 ### 15.21 `ibl_box_scores` Missing `(pid, game_type)` Composite Index
 **Location:** Indexes lines 325-342
@@ -2308,6 +2312,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Use `RENAME COLUMN IF EXISTS` (MariaDB 10.5.2+); conditional DELETEs; `ADD KEY IF NOT EXISTS`.
 **Est. effort:** S
 **Risk if untouched:** Re-seed scenarios fail fatally.
+**Status:** Completed (maintenance-27) — 113 & 117 rewritten to `RENAME COLUMN IF EXISTS` + guarded `MODIFY COLUMN IF EXISTS` (reproducing each original `CHANGE COLUMN` target); 125 to `ADD INDEX IF NOT EXISTS`. 122 was already idempotent (bare `DELETE` of absent rows). Equivalence to the originals proven by an information_schema diff of fresh-built DBs (only the 15.4/15.5/15.20 type deltas differ); double-apply confirmed error-free.
 
 ### 15.23 `ibl_gm_history.name` — Ambiguous (Username vs Display Name)
 **Location:** `ibl_gm_history.name varchar(50)` line 597 with comment "GM username"

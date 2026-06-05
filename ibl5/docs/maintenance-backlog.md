@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-05-31
+last_verified: 2026-06-05
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -2204,6 +2204,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Rename `ibl_settings.name` → `setting_key`, `.value` → `setting_value`; extend ban rule.
 **Est. effort:** M
 **Risk if untouched:** Unbacktick'd queries are valid MariaDB but fail strict parsers.
+**Status:** Deferred from maintenance-28 — needs its own plan. Migration 132 made the `ibl_settings` primary key composite `(name, league)`, so renaming `name` → `setting_key` is a PK rebuild (new PK on `(setting_key, league)`) layered on top of a pervasive PHP read-path migration (~20 queries across 6 `Settings`/repository classes) and two trigger recreations (`trg_team_identity_sync`, `trg_season_rollover` both filter `WHERE name = 'Current Season Ending Year'`). The maintenance-28 expand-contract recipe did not account for the composite PK; this is the highest-blast-radius item in that plan and is sequenced into its own PR/review. `cache`/`cache_locks` remain out of scope (upstream Laravel scaffolding).
 
 ### 15.8 `ibl_demands.pid` Lacks FK; `name` Is the PK
 **Location:** `ibl_demands` lines 421-434
@@ -2247,6 +2248,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Deprecate (join through `ibl_franchise_seasons` instead) or NOT NULL + backfill.
 **Est. effort:** M
 **Risk if untouched:** `WHERE name = 'Bulls'` returns empty for games where the column wasn't populated.
+**Status:** Completed (maintenance-28, migration 138) — `name` is now `varchar(16) NOT NULL DEFAULT ''` on both `ibl_box_scores_teams` and the Olympics parity table `ibl_olympics_box_scores_teams`, with a comment documenting the intentional denormalization (no FK: `ibl_team_info.team_name` is not unique and renames would break a FK). A defensive `UPDATE … SET name='' WHERE name IS NULL` precedes the constraint so the change is safe even on dirty production rows. `OlympicsSchemaParityTest` green (it compares column names/indexes, not the NOT NULL change).
 
 ### 15.14 `ibl_one_on_one` — No FK on Player Names
 **Location:** `ibl_one_on_one` lines 1679-1690
@@ -2254,6 +2256,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Add `winner_pid`, `loser_pid` int FKs; backfill; migrate queries.
 **Est. effort:** M
 **Risk if untouched:** Rename migrations leave silent data drift.
+**Status:** Completed (maintenance-28, migration 139) — added nullable `winner_pid`/`loser_pid int(11)` surrogate FKs → `ibl_plr.pid` (`ON DELETE SET NULL`), indexed, backfilled from `ibl_plr` by name (only names resolving to exactly one pid; ambiguous names left NULL by design). Display strings `winner`/`loser` retained for backward compatibility.
 
 ### 15.15 `ibl_votes_ASG` / `ibl_votes_EOY` — `varchar(255)` for Player Names
 **Location:** `ibl_votes_ASG` lines 2510-2525, `ibl_votes_EOY` lines 2537-2548
@@ -2261,6 +2264,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Resize to `varchar(32)`. Longer: child table with `ibl_plr.pid` FK.
 **Est. effort:** S (resize) / M (normalize)
 **Risk if untouched:** Type mismatch on joins; row size inflated.
+**Status:** Deferred from maintenance-28 — the `varchar(32)` target is unsound and needs re-scoping. These columns do NOT store bare player names: the write path stores `"PlayerName, TeamName"` composites (`VotingBallotView.php:170` — `$safeValue = $safeName . ', ' . $safeTeamName`; `VotingResultsService::extractPlayerName` strips the trailing `", TeamName"`). So a 32-char `ibl_plr.name` value plus any team suffix already exceeds `varchar(32)`, and a resize under `STRICT_ALL_TABLES` would error the production deploy. The GM ballot columns are additionally unresolved: the CI E2E fixture (`tests/e2e/fixtures/ci-seed.sql`) stores bare values (`'TestUser'`) while the shared candidate-rendering path appends the team — a data-consistency question, not a width one. **Before this can land:** (1) audit production `MAX(LENGTH)` on the ASG/EOY ballot columns; (2) resolve the GM-ballot stored format; (3) pick a target width that provably accommodates `name + ", " + team` with headroom (a major reduction from 255 is still achievable, e.g. `varchar(64)`/`varchar(128)`), or normalize into a child table with an `ibl_plr.pid` FK.
 
 ### 15.16 `ibl_draft.team` and `ibl_fa_offers.team` — Denormalized Name Columns
 **Location:** `ibl_draft.team varchar(255)` line 442; `ibl_fa_offers.team varchar(32)` line 534
@@ -2289,6 +2293,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Add `franchise_id int` FK; backfill; deprecate or comment `team_name` as point-in-time snapshot.
 **Est. effort:** M
 **Risk if untouched:** Renames silently leave stale entries; cross-team joins return zero rows.
+**Status:** Completed (maintenance-28, migration 140) — added nullable `teamid int(11)` surrogate FK → `ibl_team_info.teamid` (`ON DELETE SET NULL`), indexed, backfilled by `team_name`; `trg_team_identity_sync` extended to also rewrite `ibl_league_config.team_name` for that teamid on rename (recreated `PRECEDES trg_gm_tenure_track` to preserve the original activation order). `team_name` kept as a point-in-time snapshot string. (Surrogate key is `teamid`, not the `franchise_id` the suggestion named — `teamid` is the live PK on `ibl_team_info`.)
 
 ### 15.20 `ibl_box_scores.pos` Not Constrained to Valid Positions
 **Location:** `ibl_box_scores.pos varchar(2)` line 291
@@ -2320,3 +2325,4 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Rename to `gm_username`; add FK to `auth_users.username` or `ibl_gm_tenures.gm_username`.
 **Est. effort:** S
 **Risk if untouched:** Joins to `ibl_gm_tenures.gm_username` require manually-noted alias translation.
+**Status:** Completed (maintenance-28, migration 137) — disambiguated as a GM **username**, comment set to `GM username (ref ibl_team_info.gm_username; no enforced FK)`. Deliberately NOT shrunk from `varchar(50)`: historical usernames cannot be proven ≤25 (CI seed has zero rows so the length audit is uninformative, and `ibl_gm_tenures.gm_username` is `varchar(50)`), so a blind shrink risks truncating production history. No enforced FK because `gm_username` is not unique. A future shrink can land once a production-data length audit confirms the max.

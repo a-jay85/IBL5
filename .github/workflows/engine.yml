@@ -74,7 +74,7 @@ jobs:
       # Pinned version = deterministic gate (same philosophy as the go.mod
       # toolchain pin). Bump deliberately; never float to latest.
       - name: Lint
-        uses: golangci/golangci-lint-action@v7
+        uses: golangci/golangci-lint-action@v9
         with:
           version: v2.12.2
           working-directory: engine

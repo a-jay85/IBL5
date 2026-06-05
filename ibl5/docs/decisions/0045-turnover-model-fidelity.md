@@ -1,6 +1,6 @@
 ---
 description: Replaces the mis-ported independent-turnover check (which jammed (TVR×5.8)² into the [2,5] energy slot, firing ~24%/poss) with the faithful JSB two-part model — a negligible [2,5]-energy independent check plus a dominant steal-driven turnover tied to offensive carelessness × defensive STL — and recalibrates the 2pt make-value. Closes the season scoring-level deficit; records the Cov re-run, with a full-precision (18-season/20-run) addendum confirming the Cov null (no flip; wrong sign lives in the non-arm residual). A second-seed addendum settles Control-B as STRUCTURAL (residual-frac 1.023 vs 1.028) and relaxes the archive control to a residual-frac band (≤ 1.05).
-last_verified: 2026-06-04
+last_verified: 2026-06-05
 ---
 
 # ADR-0045: Turnover-model fidelity + 2pt make-value calibration

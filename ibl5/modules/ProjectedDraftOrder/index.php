@@ -17,21 +17,17 @@ get_lang($module_name);
 
 global $mysqli_db;
 
-// Legacy globals previously populated by ConfigBootstrap::extractRequestToGlobals().
-// Module inputs are read from $_REQUEST explicitly here.
+// Module inputs read from $_REQUEST explicitly (legacy globals are no longer
+// auto-extracted). Only the JSON save_order route branches off $op; every other
+// request renders the projected/final draft-order page.
 $op = is_string($_REQUEST['op'] ?? null) ? $_REQUEST['op'] : '';
 
-/**
- * Persist a reordered draft lottery — admin-only JSON POST endpoint.
- *
- * Replaces the former standalone modules/ProjectedDraftOrder/save_order.php,
- * routed via modules.php?name=ProjectedDraftOrder&op=save_order. Auth check,
- * method guard (405), and JSON content-type are preserved verbatim.
- */
-function saveOrder(): void
-{
-    global $mysqli_db;
-
+if ($op === 'save_order') {
+    // Admin-only JSON POST endpoint. Replaces the former standalone
+    // modules/ProjectedDraftOrder/save_order.php, now reached via
+    // modules.php?name=ProjectedDraftOrder&op=save_order. Auth check, method
+    // guard (405), JSON content-type, and validation branches are preserved
+    // verbatim; each early `return` exits this included file before the page render.
     header('Content-Type: application/json');
 
     $authService = new AuthService(new AuthRepository($mysqli_db));
@@ -99,44 +95,29 @@ function saveOrder(): void
         http_response_code(500);
         echo json_encode(['success' => false, 'error' => 'Failed to save draft order']);
     }
+
+    return;
 }
 
-/**
- * Render the projected/final draft-order page (default route).
- */
-function renderDraftOrderPage(): void
-{
-    global $mysqli_db, $pagetitle;
+$season = new \Season\Season($mysqli_db);
+$repository = new ProjectedDraftOrderRepository($mysqli_db);
+$service = new ProjectedDraftOrderService($repository);
+$view = new ProjectedDraftOrderView();
 
-    $season = new \Season\Season($mysqli_db);
-    $repository = new ProjectedDraftOrderRepository($mysqli_db);
-    $service = new ProjectedDraftOrderService($repository);
-    $view = new ProjectedDraftOrderView();
+$authService = new AuthService(new AuthRepository($mysqli_db));
+$isAdmin = $authService->isAdmin();
+$isFinalized = $repository->isDraftOrderFinalized();
+$isDraftStarted = $isFinalized && $repository->isDraftStarted($season->endingYear);
 
-    $authService = new AuthService(new AuthRepository($mysqli_db));
-    $isAdmin = $authService->isAdmin();
-    $isFinalized = $repository->isDraftOrderFinalized();
-    $isDraftStarted = $isFinalized && $repository->isDraftStarted($season->endingYear);
+$pagetitle = $isFinalized ? '- Draft Order' : '- Projected Draft Order';
 
-    $pagetitle = $isFinalized ? '- Draft Order' : '- Projected Draft Order';
+$draftOrder = $isFinalized
+    ? $service->getFinalOrProjectedDraftOrder($season->endingYear)
+    : $service->calculateDraftOrder($season->endingYear);
 
-    $draftOrder = $isFinalized
-        ? $service->getFinalOrProjectedDraftOrder($season->endingYear)
-        : $service->calculateDraftOrder($season->endingYear);
-
-    PageLayout\PageLayout::header();
-    echo $view->render($draftOrder, $season->endingYear, $isAdmin, $isFinalized, $isDraftStarted);
-    if ($isAdmin && !$isDraftStarted) {
-        echo '<script src="jslib/draft-order-drag.js"></script>';
-    }
-    PageLayout\PageLayout::footer();
+PageLayout\PageLayout::header();
+echo $view->render($draftOrder, $season->endingYear, $isAdmin, $isFinalized, $isDraftStarted);
+if ($isAdmin && !$isDraftStarted) {
+    echo '<script src="jslib/draft-order-drag.js"></script>';
 }
-
-switch ($op) {
-    case 'save_order':
-        saveOrder();
-        break;
-    default:
-        renderDraftOrderPage();
-        break;
-}
+PageLayout\PageLayout::footer();

@@ -49,4 +49,6 @@ $viewData = [
 // Render output
 $leagueStatsHtml = $view->render($viewData);
 
-require "view.php";
+PageLayout\PageLayout::header();
+echo $leagueStatsHtml;
+PageLayout\PageLayout::footer();

@@ -56,7 +56,7 @@ test.describe('Admin entry-point scripts: non-admin gets 403', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Block B — save_order.php JSON 403 for non-admin
+// Block B — save_order handler JSON 403 for non-admin
 // ---------------------------------------------------------------------------
 
 test.describe('ProjectedDraftOrder save_order: non-admin gets 403 JSON', () => {
@@ -64,7 +64,7 @@ test.describe('ProjectedDraftOrder save_order: non-admin gets 403 JSON', () => {
     request,
   }) => {
     const response = await request.post(
-      'modules.php?name=ProjectedDraftOrder&file=save_order',
+      'modules.php?name=ProjectedDraftOrder&op=save_order',
       {
         data: { order: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] },
         headers: { 'Content-Type': 'application/json' },

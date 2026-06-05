@@ -120,7 +120,7 @@ class League extends BaseMysqliRepository
         JOIN `ibl_team_info` t ON p.teamid = t.teamid
         WHERE p.pos IN ($positions)
           AND p.teamid IN ('" . $this->formatTidsForSqlQuery($conferenceTids) . "')
-          AND p.retired != 1
+          AND p.retired = 0
           AND p.stats_gm > '14'
         ORDER BY p.name";
 
@@ -203,7 +203,7 @@ class League extends BaseMysqliRepository
             "SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2
             FROM `ibl_plr` p
             JOIN `ibl_team_info` t ON p.teamid = t.teamid
-            WHERE p.retired != 1
+            WHERE p.retired = 0
               AND p.stats_gm >= '41'
               AND p.stats_min / p.stats_gm >= '30'
             ORDER BY p.name"
@@ -222,7 +222,7 @@ class League extends BaseMysqliRepository
             "SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2
             FROM `ibl_plr` p
             JOIN `ibl_team_info` t ON p.teamid = t.teamid
-            WHERE p.retired != 1
+            WHERE p.retired = 0
               AND p.stats_min / p.stats_gm >= 15
               AND p.stats_gs / p.stats_gm <= '.5'
               AND p.stats_gm >= '41'
@@ -242,7 +242,7 @@ class League extends BaseMysqliRepository
             "SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2
             FROM `ibl_plr` p
             JOIN `ibl_team_info` t ON p.teamid = t.teamid
-            WHERE p.retired != 1
+            WHERE p.retired = 0
               AND p.exp = '1'
               AND p.stats_gm >= '41'
             ORDER BY p.name"

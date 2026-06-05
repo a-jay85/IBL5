@@ -18,6 +18,19 @@ use FranchiseRecordBook\Contracts\FranchiseRecordBookRepositoryInterface;
 class FranchiseRecordBookRepository extends \BaseMysqliRepository implements FranchiseRecordBookRepositoryInterface
 {
     /**
+     * Derived-table LEFT JOIN that maps an apostrophe-stripped player name to its
+     * highest pid, used by COALESCE to backfill `pid` for records stored under the
+     * cleaned name. Identical across all three record queries, so extracted here.
+     */
+    private static function cleanNamePidSubquery(): string
+    {
+        return "LEFT JOIN (
+               SELECT REPLACE(name, '''', '') AS clean_name, MAX(pid) AS pid
+               FROM `ibl_plr` GROUP BY clean_name
+             ) plr ON plr.clean_name = r.player_name";
+    }
+
+    /**
      * @see FranchiseRecordBookRepositoryInterface::getTeamSingleSeasonRecords()
      *
      * @return list<AlltimeRecord>
@@ -32,10 +45,7 @@ class FranchiseRecordBookRepository extends \BaseMysqliRepository implements Fra
                     r.stat_value, r.stat_raw,
                     r.team_of_record, r.season_year, r.career_total
              FROM `ibl_rcb_alltime_records` r
-             LEFT JOIN (
-               SELECT REPLACE(name, '''', '') AS clean_name, MAX(pid) AS pid
-               FROM `ibl_plr` GROUP BY clean_name
-             ) plr ON plr.clean_name = r.player_name
+             " . self::cleanNamePidSubquery() . "
              WHERE r.scope = 'team' AND r.teamid = ? AND r.record_type = 'single_season'
                AND r.ranking <= ?
              ORDER BY r.stat_category, r.ranking",
@@ -62,10 +72,7 @@ class FranchiseRecordBookRepository extends \BaseMysqliRepository implements Fra
                     r.stat_value, r.stat_raw,
                     r.team_of_record, r.season_year, r.career_total
              FROM `ibl_rcb_alltime_records` r
-             LEFT JOIN (
-               SELECT REPLACE(name, '''', '') AS clean_name, MAX(pid) AS pid
-               FROM `ibl_plr` GROUP BY clean_name
-             ) plr ON plr.clean_name = r.player_name
+             " . self::cleanNamePidSubquery() . "
              WHERE r.scope = 'league' AND r.record_type = 'career'
                AND r.ranking <= ?
              ORDER BY r.stat_category, r.ranking",
@@ -91,10 +98,7 @@ class FranchiseRecordBookRepository extends \BaseMysqliRepository implements Fra
                     r.stat_value, r.stat_raw,
                     r.team_of_record, r.season_year, r.career_total
              FROM `ibl_rcb_alltime_records` r
-             LEFT JOIN (
-               SELECT REPLACE(name, '''', '') AS clean_name, MAX(pid) AS pid
-               FROM `ibl_plr` GROUP BY clean_name
-             ) plr ON plr.clean_name = r.player_name
+             " . self::cleanNamePidSubquery() . "
              WHERE r.scope = 'league' AND r.record_type = 'single_season'
                AND r.ranking <= ?
              ORDER BY r.stat_category, r.ranking",

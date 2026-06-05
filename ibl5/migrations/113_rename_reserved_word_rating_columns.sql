@@ -26,40 +26,73 @@
 -- PlayerDatabase, Updater/RefreshIblHistStep, Negotiation, plus any Service
 -- or View reading these columns. Enforced by SchemaValidator (config/
 -- schema-assertions.php) and a new PHPStan BanReservedWordColumnsRule.
+--
+-- made idempotent 2026-06-05 (maintenance-27, backlog 15.22): each pure rename
+-- is now `RENAME COLUMN IF EXISTS old TO new` followed by a guarded
+-- `MODIFY COLUMN IF EXISTS new ...` that reproduces the exact target definition
+-- (type / nullability / default / comment) the original `CHANGE COLUMN`
+-- produced. Re-running on an already-migrated DB is a no-op (the RENAME finds no
+-- old column; the MODIFY sets the type the column already has). Safe to edit
+-- this applied migration: the runner records it as run, so the body only
+-- matters on fresh installs / re-seeds.
 
 -- Tables where `to` (transition offense) and `do` (drive offense) are ratings
 ALTER TABLE `ibl_plr`
-  CHANGE COLUMN `to` `r_trans_off` tinyint(3) unsigned DEFAULT 0 COMMENT 'Transition offense rating',
-  CHANGE COLUMN `do` `r_drive_off` tinyint(3) unsigned DEFAULT 0 COMMENT 'Drive offense rating',
-  CHANGE COLUMN `r_to` `r_tvr` smallint(5) unsigned DEFAULT 0 COMMENT 'Turnover rating';
+  RENAME COLUMN IF EXISTS `to`   TO `r_trans_off`,
+  RENAME COLUMN IF EXISTS `do`   TO `r_drive_off`,
+  RENAME COLUMN IF EXISTS `r_to` TO `r_tvr`;
+ALTER TABLE `ibl_plr`
+  MODIFY COLUMN IF EXISTS `r_trans_off` tinyint(3) unsigned DEFAULT 0 COMMENT 'Transition offense rating',
+  MODIFY COLUMN IF EXISTS `r_drive_off` tinyint(3) unsigned DEFAULT 0 COMMENT 'Drive offense rating',
+  MODIFY COLUMN IF EXISTS `r_tvr` smallint(5) unsigned DEFAULT 0 COMMENT 'Turnover rating';
 
 ALTER TABLE `ibl_plr_snapshots`
-  CHANGE COLUMN `to` `r_trans_off` tinyint(3) unsigned DEFAULT 0 COMMENT 'Transition offense rating',
-  CHANGE COLUMN `do` `r_drive_off` tinyint(3) unsigned DEFAULT 0 COMMENT 'Drive offense rating',
-  CHANGE COLUMN `r_to` `r_tvr` smallint(6) DEFAULT 0 COMMENT 'Turnover rating';
+  RENAME COLUMN IF EXISTS `to`   TO `r_trans_off`,
+  RENAME COLUMN IF EXISTS `do`   TO `r_drive_off`,
+  RENAME COLUMN IF EXISTS `r_to` TO `r_tvr`;
+ALTER TABLE `ibl_plr_snapshots`
+  MODIFY COLUMN IF EXISTS `r_trans_off` tinyint(3) unsigned DEFAULT 0 COMMENT 'Transition offense rating',
+  MODIFY COLUMN IF EXISTS `r_drive_off` tinyint(3) unsigned DEFAULT 0 COMMENT 'Drive offense rating',
+  MODIFY COLUMN IF EXISTS `r_tvr` smallint(6) DEFAULT 0 COMMENT 'Turnover rating';
 
 ALTER TABLE `ibl_olympics_plr`
-  CHANGE COLUMN `to` `r_trans_off` tinyint(3) unsigned DEFAULT 0 COMMENT 'Transition offense rating',
-  CHANGE COLUMN `do` `r_drive_off` tinyint(3) unsigned DEFAULT 0 COMMENT 'Drive offense rating',
-  CHANGE COLUMN `r_to` `r_tvr` smallint(5) unsigned DEFAULT 0 COMMENT 'Turnover rating';
+  RENAME COLUMN IF EXISTS `to`   TO `r_trans_off`,
+  RENAME COLUMN IF EXISTS `do`   TO `r_drive_off`,
+  RENAME COLUMN IF EXISTS `r_to` TO `r_tvr`;
+ALTER TABLE `ibl_olympics_plr`
+  MODIFY COLUMN IF EXISTS `r_trans_off` tinyint(3) unsigned DEFAULT 0 COMMENT 'Transition offense rating',
+  MODIFY COLUMN IF EXISTS `r_drive_off` tinyint(3) unsigned DEFAULT 0 COMMENT 'Drive offense rating',
+  MODIFY COLUMN IF EXISTS `r_tvr` smallint(5) unsigned DEFAULT 0 COMMENT 'Turnover rating';
 
 ALTER TABLE `ibl_draft_class`
-  CHANGE COLUMN `to` `r_trans_off` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Transition offense rating',
-  CHANGE COLUMN `do` `r_drive_off` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Drive offense rating';
+  RENAME COLUMN IF EXISTS `to` TO `r_trans_off`,
+  RENAME COLUMN IF EXISTS `do` TO `r_drive_off`;
+ALTER TABLE `ibl_draft_class`
+  MODIFY COLUMN IF EXISTS `r_trans_off` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Transition offense rating',
+  MODIFY COLUMN IF EXISTS `r_drive_off` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Drive offense rating';
 
 -- Materialized history tables: r_to and r_do here are already ratings
 -- (populated from snap.`to` / snap.`do`). Rename for semantic uniformity
 -- with the live/snapshot tables above. This also removes the meaning-flip
 -- described above.
 ALTER TABLE `ibl_hist`
-  CHANGE COLUMN `r_to` `r_trans_off` int(11) NOT NULL DEFAULT 0 COMMENT 'Transition offense rating',
-  CHANGE COLUMN `r_do` `r_drive_off` int(11) NOT NULL DEFAULT 0 COMMENT 'Drive offense rating';
+  RENAME COLUMN IF EXISTS `r_to` TO `r_trans_off`,
+  RENAME COLUMN IF EXISTS `r_do` TO `r_drive_off`;
+ALTER TABLE `ibl_hist`
+  MODIFY COLUMN IF EXISTS `r_trans_off` int(11) NOT NULL DEFAULT 0 COMMENT 'Transition offense rating',
+  MODIFY COLUMN IF EXISTS `r_drive_off` int(11) NOT NULL DEFAULT 0 COMMENT 'Drive offense rating';
 
 ALTER TABLE `ibl_olympics_hist`
-  CHANGE COLUMN `r_to` `r_trans_off` int(11) NOT NULL DEFAULT 0 COMMENT 'Transition offense rating',
-  CHANGE COLUMN `r_do` `r_drive_off` int(11) NOT NULL DEFAULT 0 COMMENT 'Drive offense rating';
+  RENAME COLUMN IF EXISTS `r_to` TO `r_trans_off`,
+  RENAME COLUMN IF EXISTS `r_do` TO `r_drive_off`;
+ALTER TABLE `ibl_olympics_hist`
+  MODIFY COLUMN IF EXISTS `r_trans_off` int(11) NOT NULL DEFAULT 0 COMMENT 'Transition offense rating',
+  MODIFY COLUMN IF EXISTS `r_drive_off` int(11) NOT NULL DEFAULT 0 COMMENT 'Drive offense rating';
 
 -- Identifiers with spaces: ibl_sim_dates
 ALTER TABLE `ibl_sim_dates`
-  CHANGE COLUMN `Start Date` `start_date` date DEFAULT NULL COMMENT 'First date in sim range',
-  CHANGE COLUMN `End Date`   `end_date`   date DEFAULT NULL COMMENT 'Last date in sim range';
+  RENAME COLUMN IF EXISTS `Start Date` TO `start_date`,
+  RENAME COLUMN IF EXISTS `End Date`   TO `end_date`;
+ALTER TABLE `ibl_sim_dates`
+  MODIFY COLUMN IF EXISTS `start_date` date DEFAULT NULL COMMENT 'First date in sim range',
+  MODIFY COLUMN IF EXISTS `end_date`   date DEFAULT NULL COMMENT 'Last date in sim range';

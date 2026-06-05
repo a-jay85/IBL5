@@ -1,5 +1,5 @@
 ---
-description: Replaces the mis-ported independent-turnover check (which jammed (TVR×5.8)² into the [2,5] energy slot, firing ~24%/poss) with the faithful JSB two-part model — a negligible [2,5]-energy independent check plus a dominant steal-driven turnover tied to offensive carelessness × defensive STL — and recalibrates the 2pt make-value. Closes the season scoring-level deficit; records the Cov re-run, with a full-precision (18-season/20-run) addendum confirming the Cov null (no flip; wrong sign lives in the non-arm residual; Control-B structural-vs-noise left to a 2nd seed).
+description: Replaces the mis-ported independent-turnover check (which jammed (TVR×5.8)² into the [2,5] energy slot, firing ~24%/poss) with the faithful JSB two-part model — a negligible [2,5]-energy independent check plus a dominant steal-driven turnover tied to offensive carelessness × defensive STL — and recalibrates the 2pt make-value. Closes the season scoring-level deficit; records the Cov re-run, with a full-precision (18-season/20-run) addendum confirming the Cov null (no flip; wrong sign lives in the non-arm residual). A second-seed addendum settles Control-B as STRUCTURAL (residual-frac 1.023 vs 1.028) and relaxes the archive control to a residual-frac band (≤ 1.05).
 last_verified: 2026-06-04
 ---
 
@@ -193,8 +193,37 @@ forbids loosening a control on one-seed evidence.
 
 **Net settle.** The Cov flip is a confirmed null at full precision; ADR-0045's
 steal-driven turnover behaves as designed (a genuine positive-cov arm) but is not the
-missing coupling; the next lever lives in the non-arm residual. The only open thread
-is the 2.8% Control-B excess, which one additional seed resolves.
+missing coupling; the next lever lives in the non-arm residual. The one remaining
+thread — the 2.8% Control-B excess — is resolved by the **Second-seed settle**
+addendum below (structural).
+
+### Second-seed settle — Control B is STRUCTURAL (2026-06-04 addendum)
+
+The pre-registered discriminator is resolved. A second full-precision seed
+(`JSB_ARCHIVE_SEED=20240602`, `RUNS=20 STRIDE=1`, 18 seasons, ~106 min) gives
+residual-frac **1.023**, against seed `20240601`'s **1.028** — two independent seeds
+clustered tightly just above 1.0, **not** scattered across it. By the rule set in the
+prior addendum this is **structural, not noise**: the arms reproduce (TVR −0.175, Foul
++0.161, ORB −0.033, Make +0.025), baseline `Cov(lnFGA,lnPPS) = −0.001218` (Control A
+holds), and the post-ADR-0045 steal-driven TVR arm genuinely **adds** positive cov, so
+freezing all four legitimately leaves `|Cov|` ~2–3% above baseline. The harness pools
+all rows into one covariance, so the cross-seed agreement (1.023 vs 1.028) is the
+discriminator — not a per-run σ, which the artifact does not store.
+
+**Action (per the pre-registered "relax to a band, do not invert").** The
+`freeze_archive_test.go` Control-B assertion is relaxed from the strict
+`|all-frozen| ≤ |baseline|` to a residual-frac band capped at **1.05** — headroom over
+the 1.023–1.028 settle, still flagging a real defect (arms adding *far* more
+covariance than the structural TVR excess). The control is **not** inverted: a *lower*
+residual-frac (arms removing more cov) was the control's original pass direction and
+remains fine. ADR-0041's anti-metric-gaming discipline is satisfied — the loosening
+rests on two seeds, not one, and the band is justified by a named structural mechanism
+(the TVR positive-cov arm), not fitted to make a red test pass.
+
+This closes the only open thread. The validation roadmap now moves to the **non-arm
+lever hunt**: the missing *positive* volume→PPS coupling lives in the non-arm residual
+(pace / shot-mix / FT / rebound-count), ~48% of |Cov| per ADR-0043, with the four
+instrumented arms now exhausted.
 
 ## Alternatives Considered
 

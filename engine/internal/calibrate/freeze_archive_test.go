@@ -79,14 +79,20 @@ func TestRealArchive_FreezeLatticeAttribution(t *testing.T) {
 		t.Errorf("Control A: baseline |Cov| = %.6f outside the ~1e-3 sanity band [1e-5, 5e-2]", ab)
 	}
 
-	// --- Control B: freezing ALL four arms reduces |Cov| relative to baseline (the
-	// arms collectively remove covariance, never add it). The RESIDUAL that survives
-	// is the non-arm (pace / shot-mix / FT / rebound-count) covariance — REPORTED,
-	// not asserted to zero. A large residual is itself a verdict (defect outside the
-	// four arms → the "no single dominant lever" terminal branch).
+	// --- Control B (RELAXED to a band — ADR-0045 second-seed settle, 2026-06-04):
+	// freezing ALL four arms leaves |Cov| at ~baseline. Two full-precision seeds
+	// (20240601 / 20240602) put residual-frac at 1.028 / 1.023 — a STRUCTURAL ~2–3%
+	// excess above baseline, NOT noise: post-ADR-0045 the steal-driven TVR arm
+	// genuinely ADDS positive cov, so freezing it RAISES |Cov|. The arms therefore do
+	// not strictly remove covariance; the surviving residual (≈ baseline) is the
+	// non-arm (pace / shot-mix / FT / rebound-count) coupling — REPORTED, the real
+	// verdict. Band the UPPER edge only: arms adding FAR more cov than the structural
+	// TVR excess is a real defect. Do NOT invert — a lower residual-frac (arms
+	// removing more cov) was the control's original pass direction and stays fine.
+	const controlBCeiling = 1.05 // headroom over the 1.023–1.028 two-seed settle
 	allFrozen := rep.AllFrozenCovLnFGALnPPS
-	if math.Abs(allFrozen) > math.Abs(base)+1e-9 {
-		t.Errorf("Control B: all-frozen |Cov| = %.6f exceeds baseline |Cov| = %.6f (arms must not ADD covariance)", math.Abs(allFrozen), math.Abs(base))
+	if rep.ResidualFracOfBaseline > controlBCeiling {
+		t.Errorf("Control B: residual-frac of baseline = %.3f exceeds the structural-settle ceiling %.2f (all-frozen |Cov|=%.6f vs baseline |Cov|=%.6f — arms adding far more covariance than the ADR-0045 TVR-arm structural excess)", rep.ResidualFracOfBaseline, controlBCeiling, math.Abs(allFrozen), math.Abs(base))
 	}
 	t.Logf("CONTROLS: baseline Cov=%.6f all-frozen Cov=%.6f residual frac of baseline=%.3f",
 		base, allFrozen, rep.ResidualFracOfBaseline)

@@ -16,7 +16,7 @@ use PHPUnit\Framework\Attributes\Group;
 class BallotColumnWidthTest extends DatabaseTestCase
 {
     /**
-     * @return list<array{0: string, 1: string, 2: int}>
+     * @return array<string, array{0: string, 1: string, 2: int}>
      */
     public static function ballotColumnProvider(): array
     {

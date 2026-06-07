@@ -184,6 +184,11 @@ MAX_ATTEMPTS=3     # per-plan retry cap within one night (covers impl + postplan
 MAX_IMPL_SECS=3600   # per-phase cap: impl gets at most 1h
 MAX_PP_SECS=3600     # per-phase cap: post-plan gets at most 1h
 STALL_KILL_SECS=600  # kill phase if no stream events for 10 minutes
+MIN_VIABLE_SECS=60   # a real impl/postplan never finishes (pass OR fail) under a
+                     # minute — historical runs are 15-50 min; environmental
+                     # fast-fails (usage/rate limit, auth error, transient) exit in
+                     # 2-5s. A sub-minute exit is therefore environmental, not a
+                     # plan failure: stop the night, don't burn the queue to skipped/.
 
 HANDOFF_DIR="$NIGHTLY_DIR/handoff"
 mkdir -p "$LOG_DIR" "$QUEUE_DIR" "$HANDOFF_DIR"
@@ -254,6 +259,52 @@ append_cost_row() {
     printf '| %s | %s | %s |\n' "$plan" "$phase" "$cost" >> "$report"
 }
 
+# Decrement the current plan's attempt counter by one ("refund"). Used when a
+# phase is cut short by an environmental failure (usage/rate limit, auth error,
+# transient) rather than a genuine plan failure — the plan should retry cleanly
+# next run, not march toward the poison-pill skip threshold.
+refund_attempt() {
+    local current
+    current=$(cat "$ATTEMPT_FILE" 2>/dev/null || echo 0)
+    if [ "$current" -le 1 ]; then
+        rm -f "$ATTEMPT_FILE"
+    else
+        echo $(( current - 1 )) > "$ATTEMPT_FILE"
+    fi
+}
+
+# Scan this phase's slice of the log for a known environmental-failure signature:
+# a Claude usage/rate limit or an Anthropic API auth error, in any phrasing these
+# surface in (the legacy single-string checks missed "weekly limit" and the plain
+# "API Error: 401", causing whole queues to grind into skipped/). Patterns are
+# kept specific to Claude-runtime errors so a postplan security audit discussing
+# auth code does not false-trigger. Returns 0 on match. Safe under `set -e`: only
+# ever called inside an `if` condition.
+phase_env_error() {
+    local log_before=$1
+    tail -n +"$(( log_before + 1 ))" "$LOG" 2>/dev/null | grep -qiE \
+        "hit your [a-z0-9 -]*limit|usage limit reached|api error:[[:space:]]*(401|403|429|529)|overloaded_error|rate_limit_error"
+}
+
+# Write a one-line report when the run STOPS on an environmental failure. The
+# queue is left intact (nothing skipped), so without this a no-progress night —
+# e.g. a single head-of-queue plan that keeps fast-failing — would be silent.
+# Distinct filename prefix (env-stop) from the skip/error/done reports.
+write_env_stop_report() {
+    local plan=$1 phase=$2 reason=$3 log_before=$4
+    local reports_dir="$NIGHTLY_DIR/reports" slug
+    slug=$(basename "$plan" .md)
+    mkdir -p "$reports_dir"
+    {
+        printf 'Nightly run STOPPED during %s of "%s" — %s.\n\n' "$phase" "$slug" "$reason"
+        printf 'The queue was left intact — no plans were skipped. It resumes next run.\n'
+        printf 'If this recurs for the same plan, that plan may be malformed — review it.\n\n'
+        printf '## Phase log tail\n\n```\n'
+        tail -n +"$(( log_before + 1 ))" "$LOG" 2>/dev/null | tail -20 || true
+        printf '\n```\n'
+    } > "$reports_dir/$(date +%Y-%m-%d)-env-stop-$slug.md"
+}
+
 LOG="$LOG_DIR/$(date +%Y-%m-%d).log"
 
 cd "$REPO"
@@ -264,7 +315,6 @@ CAFFEINATE_PID=$!
 
 START=$(date +%s)
 PLANS_RUN=0
-AUTH_FAILED=false
 
 echo "=== Nightly session starting at $(date) ===" >> "$LOG"
 
@@ -286,12 +336,6 @@ while true; do
     ELAPSED=$(( $(date +%s) - START ))
     if [ "$ELAPSED" -gt "$MAX_ELAPSED" ]; then
         echo "Time guard: ${ELAPSED}s elapsed (max ${MAX_ELAPSED}s), stopping." >> "$LOG"
-        break
-    fi
-
-    # Session-level auth breaker — if auth failed on a prior plan, stop entirely
-    if $AUTH_FAILED; then
-        echo "Auth failure detected in prior plan — stopping session." >> "$LOG"
         break
     fi
 
@@ -353,6 +397,7 @@ while true; do
         WATCHER_PID=$!
 
         IMPL_STATUS=0
+        IMPL_START=$(date +%s)
         NIGHTLY_CMDPID_FILE="$CMDPID_FILE" \
         timeout "$REMAINING_SECS" \
             claude -p "$(cat bin/nightly-prompt-impl)
@@ -379,28 +424,27 @@ PLAN_FILE=$PLAN_NAME" \
         echo "--- Plan #$PLANS_RUN impl finished at $(date) ---" >> "$LOG"
         append_cost_row "$PLAN_NAME" impl "$IMPL_LOG_BEFORE"
 
-        # Auth-error circuit breaker — transient, not a plan failure; stop immediately
-        if tail -n +"$((IMPL_LOG_BEFORE + 1))" "$LOG" | grep -q "authentication_error"; then
-            echo "Auth error during impl — stopping loop (not a plan failure)." >> "$LOG"
-            AUTH_FAILED=true
-            CURRENT=$(cat "$ATTEMPT_FILE" 2>/dev/null || echo 0)
-            if [ "$CURRENT" -le 1 ]; then
-                rm -f "$ATTEMPT_FILE"
-            else
-                echo $(( CURRENT - 1 )) > "$ATTEMPT_FILE"
-            fi
-            break
-        fi
+        IMPL_DUR=$(( $(date +%s) - IMPL_START ))
 
-        # Usage-limit check after implementation
-        if tail -n +"$((IMPL_LOG_BEFORE + 1))" "$LOG" | grep -qE "hit your( session)? limit"; then
-            echo "Usage limit during impl — stopping loop." >> "$LOG"
-            CURRENT=$(cat "$ATTEMPT_FILE" 2>/dev/null || echo 0)
-            if [ "$CURRENT" -le 1 ]; then
-                rm -f "$ATTEMPT_FILE"
-            else
-                echo $(( CURRENT - 1 )) > "$ATTEMPT_FILE"
+        # Environmental-failure breaker. A usage/rate limit, auth error, or any
+        # transient that kills the agent is NOT a plan failure — refund the attempt
+        # and STOP so the queue survives intact (it resumes next run). Only when
+        # impl produced no handoff; two independent signals, either suffices:
+        #   1. a known limit/auth signature in this phase's log slice, or
+        #   2. a sub-minute exit — real impls run 15-50 min, so a fast no-handoff
+        #      exit is environmental whatever the phrasing, and (unlike string
+        #      matching) is immune to the async-stderr log-flush race.
+        # A slow failure with no signature falls through as a genuine plan failure,
+        # keeping its incremented attempt → eventual poison-pill skip (unchanged).
+        if [ ! -f "$HANDOFF_FILE" ] \
+           && { phase_env_error "$IMPL_LOG_BEFORE" || [ "$IMPL_DUR" -lt "$MIN_VIABLE_SECS" ]; }; then
+            REASON="usage/rate limit, auth error, or transient"
+            if [ "$IMPL_DUR" -lt "$MIN_VIABLE_SECS" ]; then
+                REASON="$REASON (impl exited in ${IMPL_DUR}s)"
             fi
+            echo "Environmental failure during impl — $REASON. Refunding attempt, stopping loop." >> "$LOG"
+            refund_attempt
+            write_env_stop_report "$PLAN_NAME" impl "$REASON" "$IMPL_LOG_BEFORE"
             break
         fi
 
@@ -436,6 +480,7 @@ PLAN_FILE=$PLAN_NAME" \
         WATCHER_PID=$!
 
         PP_STATUS=0
+        PP_START=$(date +%s)
         NIGHTLY_CMDPID_FILE="$CMDPID_FILE" \
         timeout "$REMAINING_SECS" \
             claude -p "$(cat bin/nightly-prompt-postplan)
@@ -462,28 +507,22 @@ PLAN_FILE=$PLAN_NAME" \
         echo "--- Plan #$PLANS_RUN postplan finished at $(date) ---" >> "$LOG"
         append_cost_row "$PLAN_NAME" postplan "$PP_LOG_BEFORE"
 
-        # Auth-error circuit breaker — transient, not a plan failure; stop immediately
-        if tail -n +"$((PP_LOG_BEFORE + 1))" "$LOG" | grep -q "authentication_error"; then
-            echo "Auth error during postplan — stopping loop (not a plan failure)." >> "$LOG"
-            AUTH_FAILED=true
-            CURRENT=$(cat "$ATTEMPT_FILE" 2>/dev/null || echo 0)
-            if [ "$CURRENT" -le 1 ]; then
-                rm -f "$ATTEMPT_FILE"
-            else
-                echo $(( CURRENT - 1 )) > "$ATTEMPT_FILE"
-            fi
-            break
-        fi
+        PP_DUR=$(( $(date +%s) - PP_START ))
 
-        # Usage-limit check after post-plan
-        if tail -n +"$((PP_LOG_BEFORE + 1))" "$LOG" | grep -qE "hit your( session)? limit"; then
-            echo "Usage limit during postplan — stopping loop." >> "$LOG"
-            CURRENT=$(cat "$ATTEMPT_FILE" 2>/dev/null || echo 0)
-            if [ "$CURRENT" -le 1 ]; then
-                rm -f "$ATTEMPT_FILE"
-            else
-                echo $(( CURRENT - 1 )) > "$ATTEMPT_FILE"
+        # Environmental-failure breaker (mirrors impl). A successful post-plan
+        # removes the handoff (the agent moves the plan to done/ and deletes it),
+        # so a handoff still present after a sub-minute exit means the agent never
+        # ran — environmental. A known limit/auth signature stops regardless, so a
+        # dead budget doesn't burn a postplan retry. Refund + stop; queue intact.
+        if phase_env_error "$PP_LOG_BEFORE" \
+           || { [ -f "$HANDOFF_FILE" ] && [ "$PP_DUR" -lt "$MIN_VIABLE_SECS" ]; }; then
+            REASON="usage/rate limit, auth error, or transient"
+            if [ "$PP_DUR" -lt "$MIN_VIABLE_SECS" ]; then
+                REASON="$REASON (postplan exited in ${PP_DUR}s)"
             fi
+            echo "Environmental failure during postplan — $REASON. Refunding attempt, stopping loop." >> "$LOG"
+            refund_attempt
+            write_env_stop_report "$PLAN_NAME" postplan "$REASON" "$PP_LOG_BEFORE"
             break
         fi
     fi

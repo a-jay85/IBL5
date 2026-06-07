@@ -1,0 +1,30 @@
+#!/bin/bash
+# jsb-ref — locate a JSB symbol / address / topic in the master reference and the
+# decompile, printing only excerpts (ref) and match line-numbers (the 10MB .c), so you
+# avoid full-reading 00_MASTER_REFERENCE.md (287K) or jsb560_decompiled.c (10.4M).
+# Workflow: jsb-ref FUN_004e1ba0  → then Read ±ctx at the decompile line it reports.
+# Usage: bin/jsb-ref <pattern> [context-lines]   (env: JSB_DECOMPILE_DIR)
+set -uo pipefail
+
+pat="${1:-}"
+[ -n "$pat" ] || { echo "usage: bin/jsb-ref <pattern> [context-lines]" >&2; exit 2; }
+ctx="${2:-12}"
+dir="${JSB_DECOMPILE_DIR:-$HOME/Downloads/jsb_560/decompiled}"
+ref="$dir/00_MASTER_REFERENCE.md"
+dec="$dir/jsb560_decompiled.c"
+[ -d "$dir" ] || { echo "decompile dir not found: $dir (set JSB_DECOMPILE_DIR)" >&2; exit 1; }
+
+echo "=== 00_MASTER_REFERENCE.md  (±$ctx lines, capped at 120) ==="
+if [ -f "$ref" ] && grep -q -i -- "$pat" "$ref"; then
+  grep -n -i -C "$ctx" -- "$pat" "$ref" | head -120
+else
+  echo "(no match in master ref)"
+fi
+
+echo ""
+echo "=== jsb560_decompiled.c  (match line numbers — Read ±$ctx at these, capped at 40) ==="
+if [ -f "$dec" ] && grep -q -i -- "$pat" "$dec"; then
+  grep -n -i -- "$pat" "$dec" | head -40
+else
+  echo "(no match in decompile)"
+fi

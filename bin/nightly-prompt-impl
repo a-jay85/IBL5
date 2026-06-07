@@ -156,6 +156,8 @@ git log --oneline origin/master..HEAD
 
 Work in worktrees/<slug>/ibl5/. CLAUDE.md is auto-loaded — follow all project rules. Follow the plan step by step.
 
+When a plan phase carries a `### Delegate` packet, do NOT implement that phase inline: fire **one** Agent/Task call per packet at the packet's declared tier (Haiku or Sonnet), pass the packet **verbatim** as the sub-agent prompt, and absorb only the sub-agent's one-line summary. The packet is self-verifying — the sub-agent runs the packet's self-verify command before returning — and CI plus post-plan review remain the backstop. This keeps your own context flat across the run; inlining a verbose packet's tool output defeats its purpose.
+
 ### Incremental Commits
 
 Commit and push after each major milestone to checkpoint progress. This ensures work survives if the session ends unexpectedly. Use conventional commit messages — squash-merge erases the history anyway.

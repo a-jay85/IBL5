@@ -1,6 +1,6 @@
 ---
 description: Sub-agent decision rules — when to spawn, when to skip, and which model to pick
-last_verified: 2026-05-28
+last_verified: 2026-06-07
 ---
 
 # Agent Tiering
@@ -62,21 +62,4 @@ Choose the tier per prompt — do not default all Explore agents to one tier:
 
 **Decision heuristic:** if the prompt asks the agent to notice connections, judge relevance, or trace data flow — use Sonnet. If the prompt can be answered by running a grep and formatting the output — use Haiku.
 
-## In Plans
-
-Explicitly label which implementation phases go to Sonnet / Haiku / self. The tiering decision belongs in the plan, not deferred to execution time.
-
-### Mechanical recipe agents
-
-When a plan phase writes out every action as literal commands (`git mv`, explicit find/replace mappings, `git rm`, config line swaps), the executing agent is Haiku. The prompt already contains the recipe — the agent executes it. Sonnet is only needed when the prompt asks the agent to decide *what* to do, not just *how* to do it.
-
-**Haiku:** `git mv` file renames with explicit source→target, namespace find/replace from a provided mapping, `git rm` + config updates, multi-step recipe execution
-**Sonnet:** call-site sweeps where the agent must judge whether a match is a column vs. table name, test-writing, code authoring, debugging failures
-
-### Bulk-sweep pattern
-
-- Migration authoring, PHPStan rules, ADRs → Opus (self).
-- Per-module PHP call-site sweeps that require judgment (e.g., distinguishing column refs from table refs in backtick-quoted SQL) → Sonnet.
-- Per-module sweeps with an explicit old→new mapping and no ambiguity → Haiku.
-- Running tests, migrations, schema verification → direct Bash (short output); Haiku only if multi-step or output is unpredictably large.
-- Interpreting failing tests, deciding when to update baselines → Opus (self).
+Plan-authoring tiering guidance (labeling each implementation phase Sonnet / Haiku / self, mechanical-recipe agents, bulk-sweep patterns) lives in `.claude/commands/plan.md` Step 3, where it is consumed.

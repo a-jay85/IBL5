@@ -32,7 +32,7 @@ A headless `claude -p` process runs twice daily via macOS `launchd`. It loops th
   done/     symlinks moved here after successful execution
   skipped/  symlinks moved here when skipped (ambiguity/errors/poison-pill)
   handoff/  JSON files bridging state from implementation to post-plan agent
-  reports/  per-night markdown reports (YYYY-MM-DD-{done|skipped|no-queue|error}-<slug>.md);
+  reports/  per-night markdown reports (YYYY-MM-DD-{done|skipped|env-stop|no-queue|error}-<slug>.md);
             plus YYYY-MM-DD-costs.md — per-phase token cost roll-up written by nightly-run
   logs/     claude -p output logs + launchd stdout/stderr
 ```
@@ -44,7 +44,8 @@ A headless `claude -p` process runs twice daily via macOS `launchd`. It loops th
 3. **Loop:** For each queued plan (oldest first), `nightly-run` fires two `claude -p` invocations sequentially:
    - **Implementation agent** (`bin/nightly-prompt-impl`): creates worktree, implements the plan, makes checkpoint commits, writes a handoff file. Its model is selectable per-plan via a line-1 `impl_model:` frontmatter field (`sonnet` → Sonnet, `haiku` → Haiku, absent or anything else → the Opus default), resolved by `bin/lib/plan-impl-model`; declare `sonnet` only for uniformly-mechanical plans whose every verification row is objectively machine-checkable. The post-plan agent is always Sonnet.
    - **Post-plan agent** (`bin/nightly-prompt-postplan`): reads the handoff file, runs `/post-plan` (code review, security audit, PR, CI monitoring, auto-merge), writes the completion report
-4. **Guards:** The loop stops when the queue is empty or ~4h45m have elapsed. Plans that fail 3 times are moved to `skipped/` as poison pills.
+4. **Guards:** The loop stops when the queue is empty or ~4h45m have elapsed. Plans that fail 3 times (after genuine, full-length attempts) are moved to `skipped/` as poison pills.
+   - **Environmental failures stop the run cleanly instead of skipping.** A usage/rate limit, auth error, or any transient that kills an agent — detected by a known limit/auth signature in the log *or* by a sub-minute phase exit (a real impl/postplan runs 15–50 min) — refunds the attempt and breaks the loop, leaving the **entire queue intact** to resume next run. This prevents the failure mode where one dead-budget night ground every queued plan into `skipped/`. Each such stop writes a `YYYY-MM-DD-env-stop-<slug>.md` report.
 5. **Morning:** Check `gh pr list` for new PRs, read reports for details
 
 ## Headless Mode

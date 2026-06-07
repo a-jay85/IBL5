@@ -243,17 +243,21 @@ function checkTestCoverage(string $mode, array $triggers): bool
 {
     $addedFiles = diffNames($mode, 'A');
     $modifiedFiles = diffNames($mode, 'M');
+    // Renamed files via diffRenames(), which forces `-M` so rename detection does
+    // not depend on the ambient `diff.renames` git config (diffNames does not pass
+    // it). We credit the NEW path: renaming a test during a refactor still covers it.
+    $renamedFiles = array_map(static fn (array $r): string => $r['to'], diffRenames($mode));
 
-    // Test added in this PR — any new file under ibl5/tests/
-    foreach ($addedFiles as $file) {
+    // Test added or renamed in this PR — any new/renamed file under ibl5/tests/.
+    foreach (array_merge($addedFiles, $renamedFiles) as $file) {
         if (str_starts_with($file, 'ibl5/tests/')) {
             return true;
         }
     }
 
-    // Test modified in this PR — must match an affected class/module name
+    // Test modified or renamed in this PR — must match an affected class/module name
     $affected = affectedNames($triggers);
-    foreach ($modifiedFiles as $file) {
+    foreach (array_merge($modifiedFiles, $renamedFiles) as $file) {
         if (!str_starts_with($file, 'ibl5/tests/')) {
             continue;
         }

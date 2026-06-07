@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-check-phpunit-hygiene — regression test for bin/check-phpunit-hygiene.
+#
+# Pins TWO checks the gate enforces:
+#   mark-test-skipped  markTestSkipped() is a blocking hit; an inline
+#                      `// phpunit-hygiene-allow:` marker suppresses it.
+#   no-db-group        a CONCRETE class extending DatabaseTestCase that lacks
+#                      `#[Group('database')]` is a blocking hit (the attribute
+#                      is not inherited; without it the test runs in the no-DB
+#                      job and fails). An `abstract` base class is exempt, as is
+#                      a class carrying `// phpunit-hygiene-allow-no-db-group:`.
+#
+# Each case builds a throwaway git repo under mktemp (check-phpunit-hygiene
+# resolves its scan root from `git rev-parse --show-toplevel`) with a single
+# fixture under ibl5/tests/, runs the gate in MODE=all from inside, and asserts
+# the exit code + output. MODE=all exercises the same per-file check logic as
+# --pr; only the file-set builder differs, and that is unchanged pre-existing
+# code.
+#
+# Run: bin/test-check-phpunit-hygiene  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+HYGIENE="$SCRIPT_DIR/check-phpunit-hygiene"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP" 2>/dev/null' EXIT
+
+FAILED=0
+pass()     { echo "ok: $1"; }
+failcase() { echo "FAIL: $1"; FAILED=1; }
+
+# mk_repo — build a fresh git repo with an ibl5/tests dir; echo its path.
+mk_repo() {
+    local d
+    d="$(mktemp -d "$TMP/repo.XXXXXX")"
+    git init -q "$d" >/dev/null 2>&1
+    git -C "$d" config user.email t@example.com >/dev/null 2>&1
+    git -C "$d" config user.name tester >/dev/null 2>&1
+    git -C "$d" config commit.gpgsign false >/dev/null 2>&1
+    mkdir -p "$d/ibl5/tests"
+    echo "$d"
+}
+
+# run_case <name> <expected-exit> <expected-output-regex|-> <fixture-relpath> <fixture-body>
+# Builds a repo with one fixture file and runs check-phpunit-hygiene (MODE=all).
+run_case() {
+    local name="$1" want="$2" want_re="$3" relpath="$4" body="$5"
+    local d out rc
+    d="$(mk_repo)"
+    mkdir -p "$d/$(dirname "$relpath")"
+    printf '%s\n' "$body" > "$d/$relpath"
+    out="$( ( cd "$d" && "$HYGIENE" ) 2>&1 )"
+    rc=$?
+    if [ "$rc" -ne "$want" ]; then
+        failcase "$name — expected exit $want, got $rc"
+        printf '%s\n' "$out" | sed 's/^/    /'
+        return
+    fi
+    if [ "$want_re" != "-" ] && ! printf '%s' "$out" | grep -qE "$want_re"; then
+        failcase "$name — output did not match: $want_re"
+        printf '%s\n' "$out" | sed 's/^/    /'
+        return
+    fi
+    pass "$name (exit $rc)"
+}
+
+# --- Characterization: existing mark-test-skipped behavior is preserved -------
+
+run_case "skip-flagged" 1 'mark-test-skipped' "ibl5/tests/SkipTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class SkipTest extends TestCase
+{
+    public function testThing(): void
+    {
+        $this->markTestSkipped("nope");
+    }
+}'
+
+run_case "skip-marker-suppresses" 0 '-' "ibl5/tests/SkipMarkedTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class SkipMarkedTest extends TestCase
+{
+    public function testThing(): void
+    {
+        // phpunit-hygiene-allow: external service is unreachable in unit tier
+        $this->markTestSkipped("nope");
+    }
+}'
+
+# --- New: no-db-group check ---------------------------------------------------
+
+run_case "db-group-missing-flagged" 1 'no-db-group' "ibl5/tests/NoGroupTest.php" \
+'<?php
+namespace Tests\X;
+use Tests\DatabaseIntegration\DatabaseTestCase;
+class NoGroupTest extends DatabaseTestCase
+{
+    public function testThing(): void {}
+}'
+
+run_case "db-group-present-ok" 0 '-' "ibl5/tests/WithGroupTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\Attributes\Group;
+use Tests\DatabaseIntegration\DatabaseTestCase;
+#[Group("database")]
+class WithGroupTest extends DatabaseTestCase
+{
+    public function testThing(): void {}
+}'
+
+run_case "db-group-abstract-exempt" 0 '-' "ibl5/tests/BaseTestCase.php" \
+'<?php
+namespace Tests\X;
+use Tests\DatabaseIntegration\DatabaseTestCase;
+abstract class BaseTestCase extends DatabaseTestCase
+{
+    protected function helper(): void {}
+}'
+
+run_case "db-group-marker-suppresses" 0 '-' "ibl5/tests/MarkedNoGroupTest.php" \
+'<?php
+namespace Tests\X;
+use Tests\DatabaseIntegration\DatabaseTestCase;
+// phpunit-hygiene-allow-no-db-group: runs only under a bespoke harness, not the db group
+class MarkedNoGroupTest extends DatabaseTestCase
+{
+    public function testThing(): void {}
+}'
+
+run_case "non-db-testcase-ok" 0 '-' "ibl5/tests/PlainTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class PlainTest extends TestCase
+{
+    public function testThing(): void {}
+}'
+
+if [ "$FAILED" -ne 0 ]; then
+    echo "RESULT: FAILED"
+    exit 1
+fi
+echo "RESULT: all passed"
+exit 0

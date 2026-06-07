@@ -400,6 +400,10 @@ while true; do
         IMPL_START=$(date +%s)
         # Per-plan model selection: a plan may declare `impl_model:` in its
         # first frontmatter block; absent/unknown → Opus default.
+        # Both invocations pass `--effort high` explicitly to pin reasoning
+        # depth regardless of the user's interactive `/effort` setting (which
+        # writes ~/.claude/settings.json effortLevel). Do not remove as
+        # "redundant with the default" — the pin is the point.
         IMPL_MODEL=$(bin/lib/plan-impl-model "$NEXT_PLAN")
         echo "[$(date +%H:%M:%S)] impl model: $IMPL_MODEL for $PLAN_NAME" >> "$LOG"
         NIGHTLY_CMDPID_FILE="$CMDPID_FILE" \
@@ -409,6 +413,7 @@ while true; do
 PLAN_FILE=$PLAN_NAME" \
                 --dangerously-skip-permissions \
                 --model "$IMPL_MODEL" \
+                --effort high \
                 --output-format stream-json \
                 --verbose \
                 --name "nightly-impl-$(date +%Y-%m-%d-%H%M)" \
@@ -492,6 +497,7 @@ PLAN_FILE=$PLAN_NAME" \
 PLAN_FILE=$PLAN_NAME" \
                 --dangerously-skip-permissions \
                 --model claude-sonnet-4-6 \
+                --effort high \
                 --output-format stream-json \
                 --verbose \
                 --name "nightly-postplan-$(date +%Y-%m-%d-%H%M)" \

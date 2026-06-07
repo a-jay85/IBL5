@@ -428,21 +428,24 @@ Effort scale:
 **Risk if untouched:** Submission-flow changes must be applied twice; drift.
 
 ### 2.36 ProjectedDraftOrder — Two Entrypoints With Duplicate Auth
-**Location:** `modules/ProjectedDraftOrder/index.php`, `save_order.php`
+**Status:** Completed (2026-06-05) — `save_order.php` folded into `index.php?op=save_order` via an early-return guard (single op, no named functions); `jslib/draft-order-drag.js` + both E2E specs updated `file=` → `op=`.
+**Location:** `modules/ProjectedDraftOrder/index.php`, `save_order.php` (deleted)
 **Problem:** `save_order.php` is a JSON POST handler with its own auth check, hiding in the module dir.
 **Suggested direction:** Move into `index.php?op=save` or an `ApiHandler` class.
 **Est. effort:** S
 **Risk if untouched:** Two auth implementations; access-control auditing harder.
 
 ### 2.37 TeamOffDefStats — `view.php` Partial-Template Anti-Pattern
-**Location:** `modules/TeamOffDefStats/index.php`, `view.php`
+**Status:** Completed (2026-06-05) — `view.php`'s 3 meaningful lines (`header()` / `echo $leagueStatsHtml` / `footer()`) inlined into `index.php`; partial template deleted.
+**Location:** `modules/TeamOffDefStats/index.php`, `view.php` (deleted)
 **Problem:** `view.php` is a 9-line template echoing `$leagueStatsHtml`, an implicit contract between two files.
 **Suggested direction:** Eliminate `view.php`; call `echo $view->render()` directly in `index.php`.
 **Est. effort:** S
 **Risk if untouched:** Implicit contract; silent `undefined variable` errors on rename.
 
 ### 2.38 `Topics/copyright.php` — Dead PHP-Nuke Boilerplate
-**Location:** `modules/Topics/copyright.php`
+**Status:** Completed (2026-06-05) — deleted. `PageLayout`'s footer self-guards via `file_exists(modules/$name/copyright.php)`, so removal is a no-op (drops the legacy "Copyright" popup link that only Topics still surfaced).
+**Location:** `modules/Topics/copyright.php` (deleted)
 **Problem:** Verbatim PHP-Nuke 2007 boilerplate. Uses banned `<font>`, `<b>`, `<center>` tags + inline CSS. Not referenced anywhere.
 **Suggested direction:** Delete.
 **Est. effort:** S
@@ -1977,6 +1980,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Risk if untouched:** Minor drift risk.
 
 ### 13.7 Validator Error-Accumulation Boilerplate Repeated
+**Status:** Deferred (2026-06-05, maintenance-26) — **NOT done.** The premise ("two incompatible patterns / a `ValidationResult` value object replaces both") does not hold against the code. Orientation found **four** distinct result shapes, not two: accumulator-of-`string` (Waivers, Draft); accumulator-of-structured-`{type,message,detail}` + `getErrorMessagesHtml()` (DepthChartEntry); dict `{valid,error?}` (FreeAgencyOffer, and CommonContractValidator which it chains — not even in the audit's list); dict-multikey `{valid,errors[],userPostTradeCapTotal,partnerPostTradeCapTotal}` (Trade). The existing `ValidationResult` holds `list<string>`, so DepthChartEntry's structured errors and Trade's cap totals cannot migrate without data loss, and migrating only the clean ones nets **zero** distinct-shape reduction (the dict pattern survives via CommonContractValidator). Re-scope needed: a human design decision on how structured/multi-value validators represent results (extend `ValidationResult`? sibling types?) plus an audit of all ~14 validators, not the 5 assumed here.
 **Location:** `Waivers/WaiversValidator.php`, `Draft/DraftValidator.php`, `DepthChartEntry/DepthChartEntryValidator.php`
 **Problem:** All three define `private array $errors = []; getErrors(); clearErrors();`. `TradeValidator` and `FreeAgencyOfferValidator` use a different return shape — two incompatible patterns.
 **Suggested direction:** `AbstractAccumulatingValidator` base or `ValidatorErrorBag` value object; enforce "clearErrors before validate" centrally.
@@ -1984,6 +1988,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Risk if untouched:** New validators copy without the convention; state leakage between calls.
 
 ### 13.8 `p.retired` Filter Inconsistency: `= 0` vs `!= 1`
+**Status:** Completed (2026-06-05) — `League/League.php`'s 4 `p.retired != 1` sites (getAllStar/MVP/SixthPerson/RookieOfYear candidate queries) standardized to `p.retired = 0`. Behavior-preserving: `ibl_plr.retired` holds exactly {0,1} (verified live: 659 active / 903 retired, 0 sentinels/NULLs). `tests/League/RetiredFilterCharacterizationTest` locks the emitted filter SQL. The `DEFAULT 0 NOT NULL` schema hardening stays out of scope (see [[15.4]]).
 **Location:** `League/League.php:119,202,221,241` (`!= 1`); 139, 156, 182 (`= 0`); `Team/TeamQueryRepository.php` (`= 0`); `ContractList/ContractListRepository.php` (`= 0`)
 **Problem:** Semantically equivalent in MySQL but different intent. With native types both work; future NULL would diverge silently.
 **Suggested direction:** Standardize to `retired = 0`; add `DEFAULT 0 NOT NULL` constraint in migration.
@@ -2005,6 +2010,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Risk if untouched:** Adding a stat column requires touching both services + views.
 
 ### 13.11 `FranchiseRecordBook` Apostrophe-Stripping Subquery — 3 Copies in One File
+**Status:** Completed (2026-06-05) — extracted the identical `REPLACE(name,'''','')` derived-table LEFT JOIN into `private static function cleanNamePidSubquery()`, called from all three methods. SQL is equivalent; the existing `tests/DatabaseIntegration/FranchiseRecordBookRepositoryTest` (exercises all 3 methods) is the green-green characterization.
 **Location:** `FranchiseRecordBook/FranchiseRecordBookRepository.php` lines 36, 66, 95
 **Problem:** Same `REPLACE(name, '''', '')` derived-table subquery in all three public methods.
 **Suggested direction:** Extract `private static function playerPidByCleanNameSubquery(): string`.

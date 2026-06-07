@@ -18,7 +18,7 @@ import { submitFormAndAssertEffect } from '../helpers/submit-form';
 
 test.describe.configure({ mode: 'serial' });
 
-const SAVE_ORDER_URL = 'modules.php?name=ProjectedDraftOrder&file=save_order';
+const SAVE_ORDER_URL = 'modules.php?name=ProjectedDraftOrder&op=save_order';
 const TEST_SEASON_YEAR = 2026;
 
 test.beforeAll(async ({ request }) => {
@@ -96,7 +96,7 @@ test.describe('save_order: method not allowed', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Block 4 — validation errors (one test per save_order.php branch)
+// Block 4 — validation errors (one test per save_order handler branch)
 // ---------------------------------------------------------------------------
 
 test.describe('save_order: validation errors', () => {
@@ -145,8 +145,8 @@ test.describe('save_order: validation errors', () => {
   });
 
   test('order with non-numeric string returns 400', async ({ request }) => {
-    // save_order.php casts strings via (int), so "abc" → 0, which then
-    // fails the >= 1 check in the range validator (line 64).
+    // The save_order handler casts strings via (int), so "abc" → 0, which
+    // then fails the >= 1 check in the range validator.
     const { status, body } = await postJson(request, {
       order: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 'abc'],
     });

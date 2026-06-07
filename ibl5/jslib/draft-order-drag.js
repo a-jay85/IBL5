@@ -164,7 +164,7 @@
             saveBtn.disabled = true;
             saveBtn.textContent = 'Saving...';
 
-            fetch('modules.php?name=ProjectedDraftOrder&file=save_order', {
+            fetch('modules.php?name=ProjectedDraftOrder&op=save_order', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ order: order })

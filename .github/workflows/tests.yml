@@ -509,10 +509,41 @@ jobs:
           git push
         fi
 
+  infection-excludes:
+    name: Infection exclude staleness
+    runs-on: ubuntu-latest
+    # Runs unconditionally: a stale exclude can be introduced by editing
+    # ibl5/infection.json5 alone, which no path-filter covers — so gating this on
+    # `src`/`shell` would skip exactly when it matters. The check is a few seconds
+    # of grep with no dependencies.
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+      - name: Check infection.json5 file excludes resolve
+        working-directory: ibl5
+        run: bin/check-infection-excludes
+
+  harness-tests:
+    name: Shell harness regression tests
+    needs: [changes]
+    if: needs.changes.outputs.shell == 'true'
+    runs-on: ubuntu-latest
+    # Each harness builds its own throwaway git repos under mktemp, so the
+    # checkout depth and a global git identity are irrelevant.
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+      - name: bin/test-cleanup-safety
+        run: bin/test-cleanup-safety
+      - name: bin/test-check-phpunit-hygiene
+        run: bin/test-check-phpunit-hygiene
+      - name: bin/test-refactor-flag
+        run: bin/test-refactor-flag
+
   gate:
     name: Tests and Analysis
     if: always()
-    needs: [changes, test, audit-php, audit-js, ibl6-checks, db-integration, phpstan, phpunit-hygiene, shellcheck, host-mariadb-guard, update-baselines]
+    needs: [changes, test, audit-php, audit-js, ibl6-checks, db-integration, phpstan, phpunit-hygiene, shellcheck, host-mariadb-guard, update-baselines, infection-excludes, harness-tests]
     runs-on: ubuntu-latest
     steps:
       - run: exit 1

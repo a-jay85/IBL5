@@ -529,7 +529,7 @@ function checkChanged(string $base, string $repoRoot, \DateTimeImmutable $today)
         $verifiedAtEdit = $headLv !== null && $headLv === editCommitDate($repoRoot, $base, $rel);
         if ($headLv === $baseLv && !$verifiedAtEdit) {
             $issues[] = sprintf(
-                '%s: body changed but last_verified not bumped (still %s)',
+                '%s: body changed but last_verified not bumped (still %s) — run `bin/check-docs --fix-dates` (or bump last_verified to today manually) and commit',
                 $rel,
                 $headLv ?? '(none)'
             );

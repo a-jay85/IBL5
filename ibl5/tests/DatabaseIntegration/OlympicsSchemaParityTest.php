@@ -115,7 +115,9 @@ class OlympicsSchemaParityTest extends DatabaseTestCase
             $drift[] = "Columns missing from $olympicsTable: " . implode(', ', $missingFromOlympics);
         }
         if (count($extraInOlympics) > 0) {
-            $drift[] = "Unexpected columns in $olympicsTable: " . implode(', ', $extraInOlympics);
+            $drift[] = "Unexpected columns in $olympicsTable: " . implode(', ', $extraInOlympics)
+                . " (if intentional, allowlist them in ALLOWED_OLYMPICS_ONLY_COLUMNS in "
+                . "ibl5/tests/DatabaseIntegration/OlympicsSchemaParityTest.php)";
         }
 
         self::assertEmpty($drift, implode("\n", $drift));

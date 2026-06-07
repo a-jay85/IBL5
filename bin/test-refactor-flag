@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-refactor-flag — regression test for bin/refactor-flag's test-coverage
+# credit, specifically that a RENAMED test file satisfies coverage.
+#
+# The gate detects refactor signals under ibl5/classes/** (a rename is a high
+# signal) and passes only when the PR also touches tests or carries a bypass
+# marker. checkTestCoverage() resolved test changes via --diff-filter=A and =M
+# but NOT =R, so renaming a test file (e.g. during the very refactor that fires
+# the trigger) failed to credit coverage and the gate flagged the PR spuriously.
+# This pins the fix plus two controls so the credit is not over-broadened.
+#
+# Each case builds a throwaway git repo under mktemp with a committed baseline
+# (a classes file + a matching test file), STAGES changes, and runs
+# `bin/refactor-flag --staged` from inside. --staged uses `git diff --cached`,
+# never calls `gh`, and evaluates coverage before bypass — so no gh stub needed.
+#
+# Run: bin/test-refactor-flag  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REFACTOR_FLAG="$SCRIPT_DIR/refactor-flag"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP" 2>/dev/null' EXIT
+
+FAILED=0
+pass()     { echo "ok: $1"; }
+failcase() { echo "FAIL: $1"; FAILED=1; }
+
+# mk_repo — fresh repo with a committed classes file + matching test file.
+mk_repo() {
+    local d
+    d="$(mktemp -d "$TMP/repo.XXXXXX")"
+    git init -q "$d" >/dev/null 2>&1
+    git -C "$d" config user.email t@example.com >/dev/null 2>&1
+    git -C "$d" config user.name tester >/dev/null 2>&1
+    git -C "$d" config commit.gpgsign false >/dev/null 2>&1
+    # Adverse config: rename detection OFF. The fix must still credit a renamed
+    # test, because checkTestCoverage uses diffRenames() which forces `-M`. With the
+    # old diffNames(_,'R') approach this would regress to exit 1 under this config.
+    git -C "$d" config diff.renames false >/dev/null 2>&1
+    mkdir -p "$d/ibl5/classes/Foo" "$d/ibl5/tests/Foo"
+    printf '<?php\nclass FooService\n{\n    public function run(): void {}\n}\n' \
+        > "$d/ibl5/classes/Foo/FooService.php"
+    printf '<?php\nclass FooServiceTest\n{\n    public function testRun(): void {}\n}\n' \
+        > "$d/ibl5/tests/Foo/FooServiceTest.php"
+    git -C "$d" add -A >/dev/null 2>&1
+    git -C "$d" commit -qm baseline >/dev/null 2>&1
+    echo "$d"
+}
+
+# run_flag <repo> — run refactor-flag --staged from inside; echo output, return rc.
+run_flag() {
+    ( cd "$1" && "$REFACTOR_FLAG" --staged 2>&1 )
+}
+
+# assert_rc <name> <want-exit> <repo>
+assert_rc() {
+    local name="$1" want="$2" d="$3" out rc
+    out="$(run_flag "$d")"
+    rc=$?
+    if [ "$rc" -ne "$want" ]; then
+        failcase "$name — expected exit $want, got $rc"
+        printf '%s\n' "$out" | sed 's/^/    /'
+    else
+        pass "$name (exit $rc)"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# THE FIX: a renamed classes file (trigger) + a renamed test file → coverage is
+# credited via --diff-filter=R, so the gate PASSES. (Red before the fix: the
+# renamed test appeared under neither A nor M, so the gate flagged exit 1.)
+# ---------------------------------------------------------------------------
+d="$(mk_repo)"
+git -C "$d" mv ibl5/classes/Foo/FooService.php ibl5/classes/Foo/FooServiceRenamed.php >/dev/null 2>&1
+git -C "$d" mv ibl5/tests/Foo/FooServiceTest.php ibl5/tests/Foo/FooServiceRenamedTest.php >/dev/null 2>&1
+assert_rc "renamed-test-credits-coverage" 0 "$d"
+
+# ---------------------------------------------------------------------------
+# CONTROL (gate not neutered): a classes rename trigger with NO test change of
+# any kind and no bypass marker → still FAILS (exit 1).
+# ---------------------------------------------------------------------------
+d="$(mk_repo)"
+git -C "$d" mv ibl5/classes/Foo/FooService.php ibl5/classes/Foo/FooServiceRenamed.php >/dev/null 2>&1
+assert_rc "trigger-without-any-test-fails" 1 "$d"
+
+# ---------------------------------------------------------------------------
+# CONTROL (pre-existing behavior unchanged): a classes rename trigger + a newly
+# ADDED test file (--diff-filter=A) → PASSES, as before.
+# ---------------------------------------------------------------------------
+d="$(mk_repo)"
+git -C "$d" mv ibl5/classes/Foo/FooService.php ibl5/classes/Foo/FooServiceRenamed.php >/dev/null 2>&1
+printf '<?php\nclass BrandNewTest\n{\n    public function testNew(): void {}\n}\n' \
+    > "$d/ibl5/tests/Foo/BrandNewTest.php"
+git -C "$d" add ibl5/tests/Foo/BrandNewTest.php >/dev/null 2>&1
+assert_rc "trigger-with-added-test-passes" 0 "$d"
+
+if [ "$FAILED" -ne 0 ]; then
+    echo "RESULT: FAILED"
+    exit 1
+fi
+echo "RESULT: all passed"
+exit 0

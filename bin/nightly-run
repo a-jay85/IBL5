@@ -398,13 +398,17 @@ while true; do
 
         IMPL_STATUS=0
         IMPL_START=$(date +%s)
+        # Per-plan model selection: a plan may declare `impl_model:` in its
+        # first frontmatter block; absent/unknown → Opus default.
+        IMPL_MODEL=$(bin/lib/plan-impl-model "$NEXT_PLAN")
+        echo "[$(date +%H:%M:%S)] impl model: $IMPL_MODEL for $PLAN_NAME" >> "$LOG"
         NIGHTLY_CMDPID_FILE="$CMDPID_FILE" \
         timeout "$REMAINING_SECS" \
             claude -p "$(cat bin/nightly-prompt-impl)
 
 PLAN_FILE=$PLAN_NAME" \
                 --dangerously-skip-permissions \
-                --model claude-opus-4-8 \
+                --model "$IMPL_MODEL" \
                 --output-format stream-json \
                 --verbose \
                 --name "nightly-impl-$(date +%Y-%m-%d-%H%M)" \

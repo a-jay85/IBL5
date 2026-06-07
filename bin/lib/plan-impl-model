@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/lib/plan-impl-model — resolve the nightly impl-agent model for a plan file.
+#
+# Reads a positionally-constrained `impl_model:` field from the plan's FIRST
+# YAML frontmatter block (anchored to line 1) and echoes the model id that
+# bin/nightly-run passes to `claude -p --model`. The body is never scanned, so
+# a plan that merely *documents* the syntax cannot self-select a model. Any
+# missing, unknown, or `opus` value falls through to the safe Opus default.
+#
+# Usage: bin/lib/plan-impl-model <plan-file>   # echoes exactly one model id
+
+set -u
+
+PLAN_FILE="${1:?Usage: plan-impl-model <plan-file>}"
+
+# Line-1-anchored: only a `---` on line 1 opens the frontmatter block; read
+# impl_model inside that block, then stop at its closing `---`. A body example
+# (no line-1 frontmatter, or after the block closes) is never matched.
+RAW=$(awk '
+  NR==1 && /^---[[:space:]]*$/ {infm=1; next}
+  infm && /^---[[:space:]]*$/ {infm=0; exit}
+  infm && /^impl_model:[[:space:]]*/ {sub(/^impl_model:[[:space:]]*/,""); gsub(/[[:space:]]/,""); print; exit}
+' "$PLAN_FILE" 2>/dev/null)
+
+case "$RAW" in
+  sonnet) echo "claude-sonnet-4-6" ;;
+  haiku)  echo "claude-haiku-4-5"  ;;
+  *)      echo "claude-opus-4-8"   ;;   # opus, empty, garbled, or unknown → safe default
+esac

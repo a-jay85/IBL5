@@ -433,6 +433,17 @@ jobs:
 
           echo "OK: no host mariadb invocations found outside bin/db-query."
 
+  nightly-impl-model-test:
+    name: Nightly impl-model parser test
+    needs: [changes]
+    if: needs.changes.outputs.shell == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+      - name: Run nightly impl-model parser regression test
+        run: bin/test-nightly-impl-model
+
   update-baselines:
     name: Update coverage & PHPStan baselines
     needs: [test, phpstan]
@@ -543,7 +554,7 @@ jobs:
   gate:
     name: Tests and Analysis
     if: always()
-    needs: [changes, test, audit-php, audit-js, ibl6-checks, db-integration, phpstan, phpunit-hygiene, shellcheck, host-mariadb-guard, update-baselines, infection-excludes, harness-tests]
+    needs: [changes, test, audit-php, audit-js, ibl6-checks, db-integration, phpstan, phpunit-hygiene, shellcheck, host-mariadb-guard, nightly-impl-model-test, update-baselines, infection-excludes, harness-tests]
     runs-on: ubuntu-latest
     steps:
       - run: exit 1

@@ -56,7 +56,7 @@ Run this step once per PR-sized unit identified in Step 2.5. Each run plans exac
 
 The Plan agent auto-loads CLAUDE.md, all always-loaded rules (agent-tiering, core-coding, etc.), and user memory. Do NOT re-inject any of these into the prompt — only supply what the agent cannot get on its own.
 
-Launch a **single Plan agent** (`model: "opus"`) with a prompt containing ALL of these:
+Launch a **single Plan agent** (`subagent_type: "plan-architect"` — its definition carries `model: opus` and `effort: xhigh`; do NOT pass an inline `model` override) with a prompt containing ALL of these:
 
 1. **Task description** from `$ARGUMENTS` — when the work was split in Step 2.5, scope this to the single PR being planned and state which PR it is and what it depends on
 2. **Exploration results** from Step 2 — file paths, code traces, existing patterns, test coverage findings

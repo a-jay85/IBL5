@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-nightly-impl-model — regression test for bin/lib/plan-impl-model.
+#
+# The helper selects the nightly impl-agent model from a plan's FIRST YAML
+# frontmatter block only (anchored to line 1). This pins:
+#   - sonnet / explicit-opus frontmatter selects the right model
+#   - the FOOTGUN (load-bearing negative): a plan with NO frontmatter that
+#     merely documents an impl_model example in its body must NOT self-select
+#     (→ Opus default). PR2's own plan documents the syntax this way.
+#   - frontmatter present but without impl_model → Opus default
+#   - leading/trailing whitespace tolerance
+# Without the footgun cases, a body-greedy parser could silently downgrade a
+# plan that only documents the syntax.
+#
+# Run: bin/test-nightly-impl-model  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+HELPER="$SCRIPT_DIR/lib/plan-impl-model"
+TMP="$(mktemp -d)"
+trap 'rm -f "$TMP"/*.md 2>/dev/null; rmdir "$TMP" 2>/dev/null' EXIT
+
+FAILED=0
+
+# assert <name> <expected-model> <plan-body>
+assert() {
+    name="$1"; want="$2"; body="$3"
+    f="$TMP/$name.md"
+    printf '%s\n' "$body" > "$f"
+    got=$("$HELPER" "$f")
+    if [ "$got" != "$want" ]; then
+        echo "FAIL: $name — expected '$want', got '$got'"
+        FAILED=1
+    else
+        echo "ok: $name ($got)"
+    fi
+}
+
+# c1 — line-1 frontmatter selects sonnet
+assert "c1-sonnet" "claude-sonnet-4-6" '---
+impl_model: sonnet
+---
+# Plan
+body'
+
+# c2 (FOOTGUN, negative) — no frontmatter; an impl_model example in the BODY is ignored
+assert "c2-footgun-body-example" "claude-opus-4-8" '# Plan
+Documenting the syntax:
+```
+---
+impl_model: haiku
+---
+```
+more body'
+
+# c3 (negative) — real frontmatter without impl_model; trailing body example ignored
+assert "c3-no-field" "claude-opus-4-8" '---
+description: x
+---
+# Plan
+---
+impl_model: haiku
+---'
+
+# c4 (negative) — explicit opus falls through to the default
+assert "c4-explicit-opus" "claude-opus-4-8" '---
+impl_model: opus
+---
+# Plan'
+
+# c5 — leading/trailing whitespace around the value is tolerated
+assert "c5-whitespace" "claude-sonnet-4-6" '---
+impl_model:   sonnet
+---
+# Plan'
+
+if [ "$FAILED" -ne 0 ]; then
+    echo "RESULT: FAILED"
+    exit 1
+fi
+echo "RESULT: all passed"
+exit 0

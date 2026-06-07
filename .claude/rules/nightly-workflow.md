@@ -1,6 +1,6 @@
 ---
 description: Nightly autonomous workflow — launchd fires claude -p at 00:03 and 05:03 daily, running two context-isolated agents per plan (implementation + post-plan) with time guards and incremental checkpoints.
-last_verified: 2026-05-28
+last_verified: 2026-06-07
 paths: "bin/nightly-*"
 ---
 
@@ -42,7 +42,7 @@ A headless `claude -p` process runs twice daily via macOS `launchd`. It loops th
 1. **Daytime:** Work with Claude in plan mode. After approval, queue the plan: `bin/nightly-queue <slug>`
 2. **00:03 and 05:03:** `launchd` fires `bin/nightly-run`
 3. **Loop:** For each queued plan (oldest first), `nightly-run` fires two `claude -p` invocations sequentially:
-   - **Implementation agent** (`bin/nightly-prompt-impl`): creates worktree, implements the plan, makes checkpoint commits, writes a handoff file
+   - **Implementation agent** (`bin/nightly-prompt-impl`): creates worktree, implements the plan, makes checkpoint commits, writes a handoff file. Its model is selectable per-plan via a line-1 `impl_model:` frontmatter field (`sonnet` → Sonnet, `haiku` → Haiku, absent or anything else → the Opus default), resolved by `bin/lib/plan-impl-model`; declare `sonnet` only for uniformly-mechanical plans whose every verification row is objectively machine-checkable. The post-plan agent is always Sonnet.
    - **Post-plan agent** (`bin/nightly-prompt-postplan`): reads the handoff file, runs `/post-plan` (code review, security audit, PR, CI monitoring, auto-merge), writes the completion report
 4. **Guards:** The loop stops when the queue is empty or ~4h45m have elapsed. Plans that fail 3 times are moved to `skipped/` as poison pills.
 5. **Morning:** Check `gh pr list` for new PRs, read reports for details

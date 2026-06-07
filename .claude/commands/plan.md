@@ -3,7 +3,7 @@ description: "Plan an implementation task: enforces a verification matrix, direc
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
-last_verified: 2026-05-31
+last_verified: 2026-06-07
 
 ---
 
@@ -17,7 +17,7 @@ You are planning an implementation task. The user's request follows this skill's
 
 ## Step 1: Verification rule
 
-`plan-verification.md` is already in your context (always-loaded rule — no `paths:` field). Use its full content as `$VERIFICATION_RULE` for injection into the Plan agent prompt in Step 3. Do not re-read the file. Do not summarize or paraphrase the rule.
+Read `.claude/commands/_plan-verification.md` and use its full content as `$VERIFICATION_RULE` for injection into the Plan agent prompt in Step 3. Do not summarize or paraphrase the rule.
 
 ## Step 2: Orient on the codebase
 
@@ -54,13 +54,14 @@ If the work is **multiple PRs**, list the PR-sized units in dependency order (wh
 
 Run this step once per PR-sized unit identified in Step 2.5. Each run plans exactly one PR.
 
-The Plan agent auto-loads CLAUDE.md, all always-loaded rules (agent-tiering, core-coding, plan-verification, etc.), and user memory. Do NOT re-inject any of these into the prompt — only supply what the agent cannot get on its own.
+The Plan agent auto-loads CLAUDE.md, all always-loaded rules (agent-tiering, core-coding, etc.), and user memory. Do NOT re-inject any of these into the prompt — only supply what the agent cannot get on its own.
 
 Launch a **single Plan agent** (`model: "opus"`) with a prompt containing ALL of these:
 
 1. **Task description** from `$ARGUMENTS` — when the work was split in Step 2.5, scope this to the single PR being planned and state which PR it is and what it depends on
 2. **Exploration results** from Step 2 — file paths, code traces, existing patterns, test coverage findings
 3. **The full `$VERIFICATION_RULE`** from Step 1, prefixed with: `MANDATORY — you must follow this rule exactly:`
+4. **Agent-tiering guidance for plan phases** — the "In Plans / Mechanical recipe agents / Bulk-sweep pattern" block (in *Agent-tiering guidance to inject* below), so the Plan agent labels each implementation phase's tier (Sonnet / Haiku / self).
 
 The Plan agent MUST produce:
 - Implementation steps with tests woven inline (pre-impl before their step, post-impl after)
@@ -79,6 +80,23 @@ Conditionally — include a section **only when it applies**; never emit an empt
   - Output rendering → escaped output (enforced by `RequireEscapedOutputRule`); note it so the impl agent doesn't fight the PHPStan rule.
   XSS and input validation are deterministically enforced by PHPStan custom rules — note which apply, do not write redundant manual checks.
 
+#### Agent-tiering guidance to inject (item 4 above)
+
+This guidance was relocated from `agent-tiering.md` (it is plan-authoring-only). Inject it verbatim into the Plan-agent prompt:
+
+> **In Plans.** Explicitly label which implementation phases go to Sonnet / Haiku / self. The tiering decision belongs in the plan, not deferred to execution time.
+>
+> **Mechanical recipe agents.** When a plan phase writes out every action as literal commands (`git mv`, explicit find/replace mappings, `git rm`, config line swaps), the executing agent is Haiku. The prompt already contains the recipe — the agent executes it. Sonnet is only needed when the prompt asks the agent to decide *what* to do, not just *how* to do it.
+> - **Haiku:** `git mv` file renames with explicit source→target, namespace find/replace from a provided mapping, `git rm` + config updates, multi-step recipe execution
+> - **Sonnet:** call-site sweeps where the agent must judge whether a match is a column vs. table name, test-writing, code authoring, debugging failures
+>
+> **Bulk-sweep pattern.**
+> - Migration authoring, PHPStan rules, ADRs → Opus (self).
+> - Per-module PHP call-site sweeps that require judgment (e.g., distinguishing column refs from table refs in backtick-quoted SQL) → Sonnet.
+> - Per-module sweeps with an explicit old→new mapping and no ambiguity → Haiku.
+> - Running tests, migrations, schema verification → direct Bash (short output); Haiku only if multi-step or output is unpredictably large.
+> - Interpreting failing tests, deciding when to update baselines → Opus (self).
+
 ## Step 4: Validate the matrix
 
 After receiving the Plan agent's output, check these gates yourself — do NOT delegate validation:
@@ -96,9 +114,9 @@ After receiving the Plan agent's output, check these gates yourself — do NOT d
    - `subject to validation`
    - `subject to review`
    If any match is found, resolve the decision in-place before saving the plan. The nightly agent cannot make judgment calls — every table cell must contain a concrete action, not a deferred question.
-8. **Decision-trigger pre-classified** — scan implementation phases for file additions matching `bin/adr-check` trigger patterns (listed in `plan-verification.md` § Decision-trigger pre-classification). If any trigger fires, verify the plan includes a resolution step (ADR or bypass marker). If missing, add the appropriate resolution step and update the verification matrix.
+8. **Decision-trigger pre-classified** — scan implementation phases for file additions matching `bin/adr-check` trigger patterns (listed in `_plan-verification.md` § Decision-trigger pre-classification). If any trigger fires, verify the plan includes a resolution step (ADR or bypass marker). If missing, add the appropriate resolution step and update the verification matrix.
 9. **Negative-path coverage** — every behavior-changing step has at least one matrix row asserting a failure, boundary, or rejection case, not only happy-path. If a step has only happy-path rows, add the missing negative-path row.
-10. **Hot-file extraction** — if any step adds > 100 LOC to a file `bin/check-hot-files` lists as hot (> 500 LOC under `classes/`), the plan must either propose an extraction step or carry an inline justification (per `plan-verification.md` § Hot-file thresholds). If neither is present, add one.
+10. **Hot-file extraction** — if any step adds > 100 LOC to a file `bin/check-hot-files` lists as hot (> 500 LOC under `classes/`), the plan must either propose an extraction step or carry an inline justification (per `_plan-verification.md` § Hot-file thresholds). If neither is present, add one.
 11. **Refactor characterization** — if any step under `ibl5/classes/**` carries a refactor signal (file rename, method signature change, visibility narrowing, class removal, or > 30-line deletion per `refactor-flag.md`), the matrix must include a pre-impl characterization row for the affected code. If missing, add it.
 12. **Security surface resolved** — if Step 2 flagged a touched security surface, the plan contains a Security section with a defense step and matching matrix row for each. If a flagged surface has no resolution, add it.
 

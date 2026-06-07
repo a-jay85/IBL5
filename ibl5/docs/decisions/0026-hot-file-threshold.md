@@ -1,6 +1,6 @@
 ---
 description: ADR for advisory 500-LOC hot-file threshold rule and bin/check-hot-files script
-last_verified: 2026-05-16
+last_verified: 2026-06-07
 ---
 
 # ADR-0026: Hot-File Threshold Rule
@@ -14,7 +14,7 @@ A codebase audit (2026-05-14) found 23 files in `ibl5/classes/` exceeding 500 li
 
 ## Decision
 
-1. Add a "Hot-file thresholds" section to `.claude/rules/plan-verification.md` requiring plans that add > 100 LOC to a > 500 LOC file to either propose extraction or justify the addition inline.
+1. Add a "Hot-file thresholds" section to `.claude/commands/_plan-verification.md` requiring plans that add > 100 LOC to a > 500 LOC file to either propose extraction or justify the addition inline.
 2. Add `bin/check-hot-files` — an advisory script that lists current hotspots and, with `--pr`, flags files in the current PR that grew > 100 LOC past the threshold.
 3. Add a CI workflow (`.github/workflows/hot-files.yml`) that runs the script on PRs and posts a sticky comment. Non-blocking (advisory only).
 

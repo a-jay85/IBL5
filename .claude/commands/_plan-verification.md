@@ -1,9 +1,12 @@
 ---
 description: Requires plans to classify every verification step into the test-type taxonomy at plan-write time, preventing manual-testing items from deferring to post-plan cleanup, and grounds seed/DOM-dependent E2E assertions in real fixtures.
-last_verified: 2026-05-29
+last_verified: 2026-06-07
 ---
 
 # Plan Verification Matrix
+
+Shared include — read by `/plan` (Step 1), `/post-plan`, and `_test-spec-corpus`. Not an
+always-loaded rule; `/plan` reads it on invocation.
 
 Every plan must include a **Verification Matrix** — a table classifying each verification item at plan-write time. No verification step may be deferred as "manual" or left unclassified.
 

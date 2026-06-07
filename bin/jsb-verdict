@@ -1,0 +1,33 @@
+#!/bin/bash
+# jsb-verdict — collapse a JSB calibration JSON (up to ~400KB) to its verdict metrics
+# WITHOUT full-reading it. Array indices are collapsed to [] and numeric leaves
+# aggregated (n/min/max/mean), so per-row arrays become one summary line.
+# A ~100K-token Read becomes ~40 lines. Usage: bin/jsb-verdict <artifact.json> [key-regex]
+set -uo pipefail
+
+f="${1:-}"
+[ -n "$f" ] || { echo "usage: bin/jsb-verdict <artifact.json> [key-regex]" >&2; exit 2; }
+[ -f "$f" ] || { echo "no such file: $f" >&2; exit 1; }
+command -v jq >/dev/null 2>&1 || { echo "jq not installed" >&2; exit 1; }
+re="${2:-.}"
+
+echo "=== shape ==="
+jq -r 'to_entries[]
+  | "\(.key): \(.value | if type=="array" then "array[\(length)]"
+                        elif type=="object" then "object{\(keys|length)}"
+                        else tostring end)"' "$f"
+
+echo ""
+echo "=== metrics (array indices collapsed to [], numeric leaves aggregated) ==="
+jq -r --arg re "$re" '
+  [ paths(scalars) as $p
+    | {k: ($p | map(if type=="number" then "[]" else tostring end) | join(".")),
+       v: getpath($p)} ]
+  | group_by(.k)
+  | map({k: .[0].k, n: length, vals: [.[].v]})
+  | .[]
+  | select(.k | test($re; "i"))
+  | if (.n > 1) and (.vals | all(type == "number"))
+    then "\(.k)  [n=\(.n)] min=\(.vals|min) max=\(.vals|max) mean=\(((.vals|add)/.n*1000|round)/1000)"
+    else "\(.k) = \(.vals[0])\(if .n > 1 then "  …(+\(.n-1) more)" else "" end)"
+    end' "$f"

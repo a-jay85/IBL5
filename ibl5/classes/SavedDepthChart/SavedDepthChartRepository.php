@@ -298,12 +298,15 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
             $teamid, $teamid
         );
 
+        // mysqli returns SUM() aggregates as numeric strings (not ints), and
+        // SUM over an empty set is NULL. Narrow with is_numeric() before
+        // casting — PHPStan bans casting the mixed row value straight to int.
         $wins = $row['wins'] ?? 0;
         $losses = $row['losses'] ?? 0;
 
         return [
-            'wins' => is_int($wins) ? $wins : 0,
-            'losses' => is_int($losses) ? $losses : 0,
+            'wins' => is_numeric($wins) ? (int) $wins : 0,
+            'losses' => is_numeric($losses) ? (int) $losses : 0,
         ];
     }
 

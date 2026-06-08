@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-06-05
+last_verified: 2026-06-08
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -1980,12 +1980,20 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Risk if untouched:** Minor drift risk.
 
 ### 13.7 Validator Error-Accumulation Boilerplate Repeated
-**Status:** Deferred (2026-06-05, maintenance-26) — **NOT done.** The premise ("two incompatible patterns / a `ValidationResult` value object replaces both") does not hold against the code. Orientation found **four** distinct result shapes, not two: accumulator-of-`string` (Waivers, Draft); accumulator-of-structured-`{type,message,detail}` + `getErrorMessagesHtml()` (DepthChartEntry); dict `{valid,error?}` (FreeAgencyOffer, and CommonContractValidator which it chains — not even in the audit's list); dict-multikey `{valid,errors[],userPostTradeCapTotal,partnerPostTradeCapTotal}` (Trade). The existing `ValidationResult` holds `list<string>`, so DepthChartEntry's structured errors and Trade's cap totals cannot migrate without data loss, and migrating only the clean ones nets **zero** distinct-shape reduction (the dict pattern survives via CommonContractValidator). Re-scope needed: a human design decision on how structured/multi-value validators represent results (extend `ValidationResult`? sibling types?) plus an audit of all ~14 validators, not the 5 assumed here.
+**Status:** **Partially done (Strategy A, PR validator-accumulators-to-validationresult):** the two pure string-accumulator validators (`Waivers/WaiversValidator`, `Draft/DraftValidator`) now return `ValidationResult`; mutable `private array $errors` / `getErrors()` / `clearErrors()` removed. State-leakage risk eliminated for these two. Remainder re-filed as [[13.7b]].
 **Location:** `Waivers/WaiversValidator.php`, `Draft/DraftValidator.php`, `DepthChartEntry/DepthChartEntryValidator.php`
 **Problem:** All three define `private array $errors = []; getErrors(); clearErrors();`. `TradeValidator` and `FreeAgencyOfferValidator` use a different return shape — two incompatible patterns.
 **Suggested direction:** `AbstractAccumulatingValidator` base or `ValidatorErrorBag` value object; enforce "clearErrors before validate" centrally.
 **Est. effort:** S
 **Risk if untouched:** New validators copy without the convention; state leakage between calls.
+
+### 13.7b Structured and Dict-Family Validators — Design Decision Needed
+**Status:** Backlog
+**Location:** `DepthChartEntry/DepthChartEntryValidator.php`, `FreeAgency/FreeAgencyOfferValidator.php`, `CommonContractValidator.php`, `Extension/ExtensionService.php` (uses dict), `Trade/TradeValidator.php`
+**Problem:** These validators cannot migrate to `ValidationResult` (`list<string>`) without data loss: `DepthChartEntry` stores structured `{type,message,detail}` + exposes `getErrorMessagesHtml()`; `Trade`'s validator returns a multi-key dict carrying post-trade cap totals (`userPostTradeCapTotal`, `partnerPostTradeCapTotal`). A richer result type is needed — a structured `ValidationError` value object and/or a context payload alongside the error list.
+**Suggested direction:** Design `ValidationError` (type + message + detail) and/or a `ValidationResultWithContext<T>` type; migrate dict-family validators in a second pass once the type is settled.
+**Est. effort:** M (design) + M (sweep)
+**Risk if untouched:** DepthChartEntry and Trade remain on mutable state; adding validators copies the mutable pattern.
 
 ### 13.8 `p.retired` Filter Inconsistency: `= 0` vs `!= 1`
 **Status:** Completed (2026-06-05) — `League/League.php`'s 4 `p.retired != 1` sites (getAllStar/MVP/SixthPerson/RookieOfYear candidate queries) standardized to `p.retired = 0`. Behavior-preserving: `ibl_plr.retired` holds exactly {0,1} (verified live: 659 active / 903 retired, 0 sentinels/NULLs). `tests/League/RetiredFilterCharacterizationTest` locks the emitted filter SQL. The `DEFAULT 0 NOT NULL` schema hardening stays out of scope (see [[15.4]]).

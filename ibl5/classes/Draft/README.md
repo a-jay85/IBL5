@@ -1,6 +1,6 @@
 # Draft Module Architecture
 
-**Last Updated:** December 3, 2025  
+**Last Updated:** June 8, 2026  
 **Test Coverage:** 35 tests, 92 assertions  
 **Architecture Pattern:** Interface-Driven Architecture with Repository/Service/View/Controller classes
 
@@ -68,7 +68,7 @@ getCurrentDraftPick(): ?array
 
 **Public Methods:**
 ```php
-validateDraftSelection(?string $playerName, ?string $currentDraftSelection, bool $isPlayerAlreadyDrafted = false): bool
+validateDraftSelection(?string $playerName, ?string $currentDraftSelection, bool $isPlayerAlreadyDrafted = false): ValidationResult
 getErrors(): array
 clearErrors(): void
 ```

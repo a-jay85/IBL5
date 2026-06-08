@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Waivers;
 
 use PHPUnit\Framework\TestCase;
+use Validation\ValidationResult;
 use Waivers\Contracts\WaiversRepositoryInterface;
 use Waivers\Contracts\WaiversValidatorInterface;
 use Waivers\WaiversProcessor;
@@ -47,7 +48,7 @@ class WaiversProcessorWriteTest extends TestCase
 
     public function testProcessDropReturnsSuccessWhenRepoSucceeds(): void
     {
-        $this->validatorStub->method('validateDrop')->willReturn(true);
+        $this->validatorStub->method('validateDrop')->willReturn(ValidationResult::success());
         $this->playerLookupRepoStub->method('getPlayerByID')->willReturn(['name' => 'Test Player', 'pid' => 1]);
         $this->repoStub->method('dropPlayerToWaivers')->willReturn(true);
 
@@ -59,8 +60,7 @@ class WaiversProcessorWriteTest extends TestCase
 
     public function testProcessDropReturnsErrorWhenValidationFails(): void
     {
-        $this->validatorStub->method('validateDrop')->willReturn(false);
-        $this->validatorStub->method('getErrors')->willReturn(['Over hard cap']);
+        $this->validatorStub->method('validateDrop')->willReturn(ValidationResult::failure('Over hard cap'));
 
         $result = $this->processor->processDrop(1, 'Test Team', 3, 8000);
 
@@ -70,7 +70,7 @@ class WaiversProcessorWriteTest extends TestCase
 
     public function testProcessDropReturnsErrorForNullPlayerID(): void
     {
-        $this->validatorStub->method('validateDrop')->willReturn(true);
+        $this->validatorStub->method('validateDrop')->willReturn(ValidationResult::success());
 
         $result = $this->processor->processDrop(null, 'Test Team', 3, 5000);
 
@@ -80,7 +80,7 @@ class WaiversProcessorWriteTest extends TestCase
 
     public function testProcessDropReturnsErrorForZeroPlayerID(): void
     {
-        $this->validatorStub->method('validateDrop')->willReturn(true);
+        $this->validatorStub->method('validateDrop')->willReturn(ValidationResult::success());
 
         $result = $this->processor->processDrop(0, 'Test Team', 3, 5000);
 
@@ -90,7 +90,7 @@ class WaiversProcessorWriteTest extends TestCase
 
     public function testProcessDropReturnsErrorWhenPlayerNotFound(): void
     {
-        $this->validatorStub->method('validateDrop')->willReturn(true);
+        $this->validatorStub->method('validateDrop')->willReturn(ValidationResult::success());
         $this->playerLookupRepoStub->method('getPlayerByID')->willReturn(null);
 
         $result = $this->processor->processDrop(999, 'Test Team', 3, 5000);
@@ -101,7 +101,7 @@ class WaiversProcessorWriteTest extends TestCase
 
     public function testProcessDropReturnsErrorWhenRepoFails(): void
     {
-        $this->validatorStub->method('validateDrop')->willReturn(true);
+        $this->validatorStub->method('validateDrop')->willReturn(ValidationResult::success());
         $this->playerLookupRepoStub->method('getPlayerByID')->willReturn(['name' => 'Test Player', 'pid' => 1]);
         $this->repoStub->method('dropPlayerToWaivers')->willReturn(false);
 
@@ -138,8 +138,7 @@ class WaiversProcessorWriteTest extends TestCase
         $this->playerLookupRepoStub->method('getPlayerByID')->willReturn([
             'name' => 'Test Player', 'pid' => 1, 'salary_yr1' => 0, 'exp' => 5,
         ]);
-        $this->validatorStub->method('validateAdd')->willReturn(false);
-        $this->validatorStub->method('getErrors')->willReturn(['Full roster']);
+        $this->validatorStub->method('validateAdd')->willReturn(ValidationResult::failure('Full roster'));
 
         $result = $this->processor->processAdd(1, 'Test Team', 0, 3000);
 
@@ -152,7 +151,7 @@ class WaiversProcessorWriteTest extends TestCase
         $this->playerLookupRepoStub->method('getPlayerByID')->willReturn([
             'name' => 'Test Player', 'pid' => 1, 'salary_yr1' => 0, 'exp' => 5,
         ]);
-        $this->validatorStub->method('validateAdd')->willReturn(true);
+        $this->validatorStub->method('validateAdd')->willReturn(ValidationResult::success());
         $this->teamIdentityRepoStub->method('getTeamByName')->willReturn(null);
 
         $result = $this->processor->processAdd(1, 'Fake Team', 5, 3000);
@@ -166,7 +165,7 @@ class WaiversProcessorWriteTest extends TestCase
         $this->playerLookupRepoStub->method('getPlayerByID')->willReturn([
             'name' => 'Test Player', 'pid' => 1, 'salary_yr1' => 0, 'exp' => 5,
         ]);
-        $this->validatorStub->method('validateAdd')->willReturn(true);
+        $this->validatorStub->method('validateAdd')->willReturn(ValidationResult::success());
         $this->teamIdentityRepoStub->method('getTeamByName')->willReturn(['team_name' => 'Test Team', 'teamid' => 1]);
         $this->repoStub->method('signPlayerFromWaivers')->willReturn(false);
 
@@ -181,7 +180,7 @@ class WaiversProcessorWriteTest extends TestCase
         $this->playerLookupRepoStub->method('getPlayerByID')->willReturn([
             'name' => 'Test Player', 'pid' => 1, 'salary_yr1' => 0, 'exp' => 5,
         ]);
-        $this->validatorStub->method('validateAdd')->willReturn(true);
+        $this->validatorStub->method('validateAdd')->willReturn(ValidationResult::success());
         $this->teamIdentityRepoStub->method('getTeamByName')->willReturn(['team_name' => 'Test Team', 'teamid' => 1]);
         $this->repoStub->method('signPlayerFromWaivers')->willReturn(true);
 

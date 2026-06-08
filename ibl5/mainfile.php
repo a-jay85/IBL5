@@ -38,6 +38,11 @@ require_once __DIR__ . '/classes/Bootstrap/LegacyFunctions.php';
 $bootApp = \Bootstrap\WebApplicationFactory::build(__DIR__);
 $bootApp->boot();
 
+// Default the language when nuke_config is unset/empty (e.g. fresh installs or
+// minimal seeds). Under strict_types, passing a null $language to setcookie()
+// below is a fatal TypeError rather than a silent null→"" coercion.
+$language = isset($language) && is_string($language) && $language !== '' ? $language : 'english';
+
 if (!defined('FORUM_ADMIN')) {
     if ((isset($newlang)) and (stristr($newlang, "."))) {
         if (file_exists("language/lang-" . $newlang . ".php")) {

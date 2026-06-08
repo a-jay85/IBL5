@@ -376,3 +376,24 @@ ON DUPLICATE KEY UPDATE name = VALUES(name);
 INSERT INTO ibl_settings (name, value, league)
 VALUES ('Draft Order Finalized', 'No', 'ibl')
 ON DUPLICATE KEY UPDATE value = VALUES(value);
+
+-- Nuke config: the single site-config row ConfigBootstrap::loadNukeConfig() reads
+-- to populate $GLOBALS (sitename, language, locale, …). Without it, $language is
+-- undefined and mainfile.php's setcookie("lang", $language) fatals under
+-- strict_types. The WHERE NOT EXISTS guard (rather than ON DUPLICATE KEY UPDATE on
+-- the sitename PK) seeds only an empty table — CI gets a row, dev DBs are untouched.
+INSERT INTO nuke_config (
+  sitename, nukeurl, site_logo, slogan, startdate, adminmail, anonpost, default_theme,
+  overwrite_theme, foot1, foot2, foot3, commentlimit, anonymous, minpass, pollcomm,
+  articlecomm, broadcast_msg, my_headlines, top, storyhome, user_news, oldnum, ultramode,
+  banners, backend_title, backend_language, language, locale, multilingual, useflags,
+  notify, notify_email, notify_subject, notify_message, notify_from, moderate, admingraphic,
+  censor_mode, censor_replace, copyright, version_num, gfx_chk, nuke_editor, display_errors
+)
+SELECT
+  'IBL', 'https://www.iblhoops.net/', '', 'Where WTF Happens', 'December 2008',
+  'admin@example.com', 0, 'IBL', 0, '', '', '', 4096, 'Anonymous', 5, 1, 1, 1, 1, 15, 25,
+  1, 50, 0, 1, 'IBL', 'en-us', 'english', 'en_US', 0, 0, 0, 'admin@example.com',
+  'NEWS for my site', 'New submission for your site.', 'webmaster', 0, 1, 0, '*****', '',
+  '8.1', 3, 1, 0
+WHERE NOT EXISTS (SELECT 1 FROM nuke_config);

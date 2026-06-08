@@ -1,6 +1,6 @@
 ---
 description: Worktree setup and the implementation→/post-plan handoff (run separately) for multi-step work.
-last_verified: 2026-06-04
+last_verified: 2026-06-08
 ---
 
 # Workflow Continuity Rule

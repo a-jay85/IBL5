@@ -215,6 +215,15 @@ func readFile[T any](path string, read func(io.Reader) ([]T, error)) ([]T, error
 // Report. No map-iteration order leaks into the output (triples sorted by stem;
 // .sco games kept in file order; stat rows emitted in statNames order).
 func ValidateCorpus(dir string, runs int, baseSeed uint64, gameType bundle.GameType) (Report, error) {
+	return ValidateCorpusWith(dir, runs, baseSeed, gameType, false, nil)
+}
+
+// ValidateCorpusWith is ValidateCorpus plus the Branch-B usage-shrink toggle and an
+// optional engagement accumulator (sim.BranchBAccum), threaded into the engine runs.
+// branchB=false / accum=nil is byte-identical to ValidateCorpus — the calibration A/B
+// (Phase 6/7) is the only caller that sets them. accum, when non-nil, is shared across
+// every game so the harness reads aggregate Branch-B engagement after the corpus pass.
+func ValidateCorpusWith(dir string, runs int, baseSeed uint64, gameType bundle.GameType, branchB bool, accum *sim.BranchBAccum) (Report, error) {
 	if runs <= 0 {
 		return Report{}, fmt.Errorf("validate: runs must be >= 1, got %d", runs)
 	}
@@ -249,7 +258,7 @@ func ValidateCorpus(dir string, runs int, baseSeed uint64, gameType bundle.GameT
 				continue
 			}
 			consumed[schIdx] = true
-			gr := validateGame(b, b.Schedule[schIdx], sg, runs, baseSeed+uint64(gameIndex*runs), gameType)
+			gr := validateGame(b, b.Schedule[schIdx], sg, runs, baseSeed+uint64(gameIndex*runs), gameType, branchB, accum)
 			rep.Games = append(rep.Games, gr)
 			if !gr.Pass {
 				rep.Pass = false
@@ -281,6 +290,13 @@ func ValidateCorpus(dir string, runs int, baseSeed uint64, gameType bundle.GameT
 // Report. .sco games are kept in file order; the per-game seed advances by a
 // monotonic index over INCLUDED (simulated) games only.
 func ValidateUnscheduled(dir string, runs int, baseSeed uint64, gameType bundle.GameType) (Report, error) {
+	return ValidateUnscheduledWith(dir, runs, baseSeed, gameType, false, nil)
+}
+
+// ValidateUnscheduledWith is ValidateUnscheduled plus the Branch-B toggle + engagement
+// accumulator, the unscheduled (playoff) complement of ValidateCorpusWith. branchB=false
+// / accum=nil is byte-identical to ValidateUnscheduled.
+func ValidateUnscheduledWith(dir string, runs int, baseSeed uint64, gameType bundle.GameType, branchB bool, accum *sim.BranchBAccum) (Report, error) {
 	if runs <= 0 {
 		return Report{}, fmt.Errorf("validate: runs must be >= 1, got %d", runs)
 	}
@@ -321,7 +337,7 @@ func ValidateUnscheduled(dir string, runs int, baseSeed uint64, gameType bundle.
 				Date:          sg.Date,
 				GameType:      gameType,
 			}
-			gr := validateGame(b, g, sg, runs, baseSeed+uint64(gameIndex*runs), gameType)
+			gr := validateGame(b, g, sg, runs, baseSeed+uint64(gameIndex*runs), gameType, branchB, accum)
 			rep.Games = append(rep.Games, gr)
 			if !gr.Pass {
 				rep.Pass = false
@@ -359,8 +375,8 @@ func matchSchedule(sched []backup.SchGame, consumed []bool, sg backup.ScoGame) i
 
 // validateGame simulates one matchup `runs` times and compares the aggregated
 // per-team engine means against the .sco ground truth, using gameType's bands.
-func validateGame(b bundle.Bundle, g bundle.Game, sg backup.ScoGame, runs int, baseSeed uint64, gameType bundle.GameType) GameReport {
-	visMean, homeMean, homeWinFrac, originFGA := simulateGameMeans(b, g, runs, baseSeed)
+func validateGame(b bundle.Bundle, g bundle.Game, sg backup.ScoGame, runs int, baseSeed uint64, gameType bundle.GameType, branchB bool, accum *sim.BranchBAccum) GameReport {
+	visMean, homeMean, homeWinFrac, originFGA := simulateGameMeans(b, g, runs, baseSeed, branchB, accum)
 	visSco := teamStatFromSco(sg, g.VisitorTeamID)
 	homeSco := teamStatFromSco(sg, g.HomeTeamID)
 	gr := compareGame(gameType, g.VisitorTeamID, g.HomeTeamID, sg.Date, visSco, homeSco, visMean, homeMean)
@@ -375,18 +391,26 @@ func validateGame(b bundle.Bundle, g bundle.Game, sg backup.ScoGame, runs int, b
 // runs-stable P(home win) estimate the season-aggregate layer needs). Each run
 // is an independent single-game sub-bundle so one game's distribution is
 // isolated from the rest of the schedule.
-func simulateGameMeans(b bundle.Bundle, g bundle.Game, runs int, baseSeed uint64) (visMean, homeMean map[string]float64, homeWinFrac float64, originFGA map[int]OriginFGA) {
+func simulateGameMeans(b bundle.Bundle, g bundle.Game, runs int, baseSeed uint64, branchB bool, accum *sim.BranchBAccum) (visMean, homeMean map[string]float64, homeWinFrac float64, originFGA map[int]OriginFGA) {
 	sub := bundle.Bundle{
 		LeagueID: b.LeagueID,
 		Teams:    b.Teams,
 		Players:  b.Players,
 		Schedule: []bundle.Game{g},
 	}
+	// Zero opts (branchB false) ⇒ SimulateWith == Simulate, so the OFF calibration is
+	// byte-identical to the pre-PR path. The shared accum (non-nil only under branchB)
+	// aggregates Branch-B engagement across every game of the corpus pass.
+	opts := sim.Options{}
+	if branchB {
+		opts.Freeze.BranchB = true
+		opts.BranchBAccum = accum
+	}
 	visSamples := make([]TeamStat, 0, runs)
 	homeSamples := make([]TeamStat, 0, runs)
 	originTotals := map[int]*OriginFGA{} // Σ by-origin FGA across runs, per team
 	for run := 0; run < runs; run++ {
-		res := sim.Simulate(sub, baseSeed+uint64(run))
+		res, _ := sim.SimulateWith(sub, baseSeed+uint64(run), opts)
 		gr := res.Games[0]
 		accumulateOriginFGA(originTotals, gr.Events)
 		for _, tb := range gr.TeamBoxes {

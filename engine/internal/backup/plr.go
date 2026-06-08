@@ -73,13 +73,32 @@ const (
 	//
 	// offRealLifeFGA is TOTAL field-goal attempts (incl. 3PA, standard FG naming;
 	// verified FGA>=3GA across all 657 records of a real .plr) — it IS the decompile's
-	// FGA_total, so D88 reads it directly. Only the four fields the 2pt-bucket
-	// composite consumes are mapped; the Branch-B usage-shrink's team DRB/AST rates
-	// (offsets 88/92) are a separate follow-on input and are not parsed here.
+	// FGA_total, so D88 reads it directly. The four real-life fields feed the per-player
+	// 2pt-bucket composite. The Branch-B usage-shrink's team DRB/AST rates come from a
+	// DIFFERENT block — the per-player IN-SEASON box-score totals (offSeasonGP/DRB/AST
+	// below), summed per team — NOT a separate team-summary record. (The earlier note
+	// here citing "offsets 88/92" was wrong: 88/92 are not the DRB/AST source; the
+	// faithful JSB team rate is (Σ_player season_DRB / Σ_player season_GP)×48 — see
+	// offSeasonGP and assemble.go.)
 	offRealLifeMIN = 56 // width 4 — minutes played (the per-48 rate divisor)
 	offRealLifeFGA = 64 // width 4 — total FG attempts (D88)
 	offRealLifeFTA = 72 // width 4 — FT attempts (D70 per-player part)
 	offRealLifeORB = 84 // width 4 — offensive rebounds (DB8)
+
+	// Per-player IN-SEASON box-score totals (record-relative, width 4 each), the
+	// Branch-B team-rate inputs. JSB's per-half setup (FUN_004cfa50, COMPOSITE_DOUBLES_
+	// TRACE.md §1/§2) accumulates these over a team's players and forms the team DRB/AST
+	// rates team[+0xDC0]=(Σ season_DRB/Σ season_GP)×48 and team[+0xDD0]=(Σ season_AST/Σ
+	// season_GP)×44 — the (DRB-rate + AST-rate) factor of the usage-shrink target. These
+	// are distinct from the static real-life block (56-84): they are the cumulative
+	// season tallies (the 144-207 region). VALIDATED against a real .plr (IBL5.plr,
+	// 2026-06-07): summing offSeasonAST over a team's player rows EXACTLY equals the
+	// team-summary row's AST field; the team-summary row's own GP (= team-games, not
+	// Σ player-GP) is the WRONG divisor and yields a degenerate over-shrink, which is
+	// why the per-player accumulation — not the team-summary row — is the faithful source.
+	offSeasonGP  = 148 // width 4 — season games played (Σ over a team = the rate divisor)
+	offSeasonDRB = 184 // width 4 — season defensive rebounds
+	offSeasonAST = 188 // width 4 — season assists
 
 	// Clutch / consistency / depth chart.
 	offClutch        = 128 // width 2
@@ -167,6 +186,15 @@ type PlrPlayer struct {
 	RealLifeFTA int
 	RealLifeORB int
 
+	// Per-player IN-SEASON box-score totals (offSeasonGP/DRB/AST), the Branch-B
+	// team-rate inputs. Summed per team in assemble.go into bundle.Team.DRBRate/
+	// ASTRate = (Σ season_DRB / Σ season_GP)×48 / (Σ season_AST / Σ season_GP)×44.
+	// Distinct from the static RealLife* block: these are the cumulative season
+	// tallies (the 144-207 region), the divisor being season GP, not minutes.
+	SeasonGP  int
+	SeasonDRB int
+	SeasonAST int
+
 	// Main ratings (0-99).
 	RatingFGA int
 	RatingFGP int
@@ -240,6 +268,8 @@ func ReadPlr(r io.Reader) ([]PlrPlayer, error) {
 			{&p.PFDepth, offPFDepth, 1}, {&p.CDepth, offCDepth, 1},
 			{&p.RealLifeMIN, offRealLifeMIN, 4}, {&p.RealLifeFGA, offRealLifeFGA, 4},
 			{&p.RealLifeFTA, offRealLifeFTA, 4}, {&p.RealLifeORB, offRealLifeORB, 4},
+			{&p.SeasonGP, offSeasonGP, 4}, {&p.SeasonDRB, offSeasonDRB, 4},
+			{&p.SeasonAST, offSeasonAST, 4},
 			{&p.RatingFGA, offRating2GA, 3}, {&p.RatingFGP, offRating2GP, 3},
 			{&p.RatingFTA, offRatingFTA, 3}, {&p.RatingFTP, offRatingFTP, 3},
 			{&p.Rating3GA, offRating3GA, 3}, {&p.Rating3GP, offRating3GP, 3},

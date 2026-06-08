@@ -50,9 +50,20 @@ func (g *GameType) UnmarshalJSON(data []byte) error {
 }
 
 // Team identifies one franchise in the bundle.
+//
+// DRBRate/ASTRate are the per-48 team defensive-rebound and assist rates that feed
+// the JSB Branch-B usage-shrink (sim/bucketweights.go): the usage target is
+// TransOff × (DRBRate + ASTRate) × 0.2 × 0.04. They are (Σ_player season_DRB /
+// Σ_player season_GP)×48 and (Σ_player season_AST / Σ_player season_GP)×44 — the
+// faithful JSB accumulation (COMPOSITE_DOUBLES_TRACE.md §1; team[+0xDC0]/[+0xDD0]).
+// The backup-driven calibration path populates them (backup.ToBundle); the DB-built
+// bundle leaves them 0 (Branch-B inert there) until a future PR wires DB rates.
+// JSON tags drb_rate/ast_rate match the prospective PHP bundle columns.
 type Team struct {
-	TeamID int    `json:"teamid"`
-	Name   string `json:"name"`
+	TeamID  int     `json:"teamid"`
+	Name    string  `json:"name"`
+	DRBRate float64 `json:"drb_rate"`
+	ASTRate float64 `json:"ast_rate"`
 }
 
 // Player carries the source-of-truth ratings from ibl_plr plus depth-chart

@@ -241,21 +241,29 @@ func selectMostComplete(candidates []string, countFn CountScoFunc) (best string,
 	return best, games, teams, skips
 }
 
-// resolveValidate returns opts.Validate or the real ValidateCorpus default.
+// resolveValidate returns opts.Validate (the injected test seam, which ignores the
+// Branch-B toggle) or a real ValidateCorpusWith default that captures opts.BranchB +
+// opts.BranchBAccum — so the measurement A/B threads Branch-B without widening the
+// 4-arg ValidateFunc seam (and its mocks).
 func resolveValidate(opts Options) ValidateFunc {
 	if opts.Validate != nil {
 		return opts.Validate
 	}
-	return validate.ValidateCorpus
+	return func(dir string, runs int, seed uint64, gt bundle.GameType) (validate.Report, error) {
+		return validate.ValidateCorpusWith(dir, runs, seed, gt, opts.BranchB, opts.BranchBAccum)
+	}
 }
 
-// resolveValidateUnscheduled returns opts.ValidateUnscheduled or the real
-// validate.ValidateUnscheduled default (the playoff-bucket seam).
+// resolveValidateUnscheduled returns opts.ValidateUnscheduled or a real
+// ValidateUnscheduledWith default capturing the Branch-B toggle + accumulator (the
+// playoff-bucket seam).
 func resolveValidateUnscheduled(opts Options) ValidateFunc {
 	if opts.ValidateUnscheduled != nil {
 		return opts.ValidateUnscheduled
 	}
-	return validate.ValidateUnscheduled
+	return func(dir string, runs int, seed uint64, gt bundle.GameType) (validate.Report, error) {
+		return validate.ValidateUnscheduledWith(dir, runs, seed, gt, opts.BranchB, opts.BranchBAccum)
+	}
 }
 
 // resolveCountSco returns opts.CountSco or the real countScoGames default (the

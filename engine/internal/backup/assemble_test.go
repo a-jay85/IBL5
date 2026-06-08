@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
 	"strings"
 	"testing"
@@ -155,6 +156,45 @@ func TestToBundle_RealLifeWired(t *testing.T) {
 	if got.RealLifeMIN != 2520 || got.RealLifeFGA != 1400 || got.RealLifeFTA != 360 || got.RealLifeORB != 120 {
 		t.Errorf("wired real-life = MIN%d FGA%d FTA%d ORB%d, want 2520/1400/360/120",
 			got.RealLifeMIN, got.RealLifeFGA, got.RealLifeFTA, got.RealLifeORB)
+	}
+}
+
+// Rows 6 & 7: ToBundle aggregates each team's per-player season DRB/AST over its
+// Σ season GP into bundle.Team.DRBRate=(ΣDRB/ΣGP)×48 / ASTRate=(ΣAST/ΣGP)×44 (the
+// faithful JSB accumulation — NOT a team-summary record). A team with ΣGP==0 gets
+// rate 0 (no divide-by-zero / NaN).
+func TestToBundle_TeamRates(t *testing.T) {
+	// Team 1: give two players season stats; the rest 0.
+	roster1 := teamRoster(1)
+	roster1[0].SeasonGP, roster1[0].SeasonDRB, roster1[0].SeasonAST = 40, 200, 120
+	roster1[1].SeasonGP, roster1[1].SeasonDRB, roster1[1].SeasonAST = 20, 100, 40
+	// Team 2: all season stats 0 → ΣGP==0 → rates 0.
+	roster2 := teamRoster(2)
+
+	players := append(roster1, roster2...)
+	sched := []SchGame{{VisitorTeamID: 1, HomeTeamID: 2, Month: 11, Day: 2, Played: true}}
+	b, err := ToBundle(players, sched, AssembleOptions{})
+	if err != nil {
+		t.Fatalf("ToBundle: %v", err)
+	}
+
+	var t1, t2 bundle.Team
+	for _, tm := range b.Teams {
+		switch tm.TeamID {
+		case 1:
+			t1 = tm
+		case 2:
+			t2 = tm
+		}
+	}
+	// ΣGP=60, ΣDRB=300, ΣAST=160 → DRBRate=(300/60)×48=240, ASTRate=(160/60)×44≈117.33.
+	wantDRB := 300.0 / 60.0 * 48.0
+	wantAST := 160.0 / 60.0 * 44.0
+	if math.Abs(t1.DRBRate-wantDRB) > 1e-9 || math.Abs(t1.ASTRate-wantAST) > 1e-9 {
+		t.Errorf("team1 rates = DRB%.4f AST%.4f, want %.4f/%.4f", t1.DRBRate, t1.ASTRate, wantDRB, wantAST)
+	}
+	if t2.DRBRate != 0 || t2.ASTRate != 0 {
+		t.Errorf("team2 (ΣGP=0) rates = DRB%v AST%v, want 0/0", t2.DRBRate, t2.ASTRate)
 	}
 }
 

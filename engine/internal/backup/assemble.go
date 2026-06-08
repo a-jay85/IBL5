@@ -12,6 +12,17 @@ import (
 // in the parsed roster — the "schedule references an unknown team" boundary.
 var ErrUnknownTeam = errors.New("backup: schedule references a team with no roster")
 
+// teamDRBRateBase / teamASTRateBase are the JSB per-48 team-rate scale constants
+// (COMPOSITE_DOUBLES_TRACE.md §1/§5): team[+0xDC0] DRB-rate uses ×48 (_DAT_00669ed0),
+// team[+0xDD0] AST-rate uses the distinct ×44 (_DAT_0066d328). The team rate is
+// (Σ_player season_stat / Σ_player season_GP) × base — JSB's per-half accumulation
+// over a team's players (§2 stride 0xE28), NOT the team-summary record (whose GP is
+// team-games, the wrong divisor — yields a degenerate over-shrink).
+const (
+	teamDRBRateBase = 48.0
+	teamASTRateBase = 44.0
+)
+
 // AssembleOptions carries the bundle-level metadata the backup files do not
 // themselves provide. The .sch has no game type, so the caller supplies one;
 // the zero value defaults to a regular-season game.
@@ -70,9 +81,21 @@ func ToBundle(players []PlrPlayer, sched []SchGame, opts AssembleOptions) (bundl
 
 	rosterTeams := make(map[int]bool, 32)
 	bundlePlayers := make([]bundle.Player, 0, len(players))
+	// Accumulate each team's Σ season GP/DRB/AST over its player rows — the faithful
+	// JSB team-rate inputs (see teamDRBRateBase). Keyed by TeamID.
+	type rateAcc struct{ gp, drb, ast int }
+	rates := make(map[int]*rateAcc, 32)
 	for _, p := range players {
 		rosterTeams[p.TeamID] = true
 		bundlePlayers = append(bundlePlayers, toBundlePlayer(p, opts.Minutes))
+		ra := rates[p.TeamID]
+		if ra == nil {
+			ra = &rateAcc{}
+			rates[p.TeamID] = ra
+		}
+		ra.gp += p.SeasonGP
+		ra.drb += p.SeasonDRB
+		ra.ast += p.SeasonAST
 	}
 
 	scheduleTeams := make(map[int]bool, 32)
@@ -101,7 +124,12 @@ func ToBundle(players []PlrPlayer, sched []SchGame, opts AssembleOptions) (bundl
 	sort.Ints(teamIDs) // deterministic ordering — never map-iteration order
 	teams := make([]bundle.Team, 0, len(teamIDs))
 	for _, id := range teamIDs {
-		teams = append(teams, bundle.Team{TeamID: id, Name: fmt.Sprintf("team-%d", id)})
+		t := bundle.Team{TeamID: id, Name: fmt.Sprintf("team-%d", id)}
+		if ra := rates[id]; ra != nil && ra.gp > 0 {
+			t.DRBRate = float64(ra.drb) / float64(ra.gp) * teamDRBRateBase
+			t.ASTRate = float64(ra.ast) / float64(ra.gp) * teamASTRateBase
+		}
+		teams = append(teams, t)
 	}
 
 	return bundle.Bundle{

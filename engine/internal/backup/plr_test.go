@@ -164,6 +164,39 @@ func TestReadPlr_RealLifeBlock(t *testing.T) {
 	}
 }
 
+// Row 3: ReadPlr parses the per-player in-season GP/DRB/AST (the Branch-B team-rate
+// inputs) at the transcribed offsets 148/184/188, independently of plr.go's constants.
+func TestReadPlr_SeasonBlock(t *testing.T) {
+	buf := []byte(newPlrRecord(1, 100, 1, 25, "Rebounder", "C", 70, 5, 5))
+	plrField(buf, 148, itoaPad(70, 4))  // season GP
+	plrField(buf, 184, itoaPad(420, 4)) // season DRB
+	plrField(buf, 188, itoaPad(210, 4)) // season AST
+
+	players, err := ReadPlr(strings.NewReader(string(buf) + "\r\n"))
+	if err != nil {
+		t.Fatalf("ReadPlr: %v", err)
+	}
+	p := players[0]
+	if p.SeasonGP != 70 || p.SeasonDRB != 420 || p.SeasonAST != 210 {
+		t.Errorf("season block = GP%d DRB%d AST%d, want 70/420/210", p.SeasonGP, p.SeasonDRB, p.SeasonAST)
+	}
+}
+
+// Row 5 (negative-path): a non-numeric season field yields ErrBadField naming the
+// offset — the same guard every numeric field uses, now over the season block.
+func TestReadPlr_SeasonBadField(t *testing.T) {
+	buf := []byte(newPlrRecord(1, 100, 1, 25, "Bad Season", "PG", 70, 5, 5))
+	copy(buf[184:188], "ZZZZ") // season DRB non-numeric
+
+	_, err := ReadPlr(strings.NewReader(string(buf) + "\r\n"))
+	if !errors.Is(err, ErrBadField) {
+		t.Fatalf("err = %v, want ErrBadField", err)
+	}
+	if !strings.Contains(err.Error(), "184") {
+		t.Errorf("error should name offset 184: %v", err)
+	}
+}
+
 // Row 3: a non-numeric real-life field yields ErrBadField naming the offset
 // (boundary — the same guard every numeric field uses, now over the new block).
 func TestReadPlr_RealLifeBadField(t *testing.T) {

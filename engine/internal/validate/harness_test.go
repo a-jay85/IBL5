@@ -109,6 +109,27 @@ func TestValidateCorpus_InBandPassesAndDeterministic(t *testing.T) {
 	}
 }
 
+// Row #17 (characterization): ValidateCorpusWith(branchB=false, accum=nil) yields a
+// Report byte-identical to ValidateCorpus — the OFF default of the Branch-B threading
+// leaves the existing calibration unchanged (SimulateWith(.,zero opts) == Simulate).
+func TestValidateCorpusWith_OffDefaultUnchanged(t *testing.T) {
+	dir := t.TempDir()
+	const seed = uint64(1000)
+	buildCorpus(t, dir, true, testRuns, seed)
+
+	base, err := ValidateCorpus(dir, testRuns, seed, bundle.GameTypeRegular)
+	if err != nil {
+		t.Fatalf("ValidateCorpus: %v", err)
+	}
+	off, err := ValidateCorpusWith(dir, testRuns, seed, bundle.GameTypeRegular, false, nil)
+	if err != nil {
+		t.Fatalf("ValidateCorpusWith: %v", err)
+	}
+	if !reflect.DeepEqual(base, off) {
+		t.Error("ValidateCorpusWith(branchB=false) diverged from ValidateCorpus — OFF default not inert")
+	}
+}
+
 // Row #4: validateGame stamps each GameReport with the home win-fraction over
 // the seeded runs — a real value in [0,1]. Determinism across runs is already
 // covered by the reflect.DeepEqual report comparison above (the field is part

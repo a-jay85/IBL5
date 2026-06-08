@@ -77,6 +77,14 @@ type teamState struct {
 
 	score    int
 	quarters []int // points per period in order; index 0 = Q1
+
+	// drbRate/astRate are the offensive team's per-48 defensive-rebound and assist
+	// rates (bundle.Team.DRBRate/ASTRate), reached at the play-outcome bucket sites
+	// for the JSB Branch-B usage-shrink (bucketweights.go). Default 0 — a team absent
+	// from bundle.Teams, the DB-built bundle, or any test-constructed teamState leaves
+	// them 0, so Branch-B is inert (Branch-A cold-start) there. Set in simGameWith.
+	drbRate float64
+	astRate float64
 }
 
 // addPeriodPoints credits n points to the team in the current 0-based period
@@ -124,6 +132,12 @@ type gameState struct {
 	// no-freeze baseline pass. Both are internal observability — never serialized.
 	freeze FreezeConfig
 	accum  *FreezeAccum
+
+	// branchB, when non-nil, harvests the Branch-B engagement instrument (freeze.go
+	// branchBShrink, ADR-0048) across the run: possessions where the usage-shrink
+	// engaged vs fell back to Branch-A, plus the s distribution. Shared across a run's
+	// games (like accum); nil outside the Phase-7 A/B harness. Internal, never serialized.
+	branchB *BranchBAccum
 }
 
 func (g *gameState) emit(e result.Event) { g.events = append(g.events, e) }

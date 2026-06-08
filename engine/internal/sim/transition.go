@@ -120,11 +120,14 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 		// buckets, site 3 on the offQuality divisor inside foulBucketWeight), so a
 		// home fast-break possession also grows the foul bucket.
 		hca := hcaDelta(gs.gameType, offense.isHome)
+		// allow3pt=false: a fast break is never a 3pt attempt (allowedPaths excludes it),
+		// so the 3pt composite is 0 here and Branch-B's ΣD is 2pt+foul on the break.
+		twoPtW, _, foulW := gs.playBuckets(bh, offense, defense, hca, false)
 		in := outcomeInputs{
-			twoPtWeight:      twoPtBucketWeight(bh) + hca,
-			threePtWeight:    0, // a fast break is never a 3pt attempt (allowedPaths excludes it)
+			twoPtWeight:      twoPtW,
+			threePtWeight:    0,
 			andOneWeight:     andOneBucketWeight(mq, bh),
-			foulOnlyWeight:   gs.foulWeight(offense.players, defense.players, hca),
+			foulOnlyWeight:   foulW,
 			turnoverDefValue: energyCeiling(bh),
 		}
 

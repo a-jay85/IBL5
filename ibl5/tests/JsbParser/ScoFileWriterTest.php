@@ -95,6 +95,7 @@ class ScoFileWriterTest extends TestCase
         );
 
         $stats = PlayerStats::withBoxscoreInfoLine($this->mockDb(), $slot);
+        self::assertInstanceOf(PlayerStats::class, $stats);
 
         // V4: every stat parses back equal (int-cast to handle space-padded strings)
         self::assertSame('Test Player', trim($stats->name));
@@ -122,6 +123,7 @@ class ScoFileWriterTest extends TestCase
     {
         $slot = ScoFileWriter::buildTeamTotalSlot('Rookies', 47, 98, 16, 21, 8, 21, 25, 41, 30, 11, 22, 8, 19);
         $stats = PlayerStats::withBoxscoreInfoLine($this->mockDb(), $slot);
+        self::assertInstanceOf(PlayerStats::class, $stats);
 
         self::assertSame(0, (int) $stats->playerID);
         self::assertSame('Rookies', trim($stats->name));

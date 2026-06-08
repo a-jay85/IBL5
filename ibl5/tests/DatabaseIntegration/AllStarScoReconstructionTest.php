@@ -142,6 +142,23 @@ class AllStarScoReconstructionTest extends DatabaseTestCase
         $this->repo->deleteTeamBoxscoresByGame(self::ASG_DATE, self::ASG_VISITOR_TID, self::ASG_HOME_TID, 1);
         $this->repo->deletePlayerBoxscoresByGame(self::ASG_DATE, self::ASG_VISITOR_TID, self::ASG_HOME_TID);
 
+        // Seed ibl_plr rows for every PID that will be inserted into ibl_box_scores.
+        // The fk_boxscore_player FK requires these to exist before any boxscore insert.
+        foreach ([
+            // RSG visitor
+            5936, 5938, 5931, 5930, 5937, 5939, 5929, 5935, 5942, 5964,
+            // RSG home
+            5640, 5649, 5642, 5659, 5645, 5685, 5646, 5663, 5641, 5644,
+            // ASG visitor (5640 already seeded above)
+            3852, 3851, 4148, 5258, 4500, 3282, 3561, 2975, 3277, 5265, 4507,
+            // ASG home
+            4150, 3556, 3552, 5261, 3555, 5259, 4490, 4492, 4494, 4502, 4824, 4825,
+            // sentinel
+            99999,
+        ] as $pid) {
+            $this->insertTestPlayer($pid, "Player {$pid}");
+        }
+
         // Season::getLastBoxScoreDate() queries ibl_box_scores — insert sentinel there
         $this->insertPlayerBoxscoreRow(self::SENTINEL_DATE, 99999, 'Sentinel Player', 'PG', 1, 2, 1);
     }

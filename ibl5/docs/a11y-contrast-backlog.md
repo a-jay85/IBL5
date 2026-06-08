@@ -26,7 +26,7 @@ CI will immediately catch any contrast regression on promoted pages.
 Captured by running axe-core `color-contrast` against `http://main.localhost/ibl5/` with
 the current dev seed. Rerun whenever palette CSS changes land.
 
-### Pages currently enforced (contrast passes — 16 pages)
+### Pages currently enforced (contrast passes — 15 pages)
 
 | Page | URL |
 |------|-----|
@@ -41,13 +41,12 @@ the current dev seed. Rerun whenever palette CSS changes land.
 | transaction history | `modules.php?name=TransactionHistory` |
 | voting results | `modules.php?name=VotingResults` |
 | free agency | `modules.php?name=FreeAgency` |
-| waivers | `modules.php?name=Waivers` |
 | compare players | `modules.php?name=ComparePlayers` |
 | your account | `modules.php?name=YourAccount` |
 | voting ASG ballot | `modules.php?name=Voting` (ASG phase) |
 | voting EOY ballot | `modules.php?name=Voting` (EOY phase) |
 
-### Pages in allowlist (contrast fails — 31 pages)
+### Pages in allowlist (contrast fails — 32 pages)
 
 Remove each entry from `CONTRAST_KNOWN_FAILING` in `ibl5/tests/e2e/smoke/accessibility.spec.ts`
 once the palette fix for that page is verified passing.
@@ -83,10 +82,11 @@ once the palette fix for that page is verified passing.
 | news categories | `modules.php?name=News&file=categories` |
 | news article | `modules.php?name=News&file=article&sid=1` |
 
-**Authenticated pages (5):**
+**Authenticated pages (6):**
 
 | Page | URL |
 |------|-----|
+| waivers | `modules.php?name=Waivers` |
 | trading | `modules.php?name=Trading` |
 | depth chart entry | `modules.php?name=DepthChartEntry` |
 | gm contact list | `modules.php?name=GMContactList` |

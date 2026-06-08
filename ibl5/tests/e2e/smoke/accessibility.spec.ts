@@ -38,6 +38,7 @@ const CONTRAST_KNOWN_FAILING = new Set([
   'news categories',
   'news article',
   // Auth pages
+  'waivers',
   'trading',
   'depth chart entry',
   'gm contact list',

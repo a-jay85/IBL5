@@ -1,13 +1,13 @@
 ---
-description: The production smoke test's gating IBL5 probe runs on the production box over SSH and curls the public hostname from the box's own whitelisted IP, removing the per-IP WAF from the auto-rollback path; SSH-unreachable is treated as inconclusive (never rollback). Loopback probing was rejected because the box serves a non-matching default-vhost cert on 127.0.0.1.
-last_verified: 2026-06-02
+description: Both the gating IBL5 probe and the notify-only IBL6 check run on the production box over SSH and curl their public hostnames from the box's own whitelisted IP, removing the per-IP WAF from the auto-rollback path (IBL5) and eliminating the WAF 415 false positive (IBL6); SSH-unreachable is treated as inconclusive (never rollback). Loopback probing was rejected because the box serves a non-matching default-vhost cert on 127.0.0.1.
+last_verified: 2026-06-08
 ---
 
 # ADR-0039: On-Box Smoke Gates Auto-Rollback
 
 **Status:** Accepted
 **Date:** 2026-06-02
-**Supersedes:** the *gating mechanism* of [ADR-0038](0038-smoke-inconclusive-state.md) (its inconclusive classification is retained for the external IBL6/notify path).
+**Supersedes:** the *gating mechanism* of [ADR-0038](0038-smoke-inconclusive-state.md) (its inconclusive classification is retained for the IBL6/notify path).
 
 ## Context
 
@@ -66,6 +66,6 @@ Making loopback viable requires a server-side change (AutoSSL/cert covering the 
 ## Consequences
 
 - The deploy gate now depends on **SSH reachability to the production host**. An unreachable box yields an owner DM and no rollback (verdict unknown), not a silent pass and not a revert.
-- IBL6 remains an external, notify-only check on the runner (single check, never gates rollback); moving it on-box is a possible future follow-up.
+- IBL6 now probes **on-box** over the same SSH channel/key as the IBL5 gate (`secrets.USERNAME@HOST`), so its curl originates from the box's own whitelisted IP — eliminating the per-IP WAF 415 false positive the runner-side check suffered. It remains a single, notify-only check that never gates rollback; only the network origin moved.
 - **All IBL5 triggers now probe via the box, including the daily `schedule` run and `workflow_dispatch`** — the stale `guard` step only runs for `workflow_run`, so other triggers fall through to the on-box step. This is deliberate: the previous external scheduled run was itself WAF-false-positive-prone (ADR-0038 records a scheduled run with the identical 415), so moving it on-box trades a noisy public-path probe for a reliable origin check. The trade-off is that **no IBL5 automation now exercises the path from outside the box** (foreign-network DNS / CDN / edge firewall). True public-internet reachability ("can a real visitor load the site") is a distinct concern best served by a separate distributed/residential uptime monitor (out of scope here).
 - The premise (the box can reach its own public hostname and gets 200) is validated end-to-end pre-merge via a `workflow_dispatch` run against production (which cannot trigger rollback — that requires a `workflow_run` event). `bin/smoke-prod` itself is unchanged by this PR; its existing behavior is covered by `SmokeProdCliTest.php`.

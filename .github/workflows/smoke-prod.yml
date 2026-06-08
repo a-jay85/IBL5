@@ -141,11 +141,24 @@ jobs:
           fi
           exit "$code"
 
-      - name: Run IBL6 smoke checks (notify-only)
+      - name: Run IBL6 smoke checks on-box via SSH (notify-only)
         id: ibl6
         if: steps.guard.outputs.stale != 'true'
         continue-on-error: true
-        run: bin/smoke-prod --scope=ibl6 "$BASE_URL"
+        run: |
+          # Pipe bin/smoke-prod to `bash -s` on the production box so it curls
+          # the IBL6 hostname from the box's OWN whitelisted egress IP, bypassing
+          # the per-IP WAF that bans datacenter runners (same mechanism as the
+          # IBL5 step above — ADR-0039). bin/ is host/CI-only, hence the redirect.
+          # Reuses the key written by "Setup SSH for on-box smoke" (no new setup).
+          # Minimal form (no 255-retry like IBL5): IBL6 is a single notify-only
+          # check, and the only new failure mode — SSH 255 (box unreachable) —
+          # cannot create a spurious IBL6 DM, because IBL5 runs FIRST, hits 255,
+          # and sets ibl5_inconclusive=true, which gates off notify-ibl6-degradation.
+          ssh -o ConnectTimeout=10 -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy \
+            ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
+            "bash -s -- --scope=ibl6 $BASE_URL" \
+            < bin/smoke-prod
 
   rollback-and-notify:
     name: Auto-Rollback and Notify

@@ -69,14 +69,12 @@ getCurrentDraftPick(): ?array
 **Public Methods:**
 ```php
 validateDraftSelection(?string $playerName, ?string $currentDraftSelection, bool $isPlayerAlreadyDrafted = false): ValidationResult
-getErrors(): array
-clearErrors(): void
 ```
 
 **Key Implementation Details:**
 - Three-step validation: player selected → pick available → player not drafted
-- Stores user-facing error messages for display
-- Clears errors automatically before each validation
+- Returns immutable `ValidationResult` — `isValid()` for success, `getErrors()` for failure messages
+- No mutable state; each call is independent
 
 ---
 

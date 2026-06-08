@@ -17,7 +17,7 @@ Before implementation, create a worktree unless one already exists for this task
 bin/wt-new <slug>   # slug = kebab-case branch name derived from the plan
 ```
 
-Use `--base <branch>` for stacked PRs. Work in `worktrees/<slug>/ibl5/`. Skip if already inside a worktree or the plan specifies an existing one.
+Use `--base <branch>` for stacked PRs. Work in `IBL5-worktrees/<slug>/ibl5/` (worktrees live outside the repo — ADR-0046). Skip if already inside a worktree or the plan specifies an existing one.
 
 ## Post-Plan
 

@@ -120,7 +120,7 @@ First, check if a worktree already exists for this slug:
 
 ```bash
 SLUG=<slug>
-WORKTREE_DIR="/Users/ajaynicolas/GitHub/IBL5/worktrees/$SLUG"
+WORKTREE_DIR="/Users/ajaynicolas/GitHub/IBL5-worktrees/$SLUG"
 if [ -d "$WORKTREE_DIR" ]; then
     echo "RESUME: worktree exists"
 else
@@ -144,7 +144,7 @@ If bin/wt-new fails, write an error report to $NIGHTLY_DIR/reports/YYYY-MM-DD-er
 The worktree may exist from a previous interrupted run. Check its state:
 
 ```bash
-cd /Users/ajaynicolas/GitHub/IBL5/worktrees/<slug>
+cd /Users/ajaynicolas/GitHub/IBL5-worktrees/<slug>
 git log --oneline origin/master..HEAD
 ```
 
@@ -154,7 +154,7 @@ git log --oneline origin/master..HEAD
 
 ## Step 6: Implement the Plan
 
-Work in worktrees/<slug>/ibl5/. CLAUDE.md is auto-loaded — follow all project rules. Follow the plan step by step.
+Work in /Users/ajaynicolas/GitHub/IBL5-worktrees/<slug>/ibl5/. CLAUDE.md is auto-loaded — follow all project rules. Follow the plan step by step.
 
 When a plan phase carries a `### Delegate` packet, do NOT implement that phase inline: fire **one** Agent/Task call per packet at the packet's declared tier (Haiku or Sonnet), pass the packet **verbatim** as the sub-agent prompt, and absorb only the sub-agent's one-line summary. The packet is self-verifying — the sub-agent runs the packet's self-verify command before returning — and CI plus post-plan review remain the backstop. This keeps your own context flat across the run; inlining a verbose packet's tool output defeats its purpose.
 
@@ -170,7 +170,7 @@ Checkpoint after each of these (when applicable):
 5. Seed/fixture updates complete
 
 ```bash
-cd /Users/ajaynicolas/GitHub/IBL5/worktrees/<slug>
+cd /Users/ajaynicolas/GitHub/IBL5-worktrees/<slug>
 git add -A
 git commit -m "<type>: <what this checkpoint covers>"
 git push origin <slug>
@@ -183,7 +183,7 @@ If implementation requires information you do not have — external resources, u
 This is the certain, zero-cost backstop to the Step 2.6 heuristic. If implementing the plan produced **no net change** vs master, the work was already merged and the Step 2.6 title search missed it (squash-rename, title drift). Do not write a handoff for an empty branch — an empty branch must never reach the post-plan agent.
 
 ```bash
-cd /Users/ajaynicolas/GitHub/IBL5/worktrees/<slug>
+cd /Users/ajaynicolas/GitHub/IBL5-worktrees/<slug>
 git fetch origin master
 AHEAD=$(git rev-list origin/master..HEAD)
 DIRTY=$(git status --porcelain)
@@ -210,7 +210,7 @@ mkdir -p "$NIGHTLY_DIR/handoff"
 cat <<'HANDOFF_EOF' > "$NIGHTLY_DIR/handoff/<plan-filename>.json"
 {
   "slug": "<slug>",
-  "worktree": "/Users/ajaynicolas/GitHub/IBL5/worktrees/<slug>",
+  "worktree": "/Users/ajaynicolas/GitHub/IBL5-worktrees/<slug>",
   "branch": "<slug>",
   "plan_file": "<plan-filename>",
   "plan_title": "<title from the plan>",

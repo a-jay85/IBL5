@@ -9,9 +9,13 @@
 # Usage: bin/db-sync-prod [worktree-name]
 #
 # Target resolution (in order):
-#   1. <worktree-name> argument → worktrees/<name>/.wt-slug
-#   2. CWD inside worktrees/<name>/... → that worktree
+#   1. <worktree-name> argument → <WT_PARENT>/<name>/.wt-slug
+#   2. CWD inside <WT_PARENT>/<name>/... → that worktree
 #   3. No argument, not in worktree → main ibl5-mariadb container
+#
+# Worktrees live OUTSIDE the repo (ADR-0046); WT_PARENT is resolved via the
+# worktrees_parent_dir helper. A legacy in-repo path is kept as a fallback for
+# pre-migration worktrees, mirroring bin/db-test-up.
 #
 # Prereqs: .env with REMOTE_* creds; target container already running.
 
@@ -19,6 +23,8 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$REPO_ROOT/bin/lib/db-helpers.sh"
+source "$REPO_ROOT/bin/lib/git-helpers.sh"
+WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
 
 WORKTREE_ARG="${1:-}"
 
@@ -55,25 +61,33 @@ WORKTREE_PATH=""
 
 resolve_from_wt_name() {
     local name="$1"
-    local slug_file="$REPO_ROOT/worktrees/$name/.wt-slug"
+    local wt_path="$WT_PARENT/$name"
+    if [ ! -d "$wt_path" ]; then
+        wt_path="$REPO_ROOT/worktrees/$name"  # legacy fallback (pre-migration)
+    fi
+    local slug_file="$wt_path/.wt-slug"
     if [ ! -f "$slug_file" ]; then
         return 1
     fi
     SLUG="$(cat "$slug_file")"
-    WORKTREE_PATH="$REPO_ROOT/worktrees/$name"
+    WORKTREE_PATH="$wt_path"
 }
 
 if [ -n "$WORKTREE_ARG" ]; then
     if ! resolve_from_wt_name "$WORKTREE_ARG"; then
-        echo "Error: No worktree named '$WORKTREE_ARG' (missing $REPO_ROOT/worktrees/$WORKTREE_ARG/.wt-slug)." >&2
+        echo "Error: No worktree named '$WORKTREE_ARG' (missing $WT_PARENT/$WORKTREE_ARG/.wt-slug)." >&2
         echo "Start it first: bin/wt-up $WORKTREE_ARG" >&2
         exit 1
     fi
-elif [[ "$PWD" == "$REPO_ROOT/worktrees/"* ]]; then
-    wt_rel="${PWD#"$REPO_ROOT/worktrees/"}"
+elif [[ "$PWD" == "$WT_PARENT/"* || "$PWD" == "$REPO_ROOT/worktrees/"* ]]; then
+    if [[ "$PWD" == "$WT_PARENT/"* ]]; then
+        wt_rel="${PWD#"$WT_PARENT/"}"
+    else
+        wt_rel="${PWD#"$REPO_ROOT/worktrees/"}"  # legacy fallback (pre-migration)
+    fi
     wt_name="${wt_rel%%/*}"
     if ! resolve_from_wt_name "$wt_name"; then
-        echo "Error: CWD is in worktrees/$wt_name but .wt-slug is missing. Start it: bin/wt-up $wt_name" >&2
+        echo "Error: CWD is in worktree '$wt_name' but .wt-slug is missing. Start it: bin/wt-up $wt_name" >&2
         exit 1
     fi
 else

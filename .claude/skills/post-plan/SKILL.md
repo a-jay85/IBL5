@@ -126,7 +126,7 @@ COUNT_LOCK=$(echo "$FILES" | grep -cE '(composer|package|bun)\.lock$' || true)
 COUNT_SNAPSHOT=$(echo "$FILES" | grep -cE '__snapshots__/|\.snap$' || true)
 COUNT_NON_CODE=$(( COUNT_MD + COUNT_LOCK + COUNT_SNAPSHOT ))
 # Go engine (repo-root engine/, NOT under ibl5/). Anchored at ^engine/ so other
-# worktree checkouts under worktrees/<slug>/engine/*.go never false-positive —
+# worktree checkouts under IBL5-worktrees/<slug>/engine/*.go never false-positive —
 # PR file lists are repo-root-relative.
 COUNT_GO=$(echo "$FILES" | grep -cE '^engine/.*\.go$' || true)
 COUNT_IBL5=$(echo "$FILES" | grep -cE '^ibl5/' || true)

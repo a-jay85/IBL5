@@ -57,8 +57,10 @@ Enforces the Living Documentation policy defined in
 dead repo-path references on every in-scope markdown file.
 
 Options:
-  --fix-dates        Bump last_verified to today on every scanned file.
-                     Use only for reviewed batch re-verification.
+  --fix-dates        Requires --since=<ref>. Bumps last_verified to today only
+                     on docs whose body changed vs <ref> without a date bump —
+                     exactly the files the on-touch check flags. Bumping every
+                     doc is refused: it would falsely claim re-verification.
   --include-memory   Also scan Claude Code memory for this repo
                      (auto-derived from the main repo path; works from
                      worktrees). Off in CI.
@@ -475,6 +477,42 @@ function editCommitDate(string $repoRoot, string $base, string $rel): ?string
  */
 function checkChanged(string $base, string $repoRoot, \DateTimeImmutable $today): array
 {
+    $issues = [];
+    foreach (iterChangedDocs($base, $repoRoot) as $doc) {
+        if ($doc['needsBump']) {
+            $issues[] = sprintf(
+                '%s: body changed but last_verified not bumped (still %s) — run `bin/check-docs --fix-dates --since=%s` (or bump last_verified to today manually) and commit',
+                $doc['rel'],
+                $doc['headLv'] ?? '(none)',
+                $base
+            );
+        }
+
+        foreach (checkFile($doc['abs'], $repoRoot, $today) as $fileIssue) {
+            $issues[] = sprintf('%s: %s', $doc['rel'], $fileIssue);
+        }
+    }
+
+    return $issues;
+}
+
+/**
+ * Enumerate in-scope docs changed between $base and HEAD, returning the
+ * frontmatter facts both the on-touch check and --fix-dates consume. `needsBump`
+ * is the SINGLE source of the On-Touch predicate: body changed vs base but
+ * last_verified did not move past the edit's commit date. Both callers share
+ * this enumeration (and its `A...HEAD` three-dot diff) so the failing set and
+ * the --fix-dates fixable set can never silently diverge.
+ *
+ * The same-day escape (`$verifiedAtEdit`): an unchanged date still passes when
+ * it equals the edit's git commit date — a same-day re-verify that cannot bump
+ * higher without going into the future. Keyed off the immutable commit date,
+ * not the CI wall clock, so it does not reintroduce a midnight false-fail.
+ *
+ * @return list<array{rel: string, abs: string, headLv: ?string, baseLv: ?string, needsBump: bool}>
+ */
+function iterChangedDocs(string $base, string $repoRoot): array
+{
     $escapedRoot = escapeshellarg($repoRoot);
     $escapedBase = escapeshellarg($base);
 
@@ -498,7 +536,7 @@ function checkChanged(string $base, string $repoRoot, \DateTimeImmutable $today)
         $inScopeSet[$abs] = true;
     }
 
-    $issues = [];
+    $docs = [];
     foreach ($changedRel as $rel) {
         $rel = trim($rel);
         if ($rel === '') {
@@ -522,26 +560,18 @@ function checkChanged(string $base, string $repoRoot, \DateTimeImmutable $today)
 
         $headLv = $headFm['last_verified'] ?? null;
         $baseLv = $baseFm['last_verified'] ?? null;
-
-        // Body changed but the date did not move from base. Allow it only when
-        // the kept date is itself the commit date of this edit — a same-day
-        // re-verify of a doc already verified today, which cannot bump higher
-        // without going into the future. Otherwise it is an un-bumped stale date.
         $verifiedAtEdit = $headLv !== null && $headLv === editCommitDate($repoRoot, $base, $rel);
-        if ($headLv === $baseLv && !$verifiedAtEdit) {
-            $issues[] = sprintf(
-                '%s: body changed but last_verified not bumped (still %s) — run `bin/check-docs --fix-dates` (or bump last_verified to today manually) and commit',
-                $rel,
-                $headLv ?? '(none)'
-            );
-        }
 
-        foreach (checkFile($abs, $repoRoot, $today) as $fileIssue) {
-            $issues[] = sprintf('%s: %s', $rel, $fileIssue);
-        }
+        $docs[] = [
+            'rel' => $rel,
+            'abs' => $abs,
+            'headLv' => $headLv,
+            'baseLv' => $baseLv,
+            'needsBump' => $headLv === $baseLv && !$verifiedAtEdit,
+        ];
     }
 
-    return $issues;
+    return $docs;
 }
 
 // --- main ---
@@ -583,6 +613,21 @@ $root = repoRoot();
 $today = new \DateTimeImmutable('today');
 
 if ($opts['since'] !== null) {
+    // --fix-dates is scoped to the changed-but-unbumped set (the exact files
+    // the on-touch check flags), never the whole tree — bumping an unchanged
+    // doc's date is a false re-verification claim.
+    if ($opts['fix_dates']) {
+        $toFix = [];
+        foreach (iterChangedDocs($opts['since'], $root) as $doc) {
+            if ($doc['needsBump']) {
+                $toFix[] = $doc['abs'];
+            }
+        }
+        $n = fixDates($toFix, $today);
+        echo "bumped last_verified on {$n} changed-but-unbumped file(s) vs {$opts['since']}\n";
+        exit(0);
+    }
+
     $issues = checkChanged($opts['since'], $root, $today);
     if ($issues === []) {
         echo "On-touch doc check passed (changed files vs {$opts['since']}).\n";
@@ -596,14 +641,14 @@ if ($opts['since'] !== null) {
     exit(1);
 }
 
+if ($opts['fix_dates']) {
+    fwrite(STDERR, "check-docs: --fix-dates requires --since=<ref> so it bumps only docs whose body changed vs that ref. Bumping every doc would falsely claim re-verification.\n");
+    fwrite(STDERR, usage());
+    exit(2);
+}
+
 $files = collectFiles($root, $opts['include_memory']);
 sort($files);
-
-if ($opts['fix_dates']) {
-    $n = fixDates($files, $today);
-    echo "bumped last_verified on {$n} files\n";
-    exit(0);
-}
 
 $failures = 0;
 $passed = 0;

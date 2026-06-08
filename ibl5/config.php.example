@@ -52,7 +52,7 @@ $subscription_url = "";
 $admin_file = "admin";
 
 # IBL6_BASE_URL: Base URL for the companion IBL6 application.
-define('IBL6_BASE_URL', '');
+define('IBL6_BASE_URL', 'https://ibl6.iblhoops.net');
 
 # DEMO_LOGIN_TOKEN — magic-link token for the read-only demo/hiring-manager
 # session (ibl5/demo-login.php). Set to a random 32+ char value in production.

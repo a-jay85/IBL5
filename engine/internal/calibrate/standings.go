@@ -518,7 +518,7 @@ type fidAcc struct {
 	engDiff, scoDiff []float64
 	engFGA, scoFGA   []float64 // per-team total-FGA/g, parallel to engPF/scoPF
 	engFTA, scoFTA   []float64 // per-team total-FTA/g, parallel to engPF/scoPF
-	engPoss, scoPoss []float64 // per-team POSS/g (eng count, sco proxy), parallel
+	engPoss, scoPoss []float64 // per-team POSS/g (Dean-Oliver proxy, both sides), parallel
 	season           []string  // per-row season label, for within-season demean
 }
 
@@ -802,8 +802,9 @@ type possRow struct {
 }
 
 // possRows packages the per-(season,team) PF/FGA/POSS triples for the
-// possession-count Cov decomposition — the engine side (authoritative POSS count)
-// when useEngine, else the .sco (real proxy) side.
+// possession-count Cov decomposition — the engine side (Dean-Oliver box proxy,
+// symmetric with .sco to keep the split apples-to-apples) when useEngine, else
+// the .sco proxy side.
 func possRows(fa *fidAcc, useEngine bool) []possRow {
 	rows := make([]possRow, len(fa.scoPF))
 	for i := range fa.scoPF {

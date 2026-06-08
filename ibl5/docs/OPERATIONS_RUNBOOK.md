@@ -29,7 +29,7 @@ git push origin <your-branch>:production
    - `composer install --no-dev --optimize-autoloader`
    - `php ibl5/bin/migrate`
    - `php ibl5/bin/validate-schema`
-   - SCP compiled CSS (`themes/IBL/style/style.css`)
+   - SCP compiled CSS (`ibl5/themes/IBL/style/style.css`)
    - OPcache flush
    - IBL6 restart (pm2)
 3. **Post-deploy smoke** (`.github/workflows/smoke-prod.yml`) — curls `https://www.iblhoops.net` from the production box's own IP to avoid WAF bans. On real failure, auto-reverts the `production` branch and DMs Discord.

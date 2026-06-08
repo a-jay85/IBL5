@@ -43,6 +43,7 @@ const REFERENCE_ALLOWLIST = [
     '.claude/settings.json',
     '.claude/settings.local.json',
     '.claude/rules/codebase-map.md',  // gitignored — machine-generated per session (see CLAUDE.md §Interface-Driven Modules)
+    'ibl5/themes/IBL/style/style.css',  // gitignored — compiled Tailwind build artifact (absent on clean CI checkout)
 ];
 
 function usage(): string

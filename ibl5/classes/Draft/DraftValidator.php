@@ -5,50 +5,28 @@ declare(strict_types=1);
 namespace Draft;
 
 use Draft\Contracts\DraftValidatorInterface;
+use Validation\ValidationResult;
 
 /**
  * @see DraftValidatorInterface
  */
 class DraftValidator implements DraftValidatorInterface
 {
-    /** @var array<int, string> */
-    private array $errors = [];
-
     /**
      * @see DraftValidatorInterface::validateDraftSelection()
      */
-    public function validateDraftSelection(?string $playerName, ?string $currentDraftSelection, bool $isPlayerAlreadyDrafted = false): bool
+    public function validateDraftSelection(?string $playerName, ?string $currentDraftSelection, bool $isPlayerAlreadyDrafted = false): ValidationResult
     {
-        $this->clearErrors();
         if ($playerName === null || $playerName === '') {
-            $this->errors[] = "You didn't select a player.";
-            return false;
+            return ValidationResult::failure("You didn't select a player.");
         }
         if ($currentDraftSelection !== null && $currentDraftSelection !== '') {
-            $this->errors[] = "It looks like you've already drafted a player with this draft pick.";
-            return false;
+            return ValidationResult::failure("It looks like you've already drafted a player with this draft pick.");
         }
         if ($isPlayerAlreadyDrafted) {
-            $this->errors[] = "This player has already been drafted by another team.";
-            return false;
+            return ValidationResult::failure("This player has already been drafted by another team.");
         }
 
-        return true;
-    }
-
-    /**
-     * @see DraftValidatorInterface::getErrors()
-     */
-    public function getErrors(): array
-    {
-        return $this->errors;
-    }
-
-    /**
-     * @see DraftValidatorInterface::clearErrors()
-     */
-    public function clearErrors(): void
-    {
-        $this->errors = [];
+        return ValidationResult::success();
     }
 }

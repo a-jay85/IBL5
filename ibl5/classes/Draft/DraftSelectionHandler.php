@@ -44,8 +44,9 @@ class DraftSelectionHandler implements DraftSelectionHandlerInterface
         if ($playerName !== null && $playerName !== '') {
             $isPlayerAlreadyDrafted = $this->repository->isPlayerAlreadyDrafted($playerName);
         }
-        if (!$this->validator->validateDraftSelection($playerName, $currentDraftSelection, $isPlayerAlreadyDrafted)) {
-            $errors = $this->validator->getErrors();
+        $selectionValidation = $this->validator->validateDraftSelection($playerName, $currentDraftSelection, $isPlayerAlreadyDrafted);
+        if (!$selectionValidation->isValid()) {
+            $errors = $selectionValidation->getErrors();
             return $this->view->renderValidationError($errors[0]);
         }
 

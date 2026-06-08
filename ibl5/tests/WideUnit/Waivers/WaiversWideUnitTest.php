@@ -102,8 +102,8 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $result = $this->validator->validateDrop($rosterSlots, $totalSalary);
 
         // Assert
-        $this->assertTrue($result);
-        $this->assertEmpty($this->validator->getErrors());
+        $this->assertTrue($result->isValid());
+        $this->assertEmpty($result->getErrors());
     }
 
     /**
@@ -122,8 +122,8 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $result = $this->validator->validateDrop($rosterSlots, $totalSalary);
 
         // Assert - Allowed when rosterSlots <= 2 (logic: 2 > 2 is false, so rule doesn't apply)
-        $this->assertTrue($result);
-        $this->assertEmpty($this->validator->getErrors());
+        $this->assertTrue($result->isValid());
+        $this->assertEmpty($result->getErrors());
     }
 
     // ========== DROP TO WAIVERS FAILURE SCENARIOS ==========
@@ -144,8 +144,8 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $result = $this->validator->validateDrop($rosterSlots, $totalSalary);
 
         // Assert
-        $this->assertFalse($result);
-        $errors = $this->validator->getErrors();
+        $this->assertFalse($result->isValid());
+        $errors = $result->getErrors();
         $this->assertCount(1, $errors);
         $this->assertStringContainsString('12 players', $errors[0]);
         $this->assertStringContainsString('hard cap', $errors[0]);
@@ -254,8 +254,8 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary);
 
         // Assert
-        $this->assertTrue($result);
-        $this->assertEmpty($this->validator->getErrors());
+        $this->assertTrue($result->isValid());
+        $this->assertEmpty($result->getErrors());
     }
 
     /**
@@ -275,8 +275,8 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary);
 
         // Assert - Allowed because player salary is vet min
-        $this->assertTrue($result);
-        $this->assertEmpty($this->validator->getErrors());
+        $this->assertTrue($result->isValid());
+        $this->assertEmpty($result->getErrors());
     }
 
     // ========== ADD FROM WAIVERS FAILURE SCENARIOS ==========
@@ -298,8 +298,8 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary);
 
         // Assert
-        $this->assertFalse($result);
-        $errors = $this->validator->getErrors();
+        $this->assertFalse($result->isValid());
+        $errors = $result->getErrors();
         $this->assertCount(1, $errors);
         $this->assertStringContainsString('select a valid player', $errors[0]);
     }
@@ -321,8 +321,8 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary);
 
         // Assert
-        $this->assertFalse($result);
-        $errors = $this->validator->getErrors();
+        $this->assertFalse($result->isValid());
+        $errors = $result->getErrors();
         $this->assertStringContainsString('select a valid player', $errors[0]);
     }
 
@@ -343,8 +343,8 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary);
 
         // Assert
-        $this->assertFalse($result);
-        $errors = $this->validator->getErrors();
+        $this->assertFalse($result->isValid());
+        $errors = $result->getErrors();
         $this->assertCount(1, $errors);
         $this->assertStringContainsString('full roster', $errors[0]);
     }
@@ -366,8 +366,8 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary);
 
         // Assert
-        $this->assertFalse($result);
-        $errors = $this->validator->getErrors();
+        $this->assertFalse($result->isValid());
+        $errors = $result->getErrors();
         $this->assertCount(1, $errors);
         $this->assertStringContainsString('12 or more healthy players', $errors[0]);
         $this->assertStringContainsString('hard cap', $errors[0]);
@@ -390,8 +390,8 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary);
 
         // Assert
-        $this->assertFalse($result);
-        $errors = $this->validator->getErrors();
+        $this->assertFalse($result->isValid());
+        $errors = $result->getErrors();
         $this->assertCount(1, $errors);
         $this->assertStringContainsString('over the hard cap', $errors[0]);
         $this->assertStringContainsString('veteran minimum', $errors[0]);
@@ -597,16 +597,16 @@ class WaiversWideUnitTest extends WideUnitTestCase
      */
     public function testValidatorClearsErrorsBetweenValidations(): void
     {
-        // Arrange - First validation fails
-        $this->validator->validateAdd(null, 5, 5000, 500);
-        $this->assertNotEmpty($this->validator->getErrors());
+        // Each call returns an independent result — no shared state
+        $failedResult = $this->validator->validateAdd(null, 5, 5000, 500);
+        $this->assertNotEmpty($failedResult->getErrors());
 
-        // Act - Second validation passes
+        // Act - Second validation passes — completely independent result
         $result = $this->validator->validateAdd(100, 5, 5000, 500);
 
-        // Assert - Errors should be cleared
-        $this->assertTrue($result);
-        $this->assertEmpty($this->validator->getErrors());
+        // Assert - Independent result carries no errors from the prior call
+        $this->assertTrue($result->isValid());
+        $this->assertEmpty($result->getErrors());
     }
 
     /**
@@ -616,15 +616,13 @@ class WaiversWideUnitTest extends WideUnitTestCase
      */
     public function testManualClearErrors(): void
     {
-        // Arrange - Fail validation (rosterSlots > 2 AND over cap)
-        $this->validator->validateDrop(3, 8000);
-        $this->assertNotEmpty($this->validator->getErrors());
+        // Each call returns an independent immutable result — no accumulated state
+        $failedResult = $this->validator->validateDrop(3, 8000);
+        $this->assertNotEmpty($failedResult->getErrors());
 
-        // Act
-        $this->validator->clearErrors();
-
-        // Assert
-        $this->assertEmpty($this->validator->getErrors());
+        // A subsequent success returns a fresh result with no errors
+        $successResult = $this->validator->validateDrop(2, 8000);
+        $this->assertEmpty($successResult->getErrors());
     }
 
     // ========== ADDITIONAL COVERAGE TESTS ==========
@@ -716,8 +714,8 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $result = $this->validator->validateAdd(100, 0, 5000, 500);
 
         // Assert
-        $this->assertFalse($result);
-        $errors = $this->validator->getErrors();
+        $this->assertFalse($result->isValid());
+        $errors = $result->getErrors();
         $this->assertNotEmpty($errors);
         $this->assertStringContainsString('full roster', $errors[0]);
     }
@@ -733,8 +731,8 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $result = $this->validator->validateAdd(100, 3, 6800, 500);
 
         // Assert
-        $this->assertFalse($result);
-        $errors = $this->validator->getErrors();
+        $this->assertFalse($result->isValid());
+        $errors = $result->getErrors();
         $this->assertNotEmpty($errors);
         $this->assertStringContainsString('hard cap', $errors[0]);
     }
@@ -750,8 +748,8 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $result = $this->validator->validateAdd(100, 5, 7000, 103);
 
         // Assert
-        $this->assertTrue($result);
-        $this->assertEmpty($this->validator->getErrors());
+        $this->assertTrue($result->isValid());
+        $this->assertEmpty($result->getErrors());
     }
 
     // ========== HELPER METHODS ==========

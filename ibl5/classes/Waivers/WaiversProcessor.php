@@ -153,8 +153,9 @@ class WaiversProcessor implements WaiversProcessorInterface
      */
     public function processDrop(?int $playerID, string $teamName, int $rosterSlots, int $totalSalary): array
     {
-        if (!$this->validator->validateDrop($rosterSlots, $totalSalary)) {
-            return ['success' => false, 'error' => implode(' ', $this->validator->getErrors())];
+        $dropValidation = $this->validator->validateDrop($rosterSlots, $totalSalary);
+        if (!$dropValidation->isValid()) {
+            return ['success' => false, 'error' => implode(' ', $dropValidation->getErrors())];
         }
 
         if ($playerID === null || $playerID === 0) {
@@ -213,8 +214,9 @@ class WaiversProcessor implements WaiversProcessorInterface
         $contractData = $this->determineContractData($player, $season);
         $playerSalary = $contractData['salary'];
 
-        if (!$this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary)) {
-            return ['success' => false, 'error' => implode(' ', $this->validator->getErrors())];
+        $addValidation = $this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary);
+        if (!$addValidation->isValid()) {
+            return ['success' => false, 'error' => implode(' ', $addValidation->getErrors())];
         }
 
         $team = $this->teamIdentityRepo->getTeamByName($teamName);

@@ -24,36 +24,36 @@ class WaiversValidatorTest extends TestCase
             10, // roster slots
             6000 // total salary (under cap)
         );
-        
-        $this->assertTrue($result);
-        $this->assertEmpty($this->validator->getErrors());
+
+        $this->assertTrue($result->isValid());
+        $this->assertEmpty($result->getErrors());
     }
-    
+
     public function testValidateDropFailsWithFullRosterOverCap(): void
     {
         $result = $this->validator->validateDrop(
             13, // more than 2 roster slots (12+ players)
             7500 // over hard cap
         );
-        
-        $this->assertFalse($result);
-        $errors = $this->validator->getErrors();
+
+        $this->assertFalse($result->isValid());
+        $errors = $result->getErrors();
         $this->assertCount(1, $errors);
         $this->assertStringContainsString("12 players", $errors[0]);
         $this->assertStringContainsString("over the hard cap", $errors[0]);
     }
-    
+
     public function testValidateDropSucceedsWithFullRosterUnderCap(): void
     {
         $result = $this->validator->validateDrop(
             13, // more than 2 roster slots
             6000 // under hard cap
         );
-        
-        $this->assertTrue($result);
-        $this->assertEmpty($this->validator->getErrors());
+
+        $this->assertTrue($result->isValid());
+        $this->assertEmpty($result->getErrors());
     }
-    
+
     public function testValidateAddFailsWithNullPlayerID(): void
     {
         $result = $this->validator->validateAdd(
@@ -62,13 +62,13 @@ class WaiversValidatorTest extends TestCase
             6000,  // total salary
             100    // player salary
         );
-        
-        $this->assertFalse($result);
-        $errors = $this->validator->getErrors();
+
+        $this->assertFalse($result->isValid());
+        $errors = $result->getErrors();
         $this->assertCount(1, $errors);
         $this->assertStringContainsString("didn't select a valid player", $errors[0]);
     }
-    
+
     public function testValidateAddFailsWithZeroPlayerID(): void
     {
         $result = $this->validator->validateAdd(
@@ -77,13 +77,13 @@ class WaiversValidatorTest extends TestCase
             6000,  // total salary
             100    // player salary
         );
-        
-        $this->assertFalse($result);
-        $errors = $this->validator->getErrors();
+
+        $this->assertFalse($result->isValid());
+        $errors = $result->getErrors();
         $this->assertCount(1, $errors);
         $this->assertStringContainsString("didn't select a valid player", $errors[0]);
     }
-    
+
     public function testValidateAddFailsWithFullRoster(): void
     {
         $result = $this->validator->validateAdd(
@@ -92,13 +92,13 @@ class WaiversValidatorTest extends TestCase
             6000,  // total salary
             100    // player salary
         );
-        
-        $this->assertFalse($result);
-        $errors = $this->validator->getErrors();
+
+        $this->assertFalse($result->isValid());
+        $errors = $result->getErrors();
         $this->assertCount(1, $errors);
         $this->assertStringContainsString("full roster", $errors[0]);
     }
-    
+
     public function testValidateAddFailsWith12PlusHealthyPlayersOverCap(): void
     {
         $result = $this->validator->validateAdd(
@@ -107,14 +107,14 @@ class WaiversValidatorTest extends TestCase
             6800,  // current salary
             300    // player salary (would put over cap)
         );
-        
-        $this->assertFalse($result);
-        $errors = $this->validator->getErrors();
+
+        $this->assertFalse($result->isValid());
+        $errors = $result->getErrors();
         $this->assertCount(1, $errors);
         $this->assertStringContainsString("12 or more healthy players", $errors[0]);
         $this->assertStringContainsString("over the hard cap", $errors[0]);
     }
-    
+
     public function testValidateAddSucceedsWith12HealthyPlayersUnderCap(): void
     {
         $result = $this->validator->validateAdd(
@@ -123,11 +123,11 @@ class WaiversValidatorTest extends TestCase
             6000,  // current salary
             100    // player salary (stays under cap)
         );
-        
-        $this->assertTrue($result);
-        $this->assertEmpty($this->validator->getErrors());
+
+        $this->assertTrue($result->isValid());
+        $this->assertEmpty($result->getErrors());
     }
-    
+
     public function testValidateAddFailsOverCapWithNonVetMin(): void
     {
         $result = $this->validator->validateAdd(
@@ -136,14 +136,14 @@ class WaiversValidatorTest extends TestCase
             6980,  // current salary
             400    // player salary above vet min (103), would put over cap
         );
-        
-        $this->assertFalse($result);
-        $errors = $this->validator->getErrors();
+
+        $this->assertFalse($result->isValid());
+        $errors = $result->getErrors();
         $this->assertCount(1, $errors);
         $this->assertStringContainsString("over the hard cap", $errors[0]);
         $this->assertStringContainsString("veteran minimum", $errors[0]);
     }
-    
+
     public function testValidateAddSucceedsOverCapWithVetMin(): void
     {
         $result = $this->validator->validateAdd(
@@ -152,11 +152,11 @@ class WaiversValidatorTest extends TestCase
             7100,  // over hard cap
             103    // vet min salary
         );
-        
-        $this->assertTrue($result);
-        $this->assertEmpty($this->validator->getErrors());
+
+        $this->assertTrue($result->isValid());
+        $this->assertEmpty($result->getErrors());
     }
-    
+
     public function testValidateAddSucceedsWithNormalConditions(): void
     {
         $result = $this->validator->validateAdd(
@@ -165,22 +165,22 @@ class WaiversValidatorTest extends TestCase
             6000,  // total salary
             500    // player salary
         );
-        
-        $this->assertTrue($result);
-        $this->assertEmpty($this->validator->getErrors());
+
+        $this->assertTrue($result->isValid());
+        $this->assertEmpty($result->getErrors());
     }
-    
-    public function testClearErrorsRemovesAllErrors(): void
+
+    public function testResultsAreIndependentAcrossCalls(): void
     {
-        // First create an error
-        $this->validator->validateAdd(null, 5, 6000, 100);
-        $this->assertNotEmpty($this->validator->getErrors());
-        
-        // Clear errors
-        $this->validator->clearErrors();
-        $this->assertEmpty($this->validator->getErrors());
+        $errorResult = $this->validator->validateAdd(null, 5, 6000, 100);
+        $this->assertFalse($errorResult->isValid());
+        $this->assertNotEmpty($errorResult->getErrors());
+
+        $successResult = $this->validator->validateAdd(123, 5, 6000, 100);
+        $this->assertTrue($successResult->isValid());
+        $this->assertEmpty($successResult->getErrors());
     }
-    
+
     public function testValidateAddEdgeCaseAtExactCap(): void
     {
         $result = $this->validator->validateAdd(
@@ -190,8 +190,8 @@ class WaiversValidatorTest extends TestCase
             100    // player salary brings to exactly 7000
         );
 
-        $this->assertTrue($result);
-        $this->assertEmpty($this->validator->getErrors());
+        $this->assertTrue($result->isValid());
+        $this->assertEmpty($result->getErrors());
     }
 
     // --- Merged from WaiversValidatorEdgeCaseTest ---
@@ -215,8 +215,8 @@ class WaiversValidatorTest extends TestCase
             100    // player salary
         );
 
-        $this->assertFalse($result);
-        $errors = $this->validator->getErrors();
+        $this->assertFalse($result->isValid());
+        $errors = $result->getErrors();
         $this->assertStringContainsString("didn't select a valid player", $errors[0]);
     }
 
@@ -235,7 +235,7 @@ class WaiversValidatorTest extends TestCase
         );
 
         // Currently passes because validator doesn't check for negative
-        $this->assertTrue($result);
+        $this->assertTrue($result->isValid());
     }
 
     /**
@@ -250,7 +250,7 @@ class WaiversValidatorTest extends TestCase
             100         // player salary
         );
 
-        $this->assertTrue($result);
+        $this->assertTrue($result->isValid());
     }
 
     // ============================================
@@ -269,8 +269,8 @@ class WaiversValidatorTest extends TestCase
             100    // player salary
         );
 
-        $this->assertFalse($result);
-        $errors = $this->validator->getErrors();
+        $this->assertFalse($result->isValid());
+        $errors = $result->getErrors();
         $this->assertStringContainsString('full roster', $errors[0]);
     }
 
@@ -286,7 +286,7 @@ class WaiversValidatorTest extends TestCase
             100    // player salary
         );
 
-        $this->assertTrue($result);
+        $this->assertTrue($result->isValid());
     }
 
     /**
@@ -302,8 +302,8 @@ class WaiversValidatorTest extends TestCase
             200    // player salary (would put at 7100)
         );
 
-        $this->assertFalse($result);
-        $errors = $this->validator->getErrors();
+        $this->assertFalse($result->isValid());
+        $errors = $result->getErrors();
         $this->assertStringContainsString('12 or more healthy players', $errors[0]);
     }
 
@@ -320,7 +320,7 @@ class WaiversValidatorTest extends TestCase
             103    // vet min salary
         );
 
-        $this->assertTrue($result);
+        $this->assertTrue($result->isValid());
     }
 
     /**
@@ -336,8 +336,8 @@ class WaiversValidatorTest extends TestCase
             200    // non-vet-min salary
         );
 
-        $this->assertFalse($result);
-        $errors = $this->validator->getErrors();
+        $this->assertFalse($result->isValid());
+        $errors = $result->getErrors();
         $this->assertStringContainsString('over the hard cap', $errors[0]);
         $this->assertStringContainsString('veteran minimum', $errors[0]);
     }
@@ -359,7 +359,7 @@ class WaiversValidatorTest extends TestCase
             100             // player salary brings to exactly hard cap
         );
 
-        $this->assertTrue($result);
+        $this->assertTrue($result->isValid());
     }
 
     /**
@@ -376,7 +376,7 @@ class WaiversValidatorTest extends TestCase
         );
 
         // Vet min signings allowed when over cap if under 12 players
-        $this->assertTrue($result);
+        $this->assertTrue($result->isValid());
     }
 
     /**
@@ -391,7 +391,7 @@ class WaiversValidatorTest extends TestCase
             103    // exactly vet min
         );
 
-        $this->assertTrue($result);
+        $this->assertTrue($result->isValid());
     }
 
     /**
@@ -406,7 +406,7 @@ class WaiversValidatorTest extends TestCase
             104    // one over vet min
         );
 
-        $this->assertFalse($result);
+        $this->assertFalse($result->isValid());
     }
 
     /**
@@ -421,7 +421,7 @@ class WaiversValidatorTest extends TestCase
             0      // zero player salary
         );
 
-        $this->assertTrue($result);
+        $this->assertTrue($result->isValid());
     }
 
     // ============================================
@@ -440,7 +440,7 @@ class WaiversValidatorTest extends TestCase
         );
 
         // 2 slots is NOT more than 2, so this passes
-        $this->assertTrue($result);
+        $this->assertTrue($result->isValid());
     }
 
     /**
@@ -454,8 +454,8 @@ class WaiversValidatorTest extends TestCase
             7500   // over hard cap
         );
 
-        $this->assertFalse($result);
-        $errors = $this->validator->getErrors();
+        $this->assertFalse($result->isValid());
+        $errors = $result->getErrors();
         $this->assertStringContainsString('12 players', $errors[0]);
     }
 
@@ -471,7 +471,7 @@ class WaiversValidatorTest extends TestCase
         );
 
         // Not OVER cap, so this passes
-        $this->assertTrue($result);
+        $this->assertTrue($result->isValid());
     }
 
     /**
@@ -485,7 +485,7 @@ class WaiversValidatorTest extends TestCase
             $hardCap + 1  // one over hard cap
         );
 
-        $this->assertFalse($result);
+        $this->assertFalse($result->isValid());
     }
 
     /**
@@ -499,7 +499,7 @@ class WaiversValidatorTest extends TestCase
         );
 
         // 0 is not more than 2, so this passes
-        $this->assertTrue($result);
+        $this->assertTrue($result->isValid());
     }
 
     /**
@@ -513,7 +513,7 @@ class WaiversValidatorTest extends TestCase
         );
 
         // -1 is not more than 2, so this passes
-        $this->assertTrue($result);
+        $this->assertTrue($result->isValid());
     }
 
     // ============================================
@@ -521,53 +521,44 @@ class WaiversValidatorTest extends TestCase
     // ============================================
 
     /**
-     * Test that errors are cleared between validations
+     * Test that each call returns an independent result with no shared state
      */
     public function testErrorsClearedBetweenValidations(): void
     {
         // First validation fails
-        $this->validator->validateAdd(null, 5, 6000, 100);
-        $errorsAfterFailedAdd = $this->validator->getErrors();
-        $this->assertNotEmpty($errorsAfterFailedAdd);
+        $failedResult = $this->validator->validateAdd(null, 5, 6000, 100);
+        $this->assertNotEmpty($failedResult->getErrors());
 
-        // Second validation succeeds - errors should be cleared
-        $this->validator->validateAdd(123, 5, 6000, 100);
-        $errorsAfterCleanAdd = $this->validator->getErrors();
-        $this->assertEmpty($errorsAfterCleanAdd);
+        // Second validation succeeds — completely independent result
+        $successResult = $this->validator->validateAdd(123, 5, 6000, 100);
+        $this->assertEmpty($successResult->getErrors());
     }
 
     /**
-     * Test that validateDrop clears errors from previous validateAdd
+     * Test that drop validation result is independent from a prior add validation
      */
     public function testValidateDropClearsAddErrors(): void
     {
         // Add validation fails
-        $this->validator->validateAdd(null, 5, 6000, 100);
-        $errorsAfterFailedAdd = $this->validator->getErrors();
-        $this->assertNotEmpty($errorsAfterFailedAdd);
+        $addResult = $this->validator->validateAdd(null, 5, 6000, 100);
+        $this->assertNotEmpty($addResult->getErrors());
 
-        // Drop validation succeeds - should clear errors
-        $this->validator->validateDrop(2, 6000);
-        $errorsAfterCleanDrop = $this->validator->getErrors();
-        $this->assertEmpty($errorsAfterCleanDrop);
+        // Drop validation succeeds — independent result, no cross-contamination
+        $dropResult = $this->validator->validateDrop(2, 6000);
+        $this->assertEmpty($dropResult->getErrors());
     }
 
     /**
-     * Test multiple consecutive failures accumulate correctly
+     * Test multiple consecutive failures each capture their own error
      */
     public function testMultipleValidationsOnlyCaptureLatestErrors(): void
     {
-        // First failure
-        $this->validator->validateAdd(null, 5, 6000, 100);
-        $errors1 = $this->validator->getErrors();
+        $result1 = $this->validator->validateAdd(null, 5, 6000, 100);
+        $result2 = $this->validator->validateAdd(123, 0, 6000, 100);
 
-        // Second failure with different error
-        $this->validator->validateAdd(123, 0, 6000, 100);
-        $errors2 = $this->validator->getErrors();
-
-        // Should only have the second error
-        $this->assertCount(1, $errors2);
-        $this->assertStringContainsString('full roster', $errors2[0]);
+        // Each result is independent — only the second failure's error
+        $this->assertCount(1, $result2->getErrors());
+        $this->assertStringContainsString('full roster', $result2->getErrors()[0]);
     }
 
     // ============================================
@@ -589,7 +580,7 @@ class WaiversValidatorTest extends TestCase
             $playerSalary
         );
 
-        $this->assertSame($expectedResult, $result);
+        $this->assertSame($expectedResult, $result->isValid());
     }
 
     public static function rosterSlotBoundaryProvider(): array
@@ -623,7 +614,7 @@ class WaiversValidatorTest extends TestCase
             $playerSalary
         );
 
-        $this->assertSame($expectedResult, $result);
+        $this->assertSame($expectedResult, $result->isValid());
     }
 
     public static function salaryBoundaryProvider(): array
@@ -644,6 +635,6 @@ class WaiversValidatorTest extends TestCase
     {
         $vetMin = \ContractRules::getVeteranMinimumSalary(10);
         $result = $this->validator->validateAdd(100, 5, League::HARD_CAP_MAX + 1, $vetMin);
-        $this->assertTrue($result);
+        $this->assertTrue($result->isValid());
     }
 }

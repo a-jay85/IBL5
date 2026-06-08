@@ -1,6 +1,6 @@
 # Draft Module Architecture
 
-**Last Updated:** December 3, 2025  
+**Last Updated:** June 8, 2026  
 **Test Coverage:** 35 tests, 92 assertions  
 **Architecture Pattern:** Interface-Driven Architecture with Repository/Service/View/Controller classes
 
@@ -68,15 +68,13 @@ getCurrentDraftPick(): ?array
 
 **Public Methods:**
 ```php
-validateDraftSelection(?string $playerName, ?string $currentDraftSelection, bool $isPlayerAlreadyDrafted = false): bool
-getErrors(): array
-clearErrors(): void
+validateDraftSelection(?string $playerName, ?string $currentDraftSelection, bool $isPlayerAlreadyDrafted = false): ValidationResult
 ```
 
 **Key Implementation Details:**
 - Three-step validation: player selected → pick available → player not drafted
-- Stores user-facing error messages for display
-- Clears errors automatically before each validation
+- Returns immutable `ValidationResult` — `isValid()` for success, `getErrors()` for failure messages
+- No mutable state; each call is independent
 
 ---
 

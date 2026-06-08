@@ -40,6 +40,24 @@ type GameReport struct {
 	// Engine-only (see OriginFGA); additive, not printed by WriteReport, not part
 	// of Pass — feeds the season-aggregate by-origin variance decomposition.
 	EngineOriginFGA map[int]OriginFGA
+	// EnginePossPerG / ScoPossPerG map each team ID to its mean possessions/game for
+	// the ADR-0049 possession-count decomposition — the SAME Dean-Oliver box proxy
+	// FGA + 0.44·FTA + TOV − ORB on BOTH sides (ORB IS present on the raw box; only
+	// the compared StatRow set collapses to total REB). Using one definition on both
+	// sides keeps the cross-side Cov split apples-to-apples: an FGA-derived proxy
+	// correlates with FGA by construction, so mixing a true count against it on the
+	// other side would bias which factor (count vs shots-per-possession) absorbs the
+	// coupling. Matches calibrate/possession_archive_test.go's convention.
+	EnginePossPerG map[int]float64
+	ScoPossPerG    map[int]float64
+	// EnginePossCountPerG is the engine's AUTHORITATIVE possession count (mean
+	// EventPossessionStart/game; one per offensive trip — an offensive rebound
+	// continues the SAME trip, so it is true possessions). Engine-only DIAGNOSTIC: it
+	// validates the box proxy (count ≈ proxy at the level) and the count-vs-proxy gap
+	// exposes the shots-per-possession spread the proxy folds away. It is NOT used in
+	// the cross-side Cov split (that would re-introduce the count-vs-proxy bias).
+	// Read-only — counting an event Simulate already emits changes no engine behavior.
+	EnginePossCountPerG map[int]float64
 	// EngineHomeWinFraction is the fraction of seeded runs in which the home team
 	// outscored the visitor (a tied run counts 0.5). It is a runs-stable estimate
 	// of P(home win) — unlike a single mean-margin sign, which rounds every game

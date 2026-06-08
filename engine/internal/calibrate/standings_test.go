@@ -709,3 +709,97 @@ func TestFtaFor_AndBothSidesGuard(t *testing.T) {
 		}
 	})
 }
+
+// ADR-0049 Phase 3d: CollectSeasonAggregates reads the per-team possession maps the
+// harness pre-computes (EnginePossPerG / ScoPossPerG = the symmetric Dean-Oliver
+// proxy split inputs; EnginePossCountPerG = the authoritative-count diagnostic) and
+// divides by possGP — accumulating only when BOTH teams carry BOTH proxy maps'
+// entries (the both-sides guard).
+func TestCollectSeasonAggregates_PossFromMaps(t *testing.T) {
+	t.Run("reads proxy + count maps, divides by possGP", func(t *testing.T) {
+		g := wfGame(1, 2, 1.0, 110, 108, 100, 99)
+		g.EnginePossPerG = map[int]float64{1: 99.5, 2: 97.0}
+		g.ScoPossPerG = map[int]float64{1: 101.0, 2: 98.5}
+		g.EnginePossCountPerG = map[int]float64{1: 100.2, 2: 96.4}
+		got := CollectSeasonAggregates([]validate.Report{aggReport("s1", bundle.GameTypeRegular, g)})
+		t1 := standingFor(t, got.Seasons[0], 1)
+		if t1.EnginePossPerG != 99.5 {
+			t.Errorf("EnginePossPerG = %v, want 99.5 (engine box proxy, split input)", t1.EnginePossPerG)
+		}
+		if t1.ScoPossPerG != 101.0 {
+			t.Errorf("ScoPossPerG = %v, want 101.0 (.sco box proxy, split input)", t1.ScoPossPerG)
+		}
+		if t1.EnginePossCountPerG != 100.2 {
+			t.Errorf("EnginePossCountPerG = %v, want 100.2 (authoritative count diagnostic)", t1.EnginePossCountPerG)
+		}
+	})
+
+	t.Run("both-sides guard: one side's map missing a team → possGP 0 → POSS fields 0", func(t *testing.T) {
+		g := wfGame(1, 2, 1.0, 110, 108, 100, 99)
+		g.EnginePossPerG = map[int]float64{1: 99.5, 2: 97.0}
+		// ScoPossPerG missing team 2 → not both-sides → no POSS accrues for either team.
+		g.ScoPossPerG = map[int]float64{1: 101.0}
+		got := CollectSeasonAggregates([]validate.Report{aggReport("s1", bundle.GameTypeRegular, g)})
+		t1 := standingFor(t, got.Seasons[0], 1)
+		if t1.ScoPossPerG != 0 || t1.EnginePossPerG != 0 {
+			t.Errorf("POSS fields = sco %v / eng %v, want 0 (sco map missing a team → possGP 0)", t1.ScoPossPerG, t1.EnginePossPerG)
+		}
+	})
+}
+
+// ADR-0049 Phase 3d: decomposePossCoupling splits Cov(lnFGA,lnPPS) into a
+// possession-count term and a shots-per-possession term whose SUM closes to the
+// headline covariance, and is degenerate-safe (single team / poss<=0 / empty → 0,
+// never NaN/Inf).
+func TestDecomposePossCoupling_IdentityAndDegenerate(t *testing.T) {
+	t.Run("split sums to Cov(lnFGA,lnPPS), real and engine", func(t *testing.T) {
+		fs := collectFidelitySummaries([]SeasonAggregate{regSeason(
+			TeamStanding{TeamID: 1, EngineFGAPerG: 80, EnginePointsForPG: 100, EnginePossPerG: 95, ScoFGAPerG: 80, ScoPointsForPG: 80, ScoPossPerG: 100},
+			TeamStanding{TeamID: 2, EngineFGAPerG: 90, EnginePointsForPG: 95, EnginePossPerG: 99, ScoFGAPerG: 90, ScoPointsForPG: 99, ScoPossPerG: 104},
+			TeamStanding{TeamID: 3, EngineFGAPerG: 100, EnginePointsForPG: 90, EnginePossPerG: 103, ScoFGAPerG: 100, ScoPointsForPG: 120, ScoPossPerG: 108},
+		)})[0]
+		if d := math.Abs(fs.EngineCovLnPossLnPPS + fs.EngineCovLnShotsPerPossLnPPS - fs.EngineCovLnFGALnPPS); d > 1e-9 {
+			t.Errorf("engine split does not close: %v + %v != %v (Δ %v)", fs.EngineCovLnPossLnPPS, fs.EngineCovLnShotsPerPossLnPPS, fs.EngineCovLnFGALnPPS, d)
+		}
+		if d := math.Abs(fs.RealCovLnPossLnPPS + fs.RealCovLnShotsPerPossLnPPS - fs.RealCovLnFGALnPPS); d > 1e-9 {
+			t.Errorf("real split does not close: %v + %v != %v (Δ %v)", fs.RealCovLnPossLnPPS, fs.RealCovLnShotsPerPossLnPPS, fs.RealCovLnFGALnPPS, d)
+		}
+		if fs.EngineVarLnPoss < 0 || fs.RealVarLnPoss < 0 {
+			t.Errorf("Var(lnPoss) must be non-negative: eng %v real %v", fs.EngineVarLnPoss, fs.RealVarLnPoss)
+		}
+	})
+
+	t.Run("single team → 0 and finite", func(t *testing.T) {
+		fs := collectFidelitySummaries([]SeasonAggregate{regSeason(
+			TeamStanding{TeamID: 1, EngineFGAPerG: 90, EnginePointsForPG: 100, EnginePossPerG: 99, ScoFGAPerG: 90, ScoPointsForPG: 100, ScoPossPerG: 100},
+		)})[0]
+		for name, v := range map[string]float64{
+			"engine_var_ln_poss": fs.EngineVarLnPoss, "engine_cov_poss": fs.EngineCovLnPossLnPPS,
+			"engine_cov_spp": fs.EngineCovLnShotsPerPossLnPPS, "poss_dispersion_ratio": fs.PossDispersionRatio,
+		} {
+			if math.IsNaN(v) || math.IsInf(v, 0) || v != 0 {
+				t.Errorf("single-team %s = %v, want 0 (residuals all 0)", name, v)
+			}
+		}
+	})
+
+	t.Run("poss<=0 row dropped, no NaN", func(t *testing.T) {
+		varPoss, covPoss, covSpp := decomposePossCoupling([]possRow{
+			{season: "A", pf: 100, fga: 90, poss: 0}, // dropped: poss<=0
+			{season: "A", pf: 100, fga: 88, poss: 95},
+			{season: "A", pf: 110, fga: 92, poss: 99},
+		})
+		for _, v := range []float64{varPoss, covPoss, covSpp} {
+			if math.IsNaN(v) || math.IsInf(v, 0) {
+				t.Fatalf("poss<=0 row produced non-finite: var %v covPoss %v covSpp %v", varPoss, covPoss, covSpp)
+			}
+		}
+	})
+
+	t.Run("empty input → 0", func(t *testing.T) {
+		varPoss, covPoss, covSpp := decomposePossCoupling(nil)
+		if varPoss != 0 || covPoss != 0 || covSpp != 0 {
+			t.Errorf("empty input = %v / %v / %v, want all 0", varPoss, covPoss, covSpp)
+		}
+	})
+}

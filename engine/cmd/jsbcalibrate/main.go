@@ -111,9 +111,10 @@ func runWith(args []string, stdout, stderr io.Writer, c collectors) int {
 	}
 
 	if *mode == "measure" {
-		// Terse verdict: the log-variance channel readout (Cov sign + Var ratios) in
-		// ~6 lines per game type, so each measurement iteration is a short read rather
-		// than a full JSON blob. The sign-first verdict is the Phase-7 fail-fast gate.
+		// Terse verdict: the log-variance channel readout (Cov sign + Var ratios +
+		// the ADR-0049 possession-count split) in ~9 lines per game type, so each
+		// measurement iteration is a short read rather than a full JSON blob. The
+		// sign-first verdict is the Phase-7 fail-fast gate.
 		agg := calibrate.CollectSeasonAggregates(reports)
 		if len(agg.Fidelity) == 0 {
 			_, _ = fmt.Fprintln(stderr, "jsbcalibrate: measure mode produced no fidelity summary (no contributing team rows)")
@@ -149,8 +150,11 @@ func ratio(a, b float64) float64 {
 
 // writeMeasureVerdict prints the terse log-variance verdict for each game type's
 // FidelitySummary and returns the overall PASS: the engine Cov(lnFGA,lnPPS) must
-// carry the SAME sign as real (the ADR-0042 wrong-sign is the thing Branch-B must
-// flip). Six lines per game type — header, Cov, three Var ratios, verdict.
+// carry the SAME sign as real (the ADR-0042 wrong-sign is the thing the build PR
+// must flip). Per game type — header, Cov, three Var ratios, the ADR-0049
+// possession-count Cov-split (two lines) and Var(lnPOSS) line, then the verdict.
+// The POSS lines are DIAGNOSTIC ONLY: PASS keys solely on the Cov(lnFGA,lnPPS)
+// sign, unchanged by this extension.
 func writeMeasureVerdict(w io.Writer, fid []calibrate.FidelitySummary) bool {
 	pass := true
 	for _, f := range fid {
@@ -171,6 +175,20 @@ func writeMeasureVerdict(w io.Writer, fid []calibrate.FidelitySummary) bool {
 			f.EngineVarLnPPS, f.RealVarLnPPS, ratio(f.EngineVarLnPPS, f.RealVarLnPPS))
 		_, _ = fmt.Fprintf(w, "  Var(lnPF):  engine=%.6f real=%.6f ratio=%.2f\n",
 			f.EngineVarLnPF, f.RealVarLnPF, ratio(f.EngineVarLnPF, f.RealVarLnPF))
+		// POSS diagnostic (ADR-0049): the possession-count split of Cov(lnFGA,lnPPS)
+		// into a possession-count term and a shots-per-possession term, localizing
+		// which factor carries the wrong sign. Report-only — NOT part of the PASS
+		// criterion (signMatch above stays keyed on Cov(lnFGA,lnPPS)), mirroring how
+		// the by-origin decomposition is reported, never gated. The split-sum check
+		// confirms the two terms close to the headline Cov.
+		engSplit := f.EngineCovLnPossLnPPS + f.EngineCovLnShotsPerPossLnPPS
+		realSplit := f.RealCovLnPossLnPPS + f.RealCovLnShotsPerPossLnPPS
+		_, _ = fmt.Fprintf(w, "  Cov-split engine: poss=%+.6f shotsPerPoss=%+.6f sum=%+.6f (Cov=%+.6f)\n",
+			f.EngineCovLnPossLnPPS, f.EngineCovLnShotsPerPossLnPPS, engSplit, f.EngineCovLnFGALnPPS)
+		_, _ = fmt.Fprintf(w, "  Cov-split real:   poss=%+.6f shotsPerPoss=%+.6f sum=%+.6f (Cov=%+.6f)\n",
+			f.RealCovLnPossLnPPS, f.RealCovLnShotsPerPossLnPPS, realSplit, f.RealCovLnFGALnPPS)
+		_, _ = fmt.Fprintf(w, "  Var(lnPOSS): engine=%.6f real=%.6f ratio=%.2f poss_dispersion=%.2f\n",
+			f.EngineVarLnPoss, f.RealVarLnPoss, ratio(f.EngineVarLnPoss, f.RealVarLnPoss), f.PossDispersionRatio)
 		_, _ = fmt.Fprintf(w, "  verdict=%s\n", verdict)
 	}
 	return pass

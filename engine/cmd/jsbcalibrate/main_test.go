@@ -319,14 +319,46 @@ func TestRun_MeasureEmitsTerseVerdict(t *testing.T) {
 	if json.Valid(out.Bytes()) {
 		t.Errorf("measure stdout should be terse text, not JSON:\n%s", s)
 	}
-	for _, want := range []string{"Cov(lnFGA,lnPPS):", "Var(lnFGA):", "Var(lnPPS):", "Var(lnPF):", "verdict=", "game_type=2"} {
+	for _, want := range []string{
+		"Cov(lnFGA,lnPPS):", "Var(lnFGA):", "Var(lnPPS):", "Var(lnPF):",
+		"Cov-split engine:", "Cov-split real:", "Var(lnPOSS):", "verdict=", "game_type=2",
+	} {
 		if !strings.Contains(s, want) {
 			t.Errorf("terse output missing %q:\n%s", want, s)
 		}
 	}
-	// One game type → six lines (header + Cov + 3 Var + verdict).
-	if n := strings.Count(strings.TrimSpace(s), "\n") + 1; n != 6 {
-		t.Errorf("expected 6 terse lines for one game type, got %d:\n%s", n, s)
+	// One game type → nine lines (header + Cov + 3 Var + 2 Cov-split + Var(lnPOSS) +
+	// verdict; the ADR-0049 POSS lines added three diagnostic rows).
+	if n := strings.Count(strings.TrimSpace(s), "\n") + 1; n != 9 {
+		t.Errorf("expected 9 terse lines for one game type, got %d:\n%s", n, s)
+	}
+}
+
+// Row #15 (ADR-0049, negative-path): the POSS Cov-split lines are DIAGNOSTIC —
+// writeMeasureVerdict's PASS verdict keys solely on the Cov(lnFGA,lnPPS) sign and
+// is invariant to the possession-count fields. Two summaries identical except for
+// wildly different POSS values must return the same PASS and the same verdict text.
+func TestWriteMeasureVerdict_PossLinesDoNotChangeVerdict(t *testing.T) {
+	base := calibrate.FidelitySummary{
+		GameType: 2, N: 10,
+		EngineCovLnFGALnPPS: -0.0012, RealCovLnFGALnPPS: 0.0003, // sign mismatch → FAIL
+	}
+	withPoss := base
+	withPoss.EngineCovLnPossLnPPS, withPoss.EngineCovLnShotsPerPossLnPPS = -0.5, +0.4988
+	withPoss.RealCovLnPossLnPPS, withPoss.RealCovLnShotsPerPossLnPPS = +0.9, -0.8997
+	withPoss.EngineVarLnPoss, withPoss.RealVarLnPoss, withPoss.PossDispersionRatio = 7, 2, 3.5
+
+	var a, b bytes.Buffer
+	passA := writeMeasureVerdict(&a, []calibrate.FidelitySummary{base})
+	passB := writeMeasureVerdict(&b, []calibrate.FidelitySummary{withPoss})
+	if passA != passB {
+		t.Errorf("PASS changed by POSS fields: base=%v withPoss=%v", passA, passB)
+	}
+	if passA { // Cov signs differ → must be FAIL regardless of POSS
+		t.Errorf("expected FAIL on mismatched Cov sign, got PASS")
+	}
+	if !strings.Contains(a.String(), "verdict=FAIL") || !strings.Contains(b.String(), "verdict=FAIL") {
+		t.Errorf("verdict text changed by POSS fields:\nbase:\n%s\nwithPoss:\n%s", a.String(), b.String())
 	}
 }
 

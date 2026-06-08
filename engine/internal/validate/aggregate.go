@@ -54,11 +54,14 @@ type TeamStat struct {
 	TGM    int // three-point makes
 	TGA    int // three-point attempts
 	REB    int // total rebounds = ORB + DRB
-	AST    int
-	STL    int
-	TOV    int
-	BLK    int
-	PF     int
+	ORB    int // offensive rebounds only — NOT in statNames (never compared/banded);
+	// carried for the ADR-0049 true-possession proxy FGA+0.44·FTA+TOV−ORB, which the
+	// collapsed REB total cannot supply. Read directly off the raw box on both sides.
+	AST int
+	STL int
+	TOV int
+	BLK int
+	PF  int
 }
 
 // value returns the named stat. The name must be one of statNames; an unknown
@@ -113,6 +116,7 @@ func teamStatFromBox(tb result.TeamBox) TeamStat {
 		TGM:    tb.Game3GM,
 		TGA:    tb.Game3GA,
 		REB:    tb.GameORB + tb.GameDRB,
+		ORB:    tb.GameORB,
 		AST:    tb.GameAST,
 		STL:    tb.GameSTL,
 		TOV:    tb.GameTOV,
@@ -145,6 +149,7 @@ func teamStatFromSco(sg backup.ScoGame, teamID int) TeamStat {
 		ts.TGM += b.ThreeGM
 		ts.TGA += b.ThreeGA
 		ts.REB += b.ORB + b.DRB
+		ts.ORB += b.ORB
 		ts.AST += b.AST
 		ts.STL += b.STL
 		ts.TOV += b.TOV

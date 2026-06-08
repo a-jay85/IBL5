@@ -376,12 +376,21 @@ func matchSchedule(sched []backup.SchGame, consumed []bool, sg backup.ScoGame) i
 // validateGame simulates one matchup `runs` times and compares the aggregated
 // per-team engine means against the .sco ground truth, using gameType's bands.
 func validateGame(b bundle.Bundle, g bundle.Game, sg backup.ScoGame, runs int, baseSeed uint64, gameType bundle.GameType, branchB bool, accum *sim.BranchBAccum) GameReport {
-	visMean, homeMean, homeWinFrac, originFGA := simulateGameMeans(b, g, runs, baseSeed, branchB, accum)
+	visMean, homeMean, homeWinFrac, originFGA, possProxyPerG, possCountPerG := simulateGameMeans(b, g, runs, baseSeed, branchB, accum)
 	visSco := teamStatFromSco(sg, g.VisitorTeamID)
 	homeSco := teamStatFromSco(sg, g.HomeTeamID)
 	gr := compareGame(gameType, g.VisitorTeamID, g.HomeTeamID, sg.Date, visSco, homeSco, visMean, homeMean)
 	gr.EngineHomeWinFraction = homeWinFrac
 	gr.EngineOriginFGA = originFGA
+	// Split inputs: the SAME Dean-Oliver box proxy on both sides (apples-to-apples —
+	// mixing a true count against an FGA-derived proxy biases which factor absorbs the
+	// coupling). The authoritative count rides alongside as an engine-only diagnostic.
+	gr.EnginePossPerG = possProxyPerG
+	gr.EnginePossCountPerG = possCountPerG
+	gr.ScoPossPerG = map[int]float64{
+		g.VisitorTeamID: possProxy(visSco),
+		g.HomeTeamID:    possProxy(homeSco),
+	}
 	return gr
 }
 
@@ -391,7 +400,7 @@ func validateGame(b bundle.Bundle, g bundle.Game, sg backup.ScoGame, runs int, b
 // runs-stable P(home win) estimate the season-aggregate layer needs). Each run
 // is an independent single-game sub-bundle so one game's distribution is
 // isolated from the rest of the schedule.
-func simulateGameMeans(b bundle.Bundle, g bundle.Game, runs int, baseSeed uint64, branchB bool, accum *sim.BranchBAccum) (visMean, homeMean map[string]float64, homeWinFrac float64, originFGA map[int]OriginFGA) {
+func simulateGameMeans(b bundle.Bundle, g bundle.Game, runs int, baseSeed uint64, branchB bool, accum *sim.BranchBAccum) (visMean, homeMean map[string]float64, homeWinFrac float64, originFGA map[int]OriginFGA, possProxyPerG, possCountPerG map[int]float64) {
 	sub := bundle.Bundle{
 		LeagueID: b.LeagueID,
 		Teams:    b.Teams,
@@ -409,12 +418,16 @@ func simulateGameMeans(b bundle.Bundle, g bundle.Game, runs int, baseSeed uint64
 	visSamples := make([]TeamStat, 0, runs)
 	homeSamples := make([]TeamStat, 0, runs)
 	originTotals := map[int]*OriginFGA{} // Σ by-origin FGA across runs, per team
+	possCountTotals := map[int]int{}     // Σ EventPossessionStart across runs, per team
+	possProxyTotals := map[int]float64{} // Σ box-proxy possessions across runs, per team
 	for run := 0; run < runs; run++ {
 		res, _ := sim.SimulateWith(sub, baseSeed+uint64(run), opts)
 		gr := res.Games[0]
 		accumulateOriginFGA(originTotals, gr.Events)
+		accumulatePossessions(possCountTotals, gr.Events)
 		for _, tb := range gr.TeamBoxes {
 			ts := teamStatFromBox(tb)
+			possProxyTotals[tb.TeamID] += possProxy(ts) // same Dean-Oliver proxy as the .sco side
 			switch tb.TeamID {
 			case g.VisitorTeamID:
 				visSamples = append(visSamples, ts)
@@ -428,7 +441,15 @@ func simulateGameMeans(b bundle.Bundle, g bundle.Game, runs int, baseSeed uint64
 	for id, o := range originTotals {
 		originFGA[id] = OriginFGA{Initial: o.Initial / rf, Oreb: o.Oreb / rf, Transition: o.Transition / rf}
 	}
-	return mean(visSamples), mean(homeSamples), homeWinFraction(homeSamples, visSamples), originFGA
+	possProxyPerG = make(map[int]float64, len(possProxyTotals))
+	for id, s := range possProxyTotals {
+		possProxyPerG[id] = s / rf
+	}
+	possCountPerG = make(map[int]float64, len(possCountTotals))
+	for id, n := range possCountTotals {
+		possCountPerG[id] = float64(n) / rf
+	}
+	return mean(visSamples), mean(homeSamples), homeWinFraction(homeSamples, visSamples), originFGA, possProxyPerG, possCountPerG
 }
 
 // accumulateOriginFGA folds one game's shot-attempt events into per-team by-origin
@@ -451,6 +472,36 @@ func accumulateOriginFGA(into map[int]*OriginFGA, events []result.Event) {
 			o.Oreb++
 		case result.OriginTransition:
 			o.Transition++
+		}
+	}
+}
+
+// possProxy is the Dean-Oliver true-possession estimate for one team's box (engine
+// OR .sco): FGA + 0.44·FTA + TOV − ORB. The −ORB term is essential, not cosmetic: an
+// offensive rebound EXTENDS a possession (an extra shot in the same trip), so it
+// belongs in the shots-per-possession factor, not the possession count; without it
+// ORB-continuations would be misattributed into the count channel (ADR-0049). The
+// SAME formula runs on both sides so the cross-side Cov split is apples-to-apples
+// (the engine's authoritative EventPossessionStart count is kept as a separate
+// diagnostic — mixing it into one side of the split would bias the allocation,
+// since the FGA-derived proxy correlates with FGA by construction). Matches
+// calibrate/possession_archive_test.go's convention exactly.
+func possProxy(ts TeamStat) float64 {
+	return float64(ts.FGA) + 0.44*float64(ts.FTA) + float64(ts.TOV) - float64(ts.ORB)
+}
+
+// accumulatePossessions folds one game's events into a per-team possession count,
+// tallying exactly the EventPossessionStart events (one per offensive trip; see
+// sim/possession.go). It is the read-only possession-count instrument for the
+// season-aggregate POSS decomposition (ADR-0049): it observes the event stream
+// Simulate already produces, so no engine behavior changes and the golden fixture
+// stays byte-identical. Events of any other kind are ignored — only possession
+// starts contribute, so a slice with no EventPossessionStart leaves `into`
+// untouched (no spurious team keys).
+func accumulatePossessions(into map[int]int, events []result.Event) {
+	for _, e := range events {
+		if e.Kind == result.EventPossessionStart {
+			into[e.TeamID]++
 		}
 	}
 }

@@ -1,0 +1,35 @@
+name: Orphan CSS Check
+
+on:
+  pull_request:
+    branches: [ master ]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  orphan-css:
+    name: Check orphan CSS classes
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Run bin/check-orphan-css
+        run: bin/check-orphan-css | tee orphan-css.txt
+        continue-on-error: true
+
+      - name: Post orphan-css comment
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v3
+        with:
+          header: orphan-css
+          path: orphan-css.txt

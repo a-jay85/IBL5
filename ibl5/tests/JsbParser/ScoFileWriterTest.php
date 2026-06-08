@@ -34,15 +34,6 @@ class ScoFileWriterTest extends TestCase
         return str_repeat(' ', 4000) . str_repeat('x', ScoFileWriter::SCO_FILE_SIZE - 4000);
     }
 
-    /** Minimal valid 4000-byte block (all spaces except one non-space in game-info). */
-    private function minimalBlock(): string
-    {
-        $record = str_repeat(' ', ScoFileParser::RECORD_SIZE);
-        // Make game-info non-blank with a single digit so trim() !== '' passes
-        $record = substr_replace($record, '1', 0, 1);
-        return $record . str_repeat(' ', ScoFileParser::RECORD_SIZE);
-    }
-
     // ── V3: Game-info round-trip ──────────────────────────────────────────────
 
     public function testGameInfoRoundTrip(): void
@@ -61,22 +52,22 @@ class ScoFileWriterTest extends TestCase
         $boxscore = Boxscore::withGameInfoLine(ScoFileParser::extractGameInfo($record), 2007, 'Regular Season/Playoffs');
 
         // Quarter scores and attendance/capacity are read verbatim — assert as ints (V3)
-        self::assertEquals(34, (int) $boxscore->visitor_q1_points);
-        self::assertEquals(39, (int) $boxscore->visitor_q2_points);
-        self::assertEquals(30, (int) $boxscore->visitor_q3_points);
-        self::assertEquals(31, (int) $boxscore->visitor_q4_points);
-        self::assertEquals(0,  (int) $boxscore->visitor_ot_points);
-        self::assertEquals(34, (int) $boxscore->home_q1_points);
-        self::assertEquals(31, (int) $boxscore->home_q2_points);
-        self::assertEquals(39, (int) $boxscore->home_q3_points);
-        self::assertEquals(41, (int) $boxscore->home_q4_points);
-        self::assertEquals(0,  (int) $boxscore->home_ot_points);
-        self::assertEquals(5244,  (int) $boxscore->attendance);
-        self::assertEquals(20000, (int) $boxscore->capacity);
-        self::assertEquals(0, (int) $boxscore->visitor_wins);
-        self::assertEquals(0, (int) $boxscore->visitor_losses);
-        self::assertEquals(0, (int) $boxscore->home_wins);
-        self::assertEquals(0, (int) $boxscore->home_losses);
+        self::assertSame(34, (int) $boxscore->visitor_q1_points);
+        self::assertSame(39, (int) $boxscore->visitor_q2_points);
+        self::assertSame(30, (int) $boxscore->visitor_q3_points);
+        self::assertSame(31, (int) $boxscore->visitor_q4_points);
+        self::assertSame(0,  (int) $boxscore->visitor_ot_points);
+        self::assertSame(34, (int) $boxscore->home_q1_points);
+        self::assertSame(31, (int) $boxscore->home_q2_points);
+        self::assertSame(39, (int) $boxscore->home_q3_points);
+        self::assertSame(41, (int) $boxscore->home_q4_points);
+        self::assertSame(0,  (int) $boxscore->home_ot_points);
+        self::assertSame(5244,  (int) $boxscore->attendance);
+        self::assertSame(20000, (int) $boxscore->capacity);
+        self::assertSame(0, (int) $boxscore->visitor_wins);
+        self::assertSame(0, (int) $boxscore->visitor_losses);
+        self::assertSame(0, (int) $boxscore->home_wins);
+        self::assertSame(0, (int) $boxscore->home_losses);
     }
 
     // ── V4: Player slot round-trip ────────────────────────────────────────────
@@ -108,21 +99,21 @@ class ScoFileWriterTest extends TestCase
         // V4: every stat parses back equal (int-cast to handle space-padded strings)
         self::assertSame('Test Player', trim($stats->name));
         self::assertSame('PG', trim($stats->position));
-        self::assertEquals(5936, (int) $stats->playerID);
-        self::assertEquals(32, (int) $stats->gameMinutesPlayed);
-        self::assertEquals(7,  (int) $stats->gameFieldGoalsMade);
-        self::assertEquals(15, (int) $stats->gameFieldGoalsAttempted);
-        self::assertEquals(5,  (int) $stats->gameFreeThrowsMade);
-        self::assertEquals(5,  (int) $stats->gameFreeThrowsAttempted);
-        self::assertEquals(0,  (int) $stats->gameThreePointersMade);
-        self::assertEquals(3,  (int) $stats->gameThreePointersAttempted);
-        self::assertEquals(3,  (int) $stats->gameOffensiveRebounds);
-        self::assertEquals(1,  (int) $stats->gameDefensiveRebounds);
-        self::assertEquals(7,  (int) $stats->gameAssists);
-        self::assertEquals(0,  (int) $stats->gameSteals);
-        self::assertEquals(3,  (int) $stats->gameTurnovers);
-        self::assertEquals(0,  (int) $stats->gameBlocks);
-        self::assertEquals(3,  (int) $stats->gamePersonalFouls);
+        self::assertSame(5936, (int) $stats->playerID);
+        self::assertSame(32, (int) $stats->gameMinutesPlayed);
+        self::assertSame(7,  (int) $stats->gameFieldGoalsMade);
+        self::assertSame(15, (int) $stats->gameFieldGoalsAttempted);
+        self::assertSame(5,  (int) $stats->gameFreeThrowsMade);
+        self::assertSame(5,  (int) $stats->gameFreeThrowsAttempted);
+        self::assertSame(0,  (int) $stats->gameThreePointersMade);
+        self::assertSame(3,  (int) $stats->gameThreePointersAttempted);
+        self::assertSame(3,  (int) $stats->gameOffensiveRebounds);
+        self::assertSame(1,  (int) $stats->gameDefensiveRebounds);
+        self::assertSame(7,  (int) $stats->gameAssists);
+        self::assertSame(0,  (int) $stats->gameSteals);
+        self::assertSame(3,  (int) $stats->gameTurnovers);
+        self::assertSame(0,  (int) $stats->gameBlocks);
+        self::assertSame(3,  (int) $stats->gamePersonalFouls);
     }
 
     // ── V5: Team-total slot has playerID 0 ───────────────────────────────────
@@ -132,7 +123,7 @@ class ScoFileWriterTest extends TestCase
         $slot = ScoFileWriter::buildTeamTotalSlot('Rookies', 47, 98, 16, 21, 8, 21, 25, 41, 30, 11, 22, 8, 19);
         $stats = PlayerStats::withBoxscoreInfoLine($this->mockDb(), $slot);
 
-        self::assertEquals(0, (int) $stats->playerID);
+        self::assertSame(0, (int) $stats->playerID);
         self::assertSame('Rookies', trim($stats->name));
     }
 

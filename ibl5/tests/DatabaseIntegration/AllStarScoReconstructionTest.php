@@ -174,7 +174,11 @@ class AllStarScoReconstructionTest extends DatabaseTestCase
         return (int) ($row['cnt'] ?? 0);
     }
 
-    /** Fetch a single team row by name (ibl_box_scores_teams has no teamid column). */
+    /**
+     * Fetch a single team row by name (ibl_box_scores_teams has no teamid column).
+     *
+     * @return array<string, mixed>
+     */
     private function fetchTeamRowByName(string $date, int $visitorTid, int $homeTid, string $name): array
     {
         $stmt = $this->db->prepare(
@@ -193,7 +197,11 @@ class AllStarScoReconstructionTest extends DatabaseTestCase
         return $row;
     }
 
-    /** Sum player stats for a given teamid in ibl_box_scores. */
+    /**
+     * Sum player stats for a given teamid in ibl_box_scores.
+     *
+     * @return array<string, mixed>
+     */
     private function fetchPlayerSumsForTeamId(string $date, int $visitorTid, int $homeTid, int $teamid): array
     {
         $stmt = $this->db->prepare(

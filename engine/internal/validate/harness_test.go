@@ -10,6 +10,7 @@ import (
 
 	"github.com/a-jay85/IBL5/engine/internal/backup"
 	"github.com/a-jay85/IBL5/engine/internal/bundle"
+	"github.com/a-jay85/IBL5/engine/internal/result"
 )
 
 const testRuns = 8 // small N keeps `go test ./...` fast (advisor guidance)
@@ -469,5 +470,65 @@ func TestValidateCorpus_MissingPlbReported(t *testing.T) {
 	WriteReport(&buf, rep)
 	if !strings.Contains(buf.String(), "MISSING_PLB stem=synth") {
 		t.Errorf("report should render a MISSING_PLB line:\n%s", buf.String())
+	}
+}
+
+// accumulatePossessions (ADR-0049) is the read-only possession-count instrument.
+// Happy path: it tallies exactly the EventPossessionStart events per team.
+func TestAccumulatePossessions(t *testing.T) {
+	events := []result.Event{
+		{Kind: result.EventPossessionStart, TeamID: 3},
+		{Kind: result.EventShotAttempt, TeamID: 3, Origin: result.OriginInitial},
+		{Kind: result.EventPossessionStart, TeamID: 7},
+		{Kind: result.EventPossessionStart, TeamID: 3},
+		{Kind: result.EventRebound, TeamID: 7, OffensiveRebound: true},
+		{Kind: result.EventPossessionStart, TeamID: 3},
+	}
+	got := map[int]int{}
+	accumulatePossessions(got, events)
+	if got[3] != 3 || got[7] != 1 {
+		t.Fatalf("possession counts = %v, want map[3:3 7:1]", got)
+	}
+	if len(got) != 2 {
+		t.Errorf("unexpected extra team keys: %v", got)
+	}
+}
+
+// possProxy (ADR-0049) is the Dean-Oliver true-possession estimate
+// FGA + 0.44·FTA + TOV − ORB, run identically on both the engine and .sco box. The
+// −ORB term is load-bearing: an offensive rebound extends a possession, so it must
+// NOT inflate the count.
+func TestPossProxy(t *testing.T) {
+	ts := TeamStat{FGA: 88, FTA: 25, TOV: 13, ORB: 11}
+	want := 88.0 + 0.44*25.0 + 13.0 - 11.0
+	if got := possProxy(ts); got != want {
+		t.Errorf("possProxy = %v, want %v (FGA+0.44·FTA+TOV−ORB)", got, want)
+	}
+	// ORB is subtracted, not ignored: a team with more ORB has FEWER true possessions
+	// for the same shooting line.
+	more := possProxy(TeamStat{FGA: 88, FTA: 25, TOV: 13, ORB: 20})
+	if more >= want {
+		t.Errorf("more ORB must lower the count: orb20=%v orb11=%v", more, want)
+	}
+}
+
+// Boundary: a slice with no possession-starts (only other event kinds) and an
+// empty slice both leave the counter untouched — only EventPossessionStart
+// contributes, never a spurious team key.
+func TestAccumulatePossessions_NoStarts(t *testing.T) {
+	noStarts := []result.Event{
+		{Kind: result.EventShotAttempt, TeamID: 3, Origin: result.OriginInitial},
+		{Kind: result.EventRebound, TeamID: 7, OffensiveRebound: true},
+		{Kind: result.EventFoul, TeamID: 3},
+		{Kind: result.EventTurnover, TeamID: 7},
+	}
+	got := map[int]int{}
+	accumulatePossessions(got, noStarts)
+	if len(got) != 0 {
+		t.Errorf("non-possession-start events must add no keys, got %v", got)
+	}
+	accumulatePossessions(got, nil)
+	if len(got) != 0 {
+		t.Errorf("empty event slice must add no keys, got %v", got)
 	}
 }

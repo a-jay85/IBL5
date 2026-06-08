@@ -50,6 +50,17 @@ type TeamStanding struct {
 	EngineFGAInitialPerG    float64 `json:"engine_fga_initial_per_g"`
 	EngineFGAOrebPerG       float64 `json:"engine_fga_oreb_per_g"`
 	EngineFGATransitionPerG float64 `json:"engine_fga_transition_per_g"`
+	// Possessions/game (ADR-0049 possession-count decomposition). Engine and .sco both
+	// use the SAME Dean-Oliver true-possession proxy FGA + 0.44·FTA + TOV − ORB (the
+	// symmetric split input; computed in the harness, validate.GameReport.{Engine,Sco}
+	// PossPerG). EnginePossCountPerG is the engine's authoritative EventPossessionStart
+	// count — an engine-only DIAGNOSTIC (validates the proxy; the count-vs-proxy gap
+	// exposes the shots-per-possession spread the proxy folds away), NOT a split input.
+	// 0 when the snapshot carried no contributing games on the respective side (same
+	// both-sides guard as FGA).
+	EnginePossPerG      float64 `json:"engine_poss_per_g"`
+	ScoPossPerG         float64 `json:"sco_poss_per_g"`
+	EnginePossCountPerG float64 `json:"engine_poss_count_per_g"`
 }
 
 // SeasonAggregate is one report (one season bucket) rolled up per team, plus the
@@ -171,6 +182,23 @@ type FidelitySummary struct {
 	EngineVarLnFGA      float64 `json:"engine_var_ln_fga"`
 	EngineVarLnPPS      float64 `json:"engine_var_ln_pps"`
 	EngineCovLnFGALnPPS float64 `json:"engine_cov_ln_fga_ln_pps"`
+	// Possession-count dispersion + Cov split (ADR-0049). PossDispersionRatio =
+	// stdev(engine POSS/g)/stdev(sco POSS/g) on the SAME Dean-Oliver proxy
+	// FGA+0.44·FTA+TOV−ORB both sides (symmetric — see TeamStanding; the authoritative
+	// count is a separate diagnostic, kept out of the split to avoid count-vs-proxy
+	// bias). Since lnFGA = lnPOSS + ln(FGA/POSS), the covariance decomposes into
+	// a possession-count term Cov(lnPOSS,lnPPS) and a shots-per-possession term
+	// Cov(ln(FGA/POSS),lnPPS); the two sum to {Real,Engine}CovLnFGALnPPS to float
+	// tolerance whenever every fga>0 row also has poss>0 (true for all real/engine
+	// data — you cannot attempt a shot without a possession; the proxy is always
+	// positive). All 0 (never NaN/Inf) on degenerate input, like the Var/Cov block.
+	PossDispersionRatio          float64 `json:"poss_dispersion_ratio"`
+	RealVarLnPoss                float64 `json:"real_var_ln_poss"`
+	RealCovLnPossLnPPS           float64 `json:"real_cov_ln_poss_ln_pps"`
+	RealCovLnShotsPerPossLnPPS   float64 `json:"real_cov_ln_shots_per_poss_ln_pps"`
+	EngineVarLnPoss              float64 `json:"engine_var_ln_poss"`
+	EngineCovLnPossLnPPS         float64 `json:"engine_cov_ln_poss_ln_pps"`
+	EngineCovLnShotsPerPossLnPPS float64 `json:"engine_cov_ln_shots_per_poss_ln_pps"`
 }
 
 // SeasonAggregateReport is the full season-aggregate readout: the per-season
@@ -219,6 +247,15 @@ type teamAcc struct {
 	engFTA     float64 // Σ total FTA over ftaGP games, engine side
 	scoFTA     float64 // Σ total FTA over ftaGP games, .sco side
 	ftaGP      int     // games where BOTH teams had an "fta" row (FTA divisor)
+	// Possession sums over possGP games (ADR-0049). engPoss/scoPoss = Σ the symmetric
+	// Dean-Oliver proxy FGA+0.44·FTA+TOV−ORB (engine and .sco); engPossCount = Σ the
+	// engine authoritative EventPossessionStart count (the diagnostic). possGP counts
+	// games where BOTH teams carried a proxy entry on BOTH sides (the harness sets them
+	// together), the POSS divisor.
+	engPoss      float64
+	scoPoss      float64
+	engPossCount float64
+	possGP       int
 	// Engine-only by-origin FGA sums over gp games (the ADR-0042 empty-FGA split;
 	// no .sco counterpart). Divided by gp for the per-game means in TeamStanding.
 	engFGAInit, engFGAOreb, engFGATrans float64
@@ -284,6 +321,18 @@ func CollectSeasonAggregates(reports []validate.Report) SeasonAggregateReport {
 			visFTA, okVT := ftaFor(g, g.VisitorTeamID)
 			hasFTA := okHT && okVT
 
+			// Possessions (ADR-0049): both sides are pre-computed per team by the
+			// harness as the SAME Dean-Oliver proxy FGA+0.44·FTA+TOV−ORB (g.EnginePossPerG
+			// / g.ScoPossPerG, the symmetric split inputs); the authoritative engine count
+			// (g.EnginePossCountPerG) rides along as a diagnostic. Accumulate only when
+			// BOTH teams carry BOTH proxy maps' entries (same both-sides discipline as
+			// FGA/FTA); a nil map or a hand-built GameReport without these maps yields no POSS.
+			heP, okEH := g.EnginePossPerG[g.HomeTeamID]
+			veP, okEV := g.EnginePossPerG[g.VisitorTeamID]
+			hsP, okSH := g.ScoPossPerG[g.HomeTeamID]
+			vsP, okSV := g.ScoPossPerG[g.VisitorTeamID]
+			hasPoss := okEH && okEV && okSH && okSV
+
 			h := team(acc, g.HomeTeamID)
 			h.gp++
 			h.engWins += g.EngineHomeWinFraction
@@ -322,6 +371,17 @@ func CollectSeasonAggregates(reports []validate.Report) SeasonAggregateReport {
 				v.engFTA += visFTA.EngineMean
 				v.scoFTA += visFTA.ScoVal
 				v.ftaGP++
+			}
+
+			if hasPoss {
+				h.engPoss += heP
+				h.scoPoss += hsP
+				h.engPossCount += g.EnginePossCountPerG[g.HomeTeamID]
+				h.possGP++
+				v.engPoss += veP
+				v.scoPoss += vsP
+				v.engPossCount += g.EnginePossCountPerG[g.VisitorTeamID]
+				v.possGP++
 			}
 
 			// Engine-only by-origin FGA (reported, never gated). Indexing a nil
@@ -369,6 +429,9 @@ func CollectSeasonAggregates(reports []validate.Report) SeasonAggregateReport {
 				EngineFGAInitialPerG:    perGame(t.engFGAInit, t.gp),
 				EngineFGAOrebPerG:       perGame(t.engFGAOreb, t.gp),
 				EngineFGATransitionPerG: perGame(t.engFGATrans, t.gp),
+				EnginePossPerG:          perGame(t.engPoss, t.possGP),
+				ScoPossPerG:             perGame(t.scoPoss, t.possGP),
+				EnginePossCountPerG:     perGame(t.engPossCount, t.possGP),
 			}
 			sa.Teams = append(sa.Teams, ts)
 			ra.wins = append(ra.wins, math.Abs(ts.EngineExpectedWins-float64(ts.ScoWins)))
@@ -455,6 +518,7 @@ type fidAcc struct {
 	engDiff, scoDiff []float64
 	engFGA, scoFGA   []float64 // per-team total-FGA/g, parallel to engPF/scoPF
 	engFTA, scoFTA   []float64 // per-team total-FTA/g, parallel to engPF/scoPF
+	engPoss, scoPoss []float64 // per-team POSS/g (eng count, sco proxy), parallel
 	season           []string  // per-row season label, for within-season demean
 }
 
@@ -484,6 +548,8 @@ func collectFidelitySummaries(seasons []SeasonAggregate) []FidelitySummary {
 			fa.scoFGA = append(fa.scoFGA, ts.ScoFGAPerG)
 			fa.engFTA = append(fa.engFTA, ts.EngineFTAPerG)
 			fa.scoFTA = append(fa.scoFTA, ts.ScoFTAPerG)
+			fa.engPoss = append(fa.engPoss, ts.EnginePossPerG)
+			fa.scoPoss = append(fa.scoPoss, ts.ScoPossPerG)
 			fa.season = append(fa.season, sa.Label)
 		}
 	}
@@ -501,29 +567,40 @@ func collectFidelitySummaries(seasons []SeasonAggregate) []FidelitySummary {
 		// marginals.
 		varPF, varFGA, varPPS, cov := decomposeLogVariance(decompRows(fa, false))
 		eVarPF, eVarFGA, eVarPPS, eCov := decomposeLogVariance(decompRows(fa, true))
+		// POSS split (ADR-0049): the possession-count vs shots-per-possession
+		// decomposition of the same volume↔efficiency covariance, real and engine.
+		rVarPoss, rCovPossPPS, rCovSppPPS := decomposePossCoupling(possRows(fa, false))
+		eVarPoss, eCovPossPPS, eCovSppPPS := decomposePossCoupling(possRows(fa, true))
 		// LevelGapPF = mean(engPF − scoPF) = mean(engPF) − mean(scoPF) exactly
 		// (same N), the absolute scoring-level gap.
 		out = append(out, FidelitySummary{
-			GameType:                  int(gt),
-			N:                         len(fa.engPF),
-			LevelGapPF:                mean(fa.engPF) - mean(fa.scoPF),
-			PFCorr:                    pearson(fa.engPF, fa.scoPF),
-			PFDispersionRatio:         dispersionRatio(fa.engPF, fa.scoPF),
-			WinsCorr:                  pearson(fa.engWins, fa.scoWins),
-			WinsDispersionRatio:       dispersionRatio(fa.engWins, fa.scoWins),
-			PointDiffCorr:             pearson(fa.engDiff, fa.scoDiff),
-			PointDiffDispersionRatio:  dispersionRatio(fa.engDiff, fa.scoDiff),
-			VolumeDispersionRatio:     dispersionRatio(fa.engFGA, fa.scoFGA),
-			EfficiencyDispersionRatio: dispersionRatio(engPPS, scoPPS),
-			FTADispersionRatio:        dispersionRatio(fa.engFTA, fa.scoFTA),
-			RealVarLnPF:               varPF,
-			RealVarLnFGA:              varFGA,
-			RealVarLnPPS:              varPPS,
-			RealCovLnFGALnPPS:         cov,
-			EngineVarLnPF:             eVarPF,
-			EngineVarLnFGA:            eVarFGA,
-			EngineVarLnPPS:            eVarPPS,
-			EngineCovLnFGALnPPS:       eCov,
+			GameType:                     int(gt),
+			N:                            len(fa.engPF),
+			LevelGapPF:                   mean(fa.engPF) - mean(fa.scoPF),
+			PFCorr:                       pearson(fa.engPF, fa.scoPF),
+			PFDispersionRatio:            dispersionRatio(fa.engPF, fa.scoPF),
+			WinsCorr:                     pearson(fa.engWins, fa.scoWins),
+			WinsDispersionRatio:          dispersionRatio(fa.engWins, fa.scoWins),
+			PointDiffCorr:                pearson(fa.engDiff, fa.scoDiff),
+			PointDiffDispersionRatio:     dispersionRatio(fa.engDiff, fa.scoDiff),
+			VolumeDispersionRatio:        dispersionRatio(fa.engFGA, fa.scoFGA),
+			EfficiencyDispersionRatio:    dispersionRatio(engPPS, scoPPS),
+			FTADispersionRatio:           dispersionRatio(fa.engFTA, fa.scoFTA),
+			RealVarLnPF:                  varPF,
+			RealVarLnFGA:                 varFGA,
+			RealVarLnPPS:                 varPPS,
+			RealCovLnFGALnPPS:            cov,
+			EngineVarLnPF:                eVarPF,
+			EngineVarLnFGA:               eVarFGA,
+			EngineVarLnPPS:               eVarPPS,
+			EngineCovLnFGALnPPS:          eCov,
+			PossDispersionRatio:          dispersionRatio(fa.engPoss, fa.scoPoss),
+			RealVarLnPoss:                rVarPoss,
+			RealCovLnPossLnPPS:           rCovPossPPS,
+			RealCovLnShotsPerPossLnPPS:   rCovSppPPS,
+			EngineVarLnPoss:              eVarPoss,
+			EngineCovLnPossLnPPS:         eCovPossPPS,
+			EngineCovLnShotsPerPossLnPPS: eCovSppPPS,
 		})
 	}
 	return out
@@ -714,6 +791,90 @@ func decomposeLogVariance(rows []decompRow) (varPF, varFGA, varPPS, cov float64)
 		sCov += rFGA * rPPS
 	}
 	return ssPF / n, ssFGA / n, ssPPS / n, sCov / n
+}
+
+// possRow is one (season, team) scoring observation for the possession-count
+// decomposition: total points, total FGA, and possessions per game, tagged by
+// season.
+type possRow struct {
+	season        string
+	pf, fga, poss float64
+}
+
+// possRows packages the per-(season,team) PF/FGA/POSS triples for the
+// possession-count Cov decomposition — the engine side (authoritative POSS count)
+// when useEngine, else the .sco (real proxy) side.
+func possRows(fa *fidAcc, useEngine bool) []possRow {
+	rows := make([]possRow, len(fa.scoPF))
+	for i := range fa.scoPF {
+		if useEngine {
+			rows[i] = possRow{season: fa.season[i], pf: fa.engPF[i], fga: fa.engFGA[i], poss: fa.engPoss[i]}
+		} else {
+			rows[i] = possRow{season: fa.season[i], pf: fa.scoPF[i], fga: fa.scoFGA[i], poss: fa.scoPoss[i]}
+		}
+	}
+	return rows
+}
+
+// decomposePossCoupling splits the volume↔efficiency covariance Cov(lnFGA, lnPPS)
+// into a POSSESSION-COUNT term and a SHOTS-PER-POSSESSION term via the exact
+// identity
+//
+//	lnFGA = lnPOSS + ln(FGA/POSS),   so
+//	Cov(lnFGA, lnPPS) = Cov(lnPOSS, lnPPS) + Cov(ln(FGA/POSS), lnPPS)
+//
+// where PPS := PF/FGA and lnPPS is taken as lnPF − lnFGA (never recomputed). Each
+// ln term is DEMEANED WITHIN its season before the (co)variance, exactly as
+// decomposeLogVariance handles the 24→26→28-team eras; because demeaning is linear
+// and lnPOSS + ln(FGA/POSS) = lnFGA, the two returned covariances sum to
+// decomposeLogVariance's cov over the SAME valid set — the identity the test and
+// the artifact check assert.
+//
+// Rows with pf<=0, fga<=0, or poss<=0 are dropped (ln undefined) — no NaN/Inf.
+// Empty input, or a single-team season (its residuals are all exactly 0), yields
+// 0, never NaN.
+func decomposePossCoupling(rows []possRow) (varPoss, covPossPPS, covShotsPerPossPPS float64) {
+	type logRow struct {
+		season               string
+		lnPoss, lnSPP, lnPPS float64
+	}
+	valid := make([]logRow, 0, len(rows))
+	for _, r := range rows {
+		if r.pf <= 0 || r.fga <= 0 || r.poss <= 0 {
+			continue // ln undefined — skip, never NaN/Inf
+		}
+		lnPF := math.Log(r.pf)
+		lnFGA := math.Log(r.fga)
+		lnPoss := math.Log(r.poss)
+		valid = append(valid, logRow{r.season, lnPoss, lnFGA - lnPoss, lnPF - lnFGA})
+	}
+	n := float64(len(valid))
+	if n == 0 {
+		return 0, 0, 0
+	}
+
+	sumPoss := map[string]float64{}
+	sumSPP := map[string]float64{}
+	sumPPS := map[string]float64{}
+	cnt := map[string]float64{}
+	for _, v := range valid {
+		sumPoss[v.season] += v.lnPoss
+		sumSPP[v.season] += v.lnSPP
+		sumPPS[v.season] += v.lnPPS
+		cnt[v.season]++
+	}
+
+	var ssPoss, sCovPoss, sCovSPP float64
+	for _, v := range valid {
+		c := cnt[v.season]
+		rPoss := v.lnPoss - sumPoss[v.season]/c
+		rSPP := v.lnSPP - sumSPP[v.season]/c
+		rPPS := v.lnPPS - sumPPS[v.season]/c
+		ssPoss += rPoss * rPoss
+		sCovPoss += rPoss * rPPS
+		sCovSPP += rSPP * rPPS
+	}
+	return ssPoss / n, sCovPoss / n, sCovSPP / n
 }
 
 // originRow is one (season, team) engine FGA-per-game observation split by shot

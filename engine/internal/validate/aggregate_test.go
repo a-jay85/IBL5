@@ -25,6 +25,7 @@ func TestTeamStatFromBox(t *testing.T) {
 		FTM: 14, FTA: 18,
 		TGM: 9, TGA: 24,
 		REB: 12 + 33,
+		ORB: 12,
 		AST: 21, STL: 8, TOV: 13, BLK: 5, PF: 19,
 	}
 	if got != want {
@@ -56,6 +57,7 @@ func TestTeamStatFromSco_SkipsTeamTotalRow(t *testing.T) {
 		FTM: 4 + 2, FTA: 5 + 2,
 		TGM: 2 + 1, TGA: 6 + 3,
 		REB: (3 + 5) + (2 + 7),
+		ORB: 3 + 2,
 		AST: 6 + 4, STL: 2 + 1, TOV: 3 + 2, BLK: 1 + 0, PF: 4 + 3,
 	}
 	if got != want {

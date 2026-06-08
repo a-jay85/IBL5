@@ -32,7 +32,10 @@ The context-window cost compounds: every token of verbose output in Opus's conte
 |------|-------------|---------|
 | **Haiku** | `model: "haiku"` | Command output, pattern-matching against named checklists, grep-and-format, mechanical lookups. The task can be answered by running commands and reporting results without judging relevance. |
 | **Sonnet** | `model: "sonnet"` | Tasks requiring synthesis: "is this finding relevant to the current change?", cross-file traces, semantic compliance checks, rename sweeps needing judgment about call sites. |
-| **Opus** | self (no delegation) | Planning, novel reasoning, FK ordering, rule authoring, ADR writing, interpreting ambiguous test failures, final code review, diff-triage. Never delegate understanding. |
+| **Opus** | self (no delegation) | Novel reasoning, FK ordering, rule authoring, ADR writing, interpreting ambiguous test failures, final code review, diff-triage. Never delegate understanding. |
+| **Opus (delegated)** | `subagent_type: "plan-architect"` | Implementation **planning** only, via `/plan` Step 3. The one delegated-but-still-Opus case: the agent def carries `model: opus` + `effort: xhigh`, so planning runs at Opus depth in a clean sub-context. Do not pass an inline `model` override — the def owns it. |
+
+Planning is delegated rather than done in-session **only** because the custom `plan-architect` agent pins `effort: xhigh` (no per-call effort override exists on the built-in Plan agent). An A/B test proved it methodologically equivalent to the built-in. Everything else in the Opus row stays in-session — never delegate understanding.
 
 ## Prompt Style by Tier
 

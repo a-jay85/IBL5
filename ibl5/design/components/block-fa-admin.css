@@ -1,0 +1,101 @@
+/* FA-admin block (block.php) styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+.modal-overlay.active {
+    display: flex;
+}
+.modal-content {
+    background: white;
+    padding: 20px;
+    border-radius: 5px;
+    text-align: center;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+.modal-buttons {
+    margin-top: 20px;
+}
+.btn-run {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    margin: 0 10px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+.btn-cancel {
+    background: white;
+    color: black;
+    border: 1px solid #ccc;
+    padding: 10px 20px;
+    margin: 0 10px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+.action-button {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    margin-top: 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+}
+.action-button:hover {
+    background: #0056b3;
+}
+.action-button-red {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    margin-top: 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+}
+.action-button-red:hover {
+    background: #c82333;
+}
+table {
+    border-collapse: collapse;
+    margin: 10px 0;
+}
+td, th {
+    border: 1px solid #000;
+    padding: 5px;
+}
+.message-success {
+    color: #007bff;
+    font-weight: bold;
+}
+.message-error {
+    color: #dc3545;
+    font-weight: bold;
+}
+.block-fa-day-banner {
+    color: red;
+}
+.block-fa-row-bold {
+    font-weight: bold;
+}
+.block-fa-reject-header {
+    color: red;
+}
+.block-fa-discord-header {
+    color: #7289da;
+}
+.block-fa-discord-textarea {
+    font-size: 24px;
+}

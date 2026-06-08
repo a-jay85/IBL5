@@ -303,9 +303,15 @@ if ($method === 'DELETE' && $action === 'set-champion') {
         exit;
     }
     if ($present === 1) {
-        $db->query("INSERT IGNORE INTO ibl_jsb_history (season_year, team_name, wins, losses, won_championship) VALUES ($year, '__e2e_champ', 50, 32, 1)");
+        $stmt = $db->prepare("INSERT IGNORE INTO ibl_jsb_history (season_year, team_name, wins, losses, won_championship) VALUES (?, '__e2e_champ', 50, 32, 1)");
+        $stmt->bind_param('i', $year);
+        $stmt->execute();
+        $stmt->close();
     } else {
-        $db->query("DELETE FROM ibl_jsb_history WHERE season_year = $year AND team_name = '__e2e_champ'");
+        $stmt = $db->prepare("DELETE FROM ibl_jsb_history WHERE season_year = ? AND team_name = '__e2e_champ'");
+        $stmt->bind_param('i', $year);
+        $stmt->execute();
+        $stmt->close();
     }
     echo json_encode(['champion' => $present === 1 ? 'inserted' : 'removed']);
     $db->close();
@@ -354,11 +360,17 @@ if ($method === 'DELETE' && $action === 'set-eoy-votes') {
         exit;
     }
     if ($count > 0) {
-        $db->query("UPDATE ibl_team_info SET eoy_vote = NOW() WHERE teamid BETWEEN 1 AND $count");
+        $stmt = $db->prepare("UPDATE ibl_team_info SET eoy_vote = NOW() WHERE teamid BETWEEN 1 AND ?");
+        $stmt->bind_param('i', $count);
+        $stmt->execute();
+        $stmt->close();
     }
     if ($count < 28) {
         $next = $count + 1;
-        $db->query("UPDATE ibl_team_info SET eoy_vote = 'No Vote' WHERE teamid BETWEEN $next AND 28");
+        $stmt = $db->prepare("UPDATE ibl_team_info SET eoy_vote = 'No Vote' WHERE teamid BETWEEN ? AND 28");
+        $stmt->bind_param('i', $next);
+        $stmt->execute();
+        $stmt->close();
     }
     echo json_encode(['set' => $count]);
     $db->close();

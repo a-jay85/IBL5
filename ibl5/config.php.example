@@ -39,9 +39,9 @@ if (stristr(htmlentities($_SERVER['PHP_SELF']), "config.php")) {
 ######################################################################
 
 $dbhost = getenv('DB_HOST') ?: 'localhost';
-$dbuname = "iblhoops_";
-$dbpass = "password";
-$dbname = "iblhoops_";
+$dbuname = getenv('DB_USER') ?: 'iblhoops_';
+$dbpass = getenv('DB_PASS') ?: 'password';
+$dbname = getenv('DB_NAME') ?: 'iblhoops_';
 $prefix = "nuke";
 $user_prefix = "nuke";
 $dbtype = "MySQL";

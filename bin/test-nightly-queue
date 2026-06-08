@@ -1,0 +1,177 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-nightly-queue — regression test for evict_dispositions in
+# bin/nightly-queue. Covers the duplicate-disposition symlink bug: queuing a
+# previously-done/skipped plan must evict the stale sibling before creating the
+# new queue/ entry.
+#
+# Run: bin/test-nightly-queue  (exit 0 = all pass, 1 = any case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT="$SCRIPT_DIR/nightly-queue"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+NDIR="$TMP/nightly"
+PDIR="$TMP/plans"
+FAILED=0
+
+setup() {
+    rm -rf "$NDIR"
+    mkdir -p "$NDIR/queue" "$NDIR/skipped" "$NDIR/done"
+    rm -rf "$PDIR"
+    mkdir -p "$PDIR"
+}
+
+run_queue() {
+    NIGHTLY_DIR="$NDIR" PLANS_DIR="$PDIR" "$SCRIPT" "$@"
+}
+
+assert_present() {
+    local desc="$1" path="$2"
+    if [ ! -e "$path" ] && [ ! -L "$path" ]; then
+        echo "FAIL: $desc — expected present: $path"
+        FAILED=1
+    fi
+}
+
+assert_absent() {
+    local desc="$1" path="$2"
+    if [ -e "$path" ]; then
+        echo "FAIL: $desc — expected absent (exists): $path"
+        FAILED=1
+        return
+    fi
+    if [ -L "$path" ]; then
+        echo "FAIL: $desc — expected absent (dangling symlink): $path"
+        FAILED=1
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Row 1 — plan in skipped/ only → evicted, lands in queue/
+# ---------------------------------------------------------------------------
+setup
+touch "$PDIR/plan-a.md"
+ln -s "$PDIR/plan-a.md" "$NDIR/skipped/plan-a.md"
+run_queue plan-a >/dev/null 2>&1
+assert_absent  "row1 skipped gone" "$NDIR/skipped/plan-a.md"
+assert_present "row1 queued"       "$NDIR/queue/plan-a.md"
+echo "ok: row1 — skipped-only eviction"
+
+# ---------------------------------------------------------------------------
+# Row 2 — plan in done/ only → evicted, lands in queue/
+# ---------------------------------------------------------------------------
+setup
+touch "$PDIR/plan-b.md"
+ln -s "$PDIR/plan-b.md" "$NDIR/done/plan-b.md"
+run_queue plan-b >/dev/null 2>&1
+assert_absent  "row2 done gone" "$NDIR/done/plan-b.md"
+assert_present "row2 queued"    "$NDIR/queue/plan-b.md"
+echo "ok: row2 — done-only eviction"
+
+# ---------------------------------------------------------------------------
+# Row 3 — plan in BOTH skipped/ and done/ → evicted from both, lands in queue/
+# (the core bug; asserts exactly one disposition folder after queuing)
+# ---------------------------------------------------------------------------
+setup
+touch "$PDIR/plan-c.md"
+ln -s "$PDIR/plan-c.md" "$NDIR/skipped/plan-c.md"
+ln -s "$PDIR/plan-c.md" "$NDIR/done/plan-c.md"
+run_queue plan-c >/dev/null 2>&1
+assert_absent  "row3 skipped gone" "$NDIR/skipped/plan-c.md"
+assert_absent  "row3 done gone"    "$NDIR/done/plan-c.md"
+assert_present "row3 queued"       "$NDIR/queue/plan-c.md"
+echo "ok: row3 — both-dirs eviction (core bug)"
+
+# ---------------------------------------------------------------------------
+# Row 4 — fresh plan in neither sibling → queues normally, no error
+# ---------------------------------------------------------------------------
+setup
+touch "$PDIR/plan-d.md"
+run_queue plan-d >/dev/null 2>&1
+assert_absent  "row4 no skipped" "$NDIR/skipped/plan-d.md"
+assert_absent  "row4 no done"    "$NDIR/done/plan-d.md"
+assert_present "row4 queued"     "$NDIR/queue/plan-d.md"
+echo "ok: row4 — fresh plan no-op eviction"
+
+# ---------------------------------------------------------------------------
+# Row 5 — requeue of a plan that also has a stale done/ entry → done evicted
+# ---------------------------------------------------------------------------
+setup
+touch "$PDIR/plan-e.md"
+ln -s "$PDIR/plan-e.md" "$NDIR/skipped/plan-e.md"
+ln -s "$PDIR/plan-e.md" "$NDIR/done/plan-e.md"
+run_queue requeue >/dev/null 2>&1
+assert_absent  "row5 done gone"    "$NDIR/done/plan-e.md"
+assert_absent  "row5 skipped gone" "$NDIR/skipped/plan-e.md"
+assert_present "row5 queued"       "$NDIR/queue/plan-e.md"
+echo "ok: row5 — requeue done-eviction"
+
+# ---------------------------------------------------------------------------
+# Row 6 — .attempts counter evicted alongside symlink
+# ---------------------------------------------------------------------------
+setup
+touch "$PDIR/plan-f.md"
+ln -s "$PDIR/plan-f.md" "$NDIR/skipped/plan-f.md"
+touch "$NDIR/skipped/plan-f.md.attempts"
+ln -s "$PDIR/plan-f.md" "$NDIR/done/plan-f.md"
+touch "$NDIR/done/plan-f.md.attempts"
+run_queue plan-f >/dev/null 2>&1
+assert_absent  "row6 skipped symlink gone"  "$NDIR/skipped/plan-f.md"
+assert_absent  "row6 skipped attempts gone" "$NDIR/skipped/plan-f.md.attempts"
+assert_absent  "row6 done symlink gone"     "$NDIR/done/plan-f.md"
+assert_absent  "row6 done attempts gone"    "$NDIR/done/plan-f.md.attempts"
+assert_present "row6 queued"                "$NDIR/queue/plan-f.md"
+echo "ok: row6 — .attempts eviction"
+
+# ---------------------------------------------------------------------------
+# Row 7 — stale entry is a real (non-dangling) symlink; assert ! -e AND ! -L
+# after eviction so a dangling symlink left behind would also fail
+# ---------------------------------------------------------------------------
+setup
+touch "$PDIR/plan-g.md"
+ln -s "$PDIR/plan-g.md" "$NDIR/skipped/plan-g.md"
+if [ ! -e "$NDIR/skipped/plan-g.md" ]; then
+    echo "FAIL: row7 setup — symlink is dangling before eviction"
+    FAILED=1
+fi
+run_queue plan-g >/dev/null 2>&1
+assert_absent  "row7 symlink gone"  "$NDIR/skipped/plan-g.md"
+assert_present "row7 queued"        "$NDIR/queue/plan-g.md"
+echo "ok: row7 — real-symlink eviction + dangling guard"
+
+# ---------------------------------------------------------------------------
+# Row 8 — already-queued plan still errors (regression guard); skipped/ entry
+# must remain untouched (eviction must not fire before the already-queued check)
+# ---------------------------------------------------------------------------
+setup
+touch "$PDIR/plan-h.md"
+ln -s "$PDIR/plan-h.md" "$NDIR/queue/plan-h.md"
+ln -s "$PDIR/plan-h.md" "$NDIR/skipped/plan-h.md"
+set +e
+out=$(run_queue plan-h 2>&1)
+exit_code=$?
+set -e
+if [ "$exit_code" -eq 0 ]; then
+    echo "FAIL: row8 — expected non-zero exit for already-queued plan, got 0"
+    FAILED=1
+fi
+if ! echo "$out" | grep -q "already queued"; then
+    echo "FAIL: row8 — expected 'already queued' in output, got: $out"
+    FAILED=1
+fi
+assert_present "row8 skipped untouched" "$NDIR/skipped/plan-h.md"
+assert_present "row8 queued untouched"  "$NDIR/queue/plan-h.md"
+echo "ok: row8 — already-queued errors, no partial eviction"
+
+# ---------------------------------------------------------------------------
+if [ "$FAILED" -ne 0 ]; then
+    echo "RESULT: FAILED"
+    exit 1
+fi
+echo "RESULT: all passed"
+exit 0

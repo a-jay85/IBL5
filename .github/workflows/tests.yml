@@ -550,6 +550,8 @@ jobs:
         run: bin/test-check-phpunit-hygiene
       - name: bin/test-refactor-flag
         run: bin/test-refactor-flag
+      - name: bin/test-nightly-queue
+        run: bin/test-nightly-queue
 
   gate:
     name: Tests and Analysis

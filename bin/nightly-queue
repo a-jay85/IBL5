@@ -20,11 +20,23 @@
 
 set -euo pipefail
 
-NIGHTLY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/nightly"
-PLANS_DIR="$HOME/.claude/plans"
+: "${NIGHTLY_DIR:=$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/nightly}"
+: "${PLANS_DIR:=$HOME/.claude/plans}"
 QUEUE_DIR="$NIGHTLY_DIR/queue"
+SKIPPED_DIR="$NIGHTLY_DIR/skipped"
+DONE_DIR="$NIGHTLY_DIR/done"
 
 mkdir -p "$QUEUE_DIR"
+
+# Evict any stale same-basename disposition symlink (and its .attempts counter)
+# from skipped/ and done/ before (re)queuing. queue/ is the cut vertex: a plan
+# can land in two disposition folders only if a stale sibling survives queue
+# entry. rm -f is a no-op when nothing is there.
+evict_dispositions() {
+    local name=$1
+    rm -f "$SKIPPED_DIR/$name" "$SKIPPED_DIR/${name}.attempts" \
+          "$DONE_DIR/$name" "$DONE_DIR/${name}.attempts"
+}
 
 show_queue() {
     echo "Nightly queue (next to run first):"
@@ -74,7 +86,6 @@ if [ "$1" = "remove" ] || [ "$1" = "rm" ]; then
 fi
 
 if [ "$1" = "requeue" ]; then
-    SKIPPED_DIR="$NIGHTLY_DIR/skipped"
     if ! ls "$SKIPPED_DIR"/*.md &>/dev/null; then
         echo "No skipped plans to requeue."
         exit 0
@@ -88,6 +99,7 @@ if [ "$1" = "requeue" ]; then
         fi
         mv "$f" "$QUEUE_DIR/$name"
         rm -f "$QUEUE_DIR/${name}.attempts"
+        evict_dispositions "$name"
         count=$((count + 1))
         echo "  requeued: $name"
     done
@@ -122,6 +134,8 @@ if [ -e "$QUEUE_DIR/$FILENAME" ]; then
     echo "Error: $FILENAME is already queued." >&2
     exit 1
 fi
+
+evict_dispositions "$FILENAME"
 
 ln -s "$SOURCE" "$QUEUE_DIR/$FILENAME"
 echo "Queued: $FILENAME -> $(readlink "$QUEUE_DIR/$FILENAME")"

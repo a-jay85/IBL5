@@ -31,8 +31,13 @@ func simGame(b bundle.Bundle, g bundle.Game, r *rng.RNG) (result.GameResult, int
 func simGameWith(b bundle.Bundle, g bundle.Game, r *rng.RNG, opts Options) (result.GameResult, int, *teamState, *teamState) {
 	visitor := newTeamState(b.Players, g.VisitorTeamID, false)
 	home := newTeamState(b.Players, g.HomeTeamID, true)
+	// Attach each team's Branch-B usage-shrink rates (bucketweights.go). A team absent
+	// from b.Teams (DB-built bundle, or a test bundle with no Teams) leaves them 0 —
+	// Branch-B inert. Reading b.Teams here is the only place the loop touches it.
+	visitor.drbRate, visitor.astRate = teamRates(b, g.VisitorTeamID)
+	home.drbRate, home.astRate = teamRates(b, g.HomeTeamID)
 
-	gs := &gameState{rng: r, gameType: g.GameType, madeFG: map[int]int{}, freeze: opts.Freeze, accum: opts.Accum}
+	gs := &gameState{rng: r, gameType: g.GameType, madeFG: map[int]int{}, freeze: opts.Freeze, accum: opts.Accum, branchB: opts.BranchBAccum}
 
 	// One shared possession length per game: the average of the two teams' base
 	// times (factor 1.0). Each team's base_time now carries its offensive volume
@@ -105,6 +110,18 @@ func simGameWith(b bundle.Bundle, g bundle.Game, r *rng.RNG, opts Options) (resu
 		Injuries:      aggregateInjuries(gs.events),
 	}
 	return gr, gs.transitions, visitor, home
+}
+
+// teamRates returns the team's per-48 DRB/AST rates from b.Teams (the Branch-B
+// usage-shrink inputs), or (0, 0) when the team is absent — leaving Branch-B inert.
+// Linear scan: b.Teams holds ≤ a league's worth of teams, looked up twice per game.
+func teamRates(b bundle.Bundle, teamID int) (drbRate, astRate float64) {
+	for _, t := range b.Teams {
+		if t.TeamID == teamID {
+			return t.DRBRate, t.ASTRate
+		}
+	}
+	return 0, 0
 }
 
 // rosterMetaOf snapshots a team's roster metadata (identity, position, finalized

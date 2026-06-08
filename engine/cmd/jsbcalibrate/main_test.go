@@ -288,3 +288,63 @@ func TestRun_CalibrateEmitsChannelDecompositionFields(t *testing.T) {
 		t.Fatal("no fidelity entries emitted")
 	}
 }
+
+// measureGame builds a points+fga GameReport (the channel-decomp inputs) for the
+// terse measure-mode tests.
+func measureGame(date string, homeFGA, visFGA float64) validate.GameReport {
+	return validate.GameReport{
+		HomeTeamID: 7, VisitorTeamID: 3, EngineHomeWinFraction: 0.6, Date: date,
+		Rows: []validate.StatRow{
+			{TeamID: 3, Stat: "points", ScoVal: 99, EngineMean: 100},
+			{TeamID: 7, Stat: "points", ScoVal: 108, EngineMean: 105},
+			{TeamID: 3, Stat: "fga", ScoVal: visFGA, EngineMean: visFGA},
+			{TeamID: 7, Stat: "fga", ScoVal: homeFGA, EngineMean: homeFGA},
+		},
+	}
+}
+
+// Row #16: measure mode emits the terse ~6-line-per-game-type verdict (Cov sign + the
+// three Var ratios + PASS/FAIL) to stdout — NOT a JSON blob — and exits 0/1 on the sign.
+func TestRun_MeasureEmitsTerseVerdict(t *testing.T) {
+	reports := []validate.Report{
+		{Label: "04-05", GameType: bundle.GameTypeRegular, Games: []validate.GameReport{measureGame("d1", 90, 80)}},
+		{Label: "05-06", GameType: bundle.GameTypeRegular, Games: []validate.GameReport{measureGame("d2", 94, 84)}},
+	}
+	var out, errBuf bytes.Buffer
+	code := runWith([]string{"--archive", "/x", "--mode", "measure"}, &out, &errBuf, stubCollectors(reports, nil))
+	if code != 0 && code != 1 {
+		t.Fatalf("exit = %d, want 0 or 1 (stderr: %s)", code, errBuf.String())
+	}
+	s := out.String()
+	if json.Valid(out.Bytes()) {
+		t.Errorf("measure stdout should be terse text, not JSON:\n%s", s)
+	}
+	for _, want := range []string{"Cov(lnFGA,lnPPS):", "Var(lnFGA):", "Var(lnPPS):", "Var(lnPF):", "verdict=", "game_type=2"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("terse output missing %q:\n%s", want, s)
+		}
+	}
+	// One game type → six lines (header + Cov + 3 Var + verdict).
+	if n := strings.Count(strings.TrimSpace(s), "\n") + 1; n != 6 {
+		t.Errorf("expected 6 terse lines for one game type, got %d:\n%s", n, s)
+	}
+}
+
+// Row #16 (negative-path): measure mode on a report whose only game is a home==visitor
+// collision (no contributing rows ⇒ no fidelity) prints a one-line error and exits 1.
+func TestRun_MeasureNoFidelityErrors(t *testing.T) {
+	reports := []validate.Report{{
+		Label: "04-05", GameType: bundle.GameTypeRegular,
+		Games: []validate.GameReport{{HomeTeamID: 5, VisitorTeamID: 5, Rows: []validate.StatRow{
+			{TeamID: 5, Stat: "points", ScoVal: 100, EngineMean: 100},
+		}}},
+	}}
+	var out, errBuf bytes.Buffer
+	code := runWith([]string{"--archive", "/x", "--mode", "measure"}, &out, &errBuf, stubCollectors(reports, nil))
+	if code != 1 {
+		t.Fatalf("exit = %d, want 1", code)
+	}
+	if !strings.Contains(errBuf.String(), "no fidelity summary") {
+		t.Errorf("expected a one-line 'no fidelity summary' error, got: %s", errBuf.String())
+	}
+}

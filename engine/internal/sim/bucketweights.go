@@ -96,6 +96,16 @@ const (
 	// andOneMadeRateScale maps the player's FGP rating to a made-rate proxy for the
 	// and-one stand-in (a small minority of scoring plays). Unchanged from #952.
 	andOneMadeRateScale = 0.0008
+
+	// branchBTeamScale (_DAT_0066d318 = 0.2 = 1/5) and branchBPlayerScale
+	// (_DAT_0066d310 = 0.04 = 1/25) are the two pinned constants forming the JSB
+	// Branch-B usage target (COMPOSITE_DOUBLES_TRACE.md §5, direct .rdata read):
+	//   usage = player[+0x1E8](TO) × (team DRB-rate + team AST-rate) × 0.2 × 0.04
+	// (= × 0.008). The usage is then subtracted-proportionally from the live play-
+	// outcome bucket composites (branchBShrink in freeze.go). Gated OFF by default
+	// (FreezeConfig.BranchB) — a measurement seam, not a live-engine change.
+	branchBTeamScale   = 0.2
+	branchBPlayerScale = 0.04
 )
 
 // per48Min is the per-48-MINUTE season rate (stat / minutes) × 48 (_DAT_00669ed0 =

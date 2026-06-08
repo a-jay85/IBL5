@@ -58,7 +58,7 @@ func runWith(args []string, stdout, stderr io.Writer, c collectors) int {
 	fs := flag.NewFlagSet("jsbcalibrate", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	archive := fs.String("archive", "", "root dir of JSB backup zips (required)")
-	mode := fs.String("mode", "calibrate", "calibrate | gate")
+	mode := fs.String("mode", "calibrate", "calibrate | gate | measure")
 	selection := fs.String("selection", "season", "snapshot selection: season (one regular snapshot/season, clean regular bucket) | flat (every zip, type by filename)")
 	runs := fs.Int("runs", 50, "seeded engine runs per corpus game")
 	seed := fs.Uint64("seed", 0, "base seed; per-game seeds derive deterministically from it")
@@ -66,6 +66,7 @@ func runWith(args []string, stdout, stderr io.Writer, c collectors) int {
 	includeOlympics := fs.Bool("include-olympics", false, "include olympics/ snapshots (game-type 6)")
 	coverage := fs.Float64("coverage", 0.95, "calibrate: residual coverage percentile (0,1)")
 	minRate := fs.Float64("min-rate", 0.90, "gate: minimum per-stat in-band rate to pass")
+	branchB := fs.Bool("branchB", false, "enable the JSB Branch-B usage-shrink in the engine runs (measurement A/B)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -73,8 +74,8 @@ func runWith(args []string, stdout, stderr io.Writer, c collectors) int {
 		_, _ = fmt.Fprintln(stderr, "jsbcalibrate: --archive <dir> is required")
 		return 2
 	}
-	if *mode != "calibrate" && *mode != "gate" {
-		_, _ = fmt.Fprintf(stderr, "jsbcalibrate: invalid --mode %q (valid: calibrate, gate)\n", *mode)
+	if *mode != "calibrate" && *mode != "gate" && *mode != "measure" {
+		_, _ = fmt.Fprintf(stderr, "jsbcalibrate: invalid --mode %q (valid: calibrate, gate, measure)\n", *mode)
 		return 2
 	}
 	var collect collectFunc
@@ -93,6 +94,7 @@ func runWith(args []string, stdout, stderr io.Writer, c collectors) int {
 		Seed:            *seed,
 		SampleStride:    *stride,
 		IncludeOlympics: *includeOlympics,
+		BranchB:         *branchB,
 		Progress:        stderr,
 	}
 	reports, skips, err := collect(*archive, opts)
@@ -108,6 +110,21 @@ func runWith(args []string, stdout, stderr io.Writer, c collectors) int {
 		return 1
 	}
 
+	if *mode == "measure" {
+		// Terse verdict: the log-variance channel readout (Cov sign + Var ratios) in
+		// ~6 lines per game type, so each measurement iteration is a short read rather
+		// than a full JSON blob. The sign-first verdict is the Phase-7 fail-fast gate.
+		agg := calibrate.CollectSeasonAggregates(reports)
+		if len(agg.Fidelity) == 0 {
+			_, _ = fmt.Fprintln(stderr, "jsbcalibrate: measure mode produced no fidelity summary (no contributing team rows)")
+			return 1
+		}
+		if writeMeasureVerdict(stdout, agg.Fidelity) {
+			return 0
+		}
+		return 1
+	}
+
 	enc := json.NewEncoder(stdout)
 	enc.SetIndent("", "  ")
 	if *mode == "gate" {
@@ -120,4 +137,41 @@ func runWith(args []string, stdout, stderr io.Writer, c collectors) int {
 	}
 	_ = enc.Encode(calibrate.Calibrate(reports, *coverage))
 	return 0
+}
+
+// ratio returns a/b, or 0 when b == 0 (degenerate — never a divide-by-zero).
+func ratio(a, b float64) float64 {
+	if b == 0 {
+		return 0
+	}
+	return a / b
+}
+
+// writeMeasureVerdict prints the terse log-variance verdict for each game type's
+// FidelitySummary and returns the overall PASS: the engine Cov(lnFGA,lnPPS) must
+// carry the SAME sign as real (the ADR-0042 wrong-sign is the thing Branch-B must
+// flip). Six lines per game type — header, Cov, three Var ratios, verdict.
+func writeMeasureVerdict(w io.Writer, fid []calibrate.FidelitySummary) bool {
+	pass := true
+	for _, f := range fid {
+		signMatch := (f.EngineCovLnFGALnPPS >= 0) == (f.RealCovLnFGALnPPS >= 0)
+		if !signMatch {
+			pass = false
+		}
+		verdict := "FAIL (Cov sign not matched to real)"
+		if signMatch {
+			verdict = "PASS (Cov sign matches real)"
+		}
+		_, _ = fmt.Fprintf(w, "game_type=%d N=%d\n", f.GameType, f.N)
+		_, _ = fmt.Fprintf(w, "  Cov(lnFGA,lnPPS): engine=%+.6f real=%+.6f sign=%s\n",
+			f.EngineCovLnFGALnPPS, f.RealCovLnFGALnPPS, map[bool]string{true: "MATCH", false: "FLIP-NEEDED"}[signMatch])
+		_, _ = fmt.Fprintf(w, "  Var(lnFGA): engine=%.6f real=%.6f ratio=%.2f\n",
+			f.EngineVarLnFGA, f.RealVarLnFGA, ratio(f.EngineVarLnFGA, f.RealVarLnFGA))
+		_, _ = fmt.Fprintf(w, "  Var(lnPPS): engine=%.6f real=%.6f ratio=%.2f\n",
+			f.EngineVarLnPPS, f.RealVarLnPPS, ratio(f.EngineVarLnPPS, f.RealVarLnPPS))
+		_, _ = fmt.Fprintf(w, "  Var(lnPF):  engine=%.6f real=%.6f ratio=%.2f\n",
+			f.EngineVarLnPF, f.RealVarLnPF, ratio(f.EngineVarLnPF, f.RealVarLnPF))
+		_, _ = fmt.Fprintf(w, "  verdict=%s\n", verdict)
+	}
+	return pass
 }

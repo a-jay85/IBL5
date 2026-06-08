@@ -12,6 +12,7 @@ import (
 
 	"github.com/a-jay85/IBL5/engine/internal/backup"
 	"github.com/a-jay85/IBL5/engine/internal/bundle"
+	"github.com/a-jay85/IBL5/engine/internal/sim"
 	"github.com/a-jay85/IBL5/engine/internal/validate"
 )
 
@@ -57,6 +58,15 @@ type Options struct {
 	ValidateUnscheduled ValidateFunc // nil -> validate.ValidateUnscheduled (playoff bucket)
 	CountSco            CountScoFunc // nil -> countScoGames (season: .sco game/team counter)
 	Progress            io.Writer    // nil -> io.Discard; one line per processed snapshot
+
+	// BranchB enables the JSB Branch-B usage-shrink in the default (non-injected) engine
+	// runs — the Phase-6/7 measurement A/B. It is captured by resolveValidate's real
+	// default closure; an injected Options.Validate (test seam) ignores it. Default false
+	// leaves every existing caller + the committed calibration byte-identical.
+	BranchB bool
+	// BranchBAccum, when non-nil and BranchB is set, harvests the engagement instrument
+	// (Branch-B-taken fraction + s distribution) aggregated across the whole archive pass.
+	BranchBAccum *sim.BranchBAccum
 }
 
 // Skip records a snapshot (or archive entry) that was not turned into a Report,

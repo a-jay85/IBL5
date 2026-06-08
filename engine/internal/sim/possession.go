@@ -60,6 +60,38 @@ func threePtPropensity(p onCourt) float64 {
 	return float64(p.TGA) / float64(denom)
 }
 
+// playBuckets assembles the 2pt/3pt/foul play-outcome bucket weights for one attempt,
+// applying home-court advantage at the two modeled JSB sites (site-2 +hca to the 2pt
+// bucket and −hca to the foul bucket; site-3 the home-offQuality divisor inside
+// foulBucketWeight). allow3pt is false on a fast break (3pt path excluded).
+//
+// With Branch-B OFF (the default / freeze-lattice path) this is the byte-identical
+// pre-PR assembly: twoPtBucketWeight(bh)+hca, threePtBucketWeight(bh), and the foul
+// bucket via gs.foulWeight — which preserves the freeze arm + baseline accumulation.
+//
+// With Branch-B ON it is the ordering-faithful restructure (FUN_004cfa50 setup stage,
+// COMPOSITE_DOUBLES_TRACE.md §4): shrink the RAW PRE-HCA composites by the usage factor
+// s (branchBShrink), THEN apply HCA. The foul HCA nudge is re-added as the full-composite
+// delta foulBucketWeight(...,hca)−foulBucketWeight(...,0), so HCA's magnitude is NEVER
+// scaled by s (acceptance-bar precondition), and a cold-start s=1 reproduces the OFF foul
+// bucket exactly. Branch-B and the four freeze arms are mutually exclusive diagnostics, so
+// the ON path does not route the foul bucket through gs.foulWeight.
+func (gs *gameState) playBuckets(bh onCourt, offense, defense *teamState, hca float64, allow3pt bool) (twoPtW, threePtW, foulW float64) {
+	raw3pt := 0.0
+	if allow3pt {
+		raw3pt = threePtBucketWeight(bh)
+	}
+	if !gs.freeze.BranchB {
+		foul := gs.foulWeight(offense.players, defense.players, hca)
+		return twoPtBucketWeight(bh) + hca, raw3pt, foul
+	}
+	raw2pt := twoPtBucketWeight(bh)
+	rawFoul := foulBucketWeight(offense.players, defense.players, 0)
+	s2, s3, sf := gs.branchBShrink(raw2pt, raw3pt, rawFoul, offense.drbRate, offense.astRate, bh.TransOff)
+	hcaFoulDelta := foulBucketWeight(offense.players, defense.players, hca) - rawFoul
+	return s2 + hca, s3, sf + hcaFoulDelta
+}
+
 // possession resolves one offensive trip: ball-handler selection, shot-type and
 // matchup resolution, the play-outcome path, and any free throws or rebounds.
 // Offensive rebounds continue the trip; a made shot, defensive rebound, or
@@ -126,11 +158,12 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPen
 		// Site 3: each offensive player's offQuality term is reduced by delta inside
 		// foulBucketWeight's divisor — the dominant, home-favorable term.
 		hca := hcaDelta(gs.gameType, offense.isHome)
+		twoPtW, threePtW, foulW := gs.playBuckets(bh, offense, defense, hca, true)
 		in := outcomeInputs{
-			twoPtWeight:      twoPtBucketWeight(bh) + hca,
-			threePtWeight:    threePtBucketWeight(bh),
+			twoPtWeight:      twoPtW,
+			threePtWeight:    threePtW,
 			andOneWeight:     andOneBucketWeight(mq, bh),
-			foulOnlyWeight:   gs.foulWeight(offense.players, defense.players, hca),
+			foulOnlyWeight:   foulW,
 			turnoverDefValue: energyCeiling(bh),
 		}
 

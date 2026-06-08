@@ -80,6 +80,7 @@
 
     /* Missing palette steps */
     --accent-700: var(--color-accent-700);
+    --accent-800: var(--color-accent-800);
     --success-400: var(--color-success-400);
     --success-700: var(--color-success-700);
     --error-400: var(--color-error-400);

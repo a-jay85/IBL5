@@ -3,6 +3,8 @@ import type { Page } from '@playwright/test';
 
 export interface A11yOptions {
   disableRules?: string[];
+  include?: string;
+  onlyRules?: string[];
 }
 
 /**
@@ -14,7 +16,13 @@ export async function assertNoA11yViolations(
   context?: string,
   options?: A11yOptions,
 ): Promise<void> {
-  let builder = new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']);
+  let builder = options?.onlyRules?.length
+    ? new AxeBuilder({ page }).withRules(options.onlyRules)
+    : new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']);
+
+  if (options?.include) {
+    builder = builder.include(options.include);
+  }
 
   if (options?.disableRules?.length) {
     builder = builder.disableRules(options.disableRules);

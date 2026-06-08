@@ -29,7 +29,7 @@
 .schedule-highlight-note {
     font-size: var(--text-sm);
     font-style: italic;
-    color: var(--gray-500);
+    color: var(--gray-600);
     margin: 0;
 }
 
@@ -38,7 +38,7 @@
     align-items: center;
     gap: 5px;
     padding: 5px 10px;
-    background: var(--accent-500);
+    background: var(--accent-700);
     color: white;
     font-size: 1rem;
     font-weight: 600;
@@ -51,7 +51,7 @@
 }
 
 .schedule-container a.schedule-jump-btn:hover {
-    background: var(--accent-600);
+    background: var(--accent-800);
     box-shadow: 0 3px 10px rgb(249 115 22 / 0.4);
 }
 
@@ -116,7 +116,7 @@
 }
 
 .schedule-month__header--playoffs {
-    background: var(--accent-500);
+    background: var(--accent-700);
 }
 
 /* Day Row */
@@ -220,14 +220,14 @@
 /* Winner styling */
 .schedule-game__team--win {
     font-weight: 700;
-    color: var(--accent-600);
+    color: var(--accent-700);
 }
 
 /* Team record (W-L) - inline with team name */
 .schedule-game__record {
     font-size: 1rem;
     font-weight: 400;
-    color: var(--gray-400);
+    color: var(--gray-600);
 }
 
 /* Team logo */
@@ -275,7 +275,7 @@
 }
 
 .schedule-game__score-link.schedule-game__team--win {
-    color: var(--accent-600);
+    color: var(--accent-700);
 }
 
 /* @ symbol */

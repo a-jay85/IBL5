@@ -40,6 +40,12 @@ jobs:
     name: Deploy Rehearsal (composer --no-dev + migrate + validate-schema)
     runs-on: ubuntu-latest
 
+    env:
+      DB_HOST: 127.0.0.1
+      DB_USER: root
+      DB_PASS: root
+      DB_NAME: iblhoops_ibl5
+
     services:
       mariadb:
         image: mariadb:10.11
@@ -71,14 +77,11 @@ jobs:
         working-directory: ibl5
         run: composer install --no-dev --no-interaction --optimize-autoloader
 
+      # config.php.example reads DB creds from getenv() with fallbacks; the
+      # job-level DB_* env vars point it at the CI MariaDB service.
       - name: Configure ibl5 to point at CI MariaDB
         working-directory: ibl5
-        run: |
-          cp config.php.example config.php
-          sed -i "s/\$dbhost = getenv('DB_HOST') ?: 'localhost';/\$dbhost = '127.0.0.1';/" config.php
-          sed -i "s/\$dbuname = \"iblhoops_\";/\$dbuname = \"root\";/" config.php
-          sed -i "s/\$dbpass = \"password\";/\$dbpass = \"root\";/" config.php
-          sed -i "s/\$dbname = \"iblhoops_\";/\$dbname = \"iblhoops_ibl5\";/" config.php
+        run: cp config.php.example config.php
 
       - name: Apply baseline schema
         working-directory: ibl5

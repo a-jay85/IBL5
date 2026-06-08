@@ -26,12 +26,11 @@ CI will immediately catch any contrast regression on promoted pages.
 Captured by running axe-core `color-contrast` against `http://main.localhost/ibl5/` with
 the current dev seed. Rerun whenever palette CSS changes land.
 
-### Pages currently enforced (contrast passes — 14 pages)
+### Pages currently enforced (contrast passes — 13 pages)
 
 | Page | URL |
 |------|-----|
 | standings | `modules.php?name=Standings` |
-| season leaderboards | `modules.php?name=SeasonLeaderboards` |
 | career leaderboards | `modules.php?name=CareerLeaderboards` |
 | draft history | `modules.php?name=DraftHistory` |
 | team page | `modules.php?name=Team&op=team&teamid=1` |
@@ -45,18 +44,19 @@ the current dev seed. Rerun whenever palette CSS changes land.
 | voting ASG ballot | `modules.php?name=Voting` (ASG phase) |
 | voting EOY ballot | `modules.php?name=Voting` (EOY phase) |
 
-### Pages in allowlist (contrast fails — 33 pages)
+### Pages in allowlist (contrast fails — 34 pages)
 
 Remove each entry from `CONTRAST_KNOWN_FAILING` in `ibl5/tests/e2e/smoke/accessibility.spec.ts`
 once the palette fix for that page is verified passing.
 
-**Public pages (27):**
+**Public pages (28):**
 
-> Note: `league starters` fails due to `.ibl-team-cell--colored` using DB-configured team colors (not PHP-Nuke palette). Fix requires enforcing WCAG-compliant color choices in team color configuration.
+> Note: `league starters` and `season leaderboards` fail due to `.ibl-team-cell--colored` using DB-configured team colors (not PHP-Nuke palette). Fix requires enforcing WCAG-compliant color choices in team color configuration. The dev-seed inventory previously listed `season leaderboards` as passing because no low-contrast team surfaced in its top-N rows; under the CI seed it does (intermittently, per ORDER BY tie ordering).
 
 | Page | URL |
 |------|-----|
 | league starters | `modules.php?name=LeagueStarters` |
+| season leaderboards | `modules.php?name=SeasonLeaderboards` |
 | homepage | `index.php` |
 | cap space | `modules.php?name=CapSpace` |
 | player page | `modules.php?name=Player&pa=showpage&pid=1` |

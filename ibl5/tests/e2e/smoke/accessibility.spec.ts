@@ -39,6 +39,10 @@ const CONTRAST_KNOWN_FAILING = new Set([
   'news article',
   // Pages with team-color contrast failures (ibl-team-cell--colored uses DB-configured team colors)
   'league starters',
+  // SeasonLeaderboards renders team-color cells via TeamCellHelper; which low-contrast team
+  // surfaces in the top-N depends on ORDER BY tie ordering, so the violation appeared
+  // intermittently in CI (the dev-seed inventory missed it). Same team-color debt as above.
+  'season leaderboards',
   // Auth pages
   'waivers',
   'trading',

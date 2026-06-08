@@ -53,6 +53,11 @@ test.describe('Admin entry-point scripts: non-admin gets 403', () => {
     const response = await page.goto('leagueControlPanel.php');
     expect(response?.status()).toBe(403);
   });
+
+  test('faprep.php returns 403', async ({ page }) => {
+    const response = await page.goto('faprep.php');
+    expect(response?.status()).toBe(403);
+  });
 });
 
 // ---------------------------------------------------------------------------

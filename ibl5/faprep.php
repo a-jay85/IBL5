@@ -6,6 +6,11 @@ require __DIR__ . '/mainfile.php';
 
 use Security\HtmlSanitizer;
 
+if (!is_admin()) {
+    http_response_code(403);
+    die('Forbidden');
+}
+
 /** @var mysqli $mysqli_db */
 
 $query = <<<'SQL'

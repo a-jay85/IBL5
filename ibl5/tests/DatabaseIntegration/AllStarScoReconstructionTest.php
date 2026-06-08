@@ -466,10 +466,11 @@ class AllStarScoReconstructionTest extends DatabaseTestCase
 
     public function testSeasonGateSkipsWithoutSentinel(): void
     {
-        $this->repo->deleteTeamBoxscoresByGame(self::RSG_DATE, self::RSG_VISITOR_TID, self::RSG_HOME_TID, 1);
-        $this->repo->deletePlayerBoxscoresByGame(self::RSG_DATE, self::RSG_VISITOR_TID, self::RSG_HOME_TID);
-        $this->repo->deleteTeamBoxscoresByGame(self::ASG_DATE, self::ASG_VISITOR_TID, self::ASG_HOME_TID, 1);
-        $this->repo->deletePlayerBoxscoresByGame(self::ASG_DATE, self::ASG_VISITOR_TID, self::ASG_HOME_TID);
+        // getLastBoxScoreDate() queries ibl_box_scores with no year filter.
+        // CI seed has modern games, so the 2007 all-star cutoff would always be exceeded
+        // unless we clear the table. DELETE is transactional (unlike TRUNCATE) so this
+        // rolls back in tearDown alongside all other mutations in this test.
+        $this->db->query('DELETE FROM ibl_box_scores');
         // Do NOT insert sentinel — gate should fire
 
         $result = $this->processor->processAllStarGamesData($this->buildBlock(), 2007);

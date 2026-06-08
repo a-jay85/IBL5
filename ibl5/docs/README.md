@@ -1,6 +1,6 @@
 ---
 description: Index of all IBL5 project documentation.
-last_verified: 2026-05-19
+last_verified: 2026-06-08
 ---
 
 # IBL5 Documentation Index
@@ -22,6 +22,7 @@ This directory is the primary home for all project documentation.
 | [DATABASE_GUIDE.md](DATABASE_GUIDE.md) | Schema reference and query patterns |
 | [API_GUIDE.md](API_GUIDE.md) | REST API overview — auth, rate limiting, ETag caching, controller inventory |
 | [DEVELOPMENT_ENVIRONMENT.md](DEVELOPMENT_ENVIRONMENT.md) | Docker setup, dependency caching, database connection |
+| [OPERATIONS_RUNBOOK.md](OPERATIONS_RUNBOOK.md) | Production ops — deploy, rollback, DB restore, logs, running without the harness |
 | [DOCUMENTATION_STANDARDS.md](DOCUMENTATION_STANDARDS.md) | Documentation organization and lifecycle |
 | [TESTING_STANDARDS.md](TESTING_STANDARDS.md) | Testing philosophy and conventions |
 | [decisions/README.md](decisions/README.md) | Architecture Decision Records (ADRs) — why each load-bearing decision was made |

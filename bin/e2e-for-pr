@@ -18,7 +18,9 @@ fi
 # Always resolve to the main repo root, even when run from a worktree.
 REPO_ROOT="$(cd "$(dirname "$0")/.." && \
     dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
-WORKTREE_PATH="$REPO_ROOT/worktrees/$WORKTREE_NAME"
+source "$(dirname "$0")/lib/git-helpers.sh"
+WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
+WORKTREE_PATH="$WT_PARENT/$WORKTREE_NAME"
 IBL5_DIR="$REPO_ROOT/ibl5"
 THRESHOLD="${E2E_THRESHOLD:-40}"
 

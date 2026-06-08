@@ -26,7 +26,7 @@ CI will immediately catch any contrast regression on promoted pages.
 Captured by running axe-core `color-contrast` against `http://main.localhost/ibl5/` with
 the current dev seed. Rerun whenever palette CSS changes land.
 
-### Pages currently enforced (contrast passes — 15 pages)
+### Pages currently enforced (contrast passes — 14 pages)
 
 | Page | URL |
 |------|-----|
@@ -36,7 +36,6 @@ the current dev seed. Rerun whenever palette CSS changes land.
 | draft history | `modules.php?name=DraftHistory` |
 | team page | `modules.php?name=Team&op=team&teamid=1` |
 | award history | `modules.php?name=AwardHistory` |
-| league starters | `modules.php?name=LeagueStarters` |
 | player database | `modules.php?name=PlayerDatabase` |
 | transaction history | `modules.php?name=TransactionHistory` |
 | voting results | `modules.php?name=VotingResults` |
@@ -46,15 +45,18 @@ the current dev seed. Rerun whenever palette CSS changes land.
 | voting ASG ballot | `modules.php?name=Voting` (ASG phase) |
 | voting EOY ballot | `modules.php?name=Voting` (EOY phase) |
 
-### Pages in allowlist (contrast fails — 32 pages)
+### Pages in allowlist (contrast fails — 33 pages)
 
 Remove each entry from `CONTRAST_KNOWN_FAILING` in `ibl5/tests/e2e/smoke/accessibility.spec.ts`
 once the palette fix for that page is verified passing.
 
-**Public pages (26):**
+**Public pages (27):**
+
+> Note: `league starters` fails due to `.ibl-team-cell--colored` using DB-configured team colors (not PHP-Nuke palette). Fix requires enforcing WCAG-compliant color choices in team color configuration.
 
 | Page | URL |
 |------|-----|
+| league starters | `modules.php?name=LeagueStarters` |
 | homepage | `index.php` |
 | cap space | `modules.php?name=CapSpace` |
 | player page | `modules.php?name=Player&pa=showpage&pid=1` |

@@ -37,6 +37,8 @@ const CONTRAST_KNOWN_FAILING = new Set([
   'news index',
   'news categories',
   'news article',
+  // Pages with team-color contrast failures (ibl-team-cell--colored uses DB-configured team colors)
+  'league starters',
   // Auth pages
   'waivers',
   'trading',

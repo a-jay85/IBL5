@@ -4,11 +4,54 @@ import { assertNoA11yViolations, type A11yOptions } from '../helpers/accessibili
 
 // Site-wide exclusions — explicit a11y debt tracker.
 // Each entry should have a comment explaining why it's excluded.
-const SITE_WIDE_DISABLED_RULES: string[] = [
-  'color-contrast', // PHP-Nuke legacy palette — nearly every page affected
-];
+const SITE_WIDE_DISABLED_RULES: string[] = [];
 
-const A11Y_OPTIONS: A11yOptions = { disableRules: SITE_WIDE_DISABLED_RULES };
+// Pages with known color-contrast failures — PHP-Nuke legacy palette debt.
+// See ibl5/docs/a11y-contrast-backlog.md for the full inventory and burn-down plan.
+// Remove entries as palette CSS fixes land; removals = ratchet tightening.
+const CONTRAST_KNOWN_FAILING = new Set([
+  // Public pages
+  'homepage',
+  'cap space',
+  'player page',
+  'activity tracker',
+  'all-star appearances',
+  'contract list',
+  'draft pick locator',
+  'franchise history',
+  'franchise record book',
+  'free agency preview',
+  'injuries',
+  'one on one game',
+  'player movement',
+  'projected draft order',
+  'record holders',
+  'schedule',
+  'search',
+  'season archive',
+  'season highs',
+  'series records',
+  'team off/def stats',
+  'team schedule',
+  'topics',
+  'news index',
+  'news categories',
+  'news article',
+  // Auth pages
+  'trading',
+  'depth chart entry',
+  'gm contact list',
+  'draft',
+  'next sim',
+]);
+
+function getA11yOptions(pageName: string): A11yOptions {
+  const disableRules = [...SITE_WIDE_DISABLED_RULES];
+  if (CONTRAST_KNOWN_FAILING.has(pageName)) {
+    disableRules.push('color-contrast');
+  }
+  return { disableRules };
+}
 
 // --- Public pages ---
 
@@ -59,7 +102,7 @@ publicTest.describe('Public page accessibility', () => {
   for (const { name, url } of publicPages) {
     publicTest(`${name} has no WCAG 2.1 AA violations`, async ({ page }) => {
       await page.goto(url);
-      await assertNoA11yViolations(page, `on ${url}`, A11Y_OPTIONS);
+      await assertNoA11yViolations(page, `on ${url}`, getA11yOptions(name));
     });
   }
 });
@@ -103,7 +146,7 @@ authTest.describe('Authenticated page accessibility', () => {
         await appState(state);
       }
       await page.goto(url);
-      await assertNoA11yViolations(page, `on ${url}`, A11Y_OPTIONS);
+      await assertNoA11yViolations(page, `on ${url}`, getA11yOptions(name));
     });
   }
 });

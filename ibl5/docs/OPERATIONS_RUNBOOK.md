@@ -111,10 +111,10 @@ mysql -e "DROP DATABASE IF EXISTS \`$DB\`; CREATE DATABASE \`$DB\`;"
   echo "SET FOREIGN_KEY_CHECKS=0;"
   gunzip -c "$DUMP" | perl -pe 's/ DEFINER=\S+ / /g'
   echo "SET FOREIGN_KEY_CHECKS=1;"
-} | mysql "$DB"
+} | mysql --force "$DB"
 ```
 
-Disabling FK checks is required: the single-pass dump is alphabetically ordered, so FK parents may appear after children. The `perl` strip removes `DEFINER` clauses that reference production users not present in a fresh database. This mirrors `bin/lib/db-helpers.sh`'s `db_import_sql` function.
+`--force` is required to continue past `ERROR 1906` (generated-column value warnings) without aborting the import. Disabling FK checks is required: the single-pass dump is alphabetically ordered, so FK parents may appear after children. The `perl` strip removes `DEFINER` clauses that reference production users not present in a fresh database. This mirrors `bin/lib/db-helpers.sh`'s `db_import_sql` function.
 
 ### Sanity checks after restore
 

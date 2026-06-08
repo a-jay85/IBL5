@@ -466,14 +466,15 @@ class AllStarScoReconstructionTest extends DatabaseTestCase
 
     public function testSeasonGateSkipsWithoutSentinel(): void
     {
-        // getLastBoxScoreDate() queries ibl_box_scores with no year filter.
-        // CI seed has modern games, so the 2007 all-star cutoff would always be exceeded
-        // unless we clear the table. DELETE is transactional (unlike TRUNCATE) so this
-        // rolls back in tearDown alongside all other mutations in this test.
-        $this->db->query('DELETE FROM ibl_box_scores');
-        // Do NOT insert sentinel — gate should fire
+        // Season::getLastBoxScoreDate() queries ibl_box_scores with no year filter.
+        // CI seed has modern games (dates >> 2007-02-04), so passing the real DB
+        // always makes the gate pass. Inject a Season stub that returns '' instead,
+        // so the gate fires correctly regardless of seed state.
+        $stubSeason = $this->createMock(\Season\Season::class);
+        $stubSeason->method('getLastBoxScoreDate')->willReturn('');
+        $processor = new BoxscoreProcessor($this->db, season: $stubSeason);
 
-        $result = $this->processor->processAllStarGamesData($this->buildBlock(), 2007);
+        $result = $processor->processAllStarGamesData($this->buildBlock(), 2007);
 
         self::assertTrue($result['success']);
         self::assertSame('All-Star Weekend not yet reached', $result['skipped'] ?? null);

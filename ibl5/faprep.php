@@ -14,10 +14,10 @@ if (!is_admin()) {
 /** @var mysqli $mysqli_db */
 
 $query = <<<'SQL'
-SELECT p.ordinal, p.name, p.age, t.team_name AS teamname, p.pos, p.coach, p.loyalty, p.playingTime,
-       p.winner, p.tradition, p.security, p.exp, p.sta
+SELECT p.ordinal, p.name, p.age, t.team_name AS teamname, p.pos, p.coach, p.loyalty, p.playing_time,
+       p.winner, p.tradition, p.security, p.exp, p.stamina
 FROM ibl_plr p
-LEFT JOIN ibl_team_info t ON p.tid = t.teamid
+LEFT JOIN ibl_team_info t ON p.teamid = t.teamid
 WHERE p.retired = 0
 ORDER BY p.ordinal ASC
 SQL;
@@ -56,12 +56,12 @@ $rows = $result instanceof mysqli_result ? $result->fetch_all(MYSQLI_ASSOC) : []
     <td><?= HtmlSanitizer::e($row['pos']) ?></td>
     <td><?= HtmlSanitizer::e($row['coach']) ?></td>
     <td><?= HtmlSanitizer::e($row['loyalty']) ?></td>
-    <td><?= HtmlSanitizer::e($row['playingTime']) ?></td>
+    <td><?= HtmlSanitizer::e($row['playing_time']) ?></td>
     <td><?= HtmlSanitizer::e($row['winner']) ?></td>
     <td><?= HtmlSanitizer::e($row['tradition']) ?></td>
     <td><?= HtmlSanitizer::e($row['security']) ?></td>
     <td><?= HtmlSanitizer::e($row['exp']) ?></td>
-    <td><?= HtmlSanitizer::e($row['sta']) ?></td>
+    <td><?= HtmlSanitizer::e($row['stamina']) ?></td>
 </tr>
 <?php endforeach; ?>
 </table>

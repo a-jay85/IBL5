@@ -325,4 +325,53 @@ class SavedDepthChartRepositoryTest extends DatabaseTestCase
         self::assertSame(102, $result['starters']['SG']);
         self::assertNull($result['starters']['SF']);
     }
+
+    // ── getWinLossRecord ───────────────────────────────────────────
+
+    public function testGetWinLossRecordCountsWinsAndLossesHomeAndAway(): void
+    {
+        // Team 1 within Jan 1–31: 2 wins (one away, one home), 2 losses (one away, one home).
+        $this->insertScheduleRow(2024, '2024-01-05', 1, 110, 2, 100); // away win
+        $this->insertScheduleRow(2024, '2024-01-10', 2, 90, 1, 120);  // home win
+        $this->insertScheduleRow(2024, '2024-01-15', 1, 80, 2, 95);   // away loss
+        $this->insertScheduleRow(2024, '2024-01-20', 2, 88, 1, 70);   // home loss
+
+        $record = $this->repo->getWinLossRecord(1, '2024-01-01', '2024-01-31');
+
+        // Regression guard: mysqli returns SUM() as strings, so an is_int()
+        // guard wrongly collapsed every record to 0-0 (see issue).
+        self::assertSame(2, $record['wins']);
+        self::assertSame(2, $record['losses']);
+    }
+
+    public function testGetWinLossRecordReturnsZeroZeroWhenNoGamesInWindow(): void
+    {
+        $record = $this->repo->getWinLossRecord(1, '2024-01-01', '2024-01-31');
+
+        self::assertSame(0, $record['wins']);
+        self::assertSame(0, $record['losses']);
+    }
+
+    public function testGetWinLossRecordExcludesGamesOutsideDateWindow(): void
+    {
+        $this->insertScheduleRow(2024, '2024-01-10', 1, 110, 2, 100); // in window, win
+        $this->insertScheduleRow(2024, '2024-03-01', 1, 115, 2, 100); // after window
+        $this->insertScheduleRow(2023, '2023-12-15', 2, 90, 1, 130);  // before window
+
+        $record = $this->repo->getWinLossRecord(1, '2024-01-01', '2024-01-31');
+
+        self::assertSame(1, $record['wins']);
+        self::assertSame(0, $record['losses']);
+    }
+
+    public function testGetWinLossRecordExcludesUnplayedGames(): void
+    {
+        $this->insertScheduleRow(2024, '2024-01-10', 1, 110, 2, 100); // played, win
+        $this->insertScheduleRow(2024, '2024-01-25', 1, 0, 2, 0);     // unplayed (0-0)
+
+        $record = $this->repo->getWinLossRecord(1, '2024-01-01', '2024-01-31');
+
+        self::assertSame(1, $record['wins']);
+        self::assertSame(0, $record['losses']);
+    }
 }

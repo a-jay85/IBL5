@@ -1,0 +1,302 @@
+#!/bin/bash
+# Advisory tool: reports CSS class selectors in ibl5/design/**/*.css that
+# appear in neither the source corpus nor (optionally) rendered HTML.
+# Exit 0 always (advisory); --strict exits 1 when candidates remain.
+set -euo pipefail
+
+SCRIPT_NAME=$(basename "$0")
+ROOT=$(git rev-parse --show-toplevel)
+
+# ── Flags ───────────────────────────────────────────────────────────────────
+DO_CRAWL=0
+BASE_URL=""
+STRICT=0
+SELF_TEST=0
+
+show_help() {
+    cat <<EOF
+Usage: $SCRIPT_NAME [options]
+
+Advisory tool: extracts class selectors from ibl5/design/**/*.css,
+filters those whose literal appears in the source corpus (PHP/JS/Twig/TPL/HTML),
+and optionally drops those that render in a live app crawl. Residue =
+candidates for human review -- not confirmed dead.
+
+Options:
+  --crawl              Enable step 3: crawl a running app to resolve
+                       dynamic composition (e.g. txn-badge--N).
+  --base-url <url>     App base URL for crawl (overrides ORPHAN_CSS_BASE_URL).
+                       Default derived from worktree slug:
+                       http://<slug>.localhost/ibl5/
+  --strict             Exit 1 when candidates remain (local enforcement only).
+  --self-test          Build throwaway fixtures and test filter logic; exit.
+                       Tests both directions: referenced class not flagged,
+                       absent class flagged, boundary correctness (alert not
+                       matched by alert-error). Offline -- no app needed.
+  --help, -h           Show this message.
+
+Self-test:
+  $SCRIPT_NAME --self-test
+
+EOF
+}
+
+# ── Argument parsing ─────────────────────────────────────────────────────────
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --crawl)       DO_CRAWL=1; shift ;;
+        --base-url)    BASE_URL="$2"; shift 2 ;;
+        --strict)      STRICT=1; shift ;;
+        --self-test)   SELF_TEST=1; shift ;;
+        --help|-h)     show_help; exit 0 ;;
+        *)             echo "Unknown option: $1" >&2; show_help; exit 2 ;;
+    esac
+done
+
+# ── Source-filter helper ─────────────────────────────────────────────────────
+# Returns 0 if class appears (bounded) in any .php/.js/.twig/.tpl/.html file
+# under SEARCH_DIR, excluding vendor/, node_modules/, design/ subdirs.
+class_in_source() {
+    local cls="$1"
+    local search_dir="$2"
+    grep -rlqE \
+        "(^|[^A-Za-z0-9_-])${cls}([^A-Za-z0-9_-]|\$)" \
+        --include='*.php' --include='*.js' --include='*.twig' \
+        --include='*.tpl' --include='*.html' \
+        --exclude-dir=vendor --exclude-dir=node_modules --exclude-dir=design \
+        "$search_dir" 2>/dev/null
+}
+
+# ── Self-test ────────────────────────────────────────────────────────────────
+run_self_test() {
+    local fixture_dir pass
+    fixture_dir=$(mktemp -d)
+    pass=1
+
+    local src_dir="$fixture_dir/src"
+    mkdir -p "$src_dir"
+
+    # CSS: live-class (referenced in source) + dead-orphan-class (absent)
+    cat >"$fixture_dir/test.css" <<'CSSEOF'
+.live-class { color: red; }
+.dead-orphan-class { color: blue; }
+CSSEOF
+
+    # Source: only references live-class
+    cat >"$src_dir/template.php" <<'PHPEOF'
+<div class="live-class other">test</div>
+PHPEOF
+
+    local candidates_file residue_file
+    candidates_file=$(mktemp)
+    residue_file=$(mktemp)
+
+    grep -oE '\.[A-Za-z_][A-Za-z0-9_-]*' "$fixture_dir/test.css" \
+        | sed 's/^\.//' \
+        | sort -u >"$candidates_file"
+
+    while read -r cls; do
+        if ! class_in_source "$cls" "$src_dir"; then
+            echo "$cls" >>"$residue_file"
+        fi
+    done <"$candidates_file"
+
+    if grep -qx "live-class" "$residue_file" 2>/dev/null; then
+        echo "FAIL: live-class should NOT be flagged but was" >&2
+        pass=0
+    else
+        echo "PASS: live-class correctly NOT flagged"
+    fi
+
+    if ! grep -qx "dead-orphan-class" "$residue_file" 2>/dev/null; then
+        echo "FAIL: dead-orphan-class should be flagged but was not" >&2
+        pass=0
+    else
+        echo "PASS: dead-orphan-class correctly flagged"
+    fi
+
+    # Boundary test: "alert" must NOT be matched by presence of "alert-error"
+    local boundary_css="$fixture_dir/boundary.css"
+    local boundary_src="$src_dir/boundary.php"
+    printf '.alert { color: red; }\n' >"$boundary_css"
+    printf '<div class="alert-error">x</div>\n' >"$boundary_src"
+
+    local boundary_cands boundary_residue
+    boundary_cands=$(mktemp)
+    boundary_residue=$(mktemp)
+
+    grep -oE '\.[A-Za-z_][A-Za-z0-9_-]*' "$boundary_css" \
+        | sed 's/^\.//' \
+        | sort -u >"$boundary_cands"
+
+    while read -r cls; do
+        if ! class_in_source "$cls" "$src_dir"; then
+            echo "$cls" >>"$boundary_residue"
+        fi
+    done <"$boundary_cands"
+
+    if ! grep -qx "alert" "$boundary_residue" 2>/dev/null; then
+        echo "FAIL: boundary test -- 'alert' not matched by 'alert-error' should be flagged" >&2
+        pass=0
+    else
+        echo "PASS: boundary test -- 'alert' not spared by 'alert-error'"
+    fi
+
+    rm -rf "$fixture_dir" "$candidates_file" "$residue_file" \
+        "$boundary_cands" "$boundary_residue" 2>/dev/null || true
+
+    if [ "$pass" = "1" ]; then
+        echo "PASS: all self-test assertions OK"
+        return 0
+    else
+        echo "FAIL: self-test had failures" >&2
+        return 1
+    fi
+}
+
+if [ "$SELF_TEST" = "1" ]; then
+    run_self_test
+    exit $?
+fi
+
+# ── Step 1: CSS extraction ───────────────────────────────────────────────────
+# Extract class selectors from ibl5/design/**/*.css only (not .md) --
+# extracting from .md produced phantom names (injury-table, ibl-section-title)
+# during the manual analysis run.
+echo "=== Orphan CSS Candidate Report ==="
+echo ""
+echo "Step 1: Extracting class selectors from ibl5/design/**/*.css"
+
+CSS_DIR="$ROOT/ibl5/design"
+CANDIDATES=$(mktemp)
+
+while read -r cssfile; do
+    grep -oE '\.[A-Za-z_][A-Za-z0-9_-]*' "$cssfile" 2>/dev/null \
+        | sed 's/^\.//' \
+        || true
+done < <(find "$CSS_DIR" -name '*.css') \
+    | sort -u >"$CANDIDATES"
+
+total_classes=$(wc -l <"$CANDIDATES" | tr -d ' ')
+echo "  Found $total_classes unique class selectors"
+echo ""
+
+# ── Step 2: Source-literal filter ────────────────────────────────────────────
+# Token-boundary match: class must appear bounded by non-class characters so
+# that e.g. "alert" is not marked present merely because "alert-error" exists.
+echo "Step 2: Filtering against source corpus (PHP/JS/Twig/TPL/HTML)"
+echo "  Corpus: ibl5/**/*.{php,js,twig,tpl,html}"
+echo "  Excluded: vendor/, node_modules/, design/"
+echo ""
+
+RESIDUE=$(mktemp)
+while read -r cls; do
+    if ! class_in_source "$cls" "$ROOT/ibl5"; then
+        echo "$cls" >>"$RESIDUE"
+    fi
+done <"$CANDIDATES"
+
+source_filtered=$(wc -l <"$RESIDUE" | tr -d ' ')
+removed=$((total_classes - source_filtered))
+echo "  $removed classes found in source corpus (removed)"
+echo "  $source_filtered remain after source filter"
+echo ""
+
+# ── Step 3: Compiled-HTML crawl (opt-in --crawl) ─────────────────────────────
+# Crawl is deliberately excluded from CI: CI's test-seed DB renders fewer
+# data/role/state-gated pages than prod, producing more false candidates.
+# Full crawl is a local --crawl invocation against a prod-seeded worktree.
+LIVE_TOKENS=$(mktemp)
+if [ "$DO_CRAWL" = "1" ]; then
+    if [ -z "$BASE_URL" ]; then
+        if [ -n "${ORPHAN_CSS_BASE_URL:-}" ]; then
+            BASE_URL="$ORPHAN_CSS_BASE_URL"
+        else
+            SLUG=$(basename "$(git rev-parse --show-toplevel)")
+            BASE_URL="http://${SLUG}.localhost/ibl5/"
+        fi
+    fi
+
+    echo "Step 3: Crawling app routes (base URL: $BASE_URL)"
+    echo ""
+
+    # Representative route list -- extend as needed without code surgery
+    ROUTES=(
+        ""
+        "modules.php?name=Standings"
+        "modules.php?name=Schedule"
+        "modules.php?name=Roster"
+        "modules.php?name=DepthChart"
+        "modules.php?name=PlayerView"
+        "modules.php?name=TeamSplits"
+        "modules.php?name=News"
+        "modules.php?name=Waivers"
+        "modules.php?name=TransactionHistory"
+        "modules.php?name=RecordHolders"
+        "modules.php?name=SeasonArchive"
+        "modules.php?name=Search"
+        "modules.php?name=AllStarGame"
+    )
+
+    for route in "${ROUTES[@]}"; do
+        url="${BASE_URL}${route}"
+        echo "  Crawling: $url"
+        # Extract whole space-delimited class tokens; use awk+tr (not sed)
+        # for BSD compatibility (BSD sed 's/[\t]//g' strips literal t)
+        curl -s --max-time 10 "$url" 2>/dev/null \
+            | grep -oE 'class="[^"]*"' \
+            | awk -F'"' '{print $2}' \
+            | tr ' ' '\n' \
+            | grep -v '^$' \
+            >>"$LIVE_TOKENS" || true
+    done
+
+    sort -u -o "$LIVE_TOKENS" "$LIVE_TOKENS"
+    echo ""
+    echo "  NOTE: Routes/states NOT in this list are NOT covered --"
+    echo "  un-crawled forms (auth/POST), role/state/data-gated UI may emit"
+    echo "  classes not seen here."
+    echo ""
+
+    # Whole-token equality (not substring) -- the one hard LIVE proof
+    RESIDUE2=$(mktemp)
+    while read -r cls; do
+        if ! grep -qxF "$cls" "$LIVE_TOKENS" 2>/dev/null; then
+            echo "$cls" >>"$RESIDUE2"
+        fi
+    done <"$RESIDUE"
+    mv "$RESIDUE2" "$RESIDUE"
+
+    crawl_count=$(wc -l <"$RESIDUE" | tr -d ' ')
+    echo "  $crawl_count remain after crawl filter"
+    echo ""
+fi
+
+# ── Step 4: Report ────────────────────────────────────────────────────────────
+candidate_count=$(wc -l <"$RESIDUE" | tr -d ' ')
+echo "=== Candidates for review: $candidate_count ==="
+echo ""
+
+if [ "$candidate_count" = "0" ]; then
+    echo "No candidates found."
+else
+    while read -r cls; do
+        echo "  $cls -- candidate: verify (may be data/role/state/layout-gated or composed; NOT confirmed dead)"
+    done <"$RESIDUE"
+    echo ""
+    if [ "$DO_CRAWL" = "0" ]; then
+        echo "NOTE: no source literal found; run --crawl against a prod-seeded app"
+        echo "to resolve dynamic composition (e.g. txn-badge--N) before treating"
+        echo "any class as dead."
+    fi
+fi
+
+# ── Cleanup ───────────────────────────────────────────────────────────────────
+rm -f "$CANDIDATES" "$RESIDUE" "$LIVE_TOKENS" 2>/dev/null || true
+
+# ── Step 5: Exit policy ───────────────────────────────────────────────────────
+# Advisory: exits 0 by default; --strict exits 1 when candidates remain.
+if [ "$STRICT" = "1" ] && [ "$candidate_count" -gt 0 ]; then
+    exit 1
+fi
+exit 0

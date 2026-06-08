@@ -47,6 +47,12 @@ $user_prefix = "nuke";
 $dbtype = "MySQL";
 $sitekey = "key";
 $subscription_url = "";
+# $admin_file: Administration panel filename. Rename admin.php for security and
+#              update this value to the new filename (without the .php extension).
+$admin_file = "admin";
+
+# IBL6_BASE_URL: Base URL for the companion IBL6 application.
+define('IBL6_BASE_URL', '');
 
 # DEMO_LOGIN_TOKEN — magic-link token for the read-only demo/hiring-manager
 # session (ibl5/demo-login.php). Set to a random 32+ char value in production.

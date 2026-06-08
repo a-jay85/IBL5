@@ -164,6 +164,7 @@
 @import './components/htmx.css';
 @import './components/debug.css';
 @import './components/last-sim-recap.css';
+@import './components/block-fa-admin.css';
 
 /* Site-wide layout wrapper (replaces legacy themeheader table) */
 @layer components {

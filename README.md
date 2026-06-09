@@ -1,118 +1,78 @@
 ---
-description: "IBL5 project overview: tech stack, quick start, and docs index."
-last_verified: 2026-04-29
+description: "IBL5 project overview: what it is, the engineering practices behind it, and how to run it."
+last_verified: 2026-06-08
 ---
 
-# IBL5 - Internet Basketball League
+# IBL5 — Internet Basketball League
 
-A fantasy basketball league website powered by the Jump Shot Basketball simulation engine. Managers draft, trade, and manage rosters of simulated players competing in a structured league season.
+A production fantasy-basketball league platform built around the Jump Shot Basketball simulation engine. League managers draft, trade, sign free agents, and set strategy for simulated teams that play out a full season — standings, box scores, playoffs, awards, and a permanent season archive.
+
+The codebase began in 2020 as inherited PHP-Nuke legacy code and has been incrementally modernized into a typed, tested, statically-analyzed PHP 8.5 application — without ever taking the live league offline.
 
 ![IBL Season Archive](ibl5/docs/images/season-archive.png)
 
+## What this project demonstrates
+
+This is a solo-maintained, long-running application, so it doubles as a portfolio of sustained engineering discipline on a real system with real users:
+
+- **Strangler-fig modernization** — 80+ feature modules extracted from procedural legacy code into an interface-driven Repository / Service / View pattern, one slice at a time, behind passing tests.
+- **Tests as a safety net for legacy refactoring** — hundreds of PHPUnit test files plus a Playwright E2E suite, with characterization tests written *before* extracting each module so behavior is provably preserved.
+- **Static analysis at the ceiling** — PHPStan at `level: max` with strict-rules, deprecation-rules, bleedingEdge, and a set of custom project-specific PHPStan rules that ban known footguns (e.g. raw SQL identifier drift).
+- **Mutation testing** — Infection enforces test *effectiveness*, not just coverage, on critical modules.
+- **Heavy CI/CD** — 20+ GitHub Actions workflows covering unit/integration tests, E2E, static analysis, mutation, CodeQL, secret scanning, Lighthouse performance/a11y budgets, migration safety checks, and deploy rehearsals.
+- **Decision records** — dozens of ADRs documenting the *why* behind architectural choices.
+
 ## Tech Stack
 
-- **Backend:** PHP 8.4, MariaDB 10.11
-- **Local Dev:** Docker (Apache/PHP + MariaDB 10.11)
-- **Testing:** PHPUnit 13, PHPStan (level max + strict-rules + bleedingEdge), Playwright (E2E)
-- **CI/CD:** GitHub Actions
-- **Frontend:** Tailwind CSS 4, vanilla JS
+- **Backend:** PHP 8.5, MariaDB 10.11
+- **Frontend:** Tailwind CSS 4, vanilla JS, HTMX
+- **Testing:** PHPUnit 13, PHPStan (level max + strict-rules + custom rules), Infection (mutation), Playwright (E2E)
+- **Infra:** Docker (Apache/PHP + MariaDB), GitHub Actions CI/CD
+- **Database:** versioned SQL migrations from a baseline schema
+
+## Architecture
+
+Every modernized module follows an interface-driven **Repository / Service / View** split:
+
+```
+Module/
+├── Contracts/                 # Interfaces — Repository, Service, View
+├── ModuleRepository.php       # Data access (prepared statements only)
+├── ModuleService.php          # Business logic + validation
+└── ModuleView.php             # HTML rendering (XSS-escaped)
+```
+
+`ibl5/classes/Waivers/` is the canonical, fully-built-out example (Repository, Service, Processor, Validator, View, Controller).
 
 ## Quick Start
 
 ```bash
-# 1. Clone and install
-git clone git@github.com:a-jay85/IBL5.git && cd IBL5
-cd ibl5 && composer install && cd ..
+git clone git@github.com:a-jay85/IBL5.git
+cd IBL5/ibl5 && composer install && cd ..
 
-# 2. Start Docker (Apache/PHP + MariaDB)
-docker compose up -d
-
-# 3. Run tests (from ibl5/)
-vendor/bin/phpunit
+docker compose up -d          # Apache/PHP + MariaDB
+cd ibl5 && vendor/bin/phpunit  # run the test suite
 ```
 
-See [DOCKER_SETUP.md](ibl5/docs/DOCKER_SETUP.md) for detailed Docker setup and [DEVELOPMENT_ENVIRONMENT.md](ibl5/docs/DEVELOPMENT_ENVIRONMENT.md) for dependency caching.
+See [DOCKER_SETUP.md](ibl5/docs/DOCKER_SETUP.md) for full setup.
 
-## Project Structure
-
-```
-IBL5/
-├── ibl5/
-│   ├── classes/              # 77 modules (Repository/Service/View pattern)
-│   │   ├── Waivers/          #   Canonical example (full RSV + Controller)
-│   │   ├── Player/
-│   │   ├── FreeAgency/
-│   │   ├── Trading/
-│   │   └── ...
-│   ├── tests/                # PHPUnit + Playwright test suites
-│   ├── docs/                 # Project documentation
-│   ├── migrations/           # SQL migrations (000 = baseline schema)
-│   ├── modules/              # Legacy PHP-Nuke entry points
-│   ├── db/                   # Database connection setup
-│   └── design/               # CSS source files (Tailwind)
-├── bin/                      # Dev scripts (db-migrate, wt-new, etc.)
-├── .claude/                  # Claude Code rules and skills
-├── .github/                  # CI/CD workflows
-└── CLAUDE.md                 # AI agent instructions
-```
-
-## Architecture
-
-All modules use an **interface-driven Repository/Service/View** pattern:
-
-```
-Module/
-├── Contracts/
-│   ├── ModuleRepositoryInterface.php
-│   ├── ModuleServiceInterface.php
-│   └── ModuleViewInterface.php
-├── ModuleRepository.php      # Database queries (prepared statements)
-├── ModuleService.php         # Business logic, validation
-└── ModuleView.php            # HTML rendering (XSS-protected)
-```
-
-See `ibl5/classes/Waivers/` for the canonical example (Repository, Service, Processor, Validator, View, Controller).
-
-## Testing
+## Testing & Quality (run from `ibl5/`)
 
 ```bash
-# All commands below run from ibl5/
-
-# Run all tests
-vendor/bin/phpunit
-
-# Run a specific module's tests
-vendor/bin/phpunit --filter Player
-
-# Run static analysis
-composer run analyse
-
-# Run E2E tests (requires Docker)
-bun run test:e2e
+vendor/bin/phpunit                 # unit + integration tests
+vendor/bin/phpunit --filter Player # one module
+composer run analyse               # PHPStan, level max
+bun run test:e2e                   # Playwright E2E (requires Docker)
 ```
-
-**Current:** 4851 tests, 27370 assertions | PHPStan level max
 
 ## Documentation
 
-All project documentation lives in [`ibl5/docs/`](ibl5/docs/README.md):
+Deeper docs live in [`ibl5/docs/`](ibl5/docs/README.md):
 
 | Guide | Description |
 |-------|-------------|
-| [DEVELOPMENT_GUIDE.md](ibl5/docs/DEVELOPMENT_GUIDE.md) | Development standards and priorities |
+| [DEVELOPMENT_GUIDE.md](ibl5/docs/DEVELOPMENT_GUIDE.md) | Standards and conventions |
 | [DATABASE_GUIDE.md](ibl5/docs/DATABASE_GUIDE.md) | Schema reference and query patterns |
-| [TESTING_STANDARDS.md](ibl5/docs/TESTING_STANDARDS.md) | Testing conventions and patterns |
-| [DOCKER_SETUP.md](ibl5/docs/DOCKER_SETUP.md) | Docker environment setup |
-| [REFACTORING_HISTORY.md](ibl5/docs/REFACTORING_HISTORY.md) | Complete module refactoring timeline |
-| [STRATEGIC_PRIORITIES.md](ibl5/docs/STRATEGIC_PRIORITIES.md) | Post-refactoring roadmap |
-| [DEVELOPMENT_ENVIRONMENT.md](ibl5/docs/DEVELOPMENT_ENVIRONMENT.md) | Dependency caching and dev tooling |
-
-For AI agents, see [CLAUDE.md](CLAUDE.md).
-
-## Current Status
-
-| Metric | Value |
-|--------|-------|
-| Class modules | 77 |
-| Tests | 4851 (27370 assertions) |
-| Architecture | Interface-driven Repository/Service/View |
+| [TESTING_STANDARDS.md](ibl5/docs/TESTING_STANDARDS.md) | Testing patterns and gotchas |
+| [REFACTORING_HISTORY.md](ibl5/docs/REFACTORING_HISTORY.md) | Module-by-module modernization timeline |
+| [decisions/](ibl5/docs/decisions/) | Architecture Decision Records (ADRs) |

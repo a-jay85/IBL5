@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Toggle the chrome-devtools MCP server on/off in ~/.claude/settings.json.
+#
+# Disabled by default to save context tokens (its ~26 tool schemas otherwise
+# load into every session). MCP config is read only at process startup, so
+# `/mcp` cannot live-enable it — after turning it ON, resume the current
+# conversation with `claude -c`, which starts a fresh process (re-reading
+# settings) while preserving context.
+#
+# Usage: bin/mcp-chrome {on|off|status}
+set -euo pipefail
+
+SETTINGS="$HOME/.claude/settings.json"
+SERVER="chrome-devtools"
+
+command -v jq >/dev/null 2>&1 || { echo "jq is required" >&2; exit 1; }
+[ -f "$SETTINGS" ] || { echo "No settings file at $SETTINGS" >&2; exit 1; }
+
+is_disabled() {
+  jq -e --arg s "$SERVER" \
+    '(.disabledMcpjsonServers // []) | index($s) != null' "$SETTINGS" >/dev/null
+}
+
+write() {
+  local tmp
+  tmp=$(mktemp)
+  jq --indent 2 "$1" "$SETTINGS" > "$tmp" && mv "$tmp" "$SETTINGS"
+}
+
+case "${1:-status}" in
+  on)
+    write '.disabledMcpjsonServers = ((.disabledMcpjsonServers // []) - ["'"$SERVER"'"])'
+    echo "$SERVER ENABLED. Resume this conversation with:  claude -c"
+    ;;
+  off)
+    write '.disabledMcpjsonServers = ((.disabledMcpjsonServers // []) + ["'"$SERVER"'"] | unique)'
+    echo "$SERVER DISABLED (saves tokens). Takes effect on next session start."
+    ;;
+  status)
+    if is_disabled; then echo "$SERVER: OFF (disabled)"; else echo "$SERVER: ON (enabled)"; fi
+    ;;
+  *)
+    echo "Usage: $(basename "$0") {on|off|status}" >&2
+    exit 1
+    ;;
+esac

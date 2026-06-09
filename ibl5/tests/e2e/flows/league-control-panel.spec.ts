@@ -86,6 +86,43 @@ test.describe('LeagueControlPanel — Finals MVP flow', () => {
   });
 });
 
+// Update Tradition — the migrated tradition.php flow. The button lives in the
+// Free Agency controls section, so the test sets Free Agency phase first (CI
+// seed default, but set explicitly to stay self-sufficient), clicks the new
+// guarded POST button, and asserts the PRG success flash. The asserted text
+// comes from the Processor return string, so it is engine-/seed-independent.
+
+test.describe('LeagueControlPanel — Update Tradition', () => {
+  test('update_tradition button submits and shows success flash', async ({
+    page,
+  }) => {
+    // Ensure Free Agency phase so the FA controls (incl. this button) render
+    await page.goto('leagueControlPanel.php');
+    const phaseSelect = page.locator('select[name="SeasonPhase"]');
+    await phaseSelect.selectOption('Free Agency');
+    const phaseButton = page.locator('button[value="set_season_phase"]');
+    await Promise.all([
+      page.waitForURL(/success=/),
+      phaseButton.click(),
+    ]);
+    await assertNoPhpErrors(page, 'after setting phase to Free Agency');
+
+    const traditionButton = page.locator('button[value="update_tradition"]');
+    await expect(traditionButton).toBeVisible();
+
+    await Promise.all([
+      page.waitForURL(/success=/),
+      traditionButton.click(),
+    ]);
+
+    await assertNoPhpErrors(page, 'after update_tradition click');
+    await expect(page.locator('.ibl-alert--success')).toBeVisible();
+
+    const body = await page.locator('body').textContent();
+    expect(body).toContain('tradition factors updated');
+  });
+});
+
 // Generate Season Awards — tests the button visibility and error path.
 // The LCP reads phase from the DB directly (not cookie overrides), so
 // phase must be set via form submission. CI uses a fresh DB per run;

@@ -8,6 +8,7 @@ use League\LeagueContext;
 use LeagueControlPanel\Contracts\AwardGenerationServiceInterface;
 use LeagueControlPanel\Contracts\LeagueControlPanelRepositoryInterface;
 use LeagueControlPanel\LeagueControlPanelProcessor;
+use Scripts\Contracts\MaintenanceRepositoryInterface;
 use Logging\LoggerFactory;
 use Monolog\Handler\TestHandler;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -598,6 +599,7 @@ class LeagueControlPanelProcessorTest extends TestCase
             ['reset_eoy_voting'],
             ['set_waivers_to_free_agents'],
             ['set_fa_factors_pfw'],
+            ['update_tradition'],
             ['generate_awards'],
             ['set_finals_mvp'],
         ];
@@ -611,6 +613,59 @@ class LeagueControlPanelProcessorTest extends TestCase
 
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('not available', $result['message']);
+    }
+
+    // --- update_tradition ---
+
+    public function testUpdateTraditionUpdatesEachTeamWithRoundedAverages(): void
+    {
+        $maintenanceMock = $this->createMock(MaintenanceRepositoryInterface::class);
+        $maintenanceMock->method('getAllTeams')->willReturn([['team_name' => 'Miami']]);
+        $maintenanceMock->method('getTeamRecentCompleteSeasons')->willReturn([
+            ['wins' => 50, 'losses' => 32],
+            ['wins' => 41, 'losses' => 41],
+            ['wins' => 45, 'losses' => 37],
+        ]);
+        // avg wins 45.33 -> 45, avg losses 36.67 -> 37
+        $maintenanceMock->expects($this->once())
+            ->method('updateTeamTradition')
+            ->with('Miami', 45, 37);
+
+        $stub = self::createStub(LeagueControlPanelRepositoryInterface::class);
+        $awardStub = self::createStub(AwardGenerationServiceInterface::class);
+        $processor = new LeagueControlPanelProcessor($stub, $awardStub, LeagueContext::LEAGUE_IBL, $maintenanceMock);
+
+        $result = $processor->dispatch('update_tradition', []);
+
+        $this->assertTrue($result['success']);
+        $this->assertStringContainsString('1 team', $result['message']);
+    }
+
+    public function testUpdateTraditionSkipsTeamWithZeroCompleteSeasons(): void
+    {
+        $maintenanceMock = $this->createMock(MaintenanceRepositoryInterface::class);
+        $maintenanceMock->method('getAllTeams')->willReturn([['team_name' => 'Miami']]);
+        $maintenanceMock->method('getTeamRecentCompleteSeasons')->willReturn([]);
+        $maintenanceMock->expects($this->never())->method('updateTeamTradition');
+
+        $stub = self::createStub(LeagueControlPanelRepositoryInterface::class);
+        $awardStub = self::createStub(AwardGenerationServiceInterface::class);
+        $processor = new LeagueControlPanelProcessor($stub, $awardStub, LeagueContext::LEAGUE_IBL, $maintenanceMock);
+
+        $result = $processor->dispatch('update_tradition', []);
+
+        $this->assertTrue($result['success']);
+        $this->assertStringContainsString('0 team', $result['message']);
+    }
+
+    public function testUpdateTraditionWithoutMaintenanceRepositoryReturnsFailure(): void
+    {
+        $processor = $this->createProcessorWithStub();
+
+        $result = $processor->dispatch('update_tradition', []);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('maintenance repository not configured', $result['message']);
     }
 
     private function createProcessorWithStub(): LeagueControlPanelProcessor

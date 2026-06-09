@@ -8,6 +8,7 @@ use League\LeagueContext;
 use LeagueControlPanel\Contracts\AwardGenerationServiceInterface;
 use LeagueControlPanel\Contracts\LeagueControlPanelProcessorInterface;
 use LeagueControlPanel\Contracts\LeagueControlPanelRepositoryInterface;
+use Scripts\Contracts\MaintenanceRepositoryInterface;
 use Discord\Discord;
 
 /**
@@ -35,15 +36,18 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
     private LeagueControlPanelRepositoryInterface $repository;
     private AwardGenerationServiceInterface $awardGenerationService;
     private string $league;
+    private ?MaintenanceRepositoryInterface $maintenanceRepository;
 
     public function __construct(
         LeagueControlPanelRepositoryInterface $repository,
         AwardGenerationServiceInterface $awardGenerationService,
         string $league = LeagueContext::LEAGUE_IBL,
+        ?MaintenanceRepositoryInterface $maintenanceRepository = null,
     ) {
         $this->repository = $repository;
         $this->awardGenerationService = $awardGenerationService;
         $this->league = $league;
+        $this->maintenanceRepository = $maintenanceRepository;
     }
 
     /**
@@ -72,6 +76,7 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
             'reset_eoy_voting' => $this->resetEoyVoting(),
             'set_waivers_to_free_agents' => $this->setWaiversToFreeAgents(),
             'set_fa_factors_pfw' => $this->setFaFactorsPfw($postData),
+            'update_tradition' => $this->updateTradition(),
             'generate_awards' => $this->generateAwards($postData),
             'set_finals_mvp' => $this->setFinalsMvp($postData),
             default => ['success' => false, 'message' => 'Unknown action: ' . $action],
@@ -368,5 +373,43 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
         $this->repository->upsertAward($year, 'IBL Finals MVP', $name);
 
         return ['success' => true, 'message' => 'IBL Finals MVP set to ' . $name . ' for ' . $year . '.'];
+    }
+
+    /**
+     * Recompute and persist each team's free-agency tradition factors
+     * (rounded average W/L over the last 5 complete seasons).
+     *
+     * @return array{success: bool, message: string}
+     */
+    private function updateTradition(): array
+    {
+        if ($this->maintenanceRepository === null) {
+            return ['success' => false, 'message' => 'Tradition update is unavailable: maintenance repository not configured.'];
+        }
+
+        $updated = 0;
+        $teams = $this->maintenanceRepository->getAllTeams();
+        foreach ($teams as $team) {
+            $teamName = $team['team_name'];
+            $seasons = $this->maintenanceRepository->getTeamRecentCompleteSeasons($teamName, 5);
+            $seasonCount = count($seasons);
+            if ($seasonCount === 0) {
+                continue; // teams with 0 complete seasons are SKIPPED (preserve boundary behavior)
+            }
+
+            $totalWins = 0;
+            $totalLosses = 0;
+            foreach ($seasons as $season) {
+                $totalWins += (int) $season['wins'];
+                $totalLosses += (int) $season['losses'];
+            }
+
+            $avgWins = (int) round($totalWins / $seasonCount);
+            $avgLosses = (int) round($totalLosses / $seasonCount);
+            $this->maintenanceRepository->updateTeamTradition($teamName, $avgWins, $avgLosses);
+            $updated++;
+        }
+
+        return ['success' => true, 'message' => 'Free agency tradition factors updated for ' . $updated . ' team(s).'];
     }
 }

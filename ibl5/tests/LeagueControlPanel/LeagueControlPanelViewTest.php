@@ -170,7 +170,7 @@ class LeagueControlPanelViewTest extends TestCase
         $this->assertStringContainsString('value="reset_contract_extensions"', $html);
         $this->assertStringContainsString('value="reset_mles_lles"', $html);
         $this->assertStringContainsString('value="set_fa_factors_pfw"', $html);
-        $this->assertStringContainsString('tradition.php', $html);
+        $this->assertStringContainsString('value="update_tradition"', $html);
         $this->assertStringContainsString('value="toggle_fa_notifications"', $html);
         $this->assertStringContainsString('value="set_allow_waivers"', $html);
         $this->assertStringContainsString('value="set_waivers_to_free_agents"', $html);

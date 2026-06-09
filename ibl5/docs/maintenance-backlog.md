@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-06-08
+last_verified: 2026-06-09
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -1234,6 +1234,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Archive scratchpad; verify tradition.php usage and migrate to Service class or document as legacy.
 **Est. effort:** S
 **Risk if untouched:** Maintenance burden on unclear-status scripts.
+**Status:** Tradition half resolved (2026-06-09) — `scripts/tradition.php` deleted; its compute loop migrated into `LeagueControlPanelProcessor::updateTradition()` behind the LCP `is_admin()` guard. `plrScratchpad.php` archiving still open.
 
 ### 8.6 `classes/Scripts/` vs `scripts/` Overlap
 **Location:** Both directories
@@ -1290,6 +1291,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Audit auth; move to authenticated POST endpoints.
 **Est. effort:** M
 **Risk if untouched:** Unauthorized script execution; accidental data corruption.
+**Status:** Tradition half resolved (2026-06-09) — unauthenticated `scripts/tradition.php` deleted; mutation now runs only via the `is_admin()`-guarded `update_tradition` POST action in the LCP. `updateAllTheThings.php` audit still open.
 
 ### 8.14 Mixed PHP Bootstrap Styles in Scripts
 **Location:** `ibl5/scripts/`

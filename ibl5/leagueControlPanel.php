@@ -23,7 +23,8 @@ $service    = new LeagueControlPanel\LeagueControlPanelService($repository, $cur
 $votingRepository     = new Voting\VotingRepository($mysqli_db);
 $votingResultsService = new Voting\VotingResultsService($votingRepository);
 $awardGenerationService = new LeagueControlPanel\AwardGenerationService($repository, $votingResultsService);
-$processor  = new LeagueControlPanel\LeagueControlPanelProcessor($repository, $awardGenerationService, $currentLeague);
+$maintenanceRepository = new Scripts\MaintenanceRepository($mysqli_db);
+$processor  = new LeagueControlPanel\LeagueControlPanelProcessor($repository, $awardGenerationService, $currentLeague, $maintenanceRepository);
 $view       = new LeagueControlPanel\LeagueControlPanelView();
 
 // POST → Processor → PRG redirect

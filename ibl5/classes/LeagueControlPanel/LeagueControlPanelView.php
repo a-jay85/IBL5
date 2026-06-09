@@ -322,7 +322,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         <button type="submit" name="action" value="set_fa_factors_pfw" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set Free Agency factors for PFW</button>
     </div>
     <div class="lcp-control-row">
-        <a href="/ibl5/scripts/tradition.php">Set Free Agency factors for Tradition</a>
+        <button type="submit" name="action" value="update_tradition" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set Free Agency factors for Tradition</button>
     </div>
     <div class="lcp-control-row">
         <a href="/ibl5/import-demands.php">Free Agency Demands CSV Uploader</a>

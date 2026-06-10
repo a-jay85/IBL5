@@ -1913,7 +1913,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Risk if untouched:** Low — these rarely change.
 
 ### 12.10 `Thumbs.db` Committed
-**Location:** `ibl5/images/language/Thumbs.db`
+**Location:** ibl5/images/language/Thumbs.db (deleted — git rm'd in this PR)
 **Problem:** Windows thumbnail cache; not in `.gitignore`.
 **Suggested direction:** `git rm`; add `Thumbs.db` to `.gitignore`.
 **Est. effort:** S

@@ -100,6 +100,21 @@ class SchemaInvariantTest extends DatabaseTestCase
     ];
 
     /**
+     * Non-unique performance indexes that must remain present, asserted by exact
+     * column sequence. Added by migration 141 to fix three prod slow-query hot
+     * spots (run 27093907413). A future migration dropping or reordering one of
+     * these silently regresses the plan; this locks the column order.
+     *
+     * label => [table, expected GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX)]
+     *
+     * @var array<string, array{0: string, 1: string}>
+     */
+    private const EXPECTED_INDEXES = [
+        'ibl_plr_snapshots.idx_snapshot_phase_year' => ['ibl_plr_snapshots', 'snapshot_phase,season_year'],
+        'ibl_box_scores.idx_pid_date' => ['ibl_box_scores', 'pid,game_date'],
+    ];
+
+    /**
      * Inventory of base-table `pid` / `teamid` columns that reference a player
      * or team but intentionally carry NO foreign key today. Each is acceptable
      * because the owning table is a denormalized snapshot, an append-only
@@ -261,6 +276,86 @@ class SchemaInvariantTest extends DatabaseTestCase
         );
     }
 
+    #[DataProvider('expectedIndexesProvider')]
+    public function testExpectedIndexIsPresentWithColumnOrder(
+        string $indexName,
+        string $table,
+        string $expectedColumns,
+    ): void {
+        $stmt = $this->db->prepare(
+            "SELECT GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) AS cols
+             FROM INFORMATION_SCHEMA.STATISTICS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = ?
+               AND INDEX_NAME = ?
+             GROUP BY INDEX_NAME"
+        );
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('ss', $table, $indexName);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        self::assertNotNull(
+            $row,
+            "Index '$indexName' on $table is missing — migration 141 added it; a later "
+            . "migration dropped it (regresses a prod slow-query fix)."
+        );
+        self::assertSame(
+            $expectedColumns,
+            $row['cols'],
+            "Index '$indexName' on $table has the wrong column sequence — expected "
+            . "($expectedColumns). Column order is load-bearing for the query plan."
+        );
+    }
+
+    /**
+     * Failure-case guard for migration 141's `DROP INDEX idx_pid`: proves the drop
+     * did NOT orphan fk_boxscore_player. Two parts:
+     *   (a) the standalone idx_pid is gone, and
+     *   (b) some index on ibl_box_scores leads with `pid` at SEQ_IN_INDEX=1 — that is
+     *       the new idx_pid_date composite, which now backs the FK.
+     * (testExpectedForeignKeyIsPresent separately proves fk_boxscore_player resolves.)
+     * idx_gt_pid leads with game_type, so it cannot false-satisfy part (b).
+     */
+    public function testBoxScoresPidIndexDropDidNotOrphanForeignKey(): void
+    {
+        $absent = $this->db->prepare(
+            "SELECT INDEX_NAME
+             FROM INFORMATION_SCHEMA.STATISTICS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'ibl_box_scores'
+               AND INDEX_NAME = 'idx_pid'"
+        );
+        self::assertNotFalse($absent);
+        $absent->execute();
+        $absentRow = $absent->get_result()->fetch_assoc();
+        $absent->close();
+        self::assertNull(
+            $absentRow,
+            "Standalone idx_pid still exists on ibl_box_scores — migration 141 should "
+            . "have dropped it (superseded by idx_pid_date's (pid) left-prefix)."
+        );
+
+        $backing = $this->db->prepare(
+            "SELECT INDEX_NAME
+             FROM INFORMATION_SCHEMA.STATISTICS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'ibl_box_scores'
+               AND COLUMN_NAME = 'pid'
+               AND SEQ_IN_INDEX = 1"
+        );
+        self::assertNotFalse($backing);
+        $backing->execute();
+        $backingRow = $backing->get_result()->fetch_assoc();
+        $backing->close();
+        self::assertNotNull(
+            $backingRow,
+            "No index on ibl_box_scores leads with `pid` — fk_boxscore_player would be "
+            . "orphaned. idx_pid_date (pid, game_date) must back the FK after the drop."
+        );
+    }
+
     /**
      * Locks the FK-gap inventory against the live schema. Fails when a base
      * table gains or loses an un-FK'd pid/teamid column relative to the
@@ -351,6 +446,20 @@ class SchemaInvariantTest extends DatabaseTestCase
         $cases = [];
         foreach (self::EXPECTED_UNIQUE_KEYS as $label => [$table, $column]) {
             $cases[$label] = [$table, $column];
+        }
+        return $cases;
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: string, 2: string}>
+     */
+    public static function expectedIndexesProvider(): array
+    {
+        $cases = [];
+        foreach (self::EXPECTED_INDEXES as $label => [$table, $expectedColumns]) {
+            // $label is "table.index_name"; the index name is the part after the dot.
+            $indexName = substr($label, strrpos($label, '.') + 1);
+            $cases[$label] = [$indexName, $table, $expectedColumns];
         }
         return $cases;
     }

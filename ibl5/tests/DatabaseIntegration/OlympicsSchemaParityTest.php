@@ -38,10 +38,18 @@ class OlympicsSchemaParityTest extends DatabaseTestCase
         ],
     ];
 
-    /** @var array<string, list<string>> */
+    /**
+     * idx_pid_date / idx_snapshot_phase_year are migration-141 prod slow-query fixes
+     * on the MAIN tables only (run 27093907413). The Olympics archive tables carry no
+     * slow-query evidence, so they intentionally do not mirror these perf indexes —
+     * same rationale as the pre-existing main-only idx_uuid / idx_gm_username entries.
+     *
+     * @var array<string, list<string>>
+     */
     private const ALLOWED_MISSING_INDEXES = [
-        'ibl_olympics_box_scores' => ['idx_uuid'],
-        'ibl_olympics_team_info'  => ['idx_gm_username'],
+        'ibl_olympics_box_scores'    => ['idx_uuid', 'idx_pid_date'],
+        'ibl_olympics_team_info'     => ['idx_gm_username'],
+        'ibl_olympics_plr_snapshots' => ['idx_snapshot_phase_year'],
     ];
 
     /** @var array<string, list<string>> */

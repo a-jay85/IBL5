@@ -19,7 +19,7 @@ class ScoFileWriterTest extends TestCase
 
     private function mockDb(): \mysqli
     {
-        return $this->createMock(\mysqli::class);
+        return $this->createStub(\mysqli::class);
     }
 
     /** Build a minimal synthetic .sco of the correct size (all spaces). */

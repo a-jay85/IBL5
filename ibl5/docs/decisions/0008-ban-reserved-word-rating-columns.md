@@ -1,6 +1,6 @@
 ---
 description: Rationale for renaming reserved-word rating columns and fixing the r_to meaning-flip across ibl_plr and ibl_hist, enforced by a new PHPStan rule.
-last_verified: 2026-04-28
+last_verified: 2026-06-10
 ---
 
 # ADR-0008: Ban Reserved-Word Rating Columns
@@ -45,5 +45,6 @@ Migration 113 renames the offending columns: `to` → `r_trans_off`, `do` → `r
 - `ibl5/tests/DatabaseIntegration/RatingColumnSemanticParityTest.php` — permanent parity test.
 - `ibl5/tests/DatabaseIntegration/IblHistStructuralTest.php` — `ibl_hist` structural invariants.
 - `ibl5/classes/Updater/Steps/RefreshIblHistStep.php` — rewritten INSERT SELECT with no alias flip.
+- `ibl5/migrations/143_rename_settings_name_to_setting_key.sql` — applies this ADR's reserved-word ban to `ibl_settings.name` → `setting_key` (composite-PK rebuild + tri-trigger recreation; maintenance-42, backlog 15.7).
 - PR #323 (precedent for `trade_from` / `trade_to` rename).
 - PR #449 (`SchemaValidator`).

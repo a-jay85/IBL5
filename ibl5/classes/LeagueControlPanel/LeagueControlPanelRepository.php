@@ -28,7 +28,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     public function getSetting(string $name): ?string
     {
         $row = $this->fetchOne(
-            "SELECT value FROM `ibl_settings` WHERE name = ? AND league = ?",
+            "SELECT value FROM `ibl_settings` WHERE setting_key = ? AND league = ?",
             "ss",
             $name,
             $this->league
@@ -48,7 +48,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     public function getBulkSettings(array $names): array
     {
         $rows = $this->fetchAllInList(
-            "SELECT name, value FROM `ibl_settings` WHERE league = ? AND name IN ({IN})",
+            "SELECT setting_key, value FROM `ibl_settings` WHERE league = ? AND setting_key IN ({IN})",
             's',
             $names,
             's',
@@ -58,7 +58,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
         $settings = [];
         foreach ($rows as $row) {
             /** @var string $name */
-            $name = $row['name'];
+            $name = $row['setting_key'];
             /** @var string $value */
             $value = $row['value'];
             $settings[$name] = $value;
@@ -83,7 +83,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     public function updateSetting(string $name, string $value): bool
     {
         $this->execute(
-            "UPDATE `ibl_settings` SET value = ? WHERE name = ? AND league = ?",
+            "UPDATE `ibl_settings` SET value = ? WHERE setting_key = ? AND league = ?",
             "sss",
             $value,
             $name,
@@ -100,7 +100,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     {
         $this->transactional(function () use ($phase): void {
             $this->execute(
-                "UPDATE `ibl_settings` SET value = ? WHERE name = 'Current Season Phase' AND league = ?",
+                "UPDATE `ibl_settings` SET value = ? WHERE setting_key = 'Current Season Phase' AND league = ?",
                 "ss",
                 $phase,
                 $this->league
@@ -108,7 +108,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
 
             if ($phase === 'Preseason' || $phase === 'HEAT') {
                 $this->execute(
-                    "UPDATE `ibl_settings` SET value = 'Off' WHERE name = 'Show Draft Link' AND league = ?",
+                    "UPDATE `ibl_settings` SET value = 'Off' WHERE setting_key = 'Show Draft Link' AND league = ?",
                     "s",
                     $this->league
                 );
@@ -124,7 +124,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     public function setSimLengthInDays(int $days): bool
     {
         $this->execute(
-            "UPDATE `ibl_settings` SET value = ? WHERE name = 'Sim Length in Days' AND league = ?",
+            "UPDATE `ibl_settings` SET value = ? WHERE setting_key = 'Sim Length in Days' AND league = ?",
             "is",
             $days,
             $this->league
@@ -139,7 +139,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     public function setShowDraftLink(string $value): bool
     {
         $this->execute(
-            "UPDATE `ibl_settings` SET value = ? WHERE name = 'Show Draft Link' AND league = ?",
+            "UPDATE `ibl_settings` SET value = ? WHERE setting_key = 'Show Draft Link' AND league = ?",
             "ss",
             $value,
             $this->league
@@ -162,7 +162,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
             );
 
             $this->execute(
-                "UPDATE `ibl_settings` SET value = 'Yes' WHERE name = 'ASG Voting' AND league = 'ibl'"
+                "UPDATE `ibl_settings` SET value = 'Yes' WHERE setting_key = 'ASG Voting' AND league = 'ibl'"
             );
 
             $this->execute(
@@ -187,7 +187,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
             );
 
             $this->execute(
-                "UPDATE `ibl_settings` SET value = 'Yes' WHERE name = 'EOY Voting' AND league = 'ibl'"
+                "UPDATE `ibl_settings` SET value = 'Yes' WHERE setting_key = 'EOY Voting' AND league = 'ibl'"
             );
 
             $this->execute(

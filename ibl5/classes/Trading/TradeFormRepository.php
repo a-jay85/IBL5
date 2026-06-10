@@ -72,7 +72,7 @@ class TradeFormRepository extends BaseMysqliRepository implements TradeFormRepos
     public function getAllTeamsWithCity(): array
     {
         /** @var list<TeamWithCityRow> */
-        return $this->fetchAllRealTeams('team_city ASC');
+        return $this->fetchAllRealTeams(\TeamOrderBy::TeamCity);
     }
 
     /**

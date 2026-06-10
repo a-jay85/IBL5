@@ -64,7 +64,7 @@ abstract class PipelineIntegrationTestCase extends DatabaseTestCase
 
     protected function updateSetting(string $name, string $value): void
     {
-        $stmt = $this->db->prepare("UPDATE ibl_settings SET value = ? WHERE name = ?");
+        $stmt = $this->db->prepare("UPDATE ibl_settings SET value = ? WHERE setting_key = ?");
         self::assertNotFalse($stmt);
         $stmt->bind_param('ss', $value, $name);
         $stmt->execute();

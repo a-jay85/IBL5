@@ -40,9 +40,9 @@ class SeasonQueryRepositoryTest extends DatabaseTestCase
 
     public function testGetBulkSettingsReturnsMappedValues(): void
     {
-        // Use REPLACE to safely insert test settings (PK on name)
+        // Use REPLACE to safely insert test settings (PK on setting_key)
         $this->db->query(
-            "REPLACE INTO ibl_settings (name, value) VALUES ('DB_IntTest_BulkSetting', 'test_value_42')"
+            "REPLACE INTO ibl_settings (setting_key, value) VALUES ('DB_IntTest_BulkSetting', 'test_value_42')"
         );
 
         $map = $this->repo->getBulkSettings(['DB_IntTest_BulkSetting', 'Current Season Phase']);
@@ -140,10 +140,32 @@ class SeasonQueryRepositoryTest extends DatabaseTestCase
 
     public function testGetFreeAgencyNotificationsStateReturnsString(): void
     {
-        $this->db->query("REPLACE INTO ibl_settings (name, value) VALUES ('Free Agency Notifications', 'On')");
+        $this->db->query("REPLACE INTO ibl_settings (setting_key, value) VALUES ('Free Agency Notifications', 'On')");
 
         $result = $this->repo->getFreeAgencyNotificationsState();
 
         self::assertSame('On', $result);
+    }
+
+    public function testGetAvailableSeasonYearsReturnsDistinctYearsNewestFirst(): void
+    {
+        $this->db->query("DELETE FROM `ibl_hist`");
+
+        $this->insertHistRow(9001, 'Player A', 2090);
+        $this->insertHistRow(9002, 'Player B', 2092);
+        $this->insertHistRow(9003, 'Player C', 2090); // duplicate year — must be deduplicated
+
+        $result = $this->repo->getAvailableSeasonYears();
+
+        self::assertSame([2092, 2090], $result, 'Years must be distinct and ordered newest first');
+    }
+
+    public function testGetAvailableSeasonYearsReturnsEmptyArrayWhenNoData(): void
+    {
+        $this->db->query("DELETE FROM `ibl_hist`");
+
+        $result = $this->repo->getAvailableSeasonYears();
+
+        self::assertSame([], $result, 'Empty ibl_hist must return []');
     }
 }

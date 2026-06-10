@@ -301,4 +301,41 @@ class PlayerStatsRepositoryTest extends DatabaseTestCase
     {
         self::assertNull($this->repo->getOlympicsCareerAverages(999999999));
     }
+
+    public function testGetBoxScoresBetweenDatesIncludesDnpRows(): void
+    {
+        // getBoxScoresBetweenDates is the documented include-DNP site (full per-game log).
+        // A DNP row (game_min=0) must appear in the result so the PlayerOverviewView can render MIN=0.
+        $pid = 200000073;
+        $this->insertTestPlayer($pid, 'DB Box DNP');
+
+        // DNP boxscore row (game_min = 0)
+        $this->insertPlayerBoxscoreRow('2098-01-15', $pid, 'DB Box DNP', 'PG', 2, 1, 1, minutes: 0,
+            points2m: 0, points2a: 0, ftm: 0, fta: 0, points3m: 0, points3a: 0,
+            orb: 0, drb: 0, ast: 0, stl: 0, tov: 0, blk: 0, pf: 0);
+        $this->insertTeamBoxscoreRow('2098-01-15', 'Metros', 1, 2, 1);
+        $this->insertTeamBoxscoreRow('2098-01-15', 'Sharks', 1, 2, 1);
+        $this->insertRow('ibl_schedule', [
+            'season_year' => 2098,
+            'box_id' => 501,
+            'game_date' => '2098-01-15',
+            'visitor_teamid' => 2,
+            'visitor_score' => 85,
+            'home_teamid' => 1,
+            'home_score' => 100,
+            'uuid' => 'sched-boxdt-0000-000000000002',
+        ]);
+
+        $result = $this->repo->getBoxScoresBetweenDates($pid, '2098-01-01', '2098-01-31');
+
+        $found = false;
+        foreach ($result as $row) {
+            if ($row['pid'] === $pid) {
+                $found = true;
+                self::assertSame(0, (int) $row['game_min'], 'DNP row must appear with game_min=0');
+                break;
+            }
+        }
+        self::assertTrue($found, 'DNP row must be included in getBoxScoresBetweenDates (include-DNP site)');
+    }
 }

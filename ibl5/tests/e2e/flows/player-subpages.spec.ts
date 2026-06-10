@@ -107,12 +107,7 @@ test.describe('Player rookie option sub-page', () => {
     // renders, now hosting the Player module's flippable trading card.
     await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
     await page.goto('modules.php?name=Player&pa=rookieoption&pid=200000032');
-    // This page legitimately renders a UI "Warning:" alert (rookie option
-    // warning div) so assertNoPhpErrors would false-positive. Check fatal PHP
-    // patterns directly instead.
-    const body = await page.locator('body').textContent() ?? '';
-    expect(body, 'PHP fatal error on rookie option page with trading card').not.toContain('Fatal error');
-    expect(body, 'PHP stack trace on rookie option page with trading card').not.toContain('Stack trace:');
+    await assertNoPhpErrors(page, 'on rookie option page with trading card');
     await expect(page.locator('.card-flip-container')).toBeVisible();
   });
 

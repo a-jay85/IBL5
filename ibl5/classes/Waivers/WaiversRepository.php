@@ -10,6 +10,8 @@ use Waivers\Contracts\WaiversRepositoryInterface;
 
 /**
  * @see WaiversRepositoryInterface
+ * @phpstan-import-type WaiverTeamRow from \Waivers\Contracts\WaiversRepositoryInterface
+ * @phpstan-import-type WaiverContractData from \Waivers\Contracts\WaiversRepositoryInterface
  */
 class WaiversRepository extends BaseMysqliRepository implements WaiversRepositoryInterface
 {
@@ -45,8 +47,8 @@ class WaiversRepository extends BaseMysqliRepository implements WaiversRepositor
     /**
      * @see WaiversRepositoryInterface::signPlayerFromWaivers()
      *
-     * @param array{team_name: string, teamid: int, ...<string, mixed>} $team
-     * @param array{hasExistingContract: bool, salary: int} $contractData
+     * @param WaiverTeamRow $team
+     * @param WaiverContractData $contractData
      */
     public function signPlayerFromWaivers(int $playerID, array $team, array $contractData): bool
     {

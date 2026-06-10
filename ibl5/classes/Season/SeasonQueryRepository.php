@@ -32,9 +32,9 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
      */
     public function getBulkSettings(array $names): array
     {
-        /** @var list<array{name: string, value: string}> $rows */
+        /** @var list<array{setting_key: string, value: string}> $rows */
         $rows = $this->fetchAllInList(
-            "SELECT name, value FROM `ibl_settings` WHERE league = ? AND name IN ({IN})",
+            "SELECT setting_key, value FROM `ibl_settings` WHERE league = ? AND setting_key IN ({IN})",
             's',
             $names,
             's',
@@ -44,7 +44,7 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
         /** @var array<string, string> $map */
         $map = [];
         foreach ($rows as $row) {
-            $map[$row['name']] = $row['value'];
+            $map[$row['setting_key']] = $row['value'];
         }
 
         return $map;
@@ -59,7 +59,7 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
     {
         /** @var array{value: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT value FROM `ibl_settings` WHERE name = ? AND league = ? LIMIT 1",
+            "SELECT value FROM `ibl_settings` WHERE setting_key = ? AND league = ? LIMIT 1",
             "ss",
             "Current Season Phase",
             $this->league
@@ -77,7 +77,7 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
     {
         /** @var array{value: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT value FROM `ibl_settings` WHERE name = ? AND league = ? LIMIT 1",
+            "SELECT value FROM `ibl_settings` WHERE setting_key = ? AND league = ? LIMIT 1",
             "ss",
             "Current Season Ending Year",
             $this->league
@@ -186,7 +186,7 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
     {
         /** @var array{value: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT value FROM `ibl_settings` WHERE name = ? AND league = ? LIMIT 1",
+            "SELECT value FROM `ibl_settings` WHERE setting_key = ? AND league = ? LIMIT 1",
             "ss",
             "Allow Trades",
             $this->league
@@ -204,7 +204,7 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
     {
         /** @var array{value: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT value FROM `ibl_settings` WHERE name = ? AND league = ? LIMIT 1",
+            "SELECT value FROM `ibl_settings` WHERE setting_key = ? AND league = ? LIMIT 1",
             "ss",
             "Allow Waiver Moves",
             $this->league
@@ -222,7 +222,7 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
     {
         /** @var array{value: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT value FROM `ibl_settings` WHERE name = ? AND league = ? LIMIT 1",
+            "SELECT value FROM `ibl_settings` WHERE setting_key = ? AND league = ? LIMIT 1",
             "ss",
             "Free Agency Notifications",
             $this->league
@@ -279,5 +279,22 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
 
         // Fallback to overall sim number for non-game phases (Draft, Free Agency, etc.)
         return $phaseSimNumber > 0 ? $phaseSimNumber : $overallSimNumber;
+    }
+
+    /**
+     * @see SeasonQueryRepositoryInterface::getAvailableSeasonYears()
+     * @return list<int>
+     */
+    public function getAvailableSeasonYears(): array
+    {
+        /** @var list<array{year: int}> $rows */
+        $rows = $this->fetchAll("SELECT DISTINCT year FROM `ibl_hist` ORDER BY year DESC");
+
+        $years = [];
+        foreach ($rows as $row) {
+            $years[] = $row['year'];
+        }
+
+        return $years;
     }
 }

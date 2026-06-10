@@ -411,21 +411,13 @@ abstract class BaseMysqliRepository
     /**
      * Fetch all real teams from `ibl_team_info` (excludes Free Agents, All-Star, etc.)
      *
-     * @param string $orderBy One of 'team_name ASC', 'teamid ASC', or 'team_city ASC'
      * @return list<array<string, mixed>>
      */
-    protected function fetchAllRealTeams(string $orderBy = 'team_name ASC'): array
+    protected function fetchAllRealTeams(\TeamOrderBy $orderBy = \TeamOrderBy::TeamName): array
     {
-        $allowedOrderBy = [
-            'team_name ASC' => 'team_name ASC',
-            'teamid ASC' => 'teamid ASC',
-            'team_city ASC' => 'team_city ASC',
-        ];
-        $safeOrderBy = $allowedOrderBy[$orderBy] ?? 'team_name ASC';
-
         /** @var list<array<string, mixed>> */
         return $this->fetchAll(
-            "SELECT * FROM `ibl_team_info` WHERE teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . " ORDER BY $safeOrderBy"
+            "SELECT * FROM `ibl_team_info` WHERE teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . " ORDER BY " . $orderBy->value
         );
     }
 
@@ -476,6 +468,20 @@ abstract class BaseMysqliRepository
         return "(SELECT game_date, visitor_teamid, home_teamid, MIN(game_of_that_day) AS game_of_that_day
              FROM `ibl_box_scores_teams`
              GROUP BY game_date, visitor_teamid, home_teamid)";
+    }
+
+    /**
+     * Canonical "player actually played" predicate for ibl_box_scores rows.
+     * DNP rows carry game_min = 0; consumers counting games-played or averaging
+     * per-game stats must exclude them. Pass the table alias used in the query
+     * (e.g. 'bs') or '' for an unaliased column.
+     *
+     * @param string $alias Table alias (without trailing dot), or '' for none
+     */
+    protected function playedCondition(string $alias = ''): string
+    {
+        $prefix = $alias === '' ? '' : $alias . '.';
+        return $prefix . 'game_min > 0';
     }
 
     /**

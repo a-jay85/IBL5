@@ -8,7 +8,7 @@ use Player\PlayerRepository;
 use Player\Stats\PlayerStats;
 use Player\Views\PlayerTradingCardFlipView;
 use RookieOption\RookieOptionValidator;
-use RookieOption\RookieOptionFormView;
+use RookieOption\RookieOptionView;
 use RookieOption\RookieOptionController;
 use Repositories\TeamIdentityRepository;
 use Repositories\SalaryCapRepository;
@@ -102,7 +102,7 @@ function rookieoption($pid)
     // Initialize dependencies
     $season = new \Season\Season($mysqli_db);
     $validator = new RookieOptionValidator();
-    $formView = new RookieOptionFormView();
+    $formView = new RookieOptionView();
 
     // Load player
     $player = Player::withPlayerID($mysqli_db, (int) $pid);

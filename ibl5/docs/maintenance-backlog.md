@@ -226,6 +226,7 @@ Effort scale:
 **Suggested direction:** Extract `InjuriesRepository extends BaseMysqliRepository`; add to Contracts/.
 **Est. effort:** S
 **Risk if untouched:** Injury queries un-traceable without reading service body.
+**Status:** Completed — InjuriesRepository already extracted and injected (PR #970, 2026-06-03); backlog was stale.
 
 ### 2.8 Search / Standings — No Service Layer
 **Location:** `classes/Search/`, `classes/Standings/`
@@ -233,6 +234,8 @@ Effort scale:
 **Suggested direction:** Wrap in a Service; for Search a pass-through maintains the pattern.
 **Est. effort:** S each
 **Risk if untouched:** Tiebreaker class has no obvious home; contributors may bypass it.
+**Status (Search):** Declined — pass-through Service is dead code; SearchRepository is the correct seam.
+**Status (Standings):** Declined — AggregateTiebreaker has a home (StandingsView + ProjectedDraftOrderService); no orchestration exists to wrap.
 
 ### 2.9 DraftHistory — No Service; ApiHandler Naming Ambiguous
 **Location:** `classes/DraftHistory/`
@@ -240,6 +243,7 @@ Effort scale:
 **Suggested direction:** Rename to Controller; add Service for sorting/grouping.
 **Est. effort:** S
 **Risk if untouched:** Wrong-namespace confusion; unclear where new actions go.
+**Status:** Declined — *ApiHandler is the established HTMX-fragment convention (9 handlers); rename would harm consistency. No Service target exists.
 
 ### 2.10 Extension — No View; Routed Through modules/Player
 **Location:** `classes/Extension/`, `modules/Player/extension.php`
@@ -254,6 +258,7 @@ Effort scale:
 **Suggested direction:** Add `RookieOptionService`; rename to `RookieOptionView`.
 **Est. effort:** S
 **Risk if untouched:** Service-level logic ends up in Controller/Validator; FormView name visible inconsistency.
+**Status:** Completed (2026-06-09) — renamed RookieOptionFormView → RookieOptionView / RookieOptionViewInterface. Service half declined as pass-through ceremony (RookieOptionController owns orchestration).
 
 ### 2.12 Negotiation — No Standalone Module; Six Non-Standard Role Names
 **Location:** `classes/Negotiation/`
@@ -740,6 +745,7 @@ Effort scale:
 **Suggested direction:** Extract `InjuriesRepository`; inject.
 **Est. effort:** S
 **Risk if untouched:** New injury DB logic lands as raw SQL in the Service.
+**Status:** Completed — InjuriesRepository already extracted and injected (PR #970, 2026-06-03); backlog was stale.
 
 ### 4.25 `Services/NewsService` Misplaced
 **Location:** `ibl5/classes/Topics/News/NewsRepository.php` (relocated and renamed)
@@ -2193,6 +2199,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Add `CHANGE COLUMN teamID team_id` to migration 121 + view updates.
 **Est. effort:** S
 **Risk if untouched:** Visual anomaly; future queries use the wrong name.
+**Status:** Completed — migration 114 already renamed teamID→teamid on ibl_box_scores and ibl_olympics_box_scores; the unified standard is single-token teamid (config/schema-assertions.php), not team_id. No further rename. Views already use bs.teamid (migration 121).
 
 ### 15.3 `cy1`-`cy6` / `dem1`-`dem6` / `offer1`-`offer6` — 1NF Violations
 **Location:** `ibl_plr`, `ibl_olympics_plr`, `ibl_trade_cash` (cy1-cy6); `ibl_demands` (dem1-dem6); `ibl_fa_offers` (offer1-offer6)
@@ -2230,7 +2237,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Rename `ibl_settings.name` → `setting_key`, `.value` → `setting_value`; extend ban rule.
 **Est. effort:** M
 **Risk if untouched:** Unbacktick'd queries are valid MariaDB but fail strict parsers.
-**Status:** Deferred from maintenance-28 — needs its own plan. Migration 132 made the `ibl_settings` primary key composite `(name, league)`, so renaming `name` → `setting_key` is a PK rebuild (new PK on `(setting_key, league)`) layered on top of a pervasive PHP read-path migration (~20 queries across 6 `Settings`/repository classes) and two trigger recreations (`trg_team_identity_sync`, `trg_season_rollover` both filter `WHERE name = 'Current Season Ending Year'`). The maintenance-28 expand-contract recipe did not account for the composite PK; this is the highest-blast-radius item in that plan and is sequenced into its own PR/review. `cache`/`cache_locks` remain out of scope (upstream Laravel scaffolding).
+**Status:** `name` portion **Completed** (maintenance-42, migration 143). `ibl_settings.name` → `setting_key`: the composite PK was rebuilt `(name, league)` → `(setting_key, league)` and **three** triggers reading the column were recreated against `setting_key` — `trg_team_identity_sync` (mig 140 body), `trg_gm_tenure_track` (mig 100 body, which the original brief missed), and `trg_season_rollover` (mig 017 body) — preserving the live `ibl_team_info` activation order 1→2 via the drop-both / recreate-with-`FOLLOWS` dance. The full PHP/SQL read-write sweep (`League`, `LeagueControlPanelRepository`, `ModuleAccessControl`, `ProjectedDraftOrderRepository`, `MaintenanceRepository`, `SeasonQueryRepository`, `test-state.php`, fixtures) shipped in the same PR so migration + code deploy atomically. `config/schema-assertions.php` now asserts `setting_key`, hard-failing `SchemaValidator` at boot if the rename regresses. **Still deferred:** `ibl_settings.value` → `setting_value` (name-only PR). `cache`/`cache_locks` remain out of scope (upstream Laravel scaffolding).
 
 ### 15.8 `ibl_demands.pid` Lacks FK; `name` Is the PK
 **Location:** `ibl_demands` lines 421-434
@@ -2253,6 +2260,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Add FK alongside migration-121 rename; ensure All-Star team IDs (50/51) are in `ibl_team_info`.
 **Est. effort:** S
 **Risk if untouched:** Invalid team IDs writable; stat views silently wrong.
+**Status:** Completed (maintenance-41, migration 142) — fk_boxscore_team on ibl_box_scores.teamid → ibl_team_info.teamid (ON UPDATE CASCADE), plus parity fk_olympics_boxscore_team. Special teams 0/40/41/50/51 confirmed present in ibl_team_info; zero orphans. Signedness matches (int(11) both sides).
 
 ### 15.11 Migration Numbering Gaps — 018-023, 111
 **Location:** `ibl5/migrations/`

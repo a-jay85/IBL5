@@ -167,7 +167,7 @@ export const VR_MANIFEST: VrRow[] = [
     anchor: '.card-flip-container',
     states: [{ name: 'default', appState: { 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' } }],
     viewports: ['desktop', 'mobile'],
-    notes: 'Player-module rookie option page (RookieOptionFormView). pid=200000032 "Rookie Option Target" (Metros tid=1, exp=2, round-1) is eligible in Free Agency. Locks the flippable trading card placement replacing the old small player image (PR trading-card-negotiate-rookie-option).' },
+    notes: 'Player-module rookie option page (RookieOptionView). pid=200000032 "Rookie Option Target" (Metros tid=1, exp=2, round-1) is eligible in Free Agency. Locks the flippable trading card placement replacing the old small player image (PR trading-card-negotiate-rookie-option).' },
   { name: 'next-sim', auth: 'auth', url: 'modules.php?name=NextSim',
     anchor: '.next-sim-container', extraMask: ['time.local-time'],
     viewports: ['desktop', 'mobile'],

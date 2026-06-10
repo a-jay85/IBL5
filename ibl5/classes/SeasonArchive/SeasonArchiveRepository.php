@@ -219,7 +219,7 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
      */
     public function getTeamColors(): array
     {
-        $rows = $this->fetchAllRealTeams('teamid ASC');
+        $rows = $this->fetchAllRealTeams(\TeamOrderBy::TeamId);
 
         $colors = [];
         foreach ($rows as $row) {

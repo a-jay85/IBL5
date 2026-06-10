@@ -82,7 +82,7 @@ class League extends BaseMysqliRepository
     {
         /** @var array{value: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT value FROM `ibl_settings` WHERE name = ? AND league = ? LIMIT 1",
+            "SELECT value FROM `ibl_settings` WHERE setting_key = ? AND league = ? LIMIT 1",
             "ss",
             "Sim Length in Days",
             $this->league

@@ -263,8 +263,8 @@ class SeasonQueryRepositoryTest extends TestCase
     public function testGetBulkSettingsReturnsMap(): void
     {
         $this->mockDb->setMockData([
-            ['name' => 'Allow Trades', 'value' => 'Yes'],
-            ['name' => 'Allow Waiver Moves', 'value' => 'No'],
+            ['setting_key' => 'Allow Trades', 'value' => 'Yes'],
+            ['setting_key' => 'Allow Waiver Moves', 'value' => 'No'],
         ]);
 
         $result = $this->repository->getBulkSettings(['Allow Trades', 'Allow Waiver Moves']);

@@ -194,4 +194,22 @@ class SplitStatsRepositoryTest extends DatabaseTestCase
         // Should NOT be the fallback 'vs. Team #1'
         self::assertStringNotContainsString('Team #', $label);
     }
+
+    public function testGetSplitStatsHomeDnpRowExcluded(): void
+    {
+        // Insert a DNP (game_min=0) home boxscore row for a test player — must not appear in home split
+        $dnpPid = 200090299;
+        $this->insertTestPlayer($dnpPid, 'DNP Home Player');
+        $this->insertPlayerBoxscoreRow(
+            '2098-01-15', $dnpPid, 'DNP Home Player', 'PG', 2, self::TEST_TID, self::TEST_TID,
+            minutes: 0, points2m: 0, points2a: 0, ftm: 0, fta: 0, points3m: 0, points3a: 0,
+            orb: 0, drb: 0, ast: 0, stl: 0, tov: 0, blk: 0, pf: 0,
+        );
+
+        $result = $this->repo->getSplitStats(self::TEST_TID, 2098, 'home');
+
+        foreach ($result as $row) {
+            self::assertNotSame($dnpPid, $row['pid'], 'DNP row must not appear in home split stats');
+        }
+    }
 }

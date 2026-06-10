@@ -170,16 +170,31 @@ if [ -n "$GENERATED_TABLES" ]; then
 fi
 echo ""
 
-# Stream everything into the container via db_import_sql (handles FK checks,
+# Stream schema + data into the container via db_import_sql (handles FK checks,
 # DEFINER stripping, and error filtering).
+#
+# Routines (stored procedures/functions) are dumped LAST, in a separate
+# non-fatal pass — deliberately NOT folded into the schema step. mariadb-dump
+# --routines issues `SHOW FUNCTION STATUS` against prod's mysql.proc, which can
+# block indefinitely on a server-side table-level lock. When it lived in the
+# schema step, a routine stall hung the whole stream *after* the DROP/CREATE
+# TABLE statements had already streamed in — leaving the local DB with schema
+# but zero data (every table, incl. ibl_box_scores, empty) and the run killed
+# at exit 144. --max-statement-time makes any metadata stall fail fast
+# server-side (no orphaned waiter thread); the separate pass means a routine
+# stall can never tear the data load.
+SCHEMA_TIMEOUT=120    # metadata-only queries (SHOW CREATE TABLE); generous bound
+ROUTINES_TIMEOUT=30   # mysql.proc may be locked on prod — fail fast, stay non-fatal
+
 TOTAL_STEPS=2
 [ -n "$GENERATED_TABLES" ] && TOTAL_STEPS=3
 STEP=0
 
 {
     STEP=$((STEP + 1))
-    echo "  [$STEP/$TOTAL_STEPS] Schema (tables, views, routines, triggers)..." >&2
-    remote_dump --routines --triggers --no-data "$REMOTE_DATABASE"
+    echo "  [$STEP/$TOTAL_STEPS] Schema (tables, views, triggers)..." >&2
+    remote_dump --triggers --no-data --max-statement-time="$SCHEMA_TIMEOUT" \
+        "$REMOTE_DATABASE"
 
     STEP=$((STEP + 1))
     echo "  [$STEP/$TOTAL_STEPS] Table data..." >&2
@@ -195,6 +210,17 @@ STEP=0
             "$REMOTE_DATABASE" $GENERATED_TABLES
     fi
 } | db_import_sql "$DB_CONTAINER" || exit 1
+
+# Routines pass: separate, time-bounded, non-fatal. --no-create-info/--no-data
+# emit neither DROP nor CREATE TABLE, so a stall or timeout here leaves the
+# already-loaded schema + data fully intact.
+echo "  Routines (stored procedures/functions)..." >&2
+if ! remote_dump --routines --no-create-info --no-data --skip-triggers \
+        --max-statement-time="$ROUTINES_TIMEOUT" "$REMOTE_DATABASE" \
+        | db_import_sql "$DB_CONTAINER"; then
+    echo "  WARNING: routines dump failed or timed out (prod mysql.proc may be" >&2
+    echo "           locked); schema + data loaded OK, routines skipped." >&2
+fi
 
 echo ""
 echo "Backfilling schema_migrations from prod dump..."

@@ -41,8 +41,8 @@ class LeagueControlPanelRepositoryTest extends TestCase
     public function testGetBulkSettingsReturnsMappedArray(): void
     {
         $rows = [
-            ['name' => 'Current Season Phase', 'value' => 'Playoffs'],
-            ['name' => 'Allow Trades', 'value' => 'Yes'],
+            ['setting_key' => 'Current Season Phase', 'value' => 'Playoffs'],
+            ['setting_key' => 'Allow Trades', 'value' => 'Yes'],
         ];
 
         $mockDb = $this->createMockDatabaseWithPreparedStatement($rows);

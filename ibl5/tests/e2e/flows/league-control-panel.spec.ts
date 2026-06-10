@@ -13,6 +13,18 @@ import { setAward } from '../helpers/test-state';
 
 const SEASON_YEAR = 2026; // CI seed 'Current Season Ending Year'
 
+// File-level serial: every describe below submits the LCP "Set Season Phase"
+// form, which writes the GLOBAL `Current Season Phase` DB row (the LCP reads
+// phase from the DB, not a per-request cookie override). Under fullyParallel the
+// three describes land on different workers and stomp each other's phase — e.g.
+// "Update Tradition" sets Free Agency while "Generate Season Awards" expects
+// Playoffs, surfacing "Season awards can only be generated during Playoffs or
+// Draft phase." instead of the asserted Leaders.htm error. Serializing the whole
+// file pins them to one worker so the phase row is single-owner within this spec.
+// (The remaining cross-file race with updater-awards.spec.ts — also a DB-phase
+// mutator — needs the dedicated non-sharded updater job tracked in #910.)
+test.describe.configure({ mode: 'serial' });
+
 test.describe('LeagueControlPanel — Finals MVP flow', () => {
   test.describe.configure({ mode: 'serial' });
 

@@ -130,7 +130,6 @@ class SchemaInvariantTest extends DatabaseTestCase
      * @var array<string, string>
      */
     private const KNOWN_COLUMNS_WITHOUT_FK = [
-        'ibl_box_scores.teamid' => 'denormalized per-row team marker; home_teamid/visitor_teamid carry the team FKs',
         'ibl_box_scores_engine_shadow.home_teamid' => 'engine debug shadow table; transient sim output, not referentially constrained',
         'ibl_box_scores_engine_shadow.pid' => 'engine debug shadow table; transient sim output, not referentially constrained',
         'ibl_box_scores_engine_shadow.teamid' => 'engine debug shadow table; transient sim output, not referentially constrained',
@@ -151,7 +150,6 @@ class SchemaInvariantTest extends DatabaseTestCase
         'ibl_jsb_transactions.from_teamid' => 'JSB transaction log; historical team marker, no cascade',
         'ibl_jsb_transactions.pid' => 'JSB transaction log; historical player marker, no cascade',
         'ibl_jsb_transactions.to_teamid' => 'JSB transaction log; historical team marker, no cascade',
-        'ibl_olympics_box_scores.teamid' => 'denormalized per-row team marker; home_teamid/visitor_teamid carry the team FKs',
         'ibl_olympics_career_avgs.pid' => 'denormalized Olympics career aggregate; rebuilt from box scores',
         'ibl_olympics_career_totals.pid' => 'denormalized Olympics career aggregate; rebuilt from box scores',
         'ibl_olympics_hist.pid' => 'Olympics append-only transaction log; retains rows for archived players',

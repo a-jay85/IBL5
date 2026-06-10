@@ -2199,6 +2199,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Add `CHANGE COLUMN teamID team_id` to migration 121 + view updates.
 **Est. effort:** S
 **Risk if untouched:** Visual anomaly; future queries use the wrong name.
+**Status:** Completed — migration 114 already renamed teamID→teamid on ibl_box_scores and ibl_olympics_box_scores; the unified standard is single-token teamid (config/schema-assertions.php), not team_id. No further rename. Views already use bs.teamid (migration 121).
 
 ### 15.3 `cy1`-`cy6` / `dem1`-`dem6` / `offer1`-`offer6` — 1NF Violations
 **Location:** `ibl_plr`, `ibl_olympics_plr`, `ibl_trade_cash` (cy1-cy6); `ibl_demands` (dem1-dem6); `ibl_fa_offers` (offer1-offer6)
@@ -2259,6 +2260,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Add FK alongside migration-121 rename; ensure All-Star team IDs (50/51) are in `ibl_team_info`.
 **Est. effort:** S
 **Risk if untouched:** Invalid team IDs writable; stat views silently wrong.
+**Status:** Completed (maintenance-41, migration 142) — fk_boxscore_team on ibl_box_scores.teamid → ibl_team_info.teamid (ON UPDATE CASCADE), plus parity fk_olympics_boxscore_team. Special teams 0/40/41/50/51 confirmed present in ibl_team_info; zero orphans. Signedness matches (int(11) both sides).
 
 ### 15.11 Migration Numbering Gaps — 018-023, 111
 **Location:** `ibl5/migrations/`

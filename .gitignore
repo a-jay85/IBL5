@@ -43,7 +43,8 @@ depthcharts
 .htaccess
 !/ibl5/ibl/IBL/.htaccess
 
-# Logs
+# Logs — runtime-generated (e.g. ibl5/IBL5.log, the multi-GB simulation log).
+# Never committed; lives next to source only because the sim writes it there.
 *.log
 
 # Dev watcher PID files (browser-sync, CSS watcher)
@@ -80,6 +81,13 @@ ibl5/bin/jsbsim
 ibl5/*.lge
 # Exception: IBL5.lge is used as a fixture by LgeFileParser/LeagueConfig tests
 !ibl5/IBL5.lge
+# JSB schedule files — future season .sch files should not be tracked.
+# Exceptions: IBL5.sch is a SchFileParser test fixture; Olympics.sch is the
+# disk-fallback source for the Olympics schedule pipeline
+# (ScheduleUpdater builds {LeagueContext::getFilePrefix()}.sch).
+ibl5/*.sch
+!ibl5/IBL5.sch
+!ibl5/Olympics.sch
 ibl5/*.plr
 ibl5/*.sco
 ibl5/*.car

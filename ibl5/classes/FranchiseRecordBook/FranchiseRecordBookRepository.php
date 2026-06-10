@@ -117,7 +117,7 @@ class FranchiseRecordBookRepository extends \BaseMysqliRepository implements Fra
     public function getAllTeams(): array
     {
         /** @var list<TeamInfo> */
-        return $this->fetchAllRealTeams('team_name ASC');
+        return $this->fetchAllRealTeams(\TeamOrderBy::TeamName);
     }
 
     /**

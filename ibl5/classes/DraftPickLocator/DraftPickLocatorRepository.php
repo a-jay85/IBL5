@@ -24,7 +24,7 @@ class DraftPickLocatorRepository extends \BaseMysqliRepository implements DraftP
     public function getAllTeams(): array
     {
         /** @var list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string}> */
-        return $this->fetchAllRealTeams('teamid ASC');
+        return $this->fetchAllRealTeams(\TeamOrderBy::TeamId);
     }
 
     /**

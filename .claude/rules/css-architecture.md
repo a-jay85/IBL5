@@ -3,7 +3,7 @@ description: CSS architecture: all styles live in ibl5/design/components/; inlin
 paths:
   - "**/design/**/*.css"
   - "**/*View.php"
-last_verified: 2026-05-31
+last_verified: 2026-06-10
 ---
 
 # CSS Architecture Reference
@@ -28,6 +28,12 @@ Tailwind 4 owns the layer order — only these four layers exist:
 - Within `components`, use higher specificity + later source order for overrides (e.g., `.player-stats-card table td` > `.ibl-data-table td`).
 - Tailwind utility classes (`@layer utilities`) always win over everything — this is correct.
 - **Never use custom layer names** (e.g., `reset`, `legacy`, `overrides`) — Tailwind 4 drops them from its layer order, causing them to implicitly land *after* `utilities`.
+
+## Token Naming Convention
+
+`design/input.css` declares 62 `--color-*` variables in a `@theme` block for Tailwind's engine. `design/tokens/tokens.css` re-exports each as a bare alias (`--navy-900: var(--color-navy-900);`, etc.).
+
+**Rule:** component CSS under `design/components/` must reference the bare aliases (`--navy-900`), never `--color-navy-900` directly. Using `--color-*` in components breaks the alias abstraction and bites on Tailwind version bumps (Tailwind controls the `--color-*` namespace; aliases are the stable contract).
 
 ## Table Pattern Decision Tree
 

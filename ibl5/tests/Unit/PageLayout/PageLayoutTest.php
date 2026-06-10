@@ -175,6 +175,20 @@ class PageLayoutTest extends TestCase
         self::assertStringContainsString('</html>', $output);
     }
 
+    public function testRenderFontPreconnectLinksReturnsBarlowTriple(): void
+    {
+        $result = PageLayout::renderFontPreconnectLinks();
+
+        self::assertStringContainsString('<link rel="preconnect" href="https://fonts.googleapis.com">', $result);
+        self::assertStringContainsString('<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>', $result);
+        self::assertStringContainsString('family=Barlow+Condensed:wght@500;600;700;800', $result);
+        self::assertStringContainsString('family=Barlow:wght@400;500;600;700', $result);
+        self::assertStringContainsString('display=block', $result);
+        self::assertStringContainsString('rel="stylesheet"', $result);
+        // Exactly three link tags — no more, no less
+        self::assertSame(3, substr_count($result, '<link'));
+    }
+
     public function testRenderPageGenerationTimeOutputsComment(): void
     {
         $GLOBALS['start_time'] = microtime(true) - 1.0;

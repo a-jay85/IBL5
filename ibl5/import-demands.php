@@ -205,6 +205,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['demands_csv'])) {
 <head>
     <meta charset="utf-8">
     <title>Import Free Agent Demands</title>
+    <link rel="stylesheet" href="themes/IBL/style/style.css">
     <link rel="stylesheet" href="design/components/import-demands.css">
 </head>
 <body>

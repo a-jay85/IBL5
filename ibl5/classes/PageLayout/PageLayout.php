@@ -169,9 +169,7 @@ class PageLayout
         // Root-absolute path so it resolves independently of the conditional <base href> and module depth.
         echo "<link rel=\"icon\" href=\"/ibl5/favicon.ico\" type=\"image/x-icon\">\n";
         // Google Fonts (inlined from includes/custom_files/custom_head.php)
-        echo '<link rel="preconnect" href="https://fonts.googleapis.com">';
-        echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>';
-        echo '<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=block" rel="stylesheet">';
+        echo self::renderFontPreconnectLinks();
 
         // @phpstan-ignore ibl.inlineCss (FOUT prevention: must load before external stylesheet)
         echo '<style id="font-loading-styles">
@@ -236,6 +234,13 @@ if (document.fonts && document.fonts.check("1em Barlow")) {
 
         echo "\n\n\n</head>\n\n";
         themeheader();
+    }
+
+    public static function renderFontPreconnectLinks(): string
+    {
+        return '<link rel="preconnect" href="https://fonts.googleapis.com">'
+            . '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+            . '<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=block" rel="stylesheet">';
     }
 
     /**

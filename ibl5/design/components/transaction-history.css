@@ -25,13 +25,4 @@
 
 .txn-reset { margin-left: var(--space-2); }
 
-
-/* ==========================================================================
-   Contact List Module
-   ========================================================================== */
-
-/* Contact table overrides moved to tables.css */
-
-
-
 } /* end @layer components */

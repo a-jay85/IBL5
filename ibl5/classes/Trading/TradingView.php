@@ -238,7 +238,17 @@ $tradeConfig = [
 </div>
 <div class="trading-review-wrapper">
     <div class="trading-review-offers">
-<?php if ($tradeOffers !== []): ?>
+<?php if ($tradeOffers !== []):
+    // One CSRF token per action shared by every offer card's accept/reject form
+    // on this render. Generating a token per card overflowed CsrfGuard's
+    // per-action MAX_TOKENS=10 cap once many offers accumulated (or concurrent
+    // renders piled onto the shared E2E session), evicting the oldest card's
+    // token before it could be submitted ("Invalid or expired form submission").
+    // Sharing keeps token usage flat regardless of offer count; tokens are
+    // single-use and each action PRG-reloads to mint a fresh pair.
+    $acceptToken = \Security\CsrfGuard::generateRawToken('trade_accept');
+    $rejectToken = \Security\CsrfGuard::generateRawToken('trade_reject');
+?>
     <?php foreach ($tradeOffers as $offerId => $offer):
         $preview = $offer['previewData'];
         $reviewConfigs[(int) $offerId] = [
@@ -259,7 +269,7 @@ $tradeConfig = [
             'userTeamId' => $userTeamId,
         ];
     ?>
-        <?= HtmlSanitizer::trusted($this->renderTradeOfferCard((int) $offerId, $offer, $userTeam, $userTeamId)) ?>
+        <?= HtmlSanitizer::trusted($this->renderTradeOfferCard((int) $offerId, $offer, $userTeam, $userTeamId, $acceptToken, $rejectToken)) ?>
     <?php endforeach; ?>
 <?php endif; ?>
     </div>
@@ -498,8 +508,10 @@ $tradeConfig = [
      * Render a single trade offer card with items, action buttons, and preview panel
      *
      * @param array{from: string, to: string, approval: string, oppositeTeam: string, hasHammer: bool, items: list<array{type: string, description: string, notes: string|null, from: string, to: string}>, previewData: array{fromPids: list<int>, toPids: list<int>, fromTeamId: int, toTeamId: int, fromColor1: string, toColor1: string, fromCash: array<int, int>, toCash: array<int, int>, cashStartYear: int, cashEndYear: int, seasonEndingYear: int}} $offer
+     * @param string $acceptToken Shared per-render CSRF token for the accept form (see renderReview)
+     * @param string $rejectToken Shared per-render CSRF token for the reject form (see renderReview)
      */
-    private function renderTradeOfferCard(int $offerId, array $offer, string $userTeam, int $userTeamId): string
+    private function renderTradeOfferCard(int $offerId, array $offer, string $userTeam, int $userTeamId, string $acceptToken, string $rejectToken): string
     {
         $oppositeTeam = HtmlSanitizer::safeHtmlOutput($offer['oppositeTeam']);
 
@@ -512,7 +524,7 @@ $tradeConfig = [
     <div class="trade-offer-card__actions">
 <?php if ($offer['hasHammer']): ?>
         <form name="tradeaccept" method="post" action="/ibl5/modules/Trading/accepttradeoffer.php" class="trade-offer-card__form">
-            <?= \Security\CsrfGuard::generateToken('trade_accept') ?>
+            <input type="hidden" name="_csrf_token" value="<?= HtmlSanitizer::e($acceptToken) ?>">
             <input type="hidden" name="offer" value="<?= HtmlSanitizer::e($offerId) ?>">
             <button type="submit" class="ibl-btn ibl-btn--success">Accept</button>
         </form>
@@ -520,7 +532,7 @@ $tradeConfig = [
         <span class="trade-offer-card__awaiting">Awaiting Approval</span>
 <?php endif; ?>
         <form name="tradereject" method="post" action="/ibl5/modules/Trading/rejecttradeoffer.php" class="trade-offer-card__form">
-            <?= \Security\CsrfGuard::generateToken('trade_reject') ?>
+            <input type="hidden" name="_csrf_token" value="<?= HtmlSanitizer::e($rejectToken) ?>">
             <input type="hidden" name="offer" value="<?= HtmlSanitizer::e($offerId) ?>">
             <input type="hidden" name="teamRejecting" value="<?= HtmlSanitizer::trusted($userTeam) ?>">
             <input type="hidden" name="teamReceiving" value="<?= HtmlSanitizer::trusted($oppositeTeam) ?>">

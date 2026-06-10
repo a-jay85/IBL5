@@ -61,12 +61,37 @@ class NegotiationService implements NegotiationServiceInterface
         $capSpace = $this->repository->getTeamCapSpaceNextSeason($userTeamName);
         $maxYearOneSalary = \ContractRules::getMaxContractSalary($player->getYearsOfExperience() ?? 0);
 
+        // Trading card (mirrors PlayerPageController::renderPage assembly)
+        $playerRepository = new \Player\PlayerRepository($this->db);
+        $playerName = $player->getName() ?? '';
+        $asg = $playerRepository->getAllStarGameCount($playerName);
+        $threepointcontests = $playerRepository->getThreePointContestCount($playerName);
+        $dunkcontests = $playerRepository->getDunkContestCount($playerName);
+        $rooksoph = $playerRepository->getRookieSophChallengeCount($playerName);
+        $playerStats = \Player\Stats\PlayerStats::withPlayerID($this->db, $playerID);
+        $contractDisplay = implode('/', $player->getRemainingContractArray());
+        $cardHtml = \Player\Views\PlayerTradingCardFlipView::render(
+            $player,
+            $playerStats,
+            $playerID,
+            $contractDisplay,
+            $asg,
+            $threepointcontests,
+            $dunkcontests,
+            $rooksoph,
+            $this->db
+        );
+
         $output .= NegotiationOfferView::renderNegotiationForm(
             $player,
             $demands,
             $capSpace,
-            $maxYearOneSalary
+            $maxYearOneSalary,
+            $cardHtml
         );
+
+        // Flip card script (must come after card HTML so elements exist for init)
+        $output .= \Player\Views\PlayerTradingCardFlipView::getFlipStyles();
 
         return $output;
     }

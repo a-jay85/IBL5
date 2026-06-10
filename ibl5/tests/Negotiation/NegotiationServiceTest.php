@@ -66,11 +66,17 @@ class NegotiationServiceTest extends TestCase
         // Setup complete player data
         $this->mockDb->setMockData([$this->getCompletePlayerData()]);
 
+        // Route the trading card's team-color lookup so it does not fall through
+        // to the player-row pool (which lacks color1/color2 → undefined-key warnings).
+        $this->mockDb->onQuery('color1, color2 FROM ibl_team_info', [['color1' => 'D4AF37', 'color2' => '1e3a5f']]);
+
         $result = $service->processNegotiation(1, 'Test Team', 'prefix');
 
         $this->assertIsString($result);
         // Result should contain HTML markup
         $this->assertMatchesRegularExpression('/<.*>/', $result);
+        // The happy path builds the trading card end-to-end through the service.
+        $this->assertStringContainsString('card-flip-container', $result);
     }
 
     // ============================================

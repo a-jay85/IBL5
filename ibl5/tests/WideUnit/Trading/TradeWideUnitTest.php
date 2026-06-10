@@ -205,13 +205,7 @@ class TradeWideUnitTest extends WideUnitTestCase
                 'salary_yr3' => 0,
                 'salary_yr4' => 0,
                 'salary_yr5' => 0,
-                'salary_yr6' => 0,
-                0 => 1000,
-                1 => 1500,
-                2 => 0,
-                3 => 0,
-                4 => 0,
-                5 => 0
+                'salary_yr6' => 0
             ]
         ]);
 
@@ -496,13 +490,7 @@ class TradeWideUnitTest extends WideUnitTestCase
                 'salary_yr3' => 0,
                 'salary_yr4' => 0,
                 'salary_yr5' => 0,
-                'salary_yr6' => 0,
-                0 => 500,
-                1 => 0,
-                2 => 0,
-                3 => 0,
-                4 => 0,
-                5 => 0
+                'salary_yr6' => 0
             ]
         ]);
 

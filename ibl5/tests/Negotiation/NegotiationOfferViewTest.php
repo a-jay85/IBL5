@@ -322,34 +322,44 @@ class NegotiationOfferViewTest extends TestCase
     }
 
     /**
-     * The ratings table is now a single shared static
-     * (FreeAgencyFormComponents::renderPlayerRatings) consumed by both the
-     * Free Agency offer page and the Negotiation extension page. The
-     * Negotiation page must embed that exact shared markup verbatim, so the
-     * dedup cannot silently diverge the two render paths.
+     * Card 1 now hosts the Player module's flippable trading card, which the
+     * service assembles from $db and passes in as pre-rendered HTML. The view
+     * must emit that string verbatim (and, with no card, must NOT fabricate a
+     * card wrapper or carry over the removed ratings-bar / small-img markup).
      *
      * @group view
      * @group rendering
      */
-    public function testRatingsTableRenderedFromSharedComponentVerbatim(): void
+    public function testRendersProvidedCardHtml(): void
     {
         $player = $this->createTestPlayer();
         $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
+        $cardHtml = '<div class="card-flip-container">SENTINEL</div>';
 
-        $sharedRatings = \FreeAgency\FreeAgencyFormComponents::renderPlayerRatings($player);
-        $negotiationHtml = NegotiationOfferView::renderNegotiationForm(
+        $html = NegotiationOfferView::renderNegotiationForm(
+            $player,
+            $this->getDefaultDemands(),
+            1000,
+            $maxYearOneSalary,
+            $cardHtml
+        );
+
+        // The provided card HTML is emitted verbatim.
+        $this->assertStringContainsString('card-flip-container', $html);
+        $this->assertStringContainsString('SENTINEL', $html);
+
+        // The old ratings bar / small img are gone.
+        $this->assertStringNotContainsString('offer-player-img', $html);
+        $this->assertStringNotContainsString('offer-ratings', $html);
+
+        // Boundary: with no card, the view emits no card wrapper.
+        $htmlNoCard = NegotiationOfferView::renderNegotiationForm(
             $player,
             $this->getDefaultDemands(),
             1000,
             $maxYearOneSalary
         );
-
-        // Sanity: the shared markup is the 21-column ratings table.
-        $this->assertStringContainsString('offer-ratings', $sharedRatings);
-        $this->assertSame(21, substr_count($sharedRatings, '<th>'));
-
-        // The Negotiation page embeds the shared table byte-for-byte.
-        $this->assertStringContainsString($sharedRatings, $negotiationHtml);
+        $this->assertStringNotContainsString('card-flip-container', $htmlNoCard);
     }
 
     /**

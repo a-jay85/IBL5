@@ -10,6 +10,7 @@ import (
 
 	"github.com/a-jay85/IBL5/engine/internal/backup"
 	"github.com/a-jay85/IBL5/engine/internal/bundle"
+	"github.com/a-jay85/IBL5/engine/internal/sim"
 )
 
 // This file builds SYNTHETIC .plr/.sch/.sco corpora on disk for the harness
@@ -291,7 +292,7 @@ func buildCorpus(t *testing.T, dir string, inBand bool, runs int, baseSeed uint6
 	writeSch(t, sch, []schSpec{{vis: 7, home: 3, vScore: 1, hScore: 1}})
 
 	b := assembleSynthBundle(t, plr, sch)
-	visMean, homeMean, _, _, _, _ := simulateGameMeans(b, b.Schedule[0], runs, baseSeed, false, nil)
+	visMean, homeMean, _, _, _, _ := simulateGameMeans(b, b.Schedule[0], runs, baseSeed, sim.Options{})
 	visPts, homePts := round(visMean["points"]), round(homeMean["points"])
 
 	// Rewrite .sch with the real scores so the .sco↔.sch tuple match succeeds.

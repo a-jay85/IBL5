@@ -1,6 +1,10 @@
 package sim
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/a-jay85/IBL5/engine/internal/result"
+)
 
 // Freeze-override infrastructure for the empty-FGA source-isolation diagnostic
 // (ADR-0043). The team-scoring coupling defect (ADR-0042) is a wrong-signed
@@ -27,6 +31,20 @@ type FreezeConfig struct {
 	TVR  bool // freeze the steal-driven turnover prob.  — turnoverProb output
 	Foul bool // freeze the foul-only bucket weight      — foulBucketWeight output
 	Make bool // freeze the 2pt make-value               — shotValue2pt output (pre-clutch)
+
+	// MakePutback / MakePutbackHalf are the ADR-0053 shots-per-possession decoupling
+	// A/B arms. Unlike the four freeze arms above they are ORIGIN-SCOPED: they route
+	// only OriginOffReb (putback) 2pt make-value to the league mean, leaving the
+	// initial and transition attempts on the live value. This removes the team-quality
+	// variance feeding the putback efficiency↔volume coupling (the surviving suspect in
+	// the engine's wrong-signed Cov(ln(FGA/POSS),lnPPS)). Both consume
+	// FreezeMeans.MakeVal2pt:
+	//   - MakePutback:     putback 2pt make-value → full league mean.
+	//   - MakePutbackHalf: putback 2pt make-value → halfway blend (live + mean)/2 (the
+	//     hedge if the full substitution over-narrows Var(lnPPS) below real).
+	// Off by default → a zero Options stays byte-identical to Simulate.
+	MakePutback     bool
+	MakePutbackHalf bool
 
 	// BranchB enables the JSB +0xD90-stage Branch-B usage-shrink (bucketweights.go /
 	// branchBShrink). It is NOT a FreezeMeans arm (it is a derived-value transform, not
@@ -142,6 +160,9 @@ func (o Options) validate() error {
 	if o.Freeze.Make && o.Freeze.Means.MakeVal2pt == 0 {
 		return fmt.Errorf("sim: freeze Make requested but Means.MakeVal2pt is unset (0)")
 	}
+	if (o.Freeze.MakePutback || o.Freeze.MakePutbackHalf) && o.Freeze.Means.MakeVal2pt == 0 {
+		return fmt.Errorf("sim: freeze MakePutback/MakePutbackHalf requested but Means.MakeVal2pt is unset (0)")
+	}
 	return nil
 }
 
@@ -209,7 +230,15 @@ func (gs *gameState) foulWeight(offense, defenders []onCourt, hca float64) float
 // value (clutch is still applied by the caller). Injecting here, at the shot-value
 // assembly, leaves rollMake — and therefore the free-throw make roll that shares it
 // (freethrow.go) — structurally untouched.
-func (gs *gameState) makeValue2pt(net float64, fgp int) float64 {
+//
+// origin selects the substitution scope. The Make arm freezes EVERY 2pt make-value;
+// the ADR-0053 MakePutback/MakePutbackHalf arms substitute ONLY when origin is
+// OriginOffReb (the putback continuation), so an OriginInitial/OriginTransition shot
+// keeps its live value — the origin-scoped decoupling. MakePutbackHalf returns the
+// halfway blend (live + mean)/2 instead of the full mean. The accumulator write is
+// ALWAYS on the live value v (so a baseline harvest sees the real distribution
+// regardless of which arm is on).
+func (gs *gameState) makeValue2pt(net float64, fgp int, origin result.ShotOrigin) float64 {
 	v := shotValue2pt(net, fgp, false)
 	if gs.accum != nil {
 		gs.accum.makeSum += v
@@ -217,6 +246,14 @@ func (gs *gameState) makeValue2pt(net float64, fgp int) float64 {
 	}
 	if gs.freeze.Make {
 		return gs.freeze.Means.MakeVal2pt
+	}
+	if origin == result.OriginOffReb {
+		if gs.freeze.MakePutback {
+			return gs.freeze.Means.MakeVal2pt
+		}
+		if gs.freeze.MakePutbackHalf {
+			return (v + gs.freeze.Means.MakeVal2pt) / 2
+		}
 	}
 	return v
 }

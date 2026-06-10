@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/a-jay85/IBL5/engine/internal/bundle"
+	"github.com/a-jay85/IBL5/engine/internal/sim"
 	"github.com/a-jay85/IBL5/engine/internal/validate"
 )
 
@@ -242,27 +243,70 @@ func selectMostComplete(candidates []string, countFn CountScoFunc) (best string,
 }
 
 // resolveValidate returns opts.Validate (the injected test seam, which ignores the
-// Branch-B toggle) or a real ValidateCorpusWith default that captures opts.BranchB +
-// opts.BranchBAccum — so the measurement A/B threads Branch-B without widening the
+// measurement toggles) or a real default that threads them through ValidateCorpusWith —
+// so the A/B configures Branch-B / the ADR-0053 decoupling arms without widening the
 // 4-arg ValidateFunc seam (and its mocks).
 func resolveValidate(opts Options) ValidateFunc {
 	if opts.Validate != nil {
 		return opts.Validate
 	}
-	return func(dir string, runs int, seed uint64, gt bundle.GameType) (validate.Report, error) {
-		return validate.ValidateCorpusWith(dir, runs, seed, gt, opts.BranchB, opts.BranchBAccum)
-	}
+	return validateWithArms(opts, validate.ValidateCorpusWith)
 }
 
-// resolveValidateUnscheduled returns opts.ValidateUnscheduled or a real
-// ValidateUnscheduledWith default capturing the Branch-B toggle + accumulator (the
-// playoff-bucket seam).
+// resolveValidateUnscheduled returns opts.ValidateUnscheduled or a real default that
+// threads the measurement toggles through ValidateUnscheduledWith (the playoff-bucket
+// seam).
 func resolveValidateUnscheduled(opts Options) ValidateFunc {
 	if opts.ValidateUnscheduled != nil {
 		return opts.ValidateUnscheduled
 	}
+	return validateWithArms(opts, validate.ValidateUnscheduledWith)
+}
+
+// makePutbackActive reports whether either ADR-0053 shots-per-possession decoupling
+// arm is enabled.
+func (o Options) makePutbackActive() bool { return o.MakePutback || o.MakePutbackHalf }
+
+// validateWithArms wraps a real validate.*With function into the 4-arg ValidateFunc
+// seam, threading the configured measurement seams as a sim.Options bundle.
+//
+// Without the ADR-0053 arms it is the single Branch-B passthrough (a zero sim.Options{}
+// when Branch-B is also off ⇒ byte-identical to the pre-ADR-0053 closure). With an arm
+// on it runs a PER-SEASON-BUCKET two-pass, because the arms consume
+// FreezeMeans.MakeVal2pt and the league-mean make-value is era-specific:
+//
+//  1. Harvest pass — a FRESH sim.FreezeAccum, allocated INSIDE this closure invocation
+//     so each season harvests its OWN mean (an accum hoisted to resolveValidate's scope
+//     would be shared across the whole walk → a cross-era global mean, an era-
+//     contaminated fidelity regression). validateFn is called once per season bucket
+//     (processZip → validateFn), so per-invocation == per-bucket.
+//  2. Frozen pass — the SAME seed (so the arm perturbs the same realized games the mean
+//     was harvested from, mirroring CollectFreezeAttribution's two same-seed passes),
+//     the arm on, and Means populated from the harvest. Its report is the returned one.
+//
+// The harvest report is discarded; the OFF aggregate is a separate top-level walk
+// (exactly like the Branch-B A/B), never this closure's harvest pass.
+func validateWithArms(opts Options, validateFn func(string, int, uint64, bundle.GameType, sim.Options) (validate.Report, error)) ValidateFunc {
 	return func(dir string, runs int, seed uint64, gt bundle.GameType) (validate.Report, error) {
-		return validate.ValidateUnscheduledWith(dir, runs, seed, gt, opts.BranchB, opts.BranchBAccum)
+		base := sim.Options{}
+		if opts.BranchB {
+			base.Freeze.BranchB = true
+			base.BranchBAccum = opts.BranchBAccum
+		}
+		if !opts.makePutbackActive() {
+			return validateFn(dir, runs, seed, gt, base)
+		}
+		acc := &sim.FreezeAccum{}
+		harvest := base
+		harvest.Accum = acc
+		if _, err := validateFn(dir, runs, seed, gt, harvest); err != nil {
+			return validate.Report{}, err
+		}
+		frozen := base
+		frozen.Freeze.MakePutback = opts.MakePutback
+		frozen.Freeze.MakePutbackHalf = opts.MakePutbackHalf
+		frozen.Freeze.Means = acc.Means()
+		return validateFn(dir, runs, seed, gt, frozen)
 	}
 }
 

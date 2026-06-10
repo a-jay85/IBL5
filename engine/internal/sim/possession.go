@@ -151,7 +151,7 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPen
 		// Make/foul/turnover arms route through the gameState freeze wrappers
 		// (freeze.go): live values in the normal/baseline path, league-mean
 		// substitutes when an arm is frozen for the ADR-0043 attribution.
-		sv2 := applyClutch(gs.makeValue2pt(net, bh.FGP), bh.Clutch, gs.period, scoreDiff)
+		sv2 := applyClutch(gs.makeValue2pt(net, bh.FGP, origin), bh.Clutch, gs.period, scoreDiff)
 		// Home-court advantage, applied at the two modeled JSB sites (delta = +0.2
 		// home / −0.2 away, 0 for ASG). Site 2: the made-shot (2pt) bucket gains
 		// +delta, the foul bucket loses delta (handled inside foulBucketWeight).

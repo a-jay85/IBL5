@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/auth';
 import type { APIRequestContext } from '@playwright/test';
+import { triggerUpdater } from '../helpers/updater';
 
 /**
  * Engine shadow sim runs OUT-OF-BAND (ADR-0037): hitting the admin
@@ -36,7 +37,6 @@ async function countShadowRows(request: APIRequestContext): Promise<ShadowCounts
 
 test.describe('Engine shadow: out-of-band spawn on admin update', () => {
   test('hitting updateAllTheThings spawns the detached run and shadow rows land', async ({
-    page,
     request,
   }) => {
     // Skip fast when the engine binary is not installed in this image.
@@ -48,10 +48,13 @@ test.describe('Engine shadow: out-of-band spawn on admin update', () => {
 
     const before = await countShadowRows(request);
 
-    // Trigger the admin update — runs the pipeline on GET and fires the detached
-    // shadow spawn (ENGINE_SHADOW_ENABLED=1 on the CI php service).
-    const response = await page.goto('scripts/updateAllTheThings.php');
-    expect(response?.status()).toBe(200);
+    // Trigger the admin update via a CSRF-validated POST (token fetched from the
+    // LCP form, which renders it at any phase) and fire the detached shadow spawn
+    // (ENGINE_SHADOW_ENABLED=1 on the CI php service). We POST rather than click
+    // the phase-gated button so this spec never mutates the shared season-phase
+    // row — updater-awards.spec.ts stays its sole writer. The POST resolves only
+    // after the streamed pipeline completes, replacing the old GET status check.
+    await triggerUpdater(request);
 
     // Poll for asynchronously-written shadow rows (the run is fire-and-forget).
     const deadline = Date.now() + 60_000;

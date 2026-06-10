@@ -6,17 +6,25 @@ import {
   setChampion,
   setAward,
 } from '../helpers/test-state';
+import { runUpdater } from '../helpers/updater';
 
 // E2E tests for the updater awards steps:
 //   - GenerateSeasonAwardsStep (Season awards card)
 //   - EndOfSeasonImportStep Finals MVP card
 //
+// The updater is now POST-only + CSRF-validated: it runs when the admin clicks
+// the LCP "Update All The Things" button (carrying a valid token). runUpdater()
+// navigates to the LCP and clicks that button. The button is phase-gated, so
+// every test sets a button-rendering phase (Regular Season or Playoffs) via
+// DB-level setState before triggering — the CI seed phase ('Free Agency')
+// renders no button.
+//
 // The updater script queries ibl_settings via $lcpRepo->getSetting()
-// (direct DB read), so cookie-based appState overrides don't work here.
-// All state mutations use setState() (DB-level) with afterEach cleanup.
+// (direct DB read), so cookie-based appState overrides don't work here — and
+// the LCP reads the phase the same way, so setState (DB-level) is required.
 //
 // The CI seed has:
-//   - Phase = 'Free Agency' (non-Playoffs), so the Playoffs skip is the default
+//   - Phase = 'Free Agency' (non-Playoffs, renders no Update-All button)
 //   - No ibl_jsb_history rows with won_championship=1 for year 2026,
 //     so EndOfSeasonImportStep is skipped ("No champion determined yet")
 //   - No Leaders.htm at $basePath/Leaders.htm, so the Generate button
@@ -41,9 +49,12 @@ test.describe('Updater awards — GenerateSeasonAwardsStep', () => {
 
   test('phase not Playoffs: shows "Only available during Playoffs phase"', async ({
     page,
+    request,
   }) => {
-    // Seed default is 'Regular Season' — no setup needed
-    await page.goto('scripts/updateAllTheThings.php', { timeout: 60_000 });
+    // Regular Season is a non-Playoffs phase that still renders the Update-All
+    // button, so the "Only available during Playoffs phase" skip holds.
+    await setState(request, { 'Current Season Phase': 'Regular Season' });
+    await runUpdater(page);
 
     await expect(
       page.getByText('Only available during Playoffs phase'),
@@ -56,7 +67,7 @@ test.describe('Updater awards — GenerateSeasonAwardsStep', () => {
   }) => {
     await setState(request, { 'Current Season Phase': 'Playoffs' });
     await setEoyVotes(request, 15);
-    await page.goto('scripts/updateAllTheThings.php', { timeout: 60_000 });
+    await runUpdater(page);
 
     await expect(
       page.getByText(/Voting not yet complete/),
@@ -72,7 +83,7 @@ test.describe('Updater awards — GenerateSeasonAwardsStep', () => {
     // of the Generate button.
     await setState(request, { 'Current Season Phase': 'Playoffs' });
     await setEoyVotes(request, 21);
-    await page.goto('scripts/updateAllTheThings.php', { timeout: 60_000 });
+    await runUpdater(page);
 
     await expect(
       page.getByText('Leaders.htm not found'),
@@ -86,7 +97,7 @@ test.describe('Updater awards — GenerateSeasonAwardsStep', () => {
     await setState(request, { 'Current Season Phase': 'Playoffs' });
     await setEoyVotes(request, 21);
     await setLeadersHtm(request, true);
-    await page.goto('scripts/updateAllTheThings.php', { timeout: 60_000 });
+    await runUpdater(page);
 
     const card = page.locator('.ibl-card', { hasText: 'Season Awards' });
     await expect(card).toBeVisible({ timeout: 60_000 });
@@ -100,8 +111,11 @@ test.describe('Updater awards — GenerateSeasonAwardsStep', () => {
     page,
     request,
   }) => {
+    // The already-generated short-circuit fires before the phase gate, so the
+    // message holds at any phase; Regular Season just renders the trigger button.
+    await setState(request, { 'Current Season Phase': 'Regular Season' });
     await setAward(request, SEASON_YEAR, 'Most Valuable Player (1st)', true);
-    await page.goto('scripts/updateAllTheThings.php', { timeout: 60_000 });
+    await runUpdater(page);
 
     await expect(
       page.getByText(`Season awards already generated for ${SEASON_YEAR}`),
@@ -123,7 +137,7 @@ test.describe('Updater awards — EndOfSeasonImportStep', () => {
     // CI seed has no won_championship=1 row for season year 2026, so
     // EndOfSeasonImportStep returns skipped and "IBL Finals MVP" is never rendered.
     await setState(request, { 'Current Season Phase': 'Playoffs' });
-    await page.goto('scripts/updateAllTheThings.php', { timeout: 60_000 });
+    await runUpdater(page);
 
     // Anchor: confirm the pipeline ran to completion before checking negative
     await expect(
@@ -139,7 +153,7 @@ test.describe('Updater awards — EndOfSeasonImportStep', () => {
   }) => {
     await setState(request, { 'Current Season Phase': 'Playoffs' });
     await setChampion(request, SEASON_YEAR, true);
-    await page.goto('scripts/updateAllTheThings.php', { timeout: 60_000 });
+    await runUpdater(page);
 
     const card = page.locator('.ibl-card', { hasText: 'IBL Finals MVP' });
     await expect(card).toBeVisible({ timeout: 60_000 });
@@ -158,7 +172,7 @@ test.describe('Updater awards — EndOfSeasonImportStep', () => {
     await setState(request, { 'Current Season Phase': 'Playoffs' });
     await setChampion(request, SEASON_YEAR, true);
     await setAward(request, SEASON_YEAR, 'IBL Finals MVP', true);
-    await page.goto('scripts/updateAllTheThings.php', { timeout: 60_000 });
+    await runUpdater(page);
 
     const card = page.locator('.ibl-card', { hasText: 'IBL Finals MVP' });
     await expect(card).toBeVisible({ timeout: 60_000 });

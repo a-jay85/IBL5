@@ -92,6 +92,10 @@ class LeagueControlPanelViewTest extends TestCase
         ]);
 
         $this->assertStringContainsString('Update All The Things', $html);
+        $this->assertStringContainsString('formaction="/ibl5/scripts/updateAllTheThings.php"', $html);
+        $this->assertStringContainsString('formmethod="post"', $html);
+        // Regression lock: the unauthenticated-CSRF GET link must be gone.
+        $this->assertStringNotContainsString('href="/ibl5/scripts/updateAllTheThings.php"', $html);
         $this->assertStringContainsString('value="set_allow_waivers"', $html);
         $this->assertStringContainsString('value="set_waivers_to_free_agents"', $html);
         $this->assertStringContainsString('value="reset_contract_extensions"', $html);
@@ -371,7 +375,51 @@ class LeagueControlPanelViewTest extends TestCase
         $this->assertStringNotContainsString('value="set_waivers_to_free_agents"', $html);
         $this->assertStringNotContainsString('value="reset_contract_extensions"', $html);
         $this->assertStringNotContainsString('value="reset_mles_lles"', $html);
-        $this->assertStringContainsString('updateAllTheThings', $html);
+        $this->assertStringContainsString('formaction="/ibl5/scripts/updateAllTheThings.php"', $html);
+        $this->assertStringContainsString('formmethod="post"', $html);
+        $this->assertStringNotContainsString('href="/ibl5/scripts/updateAllTheThings.php"', $html);
+    }
+
+    public function testRenderContainsCsrfTokenInPanelForm(): void
+    {
+        $html = $this->renderWithDefaults();
+
+        $this->assertStringContainsString('name="_csrf_token"', $html);
+    }
+
+    public function testOlympicsRenderContainsLeagueHiddenInput(): void
+    {
+        $html = $this->renderWithDefaults([
+            'currentLeague' => 'olympics',
+            'panelData' => self::createPanelData(['phase' => 'Regular Season']),
+        ]);
+
+        $this->assertStringContainsString('name="league"', $html);
+        $this->assertStringContainsString('value="olympics"', $html);
+    }
+
+    public function testIblRenderOmitsLeagueHiddenInput(): void
+    {
+        $html = $this->renderWithDefaults(['currentLeague' => 'ibl']);
+
+        $this->assertStringNotContainsString('name="league"', $html);
+    }
+
+    public function testSimLengthInputSuppressesEnterSubmit(): void
+    {
+        // On the Olympics panel there is no "Set Season Phase" button, so the
+        // destructive "Update All The Things" submit would otherwise be the form's
+        // implicit default — Enter in the sim-length field could fire the full
+        // updater. The number input must suppress Enter to block that.
+        $html = $this->renderWithDefaults([
+            'currentLeague' => 'olympics',
+            'panelData' => self::createPanelData(['phase' => 'Preseason']),
+        ]);
+
+        $this->assertMatchesRegularExpression(
+            '/name="SimLengthInDays"[^>]*onkeydown="if\(event\.key===\'Enter\'\)event\.preventDefault\(\)"/',
+            $html,
+        );
     }
 
     public function testRenderContainsHiddenCurrentPhase(): void

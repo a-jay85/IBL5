@@ -10,7 +10,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
 // SECURITY: Redirect logged-out users to login
 if (!function_exists('is_user') || !is_user($user ?? '')) {
-    $_SESSION['redirect_after_login_path'] = 'scripts/updateAllTheThings.php'
+    $_SESSION['redirect_after_login_path'] = 'leagueControlPanel.php'
         . (isset($_GET['league']) && $_GET['league'] === League\LeagueContext::LEAGUE_OLYMPICS ? '?league=olympics' : '');
     header('Location: ../modules.php?name=YourAccount');
     exit;
@@ -20,6 +20,21 @@ if (!function_exists('is_user') || !is_user($user ?? '')) {
 if (!is_admin()) {
     http_response_code(403);
     die('Access denied. This script requires administrator privileges.');
+}
+
+// SECURITY: This is a destructive full-league mutation — POST-only closes the
+// GET-based CSRF vector (e.g. <img src=".../updateAllTheThings.php">). A GET
+// from a stale link/bookmark bounces back to the control panel.
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    header('Location: ../leagueControlPanel.php');
+    exit;
+}
+
+// SECURITY: Validate CSRF token (form name must match the LCP View's generateToken call)
+$csrfToken = isset($_POST['_csrf_token']) && is_string($_POST['_csrf_token']) ? $_POST['_csrf_token'] : '';
+if (!\Security\CsrfGuard::validateToken($csrfToken, 'lcp_update_all')) {
+    http_response_code(403);
+    die('Invalid CSRF token.');
 }
 
 // Allow up to 5 minutes for the full update (production shared hosting has 30s default)
@@ -51,8 +66,9 @@ if (!headers_sent()) {
 
 global $mysqli_db;
 
-// Determine league context from explicit URL parameter only (not cookie/session)
-$leagueParam = isset($_GET['league']) && is_string($_GET['league']) ? $_GET['league'] : null;
+// Determine league context from the explicit POST parameter only (not cookie/session);
+// the LCP's conditional `league=olympics` hidden input rides the CSRF-validated POST.
+$leagueParam = isset($_POST['league']) && is_string($_POST['league']) ? $_POST['league'] : null;
 $leagueContext = $leagueParam === League\LeagueContext::LEAGUE_OLYMPICS ? new League\LeagueContext() : null;
 $isOlympics = $leagueContext !== null;
 if ($leagueContext !== null) {
@@ -107,8 +123,8 @@ try {
     $season = new \Season\Season($mysqli_db);
 
     // Season year override for historical imports (e.g., Olympics 2003)
-    $seasonYearOverride = isset($_GET['season_year']) && is_string($_GET['season_year'])
-        ? (int) $_GET['season_year'] : null;
+    $seasonYearOverride = isset($_POST['season_year']) && is_string($_POST['season_year'])
+        ? (int) $_POST['season_year'] : null;
     if ($seasonYearOverride !== null && $seasonYearOverride > 1900 && $seasonYearOverride < 2100) {
         $season->endingYear = $seasonYearOverride;
         $season->beginningYear = $seasonYearOverride - 1;
@@ -161,8 +177,8 @@ try {
     ));
 
     if ($isOlympics) {
-        $realTeamCountParam = isset($_GET['real_team_count']) && is_string($_GET['real_team_count'])
-            ? (int) $_GET['real_team_count'] : null;
+        $realTeamCountParam = isset($_POST['real_team_count']) && is_string($_POST['real_team_count'])
+            ? (int) $_POST['real_team_count'] : null;
         $updaterService->addStep(new Updater\Steps\AutoSeedOlympicsTeamInfoStep(
             $mysqli_db, $season->endingYear, $realTeamCountParam,
         ));

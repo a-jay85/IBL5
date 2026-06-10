@@ -103,4 +103,10 @@ interface SeasonQueryRepositoryInterface
      * @return int Phase-specific sim number (falls back to overall if 0)
      */
     public function calculatePhaseSimNumber(int $overallSimNumber, string $phase, int $seasonYear): int;
+
+    /**
+     * Distinct season years present in ibl_hist, newest first.
+     * @return list<int>
+     */
+    public function getAvailableSeasonYears(): array;
 }

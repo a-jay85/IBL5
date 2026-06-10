@@ -206,4 +206,32 @@ class PlrBoxScoreRepositoryTest extends DatabaseTestCase
         self::assertCount(1, $result);
         self::assertSame('2025-01-20', $result[0]);
     }
+
+    public function testGetSingleGameMaximumsThroughDateExcludesDnpRows(): void
+    {
+        // DNP row (game_min=0) — should be excluded by WHERE game_min > 0
+        $this->insertPlayerBoxscoreRow('2025-01-15', 1, 'P1', 'PG', 2, 1, 1, minutes: 0);
+
+        $result = $this->repo->getSingleGameMaximumsThroughDate(2025, 1, '2025-01-31');
+
+        self::assertArrayNotHasKey(1, $result, 'DNP row must not appear in single-game maximums');
+    }
+
+    public function testCumulativeRegularSeasonStatsByDateExcludesDnpFromGp(): void
+    {
+        // Played row (game_min > 0) — counts as 1 GP
+        $this->insertPlayerBoxscoreRow('2025-01-15', 1, 'P1', 'PG', 2, 1, 1, minutes: 30);
+        // DNP row (game_min = 0) — must not increment GP
+        $this->insertPlayerBoxscoreRow('2025-01-20', 1, 'P1', 'PG', 1, 3, 1, minutes: 0,
+            points2m: 0, points2a: 0, ftm: 0, fta: 0, points3m: 0, points3a: 0,
+            orb: 0, drb: 0, ast: 0, stl: 0, tov: 0, blk: 0, pf: 0);
+
+        $result = $this->repo->cumulativeRegularSeasonStatsByDate(1, 2025);
+
+        self::assertCount(2, $result);
+        // GP on the first date: 1 (played)
+        self::assertSame(1, $result[0]['gp']);
+        // GP on the second date: still 1 (DNP row must not count)
+        self::assertSame(1, $result[1]['gp']);
+    }
 }

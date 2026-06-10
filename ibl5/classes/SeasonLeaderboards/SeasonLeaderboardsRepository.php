@@ -94,15 +94,7 @@ class SeasonLeaderboardsRepository extends \BaseMysqliRepository implements Seas
      */
     public function getYears(): array
     {
-        /** @var list<array{year: int}> $rows */
-        $rows = $this->fetchAll("SELECT DISTINCT year FROM `ibl_hist` ORDER BY year DESC");
-
-        $years = [];
-        foreach ($rows as $row) {
-            $years[] = $row['year'];
-        }
-
-        return $years;
+        return (new \Season\SeasonQueryRepository($this->db))->getAvailableSeasonYears();
     }
 
     /**

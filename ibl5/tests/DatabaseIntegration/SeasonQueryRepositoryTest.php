@@ -146,4 +146,26 @@ class SeasonQueryRepositoryTest extends DatabaseTestCase
 
         self::assertSame('On', $result);
     }
+
+    public function testGetAvailableSeasonYearsReturnsDistinctYearsNewestFirst(): void
+    {
+        $this->db->query("DELETE FROM `ibl_hist`");
+
+        $this->insertHistRow(9001, 'Player A', 2090);
+        $this->insertHistRow(9002, 'Player B', 2092);
+        $this->insertHistRow(9003, 'Player C', 2090); // duplicate year — must be deduplicated
+
+        $result = $this->repo->getAvailableSeasonYears();
+
+        self::assertSame([2092, 2090], $result, 'Years must be distinct and ordered newest first');
+    }
+
+    public function testGetAvailableSeasonYearsReturnsEmptyArrayWhenNoData(): void
+    {
+        $this->db->query("DELETE FROM `ibl_hist`");
+
+        $result = $this->repo->getAvailableSeasonYears();
+
+        self::assertSame([], $result, 'Empty ibl_hist must return []');
+    }
 }

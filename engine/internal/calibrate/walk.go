@@ -67,6 +67,17 @@ type Options struct {
 	// BranchBAccum, when non-nil and BranchB is set, harvests the engagement instrument
 	// (Branch-B-taken fraction + s distribution) aggregated across the whole archive pass.
 	BranchBAccum *sim.BranchBAccum
+
+	// MakePutback / MakePutbackHalf enable the ADR-0053 shots-per-possession decoupling
+	// arms in the default (non-injected) engine runs — the Phase-3 measurement A/B. Like
+	// BranchB they are captured by resolveValidate's real default closure (an injected
+	// Options.Validate test seam ignores them) and default false leaves every existing
+	// caller byte-identical. Because the arms consume FreezeMeans.MakeVal2pt, the closure
+	// runs a per-season-bucket harvest pass to populate the mean BEFORE the frozen pass
+	// (the league-mean make-value is era-specific, so the harvest is per-bucket, never
+	// global — mirrors CollectFreezeAttribution).
+	MakePutback     bool
+	MakePutbackHalf bool
 }
 
 // Skip records a snapshot (or archive entry) that was not turned into a Report,

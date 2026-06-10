@@ -8,7 +8,68 @@ import (
 	"testing"
 
 	"github.com/a-jay85/IBL5/engine/internal/bundle"
+	"github.com/a-jay85/IBL5/engine/internal/sim"
+	"github.com/a-jay85/IBL5/engine/internal/validate"
 )
+
+// validateWithArms (ADR-0053): without an arm it is a single passthrough whose
+// sim.Options carries only the Branch-B toggle; with an arm it is a per-bucket
+// two-pass — a harvest pass (Accum set, arm off) then a frozen pass (arm on, Means
+// sourced from the harvest accum), both at the SAME seed. A fresh accum is allocated
+// per closure invocation (per bucket), never shared across buckets.
+func TestValidateWithArms(t *testing.T) {
+	type call struct {
+		seed uint64
+		opts sim.Options
+	}
+	newFn := func(calls *[]call) func(string, int, uint64, bundle.GameType, sim.Options) (validate.Report, error) {
+		return func(_ string, _ int, seed uint64, _ bundle.GameType, o sim.Options) (validate.Report, error) {
+			*calls = append(*calls, call{seed: seed, opts: o})
+			return validate.Report{}, nil
+		}
+	}
+
+	t.Run("no arm — single Branch-B passthrough", func(t *testing.T) {
+		var calls []call
+		fn := validateWithArms(Options{BranchB: true}, newFn(&calls))
+		if _, err := fn("dir", 5, 99, bundle.GameTypeRegular); err != nil {
+			t.Fatalf("fn: %v", err)
+		}
+		if len(calls) != 1 {
+			t.Fatalf("calls=%d, want 1 (no two-pass without an arm)", len(calls))
+		}
+		o := calls[0].opts
+		if !o.Freeze.BranchB || o.Freeze.MakePutback || o.Freeze.MakePutbackHalf || o.Accum != nil {
+			t.Errorf("opts=%+v, want BranchB only", o.Freeze)
+		}
+	})
+
+	t.Run("MakePutback — harvest then frozen, same seed", func(t *testing.T) {
+		var calls []call
+		fn := validateWithArms(Options{MakePutback: true}, newFn(&calls))
+		if _, err := fn("dir", 5, 99, bundle.GameTypeRegular); err != nil {
+			t.Fatalf("fn: %v", err)
+		}
+		if len(calls) != 2 {
+			t.Fatalf("calls=%d, want 2 (harvest + frozen)", len(calls))
+		}
+		harvest, frozen := calls[0], calls[1]
+		if harvest.opts.Accum == nil || harvest.opts.Freeze.MakePutback {
+			t.Errorf("harvest opts=%+v, want Accum set and arm OFF", harvest.opts)
+		}
+		// The frozen pass turns the arm on and sources Means from the SAME harvest accum
+		// (acc.Means()), so a future refactor cannot silently feed it a different mean.
+		if !frozen.opts.Freeze.MakePutback {
+			t.Errorf("frozen arm off, want MakePutback on: %+v", frozen.opts.Freeze)
+		}
+		if frozen.opts.Freeze.Means != harvest.opts.Accum.Means() {
+			t.Errorf("frozen Means=%+v, want the harvest accum's Means()=%+v", frozen.opts.Freeze.Means, harvest.opts.Accum.Means())
+		}
+		if harvest.seed != frozen.seed {
+			t.Errorf("seeds differ: harvest=%d frozen=%d (must match so the arm perturbs the harvested games)", harvest.seed, frozen.seed)
+		}
+	})
+}
 
 // okCount is a CountScoFunc stub reporting a complete season (1148 games / 28
 // teams → medGP≈82) for any path, so the public CollectSeasonReports tests that

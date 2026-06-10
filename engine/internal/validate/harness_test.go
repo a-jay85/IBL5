@@ -11,6 +11,7 @@ import (
 	"github.com/a-jay85/IBL5/engine/internal/backup"
 	"github.com/a-jay85/IBL5/engine/internal/bundle"
 	"github.com/a-jay85/IBL5/engine/internal/result"
+	"github.com/a-jay85/IBL5/engine/internal/sim"
 )
 
 const testRuns = 8 // small N keeps `go test ./...` fast (advisor guidance)
@@ -110,9 +111,9 @@ func TestValidateCorpus_InBandPassesAndDeterministic(t *testing.T) {
 	}
 }
 
-// Row #17 (characterization): ValidateCorpusWith(branchB=false, accum=nil) yields a
-// Report byte-identical to ValidateCorpus — the OFF default of the Branch-B threading
-// leaves the existing calibration unchanged (SimulateWith(.,zero opts) == Simulate).
+// Row #17 (characterization): ValidateCorpusWith(zero sim.Options{}) yields a Report
+// byte-identical to ValidateCorpus — the OFF default of the Options passthrough leaves
+// the existing calibration unchanged (SimulateWith(.,zero opts) == Simulate).
 func TestValidateCorpusWith_OffDefaultUnchanged(t *testing.T) {
 	dir := t.TempDir()
 	const seed = uint64(1000)
@@ -122,12 +123,12 @@ func TestValidateCorpusWith_OffDefaultUnchanged(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ValidateCorpus: %v", err)
 	}
-	off, err := ValidateCorpusWith(dir, testRuns, seed, bundle.GameTypeRegular, false, nil)
+	off, err := ValidateCorpusWith(dir, testRuns, seed, bundle.GameTypeRegular, sim.Options{})
 	if err != nil {
 		t.Fatalf("ValidateCorpusWith: %v", err)
 	}
 	if !reflect.DeepEqual(base, off) {
-		t.Error("ValidateCorpusWith(branchB=false) diverged from ValidateCorpus — OFF default not inert")
+		t.Error("ValidateCorpusWith(zero Options) diverged from ValidateCorpus — OFF default not inert")
 	}
 }
 
@@ -530,5 +531,45 @@ func TestAccumulatePossessions_NoStarts(t *testing.T) {
 	accumulatePossessions(got, nil)
 	if len(got) != 0 {
 		t.Errorf("empty event slice must add no keys, got %v", got)
+	}
+}
+
+// accumulateOriginFGA (ADR-0053) tallies BOTH attempts (EventShotAttempt) and makes
+// (EventShotMake) by shot origin, so a per-origin shooting efficiency is observable.
+func TestAccumulateOriginFGA(t *testing.T) {
+	events := []result.Event{
+		{Kind: result.EventShotAttempt, TeamID: 3, Origin: result.OriginInitial},
+		{Kind: result.EventShotMake, TeamID: 3, Origin: result.OriginInitial},
+		{Kind: result.EventShotAttempt, TeamID: 3, Origin: result.OriginInitial}, // a miss (no make event)
+		{Kind: result.EventShotAttempt, TeamID: 3, Origin: result.OriginOffReb},
+		{Kind: result.EventShotMake, TeamID: 3, Origin: result.OriginOffReb},
+		{Kind: result.EventShotAttempt, TeamID: 7, Origin: result.OriginTransition},
+		{Kind: result.EventShotMake, TeamID: 7, Origin: result.OriginTransition},
+	}
+	got := map[int]*OriginFGA{}
+	accumulateOriginFGA(got, events)
+	o3 := got[3]
+	if o3 == nil || o3.Initial != 2 || o3.InitialMade != 1 || o3.Oreb != 1 || o3.OrebMade != 1 {
+		t.Fatalf("team 3 = %+v, want Initial=2 InitialMade=1 Oreb=1 OrebMade=1", o3)
+	}
+	if o7 := got[7]; o7 == nil || o7.Transition != 1 || o7.TransitionMade != 1 {
+		t.Fatalf("team 7 = %+v, want Transition=1 TransitionMade=1", o7)
+	}
+}
+
+// Boundary — the empty-FGA-loop signature: OriginOffReb attempts with ZERO makes
+// (every putback misses) yields OrebMade==0 while Oreb>0. This is exactly the
+// efficiency↔volume coupling the ADR-0053 decoupling arm targets.
+func TestAccumulateOriginFGA_PutbackMissesOnly(t *testing.T) {
+	events := []result.Event{
+		{Kind: result.EventShotAttempt, TeamID: 5, Origin: result.OriginOffReb},
+		{Kind: result.EventShotMiss, TeamID: 5, Origin: result.OriginOffReb},
+		{Kind: result.EventShotAttempt, TeamID: 5, Origin: result.OriginOffReb},
+		{Kind: result.EventShotMiss, TeamID: 5, Origin: result.OriginOffReb},
+	}
+	got := map[int]*OriginFGA{}
+	accumulateOriginFGA(got, events)
+	if o := got[5]; o == nil || o.Oreb != 2 || o.OrebMade != 0 {
+		t.Fatalf("team 5 = %+v, want Oreb=2 OrebMade=0 (empty-loop signature)", got[5])
 	}
 }

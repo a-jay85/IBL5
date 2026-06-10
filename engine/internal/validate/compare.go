@@ -22,10 +22,23 @@ type StatRow struct {
 // ORIGIN (ADR-0042 empty-FGA-split diagnostic). Engine-only: real .sco box
 // scores carry no origin tag, so this has no .sco counterpart and is never
 // compared, banded, or part of the Pass verdict — it is reported, never gated.
+//
+// The *Made companion fields (ADR-0053) carry the engine mean MADE field goals
+// per game by the SAME origin, so a per-origin shooting efficiency (made/attempts)
+// is directly observable — this pinpoints WHY the putback origin anti-couples
+// (the empty/miss-driven FGA loop). They are engine-only, additive, and NOT
+// printed by WriteReport: counting EventShotMake (already emitted by Simulate)
+// changes no engine behavior, so the golden fixture stays byte-identical. Do NOT
+// conflate this per-origin efficiency readout with the season-aggregate
+// EngineCovLnShotsPerPossLnPPS factor (standings.go) — they are distinct.
 type OriginFGA struct {
 	Initial    float64
 	Oreb       float64
 	Transition float64
+	// Made-FG counts by the same origin (made/attempts = per-origin efficiency).
+	InitialMade    float64
+	OrebMade       float64
+	TransitionMade float64
 }
 
 // GameReport is the full comparison for one corpus game: every stat for both

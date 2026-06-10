@@ -1,6 +1,6 @@
 ---
-description: Possession-count decomposition of the ADR-0042 wrong-signed Cov(lnFGA,lnPPS), the instrument PR (1 of 2) succeeding ADR-0048 (Branch-B, REFUTED). ADR-0048 closed the bucket-side search, so the defect is structural/non-arm and the search moved UPSTREAM of the half-court pick. Ships a read-only possession-count instrument — the symmetric Dean-Oliver true-possession proxy FGA+0.44·FTA+TOV−ORB on both sides, plus the engine authoritative EventPossessionStart count as a level-validation diagnostic — splitting Cov(lnFGA,lnPPS) via lnFGA=lnPOSS+ln(FGA/POSS) into a possession-COUNT term and a shots-per-possession term. PRIMARY measured verdict (confirms ADR-0042): the engine's wrong sign is DOMINATED by a shots-per-possession ANTI-coupling (engine −0.000873, ~72% of the −0.001210 total) that 5.60 lacks (real +0.000027 ≈ 0) — the empty/miss-driven FGA loop. SECONDARY (sign-independent, trustworthy): the engine under-disperses possession count, Var(lnPOSS) ~2.5× too narrow. The count-factor COVARIANCE gap (engine −0.000337 vs real +0.000241) sits at the corpus noise floor and is reported, not leaned on. Lead PR-2 = REMOVE the empty-FGA shots-per-possession anti-coupling; a faithful off/def-ratio base_time pace is a secondary, conditional idea for the count factor (a distinct axis from the marginal/level one ADR-0047 refuted, gated on a precision run confirming the count covariance clears the noise floor). No engine behavior change — counting an already-emitted event needs no freeze toggle, so the golden fixture is byte-identical (cleaner than #1004).
-last_verified: 2026-06-07
+description: Possession-count decomposition of the ADR-0042 wrong-signed Cov(lnFGA,lnPPS), the instrument PR (1 of 2) succeeding ADR-0048 (Branch-B, REFUTED). ADR-0048 closed the bucket-side search, so the defect is structural/non-arm and the search moved UPSTREAM of the half-court pick. Ships a read-only possession-count instrument — the symmetric Dean-Oliver true-possession proxy FGA+0.44·FTA+TOV−ORB on both sides, plus the engine authoritative EventPossessionStart count as a level-validation diagnostic — splitting Cov(lnFGA,lnPPS) via lnFGA=lnPOSS+ln(FGA/POSS) into a possession-COUNT term and a shots-per-possession term. PRIMARY measured verdict (confirms ADR-0042): the engine's wrong sign is DOMINATED by a shots-per-possession ANTI-coupling (engine −0.000873, ~72% of the −0.001210 total) that 5.60 lacks (real +0.000027 ≈ 0) — the empty/miss-driven FGA loop. SECONDARY (sign-independent, trustworthy): the engine under-disperses possession count, Var(lnPOSS) ~2.5× too narrow. The count-factor COVARIANCE gap (engine −0.000337 vs real +0.000241) sits at the corpus noise floor and is reported, not leaned on. Lead PR-2 = REMOVE the empty-FGA shots-per-possession anti-coupling; a faithful off/def-ratio base_time pace is a secondary, conditional idea for the count factor (a distinct axis from the marginal/level one ADR-0047 refuted, gated on a precision run confirming the count covariance clears the noise floor). No engine behavior change — counting an already-emitted event needs no freeze toggle, so the golden fixture is byte-identical (cleaner than #1004). ADDENDUM 2026-06-10: a full-precision per-season sweep (20 seasons × 5 seeds) CONFIRMS the count-covariance gap clears the noise floor (17/18 seasons negative, mean −0.000609, t≈6.8), so the base_time secondary axis is no longer noise-gated — still secondary to the lead empty-FGA-removal fix; tautology hedge (real count≈total) stands.
+last_verified: 2026-06-10
 ---
 
 # ADR-0049: Possession-count coupling channel — instrument + localized verdict (PR 1 of 2)
@@ -128,6 +128,55 @@ The split closes on real data (engine −0.000337 + −0.000873 = −0.001210; r
    lead.**
 3. The faithful **true-possession proxy** (`−ORB`) and the authoritative engine count are now
    wired and reconciled against each other, available for PR 2 without re-deriving them.
+
+## Addendum (2026-06-10): full-precision noise-floor verdict
+
+The PR-1 body parked the count↔efficiency *covariance* gap (engine −0.000337 vs real
++0.000241) as "near the corpus noise floor (~3e-4), reported not leaned on," and gated the
+`base_time` secondary axis (consequence #2) on **a precision run confirming the count factor
+clears the floor.** That run is now done.
+
+**Method — per-season sweep, not a pooled high-runs run.** The floor is *corpus-side* (the
+across-season spread of the covariance), so more engine `--runs` cannot shrink it and a single
+pooled estimate has nothing to compare against. Instead: `jsbcalibrate --mode measure` run
+**per season-dir across the whole archive × seeds {1..5} at runs=50**. The cross-**season** SD
+of the count-factor covariance gap *is* the noise floor; the cross-**seed** SD is the engine
+sampling-noise band.
+
+**Verdict — the gap CLEARS the floor.**
+
+| metric | value |
+|---|---|
+| seasons with a regular snapshot | 18 / 20 (06-07, 07-08 are floor-70 incomplete — the 28-team era) |
+| seasons with a **negative** gap (engine count-cov < real) | **17 / 18** (only 88-89 marginally +6.1e-5) |
+| engine poss-cov sign | negative in **all 18** seasons; real positive in 16/18 |
+| cross-season mean gap | **−0.000609** (replicates the pooled PR-1 −0.000578) |
+| cross-season SD | 3.82e-4 ⇒ SE-of-mean ≈ 9.0e-5 ⇒ **t ≈ 6.8** from zero |
+| within-season seed SD | ~1e-6 (100–300× below the cross-season spread — measurement is precise) |
+
+The PR-1 "near the floor" hedge was **too conservative**: at full precision the
+count-covariance gap is a systematic, consistently wrong-signed defect, distinguishable from
+the corpus floor by ~7 SE. It is a *second* count-factor defect alongside the trusted
+sign-independent `Var(lnPOSS)` under-dispersion.
+
+**Two caveats — do not over-read the verdict:**
+- **Tautology hedge stands.** Real count ≈ total by near-collinearity (real shots-per-poss
+  ≈ 0), so the real-side positive covariance is partly mechanical. Statistical reality ≠ proof
+  that *building faithful `base_time` pace* is the fix — it only removes the "it's just noise"
+  objection to pursuing that axis.
+- **Floor estimated on 24/26-team eras only.** The two dropped seasons are the 28-team era; the
+  most recent / highest-team-count corpus is unrepresented in the floor.
+
+**Consequence.** ADR-0049 consequence #2's `base_time` candidate is **no longer
+noise-gated** — promoted from "parked, pursue only after a precision run" to a *legitimate*
+secondary axis. It remains **secondary** to the lead PR-2 fix (remove the empty-FGA
+shots-per-possession anti-coupling, consequence #1), which is unaffected by this run and still
+needs the engine-side RE work.
+
+Committed artifacts (full-archive `-tags archive` re-run, all six RealArchive tests green;
+engine confirmed race-clean under `go test -race -count=20`):
+`calibration-5.60-20260610-branchB-{off,on}.json`, `-freeze-attribution.json`,
+`-possession-coupling.json`.
 
 ## Reproduce
 

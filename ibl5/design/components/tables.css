@@ -924,16 +924,19 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
 }
 
 /* Sticky-col body cell backgrounds — required so content behind
-   the sticky columns doesn't bleed through on scroll */
-.sticky-table tbody tr:nth-child(odd) td[class*="sticky-col"] {
+   the sticky columns doesn't bleed through on scroll.
+   Team-colored cells (.ibl-team-cell--colored) are excluded: they carry their
+   own opaque --team-cell-bg, so the zebra/hover fill must not mask the team
+   color (these rules out-specify td.ibl-team-cell--colored otherwise). */
+.sticky-table tbody tr:nth-child(odd) td[class*="sticky-col"]:not(.ibl-team-cell--colored) {
     background-color: white;
 }
 
-.sticky-table tbody tr:nth-child(even) td[class*="sticky-col"] {
+.sticky-table tbody tr:nth-child(even) td[class*="sticky-col"]:not(.ibl-team-cell--colored) {
     background-color: var(--gray-50);
 }
 
-.sticky-table tbody tr:hover td[class*="sticky-col"] {
+.sticky-table tbody tr:hover td[class*="sticky-col"]:not(.ibl-team-cell--colored) {
     background-color: var(--gray-100);
 }
 

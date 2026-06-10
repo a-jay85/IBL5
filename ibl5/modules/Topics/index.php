@@ -18,8 +18,7 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use Search\SearchRepository;
-use Topics\TopicsRepository;
+use Topics\TopicsService;
 use Topics\TopicsView;
 
 $module_name = basename(dirname(__FILE__));
@@ -36,21 +35,14 @@ $themePath = (is_dir("themes/{$ThemeSel}/images/topics/"))
     ? "themes/{$ThemeSel}/images/topics/"
     : (string) $tipath;
 
-// Initialize services
-$service = new TopicsRepository($mysqli_db, $prefix);
-$searchRepo = new SearchRepository($mysqli_db, $prefix);
+// Initialize service (owns the Topics + Search repositories)
+$service = new TopicsService($mysqli_db, $prefix);
 $view = new TopicsView();
 
-// Get topics data
-$topics = $service->getTopicsWithArticles();
-
-// Get search filter data
-$searchFilters = [
-    'topics' => $searchRepo->getTopics(),
-    'categories' => $searchRepo->getCategories(),
-    'authors' => $searchRepo->getAuthors(),
-    'articleComm' => (bool) ($articlecomm ?? false),
-];
+// Assemble page data (topics + search filters)
+$pageData = $service->getPageData((bool) ($articlecomm ?? false));
+$topics = $pageData['topics'];
+$searchFilters = $pageData['searchFilters'];
 
 // Render page
 PageLayout\PageLayout::header();

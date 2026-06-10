@@ -226,6 +226,7 @@ Effort scale:
 **Suggested direction:** Extract `InjuriesRepository extends BaseMysqliRepository`; add to Contracts/.
 **Est. effort:** S
 **Risk if untouched:** Injury queries un-traceable without reading service body.
+**Status:** Completed — InjuriesRepository already extracted and injected (PR #970, 2026-06-03); backlog was stale.
 
 ### 2.8 Search / Standings — No Service Layer
 **Location:** `classes/Search/`, `classes/Standings/`
@@ -233,6 +234,8 @@ Effort scale:
 **Suggested direction:** Wrap in a Service; for Search a pass-through maintains the pattern.
 **Est. effort:** S each
 **Risk if untouched:** Tiebreaker class has no obvious home; contributors may bypass it.
+**Status (Search):** Declined — pass-through Service is dead code; SearchRepository is the correct seam.
+**Status (Standings):** Declined — AggregateTiebreaker has a home (StandingsView + ProjectedDraftOrderService); no orchestration exists to wrap.
 
 ### 2.9 DraftHistory — No Service; ApiHandler Naming Ambiguous
 **Location:** `classes/DraftHistory/`
@@ -240,6 +243,7 @@ Effort scale:
 **Suggested direction:** Rename to Controller; add Service for sorting/grouping.
 **Est. effort:** S
 **Risk if untouched:** Wrong-namespace confusion; unclear where new actions go.
+**Status:** Declined — *ApiHandler is the established HTMX-fragment convention (9 handlers); rename would harm consistency. No Service target exists.
 
 ### 2.10 Extension — No View; Routed Through modules/Player
 **Location:** `classes/Extension/`, `modules/Player/extension.php`
@@ -254,6 +258,7 @@ Effort scale:
 **Suggested direction:** Add `RookieOptionService`; rename to `RookieOptionView`.
 **Est. effort:** S
 **Risk if untouched:** Service-level logic ends up in Controller/Validator; FormView name visible inconsistency.
+**Status:** Completed (2026-06-09) — renamed RookieOptionFormView → RookieOptionView / RookieOptionViewInterface. Service half declined as pass-through ceremony (RookieOptionController owns orchestration).
 
 ### 2.12 Negotiation — No Standalone Module; Six Non-Standard Role Names
 **Location:** `classes/Negotiation/`
@@ -740,6 +745,7 @@ Effort scale:
 **Suggested direction:** Extract `InjuriesRepository`; inject.
 **Est. effort:** S
 **Risk if untouched:** New injury DB logic lands as raw SQL in the Service.
+**Status:** Completed — InjuriesRepository already extracted and injected (PR #970, 2026-06-03); backlog was stale.
 
 ### 4.25 `Services/NewsService` Misplaced
 **Location:** `ibl5/classes/Topics/News/NewsRepository.php` (relocated and renamed)

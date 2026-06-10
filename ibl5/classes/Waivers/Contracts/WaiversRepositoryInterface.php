@@ -6,12 +6,15 @@ namespace Waivers\Contracts;
 
 /**
  * WaiversRepositoryInterface - Contract for waiver wire database operations
- * 
+ *
  * Defines the data access layer for waiver wire transactions. Handles all
  * database operations related to dropping players to waivers and signing
  * players from the waiver pool.
- * 
+ *
  * @package Waivers\Contracts
+ *
+ * @phpstan-type WaiverTeamRow array{team_name: string, teamid: int, ...<string, mixed>}
+ * @phpstan-type WaiverContractData array{hasExistingContract: bool, salary: int}
  */
 interface WaiversRepositoryInterface
 {
@@ -45,10 +48,10 @@ interface WaiversRepositoryInterface
      * with existing contracts and free agents who need veteran minimum contracts.
      * 
      * @param int $playerID Player ID to sign (must be positive integer)
-     * @param array{team_name: string, teamid: int, ...<string, mixed>} $team Team data array with keys:
+     * @param WaiverTeamRow $team Team data array with keys:
      *   - 'team_name': string - Full team name
      *   - 'teamid': int - Team ID for foreign key relationship
-     * @param array{hasExistingContract: bool, salary: int} $contractData Contract information with keys:
+     * @param WaiverContractData $contractData Contract information with keys:
      *   - 'hasExistingContract': bool - Whether player has existing contract
      *   - 'salary': int - Salary amount (used only if no existing contract)
      * @return bool True if update succeeded, false on database error

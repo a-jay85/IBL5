@@ -160,7 +160,7 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
 
     public function testFetchAllRealTeamsOrderByTeamid(): void
     {
-        $teams = $this->repo->callFetchAllRealTeams('teamid ASC');
+        $teams = $this->repo->callFetchAllRealTeams(\TeamOrderBy::TeamId);
         self::assertNotEmpty($teams);
 
         $ids = array_column($teams, 'teamid');
@@ -169,15 +169,26 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
         self::assertSame($sorted, $ids);
     }
 
-    public function testFetchAllRealTeamsInvalidOrderFallsBackToDefault(): void
+    public function testGetAllRealTeamsRejectsNonWhitelistedOrderBy(): void
     {
-        $teams = $this->repo->callFetchAllRealTeams('DROP TABLE');
-        self::assertNotEmpty($teams);
+        $repo = new \Repositories\TeamIdentityRepository($this->db);
 
-        $names = array_column($teams, 'team_name');
-        $sorted = $names;
-        sort($sorted);
-        self::assertSame($sorted, $names);
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage("Invalid orderBy 'team_city DESC'");
+
+        $repo->getAllRealTeams('team_city DESC');
+    }
+
+    public function testGetAllRealTeamsAcceptsWhitelistedOrderBy(): void
+    {
+        $repo = new \Repositories\TeamIdentityRepository($this->db);
+        $teams = $repo->getAllRealTeams('teamid ASC');
+
+        self::assertNotEmpty($teams);
+        $ids = array_column($teams, 'teamid');
+        $sorted = $ids;
+        sort($sorted, SORT_NUMERIC);
+        self::assertSame($sorted, $ids);
     }
 
     // ==================== getLastInsertId ====================
@@ -571,7 +582,7 @@ class TestableBaseMysqliRepository extends \BaseMysqliRepository
     }
 
     /** @return list<array<string, mixed>> */
-    public function callFetchAllRealTeams(string $orderBy = 'team_name ASC'): array
+    public function callFetchAllRealTeams(\TeamOrderBy $orderBy = \TeamOrderBy::TeamName): array
     {
         return $this->fetchAllRealTeams($orderBy);
     }

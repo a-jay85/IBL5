@@ -412,6 +412,6 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     public function getAllTeams(): array
     {
         /** @var list<array{teamid: int, team_name: string}> */
-        return $this->fetchAllRealTeams('team_name ASC');
+        return $this->fetchAllRealTeams(\TeamOrderBy::TeamName);
     }
 }

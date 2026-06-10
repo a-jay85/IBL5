@@ -125,7 +125,13 @@ class TeamIdentityRepository extends \BaseMysqliRepository implements TeamIdenti
      */
     public function getAllRealTeams(string $orderBy = 'team_name ASC'): array
     {
+        $teamOrderBy = \TeamOrderBy::tryFrom($orderBy);
+        if ($teamOrderBy === null) {
+            throw new \InvalidArgumentException(
+                "Invalid orderBy '{$orderBy}'. Allowed: 'team_name ASC', 'teamid ASC', 'team_city ASC'."
+            );
+        }
         /** @var list<TeamInfoRow> */
-        return $this->fetchAllRealTeams($orderBy);
+        return $this->fetchAllRealTeams($teamOrderBy);
     }
 }

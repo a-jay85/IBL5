@@ -49,7 +49,7 @@ class ModuleAccessControl
 
         $this->settings = [];
         $settingName = 'Trivia Mode';
-        $stmt = $db->prepare("SELECT value FROM `ibl_settings` WHERE name = ? AND league = 'ibl' LIMIT 1");
+        $stmt = $db->prepare("SELECT value FROM `ibl_settings` WHERE setting_key = ? AND league = 'ibl' LIMIT 1");
         if ($stmt !== false) {
             $stmt->bind_param('s', $settingName);
             $stmt->execute();

@@ -40,9 +40,9 @@ class SeasonQueryRepositoryTest extends DatabaseTestCase
 
     public function testGetBulkSettingsReturnsMappedValues(): void
     {
-        // Use REPLACE to safely insert test settings (PK on name)
+        // Use REPLACE to safely insert test settings (PK on setting_key)
         $this->db->query(
-            "REPLACE INTO ibl_settings (name, value) VALUES ('DB_IntTest_BulkSetting', 'test_value_42')"
+            "REPLACE INTO ibl_settings (setting_key, value) VALUES ('DB_IntTest_BulkSetting', 'test_value_42')"
         );
 
         $map = $this->repo->getBulkSettings(['DB_IntTest_BulkSetting', 'Current Season Phase']);
@@ -140,7 +140,7 @@ class SeasonQueryRepositoryTest extends DatabaseTestCase
 
     public function testGetFreeAgencyNotificationsStateReturnsString(): void
     {
-        $this->db->query("REPLACE INTO ibl_settings (name, value) VALUES ('Free Agency Notifications', 'On')");
+        $this->db->query("REPLACE INTO ibl_settings (setting_key, value) VALUES ('Free Agency Notifications', 'On')");
 
         $result = $this->repo->getFreeAgencyNotificationsState();
 

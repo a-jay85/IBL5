@@ -42,7 +42,7 @@ INSERT INTO nuke_config (
 -- IBL season bootstrap
 -- ============================================================
 
-INSERT INTO ibl_settings (name, value, league) VALUES
+INSERT INTO ibl_settings (setting_key, value, league) VALUES
   ('Current Season Phase',        'Free Agency',  'ibl'),
   ('Current Season Ending Year',  '2026',         'ibl'),
   ('Allow Trades',                'No',           'ibl'),

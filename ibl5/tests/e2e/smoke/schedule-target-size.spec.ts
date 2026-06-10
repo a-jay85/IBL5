@@ -1,5 +1,6 @@
-import { test } from '../fixtures/public';
+import { expect, test } from '../fixtures/public';
 import { assertNoA11yViolations } from '../helpers/accessibility';
+import { gotoWithRetry } from '../helpers/navigation';
 
 // Guards WCAG 2.2 SC 2.5.8 (target-size) on the Schedule pages. The score links
 // (a.schedule-game__score-link) and "@"/vs links (a.schedule-game__vs) are
@@ -19,12 +20,13 @@ const schedulePages: Array<{ name: string; url: string }> = [
 
 test.describe('Schedule tap-target size (WCAG 2.2 SC 2.5.8)', () => {
   test.beforeEach(async ({ appState }) => {
-    await appState({ 'Trivia Mode': 'Off' });
+    await appState({ 'Trivia Mode': 'Off', 'Current Season Ending Year': '2026' });
   });
 
   for (const { name, url } of schedulePages) {
     test(`${name} has no target-size violations @desktop`, async ({ page }) => {
-      await page.goto(url);
+      await gotoWithRetry(page, url);
+      await expect(page.locator('.schedule-container')).toBeVisible();
       await assertNoA11yViolations(page, `target-size on ${url} @desktop`, {
         onlyRules: ['target-size'],
       });
@@ -36,7 +38,8 @@ test.describe('Schedule tap-target size (WCAG 2.2 SC 2.5.8)', () => {
 
     for (const { name, url } of schedulePages) {
       test(`${name} has no target-size violations @mobile`, async ({ page }) => {
-        await page.goto(url);
+        await gotoWithRetry(page, url);
+        await expect(page.locator('.schedule-container')).toBeVisible();
         await assertNoA11yViolations(page, `target-size on ${url} @mobile`, {
           onlyRules: ['target-size'],
         });

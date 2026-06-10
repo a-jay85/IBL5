@@ -81,7 +81,7 @@ class SplitStatsRepository extends \BaseMysqliRepository implements SplitStatsRe
         " . $splitCondition['joins'] . "
         WHERE bs.season_year = ?
             AND (bs.home_teamid = ? OR bs.visitor_teamid = ?)
-            AND bs.game_min > 0
+            AND " . $this->playedCondition('bs') . "
             AND p.teamid = ?
             AND p.retired = 0
             AND bs.game_type = 1

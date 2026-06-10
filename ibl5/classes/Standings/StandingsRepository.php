@@ -6,6 +6,7 @@ namespace Standings;
 
 use League\League;
 use League\LeagueContext;
+use SeriesRecords\SeriesRecordsRepository;
 use Standings\Contracts\StandingsRepositoryInterface;
 
 /**
@@ -247,10 +248,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
     public function getSeriesRecords(): array
     {
         /** @var list<SeriesRecordRow> */
-        return $this->fetchAll(
-            "SELECT self, opponent, wins, losses FROM vw_series_records ORDER BY self, opponent",
-            ""
-        );
+        return (new SeriesRecordsRepository($this->db))->getSeriesRecords();
     }
 
     /**

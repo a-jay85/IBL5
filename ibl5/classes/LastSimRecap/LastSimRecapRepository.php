@@ -327,7 +327,7 @@ class LastSimRecapRepository extends \BaseMysqliRepository implements LastSimRec
                AND visitor_teamid = ?
                AND home_teamid = ?
                AND teamid = ?
-               AND game_min > 0
+               AND " . $this->playedCondition() . "
              ORDER BY game_min DESC, pid ASC",
             "siii",
             $game['game_date'],

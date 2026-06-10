@@ -280,4 +280,21 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
         // Fallback to overall sim number for non-game phases (Draft, Free Agency, etc.)
         return $phaseSimNumber > 0 ? $phaseSimNumber : $overallSimNumber;
     }
+
+    /**
+     * @see SeasonQueryRepositoryInterface::getAvailableSeasonYears()
+     * @return list<int>
+     */
+    public function getAvailableSeasonYears(): array
+    {
+        /** @var list<array{year: int}> $rows */
+        $rows = $this->fetchAll("SELECT DISTINCT year FROM `ibl_hist` ORDER BY year DESC");
+
+        $years = [];
+        foreach ($rows as $row) {
+            $years[] = $row['year'];
+        }
+
+        return $years;
+    }
 }

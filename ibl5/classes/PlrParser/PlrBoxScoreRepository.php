@@ -30,7 +30,7 @@ class PlrBoxScoreRepository extends \BaseMysqliRepository implements PlrBoxScore
         $sql = "
             SELECT
                 pid,
-                SUM(CASE WHEN game_min > 0 THEN 1 ELSE 0 END) AS gp,
+                SUM(CASE WHEN " . $this->playedCondition() . " THEN 1 ELSE 0 END) AS gp,
                 SUM(game_min) AS min,
                 SUM(game_2gm) AS two_gm,
                 SUM(game_2ga) AS two_ga,
@@ -114,7 +114,7 @@ class PlrBoxScoreRepository extends \BaseMysqliRepository implements PlrBoxScore
               AND game_type = ?
               AND game_date <= ?
               AND pid IS NOT NULL
-              AND game_min > 0
+              AND " . $this->playedCondition() . "
             GROUP BY pid
         ";
 
@@ -163,7 +163,7 @@ class PlrBoxScoreRepository extends \BaseMysqliRepository implements PlrBoxScore
         $sql = "
             SELECT
                 game_date AS date,
-                SUM(CASE WHEN game_min > 0 THEN 1 ELSE 0 END) AS gp,
+                SUM(CASE WHEN " . $this->playedCondition() . " THEN 1 ELSE 0 END) AS gp,
                 SUM(game_min) AS min,
                 SUM(game_2gm) AS two_gm,
                 SUM(game_2ga) AS two_ga,

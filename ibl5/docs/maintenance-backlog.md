@@ -829,6 +829,7 @@ Effort scale:
 **Suggested direction:** Codemod: add `: void` to all `public function test*()`; manual review for helpers/providers.
 **Est. effort:** M
 **Risk if untouched:** Data providers ship wrong shapes silently.
+**Status:** Completed (verified 2026-06-09 audit) — missingType.return is 0 in phpstan-tests-baseline.neon and produces no live analyse:tests errors; test-method return types added in #939, baseline cleared in #958.
 
 ### 5.11 WideUnit Tests — 105 `phpunit.assertEquals` (Should Be `assertSame`)
 **Location:** WideUnit (105), BasketballStats (84), Statistics (84), Updater (59), CareerLeaderboards (48), FreeAgency (46), Services (46), OneOnOneGame (31)
@@ -836,6 +837,7 @@ Effort scale:
 **Suggested direction:** Global sed `assertEquals` → `assertSame`.
 **Est. effort:** S
 **Risk if untouched:** String/int type confusion in DB row assertions slips through.
+**Status:** Completed (verified 2026-06-09 audit) — phpunit.assertEquals is 0 in phpstan-tests-baseline.neon; phpstan-phpunit's AssertEqualsIsDiscouragedRule is active and reports no live errors. Converted in #940 (identical pass count); remaining assertEquals() calls are object/array comparisons the rule does not flag. Baseline cleared in #958.
 
 ### 5.12 JsbParser Tests — Interface Contract Not Statically Enforced
 **Location:** `ibl5/tests/JsbParser/` (93 errors)
@@ -904,6 +906,7 @@ Effort scale:
 **Suggested direction:** Fix `MockDatabase` first (46 of 152); then WideUnit fixture builders.
 **Est. effort:** M
 **Risk if untouched:** Fixture builders ship wrong shapes; failures appear at SUT runtime, not at fixture site.
+**Status:** Completed (verified 2026-06-09 audit) — missingType.iterableValue is 0 in phpstan-tests-baseline.neon and produces no live errors; array-shape types added in #939, baseline cleared in #958.
 
 ### 5.21 `ibl.deprecatedHtmlTag` in Business-Logic Class
 **Location:** `ConfigBootstrap.php` (`<b>`, `<center>`); `Trading/TradeOffer.php` (`<i>` ×2)
@@ -1848,13 +1851,15 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Add a comment in `.gitignore` clarifying it's runtime-generated.
 **Est. effort:** S
 **Risk if untouched:** Already fine; lack of doc is a trap.
+**Status:** Resolved (PR maintenance-31-data-file-gitignore-cleanup) — clarifying comment added beside *.log in root .gitignore:47.
 
 ### 12.2 `IBL5.sch` and `Olympics.sch` Tracked With No `*.sch` Gitignore Rule
 **Location:** `ibl5/IBL5.sch`, `ibl5/Olympics.sch`
-**Problem:** `IBL5.sch` is a test fixture for `SchFileParserTest`. `Olympics.sch` has zero references. No `*.sch` gitignore exists, so future season `.sch` files will be tracked accidentally.
-**Suggested direction:** Add `ibl5/*.sch` to `.gitignore` with `!ibl5/IBL5.sch` exception; move `IBL5.sch` to `tests/fixtures/`; delete `Olympics.sch`.
+**Problem:** `IBL5.sch` is a test fixture for `SchFileParserTest`. `Olympics.sch` is a runtime disk-fallback source (see 12.14). No `*.sch` gitignore exists, so future season `.sch` files will be tracked accidentally.
+**Suggested direction:** Add ibl5/*.sch to .gitignore with !ibl5/IBL5.sch and !ibl5/Olympics.sch exceptions. (Olympics.sch is runtime-referenced — see 12.14 — not deletable. Relocating IBL5.sch to tests/fixtures/ is deferred as a separate test-path PR.)
 **Est. effort:** S (gitignore) / M (test paths)
 **Risk if untouched:** New season `.sch` files committed by accident; dead `Olympics.sch` clutters every clone.
+**Status:** Resolved (gitignore rule + exceptions added). Fixture relocation deferred.
 
 ### 12.3 `IBL5.lge` — Test Fixture At App Root
 **Location:** `ibl5/IBL5.lge`
@@ -1862,6 +1867,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Move to `tests/fixtures/IBL5.lge`; update path resolution in 4 tests.
 **Est. effort:** S
 **Risk if untouched:** Clutter; functional otherwise.
+**Status:** Deferred — out of scope for the gitignore-cleanup PR. IBL5.lge stays tracked (already has a !ibl5/IBL5.lge exception and commit 25416a33d "fix: keep IBL5.lge tracked — used as test fixture"); consumed by LgeFileParserTest.php:25 and LeagueConfigServiceTest.php:15. Relocation to tests/fixtures/ requires repointing those tests — a separate PR.
 
 ### 12.4 `ibl5/ibl/IBL/Schedule.htm` — 284 KB HTML, 86 Commits
 **Location:** `ibl5/ibl/IBL/Schedule.htm`
@@ -1912,6 +1918,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** `git rm`; add `Thumbs.db` to `.gitignore`.
 **Est. effort:** S
 **Risk if untouched:** More Windows caches accumulate.
+**Status:** Resolved (PR maintenance-31-data-file-gitignore-cleanup) — git rm'd; already ignored via ibl5/.gitignore:18.
 
 ### 12.11 Orphaned Large Objects in Git History (~80 MB)
 **Location:** Git pack file
@@ -1926,6 +1933,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Store in CI artifact (GH Actions cache/gist) or gate auto-commit on meaningful change.
 **Est. effort:** S
 **Risk if untouched:** Commit noise; rare merge conflicts.
+**Status:** Deferred — intentionally tracked. CI consumes and regenerates it (.github/workflows/tests.yml:128 check-coverage-regression, :515 git add; ADR-0018). Untracking would break the coverage-regression gate. Gating auto-commit on meaningful change is a separate CI-behavior PR.
 
 ### 12.13 `phpunit-baseline.xml` — Vendor Deprecation Suppressions
 **Location:** `ibl5/phpunit-baseline.xml`
@@ -1933,13 +1941,15 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** CI step verifying baseline matches installed vendor; or pin to a fork with deprecation fix.
 **Est. effort:** S
 **Risk if untouched:** Silent drift after vendor updates.
+**Status:** Deferred — intentionally tracked. Referenced by ibl5/phpunit.xml:287 <source baseline="phpunit-baseline.xml">. Removing it breaks the PHPUnit config. Adding a CI vendor-match check is a separate PR.
 
-### 12.14 `Olympics.sch` Completely Unreferenced
+### 12.14 `Olympics.sch` Runtime-Referenced Schedule File
 **Location:** `ibl5/Olympics.sch`
-**Problem:** 80 KB JSB schedule from PR #284; no PHP/test references. Olympics pipeline never completed for `.sch`.
+**Problem:** 80 KB JSB schedule from PR #284. Earlier audit wrongly reported "no references" — it is a runtime disk-fallback source: ScheduleUpdater.php:235-237 builds {filePrefix}.sch and LeagueContext::getFilePrefix() (line 230) returns 'Olympics' in Olympics context, so SchFileParser::parseFile() reads ibl5/Olympics.sch.
 **Suggested direction:** Complete Olympics pipeline or delete + gitignore.
 **Est. effort:** S (delete) / M (complete)
 **Risk if untouched:** False impression of working pipeline; ongoing binary drift.
+**Status:** Resolved — keep tracked (NOT deleted). gitignore !ibl5/Olympics.sch exception added to document deliberate retention.
 
 ---
 

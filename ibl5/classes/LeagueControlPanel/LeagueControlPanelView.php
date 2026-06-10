@@ -39,6 +39,10 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
 
     <form action="leagueControlPanel.php" method="POST">
         <input type="hidden" name="current_phase" value="<?= HtmlSanitizer::e($panelData['phase']) ?>">
+        <?= \Security\CsrfGuard::generateToken('lcp_update_all') ?>
+<?php if ($currentLeague !== 'ibl'): ?>
+        <input type="hidden" name="league" value="olympics">
+<?php endif; ?>
 
         <?= HtmlSanitizer::trusted($this->renderSeasonPhaseControls($currentLeague, $panelData)) ?>
         <?= HtmlSanitizer::trusted($this->renderPhaseControls($currentLeague, $panelData)) ?>
@@ -146,6 +150,17 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         };
     }
 
+    private function renderUpdateAllButton(): string
+    {
+        ob_start();
+        ?>
+<div class="lcp-control-row">
+    <button type="submit" formaction="/ibl5/scripts/updateAllTheThings.php" formmethod="post" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Update All The Things</button>
+</div>
+        <?php
+        return (string) ob_get_clean();
+    }
+
     /**
      * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
      */
@@ -155,12 +170,10 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         ?>
 <section class="updater-section">
     <div class="updater-section__label">Preseason Operations</div>
-    <div class="lcp-control-row">
-        <a href="/ibl5/scripts/updateAllTheThings.php">Update All The Things</a>
-    </div>
+    <?= HtmlSanitizer::trusted($this->renderUpdateAllButton()) ?>
     <div class="lcp-note">Upload sim backup to <strong>backups/</strong> before running</div>
     <div class="lcp-control-row">
-        <input type="number" name="SimLengthInDays" min="1" max="180" size="3" value="<?= HtmlSanitizer::e((string) $panelData['simLengthInDays']) ?>" class="ibl-input ibl-input--sm w-20">
+        <input type="number" name="SimLengthInDays" min="1" max="180" size="3" value="<?= HtmlSanitizer::e((string) $panelData['simLengthInDays']) ?>" onkeydown="if(event.key==='Enter')event.preventDefault()" class="ibl-input ibl-input--sm w-20">
         <button type="submit" name="action" value="set_sim_length" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set Sim Length in Days</button>
     </div>
     <div class="lcp-note">You must click the button — pressing Enter will not work</div>
@@ -193,12 +206,10 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         ?>
 <section class="updater-section">
     <div class="updater-section__label">HEAT Operations</div>
-    <div class="lcp-control-row">
-        <a href="/ibl5/scripts/updateAllTheThings.php">Update All The Things</a>
-    </div>
+    <?= HtmlSanitizer::trusted($this->renderUpdateAllButton()) ?>
     <div class="lcp-note">Upload sim backup to <strong>backups/</strong> before running</div>
     <div class="lcp-control-row">
-        <input type="number" name="SimLengthInDays" min="1" max="180" size="3" value="<?= HtmlSanitizer::e((string) $panelData['simLengthInDays']) ?>" class="ibl-input ibl-input--sm w-20">
+        <input type="number" name="SimLengthInDays" min="1" max="180" size="3" value="<?= HtmlSanitizer::e((string) $panelData['simLengthInDays']) ?>" onkeydown="if(event.key==='Enter')event.preventDefault()" class="ibl-input ibl-input--sm w-20">
         <button type="submit" name="action" value="set_sim_length" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set Sim Length in Days</button>
     </div>
     <div class="lcp-note">You must click the button — pressing Enter will not work</div>
@@ -216,12 +227,10 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         ?>
 <section class="updater-section">
     <div class="updater-section__label">Regular Season Operations</div>
-    <div class="lcp-control-row">
-        <a href="/ibl5/scripts/updateAllTheThings.php">Update All The Things</a>
-    </div>
+    <?= HtmlSanitizer::trusted($this->renderUpdateAllButton()) ?>
     <div class="lcp-note">Upload sim backup to <strong>backups/</strong> before running</div>
     <div class="lcp-control-row">
-        <input type="number" name="SimLengthInDays" min="1" max="180" size="3" value="<?= HtmlSanitizer::e((string) $panelData['simLengthInDays']) ?>" class="ibl-input ibl-input--sm w-20">
+        <input type="number" name="SimLengthInDays" min="1" max="180" size="3" value="<?= HtmlSanitizer::e((string) $panelData['simLengthInDays']) ?>" onkeydown="if(event.key==='Enter')event.preventDefault()" class="ibl-input ibl-input--sm w-20">
         <button type="submit" name="action" value="set_sim_length" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set Sim Length in Days</button>
     </div>
     <div class="lcp-note">You must click the button — pressing Enter will not work</div>
@@ -249,12 +258,10 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         ?>
 <section class="updater-section">
     <div class="updater-section__label">Playoffs Operations</div>
-    <div class="lcp-control-row">
-        <a href="/ibl5/scripts/updateAllTheThings.php">Update All The Things</a>
-    </div>
+    <?= HtmlSanitizer::trusted($this->renderUpdateAllButton()) ?>
     <div class="lcp-note">Upload sim backup to <strong>backups/</strong> before running</div>
     <div class="lcp-control-row">
-        <input type="number" name="SimLengthInDays" min="1" max="180" size="3" value="<?= HtmlSanitizer::e((string) $panelData['simLengthInDays']) ?>" class="ibl-input ibl-input--sm w-20">
+        <input type="number" name="SimLengthInDays" min="1" max="180" size="3" value="<?= HtmlSanitizer::e((string) $panelData['simLengthInDays']) ?>" onkeydown="if(event.key==='Enter')event.preventDefault()" class="ibl-input ibl-input--sm w-20">
         <button type="submit" name="action" value="set_sim_length" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set Sim Length in Days</button>
     </div>
     <div class="lcp-note">You must click the button — pressing Enter will not work</div>

@@ -553,7 +553,7 @@ abstract class DatabaseTestCase extends TestCase
     }
 
     /**
-     * Insert a row into ibl_demands. PK is `name` (varchar).
+     * Insert a row into ibl_demands. PK is `pid` (int, FK to ibl_plr.pid).
      *
      * @param array<string, int> $overrides Column overrides for dem1–dem6
      */

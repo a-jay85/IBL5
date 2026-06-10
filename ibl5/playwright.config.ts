@@ -58,7 +58,21 @@ export default defineConfig({
         storageState: 'playwright/.auth/user.json',
       },
       dependencies: ['setup'],
-      testIgnore: [/auth\.setup\.ts/, /auth-regular\.setup\.ts/, /visual-regression/],
+      testIgnore: [/auth\.setup\.ts/, /auth-regular\.setup\.ts/, /visual-regression/, /updater-awards\.spec\.ts$/, /league-control-panel\.spec\.ts$/],
+    },
+    {
+      // Destructive full-season updater specs mutate GLOBAL DB rows (schedules,
+      // standings, sims, awards, season phase) that other specs read. Isolated
+      // into their own project so CI can run them in a dedicated, NON-sharded
+      // job against a fresh DB — see ADR-0052. They are excluded from chromium's
+      // testIgnore above so the sharded run never touches them.
+      name: 'mutators',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: 'playwright/.auth/user.json',
+      },
+      dependencies: ['setup'],
+      testMatch: [/updater-awards\.spec\.ts$/, /league-control-panel\.spec\.ts$/],
     },
   ],
 });

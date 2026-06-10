@@ -7,14 +7,14 @@ namespace RookieOption\Contracts;
 use Player\Player;
 
 /**
- * RookieOptionFormViewInterface - Contract for rookie option form rendering
+ * RookieOptionViewInterface - Contract for rookie option form rendering
  *
  * Defines the presentation layer for the rookie option eligibility form.
  * Renders the confirmation form with design system styling.
  *
  * @package RookieOption\Contracts
  */
-interface RookieOptionFormViewInterface
+interface RookieOptionViewInterface
 {
     /**
      * Renders the rookie option form for a player

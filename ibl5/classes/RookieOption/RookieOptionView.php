@@ -7,15 +7,15 @@ namespace RookieOption;
 use Player\Player;
 use Security\HtmlSanitizer;
 use Player\PlayerImageHelper;
-use RookieOption\Contracts\RookieOptionFormViewInterface;
+use RookieOption\Contracts\RookieOptionViewInterface;
 
 /**
- * @see RookieOptionFormViewInterface
+ * @see RookieOptionViewInterface
  */
-class RookieOptionFormView implements RookieOptionFormViewInterface
+class RookieOptionView implements RookieOptionViewInterface
 {
     /**
-     * @see RookieOptionFormViewInterface::renderForm()
+     * @see RookieOptionViewInterface::renderForm()
      */
     public function renderForm(Player $player, string $teamName, int $rookieOptionValue, ?string $error = null, ?string $result = null, ?string $from = null): string
     {

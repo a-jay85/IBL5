@@ -7,19 +7,19 @@ namespace Tests\RookieOption;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use Player\Player;
-use RookieOption\RookieOptionFormView;
+use RookieOption\RookieOptionView;
 
 /**
- * Tests for RookieOptionFormView
+ * Tests for RookieOptionView
  */
 #[AllowMockObjectsWithoutExpectations]
-class RookieOptionFormViewTest extends TestCase
+class RookieOptionViewTest extends TestCase
 {
-    private RookieOptionFormView $view;
+    private RookieOptionView $view;
 
     protected function setUp(): void
     {
-        $this->view = new RookieOptionFormView();
+        $this->view = new RookieOptionView();
     }
 
     /**

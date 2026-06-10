@@ -7,10 +7,10 @@ namespace Tests\RookieOption;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use Player\Player;
-use RookieOption\RookieOptionFormView;
+use RookieOption\RookieOptionView;
 
 #[AllowMockObjectsWithoutExpectations]
-final class RookieOptionFormViewXssTest extends TestCase
+final class RookieOptionViewXssTest extends TestCase
 {
     public function testRenderFormEscapesXssInPlayerNamePositionAndTeamName(): void
     {
@@ -22,7 +22,7 @@ final class RookieOptionFormViewXssTest extends TestCase
         $player->method('getName')->willReturn($xss);
         $player->method('getPosition')->willReturn($xss);
 
-        $view = new RookieOptionFormView();
+        $view = new RookieOptionView();
         $output = $view->renderForm($player, $xss, 100);
 
         $this->assertStringContainsString($escaped, $output);

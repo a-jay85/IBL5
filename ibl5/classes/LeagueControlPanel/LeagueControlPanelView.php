@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace LeagueControlPanel;
 
 use LeagueControlPanel\Contracts\LeagueControlPanelViewInterface;
+use PageLayout\PageLayout;
 use Security\HtmlSanitizer;
 
 /**
@@ -25,9 +26,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IBLv5 Control Panel</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=block" rel="stylesheet">
+    <?= HtmlSanitizer::trusted(PageLayout::renderFontPreconnectLinks()) ?>
     <link rel="stylesheet" href="/ibl5/themes/IBL/style/style.css">
 </head>
 <body>

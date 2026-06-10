@@ -6,6 +6,15 @@ parameters:
     level: 6
     paths:
         - tests
+    # Resolve classes/ symbols from THIS checkout's source, not the autoloader.
+    # In a worktree, vendor/ is a symlink to the main checkout, so autoload-
+    # reflection would otherwise resolve classes/ to the main repo and report
+    # false "wrong arity" / "undefined method" / class.notFound cascades for any
+    # classes/ signature this branch adds or changes. Mirrors phpstan.neon, which
+    # lists classes/ under paths and is already immune. scanDirectories is read
+    # for reflection only (not analysed), so it surfaces no new errors.
+    scanDirectories:
+        - classes
     excludePaths:
         - tests/TeamOffDefStats/TeamOffDefStatsRepositoryTest.php
         # Rule-test fixtures are deliberately-broken inputs to RuleTestCase

@@ -19,6 +19,10 @@ const schedulePages: Array<{ name: string; url: string }> = [
 ];
 
 test.describe('Schedule tap-target size (WCAG 2.2 SC 2.5.8)', () => {
+  // League schedule renders all teams — slower under parallel CI shard load.
+  // schedule-contrast.spec.ts hits the same URL concurrently; 60s matches that spec.
+  test.setTimeout(60000);
+
   test.beforeEach(async ({ appState }) => {
     await appState({ 'Trivia Mode': 'Off', 'Current Season Ending Year': '2026' });
   });

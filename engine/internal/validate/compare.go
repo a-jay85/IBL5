@@ -41,6 +41,28 @@ type OriginFGA struct {
 	TransitionMade float64
 }
 
+// ContinuationDepthRaw is one team's engine mean per-possession continuation
+// tallies for one game (the Part B continuation-chain instrument). A possession
+// is segmented as EventPossessionStart → next EventPossessionStart (or slice
+// end); its continuation depth k is the count of EventRebound{OffensiveRebound:
+// true} within it. Engine-only (real .sco carries no event stream); additive,
+// not printed by WriteReport, not part of Pass.
+//
+// N is the per-game mean possession count; SumK / SumK2 are the per-game mean
+// Σk / Σk² (kept separately so the exact mean = SumK/N and Var = SumK2/N − mean²
+// are recoverable — the capped B0..B3Plus buckets give SHAPE only and must NEVER
+// be used to derive mean/Var, since B3Plus collapses the tail). B0/B1/B2/B3Plus
+// are the per-game mean counts of possessions with k = 0 / 1 / 2 / ≥3.
+type ContinuationDepthRaw struct {
+	N      float64
+	SumK   float64
+	SumK2  float64
+	B0     float64
+	B1     float64
+	B2     float64
+	B3Plus float64
+}
+
 // GameReport is the full comparison for one corpus game: every stat for both
 // teams. Pass is true only when every row passes.
 type GameReport struct {
@@ -63,6 +85,19 @@ type GameReport struct {
 	// coupling. Matches calibrate/possession_archive_test.go's convention.
 	EnginePossPerG map[int]float64
 	ScoPossPerG    map[int]float64
+	// EngineORBPerG / ScoORBPerG map each team ID to its mean offensive rebounds/game,
+	// the numerator of the ORB-intensity channel ORB/POSS (same TeamStat.ORB already
+	// feeding possProxy; threaded here so the calibrate split can read it). Read-only.
+	EngineORBPerG map[int]float64
+	ScoORBPerG    map[int]float64
+	// EngineContinuationDepth maps each team ID to its mean per-possession
+	// continuation-depth tallies (Part B continuation-chain instrument). Engine-only —
+	// real .sco box scores carry no event stream, so there is no .sco counterpart;
+	// it is reported, never gated. Segmented from the EventPossessionStart →
+	// EventRebound{OffensiveRebound} event stream Simulate already emits, so counting
+	// it changes no engine behavior (golden stays byte-identical). See
+	// ContinuationDepthRaw and accumulateContinuationDepth.
+	EngineContinuationDepth map[int]ContinuationDepthRaw
 	// EnginePossCountPerG is the engine's AUTHORITATIVE possession count (mean
 	// EventPossessionStart/game; one per offensive trip — an offensive rebound
 	// continues the SAME trip, so it is true possessions). Engine-only DIAGNOSTIC: it

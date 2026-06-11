@@ -470,8 +470,8 @@ jobs:
       uses: shivammathur/setup-php@v2
       with:
         php-version: '8.5'
-        extensions: mbstring, intl, pcov
-        coverage: pcov
+        extensions: mbstring, intl
+        coverage: none
 
     - name: Cache vendor directory
       uses: actions/cache@v5
@@ -489,11 +489,15 @@ jobs:
       working-directory: ibl5
       run: composer install --no-progress --no-interaction
 
+    - name: Download coverage report
+      uses: actions/download-artifact@v7
+      with:
+        name: coverage-report
+        path: ibl5/coverage/
+
     - name: Update coverage baseline
       working-directory: ibl5
       run: |
-        mkdir -p coverage
-        vendor/bin/phpunit --coverage-clover coverage/clover.xml --no-output --no-progress
         COVERAGE=$(php -r '
           $xml = simplexml_load_file("coverage/clover.xml");
           $m = $xml->xpath("/coverage/project/metrics")[0];

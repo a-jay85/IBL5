@@ -81,7 +81,7 @@ type FreezeConfig struct {
 // (harvested by a no-freeze baseline pass via FreezeAccum). Each is the mean of the
 // ACTUAL derived quantity at its call site, never an event-rate proxy:
 //   - OrebProb:   mean live ORB-continuation P (faithful sqrt gate1Probability by
-//                 default; linear orebProbability under the UnfaithfulOreb hatch)
+//     default; linear orebProbability under the UnfaithfulOreb hatch)
 //   - TurnProb:   mean per-possession steal-driven turnoverProb output ∈ [0, maxTurnoverProb]
 //   - FoulWeight: mean foulBucketWeight output
 //   - MakeVal2pt: mean PRE-clutch shotValue2pt output (per-mille)

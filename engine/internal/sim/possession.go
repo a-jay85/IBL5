@@ -159,6 +159,14 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPen
 		// foulBucketWeight's divisor — the dominant, home-favorable term.
 		hca := hcaDelta(gs.gameType, offense.isHome)
 		twoPtW, threePtW, foulW := gs.playBuckets(bh, offense, defense, hca, true)
+		// Putback 3pt suppression (ADR-0055): a half-court OReb continuation is never a
+		// 3pt attempt — 5.60 re-loops a 3pt outcome on the OReb flag forcing a 2pt
+		// (decompile 94022-94024). Zero the 3pt bucket weight (same mechanism as
+		// transition.go's allow3pt=false) so selectOutcome cannot pick outcome3pt. The
+		// UnfaithfulPutback escape hatch leaves it reachable for the ADR-0055 OFF walk.
+		if origin == result.OriginOffReb && !gs.freeze.UnfaithfulPutback {
+			threePtW = 0
+		}
 		in := outcomeInputs{
 			twoPtWeight:      twoPtW,
 			threePtWeight:    threePtW,

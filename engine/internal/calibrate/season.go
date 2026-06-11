@@ -289,7 +289,8 @@ func (o Options) makePutbackActive() bool { return o.MakePutback || o.MakePutbac
 func validateWithArms(opts Options, validateFn func(string, int, uint64, bundle.GameType, sim.Options) (validate.Report, error)) ValidateFunc {
 	return func(dir string, runs int, seed uint64, gt bundle.GameType) (validate.Report, error) {
 		base := sim.Options{}
-		base.OffVolumeScale = opts.OffVolumeScale // ADR-0054 sweep seam: nil ⇒ const path; survives both the early-return and two-pass paths below
+		base.OffVolumeScale = opts.OffVolumeScale              // ADR-0054 sweep seam: nil ⇒ const path; survives both the early-return and two-pass paths below
+		base.Freeze.UnfaithfulPutback = opts.UnfaithfulPutback // ADR-0055 OFF walk: restore master's coupled putback; survives both paths (copied into harvest/frozen)
 		if opts.BranchB {
 			base.Freeze.BranchB = true
 			base.BranchBAccum = opts.BranchBAccum

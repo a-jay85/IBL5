@@ -79,6 +79,15 @@ type Options struct {
 	MakePutback     bool
 	MakePutbackHalf bool
 
+	// UnfaithfulPutback, when true, sets sim.FreezeConfig.UnfaithfulPutback in the
+	// default (non-injected) engine runs — the ADR-0055 archive A/B's OFF walk, which
+	// RESTORES master's old net-coupled, 3pt-reachable putback behavior as the
+	// diagnostic baseline. Captured by resolveValidate's real default closure (an
+	// injected Options.Validate test seam ignores it). Default false = the faithful
+	// production engine (the ON walk is a zero Options), so every existing caller stays
+	// byte-identical. Unlike MakePutback it consumes no FreezeMeans (no harvest pass).
+	UnfaithfulPutback bool
+
 	// OffVolumeScale, when non-nil, overrides the sim package-const offVolumeScale in
 	// the default (non-injected) engine runs — the ADR-0054 possession-count dispersion
 	// sweep. Captured by resolveValidate's real default closure (an injected

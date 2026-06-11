@@ -161,26 +161,31 @@ func TestFreeze_MisconfigErrors(t *testing.T) {
 //
 // The arm substitutes the league mean ONLY for an OriginOffReb (putback) 2pt make-
 // value; OriginInitial/OriginTransition keep the live value (no cross-origin leak).
-// MakePutbackHalf returns the halfway blend (live + mean)/2. The accumulator write
-// is always on the live value regardless of which arm is on.
+// MakePutbackHalf returns the halfway blend (live + mean)/2.
+//
+// ADR-0055: the live OriginOffReb value is now the faithful putbackValue2pt form
+// (net-free, boosted), so the accumulator harvests putbackValue2pt for a putback
+// and shotValue2pt for initial/transition — the freeze arms substitute against this
+// NEW baseline (no-cross-confound preserved against the faithful distribution).
 func TestMakePutback_OriginScoped(t *testing.T) {
 	const fgp = 50
 	net := 5.0
-	live := shotValue2pt(net, fgp, false)
+	live := shotValue2pt(net, fgp, false) // initial/transition live value
+	putback := putbackValue2pt(fgp)       // faithful OriginOffReb live value (ADR-0055)
 	mean := 111.0
 
 	cases := []struct {
-		name       string
-		cfg        FreezeConfig
-		origin     result.ShotOrigin
-		wantMake   float64
-		wantAccumN int
+		name      string
+		cfg       FreezeConfig
+		origin    result.ShotOrigin
+		wantMake  float64
+		wantAccum float64 // the LIVE value harvested for this origin (ADR-0055)
 	}{
-		{"full putback", FreezeConfig{MakePutback: true, Means: FreezeMeans{MakeVal2pt: mean}}, result.OriginOffReb, mean, 1},
-		{"full initial untouched", FreezeConfig{MakePutback: true, Means: FreezeMeans{MakeVal2pt: mean}}, result.OriginInitial, live, 1},
-		{"full transition untouched", FreezeConfig{MakePutback: true, Means: FreezeMeans{MakeVal2pt: mean}}, result.OriginTransition, live, 1},
-		{"half putback", FreezeConfig{MakePutbackHalf: true, Means: FreezeMeans{MakeVal2pt: mean}}, result.OriginOffReb, (live + mean) / 2, 1},
-		{"half initial untouched", FreezeConfig{MakePutbackHalf: true, Means: FreezeMeans{MakeVal2pt: mean}}, result.OriginInitial, live, 1},
+		{"full putback", FreezeConfig{MakePutback: true, Means: FreezeMeans{MakeVal2pt: mean}}, result.OriginOffReb, mean, putback},
+		{"full initial untouched", FreezeConfig{MakePutback: true, Means: FreezeMeans{MakeVal2pt: mean}}, result.OriginInitial, live, live},
+		{"full transition untouched", FreezeConfig{MakePutback: true, Means: FreezeMeans{MakeVal2pt: mean}}, result.OriginTransition, live, live},
+		{"half putback", FreezeConfig{MakePutbackHalf: true, Means: FreezeMeans{MakeVal2pt: mean}}, result.OriginOffReb, (putback + mean) / 2, putback},
+		{"half initial untouched", FreezeConfig{MakePutbackHalf: true, Means: FreezeMeans{MakeVal2pt: mean}}, result.OriginInitial, live, live},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -189,9 +194,9 @@ func TestMakePutback_OriginScoped(t *testing.T) {
 			if got := gs.makeValue2pt(net, fgp, c.origin); got != c.wantMake {
 				t.Errorf("makeValue2pt(%s) = %v, want %v", c.origin, got, c.wantMake)
 			}
-			// The harvest distribution is unchanged — the LIVE value is accumulated.
-			if acc.makeN != c.wantAccumN || acc.makeSum != live {
-				t.Errorf("accum = {n:%d sum:%v}, want {n:%d sum:%v (live)}", acc.makeN, acc.makeSum, c.wantAccumN, live)
+			// The harvest captures the LIVE value for this origin (faithful for a putback).
+			if acc.makeN != 1 || acc.makeSum != c.wantAccum {
+				t.Errorf("accum = {n:%d sum:%v}, want {n:1 sum:%v (live)}", acc.makeN, acc.makeSum, c.wantAccum)
 			}
 		})
 	}

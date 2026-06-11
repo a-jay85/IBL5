@@ -139,6 +139,15 @@ type Options struct {
 	Freeze       FreezeConfig
 	Accum        *FreezeAccum  // non-nil only during a baseline accumulation pass
 	BranchBAccum *BranchBAccum // non-nil only when harvesting the Branch-B engagement instrument
+
+	// OffVolumeScale overrides the package const offVolumeScale (tempo.go) for the
+	// ADR-0054 possession-count dispersion sweep. nil → use the const (a zero Options
+	// stays byte-identical to Simulate); non-nil → use *OffVolumeScale (0 is a valid
+	// sweep value — it disables the volume→count channel, so a plain float default-0
+	// could not mean "unset"; the pointer distinguishes the two). The override is
+	// always a valid float, so validate() needs no zero-mean guard for it (unlike the
+	// freeze arms). The only knob this seam moves.
+	OffVolumeScale *float64
 }
 
 // validate rejects a config that freezes an arm with no precomputed (zero) mean — a

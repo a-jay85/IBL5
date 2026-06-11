@@ -30,8 +30,12 @@ jobs:
           php-version: '8.5'
           coverage: none
 
-      - name: Run bin/check-docs
-        run: bin/check-docs
+      - name: Run bin/check-docs (frontmatter, dead-refs, ADR transitions)
+        # Staleness is deliberately suppressed here: an untouched stale doc must
+        # not block an unrelated PR. Repo-wide staleness is owned by the nightly
+        # doc-freshness-audit workflow; on-touch staleness is still enforced by
+        # the --since step below.
+        run: bin/check-docs --no-staleness
 
       - name: Run bin/check-docs (on-touch / changed-files)
         if: github.event_name == 'pull_request'

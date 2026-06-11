@@ -69,6 +69,15 @@ Options:
                      changed file is also run through the full-scan checks
                      (future-date, staleness, dead-ref). Pure base-vs-head
                      value comparison — never date-equality-to-today.
+  --no-staleness     Full-scan only: suppress the 60-day staleness rule while
+                     still failing on frontmatter, future-date, dead-ref, and
+                     ADR-transition issues. Used by the PR/push gate so an
+                     untouched stale doc never blocks an unrelated change; the
+                     nightly audit owns repo-wide staleness instead.
+  --staleness-report Full-scan only: emit a JSON array of stale docs
+                     ([{path, last_verified, age_days, days_over}]) and exit 0
+                     regardless of whether any doc is stale. A report, not a
+                     gate. Consumed by the doc-freshness-audit workflow.
   --verbose, -v      Show passing files too.
   --help, -h         Show this message.
 
@@ -243,8 +252,29 @@ function scanReferences(string $content, string $repoRoot): array
     return array_values(array_unique($issues));
 }
 
+/**
+ * Age in days of a valid, non-future, past ISO last_verified value.
+ *
+ * Returns null when the value is missing, not an ISO date, unparseable, or in
+ * the future — those are the gate's job (checkFile emits them as failures) and
+ * must never appear in the staleness report. Both the gate's staleness check
+ * and the staleness report derive age from this single helper so they cannot
+ * disagree about what "stale" means.
+ */
+function stalenessAgeDays(?string $lv, \DateTimeImmutable $today): ?int
+{
+    if ($lv === null || preg_match('/^\d{4}-\d{2}-\d{2}$/', $lv) !== 1) {
+        return null;
+    }
+    $verified = \DateTimeImmutable::createFromFormat('!Y-m-d', $lv);
+    if ($verified === false || $verified > $today) {
+        return null;
+    }
+    return (int) $today->diff($verified)->days;
+}
+
 /** @return list<string> */
-function checkFile(string $path, string $repoRoot, \DateTimeImmutable $today): array
+function checkFile(string $path, string $repoRoot, \DateTimeImmutable $today, bool $enforceStaleness = true): array
 {
     if (!is_file($path)) {
         return ['broken symlink or missing file'];
@@ -276,7 +306,7 @@ function checkFile(string $path, string $repoRoot, \DateTimeImmutable $today): a
             } else {
                 $diff = $today->diff($verified);
                 $age = (int) $diff->days;
-                if ($age > STALENESS_DAYS) {
+                if ($enforceStaleness && $age > STALENESS_DAYS) {
                     $issues[] = sprintf('stale: last_verified %s is %d days old (max %d)', $lv, $age, STALENESS_DAYS);
                 }
             }
@@ -288,6 +318,48 @@ function checkFile(string $path, string $repoRoot, \DateTimeImmutable $today): a
     }
 
     return $issues;
+}
+
+/**
+ * Repo-wide staleness report: one entry per in-scope doc whose last_verified is
+ * a valid past ISO date older than STALENESS_DAYS. Missing/invalid/future dates
+ * are excluded — the gate (checkFile) owns those; the report only lists docs
+ * that are genuinely stale. Pure read; never fails.
+ *
+ * @return list<array{path: string, last_verified: string, age_days: int, days_over: int}>
+ */
+function stalenessReport(string $repoRoot, \DateTimeImmutable $today): array
+{
+    $files = collectFiles($repoRoot, false);
+    sort($files);
+
+    $report = [];
+    foreach ($files as $path) {
+        if (!is_file($path)) {
+            continue;
+        }
+        $content = file_get_contents($path);
+        if ($content === false) {
+            continue;
+        }
+        $fm = parseFrontmatter($content);
+        if ($fm === null || !isset($fm['last_verified'])) {
+            continue;
+        }
+        $lv = $fm['last_verified'];
+        $age = stalenessAgeDays($lv, $today);
+        if ($age === null || $age <= STALENESS_DAYS) {
+            continue;
+        }
+        $report[] = [
+            'path' => substr($path, strlen($repoRoot) + 1),
+            'last_verified' => $lv,
+            'age_days' => $age,
+            'days_over' => $age - STALENESS_DAYS,
+        ];
+    }
+
+    return $report;
 }
 
 /**
@@ -576,7 +648,7 @@ function iterChangedDocs(string $base, string $repoRoot): array
 
 // --- main ---
 
-$opts = ['fix_dates' => false, 'include_memory' => false, 'verbose' => false, 'since' => null];
+$opts = ['fix_dates' => false, 'include_memory' => false, 'verbose' => false, 'since' => null, 'no_staleness' => false, 'staleness_report' => false];
 foreach (array_slice($argv, 1) as $arg) {
     if (str_starts_with($arg, '--since=')) {
         $opts['since'] = substr($arg, strlen('--since='));
@@ -598,6 +670,12 @@ foreach (array_slice($argv, 1) as $arg) {
         case '-v':
             $opts['verbose'] = true;
             break;
+        case '--no-staleness':
+            $opts['no_staleness'] = true;
+            break;
+        case '--staleness-report':
+            $opts['staleness_report'] = true;
+            break;
         case '--help':
         case '-h':
             echo usage();
@@ -611,6 +689,14 @@ foreach (array_slice($argv, 1) as $arg) {
 
 $root = repoRoot();
 $today = new \DateTimeImmutable('today');
+
+// Report mode short-circuits: emit the stale-doc list as JSON and exit 0
+// regardless of whether any doc is stale. It is a report, not a gate — the
+// nightly audit workflow decides what to do with the list.
+if ($opts['staleness_report']) {
+    echo json_encode(stalenessReport($root, $today), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), "\n";
+    exit(0);
+}
 
 if ($opts['since'] !== null) {
     // --fix-dates is scoped to the changed-but-unbumped set (the exact files
@@ -654,7 +740,7 @@ $failures = 0;
 $passed = 0;
 foreach ($files as $path) {
     $rel = substr($path, strlen($root) + 1);
-    $issues = checkFile($path, $root, $today);
+    $issues = checkFile($path, $root, $today, !$opts['no_staleness']);
     if ($issues === []) {
         $passed++;
         if ($opts['verbose']) {

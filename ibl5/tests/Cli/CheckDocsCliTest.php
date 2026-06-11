@@ -270,4 +270,96 @@ final class CheckDocsCliTest extends TestCase
         $this->assertSame(2, $code, $output);
         $this->assertStringContainsString('requires a base ref', $output);
     }
+
+    // --- Phase 3: --no-staleness (PR/push gate de-fang) ---
+
+    #[Test]
+    public function noStalenessStaleButValidDocExitsZero(): void
+    {
+        // Same fixture as fullScanWithStaleDocExitsOne, but the flag suppresses
+        // the staleness failure so an untouched stale doc no longer blocks.
+        $this->commitFile('ibl5/docs/sample.md', $this->doc('2026-01-01'), 'add stale doc');
+
+        [$code, $output] = $this->runScript('--no-staleness');
+        $this->assertSame(0, $code, $output);
+        $this->assertStringContainsString('docs verified', $output);
+        $this->assertStringNotContainsString('stale', $output);
+    }
+
+    #[Test]
+    public function noStalenessStillFailsOnDeadReference(): void
+    {
+        // A doc that is BOTH stale AND has a dead repo-path reference: the flag
+        // suppresses staleness, but the dead-ref failure must still fail the run.
+        $body = "References `ibl5/classes/DoesNotExist.php` which is not real.";
+        $this->commitFile('ibl5/docs/sample.md', $this->doc('2026-01-01', $body), 'stale + dead ref');
+
+        [$code, $output] = $this->runScript('--no-staleness');
+        $this->assertSame(1, $code, $output);
+        $this->assertStringContainsString('dead reference', $output);
+        $this->assertStringNotContainsString('stale', $output);
+    }
+
+    #[Test]
+    public function noStalenessStillFailsOnMissingFrontmatter(): void
+    {
+        // A second non-staleness failure class (missing frontmatter) survives the flag.
+        $this->commitFile('ibl5/docs/sample.md', "no frontmatter here\n", 'no frontmatter');
+
+        [$code, $output] = $this->runScript('--no-staleness');
+        $this->assertSame(1, $code, $output);
+        $this->assertStringContainsString('missing frontmatter block', $output);
+    }
+
+    // --- Phase 4: --staleness-report (nightly audit data source) ---
+
+    #[Test]
+    public function stalenessReportStaleDocExitsZeroWithJson(): void
+    {
+        $this->commitFile('ibl5/docs/sample.md', $this->doc('2026-01-01'), 'add stale doc');
+
+        [$code, $output] = $this->runScript('--staleness-report');
+        $this->assertSame(0, $code, $output);
+
+        $report = json_decode($output, true);
+        $this->assertIsArray($report, $output);
+        $this->assertCount(1, $report);
+        $entry = $report[0];
+        $this->assertSame('ibl5/docs/sample.md', $entry['path']);
+        $this->assertSame('2026-01-01', $entry['last_verified']);
+        $this->assertArrayHasKey('age_days', $entry);
+        $this->assertArrayHasKey('days_over', $entry);
+        $this->assertGreaterThan(60, $entry['age_days']);
+        $this->assertSame($entry['age_days'] - 60, $entry['days_over']);
+    }
+
+    #[Test]
+    public function stalenessReportAllFreshExitsZeroEmptyList(): void
+    {
+        // Zero-stale must be a valid empty JSON array, not an empty string —
+        // the nightly workflow's `jq 'length'` depends on it.
+        $this->commitFile('ibl5/docs/sample.md', $this->doc($this->freshDate()), 'add fresh doc');
+
+        [$code, $output] = $this->runScript('--staleness-report');
+        $this->assertSame(0, $code, $output);
+
+        $report = json_decode($output, true);
+        $this->assertIsArray($report, $output);
+        $this->assertCount(0, $report);
+    }
+
+    #[Test]
+    public function stalenessReportExcludesMissingDateFromReport(): void
+    {
+        // Missing last_verified is the gate's job, never the staleness report's.
+        $noDate = "---\ndescription: No date here.\n---\n\n# Sample\n\nBody.\n";
+        $this->commitFile('ibl5/docs/sample.md', $noDate, 'add doc without date');
+
+        [$code, $output] = $this->runScript('--staleness-report');
+        $this->assertSame(0, $code, $output);
+
+        $report = json_decode($output, true);
+        $this->assertIsArray($report, $output);
+        $this->assertCount(0, $report);
+    }
 }

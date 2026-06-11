@@ -54,6 +54,15 @@ type FreezeConfig struct {
 	// measurement; never combined with the four freeze arms above (separate diagnostics).
 	BranchB bool
 
+	// UnfaithfulPutback is an INVERTED-POLARITY escape hatch — the ONLY FreezeConfig
+	// flag whose zero value is NOT "live engine." Default false = the FAITHFUL JSB
+	// 5.60 putback resolution (ADR-0055): OriginOffReb 2pt make-value uses the net-free
+	// boosted putbackValue2pt form, and putback 3pt is suppressed. Set true ONLY by the
+	// ADR-0055 archive A/B's OFF walk to RESTORE master's old net-coupled,
+	// 3pt-reachable putback behavior as the diagnostic baseline. It consumes no Means
+	// (validate() ignores it, mirroring BranchB). Production NEVER sets it.
+	UnfaithfulPutback bool
+
 	Means FreezeMeans // per-season-bucket league means substituted for frozen arms
 }
 
@@ -248,7 +257,16 @@ func (gs *gameState) foulWeight(offense, defenders []onCourt, hca float64) float
 // ALWAYS on the live value v (so a baseline harvest sees the real distribution
 // regardless of which arm is on).
 func (gs *gameState) makeValue2pt(net float64, fgp int, origin result.ShotOrigin) float64 {
+	// Faithful putback make-value (ADR-0055): a half-court putback (OriginOffReb)
+	// uses the net-free 4/3-boosted putbackValue2pt form (decompile 93880-93883),
+	// computed BEFORE the accum capture so the Make/MakePutback/MakePutbackHalf arms
+	// freeze against the NEW baseline. The UnfaithfulPutback escape hatch restores the
+	// old net-coupled value for the ADR-0055 OFF walk only. OriginInitial and
+	// OriginTransition are unchanged (transition putback faithfulness is OOS — ADR-0055).
 	v := shotValue2pt(net, fgp, false)
+	if origin == result.OriginOffReb && !gs.freeze.UnfaithfulPutback {
+		v = putbackValue2pt(fgp)
+	}
 	if gs.accum != nil {
 		gs.accum.makeSum += v
 		gs.accum.makeN++

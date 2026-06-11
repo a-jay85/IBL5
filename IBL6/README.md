@@ -1,38 +1,46 @@
-# sv
+# IBL6 — SvelteKit Frontend
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+IBL6 is the SvelteKit frontend for the IBL basketball league, under early
+development and deployed at `ibl6.iblhoops.net`. It consumes the REST API
+served by the IBL5 PHP backend (see `ibl5/docs/API_GUIDE.md`); pages are being
+migrated from PHP-rendered IBL5 to SvelteKit equivalents as they mature.
 
-## Creating a project
+## Relationship to IBL5
 
-If you're seeing this, you've probably already done this step. Congrats!
+- **IBL5** (`ibl5/`): PHP backend + legacy server-rendered UI. Owns the
+  database and exposes the REST API.
+- **IBL6** (`IBL6/`): SvelteKit client. Talks to the IBL5 REST API for all
+  data; it does not access the database directly in production.
 
-```sh
-# create a new project in the current directory
-npx sv create
-
-# create a new project in my-app
-npx sv create my-app
-```
+See `ibl5/docs/STRATEGIC_PRIORITIES.md` for the migration roadmap.
 
 ## Developing
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+Install dependencies, then start the dev server:
 
 ```sh
+npm install
 npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
 ```
 
 ## Building
 
-To create a production version of your app:
-
 ```sh
-npm run build
+npm run build      # production build (vite build)
+npm run preview    # preview the production build locally
 ```
 
-You can preview the production build with `npm run preview`.
+## Quality gates
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+```sh
+npm run check      # svelte-check type checking
+npm run lint       # prettier --check + eslint
+npm run format     # prettier --write
+npm run test:unit  # vitest unit tests
+npm run test:e2e   # playwright end-to-end tests
+```
+
+## Configuration
+
+Local environment variables live in `IBL6/.env` (gitignored secrets — never
+commit credentials). Copy from the team's shared template when onboarding.

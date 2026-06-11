@@ -63,3 +63,4 @@ $query = "SELECT * FROM vw_player_current WHERE uuid = ?";
 - Leverage existing indexes for WHERE/JOIN
 - Use database views for complex API queries
 - Migrations go in `/ibl5/migrations/`
+- **Game-count filters:** when counting games from `ibl_box_scores` vs `ibl_plr`, apply the All-Star / Rookie-game / finals-phase exclusions documented in `ibl5/docs/PLR_VS_BOXSCORES_ANALYSIS.md` — omitting them overcounts games (~12% in sampled seasons).

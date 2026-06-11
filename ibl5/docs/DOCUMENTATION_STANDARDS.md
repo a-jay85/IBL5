@@ -43,6 +43,7 @@ last_verified: 2026-06-10
   - Completed optimization guides
   - Superseded guides or plans
   - Individual module refactoring summaries (after consolidating into REFACTORING_HISTORY.md)
+- **Freshness scope**: Both `ibl5/docs/archive/` and `.archive/` are intentionally excluded from `bin/check-docs` (see its `EXCLUDED_RELATIVE_FRAGMENTS`). Archived docs are frozen snapshots and are not held to the on-touch freshness rule by design — do not add frontmatter to them expecting CI enforcement.
 
 ### 5. `.archive/` (Older Historical Documents)
 - **Purpose**: Preserve older historical documentation

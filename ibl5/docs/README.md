@@ -11,8 +11,9 @@ This directory is the primary home for all project documentation.
 
 1. Start with the [Main README](../../README.md) for project overview
 2. Read [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md) for coding standards and workflow
-3. Review [REFACTORING_HISTORY.md](REFACTORING_HISTORY.md) for what's been done
-4. Check [STRATEGIC_PRIORITIES.md](STRATEGIC_PRIORITIES.md) for what to work on next
+3. Check [STRATEGIC_PRIORITIES.md](STRATEGIC_PRIORITIES.md) for what to work on next
+
+> The module refactoring effort is 100% complete; its history is archived under "Project Status" below ([REFACTORING_HISTORY.md](REFACTORING_HISTORY.md)) — read it only for historical context, not to orient on current work.
 
 ## Guides
 

@@ -712,3 +712,45 @@ func TestAccumulateContinuationDepth_Empty(t *testing.T) {
 		t.Errorf("rebounds with no possession start must add no keys, got %v", got)
 	}
 }
+
+// TestSimulateGameMeans_GateCont — simulateGameMeans surfaces the L1 gate-1
+// counterfactual per team (ADR-0057/0058): both teams populated, all fields finite,
+// MeanProd ≤ MeanG2 (gate-1 reduces), N>0.
+func TestSimulateGameMeans_GateCont(t *testing.T) {
+	dir := t.TempDir()
+	plr, sch, _ := corpusPaths(dir, "synth")
+	writePlr(t, plr, starterSpecs())
+	writeSch(t, sch, []schSpec{{vis: 7, home: 3, vScore: 1, hScore: 1}})
+	b := assembleSynthBundle(t, plr, sch)
+
+	_, _, _, _, _, _, _, _, gateContPerG := simulateGameMeans(b, b.Schedule[0], testRuns, 1, sim.Options{})
+	for _, id := range []int{7, 3} {
+		gc, ok := gateContPerG[id]
+		if !ok {
+			t.Errorf("team %d missing from EngineGateCont", id)
+			continue
+		}
+		for name, v := range map[string]float64{
+			"N": gc.N, "MeanG1": gc.MeanG1, "MeanG2": gc.MeanG2, "MeanProd": gc.MeanProd,
+			"MeanOffStr": gc.MeanOffStr, "MeanDefStr": gc.MeanDefStr,
+		} {
+			if math.IsNaN(v) || math.IsInf(v, 0) {
+				t.Errorf("team %d: %s non-finite (%v)", id, name, v)
+			}
+		}
+		if gc.N <= 0 {
+			t.Errorf("team %d: N=%v, want > 0", id, gc.N)
+		}
+		if gc.MeanProd > gc.MeanG2+1e-9 {
+			t.Errorf("team %d: MeanProd %v > MeanG2 %v (gate-1 must reduce)", id, gc.MeanProd, gc.MeanG2)
+		}
+	}
+
+	// NEGATIVE/edge: a matchup whose home team has no roster never resolves a
+	// possession, so no gate samples are recorded — no panic, no NaN, no spurious keys.
+	edge := bundle.Game{VisitorTeamID: 7, HomeTeamID: 99999, Date: "1988-11-04", GameType: bundle.GameTypeRegular}
+	_, _, _, _, _, _, _, _, edgeGate := simulateGameMeans(b, edge, testRuns, 1, sim.Options{})
+	if len(edgeGate) != 0 {
+		t.Errorf("rosterless matchup should record no gate samples, got %v", edgeGate)
+	}
+}

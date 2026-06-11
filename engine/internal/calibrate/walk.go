@@ -95,6 +95,15 @@ type Options struct {
 	// committed calibration byte-identical (the const path). 0 is a valid sweep value
 	// (channel off), distinct from nil (use const) — hence the pointer.
 	OffVolumeScale *float64
+
+	// GateBaseline, when non-nil, overrides the L1 gate-1 baseline term (the league
+	// offensive-rebound share × 100) in the default (non-injected) engine runs — the
+	// ADR-0058 gate-continuation baseline sensitivity sweep. Threaded into sim.Options by
+	// validateWithArms (an injected Options.Validate test seam ignores it). nil leaves the
+	// gate instrument on its faithful bundle-derived baseline (leagueReboundBaseline), so
+	// every existing caller is byte-identical. The gate instrument itself is always-on in
+	// the validate harness (read-only, no rng draw); only its baseline is swept here.
+	GateBaseline *float64
 }
 
 // Skip records a snapshot (or archive entry) that was not turned into a Report,

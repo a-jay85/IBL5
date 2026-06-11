@@ -221,8 +221,30 @@ whether the carrier is dominated by the dropped gate (mean) or the curvature
 `FUN_004d6f00` dumping `local_c`/`local_14`/the two rolls per trip would pin the live
 gate-1 value distribution if the static form is doubted.
 
-**Recommended next step:** a fresh `/plan` for an L1 instrument/fix that **reproduces
-5.60's two-gate determination structure** — the sqrt diminishing-returns team pick
-(`FUN_004e22a0`, gate-1) feeding the existing linear retention roll (gate-2) — **not**
-a per-trip decay and **not** a tighter continuation cap. Gate that build on the
-instrument confirming the mean-vs-curvature split above. Durable record: **ADR-0057**.
+## Resolved by ADR-0058 — instrument built, fix LOCATED (replace, not multiply)
+
+The dynamic L1 instrument above was built (read-only, golden byte-identical) and run
+over the full archive (runs 20, stride 1; committed artifact
+`engine/internal/validate/testdata/calibration-5.60-20260611-gate-continuation.json`).
+The mean-vs-curvature split resolved to a two-part **GO** verdict:
+
+1. **CURVATURE ruled out.** `Cov(gate-2,lnPPS) − Cov(product,lnPPS)` is +5e-6…−1e-5
+   across the entire baseline sweep (3–8% of `Cov(gate-2,lnPPS) ≈ +1.8e-4`), with
+   non-trivial `Var(gate-1)` — the sqrt gate-1 does not differentially couple
+   continuation to efficiency (corroborating ADR-0056's faithful ORB-intensity coupling).
+2. **The fix is LOCATED, and the composition is REPLACE, not MULTIPLY.** Three candidates
+   for 5.60's per-resolution rebound rate: gate-2 alone (the engine **today**, 0.428 →
+   ORB/POSS 0.194, 24% high); gate-1×gate-2 (0.154 → ORB ~0.07, undershoots ~2.3×);
+   **gate-1 ALONE (0.356 → measured ORB/POSS 0.160 ≈ real 0.158, within 1.5%)**. So the
+   "drops gate-1" framing above is sharpened: the engine's single rebound roll is the
+   **right role** but the **wrong formula** — it copied gate-2's linear
+   `off/(off+def)×0.5+0.25` into the rebound-*determination* slot 5.60 fills with gate-1's
+   **sqrt** team-pick (`FUN_004e22a0`). The multiplicative reading is *refuted*.
+
+The gate-1 **direction** is verified correct (caller `FUN_004d6f00:92181` — offense wins
+when `value ≥ roll`; mean gate-1 ≈ 0.36 ≈ the offensive-rebound share). So the next step
+is **NOT** the two-gate reproduction this section originally recommended, nor an x32dbg
+prerequisite — it is a **single-site formula swap** (`orebProbability` → `gate1Probability`
+at the bundle-derived baseline) in a follow-up fix PR, which reproduces 5.60's ORB to
+within 1.5% from static constants (x32dbg is an optional refinement, not a gate). **Durable
+verdict: [ADR-0058](../../ibl5/docs/decisions/0058-rebound-continuation-mean-vs-curvature-verdict.md).**

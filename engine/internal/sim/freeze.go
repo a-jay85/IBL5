@@ -2,6 +2,7 @@ package sim
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/a-jay85/IBL5/engine/internal/result"
 )
@@ -142,6 +143,58 @@ func (a *BranchBAccum) MeanS() float64 {
 	return a.SumS / float64(a.Taken)
 }
 
+// GateContAccum harvests the L1 gate-1 counterfactual instrument (ADR-0057/0058),
+// read-only. At every offensive-rebound RESOLUTION (gs.rebound, before the gate-2
+// outcome roll), it records — keyed by the OFFENSIVE team ID — the live gate-2
+// probability (orebProbability), the counterfactual gate-1 sqrt team-pick
+// (gate1Probability, the gate JSB applies but the engine omits), their product (the
+// faithful two-gate continuation probability), and the off/def rebound strengths that
+// feed the curvature-coupling read. It issues NO rng draw and is never serialized, so
+// goldens stay byte-identical. The caller (validate harness) owns one instance PER
+// GAME, pooled across that game's runs, and reads the per-team sums after. NOT
+// concurrency-safe: the harness sims a game's runs sequentially.
+type GateContAccum struct {
+	perTeam map[int]*gateTeamAcc
+}
+
+// gateTeamAcc is one offensive team's accumulated gate samples (Σ + count) over a
+// game's offensive-rebound resolutions. Means are sum/n; n is the resolution count.
+type gateTeamAcc struct {
+	n         int     // offensive-rebound resolutions observed
+	sumG1     float64 // Σ counterfactual gate-1 P(offense wins board)
+	sumG2     float64 // Σ live gate-2 P (orebProbability)
+	sumProd   float64 // Σ gate-1 × gate-2 (faithful two-gate continuation P)
+	sumOffStr float64 // Σ offensive rebound strength (curvature-coupling input)
+	sumDefStr float64 // Σ defensive rebound strength
+}
+
+// NewGateContAccum allocates an empty gate accumulator ready to harvest a game.
+func NewGateContAccum() *GateContAccum {
+	return &GateContAccum{perTeam: map[int]*gateTeamAcc{}}
+}
+
+// TeamIDs returns the offensive team IDs with at least one sample, ascending, for
+// deterministic iteration by the harness.
+func (a *GateContAccum) TeamIDs() []int {
+	ids := make([]int, 0, len(a.perTeam))
+	for id := range a.perTeam {
+		ids = append(ids, id)
+	}
+	sort.Ints(ids)
+	return ids
+}
+
+// Team returns the accumulated resolution count and sums for offensive team id (all
+// zero when id was never seen). The harness divides the sums by n for per-trip means
+// and n by the run count for the per-game resolution rate.
+func (a *GateContAccum) Team(id int) (n int, sumG1, sumG2, sumProd, sumOffStr, sumDefStr float64) {
+	t := a.perTeam[id]
+	if t == nil {
+		return 0, 0, 0, 0, 0, 0
+	}
+	return t.n, t.sumG1, t.sumG2, t.sumProd, t.sumOffStr, t.sumDefStr
+}
+
 // Options configures a SimulateWith run. The zero value is the live engine: no
 // frozen arms, no accumulation — identical to Simulate.
 type Options struct {
@@ -157,6 +210,19 @@ type Options struct {
 	// always a valid float, so validate() needs no zero-mean guard for it (unlike the
 	// freeze arms). The only knob this seam moves.
 	OffVolumeScale *float64
+
+	// GateCont, when non-nil, harvests the L1 gate-1 counterfactual instrument
+	// (ADR-0057/0058) across the run: at every offensive-rebound resolution it records
+	// the live gate-2, the counterfactual gate-1, and their product, keyed by offensive
+	// team. Read-only (no rng draw), never serialized — a zero Options stays
+	// byte-identical to Simulate. The validate harness owns one per game.
+	GateCont *GateContAccum
+	// GateBaseline overrides the gate-1 baseline term (the league offensive-rebound
+	// share × 100). nil → leagueReboundBaseline(bundle), the faithful bundle-derived
+	// value; non-nil → *GateBaseline, used by the archive instrument's baseline
+	// sensitivity sweep (the exact loader value is unpinned in the static decompile).
+	// Read only when GateCont is non-nil, so it never perturbs a normal run.
+	GateBaseline *float64
 }
 
 // validate rejects a config that freezes an arm with no precomputed (zero) mean — a
@@ -202,6 +268,34 @@ func (gs *gameState) orebProb(off, def float64) float64 {
 		return gs.freeze.Means.OrebProb
 	}
 	return p
+}
+
+// accumulateGateCont records one offensive-rebound RESOLUTION into the L1 gate-1
+// counterfactual instrument (ADR-0057/0058). It is a no-op unless gs.gateCont is set,
+// so it is inert on every normal/golden run. It computes the live gate-2 probability,
+// the counterfactual gate-1 sqrt team-pick (gate1Probability, against gs.gateBaseline),
+// and their product, and folds them into the OFFENSIVE team's accumulator. It issues
+// NO rng draw and mutates no game state, so the live continuation outcome — still the
+// single gate-2 roll at possession.go's gs.rebound — is byte-identical. Called once
+// per rebound resolution (the half-court and transition paths share gs.rebound), so it
+// covers every offensive-rebound trip exactly once.
+func (gs *gameState) accumulateGateCont(offTeamID int, off, def float64) {
+	if gs.gateCont == nil {
+		return
+	}
+	t := gs.gateCont.perTeam[offTeamID]
+	if t == nil {
+		t = &gateTeamAcc{}
+		gs.gateCont.perTeam[offTeamID] = t
+	}
+	g2 := orebProbability(off, def)
+	g1 := gate1Probability(off, def, gs.gateBaseline)
+	t.n++
+	t.sumG1 += g1
+	t.sumG2 += g2
+	t.sumProd += g1 * g2
+	t.sumOffStr += off
+	t.sumDefStr += def
 }
 
 // turnoverProb returns the per-possession steal-driven turnover probability from

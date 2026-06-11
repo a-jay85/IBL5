@@ -1401,17 +1401,17 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 ### 9.9 DEVELOPMENT_GUIDE Refers to .github/skills/ — Doesn't Exist
 **Location:** `ibl5/docs/DEVELOPMENT_GUIDE.md` lines 10, 82, 435
 **Problem:** Skills live at `.claude/skills/`, not .github/skills/.
-**Suggested direction:** Find-replace; fix `.github/copilot-instructions.md` too.
+**Suggested direction:** Find-replace.
 **Est. effort:** S
 **Risk if untouched:** Agent looks in wrong dir; may create .github/skills/.
 
-### 9.10 `copilot-instructions.md` Loaded by Claude Code But Stale
-**Location:** `.github/copilot-instructions.md`
-**Problem:** Uses `HtmlSanitizer::safeHtmlOutput()` instead of canonical `e()`. References .github/skills/. Loads on every session.
-**Suggested direction:** Archive (if superseded) or sync with current canonical.
+### 9.10 `copilot-instructions.md` — Retired (Copilot no longer used)
+**Location:** `.archive/copilot-instructions.md`
+**Problem:** Copilot-specific instruction mirror, superseded by `.claude/rules/` + `CLAUDE.md`. Not actually loaded by Claude Code (no `.claude/`/settings/hook reference); only GitHub Copilot read it.
+**Suggested direction:** Archive — done.
 **Est. effort:** S
-**Risk if untouched:** Agent uses older XSS-helper style; PHPStan violations.
-**Status:** Completed branch `doc-freshness-catchup` (2026-05-19) — safeHtmlOutput → e(); .github/skills/ → .claude/skills/. NOTE: file is out of bin/check-docs scope; no frontmatter added until CI gates it (separate backlog item).
+**Risk if untouched:** None.
+**Status:** Resolved 2026-06-10 — Copilot retired; the instruction mirror and prompt files were moved into `.archive/copilot-instructions.md` and `.archive/copilot-prompts/`, and all live references repointed to `.claude/rules/` / `CLAUDE.md` / `TESTING_STANDARDS.md`. (Earlier `doc-freshness-catchup` 2026-05-19 pass had synced the XSS-helper style and skills-dir paths while the file was still live.)
 
 ### 9.11 DOCUMENTATION_STANDARDS — Stranded `SECURITY.md` Example
 **Location:** `ibl5/docs/DOCUMENTATION_STANDARDS.md` line 35

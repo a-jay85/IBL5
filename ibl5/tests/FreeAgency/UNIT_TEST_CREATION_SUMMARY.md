@@ -406,4 +406,4 @@ These can serve as a blueprint for integration tests or guide refactoring effort
 ---
 
 **Author:** GitHub Copilot Coding Agent  
-**Reference:** See `.github/copilot-instructions.md` for testing best practices
+**Reference:** See `ibl5/docs/TESTING_STANDARDS.md` for testing best practices

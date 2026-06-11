@@ -174,7 +174,7 @@ last_verified: 2026-06-10
 
 **3. Update References**:
 - Verify links in README.md
-- Check `.github/copilot-instructions.md` examples if relevant
+- Check `.claude/rules/` examples if relevant
 - Ensure `ibl5/docs/README.md` is current
 
 ---
@@ -203,4 +203,4 @@ last_verified: 2026-06-10
 - [ ] Test suite registered in `ibl5/phpunit.xml`
 - [ ] All tests passing without warnings or errors
 
-**DO NOT deviate from this structure** - consistency is critical for Copilot Agent effectiveness.
+**DO NOT deviate from this structure** - consistency is critical for agent effectiveness.

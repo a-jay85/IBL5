@@ -24,6 +24,17 @@ func simGame(b bundle.Bundle, g bundle.Game, r *rng.RNG) (result.GameResult, int
 	return simGameWith(b, g, r, Options{})
 }
 
+// resolveOffVolumeScale returns the offensive-volume scale for this run: the package
+// const offVolumeScale (tempo.go) when opts.OffVolumeScale is nil — byte-identical to
+// the live engine — else the overridden value (the ADR-0054 sweep seam). A pure
+// function so "resolves the const when nil" is a direct unit test, not through-the-sim.
+func resolveOffVolumeScale(opts Options) float64 {
+	if opts.OffVolumeScale != nil {
+		return *opts.OffVolumeScale
+	}
+	return offVolumeScale
+}
+
 // simGameWith is simGame plus the freeze/accumulation Options (freeze.go). A zero
 // Options leaves every possession decision byte-identical to simGame; a non-zero
 // Options either harvests league-mean derived values (opts.Accum) or substitutes a
@@ -46,7 +57,8 @@ func simGameWith(b bundle.Bundle, g bundle.Game, r *rng.RNG, opts Options) (resu
 	// possession COUNT per team (clock / avg(BT_v, BT_h)), so no per-possession
 	// step is needed; the season-level FGA channel emerges because a high-volume
 	// team's games average faster across its varied opponents.
-	baseTime := (teamBaseTime(visitor.players) + teamBaseTime(home.players)) / 2.0
+	scale := resolveOffVolumeScale(opts)
+	baseTime := (teamBaseTimeWith(visitor.players, scale) + teamBaseTimeWith(home.players, scale)) / 2.0
 	step := possessionTime(baseTime)
 
 	// Tip-off winner starts on offense; possessions strictly alternate.

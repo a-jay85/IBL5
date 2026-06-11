@@ -78,6 +78,14 @@ type Options struct {
 	// global — mirrors CollectFreezeAttribution).
 	MakePutback     bool
 	MakePutbackHalf bool
+
+	// OffVolumeScale, when non-nil, overrides the sim package-const offVolumeScale in
+	// the default (non-injected) engine runs — the ADR-0054 possession-count dispersion
+	// sweep. Captured by resolveValidate's real default closure (an injected
+	// Options.Validate test seam ignores it). nil leaves every existing caller + the
+	// committed calibration byte-identical (the const path). 0 is a valid sweep value
+	// (channel off), distinct from nil (use const) — hence the pointer.
+	OffVolumeScale *float64
 }
 
 // Skip records a snapshot (or archive entry) that was not turned into a Report,

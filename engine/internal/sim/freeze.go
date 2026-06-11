@@ -64,13 +64,24 @@ type FreezeConfig struct {
 	// (validate() ignores it, mirroring BranchB). Production NEVER sets it.
 	UnfaithfulPutback bool
 
+	// UnfaithfulOreb is an INVERTED-POLARITY escape hatch — zero value is NOT "live
+	// engine." Default false = the FAITHFUL JSB 5.60 offensive-rebound continuation
+	// (ADR-0058): gs.orebProb resolves the single determination roll via the sqrt
+	// gate-1 team-pick (gate1Probability, port of FUN_004e22a0) against the league
+	// rebound baseline. Set true ONLY by the ADR-0058 archive A/B's OFF walk to RESTORE
+	// the old linear gate-2 orebProbability path as the diagnostic baseline. It consumes
+	// no Means (validate() ignores it, mirroring UnfaithfulPutback/BranchB). Production
+	// NEVER sets it.
+	UnfaithfulOreb bool
+
 	Means FreezeMeans // per-season-bucket league means substituted for frozen arms
 }
 
 // FreezeMeans are the per-mechanism per-season-bucket league-mean derived values
 // (harvested by a no-freeze baseline pass via FreezeAccum). Each is the mean of the
 // ACTUAL derived quantity at its call site, never an event-rate proxy:
-//   - OrebProb:   mean orebProbability output ∈ [0.25, 0.75]
+//   - OrebProb:   mean live ORB-continuation P (faithful sqrt gate1Probability by
+//     default; linear orebProbability under the UnfaithfulOreb hatch)
 //   - TurnProb:   mean per-possession steal-driven turnoverProb output ∈ [0, maxTurnoverProb]
 //   - FoulWeight: mean foulBucketWeight output
 //   - MakeVal2pt: mean PRE-clutch shotValue2pt output (per-mille)
@@ -143,14 +154,14 @@ func (a *BranchBAccum) MeanS() float64 {
 	return a.SumS / float64(a.Taken)
 }
 
-// GateContAccum harvests the L1 gate-1 counterfactual instrument (ADR-0057/0058),
-// read-only. At every offensive-rebound RESOLUTION (gs.rebound, before the gate-2
-// outcome roll), it records — keyed by the OFFENSIVE team ID — the live gate-2
-// probability (orebProbability), the counterfactual gate-1 sqrt team-pick
-// (gate1Probability, the gate JSB applies but the engine omits), their product (the
+// GateContAccum harvests the L1 gate-1 decomposition instrument (ADR-0057/0058),
+// read-only. At every offensive-rebound RESOLUTION (gs.rebound, before the continuation
+// outcome roll), it records — keyed by the OFFENSIVE team ID — the gate-1 sqrt team-pick
+// probability (gate1Probability, the live continuation roll since ADR-0058), the linear
+// gate-2 probability (orebProbability, the old pre-ADR-0058 path), their product (the
 // faithful two-gate continuation probability), and the off/def rebound strengths that
 // feed the curvature-coupling read. It issues NO rng draw and is never serialized, so
-// goldens stay byte-identical. The caller (validate harness) owns one instance PER
+// attaching it stays byte-identical to a plain run. The caller (validate harness) owns one instance PER
 // GAME, pooled across that game's runs, and reads the per-team sums after. NOT
 // concurrency-safe: the harness sims a game's runs sequentially.
 type GateContAccum struct {
@@ -161,8 +172,8 @@ type GateContAccum struct {
 // game's offensive-rebound resolutions. Means are sum/n; n is the resolution count.
 type gateTeamAcc struct {
 	n         int     // offensive-rebound resolutions observed
-	sumG1     float64 // Σ counterfactual gate-1 P(offense wins board)
-	sumG2     float64 // Σ live gate-2 P (orebProbability)
+	sumG1     float64 // Σ gate-1 P(offense wins board) (live continuation roll since ADR-0058)
+	sumG2     float64 // Σ linear gate-2 P (orebProbability, the old pre-ADR-0058 path)
 	sumProd   float64 // Σ gate-1 × gate-2 (faithful two-gate continuation P)
 	sumOffStr float64 // Σ offensive rebound strength (curvature-coupling input)
 	sumDefStr float64 // Σ defensive rebound strength
@@ -211,17 +222,18 @@ type Options struct {
 	// freeze arms). The only knob this seam moves.
 	OffVolumeScale *float64
 
-	// GateCont, when non-nil, harvests the L1 gate-1 counterfactual instrument
+	// GateCont, when non-nil, harvests the L1 gate-1 decomposition instrument
 	// (ADR-0057/0058) across the run: at every offensive-rebound resolution it records
-	// the live gate-2, the counterfactual gate-1, and their product, keyed by offensive
-	// team. Read-only (no rng draw), never serialized — a zero Options stays
-	// byte-identical to Simulate. The validate harness owns one per game.
+	// the gate-1 P (live since ADR-0058), the linear gate-2 P, and their product, keyed
+	// by offensive team. Read-only (no rng draw), never serialized — attaching it stays
+	// byte-identical to a plain run. The validate harness owns one per game.
 	GateCont *GateContAccum
 	// GateBaseline overrides the gate-1 baseline term (the league offensive-rebound
 	// share × 100). nil → leagueReboundBaseline(bundle), the faithful bundle-derived
 	// value; non-nil → *GateBaseline, used by the archive instrument's baseline
 	// sensitivity sweep (the exact loader value is unpinned in the static decompile).
-	// Read only when GateCont is non-nil, so it never perturbs a normal run.
+	// Read on EVERY run (ADR-0058: the live faithful ORB roll consumes gs.gateBaseline),
+	// so gameloop.go populates it unconditionally.
 	GateBaseline *float64
 }
 
@@ -259,7 +271,16 @@ func (o Options) validate() error {
 // orebProb returns P(offensive rebound). Shared by the half-court and transition
 // rebound paths (gs.rebound), so one injection covers both.
 func (gs *gameState) orebProb(off, def float64) float64 {
-	p := orebProbability(off, def)
+	// FAITHFUL by default (ADR-0058): the live continuation roll is the sqrt gate-1
+	// team-determination (FUN_004e22a0) against the league rebound baseline, resolved
+	// once per game into gs.gateBaseline (gameloop.go). The UnfaithfulOreb escape hatch
+	// restores the old linear gate-2 path for the archive A/B's OFF walk only.
+	var p float64
+	if gs.freeze.UnfaithfulOreb {
+		p = orebProbability(off, def)
+	} else {
+		p = gate1Probability(off, def, gs.gateBaseline)
+	}
 	if gs.accum != nil {
 		gs.accum.orebSum += p
 		gs.accum.orebN++
@@ -271,14 +292,15 @@ func (gs *gameState) orebProb(off, def float64) float64 {
 }
 
 // accumulateGateCont records one offensive-rebound RESOLUTION into the L1 gate-1
-// counterfactual instrument (ADR-0057/0058). It is a no-op unless gs.gateCont is set,
-// so it is inert on every normal/golden run. It computes the live gate-2 probability,
-// the counterfactual gate-1 sqrt team-pick (gate1Probability, against gs.gateBaseline),
-// and their product, and folds them into the OFFENSIVE team's accumulator. It issues
-// NO rng draw and mutates no game state, so the live continuation outcome — still the
-// single gate-2 roll at possession.go's gs.rebound — is byte-identical. Called once
-// per rebound resolution (the half-court and transition paths share gs.rebound), so it
-// covers every offensive-rebound trip exactly once.
+// decomposition instrument (ADR-0057/0058). It is a no-op unless gs.gateCont is set,
+// so it is inert on every normal/golden run. It computes the linear gate-2 probability
+// (orebProbability) and the gate-1 sqrt team-pick (gate1Probability, against
+// gs.gateBaseline — the live continuation roll since ADR-0058), and their product, and
+// folds them into the OFFENSIVE team's accumulator. It issues NO rng draw and mutates no
+// game state, so attaching the instrument is byte-identical to a plain run (it only reads
+// the same probabilities gs.orebProb already resolves). Called once per rebound resolution
+// (the half-court and transition paths share gs.rebound), so it covers every
+// offensive-rebound trip exactly once.
 func (gs *gameState) accumulateGateCont(offTeamID int, off, def float64) {
 	if gs.gateCont == nil {
 		return

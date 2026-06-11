@@ -296,10 +296,11 @@ func (gs *gameState) freeThrows(offense, defense *teamState, shooter, defender o
 func (gs *gameState) rebound(offense, defense *teamState, periodIdx int) (bool, onCourt) {
 	offStr := teamReboundStrength(offense, true)
 	defStr := teamReboundStrength(defense, false)
-	// L1 gate-1 counterfactual instrument (ADR-0057/0058): record the live gate-2, the
-	// dropped sqrt gate-1, and their product BEFORE the outcome roll. Read-only — issues
-	// no rng draw and is a no-op unless the instrument is attached, so the live outcome
-	// (the single gate-2 roll below) is unchanged and goldens stay byte-identical.
+	// L1 gate-1 decomposition instrument (ADR-0057/0058): record the linear gate-2, the
+	// sqrt gate-1 (the live continuation roll since ADR-0058), and their product BEFORE
+	// the outcome roll. Read-only — issues no rng draw and is a no-op unless the instrument
+	// is attached, so attaching it leaves the live outcome (the single gs.orebProb roll
+	// below) unchanged and goldens stay byte-identical.
 	gs.accumulateGateCont(offense.teamID, offStr, defStr)
 	// ORB-continuation arm routes through the freeze wrapper (freeze.go); shared by
 	// the half-court and transition rebound paths, so one site covers both.

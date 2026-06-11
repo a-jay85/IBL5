@@ -88,6 +88,14 @@ type Options struct {
 	// byte-identical. Unlike MakePutback it consumes no FreezeMeans (no harvest pass).
 	UnfaithfulPutback bool
 
+	// UnfaithfulOreb, when true, sets sim.FreezeConfig.UnfaithfulOreb in the default
+	// (non-injected) engine runs — the ADR-0058 archive A/B's OFF walk, which RESTORES
+	// the old linear gate-2 orebProbability ORB-continuation path as the diagnostic
+	// baseline. Captured by resolveValidate's real default closure (an injected
+	// Options.Validate test seam ignores it). Default false = the faithful production
+	// engine (the ON walk is a zero Options). Consumes no FreezeMeans (no harvest pass).
+	UnfaithfulOreb bool
+
 	// OffVolumeScale, when non-nil, overrides the sim package-const offVolumeScale in
 	// the default (non-injected) engine runs — the ADR-0054 possession-count dispersion
 	// sweep. Captured by resolveValidate's real default closure (an injected

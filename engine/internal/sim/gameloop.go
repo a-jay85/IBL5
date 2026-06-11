@@ -49,15 +49,15 @@ func simGameWith(b bundle.Bundle, g bundle.Game, r *rng.RNG, opts Options) (resu
 	home.drbRate, home.astRate = teamRates(b, g.HomeTeamID)
 
 	gs := &gameState{rng: r, gameType: g.GameType, madeFG: map[int]int{}, freeze: opts.Freeze, accum: opts.Accum, branchB: opts.BranchBAccum, gateCont: opts.GateCont}
-	// The L1 gate-1 baseline is league-constant, so resolve it ONCE per game (only when
-	// the instrument is attached — a zero Options leaves gateCont nil, so the scan and
-	// the whole instrument stay off and the run is byte-identical to Simulate).
-	if opts.GateCont != nil {
-		if opts.GateBaseline != nil {
-			gs.gateBaseline = *opts.GateBaseline
-		} else {
-			gs.gateBaseline = leagueReboundBaseline(b)
-		}
+	// The L1 gate-1 baseline is league-constant, so resolve it ONCE per game. The live
+	// faithful ORB roll (gs.orebProb) reads gs.gateBaseline on EVERY run (ADR-0058), so
+	// this MUST populate unconditionally — a zero baseline biases the sqrt branch and
+	// breaks ORB fidelity. The GateBaseline override (nil ⇒ bundle-derived) feeds both
+	// the ADR-0058 archive baseline sweep and the counterfactual instrument.
+	if opts.GateBaseline != nil {
+		gs.gateBaseline = *opts.GateBaseline
+	} else {
+		gs.gateBaseline = leagueReboundBaseline(b)
 	}
 
 	// One shared possession length per game: the average of the two teams' base

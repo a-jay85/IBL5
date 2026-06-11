@@ -70,11 +70,11 @@ func orebProbability(off, def float64) float64 {
 	return p
 }
 
-// gate1Probability is the COUNTERFACTUAL "which team wins the board" gate that JSB
-// 5.60 applies AHEAD of the linear retention roll (orebProbability = gate-2) and
-// that the engine currently OMITS — the L1 carrier ADR-0057 positively identified.
-// It is a read-only instrument: it computes the probability 5.60 WOULD apply but
-// never rolls against it, so the live continuation outcome is unchanged.
+// gate1Probability is the "which team wins the board" gate that JSB 5.60 applies
+// AHEAD of the linear retention roll (orebProbability = gate-2) — the L1 carrier
+// ADR-0057 positively identified. Since ADR-0058 it is the LIVE offensive-rebound
+// continuation roll (gs.orebProb resolves the single determination against it by
+// default); the old linear gate-2 path survives only behind the UnfaithfulOreb hatch.
 //
 // Faithful port of FUN_004e22a0 (jsb560_decompiled.c:97352-97405), the sqrt
 // diminishing-returns team-strength pick:

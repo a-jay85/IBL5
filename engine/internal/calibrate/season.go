@@ -292,6 +292,7 @@ func validateWithArms(opts Options, validateFn func(string, int, uint64, bundle.
 		base.OffVolumeScale = opts.OffVolumeScale              // ADR-0054 sweep seam: nil ⇒ const path; survives both the early-return and two-pass paths below
 		base.GateBaseline = opts.GateBaseline                  // ADR-0058 gate-baseline sweep seam: nil ⇒ bundle-derived baseline; survives both paths below
 		base.Freeze.UnfaithfulPutback = opts.UnfaithfulPutback // ADR-0055 OFF walk: restore master's coupled putback; survives both paths (copied into harvest/frozen)
+		base.Freeze.UnfaithfulOreb = opts.UnfaithfulOreb       // ADR-0058 OFF walk: restore linear gate-2 ORB continuation; survives both paths
 		if opts.BranchB {
 			base.Freeze.BranchB = true
 			base.BranchBAccum = opts.BranchBAccum

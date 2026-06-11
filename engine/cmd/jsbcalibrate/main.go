@@ -69,6 +69,7 @@ func runWith(args []string, stdout, stderr io.Writer, c collectors) int {
 	branchB := fs.Bool("branchB", false, "enable the JSB Branch-B usage-shrink in the engine runs (measurement A/B)")
 	makePutback := fs.Bool("makePutback", false, "enable the ADR-0053 putback make-value decoupling arm (full league-mean substitution; measurement A/B)")
 	makePutbackHalf := fs.Bool("makePutbackHalf", false, "enable the ADR-0053 putback make-value decoupling arm (halfway blend; measurement A/B)")
+	unfaithfulOreb := fs.Bool("unfaithfulOreb", false, "restore the old linear gate-2 ORB-continuation path in the default engine runs (ADR-0058 archive A/B OFF walk)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -99,6 +100,7 @@ func runWith(args []string, stdout, stderr io.Writer, c collectors) int {
 		BranchB:         *branchB,
 		MakePutback:     *makePutback,
 		MakePutbackHalf: *makePutbackHalf,
+		UnfaithfulOreb:  *unfaithfulOreb,
 		Progress:        stderr,
 	}
 	reports, skips, err := collect(*archive, opts)

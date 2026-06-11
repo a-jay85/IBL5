@@ -292,7 +292,7 @@ func buildCorpus(t *testing.T, dir string, inBand bool, runs int, baseSeed uint6
 	writeSch(t, sch, []schSpec{{vis: 7, home: 3, vScore: 1, hScore: 1}})
 
 	b := assembleSynthBundle(t, plr, sch)
-	visMean, homeMean, _, _, _, _ := simulateGameMeans(b, b.Schedule[0], runs, baseSeed, sim.Options{})
+	visMean, homeMean, _, _, _, _, _, _ := simulateGameMeans(b, b.Schedule[0], runs, baseSeed, sim.Options{})
 	visPts, homePts := round(visMean["points"]), round(homeMean["points"])
 
 	// Rewrite .sch with the real scores so the .sco↔.sch tuple match succeeds.

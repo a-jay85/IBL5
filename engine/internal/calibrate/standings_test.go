@@ -885,6 +885,93 @@ func TestDecomposeOrebIntensity(t *testing.T) {
 	})
 }
 
+// TestDecomposeGateContinuation_KnownRows pins the L1 gate-1 discriminator
+// (ADR-0057/0058) against hand-computed values for one season, three teams.
+func TestDecomposeGateContinuation_KnownRows(t *testing.T) {
+	rows := []gateRow{
+		{season: "A", g1: 0.8, g2: 0.4, prod: 0.32, offStr: 50, pf: 100, fga: 80},
+		{season: "A", g1: 0.7, g2: 0.5, prod: 0.35, offStr: 55, pf: 99, fga: 90},
+		{season: "A", g1: 0.6, g2: 0.6, prod: 0.36, offStr: 60, pf: 120, fga: 100},
+	}
+	mg1, mg2, mprod, red, varG1, covG2, covProd := decomposeGateContinuation(rows)
+	check := func(name string, got, want, tol float64) {
+		if math.Abs(got-want) > tol {
+			t.Errorf("%s = %v, want %v", name, got, want)
+		}
+	}
+	check("meanG1", mg1, 0.7, 1e-12)
+	check("meanG2", mg2, 0.5, 1e-12)
+	check("meanProd", mprod, 1.03/3.0, 1e-12)
+	check("reductionFrac", red, (0.5-1.03/3.0)/0.5, 1e-12) // definitional
+	check("varG1", varG1, 0.02/3.0, 1e-12)
+	check("covG2", covG2, -0.001360733151, 1e-9)
+	check("covProd", covProd, -0.000510863017, 1e-9)
+}
+
+// TestDecomposeGateContinuation_DegenerateRows — rows with no gate samples (g2<=0) or
+// undefined lnPPS (pf<=0/fga<=0) are dropped; all-dropped input returns all zeros with
+// no NaN/Inf.
+func TestDecomposeGateContinuation_DegenerateRows(t *testing.T) {
+	// The two degenerate rows are dropped; the surviving two carry the signal.
+	rows := []gateRow{
+		{season: "A", g1: 0.9, g2: 0, prod: 0, offStr: 50, pf: 100, fga: 80},    // dropped: g2<=0
+		{season: "A", g1: 0.9, g2: 0.5, prod: 0.45, offStr: 50, pf: 0, fga: 80}, // dropped: pf<=0
+		{season: "A", g1: 0.8, g2: 0.4, prod: 0.32, offStr: 55, pf: 100, fga: 80},
+		{season: "A", g1: 0.6, g2: 0.6, prod: 0.36, offStr: 60, pf: 120, fga: 100},
+	}
+	mg1, mg2, mprod, red, varG1, covG2, covProd := decomposeGateContinuation(rows)
+	for name, v := range map[string]float64{"meanG1": mg1, "meanG2": mg2, "meanProd": mprod, "red": red, "varG1": varG1, "covG2": covG2, "covProd": covProd} {
+		if math.IsNaN(v) || math.IsInf(v, 0) {
+			t.Errorf("%s = %v, want finite (degenerate rows dropped)", name, v)
+		}
+	}
+	if math.Abs(mg2-0.5) > 1e-12 { // (0.4+0.6)/2 over the two survivors
+		t.Errorf("meanG2 = %v, want 0.5 (over the two surviving rows)", mg2)
+	}
+
+	// All-dropped input → all zeros, no NaN.
+	mg1, mg2, mprod, red, varG1, covG2, covProd = decomposeGateContinuation([]gateRow{
+		{season: "A", g1: 0.9, g2: 0, prod: 0, pf: 100, fga: 80},
+	})
+	for name, v := range map[string]float64{"meanG1": mg1, "meanG2": mg2, "meanProd": mprod, "red": red, "varG1": varG1, "covG2": covG2, "covProd": covProd} {
+		if v != 0 {
+			t.Errorf("all-dropped %s = %v, want 0", name, v)
+		}
+	}
+}
+
+// TestCollectFidelitySummaries_GateFieldsPopulated — the gate-1 discriminator fields
+// thread from TeamStanding into the FidelitySummary, and the product is below gate-2.
+func TestCollectFidelitySummaries_GateFieldsPopulated(t *testing.T) {
+	mk := func(id int, pf, fga, g1, g2, prod float64) TeamStanding {
+		return TeamStanding{
+			TeamID: id, GamesPlayed: 82,
+			EnginePointsForPG: pf, EngineFGAPerG: fga,
+			EngineGateContN: 5, EngineGateContMeanG1: g1, EngineGateContMeanG2: g2,
+			EngineGateContMeanProd: prod, EngineGateContMeanOffStr: 50, EngineGateContMeanDefStr: 60,
+		}
+	}
+	seasons := []SeasonAggregate{{Label: "A", GameType: 2, Teams: []TeamStanding{
+		mk(1, 100, 80, 0.8, 0.4, 0.32),
+		mk(2, 99, 90, 0.7, 0.5, 0.35),
+		mk(3, 120, 100, 0.6, 0.6, 0.36),
+	}}}
+	fs := collectFidelitySummaries(seasons)
+	if len(fs) != 1 {
+		t.Fatalf("want 1 fidelity summary, got %d", len(fs))
+	}
+	f := fs[0]
+	if math.Abs(f.GateMeanG1-0.7) > 1e-12 || math.Abs(f.GateMeanG2-0.5) > 1e-12 {
+		t.Errorf("GateMeanG1=%v GateMeanG2=%v, want 0.7/0.5", f.GateMeanG1, f.GateMeanG2)
+	}
+	if f.GateMeanProd >= f.GateMeanG2 {
+		t.Errorf("GateMeanProd %v not < GateMeanG2 %v", f.GateMeanProd, f.GateMeanG2)
+	}
+	if f.GateVarG1 <= 0 {
+		t.Errorf("GateVarG1 = %v, want > 0 (teams differ)", f.GateVarG1)
+	}
+}
+
 // Row #7: the additive ORB-intensity + continuation-depth extension perturbs no
 // existing TeamStanding / FidelitySummary field, and the new ORB/depth fields
 // default to 0 when a snapshot carries no possession/event maps.

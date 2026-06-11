@@ -379,7 +379,7 @@ func matchSchedule(sched []backup.SchGame, consumed []bool, sg backup.ScoGame) i
 // validateGame simulates one matchup `runs` times and compares the aggregated
 // per-team engine means against the .sco ground truth, using gameType's bands.
 func validateGame(b bundle.Bundle, g bundle.Game, sg backup.ScoGame, runs int, baseSeed uint64, gameType bundle.GameType, opts sim.Options) GameReport {
-	visMean, homeMean, homeWinFrac, originFGA, possProxyPerG, possCountPerG, orbPerG, contDepthPerG := simulateGameMeans(b, g, runs, baseSeed, opts)
+	visMean, homeMean, homeWinFrac, originFGA, possProxyPerG, possCountPerG, orbPerG, contDepthPerG, gateContPerG := simulateGameMeans(b, g, runs, baseSeed, opts)
 	visSco := teamStatFromSco(sg, g.VisitorTeamID)
 	homeSco := teamStatFromSco(sg, g.HomeTeamID)
 	gr := compareGame(gameType, g.VisitorTeamID, g.HomeTeamID, sg.Date, visSco, homeSco, visMean, homeMean)
@@ -402,6 +402,7 @@ func validateGame(b bundle.Bundle, g bundle.Game, sg backup.ScoGame, runs int, b
 		g.HomeTeamID:    float64(homeSco.ORB),
 	}
 	gr.EngineContinuationDepth = contDepthPerG
+	gr.EngineGateCont = gateContPerG
 	return gr
 }
 
@@ -411,13 +412,19 @@ func validateGame(b bundle.Bundle, g bundle.Game, sg backup.ScoGame, runs int, b
 // runs-stable P(home win) estimate the season-aggregate layer needs). Each run
 // is an independent single-game sub-bundle so one game's distribution is
 // isolated from the rest of the schedule.
-func simulateGameMeans(b bundle.Bundle, g bundle.Game, runs int, baseSeed uint64, opts sim.Options) (visMean, homeMean map[string]float64, homeWinFrac float64, originFGA map[int]OriginFGA, possProxyPerG, possCountPerG, orbPerG map[int]float64, contDepthPerG map[int]ContinuationDepthRaw) {
+func simulateGameMeans(b bundle.Bundle, g bundle.Game, runs int, baseSeed uint64, opts sim.Options) (visMean, homeMean map[string]float64, homeWinFrac float64, originFGA map[int]OriginFGA, possProxyPerG, possCountPerG, orbPerG map[int]float64, contDepthPerG map[int]ContinuationDepthRaw, gateContPerG map[int]GateContRaw) {
 	sub := bundle.Bundle{
 		LeagueID: b.LeagueID,
 		Teams:    b.Teams,
 		Players:  b.Players,
 		Schedule: []bundle.Game{g},
 	}
+	// L1 gate-1 counterfactual instrument (ADR-0057/0058): one accumulator per game,
+	// pooled across the game's runs. Attaching it issues no rng draw and does not alter
+	// any outcome (read-only at the sim rebound site), so the per-team stat means below
+	// are unchanged. opts.GateBaseline (the sweep seam) rides through from the caller.
+	gateAcc := sim.NewGateContAccum()
+	opts.GateCont = gateAcc
 	// opts is threaded verbatim from the caller: a zero sim.Options{} ⇒ SimulateWith ==
 	// Simulate (byte-identical OFF calibration), and any pointer field (opts.BranchBAccum
 	// engagement instrument, opts.Accum FreezeMeans harvest) is shared across every game
@@ -479,7 +486,26 @@ func simulateGameMeans(b bundle.Bundle, g bundle.Game, runs int, baseSeed uint64
 			B3Plus: float64(d.b3plus) / rf,
 		}
 	}
-	return mean(visSamples), mean(homeSamples), homeWinFraction(homeSamples, visSamples), originFGA, possProxyPerG, possCountPerG, orbPerG, contDepthPerG
+	// Gate-1 counterfactual per-team means: N is resolutions/game (n÷runs); the gate and
+	// strength fields are per-RESOLUTION means (sum÷n, run-pooled). A team with no
+	// offensive-rebound resolution contributes no entry (n==0 skipped — no spurious key).
+	gateContPerG = make(map[int]GateContRaw)
+	for _, id := range gateAcc.TeamIDs() {
+		n, sumG1, sumG2, sumProd, sumOffStr, sumDefStr := gateAcc.Team(id)
+		if n == 0 {
+			continue
+		}
+		fn := float64(n)
+		gateContPerG[id] = GateContRaw{
+			N:          fn / rf,
+			MeanG1:     sumG1 / fn,
+			MeanG2:     sumG2 / fn,
+			MeanProd:   sumProd / fn,
+			MeanOffStr: sumOffStr / fn,
+			MeanDefStr: sumDefStr / fn,
+		}
+	}
+	return mean(visSamples), mean(homeSamples), homeWinFraction(homeSamples, visSamples), originFGA, possProxyPerG, possCountPerG, orbPerG, contDepthPerG, gateContPerG
 }
 
 // accumulateOriginFGA folds one game's shot events into per-team by-origin counters:

@@ -81,6 +81,18 @@ type TeamStanding struct {
 	EngineContDepthB1     float64 `json:"engine_cont_depth_b1"`
 	EngineContDepthB2     float64 `json:"engine_cont_depth_b2"`
 	EngineContDepthB3Plus float64 `json:"engine_cont_depth_b3plus"`
+	// Engine-only L1 gate-1 counterfactual samples (ADR-0057/0058), per game. No .sco
+	// counterpart (real box scores carry no gate probabilities); reported, never gated.
+	// N is per-game offensive-rebound resolutions; MeanG1/MeanG2/MeanProd are the
+	// per-game-mean per-resolution gate-1 / gate-2 / product probabilities; MeanOffStr/
+	// MeanDefStr are the per-game-mean rebound strengths (the curvature-coupling input).
+	// 0 when no contributing games.
+	EngineGateContN          float64 `json:"engine_gate_cont_n"`
+	EngineGateContMeanG1     float64 `json:"engine_gate_cont_mean_g1"`
+	EngineGateContMeanG2     float64 `json:"engine_gate_cont_mean_g2"`
+	EngineGateContMeanProd   float64 `json:"engine_gate_cont_mean_prod"`
+	EngineGateContMeanOffStr float64 `json:"engine_gate_cont_mean_off_str"`
+	EngineGateContMeanDefStr float64 `json:"engine_gate_cont_mean_def_str"`
 }
 
 // SeasonAggregate is one report (one season bucket) rolled up per team, plus the
@@ -233,6 +245,30 @@ type FidelitySummary struct {
 	EngineVarOrebIntensity      float64 `json:"engine_var_oreb_intensity"`
 	RealCovOrebIntensityLnPPS   float64 `json:"real_cov_oreb_intensity_ln_pps"`
 	EngineCovOrebIntensityLnPPS float64 `json:"engine_cov_oreb_intensity_ln_pps"`
+	// L1 gate-1 counterfactual discriminator (ADR-0057/0058). Engine-only — real .sco
+	// carries no gate probabilities, so there is no Real* counterpart; reported, never
+	// gated. The discriminator separates the dropped sqrt gate-1 into two mechanisms:
+	//
+	//   - MEAN channel: GateMeanReductionFrac = (GateMeanG2 − GateMeanProd)/GateMeanG2,
+	//     the fraction of continuation probability the dropped gate-1 would remove — the
+	//     ORB-level excess (engine ORB/POSS ~23% high, ADR-0056) the mean channel explains.
+	//   - CURVATURE channel: GateCovG2LnPPS − GateCovProdLnPPS, the within-season
+	//     Cov(continuation P, lnPPS) under the engine's LINEAR gate-2 vs the faithful
+	//     SQRT-gated product. offStr itself is gate-independent, so the curvature is
+	//     measured on the gated OUTPUT: a large positive difference ⇒ the linear form
+	//     over-couples ORB-strength → continuation → points relative to the sqrt-
+	//     compressed product (the Cov(ORB/POSS,lnPPS) symptom), even at matched mean.
+	//
+	// Cov terms are within-season demeaned; the means are raw pooled. 0 (never NaN/Inf)
+	// on degenerate input, like the Var/Cov block. ADR-0058 reads these to fix the future
+	// fix's shape (mean-inflation vs curvature).
+	GateMeanG1            float64 `json:"gate_mean_g1"`
+	GateMeanG2            float64 `json:"gate_mean_g2"`
+	GateMeanProd          float64 `json:"gate_mean_prod"`
+	GateMeanReductionFrac float64 `json:"gate_mean_reduction_frac"`
+	GateVarG1             float64 `json:"gate_var_g1"`
+	GateCovG2LnPPS        float64 `json:"gate_cov_g2_ln_pps"`
+	GateCovProdLnPPS      float64 `json:"gate_cov_prod_ln_pps"`
 }
 
 // SeasonAggregateReport is the full season-aggregate readout: the per-season
@@ -324,6 +360,9 @@ type teamAcc struct {
 	// counterpart; divided by gp for the per-game means in TeamStanding.
 	contDepthN, contDepthSumK, contDepthSumK2          float64
 	contDepthB0, contDepthB1, contDepthB2, contDepthB3 float64
+	// Engine-only L1 gate-1 counterfactual sums over gp games (ADR-0057/0058). No .sco
+	// counterpart; divided by gp for the per-game means in TeamStanding.
+	gateContN, gateG1, gateG2, gateProd, gateOffStr, gateDefStr float64
 }
 
 // residAcc collects one game type's per-(season,team) residuals across reports.
@@ -484,6 +523,23 @@ func CollectSeasonAggregates(reports []validate.Report) SeasonAggregateReport {
 			v.contDepthB1 += vd.B1
 			v.contDepthB2 += vd.B2
 			v.contDepthB3 += vd.B3Plus
+
+			// Engine-only L1 gate-1 counterfactual (ADR-0057/0058, reported never gated).
+			// Indexing a nil EngineGateCont map yields the zero value — safe.
+			hgc := g.EngineGateCont[g.HomeTeamID]
+			h.gateContN += hgc.N
+			h.gateG1 += hgc.MeanG1
+			h.gateG2 += hgc.MeanG2
+			h.gateProd += hgc.MeanProd
+			h.gateOffStr += hgc.MeanOffStr
+			h.gateDefStr += hgc.MeanDefStr
+			vgc := g.EngineGateCont[g.VisitorTeamID]
+			v.gateContN += vgc.N
+			v.gateG1 += vgc.MeanG1
+			v.gateG2 += vgc.MeanG2
+			v.gateProd += vgc.MeanProd
+			v.gateOffStr += vgc.MeanOffStr
+			v.gateDefStr += vgc.MeanDefStr
 		}
 
 		if numGames == 0 {
@@ -531,6 +587,13 @@ func CollectSeasonAggregates(reports []validate.Report) SeasonAggregateReport {
 				EngineContDepthB1:       perGame(t.contDepthB1, t.gp),
 				EngineContDepthB2:       perGame(t.contDepthB2, t.gp),
 				EngineContDepthB3Plus:   perGame(t.contDepthB3, t.gp),
+				// Gate-1 counterfactual per-game means (mean of the per-game means over gp).
+				EngineGateContN:          perGame(t.gateContN, t.gp),
+				EngineGateContMeanG1:     perGame(t.gateG1, t.gp),
+				EngineGateContMeanG2:     perGame(t.gateG2, t.gp),
+				EngineGateContMeanProd:   perGame(t.gateProd, t.gp),
+				EngineGateContMeanOffStr: perGame(t.gateOffStr, t.gp),
+				EngineGateContMeanDefStr: perGame(t.gateDefStr, t.gp),
 			}
 			sa.Teams = append(sa.Teams, ts)
 			ra.wins = append(ra.wins, math.Abs(ts.EngineExpectedWins-float64(ts.ScoWins)))
@@ -675,7 +738,11 @@ type fidAcc struct {
 	engFTA, scoFTA   []float64 // per-team total-FTA/g, parallel to engPF/scoPF
 	engPoss, scoPoss []float64 // per-team POSS/g (Dean-Oliver proxy, both sides), parallel
 	engORB, scoORB   []float64 // per-team ORB/g (ORB-intensity numerator, both sides), parallel
-	season           []string  // per-row season label, for within-season demean
+	// Engine-only L1 gate-1 counterfactual per-team means (ADR-0057/0058), parallel.
+	// No .sco side. gateG1/gateG2/gateProd are per-resolution gate probabilities;
+	// gateOffStr is the offensive rebound strength (the curvature-coupling input).
+	gateG1, gateG2, gateProd, gateOffStr []float64
+	season                               []string // per-row season label, for within-season demean
 }
 
 // collectFidelitySummaries pools every (season, team) row by game type and
@@ -708,6 +775,10 @@ func collectFidelitySummaries(seasons []SeasonAggregate) []FidelitySummary {
 			fa.scoPoss = append(fa.scoPoss, ts.ScoPossPerG)
 			fa.engORB = append(fa.engORB, ts.EngineORBPerG)
 			fa.scoORB = append(fa.scoORB, ts.ScoORBPerG)
+			fa.gateG1 = append(fa.gateG1, ts.EngineGateContMeanG1)
+			fa.gateG2 = append(fa.gateG2, ts.EngineGateContMeanG2)
+			fa.gateProd = append(fa.gateProd, ts.EngineGateContMeanProd)
+			fa.gateOffStr = append(fa.gateOffStr, ts.EngineGateContMeanOffStr)
 			fa.season = append(fa.season, sa.Label)
 		}
 	}
@@ -733,6 +804,9 @@ func collectFidelitySummaries(seasons []SeasonAggregate) []FidelitySummary {
 		// ORB/POSS, real and engine.
 		rOI, rVarOI, rCovOI := decomposeOrebIntensity(orebRows(fa, false))
 		eOI, eVarOI, eCovOI := decomposeOrebIntensity(orebRows(fa, true))
+		// L1 gate-1 counterfactual discriminator (ADR-0057/0058): the mean-inflation vs
+		// curvature-over-coupling split of the dropped sqrt gate-1. Engine-only.
+		gMeanG1, gMeanG2, gMeanProd, gReductionFrac, gVarG1, gCovG2, gCovProd := decomposeGateContinuation(gateRows(fa))
 		// LevelGapPF = mean(engPF − scoPF) = mean(engPF) − mean(scoPF) exactly
 		// (same N), the absolute scoring-level gap.
 		out = append(out, FidelitySummary{
@@ -769,6 +843,13 @@ func collectFidelitySummaries(seasons []SeasonAggregate) []FidelitySummary {
 			EngineVarOrebIntensity:       eVarOI,
 			RealCovOrebIntensityLnPPS:    rCovOI,
 			EngineCovOrebIntensityLnPPS:  eCovOI,
+			GateMeanG1:                   gMeanG1,
+			GateMeanG2:                   gMeanG2,
+			GateMeanProd:                 gMeanProd,
+			GateMeanReductionFrac:        gReductionFrac,
+			GateVarG1:                    gVarG1,
+			GateCovG2LnPPS:               gCovG2,
+			GateCovProdLnPPS:             gCovProd,
 		})
 	}
 	return out
@@ -1128,6 +1209,116 @@ func decomposeOrebIntensity(rows []orebRow) (meanIntensity, varIntensity, covInt
 		sCov += rInt * rPPS
 	}
 	return meanIntensity, ssInt / n, sCov / n
+}
+
+// gateRow is one (season, team) engine L1 gate-1 counterfactual observation: the
+// per-resolution gate-2 / gate-1×gate-2 product probabilities, the offensive rebound
+// strength, and PF/FGA (for lnPPS). Engine-only — real .sco carries no gate samples.
+type gateRow struct {
+	season               string
+	g1, g2, prod, offStr float64
+	pf, fga              float64
+}
+
+// gateRows packages the per-(season,team) engine gate samples for the gate-continuation
+// discriminator. Engine-only, so there is no useEngine switch (no .sco side). prod is
+// the faithful two-gate continuation P (gate-1 × gate-2); g2 is the engine's single
+// (linear) gate; g1 is the counterfactual sqrt team-pick.
+func gateRows(fa *fidAcc) []gateRow {
+	rows := make([]gateRow, len(fa.gateG2))
+	for i := range fa.gateG2 {
+		rows[i] = gateRow{
+			season: fa.season[i],
+			g1:     fa.gateG1[i],
+			g2:     fa.gateG2[i],
+			prod:   fa.gateProd[i],
+			offStr: fa.gateOffStr[i],
+			pf:     fa.engPF[i],
+			fga:    fa.engFGA[i],
+		}
+	}
+	return rows
+}
+
+// decomposeGateContinuation is the L1 mean-vs-curvature discriminator (ADR-0057/0058)
+// for the dropped sqrt gate-1. For each (season, team) row it pairs the engine's
+// continuation probabilities — the live LINEAR gate-2 and the faithful SQRT-gated
+// product (gate-1 × gate-2) — with that team's scoring efficiency lnPPS := lnPF − lnFGA.
+// Rows with no gate samples (g2<=0, i.e. a team-season with no offensive-rebound
+// resolution) or with pf<=0/fga<=0 (lnPPS undefined) are dropped, mirroring
+// decomposeOrebIntensity's guard.
+//
+//   - meanG1 / meanG2 / meanProd are the RAW pooled means of the counterfactual gate-1,
+//     the live gate-2, and their product. meanG1 is the reconciliation anchor: a faithful
+//     gate-1 must bring the engine's continuation rate down to 5.60's, so meanG1 ≈
+//     .sco_ORB/engine_ORB (ADR-0056's 0.158/0.194 ≈ 0.81). meanG1 ≪ that ⇒ the baseline is
+//     miscalibrated (the loader value is unpinned — see leagueReboundBaseline / the sweep).
+//   - reductionFrac = (meanG2 − meanProd)/meanG2 is the MEAN channel: the fraction of
+//     continuation probability the dropped gate-1 would remove (the ORB-level excess it
+//     explains). 0 when meanG2<=0.
+//   - varG1 is the WITHIN-SEASON demeaned Var(gate-1): the curvature read (covG2 − covProd)
+//     only separates curvature from mean when gate-1 carries real cross-team variance; a
+//     tiny varG1 means the Cov difference is just a scaled copy of the mean channel.
+//   - covG2 / covProd are the WITHIN-SEASON demeaned Cov(continuation P, lnPPS) under the
+//     linear gate-2 and the sqrt-gated product. Their DIFFERENCE (covG2 − covProd) is the
+//     CURVATURE channel — how much the linear form over-couples ORB-strength → points
+//     relative to the sqrt-compressed product, at matched mean.
+//
+// Empty input, or a single-team season (residuals all 0), yields zeros — never NaN/Inf.
+func decomposeGateContinuation(rows []gateRow) (meanG1, meanG2, meanProd, reductionFrac, varG1, covG2, covProd float64) {
+	type valRow struct {
+		season              string
+		g1, g2, prod, lnPPS float64
+	}
+	valid := make([]valRow, 0, len(rows))
+	for _, r := range rows {
+		if r.g2 <= 0 || r.pf <= 0 || r.fga <= 0 {
+			continue // no gate samples, or lnPPS undefined
+		}
+		valid = append(valid, valRow{r.season, r.g1, r.g2, r.prod, math.Log(r.pf) - math.Log(r.fga)})
+	}
+	n := float64(len(valid))
+	if n == 0 {
+		return 0, 0, 0, 0, 0, 0, 0
+	}
+
+	// Raw pooled means of gate-1, gate-2, product (the MEAN channel + reconciliation anchor).
+	var sumG1, sumG2, sumProd float64
+	for _, v := range valid {
+		sumG1 += v.g1
+		sumG2 += v.g2
+		sumProd += v.prod
+	}
+	meanG1 = sumG1 / n
+	meanG2 = sumG2 / n
+	meanProd = sumProd / n
+	if meanG2 > 0 {
+		reductionFrac = (meanG2 - meanProd) / meanG2
+	}
+
+	// Within-season means for the demeaned Var(g1) and Cov(g2/prod, lnPPS).
+	sG1 := map[string]float64{}
+	sG2 := map[string]float64{}
+	sProd := map[string]float64{}
+	sPPS := map[string]float64{}
+	cnt := map[string]float64{}
+	for _, v := range valid {
+		sG1[v.season] += v.g1
+		sG2[v.season] += v.g2
+		sProd[v.season] += v.prod
+		sPPS[v.season] += v.lnPPS
+		cnt[v.season]++
+	}
+	var ssG1, covG2Sum, covProdSum float64
+	for _, v := range valid {
+		c := cnt[v.season]
+		rG1 := v.g1 - sG1[v.season]/c
+		rPPS := v.lnPPS - sPPS[v.season]/c
+		ssG1 += rG1 * rG1
+		covG2Sum += (v.g2 - sG2[v.season]/c) * rPPS
+		covProdSum += (v.prod - sProd[v.season]/c) * rPPS
+	}
+	return meanG1, meanG2, meanProd, reductionFrac, ssG1 / n, covG2Sum / n, covProdSum / n
 }
 
 // originRow is one (season, team) engine FGA-per-game observation split by shot

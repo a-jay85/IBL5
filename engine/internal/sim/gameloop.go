@@ -48,7 +48,17 @@ func simGameWith(b bundle.Bundle, g bundle.Game, r *rng.RNG, opts Options) (resu
 	visitor.drbRate, visitor.astRate = teamRates(b, g.VisitorTeamID)
 	home.drbRate, home.astRate = teamRates(b, g.HomeTeamID)
 
-	gs := &gameState{rng: r, gameType: g.GameType, madeFG: map[int]int{}, freeze: opts.Freeze, accum: opts.Accum, branchB: opts.BranchBAccum}
+	gs := &gameState{rng: r, gameType: g.GameType, madeFG: map[int]int{}, freeze: opts.Freeze, accum: opts.Accum, branchB: opts.BranchBAccum, gateCont: opts.GateCont}
+	// The L1 gate-1 baseline is league-constant, so resolve it ONCE per game (only when
+	// the instrument is attached — a zero Options leaves gateCont nil, so the scan and
+	// the whole instrument stay off and the run is byte-identical to Simulate).
+	if opts.GateCont != nil {
+		if opts.GateBaseline != nil {
+			gs.gateBaseline = *opts.GateBaseline
+		} else {
+			gs.gateBaseline = leagueReboundBaseline(b)
+		}
+	}
 
 	// One shared possession length per game: the average of the two teams' base
 	// times (factor 1.0). Each team's base_time now carries its offensive volume

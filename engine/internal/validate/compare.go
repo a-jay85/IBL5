@@ -63,6 +63,24 @@ type ContinuationDepthRaw struct {
 	B3Plus float64
 }
 
+// GateContRaw is one team's engine mean L1 gate-1 counterfactual samples for one game
+// (ADR-0057/0058). At every offensive-rebound resolution the sim records, keyed by the
+// OFFENSIVE team, the live gate-2 probability, the dropped sqrt gate-1 probability,
+// their product (the faithful two-gate continuation P), and the off/def rebound
+// strengths. N is the per-game mean resolution count; MeanG1/MeanG2/MeanProd/
+// MeanOffStr/MeanDefStr are per-RESOLUTION means (run-pooled). Engine-only — real .sco
+// carries no gate probabilities, so there is no .sco counterpart; reported, never
+// gated. Computed read-only at the sim site (no rng draw), so the golden stays
+// byte-identical. See sim.GateContAccum and simulateGameMeans.
+type GateContRaw struct {
+	N          float64
+	MeanG1     float64
+	MeanG2     float64
+	MeanProd   float64
+	MeanOffStr float64
+	MeanDefStr float64
+}
+
 // GameReport is the full comparison for one corpus game: every stat for both
 // teams. Pass is true only when every row passes.
 type GameReport struct {
@@ -98,6 +116,12 @@ type GameReport struct {
 	// it changes no engine behavior (golden stays byte-identical). See
 	// ContinuationDepthRaw and accumulateContinuationDepth.
 	EngineContinuationDepth map[int]ContinuationDepthRaw
+	// EngineGateCont maps each team ID to its engine mean L1 gate-1 counterfactual
+	// samples (ADR-0057/0058). Engine-only — real .sco carries no gate probabilities, so
+	// there is no .sco counterpart; reported, never gated. Computed read-only at the sim
+	// rebound site (no rng draw), so the golden stays byte-identical. See GateContRaw and
+	// sim.GateContAccum.
+	EngineGateCont map[int]GateContRaw
 	// EnginePossCountPerG is the engine's AUTHORITATIVE possession count (mean
 	// EventPossessionStart/game; one per offensive trip — an offensive rebound
 	// continues the SAME trip, so it is true possessions). Engine-only DIAGNOSTIC: it

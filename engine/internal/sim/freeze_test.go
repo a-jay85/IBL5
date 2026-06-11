@@ -1,6 +1,7 @@
 package sim
 
 import (
+	"math"
 	"reflect"
 	"testing"
 
@@ -329,5 +330,74 @@ func TestFreeze_MakeReachesTransitionPath(t *testing.T) {
 	_, _, loMisses := count(0.5)
 	if loMisses == 0 {
 		t.Error("low frozen make-value: 0 transition 2pt misses, want > 0 (the rollMake transition path was never exercised, or the freeze did not reach it)")
+	}
+}
+
+// TestGateCont_Accumulates — the L1 gate-1 counterfactual instrument (ADR-0057/0058)
+// accumulates per offensive team AND is read-only: a run with the accumulator attached
+// produces a byte-identical result.Result to a zero-Options Simulate (no rng draw).
+func TestGateCont_Accumulates(t *testing.T) {
+	b := richBundle()
+
+	acc := NewGateContAccum()
+	res, err := SimulateWith(b, 7, Options{GateCont: acc})
+	if err != nil {
+		t.Fatalf("SimulateWith: %v", err)
+	}
+	// Read-only guarantee at the result level: identical to the live engine.
+	if !reflect.DeepEqual(res, Simulate(b, 7)) {
+		t.Error("attaching GateCont changed the result — the instrument is not read-only")
+	}
+
+	ids := acc.TeamIDs()
+	if len(ids) == 0 {
+		t.Fatal("no offensive teams accumulated — the rebound site never fired")
+	}
+	for _, id := range ids {
+		n, g1, g2, prod, offStr, defStr := acc.Team(id)
+		if n == 0 {
+			t.Errorf("team %d: TeamIDs listed it but n==0", id)
+		}
+		for name, v := range map[string]float64{"sumG1": g1, "sumG2": g2, "sumProd": prod, "sumOffStr": offStr, "sumDefStr": defStr} {
+			if math.IsNaN(v) || math.IsInf(v, 0) {
+				t.Errorf("team %d: %s non-finite (%v)", id, name, v)
+			}
+		}
+		// gate-1 ∈ [0,1] ⇒ Σ(gate1×gate2) ≤ Σ gate2 per team.
+		if prod > g2+1e-9 {
+			t.Errorf("team %d: sumProd %v > sumG2 %v (gate-1 must reduce)", id, prod, g2)
+		}
+	}
+	// A team never seen returns all zeros (no spurious key).
+	if n, _, _, _, _, _ := acc.Team(99999); n != 0 {
+		t.Errorf("unseen team should return n=0, got %d", n)
+	}
+}
+
+// TestGateCont_AllDefensiveRebounds — the accumulator fires at every rebound RESOLUTION
+// (a miss reaching gs.rebound), NOT only when the offense RETAINS. So per offensive team
+// the resolution count strictly exceeds its credited offensive rebounds (every ORB is a
+// resolution, but resolutions also include the defense winning the board).
+func TestGateCont_AllDefensiveRebounds(t *testing.T) {
+	b := richBundle()
+	acc := NewGateContAccum()
+	res, err := SimulateWith(b, 11, Options{GateCont: acc})
+	if err != nil {
+		t.Fatalf("SimulateWith: %v", err)
+	}
+
+	// Count offensive rebounds credited to each team from the event stream.
+	orbByTeam := map[int]int{}
+	for _, e := range res.Games[0].Events {
+		if e.Kind == result.EventRebound && e.OffensiveRebound {
+			orbByTeam[e.TeamID]++
+		}
+	}
+	for _, id := range acc.TeamIDs() {
+		n, _, _, _, _, _ := acc.Team(id)
+		if n <= orbByTeam[id] {
+			t.Errorf("team %d: resolution count %d not > credited ORBs %d — accumulator is keying on retention, not resolution",
+				id, n, orbByTeam[id])
+		}
 	}
 }

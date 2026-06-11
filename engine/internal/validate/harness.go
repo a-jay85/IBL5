@@ -598,12 +598,12 @@ func accumulateContinuationDepth(into map[int]*depthAcc, events []result.Event) 
 		a.n++
 		a.sumK += float64(cur)
 		a.sumK2 += float64(cur * cur)
-		switch {
-		case cur == 0:
+		switch cur {
+		case 0:
 			a.b0++
-		case cur == 1:
+		case 1:
 			a.b1++
-		case cur == 2:
+		case 2:
 			a.b2++
 		default:
 			a.b3plus++

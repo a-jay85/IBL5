@@ -184,6 +184,7 @@ MAX_ATTEMPTS=3     # per-plan retry cap within one night (covers impl + postplan
 MAX_IMPL_SECS=3600   # per-phase cap: impl gets at most 1h
 MAX_PP_SECS=3600     # per-phase cap: post-plan gets at most 1h
 STALL_KILL_SECS=600  # kill phase if no stream events for 10 minutes
+ARCHIVE_AGE_DAYS="${NIGHTLY_ARCHIVE_AGE_DAYS:-7}"  # startup-archive entries idle this many days
 MIN_VIABLE_SECS=60   # a real impl/postplan never finishes (pass OR fail) under a
                      # minute — historical runs are 15-50 min; environmental
                      # fast-fails (usage/rate limit, auth error, transient) exit in
@@ -305,6 +306,28 @@ write_env_stop_report() {
     } > "$reports_dir/$(date +%Y-%m-%d)-env-stop-$slug.md"
 }
 
+# Move entries in a nightly subdir untouched for $ARCHIVE_AGE_DAYS into a sibling
+# `<subdir>.archive/`, keeping the working dirs small without deleting history.
+# Matches regular files AND symlinks; `find` does not follow symlinks, so a
+# disposition symlink (done/, skipped/) is judged on its OWN mtime — the date it
+# was moved there — not the plan file it points at. `+N` = strictly older than
+# N*24h. Lazily creates the archive dir only when something actually moves.
+# Caller scopes this under `|| true` so a failure here can never abort the night.
+archive_stale() {
+    local subdir=$1
+    local src="$NIGHTLY_DIR/$subdir"
+    local dest="$NIGHTLY_DIR/${subdir}.archive"
+    [ -d "$src" ] || return 0
+    local moved=0 entry
+    while IFS= read -r entry; do
+        [ -n "$entry" ] || continue
+        mkdir -p "$dest"
+        mv "$entry" "$dest/" 2>/dev/null && moved=$(( moved + 1 ))
+    done < <(find "$src" -mindepth 1 -maxdepth 1 \( -type f -o -type l \) \
+                  -mtime +"$ARCHIVE_AGE_DAYS" 2>/dev/null)
+    [ "$moved" -eq 0 ] || echo "Archived $moved stale entr$([ "$moved" -eq 1 ] && echo y || echo ies) from $subdir/ → ${subdir}.archive/" >> "$LOG"
+}
+
 LOG="$LOG_DIR/$(date +%Y-%m-%d).log"
 
 cd "$REPO"
@@ -317,6 +340,17 @@ START=$(date +%s)
 PLANS_RUN=0
 
 echo "=== Nightly session starting at $(date) ===" >> "$LOG"
+
+# Startup archival: shrink the accumulating output dirs by moving entries idle
+# for $ARCHIVE_AGE_DAYS into sibling `.archive/` folders. queue/ (pending work,
+# iterated below) and handoff/ (transient, cleaned at loop end) are excluded by
+# design. Whole block guarded so an archival hiccup never stops the night.
+{
+    archive_stale logs
+    archive_stale reports
+    archive_stale done
+    archive_stale skipped
+} || true
 
 while true; do
     # Check if queue has plans

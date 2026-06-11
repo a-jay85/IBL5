@@ -580,6 +580,17 @@ if [ "$ALL" = true ]; then
             | grep -E '^ibl5-.+_.+$' \
             | sort -u)
     fi
+
+    # Informational only (non-fatal): surface worktrees whose work never
+    # reached a PR. `--stalled-only` exits 1 when any exist; `|| true` keeps
+    # cleanup's exit code and merge-master-to-prod unaffected. NOT piped, so
+    # there is no pipefail interaction.
+    stalled_report="$("$REPO_ROOT/bin/wt-status" --stalled-only 2>/dev/null || true)"
+    if [ -n "$stalled_report" ]; then
+        echo ""
+        echo "Stalled/unshipped worktrees (work never reached a PR):"
+        printf '%s\n' "$stalled_report" | sed 's/^/  /'
+    fi
 else
     WT_PATH="$WT_PARENT/$TARGET_NAME"
     if [ ! -d "$WT_PATH" ]; then

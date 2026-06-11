@@ -1,0 +1,302 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-wt-status — regression harness for bin/wt-status.
+#
+# Pins the six-classification taxonomy (MERGED / OPEN-PR / UNPUSHED / STALLED /
+# EMPTY / PROTECTED), the --stalled-only exit-code contract, --min-idle-hours
+# suppression, and the defect-3 zero-own-commit boundary (the precise shape
+# that silently stalled the doc-freshness worktree).
+#
+# Every assertion runs wt-status against a throwaway git repo built under
+# mktemp, so nothing real is touched. An env-var-driven stub gh provides
+# deterministic PR-state responses without a network call.
+#
+# Run: bin/test-wt-status  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+WTSTATUS="$SCRIPT_DIR/wt-status"
+TMP="$(mktemp -d)"
+trap 'chmod -R u+w "$TMP" 2>/dev/null; rm -rf "$TMP" 2>/dev/null' EXIT
+
+FAILED=0
+
+# env-var-driven gh stub.
+# STUB_PR_STATE: empty/unset => no PR (exit 1 on state queries, mirrors no-PR path).
+# Non-empty => echo the value for any --json state -q .state query.
+# STUB_PR_NUM: PR number for --json number queries (default 999).
+STUBBIN="$TMP/stubbin"
+mkdir -p "$STUBBIN"
+cat > "$STUBBIN/gh" <<'GH'
+#!/bin/sh
+case "$*" in
+  *"state"*) [ -n "${STUB_PR_STATE:-}" ] && { printf '%s\n' "$STUB_PR_STATE"; exit 0; }; exit 1 ;;
+  *"number"*) printf '%s\n' "${STUB_PR_NUM:-999}"; exit 0 ;;
+  *) exit 1 ;;
+esac
+GH
+chmod +x "$STUBBIN/gh"
+
+pass()     { echo "ok: $1"; }
+failcase() { echo "FAIL: $1"; FAILED=1; }
+
+# assert_match <name> <regex> <haystack>
+assert_match() {
+    if printf '%s' "$3" | grep -qE "$2"; then
+        pass "$1"
+    else
+        failcase "$1 — expected to match: $2"
+        printf '%s\n' "$3" | sed 's/^/    /'
+    fi
+}
+
+# assert_absent <name> <regex> <haystack>
+assert_absent() {
+    if printf '%s' "$3" | grep -qE "$2"; then
+        failcase "$1 — expected NOT to match: $2"
+        printf '%s\n' "$3" | sed 's/^/    /'
+    else
+        pass "$1"
+    fi
+}
+
+# new_env — build a unique <TMP>/env.XXXX/{origin.git,main}; echo the main path.
+new_env() {
+    local base
+    base="$(mktemp -d "$TMP/env.XXXXXX")"
+    git init -q --bare "$base/origin.git" >/dev/null 2>&1
+    git clone -q "$base/origin.git" "$base/main" >/dev/null 2>&1
+    git -C "$base/main" config user.email t@example.com >/dev/null 2>&1
+    git -C "$base/main" config user.name tester >/dev/null 2>&1
+    git -C "$base/main" config commit.gpgsign false >/dev/null 2>&1
+    printf 'init\n' > "$base/main/README.md"
+    git -C "$base/main" add README.md >/dev/null 2>&1
+    git -C "$base/main" commit -qm init >/dev/null 2>&1
+    git -C "$base/main" branch -q -M master >/dev/null 2>&1
+    git -C "$base/main" push -q -u origin master >/dev/null 2>&1
+    echo "$base/main"
+}
+
+# add_merged_wt <main> <name> — Check-2-merged: own-commit pushed, ff-merged,
+# remote branch deleted (prunes origin/<name> locally).
+add_merged_wt() {
+    local main="$1" name="$2"
+    local wt_path="$main/worktrees/$name"
+    git -C "$main" checkout -q -b "$name" master >/dev/null 2>&1
+    printf 'x\n' > "$main/$name.txt"
+    git -C "$main" add "$name.txt" >/dev/null 2>&1
+    git -C "$main" commit -qm "feat-$name" >/dev/null 2>&1
+    git -C "$main" push -q -u origin "$name" >/dev/null 2>&1
+    git -C "$main" checkout -q master >/dev/null 2>&1
+    git -C "$main" merge -q --ff-only "$name" >/dev/null 2>&1
+    git -C "$main" push -q origin master >/dev/null 2>&1
+    git -C "$main" push -q origin --delete "$name" >/dev/null 2>&1
+    mkdir -p "$wt_path"
+    git -C "$main" worktree add -q "$wt_path" "$name" >/dev/null 2>&1
+}
+
+# defect3_shape <main> <name> — defect-3 fixture: worktree on a zero-own-commit
+# branch (tip == fork-point), with origin/master advanced past it.
+# This is the exact shape that caused the doc-freshness stall to be invisible.
+defect3_shape() {
+    local main="$1" name="$2"
+    mkdir -p "$main/worktrees"
+    git -C "$main" worktree add -q -b "$name" "$main/worktrees/$name" master >/dev/null 2>&1
+    printf 'advance\n' > "$main/advance-$name.txt"
+    git -C "$main" add "advance-$name.txt" >/dev/null 2>&1
+    git -C "$main" commit -qm "advance-master-for-$name" >/dev/null 2>&1
+    git -C "$main" push -q origin master >/dev/null 2>&1
+}
+
+# run_status <main> <stub_pr_state> [extra-flags...]
+# Runs wt-status from inside <main> with the stub gh in PATH.
+run_status() {
+    local main="$1"
+    local stub_state="$2"
+    shift 2
+    ( cd "$main" && PATH="$STUBBIN:$PATH" STUB_PR_STATE="$stub_state" "$WTSTATUS" "$@" 2>&1 )
+}
+
+# ----------------------------------------------------------------------------
+# Row 1: STALLED (tracked uncommitted diff, defect-3 shape)
+# ----------------------------------------------------------------------------
+e="$(new_env)"
+defect3_shape "$e" "stall-tracked"
+printf 'dirty\n' >> "$e/worktrees/stall-tracked/README.md"   # tracked modification
+out="$(run_status "$e" "" --stalled-only)"
+rc=$?
+assert_match "stalled-tracked-diff-in-output" 'STALLED stall-tracked' "$out"
+if [ "$rc" -eq 1 ]; then
+    pass "stalled-tracked-diff-exit-1"
+else
+    failcase "stalled-tracked-diff-exit-1 — got rc=$rc"
+fi
+
+# ----------------------------------------------------------------------------
+# Row 2: STALLED (untracked-only, mirrors the real doc-freshness case)
+# ----------------------------------------------------------------------------
+e="$(new_env)"
+defect3_shape "$e" "stall-untracked"
+printf 'draft\n' > "$e/worktrees/stall-untracked/new-draft.md"   # untracked
+out="$(run_status "$e" "" --stalled-only)"
+rc=$?
+assert_match "stalled-untracked-in-output" 'STALLED stall-untracked' "$out"
+if [ "$rc" -eq 1 ]; then
+    pass "stalled-untracked-exit-1"
+else
+    failcase "stalled-untracked-exit-1 — got rc=$rc"
+fi
+
+# ----------------------------------------------------------------------------
+# Row 3: EMPTY — defect-3 shape, clean tree, no PR (negative: NOT stalled)
+# ----------------------------------------------------------------------------
+e="$(new_env)"
+defect3_shape "$e" "empty-clean"
+out="$(run_status "$e" "" --stalled-only)"
+rc=$?
+assert_absent "empty-not-in-stalled-output" 'empty-clean' "$out"
+if [ "$rc" -eq 0 ]; then
+    pass "empty-stalled-only-exit-0"
+else
+    failcase "empty-stalled-only-exit-0 — got rc=$rc"
+fi
+# Default output shows EMPTY classification
+out_default="$(run_status "$e" "")"
+assert_match "empty-in-default-output" 'EMPTY.*empty-clean' "$out_default"
+
+# ----------------------------------------------------------------------------
+# Row 4: MERGED — own-commit pushed, ff-merged, remote pruned (Check-2 path)
+# Negative: excluded from --stalled-only.
+# ----------------------------------------------------------------------------
+e="$(new_env)"
+add_merged_wt "$e" "merged-feat"
+out="$(run_status "$e" "" --stalled-only)"
+rc=$?
+assert_absent "merged-not-in-stalled-output" 'merged-feat' "$out"
+if [ "$rc" -eq 0 ]; then
+    pass "merged-stalled-only-exit-0"
+else
+    failcase "merged-stalled-only-exit-0 — got rc=$rc"
+fi
+# Default output shows MERGED classification
+out_default="$(run_status "$e" "")"
+assert_match "merged-in-default-output" 'MERGED.*merged-feat' "$out_default"
+
+# ----------------------------------------------------------------------------
+# Row 5: OPEN-PR — stub returns OPEN (negative: excluded from --stalled-only)
+# ----------------------------------------------------------------------------
+e="$(new_env)"
+defect3_shape "$e" "open-pr-branch"
+out="$(run_status "$e" "OPEN" --stalled-only)"
+rc=$?
+assert_absent "open-pr-not-in-stalled-output" 'open-pr-branch' "$out"
+if [ "$rc" -eq 0 ]; then
+    pass "open-pr-stalled-only-exit-0"
+else
+    failcase "open-pr-stalled-only-exit-0 — got rc=$rc"
+fi
+# Default output shows OPEN-PR classification
+out_default="$(run_status "$e" "OPEN")"
+assert_match "open-pr-in-default-output" 'OPEN-PR.*open-pr-branch' "$out_default"
+
+# ----------------------------------------------------------------------------
+# Row 6: UNPUSHED — ≥1 own-commit, not on master, no push, no PR
+# ----------------------------------------------------------------------------
+e="$(new_env)"
+mkdir -p "$e/worktrees"
+git -C "$e" worktree add -q -b "unpushed-feat" "$e/worktrees/unpushed-feat" master >/dev/null 2>&1
+printf 'new-work\n' > "$e/worktrees/unpushed-feat/feature.txt"
+git -C "$e/worktrees/unpushed-feat" add feature.txt >/dev/null 2>&1
+git -C "$e/worktrees/unpushed-feat" commit -qm "feat: implement new thing" >/dev/null 2>&1
+# NOT pushed, NOT merged into master
+out="$(run_status "$e" "" --stalled-only)"
+rc=$?
+assert_match "unpushed-in-stalled-output" 'UNPUSHED unpushed-feat' "$out"
+if [ "$rc" -eq 1 ]; then
+    pass "unpushed-exit-1"
+else
+    failcase "unpushed-exit-1 — got rc=$rc"
+fi
+
+# ----------------------------------------------------------------------------
+# Row 7a: --min-idle-hours OLD file — still reported (older than threshold)
+# ----------------------------------------------------------------------------
+e="$(new_env)"
+defect3_shape "$e" "stall-old"
+dirty_file="$e/worktrees/stall-old/old-draft.md"
+printf 'old\n' > "$dirty_file"
+touch -t 202001010000 "$dirty_file"   # Jan 1 2020 — clearly > 24h old
+out="$(run_status "$e" "" --stalled-only --min-idle-hours 24)"
+rc=$?
+assert_match "min-idle-old-still-reported" 'STALLED stall-old' "$out"
+if [ "$rc" -eq 1 ]; then
+    pass "min-idle-old-exit-1"
+else
+    failcase "min-idle-old-exit-1 — got rc=$rc"
+fi
+
+# ----------------------------------------------------------------------------
+# Row 7b: --min-idle-hours NEW file — suppressed (fresher than threshold)
+# ----------------------------------------------------------------------------
+e="$(new_env)"
+defect3_shape "$e" "stall-new"
+dirty_file="$e/worktrees/stall-new/new-draft.md"
+printf 'new\n' > "$dirty_file"
+now_stamp="$(date '+%Y%m%d%H%M')"
+touch -t "$now_stamp" "$dirty_file"   # timestamp = ~now, well under 24h
+out="$(run_status "$e" "" --stalled-only --min-idle-hours 24)"
+rc=$?
+assert_absent "min-idle-new-suppressed" 'stall-new' "$out"
+if [ "$rc" -eq 0 ]; then
+    pass "min-idle-new-exit-0"
+else
+    failcase "min-idle-new-exit-0 — got rc=$rc (output: $out)"
+fi
+
+# ----------------------------------------------------------------------------
+# Row 8: Exit-code contract — --stalled-only exits 1 iff ≥1 unshipped, else 0
+# (cross-check: clean-only env exits 0; stalled env exits 1)
+# ----------------------------------------------------------------------------
+e_clean="$(new_env)"
+# no worktrees — only the main checkout
+out="$(run_status "$e_clean" "" --stalled-only)"
+rc=$?
+if [ "$rc" -eq 0 ]; then
+    pass "exit-code-contract-no-worktrees-exit-0"
+else
+    failcase "exit-code-contract-no-worktrees-exit-0 — got rc=$rc"
+fi
+
+e_stalled="$(new_env)"
+defect3_shape "$e_stalled" "contract-stall"
+printf 'work\n' > "$e_stalled/worktrees/contract-stall/draft.md"
+out="$(run_status "$e_stalled" "" --stalled-only)"
+rc=$?
+if [ "$rc" -eq 1 ]; then
+    pass "exit-code-contract-stalled-exit-1"
+else
+    failcase "exit-code-contract-stalled-exit-1 — got rc=$rc"
+fi
+
+# ----------------------------------------------------------------------------
+# Row 9: Default output — PROTECTED branches excluded (master)
+# ----------------------------------------------------------------------------
+e="$(new_env)"
+defect3_shape "$e" "visible-branch"
+# master is the main checkout, not a linked worktree, so it won't appear.
+# Just verify visible-branch IS shown and no PROTECTED row exists.
+out_default="$(run_status "$e" "")"
+assert_match "default-output-shows-non-protected" 'visible-branch' "$out_default"
+assert_absent "default-output-no-protected-row" 'PROTECTED' "$out_default"
+
+# ----------------------------------------------------------------------------
+# Final result
+# ----------------------------------------------------------------------------
+if [ "$FAILED" -ne 0 ]; then
+    echo "RESULT: FAILED"
+    exit 1
+fi
+echo "RESULT: all passed"
+exit 0

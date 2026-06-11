@@ -1,6 +1,6 @@
 ---
 description: Schema reference and query patterns for IBL5 database work.
-last_verified: 2026-05-19
+last_verified: 2026-06-09
 ---
 
 # IBL5 Database Guide
@@ -147,6 +147,60 @@ $query = "SELECT * FROM vw_player_current WHERE uuid = ?";
 - **[Development Guide](DEVELOPMENT_GUIDE.md)** - Refactoring and testing
 - **[API Guide](API_GUIDE.md)** - API development best practices
 - **[Refactoring History](REFACTORING_HISTORY.md)** - Complete refactoring timeline
+
+## Opaque Column Glossary
+
+Every column below carries a SQL `COMMENT` in `ibl5/migrations/000_baseline_schema.sql`; this section is the human-discoverable index over those comments, not a duplication of them.
+
+### ibl_plr Rating Columns (4.14)
+
+The backlog item originally listed 6 rating columns (`oo`, `od`, `dd`, `po`, `pd`, `td`); `ibl_plr` actually has **8** — `do` (Drive offense) and `to` (Transition offense) are equally opaque and documented here for completeness. All are `tinyint` on a 1–5 scale. The sibling `r_*` columns use the expanded naming convention.
+
+| Column | Meaning | `PlayerData.php` property |
+|--------|---------|--------------------------|
+| `oo` | Outside offense rating | `ratingOutsideOffense` |
+| `od` | Outside defense rating | `ratingOutsideDefense` |
+| `do` | Drive offense rating | `ratingDriveOffense` |
+| `dd` | Drive defense rating | `ratingDriveDefense` |
+| `po` | Post offense rating | `ratingPostOffense` |
+| `pd` | Post defense rating | `ratingPostDefense` |
+| `to` | Transition offense rating | `ratingTransitionOffense` |
+| `td` | Transition defense rating | `ratingTransitionDefense` |
+
+Source: `ibl5/classes/Player/PlayerData.php`.
+
+### Contract-Year Columns (4.15)
+
+| Column | Meaning |
+|--------|---------|
+| `cy` | Current contract year — `0` = unsigned, `1`–`6` = year number |
+| `cyt` | Contract total years — `1`–`6` |
+
+ADR-0010 Tier 4 explicitly excluded these columns from the snake_case rename sweep.
+
+### Single-Word Domain Columns (4.16)
+
+| Column | Meaning |
+|--------|---------|
+| `bird` | Consecutive years with team for Bird Rights eligibility (nullable) |
+| `exp` | Years of NBA experience — **not** "expiring contract"; `exp` = experience |
+
+### Stat Prefix Groups (4.17)
+
+Consumed by `ibl5/classes/Player/Stats/PlayerStats.php`. The prefixes follow a `<scope>_<stat>` convention:
+
+| Prefix | Meaning | Example |
+|--------|---------|---------|
+| `sh_*` | Season high | `sh_pts` |
+| `sp_*` | Playoff season high | `sp_pts` |
+| `ch_*` | Career high — **not** "championship"; `ch_` = career high | `ch_pts` |
+| `cp_*` | Career playoff high | `cp_pts` |
+| `s_dd` | Season double doubles | — |
+| `s_td` | Season triple doubles | — |
+| `c_dd` | Career double doubles | — |
+| `c_td` | Career triple doubles | — |
+
+Depth-chart codes (`dc_of`, `dc_df`, `dc_oi`, `dc_di`, `dc_bh`) are documented in `ibl5/docs/JSB_FILE_FORMATS.md`.
 
 ## Need Help?
 - Check `000_baseline_schema.sql` for table structures and relationships

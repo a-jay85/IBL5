@@ -3,7 +3,7 @@ description: "Plan an implementation task: enforces a verification matrix, direc
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
-last_verified: 2026-06-07
+last_verified: 2026-06-11
 
 ---
 
@@ -136,6 +136,7 @@ After receiving the Plan agent's output, check these gates yourself — do NOT d
 11. **Refactor characterization** — if any step under `ibl5/classes/**` carries a refactor signal (file rename, method signature change, visibility narrowing, class removal, or > 30-line deletion per `refactor-flag.md`), the matrix must include a pre-impl characterization row for the affected code. If missing, add it.
 12. **Security surface resolved** — if Step 2 flagged a touched security surface, the plan contains a Security section with a defense step and matching matrix row for each. If a flagged surface has no resolution, add it.
 13. **impl_model criterion** — if the plan declares `impl_model: sonnet` frontmatter (see Step 5), scan the Verification Matrix; if ANY row is classified `Truly-manual`, strip the marker so the plan runs at the Opus default. Sonnet may drive a plan only when every behavior-changing step has an objectively machine-checkable row that fails on a wrong edit.
+14. **auto-fire risk criterion** — by default an implementation session auto-fires `/post-plan` the moment it verifies complete (no human eyeball before the PR opens and auto-merge arms). Decide yourself — do NOT delegate — whether this plan is risky enough to want that eyeball, and if so declare `auto_postplan: false` (see Step 5). Disable auto-fire when **any** hold: (a) the Verification Matrix carries a `Truly-manual` (or otherwise subjective) row — post-plan's machine gates can't validate it; (b) Step 2 flagged a touched security surface; (c) the plan is a high-blast-radius data/schema change — a destructive migration (DROP/backfill/data mutation), a column-rename sweep, or an FK-ordering migration. Otherwise omit the marker (default = auto-fire). This composes with gate 13: a `Truly-manual` row both strips `impl_model: sonnet` **and** sets `auto_postplan: false`.
 
 If validation fails on any gate, fix the matrix yourself rather than re-running the Plan agent.
 
@@ -163,11 +164,25 @@ impl_model: sonnet
 
 The implementation then runs at Sonnet (cheaper, verified-equivalent quality on uniformly-mechanical plans — parsed by `bin/lib/plan-impl-model`). Omit the marker for any plan carrying a `Truly-manual` or subjective row — absence defaults to Opus. Only the first frontmatter block is parsed, so documenting this syntax inside a plan body never mis-selects a model. Failure modes are bounded: an absent or garbled marker → Opus (safe); a wrongly-applied `sonnet` marker → the plan's objective matrix goes red under Sonnet → caught by CI / post-plan.
 
+### Disabling auto-fired post-plan (optional)
+
+By default an interactive implementation session, once it verifies complete, auto-fires a detached `/post-plan` via `bin/post-plan-now --auto` — opening the PR and arming auto-merge with no human eyeball at the trigger. For a plan judged risky by Step 4 gate 14, add `auto_postplan: false` to the **same** line-1 frontmatter block so the auto-fire skips (the work waits for a reviewed, manual `bin/post-plan-now`):
+
+```
+---
+impl_model: sonnet
+auto_postplan: false
+---
+```
+
+Either field may appear alone; the block above shows both (a mechanical column-rename sweep, e.g., can be Sonnet-eligible **and** high-blast-radius). Absence of `auto_postplan` defaults to auto-fire. Only the line-1 block is parsed (`bin/post-plan-now`), so a body that documents the syntax can't opt a plan out. Failure modes are bounded: absent/garbled → auto-fire (post-plan's own gates — code review, security audit, CI-green-required, headless golden-snapshot block — still apply); a wrongly-applied `false` → the plan just waits for a manual ship.
+
 ## Step 6: Report
 
 Tell the user:
 - The plan file path — **all of them** when the work was split into multiple PRs
 - A one-line matrix summary per plan (e.g., "12 items: 7 PHPUnit, 3 E2E, 2 CLI-executable, 0 truly-manual")
 - Whether any security surface was flagged and how each is defended (or "no security surface touched")
+- Whether post-plan auto-fires on completion (default) or is held for review (`auto_postplan: false`, per Step 4 gate 14) — and why, if held
 - For a multi-PR split: the PR sequence and dependency order (which lands first, what each stacks on)
 - Whether each plan is ready for implementation or has open questions

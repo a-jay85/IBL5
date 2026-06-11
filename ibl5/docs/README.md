@@ -1,6 +1,6 @@
 ---
 description: Index of all IBL5 project documentation.
-last_verified: 2026-06-08
+last_verified: 2026-06-11
 ---
 
 # IBL5 Documentation Index

@@ -137,7 +137,8 @@ if command -v gtimeout &>/dev/null; then
             echo "$cmd_pid" > "$NIGHTLY_CMDPID_FILE"
         fi
         ( exec 0</dev/null 1>/dev/null 2>&1
-          sleep "$secs" && kill -TERM "$cmd_pid" 2>/dev/null
+          sleep "$secs" && kill -TERM "$cmd_pid" 2>/dev/null \
+            && sleep "${KILL_GRACE_SECS:-15}" && kill -KILL "$cmd_pid" 2>/dev/null
         ) &
         local timer_pid=$!
         local status=0
@@ -159,7 +160,8 @@ elif ! command -v timeout &>/dev/null; then
         fi
         # exec inside subshell guarantees fd closure (bash 3.2 pipeline compat)
         ( exec 0</dev/null 1>/dev/null 2>&1
-          sleep "$secs" && kill -TERM "$cmd_pid" 2>/dev/null
+          sleep "$secs" && kill -TERM "$cmd_pid" 2>/dev/null \
+            && sleep "${KILL_GRACE_SECS:-15}" && kill -KILL "$cmd_pid" 2>/dev/null
         ) &
         local timer_pid=$!
         local status=0
@@ -184,6 +186,9 @@ MAX_ATTEMPTS=3     # per-plan retry cap within one night (covers impl + postplan
 MAX_IMPL_SECS=3600   # per-phase cap: impl gets at most 1h
 MAX_PP_SECS=3600     # per-phase cap: post-plan gets at most 1h
 STALL_KILL_SECS=600  # kill phase if no stream events for 10 minutes
+KILL_GRACE_SECS=15   # after SIGTERM, wait this long then SIGKILL — a phase wedged
+                     # on a dead inference stream traps SIGTERM and ignores it
+                     # (the 2026-06-11 run hung 7h on a SIGTERM that never landed)
 ARCHIVE_AGE_DAYS="${NIGHTLY_ARCHIVE_AGE_DAYS:-7}"  # startup-archive entries idle this many days
 MIN_VIABLE_SECS=60   # a real impl/postplan never finishes (pass OR fail) under a
                      # minute — historical runs are 15-50 min; environmental
@@ -226,6 +231,16 @@ run_heartbeat_watcher() {
                     "$ts" "$label" "$age" "$target_pid" >> "$log_file"
                 pkill -TERM -P "$target_pid" 2>/dev/null || true
                 kill -TERM "$target_pid" 2>/dev/null || true
+                # SIGTERM can be trapped/ignored by a phase wedged on a dead
+                # inference stream (this hung the 2026-06-11 run for 7h);
+                # escalate to SIGKILL after a grace period.
+                sleep "$KILL_GRACE_SECS"
+                if kill -0 "$target_pid" 2>/dev/null; then
+                    printf '[%s] STALL-KILL: %s — pid %s survived SIGTERM, sending SIGKILL\n' \
+                        "$(date +%H:%M:%S)" "$label" "$target_pid" >> "$log_file"
+                    pkill -KILL -P "$target_pid" 2>/dev/null || true
+                    kill -KILL "$target_pid" 2>/dev/null || true
+                fi
                 return
             else
                 printf '[%s] WARNING: %s — no events for %ds (stalled, pid gone)\n' \

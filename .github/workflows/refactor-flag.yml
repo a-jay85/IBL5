@@ -4,6 +4,11 @@ on:
   pull_request:
     branches: [ master, develop ]
     types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'ibl5/classes/**'
+      - 'ibl5/tests/**'
+      - 'bin/refactor-flag'
+      - '.github/workflows/refactor-flag.yml'
 
 permissions:
   contents: read

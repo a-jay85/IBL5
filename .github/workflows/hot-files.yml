@@ -4,6 +4,10 @@ on:
   pull_request:
     branches: [ master ]
     types: [opened, synchronize, reopened]
+    paths:
+      - 'ibl5/classes/**'
+      - 'bin/check-hot-files'
+      - '.github/workflows/hot-files.yml'
 
 permissions:
   contents: read

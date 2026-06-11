@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/a-jay85/IBL5/engine/internal/bundle"
+	"github.com/a-jay85/IBL5/engine/internal/result"
 	"github.com/a-jay85/IBL5/engine/internal/rng"
 )
 
@@ -155,5 +156,72 @@ func TestRebound_Boundaries(t *testing.T) {
 		if got.PID != 1 && got.PID != 2 {
 			t.Fatalf("invalid rebounder PID %d", got.PID)
 		}
+	}
+}
+
+// orbContinuationRate runs N seeded full sims of richBundle and returns the observed
+// offensive-rebound fraction (offensive rebound events / all rebound events) — the
+// live ORB-continuation rate the swap moves. The richBundle path is deterministic in
+// the seed, so the rate is stable across runs.
+func orbContinuationRate(t *testing.T, unfaithful bool, n uint64) float64 {
+	t.Helper()
+	b := richBundle()
+	var off, total int
+	for seed := uint64(0); seed < n; seed++ {
+		var res result.Result
+		if unfaithful {
+			r, err := SimulateWith(b, seed, Options{Freeze: FreezeConfig{UnfaithfulOreb: true}})
+			if err != nil {
+				t.Fatalf("SimulateWith(UnfaithfulOreb) seed %d: %v", seed, err)
+			}
+			res = r
+		} else {
+			res = Simulate(b, seed)
+		}
+		for _, g := range res.Games {
+			for _, e := range g.Events {
+				if e.Kind == result.EventRebound {
+					total++
+					if e.OffensiveRebound {
+						off++
+					}
+				}
+			}
+		}
+	}
+	if total == 0 {
+		t.Fatal("no rebound events observed")
+	}
+	return float64(off) / float64(total)
+}
+
+// TestOrebContinuation_LiveGate1Rate is the hard correctness gate for the ADR-0058
+// swap: the live ORB-continuation roll is now the faithful sqrt gate-1 by default, and
+// the UnfaithfulOreb escape hatch restores the old linear gate-2 path.
+//
+// The bands are pinned from the MEASURED richBundle rates (synthetic baseline 36.36 —
+// NOT the real-corpus archive aggregates 0.158/0.194, which are on a different scale).
+// Measured over N=2000 seeded sims: faithful gate-1 ≈ 0.3639, gate-2 ≈ 0.4326. Both
+// are deterministic in the seed set, so the bands are tight.
+func TestOrebContinuation_LiveGate1Rate(t *testing.T) {
+	const n = 2000
+
+	// 1) Faithful default (gate-1) inside the measured band.
+	faithful := orbContinuationRate(t, false, n)
+	if faithful < 0.355 || faithful > 0.373 {
+		t.Errorf("faithful gate-1 ORB rate = %.5f, want in [0.355, 0.373] (measured ≈0.3639)", faithful)
+	}
+
+	// 3) Negative path: UnfaithfulOreb restores the old gate-2 rate (measured band).
+	gate2 := orbContinuationRate(t, true, n)
+	if gate2 < 0.423 || gate2 > 0.443 {
+		t.Errorf("UnfaithfulOreb gate-2 ORB rate = %.5f, want in [0.423, 0.443] (measured ≈0.4326)", gate2)
+	}
+
+	// 2) The swap is live: the faithful rate is DISTINCTLY below the gate-2 rate (the
+	// sqrt diminishing-returns + off≤def cap suppress the offensive board share). A
+	// gated-baseline regression (or a no-op swap) would collapse this margin.
+	if margin := gate2 - faithful; margin < 0.04 {
+		t.Errorf("faithful gate-1 (%.5f) not distinctly below gate-2 (%.5f): margin %.5f < 0.04", faithful, gate2, margin)
 	}
 }

@@ -139,13 +139,13 @@ type gameState struct {
 	// games (like accum); nil outside the Phase-7 A/B harness. Internal, never serialized.
 	branchB *BranchBAccum
 
-	// gateCont, when non-nil, harvests the L1 gate-1 counterfactual instrument
+	// gateCont, when non-nil, harvests the L1 gate-1 decomposition instrument
 	// (freeze.go accumulateGateCont, ADR-0057/0058): per offensive-rebound resolution,
-	// the live gate-2 / counterfactual gate-1 / product, keyed by offensive team.
-	// gateBaseline is gate-1's league-baseline term (set once per game from
-	// opts.GateBaseline, else leagueReboundBaseline). Both internal, never serialized;
-	// nil gateCont (a zero Options) leaves the instrument inert and the run
-	// byte-identical to Simulate.
+	// the gate-1 (live since ADR-0058) / linear gate-2 / product, keyed by offensive team.
+	// gateBaseline is gate-1's league-baseline term, set once per game (ADR-0058: read by
+	// the live faithful ORB roll on EVERY run) from opts.GateBaseline, else
+	// leagueReboundBaseline. Both internal, never serialized; nil gateCont (a zero Options)
+	// leaves the read-only instrument inert.
 	gateCont     *GateContAccum
 	gateBaseline float64
 }

@@ -28,7 +28,7 @@ func TestFreeze_SubstitutesAndAccumulates(t *testing.T) {
 	// Means() returns them exactly (single sample each).
 	acc := &FreezeAccum{}
 	base := &gameState{accum: acc}
-	wantOreb := orebProbability(100, 100) // 0.5
+	wantOreb := gate1Probability(100, 100, base.gateBaseline) // live faithful gate-1 (base.gateBaseline is 0)
 	// float64 vars force runtime (not constant-folded) evaluation, matching the
 	// wrapper's accumulated rounding exactly.
 	careless, pressure := 60.0, 100.0
@@ -70,7 +70,7 @@ func TestFreeze_NoCrossConfound(t *testing.T) {
 	off := []onCourt{oc(slotPG, mkPlayer(1, 7, slotPG, 46))}
 	def := []onCourt{oc(slotPG, mkPlayer(2, 3, slotPG, 50))}
 
-	liveOreb := orebProbability(120, 80)
+	liveOreb := gate1Probability(120, 80, 0) // gs.gateBaseline is 0 in these cases
 	careless, pressure := 60.0, 100.0
 	liveTurn := stealTurnoverScale * careless * pressure // runtime eval, below the clamp
 	liveMake := shotValue2pt(5, 50, false)

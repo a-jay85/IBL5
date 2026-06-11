@@ -54,6 +54,14 @@ jobs:
         extensions: mbstring, intl, mysqli
         coverage: none
 
+    - name: Cache vendor directory
+      uses: actions/cache@v5
+      with:
+        path: ibl5/vendor
+        key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-vendor-
+
     - name: Install dependencies
       working-directory: ibl5
       run: composer install --no-progress --no-interaction
@@ -118,6 +126,14 @@ jobs:
         php-version: '8.5'
         extensions: mbstring, intl, mysqli
         coverage: none
+
+    - name: Cache vendor directory
+      uses: actions/cache@v5
+      with:
+        path: ibl5/vendor
+        key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-vendor-
 
     - name: Install dependencies
       working-directory: ibl5

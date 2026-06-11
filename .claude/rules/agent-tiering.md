@@ -1,6 +1,6 @@
 ---
 description: Sub-agent decision rules — when to spawn, when to skip, and which model to pick
-last_verified: 2026-06-07
+last_verified: 2026-06-10
 ---
 
 # Agent Tiering
@@ -36,6 +36,18 @@ The context-window cost compounds: every token of verbose output in Opus's conte
 | **Opus (delegated)** | `subagent_type: "plan-architect"` | Implementation **planning** only, via `/plan` Step 3. The one delegated-but-still-Opus case: the agent def carries `model: opus` + `effort: xhigh`, so planning runs at Opus depth in a clean sub-context. Do not pass an inline `model` override — the def owns it. |
 
 Planning is delegated rather than done in-session **only** because the custom `plan-architect` agent pins `effort: xhigh` (no per-call effort override exists on the built-in Plan agent). An A/B test proved it methodologically equivalent to the built-in. Everything else in the Opus row stays in-session — never delegate understanding.
+
+## Nested Sub-Agents — Available, Deliberately Unused
+
+Claude Code supports sub-agents spawning their own sub-agents (up to 5 levels deep). We keep **flat fan-out** — the Opus session owns every fan-out and absorbs every agent's output directly. Do not build nested orchestration into the recurring workflows (`/plan`, `/pr-review`, `/security-audit`, `/post-plan`, nightly).
+
+Why flat wins here:
+
+- **Our fan-out is narrow.** Workflows spawn 1–4 agents per phase, not the wide fan-out (with verbose intermediates to absorb) where nesting pays.
+- **The recurring pipelines keep review/triage in Opus by design.** `final code review` and `diff-triage` live in the Opus row above — the review→collect→score→filter step *is* triage. Pushing it into a coordinator agent blinds Opus to the findings it filtered, and our experience is that delegated judgment degrades (see `feedback_sonnet_proving_negatives`, `feedback_review_agent_full_diff`).
+- **`/post-plan` is a single-context state machine.** "Execute all phases sequentially in one response"; the Phase 3 diff-flags, Phase 5 verify-status, and Phase 6.5 auto-merge gate all read from main-session context. It's the only long autonomous run where context compounds — but also the run that poison-pills on a bad filter decision, and Phase 6.5 needs the scored survivor list in context regardless. Nesting could only hide the *filtered-out* findings; the thing Opus structurally still needs is the thing you can't remove. Upside and downside concentrate in the same workflow and the downside wins.
+
+**Tripwire to revisit:** a *measured* post-plan context-window problem, or a new workflow that genuinely develops wide fan-out with verbose per-agent intermediates. Absent that, stay flat.
 
 ## Prompt Style by Tier
 

@@ -39,15 +39,22 @@ class AuthService implements AuthServiceInterface
 
     private ?Auth $auth;
 
+    /** @var (\Closure(): \PDO)|null */
+    private ?\Closure $pdoFactory;
+
     private ?string $lastError = null;
 
     /** @var array<string, float|int|string|null>|null Cached user info row */
     private ?array $cachedUserInfo = null;
 
-    public function __construct(AuthRepositoryInterface $repository, ?Auth $auth = null)
+    /**
+     * @param (\Closure(): \PDO)|null $pdoFactory Lazy PDO source; falls back to PdoConnection::getInstance() when null.
+     */
+    public function __construct(AuthRepositoryInterface $repository, ?Auth $auth = null, ?\Closure $pdoFactory = null)
     {
         $this->repository = $repository;
         $this->auth = $auth;
+        $this->pdoFactory = $pdoFactory;
     }
 
     /**
@@ -56,7 +63,8 @@ class AuthService implements AuthServiceInterface
     private function getAuth(): Auth
     {
         if ($this->auth === null) {
-            $this->auth = new Auth(PdoConnection::getInstance(), null, 'auth_', getenv('E2E_TESTING') !== '1');
+            $pdo = $this->pdoFactory !== null ? ($this->pdoFactory)() : PdoConnection::getInstance();
+            $this->auth = new Auth($pdo, null, 'auth_', getenv('E2E_TESTING') !== '1');
         }
         return $this->auth;
     }

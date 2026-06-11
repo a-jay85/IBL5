@@ -292,6 +292,22 @@ class ScheduleUpdaterTest extends TestCase
 
     /**
      * @group schedule-updater
+     * @group di-seam
+     */
+    public function testExplicitBasePathIsUsed(): void
+    {
+        $customPath = '/custom/test/root';
+        $updater = new ScheduleUpdater($this->mockDb, $this->mockSeason, null, null, $customPath);
+
+        $reflection = new \ReflectionClass($updater);
+        $prop = $reflection->getProperty('basePath');
+        $prop->setAccessible(true);
+
+        $this->assertSame($customPath, $prop->getValue($updater), 'explicit $basePath must override AppPaths::root()');
+    }
+
+    /**
+     * @group schedule-updater
      * @group league-context
      */
     public function testOlympicsContextTruncatesOlympicsScheduleTable(): void

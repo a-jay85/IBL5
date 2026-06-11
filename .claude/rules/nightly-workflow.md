@@ -1,6 +1,6 @@
 ---
 description: Nightly autonomous workflow — launchd fires claude -p at 00:03 and 05:03 daily, running two context-isolated agents per plan (implementation + post-plan) with time guards and incremental checkpoints.
-last_verified: 2026-06-07
+last_verified: 2026-06-10
 paths: "bin/nightly-*"
 ---
 
@@ -35,7 +35,18 @@ A headless `claude -p` process runs twice daily via macOS `launchd`. It loops th
   reports/  per-night markdown reports (YYYY-MM-DD-{done|skipped|env-stop|no-queue|error}-<slug>.md);
             plus YYYY-MM-DD-costs.md — per-phase token cost roll-up written by nightly-run
   logs/     claude -p output logs + launchd stdout/stderr
+  *.archive/  startup archival: logs/reports/done/skipped entries idle >7 days are
+              moved here (logs.archive/, reports.archive/, …) at run launch
 ```
+
+### Startup archival
+
+At launch, `nightly-run` sweeps `logs/`, `reports/`, `done/`, and `skipped/` and moves any
+entry untouched for more than `NIGHTLY_ARCHIVE_AGE_DAYS` (default **7**) into a sibling
+`<dir>.archive/`. This keeps the working dirs small without deleting history. Symlinks
+(`done/`, `skipped/`) are judged on their *own* mtime — the disposition date — and their
+absolute targets keep resolving after the move. `queue/` (pending work) and `handoff/`
+(transient) are never touched. The step is non-fatal: an archival error never aborts the run.
 
 ## How It Works
 

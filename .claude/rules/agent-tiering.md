@@ -34,6 +34,22 @@ The context-window cost compounds: every token of verbose output in Opus's conte
 | **Sonnet** | `model: "sonnet"` | Tasks requiring synthesis: "is this finding relevant to the current change?", cross-file traces, semantic compliance checks, rename sweeps needing judgment about call sites. |
 | **Opus** | self (no delegation) | Novel reasoning, FK ordering, rule authoring, ADR writing, interpreting ambiguous test failures, final code review, diff-triage. Never delegate understanding. |
 | **Opus (delegated)** | `subagent_type: "plan-architect"` | Implementation **planning** only, via `/plan` Step 3. The one delegated-but-still-Opus case: the agent def carries `model: opus` + `effort: xhigh`, so planning runs at Opus depth in a clean sub-context. Do not pass an inline `model` override — the def owns it. |
+| **Fable** | `model: "fable"` — **opt-in only, see gate below** | The rung above Opus, for tasks where the intelligence *ceiling* (not cost) is the binding constraint: JSB engine reverse-engineering / RNG-sub recovery, high-stakes negative proofs ("no path reaches X"), final diff-triage on the riskiest PRs (column-rename sweeps, FK-ordering migrations, the Olympics rewrite), cross-cutting ADR/rule authoring. At ~2× Opus cost, never the default — Claude proposes, you approve. |
+
+## Fable Approval Gate
+
+**Claude must never select Fable on its own.** Fable is opt-in: the user approves each use explicitly. This holds for the main session model *and* for any `model: "fable"` sub-agent.
+
+When Claude judges a task Fable-appropriate (matches the Fable row above), it does **not** silently run on Opus and it does **not** switch to Fable. It **surfaces a suggestion** and waits for an explicit yes. The suggestion must include:
+
+- **What** the task is and why it hits the intelligence ceiling (which Opus-row trait it exceeds — novel reasoning, exhaustive negative proof, high-blast-radius triage).
+- **Pros** of Fable here: the specific failure mode Opus risks (missed aliased reference, wrong FK order, an edge case that reaches prod) and what one-shot correctness is worth.
+- **Cons**: ~2× Opus token cost ($10/$50 vs $5/$25 per MTok); whether Opus is *likely sufficient* (most tasks are); that the gain is a ceiling-raise, not a guarantee.
+- **Recommendation**: a clear "I'd use Fable here" / "Opus is probably fine, but flagging it" — not a neutral survey.
+
+Default action absent approval: proceed on Opus (or the correct lower tier). Do not block work waiting for an answer — flag, recommend, and continue at the current tier unless the user says to escalate. Once the user approves Fable for a given task, that approval covers that task only; a new task re-triggers the gate.
+
+Use `AskUserQuestion` when the Fable-vs-Opus call is a genuine fork worth pausing on; otherwise inline the suggestion in the response and keep going on Opus.
 
 Planning is delegated rather than done in-session **only** because the custom `plan-architect` agent pins `effort: xhigh` (no per-call effort override exists on the built-in Plan agent). An A/B test proved it methodologically equivalent to the built-in. Everything else in the Opus row stays in-session — never delegate understanding.
 

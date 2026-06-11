@@ -1,0 +1,266 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/wt-status — classify every linked worktree's shipping state.
+#
+# Classifications (mutually exclusive, first-match wins):
+#   PROTECTED  — master / main / production branch (excluded from output)
+#   MERGED     — confirmed merged to master (safe to reap)
+#   OPEN-PR    — has an open pull request (in-flight / healthy)
+#   UNPUSHED   — ≥1 own-commit not on master; no PR (committed work, never shipped)
+#   STALLED    — 0 own-commits, dirty tree (uncommitted or untracked), no PR
+#                (the doc-freshness gap: work exists but was never committed)
+#   EMPTY      — 0 own-commits, clean tree, no PR (harmless scaffold)
+#
+# Usage: bin/wt-status [--stalled-only] [--min-idle-hours N]
+#
+# --stalled-only: print ONLY STALLED/UNPUSHED rows; exit 1 if any exist, else 0.
+# --min-idle-hours N: when N>0, suppress worktrees whose most-recently modified
+#   dirty/untracked file is newer than N hours (likely still in progress).
+#
+# NOTE: does NOT run `git fetch`. Relies on cached refs. Callers that need
+# freshness (e.g. bin/cleanup) fetch before calling this script.
+#
+# Bash 3.2 / macOS compatible: no mapfile, no declare -A, no ${var,,}/${var^^},
+# no touch -d. Uses set -u only (NOT set -e) — the classifier intentionally
+# relies on git predicates returning nonzero as a signal (merge-base --is-ancestor,
+# rev-list | grep -q .) and on its own deliberate exit 1.
+
+set -u
+
+# shellcheck source=bin/lib/wt-guards.sh
+source "$(dirname "$0")/lib/wt-guards.sh"
+REPO_ROOT="$(git worktree list --porcelain | head -1 | sed 's/^worktree //')"
+# shellcheck source=bin/lib/git-helpers.sh
+source "$(dirname "$0")/lib/git-helpers.sh"
+WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
+
+STALLED_ONLY=false
+MIN_IDLE_HOURS=0
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --stalled-only)   STALLED_ONLY=true; shift ;;
+        --min-idle-hours)
+            if [ $# -lt 2 ]; then
+                echo "Error: --min-idle-hours requires a value" >&2; exit 2
+            fi
+            MIN_IDLE_HOURS="$2"; shift 2 ;;
+        --min-idle-hours=*)
+            MIN_IDLE_HOURS="${1#*=}"; shift ;;
+        -*) echo "Unknown option: $1" >&2; exit 2 ;;
+        *)  echo "Unexpected argument: $1" >&2; exit 2 ;;
+    esac
+done
+
+# file_mtime <path> — echo epoch seconds for a file (portable BSD+GNU).
+# GNU stat -c %Y runs first (CI/Linux); BSD stat -f %m is the macOS fallback.
+file_mtime() {
+    stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null
+}
+
+# newest_dirty_mtime <wt_path> — echo epoch seconds of the newest mtime across
+# tracked-modified and untracked files in the worktree.
+newest_dirty_mtime() {
+    local wt_path="$1"
+    local newest=0
+    local mtime
+
+    # Tracked-modified files
+    while IFS= read -r f; do
+        [ -z "$f" ] && continue
+        [ -f "$wt_path/$f" ] || continue
+        mtime="$(file_mtime "$wt_path/$f")"
+        [ -n "$mtime" ] && [ "$mtime" -gt "$newest" ] && newest="$mtime"
+    done < <(git -C "$wt_path" diff --name-only 2>/dev/null; git -C "$wt_path" diff --cached --name-only 2>/dev/null)
+
+    # Untracked files
+    while IFS= read -r f; do
+        [ -z "$f" ] && continue
+        [ -f "$wt_path/$f" ] || continue
+        mtime="$(file_mtime "$wt_path/$f")"
+        [ -n "$mtime" ] && [ "$mtime" -gt "$newest" ] && newest="$mtime"
+    done < <(git -C "$wt_path" ls-files --others --exclude-standard 2>/dev/null)
+
+    echo "$newest"
+}
+
+# get_branch_for_worktree <wt_path> — resolve branch name, strip refs/heads/.
+get_branch_for_worktree() {
+    local wt_path="$1"
+    git -C "$REPO_ROOT" worktree list --porcelain | awk -v wt="$wt_path" '
+        /^worktree / { cur = substr($0, 10) }
+        /^branch / && cur == wt {
+            b = substr($0, 8)
+            sub(/^refs\/heads\//, "", b)
+            print b
+            exit
+        }
+    '
+}
+
+# classify_worktree <wt_path> — echoes "<CLASSIFICATION> <detail>" to stdout.
+classify_worktree() {
+    local wt_path="$1"
+    local branch
+    branch="$(get_branch_for_worktree "$wt_path")"
+
+    # Detached HEAD — skip entirely
+    if [ -z "$branch" ]; then
+        return
+    fi
+
+    # PROTECTED — never include in output
+    if [ "$branch" = "master" ] || [ "$branch" = "main" ] || [ "$branch" = "production" ]; then
+        return
+    fi
+
+    local wt_name
+    wt_name="$(basename "$wt_path")"
+
+    # ---- compute signals ----
+
+    # PR state (requires gh)
+    local pr_state=""
+    if command -v gh &>/dev/null; then
+        pr_state="$(cd "$REPO_ROOT" && gh pr view "$branch" --json state -q .state 2>/dev/null || true)"
+    fi
+
+    # Remote tracking config
+    local was_tracked
+    was_tracked="$(git -C "$REPO_ROOT" config "branch.$branch.remote" 2>/dev/null || true)"
+
+    # Fork-point relative to origin/master
+    local fork_point=""
+    fork_point="$(git -C "$REPO_ROOT" merge-base --fork-point origin/master "$branch" 2>/dev/null || true)"
+
+    # ≥1 own-commit? (only meaningful when fork_point resolves)
+    local has_own_commits=false
+    if [ -n "$fork_point" ]; then
+        if git -C "$REPO_ROOT" rev-list "$fork_point..$branch" 2>/dev/null | grep -q .; then
+            has_own_commits=true
+        fi
+    fi
+
+    # Ancestor of origin/master?
+    local is_ancestor=false
+    if git -C "$REPO_ROOT" merge-base --is-ancestor "$branch" origin/master 2>/dev/null; then
+        is_ancestor=true
+    fi
+
+    # Dirty state
+    local dirty=false
+    if has_uncommitted_changes "$wt_path" || has_untracked_files "$wt_path"; then
+        dirty=true
+    fi
+
+    # ---- classification (first match wins) ----
+
+    # MERGED — Check 1: PR state MERGED
+    if [ "$pr_state" = "MERGED" ]; then
+        echo "MERGED $wt_name (PR merged)"
+        return
+    fi
+
+    # MERGED — Check 2: tracked + ancestor of origin/master + remote branch gone
+    if [ -n "$was_tracked" ] \
+       && [ "$is_ancestor" = true ] \
+       && ! git -C "$REPO_ROOT" rev-parse --verify "origin/$branch" &>/dev/null; then
+        echo "MERGED $wt_name (pushed, ff-merged, remote pruned)"
+        return
+    fi
+
+    # MERGED — Check 3: local-only, ancestor of master, ≥1 own-commit on master
+    # CRITICAL: requires has_own_commits=true. Without this gate, a zero-own-commit
+    # branch (tip == fork-point) would be falsely classified MERGED.
+    if [ -z "$was_tracked" ] \
+       && [ "$is_ancestor" = true ] \
+       && [ "$has_own_commits" = true ]; then
+        echo "MERGED $wt_name (local-only, merged into master)"
+        return
+    fi
+
+    # OPEN-PR
+    if [ "$pr_state" = "OPEN" ]; then
+        local pr_num=""
+        if command -v gh &>/dev/null; then
+            pr_num="$(cd "$REPO_ROOT" && gh pr view "$branch" --json number -q .number 2>/dev/null || true)"
+        fi
+        if [ -n "$pr_num" ]; then
+            echo "OPEN-PR $wt_name (PR #$pr_num)"
+        else
+            echo "OPEN-PR $wt_name"
+        fi
+        return
+    fi
+
+    # UNPUSHED — ≥1 own-commit, not on master, no PR
+    if [ "$has_own_commits" = true ] && [ "$is_ancestor" = false ]; then
+        echo "UNPUSHED $wt_name (committed work, no PR)"
+        return
+    fi
+
+    # STALLED — zero own-commits, dirty, no PR
+    # Must check BOTH uncommitted and untracked: has_uncommitted_changes never
+    # sees untracked files. The real doc-freshness case was untracked-only.
+    if [ "$dirty" = true ]; then
+        echo "STALLED $wt_name (uncommitted/untracked work, never committed)"
+        return
+    fi
+
+    # EMPTY — zero own-commits, clean tree, no PR (terminal catch-all)
+    echo "EMPTY $wt_name (no own commits, clean tree)"
+}
+
+# ---- main ----
+
+HAS_UNSHIPPED=false
+
+if [ "$STALLED_ONLY" = false ]; then
+    printf "%-12s %-30s %s\n" "STATUS" "WORKTREE" "DETAIL"
+    printf "%-12s %-30s %s\n" "------------" "------------------------------" "------"
+fi
+
+while IFS= read -r wt_path; do
+    [ "$wt_path" = "$REPO_ROOT" ] && continue
+    # Only process worktrees in our known locations
+    case "$wt_path" in
+        "$WT_PARENT/"*|"$REPO_ROOT/worktrees/"*|"$REPO_ROOT/.claude/worktrees/"*) ;;
+        *) continue ;;
+    esac
+
+    row="$(classify_worktree "$wt_path")"
+    [ -z "$row" ] && continue
+
+    # Extract the classification word (first token)
+    classification="${row%% *}"
+    detail="${row#* }"
+    wt_name="${detail%% *}"
+    detail_rest="${detail#* }"
+    [ "$detail_rest" = "$wt_name" ] && detail_rest=""
+
+    # --min-idle-hours suppression for STALLED and UNPUSHED
+    if [ "$MIN_IDLE_HOURS" -gt 0 ] \
+       && { [ "$classification" = "STALLED" ] || [ "$classification" = "UNPUSHED" ]; }; then
+        newest="$(newest_dirty_mtime "$wt_path")"
+        now="$(date +%s)"
+        age_hours=$(( (now - newest) / 3600 ))
+        if [ "$age_hours" -lt "$MIN_IDLE_HOURS" ]; then
+            continue  # too fresh, suppress
+        fi
+    fi
+
+    if [ "$STALLED_ONLY" = true ]; then
+        if [ "$classification" = "STALLED" ] || [ "$classification" = "UNPUSHED" ]; then
+            printf '%s %s\n' "$classification" "$wt_name"
+            HAS_UNSHIPPED=true
+        fi
+    else
+        printf "%-12s %-30s %s\n" "$classification" "$wt_name" "$detail_rest"
+    fi
+done < <(git -C "$REPO_ROOT" worktree list --porcelain | awk '/^worktree / { print substr($0, 10) }')
+
+if [ "$STALLED_ONLY" = true ] && [ "$HAS_UNSHIPPED" = true ]; then
+    exit 1
+fi
+exit 0

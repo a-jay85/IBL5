@@ -564,6 +564,8 @@ jobs:
         run: bin/test-refactor-flag
       - name: bin/test-nightly-queue
         run: bin/test-nightly-queue
+      - name: bin/test-wt-status
+        run: bin/test-wt-status
 
   gate:
     name: Tests and Analysis

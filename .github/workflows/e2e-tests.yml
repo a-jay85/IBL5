@@ -503,6 +503,13 @@ jobs:
           token: ${{ contains(github.event.pull_request.labels.*.name, 'update-baselines') && secrets.CI_PAT || github.token }}
           ref: ${{ github.head_ref || github.sha }}
 
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: IBL6/package-lock.json
+
       - uses: ./.github/actions/setup-docker-e2e
 
       - name: Wait for ibl6 healthy
@@ -593,6 +600,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: IBL6/package-lock.json
 
       - uses: ./.github/actions/setup-docker-e2e
 

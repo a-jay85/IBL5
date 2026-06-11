@@ -1,6 +1,6 @@
 ---
 description: Analysis comparing PLR snapshots against boxscore tables.
-last_verified: 2026-04-11
+last_verified: 2026-06-10
 ---
 
 # PLR Snapshots vs Box Scores: Data Accuracy Analysis

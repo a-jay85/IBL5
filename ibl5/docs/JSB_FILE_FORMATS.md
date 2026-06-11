@@ -1,6 +1,6 @@
 ---
 description: Jump Shot Basketball binary file format specifications.
-last_verified: 2026-06-03
+last_verified: 2026-06-09
 ---
 
 # Jump Shot Basketball (JSB) Engine File Format Specifications
@@ -466,6 +466,20 @@ Carries each GM's submitted depth-chart settings — most importantly the per-pl
 | 10 | 2 | `dc_bh` | No (dead field) |
 
 A team's `dc_minutes` across its playing slots sums to ≈ 240 (5 players × 48 minutes).
+
+#### Depth-Chart Code Semantics (4.19)
+
+The five opaque fields carry the following meanings (sourced from SQL `COMMENT` in `ibl5/migrations/000_baseline_schema.sql`):
+
+| Field | Semantic meaning |
+|-------|-----------------|
+| `dc_of` | Offensive focus |
+| `dc_df` | Defensive focus |
+| `dc_oi` | Offensive importance |
+| `dc_di` | Defensive importance |
+| `dc_bh` | Ball handling |
+
+These values are stored in `ibl_plr` and snapshotted into `ibl_saved_depth_chart_players` at save time. They are imported by `ibl5/classes/JsbParser/JsbImportRepository.php` but — as noted below — are dead fields the Go engine never reads.
 
 ### Readers
 

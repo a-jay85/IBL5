@@ -1,7 +1,7 @@
 ---
 allowed-tools: Bash(curl:*)
 description: Check the latest Claude Code release for anything actionable in our workflow
-last_verified: 2026-04-11
+last_verified: 2026-06-10
 ---
 
 Answer: **"Is there anything actionable for us in the latest version of Claude Code?"**

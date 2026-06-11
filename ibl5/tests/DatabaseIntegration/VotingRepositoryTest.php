@@ -39,6 +39,27 @@ class VotingRepositoryTest extends DatabaseTestCase
         self::assertSame('Test Player Four, Stars', $row['six_1']);
     }
 
+    public function testSavesMaxLengthCompositeWithoutTruncation(): void
+    {
+        // 75-char composite = GM ballot max: owner_name(32) + ', '
+        // + trim(team_city(24) + ' ' + team_name(16)) = 41.
+        $name = str_repeat('A', 32);
+        $team = str_repeat('B', 24) . ' ' . str_repeat('C', 16); // 41
+        $composite = $name . ', ' . $team;                       // 75
+        self::assertSame(75, mb_strlen($composite));
+
+        $ballot = [
+            'mvp_1' => '', 'mvp_2' => '', 'mvp_3' => '',
+            'six_1' => '', 'six_2' => '', 'six_3' => '',
+            'roy_1' => '', 'roy_2' => '', 'roy_3' => '',
+            'gm_1' => $composite, 'gm_2' => '', 'gm_3' => '',
+        ];
+        $this->repo->saveEoyVote('Metros', $ballot);
+
+        $row = $this->fetchRow('ibl_votes_EOY', 'team_name', 'Metros');
+        self::assertSame($composite, $row['gm_1']);   // exact — no silent truncation
+    }
+
     public function testSaveAsgVoteUpdatesRow(): void
     {
         $ballot = [

@@ -348,7 +348,7 @@ echo "=== Nightly session starting at $(date) ===" >> "$LOG"
 {
     archive_stale logs
     archive_stale reports
-    archive_stale done
+    archive_stale "done"
     archive_stale skipped
 } || true
 

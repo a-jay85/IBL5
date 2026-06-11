@@ -1,6 +1,6 @@
 ---
 description: Schema reference and query patterns for IBL5 database work.
-last_verified: 2026-06-09
+last_verified: 2026-06-11
 ---
 
 # IBL5 Database Guide
@@ -67,6 +67,7 @@ Core data integrity constraints implemented:
 - Use numbered prefixes (e.g., `003_my_migration.sql`)
 - Test on development database first
 - Never modify production schema directly
+- Migration PRs are dry-run against a **filtered clone of production** by the Deploy Rehearsal CI job (`.github/workflows/deploy-rehearsal.yml`). Content-dependent failures (FK / UNIQUE / NOT-NULL on accumulated rows) surface on the PR. **Caveat:** `ibl_box_scores`, `ibl_box_scores_teams`, `ibl_plr_snapshots`, and `ibl_plb_snapshots` are sampled to the two most recent seasons, so failures that depend only on *older* rows in those tables are not caught — see `ibl5/docs/decisions/0059-rehearse-migrations-against-prod-clone.md`.
 
 ### For API Development
 - Use UUIDs for all public identifiers

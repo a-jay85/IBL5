@@ -302,6 +302,17 @@ phase_env_error() {
         "hit your [a-z0-9 -]*limit|usage limit reached|api error:[[:space:]]*(401|403|429|529)|overloaded_error|rate_limit_error"
 }
 
+# A phase that emitted no stream events for STALL_KILL_SECS is force-killed by the
+# heartbeat watcher (see run_heartbeat_watcher), which writes a distinctive
+# "STALL-KILL" marker into this phase's log slice. A stall is a transient hang
+# (typically a dead/wedged inference stream), NOT a plan defect — classify it
+# environmental so the breaker refunds + stops rather than burning the attempt
+# toward the poison-pill skip. Safe under `set -e`: only called inside `if`.
+phase_stalled() {
+    local log_before=$1
+    tail -n +"$(( log_before + 1 ))" "$LOG" 2>/dev/null | grep -q "STALL-KILL"
+}
+
 # Write a one-line report when the run STOPS on an environmental failure. The
 # queue is left intact (nothing skipped), so without this a no-progress night —
 # e.g. a single head-of-queue plan that keeps fast-failing — would be silent.
@@ -492,12 +503,18 @@ PLAN_FILE=$PLAN_NAME" \
         #   2. a sub-minute exit — real impls run 15-50 min, so a fast no-handoff
         #      exit is environmental whatever the phrasing, and (unlike string
         #      matching) is immune to the async-stderr log-flush race.
+        #   3. a watchdog stall-kill — no stream events for STALL_KILL_SECS, a
+        #      transient hang (e.g. a dead inference stream), not a plan defect.
         # A slow failure with no signature falls through as a genuine plan failure,
         # keeping its incremented attempt → eventual poison-pill skip (unchanged).
         if [ ! -f "$HANDOFF_FILE" ] \
-           && { phase_env_error "$IMPL_LOG_BEFORE" || [ "$IMPL_DUR" -lt "$MIN_VIABLE_SECS" ]; }; then
+           && { phase_env_error "$IMPL_LOG_BEFORE" \
+                || phase_stalled "$IMPL_LOG_BEFORE" \
+                || [ "$IMPL_DUR" -lt "$MIN_VIABLE_SECS" ]; }; then
             REASON="usage/rate limit, auth error, or transient"
-            if [ "$IMPL_DUR" -lt "$MIN_VIABLE_SECS" ]; then
+            if phase_stalled "$IMPL_LOG_BEFORE"; then
+                REASON="phase stalled — no stream events for >$((STALL_KILL_SECS/60))min, force-killed"
+            elif [ "$IMPL_DUR" -lt "$MIN_VIABLE_SECS" ]; then
                 REASON="$REASON (impl exited in ${IMPL_DUR}s)"
             fi
             echo "Environmental failure during impl — $REASON. Refunding attempt, stopping loop." >> "$LOG"
@@ -574,9 +591,12 @@ PLAN_FILE=$PLAN_NAME" \
         # ran — environmental. A known limit/auth signature stops regardless, so a
         # dead budget doesn't burn a postplan retry. Refund + stop; queue intact.
         if phase_env_error "$PP_LOG_BEFORE" \
+           || phase_stalled "$PP_LOG_BEFORE" \
            || { [ -f "$HANDOFF_FILE" ] && [ "$PP_DUR" -lt "$MIN_VIABLE_SECS" ]; }; then
             REASON="usage/rate limit, auth error, or transient"
-            if [ "$PP_DUR" -lt "$MIN_VIABLE_SECS" ]; then
+            if phase_stalled "$PP_LOG_BEFORE"; then
+                REASON="phase stalled — no stream events for >$((STALL_KILL_SECS/60))min, force-killed"
+            elif [ "$PP_DUR" -lt "$MIN_VIABLE_SECS" ]; then
                 REASON="$REASON (postplan exited in ${PP_DUR}s)"
             fi
             echo "Environmental failure during postplan — $REASON. Refunding attempt, stopping loop." >> "$LOG"

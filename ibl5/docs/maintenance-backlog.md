@@ -2169,11 +2169,12 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Status:** In progress — per-channel `logger.<channel>` bindings registered in container (PR1, 2026-05-19); static call-site burndown to follow in PR4.
 
 ### 14.15 `AppPaths::root()` Stateful Static Singleton
-**Location:** `Bootstrap/AppPaths.php`; consumed by `Cache/PageCache.php:156`, `Mail/MailService.php:225`, `Logging/LoggerFactory.php:223,233`, `Auth/DevAutoLogin.php:89`
+**Location:** `Bootstrap/AppPaths.php`; actual consumers (repo-wide sweep 2026-06-09): `Updater/ScheduleUpdater.php:149,234`, `PageLayout/PageLayout.php:78,111`. The previously listed consumers (`Cache/PageCache.php`, `Mail/MailService.php`, `Logging/LoggerFactory.php`, `Auth/DevAutoLogin.php`) use raw `dirname(__DIR__, 2)` / `__DIR__` — not `AppPaths::root()`.
 **Problem:** Global mutable state for path resolution; not injectable.
 **Suggested direction:** Constructor-injected `string $basePath` from container.
 **Est. effort:** S
 **Risk if untouched:** Path-dependent classes untestable without filesystem coupling.
+**Status:** Partial (2026-06-09) — `ScheduleUpdater` now takes `?string $basePath = null` (fallback `AppPaths::root()`); `PageLayout::header()` is a static method with no constructor seam so it still calls `AppPaths::root()` directly — eliminating the singleton requires converting `PageLayout` to an instance class, deferred to a separate plan (suggested slug: `maintenance-51-pagelayout-instance-class`).
 
 ### 14.16 Front Controller Includes Module by `$name` String Concatenation
 **Location:** `ibl5/index.php` lines 38-60: `$modpath = "modules/$name/" . $mod_file . ".php"; include $modpath;`

@@ -198,6 +198,8 @@ class ConfigBootstrap implements BootstrapStepInterface
             return $db;
         });
 
+        $container->set('pdo', static fn (): \PDO => \Database\PdoConnection::getInstance());
+
         $channels = ['app', 'audit', 'db', 'discord', 'draft', 'admin', 'perf'];
         foreach ($channels as $channel) {
             $container->set(

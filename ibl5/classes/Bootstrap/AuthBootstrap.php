@@ -29,7 +29,11 @@ class AuthBootstrap implements BootstrapStepInterface
         /** @var \mysqli $mysqliDb */
         $mysqliDb = $GLOBALS['mysqli_db'];
 
-        $authService = new \Auth\AuthService(new \Auth\AuthRepository($mysqliDb));
+        $authService = new \Auth\AuthService(
+            new \Auth\AuthRepository($mysqliDb),
+            null,
+            static fn (): \PDO => \Database\PdoConnection::getInstance(),
+        );
         $authService->tryRememberMe();
 
         // Dev-only auto-login: bypasses login forms on localhost when DEV_AUTO_LOGIN is set.

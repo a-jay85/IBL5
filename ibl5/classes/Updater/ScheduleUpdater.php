@@ -44,10 +44,13 @@ class ScheduleUpdater extends \BaseMysqliRepository {
 
     private ?JsbSourceResolverInterface $sourceResolver;
 
-    public function __construct(\mysqli $db, Season $season, ?LeagueContext $leagueContext = null, ?JsbSourceResolverInterface $sourceResolver = null) {
+    private string $basePath;
+
+    public function __construct(\mysqli $db, Season $season, ?LeagueContext $leagueContext = null, ?JsbSourceResolverInterface $sourceResolver = null, ?string $basePath = null) {
         parent::__construct($db, $leagueContext);
         $this->season = $season;
         $this->sourceResolver = $sourceResolver;
+        $this->basePath = $basePath ?? \Bootstrap\AppPaths::root();
     }
 
     /**
@@ -146,7 +149,7 @@ class ScheduleUpdater extends \BaseMysqliRepository {
      */
     private function insertPlayoffGamesFromScheduleHtm(): string
     {
-        $ibl5Root = \Bootstrap\AppPaths::root();
+        $ibl5Root = $this->basePath;
         $leagueDir = $this->leagueContext !== null ? $this->leagueContext->getCurrentLeague() : 'IBL';
         $scheduleHtmPath = $ibl5Root . '/ibl/' . $leagueDir . '/Schedule.htm';
 
@@ -231,7 +234,7 @@ class ScheduleUpdater extends \BaseMysqliRepository {
                 }
                 $games = SchFileParser::parse($schData);
             } else {
-                $ibl5Root = \Bootstrap\AppPaths::root();
+                $ibl5Root = $this->basePath;
                 $filePrefix = $this->leagueContext !== null ? $this->leagueContext->getFilePrefix() : 'IBL5';
                 $schFilePath = $ibl5Root . '/' . $filePrefix . '.sch';
                 $games = SchFileParser::parseFile($schFilePath);

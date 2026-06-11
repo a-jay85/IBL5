@@ -1,6 +1,6 @@
 ---
 description: TSI (total skill index) progression analysis for player development tracking.
-last_verified: 2026-04-11
+last_verified: 2026-06-10
 ---
 
 # TSI → Rating Progression Analysis Results (Revised)

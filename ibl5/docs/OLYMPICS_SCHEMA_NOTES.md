@@ -1,6 +1,6 @@
 ---
 description: Schema notes for Olympics event data.
-last_verified: 2026-04-11
+last_verified: 2026-06-10
 ---
 
 # Olympics Schema Notes
@@ -20,18 +20,21 @@ When `LeagueContext::isOlympics()` is true, the following IBL table names are re
 | `ibl_league_config` | `ibl_olympics_league_config` | League configuration from .lge |
 | `ibl_plr` | `ibl_olympics_plr` | Player data from .plr |
 | `ibl_hist` | `ibl_olympics_hist` | Career/historical stats from .car/.plr |
+| `ibl_plr_snapshots` | `ibl_olympics_plr_snapshots` | Per-season player rating snapshots |
 | `ibl_jsb_history` | `ibl_olympics_jsb_history` | Season W-L records from .his |
 | `ibl_jsb_transactions` | `ibl_olympics_jsb_transactions` | Transactions from .trn |
 | `ibl_rcb_alltime_records` | `ibl_olympics_rcb_alltime_records` | All-time records from .rcb |
 | `ibl_rcb_season_records` | `ibl_olympics_rcb_season_records` | Season records from .rcb |
+| `ibl_saved_depth_charts` | `ibl_olympics_saved_depth_charts` | Saved depth chart headers |
+| `ibl_saved_depth_chart_players` | `ibl_olympics_saved_depth_chart_players` | Saved depth chart player rows |
 
 Tables not in this mapping are returned unchanged by `getTableName()`.
 
 ## How Table Resolution Works
 
 1. `LeagueContext` detects the current league from `$_GET['league']`, `$_SESSION['current_league']`, or `$_COOKIE['ibl_league']` (in priority order).
-2. `BaseMysqliRepository` accepts an optional `?LeagueContext` constructor parameter and provides `protected function resolveTable(string $iblTableName): string`.
-3. Repositories resolve table names in their constructors (stored as properties) and use those properties in SQL queries.
+2. `LeagueContext::getTableName(string $iblTableName): string` maps a single IBL table name to its Olympics equivalent via the `TABLE_MAP` constant.
+3. `BaseMysqliRepository` accepts an optional `?LeagueContext` constructor parameter and rewrites whole SQL query strings through `protected function rewriteTableNames(string $query): string`, which substitutes every `TABLE_MAP` key it finds.
 4. Repositories that don't receive a `LeagueContext` default to IBL table names (backward compatible).
 
 ### Shared Tables
@@ -87,10 +90,19 @@ Both leagues use the same JSB simulation engine, so write-path tables share iden
 These modules are gated by `LeagueContext::isModuleEnabled()` and return false for Olympics:
 
 - Draft
+- DraftPickLocator
 - FreeAgency
-- Trading
 - Waivers
+- Trading
 - Voting
+- VotingResults
+- CapSpace
+- FranchiseHistory
+- AwardHistory
+- FranchiseRecordBook
+- CareerLeaderboards
+- SeasonLeaderboards
+- RecordHolders
 
 ## Pipeline Behavior in Olympics Context
 

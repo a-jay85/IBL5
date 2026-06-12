@@ -190,14 +190,16 @@ func andOneBucketWeight(mq float64, p onCourt) float64 {
 //	foul = (foul / offQ) × (defQ − teamDef×5/6) + foul   // site-3 divisor
 //	foul −= hcaDelta                                       // site-2 nudge
 //
-// Both offQ and defQ are narrowed toward the corpus league mean by foulCompress
-// (teamquality.go, ADR-0044): the team-to-team spread of this divisor term is the
-// lead negative-Cov(lnFGA,lnPPS) driver (ADR-0043), so compressing it narrows the
-// engine's too-wide FTA-rate dispersion. The HCA delta is applied OUTSIDE that
-// compression, so the home-favorable sign and #955 magnitude are unchanged.
+// offQ is the volume-NEUTRAL constant base offQualityConstant (ADR-0061 supersedes
+// ADR-0044's off-side compression — the Fork-B carrier fix); only defQ is narrowed
+// toward the corpus league mean by foulCompress (teamquality.go): the team-to-team
+// spread of the def arm of this divisor term is the lead negative-Cov(lnFGA,lnPPS)
+// driver (ADR-0043), so compressing it narrows the engine's too-wide FTA-rate
+// dispersion. The HCA delta is applied OUTSIDE that compression, so the home-favorable
+// sign and #955 magnitude are unchanged.
 //
 // offQ = offQualityWithHCA(offense, hcaDelta) is the foul-bucket divisor; it
-// shrinks for the home team (each player's term reduced by +0.2), so foul/offQ —
+// shrinks for the home team (the constant base reduced by len×0.2), so foul/offQ —
 // and thus the home foul bucket — GROWS. That multiplicative divisor growth is the
 // dominant home-favorable term; it dominates the (anti-home) additive site-2 nudge
 // (foul −= +0.2 for home), which is near-negligible against the divisor-adjusted

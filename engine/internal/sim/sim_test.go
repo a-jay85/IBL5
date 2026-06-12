@@ -223,7 +223,7 @@ func TestSimulate_SubstitutionsFire(t *testing.T) {
 // step, never an assumed number.
 //
 // A player who DOES foul out (GamePF >= 6) leaves early and accrues fewer minutes.
-// The CALIBRATED post-HCA foul rate (offQualityRatingScale lowered to match the
+// The CALIBRATED post-HCA foul rate (offQualityConstant tuned to match the
 // corpus home margin) makes a foul-out reachable in this iron-man fixture, so the
 // conservation assertion is split: full minutes for everyone who finishes, and
 // strictly-not-more for anyone who fouls out (its exact short-minutes value is

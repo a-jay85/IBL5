@@ -22,7 +22,7 @@ class NotificationRepository extends \BaseMysqliRepository implements Notificati
         // stored as a SQL NULL literal rather than the string "".
         if ($link === null) {
             $this->execute(
-                "INSERT INTO `gm_notifications` (`team_id`, `type`, `message`, `link`)
+                "INSERT INTO `gm_notifications` (team_id, type, message, link)
                  VALUES (?, ?, ?, NULL)",
                 "iss",
                 $teamId,
@@ -31,7 +31,7 @@ class NotificationRepository extends \BaseMysqliRepository implements Notificati
             );
         } else {
             $this->execute(
-                "INSERT INTO `gm_notifications` (`team_id`, `type`, `message`, `link`)
+                "INSERT INTO `gm_notifications` (team_id, type, message, link)
                  VALUES (?, ?, ?, ?)",
                 "isss",
                 $teamId,
@@ -51,29 +51,19 @@ class NotificationRepository extends \BaseMysqliRepository implements Notificati
      */
     public function getForTeam(int $teamId, int $limit = 50): array
     {
+        /** @var list<NotificationRow> $rows */
         $rows = $this->fetchAll(
-            "SELECT `id`, `team_id`, `type`, `message`, `link`, `read_at`, `created_at`
+            "SELECT id, team_id, type, message, link, read_at, created_at
              FROM `gm_notifications`
-             WHERE `team_id` = ?
-             ORDER BY `created_at` DESC, `id` DESC
+             WHERE team_id = ?
+             ORDER BY created_at DESC, id DESC
              LIMIT ?",
             "ii",
             $teamId,
             $limit
         );
 
-        return array_map(
-            static fn (array $row): array => [
-                'id' => (int) $row['id'],
-                'team_id' => (int) $row['team_id'],
-                'type' => (string) $row['type'],
-                'message' => (string) $row['message'],
-                'link' => $row['link'] === null ? null : (string) $row['link'],
-                'read_at' => $row['read_at'] === null ? null : (string) $row['read_at'],
-                'created_at' => (string) $row['created_at'],
-            ],
-            $rows
-        );
+        return $rows;
     }
 
     /**
@@ -81,10 +71,13 @@ class NotificationRepository extends \BaseMysqliRepository implements Notificati
      */
     public function countUnread(int $teamId): int
     {
+        // COUNT(*) comes back from mysqli as a string — annotate as string and
+        // cast (a mixed→int cast would trip strict-rules cast.int).
+        /** @var array{cnt: string}|null $row */
         $row = $this->fetchOne(
             "SELECT COUNT(*) AS cnt
              FROM `gm_notifications`
-             WHERE `team_id` = ? AND `read_at` IS NULL",
+             WHERE team_id = ? AND read_at IS NULL",
             "i",
             $teamId
         );
@@ -100,8 +93,8 @@ class NotificationRepository extends \BaseMysqliRepository implements Notificati
         // Authorization invariant: team_id is the caller's session-resolved id,
         // so a forged notification id belonging to another team affects 0 rows.
         return $this->execute(
-            "UPDATE `gm_notifications` SET `read_at` = NOW()
-             WHERE `id` = ? AND `team_id` = ? AND `read_at` IS NULL",
+            "UPDATE `gm_notifications` SET read_at = NOW()
+             WHERE id = ? AND team_id = ? AND read_at IS NULL",
             "ii",
             $notificationId,
             $teamId
@@ -114,8 +107,8 @@ class NotificationRepository extends \BaseMysqliRepository implements Notificati
     public function markAllRead(int $teamId): int
     {
         return $this->execute(
-            "UPDATE `gm_notifications` SET `read_at` = NOW()
-             WHERE `team_id` = ? AND `read_at` IS NULL",
+            "UPDATE `gm_notifications` SET read_at = NOW()
+             WHERE team_id = ? AND read_at IS NULL",
             "i",
             $teamId
         );

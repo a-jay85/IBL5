@@ -185,6 +185,72 @@ class TradingService implements TradingServiceInterface
     }
 
     /**
+     * @see TradingServiceInterface::buildCounterFormData()
+     *
+     * @param list<TradeInfoRow> $sourceRows
+     * @param array<string, TradeCashRow> $cashMap
+     * @return array{checkedItems: array<string, true>, userSendsCash: array<int, int>, partnerSendsCash: array<int, int>}
+     */
+    public function buildCounterFormData(array $sourceRows, array $cashMap, int $sourceOfferId, string $counteringTeam): array
+    {
+        /** @var array<string, true> $checkedItems */
+        $checkedItems = [];
+
+        // Side-agnostic: every non-cash asset still sits on whichever team currently
+        // rosters it (the source offer is never executed — the counter auto-rejects it),
+        // so the make-offer form re-checks it by roster regardless of trade direction.
+        foreach ($sourceRows as $row) {
+            if ($row['itemtype'] === TradeItemType::Cash->value) {
+                continue;
+            }
+            $checkedItems[$row['itemtype'] . ':' . $row['itemid']] = true;
+        }
+
+        // Cash is directional. The countering GM's outbound cash (sending_team ===
+        // countering team) maps to the form's userSendsCash; the other team's cash
+        // maps to partnerSendsCash. salary_yr{y} aligns with the year-indexed cash
+        // inputs the form's renderCashRows restore reads ($previousCash[$y]).
+        $userSendsCash = $this->extractCashByYear($cashMap, $sourceOfferId, $counteringTeam, true);
+        $partnerSendsCash = $this->extractCashByYear($cashMap, $sourceOfferId, $counteringTeam, false);
+
+        return [
+            'checkedItems' => $checkedItems,
+            'userSendsCash' => $userSendsCash,
+            'partnerSendsCash' => $partnerSendsCash,
+        ];
+    }
+
+    /**
+     * Pull the positive per-year cash amounts for one side of a source offer.
+     *
+     * @param array<string, TradeCashRow> $cashMap Keyed "{offerId}:{sendingTeam}"
+     * @param bool $matchCounteringTeam When true, return the countering team's cash row;
+     *        when false, return the other team's row.
+     * @return array<int, int> Year-indexed (1-6) amounts; only > 0 entries included
+     */
+    private function extractCashByYear(array $cashMap, int $sourceOfferId, string $counteringTeam, bool $matchCounteringTeam): array
+    {
+        $cashByYear = [];
+        foreach ($cashMap as $key => $row) {
+            if ($row['trade_offer_id'] !== $sourceOfferId) {
+                continue;
+            }
+            $isCounteringTeam = ($row['sending_team'] === $counteringTeam);
+            if ($isCounteringTeam !== $matchCounteringTeam) {
+                continue;
+            }
+            for ($y = 1; $y <= 6; $y++) {
+                $amount = $row["salary_yr{$y}"] ?? 0;
+                if ($amount !== null && $amount > 0) {
+                    $cashByYear[$y] = $amount;
+                }
+            }
+        }
+
+        return $cashByYear;
+    }
+
+    /**
      * Group trade offer rows by offer ID and resolve item details
      *
      * @param list<TradeInfoRow> $allTradeRows Raw trade info rows

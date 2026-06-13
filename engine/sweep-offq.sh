@@ -41,11 +41,19 @@ c, path = sys.argv[1], sys.argv[2]
 d = json.load(open(path))
 hm = {h['game_type']: h for h in d.get('home_margins', [])}
 fid = {f['game_type']: f for f in d.get('season_aggregates', {}).get('fidelity', [])}
+nan = float('nan')
 for gt in sorted(set(hm) | set(fid)):
     m = hm.get(gt, {}); f = fid.get(gt, {})
-    print("const=%s gt%s margin eng=%.3f sco=%.3f gap=%+.3f | fta_disp=%.3f" % (
-        c, gt, m.get('engine_home_margin', float('nan')), m.get('sco_home_margin', float('nan')),
-        m.get('margin_gap', float('nan')), f.get('fta_dispersion_ratio', float('nan'))))
+    # margin_gap + fta_disp are the GATE-1 readouts; cov/var(lnFGA) are the count-axis
+    # blocker (defQ/teamDef feed (defQ−teamDef·5/6), the lead negative-Cov driver —
+    # ADR-0043). The pin can move this, so surface it: watch engine_cov toward real
+    # (real ≈ +2.7e-4, engine baseline ≈ −1e-3) without re-tuning toward it (ADR-0041).
+    print("const=%s gt%s margin eng=%.3f sco=%.3f gap=%+.3f | fta_disp=%.3f | "
+          "cov(lnFGA,lnPPS) eng=%+.6f real=%+.6f | var(lnFGA) eng=%.6f real=%.6f" % (
+        c, gt, m.get('engine_home_margin', nan), m.get('sco_home_margin', nan),
+        m.get('margin_gap', nan), f.get('fta_dispersion_ratio', nan),
+        f.get('engine_cov_ln_fga_ln_pps', nan), f.get('real_cov_ln_fga_ln_pps', nan),
+        f.get('engine_var_ln_fga', nan), f.get('real_var_ln_fga', nan)))
 PY
 done
 echo "sweep done $(date -u +%FT%TZ)" | tee -a "$OUT/sweep.log"

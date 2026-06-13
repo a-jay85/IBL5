@@ -143,6 +143,42 @@ home-margin undershoot without re-introducing foul degeneracy. If teamDef turns 
 per-team, the stand-in becomes a computed per-matchup term, not a constant — note that as a
 fidelity item.
 
+## Part 6 — Degeneracy guards: re-derive vs drop (pre-analyzed, VM-independent)
+
+Two synthetic guards exist only because offQ/defQ/teamDef are *calibrated* stand-ins;
+the pin lets them be re-derived faithfully or dropped. Pre-analyzed here so the VM
+session is a mechanical edit, not a judgment call. Both tests have a **structural core**
+(a faithful mechanism — KEEP unconditionally) and a **magnitude band** (a calibration
+backstop tied to `offQualityConstant = 1.575` — the only part the pin touches).
+
+### `TestBucketWeights_FoulPathMix` (`internal/sim/bucketweights_test.go:48`)
+- **Structural core — KEEP:** `homeFoul > awayFoul` (line 75). This is the bucket-level
+  HCA mechanism (home shrinks offQ → bigger foul bucket); faithful values cannot change
+  its sign. Keep verbatim.
+- **Magnitude band — re-derive or drop:** `homeFoul ∈ [0.02, 0.25]` (line 71). The
+  comment (66-70) is explicit that the `0.25` ceiling exists to *floor the GATE-1
+  home-margin calibration* at offQ=1.575 (it holds at 0.249, hard against the top). That
+  is a calibration artifact, not a faithful target.
+
+### `TestSimulate_FoulOutRate` (`internal/sim/sim_test.go:772`)
+- **Structural core — KEEP:** the test that an entire active roster fouling out is a
+  rare event (the `active[tb.TeamID] == 0` cascade). Non-degeneracy is faithful.
+- **Magnitude band — re-derive or drop:** `rate ≤ 0.08` (line 796). The `0.08` ceiling
+  is a synthetic degeneracy cap, not corpus-derived.
+
+### Decision rule (apply after the pin, per band)
+1. Run the live foul rate the faithful offQ/defQ/teamDef produce (the post-pin golden +
+   `sweep-offq.sh` give the shares).
+2. **Inside the current band** → KEEP the band, but rewrite the comment from "calibration
+   floor" to a faithful assertion, and drop the calibration-only `0.25` *upper* bound
+   (it only floored the old margin). The directional + non-degeneracy cores stay.
+3. **Outside the current band** → the band was calibration-shaped → **DROP it** and lean
+   on the corpus GATE-1 sweep + golden for magnitude. Do **NOT** widen a band to fit the
+   new value — fitting a synthetic guard to the measured number is the ADR-0041
+   metric-gaming failure the whole approach forbids.
+4. Either way, the count-axis Cov readout (now in the sweep, Part 5) is the *acceptance*
+   signal — never a tuning target.
+
 ## References
 
 - `ibl5/docs/decisions/0061-foul-bucket-volume-neutral-divisor.md` (the stand-in + the named follow-up)

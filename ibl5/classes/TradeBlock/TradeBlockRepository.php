@@ -44,6 +44,7 @@ class TradeBlockRepository extends BaseMysqliRepository implements TradeBlockRep
      */
     public function getBlockPidsForTeam(int $teamId): array
     {
+        /** @var list<array{pid: int, note: string}> $rows */
         $rows = $this->fetchAll(
             "SELECT b.pid, b.note
              FROM `gm_trade_block` b
@@ -56,7 +57,7 @@ class TradeBlockRepository extends BaseMysqliRepository implements TradeBlockRep
 
         $map = [];
         foreach ($rows as $row) {
-            $map[(int) $row['pid']] = (string) $row['note'];
+            $map[$row['pid']] = $row['note'];
         }
 
         return $map;
@@ -69,13 +70,14 @@ class TradeBlockRepository extends BaseMysqliRepository implements TradeBlockRep
      */
     public function getSeekingNotesByTeam(): array
     {
+        /** @var list<array{teamid: int, seeking_note: string}> $rows */
         $rows = $this->fetchAll(
             "SELECT teamid, seeking_note FROM `gm_trade_seeking`"
         );
 
         $map = [];
         foreach ($rows as $row) {
-            $map[(int) $row['teamid']] = (string) $row['seeking_note'];
+            $map[$row['teamid']] = $row['seeking_note'];
         }
 
         return $map;
@@ -86,13 +88,14 @@ class TradeBlockRepository extends BaseMysqliRepository implements TradeBlockRep
      */
     public function getSeekingNoteForTeam(int $teamId): string
     {
+        /** @var array{seeking_note: string}|null $row */
         $row = $this->fetchOne(
             "SELECT seeking_note FROM `gm_trade_seeking` WHERE teamid = ? LIMIT 1",
             "i",
             $teamId
         );
 
-        return $row !== null ? (string) $row['seeking_note'] : '';
+        return $row !== null ? $row['seeking_note'] : '';
     }
 
     /**

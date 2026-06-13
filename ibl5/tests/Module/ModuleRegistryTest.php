@@ -16,6 +16,11 @@ final class ModuleRegistryTest extends TestCase
         self::assertTrue(ModuleRegistry::isValid('YourAccount'));
     }
 
+    public function testTradeBlockModuleIsValid(): void
+    {
+        self::assertTrue(ModuleRegistry::isValid('TradeBlock'));
+    }
+
     public function testUnknownModuleIsInvalid(): void
     {
         self::assertFalse(ModuleRegistry::isValid('NotAModule'));

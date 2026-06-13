@@ -50,8 +50,10 @@ class TradeBlockController implements TradeBlockControllerInterface
             return;
         }
 
-        $cookie = $this->nukeCompat->cookieDecode($user);
-        $username = is_string($cookie[1] ?? null) ? $cookie[1] : '';
+        // Decoded return of cookieDecode($user) — a local, not the header-populated
+        // $cookie superglobal, so it is safe to read before PageLayout::header().
+        $decodedCookie = $this->nukeCompat->cookieDecode($user);
+        $username = is_string($decodedCookie[1] ?? null) ? $decodedCookie[1] : '';
 
         // PRG: process the bulk edit submission, then redirect.
         if (isset($_POST['Action']) && $_POST['Action'] === 'save') {
@@ -98,11 +100,13 @@ class TradeBlockController implements TradeBlockControllerInterface
             $result = ['success' => false, 'error' => 'An unexpected error occurred. Please try again.'];
         }
 
-        if (($result['success'] ?? false) === true) {
-            \Utilities\HtmxHelper::redirect('modules.php?name=TradeBlock&op=edit&result=' . rawurlencode($result['result'] ?? ''));
+        if ($result['success'] === true) {
+            $resultParam = $result['result'] ?? '';
+            \Utilities\HtmxHelper::redirect('modules.php?name=TradeBlock&op=edit&result=' . rawurlencode($resultParam));
+        } else {
+            $errorParam = $result['error'] ?? '';
+            \Utilities\HtmxHelper::redirect('modules.php?name=TradeBlock&op=edit&error=' . rawurlencode($errorParam));
         }
-
-        \Utilities\HtmxHelper::redirect('modules.php?name=TradeBlock&op=edit&error=' . rawurlencode($result['error'] ?? ''));
     }
 
     private function displayEditForm(string $username): void

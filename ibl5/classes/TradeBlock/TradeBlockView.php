@@ -11,7 +11,6 @@ use TradeBlock\Contracts\TradeBlockViewInterface;
  * @see TradeBlockViewInterface
  *
  * @phpstan-import-type BrowseData from \TradeBlock\Contracts\TradeBlockServiceInterface
- * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
  */
 class TradeBlockView implements TradeBlockViewInterface
 {
@@ -79,7 +78,7 @@ class TradeBlockView implements TradeBlockViewInterface
     /**
      * @see TradeBlockViewInterface::renderEditForm()
      *
-     * @param list<PlayerRow> $roster
+     * @param list<array{pid: int, name: string, ...<string, mixed>}> $roster
      * @param array<int, string> $blockPids
      */
     public function renderEditForm(

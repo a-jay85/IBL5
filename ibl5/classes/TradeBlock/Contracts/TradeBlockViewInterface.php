@@ -14,7 +14,6 @@ use Team\Team;
  * CsrfGuard::generateToken('tradeblock').
  *
  * @phpstan-import-type BrowseData from TradeBlockServiceInterface
- * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
  */
 interface TradeBlockViewInterface
 {
@@ -26,9 +25,10 @@ interface TradeBlockViewInterface
     public function renderBrowse(array $data): string;
 
     /**
-     * Owner's bulk edit form.
+     * Owner's bulk edit form. The view consumes only `pid` and `name` from each
+     * roster row (the Service passes full player rows, which satisfy this shape).
      *
-     * @param list<PlayerRow> $roster
+     * @param list<array{pid: int, name: string, ...<string, mixed>}> $roster
      * @param array<int, string> $blockPids pid => note for already-on-block players
      */
     public function renderEditForm(

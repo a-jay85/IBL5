@@ -300,6 +300,94 @@ class TradingController implements TradingControllerInterface
         \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=trade_rejected');
     }
 
+    /**
+     * @see TradingControllerInterface::counterTradeOffer()
+     *
+     * @param array<string, mixed> $post
+     */
+    public function counterTradeOffer(mixed $user, array $post): void
+    {
+        if (!\Security\CsrfGuard::validateSubmittedToken('trade_counter')) {
+            \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&error=' . rawurlencode('Invalid or expired form submission. Please try again.'));
+        }
+
+        // Identity is derived from the authenticated session, never from form input —
+        // the IDOR check below must trust who the user actually is, not who they claim.
+        if (!$this->nukeCompat->isUser($user)) {
+            $this->nukeCompat->loginBox();
+            return;
+        }
+
+        $decoded = $this->nukeCompat->cookieDecode($user);
+        $username = is_string($decoded[1] ?? null) ? $decoded[1] : '';
+        $userTeam = $this->teamIdentityRepo->getTeamnameFromUsername($username);
+
+        if ($userTeam === null || $userTeam === '') {
+            \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&error=' . rawurlencode('Could not resolve your team.'));
+        }
+
+        $offerRaw = $post['offer'] ?? null;
+
+        if (!is_numeric($offerRaw)) {
+            \Logging\LoggerFactory::getChannel('trade')->warning('Missing offer ID in POST data');
+            \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade');
+        }
+
+        $offerId = (int) $offerRaw;
+
+        $tradeRows = $this->offerRepository->getTradesByOfferId($offerId);
+
+        if ($tradeRows === []) {
+            \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=already_processed');
+        }
+
+        // IDOR: a GM may only counter an offer their team is the recipient of.
+        // Derive the original proposer from a row addressed to the user's team.
+        $originalProposer = null;
+        foreach ($tradeRows as $row) {
+            if ($row['trade_to'] === $userTeam) {
+                $originalProposer = $row['trade_from'];
+                break;
+            }
+        }
+
+        if ($originalProposer === null) {
+            \Logging\LoggerFactory::getChannel('audit')->warning('trade_offer_counter_denied', [
+                'offer_id' => $offerId,
+                'user_team' => $userTeam,
+            ]);
+            \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&error=' . rawurlencode('You are not authorized to counter this offer.'));
+        }
+
+        // Snapshot the source offer's assets + cash BEFORE deleting it, so the
+        // pre-filled counter form can reproduce the deal.
+        $cashRepository = new TradeCashRepository($this->db);
+        $cashMap = $cashRepository->getCashTransactionsByOfferIds([$offerId]);
+        $formData = $this->service->buildCounterFormData($tradeRows, $cashMap, $offerId, $userTeam);
+
+        // Auto-reject the original (collapses the deal to one live offer — the counter).
+        $this->offerRepository->deleteTradeOffer($offerId);
+
+        \Logging\LoggerFactory::getChannel('audit')->info('trade_offer_countered', [
+            'offer_id' => $offerId,
+            'countering_team' => $userTeam,
+        ]);
+
+        try {
+            $discord = new \Discord\Discord($this->teamIdentityRepo);
+            $counteringUserDiscordID = $discord->getDiscordIDFromTeamname($userTeam);
+            $proposerUserDiscordID = $discord->getDiscordIDFromTeamname($originalProposer);
+            $declineMessage = TradingService::buildDeclineMessage($counteringUserDiscordID, $userTeam);
+            \Discord\Discord::sendDM($proposerUserDiscordID, $declineMessage);
+        } catch (\Exception $e) {
+            // Silently fail if Discord notification fails
+            // The trade rejection itself has already succeeded
+        }
+
+        $_SESSION['tradeFormData'] = $formData;
+        \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=offertrade&partner=' . rawurlencode($originalProposer));
+    }
+
     private function renderTradeReview(string $username): void
     {
         $pageData = $this->service->getTradeReviewPageData($username);

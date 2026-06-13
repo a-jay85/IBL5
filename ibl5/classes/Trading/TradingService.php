@@ -240,8 +240,9 @@ class TradingService implements TradingServiceInterface
                 continue;
             }
             for ($y = 1; $y <= 6; $y++) {
-                $amount = $row["salary_yr{$y}"] ?? 0;
-                if ($amount !== null && $amount > 0) {
+                $rawAmount = $row["salary_yr{$y}"] ?? 0;
+                $amount = is_int($rawAmount) ? $rawAmount : 0;
+                if ($amount > 0) {
                     $cashByYear[$y] = $amount;
                 }
             }

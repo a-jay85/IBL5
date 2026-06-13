@@ -148,6 +148,88 @@ class TradingViewTest extends TestCase
     }
 
     // ============================================
+    // PRE-FILL SEAM TESTS (counter-offer contract)
+    // ============================================
+
+    public function testRenderTradeOfferFormChecksPlayerWhenCheckedItemsSet(): void
+    {
+        $pageData = $this->createTradeOfferPageData();
+        $pageData['userPlayers'] = [
+            ['pos' => 'PG', 'name' => 'LeBron James', 'pid' => 7, 'ordinal' => 5, 'cy' => 1, 'salary_yr1' => 500, 'salary_yr2' => 0, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0],
+        ];
+        $pageData['previousFormData'] = ['checkedItems' => ['1:7' => true], 'userSendsCash' => [], 'partnerSendsCash' => []];
+
+        $html = $this->view->renderTradeOfferForm($pageData);
+
+        $this->assertMatchesRegularExpression('/name="check0"\s+checked/', $html);
+    }
+
+    public function testRenderTradeOfferFormLeavesPlayerUncheckedWhenCheckedItemsEmpty(): void
+    {
+        $pageData = $this->createTradeOfferPageData();
+        $pageData['userPlayers'] = [
+            ['pos' => 'PG', 'name' => 'LeBron James', 'pid' => 7, 'ordinal' => 5, 'cy' => 1, 'salary_yr1' => 500, 'salary_yr2' => 0, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0],
+        ];
+        $pageData['previousFormData'] = ['checkedItems' => [], 'userSendsCash' => [], 'partnerSendsCash' => []];
+
+        $html = $this->view->renderTradeOfferForm($pageData);
+
+        $this->assertStringContainsString('type="checkbox" name="check0">', $html);
+        $this->assertDoesNotMatchRegularExpression('/name="check0"\s+checked/', $html);
+    }
+
+    // ============================================
+    // COUNTER BUTTON TESTS (review card)
+    // ============================================
+
+    public function testRenderTradeReviewShowsCounterButton(): void
+    {
+        $pageData = $this->createTradeReviewPageData();
+        $pageData['tradeOffers'] = [
+            1 => $this->createTradeOfferWithPreview([
+                'items' => [
+                    ['type' => 'player', 'description' => 'Trade item.', 'notes' => null, 'from' => 'Lakers', 'to' => 'Celtics'],
+                ],
+            ]),
+        ];
+
+        $html = $this->view->renderTradeReview($pageData);
+
+        $this->assertStringContainsString('action="/ibl5/modules/Trading/countertradeoffer.php"', $html);
+        $this->assertStringContainsString('>Counter</button>', $html);
+        // Reject form must still render alongside (regression on the shared card).
+        $this->assertStringContainsString('rejecttradeoffer.php', $html);
+        $this->assertStringContainsString('>Reject</button>', $html);
+    }
+
+    public function testCounterFormCarriesTokenAndOfferOnly(): void
+    {
+        $pageData = $this->createTradeReviewPageData();
+        $pageData['tradeOffers'] = [
+            1 => $this->createTradeOfferWithPreview(),
+        ];
+
+        $html = $this->view->renderTradeReview($pageData);
+        $counterForm = $this->sliceCounterForm($html);
+
+        $this->assertStringContainsString('name="_csrf_token"', $counterForm);
+        $this->assertStringContainsString('name="offer"', $counterForm);
+        // Team identity is derived server-side — the counter form must NOT carry it.
+        $this->assertStringNotContainsString('teamRejecting', $counterForm);
+        $this->assertStringNotContainsString('teamReceiving', $counterForm);
+    }
+
+    private function sliceCounterForm(string $html): string
+    {
+        $start = strpos($html, '<form name="tradecounter"');
+        self::assertNotFalse($start, 'counter form not rendered');
+        $end = strpos($html, '</form>', $start);
+        self::assertNotFalse($end);
+
+        return substr($html, $start, $end - $start);
+    }
+
+    // ============================================
     // COLLAPSIBLE ROSTER DETAILS TESTS
     // ============================================
 

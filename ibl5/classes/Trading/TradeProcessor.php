@@ -103,7 +103,7 @@ class TradeProcessor implements TradeProcessorInterface
             // had the hammer = the listening team). getTradesByOfferIdForUpdate() has no
             // ORDER BY, so loop-end trade_from/trade_to are non-deterministic for
             // bilateral trades and must NOT be used for sendNotifications().
-            $listeningTeamName = $tradeRows[0]['approval'];
+            $listeningTeamName = $tradeRows[0]['approval'] ?? '';
             $offeringTeamName = '';
             foreach ($tradeRows as $row) {
                 if ($row['trade_from'] !== $listeningTeamName) {

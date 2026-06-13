@@ -12,9 +12,10 @@ import { assertNoPhpErrors } from '../helpers/php-errors';
  * Verification matrix: #21.
  */
 test.describe('notification bell visibility (non-owner)', () => {
-  test('logged-in user with no team sees no notification bell', async ({ page }) => {
-    test.skip(!process.env.IBL_TEST_USER_REGULAR, 'IBL_TEST_USER_REGULAR not configured');
+  // e2e-hygiene-allow: auth-regular fixture requires this guard (fixtures/auth-regular.ts)
+  test.skip(!process.env.IBL_TEST_USER_REGULAR, 'IBL_TEST_USER_REGULAR not configured — regular.json absent or stale');
 
+  test('logged-in user with no team sees no notification bell', async ({ page }) => {
     await page.goto('index.php');
     await assertNoPhpErrors(page, 'on index.php');
 

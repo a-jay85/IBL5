@@ -98,16 +98,28 @@ class TradeProcessor implements TradeProcessorInterface
             }
 
             $storytext = "";
+
+            // Determine offering/listening teams from the approval field (the team that
+            // had the hammer = the listening team). getTradesByOfferIdForUpdate() has no
+            // ORDER BY, so loop-end trade_from/trade_to are non-deterministic for
+            // bilateral trades and must NOT be used for sendNotifications().
+            $listeningTeamName = $tradeRows[0]['approval'];
             $offeringTeamName = '';
-            $listeningTeamName = '';
+            foreach ($tradeRows as $row) {
+                if ($row['trade_from'] !== $listeningTeamName) {
+                    $offeringTeamName = $row['trade_from'];
+                    break;
+                }
+            }
+            if ($offeringTeamName === '') {
+                $offeringTeamName = $tradeRows[0]['trade_from'];
+            }
 
             foreach ($tradeRows as $tradeRow) {
                 $itemId = $tradeRow['itemid'];
                 $itemType = $tradeRow['itemtype'];
-                $offeringTeamName = $tradeRow['trade_from'];
-                $listeningTeamName = $tradeRow['trade_to'];
 
-                $result = $this->processTradeItem($itemId, $itemType, $offeringTeamName, $listeningTeamName, $offerId);
+                $result = $this->processTradeItem($itemId, $itemType, $tradeRow['trade_from'], $tradeRow['trade_to'], $offerId);
                 $storytext .= $result['tradeLine'];
             }
 

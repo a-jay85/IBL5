@@ -8,10 +8,10 @@ use PHPUnit\Framework\TestCase;
 use Tests\WideUnit\Mocks\MockDatabase;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Trading\Contracts\TradingServiceInterface;
-use Trading\Contracts\TradeProcessorInterface;
 use Trading\Contracts\TradeOfferRepositoryInterface;
 use Trading\Contracts\TradeOfferInterface;
 use Trading\Contracts\TradingViewInterface;
+use Trading\Contracts\TradeExecutionServiceInterface;
 use Trading\TradingController;
 
 class TradingControllerRosterPreviewTest extends TestCase
@@ -34,13 +34,13 @@ class TradingControllerRosterPreviewTest extends TestCase
     ): TradingController {
         return new TradingController(
             self::createStub(TradingServiceInterface::class),
-            self::createStub(TradeProcessorInterface::class),
             self::createStub(TradeOfferRepositoryInterface::class),
             self::createStub(TradeOfferInterface::class),
             self::createStub(TradingViewInterface::class),
             $teamIdentityRepo ?? self::createStub(TeamIdentityRepositoryInterface::class),
             $nukeCompat ?? self::createStub(\Utilities\NukeCompat::class),
             $this->mockDb,
+            self::createStub(TradeExecutionServiceInterface::class),
         );
     }
 

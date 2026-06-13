@@ -29,6 +29,7 @@ final class ModuleRegistry
         'GMContactList',
         'Injuries',
         'LeagueStarters',
+        'MyTransactions',
         'News',
         'NextSim',
         'OneOnOneGame',

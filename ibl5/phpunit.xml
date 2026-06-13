@@ -181,6 +181,9 @@
         <testsuite name="TransactionHistory Module Tests">
             <directory>tests/TransactionHistory</directory>
         </testsuite>
+        <testsuite name="MyTransactions Module Tests">
+            <directory>tests/MyTransactions</directory>
+        </testsuite>
         <testsuite name="AllStarAppearances Module Tests">
             <directory>tests/AllStarAppearances</directory>
         </testsuite>

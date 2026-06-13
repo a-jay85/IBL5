@@ -19,6 +19,9 @@
         <testsuite name="Trading Module Tests">
             <directory>tests/Trading</directory>
         </testsuite>
+        <testsuite name="Notifications Tests">
+            <directory>tests/Notifications</directory>
+        </testsuite>
         <testsuite name="Extension Module Tests">
             <directory>tests/Extension</directory>
         </testsuite>

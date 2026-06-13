@@ -341,17 +341,25 @@ class TradingController implements TradingControllerInterface
             \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=already_processed');
         }
 
-        // IDOR: a GM may only counter an offer their team is the recipient of.
-        // Derive the original proposer from a row addressed to the user's team.
+        // IDOR: a GM may only counter an offer their team is the RECIPIENT of —
+        // not merely involved. The recipient is the approving/hammer team
+        // (ibl_trade_info.approval), so a bilateral trade's proposer (who is also
+        // a `trade_to` on the assets they receive) is correctly excluded.
+        // Derive the original proposer as the other team on the offer.
+        $userIsRecipient = false;
         $originalProposer = null;
         foreach ($tradeRows as $row) {
-            if ($row['trade_to'] === $userTeam) {
+            if ($row['approval'] === $userTeam) {
+                $userIsRecipient = true;
+            }
+            if ($row['trade_from'] !== $userTeam) {
                 $originalProposer = $row['trade_from'];
-                break;
+            } elseif ($row['trade_to'] !== $userTeam) {
+                $originalProposer = $row['trade_to'];
             }
         }
 
-        if ($originalProposer === null) {
+        if (!$userIsRecipient || $originalProposer === null) {
             \Logging\LoggerFactory::getChannel('audit')->warning('trade_offer_counter_denied', [
                 'offer_id' => $offerId,
                 'user_team' => $userTeam,

@@ -1981,4 +1981,4 @@ INSERT INTO gm_notifications (id, team_id, type, message, link, read_at) VALUES
   (2, 1, 'TRADE_ACCEPTED',       'Stars accepted your trade.',    'modules.php?name=Trading&op=reviewtrade', NULL),
   (3, 1, 'TRADE_REJECTED',       'Stars rejected your trade offer.', 'modules.php?name=Trading&op=reviewtrade', NULL),
   (4, 2, 'TRADE_OFFER_RECEIVED', 'Metros sent you a trade offer.', 'modules.php?name=Trading&op=reviewtrade', NULL)
-ON DUPLICATE KEY UPDATE message = VALUES(message);
+ON DUPLICATE KEY UPDATE message = VALUES(message), read_at = VALUES(read_at);

@@ -62,7 +62,7 @@ test.describe('GM notification inbox', () => {
     await page.goto('modules.php?name=Notifications');
     // Scrape the shared notif_mark token from a real mark form.
     const token = await page
-      .locator('form[action*="op=mark"] input[name="_csrf_token"]')
+      .locator('form[action$="op=mark"] input[name="_csrf_token"]')
       .first()
       .getAttribute('value');
     expect(token).toMatch(/^[0-9a-f]{64}$/);
@@ -85,7 +85,7 @@ test.describe('GM notification inbox', () => {
 
     await Promise.all([
       page.waitForURL('**/modules.php?name=Notifications'),
-      page.locator('form[action*="op=mark"] button[type="submit"]').first().click(),
+      page.locator('form[action$="op=mark"] button[type="submit"]').first().click(),
     ]);
 
     await expect(page.locator('.notification-card--unread')).toHaveCount(2);

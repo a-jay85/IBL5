@@ -34,6 +34,23 @@ class DepthChartEntryEntryPointTest extends ModuleEntryPointTestCase
         $this->assertNotEmpty($output);
     }
 
+    public function testDefaultOpRendersLineupHealthCheckPanel(): void
+    {
+        $this->authenticateAs('testgm');
+        $this->mockDb->setMockTeamData([self::fullTeamData()]);
+        $this->mockDb->setMockData([]);
+        // Cap read used by the health-check panel; stub the view query so the
+        // analyzer receives a defined total (0 → no over_cap warning).
+        $this->mockDb->onQuery('vw_current_salary', [['total_salary' => 0]]);
+
+        $output = $this->runModule('DepthChartEntry', ['op' => ''], [], [
+            'user' => $GLOBALS['user'],
+        ]);
+
+        $this->assertStringContainsString('id="dc-health-check"', $output);
+        $this->assertStringNotContainsString('Fatal error', $output);
+    }
+
     public function testOpTabApiReturnsHtml(): void
     {
         $this->mockDb->setMockTeamData([self::fullTeamData()]);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DepthChartEntry;
 
+use Repositories\Contracts\SalaryCapRepositoryInterface;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 
 /**
@@ -28,12 +29,14 @@ class DepthChartEntryApiHandler
     private \mysqli $db;
     private TeamIdentityRepositoryInterface $commonRepo;
     private \League\LeagueContext $leagueContext;
+    private SalaryCapRepositoryInterface $salaryCapRepository;
 
-    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepo, \League\LeagueContext $leagueContext)
+    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepo, \League\LeagueContext $leagueContext, SalaryCapRepositoryInterface $salaryCapRepository)
     {
         $this->db = $db;
         $this->commonRepo = $commonRepo;
         $this->leagueContext = $leagueContext;
+        $this->salaryCapRepository = $salaryCapRepository;
     }
 
     public function handle(): void
@@ -71,7 +74,7 @@ class DepthChartEntryApiHandler
         }
         header('HX-Push-Url: ' . $pushUrl);
 
-        $controller = new DepthChartEntryController($this->db, $this->commonRepo, $this->leagueContext);
+        $controller = new DepthChartEntryController($this->db, $this->commonRepo, $this->leagueContext, $this->salaryCapRepository);
         $responder = new \Api\Response\HtmlResponder();
         $responder->html($controller->getTableOutput($teamid, $display, $split));
     }

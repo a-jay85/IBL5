@@ -32,6 +32,23 @@ test.describe('Navigation bar (authenticated, desktop)', () => {
     await expect(teamPageLink).toBeVisible();
   });
 
+  test('my team dropdown shows owner-gated My Watchlist link', async ({ page }) => {
+    // My Watchlist lives in getIblTeamMenu(), only reached when teamId !== null,
+    // so it is automatically owner-gated. The auth fixture owns Metros (teamid 1).
+    await page.goto('index.php');
+    const nav = desktopNav(page);
+    await nav.getByRole('button', { name: 'My Team' }).click();
+
+    const watchlistLink = nav.locator('.nav-dropdown-item', {
+      hasText: 'My Watchlist',
+    }).first();
+    await expect(watchlistLink).toBeVisible();
+    await expect(watchlistLink).toHaveAttribute(
+      'href',
+      /modules\.php\?name=Watchlist/,
+    );
+  });
+
   test('my team dropdown shows admin-only Voting Results link', async ({ page }) => {
     // The default auth fixture is the CI main user: roles_mask=1 (ADMIN,
     // setup-docker-e2e action.yml ~L128) and gm_username on team Metros

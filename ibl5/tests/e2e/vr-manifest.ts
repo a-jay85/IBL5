@@ -150,6 +150,8 @@ export const VR_MANIFEST: VrRow[] = [
   // ── Auth modules ────────────────────────────────────────────
   { name: 'api-keys', auth: 'auth', url: 'modules.php?name=ApiKeys',
     anchor: 'form[action*="ApiKeys"]', viewports: ['desktop', 'mobile'], skipContentCheck: true },
+  { name: 'notification-settings', auth: 'auth', url: 'modules.php?name=NotificationSettings',
+    anchor: 'form[action*="NotificationSettings"]', viewports: ['desktop', 'mobile'] },
   { name: 'cap-space', auth: 'auth', url: 'modules.php?name=CapSpace&teamid=1',
     anchor: '.ibl-data-table', viewports: ['desktop', 'mobile'] },
   { name: 'depth-chart-entry', auth: 'auth', url: 'modules.php?name=DepthChartEntry',

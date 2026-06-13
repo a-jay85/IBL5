@@ -159,6 +159,7 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
     {
         if ($this->config->isLoggedIn) {
             return [
+                ['label' => 'Notification Settings', 'url' => 'modules.php?name=NotificationSettings'],
                 ['label' => 'Logout', 'url' => 'modules.php?name=YourAccount&op=logout', 'noBoost' => true],
             ];
         }

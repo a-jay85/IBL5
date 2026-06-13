@@ -408,20 +408,6 @@ INSERT INTO ibl_plr (
    65, 22, 88,
    'a0000000-0000-0000-0000-000000200032');
 
--- ============================================================
--- Trade Block fixtures (trade-block.spec.ts browse board).
--- Cross-team data independent of test ordering: pid=23 "Cougars Guard"
--- (teamid=3, retired=0) is seeded onto the block, and the Cougars get a
--- seeking note. The team-1 (Metros) toggle E2E mutates its own listing and
--- cleans up via afterAll, so it must NOT collide with this row. The IDOR
--- negative test forges pid=24 "Cougars Forward" (team 3, NOT on the block),
--- so 23 (seeded) and 24 (forged) stay distinct.
--- ============================================================
-INSERT INTO gm_trade_block (pid, note) VALUES
-  (23, 'Looking for a wing defender');
-INSERT INTO gm_trade_seeking (teamid, seeking_note) VALUES
-  (3, 'Seeking shooting and a backup big');
-
 -- Cash consideration record for Free Agency placeholder filtering tests.
 -- Cash entries live in ibl_cash_considerations (not ibl_plr) since migration 095.
 -- Tests verify that cash rows appear in "Under Contract" and do NOT appear
@@ -600,6 +586,22 @@ INSERT INTO ibl_plr (
    30, 90, 50, 140, 95, 30,
    55, 35, 85,
    'a0000000-0000-0000-0000-000000000029');
+
+-- ============================================================
+-- Trade Block fixtures (trade-block.spec.ts browse board).
+-- MUST come after the pid 23/24 ibl_plr inserts above — gm_trade_block.pid has
+-- an FK to ibl_plr(pid), so the player rows must exist first.
+-- Cross-team data independent of test ordering: pid=23 "Cougars Guard"
+-- (teamid=3, retired=0) is seeded onto the block, and the Cougars get a seeking
+-- note. The team-1 (Metros) toggle E2E mutates its own listing and cleans up via
+-- afterAll, so it never collides with this row. The IDOR negative test forges
+-- pid=24 "Cougars Forward" (team 3, NOT on the block), so 23 (seeded) and 24
+-- (forged) stay distinct.
+-- ============================================================
+INSERT INTO gm_trade_block (pid, note) VALUES
+  (23, 'Looking for a wing defender');
+INSERT INTO gm_trade_seeking (teamid, seeking_note) VALUES
+  (3, 'Seeking shooting and a backup big');
 
 -- ============================================================
 -- Placeholder player for LeagueStarters module

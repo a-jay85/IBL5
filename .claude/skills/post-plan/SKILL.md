@@ -88,7 +88,7 @@ When the nightly postplan prompt supplied an authoritative plan path, use it ins
 If the working tree is clean and `git diff origin/master...HEAD` is also empty (nothing to ship), abort the entire skill — there is nothing to post-plan.
 
 1. **If working tree has uncommitted changes:** stage relevant changes, review with `git diff --staged`, commit (CLAUDE.md conventions), push. Skip this sub-step if the working tree is already clean (user committed before invoking the skill).
-2. **If no PR exists for the current branch:** create one with `gh pr create`. **Stacked PRs:** If branched from a feature branch (not `master`), use `--base <parent-branch>`. Skip if a PR already exists. **Merge-order dependency:** When this PR shares files with, or must merge after, a sibling PR that is also based on `master` (so stacking via `--base` is unavailable / fragile under squash-merge), add a `Depends-on: #<n>[, #<n>...]` line to the PR body. Phase 6.5 condition (6) reads it and refuses to arm auto-merge until every named PR is `MERGED`, so the series cannot ship out of order. Use this rather than stacking when the repo squash-merges (a squash collapses the parent's commits, leaving a stacked child's branch carrying the pre-squash commits → conflict on auto-retarget).
+2. **If no PR exists for the current branch:** create one with `gh pr create`. **Stacked PRs:** If branched from a feature branch (not `master`), use `--base <parent-branch>`. Skip if a PR already exists. **Merge-order dependency:** When this PR shares files with, or must merge after, a sibling PR that is also based on `master` (so stacking via `--base` is unavailable / fragile under squash-merge), add a `Depends-on: #<n>[, #<n>...]` line to the PR body — **on its own line** (the parser anchors to start-of-line, so an inline prose mention of the marker is ignored). Phase 6.5 condition (6) reads it and refuses to arm auto-merge until every named PR is `MERGED`, so the series cannot ship out of order. Use this rather than stacking when the repo squash-merges (a squash collapses the parent's commits, leaving a stacked child's branch carrying the pre-squash commits → conflict on auto-retarget).
 3. **Manual testing in PR description:** Check the plan file for a Verification Matrix. If one exists, copy only the rows classified as `Truly-manual` into the PR's `## Manual Testing` section. If the matrix has zero truly-manual rows (or the plan says "All verification is automated"), write: `No manual testing needed — all changes are covered by unit and E2E tests.` If no plan file or no matrix exists, fall back to the original rule: list only steps requiring subjective human judgment on new or redesigned UI/UX ("does this look/feel good?", "does this flow work well?"). Production comparison and "does output still match?" are visual-regression-replaceable, not manual. Do NOT list CLI commands or script invocations — Phase 6 executes those.
 4. Use Haiku agents for commit message generation if delegating
 
@@ -515,10 +515,13 @@ grep -q 'PHASE5_VERIFY_STATUS=fail' /tmp/post-plan-phase5-status-$PPID 2>/dev/nu
 ```bash
 # condition (6): block if any Depends-on: PR is not yet MERGED.
 # Bare `gh pr view` (no arg) resolves the current branch's PR, matching Phase 3's idiom.
+# Anchor the marker to start-of-line (`^[[:space:]]*depends-on:`) so only a real marker
+# line matches — an INLINE prose mention (e.g. "...the `Depends-on:` gate (#1077)...")
+# must NOT be parsed as a dependency, or every PR documenting the mechanism self-blocks.
 # `while read` (not `for d in $DEPS`) so it splits per-line in bash AND zsh — zsh does
 # not word-split unquoted expansions, so a `for` loop would see all numbers as one word.
 gh pr view --json body --jq '.body' \
-  | grep -ioE 'depends-on:[^0-9#]*[#0-9, ]+' | grep -oE '[0-9]+' \
+  | grep -iE '^[[:space:]]*depends-on:' | grep -oE '[0-9]+' \
   | while read -r d; do
       st=$(gh pr view "$d" --json state --jq '.state' 2>/dev/null)
       [ "$st" != "MERGED" ] && echo "BLOCKED: depends on #$d (state=${st:-unknown}, not yet MERGED)"

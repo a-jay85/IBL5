@@ -40,6 +40,7 @@ class TradeProcessor implements TradeProcessorInterface
     protected \Topics\News\NewsRepository $newsService;
     protected ?Discord $discord;
     protected string $serverName;
+    protected \Notifications\Contracts\NotificationServiceInterface $notificationService;
 
     public function __construct(
         \mysqli $db,
@@ -50,10 +51,13 @@ class TradeProcessor implements TradeProcessorInterface
         ?TradeCashRepositoryInterface $cashRepository = null,
         ?BuyoutLedgerRepositoryInterface $cashConsiderationRepository = null,
         ?TradeExecutionRepositoryInterface $executionRepository = null,
-        ?Season $season = null
+        ?Season $season = null,
+        ?\Notifications\Contracts\NotificationServiceInterface $notificationService = null
     ) {
         $this->db = $db;
         $this->commonRepository = $commonRepository;
+        $this->notificationService = $notificationService
+            ?? new \Notifications\NotificationService(new \Notifications\NotificationRepository($db));
         $this->serverName = $serverName;
         $this->offerRepository = $offerRepository ?? new TradeOfferRepository($db, $serverName);
         $this->assetRepository = $assetRepository ?? new TradeAssetRepository($db);
@@ -94,16 +98,28 @@ class TradeProcessor implements TradeProcessorInterface
             }
 
             $storytext = "";
+
+            // Determine offering/listening teams from the approval field (the team that
+            // had the hammer = the listening team). getTradesByOfferIdForUpdate() has no
+            // ORDER BY, so loop-end trade_from/trade_to are non-deterministic for
+            // bilateral trades and must NOT be used for sendNotifications().
+            $listeningTeamName = $tradeRows[0]['approval'] ?? '';
             $offeringTeamName = '';
-            $listeningTeamName = '';
+            foreach ($tradeRows as $row) {
+                if ($row['trade_from'] !== $listeningTeamName) {
+                    $offeringTeamName = $row['trade_from'];
+                    break;
+                }
+            }
+            if ($offeringTeamName === '') {
+                $offeringTeamName = $tradeRows[0]['trade_from'];
+            }
 
             foreach ($tradeRows as $tradeRow) {
                 $itemId = $tradeRow['itemid'];
                 $itemType = $tradeRow['itemtype'];
-                $offeringTeamName = $tradeRow['trade_from'];
-                $listeningTeamName = $tradeRow['trade_to'];
 
-                $result = $this->processTradeItem($itemId, $itemType, $offeringTeamName, $listeningTeamName, $offerId);
+                $result = $this->processTradeItem($itemId, $itemType, $tradeRow['trade_from'], $tradeRow['trade_to'], $offerId);
                 $storytext .= $result['tradeLine'];
             }
 
@@ -363,6 +379,24 @@ class TradeProcessor implements TradeProcessorInterface
      */
     protected function sendNotifications(string $offeringTeamName, string $listeningTeamName, string $storytext): void
     {
+        // Primary in-app notification for the offering team (their proposal was
+        // accepted — they are the GM awaiting a verdict; the accepting GM already
+        // sees the result page). Written BEFORE the Discord channel post and
+        // independent of Discord availability. Failure is logged, never thrown.
+        try {
+            $offeringTeamId = $this->commonRepository->getTidFromTeamname($offeringTeamName) ?? 0;
+            if ($offeringTeamId > 0) {
+                $this->notificationService->notify(
+                    $offeringTeamId,
+                    \Notifications\NotificationType::TRADE_ACCEPTED,
+                    "{$listeningTeamName} accepted your trade.",
+                    'modules.php?name=Trading&op=reviewtrade'
+                );
+            }
+        } catch (\Throwable $e) {
+            \Logging\LoggerFactory::getChannel('trade')->error('In-app trade notification failed', ['error' => $e->getMessage()]);
+        }
+
         // Skip notifications if Discord is not available
         if ($this->discord === null) {
             return;

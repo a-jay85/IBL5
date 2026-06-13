@@ -67,6 +67,16 @@ function themeheader()
         $teamsData = $navRepo->getTeamsData();
     }
 
+    $unreadNotificationCount = 0;
+    if ($mysqli_db && $isLoggedIn && $teamId !== null) {
+        try {
+            $unreadNotificationCount = (new \Notifications\NotificationRepository($mysqli_db))->countUnread($teamId);
+        } catch (\Throwable) {
+            // Graceful degradation: a missing gm_notifications table (pre-migration
+            // CI window) must not break the header. Bell renders with no badge.
+        }
+    }
+
     $currentLeague = $leagueContext->getCurrentLeague();
 
     $seasonPhase = '';
@@ -110,6 +120,7 @@ function themeheader()
         isDebugAdmin: $debugSession->isDebugAdmin(),
         isAdmin: is_admin() === 1,
         debugViewAllExtensions: $debugSession->isViewAllExtensionsEnabled(),
+        unreadNotificationCount: $unreadNotificationCount,
     );
 
     $navView = new \Navigation\NavigationView($navConfig);

@@ -2340,6 +2340,18 @@ INSERT INTO ibl_box_scores (
    2, 5, 9, 3, 3, 0, 2,
    'b0000000-0000-0000-0000-000000000602');
 
+-- gm_notifications: in-app GM notification inbox (FK to ibl_team_info.teamid).
+-- 3 unread rows for team_id=1 (Metros, the CI E2E user) drive the bell badge /
+-- list / mark-read specs; 1 unread row for team_id=2 (Stars) is the authz-negative
+-- fixture (the Metros user must NOT be able to mark it read). Fixed ids for
+-- idempotency. Migration 150 creates the table before this seed runs.
+INSERT INTO gm_notifications (id, team_id, type, message, link, read_at) VALUES
+  (1, 1, 'TRADE_OFFER_RECEIVED', 'Stars sent you a trade offer.', 'modules.php?name=Trading&op=reviewtrade', NULL),
+  (2, 1, 'TRADE_ACCEPTED',       'Stars accepted your trade.',    'modules.php?name=Trading&op=reviewtrade', NULL),
+  (3, 1, 'TRADE_REJECTED',       'Stars rejected your trade offer.', 'modules.php?name=Trading&op=reviewtrade', NULL),
+  (4, 2, 'TRADE_OFFER_RECEIVED', 'Metros sent you a trade offer.', 'modules.php?name=Trading&op=reviewtrade', NULL)
+ON DUPLICATE KEY UPDATE message = VALUES(message), read_at = VALUES(read_at);
+
 -- Watchlist: pre-watch pid 2 (Test Player Two) for Metros (teamid 1, the E2E
 -- user's team) so the unwatch + list E2E specs have a deterministic seeded row.
 -- FK resolves: pid 2 (ibl_plr) and teamid 1 (Metros, ibl_team_info) seeded above.

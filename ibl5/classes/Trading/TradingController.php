@@ -287,6 +287,23 @@ class TradingController implements TradingControllerInterface
         ]);
 
         try {
+            // Primary in-app notification for the receiving (offering) team, whose
+            // offer was rejected. Written BEFORE the Discord side-effect so a
+            // Discord failure cannot skip it. Failure here is silently swallowed —
+            // the rejection itself has already succeeded.
+            $teamReceivingId = $this->teamIdentityRepo->getTidFromTeamname($teamReceiving) ?? 0;
+            if ($teamReceivingId > 0) {
+                $notificationService = new \Notifications\NotificationService(
+                    new \Notifications\NotificationRepository($this->db)
+                );
+                $notificationService->notify(
+                    $teamReceivingId,
+                    \Notifications\NotificationType::TRADE_REJECTED,
+                    "{$teamRejecting} rejected your trade offer.",
+                    'modules.php?name=Trading&op=reviewtrade'
+                );
+            }
+
             $discord = new \Discord\Discord($this->teamIdentityRepo);
             $rejectingUserDiscordID = $discord->getDiscordIDFromTeamname($teamRejecting);
             $receivingUserDiscordID = $discord->getDiscordIDFromTeamname($teamReceiving);

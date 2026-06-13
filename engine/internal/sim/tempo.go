@@ -26,8 +26,8 @@ const (
 // and the 24.0 fallback are confirmed; the exact per-game stat-offset inputs are
 // "validation-phase." So this additive offensive-minus-defensive form and its two
 // scales are CORPUS-CALIBRATED STAND-INS for the ratio — exactly like the
-// defensive-only stand-in this replaces and offQualityRatingScale in
-// teamquality.go. The neutral reference points are the real dev-DB per-starter
+// defensive-only stand-in this replaces and the offQualityConstant home-margin
+// knob in teamquality.go. The neutral reference points are the real dev-DB per-starter
 // minutes-weighted composite means (offense 161.2 ± 13.8, defense 23.8 ± 1.4;
 // 28 teams, 2026-06); they center a league-average roster at baseTimeMid.
 const (

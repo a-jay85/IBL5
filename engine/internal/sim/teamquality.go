@@ -1,63 +1,83 @@
 package sim
 
-// Team-quality lineup aggregators — the two sibling functions JSB sums over the
-// 5-man lineup to feed the foul-bucket divisor (00_MASTER_REFERENCE.md L1340,
-// "Team-Quality Aggregation Helpers", VERIFIED 2026-05-30). They are distinct
-// from the per-player bucket-weight helpers in bucketweights.go.
+// Team-quality lineup aggregators — the two functions feeding the foul-bucket
+// divisor (00_MASTER_REFERENCE.md L1340, "Team-Quality Aggregation Helpers",
+// VERIFIED 2026-05-30). They are distinct from the per-player bucket-weight helpers
+// in bucketweights.go.
 //
 //   - defMatchupQuality (FUN_004e3d90) → fVar11: Σ a per-player defensive-rating
 //     stand-in over the 5 defenders, then a ×1.5 universal cap with ceiling
 //     teamDefBaseline×5×1.5 (decompile matchup_sub_calc_1_RAW.c: _DAT_00669ea0=5.0,
-//     _DAT_00669ac0=1.5). The summation + cap structure is confirmed exact.
-//   - offQualityWithHCA (FUN_004e3f80) → fVar12, the foul-bucket DIVISOR: Σ a
-//     per-player offensive-rating stand-in over the 5 offensive players, each term
-//     reduced by hcaDelta when HCA is active. The decompiled function is a plain
-//     summation with NO cap (matchup_sub_calc_2_RAW.c: `dVar2 = local_5c − (team×2−3)
-//     ×0.2`, accumulated); the master-reference gloss claiming a ×1.5 cap on this
-//     function is the loose part — only def_matchup_quality is capped.
+//     _DAT_00669ac0=1.5). The summation + cap structure is confirmed exact, and defQ
+//     stays in the foul-divisor numerator — the intended defense-driven coupling.
+//   - offQualityWithHCA (FUN_004e3f80) → fVar12, the foul-bucket DIVISOR: a
+//     volume-NEUTRAL constant base (offQualityConstant), reduced by len×hcaDelta when
+//     HCA is active, floored at offQualityFloor. NO per-player summation, NO off-side
+//     compression. This is the Fork-B carrier fix (ADR-0061, ~/jsb-foulfork-RE-
+//     verdict-20260612.md): 5.60's offQ divisor sources from the dead-zero +0xDE0
+//     (every write is a =0 init, a 0×x Branch-B scale, or a struct-copied zero), so
+//     5.60's offQ ≈ Σ(0) − HCA → a floored constant, volume-neutral. The old Go form
+//     summed floor1(OO)·offQualityRatingScale — a +0.62-roster-volume-coupled divisor
+//     that injected a foul anti-coupling (engine corr(vol,foulShare) −0.357 vs real
+//     +0.161) 5.60 does not have. Replacing the summation with a constant restores the
+//     defense-driven foul weight 0.6 + (0.6/const)·(defQ − teamDef·5/6).
 //
-// FAITHFULNESS: the SHAPE (per-lineup summation, the def cap, the per-player HCA
-// subtraction that shrinks the home divisor) is ported exactly. The per-player
-// summed values are documented STAND-INS — the exact per-game player-double source
-// offsets are unpinned (00_MASTER_REFERENCE.md L1340, "source offsets validation-
-// phase"). offQualityRatingScale (the divisor's per-player slope, and therefore the
-// fraction the fixed ±hcaMagnitude subtraction occupies) is now CALIBRATED against
-// the real 5.60 .sco archive: it sets the size of the home-court margin, which was
-// tuned to match the corpus home-minus-visitor point margin (see the const comment
-// and bands.go provenance). The def-side stand-ins keep the foul bucket a realistic
-// minority share; their exact magnitudes remain corpus-deferred (they shape the
-// foul rate, not the home/away margin).
+// FAITHFULNESS: the SHAPE (the def summation + cap, the per-player HCA subtraction
+// that shrinks the home divisor, the constant volume-neutral off base) is ported
+// exactly. The def per-player summed values are documented STAND-INS — the exact
+// per-game player-double source offsets are unpinned (00_MASTER_REFERENCE.md L1340,
+// "source offsets validation-phase"). offQualityConstant (the volume-neutral divisor
+// base, and therefore the fraction the fixed ±hcaMagnitude subtraction occupies) is
+// the GATE-1 home-margin calibration knob that offQualityRatingScale was: it sets the
+// size of the home-court margin, tuned to match the corpus home-minus-visitor point
+// margin (see the const comment and ADR-0061). The def-side stand-ins keep the foul
+// bucket a realistic minority share; their exact magnitudes remain corpus-deferred
+// (they shape the foul rate, not the home/away margin).
 
 const (
-	// offQualityRatingScale maps a player's outside-offense rating (OO) to the
-	// O(1)-per-player offensive-quality stand-in summed by offQualityWithHCA. It must
-	// be small so the 5-man Σ is O(few): the fixed ±0.2/player HCA subtraction (5×0.2
-	// = ±1.0 across the lineup) is then a meaningful fraction of the divisor — the
-	// faithful-O(1)-basis property COMPOSITE_DOUBLES_TRACE.md requires for HCA to land
-	// correctly-signed. The cost (documented) is brittleness at LOW ratings: for an
-	// average OO below ≈4 the home divisor Σ−1.0 hits offQualityFloor, so the HCA
-	// magnitude saturates and inflates for poor offensive teams. That is a magnitude
-	// artifact, not a sign error (the home-favorable SIGN holds at every rating, and
-	// FTA stays < FGA on any realistically-rated roster — only an ALL-zero-rated
-	// lineup degenerates, which real rosters never are).
+	// offQualityConstant is the volume-NEUTRAL base of the foul-bucket divisor
+	// offQualityWithHCA. Fork-B-faithful to 5.60's dead-zero +0xDE0: 5.60's offQ
+	// summation reads a struct-field that is never computed from stats (every write is
+	// a =0 init, a 0×x Branch-B scale, or a verbatim struct copy — proven binary-wide,
+	// ~/jsb-foulfork-RE-verdict-20260612.md :44-52), so 5.60's offQ ≈ Σ(0) − HCA, a
+	// floored constant independent of offensive volume. The old Go form summed
+	// floor1(OO)·offQualityRatingScale, coupling the divisor +0.62 to roster volume and
+	// injecting a foul-share anti-coupling (engine corr(vol,foulShare) −0.357 vs real
+	// +0.161) the real engine does not have. A constant base drops that coupling.
 	//
-	// CALIBRATED 2026-06-02 against the real 5.60 .sco archive (jsbcalibrate
-	// --mode calibrate, ibl5/backups, ~20 seasons) as 0.059 — the value at which the
-	// engine's mean home-minus-visitor point margin matched the corpus within ±0.5
-	// pts. RE-TUNED 2026-06-04 to 0.0565 (ADR-0044, Lever-2): foulCompress=0.45 net-
-	// weakens the home foul advantage, regressing the gt-2 margin to −0.70 (stride=1),
-	// so the scale steps down one notch to restore it to −0.30 (back in ±0.5,
-	// ≈ the pre-foulCompress −0.35 baseline). Lowering the scale grows the home margin
-	// (the fixed 1.0 HCA subtraction becomes a larger fraction of the shrinking
-	// divisor); raising it shrinks the margin. CAUTION: the margin is steeply
-	// sensitive here (0.059→0.052 swings gt-2 from −0.70 to +0.79 — the documented
-	// low-rating brittleness), so the step is small and gt-4 (pre-existing out of band
-	// at master) is not chased. This scale ALSO sets the offQ divisor that scales the
-	// FTA dispersion, so it is non-orthogonal with foulCompress on (margin, FTADisp)
-	// — see ADR-0044. hcaMagnitude (gametype.go = 0.2) is the faithful decompiled
-	// constant and is NOT a tuning knob — the magnitude is reached via this scale's
-	// ratio to that fixed 0.2. See bands.go provenance for the calibration run.
-	offQualityRatingScale = 0.0565
+	// GATE-1 CALIBRATION KNOB: this constant sets the home-court margin, the role
+	// offQualityRatingScale held — the home divisor shrinks by the fixed len×hcaMagnitude
+	// (5×0.2 = 1.0), so a SMALLER constant makes that 1.0 subtraction a larger fraction
+	// of the divisor → a LARGER home margin; a larger constant shrinks it. CAUTION: the
+	// margin is STEEPLY sensitive to this knob (the documented low-divisor brittleness
+	// carried over from offQualityRatingScale). hcaMagnitude (gametype.go = 0.2) is the
+	// faithful decompiled constant and is NOT a tuning knob — the home-margin magnitude
+	// is reached via this constant's ratio to that fixed 0.2.
+	//
+	// STAND-IN value, not yet pinned from the binary. The RE proved offQ is volume-
+	// NEUTRAL (a constant) but did NOT pin its VALUE (the static decompile shows
+	// offQ = Σ(+0xDE0=0) − HCA, which taken literally floors degenerately, so there is
+	// an unrecovered base/init term — see ADR-0061). The faithful value needs dynamic RE
+	// (x32dbg breakpoint at FUN_004e3f80 during a live possession); that is a committed
+	// FOLLOW-UP that will also pin defQ/teamDef and let the synthetic degeneracy guards
+	// drop. Until then this is corpus-calibrated, exactly as offQualityRatingScale was.
+	//
+	// CALIBRATED 2026-06-12 to 1.575 (jsbcalibrate --mode calibrate, ibl5/backups,
+	// runs=20 stride=1 seed=20240601; engine/sweep-offq.sh): the SMALLEST constant (=
+	// largest home margin) that clears BOTH synthetic degeneracy guards — the foul-mix
+	// minority band (foul share 0.249 ≤ 0.25, TestBucketWeights_FoulPathMix) and the
+	// full-team foul-out rate (0.063 ≤ 0.08, TestSimulate_FoulOutRate). gt2 home margin
+	// engine 3.479 vs sco 4.124 (gap −0.645), gt4 3.594 vs 4.590 (gap −0.995): both
+	// outside the ±0.5 GATE-1 target but IMPROVED vs master (gt2 −0.875, gt4 −1.266 at
+	// matched config) — a pre-existing HCA undershoot the volume-neutral fix narrows but
+	// does not close (closing it needs the true pinned value, x32dbg follow-up). gt2 FTA-
+	// dispersion ratio drops to 2.045 (from master 2.573 — GATE-2 improved). Smaller
+	// constants (≤1.55) bring gt2 into ±0.5 but trip the foul-out degeneracy guard
+	// (1.50 → 0.130) and the minority band — a genuine foul-heavy degeneracy, not a
+	// relaxable heuristic, so the band is NOT widened. Lineage to the deleted
+	// offQualityRatingScale=0.0565 / offQualityNeutralRatingSum=29.24 survives in prose.
+	// See ADR-0061 for the full sweep table.
+	offQualityConstant = 1.575
 
 	// offQualityFloor is the ε floor on the offQuality divisor: it guarantees the
 	// foul-bucket division (foul/offQ) can never divide by zero or flip sign even on
@@ -85,13 +105,15 @@ const (
 	// teamDefBaseline×foulDivisorTeamDefCoef. Documented stand-in.
 	teamDefBaseline = 1.0
 
-	// foulCompress narrows the team-to-team dispersion of the two quality
-	// aggregators toward the corpus league mean (offQualityNeutral/defQualityNeutral),
-	// before HCA (off) and before the cap (def). compressed = total + (foulCompress−1)
-	// ×(total − neutral): at 1.0 the exact identity (current behavior), at <1.0 a
-	// mean-preserving narrowing of the spread that drives the foul-bucket divisor
-	// term (foul/offQ)×(defQ − teamDef×5/6) — the lead negative-covariance driver
-	// (ADR-0043: the foul-only arm is 47.6% of |Cov(lnFGA,lnPPS)|).
+	// foulCompress narrows the team-to-team dispersion of the DEFENSIVE quality
+	// aggregator toward the corpus league mean (defQualityNeutral), before the cap.
+	// compressed = total + (foulCompress−1)×(total − neutral): at 1.0 the exact
+	// identity, at <1.0 a mean-preserving narrowing of the spread that drives the
+	// foul-bucket divisor term (foul/offQ)×(defQ − teamDef×5/6) — the lead negative-
+	// covariance driver (ADR-0043: the foul-only arm is 47.6% of |Cov(lnFGA,lnPPS)|).
+	// It no longer acts on the OFF side: offQ is now the volume-neutral constant
+	// offQualityConstant, not a per-team summation to compress (ADR-0061 supersedes
+	// ADR-0044's off-side compression).
 	//
 	// CALIBRATED against the corpus team-level FTA-rate dispersion (Constraint 1):
 	// the value at which the engine's FTADispersionRatio (calibrate.FidelitySummary,
@@ -101,22 +123,6 @@ const (
 	// Cov(lnFGA,lnPPS) sign (that would be the metric-gaming ADR-0041 forbids); the
 	// covariance is the emergent acceptance readout, never a knob. See ADR-0044.
 	foulCompress = 0.45
-
-	// offQualityNeutralRatingSum is the corpus league-mean rating-space offensive
-	// sum Σ floor1(OO) over a team's faithful five-pass starters, derived from the
-	// real .sco archive (TestDeriveQualityNeutrals, neutral_archive_test.go) — the
-	// .sco analog of how offVolumeNeutral=161 was derived from real per-starter
-	// composite means. offQualityNeutral is then this sum in QUALITY space, so it
-	// co-varies automatically when offQualityRatingScale is re-tuned (Step 5 /
-	// Constraint 2) and the compression stays mean-preserving without a separate
-	// re-derivation.
-	// DERIVED 2026-06-03 from the .sco archive (TestDeriveQualityNeutrals, 10 seasons
-	// 88-89…06-07, 269 team-snapshots): mean Σfloor1(OO) over five-pass starters.
-	offQualityNeutralRatingSum = 29.24
-	// offQualityNeutral is the league-mean neutral-HCA offensive-quality value the
-	// off-side compression pulls toward (mean-preserving reference). Quality space =
-	// rating sum × scale, so it tracks offQualityRatingScale.
-	offQualityNeutral = offQualityNeutralRatingSum * offQualityRatingScale
 
 	// defQualityNeutral is the corpus league-mean PRE-CAP defensive total
 	// Σ floor1(OD)×defQualityRatingScale over a team's starters (the space the
@@ -162,23 +168,19 @@ func defMatchupQuality(defenders []onCourt) float64 {
 }
 
 // offQualityWithHCA reimplements off_quality_with_hca (FUN_004e3f80 → fVar12, the
-// foul-bucket divisor): the summed per-player offensive-rating stand-in over the 5
-// offensive players, each term reduced by hcaDelta. For the home team hcaDelta is
-// +hcaMagnitude, so every term shrinks → the divisor shrinks → foul/offQ grows →
-// the home foul bucket grows (the dominant home-favorable mechanism). The result is
-// floored at offQualityFloor to keep the division well-defined. The decompiled
-// function has no cap — it is a plain summation.
+// foul-bucket divisor) as a volume-NEUTRAL constant base reduced by HCA. 5.60's offQ
+// sums the dead-zero +0xDE0 over the 5 offensive players, so its summation is Σ(0) —
+// a floored constant independent of offensive volume (ADR-0061, RE verdict :44-52).
+// The Go port therefore starts from the constant offQualityConstant (NOT a per-player
+// OO summation, NOT off-side foulCompress) and applies HCA as a fixed per-player
+// additive: total = offQualityConstant − len(offense)×hcaDelta. For the home team
+// hcaDelta is +hcaMagnitude, so the divisor shrinks by exactly len×hcaMagnitude →
+// foul/offQ grows → the home foul bucket grows (the dominant home-favorable
+// mechanism); the home/away delta is therefore unscaled and exactly len×hcaMagnitude.
+// The result is floored at offQualityFloor to keep the division well-defined on a
+// degenerate (large-HCA) lineup.
 func offQualityWithHCA(offense []onCourt, hcaDelta float64) float64 {
-	var quality float64
-	for _, p := range offense {
-		quality += floor1(p.OO) * offQualityRatingScale
-	}
-	// Compress the quality spread toward the corpus league mean (foulCompress),
-	// THEN apply HCA as a fixed per-player additive. Keeping HCA outside the
-	// compression means the #955-calibrated ±hcaMagnitude/player home/away delta is
-	// never scaled by foulCompress — the home divisor still shrinks by exactly
-	// len(offense)×hcaMagnitude regardless of the compression factor.
-	total := compressQuality(quality, offQualityNeutral, foulCompress)
+	total := offQualityConstant
 	total -= float64(len(offense)) * hcaDelta
 	if total < offQualityFloor {
 		return offQualityFloor

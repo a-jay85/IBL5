@@ -1011,6 +1011,19 @@ UPDATE ibl_draft_class SET team = 'Stars' WHERE name = 'Already Drafted PG';
 UPDATE ibl_draft_class SET team = 'Cougars' WHERE name = 'Already Drafted PF';
 
 -- ============================================================
+-- Big Board seed: exactly ONE Metros (teamid 1) board entry.
+-- Referenced by name-subquery because ibl_draft_class.id auto-assigns.
+-- This single entry drives both Mock Draft states on one page:
+--   - the FIRST Metros-owned slot in the walk shows 'Prospect Guard'
+--   - every later Metros-owned slot shows 'No prospects left on your board'
+-- and the Big Board page's non-empty (entries) state.
+-- ============================================================
+INSERT INTO gm_draft_big_board (teamid, prospect_id, `rank`, note)
+SELECT 1, id, 1, 'CI seed sleeper'
+FROM ibl_draft_class
+WHERE name = 'Prospect Guard';
+
+-- ============================================================
 -- Draft picks for round 1 (Metros pick 1 = on the clock)
 -- Only need a few picks; pick 1 has empty player (on the clock)
 -- ============================================================
@@ -2331,10 +2344,16 @@ INSERT INTO ibl_box_scores (
 -- 3 unread rows for team_id=1 (Metros, the CI E2E user) drive the bell badge /
 -- list / mark-read specs; 1 unread row for team_id=2 (Stars) is the authz-negative
 -- fixture (the Metros user must NOT be able to mark it read). Fixed ids for
--- idempotency. Migration 146 creates the table before this seed runs.
+-- idempotency. Migration 150 creates the table before this seed runs.
 INSERT INTO gm_notifications (id, team_id, type, message, link, read_at) VALUES
   (1, 1, 'TRADE_OFFER_RECEIVED', 'Stars sent you a trade offer.', 'modules.php?name=Trading&op=reviewtrade', NULL),
   (2, 1, 'TRADE_ACCEPTED',       'Stars accepted your trade.',    'modules.php?name=Trading&op=reviewtrade', NULL),
   (3, 1, 'TRADE_REJECTED',       'Stars rejected your trade offer.', 'modules.php?name=Trading&op=reviewtrade', NULL),
   (4, 2, 'TRADE_OFFER_RECEIVED', 'Metros sent you a trade offer.', 'modules.php?name=Trading&op=reviewtrade', NULL)
 ON DUPLICATE KEY UPDATE message = VALUES(message), read_at = VALUES(read_at);
+
+-- Watchlist: pre-watch pid 2 (Test Player Two) for Metros (teamid 1, the E2E
+-- user's team) so the unwatch + list E2E specs have a deterministic seeded row.
+-- FK resolves: pid 2 (ibl_plr) and teamid 1 (Metros, ibl_team_info) seeded above.
+INSERT INTO gm_player_watchlist (teamid, pid, note) VALUES
+  (1, 2, 'Seeded scouting note for E2E');

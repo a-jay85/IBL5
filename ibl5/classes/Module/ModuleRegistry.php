@@ -12,6 +12,7 @@ final class ModuleRegistry
         'AllStarAppearances',
         'ApiKeys',
         'AwardHistory',
+        'BigBoard',
         'CapSpace',
         'CareerLeaderboards',
         'ComparePlayers',
@@ -55,6 +56,7 @@ final class ModuleRegistry
         'Voting',
         'VotingResults',
         'Waivers',
+        'Watchlist',
         'YourAccount',
     ];
 

@@ -1,4 +1,4 @@
--- Migration 146: Create gm_notifications table for the in-app GM notification inbox.
+-- Migration 150: Create gm_notifications table for the in-app GM notification inbox.
 --
 -- Generic per-team notification store keyed by team_id (FK to ibl_team_info.teamid).
 -- Written through Notifications\NotificationService::notify(); read by the

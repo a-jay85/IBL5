@@ -71,6 +71,26 @@ test.describe('Big Board: page + mutations', () => {
     await expect(row.locator('input[name="rank"]').first()).toHaveValue('1');
   });
 
+  // Row 12 (CSRF, raw HTTP): a POST with NO _csrf_token field exercises the
+  // MISSING-token branch of CsrfGuard (distinct from the forged-but-valid-format
+  // branch above). The plan placed this in tests/e2e/api-e2e/, but no such wired
+  // suite exists — consolidated here (raw request context, no browser state).
+  test('add POST with a missing CSRF token is rejected and writes nothing', async ({ page }) => {
+    const response = await page.request.post('/ibl5/modules.php?name=BigBoard&op=add', {
+      form: { prospect_id: '0', rank: '7', note: 'no token' },
+      maxRedirects: 0,
+    });
+
+    const location = response.headers()['location'] ?? '';
+    expect(location, 'Expected error redirect').toContain('error=');
+    expect(location, 'Must not report success').not.toContain('result=added');
+
+    // Readback: the board still holds exactly the one seeded entry — no add landed.
+    await page.goto('modules.php?name=BigBoard');
+    await expect(page.locator('.ibl-data-table tbody tr')).toHaveCount(1);
+    await expect(page.locator('.ibl-data-table')).toContainText(SEEDED_PROSPECT);
+  });
+
   // Read the mock BEFORE the empty-state test mutates the board, so the board
   // holds exactly the seeded entry here.
   test('Mock Draft suggests the seeded prospect at the first owned pick and exhausts later', async ({ page }) => {

@@ -12,7 +12,7 @@ const UNWATCHED_PID = '1';
 const SEEDED_NOTE = 'Seeded scouting note for E2E';
 
 async function readCsrfToken(page: import('@playwright/test').Page): Promise<string> {
-  return page.locator('form input[name="csrf_token"]').first().inputValue();
+  return page.locator('form input[name="_csrf_token"]').first().inputValue();
 }
 
 test.describe('Watchlist: My Watchlist page', () => {
@@ -33,8 +33,12 @@ test.describe('Watchlist: note XSS is escaped on output', () => {
     await page.goto('modules.php?name=Watchlist');
     const saveForm = page.locator('form[action*="op=savenote"]').first();
     await saveForm.locator('textarea[name="note"]').fill(payload);
-    await saveForm.locator('button[type="submit"]').click();
-    await page.waitForURL(/name=Watchlist/);
+    // Already on modules.php?name=Watchlist — pattern is too broad; wait for
+    // the specific result redirect so waitForURL doesn't resolve on the current URL.
+    await Promise.all([
+      page.waitForURL(/result=note_saved|error=/),
+      saveForm.locator('button[type="submit"]').click(),
+    ]);
     expect(page.url()).toContain('result=note_saved');
 
     // Raw HTML readback: the payload is escaped, no live <script> is injected.
@@ -45,7 +49,7 @@ test.describe('Watchlist: note XSS is escaped on output', () => {
     // Restore the seeded note so re-runs start clean.
     const token = await readCsrfToken(page);
     await page.request.post('/ibl5/modules.php?name=Watchlist&op=savenote', {
-      form: { csrf_token: token, pid: SEEDED_WATCHED_PID, note: SEEDED_NOTE },
+      form: { _csrf_token: token, pid: SEEDED_WATCHED_PID, note: SEEDED_NOTE },
       maxRedirects: 0,
     });
   });
@@ -54,7 +58,7 @@ test.describe('Watchlist: note XSS is escaped on output', () => {
 test.describe('Watchlist: CSRF rejection', () => {
   test('toggle POST without a valid CSRF token is rejected and writes nothing', async ({ page }) => {
     const response = await page.request.post('/ibl5/modules.php?name=Watchlist&op=toggle', {
-      form: { csrf_token: 'garbage-token', pid: UNWATCHED_PID },
+      form: { _csrf_token: 'garbage-token', pid: UNWATCHED_PID },
       maxRedirects: 0,
     });
 
@@ -86,7 +90,7 @@ test.describe('Watchlist: Player-page toggle', () => {
     await page.goto(`modules.php?name=Player&pa=showpage&pid=${SEEDED_WATCHED_PID}`);
     const token = await readCsrfToken(page);
     await page.request.post('/ibl5/modules.php?name=Watchlist&op=toggle', {
-      form: { csrf_token: token, pid: SEEDED_WATCHED_PID },
+      form: { _csrf_token: token, pid: SEEDED_WATCHED_PID },
       maxRedirects: 0,
     });
   });
@@ -106,7 +110,7 @@ test.describe('Watchlist: Player-page toggle', () => {
     // Cleanup: remove pid 1 so it does not leak into other specs/re-runs.
     const token = await readCsrfToken(page);
     await page.request.post('/ibl5/modules.php?name=Watchlist&op=remove', {
-      form: { csrf_token: token, pid: UNWATCHED_PID },
+      form: { _csrf_token: token, pid: UNWATCHED_PID },
       maxRedirects: 0,
     });
   });

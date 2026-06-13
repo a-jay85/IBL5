@@ -77,7 +77,7 @@ class WatchlistView implements WatchlistViewInterface
                         <td><?= HtmlSanitizer::e($apg) ?></td>
                         <td>
                             <form method="post" action="modules.php?name=Watchlist&amp;op=savenote" class="ibl-form-group">
-                                <input type="hidden" name="csrf_token" value="<?= HtmlSanitizer::e($rawToken) ?>">
+                                <input type="hidden" name="_csrf_token" value="<?= HtmlSanitizer::e($rawToken) ?>">
                                 <input type="hidden" name="pid" value="<?= HtmlSanitizer::e($pid) ?>">
                                 <textarea name="note" rows="2" class="ibl-input" aria-label="Scouting note"><?= HtmlSanitizer::e($row['note'] ?? '') ?></textarea>
                                 <button type="submit" class="ibl-btn ibl-btn--secondary">Save Note</button>
@@ -85,7 +85,7 @@ class WatchlistView implements WatchlistViewInterface
                         </td>
                         <td>
                             <form method="post" action="modules.php?name=Watchlist&amp;op=remove">
-                                <input type="hidden" name="csrf_token" value="<?= HtmlSanitizer::e($rawToken) ?>">
+                                <input type="hidden" name="_csrf_token" value="<?= HtmlSanitizer::e($rawToken) ?>">
                                 <input type="hidden" name="pid" value="<?= HtmlSanitizer::e($pid) ?>">
                                 <button type="submit" class="ibl-btn ibl-btn--danger">Remove</button>
                             </form>
@@ -112,7 +112,7 @@ class WatchlistView implements WatchlistViewInterface
             : '<button type="submit" class="ibl-btn ibl-btn--primary">&#9733; Watch</button>';
 
         return '<form method="post" action="modules.php?name=Watchlist&amp;op=toggle" class="player-button">'
-            . '<input type="hidden" name="csrf_token" value="' . $tokenEscaped . '">'
+            . '<input type="hidden" name="_csrf_token" value="' . $tokenEscaped . '">'
             . '<input type="hidden" name="pid" value="' . $pidEscaped . '">'
             . $button
             . '</form>';

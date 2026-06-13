@@ -191,7 +191,106 @@ class TradeProcessorIntegrationTest extends DatabaseTestCase
         self::assertStringContainsString('Multi Test B', $result['storytext']);
     }
 
+    // ── Scenario 6: 3-team trade (happy path) ──────────────────
+
+    public function testThreeTeamTradeTransfersAllPlayersAroundTheCycle(): void
+    {
+        // Metros(1) -> Stars(2) -> Cougars(3) -> Metros(1): a three-team cycle.
+        $pidA = 200040020;
+        $pidB = 200040021;
+        $pidC = 200040022;
+        $this->seedPlayer($pidA, 'ThreeTeam A', 1, 'PG');
+        $this->seedPlayer($pidB, 'ThreeTeam B', 2, 'SF');
+        $this->seedPlayer($pidC, 'ThreeTeam C', 3, 'C');
+
+        $offerId = $this->seedPendingTrade([
+            ['id' => $pidA, 'type' => TradeItemType::Player->value, 'from' => 'Metros', 'to' => 'Stars'],
+            ['id' => $pidB, 'type' => TradeItemType::Player->value, 'from' => 'Stars', 'to' => 'Cougars'],
+            ['id' => $pidC, 'type' => TradeItemType::Player->value, 'from' => 'Cougars', 'to' => 'Metros'],
+        ]);
+
+        $result = $this->processor->processTrade($offerId);
+
+        self::assertTrue($result['success']);
+        self::assertSame(2, $this->getPlayerTeamId($pidA));
+        self::assertSame(3, $this->getPlayerTeamId($pidB));
+        self::assertSame(1, $this->getPlayerTeamId($pidC));
+        // 3-party trades use the joinPartyNames "A, B and C" story title.
+        self::assertStringContainsString('Metros, Stars and Cougars make a trade.', $result['storytitle']);
+    }
+
+    // ── Scenario 7: 3-team atomic rollback ─────────────────────
+
+    public function testThreeTeamTradeRollsBackAllTransfersOnMidExecutionFailure(): void
+    {
+        $pidA = 200040030;
+        $pidB = 200040031;
+        $pidC = 200040032;
+        $this->seedPlayer($pidA, 'Rollback A', 1, 'PG');
+        $this->seedPlayer($pidB, 'Rollback B', 2, 'SF');
+        $this->seedPlayer($pidC, 'Rollback C', 3, 'C');
+
+        $offerId = $this->seedPendingTrade([
+            ['id' => $pidA, 'type' => TradeItemType::Player->value, 'from' => 'Metros', 'to' => 'Stars'],
+            ['id' => $pidB, 'type' => TradeItemType::Player->value, 'from' => 'Stars', 'to' => 'Cougars'],
+            ['id' => $pidC, 'type' => TradeItemType::Player->value, 'from' => 'Cougars', 'to' => 'Metros'],
+        ]);
+
+        // Asset repository that performs the FIRST real player transfer (committed
+        // to the open transaction) then throws on the SECOND — a genuine
+        // mid-execution failure. ibl_plr.teamid carries no FK, so a bad-team UPDATE
+        // would not throw on its own; this injected double is the deterministic,
+        // schema-independent trigger. Anonymous class kept inline (typed helper
+        // returns would erase the subclass type for PHPStan).
+        $throwingAsset = new class ($this->db) extends \Trading\TradeAssetRepository {
+            public int $playerUpdateCalls = 0;
+
+            public function updatePlayerTeam(int $playerId, int $teamId): int
+            {
+                $this->playerUpdateCalls++;
+                if ($this->playerUpdateCalls >= 2) {
+                    throw new \RuntimeException('forced mid-trade failure');
+                }
+                return parent::updatePlayerTeam($playerId, $teamId);
+            }
+        };
+
+        $commonRepository = new \Repositories\TeamIdentityRepository($this->db);
+        $processor = new TradeProcessor($this->db, $commonRepository, '', null, $throwingAsset);
+
+        $threw = false;
+        try {
+            $processor->processTrade($offerId);
+        } catch (\RuntimeException $e) {
+            $threw = true;
+            self::assertStringContainsString('forced mid-trade failure', $e->getMessage());
+        }
+
+        self::assertTrue($threw, 'processTrade should rethrow the mid-execution failure');
+
+        // Every player must remain on its ORIGINAL team — the first (real) transfer
+        // was rolled back along with everything else.
+        self::assertSame(1, $this->getPlayerTeamId($pidA));
+        self::assertSame(2, $this->getPlayerTeamId($pidB));
+        self::assertSame(3, $this->getPlayerTeamId($pidC));
+
+        // The offer itself must survive (not marked completed / deleted).
+        self::assertNotSame([], $this->offerRowsFor($offerId));
+    }
+
     // ── Helpers ─────────────────────────────────────────────────
+
+    /** @return list<array<string, mixed>> */
+    private function offerRowsFor(int $offerId): array
+    {
+        $stmt = $this->db->prepare("SELECT itemid FROM ibl_trade_info WHERE tradeofferid = ?");
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('i', $offerId);
+        $stmt->execute();
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return $rows;
+    }
 
     private function seedPlayer(int $pid, string $name, int $teamId, string $pos): void
     {

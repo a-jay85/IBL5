@@ -113,6 +113,7 @@ class SchemaInvariantTest extends DatabaseTestCase
     private const EXPECTED_INDEXES = [
         'ibl_plr_snapshots.idx_snapshot_phase_year' => ['ibl_plr_snapshots', 'snapshot_phase,season_year'],
         'ibl_box_scores.idx_pid_date' => ['ibl_box_scores', 'pid,game_date'],
+        'ibl_trade_info.idx_trade_info_offer_from_to' => ['ibl_trade_info', 'tradeofferid,trade_from,trade_to'],
     ];
 
     /**

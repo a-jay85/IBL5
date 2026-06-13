@@ -1,6 +1,6 @@
 ---
 description: Replace ibl_hist TEMPTABLE VIEW with a materialized table refreshed by the update pipeline
-last_verified: 2026-04-13
+last_verified: 2026-06-13
 ---
 
 # ADR-0006: Materialize ibl_hist VIEW

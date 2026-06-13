@@ -1,0 +1,146 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-check-plan — regression test for bin/check-plan.
+#
+# Pins each gate's positive (clean plan passes) AND negative (a real violation
+# flags) case. The negative cases are load-bearing: a softened gate that stops
+# catching violations is worse than no gate, because /plan deleted its prose
+# copy of the check and now trusts this script.
+#
+# Run: bin/test-check-plan  (exit 0 = all pass, 1 = a case failed)
+#
+# shellcheck disable=SC2016  # backtick spans in the single-quoted plan fixtures
+# are literal markdown code spans, not command substitution — single quotes are
+# intentional so the fixture text reaches check-plan verbatim.
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+GUARD="$SCRIPT_DIR/check-plan"
+TMP="$(mktemp -d)"
+trap 'rm -f "$TMP"/*.md 2>/dev/null; rmdir "$TMP" 2>/dev/null' EXIT
+
+FAILED=0
+
+# assert <name> <expected-exit> <plan-body>
+assert() {
+    name="$1"; want="$2"; body="$3"
+    f="$TMP/$name.md"
+    printf '%s\n' "$body" > "$f"
+    "$GUARD" "$f" >/dev/null 2>&1
+    got=$?
+    if [ "$got" -ne "$want" ]; then
+        echo "FAIL: $name — expected exit $want, got $got"
+        FAILED=1
+    else
+        echo "ok: $name (exit $got)"
+    fi
+}
+
+# A minimal well-formed matrix passes (exit 0). Baseline / no false positives.
+assert "clean-minimal" 0 '
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | cap rejects over-cap trade | PHPUnit | pre-impl | `tests/Trade/TradeValidatorTest.php` |
+| 2 | form submits and redirects | E2E | post-impl | `tests/e2e/trade.spec.ts` |
+'
+
+# Gate 1: no matrix at all must flag (exit 1).
+assert "no-matrix" 1 'Implementation steps only. No verification table here.'
+
+# Gate 1: 6-column `| PR |` header variant is still recognized as a matrix —
+# combined with valid rows it passes (exit 0). Regression for header detection.
+assert "pr-column-header" 0 '
+| # | What to verify | Test type | Timing | Test file / location | PR |
+|---|---------------|-----------|--------|---------------------|----|
+| 1 | thing works | PHPUnit | post-impl | `tests/X.php` | 1 |
+'
+
+# Gate 2 (test-type membership) is intentionally NOT linted by check-plan — the
+# corpus proved the type column open-ended (Go-archive-diagnostic, Documented
+# (domain rule), read-before-cut). So a row with an unusual type must NOT flag
+# on type grounds (exit 0). Left as /plan Opus judgment.
+assert "open-type-not-flagged" 0 '
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | engine attribution | Go-archive-diagnostic | post-impl | `engine/x_test.go` |
+| 2 | domain invariant | Documented (domain rule) | post-impl | `walk.go comment` |
+'
+
+# Gate 3: a Truly-manual row using an automatable verb must flag (exit 1).
+assert "false-manual" 1 '
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | verify the redirect works | Truly-manual | post-impl | n/a |
+'
+
+# Gate 3: a legitimately subjective Truly-manual row (no automatable verb) must
+# NOT flag (exit 0).
+assert "real-manual-ok" 0 '
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | does the new dashboard feel polished | Truly-manual | post-impl | n/a |
+'
+
+# Gate 7: a DECIDE token in a table row must flag (exit 1).
+assert "unresolved-decide" 1 '
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | DECIDE which validator to call | PHPUnit | post-impl | `tests/X.php` |
+'
+
+# Gate 7: TBD token likewise (exit 1).
+assert "unresolved-tbd" 1 '
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | TBD which validator | PHPUnit | post-impl | `tests/X.php` |
+'
+
+# Gate 7: a benign "(or ...)" aside must NOT flag (exit 0). The corpus is full of
+# these (`≤5 (or 0 ideally)`, `(or extend existing)`); "(or " is left to /plan
+# judgment precisely so they do not false-positive here.
+assert "benign-or-aside-ok" 0 '
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | baseline count is ≤ 5 (or 0 ideally) | CLI-executable | post-impl | `grep -c X file` |
+| 2 | characterization captured | PHPUnit (or visual-regression) | pre-impl | `tests/Y.php` |
+'
+
+# Reuse: a Class::method whose class is absent from ibl5/ (could be Go/external)
+# must NOT flag — the false-positive guard (exit 0).
+assert "reuse-unknown-class-ok" 0 '
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | PHPUnit | post-impl | `tests/X.php` |
+
+**Reuse:** call `TotallyMadeUpClass::someMethod()` for the lookup.
+'
+
+# Reuse: a forward-referenced method the plan creates must NOT flag (exit 0),
+# even if it does not exist yet.
+assert "reuse-forward-ref-ok" 0 '
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | PHPUnit | post-impl | `tests/X.php` |
+
+Create a new method `TotallyMadeUpClass::brandNewMethod()` and **reuse** it later.
+'
+
+# Reuse: a `Class::SCREAMING_CASE` token is a class CONSTANT, not a method — it
+# must NOT be method-existence-checked (exit 0). Regression for the corpus false
+# positive on `EngineBundleService::DEFAULT_GAME_TYPE`.
+assert "reuse-constant-not-method" 0 '
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | PHPUnit | post-impl | `tests/X.php` |
+
+**Reuse:** the `TotallyMadeUpClass::SOME_CONSTANT` value for the default.
+'
+
+if [ "$FAILED" -ne 0 ]; then
+    echo "RESULT: FAILED"
+    exit 1
+fi
+echo "RESULT: all passed"
+exit 0

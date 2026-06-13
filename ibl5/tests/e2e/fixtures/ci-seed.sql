@@ -1011,6 +1011,19 @@ UPDATE ibl_draft_class SET team = 'Stars' WHERE name = 'Already Drafted PG';
 UPDATE ibl_draft_class SET team = 'Cougars' WHERE name = 'Already Drafted PF';
 
 -- ============================================================
+-- Big Board seed: exactly ONE Metros (teamid 1) board entry.
+-- Referenced by name-subquery because ibl_draft_class.id auto-assigns.
+-- This single entry drives both Mock Draft states on one page:
+--   - the FIRST Metros-owned slot in the walk shows 'Prospect Guard'
+--   - every later Metros-owned slot shows 'No prospects left on your board'
+-- and the Big Board page's non-empty (entries) state.
+-- ============================================================
+INSERT INTO gm_draft_big_board (teamid, prospect_id, `rank`, note)
+SELECT 1, id, 1, 'CI seed sleeper'
+FROM ibl_draft_class
+WHERE name = 'Prospect Guard';
+
+-- ============================================================
 -- Draft picks for round 1 (Metros pick 1 = on the clock)
 -- Only need a few picks; pick 1 has empty player (on the clock)
 -- ============================================================

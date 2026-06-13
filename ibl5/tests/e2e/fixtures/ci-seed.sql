@@ -1881,6 +1881,173 @@ UPDATE ibl_plr SET dc_pg_depth = 3               WHERE pid = 210;
 UPDATE ibl_plr SET dc_pf_depth = 4               WHERE pid = 211;
 
 -- ============================================================
+-- Depth Chart E2E isolation team: Nuggets (tid=19)
+--
+-- These 12 players exist solely for lineup-health-check panel E2E all-clear test.
+-- A cookie-based team override (_test_team) makes the lineup-health page render
+-- this team. No other spec touches tid=19 or pids 300-311.
+--
+-- Layout: 5 starters (PG/SG/SF/PF/C), 7 backups covering ≥3 per position.
+-- Engineered to trigger ZERO warnings (pure all-clear state):
+--   no_starter:       each position has exactly one depth=1 player
+--   thin_depth:       each position has ≥3 players assigned
+--   injured_starter:  no starter has injured > 0
+--   inactive_starter: dc_can_play_in_game defaults to 1 for all
+--   over_cap:         SUM(current_salary)=2080 ≤ 5000
+-- ============================================================
+
+INSERT INTO ibl_plr (
+  pid, name, age, peak, teamid, pos, ordinal,
+  stamina, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
+  cy, cyt, salary_yr1, salary_yr2,
+  retired, exp,
+  htft, htin, wt, college,
+  draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
+  stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta,
+  stats_3gm, stats_3ga, stats_orb, stats_drb, stats_ast, stats_stl,
+  stats_tvr, stats_blk, stats_pf,
+  uuid
+) VALUES
+  -- Starters
+  (300, 'NG Test PG',  25, 27, 19, 'PG', 1,
+   78, 73, 68, 63, 58, 70, 66, 68, 63,
+   1, 3, 300, 330,
+   0, 4,
+   6, 2, 190, 'NG University',
+   1, 5, 2022, 'Nuggets', 'Nuggets',
+   38, 1100, 180, 410, 90, 110,
+   55, 140, 28, 95, 185, 50,
+   70, 8, 75,
+   'ng000000-0000-0000-0000-000000000300'),
+  (301, 'NG Test SG',  24, 26, 19, 'SG', 2,
+   76, 71, 66, 61, 56, 68, 64, 66, 61,
+   1, 2, 250, 275,
+   0, 3,
+   6, 4, 195, 'NG State',
+   1, 10, 2023, 'Nuggets', 'Nuggets',
+   38, 1100, 165, 375, 82, 100,
+   45, 120, 32, 105, 155, 45,
+   60, 12, 80,
+   'ng000000-0000-0000-0000-000000000301'),
+  (302, 'NG Test SF',  26, 28, 19, 'SF', 3,
+   77, 72, 67, 62, 57, 69, 65, 67, 62,
+   1, 2, 280, 308,
+   0, 4,
+   6, 6, 210, 'NG College',
+   1, 8, 2022, 'Nuggets', 'Nuggets',
+   38, 1100, 175, 390, 88, 107,
+   40, 115, 42, 130, 148, 44,
+   55, 20, 82,
+   'ng000000-0000-0000-0000-000000000302'),
+  (303, 'NG Test PF',  27, 29, 19, 'PF', 4,
+   80, 76, 70, 66, 62, 74, 70, 72, 67,
+   1, 3, 350, 385,
+   0, 5,
+   6, 8, 225, 'NG Academy',
+   1, 3, 2021, 'Nuggets', 'Nuggets',
+   38, 1200, 195, 430, 100, 122,
+   28, 78, 46, 140, 92, 38,
+   50, 32, 86,
+   'ng000000-0000-0000-0000-000000000303'),
+  (304, 'NG Test C',   26, 27, 19, 'C',  5,
+   79, 74, 69, 64, 60, 71, 67, 69, 64,
+   1, 2, 200, 220,
+   0, 4,
+   7, 0, 242, 'NG Tech',
+   1, 6, 2022, 'Nuggets', 'Nuggets',
+   38, 1200, 200, 440, 105, 128,
+   18, 50, 55, 155, 82, 36,
+   48, 28, 90,
+   'ng000000-0000-0000-0000-000000000304'),
+  -- Backups (7 players covering ≥3 per position, none injured)
+  (305, 'NG Backup PG', 23, 26, 19, 'PG', 6,
+   72, 67, 62, 57, 52, 64, 60, 62, 57,
+   1, 2, 80, 88,
+   0, 2,
+   6, 1, 185, 'Backup NG',
+   2, 18, 2024, 'Nuggets', 'Nuggets',
+   28, 580, 95, 220, 48, 58,
+   28, 75, 18, 58, 85, 23,
+   38, 9, 58,
+   'ng000000-0000-0000-0000-000000000305'),
+  (306, 'NG Backup SG', 24, 26, 19, 'SG', 7,
+   71, 66, 61, 56, 51, 63, 59, 61, 56,
+   1, 2, 90, 99,
+   0, 2,
+   6, 3, 190, 'Backup NG',
+   2, 22, 2024, 'Nuggets', 'Nuggets',
+   28, 580, 90, 210, 45, 55,
+   22, 65, 22, 65, 75, 20,
+   35, 11, 62,
+   'ng000000-0000-0000-0000-000000000306'),
+  (307, 'NG Backup SF', 25, 27, 19, 'SF', 8,
+   73, 68, 63, 58, 53, 65, 61, 63, 58,
+   1, 2, 100, 110,
+   0, 3,
+   6, 5, 205, 'Backup NG',
+   2, 28, 2023, 'Nuggets', 'Nuggets',
+   32, 750, 110, 258, 55, 67,
+   18, 50, 36, 105, 65, 26,
+   42, 16, 70,
+   'ng000000-0000-0000-0000-000000000307'),
+  (308, 'NG Backup PF', 22, 25, 19, 'PF', 9,
+   70, 65, 60, 55, 50, 62, 58, 60, 55,
+   1, 1, 70, 77,
+   0, 1,
+   6, 7, 220, 'Backup NG',
+   2, 32, 2025, 'Nuggets', 'Nuggets',
+   18, 340, 55, 135, 28, 34,
+   12, 36, 28, 75, 45, 16,
+   28, 13, 48,
+   'ng000000-0000-0000-0000-000000000308'),
+  (309, 'NG Backup C',  24, 26, 19, 'C',  10,
+   74, 69, 64, 59, 54, 66, 62, 64, 59,
+   1, 3, 110, 121,
+   0, 3,
+   7, 0, 238, 'Backup NG',
+   2, 15, 2023, 'Nuggets', 'Nuggets',
+   38, 1050, 140, 310, 65, 80,
+   8, 25, 50, 132, 68, 28,
+   44, 26, 80,
+   'ng000000-0000-0000-0000-000000000309'),
+  (310, 'NG Utility A', 25, 26, 19, 'PG', 11,
+   73, 68, 63, 58, 54, 65, 61, 63, 58,
+   1, 2, 120, 132,
+   0, 2,
+   6, 2, 193, 'Utility NG',
+   2, 20, 2023, 'Nuggets', 'Nuggets',
+   32, 750, 100, 240, 50, 62,
+   25, 70, 22, 70, 78, 22,
+   38, 12, 65,
+   'ng000000-0000-0000-0000-000000000310'),
+  (311, 'NG Utility B', 26, 27, 19, 'SF', 12,
+   75, 70, 65, 60, 55, 67, 63, 65, 60,
+   1, 2, 130, 143,
+   0, 3,
+   6, 6, 208, 'Utility NG',
+   2, 25, 2023, 'Nuggets', 'Nuggets',
+   32, 750, 105, 250, 52, 64,
+   20, 56, 35, 96, 70, 24,
+   40, 18, 68,
+   'ng000000-0000-0000-0000-000000000311');
+
+-- Nuggets all-clear DC test team: depth chart starters + position assignments
+-- Starters: 300=PG, 301=SG, 302=SF, 303=PF, 304=C
+UPDATE ibl_plr SET dc_pg_depth = 1, pg_depth = 1 WHERE pid = 300;
+UPDATE ibl_plr SET dc_sg_depth = 1, sg_depth = 1 WHERE pid = 301;
+UPDATE ibl_plr SET dc_sf_depth = 1, sf_depth = 1 WHERE pid = 302;
+UPDATE ibl_plr SET dc_pf_depth = 1, pf_depth = 1 WHERE pid = 303;
+UPDATE ibl_plr SET dc_c_depth  = 1, c_depth  = 1 WHERE pid = 304;
+-- Backups: each position gets ≥3 total assignments
+UPDATE ibl_plr SET dc_pg_depth = 2, dc_sg_depth = 2 WHERE pid = 305;
+UPDATE ibl_plr SET dc_sg_depth = 3, dc_sf_depth = 2 WHERE pid = 306;
+UPDATE ibl_plr SET dc_sf_depth = 3               WHERE pid = 307;
+UPDATE ibl_plr SET dc_pf_depth = 2, dc_c_depth = 2 WHERE pid = 308;
+UPDATE ibl_plr SET dc_c_depth  = 3, dc_pf_depth = 3 WHERE pid = 309;
+UPDATE ibl_plr SET dc_pg_depth = 3               WHERE pid = 310;
+UPDATE ibl_plr SET dc_pf_depth = 4               WHERE pid = 311;
+
+-- ============================================================
 -- API Key for E2E tests
 -- Raw key: "e2e-test-key-do-not-use-in-production"
 -- SHA-256 hash: computed below

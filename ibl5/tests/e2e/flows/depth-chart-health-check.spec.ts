@@ -6,7 +6,7 @@
 // a select and expect the panel to change.
 
 import { test as unhealthyTest, expect as unhealthyExpect } from '../fixtures/auth-unhealthy-dc';
-import { test as clearTest, expect as clearExpect } from '../fixtures/auth-isolated';
+import { test as clearTest, expect as clearExpect } from '../fixtures/auth-healthy-dc';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 
 // ===========================================================================
@@ -35,10 +35,12 @@ unhealthyTest.describe('Lineup Health Check — warning present (Huskies tid=17)
 });
 
 // ===========================================================================
-// All-clear: Monarchs (tid=8) via auth-isolated
+// All-clear: Nuggets (tid=19) via auth-healthy-dc
+// Uses a dedicated isolated team so submission-spec DB mutations on Monarchs
+// (tid=8) cannot pollute this test's all-clear assertion.
 // ===========================================================================
 
-clearTest.describe('Lineup Health Check — all clear (Monarchs tid=8)', () => {
+clearTest.describe('Lineup Health Check — all clear (Nuggets tid=19)', () => {
   clearTest('shows ok state with no warning items', async ({ page }) => {
     await page.goto('modules.php?name=DepthChartEntry');
     await clearExpect(page.locator('.depth-chart-form')).toBeVisible({ timeout: 15000 });
@@ -50,6 +52,6 @@ clearTest.describe('Lineup Health Check — all clear (Monarchs tid=8)', () => {
     // No warning items present.
     await clearExpect(page.locator('#dc-health-check li[data-warning-type]')).toHaveCount(0);
 
-    await assertNoPhpErrors(page, 'on Depth Chart Entry (Monarchs, all-clear)');
+    await assertNoPhpErrors(page, 'on Depth Chart Entry (Nuggets, all-clear)');
   });
 });

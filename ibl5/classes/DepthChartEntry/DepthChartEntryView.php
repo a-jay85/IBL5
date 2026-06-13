@@ -432,13 +432,11 @@ JAVASCRIPT;
         }
 
         echo '<div id="dc-health-check" class="dc-health-check dc-health-check--warn">';
-        echo '<div class="ibl-alert ibl-alert--error">';
-        echo '<ul>';
+        echo '<ul class="dc-health-check__warnings">';
         foreach ($warnings as $warning) {
             echo '<li data-warning-type="' . HtmlSanitizer::e($warning['type']) . '">' . HtmlSanitizer::e($warning['message']) . '</li>';
         }
         echo '</ul>';
-        echo '</div>';
         echo '</div>';
     }
 }

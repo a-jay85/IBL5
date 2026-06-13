@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-06-11
+last_verified: 2026-06-13
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -43,6 +43,7 @@ Effort scale:
 **Suggested direction:** Move streak/season-start computation to `RecordHoldersService` or a dedicated `StreakCalculator`; extract HEAT champion CTE into a DB view.
 **Est. effort:** M
 **Risk if untouched:** Streak/season-date logic must be found inside a repository — a persistent layer violation attracting future bugs.
+**Status:** Completed (merged #1040, maintenance-38) — extracted StreakCalculator from RecordHoldersRepository.
 
 ### 1.3 RecordBreakingDetector — Discord Responsibility Bleed
 **Location:** `ibl5/classes/RecordHolders/RecordBreakingDetector.php`
@@ -681,6 +682,7 @@ Effort scale:
 **Suggested direction:** Add schema comments / ADR glossary. Longer-term: rename to `r_*`.
 **Est. effort:** S (doc) / L (rename)
 **Risk if untouched:** Agents waste time tracing; visual inconsistency on every `SELECT *`.
+**Status:** Completed (merged #1039, maintenance-29) — documented opaque DB columns (column-naming docs).
 
 ### 4.15 `cy` and `cyt` — Opaque Contract-Year Abbreviations
 **Location:** `ibl_plr` schema; `Player/PlayerData.php`
@@ -688,6 +690,7 @@ Effort scale:
 **Suggested direction:** Rename to `contract_current_year` / `contract_total_years`.
 **Est. effort:** M
 **Risk if untouched:** Tribal knowledge; footnote-based comprehension.
+**Status:** Completed (merged #1039, maintenance-29) — documented opaque DB columns (column-naming docs).
 
 ### 4.16 `bird` and `exp` — Single-Word Columns With Domain Meanings
 **Location:** `ibl_plr` schema
@@ -695,6 +698,7 @@ Effort scale:
 **Suggested direction:** Rename to `bird_rights_years`, `years_experience`; or at minimum schema comments.
 **Est. effort:** M (rename) / S (comments)
 **Risk if untouched:** Queries filtering "expiring players" accidentally filter on experience.
+**Status:** Completed (merged #1039, maintenance-29) — documented opaque DB columns (column-naming docs).
 
 ### 4.17 Stat Prefix Groups `sh_`/`sp_`/`ch_`/`cp_`/`s_dd`/`c_dd` Undocumented
 **Location:** `ibl_plr` schema; `Player/PlayerStats.php`
@@ -702,6 +706,7 @@ Effort scale:
 **Suggested direction:** Add schema comment block; reference in `PlayerStats.php` docblock.
 **Est. effort:** S
 **Risk if untouched:** Wrong reading (`ch_` as "championship" instead of "career high"); new columns ignore the pattern.
+**Status:** Completed (merged #1039, maintenance-29) — documented opaque DB columns (column-naming docs).
 
 ### 4.18 `game_2gm`/`game_2ga` — `2g` Naming Convention Is Unusual
 **Location:** `ibl_box_scores` schemas
@@ -716,6 +721,7 @@ Effort scale:
 **Suggested direction:** Add to `JSB_FILE_FORMATS.md`; schema comments.
 **Est. effort:** S
 **Risk if untouched:** Magic numbers with no semantic check.
+**Status:** Completed (merged #1039, maintenance-29) — documented opaque DB columns (column-naming docs).
 
 ### 4.20 `JSB.php` Root File vs `JsbParser/` Module
 **Location:** `ibl5/classes/JSB.php` vs `ibl5/classes/JsbParser/`
@@ -803,6 +809,7 @@ Effort scale:
 **Suggested direction:** Add `array<K,V>` generics to properties + method PHPDocs.
 **Est. effort:** S
 **Risk if untouched:** Wrong fixture shapes pass mock; tests pass with malformed data.
+**Status:** Completed (merged #1028, maintenance-33) — MockDatabase argument.type entries cleared (down to 0).
 
 ### 5.5 SeasonLeaderboardsView — 71 `ibl.unescapedOutput` (Highest XSS Surface)
 **Location:** `ibl5/classes/SeasonLeaderboards/SeasonLeaderboardsView.php`
@@ -1145,6 +1152,7 @@ Effort scale:
 **Suggested direction:** Add `@phpstan-type` shapes when next touched.
 **Est. effort:** S
 **Risk if untouched:** Mis-keyed arrays fail at runtime, not analysis time.
+**Status:** Completed (merged #1032, maintenance-39) — promoted WaiversRepositoryInterface shapes.
 
 ### 7.11 Inconsistent Caching Decorators
 **Location:** `PageCache::MODULE_TTLS` lists `SeasonHighs`, `FranchiseRecordBook`, `DraftHistory`, `AwardHistory`, `FranchiseHistory`
@@ -1159,6 +1167,7 @@ Effort scale:
 **Suggested direction:** Extract `enum TeamOrderBy`; or `const ALLOWED_ORDER_BY` on a future `TeamInfoRepository`.
 **Est. effort:** S
 **Risk if untouched:** Valid-sounding strings (`'team_city DESC'`) silently fall back.
+**Status:** Completed (merged #1032, maintenance-39) — TeamOrderBy enum + enumified fetchAllRealTeams (repository contract cleanup).
 
 ### 7.13 `DraftRepository` Constructs Two Repository Objects
 **Location:** `ibl5/classes/Draft/DraftRepository.php` line 26
@@ -1188,6 +1197,7 @@ Effort scale:
 **Suggested direction:** Move caches to Service; or document and add interface notes.
 **Est. effort:** S
 **Risk if untouched:** Reuse across long-lived processes returns stale data invisibly.
+**Status:** Completed (merged #1040, maintenance-38) — dropped hidden caches in RecordHolders layering.
 
 ### 7.17 `PlayerRepository::getPlayerNews` Queries `nuke_stories`
 **Location:** `ibl5/classes/Player/PlayerRepository.php` lines 547-564
@@ -1426,6 +1436,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Consolidate to one archive location; document freshness-scope explicitly.
 **Est. effort:** S
 **Risk if untouched:** Archived docs become invisible to CI checks.
+**Status:** Completed (merged #1044, maintenance-30) — documentation-drift sweep.
 
 ### 9.13 DATABASE_GUIDE "Schema Version: v1.5" Is Meaningless
 **Location:** `ibl5/docs/DATABASE_GUIDE.md` line 9
@@ -1455,6 +1466,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Move to `ibl5/docs/archive/`; replace onboarding pointer with a one-line summary.
 **Est. effort:** S
 **Risk if untouched:** New contributors read 600 LOC of completed history instead of architecture.
+**Status:** Completed (merged #1044, maintenance-30) — documentation-drift sweep.
 
 ### 9.17 PLR_VS_BOXSCORES_ANALYSIS — High-Value Reference With No Hook
 **Location:** `ibl5/docs/PLR_VS_BOXSCORES_ANALYSIS.md`
@@ -1462,6 +1474,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Add pointer in `database-access.md` or `schema-reference.md`.
 **Est. effort:** S
 **Risk if untouched:** Agent queries produce 12% wrong game counts due to missing filters.
+**Status:** Completed (merged #1044, maintenance-30) — documentation-drift sweep.
 
 ### 9.18 STRATEGIC_PRIORITIES — Stale Coverage Numbers
 **Location:** `ibl5/docs/STRATEGIC_PRIORITIES.md` lines 28-29
@@ -1491,6 +1504,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Remove the stale FK row.
 **Est. effort:** S
 **Risk if untouched:** Agent writes queries against nonexistent table.
+**Status:** Completed (merged #1044, maintenance-30) — documentation-drift sweep.
 
 ### 9.22 DOCUMENTATION_STANDARDS — README Trigger Is "When Refactoring"
 **Location:** `ibl5/docs/DOCUMENTATION_STANDARDS.md`
@@ -1505,6 +1519,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Replace with IBL6-specific content (dev mode, API base URL, IBL5 relationship).
 **Est. effort:** S
 **Risk if untouched:** Any IBL6 contributor starts from zero context.
+**Status:** Completed (merged #1044, maintenance-30) — documentation-drift sweep.
 
 ### 9.24 `codebase-map.md` — Machine-Generated But No Auto-Regen
 **Location:** CLAUDE.md line 36 + repo-root `.claude/rules/codebase-map.md` (NOT under `ibl5/` — corrected 2026-05-29 audit)
@@ -1534,6 +1549,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Add PHPDoc matching `WaiversRepositoryInterface` style.
 **Est. effort:** S
 **Risk if untouched:** Agents read implementation instead of contract.
+**Status:** Completed (merged #1044, maintenance-30) — documentation-drift sweep.
 
 ---
 
@@ -1545,6 +1561,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** `php bin/check-baseline-drift --update`; tighten drift detector to FAIL on large decreases.
 **Est. effort:** S
 **Risk if untouched:** Misleads maintainers about true baseline.
+**Status:** Completed (merged #1028, maintenance-33) — PHPStan baseline hygiene (duplicate of 10.25, already cleared).
 
 ### 10.2 `$_SESSION` Direct Access Outside Session Boundary
 **Location:** `Discord/Discord.php`, `Extension/ExtensionService.php`, `DepthChartEntry/DepthChartEntrySubmissionHandler.php`, `Bootstrap/LeagueBootstrap.php`, `Trading/TradeProcessor.php`, `Trading/TradeOfferRepository.php`, `PageLayout/PageLayout.php`
@@ -1768,6 +1785,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Add to `input.css` and load `style.css` first (matches LeagueControlPanel), or remove `var()` references.
 **Est. effort:** S
 **Risk if untouched:** Token updates don't reach this page.
+**Status:** Completed (merged #1027, maintenance-32) — CSS orphan + dead-code cleanup.
 
 ### 11.6 Duplicate Google Fonts Headers in Standalone Pages
 **Location:** `classes/LeagueControlPanel/LeagueControlPanelView.php` lines 28-31; `PageLayout::header()` lines 176-178
@@ -1775,6 +1793,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Extract `PageLayout::renderStandaloneHead(string $title)`; use from LCP, Updater, `demo-403.php`.
 **Est. effort:** S
 **Risk if untouched:** Font/stylesheet changes need multi-location edits.
+**Status:** Completed (merged #1027, maintenance-32) — CSS orphan + dead-code cleanup.
 
 ### 11.7 `editor.css` Is Orphaned (99 LOC, Zero References)
 **Location:** `themes/IBL/style/editor.css`
@@ -1782,6 +1801,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Delete.
 **Est. effort:** S
 **Risk if untouched:** Dead CSS bloats theme dir.
+**Status:** Completed (merged #1027, maintenance-32) — CSS orphan + dead-code cleanup.
 
 ### 11.8 PHP-Nuke Era Menu GIFs Likely Unreferenced
 **Location:** `themes/IBL/images/menu/` — 6 GIFs (comments.gif, exit.gif, home.gif, info.gif, themes.gif)
@@ -1789,6 +1809,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Verify; delete the dir.
 **Est. effort:** S
 **Risk if untouched:** Misleading assets; no functional risk.
+**Status:** Completed (merged #1027, maintenance-32) — CSS orphan + dead-code cleanup.
 
 ### 11.9 Dual Token Naming: `@theme` Variables vs `:root` Aliases
 **Location:** `design/input.css` `@theme` block + `design/tokens/tokens.css`
@@ -1796,6 +1817,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Document the rule in `css-architecture.md`; CI lint `grep -r -- '--color-' design/components/`.
 **Est. effort:** S
 **Risk if untouched:** Silent inconsistency that bites on Tailwind version bumps.
+**Status:** Completed (merged #1027, maintenance-32) — CSS orphan + dead-code cleanup.
 
 ### 11.10 Depth Chart CSS Split With Load-Order Coupling
 **Location:** `design/components/depth-chart.css` (+ `components/tables/depth-chart.css`, `saved-depth-charts.css`)
@@ -1839,6 +1861,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Remove dead section; consider folding 37-LOC file into `tables.css`.
 **Est. effort:** S
 **Risk if untouched:** Misleading "moved" comment.
+**Status:** Completed (merged #1027, maintenance-32) — CSS orphan + dead-code cleanup.
 
 ### 11.16 Global JS Bundle Loads Page-Specific Scripts on Every Page
 **Location:** `classes/PageLayout/PageLayout.php` lines 103-119
@@ -1989,6 +2012,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** `StandingsRepository` delegates to `SeriesRecordsRepository::getSeriesRecords()`.
 **Est. effort:** S
 **Risk if untouched:** View rename or column change drifts one query.
+**Status:** Completed (merged #1033, maintenance-40) — cross-module query dedup.
 
 ### 13.6 `SELECT DISTINCT year FROM ibl_hist` Duplicated
 **Location:** `SeasonLeaderboards/SeasonLeaderboardsRepository.php:93`, `Api/Repository/ApiLeadersRepository.php:100`
@@ -1996,6 +2020,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Add `getAvailableSeasonYears()` to `SeasonQueryRepository`; both delegate.
 **Est. effort:** S
 **Risk if untouched:** Minor drift risk.
+**Status:** Completed (merged #1033, maintenance-40) — cross-module query dedup.
 
 ### 13.7 Validator Error-Accumulation Boilerplate Repeated
 **Status:** **Partially done (Strategy A, PR validator-accumulators-to-validationresult):** the two pure string-accumulator validators (`Waivers/WaiversValidator`, `Draft/DraftValidator`) now return `ValidationResult`; mutable `private array $errors` / `getErrors()` / `clearErrors()` removed. State-leakage risk eliminated for these two. Remainder re-filed as [[13.7b]].
@@ -2056,6 +2081,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Constant `PlrBoxScoreRepository::PLAYED_CONDITION = 'game_min > 0'`; add a PHPStan rule or schema comment documenting the invariant.
 **Est. effort:** S
 **Risk if untouched:** New consumers inflate games-played counts or allow 0-stat season-high rows.
+**Status:** Completed (merged #1033, maintenance-40) — cross-module query dedup.
 
 ---
 
@@ -2113,6 +2139,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Register `\PDO` factory in the container; inject via `?Auth` parameter.
 **Est. effort:** S
 **Risk if untouched:** Tests can't swap PDO without global mutation.
+**Status:** Completed (merged #1042, maintenance-45) — lazy PDO factory injected into AuthService (DI call-site burndown C16).
 
 ### 14.8 Controllers Directly Read `$_GET`/`$_POST`/`$_REQUEST`
 **Location:** `Waivers/WaiversController.php:87-154`, `FreeAgency/FreeAgencyController.php:111-166`, `DepthChartEntry/DepthChartEntryController.php`, `Team/TeamController.php`, `Player/PlayerPageController.php`
@@ -2246,6 +2273,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Add FK `pid → ibl_plr.pid ON DELETE CASCADE`; migrate PK to `pid`.
 **Est. effort:** M
 **Risk if untouched:** Rename migrations leave stale demand rows.
+**Status:** Completed (merged #1037, maintenance-43) — ibl_demands pid FK + PK rebuild.
 
 ### 15.9 `ibl_trade_info` Missing FK to `ibl_trade_offers`
 **Location:** `ibl_trade_info` lines 2466-2479

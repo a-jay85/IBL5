@@ -205,6 +205,12 @@ export const VR_MANIFEST: VrRow[] = [
       { name: 'empty', appState: { 'Allow Waiver Moves': 'No' } },
     ],
     dataDriven: true },
+  { name: 'watchlist', auth: 'auth', url: 'modules.php?name=Watchlist',
+    anchor: '.ibl-data-table', viewports: ['desktop', 'mobile'] },
+  { name: 'big-board', auth: 'auth', url: 'modules.php?name=BigBoard',
+    anchor: '.big-board-page', viewports: ['desktop', 'mobile'] },
+  { name: 'mock-draft', auth: 'auth', url: 'modules.php?name=BigBoard&op=mock',
+    anchor: '.mock-draft-page', viewports: ['desktop', 'mobile'] },
 
   // ── Auth-regular modules ────────────────────────────────────
   { name: 'team-non-admin', auth: 'auth-regular', url: 'modules.php?name=Team&op=team&teamid=1',

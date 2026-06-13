@@ -13,7 +13,7 @@ final class NotificationServiceTest extends TestCase
 {
     public function testNotifyDelegatesToRepositoryInsertWithPassedArgs(): void
     {
-        $repository = $this->createMock(NotificationRepositoryInterface::class);
+        $repository = self::createMock(NotificationRepositoryInterface::class);
         $repository->expects($this->once())
             ->method('insert')
             ->with(
@@ -35,7 +35,7 @@ final class NotificationServiceTest extends TestCase
 
     public function testNotifyPassesNullLinkThrough(): void
     {
-        $repository = $this->createMock(NotificationRepositoryInterface::class);
+        $repository = self::createMock(NotificationRepositoryInterface::class);
         $repository->expects($this->once())
             ->method('insert')
             ->with(3, NotificationType::TRADE_ACCEPTED, 'Cougars accepted your trade.', null)

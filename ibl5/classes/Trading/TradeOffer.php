@@ -38,6 +38,7 @@ class TradeOffer implements TradeOfferInterface
     protected CashTransactionHandler $cashHandler;
     protected TradeValidator $validator;
     protected ?Discord $discord;
+    protected \Notifications\Contracts\NotificationServiceInterface $notificationService;
 
     public function __construct(
         \mysqli $db,
@@ -48,10 +49,13 @@ class TradeOffer implements TradeOfferInterface
         ?TradeCashRepositoryInterface $cashRepository = null,
         ?BuyoutLedgerRepositoryInterface $cashConsiderationRepository = null,
         ?Season $season = null,
-        ?TradeValidator $validator = null
+        ?TradeValidator $validator = null,
+        ?\Notifications\Contracts\NotificationServiceInterface $notificationService = null
     ) {
         $this->db = $db;
         $this->commonRepository = $commonRepository;
+        $this->notificationService = $notificationService
+            ?? new \Notifications\NotificationService(new \Notifications\NotificationRepository($db));
         $this->offerRepository = $offerRepository ?? new TradeOfferRepository($db, $serverName);
         $this->assetRepository = $assetRepository ?? new TradeAssetRepository($db);
         $this->cashRepository = $cashRepository ?? new TradeCashRepository($db);
@@ -486,7 +490,27 @@ class TradeOffer implements TradeOfferInterface
      */
     protected function sendTradeNotification(array $tradeData, string $tradeText, int $tradeOfferId): void
     {
-        // Skip notification if Discord is not available
+        // Primary in-app notification for the listening (receiving) team. Written
+        // BEFORE the Discord side-effect and independent of Discord availability,
+        // so a missing Discord ID or network failure never skips it. Failure here
+        // is logged, never thrown — it must not break the trade.
+        try {
+            $listeningTeamName = $tradeData['listeningTeam'];
+            $offeringTeamName = $tradeData['offeringTeam'];
+            $listeningTeamId = $this->commonRepository->getTidFromTeamname($listeningTeamName) ?? 0;
+            if ($listeningTeamId > 0) {
+                $this->notificationService->notify(
+                    $listeningTeamId,
+                    \Notifications\NotificationType::TRADE_OFFER_RECEIVED,
+                    "{$offeringTeamName} sent you a trade offer.",
+                    'modules.php?name=Trading&op=reviewtrade'
+                );
+            }
+        } catch (\Throwable $e) {
+            \Logging\LoggerFactory::getChannel('trade')->error('In-app trade notification failed', ['trade_id' => $tradeOfferId, 'error' => $e->getMessage()]);
+        }
+
+        // Skip Discord notification if Discord is not available
         if ($this->discord === null) {
             \Logging\LoggerFactory::getChannel('trade')->warning('Discord notification skipped: Discord class not initialized', ['trade_id' => $tradeOfferId]);
             return;

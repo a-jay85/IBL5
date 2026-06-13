@@ -65,6 +65,20 @@ class NavigationConfigTest extends TestCase
         $this->assertNull($config->serverName);
         $this->assertNull($config->requestUri);
         $this->assertFalse($config->isAdmin);
+        $this->assertSame(0, $config->unreadNotificationCount);
+    }
+
+    public function testUnreadNotificationCountRoundTrips(): void
+    {
+        $config = new NavigationConfig(
+            isLoggedIn: true,
+            username: 'TestUser',
+            currentLeague: 'ibl',
+            teamId: 1,
+            unreadNotificationCount: 7,
+        );
+
+        $this->assertSame(7, $config->unreadNotificationCount);
     }
 
     public function testReadonlyProperties(): void

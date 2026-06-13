@@ -420,8 +420,13 @@ class NavigationMenuBuilderTest extends TestCase
         $builder = new NavigationMenuBuilder($this->createConfig(isLoggedIn: true));
         $menu = $builder->getAccountMenu();
 
-        $this->assertCount(1, $menu);
-        $this->assertSame('Logout', $menu[0]['label']);
+        $this->assertCount(2, $menu);
+        $labels = array_column($menu, 'label');
+        $this->assertContains('Notification Settings', $labels);
+        $this->assertContains('Logout', $labels);
+        // Notification Settings precedes Logout
+        $this->assertSame('Notification Settings', $menu[0]['label']);
+        $this->assertSame('Logout', $menu[1]['label']);
     }
 
     public function testAccountMenuWhenLoggedOut(): void

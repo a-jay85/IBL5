@@ -30,6 +30,7 @@ final class ModuleRegistry
         'LeagueStarters',
         'News',
         'NextSim',
+        'NotificationSettings',
         'OneOnOneGame',
         'Player',
         'PlayerDatabase',

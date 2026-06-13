@@ -210,7 +210,6 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
             ['label' => 'Trading', 'url' => 'modules.php?name=Trading&op=reviewtrade'],
             ['label' => 'Trade Block', 'url' => 'modules.php?name=TradeBlock&op=edit'],
             ['label' => 'Voting', 'url' => 'modules.php?name=Voting'],
-            ['label' => 'My Watchlist', 'url' => 'modules.php?name=Watchlist'],
         ];
 
         if ($this->config->isAdmin) {
@@ -218,6 +217,7 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
         }
 
         $links[] = ['label' => 'Draft History', 'url' => 'modules.php?name=DraftHistory&teamid=' . $teamId];
+        $links[] = ['label' => 'My Watchlist', 'url' => 'modules.php?name=Watchlist'];
 
         if ($this->areWaiversAllowed()) {
             $links[] = ['rawHtml' => 'Waivers: <a href="modules.php?name=Waivers&amp;action=add">Add</a> | <a href="modules.php?name=Waivers&amp;action=waive">Waive</a>'];

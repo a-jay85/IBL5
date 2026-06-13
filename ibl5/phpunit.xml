@@ -31,6 +31,9 @@
         <testsuite name="Waivers Module Tests">
             <directory>tests/Waivers</directory>
         </testsuite>
+        <testsuite name="TradeBlock Module Tests">
+            <directory>tests/TradeBlock</directory>
+        </testsuite>
         <testsuite name="TrainingCampRatingsDiff Module Tests">
             <directory>tests/TrainingCampRatingsDiff</directory>
         </testsuite>

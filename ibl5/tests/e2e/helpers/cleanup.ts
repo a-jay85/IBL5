@@ -195,6 +195,24 @@ export async function resetTradeOffers(
 }
 
 /**
+ * Undo the trade-block toggle tests: delete every gm_trade_block row owned by a
+ * Metros (teamid=1) player and clear Metros' seeking note. Scoped to teamid=1 so
+ * the seeded cross-team fixture (Cougars pid=23 / teamid=3) survives.
+ */
+export async function resetTradeBlock(
+  request: APIRequestContext,
+): Promise<void> {
+  const response = await request.delete(
+    'test-state.php?action=reset-trade-block',
+  );
+  if (!response.ok()) {
+    throw new Error(
+      `reset-trade-block failed: ${response.status()} ${await response.text()}`,
+    );
+  }
+}
+
+/**
  * Restore state after a block.php assign_free_agents test: returns the three FA
  * players (pids 10/11/12) to their pre-signing seed, restores Metros' MLE/LLE,
  * deletes the assign news story, and re-seeds ibl_fa_offers.

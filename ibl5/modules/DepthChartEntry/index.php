@@ -23,7 +23,8 @@ function userinfo($username)
 {
     global $mysqli_db, $commonRepo, $leagueContext;
 
-    $controller = new DepthChartEntry\DepthChartEntryController($mysqli_db, $commonRepo, $leagueContext);
+    $salaryCapRepo = new Repositories\SalaryCapRepository($mysqli_db);
+    $controller = new DepthChartEntry\DepthChartEntryController($mysqli_db, $commonRepo, $leagueContext, $salaryCapRepo);
     $controller->displayForm($username);
 }
 
@@ -54,7 +55,8 @@ function submit()
         return;
     }
 
-    $controller = new DepthChartEntry\DepthChartEntryController($mysqli_db, $commonRepo, $leagueContext);
+    $salaryCapRepo = new Repositories\SalaryCapRepository($mysqli_db);
+    $controller = new DepthChartEntry\DepthChartEntryController($mysqli_db, $commonRepo, $leagueContext, $salaryCapRepo);
     $controller->handleSubmit($_POST);
 }
 
@@ -62,7 +64,8 @@ function tabApi()
 {
     global $mysqli_db, $commonRepo, $leagueContext;
 
-    $handler = new DepthChartEntry\DepthChartEntryApiHandler($mysqli_db, $commonRepo, $leagueContext);
+    $salaryCapRepo = new Repositories\SalaryCapRepository($mysqli_db);
+    $handler = new DepthChartEntry\DepthChartEntryApiHandler($mysqli_db, $commonRepo, $leagueContext, $salaryCapRepo);
     $handler->handle();
 }
 

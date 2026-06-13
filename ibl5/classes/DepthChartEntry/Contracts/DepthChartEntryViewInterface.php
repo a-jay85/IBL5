@@ -11,6 +11,7 @@ namespace DepthChartEntry\Contracts;
  * Uses output buffering for form rendering, direct echo for option rendering.
  *
  * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
+ * @phpstan-import-type LineupWarning from \DepthChartEntry\Contracts\LineupHealthAnalyzerInterface
  */
 interface DepthChartEntryViewInterface
 {
@@ -91,4 +92,15 @@ interface DepthChartEntryViewInterface
      * @param array<string> $slotNames Position slot names (kept for interface compat)
      */
     public function renderMobileView(array $players, array $slotNames): void;
+
+    /**
+     * Render the Lineup Health Check panel.
+     *
+     * When $warnings is empty, renders an all-clear panel with a "Lineup looks healthy"
+     * message. Otherwise renders a warning list where each item carries a data-warning-type
+     * attribute and the human-readable message.
+     *
+     * @param list<LineupWarning> $warnings
+     */
+    public function renderHealthCheckPanel(array $warnings): void;
 }

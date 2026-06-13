@@ -6,9 +6,11 @@ namespace DepthChartEntry;
 
 use DepthChartEntry\Contracts\DepthChartEntryControllerInterface;
 use DepthChartEntry\Contracts\DepthChartEntryServiceInterface;
+use DepthChartEntry\Contracts\LineupHealthAnalyzerInterface;
 use NextSim\NextSimService;
 use NextSim\NextSimView;
 use SavedDepthChart\SavedDepthChartService;
+use Repositories\Contracts\SalaryCapRepositoryInterface;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Standings\StandingsRepository;
 use Team\Contracts\TeamTableServiceInterface;
@@ -30,12 +32,16 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
     private TeamIdentityRepositoryInterface $commonRepository;
     private TeamTableServiceInterface $teamTableService;
     private DepthChartEntryServiceInterface $service;
+    private LineupHealthAnalyzerInterface $analyzer;
+    private SalaryCapRepositoryInterface $salaryCapRepository;
 
-    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepository, \League\LeagueContext $leagueContext)
+    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepository, \League\LeagueContext $leagueContext, SalaryCapRepositoryInterface $salaryCapRepository)
     {
         $this->db = $db;
         $this->repository = new DepthChartEntryRepository($db);
         $this->service = new DepthChartEntryService();
+        $this->analyzer = new LineupHealthAnalyzer();
+        $this->salaryCapRepository = $salaryCapRepository;
         $this->view = new DepthChartEntryView($leagueContext, $this->service);
         $this->commonRepository = $commonRepository;
         $teamRepository = new TeamRepository($db);
@@ -158,6 +164,10 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         );
 
         $slotNames = \JSB::PLAYER_POSITIONS;
+
+        $totalSalary = $this->salaryCapRepository->getTeamTotalSalary($teamName);
+        $warnings = $this->analyzer->analyze($playersWithQuality, $totalSalary);
+        $this->view->renderHealthCheckPanel($warnings);
 
         $this->view->renderLineupPreview();
         $this->view->renderFormHeader($teamName, $teamid, $slotNames);

@@ -83,4 +83,23 @@ class TradeProcessorTest extends TestCase
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('No trade data found', $result['error']);
     }
+
+    // ============================================
+    // PARTY-NAME JOINING (Matrix #8)
+    // ============================================
+
+    public function testJoinPartyNamesTwoTeamsMatchesLegacyWording(): void
+    {
+        $this->assertSame('Metros and Stars', TradeProcessor::joinPartyNames(['Metros', 'Stars']));
+    }
+
+    public function testJoinPartyNamesThreeTeamsUsesOxfordlessAndList(): void
+    {
+        $this->assertSame('Metros, Stars and Cougars', TradeProcessor::joinPartyNames(['Metros', 'Stars', 'Cougars']));
+    }
+
+    public function testJoinPartyNamesSingleNameReturnsItVerbatim(): void
+    {
+        $this->assertSame('Metros', TradeProcessor::joinPartyNames(['Metros']));
+    }
 }

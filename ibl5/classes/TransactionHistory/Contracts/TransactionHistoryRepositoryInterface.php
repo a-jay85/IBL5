@@ -27,4 +27,17 @@ interface TransactionHistoryRepositoryInterface
      * @return array<int, array{sid: string, catid: string, title: string, time: string}> Transaction rows
      */
     public function getTransactions(?int $categoryId, ?int $year, ?int $month): array;
+
+    /**
+     * Get a single team's transactions, scoped by word-boundary name match.
+     *
+     * Returns the newest-first ledger (same categories and row shape as
+     * {@see self::getTransactions()}) for stories whose title mentions the given
+     * team as a whole word. The team name is bound as a parameter and ERE-escaped;
+     * it is never interpolated into the SQL. Used by the My Team Transactions view.
+     *
+     * @param string $teamName Team name to scope by (resolved server-side from the GM)
+     * @return array<int, array{sid: string, catid: string, title: string, time: string}> Transaction rows, newest first
+     */
+    public function getTransactionsForTeam(string $teamName): array;
 }

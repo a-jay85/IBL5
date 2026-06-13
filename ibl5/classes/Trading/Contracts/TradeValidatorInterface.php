@@ -91,6 +91,32 @@ interface TradeValidatorInterface
     ): array;
 
     /**
+     * Validate post-trade salary caps for an arbitrary set of parties (2 or 3+ teams)
+     *
+     * Generalizes {@see self::validateSalaryCaps()} from a fixed user/partner pair
+     * to N parties. Each party supplies its current-season cap total plus the cap it
+     * sends and receives in this trade; post-trade total is `current - sent + received`,
+     * checked against League::HARD_CAP_MAX.
+     *
+     * @param list<array{teamName: string, currentSeasonCapTotal: int, capSent: int, capReceived: int}> $partyCapDeltas
+     * @return array{valid: bool, errors: list<string>, parties: list<array{teamName: string, postTradeCapTotal: int, overCap: bool}>}
+     */
+    public function validateSalaryCapsForParties(array $partyCapDeltas): array;
+
+    /**
+     * Validate post-trade roster limits for an arbitrary set of parties (2 or 3+ teams)
+     *
+     * Generalizes {@see self::validateRosterLimits()} from a fixed user/partner pair
+     * to N parties. Each party's post-trade roster is `current - sent + received`,
+     * checked against Team::ROSTER_SPOTS_MAX. Current roster size per party is read
+     * via the form repository's getTeamPlayerCount().
+     *
+     * @param list<array{teamId: int, teamName: string, playersSent: int, playersReceived: int}> $partyRosterDeltas
+     * @return array{valid: bool, errors: list<string>, parties: list<array{teamName: string, postTradeRoster: int, overLimit: bool}>}
+     */
+    public function validateRosterLimitsForParties(array $partyRosterDeltas): array;
+
+    /**
      * Get cash considerations for current season based on phase
      *
      * Determines which year's cash values to use for cap calculations

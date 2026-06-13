@@ -9,9 +9,12 @@ test.describe('Notification Settings flow', () => {
   // Matrix #10 — nav entry exists and the page renders the form (defaults).
   test('account menu links to the page and it loads with the form', async ({ page }) => {
     await page.goto('modules.php?name=NextSim');
-    // The account-menu link is present in the DOM (may live inside a dropdown).
+    // The link is folded into the My Team dropdown (the standalone Account
+    // dropdown is suppressed for users with a team). It renders in both the
+    // desktop and mobile nav — both always in the DOM — so scope to the desktop
+    // nav to assert it appears exactly once there.
     await expect(
-      page.locator('a[href*="name=NotificationSettings"]'),
+      page.locator('.nav-desktop a[href*="name=NotificationSettings"]'),
     ).toHaveCount(1);
 
     await page.goto('modules.php?name=NotificationSettings');
@@ -29,6 +32,10 @@ test.describe('Notification Settings flow', () => {
     await digest.check();
     await page.getByRole('button', { name: /Save preferences/i }).click();
     await page.waitForURL(/name=NotificationSettings/);
+    // Confirm the save round-trip completed (success banner renders on saved=1)
+    // before reloading — a failed/CSRF-rejected save would surface here rather
+    // than masquerade as a stale read on the reload assertion below.
+    await expect(page.locator('.ibl-alert--success')).toBeVisible();
 
     await page.goto('modules.php?name=NotificationSettings');
     await expect(page.locator('input[name="digest_weekly_transactions"]')).toBeChecked();
@@ -44,6 +51,10 @@ test.describe('Notification Settings flow', () => {
     await tradeOffers.uncheck();
     await page.getByRole('button', { name: /Save preferences/i }).click();
     await page.waitForURL(/name=NotificationSettings/);
+    // Confirm the save round-trip completed (success banner renders on saved=1)
+    // before reloading — a failed/CSRF-rejected save would surface here rather
+    // than masquerade as a stale read on the reload assertion below.
+    await expect(page.locator('.ibl-alert--success')).toBeVisible();
 
     await page.goto('modules.php?name=NotificationSettings');
     await expect(page.locator('input[name="notify_trade_offers"]')).not.toBeChecked();

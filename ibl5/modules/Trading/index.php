@@ -29,9 +29,15 @@ $processor = new \Trading\TradeProcessor($mysqli_db, $teamIdentityRepo, $serverN
 $tradeOffer = new \Trading\TradeOffer($mysqli_db, $teamIdentityRepo, $serverName);
 $view = new \Trading\TradingView();
 $nukeCompat = new \Utilities\NukeCompat();
+$validator = new \Trading\TradeValidator($mysqli_db);
+$salaryCapRepo = new \Repositories\SalaryCapRepository($mysqli_db);
+$cashRepo = new \Trading\TradeCashRepository($mysqli_db);
+$executionService = new \Trading\TradeExecutionService(
+    $offerRepo, $processor, $validator, $salaryCapRepo, $teamIdentityRepo, $cashRepo
+);
 $controller = new \Trading\TradingController(
-    $service, $processor, $offerRepo, $tradeOffer, $view,
-    $teamIdentityRepo, $nukeCompat, $mysqli_db
+    $service, $offerRepo, $tradeOffer, $view,
+    $teamIdentityRepo, $nukeCompat, $mysqli_db, $executionService
 );
 
 switch ($op) {

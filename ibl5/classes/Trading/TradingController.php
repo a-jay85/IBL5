@@ -6,10 +6,10 @@ namespace Trading;
 
 use Trading\Contracts\TradingControllerInterface;
 use Trading\Contracts\TradingServiceInterface;
-use Trading\Contracts\TradeProcessorInterface;
 use Trading\Contracts\TradeOfferRepositoryInterface;
 use Trading\Contracts\TradeOfferInterface;
 use Trading\Contracts\TradingViewInterface;
+use Trading\Contracts\TradeExecutionServiceInterface;
 
 /**
  * @see TradingControllerInterface
@@ -17,13 +17,13 @@ use Trading\Contracts\TradingViewInterface;
 class TradingController implements TradingControllerInterface
 {
     private TradingServiceInterface $service;
-    private TradeProcessorInterface $processor;
     private TradeOfferRepositoryInterface $offerRepository;
     private TradeOfferInterface $tradeOffer;
     private TradingViewInterface $view;
     private \Repositories\Contracts\TeamIdentityRepositoryInterface $teamIdentityRepo;
     private \Utilities\NukeCompat $nukeCompat;
     private \mysqli $db;
+    private TradeExecutionServiceInterface $executionService;
     /** Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('audit'). */
     private \Psr\Log\LoggerInterface $auditLogger;
     /** Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('trade'). */
@@ -31,26 +31,44 @@ class TradingController implements TradingControllerInterface
 
     public function __construct(
         TradingServiceInterface $service,
-        TradeProcessorInterface $processor,
         TradeOfferRepositoryInterface $offerRepository,
         TradeOfferInterface $tradeOffer,
         TradingViewInterface $view,
         \Repositories\Contracts\TeamIdentityRepositoryInterface $teamIdentityRepo,
         \Utilities\NukeCompat $nukeCompat,
         \mysqli $db,
+        TradeExecutionServiceInterface $executionService,
         ?\Psr\Log\LoggerInterface $auditLogger = null,
         ?\Psr\Log\LoggerInterface $tradeLogger = null
     ) {
         $this->service = $service;
-        $this->processor = $processor;
         $this->offerRepository = $offerRepository;
         $this->tradeOffer = $tradeOffer;
         $this->view = $view;
         $this->teamIdentityRepo = $teamIdentityRepo;
         $this->nukeCompat = $nukeCompat;
         $this->db = $db;
+        $this->executionService = $executionService;
         $this->auditLogger = $auditLogger ?? \Logging\LoggerFactory::getChannel('audit');
         $this->tradeLogger = $tradeLogger ?? \Logging\LoggerFactory::getChannel('trade');
+    }
+
+    /**
+     * Resolve the acting GM's team name from the auth cookie.
+     *
+     * This is the authoritative authz identity — derived from the session cookie,
+     * never from POST. Mirrors handleRosterPreviewApi()'s cookie decode.
+     */
+    private function resolveActingTeam(mixed $user): string
+    {
+        $decoded = $this->nukeCompat->cookieDecode($user);
+        $username = is_string($decoded[1] ?? null) ? $decoded[1] : '';
+
+        if ($username === '') {
+            return '';
+        }
+
+        return $this->teamIdentityRepo->getTeamnameFromUsername($username) ?? '';
     }
 
     /**
@@ -249,8 +267,13 @@ class TradingController implements TradingControllerInterface
      *
      * @param array<string, mixed> $post
      */
-    public function acceptTradeOffer(array $post): void
+    public function acceptTradeOffer(mixed $user, array $post): void
     {
+        if (!$this->nukeCompat->isUser($user)) {
+            $this->nukeCompat->loginBox();
+            return;
+        }
+
         if (!\Security\CsrfGuard::validateSubmittedToken('trade_accept')) {
             \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&error=' . rawurlencode('Invalid or expired form submission. Please try again.'));
         }
@@ -269,13 +292,21 @@ class TradingController implements TradingControllerInterface
             \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=already_processed');
         }
 
+        // Authz identity comes from the auth cookie, never POST. The execution
+        // service enforces that this team is a party (IDOR gate) and runs N-party
+        // cap/roster validation before any write.
+        $actingTeam = $this->resolveActingTeam($user);
+
         try {
-            $result = $this->processor->processTrade($offerId);
+            $result = $this->executionService->validateAndExecute($offerId, $actingTeam);
 
             if ($result['success']) {
                 \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=trade_accepted');
             } else {
-                $errorMsg = is_string($result['error'] ?? null) ? ($result['error'] ?? '') : 'Unknown error';
+                $errors = isset($result['errors']) && is_array($result['errors']) ? $result['errors'] : [];
+                $errorMsg = is_string($result['error'] ?? null)
+                    ? ($result['error'] ?? '')
+                    : ($errors !== [] ? implode('; ', $errors) : 'Unknown error');
                 \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=accept_error&error=' . rawurlencode($errorMsg));
             }
         } catch (\Exception $e) {
@@ -289,8 +320,13 @@ class TradingController implements TradingControllerInterface
      *
      * @param array<string, mixed> $post
      */
-    public function rejectTradeOffer(array $post): void
+    public function rejectTradeOffer(mixed $user, array $post): void
     {
+        if (!$this->nukeCompat->isUser($user)) {
+            $this->nukeCompat->loginBox();
+            return;
+        }
+
         if (!\Security\CsrfGuard::validateSubmittedToken('trade_reject')) {
             \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&error=' . rawurlencode('Invalid or expired form submission. Please try again.'));
         }
@@ -310,6 +346,18 @@ class TradingController implements TradingControllerInterface
 
         if ($tradeRows === []) {
             \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=already_processed');
+        }
+
+        // Authz/IDOR gate: only a GM whose team is a party to the offer may reject
+        // it. Identity comes from the auth cookie, never $post['teamRejecting']
+        // (which is attacker-controlled and used only for the Discord DM below).
+        $actingTeam = $this->resolveActingTeam($user);
+
+        if (!$this->executionService->assertActingTeamIsParty($offerId, $actingTeam)) {
+            \Logging\LoggerFactory::getChannel('trade')->warning('Rejected non-party trade reject attempt', [
+                'offer_id' => $offerId,
+            ]);
+            \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=reject_error');
         }
 
         $this->offerRepository->deleteTradeOffer($offerId);

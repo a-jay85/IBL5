@@ -85,8 +85,14 @@ class NavigationView
 
                     <?= HtmlSanitizer::trusted($this->desktopNavView->render($menus, $myTeamMenu, $accountMenu)) ?>
 
+                    <!-- Desktop notification bell -->
+                    <div class="hidden lg:flex items-center">
+                        <?= HtmlSanitizer::trusted($this->renderNotificationBell()) ?>
+                    </div>
+
                     <!-- Mobile controls -->
                     <div class="lg:hidden flex items-center gap-1">
+                        <?= HtmlSanitizer::trusted($this->renderNotificationBell()) ?>
                         <button id="desktop-view-toggle" class="nav-icon-btn" aria-label="Switch to desktop view" title="Switch to desktop view">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25A2.25 2.25 0 015.25 3h13.5A2.25 2.25 0 0121 5.25z"/></svg>
                         </button>
@@ -113,5 +119,31 @@ class NavigationView
         <script src="jslib/navigation.js"></script>
         <?php
         return (string) ob_get_clean();
+    }
+
+    /**
+     * Render the nav notification bell for a logged-in team owner. Returns an
+     * empty string for unauthenticated users or users without a team, so the
+     * bell is hidden exactly when the Notifications module is inaccessible.
+     */
+    private function renderNotificationBell(): string
+    {
+        if (!$this->config->isLoggedIn || $this->config->teamId === null) {
+            return '';
+        }
+
+        $badge = '';
+        if ($this->config->unreadNotificationCount > 0) {
+            $badge = '<span class="notification-bell__badge">'
+                . (string) $this->config->unreadNotificationCount
+                . '</span>';
+        }
+
+        return '<a href="modules.php?name=Notifications" class="notification-bell nav-icon-btn" aria-label="Notifications" title="Notifications">'
+            . '<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">'
+            . '<path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/>'
+            . '</svg>'
+            . $badge
+            . '</a>';
     }
 }

@@ -35,6 +35,7 @@ final class NavigationConfig
         public readonly bool $isDebugAdmin = false,
         public readonly bool $isAdmin = false,
         public readonly bool $debugViewAllExtensions = false,
+        public readonly int $unreadNotificationCount = 0,
     ) {
         $this->teamsData = $teamsData;
     }

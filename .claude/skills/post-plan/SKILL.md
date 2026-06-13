@@ -515,12 +515,14 @@ grep -q 'PHASE5_VERIFY_STATUS=fail' /tmp/post-plan-phase5-status-$PPID 2>/dev/nu
 ```bash
 # condition (6): block if any Depends-on: PR is not yet MERGED.
 # Bare `gh pr view` (no arg) resolves the current branch's PR, matching Phase 3's idiom.
-DEPS=$(gh pr view --json body --jq '.body' \
-       | grep -ioE 'depends-on:[^0-9#]*[#0-9, ]+' | grep -oE '[0-9]+' || true)
-for d in $DEPS; do
-  st=$(gh pr view "$d" --json state --jq '.state' 2>/dev/null)
-  [ "$st" != "MERGED" ] && echo "BLOCKED: depends on #$d (state=${st:-unknown}, not yet MERGED)"
-done
+# `while read` (not `for d in $DEPS`) so it splits per-line in bash AND zsh — zsh does
+# not word-split unquoted expansions, so a `for` loop would see all numbers as one word.
+gh pr view --json body --jq '.body' \
+  | grep -ioE 'depends-on:[^0-9#]*[#0-9, ]+' | grep -oE '[0-9]+' \
+  | while read -r d; do
+      st=$(gh pr view "$d" --json state --jq '.state' 2>/dev/null)
+      [ "$st" != "MERGED" ] && echo "BLOCKED: depends on #$d (state=${st:-unknown}, not yet MERGED)"
+    done
 ```
 
 If met: `gh pr merge --squash --auto --delete-branch`. The `--auto` flag queues the merge — it does **not** merge now, it arms; GitHub executes it once all required status checks pass. Do not sync local to master here; the merge has not happened yet.

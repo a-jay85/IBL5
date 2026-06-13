@@ -29,6 +29,11 @@ class CapturingRepository implements FreeAgencyRepositoryInterface
         return null;
     }
 
+    public function getOffersByTeam(int $teamid): array
+    {
+        return [];
+    }
+
     public function deleteOffer(int $teamid, int $pid): int
     {
         return 0;

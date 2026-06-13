@@ -223,4 +223,30 @@ class FreeAgencyRepositoryTest extends DatabaseTestCase
         self::assertNotContains(200020007, $pids);
         self::assertContains(200020008, $pids);
     }
+
+    public function testGetOffersByTeamReturnsOnlyThatTeam(): void
+    {
+        $this->insertTestPlayer(200020030, 'FA OffByTeamA');
+        $this->insertTestPlayer(200020031, 'FA OffByTeamB');
+        $this->insertTestPlayer(200020032, 'FA OffByTeamC');
+
+        $this->insertFaOfferRow(200020030, 1, 'FA OffByTeamA', 'Metros');
+        $this->insertFaOfferRow(200020031, 1, 'FA OffByTeamB', 'Metros');
+        $this->insertFaOfferRow(200020032, 2, 'FA OffByTeamC', 'Stars');
+
+        $teamOneBids = $this->repo->getOffersByTeam(1);
+        $pids = array_column($teamOneBids, 'pid');
+
+        self::assertContains(200020030, $pids);
+        self::assertContains(200020031, $pids);
+        self::assertNotContains(200020032, $pids);
+        // Row shape: name + pid + offer1-6.
+        self::assertArrayHasKey('name', $teamOneBids[0]);
+        self::assertArrayHasKey('offer1', $teamOneBids[0]);
+    }
+
+    public function testGetOffersByTeamReturnsEmptyForNoBids(): void
+    {
+        self::assertSame([], $this->repo->getOffersByTeam(999));
+    }
 }

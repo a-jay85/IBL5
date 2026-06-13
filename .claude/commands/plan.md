@@ -3,7 +3,7 @@ description: "Plan an implementation task: enforces a verification matrix, direc
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
-last_verified: 2026-06-11
+last_verified: 2026-06-12
 
 ---
 
@@ -115,21 +115,17 @@ Format each packet as a fenced block within the plan:
 
 ## Step 4: Validate the matrix
 
-After receiving the Plan agent's output, check these gates yourself — do NOT delegate validation:
+After receiving the Plan agent's output, check these gates yourself — do NOT delegate validation.
 
-1. **Matrix exists** — the plan contains a table with columns: #, What to verify, Test type, Timing, Test file / location
-2. **No unclassified items** — every row has a test type from the allowed set (PHPUnit, API-test, E2E, Visual-regression, CLI-executable, Truly-manual)
-3. **No false manuals** — scan for "verify", "check that", "confirm", "ensure" in any row classified as Truly-manual. These verbs indicate an automatable assertion — reclassify the row
+**The deterministic gates are scripted, not hand-run.** `bin/check-plan` (invoked in Step 5, once the plan is on disk) mechanically enforces the false-positive-free subset: gate 1 (matrix exists), gate 3 (no false manuals), the `DECIDE`/`TBD`/`subject to validation`/`subject to review` tokens of gate 7, **and** reuse-target existence (a PHP `Class::method` named in a **Reuse** note whose class exists in `ibl5/` but whose method is absent — a likely typo). Do **not** hand-scan for those; fix whatever the script reports. The gates below are the ones that need judgment a script cannot do:
+
+1. *(scripted — see above)*
+2. **No unclassified items** — every row's test type is a real classification. *Not scripted on purpose:* the type column is open-ended in practice (`Go-archive-diagnostic`, `Documented (domain rule)`, `read-before-cut` are legitimate), so a closed-set check would false-positive — judge membership yourself.
+3. *(scripted — see above)*
 4. **Tests woven inline** — pre-impl tests appear before their implementation step, not collected in a bottom appendix
 5. **Production comparison classified correctly** — any "compare against production" or "match iblhoops.net" row must be Visual-regression, not Truly-manual
 6. **Test file paths present** — every PHPUnit/API-test/E2E/Visual-regression row names a concrete test file path, not just a category
-7. **No unresolved decisions** — scan all table rows (lines matching `^\s*\|`) for these tokens (case-insensitive):
-   - `DECIDE` (whole word)
-   - `TBD` (whole word)
-   - `(or ` (literal — indicates unresolved alternative, e.g., "STAY (or move)")
-   - `subject to validation`
-   - `subject to review`
-   If any match is found, resolve the decision in-place before saving the plan. The nightly agent cannot make judgment calls — every table cell must contain a concrete action, not a deferred question.
+7. **No unresolved decisions** — the literal tokens are scripted (see above). You still hand-resolve an unresolved **`(or `** fork (e.g. "STAY (or move)") — `bin/check-plan` skips that token because the corpus showed it is overwhelmingly a benign aside (`≤5 (or 0 ideally)`, `(or extend existing)`), and telling a real fork from an aside needs reading the alternative. Resolve any genuine fork in-place; the nightly agent cannot make judgment calls.
 8. **Decision-trigger pre-classified** — scan implementation phases for file additions matching `bin/adr-check` trigger patterns (listed in `_plan-verification.md` § Decision-trigger pre-classification). If any trigger fires, verify the plan includes a resolution step (ADR or bypass marker). If missing, add the appropriate resolution step and update the verification matrix.
 9. **Negative-path coverage** — every behavior-changing step has at least one matrix row asserting a failure, boundary, or rejection case, not only happy-path. If a step has only happy-path rows, add the missing negative-path row.
 10. **Hot-file extraction** — if any step adds > 100 LOC to a file `bin/check-hot-files` lists as hot (> 500 LOC under `classes/`), the plan must either propose an extraction step or carry an inline justification (per `_plan-verification.md` § Hot-file thresholds). If neither is present, add one.
@@ -151,6 +147,14 @@ PLAN_PATH="$HOME/.claude/plans/<slug>.md"
 If a plan file already exists at that path, create a new one with a numeric suffix rather than overwriting.
 
 Write the validated plan (with corrected matrix if Step 4 required fixes) to the plan file. When the work was split into multiple PRs, give each plan a distinct slug (e.g. `<base-slug>-1-<unit>`, `<base-slug>-2-<unit>`) so they sort in dependency order, and write one file per unit.
+
+Then run the mechanical linter on each plan file you wrote and fix anything it reports, in-place, until it exits clean:
+
+```bash
+bin/check-plan "$PLAN_PATH"
+```
+
+It enforces the deterministic gates from Step 4 (matrix present, no false manuals, no `DECIDE`/`TBD`/`subject to …` tokens, reuse targets resolve). A non-zero exit prints each violation prefixed by its gate (`[1]`/`[3]`/`[7]`/`[R]`); resolve each and re-run. Do not leave a plan written until `bin/check-plan` passes.
 
 ### Declaring the implementation model (optional)
 

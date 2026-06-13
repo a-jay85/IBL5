@@ -18,12 +18,14 @@ interface TradingControllerInterface
     public function submitTradeOffer(array $post): void;
 
     /**
+     * @param mixed $user The PHP-Nuke auth cookie (authz source — never POST)
      * @param array<string, mixed> $post
      */
-    public function acceptTradeOffer(array $post): void;
+    public function acceptTradeOffer(mixed $user, array $post): void;
 
     /**
+     * @param mixed $user The PHP-Nuke auth cookie (authz source — never POST)
      * @param array<string, mixed> $post
      */
-    public function rejectTradeOffer(array $post): void;
+    public function rejectTradeOffer(mixed $user, array $post): void;
 }

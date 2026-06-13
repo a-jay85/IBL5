@@ -210,6 +210,7 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
             ['label' => 'Trading', 'url' => 'modules.php?name=Trading&op=reviewtrade'],
             ['label' => 'Trade Block', 'url' => 'modules.php?name=TradeBlock&op=edit'],
             ['label' => 'Voting', 'url' => 'modules.php?name=Voting'],
+            ['label' => 'My Watchlist', 'url' => 'modules.php?name=Watchlist'],
         ];
 
         if ($this->config->isAdmin) {

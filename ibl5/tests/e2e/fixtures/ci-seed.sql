@@ -1986,3 +1986,9 @@ INSERT INTO ibl_box_scores (
    1, 36, 7, 15, 5, 6, 3, 7,
    2, 5, 9, 3, 3, 0, 2,
    'b0000000-0000-0000-0000-000000000602');
+
+-- Watchlist: pre-watch pid 2 (Test Player Two) for Metros (teamid 1, the E2E
+-- user's team) so the unwatch + list E2E specs have a deterministic seeded row.
+-- FK resolves: pid 2 (ibl_plr) and teamid 1 (Metros, ibl_team_info) seeded above.
+INSERT INTO gm_player_watchlist (teamid, pid, note) VALUES
+  (1, 2, 'Seeded scouting note for E2E');

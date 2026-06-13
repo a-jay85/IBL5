@@ -115,9 +115,6 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
                     $this->config->isLoggedIn && $this->config->teamId !== null
                         ? ['label' => 'GM Contact List', 'url' => 'modules.php?name=GMContactList']
                         : null,
-                    $this->config->isLoggedIn && $this->config->teamId !== null
-                        ? ['label' => 'Notifications', 'url' => 'modules.php?name=Notifications']
-                        : null,
                 ], static fn (mixed $item): bool => $item !== null)),
             ],
         ];

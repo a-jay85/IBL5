@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Dashboard;
 
+use BasketballStats\StatsFormatter;
 use Dashboard\Contracts\DashboardViewInterface;
 use Security\HtmlSanitizer;
 
@@ -108,7 +109,7 @@ class DashboardView implements DashboardViewInterface
      */
     private function renderCap(array $cap): string
     {
-        $headroom = HtmlSanitizer::e(number_format($cap['headroom']));
+        $headroom = HtmlSanitizer::e(StatsFormatter::formatTotal($cap['headroom']));
         $body = "<p class=\"gm-dashboard-stat\">Cap headroom: <strong>{$headroom}</strong></p>";
 
         return $this->card('Cap Space', $body, 'modules.php?name=CapSpace');

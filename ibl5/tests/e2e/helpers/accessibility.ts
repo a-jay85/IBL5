@@ -18,7 +18,7 @@ export async function assertNoA11yViolations(
 ): Promise<void> {
   let builder = options?.onlyRules?.length
     ? new AxeBuilder({ page }).withRules(options.onlyRules)
-    : new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']);
+    : new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice']);
 
   if (options?.include) {
     builder = builder.include(options.include);

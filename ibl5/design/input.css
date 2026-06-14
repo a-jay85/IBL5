@@ -146,6 +146,7 @@
 @import './components/tables/franchise-record-book.css';
 @import './components/tables/free-agency.css';
 @import './components/cards.css';
+@import './components/notifications.css';
 @import './components/forms.css';
 @import './components/navigation.css';
 @import './components/player-views.css';

@@ -199,6 +199,7 @@ Effort scale:
 **Suggested direction:** Add a Service even as a pass-through to maintain pattern consistency.
 **Est. effort:** S each
 **Risk if untouched:** Same as 2.2.
+**Status:** Split (C7b, maintenance-48b) — FranchiseHistory: Service built; `getAllFranchiseHistory()` assembly extracted from the Repository into `FranchiseHistoryService` (raw-fetch Repo + assembly Service), unblocking DB-free unit tests of the winpct/default/merge branches. PlayerMovement: Declined — `PlayerMovementRepository::getPlayerMovements()` is a single JOIN with zero PHP assembly; a Service would be pass-through ceremony (cf. 2.9/2.11).
 
 ### 2.4 GMContactList / Topics — No Service Layer; Topics Cross-Module Coupling
 **Location:** `classes/GMContactList/`, `classes/Topics/`

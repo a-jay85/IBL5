@@ -216,6 +216,46 @@ class TeamCapCalculatorTest extends TestCase
         self::assertSame([], $this->buildCalculator()->getSalaryCapArray('Test', 1, $this->season(false)));
     }
 
+    // ── getSalaryCapArrayFromContractRows (extracted; delegation equivalence) ─
+
+    public function testGetSalaryCapArrayFromContractRowsMatchesPublicWalk(): void
+    {
+        // Same stub rows as testGetSalaryCapArrayAccumulatesContractSalariesByYear,
+        // proving the extracted method reproduces the public wrapper's year-array.
+        $rows = [
+            ['cy' => 1, 'cyt' => 3, 'salary_yr1' => 1000, 'salary_yr2' => 1100, 'salary_yr3' => 1200],
+        ];
+        $this->stubCash->method('getTeamCashForSalary')->willReturn([]);
+
+        $result = $this->buildCalculator()
+            ->getSalaryCapArrayFromContractRows($rows, 1, $this->season(false));
+
+        self::assertSame(['year1' => 1000, 'year2' => 1100, 'year3' => 1200], $result);
+    }
+
+    public function testGetSalaryCapArrayFromContractRowsAdvancesYearInOffseason(): void
+    {
+        $rows = [
+            ['cy' => 1, 'cyt' => 3, 'salary_yr1' => 1000, 'salary_yr2' => 1100, 'salary_yr3' => 1200],
+        ];
+        $this->stubCash->method('getTeamCashForSalary')->willReturn([]);
+
+        $result = $this->buildCalculator()
+            ->getSalaryCapArrayFromContractRows($rows, 1, $this->season(true));
+
+        self::assertSame(['year1' => 1100, 'year2' => 1200], $result);
+    }
+
+    public function testGetSalaryCapArrayFromContractRowsReturnsEmptyForNoCommitments(): void
+    {
+        $this->stubCash->method('getTeamCashForSalary')->willReturn([]);
+
+        self::assertSame(
+            [],
+            $this->buildCalculator()->getSalaryCapArrayFromContractRows([], 1, $this->season(false))
+        );
+    }
+
     // ── getTotalCurrentSeasonSalaries / getTotalNextSeasonSalaries ─
 
     public function testGetTotalCurrentSeasonSalariesSumsCurrentYearAcrossPlayers(): void

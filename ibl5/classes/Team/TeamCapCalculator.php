@@ -23,6 +23,7 @@ use Trading\Contracts\BuyoutLedgerRepositoryInterface;
  * (ADR-0028: a domain calculator, not a generic Service/Shared bucket).
  *
  * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
+ * @phpstan-import-type CapContractRow from TeamCapCalculatorInterface
  *
  * @see TeamCapCalculatorInterface
  */
@@ -54,11 +55,23 @@ class TeamCapCalculator implements TeamCapCalculatorInterface
      */
     public function getSalaryCapArray(string $teamName, int $teamId, Season $season): array
     {
-        /** @var array<string, int> $salaryCapSpent */
-        $salaryCapSpent = [];
         $resultContracts = $this->teamQueryRepo->getRosterUnderContractOrderedByName($teamId);
 
-        foreach ($resultContracts as $contract) {
+        return $this->getSalaryCapArrayFromContractRows($resultContracts, $teamId, $season);
+    }
+
+    /**
+     * @see TeamCapCalculatorInterface::getSalaryCapArrayFromContractRows()
+     *
+     * @param list<CapContractRow> $contractRows
+     * @return array<string, int>
+     */
+    public function getSalaryCapArrayFromContractRows(array $contractRows, int $teamId, Season $season): array
+    {
+        /** @var array<string, int> $salaryCapSpent */
+        $salaryCapSpent = [];
+
+        foreach ($contractRows as $contract) {
             $yearUnderContract = $contract['cy'] ?? 0;
             if ($season->isOffseasonPhase()) {
                 $yearUnderContract++;

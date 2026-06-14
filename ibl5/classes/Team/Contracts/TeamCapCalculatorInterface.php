@@ -17,6 +17,8 @@ use Season\Season;
  * calculator, not a generic Service/Shared bucket).
  *
  * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
+ *
+ * @phpstan-type CapContractRow array{cy?: int|null, cyt?: int|null, salary_yr1?: int|null, salary_yr2?: int|null, salary_yr3?: int|null, salary_yr4?: int|null, salary_yr5?: int|null, salary_yr6?: int|null, ...}
  */
 interface TeamCapCalculatorInterface
 {
@@ -26,6 +28,20 @@ interface TeamCapCalculatorInterface
      * @return array<string, int> Array of salary cap spent by year
      */
     public function getSalaryCapArray(string $teamName, int $teamId, Season $season): array;
+
+    /**
+     * Get salary cap array for all contract years from passed-in contract rows.
+     *
+     * Runs the same per-season cap walk as {@see self::getSalaryCapArray()} but over
+     * caller-supplied contract rows, so hypothetical scenarios (waived / added
+     * contracts) can be costed with the league's authoritative cap math. Cash
+     * considerations are still pulled by {@see $teamId} (the what-if mutates only
+     * contracts, never cash).
+     *
+     * @param list<CapContractRow> $contractRows Contract rows to walk (real or hypothetical)
+     * @return array<string, int> Array of salary cap spent by year
+     */
+    public function getSalaryCapArrayFromContractRows(array $contractRows, int $teamId, Season $season): array;
 
     /**
      * Get total current season salaries from player result array

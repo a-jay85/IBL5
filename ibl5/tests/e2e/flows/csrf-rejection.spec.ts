@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import type { APIRequestContext } from '@playwright/test';
 import { test, expect } from '../fixtures/auth';
 
 /**
@@ -22,6 +23,24 @@ import { test, expect } from '../fixtures/auth';
 /** A random 64-hex token — correct format, wrong value. */
 function forgedToken(): string {
   return randomBytes(32).toString('hex');
+}
+
+/** Fetch a fresh, valid `_csrf_token` from a GET-rendered form on `path`. */
+async function fetchToken(
+  request: APIRequestContext,
+  path: string,
+): Promise<string> {
+  const resp = await request.get(path);
+  if (!resp.ok()) {
+    throw new Error(`token fetch GET ${path} failed: ${resp.status()}`);
+  }
+  const match = (await resp.text()).match(
+    /name="_csrf_token" value="([0-9a-f]+)"/,
+  );
+  if (match === null) {
+    throw new Error(`no _csrf_token found on ${path}`);
+  }
+  return match[1];
 }
 
 test.describe('Forged CSRF token is rejected', () => {
@@ -95,5 +114,102 @@ test.describe('Forged CSRF token is rejected', () => {
     const html = await response.text();
     expect(html).not.toContain('API Key Generated');
     expect(html).toContain('Invalid or expired form submission');
+  });
+
+  // ── leagueControlPanel.php (lcp_update_all token gate) ──────────────────
+
+  test('leagueControlPanel.php with forged token → ?error= CSRF redirect, no dispatch', async ({
+    request,
+  }) => {
+    const response = await request.post('leagueControlPanel.php', {
+      form: {
+        _csrf_token: forgedToken(),
+        action: 'set_season_phase',
+        SeasonPhase: 'Regular Season',
+      },
+      maxRedirects: 0,
+    });
+    expect([301, 302, 303]).toContain(response.status());
+    const location = response.headers()['location'] ?? '';
+    // CSRF-specific: redirected to ?error= carrying the CSRF message, BEFORE
+    // dispatch — so the season-phase row is never written. NOT ?success=.
+    expect(location).toContain('error=');
+    expect(decodeURIComponent(location)).toContain(
+      'Invalid or expired form submission',
+    );
+    expect(location).not.toContain('success=');
+  });
+
+  // V2: valid-token positive. DELIBERATELY uses an UNKNOWN action (non-mutating)
+  // rather than the plan's literal set_season_phase — writing 'Current Season
+  // Phase' here would make this file a NEW cross-file mutator of that global row
+  // and reintroduce the #910 race that league-control-panel.spec.ts is engineered
+  // to contain (this spec's header commits to no global mutation). A valid token
+  // that reaches dispatch yields the dispatch 'Unknown action' message, NOT the
+  // CSRF message — positive proof the gate accepted the token and dispatch ran.
+  test('leagueControlPanel.php with valid token → passes gate, reaches dispatch', async ({
+    request,
+  }) => {
+    const token = await fetchToken(request, 'leagueControlPanel.php');
+    const response = await request.post('leagueControlPanel.php', {
+      form: { _csrf_token: token, action: '__csrf_probe__' },
+      maxRedirects: 0,
+    });
+    expect([301, 302, 303]).toContain(response.status());
+    const location = decodeURIComponent(response.headers()['location'] ?? '');
+    expect(location).toContain('Unknown action');
+    expect(location).not.toContain('Invalid or expired form submission');
+  });
+
+  // ── import-demands.php (import_demands token gate) ──────────────────────
+
+  test('import-demands.php with forged token + file → CSRF error, no truncate/insert', async ({
+    request,
+  }) => {
+    const response = await request.post('import-demands.php', {
+      multipart: {
+        _csrf_token: forgedToken(),
+        demands_csv: {
+          name: 'demands.csv',
+          mimeType: 'text/csv',
+          buffer: Buffer.from('name,dem1,dem2,dem3,dem4,dem5,dem6\nTest Player,1,1,1,1,1,1\n'),
+        },
+      },
+    });
+    expect(response.status()).toBeLessThan(400);
+    const html = await response.text();
+    // Rejection precedes the truncate+insert, so the message itself proves
+    // ibl_demands was not touched.
+    expect(html).toContain('Invalid or expired form submission');
+    expect(html).not.toContain('Successfully imported');
+  });
+
+  // ── modules.php?name=OneOnOneGame (one_on_one token gate) ───────────────
+
+  test('OneOnOneGame play with forged token → CSRF error, no game played', async ({
+    request,
+  }) => {
+    const response = await request.post('modules.php?name=OneOnOneGame', {
+      form: { _csrf_token: forgedToken(), pid1: '1', pid2: '2' },
+    });
+    expect(response.status()).toBeLessThan(400);
+    const html = await response.text();
+    // Gate precedes playGame()'s INSERT into ibl_one_on_one, so no GAME ID:
+    // result block renders and no row is inserted.
+    expect(html).toContain('Invalid or expired form submission');
+    expect(html).not.toContain('GAME ID:');
+  });
+
+  test('OneOnOneGame play with valid token → game played (GAME ID: block)', async ({
+    request,
+  }) => {
+    const token = await fetchToken(request, 'modules.php?name=OneOnOneGame');
+    const response = await request.post('modules.php?name=OneOnOneGame', {
+      form: { _csrf_token: token, pid1: '1', pid2: '2' },
+    });
+    expect(response.status()).toBeLessThan(400);
+    const html = await response.text();
+    expect(html).toContain('GAME ID:');
+    expect(html).not.toContain('Invalid or expired form submission');
   });
 });

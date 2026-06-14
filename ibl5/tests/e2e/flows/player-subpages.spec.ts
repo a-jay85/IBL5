@@ -116,35 +116,6 @@ test.describe('Player rookie option sub-page', () => {
     await resetRookieOption(request, 200000032);
   });
 
-  test('POST to processrookieoption with eligible round-1 player succeeds', async ({
-    appState,
-    request,
-  }) => {
-    await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
-    // processrookieoption now requires a valid rookie_option CSRF token; render
-    // the eligible fixture form to mint one (formName-bound, not pid-bound).
-    const token = await fetchRookieOptionCsrfToken(request);
-    const response = await request.post(
-      '/ibl5/modules.php?name=Player&pa=processrookieoption',
-      {
-        form: {
-          _csrf_token: token,
-          teamname: 'Metros',
-          playerID: '200000032',
-          rookieOptionValue: '1000',
-          from: '',
-        },
-        maxRedirects: 0,
-      },
-    );
-    const location = response.headers()['location'] ?? '';
-    expect(
-      location.includes('result=rookie_option_success') ||
-        location.includes('result=email_failed'),
-    ).toBe(true);
-    expect(location).not.toContain('error=');
-  });
-
   test('POST to processrookieoption for a DIFFERENT team is refused (IDOR)', async ({
     appState,
     request,
@@ -203,6 +174,38 @@ test.describe('Player rookie option sub-page', () => {
     const location = response.headers()['location'] ?? '';
     expect(location).toContain('error=');
     expect(location).toContain('pa=rookieoption');
+  });
+
+  // Runs LAST: this is the only test that mutates pid 200000032 (exercising the
+  // option makes the fixture ineligible). Keeping it after the token-fetching
+  // tests preserves their eligible-form render; afterAll restores the contract.
+  test('POST to processrookieoption with eligible round-1 player succeeds', async ({
+    appState,
+    request,
+  }) => {
+    await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
+    // processrookieoption now requires a valid rookie_option CSRF token; render
+    // the eligible fixture form to mint one (formName-bound, not pid-bound).
+    const token = await fetchRookieOptionCsrfToken(request);
+    const response = await request.post(
+      '/ibl5/modules.php?name=Player&pa=processrookieoption',
+      {
+        form: {
+          _csrf_token: token,
+          teamname: 'Metros',
+          playerID: '200000032',
+          rookieOptionValue: '1000',
+          from: '',
+        },
+        maxRedirects: 0,
+      },
+    );
+    const location = response.headers()['location'] ?? '';
+    expect(
+      location.includes('result=rookie_option_success') ||
+        location.includes('result=email_failed'),
+    ).toBe(true);
+    expect(location).not.toContain('error=');
   });
 });
 

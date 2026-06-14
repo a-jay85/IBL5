@@ -19,15 +19,20 @@ class InjuriesService implements InjuriesServiceInterface
 {
     private \mysqli $db;
     private InjuriesRepositoryInterface $injuriesRepository;
+    /**
+     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     */
+    private ?Season $season = null;
 
     /**
      * @param \mysqli $db Database connection (still required for Player/Team/Season hydration)
      * @param InjuriesRepositoryInterface|null $injuriesRepository Source of injured-player rows; defaults to the League-backed repository
      */
-    public function __construct(\mysqli $db, ?InjuriesRepositoryInterface $injuriesRepository = null)
+    public function __construct(\mysqli $db, ?InjuriesRepositoryInterface $injuriesRepository = null, ?Season $season = null)
     {
         $this->db = $db;
         $this->injuriesRepository = $injuriesRepository ?? new InjuriesRepository($db);
+        $this->season = $season;
     }
 
     /**
@@ -35,7 +40,7 @@ class InjuriesService implements InjuriesServiceInterface
      */
     public function getInjuredPlayersWithTeams(): array
     {
-        $season = new Season($this->db);
+        $season = $this->season ?? new Season($this->db);
         $injuredPlayers = [];
 
         $injuredRows = $this->injuriesRepository->getInjuredPlayers();

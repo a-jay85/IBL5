@@ -29,15 +29,20 @@ class PlayerPageController
 {
     private \mysqli $mysqliDb;
     private TeamIdentityRepositoryInterface $commonRepo;
+    /**
+     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     */
+    private ?Season $season = null;
 
     /**
      * @param \mysqli $mysqliDb MySQLi database connection
      * @param TeamIdentityRepositoryInterface $commonRepo Common repository for shared queries
      */
-    public function __construct(\mysqli $mysqliDb, TeamIdentityRepositoryInterface $commonRepo)
+    public function __construct(\mysqli $mysqliDb, TeamIdentityRepositoryInterface $commonRepo, ?Season $season = null)
     {
         $this->mysqliDb = $mysqliDb;
         $this->commonRepo = $commonRepo;
+        $this->season = $season;
     }
 
     /**
@@ -50,7 +55,7 @@ class PlayerPageController
      */
     public function renderPage(int $playerID, ?int $pageView, string $username): string
     {
-        $season = new Season($this->mysqliDb);
+        $season = $this->season ?? new Season($this->mysqliDb);
 
         $player = Player::withPlayerID($this->mysqliDb, $playerID);
         $playerStats = PlayerStats::withPlayerID($this->mysqliDb, $playerID);

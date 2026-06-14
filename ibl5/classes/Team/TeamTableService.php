@@ -21,11 +21,16 @@ class TeamTableService implements TeamTableServiceInterface
 {
     private \mysqli $db;
     private TeamRepositoryInterface $repository;
+    /**
+     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     */
+    private ?Season $season = null;
 
-    public function __construct(\mysqli $db, TeamRepositoryInterface $repository)
+    public function __construct(\mysqli $db, TeamRepositoryInterface $repository, ?Season $season = null)
     {
         $this->db = $db;
         $this->repository = $repository;
+        $this->season = $season;
     }
 
     /**
@@ -33,7 +38,7 @@ class TeamTableService implements TeamTableServiceInterface
      */
     public function getTableOutput(int $teamid, ?string $yr, string $display, ?string $split = null): string
     {
-        $season = new Season($this->db);
+        $season = $this->season ?? new Season($this->db);
 
         $isFreeAgency = $season->isOffseasonPhase();
 
@@ -144,7 +149,7 @@ class TeamTableService implements TeamTableServiceInterface
      */
     public function getRosterAndStarters(int $teamid): array
     {
-        $season = new Season($this->db);
+        $season = $this->season ?? new Season($this->db);
         $isFreeAgency = $season->isOffseasonPhase();
 
         if ($isFreeAgency) {

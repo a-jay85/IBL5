@@ -21,9 +21,18 @@ class DraftSelectionHandler implements DraftSelectionHandlerInterface
     private DraftProcessor $processor;
     private DraftView $view;
     private Season $season;
+    /** Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('audit'). */
+    private \Psr\Log\LoggerInterface $auditLogger;
+    /** Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('draft'). */
+    private \Psr\Log\LoggerInterface $draftLogger;
 
-    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepository, Season $season)
-    {
+    public function __construct(
+        \mysqli $db,
+        TeamIdentityRepositoryInterface $commonRepository,
+        Season $season,
+        ?\Psr\Log\LoggerInterface $auditLogger = null,
+        ?\Psr\Log\LoggerInterface $draftLogger = null
+    ) {
         $this->db = $db;
         $this->commonRepository = $commonRepository;
         $this->season = $season;
@@ -32,6 +41,8 @@ class DraftSelectionHandler implements DraftSelectionHandlerInterface
         $this->repository = new DraftRepository($db, $commonRepository);
         $this->processor = new DraftProcessor();
         $this->view = new DraftView();
+        $this->auditLogger = $auditLogger ?? \Logging\LoggerFactory::getChannel('audit');
+        $this->draftLogger = $draftLogger ?? \Logging\LoggerFactory::getChannel('draft');
     }
 
     /**
@@ -72,11 +83,11 @@ class DraftSelectionHandler implements DraftSelectionHandlerInterface
             $this->db->commit();
         } catch (\Throwable $e) {
             $this->db->rollback();
-            \Logging\LoggerFactory::getChannel('draft')->error('Draft selection DB error', ['error' => $e->getMessage()]);
+            $this->draftLogger->error('Draft selection DB error', ['error' => $e->getMessage()]);
             return $this->processor->getDatabaseErrorMessage();
         }
 
-        \Logging\LoggerFactory::getChannel('audit')->info('player_drafted', [
+        $this->auditLogger->info('player_drafted', [
             'action' => 'player_drafted',
             'player_name' => $playerName,
             'team_name' => $teamName,
@@ -113,13 +124,13 @@ class DraftSelectionHandler implements DraftSelectionHandlerInterface
                 }
             }
         } catch (\Throwable $e) {
-            \Logging\LoggerFactory::getChannel('draft')->warning('Draft next-pick lookup error', ['error' => $e->getMessage()]);
+            $this->draftLogger->warning('Draft next-pick lookup error', ['error' => $e->getMessage()]);
         }
 
         try {
             Discord::postToChannel('#general-chat', $message);
         } catch (\Throwable $e) {
-            \Logging\LoggerFactory::getChannel('draft')->error('Draft Discord #general-chat error', ['error' => $e->getMessage()]);
+            $this->draftLogger->error('Draft Discord #general-chat error', ['error' => $e->getMessage()]);
         }
 
         $messageWithNextTeam = $this->processor->createNextTeamMessage(
@@ -131,7 +142,7 @@ class DraftSelectionHandler implements DraftSelectionHandlerInterface
         try {
             Discord::postToChannel('#draft-picks', $messageWithNextTeam);
         } catch (\Throwable $e) {
-            \Logging\LoggerFactory::getChannel('draft')->error('Draft Discord #draft-picks error', ['error' => $e->getMessage()]);
+            $this->draftLogger->error('Draft Discord #draft-picks error', ['error' => $e->getMessage()]);
         }
 
         return $this->processor->getSuccessMessage($message);

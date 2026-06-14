@@ -133,6 +133,9 @@
         <testsuite name="CapSpace Module Tests">
             <directory>tests/CapSpace</directory>
         </testsuite>
+        <testsuite name="CapWhatIf Module Tests">
+            <directory>tests/CapWhatIf</directory>
+        </testsuite>
         <testsuite name="AwardHistory Module Tests">
             <directory>tests/AwardHistory</directory>
         </testsuite>

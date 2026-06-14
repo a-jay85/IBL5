@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace FranchiseHistory;
 
-use FranchiseHistory\Contracts\FranchiseHistoryRepositoryInterface;
+use FranchiseHistory\Contracts\FranchiseHistoryServiceInterface;
 use FranchiseHistory\Contracts\FranchiseHistoryViewInterface;
 use UI\TeamCellHelper;
 use Security\HtmlSanitizer;
@@ -14,7 +14,7 @@ use Security\HtmlSanitizer;
  *
  * Generates sortable HTML table displaying franchise history data.
  *
- * @phpstan-import-type FranchiseRow from FranchiseHistoryRepositoryInterface
+ * @phpstan-import-type FranchiseRow from FranchiseHistoryServiceInterface
  *
  * @see FranchiseHistoryViewInterface For the interface contract
  */

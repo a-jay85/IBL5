@@ -112,7 +112,6 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
                     ['label' => 'Prime Time Football', 'url' => 'http://www.thakfu.com/ptf/index.php', 'external' => true],
                     ['label' => 'Activity Tracker', 'url' => 'modules.php?name=ActivityTracker'],
                     ['label' => 'Topics (News)', 'url' => 'modules.php?name=Topics'],
-                    ['label' => 'Trade Block', 'url' => 'modules.php?name=TradeBlock'],
                     $this->config->isLoggedIn && $this->config->teamId !== null
                         ? ['label' => 'GM Contact List', 'url' => 'modules.php?name=GMContactList']
                         : null,
@@ -208,7 +207,6 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
             ['label' => 'Next Sim', 'url' => 'modules.php?name=NextSim'],
             ['label' => 'Depth Chart Entry', 'url' => 'modules.php?name=DepthChartEntry'],
             ['label' => 'Trading', 'url' => 'modules.php?name=Trading&op=reviewtrade'],
-            ['label' => 'Trade Block', 'url' => 'modules.php?name=TradeBlock&op=edit'],
             ['label' => 'Voting', 'url' => 'modules.php?name=Voting'],
         ];
 
@@ -217,9 +215,6 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
         }
 
         $links[] = ['label' => 'Draft History', 'url' => 'modules.php?name=DraftHistory&teamid=' . $teamId];
-        $links[] = ['label' => 'My Watchlist', 'url' => 'modules.php?name=Watchlist'];
-        $links[] = ['label' => 'Big Board', 'url' => 'modules.php?name=BigBoard'];
-        $links[] = ['label' => 'Mock Draft', 'url' => 'modules.php?name=BigBoard&op=mock'];
 
         if ($this->areWaiversAllowed()) {
             $links[] = ['rawHtml' => 'Waivers: <a href="modules.php?name=Waivers&amp;action=add">Add</a> | <a href="modules.php?name=Waivers&amp;action=waive">Waive</a>'];

@@ -588,22 +588,6 @@ INSERT INTO ibl_plr (
    'a0000000-0000-0000-0000-000000000029');
 
 -- ============================================================
--- Trade Block fixtures (trade-block.spec.ts browse board).
--- MUST come after the pid 23/24 ibl_plr inserts above — gm_trade_block.pid has
--- an FK to ibl_plr(pid), so the player rows must exist first.
--- Cross-team data independent of test ordering: pid=23 "Cougars Guard"
--- (teamid=3, retired=0) is seeded onto the block, and the Cougars get a seeking
--- note. The team-1 (Metros) toggle E2E mutates its own listing and cleans up via
--- afterAll, so it never collides with this row. The IDOR negative test forges
--- pid=24 "Cougars Forward" (team 3, NOT on the block), so 23 (seeded) and 24
--- (forged) stay distinct.
--- ============================================================
-INSERT INTO gm_trade_block (pid, note) VALUES
-  (23, 'Looking for a wing defender');
-INSERT INTO gm_trade_seeking (teamid, seeking_note) VALUES
-  (3, 'Seeking shooting and a backup big');
-
--- ============================================================
 -- Placeholder player for LeagueStarters module
 -- LeagueStartersService::getOrLoadPlaceholder() loads pid=4040404
 -- as a stand-in for teams with no starter at a given position.
@@ -1009,19 +993,6 @@ INSERT INTO ibl_draft_class (name, pos, age, team, fga, fgp, fta, ftp, r_3ga, r_
 -- Update drafted prospects with team names
 UPDATE ibl_draft_class SET team = 'Stars' WHERE name = 'Already Drafted PG';
 UPDATE ibl_draft_class SET team = 'Cougars' WHERE name = 'Already Drafted PF';
-
--- ============================================================
--- Big Board seed: exactly ONE Metros (teamid 1) board entry.
--- Referenced by name-subquery because ibl_draft_class.id auto-assigns.
--- This single entry drives both Mock Draft states on one page:
---   - the FIRST Metros-owned slot in the walk shows 'Prospect Guard'
---   - every later Metros-owned slot shows 'No prospects left on your board'
--- and the Big Board page's non-empty (entries) state.
--- ============================================================
-INSERT INTO gm_draft_big_board (teamid, prospect_id, `rank`, note)
-SELECT 1, id, 1, 'CI seed sleeper'
-FROM ibl_draft_class
-WHERE name = 'Prospect Guard';
 
 -- ============================================================
 -- Draft picks for round 1 (Metros pick 1 = on the clock)
@@ -2339,9 +2310,3 @@ INSERT INTO ibl_box_scores (
    1, 36, 7, 15, 5, 6, 3, 7,
    2, 5, 9, 3, 3, 0, 2,
    'b0000000-0000-0000-0000-000000000602');
-
--- Watchlist: pre-watch pid 2 (Test Player Two) for Metros (teamid 1, the E2E
--- user's team) so the unwatch + list E2E specs have a deterministic seeded row.
--- FK resolves: pid 2 (ibl_plr) and teamid 1 (Metros, ibl_team_info) seeded above.
-INSERT INTO gm_player_watchlist (teamid, pid, note) VALUES
-  (1, 2, 'Seeded scouting note for E2E');

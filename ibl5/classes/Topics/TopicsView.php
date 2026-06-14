@@ -107,7 +107,7 @@ class TopicsView implements TopicsViewInterface
         $click2list = HtmlSanitizer::safeHtmlOutput(_CLICK2LIST);
 
         return '<div class="topics-page">
-    <h2 class="ibl-title">' . $activeTopics . '</h2>
+    <h1 class="ibl-title">' . $activeTopics . '</h1>
     <p class="topics-page__subtitle">' . $click2list . '</p>';
     }
 

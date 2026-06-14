@@ -65,7 +65,7 @@ class VotingResultsView implements VotingResultsViewInterface
 
         $tableRowsHtml = $rowsHtml !== [] ? "\n" . implode("\n", $rowsHtml) . "\n    " : "\n    ";
 
-        $html = '<h2 class="ibl-title">' . $escapedTitle . '</h2>
+        $html = '<h1 class="ibl-title">' . $escapedTitle . '</h1>
 <table class="sortable ibl-data-table voting-results-table">
     <thead>
         <tr>

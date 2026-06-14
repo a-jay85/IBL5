@@ -51,7 +51,7 @@ class FreeAgencyView
             'error' => ['class' => 'ibl-alert--error', 'message' => 'An unexpected error occurred. Please try again.'],
         ]);
         ?>
-<h2 class="ibl-title">Free Agency</h2>
+<h1 class="ibl-title">Free Agency</h1>
 <img src="images/logo/<?= HtmlSanitizer::e($team->teamid) ?>.jpg" alt="Team Logo" class="team-logo-banner">
 <div class="mt-6"></div>
 <?= HtmlSanitizer::trusted($this->renderPlayersUnderContract($team, $season, $capMetrics, $playersUnderContract, $cashPlayers)) ?>

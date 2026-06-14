@@ -25,7 +25,7 @@ class PlayerMovementView implements PlayerMovementViewInterface
      */
     public function render(array $movements): string
     {
-        $html = '<h2 class="ibl-title">Player Movement</h2>
+        $html = '<h1 class="ibl-title">Player Movement</h1>
 <table class="sortable ibl-data-table player-movement-table">
     <thead>
         <tr>

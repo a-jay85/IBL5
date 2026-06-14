@@ -35,16 +35,16 @@ last_verified: 2026-06-14
 
 | Sub-group | Disposition | Covered by |
 |-----------|-------------|------------|
-| **Single-title views** (exactly one non-looped `h2.ibl-title`): draft history, cap space, activity tracker, all-star appearances, contract list, draft, draft pick locator, franchise history, free agency preview, gm contact list, injuries, league starters, one-on-one game, player movement, projected draft order, record holders, season highs, series records, team off/def stats, transaction history, search, topics, voting results, free agency, watchlist, training camp ratings diff | 🟢 | `a11y-2-heading-one-single-title` |
+| **Single-title views** (exactly one non-looped `h2.ibl-title`): draft history, cap space, activity tracker, all-star appearances, contract list, draft, draft pick locator, franchise history, free agency preview, gm contact list, injuries, league starters, one-on-one game, player movement, projected draft order, record holders, season highs, series records, team off/def stats, transaction history, search, topics, voting results, free agency, watchlist, training camp ratings diff | ✅ enforced | `a11y-2-heading-one-single-title` (merged) |
 | **Multi-title / loop-rendered** (which `h2` is THE title needs judgment): standings + olympics standings (per-region loop), trading (2), season archive (2), franchise record book (2), compare players (4), waivers (2), depth chart entry (2), big board (2), trade block (3) | 🟡 | backlog (this doc) |
 | **No `ibl-title` h2 — needs an `<h1>` *added* with chosen title text:** season leaderboards, career leaderboards, award history, player database, player page (Player mega-module), your account (authenticated view — the `h1.ibl-card__title` only exists on the logged-out sign-in/register cards), voting ASG/EOY ballot, homepage + news index/categories/article (legacy `modules/News` index.php, no view class) | 🟡 | backlog (this doc) |
 | **Conditional emit:** team page — `TeamView.php:52` only emits the `h1` in one ternary branch; the other branch (no team name) yields no h1 | 🟡 | backlog (this doc) |
 
-### heading-order — best-practice, moderate — 🟢
+### heading-order — best-practice, moderate — ✅ enforced
 **Location:** `record holders` (`RecordHoldersView.php` — an `<h4>` follows the title with no intervening `<h3>`).
 **Problem:** Heading levels skip. Coupled to the heading-one fix (promoting the title to `h1` shifts the hierarchy). Seed-independent.
 **Direction:** Fix the level jump. Bundle into `a11y-2-heading-one-single-title` (same view, same render).
-**Disposition:** 🟢 — `a11y-2-heading-one-single-title`.
+**Disposition:** ✅ enforced — `a11y-2-heading-one-single-title` (merged).
 
 ### empty-table-header — best-practice, minor — 🟢
 **Location:** cap space (`CapSpaceView` th[data-sort-col=7,13]), player page (`.highs-header`), free agency (`FreeAgencyView` sticky-col `th[data-sort-col=0]`), depth chart entry (`.dc-lineup-preview-table` first th + `.sep-team` separators, 9 nodes), next sim (`.next-sim-position-section` tables, 40 nodes).
@@ -113,7 +113,7 @@ last_verified: 2026-06-14
 | Plan | Scope |
 |------|-------|
 | `a11y-1-ratchet-best-practice` | Add best-practice + WCAG 2.2/2.1 tags to the helper; generalize the allowlist to per-page-per-rule; enable `page-has-heading-one`, `heading-order`, `empty-table-header` with empirically-seeded allowlists; **install this backlog doc to `ibl5/docs/a11y-backlog.md`**. No code fixes (regression-prevention only). |
-| `a11y-2-heading-one-single-title` | Promote sole `h2.ibl-title` → `h1` in the single-title views + fix record-holders `heading-order`; remove those pages from the allowlist. |
+| `a11y-2-heading-one-single-title` ✅ | Promote sole `h2.ibl-title` → `h1` in the single-title views + fix record-holders `heading-order`; remove those pages from the allowlist. |
 | `a11y-3-empty-table-header` | Add visually-hidden labels to the empty `<th>` cells on cap space / player page / free agency; remove from allowlist. |
 
 ## Burn-down process

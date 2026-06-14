@@ -155,11 +155,39 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
         return null;
     }
 
+    /**
+     * @see NavigationMenuBuilderInterface::getMyTeamMenuWithAccountLinks()
+     *
+     * @return NavMenuData|null
+     */
+    public function getMyTeamMenuWithAccountLinks(): ?array
+    {
+        $myTeamMenu = $this->getMyTeamMenu();
+        if ($myTeamMenu === null) {
+            return null;
+        }
+
+        // The desktop/mobile nav suppress the standalone Account dropdown when a
+        // My Team menu exists and render only a Logout footer in its place. Fold
+        // every non-logout account link (e.g. Notification Settings) into the My
+        // Team menu so those links stay reachable for logged-in users with a team.
+        // Logout is excluded because the views render it in their dedicated footer.
+        foreach ($this->getAccountMenu() as $link) {
+            if (str_contains($link['url'], 'op=logout')) {
+                continue;
+            }
+            $myTeamMenu['links'][] = $link;
+        }
+
+        return $myTeamMenu;
+    }
+
     /** @see NavigationMenuBuilderInterface::getAccountMenu() */
     public function getAccountMenu(): array
     {
         if ($this->config->isLoggedIn) {
             return [
+                ['label' => 'Notification Settings', 'url' => 'modules.php?name=NotificationSettings'],
                 ['label' => 'Logout', 'url' => 'modules.php?name=YourAccount&op=logout', 'noBoost' => true],
             ];
         }

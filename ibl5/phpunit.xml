@@ -178,6 +178,9 @@
         <testsuite name="ApiKeys Module Tests">
             <directory>tests/ApiKeys</directory>
         </testsuite>
+        <testsuite name="NotificationSettings Tests">
+            <directory>tests/NotificationSettings</directory>
+        </testsuite>
         <testsuite name="TransactionHistory Module Tests">
             <directory>tests/TransactionHistory</directory>
         </testsuite>

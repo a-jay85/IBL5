@@ -420,8 +420,13 @@ class NavigationMenuBuilderTest extends TestCase
         $builder = new NavigationMenuBuilder($this->createConfig(isLoggedIn: true));
         $menu = $builder->getAccountMenu();
 
-        $this->assertCount(1, $menu);
-        $this->assertSame('Logout', $menu[0]['label']);
+        $this->assertCount(2, $menu);
+        $labels = array_column($menu, 'label');
+        $this->assertContains('Notification Settings', $labels);
+        $this->assertContains('Logout', $labels);
+        // Notification Settings precedes Logout
+        $this->assertSame('Notification Settings', $menu[0]['label']);
+        $this->assertSame('Logout', $menu[1]['label']);
     }
 
     public function testAccountMenuWhenLoggedOut(): void
@@ -433,5 +438,40 @@ class NavigationMenuBuilderTest extends TestCase
         $labels = array_column($menu, 'label');
         $this->assertContains('Sign Up', $labels);
         $this->assertContains('Forgot Password', $labels);
+    }
+
+    // --- My Team menu with folded-in account links ---
+
+    public function testMyTeamMenuWithAccountLinksFoldsInNonLogoutAccountLinks(): void
+    {
+        $builder = new NavigationMenuBuilder($this->createConfig(isLoggedIn: true, teamId: 5));
+        $menu = $builder->getMyTeamMenuWithAccountLinks();
+        $this->assertNotNull($menu);
+
+        $labels = array_column($menu['links'], 'label');
+        // Notification Settings is reachable for logged-in users with a team,
+        // even though the nav suppresses the standalone Account dropdown for them.
+        $this->assertContains('Notification Settings', $labels);
+        // Logout is rendered by the views' dedicated footer, not folded into the menu.
+        $this->assertNotContains('Logout', $labels);
+
+        // The base My Team links are preserved alongside the folded-in account link.
+        $this->assertContains('Voting', $labels);
+    }
+
+    public function testMyTeamMenuWithAccountLinksIsNullWhenNoTeam(): void
+    {
+        // Logged-in user without a team: no My Team menu, so the standalone
+        // Account dropdown (with the full account menu) is used instead.
+        $builder = new NavigationMenuBuilder($this->createConfig(isLoggedIn: true, teamId: null));
+        $this->assertNull($builder->getMyTeamMenuWithAccountLinks());
+    }
+
+    public function testMyTeamMenuWithAccountLinksIsNullForGuest(): void
+    {
+        $builder = new NavigationMenuBuilder(
+            $this->createConfig(isLoggedIn: false, username: null, teamId: null)
+        );
+        $this->assertNull($builder->getMyTeamMenuWithAccountLinks());
     }
 }

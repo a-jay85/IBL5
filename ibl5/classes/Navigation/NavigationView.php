@@ -43,7 +43,7 @@ class NavigationView
     public function render(): string
     {
         $menus = $this->menuBuilder->getMenuStructure();
-        $myTeamMenu = $this->menuBuilder->getMyTeamMenu();
+        $myTeamMenu = $this->menuBuilder->getMyTeamMenuWithAccountLinks();
         $accountMenu = $this->menuBuilder->getAccountMenu();
         $showTeamLogoHamburger = $this->config->isLoggedIn && $this->config->teamId !== null;
 

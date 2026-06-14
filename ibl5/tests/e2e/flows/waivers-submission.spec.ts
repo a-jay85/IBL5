@@ -195,6 +195,83 @@ test.describe('Waivers: waive player', () => {
 });
 
 // ============================================================
+// IDOR (D-08): acting team bound to session, not POST Team_Name
+// ============================================================
+//
+// The waiver add path assigns the picked free agent to getTeamByName(Team_Name),
+// so a tampered hidden Team_Name is the observable IDOR: unfixed, a logged-in user
+// can sign a free agent onto ANY team. (The waive/drop path drops purely by pid —
+// its team value is only used for the news-story/Discord text — so it is NOT a valid
+// fixed-vs-unfixed discriminator; the add path is.)
+//
+// This lives in this serial waiver-mutation owner file (not a standalone security/
+// spec) to avoid a fullyParallel cross-worker race on shared roster state. The forged
+// POST replicates a legitimate add (real rosterslots/healthyrosterslots read from the
+// rendered form, so validateAdd passes) and tampers ONLY Team_Name.
+test.describe('Waivers: IDOR — add binds to session team', () => {
+  test('add with tampered Team_Name signs to the session team (Metros), not the victim (Stars)', async ({
+    appState,
+    page,
+  }) => {
+    await appState({ 'Allow Waiver Moves': 'Yes', 'Current Season Ending Year': '2026' });
+    await page.goto('modules.php?name=Waivers');
+
+    const form = page.locator('form[name="Waiver_Move"]');
+    await expect(form).toBeVisible();
+
+    // Pick the first available free agent from the rendered select.
+    const playerOption = form.locator('select[name="Player_ID"] option[value]:not([value=""])').first();
+    await expect(playerOption).toBeAttached({ timeout: 5000 });
+    const playerID = await playerOption.getAttribute('value');
+    const optionLabel = (await playerOption.textContent())?.trim() ?? '';
+    const playerNameOnly = optionLabel.replace(/\s+\d.*$/, '').trim();
+    expect(playerID, 'expected at least one free-agent option').toBeTruthy();
+    expect(playerNameOnly, 'expected a player display label').toBeTruthy();
+
+    // Replicate the legitimate add payload (so roster validation passes), then tamper Team_Name.
+    const csrfToken = await form.locator('input[name="_csrf_token"]').inputValue();
+    const rosterslots = await form.locator('input[name="rosterslots"]').inputValue();
+    const healthyrosterslots = await form.locator('input[name="healthyrosterslots"]').inputValue();
+    expect(csrfToken).toBeTruthy();
+
+    const response = await page.request.post('modules.php?name=Waivers', {
+      form: {
+        Action: 'add',
+        Player_ID: playerID!,
+        Team_Name: 'Stars', // tampered — server must ignore and use the session team
+        rosterslots,
+        healthyrosterslots,
+        _csrf_token: csrfToken,
+      },
+      maxRedirects: 0,
+    });
+    const location = response.headers()['location'] ?? '';
+    expect(location, `add should succeed on the session team; got ${location}`).toContain('result=player_added');
+
+    // The free agent lands on Metros (session team, teamid=1), NOT Stars (teamid=2).
+    // (Unfixed: getTeamByName('Stars') signs the player to Stars and the Metros assertion fails.)
+    await page.goto('modules.php?name=Team&op=team&teamid=1');
+    await expect(page.locator('body'), 'player must join the session team (Metros)').toContainText(
+      playerNameOnly,
+      { timeout: 5000 },
+    );
+    await page.goto('modules.php?name=Team&op=team&teamid=2');
+    await expect(page.locator('body'), 'victim team (Stars) must be untouched').not.toContainText(
+      playerNameOnly,
+    );
+
+    // Cleanup: waive the player back off the Metros active roster (legitimate, as Metros).
+    await page.goto('modules.php?name=Waivers&action=waive');
+    const waiveForm = page.locator('form[name="Waiver_Move"]');
+    const waiveToken = await waiveForm.locator('input[name="_csrf_token"]').inputValue();
+    await page.request.post('modules.php?name=Waivers', {
+      form: { Action: 'waive', Player_ID: playerID!, Team_Name: 'Metros', _csrf_token: waiveToken },
+      maxRedirects: 0,
+    });
+  });
+});
+
+// ============================================================
 // Closed state
 // ============================================================
 

@@ -588,22 +588,6 @@ INSERT INTO ibl_plr (
    'a0000000-0000-0000-0000-000000000029');
 
 -- ============================================================
--- Trade Block fixtures (trade-block.spec.ts browse board).
--- MUST come after the pid 23/24 ibl_plr inserts above — gm_trade_block.pid has
--- an FK to ibl_plr(pid), so the player rows must exist first.
--- Cross-team data independent of test ordering: pid=23 "Cougars Guard"
--- (teamid=3, retired=0) is seeded onto the block, and the Cougars get a seeking
--- note. The team-1 (Metros) toggle E2E mutates its own listing and cleans up via
--- afterAll, so it never collides with this row. The IDOR negative test forges
--- pid=24 "Cougars Forward" (team 3, NOT on the block), so 23 (seeded) and 24
--- (forged) stay distinct.
--- ============================================================
-INSERT INTO gm_trade_block (pid, note) VALUES
-  (23, 'Looking for a wing defender');
-INSERT INTO gm_trade_seeking (teamid, seeking_note) VALUES
-  (3, 'Seeking shooting and a backup big');
-
--- ============================================================
 -- Placeholder player for LeagueStarters module
 -- LeagueStartersService::getOrLoadPlaceholder() loads pid=4040404
 -- as a stand-in for teams with no starter at a given position.

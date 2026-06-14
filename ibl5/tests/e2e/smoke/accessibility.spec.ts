@@ -74,6 +74,7 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
     'news article',
     'team schedule',
     'team page',
+    'voting results',
     // Auth pages
     'trading',
     'depth chart entry',

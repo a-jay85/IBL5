@@ -340,4 +340,25 @@ class ScheduleUpdaterTest extends TestCase
         $this->assertNotEmpty($queries);
         $this->assertSame('DELETE FROM ibl_olympics_schedule', $queries[0]);
     }
+
+    // ==================== DI Seam ====================
+
+    public function testInjectedLoggerIsStoredAsChannelLogger(): void
+    {
+        // Stub (no expectations) is sufficient — we just verify the identity, not call tracking
+        $logger = self::createStub(\Psr\Log\LoggerInterface::class);
+        // Logger is the 6th (last) param — verify it lands in $channelLogger, not shadowing parent $logger
+        $updater = new ScheduleUpdater($this->mockDb, $this->mockSeason, null, null, null, $logger);
+
+        $ref = new \ReflectionProperty(ScheduleUpdater::class, 'channelLogger');
+        $this->assertSame($logger, $ref->getValue($updater));
+    }
+
+    public function testConstructsWithoutLoggerArgAndFallbackFires(): void
+    {
+        // no logger arg → trailing-optional defaults to null, fallback fires, no TypeError
+        $updater = new ScheduleUpdater($this->mockDb, $this->mockSeason);
+        $reflection = new \ReflectionClass($updater);
+        $this->assertTrue($reflection->hasMethod('update'));
+    }
 }

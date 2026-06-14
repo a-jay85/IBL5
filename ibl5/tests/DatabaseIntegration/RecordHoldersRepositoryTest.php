@@ -369,6 +369,57 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
         self::assertArrayHasKey('years', $first);
     }
 
+    /**
+     * Characterization test for the HEAT-champion branch (branch 3) of
+     * getMostTitlesByType. Drives the branch directly with the 'HEAT' pattern
+     * (no production caller does — see RecordHoldersService::500/504/508) so the
+     * seeded game_type=3 rows actually flow through the relocated query path.
+     *
+     * GREEN against the inline CTE today; GREEN again after the CTE is relocated
+     * to vw_heat_champions (migration 149) — the green-green preservation proof.
+     */
+    public function testGetMostTitlesByTypeHeatChampionsReadsFromView(): void
+    {
+        // game_type is a STORED GENERATED column (October month → 3); the
+        // helper's default scores make the HOME team win, so Metros (home) is the
+        // HEAT champion both years.
+        $this->insertTeamBoxscoreRow('2097-10-16', 'HEAT 2097', 1, 9, 1); // home=Metros wins
+        $this->insertTeamBoxscoreRow('2098-10-16', 'HEAT 2098', 1, 9, 1); // home=Metros wins
+
+        $result = $this->repo->getMostTitlesByType('HEAT');
+
+        self::assertNotEmpty($result);
+        $first = $result[0];
+        self::assertArrayHasKey('team_name', $first);
+        self::assertArrayHasKey('count', $first);
+        self::assertArrayHasKey('years', $first);
+        self::assertSame('Metros', $first['team_name']);
+        self::assertSame(2, $first['count']);
+        self::assertSame('2097, 2098', $first['years']);
+    }
+
+    /**
+     * Boundary test pinning the ROW_NUMBER tie-break inside the HEAT branch:
+     * rn=1 = latest game_date DESC, then smallest game_of_that_day ASC. Seeds
+     * three games in one year so a flip of EITHER ordering direction changes the
+     * winner — the relocated view must select the same championship game.
+     */
+    public function testGetMostTitlesByTypeHeatChampionPicksFinalGameWinner(): void
+    {
+        // All home wins (helper defaults). Same year 2098.
+        $this->insertTeamBoxscoreRow('2098-10-10', 'Early', 1, 9, 1);  // earlier date → Metros
+        $this->insertTeamBoxscoreRow('2098-10-20', 'Final-g1', 1, 9, 2); // latest date, g1 → Stars (rn=1)
+        $this->insertTeamBoxscoreRow('2098-10-20', 'Final-g2', 2, 9, 3); // latest date, g2 → Cougars
+
+        $result = $this->repo->getMostTitlesByType('HEAT');
+
+        // rn=1 = latest date (10-20) then smallest game_of_that_day (1) → Stars.
+        $names = array_column($result, 'team_name');
+        self::assertContains('Stars', $names);
+        self::assertNotContains('Metros', $names, 'earlier-date game must not win (game_date DESC)');
+        self::assertNotContains('Cougars', $names, 'higher game_of_that_day must not win (game_of_that_day ASC)');
+    }
+
     // --- Announcement Cache ---
 
     public function testGetLastAnnouncedDateReturnsNullableString(): void

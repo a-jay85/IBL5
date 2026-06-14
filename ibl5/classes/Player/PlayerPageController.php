@@ -102,20 +102,6 @@ class PlayerPageController
         $userTeam = Team::initialize($this->mysqliDb, $userTeamName);
 
         $actionButtons = $this->renderActionButtons($pageService, $player, $playerID, $userTeam, $season);
-
-        // Watchlist toggle (owner-gated; private to the GM). Mirrors the
-        // canShowRenegotiationButton owner gate: a free agent / no-team account
-        // sees no toggle. The owning teamid is resolved server-side from $username.
-        $watchlistService = new \Watchlist\WatchlistService(
-            $this->commonRepo,
-            new \Watchlist\WatchlistRepository($this->mysqliDb)
-        );
-        if ($watchlistService->resolveOwnerTeamid($username) !== null) {
-            $isWatched = $watchlistService->isWatchedByUser($username, $playerID);
-            $rawToken = \Security\CsrfGuard::generateRawToken('watchlist');
-            $actionButtons .= (new \Watchlist\WatchlistView())->renderToggleButton($playerID, $isWatched, $rawToken);
-        }
-
         if ($actionButtons !== '') {
             $html .= '<tr><td colspan="2"><div class="player-action-buttons">' . $actionButtons . '</div></td></tr>';
         }

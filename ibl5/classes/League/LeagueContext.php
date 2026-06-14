@@ -169,7 +169,6 @@ class LeagueContext
                 'CareerLeaderboards',
                 'SeasonLeaderboards',
                 'RecordHolders',
-                'Watchlist',
             ];
 
             return !in_array($moduleName, $iblOnlyModules, true);

@@ -202,8 +202,6 @@ export const VR_MANIFEST: VrRow[] = [
       { name: 'empty', appState: { 'Allow Waiver Moves': 'No' } },
     ],
     dataDriven: true },
-  { name: 'watchlist', auth: 'auth', url: 'modules.php?name=Watchlist',
-    anchor: '.ibl-data-table', viewports: ['desktop', 'mobile'] },
 
   // ── Auth-regular modules ────────────────────────────────────
   { name: 'team-non-admin', auth: 'auth-regular', url: 'modules.php?name=Team&op=team&teamid=1',

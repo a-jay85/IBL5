@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/auth';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 import { resetRookieOption } from '../helpers/cleanup';
+import { fetchRookieOptionCsrfToken } from '../helpers/csrf';
 
 // Player sub-pages — routes beyond the main showpage view.
 // These test articles.php, negotiate, rookieoption, and extension.php.
@@ -120,10 +121,14 @@ test.describe('Player rookie option sub-page', () => {
     request,
   }) => {
     await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
+    // processrookieoption now requires a valid rookie_option CSRF token; render
+    // the eligible fixture form to mint one (formName-bound, not pid-bound).
+    const token = await fetchRookieOptionCsrfToken(request);
     const response = await request.post(
       '/ibl5/modules.php?name=Player&pa=processrookieoption',
       {
         form: {
+          _csrf_token: token,
           teamname: 'Metros',
           playerID: '200000032',
           rookieOptionValue: '1000',
@@ -140,21 +145,53 @@ test.describe('Player rookie option sub-page', () => {
     expect(location).not.toContain('error=');
   });
 
+  test('POST to processrookieoption for a DIFFERENT team is refused (IDOR)', async ({
+    appState,
+    request,
+  }) => {
+    // Authenticated as the Metros GM, POST another team's name with a valid
+    // token: the ownership gate must reject before any contract mutation.
+    await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
+    const token = await fetchRookieOptionCsrfToken(request);
+    const response = await request.post(
+      '/ibl5/modules.php?name=Player&pa=processrookieoption',
+      {
+        form: {
+          _csrf_token: token,
+          teamname: 'Stars',
+          playerID: '200000032',
+          rookieOptionValue: '1000',
+          from: '',
+        },
+        maxRedirects: 0,
+      },
+    );
+    const location = response.headers()['location'] ?? '';
+    expect(location).toContain('pa=rookieoption');
+    expect(decodeURIComponent(location)).toContain(
+      'You can only exercise options for your own team',
+    );
+    expect(location).not.toContain('rookie_option_success');
+  });
+
   // Success path is covered above (pid=200000032, Free Agency phase).
   // The reset-rookie-option endpoint restores seed values after the success test.
   test('POST to processrookieoption with ineligible player returns error redirect', async ({
     appState,
     request,
   }) => {
-    await appState({
-      'Current Season Phase': 'Regular Season',
-      'Current Season Ending Year': '2026',
-    });
+    // Mint the token while the FA-eligible fixture renders, THEN switch to
+    // Regular Season (which disallows rookie options entirely) so the target
+    // is rejected on eligibility — not on CSRF or ownership.
+    await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
+    const token = await fetchRookieOptionCsrfToken(request);
+    await appState({ 'Current Season Phase': 'Regular Season' });
 
     const response = await request.post(
       '/ibl5/modules.php?name=Player&pa=processrookieoption',
       {
         form: {
+          _csrf_token: token,
           teamname: 'Metros',
           playerID: '25',
           rookieOptionValue: '1000',

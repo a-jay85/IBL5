@@ -116,6 +116,17 @@ class RookieOptionViewTest extends TestCase
         $this->assertStringContainsString('modules.php', $output);
     }
 
+    public function testRenderFormContainsCsrfToken(): void
+    {
+        $mockPlayer = $this->createPlayerMock();
+
+        $output = $this->view->renderForm($mockPlayer, 'Test Team', 500);
+
+        // The rookie-option form must carry a CSRF token so the gated
+        // pa=processrookieoption handler can validate the submission.
+        $this->assertStringContainsString('name="_csrf_token"', $output);
+    }
+
     /**
      * Test form renders warning card
      */

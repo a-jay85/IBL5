@@ -105,4 +105,15 @@ class DraftViewTest extends TestCase
         $this->assertStringContainsString('draft_pick', $result);
     }
 
+    public function testRenderDraftInterfaceContainsCsrfToken(): void
+    {
+        $players = [];
+
+        $result = $this->view->renderDraftInterface($players, 'TestTeam', 'TestTeam', 1, 1, 2025, 1);
+
+        // The draft form must carry a CSRF token so the gated op=select handler
+        // (modules/Draft/index.php) can validate the submission.
+        $this->assertStringContainsString('name="_csrf_token"', $result);
+    }
+
 }

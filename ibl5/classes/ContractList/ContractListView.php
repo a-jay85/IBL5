@@ -43,7 +43,7 @@ class ContractListView implements ContractListViewInterface
      */
     private function renderTitle(): string
     {
-        return '<h2 class="ibl-title">Master Contract List</h2>';
+        return '<h1 class="ibl-title">Master Contract List</h1>';
     }
 
     /**

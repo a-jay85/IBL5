@@ -62,7 +62,7 @@ class LeagueStartersView implements LeagueStartersViewInterface
             '#league-starters-tables',
         );
 
-        $html = '<div class="text-center"><h2 class="ibl-title">League Starters</h2></div>';
+        $html = '<div class="text-center"><h1 class="ibl-title">League Starters</h1></div>';
         $html .= $switcher->renderTabs();
         $html .= '<div id="league-starters-tables">';
         $html .= $this->renderTableContent($db, $season, $startersByPosition, $userTeam, $display);

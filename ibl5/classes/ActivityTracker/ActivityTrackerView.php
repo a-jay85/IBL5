@@ -47,7 +47,7 @@ class ActivityTrackerView implements ActivityTrackerViewInterface
                 . '</tr>';
         }
 
-        return '<h2 class="ibl-title">Activity Tracker</h2>
+        return '<h1 class="ibl-title">Activity Tracker</h1>
 <table class="sortable ibl-data-table">
     <thead>
         <tr>

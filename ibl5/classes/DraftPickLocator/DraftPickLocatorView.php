@@ -47,7 +47,7 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
      */
     private function renderTitle(): string
     {
-        return '<h2 class="ibl-title">Draft Pick Locator</h2>';
+        return '<h1 class="ibl-title">Draft Pick Locator</h1>';
     }
 
     /**

@@ -711,6 +711,7 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
     /* Center section titles above centered tables */
     .table-scroll-wrapper ~ .ibl-title,
     .ibl-title:has(+ .table-scroll-wrapper),
+    h1.ibl-title,
     h2.ibl-title {
         display: block;
         width: fit-content;
@@ -743,6 +744,7 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
 
 /* Center section titles on mobile */
 @media (max-width: 768px) {
+    h1.ibl-title,
     h2.ibl-title {
         display: block;
         text-align: center;

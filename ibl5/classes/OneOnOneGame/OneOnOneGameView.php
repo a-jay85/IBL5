@@ -24,7 +24,7 @@ class OneOnOneGameView implements OneOnOneGameViewInterface
      */
     public function renderHeader(): string
     {
-        return '<h2 class="ibl-title">One-on-One Match</h2>';
+        return '<h1 class="ibl-title">One-on-One Match</h1>';
     }
 
     /**

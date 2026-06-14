@@ -243,4 +243,178 @@ class CareerLeaderboardsRepositoryTest extends DatabaseTestCase
         self::assertSame('totals', $this->repo->getTableType('ibl_playoff_career_totals'));
         self::assertSame('averages', $this->repo->getTableType('ibl_playoff_career_avgs'));
     }
+
+    // ----------------------------------------------------------------------
+    // DNP (game_min > 0) guard on box-score-derived career views — maintenance-40c.
+    // The CI seed has no game_min=0 rows, so each test self-seeds one played +
+    // one DNP row. game_type is a STORED GENERATED column driven by the month of
+    // game_date (Jan->1 season, Jun->2 playoff, Oct->3 HEAT); teamid drives the
+    // All-Star/rookie/sophomore views. A DNP row must zero EVERY stat arg.
+    // ----------------------------------------------------------------------
+
+    /**
+     * @param array<int, array<string, mixed>> $rows
+     * @return array<string, mixed>|null
+     */
+    private function findRowByPid(array $rows, int $pid): ?array
+    {
+        foreach ($rows as $row) {
+            if ((int) $row['pid'] === $pid) {
+                return $row;
+            }
+        }
+
+        return null;
+    }
+
+    public function testSeasonAvgsExcludesDnpRows(): void
+    {
+        $pid = 200000090;
+        $this->insertTestPlayer($pid, 'DB DNP Season');
+
+        // Played January game (game_type=1): 8 pts (2*4), 6 reb (2+4), 30 min.
+        $this->insertPlayerBoxscoreRow(
+            '2098-01-15', $pid, 'DB DNP Season', 'PG', 2, 1, 1,
+            minutes: 30, points2m: 4, points2a: 8, ftm: 0, fta: 0,
+            points3m: 0, points3a: 0, orb: 2, drb: 4
+        );
+        // DNP January game: every stat zero.
+        $this->insertPlayerBoxscoreRow(
+            '2098-01-16', $pid, 'DB DNP Season', 'PG', 2, 1, 1,
+            minutes: 0, points2m: 0, points2a: 0, ftm: 0, fta: 0,
+            points3m: 0, points3a: 0, orb: 0, drb: 0, ast: 0, stl: 0,
+            tov: 0, blk: 0, pf: 0
+        );
+
+        $result = $this->repo->getLeaderboards('ibl_season_career_avgs', 'pts', 0, 5000);
+        $row = $this->findRowByPid($result['results'], $pid);
+
+        self::assertNotNull($row, 'Player with a played game should appear on the board');
+        // FIXED (post-migration 149): DNP row excluded, so averages reflect only the
+        // one played game. Pre-fix these were games 2, MIN 15.0, PTS 4.0, REB 3.0.
+        self::assertSame(1, (int) $row['games']);
+        self::assertEquals(30.00, $row['minutes']);
+        self::assertEquals(8.00, $row['pts']);
+        self::assertEquals(6.00, $row['reb']);
+    }
+
+    public function testPlayoffTotalsGamesExcludesDnpRows(): void
+    {
+        $pid = 200000091;
+        $this->insertTestPlayer($pid, 'DB DNP Playoff');
+
+        // Played June game (game_type=2): 8 pts.
+        $this->insertPlayerBoxscoreRow(
+            '2098-06-15', $pid, 'DB DNP Playoff', 'PG', 2, 1, 1,
+            minutes: 30, points2m: 4, points2a: 8, ftm: 0, fta: 0,
+            points3m: 0, points3a: 0, orb: 2, drb: 4
+        );
+        // DNP June game: every stat zero.
+        $this->insertPlayerBoxscoreRow(
+            '2098-06-16', $pid, 'DB DNP Playoff', 'PG', 2, 1, 1,
+            minutes: 0, points2m: 0, points2a: 0, ftm: 0, fta: 0,
+            points3m: 0, points3a: 0, orb: 0, drb: 0, ast: 0, stl: 0,
+            tov: 0, blk: 0, pf: 0
+        );
+
+        $result = $this->repo->getLeaderboards('ibl_playoff_career_totals', 'pts', 0, 5000);
+        $row = $this->findRowByPid($result['results'], $pid);
+
+        self::assertNotNull($row);
+        // FIXED (post-migration 149): DNP row excluded, games = 1 (was 2 pre-fix).
+        // The SUM column (pts) is unchanged — DNP added 0 either way — proving the
+        // totals fix is surgical: only games moves, the SUMs do not.
+        self::assertSame(1, (int) $row['games']);
+        self::assertSame(8, (int) $row['pts']);
+    }
+
+    public function testAllstarViewsExcludeDnpRows(): void
+    {
+        $pid = 200000092;
+        $this->insertTestPlayer($pid, 'DB DNP Allstar');
+
+        // teamid=50 drives the All-Star views regardless of date.
+        $this->insertPlayerBoxscoreRow(
+            '2098-02-15', $pid, 'DB DNP Allstar', 'PG', 2, 1, 50,
+            minutes: 30, points2m: 4, points2a: 8, ftm: 0, fta: 0,
+            points3m: 0, points3a: 0, orb: 2, drb: 4
+        );
+        $this->insertPlayerBoxscoreRow(
+            '2098-02-16', $pid, 'DB DNP Allstar', 'PG', 2, 1, 50,
+            minutes: 0, points2m: 0, points2a: 0, ftm: 0, fta: 0,
+            points3m: 0, points3a: 0, orb: 0, drb: 0, ast: 0, stl: 0,
+            tov: 0, blk: 0, pf: 0
+        );
+
+        // Averages view (COUNT/AVG family).
+        $avgs = $this->repo->getLeaderboards('ibl_allstar_career_avgs', 'pts', 0, 5000);
+        $avgRow = $this->findRowByPid($avgs['results'], $pid);
+        self::assertNotNull($avgRow);
+        self::assertSame(1, (int) $avgRow['games']);
+        self::assertEquals(8.00, $avgRow['pts']);
+
+        // Totals view (COUNT/SUM family) — same teamid WHERE shape.
+        $totals = $this->repo->getLeaderboards('ibl_allstar_career_totals', 'pts', 0, 5000);
+        $totRow = $this->findRowByPid($totals['results'], $pid);
+        self::assertNotNull($totRow);
+        self::assertSame(1, (int) $totRow['games']);
+        self::assertSame(8, (int) $totRow['pts']);
+    }
+
+    public function testAllDnpPlayerAbsentFromLeaderboard(): void
+    {
+        $pid = 200000093;
+        $this->insertTestPlayer($pid, 'DB All DNP');
+
+        // Only DNP season rows: after the guard, all rows filtered out → no GROUP row.
+        $this->insertPlayerBoxscoreRow(
+            '2098-01-20', $pid, 'DB All DNP', 'PG', 2, 1, 1,
+            minutes: 0, points2m: 0, points2a: 0, ftm: 0, fta: 0,
+            points3m: 0, points3a: 0, orb: 0, drb: 0, ast: 0, stl: 0,
+            tov: 0, blk: 0, pf: 0
+        );
+        $this->insertPlayerBoxscoreRow(
+            '2098-01-21', $pid, 'DB All DNP', 'PG', 2, 1, 1,
+            minutes: 0, points2m: 0, points2a: 0, ftm: 0, fta: 0,
+            points3m: 0, points3a: 0, orb: 0, drb: 0, ast: 0, stl: 0,
+            tov: 0, blk: 0, pf: 0
+        );
+
+        $result = $this->repo->getLeaderboards('ibl_season_career_avgs', 'pts', 0, 5000);
+        $row = $this->findRowByPid($result['results'], $pid);
+
+        // Genuine behavior change: a DNP-only player no longer appears at all
+        // (pre-fix they showed games=2 with zeroed averages). No SQL/division error —
+        // the CASE WHEN SUM(...) > 0 percentage guards protect against empty sums.
+        self::assertNull($row, 'All-DNP player must be absent from the leaderboard');
+    }
+
+    public function testPlayedOnlyPlayerUnchanged(): void
+    {
+        $pid = 200000094;
+        $this->insertTestPlayer($pid, 'DB Played Only');
+
+        // Two played season games, no DNP rows: the guard is a no-op here.
+        $this->insertPlayerBoxscoreRow(
+            '2098-01-25', $pid, 'DB Played Only', 'PG', 2, 1, 1,
+            minutes: 20, points2m: 3, points2a: 6, ftm: 0, fta: 0,
+            points3m: 0, points3a: 0, orb: 1, drb: 3
+        );
+        $this->insertPlayerBoxscoreRow(
+            '2098-01-26', $pid, 'DB Played Only', 'PG', 2, 1, 1,
+            minutes: 40, points2m: 5, points2a: 10, ftm: 0, fta: 0,
+            points3m: 0, points3a: 0, orb: 3, drb: 5
+        );
+
+        $result = $this->repo->getLeaderboards('ibl_season_career_avgs', 'pts', 0, 5000);
+        $row = $this->findRowByPid($result['results'], $pid);
+
+        self::assertNotNull($row);
+        // Both games counted; averages span the two played games unchanged.
+        // pts: AVG(6, 10) = 8.0; reb: AVG(4, 8) = 6.0; min: AVG(20, 40) = 30.0.
+        self::assertSame(2, (int) $row['games']);
+        self::assertEquals(30.00, $row['minutes']);
+        self::assertEquals(8.00, $row['pts']);
+        self::assertEquals(6.00, $row['reb']);
+    }
 }

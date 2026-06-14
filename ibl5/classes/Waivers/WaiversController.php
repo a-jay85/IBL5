@@ -35,6 +35,10 @@ class WaiversController implements WaiversControllerInterface
      * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('audit').
      */
     private \Psr\Log\LoggerInterface $logger;
+    /**
+     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     */
+    private ?Season $season = null;
 
     public function __construct(
         WaiversServiceInterface $service,
@@ -44,7 +48,8 @@ class WaiversController implements WaiversControllerInterface
         \Repositories\Contracts\SalaryCapRepositoryInterface $salaryCapRepo,
         \Utilities\NukeCompat $nukeCompat,
         \mysqli $db,
-        ?\Psr\Log\LoggerInterface $logger = null
+        ?\Psr\Log\LoggerInterface $logger = null,
+        ?Season $season = null
     ) {
         $this->service = $service;
         $this->processor = $processor;
@@ -54,6 +59,7 @@ class WaiversController implements WaiversControllerInterface
         $this->nukeCompat = $nukeCompat;
         $this->db = $db;
         $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('audit');
+        $this->season = $season;
     }
 
     /**
@@ -66,7 +72,7 @@ class WaiversController implements WaiversControllerInterface
             return;
         }
 
-        $season = new Season($this->db);
+        $season = $this->season ?? new Season($this->db);
 
         if (!$season->areWaiversAllowed()) {
             \PageLayout\PageLayout::header();

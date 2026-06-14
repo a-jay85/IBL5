@@ -30,14 +30,20 @@ class RookieOptionController implements RookieOptionControllerInterface
     private \Psr\Log\LoggerInterface $appLogger;
     /** Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('audit'). */
     private \Psr\Log\LoggerInterface $auditLogger;
+    /**
+     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     */
+    private ?Season $season = null;
 
     public function __construct(
         \mysqli $db,
         TeamIdentityRepositoryInterface $commonRepository,
         ?\Psr\Log\LoggerInterface $appLogger = null,
-        ?\Psr\Log\LoggerInterface $auditLogger = null
+        ?\Psr\Log\LoggerInterface $auditLogger = null,
+        ?Season $season = null
     ) {
         $this->db = $db;
+        $this->season = $season;
         $this->repository = new RookieOptionRepository($db);
         $this->newsService = new \Topics\News\NewsRepository($db);
         $this->commonRepository = $commonRepository;
@@ -50,7 +56,7 @@ class RookieOptionController implements RookieOptionControllerInterface
      */
     public function processRookieOption(string $teamName, int $playerID, int $extensionAmount): array
     {
-        $season = new Season($this->db);
+        $season = $this->season ?? new Season($this->db);
         $player = Player::withPlayerID($this->db, $playerID);
 
         // Validate player eligibility

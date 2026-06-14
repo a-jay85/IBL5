@@ -33,6 +33,10 @@ class TradingService implements TradingServiceInterface
     private BuyoutLedgerRepositoryInterface $cashConsiderationRepository;
     private \Repositories\Contracts\TeamIdentityRepositoryInterface $commonRepository;
     private \mysqli $mysqli_db;
+    /**
+     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     */
+    private ?Season $season = null;
 
     public function __construct(
         TradeOfferRepositoryInterface $offerRepository,
@@ -40,7 +44,8 @@ class TradingService implements TradingServiceInterface
         TradeFormRepositoryInterface $formRepository,
         \Repositories\Contracts\TeamIdentityRepositoryInterface $commonRepository,
         \mysqli $mysqli_db,
-        ?TradeCashRepositoryInterface $cashRepository = null
+        ?TradeCashRepositoryInterface $cashRepository = null,
+        ?Season $season = null
     ) {
         $this->offerRepository = $offerRepository;
         $this->assetRepository = $assetRepository;
@@ -49,6 +54,7 @@ class TradingService implements TradingServiceInterface
         $this->cashConsiderationRepository = new BuyoutLedgerRepository($mysqli_db);
         $this->commonRepository = $commonRepository;
         $this->mysqli_db = $mysqli_db;
+        $this->season = $season;
     }
 
     /**
@@ -60,7 +66,7 @@ class TradingService implements TradingServiceInterface
     {
         /** @var \mysqli $mysqliDb */
         $mysqliDb = $this->mysqli_db;
-        $season = new Season($mysqliDb);
+        $season = $this->season ?? new Season($mysqliDb);
 
         $userTeam = $this->commonRepository->getTeamnameFromUsername($username) ?? '';
 
@@ -121,7 +127,7 @@ class TradingService implements TradingServiceInterface
 
         /** @var \mysqli $mysqliDb */
         $mysqliDb = $this->mysqli_db;
-        $season = new Season($mysqliDb);
+        $season = $this->season ?? new Season($mysqliDb);
 
         $allTradeRows = $this->offerRepository->getAllTradeOffers();
         $tradeOffers = $this->groupTradeOffers($allTradeRows, $userTeam, $season->endingYear);

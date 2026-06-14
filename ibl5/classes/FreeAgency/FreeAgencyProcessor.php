@@ -33,10 +33,11 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         TeamIdentityRepositoryInterface $commonRepo,
         ?FreeAgencyDemandCalculatorInterface $calculator = null,
         ?FreeAgencyRepositoryInterface $repository = null,
-        ?\Psr\Log\LoggerInterface $logger = null
+        ?\Psr\Log\LoggerInterface $logger = null,
+        ?Season $season = null
     ) {
         $this->mysqli_db = $mysqli_db;
-        $this->season = new Season($mysqli_db);
+        $this->season = $season ?? new Season($mysqli_db);
 
         $this->commonRepo = $commonRepo;
         $this->calculator = $calculator ?? new FreeAgencyDemandCalculator(

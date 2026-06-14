@@ -27,6 +27,7 @@ final class ModuleRegistry
         'FreeAgency',
         'FreeAgencyPreview',
         'GMContactList',
+        'GMDashboard',
         'Injuries',
         'LeagueStarters',
         'News',

@@ -163,6 +163,39 @@ class NavigationMenuBuilderTest extends TestCase
         $this->assertNotContains('Voting Results', $labels);
     }
 
+    public function testIblTeamMenuIncludesMyDashboard(): void
+    {
+        $builder = new NavigationMenuBuilder($this->createConfig(isLoggedIn: true, teamId: 1));
+        $menu = $builder->getMyTeamMenu();
+        $this->assertNotNull($menu);
+
+        $dashboardLinks = array_filter(
+            $menu['links'],
+            static fn (array $link): bool => ($link['url'] ?? '') === 'modules.php?name=GMDashboard'
+        );
+        $this->assertCount(1, $dashboardLinks, 'My Dashboard link should be present in the IBL team menu');
+        $this->assertSame('My Dashboard', array_values($dashboardLinks)[0]['label'] ?? null);
+    }
+
+    public function testMyDashboardAbsentFromOlympicsTeamMenu(): void
+    {
+        $builder = new NavigationMenuBuilder($this->createConfig(currentLeague: 'olympics'));
+        $menu = $builder->getMyTeamMenu();
+        $this->assertNotNull($menu);
+
+        $urls = array_map(
+            static fn (array $link): string => $link['url'] ?? '',
+            $menu['links']
+        );
+        $this->assertNotContains('modules.php?name=GMDashboard', $urls);
+    }
+
+    public function testMyDashboardAbsentWhenLoggedOut(): void
+    {
+        $builder = new NavigationMenuBuilder($this->createConfig(isLoggedIn: false, username: null, teamId: null));
+        $this->assertNull($builder->getMyTeamMenu());
+    }
+
     #[\PHPUnit\Framework\Attributes\DataProvider('draftLinkProvider')]
     public function testDraftLinkBehavior(string $seasonPhase, string $showDraftLink, bool $expectDraftLink, ?string $expectedBadge): void
     {

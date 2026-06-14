@@ -202,6 +202,7 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
         $teamId = $this->config->teamId;
         /** @var list<NavLink> $links */
         $links = [
+            ['label' => 'My Dashboard', 'url' => 'modules.php?name=GMDashboard'],
             ['label' => 'Team Page', 'url' => 'modules.php?name=Team&op=team&teamid=' . $teamId],
             ['label' => 'Schedule', 'url' => 'modules.php?name=Schedule&teamid=' . $teamId],
             ['label' => 'Next Sim', 'url' => 'modules.php?name=NextSim'],

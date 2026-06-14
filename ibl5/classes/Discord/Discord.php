@@ -197,14 +197,14 @@ class Discord
 
         // Skip if recipient has no Discord ID
         if ($recipientDiscordId === '') {
-            self::$logger?->warning('sendDM skipped: recipient has no Discord ID');
+            (self::$logger ?? \Logging\LoggerFactory::getChannel('discord'))->warning('sendDM skipped: recipient has no Discord ID');
             return null;
         }
 
         self::loadConfig();
 
         if (self::$iblbotUrl === '') {
-            self::$logger?->warning('sendDM skipped: iblbot_url is empty in config');
+            (self::$logger ?? \Logging\LoggerFactory::getChannel('discord'))->warning('sendDM skipped: iblbot_url is empty in config');
             return null;
         }
 
@@ -269,14 +269,14 @@ class Discord
 
         // Skip if recipient has no Discord ID
         if ($recipientDiscordId === '') {
-            self::$logger?->warning('sendTradeDM skipped: recipient has no Discord ID', ['trade_id' => $tradeOfferId, 'team' => $offeringTeamName]);
+            (self::$logger ?? \Logging\LoggerFactory::getChannel('discord'))->warning('sendTradeDM skipped: recipient has no Discord ID', ['trade_id' => $tradeOfferId, 'team' => $offeringTeamName]);
             return null;
         }
 
         self::loadConfig();
 
         if (self::$iblbotUrl === '') {
-            self::$logger?->warning('sendTradeDM skipped: iblbot_url is empty in config', ['trade_id' => $tradeOfferId]);
+            (self::$logger ?? \Logging\LoggerFactory::getChannel('discord'))->warning('sendTradeDM skipped: iblbot_url is empty in config', ['trade_id' => $tradeOfferId]);
             return null;
         }
 

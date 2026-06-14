@@ -707,7 +707,9 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
     /**
      * Inlined team awards query with optimized Champions/HEAT branches.
      *
-     * Uses window functions instead of correlated subqueries.
+     * Uses window functions instead of correlated subqueries. The HEAT-champion
+     * branch reads from the `vw_heat_champions` view (migration 149) rather than
+     * an inline CTE.
      */
     private static function buildMostTitlesByTypeQuery(): string
     {
@@ -735,27 +737,8 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
 
                 UNION ALL
 
-                SELECT hc.year, ti.team_name AS name, 'IBL HEAT Champions' AS award
-                FROM (
-                    SELECT
-                        YEAR(bst.game_date) AS year,
-                        CASE
-                            WHEN (bst.home_q1_points + bst.home_q2_points + bst.home_q3_points + bst.home_q4_points
-                                  + COALESCE(bst.home_ot_points, 0))
-                               > (bst.visitor_q1_points + bst.visitor_q2_points + bst.visitor_q3_points + bst.visitor_q4_points
-                                  + COALESCE(bst.visitor_ot_points, 0))
-                            THEN bst.home_teamid
-                            ELSE bst.visitor_teamid
-                        END AS winner_tid,
-                        ROW_NUMBER() OVER (
-                            PARTITION BY YEAR(bst.game_date)
-                            ORDER BY bst.game_date DESC, bst.game_of_that_day ASC
-                        ) AS rn
-                    FROM `ibl_box_scores_teams` bst
-                    WHERE bst.game_type = 3
-                ) hc
-                JOIN `ibl_team_info` ti ON ti.teamid = hc.winner_tid
-                WHERE hc.rn = 1
+                SELECT year, name, award
+                FROM `vw_heat_champions`
             ) all_awards
             WHERE award LIKE ?
             GROUP BY name

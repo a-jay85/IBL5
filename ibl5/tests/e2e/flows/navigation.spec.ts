@@ -32,6 +32,32 @@ test.describe('Navigation bar (authenticated, desktop)', () => {
     await expect(teamPageLink).toBeVisible();
   });
 
+  test('my team dropdown shows owner Cap Calculator link', async ({ page }) => {
+    // Cap Calculator lives in getIblTeamMenu(), so it is owner-gated (teamId !== null)
+    // and IBL-only. The auth fixture owns Metros (teamid 1).
+    await page.goto('index.php');
+    const nav = desktopNav(page);
+    await nav.getByRole('button', { name: 'My Team' }).click();
+
+    const capCalcLink = nav.locator('.nav-dropdown-item', {
+      hasText: 'Cap Calculator',
+    }).first();
+    await expect(capCalcLink).toBeVisible();
+    await expect(capCalcLink).toHaveAttribute(
+      'href',
+      /modules\.php\?name=CapWhatIf/,
+    );
+  });
+
+  test('Cap Calculator link is absent in Olympics context', async ({ page }) => {
+    // getIblTeamMenu() only returns for currentLeague === 'ibl', so the link
+    // never appears under Olympics — no OLYMPICS_HIDDEN_NAV_MODULES edit needed.
+    await page.goto('index.php?league=olympics');
+    await expect(
+      desktopNav(page).locator('.nav-dropdown-item', { hasText: 'Cap Calculator' }),
+    ).not.toBeAttached();
+  });
+
   test('my team dropdown shows admin-only Voting Results link', async ({ page }) => {
     // The default auth fixture is the CI main user: roles_mask=1 (ADMIN,
     // setup-docker-e2e action.yml ~L128) and gm_username on team Metros

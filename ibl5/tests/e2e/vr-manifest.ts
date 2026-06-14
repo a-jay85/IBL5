@@ -147,6 +147,8 @@ export const VR_MANIFEST: VrRow[] = [
     anchor: 'form[action*="ApiKeys"]', viewports: ['desktop', 'mobile'], skipContentCheck: true },
   { name: 'cap-space', auth: 'auth', url: 'modules.php?name=CapSpace&teamid=1',
     anchor: '.ibl-data-table', viewports: ['desktop', 'mobile'] },
+  { name: 'cap-whatif', auth: 'auth', url: 'modules.php?name=CapWhatIf',
+    anchor: 'form[method="get"]', viewports: ['desktop', 'mobile'] },
   { name: 'depth-chart-entry', auth: 'auth', url: 'modules.php?name=DepthChartEntry',
     anchor: 'form[name="DepthChartEntry"]', viewports: ['desktop', 'mobile'] },
   { name: 'draft', auth: 'auth', url: 'modules.php?name=Draft',

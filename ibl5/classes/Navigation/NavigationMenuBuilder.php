@@ -207,6 +207,7 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
             ['label' => 'Next Sim', 'url' => 'modules.php?name=NextSim'],
             ['label' => 'Depth Chart Entry', 'url' => 'modules.php?name=DepthChartEntry'],
             ['label' => 'Trading', 'url' => 'modules.php?name=Trading&op=reviewtrade'],
+            ['label' => 'Cap Calculator', 'url' => 'modules.php?name=CapWhatIf'],
             ['label' => 'Voting', 'url' => 'modules.php?name=Voting'],
         ];
 

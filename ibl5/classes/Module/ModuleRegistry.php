@@ -13,6 +13,7 @@ final class ModuleRegistry
         'ApiKeys',
         'AwardHistory',
         'CapSpace',
+        'CapWhatIf',
         'CareerLeaderboards',
         'ComparePlayers',
         'ContractList',

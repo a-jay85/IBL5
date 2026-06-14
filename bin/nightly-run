@@ -185,6 +185,9 @@ MAX_ELAPSED=17100  # ~4h45m — stops around 4:45am, leaves headroom in the 5h u
 MAX_ATTEMPTS=3     # per-plan retry cap within one night (covers impl + postplan phases)
 MAX_IMPL_SECS=3600   # per-phase cap: impl gets at most 1h
 MAX_PP_SECS=3600     # per-phase cap: post-plan gets at most 1h
+LOCK_TTL_SECS=9000   # max a single plan legitimately holds its claim lock
+                     # (impl 1h + postplan 1h + overhead); a lock older than this
+                     # whose owner PID is gone is presumed crashed and stolen.
 STALL_KILL_SECS=600  # kill phase if no stream events for 10 minutes
 KILL_GRACE_SECS=15   # after SIGTERM, wait this long then SIGKILL — a phase wedged
                      # on a dead inference stream traps SIGTERM and ignores it
@@ -200,6 +203,7 @@ HANDOFF_DIR="$NIGHTLY_DIR/handoff"
 mkdir -p "$LOG_DIR" "$QUEUE_DIR" "$HANDOFF_DIR"
 
 WATCHER_PID=""
+CURRENT_LOCK=""   # claim-lock dir held for the plan this runner is processing
 cleanup_watcher() {
     if [ -n "$WATCHER_PID" ]; then
         kill "$WATCHER_PID" 2>/dev/null || true
@@ -207,6 +211,11 @@ cleanup_watcher() {
     fi
     rm -f "$NIGHTLY_DIR/.heartbeat-$$-impl" "$NIGHTLY_DIR/.heartbeat-$$-postplan" \
          "$NIGHTLY_DIR/.cmdpid-$$-impl" "$NIGHTLY_DIR/.cmdpid-$$-postplan" 2>/dev/null || true
+    # Release any plan claim still held (e.g. we broke out of the loop mid-plan on
+    # a time guard or env-failure) so a sibling/next run can resume it.
+    if [ -n "$CURRENT_LOCK" ]; then
+        rm -rf "$CURRENT_LOCK" 2>/dev/null || true
+    fi
 }
 trap cleanup_watcher EXIT
 
@@ -354,6 +363,50 @@ archive_stale() {
     [ "$moved" -eq 0 ] || echo "Archived $moved stale entr$([ "$moved" -eq 1 ] && echo y || echo ies) from $subdir/ → ${subdir}.archive/" >> "$LOG"
 }
 
+# Atomically claim the oldest queued plan not already locked by a live sibling
+# runner, enabling several nightly-run processes to drain the queue in parallel
+# without ever working the same plan twice. `mkdir` is atomic on the local FS, so
+# two racing runners can never both create the same lock dir — exactly one wins.
+# On success: echoes the claimed plan path to stdout and leaves
+# "$QUEUE_DIR/<plan>.lock/" held (owner PID recorded in its `pid` file). On
+# failure (every queued plan is locked by a live sibling): echoes nothing, returns 1.
+# A lock whose owner PID is dead, or older than LOCK_TTL_SECS, is treated as stale
+# and stolen — covering a runner that crashed mid-plan. Only ever called as
+# `NEXT_PLAN=$(claim_next_plan) || NEXT_PLAN=""`, so the return-1 is set -e safe.
+claim_next_plan() {
+    local plan plan_name lock owner now lock_epoch
+    while IFS= read -r plan; do
+        [ -n "$plan" ] || continue
+        plan_name=$(basename "$plan")
+        lock="$QUEUE_DIR/${plan_name}.lock"
+        # Fast path: unlocked plan — claim atomically.
+        if mkdir "$lock" 2>/dev/null; then
+            echo "$$" > "$lock/pid"
+            printf '%s\n' "$plan"
+            return 0
+        fi
+        # Locked — is the holder dead or the lock expired? If so, steal it.
+        owner=$(cat "$lock/pid" 2>/dev/null) || owner=""
+        now=$(date +%s)
+        lock_epoch=$(stat -f %m "$lock" 2>/dev/null || echo "$now")
+        if { [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; } \
+           || [ "$(( now - lock_epoch ))" -gt "$LOCK_TTL_SECS" ]; then
+            rm -rf "$lock" 2>/dev/null || true
+            # Re-create atomically; the loser of a two-stealer race fails mkdir
+            # here and simply falls through to the next plan.
+            if mkdir "$lock" 2>/dev/null; then
+                echo "$$" > "$lock/pid"
+                printf '[%s] stole stale lock for %s (dead/expired owner=%s)\n' \
+                    "$(date +%H:%M:%S)" "$plan_name" "${owner:-?}" >> "$LOG"
+                printf '%s\n' "$plan"
+                return 0
+            fi
+        fi
+        # Live lock held by a sibling — skip to the next-oldest plan.
+    done < <(ls -1tr "$QUEUE_DIR"/*.md 2>/dev/null)
+    return 1
+}
+
 LOG="$LOG_DIR/$(date +%Y-%m-%d).log"
 
 cd "$REPO"
@@ -399,9 +452,15 @@ while true; do
         break
     fi
 
-    # Pick the oldest queued plan
-    NEXT_PLAN=$(ls -1tr "$QUEUE_DIR"/*.md 2>/dev/null | head -1)
+    # Atomically claim the oldest queued plan not held by a live sibling runner.
+    # If every queued plan is already claimed, there's nothing for us to do.
+    NEXT_PLAN=$(claim_next_plan) || NEXT_PLAN=""
+    if [ -z "$NEXT_PLAN" ]; then
+        echo "All queued plans are claimed by a concurrent runner — nothing to do." >> "$LOG"
+        break
+    fi
     PLAN_NAME=$(basename "$NEXT_PLAN")
+    CURRENT_LOCK="$QUEUE_DIR/${PLAN_NAME}.lock"
 
     # Per-plan retry counter — skip poison pills
     ATTEMPT_FILE="$QUEUE_DIR/${PLAN_NAME}.attempts"
@@ -424,6 +483,8 @@ while true; do
             tail -30 "$LOG"
             printf '\n```\n'
         } > "$REPORTS_DIR/$(date +%Y-%m-%d)-skipped-$SLUG.md"
+        rm -rf "$CURRENT_LOCK" 2>/dev/null || true
+        CURRENT_LOCK=""
         continue
     fi
 
@@ -610,6 +671,14 @@ PLAN_FILE=$PLAN_NAME" \
     if [ ! -e "$NEXT_PLAN" ]; then
         rm -f "$ATTEMPT_FILE"
     fi
+
+    # Release this plan's claim — done with it for this iteration. A genuine
+    # failure leaves it in queue/ (attempt incremented) for any runner to retry;
+    # a completed plan has moved to done/. Either way, drop the lock and move on.
+    if [ -n "$CURRENT_LOCK" ]; then
+        rm -rf "$CURRENT_LOCK" 2>/dev/null || true
+        CURRENT_LOCK=""
+    fi
 done
 
 # Clean up any leftover attempt files for plans that completed
@@ -627,6 +696,17 @@ for hf in "$HANDOFF_DIR"/*.json; do
     PLAN_FOR_HANDOFF="$QUEUE_DIR/$(basename "${hf%.json}")"
     if [ ! -e "$PLAN_FOR_HANDOFF" ]; then
         rm -f "$hf"
+    fi
+done
+
+# Clean up orphaned claim locks (plan no longer in queue — completed or skipped).
+# Locks on plans still in queue/ are left alone: a sibling runner may hold one
+# legitimately, and a genuinely abandoned one is reaped via the staleness check
+# in claim_next_plan on the next run.
+for lock in "$QUEUE_DIR"/*.md.lock; do
+    [ -e "$lock" ] || continue
+    if [ ! -e "${lock%.lock}" ]; then
+        rm -rf "$lock" 2>/dev/null || true
     fi
 done
 

@@ -47,7 +47,6 @@ final class ModuleRegistry
         'Team',
         'TeamOffDefStats',
         'Topics',
-        'TradeBlock',
         'Trading',
         'TrainingCampRatingsDiff',
         'TransactionHistory',

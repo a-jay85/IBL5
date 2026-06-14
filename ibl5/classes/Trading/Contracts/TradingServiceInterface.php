@@ -11,9 +11,6 @@ use Season\Season;
  *
  * Assembles data needed by views from repositories and domain objects.
  * Views receive pre-computed data arrays and never touch the database.
- *
- * @phpstan-import-type TradeInfoRow from \Trading\Contracts\TradeOfferRepositoryInterface
- * @phpstan-import-type TradeCashRow from \Trading\Contracts\TradeCashRepositoryInterface
  */
 interface TradingServiceInterface
 {
@@ -98,20 +95,4 @@ interface TradingServiceInterface
      *         - 'hold': Player counts with salary by future year index (0-5)
      */
     public function calculateFutureSalaries(array $players, Season $season): array;
-
-    /**
-     * Build make-offer form pre-fill data for a counter-offer.
-     *
-     * Maps a source offer's assets and cash into the session structure that
-     * TradingView::renderTradeOfferForm() restores (checkedItems keyed
-     * "itemtype:id", year-indexed cash arrays). Pure — takes already-loaded rows,
-     * touches no database.
-     *
-     * @param list<TradeInfoRow> $sourceRows Source offer's ibl_trade_info rows
-     * @param array<string, TradeCashRow> $cashMap Cash rows keyed "{offerId}:{sending_team}"
-     * @param int $sourceOfferId The source offer being countered
-     * @param string $counteringTeam Team name of the GM authoring the counter (recipient of the source offer)
-     * @return array{checkedItems: array<string, true>, userSendsCash: array<int, int>, partnerSendsCash: array<int, int>}
-     */
-    public function buildCounterFormData(array $sourceRows, array $cashMap, int $sourceOfferId, string $counteringTeam): array;
 }

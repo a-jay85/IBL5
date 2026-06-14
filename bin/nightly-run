@@ -275,6 +275,32 @@ append_cost_row() {
     printf '| %s | %s | %s |\n' "$plan" "$phase" "$cost" >> "$report"
 }
 
+# Human-sign-off guard (Layer B of the deterministic gate; see
+# .github/workflows/human-signoff.yml for Layer A). The nightly bot runs as the
+# repo owner with the owner's `gh` creds, so GitHub cannot distinguish a bot
+# merge from a human one — the only bot/human discriminator lives here, in the
+# headless execution path. /post-plan Phase 6.5 arms `gh pr merge --auto` for
+# every PR including feature PRs; this strips that arming, and any
+# `human-approved` label, from any `feat:` PR the bot authored, so the gate
+# stays satisfiable only by a human applying the label in the UI. Layer A
+# already blocks the *merge* (required red check); this closes the residual
+# where the autonomous flow could arm auto or self-apply the label. Best-effort:
+# never aborts the run (`|| true` throughout; guarded by `set -e`-safe `if`).
+neutralize_feat_signoff() {
+    command -v gh >/dev/null 2>&1 || return 0
+    local n
+    gh pr list --author "@me" --state open --json number,title \
+        --jq '.[] | select(.title|test("(?i)^feat(\\([^)]*\\))?!?:")) | .number' \
+        2>/dev/null \
+    | while read -r n; do
+        [ -n "$n" ] || continue
+        gh pr merge "$n" --disable-auto 2>/dev/null || true
+        gh pr edit "$n" --remove-label "human-approved" 2>/dev/null || true
+        printf '[%s] human-signoff guard: stripped auto-merge/label from feat PR #%s\n' \
+            "$(date +%H:%M:%S)" "$n" >> "$LOG"
+    done || true
+}
+
 # Decrement the current plan's attempt counter by one ("refund"). Used when a
 # phase is cut short by an environmental failure (usage/rate limit, auth error,
 # transient) rather than a genuine plan failure — the plan should retry cleanly
@@ -604,6 +630,11 @@ PLAN_FILE=$PLAN_NAME" \
             write_env_stop_report "$PLAN_NAME" postplan "$REASON" "$PP_LOG_BEFORE"
             break
         fi
+
+        # Layer B: post-plan may have armed `gh pr merge --auto` on a feature PR.
+        # Strip that (and any human-approved label) so feature PRs can only merge
+        # after a human applies the label. Runs after every completed post-plan.
+        neutralize_feat_signoff
     fi
 
     # If the plan moved out of queue/ (to done/ or skipped/), clean up its attempt file

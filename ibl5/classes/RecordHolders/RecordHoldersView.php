@@ -63,7 +63,7 @@ class RecordHoldersView implements RecordHoldersViewInterface
      */
     public function render(array $records): string
     {
-        $output = '<h2 class="ibl-title">Record Holders</h2>';
+        $output = '<h1 class="ibl-title">Record Holders</h1>';
         $output .= '<div class="record-section">';
         $output .= $this->renderPlayerSingleGameRecords($records);
         $output .= $this->renderPlayerFullSeasonRecords($records['playerFullSeason']);
@@ -194,7 +194,7 @@ class RecordHoldersView implements RecordHoldersViewInterface
 
         // Game records subsection
         if ($records['teamGameRecords'] !== []) {
-            $output .= '<h4 class="record-section__subheading">Game Records</h4>';
+            $output .= '<h3 class="record-section__subheading">Game Records</h3>';
             foreach ($records['teamGameRecords'] as $category => $categoryRecords) {
                 $output .= $this->renderTeamGameCategoryBlock($category, $categoryRecords);
             }
@@ -202,7 +202,7 @@ class RecordHoldersView implements RecordHoldersViewInterface
 
         // Season records subsection
         if ($records['teamSeasonRecords'] !== []) {
-            $output .= '<h4 class="record-section__subheading">Season Records</h4>';
+            $output .= '<h3 class="record-section__subheading">Season Records</h3>';
             foreach ($records['teamSeasonRecords'] as $category => $categoryRecords) {
                 $output .= $this->renderTeamSeasonCategoryBlock($category, $categoryRecords);
             }
@@ -210,7 +210,7 @@ class RecordHoldersView implements RecordHoldersViewInterface
 
         // Franchise records subsection
         if ($records['teamFranchise'] !== []) {
-            $output .= '<h4 class="record-section__subheading">Franchise Records</h4>';
+            $output .= '<h3 class="record-section__subheading">Franchise Records</h3>';
             foreach ($records['teamFranchise'] as $category => $categoryRecords) {
                 $output .= $this->renderFranchiseCategoryBlock($category, $categoryRecords);
             }

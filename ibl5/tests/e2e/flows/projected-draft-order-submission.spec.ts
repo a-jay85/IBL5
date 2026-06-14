@@ -182,10 +182,10 @@ test.describe('ProjectedDraftOrder: finalized render', () => {
     await page.goto('modules.php?name=ProjectedDraftOrder');
 
     // Finalized title: "{year} Draft Order" (not "Projected Draft Order")
-    await expect(page.locator('h2.ibl-title')).toContainText(
+    await expect(page.locator('h1.ibl-title')).toContainText(
       `${TEST_SEASON_YEAR} Draft Order`,
     );
-    await expect(page.locator('h2.ibl-title')).not.toContainText(
+    await expect(page.locator('h1.ibl-title')).not.toContainText(
       'Projected Draft Order',
     );
 

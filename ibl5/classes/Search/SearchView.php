@@ -69,7 +69,7 @@ class SearchView implements SearchViewInterface
         }
 
         $safeTitle = HtmlSanitizer::safeHtmlOutput($title);
-        return '<h2 class="ibl-title">' . $safeTitle . '</h2>';
+        return '<h1 class="ibl-title">' . $safeTitle . '</h1>';
     }
 
     /**

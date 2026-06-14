@@ -27,7 +27,7 @@ class CapSpaceView implements CapSpaceViewInterface
     public function render(array $teamsData, int $beginningYear, int $endingYear): string
     {
         $html = '';
-        $html .= '<h2 class="ibl-title">Cap Info</h2>';
+        $html .= '<h1 class="ibl-title">Cap Info</h1>';
         $html .= '<div class="sticky-scroll-wrapper">';
         $html .= '<div class="sticky-scroll-container">';
         $html .= $this->renderTableHeader($beginningYear, $endingYear);

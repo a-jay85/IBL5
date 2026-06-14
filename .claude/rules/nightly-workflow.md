@@ -62,3 +62,7 @@ absolute targets keep resolving after the move. `queue/` (pending work) and `han
 ## Headless Mode
 
 `bin/nightly-run` sets `CLAUDE_HEADLESS=1`. This environment variable gates `/post-plan` Phase 10 (Preview Environment), which is skipped since no human is present to verify visually. All other phases run normally.
+
+## Feature PRs cannot auto-merge
+
+Conventional-commit **`feat:`** PRs are gated by the required `human-signoff` check and will **not** auto-merge overnight — they wait for a human to apply the `human-approved` label after inspection (ADR-0062). Post-plan still arms `--auto`, but `bin/nightly-run` strips it from `feat:` PRs (`neutralize_feat_signoff`), and the required check blocks the merge regardless. Maintenance PRs (`fix`/`refactor`/`chore`/`ci`/`docs`/`revert`) auto-merge as before. Check the morning `gh pr list` for `feat:` PRs awaiting your label.

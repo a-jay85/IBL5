@@ -14,9 +14,16 @@ use Updater\StepResult;
  */
 class ResetExtensionAttemptsStep implements PipelineStepInterface
 {
+    /**
+     * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('db').
+     */
+    private \Psr\Log\LoggerInterface $logger;
+
     public function __construct(
         private readonly \mysqli $db,
+        ?\Psr\Log\LoggerInterface $logger = null,
     ) {
+        $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('db');
     }
 
     public function getLabel(): string
@@ -37,7 +44,7 @@ class ResetExtensionAttemptsStep implements PipelineStepInterface
             $stmt->close();
         } catch (\Exception $e) {
             $errorMessage = 'Failed to reset sim contract extension attempts: ' . $e->getMessage();
-            \Logging\LoggerFactory::getChannel('db')->error('ResetExtensionAttemptsStep database error', ['error' => $errorMessage]);
+            $this->logger->error('ResetExtensionAttemptsStep database error', ['error' => $errorMessage]);
             throw new \RuntimeException($errorMessage, 1002);
         }
 

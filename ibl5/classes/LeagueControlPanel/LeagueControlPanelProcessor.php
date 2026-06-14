@@ -38,16 +38,23 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
     private string $league;
     private ?MaintenanceRepositoryInterface $maintenanceRepository;
 
+    /**
+     * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('admin').
+     */
+    private \Psr\Log\LoggerInterface $logger;
+
     public function __construct(
         LeagueControlPanelRepositoryInterface $repository,
         AwardGenerationServiceInterface $awardGenerationService,
         string $league = LeagueContext::LEAGUE_IBL,
         ?MaintenanceRepositoryInterface $maintenanceRepository = null,
+        ?\Psr\Log\LoggerInterface $logger = null,
     ) {
         $this->repository = $repository;
         $this->awardGenerationService = $awardGenerationService;
         $this->league = $league;
         $this->maintenanceRepository = $maintenanceRepository;
+        $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('admin');
     }
 
     /**
@@ -83,7 +90,7 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
         };
 
         if ($result['success']) {
-            \Logging\LoggerFactory::getChannel('admin')->info('admin_action', [
+            $this->logger->info('admin_action', [
                 'action' => $action,
                 'message' => $result['message'],
             ]);

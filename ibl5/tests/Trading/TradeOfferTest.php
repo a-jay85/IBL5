@@ -62,6 +62,7 @@ class TradeOfferTest extends TestCase
                 $this->cashHandler = $cashHandler;
                 $this->validator = $validator;
                 $this->discord = $discord;
+                $this->logger = \Logging\LoggerFactory::getChannel('trade');
             }
         };
     }

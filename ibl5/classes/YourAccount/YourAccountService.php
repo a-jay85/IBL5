@@ -27,6 +27,11 @@ class YourAccountService implements YourAccountServiceInterface
     private string $adminEmail;
     private int $minPasswordLength;
 
+    /**
+     * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('auth').
+     */
+    private \Psr\Log\LoggerInterface $logger;
+
     public function __construct(
         AuthServiceInterface $authService,
         TeamIdentityRepositoryInterface $commonRepository,
@@ -35,6 +40,7 @@ class YourAccountService implements YourAccountServiceInterface
         string $siteName,
         string $adminEmail,
         int $minPasswordLength = 5,
+        ?\Psr\Log\LoggerInterface $logger = null,
     ) {
         $this->authService = $authService;
         $this->commonRepository = $commonRepository;
@@ -43,6 +49,7 @@ class YourAccountService implements YourAccountServiceInterface
         $this->siteName = $siteName;
         $this->adminEmail = $adminEmail;
         $this->minPasswordLength = $minPasswordLength;
+        $this->logger = $logger ?? LoggerFactory::getChannel('auth');
     }
 
     /**
@@ -51,7 +58,7 @@ class YourAccountService implements YourAccountServiceInterface
     public function attemptLogin(string $username, string $password, bool $rememberMe, string $clientIp): array
     {
         if ($this->authService->attempt($username, $password, $rememberMe)) {
-            LoggerFactory::getChannel('auth')->info('login_success', [
+            $this->logger->info('login_success', [
                 'username' => $username,
                 'client_ip' => $clientIp,
             ]);
@@ -59,7 +66,7 @@ class YourAccountService implements YourAccountServiceInterface
         }
 
         $error = $this->authService->getLastError();
-        LoggerFactory::getChannel('auth')->warning('login_failed', [
+        $this->logger->warning('login_failed', [
             'username' => $username,
             'client_ip' => $clientIp,
             'error' => $error,
@@ -93,7 +100,7 @@ class YourAccountService implements YourAccountServiceInterface
                 },
             );
 
-            LoggerFactory::getChannel('auth')->info('user_registered', [
+            $this->logger->info('user_registered', [
                 'username' => $username,
             ]);
             return ['success' => true, 'error' => null];
@@ -145,7 +152,7 @@ class YourAccountService implements YourAccountServiceInterface
             return ['success' => false, 'error' => $error];
         }
 
-        LoggerFactory::getChannel('auth')->info('password_reset_requested');
+        $this->logger->info('password_reset_requested');
         return ['success' => true, 'error' => null];
     }
 
@@ -160,7 +167,7 @@ class YourAccountService implements YourAccountServiceInterface
 
         try {
             $this->authService->resetPassword($selector, $token, $newPassword);
-            LoggerFactory::getChannel('auth')->info('password_reset_completed');
+            $this->logger->info('password_reset_completed');
             return ['success' => true, 'error' => null];
         } catch (\RuntimeException) {
             $error = $this->authService->getLastError() ?? 'An error occurred while resetting your password.';
@@ -173,7 +180,7 @@ class YourAccountService implements YourAccountServiceInterface
      */
     public function logout(): void
     {
-        LoggerFactory::getChannel('auth')->info('logout');
+        $this->logger->info('logout');
         $this->authService->logout();
     }
 

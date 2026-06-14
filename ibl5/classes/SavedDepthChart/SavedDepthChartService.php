@@ -20,10 +20,16 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
     private SavedDepthChartRepository $repository;
     private \mysqli $db;
 
-    public function __construct(\mysqli $db)
+    /**
+     * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('audit').
+     */
+    private \Psr\Log\LoggerInterface $logger;
+
+    public function __construct(\mysqli $db, ?\Psr\Log\LoggerInterface $logger = null)
     {
         $this->db = $db;
         $this->repository = new SavedDepthChartRepository($db);
+        $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('audit');
     }
 
     /**
@@ -56,7 +62,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
 
                     $this->db->commit();
 
-                    \Logging\LoggerFactory::getChannel('audit')->info('depth_chart_saved', [
+                    $this->logger->info('depth_chart_saved', [
                         'action' => 'depth_chart_saved',
                         'dc_id' => $loadedDcId,
                         'team_id' => $teamid,
@@ -82,7 +88,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
 
                 $this->db->commit();
 
-                \Logging\LoggerFactory::getChannel('audit')->info('depth_chart_saved', [
+                $this->logger->info('depth_chart_saved', [
                     'action' => 'depth_chart_saved',
                     'dc_id' => $mostRecent['id'],
                     'team_id' => $teamid,
@@ -113,7 +119,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
 
             $this->db->commit();
 
-            \Logging\LoggerFactory::getChannel('audit')->info('depth_chart_saved', [
+            $this->logger->info('depth_chart_saved', [
                 'action' => 'depth_chart_saved',
                 'dc_id' => $dcId,
                 'team_id' => $teamid,

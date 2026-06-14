@@ -22,6 +22,11 @@ use Voting\Contracts\VotingSubmissionServiceInterface;
  */
 class VotingSubmissionService implements VotingSubmissionServiceInterface
 {
+    /**
+     * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('audit').
+     */
+    private \Psr\Log\LoggerInterface $logger;
+
     /** @var array<string, string> EOY category code => display label (with article) */
     private const EOY_CATEGORIES = [
         'MVP' => 'an MVP',
@@ -48,7 +53,9 @@ class VotingSubmissionService implements VotingSubmissionServiceInterface
 
     public function __construct(
         private readonly VotingRepositoryInterface $repository,
+        ?\Psr\Log\LoggerInterface $logger = null,
     ) {
+        $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('audit');
     }
 
     /**
@@ -71,7 +78,7 @@ class VotingSubmissionService implements VotingSubmissionServiceInterface
         $this->repository->saveEoyVote($teamName, $ballot);
         $this->repository->markEoyVoteCast($teamName);
 
-        \Logging\LoggerFactory::getChannel('audit')->info('eoy_vote_submitted', [
+        $this->logger->info('eoy_vote_submitted', [
             'action' => 'eoy_vote_submitted',
             'team_name' => $teamName,
         ]);
@@ -100,7 +107,7 @@ class VotingSubmissionService implements VotingSubmissionServiceInterface
         $this->repository->saveAsgVote($teamName, $ballot);
         $this->repository->markAsgVoteCast($teamName);
 
-        \Logging\LoggerFactory::getChannel('audit')->info('asg_vote_submitted', [
+        $this->logger->info('asg_vote_submitted', [
             'action' => 'asg_vote_submitted',
             'team_name' => $teamName,
         ]);

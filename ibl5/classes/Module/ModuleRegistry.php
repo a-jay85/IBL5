@@ -54,7 +54,6 @@ final class ModuleRegistry
         'Voting',
         'VotingResults',
         'Waivers',
-        'Watchlist',
         'YourAccount',
     ];
 

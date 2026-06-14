@@ -246,6 +246,97 @@ class ExtensionRepositoryTest extends TestCase
         $this->assertTrue($handler->hasErrorThatContains('markExtensionUsedThisSeason failed'));
     }
 
+    // ============================================
+    // PER-CHANNEL LOGGER SEAM (Matrix #6, #7, #8)
+    // ============================================
+
+    /**
+     * Positive seam — db channel: injected dbLogger spy receives the db-channel error.
+     * Cross-talk negative: injected appLogger spy receives NO error call (Matrix #7).
+     */
+    public function testDbLoggerSpyReceivesDbChannelErrorAndAppSpyDoesNot(): void
+    {
+        $dbSpy = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $dbSpy->expects($this->once())
+            ->method('error')
+            ->with('updatePlayerContract failed', self::arrayHasKey('exception'));
+
+        $appSpy = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $appSpy->expects($this->never())->method('error');
+
+        $repo = new class(new MockDatabase(), appLogger: $appSpy, dbLogger: $dbSpy) extends ExtensionRepository {
+            protected function execute(string $query, string $types = '', mixed ...$params): int
+            {
+                throw new \RuntimeException('forced db failure', 1003);
+            }
+        };
+
+        $offer = ['year1' => 100, 'year2' => 110, 'year3' => 120, 'year4' => 0, 'year5' => 0];
+        $result = $repo->updatePlayerContract('Test Player', $offer, 80);
+
+        $this->assertFalse($result);
+    }
+
+    /**
+     * Positive seam — app channel: injected appLogger spy receives the app-channel warning.
+     * Cross-talk negative: injected dbLogger spy receives NO warning call (Matrix #7).
+     */
+    public function testAppLoggerSpyReceivesAppChannelWarningAndDbSpyDoesNot(): void
+    {
+        $appSpy = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $appSpy->expects($this->once())
+            ->method('warning')
+            ->with('ExtensionRepository::getTeamTraditionData failed', self::arrayHasKey('error'));
+
+        $dbSpy = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $dbSpy->expects($this->never())->method('warning');
+
+        $repo = new class(new MockDatabase(), appLogger: $appSpy, dbLogger: $dbSpy) extends ExtensionRepository {
+            protected function fetchOne(string $query, string $types = '', mixed ...$params): ?array
+            {
+                throw new \RuntimeException('forced app failure');
+            }
+        };
+
+        $result = $repo->getTeamTraditionData('Test Team');
+
+        $this->assertSame(41, $result['currentSeasonWins']);
+    }
+
+    /**
+     * Subclass seam: injected loggers ($appLogger, $dbLogger) are distinct from the
+     * parent BaseMysqliRepository's private $logger — no property shadow regression.
+     */
+    public function testInjectedLoggersDoNotShadowParentLogger(): void
+    {
+        $appSpy = self::createStub(\Psr\Log\LoggerInterface::class);
+        $dbSpy = self::createStub(\Psr\Log\LoggerInterface::class);
+
+        $repo = new ExtensionRepository(new MockDatabase(), appLogger: $appSpy, dbLogger: $dbSpy);
+
+        $refApp = new \ReflectionProperty(ExtensionRepository::class, 'appLogger');
+        $refDb = new \ReflectionProperty(ExtensionRepository::class, 'dbLogger');
+
+        $this->assertSame($appSpy, $refApp->getValue($repo));
+        $this->assertSame($dbSpy, $refDb->getValue($repo));
+
+        // Parent's private $logger is a separate property — verify it resolves independently
+        $refParentLogger = new \ReflectionProperty(\BaseMysqliRepository::class, 'logger');
+        $parentLogger = $refParentLogger->getValue($repo);
+        $this->assertNotSame($appSpy, $parentLogger);
+        $this->assertNotSame($dbSpy, $parentLogger);
+    }
+
+    /**
+     * Boundary (Matrix #8): constructing without logger args does not throw;
+     * fallback-to-LoggerFactory fires and the class remains functional.
+     */
+    public function testConstructsWithoutLoggerArgsDoesNotThrow(): void
+    {
+        $repo = new ExtensionRepository(new MockDatabase());
+        $this->assertIsObject($repo);
+    }
+
     /**
      * Assert that at least one executed query contains the given substring.
      */

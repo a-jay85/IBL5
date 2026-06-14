@@ -170,13 +170,39 @@ function rookieoption($pid)
 
 function processrookieoption()
 {
-    global $mysqli_db, $commonRepository;
+    global $mysqli_db, $commonRepository, $user, $cookie;
+
+    // (1) Auth gate — pa=processrookieoption has no is_user() check.
+    if (!is_user($user)) {
+        loginbox();
+        return;
+    }
+
+    // (2) CSRF — validate before any DB mutation. PRG redirect mirrors
+    // this handler's own error path + extension.php.
+    if (!\Security\CsrfGuard::validateSubmittedToken('rookie_option')) {
+        \Utilities\HtmxHelper::redirect('modules.php?name=Player&error=' . rawurlencode('Invalid or expired form submission. Please reload and try again.'));
+        return;
+    }
+
+    cookiedecode($user);
+    $username = is_string($cookie[1] ?? null) ? $cookie[1] : '';
 
     // Get POST parameters
-    $teamName = $_POST['teamname'] ?? '';
+    $teamName = is_string($_POST['teamname'] ?? null) ? $_POST['teamname'] : '';
     $playerID = isset($_POST['playerID']) ? (int) $_POST['playerID'] : 0;
     $extensionAmount = isset($_POST['rookieOptionValue']) ? (int) $_POST['rookieOptionValue'] : 0;
     $from = $_POST['from'] ?? '';
+
+    // (3) Ownership — POST team must equal the session user's team.
+    // Reject null / Free Agents so a teamless session cannot exercise options.
+    $sessionTeam = $commonRepository->getTeamnameFromUsername($username);
+    if ($sessionTeam === null
+        || $sessionTeam === \League\League::FREE_AGENTS_TEAM_NAME
+        || $sessionTeam !== $teamName) {
+        \Utilities\HtmxHelper::redirect('modules.php?name=Player&pa=rookieoption&pid=' . $playerID . '&from=' . rawurlencode($from) . '&error=' . rawurlencode('You can only exercise options for your own team.'));
+        return;
+    }
 
     // Validate input
     if ($teamName === '' || $playerID === 0 || $extensionAmount === 0) {

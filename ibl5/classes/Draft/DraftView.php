@@ -6,6 +6,7 @@ namespace Draft;
 
 use Draft\Contracts\DraftViewInterface;
 use UI\TeamCellHelper;
+use Security\CsrfGuard;
 use Security\HtmlSanitizer;
 
 /**
@@ -42,6 +43,7 @@ class DraftView implements DraftViewInterface
         $html .= '<img src="images/logo/' . $teamid . '.jpg" alt="Team Logo" class="team-logo-banner">';
 
         $html .= "<form name='draft_form' action='/ibl5/modules.php?name=Draft&amp;op=select' method='POST'>";
+        $html .= CsrfGuard::generateToken('draft_selection');
         $safeTeamLogo = HtmlSanitizer::safeHtmlOutput($teamLogo);
         $html .= "<input type='hidden' name='teamname' value='" . $safeTeamLogo . "'>";
         $html .= "<input type='hidden' name='draft_round' value='$draftRound'>";

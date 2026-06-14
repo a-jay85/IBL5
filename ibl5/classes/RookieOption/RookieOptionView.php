@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RookieOption;
 
 use Player\Player;
+use Security\CsrfGuard;
 use Security\HtmlSanitizer;
 use RookieOption\Contracts\RookieOptionViewInterface;
 
@@ -47,6 +48,7 @@ class RookieOptionView implements RookieOptionViewInterface
         </div>
 
         <form name="RookieExtend" method="post" action="modules.php?name=Player&amp;pa=processrookieoption" class="text-center">
+            <?= CsrfGuard::generateToken('rookie_option') ?>
             <input type="hidden" name="teamname" value="<?= HtmlSanitizer::e($teamName) ?>">
             <input type="hidden" name="playerID" value="<?= HtmlSanitizer::e($playerID) ?>">
             <input type="hidden" name="rookieOptionValue" value="<?= HtmlSanitizer::e($rookieOptionValue) ?>">

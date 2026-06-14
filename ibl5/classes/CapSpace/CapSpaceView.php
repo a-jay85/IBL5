@@ -59,7 +59,7 @@ class CapSpaceView implements CapSpaceViewInterface
             $html .= $yearEnd . '<br>Total</th>';
         }
 
-        $html .= '<th class="divider" aria-label="Separator"></th>';
+        $html .= '<th class="divider"><span class="sr-only">Separator</span></th>';
 
         // Position columns (current year only)
         foreach (\JSB::PLAYER_POSITIONS as $position) {
@@ -71,7 +71,7 @@ class CapSpaceView implements CapSpaceViewInterface
             $html .= $safePosition . '</th>';
         }
 
-        $html .= '<th class="divider" aria-label="Separator"></th>';
+        $html .= '<th class="divider"><span class="sr-only">Separator</span></th>';
         $html .= '<th>FA Slots</th>';
         $html .= '<th>Has MLE</th>';
         $html .= '<th>Has LLE</th>';

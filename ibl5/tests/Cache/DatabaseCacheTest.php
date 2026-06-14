@@ -151,6 +151,113 @@ final class DatabaseCacheTest extends TestCase
 
         $this->assertSame($data, $result);
     }
+
+    public function testGetLogsErrorOnPrepareFailure(): void
+    {
+        $mockDb = new MockCacheDb();
+        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $logger->expects($this->once())->method('error')->with('cache_get_failed', \PHPUnit\Framework\Assert::anything());
+        $cache = new DatabaseCache($mockDb, $logger);
+
+        $mockDb->setPrepareShouldFail(true);
+        $result = $cache->get('any_key');
+
+        $this->assertNull($result);
+    }
+
+    public function testGetLogsWarningOnCorruptJson(): void
+    {
+        $mockDb = new MockCacheDb();
+        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $logger->expects($this->once())->method('warning')->with('cache_corrupt_json', \PHPUnit\Framework\Assert::anything());
+        $cache = new DatabaseCache($mockDb, $logger);
+
+        $mockDb->setCacheData('corrupt_key', '{invalid json!!!', time() + 3600);
+        $result = $cache->get('corrupt_key');
+
+        $this->assertNull($result);
+    }
+
+    public function testGetDoesNotLogOnCacheMiss(): void
+    {
+        $mockDb = new MockCacheDb();
+        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $logger->expects($this->never())->method('error');
+        $logger->expects($this->never())->method('warning');
+        $cache = new DatabaseCache($mockDb, $logger);
+
+        $result = $cache->get('nonexistent');
+
+        $this->assertNull($result);
+    }
+
+    public function testGetDoesNotLogOnExpiredEntry(): void
+    {
+        $mockDb = new MockCacheDb();
+        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $logger->expects($this->never())->method('error');
+        $logger->expects($this->never())->method('warning');
+        $cache = new DatabaseCache($mockDb, $logger);
+
+        $mockDb->setCacheData('expired_key', (string) json_encode(['x' => 1]), time() - 100);
+        $result = $cache->get('expired_key');
+
+        $this->assertNull($result);
+    }
+
+    public function testSetLogsErrorOnPrepareFailure(): void
+    {
+        $mockDb = new MockCacheDb();
+        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $logger->expects($this->once())->method('error')->with('cache_set_failed', \PHPUnit\Framework\Assert::anything());
+        $cache = new DatabaseCache($mockDb, $logger);
+
+        $mockDb->setPrepareShouldFail(true);
+        $cache->set('key', [['pid' => 1]], 3600);
+
+        $this->assertFalse($mockDb->wasWriteCalled());
+    }
+
+    public function testDeleteLogsErrorOnPrepareFailure(): void
+    {
+        $mockDb = new MockCacheDb();
+        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $logger->expects($this->once())->method('error')->with('cache_delete_failed', \PHPUnit\Framework\Assert::anything());
+        $cache = new DatabaseCache($mockDb, $logger);
+
+        $mockDb->setPrepareShouldFail(true);
+        $cache->delete('any_key');
+
+        $this->assertFalse($mockDb->wasDeleteCalled());
+    }
+
+    public function testConstructsWithoutLoggerArg(): void
+    {
+        $mockDb = new MockCacheDb();
+        $cache = new DatabaseCache($mockDb);
+
+        // Un-injected production call shape: fallback logger fires, no TypeError
+        $data = [['pid' => 1]];
+        $cache->set('noarg_key', $data, 3600);
+        $result = $cache->get('noarg_key');
+        $this->assertSame($data, $result);
+
+        $cache->delete('noarg_key');
+        $this->assertNull($cache->get('noarg_key'));
+    }
+
+    public function testSetLogsOnEncodeFailure(): void
+    {
+        $mockDb = new MockCacheDb();
+        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $logger->expects($this->once())->method('warning')->with('cache_set_encode_failed', \PHPUnit\Framework\Assert::anything());
+        $cache = new DatabaseCache($mockDb, $logger);
+
+        // NAN is not JSON-encodable
+        $cache->set('encode_fail_key', ['x' => NAN], 3600);
+
+        $this->assertFalse($mockDb->wasWriteCalled());
+    }
 }
 
 /**
@@ -248,6 +355,7 @@ class MockCacheDb extends \mysqli
 
 class MockCacheStmt
 {
+    public int $affected_rows = 1;
     private MockCacheDb $db;
     private string $query;
     private string $boundKey = '';

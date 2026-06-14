@@ -319,7 +319,7 @@ class TopicsView implements TopicsViewInterface
         $output .= '<img src="' . $imagePath . '" alt="" class="topic-card__image" loading="lazy">';
         $output .= '</a>';
         $output .= '<div class="topic-card__meta">';
-        $output .= '<h3 class="topic-card__title"><a href="modules.php?name=News&amp;topic=' . $topicId . '">' . $topicText . '</a></h3>';
+        $output .= '<h2 class="topic-card__title"><a href="modules.php?name=News&amp;topic=' . $topicId . '">' . $topicText . '</a></h2>';
         $output .= '<div class="topic-card__stats">';
         $output .= '<span class="topic-card__stat"><strong>' . \BasketballStats\StatsFormatter::formatTotal($storyCount) . '</strong> ' . $totNews . '</span>';
         $output .= '<span class="topic-card__stat-separator"></span>';

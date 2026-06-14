@@ -175,7 +175,7 @@ parameters:
 			path: classes/Navigation/Views/DesktopNavView.php
 
 		-
-			rawMessage: Hardcoded environment string "iblhoops.net" is banned. Inject an environment/config flag instead of branching on a literal host name.
+			rawMessage: Hardcoded environment string "www.iblhoops.net" is banned. Inject an environment/config flag instead of branching on a literal host name.
 			identifier: ibl.hardcodedEnvString
 			count: 1
 			path: classes/PageLayout/PageLayout.php

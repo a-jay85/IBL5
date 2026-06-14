@@ -41,6 +41,10 @@ class ExtensionService implements ExtensionProcessorInterface
     private TeamQueryRepositoryInterface $teamQueryRepo;
     private TeamCapCalculatorInterface $teamCapCalculator;
     private string $serverName;
+    /** Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('audit'). */
+    private \Psr\Log\LoggerInterface $auditLogger;
+    /** Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('db'). */
+    private \Psr\Log\LoggerInterface $dbLogger;
 
     /**
      * @param \mysqli $db mysqli connection
@@ -57,7 +61,9 @@ class ExtensionService implements ExtensionProcessorInterface
         ?ExtensionValidatorInterface $validator = null,
         ?ExtensionOfferEvaluatorInterface $evaluator = null,
         ?TeamQueryRepositoryInterface $teamQueryRepo = null,
-        ?TeamCapCalculatorInterface $teamCapCalculator = null
+        ?TeamCapCalculatorInterface $teamCapCalculator = null,
+        ?\Psr\Log\LoggerInterface $auditLogger = null,
+        ?\Psr\Log\LoggerInterface $dbLogger = null
     ) {
         $this->db = $db;
         $this->serverName = $serverName;
@@ -67,6 +73,8 @@ class ExtensionService implements ExtensionProcessorInterface
         $this->contractValidator = new CommonContractValidator();
         $this->teamQueryRepo = $teamQueryRepo ?? new \Team\TeamQueryRepository($db);
         $this->teamCapCalculator = $teamCapCalculator ?? new \Team\TeamCapCalculator($db, $this->teamQueryRepo);
+        $this->auditLogger = $auditLogger ?? \Logging\LoggerFactory::getChannel('audit');
+        $this->dbLogger = $dbLogger ?? \Logging\LoggerFactory::getChannel('db');
     }
 
     /**
@@ -259,7 +267,7 @@ class ExtensionService implements ExtensionProcessorInterface
             $offerDetails
         );
 
-        \Logging\LoggerFactory::getChannel('audit')->info('extension_accepted', [
+        $this->auditLogger->info('extension_accepted', [
             'action' => 'extension_accepted',
             'player_name' => $playerName,
             'team_name' => $teamName,
@@ -316,7 +324,7 @@ class ExtensionService implements ExtensionProcessorInterface
     ): array {
         $this->repository->createRejectedExtensionStory($playerName, $teamName, $offerInMillions, $offerYears);
 
-        \Logging\LoggerFactory::getChannel('audit')->info('extension_rejected', [
+        $this->auditLogger->info('extension_rejected', [
             'action' => 'extension_rejected',
             'player_name' => $playerName,
             'team_name' => $teamName,
@@ -366,7 +374,7 @@ class ExtensionService implements ExtensionProcessorInterface
             try {
                 return Player::withPlayerID($this->db, (int) $playerID);
             } catch (\Exception $e) {
-                \Logging\LoggerFactory::getChannel('db')->error('getPlayerObject failed', [
+                $this->dbLogger->error('getPlayerObject failed', [
                     'exception' => $e,
                     'context' => ['playerID' => $playerID],
                 ]);
@@ -396,7 +404,7 @@ class ExtensionService implements ExtensionProcessorInterface
         try {
             return Team::initialize($this->db, $teamName);
         } catch (\Exception $e) {
-            \Logging\LoggerFactory::getChannel('db')->error('getTeamObject failed', [
+            $this->dbLogger->error('getTeamObject failed', [
                 'exception' => $e,
                 'context' => ['teamName' => $teamName],
             ]);

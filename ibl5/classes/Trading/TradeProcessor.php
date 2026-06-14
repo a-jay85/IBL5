@@ -40,6 +40,10 @@ class TradeProcessor implements TradeProcessorInterface
     protected \Topics\News\NewsRepository $newsService;
     protected ?Discord $discord;
     protected string $serverName;
+    /** Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('audit'). */
+    private \Psr\Log\LoggerInterface $auditLogger;
+    /** Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('trade'). */
+    private \Psr\Log\LoggerInterface $tradeLogger;
 
     public function __construct(
         \mysqli $db,
@@ -50,7 +54,9 @@ class TradeProcessor implements TradeProcessorInterface
         ?TradeCashRepositoryInterface $cashRepository = null,
         ?BuyoutLedgerRepositoryInterface $cashConsiderationRepository = null,
         ?TradeExecutionRepositoryInterface $executionRepository = null,
-        ?Season $season = null
+        ?Season $season = null,
+        ?\Psr\Log\LoggerInterface $auditLogger = null,
+        ?\Psr\Log\LoggerInterface $tradeLogger = null
     ) {
         $this->db = $db;
         $this->commonRepository = $commonRepository;
@@ -63,13 +69,15 @@ class TradeProcessor implements TradeProcessorInterface
         $this->season = $season ?? new Season($db);
         $this->cashHandler = new CashTransactionHandler($db, $this->commonRepository, $this->cashConsiderationRepository, $this->cashRepository);
         $this->newsService = new \Topics\News\NewsRepository($db);
+        $this->auditLogger = $auditLogger ?? \Logging\LoggerFactory::getChannel('audit');
+        $this->tradeLogger = $tradeLogger ?? \Logging\LoggerFactory::getChannel('trade');
 
         // Initialize Discord with error handling
         try {
             $this->discord = new Discord($this->commonRepository);
         } catch (\Exception $e) {
             // Discord unavailable - will skip notifications
-            \Logging\LoggerFactory::getChannel('trade')->warning('Discord initialization failed in TradeProcessor', ['error' => $e->getMessage()]);
+            $this->tradeLogger->warning('Discord initialization failed in TradeProcessor', ['error' => $e->getMessage()]);
             $this->discord = null;
         }
     }
@@ -121,7 +129,7 @@ class TradeProcessor implements TradeProcessorInterface
 
             $this->db->commit();
 
-            \Logging\LoggerFactory::getChannel('audit')->info('trade_executed', [
+            $this->auditLogger->info('trade_executed', [
                 'action' => 'trade_executed',
                 'offer_id' => $offerId,
                 'offering_team' => $offeringTeamName,
@@ -386,7 +394,7 @@ class TradeProcessor implements TradeProcessorInterface
             }
         } catch (\Exception $e) {
             // Log the error but don't fail the trade
-            \Logging\LoggerFactory::getChannel('trade')->error('Discord notification failed', ['error' => $e->getMessage()]);
+            $this->tradeLogger->error('Discord notification failed', ['error' => $e->getMessage()]);
         }
     }
 }

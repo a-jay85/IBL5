@@ -24,6 +24,10 @@ class TradingController implements TradingControllerInterface
     private \Repositories\Contracts\TeamIdentityRepositoryInterface $teamIdentityRepo;
     private \Utilities\NukeCompat $nukeCompat;
     private \mysqli $db;
+    /** Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('audit'). */
+    private \Psr\Log\LoggerInterface $auditLogger;
+    /** Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('trade'). */
+    private \Psr\Log\LoggerInterface $tradeLogger;
 
     public function __construct(
         TradingServiceInterface $service,
@@ -33,7 +37,9 @@ class TradingController implements TradingControllerInterface
         TradingViewInterface $view,
         \Repositories\Contracts\TeamIdentityRepositoryInterface $teamIdentityRepo,
         \Utilities\NukeCompat $nukeCompat,
-        \mysqli $db
+        \mysqli $db,
+        ?\Psr\Log\LoggerInterface $auditLogger = null,
+        ?\Psr\Log\LoggerInterface $tradeLogger = null
     ) {
         $this->service = $service;
         $this->processor = $processor;
@@ -43,6 +49,8 @@ class TradingController implements TradingControllerInterface
         $this->teamIdentityRepo = $teamIdentityRepo;
         $this->nukeCompat = $nukeCompat;
         $this->db = $db;
+        $this->auditLogger = $auditLogger ?? \Logging\LoggerFactory::getChannel('audit');
+        $this->tradeLogger = $tradeLogger ?? \Logging\LoggerFactory::getChannel('trade');
     }
 
     /**
@@ -180,12 +188,12 @@ class TradingController implements TradingControllerInterface
         try {
             $result = $this->tradeOffer->createTradeOffer($tradeData);
         } catch (\Exception $e) {
-            \Logging\LoggerFactory::getChannel('trade')->error('Failed to create trade offer', ['error' => $e->getMessage()]);
+            $this->tradeLogger->error('Failed to create trade offer', ['error' => $e->getMessage()]);
             $result = ['success' => false, 'error' => $e->getMessage()];
         }
 
         if ($result['success']) {
-            \Logging\LoggerFactory::getChannel('audit')->info('trade_offer_created', [
+            $this->auditLogger->info('trade_offer_created', [
                 'offering_team' => $tradeData['offeringTeam'],
                 'listening_team' => $tradeData['listeningTeam'],
             ]);
@@ -247,7 +255,7 @@ class TradingController implements TradingControllerInterface
                 \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=accept_error&error=' . rawurlencode($errorMsg));
             }
         } catch (\Exception $e) {
-            \Logging\LoggerFactory::getChannel('trade')->error('Failed to process trade', ['error' => $e->getMessage()]);
+            $this->tradeLogger->error('Failed to process trade', ['error' => $e->getMessage()]);
             \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=accept_error&error=' . rawurlencode($e->getMessage()));
         }
     }
@@ -266,7 +274,7 @@ class TradingController implements TradingControllerInterface
         $offerRaw = $post['offer'] ?? null;
 
         if (!is_numeric($offerRaw)) {
-            \Logging\LoggerFactory::getChannel('trade')->warning('Missing offer ID in POST data');
+            $this->tradeLogger->warning('Missing offer ID in POST data');
             \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade');
         }
 
@@ -282,7 +290,7 @@ class TradingController implements TradingControllerInterface
 
         $this->offerRepository->deleteTradeOffer($offerId);
 
-        \Logging\LoggerFactory::getChannel('audit')->info('trade_offer_rejected', [
+        $this->auditLogger->info('trade_offer_rejected', [
             'offer_id' => $offerId,
         ]);
 
@@ -329,7 +337,7 @@ class TradingController implements TradingControllerInterface
         $offerRaw = $post['offer'] ?? null;
 
         if (!is_numeric($offerRaw)) {
-            \Logging\LoggerFactory::getChannel('trade')->warning('Missing offer ID in POST data');
+            $this->tradeLogger->warning('Missing offer ID in POST data');
             \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade');
         }
 
@@ -360,7 +368,7 @@ class TradingController implements TradingControllerInterface
         }
 
         if (!$userIsRecipient || $originalProposer === null) {
-            \Logging\LoggerFactory::getChannel('audit')->warning('trade_offer_counter_denied', [
+            $this->auditLogger->warning('trade_offer_counter_denied', [
                 'offer_id' => $offerId,
                 'user_team' => $userTeam,
             ]);
@@ -376,7 +384,7 @@ class TradingController implements TradingControllerInterface
         // Auto-reject the original (collapses the deal to one live offer — the counter).
         $this->offerRepository->deleteTradeOffer($offerId);
 
-        \Logging\LoggerFactory::getChannel('audit')->info('trade_offer_countered', [
+        $this->auditLogger->info('trade_offer_countered', [
             'offer_id' => $offerId,
             'countering_team' => $userTeam,
         ]);

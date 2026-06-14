@@ -28,14 +28,20 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
     private \Psr\Log\LoggerInterface $auditLogger;
     /** Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('app'). */
     private \Psr\Log\LoggerInterface $appLogger;
+    /**
+     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     */
+    private ?Season $season = null;
 
     public function __construct(
         \mysqli $db,
         TeamIdentityRepositoryInterface $commonRepo,
         ?\Psr\Log\LoggerInterface $auditLogger = null,
-        ?\Psr\Log\LoggerInterface $appLogger = null
+        ?\Psr\Log\LoggerInterface $appLogger = null,
+        ?Season $season = null
     ) {
         $this->db = $db;
+        $this->season = $season;
         $this->repository = new DepthChartEntryRepository($db);
         $this->processor = new DepthChartEntryProcessor();
         $this->validator = new DepthChartEntryValidator();
@@ -52,7 +58,7 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
      */
     public function handleSubmission(array $postData): array
     {
-        $season = new Season($this->db);
+        $season = $this->season ?? new Season($this->db);
 
         /** @var string $rawTeamName */
         $rawTeamName = $postData['Team_Name'] ?? '';

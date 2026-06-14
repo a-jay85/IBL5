@@ -26,12 +26,12 @@ class TradeValidator implements TradeValidatorInterface
     protected TradeFormRepositoryInterface $formRepository;
     protected Season $season;
 
-    public function __construct(\mysqli $db)
+    public function __construct(\mysqli $db, ?Season $season = null)
     {
         $this->db = $db;
         $this->assetRepository = new TradeAssetRepository($db);
         $this->formRepository = new TradeFormRepository($db);
-        $this->season = new Season($db);
+        $this->season = $season ?? new Season($db);
     }
 
     /**

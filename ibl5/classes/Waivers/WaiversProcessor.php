@@ -36,6 +36,10 @@ class WaiversProcessor implements WaiversProcessorInterface
      * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('audit').
      */
     private \Psr\Log\LoggerInterface $logger;
+    /**
+     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     */
+    private ?Season $season = null;
 
     public function __construct(
         WaiversRepositoryInterface $repository,
@@ -44,7 +48,8 @@ class WaiversProcessor implements WaiversProcessorInterface
         WaiversValidatorInterface $validator,
         \Topics\News\NewsRepository $newsService,
         \mysqli $db,
-        ?\Psr\Log\LoggerInterface $logger = null
+        ?\Psr\Log\LoggerInterface $logger = null,
+        ?Season $season = null
     ) {
         $this->repository = $repository;
         $this->teamIdentityRepo = $teamIdentityRepo;
@@ -54,6 +59,7 @@ class WaiversProcessor implements WaiversProcessorInterface
         $this->db = $db;
         $this->contractCalculator = new PlayerContractCalculator();
         $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('audit');
+        $this->season = $season;
     }
 
     /**
@@ -216,7 +222,7 @@ class WaiversProcessor implements WaiversProcessorInterface
             return ['success' => false, 'error' => 'Player not found.'];
         }
 
-        $season = new Season($this->db);
+        $season = $this->season ?? new Season($this->db);
         /** @var array{hasExistingContract: bool, salary: int} $contractData */
         $contractData = $this->determineContractData($player, $season);
         $playerSalary = $contractData['salary'];

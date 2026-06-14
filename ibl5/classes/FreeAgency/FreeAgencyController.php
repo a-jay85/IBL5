@@ -25,15 +25,21 @@ class FreeAgencyController
      * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('audit').
      */
     private \Psr\Log\LoggerInterface $logger;
+    /**
+     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     */
+    private ?Season $season = null;
 
     public function __construct(
         \mysqli $db,
         TeamIdentityRepositoryInterface $commonRepository,
         AuthServiceInterface $authService,
         ?\Utilities\NukeCompat $nukeCompat = null,
-        ?\Psr\Log\LoggerInterface $logger = null
+        ?\Psr\Log\LoggerInterface $logger = null,
+        ?Season $season = null
     ) {
         $this->db = $db;
+        $this->season = $season;
         $this->commonRepository = $commonRepository;
         $this->authService = $authService;
         $this->repository = new FreeAgencyRepository($db);
@@ -69,7 +75,7 @@ class FreeAgencyController
         $username = $this->authService->getUsername() ?? '';
         $teamName = $this->commonRepository->getTeamnameFromUsername($username) ?? '';
         $team = Team::initialize($this->db, $teamName);
-        $season = new Season($this->db);
+        $season = $this->season ?? new Season($this->db);
 
         $mainPageData = $this->service->getMainPageData($team, $season);
         $result = isset($_GET['result']) && is_string($_GET['result']) ? $_GET['result'] : null;
@@ -88,7 +94,7 @@ class FreeAgencyController
         $teamid = $this->commonRepository->getTidFromTeamname($userTeamName) ?? 0;
 
         $team = Team::initialize($this->db, $teamid);
-        $season = new Season($this->db);
+        $season = $this->season ?? new Season($this->db);
 
         $negotiationData = $this->service->getNegotiationData($pid, $team, $season);
         $negotiationData['team'] = $team;

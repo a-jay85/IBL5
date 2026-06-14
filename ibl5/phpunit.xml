@@ -7,9 +7,6 @@
         <testsuite name="Auth Module Tests">
             <directory>tests/Auth</directory>
         </testsuite>
-        <testsuite name="BigBoard Module Tests">
-            <directory>tests/BigBoard</directory>
-        </testsuite>
         <testsuite name="Validation Module Tests">
             <directory>tests/Validation</directory>
         </testsuite>

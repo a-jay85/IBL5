@@ -12,7 +12,6 @@ final class ModuleRegistry
         'AllStarAppearances',
         'ApiKeys',
         'AwardHistory',
-        'BigBoard',
         'CapSpace',
         'CareerLeaderboards',
         'ComparePlayers',

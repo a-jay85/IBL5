@@ -218,8 +218,6 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
 
         $links[] = ['label' => 'Draft History', 'url' => 'modules.php?name=DraftHistory&teamid=' . $teamId];
         $links[] = ['label' => 'My Watchlist', 'url' => 'modules.php?name=Watchlist'];
-        $links[] = ['label' => 'Big Board', 'url' => 'modules.php?name=BigBoard'];
-        $links[] = ['label' => 'Mock Draft', 'url' => 'modules.php?name=BigBoard&op=mock'];
 
         if ($this->areWaiversAllowed()) {
             $links[] = ['rawHtml' => 'Waivers: <a href="modules.php?name=Waivers&amp;action=add">Add</a> | <a href="modules.php?name=Waivers&amp;action=waive">Waive</a>'];

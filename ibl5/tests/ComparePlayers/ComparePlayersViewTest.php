@@ -243,7 +243,7 @@ class ComparePlayersViewTest extends TestCase
     }
 
     /**
-     * @return array<string, array{pid: int, teamid: int, name: string, pos: string, age: int, r_fga: int, r_fgp: int, r_fta: int, r_ftp: int, r_3ga: int, r_3gp: int, r_orb: int, r_drb: int, r_ast: int, r_stl: int, r_tvr: int, r_blk: int, r_foul: int, oo: int, r_drive_off: int, po: int, r_trans_off: int, od: int, dd: int, pd: int, td: int, stats_gm: int, stats_gs: int, stats_min: int, stats_fgm: int, stats_fga: int, stats_ftm: int, stats_fta: int, stats_3gm: int, stats_3ga: int, stats_orb: int, stats_drb: int, stats_ast: int, stats_stl: int, stats_tvr: int, stats_blk: int, stats_pf: int, car_gm: int, car_min: int, car_fgm: int, car_fga: int, car_ftm: int, car_fta: int, car_3gm: int, car_3ga: int, car_orb: int, car_drb: int, car_reb: int, car_ast: int, car_stl: int, car_tvr: int, car_blk: int, car_pf: int, car_pts: int}>
+     * @return array{player1: array<string, mixed>, player2: array<string, mixed>}
      */
     private function getValidComparisonData(): array
     {

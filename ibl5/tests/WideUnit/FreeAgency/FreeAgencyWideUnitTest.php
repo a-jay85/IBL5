@@ -80,7 +80,7 @@ class FreeAgencyWideUnitTest extends WideUnitTestCase
         ];
 
         // Act
-        $result = $this->processor->processOfferSubmission($postData);
+        $result = $this->processor->processOfferSubmission($postData, 'Miami Cyclones');
 
         // Assert
         $this->assertIsArray($result);
@@ -108,7 +108,7 @@ class FreeAgencyWideUnitTest extends WideUnitTestCase
         ];
 
         // Act
-        $result = $this->processor->processOfferSubmission($postData);
+        $result = $this->processor->processOfferSubmission($postData, 'Miami Cyclones');
 
         // Assert
         $this->assertIsArray($result);
@@ -135,7 +135,7 @@ class FreeAgencyWideUnitTest extends WideUnitTestCase
         ];
 
         // Act
-        $result = $this->processor->processOfferSubmission($postData);
+        $result = $this->processor->processOfferSubmission($postData, 'Miami Cyclones');
 
         // Assert
         $this->assertIsArray($result);
@@ -162,7 +162,7 @@ class FreeAgencyWideUnitTest extends WideUnitTestCase
         ];
 
         // Act
-        $result = $this->processor->processOfferSubmission($postData);
+        $result = $this->processor->processOfferSubmission($postData, 'Miami Cyclones');
 
         // Assert
         $this->assertIsArray($result);
@@ -195,7 +195,7 @@ class FreeAgencyWideUnitTest extends WideUnitTestCase
         ];
 
         // Act
-        $result = $this->processor->processOfferSubmission($postData);
+        $result = $this->processor->processOfferSubmission($postData, 'Miami Cyclones');
 
         // Assert
         $this->assertIsArray($result);
@@ -229,7 +229,7 @@ class FreeAgencyWideUnitTest extends WideUnitTestCase
         ];
 
         // Act
-        $result = $this->processor->processOfferSubmission($postData);
+        $result = $this->processor->processOfferSubmission($postData, 'Miami Cyclones');
 
         // Assert
         $this->assertIsArray($result);
@@ -265,7 +265,7 @@ class FreeAgencyWideUnitTest extends WideUnitTestCase
         ];
 
         // Act
-        $result = $this->processor->processOfferSubmission($postData);
+        $result = $this->processor->processOfferSubmission($postData, 'Miami Cyclones');
 
         // Assert
         $this->assertIsArray($result);
@@ -297,7 +297,7 @@ class FreeAgencyWideUnitTest extends WideUnitTestCase
         ];
 
         // Act
-        $result = $this->processor->processOfferSubmission($postData);
+        $result = $this->processor->processOfferSubmission($postData, 'Miami Cyclones');
 
         // Assert
         $this->assertIsArray($result);
@@ -330,7 +330,7 @@ class FreeAgencyWideUnitTest extends WideUnitTestCase
         ];
 
         // Act
-        $result = $this->processor->processOfferSubmission($postData);
+        $result = $this->processor->processOfferSubmission($postData, 'Miami Cyclones');
 
         // Assert
         $this->assertIsArray($result);
@@ -363,7 +363,7 @@ class FreeAgencyWideUnitTest extends WideUnitTestCase
         ];
 
         // Act
-        $result = $this->processor->processOfferSubmission($postData);
+        $result = $this->processor->processOfferSubmission($postData, 'Miami Cyclones');
 
         // Assert
         $this->assertIsArray($result);
@@ -388,7 +388,7 @@ class FreeAgencyWideUnitTest extends WideUnitTestCase
         ];
 
         // Act
-        $result = $this->processor->processOfferSubmission($postData);
+        $result = $this->processor->processOfferSubmission($postData, 'Miami Cyclones');
 
         // Assert
         $this->assertIsArray($result);
@@ -422,7 +422,7 @@ class FreeAgencyWideUnitTest extends WideUnitTestCase
         ];
 
         // Act
-        $result = $this->processor->processOfferSubmission($postData);
+        $result = $this->processor->processOfferSubmission($postData, 'Miami Cyclones');
 
         // Assert
         $this->assertFalse($result['success']);
@@ -451,7 +451,7 @@ class FreeAgencyWideUnitTest extends WideUnitTestCase
         ];
 
         // Act
-        $result = $this->processor->processOfferSubmission($postData);
+        $result = $this->processor->processOfferSubmission($postData, 'Miami Cyclones');
 
         // Assert
         $this->assertFalse($result['success']);
@@ -483,7 +483,7 @@ class FreeAgencyWideUnitTest extends WideUnitTestCase
         ];
 
         // Act
-        $result = $this->processor->processOfferSubmission($postData);
+        $result = $this->processor->processOfferSubmission($postData, 'Miami Cyclones');
 
         // Assert
         $this->assertIsArray($result);
@@ -515,7 +515,7 @@ class FreeAgencyWideUnitTest extends WideUnitTestCase
         ];
 
         // Act
-        $result = $this->processor->processOfferSubmission($postData);
+        $result = $this->processor->processOfferSubmission($postData, 'Miami Cyclones');
 
         // Assert
         $this->assertIsArray($result);

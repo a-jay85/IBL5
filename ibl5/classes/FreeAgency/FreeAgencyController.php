@@ -123,10 +123,16 @@ class FreeAgencyController
             \Utilities\HtmxHelper::redirect('modules.php?name=FreeAgency&result=csrf_error');
         }
 
+        $username = $this->authService->getUsername() ?? '';
+        $verifiedTeamName = $this->commonRepository->getTeamnameFromUsername($username);
+        if ($verifiedTeamName === null || $verifiedTeamName === '' || $verifiedTeamName === \League\League::FREE_AGENTS_TEAM_NAME) {
+            \Utilities\HtmxHelper::redirect('modules.php?name=FreeAgency&result=error');
+        }
+
         try {
             /** @var array<string, mixed> $postData */
             $postData = $_POST;
-            $result = $this->processor->processOfferSubmission($postData);
+            $result = $this->processor->processOfferSubmission($postData, $verifiedTeamName);
         } catch (\Throwable $e) {
             $this->logger->error('fa_offer_error', [
                 'error' => $e->getMessage(),
@@ -179,10 +185,15 @@ class FreeAgencyController
             \Utilities\HtmxHelper::redirect('modules.php?name=FreeAgency&result=csrf_error');
         }
 
+        $username = $this->authService->getUsername() ?? '';
+        $verifiedTeamName = $this->commonRepository->getTeamnameFromUsername($username);
+        if ($verifiedTeamName === null || $verifiedTeamName === '' || $verifiedTeamName === \League\League::FREE_AGENTS_TEAM_NAME) {
+            \Utilities\HtmxHelper::redirect('modules.php?name=FreeAgency&result=error');
+        }
+
         try {
             $playerID = isset($_POST['playerID']) && is_numeric($_POST['playerID']) ? (int) $_POST['playerID'] : 0;
-            $teamName = isset($_POST['teamname']) && is_string($_POST['teamname']) ? $_POST['teamname'] : '';
-            $this->processor->deleteOffers($teamName, $playerID);
+            $this->processor->deleteOffers($verifiedTeamName, $playerID);
         } catch (\Throwable $e) {
             $this->logger->error('fa_delete_error', [
                 'error' => $e->getMessage(),

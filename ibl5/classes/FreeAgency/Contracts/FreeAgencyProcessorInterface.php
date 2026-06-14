@@ -25,15 +25,15 @@ interface FreeAgencyProcessorInterface
      * 7. Return result array for PRG redirect
      *
      * @param array<string, mixed> $postData POST data from negotiation form including:
-     *                                        - teamname: Offering team
      *                                        - playerID: Player ID being offered to
      *                                        - offerType: Exception type (0=custom, 1+=exception)
      *                                        - offeryear1-6: Custom offer amounts (if offerType=0)
+     * @param string $verifiedTeamName Offering team, derived from the authenticated session — never from POST
      *
      * @return array{success: bool, type: string, message: string, playerID: int}
      *         Result array for PRG redirect handling
      */
-    public function processOfferSubmission(array $postData): array;
+    public function processOfferSubmission(array $postData, string $verifiedTeamName): array;
 
     /**
      * Delete contract offer(s) from this team to a player

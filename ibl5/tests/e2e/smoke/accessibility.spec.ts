@@ -91,16 +91,6 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
   'heading-order': new Set([
   ]),
 
-  // Empty <th> cells (icon-only sort headers, separator headers). See ibl5/docs/a11y-backlog.md.
-  // Burn-down: a11y-3-empty-table-header.
-  'empty-table-header': new Set([
-    'cap space',
-    'player page',
-    'free agency',
-    'depth chart entry',
-    'next sim',
-  ]),
-
   // Links with no discernible text. Seed-dependent (data-driven sim-recap + News template).
   // See ibl5/docs/a11y-backlog.md §link-name.
   'link-name': new Set([

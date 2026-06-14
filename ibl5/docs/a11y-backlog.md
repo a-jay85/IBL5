@@ -46,11 +46,11 @@ last_verified: 2026-06-14
 **Direction:** Fix the level jump. Bundle into `a11y-2-heading-one-single-title` (same view, same render).
 **Disposition:** ✅ enforced — `a11y-2-heading-one-single-title` (merged).
 
-### empty-table-header — best-practice, minor — 🟢
+### empty-table-header — best-practice, minor — ✅ fixed
 **Location:** cap space (`CapSpaceView` th[data-sort-col=7,13]), player page (`.highs-header`), free agency (`FreeAgencyView` sticky-col `th[data-sort-col=0]`), depth chart entry (`.dc-lineup-preview-table` first th + `.sep-team` separators, 9 nodes), next sim (`.next-sim-position-section` tables, 40 nodes).
 **Problem:** `<th>` cells with no text (icon-only sort columns / sticky row-label column / separator + position-section headers). Template-driven, seed-independent.
-**Direction:** Add a visually-hidden label or `aria-label`/`scope` to each empty header. No visual change.
-**Disposition:** 🟢 — `a11y-3-empty-table-header`.
+**Fix:** Added `aria-label` to each empty header. No visual change.
+**Disposition:** ✅ — fixed in `a11y-3-empty-table-header`; removed from `KNOWN_FAILING` in `accessibility.spec.ts`.
 
 ### link-name — wcag2a (level A), serious — 🔵
 **Location:** news index/categories/article (12 nodes each — consistent → template icon-link in `modules/News`); homepage + debug menu (12 nodes — the `last-sim-recap` panel team links, **data-dependent**).

@@ -385,7 +385,7 @@ class FreeAgencyView
         </tr>
         <tr>
             <?php if ($showOptionsColumn): ?>
-            <th></th>
+            <th><span class="sr-only">Actions</span></th>
             <?php endif; ?>
             <th>Pos</th>
             <th>Player</th>

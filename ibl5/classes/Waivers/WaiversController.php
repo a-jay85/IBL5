@@ -31,6 +31,11 @@ class WaiversController implements WaiversControllerInterface
     private \Utilities\NukeCompat $nukeCompat;
     private \mysqli $db;
 
+    /**
+     * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('audit').
+     */
+    private \Psr\Log\LoggerInterface $logger;
+
     public function __construct(
         WaiversServiceInterface $service,
         WaiversProcessorInterface $processor,
@@ -38,7 +43,8 @@ class WaiversController implements WaiversControllerInterface
         \Repositories\Contracts\TeamIdentityRepositoryInterface $teamIdentityRepo,
         \Repositories\Contracts\SalaryCapRepositoryInterface $salaryCapRepo,
         \Utilities\NukeCompat $nukeCompat,
-        \mysqli $db
+        \mysqli $db,
+        ?\Psr\Log\LoggerInterface $logger = null
     ) {
         $this->service = $service;
         $this->processor = $processor;
@@ -47,6 +53,7 @@ class WaiversController implements WaiversControllerInterface
         $this->salaryCapRepo = $salaryCapRepo;
         $this->nukeCompat = $nukeCompat;
         $this->db = $db;
+        $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('audit');
     }
 
     /**
@@ -99,7 +106,7 @@ class WaiversController implements WaiversControllerInterface
                 $postData = $_POST;
                 $result = $this->processWaiverSubmission($postData);
             } catch (\Throwable $e) {
-                \Logging\LoggerFactory::getChannel('audit')->error('waiver_submission_error', [
+                $this->logger->error('waiver_submission_error', [
                     'error' => $e->getMessage(),
                     'file' => $e->getFile(),
                     'line' => $e->getLine(),

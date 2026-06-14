@@ -19,9 +19,15 @@ class ApiKeysService implements ApiKeysServiceInterface
 {
     private ApiKeysRepositoryInterface $repository;
 
-    public function __construct(ApiKeysRepositoryInterface $repository)
+    /**
+     * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('audit').
+     */
+    private \Psr\Log\LoggerInterface $logger;
+
+    public function __construct(ApiKeysRepositoryInterface $repository, ?\Psr\Log\LoggerInterface $logger = null)
     {
         $this->repository = $repository;
+        $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('audit');
     }
 
     /**
@@ -40,7 +46,7 @@ class ApiKeysService implements ApiKeysServiceInterface
 
         $this->repository->createKey($userId, $keyHash, $keyPrefix, $username);
 
-        \Logging\LoggerFactory::getChannel('audit')->info('api_key_generated', [
+        $this->logger->info('api_key_generated', [
             'action' => 'api_key_generated',
             'user_id' => $userId,
             'username' => $username,
@@ -60,7 +66,7 @@ class ApiKeysService implements ApiKeysServiceInterface
     {
         $this->repository->revokeByUserId($userId);
 
-        \Logging\LoggerFactory::getChannel('audit')->info('api_key_revoked', [
+        $this->logger->info('api_key_revoked', [
             'action' => 'api_key_revoked',
             'user_id' => $userId,
         ]);

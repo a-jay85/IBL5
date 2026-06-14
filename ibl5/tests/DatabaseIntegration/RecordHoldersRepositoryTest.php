@@ -394,7 +394,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
         self::assertArrayHasKey('count', $first);
         self::assertArrayHasKey('years', $first);
         self::assertSame('Metros', $first['team_name']);
-        self::assertSame(2, (int) $first['count']);
+        self::assertSame(2, (int) $first['count']); // @phpstan-ignore cast.useless
         self::assertSame('2097, 2098', $first['years']);
     }
 

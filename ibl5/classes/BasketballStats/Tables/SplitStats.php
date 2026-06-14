@@ -32,7 +32,7 @@ class SplitStats
 
         foreach ($rows as $dbRow) {
             $playerRows[] = [
-                'name' => HtmlSanitizer::e((string) ($dbRow['name'] ?? '')),
+                'name' => (string) ($dbRow['name'] ?? ''),
                 'pos' => (string) ($dbRow['pos'] ?? ''),
                 'pid' => (int) $dbRow['pid'],
                 'games' => (int) $dbRow['games'],

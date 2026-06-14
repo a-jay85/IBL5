@@ -178,6 +178,16 @@ class CapWhatIfServiceTest extends TestCase
         self::assertSame($result['baseline']['spent'], $result['scenario']['spent']);
     }
 
+    public function testSalaryClampedToHardCapMax(): void
+    {
+        // Empty roster isolates the signing; salary above the cap clamps down.
+        $result = $this->buildService([])
+            ->computeScenario('Metros', 1, $this->season(false), null, 1, League::HARD_CAP_MAX + 1000);
+
+        self::assertSame(League::HARD_CAP_MAX, $result['salary']);
+        self::assertSame(League::HARD_CAP_MAX, $result['scenario']['spent']['year1']);
+    }
+
     public function testOverCapFlaggedWhenYearExceedsHardCap(): void
     {
         $overCapRoster = [

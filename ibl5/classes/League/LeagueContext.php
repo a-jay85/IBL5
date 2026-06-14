@@ -155,7 +155,6 @@ class LeagueContext
         // For Olympics, disable certain IBL-only modules
         if ($currentLeague === self::LEAGUE_OLYMPICS) {
             $iblOnlyModules = [
-                'BigBoard',
                 'Draft',
                 'DraftPickLocator',
                 'FreeAgency',

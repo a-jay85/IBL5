@@ -60,7 +60,7 @@ class DevAutoLoginTest extends TestCase
         putenv('DEV_AUTO_LOGIN=SomeOtherUser');
 
         $db = static::createStub(\mysqli::class);
-        DevAutoLogin::tryAutoLogin($db);
+        (new DevAutoLogin())->tryAutoLogin($db);
 
         // Session should remain unchanged — not overwritten with the env var user.
         // Both halves of the contract are asserted: tryAutoLogin() must leave the
@@ -79,7 +79,7 @@ class DevAutoLoginTest extends TestCase
         putenv('DEV_AUTO_LOGIN=A-Jay');
 
         $db = static::createStub(\mysqli::class);
-        DevAutoLogin::tryAutoLogin($db);
+        (new DevAutoLogin())->tryAutoLogin($db);
 
         self::assertArrayNotHasKey('auth_user_id', $_SESSION);
     }
@@ -102,7 +102,7 @@ class DevAutoLoginTest extends TestCase
         putenv('DEV_AUTO_LOGIN');
 
         $db = static::createStub(\mysqli::class);
-        DevAutoLogin::tryAutoLogin($db);
+        (new DevAutoLogin())->tryAutoLogin($db);
 
         self::assertArrayNotHasKey('auth_user_id', $_SESSION);
     }
@@ -113,7 +113,7 @@ class DevAutoLoginTest extends TestCase
         putenv('DEV_AUTO_LOGIN=');
 
         $db = static::createStub(\mysqli::class);
-        DevAutoLogin::tryAutoLogin($db);
+        (new DevAutoLogin())->tryAutoLogin($db);
 
         self::assertArrayNotHasKey('auth_user_id', $_SESSION);
     }
@@ -133,7 +133,7 @@ class DevAutoLoginTest extends TestCase
         $db = static::createStub(\mysqli::class);
         $db->method('prepare')->willReturn($stmt);
 
-        DevAutoLogin::tryAutoLogin($db);
+        (new DevAutoLogin())->tryAutoLogin($db);
 
         self::assertSame(99, $_SESSION['auth_user_id']);
         self::assertSame('TestUser', $_SESSION['auth_username']);
@@ -166,7 +166,7 @@ class DevAutoLoginTest extends TestCase
         $db = static::createStub(\mysqli::class);
         $db->method('prepare')->willReturn($stmt);
 
-        DevAutoLogin::tryAutoLogin($db);
+        (new DevAutoLogin())->tryAutoLogin($db);
 
         self::assertArrayNotHasKey('auth_user_id', $_SESSION);
     }
@@ -179,8 +179,57 @@ class DevAutoLoginTest extends TestCase
         $db = static::createStub(\mysqli::class);
         $db->method('prepare')->willReturn(false);
 
-        DevAutoLogin::tryAutoLogin($db);
+        (new DevAutoLogin())->tryAutoLogin($db);
 
         self::assertArrayNotHasKey('auth_user_id', $_SESSION);
+    }
+
+    public function testInjectedLoggerReceivesActivationLog(): void
+    {
+        $_SERVER['SERVER_NAME'] = 'localhost';
+        putenv('DEV_AUTO_LOGIN=TestUser');
+
+        $result = static::createStub(\mysqli_result::class);
+        $result->method('fetch_assoc')->willReturn(['user_id' => 99]);
+
+        $stmt = static::createStub(\mysqli_stmt::class);
+        $stmt->method('get_result')->willReturn($result);
+
+        $db = static::createStub(\mysqli::class);
+        $db->method('prepare')->willReturn($stmt);
+
+        $spy = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $spy->expects(self::once())
+            ->method('debug')
+            ->with('Dev auto-login activated', ['username' => 'TestUser']);
+
+        (new DevAutoLogin($spy))->tryAutoLogin($db);
+
+        // Seam proof: the injected logger received the activation log in place of
+        // the static getChannel('auth') factory (and the session was still set).
+        self::assertSame(99, $_SESSION['auth_user_id']);
+        self::assertSame('TestUser', $_SESSION['auth_username']);
+    }
+
+    public function testNoArgConstructorFallsBackToAuthChannelAndStillActivates(): void
+    {
+        $_SERVER['SERVER_NAME'] = 'localhost';
+        putenv('DEV_AUTO_LOGIN=TestUser');
+
+        $result = static::createStub(\mysqli_result::class);
+        $result->method('fetch_assoc')->willReturn(['user_id' => 99]);
+
+        $stmt = static::createStub(\mysqli_stmt::class);
+        $stmt->method('get_result')->willReturn($result);
+
+        $db = static::createStub(\mysqli::class);
+        $db->method('prepare')->willReturn($stmt);
+
+        // No logger arg — the ?? getChannel('auth') fallback must fire (the production
+        // AuthBootstrap form) without a TypeError, and the session writes are unchanged.
+        (new DevAutoLogin())->tryAutoLogin($db);
+
+        self::assertSame(99, $_SESSION['auth_user_id']);
+        self::assertSame('TestUser', $_SESSION['auth_username']);
     }
 }

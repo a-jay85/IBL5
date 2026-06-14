@@ -26,7 +26,14 @@ final class DevAutoLogin
 {
     private const ENV_VAR_NAME = 'DEV_AUTO_LOGIN';
 
-    public static function tryAutoLogin(\mysqli $db): void
+    private \Psr\Log\LoggerInterface $logger;
+
+    public function __construct(?\Psr\Log\LoggerInterface $logger = null)
+    {
+        $this->logger = $logger ?? LoggerFactory::getChannel('auth');
+    }
+
+    public function tryAutoLogin(\mysqli $db): void
     {
         // Guard 1: already authenticated — nothing to do
         if (isset($_SESSION['auth_user_id']) && is_int($_SESSION['auth_user_id']) && $_SESSION['auth_user_id'] > 0) {
@@ -35,12 +42,12 @@ final class DevAutoLogin
 
         // Guard 2: only on localhost (exact match or *.localhost subdomains for worktrees)
         $serverName = $_SERVER['SERVER_NAME'] ?? null;
-        if (!is_string($serverName) || !self::isLocalhost($serverName)) {
+        if (!is_string($serverName) || !$this->isLocalhost($serverName)) {
             return;
         }
 
         // Guard 3: DEV_AUTO_LOGIN must be set to a non-empty username
-        $username = self::getAutoLoginUsername();
+        $username = $this->getAutoLoginUsername();
         if ($username === null) {
             return;
         }
@@ -62,7 +69,7 @@ final class DevAutoLogin
         $stmt->close();
 
         if (!is_array($row) || !isset($row['user_id'])) {
-            LoggerFactory::getChannel('auth')->debug('Dev auto-login: user not found', ['username' => $username]);
+            $this->logger->debug('Dev auto-login: user not found', ['username' => $username]);
             return;
         }
 
@@ -74,10 +81,10 @@ final class DevAutoLogin
         $_SESSION['auth_user_id'] = (int) $row['user_id'];
         $_SESSION['auth_username'] = $username;
 
-        LoggerFactory::getChannel('auth')->debug('Dev auto-login activated', ['username' => $username]);
+        $this->logger->debug('Dev auto-login activated', ['username' => $username]);
     }
 
-    private static function getAutoLoginUsername(): ?string
+    private function getAutoLoginUsername(): ?string
     {
         // Check environment variable first (e.g., set in Docker Compose)
         $envValue = getenv(self::ENV_VAR_NAME);
@@ -111,7 +118,7 @@ final class DevAutoLogin
         return null;
     }
 
-    private static function isLocalhost(string $serverName): bool
+    private function isLocalhost(string $serverName): bool
     {
         if ($serverName === 'localhost' || $serverName === '127.0.0.1') {
             return true;

@@ -92,7 +92,7 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
     {
         /** @var list<array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int}> */
         return $this->fetchAll(
-            self::buildPerSeasonStatsQuery(2),
+            $this->buildPerSeasonStatsQuery(2),
             "s",
             $playerName
         );
@@ -120,7 +120,7 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
     {
         /** @var CareerAveragesRow|null */
         return $this->fetchOne(
-            self::buildCareerAveragesQuery(2, 'p.name = ?'),
+            $this->buildCareerAveragesQuery(2, 'p.name = ?'),
             "s",
             $playerName
         );
@@ -134,7 +134,7 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
     {
         /** @var list<array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int}> */
         return $this->fetchAll(
-            self::buildPerSeasonStatsQuery(3),
+            $this->buildPerSeasonStatsQuery(3),
             "s",
             $playerName
         );
@@ -162,7 +162,7 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
     {
         /** @var CareerAveragesRow|null */
         return $this->fetchOne(
-            self::buildCareerAveragesQuery(3, 'p.name = ?'),
+            $this->buildCareerAveragesQuery(3, 'p.name = ?'),
             "s",
             $playerName
         );
@@ -283,7 +283,7 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
      * (game_type 2 and 3). Regular-season averages (game_type=1) use
      * buildHistCareerAveragesQuery() to avoid scanning 489K+ box-score rows.
      */
-    private static function buildCareerAveragesQuery(int $gameType, string $filterClause): string
+    private function buildCareerAveragesQuery(int $gameType, string $filterClause): string
     {
         return "SELECT bs.pid, p.name,
             CAST(COUNT(*) AS SIGNED) AS games,
@@ -314,7 +314,7 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
             p.retired
         FROM `ibl_box_scores` bs
         JOIN `ibl_plr` p ON bs.pid = p.pid
-        WHERE bs.game_type = {$gameType} AND {$filterClause}
+        WHERE bs.game_type = {$gameType} AND " . $this->playedCondition('bs') . " AND {$filterClause}
         GROUP BY bs.pid, p.name, p.retired";
     }
 
@@ -323,7 +323,7 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
      *
      * Replaces SELECT from `ibl_playoff_stats` / ibl_heat_stats views.
      */
-    private static function buildPerSeasonStatsQuery(int $gameType): string
+    private function buildPerSeasonStatsQuery(int $gameType): string
     {
         return "SELECT bs.season_year AS year, MIN(bs.pos) AS pos, bs.pid, p.name,
             fs.team_name AS team,
@@ -347,7 +347,7 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
         JOIN `ibl_plr` p ON bs.pid = p.pid
         JOIN `ibl_franchise_seasons` fs ON bs.teamid = fs.franchise_id
             AND bs.season_year = fs.season_ending_year
-        WHERE bs.game_type = {$gameType} AND p.name = ?
+        WHERE bs.game_type = {$gameType} AND " . $this->playedCondition('bs') . " AND p.name = ?
         GROUP BY bs.pid, p.name, bs.season_year, fs.team_name
         ORDER BY year ASC";
     }

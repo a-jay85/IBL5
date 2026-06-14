@@ -7,10 +7,15 @@ namespace Tests\DatabaseIntegration;
 use PHPUnit\Framework\Attributes\Group;
 
 use FranchiseHistory\FranchiseHistoryRepository;
+use FranchiseHistory\FranchiseHistoryService;
 use League\League;
 
 /**
- * Database integration tests for FranchiseHistoryRepository.
+ * Database integration tests for franchise history assembly over the real DB.
+ *
+ * Exercises the FranchiseHistoryService composed over the real-DB-backed
+ * FranchiseHistoryRepository — the green-green anchor proving the assembly
+ * behavior is byte-identical after the Repository→Service extraction.
  *
  * Tests the VIEW chain: vw_franchise_summary → ibl_team_win_loss → ibl_box_scores_teams,
  * plus vw_playoff_series_results and ibl_heat_win_loss.
@@ -18,12 +23,12 @@ use League\League;
 #[Group('database')]
 class FranchiseHistoryRepositoryTest extends DatabaseTestCase
 {
-    private FranchiseHistoryRepository $repo;
+    private FranchiseHistoryService $repo;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->repo = new FranchiseHistoryRepository($this->db);
+        $this->repo = new FranchiseHistoryService(new FranchiseHistoryRepository($this->db));
     }
 
     public function testReturnsArrayWithExpectedKeys(): void

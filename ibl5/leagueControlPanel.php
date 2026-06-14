@@ -29,6 +29,10 @@ $view       = new LeagueControlPanel\LeagueControlPanelView();
 
 // POST → Processor → PRG redirect
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!\Security\CsrfGuard::validateSubmittedToken('lcp_update_all')) {
+        \Utilities\HtmxHelper::redirect('leagueControlPanel.php?error=' . rawurlencode('Invalid or expired form submission. Please reload and try again.'));
+    }
+
     $action = is_string($_POST['action'] ?? null) ? $_POST['action'] : '';
     $result = $processor->dispatch($action, $_POST);
 

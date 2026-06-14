@@ -33,6 +33,7 @@ class OneOnOneGameView implements OneOnOneGameViewInterface
     public function renderPlayerSelectionForm(array $players, ?int $selectedPlayer1, ?int $selectedPlayer2): string
     {
         $html = '<form name="OneOnOneGame" method="post" action="modules.php?name=OneOnOneGame" class="ibl-filter-form">' . "\n";
+        $html .= \Security\CsrfGuard::generateToken('one_on_one') . "\n";
         $html .= '<div class="ibl-filter-form__row">' . "\n";
 
         $html .= '<div class="ibl-filter-form__group">' . "\n";

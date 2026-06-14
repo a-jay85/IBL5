@@ -71,12 +71,16 @@ function oneonone(): void
         if (!empty($errors)) {
             echo $view->renderErrors($errors);
         } elseif ($player1 !== null && $player2 !== null) {
-            // Run new game
-            try {
-                $result = $service->playGame($player1, $player2, $ownerplaying);
-                echo $view->renderGameResult($result, $result->gameId);
-            } catch (\Exception $e) {
-                echo $view->renderErrors([$e->getMessage()]);
+            if (!\Security\CsrfGuard::validateSubmittedToken('one_on_one')) {
+                echo $view->renderErrors(['Invalid or expired form submission. Please reload and try again.']);
+            } else {
+                // Run new game
+                try {
+                    $result = $service->playGame($player1, $player2, $ownerplaying);
+                    echo $view->renderGameResult($result, $result->gameId);
+                } catch (\Exception $e) {
+                    echo $view->renderErrors([$e->getMessage()]);
+                }
             }
         }
     } else {

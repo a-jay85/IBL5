@@ -246,16 +246,16 @@ window.IBL_initNextSimHighlight();
             <th class="sticky-col">Player</th>
             <th>Pos</th>
             <th>Age</th>
-            <th class="sep-team"></th>
+            <th class="sep-team" aria-label="Separator"></th>
             <th>2ga</th>
             <th>2g%</th>
-            <th class="sep-team"></th>
+            <th class="sep-team" aria-label="Separator"></th>
             <th>fta</th>
             <th>ft%</th>
-            <th class="sep-team"></th>
+            <th class="sep-team" aria-label="Separator"></th>
             <th>3ga</th>
             <th>3g%</th>
-            <th class="sep-team"></th>
+            <th class="sep-team" aria-label="Separator"></th>
             <th>orb</th>
             <th>drb</th>
             <th>ast</th>
@@ -263,20 +263,20 @@ window.IBL_initNextSimHighlight();
             <th>tvr</th>
             <th>blk</th>
             <th>foul</th>
-            <th class="sep-team"></th>
+            <th class="sep-team" aria-label="Separator"></th>
             <th>oo</th>
             <th>do</th>
             <th>po</th>
             <th>to</th>
-            <th class="sep-team"></th>
+            <th class="sep-team" aria-label="Separator"></th>
             <th>od</th>
             <th>dd</th>
             <th>pd</th>
             <th>td</th>
-            <th class="sep-team"></th>
+            <th class="sep-team" aria-label="Separator"></th>
             <th>Clu</th>
             <th>Con</th>
-            <th class="sep-team"></th>
+            <th class="sep-team" aria-label="Separator"></th>
             <th>Days Injured</th>
         </tr>
     </thead>

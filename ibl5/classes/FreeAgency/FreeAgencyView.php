@@ -385,7 +385,7 @@ class FreeAgencyView
         </tr>
         <tr>
             <?php if ($showOptionsColumn): ?>
-            <th></th>
+            <th aria-label="Actions"></th>
             <?php endif; ?>
             <th>Pos</th>
             <th>Player</th>

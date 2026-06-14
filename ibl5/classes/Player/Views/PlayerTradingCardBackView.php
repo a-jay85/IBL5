@@ -113,7 +113,7 @@ class PlayerTradingCardBackView
             . '<h3 class="section-title">Player Highs</h3>'
             . '<table class="highs-table">'
             . '<tr>'
-            . '<th class="highs-header"></th>'
+            . '<th class="highs-header" aria-label="Category"></th>'
             . '<th class="highs-header" colspan="2">Regular Season</th>'
             . '<th class="highs-header" colspan="2">Playoffs</th>'
             . '</tr>'

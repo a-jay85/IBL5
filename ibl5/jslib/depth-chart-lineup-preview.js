@@ -757,7 +757,7 @@
      */
     function renderPreviewDesktopTable(lineup, slotMinutes) {
         var html = '<table class="ibl-data-table dc-lineup-preview-table dc-lineup-preview-table--desktop"><thead><tr>';
-        html += '<th></th>';
+        html += '<th aria-label="Depth tier"></th>';
         for (var h = 0; h < SLOTS.length; h++) {
             html += '<th>' + SLOTS[h].label + '</th>';
         }
@@ -811,7 +811,7 @@
      */
     function renderPreviewMobileTable(lineup, slotMinutes, lastNameFreq) {
         var html = '<table class="ibl-data-table dc-lineup-preview-table dc-lineup-preview-table--mobile"><thead><tr>';
-        html += '<th></th>';
+        html += '<th aria-label="Position"></th>';
         for (var d = 0; d <= BACKUP_ROWS; d++) {
             html += '<th>' + (DEPTH_LABELS[d] || ((d + 1) + 'th')) + '</th>';
         }

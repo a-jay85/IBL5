@@ -215,6 +215,9 @@ export const VR_MANIFEST: VrRow[] = [
       { name: 'empty', appState: { 'Allow Waiver Moves': 'No' } },
     ],
     dataDriven: true },
+  { name: 'gm-dashboard', auth: 'auth', url: 'modules.php?name=GMDashboard',
+    anchor: '.gm-dashboard-grid', viewports: ['desktop', 'mobile'],
+    notes: 'Owner-scoped; CI user resolves to Metros (tid=1). Renders six section cards.' },
 
   // ── Auth-regular modules ────────────────────────────────────
   { name: 'team-non-admin', auth: 'auth-regular', url: 'modules.php?name=Team&op=team&teamid=1',

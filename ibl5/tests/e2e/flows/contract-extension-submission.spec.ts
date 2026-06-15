@@ -289,7 +289,6 @@ isolatedTest.describe('Contract Extension submission: IDOR ownership gate', () =
   isolatedTest('Monarchs session POSTing another team is refused', async ({
     appState,
     page,
-    request,
   }) => {
     await appState({
       'Current Season Phase': 'Regular Season',
@@ -307,7 +306,11 @@ isolatedTest.describe('Contract Extension submission: IDOR ownership gate', () =
       '';
     isolatedExpect(csrf).toMatch(/^[a-f0-9]{64}$/);
 
-    const response = await request.post(EXTENSION_ENDPOINT, {
+    // Use page.request so the POST shares the browser context's cookies — the
+    // auth-isolated `_test_team=Monarchs` override is set on the page context,
+    // not the standalone `request` fixture, and the CSRF token is bound to the
+    // page's server session (PHPSESSID).
+    const response = await page.request.post(EXTENSION_ENDPOINT, {
       form: {
         _csrf_token: csrf,
         teamName: VICTIM_TEAM_NAME,

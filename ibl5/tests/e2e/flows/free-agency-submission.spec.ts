@@ -601,13 +601,10 @@ test.describe('Free Agency -- IDOR: acting team bound to session, not POST', () 
   });
 
   test('D-07: offer submit with tampered teamname is saved under the session team', async ({ page }) => {
-    // Start from a clean slate for pid=11 so a fresh submit is observable.
-    await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
-    const existingDelete = page.getByRole('button', { name: /Delete This Offer/i });
-    if ((await existingDelete.count()) > 0) { // e2e-hygiene-allow: cleanup precondition — offer may or may not exist
-      await existingDelete.click();
-      await page.waitForURL(/result=deleted/);
-    }
+    // Do NOT delete the existing offer first: the negotiate form only renders when
+    // hasExistingOffer=true (Metros is at 0 open roster spots in CI seed). The beforeAll
+    // already reset offers to a known-good state (pid=11 offer present), so we can read
+    // the CSRF token directly from the form without touching the offer first.
 
     // Read a valid CSRF token from the negotiate form (page.request shares the PHPSESSID,
     // so the token is valid for the forged POST).

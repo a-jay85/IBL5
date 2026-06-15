@@ -26,14 +26,17 @@ interface DepthChartEntrySubmissionHandlerInterface
      * Handle complete depth chart form submission.
      *
      * Flow:
-     * 1. Validate `Team_Name` is present.
+     * 1. Derive the authoritative team from the session username (POST `Team_Name`
+     *    is never trusted as the write target — IDOR fix D-09). Reject null/empty/
+     *    Free-Agents session teams with the empty-team failure result.
      * 2. Process raw form data via DepthChartEntryProcessor.
      * 3. Validate against current season phase via DepthChartEntryValidator.
      * 4. On success: save to DB, write CSV file, email confirmation, snapshot.
      * 5. On failure: return errorsHtml and postData for the caller to stash as flash.
      *
      * @param array<string, mixed> $postData Raw POST data from form submission ($_POST).
+     * @param string $sessionUsername Authenticated username; the write target is derived from it.
      * @return array{success: bool, fileOk: bool, errorsHtml: string, postData: array<string, mixed>}
      */
-    public function handleSubmission(array $postData): array;
+    public function handleSubmission(array $postData, string $sessionUsername): array;
 }

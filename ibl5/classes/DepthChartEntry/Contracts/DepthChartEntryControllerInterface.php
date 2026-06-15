@@ -17,9 +17,13 @@ interface DepthChartEntryControllerInterface
      *
      * Calls the submission handler, writes session flash, and redirects via PRG.
      *
+     * The authoritative write target is derived from the session username inside
+     * the handler — POST `Team_Name` is never trusted (IDOR fix D-09).
+     *
      * @param array<string, mixed> $postData Raw POST data from the form.
+     * @param string $sessionUsername Authenticated username; the handler resolves the team from it.
      */
-    public function handleSubmit(array $postData): void;
+    public function handleSubmit(array $postData, string $sessionUsername): void;
 
     /**
      * Display the depth chart entry form for a user's team

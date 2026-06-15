@@ -182,6 +182,32 @@ class ExtensionValidatorTest extends TestCase
     }
 
     /**
+     * Scope guard (D-10 IDOR): the validator must NOT perform an ownership
+     * check. Ownership is enforced at the request boundary (extension.php),
+     * never in domain validation. This pins the validator's current scope so a
+     * future refactor can't quietly move the ownership concern in here and
+     * weaken it — eligibility passes regardless of any team-name context.
+     *
+     * @group validation
+     * @group ownership-scope
+     */
+    public function testValidatorDoesNotPerformOwnershipCheck(): void
+    {
+        // Clean extension flags + arbitrary team-identity context the validator
+        // must ignore (it receives no session identity to compare against).
+        $team = (object) [
+            'hasUsedExtensionThisSeason' => 0,
+            'hasUsedExtensionThisSim' => 0,
+            'teamName' => 'Some Other Team',
+        ];
+
+        $result = $this->extensionValidator->validateExtensionEligibility($team);
+
+        $this->assertTrue($result['valid']);
+        $this->assertNull($result['error']);
+    }
+
+    /**
      * @group validation
      * @group maximum-offer
      */

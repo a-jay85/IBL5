@@ -43,7 +43,7 @@ class DepthChartEntrySubmissionHandlerTest extends TestCase
     {
         $handler = new DepthChartEntrySubmissionHandler($this->mockDb, $this->stubCommonRepo);
 
-        $result = $handler->handleSubmission(['Team_Name' => '']);
+        $result = $handler->handleSubmission(['Team_Name' => ''], 'Monarchs');
 
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('Missing required team information', $result['errorsHtml']);
@@ -56,7 +56,7 @@ class DepthChartEntrySubmissionHandlerTest extends TestCase
         $handler = new DepthChartEntrySubmissionHandler($this->mockDb, $this->stubCommonRepo);
 
         $postData = ['pg1' => '1', 'sg1' => '0'];
-        $result = $handler->handleSubmission($postData);
+        $result = $handler->handleSubmission($postData, 'Monarchs');
 
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('Missing required team information', $result['errorsHtml']);
@@ -69,7 +69,7 @@ class DepthChartEntrySubmissionHandlerTest extends TestCase
         $handler = new DepthChartEntrySubmissionHandler($this->mockDb, $this->stubCommonRepo);
 
         ob_start();
-        $result = $handler->handleSubmission(['Team_Name' => '']);
+        $result = $handler->handleSubmission(['Team_Name' => ''], 'Monarchs');
         $output = (string) ob_get_clean();
 
         $this->assertFalse($result['success']);

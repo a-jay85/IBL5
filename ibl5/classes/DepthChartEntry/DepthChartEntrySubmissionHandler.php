@@ -54,15 +54,27 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
     /**
      * @see DepthChartEntrySubmissionHandlerInterface::handleSubmission()
      * @param array<string, mixed> $postData
+     * @param string $sessionUsername Authenticated username; the write target is derived from it.
      * @return array{success: bool, fileOk: bool, errorsHtml: string, postData: array<string, mixed>}
      */
-    public function handleSubmission(array $postData): array
+    public function handleSubmission(array $postData, string $sessionUsername): array
     {
         $season = $this->season ?? new Season($this->db);
 
-        /** @var string $rawTeamName */
-        $rawTeamName = $postData['Team_Name'] ?? '';
-        $teamName = $this->sanitizeInput($rawTeamName);
+        // Derive the authoritative team from the session, not POST `Team_Name`
+        // (IDOR fix D-09). A logged-in GM cannot replay a valid CSRF token with
+        // another team's name — the write target is always their own team.
+        $sessionTeam = $this->commonRepo->getTeamnameFromUsername($sessionUsername);
+        if ($sessionTeam === null || $sessionTeam === '' || $sessionTeam === \League\League::FREE_AGENTS_TEAM_NAME) {
+            return [
+                'success' => false,
+                'fileOk' => false,
+                'errorsHtml' => '<strong class="ibl-form-error">Error: Missing required team information.</strong>',
+                'postData' => $postData,
+            ];
+        }
+
+        $teamName = $this->sanitizeInput($sessionTeam);
 
         if ($teamName === '') {
             return [

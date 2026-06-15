@@ -51,10 +51,10 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
      * @see DepthChartEntryControllerInterface::handleSubmit()
      * @param array<string, mixed> $postData
      */
-    public function handleSubmit(array $postData): void
+    public function handleSubmit(array $postData, string $sessionUsername): void
     {
         $handler = new DepthChartEntrySubmissionHandler($this->db, $this->commonRepository);
-        $result = $handler->handleSubmission($postData);
+        $result = $handler->handleSubmission($postData, $sessionUsername);
 
         if ($result['success']) {
             if ($result['fileOk']) {

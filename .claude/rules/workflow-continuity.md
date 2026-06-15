@@ -1,9 +1,15 @@
 ---
-description: Worktree setup and the implementation→/post-plan handoff (auto-fired in a detached fresh session) for multi-step work.
-last_verified: 2026-06-11
+description: All work happens in a worktree (never the main checkout); worktree setup and the implementation→/post-plan handoff (auto-fired in a detached fresh session) for multi-step work.
+last_verified: 2026-06-13
 ---
 
 # Workflow Continuity Rule
+
+## All work happens in a worktree
+
+**Never edit the main checkout (`/Users/ajaynicolas/GitHub/IBL5`, branch `master`) directly** — not code, not migrations, not docs, not `.claude/rules`, not config, not ADRs. No size or category exception (ADR-0062). The main checkout is reference/read-only: it holds canonical `master`, is the base for `bin/wt-new`, and runs main-stack Docker/DB tooling.
+
+The only files exempt are those that physically live **outside** the repo tree and cannot go in a worktree: the Claude hooks (`~/.claude/hooks/`), per-project memory (`~/.claude/projects/.../memory/`), and `~/.claude/settings*.json`. Edit those in place as usual.
 
 ## Planning
 
@@ -11,13 +17,13 @@ Use `/plan <task description>` for implementation planning.
 
 ## Worktree Setup
 
-Before implementation, create a worktree unless one already exists for this task:
+Before touching any repo file, make sure you are in a worktree. Create one unless it already exists for this task:
 
 ```bash
 bin/wt-new <slug>   # slug = kebab-case branch name derived from the plan
 ```
 
-Use `--base <branch>` for stacked PRs. Work in `IBL5-worktrees/<slug>/ibl5/` (worktrees live outside the repo — ADR-0046). Skip if already inside a worktree or the plan specifies an existing one.
+Use `--base <branch>` for stacked PRs. Work in `IBL5-worktrees/<slug>/ibl5/` (worktrees live outside the repo — ADR-0046). The only reason to skip creation is that the worktree for this task already exists (or the plan names an existing one) — never because "this edit is small enough to do on master."
 
 ## Post-Plan
 

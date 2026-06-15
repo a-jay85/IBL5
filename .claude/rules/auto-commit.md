@@ -1,11 +1,15 @@
 ---
-description: Commit after a unit of work (Stop hook reminds you); amend when fixing unpushed work
-last_verified: 2026-06-04
+description: Commit/PR work from the worktree; the Stop hook warns if the main checkout is dirty (work landed in the wrong place); amend when fixing unpushed work
+last_verified: 2026-06-13
 ---
 
 # Auto-Commit
 
-The `$HOME/.claude/hooks/auto-commit-reminder.sh` Stop hook delivers the "commit when done" reminder at runtime: it fires at turn-end when the main checkout has uncommitted changes and no plan workflow is active, and stays silent in worktrees and during `/post-plan` (those hand off / commit internally). When reminded — or whenever a prompt finishes a unit of work (impl, fix, refactor, config, docs) — invoke `/commit-commands:commit`. Skip it when mid-task or when the user is only exploring.
+All work happens in a worktree, never the main checkout (ADR-0062, `workflow-continuity.md`). Worktree work is committed by `/post-plan` (auto-fired) or `/commit-commands:commit-push-pr` — not by this hook.
+
+The `$HOME/.claude/hooks/auto-commit-reminder.sh` Stop hook is now a **misplaced-work warning**, not a commit reminder: it fires at turn-end when the **main checkout** has uncommitted changes (and no plan workflow is active), telling you the work landed in the wrong place and to move it into a worktree (`bin/wt-new`). It stays silent in worktrees and during `/post-plan`. It is a warning, not a hard block — heed it unless you have a deliberate reason to be touching the main checkout.
+
+When you finish a unit of work in a worktree (impl, fix, refactor, config, docs) and are not using the `/post-plan` auto-fire handoff, invoke `/commit-commands:commit` (or `commit-push-pr`). Skip it when mid-task or when the user is only exploring.
 
 ## Amend vs new commit
 

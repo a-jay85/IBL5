@@ -1,4 +1,6 @@
 import { test, expect } from '../fixtures/auth';
+import { test as isolatedTest, expect as isolatedExpect } from '../fixtures/auth-isolated';
+import { test as publicTest, expect as publicExpect } from '../fixtures/public';
 import { resetExtension } from '../helpers/cleanup';
 import { submitFormAndAssertEffect } from '../helpers/submit-form';
 
@@ -189,12 +191,14 @@ test.describe('Contract Extension submission: bad CSRF', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Block 3 — bogus teamName: CommonMysqliRepository returns null →
-// HtmxHelper::redirect('/ibl5/index.php')
+// Block 3 — bogus teamName: with the D-10 ownership gate, a POST whose teamName
+// differs from the session team is refused at the ownership check (which runs
+// before the team-not-found lookup), so the redirect now carries the distinct
+// extension_forbidden signal rather than the bare /ibl5/index.php bounce.
 // ---------------------------------------------------------------------------
 
 test.describe('Contract Extension submission: bogus teamName', () => {
-  test('POST with unknown teamName redirects to /ibl5/index.php', async ({
+  test('POST with a non-owned teamName is refused with extension_forbidden', async ({
     appState,
     page,
     request,
@@ -216,7 +220,9 @@ test.describe('Contract Extension submission: bogus teamName', () => {
     });
 
     expect([301, 302, 303]).toContain(response.status());
-    expect(response.headers()['location']).toBe('/ibl5/index.php');
+    expect(response.headers()['location']).toBe(
+      '/ibl5/index.php?result=extension_forbidden',
+    );
   });
 });
 
@@ -257,6 +263,101 @@ test.describe('Contract Extension submission: zero offer', () => {
     const location = response.headers()['location'] ?? '';
     expect(location).toContain('result=extension_error');
     expect(location).toMatch(/[?&]msg=[^&]+/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Block 5 — D-10 IDOR ownership gate (deterministic in CI).
+//
+// Uses the auth-isolated fixture so the session team is Monarchs (tid=8) via the
+// `_test_team` cookie, independent of the un-seeded `gm_username`. A Monarchs
+// bench player (pid=111) is made extension-eligible in ci-seed.sql so its
+// ExtensionOffer form renders and we can mint a valid `extension` CSRF token.
+// We then replay that token against a real victim team the session does NOT own
+// (Stars, tid=2). The ownership check runs BEFORE processExtension(), so no
+// victim contract or extension flag is ever touched — the distinct
+// `extension_forbidden` signal proves the ownership gate fired (not the generic
+// not-found bounce). The negative "no victim write" is pinned at unit level in
+// DepthChartEntrySubmissionHandlerOwnershipTest / ExtensionRepository tests.
+// ---------------------------------------------------------------------------
+
+const MONARCHS_ELIGIBLE_PID = 111; // 'DC Utility B' (tid=8) — expiring deal in ci-seed
+const VICTIM_TEAM_NAME = 'Stars'; // tid=2 — a real team the Monarchs session does not own
+const VICTIM_PID = 4; // 'Stars Guard' (ci-seed.sql)
+
+isolatedTest.describe('Contract Extension submission: IDOR ownership gate', () => {
+  isolatedTest('Monarchs session POSTing another team is refused', async ({
+    appState,
+    page,
+    request,
+  }) => {
+    await appState({
+      'Current Season Phase': 'Regular Season',
+      'Current Season Ending Year': '2026',
+    });
+    await page.goto(`modules.php?name=Player&pa=negotiate&pid=${MONARCHS_ELIGIBLE_PID}`);
+
+    const form = page.locator('form[name="ExtensionOffer"]');
+    await isolatedExpect(
+      form,
+      'Monarchs eligible player (pid=111) must render the extension form so we can mint a valid token',
+    ).toBeVisible({ timeout: 15000 });
+    const csrf =
+      (await form.locator('input[name="_csrf_token"]').getAttribute('value')) ??
+      '';
+    isolatedExpect(csrf).toMatch(/^[a-f0-9]{64}$/);
+
+    const response = await request.post(EXTENSION_ENDPOINT, {
+      form: {
+        _csrf_token: csrf,
+        teamName: VICTIM_TEAM_NAME,
+        playerID: String(VICTIM_PID),
+        playerName: 'Stars Guard',
+        demandsYears: '3',
+        demandsTotal: '3000',
+        maxyr1: '1000',
+        offerYear1: '1000',
+        offerYear2: '1000',
+        offerYear3: '1000',
+        offerYear4: '0',
+        offerYear5: '0',
+      },
+      maxRedirects: 0,
+    });
+
+    isolatedExpect([301, 302, 303]).toContain(response.status());
+    isolatedExpect(response.headers()['location']).toBe(
+      '/ibl5/index.php?result=extension_forbidden',
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Block 6 — D-10 unauthenticated POST is refused.
+//
+// The `public` fixture sets `_no_auto_login` so DevAutoLogin does not promote
+// the request to an admin session. With no valid `extension` token in a public
+// session the CSRF gate bounces to /ibl5/index.php (the auth gate would too) —
+// either way the request never reaches processExtension(), so no contract or
+// flag is written.
+// ---------------------------------------------------------------------------
+
+publicTest.describe('Contract Extension submission: unauthenticated', () => {
+  publicTest('unauthenticated POST to extension.php is refused', async ({
+    request,
+  }) => {
+    const response = await request.post(EXTENSION_ENDPOINT, {
+      form: {
+        teamName: VICTIM_TEAM_NAME,
+        playerID: String(VICTIM_PID),
+        playerName: 'Stars Guard',
+        offerYear1: '1000',
+      },
+      maxRedirects: 0,
+    });
+
+    publicExpect([301, 302, 303]).toContain(response.status());
+    publicExpect(response.headers()['location']).toBe('/ibl5/index.php');
   });
 });
 

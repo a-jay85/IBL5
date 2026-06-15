@@ -1,13 +1,13 @@
 ---
 description: How to derive the correct Docker hostname for the current worktree or main repo. Prevents using stale slugs.
-last_verified: 2026-06-04
+last_verified: 2026-06-13
 ---
 
 # Worktree Hostname
 
 ## Main repo
 
-When working in the main checkout (`/Users/ajaynicolas/GitHub/IBL5/ibl5/`), the Docker hostname is `main.localhost`.
+The main checkout (`/Users/ajaynicolas/GitHub/IBL5/ibl5/`) is reference/read-only — you do not edit files there (ADR-0062); all work happens in a worktree. Its Docker hostname is `main.localhost`, used for reading/serving the canonical `master` stack and main-stack DB tooling, not for developing a change.
 
 ## Worktrees
 

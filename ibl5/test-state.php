@@ -607,20 +607,6 @@ if ($method === 'DELETE' && $action === 'reset-waiver-player') {
     exit;
 }
 
-// DELETE ?action=reset-trade-block — undo the trade-block toggle tests. Deletes
-// every gm_trade_block row whose pid belongs to a Metros (teamid=1) player and
-// clears Metros' seeking note. Scoped to teamid=1 so the seeded cross-team
-// fixture (Cougars pid=23 / teamid=3 seeking note) survives for the browse spec.
-if ($method === 'DELETE' && $action === 'reset-trade-block') {
-    $db->query("DELETE b FROM gm_trade_block b JOIN ibl_plr p ON b.pid = p.pid WHERE p.teamid = 1");
-    $blockDeleted = $db->affected_rows;
-    $db->query("DELETE FROM gm_trade_seeking WHERE teamid = 1");
-    $seekingDeleted = $db->affected_rows;
-    echo json_encode(['block_deleted' => $blockDeleted, 'seeking_deleted' => $seekingDeleted]);
-    $db->close();
-    exit;
-}
-
 // DELETE ?action=reset-rookie-option&pid=N — restore the rookie-option player's
 // contract after a successful option exercise. RookieOptionRepository writes
 // salary_yr4 (round 1) for this round-1 fixture; restore salary_yr3=500 (final

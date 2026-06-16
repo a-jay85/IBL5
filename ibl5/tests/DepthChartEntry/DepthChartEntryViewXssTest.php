@@ -66,21 +66,4 @@ final class DepthChartEntryViewXssTest extends TestCase
         $this->assertStringContainsString($escaped, $html);
         $this->assertStringNotContainsString($xss, $html);
     }
-
-    public function testHealthCheckPanelWarningMessageIsEscaped(): void
-    {
-        $xss = '<script>alert(1)</script>';
-        $escaped = '&lt;script&gt;';
-
-        $warnings = [
-            ['type' => 'injured_starter', 'message' => $xss],
-        ];
-
-        ob_start();
-        $this->view->renderHealthCheckPanel($warnings);
-        $html = (string) ob_get_clean();
-
-        $this->assertStringNotContainsString($xss, $html);
-        $this->assertStringContainsString($escaped, $html);
-    }
 }

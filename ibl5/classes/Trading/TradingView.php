@@ -248,7 +248,6 @@ $tradeConfig = [
     // single-use and each action PRG-reloads to mint a fresh pair.
     $acceptToken = \Security\CsrfGuard::generateRawToken('trade_accept');
     $rejectToken = \Security\CsrfGuard::generateRawToken('trade_reject');
-    $counterToken = \Security\CsrfGuard::generateRawToken('trade_counter');
 ?>
     <?php foreach ($tradeOffers as $offerId => $offer):
         $preview = $offer['previewData'];
@@ -270,7 +269,7 @@ $tradeConfig = [
             'userTeamId' => $userTeamId,
         ];
     ?>
-        <?= HtmlSanitizer::trusted($this->renderTradeOfferCard((int) $offerId, $offer, $userTeam, $userTeamId, $acceptToken, $rejectToken, $counterToken)) ?>
+        <?= HtmlSanitizer::trusted($this->renderTradeOfferCard((int) $offerId, $offer, $userTeam, $userTeamId, $acceptToken, $rejectToken)) ?>
     <?php endforeach; ?>
 <?php endif; ?>
     </div>
@@ -511,9 +510,8 @@ $tradeConfig = [
      * @param array{from: string, to: string, approval: string, oppositeTeam: string, hasHammer: bool, items: list<array{type: string, description: string, notes: string|null, from: string, to: string}>, previewData: array{fromPids: list<int>, toPids: list<int>, fromTeamId: int, toTeamId: int, fromColor1: string, toColor1: string, fromCash: array<int, int>, toCash: array<int, int>, cashStartYear: int, cashEndYear: int, seasonEndingYear: int}} $offer
      * @param string $acceptToken Shared per-render CSRF token for the accept form (see renderReview)
      * @param string $rejectToken Shared per-render CSRF token for the reject form (see renderReview)
-     * @param string $counterToken Shared per-render CSRF token for the counter form (see renderReview)
      */
-    private function renderTradeOfferCard(int $offerId, array $offer, string $userTeam, int $userTeamId, string $acceptToken, string $rejectToken, string $counterToken): string
+    private function renderTradeOfferCard(int $offerId, array $offer, string $userTeam, int $userTeamId, string $acceptToken, string $rejectToken): string
     {
         $oppositeTeam = HtmlSanitizer::safeHtmlOutput($offer['oppositeTeam']);
 
@@ -539,11 +537,6 @@ $tradeConfig = [
             <input type="hidden" name="teamRejecting" value="<?= HtmlSanitizer::trusted($userTeam) ?>">
             <input type="hidden" name="teamReceiving" value="<?= HtmlSanitizer::trusted($oppositeTeam) ?>">
             <button type="submit" class="ibl-btn ibl-btn--danger">Reject</button>
-        </form>
-        <form name="tradecounter" method="post" action="/ibl5/modules/Trading/countertradeoffer.php" class="trade-offer-card__form">
-            <input type="hidden" name="_csrf_token" value="<?= HtmlSanitizer::e($counterToken) ?>">
-            <input type="hidden" name="offer" value="<?= HtmlSanitizer::e($offerId) ?>">
-            <button type="submit" class="ibl-btn ibl-btn--neutral">Counter</button>
         </form>
     </div>
     <div class="trade-offer-items">

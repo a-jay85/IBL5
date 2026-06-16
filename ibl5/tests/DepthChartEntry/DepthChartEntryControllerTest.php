@@ -44,8 +44,8 @@ class DepthChartEntryControllerTest extends TestCase
 
     public function testMultipleControllersCanBeInstantiated(): void
     {
-        $controller1 = new DepthChartEntryController($this->mockDb, $this->stubCommonRepo, self::createStub(\League\LeagueContext::class), self::createStub(\Repositories\Contracts\SalaryCapRepositoryInterface::class));
-        $controller2 = new DepthChartEntryController($this->mockDb, $this->stubCommonRepo, self::createStub(\League\LeagueContext::class), self::createStub(\Repositories\Contracts\SalaryCapRepositoryInterface::class));
+        $controller1 = new DepthChartEntryController($this->mockDb, $this->stubCommonRepo, self::createStub(\League\LeagueContext::class));
+        $controller2 = new DepthChartEntryController($this->mockDb, $this->stubCommonRepo, self::createStub(\League\LeagueContext::class));
 
         $this->assertNotSame($controller1, $controller2);
     }

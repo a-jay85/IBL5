@@ -26,14 +26,4 @@ interface TradingControllerInterface
      * @param array<string, mixed> $post
      */
     public function rejectTradeOffer(array $post): void;
-
-    /**
-     * Counter an incoming trade offer: auto-reject the original and PRG-redirect
-     * to the make-offer form pre-filled with the same assets, authored by the
-     * recipient. Takes the authenticated $user (not a form field) because the
-     * IDOR check must trust the session identity.
-     *
-     * @param array<string, mixed> $post
-     */
-    public function counterTradeOffer(mixed $user, array $post): void;
 }

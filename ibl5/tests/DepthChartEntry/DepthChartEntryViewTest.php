@@ -670,35 +670,4 @@ class DepthChartEntryViewTest extends TestCase
         $this->assertNotEmpty($matches);
         $this->assertMatchesRegularExpression('/value="5" SELECTED[^>]*>ok<\/option>/', $matches[1]);
     }
-
-    // =====================================================================
-    // renderHealthCheckPanel tests
-    // =====================================================================
-
-    public function testRenderHealthCheckPanelWithWarningsContainsWarnClass(): void
-    {
-        $warnings = [
-            ['type' => 'injured_starter', 'message' => 'Your PG starter is injured'],
-        ];
-
-        ob_start();
-        $this->view->renderHealthCheckPanel($warnings);
-        $output = (string) ob_get_clean();
-
-        $this->assertStringContainsString('id="dc-health-check"', $output);
-        $this->assertStringContainsString('dc-health-check--warn', $output);
-        $this->assertStringContainsString('Your PG starter is injured', $output);
-        $this->assertStringContainsString('data-warning-type="injured_starter"', $output);
-    }
-
-    public function testRenderHealthCheckPanelWithEmptyWarningsContainsOkClass(): void
-    {
-        ob_start();
-        $this->view->renderHealthCheckPanel([]);
-        $output = (string) ob_get_clean();
-
-        $this->assertStringContainsString('id="dc-health-check"', $output);
-        $this->assertStringContainsString('dc-health-check--ok', $output);
-        $this->assertStringContainsString('Lineup looks healthy', $output);
-    }
 }

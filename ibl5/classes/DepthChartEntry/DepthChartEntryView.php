@@ -11,7 +11,6 @@ use Security\HtmlSanitizer;
 
 /**
  * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
- * @phpstan-import-type LineupWarning from \DepthChartEntry\Contracts\LineupHealthAnalyzerInterface
  *
  * @see DepthChartEntryViewInterface
  */
@@ -416,27 +415,5 @@ JAVASCRIPT;
         echo '</div>'; // end settings grid
         echo '</div>'; // end body
         echo '</div>'; // end card
-    }
-
-    /**
-     * @see DepthChartEntryViewInterface::renderHealthCheckPanel()
-     * @param list<LineupWarning> $warnings
-     */
-    public function renderHealthCheckPanel(array $warnings): void
-    {
-        if ($warnings === []) {
-            echo '<div id="dc-health-check" class="dc-health-check dc-health-check--ok">';
-            echo '<div class="ibl-alert ibl-alert--success">Lineup looks healthy</div>';
-            echo '</div>';
-            return;
-        }
-
-        echo '<div id="dc-health-check" class="dc-health-check dc-health-check--warn">';
-        echo '<ul class="dc-health-check__warnings">';
-        foreach ($warnings as $warning) {
-            echo '<li data-warning-type="' . HtmlSanitizer::e($warning['type']) . '">' . HtmlSanitizer::e($warning['message']) . '</li>';
-        }
-        echo '</ul>';
-        echo '</div>';
     }
 }

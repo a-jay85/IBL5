@@ -1,4 +1,4 @@
--- Migration 149: Create gm_notification_prefs (preferences storage only).
+-- Migration 151: Create gm_notification_prefs (preferences storage only).
 -- One row per GM account, keyed by auth_users.id (INT UNSIGNED — see migration 101).
 -- Read by a future digest sender (separate PR); this migration only stores prefs.
 CREATE TABLE IF NOT EXISTS `gm_notification_prefs` (

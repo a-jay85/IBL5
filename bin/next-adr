@@ -31,6 +31,14 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CANONICAL_ROOT=$(resolve_canonical_root "$REPO_ROOT")
 CANONICAL_DIR="$CANONICAL_ROOT/ibl5/docs/decisions"
 
+if is_main_checkout "$REPO_ROOT"; then
+    echo "Error: refusing to run from the main checkout — bin/next-adr cp's the" >&2
+    echo "       template into THIS repo root before any content is written, which" >&2
+    echo "       strands an empty ADR on master. Create a worktree first:" >&2
+    echo "         bin/wt-new <slug>" >&2
+    exit 1
+fi
+
 get_max() {
     local dir="$1"
     if [ ! -d "$dir" ]; then

@@ -20,6 +20,18 @@ resolve_canonical_root() {
     echo "$repo_root"
 }
 
+# Return 0 if <repo_root> IS the main checkout (its canonical root resolves to
+# itself), 1 if it is a linked worktree. Pure path logic — no `git`, no exit —
+# so callers compose it in an `if` and own their own refusal message. Mirrors the
+# discriminator in resolve_canonical_root: main checkout's .git is a directory,
+# so canonical == passed-in root; a worktree's .git is a file resolving elsewhere.
+is_main_checkout() {
+    local repo_root="$1"
+    local canonical
+    canonical=$(resolve_canonical_root "$repo_root")
+    [ "$repo_root" = "$canonical" ]
+}
+
 # Print <path> with each component's true on-disk case.
 # macOS APFS is case-insensitive: launching from ~/github vs ~/GitHub yields the
 # same files but different path strings, which splits worktree registration and

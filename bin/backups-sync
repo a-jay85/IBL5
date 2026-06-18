@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+# Sync the JSB backup archives between local and production via rsync over SSH.
+#
+# The backups directory (ibl5/backups, ~55 GB of season *.zip files) is the
+# source of truth for JSB sim files and is git-ignored — far too large to track
+# in git. rsync is the right tool: incremental (only changed/new files move),
+# resumable (--partial), and it runs over the same SSH path the other prod
+# tooling uses (PROD_SSH_HOST in .env).
+#
+# Compression (-z) is intentionally OMITTED: the payload is already-compressed
+# *.zip archives, so on-the-wire compression only burns CPU for no gain.
+#
+# Usage:
+#   bin/backups-sync                       # PULL prod -> local (default)
+#   bin/backups-sync --push                # PUSH local -> prod
+#   bin/backups-sync --dry-run             # show what would transfer, move nothing
+#   bin/backups-sync --delete              # mirror: delete dest files absent on source
+#   bin/backups-sync --ssh-host USER@HOST --ssh-port 22 --ssh-key ~/.ssh/id  # CI mode
+#
+# --delete is OFF by default: on a backups archive an accidental mirror could
+# wipe local history. Opt in only when you truly want dest to match source.
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+LOCAL_DIR="${REPO_ROOT}/ibl5/backups"
+REMOTE_DIR="www/ibl5/backups"
+
+DIRECTION="pull"
+DRY_RUN=false
+DELETE=false
+SSH_HOST=""
+SSH_PORT=""
+SSH_KEY=""
+# The prod box (shared cPanel, no root) has no system rsync; bin/backups-sync-setup
+# installs a static one into the remote ~/bin. Pass it explicitly via --rsync-path
+# (relative to the remote home dir) so we don't depend on the remote login PATH.
+REMOTE_RSYNC="bin/rsync"
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --push) DIRECTION="push"; shift ;;
+    --pull) DIRECTION="pull"; shift ;;
+    --dry-run) DRY_RUN=true; shift ;;
+    --delete) DELETE=true; shift ;;
+    --ssh-host) SSH_HOST="$2"; shift 2 ;;
+    --ssh-port) SSH_PORT="$2"; shift 2 ;;
+    --ssh-key) SSH_KEY="$2"; shift 2 ;;
+    --remote-rsync) REMOTE_RSYNC="$2"; shift 2 ;;
+    -h|--help)
+      sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'
+      exit 0 ;;
+    *) echo "Unknown option: $1" >&2; exit 1 ;;
+  esac
+done
+
+# Fall back to .env for local use (mirrors bin/log-fetch-prod).
+if [ -z "$SSH_HOST" ]; then
+  # Try repo root first, then git common dir (worktrees resolve to main repo).
+  ENV_FILE="${REPO_ROOT}/.env"
+  if [ ! -f "$ENV_FILE" ]; then
+    GIT_ROOT="$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null | sed 's|/\.git$||')" || true
+    if [ -n "$GIT_ROOT" ] && [ -f "$GIT_ROOT/.env" ]; then
+      ENV_FILE="$GIT_ROOT/.env"
+    else
+      echo "FAILED: No --ssh-host and no .env found." >&2
+      exit 1
+    fi
+  fi
+  # shellcheck source=/dev/null
+  source "$ENV_FILE"
+  SSH_HOST="${PROD_SSH_HOST:-}"
+fi
+
+if [ -z "$SSH_HOST" ]; then
+  echo "FAILED: SSH host unset (pass --ssh-host or set PROD_SSH_HOST in .env)." >&2
+  exit 1
+fi
+
+# Build the ssh transport for rsync (-e), honoring optional port/key.
+SSH_CMD="ssh"
+if [ -n "$SSH_PORT" ]; then
+  SSH_CMD="$SSH_CMD -p $SSH_PORT"
+fi
+if [ -n "$SSH_KEY" ]; then
+  SSH_CMD="$SSH_CMD -i $SSH_KEY"
+fi
+
+# Assemble rsync flags. Trailing slashes on both endpoints sync directory
+# *contents*, not the directory itself. Stick to flags supported by both
+# stock macOS rsync (openrsync) and GNU rsync: --info=progress2 is GNU-only.
+RSYNC_FLAGS=(-a --partial --progress)
+[ -n "$REMOTE_RSYNC" ] && RSYNC_FLAGS+=(--rsync-path="$REMOTE_RSYNC")
+$DRY_RUN && RSYNC_FLAGS+=(--dry-run)
+$DELETE && RSYNC_FLAGS+=(--delete)
+
+REMOTE_SPEC="${SSH_HOST}:${REMOTE_DIR}/"
+LOCAL_SPEC="${LOCAL_DIR}/"
+
+if [ "$DIRECTION" = "pull" ]; then
+  SRC="$REMOTE_SPEC"
+  DST="$LOCAL_SPEC"
+  mkdir -p "$LOCAL_DIR"
+else
+  SRC="$LOCAL_SPEC"
+  DST="$REMOTE_SPEC"
+  if [ ! -d "$LOCAL_DIR" ]; then
+    echo "FAILED: Local backups dir not found: $LOCAL_DIR" >&2
+    exit 1
+  fi
+fi
+
+LABEL=""
+$DRY_RUN && LABEL="$LABEL [dry-run]"
+$DELETE && LABEL="$LABEL [--delete]"
+echo "Syncing ($DIRECTION)${LABEL}:"
+echo "  from: $SRC"
+echo "    to: $DST"
+echo ""
+
+rsync "${RSYNC_FLAGS[@]}" -e "$SSH_CMD" "$SRC" "$DST"

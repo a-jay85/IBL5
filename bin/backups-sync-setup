@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+# One-time setup for bin/backups-sync: install a static rsync on production.
+#
+# The prod server is shared cPanel hosting with no root, and ships no rsync.
+# bin/backups-sync needs rsync on BOTH ends. This script builds a fully-static
+# x86_64 rsync from source in an Alpine container (reproducible, no trusting a
+# random prebuilt binary) and uploads it to the remote ~/bin/rsync, which the
+# remote PATH already resolves first. It is a single userland file in the home
+# dir — no root, fully reversible (just delete ~/bin/rsync).
+#
+# Idempotent: re-running rebuilds and re-uploads. Safe to run again after a
+# server rebuild that wipes ~/bin.
+#
+# Usage:
+#   bin/backups-sync-setup                 # build + upload (host from .env PROD_SSH_HOST)
+#   bin/backups-sync-setup --ssh-host USER@HOST [--ssh-port N] [--ssh-key PATH]
+#   bin/backups-sync-setup --build-only    # build the binary to /tmp, don't upload
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+RSYNC_VERSION="3.3.0"
+REMOTE_BIN="bin/rsync"   # relative to remote home dir
+BUILD_ONLY=false
+SSH_HOST=""
+SSH_PORT=""
+SSH_KEY=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --build-only) BUILD_ONLY=true; shift ;;
+    --ssh-host) SSH_HOST="$2"; shift 2 ;;
+    --ssh-port) SSH_PORT="$2"; shift 2 ;;
+    --ssh-key) SSH_KEY="$2"; shift 2 ;;
+    -h|--help) sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "Unknown option: $1" >&2; exit 1 ;;
+  esac
+done
+
+command -v docker >/dev/null || { echo "FAILED: docker is required to build the static rsync." >&2; exit 1; }
+
+OUT_DIR="$(mktemp -d)"
+echo "Building static rsync ${RSYNC_VERSION} (linux/amd64) in Alpine..."
+docker run --rm --platform linux/amd64 -v "${OUT_DIR}:/out" alpine:3.20 sh -c "
+  set -e
+  apk add --no-cache build-base wget popt-dev zlib-dev linux-headers >/dev/null 2>&1
+  cd /tmp
+  wget -q https://download.samba.org/pub/rsync/src/rsync-${RSYNC_VERSION}.tar.gz
+  tar xf rsync-${RSYNC_VERSION}.tar.gz
+  cd rsync-${RSYNC_VERSION}
+  CFLAGS='-static -Os' ./configure --quiet \
+    --disable-openssl --disable-xxhash --disable-zstd --disable-lz4 \
+    --disable-md2man --with-included-popt --with-included-zlib >/dev/null
+  make -j4 >/dev/null 2>&1
+  strip rsync
+  cp rsync /out/rsync-static
+"
+
+BIN="${OUT_DIR}/rsync-static"
+file "$BIN" | grep -q 'x86-64' || { echo "FAILED: built binary is not x86-64." >&2; exit 1; }
+file "$BIN" | grep -q 'statically linked' || { echo "FAILED: built binary is not static." >&2; exit 1; }
+echo "Built: $(du -h "$BIN" | cut -f1) static x86-64 rsync."
+
+if $BUILD_ONLY; then
+  echo "Binary at: $BIN (--build-only, not uploaded)."
+  exit 0
+fi
+
+# Resolve SSH host from .env when not passed explicitly (mirrors bin/log-fetch-prod).
+if [ -z "$SSH_HOST" ]; then
+  ENV_FILE="${REPO_ROOT}/.env"
+  if [ ! -f "$ENV_FILE" ]; then
+    GIT_ROOT="$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null | sed 's|/\.git$||')" || true
+    [ -n "${GIT_ROOT:-}" ] && [ -f "$GIT_ROOT/.env" ] && ENV_FILE="$GIT_ROOT/.env"
+  fi
+  if [ -f "$ENV_FILE" ]; then
+    # shellcheck source=/dev/null
+    source "$ENV_FILE"
+    SSH_HOST="${PROD_SSH_HOST:-}"
+  fi
+fi
+[ -n "$SSH_HOST" ] || { echo "FAILED: no SSH host (pass --ssh-host or set PROD_SSH_HOST in .env)." >&2; exit 1; }
+
+SSH_OPTS=()
+[ -n "$SSH_PORT" ] && SSH_OPTS+=(-P "$SSH_PORT")   # scp uses -P for port
+[ -n "$SSH_KEY" ] && SSH_OPTS+=(-i "$SSH_KEY")
+SSH_RUN=(ssh)
+[ -n "$SSH_PORT" ] && SSH_RUN+=(-p "$SSH_PORT")    # ssh uses -p for port
+[ -n "$SSH_KEY" ] && SSH_RUN+=(-i "$SSH_KEY")
+
+echo "Uploading to ${SSH_HOST}:${REMOTE_BIN} ..."
+"${SSH_RUN[@]}" "$SSH_HOST" "mkdir -p \$(dirname \"$REMOTE_BIN\")"
+scp -q "${SSH_OPTS[@]}" "$BIN" "${SSH_HOST}:${REMOTE_BIN}"
+"${SSH_RUN[@]}" "$SSH_HOST" "chmod +x \"$REMOTE_BIN\"; \"\$HOME/$REMOTE_BIN\" --version | head -1"
+
+echo "Done. bin/backups-sync can now sync via the remote static rsync."

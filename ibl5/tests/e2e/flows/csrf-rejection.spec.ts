@@ -25,20 +25,39 @@ function forgedToken(): string {
   return randomBytes(32).toString('hex');
 }
 
-/** Fetch a fresh, valid `_csrf_token` from a GET-rendered form on `path`. */
+/**
+ * Fetch a fresh, valid `_csrf_token` from a GET-rendered form on `path`.
+ *
+ * A page can render several CSRF tokens (each gate has its own per-action
+ * token — e.g. the admin DebugMenu toggle in the page chrome). Pass `formName`
+ * to scope extraction to a specific `<form name="...">`; the token for that
+ * form is the first `_csrf_token` after the form's opening tag. Without it the
+ * first token on the page is returned, which on a module page is the chrome's
+ * token, not the module form's.
+ */
 async function fetchToken(
   request: APIRequestContext,
   path: string,
+  formName?: string,
 ): Promise<string> {
   const resp = await request.get(path);
   if (!resp.ok()) {
     throw new Error(`token fetch GET ${path} failed: ${resp.status()}`);
   }
-  const match = (await resp.text()).match(
-    /name="_csrf_token" value="([0-9a-f]+)"/,
-  );
+  let body = await resp.text();
+  if (formName !== undefined) {
+    const formIdx = body.indexOf(`name="${formName}"`);
+    if (formIdx === -1) {
+      throw new Error(`form name="${formName}" not found on ${path}`);
+    }
+    body = body.slice(formIdx);
+  }
+  const match = body.match(/name="_csrf_token" value="([0-9a-f]+)"/);
   if (match === null) {
-    throw new Error(`no _csrf_token found on ${path}`);
+    throw new Error(
+      `no _csrf_token found on ${path}` +
+        (formName !== undefined ? ` in form "${formName}"` : ''),
+    );
   }
   return match[1];
 }
@@ -203,7 +222,11 @@ test.describe('Forged CSRF token is rejected', () => {
   test('OneOnOneGame play with valid token → game played (GAME ID: block)', async ({
     request,
   }) => {
-    const token = await fetchToken(request, 'modules.php?name=OneOnOneGame');
+    const token = await fetchToken(
+      request,
+      'modules.php?name=OneOnOneGame',
+      'OneOnOneGame',
+    );
     const response = await request.post('modules.php?name=OneOnOneGame', {
       form: { _csrf_token: token, pid1: '1', pid2: '2' },
     });

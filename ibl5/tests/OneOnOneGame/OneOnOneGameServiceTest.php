@@ -187,6 +187,42 @@ final class OneOnOneGameServiceTest extends TestCase
         $this->assertSame(42, $result->gameId);
     }
 
+    public function testPlayGameSwallowsDiscordNotificationFailure(): void
+    {
+        $player1Data = $this->createMockPlayerData(1, 'Player One');
+        $player2Data = $this->createMockPlayerData(2, 'Player Two');
+        $gameResult = new OneOnOneGameResult();
+
+        $this->mockRepository->method('getPlayerForGame')
+            ->willReturnCallback(function ($id) use ($player1Data, $player2Data) {
+                return $id === 1 ? $player1Data : $player2Data;
+            });
+        $this->mockGameEngine->method('simulateGame')->willReturn($gameResult);
+        $this->mockRepository->method('saveGame')->willReturn(77);
+
+        // Discord posting fails (webhook outage / placeholder CI webhook). The
+        // game is already persisted, so playGame must swallow the error, log it,
+        // and still return the result rather than fail the game.
+        $service = new class ($this->mockRepository, $this->mockGameEngine) extends OneOnOneGameService {
+            public function postToDiscord(OneOnOneGameResult $result, int $gameId): void
+            {
+                throw new \RuntimeException('Discord webhook failed with HTTP 400');
+            }
+        };
+
+        $result = $service->playGame(1, 2, 'Owner');
+
+        // Returned + game persisted despite the Discord failure.
+        $this->assertSame(77, $result->gameId);
+        // Execution continued past the catch (success audit log still emitted).
+        $this->assertAuditLogEmitted('one_on_one_game_played');
+        // The failure was logged, not silently dropped.
+        $this->assertTrue(
+            $this->auditTestHandler->hasErrorThatContains('Discord notification failed for 1v1 game'),
+            'Expected an error log for the swallowed Discord failure'
+        );
+    }
+
     // ========== Audit Logging ==========
 
     public function testPlayGameEmitsAuditLog(): void

@@ -42,6 +42,18 @@ const CSRF_PROTECTED_PAGES: Array<{
     state: { 'EOY Voting': 'Yes', 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' },
     formSelector: 'form[name="EOYVote"]',
   },
+  {
+    name: 'import-demands upload form',
+    url: 'import-demands.php',
+    state: {},
+    formSelector: 'form[enctype="multipart/form-data"]',
+  },
+  {
+    name: 'OneOnOneGame player-selection form',
+    url: 'modules.php?name=OneOnOneGame',
+    state: {},
+    formSelector: 'form[name="OneOnOneGame"]',
+  },
 ];
 
 test.describe('CSRF token presence on protected forms', () => {
@@ -62,4 +74,13 @@ test.describe('CSRF token presence on protected forms', () => {
       expect(tokenValue, 'CSRF token must be a non-empty hex string').toMatch(/^[0-9a-f]{64}$/);
     });
   }
+
+  // The read-only game-lookup form is intentionally NOT CSRF-protected (no
+  // state mutation) — guard against a stray token being added to it.
+  test('OneOnOneGame game-lookup form has no _csrf_token', async ({ page }) => {
+    await gotoWithRetry(page, 'modules.php?name=OneOnOneGame');
+    const lookupForm = page.locator('form[name="LookUpOldGame"]');
+    await expect(lookupForm).toBeVisible();
+    await expect(lookupForm.locator('input[name="_csrf_token"]')).toHaveCount(0);
+  });
 });

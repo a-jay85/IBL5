@@ -173,15 +173,26 @@ done < <(grep -E '^[[:space:]]*\|' "$PLAN_FILE")
 # read as "created" and gut the include-filter.
 #
 # Resolution is computed ONCE and clears EVERY fired trigger (matches adr-check,
-# where a single ADR clears the whole diff): the plan body contains an ADR path
-# ibl5/docs/decisions/NNNN-*.md (NNNN != 0000, mirror hasAddedAdr()) OR a literal
-# `no-adr:` marker (mirror BYPASS_REGEX intent — the substring suffices at
-# plan-lint granularity).
+# where a single ADR clears the whole diff): the plan body DECLARES authoring an ADR
+# path ibl5/docs/decisions/NNNN-*.md (NNNN != 0000, mirror hasAddedAdr() — a new ADR
+# is ADDED, not merely cited for context) OR a literal `no-adr:` marker (mirror
+# BYPASS_REGEX intent — the substring suffices at plan-lint granularity).
+#
+# "Authoring" means the ADR path appears on a line that also carries a creation cue
+# (same regex as gate8_is_created). A bare citation like "per ADR-0062, see
+# ibl5/docs/decisions/0062-x.md" does NOT resolve the gate; a plan step like
+# "author ibl5/docs/decisions/0099-x.md" does. This mirrors hasAddedAdr()'s
+# diff-filter=A intent at plan-lint granularity.
 GATE8_RESOLVED=0
-if grep -oE 'ibl5/docs/decisions/[0-9]{4}-[A-Za-z0-9._/-]*\.md' "$PLAN_FILE" 2>/dev/null \
-    | grep -qvE '/decisions/0000-'; then
-    GATE8_RESOLVED=1
-fi
+while IFS= read -r _adr_path; do
+    [ -n "$_adr_path" ] || continue
+    printf '%s\n' "$_adr_path" | grep -qvE '/decisions/0000-' || continue
+    if grep -F -- "$_adr_path" "$PLAN_FILE" \
+        | grep -qE '([Cc]reate|[Aa]uthor|[Ww]rite|[Aa]dd(s|ing)? (a )?new|[Ii]ntroduce|[Ss]caffold)'; then
+        GATE8_RESOLVED=1
+        break
+    fi
+done < <(grep -oE 'ibl5/docs/decisions/[0-9]{4}-[A-Za-z0-9._/-]*\.md' "$PLAN_FILE" 2>/dev/null)
 if grep -qF 'no-adr:' "$PLAN_FILE"; then
     GATE8_RESOLVED=1
 fi

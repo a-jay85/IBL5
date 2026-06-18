@@ -206,6 +206,21 @@ Phase 1 — Create `ibl5/migrations/099_x.sql`.
 The migration runs DROP TABLE foo to remove the legacy store.
 '
 
+# Gate 8 regression: a plan that CITES an existing ADR for context (no creation
+# verb on the ADR line) but CREATES a trigger file must still flag (exit 1).
+# Prevents GATE8_RESOLVED from being set by a bare ADR reference.
+assert "gate8-cited-adr-not-authored" 1 "$M"'
+Phase 1 — Create `bin/foo` for the new tool.
+See ibl5/docs/decisions/0062-worktrees-outside-repo.md for context on the layout.
+'
+
+# Gate 8: a plan that both creates a trigger file AND authors a new ADR (creation
+# verb on the ADR line) must pass (exit 0) — confirms creation-verb check.
+assert "gate8-authored-adr-resolves" 0 "$M"'
+Phase 1 — Create `bin/foo` for the new tool.
+Phase 2 — Create ibl5/docs/decisions/0099-x.md documenting the decision.
+'
+
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"
     exit 1

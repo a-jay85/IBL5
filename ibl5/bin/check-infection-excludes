@@ -1,6 +1,27 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Validates infection.json5's mutate-scope excludes. Three gates, all run from
+# the ibl5/ directory (cwd-relative classes/ and tests/), invoked with no args by
+# both mutation.yml jobs ("mutation" and "mutation-pr") which rely only on the
+# exit code (0 = pass, 1 = fail).
+#
+#   Path gate  — every file-level "...php" exclude must resolve to classes/<path>.
+#   Gate 1     — every file-level "...php" exclude must carry a trailing
+#                "// <reason>" of >= 12 non-whitespace chars on the SAME line.
+#                (The reason is read from the substring AFTER the path's closing
+#                quote, so a stray quoted token cannot be mistaken for the path.)
+#   Gate 2     — a file-level "...php" exclude whose reason does NOT contain the
+#                literal token "infra-exclude" must NOT have a test referencing its
+#                basename in tests/ (a referencing test = stale deferral → re-include).
+#
+# Exemptions (no special-casing needed for the first; documented for reviewers):
+#   - Dir/glob excludes ("Bootstrap", "Database", "OneOnOneGame", "*/Contracts/*")
+#     are auto-exempt from ALL gates: the extractor grep -oE '"[^"]+\.php"' only
+#     matches entries ending in .php, so non-.php entries never reach any gate.
+#   - "infra-exclude"-marked files (permanent low-level infra such as JSB.php) are
+#     exempt from Gate 2 ONLY; they still satisfy Gate 1 (must carry a reason).
+
 CONFIG="infection.json5"
 
 if [ ! -f "$CONFIG" ]; then
@@ -8,7 +29,10 @@ if [ ! -f "$CONFIG" ]; then
     exit 1
 fi
 
-excludes=$(grep -v '^\s*//' "$CONFIG" | grep -oE '"[^"]+\.php"' | tr -d '"')
+# --- Path-resolution gate (existing behaviour, unchanged) -------------------
+# || true: a config with no file-level .php excludes (only dir/glob entries) yields
+# no grep matches; under `set -o pipefail` that would abort. An empty set is valid.
+excludes=$(grep -v '^\s*//' "$CONFIG" | grep -oE '"[^"]+\.php"' | tr -d '"') || true
 
 broken=()
 for path in $excludes; do
@@ -17,15 +41,83 @@ for path in $excludes; do
     fi
 done
 
-if [ ${#broken[@]} -eq 0 ]; then
-    echo "OK: all file excludes in $CONFIG resolve."
-    exit 0
-else
+# --- Gate 1 (reason required) + Gate 2 (stale-deferral detector) ------------
+missing_reason=()
+stale_deferral=()
+
+while IFS= read -r line; do
+    # Only file-level .php excludes carry reasons; skip everything else.
+    case "$line" in
+        *.php*) ;;
+        *) continue ;;
+    esac
+
+    # Extract the quoted path token (first "...php" on the line); strip quotes.
+    path=$(printf '%s\n' "$line" | grep -oE '"[^"]+\.php"' | head -1 | tr -d '"') || true
+    [ -z "$path" ] && continue
+
+    # Reason = text after the path's closing quote, then after the "//".
+    after="${line#*\""$path"\"}"
+    if [[ "$after" == *"//"* ]]; then
+        reason="${after#*//}"
+    else
+        reason=""
+    fi
+
+    # Gate 1: reason must have >= 12 non-whitespace chars.
+    nws="$(printf '%s' "$reason" | tr -d '[:space:]')"
+    if [ "${#nws}" -lt 12 ]; then
+        missing_reason+=("$path")
+        continue
+    fi
+
+    # Gate 2: infra-exclude marker is exempt; otherwise a referencing test fails.
+    if [[ "$reason" != *"infra-exclude"* ]]; then
+        classname="${path##*/}"
+        classname="${classname%.php}"
+        if grep -rql "$classname" tests/ --include='*.php' 2>/dev/null; then
+            stale_deferral+=("$path")
+        fi
+    fi
+done < <(grep -v '^[[:space:]]*//' "$CONFIG")
+
+# --- Report -----------------------------------------------------------------
+fail=0
+
+if [ ${#broken[@]} -ne 0 ]; then
+    fail=1
     echo "ERROR: ${#broken[@]} stale exclude(s) in $CONFIG:" >&2
     for p in "${broken[@]}"; do
         echo "  - $p  (classes/$p not found)" >&2
     done
     echo "" >&2
     echo "Fix: update or remove these entries in $CONFIG." >&2
-    exit 1
 fi
+
+if [ ${#missing_reason[@]} -ne 0 ]; then
+    fail=1
+    echo "ERROR: ${#missing_reason[@]} exclude(s) with reason-missing in $CONFIG:" >&2
+    for p in "${missing_reason[@]}"; do
+        echo "  - $p  (needs a trailing \"// <reason>\" of >= 12 non-whitespace chars)" >&2
+    done
+    echo "" >&2
+    echo "Fix: append a same-line // reason explaining why the file is excluded." >&2
+fi
+
+if [ ${#stale_deferral[@]} -ne 0 ]; then
+    fail=1
+    echo "ERROR: ${#stale_deferral[@]} stale exclude(s) in $CONFIG now has a test:" >&2
+    for p in "${stale_deferral[@]}"; do
+        echo "  - $p  (a test references this class — now has a test, consider re-including it)" >&2
+    done
+    echo "" >&2
+    echo "Fix: remove the exclude (re-include the file into mutate-scope), or mark it" >&2
+    echo "     infra-exclude in its reason if it is permanent low-level infra." >&2
+fi
+
+if [ "$fail" -eq 0 ]; then
+    echo "OK: all file excludes in $CONFIG resolve, are documented, and are not stale."
+    exit 0
+fi
+
+exit 1

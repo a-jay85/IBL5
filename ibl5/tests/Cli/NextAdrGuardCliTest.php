@@ -34,13 +34,13 @@ final class NextAdrGuardCliTest extends TestCase
 
         $outputStr = implode("\n", $output);
 
-        exec('rm -rf ' . escapeshellarg($t));
-
         self::assertNotSame(0, $exit, 'guard must exit non-zero from main checkout');
         self::assertStringContainsString('bin/wt-new', $outputStr, 'error message must mention bin/wt-new');
         self::assertEmpty(
             glob($t . '/ibl5/docs/decisions/[0-9][0-9][0-9][0-9]-guard-test.md'),
             'guard must not strand an ADR template file on the main checkout',
         );
+
+        exec('rm -rf ' . escapeshellarg($t));
     }
 }

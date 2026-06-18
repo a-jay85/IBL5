@@ -6,16 +6,23 @@
             "*/Contracts/*",
             "Bootstrap", "Database",
             "OneOnOneGame",
-            // Views lacking output-assertion tests — honest per-file
-            // exclusion reasons land in PR mutation-config-hygiene.
-            "LeagueStarters/LeagueStartersView.php",
-            "Negotiation/NegotiationDemandsBreakdownView.php",
-            "Player/Views/PlayerAwardsView.php",
-            "Player/Views/PlayerButtonsView.php",
-            "Player/Views/PlayerMenuView.php",
-            "Player/Views/PlayerTradingCardBackView.php",
-            "Player/Views/PlayerTradingCardFlipView.php",
-            "Player/Views/PlayerTradingCardFrontView.php"
+            // JSB engine glue is coverage-excluded (see phpunit-mutation.xml);
+            // exclude it here too so nothing Infection mutates lacks coverage. The
+            // infra-exclude marker makes it gate-2-exempt in check-infection-excludes.
+            // (MySQL.php lives at classes/Database/MySQL.php, already covered by the
+            //  "Database" dir exclude above — no separate entry needed.)
+            "JSB.php", // infra-exclude: low-level JSB engine glue, coverage-excluded — never mutated
+            // Group-B Views: no output-assertion test yet — honest per-file deferral
+            // reasons below; gate 2 in check-infection-excludes fires if a test later
+            // appears for one of these and it is not re-included. See ADR 0065.
+            "LeagueStarters/LeagueStartersView.php", // no output-assertion test yet — deferred Pass 2
+            "Negotiation/NegotiationDemandsBreakdownView.php", // no output-assertion test yet — deferred Pass 2
+            "Player/Views/PlayerAwardsView.php", // no output-assertion test yet — deferred Pass 2
+            "Player/Views/PlayerButtonsView.php", // no output-assertion test yet — deferred Pass 2
+            "Player/Views/PlayerMenuView.php", // no output-assertion test yet — deferred Pass 2
+            "Player/Views/PlayerTradingCardBackView.php", // no output-assertion test yet — deferred Pass 2
+            "Player/Views/PlayerTradingCardFlipView.php", // no output-assertion test yet — deferred Pass 2
+            "Player/Views/PlayerTradingCardFrontView.php" // no output-assertion test yet — deferred Pass 2
         ]
     },
     "phpUnit": {

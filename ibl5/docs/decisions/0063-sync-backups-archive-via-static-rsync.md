@@ -29,6 +29,19 @@ Sync the ibl5/backups directory with `bin/backups-sync` — incremental rsync ov
 - Positive: the remote rsync is reproducible from source and re-installable with one idempotent command if the host wipes `~/bin`.
 - Negative: a manual one-time bootstrap step (`bin/backups-sync-setup`) is required per host, and the static binary must be rebuilt to pick up future rsync versions or a CPU-arch change.
 
+## Nightly schedule
+
+The sync runs automatically every night at **3am local wall-clock** time via a launchd LaunchAgent (`com.ibl5.backups-sync`, written to `~/Library/LaunchAgents/`), mirroring the existing `com.ibl5.nightly-claude` job. launchd uses the machine's local time, so the job fires at 3am whether the clock is on PDT or PST. The job runs `bin/backups-sync` with no arguments (pull prod→local).
+
+The plist's `Program` and `WorkingDirectory` target the durable **main checkout** (`/Users/ajaynicolas/GitHub/IBL5`), never a worktree, so the schedule survives worktree churn — the path is derived at install time from the first `git worktree list` entry.
+
+Install/uninstall (idempotent) via the same setup script:
+
+- `bin/backups-sync-setup --install-schedule` — generate the plist and load the job.
+- `bin/backups-sync-setup --uninstall-schedule` — unload the job and remove the plist.
+
+Install **after** this change is on `master`, because the launchd `Program` points at the main checkout's `bin/backups-sync` (which only exists there once merged).
+
 ## References
 
 - `bin/backups-sync` — the sync entry point (rsync over SSH, `--rsync-path` pin).

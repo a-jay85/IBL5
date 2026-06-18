@@ -19,6 +19,16 @@
 #   7  No unresolved decisions — any table row carrying DECIDE / TBD /
 #                              "subject to validation" / "subject to review" is a
 #                              deferred question the nightly agent cannot resolve.
+#   8  Decision-trigger ADR    — a declared NEW file that matches an adr-check
+#                                trigger surface must carry a resolution (an ADR
+#                                authoring step or a `no-adr:` marker) in the plan.
+#                                Always-flag paths: ibl5/phpstan-rules/*.php,
+#                                .claude/rules/*.md, .github/workflows/*.ya?ml.
+#                                Conservative-flag (LOC/content invisible at plan
+#                                time): any new bin/<x> (can't check >=50 lines);
+#                                a new ibl5/migrations/*.sql only when the plan
+#                                text mentions DROP TABLE/COLUMN/INDEX; a
+#                                require/require-dev add to ibl5/composer.json.
 #
 # Two parts of /plan's Step 4 are DELIBERATELY left in /plan as Opus judgment,
 # because a sweep over the real plan corpus proved them not false-positive-free:
@@ -42,7 +52,7 @@
 #
 # Deliberately NOT linted (kept as /plan Opus judgment): tests-woven-inline,
 # production-comparison classification, test-file-path presence, negative-path
-# coverage, hot-file extraction, decision-trigger ADRs, security surface,
+# coverage, hot-file extraction, security surface,
 # impl_model / auto_postplan risk. Edit-anchor snippets are not linted: the real
 # plan corpus quotes them as drifting descriptions ("the Options struct", with
 # file:line refs that go stale), not verbatim lines, so a grep-the-snippet check
@@ -91,7 +101,8 @@ fi
 VIOL_FILE="$(mktemp)"
 MATRIX_FILE="$(mktemp)"
 SEEN_FILE="$(mktemp)"
-trap 'rm -f "$VIOL_FILE" "$MATRIX_FILE" "$SEEN_FILE"' EXIT
+GATE8_SEEN="$(mktemp)"
+trap 'rm -f "$VIOL_FILE" "$MATRIX_FILE" "$SEEN_FILE" "$GATE8_SEEN"' EXIT
 
 viol() { printf '%s\n' "$1" >> "$VIOL_FILE"; }
 
@@ -142,6 +153,123 @@ while IFS= read -r row; do
         viol "[7] unresolved decision token in table row: ${row}"
     fi
 done < <(grep -E '^[[:space:]]*\|' "$PLAN_FILE")
+
+# ---------------------------------------------------------------------------
+# Gate 8: Decision-trigger ADR.
+# ---------------------------------------------------------------------------
+# A declared NEW file matching a bin/adr-check trigger surface must carry a
+# resolution (an ADR-authoring step or a `no-adr:` marker) somewhere in the plan.
+# Trigger regexes mirror bin/adr-check detectTriggers() (its lines 106-158); the
+# token extraction mirrors bin/check-plan-staleness (backtick spans + markdown
+# link targets, prefix-filtered, charset-validated, de-duped).
+#
+# The creation-context filter is the correctness core and is the INVERSE of how
+# staleness uses the same cue: staleness SKIPS a token in a creation context (a
+# file the plan creates is not "stale"); gate 8 flags ONLY a token in a creation
+# context (only a NEW trigger-surface file needs an ADR). Deliberately we do NOT
+# include staleness's `post-impl` cue here — a verification-matrix row names a
+# trigger-surface path in its location column with `post-impl` in its timing
+# column on the same line, so `post-impl` would make almost every referenced file
+# read as "created" and gut the include-filter.
+#
+# Resolution is computed ONCE and clears EVERY fired trigger (matches adr-check,
+# where a single ADR clears the whole diff): the plan body DECLARES authoring an ADR
+# path ibl5/docs/decisions/NNNN-*.md (NNNN != 0000, mirror hasAddedAdr() — a new ADR
+# is ADDED, not merely cited for context) OR a literal `no-adr:` marker (mirror
+# BYPASS_REGEX intent — the substring suffices at plan-lint granularity).
+#
+# "Authoring" means the ADR path appears on a line that also carries a creation cue
+# (same regex as gate8_is_created). A bare citation like "per ADR-0062, see
+# ibl5/docs/decisions/0062-x.md" does NOT resolve the gate; a plan step like
+# "author ibl5/docs/decisions/0099-x.md" does. This mirrors hasAddedAdr()'s
+# diff-filter=A intent at plan-lint granularity.
+GATE8_RESOLVED=0
+while IFS= read -r _adr_path; do
+    [ -n "$_adr_path" ] || continue
+    printf '%s\n' "$_adr_path" | grep -qvE '/decisions/0000-' || continue
+    if grep -F -- "$_adr_path" "$PLAN_FILE" \
+        | grep -qE '([Cc]reate|[Aa]uthor|[Ww]rite|[Aa]dd(s|ing)? (a )?new|[Ii]ntroduce|[Ss]caffold)'; then
+        GATE8_RESOLVED=1
+        break
+    fi
+done < <(grep -oE 'ibl5/docs/decisions/[0-9]{4}-[A-Za-z0-9._/-]*\.md' "$PLAN_FILE" 2>/dev/null)
+if grep -qF 'no-adr:' "$PLAN_FILE"; then
+    GATE8_RESOLVED=1
+fi
+
+# Destructive-DDL presence anywhere in the plan body (mirror adr-check line 141);
+# scopes the conservative migration trigger.
+GATE8_HAS_DROP=0
+if grep -qiE '\b(DROP[[:space:]]+TABLE|DROP[[:space:]]+COLUMN|DROP[[:space:]]+INDEX)\b' "$PLAN_FILE"; then
+    GATE8_HAS_DROP=1
+fi
+
+# INCLUDE filter: does token $1 appear on at least one line carrying a creation
+# cue? (the inverse of staleness; no `post-impl` — see note above).
+gate8_is_created() {
+    grep -F -- "$1" "$PLAN_FILE" \
+        | grep -qE '([Cc]reate|[Nn]ew file|[Aa]dd(s|ing)? (a )?new|[Ii]ntroduce|[Ss]caffold)'
+}
+
+while IFS= read -r token; do
+    # Keep only the part before the first '#', '?', or whitespace (mirror staleness).
+    token="$(printf '%s' "$token" | sed -E 's/[[:space:]#?].*$//')"
+    [ -n "$token" ] || continue
+    # Only the in-scope repo-path prefixes.
+    case "$token" in
+        bin/*|ibl5/*|.claude/*|.github/*) : ;;
+        *) continue ;;
+    esac
+    # Skip glob/placeholder metacharacters and ellipsis meta-notation.
+    case "$token" in
+        *[\*\?\[\]\{\}\<\>]*) continue ;;
+    esac
+    case "$token" in *...*) continue ;; esac
+    # Validate charset.
+    if ! printf '%s' "$token" | grep -qE '^[A-Za-z0-9._/-]+$'; then
+        continue
+    fi
+    # De-duplicate.
+    if grep -qxF "$token" "$GATE8_SEEN"; then continue; fi
+    printf '%s\n' "$token" >> "$GATE8_SEEN"
+
+    # INCLUDE filter: only a NEW (creation-context) file counts.
+    gate8_is_created "$token" || continue
+
+    # Trigger classification (regexes mirror adr-check detectTriggers()).
+    fired=""
+    if printf '%s' "$token" | grep -qE '^ibl5/phpstan-rules/.+\.php$'; then
+        fired="phpstan-rule"
+    elif printf '%s' "$token" | grep -qE '^\.claude/rules/.+\.md$'; then
+        fired="agent-rule"
+    elif printf '%s' "$token" | grep -qE '^\.github/workflows/.+\.ya?ml$'; then
+        fired="ci-workflow"
+    elif printf '%s' "$token" | grep -qE '^bin/[^/]+$'; then
+        fired="new-tool-script"
+    elif [ "$GATE8_HAS_DROP" -eq 1 ] && printf '%s' "$token" | grep -qE '^ibl5/migrations/.+\.sql$'; then
+        fired="destructive-migration"
+    fi
+
+    [ -n "$fired" ] || continue
+    if [ "$GATE8_RESOLVED" -eq 0 ]; then
+        viol "[8] decision-trigger surface ${token} (${fired}) added without an ADR step or no-adr: marker"
+    fi
+done < <(
+    {
+        grep -oE '\[[^]]*\]\([^)[:space:]]+\)' "$PLAN_FILE" | sed -E 's/^\[[^]]*\]\(//; s/\)$//'
+        # shellcheck disable=SC2016  # backticks are literal markdown-span delimiters
+        grep -oE '`[^`]+`' "$PLAN_FILE" | sed -E 's/^`//; s/`$//'
+    }
+)
+
+# Composer dependency add — a MODIFY, not a new-file path, so handle it separately
+# from the path-token loop: flag when a line names ibl5/composer.json alongside a
+# require / require-dev dependency add.
+if grep -iE 'composer\.json' "$PLAN_FILE" | grep -qiE 'require(-dev)?'; then
+    if [ "$GATE8_RESOLVED" -eq 0 ]; then
+        viol "[8] decision-trigger surface ibl5/composer.json (new-dependency) added without an ADR step or no-adr: marker"
+    fi
+fi
 
 # ---------------------------------------------------------------------------
 # Reuse-target existence (new check). PHP Class::method only.

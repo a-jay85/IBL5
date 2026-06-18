@@ -138,6 +138,89 @@ assert "reuse-constant-not-method" 0 '
 **Reuse:** the `TotallyMadeUpClass::SOME_CONSTANT` value for the default.
 '
 
+# ---------------------------------------------------------------------------
+# Gate 8: decision-trigger ADR.
+# ---------------------------------------------------------------------------
+# EXIT-CODE ATTRIBUTION: gate 1 (no matrix) also exits 1, so every gate-8 fixture
+# carries the same clean minimal matrix used by `clean-minimal` above — exit 0/1
+# is then attributable solely to gate 8. M holds that matrix (single-quoted so its
+# backtick spans stay literal); each case appends gate-8-specific body with "$M".
+M='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | cap rejects over-cap trade | PHPUnit | pre-impl | `tests/Trade/TradeValidatorTest.php` |
+| 2 | form submits and redirects | E2E | post-impl | `tests/e2e/trade.spec.ts` |
+'
+
+# Gate 8: a new `bin/foo` plus an ADR-step path resolves the trigger (exit 0).
+assert "gate8-bin-with-adr" 0 "$M"'
+Phase 1 — Create `bin/foo` to do the thing.
+Phase 2 — author the ADR `ibl5/docs/decisions/0099-x.md`.
+'
+
+# Gate 8: a new `.claude/rules/x.md` plus a `no-adr:` bypass marker resolves (exit 0).
+assert "gate8-bypass-marker" 0 "$M"'
+Phase 1 — Create a new file `.claude/rules/x.md`.
+Resolution: no-adr: documented in the existing ADR-0001 already.
+'
+
+# Gate 8: a new `.claude/rules/x.md` with no resolution must flag (exit 1).
+# Load-bearing negative — always-flag path.
+assert "gate8-rule-no-resolution" 1 "$M"'
+Phase 1 — Create `.claude/rules/x.md` for the new convention.
+'
+
+# Gate 8: a new `bin/foo` with no resolution must flag (exit 1).
+# Load-bearing negative — conservative bin trigger.
+assert "gate8-bin-no-resolution" 1 "$M"'
+Phase 1 — Create `bin/foo` for the new tool.
+'
+
+# Gate 8: a trigger token that appears ONLY in a post-impl matrix row (no creation
+# verb anywhere, no resolution) must NOT flag (exit 0). This is the discriminating
+# regression for the creation-context include-filter: with `post-impl` in the cue
+# this fixture exits 1; the include-filter deliberately excludes `post-impl`.
+assert "gate8-post-impl-row-not-created" 0 '
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | workflow runs green | CLI-executable | post-impl | `.github/workflows/tests.yml` |
+| 2 | form submits and redirects | E2E | post-impl | `tests/e2e/trade.spec.ts` |
+'
+
+# Gate 8: prose merely REFERENCING an existing trigger file (no creation cue) must
+# NOT flag (exit 0) — the include-filter again.
+assert "gate8-referenced-not-created" 0 "$M"'
+This step references the existing `.github/workflows/tests.yml` workflow.
+'
+
+# Gate 8: a new migration with NO `DROP` in the plan text must NOT flag (exit 0) —
+# conservative migration scoping.
+assert "gate8-migration-no-drop" 0 "$M"'
+Phase 1 — Create `ibl5/migrations/099_x.sql` to add a nullable column.
+'
+
+# Gate 8: a new migration whose plan text mentions `DROP TABLE`, no resolution,
+# must flag (exit 1) — destructive-migration trigger.
+assert "gate8-migration-drop-no-adr" 1 "$M"'
+Phase 1 — Create `ibl5/migrations/099_x.sql`.
+The migration runs DROP TABLE foo to remove the legacy store.
+'
+
+# Gate 8 regression: a plan that CITES an existing ADR for context (no creation
+# verb on the ADR line) but CREATES a trigger file must still flag (exit 1).
+# Prevents GATE8_RESOLVED from being set by a bare ADR reference.
+assert "gate8-cited-adr-not-authored" 1 "$M"'
+Phase 1 — Create `bin/foo` for the new tool.
+See ibl5/docs/decisions/0062-worktrees-outside-repo.md for context on the layout.
+'
+
+# Gate 8: a plan that both creates a trigger file AND authors a new ADR (creation
+# verb on the ADR line) must pass (exit 0) — confirms creation-verb check.
+assert "gate8-authored-adr-resolves" 0 "$M"'
+Phase 1 — Create `bin/foo` for the new tool.
+Phase 2 — Create ibl5/docs/decisions/0099-x.md documenting the decision.
+'
+
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"
     exit 1

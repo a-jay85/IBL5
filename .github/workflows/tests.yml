@@ -568,6 +568,8 @@ jobs:
         run: bin/test-wt-status
       - name: bin/test-check-plan
         run: bin/test-check-plan
+      - name: bin/test-adr-check
+        run: bin/test-adr-check
 
   gate:
     name: Tests and Analysis

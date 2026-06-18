@@ -100,7 +100,7 @@ LOCAL_SPEC="${LOCAL_DIR}/"
 if [ "$DIRECTION" = "pull" ]; then
   SRC="$REMOTE_SPEC"
   DST="$LOCAL_SPEC"
-  mkdir -p "$LOCAL_DIR"
+  $DRY_RUN || mkdir -p "$LOCAL_DIR"
 else
   SRC="$LOCAL_SPEC"
   DST="$REMOTE_SPEC"

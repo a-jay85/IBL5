@@ -10,11 +10,11 @@ last_verified: 2026-06-18
 
 ## Context
 
-`ibl5/backups` holds ~55 GB of write-once season `*.zip` files — the JSB sim source of truth, extracted at runtime by `ExtractFromBackupStep`. It is git-ignored (`.gitignore`); tracking 55 GB of already-compressed binaries in git history would mean irreversible repo bloat and breach GitHub's file/repo limits, and Git LFS meters storage for no benefit on write-once artifacts. We needed a reproducible way to keep a developer's local copy in sync with production. The blocker: the production server is shared cPanel hosting with **no root and no rsync installed**, and rsync must exist on both ends of a transfer.
+The ibl5/backups directory (git-ignored, so absent from the repo) holds ~55 GB of write-once season `*.zip` files — the JSB sim source of truth, extracted at runtime by `ExtractFromBackupStep`. Tracking it in git tracking 55 GB of already-compressed binaries in git history would mean irreversible repo bloat and breach GitHub's file/repo limits, and Git LFS meters storage for no benefit on write-once artifacts. We needed a reproducible way to keep a developer's local copy in sync with production. The blocker: the production server is shared cPanel hosting with **no root and no rsync installed**, and rsync must exist on both ends of a transfer.
 
 ## Decision
 
-Sync `ibl5/backups` with `bin/backups-sync` — incremental rsync over the existing `PROD_SSH_HOST`/`.env` SSH path (pull by default, `--push` to reverse; `-z` omitted because the payload is already-compressed zips). Because prod ships no rsync, `bin/backups-sync-setup` builds a **fully-static x86_64 rsync from source in an Alpine container** (reproducible — no trusting an opaque prebuilt binary) and uploads it to the remote `~/bin/rsync`, a single rootless, reversible userland file; `bin/backups-sync` invokes it explicitly via `--rsync-path` so it never depends on the remote login PATH.
+Sync the ibl5/backups directory with `bin/backups-sync` — incremental rsync over the existing `PROD_SSH_HOST`/`.env` SSH path (pull by default, `--push` to reverse; `-z` omitted because the payload is already-compressed zips). Because prod ships no rsync, `bin/backups-sync-setup` builds a **fully-static x86_64 rsync from source in an Alpine container** (reproducible — no trusting an opaque prebuilt binary) and uploads it to the remote `~/bin/rsync`, a single rootless, reversible userland file; `bin/backups-sync` invokes it explicitly via `--rsync-path` so it never depends on the remote login PATH.
 
 ## Alternatives Considered
 

@@ -31,9 +31,11 @@ function forgedToken(): string {
  * A page can render several CSRF tokens (each gate has its own per-action
  * token — e.g. the admin DebugMenu toggle in the page chrome). Pass `formName`
  * to scope extraction to a specific `<form name="...">`; the token for that
- * form is the first `_csrf_token` after the form's opening tag. Without it the
- * first token on the page is returned, which on a module page is the chrome's
- * token, not the module form's.
+ * form is the first `_csrf_token` after the form's opening tag.
+ *
+ * Without `formName`, the page must contain exactly one token — if it has
+ * more, extraction is ambiguous (the first match may be the chrome's token,
+ * not the form under test) and this throws rather than silently picking one.
  */
 async function fetchToken(
   request: APIRequestContext,
@@ -45,7 +47,17 @@ async function fetchToken(
     throw new Error(`token fetch GET ${path} failed: ${resp.status()}`);
   }
   let body = await resp.text();
-  if (formName !== undefined) {
+  if (formName === undefined) {
+    const tokenCount = (
+      body.match(/name="_csrf_token" value="[0-9a-f]+"/g) ?? []
+    ).length;
+    if (tokenCount > 1) {
+      throw new Error(
+        `ambiguous _csrf_token on ${path}: ${tokenCount} tokens found — ` +
+          `pass a formName to scope extraction to the form under test`,
+      );
+    }
+  } else {
     const formIdx = body.indexOf(`name="${formName}"`);
     if (formIdx === -1) {
       throw new Error(`form name="${formName}" not found on ${path}`);

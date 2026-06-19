@@ -204,3 +204,26 @@ img {
 }
 
 } /* end @layer components (mobile overrides) */
+
+/* ==========================================================================
+   Accessibility utilities — @layer utilities
+   ========================================================================== */
+
+@layer utilities {
+
+/* Visually-hidden: hides text from sighted users while keeping it readable by
+   screen readers. Used for empty <th> accessible names (empty-table-header). */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border-width: 0;
+}
+
+} /* end @layer utilities */

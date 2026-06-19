@@ -81,6 +81,15 @@ while IFS= read -r token; do
         *[\*\?\[\]\{\}\<\>]*) continue ;;
     esac
 
+    # Skip ellipsis placeholders. `ibl5/...` is meta-notation meaning "some real
+    # path" (e.g. a plan line explaining that backtick path refs resolve), not a
+    # path the plan depends on. No real repo path contains `...`, but the charset
+    # check below passes '.' so without this guard the ellipsis is tested as a
+    # literal path and always flagged stale (false positive).
+    case "$token" in
+        *...*) continue ;;
+    esac
+
     # Validate charset; this also drops `$VAR/...` shell-variable tokens.
     if ! printf '%s' "$token" | grep -qE '^[A-Za-z0-9._/-]+$'; then
         continue

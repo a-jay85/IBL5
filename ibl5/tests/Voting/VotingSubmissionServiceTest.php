@@ -418,6 +418,29 @@ final class VotingSubmissionServiceTest extends TestCase
         $this->assertAuditLogNotEmitted('asg_vote_submitted');
     }
 
+    // ==================== DI Seam ====================
+
+    public function testInjectedLoggerReceivesCallOnEoySuccess(): void
+    {
+        $ballot = self::validEoyBallot();
+        $repo = self::createStub(VotingRepositoryInterface::class);
+        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $logger->expects($this->once())->method('info')
+            ->with('eoy_vote_submitted', self::arrayHasKey('team_name'));
+
+        $service = new VotingSubmissionService($repo, $logger);
+        $service->submitEoyVote('Test Team', $ballot);
+    }
+
+    public function testConstructsWithoutLoggerArgAndFallbackFires(): void
+    {
+        // no logger arg → fallback fires; prove the service is usable (no TypeError)
+        $repo = self::createStub(VotingRepositoryInterface::class);
+        $service = new VotingSubmissionService($repo);
+        $result = $service->submitEoyVote('Other Team', self::validEoyBallot());
+        $this->assertFalse($result->hasErrors());
+    }
+
     // ==================== Fixtures ====================
 
     /**

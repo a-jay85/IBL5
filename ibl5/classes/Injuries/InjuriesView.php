@@ -37,7 +37,7 @@ class InjuriesView implements InjuriesViewInterface
      */
     private function renderTitle(): string
     {
-        return '<h2 class="ibl-title">Injured Players</h2>';
+        return '<h1 class="ibl-title">Injured Players</h1>';
     }
 
     /**

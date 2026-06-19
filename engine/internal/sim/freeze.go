@@ -1,6 +1,11 @@
 package sim
 
-import "fmt"
+import (
+	"fmt"
+	"sort"
+
+	"github.com/a-jay85/IBL5/engine/internal/result"
+)
 
 // Freeze-override infrastructure for the empty-FGA source-isolation diagnostic
 // (ADR-0043). The team-scoring coupling defect (ADR-0042) is a wrong-signed
@@ -28,6 +33,20 @@ type FreezeConfig struct {
 	Foul bool // freeze the foul-only bucket weight      — foulBucketWeight output
 	Make bool // freeze the 2pt make-value               — shotValue2pt output (pre-clutch)
 
+	// MakePutback / MakePutbackHalf are the ADR-0053 shots-per-possession decoupling
+	// A/B arms. Unlike the four freeze arms above they are ORIGIN-SCOPED: they route
+	// only OriginOffReb (putback) 2pt make-value to the league mean, leaving the
+	// initial and transition attempts on the live value. This removes the team-quality
+	// variance feeding the putback efficiency↔volume coupling (the surviving suspect in
+	// the engine's wrong-signed Cov(ln(FGA/POSS),lnPPS)). Both consume
+	// FreezeMeans.MakeVal2pt:
+	//   - MakePutback:     putback 2pt make-value → full league mean.
+	//   - MakePutbackHalf: putback 2pt make-value → halfway blend (live + mean)/2 (the
+	//     hedge if the full substitution over-narrows Var(lnPPS) below real).
+	// Off by default → a zero Options stays byte-identical to Simulate.
+	MakePutback     bool
+	MakePutbackHalf bool
+
 	// BranchB enables the JSB +0xD90-stage Branch-B usage-shrink (bucketweights.go /
 	// branchBShrink). It is NOT a FreezeMeans arm (it is a derived-value transform, not
 	// a league-mean substitution): it consumes no Means and validate() ignores it. The
@@ -36,13 +55,33 @@ type FreezeConfig struct {
 	// measurement; never combined with the four freeze arms above (separate diagnostics).
 	BranchB bool
 
+	// UnfaithfulPutback is an INVERTED-POLARITY escape hatch — the ONLY FreezeConfig
+	// flag whose zero value is NOT "live engine." Default false = the FAITHFUL JSB
+	// 5.60 putback resolution (ADR-0055): OriginOffReb 2pt make-value uses the net-free
+	// boosted putbackValue2pt form, and putback 3pt is suppressed. Set true ONLY by the
+	// ADR-0055 archive A/B's OFF walk to RESTORE master's old net-coupled,
+	// 3pt-reachable putback behavior as the diagnostic baseline. It consumes no Means
+	// (validate() ignores it, mirroring BranchB). Production NEVER sets it.
+	UnfaithfulPutback bool
+
+	// UnfaithfulOreb is an INVERTED-POLARITY escape hatch — zero value is NOT "live
+	// engine." Default false = the FAITHFUL JSB 5.60 offensive-rebound continuation
+	// (ADR-0058): gs.orebProb resolves the single determination roll via the sqrt
+	// gate-1 team-pick (gate1Probability, port of FUN_004e22a0) against the league
+	// rebound baseline. Set true ONLY by the ADR-0058 archive A/B's OFF walk to RESTORE
+	// the old linear gate-2 orebProbability path as the diagnostic baseline. It consumes
+	// no Means (validate() ignores it, mirroring UnfaithfulPutback/BranchB). Production
+	// NEVER sets it.
+	UnfaithfulOreb bool
+
 	Means FreezeMeans // per-season-bucket league means substituted for frozen arms
 }
 
 // FreezeMeans are the per-mechanism per-season-bucket league-mean derived values
 // (harvested by a no-freeze baseline pass via FreezeAccum). Each is the mean of the
 // ACTUAL derived quantity at its call site, never an event-rate proxy:
-//   - OrebProb:   mean orebProbability output ∈ [0.25, 0.75]
+//   - OrebProb:   mean live ORB-continuation P (faithful sqrt gate1Probability by
+//     default; linear orebProbability under the UnfaithfulOreb hatch)
 //   - TurnProb:   mean per-possession steal-driven turnoverProb output ∈ [0, maxTurnoverProb]
 //   - FoulWeight: mean foulBucketWeight output
 //   - MakeVal2pt: mean PRE-clutch shotValue2pt output (per-mille)
@@ -115,12 +154,87 @@ func (a *BranchBAccum) MeanS() float64 {
 	return a.SumS / float64(a.Taken)
 }
 
+// GateContAccum harvests the L1 gate-1 decomposition instrument (ADR-0057/0058),
+// read-only. At every offensive-rebound RESOLUTION (gs.rebound, before the continuation
+// outcome roll), it records — keyed by the OFFENSIVE team ID — the gate-1 sqrt team-pick
+// probability (gate1Probability, the live continuation roll since ADR-0058), the linear
+// gate-2 probability (orebProbability, the old pre-ADR-0058 path), their product (the
+// faithful two-gate continuation probability), and the off/def rebound strengths that
+// feed the curvature-coupling read. It issues NO rng draw and is never serialized, so
+// attaching it stays byte-identical to a plain run. The caller (validate harness) owns one instance PER
+// GAME, pooled across that game's runs, and reads the per-team sums after. NOT
+// concurrency-safe: the harness sims a game's runs sequentially.
+type GateContAccum struct {
+	perTeam map[int]*gateTeamAcc
+}
+
+// gateTeamAcc is one offensive team's accumulated gate samples (Σ + count) over a
+// game's offensive-rebound resolutions. Means are sum/n; n is the resolution count.
+type gateTeamAcc struct {
+	n         int     // offensive-rebound resolutions observed
+	sumG1     float64 // Σ gate-1 P(offense wins board) (live continuation roll since ADR-0058)
+	sumG2     float64 // Σ linear gate-2 P (orebProbability, the old pre-ADR-0058 path)
+	sumProd   float64 // Σ gate-1 × gate-2 (faithful two-gate continuation P)
+	sumOffStr float64 // Σ offensive rebound strength (curvature-coupling input)
+	sumDefStr float64 // Σ defensive rebound strength
+}
+
+// NewGateContAccum allocates an empty gate accumulator ready to harvest a game.
+func NewGateContAccum() *GateContAccum {
+	return &GateContAccum{perTeam: map[int]*gateTeamAcc{}}
+}
+
+// TeamIDs returns the offensive team IDs with at least one sample, ascending, for
+// deterministic iteration by the harness.
+func (a *GateContAccum) TeamIDs() []int {
+	ids := make([]int, 0, len(a.perTeam))
+	for id := range a.perTeam {
+		ids = append(ids, id)
+	}
+	sort.Ints(ids)
+	return ids
+}
+
+// Team returns the accumulated resolution count and sums for offensive team id (all
+// zero when id was never seen). The harness divides the sums by n for per-trip means
+// and n by the run count for the per-game resolution rate.
+func (a *GateContAccum) Team(id int) (n int, sumG1, sumG2, sumProd, sumOffStr, sumDefStr float64) {
+	t := a.perTeam[id]
+	if t == nil {
+		return 0, 0, 0, 0, 0, 0
+	}
+	return t.n, t.sumG1, t.sumG2, t.sumProd, t.sumOffStr, t.sumDefStr
+}
+
 // Options configures a SimulateWith run. The zero value is the live engine: no
 // frozen arms, no accumulation — identical to Simulate.
 type Options struct {
 	Freeze       FreezeConfig
 	Accum        *FreezeAccum  // non-nil only during a baseline accumulation pass
 	BranchBAccum *BranchBAccum // non-nil only when harvesting the Branch-B engagement instrument
+
+	// OffVolumeScale overrides the package const offVolumeScale (tempo.go) for the
+	// ADR-0054 possession-count dispersion sweep. nil → use the const (a zero Options
+	// stays byte-identical to Simulate); non-nil → use *OffVolumeScale (0 is a valid
+	// sweep value — it disables the volume→count channel, so a plain float default-0
+	// could not mean "unset"; the pointer distinguishes the two). The override is
+	// always a valid float, so validate() needs no zero-mean guard for it (unlike the
+	// freeze arms). The only knob this seam moves.
+	OffVolumeScale *float64
+
+	// GateCont, when non-nil, harvests the L1 gate-1 decomposition instrument
+	// (ADR-0057/0058) across the run: at every offensive-rebound resolution it records
+	// the gate-1 P (live since ADR-0058), the linear gate-2 P, and their product, keyed
+	// by offensive team. Read-only (no rng draw), never serialized — attaching it stays
+	// byte-identical to a plain run. The validate harness owns one per game.
+	GateCont *GateContAccum
+	// GateBaseline overrides the gate-1 baseline term (the league offensive-rebound
+	// share × 100). nil → leagueReboundBaseline(bundle), the faithful bundle-derived
+	// value; non-nil → *GateBaseline, used by the archive instrument's baseline
+	// sensitivity sweep (the exact loader value is unpinned in the static decompile).
+	// Read on EVERY run (ADR-0058: the live faithful ORB roll consumes gs.gateBaseline),
+	// so gameloop.go populates it unconditionally.
+	GateBaseline *float64
 }
 
 // validate rejects a config that freezes an arm with no precomputed (zero) mean — a
@@ -142,6 +256,9 @@ func (o Options) validate() error {
 	if o.Freeze.Make && o.Freeze.Means.MakeVal2pt == 0 {
 		return fmt.Errorf("sim: freeze Make requested but Means.MakeVal2pt is unset (0)")
 	}
+	if (o.Freeze.MakePutback || o.Freeze.MakePutbackHalf) && o.Freeze.Means.MakeVal2pt == 0 {
+		return fmt.Errorf("sim: freeze MakePutback/MakePutbackHalf requested but Means.MakeVal2pt is unset (0)")
+	}
 	return nil
 }
 
@@ -154,7 +271,16 @@ func (o Options) validate() error {
 // orebProb returns P(offensive rebound). Shared by the half-court and transition
 // rebound paths (gs.rebound), so one injection covers both.
 func (gs *gameState) orebProb(off, def float64) float64 {
-	p := orebProbability(off, def)
+	// FAITHFUL by default (ADR-0058): the live continuation roll is the sqrt gate-1
+	// team-determination (FUN_004e22a0) against the league rebound baseline, resolved
+	// once per game into gs.gateBaseline (gameloop.go). The UnfaithfulOreb escape hatch
+	// restores the old linear gate-2 path for the archive A/B's OFF walk only.
+	var p float64
+	if gs.freeze.UnfaithfulOreb {
+		p = orebProbability(off, def)
+	} else {
+		p = gate1Probability(off, def, gs.gateBaseline)
+	}
 	if gs.accum != nil {
 		gs.accum.orebSum += p
 		gs.accum.orebN++
@@ -163,6 +289,35 @@ func (gs *gameState) orebProb(off, def float64) float64 {
 		return gs.freeze.Means.OrebProb
 	}
 	return p
+}
+
+// accumulateGateCont records one offensive-rebound RESOLUTION into the L1 gate-1
+// decomposition instrument (ADR-0057/0058). It is a no-op unless gs.gateCont is set,
+// so it is inert on every normal/golden run. It computes the linear gate-2 probability
+// (orebProbability) and the gate-1 sqrt team-pick (gate1Probability, against
+// gs.gateBaseline — the live continuation roll since ADR-0058), and their product, and
+// folds them into the OFFENSIVE team's accumulator. It issues NO rng draw and mutates no
+// game state, so attaching the instrument is byte-identical to a plain run (it only reads
+// the same probabilities gs.orebProb already resolves). Called once per rebound resolution
+// (the half-court and transition paths share gs.rebound), so it covers every
+// offensive-rebound trip exactly once.
+func (gs *gameState) accumulateGateCont(offTeamID int, off, def float64) {
+	if gs.gateCont == nil {
+		return
+	}
+	t := gs.gateCont.perTeam[offTeamID]
+	if t == nil {
+		t = &gateTeamAcc{}
+		gs.gateCont.perTeam[offTeamID] = t
+	}
+	g2 := orebProbability(off, def)
+	g1 := gate1Probability(off, def, gs.gateBaseline)
+	t.n++
+	t.sumG1 += g1
+	t.sumG2 += g2
+	t.sumProd += g1 * g2
+	t.sumOffStr += off
+	t.sumDefStr += def
 }
 
 // turnoverProb returns the per-possession steal-driven turnover probability from
@@ -209,14 +364,39 @@ func (gs *gameState) foulWeight(offense, defenders []onCourt, hca float64) float
 // value (clutch is still applied by the caller). Injecting here, at the shot-value
 // assembly, leaves rollMake — and therefore the free-throw make roll that shares it
 // (freethrow.go) — structurally untouched.
-func (gs *gameState) makeValue2pt(net float64, fgp int) float64 {
+//
+// origin selects the substitution scope. The Make arm freezes EVERY 2pt make-value;
+// the ADR-0053 MakePutback/MakePutbackHalf arms substitute ONLY when origin is
+// OriginOffReb (the putback continuation), so an OriginInitial/OriginTransition shot
+// keeps its live value — the origin-scoped decoupling. MakePutbackHalf returns the
+// halfway blend (live + mean)/2 instead of the full mean. The accumulator write is
+// ALWAYS on the live value v (so a baseline harvest sees the real distribution
+// regardless of which arm is on).
+func (gs *gameState) makeValue2pt(net float64, fgp int, origin result.ShotOrigin) float64 {
+	// Faithful putback make-value (ADR-0055): a half-court putback (OriginOffReb)
+	// uses the net-free 4/3-boosted putbackValue2pt form (decompile 93880-93883),
+	// computed BEFORE the accum capture so the Make/MakePutback/MakePutbackHalf arms
+	// freeze against the NEW baseline. The UnfaithfulPutback escape hatch restores the
+	// old net-coupled value for the ADR-0055 OFF walk only. OriginInitial and
+	// OriginTransition are unchanged (transition putback faithfulness is OOS — ADR-0055).
 	v := shotValue2pt(net, fgp, false)
+	if origin == result.OriginOffReb && !gs.freeze.UnfaithfulPutback {
+		v = putbackValue2pt(fgp)
+	}
 	if gs.accum != nil {
 		gs.accum.makeSum += v
 		gs.accum.makeN++
 	}
 	if gs.freeze.Make {
 		return gs.freeze.Means.MakeVal2pt
+	}
+	if origin == result.OriginOffReb {
+		if gs.freeze.MakePutback {
+			return gs.freeze.Means.MakeVal2pt
+		}
+		if gs.freeze.MakePutbackHalf {
+			return (v + gs.freeze.Means.MakeVal2pt) / 2
+		}
 	}
 	return v
 }

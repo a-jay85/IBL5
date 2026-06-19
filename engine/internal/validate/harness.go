@@ -215,15 +215,18 @@ func readFile[T any](path string, read func(io.Reader) ([]T, error)) ([]T, error
 // Report. No map-iteration order leaks into the output (triples sorted by stem;
 // .sco games kept in file order; stat rows emitted in statNames order).
 func ValidateCorpus(dir string, runs int, baseSeed uint64, gameType bundle.GameType) (Report, error) {
-	return ValidateCorpusWith(dir, runs, baseSeed, gameType, false, nil)
+	return ValidateCorpusWith(dir, runs, baseSeed, gameType, sim.Options{})
 }
 
-// ValidateCorpusWith is ValidateCorpus plus the Branch-B usage-shrink toggle and an
-// optional engagement accumulator (sim.BranchBAccum), threaded into the engine runs.
-// branchB=false / accum=nil is byte-identical to ValidateCorpus — the calibration A/B
-// (Phase 6/7) is the only caller that sets them. accum, when non-nil, is shared across
-// every game so the harness reads aggregate Branch-B engagement after the corpus pass.
-func ValidateCorpusWith(dir string, runs int, baseSeed uint64, gameType bundle.GameType, branchB bool, accum *sim.BranchBAccum) (Report, error) {
+// ValidateCorpusWith is ValidateCorpus plus a sim.Options passthrough, threaded into
+// every engine run. A zero sim.Options{} is byte-identical to ValidateCorpus — the
+// calibration A/B harnesses are the only callers that set fields. The bundled Options
+// carries the measurement seams that used to be positional bools: opts.Freeze.BranchB
+// (the usage-shrink toggle), opts.Freeze.MakePutback/MakePutbackHalf + opts.Freeze.Means
+// (the ADR-0053 decoupling arms), opts.BranchBAccum (the engagement instrument), and
+// opts.Accum (a FreezeMeans harvest pass). Pointer fields, when non-nil, are shared
+// across every game so the harness reads the aggregate after the corpus pass.
+func ValidateCorpusWith(dir string, runs int, baseSeed uint64, gameType bundle.GameType, opts sim.Options) (Report, error) {
 	if runs <= 0 {
 		return Report{}, fmt.Errorf("validate: runs must be >= 1, got %d", runs)
 	}
@@ -258,7 +261,7 @@ func ValidateCorpusWith(dir string, runs int, baseSeed uint64, gameType bundle.G
 				continue
 			}
 			consumed[schIdx] = true
-			gr := validateGame(b, b.Schedule[schIdx], sg, runs, baseSeed+uint64(gameIndex*runs), gameType, branchB, accum)
+			gr := validateGame(b, b.Schedule[schIdx], sg, runs, baseSeed+uint64(gameIndex*runs), gameType, opts)
 			rep.Games = append(rep.Games, gr)
 			if !gr.Pass {
 				rep.Pass = false
@@ -290,13 +293,13 @@ func ValidateCorpusWith(dir string, runs int, baseSeed uint64, gameType bundle.G
 // Report. .sco games are kept in file order; the per-game seed advances by a
 // monotonic index over INCLUDED (simulated) games only.
 func ValidateUnscheduled(dir string, runs int, baseSeed uint64, gameType bundle.GameType) (Report, error) {
-	return ValidateUnscheduledWith(dir, runs, baseSeed, gameType, false, nil)
+	return ValidateUnscheduledWith(dir, runs, baseSeed, gameType, sim.Options{})
 }
 
-// ValidateUnscheduledWith is ValidateUnscheduled plus the Branch-B toggle + engagement
-// accumulator, the unscheduled (playoff) complement of ValidateCorpusWith. branchB=false
-// / accum=nil is byte-identical to ValidateUnscheduled.
-func ValidateUnscheduledWith(dir string, runs int, baseSeed uint64, gameType bundle.GameType, branchB bool, accum *sim.BranchBAccum) (Report, error) {
+// ValidateUnscheduledWith is ValidateUnscheduled plus a sim.Options passthrough, the
+// unscheduled (playoff) complement of ValidateCorpusWith. A zero sim.Options{} is
+// byte-identical to ValidateUnscheduled.
+func ValidateUnscheduledWith(dir string, runs int, baseSeed uint64, gameType bundle.GameType, opts sim.Options) (Report, error) {
 	if runs <= 0 {
 		return Report{}, fmt.Errorf("validate: runs must be >= 1, got %d", runs)
 	}
@@ -337,7 +340,7 @@ func ValidateUnscheduledWith(dir string, runs int, baseSeed uint64, gameType bun
 				Date:          sg.Date,
 				GameType:      gameType,
 			}
-			gr := validateGame(b, g, sg, runs, baseSeed+uint64(gameIndex*runs), gameType, branchB, accum)
+			gr := validateGame(b, g, sg, runs, baseSeed+uint64(gameIndex*runs), gameType, opts)
 			rep.Games = append(rep.Games, gr)
 			if !gr.Pass {
 				rep.Pass = false
@@ -375,8 +378,8 @@ func matchSchedule(sched []backup.SchGame, consumed []bool, sg backup.ScoGame) i
 
 // validateGame simulates one matchup `runs` times and compares the aggregated
 // per-team engine means against the .sco ground truth, using gameType's bands.
-func validateGame(b bundle.Bundle, g bundle.Game, sg backup.ScoGame, runs int, baseSeed uint64, gameType bundle.GameType, branchB bool, accum *sim.BranchBAccum) GameReport {
-	visMean, homeMean, homeWinFrac, originFGA, possProxyPerG, possCountPerG := simulateGameMeans(b, g, runs, baseSeed, branchB, accum)
+func validateGame(b bundle.Bundle, g bundle.Game, sg backup.ScoGame, runs int, baseSeed uint64, gameType bundle.GameType, opts sim.Options) GameReport {
+	visMean, homeMean, homeWinFrac, originFGA, possProxyPerG, possCountPerG, orbPerG, contDepthPerG, gateContPerG := simulateGameMeans(b, g, runs, baseSeed, opts)
 	visSco := teamStatFromSco(sg, g.VisitorTeamID)
 	homeSco := teamStatFromSco(sg, g.HomeTeamID)
 	gr := compareGame(gameType, g.VisitorTeamID, g.HomeTeamID, sg.Date, visSco, homeSco, visMean, homeMean)
@@ -391,6 +394,15 @@ func validateGame(b bundle.Bundle, g bundle.Game, sg backup.ScoGame, runs int, b
 		g.VisitorTeamID: possProxy(visSco),
 		g.HomeTeamID:    possProxy(homeSco),
 	}
+	// ORB-intensity channel: ORB/g from the SAME TeamStat.ORB on both sides (the .sco
+	// box exposes ORB directly). Engine-only continuation-depth tallies ride alongside.
+	gr.EngineORBPerG = orbPerG
+	gr.ScoORBPerG = map[int]float64{
+		g.VisitorTeamID: float64(visSco.ORB),
+		g.HomeTeamID:    float64(homeSco.ORB),
+	}
+	gr.EngineContinuationDepth = contDepthPerG
+	gr.EngineGateCont = gateContPerG
 	return gr
 }
 
@@ -400,34 +412,40 @@ func validateGame(b bundle.Bundle, g bundle.Game, sg backup.ScoGame, runs int, b
 // runs-stable P(home win) estimate the season-aggregate layer needs). Each run
 // is an independent single-game sub-bundle so one game's distribution is
 // isolated from the rest of the schedule.
-func simulateGameMeans(b bundle.Bundle, g bundle.Game, runs int, baseSeed uint64, branchB bool, accum *sim.BranchBAccum) (visMean, homeMean map[string]float64, homeWinFrac float64, originFGA map[int]OriginFGA, possProxyPerG, possCountPerG map[int]float64) {
+func simulateGameMeans(b bundle.Bundle, g bundle.Game, runs int, baseSeed uint64, opts sim.Options) (visMean, homeMean map[string]float64, homeWinFrac float64, originFGA map[int]OriginFGA, possProxyPerG, possCountPerG, orbPerG map[int]float64, contDepthPerG map[int]ContinuationDepthRaw, gateContPerG map[int]GateContRaw) {
 	sub := bundle.Bundle{
 		LeagueID: b.LeagueID,
 		Teams:    b.Teams,
 		Players:  b.Players,
 		Schedule: []bundle.Game{g},
 	}
-	// Zero opts (branchB false) ⇒ SimulateWith == Simulate, so the OFF calibration is
-	// byte-identical to the pre-PR path. The shared accum (non-nil only under branchB)
-	// aggregates Branch-B engagement across every game of the corpus pass.
-	opts := sim.Options{}
-	if branchB {
-		opts.Freeze.BranchB = true
-		opts.BranchBAccum = accum
-	}
+	// L1 gate-1 counterfactual instrument (ADR-0057/0058): one accumulator per game,
+	// pooled across the game's runs. Attaching it issues no rng draw and does not alter
+	// any outcome (read-only at the sim rebound site), so the per-team stat means below
+	// are unchanged. opts.GateBaseline (the sweep seam) rides through from the caller.
+	gateAcc := sim.NewGateContAccum()
+	opts.GateCont = gateAcc
+	// opts is threaded verbatim from the caller: a zero sim.Options{} ⇒ SimulateWith ==
+	// Simulate (byte-identical OFF calibration), and any pointer field (opts.BranchBAccum
+	// engagement instrument, opts.Accum FreezeMeans harvest) is shared across every game
+	// so its aggregate is read after the corpus pass.
 	visSamples := make([]TeamStat, 0, runs)
 	homeSamples := make([]TeamStat, 0, runs)
 	originTotals := map[int]*OriginFGA{} // Σ by-origin FGA across runs, per team
 	possCountTotals := map[int]int{}     // Σ EventPossessionStart across runs, per team
 	possProxyTotals := map[int]float64{} // Σ box-proxy possessions across runs, per team
+	orbTotals := map[int]float64{}       // Σ offensive rebounds across runs, per team (ORB-intensity numerator)
+	depthTotals := map[int]*depthAcc{}   // Σ per-possession continuation-depth tallies across runs, per team
 	for run := 0; run < runs; run++ {
 		res, _ := sim.SimulateWith(sub, baseSeed+uint64(run), opts)
 		gr := res.Games[0]
 		accumulateOriginFGA(originTotals, gr.Events)
 		accumulatePossessions(possCountTotals, gr.Events)
+		accumulateContinuationDepth(depthTotals, gr.Events)
 		for _, tb := range gr.TeamBoxes {
 			ts := teamStatFromBox(tb)
 			possProxyTotals[tb.TeamID] += possProxy(ts) // same Dean-Oliver proxy as the .sco side
+			orbTotals[tb.TeamID] += float64(ts.ORB)     // same TeamStat.ORB feeding possProxy
 			switch tb.TeamID {
 			case g.VisitorTeamID:
 				visSamples = append(visSamples, ts)
@@ -439,7 +457,10 @@ func simulateGameMeans(b bundle.Bundle, g bundle.Game, runs int, baseSeed uint64
 	originFGA = make(map[int]OriginFGA, len(originTotals))
 	rf := float64(runs)
 	for id, o := range originTotals {
-		originFGA[id] = OriginFGA{Initial: o.Initial / rf, Oreb: o.Oreb / rf, Transition: o.Transition / rf}
+		originFGA[id] = OriginFGA{
+			Initial: o.Initial / rf, Oreb: o.Oreb / rf, Transition: o.Transition / rf,
+			InitialMade: o.InitialMade / rf, OrebMade: o.OrebMade / rf, TransitionMade: o.TransitionMade / rf,
+		}
 	}
 	possProxyPerG = make(map[int]float64, len(possProxyTotals))
 	for id, s := range possProxyTotals {
@@ -449,29 +470,81 @@ func simulateGameMeans(b bundle.Bundle, g bundle.Game, runs int, baseSeed uint64
 	for id, n := range possCountTotals {
 		possCountPerG[id] = float64(n) / rf
 	}
-	return mean(visSamples), mean(homeSamples), homeWinFraction(homeSamples, visSamples), originFGA, possProxyPerG, possCountPerG
-}
-
-// accumulateOriginFGA folds one game's shot-attempt events into per-team by-origin
-// FGA counters (every EventShotAttempt carries exactly one origin; see
-// result.ShotOrigin).
-func accumulateOriginFGA(into map[int]*OriginFGA, events []result.Event) {
-	for _, e := range events {
-		if e.Kind != result.EventShotAttempt {
+	orbPerG = make(map[int]float64, len(orbTotals))
+	for id, s := range orbTotals {
+		orbPerG[id] = s / rf
+	}
+	contDepthPerG = make(map[int]ContinuationDepthRaw, len(depthTotals))
+	for id, d := range depthTotals {
+		contDepthPerG[id] = ContinuationDepthRaw{
+			N:      float64(d.n) / rf,
+			SumK:   d.sumK / rf,
+			SumK2:  d.sumK2 / rf,
+			B0:     float64(d.b0) / rf,
+			B1:     float64(d.b1) / rf,
+			B2:     float64(d.b2) / rf,
+			B3Plus: float64(d.b3plus) / rf,
+		}
+	}
+	// Gate-1 counterfactual per-team means: N is resolutions/game (n÷runs); the gate and
+	// strength fields are per-RESOLUTION means (sum÷n, run-pooled). A team with no
+	// offensive-rebound resolution contributes no entry (n==0 skipped — no spurious key).
+	gateContPerG = make(map[int]GateContRaw)
+	for _, id := range gateAcc.TeamIDs() {
+		n, sumG1, sumG2, sumProd, sumOffStr, sumDefStr := gateAcc.Team(id)
+		if n == 0 {
 			continue
 		}
-		o := into[e.TeamID]
+		fn := float64(n)
+		gateContPerG[id] = GateContRaw{
+			N:          fn / rf,
+			MeanG1:     sumG1 / fn,
+			MeanG2:     sumG2 / fn,
+			MeanProd:   sumProd / fn,
+			MeanOffStr: sumOffStr / fn,
+			MeanDefStr: sumDefStr / fn,
+		}
+	}
+	return mean(visSamples), mean(homeSamples), homeWinFraction(homeSamples, visSamples), originFGA, possProxyPerG, possCountPerG, orbPerG, contDepthPerG, gateContPerG
+}
+
+// accumulateOriginFGA folds one game's shot events into per-team by-origin counters:
+// EventShotAttempt → FGA by origin; EventShotMake → MADE field goals by the same
+// origin (both carry exactly one origin; see result.ShotOrigin). The made tally
+// rides EventShotMake — which creditMadeFieldGoal also emits for the and-one basket
+// — so made/attempts is the per-origin shooting efficiency (ADR-0053 instrument).
+// Read-only: counting events Simulate already emits changes no engine behavior.
+func accumulateOriginFGA(into map[int]*OriginFGA, events []result.Event) {
+	get := func(team int) *OriginFGA {
+		o := into[team]
 		if o == nil {
 			o = &OriginFGA{}
-			into[e.TeamID] = o
+			into[team] = o
 		}
-		switch e.Origin {
-		case result.OriginInitial:
-			o.Initial++
-		case result.OriginOffReb:
-			o.Oreb++
-		case result.OriginTransition:
-			o.Transition++
+		return o
+	}
+	for _, e := range events {
+		switch e.Kind {
+		case result.EventShotAttempt:
+			o := get(e.TeamID)
+			switch e.Origin {
+			case result.OriginInitial:
+				o.Initial++
+			case result.OriginOffReb:
+				o.Oreb++
+			case result.OriginTransition:
+				o.Transition++
+			}
+		case result.EventShotMake:
+			o := get(e.TeamID)
+			switch e.Origin {
+			case result.OriginInitial:
+				o.InitialMade++
+			case result.OriginOffReb:
+				o.OrebMade++
+			case result.OriginTransition:
+				o.TransitionMade++
+			}
 		}
 	}
 }
@@ -504,4 +577,76 @@ func accumulatePossessions(into map[int]int, events []result.Event) {
 			into[e.TeamID]++
 		}
 	}
+}
+
+// depthAcc accumulates one team's per-possession continuation-depth tallies while
+// accumulateContinuationDepth walks a game's event stream. n/sumK/sumK2 are the
+// exact moment sums (mean = sumK/n, Var = sumK2/n − mean² downstream); b0..b3plus
+// are the capped histogram buckets (k = 0 / 1 / 2 / ≥3) used for SHAPE only.
+type depthAcc struct {
+	n                  int
+	sumK               float64
+	sumK2              float64
+	b0, b1, b2, b3plus int
+}
+
+// accumulateContinuationDepth segments one game's event stream into possessions and
+// folds each possession's offensive-rebound continuation depth k into its OWNING
+// team's accumulator (Part B continuation-chain instrument). A possession opens at
+// an EventPossessionStart — whose TeamID owns the whole trip — and closes at the
+// NEXT EventPossessionStart or at slice end; k is the count of
+// EventRebound{OffensiveRebound:true} seen within it. The just-closed possession is
+// ALWAYS attributed to the team that OPENED it (curTeam), never the team that opens
+// the next one — the easy misattribution to avoid. Only EventRebound{offensive}
+// increments depth; EventShotAttempt{Origin:OriginOffReb} does NOT (the putback
+// shot, not the rebound, would double-count). mean/Var are derived downstream from
+// n/sumK/sumK2 — NEVER from the capped buckets (b3plus collapses the tail). The
+// slice-end fold is done per call so the last possession of every run is counted
+// and no possession bleeds across runs. Read-only: it observes events Simulate
+// already emits, so no engine behavior changes.
+func accumulateContinuationDepth(into map[int]*depthAcc, events []result.Event) {
+	get := func(team int) *depthAcc {
+		a := into[team]
+		if a == nil {
+			a = &depthAcc{}
+			into[team] = a
+		}
+		return a
+	}
+	curTeam := 0
+	cur := 0
+	open := false
+	fold := func() {
+		if !open {
+			return
+		}
+		a := get(curTeam)
+		a.n++
+		a.sumK += float64(cur)
+		a.sumK2 += float64(cur * cur)
+		switch cur {
+		case 0:
+			a.b0++
+		case 1:
+			a.b1++
+		case 2:
+			a.b2++
+		default:
+			a.b3plus++
+		}
+	}
+	for _, e := range events {
+		switch e.Kind {
+		case result.EventPossessionStart:
+			fold() // close the previous possession (if any)
+			curTeam = e.TeamID
+			cur = 0
+			open = true
+		case result.EventRebound:
+			if open && e.OffensiveRebound {
+				cur++
+			}
+		}
+	}
+	fold() // close the final possession at slice end
 }

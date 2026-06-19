@@ -24,15 +24,31 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
     private DepthChartEntryValidator $validator;
     private SavedDepthChartService $savedDcService;
     private TeamIdentityRepositoryInterface $commonRepo;
+    /** Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('audit'). */
+    private \Psr\Log\LoggerInterface $auditLogger;
+    /** Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('app'). */
+    private \Psr\Log\LoggerInterface $appLogger;
+    /**
+     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     */
+    private ?Season $season = null;
 
-    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepo)
-    {
+    public function __construct(
+        \mysqli $db,
+        TeamIdentityRepositoryInterface $commonRepo,
+        ?\Psr\Log\LoggerInterface $auditLogger = null,
+        ?\Psr\Log\LoggerInterface $appLogger = null,
+        ?Season $season = null
+    ) {
         $this->db = $db;
+        $this->season = $season;
         $this->repository = new DepthChartEntryRepository($db);
         $this->processor = new DepthChartEntryProcessor();
         $this->validator = new DepthChartEntryValidator();
         $this->savedDcService = new SavedDepthChartService($db);
         $this->commonRepo = $commonRepo;
+        $this->auditLogger = $auditLogger ?? \Logging\LoggerFactory::getChannel('audit');
+        $this->appLogger = $appLogger ?? \Logging\LoggerFactory::getChannel('app');
     }
 
     /**
@@ -42,7 +58,7 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
      */
     public function handleSubmission(array $postData): array
     {
-        $season = new Season($this->db);
+        $season = $this->season ?? new Season($this->db);
 
         /** @var string $rawTeamName */
         $rawTeamName = $postData['Team_Name'] ?? '';
@@ -75,7 +91,7 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
 
         $this->saveDepthChartSnapshot($teamName, $postData, $season);
 
-        \Logging\LoggerFactory::getChannel('audit')->info('depth_chart_submitted', [
+        $this->auditLogger->info('depth_chart_submitted', [
             'action' => 'depth_chart_submitted',
             'team_name' => $teamName,
         ]);
@@ -152,7 +168,7 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
             );
         } catch (\RuntimeException $e) {
             // Don't fail the main submission if snapshot save fails
-            \Logging\LoggerFactory::getChannel('app')->error('SavedDepthChart snapshot error', ['error' => $e->getMessage()]);
+            $this->appLogger->error('SavedDepthChart snapshot error', ['error' => $e->getMessage()]);
         }
     }
 
@@ -162,7 +178,7 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
      */
     private function saveDepthChartFile(string $teamName, array $playerData): bool
     {
-        $logger = \Logging\LoggerFactory::getChannel('app');
+        $logger = $this->appLogger;
 
         $safeTeamName = preg_replace('/[^a-zA-Z0-9_\-\s]/', '', $teamName);
         if ($safeTeamName === null) {

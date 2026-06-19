@@ -67,8 +67,8 @@ class TeamOffDefStatsViewTest extends TestCase
     }
 
     /**
-     * Test that the League-wide Statistics heading is a well-formed <h2>
-     * and does not contain a malformed </h1> closing tag.
+     * Test that the League-wide Statistics heading is a well-formed <h1>
+     * and does not contain a malformed </h2> closing tag.
      */
     public function testRenderLeagueWideHeadingClosesWithH2(): void
     {
@@ -76,8 +76,8 @@ class TeamOffDefStatsViewTest extends TestCase
 
         $result = $this->view->render($data);
 
-        $this->assertStringContainsString('<h2 class="ibl-title">League-wide Statistics</h2>', $result);
-        $this->assertStringNotContainsString('League-wide Statistics</h1>', $result);
+        $this->assertStringContainsString('<h1 class="ibl-title">League-wide Statistics</h1>', $result);
+        $this->assertStringNotContainsString('League-wide Statistics</h2>', $result);
     }
 
     /**

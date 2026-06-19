@@ -7,6 +7,10 @@ namespace Tests\LeagueSchedule;
 use LeagueSchedule\LeagueScheduleView;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * @phpstan-import-type MonthData from \LeagueSchedule\Contracts\LeagueScheduleServiceInterface
+ * @phpstan-import-type SchedulePageData from \LeagueSchedule\Contracts\LeagueScheduleServiceInterface
+ */
 class LeagueScheduleViewTest extends TestCase
 {
     private LeagueScheduleView $view;
@@ -93,12 +97,14 @@ class LeagueScheduleViewTest extends TestCase
                             'homeTeam' => 'Team B',
                             'home_record' => '20-15',
                             'boxid' => 101,
-                            'game_of_that_day' => 1,
+                            'gameOfThatDay' => 1,
                             'boxScoreUrl' => 'boxscore.php?id=101',
                             'isUnplayed' => false,
                             'isUpcoming' => false,
                             'visitorWon' => true,
                             'homeWon' => false,
+                            'visitorTier' => '',
+                            'homeTier' => '',
                         ],
                     ],
                 ],
@@ -133,12 +139,14 @@ class LeagueScheduleViewTest extends TestCase
                             'homeTeam' => 'Team B',
                             'home_record' => '',
                             'boxid' => 101,
-                            'game_of_that_day' => 0,
+                            'gameOfThatDay' => 0,
                             'boxScoreUrl' => '',
                             'isUnplayed' => true,
                             'isUpcoming' => true,
                             'visitorWon' => false,
                             'homeWon' => false,
+                            'visitorTier' => '',
+                            'homeTier' => '',
                         ],
                     ],
                 ],
@@ -198,12 +206,14 @@ class LeagueScheduleViewTest extends TestCase
                             'homeTeam' => 'Team B',
                             'home_record' => '',
                             'boxid' => 101,
-                            'game_of_that_day' => 0,
+                            'gameOfThatDay' => 0,
                             'boxScoreUrl' => 'boxscore.php?id=101',
                             'isUnplayed' => true,
                             'isUpcoming' => false,
                             'visitorWon' => false,
                             'homeWon' => false,
+                            'visitorTier' => '',
+                            'homeTier' => '',
                         ],
                     ],
                 ],
@@ -217,8 +227,8 @@ class LeagueScheduleViewTest extends TestCase
     }
 
     /**
-     * @param array<string, array{label: string, dates: array<string, list<array<string, mixed>>>}> $gamesByMonth
-     * @return array{gamesByMonth: array<string, array{label: string, dates: array<string, list<array<string, mixed>>>}>, firstUnplayedId: string|null, isPlayoffPhase: bool, playoffMonthKey: string|null, simLengthDays: int}
+     * @param array<string, MonthData> $gamesByMonth
+     * @return SchedulePageData
      */
     private function createPageData(
         array $gamesByMonth = [],

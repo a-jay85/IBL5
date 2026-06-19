@@ -137,7 +137,8 @@ if command -v gtimeout &>/dev/null; then
             echo "$cmd_pid" > "$NIGHTLY_CMDPID_FILE"
         fi
         ( exec 0</dev/null 1>/dev/null 2>&1
-          sleep "$secs" && kill -TERM "$cmd_pid" 2>/dev/null
+          sleep "$secs" && kill -TERM "$cmd_pid" 2>/dev/null \
+            && sleep "${KILL_GRACE_SECS:-15}" && kill -KILL "$cmd_pid" 2>/dev/null
         ) &
         local timer_pid=$!
         local status=0
@@ -159,7 +160,8 @@ elif ! command -v timeout &>/dev/null; then
         fi
         # exec inside subshell guarantees fd closure (bash 3.2 pipeline compat)
         ( exec 0</dev/null 1>/dev/null 2>&1
-          sleep "$secs" && kill -TERM "$cmd_pid" 2>/dev/null
+          sleep "$secs" && kill -TERM "$cmd_pid" 2>/dev/null \
+            && sleep "${KILL_GRACE_SECS:-15}" && kill -KILL "$cmd_pid" 2>/dev/null
         ) &
         local timer_pid=$!
         local status=0
@@ -183,7 +185,14 @@ MAX_ELAPSED=17100  # ~4h45m — stops around 4:45am, leaves headroom in the 5h u
 MAX_ATTEMPTS=3     # per-plan retry cap within one night (covers impl + postplan phases)
 MAX_IMPL_SECS=3600   # per-phase cap: impl gets at most 1h
 MAX_PP_SECS=3600     # per-phase cap: post-plan gets at most 1h
+LOCK_TTL_SECS=9000   # max a single plan legitimately holds its claim lock
+                     # (impl 1h + postplan 1h + overhead); a lock older than this
+                     # whose owner PID is gone is presumed crashed and stolen.
 STALL_KILL_SECS=600  # kill phase if no stream events for 10 minutes
+KILL_GRACE_SECS=15   # after SIGTERM, wait this long then SIGKILL — a phase wedged
+                     # on a dead inference stream traps SIGTERM and ignores it
+                     # (the 2026-06-11 run hung 7h on a SIGTERM that never landed)
+ARCHIVE_AGE_DAYS="${NIGHTLY_ARCHIVE_AGE_DAYS:-7}"  # startup-archive entries idle this many days
 MIN_VIABLE_SECS=60   # a real impl/postplan never finishes (pass OR fail) under a
                      # minute — historical runs are 15-50 min; environmental
                      # fast-fails (usage/rate limit, auth error, transient) exit in
@@ -194,6 +203,7 @@ HANDOFF_DIR="$NIGHTLY_DIR/handoff"
 mkdir -p "$LOG_DIR" "$QUEUE_DIR" "$HANDOFF_DIR"
 
 WATCHER_PID=""
+CURRENT_LOCK=""   # claim-lock dir held for the plan this runner is processing
 cleanup_watcher() {
     if [ -n "$WATCHER_PID" ]; then
         kill "$WATCHER_PID" 2>/dev/null || true
@@ -201,6 +211,11 @@ cleanup_watcher() {
     fi
     rm -f "$NIGHTLY_DIR/.heartbeat-$$-impl" "$NIGHTLY_DIR/.heartbeat-$$-postplan" \
          "$NIGHTLY_DIR/.cmdpid-$$-impl" "$NIGHTLY_DIR/.cmdpid-$$-postplan" 2>/dev/null || true
+    # Release any plan claim still held (e.g. we broke out of the loop mid-plan on
+    # a time guard or env-failure) so a sibling/next run can resume it.
+    if [ -n "$CURRENT_LOCK" ]; then
+        rm -rf "$CURRENT_LOCK" 2>/dev/null || true
+    fi
 }
 trap cleanup_watcher EXIT
 
@@ -225,6 +240,16 @@ run_heartbeat_watcher() {
                     "$ts" "$label" "$age" "$target_pid" >> "$log_file"
                 pkill -TERM -P "$target_pid" 2>/dev/null || true
                 kill -TERM "$target_pid" 2>/dev/null || true
+                # SIGTERM can be trapped/ignored by a phase wedged on a dead
+                # inference stream (this hung the 2026-06-11 run for 7h);
+                # escalate to SIGKILL after a grace period.
+                sleep "$KILL_GRACE_SECS"
+                if kill -0 "$target_pid" 2>/dev/null; then
+                    printf '[%s] STALL-KILL: %s — pid %s survived SIGTERM, sending SIGKILL\n' \
+                        "$(date +%H:%M:%S)" "$label" "$target_pid" >> "$log_file"
+                    pkill -KILL -P "$target_pid" 2>/dev/null || true
+                    kill -KILL "$target_pid" 2>/dev/null || true
+                fi
                 return
             else
                 printf '[%s] WARNING: %s — no events for %ds (stalled, pid gone)\n' \
@@ -259,6 +284,33 @@ append_cost_row() {
     printf '| %s | %s | %s |\n' "$plan" "$phase" "$cost" >> "$report"
 }
 
+# Human-sign-off guard — best-effort defense-in-depth, NOT the deterministic
+# block. The required `human-signoff` check (.github/workflows/human-signoff.yml)
+# is what actually blocks the merge; it holds no matter what this does. The
+# nightly bot runs as the repo owner with the owner's `gh` creds, so GitHub
+# can't distinguish bot from human — the only discriminator lives here, in the
+# headless path. /post-plan Phase 6.5 arms `gh pr merge --auto` for every PR;
+# this strips that arming, and any `human-approved` label, from `feat:` PRs the
+# bot authored. Caveat: post-plan watches CI to completion before returning
+# here, so this runs too late to beat a label applied mid-watch — it's tidy-up
+# and a tripwire, not a race-free guarantee. The real safeguard against
+# self-labeling is that post-plan never applies the label. Never aborts the run
+# (`|| true` throughout; guarded by a `set -e`-safe `if`).
+neutralize_feat_signoff() {
+    command -v gh >/dev/null 2>&1 || return 0
+    local n
+    gh pr list --author "@me" --state open --json number,title \
+        --jq '.[] | select(.title|test("(?i)^feat(\\([^)]*\\))?!?:")) | .number' \
+        2>/dev/null \
+    | while read -r n; do
+        [ -n "$n" ] || continue
+        gh pr merge "$n" --disable-auto 2>/dev/null || true
+        gh pr edit "$n" --remove-label "human-approved" 2>/dev/null || true
+        printf '[%s] human-signoff guard: stripped auto-merge/label from feat PR #%s\n' \
+            "$(date +%H:%M:%S)" "$n" >> "$LOG"
+    done || true
+}
+
 # Decrement the current plan's attempt counter by one ("refund"). Used when a
 # phase is cut short by an environmental failure (usage/rate limit, auth error,
 # transient) rather than a genuine plan failure — the plan should retry cleanly
@@ -286,6 +338,17 @@ phase_env_error() {
         "hit your [a-z0-9 -]*limit|usage limit reached|api error:[[:space:]]*(401|403|429|529)|overloaded_error|rate_limit_error"
 }
 
+# A phase that emitted no stream events for STALL_KILL_SECS is force-killed by the
+# heartbeat watcher (see run_heartbeat_watcher), which writes a distinctive
+# "STALL-KILL" marker into this phase's log slice. A stall is a transient hang
+# (typically a dead/wedged inference stream), NOT a plan defect — classify it
+# environmental so the breaker refunds + stops rather than burning the attempt
+# toward the poison-pill skip. Safe under `set -e`: only called inside `if`.
+phase_stalled() {
+    local log_before=$1
+    tail -n +"$(( log_before + 1 ))" "$LOG" 2>/dev/null | grep -q "STALL-KILL"
+}
+
 # Write a one-line report when the run STOPS on an environmental failure. The
 # queue is left intact (nothing skipped), so without this a no-progress night —
 # e.g. a single head-of-queue plan that keeps fast-failing — would be silent.
@@ -305,6 +368,72 @@ write_env_stop_report() {
     } > "$reports_dir/$(date +%Y-%m-%d)-env-stop-$slug.md"
 }
 
+# Move entries in a nightly subdir untouched for $ARCHIVE_AGE_DAYS into a sibling
+# `<subdir>.archive/`, keeping the working dirs small without deleting history.
+# Matches regular files AND symlinks; `find` does not follow symlinks, so a
+# disposition symlink (done/, skipped/) is judged on its OWN mtime — the date it
+# was moved there — not the plan file it points at. `+N` = strictly older than
+# N*24h. Lazily creates the archive dir only when something actually moves.
+# Caller scopes this under `|| true` so a failure here can never abort the night.
+archive_stale() {
+    local subdir=$1
+    local src="$NIGHTLY_DIR/$subdir"
+    local dest="$NIGHTLY_DIR/${subdir}.archive"
+    [ -d "$src" ] || return 0
+    local moved=0 entry
+    while IFS= read -r entry; do
+        [ -n "$entry" ] || continue
+        mkdir -p "$dest"
+        mv "$entry" "$dest/" 2>/dev/null && moved=$(( moved + 1 ))
+    done < <(find "$src" -mindepth 1 -maxdepth 1 \( -type f -o -type l \) \
+                  -mtime +"$ARCHIVE_AGE_DAYS" 2>/dev/null)
+    [ "$moved" -eq 0 ] || echo "Archived $moved stale entr$([ "$moved" -eq 1 ] && echo y || echo ies) from $subdir/ → ${subdir}.archive/" >> "$LOG"
+}
+
+# Atomically claim the oldest queued plan not already locked by a live sibling
+# runner, enabling several nightly-run processes to drain the queue in parallel
+# without ever working the same plan twice. `mkdir` is atomic on the local FS, so
+# two racing runners can never both create the same lock dir — exactly one wins.
+# On success: echoes the claimed plan path to stdout and leaves
+# "$QUEUE_DIR/<plan>.lock/" held (owner PID recorded in its `pid` file). On
+# failure (every queued plan is locked by a live sibling): echoes nothing, returns 1.
+# A lock whose owner PID is dead, or older than LOCK_TTL_SECS, is treated as stale
+# and stolen — covering a runner that crashed mid-plan. Only ever called as
+# `NEXT_PLAN=$(claim_next_plan) || NEXT_PLAN=""`, so the return-1 is set -e safe.
+claim_next_plan() {
+    local plan plan_name lock owner now lock_epoch
+    while IFS= read -r plan; do
+        [ -n "$plan" ] || continue
+        plan_name=$(basename "$plan")
+        lock="$QUEUE_DIR/${plan_name}.lock"
+        # Fast path: unlocked plan — claim atomically.
+        if mkdir "$lock" 2>/dev/null; then
+            echo "$$" > "$lock/pid"
+            printf '%s\n' "$plan"
+            return 0
+        fi
+        # Locked — is the holder dead or the lock expired? If so, steal it.
+        owner=$(cat "$lock/pid" 2>/dev/null) || owner=""
+        now=$(date +%s)
+        lock_epoch=$(stat -f %m "$lock" 2>/dev/null || echo "$now")
+        if { [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; } \
+           || [ "$(( now - lock_epoch ))" -gt "$LOCK_TTL_SECS" ]; then
+            rm -rf "$lock" 2>/dev/null || true
+            # Re-create atomically; the loser of a two-stealer race fails mkdir
+            # here and simply falls through to the next plan.
+            if mkdir "$lock" 2>/dev/null; then
+                echo "$$" > "$lock/pid"
+                printf '[%s] stole stale lock for %s (dead/expired owner=%s)\n' \
+                    "$(date +%H:%M:%S)" "$plan_name" "${owner:-?}" >> "$LOG"
+                printf '%s\n' "$plan"
+                return 0
+            fi
+        fi
+        # Live lock held by a sibling — skip to the next-oldest plan.
+    done < <(ls -1tr "$QUEUE_DIR"/*.md 2>/dev/null)
+    return 1
+}
+
 LOG="$LOG_DIR/$(date +%Y-%m-%d).log"
 
 cd "$REPO"
@@ -317,6 +446,17 @@ START=$(date +%s)
 PLANS_RUN=0
 
 echo "=== Nightly session starting at $(date) ===" >> "$LOG"
+
+# Startup archival: shrink the accumulating output dirs by moving entries idle
+# for $ARCHIVE_AGE_DAYS into sibling `.archive/` folders. queue/ (pending work,
+# iterated below) and handoff/ (transient, cleaned at loop end) are excluded by
+# design. Whole block guarded so an archival hiccup never stops the night.
+{
+    archive_stale logs
+    archive_stale reports
+    archive_stale "done"
+    archive_stale skipped
+} || true
 
 while true; do
     # Check if queue has plans
@@ -339,9 +479,15 @@ while true; do
         break
     fi
 
-    # Pick the oldest queued plan
-    NEXT_PLAN=$(ls -1tr "$QUEUE_DIR"/*.md 2>/dev/null | head -1)
+    # Atomically claim the oldest queued plan not held by a live sibling runner.
+    # If every queued plan is already claimed, there's nothing for us to do.
+    NEXT_PLAN=$(claim_next_plan) || NEXT_PLAN=""
+    if [ -z "$NEXT_PLAN" ]; then
+        echo "All queued plans are claimed by a concurrent runner — nothing to do." >> "$LOG"
+        break
+    fi
     PLAN_NAME=$(basename "$NEXT_PLAN")
+    CURRENT_LOCK="$QUEUE_DIR/${PLAN_NAME}.lock"
 
     # Per-plan retry counter — skip poison pills
     ATTEMPT_FILE="$QUEUE_DIR/${PLAN_NAME}.attempts"
@@ -364,6 +510,8 @@ while true; do
             tail -30 "$LOG"
             printf '\n```\n'
         } > "$REPORTS_DIR/$(date +%Y-%m-%d)-skipped-$SLUG.md"
+        rm -rf "$CURRENT_LOCK" 2>/dev/null || true
+        CURRENT_LOCK=""
         continue
     fi
 
@@ -443,12 +591,18 @@ PLAN_FILE=$PLAN_NAME" \
         #   2. a sub-minute exit — real impls run 15-50 min, so a fast no-handoff
         #      exit is environmental whatever the phrasing, and (unlike string
         #      matching) is immune to the async-stderr log-flush race.
+        #   3. a watchdog stall-kill — no stream events for STALL_KILL_SECS, a
+        #      transient hang (e.g. a dead inference stream), not a plan defect.
         # A slow failure with no signature falls through as a genuine plan failure,
         # keeping its incremented attempt → eventual poison-pill skip (unchanged).
         if [ ! -f "$HANDOFF_FILE" ] \
-           && { phase_env_error "$IMPL_LOG_BEFORE" || [ "$IMPL_DUR" -lt "$MIN_VIABLE_SECS" ]; }; then
+           && { phase_env_error "$IMPL_LOG_BEFORE" \
+                || phase_stalled "$IMPL_LOG_BEFORE" \
+                || [ "$IMPL_DUR" -lt "$MIN_VIABLE_SECS" ]; }; then
             REASON="usage/rate limit, auth error, or transient"
-            if [ "$IMPL_DUR" -lt "$MIN_VIABLE_SECS" ]; then
+            if phase_stalled "$IMPL_LOG_BEFORE"; then
+                REASON="phase stalled — no stream events for >$((STALL_KILL_SECS/60))min, force-killed"
+            elif [ "$IMPL_DUR" -lt "$MIN_VIABLE_SECS" ]; then
                 REASON="$REASON (impl exited in ${IMPL_DUR}s)"
             fi
             echo "Environmental failure during impl — $REASON. Refunding attempt, stopping loop." >> "$LOG"
@@ -525,9 +679,12 @@ PLAN_FILE=$PLAN_NAME" \
         # ran — environmental. A known limit/auth signature stops regardless, so a
         # dead budget doesn't burn a postplan retry. Refund + stop; queue intact.
         if phase_env_error "$PP_LOG_BEFORE" \
+           || phase_stalled "$PP_LOG_BEFORE" \
            || { [ -f "$HANDOFF_FILE" ] && [ "$PP_DUR" -lt "$MIN_VIABLE_SECS" ]; }; then
             REASON="usage/rate limit, auth error, or transient"
-            if [ "$PP_DUR" -lt "$MIN_VIABLE_SECS" ]; then
+            if phase_stalled "$PP_LOG_BEFORE"; then
+                REASON="phase stalled — no stream events for >$((STALL_KILL_SECS/60))min, force-killed"
+            elif [ "$PP_DUR" -lt "$MIN_VIABLE_SECS" ]; then
                 REASON="$REASON (postplan exited in ${PP_DUR}s)"
             fi
             echo "Environmental failure during postplan — $REASON. Refunding attempt, stopping loop." >> "$LOG"
@@ -535,11 +692,24 @@ PLAN_FILE=$PLAN_NAME" \
             write_env_stop_report "$PLAN_NAME" postplan "$REASON" "$PP_LOG_BEFORE"
             break
         fi
+
+        # Layer B: post-plan may have armed `gh pr merge --auto` on a feature PR.
+        # Strip that (and any human-approved label) so feature PRs can only merge
+        # after a human applies the label. Runs after every completed post-plan.
+        neutralize_feat_signoff
     fi
 
     # If the plan moved out of queue/ (to done/ or skipped/), clean up its attempt file
     if [ ! -e "$NEXT_PLAN" ]; then
         rm -f "$ATTEMPT_FILE"
+    fi
+
+    # Release this plan's claim — done with it for this iteration. A genuine
+    # failure leaves it in queue/ (attempt incremented) for any runner to retry;
+    # a completed plan has moved to done/. Either way, drop the lock and move on.
+    if [ -n "$CURRENT_LOCK" ]; then
+        rm -rf "$CURRENT_LOCK" 2>/dev/null || true
+        CURRENT_LOCK=""
     fi
 done
 
@@ -558,6 +728,17 @@ for hf in "$HANDOFF_DIR"/*.json; do
     PLAN_FOR_HANDOFF="$QUEUE_DIR/$(basename "${hf%.json}")"
     if [ ! -e "$PLAN_FOR_HANDOFF" ]; then
         rm -f "$hf"
+    fi
+done
+
+# Clean up orphaned claim locks (plan no longer in queue — completed or skipped).
+# Locks on plans still in queue/ are left alone: a sibling runner may hold one
+# legitimately, and a genuinely abandoned one is reaped via the staleness check
+# in claim_next_plan on the next run.
+for lock in "$QUEUE_DIR"/*.md.lock; do
+    [ -e "$lock" ] || continue
+    if [ ! -e "${lock%.lock}" ]; then
+        rm -rf "$lock" 2>/dev/null || true
     fi
 done
 

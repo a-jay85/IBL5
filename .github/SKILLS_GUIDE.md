@@ -1,6 +1,6 @@
 # IBL5 Skills Guide
 
-How to create, use, and validate skills for Claude/Copilot progressive loading.
+How to create, use, and validate skills for Claude progressive loading.
 
 ## Skills Architecture
 

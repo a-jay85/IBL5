@@ -132,7 +132,11 @@ class PageLayout
         echo "<META NAME=\"RATING\" CONTENT=\"GENERAL\">\n";
 
         // Open Graph meta tags (for LinkedIn, Facebook, etc.)
-        $ogHost = is_string($_SERVER['HTTP_HOST'] ?? null) ? $_SERVER['HTTP_HOST'] : 'iblhoops.net';
+        // Host is used ONLY to select the preprod og:image variant -- never interpolated into output.
+        // Output host is always a hardcoded literal, so a poisoned Host header (cached + served to all
+        // anonymous visitors via PageCache, which does not key on Host) cannot reach the meta tags.
+        $requestHost = is_string($_SERVER['HTTP_HOST'] ?? null) ? $_SERVER['HTTP_HOST'] : '';
+        $ogHost = ($requestHost === 'pre.iblhoops.net') ? 'pre.iblhoops.net' : 'www.iblhoops.net';
         $ogBaseUrl = "https://{$ogHost}/ibl5";
         $ogTitle = "IBL \xe2\x80\x94 Internet Basketball League";
         $ogDescription = 'The Internet Basketball League (IBL) is an online fantasy basketball league powered by the Jump Shot Basketball simulation engine.';

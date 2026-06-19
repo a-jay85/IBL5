@@ -112,7 +112,10 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 		// Make/foul/turnover arms route through the gameState freeze wrappers
 		// (freeze.go) on the transition path too, so a frozen Make/Foul/TVR arm
 		// applies to fast-break FGA — not only the half-court loop.
-		sv2 := applyClutch(gs.makeValue2pt(net, bh.FGP), bh.Clutch, gs.period, scoreDiff)
+		// OriginTransition: the ADR-0053 MakePutback arm is OriginOffReb-scoped, so a
+		// fast-break shot (and any rebound continuation within the break, which the
+		// transition path also tags OriginTransition) keeps its live make-value.
+		sv2 := applyClutch(gs.makeValue2pt(net, bh.FGP, result.OriginTransition), bh.Clutch, gs.period, scoreDiff)
 		// Play-outcome buckets use the same faithful helpers as the half-court path
 		// (bucketweights.go) — the second of the two outcomeInputs assembly sites. sv2
 		// (above) feeds shotAttempt on the 2pt path ONLY; it does not double as the

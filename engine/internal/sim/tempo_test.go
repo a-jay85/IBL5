@@ -71,6 +71,38 @@ func TestTeamBaseTime_ZeroRatedNoNaN(t *testing.T) {
 	}
 }
 
+// TestTeamBaseTimeWith_ConstWrapperIdentity is the ADR-0054 refactor characterization:
+// teamBaseTimeWith called with the package const offVolumeScale must reproduce
+// teamBaseTime byte-for-byte, so the const-wrapper split is behavior-preserving and a
+// nil Options.OffVolumeScale stays golden-stable.
+func TestTeamBaseTimeWith_ConstWrapperIdentity(t *testing.T) {
+	for _, l := range [][]onCourt{
+		lineup(175, 24), lineup(147, 30), lineup(int(offVolumeNeutral), int(defRatingNeutral)),
+		lineup(0, 0), nil,
+	} {
+		if w, c := teamBaseTimeWith(l, offVolumeScale), teamBaseTime(l); w != c {
+			t.Fatalf("teamBaseTimeWith(_, const)=%.9f != teamBaseTime(_)=%.9f", w, c)
+		}
+	}
+}
+
+// TestTeamBaseTimeWith_ScaleBoundary is the scale-aware boundary: a larger sweep scale
+// never escapes the [13,16] clamp, and the empty-lineup guard is scale-independent.
+func TestTeamBaseTimeWith_ScaleBoundary(t *testing.T) {
+	if hot := teamBaseTimeWith(lineup(400, 24), 0.06); hot != baseTimeLow {
+		t.Fatalf("scale=0.06 extreme-volume base_time = %.4f, want clamp to %.1f", hot, baseTimeLow)
+	}
+	if empty := teamBaseTimeWith(nil, 0.06); empty != baseTimeLow {
+		t.Fatalf("scale=0.06 empty lineup base_time = %.4f, want %.1f", empty, baseTimeLow)
+	}
+	// scale=0 disables the offensive-volume term: a high-volume roster no longer
+	// shortens below a neutral one (the channel is off), but stays finite in-clamp.
+	off0 := teamBaseTimeWith(lineup(200, int(defRatingNeutral)), 0)
+	if math.Abs(off0-baseTimeMid) > 1e-9 {
+		t.Fatalf("scale=0 should null the volume term → baseTimeMid, got %.6f", off0)
+	}
+}
+
 // TestPossessionTime_FallbackBounds locks the (2.0−factor) form and the 24.0
 // out-of-range fallback: an in-range base_time passes through (truncated to int),
 // while a base_time below 1.0 or above 24.0 resets to the JSB fallback of 24.

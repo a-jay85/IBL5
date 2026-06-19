@@ -300,4 +300,4 @@ echo $html;  // HTML response (success or error message)
 - Database Guide: `ibl5/docs/DATABASE_GUIDE.md`
 - Test Suite: `tests/Draft/`
 - Interface Pattern: See Player module (`ibl5/classes/Player/README.md`)
-- Architecture Standards: `.github/copilot-instructions.md`
+- Architecture Standards: `.claude/rules/` and `CLAUDE.md`

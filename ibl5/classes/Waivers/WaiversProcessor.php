@@ -32,13 +32,24 @@ class WaiversProcessor implements WaiversProcessorInterface
     private \Topics\News\NewsRepository $newsService;
     private \mysqli $db;
 
+    /**
+     * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('audit').
+     */
+    private \Psr\Log\LoggerInterface $logger;
+    /**
+     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     */
+    private ?Season $season = null;
+
     public function __construct(
         WaiversRepositoryInterface $repository,
         \Repositories\Contracts\TeamIdentityRepositoryInterface $teamIdentityRepo,
         \Repositories\Contracts\PlayerLookupRepositoryInterface $playerLookupRepo,
         WaiversValidatorInterface $validator,
         \Topics\News\NewsRepository $newsService,
-        \mysqli $db
+        \mysqli $db,
+        ?\Psr\Log\LoggerInterface $logger = null,
+        ?Season $season = null
     ) {
         $this->repository = $repository;
         $this->teamIdentityRepo = $teamIdentityRepo;
@@ -47,6 +58,8 @@ class WaiversProcessor implements WaiversProcessorInterface
         $this->newsService = $newsService;
         $this->db = $db;
         $this->contractCalculator = new PlayerContractCalculator();
+        $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('audit');
+        $this->season = $season;
     }
 
     /**
@@ -180,10 +193,10 @@ class WaiversProcessor implements WaiversProcessorInterface
         try {
             Discord::postToChannel('#waiver-wire', $hometext);
         } catch (\Throwable $discordErr) {
-            \Logging\LoggerFactory::getChannel('audit')->warning('waiver_discord_notification_failed', ['error' => $discordErr->getMessage()]);
+            $this->logger->warning('waiver_discord_notification_failed', ['error' => $discordErr->getMessage()]);
         }
 
-        \Logging\LoggerFactory::getChannel('audit')->info('player_waived', [
+        $this->logger->info('player_waived', [
             'action' => 'player_waived',
             'player_id' => $playerID,
             'player_name' => $playerName,
@@ -209,7 +222,7 @@ class WaiversProcessor implements WaiversProcessorInterface
             return ['success' => false, 'error' => 'Player not found.'];
         }
 
-        $season = new Season($this->db);
+        $season = $this->season ?? new Season($this->db);
         /** @var array{hasExistingContract: bool, salary: int} $contractData */
         $contractData = $this->determineContractData($player, $season);
         $playerSalary = $contractData['salary'];
@@ -239,10 +252,10 @@ class WaiversProcessor implements WaiversProcessorInterface
         try {
             Discord::postToChannel('#waiver-wire', $hometext);
         } catch (\Throwable $discordErr) {
-            \Logging\LoggerFactory::getChannel('audit')->warning('waiver_discord_notification_failed', ['error' => $discordErr->getMessage()]);
+            $this->logger->warning('waiver_discord_notification_failed', ['error' => $discordErr->getMessage()]);
         }
 
-        \Logging\LoggerFactory::getChannel('audit')->info('player_signed_from_waivers', [
+        $this->logger->info('player_signed_from_waivers', [
             'action' => 'player_signed_from_waivers',
             'player_id' => $playerID,
             'player_name' => $playerName,

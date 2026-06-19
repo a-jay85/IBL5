@@ -1,6 +1,6 @@
 ---
 description: "IBL5 project overview: what it is, the engineering practices behind it, and how to run it."
-last_verified: 2026-06-08
+last_verified: 2026-06-15
 ---
 
 # IBL5 — Internet Basketball League
@@ -19,7 +19,7 @@ This is a solo-maintained, long-running application, so it doubles as a portfoli
 - **Tests as a safety net for legacy refactoring** — hundreds of PHPUnit test files plus a Playwright E2E suite, with characterization tests written *before* extracting each module so behavior is provably preserved.
 - **Static analysis at the ceiling** — PHPStan at `level: max` with strict-rules, deprecation-rules, bleedingEdge, and a set of custom project-specific PHPStan rules that ban known footguns (e.g. raw SQL identifier drift).
 - **Mutation testing** — Infection enforces test *effectiveness*, not just coverage, on critical modules.
-- **Heavy CI/CD** — 20+ GitHub Actions workflows covering unit/integration tests, E2E, static analysis, mutation, CodeQL, secret scanning, Lighthouse performance/a11y budgets, migration safety checks, and deploy rehearsals.
+- **Heavy CI/CD** — 20+ GitHub Actions workflows covering unit/integration tests, E2E, static analysis, mutation, CodeQL, secret scanning, Lighthouse performance/a11y budgets, migration safety checks, and deploy rehearsals — path-gated so docs-only pushes skip the heavy suites and the PR auto-rebase storm.
 - **Decision records** — dozens of ADRs documenting the *why* behind architectural choices.
 
 ## Tech Stack

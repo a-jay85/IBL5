@@ -1,6 +1,6 @@
 ---
 description: Template for new ADRs. Copy with `bin/next-adr "kebab-title"`; do not fill in place.
-last_verified: 2026-04-11
+last_verified: 2026-06-10
 ---
 
 # ADR-NNNN: <Title>

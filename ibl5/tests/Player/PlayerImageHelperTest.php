@@ -263,6 +263,40 @@ class PlayerImageHelperTest extends TestCase
         $this->assertStringNotContainsString('is-starter', $result);
     }
 
+    public function testRenderPlayerCellEscapesScriptInName(): void
+    {
+        $result = PlayerImageHelper::renderPlayerCell(123, '<script>alert(1)</script>');
+
+        $this->assertStringNotContainsString('<script>', $result);
+        $this->assertStringContainsString('&lt;script&gt;', $result);
+    }
+
+    public function testRenderPlayerCellEscapesNameInAbbrevSpanToo(): void
+    {
+        // Name with a space triggers abbreviation; both spans must be escaped.
+        $result = PlayerImageHelper::renderPlayerCell(123, 'Evan <b>Smith');
+
+        $this->assertStringNotContainsString('<b>', $result);
+        $this->assertStringContainsString('&lt;b&gt;', $result);
+        $this->assertStringContainsString('ibl-player-cell__name--abbrev', $result);
+    }
+
+    public function testRenderPlayerCellPipeBranchNotDoubleEscaped(): void
+    {
+        // Pipe branch already escapes; the non-pipe reassignment must not affect it.
+        $result = PlayerImageHelper::renderPlayerCell(0, '| Cash & Picks');
+
+        $this->assertStringContainsString('&amp;', $result);
+        $this->assertStringNotContainsString('&amp;amp;', $result);
+    }
+
+    public function testRenderPlayerCellLegitNameUnchanged(): void
+    {
+        $result = PlayerImageHelper::renderPlayerCell(123, 'John Smith');
+
+        $this->assertStringContainsString('John Smith', $result);
+    }
+
     public function testRenderPlayerLinkBasic(): void
     {
         $result = PlayerImageHelper::renderPlayerLink(123, 'John Smith');

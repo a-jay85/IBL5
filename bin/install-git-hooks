@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/install-git-hooks — install the pre-push ADR decision-trigger gate.
+#
+# Copies a thin shim into the COMMON git hooks dir (git rev-parse
+# --git-common-dir), so a single install covers every worktree (worktrees share
+# the common .git). The shim chains git-lfs (preserving LFS pushes) then exec's
+# bin/pre-push-adr-hook, where the gate logic lives version-controlled.
+#
+# We deliberately do NOT use core.hooksPath: it is all-or-nothing across the
+# shared common git dir and would orphan the existing untracked hooks (the git-lfs
+# pre-push, pre-commit's codebase-map + check-docs, post-merge wt-cleanup,
+# post-checkout). Copying one shim is surgical.
+#
+# Idempotent: re-running detects our sentinel marker and rewrites in place; a
+# pre-existing NON-shim pre-push (the default git-lfs one) is backed up once to
+# pre-push.pre-adr.bak before we overwrite it.
+
+set -euo pipefail
+
+SENTINEL='# IBL5-ADR-HOOK'
+
+HOOKS_DIR="$(git rev-parse --git-common-dir)/hooks"
+mkdir -p "$HOOKS_DIR"
+SHIM="$HOOKS_DIR/pre-push"
+
+# Back up a pre-existing non-shim pre-push exactly once (preserves the default
+# git-lfs hook). Re-running over our own shim makes no backup.
+if [ -e "$SHIM" ] && ! grep -qF "$SENTINEL" "$SHIM"; then
+    BACKUP="$HOOKS_DIR/pre-push.pre-adr.bak"
+    if [ ! -e "$BACKUP" ]; then
+        cp "$SHIM" "$BACKUP"
+        echo "Backed up existing pre-push hook to $BACKUP"
+    fi
+fi
+
+cat > "$SHIM" <<'EOF'
+#!/bin/sh
+# IBL5-ADR-HOOK (installed by bin/install-git-hooks)
+# Chain git-lfs (preserves LFS pushes), then the ADR decision-trigger gate.
+if command -v git-lfs >/dev/null 2>&1; then git lfs pre-push "$@" || exit $?; fi
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+exec "$REPO_ROOT/bin/pre-push-adr-hook" "$@"
+EOF
+chmod 0755 "$SHIM"
+
+echo "Installed pre-push ADR hook: $SHIM"

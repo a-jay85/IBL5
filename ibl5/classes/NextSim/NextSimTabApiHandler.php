@@ -17,10 +17,15 @@ use Team\Team;
 class NextSimTabApiHandler
 {
     private \mysqli $db;
+    /**
+     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     */
+    private ?Season $season = null;
 
-    public function __construct(\mysqli $db)
+    public function __construct(\mysqli $db, ?Season $season = null)
     {
         $this->db = $db;
+        $this->season = $season;
     }
 
     public function handle(): void
@@ -30,7 +35,7 @@ class NextSimTabApiHandler
         $teamid = self::extractValidatedTeamid($_GET);
         $position = self::extractValidatedPosition($_GET);
 
-        $season = new Season($this->db);
+        $season = $this->season ?? new Season($this->db);
         $team = Team::initialize($this->db, $teamid);
 
         // Load power rankings for SOS tier indicators

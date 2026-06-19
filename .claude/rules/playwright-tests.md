@@ -1,7 +1,7 @@
 ---
 description: Playwright E2E testing rules, Docker requirements, and actionability pitfalls.
 paths: ibl5/tests/e2e/**/*.ts
-last_verified: 2026-05-31
+last_verified: 2026-06-11
 ---
 
 # Playwright E2E Testing Rules
@@ -9,398 +9,204 @@ last_verified: 2026-05-31
 ## Commands
 
 ```bash
-# Run all E2E tests
-cd ibl5 && bun run test:e2e
-
-# Run with visible browser
-cd ibl5 && bun run test:e2e:headed
-
-# Run interactive UI mode
-cd ibl5 && bun run test:e2e:ui
-
-# Run specific test file
-cd ibl5 && bunx playwright test tests/e2e/smoke/public-pages.spec.ts
+cd ibl5 && bun run test:e2e          # all tests
+cd ibl5 && bun run test:e2e:headed   # visible browser
+cd ibl5 && bun run test:e2e:ui       # interactive UI mode
+cd ibl5 && bunx playwright test tests/e2e/smoke/public-pages.spec.ts   # one file
+cd ibl5 && bun run test:e2e:serial   # --workers=1 --retries=2, to isolate flakes
 ```
 
-## Debugging Flaky Tests
+Use `test:e2e:serial` to decide whether an intermittent failure is a genuine bug or a parallelism artifact **before** investigating further.
 
-When tests fail intermittently (race conditions, resource contention, parallel worker conflicts), re-run with a single worker to isolate the issue:
+## Prerequisites (before any E2E work)
 
-```bash
-cd ibl5 && bun run test:e2e:serial
-```
-
-This runs with `--workers=1 --retries=2` (CI-matching retries, single worker). Use this to determine whether a failure is a genuine bug or a parallelism artifact before investigating further.
-
-## Prerequisites (run before any E2E work)
-
-1. **Verify Docker is running:** `docker compose ps` — if no containers are up, run `docker compose up -d`
-2. **Verify `.env.test` exists** with valid credentials — copy from `.env.test.example` if missing
-3. **Rebuild CSS after branch switches:** `css:watch` may not detect source changes from `git checkout`. Run `bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css`. See `.claude/rules/css-auto-rebuild.md` — this is the sanctioned recovery exception to the no-manual-build rule, not a routine step.
+1. **Docker running:** `docker compose ps` — if down, `docker compose up -d`.
+2. **`.env.test` exists** with valid credentials — copy from `.env.test.example` if missing.
+3. **Rebuild CSS after a branch switch:** `css:watch` may miss source changes from `git checkout`. Run `bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css`. Per `.claude/rules/css-auto-rebuild.md` this is the sanctioned recovery exception to the no-manual-build rule, not a routine step.
 
 ## Test Categories
 
-| Category | Directory | Purpose | Auth |
+| Category | Directory | Purpose | When |
 |----------|-----------|---------|------|
-| Smoke | `smoke/` | Verify pages load and render key elements | Public or authenticated |
-| Flow | `flows/` | Test multi-step user interactions | Authenticated |
-
-**When to use each:**
-- **Smoke** — adding a new page, refactoring a module's View, verifying no PHP errors after changes
-- **Flow** — testing interactive features (trading, depth chart entry, free agency bidding)
+| Smoke | `smoke/` | Pages load, key elements render, no PHP errors | New page, View refactor, post-change error check |
+| Flow | `flows/` | Multi-step interactions (auth) | Trading, depth chart, free-agency bidding |
 
 ## File Structure Templates
 
-### Public smoke test
 ```typescript
+// PUBLIC SMOKE — no auth
 import { test, expect } from '@playwright/test';
 import { publicStorageState } from '../helpers/public-storage-state';
+test.use({ storageState: publicStorageState() });   // prevents DevAutoLogin
 
-// Public pages — no authentication required.
-test.use({ storageState: publicStorageState() });
-
-const PHP_ERROR_PATTERNS = [
-  'Fatal error',
-  'Warning:',
-  'Parse error',
-  'Uncaught',
-  'Stack trace:',
-];
-
-test.describe('Module smoke tests', () => {
-  test('page loads', async ({ page }) => {
-    await page.goto('modules.php?name=ModuleName');
-    await expect(page.locator('.ibl-title').first()).toBeVisible();
-  });
-
-  test('no PHP errors', async ({ page }) => {
-    await page.goto('modules.php?name=ModuleName');
-    const body = await page.locator('body').textContent();
-    for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(body, `PHP error "${pattern}" found`).not.toContain(pattern);
-    }
-  });
+test('page loads', async ({ page }) => {
+  await page.goto('modules.php?name=ModuleName');
+  await expect(page.locator('.ibl-title').first()).toBeVisible();
 });
-```
 
-### Authenticated smoke test
-```typescript
+// AUTHENTICATED SMOKE — stored auth state
 import { test, expect } from '../fixtures/auth';
+test('protected page loads', async ({ page }) => {
+  await page.goto('modules.php?name=ProtectedModule');
+  await expect(page.getByText('Sign In')).not.toBeVisible();
+  await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+});
 
-// Authenticated page smoke tests — these use stored auth state.
-test.describe('Module auth smoke tests', () => {
-  test('protected page loads', async ({ page }) => {
-    await page.goto('modules.php?name=ProtectedModule');
-    await expect(page.getByText('Sign In')).not.toBeVisible();
-    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
-  });
+// FLOW with state control — appState auto-restores after each test
+import { test, expect } from '../fixtures/auth';        // or '../fixtures/public' for public+cookie state
+test.beforeEach(async ({ appState, page }) => {
+  await appState({ 'Allow Trades': 'Yes' });
+  await page.goto('modules.php?name=Module');
 });
 ```
-
-### Flow test with state control
-```typescript
-import { test, expect } from '../fixtures/auth';
-
-test.describe('Module flow', () => {
-  test.beforeEach(async ({ appState, page }) => {
-    // Set the state this test needs — automatically restored after each test
-    await appState({ 'Allow Trades': 'Yes' });
-    await page.goto('modules.php?name=Module');
-  });
-
-  test('interaction works', async ({ page }) => {
-    // Test steps...
-  });
-});
-```
-
-### Public test with cookie-based state control
-```typescript
-import { test, expect } from '../fixtures/public';
-
-test.describe('Public module flow', () => {
-  test.beforeEach(async ({ appState, page }) => {
-    await appState({ 'Trivia Mode': 'Off' });
-    await page.goto('modules.php?name=Module');
-  });
-
-  test('page loads', async ({ page }) => {
-    // Test steps...
-  });
-});
-```
-
-**WARNING:** Never use `setState()` from `helpers/test-state` in tests — it modifies the database directly and races with parallel workers. The `public` fixture's `appState` uses per-request cookies instead.
 
 ## Auth Patterns
 
 | Scenario | Import from | Extra setup |
 |----------|-------------|-------------|
-| Public page (no state control) | `@playwright/test` | `import { publicStorageState } from '../helpers/public-storage-state'; test.use({ storageState: publicStorageState() })` |
-| Public page (with state control) | `../fixtures/public` | None (uses cookie-based appState) |
-| Authenticated page | `../fixtures/auth` | None (uses stored auth state + cookie-based appState) |
+| Public, no state control | `@playwright/test` | `test.use({ storageState: publicStorageState() })` (from `../helpers/public-storage-state`) |
+| Public, with state control | `../fixtures/public` | None (cookie-based `appState`) |
+| Authenticated | `../fixtures/auth` | None (stored auth state + cookie `appState`) |
 
-**Never** call the login flow inside a test — always use the auth fixture. The `auth.setup.ts` project runs first and saves browser state to `playwright/.auth/user.json`.
+**Never** call the login flow inside a test — use the auth fixture. `auth.setup.ts` runs first and saves state to `playwright/.auth/user.json`.
 
 ### Shared server session — never mutate it; test the isolation invariant
 
-All authenticated workers share ONE server-side PHP session (the single pinned
-PHPSESSID in `playwright/.auth/user.json`). Per-browser-context cookie jars are
-isolated; the server session is not. So **anything an authenticated test writes
-into `$_SESSION` leaks into every other concurrent authenticated test.** This is
-why the auth fixture forbids logout tests, and it is what broke PR #878: an
-authenticated test switching `?league=olympics` wrote `$_SESSION['current_league']`,
-flipping every parallel test into Olympics context.
+All authenticated workers share ONE server-side PHP session (the pinned PHPSESSID in `playwright/.auth/user.json`). Per-context cookie jars are isolated; **the server session is not — anything an authenticated test writes into `$_SESSION` leaks into every other concurrent authenticated test.** This is why the auth fixture forbids logout tests, and what broke PR #878 (a test switching `?league=olympics` wrote `$_SESSION['current_league']`, flipping every parallel test into Olympics context).
 
-Two consequences for any **global mode/context switch** (league, impersonation,
-admin-mode, feature flag) that is read by shared infrastructure:
+For any **global mode/context switch** (league, impersonation, admin-mode, feature flag) read by shared infrastructure:
 
-1. **Production code** must persist the switch per-request (cookie + in-memory),
-   never in `$_SESSION`. See `League\LeagueContext::setLeague()`.
-2. **Tests** must cover the *negative invariant*, not just that the switch works:
-   open a second context sharing the same storageState (= same session) and assert
-   the switch in context A does NOT change what context B resolves. See
-   `tests/e2e/flows/league-context-isolation.spec.ts` as the canonical example.
-   Assert against the RAW server response (`context.request.get(...)`) when the
-   signal lives in markup that Alpine/HTMX removes from the live DOM.
+1. **Production code** persists the switch per-request (cookie + in-memory), never in `$_SESSION`. See `League\LeagueContext::setLeague()`.
+2. **Tests** cover the *negative invariant*: open a second context sharing the same storageState and assert the switch in context A does NOT change what context B resolves. Canonical: `tests/e2e/flows/league-context-isolation.spec.ts`. Assert against the RAW server response (`context.request.get(...)`) when the signal lives in markup Alpine/HTMX strips from the live DOM.
 
 ## PHP Error Detection (Mandatory)
 
-Every smoke test file **must** check for PHP errors on the pages it visits. Use this pattern:
+Every smoke test **must** check for PHP errors on the pages it visits:
 
 ```typescript
-const PHP_ERROR_PATTERNS = [
-  'Fatal error',
-  'Warning:',
-  'Parse error',
-  'Uncaught',
-  'Stack trace:',
-];
-
-// In a test:
+const PHP_ERROR_PATTERNS = ['Fatal error', 'Warning:', 'Parse error', 'Uncaught', 'Stack trace:'];
 const body = await page.locator('body').textContent();
 for (const pattern of PHP_ERROR_PATTERNS) {
   expect(body, `PHP error "${pattern}" found on ${url}`).not.toContain(pattern);
 }
 ```
 
-A dedicated "no PHP errors" test (like in `public-pages.spec.ts`) is preferred — it loops through all URLs the file covers.
+A dedicated "no PHP errors" test that loops over all the file's URLs (like `public-pages.spec.ts`) is preferred.
 
 ## Locator Best Practices
 
-**Preference order** (most stable to least):
-1. Accessible roles: `page.getByRole('button', { name: /display/i })`
-2. Text content: `page.getByText('Trading')`
-3. Labels: `page.getByLabel('Username')`
-4. Test IDs: `page.getByTestId('trade-form')` (if added to HTML)
-5. Semantic CSS classes: `page.locator('.ibl-data-table')`
-6. Structural selectors: `page.locator('div > table:nth-child(2)')` (avoid)
+**Preference order** (stable → fragile): `getByRole` → `getByText` → `getByLabel` → `getByTestId` → semantic CSS class (`.ibl-data-table`) → structural selectors (avoid).
 
-**Stable IBL5 CSS classes safe for locators:**
-- `.ibl-title` — page title headings
-- `.ibl-data-table` — data tables
-- `.ibl-card` — card components
-- `.trading-team-select` — trading team selection table
-- `.trading-roster` — trading roster tables
-- `.trade-offer-card` — trade offer cards
-- `.player-stats-card` — player stats card
+**Stable IBL5 classes:** `.ibl-title`, `.ibl-data-table`, `.ibl-card`, `.trading-team-select`, `.trading-roster`, `.trade-offer-card`, `.player-stats-card`.
 
-**Avoid:**
-- Fragile structural selectors (`table:nth-child(3) tr:first-child td`)
-- Layout-dependent selectors that break on responsive changes
-- Selectors tied to PHP-Nuke legacy markup (table-based layout wrappers)
+**Avoid:** fragile structural selectors (`table:nth-child(3) tr:first-child td`), layout-dependent selectors that break on responsive changes, PHP-Nuke legacy table-layout wrappers.
 
 ## Assertion Patterns
 
-**Prefer web-first assertions** — they auto-retry until the condition is met or timeout is reached. Manual `expect(await loc.count())` does NOT retry and causes flaky tests when elements haven't rendered yet.
+**Prefer web-first assertions** — they auto-retry until the condition holds or times out. Manual `expect(await loc.count())` does NOT retry → flaky when elements haven't rendered.
 
 ```typescript
-// Page loads with expected title
 await expect(page).toHaveTitle(/IBL/i);
-
-// Element is visible (auto-retries)
 await expect(page.locator('.ibl-data-table').first()).toBeVisible();
-
-// Element exists in DOM but isn't visible (<option>, <datalist>, hidden inputs)
-await expect(page.locator('select option').first()).toBeAttached();
-
-// Element contains text
+await expect(page.locator('select option').first()).toBeAttached();   // DOM-only: <option>, <datalist>, hidden inputs
 await expect(page.locator('.ibl-title')).toContainText(/standings/i);
-
-// Element is NOT visible (e.g., login prompt when authenticated)
 await expect(page.getByText('Sign In')).not.toBeVisible();
-
-// Exact element count (auto-retries)
 await expect(page.locator('.trading-roster')).toHaveCount(2);
-
-// At least one element exists (auto-retries) — use instead of manual count > 0
-await expect(page.locator('input[type="checkbox"]').first()).toBeVisible();
-
-// At least N elements (no web-first equivalent — manual count is OK here)
-expect(await page.locator('option').count()).toBeGreaterThanOrEqual(28);
-
-// No PHP errors in page body
-expect(body, `PHP error on ${url}`).not.toContain('Fatal error');
+expect(await page.locator('option').count()).toBeGreaterThanOrEqual(28);   // "at least N" has no web-first form — manual OK
 ```
 
-**Anti-patterns to avoid:**
+**Anti-patterns:**
 ```typescript
-// ❌ No auto-retry — flaky in slow CI
-expect(await loc.count()).toBeGreaterThan(0);
-expect(await loc.count()).toBe(1);
-
-// ✅ Auto-retries until timeout
-await expect(loc.first()).toBeVisible();
-await expect(loc).toHaveCount(1);
-
-// ❌ <option> elements are never "visible"
-await expect(selectLocator.locator('option').first()).toBeVisible();
-
-// ✅ Use toBeAttached() for DOM-only elements
-await expect(selectLocator.locator('option').first()).toBeAttached();
+expect(await loc.count()).toBeGreaterThan(0);   // ❌ no retry → flaky in slow CI; use await expect(loc.first()).toBeVisible()
+expect(await loc.count()).toBe(1);              // ❌ use await expect(loc).toHaveCount(1)
+await expect(sel.locator('option').first()).toBeVisible();   // ❌ <option> never "visible"; use .toBeAttached()
 ```
 
-## State Control for Season-Phase-Dependent Tests
+## State Control for Phase-Dependent Tests
 
-Tests that depend on application state (season phase, trading open/closed, trivia mode, etc.) should **set the state they need** rather than detecting and skipping. This uses the `test-state.php` endpoint (gated by `E2E_TESTING=1`).
+Tests depending on app state (season phase, trading open, trivia mode…) **set the state they need** rather than detecting-and-skipping, via the `test-state.php` endpoint (gated by `E2E_TESTING=1`). Authenticated → `appState` from `../fixtures/auth`; public → `appState` from `../fixtures/public` (cookie-based, no DB races). Both auto-restore after each test.
 
-**Authenticated tests** — use the `appState` fixture from `../fixtures/auth`:
-```typescript
-// appState sets settings and auto-restores after each test
-test.beforeEach(async ({ appState, page }) => {
-  await appState({ 'Current Season Phase': 'Free Agency' });
-  await page.goto('modules.php?name=FreeAgency');
-});
-```
+**WARNING:** Never use `setState()` from `helpers/test-state` in a test — it writes the DB directly and races with parallel workers. Always use the `appState` fixture.
 
-**Public tests** — use the `public` fixture with cookie-based `appState` (same auto-restore, no DB races):
-```typescript
-import { test, expect } from '../fixtures/public';
+**Allowlisted settings:** `Current Season Phase`, `Current Season Ending Year`, `Allow Trades`, `Allow Waiver Moves`, `Show Draft Link`, `Trivia Mode`, `ASG Voting`, `EOY Voting`, `Free Agency Notifications`. Always include `'Current Season Ending Year': '2026'` when tests depend on CI seed data.
 
-test.describe('Public module flow', () => {
-  test.beforeEach(async ({ appState, page }) => {
-    await appState({ 'Trivia Mode': 'Off' });
-    await page.goto('modules.php?name=Module');
-  });
-});
-```
+**Serial mode:** Prefer splitting a spec into read-only (`smoke/`/`flows/`) and submission (`flows/*-submission.spec.ts`) files over file-level `test.describe.configure({ mode: 'serial' })`. Use serial only within one `describe` where tests genuinely share state. Canonical: `voting.spec.ts` / `voting-submission.spec.ts`.
 
-**WARNING:** Never use `setState()` from `helpers/test-state` in tests — it modifies the database directly and races with parallel workers.
+## DO
 
-**Allowlisted settings:** `Current Season Phase`, `Current Season Ending Year`, `Allow Trades`, `Allow Waiver Moves`, `Show Draft Link`, `Trivia Mode`, `ASG Voting`, `EOY Voting`, `Free Agency Notifications`.
+1. Check PHP errors on every page a smoke test visits; add new pages to the error-check loop.
+2. Use the auth fixture for authenticated tests; `publicStorageState()` for public tests.
+3. Use `appState` to set required state (include `'Current Season Ending Year': '2026'` for seed-dependent tests).
+4. Use stable CSS classes or accessible roles for locators.
+5. Keep smoke tests fast — one assertion per test, no complex interactions.
+6. Register `page.route()` mocks **before** `page.goto()`/any navigation — routes only intercept requests made after registration.
 
-**Serial mode:** Prefer splitting a spec file into read-only (`smoke/` or `flows/`) and submission (`flows/*-submission.spec.ts`) files rather than applying file-level `test.describe.configure({ mode: 'serial' })`. Use serial mode only within a single `describe` block where tests genuinely share state (e.g., a multi-step submission flow). See `voting.spec.ts` / `voting-submission.spec.ts` split as the canonical example.
+## DON'T
 
-## DO:
-1. Check for PHP errors on every page you visit in smoke tests
-2. Use the auth fixture for authenticated tests
-3. Use `publicStorageState()` from `helpers/public-storage-state` for public tests (prevents DevAutoLogin)
-4. Use `appState` fixture (from `../fixtures/auth` or `../fixtures/public`) to set required state — always include `'Current Season Ending Year': '2026'` when tests depend on CI seed data
-5. Use stable CSS classes or accessible roles for locators
-6. Keep smoke tests fast — one assertion per test, no complex interactions
-7. Add new pages to the PHP error check loop when adding smoke tests
-8. Register `page.route()` mocks **before** `page.goto()` or any navigation — routes only intercept requests made after registration
-
-## DON'T:
-1. **Don't** call login inside tests — use the auth fixture
-2. **Don't** skip tests due to season phase — use `appState` (from fixtures) to set the state you need. Never use `setState()` directly — it races with parallel workers
-3. **Don't** use fragile structural selectors — use accessible roles, text content, or stable CSS classes instead (see Locator Best Practices above)
-4. **Don't** mutate production data (create trades, submit forms) without cleanup — use `appState` for reversible settings, or `test.afterEach()` / `test.afterAll()` hooks for data created during the test
-5. **Don't** import from `@playwright/test` for authenticated tests — import from `../fixtures/auth`
-6. **Don't** use `toBeVisible()` or `toHaveText()` on locators that match multiple elements — Playwright strict mode throws. Use `.first()`, `.nth(n)`, or check `.count()` instead
-7. **Don't** use `boundingBox()` to verify CSS properties like `width: fit-content` — parent layout context affects the bounding box. Use `page.evaluate(() => getComputedStyle(el).property)` to check computed CSS values directly
-8. **Don't** import `Page` type from `../fixtures/auth` — it only exports `test` and `expect`. Import `Page` separately: `import type { Page } from '@playwright/test'`
-9. **Don't** use `link.click()` for page-to-page navigation — it triggers a Playwright-managed navigation wait that can time out under concurrent load from parallel workers. Instead, extract the href with `getAttribute('href')` and use `page.goto(href)`, which handles navigation more reliably
-10. **Don't** use `test.skip()` — set prerequisites via `appState` + CI seed instead
-11. **Don't** use `.catch(() => false)` to swallow visibility errors — use `await expect().toBeVisible()` with a timeout (exception: `phase-gating-public.spec.ts` where testing element absence is the purpose)
-12. **Don't** use bare `return` without a preceding assertion — add `await expect(locator).toBeVisible()` or `expect(value).toBe(expected)` before any early return
-13. **Don't** write dual-path `if/else` inside tests — split into separate focused tests with explicit `appState` prerequisites
-14. **Don't** write `if (count > 0) { assert }` with no else — the test silently passes when the element is absent. Use a hard assertion instead
+1. **Don't** call login inside tests — use the auth fixture.
+2. **Don't** skip tests due to season phase — use `appState`; never `setState()` (races with parallel workers).
+3. **Don't** use fragile structural selectors — use roles/text/stable classes.
+4. **Don't** mutate production data (trades, form submits) without cleanup — `appState` for reversible settings, or `afterEach`/`afterAll` for created data.
+5. **Don't** import from `@playwright/test` for authenticated tests — import from `../fixtures/auth`.
+6. **Don't** use `toBeVisible()`/`toHaveText()` on locators matching multiple elements — strict mode throws. Use `.first()`, `.nth(n)`, or `.count()`.
+7. **Don't** use `boundingBox()` to verify CSS like `width: fit-content` — parent layout skews it. Use `page.evaluate(() => getComputedStyle(el).property)`.
+8. **Don't** import `Page` from `../fixtures/auth` (it exports only `test`/`expect`) — `import type { Page } from '@playwright/test'`.
+9. **Don't** use `link.click()` for page-to-page navigation — the managed nav-wait times out under parallel load. Extract `getAttribute('href')` and `page.goto(href)`.
+10. **Don't** use `test.skip()` — set prerequisites via `appState` + CI seed.
+11. **Don't** use `.catch(() => false)` to swallow visibility errors — use `await expect().toBeVisible()` with a timeout (exception: `phase-gating-public.spec.ts`, where absence IS the test).
+12. **Don't** use bare `return` without a preceding assertion.
+13. **Don't** write dual-path `if/else` inside a test — split into focused tests with explicit `appState` prerequisites.
+14. **Don't** write `if (count > 0) { assert }` with no else — it silently passes when the element is absent. Use a hard assertion.
 
 ## Mandatory: No Skips, No Silent Passes
 
-These rules are mechanically enforced by `bin/check-e2e-hygiene` (CI workflow `.github/workflows/e2e-hygiene.yml`). Legitimate exceptions go in `.e2e-hygiene-skip-allowlist` (file-level) or as inline `// e2e-hygiene-allow: <reason >= 20 chars>` markers.
-
-The rules below (DON'Ts 10-14) are the most common E2E anti-patterns. Banned examples:
+DON'Ts 10–14 (the most common anti-patterns) are mechanically enforced by `bin/check-e2e-hygiene` (CI: `.github/workflows/e2e-hygiene.yml`). Exceptions go in `.e2e-hygiene-skip-allowlist` (file-level) or inline `// e2e-hygiene-allow: <reason >= 20 chars>`. Banned forms:
 
 ```typescript
-// CORRECT — each test has one purpose, one setup, one assertion path
-test('feature X works', async ({ appState, page }) => {
-  await appState({ 'Current Season Phase': 'Regular Season', 'Current Season Ending Year': '2026' });
-  await page.goto('modules.php?name=Module');
-  await expect(page.locator('.feature-x')).toBeVisible();
-});
-
-// BANNED — test.skip hides failures
-if (count === 0) { test.skip(true, 'No data'); return; }
-
-// BANNED — .catch(() => false) swallows errors
-if (!(await form.isVisible().catch(() => false))) return;
-
-// BANNED — bare return without assertion
-if (count === 0) return;
-
-// BANNED — dual-path if/else in one test
-if (count > 0) { assertA(); } else { assertB(); }
-
-// BANNED — true-only guard (silently passes when absent)
-if (count > 0) { await expect(el).toBeVisible(); }
+if (count === 0) { test.skip(true, 'No data'); return; }      // BANNED — hides failures
+if (!(await form.isVisible().catch(() => false))) return;     // BANNED — swallows errors
+if (count === 0) return;                                       // BANNED — bare return
+if (count > 0) { assertA(); } else { assertB(); }             // BANNED — dual-path
+if (count > 0) { await expect(el).toBeVisible(); }            // BANNED — true-only guard
 ```
 
 ## Shared Helpers
 
-- **`helpers/navigation.ts`**: `gotoWithRetry(page, url)` — retries up to 5 times with back-off when PHP's built-in server returns blank pages under parallel load. Use instead of bare `page.goto()` in parallel-load-sensitive tests (e.g., mobile tests).
-- **`smoke/htmx.spec.ts`**: Nav marker pattern — set `data-htmx-marker` on `nav.fixed` before an action, then check if the attribute persists to verify HTMX swap (no full reload). Only works for inline-rendering forms (search, depth chart), not forms that redirect via `HX-Redirect`.
+- **`helpers/navigation.ts`** `gotoWithRetry(page, url)` — retries up to 5× with back-off when PHP's built-in server returns blank pages under parallel load. Use instead of bare `page.goto()` in load-sensitive tests (e.g. mobile).
+- **`smoke/htmx.spec.ts`** nav-marker pattern — set `data-htmx-marker` on `nav.fixed` before an action, check it persists to verify an HTMX swap (no full reload). Only works for inline-rendering forms (search, depth chart), not `HX-Redirect` forms.
 
 ## CI Workflow Notes
 
-The E2E tests run in GitHub Actions via `.github/workflows/e2e-tests.yml`. Key details:
+E2E runs in `.github/workflows/e2e-tests.yml`:
 
-- **PHP built-in server** with `ibl5/router.php` replaces Apache. The router handles the single `api/v1/*` rewrite rule; returns `false` for everything else.
-- **Seed data** lives in `ibl5/tests/e2e/fixtures/ci-seed.sql`. When adding new E2E tests that require additional data (new tables, new rows), update this file.
-- **Bcrypt hashes contain `$` characters** that bash expands in unquoted heredocs (`<<EOF`). When writing CI steps that handle bcrypt hashes, use either: (a) single-quoted heredocs (`<<'EOF'`) with `getenv()` in PHP, or (b) pipe from PHP directly. Never store a bcrypt hash in a shell variable and use it in an unquoted heredoc.
-- **Secrets required:** `IBL_TEST_USER` and `IBL_TEST_PASS` must be configured as GitHub repository secrets.
+- **PHP built-in server** with `ibl5/router.php` replaces Apache (handles the single `api/v1/*` rewrite; returns `false` otherwise).
+- **Seed data** in `ibl5/tests/e2e/fixtures/ci-seed.sql` — update when new tests need new tables/rows.
+- **Bcrypt hashes contain `$`** that bash expands in unquoted heredocs. Use single-quoted heredocs (`<<'EOF'`) with `getenv()` in PHP, or pipe from PHP directly. Never put a bcrypt hash in a shell var used in an unquoted heredoc.
+- **Secrets:** `IBL_TEST_USER`, `IBL_TEST_PASS` as repo secrets.
 
 ## Worktree & Environment Gotchas
 
-- **`bin/e2e-wt.sh <name>` runs Playwright from the worktree's `ibl5/` dir** — test files and `BASE_URL` both resolve to the worktree, so TS test changes are picked up without any extra steps.
-- **Rebuild CSS after switching branches.** `css:watch` may not detect source file changes from `git checkout`. Run `bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css` after switching. See `.claude/rules/css-auto-rebuild.md` — this is the sanctioned recovery exception to the no-manual-build rule, not a routine step.
-- **E2E tests that submit login/registration forms can trigger auth throttling.** The `auth_users_throttling` table accumulates failed attempts. If `auth.setup.ts` fails with "Too many login attempts", clear: `DELETE FROM auth_users_throttling WHERE 1=1;`. CI is unaffected (fresh DB per run).
+- **`bin/e2e-wt.sh <name>`** runs Playwright from the worktree's `ibl5/` — test files and `BASE_URL` both resolve to the worktree, so TS changes are picked up with no extra steps.
+- **Rebuild CSS after a branch switch** (see Prerequisites #3).
+- **Login/registration tests can trip auth throttling** (`auth_users_throttling` accumulates failures). If `auth.setup.ts` fails with "Too many login attempts": `DELETE FROM auth_users_throttling WHERE 1=1;`. CI is unaffected (fresh DB per run).
 
 ## Completion Criteria
 
-Before considering an E2E test task complete:
-
-1. **Run the full E2E suite**: `cd ibl5 && bun run test:e2e`
-2. **Verify all tests pass** — no skips, no silent passes
-3. **No `.only`** in any spec file
-4. **PHP error coverage** — every smoke file includes PHP error pattern checks
-5. **Correct auth pattern** — public tests use empty storageState, authenticated tests import from fixtures/auth
+1. Run the full suite: `cd ibl5 && bun run test:e2e`.
+2. All pass — no skips, no silent passes, no `.only`.
+3. Every smoke file includes PHP error-pattern checks.
+4. Public tests use empty storageState; authenticated tests import from `fixtures/auth`.
 
 ## Visual Regression Manifest
 
-`ibl5/tests/e2e/vr-manifest.ts` is the single source of truth for visual regression coverage. The spec file (`visual-regression.spec.ts`) consumes the manifest — do not add rows directly to the spec.
+`ibl5/tests/e2e/vr-manifest.ts` is the single source of truth for VR coverage; `visual-regression.spec.ts` consumes it — never add rows to the spec directly.
 
-### Filename derivation
-
-Snapshot filenames are derived mechanically by `snapshotFilename()`:
-
+**Filenames** are derived mechanically by `snapshotFilename()` (desktop suffix and `default` state are elided):
 ```
-Base:     {name}.png                          // desktop, default state
-Mobile:   {name}-mobile.png                   // viewport === 'mobile'
-State:    {name}-{state.name}.png             // state.name !== 'default'
-Tab:      {name}-tab-{tab.key}.png            // htmx tab snapshot
-Combined: {name}-{state.name}-mobile.png      // state + mobile
-          {name}-tab-{tab.key}-mobile.png     // tab + mobile
+{name}.png · {name}-mobile.png · {name}-{state}.png · {name}-tab-{tab.key}.png
+{name}-{state}-mobile.png · {name}-tab-{tab.key}-mobile.png
 ```
 
-- Desktop viewport suffix is elided (no `-desktop` in filenames).
-- `default` state name is elided.
+**Add a module:** one `VrRow` in `VR_MANIFEST` (set `viewports`/`states`/`htmxTabs`), then run with `--update-snapshots` to generate the baseline PNG.
 
-### Adding a new module
-
-Add one `VrRow` to `VR_MANIFEST` in `ibl5/tests/e2e/vr-manifest.ts`. Set `viewports`, `states`, `htmxTabs` as needed. Run with `--update-snapshots` to generate the baseline PNG.
-
-### Coverage tool
-
-`bin/check-vr-coverage` reports which manifest rows are missing dimensions (mobile, empty-state, htmx-tabs). New gaps fail CI (exit 1); existing gaps in `ibl5/tests/e2e/vr-coverage-baseline.json` are advisory. Run `bin/check-vr-coverage --update-baseline` to acknowledge current gaps.
+**Coverage:** `bin/check-vr-coverage` reports rows missing dimensions; new gaps fail CI (exit 1), existing gaps in `ibl5/tests/e2e/vr-coverage-baseline.json` are advisory. `bin/check-vr-coverage --update-baseline` acknowledges current gaps.

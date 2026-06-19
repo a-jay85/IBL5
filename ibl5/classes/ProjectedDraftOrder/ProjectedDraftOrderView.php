@@ -47,7 +47,7 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
     {
         $label = $isFinalized ? 'Draft Order' : 'Projected Draft Order';
 
-        return '<h2 class="ibl-title">' . HtmlSanitizer::e($seasonYear) . ' ' . $label . '</h2>';
+        return '<h1 class="ibl-title">' . HtmlSanitizer::e($seasonYear) . ' ' . $label . '</h1>';
     }
 
     private function renderDescription(): string
@@ -64,7 +64,7 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
     {
         $colspan = $showPlayer ? '5' : '4';
         $tableId = $roundLabel === 'Round 1' ? ' id="draft-order-round1"' : '';
-        $html = '<h3 class="ibl-table-title">' . HtmlSanitizer::e($roundLabel) . '</h3>';
+        $html = '<h2 class="ibl-table-title">' . HtmlSanitizer::e($roundLabel) . '</h2>';
         $html .= '<table class="ibl-data-table projected-draft-order-table sticky-header"' . $tableId . '>';
         $html .= '<thead><tr>';
         $html .= '<th>Pick</th>';

@@ -34,7 +34,7 @@ class AllStarAppearancesView implements AllStarAppearancesViewInterface
      */
     private function renderTitle(): string
     {
-        return '<h2 class="ibl-title">All-Star Appearances</h2>';
+        return '<h1 class="ibl-title">All-Star Appearances</h1>';
     }
 
     /**

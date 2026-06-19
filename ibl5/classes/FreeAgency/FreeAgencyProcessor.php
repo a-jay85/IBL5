@@ -23,20 +23,28 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
     private Season $season;
     private TeamIdentityRepositoryInterface $commonRepo;
 
+    /**
+     * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('audit').
+     */
+    private \Psr\Log\LoggerInterface $logger;
+
     public function __construct(
         \mysqli $mysqli_db,
         TeamIdentityRepositoryInterface $commonRepo,
         ?FreeAgencyDemandCalculatorInterface $calculator = null,
-        ?FreeAgencyRepositoryInterface $repository = null
+        ?FreeAgencyRepositoryInterface $repository = null,
+        ?\Psr\Log\LoggerInterface $logger = null,
+        ?Season $season = null
     ) {
         $this->mysqli_db = $mysqli_db;
-        $this->season = new Season($mysqli_db);
+        $this->season = $season ?? new Season($mysqli_db);
 
         $this->commonRepo = $commonRepo;
         $this->calculator = $calculator ?? new FreeAgencyDemandCalculator(
             new FreeAgencyDemandRepository($this->mysqli_db)
         );
         $this->repository = $repository ?? new FreeAgencyRepository($this->mysqli_db);
+        $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('audit');
     }
 
     /**
@@ -252,7 +260,7 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         }
 
         if ($saved) {
-            \Logging\LoggerFactory::getChannel('audit')->info('fa_offer_submitted', [
+            $this->logger->info('fa_offer_submitted', [
                 'action' => 'fa_offer_submitted',
                 'player_id' => $player->getPlayerID() ?? 0,
                 'player_name' => $playerName,
@@ -323,7 +331,7 @@ _**{$playerTeam}** GM <@!$playerTeamDiscordID> could not be reached for comment.
 
         $this->repository->deleteOffer($teamid, $playerID);
 
-        \Logging\LoggerFactory::getChannel('audit')->info('fa_offer_deleted', [
+        $this->logger->info('fa_offer_deleted', [
             'action' => 'fa_offer_deleted',
             'team_name' => $teamName,
             'player_id' => $playerID,

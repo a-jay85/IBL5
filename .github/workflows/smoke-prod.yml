@@ -267,9 +267,11 @@ jobs:
           PAYLOAD=$(jq -n --arg id "$OWNER_DISCORD_ID" --arg msg "$MSG" \
             '{content: {receivingUserDiscordID: $id, message: $msg}}')
 
+          # Fail loud: no `|| echo` swallow and `curl -f` (non-2xx → exit 22), so a
+          # delivery failure turns this notify job RED — surfaced via GitHub's native
+          # workflow-failure email. A silently-dropped alert is worse than none.
           echo "$PAYLOAD" | ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
-            'curl -s --max-time 10 -X POST http://localhost:50000/discordDM -H "Content-Type: application/json" -d @-' \
-            || echo "IBLbot notification failed (bot may be down)"
+            'curl -sf --max-time 10 -X POST http://localhost:50000/discordDM -H "Content-Type: application/json" -d @-'
 
   notify-scheduled-failure:
     name: Notify Scheduled Failure
@@ -302,9 +304,11 @@ jobs:
           PAYLOAD=$(jq -n --arg id "$OWNER_DISCORD_ID" --arg msg "$MSG" \
             '{content: {receivingUserDiscordID: $id, message: $msg}}')
 
+          # Fail loud: no `|| echo` swallow and `curl -f` (non-2xx → exit 22), so a
+          # delivery failure turns this notify job RED — surfaced via GitHub's native
+          # workflow-failure email. A silently-dropped alert is worse than none.
           echo "$PAYLOAD" | ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
-            'curl -s --max-time 10 -X POST http://localhost:50000/discordDM -H "Content-Type: application/json" -d @-' \
-            || echo "IBLbot notification failed (bot may be down)"
+            'curl -sf --max-time 10 -X POST http://localhost:50000/discordDM -H "Content-Type: application/json" -d @-'
 
   notify-ibl6-degradation:
     name: Notify IBL6 Degradation
@@ -337,9 +341,11 @@ jobs:
           PAYLOAD=$(jq -n --arg id "$OWNER_DISCORD_ID" --arg msg "$MSG" \
             '{content: {receivingUserDiscordID: $id, message: $msg}}')
 
+          # Fail loud: no `|| echo` swallow and `curl -f` (non-2xx → exit 22), so a
+          # delivery failure turns this notify job RED — surfaced via GitHub's native
+          # workflow-failure email. A silently-dropped alert is worse than none.
           echo "$PAYLOAD" | ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
-            'curl -s --max-time 10 -X POST http://localhost:50000/discordDM -H "Content-Type: application/json" -d @-' \
-            || echo "IBLbot notification failed (bot may be down)"
+            'curl -sf --max-time 10 -X POST http://localhost:50000/discordDM -H "Content-Type: application/json" -d @-'
 
   notify-inconclusive:
     name: Notify Smoke Inconclusive
@@ -380,6 +386,8 @@ jobs:
           PAYLOAD=$(jq -n --arg id "$OWNER_DISCORD_ID" --arg msg "$MSG" \
             '{content: {receivingUserDiscordID: $id, message: $msg}}')
 
+          # Fail loud: no `|| echo` swallow and `curl -f` (non-2xx → exit 22), so a
+          # delivery failure turns this notify job RED — surfaced via GitHub's native
+          # workflow-failure email. A silently-dropped alert is worse than none.
           echo "$PAYLOAD" | ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
-            'curl -s --max-time 10 -X POST http://localhost:50000/discordDM -H "Content-Type: application/json" -d @-' \
-            || echo "IBLbot notification failed (bot may be down)"
+            'curl -sf --max-time 10 -X POST http://localhost:50000/discordDM -H "Content-Type: application/json" -d @-'

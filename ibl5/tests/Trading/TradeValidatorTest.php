@@ -7,6 +7,7 @@ namespace Tests\Trading;
 use PHPUnit\Framework\TestCase;
 use League\League;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Season\Season;
 use Tests\WideUnit\Mocks\MockDatabase;
 use Tests\WideUnit\Mocks\MockPreparedStatement;
 
@@ -837,5 +838,55 @@ class TradeValidatorTest extends TestCase
         $this->assertArrayHasKey('cashSentToMe', $result);
         $this->assertGreaterThanOrEqual(0, $result['cashSentToThem']);
         $this->assertGreaterThanOrEqual(0, $result['cashSentToMe']);
+    }
+
+    // --- Season DI seam (Recipe A: ctor-injected Season, fallback preserved) ---
+
+    /**
+     * Seam (positive): an explicitly injected Season whose advancesContractYears()
+     * returns true must steer getCurrentSeasonCashConsiderations to the NEXT-season
+     * index [2], proving the INJECTED instance reaches the consuming code path
+     * instead of the fallback `new Season($db)`.
+     *
+     * Keyed on advancesContractYears() (not endingYear) because TradeValidator never
+     * reads endingYear — advancesContractYears() is the only Season output it consumes.
+     * @group season-phase
+     */
+    public function testInjectedSeasonDrivesCashConsiderationSelection(): void
+    {
+        $season = self::createStub(Season::class);
+        $season->method('advancesContractYears')->willReturn(true);
+        $validator = new \Trading\TradeValidator($this->mockDb, $season);
+
+        $result = $validator->getCurrentSeasonCashConsiderations(
+            [1 => 10, 2 => 20],
+            [1 => 30, 2 => 40]
+        );
+
+        // advances=true => the method selects the [2] (next-season) entries.
+        $this->assertSame(20, $result['cashSentToThem']);
+        $this->assertSame(40, $result['cashSentToMe']);
+    }
+
+    /**
+     * Negative/boundary: the exact production call shape — construct WITHOUT the
+     * optional $season arg. The fallback `new Season($db)` fires (in tests the
+     * class_alias resolves it to the mock, phase 'Regular Season' =>
+     * advancesContractYears() false), selecting the current-season index [1].
+     * No TypeError; behavior identical to pre-injection.
+     * @group season-phase
+     */
+    public function testFallbackSeasonUsedWhenNoneInjected(): void
+    {
+        $validator = new \Trading\TradeValidator($this->mockDb);
+
+        $result = $validator->getCurrentSeasonCashConsiderations(
+            [1 => 10, 2 => 20],
+            [1 => 30, 2 => 40]
+        );
+
+        // No injected season => fallback => current-season [1] entries.
+        $this->assertSame(10, $result['cashSentToThem']);
+        $this->assertSame(30, $result['cashSentToMe']);
     }
 }

@@ -42,10 +42,23 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
      */
     private const SEASON_YEAR_EXPRESSION = 'bs.season_year';
 
-    /** @var list<array{game_date: string, visitor_teamid: int, home_teamid: int, visitorScore: int, homeScore: int}>|null */
+    /**
+     * Per-request memoization of regular-season game rows.
+     *
+     * Loaded once and reused by all four streak/season-start computations within a
+     * single request. The repository is instantiated per request (see
+     * modules/RecordHolders/index.php) and never reused across requests, so this
+     * cache cannot return stale data; no invalidation hook is required.
+     *
+     * @var list<array{game_date: string, visitor_teamid: int, home_teamid: int, visitorScore: int, homeScore: int}>|null
+     */
     private ?array $regularSeasonGamesCache = null;
 
-    /** @var array<int, string> Team ID → team name lookup cache */
+    /**
+     * Per-request memoization of team ID → team name lookups (request-scoped, see above).
+     *
+     * @var array<int, string>
+     */
     private array $teamNameCache = [];
 
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
@@ -377,176 +390,29 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
     /**
      * @see RecordHoldersRepositoryInterface::getLongestStreak()
      *
-     * Processes all games sequentially to find the longest winning or losing streak.
-     *
      * @return list<StreakRecord>
      */
     public function getLongestStreak(string $type): array
     {
-        $rows = $this->getRegularSeasonGames();
-
-        // Track streaks per team
-        /** @var array<int, array{current: int, start: string, team: int}> $streaks */
-        $streaks = [];
-        /** @var array<int, array{streak: int, start: string, end: string}> $bestStreaks */
-        $bestStreaks = [];
-
-        foreach ($rows as $row) {
-            /** @var array{game_date: string, visitor_teamid: int, home_teamid: int, visitorScore: int, homeScore: int} $row */
-            $date = $row['game_date'];
-            $visitorTid = $row['visitor_teamid'];
-            $homeTid = $row['home_teamid'];
-            $visitorScore = $row['visitorScore'];
-            $homeScore = $row['homeScore'];
-
-            $visitorWon = $visitorScore > $homeScore;
-
-            foreach ([$visitorTid, $homeTid] as $teamid) {
-                $teamWon = ($teamid === $visitorTid) ? $visitorWon : !$visitorWon;
-                $isStreakType = ($type === 'winning') ? $teamWon : !$teamWon;
-
-                if (!isset($streaks[$teamid])) {
-                    $streaks[$teamid] = ['current' => 0, 'start' => '', 'team' => $teamid];
-                    $bestStreaks[$teamid] = ['streak' => 0, 'start' => '', 'end' => ''];
-                }
-
-                if ($isStreakType) {
-                    if ($streaks[$teamid]['current'] === 0) {
-                        $streaks[$teamid]['start'] = $date;
-                    }
-                    $streaks[$teamid]['current']++;
-                    if ($streaks[$teamid]['current'] > $bestStreaks[$teamid]['streak']) {
-                        $bestStreaks[$teamid] = [
-                            'streak' => $streaks[$teamid]['current'],
-                            'start' => $streaks[$teamid]['start'],
-                            'end' => $date,
-                        ];
-                    }
-                } else {
-                    $streaks[$teamid]['current'] = 0;
-                }
-            }
-        }
-
-        // Find the overall best
-        $maxStreak = 0;
-        foreach ($bestStreaks as $data) {
-            if ($data['streak'] > $maxStreak) {
-                $maxStreak = $data['streak'];
-            }
-        }
-
-        // Collect all teams matching the max streak
-        /** @var list<StreakRecord> $records */
-        $records = [];
-        foreach ($bestStreaks as $teamid => $data) {
-            if ($data['streak'] === $maxStreak && $maxStreak > 0) {
-                $startYear = IblSeasonDateHelper::dateToSeasonEndingYear($data['start']);
-                $endYear = IblSeasonDateHelper::dateToSeasonEndingYear($data['end']);
-                $records[] = [
-                    'team_name' => $this->resolveTeamName($teamid),
-                    'streak' => $data['streak'],
-                    'start_date' => $data['start'],
-                    'end_date' => $data['end'],
-                    'start_year' => $startYear,
-                    'end_year' => $endYear,
-                ];
-            }
-        }
-
-        return $records;
+        return StreakCalculator::longestStreak(
+            $this->getRegularSeasonGames(),
+            $type,
+            fn (int $teamId): string => $this->resolveTeamName($teamId)
+        );
     }
 
     /**
      * @see RecordHoldersRepositoryInterface::getBestWorstSeasonStart()
      *
-     * Finds the team with the best/worst record at the START of any season.
-     * Best start = most consecutive wins from game 1; Worst start = most consecutive losses.
-     *
      * @return list<SeasonStartRecord>
      */
     public function getBestWorstSeasonStart(string $type): array
     {
-        $rows = $this->getRegularSeasonGames();
-
-        // Track season starts per team per season
-        /** @var array<string, array{wins: int, losses: int, streakBroken: bool}> $seasonStarts */
-        $seasonStarts = [];
-
-        foreach ($rows as $row) {
-            /** @var array{game_date: string, visitor_teamid: int, home_teamid: int, visitorScore: int, homeScore: int} $row */
-            $date = $row['game_date'];
-            $visitorTid = $row['visitor_teamid'];
-            $homeTid = $row['home_teamid'];
-            $visitorScore = $row['visitorScore'];
-            $homeScore = $row['homeScore'];
-            $visitorWon = $visitorScore > $homeScore;
-            $seasonYear = IblSeasonDateHelper::dateToSeasonEndingYear($date);
-
-            foreach ([$visitorTid, $homeTid] as $teamid) {
-                $key = $teamid . '-' . $seasonYear;
-                if (!isset($seasonStarts[$key])) {
-                    $seasonStarts[$key] = ['wins' => 0, 'losses' => 0, 'streakBroken' => false];
-                }
-
-                if ($seasonStarts[$key]['streakBroken']) {
-                    continue;
-                }
-
-                $teamWon = ($teamid === $visitorTid) ? $visitorWon : !$visitorWon;
-
-                if ($type === 'best') {
-                    if ($teamWon) {
-                        $seasonStarts[$key]['wins']++;
-                    } else {
-                        $seasonStarts[$key]['streakBroken'] = true;
-                    }
-                } else {
-                    if (!$teamWon) {
-                        $seasonStarts[$key]['losses']++;
-                    } else {
-                        $seasonStarts[$key]['streakBroken'] = true;
-                    }
-                }
-            }
-        }
-
-        // Find the record-holding start
-        $maxValue = 0;
-        foreach ($seasonStarts as $data) {
-            $value = $type === 'best' ? $data['wins'] : $data['losses'];
-            if ($value > $maxValue) {
-                $maxValue = $value;
-            }
-        }
-
-        /** @var list<SeasonStartRecord> $records */
-        $records = [];
-        foreach ($seasonStarts as $key => $data) {
-            $value = $type === 'best' ? $data['wins'] : $data['losses'];
-            if ($value === $maxValue && $maxValue > 0) {
-                [$tidStr, $yearStr] = explode('-', $key);
-                $teamid = (int) $tidStr;
-                $year = (int) $yearStr;
-                if ($type === 'best') {
-                    $records[] = [
-                        'team_name' => $this->resolveTeamName($teamid),
-                        'year' => $year,
-                        'wins' => $data['wins'],
-                        'losses' => 0,
-                    ];
-                } else {
-                    $records[] = [
-                        'team_name' => $this->resolveTeamName($teamid),
-                        'year' => $year,
-                        'wins' => 0,
-                        'losses' => $data['losses'],
-                    ];
-                }
-            }
-        }
-
-        return $records;
+        return StreakCalculator::bestWorstSeasonStart(
+            $this->getRegularSeasonGames(),
+            $type,
+            fn (int $teamId): string => $this->resolveTeamName($teamId)
+        );
     }
 
     /**
@@ -841,7 +707,9 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
     /**
      * Inlined team awards query with optimized Champions/HEAT branches.
      *
-     * Uses window functions instead of correlated subqueries.
+     * Uses window functions instead of correlated subqueries. The HEAT-champion
+     * branch reads from the `vw_heat_champions` view (migration 149) rather than
+     * an inline CTE.
      */
     private static function buildMostTitlesByTypeQuery(): string
     {
@@ -869,27 +737,8 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
 
                 UNION ALL
 
-                SELECT hc.year, ti.team_name AS name, 'IBL HEAT Champions' AS award
-                FROM (
-                    SELECT
-                        YEAR(bst.game_date) AS year,
-                        CASE
-                            WHEN (bst.home_q1_points + bst.home_q2_points + bst.home_q3_points + bst.home_q4_points
-                                  + COALESCE(bst.home_ot_points, 0))
-                               > (bst.visitor_q1_points + bst.visitor_q2_points + bst.visitor_q3_points + bst.visitor_q4_points
-                                  + COALESCE(bst.visitor_ot_points, 0))
-                            THEN bst.home_teamid
-                            ELSE bst.visitor_teamid
-                        END AS winner_tid,
-                        ROW_NUMBER() OVER (
-                            PARTITION BY YEAR(bst.game_date)
-                            ORDER BY bst.game_date DESC, bst.game_of_that_day ASC
-                        ) AS rn
-                    FROM `ibl_box_scores_teams` bst
-                    WHERE bst.game_type = 3
-                ) hc
-                JOIN `ibl_team_info` ti ON ti.teamid = hc.winner_tid
-                WHERE hc.rn = 1
+                SELECT year, name, award
+                FROM `vw_heat_champions`
             ) all_awards
             WHERE award LIKE ?
             GROUP BY name

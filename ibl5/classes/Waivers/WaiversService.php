@@ -26,19 +26,25 @@ class WaiversService implements WaiversServiceInterface
     private WaiversViewInterface $view;
     private TeamQueryRepositoryInterface $teamQueryRepo;
     private \mysqli $db;
+    /**
+     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     */
+    private ?Season $season = null;
 
     public function __construct(
         \Repositories\Contracts\TeamIdentityRepositoryInterface $commonRepository,
         WaiversProcessorInterface $processor,
         WaiversViewInterface $view,
         TeamQueryRepositoryInterface $teamQueryRepo,
-        \mysqli $db
+        \mysqli $db,
+        ?Season $season = null
     ) {
         $this->commonRepository = $commonRepository;
         $this->processor = $processor;
         $this->view = $view;
         $this->teamQueryRepo = $teamQueryRepo;
         $this->db = $db;
+        $this->season = $season;
     }
 
     /**
@@ -50,7 +56,7 @@ class WaiversService implements WaiversServiceInterface
     {
         $teamName = $this->commonRepository->getTeamnameFromUsername($username) ?? '';
         $team = Team::initialize($this->db, $teamName);
-        $season = new Season($this->db);
+        $season = $this->season ?? new Season($this->db);
 
         $tableData = $this->getTableResultAndStyle($team, $season, $action);
         $players = $this->buildPlayerOptions($tableData['tableResult'], $action, $season);

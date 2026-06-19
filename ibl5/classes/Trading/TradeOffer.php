@@ -28,6 +28,11 @@ use Discord\Discord;
  */
 class TradeOffer implements TradeOfferInterface
 {
+    /**
+     * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('trade').
+     */
+    protected \Psr\Log\LoggerInterface $logger;
+
     protected \mysqli $db;
     protected TradeOfferRepositoryInterface $offerRepository;
     protected TradeAssetRepositoryInterface $assetRepository;
@@ -48,7 +53,8 @@ class TradeOffer implements TradeOfferInterface
         ?TradeCashRepositoryInterface $cashRepository = null,
         ?BuyoutLedgerRepositoryInterface $cashConsiderationRepository = null,
         ?Season $season = null,
-        ?TradeValidator $validator = null
+        ?TradeValidator $validator = null,
+        ?\Psr\Log\LoggerInterface $logger = null
     ) {
         $this->db = $db;
         $this->commonRepository = $commonRepository;
@@ -59,13 +65,14 @@ class TradeOffer implements TradeOfferInterface
         $this->season = $season ?? new Season($db);
         $this->cashHandler = new CashTransactionHandler($db, $this->commonRepository, $this->cashConsiderationRepository, $this->cashRepository);
         $this->validator = $validator ?? new TradeValidator($db);
+        $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('trade');
 
         // Initialize Discord with error handling (may fail if column doesn't exist)
         try {
             $this->discord = new Discord($this->commonRepository);
         } catch (\Exception $e) {
             // Discord unavailable - will skip notifications
-            \Logging\LoggerFactory::getChannel('trade')->warning('Discord initialization failed in TradeOffer', ['error' => $e->getMessage()]);
+            $this->logger->warning('Discord initialization failed in TradeOffer', ['error' => $e->getMessage()]);
             $this->discord = null;
         }
     }
@@ -488,7 +495,7 @@ class TradeOffer implements TradeOfferInterface
     {
         // Skip notification if Discord is not available
         if ($this->discord === null) {
-            \Logging\LoggerFactory::getChannel('trade')->warning('Discord notification skipped: Discord class not initialized', ['trade_id' => $tradeOfferId]);
+            $this->logger->warning('Discord notification skipped: Discord class not initialized', ['trade_id' => $tradeOfferId]);
             return;
         }
 
@@ -499,7 +506,7 @@ class TradeOffer implements TradeOfferInterface
             $receivingUserDiscordID = $this->discord->getDiscordIDFromTeamname($listeningTeamName);
 
             if ($receivingUserDiscordID === '' || $receivingUserDiscordID === '0') {
-                \Logging\LoggerFactory::getChannel('trade')->warning('Discord notification skipped: no Discord ID for team', ['trade_id' => $tradeOfferId, 'team' => $listeningTeamName]);
+                $this->logger->warning('Discord notification skipped: no Discord ID for team', ['trade_id' => $tradeOfferId, 'team' => $listeningTeamName]);
                 return;
             }
 
@@ -507,7 +514,7 @@ class TradeOffer implements TradeOfferInterface
 
             Discord::sendTradeDM($receivingUserDiscordID, $tradeOfferId, $offeringTeamName, $cleanTradeText);
         } catch (\Exception $e) {
-            \Logging\LoggerFactory::getChannel('trade')->error('Discord notification failed', ['trade_id' => $tradeOfferId, 'error' => $e->getMessage()]);
+            $this->logger->error('Discord notification failed', ['trade_id' => $tradeOfferId, 'error' => $e->getMessage()]);
         }
     }
 }

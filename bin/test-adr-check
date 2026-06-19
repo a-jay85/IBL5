@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-adr-check — regression test for the local pre-push ADR gate.
+#
+# Covers the two compositions Part C relies on:
+#   1. bin/adr-check --pr --bypass-from-stdin reading the bypass body from STDIN
+#      (the commit-message blob the hook pipes in), against an origin/master..HEAD
+#      range built in a throwaway repo.
+#   2. bin/pre-push-adr-hook driving that composition end-to-end, including the
+#      origin/master-absent degrade-open path.
+#
+# Each case builds a temp git repo with a fake origin/master ref (no real remote
+# needed: `git update-ref refs/remotes/origin/master <base>`). The repo's bin/
+# gets UNTRACKED copies of adr-check + pre-push-adr-hook so REPO_ROOT resolves to
+# the temp repo — untracked, so they never appear in `git diff` and can't become
+# triggers themselves. The trigger file (bin/foo) is the only thing committed into
+# bin/, so the diff sees exactly one added bin/ script.
+#
+# Run: bin/test-adr-check  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BASE_TMP="$(mktemp -d)"
+trap 'rm -rf "$BASE_TMP"' EXIT
+
+FAILED=0
+REPO=""
+
+expect() { # name want got
+    if [ "$3" -eq "$2" ]; then
+        echo "ok: $1 (exit $3)"
+    else
+        echo "FAIL: $1 — expected exit $2, got $3"
+        FAILED=1
+    fi
+}
+
+# new_repo <with-origin: 1|0> — create a fresh temp repo with a base commit and
+# (optionally) a fake origin/master ref. Sets $REPO.
+new_repo() {
+    REPO="$(mktemp -d "$BASE_TMP/repo.XXXXXX")"
+    mkdir -p "$REPO/bin"
+    cp "$SCRIPT_DIR/adr-check" "$REPO/bin/adr-check"
+    cp "$SCRIPT_DIR/pre-push-adr-hook" "$REPO/bin/pre-push-adr-hook"
+    chmod +x "$REPO/bin/adr-check" "$REPO/bin/pre-push-adr-hook"
+    git -C "$REPO" init -q
+    git -C "$REPO" config user.email test@example.com
+    git -C "$REPO" config user.name "test"
+    git -C "$REPO" config commit.gpgsign false
+    echo base > "$REPO/README.md"
+    git -C "$REPO" add README.md          # NOT bin/* — keep the bin copies untracked
+    git -C "$REPO" commit -qm base
+    if [ "$1" -eq 1 ]; then
+        git -C "$REPO" update-ref refs/remotes/origin/master "$(git -C "$REPO" rev-parse HEAD)"
+    fi
+}
+
+# add_bin_trigger <commit-message> — commit a >=50-line bin/ script with a shebang
+# (the new-tool-script trigger).
+add_bin_trigger() {
+    printf '#!/usr/bin/env bash\n' > "$REPO/bin/foo"
+    i=1
+    while [ "$i" -le 60 ]; do
+        echo "# line $i" >> "$REPO/bin/foo"
+        i=$((i + 1))
+    done
+    git -C "$REPO" add bin/foo
+    git -C "$REPO" commit -qm "$1"
+}
+
+# add_no_trigger — commit a plain .txt file (no trigger surface).
+add_no_trigger() {
+    echo "notes" > "$REPO/notes.txt"
+    git -C "$REPO" add notes.txt
+    git -C "$REPO" commit -qm "add notes"
+}
+
+run_adr_check() { # runs the stdin composition inside $REPO
+    ( cd "$REPO" && git log origin/master..HEAD --format='%B' \
+        | "$REPO/bin/adr-check" --pr --bypass-from-stdin ) >/dev/null 2>&1
+}
+
+run_hook() { # runs the pre-push hook inside $REPO
+    ( cd "$REPO" && "$REPO/bin/pre-push-adr-hook" ) >/dev/null 2>&1
+}
+
+BYPASS='<!-- no-adr: documented in an existing decision record -->'
+
+# --- adr-check stdin composition (rows 8-9) ---
+
+new_repo 1; add_bin_trigger "add foo tool"
+run_adr_check; expect "adrcheck-trigger-no-bypass" 1 $?
+
+new_repo 1; add_bin_trigger "add foo tool
+
+$BYPASS"
+run_adr_check; expect "adrcheck-bypass-via-stdin" 0 $?
+
+new_repo 1; add_no_trigger
+run_adr_check; expect "adrcheck-no-trigger" 0 $?
+
+# --- pre-push hook script (rows 10-11) ---
+
+new_repo 1; add_bin_trigger "add foo tool"
+run_hook; expect "hook-trigger-no-adr" 1 $?
+
+new_repo 1; add_no_trigger
+run_hook; expect "hook-no-trigger" 0 $?
+
+new_repo 1; add_bin_trigger "add foo tool
+
+$BYPASS"
+run_hook; expect "hook-bypass-trailer" 0 $?
+
+# origin/master absent → degrade-open (exit 0) even with a trigger present.
+new_repo 0; add_bin_trigger "add foo tool"
+run_hook; expect "hook-no-origin-master" 0 $?
+
+# --- install-git-hooks idempotency + backup-once ---
+# install-git-hooks resolves the hooks dir from cwd's git (--git-common-dir), so
+# running the worktree copy inside $REPO targets $REPO/.git/hooks. Seed a fake
+# non-shim pre-push (the default git-lfs hook) and assert it is backed up once and
+# replaced by our sentinel shim, idempotently.
+ok_check() { # name condition-already-evaluated($?-style via [ ])
+    if [ "$2" -eq 0 ]; then echo "ok: $1"; else echo "FAIL: $1"; FAILED=1; fi
+}
+
+new_repo 1
+printf '#!/bin/sh\n# original git-lfs hook\ngit lfs pre-push "$@"\n' > "$REPO/.git/hooks/pre-push"
+chmod +x "$REPO/.git/hooks/pre-push"
+( cd "$REPO" && "$SCRIPT_DIR/install-git-hooks" ) >/dev/null 2>&1
+grep -qF '# IBL5-ADR-HOOK' "$REPO/.git/hooks/pre-push"; ok_check "install-writes-shim" $?
+grep -qF 'original git-lfs hook' "$REPO/.git/hooks/pre-push.pre-adr.bak" 2>/dev/null; ok_check "install-backs-up-original-once" $?
+
+# Re-run: still our shim, backup unchanged (no second overwrite), exits clean.
+( cd "$REPO" && "$SCRIPT_DIR/install-git-hooks" ) >/dev/null 2>&1; reinstall_exit=$?
+ok_check "install-rerun-clean-exit" "$reinstall_exit"
+grep -qF '# IBL5-ADR-HOOK' "$REPO/.git/hooks/pre-push"; ok_check "install-idempotent-shim" $?
+grep -qF 'original git-lfs hook' "$REPO/.git/hooks/pre-push.pre-adr.bak" 2>/dev/null; ok_check "install-backup-preserved" $?
+
+if [ "$FAILED" -ne 0 ]; then
+    echo "RESULT: FAILED"
+    exit 1
+fi
+echo "RESULT: all passed"
+exit 0

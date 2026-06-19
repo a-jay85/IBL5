@@ -279,7 +279,6 @@ Implements the IBL5 Database Optimization Audit:
 - `ibl_plr.tid` → `ibl_team_info.teamid` (most critical)
 - `ibl_hist.teamid` → `ibl_team_info.teamid`
 - `ibl_schedule.Visitor/Home` → `ibl_team_info.teamid`
-- `ibl_plr_chunk.pid` → `ibl_plr.pid`
 - Drops conflicting CHECK constraints before FK addition
 
 **PHP Code Changes:**

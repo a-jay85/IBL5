@@ -1,11 +1,15 @@
 //go:build archive
 
-// Derivation harness for the foulCompress neutral references
-// (offQualityNeutral / defQualityNeutral, teamquality.go). It walks a handful of
-// real JSB backup seasons, selects each team's faithful five-pass starters, and
-// runs them through the two quality aggregators at neutral HCA — the league-mean
-// of those values is exactly the mean-preserving compression reference (a team AT
-// the neutral is unchanged by any foulCompress; see the const provenance).
+// Derivation harness for the foulCompress DEFENSIVE neutral reference
+// (defQualityNeutral, teamquality.go). It walks a handful of real JSB backup
+// seasons, selects each team's faithful five-pass starters, and runs them through
+// the defensive quality aggregator at neutral HCA — the league-mean of the pre-cap
+// def total is exactly the mean-preserving compression reference (a team AT the
+// neutral is unchanged by any foulCompress; see the const provenance).
+//
+// The OFFENSIVE neutral derivation is GONE (ADR-0061): offQ is now the volume-
+// neutral constant offQualityConstant, not a per-team summation to compress, so
+// there is no off-side league mean to derive. The def side is unchanged.
 //
 // This is the .sco-corpus analog of how offVolumeNeutral=161 was derived (real
 // per-starter composite means). It is build-tag gated behind `archive` so it is
@@ -104,10 +108,11 @@ func loadRoster(t *testing.T, zipPath string) *bundle.Bundle {
 	return &b
 }
 
-// TestDeriveQualityNeutrals logs the league-mean offensive- and defensive-quality
-// references and the rating-space offensive sum, then asserts the committed
-// consts track the derived means (so a future rating-scale change that desyncs
-// the neutral is caught). It never runs in CI (archive tag).
+// TestDeriveQualityNeutrals logs the league-mean PRE-CAP defensive-quality
+// reference and asserts the committed defQualityNeutral tracks the derived mean (so
+// a future def rating-scale change that desyncs the neutral is caught). The off-side
+// derivation was removed with ADR-0061 (offQ is a constant now). Never runs in CI
+// (archive tag).
 func TestDeriveQualityNeutrals(t *testing.T) {
 	dir := os.Getenv("JSB_ARCHIVE_DIR")
 	if dir == "" {
@@ -127,10 +132,9 @@ func TestDeriveQualityNeutrals(t *testing.T) {
 	}
 
 	var (
-		offQSum, defQSum float64 // post-aggregator outputs (offQ floored, defQ capped)
-		defPreCapSum     float64 // pre-cap def total (the compression space)
-		offRatingSum     float64 // Σ floor1(OO) league sum (rating space)
-		nTeams, nCapped  int
+		defQSum         float64 // post-aggregator output (defQ capped)
+		defPreCapSum    float64 // pre-cap def total (the compression space)
+		nTeams, nCapped int
 	)
 	for _, season := range seasons {
 		sdir := filepath.Join(dir, season)
@@ -162,10 +166,6 @@ func TestDeriveQualityNeutrals(t *testing.T) {
 			if len(starters) < 5 {
 				continue // short lineup — not a league-representative unit
 			}
-			offQSum += offQualityWithHCA(starters, 0)
-			for _, p := range starters {
-				offRatingSum += floor1(p.OO) * offQualityRatingScale
-			}
 			var pre float64
 			for _, p := range starters {
 				pre += floor1(p.OD) * defQualityRatingScale
@@ -182,25 +182,18 @@ func TestDeriveQualityNeutrals(t *testing.T) {
 		t.Fatal("no teams sampled from the archive")
 	}
 
-	meanOffQ := offQSum / float64(nTeams)
 	meanDefPreCap := defPreCapSum / float64(nTeams)
 	meanDefOut := defQSum / float64(nTeams)
-	meanRatingSum := offRatingSum / float64(nTeams)
 	capRate := float64(nCapped) / float64(nTeams)
 
 	t.Logf("sampled teams=%d capped=%d (%.1f%%)", nTeams, nCapped, 100*capRate)
-	t.Logf("OFF: mean offQ(neutral)=%.4f | mean Σfloor1(OO)*scale=%.4f (rating-space sum = %.4f)",
-		meanOffQ, meanRatingSum, meanRatingSum/offQualityRatingScale)
 	t.Logf("DEF: mean pre-cap total=%.4f | mean post-cap output=%.4f", meanDefPreCap, meanDefOut)
-	t.Logf("COMMITTED: offQualityNeutral=%.4f defQualityNeutral=%.4f", offQualityNeutral, defQualityNeutral)
+	t.Logf("COMMITTED: defQualityNeutral=%.4f", defQualityNeutral)
 
-	// Guard: the committed neutrals must track the derived corpus means (the
+	// Guard: the committed def neutral must track the derived corpus mean (the
 	// mean-preservation premise). A wide band (±20%) tolerates the small season
-	// sample while still catching a gross desync (e.g. a rating-scale change that
-	// left offQualityNeutral stale).
-	if rel := relErr(offQualityNeutral, meanOffQ); rel > 0.20 {
-		t.Errorf("offQualityNeutral %.4f is %.1f%% off the derived mean %.4f — re-derive (likely a rating-scale desync)", offQualityNeutral, 100*rel, meanOffQ)
-	}
+	// sample while still catching a gross desync (e.g. a def rating-scale change that
+	// left defQualityNeutral stale).
 	if rel := relErr(defQualityNeutral, meanDefPreCap); rel > 0.20 {
 		t.Errorf("defQualityNeutral %.4f is %.1f%% off the derived mean pre-cap total %.4f — re-derive", defQualityNeutral, 100*rel, meanDefPreCap)
 	}

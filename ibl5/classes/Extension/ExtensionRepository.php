@@ -22,15 +22,25 @@ use Extension\Contracts\ExtensionRepositoryInterface;
 class ExtensionRepository extends \BaseMysqliRepository implements ExtensionRepositoryInterface
 {
     private \Topics\News\NewsRepository $newsService;
+    /** Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('app'). */
+    private \Psr\Log\LoggerInterface $appLogger;
+    /** Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('db'). */
+    private \Psr\Log\LoggerInterface $dbLogger;
 
     /**
      * @param \mysqli $db Active mysqli connection
      * @param \Topics\News\NewsRepository|null $newsService Optional NewsRepository injection
      */
-    public function __construct(\mysqli $db, ?\Topics\News\NewsRepository $newsService = null)
-    {
+    public function __construct(
+        \mysqli $db,
+        ?\Topics\News\NewsRepository $newsService = null,
+        ?\Psr\Log\LoggerInterface $appLogger = null,
+        ?\Psr\Log\LoggerInterface $dbLogger = null
+    ) {
         parent::__construct($db);
         $this->newsService = $newsService ?? new \Topics\News\NewsRepository($db);
+        $this->appLogger = $appLogger ?? \Logging\LoggerFactory::getChannel('app');
+        $this->dbLogger = $dbLogger ?? \Logging\LoggerFactory::getChannel('db');
     }
 
     /**
@@ -56,7 +66,7 @@ class ExtensionRepository extends \BaseMysqliRepository implements ExtensionRepo
             );
             return true;
         } catch (\RuntimeException $e) {
-            \Logging\LoggerFactory::getChannel('db')->error('updatePlayerContract failed', [
+            $this->dbLogger->error('updatePlayerContract failed', [
                 'exception' => $e,
                 'context' => ['playerName' => $playerName],
             ]);
@@ -77,7 +87,7 @@ class ExtensionRepository extends \BaseMysqliRepository implements ExtensionRepo
             );
             return true;
         } catch (\RuntimeException $e) {
-            \Logging\LoggerFactory::getChannel('db')->error('markExtensionUsedThisSim failed', [
+            $this->dbLogger->error('markExtensionUsedThisSim failed', [
                 'exception' => $e,
                 'context' => ['teamName' => $teamName],
             ]);
@@ -98,7 +108,7 @@ class ExtensionRepository extends \BaseMysqliRepository implements ExtensionRepo
             );
             return true;
         } catch (\RuntimeException $e) {
-            \Logging\LoggerFactory::getChannel('db')->error('markExtensionUsedThisSeason failed', [
+            $this->dbLogger->error('markExtensionUsedThisSeason failed', [
                 'exception' => $e,
                 'context' => ['teamName' => $teamName],
             ]);
@@ -185,7 +195,7 @@ class ExtensionRepository extends \BaseMysqliRepository implements ExtensionRepo
                 ];
             }
         } catch (\RuntimeException $e) {
-            \Logging\LoggerFactory::getChannel('app')->warning('ExtensionRepository::getTeamTraditionData failed', ['error' => $e->getMessage()]);
+            $this->appLogger->warning('ExtensionRepository::getTeamTraditionData failed', ['error' => $e->getMessage()]);
         }
 
         return $defaults;

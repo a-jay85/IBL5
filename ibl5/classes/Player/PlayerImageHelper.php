@@ -133,6 +133,9 @@ class PlayerImageHelper implements PlayerImageHelperInterface
                 . '</td>';
         }
 
+        // Escape once on the non-pipe path (the pipe branch above already escapes its own copy).
+        // Covers both the full-name span and abbreviateFirstName(), which derives from $displayName.
+        $displayName = HtmlSanitizer::e($displayName);
         $thumbnail = self::renderThumbnail($playerID);
         $abbreviated = self::abbreviateFirstName($displayName);
 

@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+#
+# bin/post-plan-now — fire a fresh, detached Sonnet 4.6 /post-plan session on the
+# current worktree's branch, replacing the manual "open a new session and hand
+# off" step. The run is supervised by launchd (RunAtLoad one-shot), so it
+# survives closing Claude Code or the terminal — a plain `nohup … &` launched
+# from Claude Code's Bash tool shares the tool-shell's process group and dies
+# with it, so launchd is the load-bearing detach mechanism (same reason
+# bin/nightly-run uses launchd).
+#
+# The plan is resolved from the branch slug by /post-plan Phase 1 — no handoff
+# file is needed (that machinery is nightly-only).
+#
+# Usage:
+#   bin/post-plan-now           # you decided to ship: fire unconditionally
+#   bin/post-plan-now --auto    # impl agent's closing action: honor the plan's
+#                               #   `auto_postplan: false` opt-out and skip when
+#                               #   already inside a headless/nightly run
+#
+# Run from anywhere inside the target worktree.
+
+set -euo pipefail
+
+AUTO=0
+[ "${1:-}" = "--auto" ] && AUTO=1
+
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null) \
+    || { echo "post-plan-now: not inside a git repo." >&2; exit 1; }
+cd "$ROOT"
+SLUG=$(git rev-parse --abbrev-ref HEAD)
+
+case "$SLUG" in
+    master|main|HEAD)
+        echo "post-plan-now: refusing to run on '$SLUG' — switch to the feature branch." >&2
+        exit 1 ;;
+esac
+
+PLAN_FILE="$HOME/.claude/plans/$SLUG.md"
+
+# --auto is the impl agent's automatic closing action. Two gates apply only here;
+# a bare (human) invocation always fires, because running it by hand IS the
+# decision to ship.
+if [ "$AUTO" -eq 1 ]; then
+    # (1) We're already inside a headless/nightly run — the nightly runner fires
+    #     post-plan itself, so an auto-fire here would double-run. The
+    #     workflow-continuity rule that tells the impl agent to call this is
+    #     globally loaded, so the nightly impl agent sees it too; this is the
+    #     belt-and-suspenders guard against that.
+    if [ "${CLAUDE_HEADLESS:-}" = "1" ]; then
+        echo "post-plan-now: CLAUDE_HEADLESS=1 — nightly/headless run owns post-plan; skipping auto-fire."
+        exit 0
+    fi
+    # (2) The plan opted out of auto-fire (judged risky enough to want a human
+    #     eyeball before the PR opens / auto-merge arms). Parse the line-1 YAML
+    #     frontmatter only — a body that documents the syntax can't self-select.
+    if [ -f "$PLAN_FILE" ]; then
+        AUTO_PP=$(awk '
+            NR==1 && /^---[[:space:]]*$/ {infm=1; next}
+            infm && /^---[[:space:]]*$/ {infm=0; exit}
+            infm && /^auto_postplan:[[:space:]]*/ {
+                sub(/^auto_postplan:[[:space:]]*/,""); gsub(/[[:space:]]/,""); print; exit
+            }
+        ' "$PLAN_FILE" 2>/dev/null)
+        if [ "$AUTO_PP" = "false" ]; then
+            echo "post-plan-now: plan declares 'auto_postplan: false' — judged risky; not auto-firing."
+            echo "  Review the worktree, then ship when ready:  bin/post-plan-now"
+            exit 0
+        fi
+    fi
+fi
+
+# Nothing to ship? Clean tree AND no commits ahead of origin/master.
+if git diff --quiet && git diff --cached --quiet \
+   && [ -z "$(git log --oneline origin/master..HEAD 2>/dev/null)" ]; then
+    echo "post-plan-now: nothing to do — clean tree and no commits ahead of master." >&2
+    exit 1
+fi
+
+[ -f "$PLAN_FILE" ] \
+    || echo "post-plan-now: warn — no plan at $PLAN_FILE; /post-plan will run plan-blind." >&2
+
+TS=$(date +%Y%m%d-%H%M%S)
+LOG="/tmp/post-plan-now-$SLUG-$TS.log"
+LABEL="com.ibl5.postplan-now-$SLUG-$TS"
+PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+
+PROMPT="Invoke the /post-plan skill now on the current git branch. Resolve the plan from the branch slug per the skill Phase 1, then execute every phase. No human is present: never ask questions or wait for input — make the safe choice and continue."
+
+# launchd runs with a minimal env, so prepend the same PATH bin/nightly-run uses
+# (proven to find claude/gh/docker/node for full post-plan runs). CLAUDE_HEADLESS=1
+# marks the detached run unattended: /post-plan skips the Phase 10 preview rebuild
+# and BLOCKS auto-merge on a golden-snapshot change instead of merely warning.
+# caffeinate -s keeps the Mac awake on AC for the run's duration.
+cat > "$PLIST" <<PLIST_EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>$LABEL</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>-lc</string>
+		<string>export PATH="/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH"; cd "$ROOT" &amp;&amp; CLAUDE_HEADLESS=1 caffeinate -s claude -p "$PROMPT" --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name "$LABEL"; rm -f "$PLIST"; launchctl bootout gui/\$(id -u)/$LABEL</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>WorkingDirectory</key>
+	<string>$ROOT</string>
+	<key>StandardOutPath</key>
+	<string>$LOG</string>
+	<key>StandardErrorPath</key>
+	<string>$LOG</string>
+</dict>
+</plist>
+PLIST_EOF
+
+launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
+launchctl bootstrap "gui/$(id -u)" "$PLIST"
+
+echo "post-plan-now: fired a detached Sonnet 4.6 /post-plan on branch '$SLUG'."
+echo "  supervised by launchd — survives closing Claude Code / the terminal"
+echo "  log:    tail -f $LOG"
+echo "  label:  $LABEL   (self-removes when post-plan finishes)"
+echo "  PR / code review / CI / auto-merge progress appears on the PR."
+echo "  Leave this worktree alone — /post-plan rebuilds its Docker stack for E2E."

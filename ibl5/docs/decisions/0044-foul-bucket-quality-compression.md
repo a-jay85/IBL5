@@ -1,12 +1,34 @@
 ---
 description: Lever-2 narrows the foul-bucket team-quality dispersion (foulCompress) toward the corpus league mean, calibrated to the engine's too-wide FTA-rate dispersion; the paired offVolumeScale raise is refuted on its own Var(lnFGA) target, and the Cov(lnFGA,lnPPS) sign is the emergent (never tuned) readout. Records the partial three-axis verdict.
-last_verified: 2026-06-04
+last_verified: 2026-06-12
 ---
 
 # ADR-0044: Foul-bucket team-quality compression (Lever-2)
 
-**Status:** Accepted
+**Status:** Accepted; **off-side mechanism partially superseded by ADR-0061** (2026-06-12)
 **Date:** 2026-06-04
+
+## Superseded in part by ADR-0061
+
+The Fork-B RE verdict (2026-06-12) found the foul-bucket offQ divisor
+(`offQualityWithHCA`) should be a **volume-neutral constant** (`offQualityConstant`),
+faithful to 5.60's dead-zero `+0xDE0`, not a per-team `Σ floor1(OO)·scale`. ADR-0061
+made that change, which **partially supersedes** this ADR:
+
+- **Gone:** the **off-side** `foulCompress` compression and its neutral references
+  (`offQualityNeutral`, `offQualityNeutralRatingSum`, `offQualityRatingScale` — all
+  deleted). offQ is now a constant with **zero team-to-team spread**, so there is nothing
+  on the off side to compress, and the claims below that the lever "works mainly through
+  the uncapped offQ divisor" and that `offQualityRatingScale` sets both the margin and the
+  FTA dispersion **no longer describe current behavior**.
+- **Survives, unchanged:** the **def-side** `foulCompress` compression (still applied to
+  `defMatchupQuality`), the **FTA-dispersion target** (`FTADispersionRatio`), and the
+  three-axis dispersion verdict / honest null on total `Var(lnPF)` recorded below.
+- The home-margin calibration knob moved from `offQualityRatingScale` to
+  `offQualityConstant` (ADR-0061 GATE-1).
+
+The verdict tables below are retained as the **dated record** of the Lever-2 calibration
+(true as of 2026-06-04); read them as history, not as the current off-side mechanism.
 
 ## Context
 
@@ -218,12 +240,15 @@ FTADispersionRatio recorded as residual.
   ~2× (partial); FGA-volume dispersion and the `Var(lnPPS)` marginal reach real; the
   wrong-signed Cov is roughly halved but not flipped, so total `Var(lnPF)` stays ~3.4×
   too narrow (an honest null on the total-spread magnitude).
-- `offQualityNeutral` co-varies with `offQualityRatingScale`, so the HCA-margin re-tune
-  keeps the compression mean-preserving automatically (drift-guarded).
+- (As of 2026-06-04) `offQualityNeutral` co-varied with `offQualityRatingScale`, so the
+  HCA-margin re-tune kept the off-side compression mean-preserving automatically. **ADR-0061
+  deleted these off-side consts** — the off-side no longer compresses; `foulCompress` now
+  mean-preserves the def side only (`defQualityNeutral`).
 - The golden fixture was regenerated (intentional output change). The `FTADispersionRatio`
   metric is now available to all future calibration runs as the foul-rate target.
 - A new archive-tagged derivation harness (`TestDeriveQualityNeutrals`) reproduces the
-  committed neutrals.
+  committed neutrals. **ADR-0061** stripped its off-side derivation; it now derives only
+  `defQualityNeutral`.
 
 ## References
 

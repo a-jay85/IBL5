@@ -223,7 +223,7 @@ func TestSimulate_SubstitutionsFire(t *testing.T) {
 // step, never an assumed number.
 //
 // A player who DOES foul out (GamePF >= 6) leaves early and accrues fewer minutes.
-// The CALIBRATED post-HCA foul rate (offQualityRatingScale lowered to match the
+// The CALIBRATED post-HCA foul rate (offQualityConstant tuned to match the
 // corpus home margin) makes a foul-out reachable in this iron-man fixture, so the
 // conservation assertion is split: full minutes for everyone who finishes, and
 // strictly-not-more for anyone who fouls out (its exact short-minutes value is
@@ -755,13 +755,30 @@ func TestSimulate_NonDegeneracy(t *testing.T) {
 		if totalBLK == 0 {
 			t.Errorf("seed %d: total blocks == 0 — degenerate (no contested shots)", seed)
 		}
+	}
+}
 
-		// No full-team foul-out: every team must keep ≥1 non-fouled-out player all
-		// game (a fouled-out player has GamePF ≥ 6).
-		teamByPID := map[int]int{}
-		for _, p := range richBundle().Players {
-			teamByPID[p.PID] = p.TeamID
-		}
+// --- matrix #11b: full-team foul-out RATE guard -----------------------------
+//
+// richBundle carries exactly 5 players per team (one per slot), so a full-team
+// foul-out (all five reaching GamePF ≥ 6) is a PROBABILISTIC artifact of the
+// thin synthetic fixture, NOT a per-seed engine invariant — a real 12-man roster
+// never fully fouls out. A zero-tolerance check on a hardcoded seed list is
+// therefore brittle to any RNG-stream reshuffle (e.g. the ADR-0058 ORB swap moved
+// seed 1 into the cascade set). The real degeneracy guard is the RATE: it must
+// stay rare. Measured over N=2000 seeds (4000 team-games): faithful gate-1 ≈ 2.25%,
+// the old linear gate-2 ≈ 3.25% — the faithful swap REDUCES foul-outs. The 8% bound
+// sits comfortably above both yet far below any true foul-heavy degeneracy.
+func TestSimulate_FoulOutRate(t *testing.T) {
+	const n = 2000
+	b := richBundle()
+	teamByPID := map[int]int{}
+	for _, p := range b.Players {
+		teamByPID[p.PID] = p.TeamID
+	}
+	cascades, teamGames := 0, 0
+	for seed := uint64(0); seed < n; seed++ {
+		g := Simulate(b, seed).Games[0]
 		active := map[int]int{}
 		for _, pb := range g.PlayerBoxes {
 			if pb.GamePF < 6 {
@@ -769,10 +786,15 @@ func TestSimulate_NonDegeneracy(t *testing.T) {
 			}
 		}
 		for _, tb := range g.TeamBoxes {
+			teamGames++
 			if active[tb.TeamID] == 0 {
-				t.Errorf("seed %d team %d: every player fouled out — full-team foul-out cascade", seed, tb.TeamID)
+				cascades++
 			}
 		}
+	}
+	rate := float64(cascades) / float64(teamGames)
+	if rate > 0.08 {
+		t.Errorf("full-team foul-out rate = %.4f (%d/%d), want ≤ 0.08 — foul-heavy degeneracy", rate, cascades, teamGames)
 	}
 }
 

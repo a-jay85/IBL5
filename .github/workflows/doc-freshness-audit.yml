@@ -1,0 +1,131 @@
+name: Doc Freshness Audit
+
+on:
+  # Nightly. Offset minute (not :00) per the log-review.yml convention.
+  schedule:
+    - cron: '43 11 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: doc-freshness-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: Repo-wide staleness audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          coverage: none
+
+      - name: Generate staleness report
+        id: report
+        run: |
+          bin/check-docs --staleness-report > /tmp/stale.json
+          COUNT=$(jq 'length' /tmp/stale.json)
+          SIG=$(jq -r '.[].path' /tmp/stale.json | sort | paste -sd, -)
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+          echo "sig=$SIG" >> "$GITHUB_OUTPUT"
+          echo "Stale docs: $COUNT"
+
+      - name: Build issue body
+        run: |
+          {
+            echo "Repo-wide doc staleness audit ($(date -u +%Y-%m-%d))."
+            echo ""
+            echo "These in-scope docs have a \`last_verified\` older than the 60-day window."
+            echo ""
+            echo "| Doc | last_verified | Age (days) | Days over |"
+            echo "|-----|---------------|------------|-----------|"
+            jq -r '.[] | "| `\(.path)` | \(.last_verified) | \(.age_days) | \(.days_over) |"' /tmp/stale.json
+            echo ""
+            echo "**Remediation:** re-verify each doc against reality, then bump its \`last_verified\` to today and commit (on a branch that touches the doc, \`bin/check-docs --fix-dates --since=master\` bumps the changed-but-unbumped ones)."
+            echo ""
+            echo "<!-- stale-set: ${{ steps.report.outputs.sig }} -->"
+          } > /tmp/issue-body.md
+
+      - name: Ensure stale-docs label exists
+        run: gh label create stale-docs --color 0075ca --force 2>/dev/null || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: File or update the stale-docs issue (idempotent)
+        id: issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COUNT: ${{ steps.report.outputs.count }}
+          CUR_SIG: ${{ steps.report.outputs.sig }}
+        run: |
+          NUM=$(gh issue list --label stale-docs --state open --json number --jq '.[0].number // empty')
+          PREV_SIG=""
+          if [ -n "$NUM" ]; then
+            PREV_SIG=$(gh issue view "$NUM" --json body --jq '.body' \
+              | tr -d '\r' | sed -n 's/.*<!-- stale-set: \(.*\) -->.*/\1/p')
+          fi
+
+          if [ "$COUNT" -eq 0 ]; then
+            # Everything is fresh again — close the open issue, stay silent.
+            if [ -n "$NUM" ]; then
+              gh issue close "$NUM" --comment "All previously-stale docs are now fresh. Closing automatically."
+            fi
+            echo "notify=false" >> "$GITHUB_OUTPUT"
+          elif [ -z "$NUM" ]; then
+            gh issue create \
+              --title "Stale docs: $COUNT over the 60-day window" \
+              --body-file /tmp/issue-body.md \
+              --label stale-docs
+            echo "notify=true" >> "$GITHUB_OUTPUT"
+          elif [ "$CUR_SIG" = "$PREV_SIG" ]; then
+            # Same set of stale docs as the open issue — leave it, no ping.
+            echo "Stale set unchanged; leaving issue #$NUM as-is."
+            echo "notify=false" >> "$GITHUB_OUTPUT"
+          else
+            gh issue edit "$NUM" --body-file /tmp/issue-body.md
+            echo "notify=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish to job summary
+        run: |
+          if [ "${{ steps.report.outputs.count }}" -gt 0 ]; then
+            cat /tmp/issue-body.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No stale docs — all in-scope docs are within the 60-day window." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Setup SSH
+        if: steps.issue.outputs.notify == 'true'
+        run: |
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -p ${{ secrets.PORT }} ${{ secrets.HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+        env:
+          DEPLOY_KEY: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Send Discord DM
+        if: steps.issue.outputs.notify == 'true'
+        env:
+          OWNER_DISCORD_ID: ${{ secrets.OWNER_DISCORD_ID }}
+          COUNT: ${{ steps.report.outputs.count }}
+        run: |
+          MSG=$(printf 'Doc Freshness Audit: %s doc(s) past the 60-day staleness window.\nIssue + details: https://github.com/%s/actions/runs/%s' \
+            "$COUNT" "${{ github.repository }}" "${{ github.run_id }}")
+
+          PAYLOAD=$(jq -n --arg id "$OWNER_DISCORD_ID" --arg msg "$MSG" \
+            '{content: {receivingUserDiscordID: $id, message: $msg}}')
+
+          echo "$PAYLOAD" | ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
+            'curl -s --max-time 10 -X POST http://localhost:50000/discordDM -H "Content-Type: application/json" -d @-' \
+            || echo "::warning::IBLbot notification failed (bot may be down)"

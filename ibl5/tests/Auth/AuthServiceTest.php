@@ -316,4 +316,94 @@ class AuthServiceTest extends TestCase
         // Stub returns null → isAdmin returns false
         self::assertFalse($this->authService->isAdmin());
     }
+
+    // --- DI seam tests (rows #6–#9) ---
+
+    private static function buildSqlitePdo(): \PDO
+    {
+        $pdo = new \PDO('sqlite::memory:');
+        $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+        $sql = (string) file_get_contents(
+            __DIR__ . '/../../vendor/delight-im/auth/Database/SQLite.sql'
+        );
+        // Apply auth_ prefix: replace table references "users_xxx" then bare "users"
+        $sql = str_replace('"users_', '"auth_users_', $sql);
+        $sql = str_replace('"users"', '"auth_users"', $sql);
+        foreach (explode(';', $sql) as $stmt) {
+            $stmt = trim($stmt);
+            if ($stmt !== '' && !str_starts_with($stmt, '--')) {
+                $pdo->exec($stmt);
+            }
+        }
+        return $pdo;
+    }
+
+    public function testPdoFactoryIsInvokedByGetAuth(): void
+    {
+        $invocations = 0;
+        $pdo = self::buildSqlitePdo();
+
+        $stubRepo = static::createStub(AuthRepositoryInterface::class);
+        $service = new AuthService($stubRepo, null, static function () use ($pdo, &$invocations): \PDO {
+            $invocations++;
+            return $pdo;
+        });
+
+        // Not authenticated → tryRememberMe() calls getAuth() → factory fires
+        $service->tryRememberMe();
+
+        self::assertSame(1, $invocations, 'pdoFactory must be called once when getAuth() lazily constructs Auth');
+    }
+
+    public function testAttemptReturnsFalseForBadCredsOverSqlite(): void
+    {
+        $pdo = self::buildSqlitePdo();
+
+        $stubRepo = static::createStub(AuthRepositoryInterface::class);
+        $service = new AuthService($stubRepo, null, static fn (): \PDO => $pdo);
+
+        $result = $service->attempt('nobody', 'wrongpass');
+
+        self::assertFalse($result, 'attempt() must return false for unknown credentials');
+        self::assertFalse($service->isAuthenticated(), 'isAuthenticated() must be false after rejected attempt');
+    }
+
+    public function testPdoFactoryNotInvokedWhenAlreadyAuthenticated(): void
+    {
+        $invocations = 0;
+        $pdo = self::buildSqlitePdo();
+
+        $_SESSION['auth_user_id'] = 42;
+        $_SESSION['auth_username'] = 'loggedin';
+
+        $stubRepo = static::createStub(AuthRepositoryInterface::class);
+        $service = new AuthService($stubRepo, null, static function () use ($pdo, &$invocations): \PDO {
+            $invocations++;
+            return $pdo;
+        });
+
+        $result = $service->tryRememberMe();
+
+        self::assertFalse($result, 'tryRememberMe() must return false when already authenticated');
+        self::assertSame(0, $invocations, 'pdoFactory must NOT be invoked when already authenticated (timing preserved)');
+    }
+
+    public function testNullFactoryFallsBackToPdoConnectionGetInstance(): void
+    {
+        $pdo = self::buildSqlitePdo();
+        \Database\PdoConnection::setInstance($pdo);
+
+        try {
+            $stubRepo = static::createStub(AuthRepositoryInterface::class);
+            // null factory + null auth → getAuth() falls back to PdoConnection::getInstance()
+            $service = new AuthService($stubRepo, null, null);
+
+            // tryRememberMe() calls getAuth() which calls PdoConnection::getInstance() = $pdo
+            $result = $service->tryRememberMe();
+
+            self::assertFalse($result, 'tryRememberMe() returns false when not authenticated (no remember cookie)');
+        } finally {
+            \Database\PdoConnection::reset();
+        }
+    }
 }

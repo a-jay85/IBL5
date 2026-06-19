@@ -21,14 +21,19 @@ class SavedDepthChartApiHandler
     private SavedDepthChartRepository $repository;
     private TeamIdentityRepositoryInterface $commonRepo;
     private \Api\Response\HtmlResponder $responder;
+    /**
+     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     */
+    private ?Season $season = null;
 
-    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepo)
+    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepo, ?Season $season = null)
     {
         $this->db = $db;
         $this->service = new SavedDepthChartService($db);
         $this->repository = new SavedDepthChartRepository($db);
         $this->commonRepo = $commonRepo;
         $this->responder = new \Api\Response\HtmlResponder();
+        $this->season = $season;
     }
 
     /**
@@ -67,7 +72,7 @@ class SavedDepthChartApiHandler
 
     private function handleList(int $teamid): void
     {
-        $season = new Season($this->db);
+        $season = $this->season ?? new Season($this->db);
         $options = $this->service->getDropdownOptions($teamid, $season);
 
         $depthCharts = [];
@@ -167,7 +172,7 @@ class SavedDepthChartApiHandler
         $statsHtml = '';
         if ($endDate !== null && $endDate !== '') {
             $team = Team::initialize($this->db, $teamid);
-            $season = new Season($this->db);
+            $season = $this->season ?? new Season($this->db);
             $statsHtml = \BasketballStats\Tables\PeriodAverages::render($this->db, $team, $season, $startDate, $endDate);
         }
 
@@ -237,7 +242,7 @@ class SavedDepthChartApiHandler
             $newName = mb_substr($newName, 0, 100);
         }
 
-        $season = new Season($this->db);
+        $season = $this->season ?? new Season($this->db);
         $result = $this->service->nameOrCreateActive($teamid, $username, $newName, $season);
 
         $this->responder->json($result);

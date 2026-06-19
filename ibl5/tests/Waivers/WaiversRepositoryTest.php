@@ -109,25 +109,25 @@ class WaiversRepositoryTest extends TestCase
     public function testSignPlayerFromWaiversWithNewContractDuringFreeAgency(): void
     {
         $this->mockDb->setReturnTrue(true);
-        
+
         $team = [
             'team_name' => 'Los Angeles Lakers',
             'teamid' => 14
         ];
-        
+
         $contractData = [
             'hasExistingContract' => false,
             'salary' => 76
         ];
-        
+
         $result = $this->repository->signPlayerFromWaivers(
             456,
             $team,
             $contractData
         );
-        
+
         $this->assertTrue($result);
-        
+
         $queries = $this->mockDb->getExecutedQueries();
         $this->assertCount(1, $queries);
         $this->assertStringContainsString('UPDATE ibl_plr', $queries[0]);
@@ -139,5 +139,36 @@ class WaiversRepositoryTest extends TestCase
         $this->assertStringContainsString('droptime', $queries[0]);
         $this->assertStringContainsString('= 0', $queries[0]);
     }
-    
+
+    // ==================== DI Seam ====================
+
+    public function testInjectedChannelLoggerReceivesCallOnDbError(): void
+    {
+        $mockDb = new MockDatabase();
+        $mockDb->setReturnTrue(false); // make the UPDATE fail → RuntimeException → logger path
+
+        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $logger->expects($this->once())->method('error')
+            ->with('Failed to sign player from waivers', self::arrayHasKey('error'));
+
+        $repo = new WaiversRepository($mockDb, $logger);
+        $result = $repo->signPlayerFromWaivers(
+            123,
+            ['teamid' => 1, 'team_name' => 'Test'],
+            ['hasExistingContract' => false, 'salary' => 100]
+        );
+
+        $this->assertFalse($result);
+    }
+
+    public function testConstructsWithoutLoggerArgAndFallbackFires(): void
+    {
+        // no logger arg → fallback fires; prove the repo is usable (no TypeError)
+        $mockDb = new MockDatabase();
+        $repo = new WaiversRepository($mockDb);
+        $mockDb->setReturnTrue(true);
+        $result = $repo->dropPlayerToWaivers(1, time());
+        $this->assertTrue($result);
+    }
+
 }

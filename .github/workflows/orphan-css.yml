@@ -4,6 +4,15 @@ on:
   pull_request:
     branches: [ master ]
     types: [opened, synchronize, reopened]
+    paths:
+      - 'ibl5/design/**.css'
+      - 'ibl5/**.php'
+      - 'ibl5/**.js'
+      - 'ibl5/**.twig'
+      - 'ibl5/**.tpl'
+      - 'ibl5/**.html'
+      - 'bin/check-orphan-css'
+      - '.github/workflows/orphan-css.yml'
 
 permissions:
   contents: read

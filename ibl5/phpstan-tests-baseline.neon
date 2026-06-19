@@ -37,12 +37,6 @@ parameters:
 			path: tests/CapSpace/CapSpaceViewTest.php
 
 		-
-			rawMessage: 'Parameter #1 $comparisonData of method ComparePlayers\ComparePlayersView::renderComparisonResults() expects array{player1: array<string, mixed>, player2: array<string, mixed>}, array<string, array{pid: int, teamid: int, name: string, pos: string, age: int, r_fga: int, r_fgp: int, r_fta: int, ...}> given.'
-			identifier: argument.type
-			count: 7
-			path: tests/ComparePlayers/ComparePlayersViewTest.php
-
-		-
 			rawMessage: 'Parameter #1 $offerData of method FreeAgency\FreeAgencyRepository::saveOffer() expects array{pid: int, teamid: int, teamName: string, playerName: string, offer1: int, offer2: int, offer3: int, offer4: int, ...}, array<string, float|int|string> given.'
 			identifier: argument.type
 			count: 8
@@ -245,12 +239,6 @@ parameters:
 			identifier: argument.type
 			count: 3
 			path: tests/FreeAgency/FreeAgencyAdminProcessorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $pageData of method LeagueSchedule\LeagueScheduleView::render() expects array{gamesByMonth: array<string, array{label: string, dates: array<string, list<array{date: string, visitor: int, visitorScore: int, visitorTeam: string, visitorRecord: string, home: int, homeScore: int, homeTeam: string, ...}>>}>, firstUnplayedId: string|null, isPlayoffPhase: bool, playoffMonthKey: string|null, simLengthDays: int}, array{gamesByMonth: array<string, array{label: string, dates: array<string, list<array<string, mixed>>>}>, firstUnplayedId: string|null, isPlayoffPhase: bool, playoffMonthKey: string|null, simLengthDays: int} given.'
-			identifier: argument.type
-			count: 10
-			path: tests/LeagueSchedule/LeagueScheduleViewTest.php
 
 		-
 			rawMessage: 'Parameter #2 $teamFactors of method Negotiation\NegotiationDemandCalculator::calculateDemands() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{} given.'

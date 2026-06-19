@@ -68,7 +68,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Setup PHP
       uses: shivammathur/setup-php@v2
@@ -159,7 +159,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Setup PHP
       uses: shivammathur/setup-php@v2
@@ -191,7 +191,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Setup Node
       uses: actions/setup-node@v6
@@ -210,7 +210,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Setup Node
       uses: actions/setup-node@v6
@@ -259,7 +259,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Setup PHP
       uses: shivammathur/setup-php@v2
@@ -309,7 +309,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Setup PHP
       uses: shivammathur/setup-php@v2
@@ -348,7 +348,7 @@ jobs:
     if: needs.changes.outputs.src == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Ban silently-disabled tests (markTestSkipped)
@@ -362,7 +362,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
@@ -413,7 +413,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Grep for host mariadb invocations outside bin/db-query
         run: |
@@ -448,7 +448,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Run nightly impl-model parser regression test
         run: bin/test-nightly-impl-model
 
@@ -462,7 +462,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
         token: ${{ secrets.CI_PAT }}
 
@@ -541,7 +541,7 @@ jobs:
     # of grep with no dependencies.
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Check infection.json5 file excludes resolve
         working-directory: ibl5
         run: bin/check-infection-excludes
@@ -555,7 +555,7 @@ jobs:
     # checkout depth and a global git identity are irrelevant.
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: bin/test-cleanup-safety
         run: bin/test-cleanup-safety
       - name: bin/test-check-phpunit-hygiene

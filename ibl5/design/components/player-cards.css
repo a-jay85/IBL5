@@ -652,7 +652,7 @@
 .card-flip-container {
     perspective: 1000px;
     max-width: 420px;
-    margin: 0 auto;
+    margin: 0 auto 18px;
     position: relative;
 }
 

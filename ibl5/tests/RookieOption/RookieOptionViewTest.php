@@ -45,7 +45,9 @@ class RookieOptionViewTest extends TestCase
         $output = $this->view->renderForm($mockPlayer, 'Test Team', 500);
 
         $this->assertIsString($output);
-        $this->assertStringContainsString('PG Test Player', $output);
+        // Title is a standalone ibl-title with no player name (the name lives in the trading card).
+        $this->assertStringContainsString('<h2 class="ibl-title">Rookie Option</h2>', $output);
+        $this->assertStringNotContainsString('PG Test Player', $output);
         $this->assertStringContainsString('500', $output);
         $this->assertStringContainsString('Test Team', $output);
         // Regression: the option value, warning card, and form survive the card swap.

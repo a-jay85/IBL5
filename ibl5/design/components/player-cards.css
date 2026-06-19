@@ -657,7 +657,7 @@
 }
 
 .card-flip-inner {
-    position: relative;
+    display: grid;
     width: 100%;
     transition: transform 0.6s;
     transform-style: preserve-3d;
@@ -667,19 +667,54 @@
     transform: rotateY(180deg);
 }
 
+/*
+ * Both faces share a single grid cell, so the inner sizes itself to the taller
+ * face and the two boxes are always identical — no absolute positioning, no
+ * height syncing, no peeking bottom edge.
+ */
 .card-flip-container .card-front,
 .card-flip-container .card-back {
+    grid-area: 1 / 1;
     width: 100%;
+    position: relative; /* anchor each face's absolutely-positioned flip-icon to its own face */
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
-    position: relative;
 }
 
+/*
+ * The back face sits permanently behind the front, rotated 180deg in the same
+ * 3D space. Both faces are always rendered and painted, so the back's content
+ * (and its player image) is fully decoded before the flip — rotating the solid
+ * object into view never blink-loads or swaps content. The turned-away face is
+ * hidden by backface culling, not by opacity.
+ */
 .card-flip-container .card-back {
-    position: absolute;
-    top: 0;
-    left: 0;
     transform: rotateY(180deg);
+}
+
+/*
+ * Click safety: the turned-away face is already non-interactive via backface
+ * culling, but pointer-events makes it explicit cross-browser so the hidden
+ * face's flip-icon can never be clicked.
+ */
+.card-flip-container .card-back,
+.card-flip-container.flipped .card-front {
+    pointer-events: none;
+}
+
+.card-flip-container.flipped .card-back {
+    pointer-events: auto;
+}
+
+/*
+ * Make each face's visible card box fill the full face height. The grid cell is
+ * sized to the taller face, so the shorter face's card grows to match — both
+ * sides read as one solid object and the flip-icon stays in the same spot
+ * across flips (the user never has to move the cursor to flip back).
+ */
+.card-flip-container .card-front > .trading-card,
+.card-flip-container .card-back > .trading-card-back {
+    height: 100%;
 }
 
 /* Flip Icon - circular button on trading card */
@@ -698,6 +733,13 @@
     z-index: 10;
     transition: all var(--transition-slow);
     box-shadow: var(--pc-shadow-sm);
+    /*
+     * The z-index + transition promote the icon to its own compositing layer,
+     * which would otherwise ignore the parent face's backface culling and paint
+     * through when the face is turned away. Cull this layer with its face.
+     */
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
 }
 
 .flip-icon:hover {

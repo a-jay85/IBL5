@@ -66,7 +66,7 @@ A new `notify-mutation-failure` job mirrors db-backup's `notify-backup-failure`
 `if: ${{ always() && needs.mutation.result == 'failure' }}`. It delivers a Discord DM to
 the owner via the existing SSH → `http://localhost:50000/discordDM` IBLbot endpoint on
 the prod host, reusing the already-vetted `secrets.PRIVATE_KEY` / `secrets.HOST` /
-`secrets.OWNER_DISCORD_ID` pattern verbatim — no new secret, no new endpoint.
+`secrets.OWNER_DISCORD_ID` pattern — no new secret, no new endpoint.
 
 `needs: [mutation]` scopes the alert to the **scheduled / dispatch / labeled full
 `mutation` job** and deliberately **excludes the per-PR `mutation-pr` job**: a red PR
@@ -75,6 +75,27 @@ keeps `workflow_dispatch` un-filtered (no `&& github.event_name == 'schedule'`) 
 as db-backup does, preserving the manual alert-test vector. The `ssh-keyscan` line
 retains its trailing `|| true` so a transient keyscan failure cannot kill the alert
 before the DM step.
+
+### Fail-loud delivery (divergence from the original db-backup pattern)
+
+The db-backup mirror originally ended its DM step with `... || echo "IBLbot
+notification failed"`, swallowing any SSH/curl error so the **notify** job stayed
+green even when the alert never reached Discord — a silent failure of the alerter
+itself, with no alert-on-the-alert. This PR drops that swallow in **both** the new
+`notify-mutation-failure` job and the pre-existing `notify-backup-failure` job
+(`db-backup.yml`), and adds `-f` to the `curl` (`-sf`) so a non-2xx IBLbot response
+(not just a transport error) also fails. A delivery failure now turns the notify job
+**RED**, which on a scheduled run triggers GitHub's native workflow-failure email to
+the workflow's last committer — converting a silent miss into a visible one. The
+trade-off is that transient IBLbot downtime produces a red run + email; for an alert
+path that noise is the correct bias (a dropped failure alert is worse than a false
+one). This intentionally diverges from the verbatim db-backup mirror; the other
+`|| echo` notify sites (`main.yml`, `smoke-prod.yml`, the advisory `::warning::`
+sites) are left untouched and remain a candidate for a separate fail-loud sweep.
+
+> Residual gap (not closed here): IBLbot returning HTTP 200 with an error body would
+> still pass. Closing that needs a body-level health assertion or a dead-man's-switch
+> heartbeat on the alert path — tracked separately, not a blocker for this gate.
 
 ## Activation (post-merge, manual)
 

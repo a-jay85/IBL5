@@ -327,6 +327,8 @@ jobs:
           PAYLOAD=$(jq -n --arg id "$OWNER_DISCORD_ID" --arg msg "$MSG" \
             '{content: {receivingUserDiscordID: $id, message: $msg}}')
 
+          # Fail loud: no `|| echo` swallow and `curl -f` (non-2xx → exit 22), so a
+          # delivery failure turns this job RED — surfaced via GitHub's native
+          # scheduled-run failure email. A silently-dropped alert is worse than none.
           echo "$PAYLOAD" | ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
-            'curl -s --max-time 10 -X POST http://localhost:50000/discordDM -H "Content-Type: application/json" -d @-' \
-            || echo "IBLbot notification failed (bot may be down)"
+            'curl -sf --max-time 10 -X POST http://localhost:50000/discordDM -H "Content-Type: application/json" -d @-'

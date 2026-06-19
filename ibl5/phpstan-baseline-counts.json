@@ -8,6 +8,6 @@
         "ibl.sqlStringInterpolation": 31
     },
     "phpstan-tests-baseline.neon": {
-        "argument.type": 75
+        "argument.type": 73
     }
 }

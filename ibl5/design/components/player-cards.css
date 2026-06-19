@@ -712,28 +712,6 @@
     fill: var(--pc-ink);
 }
 
-.flip-icon::before {
-    content: 'Click to flip';
-    position: absolute;
-    bottom: 100%;
-    right: 0;
-    margin-bottom: var(--pc-pad-md);
-    padding: var(--pc-pad-sm) var(--pc-pad-md);
-    background: rgba(0, 0, 0, 0.8);
-    color: var(--pc-gold);
-    font-size: var(--pc-text-sm);
-    white-space: nowrap;
-    border-radius: var(--pc-radius-sm);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity var(--transition-slow), transform var(--transition-slow);
-}
-
-.flip-icon:hover::before {
-    opacity: 1;
-    transform: rotate(-180deg);
-}
-
 @keyframes pulse-glow {
     0%, 100% {
         box-shadow: var(--pc-shadow-sm);

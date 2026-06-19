@@ -195,11 +195,11 @@ test.describe('Saved Depth Chart API', () => {
   });
 
   test('unauthenticated request returns 401', async ({ request }) => {
-    // Use a fresh request context: strip auth cookies, set _no_auto_login
-    // to prevent DevAutoLogin from auto-authenticating the request
+    // Use a fresh request context: strip auth cookies, set _e2e to skip
+    // PageCache; auto-login does not fire (opt-in is absent by default)
     const response = await request.get(
       'modules.php?name=DepthChartEntry&op=api&action=list',
-      { headers: { Cookie: '_no_auto_login=1' } },
+      { headers: { Cookie: '_e2e=1' } },
     );
 
     const contentType = response.headers()['content-type'] ?? '';
@@ -450,7 +450,7 @@ test.describe('Saved Depth Chart API: load and rename', () => {
   test('unauthenticated load returns 401 JSON', async ({ request }) => {
     const response = await request.get(
       'modules.php?name=DepthChartEntry&op=api&action=load&id=1',
-      { headers: { Cookie: '_no_auto_login=1' } },
+      { headers: { Cookie: '_e2e=1' } },
     );
     expect(response.status()).toBe(401);
     const contentType = response.headers()['content-type'] ?? '';

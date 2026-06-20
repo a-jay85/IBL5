@@ -24,7 +24,7 @@ jobs:
     name: E2E hygiene gate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Run bin/check-e2e-hygiene

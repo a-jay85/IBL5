@@ -95,6 +95,8 @@ Conditionally — include a section **only when it applies**; never emit an empt
   - Output rendering → escaped output (enforced by `RequireEscapedOutputRule`); note it so the impl agent doesn't fight the PHPStan rule.
   XSS and input validation are deterministically enforced by PHPStan custom rules — note which apply, do not write redundant manual checks.
 
+**Self-apply the Automouse Hold Challenge.** Before you classify any design decision `irreducible`, recommend a hold, or let a verification gap / reversible schema tightening default to a supervised verdict, ask yourself the question that breaks false holds in practice: *"What would I add to this plan to make it safe for automouse to merge unattended?"* If the honest answer is a buildable mechanical check — a lever-3 self-check (Verification-gap mechanization above) or the Step 3 § Schema-safety guard — **add that phase and its matrix rows** instead of leaning toward a hold. Carry a hold forward **only** when it is *intrinsic* (subjective UI/UX taste, a touched security surface, an irreversibly-destructive / design-data-blocked change, or a self-gating change to the merge-gate machinery itself) or you can state concretely *why no mechanical check is buildable*. Do **not** pressure an intrinsic hold into arming — that is a safety regression; just name its category. The orchestrator re-runs this challenge in Step 4.5, so do not leave it a reducible hold you could have dissolved.
+
 #### Agent-tiering guidance to inject (item 4 above)
 
 This guidance was relocated from `agent-tiering.md` (it is plan-authoring-only). Inject it verbatim into the Plan-agent prompt:
@@ -159,6 +161,29 @@ After receiving the Plan agent's output, check these gates yourself — do NOT d
 
 If validation fails on any gate, fix the matrix yourself rather than re-running the Plan agent.
 
+## Step 4.5: Challenge the auto-merge hold
+
+If you did **not** set `auto_merge: false` (Step 4 gate 14), skip this step — there is nothing to challenge.
+
+When you *are* about to hold the merge, run an adversarial second pass on that verdict yourself (Opus — irreducibility is Opus-tier judgment, never delegated). The forcing question, lifted from the manual re-prompt that breaks false holds in practice, is: **"What would I add to this plan to make it safe for automouse to merge unattended?"** Apply it according to the hold's *type* — the standard differs, and conflating them regresses safety in one direction or autonomy in the other.
+
+**Reducible holds — dissolve or prove infeasible.** The hold is *reducible* when its only basis is one of:
+- a **verification gap** (gate 15) — correctness is silent, integration-only, observable-only-in-prod, or "I can't tell mechanically whether it works";
+- a **reversible schema tightening** (gate 14c-reducible) — a `varchar` narrowing, or a length / `NOT NULL` add;
+- a **CI/config/tooling** change you "can't verify."
+
+You may **not** keep the hold on that basis alone. Resolve it one of two ways — **both are passing outcomes**, this is not a one-way push to arm:
+- (a) **Dissolve it.** Add the mechanization phase — a lever-3 self-check (Step 3 § Verification-gap mechanization) or the Step 3 § Schema-safety guard — and its matrix rows, then **remove `auto_merge: false`**. The check now does the watching; the hold is gone.
+- (b) **Confirm it, with cause.** Keep the hold only if you can state concretely *why no mechanical check can be built* for this specific gap. "It would be effort" is not a reason; "the only signal is subjective human perception of X" or "the asserting artifact does not exist until prod" is.
+
+**Intrinsic holds — name the category and stand.** Do **not** apply pressure to these; an intrinsic hold *should* wait for a human, and challenging it into arming is the safety regression this step exists to prevent. A hold stands as-is when it rests on:
+- **subjective UI/UX taste** (gate 14a/d) — a genuine look-and-feel / flow judgment;
+- a **touched security surface** (gate 14b);
+- an **irreversibly-destructive or design-data-blocked** change (gate 14c) — DROP / lossy backfill / in-place data mutation, a column-rename sweep, an FK-ordering migration, or a migration whose *target shape* depends on prod data unreadable from CI;
+- a **self-gating / bootstrap hazard** — a change to the auto-merge, merge-gate, or `/post-plan` machinery **itself**, where arming would let the half-built or just-rewritten mechanism gate its *own* change. No self-run check can be trusted here, because the thing under change *is* the verifier; a human must merge it under the old, known-good floor. (This is why it is not a mere verification gap — lever 3 can't mechanize a check whose own validity the PR is rewriting.)
+
+**Record the outcome.** Every plan that *keeps* `auto_merge: false` must carry an `## Automouse Hold Justification` section (its presence is enforced by `bin/check-plan`; validity is your judgment). State in it: the hold **category** (reducible-confirmed or intrinsic) and which gate-14/15 trigger it rests on, plus one line — for a reducible-confirmed hold, *why no mechanical check is buildable*; for an intrinsic hold, *why the judgment is irreducible*. A reducible hold you **dissolved** carries no section, because the plan no longer holds.
+
 ## Step 5: Write the plan file
 
 Derive a kebab-case slug from the task description (max 50 chars, lowercase, alphanumeric and hyphens only).
@@ -177,7 +202,7 @@ Then run the mechanical linter on each plan file you wrote and fix anything it r
 bin/check-plan "$PLAN_PATH"
 ```
 
-It enforces the deterministic gates from Step 4 (matrix present, no false manuals, no `DECIDE`/`TBD`/`subject to …` tokens, no unresolved decision-trigger surface, reuse targets resolve). A non-zero exit prints each violation prefixed by its gate (`[1]`/`[3]`/`[7]`/`[8]`/`[R]`); resolve each and re-run. Do not leave a plan written until `bin/check-plan` passes.
+It enforces the deterministic gates from Step 4 (matrix present, no false manuals, no `DECIDE`/`TBD`/`subject to …` tokens, no unresolved decision-trigger surface, reuse targets resolve). A non-zero exit prints each violation prefixed by its gate (`[1]`/`[3]`/`[7]`/`[8]`/`[H]`/`[R]`); resolve each and re-run. Do not leave a plan written until `bin/check-plan` passes.
 
 ### Declaring the implementation model (optional)
 
@@ -202,7 +227,7 @@ auto_merge: false
 ---
 ```
 
-Either field may appear alone; the block above shows both (a mechanical column-rename sweep, e.g., can be Sonnet-eligible **and** want a human at merge). Absence of `auto_merge` leaves the PR eligible to auto-merge (still subject to every other Phase-6.5 condition). Only the line-1 block is parsed (Phase 6.5), so a body that documents the syntax can't opt a plan out. Failure modes are bounded: absent/garbled → eligible to arm (post-plan's own gates — code review, security audit, CI-green-required, the `feat:` floor, the PR-time safety verdict, and the headless golden-snapshot block — still apply); a wrongly-applied `false` → the PR just waits for a manual merge.
+Either field may appear alone; the block above shows both (a mechanical column-rename sweep, e.g., can be Sonnet-eligible **and** want a human at merge). A plan that keeps `auto_merge: false` must also carry the `## Automouse Hold Justification` section from Step 4.5 — `bin/check-plan` gate `[H]` fails the plan if it is missing. Absence of `auto_merge` leaves the PR eligible to auto-merge (still subject to every other Phase-6.5 condition). Only the line-1 block is parsed (Phase 6.5), so a body that documents the syntax can't opt a plan out. Failure modes are bounded: absent/garbled → eligible to arm (post-plan's own gates — code review, security audit, CI-green-required, the `feat:` floor, the PR-time safety verdict, and the headless golden-snapshot block — still apply); a wrongly-applied `false` → the PR just waits for a manual merge.
 
 ## Step 6: Report
 

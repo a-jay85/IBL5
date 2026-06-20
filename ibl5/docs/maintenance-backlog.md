@@ -66,6 +66,7 @@ Effort scale:
 **Suggested direction:** Extract `DraftOrderTiebreakerResolver` for H2H/PD sorting and `PlayoffSeedingCalculator` for seeding; service becomes a thin orchestrator.
 **Est. effort:** M
 **Risk if untouched:** Tiebreaker logic is unit-test-hostile at 600 LOC; any rule change forces reasoning across the whole service.
+**Status:** Completed (merged #1148) — extracted `NonHeadToHeadTiebreaker`, `DraftOrderTiebreakerResolver`, and `PlayoffSeedingCalculator`; service is now a ~386-LOC thin orchestrator.
 
 ### 1.6 StandingsView — Cross-Cutting State and Dual-Path Rendering
 **Location:** `ibl5/classes/Standings/StandingsView.php` (609 lines)
@@ -73,6 +74,7 @@ Effort scale:
 **Suggested direction:** Unify data-loading behind a single lazy-load helper; remove `adaptBulkRows()` by canonicalizing the repository row shape; push PHP sort back into SQL.
 **Est. effort:** M
 **Risk if untouched:** Dual-path loading returns inconsistently sorted/enriched data when shared state is partially populated.
+**Status:** Completed (merged #1146) — unified bulk-data loading behind a single lazy-load helper so `render()` and `renderRegion()` can no longer diverge; byte-identical output (green-green refactor).
 
 ### 1.7 TeamService — Data Preparation Mixed with View Instantiation
 **Location:** `ibl5/classes/Team/TeamService.php` (555 lines)
@@ -80,6 +82,7 @@ Effort scale:
 **Suggested direction:** Keep `TeamService` as pure data-prep; move view instantiation to `TeamPageController` or the calling `index.php`.
 **Est. effort:** M
 **Risk if untouched:** Business logic transformations locked inside a class also owning HTML output — both harder to test independently.
+**Status:** Completed (merged #1144) — extracted `TeamPageDataPreparer` (data-prep) and `TeamCardRenderer` (view instantiation); `TeamService` is now a ~115-LOC orchestrator.
 
 ### 1.8 FreeAgencyView — Direct DB Access Inside View Layer
 **Location:** `ibl5/classes/FreeAgency/FreeAgencyView.php` (605 lines)
@@ -128,6 +131,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Extract `TradeCapCalculator`; inject collaborators.
 **Est. effort:** M
 **Risk if untouched:** Cap bugs buried in offer-creation code; CY-offset logic mixed with offer-writing.
+**Status:** Completed (merged #1143) — extracted `TradeCapCalculator`; cap-math (`calculateSalaryCapData`/`sumCashRecordSalaries`) moved out of the offer class.
 
 ### 1.15 YourAccountView — Six Inline SVG Icons + Six Page Variants
 **Location:** `ibl5/classes/YourAccount/YourAccountView.php` (548 lines)

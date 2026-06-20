@@ -9,18 +9,20 @@ use Logging\LoggerFactory;
 /**
  * Transparent dev-only auto-login for local development.
  *
- * When DEV_AUTO_LOGIN=<username> is set in .env.test and the request
- * originates from localhost, automatically authenticates as that user
- * without requiring login form interaction. This is especially useful
- * for browser-based verification via Chrome DevTools MCP.
+ * When DEV_AUTO_LOGIN=<username> is set in .env.test, the request originates
+ * from localhost, AND the request carries an _auto_login=1 opt-in cookie,
+ * automatically authenticates as that user without requiring login form
+ * interaction. This is especially useful for browser-based verification via
+ * Chrome DevTools MCP and Playwright.
  *
- * Safety: three independent guards must ALL pass:
+ * Manual browsing is logged-out by default: absent the _auto_login cookie no
+ * auto-login occurs, so a developer can stay signed out on localhost.
+ *
+ * Safety: four independent guards must ALL pass:
  * 1. Session is not already authenticated
- * 2. SERVER_NAME is localhost/127.0.0.1/main.localhost
- * 3. DEV_AUTO_LOGIN env var or .env.test entry is set to a non-empty username
- *
- * The caller (mainfile.php) also checks for the _no_auto_login cookie
- * which E2E tests set to opt out of auto-authentication.
+ * 2. The _auto_login=1 opt-in cookie is present
+ * 3. SERVER_NAME is localhost/127.0.0.1/*.localhost
+ * 4. DEV_AUTO_LOGIN env var or .env.test entry is set to a non-empty username
  */
 final class DevAutoLogin
 {
@@ -40,13 +42,19 @@ final class DevAutoLogin
             return;
         }
 
-        // Guard 2: only on localhost (exact match or *.localhost subdomains for worktrees)
+        // Guard 2: opt-in required — only auto-login when the _auto_login=1 cookie is present.
+        // Manual/MCP/curl browsing is logged-out by default; automation opts in explicitly.
+        if (($_COOKIE['_auto_login'] ?? null) !== '1') {
+            return;
+        }
+
+        // Guard 3: only on localhost (exact match or *.localhost subdomains for worktrees)
         $serverName = $_SERVER['SERVER_NAME'] ?? null;
         if (!is_string($serverName) || !$this->isLocalhost($serverName)) {
             return;
         }
 
-        // Guard 3: DEV_AUTO_LOGIN must be set to a non-empty username
+        // Guard 4: DEV_AUTO_LOGIN must be set to a non-empty username
         $username = $this->getAutoLoginUsername();
         if ($username === null) {
             return;

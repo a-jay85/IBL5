@@ -31,7 +31,7 @@ class DevAutoLoginTest extends TestCase
         $this->originalCookies = $_COOKIE;
 
         unset($_SESSION['auth_user_id'], $_SESSION['auth_username']);
-        unset($_COOKIE['_no_auto_login']);
+        unset($_COOKIE['_auto_login']);
         putenv('DEV_AUTO_LOGIN');
     }
 
@@ -118,10 +118,46 @@ class DevAutoLoginTest extends TestCase
         self::assertArrayNotHasKey('auth_user_id', $_SESSION);
     }
 
+    public function testDoesNothingWhenOptInCookieAbsentOnLocalhost(): void
+    {
+        // All other guards satisfied (localhost host, env user set, user would resolve),
+        // but the _auto_login opt-in cookie is absent — the default manual-browsing state.
+        $_SERVER['SERVER_NAME'] = 'localhost';
+        putenv('DEV_AUTO_LOGIN=TestUser');
+        // setUp() already unset $_COOKIE['_auto_login'].
+
+        $db = static::createStub(\mysqli::class);
+        (new DevAutoLogin())->tryAutoLogin($db);
+
+        self::assertArrayNotHasKey('auth_user_id', $_SESSION);
+    }
+
+    public function testSetsSessionWhenOptInCookiePresentOnLocalhost(): void
+    {
+        $_SERVER['SERVER_NAME'] = 'localhost';
+        $_COOKIE['_auto_login'] = '1';
+        putenv('DEV_AUTO_LOGIN=TestUser');
+
+        $result = static::createStub(\mysqli_result::class);
+        $result->method('fetch_assoc')->willReturn(['user_id' => 7]);
+
+        $stmt = static::createStub(\mysqli_stmt::class);
+        $stmt->method('get_result')->willReturn($result);
+
+        $db = static::createStub(\mysqli::class);
+        $db->method('prepare')->willReturn($stmt);
+
+        (new DevAutoLogin())->tryAutoLogin($db);
+
+        self::assertSame(7, $_SESSION['auth_user_id']);
+        self::assertSame('TestUser', $_SESSION['auth_username']);
+    }
+
     #[DataProvider('allowedHostProvider')]
     public function testSetsSessionWhenAllConditionsMet(string $host): void
     {
         $_SERVER['SERVER_NAME'] = $host;
+        $_COOKIE['_auto_login'] = '1';
         putenv('DEV_AUTO_LOGIN=TestUser');
 
         $result = static::createStub(\mysqli_result::class);
@@ -155,6 +191,7 @@ class DevAutoLoginTest extends TestCase
     public function testDoesNothingWhenUserNotFoundInDatabase(): void
     {
         $_SERVER['SERVER_NAME'] = 'localhost';
+        $_COOKIE['_auto_login'] = '1';
         putenv('DEV_AUTO_LOGIN=NonExistentUser');
 
         $result = static::createStub(\mysqli_result::class);
@@ -174,6 +211,7 @@ class DevAutoLoginTest extends TestCase
     public function testDoesNothingWhenPrepareFailsReturningFalse(): void
     {
         $_SERVER['SERVER_NAME'] = 'localhost';
+        $_COOKIE['_auto_login'] = '1';
         putenv('DEV_AUTO_LOGIN=TestUser');
 
         $db = static::createStub(\mysqli::class);
@@ -187,6 +225,7 @@ class DevAutoLoginTest extends TestCase
     public function testInjectedLoggerReceivesActivationLog(): void
     {
         $_SERVER['SERVER_NAME'] = 'localhost';
+        $_COOKIE['_auto_login'] = '1';
         putenv('DEV_AUTO_LOGIN=TestUser');
 
         $result = static::createStub(\mysqli_result::class);
@@ -214,6 +253,7 @@ class DevAutoLoginTest extends TestCase
     public function testNoArgConstructorFallsBackToAuthChannelAndStillActivates(): void
     {
         $_SERVER['SERVER_NAME'] = 'localhost';
+        $_COOKIE['_auto_login'] = '1';
         putenv('DEV_AUTO_LOGIN=TestUser');
 
         $result = static::createStub(\mysqli_result::class);

@@ -630,6 +630,104 @@ class TradeOfferTest extends TestCase
             $subject->exposeCalculateSalaryCapData($tradeData)
         );
     }
+
+    // ── Additive cap-math pins (gaps the V1–V4 pins above do not cover) ──
+    // V1–V4 pin self-trade zeroing, both cy branches, and the cash-record
+    // cy-offset. The pins below add: the switchCounter checked/unchecked split,
+    // the empty-offer boundary, the new-cash-consideration direction (both ways),
+    // and the null-team-id fallback. No DB, no Discord.
+
+    /**
+     * Build a cap-pin subject with no cash records, in-season (advances=false),
+     * a fixed tid, and caller-supplied new-cash considerations.
+     *
+     * @param array{cashSentToThem: int, cashSentToMe: int} $cashConsiderations
+     */
+    private function makeNoCashRecordSubject(array $cashConsiderations, ?int $tid = 1): TradeOfferCapPinDouble
+    {
+        $commonRepo = self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+        $commonRepo->method('getTidFromTeamname')->willReturn($tid);
+        $cashConsiderationRepo = self::createStub(BuyoutLedgerRepositoryInterface::class);
+        $cashConsiderationRepo->method('getTeamCashForSalary')->willReturn([]);
+        $season = self::createStub(Season::class);
+        $season->method('advancesContractYears')->willReturn(false);
+        $validator = self::createStub(TradeValidator::class);
+        $validator->method('getCurrentSeasonCashConsiderations')->willReturn($cashConsiderations);
+
+        return $this->makeCapPinSubject($commonRepo, $cashConsiderationRepo, $season, $validator);
+    }
+
+    /**
+     * Pins the switchCounter boundary AND the checked/unchecked split for the
+     * sent/received keys: user contracts are indices < switchCounter, partner
+     * contracts are indices >= switchCounter; only "on"-checked contracts add to
+     * the sent/received totals while ALL contracts add to the season totals.
+     */
+    public function testCapPinMultiPlayerSplitAcrossSwitchCounter(): void
+    {
+        $subject = $this->makeNoCashRecordSubject(['cashSentToThem' => 0, 'cashSentToMe' => 0]);
+
+        // switchCounter=2 (indices 0,1 = user), fieldsCounter=4 (indices 2,3 = partner)
+        $tradeData = $this->makeTradeData(2, 4);
+        $tradeData['check'] = [0 => 'on', 1 => null, 2 => 'on', 3 => null];
+        $tradeData['type'] = [0 => '1', 1 => '1', 2 => '1', 3 => '1'];
+        $tradeData['contract'] = [0 => '500', 1 => '1200', 2 => '700', 3 => '300'];
+
+        // user total = 500+1200=1700, sent = 500 (only index 0 checked)
+        // partner total = 700+300=1000, received = 700 (only index 2 checked)
+        $this->assertSame(
+            ['userCurrentSeasonCapTotal' => 1700, 'partnerCurrentSeasonCapTotal' => 1000, 'userCapSentToPartner' => 500, 'partnerCapSentToUser' => 700],
+            $subject->exposeCalculateSalaryCapData($tradeData)
+        );
+    }
+
+    /** Boundary: an empty offer (no players, no cash) freezes all four keys to 0. */
+    public function testCapPinEmptyOfferAllZeros(): void
+    {
+        $subject = $this->makeNoCashRecordSubject(['cashSentToThem' => 0, 'cashSentToMe' => 0]);
+
+        $this->assertSame(
+            ['userCurrentSeasonCapTotal' => 0, 'partnerCurrentSeasonCapTotal' => 0, 'userCapSentToPartner' => 0, 'partnerCapSentToUser' => 0],
+            $subject->exposeCalculateSalaryCapData($this->makeTradeData())
+        );
+    }
+
+    /** New cash the user SENDS raises the user total and lowers the partner total. */
+    public function testCapPinCashSentToThemRaisesUserLowersPartner(): void
+    {
+        $subject = $this->makeNoCashRecordSubject(['cashSentToThem' => 250, 'cashSentToMe' => 0]);
+
+        $this->assertSame(
+            ['userCurrentSeasonCapTotal' => 250, 'partnerCurrentSeasonCapTotal' => -250, 'userCapSentToPartner' => 0, 'partnerCapSentToUser' => 0],
+            $subject->exposeCalculateSalaryCapData($this->makeTradeData())
+        );
+    }
+
+    /** New cash the user RECEIVES lowers the user total and raises the partner total. */
+    public function testCapPinCashSentToMeLowersUserRaisesPartner(): void
+    {
+        $subject = $this->makeNoCashRecordSubject(['cashSentToThem' => 0, 'cashSentToMe' => 400]);
+
+        $this->assertSame(
+            ['userCurrentSeasonCapTotal' => -400, 'partnerCurrentSeasonCapTotal' => 400, 'userCapSentToPartner' => 0, 'partnerCapSentToUser' => 0],
+            $subject->exposeCalculateSalaryCapData($this->makeTradeData())
+        );
+    }
+
+    /**
+     * Negative/fallback: when getTidFromTeamname() returns null (e.g. an unknown
+     * or Free-Agents team), the `?? 0` fallback resolves the tid to 0 and the cap
+     * math proceeds without exception.
+     */
+    public function testCapPinNullTeamIdResolvesToZero(): void
+    {
+        $subject = $this->makeNoCashRecordSubject(['cashSentToThem' => 0, 'cashSentToMe' => 0], tid: null);
+
+        $this->assertSame(
+            ['userCurrentSeasonCapTotal' => 0, 'partnerCurrentSeasonCapTotal' => 0, 'userCapSentToPartner' => 0, 'partnerCapSentToUser' => 0],
+            $subject->exposeCalculateSalaryCapData($this->makeTradeData())
+        );
+    }
 }
 
 /**

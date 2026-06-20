@@ -1,6 +1,6 @@
 ---
 description: Requires plans to classify every verification step into the test-type taxonomy at plan-write time, preventing manual-testing items from deferring to post-plan cleanup, and grounds seed/DOM-dependent E2E assertions in real fixtures.
-last_verified: 2026-06-13
+last_verified: 2026-06-19
 ---
 
 # Plan Verification Matrix
@@ -75,7 +75,7 @@ Any E2E verification-matrix row that asserts a **seed-** or **DOM-dependent** va
 The source must be one of:
 
 - A specific row or count from `ibl5/tests/e2e/fixtures/ci-seed.sql` (cite the table and the rows that produce the expected value), or
-- The rendered form DOM, fetched live from the worktree stack: `curl http://<slug>.localhost/ibl5/modules.php?name=X` (cite the element the assertion targets).
+- The rendered form DOM, fetched live from the worktree stack: `curl --cookie "_auto_login=1" http://<slug>.localhost/ibl5/modules.php?name=X` (cite the element the assertion targets). The `_auto_login=1` cookie opts into dev auto-login — localhost is logged-out by default, so an auth-gated form returns the login page without it (see `.claude/rules/browser-login.md`).
 
 Two gotchas this rule exists to catch (cross-referenced from memory):
 

@@ -3,7 +3,7 @@ description: "Plan an implementation task: enforces a verification matrix, direc
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
-last_verified: 2026-06-18
+last_verified: 2026-06-19
 
 ---
 
@@ -14,6 +14,13 @@ You are planning an implementation task. The user's request follows this skill's
 **Do NOT write or edit any code files.** This skill produces a plan only. The output is one plan file per PR.
 
 **One plan = one PR.** A single plan file must be implementable and mergeable as exactly one pull request. If the work naturally spans multiple PRs (independent concerns, separate review surfaces, a refactor that should land before the feature that uses it, or a change too large to review in one sitting), do NOT bundle them. Split the work into PR-sized units and produce a separate, fully self-contained plan — its own implementation steps and its own Verification Matrix — for each one. The user should never have to ask for this split.
+
+**Maximize nightly autonomy.** A plan is most valuable when nightly can implement *and merge* it with no human in the loop. Two levers turn a would-be-supervised plan autonomous — apply them by default instead of reaching for `auto_postplan: false`:
+
+1. **Pin, don't supervise.** Uncovered code is not a reason to hold the merge — it's a reason to add a **Phase-1 characterization pin** (Step 4 gate 11). A behavior-preserving refactor with a pin is green-green; the pin *is* the coverage.
+2. **Decide at plan-time, not merge-time.** A single discrete design fork doesn't have to wait for a human at merge — surface it to the user *now* (Step 3.5) and record the answer in the plan; nightly then executes a fully-specified decision.
+
+Fall back to `auto_postplan: false` only when the judgment is **irreducible**: *distributed* across the implementation (per-site security verdicts, per-test correctness on untested code) or *data-blocked* (needs production data unreachable from CI). "A decision exists" is not a hold reason; "the decision can't be made once, up-front" is.
 
 ## Step 1: Verification rule
 
@@ -58,6 +65,8 @@ The Plan agent auto-loads CLAUDE.md, all always-loaded rules (agent-tiering, cor
 
 Launch a **single Plan agent** (`subagent_type: "plan-architect"` — its definition carries `model: opus` and `effort: xhigh`; do NOT pass an inline `model` override) with a prompt containing ALL of these:
 
+**Run this step inline — never delegate `/plan` itself.** The orchestrating session owns Steps 1–5 directly and spawns exactly **one** `plan-architect` per PR-sized unit. Do NOT hand the whole `/plan` invocation to a `general-purpose`/`claude` sub-agent (or fan it out across several), and do NOT have any such agent fire `/plan` on your behalf. Those agent types carry `Tools: *` — they *can* spawn further agents, so delegating `/plan` to them produces a `general-purpose → plan-architect` nest, exactly the multi-level `plan-architect` tree the flat-fan-out rule forbids (`agent-tiering.md` § Nested Sub-Agents). `plan-architect`/`Plan`/`Explore` cannot cause this themselves — they lack the `Agent` tool — so the only way the nest appears is an orchestrator delegating `/plan` outward. Keep planning one level deep: this session → one `plan-architect`.
+
 1. **Task description** from `$ARGUMENTS` — when the work was split in Step 2.5, scope this to the single PR being planned and state which PR it is and what it depends on
 2. **Exploration results** from Step 2 — file paths, code traces, existing patterns, test coverage findings
 3. **The full `$VERIFICATION_RULE`** from Step 1, prefixed with: `MANDATORY — you must follow this rule exactly:`
@@ -74,6 +83,7 @@ The Plan agent MUST produce:
 
 Conditionally — include a section **only when it applies**; never emit an empty header:
 - **Manual UI/UX check** (only when the plan introduces new or redesigned user-visible UI/UX — see `_plan-verification.md` § Forced manual-verification trigger): add one **Truly-manual** matrix row for the subjective look-and-feel + flow judgment (phrase it as a question of taste — no `verify`/`check that`/`confirm`/`ensure`, which `bin/check-plan` gate 3 rejects), do NOT emit the "All verification is automated" line, and set `auto_postplan: false` in the line-1 frontmatter (Step 4 gate 14d).
+- **Design decisions** (only when the design has a genuine fork): list each fork and classify it — **self-resolved** (conventional seam; state the choice + reason), **needs-user-input** (a single discrete choice the codebase can't reveal — preserve-vs-fix a known latent bug, ban-rule scope, module/admin-split boundary), or **irreducible** (distributed per-site/per-test judgment, or data-blocked). Phrase each `needs-user-input` fork as one crisp question with 2–4 concrete options, for the orchestrator to surface in Step 3.5.
 - **Approach** (non-trivial changes only): one short paragraph naming the chosen design and the main alternative rejected, with the reason. Skip for trivial single-file edits.
 - **Security** (only when Step 2 flagged a touched surface): for each surface, an implementation step encoding the defense AND a matching matrix row —
   - SQL → prepared statement / `bind_param` (mind native-type binding); row asserts the query is parameterized.
@@ -114,6 +124,14 @@ Format each packet as a fenced block within the plan:
 - **Report back:** a one-line summary only
 ````
 
+## Step 3.5: Front-load design decisions
+
+The Plan agent runs in a sub-context and **cannot ask the user**. For each `needs-user-input` fork it flagged in its **Design decisions** section, you (the orchestrator) surface it now with `AskUserQuestion` — one question, 2–4 concrete options, recommendation first; use the `preview` field to show a proposed module layout or code shape for structural choices. Record each answer + a one-line rationale into the plan's **Approach** section as a fixed constraint, then patch the affected implementation steps so the decision is fully specified.
+
+A recorded decision is **no longer a fork**: it does not trip Step 4 gate 7 (unresolved decision) and does not, by itself, force `auto_postplan: false` (gate 14) — the human judgment already happened at plan-time.
+
+Do **not** ask when: the fork is conventional (let the Plan agent's self-resolution stand), the judgment is `irreducible` (distributed per-site/per-test, or data-blocked — that legitimately keeps the plan supervised), or asking is ceremony. `AskUserQuestion` is for forks where the answer actually changes the implementation.
+
 ## Step 4: Validate the matrix
 
 After receiving the Plan agent's output, check these gates yourself — do NOT delegate validation.
@@ -130,10 +148,10 @@ After receiving the Plan agent's output, check these gates yourself — do NOT d
 8. *(scripted — `bin/check-plan` gate `[8]`)* **Decision-trigger pre-classified** — gate `[8]` flags any declared NEW file matching a `bin/adr-check` trigger surface (the pattern table lives in `_plan-verification.md` § Decision-trigger pre-classification — the single source of truth; do not duplicate it) that lacks a resolution. When it fires, do **not** merely "add an ADR step": pre-name the ADR slug and pre-fill the ADR's Context and Decision text directly into the plan body, so the spec carries the ADR draft. The conservative flags (any new `bin/` script; a new migration only when the plan text mentions `DROP`; a `composer.json` `require`/`require-dev` add) cannot read LOC/content at plan time, so they over-include slightly — clear a false flag with a `no-adr:` marker when no real decision is introduced.
 9. **Negative-path coverage** — every behavior-changing step has at least one matrix row asserting a failure, boundary, or rejection case, not only happy-path. If a step has only happy-path rows, add the missing negative-path row.
 10. **Hot-file extraction** — if any step adds > 100 LOC to a file `bin/check-hot-files` lists as hot (> 500 LOC under `classes/`), the plan must either propose an extraction step or carry an inline justification (per `_plan-verification.md` § Hot-file thresholds). If neither is present, add one.
-11. **Refactor characterization** — if any step under `ibl5/classes/**` carries a refactor signal (file rename, method signature change, visibility narrowing, class removal, or > 30-line deletion per `refactor-flag.md`), the matrix must include a pre-impl characterization row for the affected code. If missing, add it.
+11. **Refactor characterization** — if any step under `ibl5/classes/**` carries a refactor signal (file rename, method signature change, visibility narrowing, class removal, or > 30-line deletion per `refactor-flag.md`), the matrix must include a pre-impl characterization row for the affected code. If missing, add it. A correct **Phase-1** characterization pin makes a behavior-preserving refactor green-green — the pin *is* the coverage, so "this code was untested" is not on its own grounds for `auto_postplan: false` (gate 14).
 12. **Security surface resolved** — if Step 2 flagged a touched security surface, the plan contains a Security section with a defense step and matching matrix row for each. If a flagged surface has no resolution, add it.
 13. **impl_model criterion** — if the plan declares `impl_model: sonnet` frontmatter (see Step 5), scan the Verification Matrix; if ANY row is classified `Truly-manual`, strip the marker so the plan runs at the Opus default. Sonnet may drive a plan only when every behavior-changing step has an objectively machine-checkable row that fails on a wrong edit.
-14. **auto-fire risk criterion** — by default an implementation session auto-fires `/post-plan` the moment it verifies complete (no human eyeball before the PR opens and auto-merge arms). Decide yourself — do NOT delegate — whether this plan is risky enough to want that eyeball, and if so declare `auto_postplan: false` (see Step 5). Disable auto-fire when **any** hold: (a) the Verification Matrix carries a `Truly-manual` (or otherwise subjective) row — post-plan's machine gates can't validate it; (b) Step 2 flagged a touched security surface; (c) the plan is a high-blast-radius data/schema change — a destructive migration (DROP/backfill/data mutation), a column-rename sweep, or an FK-ordering migration; (d) the plan introduces **new or redesigned user-visible UI/UX** — the forced manual-verification trigger in `_plan-verification.md` (new/restyled CSS component, new rendered page/module, new nav entry/indicator/badge, or a new multi-step user flow). A plan that trips (d) must BOTH carry the forced Truly-manual look-and-feel/flow row AND set `auto_postplan: false` — set the marker **directly here**, do not route it through (a)'s row-presence: the user asked for *both* (not auto-merged AND manual testing), so coupling them would let a dropped row silently re-arm auto-merge. Otherwise omit the marker (default = auto-fire). This composes with gate 13: a `Truly-manual` row both strips `impl_model: sonnet` **and** sets `auto_postplan: false`.
+14. **auto-fire risk criterion** — by default an implementation session auto-fires `/post-plan` the moment it verifies complete (no human eyeball before the PR opens and auto-merge arms). Decide yourself — do NOT delegate — whether this plan is risky enough to want that eyeball, and if so declare `auto_postplan: false` (see Step 5). Disable auto-fire when **any** hold: (a) the Verification Matrix carries a `Truly-manual` (or otherwise subjective) row — post-plan's machine gates can't validate it; (b) Step 2 flagged a touched security surface; (c) the plan is a high-blast-radius data/schema change — a destructive migration (DROP/backfill/data mutation), a column-rename sweep, or an FK-ordering migration; (d) the plan introduces **new or redesigned user-visible UI/UX** — the forced manual-verification trigger in `_plan-verification.md` (new/restyled CSS component, new rendered page/module, new nav entry/indicator/badge, or a new multi-step user flow). A plan that trips (d) must BOTH carry the forced Truly-manual look-and-feel/flow row AND set `auto_postplan: false` — set the marker **directly here**, do not route it through (a)'s row-presence: the user asked for *both* (not auto-merged AND manual testing), so coupling them would let a dropped row silently re-arm auto-merge. Otherwise omit the marker (default = auto-fire). This composes with gate 13: a `Truly-manual` row both strips `impl_model: sonnet` **and** sets `auto_postplan: false`. A genuine design fork is **not** a hold trigger once it has been front-loaded and recorded via Step 3.5 — the judgment already happened at plan-time; hold only when the judgment is irreducible (distributed per-site/per-test, or data-blocked).
 
 If validation fails on any gate, fix the matrix yourself rather than re-running the Plan agent.
 

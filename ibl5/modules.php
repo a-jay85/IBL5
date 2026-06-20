@@ -49,10 +49,11 @@ if (is_string($requestName) && $requestName !== '') {
 
     // E2E tests use per-request cookie overrides (_test_overrides) that
     // change page content. Cached responses ignore these overrides.
-    // Also skip cache entirely during E2E runs (_no_auto_login signals
-    // a Playwright test context) to avoid cross-worker cache pollution.
+    // Public E2E browser contexts also set _e2e=1 to skip PageCache for
+    // unauthenticated GETs, avoiding cross-worker cache pollution. (Decoupled
+    // from the _auto_login auth opt-in.)
     $isE2eTesting = (isset($_COOKIE['_test_overrides']) && $_COOKIE['_test_overrides'] !== '')
-        || (isset($_COOKIE['_no_auto_login']) && $_COOKIE['_no_auto_login'] === '1');
+        || (isset($_COOKIE['_e2e']) && $_COOKIE['_e2e'] === '1');
 
     if (
         $_SERVER['REQUEST_METHOD'] === 'GET'

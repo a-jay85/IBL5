@@ -36,10 +36,10 @@ class AuthBootstrap implements BootstrapStepInterface
         );
         $authService->tryRememberMe();
 
-        // Dev-only auto-login: bypasses login forms on localhost when DEV_AUTO_LOGIN is set.
-        // E2E tests set _no_auto_login cookie to opt out.
-        $noAutoLogin = isset($_COOKIE['_no_auto_login']) && $_COOKIE['_no_auto_login'] === '1';
-        if (!$authService->isAuthenticated() && !$noAutoLogin) {
+        // Dev-only auto-login: bypasses login forms on localhost when DEV_AUTO_LOGIN is set
+        // AND the request carries an _auto_login=1 opt-in cookie. Policy lives in DevAutoLogin's
+        // guards (opt-in, localhost, env); call unconditionally and let them decide.
+        if (!$authService->isAuthenticated()) {
             (new \Auth\DevAutoLogin())->tryAutoLogin($mysqliDb);
         }
 

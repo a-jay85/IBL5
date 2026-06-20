@@ -181,7 +181,7 @@ class StandingsViewGoldenMasterTest extends TestCase
                 mkdir($snapshotDir, 0755, true);
             }
             file_put_contents($path, $actual);
-            $this->addToAssertionCount(1);
+            $this->assertFileExists($path, "Snapshot $snapshotFilename was not created");
             return;
         }
 
@@ -250,6 +250,7 @@ class StandingsViewGoldenMasterTest extends TestCase
         // renderRegion() — trusts SQL order supplied by mock: [team2, team1]
         $this->assertSame([2, 1], $regionOrder, 'renderRegion() Eastern must emit SQL-trust order [2, 1]');
         // Collapse guard — paths still diverge after the refactor
+        // @phpstan-ignore method.alreadyNarrowedType (PHPStan narrows these to literal arrays after assertSame; the runtime divergence is what matters here)
         $this->assertNotSame($renderOrder, $regionOrder, 'Divergence guard: render() and renderRegion() must produce different Eastern row orders');
     }
 }

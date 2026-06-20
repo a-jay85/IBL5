@@ -62,11 +62,7 @@ class StandingsView implements StandingsViewInterface
     public function render(): string
     {
         // Pre-load all streak, Pythagorean, and H2H data in bulk queries
-        $this->allStreakData = $this->repository->getAllStreakData();
-        $this->allPythagoreanStats = $this->repository->getAllPythagoreanStats($this->seasonYear);
-        $this->seriesMatrix = $this->seriesRecordsService->buildSeriesMatrix(
-            $this->repository->getSeriesRecords()
-        );
+        $this->ensureBulkDataLoaded();
 
         // Bulk-fetch all standings in 1 query instead of 6
         $allStandings = $this->repository->getAllStandings();
@@ -98,11 +94,12 @@ class StandingsView implements StandingsViewInterface
     }
 
     /**
-     * @see StandingsViewInterface::renderRegion()
+     * Lazily load streak, Pythagorean, and H2H series-matrix data into the
+     * shared cache properties if not already populated. Idempotent: a second
+     * call is a no-op because each property is non-null after the first.
      */
-    public function renderRegion(string $region): string
+    private function ensureBulkDataLoaded(): void
     {
-        // If called standalone (not via render()), load data on demand
         if ($this->allStreakData === null) {
             $this->allStreakData = $this->repository->getAllStreakData();
         }
@@ -114,6 +111,15 @@ class StandingsView implements StandingsViewInterface
                 $this->repository->getSeriesRecords()
             );
         }
+    }
+
+    /**
+     * @see StandingsViewInterface::renderRegion()
+     */
+    public function renderRegion(string $region): string
+    {
+        // If called standalone (not via render()), load data on demand
+        $this->ensureBulkDataLoaded();
 
         $groupingType = $this->getGroupingType($region);
         $standings = $this->repository->getStandingsByRegion($region);

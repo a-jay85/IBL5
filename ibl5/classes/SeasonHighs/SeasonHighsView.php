@@ -30,7 +30,7 @@ class SeasonHighsView implements SeasonHighsViewInterface
     {
         /** @var string $safePhase */
         $safePhase = HtmlSanitizer::safeHtmlOutput($seasonPhase);
-        $output = '<h2 class="ibl-title">Season Highs</h2>';
+        $output = '<h1 class="ibl-title">Season Highs</h1>';
         $output .= $this->renderPlayerHighs($safePhase, $data['playerHighs']);
         $output .= $this->renderTeamHighs($safePhase, $data['teamHighs']);
 

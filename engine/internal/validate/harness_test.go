@@ -3,6 +3,7 @@ package validate
 import (
 	"bytes"
 	"errors"
+	"math"
 	"os"
 	"reflect"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/a-jay85/IBL5/engine/internal/backup"
 	"github.com/a-jay85/IBL5/engine/internal/bundle"
 	"github.com/a-jay85/IBL5/engine/internal/result"
+	"github.com/a-jay85/IBL5/engine/internal/sim"
 )
 
 const testRuns = 8 // small N keeps `go test ./...` fast (advisor guidance)
@@ -110,9 +112,9 @@ func TestValidateCorpus_InBandPassesAndDeterministic(t *testing.T) {
 	}
 }
 
-// Row #17 (characterization): ValidateCorpusWith(branchB=false, accum=nil) yields a
-// Report byte-identical to ValidateCorpus — the OFF default of the Branch-B threading
-// leaves the existing calibration unchanged (SimulateWith(.,zero opts) == Simulate).
+// Row #17 (characterization): ValidateCorpusWith(zero sim.Options{}) yields a Report
+// byte-identical to ValidateCorpus — the OFF default of the Options passthrough leaves
+// the existing calibration unchanged (SimulateWith(.,zero opts) == Simulate).
 func TestValidateCorpusWith_OffDefaultUnchanged(t *testing.T) {
 	dir := t.TempDir()
 	const seed = uint64(1000)
@@ -122,12 +124,12 @@ func TestValidateCorpusWith_OffDefaultUnchanged(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ValidateCorpus: %v", err)
 	}
-	off, err := ValidateCorpusWith(dir, testRuns, seed, bundle.GameTypeRegular, false, nil)
+	off, err := ValidateCorpusWith(dir, testRuns, seed, bundle.GameTypeRegular, sim.Options{})
 	if err != nil {
 		t.Fatalf("ValidateCorpusWith: %v", err)
 	}
 	if !reflect.DeepEqual(base, off) {
-		t.Error("ValidateCorpusWith(branchB=false) diverged from ValidateCorpus — OFF default not inert")
+		t.Error("ValidateCorpusWith(zero Options) diverged from ValidateCorpus — OFF default not inert")
 	}
 }
 
@@ -150,6 +152,62 @@ func TestValidateCorpus_PopulatesHomeWinFraction(t *testing.T) {
 	wf := rep.Games[0].EngineHomeWinFraction
 	if wf < 0 || wf > 1 {
 		t.Errorf("EngineHomeWinFraction = %v, want a fraction in [0,1]", wf)
+	}
+}
+
+// Row #3: validateGame threads the ORB-intensity numerator and the engine-only
+// continuation-depth tallies onto every GameReport. ScoORBPerG is the raw .sco box
+// ORB — the synth corpus parks all rebounds in the ORB slot, so it equals the "reb"
+// row's ScoVal exactly. EngineORBPerG is the engine mean ORB: a component of the
+// engine's total rebounds and the SAME value possProxy subtracts. The
+// continuation-depth buckets are populated for both teams and sum to N.
+func TestValidateCorpus_PopulatesOrbAndContinuationDepth(t *testing.T) {
+	dir := t.TempDir()
+	const seed = uint64(1000)
+	buildCorpus(t, dir, true, testRuns, seed)
+
+	rep, err := ValidateCorpus(dir, testRuns, seed, bundle.GameTypeRegular)
+	if err != nil {
+		t.Fatalf("ValidateCorpus: %v", err)
+	}
+	if len(rep.Games) != 1 {
+		t.Fatalf("games = %d, want 1", len(rep.Games))
+	}
+	g := rep.Games[0]
+	if g.EngineORBPerG == nil || g.ScoORBPerG == nil || g.EngineContinuationDepth == nil {
+		t.Fatalf("maps not populated: orbEng=%v orbSco=%v depth=%v", g.EngineORBPerG, g.ScoORBPerG, g.EngineContinuationDepth)
+	}
+	rebRow := func(id int) StatRow {
+		for _, r := range g.Rows {
+			if r.TeamID == id && r.Stat == "reb" {
+				return r
+			}
+		}
+		t.Fatalf("no reb row for team %d", id)
+		return StatRow{}
+	}
+	for _, id := range []int{g.VisitorTeamID, g.HomeTeamID} {
+		reb := rebRow(id)
+		// The synth .sco parks all rebounds in ORB, so ScoORBPerG == the reb row exactly.
+		if g.ScoORBPerG[id] != reb.ScoVal {
+			t.Errorf("team %d ScoORBPerG = %v, want %v (raw .sco box ORB = the reb row)", id, g.ScoORBPerG[id], reb.ScoVal)
+		}
+		// Engine ORB is a component of engine total rebounds (the −ORB possProxy term):
+		// finite and within [0, total reb].
+		orb := g.EngineORBPerG[id]
+		if math.IsNaN(orb) || math.IsInf(orb, 0) || orb < 0 || orb > reb.EngineMean+1e-9 {
+			t.Errorf("team %d EngineORBPerG = %v, want a finite value in [0, reb=%v]", id, orb, reb.EngineMean)
+		}
+		// Continuation-depth tallies present and self-consistent: ΣBk == N (every
+		// possession lands in exactly one bucket).
+		d, ok := g.EngineContinuationDepth[id]
+		if !ok {
+			t.Errorf("team %d missing from EngineContinuationDepth", id)
+			continue
+		}
+		if bsum := d.B0 + d.B1 + d.B2 + d.B3Plus; math.Abs(bsum-d.N) > 1e-9 {
+			t.Errorf("team %d continuation buckets sum %v != N %v", id, bsum, d.N)
+		}
 	}
 }
 
@@ -530,5 +588,169 @@ func TestAccumulatePossessions_NoStarts(t *testing.T) {
 	accumulatePossessions(got, nil)
 	if len(got) != 0 {
 		t.Errorf("empty event slice must add no keys, got %v", got)
+	}
+}
+
+// accumulateOriginFGA (ADR-0053) tallies BOTH attempts (EventShotAttempt) and makes
+// (EventShotMake) by shot origin, so a per-origin shooting efficiency is observable.
+func TestAccumulateOriginFGA(t *testing.T) {
+	events := []result.Event{
+		{Kind: result.EventShotAttempt, TeamID: 3, Origin: result.OriginInitial},
+		{Kind: result.EventShotMake, TeamID: 3, Origin: result.OriginInitial},
+		{Kind: result.EventShotAttempt, TeamID: 3, Origin: result.OriginInitial}, // a miss (no make event)
+		{Kind: result.EventShotAttempt, TeamID: 3, Origin: result.OriginOffReb},
+		{Kind: result.EventShotMake, TeamID: 3, Origin: result.OriginOffReb},
+		{Kind: result.EventShotAttempt, TeamID: 7, Origin: result.OriginTransition},
+		{Kind: result.EventShotMake, TeamID: 7, Origin: result.OriginTransition},
+	}
+	got := map[int]*OriginFGA{}
+	accumulateOriginFGA(got, events)
+	o3 := got[3]
+	if o3 == nil || o3.Initial != 2 || o3.InitialMade != 1 || o3.Oreb != 1 || o3.OrebMade != 1 {
+		t.Fatalf("team 3 = %+v, want Initial=2 InitialMade=1 Oreb=1 OrebMade=1", o3)
+	}
+	if o7 := got[7]; o7 == nil || o7.Transition != 1 || o7.TransitionMade != 1 {
+		t.Fatalf("team 7 = %+v, want Transition=1 TransitionMade=1", o7)
+	}
+}
+
+// Boundary — the empty-FGA-loop signature: OriginOffReb attempts with ZERO makes
+// (every putback misses) yields OrebMade==0 while Oreb>0. This is exactly the
+// efficiency↔volume coupling the ADR-0053 decoupling arm targets.
+func TestAccumulateOriginFGA_PutbackMissesOnly(t *testing.T) {
+	events := []result.Event{
+		{Kind: result.EventShotAttempt, TeamID: 5, Origin: result.OriginOffReb},
+		{Kind: result.EventShotMiss, TeamID: 5, Origin: result.OriginOffReb},
+		{Kind: result.EventShotAttempt, TeamID: 5, Origin: result.OriginOffReb},
+		{Kind: result.EventShotMiss, TeamID: 5, Origin: result.OriginOffReb},
+	}
+	got := map[int]*OriginFGA{}
+	accumulateOriginFGA(got, events)
+	if o := got[5]; o == nil || o.Oreb != 2 || o.OrebMade != 0 {
+		t.Fatalf("team 5 = %+v, want Oreb=2 OrebMade=0 (empty-loop signature)", got[5])
+	}
+}
+
+// accumulateContinuationDepth (Part B continuation-chain instrument) segments the
+// event stream into possessions and folds each possession's offensive-rebound depth
+// k into the team that OPENED it. The fixture interleaves TWO teams so a curTeam
+// misattribution would be caught, and exercises every bucket including k≥3:
+//
+//	poss A — team 3, k=0 (a bare initial attempt)
+//	poss B — team 7, k=1 (one ORB; the following OriginOffReb putback ATTEMPT must
+//	         NOT increment depth — only the rebound event does)
+//	poss C — team 3, k=2 (two ORBs; an interleaved DEFENSIVE rebound must NOT count)
+//	poss D — team 3, k=3 (three ORBs; ends at slice end — the trailing possession is
+//	         still folded)
+func TestAccumulateContinuationDepth(t *testing.T) {
+	events := []result.Event{
+		// poss A — team 3, k=0
+		{Kind: result.EventPossessionStart, TeamID: 3},
+		{Kind: result.EventShotAttempt, TeamID: 3, Origin: result.OriginInitial},
+		// poss B — team 7, k=1
+		{Kind: result.EventPossessionStart, TeamID: 7},
+		{Kind: result.EventRebound, TeamID: 7, OffensiveRebound: true},
+		{Kind: result.EventShotAttempt, TeamID: 7, Origin: result.OriginOffReb}, // putback attempt: NOT a continuation
+		// poss C — team 3, k=2
+		{Kind: result.EventPossessionStart, TeamID: 3},
+		{Kind: result.EventRebound, TeamID: 3, OffensiveRebound: true},
+		{Kind: result.EventShotMiss, TeamID: 3, Origin: result.OriginOffReb},
+		{Kind: result.EventRebound, TeamID: 3, OffensiveRebound: true},
+		{Kind: result.EventRebound, TeamID: 7, OffensiveRebound: false}, // defensive: NOT a continuation
+		// poss D — team 3, k=3 (slice-end fold)
+		{Kind: result.EventPossessionStart, TeamID: 3},
+		{Kind: result.EventRebound, TeamID: 3, OffensiveRebound: true},
+		{Kind: result.EventRebound, TeamID: 3, OffensiveRebound: true},
+		{Kind: result.EventRebound, TeamID: 3, OffensiveRebound: true},
+	}
+	got := map[int]*depthAcc{}
+	accumulateContinuationDepth(got, events)
+
+	if len(got) != 2 {
+		t.Fatalf("team keys = %v, want exactly {3, 7}", got)
+	}
+	// team 3: possessions k = {0, 2, 3} → n=3, Σk=5, Σk²=0+4+9=13, buckets b0=1,b2=1,b3=1.
+	a3 := got[3]
+	if a3.n != 3 || a3.sumK != 5 || a3.sumK2 != 13 {
+		t.Errorf("team 3 moments = n%d sumK%v sumK2%v, want n3 sumK5 sumK2 13", a3.n, a3.sumK, a3.sumK2)
+	}
+	if a3.b0 != 1 || a3.b1 != 0 || a3.b2 != 1 || a3.b3plus != 1 {
+		t.Errorf("team 3 buckets = b0%d b1%d b2%d b3plus%d, want 1/0/1/1", a3.b0, a3.b1, a3.b2, a3.b3plus)
+	}
+	// team 7: a single k=1 possession → b1 holds it (NOT b2 — the putback attempt did
+	// not increment depth).
+	a7 := got[7]
+	if a7.n != 1 || a7.sumK != 1 || a7.sumK2 != 1 {
+		t.Errorf("team 7 moments = n%d sumK%v sumK2%v, want n1 sumK1 sumK2 1", a7.n, a7.sumK, a7.sumK2)
+	}
+	if a7.b1 != 1 || a7.b2 != 0 {
+		t.Errorf("team 7 buckets = b1%d b2%d, want b1=1 b2=0 (the OriginOffReb attempt is not a continuation)", a7.b1, a7.b2)
+	}
+	// The Σk² invariant: exact mean = Σk/n and Var = Σk²/n − mean² (NEVER from buckets).
+	mean3 := a3.sumK / float64(a3.n)
+	var3 := a3.sumK2/float64(a3.n) - mean3*mean3
+	if math.Abs(mean3-5.0/3.0) > 1e-12 || math.Abs(var3-14.0/9.0) > 1e-12 {
+		t.Errorf("team 3 mean=%v var=%v, want 5/3 and 14/9 (Σk²/n − mean²)", mean3, var3)
+	}
+}
+
+// Boundary: an empty / nil event slice produces no team keys (no spurious
+// accumulators), exactly like accumulatePossessions.
+func TestAccumulateContinuationDepth_Empty(t *testing.T) {
+	got := map[int]*depthAcc{}
+	accumulateContinuationDepth(got, nil)
+	accumulateContinuationDepth(got, []result.Event{})
+	if len(got) != 0 {
+		t.Errorf("empty/nil slices must add no keys, got %v", got)
+	}
+	// A stream with offensive rebounds but NO possession start opens no possession,
+	// so nothing is folded (the rebounds belong to no trip).
+	accumulateContinuationDepth(got, []result.Event{
+		{Kind: result.EventRebound, TeamID: 3, OffensiveRebound: true},
+	})
+	if len(got) != 0 {
+		t.Errorf("rebounds with no possession start must add no keys, got %v", got)
+	}
+}
+
+// TestSimulateGameMeans_GateCont — simulateGameMeans surfaces the L1 gate-1
+// counterfactual per team (ADR-0057/0058): both teams populated, all fields finite,
+// MeanProd ≤ MeanG2 (gate-1 reduces), N>0.
+func TestSimulateGameMeans_GateCont(t *testing.T) {
+	dir := t.TempDir()
+	plr, sch, _ := corpusPaths(dir, "synth")
+	writePlr(t, plr, starterSpecs())
+	writeSch(t, sch, []schSpec{{vis: 7, home: 3, vScore: 1, hScore: 1}})
+	b := assembleSynthBundle(t, plr, sch)
+
+	_, _, _, _, _, _, _, _, gateContPerG := simulateGameMeans(b, b.Schedule[0], testRuns, 1, sim.Options{})
+	for _, id := range []int{7, 3} {
+		gc, ok := gateContPerG[id]
+		if !ok {
+			t.Errorf("team %d missing from EngineGateCont", id)
+			continue
+		}
+		for name, v := range map[string]float64{
+			"N": gc.N, "MeanG1": gc.MeanG1, "MeanG2": gc.MeanG2, "MeanProd": gc.MeanProd,
+			"MeanOffStr": gc.MeanOffStr, "MeanDefStr": gc.MeanDefStr,
+		} {
+			if math.IsNaN(v) || math.IsInf(v, 0) {
+				t.Errorf("team %d: %s non-finite (%v)", id, name, v)
+			}
+		}
+		if gc.N <= 0 {
+			t.Errorf("team %d: N=%v, want > 0", id, gc.N)
+		}
+		if gc.MeanProd > gc.MeanG2+1e-9 {
+			t.Errorf("team %d: MeanProd %v > MeanG2 %v (gate-1 must reduce)", id, gc.MeanProd, gc.MeanG2)
+		}
+	}
+
+	// NEGATIVE/edge: a matchup whose home team has no roster never resolves a
+	// possession, so no gate samples are recorded — no panic, no NaN, no spurious keys.
+	edge := bundle.Game{VisitorTeamID: 7, HomeTeamID: 99999, Date: "1988-11-04", GameType: bundle.GameTypeRegular}
+	_, _, _, _, _, _, _, _, edgeGate := simulateGameMeans(b, edge, testRuns, 1, sim.Options{})
+	if len(edgeGate) != 0 {
+		t.Errorf("rosterless matchup should record no gate samples, got %v", edgeGate)
 	}
 }

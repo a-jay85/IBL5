@@ -67,6 +67,51 @@ type Options struct {
 	// BranchBAccum, when non-nil and BranchB is set, harvests the engagement instrument
 	// (Branch-B-taken fraction + s distribution) aggregated across the whole archive pass.
 	BranchBAccum *sim.BranchBAccum
+
+	// MakePutback / MakePutbackHalf enable the ADR-0053 shots-per-possession decoupling
+	// arms in the default (non-injected) engine runs — the Phase-3 measurement A/B. Like
+	// BranchB they are captured by resolveValidate's real default closure (an injected
+	// Options.Validate test seam ignores them) and default false leaves every existing
+	// caller byte-identical. Because the arms consume FreezeMeans.MakeVal2pt, the closure
+	// runs a per-season-bucket harvest pass to populate the mean BEFORE the frozen pass
+	// (the league-mean make-value is era-specific, so the harvest is per-bucket, never
+	// global — mirrors CollectFreezeAttribution).
+	MakePutback     bool
+	MakePutbackHalf bool
+
+	// UnfaithfulPutback, when true, sets sim.FreezeConfig.UnfaithfulPutback in the
+	// default (non-injected) engine runs — the ADR-0055 archive A/B's OFF walk, which
+	// RESTORES master's old net-coupled, 3pt-reachable putback behavior as the
+	// diagnostic baseline. Captured by resolveValidate's real default closure (an
+	// injected Options.Validate test seam ignores it). Default false = the faithful
+	// production engine (the ON walk is a zero Options), so every existing caller stays
+	// byte-identical. Unlike MakePutback it consumes no FreezeMeans (no harvest pass).
+	UnfaithfulPutback bool
+
+	// UnfaithfulOreb, when true, sets sim.FreezeConfig.UnfaithfulOreb in the default
+	// (non-injected) engine runs — the ADR-0058 archive A/B's OFF walk, which RESTORES
+	// the old linear gate-2 orebProbability ORB-continuation path as the diagnostic
+	// baseline. Captured by resolveValidate's real default closure (an injected
+	// Options.Validate test seam ignores it). Default false = the faithful production
+	// engine (the ON walk is a zero Options). Consumes no FreezeMeans (no harvest pass).
+	UnfaithfulOreb bool
+
+	// OffVolumeScale, when non-nil, overrides the sim package-const offVolumeScale in
+	// the default (non-injected) engine runs — the ADR-0054 possession-count dispersion
+	// sweep. Captured by resolveValidate's real default closure (an injected
+	// Options.Validate test seam ignores it). nil leaves every existing caller + the
+	// committed calibration byte-identical (the const path). 0 is a valid sweep value
+	// (channel off), distinct from nil (use const) — hence the pointer.
+	OffVolumeScale *float64
+
+	// GateBaseline, when non-nil, overrides the L1 gate-1 baseline term (the league
+	// offensive-rebound share × 100) in the default (non-injected) engine runs — the
+	// ADR-0058 gate-continuation baseline sensitivity sweep. Threaded into sim.Options by
+	// validateWithArms (an injected Options.Validate test seam ignores it). nil leaves the
+	// gate instrument on its faithful bundle-derived baseline (leagueReboundBaseline), so
+	// every existing caller is byte-identical. The gate instrument itself is always-on in
+	// the validate harness (read-only, no rng draw); only its baseline is swept here.
+	GateBaseline *float64
 }
 
 // Skip records a snapshot (or archive entry) that was not turned into a Report,

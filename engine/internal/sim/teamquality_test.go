@@ -121,20 +121,18 @@ func TestOffQualityWithHCA_SubtractionSign(t *testing.T) {
 	home := offQualityWithHCA(off, hcaMagnitude)  // +0.2 per player → Σ shrinks
 	away := offQualityWithHCA(off, -hcaMagnitude) // −0.2 per player → Σ grows
 
-	// Exact composition: offQualityWithHCA = max(floor, compress(rawQ,
-	// offQualityNeutral, foulCompress) − len×hcaDelta). HCA is applied OUTSIDE the
-	// compression, so its magnitude is never scaled by foulCompress. Asserted
-	// symbolically so it holds at any committed foulCompress.
-	rawQ := 5 * floor1(6) * offQualityRatingScale // 5 × 6 × 0.059 = 1.77
-	wantNeutral := compressQuality(rawQ, offQualityNeutral, foulCompress)
+	// At neutral HCA the divisor is the volume-neutral constant itself: no per-player
+	// OO read, no off-side compression (ADR-0061). Asserted against the symbol so the
+	// Phase-6 calibration swap does not break this test.
+	wantNeutral := offQualityConstant
 	if math.Abs(neutral-wantNeutral) > teamQualityEps {
-		t.Errorf("offQualityWithHCA(neutral) = %.4f, want compress(rawQ) = %.4f", neutral, wantNeutral)
+		t.Errorf("offQualityWithHCA(neutral) = %.4f, want offQualityConstant = %.4f", neutral, wantNeutral)
 	}
 
-	// The home/away delta is EXACTLY len×hcaMagnitude (= 5×0.2 = 1.0) regardless of
-	// foulCompress — the #955-calibrated HCA magnitude is preserved (HCA outside
-	// compression). This shrinking divisor for the home team is the home-favorable
-	// mechanism.
+	// The home/away delta is EXACTLY len×hcaMagnitude (= 5×0.2 = 1.0) — the
+	// #955-calibrated HCA magnitude is preserved (the constant base is volume-neutral,
+	// so the fixed subtraction is the whole home/away delta). This shrinking divisor
+	// for the home team is the home-favorable mechanism.
 	if math.Abs((neutral-home)-1.0) > teamQualityEps {
 		t.Errorf("home Σ = %.4f, want neutral − 1.0 = %.4f (HCA must be unscaled by foulCompress)", home, neutral-1.0)
 	}
@@ -149,31 +147,34 @@ func TestOffQualityWithHCA_SubtractionSign(t *testing.T) {
 // --- matrix #9,10 (boundary): floor guards a non-positive divisor ------------
 
 func TestOffQualityWithHCA_Floor(t *testing.T) {
-	// An all-zero-rated 5-man home lineup is the worst case: minimal raw quality,
-	// maximal HCA subtraction. The floor must keep the divisor ≥ offQualityFloor so
-	// foul/offQ stays well-defined (no divide-by-zero, no sign flip, no NaN/Inf).
-	// Whether the floor actually binds depends on foulCompress (compression pulls the
-	// low raw quality UP toward the neutral), so the test asserts the EXACT clamp
-	// behavior either way, plus the always-true invariant.
-	zero := make([]onCourt, 0, 5)
-	for slot := slotPG; slot <= slotC; slot++ {
-		p := oc(slot, mkPlayer(slot, 3, slot, 0))
-		p.OO = 0
-		zero = append(zero, p)
-	}
-	rawQ := 5 * floor1(0) * offQualityRatingScale
-	composed := compressQuality(rawQ, offQualityNeutral, foulCompress) - 5*hcaMagnitude
-	got := offQualityWithHCA(zero, hcaMagnitude)
+	// The divisor base is now the volume-neutral constant, so the floor binds only
+	// when the HCA subtraction len×hcaDelta drops it below offQualityFloor. A normal
+	// home lineup (offQualityConstant − 5×0.2) stays well above the floor; force the
+	// degenerate case with an oversized per-player HCA delta so the clamp guards the
+	// division (no divide-by-zero, no sign flip, no NaN/Inf).
+	off := fiveStarters(3)
 
-	if composed < offQualityFloor {
-		if math.Abs(got-offQualityFloor) > teamQualityEps {
-			t.Errorf("composed %.4f < floor → got %.4f, want offQualityFloor %.4f", composed, got, offQualityFloor)
-		}
-	} else if math.Abs(got-composed) > teamQualityEps {
-		t.Errorf("composed %.4f ≥ floor → got %.4f, want composed %.4f", composed, got, composed)
+	// Below-floor: 5 players × 0.30 = 1.5 subtracted. offQualityConstant − 1.5 is below
+	// offQualityFloor (0.25) for every swept constant in the calibration range
+	// (≤ 1.65 − 1.5 = 0.15 < 0.25), so the clamp binds and returns exactly the floor.
+	const bigHCA = 0.30
+	composed := offQualityConstant - 5*bigHCA
+	if composed >= offQualityFloor {
+		t.Fatalf("test setup: offQualityConstant %.4f − 5×%.2f = %.4f is not below floor %.4f; raise bigHCA",
+			offQualityConstant, bigHCA, composed, offQualityFloor)
 	}
+	if got := offQualityWithHCA(off, bigHCA); math.Abs(got-offQualityFloor) > teamQualityEps {
+		t.Errorf("below-floor divisor → got %.4f, want clamp to offQualityFloor %.4f", got, offQualityFloor)
+	}
+
+	// Above-floor: the neutral divisor is the constant itself, unclamped.
+	if got := offQualityWithHCA(off, 0); math.Abs(got-offQualityConstant) > teamQualityEps {
+		t.Errorf("neutral divisor → got %.4f, want offQualityConstant %.4f (unclamped)", got, offQualityConstant)
+	}
+
 	// Invariant: never below the floor, always finite (the guarantee the foul
 	// divisor relies on).
+	got := offQualityWithHCA(off, bigHCA)
 	if got < offQualityFloor || math.IsNaN(got) || math.IsInf(got, 0) {
 		t.Errorf("offQualityWithHCA = %v, want a finite value ≥ offQualityFloor %.4f", got, offQualityFloor)
 	}

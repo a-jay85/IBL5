@@ -37,6 +37,16 @@ func shotValue2pt(net float64, fgp int, shotClock bool) float64 {
 	return net*netToShotValue/leagueBaseline + base2pt(fgp)
 }
 
+// putbackValue2pt is the JSB 5.60 putback (OReb-continuation) 2pt make-value:
+// player[+0xD60] × 1.3333 — net-advantage-free and 4/3-boosted (decompile
+// jsb560_decompiled.c:93880-93883). base2pt(fgp) is the engine's +0xD60 2P%-rating
+// stand-in; shotClock2ptMult is the 4/3 boost. This is the SAME assembled form as
+// the shotValue2pt shotClock==true branch, named for its distinct concept (a
+// putback, not a rushed shot-clock look) so the call site reads its intent.
+func putbackValue2pt(fgp int) float64 {
+	return base2pt(fgp) * shotClock2ptMult
+}
+
 // shotValue3pt is league-baseline × 1.5 — deliberately independent of net
 // advantage. ODPT ratings decide whether a 3pt is *attempted*, but once
 // attempted, make probability is identical for all players.

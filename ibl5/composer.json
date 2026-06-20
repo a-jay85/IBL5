@@ -28,7 +28,8 @@
         "analyse:baseline": "vendor/bin/phpstan clear-result-cache --configuration=phpstan.neon && vendor/bin/phpstan analyse --configuration=phpstan.neon --autoload-file=phpstan-stubs/phpstan-rules-bootstrap.php --generate-baseline --memory-limit=1G",
         "mutation": "vendor/bin/infection --configuration=infection.json5 --coverage=coverage",
         "mutation:controllers-handlers": "vendor/bin/infection --configuration=infection.json5 --coverage=coverage --filter=\"$(cat tests/Mutation/controllers-handlers-pass1-paths.txt | tr '\\n' ',' | sed 's|,$||')\"",
-        "mutation:small-modules": "vendor/bin/infection --configuration=infection.json5 --coverage=coverage --filter=\"$(cat tests/Mutation/small-modules-pass1-paths.txt | tr '\\n' ',' | sed 's|,$||')\""
+        "mutation:small-modules": "vendor/bin/infection --configuration=infection.json5 --coverage=coverage --filter=\"$(cat tests/Mutation/small-modules-pass1-paths.txt | tr '\\n' ',' | sed 's|,$||')\"",
+        "mutation:views": "vendor/bin/infection --configuration=infection.json5 --coverage=coverage --filter=\"$(cat tests/Mutation/views-pass-paths.txt | tr '\\n' ',' | sed 's|,$||')\""
     },
     "autoload": {
         "psr-4": {

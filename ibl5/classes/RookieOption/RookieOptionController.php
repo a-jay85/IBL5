@@ -26,13 +26,29 @@ class RookieOptionController implements RookieOptionControllerInterface
     private RookieOptionRepository $repository;
     private \Topics\News\NewsRepository $newsService;
     private TeamIdentityRepositoryInterface $commonRepository;
+    /** Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('app'). */
+    private \Psr\Log\LoggerInterface $appLogger;
+    /** Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('audit'). */
+    private \Psr\Log\LoggerInterface $auditLogger;
+    /**
+     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     */
+    private ?Season $season = null;
 
-    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepository)
-    {
+    public function __construct(
+        \mysqli $db,
+        TeamIdentityRepositoryInterface $commonRepository,
+        ?\Psr\Log\LoggerInterface $appLogger = null,
+        ?\Psr\Log\LoggerInterface $auditLogger = null,
+        ?Season $season = null
+    ) {
         $this->db = $db;
+        $this->season = $season;
         $this->repository = new RookieOptionRepository($db);
         $this->newsService = new \Topics\News\NewsRepository($db);
         $this->commonRepository = $commonRepository;
+        $this->appLogger = $appLogger ?? \Logging\LoggerFactory::getChannel('app');
+        $this->auditLogger = $auditLogger ?? \Logging\LoggerFactory::getChannel('audit');
     }
 
     /**
@@ -40,27 +56,27 @@ class RookieOptionController implements RookieOptionControllerInterface
      */
     public function processRookieOption(string $teamName, int $playerID, int $extensionAmount): array
     {
-        $season = new Season($this->db);
+        $season = $this->season ?? new Season($this->db);
         $player = Player::withPlayerID($this->db, $playerID);
 
         // Validate player eligibility
         if (!$player->canRookieOption($season->phase)) {
             $errorMessage = "This player's experience doesn't match their rookie status; please let the commish know about this error.";
-            \Logging\LoggerFactory::getChannel('app')->warning('RookieOption validation error', ['player_id' => $playerID, 'error' => $errorMessage]);
+            $this->appLogger->warning('RookieOption validation error', ['player_id' => $playerID, 'error' => $errorMessage]);
             return ['success' => false, 'type' => 'validation_error', 'message' => $errorMessage, 'playerID' => $playerID];
         }
 
         // Determine which contract year to update based on draft round
         if ($player->getDraftRound() !== 1 && $player->getDraftRound() !== 2) {
             $errorMessage = "This player's experience doesn't match their rookie status; please let the commish know about this error.";
-            \Logging\LoggerFactory::getChannel('app')->warning('RookieOption draft round validation error', ['player_id' => $playerID, 'draft_round' => $player->getDraftRound()]);
+            $this->appLogger->warning('RookieOption draft round validation error', ['player_id' => $playerID, 'draft_round' => $player->getDraftRound()]);
             return ['success' => false, 'type' => 'validation_error', 'message' => $errorMessage, 'playerID' => $playerID];
         }
 
         // Update player's contract
         if (!$this->repository->updatePlayerRookieOption($playerID, $player->getDraftRound(), $extensionAmount)) {
             $errorMessage = "Failed to update player contract. Please contact the commissioner.";
-            \Logging\LoggerFactory::getChannel('app')->error('RookieOption database update failed', ['player_id' => $playerID, 'draft_round' => $player->getDraftRound(), 'extension_amount' => $extensionAmount]);
+            $this->appLogger->error('RookieOption database update failed', ['player_id' => $playerID, 'draft_round' => $player->getDraftRound(), 'extension_amount' => $extensionAmount]);
             return ['success' => false, 'type' => 'database_error', 'message' => $errorMessage, 'playerID' => $playerID];
         }
 
@@ -73,7 +89,7 @@ class RookieOptionController implements RookieOptionControllerInterface
         try {
             Discord::postToChannel(self::DISCORD_CHANNEL, $discordMessage);
         } catch (\Exception $e) {
-            \Logging\LoggerFactory::getChannel('app')->warning('RookieOption Discord notification failed', ['error' => $e->getMessage()]);
+            $this->appLogger->warning('RookieOption Discord notification failed', ['error' => $e->getMessage()]);
         }
 
         // Send email notification
@@ -86,7 +102,7 @@ class RookieOptionController implements RookieOptionControllerInterface
             $this->createRookieOptionNewsStory($teamName, $playerName, $extensionAmount);
         }
 
-        \Logging\LoggerFactory::getChannel('audit')->info('rookie_option_exercised', [
+        $this->auditLogger->info('rookie_option_exercised', [
             'action' => 'rookie_option_exercised',
             'player_id' => $playerID,
             'player_name' => $playerName,

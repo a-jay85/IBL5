@@ -44,10 +44,19 @@ class ScheduleUpdater extends \BaseMysqliRepository {
 
     private ?JsbSourceResolverInterface $sourceResolver;
 
-    public function __construct(\mysqli $db, Season $season, ?LeagueContext $leagueContext = null, ?JsbSourceResolverInterface $sourceResolver = null) {
+    private string $basePath;
+
+    /**
+     * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('db').
+     */
+    private \Psr\Log\LoggerInterface $channelLogger;
+
+    public function __construct(\mysqli $db, Season $season, ?LeagueContext $leagueContext = null, ?JsbSourceResolverInterface $sourceResolver = null, ?string $basePath = null, ?\Psr\Log\LoggerInterface $logger = null) {
         parent::__construct($db, $leagueContext);
         $this->season = $season;
         $this->sourceResolver = $sourceResolver;
+        $this->basePath = $basePath ?? \Bootstrap\AppPaths::root();
+        $this->channelLogger = $logger ?? \Logging\LoggerFactory::getChannel('db');
     }
 
     /**
@@ -146,7 +155,7 @@ class ScheduleUpdater extends \BaseMysqliRepository {
      */
     private function insertPlayoffGamesFromScheduleHtm(): string
     {
-        $ibl5Root = \Bootstrap\AppPaths::root();
+        $ibl5Root = $this->basePath;
         $leagueDir = $this->leagueContext !== null ? $this->leagueContext->getCurrentLeague() : 'IBL';
         $scheduleHtmPath = $ibl5Root . '/ibl/' . $leagueDir . '/Schedule.htm';
 
@@ -231,7 +240,7 @@ class ScheduleUpdater extends \BaseMysqliRepository {
                 }
                 $games = SchFileParser::parse($schData);
             } else {
-                $ibl5Root = \Bootstrap\AppPaths::root();
+                $ibl5Root = $this->basePath;
                 $filePrefix = $this->leagueContext !== null ? $this->leagueContext->getFilePrefix() : 'IBL5';
                 $schFilePath = $ibl5Root . '/' . $filePrefix . '.sch';
                 $games = SchFileParser::parseFile($schFilePath);
@@ -322,7 +331,7 @@ class ScheduleUpdater extends \BaseMysqliRepository {
                     $log .= "Inserted game: {$visitorName} @ {$homeName} on {$date}<br>";
                 } catch (\Exception $e) {
                     $errorMessage = "Failed to insert schedule data for game between {$visitorName} and {$homeName}: " . $e->getMessage();
-                    \Logging\LoggerFactory::getChannel('db')->error('ScheduleUpdater database insert error', ['error' => $errorMessage]);
+                    $this->channelLogger->error('ScheduleUpdater database insert error', ['error' => $errorMessage]);
                     echo '<strong class="ibl-form-error">Script Error: Failed to insert schedule data for game between ' . HtmlSanitizer::e($visitorName) . ' and ' . HtmlSanitizer::e($homeName) . '.</strong>';
                     throw new \RuntimeException($errorMessage, 1002);
                 }

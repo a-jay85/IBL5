@@ -23,12 +23,19 @@ class OneOnOneGameService implements OneOnOneGameServiceInterface
     private OneOnOneGameRepositoryInterface $repository;
     private OneOnOneGameEngineInterface $gameEngine;
 
+    /**
+     * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('audit').
+     */
+    private \Psr\Log\LoggerInterface $logger;
+
     public function __construct(
         OneOnOneGameRepositoryInterface $repository,
-        ?OneOnOneGameEngineInterface $gameEngine = null
+        ?OneOnOneGameEngineInterface $gameEngine = null,
+        ?\Psr\Log\LoggerInterface $logger = null
     ) {
         $this->repository = $repository;
         $this->gameEngine = $gameEngine ?? new OneOnOneGameEngine();
+        $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('audit');
     }
 
     /**
@@ -60,10 +67,19 @@ class OneOnOneGameService implements OneOnOneGameServiceInterface
         $gameId = $this->repository->saveGame($result);
         $result->gameId = $gameId;
 
-        // Post to Discord
-        $this->postToDiscord($result, $gameId);
+        // Post to Discord. A notification failure (webhook outage, placeholder
+        // CI webhook, etc.) must not fail the game — the result is already
+        // persisted above. Log and swallow, matching TradeProcessor's pattern.
+        try {
+            $this->postToDiscord($result, $gameId);
+        } catch (\Throwable $e) {
+            $this->logger->error('Discord notification failed for 1v1 game', [
+                'game_id' => $gameId,
+                'error' => $e->getMessage(),
+            ]);
+        }
 
-        \Logging\LoggerFactory::getChannel('audit')->info('one_on_one_game_played', [
+        $this->logger->info('one_on_one_game_played', [
             'action' => 'one_on_one_game_played',
             'game_id' => $gameId,
             'player1_id' => $player1Id,

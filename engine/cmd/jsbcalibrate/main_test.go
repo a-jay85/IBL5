@@ -152,6 +152,43 @@ func TestRun_InvalidSelection(t *testing.T) {
 	}
 }
 
+// Row #7 (ADR-0053): --makePutback / --makePutbackHalf parse into calibrate.Options;
+// both default false; an unknown flag is still a usage error (exit 2).
+func TestRun_MakePutbackFlagsParse(t *testing.T) {
+	reports := []validate.Report{reportWith(bundle.GameTypeRegular,
+		validate.StatRow{Stat: "points", Pass: true},
+	)}
+	var got calibrate.Options
+	capture := func(_ string, opts calibrate.Options) ([]validate.Report, []calibrate.Skip, error) {
+		got = opts
+		return reports, nil, nil
+	}
+	c := collectors{season: capture, flat: capture}
+
+	var out, errBuf bytes.Buffer
+	if code := runWith([]string{"--archive", "/x", "--mode", "gate"}, &out, &errBuf, c); code != 0 {
+		t.Fatalf("default run exit = %d, want 0 (stderr: %s)", code, errBuf.String())
+	}
+	if got.MakePutback || got.MakePutbackHalf {
+		t.Errorf("defaults = {MakePutback:%v MakePutbackHalf:%v}, want both false", got.MakePutback, got.MakePutbackHalf)
+	}
+
+	out.Reset()
+	errBuf.Reset()
+	if code := runWith([]string{"--archive", "/x", "--mode", "gate", "--makePutback", "--makePutbackHalf"}, &out, &errBuf, c); code != 0 {
+		t.Fatalf("flagged run exit = %d, want 0 (stderr: %s)", code, errBuf.String())
+	}
+	if !got.MakePutback || !got.MakePutbackHalf {
+		t.Errorf("flagged = {MakePutback:%v MakePutbackHalf:%v}, want both true", got.MakePutback, got.MakePutbackHalf)
+	}
+
+	out.Reset()
+	errBuf.Reset()
+	if code := runWith([]string{"--archive", "/x", "--bogusflag"}, &out, &errBuf, c); code != 2 {
+		t.Errorf("unknown flag exit = %d, want 2", code)
+	}
+}
+
 // Negative: an archive that yields no reports exits 1 with a diagnostic.
 func TestRun_NoReports(t *testing.T) {
 	var out, errBuf bytes.Buffer

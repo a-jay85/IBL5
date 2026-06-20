@@ -157,9 +157,8 @@ class TrainingCampRatingsDiffView implements TrainingCampRatingsDiffViewInterfac
      */
     private function buildRealRow(RatingRow $row): string
     {
-        $safeName = HtmlSanitizer::e($row->name);
         $html  = '<tr>';
-        $html .= PlayerImageHelper::renderPlayerCell($row->pid, $safeName);
+        $html .= PlayerImageHelper::renderPlayerCell($row->pid, $row->name);
         $html .= TeamCellHelper::renderTeamCellOrFreeAgent($row->teamid, $row->teamName ?? '', $row->teamColor1, $row->teamColor2);
         $html .= '<td>' . ($row->age !== null ? HtmlSanitizer::e($row->age) : '') . '</td>';
         $html .= '<td>' . HtmlSanitizer::e($row->pos) . '</td>';
@@ -190,9 +189,8 @@ class TrainingCampRatingsDiffView implements TrainingCampRatingsDiffViewInterfac
      */
     private function buildNewRow(RatingRow $row): string
     {
-        $safeName = HtmlSanitizer::e($row->name);
         $html  = '<tr>';
-        $html .= PlayerImageHelper::renderPlayerCell($row->pid, $safeName);
+        $html .= PlayerImageHelper::renderPlayerCell($row->pid, $row->name);
         $html .= TeamCellHelper::renderTeamCellOrFreeAgent($row->teamid, $row->teamName ?? '', $row->teamColor1, $row->teamColor2);
         $html .= '<td>' . ($row->age !== null ? HtmlSanitizer::e($row->age) : '') . '</td>';
         $html .= '<td>' . HtmlSanitizer::e($row->pos) . '</td>';

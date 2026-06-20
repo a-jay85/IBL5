@@ -557,9 +557,9 @@ final class RecordHoldersViewTest extends TestCase
 
         $html = $this->view->render($records);
 
-        $this->assertStringContainsString('Game Records</h4>', $html);
-        $this->assertStringContainsString('Season Records</h4>', $html);
-        $this->assertStringContainsString('Franchise Records</h4>', $html);
+        $this->assertStringContainsString('Game Records</h3>', $html);
+        $this->assertStringContainsString('Season Records</h3>', $html);
+        $this->assertStringContainsString('Franchise Records</h3>', $html);
     }
 
     /**

@@ -23,12 +23,17 @@ class LeagueStartersApiHandler
     private \mysqli $db;
     private TeamIdentityRepositoryInterface $commonRepo;
     private AuthServiceInterface $authService;
+    /**
+     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     */
+    private ?Season $season = null;
 
-    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepo, AuthServiceInterface $authService)
+    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepo, AuthServiceInterface $authService, ?Season $season = null)
     {
         $this->db = $db;
         $this->commonRepo = $commonRepo;
         $this->authService = $authService;
+        $this->season = $season;
     }
 
     public function handle(): void
@@ -50,7 +55,7 @@ class LeagueStartersApiHandler
         $userTeamName = $this->commonRepo->getTeamnameFromUsername($username);
         $userTeam = Team::initialize($this->db, $userTeamName ?? '');
 
-        $season = new Season($this->db);
+        $season = $this->season ?? new Season($this->db);
         $league = new League($this->db);
         $service = new LeagueStartersService($this->db, $league);
         $view = new LeagueStartersView('LeagueStarters');

@@ -1,6 +1,6 @@
 ---
 description: Requires plans to classify every verification step into the test-type taxonomy at plan-write time, preventing manual-testing items from deferring to post-plan cleanup, and grounds seed/DOM-dependent E2E assertions in real fixtures.
-last_verified: 2026-06-07
+last_verified: 2026-06-13
 ---
 
 # Plan Verification Matrix
@@ -30,7 +30,7 @@ Each implementation phase that changes behavior must have a corresponding row (o
 | **E2E** | Browser interaction (form submit, page navigation, HTMX swap, DOM state) |
 | **Visual-regression** | "Does output still match?" / production comparison where UI/UX was NOT intentionally redesigned |
 | **CLI-executable** | A command Claude can run directly during implementation (curl, bin/db-query) — not a test, but a one-shot verification |
-| **Truly-manual** | Requires subjective human judgment on **new or redesigned** UI/UX ("does this look/feel good?", "does this new flow work well?") |
+| **Truly-manual** | Requires subjective human judgment on **new or redesigned** UI/UX ("does this look/feel good?", "does this new flow work well?"). **Forced** — see § Forced manual-verification trigger — whenever the plan introduces new/redesigned UI/UX; not optional. |
 
 ### Timing — exactly one of:
 
@@ -81,6 +81,33 @@ Two gotchas this rule exists to catch (cross-referenced from memory):
 
 - **Sort direction is not "ascending by default."** `ibl5/jslib/sorttable.js` sorts **descending** on first click. An assertion on first-click sort order must match that, not an assumed ascending order. See memory `reference_sorttable_descending_first`.
 - **Seed cardinality is small.** The CI seed is a fixture, not production — counts, option lists, and "is the list non-empty" assertions must be grounded in what the seed actually contains. See memory `feedback_e2e_seed_grounding`.
+
+## Forced manual-verification trigger (new or redesigned UI/UX)
+
+When a plan introduces **new or redesigned user-visible UI/UX**, the matrix MUST include at least one **Truly-manual** row for the subjective look-and-feel + flow check — *in addition to* (never instead of) any E2E and Visual-regression rows. E2E asserts that elements are present and behave; Visual-regression pins pixels against an **existing** baseline. Neither can judge whether a *newly introduced* design looks right or a *new* multi-step flow feels right — that is the gap PR #1067 shipped through (a new notification bell, unread badge, CSS component, and mark-read flow, all classified E2E/visual with zero manual rows, then auto-merged).
+
+A plan trips this trigger when it adds or restyles any of:
+
+| Trigger | Example surface |
+|---------|----------------|
+| New or restyled CSS component / stylesheet | a file under `ibl5/design/`, a new `*.css`, a new component class |
+| New rendered page or module | a new `ibl5/modules/*/index.php` route a user navigates to |
+| New nav/menu entry, indicator, or badge | the nav bell + unread badge from #1067 |
+| New multi-step or stateful user flow | mark-read / mark-all-read, a what-if sandbox, a wizard |
+
+**Does NOT trip** (keep nightly autonomy for safe mechanical work): a non-visual refactor, a one-line CSS bugfix with no design change, a JSON/POST endpoint with no visual surface, or any change where **nothing the user sees is new or redesigned**. An *unchanged* UI is covered by Visual-regression alone — see the taxonomy's "If nothing in UI/UX changed" rule; this trigger fires only on genuinely new or redesigned surfaces.
+
+### Phrasing the forced row (gate-3 safe)
+
+The Truly-manual row is a **subjective** judgment, so phrase it as a question of taste — never with an automatable verb (`verify` / `check that` / `confirm` / `ensure`), which `bin/check-plan` gate 3 rejects as a mislabeled-automatable row. Copy this shape:
+
+```
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| N | Does the new notification bell + inbox look right, and does the mark-read flow feel right? | Truly-manual | post-impl | manual (reviewer walkthrough) |
+```
+
+A plan that trips this trigger therefore **cannot** carry the "All verification is automated — no manual testing needed" line, and per `/plan` Step 4 gate 14 must set `auto_postplan: false`.
 
 ## Hot-file thresholds
 

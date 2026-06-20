@@ -26,8 +26,8 @@ const (
 // and the 24.0 fallback are confirmed; the exact per-game stat-offset inputs are
 // "validation-phase." So this additive offensive-minus-defensive form and its two
 // scales are CORPUS-CALIBRATED STAND-INS for the ratio — exactly like the
-// defensive-only stand-in this replaces and offQualityRatingScale in
-// teamquality.go. The neutral reference points are the real dev-DB per-starter
+// defensive-only stand-in this replaces and the offQualityConstant home-margin
+// knob in teamquality.go. The neutral reference points are the real dev-DB per-starter
 // minutes-weighted composite means (offense 161.2 ± 13.8, defense 23.8 ± 1.4;
 // 28 teams, 2026-06); they center a league-average roster at baseTimeMid.
 const (
@@ -84,7 +84,17 @@ const (
 // (slower). Additive stand-in for FUN_004e4150's offensive/defensive ratio (see
 // the const block). No division is used, so a degenerate (e.g. all-zero-rated)
 // lineup clamps into [13,16] rather than producing NaN/Inf.
+// teamBaseTime uses the package-const offVolumeScale — the thin wrapper so existing
+// callers and tempo_test.go are unchanged.
 func teamBaseTime(starters []onCourt) float64 {
+	return teamBaseTimeWith(starters, offVolumeScale)
+}
+
+// teamBaseTimeWith is teamBaseTime with the offensive-volume scale supplied by the
+// caller — the ADR-0054 possession-count dispersion sweep seam. scale==offVolumeScale
+// reproduces teamBaseTime byte-for-byte (so a nil Options.OffVolumeScale is
+// golden-stable). Pure function: no Options/config in scope.
+func teamBaseTimeWith(starters []onCourt, scale float64) float64 {
 	if len(starters) == 0 {
 		return baseTimeLow
 	}
@@ -96,7 +106,7 @@ func teamBaseTime(starters []onCourt) float64 {
 	n := float64(len(starters))
 	offAvg := offSum / n
 	defAvg := defSum / n
-	bt := baseTimeMid - offVolumeScale*(offAvg-offVolumeNeutral) + defRatingScale*(defAvg-defRatingNeutral)
+	bt := baseTimeMid - scale*(offAvg-offVolumeNeutral) + defRatingScale*(defAvg-defRatingNeutral)
 	if bt < baseTimeLow {
 		bt = baseTimeLow
 	}

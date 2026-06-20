@@ -6,56 +6,123 @@ import { assertNoA11yViolations, type A11yOptions } from '../helpers/accessibili
 // Each entry should have a comment explaining why it's excluded.
 const SITE_WIDE_DISABLED_RULES: string[] = [];
 
-// Pages with known color-contrast failures — PHP-Nuke legacy palette debt.
-// See ibl5/docs/a11y-contrast-backlog.md for the full inventory and burn-down plan.
-// Remove entries as palette CSS fixes land; removals = ratchet tightening.
-const CONTRAST_KNOWN_FAILING = new Set([
-  // Public pages
-  'homepage',
-  'cap space',
-  'player page',
-  'activity tracker',
-  'all-star appearances',
-  'contract list',
-  'draft pick locator',
-  'franchise history',
-  'franchise record book',
-  'free agency preview',
-  'injuries',
-  'one on one game',
-  'player movement',
-  'projected draft order',
-  'record holders',
-  'schedule',
-  'search',
-  'season archive',
-  'season highs',
-  'series records',
-  'team off/def stats',
-  'team schedule',
-  'topics',
-  'news index',
-  'news categories',
-  'news article',
-  // Pages with team-color contrast failures (ibl-team-cell--colored uses DB-configured team colors)
-  'league starters',
-  // SeasonLeaderboards renders team-color cells via TeamCellHelper; which low-contrast team
-  // surfaces in the top-N depends on ORDER BY tie ordering, so the violation appeared
-  // intermittently in CI (the dev-seed inventory missed it). Same team-color debt as above.
-  'season leaderboards',
-  // Auth pages
-  'waivers',
-  'trading',
-  'depth chart entry',
-  'gm contact list',
-  'draft',
-  'next sim',
-]);
+// Per-rule allowlist of pages with known failures — shrinking backlog tracker.
+// See ibl5/docs/a11y-backlog.md (non-contrast) and ibl5/docs/a11y-contrast-backlog.md (contrast).
+// Each removal from a set = ratchet tightening (CI enforces that page/rule permanently).
+// Keys are axe rule ids; values are sets of page names from the spec page lists.
+const KNOWN_FAILING: Record<string, Set<string>> = {
+  // PHP-Nuke legacy palette debt. See ibl5/docs/a11y-contrast-backlog.md.
+  'color-contrast': new Set([
+    // Public pages
+    'homepage',
+    'cap space',
+    'player page',
+    'activity tracker',
+    'all-star appearances',
+    'contract list',
+    'draft pick locator',
+    'franchise history',
+    'franchise record book',
+    'free agency preview',
+    'injuries',
+    'one on one game',
+    'player movement',
+    'projected draft order',
+    'record holders',
+    'schedule',
+    'search',
+    'season archive',
+    'season highs',
+    'series records',
+    'team off/def stats',
+    'team schedule',
+    'topics',
+    'news index',
+    'news categories',
+    'news article',
+    // Pages with team-color contrast failures (ibl-team-cell--colored uses DB-configured team colors)
+    'league starters',
+    // SeasonLeaderboards renders team-color cells via TeamCellHelper; which low-contrast team
+    // surfaces in the top-N depends on ORDER BY tie ordering, so the violation appeared
+    // intermittently in CI (the dev-seed inventory missed it). Same team-color debt as above.
+    'season leaderboards',
+    // Auth pages
+    'waivers',
+    'trading',
+    'depth chart entry',
+    'gm contact list',
+    'draft',
+    'next sim',
+  ]),
+
+  // No <h1> on page — most module pages use <h2 class="ibl-title">. See ibl5/docs/a11y-backlog.md.
+  // Burn-down: a11y-2-heading-one-single-title (single-title views), supervised backlog (rest).
+  'page-has-heading-one': new Set([
+    // Seeded empirically — see plan a11y-1-ratchet-best-practice
+    'standings',
+    'homepage',
+    'season leaderboards',
+    'career leaderboards',
+    'player page',
+    'award history',
+    'franchise record book',
+    'player database',
+    'schedule',
+    'season archive',
+    'news index',
+    'news categories',
+    'news article',
+    'team schedule',
+    'team page',
+    'voting results',
+    // Auth pages
+    'trading',
+    'depth chart entry',
+    'waivers',
+    'compare players',
+    'next sim',
+    'your account',
+    'voting ASG ballot',
+    'voting EOY ballot',
+  ]),
+
+  // Heading-level skip (h4 after h2, no h3). See ibl5/docs/a11y-backlog.md.
+  // Burn-down: a11y-2-heading-one-single-title (record holders view, same render pass).
+  'heading-order': new Set([
+  ]),
+
+  // Links with no discernible text. Seed-dependent (data-driven sim-recap + News template).
+  // See ibl5/docs/a11y-backlog.md §link-name.
+  'link-name': new Set([
+    'homepage',
+    'news index',
+    'news categories',
+    'news article',
+  ]),
+
+  // Touch targets < 24×24px. Seed-dependent for small-count hits. See ibl5/docs/a11y-backlog.md.
+  'target-size': new Set([
+    'topics',
+    'homepage',
+    'news article',
+  ]),
+
+  // Multiple landmarks share role+name. See ibl5/docs/a11y-backlog.md §landmark-unique.
+  'landmark-unique': new Set([
+    'standings',
+    'league starters',
+    'next sim',
+    'schedule',
+    'team schedule',
+  ]),
+};
 
 function getA11yOptions(pageName: string): A11yOptions {
   const disableRules = [...SITE_WIDE_DISABLED_RULES];
-  if (CONTRAST_KNOWN_FAILING.has(pageName)) {
-    disableRules.push('color-contrast');
+  for (const [rule, pages] of Object.entries(KNOWN_FAILING)) {
+    if (pages.has(pageName)) {
+      disableRules.push(rule);
+    }
   }
   return { disableRules };
 }
@@ -107,7 +174,7 @@ publicTest.describe('Public page accessibility', () => {
   });
 
   for (const { name, url } of publicPages) {
-    publicTest(`${name} has no WCAG 2.1 AA violations`, async ({ page }) => {
+    publicTest(`${name} has no accessibility violations`, async ({ page }) => {
       await page.goto(url);
       await assertNoA11yViolations(page, `on ${url}`, getA11yOptions(name));
     });
@@ -148,7 +215,7 @@ const authPages: Array<{
 
 authTest.describe('Authenticated page accessibility', () => {
   for (const { name, url, state } of authPages) {
-    authTest(`${name} has no WCAG 2.1 AA violations`, async ({ appState, page }) => {
+    authTest(`${name} has no accessibility violations`, async ({ appState, page }) => {
       if (state) {
         await appState(state);
       }

@@ -58,4 +58,35 @@ class TradingControllerOfferTest extends TestCase
         $controller = $this->buildController();
         $this->assertIsObject($controller);
     }
+
+    // ============================================
+    // PER-CHANNEL LOGGER SEAM (Matrix #8 boundary)
+    // ============================================
+
+    /**
+     * Boundary (Matrix #8): constructing TradingController with injected audit/trade logger
+     * spies (the new trailing args 9 & 10) does not throw and produces a usable instance.
+     * Full invocation tests for the logging paths require E2E — all TradingController
+     * action methods call HtmxHelper::redirect() → exit after logging.
+     */
+    public function testConstructableWithAuditAndTradeLoggerSpies(): void
+    {
+        $auditSpy = self::createStub(\Psr\Log\LoggerInterface::class);
+        $tradeSpy = self::createStub(\Psr\Log\LoggerInterface::class);
+
+        $controller = new TradingController(
+            self::createStub(TradingServiceInterface::class),
+            self::createStub(TradeProcessorInterface::class),
+            self::createStub(TradeOfferRepositoryInterface::class),
+            self::createStub(TradeOfferInterface::class),
+            self::createStub(TradingViewInterface::class),
+            self::createStub(TeamIdentityRepositoryInterface::class),
+            self::createStub(\Utilities\NukeCompat::class),
+            $this->mockDb,
+            auditLogger: $auditSpy,
+            tradeLogger: $tradeSpy,
+        );
+
+        $this->assertIsObject($controller);
+    }
 }

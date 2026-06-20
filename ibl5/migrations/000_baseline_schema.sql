@@ -419,7 +419,7 @@ DROP TABLE IF EXISTS `ibl_demands`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `ibl_demands` (
-  `name` varchar(32) NOT NULL DEFAULT '' COMMENT 'Player name (PK, FK to ibl_plr.name)',
+  `name` varchar(32) NOT NULL DEFAULT '' COMMENT 'Player name (legacy; no longer PK)',
   `pid` int(11) NOT NULL DEFAULT 0,
   `dem1` int(11) NOT NULL DEFAULT 0 COMMENT 'FA year 1 day 1 demand',
   `dem2` int(11) NOT NULL DEFAULT 0 COMMENT 'FA year 2 day 1 demand',
@@ -429,7 +429,7 @@ CREATE TABLE `ibl_demands` (
   `dem6` int(11) NOT NULL DEFAULT 0 COMMENT 'FA year 6 day 1 demand',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  PRIMARY KEY (`name`),
+  PRIMARY KEY (`pid`),
   KEY `idx_pid` (`pid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;

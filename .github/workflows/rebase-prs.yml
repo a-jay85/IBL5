@@ -3,6 +3,17 @@ name: Auto-Rebase PRs
 on:
   push:
     branches: [master]
+    paths-ignore:
+      - '**.md'                      # all markdown docs (covers .claude/rules, ibl5/docs, README, ADRs)
+      - '.claude/**'                 # agent rules/skills/commands/memory — never affects app build/test
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
+      - '.github/CODEOWNERS'
+      - 'LICENSE'
+      - '**/LICENSE'
+      - '.gitignore'
+      - '**/.gitignore'
+      - '.gitattributes'
 
 permissions:
   contents: read

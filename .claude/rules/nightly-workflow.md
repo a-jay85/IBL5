@@ -1,6 +1,6 @@
 ---
 description: Nightly autonomous workflow — launchd fires claude -p at 00:03 and 05:03 daily, running two context-isolated agents per plan (implementation + post-plan) with time guards and incremental checkpoints.
-last_verified: 2026-06-07
+last_verified: 2026-06-18
 paths: "bin/nightly-*"
 ---
 
@@ -35,7 +35,18 @@ A headless `claude -p` process runs twice daily via macOS `launchd`. It loops th
   reports/  per-night markdown reports (YYYY-MM-DD-{done|skipped|env-stop|no-queue|error}-<slug>.md);
             plus YYYY-MM-DD-costs.md — per-phase token cost roll-up written by nightly-run
   logs/     claude -p output logs + launchd stdout/stderr
+  *.archive/  startup archival: logs/reports/done/skipped entries idle >7 days are
+              moved here (logs.archive/, reports.archive/, …) at run launch
 ```
+
+### Startup archival
+
+At launch, `nightly-run` sweeps `logs/`, `reports/`, `done/`, and `skipped/` and moves any
+entry untouched for more than `NIGHTLY_ARCHIVE_AGE_DAYS` (default **7**) into a sibling
+`<dir>.archive/`. This keeps the working dirs small without deleting history. Symlinks
+(`done/`, `skipped/`) are judged on their *own* mtime — the disposition date — and their
+absolute targets keep resolving after the move. `queue/` (pending work) and `handoff/`
+(transient) are never touched. The step is non-fatal: an archival error never aborts the run.
 
 ## How It Works
 
@@ -45,9 +56,13 @@ A headless `claude -p` process runs twice daily via macOS `launchd`. It loops th
    - **Implementation agent** (`bin/nightly-prompt-impl`): creates worktree, implements the plan, makes checkpoint commits, writes a handoff file. Its model is selectable per-plan via a line-1 `impl_model:` frontmatter field (`sonnet` → Sonnet, `haiku` → Haiku, absent or anything else → the Opus default), resolved by `bin/lib/plan-impl-model`; declare `sonnet` only for uniformly-mechanical plans whose every verification row is objectively machine-checkable. The post-plan agent is always Sonnet.
    - **Post-plan agent** (`bin/nightly-prompt-postplan`): reads the handoff file, runs `/post-plan` (code review, security audit, PR, CI monitoring, auto-merge), writes the completion report
 4. **Guards:** The loop stops when the queue is empty or ~4h45m have elapsed. Plans that fail 3 times (after genuine, full-length attempts) are moved to `skipped/` as poison pills.
-   - **Environmental failures stop the run cleanly instead of skipping.** A usage/rate limit, auth error, or any transient that kills an agent — detected by a known limit/auth signature in the log *or* by a sub-minute phase exit (a real impl/postplan runs 15–50 min) — refunds the attempt and breaks the loop, leaving the **entire queue intact** to resume next run. This prevents the failure mode where one dead-budget night ground every queued plan into `skipped/`. Each such stop writes a `YYYY-MM-DD-env-stop-<slug>.md` report.
+   - **Environmental failures stop the run cleanly instead of skipping.** A usage/rate limit, auth error, or any transient that kills an agent — detected by a known limit/auth signature in the log, by a sub-minute phase exit (a real impl/postplan runs 15–50 min), *or* by a watchdog stall-kill (no stream events for 10 min, e.g. a dead/wedged inference stream) — refunds the attempt and breaks the loop, leaving the **entire queue intact** to resume next run. This prevents the failure mode where one dead-budget night ground every queued plan into `skipped/`. Each such stop writes a `YYYY-MM-DD-env-stop-<slug>.md` report.
 5. **Morning:** Check `gh pr list` for new PRs, read reports for details
 
 ## Headless Mode
 
 `bin/nightly-run` sets `CLAUDE_HEADLESS=1`. This environment variable gates `/post-plan` Phase 10 (Preview Environment), which is skipped since no human is present to verify visually. All other phases run normally.
+
+## Feature PRs cannot auto-merge
+
+Conventional-commit **`feat:`** PRs are gated by the required `human-signoff` check and will **not** auto-merge overnight — they wait for a human to apply the `human-approved` label after inspection (ADR-0062). Post-plan still arms `--auto`, but `bin/nightly-run` strips it from `feat:` PRs (`neutralize_feat_signoff`), and the required check blocks the merge regardless. Maintenance PRs (`fix`/`refactor`/`chore`/`ci`/`docs`/`revert`) auto-merge as before. Check the morning `gh pr list` for `feat:` PRs awaiting your label.

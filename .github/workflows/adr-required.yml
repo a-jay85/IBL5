@@ -4,6 +4,14 @@ on:
   pull_request:
     branches: [ master, develop ]
     types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'ibl5/phpstan-rules/**'
+      - '.claude/rules/*.md'
+      - '.github/workflows/*.yml'
+      - '.github/workflows/*.yaml'
+      - 'bin/*'
+      - 'ibl5/migrations/**.sql'
+      - 'ibl5/composer.json'
 
 permissions:
   contents: read

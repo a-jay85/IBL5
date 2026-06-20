@@ -1,6 +1,6 @@
 ---
 description: Why a single centralized StatsFormatter is mandatory and number_format() is banned project-wide.
-last_verified: 2026-04-11
+last_verified: 2026-06-10
 ---
 
 # ADR-0003: `StatsFormatter` mandate, `number_format()` banned

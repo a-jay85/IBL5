@@ -29,14 +29,18 @@ class AuthBootstrap implements BootstrapStepInterface
         /** @var \mysqli $mysqliDb */
         $mysqliDb = $GLOBALS['mysqli_db'];
 
-        $authService = new \Auth\AuthService(new \Auth\AuthRepository($mysqliDb));
+        $authService = new \Auth\AuthService(
+            new \Auth\AuthRepository($mysqliDb),
+            null,
+            static fn (): \PDO => \Database\PdoConnection::getInstance(),
+        );
         $authService->tryRememberMe();
 
         // Dev-only auto-login: bypasses login forms on localhost when DEV_AUTO_LOGIN is set.
         // E2E tests set _no_auto_login cookie to opt out.
         $noAutoLogin = isset($_COOKIE['_no_auto_login']) && $_COOKIE['_no_auto_login'] === '1';
         if (!$authService->isAuthenticated() && !$noAutoLogin) {
-            \Auth\DevAutoLogin::tryAutoLogin($mysqliDb);
+            (new \Auth\DevAutoLogin())->tryAutoLogin($mysqliDb);
         }
 
         // Populate legacy $user global for backward compat

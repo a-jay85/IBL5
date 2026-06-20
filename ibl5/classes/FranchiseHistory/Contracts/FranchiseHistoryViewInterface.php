@@ -9,7 +9,7 @@ namespace FranchiseHistory\Contracts;
  *
  * Defines methods for generating HTML output for franchise history.
  *
- * @phpstan-import-type FranchiseRow from FranchiseHistoryRepositoryInterface
+ * @phpstan-import-type FranchiseRow from FranchiseHistoryServiceInterface
  *
  * @see \FranchiseHistory\FranchiseHistoryView For the concrete implementation
  */

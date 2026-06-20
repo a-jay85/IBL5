@@ -17,6 +17,12 @@ class GameTransformerTest extends TestCase
     }
 
     /**
+     * Kept as array<string, mixed> on purpose: testTransformHandlesNullScores and
+     * testTransformScheduledGameStatus deliberately set visitor_score/home_score to null
+     * (which GameViewRow types as int), so narrowing to GameViewRow would not remove those
+     * suppressions — it would only churn the baseline into per-edge entries. The argument.type
+     * mismatch on those degraded-row calls is a documented baseline defer, not a defect to fix.
+     *
      * @return array<string, mixed>
      */
     private function makeGameRow(): array

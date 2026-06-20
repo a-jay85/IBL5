@@ -226,6 +226,11 @@ class WaiversProcessorTest extends TestCase
         $this->assertStringContainsString('1 h', $waitTime); // Should be 1 hour remaining
     }
     
+    // The $playerData arrays below are intentionally partial (salary_yr1/exp/cy/cyt only);
+    // each omits keys that the tested code-path never reads, exercising specific defaulting
+    // branches. The array{} shape mismatch for the missing keys is a documented baseline
+    // defer, not a defect to fix by completing the arrays (that would obscure which keys
+    // determineContractData actually requires for each path).
     public function testDetermineContractDataForNewContract(): void
     {
         $playerData = [

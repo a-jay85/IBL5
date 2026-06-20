@@ -42,12 +42,17 @@ class TradeRosterPreviewApiHandler
      * another GM's roster the links render as non-clickable labels.
      */
     private int $loggedInTeamID;
+    /**
+     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     */
+    private ?Season $season = null;
 
-    public function __construct(\mysqli $db, TradeAssetRepositoryInterface $tradeAssetRepository, int $loggedInTeamID = 0)
+    public function __construct(\mysqli $db, TradeAssetRepositoryInterface $tradeAssetRepository, int $loggedInTeamID = 0, ?Season $season = null)
     {
         $this->db = $db;
         $this->tradeAssetRepository = $tradeAssetRepository;
         $this->loggedInTeamID = $loggedInTeamID;
+        $this->season = $season;
     }
 
     public function handle(): void
@@ -131,7 +136,7 @@ class TradeRosterPreviewApiHandler
             }
 
             $team = Team::initialize($this->db, $teamid);
-            $season = new Season($this->db);
+            $season = $this->season ?? new Season($this->db);
 
             // Build PID list for aggregate views
             /** @var list<int> $rosterPids */

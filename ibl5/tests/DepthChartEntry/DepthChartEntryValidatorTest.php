@@ -7,6 +7,13 @@ namespace Tests\DepthChartEntry;
 use PHPUnit\Framework\TestCase;
 use DepthChartEntry\DepthChartEntryValidator;
 
+/**
+ * All fixtures deliberately omit the `playerData` key — the validator's structural/count
+ * rules (activePlayers, pos_1–pos_5, hasStarterAtMultiplePositions) are tested independently
+ * of player roster data. The array{} shape mismatch for the missing key is a documented
+ * baseline defer, not a defect to fix by populating playerData (that would couple these
+ * structural tests to player-data logic they are not testing).
+ */
 class DepthChartEntryValidatorTest extends TestCase
 {
     private DepthChartEntryValidator $validator;

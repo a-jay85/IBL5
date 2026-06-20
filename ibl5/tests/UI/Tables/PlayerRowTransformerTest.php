@@ -60,7 +60,9 @@ class PlayerRowTransformerTest extends TestCase
     {
         $db = self::createStub(\mysqli::class);
 
-        // Pass an iterable with a non-array/non-Player element
+        // Pass an iterable with a non-array/non-Player element. The stdClass argument.type
+        // mismatch is a documented baseline defer, not a defect to "fix" by swapping in a
+        // real Player — that would delete the non-Player skip path this test exists to prove.
         $result = PlayerRowTransformer::resolveWithStats($db, [new \stdClass()], '');
 
         $this->assertSame([], $result);

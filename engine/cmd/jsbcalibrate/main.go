@@ -67,6 +67,9 @@ func runWith(args []string, stdout, stderr io.Writer, c collectors) int {
 	coverage := fs.Float64("coverage", 0.95, "calibrate: residual coverage percentile (0,1)")
 	minRate := fs.Float64("min-rate", 0.90, "gate: minimum per-stat in-band rate to pass")
 	branchB := fs.Bool("branchB", false, "enable the JSB Branch-B usage-shrink in the engine runs (measurement A/B)")
+	makePutback := fs.Bool("makePutback", false, "enable the ADR-0053 putback make-value decoupling arm (full league-mean substitution; measurement A/B)")
+	makePutbackHalf := fs.Bool("makePutbackHalf", false, "enable the ADR-0053 putback make-value decoupling arm (halfway blend; measurement A/B)")
+	unfaithfulOreb := fs.Bool("unfaithfulOreb", false, "restore the old linear gate-2 ORB-continuation path in the default engine runs (ADR-0058 archive A/B OFF walk)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -95,6 +98,9 @@ func runWith(args []string, stdout, stderr io.Writer, c collectors) int {
 		SampleStride:    *stride,
 		IncludeOlympics: *includeOlympics,
 		BranchB:         *branchB,
+		MakePutback:     *makePutback,
+		MakePutbackHalf: *makePutbackHalf,
+		UnfaithfulOreb:  *unfaithfulOreb,
 		Progress:        stderr,
 	}
 	reports, skips, err := collect(*archive, opts)

@@ -803,3 +803,253 @@ func TestDecomposePossCoupling_IdentityAndDegenerate(t *testing.T) {
 		}
 	})
 }
+
+// ─── ORB-intensity channel (Part A, ADR-0055 lineage, matrix 4-7) ───────────────
+
+// Row #4 / #5 / #6: decomposeOrebIntensity reports the RAW pooled mean ORB/POSS as a
+// level and the WITHIN-SEASON demeaned Var/Cov of the raw ratio against lnPPS, all
+// hand-computed; an ORB=0 row is KEPT (intensity 0.0, NOT dropped), a poss<=0 row is
+// dropped, and degenerate inputs stay finite.
+func TestDecomposeOrebIntensity(t *testing.T) {
+	t.Run("raw mean + within-season Var/Cov (hand-computed)", func(t *testing.T) {
+		// One season, three teams with distinct ORB/POSS and PF/FGA.
+		// intensity = ORB/POSS = 0.10 / 0.15 / 0.20  → raw mean 0.15.
+		// lnPPS = ln(PF) − ln(FGA) = ln1.25 / ln1.1 / ln1.2.
+		rows := []orebRow{
+			{season: "A", orb: 10, poss: 100, pf: 100, fga: 80},
+			{season: "A", orb: 15, poss: 100, pf: 99, fga: 90},
+			{season: "A", orb: 20, poss: 100, pf: 120, fga: 100},
+		}
+		mean, varI, cov := decomposeOrebIntensity(rows)
+		if math.Abs(mean-0.15) > 1e-12 {
+			t.Errorf("meanIntensity = %v, want 0.15 (raw pooled mean, NOT demeaned)", mean)
+		}
+		// intensity residuals {−0.05, 0, +0.05} → Var = (0.0025+0+0.0025)/3.
+		if math.Abs(varI-0.005/3.0) > 1e-12 {
+			t.Errorf("varIntensity = %v, want %v (within-season demeaned)", varI, 0.005/3.0)
+		}
+		// Cov of intensity residuals with lnPPS residuals (hand-computed to 1e-9).
+		if math.Abs(cov-(-0.0006803665753)) > 1e-9 {
+			t.Errorf("covIntensityLnPPS = %v, want ≈ -0.0006803665753 (negative: higher ORB-intensity pairs with lower PPS)", cov)
+		}
+	})
+
+	t.Run("ORB=0 row kept (intensity 0.0, NOT dropped)", func(t *testing.T) {
+		// If the ORB=0 row were dropped, the mean would be 0.20 (team2 only); kept, it
+		// is (0 + 0.20)/2 = 0.10.
+		mean, _, _ := decomposeOrebIntensity([]orebRow{
+			{season: "A", orb: 0, poss: 100, pf: 100, fga: 90},
+			{season: "A", orb: 20, poss: 100, pf: 100, fga: 90},
+		})
+		if math.Abs(mean-0.10) > 1e-12 {
+			t.Errorf("meanIntensity = %v, want 0.10 (ORB=0 row contributes intensity 0, not dropped)", mean)
+		}
+	})
+
+	t.Run("poss<=0 row dropped, terms finite", func(t *testing.T) {
+		// The poss=0 row is dropped; the surviving two have intensity 0.10 / 0.20 → 0.15.
+		mean, varI, cov := decomposeOrebIntensity([]orebRow{
+			{season: "A", orb: 12, poss: 0, pf: 100, fga: 90}, // dropped: poss<=0
+			{season: "A", orb: 10, poss: 100, pf: 100, fga: 80},
+			{season: "A", orb: 20, poss: 100, pf: 120, fga: 100},
+		})
+		for name, v := range map[string]float64{"mean": mean, "var": varI, "cov": cov} {
+			if math.IsNaN(v) || math.IsInf(v, 0) {
+				t.Errorf("%s = %v, want finite (poss<=0 row dropped, no NaN/Inf)", name, v)
+			}
+		}
+		if math.Abs(mean-0.15) > 1e-12 {
+			t.Errorf("meanIntensity = %v, want 0.15 (over the two surviving rows)", mean)
+		}
+	})
+
+	t.Run("single-team season → Var/Cov 0, level is the raw value", func(t *testing.T) {
+		// Within-season residuals are exactly 0 → Var=Cov=0; the mean is a LEVEL (raw),
+		// so it is the team's own intensity, not 0.
+		mean, varI, cov := decomposeOrebIntensity([]orebRow{
+			{season: "A", orb: 15, poss: 100, pf: 100, fga: 90},
+		})
+		if varI != 0 || cov != 0 {
+			t.Errorf("single-team Var/Cov = %v/%v, want 0/0 (residuals all 0)", varI, cov)
+		}
+		if math.Abs(mean-0.15) > 1e-12 {
+			t.Errorf("single-team mean = %v, want 0.15 (raw level, not demeaned)", mean)
+		}
+	})
+
+	t.Run("empty input → all 0", func(t *testing.T) {
+		mean, varI, cov := decomposeOrebIntensity(nil)
+		if mean != 0 || varI != 0 || cov != 0 {
+			t.Errorf("empty = %v/%v/%v, want all 0", mean, varI, cov)
+		}
+	})
+}
+
+// TestDecomposeGateContinuation_KnownRows pins the L1 gate-1 discriminator
+// (ADR-0057/0058) against hand-computed values for one season, three teams.
+func TestDecomposeGateContinuation_KnownRows(t *testing.T) {
+	rows := []gateRow{
+		{season: "A", g1: 0.8, g2: 0.4, prod: 0.32, offStr: 50, pf: 100, fga: 80},
+		{season: "A", g1: 0.7, g2: 0.5, prod: 0.35, offStr: 55, pf: 99, fga: 90},
+		{season: "A", g1: 0.6, g2: 0.6, prod: 0.36, offStr: 60, pf: 120, fga: 100},
+	}
+	mg1, mg2, mprod, red, varG1, covG2, covProd := decomposeGateContinuation(rows)
+	check := func(name string, got, want, tol float64) {
+		if math.Abs(got-want) > tol {
+			t.Errorf("%s = %v, want %v", name, got, want)
+		}
+	}
+	check("meanG1", mg1, 0.7, 1e-12)
+	check("meanG2", mg2, 0.5, 1e-12)
+	check("meanProd", mprod, 1.03/3.0, 1e-12)
+	check("reductionFrac", red, (0.5-1.03/3.0)/0.5, 1e-12) // definitional
+	check("varG1", varG1, 0.02/3.0, 1e-12)
+	check("covG2", covG2, -0.001360733151, 1e-9)
+	check("covProd", covProd, -0.000510863017, 1e-9)
+}
+
+// TestDecomposeGateContinuation_DegenerateRows — rows with no gate samples (g2<=0) or
+// undefined lnPPS (pf<=0/fga<=0) are dropped; all-dropped input returns all zeros with
+// no NaN/Inf.
+func TestDecomposeGateContinuation_DegenerateRows(t *testing.T) {
+	// The two degenerate rows are dropped; the surviving two carry the signal.
+	rows := []gateRow{
+		{season: "A", g1: 0.9, g2: 0, prod: 0, offStr: 50, pf: 100, fga: 80},    // dropped: g2<=0
+		{season: "A", g1: 0.9, g2: 0.5, prod: 0.45, offStr: 50, pf: 0, fga: 80}, // dropped: pf<=0
+		{season: "A", g1: 0.8, g2: 0.4, prod: 0.32, offStr: 55, pf: 100, fga: 80},
+		{season: "A", g1: 0.6, g2: 0.6, prod: 0.36, offStr: 60, pf: 120, fga: 100},
+	}
+	mg1, mg2, mprod, red, varG1, covG2, covProd := decomposeGateContinuation(rows)
+	for name, v := range map[string]float64{"meanG1": mg1, "meanG2": mg2, "meanProd": mprod, "red": red, "varG1": varG1, "covG2": covG2, "covProd": covProd} {
+		if math.IsNaN(v) || math.IsInf(v, 0) {
+			t.Errorf("%s = %v, want finite (degenerate rows dropped)", name, v)
+		}
+	}
+	if math.Abs(mg2-0.5) > 1e-12 { // (0.4+0.6)/2 over the two survivors
+		t.Errorf("meanG2 = %v, want 0.5 (over the two surviving rows)", mg2)
+	}
+
+	// All-dropped input → all zeros, no NaN.
+	mg1, mg2, mprod, red, varG1, covG2, covProd = decomposeGateContinuation([]gateRow{
+		{season: "A", g1: 0.9, g2: 0, prod: 0, pf: 100, fga: 80},
+	})
+	for name, v := range map[string]float64{"meanG1": mg1, "meanG2": mg2, "meanProd": mprod, "red": red, "varG1": varG1, "covG2": covG2, "covProd": covProd} {
+		if v != 0 {
+			t.Errorf("all-dropped %s = %v, want 0", name, v)
+		}
+	}
+}
+
+// TestCollectFidelitySummaries_GateFieldsPopulated — the gate-1 discriminator fields
+// thread from TeamStanding into the FidelitySummary, and the product is below gate-2.
+func TestCollectFidelitySummaries_GateFieldsPopulated(t *testing.T) {
+	mk := func(id int, pf, fga, g1, g2, prod float64) TeamStanding {
+		return TeamStanding{
+			TeamID: id, GamesPlayed: 82,
+			EnginePointsForPG: pf, EngineFGAPerG: fga,
+			EngineGateContN: 5, EngineGateContMeanG1: g1, EngineGateContMeanG2: g2,
+			EngineGateContMeanProd: prod, EngineGateContMeanOffStr: 50, EngineGateContMeanDefStr: 60,
+		}
+	}
+	seasons := []SeasonAggregate{{Label: "A", GameType: 2, Teams: []TeamStanding{
+		mk(1, 100, 80, 0.8, 0.4, 0.32),
+		mk(2, 99, 90, 0.7, 0.5, 0.35),
+		mk(3, 120, 100, 0.6, 0.6, 0.36),
+	}}}
+	fs := collectFidelitySummaries(seasons)
+	if len(fs) != 1 {
+		t.Fatalf("want 1 fidelity summary, got %d", len(fs))
+	}
+	f := fs[0]
+	if math.Abs(f.GateMeanG1-0.7) > 1e-12 || math.Abs(f.GateMeanG2-0.5) > 1e-12 {
+		t.Errorf("GateMeanG1=%v GateMeanG2=%v, want 0.7/0.5", f.GateMeanG1, f.GateMeanG2)
+	}
+	if f.GateMeanProd >= f.GateMeanG2 {
+		t.Errorf("GateMeanProd %v not < GateMeanG2 %v", f.GateMeanProd, f.GateMeanG2)
+	}
+	if f.GateVarG1 <= 0 {
+		t.Errorf("GateVarG1 = %v, want > 0 (teams differ)", f.GateVarG1)
+	}
+}
+
+// Row #7: the additive ORB-intensity + continuation-depth extension perturbs no
+// existing TeamStanding / FidelitySummary field, and the new ORB/depth fields
+// default to 0 when a snapshot carries no possession/event maps.
+func TestCollectSeasonAggregates_ExistingFieldsUnchangedByOrebExtension(t *testing.T) {
+	rep := aggReport("s1", bundle.GameTypeRegular,
+		wfGame(1, 2, 1.0, 110, 108, 100, 99),
+		wfGame(2, 1, 0.0, 95, 96, 105, 107),
+	)
+	got := CollectSeasonAggregates([]validate.Report{rep})
+	t1 := standingFor(t, got.Seasons[0], 1)
+	// Existing fields keep their hand-computed values (cf. the FTA-extension test).
+	if t1.EnginePointsForPG != 107.5 || t1.EnginePointsAgainstPG != 97.5 || t1.EnginePointDiffPG != 10 || t1.ScoPointDiffPG != 10 {
+		t.Errorf("existing fields perturbed by ORB extension: %+v", t1)
+	}
+	// The new ORB fields default to 0 with no poss maps in the fixture.
+	if t1.EngineORBPerG != 0 || t1.ScoORBPerG != 0 {
+		t.Errorf("ORB fields = eng %v / sco %v, want 0 (no poss maps in fixture)", t1.EngineORBPerG, t1.ScoORBPerG)
+	}
+	// The Part B continuation-depth fields default to 0 with no event maps.
+	if t1.EngineContDepthN != 0 || t1.EngineContDepthSumK != 0 || t1.EngineContDepthSumK2 != 0 ||
+		t1.EngineContDepthB0 != 0 || t1.EngineContDepthB3Plus != 0 {
+		t.Errorf("continuation-depth fields non-zero with no event maps: %+v", t1)
+	}
+	fs := collectFidelitySummaries(got.Seasons)
+	if fs[0].PFDispersionRatio == 0 && fs[0].LevelGapPF == 0 {
+		t.Fatalf("existing fidelity metrics vanished: %+v", fs[0])
+	}
+	// ORB-intensity terms are 0 with no ORB/poss data (poss<=0 rows all dropped).
+	if fs[0].EngineOrebIntensity != 0 || fs[0].EngineVarOrebIntensity != 0 || fs[0].EngineCovOrebIntensityLnPPS != 0 {
+		t.Errorf("ORB-intensity terms = %v/%v/%v, want 0 with no poss data", fs[0].EngineOrebIntensity, fs[0].EngineVarOrebIntensity, fs[0].EngineCovOrebIntensityLnPPS)
+	}
+}
+
+// Row #11: collectContinuationDepth derives the pooled Mean/Var from the Σk/Σk²
+// moments, NEVER from the capped buckets (P3Plus collapses the tail). A possession
+// with k=5 must lift Mean and Var ABOVE what a "treat ≥3 as exactly 3" bucket
+// derivation would give. P0..P3Plus sum to 1.0 when N>0; a zero-N pool → all 0.
+func TestCollectContinuationDepth_MeanFromCountsNotBuckets(t *testing.T) {
+	t.Run("mean/var from moments, not capped buckets", func(t *testing.T) {
+		// One team, per-game tallies for possessions k = {0, 1, 2, 5}:
+		//   N=4, Σk=8, Σk²=0+1+4+25=30, buckets b0=b1=b2=b3plus=1 (k=5 → b3plus).
+		// Exact: Mean=8/4=2, Var=30/4 − 2² = 3.5.
+		// Wrong (bucket-derived, ≥3 read as 3): mean=(0+1+2+3)/4=1.5, var=1.25.
+		out := collectContinuationDepth([]SeasonAggregate{regSeason(
+			TeamStanding{
+				TeamID: 1, GamesPlayed: 1,
+				EngineContDepthN: 4, EngineContDepthSumK: 8, EngineContDepthSumK2: 30,
+				EngineContDepthB0: 1, EngineContDepthB1: 1, EngineContDepthB2: 1, EngineContDepthB3Plus: 1,
+			},
+		)})
+		if len(out) != 1 {
+			t.Fatalf("got %d entries, want 1", len(out))
+		}
+		cd := out[0]
+		if math.Abs(cd.Mean-2) > 1e-12 {
+			t.Errorf("Mean = %v, want 2 (Σk/N); a bucket-derived mean would be 1.5", cd.Mean)
+		}
+		if math.Abs(cd.Var-3.5) > 1e-12 {
+			t.Errorf("Var = %v, want 3.5 (Σk²/N − Mean²); a bucket-derived var would be 1.25", cd.Var)
+		}
+		if math.Abs(cd.P0+cd.P1+cd.P2+cd.P3Plus-1.0) > 1e-9 {
+			t.Errorf("P0..P3Plus = %v+%v+%v+%v, want sum 1.0", cd.P0, cd.P1, cd.P2, cd.P3Plus)
+		}
+		if cd.N != 4 {
+			t.Errorf("N = %d, want 4", cd.N)
+		}
+	})
+
+	t.Run("zero-N pool → all 0", func(t *testing.T) {
+		out := collectContinuationDepth([]SeasonAggregate{regSeason(
+			TeamStanding{TeamID: 1, GamesPlayed: 1}, // no contDepth data → ΣN=0
+		)})
+		if len(out) != 1 {
+			t.Fatalf("got %d entries, want 1", len(out))
+		}
+		cd := out[0]
+		if cd.N != 0 || cd.Mean != 0 || cd.Var != 0 || cd.P0 != 0 || cd.P3Plus != 0 {
+			t.Errorf("zero-N pool = %+v, want all 0", cd)
+		}
+	})
+}

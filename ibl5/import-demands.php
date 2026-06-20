@@ -41,9 +41,13 @@ $submitted = false;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['demands_csv'])) {
     $submitted = true;
-    $file = $_FILES['demands_csv'];
 
-    if ($file['error'] !== UPLOAD_ERR_OK) {
+    if (!\Security\CsrfGuard::validateSubmittedToken('import_demands')) {
+        $errorMessage = 'Invalid or expired form submission. Please reload and try again.';
+    } else {
+        $file = $_FILES['demands_csv'];
+
+        if ($file['error'] !== UPLOAD_ERR_OK) {
         $errorMessage = 'File upload failed (error code: ' . $file['error'] . ').';
     } elseif (!is_uploaded_file($file['tmp_name'])) {
         $errorMessage = 'Invalid upload.';
@@ -197,6 +201,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['demands_csv'])) {
             fclose($handle);
         }
     }
+    }
 }
 
 ?>
@@ -215,6 +220,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['demands_csv'])) {
     <p>The <code>pid</code> column will be resolved automatically from the player name. The <code>ibl_demands</code> table will be truncated before import.</p>
 
     <form method="post" enctype="multipart/form-data">
+        <?= \Security\CsrfGuard::generateToken('import_demands') ?>
         <label for="demands_csv">Select CSV file:</label>
         <input type="file" name="demands_csv" id="demands_csv" accept=".csv" required>
         <button type="submit">Import Demands</button>

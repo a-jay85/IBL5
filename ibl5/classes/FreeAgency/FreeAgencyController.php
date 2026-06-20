@@ -21,13 +21,25 @@ class FreeAgencyController
     private \Utilities\NukeCompat $nukeCompat;
     private AuthServiceInterface $authService;
 
+    /**
+     * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('audit').
+     */
+    private \Psr\Log\LoggerInterface $logger;
+    /**
+     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     */
+    private ?Season $season = null;
+
     public function __construct(
         \mysqli $db,
         TeamIdentityRepositoryInterface $commonRepository,
         AuthServiceInterface $authService,
-        ?\Utilities\NukeCompat $nukeCompat = null
+        ?\Utilities\NukeCompat $nukeCompat = null,
+        ?\Psr\Log\LoggerInterface $logger = null,
+        ?Season $season = null
     ) {
         $this->db = $db;
+        $this->season = $season;
         $this->commonRepository = $commonRepository;
         $this->authService = $authService;
         $this->repository = new FreeAgencyRepository($db);
@@ -36,6 +48,7 @@ class FreeAgencyController
         $this->view = new FreeAgencyView($commonRepository);
         $this->processor = new FreeAgencyProcessor($db, $commonRepository);
         $this->nukeCompat = $nukeCompat ?? new \Utilities\NukeCompat();
+        $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('audit');
     }
 
     /**
@@ -62,7 +75,7 @@ class FreeAgencyController
         $username = $this->authService->getUsername() ?? '';
         $teamName = $this->commonRepository->getTeamnameFromUsername($username) ?? '';
         $team = Team::initialize($this->db, $teamName);
-        $season = new Season($this->db);
+        $season = $this->season ?? new Season($this->db);
 
         $mainPageData = $this->service->getMainPageData($team, $season);
         $result = isset($_GET['result']) && is_string($_GET['result']) ? $_GET['result'] : null;
@@ -81,7 +94,7 @@ class FreeAgencyController
         $teamid = $this->commonRepository->getTidFromTeamname($userTeamName) ?? 0;
 
         $team = Team::initialize($this->db, $teamid);
-        $season = new Season($this->db);
+        $season = $this->season ?? new Season($this->db);
 
         $negotiationData = $this->service->getNegotiationData($pid, $team, $season);
         $negotiationData['team'] = $team;
@@ -115,7 +128,7 @@ class FreeAgencyController
             $postData = $_POST;
             $result = $this->processor->processOfferSubmission($postData);
         } catch (\Throwable $e) {
-            \Logging\LoggerFactory::getChannel('audit')->error('fa_offer_error', [
+            $this->logger->error('fa_offer_error', [
                 'error' => $e->getMessage(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
@@ -171,7 +184,7 @@ class FreeAgencyController
             $teamName = isset($_POST['teamname']) && is_string($_POST['teamname']) ? $_POST['teamname'] : '';
             $this->processor->deleteOffers($teamName, $playerID);
         } catch (\Throwable $e) {
-            \Logging\LoggerFactory::getChannel('audit')->error('fa_delete_error', [
+            $this->logger->error('fa_delete_error', [
                 'error' => $e->getMessage(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),

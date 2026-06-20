@@ -426,6 +426,32 @@ if [ "$ALL" = true ]; then
             fi
         fi
 
+        # Check 4: Branch named pr-<N> whose name doesn't match the PR's head ref
+        # (e.g. `gh pr checkout 1041 --branch pr-1041`). Check 1's name-based
+        # `gh pr view <branch>` resolves PRs by HEAD-ref name, so it returns
+        # nothing; a squash-merge leaves the tip off master so Check 3 misses too;
+        # and the branch was never tracked under this name so Check 2 misses. Here
+        # we resolve by PR NUMBER and require the local tip to equal the PR's head
+        # OID before trusting the state — otherwise a stale/renamed pr-<N> branch
+        # could be deleted on the strength of an unrelated PR's status.
+        if [ "$should_delete" = false ] && command -v gh &>/dev/null \
+           && [[ "$bare_branch" =~ ^pr-([0-9]+)$ ]]; then
+            num_pr="${BASH_REMATCH[1]}"
+            num_pr_state=$(cd "$REPO_ROOT" && gh pr view "$num_pr" --json state -q .state 2>/dev/null || true)
+            if [ "$num_pr_state" = "MERGED" ] || [ "$num_pr_state" = "CLOSED" ]; then
+                num_pr_head=$(cd "$REPO_ROOT" && gh pr view "$num_pr" --json headRefOid -q .headRefOid 2>/dev/null || true)
+                bare_tip=$(git -C "$REPO_ROOT" rev-parse "$bare_branch" 2>/dev/null || true)
+                if [ -n "$num_pr_head" ] && [ "$num_pr_head" = "$bare_tip" ]; then
+                    should_delete=true
+                    delete_reason="PR #$num_pr $num_pr_state (matched by number; tip == head)"
+                else
+                    echo "  SKIP bare branch $bare_branch: PR #$num_pr $num_pr_state but tip != PR head"
+                    SKIPPED=$((SKIPPED + 1))
+                    continue
+                fi
+            fi
+        fi
+
         # No deletion signal — leave the branch alone
         if [ "$should_delete" = false ]; then
             continue
@@ -553,6 +579,17 @@ if [ "$ALL" = true ]; then
         done < <(docker volume ls --format '{{.Name}}' \
             | grep -E '^ibl5-.+_.+$' \
             | sort -u)
+    fi
+
+    # Informational only (non-fatal): surface worktrees whose work never
+    # reached a PR. `--stalled-only` exits 1 when any exist; `|| true` keeps
+    # cleanup's exit code and merge-master-to-prod unaffected. NOT piped, so
+    # there is no pipefail interaction.
+    stalled_report="$("$REPO_ROOT/bin/wt-status" --stalled-only 2>/dev/null || true)"
+    if [ -n "$stalled_report" ]; then
+        echo ""
+        echo "Stalled/unshipped worktrees (work never reached a PR):"
+        printf '%s\n' "$stalled_report" | sed 's/^/  /'
     fi
 else
     WT_PATH="$WT_PARENT/$TARGET_NAME"

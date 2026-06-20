@@ -229,4 +229,51 @@ class PageLayoutTest extends TestCase
         self::assertStringContainsString('ibl-alert--warning', $output);
         self::assertStringContainsString('Admin mode', $output);
     }
+
+    public function testOgMetaTagsNeverReflectMaliciousHost(): void
+    {
+        unset($_SERVER['HTTP_HX_BOOSTED']);
+        $_SERVER['HTTP_HOST'] = 'evil"><script>alert(1)</script>';
+        ob_start();
+        PageLayout::header();
+        $output = (string) ob_get_clean();
+
+        self::assertStringNotContainsString('<script>alert', $output);
+        self::assertStringNotContainsString('evil', $output);
+        self::assertStringContainsString('https://www.iblhoops.net/ibl5', $output);
+    }
+
+    public function testOgMetaTagsUseCanonicalHostWhenHostHeaderIsNormal(): void
+    {
+        unset($_SERVER['HTTP_HX_BOOSTED']);
+        $_SERVER['HTTP_HOST'] = 'www.iblhoops.net';
+        ob_start();
+        PageLayout::header();
+        $output = (string) ob_get_clean();
+
+        self::assertStringContainsString('content="https://www.iblhoops.net/ibl5', $output);
+    }
+
+    public function testOgMetaTagsUseCanonicalHostWhenNoHostHeader(): void
+    {
+        unset($_SERVER['HTTP_HX_BOOSTED']);
+        unset($_SERVER['HTTP_HOST']);
+        ob_start();
+        PageLayout::header();
+        $output = (string) ob_get_clean();
+
+        self::assertStringContainsString('content="https://www.iblhoops.net/ibl5', $output);
+    }
+
+    public function testOgMetaTagsUsePreprodHostForPreprodEnvironment(): void
+    {
+        unset($_SERVER['HTTP_HX_BOOSTED']);
+        $_SERVER['HTTP_HOST'] = 'pre.iblhoops.net';
+        ob_start();
+        PageLayout::header();
+        $output = (string) ob_get_clean();
+
+        self::assertStringContainsString('https://pre.iblhoops.net/ibl5/images/ibl/logocorner.jpg', $output);
+        self::assertStringContainsString('content="150"', $output);
+    }
 }

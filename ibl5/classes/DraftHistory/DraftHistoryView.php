@@ -61,7 +61,7 @@ class DraftHistoryView implements DraftHistoryViewInterface
         $teamName = HtmlSanitizer::safeHtmlOutput($team->name);
         $teamId = $team->teamid;
 
-        $output = "<h2 class=\"ibl-title\">{$teamName} Draft History</h2>";
+        $output = "<h1 class=\"ibl-title\">{$teamName} Draft History</h1>";
         $output .= "<img src=\"images/logo/{$teamId}.jpg\" alt=\"\" class=\"team-logo-banner\">";
 
         if ($draftPicks === []) {
@@ -85,7 +85,7 @@ class DraftHistoryView implements DraftHistoryViewInterface
      */
     private function renderTitleWithYearSelect(int $startYear, int $endYear, int $selectedYear): string
     {
-        $output = '<h2 class="ibl-title">';
+        $output = '<h1 class="ibl-title">';
         $output .= '<select id="draft-year-select" name="year" class="draft-year-select" aria-label="Draft year"'
             . ' hx-get="modules.php?name=DraftHistory&amp;op=api"'
             . ' hx-target="#draft-history-content"'
@@ -99,7 +99,7 @@ class DraftHistoryView implements DraftHistoryViewInterface
             $output .= '<option value="' . $year . '"' . $selected . '>' . $year . '</option>';
         }
 
-        $output .= '</select> Draft</h2>';
+        $output .= '</select> Draft</h1>';
         return $output;
     }
 

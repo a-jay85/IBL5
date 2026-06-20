@@ -22,10 +22,63 @@ type StatRow struct {
 // ORIGIN (ADR-0042 empty-FGA-split diagnostic). Engine-only: real .sco box
 // scores carry no origin tag, so this has no .sco counterpart and is never
 // compared, banded, or part of the Pass verdict — it is reported, never gated.
+//
+// The *Made companion fields (ADR-0053) carry the engine mean MADE field goals
+// per game by the SAME origin, so a per-origin shooting efficiency (made/attempts)
+// is directly observable — this pinpoints WHY the putback origin anti-couples
+// (the empty/miss-driven FGA loop). They are engine-only, additive, and NOT
+// printed by WriteReport: counting EventShotMake (already emitted by Simulate)
+// changes no engine behavior, so the golden fixture stays byte-identical. Do NOT
+// conflate this per-origin efficiency readout with the season-aggregate
+// EngineCovLnShotsPerPossLnPPS factor (standings.go) — they are distinct.
 type OriginFGA struct {
 	Initial    float64
 	Oreb       float64
 	Transition float64
+	// Made-FG counts by the same origin (made/attempts = per-origin efficiency).
+	InitialMade    float64
+	OrebMade       float64
+	TransitionMade float64
+}
+
+// ContinuationDepthRaw is one team's engine mean per-possession continuation
+// tallies for one game (the Part B continuation-chain instrument). A possession
+// is segmented as EventPossessionStart → next EventPossessionStart (or slice
+// end); its continuation depth k is the count of EventRebound{OffensiveRebound:
+// true} within it. Engine-only (real .sco carries no event stream); additive,
+// not printed by WriteReport, not part of Pass.
+//
+// N is the per-game mean possession count; SumK / SumK2 are the per-game mean
+// Σk / Σk² (kept separately so the exact mean = SumK/N and Var = SumK2/N − mean²
+// are recoverable — the capped B0..B3Plus buckets give SHAPE only and must NEVER
+// be used to derive mean/Var, since B3Plus collapses the tail). B0/B1/B2/B3Plus
+// are the per-game mean counts of possessions with k = 0 / 1 / 2 / ≥3.
+type ContinuationDepthRaw struct {
+	N      float64
+	SumK   float64
+	SumK2  float64
+	B0     float64
+	B1     float64
+	B2     float64
+	B3Plus float64
+}
+
+// GateContRaw is one team's engine mean L1 gate-1 counterfactual samples for one game
+// (ADR-0057/0058). At every offensive-rebound resolution the sim records, keyed by the
+// OFFENSIVE team, the live gate-2 probability, the dropped sqrt gate-1 probability,
+// their product (the faithful two-gate continuation P), and the off/def rebound
+// strengths. N is the per-game mean resolution count; MeanG1/MeanG2/MeanProd/
+// MeanOffStr/MeanDefStr are per-RESOLUTION means (run-pooled). Engine-only — real .sco
+// carries no gate probabilities, so there is no .sco counterpart; reported, never
+// gated. Computed read-only at the sim site (no rng draw), so the golden stays
+// byte-identical. See sim.GateContAccum and simulateGameMeans.
+type GateContRaw struct {
+	N          float64
+	MeanG1     float64
+	MeanG2     float64
+	MeanProd   float64
+	MeanOffStr float64
+	MeanDefStr float64
 }
 
 // GameReport is the full comparison for one corpus game: every stat for both
@@ -50,6 +103,25 @@ type GameReport struct {
 	// coupling. Matches calibrate/possession_archive_test.go's convention.
 	EnginePossPerG map[int]float64
 	ScoPossPerG    map[int]float64
+	// EngineORBPerG / ScoORBPerG map each team ID to its mean offensive rebounds/game,
+	// the numerator of the ORB-intensity channel ORB/POSS (same TeamStat.ORB already
+	// feeding possProxy; threaded here so the calibrate split can read it). Read-only.
+	EngineORBPerG map[int]float64
+	ScoORBPerG    map[int]float64
+	// EngineContinuationDepth maps each team ID to its mean per-possession
+	// continuation-depth tallies (Part B continuation-chain instrument). Engine-only —
+	// real .sco box scores carry no event stream, so there is no .sco counterpart;
+	// it is reported, never gated. Segmented from the EventPossessionStart →
+	// EventRebound{OffensiveRebound} event stream Simulate already emits, so counting
+	// it changes no engine behavior (golden stays byte-identical). See
+	// ContinuationDepthRaw and accumulateContinuationDepth.
+	EngineContinuationDepth map[int]ContinuationDepthRaw
+	// EngineGateCont maps each team ID to its engine mean L1 gate-1 counterfactual
+	// samples (ADR-0057/0058). Engine-only — real .sco carries no gate probabilities, so
+	// there is no .sco counterpart; reported, never gated. Computed read-only at the sim
+	// rebound site (no rng draw), so the golden stays byte-identical. See GateContRaw and
+	// sim.GateContAccum.
+	EngineGateCont map[int]GateContRaw
 	// EnginePossCountPerG is the engine's AUTHORITATIVE possession count (mean
 	// EventPossessionStart/game; one per offensive trip — an offensive rebound
 	// continues the SAME trip, so it is true possessions). Engine-only DIAGNOSTIC: it

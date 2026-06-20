@@ -63,7 +63,11 @@ func TestBucketWeights_FoulPathMix(t *testing.T) {
 	t.Logf("  home foul-frac=%.4f  away foul-frac=%.4f  (home−away=%+.4f)", homeFoul, awayFoul, homeFoul-awayFoul)
 
 	// Realistic minority: the foul path must be a small share (2pt-dominant), the
-	// non-degeneracy property the magnitudes are chosen to preserve.
+	// non-degeneracy property the magnitudes are chosen to preserve. The committed
+	// offQualityConstant=1.575 (ADR-0061) holds this at 0.249, inside the band; smaller
+	// constants grow the home margin but inflate the foul share past 0.25 (and trip the
+	// stronger foul-out degeneracy guard, TestSimulate_FoulOutRate) — so the band is the
+	// floor on the GATE-1 home-margin calibration. NOT widened (no silent band-widen).
 	if homeFoul < 0.02 || homeFoul > 0.25 {
 		t.Errorf("home foul share = %.4f, want a realistic minority in [0.02, 0.25]", homeFoul)
 	}

@@ -3,8 +3,16 @@
   PHPUnit configuration for mutation testing (Infection).
   Differs from phpunit.xml:
     1. Includes the 'database' group (DB integration tests provide repo coverage)
-    2. Broader <source> — includes Repositories, Views, Controllers, Handlers
-       so coverage-xml reports cover everything infection.json5 considers in-scope.
+    2. Broader <source> than infection.json5's mutate-scope, BY DESIGN:
+       - This file's coverage-excludes {classes/*/Contracts, classes/OneOnOneGame,
+         classes/Database (which contains MySQL.php), classes/JSB.php} are a SUBSET
+         of infection.json5's mutate-excludes, so nothing Infection mutates lacks
+         coverage (no spurious "Not Covered" mutants against minMsi=100).
+       - This <source> is a deliberate SUPERSET: Bootstrap and the Group-B View
+         files get coverage generated here but are NOT mutated (excluded in
+         infection.json5). Do NOT add them to the <exclude> below to "balance" it.
+       infection.json5's excludes are the authoritative mutate-scope; this file
+       only controls which classes get coverage-xml generated.
   Used only by the CI mutation workflow's coverage-generation step.
 -->
 <phpunit bootstrap="tests/bootstrap.php"

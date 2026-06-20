@@ -4,18 +4,6 @@ on:
   pull_request:
     branches: [master]
     types: [opened, synchronize, reopened, ready_for_review]
-  push:
-    branches: [master]
-    paths:
-      - '**.php'
-      - '**.css'
-      - '**.ts'
-      - '**.js'
-      - 'ibl5/design/**'
-      - 'ibl5/migrations/**.sql'
-      - 'Dockerfile'
-      - 'docker-compose*.yml'
-      - '.github/workflows/lighthouse.yml'
 
 permissions:
   contents: read
@@ -55,43 +43,14 @@ jobs:
     needs: [changes]
     if: |
       always() &&
-      (github.event_name == 'push' || needs.changes.outputs.src == 'true')
+      needs.changes.outputs.src == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
     steps:
       - uses: actions/checkout@v6
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      # --- Dependency Caching ---
-      - name: Cache vendor directory
-        uses: actions/cache@v5
-        with:
-          path: ibl5/vendor
-          key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-vendor-
-
-      - name: Cache node_modules
-        uses: actions/cache@v5
-        with:
-          path: ibl5/node_modules
-          key: ${{ runner.os }}-bun-${{ hashFiles('ibl5/bun.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-
-
-      - name: Install dependencies
-        working-directory: ibl5
-        run: |
-          composer install --no-interaction --no-progress --prefer-dist --ignore-platform-reqs
-          bun install
-
-      # --- Docker E2E Setup ---
-      - uses: ./.github/actions/setup-docker-e2e
-        with:
-          build-css: 'true'
+      - uses: ./.github/actions/lighthouse-setup
 
       # --- Lighthouse ---
       - name: Run Lighthouse CI
@@ -147,10 +106,6 @@ jobs:
         with:
           header: lighthouse-comment
           path: ibl5/.lighthouseci/comment.md
-
-      - name: Publish to job summary (master push)
-        if: always() && github.event_name == 'push' && hashFiles('ibl5/.lighthouseci/comment.md') != ''
-        run: cat ibl5/.lighthouseci/comment.md >> "$GITHUB_STEP_SUMMARY"
 
       # --- Cleanup ---
       - name: Teardown

@@ -1,6 +1,6 @@
 ---
 description: Documentation organization and lifecycle rules.
-last_verified: 2026-04-11
+last_verified: 2026-06-11
 ---
 
 # IBL5 Documentation Standards
@@ -43,6 +43,7 @@ last_verified: 2026-04-11
   - Completed optimization guides
   - Superseded guides or plans
   - Individual module refactoring summaries (after consolidating into REFACTORING_HISTORY.md)
+- **Freshness scope**: Both `ibl5/docs/archive/` and `.archive/` are intentionally excluded from `bin/check-docs` (see its `EXCLUDED_RELATIVE_FRAGMENTS`). Archived docs are frozen snapshots and are not held to the on-touch freshness rule by design — do not add frontmatter to them expecting CI enforcement.
 
 ### 5. `.archive/` (Older Historical Documents)
 - **Purpose**: Preserve older historical documentation
@@ -174,7 +175,7 @@ last_verified: 2026-04-11
 
 **3. Update References**:
 - Verify links in README.md
-- Check copilot-instructions.md examples if relevant
+- Check `.claude/rules/` examples if relevant
 - Ensure `ibl5/docs/README.md` is current
 
 ---
@@ -203,4 +204,4 @@ last_verified: 2026-04-11
 - [ ] Test suite registered in `ibl5/phpunit.xml`
 - [ ] All tests passing without warnings or errors
 
-**DO NOT deviate from this structure** - consistency is critical for Copilot Agent effectiveness.
+**DO NOT deviate from this structure** - consistency is critical for agent effectiveness.

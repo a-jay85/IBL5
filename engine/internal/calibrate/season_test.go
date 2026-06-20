@@ -8,7 +8,139 @@ import (
 	"testing"
 
 	"github.com/a-jay85/IBL5/engine/internal/bundle"
+	"github.com/a-jay85/IBL5/engine/internal/sim"
+	"github.com/a-jay85/IBL5/engine/internal/validate"
 )
+
+// validateWithArms (ADR-0053): without an arm it is a single passthrough whose
+// sim.Options carries only the Branch-B toggle; with an arm it is a per-bucket
+// two-pass — a harvest pass (Accum set, arm off) then a frozen pass (arm on, Means
+// sourced from the harvest accum), both at the SAME seed. A fresh accum is allocated
+// per closure invocation (per bucket), never shared across buckets.
+func TestValidateWithArms(t *testing.T) {
+	type call struct {
+		seed uint64
+		opts sim.Options
+	}
+	newFn := func(calls *[]call) func(string, int, uint64, bundle.GameType, sim.Options) (validate.Report, error) {
+		return func(_ string, _ int, seed uint64, _ bundle.GameType, o sim.Options) (validate.Report, error) {
+			*calls = append(*calls, call{seed: seed, opts: o})
+			return validate.Report{}, nil
+		}
+	}
+
+	t.Run("no arm — single Branch-B passthrough", func(t *testing.T) {
+		var calls []call
+		fn := validateWithArms(Options{BranchB: true}, newFn(&calls))
+		if _, err := fn("dir", 5, 99, bundle.GameTypeRegular); err != nil {
+			t.Fatalf("fn: %v", err)
+		}
+		if len(calls) != 1 {
+			t.Fatalf("calls=%d, want 1 (no two-pass without an arm)", len(calls))
+		}
+		o := calls[0].opts
+		if !o.Freeze.BranchB || o.Freeze.MakePutback || o.Freeze.MakePutbackHalf || o.Accum != nil {
+			t.Errorf("opts=%+v, want BranchB only", o.Freeze)
+		}
+	})
+
+	t.Run("MakePutback — harvest then frozen, same seed", func(t *testing.T) {
+		var calls []call
+		fn := validateWithArms(Options{MakePutback: true}, newFn(&calls))
+		if _, err := fn("dir", 5, 99, bundle.GameTypeRegular); err != nil {
+			t.Fatalf("fn: %v", err)
+		}
+		if len(calls) != 2 {
+			t.Fatalf("calls=%d, want 2 (harvest + frozen)", len(calls))
+		}
+		harvest, frozen := calls[0], calls[1]
+		if harvest.opts.Accum == nil || harvest.opts.Freeze.MakePutback {
+			t.Errorf("harvest opts=%+v, want Accum set and arm OFF", harvest.opts)
+		}
+		// The frozen pass turns the arm on and sources Means from the SAME harvest accum
+		// (acc.Means()), so a future refactor cannot silently feed it a different mean.
+		if !frozen.opts.Freeze.MakePutback {
+			t.Errorf("frozen arm off, want MakePutback on: %+v", frozen.opts.Freeze)
+		}
+		if frozen.opts.Freeze.Means != harvest.opts.Accum.Means() {
+			t.Errorf("frozen Means=%+v, want the harvest accum's Means()=%+v", frozen.opts.Freeze.Means, harvest.opts.Accum.Means())
+		}
+		if harvest.seed != frozen.seed {
+			t.Errorf("seeds differ: harvest=%d frozen=%d (must match so the arm perturbs the harvested games)", harvest.seed, frozen.seed)
+		}
+	})
+}
+
+// TestValidateWithArms_OffVolumeScale (ADR-0054): the OffVolumeScale override is
+// propagated onto the base sim.Options BEFORE the makePutbackActive early return, so
+// it reaches both the single-pass (no arm) and two-pass (arm) paths. A non-nil pointer
+// — including a pointer to 0 (a valid sweep value that disables the channel) — must
+// arrive intact, never dropped as "unset".
+func TestValidateWithArms_OffVolumeScale(t *testing.T) {
+	capture := func(got *sim.Options) func(string, int, uint64, bundle.GameType, sim.Options) (validate.Report, error) {
+		return func(_ string, _ int, _ uint64, _ bundle.GameType, o sim.Options) (validate.Report, error) {
+			*got = o
+			return validate.Report{}, nil
+		}
+	}
+	ptr := func(f float64) *float64 { return &f }
+
+	t.Run("ptr(0.04) reaches base on the no-arm path", func(t *testing.T) {
+		var got sim.Options
+		fn := validateWithArms(Options{OffVolumeScale: ptr(0.04)}, capture(&got))
+		if _, err := fn("dir", 5, 99, bundle.GameTypeRegular); err != nil {
+			t.Fatalf("fn: %v", err)
+		}
+		if got.OffVolumeScale == nil || *got.OffVolumeScale != 0.04 {
+			t.Fatalf("base.OffVolumeScale=%v, want *0.04", got.OffVolumeScale)
+		}
+	})
+
+	t.Run("ptr(0) reaches base as non-nil *0 (not dropped)", func(t *testing.T) {
+		var got sim.Options
+		fn := validateWithArms(Options{OffVolumeScale: ptr(0)}, capture(&got))
+		if _, err := fn("dir", 5, 99, bundle.GameTypeRegular); err != nil {
+			t.Fatalf("fn: %v", err)
+		}
+		if got.OffVolumeScale == nil {
+			t.Fatal("base.OffVolumeScale is nil; the explicit 0 sweep config was dropped as unset")
+		}
+		if *got.OffVolumeScale != 0 {
+			t.Fatalf("base.OffVolumeScale=*%v, want *0", *got.OffVolumeScale)
+		}
+	})
+
+	t.Run("nil leaves base.OffVolumeScale nil (const path)", func(t *testing.T) {
+		var got sim.Options
+		fn := validateWithArms(Options{}, capture(&got))
+		if _, err := fn("dir", 5, 99, bundle.GameTypeRegular); err != nil {
+			t.Fatalf("fn: %v", err)
+		}
+		if got.OffVolumeScale != nil {
+			t.Fatalf("base.OffVolumeScale=%v, want nil (use const)", got.OffVolumeScale)
+		}
+	})
+}
+
+// TestResolveValidate_InjectedSeamIgnoresScale (ADR-0054): when an Options.Validate
+// seam is injected, resolveValidate returns it directly — bypassing validateWithArms,
+// where OffVolumeScale lives. The injected ValidateFunc has no sim.Options parameter,
+// so the scale structurally cannot reach the sim through the test seam.
+func TestResolveValidate_InjectedSeamIgnoresScale(t *testing.T) {
+	called := false
+	seam := func(string, int, uint64, bundle.GameType) (validate.Report, error) {
+		called = true
+		return validate.Report{}, nil
+	}
+	ptr := func(f float64) *float64 { return &f }
+	fn := resolveValidate(Options{Validate: seam, OffVolumeScale: ptr(0.04)})
+	if _, err := fn("dir", 5, 99, bundle.GameTypeRegular); err != nil {
+		t.Fatalf("fn: %v", err)
+	}
+	if !called {
+		t.Fatal("injected Validate seam was not used; resolveValidate diverted through validateWithArms")
+	}
+}
 
 // okCount is a CountScoFunc stub reporting a complete season (1148 games / 28
 // teams → medGP≈82) for any path, so the public CollectSeasonReports tests that

@@ -1,0 +1,115 @@
+#!/bin/bash
+# rehearsal-prod-dump — emit a FILTERED logical dump of the production database to
+# stdout, for the Deploy Rehearsal CI job to restore and dry-run pending migrations
+# against real prod schema + data (ADR-0059).
+#
+# RUNS ON THE PROD HOST. The Deploy Rehearsal workflow streams this script to prod
+# via `ssh ... "REMOTE_DATABASE=... bash -s" < bin/rehearsal-prod-dump` and pipes the
+# stdout (SQL) back to the CI runner. The prod host has local socket / .my.cnf auth,
+# so no DB password is passed here.
+#
+# READ-ONLY BY CONSTRUCTION. This script issues ONLY `mariadb-dump --single-transaction`
+# (a consistent, lock-free read) and one `mysql -N -e SELECT` (the season threshold).
+# It contains NO DDL and NO DML write — it never DROPs, ALTERs, INSERTs, UPDATEs, or
+# DELETEs anything on prod. Do not add a write statement here.
+#
+# SIZE FILTER + ITS FIDELITY COST. Four bloat tables are sampled to the two most recent
+# seasons (`season_year >= MAX(season_year)-1`): ibl_box_scores (~601K rows / 410 MB),
+# ibl_box_scores_teams, ibl_plr_snapshots, ibl_plb_snapshots. This keeps ~8% of box_scores
+# rows. Filtering is a *fidelity cost*, not a free win: the rehearsal can no longer catch a
+# migration whose failure depends only on PRE-(previous-season) rows in those four tables
+# (e.g. an FK-add an ancient orphan would violate) — see ADR-0059's documented blind spot.
+# It is safe against clone-internal orphans only because the filtered tables' FK PARENTS
+# (ibl_plr, ibl_team_info) stay FULL and nothing references the filtered tables.
+#
+# ROUTINES ARE OMITTED. No pass passes `--routines`, and mariadb-dump's default is to
+# emit none — so stored procedures/functions are simply never dumped. This is deliberate:
+# `bin/migrate` and `bin/validate-schema` exercise no stored routines, and prod's
+# mysql.proc is under a server-side lock that hangs `--routines` (reference_prod_mysql_proc_lock).
+
+set -euo pipefail
+
+DB="${REMOTE_DATABASE:-iblhoops_ibl5}"
+
+DUMP="$(command -v mariadb-dump || command -v mysqldump || true)"
+if [ -z "$DUMP" ]; then
+    echo "rehearsal-prod-dump: neither mariadb-dump nor mysqldump found on PATH" >&2
+    exit 1
+fi
+
+# Tables sampled to the two most recent seasons. Each carries a `season_year` column
+# (ibl_box_scores's is STORED GENERATED; the snapshots' are plain columns).
+FILTERED_TABLES="ibl_box_scores ibl_box_scores_teams ibl_plr_snapshots ibl_plb_snapshots"
+
+# Season threshold: current season + the most recent FULL season. season_year is the
+# season's ENDING year (Oct-Dec map to year+1). Read from the typed generated column.
+N="$(mysql -N -e "SELECT MAX(season_year)-1 FROM ibl_box_scores" "$DB")"
+if ! [[ "$N" =~ ^[0-9]+$ ]]; then
+    echo "rehearsal-prod-dump: could not compute integer season threshold (got: '$N')" >&2
+    exit 1
+fi
+
+# Discover STORED GENERATED tables dynamically (same query bin/db-sync-prod uses) so the
+# Olympics generated tables never need a hardcoded list. Generated-column tables need
+# dedicated --no-create-info INSERTs (explicit column-lists omit generated cols) to avoid
+# ERROR 1906.
+GENERATED_TABLES="$(mysql -N -e "
+    SELECT DISTINCT table_name
+    FROM information_schema.columns
+    WHERE table_schema='$DB' AND extra LIKE '%GENERATED%'
+    ORDER BY table_name;" "$DB")"
+
+ALL_TABLES="$(mysql -N -e "
+    SELECT table_name
+    FROM information_schema.tables
+    WHERE table_schema='$DB' AND engine IS NOT NULL
+    ORDER BY table_name;" "$DB")"
+
+# Membership helper over a whitespace-separated list.
+in_list() {
+    local needle="$1" hay="$2" t
+    for t in $hay; do
+        [ "$t" = "$needle" ] && return 0
+    done
+    return 1
+}
+
+# Partition every base table into three disjoint groups.
+REGULAR_UNFILTERED=""    # not generated, not filtered (incl. ibl_one_on_one, kept full)
+GENERATED_UNFILTERED=""  # generated but not filtered (the Olympics generated tables)
+for name in $ALL_TABLES; do
+    if in_list "$name" "$FILTERED_TABLES"; then
+        continue
+    elif in_list "$name" "$GENERATED_TABLES"; then
+        GENERATED_UNFILTERED="$GENERATED_UNFILTERED $name"
+    else
+        REGULAR_UNFILTERED="$REGULAR_UNFILTERED $name"
+    fi
+done
+
+COMMON_FLAGS=(--single-transaction --skip-lock-tables)
+
+# Pass 1 — schema for ALL tables (+ triggers, views). Metadata-only; bounded so a stall
+# fails fast server-side rather than hanging the SSH stream.
+"$DUMP" "${COMMON_FLAGS[@]}" --no-data --triggers --max-statement-time=120 "$DB"
+
+# Pass 2 — data for regular (non-generated, non-filtered) tables, full.
+# shellcheck disable=SC2086
+"$DUMP" "${COMMON_FLAGS[@]}" --no-create-info --skip-triggers --skip-add-locks \
+    "$DB" $REGULAR_UNFILTERED
+
+# Pass 3 — data for generated-but-unfiltered tables (Olympics), full. Separate pass so the
+# explicit column-list INSERTs omit generated columns (avoids ERROR 1906).
+if [ -n "${GENERATED_UNFILTERED// }" ]; then
+    # shellcheck disable=SC2086
+    "$DUMP" "${COMMON_FLAGS[@]}" --no-create-info --skip-triggers --skip-add-locks \
+        "$DB" $GENERATED_UNFILTERED
+fi
+
+# Pass 4 — data for the filtered bloat tables, sampled to season_year >= N. Mixed
+# generated (box_scores*) + regular (snapshots); --no-create-info keeps the generated
+# tables loading cleanly. --where applies to every table in this invocation, which is why
+# all four share the same season_year predicate and live in their own pass.
+# shellcheck disable=SC2086
+"$DUMP" "${COMMON_FLAGS[@]}" --no-create-info --skip-triggers --skip-add-locks \
+    --where="season_year>=$N" "$DB" $FILTERED_TABLES

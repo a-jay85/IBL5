@@ -30,10 +30,15 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
     private TeamIdentityRepositoryInterface $commonRepository;
     private TeamTableServiceInterface $teamTableService;
     private DepthChartEntryServiceInterface $service;
+    /**
+     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     */
+    private ?Season $season = null;
 
-    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepository, \League\LeagueContext $leagueContext)
+    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepository, \League\LeagueContext $leagueContext, ?Season $season = null)
     {
         $this->db = $db;
+        $this->season = $season;
         $this->repository = new DepthChartEntryRepository($db);
         $this->service = new DepthChartEntryService();
         $this->view = new DepthChartEntryView($leagueContext, $this->service);
@@ -91,7 +96,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
             $display = 'ratings';
         }
 
-        $season = new Season($this->db);
+        $season = $this->season ?? new Season($this->db);
 
         // Consume the PRG failure flash if present. Stashed by the submission
         // handler (`_ibl_depth_chart_flash`) on validation failure or empty
@@ -198,7 +203,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
      */
     public function getTableOutput(int $teamid, string $display, ?string $split = null): string
     {
-        $season = new Season($this->db);
+        $season = $this->season ?? new Season($this->db);
         $team = Team::initialize($this->db, $teamid);
 
         // Delegate roster + starters to TeamService (single source of truth)

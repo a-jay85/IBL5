@@ -151,7 +151,7 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPen
 		// Make/foul/turnover arms route through the gameState freeze wrappers
 		// (freeze.go): live values in the normal/baseline path, league-mean
 		// substitutes when an arm is frozen for the ADR-0043 attribution.
-		sv2 := applyClutch(gs.makeValue2pt(net, bh.FGP), bh.Clutch, gs.period, scoreDiff)
+		sv2 := applyClutch(gs.makeValue2pt(net, bh.FGP, origin), bh.Clutch, gs.period, scoreDiff)
 		// Home-court advantage, applied at the two modeled JSB sites (delta = +0.2
 		// home / −0.2 away, 0 for ASG). Site 2: the made-shot (2pt) bucket gains
 		// +delta, the foul bucket loses delta (handled inside foulBucketWeight).
@@ -159,6 +159,14 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPen
 		// foulBucketWeight's divisor — the dominant, home-favorable term.
 		hca := hcaDelta(gs.gameType, offense.isHome)
 		twoPtW, threePtW, foulW := gs.playBuckets(bh, offense, defense, hca, true)
+		// Putback 3pt suppression (ADR-0055): a half-court OReb continuation is never a
+		// 3pt attempt — 5.60 re-loops a 3pt outcome on the OReb flag forcing a 2pt
+		// (decompile 94022-94024). Zero the 3pt bucket weight (same mechanism as
+		// transition.go's allow3pt=false) so selectOutcome cannot pick outcome3pt. The
+		// UnfaithfulPutback escape hatch leaves it reachable for the ADR-0055 OFF walk.
+		if origin == result.OriginOffReb && !gs.freeze.UnfaithfulPutback {
+			threePtW = 0
+		}
 		in := outcomeInputs{
 			twoPtWeight:      twoPtW,
 			threePtWeight:    threePtW,
@@ -288,6 +296,12 @@ func (gs *gameState) freeThrows(offense, defense *teamState, shooter, defender o
 func (gs *gameState) rebound(offense, defense *teamState, periodIdx int) (bool, onCourt) {
 	offStr := teamReboundStrength(offense, true)
 	defStr := teamReboundStrength(defense, false)
+	// L1 gate-1 decomposition instrument (ADR-0057/0058): record the linear gate-2, the
+	// sqrt gate-1 (the live continuation roll since ADR-0058), and their product BEFORE
+	// the outcome roll. Read-only — issues no rng draw and is a no-op unless the instrument
+	// is attached, so attaching it leaves the live outcome (the single gs.orebProb roll
+	// below) unchanged and goldens stay byte-identical.
+	gs.accumulateGateCont(offense.teamID, offStr, defStr)
 	// ORB-continuation arm routes through the freeze wrapper (freeze.go); shared by
 	// the half-court and transition rebound paths, so one site covers both.
 	if gs.rng.Float64() < gs.orebProb(offStr, defStr) {

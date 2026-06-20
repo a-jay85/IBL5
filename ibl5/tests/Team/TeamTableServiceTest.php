@@ -304,4 +304,42 @@ class TeamTableServiceTest extends TestCase
             }
         }
     }
+
+    // --- Season DI seam (Recipe B: ctor-injected nullable Season, gated in-place) ---
+
+    /**
+     * Seam (positive): an injected Season whose isOffseasonPhase() returns true must
+     * steer getRosterAndStarters() to the free-agency roster branch, proving the
+     * INJECTED instance reaches the gated `$this->season ?? new Season($db)` call site
+     * instead of the fallback.
+     */
+    public function testInjectedSeasonDrivesRosterBranchToFreeAgency(): void
+    {
+        $season = self::createStub(Season::class);
+        $season->method('isOffseasonPhase')->willReturn(true);
+
+        $repository = $this->createMock(\Team\Contracts\TeamRepositoryInterface::class);
+        $repository->expects($this->once())->method('getFreeAgencyRoster')->with(5)->willReturn([]);
+        $repository->expects($this->never())->method('getRosterUnderContract');
+
+        $service = new TeamTableService($this->mockDb, $repository, $season);
+        $service->getRosterAndStarters(5);
+    }
+
+    /**
+     * Negative/boundary: the exact production call shape — construct WITHOUT the
+     * optional $season arg. The fallback `new Season($db)` fires (in tests the
+     * class_alias resolves it to the mock, phase 'Regular Season' =>
+     * isOffseasonPhase() false), steering to the under-contract roster branch.
+     * No TypeError; the gated method-body construction still runs.
+     */
+    public function testFallbackSeasonUsedForRosterBranchWhenNoneInjected(): void
+    {
+        $repository = $this->createMock(\Team\Contracts\TeamRepositoryInterface::class);
+        $repository->expects($this->once())->method('getRosterUnderContract')->with(5)->willReturn([]);
+        $repository->expects($this->never())->method('getFreeAgencyRoster');
+
+        $service = new TeamTableService($this->mockDb, $repository);
+        $service->getRosterAndStarters(5);
+    }
 }

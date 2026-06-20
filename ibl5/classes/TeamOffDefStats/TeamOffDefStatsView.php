@@ -46,7 +46,7 @@ class TeamOffDefStatsView implements TeamOffDefStatsViewInterface
         $differentials = $data['differentials'] ?? [];
 
         $html = '<div class="league-stats-container">';
-        $html .= '<h2 class="ibl-title">League-wide Statistics</h2>';
+        $html .= '<h1 class="ibl-title">League-wide Statistics</h1>';
 
         // Team Offense Totals
         $html .= '<h2 class="ibl-table-title">Team Offense Totals</h2>';

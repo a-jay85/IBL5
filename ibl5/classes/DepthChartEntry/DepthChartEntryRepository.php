@@ -14,9 +14,15 @@ use DepthChartEntry\Contracts\DepthChartEntryRepositoryInterface;
  */
 class DepthChartEntryRepository extends \BaseMysqliRepository implements DepthChartEntryRepositoryInterface
 {
-    public function __construct(\mysqli $db)
+    /**
+     * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('db').
+     */
+    private \Psr\Log\LoggerInterface $channelLogger;
+
+    public function __construct(\mysqli $db, ?\Psr\Log\LoggerInterface $logger = null)
     {
         parent::__construct($db);
+        $this->channelLogger = $logger ?? \Logging\LoggerFactory::getChannel('db');
     }
 
     /**
@@ -77,7 +83,7 @@ class DepthChartEntryRepository extends \BaseMysqliRepository implements DepthCh
 
             return true;
         } catch (\RuntimeException $e) {
-            \Logging\LoggerFactory::getChannel('db')->error('updatePlayerDepthChart failed', [
+            $this->channelLogger->error('updatePlayerDepthChart failed', [
                 'exception' => $e,
                 'context' => ['playerName' => $playerName],
             ]);
@@ -99,7 +105,7 @@ class DepthChartEntryRepository extends \BaseMysqliRepository implements DepthCh
 
             return true;
         } catch (\RuntimeException $e) {
-            \Logging\LoggerFactory::getChannel('db')->error('updateTeamHistory failed', [
+            $this->channelLogger->error('updateTeamHistory failed', [
                 'exception' => $e,
                 'context' => ['teamName' => $teamName],
             ]);

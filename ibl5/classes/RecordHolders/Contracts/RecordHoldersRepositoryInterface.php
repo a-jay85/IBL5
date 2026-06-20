@@ -166,6 +166,9 @@ interface RecordHoldersRepositoryInterface
     /**
      * Get the longest winning or losing streak.
      *
+     * Implementations are request-scoped and may memoize the underlying game rows;
+     * results are read-only and require no cache invalidation.
+     *
      * @param string $type Streak type ('winning' or 'losing')
      * @return list<StreakRecord>
      */
@@ -173,6 +176,9 @@ interface RecordHoldersRepositoryInterface
 
     /**
      * Get the best or worst season start.
+     *
+     * Implementations are request-scoped and may memoize the underlying game rows;
+     * results are read-only and require no cache invalidation.
      *
      * @param string $type Start type ('best' or 'worst')
      * @return list<SeasonStartRecord>

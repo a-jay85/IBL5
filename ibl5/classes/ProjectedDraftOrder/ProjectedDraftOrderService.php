@@ -30,10 +30,19 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
      */
     private \Psr\Log\LoggerInterface $logger;
 
+    private NonHeadToHeadTiebreaker $nonH2hTiebreaker;
+
+    private DraftOrderTiebreakerResolver $draftOrderResolver;
+
+    private PlayoffSeedingCalculator $playoffSeeding;
+
     public function __construct(ProjectedDraftOrderRepositoryInterface $repository, ?\Psr\Log\LoggerInterface $logger = null)
     {
         $this->repository = $repository;
         $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('audit');
+        $this->nonH2hTiebreaker = new NonHeadToHeadTiebreaker();
+        $this->draftOrderResolver = new DraftOrderTiebreakerResolver($this->nonH2hTiebreaker);
+        $this->playoffSeeding = new PlayoffSeedingCalculator($this->nonH2hTiebreaker);
     }
 
     /** @return ProjectedDraftOrderResult */
@@ -60,7 +69,7 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
 
         foreach (League::CONFERENCE_NAMES as $conference) {
             $conferenceTeams = $teamsByConference[$conference] ?? [];
-            $result = $this->determinePlayoffTeams($conferenceTeams, $h2h, $pointDiffs);
+            $result = $this->playoffSeeding->determinePlayoffTeams($conferenceTeams, $h2h, $pointDiffs);
             array_push($nonPlayoffTeams, ...$result['nonPlayoff']);
             array_push($wildCardTeams, ...$result['wildCards']);
             array_push($divisionWinnerTeams, ...$result['divisionWinners']);
@@ -71,14 +80,14 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
 
         $teamMap = $this->buildTeamMap($standings);
 
-        $nonPlayoffSorted = $this->sortTeamsByRecord($nonPlayoffTeams, $h2h, $pointDiffs);
-        $wildCardsSorted = $this->sortTeamsByRecord($wildCardTeams, $h2h, $pointDiffs);
-        $divisionWinnersSorted = $this->sortTeamsByRecord($divisionWinnerTeams, $h2h, $pointDiffs);
-        $conferenceWinnersSorted = $this->sortTeamsByRecord($conferenceWinnerTeams, $h2h, $pointDiffs);
+        $nonPlayoffSorted = $this->draftOrderResolver->sortTeamsByRecord($nonPlayoffTeams, $h2h, $pointDiffs);
+        $wildCardsSorted = $this->draftOrderResolver->sortTeamsByRecord($wildCardTeams, $h2h, $pointDiffs);
+        $divisionWinnersSorted = $this->draftOrderResolver->sortTeamsByRecord($divisionWinnerTeams, $h2h, $pointDiffs);
+        $conferenceWinnersSorted = $this->draftOrderResolver->sortTeamsByRecord($conferenceWinnerTeams, $h2h, $pointDiffs);
 
         $round1Order = array_merge($nonPlayoffSorted, $wildCardsSorted, $divisionWinnersSorted, $conferenceWinnersSorted);
 
-        $allTeamsSorted = $this->sortTeamsByRecord(array_values($teamMap), $h2h, $pointDiffs);
+        $allTeamsSorted = $this->draftOrderResolver->sortTeamsByRecord(array_values($teamMap), $h2h, $pointDiffs);
 
         $pickOwnership = $this->buildPickOwnershipMap($pickOwnershipRows);
 
@@ -304,249 +313,6 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
             $map[$team['teamid']] = $team;
         }
         return $map;
-    }
-
-    /**
-     * Determine playoff teams, division winners, conference winner, and non-playoff teams.
-     *
-     * @param list<StandingsRow> $conferenceTeams
-     * @param array<int, array<int, int>> $h2h
-     * @param array<int, float> $pointDiffs
-     * @return array{wildCards: list<StandingsRow>, divisionWinners: list<StandingsRow>, conferenceWinner: StandingsRow|null, nonPlayoff: list<StandingsRow>}
-     */
-    private function determinePlayoffTeams(array $conferenceTeams, array $h2h, array $pointDiffs): array
-    {
-        if ($conferenceTeams === []) {
-            return ['wildCards' => [], 'divisionWinners' => [], 'conferenceWinner' => null, 'nonPlayoff' => []];
-        }
-
-        $byDivision = [];
-        foreach ($conferenceTeams as $team) {
-            $byDivision[$team['division']][] = $team;
-        }
-
-        $divisionWinners = [];
-        $nonWinners = [];
-
-        foreach ($byDivision as $divisionTeams) {
-            usort($divisionTeams, fn (array $a, array $b): int => $this->compareTeamsForPlayoffSeeding($a, $b, $h2h, $pointDiffs));
-            $divisionWinners[] = $divisionTeams[0];
-            for ($i = 1; $i < count($divisionTeams); $i++) {
-                $nonWinners[] = $divisionTeams[$i];
-            }
-        }
-
-        // Sort non-winners by record (best first) to pick top 6
-        usort($nonWinners, fn (array $a, array $b): int => $this->compareTeamsForPlayoffSeeding($a, $b, $h2h, $pointDiffs));
-
-        $wildCards = array_slice($nonWinners, 0, 6);
-        $nonPlayoff = array_slice($nonWinners, 6);
-
-        // Conference winner is the best division winner
-        usort($divisionWinners, fn (array $a, array $b): int => $this->compareTeamsForPlayoffSeeding($a, $b, $h2h, $pointDiffs));
-        $conferenceWinner = $divisionWinners[0];
-        $divisionOnlyWinners = array_slice($divisionWinners, 1);
-
-        return [
-            'wildCards' => array_values($wildCards),
-            'divisionWinners' => array_values($divisionOnlyWinners),
-            'conferenceWinner' => $conferenceWinner,
-            'nonPlayoff' => array_values($nonPlayoff),
-        ];
-    }
-
-    /**
-     * Compare two teams for playoff seeding (best team first).
-     *
-     * @param StandingsRow $a
-     * @param StandingsRow $b
-     * @param array<int, array<int, int>> $h2h
-     * @param array<int, float> $pointDiffs
-     */
-    private function compareTeamsForPlayoffSeeding(array $a, array $b, array $h2h, array $pointDiffs): int
-    {
-        // Higher pct is better (sort descending)
-        $pctDiff = $b['pct'] <=> $a['pct'];
-        if ($pctDiff !== 0) {
-            return $pctDiff;
-        }
-
-        return $this->applyTiebreakers($a, $b, $h2h, $pointDiffs);
-    }
-
-    /**
-     * Sort teams by record for draft order (worst first).
-     *
-     * Tiebreaker loser gets the earlier (better) pick in both lottery and playoff contexts.
-     * Uses multi-way aggregate H2H for groups of 3+ teams with the same pct.
-     *
-     * @param list<StandingsRow> $teams
-     * @param array<int, array<int, int>> $h2h
-     * @param array<int, float> $pointDiffs
-     * @return list<StandingsRow>
-     */
-    private function sortTeamsByRecord(array $teams, array $h2h, array $pointDiffs): array
-    {
-        // Step 1: Sort by pct ascending (worst first)
-        usort($teams, static fn (array $a, array $b): int => $a['pct'] <=> $b['pct']);
-
-        // Step 2: Resolve tied groups using multi-way aggregate H2H
-        return $this->resolveTiedGroups($teams, $h2h, $pointDiffs);
-    }
-
-    /**
-     * Walk the pct-sorted list, identify consecutive same-pct groups, and sort each.
-     *
-     * @param list<StandingsRow> $teams
-     * @param array<int, array<int, int>> $h2h
-     * @param array<int, float> $pointDiffs
-     * @return list<StandingsRow>
-     */
-    private function resolveTiedGroups(array $teams, array $h2h, array $pointDiffs): array
-    {
-        $result = [];
-        $i = 0;
-        $count = count($teams);
-
-        while ($i < $count) {
-            $groupStart = $i;
-            $currentPct = $teams[$i]['pct'];
-
-            // Find end of consecutive same-pct group
-            while ($i < $count && $teams[$i]['pct'] === $currentPct) {
-                $i++;
-            }
-
-            $group = array_slice($teams, $groupStart, $i - $groupStart);
-
-            if (count($group) > 1) {
-                $group = $this->sortTiedGroup($group, $h2h, $pointDiffs);
-            }
-
-            array_push($result, ...$group);
-        }
-
-        return $result;
-    }
-
-    /**
-     * Sort a group of teams with the same pct using aggregate H2H then fallback tiebreakers.
-     *
-     * For draft order: worse aggregate H2H → earlier (better) pick.
-     *
-     * @param list<StandingsRow> $group
-     * @param array<int, array<int, int>> $h2h
-     * @param array<int, float> $pointDiffs
-     * @return list<StandingsRow>
-     */
-    private function sortTiedGroup(array $group, array $h2h, array $pointDiffs): array
-    {
-        $tids = array_map(static fn (array $t): int => $t['teamid'], $group);
-
-        $aggregateH2HPct = \Standings\AggregateTiebreaker::computeAggregateH2HPcts(
-            $tids,
-            /** @return array{wins: int, losses: int} */
-            static fn (int $tid, int $oppTid): array => [
-                'wins' => $h2h[$tid][$oppTid] ?? 0,
-                'losses' => $h2h[$oppTid][$tid] ?? 0,
-            ],
-        );
-
-        usort($group, function (array $a, array $b) use ($aggregateH2HPct, $pointDiffs): int {
-            $h2hDiff = $aggregateH2HPct[$a['teamid']] <=> $aggregateH2HPct[$b['teamid']];
-            if ($h2hDiff !== 0) {
-                return $h2hDiff;
-            }
-
-            return -$this->applyNonH2HTiebreakers($a, $b, $pointDiffs);
-        });
-
-        return $group;
-    }
-
-    /**
-     * Apply NBA tiebreakers between two teams (pairwise H2H + remaining tiebreakers).
-     *
-     * Used by playoff seeding. Draft order uses multi-way aggregate H2H instead.
-     *
-     * Returns negative if A wins the tiebreaker, positive if B wins.
-     *
-     * @param StandingsRow $a
-     * @param StandingsRow $b
-     * @param array<int, array<int, int>> $h2h
-     * @param array<int, float> $pointDiffs
-     */
-    private function applyTiebreakers(array $a, array $b, array $h2h, array $pointDiffs): int
-    {
-        // 1. Head-to-head record (pairwise)
-        $aWinsVsB = $h2h[$a['teamid']][$b['teamid']] ?? 0;
-        $bWinsVsA = $h2h[$b['teamid']][$a['teamid']] ?? 0;
-        if ($aWinsVsB !== $bWinsVsA) {
-            return $bWinsVsA <=> $aWinsVsB;
-        }
-
-        // 2-6. Non-H2H tiebreakers
-        return $this->applyNonH2HTiebreakers($a, $b, $pointDiffs);
-    }
-
-    /**
-     * Apply non-H2H tiebreakers: division winner, division record, conference record,
-     * point differential, alphabetical.
-     *
-     * Returns negative if A is the better team, positive if B is better.
-     *
-     * @param StandingsRow $a
-     * @param StandingsRow $b
-     * @param array<int, float> $pointDiffs
-     */
-    private function applyNonH2HTiebreakers(array $a, array $b, array $pointDiffs): int
-    {
-        // 2. Division winner status
-        $aDivWinner = ($a['clinched_division'] ?? 0) === 1;
-        $bDivWinner = ($b['clinched_division'] ?? 0) === 1;
-        if ($aDivWinner !== $bDivWinner) {
-            return $aDivWinner ? -1 : 1;
-        }
-
-        // 3. Division record (same-division teams only)
-        if ($a['division'] === $b['division']) {
-            $aDivPct = $this->safeWinPct($a['div_wins'], $a['div_losses']);
-            $bDivPct = $this->safeWinPct($b['div_wins'], $b['div_losses']);
-            $divDiff = $bDivPct <=> $aDivPct;
-            if ($divDiff !== 0) {
-                return $divDiff;
-            }
-        }
-
-        // 4. Conference record
-        $aConfPct = $this->safeWinPct($a['conf_wins'], $a['conf_losses']);
-        $bConfPct = $this->safeWinPct($b['conf_wins'], $b['conf_losses']);
-        $confDiff = $bConfPct <=> $aConfPct;
-        if ($confDiff !== 0) {
-            return $confDiff;
-        }
-
-        // 5. Point differential
-        $aNetPts = $pointDiffs[$a['teamid']] ?? 0.0;
-        $bNetPts = $pointDiffs[$b['teamid']] ?? 0.0;
-        $ptsDiff = $bNetPts <=> $aNetPts;
-        if ($ptsDiff !== 0) {
-            return $ptsDiff;
-        }
-
-        // Fallback: alphabetical by team name (for deterministic ordering)
-        return $a['team_name'] <=> $b['team_name'];
-    }
-
-    private function safeWinPct(?int $wins, ?int $losses): float
-    {
-        $w = $wins ?? 0;
-        $l = $losses ?? 0;
-        $total = $w + $l;
-        if ($total === 0) {
-            return 0.0;
-        }
-        return $w / $total;
     }
 
     /**

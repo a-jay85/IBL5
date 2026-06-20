@@ -30,7 +30,7 @@ class WatchlistView implements WatchlistViewInterface
         ob_start();
         ?>
         <div class="watchlist-page">
-        <h2 class="ibl-title">My Watchlist</h2>
+        <h1 class="ibl-title">My Watchlist</h1>
         <?= \UI\AlertRenderer::fromCode($result, [
             'watched'    => ['class' => 'ibl-alert--success', 'message' => 'Player added to your watchlist.'],
             'unwatched'  => ['class' => 'ibl-alert--success', 'message' => 'Player removed from your watchlist.'],

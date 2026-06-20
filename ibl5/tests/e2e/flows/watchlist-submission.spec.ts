@@ -19,7 +19,7 @@ test.describe('Watchlist: My Watchlist page', () => {
   test('lists the seeded watched player', async ({ page }) => {
     await page.goto('modules.php?name=Watchlist');
 
-    await expect(page.locator('h2.ibl-title')).toHaveText('My Watchlist');
+    await expect(page.locator('h1.ibl-title')).toHaveText('My Watchlist');
     await expect(page.locator('.ibl-data-table')).toContainText('Test Player Two');
     await assertNoPhpErrors(page, 'My Watchlist page');
   });

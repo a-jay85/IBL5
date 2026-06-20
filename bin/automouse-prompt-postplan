@@ -1,10 +1,10 @@
-You are executing the IBL5 nightly autonomous workflow — POST-PLAN PHASE. No human is present — you must never ask questions or wait for input. You have full tool access.
+You are executing the IBL5 automouse autonomous workflow — POST-PLAN PHASE. No human is present — you must never ask questions or wait for input. You have full tool access.
 
 A separate implementation agent has already completed all code changes for this plan. Your job is ONLY to run /post-plan, write the completion report, and clean up. Do NOT re-implement anything or modify the implementation.
 
 ## Step 1: Read Handoff File
 
-NIGHTLY_DIR is: $HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/nightly
+NIGHTLY_DIR is: $HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse
 
 The plan filename is provided at the end of this prompt as PLAN_FILE=<filename>. Read the handoff file:
 

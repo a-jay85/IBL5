@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 #
-# bin/check-plan-staleness — staleness guard for nightly queued plans.
+# bin/check-plan-staleness — staleness guard for automouse queued plans.
 #
 # Takes one argument: a plan file path (in production, the queue symlink that
 # points at ~/.claude/plans/<name>.md). Scans the plan body for repo-path
 # reference tokens and exits non-zero, printing each unresolved token, when the
 # plan references files that no longer exist in the current checkout. A stale
-# plan would otherwise burn all three nightly attempts as a poison pill.
+# plan would otherwise burn all three automouse attempts as a poison pill.
 #
 # Token resolution mirrors bin/check-docs::scanReferences() (PHP), reimplemented
 # in Bash since check-docs is not callable for a single out-of-repo plan file:

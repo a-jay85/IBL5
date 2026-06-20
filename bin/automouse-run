@@ -1,12 +1,12 @@
 #!/bin/bash
-# Wrapper script for the IBL5 nightly autonomous workflow.
+# Wrapper script for the IBL5 automouse autonomous workflow.
 # Called by launchd at 00:03 and 11:00 daily. Loops through queued plans,
 # firing two claude -p invocations per plan (implementation + post-plan)
 # until the queue is empty or the time guard is exceeded.
 #
-# To test manually: bin/nightly-run
-# To force-trigger via launchd: launchctl start com.ibl5.nightly-claude
-# To schedule a one-shot run: bin/nightly-run schedule "2026-05-28 20:00 PDT"
+# To test manually: bin/automouse-run
+# To force-trigger via launchd: launchctl start com.ibl5.automouse
+# To schedule a one-shot run: bin/automouse-run schedule "2026-05-28 20:00 PDT"
 
 set -euo pipefail
 
@@ -14,16 +14,16 @@ set -euo pipefail
 export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:$PATH"
 
 # --- One-shot scheduler subcommand ----------------------------------------
-# Usage: bin/nightly-run schedule "YYYY-MM-DD HH:MM [TZ]"
-# Creates a self-cleaning launchd agent that fires bin/nightly-run once at the
+# Usage: bin/automouse-run schedule "YYYY-MM-DD HH:MM [TZ]"
+# Creates a self-cleaning launchd agent that fires bin/automouse-run once at the
 # given time, then removes its own plist and boots itself out. The timezone
 # abbreviation is optional and defaults to the system's local zone.
-# Example: bin/nightly-run schedule "2026-05-28 20:00 PDT"
+# Example: bin/automouse-run schedule "2026-05-28 20:00 PDT"
 if [ "${1:-}" = "schedule" ]; then
     WHEN="${2:-}"
     if [ -z "$WHEN" ]; then
-        echo "usage: bin/nightly-run schedule \"YYYY-MM-DD HH:MM [TZ]\"" >&2
-        echo "example: bin/nightly-run schedule \"2026-05-28 20:00 PDT\"" >&2
+        echo "usage: bin/automouse-run schedule \"YYYY-MM-DD HH:MM [TZ]\"" >&2
+        echo "example: bin/automouse-run schedule \"2026-05-28 20:00 PDT\"" >&2
         exit 1
     fi
 
@@ -52,11 +52,11 @@ if [ "${1:-}" = "schedule" ]; then
     CAL_MIN=$((10#$(date -r "$EPOCH" +%M)))
     LOCAL_STR=$(date -r "$EPOCH" '+%Y-%m-%d %H:%M %Z')
 
-    LABEL="com.ibl5.nightly-oneshot-$EPOCH"
+    LABEL="com.ibl5.automouse-oneshot-$EPOCH"
     PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
-    SELF="/Users/ajaynicolas/GitHub/IBL5/bin/nightly-run"
-    OUT_LOG="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/nightly/logs/launchd-oneshot-stdout.log"
-    ERR_LOG="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/nightly/logs/launchd-oneshot-stderr.log"
+    SELF="/Users/ajaynicolas/GitHub/IBL5/bin/automouse-run"
+    OUT_LOG="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/logs/launchd-oneshot-stdout.log"
+    ERR_LOG="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/logs/launchd-oneshot-stderr.log"
     mkdir -p "$(dirname "$OUT_LOG")"
 
     cat > "$PLIST" <<PLIST_EOF
@@ -96,7 +96,7 @@ PLIST_EOF
     launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
     launchctl bootstrap "gui/$(id -u)" "$PLIST"
 
-    echo "Scheduled one-shot nightly-run:"
+    echo "Scheduled one-shot automouse-run:"
     echo "  fires:  $LOCAL_STR  (local time)"
     echo "  label:  $LABEL"
     echo "  plist:  $PLIST"
@@ -106,13 +106,13 @@ fi
 
 # Burst mode: if NIGHTLY_BURST is set, check cutoff and self-revert when expired.
 if [ "${NIGHTLY_BURST:-}" = "1" ] && [ -n "${NIGHTLY_BURST_CUTOFF:-}" ]; then
-    BURST_PLIST="$HOME/Library/LaunchAgents/com.ibl5.nightly-claude.plist"
-    BURST_BACKUP="$HOME/Library/LaunchAgents/com.ibl5.nightly-claude.plist.backup-pre-burst"
+    BURST_PLIST="$HOME/Library/LaunchAgents/com.ibl5.automouse.plist"
+    BURST_BACKUP="$HOME/Library/LaunchAgents/com.ibl5.automouse.plist.backup-pre-burst"
     # Compare current time against cutoff (both in local time)
     if [ "$(date +%s)" -ge "$(date -j -f '%Y-%m-%dT%H:%M:%S' "$NIGHTLY_BURST_CUTOFF" +%s 2>/dev/null || echo 0)" ]; then
         echo "$(date '+%Y-%m-%d %H:%M:%S') Burst cutoff reached ($NIGHTLY_BURST_CUTOFF). Restoring production plist."
         if [ -f "$BURST_BACKUP" ]; then
-            launchctl remove com.ibl5.nightly-claude 2>/dev/null || true
+            launchctl remove com.ibl5.automouse 2>/dev/null || true
             sleep 1
             cp "$BURST_BACKUP" "$BURST_PLIST"
             rm -f "$BURST_BACKUP"
@@ -178,7 +178,7 @@ fi
 export CLAUDE_HEADLESS=1
 
 REPO="/Users/ajaynicolas/GitHub/IBL5"
-NIGHTLY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/nightly"
+NIGHTLY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
 LOG_DIR="$NIGHTLY_DIR/logs"
 QUEUE_DIR="$NIGHTLY_DIR/queue"
 MAX_ELAPSED=17100  # ~4h45m — stops around 4:45am, leaves headroom in the 5h usage window
@@ -264,21 +264,21 @@ run_heartbeat_watcher() {
 }
 
 # Append a per-phase cost row to the night's cost roll-up. Cost is parsed from
-# the phase's `exit:` line (emitted by nightly-stream-filter into the log). One
+# the phase's `exit:` line (emitted by automouse-stream-filter into the log). One
 # row per phase keeps this robust across split impl/postplan invocations — no
-# cross-phase variable dependency. See .claude/rules/nightly-workflow.md.
+# cross-phase variable dependency. See .claude/rules/automouse-workflow.md.
 append_cost_row() {
     local plan=$1 phase=$2 log_before=$3
     local cost report
     # `|| true` is load-bearing: under `set -euo pipefail` a killed phase emits no
     # `cost=` line, so grep exits non-zero and this plain assignment would abort the
-    # whole nightly loop before the `cost="?"` fallback below. Swallow it and continue.
+    # whole automouse loop before the `cost="?"` fallback below. Swallow it and continue.
     cost=$(tail -n +"$((log_before + 1))" "$LOG" | grep -oE 'cost=\$[0-9.]+' | tail -1 | sed 's/cost=\$//') || true
     [ -n "$cost" ] || cost="?"
     report="$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-costs.md"
     mkdir -p "$(dirname "$report")"
     if [ ! -f "$report" ]; then
-        printf '# Nightly cost roll-up — %s\n\n| Plan | Phase | Cost ($) |\n|---|---|---|\n' \
+        printf '# Automouse cost roll-up — %s\n\n| Plan | Phase | Cost ($) |\n|---|---|---|\n' \
             "$(date +%Y-%m-%d)" > "$report"
     fi
     printf '| %s | %s | %s |\n' "$plan" "$phase" "$cost" >> "$report"
@@ -332,7 +332,7 @@ write_env_stop_report() {
     slug=$(basename "$plan" .md)
     mkdir -p "$reports_dir"
     {
-        printf 'Nightly run STOPPED during %s of "%s" — %s.\n\n' "$phase" "$slug" "$reason"
+        printf 'Automouse run STOPPED during %s of "%s" — %s.\n\n' "$phase" "$slug" "$reason"
         printf 'The queue was left intact — no plans were skipped. It resumes next run.\n'
         printf 'If this recurs for the same plan, that plan may be malformed — review it.\n\n'
         printf '## Phase log tail\n\n```\n'
@@ -341,7 +341,7 @@ write_env_stop_report() {
     } > "$reports_dir/$(date +%Y-%m-%d)-env-stop-$slug.md"
 }
 
-# Move entries in a nightly subdir untouched for $ARCHIVE_AGE_DAYS into a sibling
+# Move entries in a automouse subdir untouched for $ARCHIVE_AGE_DAYS into a sibling
 # `<subdir>.archive/`, keeping the working dirs small without deleting history.
 # Matches regular files AND symlinks; `find` does not follow symlinks, so a
 # disposition symlink (done/, skipped/) is judged on its OWN mtime — the date it
@@ -364,7 +364,7 @@ archive_stale() {
 }
 
 # Atomically claim the oldest queued plan not already locked by a live sibling
-# runner, enabling several nightly-run processes to drain the queue in parallel
+# runner, enabling several automouse-run processes to drain the queue in parallel
 # without ever working the same plan twice. `mkdir` is atomic on the local FS, so
 # two racing runners can never both create the same lock dir — exactly one wins.
 # On success: echoes the claimed plan path to stdout and leaves
@@ -418,7 +418,7 @@ CAFFEINATE_PID=$!
 START=$(date +%s)
 PLANS_RUN=0
 
-echo "=== Nightly session starting at $(date) ===" >> "$LOG"
+echo "=== Automouse session starting at $(date) ===" >> "$LOG"
 
 # Startup archival: shrink the accumulating output dirs by moving entries idle
 # for $ARCHIVE_AGE_DAYS into sibling `.archive/` folders. queue/ (pending work,
@@ -529,7 +529,7 @@ while true; do
         echo "[$(date +%H:%M:%S)] impl model: $IMPL_MODEL for $PLAN_NAME" >> "$LOG"
         NIGHTLY_CMDPID_FILE="$CMDPID_FILE" \
         timeout "$REMAINING_SECS" \
-            claude -p "$(cat bin/nightly-prompt-impl)
+            claude -p "$(cat bin/automouse-prompt-impl)
 
 PLAN_FILE=$PLAN_NAME" \
                 --dangerously-skip-permissions \
@@ -537,9 +537,9 @@ PLAN_FILE=$PLAN_NAME" \
                 --effort high \
                 --output-format stream-json \
                 --verbose \
-                --name "nightly-impl-$(date +%Y-%m-%d-%H%M)" \
+                --name "automouse-impl-$(date +%Y-%m-%d-%H%M)" \
             2> >(grep -v 'thinking.type=enabled' >> "$LOG") \
-            | bin/lib/nightly-stream-filter "$HEARTBEAT_FILE" "$CMDPID_FILE" \
+            | bin/lib/automouse-stream-filter "$HEARTBEAT_FILE" "$CMDPID_FILE" \
             >> "$LOG" || IMPL_STATUS=$?
 
         kill "$WATCHER_PID" 2>/dev/null || true
@@ -619,7 +619,7 @@ PLAN_FILE=$PLAN_NAME" \
         PP_START=$(date +%s)
         NIGHTLY_CMDPID_FILE="$CMDPID_FILE" \
         timeout "$REMAINING_SECS" \
-            claude -p "$(cat bin/nightly-prompt-postplan)
+            claude -p "$(cat bin/automouse-prompt-postplan)
 
 PLAN_FILE=$PLAN_NAME" \
                 --dangerously-skip-permissions \
@@ -627,9 +627,9 @@ PLAN_FILE=$PLAN_NAME" \
                 --effort high \
                 --output-format stream-json \
                 --verbose \
-                --name "nightly-postplan-$(date +%Y-%m-%d-%H%M)" \
+                --name "automouse-postplan-$(date +%Y-%m-%d-%H%M)" \
             2> >(grep -v 'thinking.type=enabled' >> "$LOG") \
-            | bin/lib/nightly-stream-filter "$HEARTBEAT_FILE" "$CMDPID_FILE" \
+            | bin/lib/automouse-stream-filter "$HEARTBEAT_FILE" "$CMDPID_FILE" \
             >> "$LOG" || PP_STATUS=$?
 
         kill "$WATCHER_PID" 2>/dev/null || true
@@ -710,4 +710,4 @@ for lock in "$QUEUE_DIR"/*.md.lock; do
     fi
 done
 
-echo "=== Nightly session complete at $(date) — $PLANS_RUN plan(s) run ===" >> "$LOG"
+echo "=== Automouse session complete at $(date) — $PLANS_RUN plan(s) run ===" >> "$LOG"

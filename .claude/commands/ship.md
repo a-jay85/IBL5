@@ -23,7 +23,7 @@ last_verified: 2026-06-20
 Evaluate all three before doing any work. On any hit, refuse with the one-line reason and stop.
 
 1. **Current branch is `master` / `main` / `HEAD`** (`git rev-parse --abbrev-ref HEAD`) → refuse: work belongs in a worktree, not the reference/read-only main checkout (**ADR-0062**; see `.claude/rules/workflow-continuity.md`).
-2. **`$CLAUDE_HEADLESS` = `1`** → refuse: the nightly/headless run owns post-plan; `/ship` is interactive-only.
+2. **`$CLAUDE_HEADLESS` = `1`** → refuse: the automouse/headless run owns post-plan; `/ship` is interactive-only.
 3. **Clean tree AND no commits ahead of `origin/master`** (`git status --porcelain` empty **AND** `git log --oneline origin/master..HEAD` empty) → refuse: nothing to ship.
 
 **Defense-in-depth note (the gate is NOT redundant).** `bin/post-plan-now` independently enforces refusals (1)–(3): it `exit 1`s on `master`/`main`/`HEAD` and on a nothing-to-ship tree, and its headless skip is gated behind `--auto` (which `/ship` does not pass). `/ship`'s own gate still earns its place for two reasons: (a) earlier, clearer UX messaging, and (b) the **`--no-merge` path never touches `post-plan-now` at all** and would otherwise be unguarded.

@@ -15,7 +15,7 @@ nohup.out
 settings.local.json
 .claude/.workflow-pending
 .claude/scheduled_tasks.lock
-.claude/nightly/handoff/
+.claude/automouse/handoff/
 .nightly/
 .claude/rules/codebase-map.md
 

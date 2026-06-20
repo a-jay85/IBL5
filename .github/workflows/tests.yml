@@ -441,16 +441,16 @@ jobs:
 
           echo "OK: no host mariadb invocations found outside bin/db-query."
 
-  nightly-impl-model-test:
-    name: Nightly impl-model parser test
+  automouse-impl-model-test:
+    name: Automouse impl-model parser test
     needs: [changes]
     if: needs.changes.outputs.shell == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
-      - name: Run nightly impl-model parser regression test
-        run: bin/test-nightly-impl-model
+      - name: Run automouse impl-model parser regression test
+        run: bin/test-automouse-impl-model
 
   update-baselines:
     name: Update coverage & PHPStan baselines
@@ -562,8 +562,8 @@ jobs:
         run: bin/test-check-phpunit-hygiene
       - name: bin/test-refactor-flag
         run: bin/test-refactor-flag
-      - name: bin/test-nightly-queue
-        run: bin/test-nightly-queue
+      - name: bin/test-automouse-queue
+        run: bin/test-automouse-queue
       - name: bin/test-wt-status
         run: bin/test-wt-status
       - name: bin/test-check-plan
@@ -574,7 +574,7 @@ jobs:
   gate:
     name: Tests and Analysis
     if: always()
-    needs: [changes, test, audit-php, audit-js, ibl6-checks, db-integration, phpstan, phpunit-hygiene, shellcheck, host-mariadb-guard, nightly-impl-model-test, update-baselines, infection-excludes, harness-tests]
+    needs: [changes, test, audit-php, audit-js, ibl6-checks, db-integration, phpstan, phpunit-hygiene, shellcheck, host-mariadb-guard, automouse-impl-model-test, update-baselines, infection-excludes, harness-tests]
     runs-on: ubuntu-latest
     steps:
       - run: exit 1

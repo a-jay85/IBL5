@@ -1,8 +1,8 @@
 #!/bin/bash
-# Usage: claude ... --output-format stream-json | nightly-stream-filter <heartbeat_file> [<cmdpid_file>]
+# Usage: claude ... --output-format stream-json | automouse-stream-filter <heartbeat_file> [<cmdpid_file>]
 set -euo pipefail
 
-HEARTBEAT_FILE="${1:?Usage: nightly-stream-filter <heartbeat_file> [<cmdpid_file>]}"
+HEARTBEAT_FILE="${1:?Usage: automouse-stream-filter <heartbeat_file> [<cmdpid_file>]}"
 CMDPID_FILE="${2:-}"
 TOOL_COUNT=0
 TURN_COUNT=1

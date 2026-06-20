@@ -14,7 +14,7 @@ last_verified: 2026-06-20
 > **⚠️ Seed caveat:** the audit ran against the **dev DB** (`main.localhost`), not the CI seed. Per `feedback_a11y_contrast_scan_seed` (PR #1009), the dev DB misses conditional/data-driven content. Findings are split below into **seed-independent** (template/markup-driven — CI will reproduce; safe to plan now) and **seed-dependent** (must be re-verified on the `bin/wt-up --seed` / CI-seed stack before planning). Burn-down plans seed their allowlists **empirically at impl time**, not from this doc's page lists.
 
 **Disposition legend:**
-- 🟢 **nightly-safe** — fix is mechanical + verifiable by extending the spec ratchet (green-green); planned + queued.
+- 🟢 **automouse-safe** — fix is mechanical + verifiable by extending the spec ratchet (green-green); planned + queued.
 - 🟡 **supervised** — needs human judgment (label wording, "which heading is THE title", architectural refactor) or carries VR-regression risk → `auto_merge: false`.
 - 🔵 **seed-verify** — re-run axe on the CI-seed stack to confirm reproducibility before planning.
 - ⚪ **out of scope** — covered elsewhere (contrast backlog) or the page is slated for deletion.
@@ -56,7 +56,7 @@ last_verified: 2026-06-20
 **Location:** news index/categories/article (12 nodes each — consistent → template icon-link in `modules/News`); homepage + debug menu (12 nodes — the `last-sim-recap` panel team links, **data-dependent**).
 **Problem:** Links with no discernible text. **This is a WCAG-A failure on pages the existing spec already runs `wcag2a` against while CI is green → it is data-dependent (dev seed renders sim-recap/news rows the CI seed may not).**
 **Direction:** Add `aria-label` (team name / article title — available in context) or visible text. The News template portion is likely mechanical once reproduced.
-**Disposition:** 🔵 — re-run axe on the CI-seed stack. If reproduced: the News-template subset → nightly-safe plan; the sim-recap subset → confirm seed then plan. If NOT reproduced on CI seed, a ratchet assertion would go green with no fix.
+**Disposition:** 🔵 — re-run axe on the CI-seed stack. If reproduced: the News-template subset → automouse-safe plan; the sim-recap subset → confirm seed then plan. If NOT reproduced on CI seed, a ratchet assertion would go green with no fix.
 
 ### target-size — wcag22aa (WCAG 2.2), serious — 🟡🔵
 **Location:** topics (100 nodes!), homepage + news article + debug menu (2 nodes — sim-recap `leaders-tabbed` team links).
@@ -108,7 +108,7 @@ last_verified: 2026-06-20
 
 ---
 
-## Planned (nightly-safe) — queued 2026-06-13
+## Planned (automouse-safe) — queued 2026-06-13
 
 | Plan | Scope |
 |------|-------|

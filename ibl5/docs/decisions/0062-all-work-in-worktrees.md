@@ -1,6 +1,6 @@
 ---
-description: All work happens in a git worktree; the main checkout (master) is reference/read-only and is never edited directly. Generalizes the nightly agent's "never modify files on master" rule to every session — interactive and headless, code and repo-meta (rules, docs, config, ADRs). Records why and the enforcement surfaces (auto-commit Stop hook flips to a warning in the main checkout).
-last_verified: 2026-06-13
+description: All work happens in a git worktree; the main checkout (master) is reference/read-only and is never edited directly. Generalizes the automouse agent's "never modify files on master" rule to every session — interactive and headless, code and repo-meta (rules, docs, config, ADRs). Records why and the enforcement surfaces (auto-commit Stop hook flips to a warning in the main checkout).
+last_verified: 2026-06-20
 ---
 
 # ADR-0062: All work happens in a worktree; the main checkout is reference-only
@@ -13,7 +13,7 @@ last_verified: 2026-06-13
 Worktrees were already the norm for plan-driven implementation
 (`workflow-continuity.md` told you to `bin/wt-new` *before* implementation), but the
 prohibition on editing the main checkout directly only existed in one place: the
-nightly agent's prompt (`bin/nightly-prompt-impl`: "Work only in worktrees, never
+automouse agent's prompt (`bin/automouse-prompt-impl`: "Work only in worktrees, never
 modify files on the master branch directly"). Interactive sessions had no such rule.
 
 In practice this left the main checkout (`/Users/ajaynicolas/GitHub/IBL5`, branch
@@ -60,5 +60,5 @@ as before. This ADR governs **repo files only**.
   failure mode it prevents is worse.
 - The auto-commit Stop hook no longer nudges-to-commit in the main checkout; an
   uncommitted main checkout is now a signal that work landed in the wrong place.
-- Lineage: generalizes the nightly-only rule in `bin/nightly-prompt-impl` to all sessions;
+- Lineage: generalizes the automouse-only rule in `bin/automouse-prompt-impl` to all sessions;
   builds on ADR-0046 (worktree layout) and the `workflow-continuity.md` rule.

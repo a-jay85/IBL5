@@ -2,17 +2,17 @@ name: Human Sign-off
 
 # Deterministic human-sign-off gate for feature PRs.
 #
-# Why this exists: the nightly autonomous pipeline (bin/nightly-run → /post-plan
+# Why this exists: the automouse autonomous pipeline (bin/automouse-run → /post-plan
 # Phase 6.5) arms `gh pr merge --squash --auto`, and master's branch protection
 # requires no reviews — so feature PRs merged unattended overnight (see the
 # revert of #1073–#1076). A docs/frontmatter convention (#1072) could not stop
-# this: the nightly path never reads it and GitHub has nothing to block on.
+# this: the automouse path never reads it and GitHub has nothing to block on.
 #
 # This job IS that block. Once added to master's required status checks, a
 # `feat:` PR stays un-mergeable (red required check) until a human inspects it
 # and applies the `human-approved` label. `--auto` queues but GitHub never
 # completes the merge while a required check is red. Non-feature work
-# (fix/refactor/chore/docs/ci/revert/…) passes automatically, so the nightly
+# (fix/refactor/chore/docs/ci/revert/…) passes automatically, so the automouse
 # pipeline can still auto-merge maintenance.
 
 on:

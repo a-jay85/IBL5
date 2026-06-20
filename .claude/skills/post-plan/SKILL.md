@@ -12,7 +12,7 @@ last_verified: 2026-06-20
 
 Execute all phases below **sequentially in a single response**. Do NOT stop, ask for input, or return control between phases.
 
-**Phase 11 (Background Process Cleanup) is MANDATORY and must ALWAYS be the last thing you execute before ending your turn.** No phase — including Phase 9 (Retrospective) — is a valid stopping point. If you reach Phase 9 and have nothing to save, continue directly to Phase 10 and Phase 11. Ending your turn before Phase 11 leaves background processes alive, which prevents the `claude` process from exiting and triggers a stall-kill in the nightly runner.
+**Phase 11 (Background Process Cleanup) is MANDATORY and must ALWAYS be the last thing you execute before ending your turn.** No phase — including Phase 9 (Retrospective) — is a valid stopping point. If you reach Phase 9 and have nothing to save, continue directly to Phase 10 and Phase 11. Ending your turn before Phase 11 leaves background processes alive, which prevents the `claude` process from exiting and triggers a stall-kill in the automouse runner.
 
 Phase numbers below are local to this skill. The variables computed in Phase 3 (`HAS_PHP`, `NON_CODE_ONLY`, `DOCS_ONLY`, `CSS_ONLY`, `MIGRATION_ONLY`, `HAS_MODIFIED`, `HAS_COMMENTS_IN_DIFF`, `HAS_GO`, `GO_TOUCHED`, `ENGINE_ONLY`, `GOLDEN_CHANGED`, `DIFF`, etc.) are consulted by every downstream phase to gate sub-agent launches — never recompute them locally.
 
@@ -38,7 +38,7 @@ Phase 2 makes the initial commit and opens the PR. Phases that may modify files 
 The single exception to the "never stop or ask" rule above is that this phase may emit **one** advisory line — it still does **not** stop, wait, or return control. Run the gate, emit at most one line, then continue straight into Phase 1.
 
 ```bash
-# Interactive only. In nightly/headless mode this skill is already invoked as a
+# Interactive only. In automouse/headless mode this skill is already invoked as a
 # fresh `claude -p` session (the cheap path), so the advisory must NEVER fire there.
 [ -n "$CLAUDE_HEADLESS" ] && echo "ADVISORY=skip-headless" || echo "ADVISORY=eligible-interactive"
 ```
@@ -64,7 +64,7 @@ rm -f /tmp/claude-plan-active-$PPID
 Then locate the plan backing this branch so later phases can verify the implementation against its intent. The plan is the spec; phases 4–6 check conformance to it.
 
 ```bash
-# Authoritative in nightly mode: the handoff JSON's plan_file (the postplan prompt passes its path).
+# Authoritative in automouse mode: the handoff JSON's plan_file (the postplan prompt passes its path).
 # Interactive fallback: branch slug -> ~/.claude/plans/<slug>.md.
 SLUG=$(git rev-parse --abbrev-ref HEAD)
 PLAN_FILE=""
@@ -79,7 +79,7 @@ else
 fi
 ```
 
-When the nightly postplan prompt supplied an authoritative plan path, use it instead of the branch-slug derivation above. Record `$PLAN_FILE` and the flags. **Plan conformance is additive, never a hard dependency** — when `PLAN_FOUND=none` (any PR with no `/plan` file), every "if a plan exists" gate below is skipped and post-plan runs as it does today.
+When the automouse postplan prompt supplied an authoritative plan path, use it instead of the branch-slug derivation above. Record `$PLAN_FILE` and the flags. **Plan conformance is additive, never a hard dependency** — when `PLAN_FOUND=none` (any PR with no `/plan` file), every "if a plan exists" gate below is skipped and post-plan runs as it does today.
 
 ---
 
@@ -391,7 +391,7 @@ cd <worktree>/ibl5 && composer run analyse
        echo "golangci-lint not on PATH — deferring lint to engine.yml CI job (Phase 7)"
    fi
    ```
-   golangci-lint is not preinstalled in a fresh nightly env. A missing linter is **not** a Go-track `fail` — the `engine.yml` CI job enforces lint and is watched in Phase 7.
+   golangci-lint is not preinstalled in a fresh automouse env. A missing linter is **not** a Go-track `fail` — the `engine.yml` CI job enforces lint and is watched in Phase 7.
 3. If `fmt-check` or `cover` fails: fix in worktree, commit, push, and re-run the Go track (same fix-and-rerun discipline as the PHP tracks). **Never** resolve a red `TestGolden` by running `make -C <worktree>/engine golden-update` unless the output change was intentional and is called out in the PR — a silent regenerate masks a behavior regression (see Phase 6.5 condition (5)).
 
 **E2E agent (Haiku):**
@@ -507,7 +507,7 @@ grep -q 'PHASE5_VERIFY_STATUS=fail' /tmp/post-plan-phase5-status-$PPID 2>/dev/nu
 **Condition (5) — golden-snapshot safety (headless only).** If `$GOLDEN_CHANGED` is `true` AND `$CLAUDE_HEADLESS` is set, **block** auto-merge: a change to `engine/internal/sim/testdata/golden.json` means the engine's simulation output changed, and a snapshot change with no human present is exactly when not to auto-ship (an agent can turn a red `TestGolden` green by regenerating the snapshot, silently masking a regression). In **interactive** mode (`$CLAUDE_HEADLESS` unset), do **not** block — emit a prominent warning with the same text so the human confirms intent before merging. This condition is independent of `HAS_GO` (a golden-only diff is `HAS_GO=false` but must still trigger it):
 
 ```bash
-# condition (5): blocks ONLY when golden changed AND running headless (nightly autonomous)
+# condition (5): blocks ONLY when golden changed AND running headless (automouse autonomous)
 [ "$GOLDEN_CHANGED" = true ] && [ -n "$CLAUDE_HEADLESS" ] \
   && echo "BLOCKED: golden.json (simulation behavior) changed in headless mode — confirm this was an intentional 'make -C engine golden-update', not a masked regression"
 ```
@@ -530,7 +530,7 @@ gh pr view --json body --jq '.body' \
     done
 ```
 
-**Condition (7) — plan-time hold (`auto_merge: false`).** The plan author predicts at plan-time (via `/plan` Step 4 gate 14) whether the change wants a human at merge, and records it as a line-1 frontmatter field. If the located plan file declares `auto_merge: false`, **block** — the PR opens and gets reviewed, but auto-merge does not arm. Parse the line-1 YAML frontmatter only (a body documenting the syntax can't self-select). **Derive `$PLAN_FILE` inside this block** — bash variables do not survive across phases/shells (see Phase 3's note), so a bare `$PLAN_FILE` assigned in Phase 1 would be empty here and the check would silently no-op. The snippet re-derives the path from the branch slug (the same derivation `bin/post-plan-now` and Phase 1's interactive fallback use; in nightly the authoritative path the postplan prompt supplies is identical, since the queue symlinks plans by branch slug). Absent file or absent field ⇒ no hold:
+**Condition (7) — plan-time hold (`auto_merge: false`).** The plan author predicts at plan-time (via `/plan` Step 4 gate 14) whether the change wants a human at merge, and records it as a line-1 frontmatter field. If the located plan file declares `auto_merge: false`, **block** — the PR opens and gets reviewed, but auto-merge does not arm. Parse the line-1 YAML frontmatter only (a body documenting the syntax can't self-select). **Derive `$PLAN_FILE` inside this block** — bash variables do not survive across phases/shells (see Phase 3's note), so a bare `$PLAN_FILE` assigned in Phase 1 would be empty here and the check would silently no-op. The snippet re-derives the path from the branch slug (the same derivation `bin/post-plan-now` and Phase 1's interactive fallback use; in automouse the authoritative path the postplan prompt supplies is identical, since the queue symlinks plans by branch slug). Absent file or absent field ⇒ no hold:
 
 ```bash
 # condition (7): block if the plan declares auto_merge: false (line-1 frontmatter only).
@@ -581,7 +581,7 @@ If not met: do **not** arm auto-merge. Report which condition(s) blocked — the
 > - `gh pr view <pr> --json statusCheckRollup` → `status` ∈ `COMPLETED | IN_PROGRESS | QUEUED`, `conclusion` ∈ `SUCCESS | FAILURE | SKIPPED | …`.
 > Do not write `state == "COMPLETED"` or `conclusion == "failure"` against `gh pr checks` — both are silently false forever.
 
-0. **Early-exit on merged PR:** Before any polling, run `gh pr view <pr> --json state --jq '.state'`. If `MERGED`, skip the rest of Phase 7 and continue at Phase 8 — the auto-merge armed in Phase 6.5 has already fired (required checks were already green) and watching CI to completion adds nothing but wall-clock burn. This is the load-bearing optimization that keeps the nightly loop from burning a full watch timeout on an already-shipped PR.
+0. **Early-exit on merged PR:** Before any polling, run `gh pr view <pr> --json state --jq '.state'`. If `MERGED`, skip the rest of Phase 7 and continue at Phase 8 — the auto-merge armed in Phase 6.5 has already fired (required checks were already green) and watching CI to completion adds nothing but wall-clock burn. This is the load-bearing optimization that keeps the automouse loop from burning a full watch timeout on an already-shipped PR.
 1. **Wait for checks to register:** Poll `gh pr checks <pr> --json name,state 2>/dev/null | jq 'length'` up to 4 times with 15s waits. If count stays 0, warn user and continue to Phase 8.
 2. **Block until CI settles:** `gh pr checks <pr> --watch --fail-fast --interval 20` (Bash timeout 1200000 = 20 min cap — leaves a ~40-min cushion under `MAX_PP_SECS=3600` for Phase 5.0 conformance + Phases 8-11 cleanup). The gh CLI handles the polling and exit logic itself; do not re-implement it in jq. Exit codes: `0` = all checks passed, `8` = at least one failed, other = transport error.
 3. **If exit 0** → Phase 8. (Mid-watch merge detection was intentionally dropped: `gh pr checks --watch` exits as soon as the last check settles, so the only window auto-merge could fire inside the watch is the ~5–30s between final-check-pass and auto-merge action — not worth a hand-rolled poll loop. Step 0 already covers the case where the PR merged before Phase 7 started.)
@@ -621,7 +621,7 @@ Save to memory only if something was learned that would **prevent a bug** in a f
 
 ## Phase 10: Preview Environment
 
-**Skip entirely if** `$CLAUDE_HEADLESS` is set (nightly autonomous mode — no human present to verify).
+**Skip entirely if** `$CLAUDE_HEADLESS` is set (automouse autonomous mode — no human present to verify).
 
 Check the PR state using the PR number captured in Phase 4A:
 
@@ -716,7 +716,7 @@ The PR has been merged (either auto-merge fired during CI watch, or it was alrea
 
 **You MUST execute this phase before ending your turn.** This is not optional even if all earlier phases succeeded cleanly.
 
-Background shells from earlier phases (`bin/e2e-wt.sh` in Phase 5, `gh pr checks --watch` in Phase 7) may still be running. If they hold the pipeline open after you emit your final response, the nightly runner's stall-kill fires after 10 minutes and burns an attempt — three burns poison-pill the plan.
+Background shells from earlier phases (`bin/e2e-wt.sh` in Phase 5, `gh pr checks --watch` in Phase 7) may still be running. If they hold the pipeline open after you emit your final response, the automouse runner's stall-kill fires after 10 minutes and burns an attempt — three burns poison-pill the plan.
 
 Kill known lingering patterns so their tool results deliver immediately (cache warm) rather than hours later (cache miss):
 

@@ -43,7 +43,7 @@ class RookieOptionView implements RookieOptionViewInterface
     </div>
     <div class="ibl-card__body text-center">
         <div class="ibl-alert ibl-alert--warning">
-            <strong>Warning:</strong><br>By exercising this option, you cannot use an in-season contract extension on this player next season. They will become a free agent after the option year.
+            By exercising this option, you cannot use an in-season contract extension on this player next season. They will become a free agent after the option year.
         </div>
 
         <form name="RookieExtend" method="post" action="modules.php?name=Player&amp;pa=processrookieoption" class="text-center">

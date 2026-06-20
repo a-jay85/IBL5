@@ -43,7 +43,7 @@ Effort scale:
 **Suggested direction:** Move streak/season-start computation to `RecordHoldersService` or a dedicated `StreakCalculator`; extract HEAT champion CTE into a DB view.
 **Est. effort:** M
 **Risk if untouched:** Streak/season-date logic must be found inside a repository — a persistent layer violation attracting future bugs.
-**Status:** Completed (merged #1040, maintenance-38) — extracted StreakCalculator from RecordHoldersRepository.
+**Status:** Completed — StreakCalculator extracted from RecordHoldersRepository (merged #1040, maintenance-38); HEAT-champion CTE relocated to `vw_heat_champions` view via migration 149 (merged #1090, maintenance-47).
 
 ### 1.3 RecordBreakingDetector — Discord Responsibility Bleed
 **Location:** `ibl5/classes/RecordHolders/RecordBreakingDetector.php`
@@ -1116,6 +1116,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Extend `BaseMysqliRepository`; or at least add `LoggerFactory` on failure paths.
 **Est. effort:** S
 **Risk if untouched:** Cache poisoning silent; cache-read failures cause expensive cold queries undetected.
+**Status:** Completed (merged #1089, maintenance-39b) — `DatabaseCache` now extends `BaseMysqliRepository`; failure paths log instead of silently returning null.
 
 ### 7.6 IN-Clause Boilerplate Copy-Pasted Across 10 Repositories
 **Location:** `FreeAgencyAdminRepository`, `TradeAssetRepository`, `TradeCashRepository`, `SeasonQueryRepository`, `VotingRepository`, `SeasonArchiveRepository`, `LeagueControlPanelRepository`, `PlrParserRepository`, `UI/Tables/PeriodAverages`, `ProjectedDraftOrderRepository`
@@ -2083,7 +2084,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Constant `PlrBoxScoreRepository::PLAYED_CONDITION = 'game_min > 0'`; add a PHPStan rule or schema comment documenting the invariant.
 **Est. effort:** S
 **Risk if untouched:** New consumers inflate games-played counts or allow 0-stat season-high rows.
-**Status:** Completed (merged #1033, maintenance-40) — cross-module query dedup.
+**Status:** Completed (merged #1033, maintenance-40) — cross-module query dedup. DNP-correctness follow-ups: playoff/HEAT career & per-season averages now exclude DNP rows in PHP (merged #1087, maintenance-40b) and in the leaderboard DB views (merged #1088, maintenance-40c).
 
 ---
 
@@ -2187,7 +2188,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Register as shared factory in container; or cache `SeasonQueryRepository` results.
 **Est. effort:** S
 **Risk if untouched:** Every new season-aware feature adds another redundant query.
-**Status:** In progress — shared `Season` factory registered in container via `ConfigBootstrap::registerSharedServices()` (PR1, 2026-05-19); call-site migration to follow in PR2/PR3.
+**Status:** Completed (merged #1096, maintenance-49 / chunk C16b) — the ~30/90 raw figure reconciled to 18 actionable `new Season($db)` construction sites (constant refs and already-DI'd params excluded); all 18 converted to trailing-optional `?Season $season = null` injection with the existing factory fallback (green-green). `Season::IBL_*` constant refs are not DI targets and are out of scope by nature.
 
 ### 14.14 `LoggerFactory` Static Service Locator Used in 20+ Sites
 **Location:** `Logging/LoggerFactory.php`; called via `LoggerFactory::getChannel('audit')` across controllers
@@ -2195,7 +2196,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Inject `LoggerInterface` (PSR-3) per channel at construction; retire static calls outside bootstrap.
 **Est. effort:** M
 **Risk if untouched:** Log impl swaps require editing factory class; mock injection impossible in tests.
-**Status:** In progress — per-channel `logger.<channel>` bindings registered in container (PR1, 2026-05-19); static call-site burndown to follow in PR4.
+**Status:** Completed — per-channel `logger.<channel>` bindings registered in container (PR1, 2026-05-19); static call-site burndown done: `?LoggerInterface` injected into 20 single-channel classes (merged #1093, maintenance-48 / chunk C16c) and into 7 multi-channel classes (merged #1094, maintenance-52). `Auth\DevAutoLogin` also converted static→instance with an injectable `'auth'` logger (merged #1095).
 
 ### 14.15 `AppPaths::root()` Stateful Static Singleton
 **Location:** `Bootstrap/AppPaths.php`; actual consumers (repo-wide sweep 2026-06-09): `Updater/ScheduleUpdater.php:149,234`, `PageLayout/PageLayout.php:78,111`. The previously listed consumers (`Cache/PageCache.php`, `Mail/MailService.php`, `Logging/LoggerFactory.php`, `Auth/DevAutoLogin.php`) use raw `dirname(__DIR__, 2)` / `__DIR__` — not `AppPaths::root()`.
@@ -2203,7 +2204,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Constructor-injected `string $basePath` from container.
 **Est. effort:** S
 **Risk if untouched:** Path-dependent classes untestable without filesystem coupling.
-**Status:** Partial (2026-06-09) — `ScheduleUpdater` now takes `?string $basePath = null` (fallback `AppPaths::root()`); `PageLayout::header()` is a static method with no constructor seam so it still calls `AppPaths::root()` directly — eliminating the singleton requires converting `PageLayout` to an instance class, deferred to a separate plan (suggested slug: `maintenance-51-pagelayout-instance-class`).
+**Status:** Partial + remainder Declined. `ScheduleUpdater` now takes `?string $basePath = null` (fallback `AppPaths::root()`, 2026-06-09). PageLayout remainder — **Declined (user call 2026-06-13):** `PageLayout`'s `AppPaths::root()` access stays intentional-static. Converting `PageLayout` to an instance class is disproportionate (155 static call sites, no DI seam) and a trailing `?string $basePath` param seam was rejected as test-only ceremony that wouldn't even eliminate the `AppPaths::root()` singleton (the fallback remains). The `DevAutoLogin` half was completed separately (static→instance, merged #1095).
 
 ### 14.16 Front Controller Includes Module by `$name` String Concatenation
 **Location:** `ibl5/index.php` lines 38-60: `$modpath = "modules/$name/" . $mod_file . ".php"; include $modpath;`

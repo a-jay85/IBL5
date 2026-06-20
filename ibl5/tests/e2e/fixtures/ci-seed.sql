@@ -408,12 +408,14 @@ INSERT INTO ibl_plr (
    65, 22, 88,
    'a0000000-0000-0000-0000-000000200032');
 
--- pid=200000030 "Extension Card Target": Metros (tid=1) veteran in his final
+-- pid=200000033 "Extension Card Target": Metros (tid=1) veteran in his final
 -- contract year (cy=2, cyt=2, salary_yr3=0 → next-year salary is 0), so
 -- canRenegotiateContract() returns true in a non-Free-Agency phase. Owned by the
 -- CI user and touched by NO other spec, so the negotiate happy path (and its
 -- flippable trading card) renders deterministically under fullyParallel — unlike
 -- pid=30, whose contract row is mutated by contract-extension-submission.spec.ts.
+-- Uses a fresh pid (200000033) — 200000030/031/032 are already taken above
+-- (200000030 is Konstantinos Papadopoulos, the depth-chart-mobile test player).
 -- Deactivated (dc_can_play_in_game=0 below) so it does not disturb the Metros
 -- 12-active roster baseline. exp=8 with draftround=1 stays off the rookie-option
 -- path (wasRookieOptioned requires exp===4).
@@ -429,7 +431,7 @@ INSERT INTO ibl_plr (
   stats_tvr, stats_blk, stats_pf,
   uuid
 ) VALUES
-  (200000030, 'Extension Card Target', 30, 30, 1, 'SG', 22,
+  (200000033, 'Extension Card Target', 30, 30, 1, 'SG', 22,
    85, 80, 75, 70, 65, 78, 74, 76, 71,
    2, 2, 1500, 1650,
    0, 8,
@@ -438,10 +440,9 @@ INSERT INTO ibl_plr (
    41, 1260, 200, 440, 100, 120,
    50, 130, 35, 120, 150, 50,
    70, 15, 80,
-   'a0000000-0000-0000-0000-000000200030')
-ON DUPLICATE KEY UPDATE name = VALUES(name), teamid = VALUES(teamid), cy = VALUES(cy), cyt = VALUES(cyt);
+   'a0000000-0000-0000-0000-000000200033');
 -- Deactivate so the Metros active-roster baseline stays at exactly 12.
-UPDATE ibl_plr SET dc_can_play_in_game = 0 WHERE pid = 200000030;
+UPDATE ibl_plr SET dc_can_play_in_game = 0 WHERE pid = 200000033;
 
 -- Cash consideration record for Free Agency placeholder filtering tests.
 -- Cash entries live in ibl_cash_considerations (not ibl_plr) since migration 095.

@@ -1,0 +1,150 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+require_once __DIR__ . '/../ibl5/vendor/autoload.php';
+
+$worktreeClasses = realpath(__DIR__ . '/../ibl5/classes');
+if ($worktreeClasses !== false && is_link(__DIR__ . '/../ibl5/vendor')) {
+    spl_autoload_register(static function (string $class) use ($worktreeClasses): void {
+        $file = $worktreeClasses . '/' . str_replace('\\', '/', $class) . '.php';
+        if (file_exists($file)) {
+            require $file;
+        }
+    }, true, true);
+}
+
+use Cli\LighthouseUrls;
+use Module\ModuleRegistry;
+
+$baseUrl = 'http://localhost:8080';
+$jsonOutput = false;
+$useStdin = false;
+
+foreach ($argv as $i => $arg) {
+    if ($i === 0) {
+        continue;
+    }
+    if (str_starts_with($arg, '--base-url=')) {
+        $baseUrl = substr($arg, strlen('--base-url='));
+    } elseif ($arg === '--json') {
+        $jsonOutput = true;
+    } elseif ($arg === '--stdin') {
+        $useStdin = true;
+    } elseif ($arg === '--help') {
+        fwrite(STDOUT, "Usage: bin/lighthouse-pr-urls [--base-url=URL] [--json] [--stdin]\n");
+        exit(0);
+    } else {
+        fwrite(STDERR, "Unknown argument: $arg\n");
+        fwrite(STDERR, "Usage: bin/lighthouse-pr-urls [--base-url=URL] [--json] [--stdin]\n");
+        exit(2);
+    }
+}
+
+$baseUrl = rtrim($baseUrl, '/');
+
+/**
+ * @param list<string> $urls
+ */
+$emit = static function (array $urls) use ($jsonOutput): void {
+    if ($jsonOutput) {
+        fwrite(STDOUT, json_encode($urls, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+    } else {
+        foreach ($urls as $url) {
+            fwrite(STDOUT, $url . "\n");
+        }
+    }
+};
+
+// --- Acquire the changed-path list -----------------------------------------
+if ($useStdin) {
+    $rawDiff = stream_get_contents(STDIN);
+    if ($rawDiff === false) {
+        $rawDiff = '';
+    }
+} else {
+    // argv-array form: no untrusted data is interpolated into a shell string.
+    $descriptors = [
+        0 => ['pipe', 'r'],
+        1 => ['pipe', 'w'],
+        2 => ['pipe', 'w'],
+    ];
+    $proc = proc_open(
+        ['git', 'diff', '--name-only', 'origin/master...HEAD'],
+        $descriptors,
+        $pipes
+    );
+    if (!is_resource($proc)) {
+        fwrite(STDERR, "Failed to run git diff\n");
+        exit(1);
+    }
+    fclose($pipes[0]);
+    $rawDiff = stream_get_contents($pipes[1]);
+    if ($rawDiff === false) {
+        $rawDiff = '';
+    }
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    proc_close($proc);
+}
+
+$paths = array_values(array_filter(
+    array_map('trim', explode("\n", $rawDiff)),
+    static fn (string $line): bool => $line !== ''
+));
+
+// --- 1. Global fallback triggers -------------------------------------------
+// Any global asset / class / workflow-config change audits the curated
+// representative set rather than a module-scoped subset.
+foreach ($paths as $path) {
+    if (
+        str_ends_with($path, '.css')
+        || str_ends_with($path, '.ts')
+        || str_ends_with($path, '.js')
+        || str_starts_with($path, 'ibl5/classes/')
+        || str_starts_with($path, '.github/workflows/lighthouse')
+        || $path === 'ibl5/.lighthouserc.json'
+    ) {
+        $emit(LighthouseUrls::representativeUrls($baseUrl));
+        exit(0);
+    }
+}
+
+// --- 2/4. Module mapping (deduped by URL) ----------------------------------
+$modulePrefix = 'ibl5/modules/';
+$moduleUrls = [];
+foreach ($paths as $path) {
+    if (!str_starts_with($path, $modulePrefix)) {
+        continue;
+    }
+    $rest = substr($path, strlen($modulePrefix));
+    $slash = strpos($rest, '/');
+    if ($slash === false) {
+        continue; // strict `ibl5/modules/<Name>/...` prefix only
+    }
+    $name = substr($rest, 0, $slash);
+    if (ModuleRegistry::isValid($name)) {
+        $url = LighthouseUrls::moduleUrl($name, $baseUrl);
+        $moduleUrls[$url] = $url;
+    }
+}
+$moduleUrls = array_values($moduleUrls);
+
+// --- 5. Cap: a sweeping change is better covered by the representative set --
+if (count($moduleUrls) > 8) {
+    $emit(LighthouseUrls::representativeUrls($baseUrl));
+    exit(0);
+}
+
+// --- 6. Empty / no-mappable fallback: never emit an empty list -------------
+if ($moduleUrls === []) {
+    $emit(LighthouseUrls::representativeUrls($baseUrl));
+    exit(0);
+}
+
+// --- 3. Always include the homepage ----------------------------------------
+$urls = array_merge([$baseUrl . '/ibl5/index.php'], $moduleUrls);
+
+$emit($urls);
+exit(0);

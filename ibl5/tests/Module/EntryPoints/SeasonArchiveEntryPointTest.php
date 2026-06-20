@@ -4,6 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Module\EntryPoints;
 
+/**
+ * Routing characterization tests for modules/SeasonArchive/index.php.
+ *
+ * Pins the three routing branches (index, detail, null-fall-through) without
+ * asserting on byte-exact output — that is owned by SeasonArchiveGoldenMasterTest.
+ */
 class SeasonArchiveEntryPointTest extends ModuleEntryPointTestCase
 {
     protected function setUp(): void
@@ -12,45 +18,51 @@ class SeasonArchiveEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
     }
 
-    public function testNoYearShowsSeasonIndex(): void
+    public function testYearZeroRoutesToIndex(): void
+    {
+        $output = $this->runModule('SeasonArchive', get: ['year' => '0']);
+
+        $this->assertStringContainsString('IBL Season Archive', $output);
+        $this->assertStringNotContainsString('season-archive-nav', $output);
+    }
+
+    public function testYearAbsentRoutesToIndex(): void
     {
         $output = $this->runModule('SeasonArchive');
 
-        $this->assertNotEmpty($output);
-        $this->assertQueryExecuted('ibl_awards');
+        $this->assertStringContainsString('IBL Season Archive', $output);
+        $this->assertStringNotContainsString('season-archive-nav', $output);
     }
 
-    public function testValidYearShowsDetail(): void
+    public function testYearPresentWithSeasonDataRoutesToDetail(): void
     {
+        // Award row → getSeasonDetail(1989) returns non-null → detail page renders.
         $this->mockDb->onQuery('ibl_awards', [
-            ['year' => 2020, 'award' => 'MVP', 'name' => 'Test Player', 'table_id' => 1],
+            ['year' => 1989, 'award' => 'Most Valuable Player (1st)', 'name' => 'Arvydas Sabonis', 'table_id' => 1],
         ]);
-        $this->mockDb->onQuery('vw_playoff_series_results', []);
-        $this->mockDb->onQuery('ibl_team_awards', []);
-        $this->mockDb->onQuery('ibl_box_scores_teams', []);
-        $this->mockDb->onQuery('ibl_gm_awards', []);
-        $this->mockDb->onQuery('ibl_gm_tenures', []);
-        $this->mockDb->onQuery('ibl_heat_win_loss', []);
 
-        $output = $this->runModule('SeasonArchive', ['year' => '2020']);
+        $output = $this->runModule('SeasonArchive', get: ['year' => '1989']);
 
-        $this->assertNotEmpty($output);
-        $this->assertQueryExecuted('ibl_awards');
+        $this->assertStringContainsString('season-archive-nav', $output);
+        $this->assertStringContainsString('Back to Season Archive', $output);
+        $this->assertStringNotContainsString('IBL Season Archive', $output);
     }
 
-    public function testInvalidYearStringCastsToZeroAndShowsIndex(): void
+    public function testYearPresentWithNullSeasonDataFallsThroughToIndex(): void
     {
-        $output = $this->runModule('SeasonArchive', ['year' => 'garbage']);
+        // Empty data → getAwardsByYear(9999) returns [] → getSeasonDetail returns null
+        // → code falls through to renderIndex() → index title renders.
+        $output = $this->runModule('SeasonArchive', get: ['year' => '9999']);
 
-        $this->assertNotEmpty($output);
-        $this->assertQueryExecuted('ibl_awards');
+        $this->assertStringContainsString('IBL Season Archive', $output);
+        $this->assertStringNotContainsString('season-archive-nav', $output);
     }
 
-    public function testYearWithNoMatchingSeasonRendersFallback(): void
+    public function testNonNumericYearCastsToZeroAndRoutesToIndex(): void
     {
-        $output = $this->runModule('SeasonArchive', ['year' => '1800']);
+        $output = $this->runModule('SeasonArchive', get: ['year' => 'garbage']);
 
-        $this->assertNotEmpty($output);
-        $this->assertQueryExecuted('ibl_awards');
+        $this->assertStringContainsString('IBL Season Archive', $output);
+        $this->assertStringNotContainsString('season-archive-nav', $output);
     }
 }

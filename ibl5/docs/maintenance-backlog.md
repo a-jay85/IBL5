@@ -1003,6 +1003,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Service CY salary mapping (cy1 vs cy2), cap aggregation, sort stability.
 **Est. effort:** M
 **Risk if untouched:** Wrong contract years displayed; cap off by year.
+**Status:** Completed (verified 2026-06-20) — `tests/ContractList/ContractListServiceTest.php` extended with cap2-6/acap2-6 math, cy=6 boundary, cy=4 full-vector, cy=0 years 4-6, and mixed-cy accumulation coverage.
 
 ### 6.10 FreeAgencyPreview — Thin (6 files, 2 tests)
 **Location:** `ibl5/classes/FreeAgencyPreview`

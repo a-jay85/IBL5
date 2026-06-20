@@ -134,6 +134,97 @@ class ContractListServiceTest extends TestCase
         $this->assertSame('Yes', $result['contracts'][0]['bird']);
     }
 
+    public function testCapTotalsAndAvgCapsAccumulateForAllSixYears(): void
+    {
+        $this->mockRepository->method('getActivePlayerContracts')->willReturn([
+            self::createPlayerContract([
+                'cy' => 0,
+                'salary_yr1' => 2800,
+                'salary_yr2' => 5600,
+                'salary_yr3' => 8400,
+                'salary_yr4' => 11200,
+                'salary_yr5' => 14000,
+                'salary_yr6' => 16800,
+            ]),
+        ]);
+
+        $result = $this->service->getContractsWithCalculations();
+
+        $this->assertEquals(28, $result['capTotals']['cap1']);
+        $this->assertEquals(56, $result['capTotals']['cap2']);
+        $this->assertEquals(84, $result['capTotals']['cap3']);
+        $this->assertEquals(112, $result['capTotals']['cap4']);
+        $this->assertEquals(140, $result['capTotals']['cap5']);
+        $this->assertEquals(168, $result['capTotals']['cap6']);
+        $this->assertEquals(1, $result['avgCaps']['acap1']);
+        $this->assertEquals(2, $result['avgCaps']['acap2']);
+        $this->assertEquals(3, $result['avgCaps']['acap3']);
+        $this->assertEquals(4, $result['avgCaps']['acap4']);
+        $this->assertEquals(5, $result['avgCaps']['acap5']);
+        $this->assertEquals(6, $result['avgCaps']['acap6']);
+    }
+
+    public function testDynamicMappingZeroesYearsBeyondSixAtCyBoundary(): void
+    {
+        $this->mockRepository->method('getActivePlayerContracts')->willReturn([
+            self::createPlayerContract(['cy' => 6, 'salary_yr1' => 111, 'salary_yr6' => 900]),
+        ]);
+
+        $result = $this->service->getContractsWithCalculations();
+
+        $this->assertSame(900, $result['contracts'][0]['con1']);
+        $this->assertSame(0, $result['contracts'][0]['con2']);
+        $this->assertSame(0, $result['contracts'][0]['con3']);
+        $this->assertSame(0, $result['contracts'][0]['con4']);
+        $this->assertSame(0, $result['contracts'][0]['con5']);
+        $this->assertSame(0, $result['contracts'][0]['con6']);
+    }
+
+    public function testDynamicMappingFullVectorForMidRangeCy(): void
+    {
+        $this->mockRepository->method('getActivePlayerContracts')->willReturn([
+            self::createPlayerContract(['cy' => 4, 'salary_yr4' => 400, 'salary_yr5' => 500, 'salary_yr6' => 600]),
+        ]);
+
+        $result = $this->service->getContractsWithCalculations();
+
+        $this->assertSame(400, $result['contracts'][0]['con1']);
+        $this->assertSame(500, $result['contracts'][0]['con2']);
+        $this->assertSame(600, $result['contracts'][0]['con3']);
+        $this->assertSame(0, $result['contracts'][0]['con4']);
+        $this->assertSame(0, $result['contracts'][0]['con5']);
+        $this->assertSame(0, $result['contracts'][0]['con6']);
+    }
+
+    public function testDirectMappingForCyZeroCoversYearsFourToSix(): void
+    {
+        $this->mockRepository->method('getActivePlayerContracts')->willReturn([
+            self::createPlayerContract(['cy' => 0, 'salary_yr4' => 400, 'salary_yr5' => 500, 'salary_yr6' => 600]),
+        ]);
+
+        $result = $this->service->getContractsWithCalculations();
+
+        $this->assertSame(400, $result['contracts'][0]['con4']);
+        $this->assertSame(500, $result['contracts'][0]['con5']);
+        $this->assertSame(600, $result['contracts'][0]['con6']);
+    }
+
+    public function testCapTotalsAccumulateAcrossMixedCyPlayers(): void
+    {
+        $this->mockRepository->method('getActivePlayerContracts')->willReturn([
+            self::createPlayerContract(['cy' => 0, 'salary_yr1' => 500, 'salary_yr2' => 700]),
+            self::createPlayerContract(['cy' => 3, 'salary_yr3' => 300, 'salary_yr4' => 400]),
+        ]);
+
+        $result = $this->service->getContractsWithCalculations();
+
+        // Player A: cy=0 → con1=500, con2=700
+        // Player B: cy=3 → year1=3→salary_yr3=300, year2=4→salary_yr4=400
+        // cap1 = (500+300)/100 = 8, cap2 = (700+400)/100 = 11
+        $this->assertEquals(8, $result['capTotals']['cap1']);
+        $this->assertEquals(11, $result['capTotals']['cap2']);
+    }
+
     /**
      * @param array<string, mixed> $overrides
      * @return array{pid: int, name: string, pos: string, teamname: string, teamid: int, cy: int, cyt: int, salary_yr1: int, salary_yr2: int, salary_yr3: int, salary_yr4: int, salary_yr5: int, salary_yr6: int, bird: string, team_city: string|null, color1: string|null, color2: string|null}

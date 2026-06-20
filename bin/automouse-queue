@@ -47,7 +47,13 @@ show_queue() {
         local name
         name=$(basename "$f")
         local title
-        title=$(head -1 "$f" 2>/dev/null | sed 's/^# //')
+        if [ -e "$f" ]; then
+            # || true: a dangling symlink makes head exit non-zero, which under
+            # `set -e` + pipefail would abort the whole listing after the header.
+            title=$(head -1 "$f" 2>/dev/null | sed 's/^# //') || true
+        else
+            title="(BROKEN LINK -> $(readlink "$f"))"
+        fi
         printf "  %2d. %-40s %s\n" "$i" "$name" "$title"
         i=$((i + 1))
     done < <(ls -1tr "$QUEUE_DIR"/*.md 2>/dev/null)

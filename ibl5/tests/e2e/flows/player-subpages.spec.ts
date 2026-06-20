@@ -59,6 +59,12 @@ test.describe('Player negotiate sub-page', () => {
 });
 
 test.describe('Player rookie option sub-page', () => {
+  // Serial: the card-render and POST-success tests both depend on pid=200000032's
+  // seed eligibility (salary_yr4===0). The POST-success test exercises the option
+  // (mutating salary_yr4) and afterAll resets it. Under fullyParallel a shared-DB
+  // race would otherwise flake the hard .card-flip-container assertion below.
+  test.describe.configure({ mode: 'serial' });
+
   test('rookie option page renders for non-eligible player', async ({
     page,
   }) => {
@@ -90,6 +96,19 @@ test.describe('Player rookie option sub-page', () => {
   }) => {
     await page.goto('modules.php?name=Player&pa=rookieoption&pid=99999');
     await assertNoPhpErrors(page, 'on rookie option with invalid PID');
+  });
+
+  test('rookie option page renders flippable trading card', async ({
+    appState,
+    page,
+  }) => {
+    // pid=200000032 "Rookie Option Target" (Metros tid=1, exp=2, round-1) is
+    // owned by the test user and eligible in Free Agency — the happy-path form
+    // renders, now hosting the Player module's flippable trading card.
+    await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
+    await page.goto('modules.php?name=Player&pa=rookieoption&pid=200000032');
+    await assertNoPhpErrors(page, 'on rookie option page with trading card');
+    await expect(page.locator('.card-flip-container')).toBeVisible();
   });
 
   test.afterAll(async ({ request }) => {

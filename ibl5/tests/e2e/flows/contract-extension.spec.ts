@@ -39,6 +39,17 @@ test.describe('Contract Extension flow', () => {
     expect(body).toContain('Extension Vet');
   });
 
+  test('negotiate page renders flippable trading card', async ({ appState, page }) => {
+    // pid=200000033 "Extension Card Target" (Metros, owned by CI user) is in his
+    // final contract year (cy=2, yr3 salary 0), so the negotiate happy path renders
+    // outside Free Agency — now hosting the Player module's flippable trading card.
+    // This player is touched by no other spec, so the hard assertion is race-free.
+    await appState({ 'Current Season Phase': 'Regular Season', 'Current Season Ending Year': '2026' });
+    await page.goto('modules.php?name=Player&pa=negotiate&pid=200000033');
+    await assertNoPhpErrors(page, 'on negotiate page with trading card');
+    await expect(page.locator('.card-flip-container')).toBeVisible();
+  });
+
   test('extension form blocked during free agency phase', async ({ appState, page }) => {
     await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
     await page.goto('modules.php?name=Player&pa=negotiate&pid=30');

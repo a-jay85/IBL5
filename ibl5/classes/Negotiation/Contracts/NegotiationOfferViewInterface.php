@@ -27,6 +27,7 @@ interface NegotiationOfferViewInterface
      * @param DemandResult $demands Calculated demands with keys year1-year6, years, total
      * @param int $capSpace Available cap space for year 1
      * @param int $maxYearOneSalary Maximum first year salary based on experience
+     * @param string|null $cardHtml Pre-rendered flippable trading card HTML (built by the service)
      * @return string HTML form output
      *
      * **Form Fields:**
@@ -60,7 +61,8 @@ interface NegotiationOfferViewInterface
         Player $player,
         array $demands,
         int $capSpace,
-        int $maxYearOneSalary
+        int $maxYearOneSalary,
+        ?string $cardHtml = null
     ): string;
 
     /**

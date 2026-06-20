@@ -4,12 +4,10 @@ declare(strict_types=1);
 
 namespace Negotiation;
 
-use FreeAgency\FreeAgencyFormComponents;
 use League\League;
 use Negotiation\Contracts\NegotiationDemandCalculatorInterface;
 use Negotiation\Contracts\NegotiationOfferViewInterface;
 use Player\Player;
-use Player\PlayerImageHelper;
 use Security\HtmlSanitizer;
 
 /**
@@ -26,17 +24,18 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
      * @param DemandResult $demands Calculated demands
      * @param int $capSpace Available cap space for year 1
      * @param int $maxYearOneSalary Maximum first year salary based on experience
+     * @param string|null $cardHtml Pre-rendered flippable trading card HTML (built by the service)
      */
     public static function renderNegotiationForm(
         Player $player,
         array $demands,
         int $capSpace,
-        int $maxYearOneSalary
+        int $maxYearOneSalary,
+        ?string $cardHtml = null
     ): string {
         $playerName = HtmlSanitizer::e($player->getName() ?? '');
         $playerID = $player->getPlayerID() ?? 0;
         $teamName = HtmlSanitizer::e($player->getTeamName() ?? '');
-        $playerPos = HtmlSanitizer::e($player->getPosition() ?? '');
 
         // Check if player demands exceed max
         $demandsExceedMax = $demands['year1'] >= $maxYearOneSalary;
@@ -55,19 +54,9 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
 
         ob_start();
 
-        // Card 1: Player Info
+        // Card 1: Flippable trading card (front: ratings, back: stats)
         ?>
-<div class="ibl-card">
-    <div class="ibl-card__header">
-        <h2 class="ibl-card__title"><?= HtmlSanitizer::trusted($playerPos) ?> <?= HtmlSanitizer::trusted($playerName) ?> - Contract Extension</h2>
-    </div>
-    <div class="ibl-card__body">
-        <div class="offer-player-info">
-            <img src="<?= HtmlSanitizer::e(PlayerImageHelper::getImageUrl($player->getPlayerID())) ?>" alt="<?= HtmlSanitizer::trusted($playerName) ?>" class="offer-player-img">
-            <?= HtmlSanitizer::trusted(FreeAgencyFormComponents::renderPlayerRatings($player)) ?>
-        </div>
-    </div>
-</div>
+<?= HtmlSanitizer::trusted($cardHtml ?? '') ?>
 
 <?php // Card 2: Contract Offer ?>
 <div class="ibl-card">
@@ -104,7 +93,7 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
             <input type="hidden" name="playerName" value="<?= HtmlSanitizer::trusted($playerName) ?>">
             <input type="hidden" name="playerID" value="<?= HtmlSanitizer::e($playerID) ?>">
 
-            <button type="submit" class="ibl-btn ibl-btn--primary">Offer Extension</button>
+            <button type="submit" class="ibl-btn ibl-btn--danger">Offer Extension</button>
         </form>
     </div>
 </div>

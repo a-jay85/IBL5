@@ -29,6 +29,7 @@ interface RookieOptionViewInterface
      * @param string|null $error Error message from PRG redirect (via ?error= param)
      * @param string|null $result Result type from PRG redirect (via ?result= param)
      * @param string|null $from Origin page for redirect
+     * @param string|null $cardHtml Pre-rendered flippable trading card HTML (built by the caller)
      * @return string Rendered HTML
      *
      * **HTML Structure:**
@@ -36,7 +37,7 @@ interface RookieOptionViewInterface
      * - Result banner (if $result set) with ibl-alert--success/warning
      * - ibl-card with player image (flex layout) and option value
      * - Warning card with ibl-alert--warning for exercise consequences
-     * - Form with hidden fields and ibl-btn--primary submit button
+     * - Form with hidden fields and ibl-btn--danger submit button
      *
      * **Form Fields:**
      * - teamname: Team name
@@ -48,5 +49,5 @@ interface RookieOptionViewInterface
      * - All output HTML-escaped via safeHtmlOutput()
      * - Player ID cast to integer
      */
-    public function renderForm(Player $player, string $teamName, int $rookieOptionValue, ?string $error = null, ?string $result = null, ?string $from = null): string;
+    public function renderForm(Player $player, string $teamName, int $rookieOptionValue, ?string $error = null, ?string $result = null, ?string $from = null, ?string $cardHtml = null): string;
 }

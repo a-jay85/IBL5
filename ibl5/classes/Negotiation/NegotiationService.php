@@ -29,14 +29,14 @@ class NegotiationService implements NegotiationServiceInterface
         try {
             $player = Player::withPlayerID($this->db, $playerID);
         } catch (\Exception|\TypeError $e) {
-            return NegotiationOfferView::renderError('Player not found.');
+            return self::wrapInFormContainer(NegotiationOfferView::renderError('Player not found.'));
         }
 
         $output = NegotiationOfferView::renderHeader($player);
 
         $freeAgencyValidation = $this->validator->validateFreeAgencyNotActive();
         if (!$freeAgencyValidation->isValid()) {
-            return $output . NegotiationOfferView::renderError($freeAgencyValidation->getError() ?? '');
+            return self::wrapInFormContainer($output . NegotiationOfferView::renderError($freeAgencyValidation->getError() ?? ''));
         }
 
         if ($bypassOwnership) {
@@ -45,7 +45,7 @@ class NegotiationService implements NegotiationServiceInterface
             $eligibilityValidation = $this->validator->validateNegotiationEligibility($player, $userTeamName);
         }
         if (!$eligibilityValidation->isValid()) {
-            return $output . NegotiationOfferView::renderError($eligibilityValidation->getError() ?? '');
+            return self::wrapInFormContainer($output . NegotiationOfferView::renderError($eligibilityValidation->getError() ?? ''));
         }
 
         $factorsTeamName = $bypassOwnership ? ($player->getTeamName() ?? '') : $userTeamName;
@@ -54,21 +54,54 @@ class NegotiationService implements NegotiationServiceInterface
         if ($bypassOwnership) {
             $breakdown = $this->demandCalculator->calculateDemandsWithBreakdown($player, $teamFactors);
             $output .= NegotiationDemandsBreakdownView::render($breakdown);
-            return $output;
+            return self::wrapInFormContainer($output);
         }
 
         $demands = $this->demandCalculator->calculateDemands($player, $teamFactors);
         $capSpace = $this->repository->getTeamCapSpaceNextSeason($userTeamName);
         $maxYearOneSalary = \ContractRules::getMaxContractSalary($player->getYearsOfExperience() ?? 0);
 
+        // Trading card (mirrors PlayerPageController::renderPage assembly)
+        $playerRepository = new \Player\PlayerRepository($this->db);
+        $playerName = $player->getName() ?? '';
+        $asg = $playerRepository->getAllStarGameCount($playerName);
+        $threepointcontests = $playerRepository->getThreePointContestCount($playerName);
+        $dunkcontests = $playerRepository->getDunkContestCount($playerName);
+        $rooksoph = $playerRepository->getRookieSophChallengeCount($playerName);
+        $playerStats = \Player\Stats\PlayerStats::withPlayerID($this->db, $playerID);
+        $contractDisplay = implode('/', $player->getRemainingContractArray());
+        $cardHtml = \Player\Views\PlayerTradingCardFlipView::render(
+            $player,
+            $playerStats,
+            $playerID,
+            $contractDisplay,
+            $asg,
+            $threepointcontests,
+            $dunkcontests,
+            $rooksoph,
+            $this->db
+        );
+
         $output .= NegotiationOfferView::renderNegotiationForm(
             $player,
             $demands,
             $capSpace,
-            $maxYearOneSalary
+            $maxYearOneSalary,
+            $cardHtml
         );
 
-        return $output;
+        // Flip card script (must come after card HTML so elements exist for init).
+        // Kept outside the form container, mirroring the rookieoption page assembly.
+        return self::wrapInFormContainer($output)
+            . \Player\Views\PlayerTradingCardFlipView::getFlipStyles();
+    }
+
+    /**
+     * Constrain page content width, mirroring the rookieoption page's .ibl-form-container wrapper.
+     */
+    private static function wrapInFormContainer(string $content): string
+    {
+        return '<div class="ibl-form-container">' . $content . '</div>';
     }
     
     /** @return TeamFactors */

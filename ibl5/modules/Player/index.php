@@ -5,6 +5,8 @@ declare(strict_types=1);
 use Player\Player;
 use Player\PlayerPageController;
 use Player\PlayerRepository;
+use Player\Stats\PlayerStats;
+use Player\Views\PlayerTradingCardFlipView;
 use RookieOption\RookieOptionValidator;
 use RookieOption\RookieOptionView;
 use RookieOption\RookieOptionController;
@@ -136,8 +138,32 @@ function rookieoption($pid)
     $result = $_GET['result'] ?? null;
     $from = $_GET['from'] ?? null;
 
+    // Trading card (mirrors PlayerPageController::renderPage assembly)
+    $playerRepository = new PlayerRepository($mysqli_db);
+    $playerName = $player->getName() ?? '';
+    $asg = $playerRepository->getAllStarGameCount($playerName);
+    $threepointcontests = $playerRepository->getThreePointContestCount($playerName);
+    $dunkcontests = $playerRepository->getDunkContestCount($playerName);
+    $rooksoph = $playerRepository->getRookieSophChallengeCount($playerName);
+    $playerStats = PlayerStats::withPlayerID($mysqli_db, (int) $pid);
+    $contractDisplay = implode('/', $player->getRemainingContractArray());
+    $cardHtml = PlayerTradingCardFlipView::render(
+        $player,
+        $playerStats,
+        (int) $pid,
+        $contractDisplay,
+        $asg,
+        $threepointcontests,
+        $dunkcontests,
+        $rooksoph,
+        $mysqli_db
+    );
+
     // Render form
-    echo $formView->renderForm($player, $userTeamName, $rookieOptionValue, $error, $result, $from);
+    echo $formView->renderForm($player, $userTeamName, $rookieOptionValue, $error, $result, $from, $cardHtml);
+
+    // Flip card script (must come after card HTML so elements exist for init)
+    echo PlayerTradingCardFlipView::getFlipStyles();
 
     PageLayout\PageLayout::footer();
 }

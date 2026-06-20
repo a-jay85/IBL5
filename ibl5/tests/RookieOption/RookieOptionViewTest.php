@@ -45,10 +45,14 @@ class RookieOptionViewTest extends TestCase
         $output = $this->view->renderForm($mockPlayer, 'Test Team', 500);
 
         $this->assertIsString($output);
-        $this->assertStringContainsString('PG Test Player', $output);
+        // Title is a standalone ibl-title with no player name (the name lives in the trading card).
+        $this->assertStringContainsString('<h2 class="ibl-title">Rookie Option</h2>', $output);
+        $this->assertStringNotContainsString('PG Test Player', $output);
         $this->assertStringContainsString('500', $output);
         $this->assertStringContainsString('Test Team', $output);
-        $this->assertStringContainsString('images/player/123.jpg', $output);
+        // Regression: the option value, warning card, and form survive the card swap.
+        $this->assertStringContainsString('Rookie Option Value', $output);
+        $this->assertStringContainsString('ibl-alert ibl-alert--warning', $output);
         $this->assertStringContainsString('name="teamname"', $output);
         $this->assertStringContainsString('name="playerID"', $output);
         $this->assertStringContainsString('name="rookieOptionValue"', $output);
@@ -207,16 +211,25 @@ class RookieOptionViewTest extends TestCase
     }
 
     /**
-     * Test form uses flex layout for player image
+     * Test the player-info card hosts the pre-rendered flippable trading card,
+     * and with no card emits no card wrapper (boundary — null card).
      */
-    public function testRenderFormUsesCenteredLayout(): void
+    public function testRendersProvidedCardHtml(): void
     {
         $mockPlayer = $this->createPlayerMock();
+        $cardHtml = '<div class="card-flip-container">SENTINEL</div>';
 
-        $output = $this->view->renderForm($mockPlayer, 'Test Team', 500);
+        $output = $this->view->renderForm($mockPlayer, 'Test Team', 500, null, null, null, $cardHtml);
 
         $this->assertStringContainsString('text-center', $output);
-        $this->assertStringContainsString('rookie-option-img', $output);
+        $this->assertStringContainsString('card-flip-container', $output);
+        $this->assertStringContainsString('SENTINEL', $output);
+        // The old small img is gone.
+        $this->assertStringNotContainsString('rookie-option-img', $output);
+
+        // Boundary: with no card, the view emits no card wrapper.
+        $outputNoCard = $this->view->renderForm($mockPlayer, 'Test Team', 500);
+        $this->assertStringNotContainsString('card-flip-container', $outputNoCard);
     }
 
     /**

@@ -107,7 +107,7 @@ The Truly-manual row is a **subjective** judgment, so phrase it as a question of
 | N | Does the new notification bell + inbox look right, and does the mark-read flow feel right? | Truly-manual | post-impl | manual (reviewer walkthrough) |
 ```
 
-A plan that trips this trigger therefore **cannot** carry the "All verification is automated — no manual testing needed" line, and per `/plan` Step 4 gate 14 must set `auto_postplan: false`.
+A plan that trips this trigger therefore **cannot** carry the "All verification is automated — no manual testing needed" line, and per `/plan` Step 4 gate 14 must set `auto_merge: false`.
 
 ## Hot-file thresholds
 

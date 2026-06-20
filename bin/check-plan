@@ -8,7 +8,7 @@
 # collapse to "run bin/check-plan, fix what it reports" instead of having the
 # Opus orchestrator re-execute them by reading ~40 lines of instructions every
 # invocation. The JUDGMENT gates (negative-path coverage, hot-file extraction,
-# security-surface resolution, impl_model / auto_postplan risk) stay in /plan —
+# security-surface resolution, impl_model / auto_merge risk) stay in /plan —
 # they need reasoning a script cannot do.
 #
 # Gates implemented (numbering mirrors .claude/commands/plan.md Step 4):
@@ -53,7 +53,7 @@
 # Deliberately NOT linted (kept as /plan Opus judgment): tests-woven-inline,
 # production-comparison classification, test-file-path presence, negative-path
 # coverage, hot-file extraction, security surface,
-# impl_model / auto_postplan risk. Edit-anchor snippets are not linted: the real
+# impl_model / auto_merge risk. Edit-anchor snippets are not linted: the real
 # plan corpus quotes them as drifting descriptions ("the Options struct", with
 # file:line refs that go stale), not verbatim lines, so a grep-the-snippet check
 # would false-positive constantly.

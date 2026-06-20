@@ -493,7 +493,9 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 
 **Already merged?** If `gh pr view --json state --jq '.state'` returns `MERGED`, there is nothing to arm — skip to Phase 7 (which will early-exit).
 
-**All six** conditions must be true: (1) PR says "No manual testing needed", (2) no review/audit findings scored >= 80, (3) no unresolved `MISSING:` planned-test items NOR `MISSING-FILE:` planned-file items remain from Phase 5.0 — i.e. `/tmp/post-plan-missing-tests-$PPID` is absent or empty. Phase 5.0 is skipped entirely when `PLAN_FOUND=none` or `! $HAS_MATRIX`, so this bridge file frequently never exists; **absent/empty = PASS (non-blocking)**. Only a non-empty file blocks: `[ -s /tmp/post-plan-missing-tests-$PPID ]` → condition (3) fails. (4) Phase 5's local verification did not deterministically fail — i.e. `PHASE5_VERIFY_STATUS` is `pass` or `skipped`, **not** `fail`. This is the condition #887 lacked: it armed auto-merge with red E2E because no gate checked Phase 5's result. (5) golden-snapshot safety: a change to `engine/internal/sim/testdata/golden.json` does NOT auto-ship unattended (see below). (6) merge-order dependency: every PR named in a `Depends-on:` line in this PR's body is already `MERGED` (see below).
+**All nine** conditions must be true: (1) PR says "No manual testing needed", (2) no review/audit findings scored >= 80, (3) no unresolved `MISSING:` planned-test items NOR `MISSING-FILE:` planned-file items remain from Phase 5.0 — i.e. `/tmp/post-plan-missing-tests-$PPID` is absent or empty. Phase 5.0 is skipped entirely when `PLAN_FOUND=none` or `! $HAS_MATRIX`, so this bridge file frequently never exists; **absent/empty = PASS (non-blocking)**. Only a non-empty file blocks: `[ -s /tmp/post-plan-missing-tests-$PPID ]` → condition (3) fails. (4) Phase 5's local verification did not deterministically fail — i.e. `PHASE5_VERIFY_STATUS` is `pass` or `skipped`, **not** `fail`. This is the condition #887 lacked: it armed auto-merge with red E2E because no gate checked Phase 5's result. (5) golden-snapshot safety: a change to `engine/internal/sim/testdata/golden.json` does NOT auto-ship unattended (see below). (6) merge-order dependency: every PR named in a `Depends-on:` line in this PR's body is already `MERGED` (see below). (7) plan-time hold: the plan's line-1 `auto_merge: false` frontmatter is absent (see below). (8) commit-type floor: the PR title is not a conventional-commit `feat:` (see below). (9) PR-time safety verdict: the realized diff surfaces no reason to hold for a human (see below).
+
+**These conditions only ever HOLD, never RELEASE.** They are an AND-of-not-blocked set: every condition can *add* a block; none can clear another's. Conditions (7)–(9) are **additive brakes on top of** the deterministic floors (1)–(6) and the independent `human-signoff` required GitHub check — they exist to catch what those miss, never to override them. post-plan **always runs and opens the PR**; these conditions decide only whether auto-merge *arms*. A held PR stays open for a human to merge.
 
 **Condition (4) blocks on the VALUE, not file presence** — the status file is non-empty for `pass` and `skipped` too (it always contains `PHASE5_VERIFY_STATUS=...`), so the `[ -s ... ]` idiom condition (3) uses would wrongly block every `pass`/`skipped`. Block only on the literal `fail` value; **absent file OR `pass` OR `skipped` = PASS (non-blocking)** — a `skipped` status (docs-only / PHP-less PR with no mapped E2E) must NOT block, or every such PR would stop arming, a regression worse than #887:
 
@@ -528,9 +530,42 @@ gh pr view --json body --jq '.body' \
     done
 ```
 
+**Condition (7) — plan-time hold (`auto_merge: false`).** The plan author predicts at plan-time (via `/plan` Step 4 gate 14) whether the change wants a human at merge, and records it as a line-1 frontmatter field. If the located plan file declares `auto_merge: false`, **block** — the PR opens and gets reviewed, but auto-merge does not arm. Parse the line-1 YAML frontmatter only (a body documenting the syntax can't self-select). **Derive `$PLAN_FILE` inside this block** — bash variables do not survive across phases/shells (see Phase 3's note), so a bare `$PLAN_FILE` assigned in Phase 1 would be empty here and the check would silently no-op. The snippet re-derives the path from the branch slug (the same derivation `bin/post-plan-now` and Phase 1's interactive fallback use; in nightly the authoritative path the postplan prompt supplies is identical, since the queue symlinks plans by branch slug). Absent file or absent field ⇒ no hold:
+
+```bash
+# condition (7): block if the plan declares auto_merge: false (line-1 frontmatter only).
+# Self-contained: derive PLAN_FILE here (honor an in-block-set value, else slug-derive) so
+# the check can't no-op on a non-surviving cross-phase variable.
+PLAN_FILE="${PLAN_FILE:-$HOME/.claude/plans/$(git rev-parse --abbrev-ref HEAD).md}"
+AUTO_MERGE=$(awk '
+    NR==1 && /^---[[:space:]]*$/ {infm=1; next}
+    infm && /^---[[:space:]]*$/ {infm=0; exit}
+    infm && /^auto_merge:[[:space:]]*/ { sub(/^auto_merge:[[:space:]]*/,""); gsub(/[[:space:]]/,""); print; exit }
+' "$PLAN_FILE" 2>/dev/null)
+[ "$AUTO_MERGE" = false ] && echo "BLOCKED: plan declares auto_merge: false — held for human merge"
+```
+
+**Condition (8) — commit-type floor (never arm `feat:`).** A literal PR-title grep, deterministic. Mirrors the required `human-signoff` check (`.github/workflows/human-signoff.yml`) as defense-in-depth, so post-plan **never arms a `feat:` PR in the first place** (no arm-then-strip). This is a floor, not a soft signal — commit-type weighs into condition (9) only to *add* holds on maintenance PRs; it can never *release* a `feat:`:
+
+```bash
+# condition (8): block if the PR title is a conventional-commit feature (feat:/feat(scope):/feat!:)
+gh pr view --json title --jq '.title' \
+  | grep -qiE '^feat(\([^)]*\))?!?:' \
+  && echo "BLOCKED: feat: PR — auto-merge held for the human-signoff floor (post-plan never arms feat:)"
+```
+
+**Condition (9) — PR-time safety verdict (both modes).** Read the realized diff (`/tmp/post-plan-diff-$PPID`) plus the Phase-3 flags (`HAS_MIGRATION`, `GOLDEN_CHANGED`, `COUNT_*`) and the PR title, and **enumerate every concrete reason this PR should wait for a human**. If the list is non-empty, **block**. This catches *drift* — a plan that looked auto-merge-safe at plan-time but whose realized implementation grew past it. Frame it as enumerating holds, **never** as certifying safe: certifying safe is proving a negative, which is unreliable, and the only dangerous failure is *under*-holding (a false ARM); a false HOLD merely costs a human merge. **Bias hard to HOLD on any doubt.** Hold-triggers to look for in the realized diff:
+
+- an introduced or expanded SQL / POST-form / auth-gated surface that a Phase-4 finding scored < 80 did not already flag;
+- a destructive or FK-ordering migration, or a column-rename sweep (`HAS_MIGRATION=true` with a diff that drops, renames, or backfills);
+- new or redesigned user-visible UI/UX that the plan's matrix did not classify (a CSS component, a rendered page/module, a nav entry / indicator / badge, a new multi-step flow);
+- any change whose blast radius or reversibility you cannot confidently bound.
+
+Emit one `BLOCKED: <reason>` line per reason found. Condition (9) can only *add* holds on top of (1)–(8); it never releases one, and it never overrides the `feat:` floor (8) or the required `human-signoff` check.
+
 If met: `gh pr merge --squash --auto --delete-branch`. The `--auto` flag queues the merge — it does **not** merge now, it arms; GitHub executes it once all required status checks pass. Do not sync local to master here; the merge has not happened yet.
 
-If not met: do **not** arm auto-merge. Report which condition(s) blocked — the user merges manually after review. When condition (3) is the blocker, cite which planned test (`MISSING:`) or planned Critical File (`MISSING-FILE:`) is missing by `cat`-ing the bridge file (`cat /tmp/post-plan-missing-tests-$PPID`) into the report. When condition (4) is the blocker, report which Phase 5 track failed (PHPUnit / PHPStan / Go / E2E). When condition (5) is the blocker (headless + golden changed), report that the golden snapshot changed and the merge needs a human to confirm the behavior change was intentional. When condition (6) is the blocker, report which `Depends-on:` PR(s) are not yet `MERGED` — this PR re-arms on a later post-plan run once the predecessor ships (and this PR has been `git merge master`'d + re-greened). Continue to Phase 7 regardless, to monitor and fix CI — the fix-and-rerun there clears the red track so a later run can arm.
+If not met: do **not** arm auto-merge. Report which condition(s) blocked — the user merges manually after review. When condition (3) is the blocker, cite which planned test (`MISSING:`) or planned Critical File (`MISSING-FILE:`) is missing by `cat`-ing the bridge file (`cat /tmp/post-plan-missing-tests-$PPID`) into the report. When condition (4) is the blocker, report which Phase 5 track failed (PHPUnit / PHPStan / Go / E2E). When condition (5) is the blocker (headless + golden changed), report that the golden snapshot changed and the merge needs a human to confirm the behavior change was intentional. When condition (6) is the blocker, report which `Depends-on:` PR(s) are not yet `MERGED` — this PR re-arms on a later post-plan run once the predecessor ships (and this PR has been `git merge master`'d + re-greened). When condition (7) is the blocker, report that the plan declared `auto_merge: false` — the PR is open and reviewed but held for a human merge by author intent. When condition (8) is the blocker, report that this is a `feat:` PR — it waits for a maintainer to apply the `human-approved` label (the required `human-signoff` check). When condition (9) is the blocker, list each enumerated hold-reason from the realized-diff verdict. Continue to Phase 7 regardless, to monitor and fix CI — the fix-and-rerun there clears any red track so a later run can arm (conditions (7) and (8) are intent/type holds that a re-run will not clear — those PRs stay held until the human acts).
 
 **Interactive golden warning:** Whenever `$GOLDEN_CHANGED` is `true` and `$CLAUDE_HEADLESS` is unset (so condition (5) did not block), still surface the warning prominently in the report — "⚠️ golden.json changed: simulation behavior changed. Confirm this was an intentional `make -C engine golden-update`, not a masked regression." — so the human reviews intent before the queued merge fires.
 

@@ -211,6 +211,7 @@ const authPages: Array<{
     url: 'modules.php?name=Voting',
     state: { 'Current Season Phase': 'Free Agency', 'EOY Voting': 'Yes' },
   },
+  { name: 'training camp ratings diff', url: 'modules.php?name=TrainingCampRatingsDiff' },
 ];
 
 authTest.describe('Authenticated page accessibility', () => {

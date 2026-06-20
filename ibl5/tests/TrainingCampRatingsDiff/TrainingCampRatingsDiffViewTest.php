@@ -125,16 +125,23 @@ class TrainingCampRatingsDiffViewTest extends TestCase
         self::assertStringContainsString('No prior-season baseline found', $html);
     }
 
+    public function test_it_renders_h1_title_in_empty_state(): void
+    {
+        $html = $this->view->render(null, []);
+
+        self::assertStringContainsString('<h1 class="ibl-title">Training Camp Ratings Diff</h1>', $html);
+    }
+
     // ---------------------------------------------------------------------------
     // Main table rendering — structure and content
     // ---------------------------------------------------------------------------
 
-    public function test_it_renders_h2_title_and_intro_paragraph_including_the_baseline_year(): void
+    public function test_it_renders_h1_title_and_intro_paragraph_including_the_baseline_year(): void
     {
         $row  = $this->buildRatingRow(1, 'Player A', 5);
         $html = $this->view->render(2025, [$row]);
 
-        self::assertStringContainsString('<h2', $html);
+        self::assertStringContainsString('<h1', $html);
         self::assertStringContainsString('Training Camp Ratings Diff', $html);
         self::assertStringContainsString('<p', $html);
         self::assertStringContainsString('2025', $html);

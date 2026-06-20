@@ -9,6 +9,7 @@ use Trading\Contracts\TradeOfferRepositoryInterface;
 use Trading\Contracts\TradeAssetRepositoryInterface;
 use Trading\Contracts\TradeCashRepositoryInterface;
 use Trading\Contracts\BuyoutLedgerRepositoryInterface;
+use Trading\Contracts\TradeCapCalculatorInterface;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Season\Season;
 use Discord\Discord;
@@ -42,6 +43,7 @@ class TradeOffer implements TradeOfferInterface
     protected Season $season;
     protected CashTransactionHandler $cashHandler;
     protected TradeValidator $validator;
+    protected ?TradeCapCalculatorInterface $tradeCapCalculator = null;
     protected ?Discord $discord;
 
     public function __construct(
@@ -54,7 +56,8 @@ class TradeOffer implements TradeOfferInterface
         ?BuyoutLedgerRepositoryInterface $cashConsiderationRepository = null,
         ?Season $season = null,
         ?TradeValidator $validator = null,
-        ?\Psr\Log\LoggerInterface $logger = null
+        ?\Psr\Log\LoggerInterface $logger = null,
+        ?TradeCapCalculatorInterface $tradeCapCalculator = null
     ) {
         $this->db = $db;
         $this->commonRepository = $commonRepository;
@@ -66,6 +69,12 @@ class TradeOffer implements TradeOfferInterface
         $this->cashHandler = new CashTransactionHandler($db, $this->commonRepository, $this->cashConsiderationRepository, $this->cashRepository);
         $this->validator = $validator ?? new TradeValidator($db);
         $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('trade');
+        $this->tradeCapCalculator = $tradeCapCalculator ?? new TradeCapCalculator(
+            $this->commonRepository,
+            $this->cashConsiderationRepository,
+            $this->season,
+            $this->validator
+        );
 
         // Initialize Discord with error handling (may fail if column doesn't exist)
         try {
@@ -182,89 +191,14 @@ class TradeOffer implements TradeOfferInterface
      */
     protected function calculateSalaryCapData(array $tradeData): array
     {
-        $userCurrentSeasonCapTotal = 0;
-        $partnerCurrentSeasonCapTotal = 0;
-        $userCapSentToPartner = 0;
-        $partnerCapSentToUser = 0;
-
-        // Calculate user team salary data from form
-        $switchCounter = $tradeData['switchCounter'];
-        for ($j = 0; $j < $switchCounter; $j++) {
-            $isChecked = $tradeData['check'][$j] ?? null;
-            $salaryAmount = (int) ($tradeData['contract'][$j] ?? '0');
-            $userCurrentSeasonCapTotal += $salaryAmount;
-
-            if ($isChecked === "on") {
-                $userCapSentToPartner += $salaryAmount;
-            }
-        }
-
-        // Calculate partner team salary data from form
-        $fieldsCounter = $tradeData['fieldsCounter'];
-        for ($j = $switchCounter; $j < $fieldsCounter; $j++) {
-            $isChecked = $tradeData['check'][$j] ?? null;
-            $salaryAmount = (int) ($tradeData['contract'][$j] ?? '0');
-            $partnerCurrentSeasonCapTotal += $salaryAmount;
-
-            if ($isChecked === "on") {
-                $partnerCapSentToUser += $salaryAmount;
-            }
-        }
-
-        // Include existing cash transaction records (e.g. "Cash from Heat")
-        // which are stored as player records with names starting with '|'
-        // but excluded from the form's hidden contract fields
-        $userTeamId = $this->commonRepository->getTidFromTeamname($tradeData['offeringTeam']) ?? 0;
-        $partnerTeamId = $this->commonRepository->getTidFromTeamname($tradeData['listeningTeam']) ?? 0;
-
-        $userCurrentSeasonCapTotal += $this->sumCashRecordSalaries($userTeamId);
-        $partnerCurrentSeasonCapTotal += $this->sumCashRecordSalaries($partnerTeamId);
-
-        // Add new cash considerations from this trade offer
-        $cashConsiderations = $this->validator->getCurrentSeasonCashConsiderations(
-            $tradeData['userSendsCash'],
-            $tradeData['partnerSendsCash']
-        );
-
-        $userCurrentSeasonCapTotal += $cashConsiderations['cashSentToThem'];
-        $userCurrentSeasonCapTotal -= $cashConsiderations['cashSentToMe'];
-        $partnerCurrentSeasonCapTotal += $cashConsiderations['cashSentToMe'];
-        $partnerCurrentSeasonCapTotal -= $cashConsiderations['cashSentToThem'];
-
-        // Self-trade: both sides are the same team, so no players actually move.
-        // Zero out sent/received to avoid double-counting.
-        if ($tradeData['offeringTeam'] === $tradeData['listeningTeam']) {
-            $userCapSentToPartner = 0;
-            $partnerCapSentToUser = 0;
-        }
-
-        return [
-            'userCurrentSeasonCapTotal' => $userCurrentSeasonCapTotal,
-            'partnerCurrentSeasonCapTotal' => $partnerCurrentSeasonCapTotal,
-            'userCapSentToPartner' => $userCapSentToPartner,
-            'partnerCapSentToUser' => $partnerCapSentToUser
-        ];
-    }
-
-    /**
-     * Sum current-season salary from cash consideration records for a team
-     *
-     * Cash entries (trades, buyouts) are excluded from form hidden fields
-     * but still affect the team's salary cap. This computes their current-year
-     * impact using the same contract-year logic as the form.
-     *
-     * @param int $teamId Team ID
-     * @return int Sum of cash record salaries for the current season (may be negative)
-     */
-    private function sumCashRecordSalaries(int $teamId): int
-    {
-        $cashRecords = $this->cashConsiderationRepository->getTeamCashForSalary($teamId);
-
-        // Playoffs counts as offseason for trade cap math (contract years have
-        // effectively rolled over), unlike the FA cap calculation.
-        $isOffseason = $this->season->advancesContractYears();
-
-        return BuyoutLedgerRepository::sumCurrentSeasonSalaryFromRows($cashRecords, $isOffseason);
+        // Fallback-safe: constructor-skipping test doubles never set $tradeCapCalculator,
+        // so we guard with isset-safe ?? rather than accessing the typed property directly.
+        return ($this->tradeCapCalculator ?? new TradeCapCalculator(
+            $this->commonRepository,
+            $this->cashConsiderationRepository,
+            $this->season,
+            $this->validator
+        ))->calculateSalaryCapData($tradeData);
     }
 
     /**

@@ -1,6 +1,6 @@
 ---
 description: All work happens in a worktree (never the main checkout); worktree setup and the implementation→/post-plan handoff (auto-fired in a detached fresh session) for multi-step work.
-last_verified: 2026-06-13
+last_verified: 2026-06-20
 ---
 
 # Workflow Continuity Rule

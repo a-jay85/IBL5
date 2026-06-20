@@ -1,6 +1,6 @@
 ---
 description: Requires plans to classify every verification step into the test-type taxonomy at plan-write time, preventing manual-testing items from deferring to post-plan cleanup, and grounds seed/DOM-dependent E2E assertions in real fixtures.
-last_verified: 2026-06-19
+last_verified: 2026-06-20
 ---
 
 # Plan Verification Matrix

@@ -42,7 +42,7 @@ final class BanRawSuperglobalsRule implements Rule
         ],
         '_COOKIE' => [
             'suffixes' => ['Controller.php', 'ApiHandler.php', 'Bootstrap.php', 'Authenticator.php'],
-            'files' => ['CsrfGuard.php', 'LeagueContext.php', 'TestCookieOverrides.php'],
+            'files' => ['CsrfGuard.php', 'LeagueContext.php', 'TestCookieOverrides.php', 'DevAutoLogin.php'],
         ],
         '_SESSION' => [
             'suffixes' => ['Bootstrap.php'],

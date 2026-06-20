@@ -7,8 +7,9 @@ import { test, expect } from '../fixtures/base';
  * setup-file regression doesn't mask a provisioning regression.
  *
  * Test classification: API-test (Tier 2 plan, verification row 3).
- * Uses the base fixture (no storageState) and manually sets `_no_auto_login`
- * to opt out of DevAutoLogin so the login form renders.
+ * Uses the base fixture (no storageState). The login form renders by default
+ * because auto-login is now opt-in (_auto_login=1 cookie required); no
+ * opt-out cookie is needed.
  */
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -25,11 +26,7 @@ async function loginViaForm(page: Page, username: string, password: string): Pro
 }
 
 test.describe('Regular (non-admin) test user provisioning', () => {
-  test.beforeEach(async ({ page, request }) => {
-    const baseUrl = process.env.BASE_URL ?? 'http://main.localhost/ibl5/';
-    await page.context().addCookies([
-      { name: '_no_auto_login', value: '1', domain: new URL(baseUrl).hostname, path: '/' },
-    ]);
+  test.beforeEach(async ({ request }) => {
     await request.delete('test-state.php?action=clear-throttle');
   });
 

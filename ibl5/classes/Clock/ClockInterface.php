@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Api\Middleware\Contracts;
+namespace Clock;
 
 interface ClockInterface
 {

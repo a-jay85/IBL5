@@ -1,6 +1,6 @@
 ---
 description: All work happens in a worktree (never the main checkout); worktree setup and the implementation→/post-plan handoff (auto-fired in a detached fresh session) for multi-step work.
-last_verified: 2026-06-13
+last_verified: 2026-06-20
 ---
 
 # Workflow Continuity Rule
@@ -43,4 +43,4 @@ This spawns a detached, fresh **Sonnet 4.6** `/post-plan` on this branch (superv
 - **Only fire when verification passed.** If implementation did **not** verify clean (failing tests, unresolved blocker, you stopped to ask the user something), do **not** run it — leave the worktree dirty and hand off in prose instead. Turn-end ≠ done; that judgment is yours.
 - **No deadlock.** `/post-plan` resolves the plan from the branch slug (no handoff file needed); the detached child is reparented under launchd, so it clears its own plan-gate independently of this session.
 
-`--auto` adds two safety gates (a bare `bin/post-plan-now` skips them — running it by hand IS the decision to ship): it **skips** when already inside a headless/nightly run (the nightly runner fires post-plan itself), and it **honors** a plan that declares `auto_postplan: false` — a plan judged risky enough (see `/plan` Step 4) to want a human eyeball before the PR opens and auto-merge arms. A skipped risky plan is shipped later with a reviewed bare `bin/post-plan-now`.
+`--auto` adds one safety gate (a bare `bin/post-plan-now` skips it — running it by hand IS the decision to ship): it **skips** when already inside a headless/nightly run (the nightly runner fires post-plan itself). It no longer holds post-plan for a "risky" plan — post-plan **always** runs and opens the PR. Whether the PR then **auto-merges** is decided at `/post-plan` Phase 6.5, which honors a plan's `auto_merge: false` (see `/plan` Step 4) and refuses to arm auto-merge, leaving the PR open for a human to merge after review.

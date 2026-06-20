@@ -13,9 +13,12 @@
 #
 # Usage:
 #   bin/post-plan-now           # you decided to ship: fire unconditionally
-#   bin/post-plan-now --auto    # impl agent's closing action: honor the plan's
-#                               #   `auto_postplan: false` opt-out and skip when
-#                               #   already inside a headless/nightly run
+#   bin/post-plan-now --auto    # impl agent's closing action: always fires
+#                               #   (skips only inside a headless/nightly run, which
+#                               #   owns post-plan itself). post-plan ALWAYS opens the
+#                               #   PR; whether auto-merge ARMS is decided later, at
+#                               #   /post-plan Phase 6.5 (a plan's `auto_merge: false`
+#                               #   holds the merge — it no longer holds post-plan).
 #
 # Run from anywhere inside the target worktree.
 
@@ -37,35 +40,21 @@ esac
 
 PLAN_FILE="$HOME/.claude/plans/$SLUG.md"
 
-# --auto is the impl agent's automatic closing action. Two gates apply only here;
+# --auto is the impl agent's automatic closing action. One gate applies only here;
 # a bare (human) invocation always fires, because running it by hand IS the
-# decision to ship.
+# decision to ship. post-plan ALWAYS opens the PR — a "risky" plan is no longer
+# held here; the merge-hold decision now lives at /post-plan Phase 6.5, which
+# reads the plan's `auto_merge: false` and refuses to ARM auto-merge (leaving the
+# PR open for a human to merge) without ever skipping the post-plan run itself.
 if [ "$AUTO" -eq 1 ]; then
-    # (1) We're already inside a headless/nightly run — the nightly runner fires
-    #     post-plan itself, so an auto-fire here would double-run. The
-    #     workflow-continuity rule that tells the impl agent to call this is
-    #     globally loaded, so the nightly impl agent sees it too; this is the
-    #     belt-and-suspenders guard against that.
+    # We're already inside a headless/nightly run — the nightly runner fires
+    # post-plan itself, so an auto-fire here would double-run. The
+    # workflow-continuity rule that tells the impl agent to call this is
+    # globally loaded, so the nightly impl agent sees it too; this is the
+    # belt-and-suspenders guard against that.
     if [ "${CLAUDE_HEADLESS:-}" = "1" ]; then
         echo "post-plan-now: CLAUDE_HEADLESS=1 — nightly/headless run owns post-plan; skipping auto-fire."
         exit 0
-    fi
-    # (2) The plan opted out of auto-fire (judged risky enough to want a human
-    #     eyeball before the PR opens / auto-merge arms). Parse the line-1 YAML
-    #     frontmatter only — a body that documents the syntax can't self-select.
-    if [ -f "$PLAN_FILE" ]; then
-        AUTO_PP=$(awk '
-            NR==1 && /^---[[:space:]]*$/ {infm=1; next}
-            infm && /^---[[:space:]]*$/ {infm=0; exit}
-            infm && /^auto_postplan:[[:space:]]*/ {
-                sub(/^auto_postplan:[[:space:]]*/,""); gsub(/[[:space:]]/,""); print; exit
-            }
-        ' "$PLAN_FILE" 2>/dev/null)
-        if [ "$AUTO_PP" = "false" ]; then
-            echo "post-plan-now: plan declares 'auto_postplan: false' — judged risky; not auto-firing."
-            echo "  Review the worktree, then ship when ready:  bin/post-plan-now"
-            exit 0
-        fi
     fi
 fi
 

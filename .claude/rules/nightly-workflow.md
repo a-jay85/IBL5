@@ -1,6 +1,6 @@
 ---
 description: Nightly autonomous workflow — launchd fires claude -p at 00:03 and 05:03 daily, running two context-isolated agents per plan (implementation + post-plan) with time guards and incremental checkpoints.
-last_verified: 2026-06-18
+last_verified: 2026-06-20
 paths: "bin/nightly-*"
 ---
 
@@ -65,4 +65,4 @@ absolute targets keep resolving after the move. `queue/` (pending work) and `han
 
 ## Feature PRs cannot auto-merge
 
-Conventional-commit **`feat:`** PRs are gated by the required `human-signoff` check and will **not** auto-merge overnight — they wait for a human to apply the `human-approved` label after inspection (ADR-0062). Post-plan still arms `--auto`, but `bin/nightly-run` strips it from `feat:` PRs (`neutralize_feat_signoff`), and the required check blocks the merge regardless. Maintenance PRs (`fix`/`refactor`/`chore`/`ci`/`docs`/`revert`) auto-merge as before. Check the morning `gh pr list` for `feat:` PRs awaiting your label.
+Conventional-commit **`feat:`** PRs are gated by the required `human-signoff` check and will **not** auto-merge overnight — they wait for a human to apply the `human-approved` label after inspection (ADR-0062). `/post-plan` Phase 6.5 condition (8) deterministically **never arms** a `feat:` PR (a literal title grep), so there is no arm-then-strip; the required `human-signoff` check remains the independent floor that blocks the merge regardless. Maintenance PRs (`fix`/`refactor`/`chore`/`ci`/`docs`/`revert`) auto-merge as before — still subject to Phase 6.5's other conditions, including the PR-time safety verdict (9) on the realized diff. Check the morning `gh pr list` for `feat:` PRs awaiting your label.

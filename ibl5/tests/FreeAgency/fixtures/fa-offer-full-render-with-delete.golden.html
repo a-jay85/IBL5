@@ -1,0 +1,317 @@
+<h2 class="ibl-title">Free Agency</h2><div class="ibl-card">
+    <div class="ibl-card__header">
+        <h2 class="ibl-card__title">PG Test Player - Contract Negotiation</h2>
+    </div>
+    <div class="ibl-card__body">
+        <div class="offer-player-info">
+            <img src="./images/player/42.jpg" alt="Test Player" class="offer-player-img">
+            <table class="ibl-data-table offer-ratings">
+    <thead>
+        <tr>
+            <th>2ga</th>
+            <th>2gp</th>
+            <th>fta</th>
+            <th>ftp</th>
+            <th>3ga</th>
+            <th>3gp</th>
+            <th>orb</th>
+            <th>drb</th>
+            <th>ast</th>
+            <th>stl</th>
+            <th>tvr</th>
+            <th>blk</th>
+            <th>foul</th>
+            <th>oo</th>
+            <th>do</th>
+            <th>po</th>
+            <th>to</th>
+            <th>od</th>
+            <th>dd</th>
+            <th>pd</th>
+            <th>td</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>1</td>
+            <td>2</td>
+            <td>3</td>
+            <td>4</td>
+            <td>5</td>
+            <td>6</td>
+            <td>7</td>
+            <td>8</td>
+            <td>9</td>
+            <td>10</td>
+            <td>11</td>
+            <td>12</td>
+            <td>13</td>
+            <td>14</td>
+            <td>15</td>
+            <td>16</td>
+            <td>17</td>
+            <td>18</td>
+            <td>19</td>
+            <td>20</td>
+            <td>21</td>
+        </tr>
+    </tbody>
+</table>
+                </div>
+    </div>
+</div>
+
+<div class="ibl-card">
+    <div class="ibl-card__header">
+        <h2 class="ibl-card__title">Contract Offer</h2>
+    </div>
+    <div class="ibl-card__body">
+        <div class="ibl-field-group">
+            <span class="ibl-label">Player Demands (base, before team modifiers):</span>
+            <div class="ibl-field-group__content">
+                <div class="offer-salary-row">
+                    <div class="offer-salary-cell">
+            <div class="ibl-label ibl-label--sm">Yr 1</div>
+            <div class="offer-salary-cell__value">100</div>
+        </div>
+                                        <div class="offer-salary-cell">
+            <div class="ibl-label ibl-label--sm">Yr 3</div>
+            <div class="offer-salary-cell__value">50</div>
+        </div>
+                                                </div>
+                    </div>
+        </div>
+
+        <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer">
+            <input type="hidden" name="_csrf_token" value="__CSRF__">            <div class="ibl-field-group">
+                <span class="ibl-label">Your Custom Offer:</span>
+                <div class="ibl-field-group__content">
+                    <div class="offer-salary-row offer-salary-row--inputs" data-raise-percentage="0.1">
+        <div class="offer-salary-cell">
+        <label for="offeryear1" class="ibl-label ibl-label--sm">Yr 1</label>
+        <input type="number" id="offeryear1" class="ibl-input ibl-input--sm offer-salary-input" name="offeryear1" value="" min="0" max="9999">
+    </div>
+        <div class="offer-salary-cell">
+        <label for="offeryear2" class="ibl-label ibl-label--sm">Yr 2</label>
+        <input type="number" id="offeryear2" class="ibl-input ibl-input--sm offer-salary-input" name="offeryear2" value="" min="0" max="9999">
+    </div>
+        <div class="offer-salary-cell">
+        <label for="offeryear3" class="ibl-label ibl-label--sm">Yr 3</label>
+        <input type="number" id="offeryear3" class="ibl-input ibl-input--sm offer-salary-input" name="offeryear3" value="" min="0" max="9999">
+    </div>
+        <div class="offer-salary-cell">
+        <label for="offeryear4" class="ibl-label ibl-label--sm">Yr 4</label>
+        <input type="number" id="offeryear4" class="ibl-input ibl-input--sm offer-salary-input" name="offeryear4" value="" min="0" max="9999">
+    </div>
+        <div class="offer-salary-cell">
+        <label for="offeryear5" class="ibl-label ibl-label--sm">Yr 5</label>
+        <input type="number" id="offeryear5" class="ibl-input ibl-input--sm offer-salary-input" name="offeryear5" value="" min="0" max="9999">
+    </div>
+        <div class="offer-salary-cell">
+        <label for="offeryear6" class="ibl-label ibl-label--sm">Yr 6</label>
+        <input type="number" id="offeryear6" class="ibl-input ibl-input--sm offer-salary-input" name="offeryear6" value="" min="0" max="9999">
+    </div>
+    </div>
+                        </div>
+            </div>
+
+            <input type="hidden" name="teamname" value="TestTeam">
+            <input type="hidden" name="playerID" value="42">
+            <input type="hidden" name="offerType" value="0">
+
+            <button type="submit" class="ibl-btn ibl-btn--primary">Offer / Amend Free Agent Contract</button>
+        </form>
+    </div>
+</div>
+
+<div class="ibl-card">
+    <div class="ibl-card__header">
+        <h2 class="ibl-card__title">Quick Offer Presets</h2>
+    </div>
+    <div class="ibl-card__body">
+        <div class="offer-button-row">
+    <span class="ibl-label">Max Level Contract 10% (click the button that corresponds to the final year you wish to offer):</span>
+    <div class="offer-button-row__buttons">
+                    <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline">
+    <input type="hidden" name="_csrf_token" value="__CSRF__">    <input type="hidden" name="offeryear1" value="1063">
+<input type="hidden" name="teamname" value="TestTeam">
+<input type="hidden" name="playerID" value="42">
+<input type="hidden" name="offerType" value="0">
+    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary" data-testid="quick-offer-max-yr1">1063</button>
+</form>
+                            <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline">
+    <input type="hidden" name="_csrf_token" value="__CSRF__">    <input type="hidden" name="offeryear1" value="1063">
+<input type="hidden" name="offeryear2" value="1169">
+<input type="hidden" name="teamname" value="TestTeam">
+<input type="hidden" name="playerID" value="42">
+<input type="hidden" name="offerType" value="0">
+    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary" data-testid="quick-offer-max-yr2">1169</button>
+</form>
+                            <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline">
+    <input type="hidden" name="_csrf_token" value="__CSRF__">    <input type="hidden" name="offeryear1" value="1063">
+<input type="hidden" name="offeryear2" value="1169">
+<input type="hidden" name="offeryear3" value="1275">
+<input type="hidden" name="teamname" value="TestTeam">
+<input type="hidden" name="playerID" value="42">
+<input type="hidden" name="offerType" value="0">
+    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary" data-testid="quick-offer-max-yr3">1275</button>
+</form>
+                            <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline">
+    <input type="hidden" name="_csrf_token" value="__CSRF__">    <input type="hidden" name="offeryear1" value="1063">
+<input type="hidden" name="offeryear2" value="1169">
+<input type="hidden" name="offeryear3" value="1275">
+<input type="hidden" name="offeryear4" value="1381">
+<input type="hidden" name="teamname" value="TestTeam">
+<input type="hidden" name="playerID" value="42">
+<input type="hidden" name="offerType" value="0">
+    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary" data-testid="quick-offer-max-yr4">1381</button>
+</form>
+                            <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline">
+    <input type="hidden" name="_csrf_token" value="__CSRF__">    <input type="hidden" name="offeryear1" value="1063">
+<input type="hidden" name="offeryear2" value="1169">
+<input type="hidden" name="offeryear3" value="1275">
+<input type="hidden" name="offeryear4" value="1381">
+<input type="hidden" name="offeryear5" value="1487">
+<input type="hidden" name="teamname" value="TestTeam">
+<input type="hidden" name="playerID" value="42">
+<input type="hidden" name="offerType" value="0">
+    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary" data-testid="quick-offer-max-yr5">1487</button>
+</form>
+                            <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline">
+    <input type="hidden" name="_csrf_token" value="__CSRF__">    <input type="hidden" name="offeryear1" value="1063">
+<input type="hidden" name="offeryear2" value="1169">
+<input type="hidden" name="offeryear3" value="1275">
+<input type="hidden" name="offeryear4" value="1381">
+<input type="hidden" name="offeryear5" value="1487">
+<input type="hidden" name="offeryear6" value="1593">
+<input type="hidden" name="teamname" value="TestTeam">
+<input type="hidden" name="playerID" value="42">
+<input type="hidden" name="offerType" value="0">
+    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary" data-testid="quick-offer-max-yr6">1593</button>
+</form>
+                    </div>
+</div>
+        <div class="offer-button-row">
+    <span class="ibl-label">Mid-Level Exception (click the button that corresponds to the final year you wish to offer):</span>
+    <div class="offer-button-row__buttons">
+                    <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline">
+    <input type="hidden" name="_csrf_token" value="__CSRF__">    <input type="hidden" name="offeryear1" value="450">
+<input type="hidden" name="teamname" value="TestTeam">
+<input type="hidden" name="playerID" value="42">
+<input type="hidden" name="offerType" value="1">
+    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary" data-testid="quick-offer-mle-yr1">450</button>
+</form>
+                            <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline">
+    <input type="hidden" name="_csrf_token" value="__CSRF__">    <input type="hidden" name="offeryear1" value="450">
+<input type="hidden" name="offeryear2" value="495">
+<input type="hidden" name="teamname" value="TestTeam">
+<input type="hidden" name="playerID" value="42">
+<input type="hidden" name="offerType" value="2">
+    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary" data-testid="quick-offer-mle-yr2">495</button>
+</form>
+                            <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline">
+    <input type="hidden" name="_csrf_token" value="__CSRF__">    <input type="hidden" name="offeryear1" value="450">
+<input type="hidden" name="offeryear2" value="495">
+<input type="hidden" name="offeryear3" value="540">
+<input type="hidden" name="teamname" value="TestTeam">
+<input type="hidden" name="playerID" value="42">
+<input type="hidden" name="offerType" value="3">
+    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary" data-testid="quick-offer-mle-yr3">540</button>
+</form>
+                            <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline">
+    <input type="hidden" name="_csrf_token" value="__CSRF__">    <input type="hidden" name="offeryear1" value="450">
+<input type="hidden" name="offeryear2" value="495">
+<input type="hidden" name="offeryear3" value="540">
+<input type="hidden" name="offeryear4" value="585">
+<input type="hidden" name="teamname" value="TestTeam">
+<input type="hidden" name="playerID" value="42">
+<input type="hidden" name="offerType" value="4">
+    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary" data-testid="quick-offer-mle-yr4">585</button>
+</form>
+                            <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline">
+    <input type="hidden" name="_csrf_token" value="__CSRF__">    <input type="hidden" name="offeryear1" value="450">
+<input type="hidden" name="offeryear2" value="495">
+<input type="hidden" name="offeryear3" value="540">
+<input type="hidden" name="offeryear4" value="585">
+<input type="hidden" name="offeryear5" value="630">
+<input type="hidden" name="teamname" value="TestTeam">
+<input type="hidden" name="playerID" value="42">
+<input type="hidden" name="offerType" value="5">
+    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary" data-testid="quick-offer-mle-yr5">630</button>
+</form>
+                            <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline">
+    <input type="hidden" name="_csrf_token" value="__CSRF__">    <input type="hidden" name="offeryear1" value="450">
+<input type="hidden" name="offeryear2" value="495">
+<input type="hidden" name="offeryear3" value="540">
+<input type="hidden" name="offeryear4" value="585">
+<input type="hidden" name="offeryear5" value="630">
+<input type="hidden" name="offeryear6" value="675">
+<input type="hidden" name="teamname" value="TestTeam">
+<input type="hidden" name="playerID" value="42">
+<input type="hidden" name="offerType" value="6">
+    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary" data-testid="quick-offer-mle-yr6">675</button>
+</form>
+                    </div>
+</div>
+        <div class="offer-button-row">
+    <span class="ibl-label">Lower-Level Exception:</span>
+    <div class="offer-button-row__buttons">
+                    <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline">
+    <input type="hidden" name="_csrf_token" value="__CSRF__">    <input type="hidden" name="offeryear1" value="145">
+<input type="hidden" name="teamname" value="TestTeam">
+<input type="hidden" name="playerID" value="42">
+<input type="hidden" name="offerType" value="7">
+    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary" data-testid="quick-offer-lle">145</button>
+</form>
+                    </div>
+</div>
+        <div class="offer-button-row">
+    <span class="ibl-label">Veterans Exception:</span>
+    <div class="offer-button-row__buttons">
+                    <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline">
+    <input type="hidden" name="_csrf_token" value="__CSRF__">    <input type="hidden" name="offeryear1" value="70">
+<input type="hidden" name="teamname" value="TestTeam">
+<input type="hidden" name="playerID" value="42">
+<input type="hidden" name="offerType" value="8">
+    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary" data-testid="quick-offer-vetmin">70</button>
+</form>
+                    </div>
+</div>
+            </div>
+</div>
+
+<div class="ibl-card">
+    <div class="ibl-card__header">
+        <h2 class="ibl-card__title">Notes / Reminders</h2>
+    </div>
+    <div class="ibl-card__body">
+        <ul class="ibl-notes">
+            <li>The maximum contract permitted for this player (based on years of service) starts at 1063 in Year 1.</li>
+            <li>You have <strong>500</strong> in <strong>soft cap</strong> space available; the amount you offer in year 1 cannot exceed this unless you are using one of the exceptions.</li>
+                        <li>You have <strong>400</strong> in <strong>soft cap</strong> space available; the amount you offer in year 2 cannot exceed this unless you are using one of the exceptions.</li>
+                        <li>You have <strong>300</strong> in <strong>soft cap</strong> space available; the amount you offer in year 3 cannot exceed this unless you are using one of the exceptions.</li>
+                        <li>You have <strong>200</strong> in <strong>soft cap</strong> space available; the amount you offer in year 4 cannot exceed this unless you are using one of the exceptions.</li>
+                        <li>You have <strong>100</strong> in <strong>soft cap</strong> space available; the amount you offer in year 5 cannot exceed this unless you are using one of the exceptions.</li>
+                        <li>You have <strong>0</strong> in <strong>soft cap</strong> space available; the amount you offer in year 6 cannot exceed this unless you are using one of the exceptions.</li>
+                                    <li>You have <strong>600</strong> in <strong>hard cap</strong> space available; the amount you offer in year 1 cannot exceed this.</li>
+                        <li>You have <strong>500</strong> in <strong>hard cap</strong> space available; the amount you offer in year 2 cannot exceed this.</li>
+                        <li>You have <strong>400</strong> in <strong>hard cap</strong> space available; the amount you offer in year 3 cannot exceed this.</li>
+                        <li>You have <strong>300</strong> in <strong>hard cap</strong> space available; the amount you offer in year 4 cannot exceed this.</li>
+                        <li>You have <strong>200</strong> in <strong>hard cap</strong> space available; the amount you offer in year 5 cannot exceed this.</li>
+                        <li>You have <strong>100</strong> in <strong>hard cap</strong> space available; the amount you offer in year 6 cannot exceed this.</li>
+                        <li>Enter "0" for years you do not want to offer a contract.</li>
+            <li>The amounts offered each year must equal or exceed the previous year.</li>
+            <li>The first year of the contract must be at least the veteran's minimum (70 for this player).</li>
+            <li><strong>For Players who do not have Bird Rights with your team:</strong> You may add no more than 10% of the amount you offer in the first year as a raise between years (for instance, if you offer 500 in Year 1, you cannot offer a raise of more than 50 between any two subsequent years.)</li>
+        </ul>
+    </div>
+</div>
+        
+<div class="offer-delete-section">
+    <form method="post" action="modules.php?name=FreeAgency&pa=deleteoffer">
+        <input type="hidden" name="_csrf_token" value="__CSRF__">        <input type="hidden" name="teamname" value="TestTeam">
+        <input type="hidden" name="playerID" value="42">
+        <button type="submit" class="ibl-btn ibl-btn--danger">Delete This Offer</button>
+    </form>
+</div>
+        

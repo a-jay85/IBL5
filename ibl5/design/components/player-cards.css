@@ -733,13 +733,18 @@
     z-index: 10;
     transition: all var(--transition-slow);
     box-shadow: var(--pc-shadow-sm);
-    /*
-     * The z-index + transition promote the icon to its own compositing layer,
-     * which would otherwise ignore the parent face's backface culling and paint
-     * through when the face is turned away. Cull this layer with its face.
-     */
-    backface-visibility: hidden;
-    -webkit-backface-visibility: hidden;
+}
+
+/*
+ * The z-index + transition promote the icon to its own compositing layer, which
+ * ignores the parent face's backface culling and paints through (mirrored) when
+ * the face is turned away — backface-visibility on the icon itself can't cull it
+ * because its parent face is transform-style:flat. Hide the away-face's icon
+ * explicitly by flip state instead.
+ */
+.card-flip-container.flipped .card-front .flip-icon,
+.card-flip-container:not(.flipped) .card-back .flip-icon {
+    opacity: 0;
 }
 
 .flip-icon:hover {

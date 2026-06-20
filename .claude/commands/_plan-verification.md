@@ -45,6 +45,7 @@ Each implementation phase that changes behavior must have a corresponding row (o
 - "Compare against production" / "does output still match iblhoops.net?" → **visual-regression** (screenshot diff), not truly-manual — unless UI/UX was intentionally redesigned.
 - If nothing in UI/UX changed, visual regression covers it. Do not classify as truly-manual.
 - The **only** truly-manual items are subjective judgment on **new or redesigned** UI/UX.
+- "I can't tell mechanically whether it works" (a silent/integration-only failure mode, an observe-in-prod property) is a **verification gap, not a truly-manual item** → build the self-asserting check (`/plan` autonomy lever 3 / Step 3 § Verification-gap mechanization), do not classify as truly-manual or hold the merge.
 - If a plan has zero truly-manual items, state: `All verification is automated — no manual testing needed.`
 
 ### Weave tests inline

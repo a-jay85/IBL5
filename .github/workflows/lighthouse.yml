@@ -55,7 +55,10 @@ jobs:
       # --- Lighthouse ---
       - name: Run Lighthouse CI
         working-directory: ibl5
-        run: bunx @lhci/cli autorun
+        run: |
+          jq --argjson urls "$(../bin/lighthouse-pr-urls --json --base-url=http://localhost:8080)" \
+             '.ci.collect.url = $urls' .lighthouserc.json > /tmp/lhrc.pr.json
+          bunx @lhci/cli autorun --config=/tmp/lhrc.pr.json
         env:
           LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
           CHROME_PATH: /usr/bin/google-chrome-stable

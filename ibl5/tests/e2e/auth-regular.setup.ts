@@ -21,17 +21,8 @@ setup('authenticate regular (non-admin) user', async ({ page, request }) => {
     console.warn(`Failed to clear auth throttle (HTTP ${throttleResp.status()}) — login may fail if throttled`);
   }
 
-  // DEV_AUTO_LOGIN (PHP) auto-authenticates whichever user the developer's
-  // .env.test names — usually an admin. Set `_no_auto_login` BEFORE the
-  // first navigation so the login form actually renders for our non-admin
-  // credentials. Without this, a dev with DEV_AUTO_LOGIN=A-Jay would write
-  // the admin's session into regular.json. Same cookie pattern as
-  // tests/e2e/helpers/public-storage-state.ts.
-  const baseUrl = process.env.BASE_URL ?? 'http://main.localhost/ibl5/';
-  await page.context().addCookies([
-    { name: '_no_auto_login', value: '1', domain: new URL(baseUrl).hostname, path: '/' },
-  ]);
-
+  // Auto-login is now opt-in (_auto_login=1 cookie) — the login form renders by
+  // default on localhost without any opt-out cookie. Navigate directly.
   await page.goto('modules.php?name=YourAccount');
 
   const loginForm = page.locator('form', { has: page.locator('#login-username') });

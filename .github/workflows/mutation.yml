@@ -129,7 +129,9 @@ jobs:
   mutation-pr:
     name: Infection PHP (per-PR diff)
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
+    # Skip on `labeled` events (e.g. update-baselines/human-approved bookkeeping
+    # labels) — those carry no code change for this diff job to analyse.
+    if: github.event_name == 'pull_request' && github.event.action != 'labeled'
     timeout-minutes: 15
 
     services:

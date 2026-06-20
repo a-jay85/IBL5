@@ -37,7 +37,13 @@ jobs:
     permissions:
       pull-requests: read
     outputs:
-      src: ${{ github.event_name == 'push' || github.event.action == 'labeled' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.src == 'true' }}
+      # NOTE: a `labeled` event intentionally does NOT set src=true. Adding any
+      # label used to force the full E2E suite (api-e2e/shards/mutators) to rerun.
+      # Only the Visual Regression job should respond to a label — see `baseline` below.
+      src: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.src == 'true' }}
+      # True only for the `update-baselines` label. Gates the Visual Regression job
+      # alone so applying that label reruns baseline regen without a CI storm.
+      baseline: ${{ github.event.action == 'labeled' && github.event.label.name == 'update-baselines' }}
     steps:
       - uses: dorny/paths-filter@v4
         id: filter
@@ -87,7 +93,7 @@ jobs:
   e2e:
     name: Visual Regression
     needs: [changes]
-    if: needs.changes.outputs.src == 'true'
+    if: needs.changes.outputs.src == 'true' || needs.changes.outputs.baseline == 'true'
     runs-on: ubuntu-latest
     # 30 min (was 20) — full-page matrix over 49 modules is ~4-6x the
     # wall-clock of the prior 13 element crops.
@@ -493,7 +499,7 @@ jobs:
   ibl6-visual:
     name: IBL6 Visual Regression
     needs: [changes]
-    if: needs.changes.outputs.src == 'true'
+    if: needs.changes.outputs.src == 'true' || needs.changes.outputs.baseline == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 

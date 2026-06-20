@@ -10,16 +10,18 @@ declare(strict_types=1);
  *
  * @see SeasonArchive\SeasonArchiveRepository For database operations
  * @see SeasonArchive\SeasonArchiveService For business logic
- * @see SeasonArchive\SeasonArchiveView For HTML rendering
+ * @see SeasonArchive\SeasonArchiveIndexView For index HTML rendering
+ * @see SeasonArchive\SeasonDetailView For season-detail HTML rendering
  */
 
 if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
+use SeasonArchive\SeasonArchiveIndexView;
 use SeasonArchive\SeasonArchiveRepository;
 use SeasonArchive\SeasonArchiveService;
-use SeasonArchive\SeasonArchiveView;
+use SeasonArchive\SeasonDetailView;
 
 global $mysqli_db, $leagueContext;
 
@@ -27,14 +29,15 @@ PageLayout\PageLayout::header();
 
 $repository = new SeasonArchiveRepository($mysqli_db, $leagueContext);
 $service = new SeasonArchiveService($repository);
-$view = new SeasonArchiveView();
+$indexView = new SeasonArchiveIndexView();
+$detailView = new SeasonDetailView();
 
 $year = isset($_GET['year']) ? (int) $_GET['year'] : 0;
 
 if ($year > 0) {
     $seasonData = $service->getSeasonDetail($year);
     if ($seasonData !== null) {
-        echo $view->renderSeasonDetail($seasonData);
+        echo $detailView->renderSeasonDetail($seasonData);
     } else {
         $seasons = $service->getAllSeasons();
         $teamColors = $repository->getTeamColors();
@@ -44,7 +47,7 @@ if ($year > 0) {
         }
         $mvpNames = array_values(array_filter(array_column($seasons, 'mvp'), static fn(string $n): bool => $n !== ''));
         $playerIds = $repository->getPlayerIdsByNames($mvpNames);
-        echo $view->renderIndex($seasons, $teamColors, $playerIds, $teamIds);
+        echo $indexView->renderIndex($seasons, $teamColors, $playerIds, $teamIds);
     }
 } else {
     $seasons = $service->getAllSeasons();
@@ -55,7 +58,7 @@ if ($year > 0) {
     }
     $mvpNames = array_values(array_filter(array_column($seasons, 'mvp'), static fn(string $n): bool => $n !== ''));
     $playerIds = $repository->getPlayerIdsByNames($mvpNames);
-    echo $view->renderIndex($seasons, $teamColors, $playerIds, $teamIds);
+    echo $indexView->renderIndex($seasons, $teamColors, $playerIds, $teamIds);
 }
 
 PageLayout\PageLayout::footer();

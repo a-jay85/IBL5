@@ -322,6 +322,31 @@ phase_stalled() {
     tail -n +"$(( log_before + 1 ))" "$LOG" 2>/dev/null | grep -q "STALL-KILL"
 }
 
+# Decide whether an impl phase should trip the environmental breaker (refund +
+# stop the loop). Pure predicate over five 0/1 booleans so it is unit-testable
+# (see bin/test-automouse-env-breaker) — the call site computes the inputs.
+#
+# Env-stop ONLY when the agent produced NO outcome — neither a handoff (success)
+# nor a queue-exit (a deliberate skip/disposition) — AND a transient signature is
+# present (known limit/auth error, watchdog stall-kill, or a sub-minute exit).
+#
+# The in_queue guard is the fix for the false positive that stopped the loop on a
+# legitimate skip: every deliberate impl disposition (already-merged, stale-plan,
+# ambiguity, wt-new failure, missing-info — see bin/automouse-prompt-impl) runs
+# `mv queue/$PLAN → skipped/`, so the plan leaves queue/ (in_queue=0) and exits
+# fast with no handoff. Without this guard the sub-minute check misreads that
+# clean skip as a transient kill. A real transient never gets that far: it dies
+# mid-stream, leaving the plan in queue/ (in_queue=1). This mirrors the postplan
+# breaker, which gates its sub-minute check on the handoff still being present.
+#
+# Safe under `set -e`: only ever called inside an `if` condition.
+should_impl_env_stop() {
+    local handoff=$1 in_queue=$2 env_err=$3 stalled=$4 fast=$5
+    [ "$handoff" -eq 1 ] && return 1     # handoff written → impl succeeded
+    [ "$in_queue" -eq 0 ] && return 1    # plan left queue/ → deliberate disposition, not environmental
+    [ "$env_err" -eq 1 ] || [ "$stalled" -eq 1 ] || [ "$fast" -eq 1 ]
+}
+
 # Write a one-line report when the run STOPS on an environmental failure. The
 # queue is left intact (nothing skipped), so without this a no-progress night —
 # e.g. a single head-of-queue plan that keeps fast-failing — would be silent.
@@ -558,24 +583,30 @@ PLAN_FILE=$PLAN_NAME" \
 
         # Environmental-failure breaker. A usage/rate limit, auth error, or any
         # transient that kills the agent is NOT a plan failure — refund the attempt
-        # and STOP so the queue survives intact (it resumes next run). Only when
-        # impl produced no handoff; two independent signals, either suffices:
+        # and STOP so the queue survives intact (it resumes next run). The decision
+        # lives in should_impl_env_stop() (above): env-stop only when the agent
+        # produced no outcome (no handoff AND the plan is still in queue/) and a
+        # transient signature is present —
         #   1. a known limit/auth signature in this phase's log slice, or
-        #   2. a sub-minute exit — real impls run 15-50 min, so a fast no-handoff
+        #   2. a sub-minute exit — real impls run 15-50 min, so a fast no-outcome
         #      exit is environmental whatever the phrasing, and (unlike string
         #      matching) is immune to the async-stderr log-flush race.
         #   3. a watchdog stall-kill — no stream events for STALL_KILL_SECS, a
         #      transient hang (e.g. a dead inference stream), not a plan defect.
-        # A slow failure with no signature falls through as a genuine plan failure,
-        # keeping its incremented attempt → eventual poison-pill skip (unchanged).
-        if [ ! -f "$HANDOFF_FILE" ] \
-           && { phase_env_error "$IMPL_LOG_BEFORE" \
-                || phase_stalled "$IMPL_LOG_BEFORE" \
-                || [ "$IMPL_DUR" -lt "$MIN_VIABLE_SECS" ]; }; then
+        # A deliberate skip (plan moved out of queue/) is NOT environmental and
+        # falls through to continue the loop. A slow no-signature failure that left
+        # the plan in queue/ falls through as a genuine plan failure, keeping its
+        # incremented attempt → eventual poison-pill skip (unchanged).
+        IMPL_HANDOFF=0;  [ -f "$HANDOFF_FILE" ] && IMPL_HANDOFF=1
+        IMPL_IN_QUEUE=0; [ -e "$NEXT_PLAN" ]   && IMPL_IN_QUEUE=1
+        IMPL_ENV_ERR=0;  phase_env_error "$IMPL_LOG_BEFORE" && IMPL_ENV_ERR=1
+        IMPL_STALLED=0;  phase_stalled "$IMPL_LOG_BEFORE"   && IMPL_STALLED=1
+        IMPL_FAST=0;     [ "$IMPL_DUR" -lt "$MIN_VIABLE_SECS" ] && IMPL_FAST=1
+        if should_impl_env_stop "$IMPL_HANDOFF" "$IMPL_IN_QUEUE" "$IMPL_ENV_ERR" "$IMPL_STALLED" "$IMPL_FAST"; then
             REASON="usage/rate limit, auth error, or transient"
-            if phase_stalled "$IMPL_LOG_BEFORE"; then
+            if [ "$IMPL_STALLED" -eq 1 ]; then
                 REASON="phase stalled — no stream events for >$((STALL_KILL_SECS/60))min, force-killed"
-            elif [ "$IMPL_DUR" -lt "$MIN_VIABLE_SECS" ]; then
+            elif [ "$IMPL_FAST" -eq 1 ]; then
                 REASON="$REASON (impl exited in ${IMPL_DUR}s)"
             fi
             echo "Environmental failure during impl — $REASON. Refunding attempt, stopping loop." >> "$LOG"
@@ -588,6 +619,8 @@ PLAN_FILE=$PLAN_NAME" \
         if [ -f "$HANDOFF_FILE" ]; then
             echo "Handoff file created — impl succeeded." >> "$LOG"
             rm -f "$ATTEMPT_FILE"
+        elif [ ! -e "$NEXT_PLAN" ]; then
+            echo "Impl made a deliberate disposition (plan left queue/, e.g. an already-merged or stale-plan skip) — not an environmental failure, continuing." >> "$LOG"
         fi
     fi
 

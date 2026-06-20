@@ -513,4 +513,156 @@ class TradeOfferTest extends TestCase
 
         $this->assertTrue($result['success']);
     }
+
+    // ── Characterization pin — PRE-IMPL — do not edit ────────────
+
+    /**
+     * Exposes the protected calculateSalaryCapData() for the characterization pin.
+     * The test double sets only the four props that method reads; it never sets
+     * tradeCapCalculator (added later) — the Phase-4 delegator must tolerate this.
+     */
+    private function makeCapPinSubject(
+        \Repositories\Contracts\TeamIdentityRepositoryInterface $commonRepo,
+        BuyoutLedgerRepositoryInterface $cashConsiderationRepo,
+        Season $season,
+        TradeValidator $validator
+    ): TradeOfferCapPinDouble {
+        return new TradeOfferCapPinDouble($commonRepo, $cashConsiderationRepo, $season, $validator);
+    }
+
+    /**
+     * @return array{cy: int, salary_yr1: int, salary_yr2: int, salary_yr3: int, salary_yr4: int, salary_yr5: int, salary_yr6: int}
+     */
+    private function makeDiscriminatorRow(): array
+    {
+        // yr1=100, yr2=500: yr1 ≠ yr2 proves cy-offset changes the sum
+        return ['cy' => 1, 'salary_yr1' => 100, 'salary_yr2' => 500, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0];
+    }
+
+    /** V1: advances=true → cy 1→2 → yr2=500 per team */
+    public function testCapPinCalculateSalaryCapDataAdvancesTrue(): void
+    {
+        $commonRepo = self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+        $commonRepo->method('getTidFromTeamname')->willReturn(1);
+        $cashConsiderationRepo = self::createStub(BuyoutLedgerRepositoryInterface::class);
+        $cashConsiderationRepo->method('getTeamCashForSalary')->willReturn([$this->makeDiscriminatorRow()]);
+        $season = self::createStub(Season::class);
+        $season->method('advancesContractYears')->willReturn(true);
+        $validator = self::createStub(TradeValidator::class);
+        $validator->method('getCurrentSeasonCashConsiderations')->willReturn(['cashSentToThem' => 0, 'cashSentToMe' => 0]);
+
+        $subject = $this->makeCapPinSubject($commonRepo, $cashConsiderationRepo, $season, $validator);
+
+        $this->assertSame(
+            ['userCurrentSeasonCapTotal' => 500, 'partnerCurrentSeasonCapTotal' => 500, 'userCapSentToPartner' => 0, 'partnerCapSentToUser' => 0],
+            $subject->exposeCalculateSalaryCapData($this->makeTradeData())
+        );
+    }
+
+    /** V2: advances=false → cy stays 1 → yr1=100 per team */
+    public function testCapPinCalculateSalaryCapDataAdvancesFalse(): void
+    {
+        $commonRepo = self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+        $commonRepo->method('getTidFromTeamname')->willReturn(1);
+        $cashConsiderationRepo = self::createStub(BuyoutLedgerRepositoryInterface::class);
+        $cashConsiderationRepo->method('getTeamCashForSalary')->willReturn([$this->makeDiscriminatorRow()]);
+        $season = self::createStub(Season::class);
+        $season->method('advancesContractYears')->willReturn(false);
+        $validator = self::createStub(TradeValidator::class);
+        $validator->method('getCurrentSeasonCashConsiderations')->willReturn(['cashSentToThem' => 0, 'cashSentToMe' => 0]);
+
+        $subject = $this->makeCapPinSubject($commonRepo, $cashConsiderationRepo, $season, $validator);
+
+        $this->assertSame(
+            ['userCurrentSeasonCapTotal' => 100, 'partnerCurrentSeasonCapTotal' => 100, 'userCapSentToPartner' => 0, 'partnerCapSentToUser' => 0],
+            $subject->exposeCalculateSalaryCapData($this->makeTradeData())
+        );
+    }
+
+    /** V3: self-trade (offeringTeam === listeningTeam) zeroes sent keys despite checked contracts */
+    public function testCapPinSelfTradeZeroesCapSentKeys(): void
+    {
+        $commonRepo = self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+        $commonRepo->method('getTidFromTeamname')->willReturn(1);
+        $cashConsiderationRepo = self::createStub(BuyoutLedgerRepositoryInterface::class);
+        $cashConsiderationRepo->method('getTeamCashForSalary')->willReturn([]);
+        $season = self::createStub(Season::class);
+        $season->method('advancesContractYears')->willReturn(false);
+        $validator = self::createStub(TradeValidator::class);
+        $validator->method('getCurrentSeasonCashConsiderations')->willReturn(['cashSentToThem' => 0, 'cashSentToMe' => 0]);
+
+        $subject = $this->makeCapPinSubject($commonRepo, $cashConsiderationRepo, $season, $validator);
+        $tradeData = $this->makeTradeData(1, 2);
+        $tradeData['offeringTeam'] = 'Lakers';
+        $tradeData['listeningTeam'] = 'Lakers';
+        $tradeData['check'] = [0 => 'on', 1 => 'on'];
+        $tradeData['type'] = [0 => '1', 1 => '1'];
+        $tradeData['contract'] = [0 => '500', 1 => '600'];
+
+        $this->assertSame(
+            ['userCurrentSeasonCapTotal' => 500, 'partnerCurrentSeasonCapTotal' => 600, 'userCapSentToPartner' => 0, 'partnerCapSentToUser' => 0],
+            $subject->exposeCalculateSalaryCapData($tradeData)
+        );
+    }
+
+    /** V4: cash record CY-offset row summed into cap total alongside contracts */
+    public function testCapPinCashRecordCyOffsetIncludedInTotal(): void
+    {
+        // advances=true → cy 1→2 → yr2=500 per team; contracts 300 (user), 400 (partner)
+        // user total = 300+500=800, partner total = 400+500=900, sent = 300, received = 400
+        $commonRepo = self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+        $commonRepo->method('getTidFromTeamname')->willReturn(1);
+        $cashConsiderationRepo = self::createStub(BuyoutLedgerRepositoryInterface::class);
+        $cashConsiderationRepo->method('getTeamCashForSalary')->willReturn([$this->makeDiscriminatorRow()]);
+        $season = self::createStub(Season::class);
+        $season->method('advancesContractYears')->willReturn(true);
+        $validator = self::createStub(TradeValidator::class);
+        $validator->method('getCurrentSeasonCashConsiderations')->willReturn(['cashSentToThem' => 0, 'cashSentToMe' => 0]);
+
+        $subject = $this->makeCapPinSubject($commonRepo, $cashConsiderationRepo, $season, $validator);
+        $tradeData = $this->makeTradeData(1, 2);
+        $tradeData['check'] = [0 => 'on', 1 => 'on'];
+        $tradeData['type'] = [0 => '1', 1 => '1'];
+        $tradeData['contract'] = [0 => '300', 1 => '400'];
+
+        $this->assertSame(
+            ['userCurrentSeasonCapTotal' => 800, 'partnerCurrentSeasonCapTotal' => 900, 'userCapSentToPartner' => 300, 'partnerCapSentToUser' => 400],
+            $subject->exposeCalculateSalaryCapData($tradeData)
+        );
+    }
+}
+
+/**
+ * Test double for the characterization pin: exposes the protected
+ * calculateSalaryCapData() without going through the real constructor.
+ * Sets only the four props that method reads; never sets tradeCapCalculator
+ * (added in Phase 4) — the fallback delegator must tolerate this.
+ *
+ * @phpstan-import-type TradeFormData from \Trading\TradeOffer
+ */
+class TradeOfferCapPinDouble extends TradeOffer
+{
+    // @phpstan-ignore constructor.missingParentCall (test double: skip real ctor, inject the four cap collaborators directly)
+    public function __construct(
+        \Repositories\Contracts\TeamIdentityRepositoryInterface $commonRepo,
+        \Trading\Contracts\BuyoutLedgerRepositoryInterface $cashConsiderationRepo,
+        Season $season,
+        TradeValidator $validator
+    ) {
+        $this->db = new MockDatabase();
+        $this->commonRepository = $commonRepo;
+        $this->cashConsiderationRepository = $cashConsiderationRepo;
+        $this->season = $season;
+        $this->validator = $validator;
+        $this->logger = \Logging\LoggerFactory::getChannel('trade');
+    }
+
+    /**
+     * @phpstan-param TradeFormData $tradeData
+     * @return array{userCurrentSeasonCapTotal: int, partnerCurrentSeasonCapTotal: int, userCapSentToPartner: int, partnerCapSentToUser: int}
+     */
+    public function exposeCalculateSalaryCapData(array $tradeData): array
+    {
+        return $this->calculateSalaryCapData($tradeData);
+    }
 }

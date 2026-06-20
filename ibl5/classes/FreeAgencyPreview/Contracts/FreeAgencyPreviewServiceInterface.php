@@ -14,10 +14,14 @@ namespace FreeAgencyPreview\Contracts;
 interface FreeAgencyPreviewServiceInterface
 {
     /**
-     * Get all upcoming free agents for the specified season.
+     * Get all upcoming free agents projected through the target season.
      *
-     * @param int $seasonEndingYear The ending year of the current season
+     * Cumulative semantic: a player is a free agent if their salary is 0 in the
+     * contract year corresponding to the target year (offset from the current year).
+     *
+     * @param int $targetEndingYear  The ending year to project to (>= current)
+     * @param int $currentEndingYear The ending year of the current season
      * @return list<FreeAgentRow> Array of upcoming free agents
      */
-    public function getUpcomingFreeAgents(int $seasonEndingYear): array;
+    public function getUpcomingFreeAgents(int $targetEndingYear, int $currentEndingYear): array;
 }

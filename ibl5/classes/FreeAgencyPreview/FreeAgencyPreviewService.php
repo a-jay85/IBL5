@@ -31,15 +31,17 @@ class FreeAgencyPreviewService implements FreeAgencyPreviewServiceInterface
      *
      * @return list<FreeAgentRow>
      */
-    public function getUpcomingFreeAgents(int $seasonEndingYear): array
+    public function getUpcomingFreeAgents(int $targetEndingYear, int $currentEndingYear): array
     {
         $players = $this->repository->getActivePlayers();
         /** @var list<FreeAgentRow> $freeAgents */
         $freeAgents = [];
 
+        $offset = $targetEndingYear - $currentEndingYear;
+
         foreach ($players as $player) {
-            $nextYear = ($player['cy'] ?? 0) + 1;
-            $nextYearSalary = match ($nextYear) {
+            $targetContractYear = ($player['cy'] ?? 0) + 1 + $offset;
+            $targetSalary = match ($targetContractYear) {
                 1 => $player['salary_yr1'],
                 2 => $player['salary_yr2'],
                 3 => $player['salary_yr3'],
@@ -49,7 +51,7 @@ class FreeAgencyPreviewService implements FreeAgencyPreviewServiceInterface
                 default => 0,
             };
 
-            if ($nextYearSalary === 0) {
+            if ($targetSalary === 0) {
                 $freeAgents[] = [
                     'pid' => $player['pid'],
                     'teamid' => $player['teamid'],
@@ -91,5 +93,35 @@ class FreeAgencyPreviewService implements FreeAgencyPreviewServiceInterface
         }
 
         return $freeAgents;
+    }
+
+    /**
+     * Resolve and clamp a raw request value to a valid target ending year.
+     *
+     * Clamps to [$currentEndingYear, $currentEndingYear + 5] (the salary_yr1..6
+     * horizon supports offsets 0..5). Missing, non-numeric, or below-range input
+     * resolves to the current year; above-range clamps to the max horizon.
+     *
+     * @param string|null $raw The raw request value (e.g. $_GET['year']), already narrowed to ?string
+     * @param int $currentEndingYear The current season ending year
+     * @return int A target ending year within [$currentEndingYear, $currentEndingYear + 5]
+     */
+    public static function resolveRequestedYear(?string $raw, int $currentEndingYear): int
+    {
+        if ($raw === null || !is_numeric($raw)) {
+            return $currentEndingYear;
+        }
+
+        $requested = (int) $raw;
+        $maxYear = $currentEndingYear + 5;
+
+        if ($requested < $currentEndingYear) {
+            return $currentEndingYear;
+        }
+        if ($requested > $maxYear) {
+            return $maxYear;
+        }
+
+        return $requested;
     }
 }

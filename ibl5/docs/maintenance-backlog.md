@@ -1249,6 +1249,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Eligibility filtering, contract-expiration, projection accuracy.
 **Est. effort:** M
 **Risk if untouched:** Preview misses eligible players or includes ineligible.
+**Status:** Partially addressed — future-year projection restored and service tests expanded (`feat: restore future-year free-agent preview via URL param`). Projection-accuracy / contract-expiration edge coverage still open.
 
 ### 6.11 SeasonHighs — Thin (6 files, 2 tests)
 **Location:** `ibl5/classes/SeasonHighs`

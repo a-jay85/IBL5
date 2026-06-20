@@ -57,10 +57,14 @@ class TrainingCampRatingsDiffView implements TrainingCampRatingsDiffViewInterfac
     public function render(?int $baselineYear, array $rows, string $filterStatus = ''): string
     {
         if ($baselineYear === null || $rows === []) {
-            return '<div class="ratings-diff-page"><div class="ibl-card"><p>No prior-season baseline found. This page is meaningful after at least one <code>end-of-season</code> snapshot has been captured.</p></div></div>';
+            return '<div class="ratings-diff-page">'
+                . '<h1 class="ibl-title">Training Camp Ratings Diff</h1>'
+                . '<div class="ibl-card"><p>No prior-season baseline found. This page is meaningful after at least one <code>end-of-season</code> snapshot has been captured.</p></div></div>';
         }
 
-        return '<div class="ratings-diff-page">' . $this->renderTable($baselineYear, $rows, $filterStatus) . '</div>';
+        return '<div class="ratings-diff-page">'
+            . '<h1 class="ibl-title">Training Camp Ratings Diff</h1>'
+            . $this->renderTable($baselineYear, $rows, $filterStatus) . '</div>';
     }
 
     /**
@@ -83,8 +87,7 @@ class TrainingCampRatingsDiffView implements TrainingCampRatingsDiffViewInterfac
             }
         }
 
-        $html  = '<h2 class="ibl-title">Training Camp Ratings Diff</h2>';
-        $html .= '<p>Live player ratings vs their end-of-season ratings from '
+        $html  = '<p>Live player ratings vs their end-of-season ratings from '
             . HtmlSanitizer::e($baselineYear)
             . '. Sorted by largest single rating change.</p>';
         $html .= $this->renderStatusFilter($filterStatus);

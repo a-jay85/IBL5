@@ -241,9 +241,12 @@ if [ "$DO_CRAWL" = "1" ]; then
     for route in "${ROUTES[@]}"; do
         url="${BASE_URL}${route}"
         echo "  Crawling: $url"
+        # Opt into dev auto-login (.claude/rules/browser-login.md): on localhost
+        # auto-login is opt-in via the _auto_login cookie, so without it the crawl
+        # would hit logged-out pages and miss CSS used only on auth-gated views.
         # Extract whole space-delimited class tokens; use awk+tr (not sed)
         # for BSD compatibility (BSD sed 's/[\t]//g' strips literal t)
-        curl -s --max-time 10 "$url" 2>/dev/null \
+        curl -s --max-time 10 --cookie "_auto_login=1" "$url" 2>/dev/null \
             | grep -oE 'class="[^"]*"' \
             | awk -F'"' '{print $2}' \
             | tr ' ' '\n' \

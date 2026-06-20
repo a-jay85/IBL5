@@ -5,7 +5,7 @@ import { publicStorageState } from '../helpers/public-storage-state';
 /**
  * Public (unauthenticated) test fixture with appState control.
  *
- * - Sets _no_auto_login cookie so DevAutoLogin doesn't fire.
+ * - Sets _e2e cookie so PageCache is skipped; stays logged out (no auth opt-in).
  * - Uses cookie-based state overrides — no DB races in parallel tests.
  */
 export const test = base.extend<{ appState: SetStateFn }>({

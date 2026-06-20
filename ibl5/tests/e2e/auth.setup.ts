@@ -20,6 +20,11 @@ setup('authenticate', async ({ page, request }) => {
     console.warn(`Failed to clear auth throttle (HTTP ${throttleResp.status()}) — login may fail if throttled`);
   }
 
+  const baseUrl = process.env.BASE_URL ?? 'http://main.localhost/ibl5/';
+  await page.context().addCookies([
+    { name: '_auto_login', value: '1', domain: new URL(baseUrl).hostname, path: '/' },
+  ]);
+
   await page.goto('modules.php?name=YourAccount');
 
   // Check if already authenticated (e.g., DEV_AUTO_LOGIN redirected away from YourAccount)

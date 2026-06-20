@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-automouse-env-breaker — regression test for the impl environmental-
+# failure breaker decision in bin/automouse-run (should_impl_env_stop).
+#
+# The breaker refunds the attempt and STOPS the loop when a usage/rate limit,
+# auth error, or transient kills the impl agent — leaving the queue intact. The
+# load-bearing negative (the bug this locks): a LEGITIMATE skip (already-merged,
+# stale-plan, ambiguity, wt-new failure, missing-info) exits fast with no handoff
+# but moves the plan OUT of queue/ (in_queue=0). It must NOT be misread as
+# environmental, or one fast skip stops the whole run (this happened 2026-06-20:
+# god-class-split-standingsview skipped in 57s → false env-stop → 5 plans stranded).
+#
+# should_impl_env_stop <handoff> <in_queue> <env_err> <stalled> <fast>  (each 0/1)
+#   returns 0 (env-stop) ONLY when: handoff=0 AND in_queue=1 AND (env_err|stalled|fast)
+#
+# We extract the predicate from bin/automouse-run rather than copy it, so the test
+# can never drift from the implementation. The function is self-contained (it
+# reads only its five positional args), so eval'ing its definition is safe and
+# does not run the runner's top-level loop.
+#
+# Run: bin/test-automouse-env-breaker  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+RUNNER="$SCRIPT_DIR/automouse-run"
+
+if [ ! -f "$RUNNER" ]; then
+    echo "FAIL: cannot find $RUNNER"
+    exit 1
+fi
+
+# Extract `should_impl_env_stop() { ... }` (from its definition line to the first
+# line that is a lone `}`) and define it in this shell.
+FN_SRC="$(awk '
+    /^should_impl_env_stop\(\) \{/ { capture = 1 }
+    capture { print }
+    capture && /^\}/ { exit }
+' "$RUNNER")"
+
+if [ -z "$FN_SRC" ]; then
+    echo "FAIL: could not extract should_impl_env_stop from $RUNNER"
+    exit 1
+fi
+eval "$FN_SRC"
+
+FAILED=0
+
+# assert <name> <handoff> <in_queue> <env_err> <stalled> <fast> <expect: stop|continue>
+assert() {
+    name="$1"; h="$2"; q="$3"; e="$4"; s="$5"; f="$6"; want="$7"
+    if should_impl_env_stop "$h" "$q" "$e" "$s" "$f"; then
+        got="stop"
+    else
+        got="continue"
+    fi
+    if [ "$got" != "$want" ]; then
+        echo "FAIL: $name — expected '$want', got '$got' (h=$h q=$q e=$e s=$s f=$f)"
+        FAILED=1
+    else
+        echo "ok: $name ($got)"
+    fi
+}
+
+# --- The bug: legitimate skips left queue/ (in_queue=0) → NEVER env-stop ---
+# A fast skip with no handoff is the exact 2026-06-20 case.
+assert "skip-fast"           0 0 0 0 1 continue
+assert "skip-fast-and-stalled" 0 0 0 1 1 continue
+assert "skip-with-env-sig"   0 0 1 0 0 continue   # even a stray log signature can't stop a deliberate disposition
+
+# --- Genuine environmental kills: no outcome, plan still in queue/ → STOP ---
+assert "env-signature"       0 1 1 0 0 stop
+assert "stall-kill"          0 1 0 1 0 stop
+assert "sub-minute-exit"     0 1 0 0 1 stop
+assert "all-signals"         0 1 1 1 1 stop
+
+# --- Genuine plan failure: slow, no signature, still queued → NOT env-stop ---
+# (falls through to the genuine-failure path: attempt kept, eventual poison-pill)
+assert "slow-failure"        0 1 0 0 0 continue
+
+# --- Success: handoff written → never env-stop, regardless of other signals ---
+assert "handoff-success"     1 1 0 0 0 continue
+assert "handoff-despite-fast" 1 1 0 0 1 continue
+assert "handoff-despite-env" 1 1 1 1 1 continue
+
+if [ "$FAILED" -ne 0 ]; then
+    echo "RESULT: FAILED"
+    exit 1
+fi
+echo "RESULT: all passed"
+exit 0

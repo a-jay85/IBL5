@@ -451,6 +451,8 @@ jobs:
         uses: actions/checkout@v7
       - name: Run automouse impl-model parser regression test
         run: bin/test-automouse-impl-model
+      - name: Run automouse env-breaker regression test
+        run: bin/test-automouse-env-breaker
 
   update-baselines:
     name: Update coverage & PHPStan baselines

@@ -1,26 +1,26 @@
 #!/bin/bash
-# Queue a plan for nightly autonomous execution.
+# Queue a plan for automouse autonomous execution.
 #
-# Creates a symlink in the nightly queue pointing to the original plan
+# Creates a symlink in the automouse queue pointing to the original plan
 # in ~/.claude/plans/. The original plan stays in place; the symlink
 # is what gets moved to done/ or skipped/ after execution.
 #
 # Usage:
-#   bin/nightly-queue <plan-slug-or-filename>
-#   bin/nightly-queue                          # show current queue
-#   bin/nightly-queue requeue                  # move all skipped plans back to queue
-#   bin/nightly-queue remove <plan-slug>       # remove a plan from the queue
+#   bin/automouse-queue <plan-slug-or-filename>
+#   bin/automouse-queue                          # show current queue
+#   bin/automouse-queue requeue                  # move all skipped plans back to queue
+#   bin/automouse-queue remove <plan-slug>       # remove a plan from the queue
 #
 # Examples:
-#   bin/nightly-queue velvet-brewing-starlight
-#   bin/nightly-queue velvet-brewing-starlight.md
-#   bin/nightly-queue ~/.claude/plans/velvet-brewing-starlight.md
-#   bin/nightly-queue requeue
-#   bin/nightly-queue remove velvet-brewing-starlight
+#   bin/automouse-queue velvet-brewing-starlight
+#   bin/automouse-queue velvet-brewing-starlight.md
+#   bin/automouse-queue ~/.claude/plans/velvet-brewing-starlight.md
+#   bin/automouse-queue requeue
+#   bin/automouse-queue remove velvet-brewing-starlight
 
 set -euo pipefail
 
-: "${NIGHTLY_DIR:=$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/nightly}"
+: "${NIGHTLY_DIR:=$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse}"
 : "${PLANS_DIR:=$HOME/.claude/plans}"
 QUEUE_DIR="$NIGHTLY_DIR/queue"
 SKIPPED_DIR="$NIGHTLY_DIR/skipped"
@@ -39,7 +39,7 @@ evict_dispositions() {
 }
 
 show_queue() {
-    echo "Nightly queue (next to run first):"
+    echo "Automouse queue (next to run first):"
     local found=0
     local i=1
     while IFS= read -r f; do
@@ -64,7 +64,7 @@ fi
 if [ "$1" = "remove" ] || [ "$1" = "rm" ]; then
     if [ $# -lt 2 ]; then
         echo "Error: remove requires a plan slug or filename." >&2
-        echo "Usage: bin/nightly-queue remove <plan-slug>" >&2
+        echo "Usage: bin/automouse-queue remove <plan-slug>" >&2
         exit 1
     fi
     TARGET=$(basename "$2")

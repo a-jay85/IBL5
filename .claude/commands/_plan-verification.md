@@ -96,7 +96,7 @@ A plan trips this trigger when it adds or restyles any of:
 | New nav/menu entry, indicator, or badge | the nav bell + unread badge from #1067 |
 | New multi-step or stateful user flow | mark-read / mark-all-read, a what-if sandbox, a wizard |
 
-**Does NOT trip** (keep nightly autonomy for safe mechanical work): a non-visual refactor, a one-line CSS bugfix with no design change, a JSON/POST endpoint with no visual surface, or any change where **nothing the user sees is new or redesigned**. An *unchanged* UI is covered by Visual-regression alone — see the taxonomy's "If nothing in UI/UX changed" rule; this trigger fires only on genuinely new or redesigned surfaces.
+**Does NOT trip** (keep automouse autonomy for safe mechanical work): a non-visual refactor, a one-line CSS bugfix with no design change, a JSON/POST endpoint with no visual surface, or any change where **nothing the user sees is new or redesigned**. An *unchanged* UI is covered by Visual-regression alone — see the taxonomy's "If nothing in UI/UX changed" rule; this trigger fires only on genuinely new or redesigned surfaces.
 
 ### Phrasing the forced row (gate-3 safe)
 

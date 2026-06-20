@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 #
-# bin/test-nightly-queue — regression test for evict_dispositions in
-# bin/nightly-queue. Covers the duplicate-disposition symlink bug: queuing a
+# bin/test-automouse-queue — regression test for evict_dispositions in
+# bin/automouse-queue. Covers the duplicate-disposition symlink bug: queuing a
 # previously-done/skipped plan must evict the stale sibling before creating the
 # new queue/ entry.
 #
-# Run: bin/test-nightly-queue  (exit 0 = all pass, 1 = any case failed)
+# Run: bin/test-automouse-queue  (exit 0 = all pass, 1 = any case failed)
 
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-SCRIPT="$SCRIPT_DIR/nightly-queue"
+SCRIPT="$SCRIPT_DIR/automouse-queue"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-NDIR="$TMP/nightly"
+NDIR="$TMP/automouse"
 PDIR="$TMP/plans"
 FAILED=0
 

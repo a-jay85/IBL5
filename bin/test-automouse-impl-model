@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 #
-# bin/test-nightly-impl-model — regression test for bin/lib/plan-impl-model.
+# bin/test-automouse-impl-model — regression test for bin/lib/plan-impl-model.
 #
-# The helper selects the nightly impl-agent model from a plan's FIRST YAML
+# The helper selects the automouse impl-agent model from a plan's FIRST YAML
 # frontmatter block only (anchored to line 1). This pins:
 #   - sonnet / explicit-opus frontmatter selects the right model
 #   - the FOOTGUN (load-bearing negative): a plan with NO frontmatter that
@@ -14,7 +14,7 @@
 # Without the footgun cases, a body-greedy parser could silently downgrade a
 # plan that only documents the syntax.
 #
-# Run: bin/test-nightly-impl-model  (exit 0 = all pass, 1 = a case failed)
+# Run: bin/test-automouse-impl-model  (exit 0 = all pass, 1 = a case failed)
 
 set -u
 

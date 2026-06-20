@@ -1276,7 +1276,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 
 ### 8.9 `bin/lib/` Has No Manifest
 **Location:** `/bin/lib/`
-**Problem:** 4 shared shell helpers (`db-helpers.sh`, `git-helpers.sh`, `wt-guards.sh`, `nightly-stream-filter`). Inconsistent: filter has no `.sh`.
+**Problem:** 4 shared shell helpers (`db-helpers.sh`, `git-helpers.sh`, `wt-guards.sh`, `automouse-stream-filter`). Inconsistent: filter has no `.sh`.
 **Suggested direction:** Rename for consistency; add bin/lib/README.md.
 **Est. effort:** S
 **Risk if untouched:** Devs unsure which helpers exist; duplication.
@@ -1288,10 +1288,10 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Est. effort:** M
 **Risk if untouched:** Accidental human runs of CI scripts; CI-tuned scripts break locally.
 
-### 8.11 Nightly Workflow Scripts Have Complex State
-**Location:** `/bin/nightly-*` (4 files)
-**Problem:** `nightly-run`, `nightly-queue` are executables; `nightly-prompt-impl`, `nightly-prompt-postplan` are templates. No README.
-**Suggested direction:** Move to bin/nightly/; add README explaining data flow.
+### 8.11 Automouse Workflow Scripts Have Complex State
+**Location:** `/bin/automouse-*` (4 files)
+**Problem:** `automouse-run`, `automouse-queue` are executables; `automouse-prompt-impl`, `automouse-prompt-postplan` are templates. No README.
+**Suggested direction:** Move to bin/automouse/; add README explaining data flow.
 **Est. effort:** M
 **Risk if untouched:** Workflow opaque; debugging hard.
 

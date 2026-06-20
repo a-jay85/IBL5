@@ -6,15 +6,15 @@
 # survives closing Claude Code or the terminal — a plain `nohup … &` launched
 # from Claude Code's Bash tool shares the tool-shell's process group and dies
 # with it, so launchd is the load-bearing detach mechanism (same reason
-# bin/nightly-run uses launchd).
+# bin/automouse-run uses launchd).
 #
 # The plan is resolved from the branch slug by /post-plan Phase 1 — no handoff
-# file is needed (that machinery is nightly-only).
+# file is needed (that machinery is automouse-only).
 #
 # Usage:
 #   bin/post-plan-now           # you decided to ship: fire unconditionally
 #   bin/post-plan-now --auto    # impl agent's closing action: always fires
-#                               #   (skips only inside a headless/nightly run, which
+#                               #   (skips only inside a headless/automouse run, which
 #                               #   owns post-plan itself). post-plan ALWAYS opens the
 #                               #   PR; whether auto-merge ARMS is decided later, at
 #                               #   /post-plan Phase 6.5 (a plan's `auto_merge: false`
@@ -47,13 +47,13 @@ PLAN_FILE="$HOME/.claude/plans/$SLUG.md"
 # reads the plan's `auto_merge: false` and refuses to ARM auto-merge (leaving the
 # PR open for a human to merge) without ever skipping the post-plan run itself.
 if [ "$AUTO" -eq 1 ]; then
-    # We're already inside a headless/nightly run — the nightly runner fires
+    # We're already inside a headless/automouse run — the automouse runner fires
     # post-plan itself, so an auto-fire here would double-run. The
     # workflow-continuity rule that tells the impl agent to call this is
-    # globally loaded, so the nightly impl agent sees it too; this is the
+    # globally loaded, so the automouse impl agent sees it too; this is the
     # belt-and-suspenders guard against that.
     if [ "${CLAUDE_HEADLESS:-}" = "1" ]; then
-        echo "post-plan-now: CLAUDE_HEADLESS=1 — nightly/headless run owns post-plan; skipping auto-fire."
+        echo "post-plan-now: CLAUDE_HEADLESS=1 — automouse/headless run owns post-plan; skipping auto-fire."
         exit 0
     fi
 fi
@@ -75,7 +75,7 @@ PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 
 PROMPT="Invoke the /post-plan skill now on the current git branch. Resolve the plan from the branch slug per the skill Phase 1, then execute every phase. No human is present: never ask questions or wait for input — make the safe choice and continue."
 
-# launchd runs with a minimal env, so prepend the same PATH bin/nightly-run uses
+# launchd runs with a minimal env, so prepend the same PATH bin/automouse-run uses
 # (proven to find claude/gh/docker/node for full post-plan runs). CLAUDE_HEADLESS=1
 # marks the detached run unattended: /post-plan skips the Phase 10 preview rebuild
 # and BLOCKS auto-merge on a golden-snapshot change instead of merely warning.

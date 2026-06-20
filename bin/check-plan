@@ -18,7 +18,7 @@
 #                              automatable assertion mislabeled manual.
 #   7  No unresolved decisions — any table row carrying DECIDE / TBD /
 #                              "subject to validation" / "subject to review" is a
-#                              deferred question the nightly agent cannot resolve.
+#                              deferred question the automouse agent cannot resolve.
 #   8  Decision-trigger ADR    — a declared NEW file that matches an adr-check
 #                                trigger surface must carry a resolution (an ADR
 #                                authoring step or a `no-adr:` marker) in the plan.
@@ -141,7 +141,7 @@ done < "$MATRIX_FILE"
 # Gate 7: No unresolved decisions anywhere in any table row.
 # ---------------------------------------------------------------------------
 # Scans EVERY table row (not just the matrix) for deferred-question tokens. The
-# nightly agent cannot make judgment calls, so every cell must be concrete.
+# automouse agent cannot make judgment calls, so every cell must be concrete.
 #   DECIDE / TBD — whole word, case-insensitive.
 #   subject to validation / subject to review — literal.
 # ("(or " is intentionally NOT scanned here — see the header note; it lives in

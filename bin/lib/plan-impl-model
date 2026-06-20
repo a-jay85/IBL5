@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 #
-# bin/lib/plan-impl-model — resolve the nightly impl-agent model for a plan file.
+# bin/lib/plan-impl-model — resolve the automouse impl-agent model for a plan file.
 #
 # Reads a positionally-constrained `impl_model:` field from the plan's FIRST
 # YAML frontmatter block (anchored to line 1) and echoes the model id that
-# bin/nightly-run passes to `claude -p --model`. The body is never scanned, so
+# bin/automouse-run passes to `claude -p --model`. The body is never scanned, so
 # a plan that merely *documents* the syntax cannot self-select a model. Any
 # missing, unknown, or `opus` value falls through to the safe Opus default.
 #

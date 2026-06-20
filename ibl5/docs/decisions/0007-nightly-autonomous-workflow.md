@@ -1,6 +1,6 @@
 ---
-description: ADR for the nightly autonomous workflow — headless Claude executes queued plans via launchd at midnight.
-last_verified: 2026-05-26
+description: ADR for the automouse autonomous workflow (formerly "nightly") — headless Claude executes queued plans via launchd on a recurring schedule.
+last_verified: 2026-06-20
 ---
 
 # ADR-0007: Nightly Autonomous Workflow
@@ -8,15 +8,17 @@ last_verified: 2026-05-26
 **Status:** Accepted
 **Date:** 2026-04-13
 
+> **Renamed:** this pipeline is now called **automouse** (formerly "nightly"). The scripts are `bin/automouse-*` and the operational doc is `.claude/rules/automouse-workflow.md`. The ADR filename keeps its historical `0007-nightly-…` slug (ADRs are immutable cross-referenced history); the script/path references below were updated to the current `automouse-*` names. "Nightly" was dropped because the user runs the pipeline outside nighttime too.
+
 ## Context
 
 Daytime plan-mode sessions generate implementation plans that are approved but not always executed in the same session. Manually resuming plans the next day wastes context and momentum. The user wanted plans to execute overnight autonomously, producing PRs ready for morning review, without requiring an interactive REPL to be open.
 
 ## Decision
 
-Use macOS `launchd` to fire a headless `claude -p` process at 00:03 daily. For each queued plan, two context-isolated agents run sequentially: an implementation agent (`bin/nightly-prompt-impl`) creates a worktree and implements the plan, then a post-plan agent (`bin/nightly-prompt-postplan`) runs `/post-plan` for code review, security audit, testing, and PR creation. A JSON handoff file bridges state between agents. The `CLAUDE_HEADLESS=1` environment variable gates `/post-plan` Phase 11 (Worktree Preview Environment) since no human is present to verify visually.
+Use macOS `launchd` to fire a headless `claude -p` process on a recurring schedule. For each queued plan, two context-isolated agents run sequentially: an implementation agent (`bin/automouse-prompt-impl`) creates a worktree and implements the plan, then a post-plan agent (`bin/automouse-prompt-postplan`) runs `/post-plan` for code review, security audit, testing, and PR creation. A JSON handoff file bridges state between agents. The `CLAUDE_HEADLESS=1` environment variable gates `/post-plan` Phase 11 (Worktree Preview Environment) since no human is present to verify visually.
 
-Enforcement: `launchd` plist at `~/Library/LaunchAgents/com.ibl5.nightly-claude.plist`. Queue managed by `bin/nightly-queue`. Prompts authored in `bin/nightly-prompt-impl` and `bin/nightly-prompt-postplan`.
+Enforcement: `launchd` plist at `~/Library/LaunchAgents/com.ibl5.automouse.plist`. Queue managed by `bin/automouse-queue`. Prompts authored in `bin/automouse-prompt-impl` and `bin/automouse-prompt-postplan`.
 
 ## Alternatives Considered
 
@@ -34,9 +36,9 @@ Enforcement: `launchd` plist at `~/Library/LaunchAgents/com.ibl5.nightly-claude.
 
 ## References
 
-- `bin/nightly-queue` — symlink queue helper
-- `bin/nightly-prompt-impl` — implementation agent prompt (queue check through handoff file)
-- `bin/nightly-prompt-postplan` — post-plan agent prompt (reads handoff, runs /post-plan, reports)
-- `bin/nightly-run` — launchd wrapper script
-- `.claude/rules/nightly-workflow.md` — workflow documentation
+- `bin/automouse-queue` — symlink queue helper
+- `bin/automouse-prompt-impl` — implementation agent prompt (queue check through handoff file)
+- `bin/automouse-prompt-postplan` — post-plan agent prompt (reads handoff, runs /post-plan, reports)
+- `bin/automouse-run` — launchd wrapper script
+- `.claude/rules/automouse-workflow.md` — workflow documentation
 - `.claude/skills/post-plan/SKILL.md` — Phase 11 `$CLAUDE_HEADLESS` gate

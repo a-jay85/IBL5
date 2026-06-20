@@ -57,7 +57,7 @@ assert "existing-path" 0 'See `bin/check-plan-staleness` for the guard itself.'
 
 # An ellipsis placeholder (`ibl5/...` = "some real path", meta-notation) is not a
 # path dependency and must pass (exit 0), even though "ibl5/..." does not exist on
-# disk. Regression for the nightly false-positive that skipped maintenance-30.
+# disk. Regression for the automouse false-positive that skipped maintenance-30.
 assert "ellipsis-placeholder" 0 'Every backtick `ibl5/...` token in the body resolves to a real file.'
 
 if [ "$FAILED" -ne 0 ]; then

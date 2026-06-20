@@ -6,9 +6,40 @@ namespace Tests\Cache;
 
 use Cache\DatabaseCache;
 use PHPUnit\Framework\TestCase;
+use Tests\Clock\FixedClock;
 
 final class DatabaseCacheTest extends TestCase
 {
+    /**
+     * Boundary hit: with the clock fixed at T, a row whose expiration equals T
+     * is still served (the check is `expiration < now`, strict).
+     */
+    public function testGetReturnsHitWhenExpirationEqualsClockNow(): void
+    {
+        $mockDb = new MockCacheDb();
+        $cache = new DatabaseCache($mockDb, null, new FixedClock(1_000_000));
+
+        $data = [['pid' => 1, 'name' => 'Player 1']];
+        $mockDb->setCacheData('boundary_key', (string) json_encode($data), 1_000_000);
+
+        $this->assertSame($data, $cache->get('boundary_key'));
+    }
+
+    /**
+     * Boundary miss (negative path): with the clock fixed at T, a row whose
+     * expiration is T-1 is expired and returns null.
+     */
+    public function testGetReturnsMissWhenExpirationOneSecondBeforeClockNow(): void
+    {
+        $mockDb = new MockCacheDb();
+        $cache = new DatabaseCache($mockDb, null, new FixedClock(1_000_000));
+
+        $data = [['pid' => 1, 'name' => 'Player 1']];
+        $mockDb->setCacheData('expired_key', (string) json_encode($data), 999_999);
+
+        $this->assertNull($cache->get('expired_key'));
+    }
+
     public function testGetReturnsCachedDataOnHit(): void
     {
         $mockDb = new MockCacheDb();

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Cache;
 
+use Clock\ClockInterface;
+use Clock\SystemClock;
+
 /**
  * File-based full-page HTML cache for anonymous GET requests.
  *
@@ -35,6 +38,8 @@ final class PageCache
     ];
 
     private static ?string $testCacheDir = null;
+
+    private static ?ClockInterface $clock = null;
 
     public static function isCacheable(string $moduleName): bool
     {
@@ -84,7 +89,7 @@ final class PageCache
         }
 
         $expiry = (int) substr($content, 0, $newlinePos);
-        if ($expiry < time()) {
+        if ($expiry < self::clock()->now()) {
             @unlink($path);
             return null;
         }
@@ -109,7 +114,7 @@ final class PageCache
             }
         }
 
-        $expiry = time() + $ttl;
+        $expiry = self::clock()->now() + $ttl;
         $data = $expiry . "\n" . $html;
         @file_put_contents(self::cacheFilePath($key), $data, LOCK_EX);
     }
@@ -145,6 +150,19 @@ final class PageCache
     public static function setTestCacheDir(?string $dir): void
     {
         self::$testCacheDir = $dir;
+    }
+
+    /**
+     * Override the clock for testing. Pass null to restore the system clock.
+     */
+    public static function setTestClock(?ClockInterface $clock): void
+    {
+        self::$clock = $clock;
+    }
+
+    private static function clock(): ClockInterface
+    {
+        return self::$clock ?? new SystemClock();
     }
 
     private static function cacheDir(): string

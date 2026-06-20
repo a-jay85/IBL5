@@ -5,34 +5,37 @@ declare(strict_types=1);
 namespace Tests\SeasonArchive;
 
 use PHPUnit\Framework\TestCase;
-use SeasonArchive\SeasonArchiveView;
+use SeasonArchive\SeasonArchiveIndexView;
+use SeasonArchive\SeasonDetailView;
 
 /**
- * Golden-master snapshot tests for SeasonArchiveView (UNMODIFIED class).
+ * Golden-master snapshot tests pinned against the split view classes.
  *
- * Phase 1: pins are emitted from the unmodified class and frozen.
- * After the split (Phases 2-5), these same snapshots must still pass
- * against SeasonArchiveIndexView / SeasonDetailView via SeasonArchiveGoldenMasterTest.
+ * Snapshots were emitted from the unmodified SeasonArchiveView and frozen.
+ * Both new view classes must reproduce byte-identical output against these pins.
  *
- * DO NOT delete or regenerate the .html files after Phase 1c.
+ * DO NOT delete or regenerate the .html files.
  * A snapshot mismatch = the split changed rendered output = fix the new view class.
  *
- * @covers \SeasonArchive\SeasonArchiveView
+ * @covers \SeasonArchive\SeasonArchiveIndexView
+ * @covers \SeasonArchive\SeasonDetailView
  */
 class SeasonArchiveGoldenMasterTest extends TestCase
 {
     use SnapshotTestTrait;
 
-    private SeasonArchiveView $view;
+    private SeasonArchiveIndexView $indexView;
+    private SeasonDetailView $detailView;
 
     protected function setUp(): void
     {
-        $this->view = new SeasonArchiveView();
+        $this->indexView = new SeasonArchiveIndexView();
+        $this->detailView = new SeasonDetailView();
     }
 
     public function testDetailRichSnapshotMatchesUnmodifiedClass(): void
     {
-        $html = $this->view->renderSeasonDetail($this->createRichSeasonData());
+        $html = $this->detailView->renderSeasonDetail($this->createRichSeasonData());
 
         // Branch-marker guards — these run on emit AND every future run to defend the rich dataset.
         // Fail here = the rich dataset is missing a branch, not a stale snapshot.
@@ -53,7 +56,7 @@ class SeasonArchiveGoldenMasterTest extends TestCase
 
     public function testDetailMinimalSnapshotMatchesUnmodifiedClass(): void
     {
-        $html = $this->view->renderSeasonDetail($this->createMinimalSeasonData());
+        $html = $this->detailView->renderSeasonDetail($this->createMinimalSeasonData());
 
         // Empty-optional sections must be absent (boundary characterization).
         $this->assertStringNotContainsString('bracket-round-start', $html);
@@ -66,7 +69,7 @@ class SeasonArchiveGoldenMasterTest extends TestCase
     public function testIndexRichSnapshotMatchesUnmodifiedClass(): void
     {
         [$seasons, $teamColors, $playerIds, $teamIds] = $this->createRichIndexData();
-        $html = $this->view->renderIndex($seasons, $teamColors, $playerIds, $teamIds);
+        $html = $this->indexView->renderIndex($seasons, $teamColors, $playerIds, $teamIds);
 
         // Verify team cells and player cells rendered (not bare fallback paths).
         $this->assertStringContainsString('ibl-team-cell--colored', $html);
@@ -78,7 +81,7 @@ class SeasonArchiveGoldenMasterTest extends TestCase
     public function testIndexBareSnapshotMatchesUnmodifiedClass(): void
     {
         [$seasons] = $this->createRichIndexData();
-        $html = $this->view->renderIndex($seasons);
+        $html = $this->indexView->renderIndex($seasons);
 
         // Bare fallback path: no team cells, no player cells, no styles block.
         $this->assertStringNotContainsString('ibl-team-cell--colored', $html);

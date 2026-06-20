@@ -1,6 +1,6 @@
 ---
 description: WCAG 2.x full-rule (non-contrast) accessibility failure inventory and burn-down backlog per axe rule. Companion to a11y-contrast-backlog.md.
-last_verified: 2026-06-14
+last_verified: 2026-06-20
 ---
 
 # A11y Full-Rule Backlog (non-contrast)
@@ -15,7 +15,7 @@ last_verified: 2026-06-14
 
 **Disposition legend:**
 - 🟢 **nightly-safe** — fix is mechanical + verifiable by extending the spec ratchet (green-green); planned + queued.
-- 🟡 **supervised** — needs human judgment (label wording, "which heading is THE title", architectural refactor) or carries VR-regression risk → `auto_postplan: false`.
+- 🟡 **supervised** — needs human judgment (label wording, "which heading is THE title", architectural refactor) or carries VR-regression risk → `auto_merge: false`.
 - 🔵 **seed-verify** — re-run axe on the CI-seed stack to confirm reproducibility before planning.
 - ⚪ **out of scope** — covered elsewhere (contrast backlog) or the page is slated for deletion.
 
@@ -62,7 +62,7 @@ last_verified: 2026-06-14
 **Location:** topics (100 nodes!), homepage + news article + debug menu (2 nodes — sim-recap `leaders-tabbed` team links).
 **Problem:** Touch targets < 24×24px without sufficient spacing. WCAG 2.2 — a brand-new rule family for this codebase. The topics(100) hit is a dense small-link list.
 **Direction:** CSS `min-height`/`min-width`/padding on the affected components.
-**Disposition:** 🟡 (CSS sizing changes risk **visual-regression baseline** breakage → needs VR review, `auto_postplan: false`) **+ 🔵** (the small-count hits are sim-recap data-dependent; verify topics(100) on CI seed). Plan after a VR-aware human pass.
+**Disposition:** 🟡 (CSS sizing changes risk **visual-regression baseline** breakage → needs VR review, `auto_merge: false`) **+ 🔵** (the small-count hits are sim-recap data-dependent; verify topics(100) on CI seed). Plan after a VR-aware human pass.
 
 ### landmark-unique — best-practice, moderate — 🟡
 **Location:** standings (per-region scroll regions all `aria-label="Standings"`), league starters (`aria-label="Scrollable data table"` generic, ×2), next sim (`.next-sim-position-section` scroll regions share a label), schedule + team schedule (`.nav-grain` duplicate landmark).

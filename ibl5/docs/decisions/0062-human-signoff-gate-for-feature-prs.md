@@ -1,6 +1,6 @@
 ---
 description: Feature PRs (conventional-commit `feat:`) cannot merge until a human applies the `human-approved` label — a required CI check, not a convention, blocks auto-merge.
-last_verified: 2026-06-14
+last_verified: 2026-06-20
 ---
 
 # ADR-0062: Human sign-off gate for feature PRs
@@ -17,7 +17,7 @@ The nightly autonomous pipeline (`bin/nightly-run` → `/post-plan` Phase 6.5) a
 
 Feature PRs require explicit human sign-off, enforced mechanically by a **required status check**, not by convention. The workflow `.github/workflows/human-signoff.yml` classifies a PR as a feature by its conventional-commit title (`^feat(scope)?!?:`) and fails (red) until a human applies the `human-approved` label in the GitHub UI; non-feature work (`fix`/`refactor`/`chore`/`ci`/`docs`/`revert`) passes automatically so the nightly pipeline can still auto-merge maintenance. The check is added to master's required contexts, so a queued `--auto` merge never completes while it is red. **This required check is the deterministic block** — it holds regardless of what the autonomous flow does, because the merge is gated by GitHub, not by anyone's discipline.
 
-The nightly bot runs as the repo owner with the owner's `gh` credentials, so GitHub cannot tell a bot merge from a human one; the only bot/human discriminator lives in the headless execution path. `bin/nightly-run` (`neutralize_feat_signoff`) uses it as **best-effort defense-in-depth**, not a second deterministic layer: after each post-plan run it strips `--auto` arming and any `human-approved` label from `feat:` PRs the bot authored. Note the timing — post-plan arms `--auto` then watches CI to completion (Phase 7) *before* returning to `nightly-run`, so this cleanup runs too late to beat a label that was applied during the watch. The actual safeguard against the bot self-applying the label is that the post-plan flow does not apply it (verified by inspection); `neutralize_feat_signoff` is a tidy-up and a tripwire, and Layer A blocks the merge either way.
+The nightly bot runs as the repo owner with the owner's `gh` credentials, so GitHub cannot tell a bot merge from a human one. **Defense-in-depth lives in the post-plan layer and is deterministic:** `/post-plan` Phase 6.5 condition (8) is a literal PR-title grep (`^feat(scope)?!?:`) that refuses to *arm* `gh pr merge --auto` on a feature PR in the first place — so the bot never queues a `feat:` merge, and there is no arm-then-strip race to lose. The remaining safeguard against the bot self-applying the `human-approved` label is that the post-plan flow does not apply it (verified by inspection). Layer A (the required check) blocks the merge regardless. (This replaced an earlier runtime-strip mechanism — see **Update** below.)
 
 ## Alternatives Considered
 
@@ -33,6 +33,10 @@ The nightly bot runs as the repo owner with the owner's `gh` credentials, so Git
 - Negative: the nightly pipeline can no longer ship *any* new feature without a human applying the label the next morning — a deliberate throughput cost for UX-bearing changes.
 - Negative / residual: `gh pr merge --admin` would bypass the required check (admin override, since `enforce_admins: false` is kept for the direct-push paths). It is closed only by the fact the nightly flow does not use `--admin`, not by GitHub — a known, documented gap, not a guarantee. Likewise the title classifier can be dodged by editing a `feat:` PR's title; titles are the team contract (post-plan enforces conventional commits), so this is accepted, not defended.
 
+## Update (2026-06-20, PR #1137)
+
+The originally-shipped **Layer B** was a runtime strip: `bin/nightly-run`'s `neutralize_feat_signoff()` stripped `--auto` arming and any `human-approved` label from bot-authored `feat:` PRs *after* each post-plan run. Because post-plan arms `--auto` then watches CI to completion before returning to `nightly-run`, that cleanup ran too late to beat a label applied mid-watch — best-effort, not deterministic. PR #1137 **removed `neutralize_feat_signoff()`** and replaced the arm-then-strip pattern with the upstream deterministic refusal now described in the Decision (Phase 6.5 condition (8)): post-plan never arms a `feat:` PR, so nothing needs stripping. Layer A — this ADR's core decision, the required `human-signoff` check — is unchanged. The same refactor moved the general merge-hold lever from the inert `auto_postplan: false` plan-frontmatter key to `auto_merge: false`, read deterministically at Phase 6.5 condition (7).
+
 ## Lineage
 
 Relates to (does not supersede) ADR-0017 (`0017-dependabot-full-ci-and-auto-merge.md`), which established auto-merge for dependabot PRs — that path is gated separately on `dependabot[bot]` authorship and is unaffected. This ADR corrects the gap left by #1072, which is retained only as the de-facto first attempt.
@@ -40,6 +44,6 @@ Relates to (does not supersede) ADR-0017 (`0017-dependabot-full-ci-and-auto-merg
 ## References
 
 - `.github/workflows/human-signoff.yml` — Layer A, the required status check.
-- `bin/nightly-run` — Layer B, `neutralize_feat_signoff` strips auto-merge/label from `feat:` PRs.
+- `bin/nightly-run` — formerly held Layer B (`neutralize_feat_signoff`), removed by PR #1137; the `feat:` block now lives upstream in post-plan Phase 6.5 condition (8) (see Update).
 - `.claude/skills/post-plan/SKILL.md` — Phase 6.5 arms `gh pr merge --auto` (the behaviour this gate constrains).
 - `.claude/rules/nightly-workflow.md` — nightly pipeline overview.

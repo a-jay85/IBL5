@@ -1,9 +1,10 @@
 /**
  * Shared storageState for unauthenticated (public) E2E tests.
  *
- * Sets the `_no_auto_login` cookie so DevAutoLogin (PHP) doesn't
- * auto-authenticate the request. Without this cookie, all "public"
- * tests on *.localhost get silently promoted to an admin session.
+ * Sets the `_e2e=1` cookie so PageCache is skipped for unauthenticated GETs,
+ * avoiding cross-worker cache pollution. Does NOT set `_auto_login`, so these
+ * contexts stay logged out (auto-login is opt-in; absent the cookie DevAutoLogin
+ * does not fire).
  *
  * Usage (bare @playwright/test files):
  *   import { publicStorageState } from '../helpers/public-storage-state';
@@ -34,7 +35,7 @@ export function publicStorageState(): StorageState {
   return {
     cookies: [
       {
-        name: '_no_auto_login',
+        name: '_e2e',
         value: '1',
         domain,
         path: '/',

@@ -46,7 +46,6 @@ use Trading\TradeValidator;
 class TradeOfferCapDataIntegrationTest extends DatabaseTestCase
 {
     private const METROS_TID = 1;
-    private const STARS_TID = 2;
 
     /** @var array{userCurrentSeasonCapTotal: int, partnerCurrentSeasonCapTotal: int, userCapSentToPartner: int, partnerCapSentToUser: int}|null */
     private ?array $capturedCapData = null;
@@ -101,7 +100,7 @@ class TradeOfferCapDataIntegrationTest extends DatabaseTestCase
             'cashSentToThem' => 0,
             'cashSentToMe' => 0,
         ]);
-        $validator->method('validateSalaryCaps')
+        $validator->expects($this->once())->method('validateSalaryCaps')
             ->with(self::callback(function (array $capData): bool {
                 /** @var array{userCurrentSeasonCapTotal: int, partnerCurrentSeasonCapTotal: int, userCapSentToPartner: int, partnerCapSentToUser: int} $capData */
                 $this->capturedCapData = $capData;

@@ -1,0 +1,60 @@
+<div class="team-page-layout">
+    <div class="team-page-main">
+        <div class="team-stats-block">
+                        <div class="team-banner-row" style="--team-color-primary: #CC0000; --team-color-secondary: #000000;">
+        <a href="modules.php?name=Schedule&amp;teamid=1" class="team-action-link"><span class="team-action-link__text">Schedule</span><img src=".//imagesschedule-icon.svg" alt="Schedule" class="team-action-link__icon"></a>
+    <div class="team-banner-logo">
+        <img src=".//imageslogo/1.jpg" alt="Bulls logo">
+    </div>
+    <a href="modules.php?name=DraftHistory&amp;teamid=1" class="team-action-link"><span class="team-action-link__text">Draft History</span><img src=".//imagesdraft-history-icon.svg" alt="Draft History" class="team-action-link__icon"></a>
+    </div>
+                                <div class="table-scroll-wrapper">
+                <div class="table-scroll-container" tabindex="0" role="region" aria-label="Team roster">
+                    <table class="ibl-data-table team-table responsive-table sortable" style="--team-color-primary: #CC0000; --team-color-secondary: #000000;"><caption class="team-table-caption"><div class="ibl-view-dropdown" style="--team-color-primary: #000000; --team-color-secondary: #FFFFFF;"><select class="ibl-view-select" aria-label="Stats display" hx-get="modules.php?name=Team&amp;op=api&amp;teamid=1" hx-target="closest .table-scroll-container" hx-swap="innerHTML" hx-trigger="change" onchange="if(window.htmx)return;var v=this.value,d=v,s='';if(v.indexOf('split:')===0){d='split';s='&amp;split='+v.substring(6)}window.location.href='modules.php?name=Team&amp;op=team&amp;teamid=1&amp;display='+d+s"><optgroup label="Views"><option value="ratings" selected>Ratings</option><option value="total_s">Season Totals</option><option value="avg_s">Season Averages</option><option value="per36mins">Per 36 Minutes</option><option value="chunk">Sim Averages</option><option value="contracts">Contracts</option></optgroup><optgroup label="Location"><option value="split:home">Home</option><option value="split:road">Road</option></optgroup><optgroup label="Result"><option value="split:wins">Wins</option><option value="split:losses">Losses</option></optgroup><optgroup label="Season Half"><option value="split:pre_allstar">Pre All-Star</option><option value="split:post_allstar">Post All-Star</option></optgroup><optgroup label="By Month"><option value="split:month_11">November</option><option value="split:month_12">December</option><option value="split:month_1">January</option><option value="split:month_2">February</option><option value="split:month_3">March</option><option value="split:month_4">April</option><option value="split:month_5">May</option></optgroup><optgroup label="vs. Division"><option value="split:div_atlantic">vs. Atlantic</option><option value="split:div_central">vs. Central</option><option value="split:div_midwest">vs. Midwest</option><option value="split:div_pacific">vs. Pacific</option></optgroup><optgroup label="vs. Conference"><option value="split:conf_eastern">vs. Eastern</option><option value="split:conf_western">vs. Western</option></optgroup><optgroup label="vs. Team"></optgroup></select><noscript><a href="modules.php?name=Team&amp;op=team&amp;teamid=1&amp;display=ratings">Back to Ratings</a></noscript></div></caption>
+    <thead>
+        <tr>
+            <th class="sticky-col">Player</th>
+            <th>Pos</th>
+            <th class="sep-r-team">Age</th>
+            <th>2ga</th>
+            <th>2g%</th>
+            <th>fta</th>
+            <th>ft%</th>
+            <th>3ga</th>
+            <th class="sep-r-team">3g%</th>
+            <th>orb</th>
+            <th>drb</th>
+            <th>ast</th>
+            <th>stl</th>
+            <th>tvr</th>
+            <th>blk</th>
+            <th class="sep-r-team">foul</th>
+            <th>oo</th>
+            <th>do</th>
+            <th>po</th>
+            <th>to</th>
+            <th>od</th>
+            <th>dd</th>
+            <th>pd</th>
+            <th class="sep-r-team">td</th>
+            <th>Clu</th>
+            <th class="sep-r-team">Con</th>
+            <th>Days Injured</th>
+        </tr>
+    </thead>
+    <tbody>
+    </tbody>
+</table>
+                        </div>
+            </div>
+        </div>
+                <div class="team-cards-row"><div class="team-card" style="--team-color-primary: #CC0000; --team-color-secondary: #000000;"><div class="team-card__header"><h3 class="team-card__title">Current Season</h3></div><div class="team-card__body"></div></div><div class="team-card" style="--team-color-primary: #CC0000; --team-color-secondary: #000000;">
+    <div class="team-card__header">
+        <h3 class="team-card__title">Draft Picks</h3>
+    </div>
+    <div class="team-card__body--flush">
+        <ul class="draft-picks-list"></ul>    </div>
+</div>
+        </div>        <div class="franchise-history-wrapper"><div class="team-card" style="--team-color-primary: #CC0000; --team-color-secondary: #000000;"><div class="team-card__header"><h3 class="team-card__title">Franchise History</h3></div><div class="franchise-history-columns"><div class="franchise-history-column"><h4 class="franchise-history-column__title">H.E.A.T.</h4><ul class="team-history-list"></ul><div class="team-card__footer">Totals: 0-0 (0.000)</div></div><div class="franchise-history-column"><h4 class="franchise-history-column__title">Regular Season</h4><ul class="team-history-list"></ul><div class="team-card__footer">Totals: 0-0 (0.000)</div></div><div class="franchise-history-column"><h4 class="franchise-history-column__title">Playoffs</h4><div class="team-card__footer team-card__footer--bold">Post-Season: 0-0 (0.000) &middot; Series: 0-0 (0.000)</div></div></div></div></div>        <div class="team-page-rafters"></div>    </div>
+</div>
+        

@@ -121,7 +121,7 @@ jobs:
 
     - name: Check coverage threshold
       working-directory: ibl5
-      run: php bin/check-coverage coverage/clover.xml 70
+      run: php bin/check-coverage coverage/clover.xml 80
 
     - name: Check coverage regression
       working-directory: ibl5
@@ -130,7 +130,7 @@ jobs:
     - name: Check if threshold needs ratcheting
       working-directory: ibl5
       run: |
-        THRESHOLD=70
+        THRESHOLD=80
         BUFFER=5
         COVERAGE=$(php -r '
           $xml = simplexml_load_file("coverage/clover.xml");

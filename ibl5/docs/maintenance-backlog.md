@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-06-13
+last_verified: 2026-06-20
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -111,12 +111,9 @@ Effort scale:
 **Est. effort:** S
 **Risk if untouched:** Column reorder breaks silently; `flush()` corrupts tests/queued jobs.
 
-### 1.12 SeasonArchiveView — Two Fundamentally Different Pages
-**Location:** `ibl5/classes/SeasonArchive/SeasonArchiveView.php` (553 lines)
-**Problem:** Renders both the season index AND the season detail page (12+ sub-sections: tournaments, AS Weekend, awards, all-league, brackets, HEAT standings, rosters). `renderSeasonDetail()` unpacks ~20 top-level data keys before calling 10 private renders.
-**Suggested direction:** Split into `SeasonArchiveIndexView` and `SeasonDetailView`; move sub-section renders into separate components.
-**Est. effort:** M
-**Risk if untouched:** File keeps growing; index/detail share no logic but cognitive overhead applies to both.
+### 1.12 SeasonArchiveView — Two Fundamentally Different Pages ✓ Done
+
+Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/classes/SeasonArchive/SeasonArchiveIndexView.php`, `ibl5/classes/SeasonArchive/SeasonDetailView.php`, and shared `ibl5/classes/SeasonArchive/SeasonArchiveRenderHelpers.php` trait. Output byte-identical (verified by golden-master snapshots).
 
 ### 1.13 SeasonArchiveService — Mutable Instance State Accumulator
 **Location:** `ibl5/classes/SeasonArchive/SeasonArchiveService.php` line 35 (530 LOC)

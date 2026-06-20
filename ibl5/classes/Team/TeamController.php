@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Team;
 
 use Auth\Contracts\AuthServiceInterface;
+use League\League;
 use League\LeagueContext;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Team\Contracts\TeamControllerInterface;
@@ -28,7 +29,11 @@ class TeamController implements TeamControllerInterface
     {
         $this->db = $db;
         $repository = new TeamRepository($db);
-        $this->service = new TeamService($db, $repository, $leagueContext);
+        $teamQueryRepository = new TeamQueryRepository($db);
+        $league = new League($db);
+        $preparer = new TeamPageDataPreparer($db, $repository, $teamQueryRepository, $league);
+        $cardRenderer = new TeamCardRenderer();
+        $this->service = new TeamService($db, $repository, $leagueContext, $teamQueryRepository, $league, $preparer, $cardRenderer);
         $this->view = new TeamView();
         $this->commonRepo = $commonRepo;
         $this->authService = $authService;

@@ -15,7 +15,7 @@ if ($worktreeClasses !== false && is_link(__DIR__ . '/../ibl5/vendor')) {
     }, true, true);
 }
 
-use Module\ModuleRegistry;
+use Cli\LighthouseUrls;
 
 $baseUrl = 'http://localhost:8080';
 $jsonOutput = false;
@@ -40,28 +40,7 @@ foreach ($argv as $i => $arg) {
 
 $baseUrl = rtrim($baseUrl, '/');
 
-$subPages = [
-    'Team'                => '&op=team&teamid=1',
-    'Player'              => '&pa=showpage&pid=1',
-    'Schedule'            => '&teamid=1',
-    'DraftHistory'        => '&year=2025',
-    'FranchiseRecordBook' => '&op=team&teamid=1',
-    'SeasonArchive'       => '&year=2025',
-    'Injuries'            => '&teamid=1',
-    'OneOnOneGame'        => '&gameid=1',
-];
-
-$urls = [];
-
-$urls[] = $baseUrl . '/ibl5/index.php';
-
-foreach (ModuleRegistry::getAllModules() as $module) {
-    $urls[] = $baseUrl . '/ibl5/modules.php?name=' . $module;
-
-    if (isset($subPages[$module])) {
-        $urls[] = $baseUrl . '/ibl5/modules.php?name=' . $module . $subPages[$module];
-    }
-}
+$urls = LighthouseUrls::fullSiteUrls($baseUrl);
 
 if ($jsonOutput) {
     fwrite(STDOUT, json_encode($urls, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");

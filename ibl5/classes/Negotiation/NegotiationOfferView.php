@@ -93,7 +93,7 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
             <input type="hidden" name="playerName" value="<?= HtmlSanitizer::trusted($playerName) ?>">
             <input type="hidden" name="playerID" value="<?= HtmlSanitizer::e($playerID) ?>">
 
-            <button type="submit" class="ibl-btn ibl-btn--primary">Offer Extension</button>
+            <button type="submit" class="ibl-btn ibl-btn--danger">Offer Extension</button>
         </form>
     </div>
 </div>

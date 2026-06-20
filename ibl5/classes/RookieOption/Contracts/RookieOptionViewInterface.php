@@ -37,7 +37,7 @@ interface RookieOptionViewInterface
      * - Result banner (if $result set) with ibl-alert--success/warning
      * - ibl-card with player image (flex layout) and option value
      * - Warning card with ibl-alert--warning for exercise consequences
-     * - Form with hidden fields and ibl-btn--primary submit button
+     * - Form with hidden fields and ibl-btn--danger submit button
      *
      * **Form Fields:**
      * - teamname: Team name

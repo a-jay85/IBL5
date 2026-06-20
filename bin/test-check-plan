@@ -221,6 +221,33 @@ Phase 1 — Create `bin/foo` for the new tool.
 Phase 2 — Create ibl5/docs/decisions/0099-x.md documenting the decision.
 '
 
+# Gate H: a plan whose line-1 frontmatter declares `auto_merge: false` but has NO
+# `## Automouse Hold Justification` section must flag (exit 1).
+assert "gateH-hold-no-justification" 1 '---
+auto_merge: false
+---'"$M"
+
+# Gate H: the same hold WITH the justification section passes (exit 0).
+assert "gateH-hold-with-justification" 0 '---
+auto_merge: false
+---'"$M"'
+## Automouse Hold Justification
+
+Intrinsic (gate 14b): touched security surface — per-site authz verdicts are distributed across the diff.
+'
+
+# Gate H: no hold (frontmatter without `auto_merge: false`) — section absent is
+# fine, must NOT flag (exit 0).
+assert "gateH-no-hold-armed" 0 '---
+impl_model: sonnet
+---'"$M"
+
+# Gate H FP-guard: a plan that merely DOCUMENTS the `auto_merge: false` syntax in
+# its body (not in line-1 frontmatter) must NOT flag (exit 0).
+assert "gateH-body-mentions-syntax-only" 0 "$M"'
+Note: setting `auto_merge: false` in the line-1 frontmatter holds the merge.
+'
+
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"
     exit 1

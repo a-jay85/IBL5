@@ -42,6 +42,12 @@
 # Whole-word DECIDE/TBD and the "subject to …" phrases ARE FP-free, so they stay.
 #
 # Plus a NEW conservative check the gates describe but never enforced:
+#   H  Hold justification    — a plan whose line-1 frontmatter declares
+#                              `auto_merge: false` must carry an
+#                              `## Automouse Hold Justification` section (the
+#                              Step-4.5 artifact). PRESENCE only — validity of the
+#                              rationale stays Opus judgment; this just catches a
+#                              hold declared with the challenge skipped entirely.
 #   R  Reuse-target exists   — a `Class::method` token named in a **Reuse** note
 #                              must resolve: if the class exists in ibl5/ but the
 #                              method name appears nowhere as a `function`, it is a
@@ -268,6 +274,38 @@ done < <(
 if grep -iE 'composer\.json' "$PLAN_FILE" | grep -qiE 'require(-dev)?'; then
     if [ "$GATE8_RESOLVED" -eq 0 ]; then
         viol "[8] decision-trigger surface ibl5/composer.json (new-dependency) added without an ADR step or no-adr: marker"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Gate H: Auto-merge hold justification present.
+# ---------------------------------------------------------------------------
+# A plan that holds the merge (`auto_merge: false` in its line-1 frontmatter)
+# must carry an `## Automouse Hold Justification` section — the artifact /plan
+# Step 4.5 produces when it confirms a hold rather than dissolving it. This is a
+# PRESENCE backstop only: the script cannot judge whether the justification is
+# valid (reducible-confirmed vs intrinsic, infeasibility reasoning) — that stays
+# Opus judgment in Step 4.5. It only catches the case where a hold was declared
+# but the challenge was skipped entirely, leaving no recorded rationale.
+#
+# Parse ONLY the first frontmatter block (the `---`…`---` fence that, by the
+# Step-5 convention, opens the file). This keeps the check false-positive-free
+# against a plan BODY that merely documents the `auto_merge: false` syntax inside
+# a fenced code example.
+FM_HOLD=0
+while IFS= read -r fm_line; do
+    case "$fm_line" in
+        auto_merge:*false*) FM_HOLD=1; break ;;
+    esac
+done < <(awk '
+    NR==1 && /^---[[:space:]]*$/ { inf=1; next }
+    inf && /^---[[:space:]]*$/   { exit }
+    inf                          { print }
+' "$PLAN_FILE")
+
+if [ "$FM_HOLD" -eq 1 ]; then
+    if ! grep -qiE '^##[[:space:]]+Automouse Hold Justification[[:space:]]*$' "$PLAN_FILE"; then
+        viol "[H] plan declares auto_merge: false but has no '## Automouse Hold Justification' section (Step 4.5 — record why the hold is reducible-confirmed or intrinsic)"
     fi
 fi
 

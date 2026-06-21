@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-06-20
+last_verified: 2026-06-21
 ---
 
 # Post-Plan Orchestrator
@@ -13,6 +13,8 @@ last_verified: 2026-06-20
 Execute all phases below **sequentially in a single response**. Do NOT stop, ask for input, or return control between phases.
 
 **Phase 11 (Background Process Cleanup) is MANDATORY and must ALWAYS be the last thing you execute before ending your turn.** No phase — including Phase 9 (Retrospective) — is a valid stopping point. If you reach Phase 9 and have nothing to save, continue directly to Phase 10 and Phase 11. Ending your turn before Phase 11 leaves background processes alive, which prevents the `claude` process from exiting and triggers a stall-kill in the automouse runner.
+
+**No background-completion re-invocation exists here.** Post-plan runs headless (`claude -p` under the automouse runner), NOT in the interactive harness. When a `run_in_background` task finishes there is **nothing that re-invokes you** — emitting `end_turn` ends the run for good. So **"Waiting for PHPUnit/PHPStan/E2E to complete" is NEVER a valid final message or a stopping point.** If you launch any background work, you MUST drain it **within the same turn** — poll `BashOutput` until every background shell reports a terminal result — before you compute that phase's status and move on. Ending the turn with a background task still alive is the exact failure that stall-kills the run and (after 3 burns) poison-pills the plan.
 
 Phase numbers below are local to this skill. The variables computed in Phase 3 (`HAS_PHP`, `NON_CODE_ONLY`, `DOCS_ONLY`, `CSS_ONLY`, `MIGRATION_ONLY`, `HAS_MODIFIED`, `HAS_COMMENTS_IN_DIFF`, `HAS_GO`, `GO_TOUCHED`, `ENGINE_ONLY`, `GOLDEN_CHANGED`, `DIFF`, etc.) are consulted by every downstream phase to gate sub-agent launches — never recompute them locally.
 
@@ -366,7 +368,7 @@ For each `MISSING-FILE:`, the impl dropped a planned change. Either (a) make the
 
 At Phase 5.0 END, append each remaining **UNRESOLVED** `MISSING:` and `MISSING-FILE:` item (label + path + reason) to `/tmp/post-plan-missing-tests-$PPID`, one per line. Authored-green / implemented-and-checkpointed / cut-with-comment items are NOT written. This bridge file is consulted by the Phase 6.5 auto-merge gate.
 
-**PHPUnit + PHPStan — direct Bash (no agent):** **Skip if** `! $HAS_PHP`. The PostToolUse hook already ran both during edits, and a PHP-less diff cannot regress either suite. Run both as direct Bash calls with `run_in_background: true` so they execute in parallel with the E2E agent below. Output is ~5 lines each — agent overhead (~25K tokens) is never justified.
+**PHPUnit + PHPStan — direct Bash (no agent):** **Skip if** `! $HAS_PHP`. The PostToolUse hook already ran both during edits, and a PHP-less diff cannot regress either suite. Run both as **blocking** (foreground) direct Bash calls — do **NOT** pass `run_in_background: true`. Both finish in ~1–2 min, well under the per-phase cap, and backgrounding them here is the trap that stall-killed the 2026-06-21 runs: when the E2E track is skipped there is nothing left to wait on in-turn, so the model backgrounds them and ends the turn expecting a re-invocation that headless mode never delivers. Running blocking returns their results in-turn and you proceed straight to Phase 6. Output is ~5 lines each — agent overhead (~25K tokens) is never justified. (If you ever do background them for parallelism with the E2E agent, the drain rule at the top of this skill is mandatory: poll `BashOutput` to completion before computing `PHASE5_VERIFY_STATUS` — never end the turn on a pending task.)
 
 ```bash
 cd <worktree>/ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary | tail -n 3
@@ -411,6 +413,8 @@ Prompt MUST ALSO include this long-run handling rule: "`bin/e2e-wt.sh` can excee
 If either fails, fix in worktree, commit, push, and re-run the failing track.
 
 ### Phase 5 END: emit `PHASE5_VERIFY_STATUS`
+
+**Drain barrier (do this FIRST):** before computing the status, confirm **no background shell from this phase is still running** — poll `BashOutput` until every backgrounded track (a long-running E2E launched with `run_in_background`, or any backgrounded PHPUnit/PHPStan) reports a terminal result. You may not aggregate or advance to Phase 6 while a Phase 5 task is pending. "Still waiting on a track" is not a status — resolve it in-turn.
 
 **After** the fix-and-rerun loop above has resolved (every launched track green) or given up (a deterministic failure survives), aggregate the Phase 5 tracks — PHPUnit, PHPStan (both direct Bash, skipped when `! $HAS_PHP`), the **Go engine track** (direct Bash, skipped when `! $HAS_GO`), and the E2E Haiku sub-agent — into one status. The E2E track runs in a sub-agent whose shell state does not persist, so you (Opus) read its reported pass/fail from context, combine it with the PHPUnit/PHPStan/Go results, and write the flag. Persist it for durability across the per-phase cap (same `$PPID` temp-file pattern Phase 3 / Phase 5.0 use):
 

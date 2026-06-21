@@ -1,6 +1,6 @@
 ---
 description: Sub-agent decision rules — when to spawn, when to skip, and which model to pick
-last_verified: 2026-06-20
+last_verified: 2026-06-21
 ---
 
 # Agent Tiering
@@ -15,7 +15,7 @@ Each sub-agent pays fixed overhead (~3–5K tokens: system prompt + rules + memo
 
 **Spawn an agent when ANY hold:** output unpredictably verbose (large grep, failing suites with stack traces) and the agent can return a summary · multiple independent verbose tasks can run concurrently · the task is multiple sequential tool calls.
 
-**PHPUnit and PHPStan are always direct Bash calls** — passing output is ~5 lines, failures usually under 50; agent overhead dwarfs it. Use `run_in_background` for parallelism without an agent.
+**PHPUnit and PHPStan are always direct Bash calls** — passing output is ~5 lines, failures usually under 50; agent overhead dwarfs it. Use `run_in_background` for parallelism without an agent — **but only in the interactive harness, where a finished background task re-invokes you.** In a **headless** run (`claude -p`, e.g. `/post-plan` under automouse) there is no re-invocation: ending the turn with a background task alive stall-kills the run. There, either run blocking, or poll `BashOutput` to completion in-turn before ending the turn (see post-plan `SKILL.md` Phase 5).
 
 ## Tiers
 

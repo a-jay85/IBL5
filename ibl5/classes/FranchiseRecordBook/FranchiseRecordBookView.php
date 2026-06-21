@@ -69,12 +69,12 @@ class FranchiseRecordBookView
         $html = $this->renderTitle($data);
 
         if ($data['singleSeason'] !== []) {
-            $html .= '<h2 class="ibl-title record-book-section-title">Single-Season Records</h2>';
+            $html .= '<h3 class="ibl-title record-book-section-title" aria-level="2">Single-Season Records</h3>';
             $html .= $this->renderRecordSection($data['singleSeason'], 'single_season');
         }
 
         if ($data['career'] !== [] && !$this->isTeamView) {
-            $html .= '<h2 class="ibl-title record-book-section-title">Career Records</h2>';
+            $html .= '<h3 class="ibl-title record-book-section-title" aria-level="2">Career Records</h3>';
             $html .= $this->renderRecordSection($data['career'], 'career');
         }
 

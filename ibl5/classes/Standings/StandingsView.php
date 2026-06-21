@@ -266,7 +266,7 @@ class StandingsView implements StandingsViewInterface
         ?>
         <h2 class="ibl-title"><?= \Security\HtmlSanitizer::e($region) . ' ' . \Security\HtmlSanitizer::e($groupingType); ?></h2>
         <div class="table-scroll-wrapper">
-        <div class="table-scroll-container" tabindex="0" role="region" aria-label="Standings">
+        <div class="table-scroll-container" tabindex="0" role="region" aria-label="<?= \Security\HtmlSanitizer::e($region) . ' ' . \Security\HtmlSanitizer::e($groupingType) . ' Standings'; ?>">
         <table class="sortable ibl-data-table">
             <thead>
                 <tr>

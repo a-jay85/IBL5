@@ -85,7 +85,7 @@ class TradingView implements TradingViewInterface
     <?= \Security\CsrfGuard::generateToken('trade_offer') ?>
     <input type="hidden" name="offeringTeam" value="<?= HtmlSanitizer::trusted($userTeam) ?>">
     <div class="trading-layout">
-        <h2 class="ibl-title">Trading</h2>
+        <h1 class="ibl-title">Trading</h1>
         <div class="team-cards-row">
             <div class="trading-layout__card">
                 <details class="trading-roster-details" open>
@@ -233,7 +233,7 @@ $tradeConfig = [
         echo \UI\AlertRenderer::fromCode($pageData['result'] ?? null, self::TRADE_ALERT_MAP, $pageData['error'] ?? null);
         ?>
 <div class="trading-layout__header">
-    <h2 class="ibl-title">Trading</h2>
+    <h1 class="ibl-title">Trading</h1>
     <img src="images/logo/<?= HtmlSanitizer::e($userTeamId) ?>.jpg" alt="Team Logo" class="team-logo-banner">
 </div>
 <div class="trading-review-wrapper">

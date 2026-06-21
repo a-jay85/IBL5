@@ -27,7 +27,7 @@ class ComparePlayersView implements ComparePlayersViewInterface
      */
     public function renderSearchForm(array $playerNames): string
     {
-        $output = '<h2 class="ibl-title">Compare Players</h2>';
+        $output = '<h1 class="ibl-title">Compare Players</h1>';
 
         // Build datalist options for autocomplete
         $datalistHtml = '<datalist id="player-names">';

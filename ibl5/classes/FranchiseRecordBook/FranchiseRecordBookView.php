@@ -69,12 +69,12 @@ class FranchiseRecordBookView
         $html = $this->renderTitle($data);
 
         if ($data['singleSeason'] !== []) {
-            $html .= '<h3 class="ibl-title record-book-section-title">Single-Season Records</h3>';
+            $html .= '<h2 class="ibl-title record-book-section-title">Single-Season Records</h2>';
             $html .= $this->renderRecordSection($data['singleSeason'], 'single_season');
         }
 
         if ($data['career'] !== [] && !$this->isTeamView) {
-            $html .= '<h3 class="ibl-title record-book-section-title">Career Records</h3>';
+            $html .= '<h2 class="ibl-title record-book-section-title">Career Records</h2>';
             $html .= $this->renderRecordSection($data['career'], 'career');
         }
 
@@ -105,10 +105,10 @@ class FranchiseRecordBookView
         if ($data['team'] !== null) {
             $teamId = (int) $data['team']['teamid'];
             $teamName = HtmlSanitizer::safeHtmlOutput($data['team']['team_name']);
-            return '<h2 class="ibl-title">' . $teamName . ' Franchise Record Book</h2>'
+            return '<h1 class="ibl-title">' . $teamName . ' Franchise Record Book</h1>'
                 . '<img src="images/logo/' . $teamId . '.jpg" alt="" class="team-logo-banner">';
         }
-        return '<h2 class="ibl-title">League-Wide Record Book</h2>';
+        return '<h1 class="ibl-title">League-Wide Record Book</h1>';
     }
 
     /**

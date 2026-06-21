@@ -28,15 +28,16 @@ class Ratings implements RatingsInterface
      * @param Season $season Season object
      * @param string $moduleName Module name for styling variations
      * @param list<int> $starterPids Starter player IDs
+     * @param string $ariaLabel Optional aria-label for the table scroll region (empty = no attribute)
      * @return string HTML table
      */
-    public static function render($db, $data, $team, string $yr, $season, string $moduleName = "", array $starterPids = []): string
+    public static function render($db, $data, $team, string $yr, $season, string $moduleName = "", array $starterPids = [], string $ariaLabel = ''): string
     {
         $players = PlayerRowTransformer::resolvePlayers($db, $data, $yr);
 
         ob_start();
         ?>
-<table class="ibl-data-table team-table responsive-table sortable" style="<?= \UI\TableStyles::inlineTeamVars($team->color1, $team->color2) ?>">
+<table class="ibl-data-table team-table responsive-table sortable"<?= $ariaLabel !== '' ? ' aria-label="' . \Security\HtmlSanitizer::e($ariaLabel) . '"' : '' ?> style="<?= \UI\TableStyles::inlineTeamVars($team->color1, $team->color2) ?>">
     <thead>
         <tr>
 <?php if ($moduleName === "LeagueStarters"): ?>

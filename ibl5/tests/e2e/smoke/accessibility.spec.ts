@@ -104,8 +104,6 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
 
   // Multiple landmarks share role+name. See ibl5/docs/a11y-backlog.md §landmark-unique.
   'landmark-unique': new Set([
-    'league starters',
-    'next sim',
   ]),
 
   // No <main> landmark — legacy root page bypasses PageLayout. See ibl5/docs/a11y-backlog.md §landmark-one-main.

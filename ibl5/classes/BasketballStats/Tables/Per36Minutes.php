@@ -27,9 +27,10 @@ class Per36Minutes
      * @param string $yr Year filter (empty for current season)
      * @param list<int> $starterPids Starter player IDs
      * @param string $moduleName Module name
+     * @param string $ariaLabel Optional aria-label for the table scroll region (empty = no attribute)
      * @return string HTML table
      */
-    public static function render(\mysqli $db, $result, Team $team, string $yr, array $starterPids = [], string $moduleName = ""): string
+    public static function render(\mysqli $db, $result, Team $team, string $yr, array $starterPids = [], string $moduleName = "", string $ariaLabel = ''): string
     {
         $resolvedRows = PlayerRowTransformer::resolveWithStats($db, $result, $yr);
 
@@ -63,7 +64,7 @@ class Per36Minutes
 
         ob_start();
         ?>
-<table class="ibl-data-table team-table responsive-table sortable" style="<?= \UI\TableStyles::inlineTeamVars($team->color1, $team->color2) ?>">
+<table class="ibl-data-table team-table responsive-table sortable"<?= $ariaLabel !== '' ? ' aria-label="' . \Security\HtmlSanitizer::e($ariaLabel) . '"' : '' ?> style="<?= \UI\TableStyles::inlineTeamVars($team->color1, $team->color2) ?>">
     <thead>
         <tr>
 <?php if ($moduleName === "LeagueStarters"): ?>

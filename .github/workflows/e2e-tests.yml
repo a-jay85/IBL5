@@ -35,6 +35,7 @@ jobs:
     name: Detect changes
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pull-requests: read
     outputs:
       # NOTE: a `labeled` event intentionally does NOT set src=true. Adding any
@@ -45,26 +46,23 @@ jobs:
       # alone so applying that label reruns baseline regen without a CI storm.
       baseline: ${{ github.event.action == 'labeled' && github.event.label.name == 'update-baselines' }}
     steps:
-      - uses: dorny/paths-filter@v4
-        id: filter
+      - uses: actions/checkout@v7
         if: github.event_name == 'pull_request' && github.event.action != 'labeled'
         with:
-          filters: |
-            src:
-              - '**.php'
-              - '**.ts'
-              - '**.js'
-              - '**.css'
-              - 'ibl5/design/**'
-              - 'ibl5/migrations/**.sql'
-              - 'Dockerfile'
-              - 'docker-compose*.yml'
-              - 'docker/**'
-              - 'ibl5/tests/e2e/**'
-              - 'IBL6/**'
-              - 'docker/Dockerfile.ibl6'
-              - '.github/workflows/e2e-tests.yml'
-              - '.github/scripts/**'
+          fetch-depth: 0
+      - name: Compute website-affecting
+        id: filter
+        if: github.event_name == 'pull_request' && github.event.action != 'labeled'
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          CHANGED=$(git diff --name-only "$BASE"...HEAD)
+          if [ -z "$CHANGED" ]; then
+            echo "src=true" >> "$GITHUB_OUTPUT"
+          elif printf '%s\n' "$CHANGED" | bin/website-affecting; then
+            echo "src=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "src=false" >> "$GITHUB_OUTPUT"
+          fi
 
   playwright-version-drift:
     name: Playwright version drift guard

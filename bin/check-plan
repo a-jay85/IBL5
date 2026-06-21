@@ -271,7 +271,7 @@ done < <(
 # Composer dependency add — a MODIFY, not a new-file path, so handle it separately
 # from the path-token loop: flag when a line names ibl5/composer.json alongside a
 # require / require-dev dependency add.
-if grep -iE 'composer\.json' "$PLAN_FILE" | grep -qiE 'require(-dev)?'; then
+if grep -iE 'composer\.json' "$PLAN_FILE" | grep -qiE '\brequire(-dev)?\b'; then
     if [ "$GATE8_RESOLVED" -eq 0 ]; then
         viol "[8] decision-trigger surface ibl5/composer.json (new-dependency) added without an ADR step or no-adr: marker"
     fi

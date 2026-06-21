@@ -86,13 +86,11 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
   'heading-order': new Set([
   ]),
 
-  // Links with no discernible text. Seed-dependent (data-driven sim-recap + News template).
+  // Links with no discernible text. Remaining entry is the homepage last-sim-recap
+  // team links (data-dependent — out of scope; News-template links carry aria-labels).
   // See ibl5/docs/a11y-backlog.md §link-name.
   'link-name': new Set([
     'homepage',
-    'news index',
-    'news categories',
-    'news article',
   ]),
 
   // Touch targets < 24×24px. Seed-dependent for small-count hits. See ibl5/docs/a11y-backlog.md.

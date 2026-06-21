@@ -19,24 +19,26 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pull-requests: read
     outputs:
       src: ${{ github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.src == 'true' }}
     steps:
-      - uses: dorny/paths-filter@v4
-        id: filter
+      - uses: actions/checkout@v7
         with:
-          filters: |
-            src:
-              - '**.php'
-              - '**.css'
-              - '**.ts'
-              - '**.js'
-              - 'ibl5/design/**'
-              - 'ibl5/migrations/**.sql'
-              - 'Dockerfile'
-              - 'docker-compose*.yml'
-              - '.github/workflows/lighthouse.yml'
+          fetch-depth: 0
+      - name: Compute website-affecting
+        id: filter
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          CHANGED=$(git diff --name-only "$BASE"...HEAD)
+          if [ -z "$CHANGED" ]; then
+            echo "src=true" >> "$GITHUB_OUTPUT"
+          elif printf '%s\n' "$CHANGED" | bin/website-affecting; then
+            echo "src=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "src=false" >> "$GITHUB_OUTPUT"
+          fi
 
   lighthouse:
     name: Performance Audit

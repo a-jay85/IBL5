@@ -14,6 +14,7 @@ USE_PR=false
 SEED_DB=false
 PROD_DB=false
 NO_DATA=false
+FORCE=false
 
 # Parse arguments
 for arg in "$@"; do
@@ -22,19 +23,21 @@ for arg in "$@"; do
         --seed) SEED_DB=true ;;
         --prod) PROD_DB=true ;;
         --no-data) NO_DATA=true ;;
+        --force) FORCE=true ;;
         -*) echo "Unknown option: $arg" >&2; exit 1 ;;
         *) WORKTREE_NAME="$arg" ;;
     esac
 done
 
 if [ -z "$WORKTREE_NAME" ]; then
-    echo "Usage: bin/wt-up <worktree-name> [--pr] [--seed] [--prod] [--no-data]" >&2
+    echo "Usage: bin/wt-up <worktree-name> [--pr] [--seed] [--prod] [--no-data] [--force]" >&2
     echo "" >&2
     echo "Options:" >&2
     echo "  --pr            Use PR number as URL slug (e.g., pr-42.localhost)" >&2
     echo "  --seed          Import ci-seed.sql for test data (schema + CI seed)" >&2
     echo "  --prod          Sync live production DB via bin/db-sync-prod (default; requires .env REMOTE_* creds)" >&2
     echo "  --no-data       Schema only, no seed data" >&2
+    echo "  --force         Build the stack even if no website-affecting changes vs master" >&2
     echo "" >&2
     echo "Without prod creds, use --seed or --no-data." >&2
     echo "The DB volume is always purged to ensure a clean database." >&2
@@ -50,6 +53,21 @@ WORKTREE_PATH="$WT_PARENT/$WORKTREE_NAME"
 if [ ! -d "$WORKTREE_PATH" ]; then
     echo "Error: Worktree not found at $WORKTREE_PATH" >&2
     exit 1
+fi
+
+# Skip the whole stack bring-up if no changed file (vs the master merge-base)
+# affects the actual website. Fails toward building: an unknown path, an empty
+# diff, or any predicate error -> build. Override with --force.
+if [ "$FORCE" = false ]; then
+    CHANGED=$(git -C "$WORKTREE_PATH" diff --name-only master...HEAD 2>/dev/null || true)
+    if [ -n "$CHANGED" ]; then
+        if ! printf '%s\n' "$CHANGED" | "$REPO_ROOT/bin/website-affecting" >/dev/null 2>&1; then
+            echo "No website-affecting changes vs master — skipping preview." >&2
+            echo "  (docs / .claude / host bin / utility-only diff)" >&2
+            echo "  Pass --force to build anyway." >&2
+            exit 0
+        fi
+    fi
 fi
 
 # Determine URL slug

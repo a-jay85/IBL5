@@ -86,7 +86,7 @@ class LeagueStartersView implements LeagueStartersViewInterface
             $labelSafe = HtmlSanitizer::safeHtmlOutput($label);
             $html .= '<div>';
             $html .= '<h2 class="ibl-table-title">' . $labelSafe . '</h2>';
-            $html .= $this->renderTableForDisplay($db, $season, $display, $startersByPosition[$position], $userTeam);
+            $html .= $this->renderTableForDisplay($db, $season, $display, $startersByPosition[$position], $userTeam, $label);
             $html .= '</div>';
         }
 
@@ -100,17 +100,17 @@ class LeagueStartersView implements LeagueStartersViewInterface
      *
      * @param array<int, Player> $result
      */
-    private function renderTableForDisplay(\mysqli $db, Season $season, string $display, array $result, Team $team): string
+    private function renderTableForDisplay(\mysqli $db, Season $season, string $display, array $result, Team $team, string $ariaLabel = ''): string
     {
         switch ($display) {
             case 'total_s':
-                return \BasketballStats\Tables\SeasonTotals::render($db, $result, $team, '', [], $this->moduleName);
+                return \BasketballStats\Tables\SeasonTotals::render($db, $result, $team, '', [], $this->moduleName, $ariaLabel);
             case 'avg_s':
-                return \BasketballStats\Tables\SeasonAverages::render($db, $result, $team, '', [], $this->moduleName);
+                return \BasketballStats\Tables\SeasonAverages::render($db, $result, $team, '', [], $this->moduleName, $ariaLabel);
             case 'per36mins':
-                return \BasketballStats\Tables\Per36Minutes::render($db, $result, $team, '', [], $this->moduleName);
+                return \BasketballStats\Tables\Per36Minutes::render($db, $result, $team, '', [], $this->moduleName, $ariaLabel);
             default:
-                return \UI\Tables\Ratings::render($db, $result, $team, '', $season, $this->moduleName);
+                return \UI\Tables\Ratings::render($db, $result, $team, '', $season, $this->moduleName, [], $ariaLabel);
         }
     }
 }

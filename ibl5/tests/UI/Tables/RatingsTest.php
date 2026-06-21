@@ -100,6 +100,23 @@ class RatingsTest extends TestCase
     }
 
     /**
+     * Characterization pin: render() with no $ariaLabel arg emits table open tag with NO aria-label
+     */
+    public function testTableOpenTagHasNoAriaLabel(): void
+    {
+        $mockDb = $this->createMock(\mysqli::class);
+        $mockSeason = $this->createMock(Season::class);
+        $mockSeason->lastSimEndDate = '2025-01-01';
+
+        $team = $this->createMockTeam();
+
+        $html = Ratings::render($mockDb, [], $team, '', $mockSeason, 'NextSim');
+
+        $this->assertStringContainsString('<table class="ibl-data-table team-table responsive-table sortable"', $html);
+        $this->assertStringNotContainsString('aria-label', $html);
+    }
+
+    /**
      * Test that first player is rendered with correct data (not blank/zero)
      */
     public function testFirstPlayerHasData(): void

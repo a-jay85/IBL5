@@ -238,7 +238,7 @@ window.IBL_initNextSimHighlight();
 
         ob_start();
         ?>
-<table class="ibl-data-table team-table responsive-table" style="<?= TableStyles::inlineTeamVars($userTeam->color1, $userTeam->color2) ?>">
+<table class="ibl-data-table team-table responsive-table" aria-label="<?= HtmlSanitizer::e(self::POSITION_LABELS[$position] ?? $position) ?>" style="<?= TableStyles::inlineTeamVars($userTeam->color1, $userTeam->color2) ?>">
 <colgroup span="2"></colgroup><colgroup span="2"></colgroup><colgroup span="6"></colgroup><colgroup span="6"></colgroup><colgroup span="4"></colgroup><colgroup span="4"></colgroup><colgroup span="1"></colgroup>
     <thead>
         <tr>

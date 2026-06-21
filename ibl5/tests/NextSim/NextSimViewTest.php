@@ -201,6 +201,26 @@ class NextSimViewTest extends TestCase
         $this->assertStringContainsString('IBL_initNextSimHighlight', $result);
     }
 
+    public function testRenderPositionTableEmitsPerPositionAriaLabel(): void
+    {
+        $games = $this->createGameData();
+        $pgHtml = $this->view->renderPositionTable($games, 'PG', $this->userTeam, $this->userStarters);
+        $cHtml = $this->view->renderPositionTable($games, 'C', $this->userTeam, $this->userStarters);
+
+        $this->assertStringContainsString('aria-label="Point Guards"', $pgHtml);
+        $this->assertStringContainsString('aria-label="Centers"', $cHtml);
+    }
+
+    public function testRenderAriaLabelIsHtmlEscaped(): void
+    {
+        $games = $this->createGameData();
+        $html = $this->view->render($games, $this->userTeam, $this->userStarters);
+
+        // Position labels are static literals — they escape to themselves
+        $this->assertStringContainsString('aria-label="Point Guards"', $html);
+        $this->assertStringContainsString('aria-label="Centers"', $html);
+    }
+
     /**
      * @return array<int, array{game: Game, date: \DateTime, dayNumber: int, opposingTeam: Team, locationPrefix: string, opposingStarters: array<string, Player>, opponentTier: string, opponentPowerRanking: float}>
      */

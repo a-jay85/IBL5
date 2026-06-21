@@ -19,7 +19,8 @@ interface RatingsInterface
      * @param \Season\Season $season Season object
      * @param string $moduleName Module name for styling variations
      * @param list<int> $starterPids Starter player IDs
+     * @param string $ariaLabel Optional aria-label for the table scroll region (empty = no attribute)
      * @return string HTML table
      */
-    public static function render($db, $data, $team, string $yr, $season, string $moduleName = "", array $starterPids = []): string;
+    public static function render($db, $data, $team, string $yr, $season, string $moduleName = "", array $starterPids = [], string $ariaLabel = ''): string;
 }

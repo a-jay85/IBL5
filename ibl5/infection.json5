@@ -15,7 +15,6 @@
             // Group-B Views: no output-assertion test yet — honest per-file deferral
             // reasons below; gate 2 in check-infection-excludes fires if a test later
             // appears for one of these and it is not re-included. See ADR 0065.
-            "LeagueStarters/LeagueStartersView.php", // no output-assertion test yet — deferred Pass 2
             "Negotiation/NegotiationDemandsBreakdownView.php", // no output-assertion test yet — deferred Pass 2
             "Player/Views/PlayerAwardsView.php", // no output-assertion test yet — deferred Pass 2
             "Player/Views/PlayerButtonsView.php", // no output-assertion test yet — deferred Pass 2

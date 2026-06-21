@@ -40,7 +40,7 @@ This audit (2026-06-20, verified against the live `accessibility.spec.ts` `KNOWN
 | **empty-table-header** | ✅ implemented | — | `a11y-3` merged; rule key absent from `KNOWN_FAILING` entirely. |
 | **page-has-heading-one** — single-title views | ✅ implemented | — | `a11y-2` (#1103) merged. |
 | **page-has-heading-one** — training camp ratings diff | ✅ implemented | — | `a11y-4` (#1158) merged. |
-| **page-has-heading-one** — 4 leaderboard/db promotes + team-page add | 📋 planned | 🟦 not auto-mergeable | `a11y-5` (#1163) PR **open**, `auto_merge: false` — the Team-page `<h1>` **add** changes `team` VR baselines → human review. The 4 promotes alone are VR-identical, but bundled with Team. |
+| **page-has-heading-one** — 4 leaderboard/db promotes + team-page add | ✅ implemented | — | `a11y-5` (#1163) merged; the 4 `h2.ibl-title`→`h1` promotes + Team-page else-branch `<h1>` add removed from `KNOWN_FAILING`. |
 | **page-has-heading-one** — next sim (single-title promote) | ⬜ unplanned | 🟢 auto-mergeable | `NextSimView.php:54` emits a single `<h2 class="ibl-title">Next Sim</h2>` → plain promote to `<h1>` (VR-identical). An unplanned single-title view a11y-2/4 didn't sweep. |
 | **page-has-heading-one** — schedule + team schedule (STALE allowlist) | ⬜ unplanned | 🟢 auto-mergeable | **Re-checked:** both Views already emit `<h1 class="ibl-title">Schedule</h1>` **unconditionally** (`LeagueScheduleView.php:51`, `TeamScheduleView.php:101`). The pages already pass `page-has-heading-one`; the allowlist entries are **stale** → verify-and-remove (no code change), clicks the ratchet. |
 | **page-has-heading-one** — multi-title / loop-rendered (standings, trading, season archive, franchise record book, compare players, waivers, depth chart entry, voting results, olympics standings; **big board, trade block — blocked on Phase-4 re-land**) | 📋 partial | 🟠 decision | **DONE:** trading, season archive, franchise record book, compare players, waivers, depth chart entry promoted to `<h1>` (record book + `heading-order` h3→h2 co-fix). **DONE:** standings (`<h1>Standings</h1>`) + voting results (`All-Star` / `End-of-Year Voting Results`) — page-level `<h1>` added, `a11y-heading-one-standings-voting` (VR → human merge). **STILL OPEN:** olympics standings (not spec-tracked); big board / trade block blocked on Phase-4 re-land. |
@@ -60,7 +60,7 @@ This audit (2026-06-20, verified against the live `accessibility.spec.ts` `KNOWN
 **One-line takeaways for picking work:**
 - **Ready to plan as auto-mergeable now:** `page-has-heading-one` next sim (single-title promote) **and** schedule/team-schedule (stale allowlist removal — no code change). `label`/`select-name` already planned + queued.
 - **Auto-mergeable after a small scope/decision:** `page-has-heading-one` multi-title (which-`h2` decision).
-- **Automouse-safe but a human must merge:** `target-size` (VR), `page-has-heading-one` title-less + a11y-5 Team page (VR).
+- **Automouse-safe but a human must merge:** `target-size` (VR), `page-has-heading-one` title-less (VR).
 - **Not automouse-safe:** `landmark-one-main` + `region` on leagueControlPanel (2.27 refactor); everything on `faprep.php` (delete).
 
 ---
@@ -80,7 +80,7 @@ This audit (2026-06-20, verified against the live `accessibility.spec.ts` `KNOWN
 | Sub-group | Status / readiness |
 |-----------|--------------------|
 | **Single-title views** (draft history, cap space, activity tracker, all-star appearances, contract list, draft, draft pick locator, franchise history, free agency preview, gm contact list, injuries, league starters, one-on-one game, player movement, projected draft order, record holders, season highs, series records, team off/def stats, transaction history, search, topics, free agency, training camp ratings diff) | ✅ implemented — `a11y-2` + `a11y-4` merged. **watchlist** half BLOCKED on the Phase-4 GM re-land (Watchlist reverted in `503d1fa85`) — fix when that module re-lands. |
-| **4 promotes + Team-page add** (season leaderboards, career leaderboards, award history, player database; team page) | 📋 planned — `a11y-5` (#1163) **open**, 🟦 not auto-mergeable (Team `<h1>` add → VR review). |
+| **4 promotes + Team-page add** (season leaderboards, career leaderboards, award history, player database; team page) | ✅ implemented — `a11y-5` (#1163): 4 `h2.ibl-title`→`h1` promotes (VR-identical) + Team-page else-branch `<h1>` add; removed from `KNOWN_FAILING`. |
 | **next sim** (single `<h2 class="ibl-title">Next Sim</h2>`, `NextSimView.php:54`) | ⬜ unplanned — 🟢 plain promote (VR-identical); an unplanned single-title view. |
 | **schedule + team schedule** (already emit `<h1>` unconditionally — `LeagueScheduleView.php:51`, `TeamScheduleView.php:101`) | ⬜ unplanned — 🟢 **stale allowlist entry**: page already passes; remove from `KNOWN_FAILING` and confirm green (no code change). |
 | **Multi-title — promoted** (trading, season archive, franchise record book, compare players, waivers, depth chart entry) | ✅ implemented — topmost `h2.ibl-title`→`h1` (record book + `heading-order` h3→h2 co-fix). |
@@ -141,7 +141,7 @@ Tracked separately in [`a11y-contrast-backlog.md`](a11y-contrast-backlog.md). Th
 | `a11y-2-heading-one-single-title` | ✅ merged (#1103) — single-title promotes + record-holders heading-order. |
 | `a11y-3-empty-table-header` | ✅ merged — empty `<th>` labels. |
 | `a11y-4-training-camp-heading-one` | ✅ merged (#1158) — training camp `<h1>`. |
-| `a11y-5-heading-one-burndown` | 📋 PR open (#1163), `auto_merge: false` — 4 promotes + Team-page `<h1>` add (VR review). |
+| `a11y-5-heading-one-burndown` | ✅ implemented (#1163) — 4 promotes + Team-page else-branch `<h1>` add; removed from `KNOWN_FAILING`. |
 | `standings-landmark-unique-aria-label` | ✅ superseded — the standings fix already merged independently as **#1164**; the plan file is redundant (not queued). |
 | `a11y-landmark-unique-schedule` | ✅ implemented — schedule + team-schedule jump-menu `aria-label`; auto-merge eligible. |
 | `a11y-landmark-unique-starters-sim` | ✅ implemented — per-table `aria-label` via shared-renderer optional param + next-sim inline; both pages removed from `KNOWN_FAILING['landmark-unique']`; auto-merge eligible. |

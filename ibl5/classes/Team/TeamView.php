@@ -50,7 +50,7 @@ class TeamView implements TeamViewInterface
         $teamNameSafe = \Security\HtmlSanitizer::safeHtmlOutput($team->name);
         $yearHeading = ($yr !== null && $yr !== '')
             ? "<h1 class=\"ibl-title\">$yrSafe $teamNameSafe</h1>"
-            : "";
+            : "<h1 class=\"ibl-title\">$teamNameSafe</h1>";
 
         $bannerHtml = $isActualTeam
             ? $this->renderTeamBanner($teamid, $team, $imagesPath, $userTeamName, $isOwnTeam)

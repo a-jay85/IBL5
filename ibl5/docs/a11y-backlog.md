@@ -1,127 +1,153 @@
 ---
-description: WCAG 2.x full-rule (non-contrast) accessibility failure inventory and burn-down backlog per axe rule. Companion to a11y-contrast-backlog.md.
+description: WCAG 2.x full-rule (non-contrast) accessibility failure inventory and burn-down backlog per axe rule, with audited per-entry implementation + automouse-readiness status. Companion to a11y-contrast-backlog.md.
 last_verified: 2026-06-21
 ---
 
 # A11y Full-Rule Backlog (non-contrast)
 
-**Purpose:** Track WCAG 2.x accessibility failures **beyond** `color-contrast` (which has its own inventory in [`a11y-contrast-backlog.md`](a11y-contrast-backlog.md)). Each entry is a candidate for a `/plan`.
+**Purpose:** Track WCAG 2.x accessibility failures **beyond** `color-contrast` (which has its own inventory in [`a11y-contrast-backlog.md`](a11y-contrast-backlog.md)). Each open entry is a candidate for a `/plan`.
 
-**Origin:** Full-rule axe-core audit (2026-06-13). The existing ratchet (`accessibility.spec.ts`) only ran `withTags(['wcag2a','wcag2aa'])` and suppressed `color-contrast`, so the `best-practice` and WCAG 2.1/2.2 rule families were **never enforced**. This audit enabled `wcag2a, wcag2aa, wcag21a, wcag21aa, wcag22aa, best-practice` across all 47 spec pages + 9 previously-untested modules/root pages + the 9 authenticated form pages (depth chart, waivers, gm contact, compare players, draft, next sim, your account, voting ASG/EOY).
+**Origin:** Full-rule axe-core audit (2026-06-13). The existing ratchet (`accessibility.spec.ts`) only ran `withTags(['wcag2a','wcag2aa'])` and suppressed `color-contrast`, so the `best-practice` and WCAG 2.1/2.2 rule families were **never enforced**. That audit enabled `wcag2a, wcag2aa, wcag21a, wcag21aa, wcag22aa, best-practice` across all spec pages + previously-untested modules/root pages + the authenticated form pages.
 
-> **Good news on form a11y:** the 9 authenticated/form pages were audited explicitly and found **clean of `label`, `select-name`, and `link-name`** — the WCAG-A form criticals. Those criticals are confined to the admin `leagueControlPanel.php` (see below).
+> **⚠️ Seed caveat:** the original audit ran against the **dev DB** (`main.localhost`), not the CI seed. Per `feedback_a11y_contrast_scan_seed` (PR #1009), the dev DB misses conditional/data-driven content. Findings are split into **seed-independent** (template/markup-driven — CI reproduces; safe to plan now) and **seed-dependent** (must be re-verified on the `bin/wt-up --seed` / CI-seed stack before planning). Burn-down plans seed their allowlists **empirically at impl time**, not from this doc's page lists.
 
-> **⚠️ Seed caveat:** the audit ran against the **dev DB** (`main.localhost`), not the CI seed. Per `feedback_a11y_contrast_scan_seed` (PR #1009), the dev DB misses conditional/data-driven content. Findings are split below into **seed-independent** (template/markup-driven — CI will reproduce; safe to plan now) and **seed-dependent** (must be re-verified on the `bin/wt-up --seed` / CI-seed stack before planning). Burn-down plans seed their allowlists **empirically at impl time**, not from this doc's page lists.
+---
 
-**Disposition legend:**
-- 🟢 **automouse-safe** — fix is mechanical + verifiable by extending the spec ratchet (green-green); planned + queued.
-- 🟡 **supervised** — needs human judgment (label wording, "which heading is THE title", architectural refactor) or carries VR-regression risk → `auto_merge: false`.
-- 🔵 **seed-verify** — re-run axe on the CI-seed stack to confirm reproducibility before planning.
-- ⚪ **out of scope** — covered elsewhere (contrast backlog) or the page is slated for deletion.
+## Disposition taxonomy
+
+This audit (2026-06-20, verified against the live `accessibility.spec.ts` `KNOWN_FAILING` map + fresh code reads, **not** the original dev-DB descriptions) classifies every item on two axes.
+
+**Status** — where the fix stands:
+- ✅ **implemented** — merged; the rule is enforced for that page (removed from `KNOWN_FAILING`).
+- 📋 **planned** — a plan file exists (queued or PR-open); not yet merged.
+- ⬜ **unplanned** — no plan yet.
+
+**Automouse-readiness** — what it would take for automouse to ship it unattended:
+- 🟢 **auto-mergeable** — mechanical + invisible (no VR change) + no security/judgment surface; green-green verifiable by the ratchet → a plan can arm auto-merge.
+- 🟦 **automouse-safe, not auto-mergeable** — automouse can implement + verify, but a human must merge (VR baseline change needing visual review, or an `auto_merge: false` hold). Held at the merge, not the implementation.
+- 🟠 **scope/decision first** — *could* become 🟢/🟦 after a one-time addition: a small mechanical scope-add (e.g. routing a param through a shared renderer; a seed-verify phase) **or** an upfront human decision (which `h2` is THE title; chosen heading text). The judgment is a single discrete choice, front-loadable per `/plan` Step 3.5.
+- 🔴 **not automouse-safe** — needs a refactor-scale change, distributed per-site judgment, or is slated for deletion.
+
+(Legacy 🟢/🟡/🔵/⚪ markers from the original audit are superseded by the table below.)
+
+---
+
+## Master status table
+
+| Rule / subgroup | Status | Readiness | Verdict basis (fresh-checked 2026-06-20) |
+|---|---|---|---|
+| **heading-order** | ✅ implemented | — | `a11y-2` merged; empty `KNOWN_FAILING['heading-order']` set. |
+| **empty-table-header** | ✅ implemented | — | `a11y-3` merged; rule key absent from `KNOWN_FAILING` entirely. |
+| **page-has-heading-one** — single-title views | ✅ implemented | — | `a11y-2` (#1103) merged. |
+| **page-has-heading-one** — training camp ratings diff | ✅ implemented | — | `a11y-4` (#1158) merged. |
+| **page-has-heading-one** — 4 leaderboard/db promotes + team-page add | 📋 planned | 🟦 not auto-mergeable | `a11y-5` (#1163) PR **open**, `auto_merge: false` — the Team-page `<h1>` **add** changes `team` VR baselines → human review. The 4 promotes alone are VR-identical, but bundled with Team. |
+| **page-has-heading-one** — next sim (single-title promote) | ⬜ unplanned | 🟢 auto-mergeable | `NextSimView.php:54` emits a single `<h2 class="ibl-title">Next Sim</h2>` → plain promote to `<h1>` (VR-identical). An unplanned single-title view a11y-2/4 didn't sweep. |
+| **page-has-heading-one** — schedule + team schedule (STALE allowlist) | ⬜ unplanned | 🟢 auto-mergeable | **Re-checked:** both Views already emit `<h1 class="ibl-title">Schedule</h1>` **unconditionally** (`LeagueScheduleView.php:51`, `TeamScheduleView.php:101`). The pages already pass `page-has-heading-one`; the allowlist entries are **stale** → verify-and-remove (no code change), clicks the ratchet. |
+| **page-has-heading-one** — multi-title / loop-rendered (standings, trading, season archive, franchise record book, compare players, waivers, depth chart entry, voting results, olympics standings; **big board, trade block — blocked on Phase-4 re-land**) | ⬜ unplanned | 🟠 decision | Promote of an existing `h2.ibl-title`→`h1` is **VR-identical** (same class), so auto-mergeable — **but** which looped `h2` is THE title is a per-page choice. Front-load the choice (Step 3.5) → then 🟢. **big board / trade block are currently reverted (PR #1084 / #1082, like watchlist) — don't plan against a non-existent page until they re-land.** |
+| **page-has-heading-one** — title-less add (homepage, player page, your account, voting ASG/EOY ballot, news index/categories/article) | ⬜ unplanned | 🟠 decision → 🟦 | Needs an `<h1>` **added** with invented title text (decision) **and** the new visible heading changes VR baselines (human review). After the text decision, lands as 🟦 (not auto-mergeable). |
+| **link-name** (homepage, news index/categories/article) | ⬜ unplanned | 🟠 scope | `aria-label` add is invisible → auto-mergeable in principle, **but** seed-dependent: add a CI-seed reproduce phase first. News-template subset → 🟢 once reproduced; homepage sim-recap subset is data-dependent (may go green with no fix). |
+| **target-size** (topics ×100, homepage, news article) | ⬜ unplanned | 🟦 not auto-mergeable | Fix is **CSS** `min-height`/`min-width`/padding → changes rendered pixels → VR baseline regen + human review. Automouse can implement; merge is held. Small-count hits also seed-dependent. |
+| **landmark-unique** — standings | ✅ implemented | — | #1164 merged; `StandingsView::renderHeader()` derives per-region `aria-label`; removed from `KNOWN_FAILING`. |
+| **landmark-unique** — schedule + team schedule | ⬜ unplanned | 🟢 auto-mergeable | **Re-checked:** the duplicate is each schedule View's **own** `<nav class="ibl-jump-menu">` (`LeagueScheduleView.php:84`, `TeamScheduleView.php:144`) colliding with the site nav — NOT a shared-nav change. One invisible `aria-label` per View (e.g. "Jump to month") → like standings. |
+| **landmark-unique** — league starters + next sim | ⬜ unplanned | 🟠 scope | The scroll-region label is auto-derived by `responsive-tables.js:163` from each `<table>`'s `aria-label`, **but** those tables are built by **shared** renderers (`UI\Tables\Ratings`, `BasketballStats\Tables\*`) with no aria-label param. Route an optional per-table label through them (the position/section title already exists) → invisible → 🟢. |
+| **label** (leagueControlPanel `.ibl-input`) | 📋 planned | 🟢 auto-mergeable | Plan `leaguecontrolpanel-aria-label-a11y` **queued** (automouse); aria-label-only (invisible), admin-gate/CSRF/handler untouched, auto-merge eligible. |
+| **select-name** (leagueControlPanel `<select>` ×6) | 📋 planned | 🟢 auto-mergeable | Same plan, bundled. |
+| **landmark-one-main** (leagueControlPanel) | ⬜ unplanned | 🔴 not safe | Needs a `<main>` landmark, which means routing the legacy root page through `PageLayout` — the maintenance-2.27 module conversion. Refactor-scale. (The page IS now ratchet-tracked — allowlisted — via the `label`/`select-name` plan.) |
+| **landmark-one-main** / **region** / **html-has-lang** (faprep) | ⬜ unplanned | 🔴 delete instead | `faprep.php` is slated for **deletion** (maintenance 3.9). Fixing is wasted. |
+| **region** (leagueControlPanel, 13 nodes) | ⬜ unplanned | 🔴 not safe | Same as landmark-one-main: PHP-Nuke table-layout content sits outside any landmark; refactor-scale (2.27). |
+| **color-contrast** | ⬜ out of scope | — | Tracked in [`a11y-contrast-backlog.md`](a11y-contrast-backlog.md). |
+
+**One-line takeaways for picking work:**
+- **Ready to plan as auto-mergeable now:** `landmark-unique` schedule/team-schedule (jump-menu aria-label); `page-has-heading-one` next sim (single-title promote) **and** schedule/team-schedule (stale allowlist removal — no code change). `label`/`select-name` already planned + queued.
+- **Auto-mergeable after a small scope/decision:** `landmark-unique` league-starters/next-sim (renderer param); `link-name` News subset (seed-verify); `page-has-heading-one` multi-title (which-`h2` decision).
+- **Automouse-safe but a human must merge:** `target-size` (VR), `page-has-heading-one` title-less + a11y-5 Team page (VR).
+- **Not automouse-safe:** `landmark-one-main` + `region` on leagueControlPanel (2.27 refactor); everything on `faprep.php` (delete).
 
 ---
 
 ## How the expanded ratchet works
 
-`a11y-1-ratchet-best-practice` adds the `best-practice` + `wcag22aa`/`wcag21*` tags to `tests/e2e/helpers/accessibility.ts` and generalizes the page allowlist from contrast-only to a **per-page-per-rule** map (`KNOWN_FAILING[rule] = Set<page>`). Every currently-failing (page, rule) pair is allowlisted so the spec stays green while now catching **new** regressions on every other page/rule. Burn-down plans fix pages and remove allowlist entries — each removal clicks the ratchet, exactly like the contrast backlog.
+`a11y-1-ratchet-best-practice` (merged) added the `best-practice` + `wcag22aa`/`wcag21*` tags to `tests/e2e/helpers/accessibility.ts` and generalized the page allowlist to a **per-page-per-rule** map (`KNOWN_FAILING[rule] = Set<page>`) **in `tests/e2e/smoke/accessibility.spec.ts`** (not the helper — the original burn-down note misstated this). Every currently-failing (page, rule) pair is allowlisted so the spec stays green while catching **new** regressions everywhere else. Burn-down plans fix pages and remove allowlist entries — each removal clicks the ratchet.
 
 ---
 
-## Rule inventory
+## Rule inventory (detail)
 
-### page-has-heading-one — best-practice, moderate — 🟢/🟡
-**Problem:** No page emits an `<h1>`. Module titles render as `<h2 class="ibl-title">`; the convention `<h1 class="ibl-title">` already exists (TeamView, LeagueSchedule/TeamScheduleView, YourAccountView) but most views never adopted it. Seed-independent (markup, not data). ~36 covered pages + 7 uncovered modules.
-**Direction:** Promote the page's sole/main `<h2 class="ibl-title">` → `<h1>` (same CSS class = visually identical).
+### page-has-heading-one — best-practice, moderate
+**Problem:** Many module pages render their title as `<h2 class="ibl-title">` and emit no `<h1>`. The `<h1 class="ibl-title">` convention already exists (TeamView, schedule views, training camp) and is being adopted page-by-page. Seed-independent (markup, not data).
+**Direction:** Promote the page's sole/main `<h2 class="ibl-title">` → `<h1>` (same CSS class = visually identical), or **add** an `<h1>` where the page has no title heading.
 
-| Sub-group | Disposition | Covered by |
-|-----------|-------------|------------|
-| **Single-title views** (exactly one non-looped `h2.ibl-title`): draft history, cap space, activity tracker, all-star appearances, contract list, draft, draft pick locator, franchise history, free agency preview, gm contact list, injuries, league starters, one-on-one game, player movement, projected draft order, record holders, season highs, series records, team off/def stats, transaction history, search, topics, free agency, watchlist, training camp ratings diff | ✅ training camp ratings diff enforced; watchlist BLOCKED on the Phase-4 GM re-land (Watchlist module reverted from master in 503d1fa85) — fix when that module re-lands | `a11y-2-heading-one-single-title` (merged) + this plan (training camp) |
-| **Multi-title / loop-rendered** (which `h2` is THE title needs judgment): standings + olympics standings (per-region loop), trading (2), season archive (2), franchise record book (2), compare players (4), waivers (2), depth chart entry (2), big board (2), trade block (3), voting results (`VotingResultsView::renderTable()` loop-renders one title per category) | 🟡 | backlog (this doc) |
-| **No `ibl-title` h2 — needs an `<h1>` *added* with chosen title text:** season leaderboards, career leaderboards, award history, player database, player page (Player mega-module), your account (authenticated view — the `h1.ibl-card__title` only exists on the logged-out sign-in/register cards), voting ASG/EOY ballot, homepage + news index/categories/article (legacy `modules/News` index.php, no view class) | 🟡 | backlog (this doc) |
-| **Conditional emit:** team page — `TeamView.php:52` only emits the `h1` in one ternary branch; the other branch (no team name) yields no h1 | 🟡 | backlog (this doc) |
+| Sub-group | Status / readiness |
+|-----------|--------------------|
+| **Single-title views** (draft history, cap space, activity tracker, all-star appearances, contract list, draft, draft pick locator, franchise history, free agency preview, gm contact list, injuries, league starters, one-on-one game, player movement, projected draft order, record holders, season highs, series records, team off/def stats, transaction history, search, topics, free agency, training camp ratings diff) | ✅ implemented — `a11y-2` + `a11y-4` merged. **watchlist** half BLOCKED on the Phase-4 GM re-land (Watchlist reverted in `503d1fa85`) — fix when that module re-lands. |
+| **4 promotes + Team-page add** (season leaderboards, career leaderboards, award history, player database; team page) | 📋 planned — `a11y-5` (#1163) **open**, 🟦 not auto-mergeable (Team `<h1>` add → VR review). |
+| **next sim** (single `<h2 class="ibl-title">Next Sim</h2>`, `NextSimView.php:54`) | ⬜ unplanned — 🟢 plain promote (VR-identical); an unplanned single-title view. |
+| **schedule + team schedule** (already emit `<h1>` unconditionally — `LeagueScheduleView.php:51`, `TeamScheduleView.php:101`) | ⬜ unplanned — 🟢 **stale allowlist entry**: page already passes; remove from `KNOWN_FAILING` and confirm green (no code change). |
+| **Multi-title / loop-rendered** (standings, trading, season archive, franchise record book, compare players, waivers, depth chart entry, voting results; uncovered: olympics standings) | ⬜ unplanned — 🟠: promote is VR-identical, but needs a per-page "which `h2` is the title" decision. |
+| **Multi-title — blocked** (big board, trade block) | ⬜ unplanned — 🔴 blocked on Phase-4 GM re-land (reverted; PR #1084 / #1082) — don't plan until the module re-lands. |
+| **Title-less add** (homepage, player page, your account, voting ASG/EOY ballot, news index/categories/article) | ⬜ unplanned — 🟠→🟦: needs chosen title text **and** the new visible `<h1>` changes VR. |
 
-### heading-order — best-practice, moderate — ✅ enforced
-**Location:** `record holders` (`RecordHoldersView.php` — an `<h4>` follows the title with no intervening `<h3>`).
-**Problem:** Heading levels skip. Coupled to the heading-one fix (promoting the title to `h1` shifts the hierarchy). Seed-independent.
-**Direction:** Fix the level jump. Bundle into `a11y-2-heading-one-single-title` (same view, same render).
-**Disposition:** ✅ enforced — `a11y-2-heading-one-single-title` (merged).
+### heading-order — best-practice, moderate — ✅ implemented
+Was a single `<h4>`-after-`<h2>` skip on `record holders`; fixed in `a11y-2-heading-one-single-title` (merged). Empty `KNOWN_FAILING['heading-order']` set confirms enforcement.
 
-### empty-table-header — best-practice, minor — ✅ fixed
-**Location:** cap space (`CapSpaceView` th[data-sort-col=7,13]), player page (`.highs-header`), free agency (`FreeAgencyView` sticky-col `th[data-sort-col=0]`), depth chart entry (`.dc-lineup-preview-table` first th + `.sep-team` separators, 9 nodes), next sim (`.next-sim-position-section` tables, 40 nodes).
-**Problem:** `<th>` cells with no text (icon-only sort columns / sticky row-label column / separator + position-section headers). Template-driven, seed-independent.
-**Fix:** Added `aria-label` to each empty header. No visual change.
-**Disposition:** ✅ — fixed in `a11y-3-empty-table-header`; removed from `KNOWN_FAILING` in `accessibility.spec.ts`.
+### empty-table-header — best-practice, minor — ✅ implemented
+`<th>` cells with no text (icon-only sort columns / sticky row-label / separator + position-section headers) on cap space, player page, free agency, depth chart entry, next sim. Fixed via `aria-label` in `a11y-3-empty-table-header` (merged). Rule key absent from `KNOWN_FAILING` → fully enforced.
 
-### link-name — wcag2a (level A), serious — 🔵
-**Location:** news index/categories/article (12 nodes each — consistent → template icon-link in `modules/News`); homepage + debug menu (12 nodes — the `last-sim-recap` panel team links, **data-dependent**).
-**Problem:** Links with no discernible text. **This is a WCAG-A failure on pages the existing spec already runs `wcag2a` against while CI is green → it is data-dependent (dev seed renders sim-recap/news rows the CI seed may not).**
-**Direction:** Add `aria-label` (team name / article title — available in context) or visible text. The News template portion is likely mechanical once reproduced.
-**Disposition:** 🔵 — re-run axe on the CI-seed stack. If reproduced: the News-template subset → automouse-safe plan; the sim-recap subset → confirm seed then plan. If NOT reproduced on CI seed, a ratchet assertion would go green with no fix.
+### link-name — wcag2a (level A), serious — ⬜ unplanned, 🟠 scope
+**Location (allowlisted):** homepage, news index/categories/article. **Problem:** links with no discernible text — News-template icon-links (consistent → mechanical) + homepage `last-sim-recap` team links (data-dependent). **Direction:** `aria-label` (team name / article title) — invisible, so auto-mergeable per-page. **Scope to add:** a CI-seed reproduce phase first (`feedback_a11y_contrast_scan_seed`): if reproduced, News subset → 🟢; if a sim-recap hit doesn't reproduce on the CI seed, a ratchet removal would go green with no fix.
 
-### target-size — wcag22aa (WCAG 2.2), serious — 🟡🔵
-**Location:** topics (100 nodes!), homepage + news article + debug menu (2 nodes — sim-recap `leaders-tabbed` team links).
-**Problem:** Touch targets < 24×24px without sufficient spacing. WCAG 2.2 — a brand-new rule family for this codebase. The topics(100) hit is a dense small-link list.
-**Direction:** CSS `min-height`/`min-width`/padding on the affected components.
-**Disposition:** 🟡 (CSS sizing changes risk **visual-regression baseline** breakage → needs VR review, `auto_merge: false`) **+ 🔵** (the small-count hits are sim-recap data-dependent; verify topics(100) on CI seed). Plan after a VR-aware human pass.
+### target-size — wcag22aa (WCAG 2.2), serious — ⬜ unplanned, 🟦 not auto-mergeable
+**Location (allowlisted):** topics (~100 nodes, dense small-link list), homepage, news article. **Problem:** touch targets < 24×24px. **Direction:** CSS `min-height`/`min-width`/padding. **Why held:** CSS sizing changes rendered pixels → VR baseline regen + human visual review. Automouse can implement; the merge is held (`auto_merge: false`). Small-count hits are also sim-recap seed-dependent — verify topics(100) on the CI seed.
 
-### landmark-unique — best-practice, moderate — 🟡 (standings subset ✅ enforced)
-**Location (remaining):** league starters (`aria-label="Scrollable data table"` generic, ×2), next sim (`.next-sim-position-section` scroll regions share a label), schedule + team schedule (`.nav-grain` duplicate landmark).
-**Problem:** Multiple landmarks share the same role+name. Remaining mixed root causes: (a) league starters — generic default label needs a chosen per-table name; (b) `.nav-grain` — a nav-component element resolving to a duplicate landmark (needs investigation, likely affects the shared nav across all pages).
-**Direction:** Unique `aria-label` per landmark. The remaining subsets need judgment (league-starters per-table name) + care (the `.nav-grain` nav-component fix is shared across all pages).
-**Disposition:** 🟡 — supervised for the remaining league-starters + `.nav-grain` subsets (mixed label judgment + shared-nav blast radius; best-practice/moderate, not WCAG-AA).
+### landmark-unique — best-practice, moderate
+**standings — ✅ implemented** (#1164): `StandingsView::renderHeader()` derives a unique `aria-label` per region from the in-scope `$region`/`$groupingType` vars; removed from `KNOWN_FAILING`.
 
-**Standings subset — ✅ enforced.** Standings rendered one scroll-region landmark per region all labelled `aria-label="Standings"`; `StandingsView::renderHeader()` now derives a unique name from the in-scope `$region`/`$groupingType` vars (e.g. "Eastern Conference Standings", "Atlantic Division Standings"). Removed `'standings'` from `KNOWN_FAILING['landmark-unique']` in `accessibility.spec.ts` — the ratchet now enforces `landmark-unique` on the standings page.
+**schedule + team schedule — ⬜ unplanned, 🟢 auto-mergeable.** Fresh check: each schedule View emits its own `<nav class="ibl-jump-menu schedule-months">` (`LeagueScheduleView.php:84`, `TeamScheduleView.php:144`); on a schedule page that is a *second* navigation landmark alongside the shared site `<nav class="nav-grain">` (`NavigationView.php:53`), both unnamed → `landmark-unique`. Fix is one invisible `aria-label` per View on the jump-menu nav — View-local, **not** a shared-nav change. (The original "shared-nav blast radius" note was wrong.)
 
-### landmark-one-main — best-practice, moderate — 🟡
-**Location:** league control panel (`leagueControlPanel.php`), faprep (`faprep.php`).
-**Problem:** No `<main>` landmark. Both are root-level legacy pages that bypass the standard `PageLayout` (which provides the main landmark for module pages). See maintenance-backlog 2.27 (`leagueControlPanel.php` should become a module) / 3.9 (`faprep.php` slated for deletion).
-**Disposition:** 🟡 — couple to the maintenance-backlog refactors, not a standalone a11y fix. faprep → ⚪ (delete instead, maintenance 3.9).
+**league starters + next sim — ⬜ unplanned, 🟠 scope.** `responsive-tables.js:163` sets each scroll-region's `aria-label` from `table.getAttribute("aria-label") || "Scrollable data table"` — so multiple tables get the same generic name. The distinguishing labels already exist (position/section titles), but the `<table>` markup is produced by **shared** renderers (`UI\Tables\Ratings::render`, `BasketballStats\Tables\*::render`) that take no aria-label argument. Add an optional per-table `aria-label` param (or wrap) so the View can pass the section name; the JS then propagates it. Invisible → 🟢 once that small cross-cutting scope is added.
 
-### region — best-practice, moderate — 🟡
-**Location:** league control panel (13 nodes), faprep (1).
-**Problem:** Page content sits outside any landmark region (PHP-Nuke legacy table-layout markup). Refactor-scale.
-**Disposition:** 🟡 — same as landmark-one-main; couple to the maintenance-backlog 2.27/3.9 refactors. faprep → ⚪ (delete).
+### landmark-one-main — best-practice, moderate — ⬜ unplanned, 🔴 not safe
+**leagueControlPanel:** no `<main>` because the root page bypasses `PageLayout`. Fixing means routing it through `PageLayout` — the maintenance-2.27 module conversion (refactor-scale). The page is now ratchet-tracked (allowlisted for this rule) via the `label`/`select-name` plan, so regressions are caught; the fix itself waits on 2.27. **faprep:** → delete (maintenance 3.9).
 
-### label — wcag2a (level A), **critical** — 🟡
-**Location:** league control panel (`.ibl-input` with no associated `<label>`).
-**Problem:** Form input with no programmatic label. WCAG-A critical. But it's a root-level admin-only page (maintenance 2.27).
-**Direction:** Add `<label for>` / `aria-label`. Mechanical, but on a legacy admin page being restructured.
-**Disposition:** 🟡 — supervised; fold into the `leagueControlPanel.php` → module conversion (maintenance 2.27) or a standalone admin-page a11y pass.
+### region — best-practice, moderate — ⬜ unplanned, 🔴 not safe
+**leagueControlPanel** (13 nodes): PHP-Nuke table-layout content sits outside any landmark region. Same root cause and same resolution as landmark-one-main (couple to 2.27). **faprep** (1): → delete.
 
-### select-name — wcag2a (level A), **critical** — 🟡
-**Location:** league control panel (4 `<select>`, incl. `select[name="SeasonPhase"]`, the league switcher).
-**Problem:** `<select>` elements with no accessible name. WCAG-A critical. Same page as `label`.
-**Direction:** Add `aria-label`/associated `<label>`. Bundle with the `label` fix above.
-**Disposition:** 🟡 — supervised; bundle with `label` on the league control panel pass.
+### label — wcag2a (level A), **critical** — 📋 planned, 🟢 auto-mergeable
+**leagueControlPanel** `.ibl-input` with no programmatic label. Plan `leaguecontrolpanel-aria-label-a11y` (queued for automouse) adds a static `aria-label` to every input; aria-label-only (invisible, no VR), admin-gate/CSRF/POST handler untouched → auto-merge eligible. Adds the page to the ratchet enforcing `label`.
 
-### html-has-lang — wcag2a (level A), serious — ⚪
-**Location:** faprep (`faprep.php` — `<html>` with no `lang`).
-**Problem:** Standalone root page that doesn't use `PageLayout` (which sets `lang`).
-**Disposition:** ⚪ — `faprep.php` is slated for **deletion** (maintenance-backlog 3.9 / 2.28). Fix is wasted; delete the page instead.
+### select-name — wcag2a (level A), **critical** — 📋 planned, 🟢 auto-mergeable
+**leagueControlPanel** `<select>` ×6 (incl. `SeasonPhase`, the league switcher) with no accessible name. Bundled into the same queued plan; `aria-label` per select.
 
-### color-contrast — wcag2aa, serious — ⚪
-**Disposition:** ⚪ — tracked separately in [`a11y-contrast-backlog.md`](a11y-contrast-backlog.md). The full-rule audit re-confirmed contrast on 26 pages (team-color cells + stat highlights); no new action here.
+### html-has-lang — wcag2a (level A), serious — ⬜ unplanned, 🔴 delete instead
+**faprep** `<html>` with no `lang` (doesn't use `PageLayout`, which sets `lang`). `faprep.php` is slated for **deletion** (maintenance 3.9 / 2.28) — fix is wasted.
+
+### color-contrast — wcag2aa, serious — ⬜ out of scope
+Tracked separately in [`a11y-contrast-backlog.md`](a11y-contrast-backlog.md). The full-rule audit re-confirmed contrast on the team-color/stat-highlight pages; no new action here.
 
 ---
 
 ## Non-a11y findings surfaced by the audit
 
-- **BigBoard returns HTTP 500** (`modules.php?name=BigBoard`, body len 73) — a real runtime bug, not accessibility. File separately. (Could not be a11y-audited.)
+- **BigBoard returns HTTP 500** (`modules.php?name=BigBoard`) — a runtime bug, not accessibility; could not be a11y-audited. (Note: BigBoard rides the Phase-4 GM re-land — see PR #1084.) File/track separately.
 
 ---
 
-## Planned (automouse-safe) — queued 2026-06-13
+## Plans — status (audited 2026-06-20)
 
-| Plan | Scope |
-|------|-------|
-| `a11y-1-ratchet-best-practice` | Add best-practice + WCAG 2.2/2.1 tags to the helper; generalize the allowlist to per-page-per-rule; enable `page-has-heading-one`, `heading-order`, `empty-table-header` with empirically-seeded allowlists; **install this backlog doc to `ibl5/docs/a11y-backlog.md`**. No code fixes (regression-prevention only). |
-| `a11y-2-heading-one-single-title` ✅ | Promote sole `h2.ibl-title` → `h1` in the single-title views + fix record-holders `heading-order`; remove those pages from the allowlist. |
-| `a11y-3-empty-table-header` | Add visually-hidden labels to the empty `<th>` cells on cap space / player page / free agency; remove from allowlist. |
+| Plan | Status |
+|------|--------|
+| `a11y-1-ratchet-best-practice` | ✅ merged — tags + per-page-per-rule allowlist + this doc. |
+| `a11y-2-heading-one-single-title` | ✅ merged (#1103) — single-title promotes + record-holders heading-order. |
+| `a11y-3-empty-table-header` | ✅ merged — empty `<th>` labels. |
+| `a11y-4-training-camp-heading-one` | ✅ merged (#1158) — training camp `<h1>`. |
+| `a11y-5-heading-one-burndown` | 📋 PR open (#1163), `auto_merge: false` — 4 promotes + Team-page `<h1>` add (VR review). |
+| `standings-landmark-unique-aria-label` | ✅ superseded — the standings fix already merged independently as **#1164**; the plan file is redundant (not queued). |
+| `leaguecontrolpanel-aria-label-a11y` | 📋 queued for automouse — `label` + `select-name` via aria-label; auto-merge eligible. |
 
 ## Burn-down process
 
 1. Fix the markup/CSS for the target page(s).
 2. Run `bunx playwright test tests/e2e/smoke/accessibility.spec.ts --project=chromium` to confirm the page passes the now-enabled rule.
-3. Remove the (page, rule) entry from `KNOWN_FAILING` in `tests/e2e/helpers/accessibility.ts` (or the spec).
-4. Update this doc's disposition.
-5. Bump `last_verified`. CI enforces the change permanently.
+3. Remove the (page, rule) entry from `KNOWN_FAILING` in `tests/e2e/smoke/accessibility.spec.ts`.
+4. Update this doc's status/readiness in the master table.
+5. Bump `last_verified` (CI enforces via `bin/check-docs`).

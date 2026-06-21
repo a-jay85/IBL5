@@ -48,7 +48,7 @@ This audit (2026-06-20, verified against the live `accessibility.spec.ts` `KNOWN
 | **link-name** (homepage, news index/categories/article) | ⬜ unplanned | 🟠 scope | `aria-label` add is invisible → auto-mergeable in principle, **but** seed-dependent: add a CI-seed reproduce phase first. News-template subset → 🟢 once reproduced; homepage sim-recap subset is data-dependent (may go green with no fix). |
 | **target-size** (topics ×100, homepage, news article) | ⬜ unplanned | 🟦 not auto-mergeable | Fix is **CSS** `min-height`/`min-width`/padding → changes rendered pixels → VR baseline regen + human review. Automouse can implement; merge is held. Small-count hits also seed-dependent. |
 | **landmark-unique** — standings | ✅ implemented | — | #1164 merged; `StandingsView::renderHeader()` derives per-region `aria-label`; removed from `KNOWN_FAILING`. |
-| **landmark-unique** — schedule + team schedule | ⬜ unplanned | 🟢 auto-mergeable | **Re-checked:** the duplicate is each schedule View's **own** `<nav class="ibl-jump-menu">` (`LeagueScheduleView.php:84`, `TeamScheduleView.php:144`) colliding with the site nav — NOT a shared-nav change. One invisible `aria-label` per View (e.g. "Jump to month") → like standings. |
+| **landmark-unique** — schedule + team schedule | ✅ implemented | — | **Re-checked:** the duplicate is each schedule View's **own** `<nav class="ibl-jump-menu">` (`LeagueScheduleView.php:84`, `TeamScheduleView.php:144`) colliding with the site nav — NOT a shared-nav change. One invisible `aria-label` per View (e.g. "Jump to month") → like standings. **DONE:** each schedule View's jump-menu nav now carries `aria-label="Jump to month"`; removed from `KNOWN_FAILING['landmark-unique']`. |
 | **landmark-unique** — league starters + next sim | ⬜ unplanned | 🟠 scope | The scroll-region label is auto-derived by `responsive-tables.js:163` from each `<table>`'s `aria-label`, **but** those tables are built by **shared** renderers (`UI\Tables\Ratings`, `BasketballStats\Tables\*`) with no aria-label param. Route an optional per-table label through them (the position/section title already exists) → invisible → 🟢. |
 | **label** (leagueControlPanel `.ibl-input`) | 📋 planned | 🟢 auto-mergeable | Plan `leaguecontrolpanel-aria-label-a11y` **queued** (automouse); aria-label-only (invisible), admin-gate/CSRF/handler untouched, auto-merge eligible. |
 | **select-name** (leagueControlPanel `<select>` ×6) | 📋 planned | 🟢 auto-mergeable | Same plan, bundled. |
@@ -58,7 +58,7 @@ This audit (2026-06-20, verified against the live `accessibility.spec.ts` `KNOWN
 | **color-contrast** | ⬜ out of scope | — | Tracked in [`a11y-contrast-backlog.md`](a11y-contrast-backlog.md). |
 
 **One-line takeaways for picking work:**
-- **Ready to plan as auto-mergeable now:** `landmark-unique` schedule/team-schedule (jump-menu aria-label); `page-has-heading-one` next sim (single-title promote) **and** schedule/team-schedule (stale allowlist removal — no code change). `label`/`select-name` already planned + queued.
+- **Ready to plan as auto-mergeable now:** `page-has-heading-one` next sim (single-title promote) **and** schedule/team-schedule (stale allowlist removal — no code change). `label`/`select-name` already planned + queued.
 - **Auto-mergeable after a small scope/decision:** `landmark-unique` league-starters/next-sim (renderer param); `link-name` News subset (seed-verify); `page-has-heading-one` multi-title (which-`h2` decision).
 - **Automouse-safe but a human must merge:** `target-size` (VR), `page-has-heading-one` title-less + a11y-5 Team page (VR).
 - **Not automouse-safe:** `landmark-one-main` + `region` on leagueControlPanel (2.27 refactor); everything on `faprep.php` (delete).
@@ -103,7 +103,7 @@ Was a single `<h4>`-after-`<h2>` skip on `record holders`; fixed in `a11y-2-head
 ### landmark-unique — best-practice, moderate
 **standings — ✅ implemented** (#1164): `StandingsView::renderHeader()` derives a unique `aria-label` per region from the in-scope `$region`/`$groupingType` vars; removed from `KNOWN_FAILING`.
 
-**schedule + team schedule — ⬜ unplanned, 🟢 auto-mergeable.** Fresh check: each schedule View emits its own `<nav class="ibl-jump-menu schedule-months">` (`LeagueScheduleView.php:84`, `TeamScheduleView.php:144`); on a schedule page that is a *second* navigation landmark alongside the shared site `<nav class="nav-grain">` (`NavigationView.php:53`), both unnamed → `landmark-unique`. Fix is one invisible `aria-label` per View on the jump-menu nav — View-local, **not** a shared-nav change. (The original "shared-nav blast radius" note was wrong.)
+**schedule + team schedule — ✅ implemented.** Each schedule View now emits `<nav class="ibl-jump-menu schedule-months" aria-label="Jump to month">` (`LeagueScheduleView.php:84`, `TeamScheduleView.php:144`), disambiguating it from the shared site `<nav class="nav-grain">` (`NavigationView.php:53`). Removed from `KNOWN_FAILING['landmark-unique']`.
 
 **league starters + next sim — ⬜ unplanned, 🟠 scope.** `responsive-tables.js:163` sets each scroll-region's `aria-label` from `table.getAttribute("aria-label") || "Scrollable data table"` — so multiple tables get the same generic name. The distinguishing labels already exist (position/section titles), but the `<table>` markup is produced by **shared** renderers (`UI\Tables\Ratings::render`, `BasketballStats\Tables\*::render`) that take no aria-label argument. Add an optional per-table `aria-label` param (or wrap) so the View can pass the section name; the JS then propagates it. Invisible → 🟢 once that small cross-cutting scope is added.
 
@@ -143,6 +143,7 @@ Tracked separately in [`a11y-contrast-backlog.md`](a11y-contrast-backlog.md). Th
 | `a11y-4-training-camp-heading-one` | ✅ merged (#1158) — training camp `<h1>`. |
 | `a11y-5-heading-one-burndown` | 📋 PR open (#1163), `auto_merge: false` — 4 promotes + Team-page `<h1>` add (VR review). |
 | `standings-landmark-unique-aria-label` | ✅ superseded — the standings fix already merged independently as **#1164**; the plan file is redundant (not queued). |
+| `a11y-landmark-unique-schedule` | ✅ implemented — schedule + team-schedule jump-menu `aria-label`; auto-merge eligible. |
 | `leaguecontrolpanel-aria-label-a11y` | 📋 queued for automouse — `label` + `select-name` via aria-label; auto-merge eligible. |
 | `a11y-heading-one-multi-title` | ✅ implemented — 6 multi-title pages promoted; standings + voting results deferred (page-level `<h1>` decision). |
 

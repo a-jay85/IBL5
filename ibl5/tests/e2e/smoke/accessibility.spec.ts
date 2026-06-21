@@ -106,8 +106,6 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
   'landmark-unique': new Set([
     'league starters',
     'next sim',
-    'schedule',
-    'team schedule',
   ]),
 
   // No <main> landmark — legacy root page bypasses PageLayout. See ibl5/docs/a11y-backlog.md §landmark-one-main.

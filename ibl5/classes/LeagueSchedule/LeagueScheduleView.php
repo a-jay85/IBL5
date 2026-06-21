@@ -81,7 +81,7 @@ class LeagueScheduleView implements LeagueScheduleViewInterface
      */
     private function renderMonthNav(array $gamesByMonth, bool $isPlayoffPhase, ?string $playoffMonthKey): string
     {
-        $html = '<nav class="ibl-jump-menu schedule-months">';
+        $html = '<nav class="ibl-jump-menu schedule-months" aria-label="Jump to month">';
         foreach ($gamesByMonth as $key => $data) {
             if ($isPlayoffPhase && $key === $playoffMonthKey) {
                 continue;

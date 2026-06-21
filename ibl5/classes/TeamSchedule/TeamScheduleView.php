@@ -141,7 +141,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
      */
     private function renderMonthNav(array $gamesByMonth, bool $isPlayoffPhase, ?string $playoffMonthKey): string
     {
-        $html = '<nav class="ibl-jump-menu schedule-months">';
+        $html = '<nav class="ibl-jump-menu schedule-months" aria-label="Jump to month">';
         foreach ($gamesByMonth as $monthKey => $data) {
             if ($isPlayoffPhase && $monthKey === $playoffMonthKey) {
                 continue;

@@ -548,6 +548,19 @@ jobs:
         working-directory: ibl5
         run: bin/check-infection-excludes
 
+  csrf-field-name:
+    name: CSRF field-name guard
+    runs-on: ubuntu-latest
+    # Runs unconditionally: a wrong CSRF field name (name="csrf_token" without the
+    # leading underscore) silently rejects every form submission and is invisible to
+    # PHPStan/tests. The check is a few seconds of grep with no dependencies.
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+      - name: Check CSRF form field names
+        working-directory: ibl5
+        run: bin/check-csrf-field-name
+
   harness-tests:
     name: Shell harness regression tests
     needs: [changes]
@@ -576,7 +589,7 @@ jobs:
   gate:
     name: Tests and Analysis
     if: always()
-    needs: [changes, test, audit-php, audit-js, ibl6-checks, db-integration, phpstan, phpunit-hygiene, shellcheck, host-mariadb-guard, automouse-impl-model-test, update-baselines, infection-excludes, harness-tests]
+    needs: [changes, test, audit-php, audit-js, ibl6-checks, db-integration, phpstan, phpunit-hygiene, shellcheck, host-mariadb-guard, automouse-impl-model-test, update-baselines, infection-excludes, csrf-field-name, harness-tests]
     runs-on: ubuntu-latest
     steps:
       - run: exit 1

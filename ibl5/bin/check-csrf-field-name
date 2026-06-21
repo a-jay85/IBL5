@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Bans the CSRF hidden-field name written WITHOUT its leading underscore.
+#
+# CsrfGuard validates the token from $_POST['_csrf_token']. A form field emitted
+# as name="csrf_token" (no underscore) is therefore silently rejected — every
+# submission fails CSRF with no visible error. This is invisible to PHPStan/tests
+# and shipped once already (PR #1074), so a content grep is the right gate: it
+# covers PHP string literals, heredocs, inline-HTML templates, and .js/.html
+# uniformly, where an AST rule would miss the inline-HTML form markup.
+#
+# The pattern anchors to the `name="`/`name='` prefix so the WRONG form ("c…)
+# matches while the CORRECT name="_csrf_token" ("_…) does not.
+
+# grep -E pattern: name="csrf_token" or name='csrf_token'
+PATTERN='name=["'\'']csrf_token["'\'']'
+
+# Scan app source for markup that can carry a form field. --include keeps the scan
+# to source file types (so this extensionless script never self-matches its own
+# PATTERN); --exclude-dir drops vendored/build/fixture trees.
+matches=$(grep -rnE "$PATTERN" . \
+  --include='*.php' \
+  --include='*.phtml' \
+  --include='*.html' \
+  --include='*.tpl' \
+  --include='*.js' \
+  --exclude-dir=vendor \
+  --exclude-dir=node_modules \
+  --exclude-dir=.git \
+  --exclude-dir=cache \
+  --exclude-dir=Fixtures \
+  2>/dev/null || true)
+
+if [ -n "$matches" ]; then
+  echo "ERROR: CSRF form field(s) use the wrong name (missing leading underscore):" >&2
+  echo "$matches" >&2
+  echo "" >&2
+  echo 'Fix: use name="_csrf_token" (leading underscore). The bare "csrf_token" is' >&2
+  echo "     silently rejected by CsrfGuard — every form submission fails CSRF with" >&2
+  echo "     no error. Prefer CsrfGuard's field helper over hand-rolled markup." >&2
+  exit 1
+fi
+
+echo 'OK: no bare csrf_token form fields found (all use name="_csrf_token").'
+exit 0

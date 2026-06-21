@@ -6,6 +6,7 @@ namespace Tests\RecordHolders;
 
 use League\League;
 use PHPUnit\Framework\TestCase;
+use RecordHolders\RecordFormatter;
 use RecordHolders\RecordHoldersService;
 use RecordHolders\Contracts\RecordHoldersRepositoryInterface;
 
@@ -544,7 +545,7 @@ final class RecordHoldersServiceTest extends TestCase
 
     public function testTeamRegistryContainsExactlyMaxRealTeamidEntries(): void
     {
-        $reflection = new \ReflectionClass(RecordHoldersService::class);
+        $reflection = new \ReflectionClass(RecordFormatter::class);
         $registry = $reflection->getConstant('TEAM_REGISTRY');
         $this->assertIsArray($registry);
         $this->assertCount(League::MAX_REAL_TEAMID, $registry);
@@ -552,7 +553,7 @@ final class RecordHoldersServiceTest extends TestCase
 
     public function testTeamRegistryEachEntryHasAbbrAndName(): void
     {
-        $reflection = new \ReflectionClass(RecordHoldersService::class);
+        $reflection = new \ReflectionClass(RecordFormatter::class);
         /** @var array<int, array{abbr: string, name: string}> $registry */
         $registry = $reflection->getConstant('TEAM_REGISTRY');
         $this->assertIsArray($registry);

@@ -76,7 +76,6 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
     'team page',
     'voting results',
     // Auth pages
-    'next sim',
     'your account',
     'voting ASG ballot',
     'voting EOY ballot',

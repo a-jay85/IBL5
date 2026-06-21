@@ -51,7 +51,7 @@ class NextSimView implements NextSimViewInterface
     public function render(array $games, Team $userTeam, array $userStarters): string
     {
         $html = '<div class="next-sim-container">';
-        $html .= '<h2 class="ibl-title">Next Sim</h2>';
+        $html .= '<h1 class="ibl-title">Next Sim</h1>';
 
         if ($games === []) {
             $html .= '<div class="next-sim-empty">No games projected next sim!</div></div>';

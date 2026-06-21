@@ -149,11 +149,13 @@ class TeamViewTest extends TestCase
         $this->assertStringContainsString('ibl-title', $output);
     }
 
-    public function testRenderOmitsYearHeadingForCurrentSeason(): void
+    public function testRenderShowsBareTeamNameHeadingForCurrentSeason(): void
     {
         $output = $this->view->render($this->createPageData(['yr' => null]));
 
-        $this->assertStringNotContainsString('ibl-title', $output);
+        // The current-season (empty-$yr) default view emits a bare team-name <h1>
+        // so the page satisfies axe page-has-heading-one (no year prefix).
+        $this->assertStringContainsString('<h1 class="ibl-title">Celtics</h1>', $output);
     }
 
     public function testRenderContainsRaftersForActualTeam(): void

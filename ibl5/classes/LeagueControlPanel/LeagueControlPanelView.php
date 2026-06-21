@@ -79,7 +79,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     <label>Current League:</label>
     <span class="league-badge <?= HtmlSanitizer::e($badgeClass) ?>"><?= HtmlSanitizer::e(strtoupper($leagueConfig['short_name'])) ?></span>
     <label>Switch to:</label>
-    <select onchange="window.location.href=this.value" class="ibl-select ibl-select--auto">
+    <select onchange="window.location.href=this.value" aria-label="Switch league" class="ibl-select ibl-select--auto">
         <option value="leagueControlPanel.php?league=ibl"<?= $currentLeague === 'ibl' ? ' selected' : '' ?>>IBL</option>
         <option value="leagueControlPanel.php?league=olympics"<?= $currentLeague === 'olympics' ? ' selected' : '' ?>>Olympics</option>
     </select>
@@ -121,7 +121,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
 <section class="updater-section">
     <div class="updater-section__label">Season Phase</div>
     <div class="lcp-control-row">
-        <select name="SeasonPhase" class="ibl-select ibl-select--auto">
+        <select name="SeasonPhase" aria-label="Current season phase" class="ibl-select ibl-select--auto">
         <?php foreach ($phases as $phase): ?>
             <option value="<?= HtmlSanitizer::e($phase) ?>"<?= $panelData['phase'] === $phase ? ' selected' : '' ?>><?= HtmlSanitizer::e($phase) ?></option>
         <?php endforeach; ?>
@@ -172,7 +172,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     <?= HtmlSanitizer::trusted($this->renderUpdateAllButton()) ?>
     <div class="lcp-note">Upload sim backup to <strong>backups/</strong> before running</div>
     <div class="lcp-control-row">
-        <input type="number" name="SimLengthInDays" min="1" max="180" size="3" value="<?= HtmlSanitizer::e((string) $panelData['simLengthInDays']) ?>" onkeydown="if(event.key==='Enter')event.preventDefault()" class="ibl-input ibl-input--sm w-20">
+        <input type="number" name="SimLengthInDays" aria-label="Sim length in days" min="1" max="180" size="3" value="<?= HtmlSanitizer::e((string) $panelData['simLengthInDays']) ?>" onkeydown="if(event.key==='Enter')event.preventDefault()" class="ibl-input ibl-input--sm w-20">
         <button type="submit" name="action" value="set_sim_length" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set Sim Length in Days</button>
     </div>
     <div class="lcp-note">You must click the button — pressing Enter will not work</div>
@@ -208,7 +208,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     <?= HtmlSanitizer::trusted($this->renderUpdateAllButton()) ?>
     <div class="lcp-note">Upload sim backup to <strong>backups/</strong> before running</div>
     <div class="lcp-control-row">
-        <input type="number" name="SimLengthInDays" min="1" max="180" size="3" value="<?= HtmlSanitizer::e((string) $panelData['simLengthInDays']) ?>" onkeydown="if(event.key==='Enter')event.preventDefault()" class="ibl-input ibl-input--sm w-20">
+        <input type="number" name="SimLengthInDays" aria-label="Sim length in days" min="1" max="180" size="3" value="<?= HtmlSanitizer::e((string) $panelData['simLengthInDays']) ?>" onkeydown="if(event.key==='Enter')event.preventDefault()" class="ibl-input ibl-input--sm w-20">
         <button type="submit" name="action" value="set_sim_length" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set Sim Length in Days</button>
     </div>
     <div class="lcp-note">You must click the button — pressing Enter will not work</div>
@@ -229,7 +229,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     <?= HtmlSanitizer::trusted($this->renderUpdateAllButton()) ?>
     <div class="lcp-note">Upload sim backup to <strong>backups/</strong> before running</div>
     <div class="lcp-control-row">
-        <input type="number" name="SimLengthInDays" min="1" max="180" size="3" value="<?= HtmlSanitizer::e((string) $panelData['simLengthInDays']) ?>" onkeydown="if(event.key==='Enter')event.preventDefault()" class="ibl-input ibl-input--sm w-20">
+        <input type="number" name="SimLengthInDays" aria-label="Sim length in days" min="1" max="180" size="3" value="<?= HtmlSanitizer::e((string) $panelData['simLengthInDays']) ?>" onkeydown="if(event.key==='Enter')event.preventDefault()" class="ibl-input ibl-input--sm w-20">
         <button type="submit" name="action" value="set_sim_length" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set Sim Length in Days</button>
     </div>
     <div class="lcp-note">You must click the button — pressing Enter will not work</div>
@@ -260,7 +260,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     <?= HtmlSanitizer::trusted($this->renderUpdateAllButton()) ?>
     <div class="lcp-note">Upload sim backup to <strong>backups/</strong> before running</div>
     <div class="lcp-control-row">
-        <input type="number" name="SimLengthInDays" min="1" max="180" size="3" value="<?= HtmlSanitizer::e((string) $panelData['simLengthInDays']) ?>" onkeydown="if(event.key==='Enter')event.preventDefault()" class="ibl-input ibl-input--sm w-20">
+        <input type="number" name="SimLengthInDays" aria-label="Sim length in days" min="1" max="180" size="3" value="<?= HtmlSanitizer::e((string) $panelData['simLengthInDays']) ?>" onkeydown="if(event.key==='Enter')event.preventDefault()" class="ibl-input ibl-input--sm w-20">
         <button type="submit" name="action" value="set_sim_length" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set Sim Length in Days</button>
     </div>
     <div class="lcp-note">You must click the button — pressing Enter will not work</div>
@@ -351,7 +351,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         ob_start();
         ?>
 <div class="lcp-control-row">
-    <select name="Waivers" class="ibl-select ibl-select--auto">
+    <select name="Waivers" aria-label="Allow waiver moves" class="ibl-select ibl-select--auto">
         <option value="Yes"<?= $panelData['allowWaivers'] === 'Yes' ? ' selected' : '' ?>>Yes</option>
         <option value="No"<?= $panelData['allowWaivers'] === 'No' ? ' selected' : '' ?>>No</option>
     </select>
@@ -369,7 +369,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         ob_start();
         ?>
 <div class="lcp-control-row">
-    <select name="Trades" class="ibl-select ibl-select--auto">
+    <select name="Trades" aria-label="Allow trades" class="ibl-select ibl-select--auto">
         <option value="Yes"<?= $panelData['allowTrades'] === 'Yes' ? ' selected' : '' ?>>Yes</option>
         <option value="No"<?= $panelData['allowTrades'] === 'No' ? ' selected' : '' ?>>No</option>
     </select>
@@ -387,7 +387,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         ob_start();
         ?>
 <div class="lcp-control-row">
-    <select name="ShowDraftLink" class="ibl-select ibl-select--auto">
+    <select name="ShowDraftLink" aria-label="Show draft link" class="ibl-select ibl-select--auto">
         <option value="On"<?= $panelData['showDraftLink'] === 'On' ? ' selected' : '' ?>>On</option>
         <option value="Off"<?= $panelData['showDraftLink'] === 'Off' ? ' selected' : '' ?>>Off</option>
     </select>
@@ -405,7 +405,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         ob_start();
         ?>
 <div class="lcp-control-row">
-    <select name="FANotifs" class="ibl-select ibl-select--auto">
+    <select name="FANotifs" aria-label="Free agency notifications" class="ibl-select ibl-select--auto">
         <option value="On"<?= $panelData['freeAgencyNotifications'] === 'On' ? ' selected' : '' ?>>On</option>
         <option value="Off"<?= $panelData['freeAgencyNotifications'] === 'Off' ? ' selected' : '' ?>>Off</option>
     </select>
@@ -429,7 +429,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
 <div class="lcp-note">Requires Leaders.htm and completed EOY voting</div>
 <?php if (!$panelData['hasFinalsMvp']): ?>
 <div class="lcp-control-row">
-    <input type="text" name="finals_mvp_name" placeholder="Finals MVP name" class="ibl-input ibl-input--sm" maxlength="32">
+    <input type="text" name="finals_mvp_name" aria-label="Finals MVP name" placeholder="Finals MVP name" class="ibl-input ibl-input--sm" maxlength="32">
     <button type="submit" name="action" value="set_finals_mvp" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set Finals MVP</button>
 </div>
 <?php endif; ?>

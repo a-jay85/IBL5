@@ -68,11 +68,9 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
     'player page',
     'award history',
     'player database',
-    'schedule',
     'news index',
     'news categories',
     'news article',
-    'team schedule',
     'team page',
     'voting results',
     // Auth pages

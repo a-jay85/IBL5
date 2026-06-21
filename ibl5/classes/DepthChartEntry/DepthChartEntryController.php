@@ -123,7 +123,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         \PageLayout\PageLayout::header();
 
         $responder = new \Api\Response\HtmlResponder();
-        $responder->html('<h2 class="ibl-title">Depth Chart Entry</h2>');
+        $responder->html('<h1 class="ibl-title">Depth Chart Entry</h1>');
 
         if ($flashErrorsHtml !== '') {
             $responder->html('<div class="ibl-alert ibl-alert--error">' . $flashErrorsHtml . '</div>');

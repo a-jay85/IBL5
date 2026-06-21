@@ -29,7 +29,7 @@ class WaiversView implements WaiversViewInterface
         ob_start();
         ?>
         <div class="waivers-page">
-        <h2 class="ibl-title">Waivers</h2>
+        <h1 class="ibl-title">Waivers</h1>
         <?= \UI\AlertRenderer::fromCode($result, [
             'player_added'   => ['class' => 'ibl-alert--success', 'message' => 'Player successfully signed from waivers.'],
             'player_dropped' => ['class' => 'ibl-alert--success', 'message' => 'Player successfully dropped to waivers.'],
@@ -94,7 +94,7 @@ class WaiversView implements WaiversViewInterface
     public function renderWaiversClosed(): string
     {
         return '<div class="waivers-page">'
-            . '<h2 class="ibl-title">Waivers</h2>'
+            . '<h1 class="ibl-title">Waivers</h1>'
             . '<p>Sorry, but players may not be added from or dropped to waivers at the present time.</p>'
             . '</div>';
     }

@@ -1,0 +1,110 @@
+#!/bin/bash
+# bin/website-affecting — classify a list of changed files as website-affecting or not.
+#
+# Reads a newline-separated list of repo-relative changed file paths from stdin
+# (as emitted by `git diff --name-only`). Exits 0 = "affects website (RUN/BUILD)",
+# exits 1 = "does NOT affect website (SKIP)".
+#
+# Fail-safe: empty stdin, unexpected input, or any internal error → exit 0 (BUILD).
+# Caller is responsible for computing the file list; this script only classifies it.
+#
+# Usage:
+#   git diff --name-only master...HEAD | bin/website-affecting
+#   printf 'README.md\ndocs/foo.md\n' | bin/website-affecting
+#   bin/website-affecting --help
+#
+# Exit codes:
+#   0  Affects website — callers should run/build.
+#   1  Does NOT affect website — callers may skip.
+#
+# Deny-set (a file is non-website if it matches ALL of the following):
+#   - matches the deny regex: (\.md$|^docs/|^ibl5/docs/|^\.claude/|^bin/)
+#   - is NOT in the carve-out set (paths that must always trigger, even though
+#     they match the deny regex):
+#       bin/website-affecting  (the predicate itself — changing the gate must trigger it)
+#
+# Workflow files (.github/workflows/e2e-tests.yml, .github/workflows/lighthouse.yml)
+# are naturally website-side (none of their paths match the deny regex) — no
+# explicit carve-out needed.
+#
+# Anchoring is load-bearing:
+#   ^bin/      so ibl5/bin/* (app bin, website-side) is NOT denied
+#   ^docs/     top-level docs dir
+#   ^ibl5/docs/  in-repo ibl5 docs
+#   ^\.claude/ local claude rules/commands
+#   \.md$      any markdown (docs) anywhere
+#
+# shellcheck shell=bash
+
+set -u
+
+DENY_REGEX='(\.md$|^docs/|^ibl5/docs/|^\.claude/|^bin/)'
+
+# Carve-out: paths that match the deny regex but must still trigger (exact match).
+is_carveout() {
+    case "$1" in
+        bin/website-affecting) return 0 ;;
+    esac
+    return 1
+}
+
+if [ "${1:-}" = "--help" ]; then
+    cat <<'HELP'
+bin/website-affecting — classify changed files as website-affecting or not.
+
+Reads newline-separated repo-relative paths from stdin (git diff --name-only).
+Exit 0 = affects website (RUN/BUILD). Exit 1 = does not affect website (SKIP).
+Fail-safe: empty or unexpected input → exit 0 (BUILD).
+
+Deny-set (non-website if matched and not in carve-out):
+  \.md$          any markdown file
+  ^docs/         top-level docs/
+  ^ibl5/docs/    ibl5 internal docs
+  ^\.claude/     local .claude rules/commands
+  ^bin/          host repo bin/ scripts
+
+Carve-out (always website-side despite matching deny regex):
+  bin/website-affecting  (the predicate itself)
+
+Naturally website-side (not denied, no carve-out needed):
+  ibl5/**  .github/**  docker/**  Dockerfile  docker-compose*.yml  *.php *.ts *.js *.css
+HELP
+    exit 0
+fi
+
+TOTAL=0
+WEBSITE_COUNT=0
+
+while IFS= read -r line; do
+    # Skip blank lines
+    [ -z "$line" ] && continue
+    TOTAL=$((TOTAL + 1))
+
+    # A file is non-website iff: matches deny regex AND NOT in carve-out.
+    if printf '%s' "$line" | grep -qE "$DENY_REGEX"; then
+        if is_carveout "$line"; then
+            # Carve-out: treat as website-affecting
+            WEBSITE_COUNT=$((WEBSITE_COUNT + 1))
+        fi
+        # else: denied and not in carve-out — non-website, don't increment WEBSITE_COUNT
+    else
+        # Does not match deny regex → website-affecting
+        WEBSITE_COUNT=$((WEBSITE_COUNT + 1))
+    fi
+done
+
+# Fail-safe: empty input → exit 0 (build)
+if [ "$TOTAL" -eq 0 ]; then
+    printf 'website-affecting: yes (empty diff — fail-safe build)\n' >&2
+    exit 0
+fi
+
+if [ "$WEBSITE_COUNT" -gt 0 ]; then
+    printf 'website-affecting: yes (%d changed file(s), %d website-side)\n' \
+        "$TOTAL" "$WEBSITE_COUNT" >&2
+    exit 0
+else
+    printf 'website-affecting: no (all %d changed file(s) are non-website)\n' \
+        "$TOTAL" >&2
+    exit 1
+fi

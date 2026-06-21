@@ -210,7 +210,7 @@ window.IBL_initNextSimHighlight();
         $safeLabel = HtmlSanitizer::safeHtmlOutput($label);
 
         $html = '<div class="next-sim-position-section">';
-        $html .= '<h3 class="ibl-table-title">' . $safeLabel . '</h3>';
+        $html .= '<h2 class="ibl-table-title">' . $safeLabel . '</h2>';
         $html .= $this->renderPositionTable($games, $position, $userTeam, $userStarters);
         $html .= '</div>';
 

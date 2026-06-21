@@ -178,7 +178,7 @@ class TeamView implements TeamViewInterface
         ?>
 <div class="team-card" style="<?= \UI\TableStyles::inlineTeamVars($team->color1, $team->color2) ?>">
     <div class="team-card__header">
-        <h3 class="team-card__title">Draft Picks</h3>
+        <h2 class="team-card__title">Draft Picks</h2>
     </div>
     <div class="team-card__body--flush">
         <?= HtmlSanitizer::trusted($draftPicksTable) ?>

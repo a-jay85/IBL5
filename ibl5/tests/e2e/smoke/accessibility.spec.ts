@@ -53,6 +53,8 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
     'gm contact list',
     'draft',
     'next sim',
+    // Legacy admin page — PHP-Nuke palette debt. See ibl5/docs/a11y-backlog.md.
+    'league control panel',
   ]),
 
   // No <h1> on page — most module pages use <h2 class="ibl-title">. See ibl5/docs/a11y-backlog.md.
@@ -113,6 +115,16 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
     'next sim',
     'schedule',
     'team schedule',
+  ]),
+
+  // No <main> landmark — legacy root page bypasses PageLayout. See ibl5/docs/a11y-backlog.md §landmark-one-main.
+  'landmark-one-main': new Set([
+    'league control panel',
+  ]),
+
+  // Content outside landmark regions — same root-page bypass. See ibl5/docs/a11y-backlog.md §region.
+  'region': new Set([
+    'league control panel',
   ]),
 };
 
@@ -211,6 +223,11 @@ const authPages: Array<{
     state: { 'Current Season Phase': 'Free Agency', 'EOY Voting': 'Yes' },
   },
   { name: 'training camp ratings diff', url: 'modules.php?name=TrainingCampRatingsDiff' },
+  {
+    name: 'league control panel',
+    url: 'leagueControlPanel.php',
+    state: { 'Current Season Phase': 'Regular Season', 'Current Season Ending Year': '2026' },
+  },
 ];
 
 authTest.describe('Authenticated page accessibility', () => {

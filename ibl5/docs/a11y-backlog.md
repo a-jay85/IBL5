@@ -64,11 +64,13 @@ last_verified: 2026-06-20
 **Direction:** CSS `min-height`/`min-width`/padding on the affected components.
 **Disposition:** 🟡 (CSS sizing changes risk **visual-regression baseline** breakage → needs VR review, `auto_merge: false`) **+ 🔵** (the small-count hits are sim-recap data-dependent; verify topics(100) on CI seed). Plan after a VR-aware human pass.
 
-### landmark-unique — best-practice, moderate — 🟡
-**Location:** standings (per-region scroll regions all `aria-label="Standings"`), league starters (`aria-label="Scrollable data table"` generic, ×2), next sim (`.next-sim-position-section` scroll regions share a label), schedule + team schedule (`.nav-grain` duplicate landmark).
-**Problem:** Multiple landmarks share the same role+name. Mixed root causes: (a) Standings — label *is* mechanically derivable from the existing `$region`/`$groupingType` vars; (b) league starters — generic default label needs a chosen per-table name; (c) `.nav-grain` — a nav-component element resolving to a duplicate landmark (needs investigation, likely affects the shared nav).
-**Direction:** Unique `aria-label` per region. Standings subset could be mechanical; the rest need judgment + the `.nav-grain` nav-component fix needs care (shared across all pages).
-**Disposition:** 🟡 — supervised (mixed label judgment + shared-nav blast radius; best-practice/moderate, not WCAG-AA).
+### landmark-unique — best-practice, moderate — 🟡 (standings subset ✅ enforced)
+**Location (remaining):** league starters (`aria-label="Scrollable data table"` generic, ×2), next sim (`.next-sim-position-section` scroll regions share a label), schedule + team schedule (`.nav-grain` duplicate landmark).
+**Problem:** Multiple landmarks share the same role+name. Remaining mixed root causes: (a) league starters — generic default label needs a chosen per-table name; (b) `.nav-grain` — a nav-component element resolving to a duplicate landmark (needs investigation, likely affects the shared nav across all pages).
+**Direction:** Unique `aria-label` per landmark. The remaining subsets need judgment (league-starters per-table name) + care (the `.nav-grain` nav-component fix is shared across all pages).
+**Disposition:** 🟡 — supervised for the remaining league-starters + `.nav-grain` subsets (mixed label judgment + shared-nav blast radius; best-practice/moderate, not WCAG-AA).
+
+**Standings subset — ✅ enforced.** Standings rendered one scroll-region landmark per region all labelled `aria-label="Standings"`; `StandingsView::renderHeader()` now derives a unique name from the in-scope `$region`/`$groupingType` vars (e.g. "Eastern Conference Standings", "Atlantic Division Standings"). Removed `'standings'` from `KNOWN_FAILING['landmark-unique']` in `accessibility.spec.ts` — the ratchet now enforces `landmark-unique` on the standings page.
 
 ### landmark-one-main — best-practice, moderate — 🟡
 **Location:** league control panel (`leagueControlPanel.php`), faprep (`faprep.php`).

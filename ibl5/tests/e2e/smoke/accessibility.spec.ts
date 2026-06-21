@@ -109,7 +109,6 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
 
   // Multiple landmarks share role+name. See ibl5/docs/a11y-backlog.md §landmark-unique.
   'landmark-unique': new Set([
-    'standings',
     'league starters',
     'next sim',
     'schedule',

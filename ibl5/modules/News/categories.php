@@ -47,9 +47,11 @@ function theindex($catid)
         $storynum = $storyhome;
     }
     $catid = intval($catid);
-    $db->sql_query("update " . $prefix . "_stories_cat set counter=counter+1 where catid='$catid'");
-    $result = $db->sql_query("SELECT sid, aid, title, time, hometext, bodytext, comments, counter, topic, informant, notes, acomm FROM " . $prefix . "_stories where catid='$catid' $querylang ORDER BY sid DESC limit $storynum");
-    while ($row = $db->sql_fetchrow($result)) {
+    $newsService = new \Topics\News\NewsService($mysqli_db);
+    $newsService->bumpCategory($catid);
+    $stories = $newsService->getCategoryPageStories($catid, (int) $storynum, $querylang);
+    $viewModels = [];
+    foreach ($stories as $row) {
         $s_sid = intval($row['sid']);
         $aid = $row['aid'];
         $title = \Security\HtmlSanitizer::safeHtmlOutput($row['title']);
@@ -62,29 +64,17 @@ function theindex($catid)
         $informant = $row['informant'];
         $notes = \Security\HtmlSanitizer::safeHtmlOutput($row['notes']);
         $acomm = intval($row['acomm']);
-        $stmtTopics = $mysqli_db->prepare(
-            "SELECT t.topicid, t.topicname, t.topicimage, t.topictext
-             FROM {$prefix}_stories s
-             LEFT JOIN {$prefix}_topics t ON t.topicid = s.topic
-             WHERE s.sid = ?"
-        );
-        $stmtTopics->bind_param('i', $s_sid);
-        $stmtTopics->execute();
-        $topicRow = $stmtTopics->get_result()->fetch_assoc();
-        $stmtTopics->close();
+        $topicRow = $newsService->getTopicForStory($s_sid);
         $topicid = (int) ($topicRow['topicid'] ?? 0);
         $topicname = \Security\HtmlSanitizer::e($topicRow['topicname'] ?? '');
         $topicimage = \Security\HtmlSanitizer::e($topicRow['topicimage'] ?? '');
         $topictext = \Security\HtmlSanitizer::e($topicRow['topictext'] ?? '');
-        if (!is_numeric($time)) {
-            preg_match('/(\d{4})-(\d{1,2})-(\d{1,2}) (\d{1,2}):(\d{1,2}):(\d{1,2})/', $time, $dtParts);
-            $time = gmmktime((int) $dtParts[4], (int) $dtParts[5], (int) $dtParts[6], (int) $dtParts[2], (int) $dtParts[3], (int) $dtParts[1]);
-        }
-        $time -= date("Z");
+        $time = $newsService->normalizeStoryTime($time);
         $datetime = ucfirst(date(_DATESTRING, $time));
-        $introcount = strlen($hometext ?? '');
-        $fullcount = strlen($bodytext ?? '');
-        $totalcount = $introcount + $fullcount;
+        $counts = $newsService->computeByteCounts((string) ($hometext ?? ''), (string) ($bodytext ?? ''));
+        $introcount = $counts['intro'];
+        $fullcount = $counts['full'];
+        $totalcount = $counts['total'];
         $c_count = $comments;
         $r_options = "";
         if (isset($userinfo['umode'])) {$r_options .= "&amp;mode=" . $userinfo['umode'];}
@@ -104,11 +94,17 @@ function theindex($catid)
         $morelink .= " ";
         $morelink = str_replace(" |  | ", " | ", $morelink);
         $sid = intval($s_sid);
-        $row2 = $db->sql_fetchrow($db->sql_query("select title from " . $prefix . "_stories_cat where catid='$catid'"));
-        $title1 = \Security\HtmlSanitizer::safeHtmlOutput($row2['title']);
+        $catTitle = $newsService->getCategoryTitle($catid);
+        $title1 = \Security\HtmlSanitizer::safeHtmlOutput($catTitle ?? '');
         $title = "$title1: $title";
-        themeindex($aid, $informant, $time, $title, $counter, $topic, $hometext, $notes, $morelink, $topicname, $topicimage, $topictext);
+        $viewModels[] = [
+            'aid' => $aid, 'informant' => $informant, 'time' => $time, 'title' => $title,
+            'counter' => $counter, 'topic' => $topic, 'hometext' => $hometext,
+            'notes' => $notes, 'morelink' => $morelink, 'topicname' => $topicname,
+            'topicimage' => $topicimage, 'topictext' => $topictext,
+        ];
     }
+    (new \Topics\News\NewsView())->renderStories($viewModels);
     PageLayout\PageLayout::footer();
 }
 

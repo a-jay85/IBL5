@@ -18,10 +18,13 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-define('INDEX_FILE', true);
+if (!defined('INDEX_FILE')) {
+    define('INDEX_FILE', true);
+}
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
+if (!function_exists('theindex')) :
 function theindex($new_topic = "0")
 {
     global $db, $storyhome, $topicname, $topicimage, $topictext, $user, $prefix, $multilingual, $currentlang, $articlecomm, $sitename, $user_news, $userinfo, $authService, $mysqli_db;
@@ -61,20 +64,19 @@ function theindex($new_topic = "0")
     } else {
         $storynum = $storyhome;
     }
+
+    $newsService = new \Topics\News\NewsService($mysqli_db);
+
     if ($new_topic == 0) {
-        $qdb = "WHERE (ihome='0' OR catid='0')";
         $home_msg = "";
     } else {
-        $qdb = "WHERE topic='$new_topic'";
-        $result_a = $db->sql_query("SELECT topictext FROM " . $prefix . "_topics WHERE topicid='$new_topic'");
-        $row_a = $db->sql_fetchrow($result_a);
-        $numrows_a = $db->sql_numrows($result_a);
-        $topic_title = \Security\HtmlSanitizer::safeHtmlOutput($row_a['topictext']);
+        $topicText = $newsService->getTopicText($new_topic);
         OpenTable();
-        if ($numrows_a == 0) {
+        if ($topicText === null) {
             echo "<center><font class=\"title\">$sitename</font><br><br>" . _NOINFO4TOPIC . "<br><br>[ <a href=\"modules.php?name=News\">" . _GOTONEWSINDEX . "</a> | <a href=\"modules.php?name=Topics\">" . _SELECTNEWTOPIC . "</a> ]</center>";
         } else {
-            $db->sql_query("UPDATE " . $prefix . "_topics SET counter=counter+1");
+            $topic_title = \Security\HtmlSanitizer::safeHtmlOutput($topicText);
+            $newsService->bumpAllTopics();
             echo "<center><font class=\"title\">$sitename: $topic_title</font><br><br>"
                 . "<form action=\"modules.php?name=Search\" method=\"post\">"
                 . "<input type=\"hidden\" name=\"topic\" value=\"$new_topic\">"
@@ -86,8 +88,12 @@ function theindex($new_topic = "0")
         CloseTable();
         echo "<br>";
     }
-    $result = $db->sql_query("SELECT sid, catid, aid, title, time, hometext, bodytext, comments, counter, topic, informant, notes, acomm FROM " . $prefix . "_stories $qdb $querylang ORDER BY sid DESC limit $storynum");
-    while ($row = $db->sql_fetchrow($result)) {
+
+    $stories = ($new_topic == 0)
+        ? $newsService->getHomePageStories((int) $storynum, $querylang)
+        : $newsService->getTopicPageStories((int) $new_topic, (int) $storynum, $querylang);
+    $viewModels = [];
+    foreach ($stories as $row) {
         $s_sid = intval($row['sid']);
         $catid = intval($row['catid']);
         $aid = $row['aid'];
@@ -101,33 +107,16 @@ function theindex($new_topic = "0")
         $informant = $row['informant'];
         $notes = \Security\HtmlSanitizer::safeHtmlOutput($row['notes']);
         $acomm = intval($row['acomm']);
-        if ($catid > 0) {
-            $row2 = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_stories_cat WHERE catid='$catid'"));
-            $cattitle = \Security\HtmlSanitizer::safeHtmlOutput($row2['title']);
-        }
-        $stmtTopics = $mysqli_db->prepare(
-            "SELECT t.topicid, t.topicname, t.topicimage, t.topictext
-             FROM {$prefix}_stories s
-             LEFT JOIN {$prefix}_topics t ON t.topicid = s.topic
-             WHERE s.sid = ?"
-        );
-        $stmtTopics->bind_param('i', $s_sid);
-        $stmtTopics->execute();
-        $topicRow = $stmtTopics->get_result()->fetch_assoc();
-        $stmtTopics->close();
+        $topicRow = $newsService->getTopicForStory($s_sid);
         $topicid = (int) ($topicRow['topicid'] ?? 0);
         $topicname = \Security\HtmlSanitizer::e($topicRow['topicname'] ?? '');
         $topicimage = \Security\HtmlSanitizer::e($topicRow['topicimage'] ?? '');
         $topictext = \Security\HtmlSanitizer::e($topicRow['topictext'] ?? '');
-        if (!is_numeric($time)) {
-            preg_match('/(\d{4})-(\d{1,2})-(\d{1,2}) (\d{1,2}):(\d{1,2}):(\d{1,2})/', $time, $dtParts);
-            $time = gmmktime((int) $dtParts[4], (int) $dtParts[5], (int) $dtParts[6], (int) $dtParts[2], (int) $dtParts[3], (int) $dtParts[1]);
-        }
-        $time -= date("Z");
-        $datetime = ucfirst(date(_DATESTRING, $time));
-        $introcount = strlen($hometext ?? '');
-        $fullcount = strlen($bodytext ?? '');
-        $totalcount = $introcount + $fullcount;
+        $time = $newsService->normalizeStoryTime($row['time']);
+        $counts = $newsService->computeByteCounts((string) ($hometext ?? ''), (string) ($bodytext ?? ''));
+        $introcount = $counts['intro'];
+        $fullcount = $counts['full'];
+        $totalcount = $counts['total'];
         $c_count = $comments;
         $r_options = "";
         if (isset($userinfo['umode'])) {$r_options .= "&amp;mode=" . $userinfo['umode'];}
@@ -152,16 +141,23 @@ function theindex($new_topic = "0")
         }
         $sid = intval($s_sid);
         if ($catid != 0) {
-            $row3 = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_stories_cat WHERE catid='$catid'"));
-            $title1 = \Security\HtmlSanitizer::safeHtmlOutput($row3['title']);
+            $catTitle = $newsService->getCategoryTitle($catid);
+            $title1 = \Security\HtmlSanitizer::safeHtmlOutput($catTitle ?? '');
             $catLabel = $title1 !== '' ? $title1 : 'Category';
             $title = "<a class='readmore' href=\"modules.php?name=News&amp;file=categories&amp;op=newindex&amp;catid=$catid\" aria-label=\"$catLabel\"><font class=\"storycat\">$title1</font></a>: $title";
         }
         $morelink = implode(' | ', $morelink_parts);
-        themeindex($aid, $informant, $time, $title, $counter, $topic, $hometext, $notes, $morelink, $topicname, $topicimage, $topictext);
+        $viewModels[] = [
+            'aid' => $aid, 'informant' => $informant, 'time' => $time, 'title' => $title,
+            'counter' => $counter, 'topic' => $topic, 'hometext' => $hometext,
+            'notes' => $notes, 'morelink' => $morelink, 'topicname' => $topicname,
+            'topicimage' => $topicimage, 'topictext' => $topictext,
+        ];
     }
+    (new \Topics\News\NewsView())->renderStories($viewModels);
     PageLayout\PageLayout::footer();
 }
+endif;
 
 // Legacy globals previously populated by ConfigBootstrap::extractRequestToGlobals().
 // PR2 narrowed that extraction to a 2-key allowlist (newlang, redirect), so module

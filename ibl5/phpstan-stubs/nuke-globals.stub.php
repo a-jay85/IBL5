@@ -84,6 +84,12 @@ function themeheader(): void {}
 /** @return void */
 function themefooter(): void {}
 
+/** @return void */
+function themeindex(mixed $aid, mixed $informant, mixed $time, mixed $title, mixed $counter, mixed $topic, mixed $thetext, mixed $notes, mixed $morelink, mixed $topicname, mixed $topicimage, mixed $topictext): void {}
+
+/** @return void */
+function themearticle(mixed $aid, mixed $informant, mixed $datetime, mixed $title, mixed $thetext, mixed $topic, mixed $topicname, mixed $topicimage, mixed $topictext): void {}
+
 /** @return int 1 if admin, 0 otherwise */
 function is_admin(mixed $admin = null): int { return 0; }
 

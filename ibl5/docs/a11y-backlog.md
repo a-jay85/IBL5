@@ -45,7 +45,7 @@ This audit (2026-06-20, verified against the live `accessibility.spec.ts` `KNOWN
 | **page-has-heading-one** — schedule + team schedule (STALE allowlist) | ⬜ unplanned | 🟢 auto-mergeable | **Re-checked:** both Views already emit `<h1 class="ibl-title">Schedule</h1>` **unconditionally** (`LeagueScheduleView.php:51`, `TeamScheduleView.php:101`). The pages already pass `page-has-heading-one`; the allowlist entries are **stale** → verify-and-remove (no code change), clicks the ratchet. |
 | **page-has-heading-one** — multi-title / loop-rendered (standings, trading, season archive, franchise record book, compare players, waivers, depth chart entry, voting results, olympics standings; **big board, trade block — blocked on Phase-4 re-land**) | 📋 partial | 🟠 decision | **DONE (this plan):** trading, season archive, franchise record book, compare players, waivers, depth chart entry promoted to `<h1>` (record book also got a `heading-order` h3→h2 co-fix). **STILL OPEN:** standings + voting results need a page-level `<h1>` ADDED (per-region/per-award loop, no single title — a VR-changing decision, separate plan); olympics standings is not spec-tracked; big board / trade block blocked on Phase-4 re-land. |
 | **page-has-heading-one** — title-less add (homepage, player page, your account, voting ASG/EOY ballot, news index/categories/article) | ⬜ unplanned | 🟠 decision → 🟦 | Needs an `<h1>` **added** with invented title text (decision) **and** the new visible heading changes VR baselines (human review). After the text decision, lands as 🟦 (not auto-mergeable). |
-| **link-name** (homepage, news index/categories/article) | ⬜ unplanned | 🟠 scope | `aria-label` add is invisible → auto-mergeable in principle, **but** seed-dependent: add a CI-seed reproduce phase first. News-template subset → 🟢 once reproduced; homepage sim-recap subset is data-dependent (may go green with no fix). |
+| **link-name** (homepage, news index/categories/article) | 📋 partial | 🟠 scope | `aria-label` add is invisible → auto-mergeable in principle, **but** seed-dependent: add a CI-seed reproduce phase first. News-template subset → 🟢 once reproduced; homepage sim-recap subset is data-dependent (may go green with no fix). **DONE (this plan):** News pages (index/categories/article) — links already carried aria-labels; reproduce-gated stale-allowlist removal, rule now enforced. **STILL OPEN:** homepage last-sim-recap team links (data-dependent, out of scope). |
 | **target-size** (topics ×100, homepage, news article) | ⬜ unplanned | 🟦 not auto-mergeable | Fix is **CSS** `min-height`/`min-width`/padding → changes rendered pixels → VR baseline regen + human review. Automouse can implement; merge is held. Small-count hits also seed-dependent. |
 | **landmark-unique** — standings | ✅ implemented | — | #1164 merged; `StandingsView::renderHeader()` derives per-region `aria-label`; removed from `KNOWN_FAILING`. |
 | **landmark-unique** — schedule + team schedule | ✅ implemented | — | **Re-checked:** the duplicate is each schedule View's **own** `<nav class="ibl-jump-menu">` (`LeagueScheduleView.php:84`, `TeamScheduleView.php:144`) colliding with the site nav — NOT a shared-nav change. One invisible `aria-label` per View (e.g. "Jump to month") → like standings. **DONE:** each schedule View's jump-menu nav now carries `aria-label="Jump to month"`; removed from `KNOWN_FAILING['landmark-unique']`. |
@@ -59,7 +59,7 @@ This audit (2026-06-20, verified against the live `accessibility.spec.ts` `KNOWN
 
 **One-line takeaways for picking work:**
 - **Ready to plan as auto-mergeable now:** `page-has-heading-one` next sim (single-title promote) **and** schedule/team-schedule (stale allowlist removal — no code change). `label`/`select-name` already planned + queued.
-- **Auto-mergeable after a small scope/decision:** `link-name` News subset (seed-verify); `page-has-heading-one` multi-title (which-`h2` decision).
+- **Auto-mergeable after a small scope/decision:** `page-has-heading-one` multi-title (which-`h2` decision).
 - **Automouse-safe but a human must merge:** `target-size` (VR), `page-has-heading-one` title-less + a11y-5 Team page (VR).
 - **Not automouse-safe:** `landmark-one-main` + `region` on leagueControlPanel (2.27 refactor); everything on `faprep.php` (delete).
 
@@ -94,8 +94,8 @@ Was a single `<h4>`-after-`<h2>` skip on `record holders`; fixed in `a11y-2-head
 ### empty-table-header — best-practice, minor — ✅ implemented
 `<th>` cells with no text (icon-only sort columns / sticky row-label / separator + position-section headers) on cap space, player page, free agency, depth chart entry, next sim. Fixed via `aria-label` in `a11y-3-empty-table-header` (merged). Rule key absent from `KNOWN_FAILING` → fully enforced.
 
-### link-name — wcag2a (level A), serious — ⬜ unplanned, 🟠 scope
-**Location (allowlisted):** homepage, news index/categories/article. **Problem:** links with no discernible text — News-template icon-links (consistent → mechanical) + homepage `last-sim-recap` team links (data-dependent). **Direction:** `aria-label` (team name / article title) — invisible, so auto-mergeable per-page. **Scope to add:** a CI-seed reproduce phase first (`feedback_a11y_contrast_scan_seed`): if reproduced, News subset → 🟢; if a sim-recap hit doesn't reproduce on the CI seed, a ratchet removal would go green with no fix.
+### link-name — wcag2a (level A), serious — 📋 News subset implemented; homepage open
+**Location (allowlisted — homepage only):** homepage (`last-sim-recap` team links). **News subset ✅ implemented:** news index/categories/article links already carried `aria-label` attributes (added in prior PRs); reproduce-gated stale-allowlist removal via `a11y-link-name-news`; rule now enforced on those three pages. **STILL OPEN:** homepage `last-sim-recap` team links — data-dependent (out of scope, user decision).
 
 ### target-size — wcag22aa (WCAG 2.2), serious — ⬜ unplanned, 🟦 not auto-mergeable
 **Location (allowlisted):** topics (~100 nodes, dense small-link list), homepage, news article. **Problem:** touch targets < 24×24px. **Direction:** CSS `min-height`/`min-width`/padding. **Why held:** CSS sizing changes rendered pixels → VR baseline regen + human visual review. Automouse can implement; the merge is held (`auto_merge: false`). Small-count hits are also sim-recap seed-dependent — verify topics(100) on the CI seed.
@@ -147,6 +147,7 @@ Tracked separately in [`a11y-contrast-backlog.md`](a11y-contrast-backlog.md). Th
 | `a11y-landmark-unique-starters-sim` | ✅ implemented — per-table `aria-label` via shared-renderer optional param + next-sim inline; both pages removed from `KNOWN_FAILING['landmark-unique']`; auto-merge eligible. |
 | `leaguecontrolpanel-aria-label-a11y` | 📋 queued for automouse — `label` + `select-name` via aria-label; auto-merge eligible. |
 | `a11y-heading-one-multi-title` | ✅ implemented — 6 multi-title pages promoted; standings + voting results deferred (page-level `<h1>` decision). |
+| `a11y-link-name-news` | ✅ implemented — News-page `link-name` reproduce-gated removal (links already labeled); homepage deferred. |
 
 ## Burn-down process
 

@@ -51,7 +51,7 @@ class NextSimView implements NextSimViewInterface
     public function render(array $games, Team $userTeam, array $userStarters): string
     {
         $html = '<div class="next-sim-container">';
-        $html .= '<h2 class="ibl-title">Next Sim</h2>';
+        $html .= '<h1 class="ibl-title">Next Sim</h1>';
 
         if ($games === []) {
             $html .= '<div class="next-sim-empty">No games projected next sim!</div></div>';
@@ -210,7 +210,7 @@ window.IBL_initNextSimHighlight();
         $safeLabel = HtmlSanitizer::safeHtmlOutput($label);
 
         $html = '<div class="next-sim-position-section">';
-        $html .= '<h3 class="ibl-table-title">' . $safeLabel . '</h3>';
+        $html .= '<h2 class="ibl-table-title">' . $safeLabel . '</h2>';
         $html .= $this->renderPositionTable($games, $position, $userTeam, $userStarters);
         $html .= '</div>';
 

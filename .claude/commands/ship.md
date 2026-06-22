@@ -1,22 +1,17 @@
 ---
-description: "Commit, push, and open a PR; optionally arm gated auto-merge by delegating to /post-plan (never arms directly)."
-last_verified: 2026-06-20
+description: "Commit, push, and open a PR via /post-plan, which decides whether auto-merge arms; /ship never arms directly."
+last_verified: 2026-06-22
 ---
 
-# /ship — Commit, push, PR, optionally arm gated auto-merge
+# /ship — Commit, push, PR via /post-plan
 
-`/ship` is an **interactive-only** wrapper around `/commit-commands:commit-push-pr`. It routes commit/push/PR work down one of two paths: a plain **no-merge** path that opens a PR and leaves it open, or a gated **auto-merge** path that fires `bin/post-plan-now` and lets `/post-plan` Phase 6.5 decide whether auto-merge actually arms. The user's invocation text is available as `$ARGUMENTS`.
+`/ship` is an **interactive-only** wrapper that hands commit/push/PR work to `/post-plan`. There is **one path**: it fires `bin/post-plan-now`, and `/post-plan` opens the PR, runs code review + security audit + verification, and decides at Phase 6.5 whether auto-merge arms or the PR waits for a human. The user's invocation text is available as `$ARGUMENTS`.
 
-> ## Core invariant — `/ship` ONLY routes; it NEVER arms auto-merge itself.
+> ## Core invariant — `/ship` ONLY delegates; it NEVER arms auto-merge itself.
 >
-> Arming is owned exclusively by `/post-plan` Phase 6.5. That phase runs the teeth this wrapper structurally cannot supply from conversation context:
-> - code review (any finding scored **≥ 80 blocks** — condition **(2)**),
-> - Phase-5 local verification status (condition **(4)**),
-> - planned-test / planned-file completeness (condition **(3)**),
-> - CI-green-required, and
-> - the independent `human-signoff` required GitHub check.
->
-> The merge path therefore **delegates rather than reimplements**: conditions (2)/(3)/(4) plus CI-green and the `human-signoff` check are produced by post-plan phases (review scoring, Phase-5 verification, CI watch) that a chat-context wrapper cannot reproduce. A routing bug **fails safe** — the worst case is the wrong path is taken, never an unreviewed merge.
+> Arming is owned exclusively by `/post-plan` Phase 6.5, which runs the teeth a chat-context wrapper structurally cannot supply: code-review scoring (condition (2)), Phase-5 verification (condition (4)), planned-test / planned-file completeness (condition (3)), CI-green-required, the realized-diff safety verdict (condition (9)), the `feat:` floor (condition (8)), and the independent `human-signoff` required GitHub check. A **reviewed-but-held PR** (open, a human merges it) is the **automatic** outcome whenever any Phase 6.5 condition holds — there is no token to request it. A routing bug **fails safe**: the worst case is a delayed ship, never an unreviewed merge.
+
+(`/ship` previously carried merge-intent tokens and a routing step; both were removed per ADR-0067 — the held-PR outcome already emerges automatically when work is not arming-safe, and a flag the user never reaches for is dead weight. `/ship` now has a single behavior.)
 
 ## Step 1 — Precondition gate (refuse on ANY; before touching anything)
 
@@ -26,30 +21,20 @@ Evaluate all three before doing any work. On any hit, refuse with the one-line r
 2. **`$CLAUDE_HEADLESS` = `1`** → refuse: the automouse/headless run owns post-plan; `/ship` is interactive-only.
 3. **Clean tree AND no commits ahead of `origin/master`** (`git status --porcelain` empty **AND** `git log --oneline origin/master..HEAD` empty) → refuse: nothing to ship.
 
-**Defense-in-depth note (the gate is NOT redundant).** `bin/post-plan-now` independently enforces refusals (1)–(3): it `exit 1`s on `master`/`main`/`HEAD` and on a nothing-to-ship tree, and its headless skip is gated behind `--auto` (which `/ship` does not pass). `/ship`'s own gate still earns its place for two reasons: (a) earlier, clearer UX messaging, and (b) the **`--no-merge` path never touches `post-plan-now` at all** and would otherwise be unguarded.
+**Defense-in-depth note.** `bin/post-plan-now` independently enforces refusals (1)–(3): it `exit 1`s on `master`/`main`/`HEAD` and on a nothing-to-ship tree. `/ship`'s own gate still earns its place for earlier, clearer UX messaging.
 
-## Step 2 — Resolve merge intent (precedence order, exactly)
-
-1. An explicit `--merge` or `--no-merge` token in `$ARGUMENTS` **wins outright**.
-2. Else, if THIS conversation explicitly asked to auto-merge / ship-and-merge / "merge when green" → treat as `--merge`.
-3. Else call **`AskUserQuestion`** — **default to ASK, never silently assume**. Arming auto-merge is outward-facing and hard to reverse, so an ambiguous intent must be confirmed, not guessed.
-
-## Step 3a — No-merge path
-
-Run `/commit-commands:commit-push-pr`: commit, push, open the PR, and **leave it OPEN**. Report the PR URL. Do **not** fire `bin/post-plan-now`.
-
-## Step 3b — Merge-wanted path (delegate the gated arming, NEVER arm directly)
+## Step 2 — Fire post-plan (the single path)
 
 First, a cheap **advisory prediction** — clearly label it *"advisory only; `/post-plan` Phase 6.5 makes the real call"*. Emit a warning for each that matches:
 
 - PR/commit title matches `^feat(\(|!|:)` → Phase 6.5 condition **(8)** (the `feat:` floor) will **HOLD**.
-- `git diff HEAD --name-only` includes `engine/internal/sim/testdata/golden.json` → condition **(5)** holds under headless.
+- `git diff HEAD --name-only` includes `engine/internal/sim/testdata/golden.json` → condition **(5)** holds under headless (warns interactively).
 - A plan at `~/.claude/plans/<branch-slug>.md` whose **line-1** frontmatter has `auto_merge: false` → condition **(7)** will **HOLD**.
 
 Then the actions:
 
 - **Do NOT commit.** Leave the worktree **dirty** — `/post-plan` Phase 2 commits the uncommitted tree and opens the PR; committing first would change what ships (see `.claude/rules/workflow-continuity.md`).
-- Fire **`bin/post-plan-now`** (bare, **not** `--auto`): a human invoking `/ship --merge` IS the decision to ship; `--auto` only matters inside headless, which the Step 1 precondition already rejected.
+- Fire **`bin/post-plan-now`** (bare, **not** `--auto`): a human invoking `/ship` IS the decision to ship; `--auto` only matters inside headless, which the Step 1 precondition already rejected.
 - Report: post-plan fired (detached Sonnet 4.6, launchd-supervised); the PR / code review / CI / auto-merge progress all land on the PR; list any predicted holds from the advisory step.
 
 ## Decision-table recap
@@ -59,8 +44,6 @@ Then the actions:
 | Branch is `master`/`main`/`HEAD` | **Refuse** (Step 1.1 — worktree rule, ADR-0062) |
 | `$CLAUDE_HEADLESS=1` | **Refuse** (Step 1.2 — interactive-only) |
 | Clean tree AND 0 commits ahead of `origin/master` | **Refuse** (Step 1.3 — nothing to ship) |
-| Intent resolves `--no-merge` | **No-merge path** (Step 3a — open PR, leave OPEN) |
-| Intent resolves `--merge` | **Merge path** (Step 3b — dirty tree, fire `bin/post-plan-now`) |
-| Intent ambiguous | **`AskUserQuestion`** (Step 2.3 — never assume merge) |
+| Otherwise | **Fire `bin/post-plan-now`** (Step 2 — dirty tree; post-plan opens the PR and decides arming) |
 
 Arming is always delegated to `bin/post-plan-now` → `/post-plan` Phase 6.5. `/ship` never runs `gh pr merge --auto` or `--enable-auto-merge` itself.

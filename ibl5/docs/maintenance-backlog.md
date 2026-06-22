@@ -280,7 +280,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 | 2.23 | ✅ Implemented | — | `Shared/` deleted; SalaryConverter→BasketballStats. |
 | 2.24 | ⬜ Open | 🟩 | Navigation views lack interfaces; add `NavigationViewInterface` + sub-view ifaces. Additive, green-green. |
 | 2.25 | ⬜ Open | 🟨 | index.php still defines `showpage/negotiate/rookieoption/processrookieoption` globals (verified); rookieoption/negotiate touch mutation → collides with #1107 (sequence). showpage extraction alone is green-green. |
-| 2.26 | ⬜ Open | 🟩 | Document Updater as CLI-only (ADR/README). Docs-only, auto-mergeable. |
+| 2.26 | ✅ Implemented | — | Documented Updater web-POST placement (`classes/Updater/README.md`); audit's "CLI-only" was inaccurate — it is web-only. |
 | 2.27 | ⬜ Open | 🟦 | Root `leagueControlPanel.php`→module bypasses `ModuleAccessControl`; converting changes admin-auth path (security surface) → human-merge. (a11y fix kept standalone deliberately.) |
 | 2.28 | ⬜ Open | 🟨 | `faprep.php` exists (verified), inline SQL + unescaped output. Resolve with 3.9 (delete); if absorbed instead, XSS/admin-SQL = human-merge. |
 | 2.29 | ⬜ Open | 🟩 | `JSB.php`/`ContractRules.php`/`BaseMysqliRepository.php` still root-level. Namespace sweep (follow relocation checklist incl. phpunit-mutation.xml); green-green, wide blast radius. |
@@ -485,6 +485,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Document explicitly (ADR or README) as CLI-only module.
 **Est. effort:** S (document)
 **Risk if untouched:** Confusion about why there's no module entrypoint.
+**Status:** ✅ Implemented (2026-06-21) — documented in `classes/Updater/README.md`. Correction: the audit's "CLI-only / no web-accessible route" label was inaccurate — the Updater is **web-only**, invoked via the root-level admin POST endpoint `scripts/updateAllTheThings.php` (the LCP "Update All The Things" button). True observation retained: there is no `modules/Updater/` route and no CLI entry point.
 
 ### 2.27 LeagueControlPanel — Root-Level PHP File Bypasses `modules/` System
 **Location:** `ibl5/leagueControlPanel.php`, `classes/LeagueControlPanel/`
@@ -1492,7 +1493,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 | 8.13 | ✅ Implemented | — | Web-mutation scripts auth-resolved (2026-06-09): admin-guarded CSRF POST. |
 | 8.14 | ⬜ Open | 🟩 | Standardize script bootstrap; green-green per script. |
 | 8.15 | ⬜ Open | 🟨 | Consolidate the two E2E drivers — context-detection design; mind the outside-repo `e2e-for-pr` gotcha. |
-| 8.16 | ⬜ Open | 🟩 | Check-script output/exit-code standard (doc/helper). |
+| 8.16 | ✅ Implemented | — | Documented the de-facto check-script exit-code/output standard in `bin/README.md`. Helper lib deferred (separate item). |
 | 8.17 | ⬜ Open | 🟨 | ShellCheck CI gate needs an upfront pass over existing scripts (then green-green); smoke tests are additive. |
 
 ### 8.1 Committed Database Dumps (~1.1GB)
@@ -1613,6 +1614,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Define check-script standard in bin/README.md or bin/lib/check-helpers.sh.
 **Est. effort:** S
 **Risk if untouched:** CI jobs misinterpret check results.
+**Status:** ✅ Implemented (2026-06-21) — documented the existing de-facto standard (exit 0 = pass, 1 = violation, 2 = usage/env error; stdout violations with UPPERCASE prefix tags, stderr diagnostics) in `bin/README.md`. A shared `check-helpers.sh` helper under `bin/lib/` is deferred as a separate item (a new `bin/` script would trip `adr-check`).
 
 ### 8.17 No Tests for Scripts
 **Location:** All script directories

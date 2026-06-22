@@ -47,3 +47,34 @@ be reachable from two paths, add a short wrapper that `exec`s the canonical
 script, or relocate the script to its correct home (`bin/` vs `ibl5/bin/` vs
 `ibl5/scripts/`). A `.symlinks` manifest is intentionally **not** maintained —
 one tracked symlink does not warrant one.
+
+## Check-script conventions
+
+Applies to `bin/check-*` (Bash) and `ibl5/bin/check-*` (PHP) — both sets follow
+this de-facto standard.
+
+### Exit codes
+
+| Code | Meaning | Examples |
+|------|---------|---------|
+| `0` | Pass — no violations | `bin/check-plan` prints `check-plan: OK (...)` then exits 0; `ibl5/bin/check-baseline-drift` prints `PASSED: ...`; advisory listing mode (`bin/check-hot-files`, `ibl5/bin/check-new-class-coverage`) exits 0 |
+| `1` | Violations / drift detected | `bin/check-plan` cats violations then exits 1; `bin/check-plan-staleness` prints `STALE: <token>` then exits 1; `ibl5/bin/check-baseline-drift` prints `FAILED: ...`; `bin/check-docs` prints `FAIL <path>` |
+| `2` | Usage / environment error | `bin/check-master-ci-green` exits 2 when `gh` is not authenticated — distinct from a content failure |
+
+### Output channels
+
+- **stdout** — violation lines and pass/summary lines.
+- **stderr** (`>&2`) — diagnostic, usage, and environment errors.
+
+Violation lines are prefixed with an **UPPERCASE tag** for grep-ability:
+`STALE:`, `FLAG:`, `INCREASE:`, `FAILED:`, `ERROR:`, `FAIL`.
+
+### Bash preamble
+
+Bash check scripts open with `set -euo pipefail`. PHP check scripts compute an
+`$exitCode` integer and call `exit($exitCode)`.
+
+### CI consumption
+
+CI gates key off the exit code: `0` = passes the gate, non-zero = fails. `exit 2`
+lets CI distinguish a genuine violation (`1`) from a broken environment (`2`).

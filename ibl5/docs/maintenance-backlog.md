@@ -743,7 +743,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| 4.1 | ⬜ Open | 🟩 | Trading/Trade prefix convention undocumented. Document the rule (+ optional rename sweep). Green-green. |
+| 4.1 | ✅ Implemented | — | Convention already documented at `ibl5/classes/Trading/README.md` (canonical home); cross-linked from `ibl5/docs/ARCHITECTURE_PATTERNS.md` (2026-06-22). Rename sweep explicitly out of scope. |
 | 4.2 | ✅ Implemented | — | CashConsideration→`BuyoutLedgerRepository` (2026-05-20). |
 | 4.3 | ✅ Implemented | — | `Services/` deleted. |
 | 4.4 | ✅ Implemented | — | `Shared/SharedRepository` deleted. |
@@ -751,7 +751,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 | 4.6 | ⬜ Open | 🟨 | PlayerMovement/TransactionHistory rename; same URL-break decision as 4.5. |
 | 4.7 | ✅ Implemented | — | →FreeAgencyOfferView (2026-05-17). |
 | 4.8 | ⬜ Open | 🟩 | Both `*DemandCalculator` present (verified). Internal class rename; green-green. |
-| 4.9 | ⬜ Open | 🟩 | `*ApiHandler` vs `Api/Controller` — document the convention (cheap path); green-green. |
+| 4.9 | ✅ Implemented | — | `*ApiHandler` (module-local HTMX) vs `Api\Controller\*Controller` (REST) documented in `ibl5/docs/ARCHITECTURE_PATTERNS.md` (2026-06-22). |
 | 4.10 | ⬜ Open | 🟨 | DepthChartEntry/SavedDepthChart still old-named (verified). Module rename = URL break → decision. |
 | 4.11 | ⬜ Open | 🟩 | `TradeQueueProcessor` present (verified). Internal rename → `NightlyTradeBatchRunner`; green-green. |
 | 4.12 | ✅ Implemented | — | car_to→car_tvr (migration 128). |
@@ -777,6 +777,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Reserve `Trading*` for module-level entry points (Service, View); `Trade*` for domain objects; document.
 **Est. effort:** S
 **Risk if untouched:** Wrong prefix on new classes; grep returns partial results.
+**Status:** Documented (2026-06-22) — the `Trading*`/`Trade*` rule has a canonical home at `ibl5/classes/Trading/README.md` (inventory + rationale), advisory-enforced by `TradingPrefixConventionRule` (`ibl5/phpstan-rules/TradingPrefixConventionRule.php`), and is cross-linked from `ibl5/docs/ARCHITECTURE_PATTERNS.md`. Optional rename sweep explicitly out of scope.
 
 ### 4.2 `CashConsiderationRepository` vs `TradeCashRepository`
 **Location:** `ibl5/classes/Trading/BuyoutLedgerRepository.php`, `TradeCashRepository.php`
@@ -833,6 +834,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Document or rename `*ApiHandler` → `*HtmxHandler`/`*PartialHandler`.
 **Est. effort:** S (doc) / M (rename)
 **Risk if untouched:** New HTMX endpoints land in `Api/Controller/`; new REST endpoints land as module-local handlers.
+**Status:** Documented (2026-06-22) — distinction now in `ibl5/docs/ARCHITECTURE_PATTERNS.md` § Naming Conventions (`*ApiHandler` = module-local HTMX partial handler instantiated in `ibl5/modules/*/index.php`; `Api\Controller\*Controller` = routed REST endpoint in `ibl5/classes/Api/Router.php`). Cheap doc path taken; rename out of scope.
 
 ### 4.10 `DepthChartEntry/` vs `SavedDepthChart/`
 **Location:** Two modules for one feature (live editing vs snapshot management)

@@ -1,6 +1,6 @@
 ---
 description: Canonical interface-driven Repository/Service/View patterns for new modules.
-last_verified: 2026-05-19
+last_verified: 2026-06-22
 ---
 
 # IBL5 Architecture Patterns
@@ -311,3 +311,45 @@ As the codebase migrates toward Laravel/modern PHP, all database interactions sh
 | Processor | Complex operations | `ProcessorInterface` |
 | View | HTML rendering | `ViewInterface` |
 | Facade | Simplified API | `Interface` |
+
+---
+
+## Naming Conventions
+
+Two cross-module naming distinctions that recur in `ibl5/classes/`. Both are
+conventions to follow, not bugs to fix.
+
+### `*ApiHandler` (module-local HTMX) vs `Api\Controller\*Controller` (REST)
+
+The codebase has two parallel HTTP-endpoint styles. They are distinct on purpose:
+
+| Style | Lives under | Dispatched by | Returns | Use for |
+|-------|-------------|---------------|---------|---------|
+| `*ApiHandler` | a **feature module** namespace (e.g. `DepthChartEntry\DepthChartEntryApiHandler`) | instantiated **directly** in the owning `ibl5/modules/<Module>/index.php` | an **HTML partial** for an HTMX swap into an already-rendered page | in-page interactivity within one module's UI (HTMX `hx-get`/`hx-post` fragment endpoints) |
+| `Api\Controller\*Controller` | `ibl5/classes/Api/Controller/` | the central `ibl5/classes/Api/Router.php` route table | a **JSON** REST response | the versioned external REST API (API-key auth, rate limiting, ETag caching — see API_GUIDE.md) |
+
+**Rule of thumb:** if a new endpoint feeds an HTMX fragment swap inside one
+module's page, it is a `*ApiHandler` in that module. If it is a routed,
+JSON, externally consumed REST endpoint, it is an `Api\Controller\*Controller`
+registered in `Api/Router.php`. A `*ApiHandler` is **not** part of the REST API
+and is never registered in `Api/Router.php`.
+
+Current `*ApiHandler` inventory (module-local HTMX):
+`DepthChartEntry\DepthChartEntryApiHandler`,
+`DraftHistory\DraftHistoryApiHandler`,
+`FranchiseRecordBook\FranchiseRecordBookApiHandler`,
+`LeagueStarters\LeagueStartersApiHandler`,
+`NextSim\NextSimTabApiHandler`,
+`SavedDepthChart\SavedDepthChartApiHandler`,
+`Team\TeamApiHandler`,
+`Trading\TradeRosterPreviewApiHandler`.
+
+### `Trading*` vs `Trade*` prefix within `Trading/`
+
+This convention is documented at its source, next to the code it governs:
+**`ibl5/classes/Trading/README.md`**. In brief: `Trading*` is reserved for
+module-level entry points (Service, View, Controller); `Trade*` is for
+single-trade-scoped domain objects (repositories, validator, processor, offer).
+It is advisory-enforced by the `TradingPrefixConventionRule` PHPStan rule
+(`ibl5/phpstan-rules/TradingPrefixConventionRule.php`). See that README for the
+full inventory and rationale.

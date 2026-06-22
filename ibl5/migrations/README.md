@@ -4,7 +4,7 @@ This directory contains SQL migration scripts to improve the IBL5 database schem
 
 ## Overview
 
-These migrations implement the recommendations from `DATABASE_SCHEMA_IMPROVEMENTS.md` in a phased approach to minimize risk and downtime.
+These migrations improve the IBL5 database schema in a phased approach to minimize risk and downtime.
 
 ## Auto-Rollback Compatibility (New Migrations)
 
@@ -74,6 +74,21 @@ The runner executes migrations in this deterministic order:
 1. **Numbered** (`001_*` through `999_*`) — natural sort
 2. **Non-numbered** (`add_*`, `fix-*`, `create_*`, `migrate_*`) — alphabetical
 3. **Timestamp-based** (`20260226_*`) — natural sort
+
+### Numbering Gaps Are Intentional
+
+The numbered migration sequence has gaps — numbers with no corresponding file. As of this writing the absent numbers in the `001`–`151` range are:
+
+**018, 019, 020, 021, 022, 023, 111, 136, 146, 147, 148**
+
+These gaps are **expected and harmless**. A number is intentionally absent when no migration file carries that numeric prefix and nothing in the sequence references it. Gaps arise when a number was reserved in a development branch (via `bin/next-migration`) that was later squashed, renumbered, or abandoned before merge — a normal artifact of multiple branches developing migrations in parallel. No migration was "lost."
+
+**Rules for new migrations:**
+
+- **Never reuse a gap number.** Do not "fill in" `019` or `111`. Filling a gap would place a brand-new migration *earlier* in natural-sort order than migrations that already ran in production, risking out-of-dependency-order execution on a fresh install.
+- **Always take the next number after the current maximum** — run `bin/next-migration`, which prints the next available prefix by inspecting the main checkout — or use a timestamp-based name (`YYYYMMDD_HHMMSS_description.sql`) as described above.
+
+A handful of historical migrations carry a letter suffix (`033b`, `037b`, `037c`, `044b`). These share a base number with their unsuffixed sibling and sort naturally **after** it; they are legacy artifacts, not a convention to extend — prefer the next sequential number or a timestamp for new work.
 
 ### CLI Usage
 
@@ -235,7 +250,7 @@ Implements:
 - Invalid data prevented at database level
 - API reliability improved with data validation
 
-### 009_schema_optimization_audit.sql (Phase 9) 🎯 PENDING
+### 009_schema_optimization_audit.sql (Phase 9)
 
 **Priority:** Medium (Schema Quality & Performance)
 **Estimated Time:** 15-30 minutes
@@ -849,17 +864,9 @@ Based on analysis of foreign key constraints and current production schema statu
 
 ## Documentation Structure
 
-**Active Documentation:**
 - **[DATABASE_OPTIMIZATION_GUIDE.md](../docs/archive/DATABASE_OPTIMIZATION_GUIDE.md)** - Optimization reference (archived)
 - **[DATABASE_GUIDE.md](../docs/DATABASE_GUIDE.md)** - Developer quick reference
 - **ibl5/migrations/README.md** - This file
-- **MIGRATION_004_FIXES.md** - Migration 004 correction details
-
-**Archived Documentation** (moved to `.archive/`):
-- DATABASE_SCHEMA_IMPROVEMENTS.md - Original recommendations
-- DATABASE_SCHEMA_GUIDE.md - Superseded by DATABASE_GUIDE.md
-- DATABASE_FUTURE_PHASES.md - Consolidated into optimization guide
-- SCHEMA_IMPLEMENTATION_REVIEW.md - Historical implementation review
 
 ## Support
 
@@ -879,7 +886,7 @@ For issues or questions:
 - **Phase 4:** Data Type Refinements (TINYINT, SMALLINT, ENUM, CHECK) - ✅ DONE (Nov 9, 2025)
 - **Phase 5.1:** Composite Indexes - ✅ DONE
 - **Phase 7:** Native PHP Type Casting - ✅ DONE (Jan 26, 2026)
-- **Phase 9:** Schema Optimization Audit - 🎯 PENDING (Feb 2026)
+- **Phase 9:** Schema Optimization Audit - see `009_schema_optimization_audit.sql`
 
 ### 🎉 Phase 4 Implementation Complete!
 
@@ -958,4 +965,4 @@ After Phase 4 is complete, the next priority improvements are:
    - **Estimated Time:** 5-7 days
    - **Risk Level:** High (requires application code updates)
 
-See `DATABASE_SCHEMA_IMPROVEMENTS.md` for detailed roadmap and `SCHEMA_IMPLEMENTATION_REVIEW.md` for current status.
+See `../docs/DATABASE_GUIDE.md` for the developer database reference and `../docs/archive/DATABASE_OPTIMIZATION_GUIDE.md` for the historical optimization strategy.

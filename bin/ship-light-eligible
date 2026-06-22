@@ -1,0 +1,129 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * bin/ship-light-eligible — mechanical predicate for the docs-only light ship path.
+ *
+ * Single source of truth shared by `.claude/commands/ship.md` (the /ship light
+ * path) and `.claude/rules/workflow-continuity.md` (the interactive auto-fire
+ * routing). Decides whether the current branch's changes are safe to open as a
+ * PR and arm `gh pr merge --auto` directly, SKIPPING /post-plan's code review,
+ * security audit, and E2E — because the diff touches nothing those teeth check.
+ *
+ * Eligible IFF ALL hold (see ADR-0067):
+ *   - there is at least one change vs the merge-base with origin/master;
+ *   - EVERY changed path is a Markdown file (`*.md`, case-insensitive) — no code,
+ *     SQL, config, templates, or tests, i.e. no surface post-plan reviews;
+ *   - NONE of the changed paths is a merge-gate / arming-machinery file (the
+ *     EXCLUDE set below) — those must never self-arm via the path they define.
+ *
+ * Exit 0  eligible (prints "eligible: ...").
+ * Exit 1  ineligible (prints "ineligible: <reason>" naming the disqualifier).
+ * Exit 2  error (not a git repo, origin/master unknown, usage).
+ *
+ * Note: skipping post-plan is NOT skipping CI — the branch-protection required
+ * contexts (Tests and Analysis, E2E Tests, human-signoff) still gate the merge.
+ * (check-docs is not a required context; the light path runs it locally first.)
+ */
+
+// Files that DEFINE the merge-gate machinery — what arms a merge AND what decides
+// which future changes need human review. A change to any of them must not ride the
+// light path: an unreviewed edit could arm itself or weaken the very criteria/teeth
+// that gate everything else. Never light-path eligible even though Markdown. See ADR-0067.
+//
+// Two prefixes below cover the rest: `.claude/skills/post-plan/` (the post-plan
+// orchestrator) and `.claude/commands/_` (the shared gate/review/security/test-spec
+// components: _plan-verification, _review-agents, _review-rubric, _security-agents,
+// _test-spec-agent, _test-spec-corpus).
+const EXCLUDE = [
+    // Arming machinery.
+    '.claude/commands/ship.md',
+    '.claude/rules/workflow-continuity.md',
+    '.claude/rules/auto-commit.md',
+    '.claude/rules/commit-conventions.md',
+    // Gate-authoring / review / security machinery (decides what needs review).
+    '.claude/commands/plan.md',
+    '.claude/commands/pr-review.md',
+    '.claude/commands/security-audit.md',
+];
+
+/** Path prefixes whose every Markdown file is merge-gate machinery. */
+const EXCLUDE_PREFIXES = [
+    '.claude/skills/post-plan/',
+    '.claude/commands/_',
+];
+
+/** Run a git command, returning trimmed stdout; null on non-zero exit. */
+function git(string $args): ?string
+{
+    $out = [];
+    $code = 0;
+    exec('git ' . $args . ' 2>/dev/null', $out, $code);
+    return $code === 0 ? implode("\n", $out) : null;
+}
+
+function fail(string $reason): never
+{
+    fwrite(STDOUT, "ineligible: {$reason}\n");
+    exit(1);
+}
+
+function error(string $msg): never
+{
+    fwrite(STDERR, "error: {$msg}\n");
+    exit(2);
+}
+
+if (git('rev-parse --is-inside-work-tree') === null) {
+    error('not inside a git work tree');
+}
+
+$base = git('merge-base origin/master HEAD') ?? git('rev-parse origin/master');
+if ($base === null || $base === '') {
+    error('cannot resolve origin/master (fetch first?)');
+}
+
+// Full change set = committed-ahead ∪ uncommitted (staged/unstaged/untracked).
+$files = [];
+foreach (explode("\n", (string) git('diff --name-only ' . escapeshellarg($base) . ' HEAD')) as $f) {
+    if ($f !== '') {
+        $files[$f] = true;
+    }
+}
+foreach (explode("\n", (string) git('status --porcelain -uall')) as $line) {
+    if ($line === '') {
+        continue;
+    }
+    // Porcelain v1: "XY <path>" or "XY <old> -> <new>" for renames.
+    $path = substr($line, 3);
+    if (str_contains($path, ' -> ')) {
+        $path = substr($path, (int) strpos($path, ' -> ') + 4);
+    }
+    $files[trim($path, '"')] = true;
+}
+
+$paths = array_keys($files);
+if ($paths === []) {
+    fail('no changes vs origin/master');
+}
+
+foreach ($paths as $p) {
+    if (strtolower(pathinfo($p, PATHINFO_EXTENSION)) !== 'md') {
+        fail("non-Markdown file changed: {$p}");
+    }
+    $excludedPrefix = false;
+    foreach (EXCLUDE_PREFIXES as $prefix) {
+        if (str_starts_with($p, $prefix)) {
+            $excludedPrefix = true;
+            break;
+        }
+    }
+    if (in_array($p, EXCLUDE, true) || $excludedPrefix) {
+        fail("merge-gate machinery changed (self-gating): {$p}");
+    }
+}
+
+fwrite(STDOUT, 'eligible: docs-only (' . count($paths) . " markdown file(s))\n");
+exit(0);

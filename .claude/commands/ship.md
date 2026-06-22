@@ -1,15 +1,15 @@
 ---
-description: "Commit, push, and open a PR; optionally arm gated auto-merge by delegating to /post-plan (never arms directly)."
-last_verified: 2026-06-20
+description: "Commit, push, and open a PR; arm gated auto-merge by delegating to /post-plan, except a mechanically-gated docs-only light path that arms directly."
+last_verified: 2026-06-22
 ---
 
 # /ship — Commit, push, PR, optionally arm gated auto-merge
 
-`/ship` is an **interactive-only** wrapper around `/commit-commands:commit-push-pr`. It routes commit/push/PR work down one of two paths: a plain **no-merge** path that opens a PR and leaves it open, or a gated **auto-merge** path that fires `bin/post-plan-now` and lets `/post-plan` Phase 6.5 decide whether auto-merge actually arms. The user's invocation text is available as `$ARGUMENTS`.
+`/ship` is an **interactive-only** wrapper around `/commit-commands:commit-push-pr`. It routes commit/push/PR work down one of three paths: a plain **no-merge** path that opens a PR and leaves it open; a gated **auto-merge** path that fires `bin/post-plan-now` and lets `/post-plan` Phase 6.5 decide whether auto-merge actually arms; or — only when the change is mechanically proven **docs-only** — a **light path** that opens the PR and arms `gh pr merge --auto` directly, skipping `/post-plan` (ADR-0067). The user's invocation text is available as `$ARGUMENTS`.
 
-> ## Core invariant — `/ship` ONLY routes; it NEVER arms auto-merge itself.
+> ## Core invariant — `/ship` arms directly ONLY on the mechanically-gated docs-only light path; otherwise it ONLY routes.
 >
-> Arming is owned exclusively by `/post-plan` Phase 6.5. That phase runs the teeth this wrapper structurally cannot supply from conversation context:
+> For any change that contains code, SQL, auth, output, config, templates, tests, or merge-gate machinery, arming is owned exclusively by `/post-plan` Phase 6.5. That phase runs the teeth this wrapper structurally cannot supply from conversation context:
 > - code review (any finding scored **≥ 80 blocks** — condition **(2)**),
 > - Phase-5 local verification status (condition **(4)**),
 > - planned-test / planned-file completeness (condition **(3)**),
@@ -17,6 +17,8 @@ last_verified: 2026-06-20
 > - the independent `human-signoff` required GitHub check.
 >
 > The merge path therefore **delegates rather than reimplements**: conditions (2)/(3)/(4) plus CI-green and the `human-signoff` check are produced by post-plan phases (review scoring, Phase-5 verification, CI watch) that a chat-context wrapper cannot reproduce. A routing bug **fails safe** — the worst case is the wrong path is taken, never an unreviewed merge.
+>
+> **The single carve-out (ADR-0067):** when `bin/ship-light-eligible` exits 0, the diff is Markdown-only and touches no merge-gate machinery, so post-plan's teeth have *nothing to bite on* — there is no code to review, no security surface to audit, no app behavior to E2E. There `/ship` may arm `gh pr merge --auto` directly. This is safe because eligibility is a **mechanical** predicate (never a "feels small" judgment), the merge-gate machinery excludes *itself* — both the arming machinery and the gate-authoring/review/security docs (`plan.md`, `_plan-verification.md`, `pr-review.md`, `security-audit.md`, the shared `.claude/commands/_*.md`), so a gate edit can neither self-arm nor weaken the gates unreviewed — and **skipping post-plan is not skipping CI** — the branch-protection required contexts (`Tests and Analysis`, `E2E Tests`, `human-signoff`) all run on a docs-only PR and gate the `--auto` merge. `check-docs` is **not** a required context, so the light path runs it locally before arming (Step 3b-light).
 
 ## Step 1 — Precondition gate (refuse on ANY; before touching anything)
 
@@ -38,7 +40,28 @@ Evaluate all three before doing any work. On any hit, refuse with the one-line r
 
 Run `/commit-commands:commit-push-pr`: commit, push, open the PR, and **leave it OPEN**. Report the PR URL. Do **not** fire `bin/post-plan-now`.
 
-## Step 3b — Merge-wanted path (delegate the gated arming, NEVER arm directly)
+## Step 3b — Merge-wanted path: route light vs delegated
+
+Before doing anything else on the merge path, run the eligibility predicate:
+
+```bash
+bin/ship-light-eligible
+```
+
+- **Exit 0 (docs-only)** → take the **light path** (Step 3b-light below).
+- **Exit 1 (anything else)** → take the **delegated path** (Step 3b-heavy below). This is the default; on any doubt or a non-zero/error exit, delegate.
+
+### Step 3b-light — Docs-only light path (arm directly, per ADR-0067)
+
+Only reachable when `bin/ship-light-eligible` exited 0. The diff is Markdown-only and touches no merge-gate machinery, so `/post-plan` adds nothing.
+
+- **Doc-validity gate (required before arming).** Run `bin/check-docs --since=origin/master`. `check-docs` (dead references, `last_verified` freshness, ADR transitions) is **not** a branch-protection required context, so it would not block `--auto` on its own — enforce it here. If it fails, **do not arm**: fix the docs and re-run, or fall back to Step 3b-heavy. Only proceed when it passes.
+- Run `/commit-commands:commit-push-pr`: commit, push, open the PR.
+- Arm GitHub-native auto-merge: `gh pr merge --auto --squash <pr>` (the PR merges itself once the required contexts — `Tests and Analysis`, `E2E Tests`, `human-signoff` — pass; CI still gates it).
+- Do **not** fire `bin/post-plan-now`.
+- Report: PR URL, that the light path was taken (docs-only, post-plan skipped), and that CI required checks still gate the merge.
+
+### Step 3b-heavy — Delegated path (delegate the gated arming, NEVER arm directly)
 
 First, a cheap **advisory prediction** — clearly label it *"advisory only; `/post-plan` Phase 6.5 makes the real call"*. Emit a warning for each that matches:
 
@@ -60,7 +83,8 @@ Then the actions:
 | `$CLAUDE_HEADLESS=1` | **Refuse** (Step 1.2 — interactive-only) |
 | Clean tree AND 0 commits ahead of `origin/master` | **Refuse** (Step 1.3 — nothing to ship) |
 | Intent resolves `--no-merge` | **No-merge path** (Step 3a — open PR, leave OPEN) |
-| Intent resolves `--merge` | **Merge path** (Step 3b — dirty tree, fire `bin/post-plan-now`) |
+| Intent resolves `--merge`, `bin/ship-light-eligible` exits 0 | **Light path** (Step 3b-light — commit-push-pr, arm `gh pr merge --auto` directly) |
+| Intent resolves `--merge`, `bin/ship-light-eligible` exits non-0 | **Delegated path** (Step 3b-heavy — dirty tree, fire `bin/post-plan-now`) |
 | Intent ambiguous | **`AskUserQuestion`** (Step 2.3 — never assume merge) |
 
-Arming is always delegated to `bin/post-plan-now` → `/post-plan` Phase 6.5. `/ship` never runs `gh pr merge --auto` or `--enable-auto-merge` itself.
+Arming is delegated to `bin/post-plan-now` → `/post-plan` Phase 6.5 for every change **except** the mechanically-gated docs-only light path (ADR-0067), where `/ship` arms `gh pr merge --auto` directly. `/ship` never arms directly on any diff that `bin/ship-light-eligible` does not clear.

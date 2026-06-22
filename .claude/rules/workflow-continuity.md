@@ -1,6 +1,6 @@
 ---
-description: All work happens in a worktree (never the main checkout); worktree setup and the implementation→/post-plan handoff (auto-fired in a detached fresh session) for multi-step work.
-last_verified: 2026-06-20
+description: All work happens in a worktree (never the main checkout); worktree setup and the implementation handoff — routed by bin/ship-light-eligible to a docs-only light path or the full /post-plan auto-fire.
+last_verified: 2026-06-22
 ---
 
 # Workflow Continuity Rule
@@ -31,11 +31,18 @@ Never run `/post-plan` **inline** in this session — it re-reads the full imple
 
 ### Interactive sessions — auto-fire the handoff
 
-When implementation is **verified complete**, your **final action** is:
+When implementation is **verified complete**, route the handoff by *what the change touches* — assess first with the mechanical predicate (ADR-0067), never a "this feels small" judgment:
 
 ```bash
-bin/post-plan-now --auto
+bin/ship-light-eligible
 ```
+
+- **Exit 0 — docs-only:** the diff is Markdown-only and touches no merge-gate machinery, so `/post-plan`'s code review, security audit, and E2E would have nothing to check. Take the **light path**: invoke `/ship --merge`, which gates on `bin/check-docs --since=origin/master`, then opens the PR and arms `gh pr merge --auto` directly (see `.claude/commands/ship.md` § Step 3b-light). Skipping post-plan is **not** skipping CI — the required contexts (`Tests and Analysis`, `E2E Tests`, `human-signoff`) still gate the merge.
+- **Exit 1 / non-zero — anything else** (any non-Markdown file, or an edit to the merge-gate machinery itself): your **final action** is the full handoff:
+
+  ```bash
+  bin/post-plan-now --auto
+  ```
 
 This spawns a detached, fresh **Sonnet 4.6** `/post-plan` on this branch (supervised by launchd, so it survives you closing Claude Code). It removes the manual "open a new session and hand off" step. Notes:
 

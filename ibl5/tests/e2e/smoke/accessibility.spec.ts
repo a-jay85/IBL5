@@ -92,10 +92,8 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
   ]),
 
   // Touch targets < 24×24px. Seed-dependent for small-count hits. See ibl5/docs/a11y-backlog.md.
+  // Empirically clean on the CI seed (axe target-size: 0 violations on topics/homepage/news article) — ratchet tightened.
   'target-size': new Set([
-    'topics',
-    'homepage',
-    'news article',
   ]),
 
   // Multiple landmarks share role+name. See ibl5/docs/a11y-backlog.md §landmark-unique.

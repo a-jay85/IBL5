@@ -191,6 +191,12 @@ jobs:
     name: Schema Completeness
     runs-on: ubuntu-latest
 
+    env:
+      DB_HOST: 127.0.0.1
+      DB_USER: root
+      DB_PASS: root
+      DB_NAME: ibl5_completeness
+
     services:
       mariadb:
         image: mariadb:10.11
@@ -209,10 +215,50 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v7
 
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.5'
+        extensions: mbstring, intl, mysqli
+        coverage: none
+
+    - name: Cache vendor directory
+      uses: actions/cache@v5
+      with:
+        path: ibl5/vendor
+        key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-vendor-
+
+    - name: Install dependencies
+      working-directory: ibl5
+      run: composer install --no-progress --no-interaction
+
+    # config.php.example reads DB creds from getenv(); the job-level DB_* env
+    # vars point it at the CI MariaDB service (ibl5_completeness).
+    - name: Create config.php for CI
+      working-directory: ibl5
+      run: cp config.php.example config.php
+
     - name: Apply all migrations
       run: |
         chmod +x ibl5/bin/run-migrations-ci.sh
         ibl5/bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot ibl5_completeness
+
+    - name: Check for stale renamed-column references
+      env:
+        PR_BODY: ${{ github.event.pull_request.body }}
+      run: |
+        chmod +x bin/check-column-rename-sweep
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          printf '%s' "$PR_BODY" | bin/check-column-rename-sweep \
+            --db-host=127.0.0.1 --db-user=root --db-pass=root \
+            --db-name=ibl5_completeness --bypass-from-stdin
+        else
+          bin/check-column-rename-sweep \
+            --db-host=127.0.0.1 --db-user=root --db-pass=root \
+            --db-name=ibl5_completeness
+        fi
 
     - name: Check FK integrity
       run: |
@@ -265,40 +311,12 @@ jobs:
         echo "PASS: All ${#REQUIRED_TABLES[@]} required tables exist."
 
     - name: Check critical columns
-      run: |
-        # Verify key columns that the application depends on
-        CHECKS=(
-          "ibl_plr:pid,name,teamid,pos,uuid"
-          "ibl_team_info:teamid,team_city,team_name,uuid"
-          "ibl_schedule:game_date,season_year,visitor_teamid,home_teamid,uuid"
-          "ibl_settings:setting_key,value"
-          "ibl_draft_picks:pickid,ownerofpick,owner_teamid,year,round"
-          "ibl_trade_info:id,tradeofferid,itemid,trade_from,trade_to"
-          "ibl_standings:teamid,team_name,wins,losses,pct"
-        )
-
-        FAIL=0
-        for check in "${CHECKS[@]}"; do
-          table="${check%%:*}"
-          columns="${check##*:}"
-          IFS=',' read -ra cols <<< "$columns"
-          for col in "${cols[@]}"; do
-            count=$(mysql -h 127.0.0.1 -u root -proot ibl5_completeness -N -e "
-              SELECT COUNT(*) FROM information_schema.COLUMNS
-              WHERE TABLE_SCHEMA = 'ibl5_completeness'
-                AND TABLE_NAME = '$table' AND COLUMN_NAME = '$col';
-            ")
-            if [ "$count" = "0" ]; then
-              echo "FAIL: $table.$col missing"
-              FAIL=1
-            fi
-          done
-        done
-
-        if [ "$FAIL" = "1" ]; then
-          exit 1
-        fi
-        echo "PASS: All critical columns present."
+      working-directory: ibl5
+      # Critical-columns coverage is driven from config/schema-assertions.php
+      # (single source of truth, enforced by MigrationFileIntegrityTest). A rename
+      # that updates the assertion automatically updates this check — no hardcoded
+      # column list to keep in sync.
+      run: php bin/validate-schema
 
   destructive-migration-scan:
     name: Destructive Migration Scan

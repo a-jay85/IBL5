@@ -2655,14 +2655,14 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 | 15.8 | ✅ Implemented | — | ibl_demands pid FK + PK (#1037). |
 | 15.9 | ✅ Implemented | — | trade_info FK (migration 067). |
 | 15.10 | ✅ Implemented | — | box_scores teamid FK (#142). |
-| 15.11 | ⬜ Open | 🟩 | Document migration numbering gaps in README; docs-only. |
+| 15.11 | ✅ Implemented | 🟩 | Document migration numbering gaps in README; docs-only. **Status:** Documented numbering gaps (018-023, 111, 136, 146-148) in `ibl5/migrations/README.md` (this PR). |
 | 15.12 | ⬜ Open | 🟩 | Codify suffix convention + CI lint for new names; docs + additive gate. |
 | 15.13 | ✅ Implemented | — | box_scores_teams.name NOT NULL (#138). |
 | 15.14 | ✅ Implemented | — | one_on_one winner_pid/loser_pid FKs (#139). |
 | 15.15 | ✅ Implemented | — | ASG/EOY ballot cols→varchar(128) (#145); further shrink needs prod MAX audit (data-blocked). |
 | 15.16 | ✅ Implemented | — | **Marker was missing/stale.** ibl_draft.team varchar(255)→varchar(35) (#1157, maintenance-41c). |
 | 15.17 | ⬜ Open | 🟨 | olympics_career int(11)→smallint/mediumint. Reversible narrowing → arm via the `/plan` schema-safety guard (apply-time fail-closed + DatabaseIntegration test); else 🟦. |
-| 15.18 | ⬜ Open | 🟩 | migrations/README strip stale "pending"/dead refs; docs-only. |
+| 15.18 | ✅ Implemented | 🟩 | migrations/README strip stale "pending"/dead refs; docs-only. **Status:** Stripped stale "PENDING"/roadmap framing and dead doc refs from `ibl5/migrations/README.md` (this PR). |
 | 15.19 | ✅ Implemented | — | league_config teamid FK + trigger (#140). |
 | 15.20 | ✅ Implemented | — | box_scores.pos→ENUM (#135). |
 | 15.21 | ✅ Implemented | — | covering index (migration 091/121). |

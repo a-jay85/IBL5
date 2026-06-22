@@ -37,6 +37,12 @@ function theindex($new_topic = "0")
     }
     PageLayout\PageLayout::header();
 
+    if (defined('HOME_FILE')) {
+        echo '<h1 class="ibl-title">' . \Security\HtmlSanitizer::e((string) $sitename) . '</h1>';
+    } else {
+        echo '<h1 class="ibl-title">News</h1>';
+    }
+
     if (is_user($user)) {
         $teamRepo = new \Repositories\TeamIdentityRepository($mysqli_db);
         $teamName = $teamRepo->getTeamnameFromUsername($userinfo['username'] ?? null);

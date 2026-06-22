@@ -93,6 +93,7 @@ $newsService->bumpStory($sid);
 $artpage = 1;
 $pagetitle = "- $title";
 PageLayout\PageLayout::header();
+echo '<h1 class="ibl-title">' . \Security\HtmlSanitizer::e((string) ($row['title'] ?? '')) . '</h1>';
 $artpage = 0;
 
 $time = $newsService->normalizeStoryTime($time);

@@ -59,6 +59,9 @@ function userinfo(string $username): void
     $categories = $service->getBallotData($voterTeamName, $season, $league);
 
     PageLayout\PageLayout::header();
+    echo ($season->phase === 'Regular Season')
+        ? '<h1 class="ibl-title">All-Star Game Ballot</h1>'
+        : '<h1 class="ibl-title">End-of-Year Awards Ballot</h1>';
     echo $view->renderBallotForm($formAction, $voterTeamName, $teamid, $season->phase, $categories);
     PageLayout\PageLayout::footer();
 }

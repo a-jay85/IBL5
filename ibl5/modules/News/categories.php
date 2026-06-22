@@ -41,6 +41,7 @@ function theindex($catid)
         $querylang = "";
     }
     PageLayout\PageLayout::header();
+    echo '<h1 class="ibl-title">News Categories</h1>';
     if (isset($userinfo['storynum'])) {
         $storynum = $userinfo['storynum'];
     } else {

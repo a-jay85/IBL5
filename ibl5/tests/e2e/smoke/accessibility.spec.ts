@@ -61,15 +61,8 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
   // Burn-down: a11y-2-heading-one-single-title (single-title views), supervised backlog (rest).
   'page-has-heading-one': new Set([
     // Seeded empirically — see plan a11y-1-ratchet-best-practice
-    'homepage',
-    'player page',
-    'news index',
-    'news categories',
-    'news article',
     // Auth pages
     'your account',
-    'voting ASG ballot',
-    'voting EOY ballot',
   ]),
 
   // Heading-level skip (h4 after h2, no h3). See ibl5/docs/backlog/a11y-backlog.md.

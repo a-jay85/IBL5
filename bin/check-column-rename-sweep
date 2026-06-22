@@ -1,0 +1,225 @@
+#!/bin/bash
+
+# Scans ibl5/scripts/, ibl5/bin/, and ibl5/api.php for bare SQL column
+# references that were renamed by a migration but are absent from the live
+# schema — the exact blind spot that caused PR #637 (a scripts/ file that was
+# never modified by the rename PR but still used the old column name).
+#
+# Unlike bin/check-destructive-migrations, this scan is WHOLE-TREE, never
+# diff-scoped: the offending file in PR #637 was untouched by the rename PR,
+# so any diff-scoping silently neuters the gate.
+#
+# False-positive design (D2): a renamed old-name is only flagged when it is
+# ABSENT from the live post-migration schema. If 'name' is renamed in
+# ibl_settings → setting_key but 'name' still exists in ibl_plr, the gate
+# correctly passes — the word still resolves to a live column. Accepted
+# residual: a bare 'name' intended for ibl_settings will resolve to ibl_plr's
+# 'name' rather than throwing; that is a semantic bug, not a missing-column
+# crash, and is out of scope for this gate.
+#
+# Exit codes: 0 = pass, 1 = stale references found, 2 = usage error.
+
+set -euo pipefail
+
+BYPASS_MIN_LENGTH=20
+MIGRATIONS_DIR="ibl5/migrations"
+SCAN_PATHS="ibl5/scripts/ ibl5/bin/ ibl5/api.php"
+
+usage() {
+    cat <<'EOF'
+Usage: bin/check-column-rename-sweep [--columns-file=<path>|--db-host=<h> --db-user=<u> --db-pass=<p> --db-name=<n>] [--bypass-from-stdin] [--help|-h]
+
+Scans ibl5/scripts/, ibl5/bin/, and ibl5/api.php for references to column
+names that were renamed in a migration but are no longer present in the live
+schema (the PR #637 blind-spot paths PHPStan never checks).
+
+Column-set source (mutually exclusive; one required):
+  --columns-file=<path>       One column name per line. Used by tests (no DB).
+  --db-host=<h>               }
+  --db-user=<u>               } Together, query information_schema.COLUMNS
+  --db-pass=<p>               } via the mysql CLI.
+  --db-name=<n>               }
+
+Options:
+  --bypass-from-stdin   Read PR body from stdin for the global bypass marker:
+                          <!-- check-column-rename: <reason >= 20 chars> -->
+  --help, -h            Show this message.
+
+Scan paths (whole-tree, not diff-scoped):
+  ibl5/scripts/, ibl5/bin/, ibl5/api.php
+
+Exit codes: 0 = pass, 1 = stale references found, 2 = usage error.
+EOF
+}
+
+COLUMNS_FILE=""
+DB_HOST=""
+DB_USER=""
+DB_PASS=""
+DB_NAME=""
+BYPASS_STDIN=0
+
+for arg in "$@"; do
+    case "$arg" in
+        --columns-file=*)
+            COLUMNS_FILE="${arg#--columns-file=}"
+            ;;
+        --db-host=*)
+            DB_HOST="${arg#--db-host=}"
+            ;;
+        --db-user=*)
+            DB_USER="${arg#--db-user=}"
+            ;;
+        --db-pass=*)
+            DB_PASS="${arg#--db-pass=}"
+            ;;
+        --db-name=*)
+            DB_NAME="${arg#--db-name=}"
+            ;;
+        --bypass-from-stdin)
+            BYPASS_STDIN=1
+            ;;
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        --*)
+            echo "unknown flag: $arg" >&2
+            usage >&2
+            exit 2
+            ;;
+        *)
+            echo "unknown argument: $arg" >&2
+            usage >&2
+            exit 2
+            ;;
+    esac
+done
+
+# Validate: columns-file and db-* are mutually exclusive
+DB_FLAGS_SET=0
+if [ -n "$DB_HOST" ] || [ -n "$DB_USER" ] || [ -n "$DB_PASS" ] || [ -n "$DB_NAME" ]; then
+    DB_FLAGS_SET=1
+fi
+
+if [ -n "$COLUMNS_FILE" ] && [ "$DB_FLAGS_SET" = "1" ]; then
+    echo "error: --columns-file and --db-* flags are mutually exclusive" >&2
+    usage >&2
+    exit 2
+fi
+
+if [ -z "$COLUMNS_FILE" ] && [ "$DB_FLAGS_SET" = "0" ]; then
+    echo "error: either --columns-file or all four --db-* flags are required" >&2
+    usage >&2
+    exit 2
+fi
+
+# Handle PR-body bypass
+PR_BODY_BYPASS=""
+if [ "$BYPASS_STDIN" = "1" ]; then
+    PR_BODY="$(cat)"
+    REASON="$(printf '%s' "$PR_BODY" | sed -n 's/.*<!--[[:space:]]*check-column-rename:[[:space:]]*\(.\{1,\}\)[[:space:]]*-->.*/\1/p' | head -1)"
+    REASON="$(printf '%s' "$REASON" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    if [ -n "$REASON" ] && [ "${#REASON}" -ge "$BYPASS_MIN_LENGTH" ]; then
+        PR_BODY_BYPASS="$REASON"
+    fi
+fi
+
+# Temp files (bash 3.2 compatible — no associative arrays)
+TMP_DIR="$(mktemp -d)"
+RENAME_MAP_FILE="$TMP_DIR/rename_map.txt"  # format: old_name<TAB>mig_basename
+TMP_COLUMNS_FILE="$TMP_DIR/columns.txt"
+touch "$RENAME_MAP_FILE"
+
+cleanup() {
+    rm -rf "$TMP_DIR"
+}
+trap cleanup EXIT
+
+# Build rename map from all migrations except 000_baseline_schema.sql
+# Format: old_name<TAB>migration_basename (one pair per line, deduped to first occurrence)
+while IFS= read -r migfile; do
+    migbase="$(basename "$migfile")"
+    while IFS= read -r line; do
+        old_name=""
+        new_name=""
+
+        # CHANGE COLUMN [IF EXISTS] `old` `new` (backtick-quoted)
+        if printf '%s' "$line" | grep -qiE 'CHANGE[[:space:]]+COLUMN([[:space:]]+IF[[:space:]]+EXISTS)?[[:space:]]+`[^`]+`[[:space:]]+`[^`]+`'; then
+            old_name="$(printf '%s' "$line" | sed -E 's/.*CHANGE[[:space:]]+COLUMN([[:space:]]+IF[[:space:]]+EXISTS)?[[:space:]]+`([^`]+)`[[:space:]]+`([^`]+)`.*/\2/I')"
+            new_name="$(printf '%s' "$line" | sed -E 's/.*CHANGE[[:space:]]+COLUMN([[:space:]]+IF[[:space:]]+EXISTS)?[[:space:]]+`([^`]+)`[[:space:]]+`([^`]+)`.*/\3/I')"
+        # RENAME COLUMN [IF EXISTS] `old` TO `new` (backtick-quoted)
+        elif printf '%s' "$line" | grep -qiE 'RENAME[[:space:]]+COLUMN([[:space:]]+IF[[:space:]]+EXISTS)?[[:space:]]+`[^`]+`[[:space:]]+TO[[:space:]]+`[^`]+`'; then
+            old_name="$(printf '%s' "$line" | sed -E 's/.*RENAME[[:space:]]+COLUMN([[:space:]]+IF[[:space:]]+EXISTS)?[[:space:]]+`([^`]+)`[[:space:]]+TO[[:space:]]+`([^`]+)`.*/\2/I')"
+            new_name="$(printf '%s' "$line" | sed -E 's/.*RENAME[[:space:]]+COLUMN([[:space:]]+IF[[:space:]]+EXISTS)?[[:space:]]+`([^`]+)`[[:space:]]+TO[[:space:]]+`([^`]+)`.*/\3/I')"
+        # CHANGE COLUMN [IF EXISTS] old new (un-backticked — for test fixtures)
+        elif printf '%s' "$line" | grep -qiE 'CHANGE[[:space:]]+COLUMN([[:space:]]+IF[[:space:]]+EXISTS)?[[:space:]]+[a-zA-Z_][a-zA-Z0-9_]*[[:space:]]+[a-zA-Z_][a-zA-Z0-9_]*'; then
+            old_name="$(printf '%s' "$line" | sed -E 's/.*CHANGE[[:space:]]+COLUMN([[:space:]]+IF[[:space:]]+EXISTS)?[[:space:]]+([a-zA-Z_][a-zA-Z0-9_]*)[[:space:]]+([a-zA-Z_][a-zA-Z0-9_]*).*/\2/I')"
+            new_name="$(printf '%s' "$line" | sed -E 's/.*CHANGE[[:space:]]+COLUMN([[:space:]]+IF[[:space:]]+EXISTS)?[[:space:]]+([a-zA-Z_][a-zA-Z0-9_]*)[[:space:]]+([a-zA-Z_][a-zA-Z0-9_]*).*/\3/I')"
+        # RENAME COLUMN [IF EXISTS] old TO new (un-backticked — for test fixtures)
+        elif printf '%s' "$line" | grep -qiE 'RENAME[[:space:]]+COLUMN([[:space:]]+IF[[:space:]]+EXISTS)?[[:space:]]+[a-zA-Z_][a-zA-Z0-9_]*[[:space:]]+TO[[:space:]]+[a-zA-Z_][a-zA-Z0-9_]*'; then
+            old_name="$(printf '%s' "$line" | sed -E 's/.*RENAME[[:space:]]+COLUMN([[:space:]]+IF[[:space:]]+EXISTS)?[[:space:]]+([a-zA-Z_][a-zA-Z0-9_]*)[[:space:]]+TO[[:space:]]+([a-zA-Z_][a-zA-Z0-9_]*).*/\2/I')"
+            new_name="$(printf '%s' "$line" | sed -E 's/.*RENAME[[:space:]]+COLUMN([[:space:]]+IF[[:space:]]+EXISTS)?[[:space:]]+([a-zA-Z_][a-zA-Z0-9_]*)[[:space:]]+TO[[:space:]]+([a-zA-Z_][a-zA-Z0-9_]*).*/\3/I')"
+        fi
+
+        # Add to map if names differ and not already mapped (first migration wins)
+        if [ -n "$old_name" ] && [ -n "$new_name" ] && [ "$old_name" != "$new_name" ]; then
+            if ! grep -qxF "${old_name}"$'\t'"${migbase}" "$RENAME_MAP_FILE" 2>/dev/null; then
+                if ! awk -F'\t' -v k="$old_name" '$1 == k {found=1} END {exit !found}' \
+                     "$RENAME_MAP_FILE" 2>/dev/null; then
+                    printf '%s\t%s\n' "$old_name" "$migbase" >> "$RENAME_MAP_FILE"
+                fi
+            fi
+        fi
+    done < "$migfile"
+done < <(find "$MIGRATIONS_DIR" -name '*.sql' -not -name '000_baseline_schema.sql' 2>/dev/null | sort)
+
+# Obtain the existing-column set
+if [ -n "$COLUMNS_FILE" ]; then
+    cp "$COLUMNS_FILE" "$TMP_COLUMNS_FILE"
+else
+    mysql -h "$DB_HOST" -u "$DB_USER" "-p${DB_PASS}" -N -e \
+        "SELECT DISTINCT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='${DB_NAME}';" \
+        > "$TMP_COLUMNS_FILE" 2>/dev/null || {
+        echo "error: could not query information_schema.COLUMNS — check DB flags" >&2
+        exit 2
+    }
+fi
+
+# Find candidates: old names NOT in the live schema
+# Grep the blind-spot paths for each candidate (word-boundary match)
+HITS=""
+while IFS='	' read -r old_name mig_basename; do
+    [ -n "$old_name" ] || continue
+    # Skip if old_name is still in the live schema (FP-filter, D2)
+    if grep -qxF "$old_name" "$TMP_COLUMNS_FILE" 2>/dev/null; then
+        continue
+    fi
+    # Grep the blind-spot paths
+    for scan_path in $SCAN_PATHS; do
+        [ -e "$scan_path" ] || continue
+        while IFS= read -r hit; do
+            [ -n "$hit" ] && HITS="${HITS}${hit}  (renamed in ${mig_basename})"$'\n'
+        done < <(grep -rwnE "\b${old_name}\b" "$scan_path" 2>/dev/null || true)
+    done
+done < "$RENAME_MAP_FILE"
+
+if [ -z "$HITS" ]; then
+    echo "No stale renamed-column references detected."
+    exit 0
+fi
+
+if [ -n "$PR_BODY_BYPASS" ]; then
+    echo "PASS (bypass): $PR_BODY_BYPASS"
+    exit 0
+fi
+
+echo "Stale renamed-column references detected:"
+echo ""
+printf '%s' "$HITS"
+echo ""
+echo "To bypass (for a legitimate reason), add an HTML comment to the PR body:"
+echo "  <!-- check-column-rename: <reason at least 20 chars> -->"
+echo ""
+echo "Or fix the reference to use the post-rename column name."
+exit 1

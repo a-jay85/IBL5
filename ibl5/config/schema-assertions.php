@@ -39,6 +39,26 @@ return [
     new SchemaAssertion('ibl_settings', 'setting_key'),
     new SchemaAssertion('ibl_settings', 'value'),
 
+    // Ported from .github/workflows/migration-safety.yml "Check critical columns"
+    // CHECKS array when that step was replaced by bin/validate-schema. These are
+    // application-critical columns that were not yet covered by an assertion.
+    new SchemaAssertion('ibl_plr', 'pos'),
+    new SchemaAssertion('ibl_plr', 'uuid'),
+    new SchemaAssertion('ibl_team_info', 'team_city'),
+    new SchemaAssertion('ibl_team_info', 'uuid'),
+    new SchemaAssertion('ibl_schedule', 'uuid'),
+    new SchemaAssertion('ibl_draft_picks', 'pickid'),
+    new SchemaAssertion('ibl_draft_picks', 'ownerofpick'),
+    new SchemaAssertion('ibl_draft_picks', 'year'),
+    new SchemaAssertion('ibl_draft_picks', 'round'),
+    new SchemaAssertion('ibl_trade_info', 'id'),
+    new SchemaAssertion('ibl_trade_info', 'tradeofferid'),
+    new SchemaAssertion('ibl_trade_info', 'itemid'),
+    new SchemaAssertion('ibl_standings', 'team_name'),
+    new SchemaAssertion('ibl_standings', 'wins'),
+    new SchemaAssertion('ibl_standings', 'losses'),
+    new SchemaAssertion('ibl_standings', 'pct'),
+
     // Migration 099: gm_username → gm_display_name (column stores display names, not usernames)
     new SchemaAssertion('ibl_gm_tenures', 'gm_display_name'),
 

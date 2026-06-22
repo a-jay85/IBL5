@@ -72,6 +72,7 @@ Launch a **single Plan agent** (`subagent_type: "plan-architect"` — its defini
 2. **Exploration results** from Step 2 — file paths, code traces, existing patterns, test coverage findings
 3. **The full `$VERIFICATION_RULE`** from Step 1, prefixed with: `MANDATORY — you must follow this rule exactly:`
 4. **Agent-tiering guidance for plan phases** — the "In Plans / Mechanical recipe agents / Bulk-sweep pattern" block (in *Agent-tiering guidance to inject* below), so the Plan agent labels each implementation phase's tier (Sonnet / Haiku / self).
+5. **Draft output path** — the absolute path `$HOME/.claude/plans/.drafts/<slug>.draft.md` (using this PR's Step-5 slug) that the agent must persist the finished plan to *before* returning (see **Persist before returning** below). Pre-resolve `$HOME` and the slug yourself; pass a literal path.
 
 The Plan agent MUST produce:
 - Implementation steps with tests woven inline (pre-impl before their step, post-impl after)
@@ -81,6 +82,17 @@ The Plan agent MUST produce:
 - An **exact edit anchor** for every step that modifies an existing file: quote the unique surrounding snippet (the exact line(s) the edit lands on or next to) so the impl agent's first `Edit` matches unambiguously. This is a **correctness / disambiguation** aid — it secures a first-try Edit match and avoids a failed-edit→re-read retry. It is **not** a token optimization and must not be presented as one: the impl agent already greps-then-slices and never reads a whole file to locate an edit, so anchors reduce ambiguity, not tokens.
 - For every behavior-changing step, at least one **negative-path, boundary, or failure-case** matrix row — not only the happy path (e.g. "rejects over-cap trade", "returns null for unknown player", "empty roster"). Happy-path-only coverage is insufficient.
 - When the plan emits a `## Critical Files` section, **mark every entry that will NOT be changed** (references, templates, files read for context) with an explicit reference marker — use `` `path` (reference) `` or `` `path` (read-only reference) ``. post-plan's Phase 5.0 file-conformance check treats every Critical File as a **must-appear** change target *by default* and blocks auto-merge if it never lands in the diff — it exempts an entry **only** when the annotation carries a reference marker (`reference`/`read-only`/`verify`/`template`/etc.). A bare path OR a path you annotate with a change-*description* (e.g. `` `path` — add the foo helper ``) is still checked, so describing your change-targets is safe; only the reference marker exempts. Mark the non-changed entries and the gate stays false-positive-free.
+
+**Persist before returning (timeout durability).** The `plan-architect` agent has no `Write`/`Edit` tool, so its only delivery channel is its streamed final message — and a long final message can be lost to an `API Error: Stream idle timeout`, which is **unrecoverable** (this harness has no resume / `SendMessage`, and the agent cannot self-persist a draft once the message drops). Defend against this in the prompt: instruct the agent that **before** it emits its final message it MUST write the complete plan markdown to the **Draft output path** (item 5) via Bash, then return only a **one-line pointer** (`Plan written to <draft path>`) — never the plan body. Give it this exact recipe:
+
+```bash
+mkdir -p "$HOME/.claude/plans/.drafts"
+cat > "$HOME/.claude/plans/.drafts/<slug>.draft.md" <<'PLAN_EOF'
+<the full plan markdown>
+PLAN_EOF
+```
+
+This makes the artifact durable the moment the Bash call returns (tool calls complete and return even when the trailing assistant message idles out) and shrinks the timeout-prone final message to a single line. The orchestrator reads the draft in Step 5. (`API_FORCE_IDLE_TIMEOUT=0` in `~/.claude/settings.json` separately disables the 5-minute idle-gap abort; this Bash-persist defends even if that env var is unset or the run hits the total `API_TIMEOUT_MS` ceiling.)
 
 Conditionally — include a section **only when it applies**; never emit an empty header:
 - **Backlog / tracking-doc status update** (only when Step 2 recorded that the task resolves — fully or partially — a finding tracked in a status/tracking doc with per-item status markers, e.g. `ibl5/docs/maintenance-backlog.md`): the plan MUST include an implementation step that updates that finding's status **in the same PR**, so the bookkeeping ships with the work and no separate follow-up "mark-done" PR is ever needed. The step must: (1) flip the finding's marker — `⬜ Open → ✅ Implemented`, or `→ ◑ Partial` with the residual work named, for a partial resolution downgrade rather than close; (2) add a one-line `**Status:**` note citing what shipped; and (3) bump the doc's `last_verified` frontmatter per `doc-freshness.md` (same edit). Add the tracking doc to **Critical Files** as a change target — a bare path or a change-description, **never** a `(reference)` marker, since the doc IS edited (post-plan Phase 5.0 then verifies the status edit actually landed). Quote the exact current table row / status line as the edit anchor. Tier this step **Haiku** (mechanical marker swap from a provided old→new mapping).
@@ -195,6 +207,8 @@ PLAN_PATH="$HOME/.claude/plans/<slug>.md"
 ```
 
 If a plan file already exists at that path, create a new one with a numeric suffix rather than overwriting.
+
+**Source the plan from the persisted draft.** The Step-3 agent wrote the finished plan to `$HOME/.claude/plans/.drafts/<slug>.draft.md` before returning (see Step 3 § Persist before returning), and returned only a one-line pointer. Read **that draft file** as the source of truth — the streamed final message may have been truncated by a stream-idle timeout, so never reconstruct the plan from the message when a draft exists. Fall back to the streamed message only if the draft is missing (e.g. the agent errored before persisting); if neither is usable, re-run the Step-3 agent. After writing the final `$PLAN_PATH` and passing `bin/check-plan`, delete the draft (`rm -f "$HOME/.claude/plans/.drafts/<slug>.draft.md"`).
 
 Write the validated plan (with corrected matrix if Step 4 required fixes) to the plan file. When the work was split into multiple PRs, give each plan a distinct slug (e.g. `<base-slug>-1-<unit>`, `<base-slug>-2-<unit>`) so they sort in dependency order, and write one file per unit.
 

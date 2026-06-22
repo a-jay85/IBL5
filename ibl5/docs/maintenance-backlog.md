@@ -1483,8 +1483,8 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 | 8.4 | ✅ Implemented | — | `shellScripts/` absent from tree + index (verified); follows 8.1. |
 | 8.5 | ◑ Partial | 🟩 | `tradition.php` deleted; `scripts/plrScratchpad.php` still present (verified) → archive it. |
 | 8.6 | ⬜ Open | 🟩 | `classes/Scripts/` present (verified); rename→`Maintenance`, namespace sweep, green-green. |
-| 8.7 | ⬜ Open | 🟩 | Document symlink strategy (docs). |
-| 8.8 | ⬜ Open | 🟩 | `scripts/archive/README.md` (docs). |
+| 8.7 | ✅ Implemented | — | Document symlink strategy (docs). **Status:** Added `## Symlink strategy` to `bin/README.md` stating the convention (single tracked symlink `bin/db-query` → `ibl5/bin/db-query`; real files pinned to `ibl5/bin/` by the `./ibl5` Docker bind-mount; new symlinks discouraged) (this PR). |
+| 8.8 | ✅ Implemented | — | `scripts/archive/README.md` (docs). **Status:** Added `ibl5/scripts/archive/README.md` documenting the two retained-but-not-run 2007 box-score import scripts + the archive policy (this PR). |
 | 8.9 | ⬜ Open | 🟩 | bin/lib manifest + helper rename. |
 | 8.10 | ⬜ Open | 🟨 | Interactive-vs-CI convention — upfront decision (`check-*`/`test-*` prefix vs a dedicated `ci/` subdir). |
 | 8.11 | ⬜ Open | 🟩 | Move `automouse-*` to bin/automouse/ + README; caller sweep (launchd plist refs). |
@@ -1542,14 +1542,14 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Est. effort:** M
 **Risk if untouched:** New scripts placed in wrong folder.
 
-### 8.7 Symlink Strategy Undocumented
+### 8.7 Symlink Strategy Undocumented — RESOLVED
 **Location:** `/bin/db-query` → `../ibl5/bin/db-query`
 **Problem:** One-off symlink; no manifest or convention.
 **Suggested direction:** bin/README.md documenting the pattern; optional `.symlinks` manifest.
 **Est. effort:** S
 **Risk if untouched:** Symlinks rot when scripts move.
 
-### 8.8 Archive Directory Disorganized
+### 8.8 Archive Directory Disorganized — RESOLVED
 **Location:** `ibl5/scripts/archive/`
 **Problem:** 2 legacy scripts; no README documenting why archived.
 **Suggested direction:** Add `scripts/archive/README.md` with filename + deprecation date + reason + safe-to-delete flag.

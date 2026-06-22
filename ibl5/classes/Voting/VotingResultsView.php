@@ -23,10 +23,13 @@ class VotingResultsView implements VotingResultsViewInterface
      * @see VotingResultsViewInterface::renderTables()
      *
      * @param list<VoteTable> $tables
+     * @param string $pageTitle Optional page-level heading; when non-empty, emits an <h1> above the award tables.
      */
-    public function renderTables(array $tables): string
+    public function renderTables(array $tables, string $pageTitle = ''): string
     {
-        $output = '';
+        $output = $pageTitle !== ''
+            ? '<h1 class="ibl-title">' . HtmlSanitizer::safeHtmlOutput($pageTitle) . '</h1>'
+            : '';
         foreach ($tables as $table) {
             $title = $table['title'];
             $rows = $table['rows'];

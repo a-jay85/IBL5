@@ -61,7 +61,6 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
   // Burn-down: a11y-2-heading-one-single-title (single-title views), supervised backlog (rest).
   'page-has-heading-one': new Set([
     // Seeded empirically — see plan a11y-1-ratchet-best-practice
-    'standings',
     'homepage',
     'season leaderboards',
     'career leaderboards',
@@ -72,7 +71,6 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
     'news categories',
     'news article',
     'team page',
-    'voting results',
     // Auth pages
     'your account',
     'voting ASG ballot',

@@ -69,7 +69,7 @@ class StandingsView implements StandingsViewInterface
         $grouped = $this->groupStandings($allStandings);
 
         $regions = ['Eastern', 'Western', 'Atlantic', 'Central', 'Midwest', 'Pacific'];
-        $html = '';
+        $html = '<h1 class="ibl-title">Standings</h1>';
 
         foreach ($regions as $region) {
             $isConference = in_array($region, League::CONFERENCE_NAMES, true);

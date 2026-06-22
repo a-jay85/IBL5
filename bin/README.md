@@ -28,3 +28,22 @@ container.
 
 `bin/db-query` is a symlink to `ibl5/bin/db-query` so the DB CLI is reachable
 from both paths. See **`ibl5/bin/README.md`** for the app-scoped folder.
+
+## Symlink strategy
+
+The repo keeps its symlink surface deliberately tiny. **There is exactly one
+tracked symlink:** `bin/db-query → ../ibl5/bin/db-query`.
+
+**Why the real file lives in `ibl5/bin/`, not here:** `docker-compose.yml`
+bind-mounts only `./ibl5` into the container, so any script that must run
+**inside Docker** (or needs the PHP app's autoload / `config.php`) is physically
+pinned to `ibl5/bin/` — a symlink in this folder cannot relocate the real file
+out of the mount. `db-query` is such a script, so its source of truth is
+`ibl5/bin/db-query`, and `bin/db-query` is a thin convenience symlink so the DB
+CLI is reachable from the repo-root `bin/` path too.
+
+**Convention for new symlinks:** prefer **not** to add them. If a tool needs to
+be reachable from two paths, add a short wrapper that `exec`s the canonical
+script, or relocate the script to its correct home (`bin/` vs `ibl5/bin/` vs
+`ibl5/scripts/`). A `.symlinks` manifest is intentionally **not** maintained —
+one tracked symlink does not warrant one.

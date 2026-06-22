@@ -116,6 +116,23 @@ final class CheckColumnRenameSweepCliTest extends TestCase
         self::assertStringContainsString('PASS (bypass)', $result['output']);
     }
 
+    public function testShortPrBodyBypassExitsOne(): void
+    {
+        $this->writeMigration(
+            '100_rename_legacyZorp.sql',
+            "ALTER TABLE foo CHANGE COLUMN `legacyZorp` `new_zorp` INT;\n"
+        );
+        file_put_contents($this->tmpDir . '/ibl5/scripts/foo.php', "SELECT legacyZorp FROM foo;\n");
+        $colFile = $this->writeColumnsFile(['new_zorp']);
+
+        // Reason shorter than BYPASS_MIN_LENGTH=20 must NOT bypass
+        $prBody = '<!-- check-column-rename: too short -->';
+        $result = $this->runScript(['--columns-file=' . $colFile, '--bypass-from-stdin'], $prBody);
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('legacyZorp', $result['output']);
+    }
+
     public function testBothColumnSourcesExitsTwo(): void
     {
         $colFile = $this->writeColumnsFile(['new_zorp']);

@@ -1,6 +1,6 @@
 ---
 description: Documentation organization and lifecycle rules.
-last_verified: 2026-06-11
+last_verified: 2026-06-22
 ---
 
 # IBL5 Documentation Standards
@@ -32,10 +32,20 @@ last_verified: 2026-06-11
 - **Location**: Next to the code they document
 - Examples:
   - `ibl5/classes/Player/README.md` - Player module architecture
-  - `ibl5/classes/DepthChartEntry/SECURITY.md` - Security patterns
+  - `ibl5/classes/DepthChartEntry/SECURITY.md` - Security patterns (security-refactor exemplar)
+  - `ibl5/classes/ComparePlayers/SECURITY.md` - Security patterns (security-refactor exemplar)
   - `ibl5/tests/Trading/README.md` - Trading test documentation
+- **`SECURITY.md` is not a per-module requirement.** Only the two modules above carry one, each documenting a dedicated security refactor. Do **not** create a `SECURITY.md` for a module that has not had such a refactor — these two are exemplars, not a repo-wide convention.
 - **When to create**: When refactoring a module or creating a new class
 - **Keep updated**: Update when module architecture changes
+
+#### Retroactive README coverage policy
+
+The original module refactor is complete, so the "when refactoring" trigger above never fires for the ~65 existing module directories that still lack a `README.md`. To keep that gap from persisting indefinitely, the policy is **opportunistic backfill**:
+
+- **Any PR making a non-trivial change to a module directory under `ibl5/classes/<Module>/` that has no `README.md` must add one in the same PR.** "Non-trivial" means new methods/classes, a behavior change, or a refactor — not a one-line fix or a comment/typo edit.
+- A bulk, immediate backfill of all README-less modules is **explicitly out of scope** — READMEs accrue as modules are touched, so the content is written with the context of real work rather than as low-value boilerplate.
+- New modules and class refactors still follow the "when to create" trigger above; this policy only adds the retroactive case.
 
 ### 4. `ibl5/docs/archive/` (Recent Historical Documents)
 - **Purpose**: Preserve recently completed work and superseded documentation

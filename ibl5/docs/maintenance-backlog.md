@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-06-21
+last_verified: 2026-06-22
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -1639,10 +1639,10 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 | 9.8 | ✅ Implemented | — | "Established" aligned to Waivers. |
 | 9.9 | ✅ Implemented | — | **Marker was missing/stale.** The stale GitHub-skills path is no longer referenced in DEVELOPMENT_GUIDE; skills live at `.claude/skills/` (verified). |
 | 9.10 | ✅ Implemented | — | Copilot retired/archived (2026-06-10). |
-| 9.11 | ⬜ Open | 🟩 | SECURITY.md still cited + only DepthChartEntry has one (verified). Note as one-off; docs-only. |
+| 9.11 | ✅ Implemented | 🟩 | DOCUMENTATION_STANDARDS lists both SECURITY.md exemplars (DepthChartEntry + ComparePlayers) + notes it is not a per-module requirement; docs-only. |
 | 9.12 | ✅ Implemented | — | Archive scope (#1044). |
 | 9.13 | ✅ Implemented | — | Schema Version line removed. |
-| 9.14 | ⬜ Open | 🟩 | css-architecture path-conditional verification; docs/no-op. |
+| 9.14 | ✅ Implemented | 🟩 | css-architecture path-conditional rule verified accurate (paths: frontmatter scopes it); no change needed. |
 | 9.15 | ⬜ Open | 🟩 | Path-trigger the always-loaded PR-workflow rules; `.claude/rules` frontmatter, green-green (cuts context budget). |
 | 9.16 | ✅ Implemented | — | REFACTORING_HISTORY archived (#1044). |
 | 9.17 | ✅ Implemented | — | PLR_VS_BOXSCORES hook added (#1044). |
@@ -1650,7 +1650,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 | 9.19 | ⬜ Open | 🟩 | 18 class READMEs; ~61 modules without (verified). Additive docs (M top-10 / L all). |
 | 9.20 | ⬜ Open | 🟩 | Add README frontmatter + extend IN_SCOPE_GLOBS in the same PR. Additive. |
 | 9.21 | ✅ Implemented | — | migrations/README stale FK removed (#1044). |
-| 9.22 | ⬜ Open | 🟩 | README retroactive-coverage policy (docs). |
+| 9.22 | ✅ Implemented | 🟩 | Opportunistic-backfill README policy added to DOCUMENTATION_STANDARDS; docs-only. |
 | 9.23 | ✅ Implemented | — | IBL6/README replaced (#1044). |
 | 9.24 | ⬜ Open | 🟩 | `codebase-map.md` is **tracked** (verified — not gitignored); add CI regen-and-diff step. |
 | 9.25 | ✅ Implemented | — | STRATEGIC_PRIORITIES Completed-drops subsection. |
@@ -1743,6 +1743,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Remove from list or note as one-off.
 **Est. effort:** S
 **Risk if untouched:** Agents create spurious `SECURITY.md` files.
+**Status:** Implemented — investigation found TWO active exemplars (DepthChartEntry + ComparePlayers, both genuine security-refactor docs); DOCUMENTATION_STANDARDS now lists both and states SECURITY.md is not a per-module requirement (do not create spuriously). The original "single exemplar" premise was inaccurate.
 
 ### 9.12 `ibl5/docs/archive/` Is Out of `bin/check-docs` Scope
 **Location:** `ibl5/docs/DOCUMENTATION_STANDARDS.md` lines 40-44
@@ -1766,6 +1767,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Verify path-conditional loading; no immediate change.
 **Est. effort:** S (verification)
 **Risk if untouched:** Low — note for completeness.
+**Status:** Implemented — verified accurate, no change needed. css-architecture.md carries paths: frontmatter, so the harness loads it path-conditionally; zero by-name imports is expected for a path-triggered rule, not a defect. Backlog-only resolution.
 
 ### 9.15 `lighthouse-pr-comments.md` and `refactor-flag.md` Always-Loaded
 **Location:** `.claude/rules/lighthouse-pr-comments.md`, `refactor-flag.md`
@@ -1826,6 +1828,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Add retroactive coverage policy: any PR to a module without README must add one.
 **Est. effort:** S (policy) / L (backfill)
 **Risk if untouched:** Gap persists indefinitely.
+**Status:** Implemented — added a "Retroactive README coverage policy" subsection to DOCUMENTATION_STANDARDS: any PR making a non-trivial change to a module dir under ibl5/classes/<Module>/ that lacks a README must add one in that PR (opportunistic backfill); bulk immediate backfill explicitly out of scope.
 
 ### 9.23 `IBL6/README.md` Is Default SvelteKit Scaffolding
 **Location:** `IBL6/README.md`

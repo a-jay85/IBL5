@@ -36,6 +36,10 @@ export type VrRow = {
   // vr-anchors-discriminate.spec.ts only: per-row anchor-visibility timeout (ms)
   // for slow-rendering pages. Falls back to the config default when unset.
   timeout?: number;
+  // Source paths whose change implies this row's page changed. When omitted, the
+  // default glob is derived from the module name in `url` (ibl5/modules/<Name>/**).
+  // Set explicitly only for cross-cutting rows (homepage, news, error pages).
+  sourceGlobs?: string[];
 };
 
 const DEFAULT_STATE: StateVariant = { name: 'default', appState: {} };
@@ -43,7 +47,8 @@ const DEFAULT_STATE: StateVariant = { name: 'default', appState: {} };
 export const VR_MANIFEST: VrRow[] = [
   // ── Public modules ──────────────────────────────────────────
   { name: 'index', auth: 'public', url: 'index.php', anchor: 'article',
-    extraMask: ['div.news-article__body'] },
+    extraMask: ['div.news-article__body'],
+    sourceGlobs: ['ibl5/index.php', 'ibl5/themes/**', 'ibl5/modules/News/**'] },
   { name: 'activity-tracker', auth: 'public', url: 'modules.php?name=ActivityTracker',
     anchor: '.ibl-data-table', extraMask: ['.activity-row time'],
     viewports: ['desktop', 'mobile'] },
@@ -79,7 +84,8 @@ export const VR_MANIFEST: VrRow[] = [
       { key: 'per36mins', trigger: 'a.ibl-tab[data-display="per36mins"]', swapTarget: '#league-starters-tables' },
     ] },
   { name: 'news', auth: 'public', url: 'modules.php?name=News', anchor: 'article',
-    extraMask: ['article time'], viewports: ['desktop', 'mobile'] },
+    extraMask: ['article time'], viewports: ['desktop', 'mobile'],
+    sourceGlobs: ['ibl5/modules/News/**', 'ibl5/themes/**'] },
   { name: 'player', auth: 'public', url: 'modules.php?name=Player&pa=showpage&pid=1',
     anchor: '.stats-grid', viewports: ['desktop', 'mobile'] },
   { name: 'player-database', auth: 'public', url: 'modules.php?name=PlayerDatabase',
@@ -129,9 +135,11 @@ export const VR_MANIFEST: VrRow[] = [
   // ── Error pages ──────────────────────────────────────────────
   { name: 'error-invalid-module', auth: 'public', url: 'modules.php?name=NonExistentModule',
     anchor: 'article',
+    sourceGlobs: ['ibl5/modules.php', 'ibl5/index.php', 'ibl5/themes/**'],
     notes: 'Invalid module name redirects to index.php; captures post-redirect homepage render.' },
   { name: 'error-nonexistent-file', auth: 'public',
     url: 'modules.php?name=Standings&file=nonexistent', anchor: 'body',
+    sourceGlobs: ['ibl5/modules.php', 'ibl5/themes/**'],
     notes: 'Nonexistent file renders error message within page layout.' },
 
   // ── Auth modules ────────────────────────────────────────────

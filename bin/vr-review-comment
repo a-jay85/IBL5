@@ -1,0 +1,85 @@
+#!/usr/bin/env bun
+// bin/vr-review-comment — build the sticky `visual-review` PR comment markdown.
+//
+// Reads the Playwright JSON report (failed specs ⇒ diffing cells), the coverage
+// JSON (bin/vr-changed-coverage output), and the per-SHA Pages base URL, then
+// writes the comment markdown (consumed by marocchino/sticky-pull-request-comment
+// in .github/workflows/e2e-tests.yml). Models bin/lighthouse-comment.
+//
+// Usage:
+//   bin/vr-review-comment --results=ibl5/test-results.json --coverage=coverage.json \
+//     --pages-url=https://a-jay85.github.io/IBL5/<sha>/visual-review/ --out=vr-review-comment.md
+import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dir = dirname(fileURLToPath(import.meta.url));
+const ibl5Dir = resolve(__dir, '..', 'ibl5');
+
+const { VR_MANIFEST } = await import(resolve(ibl5Dir, 'tests/e2e/vr-manifest.ts'));
+const { buildComment, extractDiffCells } = await import(
+  resolve(ibl5Dir, 'tests/e2e/vr-review-comment.ts')
+);
+
+const USAGE =
+  'Usage: bin/vr-review-comment --results=PATH --coverage=PATH --pages-url=URL [--out=PATH]';
+
+let resultsPath: string | null = null;
+let coveragePath: string | null = null;
+let pagesUrl: string | null = null;
+let outPath: string | null = null;
+
+for (const arg of process.argv.slice(2)) {
+  if (arg.startsWith('--results=')) resultsPath = arg.slice('--results='.length);
+  else if (arg.startsWith('--coverage=')) coveragePath = arg.slice('--coverage='.length);
+  else if (arg.startsWith('--pages-url=')) pagesUrl = arg.slice('--pages-url='.length);
+  else if (arg.startsWith('--out=')) outPath = arg.slice('--out='.length);
+  else if (arg === '--help') {
+    process.stdout.write(USAGE + '\n');
+    process.exit(0);
+  } else {
+    process.stderr.write(`Unknown argument: ${arg}\n${USAGE}\n`);
+    process.exit(2);
+  }
+}
+
+if (pagesUrl === null) {
+  process.stderr.write(`--pages-url is required\n${USAGE}\n`);
+  process.exit(2);
+}
+
+// Coverage JSON — fail safe to "review everything" if absent/garbled.
+let coverage = { coveredRows: [] as string[], uncoveredChangedPaths: [] as string[], globalChange: true };
+if (coveragePath !== null && existsSync(coveragePath)) {
+  try {
+    coverage = JSON.parse(readFileSync(coveragePath, 'utf-8'));
+  } catch {
+    // keep the fail-safe default
+  }
+}
+
+// Playwright JSON report — absent/garbled ⇒ no diff cells (the uncovered/global
+// sections still render from coverage).
+let report: { suites?: unknown[] } = {};
+if (resultsPath !== null && existsSync(resultsPath)) {
+  try {
+    report = JSON.parse(readFileSync(resultsPath, 'utf-8'));
+  } catch {
+    // keep empty report
+  }
+}
+
+const diffCells = extractDiffCells(report, VR_MANIFEST);
+
+const markdown = buildComment({
+  diffCells,
+  uncoveredChangedPaths: coverage.uncoveredChangedPaths ?? [],
+  globalChange: coverage.globalChange ?? false,
+  pagesUrl,
+});
+
+if (outPath !== null) {
+  writeFileSync(outPath, markdown);
+} else {
+  process.stdout.write(markdown);
+}

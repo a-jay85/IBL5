@@ -140,22 +140,70 @@ class TeamViewTest extends TestCase
         $this->assertStringNotContainsString('team-cards-row', $output);
     }
 
-    public function testRenderShowsYearHeadingForHistoricalYear(): void
+    public function testRenderShowsYearHeadingAsHeadingTwoForHistoricalYear(): void
     {
         $output = $this->view->render($this->createPageData(['yr' => '2023']));
 
-        $this->assertStringContainsString('2023', $output);
-        $this->assertStringContainsString('Celtics', $output);
-        $this->assertStringContainsString('ibl-title', $output);
+        $this->assertStringContainsString('<h2 class="ibl-title">2023 Celtics</h2>', $output);
+        // Exactly one <h1> (the banner) — the year is an <h2>, not a second <h1>.
+        $this->assertSame(1, substr_count($output, '<h1'), 'Historical actual team must still have exactly one <h1>.');
+        // Banner <h1> appears BEFORE the year <h2> in DOM order.
+        $this->assertLessThan(
+            strpos($output, '<h2 class="ibl-title">2023 Celtics</h2>'),
+            strpos($output, '<h1>'),
+            'Banner h1 must precede the year h2.'
+        );
+        // The year h2 sits between the banner and the roster table.
+        $this->assertLessThan(
+            strpos($output, 'table-scroll-wrapper'),
+            strpos($output, '<h2 class="ibl-title">2023 Celtics</h2>'),
+            'Year h2 must appear before the roster table.'
+        );
     }
 
-    public function testRenderShowsBareTeamNameHeadingForCurrentSeason(): void
+    public function testRenderShowsBannerLogoAsHeadingOneForCurrentSeason(): void
     {
         $output = $this->view->render($this->createPageData(['yr' => null]));
 
-        // The current-season (empty-$yr) default view emits a bare team-name <h1>
-        // so the page satisfies axe page-has-heading-one (no year prefix).
-        $this->assertStringContainsString('<h1 class="ibl-title">Celtics</h1>', $output);
+        // Banner logo is wrapped in <h1>; its accessible name is the team name (no " logo").
+        $this->assertMatchesRegularExpression(
+            '/<h1>\s*<img[^>]*alt="Celtics"[^>]*>\s*<\/h1>/',
+            $output
+        );
+        $this->assertStringNotContainsString('alt="Celtics logo"', $output);
+        // The banner h1 must NOT carry ibl-title, and current-season has no text title at all.
+        $this->assertStringNotContainsString('ibl-title', $output);
+    }
+
+    public function testCurrentSeasonActualTeamHasExactlyOneHeadingOneAndNoYearHeadingTwo(): void
+    {
+        $output = $this->view->render($this->createPageData(['yr' => null]));
+
+        $this->assertSame(1, substr_count($output, '<h1'), 'Actual team current-season must have exactly one <h1> (the banner).');
+        $this->assertStringNotContainsString('<h2 class="ibl-title">', $output, 'No year h2 row when yr is null.');
+    }
+
+    public function testFreeAgentsNonActualTeamShowsTextHeadingOneAndNoBanner(): void
+    {
+        $team = new \stdClass();
+        $team->name = 'Free Agents';
+        $team->color1 = '000000';
+        $team->color2 = 'FFFFFF';
+        $team->discord_id = null;
+
+        $output = $this->view->render($this->createPageData([
+            'teamid' => 0,
+            'team' => $team,
+            'isActualTeam' => false,
+        ]));
+
+        $this->assertStringContainsString('<h1 class="ibl-title">Free Agents</h1>', $output);
+        $this->assertSame(1, substr_count($output, '<h1'), 'Free Agents page must have exactly one <h1>.');
+        // The banner row is NOT rendered for non-actual teams.
+        $this->assertStringNotContainsString('team-banner-row', $output);
+        // The decorative fallback logo is present with empty alt (cannot be the h1).
+        $this->assertStringContainsString('team-logo-fallback', $output);
+        $this->assertStringContainsString('alt=""', $output);
     }
 
     public function testRenderContainsRaftersForActualTeam(): void

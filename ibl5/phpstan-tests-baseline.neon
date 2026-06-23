@@ -279,7 +279,7 @@ parameters:
 		-
 			rawMessage: 'Parameter #1 $pageData of method Team\TeamView::render() expects array{teamid: int, team: Team\Team, imagesPath: string, yr: string|null, display: string, insertyear: string, isActualTeam: bool, tableOutput: string, ...}, array<string, mixed> given.'
 			identifier: argument.type
-			count: 23
+			count: 25
 			path: tests/Team/TeamViewTest.php
 
 		-

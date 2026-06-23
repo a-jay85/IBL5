@@ -1,6 +1,6 @@
 ---
 description: WCAG 2.x full-rule (non-contrast) accessibility failure inventory and burn-down backlog per axe rule, with audited per-entry implementation + automouse-readiness status. Companion to a11y-contrast-backlog.md.
-last_verified: 2026-06-21
+last_verified: 2026-06-22
 ---
 
 # A11y Full-Rule Backlog (non-contrast)
@@ -40,7 +40,7 @@ This audit (2026-06-20, verified against the live `accessibility.spec.ts` `KNOWN
 | **empty-table-header** | ✅ implemented | — | `a11y-3` merged; rule key absent from `KNOWN_FAILING` entirely. |
 | **page-has-heading-one** — single-title views | ✅ implemented | — | `a11y-2` (#1103) merged. |
 | **page-has-heading-one** — training camp ratings diff | ✅ implemented | — | `a11y-4` (#1158) merged. |
-| **page-has-heading-one** — 4 leaderboard/db promotes + team-page add | ✅ implemented | — | `a11y-5` (#1163) merged; the 4 `h2.ibl-title`→`h1` promotes + Team-page else-branch `<h1>` add removed from `KNOWN_FAILING`. |
+| **page-has-heading-one** — 4 leaderboard/db promotes + team-page banner-`<h1>` | ✅ implemented | — | `a11y-5` (#1163): the 4 `h2.ibl-title`→`h1` promotes + Team-page banner-as-`<h1>` redesign (logo wrapped in `<h1>`; year demoted to `<h2>`); Free-Agents text-`<h1>` retained — removed from `KNOWN_FAILING`. |
 | **page-has-heading-one** — next sim (single-title promote) | ⬜ unplanned | 🟢 auto-mergeable | `NextSimView.php:54` emits a single `<h2 class="ibl-title">Next Sim</h2>` → plain promote to `<h1>` (VR-identical). An unplanned single-title view a11y-2/4 didn't sweep. |
 | **page-has-heading-one** — schedule + team schedule (STALE allowlist) | ⬜ unplanned | 🟢 auto-mergeable | **Re-checked:** both Views already emit `<h1 class="ibl-title">Schedule</h1>` **unconditionally** (`LeagueScheduleView.php:51`, `TeamScheduleView.php:101`). The pages already pass `page-has-heading-one`; the allowlist entries are **stale** → verify-and-remove (no code change), clicks the ratchet. |
 | **page-has-heading-one** — multi-title / loop-rendered (standings, trading, season archive, franchise record book, compare players, waivers, depth chart entry, voting results, olympics standings; **big board, trade block — blocked on Phase-4 re-land**) | 📋 partial | 🟠 decision | **DONE (this plan):** trading, season archive, franchise record book, compare players, waivers, depth chart entry promoted to `<h1>` (record book also got a `heading-order` h3→h2 co-fix). **STILL OPEN:** standings + voting results need a page-level `<h1>` ADDED (per-region/per-award loop, no single title — a VR-changing decision, separate plan); olympics standings is not spec-tracked; big board / trade block blocked on Phase-4 re-land. |
@@ -80,7 +80,7 @@ This audit (2026-06-20, verified against the live `accessibility.spec.ts` `KNOWN
 | Sub-group | Status / readiness |
 |-----------|--------------------|
 | **Single-title views** (draft history, cap space, activity tracker, all-star appearances, contract list, draft, draft pick locator, franchise history, free agency preview, gm contact list, injuries, league starters, one-on-one game, player movement, projected draft order, record holders, season highs, series records, team off/def stats, transaction history, search, topics, free agency, training camp ratings diff) | ✅ implemented — `a11y-2` + `a11y-4` merged. **watchlist** half BLOCKED on the Phase-4 GM re-land (Watchlist reverted in `503d1fa85`) — fix when that module re-lands. |
-| **4 promotes + Team-page add** (season leaderboards, career leaderboards, award history, player database; team page) | ✅ implemented — `a11y-5` (#1163): 4 `h2.ibl-title`→`h1` promotes (VR-identical) + Team-page else-branch `<h1>` add. The Team `<h1>` exposed a latent `heading-order` skip (section cards were `h3` with no `h2`), co-fixed by demoting card titles `h3`→`h2` and franchise sub-columns `h4`→`h3` (class-styled, VR-identical). Removed from `KNOWN_FAILING`. |
+| **4 promotes + Team-page banner-`<h1>`** (season leaderboards, career leaderboards, award history, player database; team page) | ✅ implemented — `a11y-5` (#1163): 4 `h2.ibl-title`→`h1` promotes (VR-identical) + Team-page banner-as-`<h1>` redesign — the logo banner is the page `<h1>`, the year title is demoted to an `<h2>` row between the banner and the roster table, and Free Agents keeps a literal text `<h1>`. The Team `<h1>` exposed a latent `heading-order` skip (section cards were `h3` with no `h2`), co-fixed by demoting card titles `h3`→`h2` and franchise sub-columns `h4`→`h3` (class-styled, VR-identical). Removed from `KNOWN_FAILING`. |
 | **next sim** (single `<h2 class="ibl-title">Next Sim</h2>`, `NextSimView.php:54`) | ⬜ unplanned — 🟢 plain promote (VR-identical); an unplanned single-title view. |
 | **schedule + team schedule** (already emit `<h1>` unconditionally — `LeagueScheduleView.php:51`, `TeamScheduleView.php:101`) | ⬜ unplanned — 🟢 **stale allowlist entry**: page already passes; remove from `KNOWN_FAILING` and confirm green (no code change). |
 | **Multi-title — promoted** (trading, season archive, franchise record book, compare players, waivers, depth chart entry) | ✅ implemented — topmost `h2.ibl-title`→`h1` (record book + `heading-order` h3→h2 co-fix). |
@@ -141,7 +141,7 @@ Tracked separately in [`a11y-contrast-backlog.md`](a11y-contrast-backlog.md). Th
 | `a11y-2-heading-one-single-title` | ✅ merged (#1103) — single-title promotes + record-holders heading-order. |
 | `a11y-3-empty-table-header` | ✅ merged — empty `<th>` labels. |
 | `a11y-4-training-camp-heading-one` | ✅ merged (#1158) — training camp `<h1>`. |
-| `a11y-5-heading-one-burndown` | ✅ implemented (#1163) — 4 promotes + Team-page else-branch `<h1>` add; removed from `KNOWN_FAILING`. |
+| `a11y-5-heading-one-burndown` | ✅ implemented (#1163) — 4 promotes + Team-page banner-as-`<h1>` redesign (logo wrapped in `<h1>`; year demoted to `<h2>`; Free-Agents text-`<h1>` retained); removed from `KNOWN_FAILING`. |
 | `standings-landmark-unique-aria-label` | ✅ superseded — the standings fix already merged independently as **#1164**; the plan file is redundant (not queued). |
 | `a11y-landmark-unique-schedule` | ✅ implemented — schedule + team-schedule jump-menu `aria-label`; auto-merge eligible. |
 | `a11y-landmark-unique-starters-sim` | ✅ implemented — per-table `aria-label` via shared-renderer optional param + next-sim inline; both pages removed from `KNOWN_FAILING['landmark-unique']`; auto-merge eligible. |

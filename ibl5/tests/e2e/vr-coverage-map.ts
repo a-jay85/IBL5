@@ -1,5 +1,5 @@
 // Pure changed-files → VR-manifest coverage mapper. No I/O, no git — all inputs
-// are passed in so the logic is unit-testable in isolation (tests/unit/vr-coverage-map.test.ts).
+// are passed in so the logic is unit-testable in isolation (tests/ts-unit/vr-coverage-map.test.ts).
 // The bin/vr-changed-coverage wrapper supplies the manifest, the changed-file
 // list, and the global-change glob set; this module decides which VR rows a
 // change touches and which changed paths fall into the silent-coverage gap.

@@ -1,6 +1,6 @@
 // Pure builder for the sticky `visual-review` PR comment. No I/O — the
 // bin/vr-review-comment wrapper reads the Playwright JSON + coverage JSON and
-// calls these functions, so the markup is unit-testable (tests/unit/vr-review-comment.test.ts).
+// calls these functions, so the markup is unit-testable (tests/ts-unit/vr-review-comment.test.ts).
 //
 // Models the "script writes a .md consumed by marocchino" pattern of
 // bin/lighthouse-comment (consumed in .github/workflows/lighthouse.yml).

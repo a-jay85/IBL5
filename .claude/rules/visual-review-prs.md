@@ -59,7 +59,7 @@ approval mechanism.
 Changed-files → coverage selection lives in `ibl5/tests/e2e/vr-coverage-map.ts`
 (`classifyChangedFiles`, `deriveModuleGlob`, `rowGlobs`) and the comment markup in
 `ibl5/tests/e2e/vr-review-comment.ts` (`buildComment`). Both are pure and unit-tested
-(`ibl5/tests/unit/vr-coverage-map.test.ts`, `ibl5/tests/unit/vr-review-comment.test.ts`,
+(`ibl5/tests/ts-unit/vr-coverage-map.test.ts`, `ibl5/tests/ts-unit/vr-review-comment.test.ts`,
 run via `bun run test:unit` from `ibl5/`). Per-row source overrides use the optional
 `sourceGlobs` field on `VrRow`. **Changing this selection logic is a mechanical-enforcement
 surface and requires an ADR.**

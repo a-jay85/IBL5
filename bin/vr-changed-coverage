@@ -1,0 +1,74 @@
+#!/usr/bin/env bun
+// bin/vr-changed-coverage — map a changed-file list onto VR-manifest coverage.
+//
+// Reads a newline-separated list of repo-relative changed paths from stdin (as
+// `git diff --name-only <base>...HEAD` emits), classifies it against the live
+// VR_MANIFEST, and prints the result JSON to stdout:
+//   { coveredRows: string[], uncoveredChangedPaths: string[], globalChange: boolean }
+//
+// Fail-safe: empty or garbled stdin ⇒ treat as a global change (review EVERY row),
+// never a silently-empty result. Unknown input must over-report, not under-report.
+//
+// Usage:
+//   git diff --name-only "$BASE"...HEAD | bin/vr-changed-coverage > coverage.json
+//   printf 'ibl5/modules/Standings/Standings.php\n' | bin/vr-changed-coverage
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dir = dirname(fileURLToPath(import.meta.url));
+const ibl5Dir = resolve(__dir, '..', 'ibl5');
+
+// Dynamic import so this works when invoked from the repo root (same idiom as
+// bin/check-vr-coverage).
+const { VR_MANIFEST } = await import(resolve(ibl5Dir, 'tests/e2e/vr-manifest.ts'));
+const { classifyChangedFiles } = await import(
+  resolve(ibl5Dir, 'tests/e2e/vr-coverage-map.ts')
+);
+
+// Globs whose change fans out to every row (shared CSS / design tokens / themes /
+// shared PHP classes / shared layout). A match here ⇒ globalChange.
+const GLOBAL_GLOBS: string[] = [
+  '**/*.css',
+  'ibl5/design/**',
+  'ibl5/themes/**',
+  'ibl5/classes/**',
+  'ibl5/header.php',
+  'ibl5/footer.php',
+  'ibl5/mainfile.php',
+];
+
+function allRows(): { coveredRows: string[]; uncoveredChangedPaths: string[]; globalChange: boolean } {
+  return {
+    coveredRows: VR_MANIFEST.map((r: { name: string }) => r.name),
+    uncoveredChangedPaths: [],
+    globalChange: true,
+  };
+}
+
+let raw = '';
+try {
+  raw = await Bun.stdin.text();
+} catch {
+  // Unreadable stdin — fail safe to "review everything".
+  process.stdout.write(JSON.stringify(allRows()) + '\n');
+  process.exit(0);
+}
+
+const changedPaths = raw
+  .split('\n')
+  .map((l) => l.trim())
+  .filter((l) => l.length > 0);
+
+if (changedPaths.length === 0) {
+  // Empty diff — fail safe to "review everything".
+  process.stdout.write(JSON.stringify(allRows()) + '\n');
+  process.exit(0);
+}
+
+const result = classifyChangedFiles({
+  manifest: VR_MANIFEST,
+  changedPaths,
+  globalGlobs: GLOBAL_GLOBS,
+});
+
+process.stdout.write(JSON.stringify(result) + '\n');

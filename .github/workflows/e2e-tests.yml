@@ -96,6 +96,12 @@ jobs:
     # 30 min (was 20) — full-page matrix over 49 modules is ~4-6x the
     # wall-clock of the prior 13 element crops.
     timeout-minutes: 30
+    # contents: write → push the Playwright HTML report to the gh-pages branch.
+    # pull-requests: write → post the sticky visual-review comment.
+    # (Job-level scope: only this job gets write; the top-level default stays read.)
+    permissions:
+      contents: write
+      pull-requests: write
 
     steps:
       - uses: actions/checkout@v7
@@ -104,6 +110,8 @@ jobs:
           # Default GITHUB_TOKEN pushes don't trigger workflows (GitHub's anti-loop protection).
           token: ${{ contains(github.event.pull_request.labels.*.name, 'update-baselines') && secrets.CI_PAT || github.token }}
           ref: ${{ github.head_ref || github.sha }}
+          # Full history so `git diff <base>...HEAD` (changed-file coverage) resolves the base SHA.
+          fetch-depth: 0
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -168,6 +176,48 @@ jobs:
             -e "HOME=/tmp" \
             mcr.microsoft.com/playwright:v1.60.0-jammy \
             npx playwright test --config=playwright.visual.config.ts
+
+      # --- Visual-review publishing (review run only) ---
+      # Fire on the PLAIN failing VR run (label absent) and NOT during baseline regen,
+      # so the committed baseline is still the "before". Ordering invariant: these steps
+      # run AFTER the VR run and BEFORE the regen step below — regenerating first would
+      # overwrite the before/after and destroy the comparison.
+      # Fork PRs receive a read-only token with no secrets, so these steps no-op there.
+      - name: Compute VR coverage from changed files
+        id: vr-coverage
+        if: always() && github.event_name == 'pull_request' && steps.visual-regression.outcome == 'failure' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
+        run: |
+          git diff --name-only "${{ github.event.pull_request.base.sha }}"...HEAD \
+            | bin/vr-changed-coverage > coverage.json
+          cat coverage.json
+
+      - name: Deploy Playwright report to per-SHA GitHub Pages
+        id: vr-pages
+        if: always() && github.event_name == 'pull_request' && steps.visual-regression.outcome == 'failure' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ibl5/playwright-report
+          # One subdirectory per commit SHA so multiple open PRs/SHAs coexist.
+          destination_dir: ${{ github.sha }}/visual-review
+          keep_files: true
+
+      - name: Build visual-review comment
+        if: always() && github.event_name == 'pull_request' && steps.visual-regression.outcome == 'failure' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
+        run: |
+          bin/vr-review-comment \
+            --results=ibl5/test-results.json \
+            --coverage=coverage.json \
+            --pages-url=https://a-jay85.github.io/IBL5/${{ github.sha }}/visual-review/ \
+            --out=vr-review-comment.md
+          cat vr-review-comment.md
+
+      - name: Post sticky visual-review comment
+        if: always() && github.event_name == 'pull_request' && steps.visual-regression.outcome == 'failure' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
+        uses: marocchino/sticky-pull-request-comment@v3
+        with:
+          header: visual-review
+          path: vr-review-comment.md
 
       # --- Auto-update baselines when label is present ---
       - name: Regenerate visual regression baselines
@@ -757,3 +807,44 @@ jobs:
     steps:
       - run: exit 1
         if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+
+  # Retention/cleanup for the per-SHA visual-review reports on gh-pages. Runs on
+  # pushes to master (not on PRs, so it is NOT part of the `gate` required check)
+  # and prunes per-SHA dirs whose newest commit is older than 14 days, keeping the
+  # gh-pages branch from growing unbounded.
+  vr-pages-cleanup:
+    name: VR Pages retention cleanup
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout gh-pages (skip if it does not exist yet)
+        id: checkout-pages
+        continue-on-error: true
+        uses: actions/checkout@v7
+        with:
+          ref: gh-pages
+          fetch-depth: 0
+
+      - name: Prune per-SHA report dirs older than 14 days
+        if: steps.checkout-pages.outcome == 'success'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # A fresh checkout resets filesystem mtimes, so `find -mtime` is unreliable;
+          # derive each per-SHA dir's age from its newest commit date instead.
+          cutoff=$(( $(date +%s) - 14 * 86400 ))
+          removed=0
+          while IFS= read -r d; do
+            ts=$(git log -1 --format=%ct -- "$d")
+            if [ -n "$ts" ] && [ "$ts" -lt "$cutoff" ]; then
+              git rm -rq "$d" && removed=$((removed + 1))
+            fi
+          done < <(find . -mindepth 1 -maxdepth 1 -type d -not -name '.git')
+          if [ "$removed" -gt 0 ]; then
+            git commit -m "chore(vr-pages): prune ${removed} per-SHA report dir(s) older than 14d"
+            git push origin gh-pages
+          else
+            echo "Nothing to prune."
+          fi

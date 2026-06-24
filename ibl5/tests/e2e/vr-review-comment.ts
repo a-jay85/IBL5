@@ -14,6 +14,13 @@ export type DiffCell = {
   viewport: Viewport;
   /** The Playwright test title (snapshot filename without .png), e.g. `standings-mobile`. */
   title: string;
+  /**
+   * True when this cell's baseline snapshot is NOT committed to the git index
+   * (a brand-new view rendered in Playwright `missing` mode — no prior baseline
+   * to diff against). Set by classifyCells from the wrapper's git ls-files
+   * result; absent/false ⇒ a real pixel regression against a committed baseline.
+   */
+  isNew?: boolean;
 };
 
 // ── Playwright JSON report (only the fields we read) ─────────────────────────
@@ -64,6 +71,16 @@ export function extractDiffCells(report: PwReport, manifest: VrRow[]): DiffCell[
   return cells;
 }
 
+/**
+ * Classify each diff cell NEW vs CHANGED by whether its baseline snapshot is in
+ * the git tracked index. `trackedTitles` is the set of titles whose snapshot
+ * .png IS committed (the wrapper computes this via `git ls-files`, keeping this
+ * function pure). NEW ⇔ the title is NOT tracked.
+ */
+export function classifyCells(cells: DiffCell[], trackedTitles: Set<string>): DiffCell[] {
+  return cells.map((cell) => ({ ...cell, isNew: !trackedTitles.has(cell.title) }));
+}
+
 export type BuildCommentInput = {
   diffCells: DiffCell[];
   uncoveredChangedPaths: string[];
@@ -106,29 +123,56 @@ export function buildComment(input: BuildCommentInput): string {
     lines.push('');
   }
 
-  if (diffCells.length > 0) {
+  const changedCells = diffCells.filter((c) => !c.isNew);
+  const newCells = diffCells.filter((c) => c.isNew);
+
+  // Render one "grouped by module" block under a section heading.
+  const renderModuleSection = (heading: string, cells: DiffCell[]): void => {
     const byModule = new Map<string, DiffCell[]>();
-    for (const cell of diffCells) {
+    for (const cell of cells) {
       const arr = byModule.get(cell.module) ?? [];
       arr.push(cell);
       byModule.set(cell.module, arr);
     }
-
-    lines.push(`### ${diffCells.length} changed view(s) across ${byModule.size} module(s)`);
+    lines.push(`### ${heading.replace('{n}', String(cells.length)).replace('{m}', String(byModule.size))}`);
     lines.push('');
     for (const module of [...byModule.keys()].sort()) {
-      const cells = byModule.get(module)!;
-      lines.push(`<details><summary><strong>${module}</strong> — ${cells.length} view(s)</summary>`);
+      const group = byModule.get(module)!;
+      lines.push(`<details><summary><strong>${module}</strong> — ${group.length} view(s)</summary>`);
       lines.push('');
-      for (const cell of cells.sort((a, b) => a.title.localeCompare(b.title))) {
+      for (const cell of group.sort((a, b) => a.title.localeCompare(b.title))) {
         lines.push(`- [${cell.title} — ${cell.viewport}](${reportLink(pagesUrl, cell.title)})`);
       }
       lines.push('');
       lines.push('</details>');
       lines.push('');
     }
-  } else if (!globalChange && uncoveredChangedPaths.length === 0) {
-    // Boundary: nothing diffed and nothing uncovered — safe no-diff body.
+  };
+
+  if (changedCells.length > 0) {
+    renderModuleSection('{n} changed view(s) across {m} module(s)', changedCells);
+  }
+
+  if (newCells.length > 0) {
+    lines.push('### 🆕 New views (no prior baseline — review the render)');
+    lines.push('');
+    lines.push(
+      'These views have **no committed baseline** — Playwright wrote the first ' +
+        'render and the run failed by design. There is no "before"; the link shows ' +
+        'the new render. Confirm it looks right, then apply `update-baselines` to ' +
+        'commit these as the baselines.',
+    );
+    lines.push('');
+    renderModuleSection('{n} new view(s) across {m} module(s)', newCells);
+  }
+
+  if (
+    changedCells.length === 0 &&
+    newCells.length === 0 &&
+    !globalChange &&
+    uncoveredChangedPaths.length === 0
+  ) {
+    // Boundary: nothing diffed, nothing new, nothing uncovered — safe no-diff body.
     lines.push('_No visual diffs detected and no changed page falls outside VR coverage._');
     lines.push('');
   }

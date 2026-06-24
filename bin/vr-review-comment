@@ -12,12 +12,13 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { execFileSync } from 'child_process';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const ibl5Dir = resolve(__dir, '..', 'ibl5');
 
 const { VR_MANIFEST } = await import(resolve(ibl5Dir, 'tests/e2e/vr-manifest.ts'));
-const { buildComment, extractDiffCells } = await import(
+const { buildComment, extractDiffCells, classifyCells } = await import(
   resolve(ibl5Dir, 'tests/e2e/vr-review-comment.ts')
 );
 
@@ -71,8 +72,44 @@ if (resultsPath !== null && existsSync(resultsPath)) {
 
 const diffCells = extractDiffCells(report, VR_MANIFEST);
 
+// Classify NEW (no committed baseline) vs CHANGED (committed baseline = real
+// diff). Signal: `git ls-files <snapshot path>` reads the TRACKED INDEX, not the
+// working tree — so a brand-new row (whose .png Playwright `missing` mode just
+// wrote UNTRACKED into the working dir) returns NO output line, while a committed
+// baseline prints its path. existsSync is WRONG here: missing-mode writes the
+// untracked baseline during the run. Discriminator is the printed line, NOT the
+// exit code (both tracked and untracked paths exit 0).
+const repoRoot = resolve(__dir, '..'); // bin/ is at repo root; .. == repo root
+const SNAPSHOT_DIR = 'ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots';
+const snapshotPath = (title: string): string => `${SNAPSHOT_DIR}/${title}.png`;
+
+let trackedTitles = new Set<string>();
+if (diffCells.length > 0) {
+  // Guard: never call `git ls-files` with no pathspec — it lists the whole tree.
+  const paths = diffCells.map((c) => snapshotPath(c.title));
+  let tracked: string[] = [];
+  try {
+    const out = execFileSync('git', ['ls-files', '-z', '--', ...paths], {
+      cwd: repoRoot,
+      encoding: 'utf-8',
+    });
+    tracked = out.split('\0').filter((p) => p.length > 0);
+  } catch {
+    // git unavailable / not a repo ⇒ fail safe to "all CHANGED" (no NEW section),
+    // which is the existing behavior — never crash the comment build.
+    tracked = paths;
+  }
+  const trackedSet = new Set(tracked);
+  // Map tracked PATHS back to TITLES for the title-keyed classifier.
+  trackedTitles = new Set(
+    diffCells.map((c) => c.title).filter((t) => trackedSet.has(snapshotPath(t))),
+  );
+}
+
+const classifiedCells = classifyCells(diffCells, trackedTitles);
+
 const markdown = buildComment({
-  diffCells,
+  diffCells: classifiedCells,
   uncoveredChangedPaths: coverage.uncoveredChangedPaths ?? [],
   globalChange: coverage.globalChange ?? false,
   pagesUrl,

@@ -7,12 +7,12 @@ paths:
   - "ibl5/tests/e2e/vr-review-comment.ts"
   - "bin/vr-changed-coverage"
   - "bin/vr-review-comment"
-last_verified: 2026-06-22
+last_verified: 2026-06-24
 ---
 
 # Visual-review PRs
 
-See ADR-0068 for the decision and rationale.
+See ADR-0068 and ADR-0069 for the decisions and rationale.
 
 ## What runs
 
@@ -38,6 +38,12 @@ per-SHA report dirs whose newest commit is older than 14 days.
 - Diffing views are grouped per module in `<details>` blocks; each link deep-links into the
   per-SHA Playwright HTML report (filtered by test title) where the before/after/diff slider
   shows desktop + mobile.
+- A **"🆕 New views (no prior baseline — review the render)"** section lists failing cells
+  whose baseline was never committed (a brand-new VR row). These have no before/after — the
+  link shows the first render; sanity-check it, then `update-baselines` commits it as the
+  baseline. NEW cells are excluded from the "changed view(s)" count so a first-render never
+  reads as a regression. Classification uses `git ls-files` on the tracked index (not disk),
+  per ADR-0069.
 - The per-SHA Pages URL shape is `https://a-jay85.github.io/IBL5/<sha>/visual-review/`.
 - A **"⚠️ Changed but NOT covered by the VR manifest"** section lists changed website paths
   that match no manifest row — review those by hand or add a `vr-manifest.ts` row. A

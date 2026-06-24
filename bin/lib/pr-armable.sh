@@ -40,7 +40,7 @@ GH_CMD="${GH_CMD:-gh}"
 pr_manual_testing_clearance() {
     local body="$1"
     local section content
-    section=$(printf '%s\n' "$body" | sed -n '/## Manual Testing/,/^## /p')
+    section=$(printf '%s\n' "$body" | sed -n '/^## Manual Testing/,/^## /p')
     if [ -z "$section" ]; then
         echo "UNKNOWN"
         return

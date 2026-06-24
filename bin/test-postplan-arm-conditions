@@ -1,0 +1,140 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-postplan-arm-conditions — regression guard for the /post-plan Phase 6.5
+# auto-merge conditions that call the shared predicate bin/lib/pr-armable.sh
+# (conditions (1) Manual-Testing, (5) golden, (6) Depends-on, (8) feat:).
+#
+# Why this exists: those conditions live as separate ```bash blocks inside
+# SKILL.md, and the orchestrator may run each block in its OWN shell. A block
+# that relied on a hoisted `source` or a shared `PR_JSON` from a preamble would
+# then have an UNDEFINED predicate function — and for condition (8) that fails
+# OPEN (no BLOCKED line emitted → a feat: PR auto-arms). This test runs each
+# block in an isolated `bash -c` against a gh shim and asserts the holds, plus a
+# structural check that every predicate-using block re-`source`s the lib itself.
+#
+# Run: bin/test-postplan-arm-conditions  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SKILL="$REPO_ROOT/.claude/skills/post-plan/SKILL.md"
+
+BASE_TMP="$(mktemp -d)"
+trap 'rm -rf "$BASE_TMP"' EXIT
+FAILED=0
+
+# A gh shim emulating the only calls the condition blocks make:
+#   gh pr view <n> --json state          -> predecessor state (#1100 OPEN else MERGED)
+#   gh pr view --json <fields> --jq F    -> jq -r F applied to $GH_PR_FIXTURE
+SHIMD="$BASE_TMP/shim"
+mkdir -p "$SHIMD"
+cat > "$SHIMD/gh" <<'SHIM'
+#!/usr/bin/env bash
+if [ "$1" = "pr" ] && [ "$2" = "view" ]; then
+  if [[ "$3" =~ ^[0-9]+$ ]]; then
+    case "$3" in 1100) echo '{"state":"OPEN"}' ;; *) echo '{"state":"MERGED"}' ;; esac
+    exit 0
+  fi
+  filter='.'
+  for ((i=1; i<=$#; i++)); do
+    if [ "${!i}" = "--jq" ]; then j=$((i+1)); filter="${!j}"; fi
+  done
+  jq -r "$filter" "$GH_PR_FIXTURE"
+  exit 0
+fi
+exit 1
+SHIM
+chmod +x "$SHIMD/gh"
+
+# extract_block <literal-marker> — print the first ```bash fenced block whose
+# body contains the literal marker substring (e.g. "# condition (8)"). Uses
+# index() (literal), not regex, so the parens in the marker are matched verbatim.
+extract_block() {
+    awk -v want="$1" '
+        /^```bash$/ { inb=1; buf=""; next }
+        /^```$/     { if (inb && index(buf, want) > 0) { printf "%s", buf } ; inb=0; next }
+        inb         { buf = buf $0 "\n" }
+    ' "$SKILL"
+}
+
+# run_isolated <block> <fixture-json> <golden_changed> <headless> — run the block
+# in its OWN fresh shell (the failure model) and echo its stdout.
+run_isolated() {
+    printf '%s' "$2" > "$BASE_TMP/fixture.json"
+    PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" \
+        GOLDEN_CHANGED="$3" CLAUDE_HEADLESS="$4" \
+        bash -c "$1" 2>&1
+}
+
+expect_block() { # name  BLOCK|NONE  output
+    local got_block=0
+    [[ "$3" == *BLOCKED* ]] && got_block=1
+    if { [ "$2" = "BLOCK" ] && [ "$got_block" -eq 1 ]; } \
+        || { [ "$2" = "NONE" ] && [ "$got_block" -eq 0 ]; }; then
+        echo "ok: $1"
+    else
+        echo "FAIL: $1 — expected $2, got: '$3'"
+        FAILED=1
+    fi
+}
+
+assert_self_contained() { # marker name
+    local block; block="$(extract_block "$1")"
+    if [ -z "$block" ]; then
+        echo "FAIL: $2 — no block matching '$1' found in SKILL.md"
+        FAILED=1
+        return
+    fi
+    if printf '%s' "$block" | grep -q 'source' && printf '%s' "$block" | grep -q 'pr-armable.sh'; then
+        echo "ok: $2 self-sources the predicate"
+    else
+        echo "FAIL: $2 — block uses the predicate but does NOT source pr-armable.sh in-block (hoisted source = fail-open risk)"
+        FAILED=1
+    fi
+}
+
+B1="$(extract_block '# condition (1)')"
+B5="$(extract_block '# condition (5)')"
+B6="$(extract_block '# condition (6)')"
+B8="$(extract_block '# condition (8)')"
+
+# --- structural: every predicate-using block must source the lib itself ---
+assert_self_contained '# condition (1)' "condition (1)"
+assert_self_contained '# condition (5)' "condition (5)"
+assert_self_contained '# condition (6)' "condition (6)"
+assert_self_contained '# condition (8)' "condition (8)"
+
+# --- behavioral: each block, run in isolation, holds correctly ---
+expect_block "(1) HELD manual rows -> BLOCK" BLOCK \
+    "$(run_isolated "$B1" '{"body":"## Manual Testing\n\n- review the new <h1>"}' '' '')"
+expect_block "(1) cleared sentinel -> NONE" NONE \
+    "$(run_isolated "$B1" '{"body":"## Manual Testing\nNo manual testing needed — automated."}' '' '')"
+expect_block "(1) no section (UNKNOWN) -> BLOCK (fail-closed)" BLOCK \
+    "$(run_isolated "$B1" '{"body":"hand-made PR, no manual testing heading"}' '' '')"
+
+expect_block "(5) golden + headless -> BLOCK" BLOCK \
+    "$(run_isolated "$B5" '{"files":[{"path":"engine/internal/sim/testdata/golden.json"}]}' '' '1')"
+expect_block "(5) golden + interactive -> NONE (warn-only)" NONE \
+    "$(run_isolated "$B5" '{"files":[{"path":"engine/internal/sim/testdata/golden.json"}]}' '' '')"
+
+expect_block "(6) unmerged Depends-on -> BLOCK" BLOCK \
+    "$(run_isolated "$B6" '{"body":"x\nDepends-on: #1100"}' '' '')"
+expect_block "(6) merged Depends-on -> NONE" NONE \
+    "$(run_isolated "$B6" '{"body":"x\nDepends-on: #1071"}' '' '')"
+
+# The fail-open this whole test exists to catch:
+expect_block "(8) feat: no label -> BLOCK (fail-open guard)" BLOCK \
+    "$(run_isolated "$B8" '{"title":"feat: shiny","labels":[]}' '' '')"
+expect_block "(8) feat: + human-approved -> NONE" NONE \
+    "$(run_isolated "$B8" '{"title":"feat: shiny","labels":[{"name":"human-approved"}]}' '' '')"
+expect_block "(8) fix: title -> NONE" NONE \
+    "$(run_isolated "$B8" '{"title":"fix: bug","labels":[]}' '' '')"
+
+if [ "$FAILED" -eq 0 ]; then
+    echo "All post-plan arm-condition checks passed."
+else
+    echo "Some post-plan arm-condition checks FAILED."
+fi
+exit "$FAILED"

@@ -1,0 +1,253 @@
+#!/bin/bash
+
+# Cross-PR auto-merge triage. Classifies every OPEN PR into exactly one bucket
+# (first-match-wins) and prints a report. With --arm it arms
+# `gh pr merge --squash --auto --delete-branch` on ONLY the ARMABLE bucket.
+#
+# ARMABLE is FAIL-CLOSED: it requires a POSITIVE clearance signal (the
+# `No manual testing needed` Manual-Testing sentinel that /post-plan writes after
+# resolving every manual-testing item), never the mere absence of holds. A PR
+# with no `## Manual Testing` section is UNCLEARED -> routed to a human, never
+# auto-armed. This is why pr-triage never auto-arms a hand-made visual-change PR.
+#
+# The four live holds (Manual-Testing / golden / Depends-on / feat:) are shared
+# verbatim with /post-plan Phase 6.5 via bin/lib/pr-armable.sh, so the arming
+# judgment has one executable home and cannot drift. The live CI-check reading
+# (DIRTY / BLOCKED-CHECK) is pr-triage's own — Phase 6.5 delegates it to `--auto`.
+#
+# Bucket precedence (first match wins):
+#   1. DIRTY                  merge conflict (mergeStateStatus == DIRTY)
+#   2. BLOCKED-CHECK          a required Tests/E2E check is failing/pending/
+#                             cancelled/absent, or body declares an expected-red
+#   3. HELD                   Manual-Testing real rows, golden touched, or a
+#                             belt-and-suspenders body hold marker
+#   4. BLOCKED-DEP            an unmerged Depends-on: predecessor
+#   5. FEAT-AWAITING-SIGNOFF  feat: title without the human-approved label
+#   6. UNCLEARED              no Manual-Testing section (fail-closed; never armed)
+#   7. ARMABLE                CLEARED + not dirty + all required checks green
+#
+# Exit codes: 0 = report generated; 1 = an attempted --arm merge failed;
+#             2 = usage error or gh not authenticated.
+
+set -euo pipefail
+
+GH_CMD="${GH_CMD:-gh}"
+GH_API_CMD="${GH_API_CMD:-gh api}"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=bin/lib/pr-armable.sh
+source "$SCRIPT_DIR/lib/pr-armable.sh"
+
+usage() {
+    cat <<'EOF'
+Usage: bin/pr-triage [--arm] [--help|-h]
+
+Classifies every OPEN PR into one bucket (first-match-wins) and prints a report.
+
+Options:
+  --arm        Arm `gh pr merge --squash --auto --delete-branch` on ONLY the
+               ARMABLE bucket. Without it, the tool is read-only (report only).
+  --help, -h   Show this message.
+
+Environment (test seams):
+  GH_CMD        Override the gh command (default: "gh").
+  GH_API_CMD    Override the gh api command (default: "gh api").
+
+ARMABLE is fail-closed: a PR is armed only with a positive Manual-Testing
+clearance ("No manual testing needed"), all required checks green-and-current,
+and no DIRTY/HELD/dep/feat hold. A PR with no `## Manual Testing` section is
+UNCLEARED and routed to a human. Reads one page (200 PRs / 100 check-runs).
+
+Exit codes: 0 = report generated; 1 = an attempted --arm merge failed;
+            2 = usage error / gh not authenticated.
+EOF
+}
+
+ARM=0
+for arg in "$@"; do
+    case "$arg" in
+        --arm)
+            ARM=1
+            ;;
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        --*)
+            echo "unknown flag: $arg" >&2
+            usage >&2
+            exit 2
+            ;;
+        *)
+            echo "unexpected argument: $arg" >&2
+            usage >&2
+            exit 2
+            ;;
+    esac
+done
+
+if ! gh auth status >/dev/null 2>&1; then
+    echo "ERROR: GitHub CLI is not authenticated." >&2
+    echo "Run 'gh auth login' to authenticate, then retry." >&2
+    exit 2
+fi
+
+REMOTE_URL="$(git remote get-url origin 2>/dev/null)" || {
+    echo "ERROR: cannot read origin remote URL" >&2
+    exit 2
+}
+SLUG="$(echo "$REMOTE_URL" | sed -E 's#^(https://github\.com/|ssh://git@github\.com/|git@github\.com:)##; s#\.git$##')"
+if [ -z "$SLUG" ]; then
+    echo "ERROR: cannot parse repo slug from origin URL: $REMOTE_URL" >&2
+    exit 2
+fi
+
+# --- required contexts (decision 5): protection API, else hardcoded fallback ---
+PROT="$($GH_API_CMD "repos/$SLUG/branches/master/protection" 2>/dev/null || echo '{}')"
+REQUIRED=()
+while IFS= read -r ctx; do
+    [ -n "$ctx" ] && REQUIRED+=("$ctx")
+done < <(echo "$PROT" | jq -r '.required_status_checks.contexts[]?' 2>/dev/null)
+if [ "${#REQUIRED[@]}" -eq 0 ]; then
+    # Fallback: token lacks admin/repo scope for the protection API.
+    REQUIRED=("Tests and Analysis" "E2E Tests" "human-signoff")
+fi
+
+# BLOCKED-CHECK evaluates only the non-signoff contexts (decision 1):
+# human-signoff is the feat: floor's lever, handled by bucket FEAT, not here.
+is_blocked_check_ctx() {
+    case "$1" in
+        "human-signoff") return 1 ;;
+        *) return 0 ;;
+    esac
+}
+
+# state_of <latest_json> <ctx> -> green|failing|pending|cancelled|absent
+state_of() {
+    echo "$1" | jq -r --arg n "$2" '
+        map(select(.name == $n)) as $m
+        | if ($m | length) == 0 then "absent"
+          elif ($m[0].status != "completed") then "pending"
+          elif ($m[0].conclusion == "cancelled") then "cancelled"
+          elif ($m[0].conclusion | IN("success","skipped","neutral")) then "green"
+          else "failing" end'
+}
+
+# rerun_id <latest_json> <ctx> -> the workflow-run id from .details_url, or empty
+# `|| true`: grep exits 1 when details_url lacks a runs/<id> segment; without it
+# the captured substitution would abort under `set -o pipefail`.
+rerun_id() {
+    echo "$1" | jq -r --arg n "$2" 'map(select(.name == $n)) | .[0].details_url // ""' \
+        | grep -oE 'runs/[0-9]+' | grep -oE '[0-9]+' | head -1 || true
+}
+
+EXPECTED_RED_RE='expected[ -]?red|will be RED|Expected CI check.*RED'
+HELD_BODY_RE='auto_merge:[[:space:]]*false|auto_postplan:[[:space:]]*false|human reviewer|human authz|requires human review|do NOT auto-merge|DNM'
+
+PRS_JSON="$("$GH_CMD" pr list --state open --limit 200 \
+    --json number,title,body,labels,mergeStateStatus,headRefOid,files 2>/dev/null || echo '[]')"
+
+PR_COUNT="$(echo "$PRS_JSON" | jq 'length')"
+
+printf '%-7s  %-22s  %-26s  %s\n' "PR#" "BUCKET" "NEXT-ACTION" "SIGNALS"
+printf '%-7s  %-22s  %-26s  %s\n' "-------" "----------------------" "--------------------------" "-------"
+
+EXIT=0
+RERUN_HINTS=""
+
+i=0
+while [ "$i" -lt "$PR_COUNT" ]; do
+    PR="$(echo "$PRS_JSON" | jq ".[$i]")"
+    i=$((i + 1))
+
+    num="$(echo "$PR" | jq -r '.number')"
+    title="$(echo "$PR" | jq -r '.title')"
+    body="$(echo "$PR" | jq -r '.body // ""')"
+    mss="$(echo "$PR" | jq -r '.mergeStateStatus // ""')"
+    sha="$(echo "$PR" | jq -r '.headRefOid')"
+    labels="$(echo "$PR" | jq -c '.labels // []')"
+    files="$(echo "$PR" | jq -c '.files // []')"
+
+    # --- live check-runs for this PR's head SHA (dedupe: latest run per name) ---
+    CR_JSON="$($GH_API_CMD "repos/$SLUG/commits/$sha/check-runs?per_page=100" 2>/dev/null \
+        || echo '{"check_runs":[]}')"
+    LATEST="$(echo "$CR_JSON" | jq '[.check_runs | group_by(.name) | .[]
+        | sort_by(.completed_at // .started_at) | last]')"
+
+    # --- compute signals ---
+    clearance="$(pr_manual_testing_clearance "$body")"
+    golden="$(pr_golden_hold "$files")"
+    feat="$(pr_feat_hold "$title" "$labels")"
+    deps="$(pr_dep_holds "$body" | tr '\n' ' ')"
+
+    check_signals=""
+    blocked_check=0
+    cancelled_ctx=""
+    armable_checks_green=1
+    for ctx in "${REQUIRED[@]}"; do
+        st="$(state_of "$LATEST" "$ctx")"
+        check_signals="${check_signals}${ctx}=${st}; "
+        [ "$st" != "green" ] && armable_checks_green=0
+        if is_blocked_check_ctx "$ctx" && [ "$st" != "green" ]; then
+            blocked_check=1
+            [ "$st" = "cancelled" ] && cancelled_ctx="$ctx"
+        fi
+    done
+    expected_red=0
+    if echo "$body" | grep -qiE "$EXPECTED_RED_RE"; then
+        expected_red=1
+        blocked_check=1
+    fi
+
+    held_body=0
+    if echo "$body" | grep -qiE "$HELD_BODY_RE"; then
+        held_body=1
+    fi
+
+    # --- bucket (first match wins) ---
+    bucket=""
+    action=""
+    if [ "$mss" = "DIRTY" ]; then
+        bucket="DIRTY"; action="rebase onto master"
+    elif [ "$blocked_check" = "1" ]; then
+        bucket="BLOCKED-CHECK"; action="fix / re-run CI"
+        if [ -n "$cancelled_ctx" ]; then
+            rid="$(rerun_id "$LATEST" "$cancelled_ctx")"
+            [ -n "$rid" ] && RERUN_HINTS="${RERUN_HINTS}hint: gh run rerun ${rid}  # ${cancelled_ctx} was CANCELLED on PR #${num}"$'\n'
+        fi
+    elif [ "$clearance" = "HELD" ] || [ -n "$golden" ] || [ "$held_body" = "1" ]; then
+        bucket="HELD"; action="human review"
+    elif [ -n "$deps" ]; then
+        bucket="BLOCKED-DEP"; action="wait for predecessor"
+    elif [ -n "$feat" ]; then
+        bucket="FEAT-AWAITING-SIGNOFF"; action="human sign-off + label"
+    elif [ "$clearance" = "UNKNOWN" ]; then
+        bucket="UNCLEARED"; action="human review (no clearance)"
+    elif [ "$clearance" = "CLEARED" ] && [ "$mss" != "DIRTY" ] && [ "$armable_checks_green" = "1" ]; then
+        bucket="ARMABLE"; action="arm auto-merge"
+    else
+        # Defensive: cleared but a check is not green yet (race) -> not armable.
+        bucket="UNCLEARED"; action="human review (checks not green)"
+    fi
+
+    signals="clearance=${clearance}; ${check_signals}held_body=$([ "$held_body" = 1 ] && echo yes || echo no); golden=$([ -n "$golden" ] && echo yes || echo no); deps=$([ -n "$deps" ] && echo "${deps% }" || echo none); feat=$([ -n "$feat" ] && echo yes || echo no); expected_red=$([ "$expected_red" = 1 ] && echo yes || echo no)"
+
+    printf '%-7s  %-22s  %-26s  %s\n' "#$num" "$bucket" "$action" "$signals"
+
+    # --- --arm side-effect: ONLY the ARMABLE bucket ---
+    if [ "$ARM" = "1" ] && [ "$bucket" = "ARMABLE" ]; then
+        if "$GH_CMD" pr merge "$num" --squash --auto --delete-branch >/dev/null 2>&1; then
+            echo "  armed auto-merge on #$num"
+        else
+            echo "  ARM FAILED on #$num (gh pr merge exited non-zero)" >&2
+            EXIT=1
+        fi
+    fi
+done
+
+if [ -n "$RERUN_HINTS" ]; then
+    echo
+    printf '%s' "$RERUN_HINTS"
+fi
+
+exit "$EXIT"

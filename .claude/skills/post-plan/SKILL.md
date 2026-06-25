@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-06-21
+last_verified: 2026-06-24
 ---
 
 # Post-Plan Orchestrator
@@ -501,6 +501,19 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 
 **These conditions only ever HOLD, never RELEASE.** They are an AND-of-not-blocked set: every condition can *add* a block; none can clear another's. Conditions (7)–(9) are **additive brakes on top of** the deterministic floors (1)–(6) and the independent `human-signoff` required GitHub check — they exist to catch what those miss, never to override them. post-plan **always runs and opens the PR**; these conditions decide only whether auto-merge *arms*. A held PR stays open for a human to merge.
 
+**Conditions (1)/(5)/(6)/(8) come from the shared predicate `bin/lib/pr-armable.sh`** — the single source of truth also used by `bin/pr-triage`, so the live-readable arming judgment has **one executable home** and cannot drift between consumers (hand-re-derived divergence is exactly what mis-armed #1163/#1188). The run-only conditions (2)/(3)/(4)/(7)/(9) stay inline below — they read post-plan-run-local state (`/tmp`, the local plan file, the realized diff) that no cross-PR consumer can see, so they cannot move into the shared predicate.
+
+**Each condition block is SELF-CONTAINED** — it `source`s the predicate and fetches its own inputs in-block, exactly as condition (7) re-derives `$PLAN_FILE` and the original (6)/(8) ran their own `gh pr view`. **Do not** hoist the `source` or a shared `PR_JSON` into a preamble block: a sourced function or a shell variable does not survive into a separately-executed block (only exported env vars like `$CLAUDE_HEADLESS` do), and a missing `source` would make `pr_feat_hold` a no-op — **failing OPEN, auto-arming a `feat:` PR**. Each block re-`source`ing the lib is idempotent and cheap. Every block extracts gh output with `gh ... --jq` (gh does the decode — no `echo`/`printf` round-trip needed); when a block must round-trip a multi-field `PR_JSON` it uses `printf '%s'` (never `echo`, whose zsh `\n` expansion corrupts jq's parse).
+
+**Condition (1) — Manual-Testing clearance (mechanized via the shared predicate).** Previously a prose gate ("PR says No manual testing needed") the orchestrator eyeballed — itself a judgment-error surface. Now deterministic: `pr_manual_testing_clearance` returns `CLEARED` (the `No manual testing needed` sentinel is present — the positive signal Phase 6 writes after resolving every manual-testing item), `HELD` (real manual rows remain), or `UNKNOWN` (no `## Manual Testing` section at all). **Fail-closed: arm only on `CLEARED`.** Phase 6 always writes the section, so a post-plan PR is `CLEARED` or `HELD`, never `UNKNOWN` on this path — the armed set is unchanged; the stricter `UNKNOWN→block` only matters to `bin/pr-triage`'s cross-PR sweep of hand-made PRs:
+
+```bash
+# condition (1): block unless the Manual-Testing section is the positive sentinel.
+source "$(git rev-parse --show-toplevel)/bin/lib/pr-armable.sh"
+CLEAR=$(pr_manual_testing_clearance "$(gh pr view --json body --jq '.body')")
+[ "$CLEAR" != "CLEARED" ] && echo "BLOCKED: Manual-Testing not cleared (state=$CLEAR) — held for human review"
+```
+
 **Condition (4) blocks on the VALUE, not file presence** — the status file is non-empty for `pass` and `skipped` too (it always contains `PHASE5_VERIFY_STATUS=...`), so the `[ -s ... ]` idiom condition (3) uses would wrongly block every `pass`/`skipped`. Block only on the literal `fail` value; **absent file OR `pass` OR `skipped` = PASS (non-blocking)** — a `skipped` status (docs-only / PHP-less PR with no mapped E2E) must NOT block, or every such PR would stop arming, a regression worse than #887:
 
 ```bash
@@ -511,27 +524,31 @@ grep -q 'PHASE5_VERIFY_STATUS=fail' /tmp/post-plan-phase5-status-$PPID 2>/dev/nu
 **Condition (5) — golden-snapshot safety (headless only).** If `$GOLDEN_CHANGED` is `true` AND `$CLAUDE_HEADLESS` is set, **block** auto-merge: a change to `engine/internal/sim/testdata/golden.json` means the engine's simulation output changed, and a snapshot change with no human present is exactly when not to auto-ship (an agent can turn a red `TestGolden` green by regenerating the snapshot, silently masking a regression). In **interactive** mode (`$CLAUDE_HEADLESS` unset), do **not** block — emit a prominent warning with the same text so the human confirms intent before merging. This condition is independent of `HAS_GO` (a golden-only diff is `HAS_GO=false` but must still trigger it):
 
 ```bash
-# condition (5): blocks ONLY when golden changed AND running headless (automouse autonomous)
-[ "$GOLDEN_CHANGED" = true ] && [ -n "$CLAUDE_HEADLESS" ] \
+# condition (5): blocks ONLY when golden changed AND running headless (automouse autonomous).
+# Self-contained: source the predicate and fetch the live file list here. Detection
+# is the Phase-3 diff flag $GOLDEN_CHANGED (a shell var — may be empty in a fresh
+# block) OR the shared predicate's live file-list check (pr_golden_hold, the same
+# one bin/pr-triage uses — reliable regardless of block isolation). Mode policy
+# (headless-only block) stays in the caller; $CLAUDE_HEADLESS is an env var so it
+# survives. Interactive (unset) still warns rather than blocks.
+source "$(git rev-parse --show-toplevel)/bin/lib/pr-armable.sh"
+{ [ "${GOLDEN_CHANGED:-}" = true ] || [ -n "$(pr_golden_hold "$(gh pr view --json files --jq '.files')")" ]; } \
+  && [ -n "${CLAUDE_HEADLESS:-}" ] \
   && echo "BLOCKED: golden.json (simulation behavior) changed in headless mode — confirm this was an intentional 'make -C engine golden-update', not a masked regression"
 ```
 
 **Condition (6) — merge-order dependency (both modes).** When a PR must not merge ahead of another (a refactor that ships first, a migration-number sequence, shared files that re-conflict on merge), its body declares the predecessors with a `Depends-on:` line, e.g. `Depends-on: #1066, #1071`. Arming auto-merge here would let GitHub queue the merge the instant checks pass — out of order — so block until every named PR is `MERGED`. Reads the **live** PR body via `gh` (independent of which branch's skill is running), so a stale local checkout can't bypass it. No `Depends-on:` line ⇒ no dependency ⇒ never blocks. This gate prevents *premature arming only*; it does not rebase — after a predecessor merges, the successor still needs its own `git merge master` + re-green before its checks pass and a later post-plan run can arm:
 
 ```bash
-# condition (6): block if any Depends-on: PR is not yet MERGED.
-# Bare `gh pr view` (no arg) resolves the current branch's PR, matching Phase 3's idiom.
-# Anchor the marker to start-of-line (`^[[:space:]]*depends-on:`) so only a real marker
-# line matches — an INLINE prose mention (e.g. "...the `Depends-on:` gate (#1077)...")
-# must NOT be parsed as a dependency, or every PR documenting the mechanism self-blocks.
-# `while read` (not `for d in $DEPS`) so it splits per-line in bash AND zsh — zsh does
-# not word-split unquoted expansions, so a `for` loop would see all numbers as one word.
-gh pr view --json body --jq '.body' \
-  | grep -iE '^[[:space:]]*depends-on:' | grep -oE '[0-9]+' \
-  | while read -r d; do
-      st=$(gh pr view "$d" --json state --jq '.state' 2>/dev/null)
-      [ "$st" != "MERGED" ] && echo "BLOCKED: depends on #$d (state=${st:-unknown}, not yet MERGED)"
-    done
+# condition (6): block if any Depends-on: predecessor is not yet MERGED — shared
+# predicate (also used by bin/pr-triage). Self-contained: source + fetch the body
+# here. pr_dep_holds anchors the marker to start-of-line (an inline prose mention
+# is ignored) and splits per-line (bash+zsh safe), echoing `depends-on:#N` for
+# each unmerged predecessor.
+source "$(git rev-parse --show-toplevel)/bin/lib/pr-armable.sh"
+pr_dep_holds "$(gh pr view --json body --jq '.body')" | while read -r dep; do
+  echo "BLOCKED: depends on ${dep#depends-on:} — not yet MERGED"
+done
 ```
 
 **Condition (7) — plan-time hold (`auto_merge: false`).** The plan author predicts at plan-time (via `/plan` Step 4 gate 14) whether the change wants a human at merge, and records it as a line-1 frontmatter field. If the located plan file declares `auto_merge: false`, **block** — the PR opens and gets reviewed, but auto-merge does not arm. Parse the line-1 YAML frontmatter only (a body documenting the syntax can't self-select). **Derive `$PLAN_FILE` inside this block** — bash variables do not survive across phases/shells (see Phase 3's note), so a bare `$PLAN_FILE` assigned in Phase 1 would be empty here and the check would silently no-op. The snippet re-derives the path from the branch slug (the same derivation `bin/post-plan-now` and Phase 1's interactive fallback use; in automouse the authoritative path the postplan prompt supplies is identical, since the queue symlinks plans by branch slug). Absent file or absent field ⇒ no hold:
@@ -552,10 +569,15 @@ AUTO_MERGE=$(awk '
 **Condition (8) — commit-type floor (never arm `feat:`).** A literal PR-title grep, deterministic. Mirrors the required `human-signoff` check (`.github/workflows/human-signoff.yml`) as defense-in-depth, so post-plan **never arms a `feat:` PR in the first place** (no arm-then-strip). This is a floor, not a soft signal — commit-type weighs into condition (9) only to *add* holds on maintenance PRs; it can never *release* a `feat:`:
 
 ```bash
-# condition (8): block if the PR title is a conventional-commit feature (feat:/feat(scope):/feat!:)
-gh pr view --json title --jq '.title' \
-  | grep -qiE '^feat(\([^)]*\))?!?:' \
-  && echo "BLOCKED: feat: PR — auto-merge held for the human-signoff floor (post-plan never arms feat:)"
+# condition (8): block a conventional-commit feature title — shared predicate
+# (also used by bin/pr-triage). REFINEMENT: pr_feat_hold is label-aware — a feat:
+# carrying the `human-approved` label does NOT block (the maintainer has signed
+# off, matching the human-signoff check). At post-plan's normal call time (PR
+# just created) no label is present, so this blocks every feat: exactly as before;
+# the label-aware path only releases on a later re-run after a human labeled it.
+source "$(git rev-parse --show-toplevel)/bin/lib/pr-armable.sh"
+FEAT_HOLD=$(pr_feat_hold "$(gh pr view --json title --jq '.title')" "$(gh pr view --json labels --jq '.labels')")
+[ -n "$FEAT_HOLD" ] && echo "BLOCKED: feat: PR — auto-merge held for the human-signoff floor (post-plan never arms an unlabeled feat:)"
 ```
 
 **Condition (9) — PR-time safety verdict (both modes).** Read the realized diff (`/tmp/post-plan-diff-$PPID`) plus the Phase-3 flags (`HAS_MIGRATION`, `GOLDEN_CHANGED`, `COUNT_*`) and the PR title, and **enumerate every concrete reason this PR should wait for a human**. If the list is non-empty, **block**. This catches *drift* — a plan that looked auto-merge-safe at plan-time but whose realized implementation grew past it. Frame it as enumerating holds, **never** as certifying safe: certifying safe is proving a negative, which is unreliable, and the only dangerous failure is *under*-holding (a false ARM); a false HOLD merely costs a human merge. **Bias hard to HOLD on any doubt.** Hold-triggers to look for in the realized diff:

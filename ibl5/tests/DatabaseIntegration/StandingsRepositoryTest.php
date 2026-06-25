@@ -174,4 +174,51 @@ class StandingsRepositoryTest extends DatabaseTestCase
         self::assertArrayHasKey('wins', $first);
         self::assertArrayHasKey('losses', $first);
     }
+
+    // --- Identifier allowlist negative paths (SQL-injection guard) -----------
+    // Column identifiers cannot be bound; they are validated against a closed
+    // allowlist and rejected with InvalidArgumentException. These assert an
+    // out-of-allowlist / injection-style column is refused before any SQL runs.
+
+    public function testUpdateMagicNumberRejectsUnknownColumn(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invalid magic number column');
+        $this->repo->updateMagicNumber(1, 5, 'conf_magic_number = 0; DROP TABLE ibl_standings');
+    }
+
+    public function testUpdateClinchedFlagRejectsUnknownColumn(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invalid clinched column');
+        $this->repo->updateClinchedFlag('Some Team', 'clinched_league = 1 WHERE 1=1; --');
+    }
+
+    public function testFetchTeamsByRegionRejectsUnknownGrouping(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invalid grouping column');
+        $this->repo->fetchTeamsByRegion('1=1', 'Eastern');
+    }
+
+    public function testFetchTopTeamsByWinsRejectsUnknownGrouping(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invalid grouping column');
+        $this->repo->fetchTopTeamsByWins('teamid); DROP TABLE ibl_standings; --', 'Eastern');
+    }
+
+    public function testUpdateMagicNumberAcceptsAllowlistedColumn(): void
+    {
+        // A valid column passes validation and executes without throwing.
+        $this->repo->updateMagicNumber(1, 3, 'conf_magic_number');
+        self::assertTrue(true);
+    }
+
+    public function testFetchTeamsByRegionReturnsRowsForValidGrouping(): void
+    {
+        $result = $this->repo->fetchTeamsByRegion('conference', 'Eastern');
+        self::assertNotEmpty($result);
+        self::assertArrayHasKey('teamid', $result[0]);
+    }
 }

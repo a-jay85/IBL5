@@ -157,22 +157,25 @@ class LastSimRecapRepository extends \BaseMysqliRepository implements LastSimRec
             . " '-', t.transaction_month, '-', t.transaction_day"
             . "), '%Y-%c-%e')";
 
+        // $dateExpr is a fixed SQL fragment built in-class above from column refs and
+        // constants (no user input); $placeholders is a count-derived run of bound `?`
+        // markers. Concatenate both validated fragments rather than interpolating.
         $sql = "SELECT t.pid,
                        p.name,
                        p.pos,
-                       {$dateExpr} AS injury_date,
+                       " . $dateExpr . " AS injury_date,
                        t.injury_description,
                        t.injury_games_missed,
-                       DATEDIFF(DATE_ADD({$dateExpr}, INTERVAL t.injury_games_missed DAY), ?) AS days_remaining,
-                       DATE_FORMAT(DATE_ADD({$dateExpr}, INTERVAL t.injury_games_missed DAY), '%Y-%m-%d') AS return_date,
-                       ({$dateExpr} = ?) AS is_new
+                       DATEDIFF(DATE_ADD(" . $dateExpr . ", INTERVAL t.injury_games_missed DAY), ?) AS days_remaining,
+                       DATE_FORMAT(DATE_ADD(" . $dateExpr . ", INTERVAL t.injury_games_missed DAY), '%Y-%m-%d') AS return_date,
+                       (" . $dateExpr . " = ?) AS is_new
                 FROM `ibl_jsb_transactions` t
                 JOIN `ibl_plr` p ON p.pid = t.pid
                 WHERE t.transaction_type = 1
-                  AND t.pid IN ($placeholders)
+                  AND t.pid IN (" . $placeholders . ")
                   AND t.injury_games_missed IS NOT NULL
-                  AND {$dateExpr} <= ?
-                  AND DATE_ADD({$dateExpr}, INTERVAL t.injury_games_missed DAY) > ?
+                  AND " . $dateExpr . " <= ?
+                  AND DATE_ADD(" . $dateExpr . ", INTERVAL t.injury_games_missed DAY) > ?
                 ORDER BY is_new DESC, injury_date DESC";
 
         // Build types/params: ss (date for days_remaining + is_new), pids (i...), ss (date <= + date <)

@@ -36,10 +36,12 @@ class SchemaValidator extends \BaseMysqliRepository
 
         /** @var list<array{TABLE_NAME: string, COLUMN_NAME: string}> $rows */
         $rows = $this->fetchAll(
+            // $tupleList is a list of real_escape_string-quoted (table, column)
+            // value-tuples built via quote() above; concatenate, not interpolate.
             "SELECT TABLE_NAME, COLUMN_NAME
              FROM INFORMATION_SCHEMA.COLUMNS
              WHERE TABLE_SCHEMA = DATABASE()
-               AND (TABLE_NAME, COLUMN_NAME) IN ({$tupleList})"
+               AND (TABLE_NAME, COLUMN_NAME) IN (" . $tupleList . ")"
         );
 
         $foundKeys = [];

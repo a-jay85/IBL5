@@ -196,26 +196,6 @@
     border-radius: 0;
 }
 
-/* Accent variant tabs */
-.ibl-tabs--accent {
-    background: var(--gradient-accent);
-}
-
-.ibl-tabs--accent .ibl-tab {
-    color: rgba(255, 255, 255, 0.7);
-}
-
-.ibl-tabs--accent .ibl-tab:hover {
-    color: white;
-    background: rgba(0, 0, 0, 0.1);
-}
-
-.ibl-tabs--accent .ibl-tab--active {
-    color: white;
-    background: rgba(0, 0, 0, 0.15);
-    border-bottom-color: white;
-}
-
 /* ==========================================================================
    Jump Menu (Month/Season Selector)
    ========================================================================== */

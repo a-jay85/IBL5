@@ -11,15 +11,6 @@
     max-width: 800px;
 }
 
-.contact-table .team-cell {
-    border-radius: var(--radius-sm);
-    padding: 0.5rem 0.75rem;
-}
-
-.contact-table .team-cell a {
-    font-weight: 600;
-}
-
 .contact-table .gm-cell a {
     color: var(--gray-700);
 }

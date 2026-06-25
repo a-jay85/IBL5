@@ -133,15 +133,6 @@ A:hover {
     text-decoration: none;
 }
 
-.tiny {
-    background: none;
-    color: #000000;
-    font-size: 1rem;
-    font-weight: normal;
-    font-family: var(--font-sans);
-    text-decoration: none;
-}
-
 /* --- Layout Constraints ---
    Prevent legacy table-based layouts from causing horizontal overflow.
    Scoped to non-.ibl-data-table elements so modern tables don't inherit

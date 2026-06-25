@@ -61,8 +61,8 @@ class SeasonLeaderboardsRepository extends \BaseMysqliRepository implements Seas
                 t.team_city, t.color1, t.color2
             FROM `ibl_hist` h
             LEFT JOIN `ibl_team_info` t ON h.teamid = t.teamid
-            WHERE {$where->toWhereClause()} ORDER BY $sortBy DESC, h.pid ASC"
-            . ($limit > 0 ? " LIMIT $limit" : "");
+            WHERE " . $where->toWhereClause() . " ORDER BY " . $sortBy . " DESC, h.pid ASC"
+            . ($limit > 0 ? " LIMIT " . $limit : "");
 
         /** @var list<HistRow> $rows */
         $rows = $this->fetchAll($query, $where->getTypes(), ...$where->getParams());

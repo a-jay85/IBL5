@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-06-22
+last_verified: 2026-06-25
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -1891,14 +1891,14 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 | 10.9 | ✅ Implemented | — | `BanRawHtmlEscapeFunctionsRule` (0). |
 | 10.10 | ⬜ Open | 🟩 | `RequireTrustedAnnotationRule` NOT built (verified absent from phpstan-rules/). New rule + baseline + ADR; green-green. |
 | 10.11 | ✅ Implemented | — | `BanDirectHeaderCallRule` (1 baseline). |
-| 10.12 | ✅ Implemented | 🟩 | `BanDirectMysqliQueryRule` landed; 7 Updater-step sites — burndown 🟩. |
+| 10.12 | ✅ Implemented | 🟩 | `BanDirectMysqliQueryRule` landed; 7 Updater-step sites — burndown 🟩. **Status:** baseline cleared — 7 sites in 3 Refresh steps rerouted to `BaseMysqliRepository::execute()`. |
 | 10.13 | ✅ Implemented | 🟩 | `BanSqlStringInterpolationRule` landed; 32 baseline — burndown 🟩. |
 | 10.14 | 📋 Planned | 🟩 | PR #1160 open (`clock-abstraction-global-seam-ban-rule`): global Clock + ban direct time calls. L refactor, green-green. (Its "still open" note below is stale.) |
 | 10.15 | ⬜ Open | 🟩 | `echo ob_get_clean()` in DebugOutput — code fix; green-green. |
 | 10.16 | ✅ Implemented | — | unescapedOutput baseline cleared. |
 | 10.17 | ✅ Implemented | — | cookieBeforeHeader cleared (ADR-0032). |
 | 10.18 | ✅ Implemented | — | `BanServiceExtendsBaseRepositoryRule` (0). |
-| 10.19 | ✅ Implemented | 🟩 | `BanDuplicateModifierMethodRule` landed; 5 ExtensionOfferEvaluator sites — burndown 🟩. |
+| 10.19 | ✅ Implemented | 🟩 | `BanDuplicateModifierMethodRule` landed; 5 ExtensionOfferEvaluator sites — burndown 🟩. **Status:** baseline cleared — 5 adapter methods renamed `calculate*Modifier`→`compute*Modifier` (delegation to `ContractRules` unchanged). |
 | 10.20 | ⬜ Open | 🟩 | Extend `RequireMeaningfulAssertionsRule` with `$scope` type access (L); green-green rule enhancement. |
 | 10.21 | ✅ Implemented | 🟩 | `BanBareColumnIdentifierRule` landed; 23 sites (3 files) — burndown 🟩. |
 | 10.22 | ✅ Implemented | — | `BanJsonDecodeWithoutThrowFlagRule` (0). |

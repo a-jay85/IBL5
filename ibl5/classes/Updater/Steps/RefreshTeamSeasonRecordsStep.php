@@ -62,7 +62,7 @@ final class RefreshTeamSeasonRecordsStep implements PipelineStepInterface
             $stmt->close();
             throw new \RuntimeException('Execute failed: ' . $err);
         }
-        $affected = $stmt->affected_rows;
+        $affected = (int) $stmt->affected_rows;
         $stmt->close();
         return $affected;
     }

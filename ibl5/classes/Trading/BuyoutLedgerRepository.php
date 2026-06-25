@@ -29,9 +29,11 @@ class BuyoutLedgerRepository extends BaseMysqliRepository implements BuyoutLedge
         $counterpartySql = $counterpartyTid !== null ? '?' : 'NULL';
         $tradeOfferSql = $tradeOfferId !== null ? '?' : 'NULL';
 
+        // $counterpartySql / $tradeOfferSql are each a literal '?' or 'NULL' chosen
+        // above (no user input) — concatenate the conditional placeholders.
         $sql = "INSERT INTO `ibl_cash_considerations`
                     (teamid, type, label, counterparty_teamid, trade_offer_id, cy, cyt, salary_yr1, salary_yr2, salary_yr3, salary_yr4, salary_yr5, salary_yr6)
-                 VALUES (?, ?, ?, {$counterpartySql}, {$tradeOfferSql}, ?, ?, ?, ?, ?, ?, ?, ?)";
+                 VALUES (?, ?, ?, " . $counterpartySql . ", " . $tradeOfferSql . ", ?, ?, ?, ?, ?, ?, ?, ?)";
 
         $types = 'iss';
         $params = [$data['teamid'], $data['type'], $data['label']];

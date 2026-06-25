@@ -35,17 +35,9 @@ final class RefreshTeamSeasonRecordsStep implements PipelineStepInterface
         $this->db->begin_transaction();
 
         try {
-            if ($this->db->query('DELETE FROM `ibl_team_season_records`') === false) {
-                throw new \RuntimeException('DELETE failed: ' . $this->db->error);
-            }
-            if ($this->db->query(self::INSERT_REGULAR_SEASON_SQL) === false) {
-                throw new \RuntimeException('Regular-season INSERT failed: ' . $this->db->error);
-            }
-            $regularRows = (int) $this->db->affected_rows;
-            if ($this->db->query(self::INSERT_HEAT_SQL) === false) {
-                throw new \RuntimeException('HEAT INSERT failed: ' . $this->db->error);
-            }
-            $heatRows = (int) $this->db->affected_rows;
+            $this->dbExec('DELETE FROM `ibl_team_season_records`');
+            $regularRows = $this->dbExec(self::INSERT_REGULAR_SEASON_SQL);
+            $heatRows = $this->dbExec(self::INSERT_HEAT_SQL);
             $this->db->commit();
         } catch (\Throwable $e) {
             $this->db->rollback();
@@ -56,6 +48,23 @@ final class RefreshTeamSeasonRecordsStep implements PipelineStepInterface
             $this->getLabel(),
             sprintf('%d regular + %d HEAT rows', $regularRows, $heatRows),
         );
+    }
+
+    /** Prepare and execute a zero-parameter DML statement; returns affected rows. */
+    private function dbExec(string $sql): int
+    {
+        $stmt = $this->db->prepare($sql);
+        if ($stmt === false) {
+            throw new \RuntimeException('Prepare failed: ' . $this->db->error);
+        }
+        if (!$stmt->execute()) {
+            $err = $stmt->error;
+            $stmt->close();
+            throw new \RuntimeException('Execute failed: ' . $err);
+        }
+        $affected = $stmt->affected_rows;
+        $stmt->close();
+        return $affected;
     }
 
     /**

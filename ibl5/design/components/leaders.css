@@ -124,10 +124,6 @@
     overflow: hidden;
 }
 
-.leaders-tabbed__leader-rank {
-    display: none;
-}
-
 .leaders-tabbed__leader-name {
     font-weight: 600;
     font-size: var(--text-lg);

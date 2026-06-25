@@ -218,28 +218,6 @@
     content: none;
 }
 
-/* Admin links */
-.search-result__admin {
-    display: inline-flex;
-    gap: var(--space-2);
-    margin-left: auto;
-}
-
-.search-result__admin a {
-    font-family: var(--font-display);
-    font-size: var(--text-xs);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: var(--tracking-display);
-    color: var(--gray-400);
-    text-decoration: none;
-    transition: color var(--transition-fast);
-}
-
-.search-result__admin a:hover {
-    color: var(--accent-500);
-}
-
 /* Pagination */
 .search-pagination {
     display: flex;

@@ -563,18 +563,6 @@
     background: linear-gradient(90deg, color-mix(in srgb, var(--card-border) 20%, transparent) 0%, color-mix(in srgb, var(--card-border) 10%, transparent) 100%);
 }
 
-/* Footer Row (e.g., Total Salary) */
-.player-stats-card .footer-row td,
-.player-stats-card .stats-table .footer-row td {
-    background: rgba(0, 0, 0, 0.3);
-    color: var(--card-accent);
-    font-weight: 600;
-    font-style: italic;
-    padding: var(--pc-pad-lg);
-    text-align: center;
-    border-top: 2px solid color-mix(in srgb, var(--card-border) 30%, transparent);
-}
-
 /* Team Links */
 .player-stats-card table a,
 .player-stats-card .stats-table a {

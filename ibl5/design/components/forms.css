@@ -6,8 +6,7 @@
    ========================================================================== */
 
 .ibl-input,
-.ibl-select,
-.ibl-textarea {
+.ibl-select {
     font-family: var(--font-sans);
     font-size: var(--text-lg);
     color: var(--navy-800);
@@ -20,8 +19,7 @@
 }
 
 .ibl-input:focus,
-.ibl-select:focus,
-.ibl-textarea:focus {
+.ibl-select:focus {
     outline: none;
     border-color: var(--accent-500);
     box-shadow: var(--ring-accent);
@@ -32,8 +30,7 @@
 }
 
 .ibl-input:disabled,
-.ibl-select:disabled,
-.ibl-textarea:disabled {
+.ibl-select:disabled {
     background-color: var(--gray-100);
     color: var(--gray-500);
     cursor: not-allowed;

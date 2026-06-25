@@ -94,12 +94,6 @@
     background: var(--team-row-hover-bg);
 }
 
-/* User label with orange accent */
-.next-sim-user-label {
-    color: var(--accent-500);
-    font-weight: 700;
-}
-
 /* Player + Game cells: team-colored background + text (matches ibl-team-cell--colored) */
 .next-sim-row--user .ibl-player-cell,
 .next-sim-row--opponent .ibl-player-cell,

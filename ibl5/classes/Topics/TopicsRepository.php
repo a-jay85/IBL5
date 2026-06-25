@@ -30,7 +30,11 @@ class TopicsRepository extends BaseMysqliRepository implements TopicsRepositoryI
     public function __construct(\mysqli $db, string $prefix = 'nuke')
     {
         parent::__construct($db);
-        $this->prefix = $prefix;
+        // The prefix is an operator-controlled config identifier spliced into table
+        // names (never a bindable value). Validate it against a conservative
+        // identifier pattern and fall back to the default 'nuke' so an unexpected
+        // value can never reach query text; real prefixes match unchanged.
+        $this->prefix = preg_match('/^[a-z0-9_]+$/i', $prefix) === 1 ? $prefix : 'nuke';
     }
 
     /**
@@ -75,8 +79,8 @@ class TopicsRepository extends BaseMysqliRepository implements TopicsRepositoryI
         $sql = "SELECT t.topicid, t.topicname, t.topicimage, t.topictext,
                        COUNT(s.sid) AS stories,
                        COALESCE(SUM(s.counter), 0) AS total_reads
-                FROM {$this->prefix}_topics t
-                LEFT JOIN {$this->prefix}_stories s ON (s.topic = t.topicid)
+                FROM " . $this->prefix . "_topics t
+                LEFT JOIN " . $this->prefix . "_stories s ON (s.topic = t.topicid)
                 GROUP BY t.topicid, t.topicname, t.topicimage, t.topictext
                 ORDER BY t.topictext";
 
@@ -93,8 +97,8 @@ class TopicsRepository extends BaseMysqliRepository implements TopicsRepositoryI
     private function fetchRecentArticles(int $topicId): array
     {
         $sql = "SELECT s.sid, s.catid, s.title, COALESCE(c.title, '') AS cat_title
-                FROM {$this->prefix}_stories s
-                LEFT JOIN {$this->prefix}_stories_cat c ON s.catid = c.catid
+                FROM " . $this->prefix . "_stories s
+                LEFT JOIN " . $this->prefix . "_stories_cat c ON s.catid = c.catid
                 WHERE s.topic = ?
                 ORDER BY s.sid DESC
                 LIMIT 10";

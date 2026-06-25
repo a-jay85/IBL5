@@ -28,6 +28,7 @@ Options:
   --base-url <url>     App base URL for crawl (overrides ORPHAN_CSS_BASE_URL).
                        Default derived from worktree slug:
                        http://<slug>.localhost/ibl5/
+                       (Slug "IBL5" defaults to main.localhost.)
   --strict             Exit 1 when candidates remain (local enforcement only).
   --self-test          Build throwaway fixtures and test filter logic; exit.
                        Tests both directions: referenced class not flagged,
@@ -65,6 +66,73 @@ class_in_source() {
         --include='*.tpl' --include='*.html' \
         --exclude-dir=vendor --exclude-dir=node_modules --exclude-dir=design \
         "$search_dir" 2>/dev/null
+}
+
+# ── URL derivation helper ────────────────────────────────────────────────────
+# Echoes the crawl base URL for a given worktree slug.
+# Slug "IBL5" is the main checkout; all others are worktrees.
+derive_base_url() {
+    local slug="$1"
+    if [ "$slug" = "IBL5" ]; then
+        echo "http://main.localhost/ibl5/"
+    else
+        echo "http://${slug}.localhost/ibl5/"
+    fi
+}
+
+# ── Routes file parser ───────────────────────────────────────────────────────
+# Built-in default: 15 named routes (homepage "" crawled unconditionally in-script)
+_DEFAULT_ROUTES=(
+    "modules.php?name=Standings"
+    "modules.php?name=Schedule"
+    "modules.php?name=Roster"
+    "modules.php?name=DepthChart"
+    "modules.php?name=PlayerView"
+    "modules.php?name=TeamSplits"
+    "modules.php?name=News"
+    "modules.php?name=Waivers"
+    "modules.php?name=TransactionHistory"
+    "modules.php?name=RecordHolders"
+    "modules.php?name=SeasonArchive"
+    "modules.php?name=Search"
+    "modules.php?name=AllStarGame"
+    "modules.php?name=GMContactList"
+    "modules.php?name=NextSim"
+)
+
+# Echoes one route per line from path, stripping '#' comments and blank lines.
+# Falls back to _DEFAULT_ROUTES when path is empty, missing, or unreadable.
+parse_routes_file() {
+    local path="$1"
+    if [ -f "$path" ]; then
+        grep -v '^[[:space:]]*#' "$path" \
+            | sed 's/[[:space:]]*#.*//' \
+            | grep -v '^[[:space:]]*$' \
+            || true
+    else
+        printf '%s\n' "${_DEFAULT_ROUTES[@]}"
+    fi
+}
+
+# ── CSS definition locator ───────────────────────────────────────────────────
+# Echoes the first file:line where .cls is defined in css_dir/**/*.css.
+# Uses the same right-boundary as class_in_source so ".alert" is not
+# located via ".alert-error". Degrades to "(source unknown)" on no match.
+css_definition_location() {
+    local cls="$1"
+    local css_dir="$2"
+    local result
+    result=$(grep -rnE "\.${cls}([^A-Za-z0-9_-]|\$)" \
+        --include='*.css' \
+        "$css_dir" 2>/dev/null \
+        | head -1 \
+        | cut -d: -f1-2 \
+        || true)
+    if [ -z "$result" ]; then
+        echo "(source unknown)"
+    else
+        echo "$result"
+    fi
 }
 
 # ── Self-test ────────────────────────────────────────────────────────────────
@@ -142,6 +210,133 @@ PHPEOF
         echo "PASS: boundary test -- 'alert' not spared by 'alert-error'"
     fi
 
+    # ── Row 2: derive_base_url ───────────────────────────────────────────────
+    local url_ibl5 url_foo
+    url_ibl5=$(derive_base_url "IBL5")
+    url_foo=$(derive_base_url "foo")
+    if [ "$url_ibl5" = "http://main.localhost/ibl5/" ]; then
+        echo "PASS: derive_base_url IBL5 -> main.localhost"
+    else
+        echo "FAIL: derive_base_url IBL5 got '$url_ibl5'" >&2
+        pass=0
+    fi
+    if [ "$url_foo" = "http://foo.localhost/ibl5/" ]; then
+        echo "PASS: derive_base_url foo -> foo.localhost"
+    else
+        echo "FAIL: derive_base_url foo got '$url_foo'" >&2
+        pass=0
+    fi
+
+    # ── Row 3: parse_routes_file strips comments and blanks ─────────────────
+    local fixture_routes="$fixture_dir/routes.txt"
+    printf '# comment line\n\nmodules.php?name=A\nmodules.php?name=B\n' >"$fixture_routes"
+    local parsed_routes
+    parsed_routes=$(parse_routes_file "$fixture_routes")
+    local parsed_count
+    parsed_count=$(printf '%s\n' "$parsed_routes" | grep -c '^modules' || true)
+    if [ "$parsed_count" = "2" ]; then
+        echo "PASS: parse_routes_file strips comments/blanks -> 2 routes"
+    else
+        echo "FAIL: parse_routes_file got $parsed_count routes (expected 2)" >&2
+        pass=0
+    fi
+    if printf '%s\n' "$parsed_routes" | grep -qx 'modules.php?name=A' && \
+       printf '%s\n' "$parsed_routes" | grep -qx 'modules.php?name=B'; then
+        echo "PASS: parse_routes_file fixture routes present"
+    else
+        echo "FAIL: parse_routes_file missing expected route" >&2
+        pass=0
+    fi
+
+    # ── Row 4: path argument honored over committed file ─────────────────────
+    # Calling with fixture path (2 routes) vs committed file (15 routes) proves
+    # the path arg controls output -- this is the mechanism ORPHAN_CSS_ROUTES_FILE uses
+    local r4_count
+    r4_count=$(parse_routes_file "$fixture_routes" | grep -c '^modules' || true)
+    if [ "$r4_count" = "2" ]; then
+        echo "PASS: parse_routes_file path arg honored (fixture -> 2 routes, not 15)"
+    else
+        echo "FAIL: parse_routes_file path arg got $r4_count routes (expected 2)" >&2
+        pass=0
+    fi
+
+    # ── Row 5: missing routes file falls back to 15 built-in defaults ────────
+    local missing_count
+    missing_count=$(parse_routes_file "/nonexistent/path/routes.txt" | grep -c '^modules' || true)
+    if [ "$missing_count" = "15" ]; then
+        echo "PASS: parse_routes_file missing file -> 15 built-in defaults"
+    else
+        echo "FAIL: parse_routes_file missing file got $missing_count routes (expected 15)" >&2
+        pass=0
+    fi
+
+    # ── Rows 6/7/8: css_definition_location ─────────────────────────────────
+    local css_fixture_dir="$fixture_dir/css"
+    mkdir -p "$css_fixture_dir"
+    # Line 1: .other-class, Line 2: .dead-loc-class,
+    # Line 3: .alert-error,  Line 4: .alert
+    printf '.other-class { color: green; }\n.dead-loc-class { color: purple; }\n.alert-error { color: orange; }\n.alert { color: red; }\n' \
+        >"$css_fixture_dir/test.css"
+
+    # Row 6: known class returns file:line matching correct line number
+    local loc_known
+    loc_known=$(css_definition_location "dead-loc-class" "$css_fixture_dir")
+    if echo "$loc_known" | grep -qE ':2$'; then
+        echo "PASS: css_definition_location returns correct file:line for dead-loc-class"
+    else
+        echo "FAIL: css_definition_location for dead-loc-class got '$loc_known' (expected :2)" >&2
+        pass=0
+    fi
+
+    # Row 7: undefined class -> (source unknown), no crash under set -e
+    local loc_unknown
+    loc_unknown=$(css_definition_location "never-defined-xyz" "$css_fixture_dir")
+    if [ "$loc_unknown" = "(source unknown)" ]; then
+        echo "PASS: css_definition_location unknown class -> (source unknown)"
+    else
+        echo "FAIL: css_definition_location unknown got '$loc_unknown'" >&2
+        pass=0
+    fi
+
+    # Row 8: .alert NOT located via .alert-error (right-boundary check)
+    # .alert-error is on line 3; .alert is on line 4 -- must resolve to line 4
+    local loc_alert
+    loc_alert=$(css_definition_location "alert" "$css_fixture_dir")
+    if echo "$loc_alert" | grep -qE ':4$'; then
+        echo "PASS: css_definition_location alert -> line 4 (not alert-error on line 3)"
+    else
+        echo "FAIL: css_definition_location alert got '$loc_alert' (expected :4)" >&2
+        pass=0
+    fi
+
+    # ── Rows 9/10: committed routes file ─────────────────────────────────────
+    local committed_routes_file="$ROOT/bin/orphan-css-routes.txt"
+    if [ -f "$committed_routes_file" ]; then
+        local committed_count
+        committed_count=$(parse_routes_file "$committed_routes_file" | grep -c '^modules' || true)
+        if [ "$committed_count" = "15" ]; then
+            echo "PASS: committed routes file parses to 15 routes"
+        else
+            echo "FAIL: committed routes file got $committed_count routes (expected 15)" >&2
+            pass=0
+        fi
+        if parse_routes_file "$committed_routes_file" | grep -qx 'modules.php?name=GMContactList'; then
+            echo "PASS: GMContactList present in committed routes"
+        else
+            echo "FAIL: GMContactList missing from committed routes" >&2
+            pass=0
+        fi
+        if parse_routes_file "$committed_routes_file" | grep -qx 'modules.php?name=NextSim'; then
+            echo "PASS: NextSim present in committed routes"
+        else
+            echo "FAIL: NextSim missing from committed routes" >&2
+            pass=0
+        fi
+    else
+        echo "FAIL: committed routes file not found at $committed_routes_file" >&2
+        pass=0
+    fi
+
     rm -rf "$fixture_dir" "$candidates_file" "$residue_file" \
         "$boundary_cands" "$boundary_residue" 2>/dev/null || true
 
@@ -212,31 +407,22 @@ if [ "$DO_CRAWL" = "1" ]; then
         if [ -n "${ORPHAN_CSS_BASE_URL:-}" ]; then
             BASE_URL="$ORPHAN_CSS_BASE_URL"
         else
-            SLUG=$(basename "$(git rev-parse --show-toplevel)")
-            BASE_URL="http://${SLUG}.localhost/ibl5/"
+            SLUG=$(basename "$ROOT")
+            BASE_URL="$(derive_base_url "$SLUG")"
         fi
     fi
 
     echo "Step 3: Crawling app routes (base URL: $BASE_URL)"
     echo ""
 
-    # Representative route list -- extend as needed without code surgery
-    ROUTES=(
-        ""
-        "modules.php?name=Standings"
-        "modules.php?name=Schedule"
-        "modules.php?name=Roster"
-        "modules.php?name=DepthChart"
-        "modules.php?name=PlayerView"
-        "modules.php?name=TeamSplits"
-        "modules.php?name=News"
-        "modules.php?name=Waivers"
-        "modules.php?name=TransactionHistory"
-        "modules.php?name=RecordHolders"
-        "modules.php?name=SeasonArchive"
-        "modules.php?name=Search"
-        "modules.php?name=AllStarGame"
-    )
+    ROUTES_FILE="${ORPHAN_CSS_ROUTES_FILE:-$ROOT/bin/orphan-css-routes.txt}"
+    echo "  Routes file: $ROUTES_FILE"
+
+    # Homepage crawled unconditionally; named routes loaded from file (or built-in fallback)
+    ROUTES=("")
+    while IFS= read -r route; do
+        ROUTES+=("$route")
+    done < <(parse_routes_file "$ROUTES_FILE")
 
     for route in "${ROUTES[@]}"; do
         url="${BASE_URL}${route}"
@@ -284,7 +470,8 @@ if [ "$candidate_count" = "0" ]; then
     echo "No candidates found."
 else
     while read -r cls; do
-        echo "  $cls -- candidate: verify (may be data/role/state/layout-gated or composed; NOT confirmed dead)"
+        loc="$(css_definition_location "$cls" "$CSS_DIR")"
+        echo "  $cls -- candidate ($loc): verify (may be data/role/state/layout-gated or composed; NOT confirmed dead)"
     done <"$RESIDUE"
     echo ""
     if [ "$DO_CRAWL" = "0" ]; then

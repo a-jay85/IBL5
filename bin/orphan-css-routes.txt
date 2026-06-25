@@ -1,0 +1,19 @@
+# Crawl route list for bin/check-orphan-css (--crawl). One route per line.
+# '#' comments and blank lines are ignored. The homepage ("") is crawled
+# automatically by the script and is NOT listed here.
+# Override ad-hoc with ORPHAN_CSS_ROUTES_FILE=/path/to/routes.txt.
+modules.php?name=Standings
+modules.php?name=Schedule
+modules.php?name=Roster
+modules.php?name=DepthChart
+modules.php?name=PlayerView
+modules.php?name=TeamSplits
+modules.php?name=News
+modules.php?name=Waivers
+modules.php?name=TransactionHistory
+modules.php?name=RecordHolders
+modules.php?name=SeasonArchive
+modules.php?name=Search
+modules.php?name=AllStarGame
+modules.php?name=GMContactList
+modules.php?name=NextSim

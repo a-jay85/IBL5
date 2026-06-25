@@ -25,9 +25,9 @@ class ExtensionOfferEvaluator implements ExtensionOfferEvaluatorInterface
     }
 
     /**
-     * @see ExtensionOfferEvaluatorInterface::calculateWinnerModifier()
+     * @see ExtensionOfferEvaluatorInterface::computeWinnerModifier()
      */
-    public function calculateWinnerModifier(array $teamFactors, array $playerPreferences): float
+    public function computeWinnerModifier(array $teamFactors, array $playerPreferences): float
     {
         return \ContractRules::calculateWinnerModifier(
             $teamFactors['wins'] ?? 0,
@@ -37,9 +37,9 @@ class ExtensionOfferEvaluator implements ExtensionOfferEvaluatorInterface
     }
 
     /**
-     * @see ExtensionOfferEvaluatorInterface::calculateTraditionModifier()
+     * @see ExtensionOfferEvaluatorInterface::computeTraditionModifier()
      */
-    public function calculateTraditionModifier(array $teamFactors, array $playerPreferences): float
+    public function computeTraditionModifier(array $teamFactors, array $playerPreferences): float
     {
         return \ContractRules::calculateTraditionModifier(
             $teamFactors['tradition_wins'] ?? 0,
@@ -49,17 +49,17 @@ class ExtensionOfferEvaluator implements ExtensionOfferEvaluatorInterface
     }
 
     /**
-     * @see ExtensionOfferEvaluatorInterface::calculateLoyaltyModifier()
+     * @see ExtensionOfferEvaluatorInterface::computeLoyaltyModifier()
      */
-    public function calculateLoyaltyModifier(array $playerPreferences): float
+    public function computeLoyaltyModifier(array $playerPreferences): float
     {
         return \ContractRules::calculateLoyaltyModifier($playerPreferences['loyalty'] ?? 1);
     }
 
     /**
-     * @see ExtensionOfferEvaluatorInterface::calculatePlayingTimeModifier()
+     * @see ExtensionOfferEvaluatorInterface::computePlayingTimeModifier()
      */
-    public function calculatePlayingTimeModifier(array $teamFactors, array $playerPreferences): float
+    public function computePlayingTimeModifier(array $teamFactors, array $playerPreferences): float
     {
         return \ContractRules::calculatePlayingTimeModifier(
             $teamFactors['money_committed_at_position'] ?? 0,
@@ -68,15 +68,15 @@ class ExtensionOfferEvaluator implements ExtensionOfferEvaluatorInterface
     }
 
     /**
-     * @see ExtensionOfferEvaluatorInterface::calculateCombinedModifier()
+     * @see ExtensionOfferEvaluatorInterface::computeCombinedModifier()
      */
-    public function calculateCombinedModifier(array $teamFactors, array $playerPreferences): float
+    public function computeCombinedModifier(array $teamFactors, array $playerPreferences): float
     {
         $modifier = 1.0;
-        $modifier += $this->calculateWinnerModifier($teamFactors, $playerPreferences);
-        $modifier += $this->calculateTraditionModifier($teamFactors, $playerPreferences);
-        $modifier += $this->calculateLoyaltyModifier($playerPreferences);
-        $modifier += $this->calculatePlayingTimeModifier($teamFactors, $playerPreferences);
+        $modifier += $this->computeWinnerModifier($teamFactors, $playerPreferences);
+        $modifier += $this->computeTraditionModifier($teamFactors, $playerPreferences);
+        $modifier += $this->computeLoyaltyModifier($playerPreferences);
+        $modifier += $this->computePlayingTimeModifier($teamFactors, $playerPreferences);
         return $modifier;
     }
 
@@ -88,7 +88,7 @@ class ExtensionOfferEvaluator implements ExtensionOfferEvaluatorInterface
         $offerData = $this->contractValidator->calculateOfferValue($offer);
         $demandsData = $this->contractValidator->calculateOfferValue($demands);
         
-        $modifier = $this->calculateCombinedModifier($teamFactors, $playerPreferences);
+        $modifier = $this->computeCombinedModifier($teamFactors, $playerPreferences);
         
         $adjustedOfferValue = $offerData['averagePerYear'] * $modifier;
         $demandValue = $demandsData['averagePerYear'];

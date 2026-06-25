@@ -67,36 +67,6 @@ parameters:
 			path: classes/EngineBundle/EngineBundleRepository.php
 
 		-
-			rawMessage: 'Method calculateCombinedModifier() duplicates a contract-modifier formula. Modifier calculations must live in ContractRules to keep salary-formula logic centralized — delegate to ContractRules::calculateCombinedModifier() instead of re-implementing it here.'
-			identifier: ibl.duplicateModifierMethod
-			count: 1
-			path: classes/Extension/ExtensionOfferEvaluator.php
-
-		-
-			rawMessage: 'Method calculateLoyaltyModifier() duplicates a contract-modifier formula. Modifier calculations must live in ContractRules to keep salary-formula logic centralized — delegate to ContractRules::calculateLoyaltyModifier() instead of re-implementing it here.'
-			identifier: ibl.duplicateModifierMethod
-			count: 1
-			path: classes/Extension/ExtensionOfferEvaluator.php
-
-		-
-			rawMessage: 'Method calculatePlayingTimeModifier() duplicates a contract-modifier formula. Modifier calculations must live in ContractRules to keep salary-formula logic centralized — delegate to ContractRules::calculatePlayingTimeModifier() instead of re-implementing it here.'
-			identifier: ibl.duplicateModifierMethod
-			count: 1
-			path: classes/Extension/ExtensionOfferEvaluator.php
-
-		-
-			rawMessage: 'Method calculateTraditionModifier() duplicates a contract-modifier formula. Modifier calculations must live in ContractRules to keep salary-formula logic centralized — delegate to ContractRules::calculateTraditionModifier() instead of re-implementing it here.'
-			identifier: ibl.duplicateModifierMethod
-			count: 1
-			path: classes/Extension/ExtensionOfferEvaluator.php
-
-		-
-			rawMessage: 'Method calculateWinnerModifier() duplicates a contract-modifier formula. Modifier calculations must live in ContractRules to keep salary-formula logic centralized — delegate to ContractRules::calculateWinnerModifier() instead of re-implementing it here.'
-			identifier: ibl.duplicateModifierMethod
-			count: 1
-			path: classes/Extension/ExtensionOfferEvaluator.php
-
-		-
 			rawMessage: Hardcoded environment string "127.0.0.1" is banned. Inject an environment/config flag instead of branching on a literal host name.
 			identifier: ibl.hardcodedEnvString
 			count: 1
@@ -365,24 +335,6 @@ parameters:
 			identifier: ibl.sqlStringInterpolation
 			count: 1
 			path: classes/TransactionHistory/TransactionHistoryRepository.php
-
-		-
-			rawMessage: 'Direct \mysqli::query() is banned outside the DB-access boundary. Use a BaseMysqliRepository helper (execute()/fetchOne()/fetchAll()) instead — raw query() bypasses prepared-statement parameterization.'
-			identifier: ibl.directMysqliQuery
-			count: 2
-			path: classes/Updater/Steps/RefreshIblHistStep.php
-
-		-
-			rawMessage: 'Direct \mysqli::query() is banned outside the DB-access boundary. Use a BaseMysqliRepository helper (execute()/fetchOne()/fetchAll()) instead — raw query() bypasses prepared-statement parameterization.'
-			identifier: ibl.directMysqliQuery
-			count: 2
-			path: classes/Updater/Steps/RefreshPlayoffSeriesResultsStep.php
-
-		-
-			rawMessage: 'Direct \mysqli::query() is banned outside the DB-access boundary. Use a BaseMysqliRepository helper (execute()/fetchOne()/fetchAll()) instead — raw query() bypasses prepared-statement parameterization.'
-			identifier: ibl.directMysqliQuery
-			count: 3
-			path: classes/Updater/Steps/RefreshTeamSeasonRecordsStep.php
 
 		-
 			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'

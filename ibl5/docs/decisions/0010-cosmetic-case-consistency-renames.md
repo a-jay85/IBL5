@@ -1,6 +1,6 @@
 ---
 description: Rationale for snake-casing PascalCase/camelCase columns across the schema (Tiers 3-5 of the sql-column-naming audit), enforced by a PHPStan rule. Covers the multi-PR roadmap from player ratings through awards/voting/legacy-nuke cleanup.
-last_verified: 2026-04-25
+last_verified: 2026-06-25
 ---
 
 # ADR-0010: Cosmetic Case-Consistency Renames (Tier 3)

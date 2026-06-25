@@ -210,9 +210,15 @@ class StandingsRepositoryTest extends DatabaseTestCase
 
     public function testUpdateMagicNumberAcceptsAllowlistedColumn(): void
     {
-        // A valid column passes validation and executes without throwing.
+        // A valid column passes validation and the magic number is persisted to
+        // that column (proves the allowlisted identifier reached the UPDATE).
         $this->repo->updateMagicNumber(1, 3, 'conf_magic_number');
-        self::assertTrue(true);
+
+        $result = $this->db->query('SELECT `conf_magic_number` FROM `ibl_standings` WHERE `teamid` = 1');
+        self::assertNotFalse($result);
+        $row = $result->fetch_assoc();
+        self::assertIsArray($row);
+        self::assertEquals(3, $row['conf_magic_number']);
     }
 
     public function testFetchTeamsByRegionReturnsRowsForValidGrouping(): void

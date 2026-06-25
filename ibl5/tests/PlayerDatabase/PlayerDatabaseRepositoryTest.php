@@ -110,7 +110,7 @@ final class PlayerDatabaseRepositoryTest extends TestCase
         $this->mockDb->expects($this->once())
             ->method('prepare')
             ->with(self::callback(function ($query) {
-                return strpos($query, 'retired = 0') !== false;
+                return strpos(str_replace('`', '', $query), 'retired = 0') !== false;
             }))
             ->willReturn($mockStmt);
 
@@ -143,7 +143,7 @@ final class PlayerDatabaseRepositoryTest extends TestCase
         $this->mockDb->expects($this->once())
             ->method('prepare')
             ->with(self::callback(function ($query) {
-                return strpos($query, 'name LIKE ?') !== false;
+                return strpos(str_replace('`', '', $query), 'name LIKE ?') !== false;
             }))
             ->willReturn($mockStmt);
 
@@ -165,7 +165,7 @@ final class PlayerDatabaseRepositoryTest extends TestCase
         $this->mockDb->expects($this->once())
             ->method('prepare')
             ->with(self::callback(function ($query) {
-                return strpos($query, 'college LIKE ?') !== false;
+                return strpos(str_replace('`', '', $query), 'college LIKE ?') !== false;
             }))
             ->willReturn($mockStmt);
 
@@ -187,7 +187,7 @@ final class PlayerDatabaseRepositoryTest extends TestCase
         $this->mockDb->expects($this->once())
             ->method('prepare')
             ->with(self::callback(function ($query) {
-                return strpos($query, 'pos = ?') !== false;
+                return strpos(str_replace('`', '', $query), 'pos = ?') !== false;
             }))
             ->willReturn($mockStmt);
 
@@ -209,7 +209,7 @@ final class PlayerDatabaseRepositoryTest extends TestCase
         $this->mockDb->expects($this->once())
             ->method('prepare')
             ->with(self::callback(function ($query) {
-                return strpos($query, 'age <= ?') !== false;
+                return strpos(str_replace('`', '', $query), 'age <= ?') !== false;
             }))
             ->willReturn($mockStmt);
 
@@ -231,7 +231,7 @@ final class PlayerDatabaseRepositoryTest extends TestCase
         $this->mockDb->expects($this->once())
             ->method('prepare')
             ->with(self::callback(function ($query) {
-                return strpos($query, 'oo >= ?') !== false;
+                return strpos(str_replace('`', '', $query), 'oo >= ?') !== false;
             }))
             ->willReturn($mockStmt);
 

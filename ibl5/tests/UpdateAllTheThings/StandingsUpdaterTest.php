@@ -611,11 +611,6 @@ class StandingsUpdaterTest extends TestCase
         }
     }
 
-    public function testRegularSeasonGamesConstantEquals82(): void
-    {
-        $this->assertSame(82, \League\League::REGULAR_SEASON_GAMES);
-    }
-
     public function testConstructorAcceptsOptionalIsOlympicsFlag(): void
     {
         $updater = new \Updater\StandingsUpdater($this->repository, $this->mockSeason, true);

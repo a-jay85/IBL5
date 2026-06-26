@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace RecordHolders;
 
+use RecordHolders\Contracts\AnnouncementDispatcherInterface;
 use RecordHolders\Contracts\RecordBreakingDetectorInterface;
 use RecordHolders\Contracts\RecordHoldersRepositoryInterface;
 use Utilities\BoxScoreUrlBuilder;
-use Discord\Discord;
 
 /**
  * RecordBreakingDetector - Detects and announces broken/tied all-time IBL records.
@@ -22,6 +22,8 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
 {
     private RecordHoldersRepositoryInterface $repository;
 
+    private AnnouncementDispatcherInterface $dispatcher;
+
     private const SITE_BASE_URL = 'https://iblhoops.net';
 
     /**
@@ -33,9 +35,12 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
         'heat' => 'HEAT',
     ];
 
-    public function __construct(RecordHoldersRepositoryInterface $repository)
-    {
+    public function __construct(
+        RecordHoldersRepositoryInterface $repository,
+        ?AnnouncementDispatcherInterface $dispatcher = null
+    ) {
         $this->repository = $repository;
+        $this->dispatcher = $dispatcher ?? new DiscordAnnouncementDispatcher();
     }
 
     /**
@@ -117,9 +122,15 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
         $qdAnnouncements = $this->detectNewQuadrupleDoubles($allTargetDates);
         array_push($announcements, ...$qdAnnouncements);
 
-        // Send all Discord notifications
+        // Dispatch each announcement independently — one failed dispatch must
+        // not abort the remaining announcements (finding 1.3 resilience fix).
         foreach ($announcements as $message) {
-            $this->sendDiscordNotification($message);
+            try {
+                $this->dispatcher->dispatch($message);
+            } catch (\Throwable) {
+                // Swallow deliberately: a dispatch failure (e.g. Discord outage)
+                // must not stop later announcements from being dispatched.
+            }
         }
 
         return $announcements;
@@ -411,15 +422,6 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
         return "**NEW QUADRUPLE DOUBLE!**\n"
             . $playerLink . ' (' . $teamName . ') recorded a quadruple double (' . $linkedStats
             . ') in a ' . $gameTypeLabel . ' game!';
-    }
-
-    /**
-     * Send a Discord notification about a record.
-     */
-    private function sendDiscordNotification(string $message): void
-    {
-        Discord::postToChannel('#trades', $message);
-        Discord::postToChannel('#general-chat', $message);
     }
 
     /**

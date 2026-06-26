@@ -81,7 +81,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 |---|--------|-----------|-----------------|
 | 1.1 | ◑ Partial | 🟩 | Narrow fix done (stubs/cache, −39 LOC); the formatter god-class split is **PR #1167** open (queued `extract-recordformatter`, armed green-green). Service still 687 LOC. |
 | 1.2 | ✅ Implemented | — | `StreakCalculator` exists (#1040); HEAT CTE → `vw_heat_champions` (migration 149, #1090). Repo still 823 LOC = separate cohesive batch-query concern, not this finding. |
-| 1.3 | ⬜ Open | 🟩 | Verified `detectAndAnnounce()` + private `sendDiscordNotification()` still coupled. Inject dispatcher interface; green-green, no security/UI/schema. |
+| 1.3 | ✅ Implemented | 🟩 | `AnnouncementDispatcherInterface` injected (defaulted to `DiscordAnnouncementDispatcher`); dispatch loop now isolates per-message failures; `NullAnnouncementDispatcher` for dry-run/tests. Green-green + 1 tested resilience delta. |
 | 1.4 | ✅ Implemented | — | `JsbImportService` now 177-LOC facade + 10 `Importers/` (#801). |
 | 1.5 | ✅ Implemented | — | #1148 — 3 collaborators extracted; service ~386 LOC. |
 | 1.6 | ✅ Implemented | — | Dual-path unified, byte-identical (#1146). View still 610 LOC = residual size, not this concern. |
@@ -122,6 +122,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Return announcement list from `detectAndAnnounce()`; or inject `AnnouncementDispatcher` interface with a null impl for tests.
 **Est. effort:** S
 **Risk if untouched:** Discord outage silently aborts announcements mid-way; dry-run impossible without modifying class.
+**Status:** Implemented (2026-06-25) — injected `AnnouncementDispatcherInterface` (defaulted to `DiscordAnnouncementDispatcher`); `detectAndAnnounce()` dispatches per-message with `try/catch` isolation so a Discord outage no longer aborts the loop; `NullAnnouncementDispatcher` enables dry-run/testable detection. Private `sendDiscordNotification()` removed.
 
 ### 1.4 JsbImportService — One Class Handling 10 File Formats
 **Location:** `ibl5/classes/JsbParser/JsbImportService.php` (853 lines)

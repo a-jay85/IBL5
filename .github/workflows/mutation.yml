@@ -55,7 +55,7 @@ jobs:
         coverage: pcov
 
     - name: Cache vendor directory
-      uses: actions/cache@v5
+      uses: actions/cache@v6
       with:
         path: ibl5/vendor
         key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
@@ -166,7 +166,7 @@ jobs:
         coverage: pcov
 
     - name: Cache vendor directory
-      uses: actions/cache@v5
+      uses: actions/cache@v6
       with:
         path: ibl5/vendor
         key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}

@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-06-25
+last_verified: 2026-06-26
 ---
 
 # Maintenance-Cost Reduction Backlog

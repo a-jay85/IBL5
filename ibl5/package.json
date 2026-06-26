@@ -43,7 +43,7 @@
   },
   "//pin": "@playwright/test is exact-pinned (no caret) to keep all 5 surfaces in lock-step with the v1.60.0-jammy Docker image; CI job 'playwright-version-drift' enforces this. The transitive playwright-core@1.58.2 carried via @axe-core/playwright is left untouched — overriding it risks an incompatible axe-core/playwright-core pair, and it is separate from the runtime Playwright that executes tests.",
   "devDependencies": {
-    "@axe-core/playwright": "^4.11.3",
+    "@axe-core/playwright": "^4.12.1",
     "@lhci/cli": "^0.15.1",
     "@playwright/test": "1.60.0",
     "@tailwindcss/cli": "^4.3.1",

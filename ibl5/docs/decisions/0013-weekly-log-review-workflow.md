@@ -1,6 +1,6 @@
 ---
 description: ADR for weekly production log review via GitHub Action and Discord DM notification.
-last_verified: 2026-04-26
+last_verified: 2026-06-25
 ---
 
 # ADR-0013: Weekly Log Review Workflow

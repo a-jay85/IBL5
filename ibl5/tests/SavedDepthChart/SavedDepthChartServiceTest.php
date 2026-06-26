@@ -340,7 +340,7 @@ class SavedDepthChartServiceTest extends WideUnitTestCase
             'dc_minutes' => 30, 'dc_of' => 1, 'dc_df' => 1, 'dc_oi' => 1, 'dc_di' => 1, 'dc_bh' => 1,
         ];
 
-        $repo = $this->createStub(SavedDepthChartRepositoryInterface::class);
+        $repo = self::createStub(SavedDepthChartRepositoryInterface::class);
         $repo->method('getActiveDepthChartForTeam')->willReturn($activeDcRow);
         $repo->method('getSavedDepthChartsForTeam')->willReturn([$activeDcRow]);
         $repo->method('getPlayersForDepthChart')->willReturn([$dcPlayerRow]);
@@ -360,7 +360,7 @@ class SavedDepthChartServiceTest extends WideUnitTestCase
     {
         $activeDcRow = $this->makeActiveDcRow(42, 'Championship DC');
 
-        $repo = $this->createStub(SavedDepthChartRepositoryInterface::class);
+        $repo = self::createStub(SavedDepthChartRepositoryInterface::class);
         $repo->method('getActiveDepthChartForTeam')->willReturn($activeDcRow);
         $repo->method('getWinLossRecord')->willReturn(['wins' => 3, 'losses' => 1]);
 
@@ -373,7 +373,7 @@ class SavedDepthChartServiceTest extends WideUnitTestCase
 
     public function testBuildCurrentLiveLabelFallsBackWhenNoActiveDc(): void
     {
-        $repo = $this->createStub(SavedDepthChartRepositoryInterface::class);
+        $repo = self::createStub(SavedDepthChartRepositoryInterface::class);
         $repo->method('getActiveDepthChartForTeam')->willReturn(null);
 
         $service = new SavedDepthChartService($this->mockDb, $repo);
@@ -437,7 +437,7 @@ class SavedDepthChartServiceTest extends WideUnitTestCase
             'dc_minutes' => 30, 'dc_of' => 1, 'dc_df' => 1, 'dc_oi' => 1, 'dc_di' => 1, 'dc_bh' => 1,
         ];
 
-        $mock = $this->createStub(SavedDepthChartRepositoryInterface::class);
+        $mock = self::createStub(SavedDepthChartRepositoryInterface::class);
         $mock->method('getActiveDepthChartForTeam')->willReturnMap([
             [1, $dcTeam1],
             [2, $dcTeam2],

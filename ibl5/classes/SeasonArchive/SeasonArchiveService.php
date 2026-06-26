@@ -31,9 +31,6 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
 
     private SeasonArchiveRepositoryInterface $repository;
 
-    /** @var array<string, true> Player names accumulated during getSeasonDetail() assembly */
-    private array $collectedPlayerNames = [];
-
     public function __construct(SeasonArchiveRepositoryInterface $repository)
     {
         $this->repository = $repository;
@@ -132,8 +129,9 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
             $teamIds[$teamName] = $colorData['teamid'];
         }
 
-        // Reset accumulator — extractAward/extractAwardList populate it during assembly
-        $this->collectedPlayerNames = [];
+        // Player names collected during assembly, consumed below for player-ID lookup
+        /** @var array<string, true> $collectedPlayerNames */
+        $collectedPlayerNames = [];
 
         $seasonData = [
             'year' => $year,
@@ -141,8 +139,8 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
             'tournaments' => [
                 'heatChampion' => $this->getHeatChampionFromTeamAwards($teamAwards),
                 'heatUrl' => $this->getChallongeUrl('heat', $year),
-                'oneOnOneChampion' => $this->extractAward($awards, 'One-on-One Tournament Champion'),
-                'rookieOneOnOneChampion' => $this->extractAward($awards, 'Rookie One-on-One Tournament Champion'),
+                'oneOnOneChampion' => $this->extractAward($awards, 'One-on-One Tournament Champion', $collectedPlayerNames),
+                'rookieOneOnOneChampion' => $this->extractAward($awards, 'Rookie One-on-One Tournament Champion', $collectedPlayerNames),
                 'oneOnOneUrl' => 'https://challonge.com/users/coldbeatle89/tournaments',
                 'iblFinalsWinner' => $iblFinals['winner'],
                 'iblFinalsLoser' => $iblFinals['loser'],
@@ -151,56 +149,56 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
             ],
             'allStarWeekend' => [
                 'gameMvps' => array_merge(
-                    $this->extractAwardList($awards, 'All-Star Game MVP'),
-                    $this->extractAwardList($awards, 'All-Star Game Co-MVP'),
+                    $this->extractAwardList($awards, 'All-Star Game MVP', $collectedPlayerNames),
+                    $this->extractAwardList($awards, 'All-Star Game Co-MVP', $collectedPlayerNames),
                 ),
-                'slamDunkWinner' => $this->extractAward($awards, 'Slam Dunk Competition - Winner'),
-                'threePointWinner' => $this->extractAward($awards, 'Three-Point Contest - Winner'),
-                'rookieSophomoreMvp' => $this->extractAward($awards, 'Rookie-Sophomore Challenge - MVP'),
-                'slamDunkParticipants' => $this->extractAwardList($awards, 'Slam Dunk Competition'),
-                'threePointParticipants' => $this->extractAwardList($awards, 'Three-Point Contest'),
-                'rookieSophomoreParticipants' => $this->extractAwardList($awards, 'Rookie-Sophomore Challenge'),
+                'slamDunkWinner' => $this->extractAward($awards, 'Slam Dunk Competition - Winner', $collectedPlayerNames),
+                'threePointWinner' => $this->extractAward($awards, 'Three-Point Contest - Winner', $collectedPlayerNames),
+                'rookieSophomoreMvp' => $this->extractAward($awards, 'Rookie-Sophomore Challenge - MVP', $collectedPlayerNames),
+                'slamDunkParticipants' => $this->extractAwardList($awards, 'Slam Dunk Competition', $collectedPlayerNames),
+                'threePointParticipants' => $this->extractAwardList($awards, 'Three-Point Contest', $collectedPlayerNames),
+                'rookieSophomoreParticipants' => $this->extractAwardList($awards, 'Rookie-Sophomore Challenge', $collectedPlayerNames),
             ],
             'majorAwards' => [
-                'mvp' => $this->extractAward($awards, 'Most Valuable Player (1st)'),
-                'dpoy' => $this->extractAward($awards, 'Defensive Player of the Year (1st)'),
-                'roy' => $this->extractAward($awards, 'Rookie of the Year (1st)'),
-                'sixthMan' => $this->extractAward($awards, '6th Man Award (1st)'),
+                'mvp' => $this->extractAward($awards, 'Most Valuable Player (1st)', $collectedPlayerNames),
+                'dpoy' => $this->extractAward($awards, 'Defensive Player of the Year (1st)', $collectedPlayerNames),
+                'roy' => $this->extractAward($awards, 'Rookie of the Year (1st)', $collectedPlayerNames),
+                'sixthMan' => $this->extractAward($awards, '6th Man Award (1st)', $collectedPlayerNames),
                 'gmOfYear' => $this->getGmOfTheYear($gmAwards, $year),
-                'finalsMvp' => $this->extractAward($awards, 'IBL Finals MVP'),
+                'finalsMvp' => $this->extractAward($awards, 'IBL Finals MVP', $collectedPlayerNames),
             ],
             'allLeagueTeams' => [
-                'first' => $this->extractAwardList($awards, 'All-League First Team'),
-                'second' => $this->extractAwardList($awards, 'All-League Second Team'),
-                'third' => $this->extractAwardList($awards, 'All-League Third Team'),
+                'first' => $this->extractAwardList($awards, 'All-League First Team', $collectedPlayerNames),
+                'second' => $this->extractAwardList($awards, 'All-League Second Team', $collectedPlayerNames),
+                'third' => $this->extractAwardList($awards, 'All-League Third Team', $collectedPlayerNames),
             ],
             'allDefensiveTeams' => [
-                'first' => $this->extractAwardList($awards, 'All-Defensive Team (1st)'),
-                'second' => $this->extractAwardList($awards, 'All-Defensive Team (2nd)'),
-                'third' => $this->extractAwardList($awards, 'All-Defensive Team (3rd)'),
+                'first' => $this->extractAwardList($awards, 'All-Defensive Team (1st)', $collectedPlayerNames),
+                'second' => $this->extractAwardList($awards, 'All-Defensive Team (2nd)', $collectedPlayerNames),
+                'third' => $this->extractAwardList($awards, 'All-Defensive Team (3rd)', $collectedPlayerNames),
             ],
             'allRookieTeams' => [
-                'first' => $this->extractAwardList($awards, 'All-Rookie Team (1st)'),
-                'second' => $this->extractAwardList($awards, 'All-Rookie Team (2nd)'),
-                'third' => $this->extractAwardList($awards, 'All-Rookie Team (3rd)'),
+                'first' => $this->extractAwardList($awards, 'All-Rookie Team (1st)', $collectedPlayerNames),
+                'second' => $this->extractAwardList($awards, 'All-Rookie Team (2nd)', $collectedPlayerNames),
+                'third' => $this->extractAwardList($awards, 'All-Rookie Team (3rd)', $collectedPlayerNames),
             ],
             'statisticalLeaders' => [
-                'scoring' => $this->extractAward($awards, 'Scoring Leader (1st)'),
-                'rebounds' => $this->extractAward($awards, 'Rebounding Leader (1st)'),
-                'assists' => $this->extractAward($awards, 'Assists Leader (1st)'),
-                'steals' => $this->extractAward($awards, 'Steals Leader (1st)'),
-                'blocks' => $this->extractAward($awards, 'Blocks Leader (1st)'),
+                'scoring' => $this->extractAward($awards, 'Scoring Leader (1st)', $collectedPlayerNames),
+                'rebounds' => $this->extractAward($awards, 'Rebounding Leader (1st)', $collectedPlayerNames),
+                'assists' => $this->extractAward($awards, 'Assists Leader (1st)', $collectedPlayerNames),
+                'steals' => $this->extractAward($awards, 'Steals Leader (1st)', $collectedPlayerNames),
+                'blocks' => $this->extractAward($awards, 'Blocks Leader (1st)', $collectedPlayerNames),
             ],
             'playoffBracket' => $playoffBracket,
             'heatStandings' => $heatStandings,
             'teamAwards' => $parsedTeamAwards,
             'championRosters' => [
-                'ibl' => $this->extractAwardList($awards, 'IBL Champion'),
-                'heat' => $this->extractAwardList($awards, 'IBL HEAT Championship'),
+                'ibl' => $this->extractAwardList($awards, 'IBL Champion', $collectedPlayerNames),
+                'heat' => $this->extractAwardList($awards, 'IBL HEAT Championship', $collectedPlayerNames),
             ],
             'allStarRosters' => [
-                'east' => $this->extractAwardList($awards, 'Eastern Conference All-Star'),
-                'west' => $this->extractAwardList($awards, 'Western Conference All-Star'),
+                'east' => $this->extractAwardList($awards, 'Eastern Conference All-Star', $collectedPlayerNames),
+                'west' => $this->extractAwardList($awards, 'Western Conference All-Star', $collectedPlayerNames),
             ],
             'allStarCoaches' => $this->getAllStarCoaches($gmAwards, $year, $teamConferences),
             'iblChampionCoach' => $this->getIblChampionCoach($gmTenures, $iblFinals['winner'], $year),
@@ -209,7 +207,7 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
             'teamIds' => $teamIds,
         ];
 
-        $seasonData['playerIds'] = $this->repository->getPlayerIdsByNames(array_keys($this->collectedPlayerNames));
+        $seasonData['playerIds'] = $this->repository->getPlayerIdsByNames(array_keys($collectedPlayerNames));
 
         return $seasonData;
     }
@@ -252,15 +250,16 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
      *
      * @param list<AwardRow> $awards All awards for a year
      * @param string $awardName Exact award name to match
+     * @param array<string, true> $collected Player-name accumulator (by reference)
      * @return string Winner name, or empty string if not found
      */
-    private function extractAward(array $awards, string $awardName): string
+    private function extractAward(array $awards, string $awardName, array &$collected = []): string
     {
         foreach ($awards as $award) {
             if (trim($award['award']) === $awardName) {
                 $name = trim($award['name']);
                 if ($name !== '') {
-                    $this->collectedPlayerNames[$name] = true;
+                    $collected[$name] = true;
                 }
 
                 return $name;
@@ -277,9 +276,10 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
      *
      * @param list<AwardRow> $awards All awards for a year
      * @param string $awardName Award name to match (exact match after trim)
+     * @param array<string, true> $collected Player-name accumulator (by reference)
      * @return list<string> List of player names
      */
-    private function extractAwardList(array $awards, string $awardName): array
+    private function extractAwardList(array $awards, string $awardName, array &$collected = []): array
     {
         $names = [];
         foreach ($awards as $award) {
@@ -287,7 +287,7 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
                 $name = trim($award['name']);
                 $names[] = $name;
                 if ($name !== '') {
-                    $this->collectedPlayerNames[$name] = true;
+                    $collected[$name] = true;
                 }
             }
         }

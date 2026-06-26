@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\DatabaseIntegration;
 
 use League\LeagueContext;
+use Monolog\Handler\TestHandler;
+use Monolog\Logger;
 use PHPUnit\Framework\Attributes\Group;
 use Psr\Log\LoggerInterface;
 
@@ -538,6 +540,64 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
         } catch (\RuntimeException) {
             // expected — type mismatch
         }
+    }
+
+    protected function tearDown(): void
+    {
+        \Logging\LoggerFactory::reset();
+        parent::tearDown();
+    }
+
+    // ==================== Perf Logger (slow-query seam) ====================
+
+    public function testInjectedPerfLoggerReceivesSlowQueryRecord(): void
+    {
+        \Logging\LoggerFactory::reset();
+        $handler = new TestHandler();
+        $spy = new Logger('perf_spy', [$handler]);
+        $this->repo->setPerfLogger($spy);
+
+        $stmt = $this->repo->callExecuteQuery('SELECT SLEEP(0.25)', '');
+        $stmt->close();
+
+        $warnings = array_filter(
+            $handler->getRecords(),
+            static fn ($r): bool => $r->message === 'slow_query',
+        );
+        $this->assertCount(1, $warnings, 'Expected exactly one slow_query warning');
+        $record = array_values($warnings)[0];
+        $context = $record->context;
+        $this->assertArrayHasKey('action', $context);
+        $this->assertArrayHasKey('elapsed_ms', $context);
+        $this->assertArrayHasKey('query', $context);
+        $this->assertArrayHasKey('repository', $context);
+    }
+
+    public function testNoInjectedPerfLoggerStillLogsViaFallbackWithoutFatal(): void
+    {
+        \Logging\LoggerFactory::reset();
+
+        // No exception thrown — the ?? fallback resolved a real logger; the log was NOT silently dropped.
+        $stmt = $this->repo->callExecuteQuery('SELECT SLEEP(0.25)', '');
+        $this->assertInstanceOf(\mysqli_stmt::class, $stmt);
+        $stmt->close();
+    }
+
+    public function testFastQueryDoesNotLogSlowQuery(): void
+    {
+        \Logging\LoggerFactory::reset();
+        $handler = new TestHandler();
+        $spy = new Logger('perf_spy', [$handler]);
+        $this->repo->setPerfLogger($spy);
+
+        $stmt = $this->repo->callExecuteQuery('SELECT 1', '');
+        $stmt->close();
+
+        $warnings = array_filter(
+            $handler->getRecords(),
+            static fn ($r): bool => $r->message === 'slow_query',
+        );
+        $this->assertCount(0, $warnings, 'Fast query must not trigger slow_query log');
     }
 }
 

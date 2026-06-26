@@ -104,6 +104,12 @@ abstract class BaseMysqliRepository
     private ?\Psr\Log\LoggerInterface $logger = null;
 
     /**
+     * Optional perf-channel logger for slow-query warnings.
+     * When null, falls back to LoggerFactory::getChannel('perf').
+     */
+    private ?\Psr\Log\LoggerInterface $perfLogger = null;
+
+    /**
      * Constructor with connection validation
      *
      * @param \mysqli $db Active mysqli connection
@@ -129,6 +135,14 @@ abstract class BaseMysqliRepository
     public function setLogger(\Psr\Log\LoggerInterface $logger): void
     {
         $this->logger = $logger;
+    }
+
+    /**
+     * Set a PSR-3 logger for perf-channel slow-query warnings.
+     */
+    public function setPerfLogger(\Psr\Log\LoggerInterface $logger): void
+    {
+        $this->perfLogger = $logger;
     }
 
     public static function setSharedLeagueContext(\League\LeagueContext $context): void
@@ -278,7 +292,7 @@ abstract class BaseMysqliRepository
         if ($thresholdMs > 0) {
             $elapsedMs = (hrtime(true) - $startTime) / 1_000_000;
             if ($elapsedMs >= $thresholdMs) {
-                \Logging\LoggerFactory::getChannel('perf')->warning('slow_query', [
+                ($this->perfLogger ?? \Logging\LoggerFactory::getChannel('perf'))->warning('slow_query', [
                     'action' => 'slow_query',
                     'elapsed_ms' => round($elapsedMs, 1),
                     'query' => substr($query, 0, 500),

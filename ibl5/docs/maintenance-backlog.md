@@ -96,7 +96,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 1.15 | ⬜ Open | 🟩 | YourAccountView 536 LOC, 6 SVG + 6 page variants. Green-green with VR pin; auth *display* only (no auth-logic change → no security surface). |
 | 1.16 | ✅ Implemented | — | `computeJsbProduction()` moved to service (verified). |
 | 1.17 | ◑ Partial | 🟩 | Constructor logger injected w/ `db` fallback (#1089, L585), but the `perf` channel is still static `LoggerFactory::getChannel('perf')` at L281. Inject perf logger; green-green. |
-| 1.18 | ⬜ Open | 🟩 | 11 `echo` in StandingsUpdater (verified). echo→LoggerInterface; remove dead `$log`; `82`→`League` const. CLI. |
+| 1.18 | ◑ Partial | 🟩 | StandingsUpdater. `82`→`League::REGULAR_SEASON_GAMES` DONE (refactor PR). echo→logger + `$log` removal DEFERRED: behavior-changing — echoes feed the rendered pipeline `capturedLog` (UpdateStandingsStep→UpdaterController); `$log` feeds admin-rendered `DebugOutput::display`. Needs a non-`refactor:` PR. |
 | 1.19 | ⬜ Open | 🟨 | `processPlrData`+`processPlrDataForYear` 80% duplicated; 510 LOC. `.plr` parse is engine-fidelity-critical → add characterization pins (mechanical scope) before merging the two paths, then 🟩. |
 | 1.20 | ✅ Implemented | 🟩 | SearchView 485 LOC string-concat. Extracted `renderResultList()` + ob_start migration; VR pin. |
 
@@ -229,11 +229,12 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Risk if untouched:** Repository unit tests require full logging subsystem; slow-query behavior can't be disabled for tests.
 
 ### 1.18 StandingsUpdater — `echo` Mixed with Data Computation
-**Location:** `ibl5/classes/Updater/StandingsUpdater.php` lines 70, 91, 280
-**Problem:** `update()`, `computeAndInsertStandings()`, `computeAndInsertAll()` use `echo` for progress. `$log` variable built but never used. Magic constant `82` (games/season) inline.
-**Suggested direction:** Replace `echo` with `LoggerInterface`; remove dead `$log`; extract `82` to `League::REGULAR_SEASON_GAMES`.
+**Location:** `ibl5/classes/Updater/StandingsUpdater.php` (echoes at update()/computeAndInsertStandings()/computeAndInsertAll(); magic `82` at the gamesUnplayed and magic-number sites).
+**Status:** PARTIAL — magic `82` extracted to `League::REGULAR_SEASON_GAMES` (refactor PR, this batch). The echo cleanup is DEFERRED.
+**Problem:** `update()`, `computeAndInsertStandings()`, `computeAndInsertAll()` use `echo` for progress. The echoed output is NOT discardable: `UpdateStandingsStep::execute()` captures it (`ob_start`/`ob_get_clean`) into `StepResult::capturedLog` and `UpdaterController` renders it to the user as a collapsible log; the two `$log` accumulators are rendered to admins via `\UI\DebugOutput::display()`. So echo→logger and `$log` removal are behavior-changing, not a pure refactor.
+**Suggested direction:** Separate non-`refactor:` PR that migrates the echoes to a logger while preserving (or deliberately changing) the rendered pipeline/admin output; `auto_merge: false`.
 **Est. effort:** S
-**Risk if untouched:** Updater can't run from test/queue; abandoned logging intent.
+**Risk if untouched:** Progress output mixed with computation in the updater; logging intent unrealized.
 
 ### 1.19 PlrParserService — Duplicate Pass-1 Logic
 **Location:** `ibl5/classes/PlrParser/PlrParserService.php`

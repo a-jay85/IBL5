@@ -31,6 +31,9 @@ class League extends BaseMysqliRepository
     const SOFT_CAP_MAX = 5000;
     const HARD_CAP_MAX = 7000;
 
+    /** Games in a full IBL regular season (per team). */
+    const REGULAR_SEASON_GAMES = 82;
+
     const FREE_AGENTS_TEAMID = 0;
     const FREE_AGENTS_TEAM_NAME = 'Free Agents';
     const MAX_REAL_TEAMID = 28;

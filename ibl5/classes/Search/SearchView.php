@@ -37,21 +37,16 @@ class SearchView implements SearchViewInterface
      */
     public function render(array $data): string
     {
-        $output = '<div class="search-page">';
-        $output .= $this->renderPageHeader($data['topicText'], $data['type']);
-        $output .= $this->renderSearchForm($data);
-
+        ob_start();
+        ?><div class="search-page"><?= HtmlSanitizer::trusted($this->renderPageHeader($data['topicText'], $data['type'])) ?><?= HtmlSanitizer::trusted($this->renderSearchForm($data)) ?><?php
         if ($data['error'] !== '') {
-            $output .= $this->renderError($data['error']);
+            ?><?= HtmlSanitizer::trusted($this->renderError($data['error'])) ?><?php
         }
-
         if ($data['results'] !== null) {
-            $output .= $this->renderResults($data);
+            ?><?= HtmlSanitizer::trusted($this->renderResults($data)) ?><?php
         }
-
-        $output .= '</div>';
-
-        return $output;
+        ?></div><?php
+        return (string) ob_get_clean();
     }
 
     /**
@@ -69,7 +64,9 @@ class SearchView implements SearchViewInterface
         }
 
         $safeTitle = HtmlSanitizer::safeHtmlOutput($title);
-        return '<h1 class="ibl-title">' . $safeTitle . '</h1>';
+        ob_start();
+        ?><h1 class="ibl-title"><?= HtmlSanitizer::trusted($safeTitle) ?></h1><?php
+        return (string) ob_get_clean();
     }
 
     /**
@@ -81,48 +78,22 @@ class SearchView implements SearchViewInterface
     {
         $query = HtmlSanitizer::safeHtmlOutput($data['query']);
         $type = $data['type'];
-
-        $output = '<form action="modules.php?name=Search" method="post" class="search-form">';
-
-        // Search input row
-        $output .= '<div class="search-form__input-row">';
-        $output .= '<div class="ibl-search search-form__search-bar">';
-        $output .= '<svg class="ibl-search__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
-        $output .= '<input type="text" name="query" class="ibl-search__input" value="' . $query . '" placeholder="Search...">';
         $safeSearch = HtmlSanitizer::safeHtmlOutput(_SEARCH);
-        $output .= '<button type="submit" class="ibl-search__btn">' . $safeSearch . '</button>';
-        $output .= '</div></div>';
-
-        // Filter row
-        $output .= '<div class="search-form__filters">';
-        $output .= $this->renderTopicSelect($data['topics'], $data['topic']);
-        $output .= $this->renderCategorySelect($data['categories'], $data['category']);
-        $output .= $this->renderAuthorSelect($data['authors'], $data['author']);
-        $output .= $this->renderDaysSelect($data['days']);
-        $output .= '</div>';
-
-        // Search type radio buttons
-        $output .= '<div class="search-form__types">';
         $safeSearchOn = HtmlSanitizer::safeHtmlOutput(_SEARCHON);
-        $output .= '<span class="search-form__types-label">' . $safeSearchOn . '</span>';
         /** @var string $storiesLabel */
         $storiesLabel = _SSTORIES;
-        $output .= $this->renderTypeRadio('stories', $storiesLabel, $type);
+        /** @var string $usersLabel */
+        $usersLabel = _SUSERS;
 
+        ob_start();
+        ?><form action="modules.php?name=Search" method="post" class="search-form"><div class="search-form__input-row"><div class="ibl-search search-form__search-bar"><svg class="ibl-search__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" name="query" class="ibl-search__input" value="<?= HtmlSanitizer::trusted($query) ?>" placeholder="Search..."><button type="submit" class="ibl-search__btn"><?= HtmlSanitizer::trusted($safeSearch) ?></button></div></div><div class="search-form__filters"><?= HtmlSanitizer::trusted($this->renderTopicSelect($data['topics'], $data['topic'])) ?><?= HtmlSanitizer::trusted($this->renderCategorySelect($data['categories'], $data['category'])) ?><?= HtmlSanitizer::trusted($this->renderAuthorSelect($data['authors'], $data['author'])) ?><?= HtmlSanitizer::trusted($this->renderDaysSelect($data['days'])) ?></div><div class="search-form__types"><span class="search-form__types-label"><?= HtmlSanitizer::trusted($safeSearchOn) ?></span><?= HtmlSanitizer::trusted($this->renderTypeRadio('stories', $storiesLabel, $type)) ?><?php
         if ($data['articleComm']) {
             /** @var string $commentsLabel */
             $commentsLabel = _SCOMMENTS;
-            $output .= $this->renderTypeRadio('comments', $commentsLabel, $type);
+            ?><?= HtmlSanitizer::trusted($this->renderTypeRadio('comments', $commentsLabel, $type)) ?><?php
         }
-
-        /** @var string $usersLabel */
-        $usersLabel = _SUSERS;
-        $output .= $this->renderTypeRadio('users', $usersLabel, $type);
-        $output .= '</div>';
-
-        $output .= '</form>';
-
-        return $output;
+        ?><?= HtmlSanitizer::trusted($this->renderTypeRadio('users', $usersLabel, $type)) ?></div></form><?php
+        return (string) ob_get_clean();
     }
 
     /**
@@ -132,19 +103,17 @@ class SearchView implements SearchViewInterface
      */
     private function renderTopicSelect(array $topics, int $selectedTopic): string
     {
-        $output = '<select name="topic" aria-label="Topic" class="search-form__select">';
         $safeAllTopics = HtmlSanitizer::safeHtmlOutput(_ALLTOPICS);
-        $output .= '<option value="">' . $safeAllTopics . '</option>';
-
+        ob_start();
+        ?><select name="topic" aria-label="Topic" class="search-form__select"><option value=""><?= HtmlSanitizer::trusted($safeAllTopics) ?></option><?php
         foreach ($topics as $topic) {
             $topicId = $topic['topicId'];
             $topicText = HtmlSanitizer::safeHtmlOutput($topic['topicText']);
             $selected = ($topicId === $selectedTopic) ? ' selected' : '';
-            $output .= '<option value="' . $topicId . '"' . $selected . '>' . $topicText . '</option>';
+            ?><option value="<?= HtmlSanitizer::trusted((string) $topicId) ?>"<?= HtmlSanitizer::trusted($selected) ?>><?= HtmlSanitizer::trusted($topicText) ?></option><?php
         }
-
-        $output .= '</select>';
-        return $output;
+        ?></select><?php
+        return (string) ob_get_clean();
     }
 
     /**
@@ -154,19 +123,17 @@ class SearchView implements SearchViewInterface
      */
     private function renderCategorySelect(array $categories, int $selectedCategory): string
     {
-        $output = '<select name="category" aria-label="Category" class="search-form__select">';
         $safeArticles = HtmlSanitizer::safeHtmlOutput(_ARTICLES);
-        $output .= '<option value="0">' . $safeArticles . '</option>';
-
+        ob_start();
+        ?><select name="category" aria-label="Category" class="search-form__select"><option value="0"><?= HtmlSanitizer::trusted($safeArticles) ?></option><?php
         foreach ($categories as $cat) {
             $catId = $cat['catId'];
             $title = HtmlSanitizer::safeHtmlOutput($cat['title']);
             $selected = ($catId === $selectedCategory) ? ' selected' : '';
-            $output .= '<option value="' . $catId . '"' . $selected . '>' . $title . '</option>';
+            ?><option value="<?= HtmlSanitizer::trusted((string) $catId) ?>"<?= HtmlSanitizer::trusted($selected) ?>><?= HtmlSanitizer::trusted($title) ?></option><?php
         }
-
-        $output .= '</select>';
-        return $output;
+        ?></select><?php
+        return (string) ob_get_clean();
     }
 
     /**
@@ -176,18 +143,16 @@ class SearchView implements SearchViewInterface
      */
     private function renderAuthorSelect(array $authors, string $selectedAuthor): string
     {
-        $output = '<select name="author" aria-label="Author" class="search-form__select">';
         $safeAllAuthors = HtmlSanitizer::safeHtmlOutput(_ALLAUTHORS);
-        $output .= '<option value="">' . $safeAllAuthors . '</option>';
-
+        ob_start();
+        ?><select name="author" aria-label="Author" class="search-form__select"><option value=""><?= HtmlSanitizer::trusted($safeAllAuthors) ?></option><?php
         foreach ($authors as $authorName) {
             $safe = HtmlSanitizer::safeHtmlOutput($authorName);
             $selected = ($authorName === $selectedAuthor) ? ' selected' : '';
-            $output .= '<option value="' . $safe . '"' . $selected . '>' . $safe . '</option>';
+            ?><option value="<?= HtmlSanitizer::trusted($safe) ?>"<?= HtmlSanitizer::trusted($selected) ?>><?= HtmlSanitizer::trusted($safe) ?></option><?php
         }
-
-        $output .= '</select>';
-        return $output;
+        ?></select><?php
+        return (string) ob_get_clean();
     }
 
     /**
@@ -216,16 +181,15 @@ class SearchView implements SearchViewInterface
             90 => '3 ' . $monthsLabel,
         ];
 
-        $output = '<select name="days" aria-label="Date range" class="search-form__select">';
-
+        ob_start();
+        ?><select name="days" aria-label="Date range" class="search-form__select"><?php
         foreach ($options as $value => $label) {
             $selected = ($value === $selectedDays) ? ' selected' : '';
             $safeLabel = HtmlSanitizer::safeHtmlOutput($label);
-            $output .= '<option value="' . $value . '"' . $selected . '>' . $safeLabel . '</option>';
+            ?><option value="<?= HtmlSanitizer::trusted((string) $value) ?>"<?= HtmlSanitizer::trusted($selected) ?>><?= HtmlSanitizer::trusted($safeLabel) ?></option><?php
         }
-
-        $output .= '</select>';
-        return $output;
+        ?></select><?php
+        return (string) ob_get_clean();
     }
 
     /**
@@ -237,10 +201,12 @@ class SearchView implements SearchViewInterface
         $id = 'search-type-' . $value;
 
         $safeLabel = HtmlSanitizer::safeHtmlOutput($label);
-        return '<label class="search-form__type" for="' . $id . '">
-            <input type="radio" name="type" value="' . $value . '" id="' . $id . '"' . $checked . '>
-            <span class="search-form__type-label">' . $safeLabel . '</span>
-        </label>';
+        ob_start();
+        ?><label class="search-form__type" for="<?= HtmlSanitizer::trusted($id) ?>">
+            <input type="radio" name="type" value="<?= HtmlSanitizer::trusted($value) ?>" id="<?= HtmlSanitizer::trusted($id) ?>"<?= HtmlSanitizer::trusted($checked) ?>>
+            <span class="search-form__type-label"><?= HtmlSanitizer::trusted($safeLabel) ?></span>
+        </label><?php
+        return (string) ob_get_clean();
     }
 
     /**
@@ -249,7 +215,9 @@ class SearchView implements SearchViewInterface
     private function renderError(string $error): string
     {
         $safeError = HtmlSanitizer::safeHtmlOutput($error);
-        return '<div class="ibl-alert ibl-alert--error search-error">' . $safeError . '</div>';
+        ob_start();
+        ?><div class="ibl-alert ibl-alert--error search-error"><?= HtmlSanitizer::trusted($safeError) ?></div><?php
+        return (string) ob_get_clean();
     }
 
     /**
@@ -266,35 +234,45 @@ class SearchView implements SearchViewInterface
             return '';
         }
 
-        $output = '<div class="search-results">';
         $safeSearchResults = HtmlSanitizer::safeHtmlOutput(_SEARCHRESULTS);
-        $output .= '<h3 class="search-results__heading">' . $safeSearchResults . '</h3>';
-
+        ob_start();
+        ?><div class="search-results"><h3 class="search-results__heading"><?= HtmlSanitizer::trusted($safeSearchResults) ?></h3><?php
         if (count($results) === 0) {
             $safeNoMatches = HtmlSanitizer::safeHtmlOutput(_NOMATCHES);
-            $output .= '<div class="ibl-empty-state"><p class="ibl-empty-state__text">' . $safeNoMatches . '</p></div>';
-            $output .= '</div>';
-            return $output;
+            ?><div class="ibl-empty-state"><p class="ibl-empty-state__text"><?= HtmlSanitizer::trusted($safeNoMatches) ?></p></div></div><?php
+            return (string) ob_get_clean();
         }
-
         if ($type === 'comments') {
             /** @var list<CommentResult> $commentResults */
             $commentResults = $results;
-            $output .= $this->renderCommentResults($commentResults);
+            ?><?= HtmlSanitizer::trusted($this->renderCommentResults($commentResults)) ?><?php
         } elseif ($type === 'users') {
             /** @var list<UserResult> $userResults */
             $userResults = $results;
-            $output .= $this->renderUserResults($userResults);
+            ?><?= HtmlSanitizer::trusted($this->renderUserResults($userResults)) ?><?php
         } else {
             /** @var list<StoryResult> $storyResults */
             $storyResults = $results;
-            $output .= $this->renderStoryResults($storyResults);
+            ?><?= HtmlSanitizer::trusted($this->renderStoryResults($storyResults)) ?><?php
         }
+        ?><?= HtmlSanitizer::trusted($this->renderPagination($data)) ?></div><?php
+        return (string) ob_get_clean();
+    }
 
-        $output .= $this->renderPagination($data);
-        $output .= '</div>';
-
-        return $output;
+    /**
+     * Wrap pre-built per-item card bodies in the shared results-list scaffold.
+     *
+     * @param list<string> $itemBodies Already-escaped inner HTML for each card body
+     * @param string       $itemModifier Extra class appended to "search-result"
+     *                                    ('' for stories/comments, ' search-result--compact' for users)
+     */
+    private function renderResultList(array $itemBodies, string $itemModifier = ''): string
+    {
+        ob_start();
+        ?><div class="search-results__list"><?php foreach ($itemBodies as $index => $itemBody) {
+            $delay = min($index * 40, 400);
+        ?><div class="search-result<?= HtmlSanitizer::trusted($itemModifier) ?>" style="--anim-delay: <?= (int) $delay ?>ms"><?= HtmlSanitizer::trusted($itemBody) ?></div><?php } ?></div><?php
+        return (string) ob_get_clean();
     }
 
     /**
@@ -304,9 +282,8 @@ class SearchView implements SearchViewInterface
      */
     private function renderStoryResults(array $results): string
     {
-        $output = '<div class="search-results__list">';
-
-        foreach ($results as $index => $result) {
+        $itemBodies = [];
+        foreach ($results as $result) {
             $sid = $result['sid'];
             $title = HtmlSanitizer::safeHtmlOutput($result['title']);
             $aid = HtmlSanitizer::safeHtmlOutput($result['aid']);
@@ -315,47 +292,35 @@ class SearchView implements SearchViewInterface
             $comments = $result['comments'];
             $topicId = $result['topicId'];
             $topicText = HtmlSanitizer::safeHtmlOutput($result['topicText']);
-            $delay = min($index * 40, 400);
 
-            $output .= '<div class="search-result" style="--anim-delay: ' . $delay . 'ms">';
-            $output .= '<div class="search-result__header">';
-            $output .= '<a href="modules.php?name=News&amp;file=article&amp;sid=' . $sid . '" class="search-result__title">' . $title . '</a>';
-            $output .= '</div>';
-
-            $output .= '<div class="search-result__meta">';
-
+            ob_start();
+            ?><div class="search-result__header"><a href="modules.php?name=News&amp;file=article&amp;sid=<?= (int) $sid ?>" class="search-result__title"><?= HtmlSanitizer::trusted($title) ?></a></div><div class="search-result__meta"><?php
             if ($informant !== '') {
                 $safeContributedBy = HtmlSanitizer::safeHtmlOutput(_CONTRIBUTEDBY);
-                $output .= '<span class="search-result__meta-item">' . $safeContributedBy . ' ' . $informant . '</span>';
+                ?><span class="search-result__meta-item"><?= HtmlSanitizer::trusted($safeContributedBy) ?> <?= HtmlSanitizer::trusted($informant) ?></span><?php
             }
-
             $safePostedBy = HtmlSanitizer::safeHtmlOutput(_POSTEDBY);
             $safeOn = HtmlSanitizer::safeHtmlOutput(_ON);
-            $output .= '<span class="search-result__meta-item">' . $safePostedBy . ' ' . $aid . ' ' . $safeOn . ' ' . $time . '</span>';
-
+            ?><span class="search-result__meta-item"><?= HtmlSanitizer::trusted($safePostedBy) ?> <?= HtmlSanitizer::trusted($aid) ?> <?= HtmlSanitizer::trusted($safeOn) ?> <?= HtmlSanitizer::trusted($time) ?></span><?php
             if ($topicText !== '') {
                 $safeTopic = HtmlSanitizer::safeHtmlOutput(_TOPIC);
-                $output .= '<span class="search-result__meta-item">' . $safeTopic . ': <a href="modules.php?name=Search&amp;query=&amp;topic=' . $topicId . '">' . $topicText . '</a></span>';
+                ?><span class="search-result__meta-item"><?= HtmlSanitizer::trusted($safeTopic) ?>: <a href="modules.php?name=Search&amp;query=&amp;topic=<?= (int) $topicId ?>"><?= HtmlSanitizer::trusted($topicText) ?></a></span><?php
             }
-
-            $output .= '<span class="search-result__meta-item">';
+            ?><span class="search-result__meta-item"><?php
             if ($comments === 0) {
                 $safeNoComments = HtmlSanitizer::safeHtmlOutput(_NOCOMMENTS);
-                $output .= $safeNoComments;
+                ?><?= HtmlSanitizer::trusted($safeNoComments) ?><?php
             } elseif ($comments === 1) {
                 $safeUComment = HtmlSanitizer::safeHtmlOutput(_UCOMMENT);
-                $output .= $comments . ' ' . $safeUComment;
+                ?><?= HtmlSanitizer::trusted((string) $comments) ?> <?= HtmlSanitizer::trusted($safeUComment) ?><?php
             } else {
                 $safeUComments = HtmlSanitizer::safeHtmlOutput(_UCOMMENTS);
-                $output .= $comments . ' ' . $safeUComments;
+                ?><?= HtmlSanitizer::trusted((string) $comments) ?> <?= HtmlSanitizer::trusted($safeUComments) ?><?php
             }
-            $output .= '</span>';
-
-            $output .= '</div></div>';
+            ?></span></div><?php
+            $itemBodies[] = (string) ob_get_clean();
         }
-
-        $output .= '</div>';
-        return $output;
+        return $this->renderResultList($itemBodies);
     }
 
     /**
@@ -365,9 +330,8 @@ class SearchView implements SearchViewInterface
      */
     private function renderCommentResults(array $results): string
     {
-        $output = '<div class="search-results__list">';
-
-        foreach ($results as $index => $result) {
+        $itemBodies = [];
+        foreach ($results as $result) {
             $teamid = $result['teamid'];
             $sid = $result['sid'];
             $subject = HtmlSanitizer::safeHtmlOutput($result['subject']);
@@ -375,36 +339,25 @@ class SearchView implements SearchViewInterface
             $name = HtmlSanitizer::safeHtmlOutput($result['name']);
             $articleTitle = HtmlSanitizer::safeHtmlOutput($result['articleTitle']);
             $replyCount = $result['replyCount'];
-            $delay = min($index * 40, 400);
 
-            $output .= '<div class="search-result" style="--anim-delay: ' . $delay . 'ms">';
-            $output .= '<div class="search-result__header">';
-            $output .= '<a href="modules.php?name=News&amp;file=article&amp;thold=-1&amp;mode=flat&amp;order=1&amp;sid=' . $sid . '#' . $teamid . '" class="search-result__title">' . $subject . '</a>';
-            $output .= '</div>';
-
-            $output .= '<div class="search-result__meta">';
-
+            ob_start();
+            ?><div class="search-result__header"><a href="modules.php?name=News&amp;file=article&amp;thold=-1&amp;mode=flat&amp;order=1&amp;sid=<?= (int) $sid ?>#<?= (int) $teamid ?>" class="search-result__title"><?= HtmlSanitizer::trusted($subject) ?></a></div><div class="search-result__meta"><?php
             if ($name !== '') {
                 $safePostedBy = HtmlSanitizer::safeHtmlOutput(_POSTEDBY);
                 $safeOn = HtmlSanitizer::safeHtmlOutput(_ON);
-                $output .= '<span class="search-result__meta-item">' . $safePostedBy . ' ' . $name . ' ' . $safeOn . ' ' . $date . '</span>';
+                ?><span class="search-result__meta-item"><?= HtmlSanitizer::trusted($safePostedBy) ?> <?= HtmlSanitizer::trusted($name) ?> <?= HtmlSanitizer::trusted($safeOn) ?> <?= HtmlSanitizer::trusted($date) ?></span><?php
             }
-
             if ($articleTitle !== '') {
                 $safeAttachArt = HtmlSanitizer::safeHtmlOutput(_ATTACHART);
-                $output .= '<span class="search-result__meta-item">' . $safeAttachArt . ': ' . $articleTitle . '</span>';
+                ?><span class="search-result__meta-item"><?= HtmlSanitizer::trusted($safeAttachArt) ?>: <?= HtmlSanitizer::trusted($articleTitle) ?></span><?php
             }
-
             /** @var string $replyLabel */
             $replyLabel = ($replyCount === 1) ? _SREPLY : _SREPLIES;
             $safeReplyLabel = HtmlSanitizer::safeHtmlOutput($replyLabel);
-            $output .= '<span class="search-result__meta-item">' . $replyCount . ' ' . $safeReplyLabel . '</span>';
-
-            $output .= '</div></div>';
+            ?><span class="search-result__meta-item"><?= (int) $replyCount ?> <?= HtmlSanitizer::trusted($safeReplyLabel) ?></span></div><?php
+            $itemBodies[] = (string) ob_get_clean();
         }
-
-        $output .= '</div>';
-        return $output;
+        return $this->renderResultList($itemBodies);
     }
 
     /**
@@ -414,28 +367,19 @@ class SearchView implements SearchViewInterface
      */
     private function renderUserResults(array $results): string
     {
-        $output = '<div class="search-results__list">';
-
-        foreach ($results as $index => $result) {
-            $userId = $result['userId'];
+        $itemBodies = [];
+        foreach ($results as $result) {
             $username = HtmlSanitizer::safeHtmlOutput($result['username']);
             $name = HtmlSanitizer::safeHtmlOutput($result['name']);
-            $delay = min($index * 40, 400);
 
             $safeNoName = HtmlSanitizer::safeHtmlOutput(_NONAME);
             $displayName = ($name !== '') ? $name : $safeNoName;
 
-            $output .= '<div class="search-result search-result--compact" style="--anim-delay: ' . $delay . 'ms">';
-            $output .= '<div class="search-result__header">';
-            $output .= '<span class="search-result__title">' . $username . '</span>';
-            $output .= '<span class="search-result__subtitle">' . $displayName . '</span>';
-            $output .= '</div>';
-
-            $output .= '</div>';
+            ob_start();
+            ?><div class="search-result__header"><span class="search-result__title"><?= HtmlSanitizer::trusted($username) ?></span><span class="search-result__subtitle"><?= HtmlSanitizer::trusted($displayName) ?></span></div><?php
+            $itemBodies[] = (string) ob_get_clean();
         }
-
-        $output .= '</div>';
-        return $output;
+        return $this->renderResultList($itemBodies, ' search-result--compact');
     }
 
     /**
@@ -460,26 +404,20 @@ class SearchView implements SearchViewInterface
             return '';
         }
 
-        $output = '<div class="search-pagination">';
-
+        ob_start();
+        ?><div class="search-pagination"><?php
         if ($hasPrev) {
             $prev = $min - $offset;
-            $output .= '<a href="modules.php?name=Search&amp;author=' . $author . '&amp;topic=' . $topic . '&amp;min=' . $prev . '&amp;query=' . $query . '&amp;type=' . $type . '&amp;category=' . $category . '" class="search-pagination__link search-pagination__link--prev">';
             $safePrevMatches = HtmlSanitizer::safeHtmlOutput(_PREVMATCHES);
-            $output .= '&larr; ' . $safePrevMatches;
-            $output .= '</a>';
+            ?><a href="modules.php?name=Search&amp;author=<?= HtmlSanitizer::trusted($author) ?>&amp;topic=<?= HtmlSanitizer::trusted((string) $topic) ?>&amp;min=<?= HtmlSanitizer::trusted((string) $prev) ?>&amp;query=<?= HtmlSanitizer::trusted($query) ?>&amp;type=<?= HtmlSanitizer::trusted($type) ?>&amp;category=<?= HtmlSanitizer::trusted((string) $category) ?>" class="search-pagination__link search-pagination__link--prev">&larr; <?= HtmlSanitizer::trusted($safePrevMatches) ?></a><?php
         }
-
         if ($hasMore) {
             $next = $min + $offset;
-            $output .= '<a href="modules.php?name=Search&amp;author=' . $author . '&amp;topic=' . $topic . '&amp;min=' . $next . '&amp;query=' . $query . '&amp;type=' . $type . '&amp;category=' . $category . '" class="search-pagination__link search-pagination__link--next">';
             $safeNextMatches = HtmlSanitizer::safeHtmlOutput(_NEXTMATCHES);
-            $output .= $safeNextMatches . ' &rarr;';
-            $output .= '</a>';
+            ?><a href="modules.php?name=Search&amp;author=<?= HtmlSanitizer::trusted($author) ?>&amp;topic=<?= HtmlSanitizer::trusted((string) $topic) ?>&amp;min=<?= HtmlSanitizer::trusted((string) $next) ?>&amp;query=<?= HtmlSanitizer::trusted($query) ?>&amp;type=<?= HtmlSanitizer::trusted($type) ?>&amp;category=<?= HtmlSanitizer::trusted((string) $category) ?>" class="search-pagination__link search-pagination__link--next"><?= HtmlSanitizer::trusted($safeNextMatches) ?> &rarr;</a><?php
         }
-
-        $output .= '</div>';
-        return $output;
+        ?></div><?php
+        return (string) ob_get_clean();
     }
 
 }

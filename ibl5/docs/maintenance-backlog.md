@@ -95,7 +95,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 1.14 | ✅ Implemented | — | `TradeCapCalculator` extracted (#1143). |
 | 1.15 | ⬜ Open | 🟩 | YourAccountView 536 LOC, 6 SVG + 6 page variants. Green-green with VR pin; auth *display* only (no auth-logic change → no security surface). |
 | 1.16 | ✅ Implemented | — | `computeJsbProduction()` moved to service (verified). |
-| 1.17 | ◑ Partial | 🟩 | Constructor logger injected w/ `db` fallback (#1089, L585), but the `perf` channel is still static `LoggerFactory::getChannel('perf')` at L281. Inject perf logger; green-green. |
+| 1.17 | ✅ Implemented | 🟩 | perf-channel slow-query logger now injectable via `setPerfLogger()` + `$this->perfLogger ?? LoggerFactory::getChannel('perf')` fallback at L281; no static logging globals remain in `executeQuery`. |
 | 1.18 | ◑ Partial | 🟩 | StandingsUpdater. `82`→`League::REGULAR_SEASON_GAMES` DONE (refactor PR). echo→logger + `$log` removal DEFERRED: behavior-changing — echoes feed the rendered pipeline `capturedLog` (UpdateStandingsStep→UpdaterController); `$log` feeds admin-rendered `DebugOutput::display`. Needs a non-`refactor:` PR. |
 | 1.19 | ⬜ Open | 🟨 | `processPlrData`+`processPlrDataForYear` 80% duplicated; 510 LOC. `.plr` parse is engine-fidelity-critical → add characterization pins (mechanical scope) before merging the two paths, then 🟩. |
 | 1.20 | ✅ Implemented | 🟩 | SearchView 485 LOC string-concat. Extracted `renderResultList()` + ob_start migration; VR pin. |
@@ -228,6 +228,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Accept `\Psr\Log\LoggerInterface $perfLogger = null` in constructor.
 **Est. effort:** S
 **Risk if untouched:** Repository unit tests require full logging subsystem; slow-query behavior can't be disabled for tests.
+**Status:** Completed — slow-query perf logging made injectable via a `setPerfLogger()` setter + `$this->perfLogger ?? \Logging\LoggerFactory::getChannel('perf')` fallback at L281 (mirrors the existing `setLogger()`/`db`-channel precedent at L129/L585; no constructor-signature change, so all 24 subclasses are untouched). The last static logging global in `executeQuery()` is gone.
 
 ### 1.18 StandingsUpdater — `echo` Mixed with Data Computation
 **Location:** `ibl5/classes/Updater/StandingsUpdater.php` (echoes at update()/computeAndInsertStandings()/computeAndInsertAll(); magic `82` at the gamesUnplayed and magic-number sites).

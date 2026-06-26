@@ -222,4 +222,9 @@ class Season
     {
         return $this->lastSimNumber;
     }
+
+    public function calculatePhaseSimNumber(int $overallSimNumber, string $phase, int $seasonYear): int
+    {
+        return $overallSimNumber;
+    }
 }

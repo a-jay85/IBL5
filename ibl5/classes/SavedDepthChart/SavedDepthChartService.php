@@ -17,7 +17,7 @@ use Season\Season;
  */
 class SavedDepthChartService implements SavedDepthChartServiceInterface
 {
-    private SavedDepthChartRepository $repository;
+    private SavedDepthChartRepositoryInterface $repository;
     private \mysqli $db;
 
     /**
@@ -25,10 +25,22 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
      */
     private \Psr\Log\LoggerInterface $logger;
 
-    public function __construct(\mysqli $db, ?\Psr\Log\LoggerInterface $logger = null)
-    {
+    /**
+     * Per-teamid memo of getActiveDepthChartForTeam() within one request.
+     * Stores null too — array_key_exists() distinguishes "not fetched"
+     * from "fetched, no active DC".
+     *
+     * @var array<int, SavedDepthChartRow|null>
+     */
+    private array $activeDcCache = [];
+
+    public function __construct(
+        \mysqli $db,
+        ?SavedDepthChartRepositoryInterface $repo = null,
+        ?\Psr\Log\LoggerInterface $logger = null
+    ) {
         $this->db = $db;
-        $this->repository = new SavedDepthChartRepository($db);
+        $this->repository = $repo ?? new SavedDepthChartRepository($db);
         $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('audit');
     }
 
@@ -184,7 +196,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
         $parts = [];
 
         // Find active DC (most recently updated) for sim range, date range, and win-loss record
-        $activeDc = $this->repository->getActiveDepthChartForTeam($teamid);
+        $activeDc = $this->getActiveDc($teamid);
 
         // Use the active DC's name if it has one, otherwise default label
         if ($activeDc !== null && $activeDc['name'] !== null && $activeDc['name'] !== '') {
@@ -237,7 +249,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
         $savedDcs = $this->repository->getSavedDepthChartsForTeam($teamid);
 
         // Find active DC (most recently updated if multiple)
-        $activeDc = $this->repository->getActiveDepthChartForTeam($teamid);
+        $activeDc = $this->getActiveDc($teamid);
 
         // Hide active DC if it matches live ibl_plr settings exactly
         $hideActiveDc = false;
@@ -425,6 +437,20 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
     }
 
     /**
+     * Memoized active-DC fetch, keyed by teamid.
+     *
+     * @return SavedDepthChartRow|null
+     */
+    private function getActiveDc(int $teamid): ?array
+    {
+        if (!array_key_exists($teamid, $this->activeDcCache)) {
+            $this->activeDcCache[$teamid] = $this->repository->getActiveDepthChartForTeam($teamid);
+        }
+
+        return $this->activeDcCache[$teamid];
+    }
+
+    /**
      * Build a human-readable dropdown label for a saved depth chart
      *
      * @param SavedDepthChartRow $dc
@@ -490,11 +516,12 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
      */
     public function nameOrCreateActive(int $teamid, string $username, string $name, Season $season): array
     {
-        $activeDc = $this->repository->getActiveDepthChartForTeam($teamid);
+        $activeDc = $this->getActiveDc($teamid);
 
         if ($activeDc !== null) {
             $this->repository->updateName($activeDc['id'], $teamid, $name);
             $this->repository->deactivateOthersForTeam($teamid, $activeDc['id'], $season->lastSimEndDate, $season->lastSimNumber);
+            unset($this->activeDcCache[$teamid]);
             return ['success' => true, 'id' => $activeDc['id'], 'name' => $name];
         }
 

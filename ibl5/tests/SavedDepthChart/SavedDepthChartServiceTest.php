@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\SavedDepthChart;
 
 use SavedDepthChart\SavedDepthChartService;
+use SavedDepthChart\Contracts\SavedDepthChartRepositoryInterface;
 use Tests\WideUnit\WideUnitTestCase;
 use Season\Season;
 
@@ -307,6 +308,181 @@ class SavedDepthChartServiceTest extends WideUnitTestCase
 
         $this->assertFalse($result['success']);
         $this->assertSame('No players found on roster', $result['error']);
+    }
+
+    // ── characterization (Phase 1b) ──────────────────────────────────────────
+
+    /** @return array{id:int,teamid:int,username:string,name:string|null,phase:string,season_year:int,sim_start_date:string,sim_end_date:string|null,sim_number_start:int,sim_number_end:int|null,is_active:int,created_at:string,updated_at:string} */
+    private function makeActiveDcRow(int $id = 42, string $name = 'Championship DC'): array
+    {
+        return [
+            'id' => $id, 'teamid' => 1, 'username' => 'testuser',
+            'name' => $name, 'phase' => 'Regular Season', 'season_year' => 2024,
+            'sim_start_date' => '2024-01-01', 'sim_end_date' => null,
+            'sim_number_start' => 1, 'sim_number_end' => null, 'is_active' => 1,
+            'created_at' => '2024-01-01 00:00:00', 'updated_at' => '2024-01-01 00:00:00',
+        ];
+    }
+
+    public function testGetDropdownOptionsOutputUnchangedWithSingleActiveDc(): void
+    {
+        $activeDcRow = $this->makeActiveDcRow(42);
+        $dcPlayerRow = [
+            'id' => 1, 'depth_chart_id' => 42, 'pid' => 100, 'player_name' => 'Player One',
+            'ordinal' => 1, 'dc_pg_depth' => 1, 'dc_sg_depth' => 0, 'dc_sf_depth' => 0,
+            'dc_pf_depth' => 0, 'dc_c_depth' => 0, 'dc_can_play_in_game' => 1,
+            'dc_minutes' => 30, 'dc_of' => 1, 'dc_df' => 1, 'dc_oi' => 1, 'dc_di' => 1, 'dc_bh' => 1,
+        ];
+        $liveRosterRow = [
+            'pid' => 200, 'name' => 'Other Player', 'ordinal' => 1,
+            'dc_pg_depth' => 0, 'dc_sg_depth' => 0, 'dc_sf_depth' => 0,
+            'dc_pf_depth' => 0, 'dc_c_depth' => 0, 'dc_can_play_in_game' => 1,
+            'dc_minutes' => 30, 'dc_of' => 1, 'dc_df' => 1, 'dc_oi' => 1, 'dc_di' => 1, 'dc_bh' => 1,
+        ];
+
+        $repo = $this->createStub(SavedDepthChartRepositoryInterface::class);
+        $repo->method('getActiveDepthChartForTeam')->willReturn($activeDcRow);
+        $repo->method('getSavedDepthChartsForTeam')->willReturn([$activeDcRow]);
+        $repo->method('getPlayersForDepthChart')->willReturn([$dcPlayerRow]);
+        $repo->method('getLiveRosterSettings')->willReturn([$liveRosterRow]);
+        $repo->method('getWinLossRecord')->willReturn(['wins' => 3, 'losses' => 1]);
+
+        $service = new SavedDepthChartService($this->mockDb, $repo);
+        $result = $service->getDropdownOptions(1, new Season($this->mockDb));
+
+        $this->assertCount(1, $result);
+        $this->assertSame(42, $result[0]['id']);
+        $this->assertTrue($result[0]['isActive']);
+        $this->assertNotEmpty($result[0]['label']);
+    }
+
+    public function testBuildCurrentLiveLabelContainsRecordWithActiveDc(): void
+    {
+        $activeDcRow = $this->makeActiveDcRow(42, 'Championship DC');
+
+        $repo = $this->createStub(SavedDepthChartRepositoryInterface::class);
+        $repo->method('getActiveDepthChartForTeam')->willReturn($activeDcRow);
+        $repo->method('getWinLossRecord')->willReturn(['wins' => 3, 'losses' => 1]);
+
+        $service = new SavedDepthChartService($this->mockDb, $repo);
+        $label = $service->buildCurrentLiveLabel(1, new Season($this->mockDb));
+
+        $this->assertStringContainsString('(3-1)', $label);
+        $this->assertStringContainsString('Championship DC', $label);
+    }
+
+    public function testBuildCurrentLiveLabelFallsBackWhenNoActiveDc(): void
+    {
+        $repo = $this->createStub(SavedDepthChartRepositoryInterface::class);
+        $repo->method('getActiveDepthChartForTeam')->willReturn(null);
+
+        $service = new SavedDepthChartService($this->mockDb, $repo);
+        $label = $service->buildCurrentLiveLabel(1, new Season($this->mockDb));
+
+        $this->assertStringContainsString('Current (Live)', $label);
+        $this->assertStringContainsString('Sim ', $label);
+    }
+
+    // ── memoization + injected-interface seam (Phase 3) ─────────────────────
+
+    public function testActiveDcFetchedOnceForBothDropdownReads(): void
+    {
+        $activeDcRow = $this->makeActiveDcRow(42);
+        $dcPlayerRow = [
+            'id' => 1, 'depth_chart_id' => 42, 'pid' => 100, 'player_name' => 'Player One',
+            'ordinal' => 1, 'dc_pg_depth' => 1, 'dc_sg_depth' => 0, 'dc_sf_depth' => 0,
+            'dc_pf_depth' => 0, 'dc_c_depth' => 0, 'dc_can_play_in_game' => 1,
+            'dc_minutes' => 30, 'dc_of' => 1, 'dc_df' => 1, 'dc_oi' => 1, 'dc_di' => 1, 'dc_bh' => 1,
+        ];
+        $liveRosterRow = [
+            'pid' => 200, 'name' => 'Other Player', 'ordinal' => 1,
+            'dc_pg_depth' => 0, 'dc_sg_depth' => 0, 'dc_sf_depth' => 0,
+            'dc_pf_depth' => 0, 'dc_c_depth' => 0, 'dc_can_play_in_game' => 1,
+            'dc_minutes' => 30, 'dc_of' => 1, 'dc_df' => 1, 'dc_oi' => 1, 'dc_di' => 1, 'dc_bh' => 1,
+        ];
+
+        $mock = $this->createMock(SavedDepthChartRepositoryInterface::class);
+        $mock->expects($this->once())
+            ->method('getActiveDepthChartForTeam')
+            ->with(1)
+            ->willReturn($activeDcRow);
+        $mock->method('getSavedDepthChartsForTeam')->willReturn([$activeDcRow]);
+        $mock->method('getPlayersForDepthChart')->willReturn([$dcPlayerRow]);
+        $mock->method('getLiveRosterSettings')->willReturn([$liveRosterRow]);
+        $mock->method('getWinLossRecord')->willReturn(['wins' => 3, 'losses' => 1]);
+
+        $service = new SavedDepthChartService($this->mockDb, $mock);
+        $season = new Season($this->mockDb);
+        $service->getDropdownOptions(1, $season);
+        $service->buildCurrentLiveLabel(1, $season);
+    }
+
+    public function testMemoizationIsolatesDistinctTeams(): void
+    {
+        $dcTeam1 = $this->makeActiveDcRow(101, 'Team 1 DC');
+        $dcTeam1['teamid'] = 1;
+        $dcTeam2 = $this->makeActiveDcRow(202, 'Team 2 DC');
+        $dcTeam2['teamid'] = 2;
+        // Different pids in DC vs live → isDepthChartMatchingLive returns false → hideActiveDc = false
+        $dcPlayerRow = [
+            'id' => 1, 'depth_chart_id' => 0, 'pid' => 100, 'player_name' => 'P1',
+            'ordinal' => 1, 'dc_pg_depth' => 1, 'dc_sg_depth' => 0, 'dc_sf_depth' => 0,
+            'dc_pf_depth' => 0, 'dc_c_depth' => 0, 'dc_can_play_in_game' => 1,
+            'dc_minutes' => 30, 'dc_of' => 1, 'dc_df' => 1, 'dc_oi' => 1, 'dc_di' => 1, 'dc_bh' => 1,
+        ];
+        $liveRosterRow = [
+            'pid' => 200, 'name' => 'P2', 'ordinal' => 1,
+            'dc_pg_depth' => 0, 'dc_sg_depth' => 0, 'dc_sf_depth' => 0,
+            'dc_pf_depth' => 0, 'dc_c_depth' => 0, 'dc_can_play_in_game' => 1,
+            'dc_minutes' => 30, 'dc_of' => 1, 'dc_df' => 1, 'dc_oi' => 1, 'dc_di' => 1, 'dc_bh' => 1,
+        ];
+
+        $mock = $this->createStub(SavedDepthChartRepositoryInterface::class);
+        $mock->method('getActiveDepthChartForTeam')->willReturnMap([
+            [1, $dcTeam1],
+            [2, $dcTeam2],
+        ]);
+        $mock->method('getSavedDepthChartsForTeam')->willReturnMap([
+            [1, [$dcTeam1]],
+            [2, [$dcTeam2]],
+        ]);
+        $mock->method('getPlayersForDepthChart')->willReturn([$dcPlayerRow]);
+        $mock->method('getLiveRosterSettings')->willReturn([$liveRosterRow]);
+        $mock->method('getWinLossRecord')->willReturn(['wins' => 0, 'losses' => 0]);
+
+        $service = new SavedDepthChartService($this->mockDb, $mock);
+        $season = new Season($this->mockDb);
+
+        $resultTeam1 = $service->getDropdownOptions(1, $season);
+        $resultTeam2 = $service->getDropdownOptions(2, $season);
+
+        $ids1 = array_column($resultTeam1, 'id');
+        $ids2 = array_column($resultTeam2, 'id');
+
+        $this->assertContains(101, $ids1);
+        $this->assertNotContains(202, $ids1);
+        $this->assertContains(202, $ids2);
+        $this->assertNotContains(101, $ids2);
+    }
+
+    public function testActiveDcCacheInvalidatedAfterRename(): void
+    {
+        $activeDcRow = $this->makeActiveDcRow(42);
+
+        $mock = $this->createMock(SavedDepthChartRepositoryInterface::class);
+        $mock->expects($this->exactly(2))
+            ->method('getActiveDepthChartForTeam')
+            ->with(1)
+            ->willReturn($activeDcRow);
+        $mock->method('updateName')->willReturn(true);
+        $mock->method('deactivateOthersForTeam');
+        $mock->method('getWinLossRecord')->willReturn(['wins' => 2, 'losses' => 0]);
+
+        $service = new SavedDepthChartService($this->mockDb, $mock);
+        $season = new Season($this->mockDb);
+
+        $service->nameOrCreateActive(1, 'gm', 'New Name', $season);
+        $service->buildCurrentLiveLabel(1, $season);
     }
 
 }

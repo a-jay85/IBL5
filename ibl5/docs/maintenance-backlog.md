@@ -87,7 +87,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 1.6 | ✅ Implemented | — | Dual-path unified, byte-identical (#1146). View still 610 LOC = residual size, not this concern. |
 | 1.7 | ✅ Implemented | — | `TeamPageDataPreparer`+`TeamCardRenderer` (#1144); `TeamService` ~115 LOC (absent from >500 list). |
 | 1.8 | ✅ Implemented | — | Verified: no inline `new TeamQueryRepository`/`BuyoutLedgerRepository` in the view. Still 590 LOC = residual. |
-| 1.9 | ⬜ Open | 🟩 | Verified `new SavedDepthChartRepository($db)` at L31; 599 LOC. Memoize active-DC + inject interface; green-green. |
+| 1.9 | ✅ Implemented | — | Memoized active-DC fetch (`getActiveDc()`) + injected `SavedDepthChartRepositoryInterface`; green-green. |
 | 1.10 | ✅ Implemented | — | Verified: `syncPropertiesFromPlayerData` gone, zero public nullable props. `Player.php` 671 LOC = typed-getter bulk (residual). |
 | 1.11 | ⬜ Open | 🟩 | `insertTeamBoxscore()` 30-arg signature now lives in `BoxscoreRepository:252`; 557 LOC. Array-param + injectable ProgressReporter; pin with a DB-integration test. |
 | 1.12 | ✅ Implemented | — | #1145 — split into Index/Detail views, byte-identical golden-master. |
@@ -170,6 +170,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Memoize active DC per call chain; accept `SavedDepthChartRepositoryInterface`.
 **Est. effort:** S
 **Risk if untouched:** Every DC dropdown render triggers 3+ redundant queries; pattern proliferates.
+**Status:** Completed (PR for finding 1.9) — `SavedDepthChartService` constructor now accepts an optional `SavedDepthChartRepositoryInterface` (defaults to `new SavedDepthChartRepository($db)`); the active-DC fetch is memoized per teamid via private `getActiveDc()`, reused by `buildCurrentLiveLabel()`, `getDropdownOptions()`, and `nameOrCreateActive()` — collapsing the two redundant reads in `SavedDepthChartApiHandler::handleList()` into one. Cache invalidated after `nameOrCreateActive()` writes. Green-green.
 
 ### 1.10 Player (facade) — 50+ Public Properties Duplicating PlayerData
 **Location:** `ibl5/classes/Player/Player.php` (558 lines)

@@ -253,12 +253,6 @@ parameters:
 			path: tests/Player/PlayerImageHelperTest.php
 
 		-
-			rawMessage: 'Parameter #1 $data of method Search\SearchView::render() expects array{query: string, type: string, topic: int, category: int, author: string, days: int, min: int, offset: int, ...}, array{query: string, type: string, topic: int, category: int, author: string, days: int, min: int, offset: int, ...} given.'
-			identifier: argument.type
-			count: 6
-			path: tests/Search/SearchViewTest.php
-
-		-
 			rawMessage: 'Parameter #1 $games of method Statistics\TeamStatsCalculator::calculate() expects list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}>, array{array{visitor_score: 100, home_score: 95}} given.'
 			identifier: argument.type
 			count: 1

@@ -98,7 +98,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 1.17 | ◑ Partial | 🟩 | Constructor logger injected w/ `db` fallback (#1089, L585), but the `perf` channel is still static `LoggerFactory::getChannel('perf')` at L281. Inject perf logger; green-green. |
 | 1.18 | ⬜ Open | 🟩 | 11 `echo` in StandingsUpdater (verified). echo→LoggerInterface; remove dead `$log`; `82`→`League` const. CLI. |
 | 1.19 | ⬜ Open | 🟨 | `processPlrData`+`processPlrDataForYear` 80% duplicated; 510 LOC. `.plr` parse is engine-fidelity-critical → add characterization pins (mechanical scope) before merging the two paths, then 🟩. |
-| 1.20 | ⬜ Open | 🟩 | SearchView 485 LOC string-concat. Extract `renderResultTable()` + ob_start migration; VR pin. |
+| 1.20 | ✅ Implemented | 🟩 | SearchView 485 LOC string-concat. Extracted `renderResultList()` + ob_start migration; VR pin. |
 
 ### 1.1 RecordHoldersService — Hardcoded Team Registry + Multi-Concern Formatter
 **Location:** `ibl5/classes/RecordHolders/RecordHoldersService.php`
@@ -248,6 +248,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Extract `renderResultTable(string $title, array $headers, array $rows): string`; migrate to `ob_start()`.
 **Est. effort:** S
 **Risk if untouched:** New result types require copy-paste; `NukeCompat` dep invisible in type signature.
+**Status:** Implemented (2026-06-26) — migrated all renderers to `ob_start()` and extracted shared `renderResultList()` scaffold; byte-identical output (golden-master test + VR pin); escaping preserved (`RequireEscapedOutputRule` green).
 
 ---
 

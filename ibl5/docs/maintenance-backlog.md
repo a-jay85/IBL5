@@ -91,7 +91,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 1.10 | ✅ Implemented | — | Verified: `syncPropertiesFromPlayerData` gone, zero public nullable props. `Player.php` 671 LOC = typed-getter bulk (residual). |
 | 1.11 | ⬜ Open | 🟩 | `insertTeamBoxscore()` 30-arg signature now lives in `BoxscoreRepository:252`; 557 LOC. Array-param + injectable ProgressReporter; pin with a DB-integration test. |
 | 1.12 | ✅ Implemented | — | #1145 — split into Index/Detail views, byte-identical golden-master. |
-| 1.13 | ⬜ Open | 🟩 | Mutable `$collectedPlayerNames` accumulator; 530 LOC. Local var / collector VO; green-green. |
+| 1.13 | ✅ Implemented | — | Mutable `$collectedPlayerNames` accumulator → local var passed by-ref; green-green; getAllSeasons() untouched. |
 | 1.14 | ✅ Implemented | — | `TradeCapCalculator` extracted (#1143). |
 | 1.15 | ⬜ Open | 🟩 | YourAccountView 536 LOC, 6 SVG + 6 page variants. Green-green with VR pin; auth *display* only (no auth-logic change → no security surface). |
 | 1.16 | ✅ Implemented | — | `computeJsbProduction()` moved to service (verified). |
@@ -191,6 +191,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/classes/SeasonArchive/SeasonArchiveIndexView.php`, `ibl5/classes/SeasonArchive/SeasonDetailView.php`, and shared `ibl5/classes/SeasonArchive/SeasonArchiveRenderHelpers.php` trait. Output byte-identical (verified by golden-master snapshots).
 
 ### 1.13 SeasonArchiveService — Mutable Instance State Accumulator
+**Status:** ✅ Implemented — `$collectedPlayerNames` instance property replaced by a local variable in `getSeasonDetail()` passed by reference into `extractAward()`/`extractAwardList()` (optional `&$collected = []` param). Cross-call contamination structurally impossible; `getAllSeasons()` unchanged. Green-green (existing `testAccumulatorResetsBetweenCalls` + new `testReusedInstanceCollectsSameNamesAsFreshInstance`).
 **Location:** `ibl5/classes/SeasonArchive/SeasonArchiveService.php` line 35 (530 LOC)
 **Problem:** `private array $collectedPlayerNames = []` is a side-effect accumulator populated during `extractAward()`/`extractAwardList()` inside `getSeasonDetail()`. Reset only at start of `getSeasonDetail()` — not on construction — creating cross-contamination risk if reused.
 **Suggested direction:** Replace with a local variable passed into extract helpers; or use a `PlayerNameCollector` value object.

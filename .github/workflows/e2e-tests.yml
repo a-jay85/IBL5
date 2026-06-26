@@ -118,7 +118,7 @@ jobs:
 
       # --- Dependency Caching ---
       - name: Cache vendor directory
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ibl5/vendor
           key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
@@ -126,7 +126,7 @@ jobs:
             ${{ runner.os }}-vendor-
 
       - name: Cache node_modules
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ibl5/node_modules
           key: ${{ runner.os }}-bun-${{ hashFiles('ibl5/bun.lock') }}
@@ -298,7 +298,7 @@ jobs:
         uses: oven-sh/setup-bun@v2
 
       - name: Cache vendor directory
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ibl5/vendor
           key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
@@ -306,7 +306,7 @@ jobs:
             ${{ runner.os }}-vendor-
 
       - name: Cache node_modules
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ibl5/node_modules
           key: ${{ runner.os }}-bun-${{ hashFiles('ibl5/bun.lock') }}
@@ -355,7 +355,7 @@ jobs:
 
       # --- Dependency Caching ---
       - name: Cache vendor directory
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ibl5/vendor
           key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
@@ -363,7 +363,7 @@ jobs:
             ${{ runner.os }}-vendor-
 
       - name: Cache node_modules
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ibl5/node_modules
           key: ${{ runner.os }}-bun-${{ hashFiles('ibl5/bun.lock') }}
@@ -457,7 +457,7 @@ jobs:
 
       # --- Dependency Caching ---
       - name: Cache vendor directory
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ibl5/vendor
           key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
@@ -465,7 +465,7 @@ jobs:
             ${{ runner.os }}-vendor-
 
       - name: Cache node_modules
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ibl5/node_modules
           key: ${{ runner.os }}-bun-${{ hashFiles('ibl5/bun.lock') }}
@@ -767,7 +767,7 @@ jobs:
 
       - name: Restore CML cache
         if: always() && github.event_name == 'pull_request'
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cml
           key: ${{ runner.os }}-cml-0.20.6

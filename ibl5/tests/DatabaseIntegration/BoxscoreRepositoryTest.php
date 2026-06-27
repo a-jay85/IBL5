@@ -39,18 +39,35 @@ class BoxscoreRepositoryTest extends DatabaseTestCase
 
     public function testInsertTeamBoxscoreCreatesRow(): void
     {
-        $this->repo->insertTeamBoxscore(
-            '2025-02-01', 'Metros', 1, 2, 1,
-            10000, 15000, 20, 10, 25, 5,
-            28, 24, 22, 30, 0,
-            20, 22, 18, 25, 0,
-            30, 60, 15, 20, 8, 22, 10, 30, 20, 8, 12, 5, 18
-        );
+        $row = [
+            'game_date' => '2025-02-01', 'name' => 'Metros', 'game_of_that_day' => 1,
+            'visitor_teamid' => 2, 'home_teamid' => 1, 'attendance' => 10000, 'capacity' => 15000,
+            'visitor_wins' => 20, 'visitor_losses' => 10, 'home_wins' => 25, 'home_losses' => 5,
+            'visitor_q1_points' => 28, 'visitor_q2_points' => 24, 'visitor_q3_points' => 22, 'visitor_q4_points' => 30, 'visitor_ot_points' => 0,
+            'home_q1_points' => 20, 'home_q2_points' => 22, 'home_q3_points' => 18, 'home_q4_points' => 25, 'home_ot_points' => 0,
+            'game_2gm' => 30, 'game_2ga' => 60, 'game_ftm' => 15, 'game_fta' => 20, 'game_3gm' => 8, 'game_3ga' => 22,
+            'game_orb' => 10, 'game_drb' => 30, 'game_ast' => 20, 'game_stl' => 8, 'game_tov' => 12, 'game_blk' => 5, 'game_pf' => 18,
+        ];
+        $affected = $this->repo->insertTeamBoxscore($row);
+        self::assertSame(1, $affected);
 
-        $row = $this->repo->findTeamBoxscore('2025-02-01', 2, 1, 1);
-        self::assertNotNull($row);
-        self::assertSame(28, $row['visitor_q1_points']);
-        self::assertSame(20, $row['home_q1_points']);
+        $stmt = $this->db->prepare(
+            'SELECT game_date, name, game_of_that_day, visitor_teamid, home_teamid, attendance, capacity,
+                    visitor_wins, visitor_losses, home_wins, home_losses,
+                    visitor_q1_points, visitor_q2_points, visitor_q3_points, visitor_q4_points, visitor_ot_points,
+                    home_q1_points, home_q2_points, home_q3_points, home_q4_points, home_ot_points,
+                    game_2gm, game_2ga, game_ftm, game_fta, game_3gm, game_3ga,
+                    game_orb, game_drb, game_ast, game_stl, game_tov, game_blk, game_pf
+             FROM ibl_box_scores_teams WHERE game_date = ? AND name = ? AND game_of_that_day = ?'
+        );
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('ssi', $row['game_date'], $row['name'], $row['game_of_that_day']);
+        $stmt->execute();
+        $persisted = $stmt->get_result()->fetch_assoc();
+        self::assertNotNull($persisted);
+        foreach ($row as $col => $expected) {
+            self::assertSame($expected, $persisted[$col], "Column {$col} did not round-trip byte-identical");
+        }
     }
 
     public function testInsertPlayerBoxscoreCreatesRow(): void

@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-06-26
+last_verified: 2026-06-27
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -89,7 +89,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 1.8 | ✅ Implemented | — | Verified: no inline `new TeamQueryRepository`/`BuyoutLedgerRepository` in the view. Still 590 LOC = residual. |
 | 1.9 | ✅ Implemented | — | Memoized active-DC fetch (`getActiveDc()`) + injected `SavedDepthChartRepositoryInterface`; green-green. |
 | 1.10 | ✅ Implemented | — | Verified: `syncPropertiesFromPlayerData` gone, zero public nullable props. `Player.php` 671 LOC = typed-getter bulk (residual). |
-| 1.11 | ⬜ Open | 🟩 | `insertTeamBoxscore()` 30-arg signature now lives in `BoxscoreRepository:252`; 557 LOC. Array-param + injectable ProgressReporter; pin with a DB-integration test. |
+| 1.11 | ✅ Implemented | 🟩 | `insertTeamBoxscore()` 30-arg signature now lives in `BoxscoreRepository:252`; 557 LOC. Array-param + injectable ProgressReporter; pin with a DB-integration test. |
 | 1.12 | ✅ Implemented | — | #1145 — split into Index/Detail views, byte-identical golden-master. |
 | 1.13 | ✅ Implemented | — | Mutable `$collectedPlayerNames` accumulator → local var passed by-ref; green-green; getAllSeasons() untouched. |
 | 1.14 | ✅ Implemented | — | `TradeCapCalculator` extracted (#1143). |
@@ -186,6 +186,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Array-parameter version of `insertTeamBoxscore()`; move `flush()` into an injectable `ProgressReporter` callback.
 **Est. effort:** S
 **Risk if untouched:** Column reorder breaks silently; `flush()` corrupts tests/queued jobs.
+**Status:** Implemented — `insertTeamBoxscore()` now takes a typed array-keyed `$row` (SQL/bind type string unchanged); `flush()` moved behind `Boxscore\Contracts\ProgressReporterInterface` (`FlushProgressReporter` default, `NoOpProgressReporter` for tests). Pinned by the all-34-column byte-identical round-trip in `tests/DatabaseIntegration/BoxscoreRepositoryTest.php`.
 
 ### 1.12 SeasonArchiveView — Two Fundamentally Different Pages ✓ Done
 

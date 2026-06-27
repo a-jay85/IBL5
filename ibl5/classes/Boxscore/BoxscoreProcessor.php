@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Boxscore;
 
 use Boxscore\Contracts\BoxscoreProcessorInterface;
+use Boxscore\Contracts\ProgressReporterInterface;
+use Boxscore\FlushProgressReporter;
 use JsbParser\ScoFileParser;
 use League\LeagueContext;
 use Player\Stats\PlayerStats;
@@ -33,13 +35,15 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
     protected BoxscoreRepository $repository;
     protected Season $season;
     private ?LeagueContext $leagueContext;
+    private ProgressReporterInterface $progressReporter;
 
-    public function __construct(\mysqli $db, ?BoxscoreRepository $repository = null, ?Season $season = null, ?LeagueContext $leagueContext = null)
+    public function __construct(\mysqli $db, ?BoxscoreRepository $repository = null, ?Season $season = null, ?LeagueContext $leagueContext = null, ?ProgressReporterInterface $progressReporter = null)
     {
         $this->db = $db;
         $this->leagueContext = $leagueContext;
         $this->repository = $repository ?? new BoxscoreRepository($db, $leagueContext);
         $this->season = $season ?? new Season($db);
+        $this->progressReporter = $progressReporter ?? new FlushProgressReporter();
     }
 
     /**
@@ -122,9 +126,7 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
             }
 
             $totalGames = $gamesInserted + $gamesUpdated + $gamesSkipped;
-            if ($totalGames % 50 === 0) {
-                flush();
-            }
+            $this->progressReporter->report($totalGames);
         }
 
         $messages[] = "Number of .sco lines processed: {$linesProcessed}";
@@ -257,42 +259,42 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
                         }
                     }
 
-                    $this->repository->insertTeamBoxscore(
-                        $boxscoreGameInfo->gameDate,
-                        $name,
-                        $boxscoreGameInfo->game_of_that_day,
-                        $boxscoreGameInfo->visitor_teamid,
-                        $boxscoreGameInfo->home_teamid,
-                        (int) $boxscoreGameInfo->attendance,
-                        (int) $boxscoreGameInfo->capacity,
-                        (int) $boxscoreGameInfo->visitor_wins,
-                        (int) $boxscoreGameInfo->visitor_losses,
-                        (int) $boxscoreGameInfo->home_wins,
-                        (int) $boxscoreGameInfo->home_losses,
-                        (int) $boxscoreGameInfo->visitor_q1_points,
-                        (int) $boxscoreGameInfo->visitor_q2_points,
-                        (int) $boxscoreGameInfo->visitor_q3_points,
-                        (int) $boxscoreGameInfo->visitor_q4_points,
-                        (int) $boxscoreGameInfo->visitor_ot_points,
-                        (int) $boxscoreGameInfo->home_q1_points,
-                        (int) $boxscoreGameInfo->home_q2_points,
-                        (int) $boxscoreGameInfo->home_q3_points,
-                        (int) $boxscoreGameInfo->home_q4_points,
-                        (int) $boxscoreGameInfo->home_ot_points,
-                        (int) $playerStats->gameFieldGoalsMade,
-                        (int) $playerStats->gameFieldGoalsAttempted,
-                        (int) $playerStats->gameFreeThrowsMade,
-                        (int) $playerStats->gameFreeThrowsAttempted,
-                        (int) $playerStats->gameThreePointersMade,
-                        (int) $playerStats->gameThreePointersAttempted,
-                        (int) $playerStats->gameOffensiveRebounds,
-                        (int) $playerStats->gameDefensiveRebounds,
-                        (int) $playerStats->gameAssists,
-                        (int) $playerStats->gameSteals,
-                        (int) $playerStats->gameTurnovers,
-                        (int) $playerStats->gameBlocks,
-                        (int) $playerStats->gamePersonalFouls,
-                    );
+                    $this->repository->insertTeamBoxscore([
+                        'game_date' => $boxscoreGameInfo->gameDate,
+                        'name' => $name,
+                        'game_of_that_day' => $boxscoreGameInfo->game_of_that_day,
+                        'visitor_teamid' => $boxscoreGameInfo->visitor_teamid,
+                        'home_teamid' => $boxscoreGameInfo->home_teamid,
+                        'attendance' => (int) $boxscoreGameInfo->attendance,
+                        'capacity' => (int) $boxscoreGameInfo->capacity,
+                        'visitor_wins' => (int) $boxscoreGameInfo->visitor_wins,
+                        'visitor_losses' => (int) $boxscoreGameInfo->visitor_losses,
+                        'home_wins' => (int) $boxscoreGameInfo->home_wins,
+                        'home_losses' => (int) $boxscoreGameInfo->home_losses,
+                        'visitor_q1_points' => (int) $boxscoreGameInfo->visitor_q1_points,
+                        'visitor_q2_points' => (int) $boxscoreGameInfo->visitor_q2_points,
+                        'visitor_q3_points' => (int) $boxscoreGameInfo->visitor_q3_points,
+                        'visitor_q4_points' => (int) $boxscoreGameInfo->visitor_q4_points,
+                        'visitor_ot_points' => (int) $boxscoreGameInfo->visitor_ot_points,
+                        'home_q1_points' => (int) $boxscoreGameInfo->home_q1_points,
+                        'home_q2_points' => (int) $boxscoreGameInfo->home_q2_points,
+                        'home_q3_points' => (int) $boxscoreGameInfo->home_q3_points,
+                        'home_q4_points' => (int) $boxscoreGameInfo->home_q4_points,
+                        'home_ot_points' => (int) $boxscoreGameInfo->home_ot_points,
+                        'game_2gm' => (int) $playerStats->gameFieldGoalsMade,
+                        'game_2ga' => (int) $playerStats->gameFieldGoalsAttempted,
+                        'game_ftm' => (int) $playerStats->gameFreeThrowsMade,
+                        'game_fta' => (int) $playerStats->gameFreeThrowsAttempted,
+                        'game_3gm' => (int) $playerStats->gameThreePointersMade,
+                        'game_3ga' => (int) $playerStats->gameThreePointersAttempted,
+                        'game_orb' => (int) $playerStats->gameOffensiveRebounds,
+                        'game_drb' => (int) $playerStats->gameDefensiveRebounds,
+                        'game_ast' => (int) $playerStats->gameAssists,
+                        'game_stl' => (int) $playerStats->gameSteals,
+                        'game_tov' => (int) $playerStats->gameTurnovers,
+                        'game_blk' => (int) $playerStats->gameBlocks,
+                        'game_pf' => (int) $playerStats->gamePersonalFouls,
+                    ]);
                     $gameLinesProcessed++;
                 } else {
                     $playerUuid = UuidGenerator::generateUuid();

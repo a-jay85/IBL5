@@ -1334,7 +1334,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 | 7.11 | ⬜ Open | 🟨 | Inconsistent caching decorators. Upfront decision: add `Cached*Repository` for SeasonHighs/FranchiseRecordBook/etc. vs document why page-cache suffices. |
 | 7.12 | ✅ Implemented | — | TeamOrderBy enum (#1032). |
 | 7.13 | ✅ Implemented | — | DraftRepository injects TeamIdentityRepositoryInterface. |
-| 7.14 | ⬜ Open | 🟩 | `calculatePythagoreanStats` present (verified); StandingsRepository 681 LOC. Move calc to Service; green-green. |
+| 7.14 | ✅ Implemented | 🟩 | Extracted `Standings\PythagoreanCalculator` (pure `calculate()`); StandingsRepository delegates both call sites; green-green. |
 | 7.15 | ⬜ Open | 🟩 | 8 map*/FIELD_MAP members (verified); PlayerRepository 622 LOC. Extract PlayerDataMapper/Hydrator; green-green. |
 | 7.16 | ✅ Implemented | — | Hidden caches dropped (#1040). |
 | 7.17 | ⬜ Open | 🟩 | `getPlayerNews`→nuke_stories cross-query. Annotate `@see` (trivial) or extract LegacyNewsRepository; green-green. |
@@ -1444,6 +1444,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Status:** Completed (verified 2026-05-29 audit) — `DraftRepository` constructor now injects `TeamIdentityRepositoryInterface`; no inline `new CommonMysqliRepository`.
 
 ### 7.14 `StandingsRepository` Contains Business Logic
+**Status:** ✅ Implemented -- extracted the points-scored/allowed math into stateless `Standings\PythagoreanCalculator::calculate()`; SQL subquery builders left private in the repository.
 **Location:** `ibl5/classes/Standings/StandingsRepository.php` lines 602-663
 **Problem:** `calculatePythagoreanStats` returns a derived shape; subquery builders carry basketball semantics.
 **Suggested direction:** Move calc to `StandingsService` or `StatsFormatter`; keep SQL builders private.

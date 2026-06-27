@@ -184,6 +184,99 @@ class TeamScheduleServiceTest extends TestCase
     }
 
     // ============================================
+    // OPPONENT LOOKUP TESTS
+    // ============================================
+
+    public function testOpponentLookupPopulatesOpponentTextWithRecord(): void
+    {
+        $this->setupTeamMockData();
+        $this->stubRepository->method('getSchedule')->willReturn([
+            $this->makeGameRow('2024-01-10', visitor: 2, home: 1, vScore: 90, hScore: 100),
+            $this->makeGameRow('2024-01-12', visitor: 1, home: 2, vScore: 105, hScore: 95),
+        ]);
+
+        $service = new TeamScheduleService($this->mockDb, $this->stubRepository);
+        $season = new Season($this->mockDb);
+
+        $result = $service->getProcessedSchedule(1, $season);
+
+        $this->assertCount(2, $result);
+        $this->assertSame('Opponents', $result[0]['opposingTeam']->name);
+        $this->assertSame('Opponents', $result[1]['opposingTeam']->name);
+        $this->assertStringContainsString('Opponents', $result[0]['opponentText']);
+        $this->assertStringContainsString('(30-10)', $result[0]['opponentText']);
+        $this->assertStringContainsString('Opponents', $result[1]['opponentText']);
+    }
+
+    public function testOpponentTierAssignedWhenPowerRankingsProvided(): void
+    {
+        $this->setupTeamMockData();
+        $this->stubRepository->method('getSchedule')->willReturn([
+            $this->makeGameRow('2024-01-10', visitor: 2, home: 1, vScore: 90, hScore: 100),
+        ]);
+
+        $service = new TeamScheduleService(
+            $this->mockDb,
+            $this->stubRepository,
+            [1 => 50.0, 2 => 90.0]
+        );
+        $season = new Season($this->mockDb);
+
+        $result = $service->getProcessedSchedule(1, $season);
+
+        $this->assertNotSame('', $result[0]['opponentTier']);
+    }
+
+    public function testOpponentTierEmptyWhenNoPowerRankings(): void
+    {
+        $this->setupTeamMockData();
+        $this->stubRepository->method('getSchedule')->willReturn([
+            $this->makeGameRow('2024-01-10', visitor: 2, home: 1, vScore: 90, hScore: 100),
+        ]);
+
+        $service = new TeamScheduleService($this->mockDb, $this->stubRepository);
+        $season = new Season($this->mockDb);
+
+        $result = $service->getProcessedSchedule(1, $season);
+
+        $this->assertSame('', $result[0]['opponentTier']);
+    }
+
+    public function testUnplayedGameWithinNextSimWindowIsHighlighted(): void
+    {
+        $this->setupTeamMockData();
+        $this->stubRepository->method('getSchedule')->willReturn([
+            $this->makeGameRow('2025-01-15', visitor: 2, home: 1, vScore: 0, hScore: 0),
+        ]);
+
+        $season = self::createStub(Season::class);
+        $season->endingYear = 2025;
+        $season->projectedNextSimEndDate = new \DateTime('2025-01-20');
+
+        $service = new TeamScheduleService($this->mockDb, $this->stubRepository);
+        $result = $service->getProcessedSchedule(1, $season);
+
+        $this->assertSame('next-sim', $result[0]['highlight']);
+    }
+
+    public function testUnplayedGameBeyondNextSimWindowIsNotHighlighted(): void
+    {
+        $this->setupTeamMockData();
+        $this->stubRepository->method('getSchedule')->willReturn([
+            $this->makeGameRow('2025-02-10', visitor: 2, home: 1, vScore: 0, hScore: 0),
+        ]);
+
+        $season = self::createStub(Season::class);
+        $season->endingYear = 2025;
+        $season->projectedNextSimEndDate = new \DateTime('2025-01-20');
+
+        $service = new TeamScheduleService($this->mockDb, $this->stubRepository);
+        $result = $service->getProcessedSchedule(1, $season);
+
+        $this->assertSame('', $result[0]['highlight']);
+    }
+
+    // ============================================
     // HELPERS
     // ============================================
 

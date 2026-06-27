@@ -165,6 +165,48 @@ class LeagueStartersServiceTest extends TestCase
         $this->assertNotSame($result['PG'][0], $result['PG'][1]);
     }
 
+    public function testNonIntTeamIdRowIsSkipped(): void
+    {
+        $mockRepo = self::createStub(LeagueStartersRepositoryInterface::class);
+
+        $row = $this->makeStarterRow(101, 1, 'PG', 'Test Team');
+        $row['teamid'] = '1';
+        $mockRepo->method('getAllStartersWithTeamData')->willReturn([$row]);
+        $mockRepo->method('getPlaceholderRow')->willReturn(
+            TestDataFactory::createPlayer(['pid' => 4040404, 'teamid' => 0, 'name' => 'Placeholder', 'loyalty' => 0, 'playing_time' => 0, 'winner' => 0, 'tradition' => 0, 'security' => 0])
+        );
+
+        $this->mockDb->onQuery('SELECT[\s\S]*ibl_team_info[\s\S]*teamid BETWEEN', [
+            $this->makeTeamRow(1, 'Test Team', 'Test City'),
+        ]);
+
+        $service = new LeagueStartersService($this->mockDb, $this->mockLeague, $mockRepo);
+        $result = $service->getAllStartersByPosition();
+
+        $this->assertSame(4040404, $result['PG'][0]->getPlayerID());
+    }
+
+    public function testFirstStarterWinsPerTeamPosition(): void
+    {
+        $mockRepo = self::createStub(LeagueStartersRepositoryInterface::class);
+        $mockRepo->method('getAllStartersWithTeamData')->willReturn([
+            $this->makeStarterRow(101, 1, 'PG', 'Test Team'),
+            $this->makeStarterRow(102, 1, 'PG', 'Test Team'),
+        ]);
+        $mockRepo->method('getPlaceholderRow')->willReturn(
+            TestDataFactory::createPlayer(['pid' => 4040404, 'teamid' => 0, 'name' => 'Placeholder', 'loyalty' => 0, 'playing_time' => 0, 'winner' => 0, 'tradition' => 0, 'security' => 0])
+        );
+
+        $this->mockDb->onQuery('SELECT[\s\S]*ibl_team_info[\s\S]*teamid BETWEEN', [
+            $this->makeTeamRow(1, 'Test Team', 'Test City'),
+        ]);
+
+        $service = new LeagueStartersService($this->mockDb, $this->mockLeague, $mockRepo);
+        $result = $service->getAllStartersByPosition();
+
+        $this->assertSame(101, $result['PG'][0]->getPlayerID());
+    }
+
     // ============================================
     // MULTIPLE INSTANCES TEST
     // ============================================

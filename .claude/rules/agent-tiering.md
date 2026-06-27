@@ -1,6 +1,6 @@
 ---
 description: Sub-agent decision rules — when to spawn, when to skip, and which model to pick
-last_verified: 2026-06-21
+last_verified: 2026-06-27
 ---
 
 # Agent Tiering
@@ -14,6 +14,8 @@ Each sub-agent pays fixed overhead (~3–5K tokens: system prompt + rules + memo
 **Run directly (no agent) when ALL hold:** single command/tool call · output under ~50 lines · nothing else needs to run in parallel · output won't persist across many turns.
 
 **Spawn an agent when ANY hold:** output unpredictably verbose (large grep, failing suites with stack traces) and the agent can return a summary · multiple independent verbose tasks can run concurrently · the task is multiple sequential tool calls.
+
+**When you do spawn, minimize the invocation count — the question is "how many agents are actually needed," not "parallel vs sequential."** Each spawn re-pays the ~3–5K overhead, so batch N related tasks into one agent (or do them yourself) rather than one agent per task. Separate agents are justified only when each genuinely needs its own context (independent worktrees, isolating verbose output) — not merely because the tasks are logically distinct.
 
 **PHPUnit and PHPStan are always direct Bash calls** — passing output is ~5 lines, failures usually under 50; agent overhead dwarfs it. Use `run_in_background` for parallelism without an agent — **but only in the interactive harness, where a finished background task re-invokes you.** In a **headless** run (`claude -p`, e.g. `/post-plan` under automouse) there is no re-invocation: ending the turn with a background task alive stall-kills the run. There, either run blocking, or poll `BashOutput` to completion in-turn before ending the turn (see post-plan `SKILL.md` Phase 5).
 

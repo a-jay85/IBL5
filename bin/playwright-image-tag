@@ -1,0 +1,28 @@
+#!/bin/bash
+# bin/playwright-image-tag — derive the pinned Playwright Docker image ref from
+# a package.json's exact-pinned @playwright/test version. Single source of truth
+# for the version-to-image-tag mapping (see ADR-0070). Used by visual-regression.sh,
+# the setup-docker-e2e composite action, and the IBL6 E2E jobs so the installed
+# @playwright/test client and the Docker image tag can never drift.
+#
+# Usage: bin/playwright-image-tag <path-to-package.json>
+# Echoes e.g. the Microsoft Playwright image ref tagged with the pinned version.
+set -eu
+
+pkg="${1:?usage: playwright-image-tag <path-to-package.json>}"
+if [ ! -f "$pkg" ]; then
+  echo "playwright-image-tag: no such file: $pkg" >&2
+  exit 1
+fi
+
+# Exact-pin only (value starts with a digit, no caret) — doubles as a pin-convention
+# guard. Anchored on "@playwright/test" so @axe-core/playwright, eslint-plugin-playwright
+# and the bare "playwright" dep are never matched.
+ver="$(grep -oE '"@playwright/test": *"[0-9]+\.[0-9]+\.[0-9]+"' "$pkg" \
+  | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+if [ -z "$ver" ]; then
+  echo "playwright-image-tag: no exact @playwright/test version in $pkg" >&2
+  exit 1
+fi
+
+printf 'mcr.microsoft.com/playwright:v%s-jammy\n' "$ver"

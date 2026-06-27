@@ -247,6 +247,12 @@ parameters:
 			path: tests/Negotiation/NegotiationDemandCalculatorTest.php
 
 		-
+			rawMessage: 'Parameter #1 $plrRow of method Player\PlayerDataMapper::fillFromCurrentRow() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ..., ...<string, mixed>}, non-empty-array<string, mixed> given.'
+			identifier: argument.type
+			count: 1
+			path: tests/Player/PlayerDataMapperFieldMapTest.php
+
+		-
 			rawMessage: 'Parameter #1 $playerID of static method Player\PlayerImageHelper::getImageUrl() expects int|string|null, float given.'
 			identifier: argument.type
 			count: 1

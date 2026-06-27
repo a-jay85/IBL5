@@ -6,22 +6,21 @@ namespace Tests\Player;
 
 use PHPUnit\Framework\TestCase;
 use Player\PlayerData;
-use Player\PlayerRepository;
+use Player\PlayerDataMapper;
 
-class PlayerRepositoryFieldMapTest extends TestCase
+class PlayerDataMapperFieldMapTest extends TestCase
 {
-    private PlayerRepository $repository;
+    private PlayerDataMapper $mapper;
 
     protected function setUp(): void
     {
-        $db = self::createStub(\mysqli::class);
-        $this->repository = new PlayerRepository($db);
+        $this->mapper = new PlayerDataMapper();
     }
 
     public function testFillFromCurrentRowMapsAllExpectedFields(): void
     {
         $row = $this->buildFullCurrentRow();
-        $player = $this->repository->fillFromCurrentRow($row);
+        $player = $this->mapper->fillFromCurrentRow($row);
 
         self::assertSame(100, $player->playerID);
         self::assertSame(5, $player->ordinal);
@@ -103,7 +102,7 @@ class PlayerRepositoryFieldMapTest extends TestCase
     public function testFillFromHistoricalRowMapsAllExpectedFields(): void
     {
         $row = $this->buildFullHistoricalRow();
-        $player = $this->repository->fillFromHistoricalRow($row);
+        $player = $this->mapper->fillFromHistoricalRow($row);
 
         self::assertSame(200, $player->playerID);
         self::assertSame(2015, $player->historicalYear);
@@ -162,7 +161,7 @@ class PlayerRepositoryFieldMapTest extends TestCase
         $row['wt'] = null;
         $row['retired'] = null;
 
-        $player = $this->repository->fillFromCurrentRow($row);
+        $player = $this->mapper->fillFromCurrentRow($row);
 
         self::assertNull($player->nickname);
         self::assertNull($player->teamName);
@@ -177,12 +176,38 @@ class PlayerRepositoryFieldMapTest extends TestCase
         self::assertNull($player->isRetired);
     }
 
+    public function testFillFromCurrentRowMapsEmptyStringOptionalFieldsToNull(): void
+    {
+        $row = $this->buildFullCurrentRow();
+        $row['nickname'] = '';
+        $row['draftedby'] = '';
+        $row['draftedbycurrentname'] = '';
+        $row['college'] = '';
+
+        $player = $this->mapper->fillFromCurrentRow($row);
+
+        self::assertNull($player->nickname);
+        self::assertNull($player->draftTeamOriginalName);
+        self::assertNull($player->draftTeamCurrentName);
+        self::assertNull($player->collegeName);
+    }
+
+    public function testFillFromCurrentRowMapsNonStringOptionalFieldToNull(): void
+    {
+        $row = $this->buildFullCurrentRow();
+        $row['draftedby'] = 12345; // non-string → getOptionalStrippedValue returns null
+
+        $player = $this->mapper->fillFromCurrentRow($row);
+
+        self::assertNull($player->draftTeamOriginalName);
+    }
+
     public function testFillFromCurrentRowStripsSlashesFromName(): void
     {
         $row = $this->buildFullCurrentRow();
         $row['name'] = "O\\'Brien";
 
-        $player = $this->repository->fillFromCurrentRow($row);
+        $player = $this->mapper->fillFromCurrentRow($row);
         self::assertSame("O'Brien", $player->name);
     }
 
@@ -195,14 +220,14 @@ class PlayerRepositoryFieldMapTest extends TestCase
         );
 
         $mappedTargets = [];
-        foreach (PlayerRepository::FIELD_MAP as $entries) {
+        foreach (PlayerDataMapper::FIELD_MAP as $entries) {
             foreach ($entries as $entry) {
                 $mappedTargets[] = $entry['target'];
             }
         }
         $mappedTargets = array_unique($mappedTargets);
 
-        $accountedFor = array_merge($mappedTargets, PlayerRepository::EXCLUDED_FROM_FIELD_MAP);
+        $accountedFor = array_merge($mappedTargets, PlayerDataMapper::EXCLUDED_FROM_FIELD_MAP);
 
         $unmapped = array_diff($allProperties, $accountedFor);
 
@@ -221,7 +246,7 @@ class PlayerRepositoryFieldMapTest extends TestCase
             $reflection->getProperties()
         );
 
-        foreach (PlayerRepository::FIELD_MAP as $category => $entries) {
+        foreach (PlayerDataMapper::FIELD_MAP as $category => $entries) {
             foreach ($entries as $entry) {
                 self::assertContains(
                     $entry['target'],
@@ -240,7 +265,7 @@ class PlayerRepositoryFieldMapTest extends TestCase
             $reflection->getProperties()
         );
 
-        foreach (PlayerRepository::EXCLUDED_FROM_FIELD_MAP as $prop) {
+        foreach (PlayerDataMapper::EXCLUDED_FROM_FIELD_MAP as $prop) {
             self::assertContains(
                 $prop,
                 $validProperties,

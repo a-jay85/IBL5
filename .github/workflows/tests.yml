@@ -586,6 +586,8 @@ jobs:
         run: bin/test-wt-status
       - name: bin/test-check-plan
         run: bin/test-check-plan
+      - name: bin/test-check-plan-staleness
+        run: bin/test-check-plan-staleness
       - name: bin/test-adr-check
         run: bin/test-adr-check
       - name: bin/test-postplan-arm-conditions

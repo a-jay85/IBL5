@@ -89,7 +89,7 @@ class TestDataFactory
             'stamina' => 50,
             'used_extension_this_season' => 0,
             'used_extension_this_chunk' => 0,
-            // Free-agency rating fields (read by PlayerRepository::mapFreeAgencyFields)
+            // Free-agency rating fields (read by PlayerDataMapper::mapFreeAgencyFields)
             'loyalty' => 50,
             'playing_time' => 50,
             'winner' => 50,

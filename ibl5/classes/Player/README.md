@@ -58,17 +58,33 @@ A simple data container that holds player information without any business logic
 Handles all database operations for player data following the Repository pattern. This class:
 - Encapsulates data loading logic
 - Provides methods to load players from different sources
-- Translates database rows into PlayerData objects
+- Delegates row→DTO mapping to `PlayerDataMapper`
 - Isolates the rest of the code from database schema changes
-- Uses focused helper methods to organize field mapping
 
 **Key Methods**:
 - `loadByID(int $playerID): PlayerData` - Load a player by ID
-- `fillFromCurrentRow(array $plrRow): PlayerData` - Create PlayerData from current season row
-- `fillFromHistoricalRow(array $plrRow): PlayerData` - Create PlayerData from historical row
+- `fillFromCurrentRow(array $plrRow): PlayerData` - Delegates to `PlayerDataMapper::fillFromCurrentRow()`
+- `fillFromHistoricalRow(array $plrRow): PlayerData` - Delegates to `PlayerDataMapper::fillFromHistoricalRow()`
 - `getFreeAgencyDemands(string $playerName)` - Query free agency demands
 
-**Private Helper Methods** (for better organization):
+**Location**: `/ibl5/classes/Player/PlayerRepository.php`
+
+---
+
+### PlayerDataMapper
+**Responsibility**: Row→DTO Mapping
+
+A dependency-free class that owns the declarative field map and all row→PlayerData transformation logic (extracted from `PlayerRepository`, backlog 7.15). Makes no database calls.
+
+**Constants**:
+- `FIELD_MAP` - Declarative property→column mapping for all PlayerData fields
+- `EXCLUDED_FROM_FIELD_MAP` - Properties set outside the field map
+
+**Public Methods**:
+- `fillFromCurrentRow(array $plrRow): PlayerData` - Map a current-season `ibl_plr` row to PlayerData
+- `fillFromHistoricalRow(array $plrRow): PlayerData` - Map a historical row to PlayerData
+
+**Private Helper Methods**:
 - `mapBasicFields()` - Map player identity and team information
 - `mapRatingsFromCurrentRow()` / `mapRatingsFromHistoricalRow()` - Map rating fields
 - `mapFreeAgencyFields()` - Map free agency preferences
@@ -78,7 +94,7 @@ Handles all database operations for player data following the Repository pattern
 - `mapStatusFields()` - Map status flags
 - `getOptionalStrippedValue()` - Helper for nullable string fields
 
-**Location**: `/ibl5/classes/Player/PlayerRepository.php`
+**Location**: `/ibl5/classes/Player/PlayerDataMapper.php`
 
 ---
 

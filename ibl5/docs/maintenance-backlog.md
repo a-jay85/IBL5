@@ -2398,7 +2398,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 | 13.7b | ⬜ Open | 🟨 | Needs `ValidationError`/`ValidationResultWithContext` type design (Depth/Trade carry structured + cap-total payloads) before the sweep. |
 | 13.8 | ✅ Implemented | — | retired filter standardized to `= 0` (2026-06-05). |
 | 13.9 | ⬜ Open | 🟦 | 4 team-color CSS var sets → one sanitizing `TableStyles::inlineTeamVars()`. Touches hex-injection sanitization (output-security surface) + VR → human-merge. |
-| 13.10 | ⬜ Open | 🟩 | Extract `StatRowFormatter` for Career/Season leaderboards; green-green (RecordFormatter-style). |
+| 13.10 | 🚫 Declined | — | Premise invalid: Career/Season `processPlayerRow` return arrays differ in key membership, order, and value-type (22 vs 44 keys) — no shared surface to extract. Doc-only closure, no code. |
 | 13.11 | ✅ Implemented | — | cleanName subquery extracted (2026-06-05). |
 | 13.12 | ⬜ Open | 🟩 | player↔team JOIN ×15 → `vw_players_with_team`/helper; green-green, opportunistic (L). |
 | 13.13 | ✅ Implemented | — | #1033 + DNP follow-ups #1087/#1088. |
@@ -2473,6 +2473,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Risk if untouched:** Hex-injection bypass through unsanitized site; CSS variable rename breaks only one variant.
 
 ### 13.10 `CareerLeaderboards` vs `SeasonLeaderboards` Stat-Row Formatting Diverges
+**Status:** 🚫 Declined (2026-06-24) — premise invalid. The two services' `processPlayerRow` return arrays are disjoint: Career's `FormattedPlayerStats` (22 keys, percentages interleaved, `pts`/`drb`, all values formatted strings, retired `*` appended) vs Season's `ProcessedStats` (44 keys, raw-totals block then grouped percentages then a per-game `mpg…ppg` block, `points`/`drebpg`, raw ints, plus `year`/`teamname`/team-color/`qa`). They differ in key membership, order, AND per-key value-type; the only identical residue is the `pid` passthrough. No shared `STAT_COLUMNS`/`assembleRow` surface exists, so no `StatRowFormatter` was extracted — forcing one would be cosmetic co-location that raises (not lowers) maintenance cost. The premise that both "iterate the same 18-stat-column set" is also false: neither service iterates a column list (both write positional array literals).
 **Location:** `CareerLeaderboards/CareerLeaderboardsService.php` (`processPlayerRow`, 90 LOC), `SeasonLeaderboards/SeasonLeaderboardsService.php`
 **Problem:** Both iterate over the same 18-stat-column set with `StatsFormatter::formatTotal`/`formatPerGameAverage`.
 **Suggested direction:** Extract `StatRowFormatter::formatTotalsRow()`, `formatAveragesRow()`; both delegate.

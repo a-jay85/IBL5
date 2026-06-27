@@ -202,25 +202,42 @@ try {
             [$fgm, $fga, $ftm, $fta, $tpm, $tpa, $orb, $reb, $ast, $stl, $tov, $blk, $pf] = $t;
             $name = $g[$side . '_name'];
 
-            $repository->insertTeamBoxscore(
-                $g['date'],
-                $name,
-                1,
-                $g['visitor_teamid'],
-                $g['home_teamid'],
-                ATTENDANCE,
-                CAPACITY,
-                0, 0, 0, 0, // W/L unrecoverable
-                $vq1, $vq2, $vq3, $vq4, $vot,
-                $hq1, $hq2, $hq3, $hq4, $hot,
-                $fgm - $tpm, // game_2gm
-                $fga - $tpa, // game_2ga
-                $ftm, $fta,
-                $tpm, $tpa,
-                $orb,
-                $reb - $orb, // game_drb
-                $ast, $stl, $tov, $blk, $pf,
-            );
+            $repository->insertTeamBoxscore([
+                'game_date' => $g['date'],
+                'name' => $name,
+                'game_of_that_day' => 1,
+                'visitor_teamid' => $g['visitor_teamid'],
+                'home_teamid' => $g['home_teamid'],
+                'attendance' => ATTENDANCE,
+                'capacity' => CAPACITY,
+                'visitor_wins' => 0,
+                'visitor_losses' => 0,
+                'home_wins' => 0,
+                'home_losses' => 0, // W/L unrecoverable
+                'visitor_q1_points' => $vq1,
+                'visitor_q2_points' => $vq2,
+                'visitor_q3_points' => $vq3,
+                'visitor_q4_points' => $vq4,
+                'visitor_ot_points' => $vot,
+                'home_q1_points' => $hq1,
+                'home_q2_points' => $hq2,
+                'home_q3_points' => $hq3,
+                'home_q4_points' => $hq4,
+                'home_ot_points' => $hot,
+                'game_2gm' => $fgm - $tpm,
+                'game_2ga' => $fga - $tpa,
+                'game_ftm' => $ftm,
+                'game_fta' => $fta,
+                'game_3gm' => $tpm,
+                'game_3ga' => $tpa,
+                'game_orb' => $orb,
+                'game_drb' => $reb - $orb,
+                'game_ast' => $ast,
+                'game_stl' => $stl,
+                'game_tov' => $tov,
+                'game_blk' => $blk,
+                'game_pf' => $pf,
+            ]);
             $teamPts = ($fgm - $tpm) * 2 + $ftm + $tpm * 3;
             echo sprintf("  team  %-12s 2GM %2d 3GM %2d FT %2d ORB %2d DRB %2d  PTS %d\n",
                 $name, $fgm - $tpm, $tpm, $ftm, $orb, $reb - $orb, $teamPts);

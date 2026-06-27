@@ -8,6 +8,7 @@ use Boxscore\Boxscore;
 use Boxscore\BoxscoreProcessor;
 use Boxscore\BoxscoreRepository;
 use Boxscore\Contracts\BoxscoreProcessorInterface;
+use Boxscore\Contracts\ProgressReporterInterface;
 use PHPUnit\Framework\TestCase;
 use Season\Season;
 use Tests\WideUnit\Mocks\MockDatabase;
@@ -609,6 +610,57 @@ class BoxscoreProcessorTest extends TestCase
         $this->assertSame(1, $result['gamesInserted']);
         $this->assertSame(0, $result['gamesSkipped']);
         $this->assertGreaterThan(0, $result['linesProcessed']);
+    }
+
+    // --- ProgressReporter seam tests ---
+
+    public function testProcessorUsesInjectedProgressReporterAndDoesNotFlushOnNoOp(): void
+    {
+        $spy = new class implements ProgressReporterInterface {
+            /** @var list<int> */
+            public array $counts = [];
+            public function report(int $processedCount): void { $this->counts[] = $processedCount; }
+        };
+
+        $mockDb = new MockDatabase();
+        $mockDb->setReturnTrue(true);
+        $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', []); // new game -> insert
+
+        $repository = new BoxscoreRepository($mockDb);
+        $seasonStub = self::createStub(Season::class);
+        $seasonStub->lastSimEndDate = '';
+
+        $scoFile = $this->buildScoFileWithOneGame($this->buildGameInfoLine(3, 10));
+        $data = file_get_contents($scoFile);
+        self::assertNotFalse($data);
+        $processor = new BoxscoreProcessor($mockDb, $repository, $seasonStub, null, $spy);
+
+        $result = $processor->processScoData($data, 2026, 'Regular Season/Playoffs', skipSimDates: true);
+
+        self::assertTrue($result['success']);
+        self::assertSame(1, $result['gamesInserted']);
+        self::assertSame([1], $spy->counts); // report() called once per processed game; no flush side effect (spy is no-op)
+    }
+
+    public function testDefaultConstructionWiresFlushProgressReporterAndRunsGame(): void
+    {
+        $mockDb = new MockDatabase();
+        $mockDb->setReturnTrue(true);
+        $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', []); // new game -> insert
+
+        $repository = new BoxscoreRepository($mockDb);
+        $seasonStub = self::createStub(Season::class);
+        $seasonStub->lastSimEndDate = '';
+
+        $scoFile = $this->buildScoFileWithOneGame($this->buildGameInfoLine(3, 10));
+        $data = file_get_contents($scoFile);
+        self::assertNotFalse($data);
+        $processor = new BoxscoreProcessor($mockDb, $repository, $seasonStub); // no 5th arg — defaults to FlushProgressReporter
+
+        $result = $processor->processScoData($data, 2026, 'Regular Season/Playoffs', skipSimDates: true);
+
+        self::assertTrue($result['success']);
+        self::assertSame(1, $result['gamesInserted']);
     }
 
     // --- Helper methods ---

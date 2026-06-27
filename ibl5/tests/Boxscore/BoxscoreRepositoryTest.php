@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Boxscore;
 
+use Boxscore\Boxscore;
 use Boxscore\BoxscoreRepository;
 use Boxscore\Contracts\BoxscoreRepositoryInterface;
 use League\LeagueContext;
@@ -100,42 +101,42 @@ class BoxscoreRepositoryTest extends TestCase
     {
         $this->mockDb->setReturnTrue(true);
 
-        $result = $this->repository->insertTeamBoxscore(
-            '2025-01-15',
-            'TestTeam',
-            1,
-            1,
-            2,
-            15000,
-            18000,
-            10,
-            5,
-            8,
-            7,
-            25,
-            30,
-            20,
-            28,
-            0,
-            22,
-            27,
-            24,
-            30,
-            0,
-            40,
-            85,
-            20,
-            25,
-            10,
-            30,
-            12,
-            30,
-            25,
-            8,
-            15,
-            5,
-            20,
-        );
+        $result = $this->repository->insertTeamBoxscore([
+            'game_date' => '2025-01-15',
+            'name' => 'TestTeam',
+            'game_of_that_day' => 1,
+            'visitor_teamid' => 1,
+            'home_teamid' => 2,
+            'attendance' => 15000,
+            'capacity' => 18000,
+            'visitor_wins' => 10,
+            'visitor_losses' => 5,
+            'home_wins' => 8,
+            'home_losses' => 7,
+            'visitor_q1_points' => 25,
+            'visitor_q2_points' => 30,
+            'visitor_q3_points' => 20,
+            'visitor_q4_points' => 28,
+            'visitor_ot_points' => 0,
+            'home_q1_points' => 22,
+            'home_q2_points' => 27,
+            'home_q3_points' => 24,
+            'home_q4_points' => 30,
+            'home_ot_points' => 0,
+            'game_2gm' => 40,
+            'game_2ga' => 85,
+            'game_ftm' => 20,
+            'game_fta' => 25,
+            'game_3gm' => 10,
+            'game_3ga' => 30,
+            'game_orb' => 12,
+            'game_drb' => 30,
+            'game_ast' => 25,
+            'game_stl' => 8,
+            'game_tov' => 15,
+            'game_blk' => 5,
+            'game_pf' => 20,
+        ]);
 
         $queries = $this->mockDb->getExecutedQueries();
         $this->assertCount(1, $queries);
@@ -220,13 +221,52 @@ class BoxscoreRepositoryTest extends TestCase
         $repo = new BoxscoreRepository($this->mockDb);
         $this->mockDb->setReturnTrue(true);
 
-        $repo->insertTeamBoxscore(
-            '2025-01-15', 'TestTeam', 1, 1, 2, 15000, 18000,
-            10, 5, 8, 7, 25, 30, 20, 28, 0, 22, 27, 24, 30, 0,
-            40, 85, 20, 25, 10, 30, 12, 30, 25, 8, 15, 5, 20,
-        );
+        $repo->insertTeamBoxscore([
+            'game_date' => '2025-01-15',
+            'name' => 'TestTeam',
+            'game_of_that_day' => 1,
+            'visitor_teamid' => 1,
+            'home_teamid' => 2,
+            'attendance' => 15000,
+            'capacity' => 18000,
+            'visitor_wins' => 10,
+            'visitor_losses' => 5,
+            'home_wins' => 8,
+            'home_losses' => 7,
+            'visitor_q1_points' => 25,
+            'visitor_q2_points' => 30,
+            'visitor_q3_points' => 20,
+            'visitor_q4_points' => 28,
+            'visitor_ot_points' => 0,
+            'home_q1_points' => 22,
+            'home_q2_points' => 27,
+            'home_q3_points' => 24,
+            'home_q4_points' => 30,
+            'home_ot_points' => 0,
+            'game_2gm' => 40,
+            'game_2ga' => 85,
+            'game_ftm' => 20,
+            'game_fta' => 25,
+            'game_3gm' => 10,
+            'game_3ga' => 30,
+            'game_orb' => 12,
+            'game_drb' => 30,
+            'game_ast' => 25,
+            'game_stl' => 8,
+            'game_tov' => 15,
+            'game_blk' => 5,
+            'game_pf' => 20,
+        ]);
 
         $queries = $this->mockDb->getExecutedQueries();
         $this->assertStringContainsString('INSERT INTO ibl_olympics_box_scores_teams', $queries[0]);
+    }
+
+    public function testTeamInsertTemplateIsFullyParameterized(): void
+    {
+        $sql = Boxscore::teamInsertSql('`ibl_box_scores_teams`');
+        self::assertSame(34, substr_count($sql, '?'));
+        self::assertStringContainsString('VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', $sql);
+        self::assertStringContainsString('INSERT INTO `ibl_box_scores_teams`', $sql);
     }
 }

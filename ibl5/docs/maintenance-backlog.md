@@ -1162,16 +1162,16 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 | 6.5 | ✅ Implemented | — | TeamStatsCalculatorTest exists. |
 | 6.6 | ✅ Implemented | — | StrengthOfScheduleCalculatorTest exists. |
 | 6.7 | ✅ Implemented | 🟩 | LeagueStarters thin; additive. |
-| 6.8 | ⬜ Open | 🟩 | ApiKeys thin; additive (security tests catch, don't introduce surface). |
+| 6.8 | ✅ Implemented | — | ApiKeysRepositoryTest added (revocation active-only scoping, latest-key lookup). |
 | 6.9 | ✅ Implemented | — | ContractListServiceTest extended (#1161, 2026-06-20). |
 | 6.10 | ✅ Implemented | 🟩 | FreeAgencyPreview thin; additive — coordinate with PR #1162 (future-year restore). |
 | 6.11 | ✅ Implemented | 🟩 | SeasonHighs thin; additive. |
 | 6.12 | ✅ Implemented | 🟩 | TeamSchedule thin; additive. |
 | 6.13 | ⬜ Open | 🟩 | Player 0.24 ratio; additive (L — chunk it). |
 | 6.14 | ⬜ Open | 🟩 | Updater steps; additive. |
-| 6.15 | ⬜ Open | 🟩 | Voting; additive. |
-| 6.16 | ⬜ Open | 🟩 | Api auth/rate-limit/pagination; additive. |
-| 6.17 | ⬜ Open | 🟩 | Trading validation; additive. |
+| 6.15 | ✅ Implemented | — | VotingRepositoryTest + SubmissionResultTest added (aggregation, column allowlist). |
+| 6.16 | ◑ Partial | 🟩 | ApiKeyRepositoryTest + RateLimitRepositoryTest added; data repos + JsonResponder/SystemClock still untested. |
+| 6.17 | ◑ Partial | 🟩 | TradeAssetRepositoryTest + TradeOfferRepositoryTest added (draft-pick mapping, offer lifecycle); TradeExecutionRepository untested + TradeFormRepository partial. |
 | 6.18 | ⬜ Open | 🟩 | Moderate-gap modules; per-module targeted tests, additive. |
 | 6.19 | ⬜ Open | 🟩 | Additive. **`Shared (3/1)` sub-item stale** — `Shared/` deleted (2.23). |
 
@@ -1235,6 +1235,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Service uniqueness, Repository revocation, rate-limiter integration.
 **Est. effort:** M
 **Risk if untouched:** Key collisions, revocation failures, rate-limit bypass.
+**Status:** Implemented (verified 2026-06-27) — tests/ApiKeys/ApiKeysRepositoryTest.php added (findByUserId latest-key selection, createKey, revokeByUserId active-only scoping). Rate-limiter integration covered by tests/Api/Repository/RateLimitRepositoryTest.php (6.16).
 
 ### 6.9 ContractList — Thin (6 files, 2 tests)
 **Location:** `ibl5/classes/ContractList`
@@ -1288,6 +1289,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Ballot validation, duplicate-vote prevention, ranking aggregation.
 **Est. effort:** M
 **Risk if untouched:** Award voting corruption; duplicates counted.
+**Status:** Implemented (verified 2026-06-27) — tests/Voting/VotingRepositoryTest.php (vote aggregation, column-allowlist rejection, save/cooldown writes, name→pid mapping) + tests/Voting/SubmissionResultTest.php added. Results service/controller/view already covered under tests/VotingResults/.
 
 ### 6.16 Api Module — Subthreshold (48 files, 22 tests, 0.46 ratio)
 **Location:** `ibl5/classes/Api`
@@ -1295,6 +1297,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Header parsing, token-bucket logic, pagination offset/limit edges.
 **Est. effort:** L
 **Risk if untouched:** Auth bypass; rate limiter broken; pagination off-by-one.
+**Status:** Partial (verified 2026-06-27) — tests/Api/Repository/ApiKeyRepositoryTest.php + tests/Api/Repository/RateLimitRepositoryTest.php added (active-key-only lookup, token-bucket upsert/window count). ApiKeyAuthenticator/RateLimiter/Paginator already well-covered. Residual: data repositories (ApiGameRepository, ApiInjuriesRepository, ApiLeadersRepository, ApiPlayerRepository, ApiPlayerStatsRepository, ApiStandingsRepository, ApiTeamRepository, HealthRepository) + JsonResponder + SystemClock.
 
 ### 6.17 Trading Module — Subthreshold (27 files, 12 tests, 0.44 ratio)
 **Location:** `ibl5/classes/Trading`
@@ -1302,6 +1305,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Validation (cap/roster/eligibility), draft-pick mapping, rejection reasons.
 **Est. effort:** M
 **Risk if untouched:** Trades bypass validation; cap exploits; pick duplication.
+**Status:** Partial (verified 2026-06-27) — tests/Trading/TradeAssetRepositoryTest.php (draft-pick mapping, pick-owner reassignment, player lookups) + tests/Trading/TradeOfferRepositoryTest.php (offer-id generation + failure path, transactional delete with cash coordination) added. Validation/rejection-reasons already covered by TradeValidatorTest. Residual: TradeExecutionRepository (untested) + TradeFormRepository (partial).
 
 ### 6.18 Moderate-Gap Modules (0.40–0.50 ratio)
 **Location:** `DraftPickLocator` (5/2), `LeagueSchedule` (7/3), `NextSim` (5/2), `SavedDepthChart` (5/2), `TransactionHistory` (5/2), `CapSpace` (5/2), `DepthChartEntry` (15/8)

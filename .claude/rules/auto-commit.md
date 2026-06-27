@@ -1,11 +1,13 @@
 ---
-description: Commit/PR work from the worktree; the Stop hook nudges to commit in a worktree and warns if the main checkout is dirty (work landed in the wrong place); amend when fixing unpushed work
-last_verified: 2026-06-19
+description: Commit/PR work from the worktree; the Stop hook nudges to commit in a worktree and warns if the main checkout is dirty (work landed in the wrong place); amend when fixing unpushed work. Carries the one-line PR-title decision test (full rubric in commit-conventions.md).
+last_verified: 2026-06-27
 ---
 
 # Auto-Commit
 
 All work happens in a worktree, never the main checkout (ADR-0062, `workflow-continuity.md`). Worktree work is committed by `/post-plan` (auto-fired) or `/commit-commands:commit-push-pr` — not by this hook.
+
+**PR/commit title type** (when titling via `/commit-commands:*`): decision test — *"Would a league GM notice a new ability they didn't have before?"* Yes → `feat:` (trips the human-signoff hold — that's the gate working, not a cost to route around); invisible to a GM (dev tooling, a new slash command, an internal refactor, a doc, a dep bump) → `chore:`/`fix:`/`refactor:`/`docs:`. Classify by what the diff **is**, never by the desired merge outcome. Full rubric incl. edge cases: `.claude/rules/commit-conventions.md`.
 
 The `$HOME/.claude/hooks/auto-commit-reminder.sh` Stop hook fires at turn-end when there are uncommitted changes, and nudges the right action depending on **where** the work is:
 

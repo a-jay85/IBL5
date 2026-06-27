@@ -90,6 +90,17 @@ while IFS= read -r token; do
         *...*) continue ;;
     esac
 
+    # Skip new-ADR numeric placeholders. A plan that will create an ADR cites it
+    # at a placeholder path like `ibl5/docs/decisions/00NN-slug.md` — the number
+    # is assigned at impl time by bin/next-adr. Real ADR files use digits only in
+    # the number slot and lowercase-kebab slugs, so an uppercase "NN" in a
+    # docs/decisions path is always a placeholder, never a dependency the plan
+    # reads. (Recurring FP class A — e.g. plan pr-triage-gated-auto-arm.) The
+    # case is case-sensitive, so a real ADR like 0069-foo.md never matches.
+    case "$token" in
+        *docs/decisions/*NN*) continue ;;
+    esac
+
     # Validate charset; this also drops `$VAR/...` shell-variable tokens.
     if ! printf '%s' "$token" | grep -qE '^[A-Za-z0-9._/-]+$'; then
         continue
@@ -125,7 +136,7 @@ while IFS= read -r token; do
     # for new artifacts; `pre-impl` rows reference existing files (which resolve
     # on disk and never reach here).
     if grep -F -- "$token" "$PLAN_FILE" \
-        | grep -qE '([Cc]reate|[Nn]ew file|[Aa]dd(s|ing)? (a )?new|[Ii]ntroduce|[Ss]caffold|throwaway|scratch|post-impl)'; then
+        | grep -qE '([Cc]reate|[Nn]ew file|[Aa]dd(s|ing)? (a )?new|[Ii]ntroduce|[Ss]caffold|[Ww]rite|\*\*NEW\*\*|[Rr]eject(ed)?|[Ff]ixture|throwaway|scratch|post-impl)'; then
         continue
     fi
 

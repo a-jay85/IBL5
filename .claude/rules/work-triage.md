@@ -1,6 +1,6 @@
 ---
 description: Triage every non-trivial unit of work as ad-hoc vs /plan before starting, with an ad-hoc safety mirror; the gateway that feeds the deployment funnel (ADR-0067).
-last_verified: 2026-06-22
+last_verified: 2026-06-27
 ---
 
 # Work Triage Rule
@@ -37,6 +37,4 @@ then prefer `/plan`, so the defense and its verification are designed up front. 
 
 Surface the verdict only when scope is **non-trivial or borderline**. Skip the ritual for obviously trivial edits (typo, one-line fix) — just do them; don't add ceremony.
 
-## Headless
-
-In a headless/automouse run there is no user to recommend `/plan` to, and automouse only executes pre-vetted plans. This rule is a no-op there — it governs interactive work-start only.
+**Headless:** no-op under headless/automouse (no user to recommend `/plan` to; automouse runs only pre-vetted plans). Governs interactive work-start only.

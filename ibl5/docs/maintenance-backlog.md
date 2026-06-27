@@ -1161,12 +1161,12 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 | 6.4 | ◑ Partial | 🟩 | Header side-effect test exists; broader structure/CSS coverage still thin → additive. |
 | 6.5 | ✅ Implemented | — | TeamStatsCalculatorTest exists. |
 | 6.6 | ✅ Implemented | — | StrengthOfScheduleCalculatorTest exists. |
-| 6.7 | ⬜ Open | 🟩 | LeagueStarters thin; additive. |
+| 6.7 | ✅ Implemented | 🟩 | LeagueStarters thin; additive. |
 | 6.8 | ⬜ Open | 🟩 | ApiKeys thin; additive (security tests catch, don't introduce surface). |
 | 6.9 | ✅ Implemented | — | ContractListServiceTest extended (#1161, 2026-06-20). |
-| 6.10 | ⬜ Open | 🟩 | FreeAgencyPreview thin; additive — coordinate with PR #1162 (future-year restore). |
-| 6.11 | ⬜ Open | 🟩 | SeasonHighs thin; additive. |
-| 6.12 | ⬜ Open | 🟩 | TeamSchedule thin; additive. |
+| 6.10 | ✅ Implemented | 🟩 | FreeAgencyPreview thin; additive — coordinate with PR #1162 (future-year restore). |
+| 6.11 | ✅ Implemented | 🟩 | SeasonHighs thin; additive. |
+| 6.12 | ✅ Implemented | 🟩 | TeamSchedule thin; additive. |
 | 6.13 | ⬜ Open | 🟩 | Player 0.24 ratio; additive (L — chunk it). |
 | 6.14 | ⬜ Open | 🟩 | Updater steps; additive. |
 | 6.15 | ⬜ Open | 🟩 | Voting; additive. |
@@ -1227,6 +1227,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Service all-star selection, Repository correctness, API response format.
 **Est. effort:** M
 **Risk if untouched:** All-Star eligibility/voting aggregation untested.
+**Status:** Implemented (2026-06-27) — added LeagueStartersApiHandler handle() response-format + invalid-display-fallback tests and Service boundary tests (non-int teamid skip, per-team/position dedupe) in tests/LeagueStarters/. Repository SQL correctness remains owned by the gated tests/DatabaseIntegration/LeagueStartersRepositoryTest.php.
 
 ### 6.8 ApiKeys — Thin (6 files, 2 tests, 0.33 ratio)
 **Location:** `ibl5/classes/ApiKeys`
@@ -1249,6 +1250,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Eligibility filtering, contract-expiration, projection accuracy.
 **Est. effort:** M
 **Risk if untouched:** Preview misses eligible players or includes ineligible.
+**Status:** Implemented (2026-06-27) — added FreeAgencyPreviewService contract-end boundary tests (cy=6 final-year eligible, cy=5 with year-6 salary excluded) in tests/FreeAgencyPreview/. Held to the current getUpcomingFreeAgents() API to avoid colliding with PR #1162. Repository correctness owned by gated tests/DatabaseIntegration/FreeAgencyPreviewRepositoryTest.php.
 
 ### 6.11 SeasonHighs — Thin (6 files, 2 tests)
 **Location:** `ibl5/classes/SeasonHighs`
@@ -1256,6 +1258,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** High-water filtering, repository correctness, stat-type formatting.
 **Est. effort:** M
 **Risk if untouched:** Wrong records on player profile pages.
+**Status:** Implemented (2026-06-27) — added host-runnable SeasonHighsRepository transformation tests (normalizeRow int-casts/color defaults/optional keys, getSeasonHighsBatch bucketing/sort/tiebreak/empty-stats short-circuit) in tests/SeasonHighs/SeasonHighsRepositoryTest.php. Gated tests/DatabaseIntegration/SeasonHighsRepositoryTest.php still covers the SQL.
 
 ### 6.12 TeamSchedule — Thin (6 files, 2 tests)
 **Location:** `ibl5/classes/TeamSchedule`
@@ -1263,6 +1266,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Playoff bracket construction, game-order, opponent lookup.
 **Est. effort:** M
 **Risk if untouched:** Seeding incorrect; game sequence out of order.
+**Status:** Implemented (2026-06-27) — added TeamScheduleService opponent-lookup/opponent-text, SOS-tier (populated vs empty rankings), and next-sim-highlight tests in tests/TeamSchedule/. Repository correctness owned by gated tests/DatabaseIntegration/TeamScheduleRepositoryTest.php; no playoff-bracket unit exists on master (View-only month relabel).
 
 ### 6.13 Player Module — Large + Subthreshold (71 files, 17 tests, 0.24 ratio)
 **Location:** `ibl5/classes/Player`

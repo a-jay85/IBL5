@@ -1335,7 +1335,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 | 7.12 | ✅ Implemented | — | TeamOrderBy enum (#1032). |
 | 7.13 | ✅ Implemented | — | DraftRepository injects TeamIdentityRepositoryInterface. |
 | 7.14 | ✅ Implemented | 🟩 | Extracted `Standings\PythagoreanCalculator` (pure `calculate()`); StandingsRepository delegates both call sites; green-green. |
-| 7.15 | ⬜ Open | 🟩 | 8 map*/FIELD_MAP members (verified); PlayerRepository 622 LOC. Extract PlayerDataMapper/Hydrator; green-green. |
+| 7.15 | ✅ Implemented | 🟩 | 8 map*/FIELD_MAP members (verified); PlayerRepository 622 LOC. Extract PlayerDataMapper/Hydrator; green-green. |
 | 7.16 | ✅ Implemented | — | Hidden caches dropped (#1040). |
 | 7.17 | ⬜ Open | 🟩 | `getPlayerNews`→nuke_stories cross-query. Annotate `@see` (trivial) or extract LegacyNewsRepository; green-green. |
 | 7.18 | ⬜ Open | 🟩 | Duplicate player-lookup JOINs (PlayerRepository vs CommonMysqli). Delegate one; green-green with characterization pin (column drift noted). |
@@ -1457,6 +1457,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Extract `PlayerDataMapper` / `PlayerHydrator`.
 **Est. effort:** M
 **Risk if untouched:** Two responsibilities change together; both harder to test.
+**Status:** Implemented — extracted `ibl5/classes/Player/PlayerDataMapper.php` (constants + 8 map* methods); `PlayerRepository` delegates. Green-green refactor.
 
 ### 7.16 `RecordHoldersRepository` Has Hidden In-Memory Caches
 **Location:** `ibl5/classes/RecordHolders/RecordHoldersRepository.php` lines 45-49

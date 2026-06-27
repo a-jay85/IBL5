@@ -30,10 +30,13 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
 {
     private string $teamAwardsTable;
 
+    private readonly PythagoreanCalculator $pythagoreanCalculator;
+
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
         $this->teamAwardsTable = 'ibl_team_awards';
+        $this->pythagoreanCalculator = new PythagoreanCalculator();
     }
 
     /**
@@ -175,7 +178,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
             return null;
         }
 
-        return $this->calculatePythagoreanStats($stats);
+        return $this->pythagoreanCalculator->calculate($stats);
     }
 
     /**
@@ -234,7 +237,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
         /** @var array<int, PythagoreanStats> $result */
         $result = [];
         foreach ($rows as $row) {
-            $result[$row['teamid']] = $this->calculatePythagoreanStats($row);
+            $result[$row['teamid']] = $this->pythagoreanCalculator->calculate($row);
         }
 
         return $result;
@@ -613,32 +616,6 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
             $result[$row['teamid']] = $row['game_count'];
         }
         return $result;
-    }
-
-    /**
-     * Calculate Pythagorean stats from raw shooting data
-     *
-     * @param array{off_fgm: int, off_ftm: int, off_tgm: int, def_fgm: int, def_ftm: int, def_tgm: int, ...<string, mixed>} $stats
-     * @return PythagoreanStats
-     */
-    private function calculatePythagoreanStats(array $stats): array
-    {
-        $pointsScored = \BasketballStats\StatsFormatter::calculatePoints(
-            $stats['off_fgm'],
-            $stats['off_ftm'],
-            $stats['off_tgm']
-        );
-
-        $pointsAllowed = \BasketballStats\StatsFormatter::calculatePoints(
-            $stats['def_fgm'],
-            $stats['def_ftm'],
-            $stats['def_tgm']
-        );
-
-        return [
-            'pointsScored' => $pointsScored,
-            'pointsAllowed' => $pointsAllowed,
-        ];
     }
 
     /**

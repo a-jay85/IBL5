@@ -50,6 +50,7 @@
 	"overrides": {
 		"effect": "^3.20.0"
 	},
+	"//pin": "@playwright/test is exact-pinned (no caret) so bin/playwright-image-tag derives IBL6's Playwright Docker image tag from THIS version at runtime (ADR-0070). IBL6 is manually version-managed and intentionally NOT in .github/dependabot.yml — bump this by hand; an ibl5 Dependabot bump cannot break IBL6.",
 	"dependencies": {
 		"@sveltejs/adapter-node": "^5.5.3",
 		"daisyui": "^5.0.54",

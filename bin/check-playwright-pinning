@@ -1,0 +1,34 @@
+#!/bin/bash
+# bin/check-playwright-pinning — regression guard (ADR-0070): the Playwright
+# Docker image tag must be DERIVED from package.json at runtime, never hardcoded.
+# Fails if a hardcoded image literal reappears in any derivation surface. Replaces
+# the old "all surfaces pin v1.60.0" lockstep guard, which structurally cannot drift
+# now that the tag is single-sourced. This file is NOT in the default surface list,
+# and its own pattern below has a "[" (not a digit) after ":v", so it never self-matches.
+#
+# Usage: bin/check-playwright-pinning [file ...]   (default: the 3 derivation surfaces)
+set -eu
+
+pat='mcr\.microsoft\.com/playwright:v[0-9]'
+
+if [ "$#" -gt 0 ]; then
+  set -- "$@"
+else
+  set -- ibl5/bin/visual-regression.sh \
+         .github/actions/setup-docker-e2e/action.yml \
+         .github/workflows/e2e-tests.yml
+fi
+
+fail=0
+for f in "$@"; do
+  if [ ! -f "$f" ]; then
+    echo "check-playwright-pinning: missing surface: $f" >&2
+    fail=1
+    continue
+  fi
+  if grep -nE "$pat" "$f"; then
+    echo "check-playwright-pinning: hardcoded Playwright image literal in $f — derive it from package.json via bin/playwright-image-tag (ADR-0070)" >&2
+    fail=1
+  fi
+done
+exit "$fail"

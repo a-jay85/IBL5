@@ -590,6 +590,8 @@ jobs:
         run: bin/test-adr-check
       - name: bin/test-postplan-arm-conditions
         run: bin/test-postplan-arm-conditions
+      - name: bin/test-playwright-version
+        run: bin/test-playwright-version
 
   gate:
     name: Tests and Analysis

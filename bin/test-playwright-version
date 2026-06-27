@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-playwright-version — regression test for the single-sourced Playwright
+# image-tag derivation (ADR-0070). Covers:
+#   1. bin/playwright-image-tag maps a package.json @playwright/test version to the
+#      Docker image ref, including a BUMPED version (the self-heal proof — no real bump).
+#   2. bin/playwright-image-tag fails on a package.json with no exact pin.
+#   3. bin/check-playwright-pinning REJECTS a hardcoded literal and PASSES on the
+#      derived ($PW_IMAGE) form.
+#
+# Run: bin/test-playwright-version  (exit 0 = all pass, 1 = a case failed)
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+TAG="$SCRIPT_DIR/playwright-image-tag"
+GUARD="$SCRIPT_DIR/check-playwright-pinning"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+FAILED=0
+
+expect_eq() { # name want got
+    if [ "$3" = "$2" ]; then echo "ok: $1"
+    else echo "FAIL: $1 — expected [$2], got [$3]"; FAILED=1; fi
+}
+expect_exit() { # name want-code got-code
+    if [ "$3" -eq "$2" ]; then echo "ok: $1 (exit $3)"
+    else echo "FAIL: $1 — expected exit $2, got $3"; FAILED=1; fi
+}
+
+# 1. bumped version derives bumped tag (self-heal proof)
+printf '{\n  "devDependencies": {\n    "@playwright/test": "9.9.9"\n  }\n}\n' > "$TMP/bumped.json"
+got="$("$TAG" "$TMP/bumped.json")"
+expect_eq "bumped version derives bumped tag" \
+    "mcr.microsoft.com/playwright:v9.9.9-jammy" "$got"
+
+# 2. real ibl5/package.json derives a well-formed tag (version-agnostic so it
+#    survives future Dependabot bumps)
+REAL="$(cd "$SCRIPT_DIR/.." && pwd)/ibl5/package.json"
+got="$("$TAG" "$REAL")"
+case "$got" in
+    mcr.microsoft.com/playwright:v[0-9]*.[0-9]*.[0-9]*-jammy)
+        echo "ok: real package.json derives well-formed tag ($got)" ;;
+    *)  echo "FAIL: real package.json derived malformed tag: [$got]"; FAILED=1 ;;
+esac
+
+# 3. missing @playwright/test → non-zero exit
+printf '{\n  "devDependencies": {}\n}\n' > "$TMP/empty.json"
+"$TAG" "$TMP/empty.json" >/dev/null 2>&1
+expect_exit "missing @playwright/test fails" 1 "$?"
+
+# 4. guard REJECTS a hardcoded literal
+printf 'docker pull %s\n' "mcr.microsoft.com/playwright:v1.2.3-jammy" > "$TMP/bad.yml"
+"$GUARD" "$TMP/bad.yml" >/dev/null 2>&1
+expect_exit "guard rejects hardcoded literal" 1 "$?"
+
+# 5. guard PASSES on the derived form
+printf 'docker pull "$PW_IMAGE"\n' > "$TMP/good.yml"
+"$GUARD" "$TMP/good.yml" >/dev/null 2>&1
+expect_exit "guard passes derived form" 0 "$?"
+
+if [ "$FAILED" -eq 0 ]; then echo "ALL PASS"; exit 0; fi
+echo "SOME FAILED"; exit 1

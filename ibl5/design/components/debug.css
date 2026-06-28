@@ -149,12 +149,12 @@
 }
 
 .debug-toggle-on {
-    background: #22c55e;
-    box-shadow: 0 0 4px #22c55e;
+    background: var(--success-500);
+    box-shadow: 0 0 4px var(--success-500);
 }
 
 .debug-toggle-off {
-    background: #ef4444;
+    background: var(--error-500);
 }
 
 } /* end @layer components */

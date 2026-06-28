@@ -372,6 +372,20 @@
     .trading-cash-exchange input[type="number"] {
         width: 100px;
     }
+
+    /* Show team name in team-cell (override global hide) but hide city */
+    .trading-team-select .ibl-team-cell__text {
+        display: inline;
+    }
+
+    .trading-team-select .ibl-team-cell__city {
+        display: none;
+    }
+
+    /* Re-sort by team name on mobile (desktop sorts by city) */
+    .trading-team-select td {
+        order: var(--mobile-order, 0);
+    }
 }
 
 } /* end @layer components */

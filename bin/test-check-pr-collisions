@@ -1,0 +1,198 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-check-pr-collisions — regression harness for bin/check-pr-collisions.
+#
+# All GitHub calls are intercepted by a stub gh (via GH_CMD). No network required.
+# Pins: grouping, ascending merge order, draft exclusion, dir-prefix matching,
+# benign self-clear path, empty-set sweep, and sticky-marker convergence.
+#
+# Run: bin/test-check-pr-collisions  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+GUARD="$SCRIPT_DIR/check-pr-collisions"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP" 2>/dev/null' EXIT
+
+FAILED=0
+
+pass()     { echo "ok: $1"; }
+failcase() { echo "FAIL: $1"; FAILED=1; }
+
+assert_match() {
+    if printf '%s' "$3" | grep -qE "$2"; then
+        pass "$1"
+    else
+        failcase "$1 — expected to match: $2"
+        printf '%s\n' "$3" | sed 's/^/    /'
+    fi
+}
+
+assert_absent() {
+    if printf '%s' "$3" | grep -qE "$2"; then
+        failcase "$1 — expected NOT to match: $2"
+        printf '%s\n' "$3" | sed 's/^/    /'
+    else
+        pass "$1"
+    fi
+}
+
+# --- Stub gh setup ---
+
+STUBBIN="$TMP/stubbin"
+GH_PRS_FIXTURE="$TMP/prs.json"
+GH_COMMENT_LOG="$TMP/comment.log"
+export GH_PRS_FIXTURE GH_COMMENT_LOG
+
+mkdir -p "$STUBBIN"
+
+cat > "$STUBBIN/gh" <<'STUB'
+#!/usr/bin/env bash
+set -u
+cmd="$1 ${2:-}"
+shift 2 2>/dev/null || shift 1 2>/dev/null || true
+
+case "$cmd" in
+    "pr list")
+        cat "${GH_PRS_FIXTURE}"
+        ;;
+    "api --method")
+        # PATCH — succeed silently
+        exit 0
+        ;;
+    "api repos"*)
+        # GET issue comments — return nothing (no existing sticky comment)
+        printf ''
+        ;;
+    "pr comment")
+        # Args after "pr comment": <n> [--body-file <file>] [--body <text>]
+        body_file=""
+        while [[ $# -gt 0 ]]; do
+            case "$1" in
+                --body-file) body_file="$2"; shift 2 ;;
+                *) shift ;;
+            esac
+        done
+        if [[ -n "$body_file" && -f "$body_file" ]]; then
+            cat "$body_file" >> "${GH_COMMENT_LOG:-/dev/null}"
+            printf '\n---END---\n' >> "${GH_COMMENT_LOG:-/dev/null}"
+        fi
+        ;;
+    *)
+        exit 0
+        ;;
+esac
+STUB
+
+chmod +x "$STUBBIN/gh"
+
+# --- Core fixture (8 PRs) ---
+
+cat > "$GH_PRS_FIXTURE" <<'FIXTURE'
+[
+  {"number": 10, "headRefName": "pr-10", "title": "PR 10", "isDraft": false,
+   "files": [{"path": "ibl5/tests/e2e/smoke/accessibility.spec.ts"}]},
+  {"number": 11, "headRefName": "pr-11", "title": "PR 11", "isDraft": false,
+   "files": [{"path": "ibl5/tests/e2e/smoke/accessibility.spec.ts"}]},
+  {"number": 12, "headRefName": "pr-12", "title": "PR 12", "isDraft": false,
+   "files": [{"path": "ibl5/tests/e2e/smoke/accessibility.spec.ts"}]},
+  {"number": 13, "headRefName": "pr-13", "title": "PR 13 (draft)", "isDraft": true,
+   "files": [{"path": "ibl5/tests/e2e/smoke/accessibility.spec.ts"}]},
+  {"number": 14, "headRefName": "pr-14", "title": "PR 14", "isDraft": false,
+   "files": [{"path": "ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots/a-chromium.png"}]},
+  {"number": 15, "headRefName": "pr-15", "title": "PR 15", "isDraft": false,
+   "files": [{"path": "ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots/b-chromium.png"}]},
+  {"number": 20, "headRefName": "pr-20", "title": "PR 20", "isDraft": false,
+   "files": [{"path": "ibl5/phpstan-baseline.neon"}]},
+  {"number": 21, "headRefName": "pr-21", "title": "PR 21", "isDraft": false,
+   "files": [{"path": "ibl5/some/unrelated/file.php"}]}
+]
+FIXTURE
+
+# Shorthand: run --pr mode and capture output
+pr_body() {
+    GH_CMD="$STUBBIN/gh" "$GUARD" --pr "$1" 2>/dev/null
+}
+
+# --- Test cases ---
+
+# (a) Grouping: --pr 11 body names siblings #10 and #12
+body11="$(pr_body 11)"
+assert_match "grouping-names-#10"  '#10' "$body11"
+assert_match "grouping-names-#12"  '#12' "$body11"
+
+# (b) Order: recommended merge order is ascending #10, #11, #12
+assert_match "order-ascending" '#10.*#11.*#12' "$body11"
+
+# (c) Benign — collision-prone file but no sibling: #20 touches phpstan-baseline alone
+body20="$(pr_body 20)"
+assert_match  "benign-no-sibling"        'No inter-PR collisions detected' "$body20"
+assert_absent "benign-no-sibling-no-ref" '#[0-9]' "$body20"
+
+# (d) Benign — no collision-prone file: #21 touches only an unrelated file
+body21="$(pr_body 21)"
+assert_match "benign-no-collision-file" 'No inter-PR collisions detected' "$body21"
+
+# (e) Draft excluded from siblings: #10's body must NOT list draft #13
+body10="$(pr_body 10)"
+assert_absent "draft-excluded-from-siblings" '#13' "$body10"
+
+# (e cont) Draft's own body is benign
+body13="$(pr_body 13)"
+assert_match "draft-own-body-benign" 'No inter-PR collisions detected' "$body13"
+
+# (f) Empty set: --sweep over [] exits 0 and prints "No open PRs."
+printf '[]' > "$GH_PRS_FIXTURE"
+sweep_out="$(GH_CMD="$STUBBIN/gh" "$GUARD" --sweep 2>/dev/null)"
+assert_match "empty-sweep-message" 'No open PRs\.' "$sweep_out"
+
+# Restore populated fixture for remaining tests
+cat > "$GH_PRS_FIXTURE" <<'FIXTURE'
+[
+  {"number": 10, "headRefName": "pr-10", "title": "PR 10", "isDraft": false,
+   "files": [{"path": "ibl5/tests/e2e/smoke/accessibility.spec.ts"}]},
+  {"number": 11, "headRefName": "pr-11", "title": "PR 11", "isDraft": false,
+   "files": [{"path": "ibl5/tests/e2e/smoke/accessibility.spec.ts"}]},
+  {"number": 12, "headRefName": "pr-12", "title": "PR 12", "isDraft": false,
+   "files": [{"path": "ibl5/tests/e2e/smoke/accessibility.spec.ts"}]},
+  {"number": 13, "headRefName": "pr-13", "title": "PR 13 (draft)", "isDraft": true,
+   "files": [{"path": "ibl5/tests/e2e/smoke/accessibility.spec.ts"}]},
+  {"number": 14, "headRefName": "pr-14", "title": "PR 14", "isDraft": false,
+   "files": [{"path": "ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots/a-chromium.png"}]},
+  {"number": 15, "headRefName": "pr-15", "title": "PR 15", "isDraft": false,
+   "files": [{"path": "ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots/b-chromium.png"}]},
+  {"number": 20, "headRefName": "pr-20", "title": "PR 20", "isDraft": false,
+   "files": [{"path": "ibl5/phpstan-baseline.neon"}]},
+  {"number": 21, "headRefName": "pr-21", "title": "PR 21", "isDraft": false,
+   "files": [{"path": "ibl5/some/unrelated/file.php"}]}
+]
+FIXTURE
+
+# (g) Directory-prefix match: #14 body names #15 (both under snapshots/ prefix)
+body14="$(pr_body 14)"
+assert_match "dir-prefix-match-#15" '#15' "$body14"
+
+# (h) Sweep posts sticky marker: run --sweep and check comment log
+rm -f "$GH_COMMENT_LOG"
+GH_CMD="$STUBBIN/gh" "$GUARD" --sweep >/dev/null 2>&1
+log_content="$(cat "$GH_COMMENT_LOG" 2>/dev/null || true)"
+
+# Colliding PR numbers appear in the log (as sibling refs in each other's bodies)
+assert_match "sweep-log-has-#10" '#10' "$log_content"
+assert_match "sweep-log-has-#11" '#11' "$log_content"
+assert_match "sweep-log-has-#12" '#12' "$log_content"
+
+# The exact sticky marker is present in at least one posted body
+assert_match "sweep-posts-sticky-marker" \
+    '<!-- Sticky Pull Request Commentpr-collisions -->' "$log_content"
+
+# --- Results ---
+
+if [[ "$FAILED" -ne 0 ]]; then
+    echo "RESULT: FAILED"
+    exit 1
+fi
+echo "RESULT: all passed"
+exit 0

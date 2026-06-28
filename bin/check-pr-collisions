@@ -1,0 +1,234 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/check-pr-collisions — Advisory inter-PR collision detector.
+#
+# Groups open PRs that touch the same collision-prone file and emits
+# a markdown collision report / recommended merge order.
+#
+# Modes:
+#   --pr <n>    Emit this PR's collision body to stdout (no posting)
+#   --sweep     Iterate every open PR and post/refresh its sticky comment (default)
+#
+# Exit codes: 0 = ran (report/sweep generated); 2 = usage error.
+# The guard is advisory — never exits 1 to fail CI.
+
+set -euo pipefail
+
+GH_CMD="${GH_CMD:-gh}"
+STICKY_HEADER="pr-collisions"
+STICKY_MARKER="<!-- Sticky Pull Request Comment${STICKY_HEADER} -->"
+
+COLLISION_PATHS=(
+    "ibl5/tests/e2e/smoke/accessibility.spec.ts"
+    "ibl5/phpstan-baseline.neon"
+    "ibl5/phpstan-tests-baseline.neon"
+    "ibl5/phpstan-baseline-counts.json"
+    "ibl5/coverage-baseline.json"
+    "ibl5/tests/e2e/fixtures/ci-seed.sql"
+    "ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots/"
+    "ibl5/tests/e2e/vr-manifest.ts"
+)
+
+usage() {
+    cat <<'EOF'
+Usage: bin/check-pr-collisions [--pr <n>] [--sweep] [--help|-h]
+
+Groups open PRs that edit the same collision-prone file and emits a collision
+report / recommended merge order.
+
+Options:
+  --pr <n>     Emit collision body for PR <n> to stdout (no posting).
+  --sweep      Iterate every open PR and post/refresh sticky comments (default).
+  --help, -h   Show this message.
+
+Environment (test seams):
+  GH_CMD       Override the gh command (default: "gh").
+EOF
+}
+
+MODE="sweep"
+PR_NUM=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --pr)
+            if [[ $# -lt 2 ]]; then
+                echo "Error: --pr requires a PR number" >&2
+                usage >&2
+                exit 2
+            fi
+            MODE="pr"
+            PR_NUM="$2"
+            shift 2
+            ;;
+        --sweep)
+            MODE="sweep"
+            shift
+            ;;
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Error: unknown option: $1" >&2
+            usage >&2
+            exit 2
+            ;;
+    esac
+done
+
+# One call for all modes — both per-PR and sweep need all PRs' files to detect siblings.
+PRS_JSON="$("$GH_CMD" pr list --base master --state open --limit 200 \
+    --json number,headRefName,title,isDraft,files 2>/dev/null || echo '[]')"
+
+# pr_touches <n> <path> — exits 0 if PR <n> touches <path> (exact or dir-prefix)
+pr_touches() {
+    local n="$1" p="$2"
+    if [[ "$p" == */ ]]; then
+        jq -e --argjson n "$n" --arg p "$p" \
+            'any(.[] | select(.number==$n) | .files[]; .path | startswith($p))' \
+            <<<"$PRS_JSON" >/dev/null 2>&1
+    else
+        jq -e --argjson n "$n" --arg p "$p" \
+            'any(.[] | select(.number==$n) | .files[]; .path == $p)' \
+            <<<"$PRS_JSON" >/dev/null 2>&1
+    fi
+}
+
+# prs_touching <path> — print ascending-sorted non-draft PR numbers touching <path>
+prs_touching() {
+    local p="$1"
+    if [[ "$p" == */ ]]; then
+        jq -r --arg p "$p" \
+            '.[] | select((.isDraft | not) and (any(.files[]; .path | startswith($p)))) | .number' \
+            <<<"$PRS_JSON" | sort -nu
+    else
+        jq -r --arg p "$p" \
+            '.[] | select((.isDraft | not) and (any(.files[]; .path == $p))) | .number' \
+            <<<"$PRS_JSON" | sort -nu
+    fi
+}
+
+benign_body() {
+    cat <<'EOF'
+## Inter-PR Collision Check
+
+No inter-PR collisions detected for this PR.
+
+> **Advisory only — does not block merge.**
+EOF
+}
+
+warn_body() {
+    local n="$1"
+    printf '## Inter-PR Collision Check\n\n'
+    printf '**Warning:** This PR edits files also edited by other open PRs.\n'
+    printf 'Merging in parallel may cause ratchet drift or rebase conflicts.\n\n'
+
+    for path in "${COLLISION_PATHS[@]}"; do
+        if ! pr_touches "$n" "$path"; then
+            continue
+        fi
+
+        local all_prs=()
+        while IFS= read -r p; do
+            [[ -n "$p" ]] && all_prs+=("$p")
+        done < <(prs_touching "$path")
+
+        local siblings=()
+        for p in "${all_prs[@]}"; do
+            [[ "$p" != "$n" ]] && siblings+=("$p")
+        done
+
+        if [[ ${#siblings[@]} -eq 0 ]]; then
+            continue
+        fi
+
+        # shellcheck disable=SC2016
+        printf '**Collision on `%s`:**\n' "$path"
+        local sib_refs=""
+        for s in "${siblings[@]}"; do
+            sib_refs+="#${s}, "
+        done
+        printf 'Siblings: %s\n\n' "${sib_refs%, }"
+
+        local order_refs=""
+        for p in "${all_prs[@]}"; do
+            order_refs+="#${p}, "
+        done
+        printf '**Recommended merge order:** %s\n' "${order_refs%, }"
+        printf '(Rebase remaining PRs after each merge.)\n\n'
+    done
+
+    printf '> **Advisory only — does not block merge.**\n'
+}
+
+pr_body() {
+    local n="$1"
+
+    local is_draft
+    is_draft="$(jq -r --argjson n "$n" '.[] | select(.number==$n) | .isDraft' <<<"$PRS_JSON")"
+
+    if [[ -z "$is_draft" || "$is_draft" == "true" ]]; then
+        benign_body
+        return
+    fi
+
+    local has_collision=0
+    for path in "${COLLISION_PATHS[@]}"; do
+        if pr_touches "$n" "$path"; then
+            local total
+            total="$(prs_touching "$path" | wc -l | tr -d ' ')"
+            if [[ "$total" -gt 1 ]]; then
+                has_collision=1
+                break
+            fi
+        fi
+    done
+
+    if [[ "$has_collision" -eq 1 ]]; then
+        warn_body "$n"
+    else
+        benign_body
+    fi
+}
+
+post_sticky() {
+    local n="$1"
+    local body="$2"
+    local tmpfile
+    tmpfile="$(mktemp)"
+
+    printf '%s\n%s\n' "$body" "$STICKY_MARKER" > "$tmpfile"
+
+    local existing_id
+    existing_id="$("$GH_CMD" api "repos/{owner}/{repo}/issues/$n/comments" --paginate \
+        --jq ".[] | select(.body | contains(\"$STICKY_MARKER\")) | .id" | head -1 || true)"
+
+    if [[ -n "$existing_id" ]]; then
+        "$GH_CMD" api --method PATCH "repos/{owner}/{repo}/issues/comments/$existing_id" \
+            -F body=@"$tmpfile" >/dev/null || true
+    else
+        "$GH_CMD" pr comment "$n" --body-file "$tmpfile" >/dev/null || true
+    fi
+
+    rm -f "$tmpfile"
+}
+
+if [[ "$MODE" == "pr" ]]; then
+    pr_body "$PR_NUM"
+    exit 0
+fi
+
+# Sweep mode
+pr_count="$(jq 'length' <<<"$PRS_JSON")"
+if [[ "$pr_count" -eq 0 ]]; then
+    echo "No open PRs."
+    exit 0
+fi
+
+while IFS= read -r n; do
+    body="$(pr_body "$n")"
+    post_sticky "$n" "$body" || printf 'Warning: failed to post for PR %s\n' "$n" >&2
+done < <(jq -r '.[].number' <<<"$PRS_JSON")

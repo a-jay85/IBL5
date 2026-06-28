@@ -346,6 +346,56 @@ class PlayerContractValidatorTest extends TestCase
         );
     }
 
+    public function testCanRenegotiateAdvancesContractYearDuringOffseason(): void
+    {
+        $playerData = new PlayerData();
+        $playerData->contractCurrentYear = 5;
+        $playerData->contractYear6Salary = 600;
+
+        $season = self::createStub(Season::class);
+        $season->method('isOffseasonPhase')->willReturn(true);
+
+        $this->assertTrue($this->validator->canRenegotiateContract($playerData, $season));
+    }
+
+    public function testCannotRenegotiateSameDataWithoutOffseasonBump(): void
+    {
+        $playerData = new PlayerData();
+        $playerData->contractCurrentYear = 5;
+        $playerData->contractYear6Salary = 600;
+
+        $this->assertFalse($this->validator->canRenegotiateContract($playerData));
+    }
+
+    public function testCannotRookieOptionWhenNotDraftPick(): void
+    {
+        $playerData = new PlayerData();
+        $playerData->draftRound = 0;
+        $playerData->yearsOfExperience = 2;
+
+        $this->assertFalse($this->validator->canRookieOption($playerData, 'Free Agency'));
+    }
+
+    public function testCannotRookieOptionFirstRoundWhenYear4SalaryAlreadySet(): void
+    {
+        $playerData = new PlayerData();
+        $playerData->draftRound = 1;
+        $playerData->yearsOfExperience = 2;
+        $playerData->contractYear4Salary = 500;
+
+        $this->assertFalse($this->validator->canRookieOption($playerData, 'Free Agency'));
+    }
+
+    public function testCannotRookieOptionSecondRoundWhenYear3SalaryAlreadySet(): void
+    {
+        $playerData = new PlayerData();
+        $playerData->draftRound = 2;
+        $playerData->yearsOfExperience = 1;
+        $playerData->contractYear3Salary = 300;
+
+        $this->assertFalse($this->validator->canRookieOption($playerData, 'Free Agency'));
+    }
+
     private function createMockSeason(int $endingYear): Season&\PHPUnit\Framework\MockObject\Stub
     {
         $season = self::createStub(Season::class);

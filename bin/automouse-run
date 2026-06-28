@@ -331,9 +331,10 @@ phase_stalled() {
 # present (known limit/auth error, watchdog stall-kill, or a sub-minute exit).
 #
 # The in_queue guard is the fix for the false positive that stopped the loop on a
-# legitimate skip: every deliberate impl disposition (already-merged, stale-plan,
-# ambiguity, wt-new failure, missing-info — see bin/automouse-prompt-impl) runs
-# `mv queue/$PLAN → skipped/`, so the plan leaves queue/ (in_queue=0) and exits
+# legitimate disposition: every deliberate impl disposition (already-merged,
+# stale-plan, ambiguity, wt-new failure, missing-info — see bin/automouse-prompt-impl)
+# runs `mv queue/$PLAN → done/` (already-merged) or `→ skipped/` (the rest), so the
+# plan leaves queue/ (in_queue=0) and exits
 # fast with no handoff. Without this guard the sub-minute check misreads that
 # clean skip as a transient kill. A real transient never gets that far: it dies
 # mid-stream, leaving the plan in queue/ (in_queue=1). This mirrors the postplan
@@ -638,7 +639,7 @@ PLAN_FILE=$PLAN_NAME" \
             echo "Handoff file created — impl succeeded." >> "$LOG"
             rm -f "$ATTEMPT_FILE"
         elif [ ! -e "$NEXT_PLAN" ]; then
-            echo "Impl made a deliberate disposition (plan left queue/, e.g. an already-merged or stale-plan skip) — not an environmental failure, continuing." >> "$LOG"
+            echo "Impl made a deliberate disposition (plan left queue/, e.g. already-merged → done/ or a stale-plan skip) — not an environmental failure, continuing." >> "$LOG"
         fi
     fi
 

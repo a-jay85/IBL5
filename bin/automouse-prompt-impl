@@ -89,10 +89,10 @@ gh pr list --state merged --limit 10 --search "$SLUG_WORDS in:title" \
 
 Read the candidate PRs and JUDGE: does a merged PR clearly implement THIS plan's deliverables? This is a SEMANTIC match, not a string match — a renamed or renumbered artifact still counts (PR #895 shipped with different pids and dropped a phase, but it WAS this plan). If you are unsure, do NOT skip on this gate alone — let implementation proceed and rely on the Step 6.5 empty-diff backstop, which is the certain check.
 
-If a merged PR clearly implements this plan, take the already-merged skip:
+If a merged PR clearly implements this plan, take the already-merged disposition (the plan's work shipped — it is DONE, not skipped, so it lands in `done/`):
 
-1. `mv "$NIGHTLY_DIR/queue/$PLAN_FILE" "$NIGHTLY_DIR/skipped/"`
-2. Write an ALREADY-MERGED report to `$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-<slug>.md` (derive `<slug>` from the plan title). Title and body must make it visibly an **already-merged skip** — wording clearly distinct from the staleness and ambiguity skips — name the merged PR (number + title), and cite which plan deliverables you confirmed present on master.
+1. `mv "$NIGHTLY_DIR/queue/$PLAN_FILE" "$NIGHTLY_DIR/done/"`
+2. Write an ALREADY-MERGED report to `$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-done-<slug>.md` (derive `<slug>` from the plan title). Title and body must make it visibly an **already-merged completion** — wording clearly distinct from a normal post-plan completion and from the staleness/ambiguity skips — name the merged PR (number + title), and cite which plan deliverables you confirmed present on master.
 3. STOP — no worktree, no handoff.
 
 If no merged PR clearly matches, continue to Step 3.
@@ -190,12 +190,12 @@ AHEAD=$(git rev-list origin/master..HEAD)
 DIRTY=$(git status --porcelain)
 ```
 
-If BOTH `$AHEAD` and `$DIRTY` are empty (no commits ahead of master, clean working tree), the branch is identical to master — the plan is already merged. Take the already-merged skip:
+If BOTH `$AHEAD` and `$DIRTY` are empty (no commits ahead of master, clean working tree), the branch is identical to master — the plan is already merged. Take the already-merged disposition (the plan's work shipped — it is DONE, not skipped, so it lands in `done/`):
 
 1. Delete the pushed remote branch if `bin/wt-new` created one: `git push origin --delete <slug> || true`
 2. `bin/wt-remove <slug>` to remove the empty worktree and local branch.
-3. `mv "$NIGHTLY_DIR/queue/$PLAN_FILE" "$NIGHTLY_DIR/skipped/"`
-4. Write an ALREADY-MERGED report to `$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-<slug>.md` — same already-merged wording as Step 2.6, and note that the **empty-diff backstop** caught it (the title cross-reference did not).
+3. `mv "$NIGHTLY_DIR/queue/$PLAN_FILE" "$NIGHTLY_DIR/done/"`
+4. Write an ALREADY-MERGED report to `$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-done-<slug>.md` — same already-merged wording as Step 2.6, and note that the **empty-diff backstop** caught it (the title cross-reference did not).
 5. Do NOT write a handoff file.
 6. STOP.
 

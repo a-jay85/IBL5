@@ -1,7 +1,7 @@
 # Draft Module Architecture
 
-**Last Updated:** June 8, 2026  
-**Test Coverage:** 35 tests, 92 assertions  
+**Last Updated:** June 28, 2026  
+**Test Coverage:** 35+ tests  
 **Architecture Pattern:** Interface-Driven Architecture with Repository/Service/View/Controller classes
 
 ## Overview
@@ -17,13 +17,17 @@ Draft Module (Interface-Driven Architecture)
 │   ├── DraftValidatorInterface
 │   ├── DraftProcessorInterface
 │   ├── DraftViewInterface
-│   └── DraftSelectionHandlerInterface
+│   ├── DraftServiceInterface
+│   └── DraftControllerInterface
+├── Dto/
+│   └── DraftBoardData
 └── Implementation Classes
     ├── DraftRepository (implements DraftRepositoryInterface)
     ├── DraftValidator (implements DraftValidatorInterface)
     ├── DraftProcessor (implements DraftProcessorInterface)
     ├── DraftView (implements DraftViewInterface)
-    └── DraftSelectionHandler (implements DraftSelectionHandlerInterface)
+    ├── DraftService (implements DraftServiceInterface) — read-path orchestration
+    └── DraftController (implements DraftControllerInterface) — auth gate + write path
 ```
 
 ## Interface-Driven Architecture Benefits
@@ -120,23 +124,27 @@ hasUndraftedPlayers(array $players): bool
 
 ---
 
-### DraftSelectionHandlerInterface / DraftSelectionHandler
-**Responsibility:** Orchestrates complete draft selection workflow
+### DraftControllerInterface / DraftController
+**Responsibility:** Auth gate, read-path display via DraftService, and write-path draft selection
 
-**Location:** `/ibl5/classes/Draft/Contracts/DraftSelectionHandlerInterface.php` | `/ibl5/classes/Draft/DraftSelectionHandler.php`
+**Location:** `/ibl5/classes/Draft/Contracts/DraftControllerInterface.php` | `/ibl5/classes/Draft/DraftController.php`
 
 **Public Methods:**
 ```php
+main(mixed $user): void
+displayDraftBoard(string $username): void
+submitSelection(array $post): string
 handleDraftSelection(string $teamName, ?string $playerName, int $draftRound, int $draftPick): string
 ```
 
-**Workflow:**
-1. Get current draft selection (if any)
-2. Check if player already drafted
-3. Validate selection (player, pick, status)
-4. If valid: update all three database tables
-5. Send Discord notifications to #general-chat and #draft-picks
-6. Return HTML response (success or error)
+**Workflow (write path):**
+1. `submitSelection()` narrows POST values and delegates to `handleDraftSelection()`
+2. Get current draft selection (if any)
+3. Check if player already drafted
+4. Validate selection (player, pick, status)
+5. If valid: update all three database tables
+6. Send Discord notifications to #general-chat and #draft-picks
+7. Return HTML response (success or error)
 
 ---
 
@@ -251,13 +259,8 @@ echo $html;
 
 ### Handle Draft Selection
 ```php
-$handler = new Draft\DraftSelectionHandler($db, $sharedFunctions, $season);
-$html = $handler->handleDraftSelection(
-    $_POST['teamname'],
-    $_POST['player'] ?? null,
-    (int)$_POST['draft_round'],
-    (int)$_POST['draft_pick']
-);
+$controller = new Draft\DraftController($db, $commonRepository, $season);
+$html = $controller->submitSelection($_POST);
 echo $html;  // HTML response (success or error message)
 ```
 
@@ -266,12 +269,12 @@ echo $html;  // HTML response (success or error message)
 ## Code Quality Metrics
 
 **Current State:**
-- 5 implementation classes + 5 interfaces
+- 7 implementation classes + 7 interfaces (DraftService + DraftController added; DraftController replaces DraftSelectionHandler)
 - 302 lines (DraftRepository) - complex database operations
 - 206 lines (DraftView) - comprehensive UI rendering
-- 148 lines (DraftSelectionHandler) - workflow orchestration
+- DraftController - auth gate + write-path orchestration
+- DraftService - read-path orchestration (extracted from index.php)
 - 100 lines average for simpler classes
-- 35 tests with 92 assertions = high confidence
 
 **Interface Documentation:**
 - All interfaces have complete PHPDoc

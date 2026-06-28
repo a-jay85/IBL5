@@ -6,7 +6,7 @@ namespace Tests\WideUnit\Draft;
 
 use Tests\WideUnit\WideUnitTestCase;
 use Tests\WideUnit\Mocks\TestDataFactory;
-use Draft\DraftSelectionHandler;
+use Draft\DraftController;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Season\Season;
 
@@ -20,14 +20,14 @@ use Season\Season;
  * - Validation failures (duplicate pick, already drafted)
  * - Next team notifications
  *
- * @covers \Draft\DraftSelectionHandler
+ * @covers \Draft\DraftController
  * @covers \Draft\DraftRepository
  * @covers \Draft\DraftValidator
  * @covers \Draft\DraftProcessor
  */
 class DraftWideUnitTest extends WideUnitTestCase
 {
-    private DraftSelectionHandler $handler;
+    private DraftController $handler;
     private TeamIdentityRepositoryInterface $mockCommonRepository;
     private Season $mockSeason;
 
@@ -44,7 +44,7 @@ class DraftWideUnitTest extends WideUnitTestCase
         $this->mockSeason->endingYear = 2025;
         $this->mockSeason->freeAgencyNotificationsState = 'Off';
 
-        $this->handler = new DraftSelectionHandler(
+        $this->handler = new DraftController(
             $this->mockDb,
             $this->mockCommonRepository,
             $this->mockSeason

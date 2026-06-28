@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/regen-baselines — regenerate the PHPStan baselines + their count snapshot.
+#
+# Run this after a merge or rebase that touched any of:
+#   ibl5/phpstan-baseline.neon
+#   ibl5/phpstan-tests-baseline.neon
+#   ibl5/phpstan-baseline-counts.json
+#
+# These three are GENERATED artifacts, not hand-authored. On a merge/rebase
+# conflict, do NOT edit the conflict markers by hand: take either side to clear
+# them, then run this script so the baselines reflect the actual merged code.
+# The check-baseline-drift CI gate is the backstop — it fails the PR if these
+# files are stale, so a forgotten regen is caught at PR time, not silently shipped.
+#
+# This runs two full PHPStan passes (~2-3 min total) plus a drift-snapshot update.
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT/ibl5"
+
+echo "==> Regenerating phpstan-baseline.neon (production)"
+composer run analyse:baseline
+
+echo "==> Regenerating phpstan-tests-baseline.neon (tests)"
+composer run analyse:tests:baseline
+
+echo "==> Updating phpstan-baseline-counts.json"
+php bin/check-baseline-drift --update
+
+echo
+echo "Done. Review and commit the regenerated baselines:"
+git -C "$REPO_ROOT" status --short -- \
+    ibl5/phpstan-baseline.neon \
+    ibl5/phpstan-tests-baseline.neon \
+    ibl5/phpstan-baseline-counts.json

@@ -1,6 +1,6 @@
 ---
 description: Materialize vw_playoff_series_results and team season win/loss records into refresh-on-pipeline tables for indexed lookups
-last_verified: 2026-04-28
+last_verified: 2026-06-27
 ---
 
 # ADR-0015: Materialize Playoff Series and Team Season Aggregate Tables

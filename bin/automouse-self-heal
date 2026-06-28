@@ -7,7 +7,7 @@
 #   bin/automouse-self-heal --dry-run # preview without acting
 #
 # Only plans carrying a <plan>.md.staleness sidecar marker are eligible —
-# ambiguity / already-merged / poison-pill skips are never recovered.
+# ambiguity / poison-pill skips are never recovered (already-merged plans go to done/, not skipped/).
 
 set -u
 

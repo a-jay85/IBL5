@@ -33,7 +33,8 @@ A headless `claude -p` process runs on a recurring schedule via macOS `launchd`.
 ```
 ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/
   queue/    symlinks to ~/.claude/plans/*.md (oldest runs first)
-  done/     symlinks moved here after successful execution
+  done/     symlinks moved here after successful execution, or when the impl agent
+            detects the plan is already merged (its work shipped under a prior PR)
   skipped/  symlinks moved here when skipped (ambiguity/errors/poison-pill);
             a sibling <plan>.md.staleness marker tags a *staleness* skip (read by bin/automouse-self-heal)
   handoff/  JSON files bridging state from implementation to post-plan agent
@@ -58,8 +59,8 @@ absolute targets keep resolving after the move. `queue/` (pending work) and `han
 Before the startup archival block, `automouse-run` freshens the local master checkout (a
 `git fetch` + `merge --ff-only`), then runs `bin/automouse-self-heal`. The self-heal script
 scans `skipped/` for plans carrying a `<plan>.md.staleness` sidecar marker — the signal that
-a plan was skipped specifically by the staleness gate, not for ambiguity / already-merged /
-poison-pill. For each such plan, it re-runs `bin/check-plan-staleness` against the
+a plan was skipped specifically by the staleness gate, not for ambiguity / poison-pill
+(already-merged plans are not skipped at all — they land in `done/`). For each such plan, it re-runs `bin/check-plan-staleness` against the
 freshly-pulled master; if the guard now passes, `bin/automouse-queue` is invoked to requeue
 the plan (which also evicts the `.staleness` and `.attempts` sidecars). Use
 `bin/automouse-self-heal --dry-run` to preview what would be healed without acting. The step
@@ -74,7 +75,7 @@ plans already in `skipped/` before this PR landed need a one-time manual `bin/au
    - **Implementation agent** (`bin/automouse-prompt-impl`): creates worktree, implements the plan, makes checkpoint commits, writes a handoff file. Its model is selectable per-plan via a line-1 `impl_model:` frontmatter field (`sonnet` → Sonnet, `haiku` → Haiku, absent or anything else → the Opus default), resolved by `bin/lib/plan-impl-model`; declare `sonnet` only for uniformly-mechanical plans whose every verification row is objectively machine-checkable. The post-plan agent is always Sonnet.
    - **Post-plan agent** (`bin/automouse-prompt-postplan`): reads the handoff file, runs `/post-plan` (code review, security audit, PR, CI monitoring, auto-merge), writes the completion report
 4. **Guards:** The loop stops when the queue is empty or ~4h45m have elapsed. Plans that fail 3 times (after genuine, full-length attempts) are moved to `skipped/` as poison pills.
-   - **Environmental failures stop the run cleanly instead of skipping.** A usage/rate limit, auth error, or any transient that kills an agent — detected by a known limit/auth signature in the log, by a sub-minute phase exit (a real impl/postplan runs 15–50 min), *or* by a watchdog stall-kill (no stream events for 10 min, e.g. a dead/wedged inference stream) — refunds the attempt and breaks the loop, leaving the **entire queue intact** to resume next run. This prevents the failure mode where one dead-budget run ground every queued plan into `skipped/`. Each such stop writes a `YYYY-MM-DD-env-stop-<slug>.md` report. A **deliberate impl disposition is not environmental**: when the impl agent legitimately skips a plan (already-merged, stale-plan, ambiguity, wt-new failure, missing-info) it moves the plan out of `queue/`, which the breaker treats as an outcome (not a transient kill) and the loop continues to the next plan — even though that skip also exits fast with no handoff. The impl decision lives in `should_impl_env_stop()` and is locked by `bin/test-automouse-env-breaker`.
+   - **Environmental failures stop the run cleanly instead of skipping.** A usage/rate limit, auth error, or any transient that kills an agent — detected by a known limit/auth signature in the log, by a sub-minute phase exit (a real impl/postplan runs 15–50 min), *or* by a watchdog stall-kill (no stream events for 10 min, e.g. a dead/wedged inference stream) — refunds the attempt and breaks the loop, leaving the **entire queue intact** to resume next run. This prevents the failure mode where one dead-budget run ground every queued plan into `skipped/`. Each such stop writes a `YYYY-MM-DD-env-stop-<slug>.md` report. A **deliberate impl disposition is not environmental**: when the impl agent legitimately disposes of a plan — to `done/` (already-merged) or to `skipped/` (stale-plan, ambiguity, wt-new failure, missing-info) — it moves the plan out of `queue/`, which the breaker treats as an outcome (not a transient kill) and the loop continues to the next plan — even though that disposition also exits fast with no handoff. The impl decision lives in `should_impl_env_stop()` and is locked by `bin/test-automouse-env-breaker`.
 5. **After a run:** Check `gh pr list` for new PRs, read reports for details
 
 ## Headless Mode

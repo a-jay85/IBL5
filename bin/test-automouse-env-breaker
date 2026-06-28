@@ -6,8 +6,8 @@
 #
 # The breaker refunds the attempt and STOPS the loop when a usage/rate limit,
 # auth error, or transient kills the impl agent — leaving the queue intact. The
-# load-bearing negative (the bug this locks): a LEGITIMATE skip (already-merged,
-# stale-plan, ambiguity, wt-new failure, missing-info) exits fast with no handoff
+# load-bearing negative (the bug this locks): a LEGITIMATE disposition (already-merged
+# → done/, stale-plan/ambiguity/wt-new failure/missing-info → skipped/) exits fast with no handoff
 # but moves the plan OUT of queue/ (in_queue=0). It must NOT be misread as
 # environmental, or one fast skip stops the whole run (this happened 2026-06-20:
 # god-class-split-standingsview skipped in 57s → false env-stop → 5 plans stranded).

@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-06-24
+last_verified: 2026-06-28
 ---
 
 # Post-Plan Orchestrator
@@ -302,7 +302,7 @@ Run the pattern-detection block from that file to get SQL and Forms category cou
 
 Combine ALL issues from 4B and 4C into one numbered list.
 
-**Skip the scoring agent if the combined list is empty** — jump straight to posting "No issues found." comments in the two `gh pr comment` steps below.
+**Skip the scoring agent if the combined list is empty** — jump straight to the `post_review_summary` no-issues path below.
 
 Otherwise launch a **single Haiku agent**, pass it the issues list plus the **Scoring scale and Thresholds sections** from `_review-rubric.md` (not the full Automatic Zero or false-positive lists — review agents have already filtered those). Instruct it to return JSON scores per that rubric. Parse the response and assign scores back to each issue.
 
@@ -310,19 +310,26 @@ Otherwise launch a **single Haiku agent**, pass it the issues list plus the **Sc
 
 **Re-check PR state:** `gh pr view --json state --jq '.state'` — skip posting if not `OPEN`.
 
-**Post two `gh pr comment` entries** (code review + security audit) using full SHA from 4A.
+**Post results for code review and security audit** using the shared posting helper. Source it mirroring the pr-armable.sh idiom used by the Phase 6.5 condition blocks:
 
-Code review format (issues found): `### Code review\n\nFound N issues:\n\n1. <description> (CLAUDE.md says "<rule>")\n\n<link>`
+```bash
+source "$(git rev-parse --show-toplevel)/bin/lib/post-review-findings.sh"
+```
 
-Code review format (no issues): `### Code review\n\nNo issues found.` followed by a 1-2 sentence evidence summary assembled from agent responses (e.g., "Architecture follows Repository/Service/View split. Native-type comparisons consistent with schema. No bind_param mismatches in modified files.").
+The helper provides two public functions:
 
-Security audit format (issues found): `### Security audit\n\nFound N issue(s):\n\n**[SEVERITY]** Type in \`Class::method()\` — description\n\n<link>` Severity: CRITICAL (SQLi/CMDi), HIGH (missing auth/open redirect), MEDIUM (CSRF/missing auth on non-critical endpoints), LOW (best practice).
+- `post_review_findings PR_NUMBER HEAD_SHA REVIEW_TITLE FINDINGS_FILE` — splits findings into on-diff (→ batch resolvable inline review threads) and out-of-diff (→ single fallback `gh pr comment`). Nothing is dropped. The `<!-- score: N -->` marker is appended automatically; the heading envelope and footer are emitted by the helper — do NOT re-add them.
+- `post_review_summary PR_NUMBER REVIEW_TITLE BODY` — for the no-issues path; posts a single `gh pr comment` with the heading, evidence body, and footer.
 
-Security audit format (no issues): `### Security audit\n\nNo security issues found.` followed by brief evidence per category that launched (e.g., "SQL: all queries use prepared statements. CSRF: token validated on line N. Auth: guard present on state-changing endpoints.") and `(XSS and input validation are enforced by PHPStan custom rules.)`
+**For code review:**
+- Issues survived filter → build a JSON findings array (one object per issue: `path` = repo-relative file, `line` = single anchor line on new-file side, `body` = `<description> (CLAUDE.md says "<rule>")` + full-SHA range link, `score` = Haiku score) to a temp file; call `post_review_findings "$PR" "$FULL_SHA" "Code review" <file>`.
+- No issues → call `post_review_summary "$PR" "Code review" "No issues found. <1-2 sentence evidence summary>"`.
 
-**Link format:** `https://github.com/a-jay85/IBL5/blob/{FULL_SHA}/path/to/file#L{start}-L{end}` — expand SHA beforehand, never use bash interpolation in the comment. Include 1 line of context before/after.
+**For security audit:**
+- Issues survived filter → build findings JSON (`body` = `**[SEVERITY]** Type in \`Class::method()\` — description` + full-SHA range link, `score`); call `post_review_findings "$PR" "$FULL_SHA" "Security audit" <file>`. Severity: CRITICAL (SQLi/CMDi), HIGH (missing auth/open redirect), MEDIUM (CSRF/missing auth on non-critical endpoints), LOW (best practice).
+- No issues → call `post_review_summary "$PR" "Security audit" "No security issues found. <brief evidence per category> (XSS and input validation are enforced by PHPStan custom rules.)"`.
 
-Both comments end with: `Generated with [Claude Code](https://claude.ai/code)` and `<sub>If this was useful, react with thumbs-up. Otherwise, thumbs-down.</sub>`
+**Link format (in `body` field):** `https://github.com/a-jay85/IBL5/blob/{FULL_SHA}/path/to/file#L{start}-L{end}` — expand SHA from 4A beforehand, never use bash interpolation in the body string. Include 1 line of context before/after the anchor line.
 
 ---
 

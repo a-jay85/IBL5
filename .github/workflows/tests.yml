@@ -54,6 +54,10 @@ jobs:
               # bin/test-postplan-arm-conditions reads the Phase 6.5 condition
               # blocks here, so a SKILL.md-only edit must run the harness job.
               - '.claude/skills/post-plan/SKILL.md'
+              # bin/test-post-review-findings reads the Step 7 / Step 1 blocks here,
+              # so a command-only edit must run the harness job too.
+              - '.claude/commands/pr-review.md'
+              - '.claude/commands/security-audit.md'
             ibl6:
               - 'IBL6/**'
               - '.github/workflows/tests.yml'
@@ -598,6 +602,8 @@ jobs:
         run: bin/test-adr-check
       - name: bin/test-postplan-arm-conditions
         run: bin/test-postplan-arm-conditions
+      - name: bin/test-post-review-findings
+        run: bin/test-post-review-findings
       - name: bin/test-playwright-version
         run: bin/test-playwright-version
 

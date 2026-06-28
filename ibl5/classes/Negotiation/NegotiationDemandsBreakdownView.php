@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace Negotiation;
 
 use BasketballStats\StatsFormatter;
-use Negotiation\Contracts\NegotiationDemandCalculatorInterface;
+use Negotiation\Contracts\ExtensionContractDemandCalculatorInterface;
 use Security\HtmlSanitizer;
 
 /**
  * Renders a detailed breakdown of the contract demands formula.
  *
- * @phpstan-import-type DemandsBreakdown from NegotiationDemandCalculatorInterface
+ * @phpstan-import-type DemandsBreakdown from ExtensionContractDemandCalculatorInterface
  */
 class NegotiationDemandsBreakdownView
 {

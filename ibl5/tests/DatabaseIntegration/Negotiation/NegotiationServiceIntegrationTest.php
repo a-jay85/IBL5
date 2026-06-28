@@ -6,7 +6,7 @@ namespace Tests\DatabaseIntegration\Negotiation;
 
 use PHPUnit\Framework\Attributes\Group;
 use Tests\DatabaseIntegration\DatabaseTestCase;
-use Negotiation\NegotiationDemandCalculator;
+use Negotiation\ExtensionContractDemandCalculator;
 use Negotiation\NegotiationRepository;
 use Negotiation\NegotiationService;
 use Negotiation\NegotiationValidator;
@@ -88,7 +88,7 @@ class NegotiationServiceIntegrationTest extends DatabaseTestCase
             $this->db,
             new NegotiationRepository($this->db, new SalaryCapRepository($this->db)),
             new NegotiationValidator($this->db, $season),
-            new NegotiationDemandCalculator($this->db, new SalaryCapRepository($this->db)),
+            new ExtensionContractDemandCalculator($this->db, new SalaryCapRepository($this->db)),
         );
     }
 

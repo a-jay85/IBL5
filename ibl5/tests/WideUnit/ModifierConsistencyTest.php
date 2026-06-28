@@ -6,8 +6,8 @@ namespace Tests\WideUnit;
 
 use PHPUnit\Framework\TestCase;
 use Extension\ExtensionOfferEvaluator;
-use FreeAgency\FreeAgencyDemandCalculator;
-use Negotiation\NegotiationDemandCalculator;
+use FreeAgency\FreeAgencyMarketDemandCalculator;
+use Negotiation\ExtensionContractDemandCalculator;
 use Repositories\Contracts\SalaryCapRepositoryInterface;
 use Tests\WideUnit\Mocks\MockDatabase;
 
@@ -19,8 +19,8 @@ use Tests\WideUnit\Mocks\MockDatabase;
  *
  * @covers \ContractRules
  * @covers \Extension\ExtensionOfferEvaluator
- * @covers \Negotiation\NegotiationDemandCalculator
- * @covers \FreeAgency\FreeAgencyDemandCalculator
+ * @covers \Negotiation\ExtensionContractDemandCalculator
+ * @covers \FreeAgency\FreeAgencyMarketDemandCalculator
  */
 class ModifierConsistencyTest extends TestCase
 {
@@ -96,7 +96,7 @@ class ModifierConsistencyTest extends TestCase
             ],
         ]);
 
-        $calculator = new NegotiationDemandCalculator($mockDb, self::createStub(SalaryCapRepositoryInterface::class));
+        $calculator = new ExtensionContractDemandCalculator($mockDb, self::createStub(SalaryCapRepositoryInterface::class));
 
         $expectedWinner = \ContractRules::calculateWinnerModifier(self::WINS, self::LOSSES, self::WINNER_PREF);
         $expectedTradition = \ContractRules::calculateTraditionModifier(self::TRAD_WINS, self::TRAD_LOSSES, self::TRADITION_PREF);

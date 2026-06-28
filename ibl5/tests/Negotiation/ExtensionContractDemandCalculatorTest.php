@@ -6,14 +6,14 @@ namespace Tests\Negotiation;
 
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
-use Negotiation\NegotiationDemandCalculator;
+use Negotiation\ExtensionContractDemandCalculator;
 use Player\Player;
 use Repositories\Contracts\SalaryCapRepositoryInterface;
 use Tests\WideUnit\Mocks\MockDatabase;
 use Tests\WideUnit\Mocks\TestDataFactory;
 
 /**
- * Tests for NegotiationDemandCalculator
+ * Tests for ExtensionContractDemandCalculator
  * 
  * Tests contract demand calculation logic:
  * - Base demands calculated from player ratings
@@ -21,15 +21,15 @@ use Tests\WideUnit\Mocks\TestDataFactory;
  * - Modifier calculation from team/player factors
  * - Yearly demands with 10% raises
  */
-class NegotiationDemandCalculatorTest extends TestCase
+class ExtensionContractDemandCalculatorTest extends TestCase
 {
     private ?MockDatabase $mockDb;
-    private ?NegotiationDemandCalculator $calculator;
+    private ?ExtensionContractDemandCalculator $calculator;
 
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->calculator = new NegotiationDemandCalculator($this->mockDb, self::createStub(SalaryCapRepositoryInterface::class));
+        $this->calculator = new ExtensionContractDemandCalculator($this->mockDb, self::createStub(SalaryCapRepositoryInterface::class));
     }
 
     protected function tearDown(): void
@@ -419,7 +419,7 @@ class NegotiationDemandCalculatorTest extends TestCase
         ];
     }
 
-    // --- Merged from NegotiationDemandCalculatorEdgeCaseTest ---
+    // --- Merged from ExtensionContractDemandCalculatorEdgeCaseTest ---
 
     // ============================================
     // ZERO/NEAR-ZERO MODIFIER EDGE CASES

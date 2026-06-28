@@ -6,7 +6,7 @@ namespace Tests\FreeAgency;
 
 use PHPUnit\Framework\TestCase;
 use FreeAgency\FreeAgencyProcessor;
-use FreeAgency\Contracts\FreeAgencyDemandCalculatorInterface;
+use FreeAgency\Contracts\FreeAgencyMarketDemandCalculatorInterface;
 use FreeAgency\Contracts\FreeAgencyRepositoryInterface;
 use Player\Player;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
@@ -64,7 +64,7 @@ class CapturingRepository implements FreeAgencyRepositoryInterface
 /**
  * Stub calculator that returns known modifier/random/perceivedValue.
  */
-class StubDemandCalculator implements FreeAgencyDemandCalculatorInterface
+class StubDemandCalculator implements FreeAgencyMarketDemandCalculatorInterface
 {
     private float $modifier;
     private int $random;

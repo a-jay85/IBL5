@@ -14,7 +14,7 @@ use Player\Player;
  *
  * @phpstan-type CalculationResult array{modifier: float, random: int, perceivedValue: float}
  */
-interface FreeAgencyDemandCalculatorInterface
+interface FreeAgencyMarketDemandCalculatorInterface
 {
     /**
      * Set a static random factor for testing (overrides actual randomness).

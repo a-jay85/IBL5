@@ -58,8 +58,6 @@ class DebugOutput implements DebugOutputInterface
         $safeContent = htmlspecialchars($content, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         // Restore <br> tags after escaping (they're safe and commonly used)
         $safeContent = str_replace(['&lt;br&gt;', '&lt;br/&gt;', '&lt;br /&gt;'], '<br>', $safeContent);
-
-        ob_start();
         ?>
 <div class="debug-panel">
     <div class="debug-panel__header"
@@ -77,6 +75,5 @@ class DebugOutput implements DebugOutputInterface
     }
 </script>
         <?php
-        echo ob_get_clean();
     }
 }

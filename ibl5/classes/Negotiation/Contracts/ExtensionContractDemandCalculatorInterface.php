@@ -7,7 +7,7 @@ namespace Negotiation\Contracts;
 use Player\Player;
 
 /**
- * NegotiationDemandCalculatorInterface - Contract demand calculations
+ * ExtensionContractDemandCalculatorInterface - Contract demand calculations
  *
  * Calculates contract demands based on player ratings and statistics
  * using market-based analysis to determine fair contract values.
@@ -18,7 +18,7 @@ use Player\Player;
  * @phpstan-type ModifierBreakdown array{name: string, formula: string, inputs: string, result: float}
  * @phpstan-type DemandsBreakdown array{ratings: list<RatingBreakdown>, totalRawScore: int, baseline: int, adjustedScore: int, avgDemands: float|int, totalDemands: float|int, baseDemands: float|int, maxRaise: float|int, faPreferences: array{playForWinner: int, tradition: int, loyalty: int, playingTime: int}, teamFactors: TeamFactors, modifiers: list<ModifierBreakdown>, totalModifier: float, demands: DemandResult}
  */
-interface NegotiationDemandCalculatorInterface
+interface ExtensionContractDemandCalculatorInterface
 {
     /**
      * Calculate contract demands for a player

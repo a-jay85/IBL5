@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Negotiation;
 
-use Negotiation\Contracts\NegotiationDemandCalculatorInterface;
+use Negotiation\Contracts\ExtensionContractDemandCalculatorInterface;
 use Negotiation\Contracts\NegotiationRepositoryInterface;
 use Negotiation\Contracts\NegotiationServiceInterface;
 use Negotiation\Contracts\NegotiationValidatorInterface;
@@ -13,7 +13,7 @@ use Player\Player;
 /**
  * @see NegotiationServiceInterface
  *
- * @phpstan-import-type TeamFactors from NegotiationDemandCalculatorInterface
+ * @phpstan-import-type TeamFactors from ExtensionContractDemandCalculatorInterface
  */
 class NegotiationService implements NegotiationServiceInterface
 {
@@ -21,7 +21,7 @@ class NegotiationService implements NegotiationServiceInterface
         private readonly \mysqli $db,
         private readonly NegotiationRepositoryInterface $repository,
         private readonly NegotiationValidatorInterface $validator,
-        private readonly NegotiationDemandCalculatorInterface $demandCalculator,
+        private readonly ExtensionContractDemandCalculatorInterface $demandCalculator,
     ) {}
     
     public function processNegotiation(int $playerID, string $userTeamName, string $prefix, bool $bypassOwnership = false): string

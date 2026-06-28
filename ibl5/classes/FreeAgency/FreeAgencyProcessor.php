@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace FreeAgency;
 
-use FreeAgency\Contracts\FreeAgencyDemandCalculatorInterface;
+use FreeAgency\Contracts\FreeAgencyMarketDemandCalculatorInterface;
 use FreeAgency\Contracts\FreeAgencyProcessorInterface;
 use FreeAgency\Contracts\FreeAgencyRepositoryInterface;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
@@ -18,7 +18,7 @@ use Discord\Discord;
 class FreeAgencyProcessor implements FreeAgencyProcessorInterface
 {
     private \mysqli $mysqli_db;
-    private FreeAgencyDemandCalculatorInterface $calculator;
+    private FreeAgencyMarketDemandCalculatorInterface $calculator;
     private FreeAgencyRepositoryInterface $repository;
     private Season $season;
     private TeamIdentityRepositoryInterface $commonRepo;
@@ -31,7 +31,7 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
     public function __construct(
         \mysqli $mysqli_db,
         TeamIdentityRepositoryInterface $commonRepo,
-        ?FreeAgencyDemandCalculatorInterface $calculator = null,
+        ?FreeAgencyMarketDemandCalculatorInterface $calculator = null,
         ?FreeAgencyRepositoryInterface $repository = null,
         ?\Psr\Log\LoggerInterface $logger = null,
         ?Season $season = null
@@ -40,7 +40,7 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         $this->season = $season ?? new Season($mysqli_db);
 
         $this->commonRepo = $commonRepo;
-        $this->calculator = $calculator ?? new FreeAgencyDemandCalculator(
+        $this->calculator = $calculator ?? new FreeAgencyMarketDemandCalculator(
             new FreeAgencyDemandRepository($this->mysqli_db)
         );
         $this->repository = $repository ?? new FreeAgencyRepository($this->mysqli_db);

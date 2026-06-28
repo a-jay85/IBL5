@@ -8,7 +8,7 @@ use PHPUnit\Framework\TestCase;
 use Negotiation\NegotiationService;
 use Negotiation\NegotiationRepository;
 use Negotiation\NegotiationValidator;
-use Negotiation\NegotiationDemandCalculator;
+use Negotiation\ExtensionContractDemandCalculator;
 use Repositories\Contracts\SalaryCapRepositoryInterface;
 use Tests\WideUnit\Mocks\MockDatabase;
 
@@ -94,7 +94,7 @@ class NegotiationServiceTest extends TestCase
             $this->mockDb,
             new NegotiationRepository($this->mockDb, $commonRepo),
             new NegotiationValidator($this->mockDb, $season),
-            new NegotiationDemandCalculator($this->mockDb, $commonRepo),
+            new ExtensionContractDemandCalculator($this->mockDb, $commonRepo),
         );
     }
 

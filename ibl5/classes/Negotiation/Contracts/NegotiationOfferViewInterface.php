@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Negotiation\Contracts;
 
-use Negotiation\Contracts\NegotiationDemandCalculatorInterface;
+use Negotiation\Contracts\ExtensionContractDemandCalculatorInterface;
 use Player\Player;
 
 /**
@@ -13,7 +13,7 @@ use Player\Player;
  * Handles HTML rendering for the negotiation page, separating
  * presentation logic from business logic. All methods are static.
  *
- * @phpstan-import-type DemandResult from NegotiationDemandCalculatorInterface
+ * @phpstan-import-type DemandResult from ExtensionContractDemandCalculatorInterface
  */
 interface NegotiationOfferViewInterface
 {

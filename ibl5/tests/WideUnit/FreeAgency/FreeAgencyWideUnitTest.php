@@ -20,7 +20,7 @@ use Repositories\Contracts\TeamIdentityRepositoryInterface;
  *
  * @covers \FreeAgency\FreeAgencyProcessor
  * @covers \FreeAgency\FreeAgencyOfferValidator
- * @covers \FreeAgency\FreeAgencyDemandCalculator
+ * @covers \FreeAgency\FreeAgencyMarketDemandCalculator
  * @covers \FreeAgency\FreeAgencyRepository
  * @covers \FreeAgency\FreeAgencyCapCalculator
  * @covers \FreeAgency\OfferType

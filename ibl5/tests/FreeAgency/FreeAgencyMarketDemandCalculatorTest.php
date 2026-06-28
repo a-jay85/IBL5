@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\FreeAgency;
 
 use PHPUnit\Framework\TestCase;
-use FreeAgency\FreeAgencyDemandCalculator;
+use FreeAgency\FreeAgencyMarketDemandCalculator;
 use FreeAgency\Contracts\FreeAgencyDemandRepositoryInterface;
 use Player\Player;
 
@@ -42,7 +42,7 @@ class MockDemandRepository implements FreeAgencyDemandRepositoryInterface
 }
 
 /**
- * Tests for FreeAgencyDemandCalculator — the perceived value formula.
+ * Tests for FreeAgencyMarketDemandCalculator — the perceived value formula.
  *
  * All tests are based on the ORIGINAL pre-refactor implementation in
  * freeagentoffer.php (commit 188bd3f4c^). The formula is:
@@ -54,15 +54,15 @@ class MockDemandRepository implements FreeAgencyDemandRepositoryInterface
  *
  * The calculator MUST return all three components: modifier, random, perceivedValue.
  */
-class FreeAgencyDemandCalculatorTest extends TestCase
+class FreeAgencyMarketDemandCalculatorTest extends TestCase
 {
     private MockDemandRepository $mockRepository;
-    private FreeAgencyDemandCalculator $calculator;
+    private FreeAgencyMarketDemandCalculator $calculator;
 
     protected function setUp(): void
     {
         $this->mockRepository = new MockDemandRepository();
-        $this->calculator = new FreeAgencyDemandCalculator($this->mockRepository);
+        $this->calculator = new FreeAgencyMarketDemandCalculator($this->mockRepository);
     }
 
     // ================================================================
@@ -440,7 +440,7 @@ class FreeAgencyDemandCalculatorTest extends TestCase
             'tradWins' => 500, 'tradLosses' => 500,
         ];
         $lowRepo->positionSalaryCommitment = 500;
-        $calcLow = new FreeAgencyDemandCalculator($lowRepo);
+        $calcLow = new FreeAgencyMarketDemandCalculator($lowRepo);
         $calcLow->setRandomFactor(0);
         $lowResult = $calcLow->calculatePerceivedValue(
             offerAverage: 1000,
@@ -456,7 +456,7 @@ class FreeAgencyDemandCalculatorTest extends TestCase
             'tradWins' => 500, 'tradLosses' => 500,
         ];
         $highRepo->positionSalaryCommitment = 1500;
-        $calcHigh = new FreeAgencyDemandCalculator($highRepo);
+        $calcHigh = new FreeAgencyMarketDemandCalculator($highRepo);
         $calcHigh->setRandomFactor(0);
         $highResult = $calcHigh->calculatePerceivedValue(
             offerAverage: 1000,

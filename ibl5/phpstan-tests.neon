@@ -36,3 +36,7 @@ services:
         class: PHPStanRules\RequireMeaningfulAssertionsRule
         tags:
             - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanRedeclaredMockDbQueryHelperRule
+        tags:
+            - phpstan.rules.rule

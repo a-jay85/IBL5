@@ -1,6 +1,6 @@
 ---
 description: Development standards, priorities, and workflow for IBL5.
-last_verified: 2026-05-19
+last_verified: 2026-06-28
 ---
 
 # Development Guide
@@ -363,6 +363,7 @@ last_verified: 2026-05-19
 **Test Infrastructure Improvements:**
 - Created standalone TestDataFactory class in Tests\WideUnit\Mocks\ namespace for centralized fixture creation
 - WideUnitTestCase base class provides mock database and helper assertions
+- **Enforced:** `BanRedeclaredMockDbQueryHelperRule` (PHPStan, `analyse:tests`) fails CI if a test re-declares `assertQueryExecuted()` / `assertQueryNotExecuted()` — extend `Tests\WideUnit\WideUnitTestCase` instead of re-implementing its query-assertion helpers
 - All wide-unit tests use TestDataFactory::createPlayer/createTeam/createSeason static methods
 - Refactored mock classes from inline definitions to proper namespaced classes in tests/WideUnit/Mocks/
 - Enhanced autoloader.php to support Tests\ namespace

@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Extension;
 
-use PHPUnit\Framework\TestCase;
 use Extension\ExtensionRepository;
 use Logging\LoggerFactory;
 use Monolog\Handler\TestHandler;
 use Tests\WideUnit\Mocks\MockDatabase;
+use Tests\WideUnit\WideUnitTestCase;
 
 /**
  * Tests for ExtensionRepository
@@ -21,20 +21,19 @@ use Tests\WideUnit\Mocks\MockDatabase;
  *
  * @covers \Extension\ExtensionRepository
  */
-class ExtensionRepositoryTest extends TestCase
+class ExtensionRepositoryTest extends WideUnitTestCase
 {
-    private MockDatabase $mockDb;
-    private ExtensionRepository $repository;
-
-    protected function setUp(): void
-    {
-        $this->mockDb = new MockDatabase();
-        $this->repository = new ExtensionRepository($this->mockDb);
-    }
-
     protected function tearDown(): void
     {
         LoggerFactory::reset();
+        parent::tearDown();
+    }
+
+    private function repo(): ExtensionRepository
+    {
+        $db = $this->mockDb;
+        self::assertNotNull($db);
+        return new ExtensionRepository($db);
     }
 
     // ============================================
@@ -48,7 +47,7 @@ class ExtensionRepositoryTest extends TestCase
             'year4' => 1300, 'year5' => 1400,
         ];
 
-        $result = $this->repository->updatePlayerContract('Test Player', $offer, 800);
+        $result = $this->repo()->updatePlayerContract('Test Player', $offer, 800);
 
         $this->assertTrue($result);
         $this->assertQueryExecuted('UPDATE ibl_plr');
@@ -61,14 +60,14 @@ class ExtensionRepositoryTest extends TestCase
             'year4' => 0, 'year5' => 0,
         ];
 
-        $result = $this->repository->updatePlayerContract('Test Player', $offer, 800);
+        $result = $this->repo()->updatePlayerContract('Test Player', $offer, 800);
 
         $this->assertTrue($result);
     }
 
     public function testMarksExtensionUsedThisSim(): void
     {
-        $result = $this->repository->markExtensionUsedThisSim('Test Team');
+        $result = $this->repo()->markExtensionUsedThisSim('Test Team');
 
         $this->assertTrue($result);
         $this->assertQueryExecuted('used_extension_this_chunk');
@@ -76,7 +75,7 @@ class ExtensionRepositoryTest extends TestCase
 
     public function testMarksExtensionUsedThisSeason(): void
     {
-        $result = $this->repository->markExtensionUsedThisSeason('Test Team');
+        $result = $this->repo()->markExtensionUsedThisSeason('Test Team');
 
         $this->assertTrue($result);
         $this->assertQueryExecuted('used_extension_this_season');
@@ -95,7 +94,7 @@ class ExtensionRepositoryTest extends TestCase
         $this->mockDb->setNumRows(1);
         $this->mockDb->setReturnTrue(true);
 
-        $result = $this->repository->createAcceptedExtensionStory(
+        $result = $this->repo()->createAcceptedExtensionStory(
             'Test Player',
             'Test Team',
             120.0,
@@ -116,7 +115,7 @@ class ExtensionRepositoryTest extends TestCase
         $this->mockDb->setNumRows(1);
         $this->mockDb->setReturnTrue(true);
 
-        $result = $this->repository->createRejectedExtensionStory(
+        $result = $this->repo()->createRejectedExtensionStory(
             'Test Player',
             'Test Team',
             100.0,
@@ -137,7 +136,7 @@ class ExtensionRepositoryTest extends TestCase
             ['contract_wins' => 50, 'contract_losses' => 32, 'contract_avg_w' => 2500, 'contract_avg_l' => 2000],
         ]);
 
-        $result = $this->repository->getTeamTraditionData('Test Team');
+        $result = $this->repo()->getTeamTraditionData('Test Team');
 
         $this->assertSame(50, $result['currentSeasonWins']);
         $this->assertSame(32, $result['currentSeasonLosses']);
@@ -150,7 +149,7 @@ class ExtensionRepositoryTest extends TestCase
         // Empty mock data — no rows returned
         $this->mockDb->setMockData([]);
 
-        $result = $this->repository->getTeamTraditionData('Nonexistent Team');
+        $result = $this->repo()->getTeamTraditionData('Nonexistent Team');
 
         $this->assertSame(41, $result['currentSeasonWins']);
         $this->assertSame(41, $result['currentSeasonLosses']);
@@ -171,7 +170,7 @@ class ExtensionRepositoryTest extends TestCase
             'year4' => 0, 'year5' => 0,
         ];
 
-        $this->repository->saveAcceptedExtension(
+        $this->repo()->saveAcceptedExtension(
             'Test Player',
             'Test Team',
             $offer,
@@ -335,24 +334,5 @@ class ExtensionRepositoryTest extends TestCase
     {
         $repo = new ExtensionRepository(new MockDatabase());
         $this->assertIsObject($repo);
-    }
-
-    /**
-     * Assert that at least one executed query contains the given substring.
-     */
-    private function assertQueryExecuted(string $substring): void
-    {
-        $queries = $this->mockDb->getExecutedQueries();
-        $found = false;
-        foreach ($queries as $query) {
-            if (str_contains($query, $substring)) {
-                $found = true;
-                break;
-            }
-        }
-        self::assertTrue(
-            $found,
-            "Expected a query containing '{$substring}' but none was found. Queries: " . implode("\n", $queries)
-        );
     }
 }

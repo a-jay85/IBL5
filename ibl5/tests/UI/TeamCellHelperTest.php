@@ -127,4 +127,29 @@ class TeamCellHelperTest extends TestCase
         $this->assertStringContainsString('--team-cell-bg: #FF0000', $result);
         $this->assertStringContainsString('--team-cell-color: #FFFFFF', $result);
     }
+
+    public function testRenderTeamCellWithExtraStylesPrependsBeforeTeamCellBg(): void
+    {
+        $result = TeamCellHelper::renderTeamCell(1, 'Miami', 'FF0000', 'FFFFFF', '', '', '', '--mobile-order: 3; ');
+
+        $this->assertStringContainsString('style="--mobile-order: 3; --team-cell-bg: #FF0000', $result);
+    }
+
+    public function testRenderTeamCellExtraStylesProducesIdenticalOutputToStrReplace(): void
+    {
+        $withoutExtra = TeamCellHelper::renderTeamCell(5, 'Chicago', '000000', 'FFFFFF', '', 'http://example.com', '');
+        $strReplaced = str_replace('style="', 'style="--mobile-order: 1; ', $withoutExtra);
+
+        $withExtra = TeamCellHelper::renderTeamCell(5, 'Chicago', '000000', 'FFFFFF', '', 'http://example.com', '', '--mobile-order: 1; ');
+
+        $this->assertSame($strReplaced, $withExtra);
+    }
+
+    public function testRenderTeamCellEmptyExtraStylesProducesUnchangedOutput(): void
+    {
+        $withoutParam = TeamCellHelper::renderTeamCell(1, 'Miami', 'FF0000', 'FFFFFF');
+        $withEmptyExtra = TeamCellHelper::renderTeamCell(1, 'Miami', 'FF0000', 'FFFFFF', '', '', '', '');
+
+        $this->assertSame($withoutParam, $withEmptyExtra);
+    }
 }

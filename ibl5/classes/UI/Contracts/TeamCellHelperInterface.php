@@ -26,6 +26,7 @@ interface TeamCellHelperInterface
      * @param string $extraClasses Additional CSS classes (e.g. 'sticky-col')
      * @param string $linkUrl Custom link URL; if empty, uses default team page URL
      * @param string $nameHtml Pre-escaped custom inner HTML; if empty, uses escaped team name
+     * @param string $extraStyles Extra inline CSS prepended inside the style attribute (e.g. '--mobile-order: 2; ')
      * @return string Complete <td> HTML element
      */
     public static function renderTeamCell(
@@ -36,6 +37,7 @@ interface TeamCellHelperInterface
         string $extraClasses = '',
         string $linkUrl = '',
         string $nameHtml = '',
+        string $extraStyles = '',
     ): string;
 
     /**

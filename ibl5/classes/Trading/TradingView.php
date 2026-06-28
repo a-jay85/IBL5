@@ -323,8 +323,7 @@ $tradeConfig = [
         $partnerUrl = 'modules.php?name=Trading&amp;op=offertrade&amp;partner=' . $teamName;
         $cityHtml = HtmlSanitizer::safeHtmlOutput($team['city']);
         $nameHtml = '<span class="ibl-team-cell__city">' . $cityHtml . ' </span>' . $teamName;
-        $cell = TeamCellHelper::renderTeamCell($teamId, $team['fullName'], $team['color1'], $team['color2'], '', $partnerUrl, $nameHtml);
-        $cell = str_replace('style="', 'style="--mobile-order: ' . $team['mobileOrder'] . '; ', $cell);
+        $cell = TeamCellHelper::renderTeamCell($teamId, $team['fullName'], $team['color1'], $team['color2'], '', $partnerUrl, $nameHtml, '--mobile-order: ' . $team['mobileOrder'] . '; ');
         ?>
         <tr>
             <?= HtmlSanitizer::trusted($cell) ?>

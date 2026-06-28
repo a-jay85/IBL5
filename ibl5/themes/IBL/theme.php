@@ -280,10 +280,33 @@ function themearticle($aid, $informant, $datetime, $title, $thetext, $topic, $to
 /**
  * Center block for homepage content (Leaders, News, etc.)
  * Modern responsive container styling
+ *
+ * @param string $title Block title (used for legacy wrapper only)
+ * @param string $content Block HTML content
+ * @param string|null $type Explicit block type: 'leaders', 'injury', or null to fall back to
+ *                          content-sniffing for unmigrated callers (byte-identical output)
  */
-function themecenterbox($title, $content)
+function themecenterbox($title, $content, ?string $type = null)
 {
-    // Check if content already has modern styling
+    if ($type !== null) {
+        // Explicit type: select branch directly without content inspection
+        if ($type === 'leaders') {
+            echo '<div class="leaders-grid-item" style="overflow: hidden;">'
+                . $content
+                . '</div>';
+        } elseif ($type === 'injury') {
+            echo '<div style="max-width: 100%; overflow: hidden;">'
+                . $content
+                . '</div>';
+        } else {
+            echo '<div style="margin-bottom: 1rem; max-width: 100%; overflow: hidden;">'
+                . $content
+                . '</div>';
+        }
+        return;
+    }
+
+    // Null fallback: original strpos logic for unmigrated callers (byte-identical output)
     $hasModernStyling = strpos($content, 'leaders-block') !== false ||
                         strpos($content, 'leaders-tabbed') !== false ||
                         strpos($content, 'injury-block') !== false ||

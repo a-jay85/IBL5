@@ -5,20 +5,20 @@ declare(strict_types=1);
 namespace Tests\Draft;
 
 use PHPUnit\Framework\TestCase;
-use Draft\DraftSelectionHandler;
+use Draft\DraftController;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Season\Season;
 use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
- * DraftSelectionHandlerTest - Tests for draft pick selection handling
+ * DraftControllerTest - Tests for draft controller
  *
  * Tests:
- * - Handler instantiation
+ * - Controller instantiation
  * - Interface compliance
- * - Validation flow
+ * - Validation flow (handleDraftSelection and submitSelection)
  */
-class DraftSelectionHandlerTest extends TestCase
+class DraftControllerTest extends TestCase
 {
     private MockDatabase $mockDb;
     private TeamIdentityRepositoryInterface $mockCommonRepository;
@@ -38,10 +38,8 @@ class DraftSelectionHandlerTest extends TestCase
 
     private function setupMockDependencies(): void
     {
-        // Stub CommonMysqliRepository (no expectations needed)
         $this->mockCommonRepository = self::createStub(TeamIdentityRepositoryInterface::class);
 
-        // Mock Season object
         $this->mockSeason = self::createStub(Season::class);
         $this->mockSeason->beginningYear = 2024;
         $this->mockSeason->endingYear = 2025;
@@ -52,15 +50,15 @@ class DraftSelectionHandlerTest extends TestCase
     // CONSTRUCTOR TESTS
     // ============================================
 
-    public function testHandlerCanBeInstantiated(): void
+    public function testControllerCanBeInstantiated(): void
     {
-        $handler = new DraftSelectionHandler(
+        $controller = new DraftController(
             $this->mockDb,
             $this->mockCommonRepository,
             $this->mockSeason
         );
 
-        $this->assertIsObject($handler);
+        $this->assertIsObject($controller);
     }
 
     // ============================================
@@ -69,49 +67,55 @@ class DraftSelectionHandlerTest extends TestCase
 
     public function testHandleDraftSelectionReturnsErrorForNullPlayerName(): void
     {
-        $handler = new DraftSelectionHandler(
+        $controller = new DraftController(
             $this->mockDb,
             $this->mockCommonRepository,
             $this->mockSeason
         );
 
-        $result = $handler->handleDraftSelection('Test Team', null, 1, 1);
+        $result = $controller->handleDraftSelection('Test Team', null, 1, 1);
 
         $this->assertIsString($result);
-        // Should return validation error message containing "didn't select"
         $this->assertStringContainsString('select a player', $result);
     }
 
     public function testHandleDraftSelectionReturnsErrorForEmptyPlayerName(): void
     {
-        $handler = new DraftSelectionHandler(
+        $controller = new DraftController(
             $this->mockDb,
             $this->mockCommonRepository,
             $this->mockSeason
         );
 
-        $result = $handler->handleDraftSelection('Test Team', '', 1, 1);
+        $result = $controller->handleDraftSelection('Test Team', '', 1, 1);
 
         $this->assertIsString($result);
+    }
+
+    public function testSubmitSelectionWithoutPlayerKeyReturnsValidationError(): void
+    {
+        $controller = new DraftController($this->mockDb, $this->mockCommonRepository, $this->mockSeason);
+        $result = $controller->submitSelection(['teamname' => 'Test Team', 'draft_round' => '1', 'draft_pick' => '1']);
+        $this->assertStringContainsString('select a player', $result);
     }
 
     // ============================================
     // MULTIPLE INSTANCES TEST
     // ============================================
 
-    public function testMultipleHandlersCanBeInstantiated(): void
+    public function testMultipleControllersCanBeInstantiated(): void
     {
-        $handler1 = new DraftSelectionHandler(
+        $controller1 = new DraftController(
             $this->mockDb,
             $this->mockCommonRepository,
             $this->mockSeason
         );
-        $handler2 = new DraftSelectionHandler(
+        $controller2 = new DraftController(
             $this->mockDb,
             $this->mockCommonRepository,
             $this->mockSeason
         );
 
-        $this->assertNotSame($handler1, $handler2);
+        $this->assertNotSame($controller1, $controller2);
     }
 }

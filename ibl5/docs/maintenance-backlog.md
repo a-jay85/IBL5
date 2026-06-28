@@ -263,17 +263,17 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
 | 2.1 | ⬜ Open | 🟩 | Globals still in all 6 (Draft `userinfo/main/submit`, Voting, Waivers `waivers`, ComparePlayers, ApiKeys `handle`, News `theindex`). Extract→Controller, green-green E2E pin. News portion = PR #1166. |
-| 2.2 | ⬜ Open | 🟩 | Both still R+V only (verified, no Service). Thin Service extraction, green-green. |
+| 2.2 | 🚫 Declined | — | **Status (2026-06-28):** Declined. ActivityTracker + AllStarAppearances `index.php` are single-repo R+V passthrough (one `repo->getX()` → `view->render()`, verified on disk). A Service would be single-implementor pass-through ceremony — no orchestration to house (cf. 2.5/2.8/2.3 passthrough declines). |
 | 2.3 | ◑ Partial | — | FranchiseHistory Service built (#1091); PlayerMovement **declined** (single JOIN, pass-through ceremony). |
-| 2.4 | ◑ Partial | 🟩 | Topics Service done (#1030); GMContactList still R+V → add Service, green-green. |
-| 2.5 | ⬜ Open | 🟩 | Boxscore R+V+P, no Service (verified); rename Processor→Service + add ViewInterface. Refactor-flag, green-green. |
+| 2.4 | 🚫 Declined | — | **Status (2026-06-28):** Declined for GMContactList. Its `index.php` is single-repo passthrough (`getAllTeamContacts()` → render). The "match Topics (#1030)" premise is invalid: `TopicsService` orchestrates **two** repos (Topics + Search → `getPageData`) — real aggregation, not uniformity. No equivalent need here. |
+| 2.5 | ◑ Partial | 🟩 | **Status (2026-06-28):** Processor→Service rename **declined** — `BoxscoreProcessor` is a mutating .sco import pipeline (every method drives DB writes; consumed by Updater steps/BulkImport/scripts; no user-facing Boxscore page). Additive `BoxscoreViewInterface` half is 📋 planned in `tier1-module-architecture-scaffold` (staleness-skipped 2026-06-27, re-queue pending). |
 | 2.6 | ⬜ Open | 🟩 | Draft R+V+P+Vl, no Service; globals in index.php. Add Service + promote handler; green-green (M). |
 | 2.7 | ✅ Implemented | — | InjuriesRepository extracted+injected (#970). |
 | 2.8 | 🚫 Declined | — | Search + Standings: pass-through Service = dead code; declined. |
 | 2.9 | 🚫 Declined | — | `*ApiHandler` is the HTMX-fragment convention (9 handlers); rename declined. |
 | 2.10 | ⬜ Open | 🟨 | Extension R+S+P+Vl, no View. Upfront decision (own module vs Player sub-action) **+** extension handler touches #1110 IDOR (sequence). |
 | 2.11 | ✅ Implemented | — | RookieOptionFormView→RookieOptionView (#1031); Service declined. |
-| 2.12 | ⬜ Open | 🟩 | Negotiation non-canonical view names; consolidate Breakdown as sub-view. Rename, green-green. |
+| 2.12 | 📋 Planned | 🟩 | **Planned** in `tier1-module-architecture-scaffold`: consolidate `NegotiationDemandsBreakdownView` into `Views/` (NegotiationOfferView already canonical via 4.22). Skipped by `check-plan-staleness` FP 2026-06-27 (`— NEW` cue unrecognized); re-queue pending. |
 | 2.13 | 📋 Planned | 🟨 | Characterization-pins plan queued (`freeagency-2-13-characterization-pins`); the admin/user split touches admin-mutation surface (→ human-merge) **+** collides with #1109 FA IDOR (sequence). |
 | 2.14 | ◑ Partial | 🟨 | TradingController+Service exist (#802) but `maketradeoffer/accepttradeoffer/rejecttradeoffer.php` standalone endpoints remain (verified). Promoting touches trade-mutation surface + collides with #1108 (sequence). |
 | 2.15 | ⬜ Open | 🟨 | `classes/VotingResults/` absent. Upfront decision: merge module dirs vs split namespace. |
@@ -281,17 +281,17 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 | 2.17 | 📋 Planned | 🟦 | News R/S/V extraction = PR #1166 open (queued `extract-news`); held `auto_merge:false` (SQL surface). |
 | 2.18 | ⬜ Open | 🟨 | Static HTML in index.php. Upfront decision: static page outside module vs minimal View. Low risk. |
 | 2.19 | ✅ Implemented | — | **Marker was missing/stale.** `modules/SiteStatistics/` deleted (#733, verified absent). |
-| 2.20 | ⬜ Open | 🟩 | Schedule index.php branches LeagueSchedule/TeamSchedule; add ScheduleController. Green-green. |
+| 2.20 | 📋 Planned | 🟩 | **Planned** in `tier1-module-architecture-scaffold`: extract `ScheduleController::render(int): string` (header/footer stay in index.php). Verified: index.php still branches inline. Skipped by staleness FP 2026-06-27; re-queue pending. |
 | 2.21 | ⬜ Open | 🟨 | Same root cause as 2.15 (VotingResults namespace); resolve together. |
 | 2.22 | ✅ Implemented | — | `Services/` deleted (2026-05-16). |
 | 2.23 | ✅ Implemented | — | `Shared/` deleted; SalaryConverter→BasketballStats. |
-| 2.24 | ⬜ Open | 🟩 | Navigation views lack interfaces; add `NavigationViewInterface` + sub-view ifaces. Additive, green-green. |
+| 2.24 | 📋 Planned | 🟩 | **Planned** in `tier1-module-architecture-scaffold`: add `NavigationViewInterface` + 4 sub-view ifaces (additive, no constructor retype). Skipped by staleness FP 2026-06-27; re-queue pending. |
 | 2.25 | ⬜ Open | 🟨 | index.php still defines `showpage/negotiate/rookieoption/processrookieoption` globals (verified); rookieoption/negotiate touch mutation → collides with #1107 (sequence). showpage extraction alone is green-green. |
 | 2.26 | ✅ Implemented | — | Documented Updater web-POST placement (`classes/Updater/README.md`); audit's "CLI-only" was inaccurate — it is web-only. |
 | 2.27 | ⬜ Open | 🟦 | Root `leagueControlPanel.php`→module bypasses `ModuleAccessControl`; converting changes admin-auth path (security surface) → human-merge. (a11y fix kept standalone deliberately.) |
 | 2.28 | ⬜ Open | 🟨 | `faprep.php` exists (verified), inline SQL + unescaped output. Resolve with 3.9 (delete); if absorbed instead, XSS/admin-SQL = human-merge. |
 | 2.29 | ⬜ Open | 🟩 | `JSB.php`/`ContractRules.php`/`BaseMysqliRepository.php` still root-level. Namespace sweep (follow relocation checklist incl. phpunit-mutation.xml); green-green, wide blast radius. |
-| 2.30 | ⬜ Open | 🟩 | Statistics + StrengthOfSchedule single-class dirs; relocate to BasketballStats. Move, green-green. |
+| 2.30 | 📋 Planned | 🟩 | **Planned** in `tier1-namespace-relocations`: move `TeamStatsCalculator` + `StrengthOfScheduleCalculator` into `BasketballStats`. Skipped by `check-plan-staleness` FP 2026-06-27 (`moved` cue unrecognized); re-queue pending. |
 | 2.31 | ⬜ Open | 🟩 | UI/ 1 interface of 15; add interfaces systematically. Additive. |
 | 2.32 | ⬜ Open | 🟩 | Api/ flatten `Middleware/Contracts/` + add Transformer/Response interfaces. Refactor+additive. |
 | 2.33 | ◑ Partial | 🟩 | `DebugController` added + sanitizeRedirect moved (see 2.16); residual: `DebugSession` still wraps `$_COOKIE/$_SERVER/getenv()` directly → inject. Green-green. |
@@ -776,7 +776,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 | 4.24 | ✅ Implemented | — | InjuriesRepository extracted (#970) (= 2.7). |
 | 4.25 | ✅ Implemented | — | →`Topics\News\NewsRepository` (ADR-0001). |
 | 4.26 | ⬜ Open | 🟩 | `Module/ModuleAccessControl` present (verified). Move/rename dir (access-control); green-green if behavior identical. |
-| 4.27 | ⬜ Open | 🟩 | `Updater/Steps/PreseasonCleanupRepository` present (verified). Move to Updater/ root; green-green. |
+| 4.27 | 📋 Planned | 🟩 | **Planned** in `tier1-namespace-relocations`: move `PreseasonCleanupRepository` to `Updater` root. Skipped by staleness FP 2026-06-27; re-queue pending. |
 
 ### 4.1 `Trading` vs `Trade` Prefix Within the Same Module
 **Location:** `ibl5/classes/Trading/`
@@ -1350,8 +1350,8 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 | 7.14 | ✅ Implemented | 🟩 | Extracted `Standings\PythagoreanCalculator` (pure `calculate()`); StandingsRepository delegates both call sites; green-green. |
 | 7.15 | ✅ Implemented | 🟩 | 8 map*/FIELD_MAP members (verified); PlayerRepository 622 LOC. Extract PlayerDataMapper/Hydrator; green-green. |
 | 7.16 | ✅ Implemented | — | Hidden caches dropped (#1040). |
-| 7.17 | ⬜ Open | 🟩 | `getPlayerNews`→nuke_stories cross-query. Annotate `@see` (trivial) or extract LegacyNewsRepository; green-green. |
-| 7.18 | ⬜ Open | 🟩 | Duplicate player-lookup JOINs (PlayerRepository vs CommonMysqli). Delegate one; green-green with characterization pin (column drift noted). |
+| 7.17 | 📋 Planned | 🟩 | **Planned** in `playerrepo-query-hygiene`: add `@see nuke_stories` annotation (no extraction). Skipped by `check-plan-staleness` FP 2026-06-28 (lowercase `new` cue unrecognized); re-queue pending. |
+| 7.18 | 📋 Planned | 🟩 | **Planned** in `playerrepo-query-hygiene`: shared player↔team JOIN trait (`PlayerTeamJoinQuery`). Skipped by staleness FP 2026-06-28; re-queue pending. |
 
 ### 7.1 `CommonMysqliRepository` Has No Interface
 **Location:** `ibl5/classes/Repositories/Contracts/` (interfaces extracted here)
@@ -1507,7 +1507,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 | 8.3 | ⬜ Open | 🟩 | kebab-case/`.sh` consistency. Rename + caller sweep (CI/hooks refs); green-green. |
 | 8.4 | ✅ Implemented | — | `shellScripts/` absent from tree + index (verified); follows 8.1. |
 | 8.5 | ◑ Partial | 🟩 | `tradition.php` deleted; `scripts/plrScratchpad.php` still present (verified) → archive it. |
-| 8.6 | ⬜ Open | 🟩 | `classes/Scripts/` present (verified); rename→`Maintenance`, namespace sweep, green-green. |
+| 8.6 | 📋 Planned | 🟩 | **Planned** in `tier1-namespace-relocations`: rename `Scripts` namespace dir → `Maintenance`. Skipped by staleness FP 2026-06-27; re-queue pending. |
 | 8.7 | ✅ Implemented | — | Document symlink strategy (docs). **Status:** Added `## Symlink strategy` to `bin/README.md` stating the convention (single tracked symlink `bin/db-query` → `ibl5/bin/db-query`; real files pinned to `ibl5/bin/` by the `./ibl5` Docker bind-mount; new symlinks discouraged) (this PR). |
 | 8.8 | ✅ Implemented | — | `scripts/archive/README.md` (docs). **Status:** Added `ibl5/scripts/archive/README.md` documenting the two retained-but-not-run 2007 box-score import scripts + the archive policy (this PR). |
 | 8.9 | ⬜ Open | 🟩 | bin/lib manifest + helper rename. |

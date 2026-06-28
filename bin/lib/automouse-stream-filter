@@ -1,18 +1,26 @@
 #!/bin/bash
-# Usage: claude ... --output-format stream-json | automouse-stream-filter <heartbeat_file> [<cmdpid_file>]
+# Usage: claude ... --output-format stream-json | automouse-stream-filter <heartbeat_file> [<cmdpid_file>] [<slug>]
 set -euo pipefail
 
-HEARTBEAT_FILE="${1:?Usage: automouse-stream-filter <heartbeat_file> [<cmdpid_file>]}"
+HEARTBEAT_FILE="${1:?Usage: automouse-stream-filter <heartbeat_file> [<cmdpid_file>] [<slug>]}"
 CMDPID_FILE="${2:-}"
+SLUG="${3:-}"
 TOOL_COUNT=0
 TURN_COUNT=1
 START_EPOCH=$(date +%s)
 
-elapsed_ts() {
-    local now
+# Line prefix: the elapsed timestamp, plus the active plan slug when one was
+# passed. Concurrent runners interleave into per-day logs, so the slug column
+# right after the timestamp says which plan each line belongs to.
+line_prefix() {
+    local now diff
     now=$(date +%s)
-    local diff=$(( now - START_EPOCH ))
-    printf '[%02d:%02d:%02d]' $(( diff / 3600 )) $(( (diff % 3600) / 60 )) $(( diff % 60 ))
+    diff=$(( now - START_EPOCH ))
+    if [ -n "$SLUG" ]; then
+        printf '[%02d:%02d:%02d] %s' $(( diff / 3600 )) $(( (diff % 3600) / 60 )) $(( diff % 60 )) "$SLUG"
+    else
+        printf '[%02d:%02d:%02d]' $(( diff / 3600 )) $(( (diff % 3600) / 60 )) $(( diff % 60 ))
+    fi
 }
 
 while IFS= read -r line; do
@@ -28,7 +36,7 @@ while IFS= read -r line; do
             ' 2>/dev/null) || true
             if [ -n "$tool_name" ]; then
                 TOOL_COUNT=$(( TOOL_COUNT + 1 ))
-                printf '%s tool: %s (#%d, turn %d)\n' "$(elapsed_ts)" "$tool_name" "$TOOL_COUNT" "$TURN_COUNT"
+                printf '%s tool: %s (#%d, turn %d)\n' "$(line_prefix)" "$tool_name" "$TOOL_COUNT" "$TURN_COUNT"
             fi
             ;;
         user)
@@ -47,7 +55,7 @@ while IFS= read -r line; do
             out_tokens=$(printf '%s' "$line" | jq -r '.usage.output_tokens // "?"' 2>/dev/null) || true
             cache_tokens=$(printf '%s' "$line" | jq -r '.usage.cache_read_input_tokens // "?"' 2>/dev/null) || true
             printf '%s exit: stop_reason=%s turns=%s tools=%d duration=%sms cost=$%s in=%s out=%s cache=%s\n' \
-                "$(elapsed_ts)" "$stop_reason" "$num_turns" "$TOOL_COUNT" "$duration_ms" \
+                "$(line_prefix)" "$stop_reason" "$num_turns" "$TOOL_COUNT" "$duration_ms" \
                 "$cost_usd" "$in_tokens" "$out_tokens" "$cache_tokens"
             # result is the final stream-json event — terminate claude and exit
             if [ -n "$CMDPID_FILE" ]; then

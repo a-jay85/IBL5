@@ -1,0 +1,22 @@
+@layer components {
+
+/* ==========================================================================
+   Sorted Column Highlight (Season & Career Leaderboards)
+
+   Highlights the column corresponding to the active sort dimension.
+   Applied via .sorted-col class on <th> and <td> elements.
+   ========================================================================== */
+
+.ibl-data-table th.sorted-col {
+    background: var(--navy-600);
+}
+
+.ibl-data-table td.sorted-col {
+    background-color: var(--accent-100);
+}
+
+.ibl-data-table tbody tr:hover td.sorted-col {
+    background-color: var(--accent-200);
+}
+
+} /* end @layer components */

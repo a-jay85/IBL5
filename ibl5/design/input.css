@@ -145,6 +145,7 @@
 @import './components/tables/player-movement.css';
 @import './components/tables/franchise-record-book.css';
 @import './components/tables/free-agency.css';
+@import './components/tables/leaderboards.css';
 @import './components/cards.css';
 @import './components/forms.css';
 @import './components/navigation.css';

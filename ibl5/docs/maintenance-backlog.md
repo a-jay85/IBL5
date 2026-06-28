@@ -269,7 +269,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 | 2.3 | ◑ Partial | — | FranchiseHistory Service built (#1091); PlayerMovement **declined** (single JOIN, pass-through ceremony). |
 | 2.4 | 🚫 Declined | — | **Status (2026-06-28):** Declined for GMContactList. Its `index.php` is single-repo passthrough (`getAllTeamContacts()` → render). The "match Topics (#1030)" premise is invalid: `TopicsService` orchestrates **two** repos (Topics + Search → `getPageData`) — real aggregation, not uniformity. No equivalent need here. |
 | 2.5 | ◑ Partial | 🟩 | **Status (2026-06-28):** Processor→Service rename **declined** — `BoxscoreProcessor` is a mutating .sco import pipeline (every method drives DB writes; consumed by Updater steps/BulkImport/scripts; no user-facing Boxscore page). Additive `BoxscoreViewInterface` half is 📋 planned in `tier1-module-architecture-scaffold` (staleness-skipped 2026-06-27, re-queue pending). |
-| 2.6 | ⬜ Open | 🟩 | Draft R+V+P+Vl, no Service; globals in index.php. Add Service + promote handler; green-green (M). |
+| 2.6 | ✅ Implemented | — | DraftService + DraftController extracted; index.php globals removed; green-green. |
 | 2.7 | ✅ Implemented | — | InjuriesRepository extracted+injected (#970). |
 | 2.8 | 🚫 Declined | — | Search + Standings: pass-through Service = dead code; declined. |
 | 2.9 | 🚫 Declined | — | `*ApiHandler` is the HTMX-fragment convention (9 handlers); rename declined. |
@@ -345,6 +345,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Add `DraftService`; promote `DraftSelectionHandler` to `DraftController` (or merge).
 **Est. effort:** M
 **Risk if untouched:** Globals untestable; `DraftSelectionHandler` confuses future contributors.
+**Status:** Completed (2026-06-28) — DraftService + DraftBoardData added; DraftSelectionHandler promoted to DraftController; userinfo()/main() globals removed from modules/Draft/index.php.
 
 ### 2.7 Injuries — No Repository Layer
 **Location:** `classes/Injuries/`

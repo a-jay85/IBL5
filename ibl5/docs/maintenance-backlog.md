@@ -604,7 +604,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 | 3.11 | ✅ Implemented | — | #1008 — example carries admin_file/IBL6_BASE_URL/DEMO_LOGIN_TOKEN (verified). |
 | 3.12 | ✅ Implemented | — | index.php thin shim. |
 | 3.13 | ✅ Implemented | — | Bootstrap\Application is composition root (ADR-0030). |
-| 3.14 | ⬜ Open | 🟩 | Verified `require $_SERVER['DOCUMENT_ROOT']...` at L5. One-line `require __DIR__`; green-green. |
+| 3.14 | ✅ Implemented | — | Shipped: `require __DIR__ . '/mainfile.php'`. |
 | 3.15 | ✅ Implemented | — | #1008 — test-state.php uses `prepare()`+`bind_param` (verified). |
 | 3.16 | ✅ Implemented | — | mainfile.php `filter()`/`addslashes` save=1 path gone. |
 | 3.17 | ✅ Implemented | — | modules.php reads `$_GET['name']` w/ regex + `===`. |
@@ -717,6 +717,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Change to `require __DIR__ . '/mainfile.php'`.
 **Est. effort:** S
 **Risk if untouched:** Mysterious auth failures in worktree dev.
+**Status:** Implemented (2026-06-28) — replaced `$_SERVER['DOCUMENT_ROOT']`-relative require with `__DIR__`-relative; fixes worktree auth bootstrap.
 
 ### 3.15 `test-state.php` String-Interpolated SQL
 **Location:** `ibl5/test-state.php:196-201, 246-248`
@@ -757,17 +758,17 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 | 4.5 | ⬜ Open | 🟨 | Player/PlayerDatabase/PlayerMovement still old-named (verified). Module rename breaks `modules.php?name=` URLs → upfront redirect/decision. |
 | 4.6 | ⬜ Open | 🟨 | PlayerMovement/TransactionHistory rename; same URL-break decision as 4.5. |
 | 4.7 | ✅ Implemented | — | →FreeAgencyOfferView (2026-05-17). |
-| 4.8 | ⬜ Open | 🟩 | Both `*DemandCalculator` present (verified). Internal class rename; green-green. |
+| 4.8 | ✅ Implemented | — | Renamed: `FreeAgencyMarketDemandCalculator` + `ExtensionContractDemandCalculator`. |
 | 4.9 | ✅ Implemented | — | `*ApiHandler` (module-local HTMX) vs `Api\Controller\*Controller` (REST) documented in `ibl5/docs/ARCHITECTURE_PATTERNS.md` (2026-06-22). |
 | 4.10 | ⬜ Open | 🟨 | DepthChartEntry/SavedDepthChart still old-named (verified). Module rename = URL break → decision. |
-| 4.11 | ⬜ Open | 🟩 | `TradeQueueProcessor` present (verified). Internal rename → `NightlyTradeBatchRunner`; green-green. |
+| 4.11 | ✅ Implemented | — | Renamed `TradeQueueProcessor` → `NightlyTradeBatchRunner`; no production caller. |
 | 4.12 | ✅ Implemented | — | car_to→car_tvr (migration 128). |
 | 4.13 | ✅ Implemented | — | car_tgm→car_3gm (migration 128). |
 | 4.14 | ✅ Implemented | — | Two-letter rating cols documented (#1039); `r_*` rename deferred (L). |
 | 4.15 | ✅ Implemented | — | cy/cyt documented (#1039); rename deferred. |
 | 4.16 | ✅ Implemented | — | bird/exp documented (#1039); rename deferred. |
 | 4.17 | ✅ Implemented | — | sh_/sp_/ch_/cp_ prefixes documented (#1039). |
-| 4.18 | ⬜ Open | 🟩 | `game_2gm/2ga` — NOT in the #1039 sweep (no marker). Add column COMMENTs (additive, idempotent migration); Tier-6 rename deferred (destructive). |
+| 4.18 | ✅ Implemented | — | Migration 121 added COMMENT to `game_2gm`/`game_2ga` on both `ibl_box_scores` and `ibl_box_scores_teams` (live DB confirmed 2026-06-28). |
 | 4.19 | ✅ Implemented | — | dc_* codes documented (#1039). |
 | 4.20 | ⬜ Open | 🟩 | `JSB.php` still root-level (verified). →`JsbConstants` into JsbParser/; namespace sweep, green-green (see 2.29). |
 | 4.21 | ⬜ Open | 🟩 | `JsbParser/JsbExportService` present (verified). Move to PlrParser/; green-green. |
@@ -834,6 +835,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** `FreeAgencyMarketDemandCalculator` and `ExtensionContractDemandCalculator`.
 **Est. effort:** S
 **Risk if untouched:** Demand logic copy-pasted between types; agents open the wrong class.
+**Status:** Implemented (2026-06-28) — renamed `FreeAgencyDemandCalculator`→`FreeAgencyMarketDemandCalculator` and `NegotiationDemandCalculator`→`ExtensionContractDemandCalculator` (concrete classes + interfaces + tests + PHPStan baseline regenerated).
 
 ### 4.9 `*ApiHandler` (Module-Local HTMX) vs `Api/Controller/*Controller` (REST)
 **Location:** 8 `*ApiHandler` classes in feature modules vs `Api/Controller/` subtree
@@ -856,6 +858,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Rename `TradeQueueProcessor` → `NightlyTradeBatchRunner`.
 **Est. effort:** S
 **Risk if untouched:** Batch logic bleeds into single-trade path or vice versa.
+**Status:** Implemented (2026-06-28) — renamed `TradeQueueProcessor`→`NightlyTradeBatchRunner` (no production caller; test renamed alongside).
 
 ### 4.12 `ibl_plr.car_to` vs `stats_tvr` — Turnover Intra-Table Inconsistency
 **Status:** Completed (2026-05-20) — migration 128 renamed `car_to` → `car_tvr` on `ibl_plr`, `ibl_plr_snapshots`, `ibl_olympics_plr`. `BanInconsistentColumnNamesRule` extended.
@@ -901,6 +904,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** ADR-0010 deferred to Tier 6; add schema column comments now.
 **Est. effort:** L (Tier 6)
 **Risk if untouched:** New SQL writes `game_fgm` (doesn't exist); silent wrong totals.
+**Status:** Already implemented — migration 121 (`121_snake_case_boxscore_and_schedule_columns.sql`) added `COMMENT 'Two-point field goals made/attempted'` to `game_2gm`/`game_2ga` on `ibl_box_scores` AND `ibl_box_scores_teams` (live DB confirmed 2026-06-28). The #1039-sweep marker was missing but DB comments predate this audit. Out of scope: `ibl_box_scores_engine_shadow*` (intentionally minimal mirror tables) and `ibl_olympics_box_scores*` (comments say "Field goals") — not the finding's named target; no migration authored.
 
 ### 4.19 `dc_of`, `dc_df`, `dc_oi`, `dc_di`, `dc_bh` Undocumented Depth-Chart Codes
 **Location:** `ibl_plr`, `ibl_saved_depth_chart_players`, `JsbParser/JsbImportRepository.php`
@@ -1916,7 +1920,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 | 10.12 | ✅ Implemented | 🟩 | `BanDirectMysqliQueryRule` landed; 7 Updater-step sites — burndown 🟩. **Status:** baseline cleared — 7 sites in 3 Refresh steps rerouted to `BaseMysqliRepository::execute()`. |
 | 10.13 | ✅ Implemented | 🟩 | `BanSqlStringInterpolationRule` landed; 32 baseline — burndown 🟩. |
 | 10.14 | 📋 Planned | 🟩 | PR #1160 open (`clock-abstraction-global-seam-ban-rule`): global Clock + ban direct time calls. L refactor, green-green. (Its "still open" note below is stale.) |
-| 10.15 | ⬜ Open | 🟩 | `echo ob_get_clean()` in DebugOutput — code fix; green-green. |
+| 10.15 | ✅ Implemented | — | Removed `ob_start()`/`echo ob_get_clean()` wrapper; output byte-identical (characterization-pinned). |
 | 10.16 | ✅ Implemented | — | unescapedOutput baseline cleared. |
 | 10.17 | ✅ Implemented | — | cookieBeforeHeader cleared (ADR-0032). |
 | 10.18 | ✅ Implemented | — | `BanServiceExtendsBaseRepositoryRule` (0). |
@@ -2045,6 +2049,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Code fix (not a rule); document in code review.
 **Est. effort:** S
 **Risk if untouched:** Nested output buffer corruption.
+**Status:** Implemented (2026-06-28) — removed `ob_start()`/`echo ob_get_clean()` wrapper in `UI/DebugOutput::display()` (inline HTML now emits directly; output byte-identical, characterization-pinned by `tests/UI/DebugOutputTest.php`).
 
 ### ~~10.16 `ibl.unescapedOutput` Baseline: 11 Entries Remaining~~ ✅ RESOLVED
 **Resolved:** 2026-05-17 via `xss-c-career-leaderboards-remainder`. All view-level baseline entries cleared across Plans A/B/C; 11 files now in zero-floor. Zero `ibl.unescapedOutput` entries remain in baseline.
@@ -2275,7 +2280,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 | 12.1 | ✅ Implemented | — | gitignore clarifying comment added. |
 | 12.2 | ✅ Implemented | — | `*.sch` gitignore + `!`-exceptions. |
 | 12.3 | 🚫 Declined | — | IBL5.lge kept tracked (test fixture); relocation deferred (🟩 if pursued). |
-| 12.4 | ⬜ Open | 🟩 | Schedule.htm → gitignored backups/ + repoint ScheduleUpdater; verify pipeline reads new path. |
+| 12.4 | ⬜ Open | 🟨 | Deferred — delivery is via tracked git commits (see Status). |
 | 12.5 | ⬜ Open | 🟨 | Standings.htm — upfront: verify legacy view unused → delete + redirect. |
 | 12.6 | ✅ Implemented | — | tests-baseline reduced 9519→7557 (2026-05-16). |
 | 12.7 | ⬜ Open | 🟨 | VR PNG baselines — infra decision (Git LFS vs force-updated baselines branch). |
@@ -2317,6 +2322,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Move to ibl5/backups/ (gitignored); have ScheduleUpdater source from there.
 **Est. effort:** M
 **Risk if untouched:** Weekly merge conflicts during active season; ongoing bloat.
+**Status:** Deferred (verified 2026-06-28) — `ibl/IBL/Schedule.htm` is delivered to the runtime by tracked git commits (86 "Update sim files" commits), not out-of-band; gitignoring/moving it removes it from any git-fed runtime, and `ScheduleUpdater::insertPlayoffGamesFromScheduleHtm()` guards only the absent-file case, so a stale/relocated copy would parse silently-wrong playoff data. A safe fix must first route `Schedule.htm` through the archive-first `JsbSourceResolver` (carry it inside the uploaded backup archive like `.sch`/`.lge`) — M-effort architecture change, reclassified 🟨 conditional; not a green-green micro-fix.
 
 ### 12.5 `ibl5/ibl/IBL/Standings.htm` — Orphaned Legacy View
 **Location:** `ibl5/ibl/IBL/Standings.htm`

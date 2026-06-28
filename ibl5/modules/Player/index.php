@@ -12,7 +12,7 @@ use RookieOption\RookieOptionView;
 use RookieOption\RookieOptionController;
 use Repositories\TeamIdentityRepository;
 use Repositories\SalaryCapRepository;
-use Negotiation\NegotiationDemandCalculator;
+use Negotiation\ExtensionContractDemandCalculator;
 use Negotiation\NegotiationRepository;
 use Negotiation\NegotiationService;
 use Negotiation\NegotiationValidator;
@@ -88,7 +88,7 @@ function negotiate($playerID)
         $mysqli_db,
         new NegotiationRepository($mysqli_db, $salaryCapRepo),
         new NegotiationValidator($mysqli_db),
-        new NegotiationDemandCalculator($mysqli_db, $salaryCapRepo),
+        new ExtensionContractDemandCalculator($mysqli_db, $salaryCapRepo),
     );
     echo $service->processNegotiation($playerID, $userTeamName, $prefix, $bypassOwnership);
 

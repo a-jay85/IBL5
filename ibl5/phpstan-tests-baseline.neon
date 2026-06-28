@@ -241,10 +241,10 @@ parameters:
 			path: tests/FreeAgency/FreeAgencyAdminProcessorTest.php
 
 		-
-			rawMessage: 'Parameter #2 $teamFactors of method Negotiation\NegotiationDemandCalculator::calculateDemands() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{} given.'
+			rawMessage: 'Parameter #2 $teamFactors of method Negotiation\ExtensionContractDemandCalculator::calculateDemands() expects array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}, array{} given.'
 			identifier: argument.type
 			count: 1
-			path: tests/Negotiation/NegotiationDemandCalculatorTest.php
+			path: tests/Negotiation/ExtensionContractDemandCalculatorTest.php
 
 		-
 			rawMessage: 'Parameter #1 $plrRow of method Player\PlayerDataMapper::fillFromCurrentRow() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ..., ...<string, mixed>}, non-empty-array<string, mixed> given.'
@@ -377,6 +377,12 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: tests/Trading/TradeValidatorTest.php
+
+		-
+			rawMessage: 'Dynamic call to static method PHPUnit\Framework\TestCase::createStub().'
+			identifier: staticMethod.dynamicCall
+			count: 2
+			path: tests/UI/DebugOutputTest.php
 
 		-
 			rawMessage: 'Parameter #2 $result of static method UI\Tables\PlayerRowTransformer::resolveWithStats() expects iterable<int, array<string, mixed>|Player\Player>, array<int, stdClass> given.'

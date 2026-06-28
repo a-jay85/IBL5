@@ -4,24 +4,24 @@ declare(strict_types=1);
 
 namespace Negotiation;
 
-use Negotiation\Contracts\NegotiationDemandCalculatorInterface;
+use Negotiation\Contracts\ExtensionContractDemandCalculatorInterface;
 use Negotiation\Contracts\NegotiationRepositoryInterface;
 use Player\Player;
 use Repositories\Contracts\SalaryCapRepositoryInterface;
 
 /**
- * @see NegotiationDemandCalculatorInterface
+ * @see ExtensionContractDemandCalculatorInterface
  *
- * @phpstan-import-type TeamFactors from NegotiationDemandCalculatorInterface
- * @phpstan-import-type DemandResult from NegotiationDemandCalculatorInterface
- * @phpstan-import-type DemandsBreakdown from NegotiationDemandCalculatorInterface
- * @phpstan-import-type RatingBreakdown from NegotiationDemandCalculatorInterface
- * @phpstan-import-type ModifierBreakdown from NegotiationDemandCalculatorInterface
+ * @phpstan-import-type TeamFactors from ExtensionContractDemandCalculatorInterface
+ * @phpstan-import-type DemandResult from ExtensionContractDemandCalculatorInterface
+ * @phpstan-import-type DemandsBreakdown from ExtensionContractDemandCalculatorInterface
+ * @phpstan-import-type RatingBreakdown from ExtensionContractDemandCalculatorInterface
+ * @phpstan-import-type ModifierBreakdown from ExtensionContractDemandCalculatorInterface
  * @phpstan-type RatingMap array{fga: int, fgp: int, fta: int, ftp: int, tga: int, tgp: int, orb: int, drb: int, ast: int, stl: int, tov: int, blk: int, foul: int, oo: int, od: int, do: int, dd: int, po: int, pd: int, to: int, td: int}
  * @phpstan-type MarketMaximums array{fga: int, fgp: int, fta: int, ftp: int, tga: int, tgp: int, orb: int, drb: int, ast: int, stl: int, tov: int, blk: int, foul: int, oo: int, od: int, do: int, dd: int, po: int, pd: int, to: int, td: int}
  * @phpstan-type BaseDemands array{dem1: float, dem2: float, dem3: float, dem4: float, dem5: float, dem6: int}
  */
-class NegotiationDemandCalculator implements NegotiationDemandCalculatorInterface
+class ExtensionContractDemandCalculator implements ExtensionContractDemandCalculatorInterface
 {
     private NegotiationRepositoryInterface $repository;
 
@@ -35,7 +35,7 @@ class NegotiationDemandCalculator implements NegotiationDemandCalculatorInterfac
     }
     
     /**
-     * @see NegotiationDemandCalculatorInterface::calculateDemands()
+     * @see ExtensionContractDemandCalculatorInterface::calculateDemands()
      *
      * @param Player $player The player object with ratings and stats
      * @param TeamFactors $teamFactors Team factors affecting demands
@@ -94,7 +94,7 @@ class NegotiationDemandCalculator implements NegotiationDemandCalculatorInterfac
     ];
 
     /**
-     * @see NegotiationDemandCalculatorInterface::calculateDemandsWithBreakdown()
+     * @see ExtensionContractDemandCalculatorInterface::calculateDemandsWithBreakdown()
      *
      * @param Player $player The player object with ratings and stats
      * @param TeamFactors $teamFactors Team factors affecting demands

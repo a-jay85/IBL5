@@ -8,7 +8,7 @@ use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Trading\Contracts\TradeExecutionRepositoryInterface;
 
 /**
- * TradeQueueProcessor - Executes queued trade operations
+ * NightlyTradeBatchRunner - Executes queued trade operations
  *
  * During certain season phases (Playoffs, Draft, Free Agency), trades are queued
  * rather than executed immediately. This class processes the queue by executing
@@ -18,7 +18,7 @@ use Trading\Contracts\TradeExecutionRepositoryInterface;
  * @phpstan-type PlayerTransferParams array{player_id: int, team_id: int}
  * @phpstan-type PickTransferParams array{pick_id: int, new_owner: string, new_owner_id?: int}
  */
-class TradeQueueProcessor
+class NightlyTradeBatchRunner
 {
     private TradeExecutionRepositoryInterface $executionRepository;
     private TeamIdentityRepositoryInterface $commonRepository;

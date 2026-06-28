@@ -6,7 +6,7 @@ namespace Tests\WideUnit\Negotiation;
 
 use Tests\WideUnit\WideUnitTestCase;
 use Tests\WideUnit\Mocks\TestDataFactory;
-use Negotiation\NegotiationDemandCalculator;
+use Negotiation\ExtensionContractDemandCalculator;
 use Negotiation\NegotiationRepository;
 use Negotiation\NegotiationService;
 use Negotiation\NegotiationValidator;
@@ -24,7 +24,7 @@ use Repositories\Contracts\SalaryCapRepositoryInterface;
  *
  * @covers \Negotiation\NegotiationService
  * @covers \Negotiation\NegotiationValidator
- * @covers \Negotiation\NegotiationDemandCalculator
+ * @covers \Negotiation\ExtensionContractDemandCalculator
  * @covers \Negotiation\NegotiationRepository
  */
 class NegotiationWideUnitTest extends WideUnitTestCase
@@ -45,7 +45,7 @@ class NegotiationWideUnitTest extends WideUnitTestCase
             $db,
             new NegotiationRepository($db, $commonRepo),
             new NegotiationValidator($db, $this->mockSeason),
-            new NegotiationDemandCalculator($db, $commonRepo),
+            new ExtensionContractDemandCalculator($db, $commonRepo),
         );
 
         // Prevent any external calls during tests

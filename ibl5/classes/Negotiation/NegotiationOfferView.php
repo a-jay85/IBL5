@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Negotiation;
 
 use League\League;
-use Negotiation\Contracts\NegotiationDemandCalculatorInterface;
+use Negotiation\Contracts\ExtensionContractDemandCalculatorInterface;
 use Negotiation\Contracts\NegotiationOfferViewInterface;
 use Player\Player;
 use Security\HtmlSanitizer;
@@ -13,7 +13,7 @@ use Security\HtmlSanitizer;
 /**
  * @see NegotiationOfferViewInterface
  *
- * @phpstan-import-type DemandResult from NegotiationDemandCalculatorInterface
+ * @phpstan-import-type DemandResult from ExtensionContractDemandCalculatorInterface
  */
 class NegotiationOfferView implements NegotiationOfferViewInterface
 {

@@ -7,9 +7,9 @@ namespace Tests\Trading;
 use PHPUnit\Framework\TestCase;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Trading\Contracts\TradeExecutionRepositoryInterface;
-use Trading\TradeQueueProcessor;
+use Trading\NightlyTradeBatchRunner;
 
-class TradeQueueProcessorTest extends TestCase
+class NightlyTradeBatchRunnerTest extends TestCase
 {
     private TeamIdentityRepositoryInterface $stubCommonRepo;
 
@@ -26,7 +26,7 @@ class TradeQueueProcessorTest extends TestCase
     {
         $stub = self::createStub(TradeExecutionRepositoryInterface::class);
         $stub->method('getQueuedTrades')->willReturn([]);
-        $processor = new TradeQueueProcessor($stub, $this->stubCommonRepo);
+        $processor = new NightlyTradeBatchRunner($stub, $this->stubCommonRepo);
 
         $result = $processor->processQueue();
 
@@ -53,7 +53,7 @@ class TradeQueueProcessorTest extends TestCase
             ->method('deleteQueuedTrade')
             ->with(1);
 
-        $processor = new TradeQueueProcessor($mock, $this->stubCommonRepo);
+        $processor = new NightlyTradeBatchRunner($mock, $this->stubCommonRepo);
         $result = $processor->processQueue();
 
         $this->assertSame(1, $result['processed']);
@@ -70,7 +70,7 @@ class TradeQueueProcessorTest extends TestCase
         $mock->method('executeQueuedPlayerTransfer')->willReturn(0);
         $mock->expects($this->never())->method('deleteQueuedTrade');
 
-        $processor = new TradeQueueProcessor($mock, $this->stubCommonRepo);
+        $processor = new NightlyTradeBatchRunner($mock, $this->stubCommonRepo);
         $result = $processor->processQueue();
 
         $this->assertSame(0, $result['processed']);
@@ -86,7 +86,7 @@ class TradeQueueProcessorTest extends TestCase
         $mock->method('getQueuedTrades')->willReturn([$trade]);
         $mock->expects($this->never())->method('deleteQueuedTrade');
 
-        $processor = new TradeQueueProcessor($mock, $this->stubCommonRepo);
+        $processor = new NightlyTradeBatchRunner($mock, $this->stubCommonRepo);
         $result = $processor->processQueue();
 
         $this->assertSame(1, $result['failed']);
@@ -109,7 +109,7 @@ class TradeQueueProcessorTest extends TestCase
             ->willReturn(1);
         $mock->expects($this->once())->method('deleteQueuedTrade')->with(2);
 
-        $processor = new TradeQueueProcessor($mock, $this->stubCommonRepo);
+        $processor = new NightlyTradeBatchRunner($mock, $this->stubCommonRepo);
         $result = $processor->processQueue();
 
         $this->assertSame(1, $result['processed']);
@@ -123,7 +123,7 @@ class TradeQueueProcessorTest extends TestCase
         $stub->method('getQueuedTrades')->willReturn([$trade]);
         $stub->method('executeQueuedPickTransfer')->willReturn(0);
 
-        $processor = new TradeQueueProcessor($stub, $this->stubCommonRepo);
+        $processor = new NightlyTradeBatchRunner($stub, $this->stubCommonRepo);
         $result = $processor->processQueue();
 
         $this->assertSame(1, $result['failed']);
@@ -137,7 +137,7 @@ class TradeQueueProcessorTest extends TestCase
         $stub = self::createStub(TradeExecutionRepositoryInterface::class);
         $stub->method('getQueuedTrades')->willReturn([$trade]);
 
-        $processor = new TradeQueueProcessor($stub, $this->stubCommonRepo);
+        $processor = new NightlyTradeBatchRunner($stub, $this->stubCommonRepo);
         $result = $processor->processQueue();
 
         $this->assertSame(1, $result['failed']);
@@ -160,7 +160,7 @@ class TradeQueueProcessorTest extends TestCase
         $stub = self::createStub(TradeExecutionRepositoryInterface::class);
         $stub->method('getQueuedTrades')->willReturn([$trade]);
 
-        $processor = new TradeQueueProcessor($stub, $this->stubCommonRepo);
+        $processor = new NightlyTradeBatchRunner($stub, $this->stubCommonRepo);
         $result = $processor->processQueue();
 
         $this->assertSame(1, $result['failed']);
@@ -174,7 +174,7 @@ class TradeQueueProcessorTest extends TestCase
         $stub = self::createStub(TradeExecutionRepositoryInterface::class);
         $stub->method('getQueuedTrades')->willReturn([$trade]);
 
-        $processor = new TradeQueueProcessor($stub, $this->stubCommonRepo);
+        $processor = new NightlyTradeBatchRunner($stub, $this->stubCommonRepo);
         $result = $processor->processQueue();
 
         $this->assertSame(1, $result['failed']);
@@ -202,7 +202,7 @@ class TradeQueueProcessorTest extends TestCase
             ]);
         $stub->method('executeQueuedPickTransfer')->willReturn(1);
 
-        $processor = new TradeQueueProcessor($stub, $this->stubCommonRepo);
+        $processor = new NightlyTradeBatchRunner($stub, $this->stubCommonRepo);
         $result = $processor->processQueue();
 
         $this->assertSame(2, $result['processed']);

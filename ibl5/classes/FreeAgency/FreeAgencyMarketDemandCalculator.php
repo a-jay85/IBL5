@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace FreeAgency;
 
-use FreeAgency\Contracts\FreeAgencyDemandCalculatorInterface;
+use FreeAgency\Contracts\FreeAgencyMarketDemandCalculatorInterface;
 use FreeAgency\Contracts\FreeAgencyDemandRepositoryInterface;
 use Player\Player;
 
 /**
- * @see FreeAgencyDemandCalculatorInterface
+ * @see FreeAgencyMarketDemandCalculatorInterface
  *
- * @phpstan-import-type CalculationResult from FreeAgencyDemandCalculatorInterface
+ * @phpstan-import-type CalculationResult from FreeAgencyMarketDemandCalculatorInterface
  */
-class FreeAgencyDemandCalculator implements FreeAgencyDemandCalculatorInterface
+class FreeAgencyMarketDemandCalculator implements FreeAgencyMarketDemandCalculatorInterface
 {
     private const SECURITY_BASE_FACTOR = -0.025;
     private const SECURITY_YEAR_FACTOR = 0.01;
@@ -30,7 +30,7 @@ class FreeAgencyDemandCalculator implements FreeAgencyDemandCalculatorInterface
     }
 
     /**
-     * @see FreeAgencyDemandCalculatorInterface::setRandomFactor()
+     * @see FreeAgencyMarketDemandCalculatorInterface::setRandomFactor()
      */
     public function setRandomFactor(?int $factor): void
     {
@@ -38,7 +38,7 @@ class FreeAgencyDemandCalculator implements FreeAgencyDemandCalculatorInterface
     }
 
     /**
-     * @see FreeAgencyDemandCalculatorInterface::calculatePerceivedValue()
+     * @see FreeAgencyMarketDemandCalculatorInterface::calculatePerceivedValue()
      *
      * @return CalculationResult
      */

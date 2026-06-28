@@ -50,10 +50,10 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 | Status | Count |
 |--------|------:|
-| ✅ Implemented | ~169 |
+| ✅ Implemented | ~171 |
 | ◑ Partial | ~20 |
 | 📋 Planned (plan/PR open: 2.13, 2.17, 10.14) | 3 |
-| ⬜ Open | ~114 |
+| ⬜ Open | ~112 |
 | 🚫 Declined | 6 |
 
 **Automouse-readiness of the not-yet-complete (⬜/◑/📋) items:**
@@ -2409,14 +2409,14 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 |---|--------|-----------|-----------------|
 | 13.1 | ✅ Implemented | — | PlayerSeasonTableRenderer extracted. |
 | 13.2 | ✅ Implemented | — | Merged into 13.1. |
-| 13.3 | ⬜ Open | 🟩 | game_of_that_day subquery ×5 → `vw_game_box_id` view / BaseMysqliRepository helper; green-green. |
+| 13.3 | ✅ Implemented | — | **Status:** Done (verified 2026-06-28, no plan — stale-Open) — `BaseMysqliRepository::gameOfThatDaySubquery()` (the protected-helper option of the suggested direction) is used by all 5 sites; zero inline `MIN(game_of_that_day)` copies remain. |
 | 13.4 | ⬜ Open | 🟨 | `CommonContractValidator` deleted (Services/ gone) → re-identify/extract the shared CBA comparator first (upfront decision), then delegate. |
 | 13.5 | ✅ Implemented | — | #1033. |
 | 13.6 | ✅ Implemented | — | #1033. |
 | 13.7 | ◑ Partial | 🟩 | Waivers/Draft → ValidationResult (Strategy A); remainder is 13.7b. Done part green-green. |
 | 13.7b | ⬜ Open | 🟨 | Needs `ValidationError`/`ValidationResultWithContext` type design (Depth/Trade carry structured + cap-total payloads) before the sweep. |
 | 13.8 | ✅ Implemented | — | retired filter standardized to `= 0` (2026-06-05). |
-| 13.9 | ⬜ Open | 🟦 | 4 team-color CSS var sets → one sanitizing `TableStyles::inlineTeamVars()`. Touches hex-injection sanitization (output-security surface) + VR → human-merge. |
+| 13.9 | ✅ Implemented | — | **Status:** Done (verified 2026-06-28, no plan — stale-Open) — sanitizing `TableStyles::inlineTeamVars()` is the canonical helper (adopted ~9 sites incl. `BannersView`); the old var schemes are now CSS aliases (`design/CSS_TABLE_MAP.md`); `--team-cell-bg` is emitted by the separate sanitizing `TeamCellHelper` (renders a full `<td>`). Hex-injection closed at every site. |
 | 13.10 | 🚫 Declined | — | Premise invalid: Career/Season `processPlayerRow` return arrays differ in key membership, order, and value-type (22 vs 44 keys) — no shared surface to extract. Doc-only closure, no code. |
 | 13.11 | ✅ Implemented | — | cleanName subquery extracted (2026-06-05). |
 | 13.12 | ⬜ Open | 🟩 | player↔team JOIN ×15 → `vw_players_with_team`/helper; green-green, opportunistic (L). |
@@ -2436,6 +2436,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Promote to a SQL view (`vw_game_box_id`) or a protected static helper on `BaseMysqliRepository` (following `buildOffenseSubquery`).
 **Est. effort:** S
 **Risk if untouched:** Dedup logic change requires updating 5 copies.
+**Status:** ✅ Implemented (verified 2026-06-28) — the protected-helper option was taken: `BaseMysqliRepository::gameOfThatDaySubquery()` returns the canonical derived-table fragment, called from `LeagueScheduleRepository`, `TeamScheduleRepository`, and `RecordHoldersRepository` (3 methods). No inline `MIN(game_of_that_day)` copies remain outside the helper. The doc had this stale-Open (no plan owned it).
 
 ### 13.4 `FreeAgencyOfferValidator` Duplicates `CommonContractValidator`
 **Location:** `FreeAgency/FreeAgencyOfferValidator.php` (private methods). NOTE (2026-05-29 audit): the originally-cited `Services/CommonContractValidator.php` no longer exists (`Services/` was deleted, see [[2.22]]) — the shared comparator must be re-identified or extracted fresh.
@@ -2490,6 +2491,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Canonical variable names + single `TableStyles::inlineTeamVars(string $c1, string $c2)` method with sanitization. Component-specific names become CSS aliases.
 **Est. effort:** M
 **Risk if untouched:** Hex-injection bypass through unsanitized site; CSS variable rename breaks only one variant.
+**Status:** ✅ Implemented (verified 2026-06-28) — `UI\TableStyles::inlineTeamVars()` emits canonical `--team-color-primary`/`--team-color-secondary`, sanitizing each via `sanitizeColor()` (hex regex, `000000` fallback). Adopted across `TableViewDropdown`, `TableViewSwitcher`, `TeamScheduleView`, `BannersView`, `NextSimView`, `TeamCardRenderer`, `Ratings`, `Contracts`. The four old naming schemes are CSS aliases (`design/CSS_TABLE_MAP.md`: `--team-tab-bg-color`/`--banner-primary` → `var(--team-color-primary)`). The `--team-cell-bg`/`--team-cell-color` pair is emitted by the separate `TeamCellHelper` (also sanitized) because it renders a whole `<td>`, not just the vars — a deliberate second helper, not an unsanitized site. The hex-injection risk that drove the 🟦 human-merge tag is therefore fully closed; the doc had this stale-Open.
 
 ### 13.10 `CareerLeaderboards` vs `SeasonLeaderboards` Stat-Row Formatting Diverges
 **Status:** 🚫 Declined (2026-06-24) — premise invalid. The two services' `processPlayerRow` return arrays are disjoint: Career's `FormattedPlayerStats` (22 keys, percentages interleaved, `pts`/`drb`, all values formatted strings, retired `*` appended) vs Season's `ProcessedStats` (44 keys, raw-totals block then grouped percentages then a per-game `mpg…ppg` block, `points`/`drebpg`, raw ints, plus `year`/`teamname`/team-color/`qa`). They differ in key membership, order, AND per-key value-type; the only identical residue is the `pid` passthrough. No shared `STAT_COLUMNS`/`assembleRow` surface exists, so no `StatRowFormatter` was extracted — forcing one would be cosmetic co-location that raises (not lowers) maintenance cost. The premise that both "iterate the same 18-stat-column set" is also false: neither service iterates a column list (both write positional array literals).

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Security;
 
+use Clock\ClockInterface;
+use Clock\SystemClock;
+
 /**
  * CSRF (Cross-Site Request Forgery) Protection Utility
  *
@@ -35,6 +38,25 @@ class CsrfGuard
      * Maximum number of tokens to store per session
      */
     private const MAX_TOKENS = 10;
+
+    /**
+     * Injectable clock for deterministic token-expiry testing.
+     * Null = system clock (production default).
+     */
+    private static ?ClockInterface $clock = null;
+
+    /**
+     * Override the clock for testing. Pass null to restore the system clock.
+     */
+    public static function setTestClock(?ClockInterface $clock): void
+    {
+        self::$clock = $clock;
+    }
+
+    private static function clock(): ClockInterface
+    {
+        return self::$clock ?? new SystemClock();
+    }
 
     /**
      * Generate a CSRF token and return as HTML hidden input
@@ -95,7 +117,7 @@ class CsrfGuard
 
         foreach ($tokens as $index => $tokenData) {
             // Check expiration
-            if (time() > $tokenData['expires']) {
+            if (self::clock()->now() > $tokenData['expires']) {
                 continue;
             }
 
@@ -206,7 +228,7 @@ class CsrfGuard
         // Add new token
         $allTokens[$formName][] = [
             'token' => $token,
-            'expires' => time() + self::TOKEN_EXPIRATION,
+            'expires' => self::clock()->now() + self::TOKEN_EXPIRATION,
         ];
 
         // Store back
@@ -260,7 +282,7 @@ class CsrfGuard
             return;
         }
 
-        $currentTime = time();
+        $currentTime = self::clock()->now();
         $tokens = $allTokens[$formName];
 
         // Remove expired tokens

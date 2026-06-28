@@ -2,9 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Api\Middleware;
-
-use Api\Middleware\Contracts\ClockInterface;
+namespace Clock;
 
 class SystemClock implements ClockInterface
 {

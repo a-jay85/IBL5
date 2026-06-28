@@ -156,3 +156,7 @@ services:
         class: PHPStanRules\BanBareColumnIdentifierRule
         tags:
             - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanDirectTimeCallsRule
+        tags:
+            - phpstan.rules.rule

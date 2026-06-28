@@ -37,7 +37,11 @@ class DraftEntryPointTest extends ModuleEntryPointTestCase
             'user' => $GLOBALS['user'],
         ]);
 
-        $this->assertNotEmpty($output);
+        $this->assertStringContainsString('class="draft-container"', $output);
+        $this->assertStringContainsString('<h1 class="ibl-title">Draft</h1>', $output);
+        $this->assertStringContainsString("action='/ibl5/modules.php?name=Draft&amp;op=select'", $output);
+        $this->assertStringContainsString('class="team-logo-banner"', $output);
+        $this->assertStringContainsString('draft-table', $output);
     }
 
     public function testUnknownOpFallsToMain(): void
@@ -46,7 +50,16 @@ class DraftEntryPointTest extends ModuleEntryPointTestCase
             'user' => $GLOBALS['user'],
         ]);
 
-        $this->assertNotEmpty($output);
+        $this->assertStringContainsString('class="draft-container"', $output);
+    }
+
+    public function testSelectOpWithoutPlayerReturnsValidationError(): void
+    {
+        $output = $this->runModule('Draft', ['op' => 'select'],
+            ['teamname' => 'Test', 'draft_round' => '1', 'draft_pick' => '1'],
+            ['user' => $GLOBALS['user']]);
+
+        $this->assertStringContainsString('select a player', $output);
     }
 
     /**

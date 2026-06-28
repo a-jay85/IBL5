@@ -445,6 +445,23 @@ PLANS_RUN=0
 
 echo "=== Automouse session starting at $(date) ===" >> "$LOG"
 
+# Freshen the reference checkout's master so the self-heal staleness guard below
+# sees origin's latest — a re-created file or a widened guard only exists locally
+# once pulled. automouse-run has no other top-of-run pull (the per-plan pull in
+# automouse-prompt-impl runs AFTER this and never when the queue holds only
+# skipped plans), so without this the empty-queue recovery case never advances
+# master and the FP is never seen. ff-only never diverges the read-only main
+# checkout (ADR-0062); both lines are non-fatal so a fetch hiccup can't abort the
+# night.
+git -C "$REPO" fetch origin master >> "$LOG" 2>&1 || true
+git -C "$REPO" merge --ff-only origin/master >> "$LOG" 2>&1 || true
+
+# Self-heal: requeue staleness-skipped plans whose guard now passes. Runs BEFORE
+# archival so a marked plan isn't swept into skipped.archive/ first. Non-fatal
+# (|| true): a self-heal hiccup must never abort the night (mirrors the || true
+# on the archive_stale block).
+"$REPO/bin/automouse-self-heal" >> "$LOG" 2>&1 || true
+
 # Startup archival: shrink the accumulating output dirs by moving entries idle
 # for $ARCHIVE_AGE_DAYS into sibling `.archive/` folders. queue/ (pending work,
 # iterated below) and handoff/ (transient, cleaned at loop end) are excluded by

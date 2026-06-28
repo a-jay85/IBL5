@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# Regression harness for bin/automouse-self-heal.
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT="$SCRIPT_DIR/automouse-self-heal"
+
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+NDIR="$TMP/automouse"
+PDIR="$TMP/plans"
+
+FAILED=0
+
+setup() {
+    rm -rf "$NDIR"
+    mkdir -p "$NDIR/queue" "$NDIR/skipped" "$NDIR/done" "$NDIR/reports"
+    rm -rf "$PDIR"
+    mkdir -p "$PDIR"
+}
+
+assert_present() {
+    local label=$1 path=$2
+    if [ ! -e "$path" ]; then
+        echo "FAIL: $label — expected present: $path"
+        FAILED=1
+    fi
+}
+
+assert_absent() {
+    local label=$1 path=$2
+    if [ -e "$path" ]; then
+        echo "FAIL: $label — expected absent: $path"
+        FAILED=1
+    fi
+}
+
+# Stub guard: exit 0 when basename contains "fresh", else exit 1.
+cat > "$TMP/stub-guard" <<'GUARD_EOF'
+#!/usr/bin/env bash
+case "$(basename "${1:-}")" in
+  *fresh*) exit 0 ;;
+  *)       exit 1 ;;
+esac
+GUARD_EOF
+chmod +x "$TMP/stub-guard"
+
+run_heal() {
+    NIGHTLY_DIR="$NDIR" PLANS_DIR="$PDIR" STALENESS_GUARD="$TMP/stub-guard" "$SCRIPT" "$@"
+}
+
+# ---------------------------------------------------------------------------
+# Row 1 — POSITIVE (healable): staleness-marked plan passes guard → requeued
+# ---------------------------------------------------------------------------
+setup
+touch "$PDIR/plan-fresh.md"
+ln -s "$PDIR/plan-fresh.md" "$NDIR/skipped/plan-fresh.md"
+touch "$NDIR/skipped/plan-fresh.md.staleness"
+run_heal >/dev/null 2>&1
+assert_absent  "row1 skipped symlink gone"  "$NDIR/skipped/plan-fresh.md"
+assert_present "row1 queued"                "$NDIR/queue/plan-fresh.md"
+assert_absent  "row1 staleness marker gone" "$NDIR/skipped/plan-fresh.md.staleness"
+echo "ok: row1 — POSITIVE healable"
+
+# ---------------------------------------------------------------------------
+# Row 2 — NEGATIVE (still-stale): marked plan fails guard → stays in skipped/
+# ---------------------------------------------------------------------------
+setup
+touch "$PDIR/plan-stale.md"
+ln -s "$PDIR/plan-stale.md" "$NDIR/skipped/plan-stale.md"
+touch "$NDIR/skipped/plan-stale.md.staleness"
+run_heal >/dev/null 2>&1
+assert_present "row2 skipped stays"         "$NDIR/skipped/plan-stale.md"
+assert_absent  "row2 not queued"            "$NDIR/queue/plan-stale.md"
+assert_present "row2 marker retained"       "$NDIR/skipped/plan-stale.md.staleness"
+echo "ok: row2 — NEGATIVE still-stale"
+
+# ---------------------------------------------------------------------------
+# Row 3 — NEGATIVE (core safety, no marker): guard would pass but NO marker → not requeued
+# ---------------------------------------------------------------------------
+setup
+touch "$PDIR/plan-fresh-nomarker.md"
+ln -s "$PDIR/plan-fresh-nomarker.md" "$NDIR/skipped/plan-fresh-nomarker.md"
+# deliberately NO .staleness marker
+run_heal >/dev/null 2>&1
+assert_present "row3 skipped stays"   "$NDIR/skipped/plan-fresh-nomarker.md"
+assert_absent  "row3 not queued"      "$NDIR/queue/plan-fresh-nomarker.md"
+echo "ok: row3 — NEGATIVE core safety (no marker, not recovered)"
+
+# ---------------------------------------------------------------------------
+# Row 4 — DRY-RUN: healable plan listed but not moved, no report written
+# ---------------------------------------------------------------------------
+setup
+touch "$PDIR/plan-fresh-dry.md"
+ln -s "$PDIR/plan-fresh-dry.md" "$NDIR/skipped/plan-fresh-dry.md"
+touch "$NDIR/skipped/plan-fresh-dry.md.staleness"
+out=$(run_heal --dry-run 2>&1)
+assert_present "row4 skipped still present" "$NDIR/skipped/plan-fresh-dry.md"
+assert_absent  "row4 not queued"            "$NDIR/queue/plan-fresh-dry.md"
+assert_present "row4 marker still present"  "$NDIR/skipped/plan-fresh-dry.md.staleness"
+if ! echo "$out" | grep -q "would heal"; then
+    echo "FAIL: row4 — expected 'would heal' in dry-run output, got: $out"
+    FAILED=1
+fi
+if ls "$NDIR/reports/"*-self-heal.md >/dev/null 2>&1; then
+    echo "FAIL: row4 — report must not be written in dry-run mode"
+    FAILED=1
+fi
+echo "ok: row4 — DRY-RUN"
+
+# ---------------------------------------------------------------------------
+# Row 5 — EDGE (empty skipped/): no-op, exit 0
+# ---------------------------------------------------------------------------
+setup
+rc=0
+run_heal >/dev/null 2>&1 || rc=$?
+if [ "$rc" -ne 0 ]; then
+    echo "FAIL: row5 — expected exit 0 on empty skipped/, got $rc"
+    FAILED=1
+fi
+echo "ok: row5 — EDGE empty skipped/"
+
+# ---------------------------------------------------------------------------
+# Row 6 — CLEANUP: .attempts + .staleness sidecars gone after requeue
+# ---------------------------------------------------------------------------
+setup
+touch "$PDIR/plan-fresh-clean.md"
+ln -s "$PDIR/plan-fresh-clean.md" "$NDIR/skipped/plan-fresh-clean.md"
+touch "$NDIR/skipped/plan-fresh-clean.md.attempts"
+touch "$NDIR/skipped/plan-fresh-clean.md.staleness"
+run_heal >/dev/null 2>&1
+assert_absent  "row6 skipped symlink gone"  "$NDIR/skipped/plan-fresh-clean.md"
+assert_absent  "row6 attempts gone"         "$NDIR/skipped/plan-fresh-clean.md.attempts"
+assert_absent  "row6 staleness gone"        "$NDIR/skipped/plan-fresh-clean.md.staleness"
+assert_present "row6 queued"                "$NDIR/queue/plan-fresh-clean.md"
+echo "ok: row6 — CLEANUP sidecars evicted"
+
+# ---------------------------------------------------------------------------
+if [ "$FAILED" -ne 0 ]; then
+    echo "RESULT: FAILED"
+    exit 1
+fi
+echo "RESULT: all passed"
+exit 0

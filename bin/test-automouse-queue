@@ -169,6 +169,19 @@ assert_present "row8 queued untouched"  "$NDIR/queue/plan-h.md"
 echo "ok: row8 — already-queued errors, no partial eviction"
 
 # ---------------------------------------------------------------------------
+# Row 9 — .staleness sidecar evicted alongside symlink on (re)queue
+# ---------------------------------------------------------------------------
+setup
+touch "$PDIR/plan-i.md"
+ln -s "$PDIR/plan-i.md" "$NDIR/skipped/plan-i.md"
+touch "$NDIR/skipped/plan-i.md.staleness"
+run_queue plan-i >/dev/null 2>&1
+assert_absent  "row9 skipped symlink gone"   "$NDIR/skipped/plan-i.md"
+assert_absent  "row9 staleness marker gone"  "$NDIR/skipped/plan-i.md.staleness"
+assert_present "row9 queued"                  "$NDIR/queue/plan-i.md"
+echo "ok: row9 — .staleness eviction"
+
+# ---------------------------------------------------------------------------
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"
     exit 1

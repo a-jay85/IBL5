@@ -61,8 +61,9 @@ If `bin/check-plan-staleness` exits non-zero, the plan is STALE. Take the skip-w
 
 1. Capture the unresolved paths the helper printed (its `STALE: <token>` lines).
 2. `mv "$NIGHTLY_DIR/queue/$PLAN_FILE" "$NIGHTLY_DIR/skipped/"`
-3. Write a STALENESS-specific report to `$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-<slug>.md` (derive `<slug>` from the plan title). The title and body must make it visibly a **staleness skip** — clearly distinct wording from the ambiguity skip — and must list the specific unresolved repo paths the helper emitted.
-4. STOP.
+3. `touch "$NIGHTLY_DIR/skipped/$PLAN_FILE.staleness"` — drop a sidecar marker that records this skip as a **staleness** skip (not ambiguity / already-merged / poison-pill). At the next run's top, `bin/automouse-self-heal` reads this marker and auto-requeues the plan **iff** `bin/check-plan-staleness` now passes against the freshly-pulled master; a skip without the marker is never auto-recovered.
+4. Write a STALENESS-specific report to `$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-<slug>.md` (derive `<slug>` from the plan title). The title and body must make it visibly a **staleness skip** — clearly distinct wording from the ambiguity skip — and must list the specific unresolved repo paths the helper emitted.
+5. STOP.
 
 If `bin/check-plan-staleness` exits 0, the plan is fresh — continue to Step 2.6.
 

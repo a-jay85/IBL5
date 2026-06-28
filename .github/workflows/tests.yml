@@ -584,6 +584,8 @@ jobs:
         run: bin/test-refactor-flag
       - name: bin/test-automouse-queue
         run: bin/test-automouse-queue
+      - name: bin/test-automouse-self-heal
+        run: bin/test-automouse-self-heal
       - name: bin/test-automouse-concurrency
         run: bin/test-automouse-concurrency
       - name: bin/test-wt-status

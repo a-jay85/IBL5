@@ -50,11 +50,13 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 | Status | Count |
 |--------|------:|
-| ✅ Implemented | ~169 |
-| ◑ Partial | ~20 |
-| 📋 Planned (plan/PR open: 2.13, 2.17, 10.14) | 3 |
-| ⬜ Open | ~114 |
-| 🚫 Declined | 6 |
+| ✅ Implemented | 203 |
+| ◑ Partial | 27 |
+| 📋 Planned (plan queued / PR open) | 11 |
+| ⬜ Open | 63 |
+| 🚫 Declined | 8 |
+
+> Status counts re-verified 2026-06-28 (exact, from the per-axis tables). Four rows carry an **open PR that owns its own status-flip step**, so they still show their pre-merge glyph here and flip on that PR's merge — do **not** pre-flip them (the #1233 collision lesson): **2.6** (#1240), **2.31 / 2.32** (#1230), **5.18** (#1204).
 
 **Automouse-readiness of the not-yet-complete (⬜/◑/📋) items:**
 
@@ -79,7 +81,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| 1.1 | ◑ Partial | 🟩 | Narrow fix done (stubs/cache, −39 LOC); the formatter god-class split is **PR #1167** open (queued `extract-recordformatter`, armed green-green). Service still 687 LOC. |
+| 1.1 | ✅ Implemented | — | `RecordFormatter` collaborator extracted (#1167, merged 2026-06-21); stubs/cache narrowed earlier (−39 LOC). Service ~687 LOC = residual typed-getter/query bulk, not this finding's concern. |
 | 1.2 | ✅ Implemented | — | `StreakCalculator` exists (#1040); HEAT CTE → `vw_heat_champions` (migration 149, #1090). Repo still 823 LOC = separate cohesive batch-query concern, not this finding. |
 | 1.3 | ✅ Implemented | 🟩 | `AnnouncementDispatcherInterface` injected (defaulted to `DiscordAnnouncementDispatcher`); dispatch loop now isolates per-message failures; `NullAnnouncementDispatcher` for dry-run/tests. Green-green + 1 tested resilience delta. |
 | 1.4 | ✅ Implemented | — | `JsbImportService` now 177-LOC facade + 10 `Importers/` (#801). |
@@ -106,7 +108,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Extract `TeamRegistry` (or reuse `League`/`TeamQueryRepository`); implement or delete the two silent stubs.
 **Est. effort:** M
 **Risk if untouched:** Team rename requires DB and constant update; silent stubs create invisible display gaps.
-**Status:** Completed (2026-05-19) — collapsed `nameToIdCache` into static lookup; deleted `getAllStarYears`/`getAllStarTeams` stubs (data not trivially queryable against seed); net −39 LOC.
+**Status:** Implemented — registry/stubs collapsed (2026-05-19, −39 LOC: `nameToIdCache`→static lookup, `getAllStarYears`/`getAllStarTeams` deleted); the multi-concern `format*` split completed via `RecordFormatter` extraction (#1167, merged 2026-06-21). Residual ~687 LOC is typed-getter/query bulk, not this concern.
 
 ### 1.2 RecordHoldersRepository — Streak/Season-Start Logic in Repository Layer
 **Location:** `ibl5/classes/RecordHolders/RecordHoldersRepository.php` lines 401-566
@@ -2135,7 +2137,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 |---|--------|-----------|-----------------|
 | 11.1 | ⬜ Open | 🟩 | PageLayout FOUT `<style>`→design/base.css; VR pin (global). |
 | 11.2 | ⬜ Open | 🟩 | Add `themes/` to PHPStan scan + migrate 5 inline styles; baseline + VR pin. |
-| 11.3 | ⬜ Open | 🟩 | tables.css ~1410-LOC split into paired component files (CSS_TABLE_MAP guide); pure relocation, VR pin. |
+| 11.3 | ◑ Partial | 🟩 | Split ongoing (#1234 + earlier): 15 component files now under `design/components/tables/`; `components/tables.css` still ~1296 LOC. Continue relocation; VR pin. |
 | 11.4 | ⬜ Open | 🟨 | player-views.css parallel table system → `.ibl-data-table`. Visual consolidation = VR-affecting → human review / baseline update. |
 | 11.5 | ✅ Implemented | — | CSS orphan cleanup (#1027). |
 | 11.6 | ✅ Implemented | — | Standalone-head font helper (#1027). |
@@ -2143,10 +2145,10 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 | 11.8 | ✅ Implemented | — | menu GIFs deleted (#1027). |
 | 11.9 | ✅ Implemented | — | dual-token convention documented (#1027). |
 | 11.10 | ⬜ Open | 🟩 | Consolidate depth-chart CSS (load-order coupling); VR pin. |
-| 11.11 | ⬜ Open | 🟩 | themecenterbox strpos→explicit `$type` param; VR pin (homepage). |
+| 11.11 | ✅ Implemented | — | themecenterbox content-sniff replaced with explicit `$type` param (#1232, merged 2026-06-28). |
 | 11.12 | ✅ Implemented | — | display:none→hidden cleared. |
-| 11.13 | ⬜ Open | 🟩 | TradingView str_replace→TeamCellHelper param; VR pin. |
-| 11.14 | ⬜ Open | 🟩 | 82 hex→token aliases (alias = same value → pixel-identical); VR pin. |
+| 11.13 | ✅ Implemented | — | TradingView `str_replace` CSS-patch replaced with explicit render param (#1232, merged 2026-06-28). |
+| 11.14 | ◑ Partial | 🟩 | Exact-match hex→token aliases landed (#1234, merged 2026-06-28); ~62 raw hex still in `design/components/` (no exact token match). Continue aliasing; VR pin. |
 | 11.15 | ✅ Implemented | — | dead section removed (#1027). |
 | 11.16 | ⬜ Open | 🟩 | Page-specific JS to per-view loaders; E2E/VR pin. |
 
@@ -2170,6 +2172,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Keep base system in `tables.css`; split module sections into paired component files (`trade-roster-preview.css`, `draft.css`); `CSS_TABLE_MAP.md` is the split guide.
 **Est. effort:** M
 **Risk if untouched:** Contributors keep adding module rules to base file; file grows.
+**Status:** Partial — component split is incremental: 15 paired files now live under `design/components/tables/` (latest via #1234), but `design/components/tables.css` still holds ~1296 LOC. Continue extracting module sections.
 
 ### 11.4 `player-views.css` Maintains Parallel Table System
 **Location:** `ibl5/design/components/player-views.css` lines 15-100
@@ -2231,6 +2234,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Replace with explicit `$type` parameter from call sites.
 **Est. effort:** S
 **Risk if untouched:** CSS renames break homepage layout invisibly.
+**Status:** Implemented (#1232, merged 2026-06-28) — `themecenterbox()` now takes an explicit `$type` argument from call sites; the `strpos()` content-sniffing is gone.
 
 ### 11.12 DepthChartEntryView Two `style="display:none"` Baselines
 **Location:** `classes/DepthChartEntry/DepthChartEntryView.php` lines 340, 342
@@ -2246,6 +2250,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Pass `--mobile-order` as a parameter to `TeamCellHelper::renderTeamCell()` or accept `$extraStyles` array.
 **Est. effort:** S
 **Risk if untouched:** Future helper changes silently produce malformed style attrs.
+**Status:** Implemented (#1232, merged 2026-06-28) — `--mobile-order` is now passed as an explicit render param into the team-cell helper; the post-render `str_replace` patch is removed.
 
 ### 11.14 82 Hardcoded Hex Values in Component CSS Partially Bypass Token System
 **Location:** All `design/components/*.css` (concentrated in `tables.css`, `player-views.css`)
@@ -2253,6 +2258,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Targeted audit; replace borders/text with `--gray-*` aliases.
 **Est. effort:** M
 **Risk if untouched:** Brand color change requires grepping raw hex across files.
+**Status:** Partial — exact-match hex values aliased to design tokens via #1234 (merged 2026-06-28); ~62 raw hex codes remain in `design/components/` where no token has the identical value. Continue once those tokens exist (or a value change is intended).
 
 ### 11.15 `transaction-history.css` Contains Dead Section
 **Location:** `design/components/transaction-history.css` lines 31-37

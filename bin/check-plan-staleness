@@ -136,7 +136,7 @@ while IFS= read -r token; do
     # for new artifacts; `pre-impl` rows reference existing files (which resolve
     # on disk and never reach here).
     if grep -F -- "$token" "$PLAN_FILE" \
-        | grep -qE '([Cc]reate|[Nn]ew file|[Aa]dd(s|ing)? (a )?new|[Ii]ntroduce|[Ss]caffold|[Ww]rite|\*\*[Nn][Ee][Ww]\*\*|[-—] *NEW\b|\b[Mm]ov(e|ed|es|ing)\b|\b[Rr]ename(d|s|ing)?\b|\b[Rr]elocat(e|ed|es|ing)\b|[Rr]eject(ed)?|[Ff]ixture|throwaway|scratch|post-impl)'; then
+        | grep -qE '([Cc]reate|[Nn]ew file|[Aa]dd(s|ing)? (a )?new|[Ii]ntroduce|[Ss]caffold|[Ww]rite|\*\*[Nn][Ee][Ww]\*\*|[-—] *NEW\b|\b[Mm]ov(e|ed|es|ing)\b|\b[Rr]ename(d|s|ing)?\b|\b[Rr]elocat(e|ed|es|ing)\b|→|[Rr]eject(ed)?|[Ff]ixture|throwaway|scratch|post-impl)'; then
         continue
     fi
 

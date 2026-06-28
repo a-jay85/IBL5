@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-06-27
+last_verified: 2026-06-28
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -1155,25 +1155,25 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| 6.1 | ⬜ Open | 🟩 | BulkImport 0 tests; additive unit tests. |
+| 6.1 | ✅ Implemented | — | All 7 concrete BulkImport classes already have substantive tests under tests/Unit/BulkImport/ (verified). |
 | 6.2 | ⬜ Open | 🟩 | PdoConnection tests 🟩; `MySQL` is the deprecated class slated for removal (5.18) — don't invest there. |
 | 6.3 | ✅ Implemented | — | ModuleAccessControlTest + ModuleRegistryTest exist. |
 | 6.4 | ◑ Partial | 🟩 | Header side-effect test exists; broader structure/CSS coverage still thin → additive. |
 | 6.5 | ✅ Implemented | — | TeamStatsCalculatorTest exists. |
 | 6.6 | ✅ Implemented | — | StrengthOfScheduleCalculatorTest exists. |
-| 6.7 | ⬜ Open | 🟩 | LeagueStarters thin; additive. |
-| 6.8 | ⬜ Open | 🟩 | ApiKeys thin; additive (security tests catch, don't introduce surface). |
+| 6.7 | ✅ Implemented | 🟩 | LeagueStarters thin; additive. |
+| 6.8 | ✅ Implemented | — | ApiKeysRepositoryTest added (revocation active-only scoping, latest-key lookup). |
 | 6.9 | ✅ Implemented | — | ContractListServiceTest extended (#1161, 2026-06-20). |
-| 6.10 | ⬜ Open | 🟩 | FreeAgencyPreview thin; additive — coordinate with PR #1162 (future-year restore). |
-| 6.11 | ⬜ Open | 🟩 | SeasonHighs thin; additive. |
-| 6.12 | ⬜ Open | 🟩 | TeamSchedule thin; additive. |
+| 6.10 | ✅ Implemented | 🟩 | FreeAgencyPreview thin; additive — coordinate with PR #1162 (future-year restore). |
+| 6.11 | ✅ Implemented | 🟩 | SeasonHighs thin; additive. |
+| 6.12 | ✅ Implemented | 🟩 | TeamSchedule thin; additive. |
 | 6.13 | ⬜ Open | 🟩 | Player 0.24 ratio; additive (L — chunk it). |
 | 6.14 | ⬜ Open | 🟩 | Updater steps; additive. |
-| 6.15 | ⬜ Open | 🟩 | Voting; additive. |
-| 6.16 | ⬜ Open | 🟩 | Api auth/rate-limit/pagination; additive. |
-| 6.17 | ⬜ Open | 🟩 | Trading validation; additive. |
-| 6.18 | ⬜ Open | 🟩 | Moderate-gap modules; per-module targeted tests, additive. |
-| 6.19 | ⬜ Open | 🟩 | Additive. **`Shared (3/1)` sub-item stale** — `Shared/` deleted (2.23). |
+| 6.15 | ✅ Implemented | — | VotingRepositoryTest + SubmissionResultTest added (aggregation, column allowlist). |
+| 6.16 | ◑ Partial | 🟩 | ApiKeyRepositoryTest + RateLimitRepositoryTest added; data repos + JsonResponder/SystemClock still untested. |
+| 6.17 | ◑ Partial | 🟩 | TradeAssetRepositoryTest + TradeOfferRepositoryTest added (draft-pick mapping, offer lifecycle); TradeExecutionRepository untested + TradeFormRepository partial. |
+| 6.18 | ◑ Partial | 🟩 | Unit tests added: DraftPickLocator repo, LeagueSchedule Game, TransactionHistory repo, CapSpace repo. NextSim/SavedDepthChart/DepthChartEntry verified covered. Residual: SQL aggregation/ordering + SDC write-path are DB-integration-only. |
+| 6.19 | ◑ Partial | 🟩 | AllStarAppearances + GMContactList repo unit tests added. Season entity predicates blocked by `Season\Season`→mock alias (QueryRepo plumbing covered). `Shared` N/A (deleted 2.23). |
 
 ### 6.1 BulkImport — Zero Tests, 9 Files
 **Location:** `ibl5/classes/BulkImport`
@@ -1181,6 +1181,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** PHPUnit for `BulkImportSummary` aggregation, `ArchiveExtractor` file handling, `ImportEntry` state transitions.
 **Est. effort:** M
 **Risk if untouched:** Bulk imports fail silently; error aggregation untested.
+**Status:** ✅ Already covered (verified 2026-06-26) — all 7 concrete classes have substantive unit tests under tests/Unit/BulkImport/ (ArchiveExtractorTest 27, BulkImportSummaryTest 9, ImportEntryTest 3, plus BulkImportRunner/BackupArchiveLocator/FileTypeHandler/JsbFileType). The finding's "zero tests" premise is stale; no new tests added.
 
 ### 6.2 Database — Zero Tests, 2 Files
 **Location:** `ibl5/classes/Database`
@@ -1227,6 +1228,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Service all-star selection, Repository correctness, API response format.
 **Est. effort:** M
 **Risk if untouched:** All-Star eligibility/voting aggregation untested.
+**Status:** Implemented (2026-06-27) — added LeagueStartersApiHandler handle() response-format + invalid-display-fallback tests and Service boundary tests (non-int teamid skip, per-team/position dedupe) in tests/LeagueStarters/. Repository SQL correctness remains owned by the gated tests/DatabaseIntegration/LeagueStartersRepositoryTest.php.
 
 ### 6.8 ApiKeys — Thin (6 files, 2 tests, 0.33 ratio)
 **Location:** `ibl5/classes/ApiKeys`
@@ -1234,6 +1236,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Service uniqueness, Repository revocation, rate-limiter integration.
 **Est. effort:** M
 **Risk if untouched:** Key collisions, revocation failures, rate-limit bypass.
+**Status:** Implemented (verified 2026-06-27) — tests/ApiKeys/ApiKeysRepositoryTest.php added (findByUserId latest-key selection, createKey, revokeByUserId active-only scoping). Rate-limiter integration covered by tests/Api/Repository/RateLimitRepositoryTest.php (6.16).
 
 ### 6.9 ContractList — Thin (6 files, 2 tests)
 **Location:** `ibl5/classes/ContractList`
@@ -1249,7 +1252,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Eligibility filtering, contract-expiration, projection accuracy.
 **Est. effort:** M
 **Risk if untouched:** Preview misses eligible players or includes ineligible.
-**Status:** Partially addressed — future-year projection restored and service tests expanded (`feat: restore future-year free-agent preview via URL param`). Projection-accuracy / contract-expiration edge coverage still open.
+**Status:** Implemented (2026-06-27) — future-year projection restored via URL param (`feat: restore future-year free-agent preview via URL param`, PR #1162) and FreeAgencyPreviewService tests expanded with contract-end boundary cases (cy=6 final-year eligible, cy=5 with year-6 salary excluded) in tests/FreeAgencyPreview/. Repository correctness owned by gated tests/DatabaseIntegration/FreeAgencyPreviewRepositoryTest.php. Projection-accuracy edge coverage still open.
 
 ### 6.11 SeasonHighs — Thin (6 files, 2 tests)
 **Location:** `ibl5/classes/SeasonHighs`
@@ -1257,6 +1260,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** High-water filtering, repository correctness, stat-type formatting.
 **Est. effort:** M
 **Risk if untouched:** Wrong records on player profile pages.
+**Status:** Implemented (2026-06-27) — added host-runnable SeasonHighsRepository transformation tests (normalizeRow int-casts/color defaults/optional keys, getSeasonHighsBatch bucketing/sort/tiebreak/empty-stats short-circuit) in tests/SeasonHighs/SeasonHighsRepositoryTest.php. Gated tests/DatabaseIntegration/SeasonHighsRepositoryTest.php still covers the SQL.
 
 ### 6.12 TeamSchedule — Thin (6 files, 2 tests)
 **Location:** `ibl5/classes/TeamSchedule`
@@ -1264,6 +1268,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Playoff bracket construction, game-order, opponent lookup.
 **Est. effort:** M
 **Risk if untouched:** Seeding incorrect; game sequence out of order.
+**Status:** Implemented (2026-06-27) — added TeamScheduleService opponent-lookup/opponent-text, SOS-tier (populated vs empty rankings), and next-sim-highlight tests in tests/TeamSchedule/. Repository correctness owned by gated tests/DatabaseIntegration/TeamScheduleRepositoryTest.php; no playoff-bracket unit exists on master (View-only month relabel).
 
 ### 6.13 Player Module — Large + Subthreshold (71 files, 17 tests, 0.24 ratio)
 **Location:** `ibl5/classes/Player`
@@ -1285,6 +1290,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Ballot validation, duplicate-vote prevention, ranking aggregation.
 **Est. effort:** M
 **Risk if untouched:** Award voting corruption; duplicates counted.
+**Status:** Implemented (verified 2026-06-27) — tests/Voting/VotingRepositoryTest.php (vote aggregation, column-allowlist rejection, save/cooldown writes, name→pid mapping) + tests/Voting/SubmissionResultTest.php added. Results service/controller/view already covered under tests/VotingResults/.
 
 ### 6.16 Api Module — Subthreshold (48 files, 22 tests, 0.46 ratio)
 **Location:** `ibl5/classes/Api`
@@ -1292,6 +1298,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Header parsing, token-bucket logic, pagination offset/limit edges.
 **Est. effort:** L
 **Risk if untouched:** Auth bypass; rate limiter broken; pagination off-by-one.
+**Status:** Partial (verified 2026-06-27) — tests/Api/Repository/ApiKeyRepositoryTest.php + tests/Api/Repository/RateLimitRepositoryTest.php added (active-key-only lookup, token-bucket upsert/window count). ApiKeyAuthenticator/RateLimiter/Paginator already well-covered. Residual: data repositories (ApiGameRepository, ApiInjuriesRepository, ApiLeadersRepository, ApiPlayerRepository, ApiPlayerStatsRepository, ApiStandingsRepository, ApiTeamRepository, HealthRepository) + JsonResponder + SystemClock.
 
 ### 6.17 Trading Module — Subthreshold (27 files, 12 tests, 0.44 ratio)
 **Location:** `ibl5/classes/Trading`
@@ -1299,6 +1306,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Validation (cap/roster/eligibility), draft-pick mapping, rejection reasons.
 **Est. effort:** M
 **Risk if untouched:** Trades bypass validation; cap exploits; pick duplication.
+**Status:** Partial (verified 2026-06-27) — tests/Trading/TradeAssetRepositoryTest.php (draft-pick mapping, pick-owner reassignment, player lookups) + tests/Trading/TradeOfferRepositoryTest.php (offer-id generation + failure path, transactional delete with cash coordination) added. Validation/rejection-reasons already covered by TradeValidatorTest. Residual: TradeExecutionRepository (untested) + TradeFormRepository (partial).
 
 ### 6.18 Moderate-Gap Modules (0.40–0.50 ratio)
 **Location:** `DraftPickLocator` (5/2), `LeagueSchedule` (7/3), `NextSim` (5/2), `SavedDepthChart` (5/2), `TransactionHistory` (5/2), `CapSpace` (5/2), `DepthChartEntry` (15/8)
@@ -1306,6 +1314,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Per-module targeted PHPUnit — see test-coverage audit detail.
 **Est. effort:** S each (M for CapSpace, NextSim, DepthChartEntry)
 **Risk if untouched:** Per-module: stashed picks mislocated; schedule phase boundaries wrong; cap floor misreported; saved DC corrupted; transaction log misordered; cap exploitation; invalid DC entries saved.
+**Status:** ◑ Partial (2026-06-26) — added unit coverage: DraftPickLocatorRepositoryTest (pick grouping), LeagueScheduleGameTest (Game value object), TransactionHistoryRepositoryTest (year int-cast + filter branches), CapSpaceRepositoryTest (post-season contract rows). Verified already covered: NextSim (all classes tested; Service is a thin delegator), SavedDepthChart (22-test WideUnit service suite exercises repo read paths), DepthChartEntry (11-test Validator covers "invalid DC entries"). CapSpace cap-math is already covered by CapSpaceServiceTest. Residual (DatabaseIntegration-only): transaction ORDER BY correctness, SavedDepthChart write-path (insert_id), aggregation correctness.
 
 ### 6.19 Small Modules With Single-Test Coverage
 **Location:** `AllStarAppearances` (4/1), `GMContactList` (4/1), `Season` (3/1), `Shared` (3/1)
@@ -1313,6 +1322,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Targeted single-class tests.
 **Est. effort:** S each
 **Risk if untouched:** AS appearances double-counted; duplicate GMs; season state inconsistencies; shared data leaks.
+**Status:** ◑ Partial (2026-06-26) — added AllStarAppearancesRepositoryTest and GMContactListRepositoryTest (return-shape + empty negative). Season: phase plumbing covered by SeasonQueryRepositoryTest (getSeasonPhase, calculatePhaseSimNumber); the Season-entity phase predicates (isFreeAgencyPhase, areTradesAllowed, areWaiversAllowed, advancesContractYears) are structurally untestable because classes/Bootstrap/TestAliasesBootstrap.php:22 aliases Season\Season → the mock — left as-is (removing the alias is a cross-suite infra change, out of scope). Shared: N/A (deleted, backlog 2.23). Residual (DatabaseIntegration-only): AS-appearance aggregation / GM dedup correctness.
 
 ---
 
@@ -2399,7 +2409,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 | 13.7b | ⬜ Open | 🟨 | Needs `ValidationError`/`ValidationResultWithContext` type design (Depth/Trade carry structured + cap-total payloads) before the sweep. |
 | 13.8 | ✅ Implemented | — | retired filter standardized to `= 0` (2026-06-05). |
 | 13.9 | ⬜ Open | 🟦 | 4 team-color CSS var sets → one sanitizing `TableStyles::inlineTeamVars()`. Touches hex-injection sanitization (output-security surface) + VR → human-merge. |
-| 13.10 | ⬜ Open | 🟩 | Extract `StatRowFormatter` for Career/Season leaderboards; green-green (RecordFormatter-style). |
+| 13.10 | 🚫 Declined | — | Premise invalid: Career/Season `processPlayerRow` return arrays differ in key membership, order, and value-type (22 vs 44 keys) — no shared surface to extract. Doc-only closure, no code. |
 | 13.11 | ✅ Implemented | — | cleanName subquery extracted (2026-06-05). |
 | 13.12 | ⬜ Open | 🟩 | player↔team JOIN ×15 → `vw_players_with_team`/helper; green-green, opportunistic (L). |
 | 13.13 | ✅ Implemented | — | #1033 + DNP follow-ups #1087/#1088. |
@@ -2474,6 +2484,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Risk if untouched:** Hex-injection bypass through unsanitized site; CSS variable rename breaks only one variant.
 
 ### 13.10 `CareerLeaderboards` vs `SeasonLeaderboards` Stat-Row Formatting Diverges
+**Status:** 🚫 Declined (2026-06-24) — premise invalid. The two services' `processPlayerRow` return arrays are disjoint: Career's `FormattedPlayerStats` (22 keys, percentages interleaved, `pts`/`drb`, all values formatted strings, retired `*` appended) vs Season's `ProcessedStats` (44 keys, raw-totals block then grouped percentages then a per-game `mpg…ppg` block, `points`/`drebpg`, raw ints, plus `year`/`teamname`/team-color/`qa`). They differ in key membership, order, AND per-key value-type; the only identical residue is the `pid` passthrough. No shared `STAT_COLUMNS`/`assembleRow` surface exists, so no `StatRowFormatter` was extracted — forcing one would be cosmetic co-location that raises (not lowers) maintenance cost. The premise that both "iterate the same 18-stat-column set" is also false: neither service iterates a column list (both write positional array literals).
 **Location:** `CareerLeaderboards/CareerLeaderboardsService.php` (`processPlayerRow`, 90 LOC), `SeasonLeaderboards/SeasonLeaderboardsService.php`
 **Problem:** Both iterate over the same 18-stat-column set with `StatsFormatter::formatTotal`/`formatPerGameAverage`.
 **Suggested direction:** Extract `StatRowFormatter::formatTotalsRow()`, `formatAveragesRow()`; both delegate.

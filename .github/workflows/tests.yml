@@ -582,10 +582,14 @@ jobs:
         run: bin/test-refactor-flag
       - name: bin/test-automouse-queue
         run: bin/test-automouse-queue
+      - name: bin/test-automouse-concurrency
+        run: bin/test-automouse-concurrency
       - name: bin/test-wt-status
         run: bin/test-wt-status
       - name: bin/test-check-plan
         run: bin/test-check-plan
+      - name: bin/test-check-plan-staleness
+        run: bin/test-check-plan-staleness
       - name: bin/test-adr-check
         run: bin/test-adr-check
       - name: bin/test-postplan-arm-conditions

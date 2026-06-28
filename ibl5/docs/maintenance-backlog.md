@@ -1155,7 +1155,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| 6.1 | ⬜ Open | 🟩 | BulkImport 0 tests; additive unit tests. |
+| 6.1 | ✅ Implemented | — | All 7 concrete BulkImport classes already have substantive tests under tests/Unit/BulkImport/ (verified). |
 | 6.2 | ⬜ Open | 🟩 | PdoConnection tests 🟩; `MySQL` is the deprecated class slated for removal (5.18) — don't invest there. |
 | 6.3 | ✅ Implemented | — | ModuleAccessControlTest + ModuleRegistryTest exist. |
 | 6.4 | ◑ Partial | 🟩 | Header side-effect test exists; broader structure/CSS coverage still thin → additive. |
@@ -1172,8 +1172,8 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 | 6.15 | ✅ Implemented | — | VotingRepositoryTest + SubmissionResultTest added (aggregation, column allowlist). |
 | 6.16 | ◑ Partial | 🟩 | ApiKeyRepositoryTest + RateLimitRepositoryTest added; data repos + JsonResponder/SystemClock still untested. |
 | 6.17 | ◑ Partial | 🟩 | TradeAssetRepositoryTest + TradeOfferRepositoryTest added (draft-pick mapping, offer lifecycle); TradeExecutionRepository untested + TradeFormRepository partial. |
-| 6.18 | ⬜ Open | 🟩 | Moderate-gap modules; per-module targeted tests, additive. |
-| 6.19 | ⬜ Open | 🟩 | Additive. **`Shared (3/1)` sub-item stale** — `Shared/` deleted (2.23). |
+| 6.18 | ◑ Partial | 🟩 | Unit tests added: DraftPickLocator repo, LeagueSchedule Game, TransactionHistory repo, CapSpace repo. NextSim/SavedDepthChart/DepthChartEntry verified covered. Residual: SQL aggregation/ordering + SDC write-path are DB-integration-only. |
+| 6.19 | ◑ Partial | 🟩 | AllStarAppearances + GMContactList repo unit tests added. Season entity predicates blocked by `Season\Season`→mock alias (QueryRepo plumbing covered). `Shared` N/A (deleted 2.23). |
 
 ### 6.1 BulkImport — Zero Tests, 9 Files
 **Location:** `ibl5/classes/BulkImport`
@@ -1181,6 +1181,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** PHPUnit for `BulkImportSummary` aggregation, `ArchiveExtractor` file handling, `ImportEntry` state transitions.
 **Est. effort:** M
 **Risk if untouched:** Bulk imports fail silently; error aggregation untested.
+**Status:** ✅ Already covered (verified 2026-06-26) — all 7 concrete classes have substantive unit tests under tests/Unit/BulkImport/ (ArchiveExtractorTest 27, BulkImportSummaryTest 9, ImportEntryTest 3, plus BulkImportRunner/BackupArchiveLocator/FileTypeHandler/JsbFileType). The finding's "zero tests" premise is stale; no new tests added.
 
 ### 6.2 Database — Zero Tests, 2 Files
 **Location:** `ibl5/classes/Database`
@@ -1313,6 +1314,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Per-module targeted PHPUnit — see test-coverage audit detail.
 **Est. effort:** S each (M for CapSpace, NextSim, DepthChartEntry)
 **Risk if untouched:** Per-module: stashed picks mislocated; schedule phase boundaries wrong; cap floor misreported; saved DC corrupted; transaction log misordered; cap exploitation; invalid DC entries saved.
+**Status:** ◑ Partial (2026-06-26) — added unit coverage: DraftPickLocatorRepositoryTest (pick grouping), LeagueScheduleGameTest (Game value object), TransactionHistoryRepositoryTest (year int-cast + filter branches), CapSpaceRepositoryTest (post-season contract rows). Verified already covered: NextSim (all classes tested; Service is a thin delegator), SavedDepthChart (22-test WideUnit service suite exercises repo read paths), DepthChartEntry (11-test Validator covers "invalid DC entries"). CapSpace cap-math is already covered by CapSpaceServiceTest. Residual (DatabaseIntegration-only): transaction ORDER BY correctness, SavedDepthChart write-path (insert_id), aggregation correctness.
 
 ### 6.19 Small Modules With Single-Test Coverage
 **Location:** `AllStarAppearances` (4/1), `GMContactList` (4/1), `Season` (3/1), `Shared` (3/1)
@@ -1320,6 +1322,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Targeted single-class tests.
 **Est. effort:** S each
 **Risk if untouched:** AS appearances double-counted; duplicate GMs; season state inconsistencies; shared data leaks.
+**Status:** ◑ Partial (2026-06-26) — added AllStarAppearancesRepositoryTest and GMContactListRepositoryTest (return-shape + empty negative). Season: phase plumbing covered by SeasonQueryRepositoryTest (getSeasonPhase, calculatePhaseSimNumber); the Season-entity phase predicates (isFreeAgencyPhase, areTradesAllowed, areWaiversAllowed, advancesContractYears) are structurally untestable because classes/Bootstrap/TestAliasesBootstrap.php:22 aliases Season\Season → the mock — left as-is (removing the alias is a cross-suite infra change, out of scope). Shared: N/A (deleted, backlog 2.23). Residual (DatabaseIntegration-only): AS-appearance aggregation / GM dedup correctness.
 
 ---
 

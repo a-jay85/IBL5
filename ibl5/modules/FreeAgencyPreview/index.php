@@ -39,7 +39,11 @@ if ($season->endingYear === null || $season->endingYear === 0) {
     return;
 }
 
-$pagetitle = "- Upcoming Free Agents ($season->endingYear)";
+// Resolve the requested target ending year from the URL (clamped to [C, C+5]).
+$rawYear = isset($_GET['year']) && is_string($_GET['year']) ? $_GET['year'] : null;
+$requestedYear = FreeAgencyPreviewService::resolveRequestedYear($rawYear, $season->endingYear);
+
+$pagetitle = "- Upcoming Free Agents ($requestedYear)";
 
 // Initialize services
 $repository = new FreeAgencyPreviewRepository($mysqli_db);
@@ -47,9 +51,9 @@ $service = new FreeAgencyPreviewService($repository);
 $view = new FreeAgencyPreviewView();
 
 // Get upcoming free agents
-$freeAgents = $service->getUpcomingFreeAgents($season->endingYear);
+$freeAgents = $service->getUpcomingFreeAgents($requestedYear, $season->endingYear);
 
 // Render page
 PageLayout\PageLayout::header();
-echo $view->render($season->endingYear, $freeAgents);
+echo $view->render($requestedYear, $freeAgents);
 PageLayout\PageLayout::footer();

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Cache;
 
 use Cache\Contracts\DatabaseCacheInterface;
+use Clock\ClockInterface;
+use Clock\SystemClock;
 
 /**
  * DatabaseCache - Generic key-value cache using the `cache` database table.
@@ -16,10 +18,13 @@ class DatabaseCache extends \BaseMysqliRepository implements DatabaseCacheInterf
     /** PSR-3 logger for cache-layer failure logging; defaults to the 'db' channel. */
     private \Psr\Log\LoggerInterface $channelLogger;
 
-    public function __construct(\mysqli $db, ?\Psr\Log\LoggerInterface $logger = null)
+    private ClockInterface $clock;
+
+    public function __construct(\mysqli $db, ?\Psr\Log\LoggerInterface $logger = null, ?ClockInterface $clock = null)
     {
         parent::__construct($db);
         $this->channelLogger = $logger ?? \Logging\LoggerFactory::getChannel('db');
+        $this->clock = $clock ?? new SystemClock();
     }
 
     /**
@@ -45,7 +50,7 @@ class DatabaseCache extends \BaseMysqliRepository implements DatabaseCacheInterf
         }
 
         /** @var array{value: string, expiration: int} $row */
-        if ($row['expiration'] < time()) {
+        if ($row['expiration'] < $this->clock->now()) {
             return null; // expired — not an error
         }
 
@@ -78,7 +83,7 @@ class DatabaseCache extends \BaseMysqliRepository implements DatabaseCacheInterf
             return;
         }
 
-        $expiration = time() + $ttlSeconds;
+        $expiration = $this->clock->now() + $ttlSeconds;
         try {
             $this->execute(
                 "REPLACE INTO `cache` (`cache_key`, `value`, `expiration`) VALUES (?, ?, ?)",

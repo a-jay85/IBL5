@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Api\Middleware;
 
-use Api\Middleware\Contracts\ClockInterface;
 use Api\Middleware\RateLimiter;
+use Clock\ClockInterface;
 use Api\Repository\RateLimitRepository;
 use PHPUnit\Framework\TestCase;
 

@@ -6,6 +6,7 @@ namespace Tests\Cache;
 
 use Cache\PageCache;
 use PHPUnit\Framework\TestCase;
+use Tests\Clock\FixedClock;
 
 final class PageCacheTest extends TestCase
 {
@@ -29,6 +30,7 @@ final class PageCacheTest extends TestCase
         }
         @rmdir($this->tempDir);
         PageCache::setTestCacheDir(null);
+        PageCache::setTestClock(null);
     }
 
     // ── isCacheable ────────────────────────────────────────────
@@ -141,6 +143,37 @@ final class PageCacheTest extends TestCase
         self::assertNull($result);
         // File should be cleaned up
         self::assertFileDoesNotExist($this->tempDir . '/expiredkey.html');
+    }
+
+    /**
+     * Boundary hit: at exactly T+ttl the entry is still served (the check is
+     * `expiry < now`, strict). FixedClock pins the second deterministically.
+     */
+    public function testGetReturnsHitAtExactTtlBoundary(): void
+    {
+        $clock = new FixedClock(1_000_000);
+        PageCache::setTestClock($clock);
+
+        PageCache::set('boundarykey', '<html>fresh</html>', 900); // expiry = 1_000_900
+        $clock->setNow(1_000_900);                                // now == expiry
+
+        self::assertSame('<html>fresh</html>', PageCache::get('boundarykey'));
+    }
+
+    /**
+     * Boundary miss (negative path): one second past T+ttl the entry is a miss
+     * and the file is unlinked.
+     */
+    public function testGetReturnsMissOneSecondPastTtl(): void
+    {
+        $clock = new FixedClock(1_000_000);
+        PageCache::setTestClock($clock);
+
+        PageCache::set('staleskey', '<html>stale</html>', 900); // expiry = 1_000_900
+        $clock->setNow(1_000_901);                              // now == expiry + 1
+
+        self::assertNull(PageCache::get('staleskey'));
+        self::assertFileDoesNotExist($this->tempDir . '/staleskey.html');
     }
 
     public function testGetReturnsNullOnCorruptFile(): void

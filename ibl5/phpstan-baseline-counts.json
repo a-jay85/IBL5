@@ -2,6 +2,7 @@
     "phpstan-baseline.neon": {
         "ibl.bareColumnIdentifier": 17,
         "ibl.directHeader": 1,
+        "ibl.directTime": 13,
         "ibl.hardcodedEnvString": 8,
         "ibl.sqlStringInterpolation": 31
     },

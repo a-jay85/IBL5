@@ -6,6 +6,7 @@ namespace Tests\Security;
 
 use PHPUnit\Framework\TestCase;
 use Security\CsrfGuard;
+use Tests\Clock\FixedClock;
 
 class CsrfGuardTest extends TestCase
 {
@@ -19,6 +20,7 @@ class CsrfGuardTest extends TestCase
     {
         $_SESSION = [];
         $_POST = [];
+        CsrfGuard::setTestClock(null);
     }
 
     // ============================================
@@ -117,6 +119,37 @@ class CsrfGuardTest extends TestCase
 
         // Manually expire the token by setting its expiration to the past
         $_SESSION['_csrf_tokens']['form'][0]['expires'] = time() - 1;
+
+        $this->assertFalse(CsrfGuard::validateToken($token, 'form'));
+    }
+
+    /**
+     * Boundary accept: a token whose `expires` equals the validation `now`
+     * is still valid (the check is `now > expires`, strict). Injecting a
+     * FixedClock pins the exact second deterministically.
+     */
+    public function testTokenValidAtExactExpiryBoundary(): void
+    {
+        $clock = new FixedClock(1_000_000);
+        CsrfGuard::setTestClock($clock);
+
+        $token = CsrfGuard::generateRawToken('form'); // expires = 1_000_000 + 14400
+        $clock->setNow(1_000_000 + 14400);            // now == expires
+
+        $this->assertTrue(CsrfGuard::validateToken($token, 'form'));
+    }
+
+    /**
+     * Boundary reject (negative path): one second past expiry the token is
+     * rejected.
+     */
+    public function testTokenRejectedOneSecondPastExpiry(): void
+    {
+        $clock = new FixedClock(1_000_000);
+        CsrfGuard::setTestClock($clock);
+
+        $token = CsrfGuard::generateRawToken('form');
+        $clock->setNow(1_000_000 + 14400 + 1);        // now == expires + 1
 
         $this->assertFalse(CsrfGuard::validateToken($token, 'form'));
     }

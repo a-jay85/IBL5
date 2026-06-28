@@ -85,6 +85,18 @@ assert "rejected-alternative" 0 'Rejected: a separate `bin/plan-queue-safe` scri
 # pass via the [Ff]ixture cue, without needing an explicit throwaway/scratch tag.
 assert "fixture-cue" 0 'The test scans a temp fixture `ibl5/scripts/throwaway-fixture-xyz.php` in a tmpdir.'
 
+# New creation cues (FP-now-passes). Each references a path that does NOT exist on
+# disk; the cue on the same line must exempt it (exit 0).
+assert "new-marker-lowercase" 0 '| `ibl5/classes/Repositories/PlayerTeamJoinQuery.php` | **new** trait holding the shared select prefix. |'
+assert "moved-cue"           0 '`ibl5/classes/BasketballStats/TeamStatsCalculator.php` — **moved** here (2.30).'
+assert "dash-new-cue"        0 '`ibl5/classes/Negotiation/Views/DemandsBreakdownView.php` — NEW (consolidated sub-view) (2.12).'
+assert "rename-cue"          0 'Rename to `ibl5/tests/Foo/RenamedThingTest.php` from the old name.'
+assert "relocate-cue"        0 'Relocate `ibl5/classes/Foo/RelocatedBar.php` into the shared dir.'
+
+# Over-widening guard: "remove"/"removed" must NOT be read as a creation cue (word
+# boundary on the move verb). A removed file on a cue-less-of-creation line stays stale.
+assert "remove-not-cue" 1 'Remove the deprecated `ibl5/classes/GoneForever.php` from the bootstrap.'
+
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"
     exit 1

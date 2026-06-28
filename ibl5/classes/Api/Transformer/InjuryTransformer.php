@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Api\Transformer;
 
+use Api\Contracts\TransformerInterface;
+
 /**
  * @phpstan-import-type InjuredPlayerRow from \Api\Repository\ApiInjuriesRepository
+ * @implements TransformerInterface<InjuredPlayerRow>
  */
-class InjuryTransformer
+class InjuryTransformer implements TransformerInterface
 {
     /**
      * Transform an injured player row.

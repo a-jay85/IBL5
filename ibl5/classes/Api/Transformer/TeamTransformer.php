@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Api\Transformer;
 
+use Api\Contracts\TransformerInterface;
+
 /**
  * @phpstan-import-type TeamListRow from \Api\Repository\ApiTeamRepository
  * @phpstan-import-type TeamDetailRow from \Api\Repository\ApiTeamRepository
+ * @implements TransformerInterface<TeamListRow>
  */
-class TeamTransformer
+class TeamTransformer implements TransformerInterface
 {
     /**
      * Transform a team row for list endpoints.

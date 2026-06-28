@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Api\Transformer;
 
+use Api\Contracts\TransformerInterface;
+
 /**
  * @phpstan-import-type PlayerCurrentRow from \Api\Repository\ApiPlayerRepository
+ * @implements TransformerInterface<PlayerCurrentRow>
  */
-class PlayerTransformer
+class PlayerTransformer implements TransformerInterface
 {
     /**
      * Transform a player row from vw_player_current for list endpoints.

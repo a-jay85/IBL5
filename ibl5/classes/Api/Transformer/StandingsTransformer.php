@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Api\Transformer;
 
+use Api\Contracts\TransformerInterface;
+
 /**
  * @phpstan-import-type StandingsViewRow from \Api\Repository\ApiStandingsRepository
+ * @implements TransformerInterface<StandingsViewRow>
  */
-class StandingsTransformer
+class StandingsTransformer implements TransformerInterface
 {
     /**
      * Transform a standings row from vw_team_standings.

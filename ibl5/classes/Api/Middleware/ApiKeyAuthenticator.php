@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Api\Middleware;
 
-use Api\Middleware\Contracts\AuthenticatorInterface;
+use Api\Contracts\AuthenticatorInterface;
 use Api\Repository\ApiKeyRepository;
 
 class ApiKeyAuthenticator implements AuthenticatorInterface

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Api\Middleware;
 
-use Api\Middleware\Contracts\RateLimiterInterface;
+use Api\Contracts\RateLimiterInterface;
 use Api\Repository\RateLimitRepository;
 use Clock\ClockInterface;
 use Clock\SystemClock;

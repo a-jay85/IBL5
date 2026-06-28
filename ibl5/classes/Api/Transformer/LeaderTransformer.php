@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Api\Transformer;
 
+use Api\Contracts\TransformerInterface;
 use BasketballStats\StatsFormatter;
 
 /**
  * @phpstan-import-type LeaderRow from \Api\Repository\ApiLeadersRepository
+ * @implements TransformerInterface<LeaderRow>
  */
-class LeaderTransformer
+class LeaderTransformer implements TransformerInterface
 {
     /**
      * Transform a leader row from `ibl_hist` joined with player and team tables.

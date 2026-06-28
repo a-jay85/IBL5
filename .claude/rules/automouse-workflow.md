@@ -1,6 +1,6 @@
 ---
 description: Automouse autonomous workflow (formerly "nightly") — launchd fires claude -p on a recurring schedule, running two context-isolated agents per plan (implementation + post-plan) with time guards and incremental checkpoints.
-last_verified: 2026-06-20
+last_verified: 2026-06-28
 paths: "bin/automouse-*"
 ---
 
@@ -24,6 +24,8 @@ A headless `claude -p` process runs on a recurring schedule via macOS `launchd`.
 | Re-enable the automouse job | `launchctl load ~/Library/LaunchAgents/com.ibl5.automouse.plist` |
 | Force-trigger now | `launchctl start com.ibl5.automouse` |
 | Requeue skipped plans | `bin/automouse-queue requeue` |
+| Self-heal staleness-FP skips | `bin/automouse-self-heal` |
+| Preview self-heal (no changes) | `bin/automouse-self-heal --dry-run` |
 | Check logs | `cat ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/logs/$(date +%Y-%m-%d).log` |
 
 ## Directory Layout
@@ -32,7 +34,8 @@ A headless `claude -p` process runs on a recurring schedule via macOS `launchd`.
 ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/
   queue/    symlinks to ~/.claude/plans/*.md (oldest runs first)
   done/     symlinks moved here after successful execution
-  skipped/  symlinks moved here when skipped (ambiguity/errors/poison-pill)
+  skipped/  symlinks moved here when skipped (ambiguity/errors/poison-pill);
+            a sibling <plan>.md.staleness marker tags a *staleness* skip (read by bin/automouse-self-heal)
   handoff/  JSON files bridging state from implementation to post-plan agent
   reports/  per-run markdown reports (YYYY-MM-DD-{done|skipped|env-stop|no-queue|error}-<slug>.md);
             plus YYYY-MM-DD-costs.md — per-phase token cost roll-up written by automouse-run
@@ -49,6 +52,19 @@ entry untouched for more than `NIGHTLY_ARCHIVE_AGE_DAYS` (default **7**) into a 
 (`done/`, `skipped/`) are judged on their *own* mtime — the disposition date — and their
 absolute targets keep resolving after the move. `queue/` (pending work) and `handoff/`
 (transient) are never touched. The step is non-fatal: an archival error never aborts the run.
+
+### Self-heal
+
+Before the startup archival block, `automouse-run` freshens the local master checkout (a
+`git fetch` + `merge --ff-only`), then runs `bin/automouse-self-heal`. The self-heal script
+scans `skipped/` for plans carrying a `<plan>.md.staleness` sidecar marker — the signal that
+a plan was skipped specifically by the staleness gate, not for ambiguity / already-merged /
+poison-pill. For each such plan, it re-runs `bin/check-plan-staleness` against the
+freshly-pulled master; if the guard now passes, `bin/automouse-queue` is invoked to requeue
+the plan (which also evicts the `.staleness` and `.attempts` sidecars). Use
+`bin/automouse-self-heal --dry-run` to preview what would be healed without acting. The step
+is non-fatal and forward-only: only staleness skips made after this PR carry the marker;
+plans already in `skipped/` before this PR landed need a one-time manual `bin/automouse-queue`.
 
 ## How It Works
 

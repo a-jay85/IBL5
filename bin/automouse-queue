@@ -34,8 +34,8 @@ mkdir -p "$QUEUE_DIR"
 # entry. rm -f is a no-op when nothing is there.
 evict_dispositions() {
     local name=$1
-    rm -f "$SKIPPED_DIR/$name" "$SKIPPED_DIR/${name}.attempts" \
-          "$DONE_DIR/$name" "$DONE_DIR/${name}.attempts"
+    rm -f "$SKIPPED_DIR/$name" "$SKIPPED_DIR/${name}.attempts" "$SKIPPED_DIR/${name}.staleness" \
+          "$DONE_DIR/$name" "$DONE_DIR/${name}.attempts" "$DONE_DIR/${name}.staleness"
 }
 
 show_queue() {

@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# Requeue plans that were skipped by the staleness gate and now pass it.
+#
+# Usage:
+#   bin/automouse-self-heal           # requeue eligible plans
+#   bin/automouse-self-heal --dry-run # preview without acting
+#
+# Only plans carrying a <plan>.md.staleness sidecar marker are eligible —
+# ambiguity / already-merged / poison-pill skips are never recovered.
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+: "${NIGHTLY_DIR:=$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse}"
+: "${PLANS_DIR:=$HOME/.claude/plans}"
+: "${STALENESS_GUARD:=$SCRIPT_DIR/check-plan-staleness}"
+
+SKIPPED_DIR="$NIGHTLY_DIR/skipped"
+
+DRY_RUN=0
+[ "${1:-}" = "--dry-run" ] && DRY_RUN=1
+
+healed=0
+still_stale=0
+healed_names_file="$(mktemp)"
+trap 'rm -f "$healed_names_file"' EXIT
+
+if ! ls "$SKIPPED_DIR"/*.md >/dev/null 2>&1; then
+    echo "self-heal: skipped/ is empty — nothing to recover."
+    exit 0
+fi
+
+for f in "$SKIPPED_DIR"/*.md; do
+    [ -e "$f" ] || continue
+
+    name="$(basename "$f")"
+    marker="$SKIPPED_DIR/${name}.staleness"
+
+    # Core safety gate: only staleness-marked skips are eligible.
+    [ -f "$marker" ] || continue
+
+    # Run the staleness guard quietly against the skipped/ symlink.
+    if "$STALENESS_GUARD" "$f" >/dev/null 2>&1; then
+        # Guard passes — this plan is eligible for recovery.
+        if [ "$DRY_RUN" -eq 1 ]; then
+            echo "would heal: $name (staleness guard now passes)"
+            healed=$((healed + 1))
+            continue
+        fi
+
+        # Real mode: requeue via automouse-queue (owns mv + sidecar eviction).
+        if NIGHTLY_DIR="$NIGHTLY_DIR" PLANS_DIR="$PLANS_DIR" \
+           "$SCRIPT_DIR/automouse-queue" "$name" >/dev/null 2>&1; then
+            echo "healed: $name (staleness guard now passes — requeued)"
+            printf '%s\n' "$name" >> "$healed_names_file"
+            healed=$((healed + 1))
+        else
+            echo "self-heal: requeue failed for $name (left in skipped/)"
+        fi
+    else
+        # Guard still fails — leave the plan in skipped/.
+        if [ "$DRY_RUN" -eq 1 ]; then
+            echo "still stale: $name (staleness guard still flags it)"
+        fi
+        still_stale=$((still_stale + 1))
+    fi
+done
+
+if [ "$DRY_RUN" -eq 1 ]; then
+    echo "self-heal (dry-run): $healed would heal, $still_stale still stale. No changes made."
+    exit 0
+fi
+
+if [ "$healed" -gt 0 ]; then
+    mkdir -p "$NIGHTLY_DIR/reports"
+    report="$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-self-heal.md"
+    {
+        echo "# Automouse Self-Heal Report — $(date +%Y-%m-%d)"
+        echo ""
+        echo "Plans recovered from staleness skip and requeued:"
+        echo ""
+        while IFS= read -r n; do
+            echo "- $n"
+        done < "$healed_names_file"
+    } > "$report"
+fi
+
+echo "self-heal: $healed plan(s) recovered, $still_stale still stale."
+exit 0

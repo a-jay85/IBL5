@@ -8,6 +8,7 @@ use FreeAgencyPreview\Contracts\FreeAgencyPreviewRepositoryInterface;
 use FreeAgencyPreview\Contracts\FreeAgencyPreviewServiceInterface;
 use FreeAgencyPreview\FreeAgencyPreviewService;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -32,7 +33,7 @@ class FreeAgencyPreviewServiceTest extends TestCase
             self::createActivePlayer(['cy' => 1, 'salary_yr2' => 600]),
         ]);
 
-        $result = $this->service->getUpcomingFreeAgents(2025);
+        $result = $this->service->getUpcomingFreeAgents(2025, 2025);
 
         $this->assertSame([], $result);
     }
@@ -43,7 +44,7 @@ class FreeAgencyPreviewServiceTest extends TestCase
             self::createActivePlayer(['cy' => 2, 'salary_yr3' => 0, 'name' => 'Free Agent']),
         ]);
 
-        $result = $this->service->getUpcomingFreeAgents(2025);
+        $result = $this->service->getUpcomingFreeAgents(2025, 2025);
 
         $this->assertCount(1, $result);
         $this->assertSame('Free Agent', $result[0]['name']);
@@ -56,7 +57,7 @@ class FreeAgencyPreviewServiceTest extends TestCase
             self::createActivePlayer(['cy' => 1, 'salary_yr2' => 500, 'name' => 'UnderContract']),
         ]);
 
-        $result = $this->service->getUpcomingFreeAgents(2025);
+        $result = $this->service->getUpcomingFreeAgents(2025, 2025);
 
         $this->assertCount(1, $result);
         $this->assertSame('Expiring', $result[0]['name']);
@@ -74,7 +75,7 @@ class FreeAgencyPreviewServiceTest extends TestCase
             ]),
         ]);
 
-        $result = $this->service->getUpcomingFreeAgents(2025);
+        $result = $this->service->getUpcomingFreeAgents(2025, 2025);
 
         $this->assertCount(1, $result);
         $this->assertSame('No Contract', $result[0]['name']);
@@ -91,7 +92,7 @@ class FreeAgencyPreviewServiceTest extends TestCase
             ]),
         ]);
 
-        $result = $this->service->getUpcomingFreeAgents(2025);
+        $result = $this->service->getUpcomingFreeAgents(2025, 2025);
 
         $this->assertSame(65, $result[0]['r_fga']);
         $this->assertSame(70, $result[0]['oo']);
@@ -109,7 +110,7 @@ class FreeAgencyPreviewServiceTest extends TestCase
             ]),
         ]);
 
-        $result = $this->service->getUpcomingFreeAgents(2025);
+        $result = $this->service->getUpcomingFreeAgents(2025, 2025);
 
         $this->assertSame('', $result[0]['team_city']);
         $this->assertSame('FFFFFF', $result[0]['color1']);
@@ -120,9 +121,128 @@ class FreeAgencyPreviewServiceTest extends TestCase
     {
         $this->mockRepository->method('getActivePlayers')->willReturn([]);
 
-        $result = $this->service->getUpcomingFreeAgents(2025);
+        $result = $this->service->getUpcomingFreeAgents(2025, 2025);
 
         $this->assertSame([], $result);
+    }
+
+    public function testFutureYearShiftsCheckedContractYear(): void
+    {
+        // cy=1 → offset 0 checks yr2 (600, nonzero); offset 1 checks yr3 (0).
+        $this->mockRepository->method('getActivePlayers')->willReturn([
+            self::createActivePlayer([
+                'cy' => 1,
+                'salary_yr2' => 600,
+                'salary_yr3' => 0,
+                'name' => 'Expires In Two',
+            ]),
+        ]);
+
+        $this->assertSame([], $this->service->getUpcomingFreeAgents(2025, 2025));
+
+        $futureResult = $this->service->getUpcomingFreeAgents(2026, 2025);
+        $this->assertCount(1, $futureResult);
+        $this->assertSame('Expires In Two', $futureResult[0]['name']);
+    }
+
+    public function testTargetContractYearAboveSixIsFreeAgent(): void
+    {
+        // Fully contracted yr1-6; at offset 6 the target contract year is 8 → default => 0.
+        $this->mockRepository->method('getActivePlayers')->willReturn([
+            self::createActivePlayer([
+                'cy' => 1,
+                'salary_yr1' => 500,
+                'salary_yr2' => 600,
+                'salary_yr3' => 700,
+                'salary_yr4' => 800,
+                'salary_yr5' => 900,
+                'salary_yr6' => 1000,
+                'name' => 'Beyond Horizon',
+            ]),
+        ]);
+
+        $result = $this->service->getUpcomingFreeAgents(2031, 2025);
+
+        $this->assertCount(1, $result);
+        $this->assertSame('Beyond Horizon', $result[0]['name']);
+    }
+
+    public function testAllZeroContractIsFreeAgentAtEveryOffset(): void
+    {
+        $this->mockRepository->method('getActivePlayers')->willReturn([
+            self::createActivePlayer([
+                'cy' => 0,
+                'salary_yr1' => 0,
+                'salary_yr2' => 0,
+                'salary_yr3' => 0,
+                'salary_yr4' => 0,
+                'salary_yr5' => 0,
+                'salary_yr6' => 0,
+                'name' => 'No Contract',
+            ]),
+        ]);
+
+        $this->assertCount(1, $this->service->getUpcomingFreeAgents(2025, 2025));
+        $this->assertCount(1, $this->service->getUpcomingFreeAgents(2028, 2025));
+    }
+
+    public function testMaxHorizonOffsetFive(): void
+    {
+        // cy=0 → offset 5 targets contract year 6 (salary_yr6=0) → free agent.
+        $this->mockRepository->method('getActivePlayers')->willReturn([
+            self::createActivePlayer([
+                'cy' => 0,
+                'salary_yr1' => 500,
+                'salary_yr6' => 0,
+                'name' => 'Horizon Five',
+            ]),
+        ]);
+
+        $result = $this->service->getUpcomingFreeAgents(2030, 2025);
+
+        $this->assertCount(1, $result);
+        $this->assertSame('Horizon Five', $result[0]['name']);
+    }
+
+    public function testPlayerNotYetFreeAgentAtRequestedFutureYearIsExcluded(): void
+    {
+        // cy=1 → offset 2 targets contract year 4 (salary_yr4=800, nonzero) → excluded.
+        $this->mockRepository->method('getActivePlayers')->willReturn([
+            self::createActivePlayer([
+                'cy' => 1,
+                'salary_yr2' => 600,
+                'salary_yr3' => 700,
+                'salary_yr4' => 800,
+                'name' => 'Still Under Contract',
+            ]),
+        ]);
+
+        $this->assertSame([], $this->service->getUpcomingFreeAgents(2027, 2025));
+    }
+
+    #[DataProvider('resolveRequestedYearProvider')]
+    public function testResolveRequestedYear(?string $raw, int $expected): void
+    {
+        $this->assertSame(
+            $expected,
+            FreeAgencyPreviewService::resolveRequestedYear($raw, 2025)
+        );
+    }
+
+    /**
+     * @return array<string, array{0: string|null, 1: int}>
+     */
+    public static function resolveRequestedYearProvider(): array
+    {
+        return [
+            'null resolves to current' => [null, 2025],
+            'non-numeric resolves to current' => ['abc', 2025],
+            'below current clamps up to current' => ['2024', 2025],
+            'in range passes through' => ['2027', 2027],
+            'above max clamps to C+5' => ['2034', 2030],
+            'exact current boundary' => ['2025', 2025],
+            'exact max boundary' => ['2030', 2030],
+        ];
     }
 
     public function testPlayerInFinalContractYearIsEligible(): void
@@ -131,7 +251,7 @@ class FreeAgencyPreviewServiceTest extends TestCase
             self::createActivePlayer(['cy' => 6, 'name' => 'Final Year']),
         ]);
 
-        $result = $this->service->getUpcomingFreeAgents(2025);
+        $result = $this->service->getUpcomingFreeAgents(2025, 2025);
 
         $this->assertCount(1, $result);
         $this->assertSame('Final Year', $result[0]['name']);
@@ -143,7 +263,7 @@ class FreeAgencyPreviewServiceTest extends TestCase
             self::createActivePlayer(['cy' => 5, 'salary_yr6' => 500, 'name' => 'Still Under']),
         ]);
 
-        $result = $this->service->getUpcomingFreeAgents(2025);
+        $result = $this->service->getUpcomingFreeAgents(2025, 2025);
 
         $this->assertSame([], $result);
     }

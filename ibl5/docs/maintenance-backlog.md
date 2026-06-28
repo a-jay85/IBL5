@@ -1258,7 +1258,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Eligibility filtering, contract-expiration, projection accuracy.
 **Est. effort:** M
 **Risk if untouched:** Preview misses eligible players or includes ineligible.
-**Status:** Implemented (2026-06-27) — added FreeAgencyPreviewService contract-end boundary tests (cy=6 final-year eligible, cy=5 with year-6 salary excluded) in tests/FreeAgencyPreview/. Held to the current getUpcomingFreeAgents() API to avoid colliding with PR #1162. Repository correctness owned by gated tests/DatabaseIntegration/FreeAgencyPreviewRepositoryTest.php.
+**Status:** Implemented (2026-06-27) — future-year projection restored via URL param (`feat: restore future-year free-agent preview via URL param`, PR #1162) and FreeAgencyPreviewService tests expanded with contract-end boundary cases (cy=6 final-year eligible, cy=5 with year-6 salary excluded) in tests/FreeAgencyPreview/. Repository correctness owned by gated tests/DatabaseIntegration/FreeAgencyPreviewRepositoryTest.php. Projection-accuracy edge coverage still open.
 
 ### 6.11 SeasonHighs — Thin (6 files, 2 tests)
 **Location:** `ibl5/classes/SeasonHighs`

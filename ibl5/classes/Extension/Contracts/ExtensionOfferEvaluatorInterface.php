@@ -25,7 +25,7 @@ interface ExtensionOfferEvaluatorInterface
      * @param array{winner: int, tradition: int, loyalty: int, playing_time: int} $playerPreferences Player's "play for winner" preference (1-5 scale)
      * @return float Modifier contribution (positive for winning teams with winner-preferring players)
      */
-    public function calculateWinnerModifier(array $teamFactors, array $playerPreferences): float;
+    public function computeWinnerModifier(array $teamFactors, array $playerPreferences): float;
 
     /**
      * Calculates the tradition modifier based on franchise history and player preference
@@ -37,7 +37,7 @@ interface ExtensionOfferEvaluatorInterface
      * @param array{winner: int, tradition: int, loyalty: int, playing_time: int} $playerPreferences Player's tradition preference (1-5 scale)
      * @return float Modifier contribution
      */
-    public function calculateTraditionModifier(array $teamFactors, array $playerPreferences): float;
+    public function computeTraditionModifier(array $teamFactors, array $playerPreferences): float;
 
     /**
      * Calculates the loyalty modifier based on player's loyalty rating
@@ -48,7 +48,7 @@ interface ExtensionOfferEvaluatorInterface
      * @param array{winner: int, tradition: int, loyalty: int, playing_time: int} $playerPreferences Player's loyalty rating (1-5 scale)
      * @return float Modifier contribution (0 to 0.1 range)
      */
-    public function calculateLoyaltyModifier(array $playerPreferences): float;
+    public function computeLoyaltyModifier(array $playerPreferences): float;
 
     /**
      * Calculates the playing time modifier based on money committed at position
@@ -61,7 +61,7 @@ interface ExtensionOfferEvaluatorInterface
      * @param array{winner: int, tradition: int, loyalty: int, playing_time: int} $playerPreferences Player's playing time preference (1-5 scale)
      * @return float Modifier contribution
      */
-    public function calculatePlayingTimeModifier(array $teamFactors, array $playerPreferences): float;
+    public function computePlayingTimeModifier(array $teamFactors, array $playerPreferences): float;
 
     /**
      * Calculates the combined modifier from all factors
@@ -81,7 +81,7 @@ interface ExtensionOfferEvaluatorInterface
      *  - + loyaltyModifier
      *  - + playingTimeModifier
      */
-    public function calculateCombinedModifier(array $teamFactors, array $playerPreferences): float;
+    public function computeCombinedModifier(array $teamFactors, array $playerPreferences): float;
 
     /**
      * Evaluates whether a player will accept an extension offer

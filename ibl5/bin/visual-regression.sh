@@ -9,11 +9,14 @@
 
 set -euo pipefail
 
-PLAYWRIGHT_IMAGE="${PLAYWRIGHT_IMAGE:-mcr.microsoft.com/playwright:v1.60.0-jammy}"
-
 # Resolve ibl5/ directory (script lives in ibl5/bin/)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 IBL5_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Single-source the Playwright image tag from ibl5/package.json so the Docker
+# image and the installed @playwright/test client can never drift (ADR-0070).
+# bin/playwright-image-tag lives at the repo root (ibl5/../bin).
+PLAYWRIGHT_IMAGE="${PLAYWRIGHT_IMAGE:-$("$IBL5_DIR/../bin/playwright-image-tag" "$IBL5_DIR/package.json")}"
 
 # ---------- Pre-flight checks ----------
 

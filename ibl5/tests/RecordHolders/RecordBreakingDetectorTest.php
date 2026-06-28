@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Tests\RecordHolders;
 
 use PHPUnit\Framework\TestCase;
+use RecordHolders\NullAnnouncementDispatcher;
 use RecordHolders\RecordBreakingDetector;
+use RecordHolders\Contracts\AnnouncementDispatcherInterface;
 use RecordHolders\Contracts\RecordHoldersRepositoryInterface;
 
 final class RecordBreakingDetectorTest extends TestCase
@@ -416,6 +418,145 @@ final class RecordBreakingDetectorTest extends TestCase
 
         $this->assertCount(1, $teamConfigs);
         $this->assertSame($expectedConfig, $teamConfigs[0]);
+    }
+
+    // --- Pre-impl contract pin (characterization) ---
+
+    /**
+     * Pins the exact announcement-list contract detectAndAnnounce() returns for a
+     * broken player record — count, header, player name, value, previous holder.
+     * Runs green on master before any production edit; the refactor must keep it green.
+     */
+    public function testDetectAndAnnounceReturnsExactAnnouncementContract(): void
+    {
+        $newRecord = $this->makePlayerRecord(['name' => 'New Star', 'date' => '2007-01-15', 'value' => 85]);
+        $previousRecord = $this->makePlayerRecord(['name' => 'Bob Pettit', 'date' => '1996-01-16', 'value' => 80]);
+
+        // Populate only 'points' so exactly one announcement is produced.
+        $batchResult = $this->buildPlayerBatchResult([]);
+        $batchResult['points'] = [$newRecord, $previousRecord];
+
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')->willReturn($batchResult);
+        $this->mockRepository->method('getTopTeamSingleGameBatch')->willReturn($this->buildTeamBatchResult([]));
+        $this->mockRepository->method('getQuadrupleDoubles')->willReturn([]);
+
+        $result = $this->detector->detectAndAnnounce(['2007-01-15']);
+
+        $expectedMessage = "**NEW IBL RECORD!**\n"
+            . '[New Star](https://iblhoops.net/modules.php?name=Player&pa=showpage&pid=100) (Heat) '
+            . 'just recorded **85 points** in a regular season game, '
+            . "breaking Bob Pettit's all-time record of 80 points!";
+
+        $this->assertCount(1, $result);
+        $this->assertSame($expectedMessage, $result[0]);
+    }
+
+    // --- Post-impl dispatch integration tests ---
+
+    /**
+     * Matrix row 2: each returned announcement is dispatched exactly once, in order.
+     */
+    public function testDispatchesEachAnnouncementExactlyOnce(): void
+    {
+        $newRecord = $this->makePlayerRecord(['name' => 'New Star', 'date' => '2007-01-15', 'value' => 85]);
+        $previousRecord = $this->makePlayerRecord(['name' => 'Bob Pettit', 'date' => '1996-01-16', 'value' => 80]);
+
+        $batchResult = $this->buildPlayerBatchResult([]);
+        $batchResult['points'] = [$newRecord, $previousRecord];
+
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')->willReturn($batchResult);
+        $this->mockRepository->method('getTopTeamSingleGameBatch')->willReturn($this->buildTeamBatchResult([]));
+        $this->mockRepository->method('getQuadrupleDoubles')->willReturn([]);
+
+        $spy = new class implements AnnouncementDispatcherInterface {
+            /** @var list<string> */
+            public array $captured = [];
+
+            public function dispatch(string $message): void
+            {
+                $this->captured[] = $message;
+            }
+        };
+
+        $detector = new RecordBreakingDetector($this->mockRepository, $spy);
+        $result = $detector->detectAndAnnounce(['2007-01-15']);
+
+        $this->assertNotEmpty($result);
+        $this->assertSame($result, $spy->captured, 'Each announcement must be dispatched exactly once, in order');
+    }
+
+    /**
+     * Matrix row 3: NullDispatcher dispatches nothing, yet detectAndAnnounce()
+     * still returns the full announcement list — detection is unaffected by no-op dispatch.
+     */
+    public function testNullDispatcherDispatchesNothingButDetectionStillReturnsFullResult(): void
+    {
+        $newRecord = $this->makePlayerRecord(['name' => 'New Star', 'date' => '2007-01-15', 'value' => 85]);
+        $previousRecord = $this->makePlayerRecord(['name' => 'Bob Pettit', 'date' => '1996-01-16', 'value' => 80]);
+
+        $batchResult = $this->buildPlayerBatchResult([]);
+        $batchResult['points'] = [$newRecord, $previousRecord];
+
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')->willReturn($batchResult);
+        $this->mockRepository->method('getTopTeamSingleGameBatch')->willReturn($this->buildTeamBatchResult([]));
+        $this->mockRepository->method('getQuadrupleDoubles')->willReturn([]);
+
+        $detector = new RecordBreakingDetector($this->mockRepository, new NullAnnouncementDispatcher());
+        $result = $detector->detectAndAnnounce(['2007-01-15']);
+
+        $expectedMessage = "**NEW IBL RECORD!**\n"
+            . '[New Star](https://iblhoops.net/modules.php?name=Player&pa=showpage&pid=100) (Heat) '
+            . 'just recorded **85 points** in a regular season game, '
+            . "breaking Bob Pettit's all-time record of 80 points!";
+
+        $this->assertCount(1, $result, 'Detection must still return full results with NullDispatcher');
+        $this->assertSame($expectedMessage, $result[0]);
+    }
+
+    /**
+     * Matrix row 4: a dispatcher that throws on the first announcement does NOT abort
+     * the rest — later announcements are still dispatched and no exception propagates.
+     */
+    public function testFailingDispatchDoesNotAbortRemainingAnnouncements(): void
+    {
+        // Two separate announcements: a broken player record and a broken team record.
+        $playerRecord = $this->makePlayerRecord(['name' => 'New Star', 'date' => '2007-01-15', 'value' => 85]);
+        $prevPlayerRecord = $this->makePlayerRecord(['name' => 'Bob Pettit', 'date' => '1996-01-16', 'value' => 80]);
+        $teamRecord = $this->makeTeamRecord(['team_name' => 'Heat', 'date' => '2007-01-15', 'value' => 150]);
+        $prevTeamRecord = $this->makeTeamRecord(['team_name' => 'Bulls', 'date' => '2000-03-10', 'value' => 145]);
+
+        $playerBatch = $this->buildPlayerBatchResult([]);
+        $playerBatch['points'] = [$playerRecord, $prevPlayerRecord];
+
+        $teamBatch = $this->buildTeamBatchResult([]);
+        $teamBatch['team_points'] = [$teamRecord, $prevTeamRecord];
+
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')->willReturn($playerBatch);
+        $this->mockRepository->method('getTopTeamSingleGameBatch')->willReturn($teamBatch);
+        $this->mockRepository->method('getQuadrupleDoubles')->willReturn([]);
+
+        // Throws on first dispatch, records every subsequent message.
+        $throwingDispatcher = new class implements AnnouncementDispatcherInterface {
+            /** @var list<string> */
+            public array $capturedAfterFirst = [];
+            private bool $isFirst = true;
+
+            public function dispatch(string $message): void
+            {
+                if ($this->isFirst) {
+                    $this->isFirst = false;
+                    throw new \RuntimeException('Simulated dispatch failure on first message');
+                }
+                $this->capturedAfterFirst[] = $message;
+            }
+        };
+
+        $detector = new RecordBreakingDetector($this->mockRepository, $throwingDispatcher);
+        $result = $detector->detectAndAnnounce(['2007-01-15']);
+
+        $this->assertCount(2, $result, 'detectAndAnnounce must return all announcements regardless of dispatch failures');
+        $this->assertCount(1, $throwingDispatcher->capturedAfterFirst, 'Announcements after a failed dispatch must still be dispatched');
+        $this->assertSame($result[1], $throwingDispatcher->capturedAfterFirst[0], 'Second announcement must be dispatched after the first one failed');
     }
 
     // --- Helper methods ---

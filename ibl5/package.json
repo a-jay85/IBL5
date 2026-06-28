@@ -41,17 +41,17 @@
       "brace-expansion": "5.0.6"
     }
   },
-  "//pin": "@playwright/test is exact-pinned (no caret) to keep all 5 surfaces in lock-step with the v1.60.0-jammy Docker image; CI job 'playwright-version-drift' enforces this. The transitive playwright-core@1.58.2 carried via @axe-core/playwright is left untouched — overriding it risks an incompatible axe-core/playwright-core pair, and it is separate from the runtime Playwright that executes tests.",
+  "//pin": "@playwright/test is exact-pinned (no caret) so bin/playwright-image-tag derives the Playwright Docker image tag from THIS version at runtime — the image and the installed client cannot drift (ADR-0070). Dependabot bumps this; every CI surface follows automatically. The transitive playwright-core carried via @axe-core/playwright is left untouched — overriding it risks an incompatible axe-core/playwright-core pair, and it is separate from the runtime Playwright that executes tests.",
   "devDependencies": {
-    "@axe-core/playwright": "^4.11.3",
+    "@axe-core/playwright": "^4.12.1",
     "@lhci/cli": "^0.15.1",
-    "@playwright/test": "1.60.0",
+    "@playwright/test": "1.61.1",
     "@tailwindcss/cli": "^4.3.1",
     "browser-sync": "^3.0.4",
     "eslint": "^10.5.0",
     "eslint-plugin-playwright": "^2.10.4",
     "tailwindcss": "^4.3.1",
-    "typescript-eslint": "^8.61.1",
+    "typescript-eslint": "^8.62.0",
     "vitest": "^4.1.9"
   }
 }

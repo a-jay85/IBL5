@@ -3,7 +3,7 @@ description: "Plan an implementation task: enforces a verification matrix, direc
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
-last_verified: 2026-06-22
+last_verified: 2026-06-28
 
 ---
 
@@ -66,7 +66,7 @@ The Plan agent auto-loads CLAUDE.md, all always-loaded rules (agent-tiering, cor
 
 Launch a **single Plan agent** (`subagent_type: "plan-architect"` — its definition carries `model: opus` and `effort: xhigh`; do NOT pass an inline `model` override) with a prompt containing ALL of these:
 
-**Run this step inline — never delegate `/plan` itself.** The orchestrating session owns Steps 1–5 directly and spawns exactly **one** `plan-architect` per PR-sized unit. Do NOT hand the whole `/plan` invocation to a `general-purpose`/`claude` sub-agent (or fan it out across several), and do NOT have any such agent fire `/plan` on your behalf. Those agent types carry `Tools: *` — they *can* spawn further agents, so delegating `/plan` to them produces a `general-purpose → plan-architect` nest, exactly the multi-level `plan-architect` tree the flat-fan-out rule forbids (`agent-tiering.md` § Nested Sub-Agents). `plan-architect`/`Plan`/`Explore` cannot cause this themselves — they lack the `Agent` tool — so the only way the nest appears is an orchestrator delegating `/plan` outward. Keep planning one level deep: this session → one `plan-architect`.
+**Run this step inline — never delegate `/plan` itself.** The orchestrating session owns Steps 1–5 directly and spawns exactly **one** `plan-architect` per PR-sized unit. Do NOT hand the whole `/plan` invocation to a `general-purpose`/`claude` sub-agent (or fan it out across several), and do NOT have any such agent fire `/plan` on your behalf. Those agent types carry `Tools: *` — they *can* spawn further agents, so delegating `/plan` to them produces a `general-purpose → plan-architect` nest, exactly the multi-level `plan-architect` tree the flat-fan-out rule forbids (`agent-tiering.md` § Flat fan-out). `plan-architect`/`Plan`/`Explore` cannot cause this themselves — they lack the `Agent` tool — so the only way the nest appears is an orchestrator delegating `/plan` outward. Keep planning one level deep: this session → one `plan-architect`.
 
 1. **Task description** from `$ARGUMENTS` — when the work was split in Step 2.5, scope this to the single PR being planned and state which PR it is and what it depends on
 2. **Exploration results** from Step 2 — file paths, code traces, existing patterns, test coverage findings
@@ -245,10 +245,25 @@ auto_merge: false
 
 Either field may appear alone; the block above shows both (a mechanical column-rename sweep, e.g., can be Sonnet-eligible **and** want a human at merge). A plan that keeps `auto_merge: false` must also carry the `## Automouse Hold Justification` section from Step 4.5 — `bin/check-plan` gate `[H]` fails the plan if it is missing. Absence of `auto_merge` leaves the PR eligible to auto-merge (still subject to every other Phase-6.5 condition). Only the line-1 block is parsed (Phase 6.5), so a body that documents the syntax can't opt a plan out. Failure modes are bounded: absent/garbled → eligible to arm (post-plan's own gates — code review, security audit, CI-green-required, the `feat:` floor, the PR-time safety verdict, and the headless golden-snapshot block — still apply); a wrongly-applied `false` → the PR just waits for a manual merge.
 
+## Step 5.5: Auto-queue queue-safe plans
+
+A plan is **queue-safe** the moment `bin/check-plan` (Step 5) exits 0 — that gate already enforces no unresolved decisions, no `DECIDE`/`TBD`/`subject to…` tokens, resolved decision-triggers, and resolved reuse targets, so a passing plan is fully specified for unattended automouse execution. Queue-safety is **independent of `auto_merge`**: a plan held for human merge (`auto_merge: false`) is still safe to *implement* autonomously — only its merge waits (Phase 6.5 condition (7)).
+
+For every plan that passed `bin/check-plan` in Step 5, decide its disposition by this precedence (the default is **queue**):
+
+1. **Explicit token in `$ARGUMENTS`** wins outright: `--implement` (or "implement now") → do NOT queue; leave the plan on disk and report it ready to implement. `--queue` → queue.
+2. **Else, clear session intent to implement now** (the user said they will implement it in this session, or implementation is already underway) → do NOT queue.
+3. **Else, default: auto-queue.** Run `bin/automouse-queue <slug>` for the plan.
+
+When the work was split into multiple PRs (Step 2.5), queue **every** queue-safe unit, running `bin/automouse-queue <slug>` once per plan in dependency order (the order they must merge). A plan that did not pass `bin/check-plan` is never queued — fix it first.
+
+Report which plans were queued (and which were left for in-session implementation) in Step 6.
+
 ## Step 6: Report
 
 Tell the user:
 - The plan file path — **all of them** when the work was split into multiple PRs
+- The **disposition** of each plan: auto-queued for automouse (default), or left for in-session implementation (`--implement` / clear implement-now intent) — and the resulting `bin/automouse-queue` state
 - A one-line matrix summary per plan (e.g., "12 items: 7 PHPUnit, 3 E2E, 2 CLI-executable, 0 truly-manual")
 - Whether any security surface was flagged and how each is defended (or "no security surface touched")
 - Whether the PR is eligible to auto-merge on green CI (default) or is held for a human merge (`auto_merge: false`, per Step 4 gate 14) — and why, if held

@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-automouse-concurrency — regression test proving two simultaneous
+# `bin/automouse-run` sessions are safe: the atomic-mkdir claim lock
+# (claim_next_plan) guarantees each queued plan is executed exactly once, the
+# queue drains correctly under contention, and all locks/attempt files are reaped.
+#
+# It runs the REAL automouse-run with two isolations so it costs zero tokens and
+# has no side effects:
+#   1. NIGHTLY_DIR (hardcoded in the runner) is redirected to a temp dir.
+#   2. `claude` is stubbed on PATH — the stub writes the impl handoff, then on the
+#      post-plan call moves the plan to done/, simulating a successful plan in ~2s.
+# Two copies are launched at once against a shared fake queue; the stub's ~2s
+# sleep guarantees the two runners' phases overlap in wall-clock time, so this
+# exercises real concurrent claiming, not accidental serialization.
+#
+# macOS-only: the automouse pipeline is built on macOS launchd + BSD coreutils
+# (the runner uses `caffeinate`, `stat -f`, BSD `date`). On Linux CI it skips.
+#
+# Run: bin/test-automouse-concurrency  (exit 0 = pass/skip, 1 = a safety property failed)
+
+set -u
+
+if [ "$(uname)" != "Darwin" ]; then
+    echo "SKIP: test-automouse-concurrency is macOS-only (automouse-run depends on launchd/BSD tools)."
+    exit 0
+fi
+
+REPO="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$(mktemp -d)"
+trap 'rm -rf "$ROOT"' EXIT
+
+NDIR="$ROOT/automouse"
+PLANS="$ROOT/plans"
+STUBDIR="$ROOT/stub"
+TRACE="$ROOT/trace.log"      # stub appends: <epoch_start> <epoch_end> <stub_pid> <plan> <phase>
+mkdir -p "$NDIR/queue" "$NDIR/handoff" "$NDIR/logs" "$NDIR/reports" "$NDIR/done" "$NDIR/skipped" "$PLANS" "$STUBDIR"
+
+N_PLANS=4
+for i in $(seq 1 $N_PLANS); do
+    printf '# fake-plan-%s\n\nimpl_model: sonnet\n' "$i" > "$PLANS/fake-plan-$i.md"
+    ln -s "$PLANS/fake-plan-$i.md" "$NDIR/queue/fake-plan-$i.md"
+done
+
+# --- Stub `claude` ---------------------------------------------------------
+# Parses the real PLAN_FILE=<name> the runner appends LAST to the prompt (the
+# prompt body itself contains a literal `PLAN_FILE=<filename>` placeholder, so we
+# take the final match). First call per plan (no handoff yet) = impl: writes
+# handoff JSON. Second call (handoff present) = postplan: moves the queue symlink
+# to done/ and clears the handoff + attempts, mirroring a real post-plan success.
+# Emits one stream-json `result` event so automouse-stream-filter records cost
+# and exits. Sleeps ~2s so two concurrent runners measurably overlap.
+cat > "$STUBDIR/claude" <<STUB
+#!/usr/bin/env bash
+set -u
+NDIR="$NDIR"
+TRACE="$TRACE"
+plan="\$(printf '%s\n' "\$*" | grep -oE 'PLAN_FILE=[^[:space:]]+' | tail -1 | cut -d= -f2)"
+start=\$(date +%s)
+sleep 2
+if [ -n "\$plan" ]; then
+    hf="\$NDIR/handoff/\$plan.json"
+    if [ ! -f "\$hf" ]; then
+        phase=impl
+        printf '{"branch":"x","plan":"%s"}\n' "\$plan" > "\$hf"
+    else
+        phase=postplan
+        mv "\$NDIR/queue/\$plan" "\$NDIR/done/\$plan" 2>/dev/null || true
+        rm -f "\$hf" "\$NDIR/queue/\$plan.attempts" 2>/dev/null || true
+    fi
+    printf '%s %s %s %s %s\n' "\$start" "\$(date +%s)" "\$\$" "\$plan" "\$phase" >> "\$TRACE"
+fi
+printf '{"type":"result","subtype":"success","stop_reason":"end_turn","num_turns":1,"duration_ms":2000,"total_cost_usd":0.001,"usage":{"input_tokens":1,"output_tokens":1}}\n'
+exit 0
+STUB
+chmod +x "$STUBDIR/claude"
+
+# --- Copy the REAL runner; redirect NIGHTLY_DIR + force our stub onto PATH ---
+# Portable (no `sed -i`): transform into a new file. Two substitutions —
+#   1. point the hardcoded NIGHTLY_DIR at our temp dir;
+#   2. replace the runner's own `export PATH=` (which re-prepends system bins and
+#      would shadow our stub) with one that puts STUBDIR first.
+RUNNER="$ROOT/automouse-run"
+sed -e "s#^NIGHTLY_DIR=.*#NIGHTLY_DIR=\"$NDIR\"#" \
+    -e "s#^export PATH=.*#export PATH=\"$STUBDIR:/usr/local/bin:/opt/homebrew/bin:\$PATH\"#" \
+    "$REPO/bin/automouse-run" > "$RUNNER"
+chmod +x "$RUNNER"
+
+echo "Seeded $N_PLANS plans. Launching two concurrent runners..."
+"$RUNNER" > "$ROOT/runA.out" 2>&1 &
+A=$!
+"$RUNNER" > "$ROOT/runB.out" 2>&1 &
+B=$!
+wait "$A"; echo "runner A (pid $A) exited $?"
+wait "$B"; echo "runner B (pid $B) exited $?"
+
+echo
+echo "=========================== RESULTS ==========================="
+FAIL=0
+
+echo "--- trace (one impl + one postplan per plan) ---"
+sort "$TRACE" 2>/dev/null
+
+# 1. Every plan completed exactly once — the core safety property (no double-claim).
+pp_total=$(awk '/ postplan$/' "$TRACE" 2>/dev/null | wc -l | tr -d ' ')
+pp_uniq=$(awk '/ postplan$/{print $4}' "$TRACE" 2>/dev/null | sort -u | wc -l | tr -d ' ')
+if [ "$pp_total" -eq "$N_PLANS" ] && [ "$pp_uniq" -eq "$N_PLANS" ]; then
+    echo "PASS: all $N_PLANS plans completed exactly once (no double-processing)."
+else
+    echo "FAIL: postplan total=$pp_total uniq=$pp_uniq (expected $N_PLANS each)."; FAIL=1
+fi
+
+# 2. Temporal overlap: phases from different stub PIDs ran at the same wall-clock
+#    time → the two runners genuinely worked in parallel, not serialized.
+overlap=$(awk '
+  { s[NR]=$1; e[NR]=$2; pid[NR]=$3; n=NR }
+  END {
+    for(i=1;i<=n;i++) for(j=i+1;j<=n;j++)
+      if(pid[i]!=pid[j] && s[i] < e[j] && s[j] < e[i]) { print "yes"; exit }
+  }' "$TRACE" 2>/dev/null)
+if [ "$overlap" = "yes" ]; then
+    echo "PASS: phases overlapped in time (TRUE concurrency)."
+else
+    echo "FAIL: no temporal overlap — runners serialized, concurrency not exercised."; FAIL=1
+fi
+
+# 3. No leftover claim locks / attempt files / queued plans (cleanup ran).
+locks=$(ls -d "$NDIR"/queue/*.lock 2>/dev/null | wc -l | tr -d ' ')
+attempts=$(ls "$NDIR"/queue/*.attempts 2>/dev/null | wc -l | tr -d ' ')
+leftover_md=$(ls "$NDIR"/queue/*.md 2>/dev/null | wc -l | tr -d ' ')
+if [ "$locks" -eq 0 ] && [ "$attempts" -eq 0 ] && [ "$leftover_md" -eq 0 ]; then
+    echo "PASS: queue fully drained, all locks + attempt files reaped."
+else
+    echo "FAIL: residue in queue/ (locks=$locks attempts=$attempts md=$leftover_md)."; FAIL=1
+fi
+
+# 4. All plans landed in done/.
+done_count=$(ls "$NDIR"/done/*.md 2>/dev/null | wc -l | tr -d ' ')
+if [ "$done_count" -eq "$N_PLANS" ]; then
+    echo "PASS: all $N_PLANS plans in done/."
+else
+    echo "FAIL: $done_count in done/ (expected $N_PLANS)."; FAIL=1
+fi
+
+echo "==============================================================="
+if [ "$FAIL" -ne 0 ]; then
+    echo "RESULT: FAILED"
+    exit 1
+fi
+echo "RESULT: all passed"
+exit 0

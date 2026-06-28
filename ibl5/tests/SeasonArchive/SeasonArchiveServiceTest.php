@@ -499,6 +499,80 @@ class SeasonArchiveServiceTest extends TestCase
         $this->assertNotContains('Season1 MVP', $capturedNames[1]);
     }
 
+    public function testReusedInstanceCollectsSameNamesAsFreshInstance(): void
+    {
+        $awards1989 = [
+            ['year' => 1989, 'award' => 'Most Valuable Player (1st)', 'name' => 'Season1 MVP', 'table_id' => 1],
+        ];
+        $awards1990 = [
+            ['year' => 1990, 'award' => 'Most Valuable Player (1st)', 'name' => 'Season2 MVP', 'table_id' => 2],
+        ];
+
+        $buildRepo = static function (array $awards) {
+            $repo = self::createStub(SeasonArchiveRepositoryInterface::class);
+            $repo->method('getTeamConferences')->willReturn([]);
+            $repo->method('getAwardsByYear')->willReturn($awards);
+            $repo->method('getPlayoffResultsByYear')->willReturn([]);
+            $repo->method('getTeamAwardsByYear')->willReturn([]);
+            $repo->method('getAllGmAwardsWithTeams')->willReturn([]);
+            $repo->method('getAllGmTenuresWithTeams')->willReturn([]);
+            $repo->method('getHeatWinLossByYear')->willReturn([]);
+            $repo->method('getTeamColors')->willReturn([]);
+
+            return $repo;
+        };
+
+        // Fresh single-call instance for 1990 — the reference set of collected names.
+        $freshNames = [];
+        $freshRepo = $buildRepo($awards1990);
+        $freshRepo->method('getPlayerIdsByNames')->willReturnCallback(
+            static function (array $names) use (&$freshNames): array {
+                $freshNames = $names;
+
+                return [];
+            },
+        );
+        (new SeasonArchiveService($freshRepo))->getSeasonDetail(1990);
+
+        // Reused instance: 1989 first (potential contaminant), then 1990 on the SAME instance.
+        $reusedNames = [];
+        $callCount = 0;
+        $reusedRepo = self::createStub(SeasonArchiveRepositoryInterface::class);
+        $reusedRepo->method('getTeamConferences')->willReturn([]);
+        $reusedRepo->method('getPlayoffResultsByYear')->willReturn([]);
+        $reusedRepo->method('getTeamAwardsByYear')->willReturn([]);
+        $reusedRepo->method('getAllGmAwardsWithTeams')->willReturn([]);
+        $reusedRepo->method('getAllGmTenuresWithTeams')->willReturn([]);
+        $reusedRepo->method('getHeatWinLossByYear')->willReturn([]);
+        $reusedRepo->method('getTeamColors')->willReturn([]);
+        $reusedRepo->method('getAwardsByYear')->willReturnCallback(
+            static function (int $year) use ($awards1989, $awards1990, &$callCount): array {
+                $callCount++;
+
+                return $callCount === 1 ? $awards1989 : $awards1990;
+            },
+        );
+        $reusedRepo->method('getPlayerIdsByNames')->willReturnCallback(
+            static function (array $names) use (&$reusedNames): array {
+                $reusedNames = $names;   // overwritten each call; ends on the 1990 call
+
+                return [];
+            },
+        );
+
+        $service = new SeasonArchiveService($reusedRepo);
+        $service->getSeasonDetail(1989);
+        $service->getSeasonDetail(1990);
+
+        // The reused instance's second (1990) collected-name set must EQUAL the fresh
+        // single-call set — no stale 'Season1 MVP' carryover changes the collected names.
+        sort($freshNames);
+        sort($reusedNames);
+        $this->assertSame($freshNames, $reusedNames);
+        $this->assertContains('Season2 MVP', $reusedNames);
+        $this->assertNotContains('Season1 MVP', $reusedNames);
+    }
+
     public function testAllStarCoachesIncludedInSeasonDetail(): void
     {
         $mockRepo = $this->createMock(SeasonArchiveRepositoryInterface::class);

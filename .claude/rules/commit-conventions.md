@@ -1,6 +1,9 @@
 ---
-description: Conventional-commit type rubric for PR titles — when a change is feat: (and trips the human-signoff hold) vs. fix/refactor/chore/docs/etc. Single source of truth for /post-plan Phase 2 titling.
-last_verified: 2026-06-20
+description: Conventional-commit type rubric for PR titles — when a change is feat: (and trips the human-signoff hold) vs. fix/refactor/chore/docs/etc. Single source of truth for /post-plan Phase 2 titling. Read-on-demand at title time (the one-line decision test is mirrored in auto-commit.md); auto-loads only when editing the gate definitions.
+last_verified: 2026-06-27
+paths:
+  - ".github/workflows/human-signoff.yml"
+  - ".claude/skills/post-plan/SKILL.md"
 ---
 
 # Commit-Type Rubric (PR titles)

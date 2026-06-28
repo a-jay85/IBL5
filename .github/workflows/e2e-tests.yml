@@ -69,24 +69,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - name: Verify all surfaces pin v1.60.0-jammy
-        run: |
-          EXPECTED="v1.60.0-jammy"
-          EXPECTED_NPM="1.60.0"
-          fail=0
-          grep -q "playwright:${EXPECTED}" ibl5/bin/visual-regression.sh \
-            || { echo "drift: ibl5/bin/visual-regression.sh"; fail=1; }
-          grep -q "playwright:${EXPECTED}" .github/actions/setup-docker-e2e/action.yml \
-            || { echo "drift: .github/actions/setup-docker-e2e/action.yml"; fail=1; }
-          grep -q "playwright:${EXPECTED}" .github/workflows/e2e-tests.yml \
-            || { echo "drift: .github/workflows/e2e-tests.yml"; fail=1; }
-          grep -q "\"@playwright/test\": \"${EXPECTED_NPM}\"" ibl5/package.json \
-            || { echo "drift: ibl5/package.json"; fail=1; }
-          grep -q "\"@playwright/test@${EXPECTED_NPM}\"" ibl5/bun.lock \
-            || { echo "drift: ibl5/bun.lock"; fail=1; }
-          grep -q "\"@playwright/test\": \"${EXPECTED_NPM}\"" IBL6/package.json \
-            || { echo "drift: IBL6/package.json"; fail=1; }
-          exit $fail
+      - name: Verify Playwright image tag is derived, never hardcoded
+        run: bin/check-playwright-pinning
 
   e2e:
     name: Visual Regression
@@ -118,7 +102,7 @@ jobs:
 
       # --- Dependency Caching ---
       - name: Cache vendor directory
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ibl5/vendor
           key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
@@ -126,7 +110,7 @@ jobs:
             ${{ runner.os }}-vendor-
 
       - name: Cache node_modules
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ibl5/node_modules
           key: ${{ runner.os }}-bun-${{ hashFiles('ibl5/bun.lock') }}
@@ -174,7 +158,7 @@ jobs:
             -e "IBL_TEST_USER_REGULAR=$IBL_TEST_USER_REGULAR" \
             -e "IBL_TEST_PASS_REGULAR=$IBL_TEST_PASS_REGULAR" \
             -e "HOME=/tmp" \
-            mcr.microsoft.com/playwright:v1.60.0-jammy \
+            "$PW_IMAGE" \
             npx playwright test --config=playwright.visual.config.ts
 
       # --- Visual-review publishing (review run only) ---
@@ -240,7 +224,7 @@ jobs:
             -e "IBL_TEST_USER_REGULAR=$IBL_TEST_USER_REGULAR" \
             -e "IBL_TEST_PASS_REGULAR=$IBL_TEST_PASS_REGULAR" \
             -e "HOME=/tmp" \
-            mcr.microsoft.com/playwright:v1.60.0-jammy \
+            "$PW_IMAGE" \
             npx playwright test --config=playwright.visual.config.ts --update-snapshots
 
       - name: Commit and push updated baselines
@@ -298,7 +282,7 @@ jobs:
         uses: oven-sh/setup-bun@v2
 
       - name: Cache vendor directory
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ibl5/vendor
           key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
@@ -306,7 +290,7 @@ jobs:
             ${{ runner.os }}-vendor-
 
       - name: Cache node_modules
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ibl5/node_modules
           key: ${{ runner.os }}-bun-${{ hashFiles('ibl5/bun.lock') }}
@@ -355,7 +339,7 @@ jobs:
 
       # --- Dependency Caching ---
       - name: Cache vendor directory
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ibl5/vendor
           key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
@@ -363,7 +347,7 @@ jobs:
             ${{ runner.os }}-vendor-
 
       - name: Cache node_modules
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ibl5/node_modules
           key: ${{ runner.os }}-bun-${{ hashFiles('ibl5/bun.lock') }}
@@ -407,7 +391,7 @@ jobs:
             -e "IBL_TEST_USER_REGULAR=$IBL_TEST_USER_REGULAR" \
             -e "IBL_TEST_PASS_REGULAR=$IBL_TEST_PASS_REGULAR" \
             -e "HOME=/tmp" \
-            mcr.microsoft.com/playwright:v1.60.0-jammy \
+            "$PW_IMAGE" \
             npx playwright test \
               --project=chromium \
               --shard=${{ matrix.shard-index }}/${{ matrix.total-shards }} \
@@ -457,7 +441,7 @@ jobs:
 
       # --- Dependency Caching ---
       - name: Cache vendor directory
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ibl5/vendor
           key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
@@ -465,7 +449,7 @@ jobs:
             ${{ runner.os }}-vendor-
 
       - name: Cache node_modules
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ibl5/node_modules
           key: ${{ runner.os }}-bun-${{ hashFiles('ibl5/bun.lock') }}
@@ -509,7 +493,7 @@ jobs:
             -e "IBL_TEST_USER_REGULAR=$IBL_TEST_USER_REGULAR" \
             -e "IBL_TEST_PASS_REGULAR=$IBL_TEST_PASS_REGULAR" \
             -e "HOME=/tmp" \
-            mcr.microsoft.com/playwright:v1.60.0-jammy \
+            "$PW_IMAGE" \
             npx playwright test \
               --project=mutators \
               --workers=1 \
@@ -579,8 +563,13 @@ jobs:
           done
           echo "ibl6 is healthy"
 
+      - name: Derive Playwright image tag
+        run: |
+          tag="$(bin/playwright-image-tag IBL6/package.json)"
+          echo "PW_IMAGE=$tag" >> "$GITHUB_ENV"
+
       - name: Pull Playwright image
-        run: docker pull mcr.microsoft.com/playwright:v1.60.0-jammy
+        run: docker pull "$PW_IMAGE"
 
       - name: Install IBL6 dependencies
         working-directory: IBL6
@@ -597,7 +586,7 @@ jobs:
             -w /IBL6 \
             -e "BASE_URL=http://ibl6:3001" \
             -e "HOME=/tmp" \
-            mcr.microsoft.com/playwright:v1.60.0-jammy \
+            "$PW_IMAGE" \
             npx playwright test --config=playwright.visual.config.ts
 
       - name: Regenerate IBL6 visual regression baselines
@@ -611,7 +600,7 @@ jobs:
             -w /IBL6 \
             -e "BASE_URL=http://ibl6:3001" \
             -e "HOME=/tmp" \
-            mcr.microsoft.com/playwright:v1.60.0-jammy \
+            "$PW_IMAGE" \
             npx playwright test --config=playwright.visual.config.ts --update-snapshots
 
       - name: Commit and push updated IBL6 baselines
@@ -677,8 +666,13 @@ jobs:
           done
           echo "ibl6 is healthy"
 
+      - name: Derive Playwright image tag
+        run: |
+          tag="$(bin/playwright-image-tag IBL6/package.json)"
+          echo "PW_IMAGE=$tag" >> "$GITHUB_ENV"
+
       - name: Pull Playwright image
-        run: docker pull mcr.microsoft.com/playwright:v1.60.0-jammy
+        run: docker pull "$PW_IMAGE"
 
       - name: Install IBL6 dependencies
         working-directory: IBL6
@@ -693,7 +687,7 @@ jobs:
             -w /IBL6 \
             -e "BASE_URL=http://ibl6:3001" \
             -e "HOME=/tmp" \
-            mcr.microsoft.com/playwright:v1.60.0-jammy \
+            "$PW_IMAGE" \
             npx playwright test
 
       - name: Upload IBL6 E2E report
@@ -767,7 +761,7 @@ jobs:
 
       - name: Restore CML cache
         if: always() && github.event_name == 'pull_request'
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cml
           key: ${{ runner.os }}-cml-0.20.6

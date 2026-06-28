@@ -272,42 +272,42 @@ foreach ($gameRecordOffsets as $offset) {
                 // Use the actual team name from the .bxs (should match header)
             }
 
-            $repository->insertTeamBoxscore(
-                $header['date'],
-                $teamName,
-                $gameOfDay,
-                $header['visId'],
-                $header['homeId'],
-                0, // attendance
-                0, // capacity
-                0, // visitor_wins
-                0, // visitor_losses
-                0, // home_wins
-                0, // home_losses
-                0, // visitor_q1_points
-                0, // visitor_q2_points
-                0, // visitor_q3_points
-                0, // visitor_q4_points
-                0, // visitor_ot_points
-                0, // home_q1_points
-                0, // home_q2_points
-                0, // home_q3_points
-                0, // home_q4_points
-                0, // home_ot_points
-                $player['fgm'],
-                $player['fga'],
-                $player['ftm'],
-                $player['fta'],
-                $player['tpm'],
-                $player['tpa'],
-                $player['oreb'],
-                $player['dreb'],
-                $player['ast'],
-                $player['stl'],
-                $player['tov'],
-                $player['blk'],
-                $player['pf'],
-            );
+            $repository->insertTeamBoxscore([
+                'game_date' => $header['date'],
+                'name' => $teamName,
+                'game_of_that_day' => $gameOfDay,
+                'visitor_teamid' => $header['visId'],
+                'home_teamid' => $header['homeId'],
+                'attendance' => 0,
+                'capacity' => 0,
+                'visitor_wins' => 0,
+                'visitor_losses' => 0,
+                'home_wins' => 0,
+                'home_losses' => 0,
+                'visitor_q1_points' => 0,
+                'visitor_q2_points' => 0,
+                'visitor_q3_points' => 0,
+                'visitor_q4_points' => 0,
+                'visitor_ot_points' => 0,
+                'home_q1_points' => 0,
+                'home_q2_points' => 0,
+                'home_q3_points' => 0,
+                'home_q4_points' => 0,
+                'home_ot_points' => 0,
+                'game_2gm' => $player['fgm'],
+                'game_2ga' => $player['fga'],
+                'game_ftm' => $player['ftm'],
+                'game_fta' => $player['fta'],
+                'game_3gm' => $player['tpm'],
+                'game_3ga' => $player['tpa'],
+                'game_orb' => $player['oreb'],
+                'game_drb' => $player['dreb'],
+                'game_ast' => $player['ast'],
+                'game_stl' => $player['stl'],
+                'game_tov' => $player['tov'],
+                'game_blk' => $player['blk'],
+                'game_pf' => $player['pf'],
+            ]);
             $gamePlayers++;
         } else {
             // Player row

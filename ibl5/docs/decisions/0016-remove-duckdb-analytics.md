@@ -1,6 +1,6 @@
 ---
 description: Rationale for removing the DuckDB OLAP analytics layer, write-back tables, and associated tooling.
-last_verified: 2026-04-28
+last_verified: 2026-06-27
 ---
 
 # ADR-0016: Remove DuckDB Analytics Layer

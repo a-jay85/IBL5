@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Updater;
 
+use League\League;
 use Season\Season;
 use Standings\Contracts\StandingsRepositoryInterface;
 
@@ -282,7 +283,7 @@ class StandingsUpdater {
         foreach ($standings as $team) {
             $totalGames = $team['wins'] + $team['losses'];
             $pct = $totalGames > 0 ? round($team['wins'] / $totalGames, 3) : 0.000;
-            $gamesUnplayed = 82 - $team['home_wins'] - $team['home_losses'] - $team['away_wins'] - $team['away_losses'];
+            $gamesUnplayed = League::REGULAR_SEASON_GAMES - $team['home_wins'] - $team['home_losses'] - $team['away_wins'] - $team['away_losses'];
 
             $leagueRecord = $team['wins'] . '-' . $team['losses'];
             $confRecord = $team['conf_wins'] . '-' . $team['conf_losses'];
@@ -350,7 +351,7 @@ class StandingsUpdater {
                 $belowTeamTotalLosses = 0;
             }
 
-            $magicNumber = 82 + 1 - $teamTotalWins - $belowTeamTotalLosses;
+            $magicNumber = League::REGULAR_SEASON_GAMES + 1 - $teamTotalWins - $belowTeamTotalLosses;
 
             $this->repository->updateMagicNumber($teamid, $magicNumber, $groupingMagicNumber);
             $log .= "Updated {$groupingMagicNumber} for {$teamName} to {$magicNumber}<br>";
@@ -409,7 +410,7 @@ class StandingsUpdater {
         /** @var int $leastLosingestTeamLosses */
         $leastLosingestTeamLosses = $leastLosingestTeam['losses'];
 
-        $magicNumber = 82 + 1 - $winningestTeamWins - $leastLosingestTeamLosses;
+        $magicNumber = League::REGULAR_SEASON_GAMES + 1 - $winningestTeamWins - $leastLosingestTeamLosses;
 
         if ($magicNumber > 0 && $first['wins'] === $second['wins']) {
             if ($this->repository->isRegionSeasonOver($grouping, $region)) {
@@ -460,7 +461,7 @@ class StandingsUpdater {
 
                 /** @var int $bottomTeamLosses */
                 $bottomTeamLosses = $sixLosingestTeams[$j]['losses'];
-                $magicNumber = 82 + 1 - $contendingTeamWins - $bottomTeamLosses;
+                $magicNumber = League::REGULAR_SEASON_GAMES + 1 - $contendingTeamWins - $bottomTeamLosses;
 
                 if ($magicNumber <= 0) {
                     $teamsEliminated++;

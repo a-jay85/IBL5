@@ -33,13 +33,8 @@ final class RefreshIblHistStep implements PipelineStepInterface
         $this->db->begin_transaction();
 
         try {
-            if ($this->db->query('DELETE FROM `ibl_hist`') === false) {
-                throw new \RuntimeException('DELETE failed: ' . $this->db->error);
-            }
-            if ($this->db->query('INSERT INTO `ibl_hist` ' . self::SELECT_SQL) === false) {
-                throw new \RuntimeException('INSERT failed: ' . $this->db->error);
-            }
-            $rowCount = $this->db->affected_rows;
+            $this->dbExec('DELETE FROM `ibl_hist`');
+            $rowCount = $this->dbExec('INSERT INTO `ibl_hist` ' . self::SELECT_SQL);
             $this->db->commit();
         } catch (\Throwable $e) {
             $this->db->rollback();
@@ -47,6 +42,23 @@ final class RefreshIblHistStep implements PipelineStepInterface
         }
 
         return StepResult::success($this->getLabel(), $rowCount . ' rows');
+    }
+
+    /** Prepare and execute a zero-parameter DML statement; returns affected rows. */
+    private function dbExec(string $sql): int
+    {
+        $stmt = $this->db->prepare($sql);
+        if ($stmt === false) {
+            throw new \RuntimeException('Prepare failed: ' . $this->db->error);
+        }
+        if (!$stmt->execute()) {
+            $err = $stmt->error;
+            $stmt->close();
+            throw new \RuntimeException('Execute failed: ' . $err);
+        }
+        $affected = (int) $stmt->affected_rows;
+        $stmt->close();
+        return $affected;
     }
 
     /**

@@ -3,11 +3,14 @@
 #
 # bin/test-check-plan-staleness — regression test for bin/check-plan-staleness.
 #
-# The guard relaxes two false-positive classes (bare bin/ tokens that live at
-# ibl5/bin/, and to-be-created files referenced in a creation context). This
-# test pins both the relaxations AND the negative case: a missing path that is
-# NOT in a creation context must still be flagged stale. Without the negative
-# case, a relaxed guard could silently stop catching real poison-pill plans.
+# The guard skips several documented non-dependency path classes: bare bin/
+# tokens that live at ibl5/bin/, ellipsis (`ibl5/...`) meta-notation, ADR numeric
+# placeholders (`docs/decisions/00NN-…`), and to-be-created/non-dependency paths
+# carried by a same-line cue (create / new file / Write / **NEW** / Reject(ed) /
+# fixture / scaffold / throwaway / scratch / post-impl). This test pins each
+# relaxation AND the load-bearing negative: a missing path on a cue-LESS line
+# must still flag stale. Without the negatives, a relaxed guard could silently
+# stop catching real poison-pill plans.
 #
 # Run: bin/test-check-plan-staleness  (exit 0 = all pass, 1 = a case failed)
 
@@ -59,6 +62,28 @@ assert "existing-path" 0 'See `bin/check-plan-staleness` for the guard itself.'
 # path dependency and must pass (exit 0), even though "ibl5/..." does not exist on
 # disk. Regression for the automouse false-positive that skipped maintenance-30.
 assert "ellipsis-placeholder" 0 'Every backtick `ibl5/...` token in the body resolves to a real file.'
+
+# Class A: a new-ADR numeric placeholder (`00NN`, assigned later by bin/next-adr)
+# on a line with NO creation cue — must pass via the placeholder skip-case, not a
+# cue. Isolates the skip-case (red against the pre-patch guard).
+assert "adr-placeholder" 0 '### Phase 5 — ADR `ibl5/docs/decisions/00NN-some-future-adr.md` (Tier: self).'
+
+# Class B: a path the plan will Write (verb "Write") must pass via the [Ww]rite
+# cue. Digit-only ADR number so the placeholder skip-case does NOT apply — this
+# exercises the cue, not the skip.
+assert "write-cue-adr" 0 'Phase 4 — Write `ibl5/docs/decisions/0099-fictional-adr.md` documenting the change.'
+
+# Class B: a Critical-Files table row marking a path **NEW** must pass via the
+# **NEW** bold-marker cue (the row has no "create"/"file" word).
+assert "new-marker-critical-file" 0 '| `ibl5/classes/BrandNewService.php` | **NEW** — a service handler. |'
+
+# Class B: a rejected-alternative path in an ## Approach section must pass via the
+# [Rr]eject(ed)? cue (the path is explicitly NOT built).
+assert "rejected-alternative" 0 'Rejected: a separate `bin/plan-queue-safe` script (redundant with check-plan).'
+
+# Class C: a throwaway test-fixture path described with the word "fixture" must
+# pass via the [Ff]ixture cue, without needing an explicit throwaway/scratch tag.
+assert "fixture-cue" 0 'The test scans a temp fixture `ibl5/scripts/throwaway-fixture-xyz.php` in a tmpdir.'
 
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"

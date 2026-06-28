@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-06-22
+last_verified: 2026-06-27
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -81,24 +81,24 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 |---|--------|-----------|-----------------|
 | 1.1 | ◑ Partial | 🟩 | Narrow fix done (stubs/cache, −39 LOC); the formatter god-class split is **PR #1167** open (queued `extract-recordformatter`, armed green-green). Service still 687 LOC. |
 | 1.2 | ✅ Implemented | — | `StreakCalculator` exists (#1040); HEAT CTE → `vw_heat_champions` (migration 149, #1090). Repo still 823 LOC = separate cohesive batch-query concern, not this finding. |
-| 1.3 | ⬜ Open | 🟩 | Verified `detectAndAnnounce()` + private `sendDiscordNotification()` still coupled. Inject dispatcher interface; green-green, no security/UI/schema. |
+| 1.3 | ✅ Implemented | 🟩 | `AnnouncementDispatcherInterface` injected (defaulted to `DiscordAnnouncementDispatcher`); dispatch loop now isolates per-message failures; `NullAnnouncementDispatcher` for dry-run/tests. Green-green + 1 tested resilience delta. |
 | 1.4 | ✅ Implemented | — | `JsbImportService` now 177-LOC facade + 10 `Importers/` (#801). |
 | 1.5 | ✅ Implemented | — | #1148 — 3 collaborators extracted; service ~386 LOC. |
 | 1.6 | ✅ Implemented | — | Dual-path unified, byte-identical (#1146). View still 610 LOC = residual size, not this concern. |
 | 1.7 | ✅ Implemented | — | `TeamPageDataPreparer`+`TeamCardRenderer` (#1144); `TeamService` ~115 LOC (absent from >500 list). |
 | 1.8 | ✅ Implemented | — | Verified: no inline `new TeamQueryRepository`/`BuyoutLedgerRepository` in the view. Still 590 LOC = residual. |
-| 1.9 | ⬜ Open | 🟩 | Verified `new SavedDepthChartRepository($db)` at L31; 599 LOC. Memoize active-DC + inject interface; green-green. |
+| 1.9 | ✅ Implemented | — | Memoized active-DC fetch (`getActiveDc()`) + injected `SavedDepthChartRepositoryInterface`; green-green. |
 | 1.10 | ✅ Implemented | — | Verified: `syncPropertiesFromPlayerData` gone, zero public nullable props. `Player.php` 671 LOC = typed-getter bulk (residual). |
-| 1.11 | ⬜ Open | 🟩 | `insertTeamBoxscore()` 30-arg signature now lives in `BoxscoreRepository:252`; 557 LOC. Array-param + injectable ProgressReporter; pin with a DB-integration test. |
+| 1.11 | ✅ Implemented | 🟩 | `insertTeamBoxscore()` 30-arg signature now lives in `BoxscoreRepository:252`; 557 LOC. Array-param + injectable ProgressReporter; pin with a DB-integration test. |
 | 1.12 | ✅ Implemented | — | #1145 — split into Index/Detail views, byte-identical golden-master. |
-| 1.13 | ⬜ Open | 🟩 | Mutable `$collectedPlayerNames` accumulator; 530 LOC. Local var / collector VO; green-green. |
+| 1.13 | ✅ Implemented | — | Mutable `$collectedPlayerNames` accumulator → local var passed by-ref; green-green; getAllSeasons() untouched. |
 | 1.14 | ✅ Implemented | — | `TradeCapCalculator` extracted (#1143). |
 | 1.15 | ⬜ Open | 🟩 | YourAccountView 536 LOC, 6 SVG + 6 page variants. Green-green with VR pin; auth *display* only (no auth-logic change → no security surface). |
 | 1.16 | ✅ Implemented | — | `computeJsbProduction()` moved to service (verified). |
-| 1.17 | ◑ Partial | 🟩 | Constructor logger injected w/ `db` fallback (#1089, L585), but the `perf` channel is still static `LoggerFactory::getChannel('perf')` at L281. Inject perf logger; green-green. |
-| 1.18 | ⬜ Open | 🟩 | 11 `echo` in StandingsUpdater (verified). echo→LoggerInterface; remove dead `$log`; `82`→`League` const. CLI. |
+| 1.17 | ✅ Implemented | 🟩 | perf-channel slow-query logger now injectable via `setPerfLogger()` + `$this->perfLogger ?? LoggerFactory::getChannel('perf')` fallback at L281; no static logging globals remain in `executeQuery`. |
+| 1.18 | ◑ Partial | 🟩 | StandingsUpdater. `82`→`League::REGULAR_SEASON_GAMES` DONE (refactor PR). echo→logger + `$log` removal DEFERRED: behavior-changing — echoes feed the rendered pipeline `capturedLog` (UpdateStandingsStep→UpdaterController); `$log` feeds admin-rendered `DebugOutput::display`. Needs a non-`refactor:` PR. |
 | 1.19 | ⬜ Open | 🟨 | `processPlrData`+`processPlrDataForYear` 80% duplicated; 510 LOC. `.plr` parse is engine-fidelity-critical → add characterization pins (mechanical scope) before merging the two paths, then 🟩. |
-| 1.20 | ⬜ Open | 🟩 | SearchView 485 LOC string-concat. Extract `renderResultTable()` + ob_start migration; VR pin. |
+| 1.20 | ✅ Implemented | 🟩 | SearchView 485 LOC string-concat. Extracted `renderResultList()` + ob_start migration; VR pin. |
 
 ### 1.1 RecordHoldersService — Hardcoded Team Registry + Multi-Concern Formatter
 **Location:** `ibl5/classes/RecordHolders/RecordHoldersService.php`
@@ -122,6 +122,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Return announcement list from `detectAndAnnounce()`; or inject `AnnouncementDispatcher` interface with a null impl for tests.
 **Est. effort:** S
 **Risk if untouched:** Discord outage silently aborts announcements mid-way; dry-run impossible without modifying class.
+**Status:** Implemented (2026-06-25) — injected `AnnouncementDispatcherInterface` (defaulted to `DiscordAnnouncementDispatcher`); `detectAndAnnounce()` dispatches per-message with `try/catch` isolation so a Discord outage no longer aborts the loop; `NullAnnouncementDispatcher` enables dry-run/testable detection. Private `sendDiscordNotification()` removed.
 
 ### 1.4 JsbImportService — One Class Handling 10 File Formats
 **Location:** `ibl5/classes/JsbParser/JsbImportService.php` (853 lines)
@@ -169,6 +170,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Memoize active DC per call chain; accept `SavedDepthChartRepositoryInterface`.
 **Est. effort:** S
 **Risk if untouched:** Every DC dropdown render triggers 3+ redundant queries; pattern proliferates.
+**Status:** Completed (PR for finding 1.9) — `SavedDepthChartService` constructor now accepts an optional `SavedDepthChartRepositoryInterface` (defaults to `new SavedDepthChartRepository($db)`); the active-DC fetch is memoized per teamid via private `getActiveDc()`, reused by `buildCurrentLiveLabel()`, `getDropdownOptions()`, and `nameOrCreateActive()` — collapsing the two redundant reads in `SavedDepthChartApiHandler::handleList()` into one. Cache invalidated after `nameOrCreateActive()` writes. Green-green.
 
 ### 1.10 Player (facade) — 50+ Public Properties Duplicating PlayerData
 **Location:** `ibl5/classes/Player/Player.php` (558 lines)
@@ -184,12 +186,14 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Array-parameter version of `insertTeamBoxscore()`; move `flush()` into an injectable `ProgressReporter` callback.
 **Est. effort:** S
 **Risk if untouched:** Column reorder breaks silently; `flush()` corrupts tests/queued jobs.
+**Status:** Implemented — `insertTeamBoxscore()` now takes a typed array-keyed `$row` (SQL/bind type string unchanged); `flush()` moved behind `Boxscore\Contracts\ProgressReporterInterface` (`FlushProgressReporter` default, `NoOpProgressReporter` for tests). Pinned by the all-34-column byte-identical round-trip in `tests/DatabaseIntegration/BoxscoreRepositoryTest.php`.
 
 ### 1.12 SeasonArchiveView — Two Fundamentally Different Pages ✓ Done
 
 Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/classes/SeasonArchive/SeasonArchiveIndexView.php`, `ibl5/classes/SeasonArchive/SeasonDetailView.php`, and shared `ibl5/classes/SeasonArchive/SeasonArchiveRenderHelpers.php` trait. Output byte-identical (verified by golden-master snapshots).
 
 ### 1.13 SeasonArchiveService — Mutable Instance State Accumulator
+**Status:** ✅ Implemented — `$collectedPlayerNames` instance property replaced by a local variable in `getSeasonDetail()` passed by reference into `extractAward()`/`extractAwardList()` (optional `&$collected = []` param). Cross-call contamination structurally impossible; `getAllSeasons()` unchanged. Green-green (existing `testAccumulatorResetsBetweenCalls` + new `testReusedInstanceCollectsSameNamesAsFreshInstance`).
 **Location:** `ibl5/classes/SeasonArchive/SeasonArchiveService.php` line 35 (530 LOC)
 **Problem:** `private array $collectedPlayerNames = []` is a side-effect accumulator populated during `extractAward()`/`extractAwardList()` inside `getSeasonDetail()`. Reset only at start of `getSeasonDetail()` — not on construction — creating cross-contamination risk if reused.
 **Suggested direction:** Replace with a local variable passed into extract helpers; or use a `PlayerNameCollector` value object.
@@ -225,13 +229,15 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Accept `\Psr\Log\LoggerInterface $perfLogger = null` in constructor.
 **Est. effort:** S
 **Risk if untouched:** Repository unit tests require full logging subsystem; slow-query behavior can't be disabled for tests.
+**Status:** Completed — slow-query perf logging made injectable via a `setPerfLogger()` setter + `$this->perfLogger ?? \Logging\LoggerFactory::getChannel('perf')` fallback at L281 (mirrors the existing `setLogger()`/`db`-channel precedent at L129/L585; no constructor-signature change, so all 24 subclasses are untouched). The last static logging global in `executeQuery()` is gone.
 
 ### 1.18 StandingsUpdater — `echo` Mixed with Data Computation
-**Location:** `ibl5/classes/Updater/StandingsUpdater.php` lines 70, 91, 280
-**Problem:** `update()`, `computeAndInsertStandings()`, `computeAndInsertAll()` use `echo` for progress. `$log` variable built but never used. Magic constant `82` (games/season) inline.
-**Suggested direction:** Replace `echo` with `LoggerInterface`; remove dead `$log`; extract `82` to `League::REGULAR_SEASON_GAMES`.
+**Location:** `ibl5/classes/Updater/StandingsUpdater.php` (echoes at update()/computeAndInsertStandings()/computeAndInsertAll(); magic `82` at the gamesUnplayed and magic-number sites).
+**Status:** PARTIAL — magic `82` extracted to `League::REGULAR_SEASON_GAMES` (refactor PR, this batch). The echo cleanup is DEFERRED.
+**Problem:** `update()`, `computeAndInsertStandings()`, `computeAndInsertAll()` use `echo` for progress. The echoed output is NOT discardable: `UpdateStandingsStep::execute()` captures it (`ob_start`/`ob_get_clean`) into `StepResult::capturedLog` and `UpdaterController` renders it to the user as a collapsible log; the two `$log` accumulators are rendered to admins via `\UI\DebugOutput::display()`. So echo→logger and `$log` removal are behavior-changing, not a pure refactor.
+**Suggested direction:** Separate non-`refactor:` PR that migrates the echoes to a logger while preserving (or deliberately changing) the rendered pipeline/admin output; `auto_merge: false`.
 **Est. effort:** S
-**Risk if untouched:** Updater can't run from test/queue; abandoned logging intent.
+**Risk if untouched:** Progress output mixed with computation in the updater; logging intent unrealized.
 
 ### 1.19 PlrParserService — Duplicate Pass-1 Logic
 **Location:** `ibl5/classes/PlrParser/PlrParserService.php`
@@ -246,6 +252,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Extract `renderResultTable(string $title, array $headers, array $rows): string`; migrate to `ob_start()`.
 **Est. effort:** S
 **Risk if untouched:** New result types require copy-paste; `NukeCompat` dep invisible in type signature.
+**Status:** Implemented (2026-06-26) — migrated all renderers to `ob_start()` and extracted shared `renderResultList()` scaffold; byte-identical output (golden-master test + VR pin); escaping preserved (`RequireEscapedOutputRule` green).
 
 ---
 
@@ -1148,25 +1155,25 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| 6.1 | ⬜ Open | 🟩 | BulkImport 0 tests; additive unit tests. |
+| 6.1 | ✅ Implemented | — | All 7 concrete BulkImport classes already have substantive tests under tests/Unit/BulkImport/ (verified). |
 | 6.2 | ⬜ Open | 🟩 | PdoConnection tests 🟩; `MySQL` is the deprecated class slated for removal (5.18) — don't invest there. |
 | 6.3 | ✅ Implemented | — | ModuleAccessControlTest + ModuleRegistryTest exist. |
 | 6.4 | ◑ Partial | 🟩 | Header side-effect test exists; broader structure/CSS coverage still thin → additive. |
 | 6.5 | ✅ Implemented | — | TeamStatsCalculatorTest exists. |
 | 6.6 | ✅ Implemented | — | StrengthOfScheduleCalculatorTest exists. |
-| 6.7 | ⬜ Open | 🟩 | LeagueStarters thin; additive. |
-| 6.8 | ⬜ Open | 🟩 | ApiKeys thin; additive (security tests catch, don't introduce surface). |
+| 6.7 | ✅ Implemented | 🟩 | LeagueStarters thin; additive. |
+| 6.8 | ✅ Implemented | — | ApiKeysRepositoryTest added (revocation active-only scoping, latest-key lookup). |
 | 6.9 | ✅ Implemented | — | ContractListServiceTest extended (#1161, 2026-06-20). |
-| 6.10 | ⬜ Open | 🟩 | FreeAgencyPreview thin; additive — coordinate with PR #1162 (future-year restore). |
-| 6.11 | ⬜ Open | 🟩 | SeasonHighs thin; additive. |
-| 6.12 | ⬜ Open | 🟩 | TeamSchedule thin; additive. |
+| 6.10 | ✅ Implemented | 🟩 | FreeAgencyPreview thin; additive — coordinate with PR #1162 (future-year restore). |
+| 6.11 | ✅ Implemented | 🟩 | SeasonHighs thin; additive. |
+| 6.12 | ✅ Implemented | 🟩 | TeamSchedule thin; additive. |
 | 6.13 | ⬜ Open | 🟩 | Player 0.24 ratio; additive (L — chunk it). |
 | 6.14 | ⬜ Open | 🟩 | Updater steps; additive. |
-| 6.15 | ⬜ Open | 🟩 | Voting; additive. |
-| 6.16 | ⬜ Open | 🟩 | Api auth/rate-limit/pagination; additive. |
-| 6.17 | ⬜ Open | 🟩 | Trading validation; additive. |
-| 6.18 | ⬜ Open | 🟩 | Moderate-gap modules; per-module targeted tests, additive. |
-| 6.19 | ⬜ Open | 🟩 | Additive. **`Shared (3/1)` sub-item stale** — `Shared/` deleted (2.23). |
+| 6.15 | ✅ Implemented | — | VotingRepositoryTest + SubmissionResultTest added (aggregation, column allowlist). |
+| 6.16 | ◑ Partial | 🟩 | ApiKeyRepositoryTest + RateLimitRepositoryTest added; data repos + JsonResponder/SystemClock still untested. |
+| 6.17 | ◑ Partial | 🟩 | TradeAssetRepositoryTest + TradeOfferRepositoryTest added (draft-pick mapping, offer lifecycle); TradeExecutionRepository untested + TradeFormRepository partial. |
+| 6.18 | ◑ Partial | 🟩 | Unit tests added: DraftPickLocator repo, LeagueSchedule Game, TransactionHistory repo, CapSpace repo. NextSim/SavedDepthChart/DepthChartEntry verified covered. Residual: SQL aggregation/ordering + SDC write-path are DB-integration-only. |
+| 6.19 | ◑ Partial | 🟩 | AllStarAppearances + GMContactList repo unit tests added. Season entity predicates blocked by `Season\Season`→mock alias (QueryRepo plumbing covered). `Shared` N/A (deleted 2.23). |
 
 ### 6.1 BulkImport — Zero Tests, 9 Files
 **Location:** `ibl5/classes/BulkImport`
@@ -1174,6 +1181,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** PHPUnit for `BulkImportSummary` aggregation, `ArchiveExtractor` file handling, `ImportEntry` state transitions.
 **Est. effort:** M
 **Risk if untouched:** Bulk imports fail silently; error aggregation untested.
+**Status:** ✅ Already covered (verified 2026-06-26) — all 7 concrete classes have substantive unit tests under tests/Unit/BulkImport/ (ArchiveExtractorTest 27, BulkImportSummaryTest 9, ImportEntryTest 3, plus BulkImportRunner/BackupArchiveLocator/FileTypeHandler/JsbFileType). The finding's "zero tests" premise is stale; no new tests added.
 
 ### 6.2 Database — Zero Tests, 2 Files
 **Location:** `ibl5/classes/Database`
@@ -1220,6 +1228,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Service all-star selection, Repository correctness, API response format.
 **Est. effort:** M
 **Risk if untouched:** All-Star eligibility/voting aggregation untested.
+**Status:** Implemented (2026-06-27) — added LeagueStartersApiHandler handle() response-format + invalid-display-fallback tests and Service boundary tests (non-int teamid skip, per-team/position dedupe) in tests/LeagueStarters/. Repository SQL correctness remains owned by the gated tests/DatabaseIntegration/LeagueStartersRepositoryTest.php.
 
 ### 6.8 ApiKeys — Thin (6 files, 2 tests, 0.33 ratio)
 **Location:** `ibl5/classes/ApiKeys`
@@ -1227,6 +1236,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Service uniqueness, Repository revocation, rate-limiter integration.
 **Est. effort:** M
 **Risk if untouched:** Key collisions, revocation failures, rate-limit bypass.
+**Status:** Implemented (verified 2026-06-27) — tests/ApiKeys/ApiKeysRepositoryTest.php added (findByUserId latest-key selection, createKey, revokeByUserId active-only scoping). Rate-limiter integration covered by tests/Api/Repository/RateLimitRepositoryTest.php (6.16).
 
 ### 6.9 ContractList — Thin (6 files, 2 tests)
 **Location:** `ibl5/classes/ContractList`
@@ -1242,6 +1252,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Eligibility filtering, contract-expiration, projection accuracy.
 **Est. effort:** M
 **Risk if untouched:** Preview misses eligible players or includes ineligible.
+**Status:** Implemented (2026-06-27) — added FreeAgencyPreviewService contract-end boundary tests (cy=6 final-year eligible, cy=5 with year-6 salary excluded) in tests/FreeAgencyPreview/. Held to the current getUpcomingFreeAgents() API to avoid colliding with PR #1162. Repository correctness owned by gated tests/DatabaseIntegration/FreeAgencyPreviewRepositoryTest.php.
 
 ### 6.11 SeasonHighs — Thin (6 files, 2 tests)
 **Location:** `ibl5/classes/SeasonHighs`
@@ -1249,6 +1260,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** High-water filtering, repository correctness, stat-type formatting.
 **Est. effort:** M
 **Risk if untouched:** Wrong records on player profile pages.
+**Status:** Implemented (2026-06-27) — added host-runnable SeasonHighsRepository transformation tests (normalizeRow int-casts/color defaults/optional keys, getSeasonHighsBatch bucketing/sort/tiebreak/empty-stats short-circuit) in tests/SeasonHighs/SeasonHighsRepositoryTest.php. Gated tests/DatabaseIntegration/SeasonHighsRepositoryTest.php still covers the SQL.
 
 ### 6.12 TeamSchedule — Thin (6 files, 2 tests)
 **Location:** `ibl5/classes/TeamSchedule`
@@ -1256,6 +1268,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Playoff bracket construction, game-order, opponent lookup.
 **Est. effort:** M
 **Risk if untouched:** Seeding incorrect; game sequence out of order.
+**Status:** Implemented (2026-06-27) — added TeamScheduleService opponent-lookup/opponent-text, SOS-tier (populated vs empty rankings), and next-sim-highlight tests in tests/TeamSchedule/. Repository correctness owned by gated tests/DatabaseIntegration/TeamScheduleRepositoryTest.php; no playoff-bracket unit exists on master (View-only month relabel).
 
 ### 6.13 Player Module — Large + Subthreshold (71 files, 17 tests, 0.24 ratio)
 **Location:** `ibl5/classes/Player`
@@ -1277,6 +1290,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Ballot validation, duplicate-vote prevention, ranking aggregation.
 **Est. effort:** M
 **Risk if untouched:** Award voting corruption; duplicates counted.
+**Status:** Implemented (verified 2026-06-27) — tests/Voting/VotingRepositoryTest.php (vote aggregation, column-allowlist rejection, save/cooldown writes, name→pid mapping) + tests/Voting/SubmissionResultTest.php added. Results service/controller/view already covered under tests/VotingResults/.
 
 ### 6.16 Api Module — Subthreshold (48 files, 22 tests, 0.46 ratio)
 **Location:** `ibl5/classes/Api`
@@ -1284,6 +1298,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Header parsing, token-bucket logic, pagination offset/limit edges.
 **Est. effort:** L
 **Risk if untouched:** Auth bypass; rate limiter broken; pagination off-by-one.
+**Status:** Partial (verified 2026-06-27) — tests/Api/Repository/ApiKeyRepositoryTest.php + tests/Api/Repository/RateLimitRepositoryTest.php added (active-key-only lookup, token-bucket upsert/window count). ApiKeyAuthenticator/RateLimiter/Paginator already well-covered. Residual: data repositories (ApiGameRepository, ApiInjuriesRepository, ApiLeadersRepository, ApiPlayerRepository, ApiPlayerStatsRepository, ApiStandingsRepository, ApiTeamRepository, HealthRepository) + JsonResponder + SystemClock.
 
 ### 6.17 Trading Module — Subthreshold (27 files, 12 tests, 0.44 ratio)
 **Location:** `ibl5/classes/Trading`
@@ -1291,6 +1306,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Validation (cap/roster/eligibility), draft-pick mapping, rejection reasons.
 **Est. effort:** M
 **Risk if untouched:** Trades bypass validation; cap exploits; pick duplication.
+**Status:** Partial (verified 2026-06-27) — tests/Trading/TradeAssetRepositoryTest.php (draft-pick mapping, pick-owner reassignment, player lookups) + tests/Trading/TradeOfferRepositoryTest.php (offer-id generation + failure path, transactional delete with cash coordination) added. Validation/rejection-reasons already covered by TradeValidatorTest. Residual: TradeExecutionRepository (untested) + TradeFormRepository (partial).
 
 ### 6.18 Moderate-Gap Modules (0.40–0.50 ratio)
 **Location:** `DraftPickLocator` (5/2), `LeagueSchedule` (7/3), `NextSim` (5/2), `SavedDepthChart` (5/2), `TransactionHistory` (5/2), `CapSpace` (5/2), `DepthChartEntry` (15/8)
@@ -1298,6 +1314,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Per-module targeted PHPUnit — see test-coverage audit detail.
 **Est. effort:** S each (M for CapSpace, NextSim, DepthChartEntry)
 **Risk if untouched:** Per-module: stashed picks mislocated; schedule phase boundaries wrong; cap floor misreported; saved DC corrupted; transaction log misordered; cap exploitation; invalid DC entries saved.
+**Status:** ◑ Partial (2026-06-26) — added unit coverage: DraftPickLocatorRepositoryTest (pick grouping), LeagueScheduleGameTest (Game value object), TransactionHistoryRepositoryTest (year int-cast + filter branches), CapSpaceRepositoryTest (post-season contract rows). Verified already covered: NextSim (all classes tested; Service is a thin delegator), SavedDepthChart (22-test WideUnit service suite exercises repo read paths), DepthChartEntry (11-test Validator covers "invalid DC entries"). CapSpace cap-math is already covered by CapSpaceServiceTest. Residual (DatabaseIntegration-only): transaction ORDER BY correctness, SavedDepthChart write-path (insert_id), aggregation correctness.
 
 ### 6.19 Small Modules With Single-Test Coverage
 **Location:** `AllStarAppearances` (4/1), `GMContactList` (4/1), `Season` (3/1), `Shared` (3/1)
@@ -1305,6 +1322,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Targeted single-class tests.
 **Est. effort:** S each
 **Risk if untouched:** AS appearances double-counted; duplicate GMs; season state inconsistencies; shared data leaks.
+**Status:** ◑ Partial (2026-06-26) — added AllStarAppearancesRepositoryTest and GMContactListRepositoryTest (return-shape + empty negative). Season: phase plumbing covered by SeasonQueryRepositoryTest (getSeasonPhase, calculatePhaseSimNumber); the Season-entity phase predicates (isFreeAgencyPhase, areTradesAllowed, areWaiversAllowed, advancesContractYears) are structurally untestable because classes/Bootstrap/TestAliasesBootstrap.php:22 aliases Season\Season → the mock — left as-is (removing the alias is a cross-suite infra change, out of scope). Shared: N/A (deleted, backlog 2.23). Residual (DatabaseIntegration-only): AS-appearance aggregation / GM dedup correctness.
 
 ---
 
@@ -1327,8 +1345,8 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 | 7.11 | ⬜ Open | 🟨 | Inconsistent caching decorators. Upfront decision: add `Cached*Repository` for SeasonHighs/FranchiseRecordBook/etc. vs document why page-cache suffices. |
 | 7.12 | ✅ Implemented | — | TeamOrderBy enum (#1032). |
 | 7.13 | ✅ Implemented | — | DraftRepository injects TeamIdentityRepositoryInterface. |
-| 7.14 | ⬜ Open | 🟩 | `calculatePythagoreanStats` present (verified); StandingsRepository 681 LOC. Move calc to Service; green-green. |
-| 7.15 | ⬜ Open | 🟩 | 8 map*/FIELD_MAP members (verified); PlayerRepository 622 LOC. Extract PlayerDataMapper/Hydrator; green-green. |
+| 7.14 | ✅ Implemented | 🟩 | Extracted `Standings\PythagoreanCalculator` (pure `calculate()`); StandingsRepository delegates both call sites; green-green. |
+| 7.15 | ✅ Implemented | 🟩 | 8 map*/FIELD_MAP members (verified); PlayerRepository 622 LOC. Extract PlayerDataMapper/Hydrator; green-green. |
 | 7.16 | ✅ Implemented | — | Hidden caches dropped (#1040). |
 | 7.17 | ⬜ Open | 🟩 | `getPlayerNews`→nuke_stories cross-query. Annotate `@see` (trivial) or extract LegacyNewsRepository; green-green. |
 | 7.18 | ⬜ Open | 🟩 | Duplicate player-lookup JOINs (PlayerRepository vs CommonMysqli). Delegate one; green-green with characterization pin (column drift noted). |
@@ -1437,6 +1455,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Status:** Completed (verified 2026-05-29 audit) — `DraftRepository` constructor now injects `TeamIdentityRepositoryInterface`; no inline `new CommonMysqliRepository`.
 
 ### 7.14 `StandingsRepository` Contains Business Logic
+**Status:** ✅ Implemented -- extracted the points-scored/allowed math into stateless `Standings\PythagoreanCalculator::calculate()`; SQL subquery builders left private in the repository.
 **Location:** `ibl5/classes/Standings/StandingsRepository.php` lines 602-663
 **Problem:** `calculatePythagoreanStats` returns a derived shape; subquery builders carry basketball semantics.
 **Suggested direction:** Move calc to `StandingsService` or `StatsFormatter`; keep SQL builders private.
@@ -1449,6 +1468,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Extract `PlayerDataMapper` / `PlayerHydrator`.
 **Est. effort:** M
 **Risk if untouched:** Two responsibilities change together; both harder to test.
+**Status:** Implemented — extracted `ibl5/classes/Player/PlayerDataMapper.php` (constants + 8 map* methods); `PlayerRepository` delegates. Green-green refactor.
 
 ### 7.16 `RecordHoldersRepository` Has Hidden In-Memory Caches
 **Location:** `ibl5/classes/RecordHolders/RecordHoldersRepository.php` lines 45-49
@@ -1891,14 +1911,14 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 | 10.9 | ✅ Implemented | — | `BanRawHtmlEscapeFunctionsRule` (0). |
 | 10.10 | ⬜ Open | 🟩 | `RequireTrustedAnnotationRule` NOT built (verified absent from phpstan-rules/). New rule + baseline + ADR; green-green. |
 | 10.11 | ✅ Implemented | — | `BanDirectHeaderCallRule` (1 baseline). |
-| 10.12 | ✅ Implemented | 🟩 | `BanDirectMysqliQueryRule` landed; 7 Updater-step sites — burndown 🟩. |
+| 10.12 | ✅ Implemented | 🟩 | `BanDirectMysqliQueryRule` landed; 7 Updater-step sites — burndown 🟩. **Status:** baseline cleared — 7 sites in 3 Refresh steps rerouted to `BaseMysqliRepository::execute()`. |
 | 10.13 | ✅ Implemented | 🟩 | `BanSqlStringInterpolationRule` landed; 32 baseline — burndown 🟩. |
 | 10.14 | 📋 Planned | 🟩 | PR #1160 open (`clock-abstraction-global-seam-ban-rule`): global Clock + ban direct time calls. L refactor, green-green. (Its "still open" note below is stale.) |
 | 10.15 | ⬜ Open | 🟩 | `echo ob_get_clean()` in DebugOutput — code fix; green-green. |
 | 10.16 | ✅ Implemented | — | unescapedOutput baseline cleared. |
 | 10.17 | ✅ Implemented | — | cookieBeforeHeader cleared (ADR-0032). |
 | 10.18 | ✅ Implemented | — | `BanServiceExtendsBaseRepositoryRule` (0). |
-| 10.19 | ✅ Implemented | 🟩 | `BanDuplicateModifierMethodRule` landed; 5 ExtensionOfferEvaluator sites — burndown 🟩. |
+| 10.19 | ✅ Implemented | 🟩 | `BanDuplicateModifierMethodRule` landed; 5 ExtensionOfferEvaluator sites — burndown 🟩. **Status:** baseline cleared — 5 adapter methods renamed `calculate*Modifier`→`compute*Modifier` (delegation to `ContractRules` unchanged). |
 | 10.20 | ⬜ Open | 🟩 | Extend `RequireMeaningfulAssertionsRule` with `$scope` type access (L); green-green rule enhancement. |
 | 10.21 | ✅ Implemented | 🟩 | `BanBareColumnIdentifierRule` landed; 23 sites (3 files) — burndown 🟩. |
 | 10.22 | ✅ Implemented | — | `BanJsonDecodeWithoutThrowFlagRule` (0). |
@@ -2389,7 +2409,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 | 13.7b | ⬜ Open | 🟨 | Needs `ValidationError`/`ValidationResultWithContext` type design (Depth/Trade carry structured + cap-total payloads) before the sweep. |
 | 13.8 | ✅ Implemented | — | retired filter standardized to `= 0` (2026-06-05). |
 | 13.9 | ⬜ Open | 🟦 | 4 team-color CSS var sets → one sanitizing `TableStyles::inlineTeamVars()`. Touches hex-injection sanitization (output-security surface) + VR → human-merge. |
-| 13.10 | ⬜ Open | 🟩 | Extract `StatRowFormatter` for Career/Season leaderboards; green-green (RecordFormatter-style). |
+| 13.10 | 🚫 Declined | — | Premise invalid: Career/Season `processPlayerRow` return arrays differ in key membership, order, and value-type (22 vs 44 keys) — no shared surface to extract. Doc-only closure, no code. |
 | 13.11 | ✅ Implemented | — | cleanName subquery extracted (2026-06-05). |
 | 13.12 | ⬜ Open | 🟩 | player↔team JOIN ×15 → `vw_players_with_team`/helper; green-green, opportunistic (L). |
 | 13.13 | ✅ Implemented | — | #1033 + DNP follow-ups #1087/#1088. |
@@ -2464,6 +2484,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Risk if untouched:** Hex-injection bypass through unsanitized site; CSS variable rename breaks only one variant.
 
 ### 13.10 `CareerLeaderboards` vs `SeasonLeaderboards` Stat-Row Formatting Diverges
+**Status:** 🚫 Declined (2026-06-24) — premise invalid. The two services' `processPlayerRow` return arrays are disjoint: Career's `FormattedPlayerStats` (22 keys, percentages interleaved, `pts`/`drb`, all values formatted strings, retired `*` appended) vs Season's `ProcessedStats` (44 keys, raw-totals block then grouped percentages then a per-game `mpg…ppg` block, `points`/`drebpg`, raw ints, plus `year`/`teamname`/team-color/`qa`). They differ in key membership, order, AND per-key value-type; the only identical residue is the `pid` passthrough. No shared `STAT_COLUMNS`/`assembleRow` surface exists, so no `StatRowFormatter` was extracted — forcing one would be cosmetic co-location that raises (not lowers) maintenance cost. The premise that both "iterate the same 18-stat-column set" is also false: neither service iterates a column list (both write positional array literals).
 **Location:** `CareerLeaderboards/CareerLeaderboardsService.php` (`processPlayerRow`, 90 LOC), `SeasonLeaderboards/SeasonLeaderboardsService.php`
 **Problem:** Both iterate over the same 18-stat-column set with `StatsFormatter::formatTotal`/`formatPerGameAverage`.
 **Suggested direction:** Extract `StatRowFormatter::formatTotalsRow()`, `formatAveragesRow()`; both delegate.

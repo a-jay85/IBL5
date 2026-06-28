@@ -54,7 +54,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
         $teamFactors = ['wins' => 50, 'losses' => 32, 'tradition_wins' => 0, 'tradition_losses' => 0, 'money_committed_at_position' => 0];
         $playerPreferences = ['winner' => 3, 'tradition' => 1, 'loyalty' => 1, 'playing_time' => 1];
 
-        $result = $this->evaluator->calculateWinnerModifier($teamFactors, $playerPreferences);
+        $result = $this->evaluator->computeWinnerModifier($teamFactors, $playerPreferences);
 
         $this->assertIsFloat($result);
         $this->assertGreaterThan(0, $result);
@@ -65,7 +65,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
         $teamFactors = ['wins' => 20, 'losses' => 62, 'tradition_wins' => 0, 'tradition_losses' => 0, 'money_committed_at_position' => 0];
         $playerPreferences = ['winner' => 3, 'tradition' => 1, 'loyalty' => 1, 'playing_time' => 1];
 
-        $result = $this->evaluator->calculateWinnerModifier($teamFactors, $playerPreferences);
+        $result = $this->evaluator->computeWinnerModifier($teamFactors, $playerPreferences);
 
         $this->assertIsFloat($result);
         $this->assertLessThan(0, $result);
@@ -76,7 +76,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
         $teamFactors = ['wins' => 50, 'losses' => 32, 'tradition_wins' => 0, 'tradition_losses' => 0, 'money_committed_at_position' => 0];
         $playerPreferences = ['winner' => 1, 'tradition' => 1, 'loyalty' => 1, 'playing_time' => 1]; // Default preference
 
-        $result = $this->evaluator->calculateWinnerModifier($teamFactors, $playerPreferences);
+        $result = $this->evaluator->computeWinnerModifier($teamFactors, $playerPreferences);
 
         // With winner preference of 1, modifier should be 0
         $this->assertSame(0.0, $result);
@@ -91,7 +91,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
         $teamFactors = ['wins' => 0, 'losses' => 0, 'tradition_wins' => 1000, 'tradition_losses' => 500, 'money_committed_at_position' => 0];
         $playerPreferences = ['winner' => 1, 'tradition' => 3, 'loyalty' => 1, 'playing_time' => 1];
 
-        $result = $this->evaluator->calculateTraditionModifier($teamFactors, $playerPreferences);
+        $result = $this->evaluator->computeTraditionModifier($teamFactors, $playerPreferences);
 
         $this->assertIsFloat($result);
         $this->assertGreaterThan(0, $result);
@@ -105,7 +105,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
     {
         $playerPreferences = ['winner' => 1, 'tradition' => 1, 'loyalty' => 5, 'playing_time' => 1];
 
-        $result = $this->evaluator->calculateLoyaltyModifier($playerPreferences);
+        $result = $this->evaluator->computeLoyaltyModifier($playerPreferences);
 
         $this->assertIsFloat($result);
         $this->assertGreaterThan(0, $result);
@@ -115,7 +115,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
     {
         $playerPreferences = ['winner' => 1, 'tradition' => 1, 'loyalty' => 1, 'playing_time' => 1];
 
-        $result = $this->evaluator->calculateLoyaltyModifier($playerPreferences);
+        $result = $this->evaluator->computeLoyaltyModifier($playerPreferences);
 
         $this->assertSame(0.0, $result);
     }
@@ -129,7 +129,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
         $teamFactors = ['wins' => 0, 'losses' => 0, 'tradition_wins' => 0, 'tradition_losses' => 0, 'money_committed_at_position' => 50000000];
         $playerPreferences = ['winner' => 1, 'tradition' => 1, 'loyalty' => 1, 'playing_time' => 5];
 
-        $result = $this->evaluator->calculatePlayingTimeModifier($teamFactors, $playerPreferences);
+        $result = $this->evaluator->computePlayingTimeModifier($teamFactors, $playerPreferences);
 
         $this->assertIsFloat($result);
         // Should be negative since more money committed means less playing time
@@ -149,7 +149,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
         $teamFactors = [];
         $playerPreferences = [];
 
-        $result = $this->evaluator->calculateCombinedModifier($teamFactors, $playerPreferences);
+        $result = $this->evaluator->computeCombinedModifier($teamFactors, $playerPreferences);
 
         $this->assertSame(1.0, $result);
     }
@@ -159,7 +159,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
         $teamFactors = ['wins' => 60, 'losses' => 22, 'tradition_wins' => 1000, 'tradition_losses' => 400, 'money_committed_at_position' => 0];
         $playerPreferences = ['winner' => 5, 'tradition' => 3, 'loyalty' => 5, 'playing_time' => 1];
 
-        $result = $this->evaluator->calculateCombinedModifier($teamFactors, $playerPreferences);
+        $result = $this->evaluator->computeCombinedModifier($teamFactors, $playerPreferences);
 
         $this->assertGreaterThan(1.0, $result);
     }
@@ -288,7 +288,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
         ];
 
         // Act
-        $modifier = $this->evaluator->calculateWinnerModifier($teamFactors, $playerPreferences);
+        $modifier = $this->evaluator->computeWinnerModifier($teamFactors, $playerPreferences);
 
         // Assert - With wins > losses and high winner preference, modifier should be positive
         $this->assertGreaterThan(0, $modifier);
@@ -316,7 +316,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
         ];
 
         // Act
-        $modifier = $this->evaluator->calculateTraditionModifier($teamFactors, $playerPreferences);
+        $modifier = $this->evaluator->computeTraditionModifier($teamFactors, $playerPreferences);
 
         // Assert - Good tradition with preference should give positive modifier
         $this->assertGreaterThan(0, $modifier);
@@ -337,14 +337,14 @@ class ExtensionOfferEvaluatorTest extends TestCase
         ];
 
         // Act
-        $modifier = $this->evaluator->calculateLoyaltyModifier($playerPreferences);
+        $modifier = $this->evaluator->computeLoyaltyModifier($playerPreferences);
 
         // Assert - High loyalty should give positive modifier
         $this->assertGreaterThan(0, $modifier);
 
         // Test low loyalty
         $playerPreferences['loyalty'] = 1;
-        $modifierLow = $this->evaluator->calculateLoyaltyModifier($playerPreferences);
+        $modifierLow = $this->evaluator->computeLoyaltyModifier($playerPreferences);
         $this->assertEquals(0, $modifierLow); // loyalty of 1 means no modifier
     }
 
@@ -370,7 +370,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
         ];
 
         // Act
-        $modifier = $this->evaluator->calculatePlayingTimeModifier($teamFactors, $playerPreferences);
+        $modifier = $this->evaluator->computePlayingTimeModifier($teamFactors, $playerPreferences);
 
         // Assert - High money at position with playing time preference should be negative
         $this->assertLessThan(0, $modifier);
@@ -398,7 +398,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
         ];
 
         // Act
-        $modifier = $this->evaluator->calculateCombinedModifier($teamFactors, $playerPreferences);
+        $modifier = $this->evaluator->computeCombinedModifier($teamFactors, $playerPreferences);
 
         // Assert - Modifier should be around 1.0 (neutral preferences)
         $this->assertGreaterThan(0.9, $modifier);
@@ -515,7 +515,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
         ];
 
         // Act
-        $modifier = $this->evaluator->calculateCombinedModifier($teamFactors, $playerPreferences);
+        $modifier = $this->evaluator->computeCombinedModifier($teamFactors, $playerPreferences);
 
         // Assert - Modifier should be significantly above 1.0
         $this->assertGreaterThan(1.0, $modifier);
@@ -543,7 +543,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
         ];
 
         // Act
-        $modifier = $this->evaluator->calculateCombinedModifier($teamFactors, $playerPreferences);
+        $modifier = $this->evaluator->computeCombinedModifier($teamFactors, $playerPreferences);
 
         // Assert - Modifier should be significantly below 1.0
         $this->assertLessThan(1.0, $modifier);
@@ -593,7 +593,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
         // Empty team factors → wins ?? 0, losses ?? 0 → winDiff = 0. Empty array is
         // intentional (mutation-hardening of the `?? 0` defaults); the shape mismatch
         // is a documented baseline defer, not a defect to "fix" by populating it.
-        $result = $this->evaluator->calculateWinnerModifier([], ['winner' => 3, 'tradition' => 1, 'loyalty' => 1, 'playing_time' => 1]);
+        $result = $this->evaluator->computeWinnerModifier([], ['winner' => 3, 'tradition' => 1, 'loyalty' => 1, 'playing_time' => 1]);
 
         $this->assertSame(0.0, $result);
     }
@@ -602,7 +602,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
     {
         // Missing 'winner' key → defaults to 1, so (1-1) = 0 → modifier = 0. Empty
         // preference array is intentional (hardens the `?? 1` default); deferred shape.
-        $result = $this->evaluator->calculateWinnerModifier(
+        $result = $this->evaluator->computeWinnerModifier(
             ['wins' => 50, 'losses' => 32, 'tradition_wins' => 0, 'tradition_losses' => 0, 'money_committed_at_position' => 0],
             []
         );
@@ -614,7 +614,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
     {
         // Empty team factors → tradition_wins/losses ?? 0 → diff = 0. Intentional
         // (hardens the `?? 0` defaults); deferred shape.
-        $result = $this->evaluator->calculateTraditionModifier([], ['winner' => 1, 'tradition' => 3, 'loyalty' => 1, 'playing_time' => 1]);
+        $result = $this->evaluator->computeTraditionModifier([], ['winner' => 1, 'tradition' => 3, 'loyalty' => 1, 'playing_time' => 1]);
 
         $this->assertSame(0.0, $result);
     }
@@ -623,7 +623,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
     {
         // Missing 'loyalty' key → defaults to 1, so (1-1) = 0. Empty array is
         // intentional (hardens the `?? 1` default); deferred shape.
-        $result = $this->evaluator->calculateLoyaltyModifier([]);
+        $result = $this->evaluator->computeLoyaltyModifier([]);
 
         $this->assertSame(0.0, $result);
     }
@@ -632,7 +632,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
     {
         // Missing money_committed → defaults to 0; missing playingTime → defaults to 1.
         // Empty arrays are intentional (harden the `??` defaults); deferred shape.
-        $result = $this->evaluator->calculatePlayingTimeModifier([], []);
+        $result = $this->evaluator->computePlayingTimeModifier([], []);
 
         $this->assertSame(0.0, $result);
     }
@@ -647,7 +647,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
      */
     public function testPlayingTimeModifierExactValueAtMc500(): void
     {
-        $result = $this->evaluator->calculatePlayingTimeModifier(
+        $result = $this->evaluator->computePlayingTimeModifier(
             ['wins' => 0, 'losses' => 0, 'tradition_wins' => 0, 'tradition_losses' => 0, 'money_committed_at_position' => 500],
             ['winner' => 1, 'tradition' => 1, 'loyalty' => 1, 'playing_time' => 5]
         );
@@ -661,7 +661,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
      */
     public function testPlayingTimeModifierExactValueAtMc1500(): void
     {
-        $result = $this->evaluator->calculatePlayingTimeModifier(
+        $result = $this->evaluator->computePlayingTimeModifier(
             ['wins' => 0, 'losses' => 0, 'tradition_wins' => 0, 'tradition_losses' => 0, 'money_committed_at_position' => 1500],
             ['winner' => 1, 'tradition' => 1, 'loyalty' => 1, 'playing_time' => 5]
         );
@@ -675,7 +675,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
      */
     public function testWinnerModifierExactValueWithRawDifferential(): void
     {
-        $result = $this->evaluator->calculateWinnerModifier(
+        $result = $this->evaluator->computeWinnerModifier(
             ['wins' => 60, 'losses' => 22, 'tradition_wins' => 0, 'tradition_losses' => 0, 'money_committed_at_position' => 0],
             ['winner' => 5, 'tradition' => 1, 'loyalty' => 1, 'playing_time' => 1]
         );
@@ -689,7 +689,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
      */
     public function testTraditionModifierExactValueWithRawDifferential(): void
     {
-        $result = $this->evaluator->calculateTraditionModifier(
+        $result = $this->evaluator->computeTraditionModifier(
             ['wins' => 0, 'losses' => 0, 'tradition_wins' => 700, 'tradition_losses' => 300, 'money_committed_at_position' => 0],
             ['winner' => 1, 'tradition' => 5, 'loyalty' => 1, 'playing_time' => 1]
         );

@@ -57,7 +57,7 @@ jobs:
         run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
 
       - name: Cache Composer dependencies
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ${{ steps.composer-cache.outputs.dir }}
           key: ${{ runner.os }}-composer-${{ hashFiles('ibl5/composer.lock') }}
@@ -65,7 +65,7 @@ jobs:
             ${{ runner.os }}-composer-
 
       - name: Cache vendor directory
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         id: vendor-cache
         with:
           path: ibl5/vendor
@@ -94,7 +94,7 @@ jobs:
         uses: oven-sh/setup-bun@v2
 
       - name: Cache node_modules
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         id: node-modules-cache
         with:
           path: ibl5/node_modules
@@ -107,7 +107,7 @@ jobs:
 
       # --- CML (for PR comment screenshots) ---
       - name: Cache CML
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         id: cml-cache
         with:
           path: ~/.cml

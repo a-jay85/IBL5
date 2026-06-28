@@ -17,6 +17,18 @@
 # 'name' rather than throwing; that is a semantic bug, not a missing-column
 # crash, and is out of scope for this gate.
 #
+# Denylist design (D3): common English words and SQL reserved words (from, to,
+# key, name, value, line, order, …) generate prose/comment/variable false
+# positives when matched with a bare word-boundary grep. When a renamed
+# old-name is on the denylist, only a backtick-quoted (`from`) or
+# single/double-quoted token ('from' / "from", covering $row['from'] and
+# quoted SQL identifiers) is treated as a real column reference. Non-denylisted
+# names keep the existing bareword \b${old_name}\b match, preserving the
+# PR #637 blind-spot coverage. Accepted residual: a literal unquoted
+# `SELECT from FROM …` is not flagged, but SQL's reserved-word quoting
+# requirement means any real column named 'from' must be backtick-quoted in
+# practice, so the recall gap is near-zero. See ADR-0071.
+#
 # Exit codes: 0 = pass, 1 = stale references found, 2 = usage error.
 
 set -euo pipefail
@@ -24,6 +36,11 @@ set -euo pipefail
 BYPASS_MIN_LENGTH=20
 MIGRATIONS_DIR="ibl5/migrations"
 SCAN_PATHS="ibl5/scripts/ ibl5/bin/ ibl5/api.php"
+
+# Common English / short SQL-reserved words. When a renamed old-name is one of these,
+# require an unambiguous SQL context (backtick- or quote-wrapped) to avoid matching the
+# word in comments, shell/PHP variables, and prose. See ADR-0071.
+COMMON_WORD_DENYLIST=" from to key name value line order set group by select table column index type status date id "
 
 usage() {
     cat <<'EOF'
@@ -47,6 +64,16 @@ Options:
 
 Scan paths (whole-tree, not diff-scoped):
   ibl5/scripts/, ibl5/bin/, ibl5/api.php
+
+Matching precision (ADR-0071):
+  Normal column names use word-boundary matching (\b<name>\b).
+  Common English / SQL-reserved words (from, to, key, name, value, line,
+  order, set, group, type, …) require a backtick-quoted or single/double-
+  quoted token to be flagged, preventing false positives in comments,
+  shell loop variables, PHP variables, and prose strings.
+  Accepted residual: an unquoted bare reference to a denylisted name (e.g.
+  SELECT from FROM …) is not flagged, but SQL's reserved-word quoting
+  requirement means such a reference must be backtick-quoted in practice.
 
 Exit codes: 0 = pass, 1 = stale references found, 2 = usage error.
 EOF
@@ -195,12 +222,18 @@ while IFS='	' read -r old_name mig_basename; do
     if grep -qxF "$old_name" "$TMP_COLUMNS_FILE" 2>/dev/null; then
         continue
     fi
+    # Choose match expression: denylisted words require backtick- or quote-wrapped token.
+    if printf '%s' "$COMMON_WORD_DENYLIST" | grep -qiF " ${old_name} "; then
+        match_re="(\`${old_name}\`|['\"]${old_name}['\"])"
+    else
+        match_re="\b${old_name}\b"
+    fi
     # Grep the blind-spot paths
     for scan_path in $SCAN_PATHS; do
         [ -e "$scan_path" ] || continue
         while IFS= read -r hit; do
             [ -n "$hit" ] && HITS="${HITS}${hit}  (renamed in ${mig_basename})"$'\n'
-        done < <(grep -rwnE "\b${old_name}\b" "$scan_path" 2>/dev/null || true)
+        done < <(grep -rnE "$match_re" "$scan_path" 2>/dev/null || true)
     done
 done < "$RENAME_MAP_FILE"
 

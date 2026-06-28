@@ -4,17 +4,16 @@ declare(strict_types=1);
 
 namespace Tests\TransactionHistory;
 
-use PHPUnit\Framework\TestCase;
 use TransactionHistory\TransactionHistoryRepository;
-use Tests\WideUnit\Mocks\MockDatabase;
+use Tests\WideUnit\WideUnitTestCase;
 
-class TransactionHistoryRepositoryTest extends TestCase
+class TransactionHistoryRepositoryTest extends WideUnitTestCase
 {
-    private MockDatabase $mockDb;
-
-    protected function setUp(): void
+    private function repo(): TransactionHistoryRepository
     {
-        $this->mockDb = new MockDatabase();
+        $db = $this->mockDb;
+        self::assertNotNull($db);
+        return new TransactionHistoryRepository($db);
     }
 
     // ORDER BY correctness (time DESC) is DB-integration-only; MockDatabase returns data in feed order.
@@ -25,9 +24,8 @@ class TransactionHistoryRepositoryTest extends TestCase
             ['year' => '2025'],
             ['year' => '2024'],
         ]);
-        $repo = new TransactionHistoryRepository($this->mockDb);
 
-        $result = $repo->getAvailableYears();
+        $result = $this->repo()->getAvailableYears();
 
         $this->assertSame([2025, 2024], $result);
     }
@@ -35,18 +33,16 @@ class TransactionHistoryRepositoryTest extends TestCase
     public function testGetAvailableYearsReturnsEmptyArrayWhenNoRows(): void
     {
         $this->mockDb->setMockData([]);
-        $repo = new TransactionHistoryRepository($this->mockDb);
 
-        $this->assertSame([], $repo->getAvailableYears());
+        $this->assertSame([], $this->repo()->getAvailableYears());
     }
 
     public function testGetTransactionsWithNoFiltersReturnsRows(): void
     {
         $row = ['sid' => '1', 'catid' => '1', 'title' => 'Trade', 'time' => '2025-03-01 12:00:00'];
         $this->mockDb->setMockData([$row]);
-        $repo = new TransactionHistoryRepository($this->mockDb);
 
-        $result = $repo->getTransactions(null, null, null);
+        $result = $this->repo()->getTransactions(null, null, null);
 
         $this->assertSame([$row], $result);
         $this->assertQueryExecuted('nuke_stories');
@@ -56,9 +52,8 @@ class TransactionHistoryRepositoryTest extends TestCase
     {
         $row = ['sid' => '2', 'catid' => '2', 'title' => 'Waiver', 'time' => '2025-04-01 10:00:00'];
         $this->mockDb->setMockData([$row]);
-        $repo = new TransactionHistoryRepository($this->mockDb);
 
-        $result = $repo->getTransactions(2, null, null);
+        $result = $this->repo()->getTransactions(2, null, null);
 
         $this->assertSame([$row], $result);
     }
@@ -67,9 +62,8 @@ class TransactionHistoryRepositoryTest extends TestCase
     {
         $row = ['sid' => '3', 'catid' => '1', 'title' => 'FA Sign', 'time' => '2025-12-15 09:00:00'];
         $this->mockDb->setMockData([$row]);
-        $repo = new TransactionHistoryRepository($this->mockDb);
 
-        $result = $repo->getTransactions(null, 2025, 12);
+        $result = $this->repo()->getTransactions(null, 2025, 12);
 
         $this->assertSame([$row], $result);
     }
@@ -78,9 +72,8 @@ class TransactionHistoryRepositoryTest extends TestCase
     {
         $row = ['sid' => '4', 'catid' => '1', 'title' => 'Cut', 'time' => '2025-03-10 08:00:00'];
         $this->mockDb->setMockData([$row]);
-        $repo = new TransactionHistoryRepository($this->mockDb);
 
-        $result = $repo->getTransactions(null, null, 3);
+        $result = $this->repo()->getTransactions(null, null, 3);
 
         $this->assertSame([$row], $result);
     }
@@ -88,24 +81,7 @@ class TransactionHistoryRepositoryTest extends TestCase
     public function testGetTransactionsReturnsEmptyArrayWhenNoRows(): void
     {
         $this->mockDb->setMockData([]);
-        $repo = new TransactionHistoryRepository($this->mockDb);
 
-        $this->assertSame([], $repo->getTransactions(null, null, null));
-    }
-
-    private function assertQueryExecuted(string $substring): void
-    {
-        $queries = $this->mockDb->getExecutedQueries();
-        $found = false;
-        foreach ($queries as $query) {
-            if (str_contains($query, $substring)) {
-                $found = true;
-                break;
-            }
-        }
-        self::assertTrue(
-            $found,
-            "Expected a query containing '{$substring}' but none was found. Queries: " . implode("\n", $queries)
-        );
+        $this->assertSame([], $this->repo()->getTransactions(null, null, null));
     }
 }

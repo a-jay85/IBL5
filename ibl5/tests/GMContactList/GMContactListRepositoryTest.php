@@ -5,16 +5,15 @@ declare(strict_types=1);
 namespace Tests\GMContactList;
 
 use GMContactList\GMContactListRepository;
-use PHPUnit\Framework\TestCase;
-use Tests\WideUnit\Mocks\MockDatabase;
+use Tests\WideUnit\WideUnitTestCase;
 
-class GMContactListRepositoryTest extends TestCase
+class GMContactListRepositoryTest extends WideUnitTestCase
 {
-    private MockDatabase $mockDb;
-
-    protected function setUp(): void
+    private function repo(): GMContactListRepository
     {
-        $this->mockDb = new MockDatabase();
+        $db = $this->mockDb;
+        self::assertNotNull($db);
+        return new GMContactListRepository($db);
     }
 
     public function testGetAllTeamContactsReturnsMappedContacts(): void
@@ -23,9 +22,8 @@ class GMContactListRepositoryTest extends TestCase
             ['teamid' => 1, 'team_city' => 'Springfield', 'team_name' => 'Bears', 'color1' => '#111', 'color2' => '#222', 'owner_name' => 'Alice', 'discord_id' => 123456],
             ['teamid' => 2, 'team_city' => 'Shelbyville', 'team_name' => 'Eagles', 'color1' => '#333', 'color2' => '#444', 'owner_name' => 'Bob', 'discord_id' => null],
         ]);
-        $repo = new GMContactListRepository($this->mockDb);
 
-        $result = $repo->getAllTeamContacts();
+        $result = $this->repo()->getAllTeamContacts();
 
         $this->assertSame([
             ['teamid' => 1, 'team_city' => 'Springfield', 'team_name' => 'Bears', 'color1' => '#111', 'color2' => '#222', 'owner_name' => 'Alice', 'discord_id' => 123456],
@@ -37,24 +35,7 @@ class GMContactListRepositoryTest extends TestCase
     public function testGetAllTeamContactsReturnsEmptyArrayWhenNoTeams(): void
     {
         $this->mockDb->setMockData([]);
-        $repo = new GMContactListRepository($this->mockDb);
 
-        $this->assertSame([], $repo->getAllTeamContacts());
-    }
-
-    private function assertQueryExecuted(string $substring): void
-    {
-        $queries = $this->mockDb->getExecutedQueries();
-        $found = false;
-        foreach ($queries as $query) {
-            if (str_contains($query, $substring)) {
-                $found = true;
-                break;
-            }
-        }
-        self::assertTrue(
-            $found,
-            "Expected a query containing '{$substring}' but none was found. Queries: " . implode("\n", $queries)
-        );
+        $this->assertSame([], $this->repo()->getAllTeamContacts());
     }
 }

@@ -220,7 +220,7 @@ cleanup_watcher() {
 trap cleanup_watcher EXIT
 
 run_heartbeat_watcher() {
-    local hb_file=$1 log_file=$2 label=$3 pid_file=$4
+    local hb_file=$1 log_file=$2 label=$3 pid_file=$4 slug=$5
     while sleep 60; do
         if [ ! -f "$hb_file" ]; then
             continue
@@ -236,8 +236,8 @@ run_heartbeat_watcher() {
             local target_pid
             target_pid=$(cat "$pid_file" 2>/dev/null) || true
             if [ -n "$target_pid" ] && kill -0 "$target_pid" 2>/dev/null; then
-                printf '[%s] STALL-KILL: %s — no events for %ds, killing pid %s and children\n' \
-                    "$ts" "$label" "$age" "$target_pid" >> "$log_file"
+                printf '[%s] %s STALL-KILL: %s — no events for %ds, killing pid %s and children\n' \
+                    "$ts" "$slug" "$label" "$age" "$target_pid" >> "$log_file"
                 pkill -TERM -P "$target_pid" 2>/dev/null || true
                 kill -TERM "$target_pid" 2>/dev/null || true
                 # SIGTERM can be trapped/ignored by a phase wedged on a dead
@@ -245,20 +245,20 @@ run_heartbeat_watcher() {
                 # escalate to SIGKILL after a grace period.
                 sleep "$KILL_GRACE_SECS"
                 if kill -0 "$target_pid" 2>/dev/null; then
-                    printf '[%s] STALL-KILL: %s — pid %s survived SIGTERM, sending SIGKILL\n' \
-                        "$(date +%H:%M:%S)" "$label" "$target_pid" >> "$log_file"
+                    printf '[%s] %s STALL-KILL: %s — pid %s survived SIGTERM, sending SIGKILL\n' \
+                        "$(date +%H:%M:%S)" "$slug" "$label" "$target_pid" >> "$log_file"
                     pkill -KILL -P "$target_pid" 2>/dev/null || true
                     kill -KILL "$target_pid" 2>/dev/null || true
                 fi
                 return
             else
-                printf '[%s] WARNING: %s — no events for %ds (stalled, pid gone)\n' \
-                    "$ts" "$label" "$age" >> "$log_file"
+                printf '[%s] %s WARNING: %s — no events for %ds (stalled, pid gone)\n' \
+                    "$ts" "$slug" "$label" "$age" >> "$log_file"
             fi
         elif [ "$age" -gt 300 ]; then
-            printf '[%s] WARNING: %s — no events for %ds (possibly stalled)\n' "$ts" "$label" "$age" >> "$log_file"
+            printf '[%s] %s WARNING: %s — no events for %ds (possibly stalled)\n' "$ts" "$slug" "$label" "$age" >> "$log_file"
         else
-            printf '[%s] heartbeat: %s alive (%ds since last event)\n' "$ts" "$label" "$age" >> "$log_file"
+            printf '[%s] %s heartbeat: %s alive (%ds since last event)\n' "$ts" "$slug" "$label" "$age" >> "$log_file"
         fi
     done
 }
@@ -485,6 +485,7 @@ while true; do
         break
     fi
     PLAN_NAME=$(basename "$NEXT_PLAN")
+    PLAN_SLUG="${PLAN_NAME%.md}"   # tags each interleaved log line with its plan
     CURRENT_LOCK="$QUEUE_DIR/${PLAN_NAME}.lock"
 
     # Per-plan retry counter — skip poison pills
@@ -539,7 +540,7 @@ while true; do
         CMDPID_FILE="$NIGHTLY_DIR/.cmdpid-$$-impl"
         rm -f "$HEARTBEAT_FILE" "$CMDPID_FILE"
 
-        run_heartbeat_watcher "$HEARTBEAT_FILE" "$LOG" "impl:$PLAN_NAME" "$CMDPID_FILE" &
+        run_heartbeat_watcher "$HEARTBEAT_FILE" "$LOG" "impl" "$CMDPID_FILE" "$PLAN_SLUG" &
         WATCHER_PID=$!
 
         IMPL_STATUS=0
@@ -564,7 +565,7 @@ PLAN_FILE=$PLAN_NAME" \
                 --verbose \
                 --name "automouse-impl-$(date +%Y-%m-%d-%H%M)" \
             2> >(grep -v 'thinking.type=enabled' >> "$LOG") \
-            | bin/lib/automouse-stream-filter "$HEARTBEAT_FILE" "$CMDPID_FILE" \
+            | bin/lib/automouse-stream-filter "$HEARTBEAT_FILE" "$CMDPID_FILE" "$PLAN_SLUG" \
             >> "$LOG" || IMPL_STATUS=$?
 
         kill "$WATCHER_PID" 2>/dev/null || true
@@ -573,7 +574,7 @@ PLAN_FILE=$PLAN_NAME" \
         rm -f "$HEARTBEAT_FILE" "$CMDPID_FILE"
 
         if [ "$IMPL_STATUS" -ne 0 ]; then
-            printf '[%s] claude exited code=%d (impl phase)\n' "$(date +%H:%M:%S)" "$IMPL_STATUS" >> "$LOG"
+            printf '[%s] %s claude exited code=%d (impl phase)\n' "$(date +%H:%M:%S)" "$PLAN_SLUG" "$IMPL_STATUS" >> "$LOG"
         fi
 
         echo "--- Plan #$PLANS_RUN impl finished at $(date) ---" >> "$LOG"
@@ -645,7 +646,7 @@ PLAN_FILE=$PLAN_NAME" \
         CMDPID_FILE="$NIGHTLY_DIR/.cmdpid-$$-postplan"
         rm -f "$HEARTBEAT_FILE" "$CMDPID_FILE"
 
-        run_heartbeat_watcher "$HEARTBEAT_FILE" "$LOG" "postplan:$PLAN_NAME" "$CMDPID_FILE" &
+        run_heartbeat_watcher "$HEARTBEAT_FILE" "$LOG" "postplan" "$CMDPID_FILE" "$PLAN_SLUG" &
         WATCHER_PID=$!
 
         PP_STATUS=0
@@ -662,7 +663,7 @@ PLAN_FILE=$PLAN_NAME" \
                 --verbose \
                 --name "automouse-postplan-$(date +%Y-%m-%d-%H%M)" \
             2> >(grep -v 'thinking.type=enabled' >> "$LOG") \
-            | bin/lib/automouse-stream-filter "$HEARTBEAT_FILE" "$CMDPID_FILE" \
+            | bin/lib/automouse-stream-filter "$HEARTBEAT_FILE" "$CMDPID_FILE" "$PLAN_SLUG" \
             >> "$LOG" || PP_STATUS=$?
 
         kill "$WATCHER_PID" 2>/dev/null || true
@@ -671,7 +672,7 @@ PLAN_FILE=$PLAN_NAME" \
         rm -f "$HEARTBEAT_FILE" "$CMDPID_FILE"
 
         if [ "$PP_STATUS" -ne 0 ]; then
-            printf '[%s] claude exited code=%d (postplan phase)\n' "$(date +%H:%M:%S)" "$PP_STATUS" >> "$LOG"
+            printf '[%s] %s claude exited code=%d (postplan phase)\n' "$(date +%H:%M:%S)" "$PLAN_SLUG" "$PP_STATUS" >> "$LOG"
         fi
 
         echo "--- Plan #$PLANS_RUN postplan finished at $(date) ---" >> "$LOG"

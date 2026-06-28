@@ -183,6 +183,114 @@ final class CheckColumnRenameSweepCliTest extends TestCase
         self::assertStringContainsString('r_to', $result['output']);
     }
 
+    public function testDenylistedWordInCommentNotFlagged(): void
+    {
+        $this->writeMigration(
+            '059_rename_trade_info_from_to.sql',
+            "ALTER TABLE trade_info CHANGE COLUMN `from` `origin_team` VARCHAR(50);\n"
+        );
+        file_put_contents(
+            $this->tmpDir . '/ibl5/scripts/foo.php',
+            "// import data from the archive\n"
+        );
+        $colFile = $this->writeColumnsFile(['origin_team']);
+
+        $result = $this->runScript(['--columns-file=' . $colFile]);
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('No stale renamed-column references detected', $result['output']);
+    }
+
+    public function testDenylistedWordAsShellLoopVarNotFlagged(): void
+    {
+        $this->writeMigration(
+            '060_rename_log_line.sql',
+            "ALTER TABLE ibl_log CHANGE COLUMN `line` `log_line` TEXT;\n"
+        );
+        file_put_contents(
+            $this->tmpDir . '/ibl5/bin/foo',
+            "while IFS= read -r line; do :; done\n"
+        );
+        $colFile = $this->writeColumnsFile(['log_line']);
+
+        $result = $this->runScript(['--columns-file=' . $colFile]);
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('No stale renamed-column references detected', $result['output']);
+    }
+
+    public function testDenylistedWordAsPhpVarNotFlagged(): void
+    {
+        $this->writeMigration(
+            '061_rename_settings_key.sql',
+            "ALTER TABLE ibl_settings CHANGE COLUMN `key` `setting_key` VARCHAR(100);\n"
+        );
+        file_put_contents(
+            $this->tmpDir . '/ibl5/scripts/foo.php',
+            "\$key = \$matches[1];\n"
+        );
+        $colFile = $this->writeColumnsFile(['setting_key']);
+
+        $result = $this->runScript(['--columns-file=' . $colFile]);
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('No stale renamed-column references detected', $result['output']);
+    }
+
+    public function testDenylistedWordInProseStringNotFlagged(): void
+    {
+        $this->writeMigration(
+            '059_rename_trade_info_from_to.sql',
+            "ALTER TABLE trade_info CHANGE COLUMN `from` `origin_team` VARCHAR(50);\n"
+        );
+        file_put_contents(
+            $this->tmpDir . '/ibl5/scripts/foo.php',
+            "echo 'This script must be run from the command line.';\n"
+        );
+        $colFile = $this->writeColumnsFile(['origin_team']);
+
+        $result = $this->runScript(['--columns-file=' . $colFile]);
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('No stale renamed-column references detected', $result['output']);
+    }
+
+    public function testDenylistedWordBacktickedIsFlagged(): void
+    {
+        $this->writeMigration(
+            '059_rename_trade_info_from_to.sql',
+            "ALTER TABLE trade_info CHANGE COLUMN `from` `origin_team` VARCHAR(50);\n"
+        );
+        file_put_contents(
+            $this->tmpDir . '/ibl5/scripts/foo.php',
+            "SELECT `from` FROM trade_info;\n"
+        );
+        $colFile = $this->writeColumnsFile(['origin_team']);
+
+        $result = $this->runScript(['--columns-file=' . $colFile]);
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('from', $result['output']);
+    }
+
+    public function testDenylistedWordQuotedSubscriptIsFlagged(): void
+    {
+        $this->writeMigration(
+            '059_rename_trade_info_from_to.sql',
+            "ALTER TABLE trade_info CHANGE COLUMN `from` `origin_team` VARCHAR(50);\n"
+        );
+        file_put_contents(
+            $this->tmpDir . '/ibl5/scripts/foo.php',
+            "echo \$row['from'];\n"
+        );
+        $colFile = $this->writeColumnsFile(['origin_team']);
+
+        $result = $this->runScript(['--columns-file=' . $colFile]);
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('from', $result['output']);
+    }
+
     /**
      * @param list<string> $args
      * @return array{output: string, exit: int}

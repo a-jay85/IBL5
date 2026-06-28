@@ -89,4 +89,31 @@ class RecordParserTest extends TestCase
         $this->assertSame(0, $result['wins']);
         $this->assertSame(0, $result['losses']);
     }
+
+    public function testExtractWinsFromEmptyStringReturnsZero(): void
+    {
+        $this->assertSame(0, RecordParser::extractWins(''));
+    }
+
+    public function testExtractLossesFromEmptyStringReturnsZero(): void
+    {
+        $this->assertSame(0, RecordParser::extractLosses(''));
+    }
+
+    public function testExtractWinsFromNonNumericReturnsZero(): void
+    {
+        $this->assertSame(0, RecordParser::extractWins('abc-def'));
+    }
+
+    public function testExtractWinsFromLeadingDashReturnsZero(): void
+    {
+        $this->assertSame(0, RecordParser::extractWins('-5'));
+    }
+
+    public function testParseRecordIgnoresExtraSeparators(): void
+    {
+        $result = RecordParser::parseRecord('45-37-12');
+        $this->assertSame(45, $result['wins']);
+        $this->assertSame(37, $result['losses']);
+    }
 }

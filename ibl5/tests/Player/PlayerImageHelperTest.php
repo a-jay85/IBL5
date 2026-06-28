@@ -379,4 +379,56 @@ class PlayerImageHelperTest extends TestCase
         $this->assertStringNotContainsString('<script>', $result);
         $this->assertStringContainsString('&lt;script&gt;', $result);
     }
+
+    public function testRenderThumbnailReturnsPlaceholderForInvalidId(): void
+    {
+        $result = PlayerImageHelper::renderThumbnail(0);
+
+        $this->assertStringContainsString('data:image/png;base64', $result);
+        $this->assertStringContainsString('ibl-player-photo', $result);
+    }
+
+    public function testRenderThumbnailUsesPlayerUrlForValidId(): void
+    {
+        $result = PlayerImageHelper::renderThumbnail(123);
+
+        $this->assertStringContainsString('./images/player/123.jpg', $result);
+        $this->assertStringContainsString('ibl-player-photo', $result);
+    }
+
+    public function testRenderPhotoEscapesAltText(): void
+    {
+        $result = PlayerImageHelper::renderPhoto(123, '<script>alert(1)</script>');
+
+        $this->assertStringNotContainsString('<script>', $result);
+        $this->assertStringContainsString('&lt;script&gt;', $result);
+        $this->assertStringContainsString('width="65"', $result);
+        $this->assertStringContainsString('height="90"', $result);
+    }
+
+    public function testRenderPhotoUsesProvidedDimensions(): void
+    {
+        $result = PlayerImageHelper::renderPhoto(123, 'x', 40, 50);
+
+        $this->assertStringContainsString('width="40"', $result);
+        $this->assertStringContainsString('height="50"', $result);
+    }
+
+    public function testRenderLargePlayerCellLinksPhotoAndName(): void
+    {
+        $result = PlayerImageHelper::renderLargePlayerCell(123, 'John Smith');
+
+        $this->assertStringContainsString('class="player-cell"', $result);
+        $this->assertStringContainsString('pid=123', $result);
+        $this->assertStringContainsString('<img', $result);
+        $this->assertStringContainsString('John Smith', $result);
+    }
+
+    public function testRenderLargePlayerCellEscapesName(): void
+    {
+        $result = PlayerImageHelper::renderLargePlayerCell(123, '<script>alert(1)</script>');
+
+        $this->assertStringNotContainsString('<script>', $result);
+        $this->assertStringContainsString('&lt;script&gt;', $result);
+    }
 }

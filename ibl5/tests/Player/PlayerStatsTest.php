@@ -241,6 +241,16 @@ class PlayerStatsTest extends TestCase
         $this->assertSame('0.0', $this->stats->seasonAssistsPerGame);
     }
 
+    public function testFillHistoricalMissingColumnsDefaultToZero(): void
+    {
+        $this->stats->exposedFillHistorical([]);
+
+        $this->assertSame(0, $this->stats->seasonGamesPlayed);
+        $this->assertSame(0, $this->stats->seasonMinutes);
+        $this->assertSame(0, $this->stats->seasonPoints);
+        $this->assertSame(0, $this->stats->seasonTotalRebounds);
+    }
+
     // --- fillBoxscoreStats() tests ---
 
     public function testFillBoxscoreStatsExtractsNameFromFixedOffset(): void
@@ -287,6 +297,14 @@ class PlayerStatsTest extends TestCase
 
         $this->assertSame('Short Name', $this->stats->name);
         $this->assertSame('PG', $this->stats->position);
+    }
+
+    public function testFillBoxscoreStatsHandlesEmptyLineWithoutError(): void
+    {
+        $this->stats->exposedFillBoxscoreStats('');
+
+        $this->assertSame('', $this->stats->name);
+        $this->assertSame('', $this->stats->position);
     }
 
     // --- Helper methods ---

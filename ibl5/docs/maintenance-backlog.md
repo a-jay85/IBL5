@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-06-27
+last_verified: 2026-06-28
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -1167,8 +1167,8 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 | 6.10 | ✅ Implemented | 🟩 | FreeAgencyPreview thin; additive — coordinate with PR #1162 (future-year restore). |
 | 6.11 | ✅ Implemented | 🟩 | SeasonHighs thin; additive. |
 | 6.12 | ✅ Implemented | 🟩 | TeamSchedule thin; additive. |
-| 6.13 | ⬜ Open | 🟩 | Player 0.24 ratio; additive (L — chunk it). |
-| 6.14 | ⬜ Open | 🟩 | Updater steps; additive. |
+| 6.13 | ◑ Partial | 🟩 | Player 0.24 ratio; additive (L — chunk it). |
+| 6.14 | ◑ Partial | 🟩 | Updater steps; additive. |
 | 6.15 | ✅ Implemented | — | VotingRepositoryTest + SubmissionResultTest added (aggregation, column allowlist). |
 | 6.16 | ◑ Partial | 🟩 | ApiKeyRepositoryTest + RateLimitRepositoryTest added; data repos + JsonResponder/SystemClock still untested. |
 | 6.17 | ◑ Partial | 🟩 | TradeAssetRepositoryTest + TradeOfferRepositoryTest added (draft-pick mapping, offer lifecycle); TradeExecutionRepository untested + TradeFormRepository partial. |
@@ -1276,6 +1276,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Page-type routing, contract rules, stats aggregation, image-helper edge cases.
 **Est. effort:** L
 **Risk if untouched:** Profile regressions cascade; contract validation bypass.
+**Status:** ◑ Partial (this PR, 2026-06-27). Added negative-path/boundary coverage on the named critical classes — `PlayerContractValidator` (offseason renegotiation advance; non-draft-pick and already-set option-year rejections), `PlayerImageHelper` (`renderPhoto`/`renderLargePlayerCell` escaping; `renderThumbnail` invalid-id placeholder), `PlayerStats` (empty boxscore line; missing historical columns) — in `ibl5/tests/Player/PlayerContractValidatorTest.php`, `ibl5/tests/Player/PlayerImageHelperTest.php`, `ibl5/tests/Player/PlayerStatsTest.php`. `PlayerPageService`/`PlayerPageType` page-type routing already covered (`ibl5/tests/Player/PlayerPageServiceTest.php`, `ibl5/tests/Player/PlayerPageTypeTest.php`). **Residual:** `Player/Views/`, `Player/Stats/Views/`, `PlayerRepository`, and `PlayerPageController` full routing remain untested; the 71-file module is still well below a 0.5 ratio.
 
 ### 6.14 Updater Module — Large + Subthreshold (37 files, 9 tests)
 **Location:** `ibl5/classes/Updater`
@@ -1283,6 +1284,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Per-step W-L aggregation, date ordering, format parsing.
 **Est. effort:** L
 **Risk if untouched:** Nightly automation corrupts standings/schedules/stats silently.
+**Status:** ◑ Partial (this PR, 2026-06-27). Added `ibl5/tests/Updater/StandingsUpdaterTest.php` (league/home/away/conference/division W-L aggregation, plus unknown-team-skip, empty-config, and zero-games boundaries) and `ibl5/tests/Updater/PowerRankingsUpdaterTest.php` (ranking formula + div-by-zero guard); extended `ibl5/tests/Updater/RecordParserTest.php` with empty/non-numeric/leading-dash boundaries. `ScheduleUpdater` already covered (`ibl5/tests/Updater/ScheduleUpdaterTest.php`). **Residual:** `Updater/Steps/` (22 step classes), `OlympicsFlatStandingsUpdater`, `UpdaterView`, and `JsbSourceResolver` remain untested; the 37-file module is still well below a 0.5 ratio.
 
 ### 6.15 Voting Module — Subthreshold (17 files, 4 tests)
 **Location:** `ibl5/classes/Voting`

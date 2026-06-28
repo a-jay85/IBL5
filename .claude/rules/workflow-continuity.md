@@ -1,6 +1,6 @@
 ---
-description: All work happens in a worktree (never the main checkout); worktree setup and the implementation→/post-plan handoff (auto-fired in a detached fresh session) for multi-step work.
-last_verified: 2026-06-20
+description: All work happens in a worktree (never the main checkout); worktree setup and the implementation→/post-plan handoff (auto-fired in a detached fresh session) for any verified-complete worktree work, plan-driven or ad-hoc.
+last_verified: 2026-06-28
 ---
 
 # Workflow Continuity Rule
@@ -31,11 +31,13 @@ Never run `/post-plan` **inline** in this session — it re-reads the full imple
 
 ### Interactive sessions — auto-fire the handoff
 
-When implementation is **verified complete**, your **final action** is:
+This applies to **any** verified-complete unit of work in a worktree — plan-driven **or ad-hoc**. When the work has verified clean and the only thing left is the mechanical push + open-PR to land it, that ship step does **not** need a confirmation prompt — do **not** ask "want me to push and open the PR?". The global "confirm before outward-facing actions" default is **durably overridden here**: shipping verified-complete worktree work is pre-authorized. Your **final action** is:
 
 ```bash
 bin/post-plan-now --auto
 ```
+
+(On an ad-hoc branch with no plan file, post-plan runs plan-blind — that's expected, not an error. The merge-arming decision still happens at `/post-plan` Phase 6.5, so auto-opening the PR never means auto-merging a `feat:`/`auto_merge: false`/visual PR without human signoff.)
 
 This spawns a detached, fresh **Sonnet 4.6** `/post-plan` on this branch (supervised by launchd, so it survives you closing Claude Code). It removes the manual "open a new session and hand off" step. Notes:
 

@@ -1,9 +1,9 @@
 ---
 allowed-tools: Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh pr comment:*),
-  Bash(gh api:*), Bash(git rev-parse:*)
+  Bash(gh api:*), Bash(git rev-parse:*), Bash(source:*)
 description: Token-efficient security audit for pull requests
 model: sonnet
-last_verified: 2026-04-29
+last_verified: 2026-06-28
 ---
 
 Perform a security audit on the given pull request. This command optimizes token usage by fetching the diff once and passing it to a single merged security agent.
@@ -11,7 +11,7 @@ Perform a security audit on the given pull request. This command optimizes token
 ## Step 1: Eligibility check
 
 Use a **Haiku** agent to check if the pull request:
-(a) is closed, (b) is a draft, (c) has zero PHP files changed, or (d) already has a `### Security audit` comment from you.
+(a) is closed, (b) is a draft, (c) has zero PHP files changed, or (d) already has a `### Security audit` from you in a PR issue comment OR a PR **review** body — `gh pr view --json comments,reviews` — since findings now post as a review with inline threads, not only as issue comments.
 
 If any of these are true, do not proceed. Tell the user why.
 
@@ -77,31 +77,48 @@ gh pr view --json state --jq '.state'
 
 If the result is not `"OPEN"`, do not post a comment. Tell the user the PR is no longer open.
 
-## Step 7: Post comment
+## Step 7: Post findings
 
-Use `gh pr comment` to post the audit results. Use the PR number and head SHA from Step 2a for links.
+Source the shared posting helper (same idiom as `bin/lib/pr-armable.sh`):
 
-### Comment format (if issues found):
+```bash
+source "$(git rev-parse --show-toplevel)/bin/lib/post-review-findings.sh"
+```
 
----
+**If findings survived Step 5,** build a findings JSON array (write to a temp file — not a shell arg). Each element:
+```json
+{ "path": "repo/relative/path.php",
+  "line": 17,
+  "body": "**[SEVERITY]** Vulnerability type in `Class::method()` — description\n\n<full-SHA range link>",
+  "score": 88 }
+```
+- `path` is the repo-relative file path.
+- `line` is a single anchor line on the new-file (right) side.
+- `body` is the finding description in the format below, followed by the full-SHA link. Do NOT add the footer — the helper adds it.
+- `score` is the Haiku score from Step 4.
 
-### Security audit
+Then call:
+```bash
+post_review_findings "$PR_NUMBER" "$HEAD_SHA" "Security audit" "$findings_file"
+```
 
-Found N issue(s):
+The helper routes on-diff findings to a batch resolvable review POST (inline threads) and out-of-diff findings to a fallback `gh pr comment`. Nothing is dropped.
 
+**If no findings survived Step 5,** call:
+```bash
+post_review_summary "$PR_NUMBER" "Security audit" \
+    "No security issues found. <brief evidence per category> (XSS and input validation are enforced by PHPStan custom rules.)"
+```
+
+### Per-finding body format:
+
+```
 **[SEVERITY]** Vulnerability type in `Class::method()` — description
 
-<link to file and line with full SHA + line range>
+https://github.com/a-jay85/IBL5/blob/FULL_SHA/path/to/file.php#L13-L17
+```
 
-**[SEVERITY]** Vulnerability type in `Class::method()` — description
-
-<link to file and line with full SHA + line range>
-
-Generated with [Claude Code](https://claude.ai/code)
-
-<sub>If this security audit was useful, please react with thumbs-up. Otherwise, react with thumbs-down.</sub>
-
----
+(The heading `### Security audit`, the found-N summary line, and the footer are emitted by the helper — do NOT include them in individual finding bodies.)
 
 ### Severity mapping:
 - **CRITICAL** — SQL injection, command injection
@@ -111,23 +128,11 @@ Generated with [Claude Code](https://claude.ai/code)
 
 (XSS and input validation are not in this list because `RequireEscapedOutputRule` and `BanRawSuperglobalsRule` catch them in CI before this audit runs.)
 
-### Comment format (if no issues):
-
----
-
-### Security audit
-
-No security issues found. \<brief evidence per category that launched, e.g. "SQL: all queries use prepared statements via fetchOne()/fetchAll(). CSRF: token validated via CsrfGuard::validateSubmittedToken() on line N. Auth: is\_user() guard on state-changing endpoints."\> (XSS and input validation are enforced by PHPStan custom rules.)
-
-Generated with [Claude Code](https://claude.ai/code)
-
----
-
 ### Link format rules:
 - Must use the full git SHA (from Step 2a's `headRefOid`)
 - Format: `https://github.com/a-jay85/IBL5/blob/{FULL_SHA}/path/to/file#L{start}-L{end}`
 - Provide at least 1 line of context before and after the line you are commenting about
-- Do NOT use `$(git rev-parse HEAD)` or any bash interpolation in the comment — expand the SHA beforehand
+- Do NOT use `$(git rev-parse HEAD)` or any bash interpolation in the body string — expand the SHA beforehand
 
 ### Notes:
 - Do not check build signal or attempt to build or typecheck the app. These will run separately.

@@ -1,0 +1,222 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-post-review-findings — regression guard for bin/lib/post-review-findings.sh
+#
+# Verifies that:
+#   • on-diff findings → batch resolvable review POST (not a plain comment)
+#   • out-of-diff findings → fallback gh pr comment (nothing dropped)
+#   • mixed partition → each finding lands in the right channel
+#   • no-issues path → evidence comment with footer, no review POST
+#   • score marker <!-- score: N --> encoded in every finding body
+#   • empty findings array → complete no-op
+#   • all 3 callers reference post-review-findings.sh (structural)
+#   • /pr-review & /security-audit Step 1 guards check PR reviews (structural)
+#
+# Run: bin/test-post-review-findings  (exit 0 = all pass, 1 = some failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+LIB="$REPO_ROOT/bin/lib/post-review-findings.sh"
+
+BASE_TMP="$(mktemp -d)"
+trap 'rm -rf "$BASE_TMP"' EXIT
+FAILED=0
+
+# ── gh shim ───────────────────────────────────────────────────────────────────
+SHIMD="$BASE_TMP/shim"
+mkdir -p "$SHIMD"
+cat > "$SHIMD/gh" <<'SHIM'
+#!/usr/bin/env bash
+# shim for: gh pr diff N  |  gh api --method POST .../reviews --input F
+#           gh pr comment N --body-file F
+if [ "$1" = "pr" ] && [ "$2" = "diff" ]; then
+    cat "$GH_DIFF_FIXTURE"
+    exit 0
+fi
+if [ "$1" = "api" ] && [ "$2" = "--method" ] && [ "$3" = "POST" ]; then
+    input_file=""
+    for ((i=1; i<=$#; i++)); do
+        if [ "${!i}" = "--input" ]; then j=$((i+1)); input_file="${!j}"; fi
+    done
+    cp "$input_file" "$REVIEW_OUT"
+    echo '{"id":1}'
+    exit 0
+fi
+if [ "$1" = "pr" ] && [ "$2" = "comment" ]; then
+    body_file=""
+    for ((i=1; i<=$#; i++)); do
+        if [ "${!i}" = "--body-file" ]; then j=$((i+1)); body_file="${!j}"; fi
+    done
+    cp "$body_file" "$COMMENT_OUT"
+    exit 0
+fi
+exit 1
+SHIM
+chmod +x "$SHIMD/gh"
+
+# ── diff fixture ──────────────────────────────────────────────────────────────
+# Single file classes/Foo.php, hunk @@ -10,3 +10,4 @@
+# Right-side lines in diff: 10 (ctx), 11 (ctx), 12 (added), 13 (ctx)
+# → line 12 is on-diff; line 999 is out-of-diff.
+GH_DIFF_FIXTURE="$BASE_TMP/diff.txt"
+cat > "$GH_DIFF_FIXTURE" <<'DIFF'
+diff --git a/classes/Foo.php b/classes/Foo.php
+--- a/classes/Foo.php
++++ b/classes/Foo.php
+@@ -10,3 +10,4 @@
+ context line 10
+ context line 11
++added line 12
+ context line 13
+DIFF
+
+# ── output capture files ──────────────────────────────────────────────────────
+REVIEW_OUT="$BASE_TMP/review.json"
+COMMENT_OUT="$BASE_TMP/comment.txt"
+
+# Export all vars the shim and lib need to see from child processes
+export GH_CMD="$SHIMD/gh"
+export REPO_SLUG="a-jay85/IBL5"
+export GH_DIFF_FIXTURE
+export REVIEW_OUT
+export COMMENT_OUT
+
+# Source the lib once (GH_CMD and REPO_SLUG already exported above; lib's
+# `:-` defaults are no-ops because the vars are already set)
+# shellcheck disable=SC1090
+source "$LIB"
+
+reset_outputs() { rm -f "$REVIEW_OUT" "$COMMENT_OUT"; }
+
+# ── assertion helpers ─────────────────────────────────────────────────────────
+ok()   { printf 'ok: %s\n' "$*"; }
+fail() { printf 'FAIL: %s\n' "$*"; FAILED=1; }
+
+assert_jq() { # label jq-expr file
+    local label="$1" expr="$2" file="$3"
+    if jq -e "$expr" "$file" >/dev/null 2>&1; then
+        ok "$label"
+    else
+        fail "$label — jq '$expr' failed on: $(head -5 "$file" 2>/dev/null)"
+    fi
+}
+
+assert_contains() { # label file text
+    if grep -qF "$3" "$2" 2>/dev/null; then
+        ok "$1 contains expected text"
+    else
+        fail "$1 missing '$3'"
+    fi
+}
+
+assert_absent() { # label file
+    if [ ! -f "$2" ]; then
+        ok "$1 absent (correct)"
+    else
+        fail "$1 should NOT exist but does"
+    fi
+}
+
+# ── case 1: on-diff ───────────────────────────────────────────────────────────
+# Finding anchored on a line that IS in the diff (line 12).
+# Expect: $REVIEW_OUT posted as batch review; $COMMENT_OUT absent.
+reset_outputs
+f1="$BASE_TMP/f1.json"
+printf '[{"path":"classes/Foo.php","line":12,"body":"Bug X — link","score":85}]' > "$f1"
+post_review_findings 42 deadbeefcafe "Code review" "$f1"
+
+assert_jq       "case1: commit_id"       '.commit_id == "deadbeefcafe"'                        "$REVIEW_OUT"
+assert_jq       "case1: event COMMENT"   '.event == "COMMENT"'                                 "$REVIEW_OUT"
+assert_jq       "case1: comments count"  '.comments | length == 1'                             "$REVIEW_OUT"
+assert_jq       "case1: path"            '.comments[0].path == "classes/Foo.php"'              "$REVIEW_OUT"
+assert_jq       "case1: line"            '.comments[0].line == 12'                             "$REVIEW_OUT"
+assert_jq       "case1: side RIGHT"      '.comments[0].side == "RIGHT"'                        "$REVIEW_OUT"
+assert_jq       "case1: body has Bug X"  '.comments[0].body | contains("Bug X")'              "$REVIEW_OUT"
+assert_jq       "case1: score marker"    '.comments[0].body | contains("<!-- score: 85 -->")' "$REVIEW_OUT"
+assert_absent   "case1: no fallback"     "$COMMENT_OUT"
+
+# ── case 2: out-of-diff (NEGATIVE) ───────────────────────────────────────────
+# Finding on line NOT in the diff (line 999).
+# Expect: $COMMENT_OUT posted as fallback; $REVIEW_OUT absent.
+reset_outputs
+f2="$BASE_TMP/f2.json"
+printf '[{"path":"classes/Foo.php","line":999,"body":"Bug Y — link","score":90}]' > "$f2"
+post_review_findings 42 deadbeefcafe "Code review" "$f2"
+
+assert_contains "case2: heading"         "$COMMENT_OUT" "### Code review"
+assert_contains "case2: Bug Y present"   "$COMMENT_OUT" "Bug Y"
+assert_contains "case2: score marker 90" "$COMMENT_OUT" "<!-- score: 90 -->"
+assert_absent   "case2: no review POST"  "$REVIEW_OUT"
+
+# ── case 3: mixed ─────────────────────────────────────────────────────────────
+# Two findings: line 12 on-diff, line 999 out-of-diff.
+# Expect: review has 1 comment (line 12); fallback has Bug Off.
+reset_outputs
+f3="$BASE_TMP/f3.json"
+printf '[{"path":"classes/Foo.php","line":12,"body":"Bug On","score":80},{"path":"classes/Foo.php","line":999,"body":"Bug Off","score":82}]' > "$f3"
+post_review_findings 42 deadbeefcafe "Code review" "$f3"
+
+assert_jq       "case3: review count 1"  '.comments | length == 1'   "$REVIEW_OUT"
+assert_jq       "case3: inline line 12"  '.comments[0].line == 12'   "$REVIEW_OUT"
+assert_contains "case3: fallback Bug Off" "$COMMENT_OUT" "Bug Off"
+
+# ── case 4: no-issues path ───────────────────────────────────────────────────
+# Expect: $COMMENT_OUT with heading + body + footer; $REVIEW_OUT absent.
+reset_outputs
+post_review_summary 42 "Code review" "No issues found. Architecture clean."
+
+assert_contains "case4: heading"   "$COMMENT_OUT" "### Code review"
+assert_contains "case4: body"      "$COMMENT_OUT" "No issues found."
+assert_contains "case4: footer"    "$COMMENT_OUT" "Generated with [Claude Code]"
+assert_absent   "case4: no review" "$REVIEW_OUT"
+
+# ── case 6: BOUNDARY — empty findings ────────────────────────────────────────
+reset_outputs
+f6="$BASE_TMP/f6.json"
+printf '[]' > "$f6"
+post_review_findings 42 deadbeefcafe "Code review" "$f6"
+
+assert_absent "case6: no review on empty"   "$REVIEW_OUT"
+assert_absent "case6: no comment on empty"  "$COMMENT_OUT"
+
+# ── structural case 7: all 3 callers reference the helper ────────────────────
+for f in \
+    "$REPO_ROOT/.claude/skills/post-plan/SKILL.md" \
+    "$REPO_ROOT/.claude/commands/pr-review.md" \
+    "$REPO_ROOT/.claude/commands/security-audit.md"
+do
+    name="$(basename "$f")"
+    if grep -q 'post-review-findings.sh' "$f" 2>/dev/null; then
+        ok "case7: $name references post-review-findings.sh"
+    else
+        fail "case7: $name does NOT reference post-review-findings.sh"
+    fi
+done
+
+# ── structural case 8: Step 1 re-run guards check PR reviews ─────────────────
+# The fix adds `gh pr view --json comments,reviews` (or equivalent) so that a
+# prior posting as a review body (not just an issue comment) is detected.
+# Assert "reviews" (plural) appears in the Step 1 → Step 2 region of each file.
+for f in \
+    "$REPO_ROOT/.claude/commands/pr-review.md" \
+    "$REPO_ROOT/.claude/commands/security-audit.md"
+do
+    name="$(basename "$f")"
+    step1=$(awk '/^## Step 1/,/^## Step 2/' "$f" 2>/dev/null)
+    if printf '%s' "$step1" | grep -qi 'reviews'; then
+        ok "case8: $name Step 1 checks PR reviews for prior findings"
+    else
+        fail "case8: $name Step 1 does NOT check PR reviews — re-run guard broken after findings move off issue comments"
+    fi
+done
+
+# ── summary ───────────────────────────────────────────────────────────────────
+if [ "$FAILED" -eq 0 ]; then
+    echo "All post-review-findings checks passed."
+else
+    echo "Some post-review-findings checks FAILED."
+fi
+exit "$FAILED"

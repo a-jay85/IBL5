@@ -1,10 +1,10 @@
 ---
 allowed-tools: Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh pr comment:*),
   Bash(gh issue view:*), Bash(gh search:*), Bash(gh pr list:*), Bash(gh api:*),
-  Bash(git log:*), Bash(git rev-parse:*), Bash(git show:*)
+  Bash(git log:*), Bash(git rev-parse:*), Bash(git show:*), Bash(source:*)
 description: Token-efficient code review for pull requests
 model: sonnet
-last_verified: 2026-05-21
+last_verified: 2026-06-28
 ---
 
 Provide a code review for the given pull request. This command optimizes token usage by fetching the diff once and distributing only what each agent needs.
@@ -12,7 +12,7 @@ Provide a code review for the given pull request. This command optimizes token u
 ## Step 1: Eligibility check
 
 Use a **Haiku** agent to check if the pull request:
-(a) is closed, (b) is a draft, (c) does not need a code review (e.g. automated PR, or very simple and obviously ok), or (d) already has a code review from you earlier.
+(a) is closed, (b) is a draft, (c) does not need a code review (e.g. automated PR, or very simple and obviously ok), or (d) already has a code review from you earlier (check both PR issue comments and PR **reviews** — `gh pr view --json comments,reviews` — for a prior `### Code review` heading from you, since findings are now posted as a review body with inline threads, not only as issue comments).
 
 If any of these are true, do not proceed. Tell the user why.
 
@@ -90,9 +90,38 @@ gh pr view --json state --jq '.state'
 
 If the result is not `"OPEN"`, do not post a comment. Tell the user the PR is no longer open.
 
-## Step 7: Post comment
+## Step 7: Post findings
 
-Use `gh pr comment` to post the review. Use the PR number and head SHA from Step 2a for links.
+Source the shared posting helper (same idiom as `bin/lib/pr-armable.sh`):
+
+```bash
+source "$(git rev-parse --show-toplevel)/bin/lib/post-review-findings.sh"
+```
+
+**If issues survived Step 5,** build a findings JSON array (write to a temp file — not a shell arg — to avoid quoting limits). Each element:
+```json
+{ "path": "repo/relative/path.php",
+  "line": 17,
+  "body": "<description> (CLAUDE.md says \"<rule>\")\n\n<full-SHA range link>",
+  "score": 85 }
+```
+- `path` is the repo-relative file path (matching `+++ b/<path>` in the diff).
+- `line` is a single anchor line on the new-file (right) side.
+- `body` is the description in the format below, followed by the full-SHA link. Do NOT add the footer — the helper adds it.
+- `score` is the Haiku score from Step 4.
+
+Then call:
+```bash
+post_review_findings "$PR_NUMBER" "$HEAD_SHA" "Code review" "$findings_file"
+```
+
+The helper routes on-diff findings to a batch resolvable review POST (inline threads) and out-of-diff findings to a fallback `gh pr comment`. Nothing is dropped.
+
+**If no issues survived Step 5,** call:
+```bash
+post_review_summary "$PR_NUMBER" "Code review" \
+    "No issues found. <1-2 sentence evidence summary>"
+```
 
 ### Notes:
 - Do not check build signal or attempt to build or typecheck the app. These will run separately.
@@ -100,42 +129,18 @@ Use `gh pr comment` to post the review. Use the PR number and head SHA from Step
 - Make a todo list first.
 - You must cite and link each bug (e.g. if referring to a CLAUDE.md, you must link it).
 
-### Comment format (if issues found):
+### Per-finding body format:
 
----
+```
+<brief description of bug> (CLAUDE.md says "<...>")
 
-### Code review
+https://github.com/a-jay85/IBL5/blob/FULL_SHA/path/to/file.php#L13-L17
+```
 
-Found N issues:
-
-1. \<brief description of bug\> (CLAUDE.md says "\<...\>")
-
-\<link to file and line with full sha1 + line range for context, e.g. https://github.com/a-jay85/IBL5/blob/FULL_SHA/path/to/file.php#L13-L17\>
-
-2. \<brief description of bug\> (bug due to \<file and code snippet\>)
-
-\<link to file and line with full sha1 + line range for context\>
-
-Generated with [Claude Code](https://claude.ai/code)
-
-\<sub\>If this code review was useful, please react with thumbs-up. Otherwise, react with thumbs-down.\</sub\>
-
----
-
-### Comment format (if no issues):
-
----
-
-### Code review
-
-No issues found. \<1-2 sentence evidence summary assembled from agent responses, e.g. "Architecture follows Repository/Service/View split. Native-type comparisons consistent with schema. No bind\_param mismatches in modified files."\>
-
-Generated with [Claude Code](https://claude.ai/code)
-
----
+(The heading `### Code review`, the found-N summary line, and the footer are emitted by the helper — do NOT include them in individual finding bodies.)
 
 ### Link format rules:
 - Must use the full git SHA (from Step 2a's `headRefOid`)
 - Format: `https://github.com/a-jay85/IBL5/blob/{FULL_SHA}/path/to/file#L{start}-L{end}`
 - Provide at least 1 line of context before and after the line you are commenting about
-- Do NOT use `$(git rev-parse HEAD)` or any bash interpolation in the comment — expand the SHA beforehand
+- Do NOT use `$(git rev-parse HEAD)` or any bash interpolation in the body string — expand the SHA beforehand

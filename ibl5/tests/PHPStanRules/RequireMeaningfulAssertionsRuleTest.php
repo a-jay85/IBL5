@@ -62,6 +62,29 @@ final class RequireMeaningfulAssertionsRuleTest extends RuleTestCase
         );
     }
 
+    public function testFlagsAssertNotNullOnStaticallyNonNullValue(): void
+    {
+        $this->analyse(
+            [__DIR__ . '/Fixtures/tests/AssertNotNullOnNonNullFixture.php'],
+            [
+                [
+                    '`assertNotNull()` is called on a value PHPStan already knows is '
+                    . 'non-null (type `string`); the assertion always passes. Assert '
+                    . 'against actual behavior instead.',
+                    9,
+                ],
+            ],
+        );
+    }
+
+    public function testAllowsAssertNotNullOnNullableOrMixedValue(): void
+    {
+        $this->analyse(
+            [__DIR__ . '/Fixtures/tests/AssertNotNullNullableFixture.php'],
+            [],
+        );
+    }
+
     public function testAllowsMeaningfulAssertion(): void
     {
         $this->analyse(

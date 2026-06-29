@@ -4,6 +4,7 @@
         "ibl.directHeader": 1,
         "ibl.directTime": 13,
         "ibl.hardcodedEnvString": 8,
+        "ibl.sqlStringConcatenation": 10,
         "ibl.sqlStringInterpolation": 31
     },
     "phpstan-tests-baseline.neon": {

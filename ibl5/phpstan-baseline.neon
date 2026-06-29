@@ -7,6 +7,12 @@ parameters:
 			path: classes/Api/Controller/HealthController.php
 
 		-
+			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringConcatenation
+			count: 2
+			path: classes/Api/Repository/ApiGameRepository.php
+
+		-
 			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringInterpolation
 			count: 2
@@ -109,6 +115,12 @@ parameters:
 			path: classes/Extension/ExtensionService.php
 
 		-
+			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringConcatenation
+			count: 3
+			path: classes/FranchiseRecordBook/FranchiseRecordBookRepository.php
+
+		-
 			rawMessage: 'Direct now-returning time call is banned outside the Clock seam. Inject Clock\ClockInterface (constructor for instance classes; settable static clock with factory fallback for static classes) and call $clock->now(). Pass an explicit timestamp to date()/strtotime() for deterministic formatting.'
 			identifier: ibl.directTime
 			count: 1
@@ -157,6 +169,12 @@ parameters:
 			path: classes/JsbParser/PlayerIdResolver.php
 
 		-
+			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringConcatenation
+			count: 1
+			path: classes/LastSimRecap/LastSimRecapRepository.php
+
+		-
 			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringInterpolation
 			count: 1
@@ -173,6 +191,12 @@ parameters:
 			identifier: ibl.directTime
 			count: 1
 			path: classes/League/LeagueContext.php
+
+		-
+			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringConcatenation
+			count: 1
+			path: classes/LeagueSchedule/LeagueScheduleRepository.php
 
 		-
 			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
@@ -265,6 +289,12 @@ parameters:
 			path: classes/PlayerDatabase/PlayerDatabaseRepository.php
 
 		-
+			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringConcatenation
+			count: 3
+			path: classes/PlrParser/PlrBoxScoreRepository.php
+
+		-
 			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringInterpolation
 			count: 1
@@ -313,6 +343,12 @@ parameters:
 			path: classes/SeasonLeaderboards/SeasonLeaderboardsRepository.php
 
 		-
+			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringConcatenation
+			count: 4
+			path: classes/Standings/StandingsRepository.php
+
+		-
 			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringInterpolation
 			count: 10
@@ -323,6 +359,12 @@ parameters:
 			identifier: ibl.sqlStringInterpolation
 			count: 2
 			path: classes/Statistics/TeamStatsCalculator.php
+
+		-
+			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringConcatenation
+			count: 3
+			path: classes/Team/SplitStatsRepository.php
 
 		-
 			rawMessage: 'Table-qualified column ''ibl_standings.league_record'' must be wrapped in backticks (`ibl_standings`.`league_record`) for PHPStan rename safety.'
@@ -349,10 +391,28 @@ parameters:
 			path: classes/Team/Team.php
 
 		-
+			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringConcatenation
+			count: 2
+			path: classes/Team/TeamQueryRepository.php
+
+		-
+			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringConcatenation
+			count: 8
+			path: classes/TeamOffDefStats/TeamOffDefStatsRepository.php
+
+		-
 			rawMessage: 'SQL string uses variable interpolation. Splicing a variable into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringInterpolation
 			count: 2
 			path: classes/TeamOffDefStats/TeamOffDefStatsRepository.php
+
+		-
+			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringConcatenation
+			count: 1
+			path: classes/TeamSchedule/TeamScheduleRepository.php
 
 		-
 			rawMessage: 'Direct now-returning time call is banned outside the Clock seam. Inject Clock\ClockInterface (constructor for instance classes; settable static clock with factory fallback for static classes) and call $clock->now(). Pass an explicit timestamp to date()/strtotime() for deterministic formatting.'

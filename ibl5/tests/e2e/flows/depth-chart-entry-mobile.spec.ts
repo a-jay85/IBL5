@@ -382,40 +382,29 @@ test.describe('DCE mobile: saved depth chart loading', () => {
 
 // Isolated to the Monarchs (tid=8) roster via the auth-isolated fixture so a
 // real submit cannot corrupt the shared logged-in team's live state — mirroring
-// depth-chart-entry-submission.spec.ts. Loads a known-valid saved DC before
-// submitting so the submission is deterministically valid, then requires the
-// success signal (a server rejection must NOT pass).
+// depth-chart-entry-submission.spec.ts. Submits the seeded *live* config (which
+// that spec proves passes validation) and requires the success signal, so a
+// server rejection no longer passes as success.
+//
+// A saved DC is deliberately NOT loaded first: the seeded "DC Test *" saved
+// configs do not satisfy the >=3-non-injured-players-per-position rule (e.g.
+// "DC Test Defense" has only 2 SG), so loading one and submitting is correctly
+// rejected by the validator — that is a test-setup trap, not the success path
+// this test must prove. The live config is the deterministically-valid input.
 isolatedTest.describe('DCE mobile: form submission', () => {
   isolatedTest.use({ viewport: { width: 375, height: 812 } });
 
-  isolatedTest('submitting a loaded saved depth chart from mobile view succeeds', async ({ page }) => {
+  isolatedTest('submitting the live depth chart from mobile view succeeds', async ({ page }) => {
     await page.goto('modules.php?name=DepthChartEntry');
 
-    // Mobile cards should be ready before loading a saved config.
+    // Web-first readiness gate (replaces the networkidle wait): cards rendered
+    // and their selects enabled means the mobile form is fully hydrated.
     await expect(page.locator('.dc-mobile-cards')).toBeVisible();
     await expect(
       page.locator('.dc-mobile-cards select[name^="pg"]').first(),
     ).toBeEnabled();
 
-    // Load a known-valid saved depth chart — the seeded tid=8 config at option
-    // index 1, the same source the loading test (above) and
-    // depth-chart-saved-dc-api.spec.ts already rely on — so the submit is valid.
-    const dropdown = page.locator('#saved-dc-select');
-    await expect(dropdown).toBeVisible();
-    await dropdown.selectOption({ index: 1 });
-
-    // Web-first wait for the AJAX load to land (replaces the networkidle wait).
-    const loadedId = page.locator('#loaded_dc_id, input[name="loaded_dc_id"]');
-    await expect(
-      loadedId.first(),
-      'loaded_dc_id hidden field must exist in form',
-    ).toBeAttached();
-    await expect(async () => {
-      const val = await loadedId.first().inputValue();
-      expect(val).not.toBe('0');
-    }).toPass({ timeout: 5000 });
-
-    // Submit via the mobile footer button.
+    // Submit the live (valid) config via the mobile footer button.
     const submitBtn = page.locator(
       '.dc-mobile-cards__footer .depth-chart-submit-btn',
     );

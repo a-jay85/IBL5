@@ -244,7 +244,7 @@ Green tests that don't guard the behavior they're named for. **Fix first.** D1/D
 | # | Status | Auto | File:line | Problem |
 |---|--------|------|-----------|---------|
 | D1 | ✅ | — | `trading-submission.spec.ts:316,408` | `expect(offer_sent \|\| error=)` — a cap/validation error redirect passes. ✓verified — Blocks 2 & 4 now require `result=offer_sent` + `collectNewOfferIds` read-back; Block 4 uses a cap-safe (max-user / min-partner salary) selection. ✓done |
-| D2 | ✅ | — | `depth-chart-entry-mobile.spec.ts:402` | `hasSuccess \|\| hasValidation` (regex incl. `position`) — server rejection passes. ✓verified — submission describe now uses the `auth-isolated` (tid=8) fixture, loads a valid saved DC, requires the success banner, and cleans up via `resetSavedDcNames`. ✓done |
+| D2 | ✅ | — | `depth-chart-entry-mobile.spec.ts:402` | `hasSuccess \|\| hasValidation` (regex incl. `position`) — server rejection passes. ✓verified — submission describe now uses the `auth-isolated` (tid=8) fixture, submits the seeded valid live config, requires the success banner (verified against the live stack), and cleans up via `resetSavedDcNames`. ✓done |
 | D3 | ⬜ | 🟨 | `depth-chart-entry-submission.spec.ts` "change a position depth" | `if(val==='0'){…;break}` with no assertion the loop ever matched → silent pass on zero changes. |
 | D4 | ⬜ | 🟨 | `depth-chart-entry-submission.spec.ts` "loading saved DC" | reads a hidden field only, not select/minute population. |
 | D5 | ⬜ | 🟨 | `free-agency-submission.spec.ts` "amend offer" | asserts success banner only; never reads back amended yr1. |

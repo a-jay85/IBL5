@@ -42,6 +42,34 @@ while IFS= read -r line; do
         user)
             TURN_COUNT=$(( TURN_COUNT + 1 ))
             ;;
+        system)
+            # Claude Code emits a `system`/`compact_boundary` event when context is
+            # compacted (auto at the autoCompactWindow threshold, or manual /compact).
+            # Before this arm these fell through silently — a long impl/postplan phase
+            # could compact mid-run with nothing in the log to show it happened. We
+            # record it as a discrete COMPACTION line so a run's context pressure is
+            # visible alongside the tool/exit lines. Match the subtype with a glob:
+            # the exact-string was a moving target (docs say `compact_boundary`), so a
+            # `*compact*` guard records the event even if the subtype label shifts,
+            # which is the whole failure mode we're fixing. The field names differ
+            # between the stored transcript (camelCase `compactMetadata.preTokens`) and
+            # the documented wire schema (snake_case `compact_metadata.pre_tokens`), so
+            # extract across both casings and fall back to `?`.
+            ev_subtype=$(printf '%s' "$line" | jq -r '.subtype // empty' 2>/dev/null) || true
+            case "$ev_subtype" in
+                *compact*)
+                    trigger=$(printf '%s' "$line" | jq -r '
+                        .compact_metadata.trigger // .compactMetadata.trigger // .trigger // "?"
+                    ' 2>/dev/null) || true
+                    pre_tokens=$(printf '%s' "$line" | jq -r '
+                        .compact_metadata.pre_tokens // .compactMetadata.preTokens
+                        // .pre_tokens // .preTokens // "?"
+                    ' 2>/dev/null) || true
+                    printf '%s COMPACTION: subtype=%s trigger=%s pre_tokens=%s\n' \
+                        "$(line_prefix)" "$ev_subtype" "$trigger" "$pre_tokens"
+                    ;;
+            esac
+            ;;
         result)
             result_text=$(printf '%s' "$line" | jq -r '.result // empty' 2>/dev/null) || true
             if [ -n "$result_text" ]; then

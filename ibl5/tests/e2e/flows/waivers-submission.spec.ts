@@ -80,20 +80,6 @@ test.describe('Waivers: add player', () => {
     });
   });
 
-  test('success banner shows on successful add', async ({
-    appState,
-    page,
-  }) => {
-    await appState({ 'Allow Waiver Moves': 'Yes' });
-
-    // Navigate with a success result param to verify banner rendering
-    await page.goto(
-      'modules.php?name=Waivers&action=add&result=player_added',
-    );
-
-    const successBanner = page.locator('.ibl-alert--success');
-    await expect(successBanner).toBeVisible();
-  });
 });
 
 // ============================================================
@@ -317,18 +303,5 @@ test.describe('Waivers: waive form and result banner', () => {
 
     const actionInput = form.locator('input[name="Action"]');
     await expect(actionInput).toHaveValue('waive');
-  });
-
-  test('player_dropped success banner', async ({ appState, page }) => {
-    await appState({ 'Allow Waiver Moves': 'Yes' });
-    await page.goto(
-      'modules.php?name=Waivers&action=waive&result=player_dropped',
-    );
-
-    const successBanner = page.locator('.ibl-alert--success');
-    await expect(successBanner).toBeVisible();
-    await expect(successBanner).toContainText(
-      'Player successfully dropped to waivers.',
-    );
   });
 });

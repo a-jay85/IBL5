@@ -32,9 +32,10 @@ $cashRepo = new \Trading\TradeCashRepository($mysqli_db);
 $executionService = new \Trading\TradeExecutionService(
     $offerRepo, $processor, $validator, $salaryCapRepo, $teamIdentityRepo, $cashRepo
 );
+global $authService;
 $controller = new \Trading\TradingController(
     $service, $offerRepo, $tradeOffer, $view,
-    $teamIdentityRepo, $nukeCompat, $mysqli_db, $executionService
+    $teamIdentityRepo, $nukeCompat, $mysqli_db, $executionService, $authService
 );
 
 $controller->submitTradeOffer($user, $_POST);

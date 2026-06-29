@@ -22,13 +22,13 @@ interface TradingControllerInterface
     public function submitTradeOffer(mixed $user, array $post): void;
 
     /**
-     * @param mixed $user The PHP-Nuke auth cookie (authz source — never POST)
+     * @param mixed $user The PHP-Nuke auth marker for the isUser() gate; identity is read from the authenticated session, never POST
      * @param array<string, mixed> $post
      */
     public function acceptTradeOffer(mixed $user, array $post): void;
 
     /**
-     * @param mixed $user The PHP-Nuke auth cookie (authz source — never POST)
+     * @param mixed $user The PHP-Nuke auth marker for the isUser() gate; identity is read from the authenticated session, never POST
      * @param array<string, mixed> $post
      */
     public function rejectTradeOffer(mixed $user, array $post): void;

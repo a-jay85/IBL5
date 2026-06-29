@@ -13,6 +13,7 @@ use Trading\Contracts\TradeOfferRepositoryInterface;
 use Trading\Contracts\TradeOfferInterface;
 use Trading\Contracts\TradingViewInterface;
 use Trading\Contracts\TradeExecutionServiceInterface;
+use Auth\Contracts\AuthServiceInterface;
 use Trading\TradingController;
 
 /**
@@ -53,6 +54,7 @@ class TradingControllerSubmitOfferTest extends TestCase
             $nukeCompat ?? self::createStub(\Utilities\NukeCompat::class),
             $this->mockDb,
             self::createStub(TradeExecutionServiceInterface::class),
+            self::createStub(AuthServiceInterface::class),
         );
     }
 

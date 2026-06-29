@@ -32,7 +32,7 @@ interface TradeExecutionServiceInterface
      * Authz / IDOR gate: is the acting GM's team a party to this offer?
      *
      * @param int $offerId Trade offer ID
-     * @param string $actingTeam Team name resolved from the auth cookie (never POST)
+     * @param string $actingTeam Team name resolved from the authenticated session (never POST)
      * @return bool True if $actingTeam is among the offer's parties
      */
     public function assertActingTeamIsParty(int $offerId, string $actingTeam): bool;
@@ -46,7 +46,7 @@ interface TradeExecutionServiceInterface
      * failure processTrade() is never entered.
      *
      * @param int $offerId Trade offer ID
-     * @param string $actingTeam Team name resolved from the auth cookie
+     * @param string $actingTeam Team name resolved from the authenticated session
      * @return array{success: bool, error?: string, errors?: list<string>, storytext?: string, storytitle?: string}
      */
     public function validateAndExecute(int $offerId, string $actingTeam): array;

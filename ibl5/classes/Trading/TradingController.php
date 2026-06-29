@@ -10,6 +10,7 @@ use Trading\Contracts\TradeOfferRepositoryInterface;
 use Trading\Contracts\TradeOfferInterface;
 use Trading\Contracts\TradingViewInterface;
 use Trading\Contracts\TradeExecutionServiceInterface;
+use Auth\Contracts\AuthServiceInterface;
 
 /**
  * @see TradingControllerInterface
@@ -24,6 +25,7 @@ class TradingController implements TradingControllerInterface
     private \Utilities\NukeCompat $nukeCompat;
     private \mysqli $db;
     private TradeExecutionServiceInterface $executionService;
+    private AuthServiceInterface $authService;
     /** Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('audit'). */
     private \Psr\Log\LoggerInterface $auditLogger;
     /** Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('trade'). */
@@ -38,6 +40,7 @@ class TradingController implements TradingControllerInterface
         \Utilities\NukeCompat $nukeCompat,
         \mysqli $db,
         TradeExecutionServiceInterface $executionService,
+        AuthServiceInterface $authService,
         ?\Psr\Log\LoggerInterface $auditLogger = null,
         ?\Psr\Log\LoggerInterface $tradeLogger = null
     ) {
@@ -49,20 +52,20 @@ class TradingController implements TradingControllerInterface
         $this->nukeCompat = $nukeCompat;
         $this->db = $db;
         $this->executionService = $executionService;
+        $this->authService = $authService;
         $this->auditLogger = $auditLogger ?? \Logging\LoggerFactory::getChannel('audit');
         $this->tradeLogger = $tradeLogger ?? \Logging\LoggerFactory::getChannel('trade');
     }
 
     /**
-     * Resolve the acting GM's team name from the auth cookie.
+     * Resolve the acting GM's team name from the authenticated session.
      *
-     * This is the authoritative authz identity — derived from the session cookie,
-     * never from POST. Mirrors handleRosterPreviewApi()'s cookie decode.
+     * This is the authoritative authz identity — read from the session via
+     * AuthService, never from POST. Mirrors handleRosterPreviewApi()'s identity lookup.
      */
-    private function resolveActingTeam(mixed $user): string
+    private function resolveActingTeam(): string
     {
-        $decoded = $this->nukeCompat->cookieDecode($user);
-        $username = is_string($decoded[1] ?? null) ? $decoded[1] : '';
+        $username = $this->authService->getUsername() ?? '';
 
         if ($username === '') {
             return '';
@@ -91,8 +94,7 @@ class TradingController implements TradingControllerInterface
             return;
         }
 
-        $cookie = $this->nukeCompat->cookieDecode($user);
-        $username = is_string($cookie[1] ?? null) ? $cookie[1] : '';
+        $username = $this->authService->getUsername() ?? '';
         $this->renderTradeReview($username);
     }
 
@@ -106,8 +108,7 @@ class TradingController implements TradingControllerInterface
             return;
         }
 
-        $decoded = $this->nukeCompat->cookieDecode($user);
-        $username = is_string($decoded[1] ?? null) ? $decoded[1] : '';
+        $username = $this->authService->getUsername() ?? '';
         $this->renderTradeOffer($username, $partner);
     }
 
@@ -123,8 +124,7 @@ class TradingController implements TradingControllerInterface
             return;
         }
 
-        $decoded = $this->nukeCompat->cookieDecode($user);
-        $loggedInUsername = is_string($decoded[1] ?? null) ? $decoded[1] : '';
+        $loggedInUsername = $this->authService->getUsername() ?? '';
         $loggedInTeamID = 0;
 
         if ($loggedInUsername !== '') {
@@ -157,8 +157,7 @@ class TradingController implements TradingControllerInterface
             return;
         }
 
-        $decoded = $this->nukeCompat->cookieDecode($user);
-        $username = is_string($decoded[1] ?? null) ? $decoded[1] : '';
+        $username = $this->authService->getUsername() ?? '';
         $sessionTeam = $this->teamIdentityRepo->getTeamnameFromUsername($username);
 
         if ($sessionTeam === null || $sessionTeam === '' || $sessionTeam === \League\League::FREE_AGENTS_TEAM_NAME) {
@@ -292,10 +291,10 @@ class TradingController implements TradingControllerInterface
             \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=already_processed');
         }
 
-        // Authz identity comes from the auth cookie, never POST. The execution
+        // Authz identity comes from the authenticated session, never POST. The execution
         // service enforces that this team is a party (IDOR gate) and runs N-party
         // cap/roster validation before any write.
-        $actingTeam = $this->resolveActingTeam($user);
+        $actingTeam = $this->resolveActingTeam();
 
         try {
             $result = $this->executionService->validateAndExecute($offerId, $actingTeam);
@@ -349,9 +348,9 @@ class TradingController implements TradingControllerInterface
         }
 
         // Authz/IDOR gate: only a GM whose team is a party to the offer may reject
-        // it. Identity comes from the auth cookie, never $post['teamRejecting']
+        // it. Identity comes from the authenticated session, never $post['teamRejecting']
         // (which is attacker-controlled and used only for the Discord DM below).
-        $actingTeam = $this->resolveActingTeam($user);
+        $actingTeam = $this->resolveActingTeam();
 
         if (!$this->executionService->assertActingTeamIsParty($offerId, $actingTeam)) {
             \Logging\LoggerFactory::getChannel('trade')->warning('Rejected non-party trade reject attempt', [

@@ -15,7 +15,8 @@ import { collectNewOfferIds } from '../helpers/trading';
  * those endpoints to the session; its coverage lives with that change.)
  *
  * Two distinct fixtures:
- *   - authTest (Metros, teamid=1): D-03 submit-override IDOR.
+ *   - authTest (Metros, teamid=1): D-03 submit-override IDOR + the unresolvable-team
+ *     guard (session team forced to Free Agents via the `_test_team` override).
  *   - publicTest (unauthenticated): refusal of the submit endpoint.
  */
 
@@ -83,6 +84,63 @@ authTest.describe('Trade submit IDOR: offeringTeam bound to session (D-03)', () 
         newIds.length,
         'created offer must be visible on the Metros review page — proving it was bound to Metros, not Stars',
       ).toBeGreaterThan(0);
+    },
+  );
+});
+
+// ---------------------------------------------------------------------------
+// D-03 guard: a session whose team resolves to Free Agents / is unresolvable is
+// refused BEFORE any offer is created (submitTradeOffer's resolve-team bail)
+// ---------------------------------------------------------------------------
+
+authTest.describe('Trade submit refuses an unresolvable session team (D-03 guard)', () => {
+  authTest.afterAll(async ({ request }) => {
+    // Defensive: the bail should create nothing, but reset in case a regression
+    // run did write an offer before failing.
+    await resetTradeOffers(request);
+  });
+
+  authTest(
+    'session team = Free Agents is refused at the resolve-team guard — no offer created',
+    async ({ appState, page, context }) => {
+      await appState({ 'Allow Trades': 'Yes', 'Current Season Ending Year': '2026' });
+
+      // Land on a real trade form AS the normal session team (Metros) so we hold a
+      // server-issued CSRF token + a live submit button — an otherwise-valid request.
+      const onForm = await findTradeFormWithBothRosters(page);
+      expect(onForm, 'CI seed must provide a partner with checkable players on both sides').toBe(true);
+
+      // Check one player on each roster — a complete, otherwise-valid offer. (The
+      // submit button is client-side disabled until both sides have a selection;
+      // the server-side guard runs ahead of offer construction regardless.)
+      await page.locator('.trading-roster.team-table').first().locator('input[type="checkbox"]').first().check();
+      await page.locator('.trading-roster.team-table').nth(1).locator('input[type="checkbox"]').first().check();
+
+      // Flip ONLY the resolved team to Free Agents via the `_test_team` override
+      // (TestCookieOverrides::getTeamOverride). The CSRF token is session-bound, not
+      // team-bound, so it stays valid — the request reaches submitTradeOffer's
+      // resolve-team check, where sessionTeam === FREE_AGENTS_TEAM_NAME forces the
+      // bail before any DB write.
+      await context.addCookies([
+        { name: '_test_team', value: 'Free Agents', domain: new URL(page.url()).hostname, path: '/' },
+      ]);
+
+      const submitBtn = page.locator('form[name="Trade_Offer"] button[type="submit"]');
+      await Promise.all([page.waitForURL(/op=reviewtrade/), submitBtn.click()]);
+
+      // The bail redirects to reviewtrade with this exact message (rawurlencode of
+      // 'Could not resolve your team.'). The string is unique to the resolve-team
+      // branch — a CSRF failure redirects with 'Invalid...' and no op=reviewtrade,
+      // and a successful submit carries result=offer_sent. Asserting the message
+      // (not merely the absence of offer_sent) means deleting the guard fails this.
+      const errorParam = new URL(page.url()).searchParams.get('error') ?? '';
+      expect(
+        errorParam,
+        'Free-Agents/unresolvable session team must be refused at the resolve-team guard',
+      ).toContain('Could not resolve your team');
+      for (const marker of SUCCESS_MARKERS) {
+        expect(page.url(), `unresolvable-team submit must not yield ${marker}`).not.toContain(marker);
+      }
     },
   );
 });

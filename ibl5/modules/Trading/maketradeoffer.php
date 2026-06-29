@@ -9,7 +9,7 @@ try {
     die("Error loading system files. Please contact the administrator.");
 }
 
-global $mysqli_db;
+global $mysqli_db, $user;
 
 if (!isset($mysqli_db) || !($mysqli_db instanceof mysqli)) {
     \Logging\LoggerFactory::getChannel('trade')->critical('Database connection not available');
@@ -31,4 +31,4 @@ $controller = new \Trading\TradingController(
     $teamIdentityRepo, $nukeCompat, $mysqli_db
 );
 
-$controller->submitTradeOffer($_POST);
+$controller->submitTradeOffer($user, $_POST);

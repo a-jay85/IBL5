@@ -126,15 +126,39 @@ class TradingController implements TradingControllerInterface
      *
      * @param array<string, mixed> $post
      */
-    public function submitTradeOffer(array $post): void
+    public function submitTradeOffer(mixed $user, array $post): void
     {
         if (!\Security\CsrfGuard::validateSubmittedToken('trade_offer')) {
             \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&error=' . rawurlencode('Invalid or expired form submission. Please try again.'));
         }
 
+        // Identity is derived from the authenticated session, never from form input —
+        // the IDOR check below must trust who the user actually is, not who they claim.
+        if (!$this->nukeCompat->isUser($user)) {
+            $this->nukeCompat->loginBox();
+            return;
+        }
+
+        $decoded = $this->nukeCompat->cookieDecode($user);
+        $username = is_string($decoded[1] ?? null) ? $decoded[1] : '';
+        $sessionTeam = $this->teamIdentityRepo->getTeamnameFromUsername($username);
+
+        if ($sessionTeam === null || $sessionTeam === '' || $sessionTeam === \League\League::FREE_AGENTS_TEAM_NAME) {
+            \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&error=' . rawurlencode('Could not resolve your team.'));
+        }
+
         $rawFieldsCounter = $post['fieldsCounter'] ?? 0;
         $fieldsCounter = (is_numeric($rawFieldsCounter) ? (int) $rawFieldsCounter : 0) + 1;
-        $offeringTeam = is_string($post['offeringTeam'] ?? null) ? $post['offeringTeam'] : '';
+        // IDOR (D-03): the offering team is bound to the session, never the POST body.
+        // We read the posted value only to audit-log a tamper attempt, then discard it.
+        $postOfferingTeam = is_string($post['offeringTeam'] ?? null) ? $post['offeringTeam'] : '';
+        if ($postOfferingTeam !== '' && $postOfferingTeam !== $sessionTeam) {
+            $this->auditLogger->warning('trade_offer_team_mismatch', [
+                'post' => $postOfferingTeam,
+                'session' => $sessionTeam,
+            ]);
+        }
+        $offeringTeam = $sessionTeam;
         $listeningTeam = is_string($post['listeningTeam'] ?? null) ? $post['listeningTeam'] : '';
         $rawSwitch = $post['switchCounter'] ?? 0;
         $switchCounter = is_numeric($rawSwitch) ? (int) $rawSwitch : 0;

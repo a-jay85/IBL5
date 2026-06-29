@@ -1,11 +1,10 @@
-// Do NOT swap page.goto for gotoWithRetry in this PR — that's a behavior
-// change; defer to a follow-up.
 import type { Locator, Page } from '@playwright/test';
 import { test as publicTest } from '../fixtures/public';
 import { test as authTest } from '../fixtures/auth';
 import { test as authRegularTest } from '../fixtures/auth-regular';
 import { expect } from '../fixtures/base';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { gotoWithRetry } from '../helpers/navigation';
 import {
   VR_MANIFEST,
   DEFAULT_STATE,
@@ -37,7 +36,7 @@ async function captureSnapshot(
   if (viewport === 'mobile') {
     await page.setViewportSize({ width: 375, height: 812 });
   }
-  await page.goto(row.url);
+  await gotoWithRetry(page, row.url);
   await assertNoPhpErrors(page, `on ${row.url}`);
   await page.waitForLoadState('networkidle');
   const anchor = page.locator(row.anchor).first();

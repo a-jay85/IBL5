@@ -143,6 +143,14 @@ if ($method === 'DELETE' && $action === 'reset-extension') {
     $stmt->execute();
     $reset = $stmt->affected_rows > 0 ? 1 : 0;
     $stmt->close();
+    // Also reset the team-level extension flags for Metros (teamid=1) so
+    // repeated local runs are idempotent — the processExtension() happy path
+    // sets Used_Extension_This_Season=1 on accept; without this reset the next
+    // run's Block 1 sees "already used" on its first request.
+    $db->query(
+        'UPDATE ibl_team_info SET Used_Extension_This_Season = 0, Used_Extension_This_Chunk = 0
+         WHERE teamid = 1'
+    );
     echo json_encode(['reset' => $reset]);
     $db->close();
     exit;

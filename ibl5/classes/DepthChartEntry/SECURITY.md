@@ -165,10 +165,12 @@ mail($recipient, $emailSubject, $csvContent, $headers);
 User input displayed in HTML could contain malicious scripts.
 
 #### Solution
-All user-provided strings are sanitized before storage:
+All user-provided strings are sanitized before storage. The write-target team is
+**not** taken from POST — it is derived from the session (see *Ownership /
+Authorization* below) and then sanitized:
 
 ```php
-$teamName = trim(strip_tags($postData['Team_Name'] ?? ''));
+$teamName = $this->sanitizeInput($sessionTeam); // session-derived, never POST
 $setName = trim(strip_tags($postData['Set_Name'] ?? ''));
 ```
 
@@ -177,7 +179,33 @@ $setName = trim(strip_tags($postData['Set_Name'] ?? ''));
 - Data is cleaned before database storage
 - View rendering should also escape output (defense in depth)
 
-### 6. Type Safety
+### 6. Ownership / Authorization (IDOR Prevention)
+
+#### Problem
+`submit()` validated the CSRF token but trusted the POST `Team_Name` as the write
+target. A logged-in GM could lift a valid token from their own form and replay it
+with another team's name to overwrite that team's depth chart (an Insecure Direct
+Object Reference — finding D-09).
+
+#### Solution
+`submit($user)` gates `is_user()` and resolves the team from the session
+(`cookiedecode($user)` → `getTeamnameFromUsername($cookie[1])`), rejecting
+null/empty/Free-Agents sessions. The session username is threaded into
+`DepthChartEntrySubmissionHandler::handleSubmission()`, which derives the
+authoritative team and **ignores POST `Team_Name`** as the write target.
+
+```php
+$sessionTeam = $this->commonRepo->getTeamnameFromUsername($sessionUsername);
+// reject null/''/Free Agents, then:
+$teamName = $this->sanitizeInput($sessionTeam);
+```
+
+**Protection Against:**
+- IDOR: a GM cannot act on a team they do not own, even with a valid CSRF token
+- The per-team filename sanitization in `saveDepthChartFile()` now sanitizes the
+  *derived* team name (the ownership source, not the injection vector)
+
+### 7. Type Safety
 
 #### Implementation
 All methods use type hints for parameters and return values:
@@ -193,7 +221,7 @@ private function sanitizeDepthValue($value): int
 - Ensures data integrity
 - Makes code more predictable and secure
 
-### 7. Error Handling
+### 8. Error Handling
 
 #### Safe Error Messages
 Error messages don't reveal sensitive system information:

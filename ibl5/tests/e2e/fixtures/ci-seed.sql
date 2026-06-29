@@ -1689,9 +1689,14 @@ INSERT INTO ibl_plr (
    28, 75, 25, 75, 85, 24,
    42, 14, 70,
    'dc000000-0000-0000-0000-000000000110'),
+  -- Expiring 1-year deal (cy=1 of 1, next-year salary 0) so this Monarchs
+  -- bench player is extension-eligible — lets the D-10 IDOR E2E render the
+  -- ExtensionOffer form under the auth-isolated (Monarchs) session to mint a
+  -- valid 'extension' CSRF token. current_salary stays salary_yr1 (130), so
+  -- Monarchs cap math is unchanged.
   (111, 'DC Utility B', 27, 28, 8, 'SF', 12,
    78, 73, 68, 63, 58, 70, 66, 68, 63,
-   1, 2, 130, 143,
+   1, 1, 130, 0,
    0, 3,
    6, 6, 210, 'Utility U',
    2, 28, 2023, 'Monarchs', 'Monarchs',

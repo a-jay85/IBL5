@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/auth-isolated';
+import { test as publicTest, expect as publicExpect } from '../fixtures/public';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 import { submitFormAndAssertEffect } from '../helpers/submit-form';
 
@@ -316,5 +317,74 @@ test.describe('Depth Chart submission', () => {
 
   test('no PHP errors on depth chart page', async ({ page }) => {
     await assertNoPhpErrors(page, 'on Depth Chart Entry');
+  });
+
+  test('IDOR: spoofed Team_Name is ignored — write targets the session team, not the victim', async ({
+    page,
+  }) => {
+    // The hidden Team_Name field renders as the session team (Monarchs). A
+    // logged-in GM could tamper it to a real victim team (Metros, tid=1) and
+    // replay the valid CSRF token. The D-09 fix derives the write target from
+    // the session, so the tampered Team_Name is ignored: the submission applies
+    // to Monarchs (the legitimate owner), never Metros. The "no victim write"
+    // negative is pinned at unit level in
+    // DepthChartEntrySubmissionHandlerOwnershipTest.
+    await expect(page.locator('.depth-chart-form')).toBeVisible({ timeout: 15000 });
+
+    const firstPg = page
+      .locator('.depth-chart-table select[name^="pg"]')
+      .first();
+    await firstPg.selectOption('3');
+
+    // Tamper the hidden Team_Name to a real victim team the session doesn't own.
+    await page.evaluate(() => {
+      const el = document.querySelector(
+        '.depth-chart-form input[name="Team_Name"]',
+      );
+      if (el instanceof HTMLInputElement) {
+        el.value = 'Metros';
+      }
+    });
+
+    await page.locator('.depth-chart-buttons .depth-chart-submit-btn').click();
+
+    // Treated as a normal Monarchs submission (Team_Name ignored): PRG back to
+    // the module with the success flash, and the change persisted on Monarchs.
+    await expect(page).toHaveURL(
+      /modules\.php\?name=DepthChartEntry(?!.*op=submit)/,
+    );
+    await expect(
+      page.locator('.ibl-alert--success', { hasText: /depth chart saved/i }),
+    ).toBeVisible({ timeout: 15000 });
+    await expect(
+      page.locator('.depth-chart-table select[name^="pg"]').first(),
+    ).toHaveValue('3');
+    await assertNoPhpErrors(page, 'after IDOR-tampered depth chart submission');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D-09 unauthenticated submit — refused before the handler runs.
+//
+// submit() gates is_user() before the CSRF check and before the controller, so
+// an unauthenticated POST (DevAutoLogin suppressed via the public fixture)
+// renders the inline "Invalid or expired form submission" error and writes
+// nothing.
+// ---------------------------------------------------------------------------
+
+publicTest.describe('Depth Chart submission — unauthenticated', () => {
+  publicTest('unauthenticated submit is refused with the inline error', async ({
+    request,
+  }) => {
+    const response = await request.post(
+      'modules.php?name=DepthChartEntry&op=submit',
+      {
+        form: { Team_Name: 'Metros', pg1: '1' },
+        maxRedirects: 0,
+      },
+    );
+    const body = await response.text();
+    publicExpect(body).toContain('Invalid or expired form submission');
+    publicExpect(body).not.toContain('depth chart saved');
   });
 });

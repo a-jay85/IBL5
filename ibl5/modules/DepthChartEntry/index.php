@@ -38,9 +38,32 @@ function main($user)
     }
 }
 
-function submit()
+function renderInlineSubmitError(): void
 {
-    global $mysqli_db, $commonRepo, $leagueContext;
+    PageLayout\PageLayout::header();
+    echo '<strong class="ibl-form-error">Invalid or expired form submission. Please reload and try again.</strong>';
+    PageLayout\PageLayout::footer();
+}
+
+function submit($user)
+{
+    global $mysqli_db, $commonRepo, $leagueContext, $cookie;
+
+    // Auth + ownership gate (IDOR fix D-09). The write target is derived from
+    // the session team inside the handler, never from POST `Team_Name`, so an
+    // authenticated GM cannot replay a valid CSRF token against another team.
+    if (!is_user($user)) {
+        renderInlineSubmitError();
+        return;
+    }
+
+    cookiedecode($user);
+    $username = is_string($cookie[1] ?? null) ? $cookie[1] : '';
+    $sessionTeam = $commonRepo->getTeamnameFromUsername($username);
+    if ($sessionTeam === null || $sessionTeam === '' || $sessionTeam === \League\League::FREE_AGENTS_TEAM_NAME) {
+        renderInlineSubmitError();
+        return;
+    }
 
     // CSRF failure stays inline — no in-flight edits to preserve, and
     // "Please reload and try again" is already the correct instruction.
@@ -48,14 +71,12 @@ function submit()
     // takes the PRG path below so Back never lands on a stale form with
     // a consumed token.
     if (!\Security\CsrfGuard::validateSubmittedToken('depth_chart')) {
-        PageLayout\PageLayout::header();
-        echo '<strong class="ibl-form-error">Invalid or expired form submission. Please reload and try again.</strong>';
-        PageLayout\PageLayout::footer();
+        renderInlineSubmitError();
         return;
     }
 
     $controller = new DepthChartEntry\DepthChartEntryController($mysqli_db, $commonRepo, $leagueContext);
-    $controller->handleSubmit($_POST);
+    $controller->handleSubmit($_POST, $username);
 }
 
 function tabApi()
@@ -123,7 +144,7 @@ function api($user)
 
 switch ($op) {
     case "submit":
-        submit();
+        submit($user);
         break;
     case "tab-api":
         tabApi();

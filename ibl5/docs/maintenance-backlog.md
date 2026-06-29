@@ -1955,7 +1955,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 | 10.17 | ✅ Implemented | — | cookieBeforeHeader cleared (ADR-0032). |
 | 10.18 | ✅ Implemented | — | `BanServiceExtendsBaseRepositoryRule` (0). |
 | 10.19 | ✅ Implemented | 🟩 | `BanDuplicateModifierMethodRule` landed; 5 ExtensionOfferEvaluator sites — burndown 🟩. **Status:** baseline cleared — 5 adapter methods renamed `calculate*Modifier`→`compute*Modifier` (delegation to `ContractRules` unchanged). |
-| 10.20 | ⬜ Open | 🟩 | Extend `RequireMeaningfulAssertionsRule` with `$scope` type access (L); green-green rule enhancement. |
+| 10.20 | ✅ Implemented | — | `RequireMeaningfulAssertionsRule` now flags `assertNotNull()` on statically-non-null values via `$scope->getType()->isNull()`. **Status:** conservative `isNull()->no()` gate flagged zero existing sites — no baseline change. |
 | 10.21 | ✅ Implemented | 🟩 | `BanBareColumnIdentifierRule` landed; 23 sites (3 files) — burndown 🟩. |
 | 10.22 | ✅ Implemented | — | `BanJsonDecodeWithoutThrowFlagRule` (0). |
 | 10.23 | ✅ Implemented | 🟩 | `BanHardcodedEnvironmentStringsRule` landed; 8 sites — config-injection burndown 🟩 (env-branching — verify behavior). |
@@ -2114,6 +2114,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Extend rule using `$scope->getType()->isNull()` — requires type-scope access.
 **Est. effort:** L
 **Risk if untouched:** False-positive assertion count inflates test metrics.
+**Status:** Rule landed (2026-06-29) — `RequireMeaningfulAssertionsRule` sub-check 3 flags `assertNotNull($x)` when `$scope->getType($x)->isNull()->no()` (statically non-null), reporting the resolved type via `VerbosityLevel::typeOnly()`. Scoped to `assertNotNull` only (`assertInstanceOf`/`assertIs*` deferred — they need `isSuperTypeOf` reasoning with higher false-positive risk). The conservative `isNull()->no()` gate (production runs `treatPhpDocTypesAsCertain: false`, so `?Foo` stays `maybe`) flagged zero existing test sites — `phpstan-tests-baseline.neon` is byte-unchanged, no burndown needed.
 
 ### 10.21 `BanBareTableIdentifierRule` Doesn't Cover Column Identifiers in SQL Strings
 **Location:** Bare column refs in `League/League.php:119,202,221,241` (`p.retired != 1`) and elsewhere

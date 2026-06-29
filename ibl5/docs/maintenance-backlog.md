@@ -23,7 +23,7 @@ Effort scale:
 - **M** — multi-step plan, 1-3 days, may touch several modules
 - **L** — refactor or platform shift, > 3 days, likely needs ADR
 
-**Status:** Complete — 15-axis audit, 312 findings (+2 post-audit follow-ups from the PR #1107 review → 314 tracked).
+**Status:** Complete — 15-axis audit, 312 findings (+2 post-audit follow-ups from the PR #1107 review, +1 from the #1066 reject-IDOR review → 315 tracked).
 
 ---
 
@@ -46,17 +46,17 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 > A file still >500 LOC after a ✅ does **not** reopen the finding when the finding's named concern was narrower than "shrink below 500 LOC"; residual size is noted, not re-flagged.
 
-### Roll-up (314 findings)
+### Roll-up (315 findings)
 
 | Status | Count |
 |--------|------:|
 | ✅ Implemented | 205 |
 | ◑ Partial | 27 |
 | 📋 Planned (plan queued / PR open) | 11 |
-| ⬜ Open | 63 |
+| ⬜ Open | 64 |
 | 🚫 Declined | 8 |
 
-> Status counts re-verified 2026-06-28 (exact, from the per-axis tables); **6.20 / 6.21 added 2026-06-29** from the PR #1107 review (⬜ Open +2). Four rows carry an **open PR that owns its own status-flip step**, so they still show their pre-merge glyph here and flip on that PR's merge — do **not** pre-flip them (the #1233 collision lesson): **2.6** (#1240), **2.31 / 2.32** (#1230), **5.18** (#1204). Two stale-Open rows were flipped directly (no plan owned them): **13.3**, **13.9** (✅ +2, ⬜ −2 vs the master re-count).
+> Status counts re-verified 2026-06-28 (exact, from the per-axis tables); **6.20 / 6.21 added 2026-06-29** from the PR #1107 review (⬜ Open +2); **6.22 added 2026-06-29** from the #1066 reject-IDOR review (⬜ Open +1). Four rows carry an **open PR that owns its own status-flip step**, so they still show their pre-merge glyph here and flip on that PR's merge — do **not** pre-flip them (the #1233 collision lesson): **2.6** (#1240), **2.31 / 2.32** (#1230), **5.18** (#1204). Two stale-Open rows were flipped directly (no plan owned them): **13.3**, **13.9** (✅ +2, ⬜ −2 vs the master re-count).
 
 **Automouse-readiness of the not-yet-complete (⬜/◑/📋) items:**
 
@@ -64,7 +64,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 |--------|------:|---------------|
 | 🟩 Auto-mergeable | ~103 | green-green + pinnable; arms unattended |
 | 🟦 Safe, human-merge | 10 | gate-14 trigger (security / UI-UX / destructive schema) → `auto_merge: false` |
-| 🟨 Conditional | 33 | needs one mechanical-scope add, one upfront decision, or a collision-PR to merge first |
+| 🟨 Conditional | 34 | needs one mechanical-scope add, one upfront decision, or a collision-PR to merge first |
 | 🟥 Not automouse-safe | 1 | 12.11 — `git filter-repo` history rewrite (irreversible, coordinated) |
 
 (A few ✅ rows also carry a 🟩 for an *optional* residual burndown — e.g. PHPStan-rule baselines — so automouse tags slightly exceed the not-done count. Counts verified by grep of the per-axis tables; treat as ±2.)
@@ -1155,7 +1155,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 
 ## Axis 6: Test Coverage Gaps
 
-**Summary:** 6 zero-test modules; 6 thin-test modules (>5 files, <3 tests); 4 large modules below 0.5 ratio; +2 post-audit E2E-coverage follow-ups (6.20, 6.21) from the PR #1107 review.
+**Summary:** 6 zero-test modules; 6 thin-test modules (>5 files, <3 tests); 4 large modules below 0.5 ratio; +2 post-audit E2E-coverage follow-ups (6.20, 6.21) from the PR #1107 review; +1 (6.22) from the #1066 reject-IDOR review.
 
 **Automouse audit (verified 2026-06-20):** Adding tests is inherently green-green (no production change) → every open coverage gap is 🟩 auto-mergeable. If writing a test surfaces a real bug, the *fix* becomes its own finding with its own classification. (Exception: **6.21** is 🟨, not 🟩 — its handler `exit()`s, so the test isn't writable until a teamless-fixture / non-`exit()` refactor infra decision is made.)
 
@@ -1182,6 +1182,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 | 6.19 | ◑ Partial | 🟩 | AllStarAppearances + GMContactList repo unit tests added. Season entity predicates blocked by `Season\Season`→mock alias (QueryRepo plumbing covered). `Shared` N/A (deleted 2.23). |
 | 6.20 | ⬜ Open | 🟩 | Anon rookie-option lockdown E2E (`draft-rookie-anon-lockdown.spec.ts`) asserts `toContain('YourAccount')` — emitted by nav chrome on every anon page, so a regressed `is_user()` gate still passes. Strengthen to `maxRedirects:0` + redirect/`Location` assert. Test-only, green-green. From PR #1107 review. |
 | 6.21 | ⬜ Open | 🟨 | Row-12 (Free-Agents/teamless session) `processrookieoption` ownership-rejection path untested: PHPUnit entry-point test impossible (handler `exit()`s), E2E auth fixture always has a session team. Needs a teamless-fixture / non-`exit()` refactor decision before it's writable → 🟨. From PR #1107 Phase 5.0 note. |
+| 6.22 | ⬜ Open | 🟨 | **Pattern behind 6.20/6.21.** Authz/IDOR gates inline in controllers end in `HtmxHelper::redirect()→exit()`, so the security-critical "non-party refused + no mutation" property is E2E-only (forced the D-05 reject test, #1066). `Trading\TradeExecutionService` (accept path, #1066) proves the fix: a gate returning a *verdict* is unit-testable exit-free (`testValidateAndExecuteRejectsNonPartyWithoutExecuting`). Convert the inline gates (Waivers, FreeAgency, Trade API accept/decline, Trading reject) to verdict + thin redirect-shim → security logic becomes unit-testable; unblocks 6.21. 🟨: production refactor on a security surface; needs a verdict-shape decision. From the #1066 reject-IDOR review. |
 
 ### 6.1 BulkImport — Zero Tests, 9 Files
 **Location:** `ibl5/classes/BulkImport`
@@ -1349,6 +1350,14 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Est. effort:** S (E2E fixture) / M (handler refactor)
 **Risk if untouched:** The teamless-session rejection on the rookie-option mutation can regress undetected; today it is gated only by shared `getTeamnameFromUsername()` behavior, not by a dedicated test.
 **Status:** ⬜ Open — accepted coverage gap from PR #1107 (Phase 5.0 plan-conformance note). 🟨 conditional: not writable until the exit()/fixture infra decision above is made.
+
+### 6.22 Inline controller authz gates force E2E-only coverage (the pattern behind 6.20/6.21)
+**Location:** `ibl5/classes/Waivers/WaiversController.php`, `ibl5/classes/FreeAgency/FreeAgencyController.php`, `ibl5/classes/Api/Controller/TradeAcceptController.php`, `ibl5/classes/Api/Controller/TradeDeclineController.php`, `ibl5/classes/Trading/TradingController.php` (reject path, added in #1066)
+**Problem:** The dominant authz convention gates inline in the controller method, and every branch ends in `HtmxHelper::redirect() → exit()`. `exit()` terminates the process before any PHPUnit assertion past the gate runs, so the security-critical "a non-party is refused AND no mutation occurs" property cannot be unit-tested — it is provable only via E2E (slower, and on the pre-baked PHP image rebuilt on master push only). This is the root cause of 6.20 and 6.21, and forced the D-05 reject-IDOR coverage (#1066) to be E2E-only. The accept path (the `Trading\TradeExecutionService` orchestrator introduced in #1066) demonstrates the alternative: its gate returns a verdict array instead of redirecting, so `TradeExecutionServiceTest::testValidateAndExecuteRejectsNonPartyWithoutExecuting` asserts the refusal + non-execution exit-free in PHPUnit.
+**Suggested direction:** Extract each inline authz *decision* into a service/policy method returning a verdict (bool or result array); leave the controller a thin `verdict → redirect` shim. The security logic becomes unit-testable; only the trivial shim stays E2E. Mirrors the accept-path pattern and retires the E2E reliance for these gates (and unblocks 6.21's teamless-rejection test).
+**Est. effort:** M
+**Risk if untouched:** Security-critical authz gates rest on untested invariants (`redirect()` keeps `exit()`ing; the destructive call stays after the gate). A future edit can silently restore unauthorized access with nothing red in unit CI — the only guard is an E2E on a slower cadence.
+**Status:** ⬜ Open — raised from the #1066 reject-IDOR review. 🟨 conditional: a production refactor touching a security surface, gated on a verdict-shape design decision (best done in concert with the accept/reject symmetry call from the same review — the user chose to keep #1066's asymmetry, prioritizing testability over the inline-gate convention).
 
 ---
 

@@ -8,17 +8,17 @@ use PHPUnit\Framework\TestCase;
 use Tests\WideUnit\Mocks\MockDatabase;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Trading\Contracts\TradingServiceInterface;
-use Trading\Contracts\TradeProcessorInterface;
 use Trading\Contracts\TradeOfferRepositoryInterface;
 use Trading\Contracts\TradeOfferInterface;
 use Trading\Contracts\TradingViewInterface;
+use Trading\Contracts\TradeExecutionServiceInterface;
+use Auth\Contracts\AuthServiceInterface;
 use Trading\TradingController;
 
 class TradingControllerReviewTest extends TestCase
 {
     private MockDatabase $mockDb;
     private TradingServiceInterface $stubService;
-    private TradeProcessorInterface $stubProcessor;
     private TradeOfferRepositoryInterface $stubOfferRepo;
     private TradeOfferInterface $stubTradeOffer;
     private TeamIdentityRepositoryInterface $stubTeamIdentityRepo;
@@ -28,7 +28,6 @@ class TradingControllerReviewTest extends TestCase
         $this->mockDb = new MockDatabase();
 
         $this->stubService = self::createStub(TradingServiceInterface::class);
-        $this->stubProcessor = self::createStub(TradeProcessorInterface::class);
         $this->stubOfferRepo = self::createStub(TradeOfferRepositoryInterface::class);
         $this->stubTradeOffer = self::createStub(TradeOfferInterface::class);
         $this->stubTeamIdentityRepo = self::createStub(TeamIdentityRepositoryInterface::class);
@@ -41,13 +40,14 @@ class TradingControllerReviewTest extends TestCase
     ): TradingController {
         return new TradingController(
             $service ?? $this->stubService,
-            $this->stubProcessor,
             $this->stubOfferRepo,
             $this->stubTradeOffer,
             $view ?? self::createStub(TradingViewInterface::class),
             $this->stubTeamIdentityRepo,
             $nukeCompat ?? self::createStub(\Utilities\NukeCompat::class),
             $this->mockDb,
+            self::createStub(TradeExecutionServiceInterface::class),
+            self::createStub(AuthServiceInterface::class),
         );
     }
 

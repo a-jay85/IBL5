@@ -814,6 +814,133 @@ class TradeValidatorTest extends TestCase
         ];
     }
 
+    // ============================================
+    // N-PARTY (3-TEAM) VALIDATION TESTS
+    // ============================================
+
+    /**
+     * Matrix #2 — a valid 3-party cap scenario returns valid=true.
+     *
+     * @group validation
+     * @group salary-cap
+     */
+    public function testValidatesThreePartyCapsWithinLimits(): void
+    {
+        $result = $this->validator->validateSalaryCapsForParties([
+            ['teamName' => 'Metros', 'currentSeasonCapTotal' => 5000, 'capSent' => 500, 'capReceived' => 400],
+            ['teamName' => 'Stars', 'currentSeasonCapTotal' => 5000, 'capSent' => 400, 'capReceived' => 600],
+            ['teamName' => 'Cougars', 'currentSeasonCapTotal' => 4000, 'capSent' => 600, 'capReceived' => 500],
+        ]);
+
+        $this->assertTrue($result['valid']);
+        $this->assertSame([], $result['errors']);
+        $this->assertSame(4900, $result['parties'][0]['postTradeCapTotal']);
+        $this->assertSame(5200, $result['parties'][1]['postTradeCapTotal']);
+        $this->assertSame(3900, $result['parties'][2]['postTradeCapTotal']);
+    }
+
+    /**
+     * Matrix #3 — only the THIRD party busts the hard cap; the error names that
+     * team and the other two are absent.
+     *
+     * @group validation
+     * @group salary-cap
+     */
+    public function testRejectsThreePartyCapWhenThirdPartyOverHardCap(): void
+    {
+        $result = $this->validator->validateSalaryCapsForParties([
+            ['teamName' => 'Metros', 'currentSeasonCapTotal' => 5000, 'capSent' => 500, 'capReceived' => 400],
+            ['teamName' => 'Stars', 'currentSeasonCapTotal' => 5000, 'capSent' => 400, 'capReceived' => 600],
+            ['teamName' => 'Cougars', 'currentSeasonCapTotal' => 6800, 'capSent' => 0, 'capReceived' => 500],
+        ]);
+
+        $this->assertFalse($result['valid']);
+        $this->assertCount(1, $result['errors']);
+        $this->assertStringContainsString('Cougars', $result['errors'][0]);
+        $this->assertStringNotContainsString('Metros', $result['errors'][0]);
+        $this->assertStringNotContainsString('Stars', $result['errors'][0]);
+        $this->assertSame(League::HARD_CAP_MAX + 300, $result['parties'][2]['postTradeCapTotal']);
+        $this->assertTrue($result['parties'][2]['overCap']);
+        $this->assertFalse($result['parties'][0]['overCap']);
+        $this->assertFalse($result['parties'][1]['overCap']);
+    }
+
+    /**
+     * Matrix #4 — a 3-party roster scenario where exactly the third team exceeds
+     * ROSTER_SPOTS_MAX. MockDatabase returns the same roster count for every
+     * getTeamPlayerCount() call, so the per-party send/receive deltas decide.
+     *
+     * @group validation
+     * @group roster-limits
+     */
+    public function testRejectsThreePartyRosterWhenThirdTeamExceedsLimit(): void
+    {
+        // Every team currently has 14 players (mock returns the same count).
+        // Metros: 14 - 1 + 0 = 13 (ok); Stars: 14 - 1 + 1 = 14 (ok);
+        // Cougars: 14 - 0 + 2 = 16 (over the 15-player limit).
+        $this->mockDb->setMockData([['cnt' => 14]]);
+
+        $result = $this->validator->validateRosterLimitsForParties([
+            ['teamId' => 1, 'teamName' => 'Metros', 'playersSent' => 1, 'playersReceived' => 0],
+            ['teamId' => 2, 'teamName' => 'Stars', 'playersSent' => 1, 'playersReceived' => 1],
+            ['teamId' => 3, 'teamName' => 'Cougars', 'playersSent' => 0, 'playersReceived' => 2],
+        ]);
+
+        $this->assertFalse($result['valid']);
+        $this->assertCount(1, $result['errors']);
+        $this->assertStringContainsString('Cougars', $result['errors'][0]);
+        $this->assertStringContainsString('roster limit', $result['errors'][0]);
+        $this->assertSame(16, $result['parties'][2]['postTradeRoster']);
+        $this->assertTrue($result['parties'][2]['overLimit']);
+    }
+
+    /**
+     * Matrix #5 (green-green) — the legacy two-party validateSalaryCaps still
+     * returns the legacy shape and exact legacy error strings now that it
+     * delegates to validateSalaryCapsForParties.
+     *
+     * @group validation
+     * @group salary-cap
+     */
+    public function testLegacyValidateSalaryCapsRetainsLegacyShapeAndStrings(): void
+    {
+        $result = $this->validator->validateSalaryCaps([
+            'userCurrentSeasonCapTotal' => 6000,
+            'partnerCurrentSeasonCapTotal' => 5000,
+            'userCapSentToPartner' => 100,
+            'partnerCapSentToUser' => 1500,
+        ]);
+
+        // User: 6000 - 100 + 1500 = 7400 (over); partner: 5000 - 1500 + 100 = 3600.
+        $this->assertFalse($result['valid']);
+        $this->assertCount(1, $result['errors']);
+        $this->assertSame('This trade is illegal since it puts you over the hard cap.', $result['errors'][0]);
+        $this->assertSame(7400, $result['userPostTradeCapTotal']);
+        $this->assertSame(3600, $result['partnerPostTradeCapTotal']);
+        $this->assertArrayNotHasKey('parties', $result);
+    }
+
+    /**
+     * Matrix #5 (green-green) — the legacy two-party validateRosterLimits still
+     * returns the legacy shape and exact legacy error strings via delegation.
+     *
+     * @group validation
+     * @group roster-limits
+     */
+    public function testLegacyValidateRosterLimitsRetainsLegacyShapeAndStrings(): void
+    {
+        // Both teams at 14; user sends 0, partner sends 2 => user 16 (over), partner 12.
+        $this->mockDb->setMockData([['cnt' => 14]]);
+
+        $result = $this->validator->validateRosterLimits(1, 2, 0, 2);
+
+        $this->assertFalse($result['valid']);
+        $this->assertCount(1, $result['errors']);
+        $this->assertStringContainsString('your team', $result['errors'][0]);
+        $this->assertStringContainsString('roster limit', $result['errors'][0]);
+        $this->assertArrayNotHasKey('parties', $result);
+    }
+
     // --- Merged from SeasonPhaseTest ---
 
     /**

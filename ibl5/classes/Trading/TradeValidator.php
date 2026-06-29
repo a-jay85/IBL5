@@ -69,24 +69,73 @@ class TradeValidator implements TradeValidatorInterface
         $userCapSentToPartner = $tradeData['userCapSentToPartner'] ?? 0;
         $partnerCapSentToUser = $tradeData['partnerCapSentToUser'] ?? 0;
 
-        $userPostTradeCapTotal = $userCurrentSeasonCapTotal - $userCapSentToPartner + $partnerCapSentToUser;
-        $partnerPostTradeCapTotal = $partnerCurrentSeasonCapTotal - $partnerCapSentToUser + $userCapSentToPartner;
+        // Delegate the cap math to the N-party method with a 2-element list so the
+        // bilateral and N-party paths share a single implementation (green-green).
+        // The user team sends $userCapSentToPartner and receives $partnerCapSentToUser;
+        // the partner team is the mirror image.
+        $result = $this->validateSalaryCapsForParties([
+            [
+                'teamName' => 'user',
+                'currentSeasonCapTotal' => $userCurrentSeasonCapTotal,
+                'capSent' => $userCapSentToPartner,
+                'capReceived' => $partnerCapSentToUser,
+            ],
+            [
+                'teamName' => 'partner',
+                'currentSeasonCapTotal' => $partnerCurrentSeasonCapTotal,
+                'capSent' => $partnerCapSentToUser,
+                'capReceived' => $userCapSentToPartner,
+            ],
+        ]);
 
+        // Reshape to the legacy two-party contract with the exact legacy error
+        // strings (the N-party method emits team-name-generalized messages).
         $errors = [];
-
-        if ($userPostTradeCapTotal > League::HARD_CAP_MAX) {
+        if ($result['parties'][0]['overCap']) {
             $errors[] = 'This trade is illegal since it puts you over the hard cap.';
         }
-
-        if ($partnerPostTradeCapTotal > League::HARD_CAP_MAX) {
+        if ($result['parties'][1]['overCap']) {
             $errors[] = 'This trade is illegal since it puts other team over the hard cap.';
         }
 
         return [
             'valid' => $errors === [],
             'errors' => $errors,
-            'userPostTradeCapTotal' => $userPostTradeCapTotal,
-            'partnerPostTradeCapTotal' => $partnerPostTradeCapTotal
+            'userPostTradeCapTotal' => $result['parties'][0]['postTradeCapTotal'],
+            'partnerPostTradeCapTotal' => $result['parties'][1]['postTradeCapTotal'],
+        ];
+    }
+
+    /**
+     * @see TradeValidatorInterface::validateSalaryCapsForParties()
+     *
+     * @param list<array{teamName: string, currentSeasonCapTotal: int, capSent: int, capReceived: int}> $partyCapDeltas
+     * @return array{valid: bool, errors: list<string>, parties: list<array{teamName: string, postTradeCapTotal: int, overCap: bool}>}
+     */
+    public function validateSalaryCapsForParties(array $partyCapDeltas): array
+    {
+        $errors = [];
+        $parties = [];
+
+        foreach ($partyCapDeltas as $party) {
+            $postTradeCapTotal = $party['currentSeasonCapTotal'] - $party['capSent'] + $party['capReceived'];
+            $overCap = $postTradeCapTotal > League::HARD_CAP_MAX;
+
+            if ($overCap) {
+                $errors[] = 'This trade is illegal since it puts the ' . $party['teamName'] . ' over the hard cap.';
+            }
+
+            $parties[] = [
+                'teamName' => $party['teamName'],
+                'postTradeCapTotal' => $postTradeCapTotal,
+                'overCap' => $overCap,
+            ];
+        }
+
+        return [
+            'valid' => $errors === [],
+            'errors' => $errors,
+            'parties' => $parties,
         ];
     }
 
@@ -99,27 +148,73 @@ class TradeValidator implements TradeValidatorInterface
         int $userPlayersSent,
         int $partnerPlayersSent
     ): array {
-        $isOffseason = $this->season->advancesContractYears();
+        // Delegate to the N-party method with a 2-element list so the bilateral and
+        // N-party roster paths share a single implementation (green-green). The
+        // user team sends $userPlayersSent and receives $partnerPlayersSent.
+        $result = $this->validateRosterLimitsForParties([
+            [
+                'teamId' => $userTeamId,
+                'teamName' => 'user',
+                'playersSent' => $userPlayersSent,
+                'playersReceived' => $partnerPlayersSent,
+            ],
+            [
+                'teamId' => $partnerTeamId,
+                'teamName' => 'partner',
+                'playersSent' => $partnerPlayersSent,
+                'playersReceived' => $userPlayersSent,
+            ],
+        ]);
 
-        $userCurrentRoster = $this->formRepository->getTeamPlayerCount($userTeamId, $isOffseason);
-        $partnerCurrentRoster = $this->formRepository->getTeamPlayerCount($partnerTeamId, $isOffseason);
-
-        $userPostTradeRoster = $userCurrentRoster - $userPlayersSent + $partnerPlayersSent;
-        $partnerPostTradeRoster = $partnerCurrentRoster - $partnerPlayersSent + $userPlayersSent;
-
+        // Reshape to the legacy two-party contract with the exact legacy error
+        // strings (the N-party method emits team-name-generalized messages).
         $errors = [];
-
-        if ($userPostTradeRoster > Team::ROSTER_SPOTS_MAX) {
+        if ($result['parties'][0]['overLimit']) {
             $errors[] = 'This trade is illegal since it puts your team over the ' . Team::ROSTER_SPOTS_MAX . '-player roster limit.';
         }
-
-        if ($partnerPostTradeRoster > Team::ROSTER_SPOTS_MAX) {
+        if ($result['parties'][1]['overLimit']) {
             $errors[] = 'This trade is illegal since it puts the other team over the ' . Team::ROSTER_SPOTS_MAX . '-player roster limit.';
         }
 
         return [
             'valid' => $errors === [],
             'errors' => $errors,
+        ];
+    }
+
+    /**
+     * @see TradeValidatorInterface::validateRosterLimitsForParties()
+     *
+     * @param list<array{teamId: int, teamName: string, playersSent: int, playersReceived: int}> $partyRosterDeltas
+     * @return array{valid: bool, errors: list<string>, parties: list<array{teamName: string, postTradeRoster: int, overLimit: bool}>}
+     */
+    public function validateRosterLimitsForParties(array $partyRosterDeltas): array
+    {
+        $isOffseason = $this->season->advancesContractYears();
+
+        $errors = [];
+        $parties = [];
+
+        foreach ($partyRosterDeltas as $party) {
+            $currentRoster = $this->formRepository->getTeamPlayerCount($party['teamId'], $isOffseason);
+            $postTradeRoster = $currentRoster - $party['playersSent'] + $party['playersReceived'];
+            $overLimit = $postTradeRoster > Team::ROSTER_SPOTS_MAX;
+
+            if ($overLimit) {
+                $errors[] = 'This trade is illegal since it puts the ' . $party['teamName'] . ' over the ' . Team::ROSTER_SPOTS_MAX . '-player roster limit.';
+            }
+
+            $parties[] = [
+                'teamName' => $party['teamName'],
+                'postTradeRoster' => $postTradeRoster,
+                'overLimit' => $overLimit,
+            ];
+        }
+
+        return [
+            'valid' => $errors === [],
+            'errors' => $errors,
+            'parties' => $parties,
         ];
     }
 

@@ -127,8 +127,8 @@ class TradeProcessorTest extends TestCase
             auditLogger: $auditSpy,
             tradeLogger: $tradeSpy,
         ) extends TradeProcessor {
-            protected function createNewsStory(string $title, string $text): void {}
-            protected function sendNotifications(string $from, string $to, string $text): void {}
+            protected function createNewsStory(string $storytitle, string $storytext): void {}
+            protected function sendNotifications(array $parties, string $offeringTeamName, string $listeningTeamName, string $storytext): void {}
         };
 
         $result = $processor->processTrade(42);
@@ -164,5 +164,24 @@ class TradeProcessorTest extends TestCase
     {
         $processor = new TradeProcessor($this->mockDb, $this->mockCommonRepo);
         $this->assertIsObject($processor);
+    }
+
+    // ============================================
+    // PARTY-NAME JOINING (Matrix #8)
+    // ============================================
+
+    public function testJoinPartyNamesTwoTeamsMatchesLegacyWording(): void
+    {
+        $this->assertSame('Metros and Stars', TradeProcessor::joinPartyNames(['Metros', 'Stars']));
+    }
+
+    public function testJoinPartyNamesThreeTeamsUsesOxfordlessAndList(): void
+    {
+        $this->assertSame('Metros, Stars and Cougars', TradeProcessor::joinPartyNames(['Metros', 'Stars', 'Cougars']));
+    }
+
+    public function testJoinPartyNamesSingleNameReturnsItVerbatim(): void
+    {
+        $this->assertSame('Metros', TradeProcessor::joinPartyNames(['Metros']));
     }
 }

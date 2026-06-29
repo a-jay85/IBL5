@@ -104,6 +104,8 @@ class TradeProcessor implements TradeProcessorInterface
             $storytext = "";
             $offeringTeamName = '';
             $listeningTeamName = '';
+            /** @var list<string> $parties Distinct party team names in first-seen order */
+            $parties = [];
 
             foreach ($tradeRows as $tradeRow) {
                 $itemId = $tradeRow['itemid'];
@@ -111,15 +113,26 @@ class TradeProcessor implements TradeProcessorInterface
                 $offeringTeamName = $tradeRow['trade_from'];
                 $listeningTeamName = $tradeRow['trade_to'];
 
+                foreach ([$offeringTeamName, $listeningTeamName] as $party) {
+                    if ($party !== '' && !in_array($party, $parties, true)) {
+                        $parties[] = $party;
+                    }
+                }
+
                 $result = $this->processTradeItem($itemId, $itemType, $offeringTeamName, $listeningTeamName, $offerId);
                 $storytext .= $result['tradeLine'];
             }
 
-            // Create news story and notifications
-            $storytitle = "$offeringTeamName and $listeningTeamName make a trade.";
+            // Create news story and notifications. For 2 parties keep the exact
+            // legacy "$offeringTeamName and $listeningTeamName" wording (those vars
+            // hold the LAST row's from/to, preserving byte-identical output); only
+            // 3+ party trades use the generalized joinPartyNames() list.
+            $storytitle = count($parties) >= 3
+                ? self::joinPartyNames($parties) . " make a trade."
+                : "$offeringTeamName and $listeningTeamName make a trade.";
 
             $this->createNewsStory($storytitle, $storytext);
-            $this->sendNotifications($offeringTeamName, $listeningTeamName, $storytext);
+            $this->sendNotifications($parties, $offeringTeamName, $listeningTeamName, $storytext);
 
             // Preserve trade_info rows for TRN export by marking them completed,
             // then clean up only the parent offer and cash rows.
@@ -363,13 +376,16 @@ class TradeProcessor implements TradeProcessorInterface
      * Send notifications (Discord, email) for the trade
      *
      * Posts trade announcement to Discord #trades and #general-chat channels.
+     * Works for N parties; a 2-party trade produces byte-identical output to the
+     * historical two-team path.
      *
-     * @param string $offeringTeamName Offering team
-     * @param string $listeningTeamName Listening team
+     * @param list<string> $parties Distinct party team names in first-seen order
+     * @param string $offeringTeamName Offering team (last row's trade_from; legacy 2-party var)
+     * @param string $listeningTeamName Listening team (last row's trade_to; legacy 2-party var)
      * @param string $storytext Full story text with trade details
      * @return void
      */
-    protected function sendNotifications(string $offeringTeamName, string $listeningTeamName, string $storytext): void
+    protected function sendNotifications(array $parties, string $offeringTeamName, string $listeningTeamName, string $storytext): void
     {
         // Skip notifications if Discord is not available
         if ($this->discord === null) {
@@ -377,14 +393,26 @@ class TradeProcessor implements TradeProcessorInterface
         }
 
         try {
-            $fromDiscordId = $this->discord->getDiscordIDFromTeamname($offeringTeamName);
-            $toDiscordId = $this->discord->getDiscordIDFromTeamname($listeningTeamName);
-
-            // Build Discord mention text only if both IDs exist
-            if ($fromDiscordId !== '' && $toDiscordId !== '') {
-                $discordText = "<@!$fromDiscordId> and <@!$toDiscordId> agreed to a trade:\n" . $storytext;
+            if (count($parties) >= 3) {
+                // N-party: build a mention list, falling back to the team name
+                // when a party has no Discord ID.
+                $mentions = [];
+                foreach ($parties as $party) {
+                    $discordId = $this->discord->getDiscordIDFromTeamname($party);
+                    $mentions[] = $discordId !== '' ? "<@!$discordId>" : $party;
+                }
+                $discordText = self::joinPartyNames($mentions) . " agreed to a trade:\n" . $storytext;
             } else {
-                $discordText = "$offeringTeamName and $listeningTeamName agreed to a trade:\n" . $storytext;
+                // Legacy 2-party path — preserved byte-for-byte.
+                $fromDiscordId = $this->discord->getDiscordIDFromTeamname($offeringTeamName);
+                $toDiscordId = $this->discord->getDiscordIDFromTeamname($listeningTeamName);
+
+                // Build Discord mention text only if both IDs exist
+                if ($fromDiscordId !== '' && $toDiscordId !== '') {
+                    $discordText = "<@!$fromDiscordId> and <@!$toDiscordId> agreed to a trade:\n" . $storytext;
+                } else {
+                    $discordText = "$offeringTeamName and $listeningTeamName agreed to a trade:\n" . $storytext;
+                }
             }
 
             Discord::postToChannel('#trades', $discordText);
@@ -396,5 +424,31 @@ class TradeProcessor implements TradeProcessorInterface
             // Log the error but don't fail the trade
             $this->tradeLogger->error('Discord notification failed', ['error' => $e->getMessage()]);
         }
+    }
+
+    /**
+     * Join party team names into a human-readable trade phrase.
+     *
+     * Two names -> "A and B" (the exact legacy two-team wording); three or more ->
+     * "A, B and C". Used for both the news story title and the Discord mention
+     * list of multi-party trades.
+     *
+     * @param list<string> $names Party names (or Discord mentions) in display order
+     */
+    public static function joinPartyNames(array $names): string
+    {
+        $count = count($names);
+
+        if ($count === 0) {
+            return '';
+        }
+
+        if ($count === 1) {
+            return $names[0];
+        }
+
+        $last = array_pop($names);
+
+        return implode(', ', $names) . ' and ' . $last;
     }
 }

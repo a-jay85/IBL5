@@ -8,10 +8,11 @@ use PHPUnit\Framework\TestCase;
 use Tests\WideUnit\Mocks\MockDatabase;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Trading\Contracts\TradingServiceInterface;
-use Trading\Contracts\TradeProcessorInterface;
 use Trading\Contracts\TradeOfferRepositoryInterface;
 use Trading\Contracts\TradeOfferInterface;
 use Trading\Contracts\TradingViewInterface;
+use Trading\Contracts\TradeExecutionServiceInterface;
+use Auth\Contracts\AuthServiceInterface;
 use Trading\TradingController;
 
 class TradingControllerRosterPreviewTest extends TestCase
@@ -31,16 +32,18 @@ class TradingControllerRosterPreviewTest extends TestCase
     private function buildController(
         ?\Utilities\NukeCompat $nukeCompat = null,
         ?TeamIdentityRepositoryInterface $teamIdentityRepo = null,
+        ?AuthServiceInterface $authService = null,
     ): TradingController {
         return new TradingController(
             self::createStub(TradingServiceInterface::class),
-            self::createStub(TradeProcessorInterface::class),
             self::createStub(TradeOfferRepositoryInterface::class),
             self::createStub(TradeOfferInterface::class),
             self::createStub(TradingViewInterface::class),
             $teamIdentityRepo ?? self::createStub(TeamIdentityRepositoryInterface::class),
             $nukeCompat ?? self::createStub(\Utilities\NukeCompat::class),
             $this->mockDb,
+            self::createStub(TradeExecutionServiceInterface::class),
+            $authService ?? self::createStub(AuthServiceInterface::class),
         );
     }
 
@@ -75,7 +78,9 @@ class TradingControllerRosterPreviewTest extends TestCase
     {
         $nukeCompat = self::createStub(\Utilities\NukeCompat::class);
         $nukeCompat->method('isUser')->willReturn(true);
-        $nukeCompat->method('cookieDecode')->willReturn(['', 'testuser']);
+
+        $authService = self::createStub(AuthServiceInterface::class);
+        $authService->method('getUsername')->willReturn('testuser');
 
         $mockTeamIdentityRepo = $this->createMock(TeamIdentityRepositoryInterface::class);
         $mockTeamIdentityRepo->expects($this->once())
@@ -84,7 +89,11 @@ class TradingControllerRosterPreviewTest extends TestCase
             ->willReturn('Lakers');
         $mockTeamIdentityRepo->method('getTidFromTeamname')->willReturn(1);
 
-        $controller = $this->buildController(nukeCompat: $nukeCompat, teamIdentityRepo: $mockTeamIdentityRepo);
+        $controller = $this->buildController(
+            nukeCompat: $nukeCompat,
+            teamIdentityRepo: $mockTeamIdentityRepo,
+            authService: $authService,
+        );
 
         $this->captureOutput(fn () => $controller->handleRosterPreviewApi('user-cookie'));
     }

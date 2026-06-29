@@ -17,12 +17,15 @@ use PhpParser\NodeFinder;
 use PHPStan\Analyser\Scope;
 use PHPStan\Rules\Rule;
 use PHPStan\Rules\RuleErrorBuilder;
+use PHPStan\Type\VerbosityLevel;
 
 /**
  * Enforces meaningful assertions in PHPUnit test methods. Flags:
  *   1. Empty test method bodies (`public function testFoo(): void {}`)
  *   2. Trivially-true assertions: `assertTrue(true)`, `assertFalse(false)`,
  *      `assertNull(null)`, `assertEquals($x, $x)` with identical literal args.
+ *   3. `assertNotNull($x)` where PHPStan statically knows `$x` is non-nullable
+ *      (its type's `isNull()` is `no`), so the assertion always passes.
  *
  * Only applies to files under tests/ whose class methods start with `test`.
  *
@@ -127,6 +130,24 @@ final class RequireMeaningfulAssertionsRule implements Rule
                         ->identifier('ibl.meaninglessAssertion')
                         ->line($call->getStartLine())
                         ->build();
+                }
+            }
+
+            // assertNotNull($x) where PHPStan statically knows $x is non-null
+            if ($methodName === 'assertNotNull') {
+                $firstArg = $call->args[0] ?? null;
+                if ($firstArg instanceof Arg && !$firstArg->unpack) {
+                    $resolvedType = $scope->getType($firstArg->value);
+                    if ($resolvedType->isNull()->no()) {
+                        $errors[] = RuleErrorBuilder::message(
+                            '`assertNotNull()` is called on a value PHPStan already knows is '
+                            . 'non-null (type `' . $resolvedType->describe(VerbosityLevel::typeOnly()) . '`); '
+                            . 'the assertion always passes. Assert against actual behavior instead.'
+                        )
+                            ->identifier('ibl.meaninglessAssertion')
+                            ->line($call->getStartLine())
+                            ->build();
+                    }
                 }
             }
         }

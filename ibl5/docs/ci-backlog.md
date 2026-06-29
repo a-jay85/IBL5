@@ -48,7 +48,7 @@ last_verified: 2026-06-29
 | # | Title | Status | Automouse | Effort |
 |---|-------|--------|-----------|-------:|
 | 1.1 | Revive + adopt `setup-php-env` composite | ✅ Implemented | 🟩 | M |
-| 1.2 | Extract `notify-discord` composite (SSH + Discord DM) | 📋 Planned | 🟦 | M |
+| 1.2 | Extract `notify-discord` composite (SSH + Discord DM) | ✅ Implemented | 🟦 | M |
 
 ### 1.1 Dead `setup-php-env` composite; PHP setup hand-rolled 16×
 **Location:** `.github/actions/setup-php-env/action.yml` (defined, **used by zero workflows**); duplicated blocks in `.github/workflows/tests.yml` (×5), `migration-safety.yml` (×3), `mutation.yml` (×2), `adr-required.yml`, `refactor-flag.yml`, `doc-freshness.yml`, `doc-freshness-audit.yml`, `deploy-rehearsal.yml`, `cache-dependencies.yml`.
@@ -62,7 +62,7 @@ last_verified: 2026-06-29
 **Problem:** Two structurally identical blocks copy-pasted across the deploy/notify surface; the Discord blocks differ only in the `MSG` string. Each copy is a place a key-handling or endpoint change must be repeated.
 **Suggested direction:** A `notify-discord` composite action taking `message` (and host/secret inputs) that owns both the SSH setup and the DM POST. Callers reduce to one `uses:` + a message string. Note `db-backup.yml`'s notify intentionally targets `secrets.HOST` (not the override) and `deploy-rehearsal.yml`'s SSH setup has a secret-empty guard — the composite must preserve both as inputs/options.
 **Risk if untouched:** A secret rotation or endpoint change touches 12 SSH blocks + 8 DM blocks by hand; the `db-backup` heredoc remote logic is already un-shellchecked.
-**Status (2026-06-28):** 📋 Planned — plan `ci-notify-discord-composite` written + queued for automouse (own PR, split from 1.1). Two composites (`setup-ssh` + `notify-discord`) across the **13 SSH + 9 Discord sites** the plan re-counted on disk. 🟦 `auto_merge: false`: the Discord-send + rollback-alert path runs only against prod (SSH + IBLbot `discordDM`), **unreachable from CI** — `actionlint` proves wiring/syntax but not that a prod DM actually sends; combined with the deploy/secrets surface, a human merges (gate-14 deploy/secrets + gate-15 data-blocked verification gap).
+**Status (2026-06-29):** ✅ Implemented (PR for ci-notify-discord-composite) — two composites (`setup-ssh`, `notify-discord`) extracted and adopted at all 13 SSH + 9 Discord sites; per-caller variants (guard, override-host, loud/soft) preserved. `auto_merge: false` — Discord/rollback-alert path is prod-only, unreachable from CI.
 
 ---
 

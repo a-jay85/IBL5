@@ -98,24 +98,13 @@ jobs:
       # server-side over SSH (the db-backup.yml pattern), reusing the deploy key — no
       # new secrets.
       - name: Setup SSH
-        run: |
-          set -euo pipefail
-          # Fail loud if a secret is empty. When this workflow runs via `workflow_call`
-          # the caller MUST pass `secrets: inherit`, or these render empty and `ssh -p`
-          # silently consumes `-i` as its port arg ("Bad port '-i'"). See run 27378437919.
-          : "${PORT:?empty — caller must pass 'secrets: inherit'}"
-          : "${HOST:?empty — caller must pass 'secrets: inherit'}"
-          : "${USERNAME:?empty — caller must pass 'secrets: inherit'}"
-          : "${DEPLOY_KEY:?empty — caller must pass 'secrets: inherit'}"
-          mkdir -p ~/.ssh
-          echo "$DEPLOY_KEY" > ~/.ssh/id_deploy
-          chmod 600 ~/.ssh/id_deploy
-          ssh-keyscan -p "$PORT" "$HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
-        env:
-          PORT: ${{ secrets.PORT }}
-          HOST: ${{ secrets.HOST }}
-          USERNAME: ${{ secrets.USERNAME }}
-          DEPLOY_KEY: ${{ secrets.PRIVATE_KEY }}
+        uses: ./.github/actions/setup-ssh
+        with:
+          require-secrets: 'true'
+          host: ${{ secrets.HOST }}
+          port: ${{ secrets.PORT }}
+          username: ${{ secrets.USERNAME }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
 
       - name: Clone filtered production data into CI MariaDB
         run: |

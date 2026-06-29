@@ -86,13 +86,11 @@ jobs:
       # (ADR-0039).
       - name: Setup SSH for on-box smoke
         if: steps.guard.outputs.stale != 'true'
-        run: |
-          mkdir -p ~/.ssh
-          echo "$DEPLOY_KEY" > ~/.ssh/id_deploy
-          chmod 600 ~/.ssh/id_deploy
-          ssh-keyscan -p ${{ secrets.PORT }} ${{ secrets.HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
-        env:
-          DEPLOY_KEY: ${{ secrets.PRIVATE_KEY }}
+        uses: ./.github/actions/setup-ssh
+        with:
+          host: ${{ secrets.HOST }}
+          port: ${{ secrets.PORT }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
 
       - name: Run IBL5 smoke checks on-box via SSH (gates auto-rollback)
         id: ibl5
@@ -234,22 +232,19 @@ jobs:
           git push origin production
 
       - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "$DEPLOY_KEY" > ~/.ssh/id_deploy
-          chmod 600 ~/.ssh/id_deploy
-          ssh-keyscan -p ${{ secrets.PORT }} ${{ secrets.HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
-        env:
-          DEPLOY_KEY: ${{ secrets.PRIVATE_KEY }}
+        uses: ./.github/actions/setup-ssh
+        with:
+          host: ${{ secrets.HOST }}
+          port: ${{ secrets.PORT }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
 
-      - name: Send Discord DM
+      - name: Build Discord message
         env:
           COMMIT_MSG: ${{ steps.check.outputs.commit_msg }}
           COMMIT_SHA: ${{ steps.check.outputs.commit_sha }}
           SHOULD_REVERT: ${{ steps.check.outputs.should_revert }}
           SKIP_REASON: ${{ steps.check.outputs.skip_reason }}
           REVERT_OUTCOME: ${{ steps.revert.outcome }}
-          OWNER_DISCORD_ID: ${{ secrets.OWNER_DISCORD_ID }}
         run: |
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           SHORT_SHA="${COMMIT_SHA:0:7}"
@@ -263,15 +258,15 @@ jobs:
           else
             MSG=$(printf 'Production smoke test FAILED after deploy. Auto-reverted commit %s. A recovery deploy is in progress.\n\nReverted: %s\nRun: %s' "$SHORT_SHA" "$COMMIT_MSG" "$RUN_URL")
           fi
+          printf '%s' "$MSG" > /tmp/discord-msg.txt
 
-          PAYLOAD=$(jq -n --arg id "$OWNER_DISCORD_ID" --arg msg "$MSG" \
-            '{content: {receivingUserDiscordID: $id, message: $msg}}')
-
-          # Fail loud: no `|| echo` swallow and `curl -f` (non-2xx → exit 22), so a
-          # delivery failure turns this notify job RED — surfaced via GitHub's native
-          # workflow-failure email. A silently-dropped alert is worse than none.
-          echo "$PAYLOAD" | ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
-            'curl -sf --max-time 10 -X POST http://localhost:50000/discordDM -H "Content-Type: application/json" -d @-'
+      - name: Send Discord DM
+        uses: ./.github/actions/notify-discord
+        with:
+          discord-id: ${{ secrets.OWNER_DISCORD_ID }}
+          port: ${{ secrets.PORT }}
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
 
   notify-scheduled-failure:
     name: Notify Scheduled Failure
@@ -284,31 +279,29 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "$DEPLOY_KEY" > ~/.ssh/id_deploy
-          chmod 600 ~/.ssh/id_deploy
-          ssh-keyscan -p ${{ secrets.PORT }} ${{ secrets.HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
-        env:
-          DEPLOY_KEY: ${{ secrets.PRIVATE_KEY }}
+      - uses: actions/checkout@v7
 
-      - name: Send Discord DM
-        env:
-          OWNER_DISCORD_ID: ${{ secrets.OWNER_DISCORD_ID }}
+      - name: Setup SSH
+        uses: ./.github/actions/setup-ssh
+        with:
+          host: ${{ secrets.HOST }}
+          port: ${{ secrets.PORT }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Build Discord message
         run: |
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           TRIGGER="${{ github.event_name }}"
           MSG=$(printf 'Production smoke test FAILED (%s trigger — no auto-rollback).\n\nThis may be a transient issue. Check the run for details: %s' "$TRIGGER" "$RUN_URL")
+          printf '%s' "$MSG" > /tmp/discord-msg.txt
 
-          PAYLOAD=$(jq -n --arg id "$OWNER_DISCORD_ID" --arg msg "$MSG" \
-            '{content: {receivingUserDiscordID: $id, message: $msg}}')
-
-          # Fail loud: no `|| echo` swallow and `curl -f` (non-2xx → exit 22), so a
-          # delivery failure turns this notify job RED — surfaced via GitHub's native
-          # workflow-failure email. A silently-dropped alert is worse than none.
-          echo "$PAYLOAD" | ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
-            'curl -sf --max-time 10 -X POST http://localhost:50000/discordDM -H "Content-Type: application/json" -d @-'
+      - name: Send Discord DM
+        uses: ./.github/actions/notify-discord
+        with:
+          discord-id: ${{ secrets.OWNER_DISCORD_ID }}
+          port: ${{ secrets.PORT }}
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
 
   notify-ibl6-degradation:
     name: Notify IBL6 Degradation
@@ -322,30 +315,28 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "$DEPLOY_KEY" > ~/.ssh/id_deploy
-          chmod 600 ~/.ssh/id_deploy
-          ssh-keyscan -p ${{ secrets.PORT }} ${{ secrets.HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
-        env:
-          DEPLOY_KEY: ${{ secrets.PRIVATE_KEY }}
+      - uses: actions/checkout@v7
 
-      - name: Send Discord DM
-        env:
-          OWNER_DISCORD_ID: ${{ secrets.OWNER_DISCORD_ID }}
+      - name: Setup SSH
+        uses: ./.github/actions/setup-ssh
+        with:
+          host: ${{ secrets.HOST }}
+          port: ${{ secrets.PORT }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Build Discord message
         run: |
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           MSG=$(printf 'IBL6 smoke FAILED; IBL5 unaffected. No rollback.\n\nRun: %s' "$RUN_URL")
+          printf '%s' "$MSG" > /tmp/discord-msg.txt
 
-          PAYLOAD=$(jq -n --arg id "$OWNER_DISCORD_ID" --arg msg "$MSG" \
-            '{content: {receivingUserDiscordID: $id, message: $msg}}')
-
-          # Fail loud: no `|| echo` swallow and `curl -f` (non-2xx → exit 22), so a
-          # delivery failure turns this notify job RED — surfaced via GitHub's native
-          # workflow-failure email. A silently-dropped alert is worse than none.
-          echo "$PAYLOAD" | ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
-            'curl -sf --max-time 10 -X POST http://localhost:50000/discordDM -H "Content-Type: application/json" -d @-'
+      - name: Send Discord DM
+        uses: ./.github/actions/notify-discord
+        with:
+          discord-id: ${{ secrets.OWNER_DISCORD_ID }}
+          port: ${{ secrets.PORT }}
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
 
   notify-inconclusive:
     name: Notify Smoke Inconclusive
@@ -362,18 +353,17 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "$DEPLOY_KEY" > ~/.ssh/id_deploy
-          chmod 600 ~/.ssh/id_deploy
-          ssh-keyscan -p ${{ secrets.PORT }} ${{ secrets.HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
-        env:
-          DEPLOY_KEY: ${{ secrets.PRIVATE_KEY }}
+      - uses: actions/checkout@v7
 
-      - name: Send Discord DM
+      - name: Setup SSH
+        uses: ./.github/actions/setup-ssh
+        with:
+          host: ${{ secrets.HOST }}
+          port: ${{ secrets.PORT }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Build Discord message
         env:
-          OWNER_DISCORD_ID: ${{ secrets.OWNER_DISCORD_ID }}
           INCONCLUSIVE_REASON: ${{ needs.smoke.outputs.ibl5_inconclusive_reason }}
         run: |
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
@@ -382,12 +372,12 @@ jobs:
           else
             MSG=$(printf 'IBL5 smoke INCONCLUSIVE (on-box prober hit a uniform WAF-class block). NO rollback; production untouched. Run: %s' "$RUN_URL")
           fi
+          printf '%s' "$MSG" > /tmp/discord-msg.txt
 
-          PAYLOAD=$(jq -n --arg id "$OWNER_DISCORD_ID" --arg msg "$MSG" \
-            '{content: {receivingUserDiscordID: $id, message: $msg}}')
-
-          # Fail loud: no `|| echo` swallow and `curl -f` (non-2xx → exit 22), so a
-          # delivery failure turns this notify job RED — surfaced via GitHub's native
-          # workflow-failure email. A silently-dropped alert is worse than none.
-          echo "$PAYLOAD" | ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
-            'curl -sf --max-time 10 -X POST http://localhost:50000/discordDM -H "Content-Type: application/json" -d @-'
+      - name: Send Discord DM
+        uses: ./.github/actions/notify-discord
+        with:
+          discord-id: ${{ secrets.OWNER_DISCORD_ID }}
+          port: ${{ secrets.PORT }}
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}

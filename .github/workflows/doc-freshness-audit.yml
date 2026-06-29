@@ -108,26 +108,27 @@ jobs:
 
       - name: Setup SSH
         if: steps.issue.outputs.notify == 'true'
-        run: |
-          mkdir -p ~/.ssh
-          echo "$DEPLOY_KEY" > ~/.ssh/id_deploy
-          chmod 600 ~/.ssh/id_deploy
-          ssh-keyscan -p ${{ secrets.PORT }} ${{ secrets.HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
-        env:
-          DEPLOY_KEY: ${{ secrets.PRIVATE_KEY }}
+        uses: ./.github/actions/setup-ssh
+        with:
+          host: ${{ secrets.HOST }}
+          port: ${{ secrets.PORT }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
 
-      - name: Send Discord DM
+      - name: Build Discord message
         if: steps.issue.outputs.notify == 'true'
         env:
-          OWNER_DISCORD_ID: ${{ secrets.OWNER_DISCORD_ID }}
           COUNT: ${{ steps.report.outputs.count }}
         run: |
           MSG=$(printf 'Doc Freshness Audit: %s doc(s) past the 60-day staleness window.\nIssue + details: https://github.com/%s/actions/runs/%s' \
             "$COUNT" "${{ github.repository }}" "${{ github.run_id }}")
+          printf '%s' "$MSG" > /tmp/discord-msg.txt
 
-          PAYLOAD=$(jq -n --arg id "$OWNER_DISCORD_ID" --arg msg "$MSG" \
-            '{content: {receivingUserDiscordID: $id, message: $msg}}')
-
-          echo "$PAYLOAD" | ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
-            'curl -s --max-time 10 -X POST http://localhost:50000/discordDM -H "Content-Type: application/json" -d @-' \
-            || echo "::warning::IBLbot notification failed (bot may be down)"
+      - name: Send Discord DM
+        if: steps.issue.outputs.notify == 'true'
+        uses: ./.github/actions/notify-discord
+        with:
+          discord-id: ${{ secrets.OWNER_DISCORD_ID }}
+          port: ${{ secrets.PORT }}
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          fail-on-delivery: 'false'

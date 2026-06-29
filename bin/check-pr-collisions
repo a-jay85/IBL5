@@ -4,7 +4,7 @@
 # bin/check-pr-collisions — Advisory inter-PR collision detector.
 #
 # Groups open PRs that touch the same collision-prone file and emits
-# a markdown collision report / recommended merge order.
+# a markdown collision report / sibling PR listing.
 #
 # Modes:
 #   --pr <n>    Emit this PR's collision body to stdout (no posting)
@@ -35,7 +35,7 @@ usage() {
 Usage: bin/check-pr-collisions [--pr <n>] [--sweep] [--help|-h]
 
 Groups open PRs that edit the same collision-prone file and emits a collision
-report / recommended merge order.
+report / sibling PR listing.
 
 Options:
   --pr <n>     Emit collision body for PR <n> to stdout (no posting).

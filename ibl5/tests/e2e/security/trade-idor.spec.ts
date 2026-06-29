@@ -11,8 +11,13 @@ import { collectNewOfferIds } from '../helpers/trading';
  * static-walled — every post-auth path ends in HtmxHelper::redirect() (which
  * exit()s) — so the happy path and the IDOR-different-team path are E2E-only.
  *
- * (Accept/reject IDOR — D-04/D-05 — is owned by the trade-refactor PR that binds
- * those endpoints to the session; its coverage lives with that change.)
+ * Reject IDOR (D-05) lives here too: this is the trade-refactor PR that binds the
+ * reject endpoint to the session, so its coverage ships with the change. The
+ * reject gate is INLINE in the controller and every branch ends in
+ * HtmxHelper::redirect() (exit()), so "a non-party cannot delete the offer" can
+ * only be proven end-to-end — there is no exit-free unit seam. (Accept IDOR —
+ * D-04 — gates inside TradeExecutionService and IS unit-tested exit-free in
+ * TradeExecutionServiceTest::testValidateAndExecuteRejectsNonPartyWithoutExecuting.)
  *
  * Two distinct fixtures:
  *   - authTest (Metros, teamid=1): D-03 submit-override IDOR + the unresolvable-team
@@ -21,6 +26,7 @@ import { collectNewOfferIds } from '../helpers/trading';
  */
 
 const MAKE_ENDPOINT = '/ibl5/modules/Trading/maketradeoffer.php';
+const REJECT_ENDPOINT = '/ibl5/modules/Trading/rejecttradeoffer.php';
 
 // Success-result marker — its ABSENCE proves the action did not complete.
 const SUCCESS_MARKERS = ['result=offer_sent'];
@@ -170,8 +176,125 @@ publicTest.describe('Trade submit endpoint refuses unauthenticated requests', ()
 });
 
 // ---------------------------------------------------------------------------
+// D-05: reject IDOR — a non-party GM cannot DELETE an offer they are not part of
+// ---------------------------------------------------------------------------
+
+authTest.describe('Trade reject IDOR: a non-party cannot delete an offer (D-05)', () => {
+  authTest.afterAll(async ({ request }) => {
+    await resetTradeOffers(request);
+  });
+
+  authTest(
+    'a non-party acting team is refused at the gate and the offer is NOT deleted',
+    async ({ appState, page, context }) => {
+      await appState({ 'Allow Trades': 'Yes', 'Current Season Ending Year': '2026' });
+
+      // --- Seed exactly one real offer authored by the session team (Metros). ---
+      const existingIds = await collectAllOfferIds(page);
+
+      // Real partner team names (from the ?partner= link param) so the non-party
+      // override below is a genuine team, not a synthetic string the gate might
+      // one day reject for a different reason.
+      const partnerNames = await collectPartnerNames(page);
+      expect(
+        partnerNames.length,
+        'CI seed must expose >=2 trade partners so a non-party team exists',
+      ).toBeGreaterThanOrEqual(2);
+
+      const onForm = await findTradeFormWithBothRosters(page);
+      expect(onForm, 'CI seed must provide a partner with checkable players on both sides').toBe(true);
+
+      // The team this offer is actually with — read from the form, authoritative.
+      const offerPartner = await page
+        .locator('form[name="Trade_Offer"] input[name="listeningTeam"]')
+        .inputValue();
+
+      await page.locator('.trading-roster.team-table').first().locator('input[type="checkbox"]').first().check();
+      await page.locator('.trading-roster.team-table').nth(1).locator('input[type="checkbox"]').first().check();
+      const submitBtn = page.locator('form[name="Trade_Offer"] button[type="submit"]');
+      await Promise.all([page.waitForURL(/result=offer_sent/), submitBtn.click()]);
+
+      const newIds = await collectNewOfferIds(page, existingIds);
+      expect(newIds.length, 'a Metros-authored offer must exist to target').toBeGreaterThan(0);
+      const targetOfferId = newIds[0];
+
+      // The offer's party set is {Metros, offerPartner}. A faithful non-party is
+      // any real team that is neither.
+      const nonParty = partnerNames.find((t) => t !== offerPartner && t !== 'Metros');
+      expect(nonParty, 'CI seed must expose a real team that is not a party to the offer').toBeTruthy();
+
+      // --- Harvest the session-bound trade_reject CSRF token from the review page.
+      // It is rendered inside the offer card and is session-bound, NOT offer- or
+      // team-bound (TradingView mints it once via generateRawToken('trade_reject')),
+      // so it stays valid after the team override below. ---
+      await gotoWithRetry(page, 'modules.php?name=Trading&op=reviewtrade');
+      const rejectToken = await page
+        .locator('form[name="tradereject"] input[name="_csrf_token"]')
+        .first()
+        .inputValue();
+      expect(rejectToken, 'review page must mint a trade_reject token').not.toBe('');
+
+      // --- Flip the ACTING team to the non-party via _test_team. The CSRF token is
+      // session-bound so it stays valid (same technique as the D-03 guard test);
+      // resolveActingTeam() now returns the non-party, so assertActingTeamIsParty()
+      // must fail and short-circuit BEFORE deleteTradeOffer() runs. teamRejecting is
+      // attacker-controlled and used only for the Discord DM — the gate ignores it. ---
+      const host = new URL(page.url()).hostname;
+      await context.addCookies([{ name: '_test_team', value: nonParty!, domain: host, path: '/' }]);
+
+      const resp = await page.request.post(REJECT_ENDPOINT, {
+        form: {
+          _csrf_token: rejectToken,
+          offer: String(targetOfferId),
+          teamRejecting: nonParty!,
+          teamReceiving: offerPartner,
+        },
+        maxRedirects: 0,
+      });
+      const location = resp.headers()['location'] ?? '';
+      expect(location, 'non-party reject must hit the gate deny branch').toContain('result=reject_error');
+      expect(
+        location,
+        'non-party reject must NOT report a successful rejection',
+      ).not.toContain('result=trade_rejected');
+
+      // --- Load-bearing assertion: the offer ROW still exists. A delete-then-redirect
+      // bug (gate moved below the delete, or redirect() stops exiting) would pass the
+      // marker check above but fail HERE. Re-scrape as a real party (override → Metros,
+      // the offering team, which sees the offer on its review page). ---
+      await context.addCookies([{ name: '_test_team', value: 'Metros', domain: host, path: '/' }]);
+      const survivingIds = await collectAllOfferIds(page);
+      expect(
+        [...survivingIds],
+        'the offer a non-party tried to reject must still exist',
+      ).toContain(targetOfferId);
+    },
+  );
+});
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Real partner team names from the trade team-select links. Each link is
+ * `...&partner=<teamName>` (TradingView line ~323), so the value is the clean
+ * team name — used to pick a genuine non-party team for the IDOR override.
+ */
+async function collectPartnerNames(page: Page): Promise<string[]> {
+  await gotoWithRetry(page, 'modules.php?name=Trading');
+  const links = page.locator('.trading-team-select a');
+  const count = await links.count();
+  const names: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const href = await links.nth(i).getAttribute('href');
+    const match = href?.match(/[?&]partner=([^&]+)/);
+    if (match) {
+      names.push(decodeURIComponent(match[1]));
+    }
+  }
+  return names;
+}
 
 /** Collect all offer IDs currently on the Metros review page. */
 async function collectAllOfferIds(page: Page): Promise<Set<number>> {

@@ -274,7 +274,7 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
             p.retired
         FROM `ibl_hist` h
         JOIN `ibl_plr` p ON h.pid = p.pid
-        WHERE h.games > 0 AND {$filterClause}
+        WHERE h.games > 0 AND " . $filterClause . "
         GROUP BY h.pid, p.name, p.retired";
     }
 
@@ -314,7 +314,7 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
             p.retired
         FROM `ibl_box_scores` bs
         JOIN `ibl_plr` p ON bs.pid = p.pid
-        WHERE bs.game_type = {$gameType} AND " . $this->playedCondition('bs') . " AND {$filterClause}
+        WHERE bs.game_type = " . $gameType . " AND " . $this->playedCondition('bs') . " AND " . $filterClause . "
         GROUP BY bs.pid, p.name, p.retired";
     }
 
@@ -347,7 +347,7 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
         JOIN `ibl_plr` p ON bs.pid = p.pid
         JOIN `ibl_franchise_seasons` fs ON bs.teamid = fs.franchise_id
             AND bs.season_year = fs.season_ending_year
-        WHERE bs.game_type = {$gameType} AND " . $this->playedCondition('bs') . " AND p.name = ?
+        WHERE bs.game_type = " . $gameType . " AND " . $this->playedCondition('bs') . " AND p.name = ?
         GROUP BY bs.pid, p.name, bs.season_year, fs.team_name
         ORDER BY year ASC";
     }

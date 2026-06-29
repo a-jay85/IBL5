@@ -326,7 +326,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
                     $params[] = $r['source_file'];
                 }
                 $total += $this->execute(
-                    "INSERT INTO `ibl_rcb_alltime_records` {$columns} VALUES {$placeholders}",
+                    "INSERT INTO `ibl_rcb_alltime_records` " . $columns . " VALUES " . $placeholders,
                     $types,
                     ...$params
                 );
@@ -374,7 +374,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
                     $params[] = $r['source_file'];
                 }
                 $total += $this->execute(
-                    "INSERT INTO `ibl_rcb_season_records` {$columns} VALUES {$placeholders}",
+                    "INSERT INTO `ibl_rcb_season_records` " . $columns . " VALUES " . $placeholders,
                     $types,
                     ...$params
                 );

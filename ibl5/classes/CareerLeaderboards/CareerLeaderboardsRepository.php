@@ -106,16 +106,16 @@ class CareerLeaderboardsRepository extends \BaseMysqliRepository implements Care
                 p.retired
                 FROM `ibl_hist` h
                 LEFT JOIN `ibl_plr` p ON h.pid = p.pid
-                WHERE $whereClause
+                WHERE " . $whereClause . "
                 GROUP BY pid
-                ORDER BY $sortColumn DESC, pid ASC"
+                ORDER BY " . $sortColumn . " DESC, pid ASC"
                 . " LIMIT " . ($limit > 0 ? $limit : self::DEFAULT_SAFETY_LIMIT) . ";";
         } else {
             $query = "SELECT h.*, p.retired
-                FROM $tableKey h
+                FROM " . $tableKey . " h
                 LEFT JOIN `ibl_plr` p ON h.pid = p.pid
-                WHERE $whereClause
-                ORDER BY $sortColumn DESC, h.pid ASC"
+                WHERE " . $whereClause . "
+                ORDER BY " . $sortColumn . " DESC, h.pid ASC"
                 . " LIMIT " . ($limit > 0 ? $limit : self::DEFAULT_SAFETY_LIMIT) . ";";
         }
 

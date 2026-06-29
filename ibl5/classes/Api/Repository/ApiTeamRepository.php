@@ -28,16 +28,17 @@ class ApiTeamRepository extends \BaseMysqliRepository
     {
         $orderBy = $paginator->getOrderByClause();
 
+        // IDENTIFIER (already-validated): $orderBy = allowlist-validated by Paginator
         /** @var list<TeamListRow> */
         return $this->fetchAll(
-            "SELECT t.teamid, t.uuid, t.team_city, t.team_name, t.owner_name, t.arena,
-                    s.conference, s.division,
-                    t.discord_id
-             FROM `ibl_team_info` t
-             LEFT JOIN `ibl_standings` s ON t.teamid = s.teamid
-             WHERE t.teamid BETWEEN 1 AND ?
-             ORDER BY {$orderBy}
-             LIMIT ? OFFSET ?",
+            'SELECT t.teamid, t.uuid, t.team_city, t.team_name, t.owner_name, t.arena,'
+            . ' s.conference, s.division,'
+            . ' t.discord_id'
+            . ' FROM `ibl_team_info` t'
+            . ' LEFT JOIN `ibl_standings` s ON t.teamid = s.teamid'
+            . ' WHERE t.teamid BETWEEN 1 AND ?'
+            . ' ORDER BY ' . $orderBy
+            . ' LIMIT ? OFFSET ?',
             'iii',
             League::MAX_REAL_TEAMID,
             $paginator->getLimit(),

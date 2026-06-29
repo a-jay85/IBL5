@@ -49,7 +49,10 @@ class TeamStatsCalculator
         if (method_exists($this->db, 'fetchAll')) {
             /** @var list<array{teamid: int, win: int, loss: int}> $rows */
             $rows = $this->db->fetchAll(
-                "SELECT teamid AS teamid, wins AS win, losses AS loss FROM {$this->standingsTable}",
+                // $standingsTable is a context-resolved table identifier from
+                // LeagueContext::getTableName() (closed TABLE_MAP, no user input) —
+                // concatenate the validated identifier, do not interpolate.
+                "SELECT teamid AS teamid, wins AS win, losses AS loss FROM " . $this->standingsTable,
                 ""
             );
 
@@ -191,7 +194,10 @@ class TeamStatsCalculator
         if (method_exists($this->db, 'fetchOne')) {
             /** @var array{win: int, loss: int}|null $result */
             $result = $this->db->fetchOne(
-                "SELECT wins AS win, losses AS loss FROM {$this->standingsTable} WHERE teamid = ?",
+                // $standingsTable is a context-resolved table identifier from
+                // LeagueContext::getTableName() (closed TABLE_MAP, no user input) —
+                // concatenate the validated identifier, do not interpolate.
+                "SELECT wins AS win, losses AS loss FROM " . $this->standingsTable . " WHERE teamid = ?",
                 "i",
                 $teamId
             );

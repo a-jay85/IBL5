@@ -44,7 +44,8 @@ class ApiPlayerRepository extends \BaseMysqliRepository
         $whereClause = $where !== [] ? 'WHERE ' . implode(' AND ', $where) : '';
         $orderBy = $paginator->getOrderByClause();
 
-        $query = "SELECT * FROM vw_player_current {$whereClause} ORDER BY {$orderBy} LIMIT ? OFFSET ?";
+        // IDENTIFIER (already-validated): $whereClause = hardcoded fragments; $orderBy = allowlist-validated by Paginator
+        $query = 'SELECT * FROM vw_player_current ' . $whereClause . ' ORDER BY ' . $orderBy . ' LIMIT ? OFFSET ?';
         $types .= 'ii';
         $params[] = $paginator->getLimit();
         $params[] = $paginator->getOffset();
@@ -85,7 +86,8 @@ class ApiPlayerRepository extends \BaseMysqliRepository
         $whereClause = $where !== [] ? 'WHERE ' . implode(' AND ', $where) : '';
 
         /** @var array{total: int}|null $row */
-        $row = $this->fetchOne("SELECT COUNT(*) AS total FROM vw_player_current {$whereClause}", $types, ...$params);
+        // IDENTIFIER (already-validated): $whereClause built from hardcoded fragments only
+        $row = $this->fetchOne('SELECT COUNT(*) AS total FROM vw_player_current ' . $whereClause, $types, ...$params);
 
         return $row !== null ? $row['total'] : 0;
     }

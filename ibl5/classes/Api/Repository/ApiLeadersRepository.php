@@ -49,13 +49,14 @@ class ApiLeadersRepository extends \BaseMysqliRepository
         $category = $this->resolveCategory($filters);
         $sortExpr = self::CATEGORY_SORT_MAP[$category];
 
-        $query = "SELECT h.*, p.uuid AS player_uuid, t.uuid AS team_uuid, t.team_city, t.team_name
-                  FROM `ibl_hist` h
-                  JOIN `ibl_plr` p ON h.pid = p.pid
-                  LEFT JOIN `ibl_team_info` t ON h.teamid = t.teamid
-                  WHERE {$whereClause}
-                  ORDER BY {$sortExpr} DESC
-                  LIMIT ? OFFSET ?";
+        // IDENTIFIER (already-validated): $whereClause = hardcoded fragments; $sortExpr = CATEGORY_SORT_MAP value, category validated against VALID_CATEGORIES
+        $query = 'SELECT h.*, p.uuid AS player_uuid, t.uuid AS team_uuid, t.team_city, t.team_name'
+               . ' FROM `ibl_hist` h'
+               . ' JOIN `ibl_plr` p ON h.pid = p.pid'
+               . ' LEFT JOIN `ibl_team_info` t ON h.teamid = t.teamid'
+               . ' WHERE ' . $whereClause
+               . ' ORDER BY ' . $sortExpr . ' DESC'
+               . ' LIMIT ? OFFSET ?';
         $types .= 'ii';
         $params[] = $paginator->getLimit();
         $params[] = $paginator->getOffset();
@@ -81,7 +82,8 @@ class ApiLeadersRepository extends \BaseMysqliRepository
 
         /** @var array{total: int}|null $row */
         $row = $this->fetchOne(
-            "SELECT COUNT(*) AS total FROM `ibl_hist` h WHERE {$whereClause}",
+            // IDENTIFIER (already-validated): $whereClause built from hardcoded fragments only
+            'SELECT COUNT(*) AS total FROM `ibl_hist` h WHERE ' . $whereClause,
             $types,
             ...$params
         );

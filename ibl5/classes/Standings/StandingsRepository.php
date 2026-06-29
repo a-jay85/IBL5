@@ -32,11 +32,53 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
 
     private readonly PythagoreanCalculator $pythagoreanCalculator;
 
+    /**
+     * Closed allowlists for the column identifiers that callers may pass into the
+     * setters/filters below. A column name is a SQL **identifier**, never a
+     * bindable value, so it cannot be a `?` parameter — it is validated against a
+     * fixed set (mirrors {@see \CareerLeaderboards\CareerLeaderboardsRepository}'s
+     * VALID_TABLES allowlist) and rejected with InvalidArgumentException, then
+     * concatenated backticked into the query. This closes the injection shape
+     * BanSqlStringInterpolationRule flags. The accepted values match exactly what
+     * {@see \Updater\StandingsUpdater} / {@see \Updater\StandingsGrouper} emit.
+     *
+     * @var list<string>
+     */
+    private const VALID_GROUPING_COLUMNS = ['conference', 'division'];
+
+    /** @var list<string> */
+    private const VALID_MAGIC_NUMBER_COLUMNS = ['conf_magic_number', 'div_magic_number'];
+
+    /** @var list<string> */
+    private const VALID_CLINCHED_COLUMNS = [
+        'clinched_conference',
+        'clinched_division',
+        'clinched_playoffs',
+        'clinched_league',
+    ];
+
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
         $this->teamAwardsTable = 'ibl_team_awards';
         $this->pythagoreanCalculator = new PythagoreanCalculator();
+    }
+
+    /**
+     * Validate a caller-supplied column identifier against a closed allowlist and
+     * return it backtick-quoted for safe concatenation into query text. Throws on
+     * any value outside the allowlist — identifiers are never bound, so this is the
+     * only safe way to splice them.
+     *
+     * @param list<string> $allowed
+     */
+    private static function backtickAllowedColumn(string $column, array $allowed, string $kind): string
+    {
+        if (!in_array($column, $allowed, true)) {
+            throw new \InvalidArgumentException("Invalid {$kind} column: {$column}");
+        }
+
+        return '`' . $column . '`';
     }
 
     /**
@@ -47,19 +89,23 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
      */
     private function getGroupingColumns(string $region): array
     {
+        // Identifier, validated upstream by this method's region check: the
+        // returned column names are fixed, backtick-quoted literals from a closed
+        // set, concatenated (never interpolated) into getStandingsByRegion()'s
+        // query — an invalid region throws below, so no unvalidated token reaches SQL.
         if (in_array($region, League::CONFERENCE_NAMES, true)) {
             return [
-                'grouping' => 'conference',
-                'gbColumn' => 'conf_gb',
-                'magicNumberColumn' => 'conf_magic_number',
+                'grouping' => '`conference`',
+                'gbColumn' => '`conf_gb`',
+                'magicNumberColumn' => '`conf_magic_number`',
             ];
         }
 
         if (in_array($region, League::DIVISION_NAMES, true)) {
             return [
-                'grouping' => 'division',
-                'gbColumn' => 'div_gb',
-                'magicNumberColumn' => 'div_magic_number',
+                'grouping' => '`division`',
+                'gbColumn' => '`div_gb`',
+                'magicNumberColumn' => '`div_magic_number`',
             ];
         }
 
@@ -74,19 +120,25 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
     public function getStandingsByRegion(string $region): array
     {
         $columns = $this->getGroupingColumns($region);
+        // $columns holds backtick-quoted identifier literals from a closed set
+        // (validated by getGroupingColumns' region check); concatenate them so the
+        // query is no longer an interpolated string. Never bind — these are identifiers.
+        $gbColumn = $columns['gbColumn'];
+        $magicNumberColumn = $columns['magicNumberColumn'];
+        $groupingColumn = $columns['grouping'];
 
         $query = "SELECT
             s.teamid,
             s.team_name,
             s.league_record,
             s.pct,
-            s.{$columns['gbColumn']} AS gamesBack,
+            s." . $gbColumn . " AS gamesBack,
             s.conf_record,
             s.div_record,
             s.home_record,
             s.away_record,
             s.games_unplayed,
-            s.{$columns['magicNumberColumn']} AS magicNumber,
+            s." . $magicNumberColumn . " AS magicNumber,
             s.clinched_conference,
             s.clinched_division,
             s.clinched_playoffs,
@@ -98,8 +150,8 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
             t.color2
             FROM `ibl_standings` s
             JOIN `ibl_team_info` t ON s.teamid = t.teamid
-            WHERE s.{$columns['grouping']} = ?
-            ORDER BY s.{$columns['gbColumn']} ASC,
+            WHERE s." . $groupingColumn . " = ?
+            ORDER BY s." . $gbColumn . " ASC,
                 (COALESCE(s.clinched_league, 0) * 4
                  + COALESCE(s.clinched_conference, 0) * 3
                  + COALESCE(s.clinched_division, 0) * 2
@@ -329,8 +381,13 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
      */
     public function updateMagicNumber(int $teamid, int $magicNumber, string $magicNumberColumn): void
     {
+        $column = self::backtickAllowedColumn(
+            $magicNumberColumn,
+            self::VALID_MAGIC_NUMBER_COLUMNS,
+            'magic number'
+        );
         $this->execute(
-            "UPDATE `ibl_standings` SET {$magicNumberColumn} = ? WHERE teamid = ?",
+            "UPDATE `ibl_standings` SET " . $column . " = ? WHERE teamid = ?",
             "ii",
             $magicNumber,
             $teamid
@@ -342,8 +399,13 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
      */
     public function updateClinchedFlag(string $teamName, string $clinchedColumn): void
     {
+        $column = self::backtickAllowedColumn(
+            $clinchedColumn,
+            self::VALID_CLINCHED_COLUMNS,
+            'clinched'
+        );
         $this->execute(
-            "UPDATE `ibl_standings` SET {$clinchedColumn} = 1 WHERE team_name = ?",
+            "UPDATE `ibl_standings` SET " . $column . " = 1 WHERE team_name = ?",
             "s",
             $teamName
         );
@@ -354,8 +416,10 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
      */
     public function upsertTeamAward(int $seasonYear, string $teamName, string $awardName): void
     {
+        // $teamAwardsTable is the fixed property 'ibl_team_awards' (constructor-set,
+        // never user input); concatenate it backticked instead of interpolating.
         $this->execute(
-            "INSERT INTO `{$this->teamAwardsTable}` (year, name, award)
+            "INSERT INTO `" . $this->teamAwardsTable . "` (year, name, award)
              VALUES (?, ?, ?)
              ON DUPLICATE KEY UPDATE name = VALUES(name)",
             "iss",
@@ -372,11 +436,12 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
      */
     public function fetchTeamsByRegion(string $grouping, string $region): array
     {
+        $groupingColumn = self::backtickAllowedColumn($grouping, self::VALID_GROUPING_COLUMNS, 'grouping');
         /** @var list<array{teamid: int, team_name: string, home_wins: int, home_losses: int, away_wins: int, away_losses: int}> */
         return $this->fetchAll(
             "SELECT teamid, team_name, home_wins, home_losses, away_wins, away_losses
             FROM `ibl_standings`
-            WHERE {$grouping} = ?
+            WHERE " . $groupingColumn . " = ?
             ORDER BY pct DESC",
             "s",
             $region
@@ -391,11 +456,12 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
     public function fetchTopTeamsByWins(?string $grouping, ?string $region): array
     {
         if ($grouping !== null && $region !== null) {
+            $groupingColumn = self::backtickAllowedColumn($grouping, self::VALID_GROUPING_COLUMNS, 'grouping');
             /** @var list<array{teamid: int, team_name: string, wins: int}> */
             return $this->fetchAll(
                 "SELECT teamid, team_name, home_wins + away_wins AS wins
                 FROM `ibl_standings`
-                WHERE {$grouping} = ?
+                WHERE " . $groupingColumn . " = ?
                 ORDER BY wins DESC
                 LIMIT 2",
                 "s",
@@ -421,11 +487,12 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
     public function fetchLeastLosingTeam(string $excludeTeamName, ?string $grouping, ?string $region): ?array
     {
         if ($grouping !== null && $region !== null) {
+            $groupingColumn = self::backtickAllowedColumn($grouping, self::VALID_GROUPING_COLUMNS, 'grouping');
             /** @var array{losses: int}|null */
             return $this->fetchOne(
                 "SELECT home_losses + away_losses AS losses
                 FROM `ibl_standings`
-                WHERE {$grouping} = ?
+                WHERE " . $groupingColumn . " = ?
                     AND team_name <> ?
                 ORDER BY losses ASC
                 LIMIT 1",
@@ -453,8 +520,9 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
     public function isRegionSeasonOver(?string $grouping, ?string $region): bool
     {
         if ($grouping !== null && $grouping !== '' && $region !== null && $region !== '') {
+            $groupingColumn = self::backtickAllowedColumn($grouping, self::VALID_GROUPING_COLUMNS, 'grouping');
             $result = $this->fetchOne(
-                "SELECT MAX(games_unplayed) AS maxLeft FROM `ibl_standings` WHERE {$grouping} = ?",
+                "SELECT MAX(games_unplayed) AS maxLeft FROM `ibl_standings` WHERE " . $groupingColumn . " = ?",
                 "s",
                 $region
             );
@@ -630,7 +698,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
         FROM `ibl_box_scores_teams` bst
         JOIN `ibl_franchise_seasons` fs
             ON fs.team_name = bst.name AND fs.season_ending_year = bst.season_year
-        WHERE bst.game_type = 1 AND {$filterClause}
+        WHERE bst.game_type = 1 AND " . $filterClause . "
         GROUP BY fs.franchise_id, fs.team_name, bst.season_year";
     }
 
@@ -652,7 +720,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
             AND my.name <> opp.name
         JOIN `ibl_franchise_seasons` fs
             ON fs.team_name = my.name AND fs.season_ending_year = my.season_year
-        WHERE my.game_type = 1 AND {$filterClause}
+        WHERE my.game_type = 1 AND " . $filterClause . "
         GROUP BY fs.franchise_id, fs.team_name, my.season_year";
     }
 }

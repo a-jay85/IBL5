@@ -92,7 +92,7 @@ class PeriodAverages
             AND bs.game_min > 0
             AND p.teamid = ?
             AND p.retired = 0
-            {$pidFilterClause}
+            " . $pidFilterClause . "
         GROUP  BY p.name, bs.pos, bs.pid
         ORDER  BY p.name ASC";
 

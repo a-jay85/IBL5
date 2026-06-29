@@ -75,27 +75,27 @@ class PlayerDatabaseRepository extends BaseMysqliRepository implements PlayerDat
      */
     public function searchPlayers(array $params): array
     {
-        $baseConditions = ['ibl_plr.pid > 0'];
+        $baseConditions = ['`ibl_plr`.`pid` > 0'];
         if ($params['active'] === 0) {
-            $baseConditions[] = 'ibl_plr.retired = 0';
+            $baseConditions[] = '`ibl_plr`.`retired` = 0';
         }
         $qc = new QueryConditions($baseConditions);
 
         // String filters (LIKE)
         $nameSearch = is_string($params['search_name']) ? '%' . $params['search_name'] . '%' : null;
-        $qc->addIfNotNull('ibl_plr.name LIKE ?', 's', $nameSearch);
+        $qc->addIfNotNull('`ibl_plr`.`name` LIKE ?', 's', $nameSearch);
 
         $collegeSearch = is_string($params['college']) ? '%' . $params['college'] . '%' : null;
-        $qc->addIfNotNull('ibl_plr.college LIKE ?', 's', $collegeSearch);
+        $qc->addIfNotNull('`ibl_plr`.`college` LIKE ?', 's', $collegeSearch);
 
-        $qc->addIfNotNull('ibl_plr.pos = ?', 's', is_string($params['pos']) ? $params['pos'] : null);
+        $qc->addIfNotNull('`ibl_plr`.`pos` = ?', 's', is_string($params['pos']) ? $params['pos'] : null);
 
         // Integer filters (range)
-        $qc->addIfNotNull('ibl_plr.age <= ?', 'i', is_int($params['age']) ? $params['age'] : null);
-        $qc->addIfNotNull('ibl_plr.exp >= ?', 'i', is_int($params['exp']) ? $params['exp'] : null);
-        $qc->addIfNotNull('ibl_plr.exp <= ?', 'i', is_int($params['exp_max']) ? $params['exp_max'] : null);
-        $qc->addIfNotNull('ibl_plr.bird >= ?', 'i', is_int($params['bird']) ? $params['bird'] : null);
-        $qc->addIfNotNull('ibl_plr.bird <= ?', 'i', is_int($params['bird_max']) ? $params['bird_max'] : null);
+        $qc->addIfNotNull('`ibl_plr`.`age` <= ?', 'i', is_int($params['age']) ? $params['age'] : null);
+        $qc->addIfNotNull('`ibl_plr`.`exp` >= ?', 'i', is_int($params['exp']) ? $params['exp'] : null);
+        $qc->addIfNotNull('`ibl_plr`.`exp` <= ?', 'i', is_int($params['exp_max']) ? $params['exp_max'] : null);
+        $qc->addIfNotNull('`ibl_plr`.`bird` >= ?', 'i', is_int($params['bird']) ? $params['bird'] : null);
+        $qc->addIfNotNull('`ibl_plr`.`bird` <= ?', 'i', is_int($params['bird_max']) ? $params['bird_max'] : null);
 
         // Rating filters (>= threshold)
         $greaterThanFilters = [
@@ -108,17 +108,23 @@ class PlayerDatabaseRepository extends BaseMysqliRepository implements PlayerDat
         foreach ($greaterThanFilters as $filter) {
             $filterValue = $params[$filter] ?? null;
             if (is_int($filterValue)) {
+                // $column is a value from the closed COLUMN_MAP allowlist keyed by the
+                // hardcoded $greaterThanFilters list (no user input) — concatenate the
+                // validated, backticked identifier rather than interpolating it.
                 $column = self::COLUMN_MAP[$filter];
-                $qc->add("ibl_plr.$column >= ?", 'i', $filterValue);
+                $qc->add("`ibl_plr`.`" . $column . "` >= ?", 'i', $filterValue);
             }
         }
 
+        // $whereClause is a QueryConditions-built clause whose values are bound (?)
+        // params; concatenate it rather than interpolating, and backtick every
+        // ibl_<table>.<column> reference now exposed in this non-interpolated literal.
         $whereClause = $qc->toWhereClause();
-        $query = "SELECT ibl_plr.*, ibl_team_info.team_name AS teamname, ibl_team_info.color1, ibl_team_info.color2
+        $query = "SELECT `ibl_plr`.*, `ibl_team_info`.`team_name` AS teamname, `ibl_team_info`.`color1`, `ibl_team_info`.`color2`
             FROM `ibl_plr`
-            LEFT JOIN `ibl_team_info` ON ibl_plr.teamid = ibl_team_info.teamid
-            WHERE $whereClause
-            ORDER BY ibl_plr.retired ASC, ibl_plr.ordinal ASC";
+            LEFT JOIN `ibl_team_info` ON `ibl_plr`.`teamid` = `ibl_team_info`.`teamid`
+            WHERE " . $whereClause . "
+            ORDER BY `ibl_plr`.`retired` ASC, `ibl_plr`.`ordinal` ASC";
 
         $stmt = $this->executeQuery($query, $qc->getTypes(), ...$qc->getParams());
         $result = $stmt->get_result();

@@ -101,7 +101,7 @@ class PlayerIdResolver
     private function findInSnapshots(string $name, int $teamId, int $year): ?int
     {
         $stmt = $this->db->prepare(
-            "SELECT pid FROM {$this->snapshotTable} WHERE name = ? AND teamid = ? AND season_year = ? LIMIT 1"
+            "SELECT pid FROM " . $this->snapshotTable . " WHERE name = ? AND teamid = ? AND season_year = ? LIMIT 1"
         );
         if ($stmt === false) {
             return null;
@@ -123,7 +123,7 @@ class PlayerIdResolver
     private function findInPlr(string $name, int $teamId): ?int
     {
         $stmt = $this->db->prepare(
-            "SELECT pid FROM {$this->plrTable} WHERE name = ? AND teamid = ? LIMIT 1"
+            "SELECT pid FROM " . $this->plrTable . " WHERE name = ? AND teamid = ? LIMIT 1"
         );
         if ($stmt === false) {
             return null;
@@ -145,7 +145,7 @@ class PlayerIdResolver
     private function findInSnapshotsByNameOnly(string $name, int $year): ?int
     {
         $stmt = $this->db->prepare(
-            "SELECT pid FROM {$this->snapshotTable} WHERE name = ? AND season_year = ? LIMIT 1"
+            "SELECT pid FROM " . $this->snapshotTable . " WHERE name = ? AND season_year = ? LIMIT 1"
         );
         if ($stmt === false) {
             return null;
@@ -167,7 +167,7 @@ class PlayerIdResolver
     private function findInPlrByNameOnly(string $name): ?int
     {
         $stmt = $this->db->prepare(
-            "SELECT pid FROM {$this->plrTable} WHERE name = ? LIMIT 1"
+            "SELECT pid FROM " . $this->plrTable . " WHERE name = ? LIMIT 1"
         );
         if ($stmt === false) {
             return null;

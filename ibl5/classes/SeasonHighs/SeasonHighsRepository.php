@@ -62,14 +62,14 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
                 t.`team_city`, t.`color1`, t.`color2`,
                 bs.`game_date` AS `date`, sch.`box_id`,
                 COALESCE(bs.`game_of_that_day`, 0) AS game_of_that_day,
-                {$statExpression} AS `{$safeStatName}`
+                " . $statExpression . " AS `" . $safeStatName . "`
                 FROM `ibl_box_scores` bs
                 JOIN `ibl_plr` p ON bs.pid = p.pid
                 LEFT JOIN `ibl_team_info` t ON p.teamid = t.teamid
                 LEFT JOIN `ibl_schedule` sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
-                WHERE bs.`game_date` BETWEEN ? AND ?{$locationCondition}
-                ORDER BY `{$safeStatName}` DESC, bs.`game_date` ASC
-                LIMIT {$limit}";
+                WHERE bs.`game_date` BETWEEN ? AND ?" . $locationCondition . "
+                ORDER BY `" . $safeStatName . "` DESC, bs.`game_date` ASC
+                LIMIT " . $limit;
         } else {
             // For team stats, JOIN with ibl_team_info to get team ID and colors for linking
             // Also JOIN with ibl_schedule to get box_id for linking to box scores
@@ -77,13 +77,13 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
             $query = "SELECT t.`teamid`, t.`team_city`, t.`color1`, t.`color2`,
                 bs.`name`, bs.`game_date` AS `date`, sch.`box_id`,
                 COALESCE(bs.`game_of_that_day`, 0) AS game_of_that_day,
-                {$statExpression} AS `{$safeStatName}`
+                " . $statExpression . " AS `" . $safeStatName . "`
                 FROM `ibl_box_scores_teams` bs
                 JOIN `ibl_team_info` t ON bs.name = t.team_name
                 LEFT JOIN `ibl_schedule` sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
                 WHERE bs.`game_date` BETWEEN ? AND ?
-                ORDER BY `{$safeStatName}` DESC, bs.`game_date` ASC
-                LIMIT {$limit}";
+                ORDER BY `" . $safeStatName . "` DESC, bs.`game_date` ASC
+                LIMIT " . $limit;
         }
 
         $results = $this->fetchAll($query, "ss", $startDate, $endDate);
@@ -142,25 +142,25 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
                     t.`team_city`, t.`color1`, t.`color2`,
                     bs.`game_date` AS `date`, sch.`box_id`,
                     COALESCE(bs.`game_of_that_day`, 0) AS game_of_that_day,
-                    ({$statExpression}) AS stat_value
+                    (" . $statExpression . ") AS stat_value
                     FROM `ibl_box_scores` bs
                     JOIN `ibl_plr` p ON bs.pid = p.pid
                     LEFT JOIN `ibl_team_info` t ON p.teamid = t.teamid
                     LEFT JOIN `ibl_schedule` sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
-                    WHERE bs.`game_date` BETWEEN ? AND ?{$locationCondition}
+                    WHERE bs.`game_date` BETWEEN ? AND ?" . $locationCondition . "
                     ORDER BY stat_value DESC, bs.`game_date` ASC
-                    LIMIT {$safeLimit})";
+                    LIMIT " . $safeLimit . ")";
             } else {
                 $branches[] = "(SELECT ? AS stat_category, t.`teamid`, t.`team_city`, t.`color1`, t.`color2`,
                     bs.`name`, bs.`game_date` AS `date`, sch.`box_id`,
                     COALESCE(bs.`game_of_that_day`, 0) AS game_of_that_day,
-                    ({$statExpression}) AS stat_value
+                    (" . $statExpression . ") AS stat_value
                     FROM `ibl_box_scores_teams` bs
                     JOIN `ibl_team_info` t ON bs.name = t.team_name
                     LEFT JOIN `ibl_schedule` sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
                     WHERE bs.`game_date` BETWEEN ? AND ?
                     ORDER BY stat_value DESC, bs.`game_date` ASC
-                    LIMIT {$safeLimit})";
+                    LIMIT " . $safeLimit . ")";
             }
             $params[] = $statName;
             $params[] = $startDate;

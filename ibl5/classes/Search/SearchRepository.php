@@ -42,7 +42,11 @@ class SearchRepository extends BaseMysqliRepository implements SearchRepositoryI
     public function __construct(\mysqli $db, string $prefix = 'nuke')
     {
         parent::__construct($db);
-        $this->prefix = $prefix;
+        // The prefix is an operator-controlled config identifier spliced into table
+        // names (never a bindable value). Validate it against a conservative
+        // identifier pattern and fall back to the default 'nuke' so an unexpected
+        // value can never reach query text; real prefixes match unchanged.
+        $this->prefix = preg_match('/^[a-z0-9_]+$/i', $prefix) === 1 ? $prefix : 'nuke';
     }
 
     /**
@@ -66,8 +70,8 @@ class SearchRepository extends BaseMysqliRepository implements SearchRepositoryI
         $sql = "SELECT s.sid, s.aid, s.informant, s.title, s.time,
                        s.hometext, s.bodytext, s.comments, s.topic,
                        t.topictext
-                FROM {$this->prefix}_stories s
-                LEFT JOIN {$this->prefix}_topics t ON s.topic = t.topicid
+                FROM " . $this->prefix . "_stories s
+                LEFT JOIN " . $this->prefix . "_topics t ON s.topic = t.topicid
                 WHERE (s.title LIKE ? OR s.hometext LIKE ? OR s.bodytext LIKE ? OR s.notes LIKE ?)";
 
         $types = 'ssss';
@@ -183,7 +187,7 @@ class SearchRepository extends BaseMysqliRepository implements SearchRepositoryI
     {
         /** @var list<TopicDbRow> $rows */
         $rows = $this->fetchAll(
-            "SELECT topicid, topictext FROM {$this->prefix}_topics ORDER BY topictext"
+            "SELECT topicid, topictext FROM " . $this->prefix . "_topics ORDER BY topictext"
         );
 
         $topics = [];
@@ -205,7 +209,7 @@ class SearchRepository extends BaseMysqliRepository implements SearchRepositoryI
     {
         /** @var list<CategoryDbRow> $rows */
         $rows = $this->fetchAll(
-            "SELECT catid, title FROM {$this->prefix}_stories_cat ORDER BY title"
+            "SELECT catid, title FROM " . $this->prefix . "_stories_cat ORDER BY title"
         );
 
         $categories = [];
@@ -235,7 +239,7 @@ class SearchRepository extends BaseMysqliRepository implements SearchRepositoryI
     {
         /** @var TopicInfoDbRow|null $row */
         $row = $this->fetchOne(
-            "SELECT topicimage, topictext FROM {$this->prefix}_topics WHERE topicid = ?",
+            "SELECT topicimage, topictext FROM " . $this->prefix . "_topics WHERE topicid = ?",
             'i',
             $topicId
         );

@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-06-28
+last_verified: 2026-06-29
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -23,7 +23,7 @@ Effort scale:
 - **M** — multi-step plan, 1-3 days, may touch several modules
 - **L** — refactor or platform shift, > 3 days, likely needs ADR
 
-**Status:** Complete — 15-axis audit, 312 findings.
+**Status:** Complete — 15-axis audit, 312 findings (+2 post-audit follow-ups from the PR #1107 review → 314 tracked).
 
 ---
 
@@ -46,30 +46,30 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 > A file still >500 LOC after a ✅ does **not** reopen the finding when the finding's named concern was narrower than "shrink below 500 LOC"; residual size is noted, not re-flagged.
 
-### Roll-up (312 findings)
+### Roll-up (314 findings)
 
 | Status | Count |
 |--------|------:|
 | ✅ Implemented | 205 |
 | ◑ Partial | 27 |
 | 📋 Planned (plan queued / PR open) | 11 |
-| ⬜ Open | 61 |
+| ⬜ Open | 63 |
 | 🚫 Declined | 8 |
 
-> Status counts re-verified 2026-06-28 (exact, from the per-axis tables). Four rows carry an **open PR that owns its own status-flip step**, so they still show their pre-merge glyph here and flip on that PR's merge — do **not** pre-flip them (the #1233 collision lesson): **2.6** (#1240), **2.31 / 2.32** (#1230), **5.18** (#1204). Two stale-Open rows were flipped directly (no plan owned them): **13.3**, **13.9** (✅ +2, ⬜ −2 vs the master re-count).
+> Status counts re-verified 2026-06-28 (exact, from the per-axis tables); **6.20 / 6.21 added 2026-06-29** from the PR #1107 review (⬜ Open +2). Four rows carry an **open PR that owns its own status-flip step**, so they still show their pre-merge glyph here and flip on that PR's merge — do **not** pre-flip them (the #1233 collision lesson): **2.6** (#1240), **2.31 / 2.32** (#1230), **5.18** (#1204). Two stale-Open rows were flipped directly (no plan owned them): **13.3**, **13.9** (✅ +2, ⬜ −2 vs the master re-count).
 
 **Automouse-readiness of the not-yet-complete (⬜/◑/📋) items:**
 
 | Bucket | Count | What it means |
 |--------|------:|---------------|
-| 🟩 Auto-mergeable | ~102 | green-green + pinnable; arms unattended |
+| 🟩 Auto-mergeable | ~103 | green-green + pinnable; arms unattended |
 | 🟦 Safe, human-merge | 10 | gate-14 trigger (security / UI-UX / destructive schema) → `auto_merge: false` |
-| 🟨 Conditional | 32 | needs one mechanical-scope add, one upfront decision, or a collision-PR to merge first |
+| 🟨 Conditional | 33 | needs one mechanical-scope add, one upfront decision, or a collision-PR to merge first |
 | 🟥 Not automouse-safe | 1 | 12.11 — `git filter-repo` history rewrite (irreversible, coordinated) |
 
 (A few ✅ rows also carry a 🟩 for an *optional* residual burndown — e.g. PHPStan-rule baselines — so automouse tags slightly exceed the not-done count. Counts verified by grep of the per-axis tables; treat as ±2.)
 
-**Highest-leverage 🟩 auto-mergeable clusters** (no human needed): the open god-class extractions (1.3/1.9/1.11/1.13/1.17/1.18/1.20, 7.14/7.15, 13.10), the entire Axis-6 coverage backlog, the Axis-9 docs items, and the PHPStan-baseline burndowns (10.4/10.12/10.13/10.19/10.21).
+**Highest-leverage 🟩 auto-mergeable clusters** (no human needed): the open god-class extractions (1.3/1.9/1.11/1.13/1.17/1.18/1.20, 7.14/7.15, 13.10), the entire Axis-6 coverage backlog (bar 6.21, now 🟨), the Axis-9 docs items, and the PHPStan-baseline burndowns (10.4/10.12/10.13/10.19/10.21).
 
 **Sequencing watch-list** (🟨 blocked by open IDOR PRs #1107–1110): 2.10, 2.13, 2.14, 2.25, 7.7, 14.6 — do these *after* the security PRs land.
 
@@ -1155,9 +1155,9 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 
 ## Axis 6: Test Coverage Gaps
 
-**Summary:** 6 zero-test modules; 6 thin-test modules (>5 files, <3 tests); 4 large modules below 0.5 ratio.
+**Summary:** 6 zero-test modules; 6 thin-test modules (>5 files, <3 tests); 4 large modules below 0.5 ratio; +2 post-audit E2E-coverage follow-ups (6.20, 6.21) from the PR #1107 review.
 
-**Automouse audit (verified 2026-06-20):** Adding tests is inherently green-green (no production change) → every open coverage gap is 🟩 auto-mergeable. If writing a test surfaces a real bug, the *fix* becomes its own finding with its own classification.
+**Automouse audit (verified 2026-06-20):** Adding tests is inherently green-green (no production change) → every open coverage gap is 🟩 auto-mergeable. If writing a test surfaces a real bug, the *fix* becomes its own finding with its own classification. (Exception: **6.21** is 🟨, not 🟩 — its handler `exit()`s, so the test isn't writable until a teamless-fixture / non-`exit()` refactor infra decision is made.)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
@@ -1180,6 +1180,8 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 | 6.17 | ◑ Partial | 🟩 | TradeAssetRepositoryTest + TradeOfferRepositoryTest added (draft-pick mapping, offer lifecycle); TradeExecutionRepository untested + TradeFormRepository partial. |
 | 6.18 | ◑ Partial | 🟩 | Unit tests added: DraftPickLocator repo, LeagueSchedule Game, TransactionHistory repo, CapSpace repo. NextSim/SavedDepthChart/DepthChartEntry verified covered. Residual: SQL aggregation/ordering + SDC write-path are DB-integration-only. |
 | 6.19 | ◑ Partial | 🟩 | AllStarAppearances + GMContactList repo unit tests added. Season entity predicates blocked by `Season\Season`→mock alias (QueryRepo plumbing covered). `Shared` N/A (deleted 2.23). |
+| 6.20 | ⬜ Open | 🟩 | Anon rookie-option lockdown E2E (`draft-rookie-anon-lockdown.spec.ts`) asserts `toContain('YourAccount')` — emitted by nav chrome on every anon page, so a regressed `is_user()` gate still passes. Strengthen to `maxRedirects:0` + redirect/`Location` assert. Test-only, green-green. From PR #1107 review. |
+| 6.21 | ⬜ Open | 🟨 | Row-12 (Free-Agents/teamless session) `processrookieoption` ownership-rejection path untested: PHPUnit entry-point test impossible (handler `exit()`s), E2E auth fixture always has a session team. Needs a teamless-fixture / non-`exit()` refactor decision before it's writable → 🟨. From PR #1107 Phase 5.0 note. |
 
 ### 6.1 BulkImport — Zero Tests, 9 Files
 **Location:** `ibl5/classes/BulkImport`
@@ -1331,6 +1333,22 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Est. effort:** S each
 **Risk if untouched:** AS appearances double-counted; duplicate GMs; season state inconsistencies; shared data leaks.
 **Status:** ◑ Partial (2026-06-26) — added AllStarAppearancesRepositoryTest and GMContactListRepositoryTest (return-shape + empty negative). Season: phase plumbing covered by SeasonQueryRepositoryTest (getSeasonPhase, calculatePhaseSimNumber); the Season-entity phase predicates (isFreeAgencyPhase, areTradesAllowed, areWaiversAllowed, advancesContractYears) are structurally untestable because classes/Bootstrap/TestAliasesBootstrap.php:22 aliases Season\Season → the mock — left as-is (removing the alias is a cross-suite infra change, out of scope). Shared: N/A (deleted, backlog 2.23). Residual (DatabaseIntegration-only): AS-appearance aggregation / GM dedup correctness.
+
+### 6.20 Anonymous rookie-option lockdown E2E assertion is non-discriminating
+**Location:** `tests/e2e/security/draft-rookie-anon-lockdown.spec.ts` (under `ibl5/`; added by PR #1107, not yet on `master`)
+**Problem:** The unauthenticated `processrookieoption` lockdown test asserts the response `toContain('YourAccount')` — a string emitted by `loginbox()` / global nav chrome on *every* anonymous page. It therefore does not discriminate a working auth gate from a broken one: if the `is_user()` gate regressed, the success marker (`result=rookie_option_success`) appears only in the redirect *URL*, not the response body, so the test would still pass. (The sibling Draft lockdown test is independently saved by its `not.toMatch(/select\s*\*\*.*!\*\*/)` negative matcher; the rookie test has no such backstop.)
+**Suggested direction:** Re-issue the anonymous POST with `maxRedirects: 0` and assert the redirect status + `Location` (login / `error=`), or assert absence of the rookie-option success side-effect — a marker present only when the gate is bypassed.
+**Est. effort:** S
+**Risk if untouched:** A future regression that drops the `is_user()` gate on `processrookieoption` ships green; the lockdown test gives false confidence.
+**Status:** ⬜ Open — surfaced in the PR #1107 review (low-confidence 75/100 reviewer note). Test-only, green-green (🟩).
+
+### 6.21 Rookie-option Free-Agents/teamless ownership gate is untested
+**Location:** `ibl5/modules/Player/index.php` (`processrookieoption()` ownership gate); planned `tests/Module/EntryPoints/PlayerRookieOptionEntryPointTest.php`
+**Problem:** The ownership gate rejects a session whose team is `null` or `League::FREE_AGENTS_TEAM_NAME`, but that branch (PR #1107 plan matrix row 12) has no automated coverage. A PHPUnit entry-point test is structurally impossible — every `processrookieoption()` path ends in `HtmxHelper::redirect() → exit()`, terminating the child process before post-`runModule()` assertions run (contrast Draft, whose error paths `echo`+`return`, so `DraftEntryPointTest::testFreeAgentsSessionIsRefusedNoWrite` *does* cover the equivalent gate). The E2E auth fixture always carries a real session team, so it can't reach the teamless branch either.
+**Suggested direction:** One upfront infra decision — add a teamless / Free-Agents E2E auth fixture, OR refactor the handler so its terminal output is `return`-based (testable in-process). The same change also unblocks the cut rows-10/11 entry-point tests (currently E2E-covered).
+**Est. effort:** S (E2E fixture) / M (handler refactor)
+**Risk if untouched:** The teamless-session rejection on the rookie-option mutation can regress undetected; today it is gated only by shared `getTeamnameFromUsername()` behavior, not by a dedicated test.
+**Status:** ⬜ Open — accepted coverage gap from PR #1107 (Phase 5.0 plan-conformance note). 🟨 conditional: not writable until the exit()/fixture infra decision above is made.
 
 ---
 

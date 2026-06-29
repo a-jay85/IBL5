@@ -72,16 +72,46 @@ function main($user)
 
 function submitDraftSelection(): void
 {
-    global $mysqli_db;
+    global $mysqli_db, $user, $cookie;
 
-    $teamname = $_POST['teamname'] ?? '';
+    // (1) Auth gate — op=select bypasses main()'s is_user() check.
+    if (!is_user($user)) {
+        loginbox();
+        return;
+    }
+
+    // (2) CSRF — validate before any DB mutation. Inline error mirrors
+    // DepthChartEntry::submit(); op=select already echoes inline HTML.
+    if (!\Security\CsrfGuard::validateSubmittedToken('draft_selection')) {
+        PageLayout\PageLayout::header();
+        echo '<strong class="ibl-form-error">Invalid or expired form submission. Please reload and try again.</strong>';
+        PageLayout\PageLayout::footer();
+        return;
+    }
+
+    cookiedecode($user);
+    $username = is_string($cookie[1] ?? null) ? $cookie[1] : '';
+
+    $teamname = is_string($_POST['teamname'] ?? null) ? $_POST['teamname'] : '';
     $playerToBeDrafted = $_POST['player'] ?? null;
     $draft_round = (int) ($_POST['draft_round'] ?? 0);
     $draft_pick = (int) ($_POST['draft_pick'] ?? 0);
 
     $commonRepository = new \Repositories\TeamIdentityRepository($mysqli_db);
-    $season = new \Season\Season($mysqli_db);
 
+    // (3) Ownership — POST team must equal the session user's team.
+    // Reject null / Free Agents so a teamless session cannot draft.
+    $sessionTeam = $commonRepository->getTeamnameFromUsername($username);
+    if ($sessionTeam === null
+        || $sessionTeam === \League\League::FREE_AGENTS_TEAM_NAME
+        || $sessionTeam !== $teamname) {
+        PageLayout\PageLayout::header();
+        echo '<strong class="ibl-form-error">You can only make selections for your own team.</strong>';
+        PageLayout\PageLayout::footer();
+        return;
+    }
+
+    $season = new \Season\Season($mysqli_db);
     $handler = new DraftSelectionHandler($mysqli_db, $commonRepository, $season);
     echo $handler->handleDraftSelection($teamname, $playerToBeDrafted, $draft_round, $draft_pick);
 }

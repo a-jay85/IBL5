@@ -247,4 +247,50 @@ test.describe('Forged CSRF token is rejected', () => {
     expect(html).toContain('GAME ID:');
     expect(html).not.toContain('Invalid or expired form submission');
   });
+
+  test('Draft op=select with forged token → inline error, no selection', async ({
+    request,
+  }) => {
+    const response = await request.post('modules.php?name=Draft&op=select', {
+      form: {
+        _csrf_token: forgedToken(),
+        teamname: 'Metros',
+        player: 'Some Prospect',
+        draft_round: '1',
+        draft_pick: '1',
+      },
+    });
+    expect(response.status()).toBeLessThan(400);
+    const html = await response.text();
+    // op=select echoes inline HTML; CSRF is rejected before any ibl_draft write,
+    // so the inline error (not a "select **Name!**" success banner) proves it.
+    expect(html).toContain('Invalid or expired form submission');
+    expect(html).not.toMatch(/select\s*\*\*.*!\*\*/);
+  });
+
+  test('processrookieoption with forged token → redirected to error, no exercise', async ({
+    request,
+  }) => {
+    const response = await request.post(
+      'modules.php?name=Player&pa=processrookieoption',
+      {
+        form: {
+          _csrf_token: forgedToken(),
+          teamname: 'Metros',
+          playerID: '200000032',
+          rookieOptionValue: '1000',
+          from: '',
+        },
+        maxRedirects: 0,
+      },
+    );
+    expect([301, 302, 303]).toContain(response.status());
+    const location = response.headers()['location'] ?? '';
+    // CSRF failure redirects to name=Player with the generic "Invalid" error —
+    // NOT the pa=rookieoption eligibility path and NOT a success result.
+    expect(location).toContain('name=Player');
+    expect(decodeURIComponent(location)).toContain('Invalid or expired form submission');
+    expect(location).not.toContain('pa=rookieoption');
+    expect(location).not.toContain('rookie_option_success');
+  });
 });

@@ -48,4 +48,88 @@ class DraftEntryPointTest extends ModuleEntryPointTestCase
 
         $this->assertNotEmpty($output);
     }
+
+    /**
+     * Route the gm_username → team_name lookup so the ownership gate sees a
+     * controlled session team. onQuery patterns are checked before the
+     * team-info special handler in MockDatabase::sql_query().
+     */
+    private function setSessionTeam(?string $teamName): void
+    {
+        $rows = $teamName === null ? [] : [['team_name' => $teamName]];
+        $this->mockDb->onQuery('gm_username', $rows);
+    }
+
+    /**
+     * @param array<string, string> $extraPost
+     * @return string
+     */
+    private function runDraftSelect(string $postTeamName, array $extraPost = []): string
+    {
+        $token = \Security\CsrfGuard::generateRawToken('draft_selection');
+
+        return $this->runModule('Draft', ['op' => 'select'], array_merge([
+            '_csrf_token' => $token,
+            'teamname' => $postTeamName,
+            'player' => 'Some Prospect',
+            'draft_round' => '1',
+            'draft_pick' => '1',
+        ], $extraPost), [
+            'user' => $GLOBALS['user'],
+        ]);
+    }
+
+    public function testOwnerWithValidTokenReachesDraftWrite(): void
+    {
+        // Session user owns Metros; POST matches → ownership passes and the
+        // handler runs, touching ibl_draft (getCurrentDraftSelection at minimum).
+        $this->setSessionTeam('Metros');
+
+        $this->runDraftSelect('Metros');
+
+        $this->assertQueryExecuted('ibl_draft');
+    }
+
+    public function testIdorDifferentTeamIsRefusedNoWrite(): void
+    {
+        // Session user owns Metros but POSTs another team's name → rejected
+        // before any draft mutation.
+        $this->setSessionTeam('Metros');
+
+        $output = $this->runDraftSelect('Stars');
+
+        $this->assertStringContainsString('You can only make selections for your own team.', $output);
+        $this->assertQueryNotExecuted('ibl_draft');
+        $this->assertQueryNotExecuted('ibl_draft_class');
+    }
+
+    public function testFreeAgentsSessionIsRefusedNoWrite(): void
+    {
+        // Session resolves to no team (gm_username lookup empty → null) → rejected
+        // even though the POST carries a real team name.
+        $this->setSessionTeam(null);
+
+        $output = $this->runDraftSelect('Metros');
+
+        $this->assertStringContainsString('You can only make selections for your own team.', $output);
+        $this->assertQueryNotExecuted('ibl_draft');
+    }
+
+    public function testForgedTokenIsRefusedNoWrite(): void
+    {
+        $this->setSessionTeam('Metros');
+
+        $output = $this->runModule('Draft', ['op' => 'select'], [
+            '_csrf_token' => 'deadbeef',
+            'teamname' => 'Metros',
+            'player' => 'Some Prospect',
+            'draft_round' => '1',
+            'draft_pick' => '1',
+        ], [
+            'user' => $GLOBALS['user'],
+        ]);
+
+        $this->assertStringContainsString('Invalid or expired form submission', $output);
+        $this->assertQueryNotExecuted('ibl_draft');
+    }
 }

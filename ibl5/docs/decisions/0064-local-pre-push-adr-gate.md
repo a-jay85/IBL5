@@ -1,6 +1,6 @@
 ---
 description: Local pre-push hook that front-runs the CI ADR decision-trigger gate, catching missing-ADR triggers before the round-trip to CI.
-last_verified: 2026-06-18
+last_verified: 2026-06-29
 ---
 
 # ADR-0064: Local pre-push ADR decision-trigger gate
@@ -10,7 +10,7 @@ last_verified: 2026-06-18
 
 ## Context
 
-The `bin/adr-check` decision-trigger gate runs only at CI (`.github/workflows/adr-required.yml`, on `pull_request`). Ad-hoc work that skips `/plan` — where `bin/check-plan` gate `[8]` would catch a missing ADR at plan-write time — reaches CI before anyone learns an ADR is required. PR #1117 added two ~70-line `bin/` scripts, skipped `/plan`, and only hit the missing-ADR failure after the push and a full CI run. We want a local surface that catches the same trigger at push time, before the round-trip to CI.
+The `bin/adr-check` decision-trigger gate runs only at CI (the `adr-check` step in `.github/workflows/pr-meta-checks.yml`, consolidated from the former `adr-required.yml`, on `pull_request`). Ad-hoc work that skips `/plan` — where `bin/check-plan` gate `[8]` would catch a missing ADR at plan-write time — reaches CI before anyone learns an ADR is required. PR #1117 added two ~70-line `bin/` scripts, skipped `/plan`, and only hit the missing-ADR failure after the push and a full CI run. We want a local surface that catches the same trigger at push time, before the round-trip to CI.
 
 ## Decision
 
@@ -26,14 +26,14 @@ Add a tracked pre-push hook (`bin/pre-push-adr-hook`) and an idempotent installe
 
 - Positive: missing-ADR triggers are caught locally, before CI, for work that skips `/plan`.
 - Positive: `bin/adr-check` is untouched (zero CI-behavior regression risk); the gate logic is tracked and tested.
-- Negative: the hook is opt-in per machine (`bin/install-git-hooks` must be run), and `git push --no-verify` can bypass it — accepted, because the CI `adr-required.yml` gate remains the hard backstop.
+- Negative: the hook is opt-in per machine (`bin/install-git-hooks` must be run), and `git push --no-verify` can bypass it — accepted, because the CI `adr-check` gate (in `pr-meta-checks.yml`) remains the hard backstop.
 
 ## References
 
 - `bin/pre-push-adr-hook` — the tracked hook logic (the `git log | adr-check --pr --bypass-from-stdin` composition + degrade-open).
 - `bin/install-git-hooks` — the idempotent installer (common-dir target, git-lfs chaining, backup-once).
 - `bin/adr-check` — the decision-trigger gate, reused unchanged.
-- `.github/workflows/adr-required.yml` — the CI backstop this hook front-runs.
+- `.github/workflows/pr-meta-checks.yml` — the CI backstop this hook front-runs (the `adr-check` step, consolidated from the former `adr-required.yml`).
 - `bin/check-plan` — gate `[8]`, the plan-write-time surface for the same triggers.
 - `bin/test-adr-check` — the regression harness.
 - `ibl5/docs/decisions/README.md` — the "When an ADR is Required" policy.

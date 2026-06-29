@@ -1,0 +1,172 @@
+name: PR meta checks
+
+# Consolidated runner for the seven former standalone PR meta-check workflows
+# (adr-required, doc-freshness, refactor-flag, hot-files, orphan-css,
+# pr-collisions, e2e-hygiene). One runner per PR event instead of up to seven,
+# trading wall-time (sequential steps) for far fewer runners under the
+# post-rebase storm. Each check reports independently via `if: !cancelled()`.
+
+on:
+  push:
+    branches: [ master, develop ]
+  pull_request:
+    branches: [ master, develop ]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  meta-checks:
+    name: Meta checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup PHP environment
+        uses: ./.github/actions/setup-php-env
+        with:
+          extensions: ''
+          cache: 'false'
+          create-config: 'false'
+          install: 'false'
+
+      - name: Compute changed-path filters
+        id: filter
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            adr:
+              - 'ibl5/phpstan-rules/**'
+              - '.claude/rules/*.md'
+              - '.github/workflows/*.yml'
+              - '.github/workflows/*.yaml'
+              - 'bin/*'
+              - 'ibl5/migrations/**.sql'
+              - 'ibl5/composer.json'
+            refactor:
+              - 'ibl5/classes/**'
+              - 'ibl5/tests/**'
+              - 'bin/refactor-flag'
+              - '.github/workflows/pr-meta-checks.yml'
+            hotfiles:
+              - 'ibl5/classes/**'
+              - 'bin/check-hot-files'
+              - '.github/workflows/pr-meta-checks.yml'
+            orphancss:
+              - 'ibl5/design/**.css'
+              - 'ibl5/**.php'
+              - 'ibl5/**.js'
+              - 'ibl5/**.twig'
+              - 'ibl5/**.tpl'
+              - 'ibl5/**.html'
+              - 'bin/check-orphan-css'
+              - '.github/workflows/pr-meta-checks.yml'
+            prcollisions:
+              - 'ibl5/tests/e2e/smoke/accessibility.spec.ts'
+              - 'ibl5/phpstan-baseline.neon'
+              - 'ibl5/phpstan-tests-baseline.neon'
+              - 'ibl5/phpstan-baseline-counts.json'
+              - 'ibl5/coverage-baseline.json'
+              - 'ibl5/tests/e2e/fixtures/ci-seed.sql'
+              - 'ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots/**'
+              - 'ibl5/tests/e2e/vr-manifest.ts'
+              - 'bin/check-pr-collisions'
+              - '.github/workflows/pr-meta-checks.yml'
+            e2ehygiene:
+              - 'ibl5/tests/e2e/**'
+              - 'bin/check-e2e-hygiene'
+              - 'bin/check-e2e-fa-offers-owner'
+              - '.e2e-hygiene-skip-allowlist'
+              - '.github/workflows/pr-meta-checks.yml'
+
+      # --- doc-freshness: UNCONDITIONAL (dead-reference safety). Runs on every
+      # PR and push, never path-gated. A code-only change (e.g. deleting bin/foo)
+      # can orphan a doc reference while touching no .md, so path-gating would
+      # silently skip exactly the PR that needs checking. Hard gate. ---
+      - name: Run bin/check-docs (frontmatter, dead-refs, ADR transitions)
+        # Staleness is deliberately suppressed here: an untouched stale doc must
+        # not block an unrelated PR. Repo-wide staleness is owned by the nightly
+        # doc-freshness-audit workflow; on-touch staleness is enforced below.
+        if: ${{ !cancelled() }}
+        run: bin/check-docs --no-staleness
+
+      - name: Run bin/check-docs (on-touch / changed-files)
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        run: bin/check-docs --since=${{ github.event.pull_request.base.sha }}
+
+      # --- Hard gates (path-gated): a non-zero exit fails the job, same as the
+      # former standalone workflows. `!cancelled()` makes each report
+      # independently of an earlier step's failure (no sequential masking). ---
+      - name: Run bin/adr-check
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.filter.outputs.adr == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: bin/adr-check --pr
+
+      - name: Run bin/refactor-flag
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.filter.outputs.refactor == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: bin/refactor-flag --pr
+
+      - name: Run bin/check-e2e-hygiene
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.filter.outputs.e2ehygiene == 'true' }}
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: bin/check-e2e-hygiene --pr
+
+      - name: Run bin/check-e2e-fa-offers-owner
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.filter.outputs.e2ehygiene == 'true' }}
+        run: bin/check-e2e-fa-offers-owner
+
+      # --- Advisory checks (path-gated): continue-on-error so they never fail
+      # the job; each posts a sticky PR comment, same as today. ---
+      - name: Run bin/check-hot-files
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.filter.outputs.hotfiles == 'true' }}
+        continue-on-error: true
+        run: bin/check-hot-files --pr | tee hot-files.txt
+
+      - name: Post hot-file comment
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.filter.outputs.hotfiles == 'true' }}
+        uses: marocchino/sticky-pull-request-comment@v3
+        with:
+          header: hot-files
+          path: hot-files.txt
+
+      - name: Run bin/check-orphan-css
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.filter.outputs.orphancss == 'true' }}
+        continue-on-error: true
+        run: bin/check-orphan-css | tee orphan-css.txt
+
+      - name: Post orphan-css comment
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.filter.outputs.orphancss == 'true' }}
+        uses: marocchino/sticky-pull-request-comment@v3
+        with:
+          header: orphan-css
+          path: orphan-css.txt
+
+      - name: Run bin/check-pr-collisions
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.filter.outputs.prcollisions == 'true' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bin/check-pr-collisions --pr "${{ github.event.pull_request.number }}" | tee pr-collisions.txt
+
+      - name: Post collision comment
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.filter.outputs.prcollisions == 'true' }}
+        uses: marocchino/sticky-pull-request-comment@v3
+        with:
+          header: pr-collisions
+          path: pr-collisions.txt

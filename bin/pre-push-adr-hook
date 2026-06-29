@@ -3,7 +3,7 @@
 #
 # bin/pre-push-adr-hook — local pre-push ADR decision-trigger gate.
 #
-# Front-runs the CI adr-required.yml gate: catches a push that adds a
+# Front-runs the CI adr-check gate (in pr-meta-checks.yml): catches a push that adds a
 # decision-trigger surface (new PHPStan rule, .claude/rules/*.md, CI workflow,
 # destructive migration, a >=50-line bin/ script, or a composer dependency)
 # WITHOUT an accompanying ADR, before the round-trip to CI. PR #1117 added two
@@ -46,7 +46,7 @@ if [ "$REPO_ROOT" = "/" ]; then
 fi
 
 # Degrade-open when origin/master is unknown (fresh clone, never fetched): the CI
-# adr-required.yml gate remains the backstop, and blocking a legitimate push here
+# adr-check gate (in pr-meta-checks.yml) remains the backstop, and blocking a legitimate push here
 # would be worse than deferring to CI.
 if ! git -C "$REPO_ROOT" rev-parse --verify origin/master >/dev/null 2>&1; then
     echo "pre-push-adr-hook: origin/master not found; skipping ADR gate (CI still enforces it)." >&2
@@ -69,6 +69,6 @@ Resolve with ONE of:
   2. Add a bypass marker to a commit message on this branch (reason >=15 chars):
        <!-- no-adr: reason at least 15 characters long -->
   3. Override this local check only: git push --no-verify
-The CI adr-required.yml gate remains the backstop regardless.
+The CI adr-check gate (in pr-meta-checks.yml) remains the backstop regardless.
 EOF
 exit 1

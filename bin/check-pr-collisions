@@ -4,7 +4,7 @@
 # bin/check-pr-collisions — Advisory inter-PR collision detector.
 #
 # Groups open PRs that touch the same collision-prone file and emits
-# a markdown collision report / recommended merge order.
+# a markdown collision report / sibling PR listing.
 #
 # Modes:
 #   --pr <n>    Emit this PR's collision body to stdout (no posting)
@@ -35,7 +35,7 @@ usage() {
 Usage: bin/check-pr-collisions [--pr <n>] [--sweep] [--help|-h]
 
 Groups open PRs that edit the same collision-prone file and emits a collision
-report / recommended merge order.
+report / sibling PR listing.
 
 Options:
   --pr <n>     Emit collision body for PR <n> to stdout (no posting).
@@ -124,7 +124,9 @@ warn_body() {
     local n="$1"
     printf '## Inter-PR Collision Check\n\n'
     printf '**Warning:** This PR edits files also edited by other open PRs.\n'
-    printf 'Merging in parallel may cause ratchet drift or rebase conflicts.\n\n'
+    printf 'Merging in parallel may cause ratchet drift or rebase conflicts.\n'
+    printf 'Coordinate before merging — pick the sequence by each PR'\''s readiness\n'
+    printf '(CI green, mergeable, not held), then rebase the rest after each merge.\n\n'
 
     for path in "${COLLISION_PATHS[@]}"; do
         if ! pr_touches "$n" "$path"; then
@@ -157,8 +159,8 @@ warn_body() {
         for p in "${all_prs[@]}"; do
             order_refs+="#${p}, "
         done
-        printf '**Recommended merge order:** %s\n' "${order_refs%, }"
-        printf '(Rebase remaining PRs after each merge.)\n\n'
+        printf '**All open PRs touching this file:** %s\n' "${order_refs%, }"
+        printf '_(Listed lowest-number-first — this is **not** a recommended merge order.)_\n\n'
     done
 
     printf '> **Advisory only — does not block merge.**\n'

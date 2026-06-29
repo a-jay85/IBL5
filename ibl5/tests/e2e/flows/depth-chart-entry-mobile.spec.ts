@@ -1,6 +1,8 @@
 import { test, expect } from '../fixtures/auth';
+import { test as isolatedTest } from '../fixtures/auth-isolated';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 import { assertNoHorizontalOverflow } from '../helpers/mobile';
+import { resetSavedDcNames } from '../helpers/cleanup';
 
 // Depth Chart Entry — mobile card view tests.
 // Runs at 375x812 (iPhone viewport) to verify the card layout.
@@ -378,30 +380,62 @@ test.describe('DCE mobile: saved depth chart loading', () => {
   });
 });
 
-test.describe('DCE mobile: form submission', () => {
-  test.use({ viewport: { width: 375, height: 812 } });
+// Isolated to the Monarchs (tid=8) roster via the auth-isolated fixture so a
+// real submit cannot corrupt the shared logged-in team's live state — mirroring
+// depth-chart-entry-submission.spec.ts. Loads a known-valid saved DC before
+// submitting so the submission is deterministically valid, then requires the
+// success signal (a server rejection must NOT pass).
+isolatedTest.describe('DCE mobile: form submission', () => {
+  isolatedTest.use({ viewport: { width: 375, height: 812 } });
 
-  test('submitting depth chart from mobile view succeeds', async ({ page }) => {
+  isolatedTest('submitting a loaded saved depth chart from mobile view succeeds', async ({ page }) => {
     await page.goto('modules.php?name=DepthChartEntry');
-    await page.waitForLoadState('networkidle');
 
-    // Mobile cards should be visible
+    // Mobile cards should be ready before loading a saved config.
     await expect(page.locator('.dc-mobile-cards')).toBeVisible();
+    await expect(
+      page.locator('.dc-mobile-cards select[name^="pg"]').first(),
+    ).toBeEnabled();
 
-    // Click the mobile submit button
-    const submitBtn = page.locator('.dc-mobile-cards__footer .depth-chart-submit-btn');
+    // Load a known-valid saved depth chart — the seeded tid=8 config at option
+    // index 1, the same source the loading test (above) and
+    // depth-chart-saved-dc-api.spec.ts already rely on — so the submit is valid.
+    const dropdown = page.locator('#saved-dc-select');
+    await expect(dropdown).toBeVisible();
+    await dropdown.selectOption({ index: 1 });
+
+    // Web-first wait for the AJAX load to land (replaces the networkidle wait).
+    const loadedId = page.locator('#loaded_dc_id, input[name="loaded_dc_id"]');
+    await expect(
+      loadedId.first(),
+      'loaded_dc_id hidden field must exist in form',
+    ).toBeAttached();
+    await expect(async () => {
+      const val = await loadedId.first().inputValue();
+      expect(val).not.toBe('0');
+    }).toPass({ timeout: 5000 });
+
+    // Submit via the mobile footer button.
+    const submitBtn = page.locator(
+      '.dc-mobile-cards__footer .depth-chart-submit-btn',
+    );
     await expect(submitBtn).toBeVisible();
     await submitBtn.click();
 
-    await page.waitForLoadState('domcontentloaded');
-    const body = await page.locator('body').textContent();
-
-    // Should get success or validation feedback — not a blank page or PHP error
-    const hasSuccess = body?.match(/submitted.*successfully|thank you|depth chart has been/i);
-    const hasValidation = body?.match(/must have|active players|position/i);
-    expect(hasSuccess || hasValidation, 'Expected success or validation message after mobile submission').toBeTruthy();
-
+    // Require the success signal — PRG back to the module base with the saved
+    // banner. A validation/server rejection no longer passes as success.
+    await page.waitForURL(
+      /modules\.php\?name=DepthChartEntry(?!.*op=submit)/,
+      { timeout: 15_000 },
+    );
+    await expect(
+      page.locator('.ibl-alert--success', { hasText: /depth chart saved/i }),
+    ).toBeVisible({ timeout: 15000 });
     await assertNoPhpErrors(page, 'after mobile depth chart submission');
+  });
+
+  isolatedTest.afterAll(async ({ request }) => {
+    await resetSavedDcNames(request, 8);
   });
 });
 

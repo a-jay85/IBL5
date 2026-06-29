@@ -1,6 +1,6 @@
 ---
 description: E2E (Playwright + api-e2e) test-quality backlog — refactoring, perf, weak/tautological assertions, tests that don't prove functionality, and flake-prone patterns, with per-entry status + automouse-readiness. Each open entry is a candidate for a /plan.
-last_verified: 2026-06-28
+last_verified: 2026-06-29
 ---
 
 # E2E Test-Quality Backlog
@@ -53,10 +53,10 @@ Effort scale:
 
 | Status | Count |
 |--------|------:|
-| ✅ Implemented | 0 |
+| ✅ Implemented | 3 |
 | ◑ Partial | 0 |
 | 📋 Planned | 0 |
-| ⬜ Open | 66 |
+| ⬜ Open | 63 |
 | 🚫 Declined | 0 |
 
 | Axis | Findings | Theme |
@@ -243,13 +243,13 @@ Green tests that don't guard the behavior they're named for. **Fix first.** D1/D
 
 | # | Status | Auto | File:line | Problem |
 |---|--------|------|-----------|---------|
-| D1 | ⬜ | 🟨 | `trading-submission.spec.ts:316,408` | `expect(offer_sent \|\| error=)` — a cap/validation error redirect passes. ✓verified |
-| D2 | ⬜ | 🟨 | `depth-chart-entry-mobile.spec.ts:402` | `hasSuccess \|\| hasValidation` (regex incl. `position`) — server rejection passes. ✓verified |
+| D1 | ✅ | — | `trading-submission.spec.ts:316,408` | `expect(offer_sent \|\| error=)` — a cap/validation error redirect passes. ✓verified — Blocks 2 & 4 now require `result=offer_sent` + `collectNewOfferIds` read-back; Block 4 uses a cap-safe (max-user / min-partner salary) selection. ✓done |
+| D2 | ✅ | — | `depth-chart-entry-mobile.spec.ts:402` | `hasSuccess \|\| hasValidation` (regex incl. `position`) — server rejection passes. ✓verified — submission describe now uses the `auth-isolated` (tid=8) fixture, loads a valid saved DC, requires the success banner, and cleans up via `resetSavedDcNames`. ✓done |
 | D3 | ⬜ | 🟨 | `depth-chart-entry-submission.spec.ts` "change a position depth" | `if(val==='0'){…;break}` with no assertion the loop ever matched → silent pass on zero changes. |
 | D4 | ⬜ | 🟨 | `depth-chart-entry-submission.spec.ts` "loading saved DC" | reads a hidden field only, not select/minute population. |
 | D5 | ⬜ | 🟨 | `free-agency-submission.spec.ts` "amend offer" | asserts success banner only; never reads back amended yr1. |
 | D6 | ⬜ | 🟨 | `contract-extension-submission.spec.ts` block 1 | accepts `.ibl-alert--info` → `extension_rejected` passes. |
-| D7 | ⬜ | 🟨 | `waivers-submission.spec.ts:83` | "success banner" navigates straight to `&result=player_added`, never POSTs. ✓verified (real POST covered separately → redundant-weak). |
+| D7 | ✅ | — | `waivers-submission.spec.ts:83` | "success banner" navigates straight to `&result=player_added`, never POSTs. ✓verified (real POST covered separately → redundant-weak). ✓done — deleted the redundant add + waive query-param banner tests; the real-POST add/waive tests already assert `.ibl-alert--success`. |
 | D8 | ⬜ | 🟨 | `trading-submission.spec.ts` accept-offer readBack | re-asserts URL `waitForURL` already confirmed; never checks the card was consumed. |
 | D9 | ⬜ | 🟨 | `all-star-rename-submission.spec.ts` & `projected-draft-order-submission.spec.ts` 405/0 | assert `success===false` only; any error payload passes — add error-code check. |
 | D10 | ⬜ | 🟨 | `admin-pages.spec.ts` block.php | `status not 403 / <500` → 404/blank passes; no content assertion. |

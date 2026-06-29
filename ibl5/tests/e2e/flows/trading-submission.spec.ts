@@ -110,6 +110,20 @@ function getPartnerPlayerIndices(fd: FormData): number[] {
     );
 }
 
+/** Index (from `indices`) of the player carrying the highest contract salary. */
+function maxByContract(fd: FormData, indices: number[]): number {
+  return indices.reduce((best, i) =>
+    Number(fd.fields[i].contract) > Number(fd.fields[best].contract) ? i : best,
+  );
+}
+
+/** Index (from `indices`) of the player carrying the lowest contract salary. */
+function minByContract(fd: FormData, indices: number[]): number {
+  return indices.reduce((best, i) =>
+    Number(fd.fields[i].contract) < Number(fd.fields[best].contract) ? i : best,
+  );
+}
+
 /** Get checkable user pick indices (type=0, before switchCounter) */
 function getUserPickIndices(fd: FormData): number[] {
   return fd.fields
@@ -311,14 +325,10 @@ test.describe('Trade submission: draft pick trade (API)', () => {
     const body = buildFormBody(fd!, [pickIdx, partnerIdx], undefined, undefined, token);
     const location = await submitOffer(request, body);
 
-    // Accept either success or cap/validation error — both prove the pipeline works
-    expect(
-      location.includes('result=offer_sent') || location.includes('error='),
-    ).toBeTruthy();
-
-    if (location.includes('result=offer_sent')) {
-      createdOfferIds = await collectNewOfferIds(page, existingIds);
-    }
+    // Player-for-pick gives away a salaried player for a salary-free pick, so
+    // the offering team's post-trade salary can only drop → always clears cap.
+    expect(location).toContain('result=offer_sent');
+    createdOfferIds = await collectNewOfferIds(page, existingIds);
   });
 
   test.afterAll(async ({ request }) => {
@@ -391,8 +401,14 @@ test.describe('Trade submission: mixed trade (API)', () => {
     const token = await getCsrfToken(page);
     const existingIds = await collectAllOfferIds(page);
 
-    const userIdx = getUserPlayerIndices(fd!)[0];
-    const partnerIdx = getPartnerPlayerIndices(fd!)[0];
+    // Player+cash adds the partner's player salary to the offering team — the
+    // genuine cap-risk case. Make the selection cap-safe (seed-independent):
+    // send the user's most expensive tradeable player, take the partner's
+    // cheapest, so the offering team's post-trade salary can only drop. The
+    // `contract<k>` field carries each player's salary (see TradingView), so
+    // this reads salaries already present in the form, no extra extraction.
+    const userIdx = maxByContract(fd!, getUserPlayerIndices(fd!));
+    const partnerIdx = minByContract(fd!, getPartnerPlayerIndices(fd!));
     const cashYear = fd!.cashStartYear;
     const body = buildFormBody(
       fd!,
@@ -403,14 +419,10 @@ test.describe('Trade submission: mixed trade (API)', () => {
     );
     const location = await submitOffer(request, body);
 
-    // Accept either success or cap/validation error — both prove the pipeline works
-    expect(
-      location.includes('result=offer_sent') || location.includes('error='),
-    ).toBeTruthy();
-
-    if (location.includes('result=offer_sent')) {
-      createdOfferIds = await collectNewOfferIds(page, existingIds);
-    }
+    // Cap-safe selection above keeps the offering team under the hard cap, so
+    // success is required. A red here after cap-safe selection is a real bug.
+    expect(location).toContain('result=offer_sent');
+    createdOfferIds = await collectNewOfferIds(page, existingIds);
   });
 
   test.afterAll(async ({ request }) => {

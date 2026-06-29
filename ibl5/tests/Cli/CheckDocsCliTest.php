@@ -202,6 +202,30 @@ final class CheckDocsCliTest extends TestCase
     }
 
     #[Test]
+    public function sinceRebasedOntoBaseAlreadyVerifiedTodayExitsZero(): void
+    {
+        // A doc PR verified today, then rebased onto a base whose copy of the doc
+        // was ALSO bumped to today by a sibling PR. Base and head last_verified are
+        // now equal (today), but the rebase PRESERVES the head commit's author date
+        // — which predates today. The freshness escape (lv >= edit commit date)
+        // must pass it; the old equality escape (lv === edit commit date) false-
+        // failed because today !== the stale author date. Body still differs, so
+        // this exercises the escape, not the values-differ path.
+        $today = (new \DateTimeImmutable('today'))->format('Y-m-d');
+        $this->commitFile('ibl5/docs/sample.md', $this->doc($today, 'Original body.'), 'base verified today by sibling PR');
+        $base = $this->currentSha();
+
+        // Head commit with an author date in the past (what a rebase leaves behind).
+        $staleAuthorDate = (new \DateTimeImmutable('today -4 days'))->format('Y-m-d\T12:00:00');
+        file_put_contents($this->tmpDir . '/ibl5/docs/sample.md', $this->doc($today, 'Rebased body.'));
+        $this->runGit('add -A');
+        $this->runGit(sprintf('commit -q --date=%s -m %s', escapeshellarg($staleAuthorDate), escapeshellarg('rebased edit, author date preserved')));
+
+        [$code, $output] = $this->runScript('--since=' . $base);
+        $this->assertSame(0, $code, $output);
+    }
+
+    #[Test]
     public function sinceOutOfScopeChangeExitsZero(): void
     {
         $date = $this->freshDate();

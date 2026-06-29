@@ -501,7 +501,10 @@ function fixDates(array $files, \DateTimeImmutable $today): int
  * Immutable per commit, so comparing last_verified against it is independent of
  * when CI runs: a same-day re-edit of a doc already verified today passes without
  * waiting for UTC rollover, and a PR spanning midnight never false-fails (the trap
- * equality-to-today would create). Returns null when the date can't be read, so
+ * equality-to-today would create). Read from the author timestamp, which a rebase
+ * preserves — so the caller compares last_verified `>=` this date (freshness), not
+ * `===` (which would false-fail a rebased doc whose author date predates a base
+ * that already carries today's date). Returns null when the date can't be read, so
  * the caller falls back to the strict value comparison (fail-closed).
  */
 function editCommitDate(string $repoRoot, string $base, string $rel): ?string
@@ -536,14 +539,17 @@ function editCommitDate(string $repoRoot, string $base, string $rel): ?string
  * false-fail, and body text that literally contains `last_verified:` (e.g. inside
  * a code fence) cannot trip the check. One escape sits on top of the value
  * compare: when head and base values are EQUAL, the file still passes if that
- * value equals the edit's commit date (editCommitDate) — a same-day re-edit of a
- * doc already verified today, which cannot bump higher without becoming a future
- * date. The escape keys off the immutable commit date, not the CI wall clock, so
- * it does not reintroduce the midnight false-fail. Cases: body-changed-not-bumped
- * fails (values equal AND lv predates the edit), date-bumped passes (values
- * differ), same-day re-edit passes (value == commit date), newly-added-with-date
- * passes (base null != date), added-without-date fails (null === null, null !=
- * commit date).
+ * value is `>=` the edit's commit date (editCommitDate) — a doc whose verification
+ * is at least as fresh as the edit, which includes both a same-day re-edit (value
+ * == commit date) and a rebased PR whose preserved author date now predates a base
+ * that already carries today's date (value > commit date). The escape keys off the
+ * immutable commit date, not the CI wall clock, so it does not reintroduce the
+ * midnight false-fail; a strictly-newer value is only ever a future date, which
+ * checkFile() rejects separately. Cases: body-changed-not-bumped fails (values
+ * equal AND lv predates the edit), date-bumped passes (values differ), same-day
+ * re-edit passes (value == commit date), rebased-onto-today passes (value > commit
+ * date), newly-added-with-date passes (base null != date), added-without-date
+ * fails (null === null, null !< commit date).
  *
  * @return list<string> diagnostic lines, each prefixed with the repo-relative path.
  */
@@ -576,10 +582,13 @@ function checkChanged(string $base, string $repoRoot, \DateTimeImmutable $today)
  * this enumeration (and its `A...HEAD` three-dot diff) so the failing set and
  * the --fix-dates fixable set can never silently diverge.
  *
- * The same-day escape (`$verifiedAtEdit`): an unchanged date still passes when
- * it equals the edit's git commit date — a same-day re-verify that cannot bump
- * higher without going into the future. Keyed off the immutable commit date,
- * not the CI wall clock, so it does not reintroduce a midnight false-fail.
+ * The freshness escape (`$verifiedAtEdit`): an unchanged date still passes when
+ * it is `>=` the edit's git commit date — a verification at least as fresh as the
+ * edit. Covers a same-day re-verify (== commit date) and a rebased PR whose
+ * preserved author date now predates a base already carrying today's date
+ * (> commit date). Keyed off the immutable commit date, not the CI wall clock, so
+ * it does not reintroduce a midnight false-fail; a strictly-newer value can only
+ * be a future date, which checkFile() rejects separately.
  *
  * @return list<array{rel: string, abs: string, headLv: ?string, baseLv: ?string, needsBump: bool}>
  */
@@ -632,7 +641,8 @@ function iterChangedDocs(string $base, string $repoRoot): array
 
         $headLv = $headFm['last_verified'] ?? null;
         $baseLv = $baseFm['last_verified'] ?? null;
-        $verifiedAtEdit = $headLv !== null && $headLv === editCommitDate($repoRoot, $base, $rel);
+        $editDate = editCommitDate($repoRoot, $base, $rel);
+        $verifiedAtEdit = $headLv !== null && $editDate !== null && $headLv >= $editDate;
 
         $docs[] = [
             'rel' => $rel,

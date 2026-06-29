@@ -1,4 +1,4 @@
--- Migration 151: Add composite party-derivation index to ibl_trade_info
+-- Migration 152: Add composite party-derivation index to ibl_trade_info
 --
 -- Multi-team (N-party) trade support derives the set of party teams for an
 -- offer by scanning that offer's trade_info rows' trade_from / trade_to columns.

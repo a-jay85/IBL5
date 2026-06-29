@@ -32,8 +32,9 @@ $nukeCompat = new \Utilities\NukeCompat();
 $validator = new \Trading\TradeValidator($mysqli_db);
 $salaryCapRepo = new \Repositories\SalaryCapRepository($mysqli_db);
 $cashRepo = new \Trading\TradeCashRepository($mysqli_db);
+$season = new \Season\Season($mysqli_db);
 $executionService = new \Trading\TradeExecutionService(
-    $offerRepo, $processor, $validator, $salaryCapRepo, $teamIdentityRepo, $cashRepo
+    $offerRepo, $processor, $validator, $salaryCapRepo, $teamIdentityRepo, $cashRepo, $season
 );
 global $authService;
 $controller = new \Trading\TradingController(

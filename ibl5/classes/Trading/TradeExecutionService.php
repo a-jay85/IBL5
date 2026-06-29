@@ -11,6 +11,7 @@ use Trading\Contracts\TradeValidatorInterface;
 use Trading\Contracts\TradeCashRepositoryInterface;
 use Repositories\Contracts\SalaryCapRepositoryInterface;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
+use Season\Season;
 
 /**
  * TradeExecutionService - Policy/authz/validation layer for accepting trades.
@@ -35,6 +36,7 @@ class TradeExecutionService implements TradeExecutionServiceInterface
         private readonly SalaryCapRepositoryInterface $salaryCapRepository,
         private readonly TeamIdentityRepositoryInterface $teamIdentityRepository,
         private readonly TradeCashRepositoryInterface $cashRepository,
+        private readonly Season $season,
     ) {
     }
 
@@ -164,9 +166,11 @@ class TradeExecutionService implements TradeExecutionServiceInterface
     /**
      * Current-season cash amount for one (offer, sending team) cash leg.
      *
-     * Uses salary_yr1 to match the vw_current_salary basis used by
-     * getTeamTotalSalary()/getPlayerCurrentSalary() (cy=1 -> salary_yr1),
-     * keeping the cap math on a single consistent basis.
+     * Mirrors the offer-time basis ({@see TradeValidator::getCurrentSeasonCashConsiderations()}):
+     * during phases that advance contract years (Playoffs/Draft/Free Agency) the
+     * current-season obligation is salary_yr2, otherwise salary_yr1. Without this
+     * branch the accept-time cap check would disagree with the offer-time check for
+     * any cash leg accepted during an offseason phase.
      */
     private function currentSeasonCashForLeg(int $offerId, string $sendingTeam): int
     {
@@ -175,6 +179,8 @@ class TradeExecutionService implements TradeExecutionServiceInterface
             return 0;
         }
 
-        return (int) ($cashRow['salary_yr1'] ?? 0);
+        $column = $this->season->advancesContractYears() ? 'salary_yr2' : 'salary_yr1';
+
+        return (int) ($cashRow[$column] ?? 0);
     }
 }

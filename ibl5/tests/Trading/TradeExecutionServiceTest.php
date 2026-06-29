@@ -13,6 +13,7 @@ use Trading\Contracts\TradeProcessorInterface;
 use Trading\Contracts\TradeValidatorInterface;
 use Trading\TradeExecutionService;
 use Trading\TradeItemType;
+use Season\Season;
 
 /**
  * Unit tests for Trading\TradeExecutionService — the accept-path orchestrator
@@ -28,6 +29,8 @@ class TradeExecutionServiceTest extends TestCase
         ?TradeProcessorInterface $processor = null,
         ?TradeValidatorInterface $validator = null,
         ?SalaryCapRepositoryInterface $salaryCap = null,
+        ?TradeCashRepositoryInterface $cashRepo = null,
+        ?Season $season = null,
     ): TradeExecutionService {
         $offerRepo = self::createStub(TradeOfferRepositoryInterface::class);
         $offerRepo->method('getTradesByOfferId')->willReturn($tradeRows);
@@ -35,8 +38,16 @@ class TradeExecutionServiceTest extends TestCase
         $teamIdentity = self::createStub(TeamIdentityRepositoryInterface::class);
         $teamIdentity->method('getTidFromTeamname')->willReturn(1);
 
-        $cashRepo = self::createStub(TradeCashRepositoryInterface::class);
-        $cashRepo->method('getCashTransactionByOffer')->willReturn(null);
+        if ($cashRepo === null) {
+            $cashRepo = self::createStub(TradeCashRepositoryInterface::class);
+            $cashRepo->method('getCashTransactionByOffer')->willReturn(null);
+        }
+
+        if ($season === null) {
+            // Default: a non-offseason phase (cy stays 1 -> salary_yr1).
+            $season = self::createStub(Season::class);
+            $season->method('advancesContractYears')->willReturn(false);
+        }
 
         $salaryCap ??= self::createStub(SalaryCapRepositoryInterface::class);
         $validator ??= self::createStub(TradeValidatorInterface::class);
@@ -49,6 +60,7 @@ class TradeExecutionServiceTest extends TestCase
             $salaryCap,
             $teamIdentity,
             $cashRepo,
+            $season,
         );
     }
 
@@ -175,6 +187,109 @@ class TradeExecutionServiceTest extends TestCase
         $result = $service->validateAndExecute(1, 'Metros');
 
         $this->assertTrue($result['success']);
+    }
+
+    /**
+     * Regression — accept-time cash cap basis must match the offer-time basis
+     * ({@see \Trading\TradeValidator::getCurrentSeasonCashConsiderations()}).
+     * Outside an offseason phase the current-season cash obligation is salary_yr1.
+     */
+    public function testCashLegUsesSalaryYr1OutsideOffseason(): void
+    {
+        $delta = $this->deltaFor(
+            $this->captureCapDeltasForCashLeg(advancesContractYears: false, yr1: 100, yr2: 900),
+            'Metros'
+        );
+
+        self::assertSame(100, $delta['capReceived'], 'cash sender cap must rise by salary_yr1 outside offseason');
+    }
+
+    /**
+     * Regression (the bug this fix closes) — during phases that advance contract
+     * years (Playoffs/Draft/Free Agency) the current-season cash obligation is
+     * salary_yr2, matching the offer-time validator. The pre-fix accept path read
+     * salary_yr1 unconditionally, so an offseason cash leg was validated on the
+     * wrong year and could pass/fail the cap check inconsistently with offer time.
+     */
+    public function testCashLegUsesSalaryYr2DuringOffseason(): void
+    {
+        $delta = $this->deltaFor(
+            $this->captureCapDeltasForCashLeg(advancesContractYears: true, yr1: 100, yr2: 900),
+            'Metros'
+        );
+
+        self::assertSame(900, $delta['capReceived'], 'cash sender cap must rise by salary_yr2 during offseason');
+    }
+
+    /**
+     * Run validateAndExecute over a single Metros->Stars cash leg and return the
+     * per-party cap deltas the service hands to the cap validator. The acting team
+     * (Metros) is a party, so the IDOR gate passes and validateParties runs.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function captureCapDeltasForCashLeg(bool $advancesContractYears, int $yr1, int $yr2): array
+    {
+        $cashRepo = self::createStub(TradeCashRepositoryInterface::class);
+        $cashRepo->method('getCashTransactionByOffer')->willReturn(['salary_yr1' => $yr1, 'salary_yr2' => $yr2]);
+
+        $season = self::createStub(Season::class);
+        $season->method('advancesContractYears')->willReturn($advancesContractYears);
+
+        $captured = [];
+        $validator = self::createStub(TradeValidatorInterface::class);
+        $validator->method('validateSalaryCapsForParties')->willReturnCallback(
+            function (array $deltas) use (&$captured): array {
+                $captured = $deltas;
+                return ['valid' => true, 'errors' => [], 'parties' => []];
+            }
+        );
+        $validator->method('validateRosterLimitsForParties')->willReturn(['valid' => true, 'errors' => [], 'parties' => []]);
+
+        $processor = self::createStub(TradeProcessorInterface::class);
+        $processor->method('processTrade')->willReturn(['success' => true]);
+
+        $service = $this->buildService(
+            [$this->cashRow('Metros', 'Stars')],
+            processor: $processor,
+            validator: $validator,
+            cashRepo: $cashRepo,
+            season: $season,
+        );
+
+        $service->validateAndExecute(1, 'Metros');
+
+        return $captured;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $deltas
+     * @return array<string, mixed>
+     */
+    private function deltaFor(array $deltas, string $teamName): array
+    {
+        foreach ($deltas as $delta) {
+            if (($delta['teamName'] ?? null) === $teamName) {
+                return $delta;
+            }
+        }
+
+        self::fail("No cap delta captured for {$teamName}");
+    }
+
+    /** @return array<string, mixed> */
+    private function cashRow(string $from, string $to): array
+    {
+        return [
+            'tradeofferid' => 1,
+            'itemid' => 0,
+            'itemtype' => TradeItemType::Cash->value,
+            'trade_from' => $from,
+            'trade_to' => $to,
+            'approval' => '',
+            'created_at' => '',
+            'updated_at' => '',
+        ];
     }
 
     /**

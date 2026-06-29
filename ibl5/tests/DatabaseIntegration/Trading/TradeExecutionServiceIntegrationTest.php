@@ -14,6 +14,7 @@ use Trading\TradeProcessor;
 use Trading\TradeValidator;
 use Repositories\SalaryCapRepository;
 use Repositories\TeamIdentityRepository;
+use Season\Season;
 
 /**
  * End-to-end (real-wiring) proof of the accept path's NEW behavior: cap/roster
@@ -45,6 +46,7 @@ class TradeExecutionServiceIntegrationTest extends DatabaseTestCase
         $validator = new TradeValidator($this->db);
         $salaryCap = new SalaryCapRepository($this->db);
         $cashRepo = new TradeCashRepository($this->db);
+        $season = new Season($this->db);
 
         $this->service = new TradeExecutionService(
             $offerRepo,
@@ -53,6 +55,7 @@ class TradeExecutionServiceIntegrationTest extends DatabaseTestCase
             $salaryCap,
             $teamIdentity,
             $cashRepo,
+            $season,
         );
     }
 
@@ -154,7 +157,83 @@ class TradeExecutionServiceIntegrationTest extends DatabaseTestCase
         self::assertSame(['Metros', 'Stars', 'Cougars'], $this->service->deriveParties($offerId));
     }
 
+    /**
+     * Regression (offseason cash cap basis), real schema — a cash leg accepted
+     * during a phase that advances contract years (here 'Playoffs') must be
+     * validated on salary_yr2, matching the offer-time validator. The cash here is
+     * 0 in yr1 but well over the hard cap in yr2, so the offseason path MUST see
+     * Metros (the sender — sending cash raises your cap) go over the cap and
+     * reject. The pre-fix accept path read salary_yr1 (0) and would have executed
+     * the trade. Proves the real TradeCashRepository returns salary_yr2 and the
+     * accept-time Season branch reads it.
+     */
+    public function testOffseasonCashLegValidatedOnSalaryYr2(): void
+    {
+        $pidA = 200040057;
+        $pidB = 200040058;
+        $this->seedEqualSalaryPlayer($pidA, 'Cash A', 1, 'PG');
+        $this->seedEqualSalaryPlayer($pidB, 'Cash B', 2, 'SG');
+
+        $offerId = $this->seedPendingTrade([
+            ['id' => $pidA, 'type' => TradeItemType::Player->value, 'from' => 'Metros', 'to' => 'Stars'],
+            ['id' => $pidB, 'type' => TradeItemType::Player->value, 'from' => 'Stars', 'to' => 'Metros'],
+            ['id' => 0, 'type' => TradeItemType::Cash->value, 'from' => 'Metros', 'to' => 'Stars'],
+        ]);
+
+        // Metros sends cash to Stars: yr1 = 0 (legal), yr2 = 50000 (far over the
+        // 7000 hard cap). Only the salary_yr2 basis trips the cap.
+        (new TradeCashRepository($this->db))->insertCashTradeOffer(
+            $offerId,
+            'Metros',
+            'Stars',
+            0,
+            50000,
+            0,
+            0,
+            0,
+            0,
+        );
+
+        $offseasonService = $this->buildServiceWithPhase('Playoffs');
+
+        $result = $offseasonService->validateAndExecute($offerId, 'Metros');
+
+        self::assertFalse(
+            $result['success'],
+            'offseason cash leg must be validated on salary_yr2 (over the hard cap), not salary_yr1'
+        );
+        self::assertSame(1, $this->getPlayerTeamId($pidA), 'no player may move when validation fails');
+        self::assertSame(2, $this->getPlayerTeamId($pidB));
+    }
+
     // ── Helpers ─────────────────────────────────────────────────
+
+    /**
+     * Real-wiring service whose Season is forced to a specific phase, so a test can
+     * exercise the offseason ({@see Season::advancesContractYears()}) cap branch
+     * without depending on the seed's live phase.
+     */
+    private function buildServiceWithPhase(string $phase): TradeExecutionService
+    {
+        $teamIdentity = new TeamIdentityRepository($this->db);
+        $offerRepo = new TradeOfferRepository($this->db, 'localhost');
+        $processor = new TradeProcessor($this->db, $teamIdentity);
+        $validator = new TradeValidator($this->db);
+        $salaryCap = new SalaryCapRepository($this->db);
+        $cashRepo = new TradeCashRepository($this->db);
+        $season = new Season($this->db);
+        $season->phase = $phase;
+
+        return new TradeExecutionService(
+            $offerRepo,
+            $processor,
+            $validator,
+            $salaryCap,
+            $teamIdentity,
+            $cashRepo,
+            $season,
+        );
+    }
 
     private function seedEqualSalaryPlayer(int $pid, string $name, int $teamId, string $pos): void
     {

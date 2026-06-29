@@ -31,11 +31,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+      - name: Setup PHP environment
+        uses: ./.github/actions/setup-php-env
         with:
-          php-version: '8.5'
-          coverage: none
+          extensions: ''
+          cache: 'false'
+          create-config: 'false'
+          install: 'false'
 
       - name: Run bin/adr-check
         env:

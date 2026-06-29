@@ -1,6 +1,6 @@
 ---
 description: CI/GitHub-Actions workflow simplification backlog — duplicated setup/notify boilerplate, job consolidation, and verified-not-redundant workflows, with per-entry status + automouse-readiness.
-last_verified: 2026-06-28
+last_verified: 2026-06-29
 ---
 
 # CI Workflow Simplification Backlog
@@ -35,8 +35,8 @@ last_verified: 2026-06-28
 | Status | Count |
 |--------|------:|
 | ⬜ Open | 7 |
-| 📋 Planned | 2 |
-| ✅ Implemented | 0 |
+| 📋 Planned | 1 |
+| ✅ Implemented | 1 |
 | 🚫 Declined | 0 |
 
 > The 4 "verified-not-redundant" entries in Axis 4 are **decisions to keep**, not open work — they exist so a future audit does not re-flag them. Not counted above.
@@ -47,7 +47,7 @@ last_verified: 2026-06-28
 
 | # | Title | Status | Automouse | Effort |
 |---|-------|--------|-----------|-------:|
-| 1.1 | Revive + adopt `setup-php-env` composite | 📋 Planned | 🟩 | M |
+| 1.1 | Revive + adopt `setup-php-env` composite | ✅ Implemented | 🟩 | M |
 | 1.2 | Extract `notify-discord` composite (SSH + Discord DM) | 📋 Planned | 🟦 | M |
 
 ### 1.1 Dead `setup-php-env` composite; PHP setup hand-rolled 16×
@@ -55,7 +55,7 @@ last_verified: 2026-06-28
 **Problem:** The "Checkout / Setup PHP / cache vendor / composer install" sequence is hand-rolled **16 times across 9 files**. A composite action to collapse it already exists but was abandoned and has rotted: it pins `actions/cache@v4` (workflows use `@v6`), defaults PHP `8.3` (workflows use `8.5`), and omits the `shivammathur/setup-php` step itself. Meanwhile `cache-dependencies.yml` warms vendor with extensions `pdo, pdo_mysql` while every consumer uses `mysqli` — a latent cache-key/extension divergence a shared action would eliminate (see 3.5).
 **Suggested direction:** Rewrite `setup-php-env` to own the full sequence (add the `setup-php` step + optional `config.php` creation as inputs, refresh action versions to match current usage), then adopt it across all 9 files. Mirrors the existing house pattern (`setup-docker-e2e`, `lighthouse-setup` composites).
 **Risk if untouched:** A version/extension bump must be applied in 16 places; drift already present (3.5).
-**Status (2026-06-28):** 📋 Planned — plan `ci-setup-php-env-composite` written + queued for automouse (own PR, split from 1.2). 🟩 auto-mergeable: behavior-preserving; verified at impl time by `actionlint -shellcheck=` (host-installed, not yet in CI — plain `actionlint` exits 1 on master from pre-existing shellcheck noise, so the gate is `-shellcheck=` + a no-new-findings delta) plus the self-triggering consumer workflows' own PR CI (`tests`/`refactor-flag`/`deploy-rehearsal`/`adr-required` glob/`doc-freshness` no-filter). The 4 non-self-triggering adopters (`migration-safety`/`mutation`/`doc-freshness-audit`/`cache-dependencies`) rely on impl-time `actionlint` + grep-asserted identical step logic.
+**Status (2026-06-28):** ✅ Implemented — rewrote `.github/actions/setup-php-env/action.yml` to own `shivammathur/setup-php` + optional vendor cache / `config.php` / `composer install` (refreshed to `actions/cache@v6`, default PHP 8.5); adopted across all 10 workflows (17 call-sites). 3.5 folded in.
 
 ### 1.2 No `notify-discord` composite; SSH + Discord DM hand-rolled
 **Location:** "Setup SSH" block (`mkdir ~/.ssh` / write key / `chmod 600` / `ssh-keyscan`) appears **12× across 7 files** — `smoke-prod.yml` (×5), `db-backup.yml` (×2), `main.yml` (×2), `mutation.yml`, `log-review.yml`, `doc-freshness-audit.yml`, `deploy-rehearsal.yml`. The "Send Discord DM" block (`jq` payload + `ssh`+`curl` to the IBLbot `discordDM` endpoint) appears **8× across 6 files** — `smoke-prod.yml` (×4), `main.yml`, `mutation.yml`, `db-backup.yml`, `log-review.yml`, `doc-freshness-audit.yml`.
@@ -97,7 +97,7 @@ last_verified: 2026-06-28
 | 3.2 | db-backup redundant MariaDB wait loop | ⬜ Open | 🟩 | S |
 | 3.3 | lighthouse-audit re-collects instead of reusing baseline artifact | ⬜ Open | 🟨 | S |
 | 3.4 | `changes`-detection mechanism is inconsistent | ⬜ Open | 🟨 | M |
-| 3.5 | PHP extension set divergence in cache-dependencies | ⬜ Open | 🟩 | S |
+| 3.5 | PHP extension set divergence in cache-dependencies | ✅ Implemented | 🟩 | S |
 
 ### 3.1 audit-js — `npm audit` without a prior install
 **Location:** `.github/workflows/tests.yml`, job `audit-js`.
@@ -132,7 +132,7 @@ last_verified: 2026-06-28
 **Problem:** The cache warmer builds under a different PHP extension set than the workflows restoring the cache. Vendor is largely extension-agnostic so it works today, but it's a latent footgun. A shared `setup-php-env` (1.1) would force a single source of truth.
 **Suggested direction:** Align the extension list; fold into 1.1.
 **Risk if untouched:** A future extension-sensitive dep could cache-poison consumers.
-**Status (2026-06-28):** ⬜ Open — 🟩 (subsumed by 1.1).
+**Status (2026-06-28):** ✅ Implemented — 🟩 (subsumed by 1.1; cache-dependencies now inherits the composite default `mbstring, intl, mysqli`).
 
 ---
 

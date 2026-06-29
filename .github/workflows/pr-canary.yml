@@ -63,25 +63,8 @@ jobs:
         with:
           ref: master
           fetch-depth: 0
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.5'
-          extensions: mbstring, intl, mysqli
-          coverage: none
-      - name: Cache vendor directory
-        uses: actions/cache@v6
-        with:
-          path: ibl5/vendor
-          key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-vendor-
-      - name: Create config.php
-        working-directory: ibl5
-        run: cp config.php.example config.php
-      - name: Install dependencies
-        working-directory: ibl5
-        run: composer install --no-progress --no-interaction
+      - name: Setup PHP environment
+        uses: ./.github/actions/setup-php-env
       - name: Run fast-canary
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

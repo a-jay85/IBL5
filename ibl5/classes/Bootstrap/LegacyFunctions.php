@@ -73,12 +73,7 @@ function is_user($user)
 
 function blocks($side)
 {
-    global $storynum, $prefix, $multilingual, $currentlang, $db, $user;
-    if ($multilingual == 1) {
-        $querylang = "AND (blanguage='" . $db->db_connect_id->real_escape_string($currentlang) . "' OR blanguage='')";
-    } else {
-        $querylang = "";
-    }
+    global $storynum, $prefix, $multilingual, $currentlang, $mysqli_db, $user;
     if (strtolower($side[0]) == "l") {
         $pos = "l";
     } elseif (strtolower($side[0]) == "r") {
@@ -89,9 +84,19 @@ function blocks($side)
         $pos = "d";
     }
     $side = $pos;
-    $sql = "SELECT bid, bkey, title, content, url, blockfile, view, expire, action, subscription FROM " . $prefix . "_blocks WHERE bposition='$pos' AND active='1' $querylang ORDER BY weight ASC";
-    $result = $db->sql_query($sql);
-    while ($row = $db->sql_fetchrow($result)) {
+    $blockConditions = ["bposition = ?", "active = '1'"];
+    $blockTypes = 's';
+    $blockParams = [$pos];
+    if ($multilingual == 1) {
+        $blockConditions[] = "(blanguage = ? OR blanguage = '')";
+        $blockTypes .= 's';
+        $blockParams[] = $currentlang;
+    }
+    $stmtBlocks = $mysqli_db->prepare("SELECT bid, bkey, title, content, url, blockfile, view, expire, action, subscription FROM " . $prefix . "_blocks WHERE " . implode(' AND ', $blockConditions) . " ORDER BY weight ASC");
+    $stmtBlocks->bind_param($blockTypes, ...$blockParams);
+    $stmtBlocks->execute();
+    $result = $stmtBlocks->get_result();
+    while ($row = $result->fetch_assoc()) {
         $bid = intval($row['bid']);
         $title = (!isset($row['title'])) ?: filter($row['title'], "nohtml");
         $content = (!isset($row['content'])) ?: stripslashes($row['content']);
@@ -114,10 +119,16 @@ function blocks($side)
         if ($sub == 0 or $sub == 1) {
             if ($expire != 0 and $expire <= $now) {
                 if ($action == "d") {
-                    $db->sql_query("UPDATE " . $prefix . "_blocks SET active='0', expire='0' WHERE bid='$bid'");
+                    $stmtExpire = $mysqli_db->prepare("UPDATE " . $prefix . "_blocks SET active = '0', expire = '0' WHERE bid = ?");
+                    $stmtExpire->bind_param('i', $bid);
+                    $stmtExpire->execute();
+                    $stmtExpire->close();
                     return;
                 } elseif ($action == "r") {
-                    $db->sql_query("DELETE FROM " . $prefix . "_blocks WHERE bid='$bid'");
+                    $stmtDelete = $mysqli_db->prepare("DELETE FROM " . $prefix . "_blocks WHERE bid = ?");
+                    $stmtDelete->bind_param('i', $bid);
+                    $stmtDelete->execute();
+                    $stmtDelete->close();
                     return;
                 }
             }
@@ -148,7 +159,8 @@ function blocks($side)
             }
         }
     }
-    $db->sql_freeresult($result);
+    $result->free();
+    $stmtBlocks->close();
 }
 
 

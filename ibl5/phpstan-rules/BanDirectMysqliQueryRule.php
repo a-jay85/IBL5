@@ -17,7 +17,7 @@ use PHPStan\Rules\RuleErrorBuilder;
  * Raw query() bypasses prepared-statement parameterization. DB access must go
  * through a repository helper (BaseMysqliRepository::execute()/fetchOne()/fetchAll())
  * which prepares and binds. The boundary classes that wrap \mysqli directly
- * (BaseMysqliRepository, Database\MySQL) are allowlisted.
+ * (BaseMysqliRepository) is allowlisted.
  *
  * @implements Rule<MethodCall>
  */
@@ -30,7 +30,6 @@ final class BanDirectMysqliQueryRule implements Rule
      */
     private const ALLOWED_FILE_TAILS = [
         DIRECTORY_SEPARATOR . 'BaseMysqliRepository.php',
-        DIRECTORY_SEPARATOR . 'Database' . DIRECTORY_SEPARATOR . 'MySQL.php',
     ];
 
     public function getNodeType(): string

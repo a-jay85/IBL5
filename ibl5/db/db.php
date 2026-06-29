@@ -93,8 +93,6 @@ switch ($dbtype) {
 }
 
 if ($dbtype == 'MySQL') {
-    $db = new \Database\MySQL($dbhost, $dbuname, $dbpass, $dbname, false);
-
     // Create mysqli connection with native type casting enabled
     // This makes INT/FLOAT columns return PHP int/float instead of strings
     // Required for PHP 8.x strict type declarations
@@ -106,11 +104,11 @@ if ($dbtype == 'MySQL') {
     if ($mysqli_db) {
         $mysqli_db->set_charset('utf8mb4');
     }
+    if ($mysqli_db->connect_errno) {
+        die("<br><br><center><img src=images/logo.gif><br><br><b>There seems to be a problem with the $dbtype server, sorry for the inconvenience.<br><br>We should be back shortly.</center></b>");
+    }
 } else if ($dbtype == 'sqlite') {
     $db = new SQLite($dbhost);
 } else {
     $db = new sql_db($dbhost, $dbuname, $dbpass, $dbname, false);
-}
-if (!$db->db_connect_id) {
-    die("<br><br><center><img src=images/logo.gif><br><br><b>There seems to be a problem with the $dbtype server, sorry for the inconvenience.<br><br>We should be back shortly.</center></b>");
 }

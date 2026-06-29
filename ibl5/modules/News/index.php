@@ -24,13 +24,16 @@ get_lang($module_name);
 
 function theindex($new_topic = "0")
 {
-    global $db, $storyhome, $topicname, $topicimage, $topictext, $user, $prefix, $multilingual, $currentlang, $articlecomm, $sitename, $user_news, $userinfo, $authService, $mysqli_db;
+    global $storyhome, $topicname, $topicimage, $topictext, $user, $prefix, $multilingual, $currentlang, $articlecomm, $sitename, $user_news, $userinfo, $authService, $mysqli_db;
     if (is_user($user)) {$userinfo = $authService->getUserInfo();}
     $new_topic = intval($new_topic);
+    $storyConditions = [];
+    $storyTypes = '';
+    $storyParams = [];
     if ($multilingual == 1) {
-        $querylang = "AND (alanguage='$currentlang' OR alanguage='')";
-    } else {
-        $querylang = "";
+        $storyConditions[] = "(alanguage = ? OR alanguage = '')";
+        $storyTypes .= 's';
+        $storyParams[] = $currentlang;
     }
     PageLayout\PageLayout::header();
 
@@ -62,19 +65,27 @@ function theindex($new_topic = "0")
         $storynum = $storyhome;
     }
     if ($new_topic == 0) {
-        $qdb = "WHERE (ihome='0' OR catid='0')";
+        array_unshift($storyConditions, "(ihome='0' OR catid='0')");
         $home_msg = "";
     } else {
-        $qdb = "WHERE topic='$new_topic'";
-        $result_a = $db->sql_query("SELECT topictext FROM " . $prefix . "_topics WHERE topicid='$new_topic'");
-        $row_a = $db->sql_fetchrow($result_a);
-        $numrows_a = $db->sql_numrows($result_a);
-        $topic_title = \Security\HtmlSanitizer::safeHtmlOutput($row_a['topictext']);
+        array_unshift($storyConditions, "topic = ?");
+        $storyTypes = 'i' . $storyTypes;
+        array_unshift($storyParams, $new_topic);
+        $stmtTopic = $mysqli_db->prepare("SELECT topictext FROM " . $prefix . "_topics WHERE topicid = ?");
+        $stmtTopic->bind_param('i', $new_topic);
+        $stmtTopic->execute();
+        $result_a = $stmtTopic->get_result();
+        $row_a = $result_a->fetch_assoc();
+        $numrows_a = $result_a->num_rows;
+        $stmtTopic->close();
+        $topic_title = \Security\HtmlSanitizer::safeHtmlOutput($row_a['topictext'] ?? '');
         OpenTable();
         if ($numrows_a == 0) {
             echo "<center><font class=\"title\">$sitename</font><br><br>" . _NOINFO4TOPIC . "<br><br>[ <a href=\"modules.php?name=News\">" . _GOTONEWSINDEX . "</a> | <a href=\"modules.php?name=Topics\">" . _SELECTNEWTOPIC . "</a> ]</center>";
         } else {
-            $db->sql_query("UPDATE " . $prefix . "_topics SET counter=counter+1");
+            $stmtUpdate = $mysqli_db->prepare("UPDATE " . $prefix . "_topics SET counter = counter + 1");
+            $stmtUpdate->execute();
+            $stmtUpdate->close();
             echo "<center><font class=\"title\">$sitename: $topic_title</font><br><br>"
                 . "<form action=\"modules.php?name=Search\" method=\"post\">"
                 . "<input type=\"hidden\" name=\"topic\" value=\"$new_topic\">"
@@ -86,8 +97,14 @@ function theindex($new_topic = "0")
         CloseTable();
         echo "<br>";
     }
-    $result = $db->sql_query("SELECT sid, catid, aid, title, time, hometext, bodytext, comments, counter, topic, informant, notes, acomm FROM " . $prefix . "_stories $qdb $querylang ORDER BY sid DESC limit $storynum");
-    while ($row = $db->sql_fetchrow($result)) {
+    $storyTypes .= 'i';
+    $storyParams[] = (int) $storynum;
+    $whereSql = $storyConditions !== [] ? 'WHERE ' . implode(' AND ', $storyConditions) : '';
+    $stmtStories = $mysqli_db->prepare("SELECT sid, catid, aid, title, time, hometext, bodytext, comments, counter, topic, informant, notes, acomm FROM " . $prefix . "_stories " . $whereSql . " ORDER BY sid DESC LIMIT ?");
+    $stmtStories->bind_param($storyTypes, ...$storyParams);
+    $stmtStories->execute();
+    $result = $stmtStories->get_result();
+    while ($row = $result->fetch_assoc()) {
         $s_sid = intval($row['sid']);
         $catid = intval($row['catid']);
         $aid = $row['aid'];
@@ -102,8 +119,12 @@ function theindex($new_topic = "0")
         $notes = \Security\HtmlSanitizer::safeHtmlOutput($row['notes']);
         $acomm = intval($row['acomm']);
         if ($catid > 0) {
-            $row2 = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_stories_cat WHERE catid='$catid'"));
-            $cattitle = \Security\HtmlSanitizer::safeHtmlOutput($row2['title']);
+            $stmtCat2 = $mysqli_db->prepare("SELECT title FROM " . $prefix . "_stories_cat WHERE catid = ?");
+            $stmtCat2->bind_param('i', $catid);
+            $stmtCat2->execute();
+            $row2 = $stmtCat2->get_result()->fetch_assoc();
+            $stmtCat2->close();
+            $cattitle = \Security\HtmlSanitizer::safeHtmlOutput($row2['title'] ?? '');
         }
         $stmtTopics = $mysqli_db->prepare(
             "SELECT t.topicid, t.topicname, t.topicimage, t.topictext
@@ -152,14 +173,19 @@ function theindex($new_topic = "0")
         }
         $sid = intval($s_sid);
         if ($catid != 0) {
-            $row3 = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_stories_cat WHERE catid='$catid'"));
-            $title1 = \Security\HtmlSanitizer::safeHtmlOutput($row3['title']);
+            $stmtCat3 = $mysqli_db->prepare("SELECT title FROM " . $prefix . "_stories_cat WHERE catid = ?");
+            $stmtCat3->bind_param('i', $catid);
+            $stmtCat3->execute();
+            $row3 = $stmtCat3->get_result()->fetch_assoc();
+            $stmtCat3->close();
+            $title1 = \Security\HtmlSanitizer::safeHtmlOutput($row3['title'] ?? '');
             $catLabel = $title1 !== '' ? $title1 : 'Category';
             $title = "<a class='readmore' href=\"modules.php?name=News&amp;file=categories&amp;op=newindex&amp;catid=$catid\" aria-label=\"$catLabel\"><font class=\"storycat\">$title1</font></a>: $title";
         }
         $morelink = implode(' | ', $morelink_parts);
         themeindex($aid, $informant, $time, $title, $counter, $topic, $hometext, $notes, $morelink, $topicname, $topicimage, $topictext);
     }
+    $stmtStories->close();
     PageLayout\PageLayout::footer();
 }
 

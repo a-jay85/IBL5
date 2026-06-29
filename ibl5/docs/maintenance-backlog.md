@@ -994,7 +994,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 | 5.15 | ◑ Partial | 🟨 | `argument.type` 161→**73** in tests baseline (verified); phantom cascades cleared, real remainder persists (#1100 burns 2). Each fix must **not** weaken the assert (`feedback_agent_argument_type_weakening`) → careful, error-prone. |
 | 5.16 | ✅ Implemented | — | ibl.inlineCss 0; PageLayout inline `@phpstan-ignore`. |
 | 5.17 | ✅ Implemented | — | cookieBeforeHeader 4 cleared; zero-floor (ADR-0032). |
-| 5.18 | ◑ Partial | 🟩 | ConfigBootstrap baseline **6→1** (verified, only sqlStringInterpolation left). `Database\MySQL` now has no app consumers (grep finds only the class file) → removal likely unblocked; green-green after consumer re-verify. |
+| 5.18 | ✅ Implemented | — | Deprecated `Database\MySQL` removed: 3 consumers (News/index.php, News/categories.php, blocks()) migrated to `$mysqli_db` prepared statements; class file + db.php instantiation deleted; db.php health check reworked to `$mysqli_db->connect_errno`. The earlier "no app consumers" note was wrong — there were 3, now migrated. |
 | 5.19 | ◑ Partial | 🟨 | DepthChartEntry tests **87→16** baseline entries (verified); bulk cleared by 5.1/5.14. Remaining 16 = careful test-type fixes (as 5.15). |
 | 5.20 | ✅ Implemented | — | missingType.iterableValue 0 (#939/#958). |
 | 5.21 | ✅ Implemented | — | ibl.deprecatedHtmlTag 0 in both baselines. |
@@ -1126,7 +1126,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Migrate config-read to prepared statements via `$mysqli_db`; fix HTML.
 **Est. effort:** M
 **Risk if untouched:** Blocks `Database\MySQL` deprecation removal.
-**Status:** Partial (verified 2026-06-20) — ConfigBootstrap baseline entries down 6→1 (only `ibl.sqlStringInterpolation`); a grep finds no remaining app consumers of `Database\MySQL` besides the class file, so removal is likely now unblocked (re-verify consumers first).
+**Status:** Completed (2026-06-25) — `Database\MySQL` deleted. The "no remaining app consumers" claim was incorrect; the actual consumers were `modules/News/index.php`, `modules/News/categories.php`, and `classes/Bootstrap/LegacyFunctions.php::blocks()`, all migrated to `$mysqli_db` prepared statements. `db/db.php` instantiation removed and its connection-health check reworked to probe `$mysqli_db->connect_errno`.
 
 ### 5.19 DepthChartEntry Tests — 87 Errors Across 5 Files (Canonical Module!)
 **Location:** `ibl5/tests/DepthChartEntry/`

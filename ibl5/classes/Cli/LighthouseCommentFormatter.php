@@ -83,8 +83,17 @@ final class LighthouseCommentFormatter
         $body .= "\u{1F7E1} = below warn threshold or regression > 0.03 vs baseline\n";
         $body .= "\u{1F534} = below error threshold\n";
 
+        // Clean audits (no error-level violation) collapse under <details> to save
+        // PR scroll space; failing audits stay expanded. The wrapComment() marker
+        // stays outside the <details> so sticky-comment detection still finds it.
+        $markdown = $hasErrorViolation
+            ? $body
+            : "<details><summary>\u{2705} Lighthouse Audit \u{2014} no failing audits</summary>\n\n"
+                . $body
+                . "\n</details>\n";
+
         return [
-            'markdown' => $this->wrapComment($body),
+            'markdown' => $this->wrapComment($markdown),
             'hasErrorViolation' => $hasErrorViolation,
         ];
     }

@@ -1948,7 +1948,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 | 10.10 | ⬜ Open | 🟩 | `RequireTrustedAnnotationRule` NOT built (verified absent from phpstan-rules/). New rule + baseline + ADR; green-green. |
 | 10.11 | ✅ Implemented | — | `BanDirectHeaderCallRule` (1 baseline). |
 | 10.12 | ✅ Implemented | 🟩 | `BanDirectMysqliQueryRule` landed; 7 Updater-step sites — burndown 🟩. **Status:** baseline cleared — 7 sites in 3 Refresh steps rerouted to `BaseMysqliRepository::execute()`. |
-| 10.13 | ✅ Implemented | 🟩 | `BanSqlStringInterpolationRule` landed; 32 baseline — burndown 🟩. |
+| 10.13 | ✅ Implemented | — | `BanSqlStringInterpolationRule` landed; all sqlInterp baseline entries cleared (PR2 finisher). |
 | 10.14 | 📋 Planned | 🟩 | PR #1160 open (`clock-abstraction-global-seam-ban-rule`): global Clock + ban direct time calls. L refactor, green-green. (Its "still open" note below is stale.) |
 | 10.15 | ✅ Implemented | — | Removed `ob_start()`/`echo ob_get_clean()` wrapper; output byte-identical (characterization-pinned). |
 | 10.16 | ✅ Implemented | — | unescapedOutput baseline cleared. |
@@ -1956,7 +1956,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 | 10.18 | ✅ Implemented | — | `BanServiceExtendsBaseRepositoryRule` (0). |
 | 10.19 | ✅ Implemented | 🟩 | `BanDuplicateModifierMethodRule` landed; 5 ExtensionOfferEvaluator sites — burndown 🟩. **Status:** baseline cleared — 5 adapter methods renamed `calculate*Modifier`→`compute*Modifier` (delegation to `ContractRules` unchanged). |
 | 10.20 | ✅ Implemented | — | `RequireMeaningfulAssertionsRule` now flags `assertNotNull()` on statically-non-null values via `$scope->getType()->isNull()`. **Status:** conservative `isNull()->no()` gate flagged zero existing sites — no baseline change. |
-| 10.21 | ✅ Implemented | 🟩 | `BanBareColumnIdentifierRule` landed; 23 sites (3 files) — burndown 🟩. |
+| 10.21 | ✅ Implemented | — | `BanBareColumnIdentifierRule` landed; all baseline sites cleared (shared-file residual cleared in PR2). |
 | 10.22 | ✅ Implemented | — | `BanJsonDecodeWithoutThrowFlagRule` (0). |
 | 10.23 | ✅ Implemented | 🟩 | `BanHardcodedEnvironmentStringsRule` landed; 8 sites — config-injection burndown 🟩 (env-branching — verify behavior). |
 | 10.24 | ✅ Implemented | — | RequireStrictTypesRule scope extended. |
@@ -2064,6 +2064,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Est. effort:** M
 **Risk if untouched:** Pattern is contagious; first user-controlled use is a real injection.
 **Status:** Rule landed (2026-05-31) — `BanSqlStringInterpolationRule` (`ibl.sqlStringInterpolation`). Flags `InterpolatedString` SQL literals via an anchored SQL-statement pattern, so prose mentioning SQL keywords as English words is NOT matched. `SeasonLeaderboards:80` is dot-concatenation, correctly NOT a site. Plan estimated 3 sites; the rule found 66 genuine interpolated-SQL sites across ~40 files (32 baseline entries) — all baselined. Refactoring (e.g. AwardHistory `$sortColumn` → match-validated enum) deferred to a separate plan.
+**Status (2026-06-25, burndown complete):** All interpolated-SQL sites converted to bound `?` params (values) or validated allowlist/`match()`/concatenated-literal identifiers (table/column names, ORDER BY, grouping columns); every `ibl.sqlStringInterpolation` baseline entry cleared. Done across the burndown PR1/PR2 pair (PR2 the finisher). `grep -c 'ibl.sqlStringInterpolation' phpstan-baseline.neon` → 0; `composer run analyse` green.
 
 ### 10.14 `time()` / `date()` / `strtotime()` — No Clock Abstraction
 **Location:** `Draft/DraftSelectionHandler.php:60`, `Cache/PageCache.php:87,112`, `Cache/DatabaseCache.php:52,83`, `Security/CsrfGuard.php:98,209,263`, `LeagueSchedule/LeagueScheduleView.php:89-121`, several more
@@ -2123,6 +2124,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Est. effort:** M
 **Risk if untouched:** Column renames leave silent runtime errors.
 **Status:** Rule landed (2026-05-31) — `BanBareColumnIdentifierRule` (`ibl.bareColumnIdentifier`). NOT an extension of `BanInconsistentColumnNamesRule` (global `name`/`value` matching would false-positive every table). New rule narrowly targets bare `ibl_<table>.<column>` qualified refs — the `ibl_` prefix disambiguates them; bare unqualified columns, alias-qualified columns (`p.name`), and `ibl_plr.*` are NOT flagged. Zero false positives in a trial `composer run analyse` → ships blocking (no advisory downgrade needed). 23 baseline occurrences across 3 files (`FreeAgencyAdminRepository`, `PlayerDatabaseRepository`, `Team`).
+**Status (2026-06-25, burndown complete):** All bare `ibl_<table>.<column>` refs in the 3 shared files backticked both halves (`` `ibl_plr`.`pid` ``); every `ibl.bareColumnIdentifier` baseline entry cleared. `PlayerDatabaseRepository`'s big query was an interpolated literal (hidden from the column rule) — de-interpolating its `WHERE` clause exposed its `ibl_` refs, which were backticked in the same edit to avoid new violations. `grep -c 'ibl.bareColumnIdentifier' phpstan-baseline.neon` → 0; `composer run analyse` green.
 
 ### 10.22 `json_decode` Without `JSON_THROW_ON_ERROR`
 **Location:** `Cache/DatabaseCache.php:52`, `Utilities/TestCookieOverrides.php`, `Negotiation/NegotiationRepository.php`, `Trading/TradeQueueProcessor.php`

@@ -4,7 +4,7 @@
 # bin/test-check-pr-collisions — regression harness for bin/check-pr-collisions.
 #
 # All GitHub calls are intercepted by a stub gh (via GH_CMD). No network required.
-# Pins: grouping, ascending merge order, draft exclusion, dir-prefix matching,
+# Pins: grouping, ascending PR-number listing, draft exclusion, dir-prefix matching,
 # benign self-clear path, empty-set sweep, and sticky-marker convergence.
 #
 # Run: bin/test-check-pr-collisions  (exit 0 = all pass, 1 = a case failed)
@@ -123,8 +123,10 @@ body11="$(pr_body 11)"
 assert_match "grouping-names-#10"  '#10' "$body11"
 assert_match "grouping-names-#12"  '#12' "$body11"
 
-# (b) Order: recommended merge order is ascending #10, #11, #12
-assert_match "order-ascending" '#10.*#11.*#12' "$body11"
+# (b) Listing: PRs are listed ascending #10, #11, #12 (lowest-first, not a merge order)
+assert_match "listing-ascending" '#10.*#11.*#12' "$body11"
+# (b cont) The list is explicitly NOT framed as a recommended merge order
+assert_absent "no-prescriptive-order" 'Recommended merge order' "$body11"
 
 # (c) Benign — collision-prone file but no sibling: #20 touches phpstan-baseline alone
 body20="$(pr_body 20)"

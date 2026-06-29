@@ -345,7 +345,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Add `DraftService`; promote `DraftSelectionHandler` to `DraftController` (or merge).
 **Est. effort:** M
 **Risk if untouched:** Globals untestable; `DraftSelectionHandler` confuses future contributors.
-**Status:** Completed (2026-06-28) — DraftService + DraftBoardData added; DraftSelectionHandler promoted to DraftController; userinfo()/main() globals removed from modules/Draft/index.php.
+**Status:** Completed (2026-06-28, #1240) — DraftService + DraftBoardData added; DraftSelectionHandler promoted to DraftController; userinfo()/main() globals removed from modules/Draft/index.php.
 
 ### 2.7 Injuries — No Repository Layer
 **Location:** `classes/Injuries/`

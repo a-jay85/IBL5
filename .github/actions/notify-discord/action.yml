@@ -1,0 +1,58 @@
+name: 'Notify via Discord DM'
+description: >-
+  Read a pre-built message from a file, wrap it in the IBLbot discordDM payload,
+  and POST it over SSH to the prod box. Assumes a prior Setup SSH step already
+  wrote ~/.ssh/id_deploy.
+inputs:
+  message-file:
+    description: 'Path to a file holding the already-built message body.'
+    required: false
+    default: '/tmp/discord-msg.txt'
+  discord-id:
+    description: 'Recipient Discord user id (secrets.OWNER_DISCORD_ID).'
+    required: true
+  port:
+    description: 'SSH port.'
+    required: true
+  host:
+    description: 'SSH host (the prod box running IBLbot).'
+    required: true
+  username:
+    description: 'SSH username.'
+    required: true
+  fail-on-delivery:
+    description: >-
+      "true" (default): curl -sf with no swallow — a non-2xx or unreachable bot
+      turns the job RED (loud-fail). "false": curl -s + warn-and-continue (soft-fail).
+    required: false
+    default: 'true'
+runs:
+  using: 'composite'
+  steps:
+    - name: Send Discord DM
+      shell: bash
+      env:
+        OWNER_DISCORD_ID: ${{ inputs.discord-id }}
+        MSG_FILE: ${{ inputs.message-file }}
+        PORT: ${{ inputs.port }}
+        HOST: ${{ inputs.host }}
+        USERNAME: ${{ inputs.username }}
+        FAIL_ON_DELIVERY: ${{ inputs.fail-on-delivery }}
+      run: |
+        MSG=$(cat "$MSG_FILE")
+
+        PAYLOAD=$(jq -n --arg id "$OWNER_DISCORD_ID" --arg msg "$MSG" \
+          '{content: {receivingUserDiscordID: $id, message: $msg}}')
+
+        if [ "$FAIL_ON_DELIVERY" = "true" ]; then
+          # Fail loud: curl -f (non-2xx → exit 22), no `|| echo` swallow — a delivery
+          # failure turns this notify job RED via GitHub's native failure email. A
+          # silently-dropped alert is worse than none.
+          echo "$PAYLOAD" | ssh -p "$PORT" -i ~/.ssh/id_deploy "$USERNAME@$HOST" \
+            'curl -sf --max-time 10 -X POST http://localhost:50000/discordDM -H "Content-Type: application/json" -d @-'
+        else
+          # Soft-fail: a down bot must not red an advisory cron. Warn and continue.
+          echo "$PAYLOAD" | ssh -p "$PORT" -i ~/.ssh/id_deploy "$USERNAME@$HOST" \
+            'curl -s --max-time 10 -X POST http://localhost:50000/discordDM -H "Content-Type: application/json" -d @-' \
+            || echo "::warning::IBLbot notification failed (bot may be down)"
+        fi

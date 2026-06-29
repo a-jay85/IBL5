@@ -33,12 +33,15 @@ $cat = $catid;
 
 function theindex($catid)
 {
-    global $storyhome, $topicname, $topicimage, $topictext, $datetime, $user, $cookie, $nukeurl, $prefix, $multilingual, $currentlang, $db, $articlecomm, $module_name, $userinfo, $authService, $mysqli_db;
+    global $storyhome, $topicname, $topicimage, $topictext, $datetime, $user, $cookie, $nukeurl, $prefix, $multilingual, $currentlang, $articlecomm, $module_name, $userinfo, $authService, $mysqli_db;
     if (is_user($user)) {$userinfo = $authService->getUserInfo();}
+    $storyConditions = [];
+    $storyTypes = '';
+    $storyParams = [];
     if ($multilingual == 1) {
-        $querylang = "AND (alanguage='$currentlang' OR alanguage='')"; /* the OR is needed to display stories who are posted to ALL languages */
-    } else {
-        $querylang = "";
+        $storyConditions[] = "(alanguage = ? OR alanguage = '')";
+        $storyTypes .= 's';
+        $storyParams[] = $currentlang;
     }
     PageLayout\PageLayout::header();
     if (isset($userinfo['storynum'])) {
@@ -47,9 +50,20 @@ function theindex($catid)
         $storynum = $storyhome;
     }
     $catid = intval($catid);
-    $db->sql_query("update " . $prefix . "_stories_cat set counter=counter+1 where catid='$catid'");
-    $result = $db->sql_query("SELECT sid, aid, title, time, hometext, bodytext, comments, counter, topic, informant, notes, acomm FROM " . $prefix . "_stories where catid='$catid' $querylang ORDER BY sid DESC limit $storynum");
-    while ($row = $db->sql_fetchrow($result)) {
+    $stmtCatUpdate = $mysqli_db->prepare("UPDATE " . $prefix . "_stories_cat SET counter = counter + 1 WHERE catid = ?");
+    $stmtCatUpdate->bind_param('i', $catid);
+    $stmtCatUpdate->execute();
+    $stmtCatUpdate->close();
+    array_unshift($storyConditions, "catid = ?");
+    $storyTypes = 'i' . $storyTypes;
+    array_unshift($storyParams, $catid);
+    $storyTypes .= 'i';
+    $storyParams[] = (int) $storynum;
+    $stmtStories = $mysqli_db->prepare("SELECT sid, aid, title, time, hometext, bodytext, comments, counter, topic, informant, notes, acomm FROM " . $prefix . "_stories WHERE " . implode(' AND ', $storyConditions) . " ORDER BY sid DESC LIMIT ?");
+    $stmtStories->bind_param($storyTypes, ...$storyParams);
+    $stmtStories->execute();
+    $result = $stmtStories->get_result();
+    while ($row = $result->fetch_assoc()) {
         $s_sid = intval($row['sid']);
         $aid = $row['aid'];
         $title = \Security\HtmlSanitizer::safeHtmlOutput($row['title']);
@@ -104,11 +118,16 @@ function theindex($catid)
         $morelink .= " ";
         $morelink = str_replace(" |  | ", " | ", $morelink);
         $sid = intval($s_sid);
-        $row2 = $db->sql_fetchrow($db->sql_query("select title from " . $prefix . "_stories_cat where catid='$catid'"));
-        $title1 = \Security\HtmlSanitizer::safeHtmlOutput($row2['title']);
+        $stmtCat2 = $mysqli_db->prepare("SELECT title FROM " . $prefix . "_stories_cat WHERE catid = ?");
+        $stmtCat2->bind_param('i', $catid);
+        $stmtCat2->execute();
+        $row2 = $stmtCat2->get_result()->fetch_assoc();
+        $stmtCat2->close();
+        $title1 = \Security\HtmlSanitizer::safeHtmlOutput($row2['title'] ?? '');
         $title = "$title1: $title";
         themeindex($aid, $informant, $time, $title, $counter, $topic, $hometext, $notes, $morelink, $topicname, $topicimage, $topictext);
     }
+    $stmtStories->close();
     PageLayout\PageLayout::footer();
 }
 

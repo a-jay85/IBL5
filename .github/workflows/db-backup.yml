@@ -61,14 +61,14 @@ jobs:
       REMOTE_DATABASE: iblhoops_ibl5
 
     steps:
+      - uses: actions/checkout@v7
+
       - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "$DEPLOY_KEY" > ~/.ssh/id_deploy
-          chmod 600 ~/.ssh/id_deploy
-          ssh-keyscan -p ${{ secrets.PORT }} "$BACKUP_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
-        env:
-          DEPLOY_KEY: ${{ secrets.PRIVATE_KEY }}
+        uses: ./.github/actions/setup-ssh
+        with:
+          host: ${{ github.event.inputs.ssh_host_override || secrets.HOST }}
+          port: ${{ secrets.PORT }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
 
       - name: Dump prod database, rotate, integrity-check
         id: dump
@@ -177,28 +177,26 @@ jobs:
     timeout-minutes: 5
 
     steps:
+      - uses: actions/checkout@v7
+
       - name: Setup SSH
         # Always the real prod host — a forced-bad backup host must still alert.
-        run: |
-          mkdir -p ~/.ssh
-          echo "$DEPLOY_KEY" > ~/.ssh/id_deploy
-          chmod 600 ~/.ssh/id_deploy
-          ssh-keyscan -p ${{ secrets.PORT }} ${{ secrets.HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
-        env:
-          DEPLOY_KEY: ${{ secrets.PRIVATE_KEY }}
+        uses: ./.github/actions/setup-ssh
+        with:
+          host: ${{ secrets.HOST }}
+          port: ${{ secrets.PORT }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
 
-      - name: Send Discord DM
-        env:
-          OWNER_DISCORD_ID: ${{ secrets.OWNER_DISCORD_ID }}
+      - name: Build Discord message
         run: |
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           MSG=$(printf 'Production DB backup FAILED (%s trigger).\n\nNo verified dump was produced for today. Check the run: %s' "${{ github.event_name }}" "$RUN_URL")
+          printf '%s' "$MSG" > /tmp/discord-msg.txt
 
-          PAYLOAD=$(jq -n --arg id "$OWNER_DISCORD_ID" --arg msg "$MSG" \
-            '{content: {receivingUserDiscordID: $id, message: $msg}}')
-
-          # Fail loud: no `|| echo` swallow and `curl -f` (non-2xx → exit 22), so a
-          # delivery failure turns this job RED — surfaced via GitHub's native
-          # scheduled-run failure email. A silently-dropped alert is worse than none.
-          echo "$PAYLOAD" | ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
-            'curl -sf --max-time 10 -X POST http://localhost:50000/discordDM -H "Content-Type: application/json" -d @-'
+      - name: Send Discord DM
+        uses: ./.github/actions/notify-discord
+        with:
+          discord-id: ${{ secrets.OWNER_DISCORD_ID }}
+          port: ${{ secrets.PORT }}
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}

@@ -1,0 +1,50 @@
+name: 'Setup SSH deploy key'
+description: >-
+  Write the deploy private key to ~/.ssh/id_deploy (chmod 600) and keyscan the
+  host into ~/.ssh/known_hosts. Optionally fail loud when any required secret is
+  empty (for workflow_call callers that may forget `secrets: inherit`).
+inputs:
+  host:
+    description: 'SSH host to keyscan (and assert non-empty when require-secrets is true).'
+    required: true
+  port:
+    description: 'SSH port.'
+    required: true
+  private-key:
+    description: 'SSH private key (secrets.PRIVATE_KEY). Written to ~/.ssh/id_deploy.'
+    required: true
+  username:
+    description: 'SSH username — only asserted non-empty when require-secrets is true.'
+    required: false
+    default: ''
+  require-secrets:
+    description: >-
+      When "true", fail loud if PORT/HOST/USERNAME/PRIVATE_KEY are empty.
+    required: false
+    default: 'false'
+runs:
+  using: 'composite'
+  steps:
+    - name: Write deploy key and keyscan host
+      shell: bash
+      env:
+        PORT: ${{ inputs.port }}
+        HOST: ${{ inputs.host }}
+        USERNAME: ${{ inputs.username }}
+        DEPLOY_KEY: ${{ inputs.private-key }}
+        REQUIRE_SECRETS: ${{ inputs.require-secrets }}
+      run: |
+        set -euo pipefail
+        if [ "$REQUIRE_SECRETS" = "true" ]; then
+          # Fail loud if a secret is empty. When the workflow runs via `workflow_call`
+          # the caller MUST pass `secrets: inherit`, or these render empty and `ssh -p`
+          # silently consumes `-i` as its port arg ("Bad port '-i'"). See run 27378437919.
+          : "${PORT:?empty — caller must pass 'secrets: inherit'}"
+          : "${HOST:?empty — caller must pass 'secrets: inherit'}"
+          : "${USERNAME:?empty — caller must pass 'secrets: inherit'}"
+          : "${DEPLOY_KEY:?empty — caller must pass 'secrets: inherit'}"
+        fi
+        mkdir -p ~/.ssh
+        echo "$DEPLOY_KEY" > ~/.ssh/id_deploy
+        chmod 600 ~/.ssh/id_deploy
+        ssh-keyscan -p "$PORT" "$HOST" >> ~/.ssh/known_hosts 2>/dev/null || true

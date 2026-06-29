@@ -24,13 +24,11 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "$DEPLOY_KEY" > ~/.ssh/id_deploy
-          chmod 600 ~/.ssh/id_deploy
-          ssh-keyscan -p ${{ secrets.PORT }} ${{ secrets.HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
-        env:
-          DEPLOY_KEY: ${{ secrets.PRIVATE_KEY }}
+        uses: ./.github/actions/setup-ssh
+        with:
+          host: ${{ secrets.HOST }}
+          port: ${{ secrets.PORT }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
 
       - name: Fetch log digest
         id: digest
@@ -85,14 +83,10 @@ jobs:
           } | tee /tmp/discord-msg.txt
 
       - name: Send Discord DM
-        env:
-          OWNER_DISCORD_ID: ${{ secrets.OWNER_DISCORD_ID }}
-        run: |
-          MSG=$(cat /tmp/discord-msg.txt)
-
-          PAYLOAD=$(jq -n --arg id "$OWNER_DISCORD_ID" --arg msg "$MSG" \
-            '{content: {receivingUserDiscordID: $id, message: $msg}}')
-
-          echo "$PAYLOAD" | ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
-            'curl -s --max-time 10 -X POST http://localhost:50000/discordDM -H "Content-Type: application/json" -d @-' \
-            || echo "::warning::IBLbot notification failed (bot may be down)"
+        uses: ./.github/actions/notify-discord
+        with:
+          discord-id: ${{ secrets.OWNER_DISCORD_ID }}
+          port: ${{ secrets.PORT }}
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          fail-on-delivery: 'false'

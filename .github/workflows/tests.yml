@@ -606,6 +606,8 @@ jobs:
         run: bin/test-post-review-findings
       - name: bin/test-playwright-version
         run: bin/test-playwright-version
+      - name: bin/test-pr-canary-check
+        run: bin/test-pr-canary-check
 
   gate:
     name: Tests and Analysis

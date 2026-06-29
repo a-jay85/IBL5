@@ -1,0 +1,164 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/pr-canary-check — Advisory per-PR fast-canary helper.
+#
+# For one PR number: trial-merges latest master into the PR head, runs
+# composer run analyse (PHPStan) + composer run test (default-group PHPUnit),
+# renders a pass/fail report body, and posts it as a create-or-update sticky
+# comment on the PR.
+#
+# Exit codes: 0 = ran (findings are advisory — never exits 1 on a finding);
+#             2 = usage error.
+# NOT a required check — advisory only, never blocks merge.
+
+set -euo pipefail
+
+GH_CMD="${GH_CMD:-gh}"
+STICKY_MARKER="<!-- pr-fast-canary -->"
+
+# Test seams — override in tests to inject stub commands without real git/composer.
+do_trial_merge() { ${CANARY_MERGE_CMD:-git merge --no-commit --no-ff FETCH_HEAD}; }
+do_analyse()     { ( cd "$REPO_ROOT/ibl5" && ${CANARY_ANALYSE_CMD:-composer run analyse}; ); }
+do_test()        { ( cd "$REPO_ROOT/ibl5" && ${CANARY_TEST_CMD:-composer run test}; ); }
+
+usage() {
+    cat <<'EOF'
+Usage: bin/pr-canary-check --pr <n> [--help|-h]
+
+Advisory per-PR fast-canary: trial-merge latest master into the PR head,
+run PHPStan + default-group PHPUnit, post a sticky comment on the PR.
+
+Options:
+  --pr <n>     PR number to canary-check (required).
+  --help, -h   Show this message.
+
+Environment (test seams):
+  GH_CMD              Override the gh command (default: "gh").
+  CANARY_MERGE_CMD    Override the trial-merge command.
+  CANARY_ANALYSE_CMD  Override the composer run analyse command.
+  CANARY_TEST_CMD     Override the composer run test command.
+EOF
+}
+
+PR_NUM=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --pr)
+            if [[ $# -lt 2 ]]; then
+                echo "Error: --pr requires a PR number" >&2
+                usage >&2
+                exit 2
+            fi
+            PR_NUM="$2"
+            shift 2
+            ;;
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Error: unknown option: $1" >&2
+            usage >&2
+            exit 2
+            ;;
+    esac
+done
+
+if [[ -z "$PR_NUM" ]]; then
+    echo "Error: --pr <n> is required" >&2
+    usage >&2
+    exit 2
+fi
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+# Trial-merge: only fetch for real when the merge cmd is not injected
+merge=clean
+[ -z "${CANARY_MERGE_CMD:-}" ] && git fetch --no-tags origin "refs/pull/${PR_NUM}/head"
+if ! do_trial_merge >/tmp/canary-merge.log 2>&1; then
+    merge=conflict
+    git merge --abort || true
+fi
+
+# set -e-safe capture: run checks only when the merge was clean
+analyse=skipped
+test=skipped
+if [ "$merge" = clean ]; then
+    analyse=pass; if ! do_analyse >/tmp/canary-analyse.log 2>&1; then analyse=fail; fi
+    test=pass;    if ! do_test    >/tmp/canary-test.log    2>&1; then test=fail;    fi
+fi
+
+render_body() {
+    local merge_status analyse_status test_status overall
+
+    case "$merge" in
+        clean)    merge_status="clean" ;;
+        conflict) merge_status="CONFLICT" ;;
+        *)        merge_status="$merge" ;;
+    esac
+
+    case "$analyse" in
+        pass)    analyse_status="PASS" ;;
+        fail)    analyse_status="FAIL" ;;
+        skipped) analyse_status="skipped" ;;
+        *)       analyse_status="$analyse" ;;
+    esac
+
+    case "$test" in
+        pass)    test_status="PASS" ;;
+        fail)    test_status="FAIL" ;;
+        skipped) test_status="skipped" ;;
+        *)       test_status="$test" ;;
+    esac
+
+    if [ "$merge" = conflict ] || [ "$analyse" = fail ] || [ "$test" = fail ]; then
+        overall="FAIL"
+    else
+        overall="PASS"
+    fi
+
+    local run_link=""
+    if [[ -n "${GITHUB_SERVER_URL:-}" && -n "${GITHUB_REPOSITORY:-}" && -n "${GITHUB_RUN_ID:-}" ]]; then
+        run_link="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+    fi
+
+    printf '## PR Fast-Canary\n\n'
+    printf '**Merge:** %s\n\n' "$merge_status"
+    printf '**PHPStan (`composer run analyse`):** %s\n\n' "$analyse_status"
+    printf '**PHPUnit (`composer run test`):** %s\n\n' "$test_status"
+    printf '**Overall:** %s\n\n' "$overall"
+    if [[ -n "$run_link" ]]; then
+        printf '[Run log](%s)\n\n' "$run_link"
+    fi
+    printf '> **Advisory only — does not block merge.** The merge queue runs the authoritative full suite.\n\n'
+    printf '%s\n' "$STICKY_MARKER"
+}
+
+post_sticky() {
+    local n="$1"
+    local body="$2"
+    local tmpfile
+    tmpfile="$(mktemp)"
+
+    printf '%s\n' "$body" > "$tmpfile"
+
+    local existing_id
+    existing_id="$("$GH_CMD" api "repos/{owner}/{repo}/issues/$n/comments" --paginate \
+        --jq ".[] | select(.body | contains(\"$STICKY_MARKER\")) | .id" | head -1 || true)"
+
+    if [[ -n "$existing_id" ]]; then
+        "$GH_CMD" api --method PATCH "repos/{owner}/{repo}/issues/comments/$existing_id" \
+            -F body=@"$tmpfile" >/dev/null || true
+    else
+        "$GH_CMD" pr comment "$n" --body-file "$tmpfile" >/dev/null || true
+    fi
+
+    rm -f "$tmpfile"
+}
+
+body="$(render_body)"
+printf '%s\n' "$body"
+post_sticky "$PR_NUM" "$body"
+exit 0

@@ -1,0 +1,88 @@
+name: PR Fast-Canary
+
+# Advisory early-signal: on each master push, trial-merge latest master into every
+# open PR head and run ONLY the cheap checks (PHPStan + default-group PHPUnit), skipping
+# the heavy E2E suite. Reports per-PR via a sticky comment. NOT a required check — the
+# merge queue owns the authoritative full-suite gate.
+
+on:
+  push:
+    branches: [master]
+    paths-ignore:
+      - '**.md'
+      - '.claude/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
+      - '.github/CODEOWNERS'
+      - 'LICENSE'
+      - '**/LICENSE'
+      - '.gitignore'
+      - '**/.gitignore'
+      - '.gitattributes'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: pr-canary
+  cancel-in-progress: true
+
+jobs:
+  enumerate:
+    name: Enumerate open PRs
+    runs-on: ubuntu-latest
+    outputs:
+      prs: ${{ steps.list.outputs.prs }}
+      count: ${{ steps.list.outputs.count }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: List open PRs as a JSON array
+        id: list
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          prs=$(gh pr list --base master --state open --json number --jq '[.[].number]')
+          echo "prs=$prs" >> "$GITHUB_OUTPUT"
+          echo "count=$(printf '%s' "$prs" | jq 'length')" >> "$GITHUB_OUTPUT"
+
+  canary:
+    name: Canary PR #${{ matrix.pr }}
+    needs: enumerate
+    if: needs.enumerate.outputs.count != '0'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        pr: ${{ fromJSON(needs.enumerate.outputs.prs) }}
+    steps:
+      - name: Checkout master (full history)
+        uses: actions/checkout@v7
+        with:
+          ref: master
+          fetch-depth: 0
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: mbstring, intl, mysqli
+          coverage: none
+      - name: Cache vendor directory
+        uses: actions/cache@v6
+        with:
+          path: ibl5/vendor
+          key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-vendor-
+      - name: Create config.php
+        working-directory: ibl5
+        run: cp config.php.example config.php
+      - name: Install dependencies
+        working-directory: ibl5
+        run: composer install --no-progress --no-interaction
+      - name: Run fast-canary
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bin/pr-canary-check --pr "${{ matrix.pr }}"

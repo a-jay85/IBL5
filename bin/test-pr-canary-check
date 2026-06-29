@@ -1,0 +1,229 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-pr-canary-check — regression harness for bin/pr-canary-check.
+#
+# All GitHub calls are intercepted by a stub gh (via GH_CMD). No network,
+# no real git merge, no real PHP required. Proves every decision path of
+# the helper including all failure paths, set-e-safe capture, and sticky
+# comment create-vs-update routing.
+#
+# Run: bin/test-pr-canary-check  (exit 0 = all pass, exit 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+GUARD="$SCRIPT_DIR/pr-canary-check"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP" 2>/dev/null' EXIT
+
+FAILED=0
+
+pass()     { echo "ok: $1"; }
+failcase() { echo "FAIL: $1"; FAILED=1; }
+
+assert_match() {
+    if printf '%s' "$3" | grep -qE "$2"; then
+        pass "$1"
+    else
+        failcase "$1 — expected to match: $2"
+        printf '%s\n' "$3" | sed 's/^/    /'
+    fi
+}
+
+assert_absent() {
+    if printf '%s' "$3" | grep -qE "$2"; then
+        failcase "$1 — expected NOT to match: $2"
+        printf '%s\n' "$3" | sed 's/^/    /'
+    else
+        pass "$1"
+    fi
+}
+
+# --- Stub gh setup ---
+
+STUBBIN="$TMP/stubbin"
+GH_COMMENT_LOG="$TMP/comment.log"
+GH_PATCH_LOG="$TMP/patch.log"
+GH_API_LOG="$TMP/api.log"
+export GH_COMMENT_LOG GH_PATCH_LOG GH_API_LOG
+
+mkdir -p "$STUBBIN"
+
+cat > "$STUBBIN/gh" <<'STUB'
+#!/usr/bin/env bash
+set -u
+cmd="$1 ${2:-}"
+shift 2 2>/dev/null || shift 1 2>/dev/null || true
+
+case "$cmd" in
+    "api --method")
+        # PATCH — log the full invocation for assertion, succeed silently
+        printf 'PATCH %s\n' "$@" >> "${GH_PATCH_LOG:-/dev/null}"
+        printf 'PATCH %s\n' "$@" >> "${GH_API_LOG:-/dev/null}"
+        exit 0
+        ;;
+    "api "*)
+        # GET comments — log the call, return existing id or nothing
+        printf 'GET %s\n' "$cmd" >> "${GH_API_LOG:-/dev/null}"
+        if [[ -n "${GH_RETURN_EXISTING_ID:-}" ]]; then
+            printf '%s\n' "$GH_RETURN_EXISTING_ID"
+        fi
+        ;;
+    "pr comment")
+        # Log body file content to GH_COMMENT_LOG
+        body_file=""
+        while [[ $# -gt 0 ]]; do
+            case "$1" in
+                --body-file) body_file="$2"; shift 2 ;;
+                *) shift ;;
+            esac
+        done
+        if [[ -n "$body_file" && -f "$body_file" ]]; then
+            cat "$body_file" >> "${GH_COMMENT_LOG:-/dev/null}"
+            printf '\n---END---\n' >> "${GH_COMMENT_LOG:-/dev/null}"
+        fi
+        ;;
+    *)
+        exit 0
+        ;;
+esac
+STUB
+
+chmod +x "$STUBBIN/gh"
+
+# Shorthand: run canary with stub gh and injected seams, capture stdout + exit code
+run_canary() {
+    # Usage: run_canary [extra env vars...] -- [args to pass to pr-canary-check]
+    local extra_env=()
+    while [[ "${1:-}" != "--" && $# -gt 0 ]]; do
+        extra_env+=("$1")
+        shift
+    done
+    [[ "${1:-}" == "--" ]] && shift
+    env GH_CMD="$STUBBIN/gh" "${extra_env[@]+"${extra_env[@]}"}" "$GUARD" "$@" 2>/dev/null
+}
+
+run_canary_rc() {
+    # Like run_canary but returns the exit code, discards output
+    local extra_env=()
+    while [[ "${1:-}" != "--" && $# -gt 0 ]]; do
+        extra_env+=("$1")
+        shift
+    done
+    [[ "${1:-}" == "--" ]] && shift
+    env GH_CMD="$STUBBIN/gh" "${extra_env[@]+"${extra_env[@]}"}" "$GUARD" "$@" >/dev/null 2>&1
+    return $?
+}
+
+# --- Row 1: Usage errors ---
+
+run_canary_rc -- --pr && failcase "row1-pr-missing-value-exits2" || {
+    rc=$?; [ "$rc" -eq 2 ] && pass "row1-pr-missing-value-exits2" || failcase "row1-pr-missing-value-exits2 (got exit $rc)"
+}
+
+run_canary_rc -- --unknown-flag && failcase "row1-unknown-flag-exits2" || {
+    rc=$?; [ "$rc" -eq 2 ] && pass "row1-unknown-flag-exits2" || failcase "row1-unknown-flag-exits2 (got exit $rc)"
+}
+
+run_canary_rc -- --help && pass "row1-help-exits0" || failcase "row1-help-exits0 (got exit $?)"
+
+# --- Row 2: Merge conflict ---
+
+body_conflict="$(run_canary "CANARY_MERGE_CMD=false" "CANARY_ANALYSE_CMD=false" "CANARY_TEST_CMD=false" -- --pr 42)"
+rc_conflict=0
+run_canary_rc "CANARY_MERGE_CMD=false" "CANARY_ANALYSE_CMD=false" "CANARY_TEST_CMD=false" -- --pr 42 || rc_conflict=$?
+
+assert_match "row2-conflict-body-says-CONFLICT" 'CONFLICT' "$body_conflict"
+assert_match "row2-conflict-phpstan-skipped"    'PHPStan.*skipped' "$body_conflict"
+assert_match "row2-conflict-phpunit-skipped"    'PHPUnit.*skipped' "$body_conflict"
+assert_match "row2-conflict-overall-FAIL"       'Overall.*FAIL' "$body_conflict"
+[ "$rc_conflict" -eq 0 ] && pass "row2-conflict-exits0" || failcase "row2-conflict-exits0 (got $rc_conflict)"
+
+# --- Row 3: PHPStan FAIL (set-e-safe capture) ---
+
+body_analyse_fail="$(run_canary "CANARY_MERGE_CMD=true" "CANARY_ANALYSE_CMD=false" "CANARY_TEST_CMD=true" -- --pr 42)"
+rc_analyse_fail=0
+run_canary_rc "CANARY_MERGE_CMD=true" "CANARY_ANALYSE_CMD=false" "CANARY_TEST_CMD=true" -- --pr 42 || rc_analyse_fail=$?
+
+assert_match "row3-phpstan-fail-body"   'PHPStan.*FAIL'  "$body_analyse_fail"
+assert_match "row3-phpstan-overall-fail" 'Overall.*FAIL' "$body_analyse_fail"
+[ "$rc_analyse_fail" -eq 0 ] && pass "row3-phpstan-fail-exits0" || failcase "row3-phpstan-fail-exits0 (got $rc_analyse_fail)"
+
+# --- Row 4: PHPUnit FAIL ---
+
+body_test_fail="$(run_canary "CANARY_MERGE_CMD=true" "CANARY_ANALYSE_CMD=true" "CANARY_TEST_CMD=false" -- --pr 42)"
+rc_test_fail=0
+run_canary_rc "CANARY_MERGE_CMD=true" "CANARY_ANALYSE_CMD=true" "CANARY_TEST_CMD=false" -- --pr 42 || rc_test_fail=$?
+
+assert_match "row4-phpunit-fail-body"    'PHPUnit.*FAIL'  "$body_test_fail"
+assert_match "row4-phpunit-overall-fail" 'Overall.*FAIL'  "$body_test_fail"
+[ "$rc_test_fail" -eq 0 ] && pass "row4-phpunit-fail-exits0" || failcase "row4-phpunit-fail-exits0 (got $rc_test_fail)"
+
+# --- Row 5: All pass ---
+
+body_pass="$(run_canary "CANARY_MERGE_CMD=true" "CANARY_ANALYSE_CMD=true" "CANARY_TEST_CMD=true" -- --pr 42)"
+
+assert_match "row5-all-pass-overall" 'Overall.*PASS' "$body_pass"
+assert_match "row5-merge-clean"      'Merge.*clean'  "$body_pass"
+assert_match "row5-phpstan-pass"     'PHPStan.*PASS' "$body_pass"
+assert_match "row5-phpunit-pass"     'PHPUnit.*PASS' "$body_pass"
+
+# --- Row 6: Disclaimer + marker in every rendered body ---
+
+assert_match "row6-disclaimer-conflict"      'Advisory only'           "$body_conflict"
+assert_match "row6-marker-conflict"          '<!-- pr-fast-canary -->' "$body_conflict"
+assert_match "row6-disclaimer-analyse-fail"  'Advisory only'           "$body_analyse_fail"
+assert_match "row6-marker-analyse-fail"      '<!-- pr-fast-canary -->' "$body_analyse_fail"
+assert_match "row6-disclaimer-test-fail"     'Advisory only'           "$body_test_fail"
+assert_match "row6-marker-test-fail"         '<!-- pr-fast-canary -->' "$body_test_fail"
+assert_match "row6-disclaimer-pass"          'Advisory only'           "$body_pass"
+assert_match "row6-marker-pass"              '<!-- pr-fast-canary -->' "$body_pass"
+
+# --- Row 7: Sticky create (no existing comment) ---
+
+rm -f "$GH_COMMENT_LOG" "$GH_PATCH_LOG"
+GH_RETURN_EXISTING_ID="" \
+    run_canary "CANARY_MERGE_CMD=true" "CANARY_ANALYSE_CMD=true" "CANARY_TEST_CMD=true" -- --pr 99 >/dev/null 2>&1 || true
+log_create="$(cat "$GH_COMMENT_LOG" 2>/dev/null || true)"
+assert_match "row7-create-has-marker"   '<!-- pr-fast-canary -->' "$log_create"
+patch_log_create="$(cat "$GH_PATCH_LOG" 2>/dev/null || true)"
+assert_absent "row7-create-no-patch"    'PATCH' "$patch_log_create"
+
+# --- Row 8: Sticky update (existing comment id) ---
+
+rm -f "$GH_COMMENT_LOG" "$GH_PATCH_LOG"
+GH_RETURN_EXISTING_ID="999" \
+    run_canary "CANARY_MERGE_CMD=true" "CANARY_ANALYSE_CMD=true" "CANARY_TEST_CMD=true" -- --pr 99 >/dev/null 2>&1 || true
+patch_log_update="$(cat "$GH_PATCH_LOG" 2>/dev/null || true)"
+comment_log_update="$(cat "$GH_COMMENT_LOG" 2>/dev/null || true)"
+assert_match "row8-update-issues-patch" 'PATCH.*issues/comments/999' "$patch_log_update"
+[ -z "$comment_log_update" ] && pass "row8-update-no-create" \
+    || failcase "row8-update-no-create (gh pr comment was called when PATCH path should have run)"
+
+# --- Row 9: No statuses or check-runs ever called ---
+
+rm -f "$GH_API_LOG"
+for seam_combo in \
+    "CANARY_MERGE_CMD=false" \
+    "CANARY_MERGE_CMD=true CANARY_ANALYSE_CMD=false CANARY_TEST_CMD=true" \
+    "CANARY_MERGE_CMD=true CANARY_ANALYSE_CMD=true CANARY_TEST_CMD=false" \
+    "CANARY_MERGE_CMD=true CANARY_ANALYSE_CMD=true CANARY_TEST_CMD=true"
+do
+    eval "env GH_CMD=\"$STUBBIN/gh\" $seam_combo \"$GUARD\" --pr 42 >/dev/null 2>&1" || true
+done
+api_log="$(cat "$GH_API_LOG" 2>/dev/null || true)"
+assert_absent "row9-api-no-statuses"   'statuses'   "$api_log"
+assert_absent "row9-api-no-check-runs" 'check-runs' "$api_log"
+grep_result="$(grep -cE 'statuses|check-runs' "$GUARD" 2>/dev/null || true)"
+[ "${grep_result:-0}" -eq 0 ] && pass "row9-grep-source-no-statuses-check-runs" \
+    || failcase "row9-grep-source-no-statuses-check-runs (found $grep_result matches)"
+
+# --- Results ---
+
+if [[ "$FAILED" -ne 0 ]]; then
+    echo "RESULT: FAILED"
+    exit 1
+fi
+echo "RESULT: all passed"
+exit 0

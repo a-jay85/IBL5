@@ -18,7 +18,7 @@ const __dir = dirname(fileURLToPath(import.meta.url));
 const ibl5Dir = resolve(__dir, '..', 'ibl5');
 
 const { VR_MANIFEST } = await import(resolve(ibl5Dir, 'tests/e2e/vr-manifest.ts'));
-const { buildComment, extractDiffCells, classifyCells } = await import(
+const { buildComment, extractCells, classifyCells } = await import(
   resolve(ibl5Dir, 'tests/e2e/vr-review-comment.ts')
 );
 
@@ -70,7 +70,7 @@ if (resultsPath !== null && existsSync(resultsPath)) {
   }
 }
 
-const diffCells = extractDiffCells(report, VR_MANIFEST);
+const { diffCells, infraCells } = extractCells(report, VR_MANIFEST);
 
 // Classify NEW (no committed baseline) vs CHANGED (committed baseline = real
 // diff). Signal: `git ls-files <snapshot path>` reads the TRACKED INDEX, not the
@@ -110,6 +110,7 @@ const classifiedCells = classifyCells(diffCells, trackedTitles);
 
 const markdown = buildComment({
   diffCells: classifiedCells,
+  infraCells,
   uncoveredChangedPaths: coverage.uncoveredChangedPaths ?? [],
   globalChange: coverage.globalChange ?? false,
   pagesUrl,

@@ -24,9 +24,35 @@ export type DiffCell = {
 };
 
 // ── Playwright JSON report (only the fields we read) ─────────────────────────
-type PwSpec = { title?: string; ok?: boolean };
+type PwAttachment = { name?: string; contentType?: string; path?: string };
+type PwResult = { status?: string; attachments?: PwAttachment[]; error?: { message?: string }; errors?: Array<{ message?: string }> };
+type PwTest = { results?: PwResult[] };
+type PwSpec = { title?: string; ok?: boolean; tests?: PwTest[] };
 type PwSuite = { specs?: PwSpec[]; suites?: PwSuite[] };
 type PwReport = { suites?: PwSuite[] };
+
+/** A failed cell that carries no screenshot triplet — a navigation/render/error
+ *  failure, NOT a pixel change. */
+export type InfraCell = { module: string; viewport: Viewport; title: string; error?: string };
+
+/** All attachments across a spec's results. */
+function specAttachments(spec: PwSpec): PwAttachment[] {
+  const out: PwAttachment[] = [];
+  for (const t of spec.tests ?? []) for (const r of t.results ?? []) for (const a of r.attachments ?? []) out.push(a);
+  return out;
+}
+/** A genuine screenshot mismatch attaches `<title>-diff.png`. */
+function specHasPixelDiff(spec: PwSpec): boolean {
+  return specAttachments(spec).some((a) => (a.name ?? '').endsWith('-diff.png'));
+}
+/** First error line, if the report carried one (for the infra section). */
+function specError(spec: PwSpec): string | undefined {
+  for (const t of spec.tests ?? []) for (const r of t.results ?? []) {
+    const m = r.error?.message ?? r.errors?.[0]?.message;
+    if (m) return m.split('\n')[0].slice(0, 140);
+  }
+  return undefined;
+}
 
 /** Flatten the nested suite tree into a flat spec list. */
 function collectSpecs(suite: PwSuite, out: PwSpec[]): void {
@@ -54,21 +80,44 @@ function titleViewport(title: string): Viewport {
   return title.endsWith('-mobile') ? 'mobile' : 'desktop';
 }
 
-/** Parse the Playwright JSON report into the failing (diffing) cells. */
-export function extractDiffCells(report: PwReport, manifest: VrRow[]): DiffCell[] {
+/**
+ * Parse the Playwright JSON report into failing cells, split by failure KIND:
+ *  - diffCells  — genuine pixel mismatches (carry a `*-diff.png` attachment).
+ *  - infraCells — failed but with NO screenshot triplet (navigation/timeout/error).
+ *
+ * Legacy fallback: a failed spec with NO attachment info at all (the historical
+ * `{title, ok}`-only fixture shape) is treated as a pixel diff, preserving prior
+ * behavior. Real Playwright reports always attach ≥1 artifact on failure
+ * (`error-context` at minimum), so this fallback only affects synthetic fixtures.
+ */
+export function extractCells(report: PwReport, manifest: VrRow[]): { diffCells: DiffCell[]; infraCells: InfraCell[] } {
   const specs: PwSpec[] = [];
   for (const suite of report.suites ?? []) collectSpecs(suite, specs);
 
-  const cells: DiffCell[] = [];
+  const diffCells: DiffCell[] = [];
+  const infraCells: InfraCell[] = [];
   for (const spec of specs) {
-    if (spec.ok !== false) continue; // only failed screenshot comparisons
+    if (spec.ok !== false) continue; // only failed specs
     const title = spec.title;
     if (!title) continue;
     const module = titleToModule(title, manifest);
     if (module === null) continue; // not a VR cell (defensive)
-    cells.push({ module, viewport: titleViewport(title), title });
+    const viewport = titleViewport(title);
+    const atts = specAttachments(spec);
+    if (specHasPixelDiff(spec)) {
+      diffCells.push({ module, viewport, title });
+    } else if (atts.length > 0) {
+      infraCells.push({ module, viewport, title, error: specError(spec) });
+    } else {
+      diffCells.push({ module, viewport, title }); // legacy fallback (no attachment info)
+    }
   }
-  return cells;
+  return { diffCells, infraCells };
+}
+
+/** Back-compat: callers that only want pixel-diff cells. */
+export function extractDiffCells(report: PwReport, manifest: VrRow[]): DiffCell[] {
+  return extractCells(report, manifest).diffCells;
 }
 
 /**
@@ -83,6 +132,7 @@ export function classifyCells(cells: DiffCell[], trackedTitles: Set<string>): Di
 
 export type BuildCommentInput = {
   diffCells: DiffCell[];
+  infraCells?: InfraCell[];
   uncoveredChangedPaths: string[];
   globalChange: boolean;
   /** Per-SHA Pages base URL, e.g. https://a-jay85.github.io/IBL5/<sha>/visual-review/ */
@@ -104,21 +154,33 @@ function reportLink(pagesUrl: string, title: string): string {
  */
 export function buildComment(input: BuildCommentInput): string {
   const { diffCells, uncoveredChangedPaths, globalChange, pagesUrl } = input;
+  const infraCells = input.infraCells ?? [];
+  const hasPixelWork = diffCells.length > 0; // changed + new are both DiffCells
   const lines: string[] = [];
 
   lines.push(`## ${COMMENT_HEADER}`);
   lines.push('');
-  lines.push(
-    'This PR changed pixels. Review the before/after/diff below, then **apply the ' +
-      '`update-baselines` label** to approve — that regenerates the baselines and ' +
-      'the auto-commit is the durable sign-off. The VR check stays red until then.',
-  );
-  lines.push('');
 
-  if (globalChange) {
+  if (hasPixelWork) {
     lines.push(
-      '> 🌐 **Global change detected** (shared CSS / theme / class) — every VR row ' +
-        'is treated as potentially affected; review broadly.',
+      'This PR changed pixels. Review the before/after/diff below, then **apply the ' +
+        '`update-baselines` label** to approve — that regenerates the baselines and ' +
+        'the auto-commit is the durable sign-off. The VR check stays red until then.',
+    );
+    lines.push('');
+    if (globalChange) {
+      lines.push(
+        '> 🌐 **Global change detected** (shared CSS / theme / class) — every VR row ' +
+          'is treated as potentially affected; review broadly.',
+      );
+      lines.push('');
+    }
+  } else if (infraCells.length > 0) {
+    lines.push(
+      '⚠️ **The VR run failed to render — this is NOT a pixel change.** ' +
+        'The view(s) below errored on navigation/timeout, so there is no before/after to ' +
+        'review. **Re-run the VR job** — regenerating baselines cannot fix a render failure, ' +
+        'so do **not** apply the baseline-regeneration label.',
     );
     lines.push('');
   }
@@ -169,11 +231,28 @@ export function buildComment(input: BuildCommentInput): string {
   if (
     changedCells.length === 0 &&
     newCells.length === 0 &&
+    infraCells.length === 0 &&
     !globalChange &&
     uncoveredChangedPaths.length === 0
   ) {
     // Boundary: nothing diffed, nothing new, nothing uncovered — safe no-diff body.
     lines.push('_No visual diffs detected and no changed page falls outside VR coverage._');
+    lines.push('');
+  }
+
+  if (infraCells.length > 0) {
+    lines.push(
+      `### ⚠️ ${infraCells.length} view(s) failed to render (navigation/error — not a pixel change)`,
+    );
+    lines.push('');
+    lines.push(
+      'These cells errored before a screenshot could be taken, so there is **no before/after**. ' +
+        'Re-run the VR job; this is a flake/infra failure, **not** a baseline issue.',
+    );
+    lines.push('');
+    for (const cell of [...infraCells].sort((a, b) => a.title.localeCompare(b.title))) {
+      lines.push(`- \`${cell.title}\` — ${cell.viewport}${cell.error ? ` (${cell.error})` : ''}`);
+    }
     lines.push('');
   }
 

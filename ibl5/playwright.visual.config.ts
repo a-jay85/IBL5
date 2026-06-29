@@ -47,7 +47,7 @@ export default defineConfig({
     baseURL: process.env.BASE_URL || 'http://main.localhost/ibl5/',
     actionTimeout: 10_000,
     navigationTimeout: 20_000,
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     viewport: { width: 1280, height: 900 },
     reducedMotion: 'reduce',

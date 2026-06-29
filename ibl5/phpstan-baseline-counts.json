@@ -1,9 +1,12 @@
 {
     "phpstan-baseline.neon": {
         "ibl.directHeader": 1,
-        "ibl.hardcodedEnvString": 8
+        "ibl.directTime": 13,
+        "ibl.hardcodedEnvString": 8,
+        "ibl.sqlStringConcatenation": 32
     },
     "phpstan-tests-baseline.neon": {
-        "argument.type": 72
+        "argument.type": 73,
+        "staticMethod.dynamicCall": 1
     }
 }

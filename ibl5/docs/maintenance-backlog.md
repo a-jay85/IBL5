@@ -1961,6 +1961,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 | 10.23 | ✅ Implemented | 🟩 | `BanHardcodedEnvironmentStringsRule` landed; 8 sites — config-injection burndown 🟩 (env-branching — verify behavior). |
 | 10.24 | ✅ Implemented | — | RequireStrictTypesRule scope extended. |
 | 10.25 | ✅ Implemented | — | The 4 cited counts at 0; drift fix folds into 10.1. |
+| 10.26 | ⬜ Open | 🟥 | `BanSqlStringConcatenationRule` flags the identifier-concatenation sites introduced by the sqlInterp burndown (PR #1203) — ~71 occurrences baselined. Convert `in_array`-guarded identifier sites to `match()`/constant-array lookup so PHPStan types them as constant-string (rule-inert), clearing the concat baseline. |
 
 ### 10.1 Baseline-Counts.json Stale: `ibl.rawSuperglobal` Claims 7 Entries (Actual: 0)
 **Location:** `ibl5/phpstan-baseline-counts.json`

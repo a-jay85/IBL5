@@ -18,7 +18,13 @@ GH_CMD="${GH_CMD:-gh}"
 STICKY_MARKER="<!-- pr-fast-canary -->"
 
 # Test seams — override in tests to inject stub commands without real git/composer.
-do_trial_merge()   { ${CANARY_MERGE_CMD:-git merge --no-commit --no-ff FETCH_HEAD}; }
+# The -c identity is scoped to this one invocation (no global git state mutated).
+# git validates committer identity before preparing a non-fast-forward merge even
+# with --no-commit, so on a bare CI runner (no user.name/email) the merge would
+# abort with "Committer identity unknown" before any real conflict could surface —
+# misreported as a precondition error. The merge is thrown away, so the value is
+# irrelevant; it only has to be non-empty.
+do_trial_merge()   { ${CANARY_MERGE_CMD:-git -c user.email=canary@ci.invalid -c user.name=fast-canary merge --no-commit --no-ff FETCH_HEAD}; }
 do_analyse()       { ( cd "$REPO_ROOT/ibl5" && ${CANARY_ANALYSE_CMD:-composer run analyse}; ); }
 do_test()          { ( cd "$REPO_ROOT/ibl5" && ${CANARY_TEST_CMD:-composer run test}; ); }
 # True when a merge actually began (left a MERGE_HEAD) — i.e. a real content

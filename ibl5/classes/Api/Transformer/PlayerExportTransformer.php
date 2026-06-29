@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Api\Transformer;
 
+use Api\Contracts\TransformerInterface;
+
 /**
  * Transforms vw_player_current rows to flat CSV-ready string arrays.
  *
  * @phpstan-import-type PlayerCurrentRow from \Api\Repository\ApiPlayerRepository
+ * @implements TransformerInterface<PlayerCurrentRow>
  */
-class PlayerExportTransformer
+class PlayerExportTransformer implements TransformerInterface
 {
     /** @var list<string> Column keys in output order */
     private const COLUMN_MAP = [

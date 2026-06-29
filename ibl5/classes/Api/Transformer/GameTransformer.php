@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Api\Transformer;
 
+use Api\Contracts\TransformerInterface;
+
 /**
  * @phpstan-import-type GameViewRow from \Api\Repository\ApiGameRepository
+ * @implements TransformerInterface<GameViewRow>
  */
-class GameTransformer
+class GameTransformer implements TransformerInterface
 {
     /**
      * Transform a game row from vw_schedule_upcoming for list/detail endpoints.

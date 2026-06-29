@@ -295,7 +295,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 | 2.29 | ⬜ Open | 🟩 | `JSB.php`/`ContractRules.php`/`BaseMysqliRepository.php` still root-level. Namespace sweep (follow relocation checklist incl. phpunit-mutation.xml); green-green, wide blast radius. |
 | 2.30 | 📋 Planned | 🟩 | **Planned** in `tier1-namespace-relocations`: move `TeamStatsCalculator` + `StrengthOfScheduleCalculator` into `BasketballStats`. Skipped by `check-plan-staleness` FP 2026-06-27 (`moved` cue unrecognized); re-queue pending. |
 | 2.31 | ⬜ Open | 🟩 | UI/ 1 interface of 15; add interfaces systematically. Additive. |
-| 2.32 | ⬜ Open | 🟩 | Api/ flatten `Middleware/Contracts/` + add Transformer/Response interfaces. Refactor+additive. |
+| 2.32 | ◑ Partial | 🟩 | Shipped: common `Api\Contracts\TransformerInterface` (7 uniform transformers) + flattened `Middleware/Contracts/`→`Api/Contracts/`. **Status:** partial 2026-06-26; residual = divergent-transformer interfaces (Boxscore/PlayerStats), responder interfaces (Csv/Json — disjoint shapes), `Response/Contracts/` flatten. |
 | 2.33 | ◑ Partial | 🟩 | `DebugController` added + sanitizeRedirect moved (see 2.16); residual: `DebugSession` still wraps `$_COOKIE/$_SERVER/getenv()` directly → inject. Green-green. |
 | 2.34 | ✅ Implemented | — | Folded into `index.php?op=select`. |
 | 2.35 | ✅ Implemented | — | Folded into `?op=submit_asg|submit_eoy`. |

@@ -488,6 +488,23 @@ jobs:
         working-directory: ibl5
         run: bin/check-csrf-field-name
 
+  workflow-lint:
+    name: Workflow composite-action lint
+    runs-on: ubuntu-latest
+    # Runs unconditionally: a job that `uses:` a local ./.github/actions/* action
+    # without a prior checkout fails only at runtime (and reusable cron/deploy jobs
+    # aren't exercised on the PR), and a composite that drops a pinned behavior
+    # contract fails silently — neither is covered by any path-filter. Both checks
+    # are a few seconds of bash with no dependencies. NOTE: no working-directory —
+    # these live in repo-root bin/ and scan repo-root .github/.
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+      - name: Local-action checkout ordering
+        run: bin/check-workflow-checkout
+      - name: Composite behavior contracts
+        run: bin/check-composite-contracts
+
   harness-tests:
     name: Shell harness regression tests
     needs: [changes]
@@ -528,6 +545,10 @@ jobs:
         run: bin/test-playwright-version
       - name: bin/test-pr-canary-check
         run: bin/test-pr-canary-check
+      - name: bin/test-check-workflow-checkout
+        run: bin/test-check-workflow-checkout
+      - name: bin/test-check-composite-contracts
+        run: bin/test-check-composite-contracts
 
   gate:
     name: Tests and Analysis

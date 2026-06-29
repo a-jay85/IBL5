@@ -1,0 +1,61 @@
+#!/bin/bash
+# bin/check-composite-contracts — pins two behavior contracts of the shared CI
+# composites that CI itself cannot exercise (the prod SSH + IBLbot Discord path is
+# unreachable from CI, so actionlint proves wiring but not these semantics).
+#
+#   setup-ssh:      the host keyscan must keep its `|| true` guard, so a transient
+#                   keyscan failure never aborts a deploy/backup/smoke job.
+#   notify-discord: `fail-on-delivery` must DEFAULT to 'true' (loud-fail), so a
+#                   caller that omits it keeps alert-delivery failures RED. (This
+#                   pins the default only; it does NOT verify that no caller passes
+#                   fail-on-delivery: false on an alert path — that intent is not
+#                   mechanizable from the composite alone.)
+#
+# Conditional by design: each check is SKIPPED (visibly) when its composite file is
+# absent, so this no-ops on a branch without the composites and auto-activates the
+# moment they land. The visible "skipped" line means a path typo can't silently turn
+# the gate into a vacuous pass.
+#
+# Usage: bin/check-composite-contracts [actions-dir]   (default: .github/actions)
+set -eu
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ACTIONS="${1:-$ROOT/.github/actions}"
+
+fail=0
+
+ssh_file="$ACTIONS/setup-ssh/action.yml"
+if [ -f "$ssh_file" ]; then
+  if grep -qE 'ssh-keyscan.*\|\| true' "$ssh_file"; then
+    echo "composite-contracts: setup-ssh keyscan guard present"
+  else
+    echo "composite-contracts: setup-ssh is MISSING its 'ssh-keyscan ... || true' guard — a transient keyscan failure must not abort the job ($ssh_file)" >&2
+    fail=1
+  fi
+else
+  echo "composite-contracts: setup-ssh absent — skipped"
+fi
+
+nd_file="$ACTIONS/notify-discord/action.yml"
+if [ -f "$nd_file" ]; then
+  # Read the default of the fail-on-delivery input specifically: enter its block on
+  # the bare 2-space key, leave on the next bare 2-space key, capture default within.
+  # This reads the RIGHT block's default even when fail-on-delivery is not last and
+  # other inputs also define a default.
+  default_raw="$(awk '
+    /^  fail-on-delivery:[[:space:]]*$/ { inblk=1; next }
+    inblk && /^  [A-Za-z0-9_-]+:[[:space:]]*$/ { inblk=0 }
+    inblk && /^[[:space:]]*default:/ { sub(/^[[:space:]]*default:[[:space:]]*/, ""); print; exit }
+  ' "$nd_file")"
+  default="$(printf '%s' "$default_raw" | tr -d "\"' ")"
+  if [ "$default" = "true" ]; then
+    echo "composite-contracts: notify-discord fail-on-delivery defaults to 'true' (loud-fail)"
+  else
+    echo "composite-contracts: notify-discord fail-on-delivery default is '${default:-<unset>}', expected 'true' (loud-fail) ($nd_file)" >&2
+    fail=1
+  fi
+else
+  echo "composite-contracts: notify-discord absent — skipped"
+fi
+
+exit "$fail"

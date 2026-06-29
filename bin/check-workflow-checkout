@@ -1,0 +1,58 @@
+#!/bin/bash
+# bin/check-workflow-checkout — CI gate: any workflow job that `uses:` a LOCAL
+# composite action (./.github/actions/...) must run actions/checkout FIRST in that
+# job. GitHub resolves a local action from the checked-out tree, so without a prior
+# checkout the step fails at runtime with "Can't find '…/action.yml'". actionlint
+# does not model step ordering, so it never catches this — this gate fills that gap.
+#
+# Reusable-workflow calls (uses: ./.github/workflows/*.yml) are JOB-level and need
+# NO checkout (GitHub fetches them itself), so they are deliberately NOT flagged —
+# only ./.github/actions/ uses are.
+#
+# Usage: bin/check-workflow-checkout [file ...]   (default: .github/workflows/*.yml)
+set -eu
+
+if [ "$#" -gt 0 ]; then
+  set -- "$@"
+else
+  set --
+  for f in .github/workflows/*.yml; do
+    [ -f "$f" ] && set -- "$@" "$f"
+  done
+fi
+
+[ "$#" -gt 0 ] || { echo "check-workflow-checkout: no workflow files to scan" >&2; exit 0; }
+
+rc=0
+awk '
+  # Reset per file so state never leaks across workflows.
+  FNR==1 { injobs=0; seen=0; job="" }
+
+  # Enter the jobs: map; any later top-level key closes it.
+  /^jobs:[[:space:]]*$/ { injobs=1; next }
+  injobs && /^[^[:space:]#]/ { injobs=0 }
+
+  # A job header is the only 2-space-indented bare key under jobs:. Reset checkout
+  # state for the new job.
+  injobs && /^  [A-Za-z0-9_-]+:[[:space:]]*(#.*)?$/ { job=$0; sub(/:.*/, "", job); gsub(/[[:space:]]/, "", job); seen=0 }
+
+  # A checkout step (any version) satisfies the requirement for the rest of the job.
+  # Leading "- " allows the inline list-item form.
+  injobs && /^[[:space:]]*(- )?uses:[[:space:]]*actions\/checkout/ { seen=1 }
+
+  # A local composite-action use with no prior checkout in this job is a violation.
+  injobs && /^[[:space:]]*(- )?uses:[[:space:]]*\.\/\.github\/actions\// {
+    if (!seen) {
+      printf "%s:%d: job \"%s\" uses a local action before any actions/checkout step\n", FILENAME, FNR, job
+      fail = 1
+    }
+  }
+
+  END { exit (fail ? 1 : 0) }
+' "$@" || rc=$?
+
+if [ "$rc" -ne 0 ]; then
+  echo "check-workflow-checkout: a job uses a local ./.github/actions/* action without a prior actions/checkout step — add 'uses: actions/checkout@v7' before it (GitHub cannot resolve a local action without the repo checked out)." >&2
+  exit 1
+fi
+exit 0

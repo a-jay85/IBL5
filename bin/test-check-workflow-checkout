@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-check-workflow-checkout — regression test for the local-action checkout
+# gate. Each case writes a throwaway workflow file and asserts the check's exit code
+# (and, where it matters, which job is named in the output).
+#
+# Run: bin/test-check-workflow-checkout  (exit 0 = all pass, 1 = a case failed)
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+CHECK="$SCRIPT_DIR/check-workflow-checkout"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+FAILED=0
+
+# write_wf <body>  → echoes the path of a fresh workflow file holding <body>. Uses
+# mktemp (not a counter): this runs in a $(...) subshell, so a counter would not
+# persist and every call would reuse one path.
+write_wf() {
+  # X's must be the trailing chars (BSD mktemp rejects a suffix). The check reads any
+  # path given as an arg, so the missing .yml extension is irrelevant here.
+  local f
+  f="$(mktemp "$TMP/wf.XXXXXX")"
+  printf '%s\n' "$1" > "$f"
+  printf '%s' "$f"
+}
+
+expect() { # name want-exit got-exit
+  if [ "$3" -eq "$2" ]; then
+    echo "ok: $1 (exit $3)"
+  else
+    echo "FAIL: $1 — expected exit $2, got $3"
+    FAILED=1
+  fi
+}
+
+# --- good: checkout precedes local action -------------------------------------
+f="$(write_wf 'name: ok
+on: [pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-ssh')"
+"$CHECK" "$f" >/dev/null 2>&1; expect "checkout-before-local-action" 0 $?
+
+# --- bad: local action, no checkout -------------------------------------------
+f="$(write_wf 'name: bad
+on: [pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ./.github/actions/setup-ssh')"
+"$CHECK" "$f" >/dev/null 2>&1; expect "local-action-no-checkout" 1 $?
+
+# --- bad: checkout AFTER the local action (order matters) ----------------------
+f="$(write_wf 'name: order
+on: [pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ./.github/actions/setup-ssh
+      - uses: actions/checkout@v7')"
+"$CHECK" "$f" >/dev/null 2>&1; expect "checkout-after-local-action" 1 $?
+
+# --- good: reusable-workflow call needs no checkout (must NOT be flagged) -------
+f="$(write_wf 'name: reusable
+on: [pull_request]
+jobs:
+  call:
+    uses: ./.github/workflows/deploy-rehearsal.yml
+    secrets: inherit')"
+"$CHECK" "$f" >/dev/null 2>&1; expect "reusable-workflow-no-flag" 0 $?
+
+# --- good: keyed (non-list) uses with prior checkout ---------------------------
+f="$(write_wf 'name: keyed
+on: [pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Setup
+        uses: ./.github/actions/setup-ssh')"
+"$CHECK" "$f" >/dev/null 2>&1; expect "keyed-form-with-checkout" 0 $?
+
+# --- per-job reset: job A clean, job B violates → fail, and only B is named -----
+f="$(write_wf 'name: twojobs
+on: [pull_request]
+jobs:
+  alpha:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-ssh
+  bravo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ./.github/actions/notify-discord')"
+out="$("$CHECK" "$f" 2>&1)"; rc=$?
+expect "two-jobs-second-violates" 1 "$rc"
+if printf '%s' "$out" | grep -q '"bravo"' && ! printf '%s' "$out" | grep -q '"alpha"'; then
+  echo "ok: only-violating-job-named"
+else
+  echo "FAIL: only-violating-job-named — output: $out"
+  FAILED=1
+fi
+
+# --- comment mentioning uses: must not false-trigger ---------------------------
+f="$(write_wf 'name: comment
+on: [pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # uses: ./.github/actions/setup-ssh  (documentation only)
+      - uses: actions/checkout@v7')"
+"$CHECK" "$f" >/dev/null 2>&1; expect "commented-uses-ignored" 0 $?
+
+if [ "$FAILED" -ne 0 ]; then
+  echo "RESULT: FAILED"
+  exit 1
+fi
+echo "RESULT: all passed"
+exit 0

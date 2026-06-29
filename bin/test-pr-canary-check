@@ -92,6 +92,15 @@ STUB
 
 chmod +x "$STUBBIN/gh"
 
+# Stub merge command: emits a recognizable error to stderr and fails, so we can
+# assert the canary surfaces the real trial-merge output in the rendered body.
+cat > "$STUBBIN/mergefail" <<'STUB'
+#!/usr/bin/env bash
+echo "SIMULATED-MERGE-OUTPUT: boom" >&2
+exit 1
+STUB
+chmod +x "$STUBBIN/mergefail"
+
 # Shorthand: run canary with stub gh and injected seams, capture stdout + exit code
 run_canary() {
     # Usage: run_canary [extra env vars...] -- [args to pass to pr-canary-check]
@@ -128,17 +137,30 @@ run_canary_rc -- --unknown-flag && failcase "row1-unknown-flag-exits2" || {
 
 run_canary_rc -- --help && pass "row1-help-exits0" || failcase "row1-help-exits0 (got exit $?)"
 
-# --- Row 2: Merge conflict ---
+# --- Row 2: Real merge conflict (merge began — MERGE_HEAD present) ---
 
-body_conflict="$(run_canary "CANARY_MERGE_CMD=false" "CANARY_ANALYSE_CMD=false" "CANARY_TEST_CMD=false" -- --pr 42)"
+conflict_env=("CANARY_MERGE_CMD=$STUBBIN/mergefail" "CANARY_MERGE_STATE_CMD=true" "CANARY_ANALYSE_CMD=false" "CANARY_TEST_CMD=false")
+body_conflict="$(run_canary "${conflict_env[@]}" -- --pr 42)"
 rc_conflict=0
-run_canary_rc "CANARY_MERGE_CMD=false" "CANARY_ANALYSE_CMD=false" "CANARY_TEST_CMD=false" -- --pr 42 || rc_conflict=$?
+run_canary_rc "${conflict_env[@]}" -- --pr 42 || rc_conflict=$?
 
-assert_match "row2-conflict-body-says-CONFLICT" 'CONFLICT' "$body_conflict"
+assert_match "row2-conflict-body-says-CONFLICT" 'Merge:\*\* CONFLICT' "$body_conflict"
+assert_match "row2-conflict-surfaces-merge-log" 'SIMULATED-MERGE-OUTPUT: boom' "$body_conflict"
+assert_match "row2-conflict-has-details-block"  'Trial-merge output' "$body_conflict"
 assert_match "row2-conflict-phpstan-skipped"    'PHPStan.*skipped' "$body_conflict"
 assert_match "row2-conflict-phpunit-skipped"    'PHPUnit.*skipped' "$body_conflict"
 assert_match "row2-conflict-overall-FAIL"       'Overall.*FAIL' "$body_conflict"
 [ "$rc_conflict" -eq 0 ] && pass "row2-conflict-exits0" || failcase "row2-conflict-exits0 (got $rc_conflict)"
+
+# --- Row 2b: Precondition error (merge never started — no MERGE_HEAD) ---
+
+error_env=("CANARY_MERGE_CMD=$STUBBIN/mergefail" "CANARY_MERGE_STATE_CMD=false" "CANARY_ANALYSE_CMD=false" "CANARY_TEST_CMD=false")
+body_error="$(run_canary "${error_env[@]}" -- --pr 42)"
+
+assert_match  "row2b-error-body-says-ERROR"      'Merge:\*\* ERROR' "$body_error"
+assert_absent "row2b-error-not-labeled-conflict" 'Merge:\*\* CONFLICT' "$body_error"
+assert_match  "row2b-error-surfaces-merge-log"   'SIMULATED-MERGE-OUTPUT: boom' "$body_error"
+assert_match  "row2b-error-overall-FAIL"         'Overall.*FAIL' "$body_error"
 
 # --- Row 3: PHPStan FAIL (set-e-safe capture) ---
 

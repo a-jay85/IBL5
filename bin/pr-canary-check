@@ -18,9 +18,12 @@ GH_CMD="${GH_CMD:-gh}"
 STICKY_MARKER="<!-- pr-fast-canary -->"
 
 # Test seams — override in tests to inject stub commands without real git/composer.
-do_trial_merge() { ${CANARY_MERGE_CMD:-git merge --no-commit --no-ff FETCH_HEAD}; }
-do_analyse()     { ( cd "$REPO_ROOT/ibl5" && ${CANARY_ANALYSE_CMD:-composer run analyse}; ); }
-do_test()        { ( cd "$REPO_ROOT/ibl5" && ${CANARY_TEST_CMD:-composer run test}; ); }
+do_trial_merge()   { ${CANARY_MERGE_CMD:-git merge --no-commit --no-ff FETCH_HEAD}; }
+do_analyse()       { ( cd "$REPO_ROOT/ibl5" && ${CANARY_ANALYSE_CMD:-composer run analyse}; ); }
+do_test()          { ( cd "$REPO_ROOT/ibl5" && ${CANARY_TEST_CMD:-composer run test}; ); }
+# True when a merge actually began (left a MERGE_HEAD) — i.e. a real content
+# conflict, as opposed to a precondition error where the merge never started.
+merge_in_progress() { ${CANARY_MERGE_STATE_CMD:-git rev-parse -q --verify MERGE_HEAD}; }
 
 usage() {
     cat <<'EOF'
@@ -76,10 +79,22 @@ REPO_ROOT="$(git rev-parse --show-toplevel)"
 
 # Trial-merge: only fetch for real when the merge cmd is not injected
 merge=clean
+merge_log=""
 [ -z "${CANARY_MERGE_CMD:-}" ] && git fetch --no-tags origin "refs/pull/${PR_NUM}/head"
 if ! do_trial_merge >/tmp/canary-merge.log 2>&1; then
-    merge=conflict
-    git merge --abort || true
+    # Capture the real git output so a failure is debuggable from the PR comment
+    # and the CI run log — not silently swallowed.
+    merge_log="$(tail -n 60 /tmp/canary-merge.log 2>/dev/null || true)"
+    # Distinguish a genuine content conflict (the merge began, leaving a
+    # MERGE_HEAD / unmerged paths) from a precondition error where the merge
+    # never started (dirty tree, unrelated histories, unresolvable ref, …).
+    # Both fail the canary, but only the former is an actual merge conflict.
+    if merge_in_progress >/dev/null 2>&1; then
+        merge=conflict
+    else
+        merge=error
+    fi
+    git merge --abort >/dev/null 2>&1 || true
 fi
 
 # set -e-safe capture: run checks only when the merge was clean
@@ -96,6 +111,7 @@ render_body() {
     case "$merge" in
         clean)    merge_status="clean" ;;
         conflict) merge_status="CONFLICT" ;;
+        error)    merge_status="ERROR (trial-merge could not start — not a content conflict)" ;;
         *)        merge_status="$merge" ;;
     esac
 
@@ -113,7 +129,7 @@ render_body() {
         *)       test_status="$test" ;;
     esac
 
-    if [ "$merge" = conflict ] || [ "$analyse" = fail ] || [ "$test" = fail ]; then
+    if [ "$merge" != clean ] || [ "$analyse" = fail ] || [ "$test" = fail ]; then
         overall="FAIL"
     else
         overall="PASS"
@@ -126,6 +142,9 @@ render_body() {
 
     printf '## PR Fast-Canary\n\n'
     printf '**Merge:** %s\n\n' "$merge_status"
+    if [[ -n "$merge_log" ]]; then
+        printf '<details><summary>Trial-merge output</summary>\n\n```\n%s\n```\n\n</details>\n\n' "$merge_log"
+    fi
     printf '**PHPStan (`composer run analyse`):** %s\n\n' "$analyse_status"
     printf '**PHPUnit (`composer run test`):** %s\n\n' "$test_status"
     printf '**Overall:** %s\n\n' "$overall"

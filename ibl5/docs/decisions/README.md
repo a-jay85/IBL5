@@ -10,7 +10,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 ## How to Use
 
 - **Reading:** start with the ADR most relevant to the surface you're touching. Each rule file and each PHPStan custom rule links back to the ADR that justifies it.
-- **Writing:** when you make a new significant decision, create an ADR first — the CI gate (`bin/adr-check`, workflow `adr-required.yml`) blocks PRs that add mechanical-enforcement surfaces without an accompanying ADR. See the "When an ADR is required" section below.
+- **Writing:** when you make a new significant decision, create an ADR first — the CI gate (`bin/adr-check`, the `adr-check` step in workflow `pr-meta-checks.yml`) blocks PRs that add mechanical-enforcement surfaces without an accompanying ADR. See the "When an ADR is required" section below.
 - **Creating one:** run `bin/next-adr "kebab-title"` from a worktree (`bin/wt-new <slug>`); it refuses to run from the main checkout to avoid stranding an empty template on `master`. It copies `0000-template.md` into the next numbered slot and prints the path. The template is Michael Nygard format, adapted for IBL5's frontmatter schema.
 
 ## Index
@@ -29,7 +29,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 
 ## When an ADR is Required
 
-The CI workflow `adr-required.yml` runs `bin/adr-check` on every PR. An ADR is required if the PR adds any of:
+The CI workflow `pr-meta-checks.yml` runs `bin/adr-check` (the `adr-check` step) on every PR. An ADR is required if the PR adds any of:
 
 1. A new PHPStan custom rule under `ibl5/phpstan-rules/*.php`.
 2. A new always-loaded or path-conditional agent rule under `.claude/rules/*.md`.

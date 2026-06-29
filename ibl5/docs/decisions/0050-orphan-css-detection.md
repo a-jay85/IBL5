@@ -1,6 +1,6 @@
 ---
 description: Advisory tool and CI workflow for detecting orphan CSS class candidates in ibl5/design/
-last_verified: 2026-05-28
+last_verified: 2026-06-29
 ---
 
 # ADR-0050: Orphan CSS Detection
@@ -23,7 +23,7 @@ Add `bin/check-orphan-css`, a Bash advisory tool that extracts every class selec
 from `ibl5/design/**/*.css`, filters against the source corpus using class-character
 token-boundary matching, and optionally crawls a running app (`--crawl`) to drop
 candidates that render in a live page. Residue is reported as candidates for human
-review — never as confirmed-dead. Add `.github/workflows/orphan-css.yml` to run
+review — never as confirmed-dead. Add the `orphan-css` check in `.github/workflows/pr-meta-checks.yml` (consolidated from the former `orphan-css.yml`) to run
 steps 1–2 (no crawl) on pull requests and post a sticky advisory comment.
 Non-blocking: `continue-on-error: true`, no failing gate step.
 
@@ -88,6 +88,6 @@ carries the step-4 caveat so the list reads as "source-absent, crawl-pending," n
 ## References
 
 - `bin/check-orphan-css` — the advisory tool (exit-0 pattern from `bin/check-hot-files`)
-- `.github/workflows/orphan-css.yml` — non-blocking CI workflow
+- `.github/workflows/pr-meta-checks.yml` — non-blocking CI workflow (the `orphan-css` check, consolidated from the former `orphan-css.yml`)
 - `bin/check-hot-files` — advisory-gate precedent
 - `ibl5/design/` — CSS source directory (extraction scope)

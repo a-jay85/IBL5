@@ -1,6 +1,6 @@
 ---
 description: ADR for bin/refactor-flag CI gate that blocks refactor PRs without test coverage.
-last_verified: 2026-05-13
+last_verified: 2026-06-29
 ---
 
 # ADR-0021: Refactor PR Flag
@@ -14,7 +14,7 @@ Refactor PRs without pre-implementation characterization tests are the dominant 
 
 ## Decision
 
-Add a CI gate (`bin/refactor-flag`, wired to `.github/workflows/refactor-flag.yml`) that detects refactor signals under `ibl5/classes/**` (file renames, method signature changes, visibility narrowing, class declaration removal, large deletions > 30 lines) and blocks merge when the same PR does not also add or modify a test file under `ibl5/tests/`. A bypass marker (`<!-- no-refactor-tests: reason ≥ 20 chars -->`) in the PR body overrides the gate for documented exceptions. An agent rule (`.claude/rules/refactor-flag.md`) documents the policy for agents.
+Add a CI gate (`bin/refactor-flag`, wired into the consolidated `.github/workflows/pr-meta-checks.yml`) that detects refactor signals under `ibl5/classes/**` (file renames, method signature changes, visibility narrowing, class declaration removal, large deletions > 30 lines) and blocks merge when the same PR does not also add or modify a test file under `ibl5/tests/`. A bypass marker (`<!-- no-refactor-tests: reason ≥ 20 chars -->`) in the PR body overrides the gate for documented exceptions. An agent rule (`.claude/rules/refactor-flag.md`) documents the policy for agents.
 
 ## Alternatives Considered
 
@@ -32,7 +32,7 @@ Add a CI gate (`bin/refactor-flag`, wired to `.github/workflows/refactor-flag.ym
 ## References
 
 - `bin/refactor-flag` — the CI gate script
-- `.github/workflows/refactor-flag.yml` — the GitHub Actions workflow
+- `.github/workflows/pr-meta-checks.yml` — the GitHub Actions workflow (the `refactor-flag` check, consolidated from the former `refactor-flag.yml`)
 - `.claude/rules/refactor-flag.md` — agent rule documenting the policy
 - `bin/adr-check` — the existing decision-trigger gate this mirrors
 - `ibl5/tests/Cli/RefactorFlagCliTest.php` — test coverage for the gate

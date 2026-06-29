@@ -24,7 +24,7 @@ $controller = new \Draft\DraftController($mysqli_db, $commonRepository, $season)
 
 switch ($op) {
     case 'select':
-        echo $controller->submitSelection($_POST);
+        echo $controller->submitSelection($_POST, $user);
         break;
     default:
         $controller->main($user);

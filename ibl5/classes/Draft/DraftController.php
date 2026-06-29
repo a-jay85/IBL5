@@ -71,10 +71,36 @@ class DraftController implements DraftControllerInterface
         \PageLayout\PageLayout::footer();
     }
 
-    /** @param array<string, mixed> $post */
-    public function submitSelection(array $post): string
+    /**
+     * @param array<string, mixed> $post
+     * @param mixed $user The PHP-Nuke $user cookie variable
+     */
+    public function submitSelection(array $post, mixed $user): string
     {
-        $teamName   = is_string($post['teamname'] ?? null) ? $post['teamname'] : '';
+        // (1) Auth gate — op=select bypasses main()'s isUser() check, so guard here.
+        if (!$this->nukeCompat->isUser($user)) {
+            $this->nukeCompat->loginBox();
+            return '';
+        }
+
+        // (2) CSRF — validate before any DB mutation.
+        if (!\Security\CsrfGuard::validateSubmittedToken('draft_selection')) {
+            return $this->view->renderValidationError('Invalid or expired form submission. Please reload and try again.');
+        }
+
+        $teamName = is_string($post['teamname'] ?? null) ? $post['teamname'] : '';
+
+        // (3) Ownership — POST team must equal the session user's team.
+        // Reject null / Free Agents so a teamless session cannot draft.
+        $decoded = $this->nukeCompat->cookieDecode($user);
+        $username = is_string($decoded[1] ?? null) ? $decoded[1] : '';
+        $sessionTeam = $this->commonRepository->getTeamnameFromUsername($username);
+        if ($sessionTeam === null
+            || $sessionTeam === \League\League::FREE_AGENTS_TEAM_NAME
+            || $sessionTeam !== $teamName) {
+            return $this->view->renderValidationError('You can only make selections for your own team.');
+        }
+
         $playerName = is_string($post['player'] ?? null) ? $post['player'] : null;
         $rawRound   = $post['draft_round'] ?? null;
         $rawPick    = $post['draft_pick'] ?? null;

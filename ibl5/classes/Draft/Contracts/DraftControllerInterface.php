@@ -27,12 +27,14 @@ interface DraftControllerInterface
     public function displayDraftBoard(string $username): void;
 
     /**
-     * Narrow and delegate a draft-selection POST submission.
+     * Enforce auth + CSRF + ownership guards, then narrow and delegate a
+     * draft-selection POST submission.
      *
      * @param array<string, mixed> $post
+     * @param mixed $user The PHP-Nuke $user cookie variable
      * @see \Draft\DraftController::submitSelection()
      */
-    public function submitSelection(array $post): string;
+    public function submitSelection(array $post, mixed $user): string;
 
     /**
      * Handle a draft selection submission

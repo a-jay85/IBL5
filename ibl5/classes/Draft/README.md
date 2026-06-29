@@ -133,12 +133,12 @@ hasUndraftedPlayers(array $players): bool
 ```php
 main(mixed $user): void
 displayDraftBoard(string $username): void
-submitSelection(array $post): string
+submitSelection(array $post, mixed $user): string
 handleDraftSelection(string $teamName, ?string $playerName, int $draftRound, int $draftPick): string
 ```
 
 **Workflow (write path):**
-1. `submitSelection()` narrows POST values and delegates to `handleDraftSelection()`
+1. `submitSelection()` enforces auth + CSRF + ownership guards, narrows POST values, and delegates to `handleDraftSelection()`
 2. Get current draft selection (if any)
 3. Check if player already drafted
 4. Validate selection (player, pick, status)
@@ -260,7 +260,7 @@ echo $html;
 ### Handle Draft Selection
 ```php
 $controller = new Draft\DraftController($db, $commonRepository, $season);
-$html = $controller->submitSelection($_POST);
+$html = $controller->submitSelection($_POST, $user);  // auth + CSRF + ownership guarded
 echo $html;  // HTML response (success or error message)
 ```
 

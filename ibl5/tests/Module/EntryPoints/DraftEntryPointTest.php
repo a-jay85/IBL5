@@ -8,12 +8,17 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\Attributes\PreserveGlobalState;
 
 /**
- * Draft/index.php defines global functions (userinfo, main) that cannot be
- * redeclared, and is_user() has a static cache. Each test runs in a separate
- * process.
+ * Draft/index.php delegates to DraftController. is_user() has a static cache,
+ * so each test runs in a separate process.
  *
- * Unauthenticated path calls loginbox() → die() and is skipped here.
- * Covered by E2E flows.
+ * The op=select endpoint enforces auth → CSRF → ownership guards inside
+ * DraftController::submitSelection() (restored from #1107). These tests drive
+ * the guards through index.php with an authenticated session.
+ *
+ * The UNAUTHENTICATED op=select path is not exercised here: loginbox() emits a
+ * redirect and die()s, which a separate-process entry-point test cannot capture.
+ * That path is covered by DraftControllerTest::testLoggedOutSubmissionInvokesLoginBoxAndWritesNothing
+ * (controller unit, Matrix row 2) and the e2e anon-lockdown spec (Matrix row 10).
  */
 #[RunTestsInSeparateProcesses]
 #[PreserveGlobalState(false)]
@@ -53,15 +58,6 @@ class DraftEntryPointTest extends ModuleEntryPointTestCase
         $this->assertStringContainsString('class="draft-container"', $output);
     }
 
-    public function testSelectOpWithoutPlayerReturnsValidationError(): void
-    {
-        $output = $this->runModule('Draft', ['op' => 'select'],
-            ['teamname' => 'Test', 'draft_round' => '1', 'draft_pick' => '1'],
-            ['user' => $GLOBALS['user']]);
-
-        $this->assertStringContainsString('select a player', $output);
-    }
-
     /**
      * Route the gm_username → team_name lookup so the ownership gate sees a
      * controlled session team. onQuery patterns are checked before the
@@ -75,7 +71,6 @@ class DraftEntryPointTest extends ModuleEntryPointTestCase
 
     /**
      * @param array<string, string> $extraPost
-     * @return string
      */
     private function runDraftSelect(string $postTeamName, array $extraPost = []): string
     {

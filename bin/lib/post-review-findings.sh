@@ -127,6 +127,8 @@ ${PRF_FOOTER}"
 #   Posts a single issue comment for the no-issues path (no findings survived the
 #   filter).  The heading and footer are emitted by this function; callers pass
 #   only the evidence body (e.g. "No issues found. Architecture clean.").
+#   This is always the clean path, so the comment is wrapped in a collapsed
+#   <details> (affirmative one-line summary) to save PR scroll space.
 post_review_summary() {
     local pr="$1" title="$2" body="$3"
     local tmp; tmp="$(mktemp -d)"
@@ -134,6 +136,7 @@ post_review_summary() {
     trap "rm -rf '$tmp'" RETURN
 
     local out="$tmp/summary.txt"
-    printf '### %s\n\n%s\n\n%s\n' "$title" "$body" "$PRF_FOOTER" > "$out"
+    printf '<details><summary>✅ %s — no issues found</summary>\n\n### %s\n\n%s\n\n%s\n\n</details>\n' \
+        "$title" "$title" "$body" "$PRF_FOOTER" > "$out"
     "$GH_CMD" pr comment "$pr" --body-file "$out"
 }

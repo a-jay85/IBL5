@@ -227,7 +227,8 @@ function generateSectionMarkdown(label, report, screenshotsDir) {
   const flakyCount = results.flaky.length;
 
   if (failCount === 0 && flakyCount === 0) {
-    lines.push(`### ${label} — All ${results.total} tests passed`);
+    // Clean section collapses to a one-line <details> summary to save PR scroll.
+    lines.push(`<details><summary>✅ ${label} — all ${results.total} tests passed</summary></details>`);
   } else {
     const parts = [];
     if (failCount > 0) parts.push(`${failCount} failed`);

@@ -38,6 +38,17 @@ final class LighthouseCommentFormatterTest extends TestCase
         $tableRows = $this->extractTableRows($result['markdown']);
         self::assertStringNotContainsString("\u{1F534}", $tableRows);
         self::assertStringNotContainsString("\u{1F7E1}", $tableRows);
+        // Clean audit collapses; the lighthouse-comment marker stays outside <details>.
+        self::assertStringContainsString(
+            "<details><summary>\u{2705} Lighthouse Audit \u{2014} no failing audits</summary>",
+            $result['markdown']
+        );
+        self::assertStringContainsString('</details>', $result['markdown']);
+        self::assertTrue(
+            strpos($result['markdown'], '<!-- lighthouse-comment -->')
+                < strpos($result['markdown'], '<details>'),
+            'lighthouse-comment marker must precede the <details> wrapper'
+        );
     }
 
     /** Case 2: All scores pass, with baseline (no regression) — delta column shows ±0.00 */
@@ -66,6 +77,8 @@ final class LighthouseCommentFormatterTest extends TestCase
         self::assertStringContainsString("\u{1F7E1}", $result['markdown']);
         self::assertStringContainsString('0.55', $result['markdown']);
         self::assertStringContainsString('-0.05', $result['markdown']);
+        // Warn-level regression with no error violation still collapses.
+        self::assertStringContainsString('<details>', $result['markdown']);
     }
 
     /** Case 4: One URL fails error threshold — shows red marker, hasErrorViolation true */
@@ -78,6 +91,8 @@ final class LighthouseCommentFormatterTest extends TestCase
         self::assertTrue($result['hasErrorViolation']);
         self::assertStringContainsString("\u{1F534}", $result['markdown']);
         self::assertStringContainsString('0.75', $result['markdown']);
+        // Failing audit stays expanded — reviewers see the red row inline.
+        self::assertStringNotContainsString('<details>', $result['markdown']);
     }
 
     /** Case 5: Baseline file absent (null) — comment includes "No master baseline yet" */
@@ -99,6 +114,8 @@ final class LighthouseCommentFormatterTest extends TestCase
         self::assertFalse($result['hasErrorViolation']);
         self::assertStringContainsString('<!-- lighthouse-comment -->', $result['markdown']);
         self::assertStringContainsString('Lighthouse skipped', $result['markdown']);
+        // The one-line skip path is left expanded (collapsing a one-liner is noise).
+        self::assertStringNotContainsString('<details>', $result['markdown']);
     }
 
     /** Case 7: bin/lighthouse-comment exits 2 on missing --manifest */

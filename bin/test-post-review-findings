@@ -120,6 +120,14 @@ assert_absent() { # label file
     fi
 }
 
+assert_not_contains() { # label file text
+    if grep -qF "$3" "$2" 2>/dev/null; then
+        fail "$1 should NOT contain '$3' but does"
+    else
+        ok "$1 correctly omits '$3'"
+    fi
+}
+
 # ── case 1: on-diff ───────────────────────────────────────────────────────────
 # Finding anchored on a line that IS in the diff (line 12).
 # Expect: $REVIEW_OUT posted as batch review; $COMMENT_OUT absent.
@@ -137,6 +145,7 @@ assert_jq       "case1: side RIGHT"      '.comments[0].side == "RIGHT"'         
 assert_jq       "case1: body has Bug X"  '.comments[0].body | contains("Bug X")'              "$REVIEW_OUT"
 assert_jq       "case1: score marker"    '.comments[0].body | contains("<!-- score: 85 -->")' "$REVIEW_OUT"
 assert_absent   "case1: no fallback"     "$COMMENT_OUT"
+assert_not_contains "case1: review body not collapsed" "$REVIEW_OUT" "<details>"
 
 # ── case 2: out-of-diff (NEGATIVE) ───────────────────────────────────────────
 # Finding on line NOT in the diff (line 999).
@@ -150,6 +159,7 @@ assert_contains "case2: heading"         "$COMMENT_OUT" "### Code review"
 assert_contains "case2: Bug Y present"   "$COMMENT_OUT" "Bug Y"
 assert_contains "case2: score marker 90" "$COMMENT_OUT" "<!-- score: 90 -->"
 assert_absent   "case2: no review POST"  "$REVIEW_OUT"
+assert_not_contains "case2: issues comment not collapsed" "$COMMENT_OUT" "<details>"
 
 # ── case 3: mixed ─────────────────────────────────────────────────────────────
 # Two findings: line 12 on-diff, line 999 out-of-diff.
@@ -172,6 +182,16 @@ assert_contains "case4: heading"   "$COMMENT_OUT" "### Code review"
 assert_contains "case4: body"      "$COMMENT_OUT" "No issues found."
 assert_contains "case4: footer"    "$COMMENT_OUT" "Generated with [Claude Code]"
 assert_absent   "case4: no review" "$REVIEW_OUT"
+assert_contains "case4: collapsed details" "$COMMENT_OUT" "<details><summary>"
+assert_contains "case4: summary verdict"   "$COMMENT_OUT" "✅ Code review — no issues found"
+assert_contains "case4: details close"     "$COMMENT_OUT" "</details>"
+
+# case 4b: SAME function collapses for Security audit (proves one change covers both)
+reset_outputs
+post_review_summary 99 "Security audit" "No security issues found. Inputs validated."
+assert_contains "case4b: security collapsed" "$COMMENT_OUT" "<details><summary>"
+assert_contains "case4b: security verdict"   "$COMMENT_OUT" "✅ Security audit — no issues found"
+assert_contains "case4b: security heading"   "$COMMENT_OUT" "### Security audit"
 
 # ── case 6: BOUNDARY — empty findings ────────────────────────────────────────
 reset_outputs

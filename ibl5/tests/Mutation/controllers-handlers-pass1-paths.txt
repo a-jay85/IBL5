@@ -4,7 +4,7 @@ classes/DepthChartEntry/DepthChartEntryController.php
 classes/DepthChartEntry/DepthChartEntrySubmissionHandler.php
 classes/Logging/DiscordWebhookHandler.php
 classes/DraftHistory/DraftHistoryApiHandler.php
-classes/Draft/DraftSelectionHandler.php
+classes/Draft/DraftController.php
 classes/Api/Cache/ETagHandler.php
 classes/BulkImport/FileTypeHandler.php
 classes/FranchiseRecordBook/FranchiseRecordBookApiHandler.php

@@ -17,7 +17,13 @@ class DraftViewTest extends TestCase
 
     protected function setUp(): void
     {
+        $_SESSION = [];
         $this->view = new DraftView();
+    }
+
+    protected function tearDown(): void
+    {
+        $_SESSION = [];
     }
 
     // ============================================

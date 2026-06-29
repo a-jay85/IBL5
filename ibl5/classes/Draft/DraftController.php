@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace Draft;
 
-use Draft\Contracts\DraftSelectionHandlerInterface;
+use Draft\Contracts\DraftControllerInterface;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Season\Season;
 use Discord\Discord;
 
 /**
- * @see DraftSelectionHandlerInterface
+ * @see DraftControllerInterface
  */
-class DraftSelectionHandler implements DraftSelectionHandlerInterface
+class DraftController implements DraftControllerInterface
 {
     private \mysqli $db;
     private DraftValidator $validator;
@@ -25,13 +25,16 @@ class DraftSelectionHandler implements DraftSelectionHandlerInterface
     private \Psr\Log\LoggerInterface $auditLogger;
     /** Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('draft'). */
     private \Psr\Log\LoggerInterface $draftLogger;
+    private DraftService $service;
+    private \Utilities\NukeCompat $nukeCompat;
 
     public function __construct(
         \mysqli $db,
         TeamIdentityRepositoryInterface $commonRepository,
         Season $season,
         ?\Psr\Log\LoggerInterface $auditLogger = null,
-        ?\Psr\Log\LoggerInterface $draftLogger = null
+        ?\Psr\Log\LoggerInterface $draftLogger = null,
+        ?\Utilities\NukeCompat $nukeCompat = null
     ) {
         $this->db = $db;
         $this->commonRepository = $commonRepository;
@@ -43,10 +46,71 @@ class DraftSelectionHandler implements DraftSelectionHandlerInterface
         $this->view = new DraftView();
         $this->auditLogger = $auditLogger ?? \Logging\LoggerFactory::getChannel('audit');
         $this->draftLogger = $draftLogger ?? \Logging\LoggerFactory::getChannel('draft');
+        $this->service = new DraftService($db, $commonRepository, $season);
+        $this->nukeCompat = $nukeCompat ?? new \Utilities\NukeCompat();
+    }
+
+    public function main(mixed $user): void
+    {
+        if (!$this->nukeCompat->isUser($user)) {
+            $this->nukeCompat->loginBox();
+            return;
+        }
+        $decoded = $this->nukeCompat->cookieDecode($user);
+        $username = $decoded[1] ?? '';
+        $this->displayDraftBoard($username);
+    }
+
+    public function displayDraftBoard(string $username): void
+    {
+        \PageLayout\PageLayout::header();
+        $data = $this->service->getDraftBoardData($username);
+        (new \Api\Response\HtmlResponder())->html($this->view->renderDraftInterface(
+            $data->players, $data->teamLogo, $data->pickOwner,
+            $data->draftRound, $data->draftPick, $data->seasonYear, $data->teamId));
+        \PageLayout\PageLayout::footer();
     }
 
     /**
-     * @see DraftSelectionHandlerInterface::handleDraftSelection()
+     * @param array<string, mixed> $post
+     * @param mixed $user The PHP-Nuke $user cookie variable
+     */
+    public function submitSelection(array $post, mixed $user): string
+    {
+        // (1) Auth gate — op=select bypasses main()'s isUser() check, so guard here.
+        if (!$this->nukeCompat->isUser($user)) {
+            $this->nukeCompat->loginBox();
+            return '';
+        }
+
+        // (2) CSRF — validate before any DB mutation.
+        if (!\Security\CsrfGuard::validateSubmittedToken('draft_selection')) {
+            return $this->view->renderValidationError('Invalid or expired form submission. Please reload and try again.');
+        }
+
+        $teamName = is_string($post['teamname'] ?? null) ? $post['teamname'] : '';
+
+        // (3) Ownership — POST team must equal the session user's team.
+        // Reject null / Free Agents so a teamless session cannot draft.
+        $decoded = $this->nukeCompat->cookieDecode($user);
+        $username = is_string($decoded[1] ?? null) ? $decoded[1] : '';
+        $sessionTeam = $this->commonRepository->getTeamnameFromUsername($username);
+        if ($sessionTeam === null
+            || $sessionTeam === \League\League::FREE_AGENTS_TEAM_NAME
+            || $sessionTeam !== $teamName) {
+            return $this->view->renderValidationError('You can only make selections for your own team.');
+        }
+
+        $playerName = is_string($post['player'] ?? null) ? $post['player'] : null;
+        $rawRound   = $post['draft_round'] ?? null;
+        $rawPick    = $post['draft_pick'] ?? null;
+        $draftRound = is_numeric($rawRound) ? (int) $rawRound : 0;
+        $draftPick  = is_numeric($rawPick) ? (int) $rawPick : 0;
+        return $this->handleDraftSelection($teamName, $playerName, $draftRound, $draftPick);
+    }
+
+    /**
+     * @see DraftControllerInterface::handleDraftSelection()
      */
     public function handleDraftSelection(string $teamName, ?string $playerName, int $draftRound, int $draftPick): string
     {

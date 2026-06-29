@@ -1,6 +1,7 @@
 name: E2E Tests
 
 on:
+  merge_group:
   pull_request:
     branches: [master]
     types: [opened, synchronize, reopened, ready_for_review, labeled]
@@ -41,7 +42,7 @@ jobs:
       # NOTE: a `labeled` event intentionally does NOT set src=true. Adding any
       # label used to force the full E2E suite (api-e2e/shards/mutators) to rerun.
       # Only the Visual Regression job should respond to a label — see `baseline` below.
-      src: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.src == 'true' }}
+      src: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.src == 'true' }}
       # True only for the `update-baselines` label. Gates the Visual Regression job
       # alone so applying that label reruns baseline regen without a CI storm.
       baseline: ${{ github.event.action == 'labeled' && github.event.label.name == 'update-baselines' }}

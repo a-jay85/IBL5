@@ -47,28 +47,11 @@ jobs:
       working-directory: ibl5
       run: bin/check-infection-excludes
 
-    - name: Setup PHP
-      uses: shivammathur/setup-php@v2
+    - name: Setup PHP environment
+      uses: ./.github/actions/setup-php-env
       with:
-        php-version: '8.5'
         extensions: mbstring, intl, mysqli, pcov
         coverage: pcov
-
-    - name: Cache vendor directory
-      uses: actions/cache@v6
-      with:
-        path: ibl5/vendor
-        key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-vendor-
-
-    - name: Create config.php
-      working-directory: ibl5
-      run: cp config.php.example config.php
-
-    - name: Install dependencies
-      working-directory: ibl5
-      run: composer install --no-progress --no-interaction
 
     - name: Apply migrations
       working-directory: ibl5
@@ -158,28 +141,11 @@ jobs:
       working-directory: ibl5
       run: bin/check-infection-excludes
 
-    - name: Setup PHP
-      uses: shivammathur/setup-php@v2
+    - name: Setup PHP environment
+      uses: ./.github/actions/setup-php-env
       with:
-        php-version: '8.5'
         extensions: mbstring, intl, mysqli, pcov
         coverage: pcov
-
-    - name: Cache vendor directory
-      uses: actions/cache@v6
-      with:
-        path: ibl5/vendor
-        key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-vendor-
-
-    - name: Create config.php
-      working-directory: ibl5
-      run: cp config.php.example config.php
-
-    - name: Install dependencies
-      working-directory: ibl5
-      run: composer install --no-progress --no-interaction
 
     - name: Detect covered changes
       id: changes

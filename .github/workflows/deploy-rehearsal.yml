@@ -70,12 +70,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+      - name: Setup PHP environment
+        uses: ./.github/actions/setup-php-env
         with:
-          php-version: '8.5'
-          extensions: mbstring, intl, mysqli
-          coverage: none
+          cache: 'false'
+          create-config: 'false'
+          install: 'false'
 
       # Mirror main.yml "Install PHP dependencies" exactly (--no-dev catches
       # dev-dependency leaks that tests.yml's full install would miss)

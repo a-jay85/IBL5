@@ -47,30 +47,10 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v7
 
-    - name: Setup PHP
-      uses: shivammathur/setup-php@v2
-      with:
-        php-version: '8.5'
-        extensions: mbstring, intl, mysqli
-        coverage: none
-
-    - name: Cache vendor directory
-      uses: actions/cache@v6
-      with:
-        path: ibl5/vendor
-        key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-vendor-
-
-    - name: Install dependencies
-      working-directory: ibl5
-      run: composer install --no-progress --no-interaction
-
     # config.php.example reads DB creds from getenv(); the job-level DB_* env
     # vars point it at the CI MariaDB service.
-    - name: Create config.php for CI
-      working-directory: ibl5
-      run: cp config.php.example config.php
+    - name: Setup PHP environment
+      uses: ./.github/actions/setup-php-env
 
     - name: Apply migrations via bash runner
       run: ibl5/bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot iblhoops_ibl5
@@ -120,24 +100,10 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v7
 
-    - name: Setup PHP
-      uses: shivammathur/setup-php@v2
+    - name: Setup PHP environment
+      uses: ./.github/actions/setup-php-env
       with:
-        php-version: '8.5'
-        extensions: mbstring, intl, mysqli
-        coverage: none
-
-    - name: Cache vendor directory
-      uses: actions/cache@v6
-      with:
-        path: ibl5/vendor
-        key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-vendor-
-
-    - name: Install dependencies
-      working-directory: ibl5
-      run: composer install --no-progress --no-interaction
+        create-config: 'false'
 
     - name: Create databases
       run: |
@@ -215,30 +181,10 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v7
 
-    - name: Setup PHP
-      uses: shivammathur/setup-php@v2
-      with:
-        php-version: '8.5'
-        extensions: mbstring, intl, mysqli
-        coverage: none
-
-    - name: Cache vendor directory
-      uses: actions/cache@v6
-      with:
-        path: ibl5/vendor
-        key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-vendor-
-
-    - name: Install dependencies
-      working-directory: ibl5
-      run: composer install --no-progress --no-interaction
-
     # config.php.example reads DB creds from getenv(); the job-level DB_* env
     # vars point it at the CI MariaDB service (ibl5_completeness).
-    - name: Create config.php for CI
-      working-directory: ibl5
-      run: cp config.php.example config.php
+    - name: Setup PHP environment
+      uses: ./.github/actions/setup-php-env
 
     - name: Apply all migrations
       run: |

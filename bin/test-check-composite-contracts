@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-check-composite-contracts — regression test for the composite-contract
+# gate. Builds throwaway .github/actions trees and asserts the check's exit code and
+# skip/active behavior. Verifies the logic even while the live composites are absent
+# on master (the check is dormant there, but its logic must already be correct so it
+# is sound the moment the composites land).
+#
+# Run: bin/test-check-composite-contracts  (exit 0 = all pass, 1 = a case failed)
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+CHECK="$SCRIPT_DIR/check-composite-contracts"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+FAILED=0
+
+# fresh_actions → echoes a new empty actions dir. Uses mktemp (not a counter): this
+# runs in a $(...) subshell at the call site, so a counter increment would not
+# persist and every call would reuse one dir, leaking state across cases.
+fresh_actions() {
+  mktemp -d "$TMP/actions.XXXXXX"
+}
+
+put_ssh() { # dir, guarded(1|0)
+  mkdir -p "$1/setup-ssh"
+  # $PORT/$HOST are intentionally literal in the fixture YAML, not shell-expanded.
+  # shellcheck disable=SC2016
+  if [ "$2" -eq 1 ]; then
+    printf 'runs:\n  steps:\n    - run: ssh-keyscan -p "$PORT" "$HOST" >> ~/.ssh/known_hosts 2>/dev/null || true\n' > "$1/setup-ssh/action.yml"
+  else
+    printf 'runs:\n  steps:\n    - run: ssh-keyscan -p "$PORT" "$HOST" >> ~/.ssh/known_hosts\n' > "$1/setup-ssh/action.yml"
+  fi
+}
+
+# put_nd <dir> <fail-on-delivery-default> [extra-input-with-default]
+# Writes a notify-discord action.yml. When the 3rd arg is "lead", an UNRELATED input
+# with its own default is placed BEFORE fail-on-delivery, and fail-on-delivery is not
+# last — proving the parser reads the right block's default.
+put_nd() {
+  mkdir -p "$1/notify-discord"
+  local f="$1/notify-discord/action.yml"
+  {
+    echo 'inputs:'
+    if [ "${3:-}" = "lead" ]; then
+      echo '  message-file:'
+      echo '    description: msg'
+      echo "    default: '/tmp/x.txt'"
+    fi
+    echo '  fail-on-delivery:'
+    echo '    description: loud or soft'
+    echo '    required: false'
+    echo "    default: '$2'"
+    echo '  port:'
+    echo '    description: port'
+    echo '    required: true'
+  } > "$f"
+}
+
+expect() { # name want got
+  if [ "$3" -eq "$2" ]; then
+    echo "ok: $1 (exit $3)"
+  else
+    echo "FAIL: $1 — expected exit $2, got $3"
+    FAILED=1
+  fi
+}
+
+# --- both absent → pass, both skipped (visibly) --------------------------------
+d="$(fresh_actions)"
+out="$("$CHECK" "$d" 2>&1)"; rc=$?
+expect "both-absent-pass" 0 "$rc"
+if printf '%s' "$out" | grep -q 'setup-ssh absent — skipped' \
+   && printf '%s' "$out" | grep -q 'notify-discord absent — skipped'; then
+  echo "ok: absent-skips-are-visible"
+else
+  echo "FAIL: absent-skips-are-visible — output: $out"; FAILED=1
+fi
+
+# --- setup-ssh guarded → pass --------------------------------------------------
+d="$(fresh_actions)"; put_ssh "$d" 1
+"$CHECK" "$d" >/dev/null 2>&1; expect "ssh-guard-present" 0 $?
+
+# --- setup-ssh missing guard → fail --------------------------------------------
+d="$(fresh_actions)"; put_ssh "$d" 0
+"$CHECK" "$d" >/dev/null 2>&1; expect "ssh-guard-missing" 1 $?
+
+# --- notify-discord default true → pass ----------------------------------------
+d="$(fresh_actions)"; put_nd "$d" true
+"$CHECK" "$d" >/dev/null 2>&1; expect "nd-default-true" 0 $?
+
+# --- notify-discord default false → fail ---------------------------------------
+d="$(fresh_actions)"; put_nd "$d" false
+"$CHECK" "$d" >/dev/null 2>&1; expect "nd-default-false" 1 $?
+
+# --- right-block parsing: a leading input also has a default; fail-on-delivery
+#     (true) is not last → must still pass (reads the correct block) -------------
+d="$(fresh_actions)"; put_nd "$d" true lead
+"$CHECK" "$d" >/dev/null 2>&1; expect "nd-reads-correct-block-true" 0 $?
+
+# --- same shape but fail-on-delivery=false with a leading true default → fail ---
+d="$(fresh_actions)"; put_nd "$d" false lead
+"$CHECK" "$d" >/dev/null 2>&1; expect "nd-reads-correct-block-false" 1 $?
+
+if [ "$FAILED" -ne 0 ]; then
+  echo "RESULT: FAILED"
+  exit 1
+fi
+echo "RESULT: all passed"
+exit 0

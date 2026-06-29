@@ -149,6 +149,10 @@ services:
         tags:
             - phpstan.rules.rule
     -
+        class: PHPStanRules\BanSqlStringConcatenationRule
+        tags:
+            - phpstan.rules.rule
+    -
         class: PHPStanRules\BanDuplicateModifierMethodRule
         tags:
             - phpstan.rules.rule

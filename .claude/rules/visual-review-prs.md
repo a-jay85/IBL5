@@ -7,7 +7,7 @@ paths:
   - "ibl5/tests/e2e/vr-review-comment.ts"
   - "bin/vr-changed-coverage"
   - "bin/vr-review-comment"
-last_verified: 2026-06-24
+last_verified: 2026-06-29
 ---
 
 # Visual-review PRs
@@ -59,6 +59,17 @@ approval mechanism.
 
 - Fork PR: the read-only token has no secrets, so the publish/comment steps no-op (expected).
 - No pixel diffs: VR passes, nothing to review, no comment.
+
+## Infra/render failures vs pixel diffs
+
+A failed VR cell is a **pixel diff** only when it carries a `*-diff.png` screenshot attachment.
+A cell that failed before a screenshot could be taken — a `page.goto` navigation timeout, a blank
+render, an error — carries no triplet and is labeled an **infra/render failure** in a separate
+`⚠️ … failed to render` comment section whose remedy is **re-run the VR job**, NOT
+`update-baselines` (which cannot fix a timeout). The "changed pixels" headline and the global-change
+banner appear only when ≥1 genuine pixel diff exists. The VR spec uses `gotoWithRetry`
+(`tests/e2e/helpers/navigation.ts`) so transient navigation timeouts self-heal rather than
+producing these cells. See ADR-0073.
 
 ## Modifying the selection logic
 

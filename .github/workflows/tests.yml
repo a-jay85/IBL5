@@ -553,7 +553,7 @@ jobs:
   gate:
     name: Tests and Analysis
     if: always()
-    needs: [changes, test, audit-php, audit-js, ibl6-checks, db-integration, phpstan, phpunit-hygiene, shellcheck, host-mariadb-guard, automouse-impl-model-test, update-baselines, infection-excludes, csrf-field-name, harness-tests]
+    needs: [changes, test, audit-php, audit-js, ibl6-checks, db-integration, phpstan, phpunit-hygiene, shellcheck, host-mariadb-guard, automouse-impl-model-test, update-baselines, infection-excludes, csrf-field-name, harness-tests, workflow-lint]
     runs-on: ubuntu-latest
     steps:
       - run: exit 1

@@ -58,6 +58,9 @@ jobs:
               # so a command-only edit must run the harness job too.
               - '.claude/commands/pr-review.md'
               - '.claude/commands/security-audit.md'
+              # bin/test-human-signoff-classifier guards the classifier lib that
+              # human-signoff.yml sources, so a workflow-only edit must run it too.
+              - '.github/workflows/human-signoff.yml'
             ibl6:
               - 'IBL6/**'
               - '.github/workflows/tests.yml'
@@ -541,6 +544,8 @@ jobs:
         run: bin/test-postplan-arm-conditions
       - name: bin/test-post-review-findings
         run: bin/test-post-review-findings
+      - name: bin/test-human-signoff-classifier
+        run: bin/test-human-signoff-classifier
       - name: bin/test-playwright-version
         run: bin/test-playwright-version
       - name: bin/test-pr-canary-check

@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-human-signoff-classifier — regression guard for
+# bin/lib/human-signoff-classifier.sh, which BOTH .github/workflows/human-signoff.yml
+# and this test source. Every classifier case runs in an ISOLATED `bash -c` under
+# the SAME `set -euo pipefail` the workflow run step uses, so the test exercises
+# production shell semantics (mirrors bin/test-postplan-arm-conditions'
+# isolated-block fidelity).
+#
+# Run: bin/test-human-signoff-classifier  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+LIB="$REPO_ROOT/bin/lib/human-signoff-classifier.sh"
+
+FAILED=0
+LAST_OUT=""
+expect() { # name expected_rc actual_rc
+    if [ "$2" -eq "$3" ]; then
+        echo "ok: $1"
+    else
+        echo "FAIL: $1 — expected rc=$2 got rc=$3; output: $LAST_OUT"
+        FAILED=1
+    fi
+}
+
+# run_pr <title> <labels> — eval the entry gate under production strict mode.
+# Args are passed positionally into bash -c (no interpolation into the script
+# body) so titles cannot inject shell.
+run_pr() {
+    LAST_OUT=$(bash -c "set -euo pipefail; source '$LIB'; hs_eval_pull_request \"\$1\" \"\$2\"" _ "$1" "$2" 2>&1)
+    return $?
+}
+
+# ---- pull_request entry gate ----
+run_pr "feat: shiny new page" "";               expect "feat: no label -> FAIL" 1 "$?"
+run_pr "feat: shiny new page" "human-approved";  expect "feat: + human-approved -> PASS" 0 "$?"
+run_pr "feat(ui): scoped" "";                    expect "feat(scope): no label -> FAIL" 1 "$?"
+run_pr "feat!: breaking" "";                     expect "feat!: no label -> FAIL" 1 "$?"
+run_pr "fix: a bug" "";                          expect "fix: -> PASS" 0 "$?"
+run_pr "ci: plumb merge queue" "";               expect "ci: -> PASS" 0 "$?"
+run_pr "feat: x" "not-human-approved-yet";       expect "feat: + lookalike label -> FAIL" 1 "$?"
+
+if [ "$FAILED" -eq 0 ]; then
+    echo "All human-signoff classifier checks passed."
+else
+    echo "Some human-signoff classifier checks FAILED."
+fi
+exit "$FAILED"

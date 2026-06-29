@@ -14,6 +14,10 @@ name: Human Sign-off
 # completes the merge while a required check is red. Non-feature work
 # (fix/refactor/chore/docs/ci/revert/…) passes automatically, so the automouse
 # pipeline can still auto-merge maintenance.
+#
+# The classifier itself lives in bin/lib/human-signoff-classifier.sh, sourced by
+# BOTH this workflow and bin/test-human-signoff-classifier so the gate's logic
+# cannot drift from its regression test.
 
 on:
   pull_request:
@@ -35,28 +39,16 @@ jobs:
     name: human-signoff
     runs-on: ubuntu-latest
     steps:
+      # Checkout is required so the run step can source the shared classifier lib.
+      - name: Checkout (for the shared classifier lib)
+        uses: actions/checkout@v7
       - name: Require human sign-off for feature PRs
         env:
           TITLE: ${{ github.event.pull_request.title }}
           LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
         run: |
           set -euo pipefail
+          # shellcheck source=bin/lib/human-signoff-classifier.sh
+          source bin/lib/human-signoff-classifier.sh
 
-          # Classifier: conventional-commit feature PRs require sign-off. Matches
-          # feat:, feat(scope):, and the breaking-change feat!: / feat(scope)!:.
-          if ! printf '%s' "$TITLE" | grep -qiE '^feat(\([^)]*\))?!?:'; then
-            echo "Title is not a feat: PR — human sign-off not required."
-            echo "  title: $TITLE"
-            exit 0
-          fi
-
-          # A human grants sign-off by applying the 'human-approved' label in the
-          # GitHub UI after manual inspection. (Comma-wrap both sides so the grep
-          # matches whole label names, never a substring.)
-          if printf '%s' ",$LABELS," | grep -q ',human-approved,'; then
-            echo "'human-approved' label present — human sign-off granted."
-            exit 0
-          fi
-
-          echo "::error title=Human sign-off required::This feature PR must be manually inspected by a maintainer, who then applies the 'human-approved' label. Auto-merge cannot satisfy this gate."
-          exit 1
+          hs_eval_pull_request "$TITLE" "$LABELS"

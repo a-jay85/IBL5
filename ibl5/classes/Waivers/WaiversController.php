@@ -107,10 +107,15 @@ class WaiversController implements WaiversControllerInterface
                 \Utilities\HtmxHelper::redirect('modules.php?name=Waivers&action=' . rawurlencode($postAction) . '&error=' . rawurlencode('Invalid or expired form submission. Please try again.'));
             }
 
+            $verifiedTeamName = $this->teamIdentityRepo->getTeamnameFromUsername($username);
+            if ($verifiedTeamName === null || $verifiedTeamName === '' || $verifiedTeamName === \League\League::FREE_AGENTS_TEAM_NAME) {
+                $verifiedTeamName = null;
+            }
+
             try {
                 /** @var array<string, string> $postData */
                 $postData = $_POST;
-                $result = $this->processWaiverSubmission($postData);
+                $result = $this->processWaiverSubmission($postData, $verifiedTeamName);
             } catch (\Throwable $e) {
                 $this->logger->error('waiver_submission_error', [
                     'error' => $e->getMessage(),
@@ -135,17 +140,22 @@ class WaiversController implements WaiversControllerInterface
 
     /**
      * @param array<string, string> $postData
+     * @param ?string $verifiedTeamName Acting team derived from the authenticated session — never from POST
      * @return array{success: bool, result?: string, error?: string}
      */
-    private function processWaiverSubmission(array $postData): array
+    private function processWaiverSubmission(array $postData, ?string $verifiedTeamName): array
     {
-        $teamName = $postData['Team_Name'] ?? '';
+        // Acting team is the verified session team — never read from POST (IDOR fix D-08).
+        if ($verifiedTeamName === null || $verifiedTeamName === '') {
+            return ['success' => false, 'error' => 'Unable to determine your team.'];
+        }
+        $teamName = $verifiedTeamName;
         $action = $postData['Action'] ?? '';
         $playerID = isset($postData['Player_ID']) ? (int) $postData['Player_ID'] : null;
         $rosterSlots = isset($postData['rosterslots']) ? (int) $postData['rosterslots'] : 0;
         $healthyRosterSlots = isset($postData['healthyrosterslots']) ? (int) $postData['healthyrosterslots'] : 0;
 
-        if ($teamName === '' || !in_array($action, ['add', 'waive'], true)) {
+        if (!in_array($action, ['add', 'waive'], true)) {
             return ['success' => false, 'error' => 'Invalid submission data.'];
         }
 

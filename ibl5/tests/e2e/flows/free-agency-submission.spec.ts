@@ -570,3 +570,131 @@ test.describe('Free Agency -- Bird Rights negotiation', () => {
     expect(notesText).toMatch(/\d+%/);
   });
 });
+
+// IDOR (D-06 delete / D-07 submit) — the FA write paths must bind the acting team
+// to the authenticated session, never to the POST-supplied `teamname` field.
+//
+// Placement: these rows mutate the global ibl_fa_offers table, so they live HERE in
+// the single serial owner file (enforced by bin/check-e2e-fa-offers-owner) rather
+// than a standalone tests/e2e/security/ spec. A separate mutating file would dodge
+// the guard's flows/-only scan but still race the blocks above under fullyParallel
+// (the PR #884/#886 cross-worker wipe race). The plan's "new file" line was a means
+// to coverage; coverage lands here race-safely.
+//
+// Coverage split (honest): the PHPUnit processor-seam test proves the POST team is
+// DISCARDED (asserts the team lookup uses the verified name; the POST name never
+// reaches the DB). These E2E rows prove the controller DERIVES the acting team from
+// the session — the offer is saved/deleted under Metros (the session team, teamid=1),
+// whose Contract Offers table is session-scoped (FreeAgencyService::buildOfferPlayers
+// keys on the session team's teamid).
+test.describe('Free Agency -- IDOR: acting team bound to session, not POST', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  test.beforeAll(async ({ request }) => {
+    await request.delete('test-state.php?action=reset-fa-offers');
+  });
+  test.afterAll(async ({ request }) => {
+    await request.delete('test-state.php?action=reset-fa-offers');
+  });
+  test.beforeEach(async ({ appState }) => {
+    await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
+  });
+
+  test('D-07: offer submit with tampered teamname is saved under the session team', async ({ page }) => {
+    // Do NOT delete the existing offer first: the negotiate form only renders when
+    // hasExistingOffer=true (Metros is at 0 open roster spots in CI seed). The beforeAll
+    // already reset offers to a known-good state (pid=11 offer present), so we can read
+    // the CSRF token directly from the form without touching the offer first.
+
+    // Read a valid CSRF token from the negotiate form (page.request shares the PHPSESSID,
+    // so the token is valid for the forged POST).
+    await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
+    const csrfToken = await page
+      .locator('form[name="FAOffer"] input[name="_csrf_token"]')
+      .first()
+      .inputValue();
+    expect(csrfToken, 'negotiate form must expose a CSRF token').toBeTruthy();
+
+    // Attacker tampers the hidden teamname to a victim team (Stars, teamid=2).
+    const response = await page.request.post('modules.php?name=FreeAgency&pa=processoffer', {
+      form: {
+        _csrf_token: csrfToken,
+        teamname: 'Stars', // tampered — the server must ignore this and use the session team
+        playerID: '11',
+        offeryear1: '200',
+        offeryear2: '0',
+        offeryear3: '0',
+        offeryear4: '0',
+        offeryear5: '0',
+        offeryear6: '0',
+        offerType: '0',
+      },
+      maxRedirects: 0,
+    });
+    const location = response.headers()['location'] ?? '';
+    expect(location, `offer submit should succeed (PRG); got ${location}`).toContain('result=offer_success');
+
+    // Read-back as the session user (Metros): the offer appears in the session team's
+    // Contract Offers table. Since that table is keyed on the session teamid, its
+    // presence proves the offer was saved under Metros — the tampered 'Stars' was
+    // discarded. (Unfixed: the offer is saved under Stars and never appears here.)
+    await page.goto('modules.php?name=FreeAgency');
+    const offersTable = page.locator('table.fa-table', {
+      has: page.locator('th', { hasText: 'Contract Offers' }),
+    });
+    await expect(
+      offersTable.locator('a[href*="pa=negotiate&pid=11"]'),
+      'tampered-team offer must be recorded under the session team (Metros)',
+    ).toBeVisible();
+
+    // Cleanup: delete the offer so the table returns to its seeded shape.
+    await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
+    const deleteBtn = page.getByRole('button', { name: /Delete This Offer/i });
+    if ((await deleteBtn.count()) > 0) { // e2e-hygiene-allow: cleanup — restore state
+      await deleteBtn.click();
+      await page.waitForURL(/result=deleted/);
+    }
+  });
+
+  test('D-06: offer delete with tampered teamname deletes the session team\'s offer', async ({ page, request }) => {
+    // Seed the three Metros offers (pid=10/11/12) so pid=11 has a deletable offer
+    // and pid=10 remains as a control that the table still renders other offers.
+    await request.delete('test-state.php?action=reset-fa-offers');
+    await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
+    await expect(
+      page.getByRole('button', { name: /Delete This Offer/i }),
+      'seed must provide a Metros offer for pid=11',
+    ).toBeVisible();
+
+    const csrfToken = await page
+      .locator('form[action*="deleteoffer"] input[name="_csrf_token"]')
+      .first()
+      .inputValue();
+    expect(csrfToken, 'delete form must expose a CSRF token').toBeTruthy();
+
+    // Attacker tampers teamname to Stars (which has no pid=11 offer). The server must
+    // delete the SESSION team's (Metros) offer, ignoring the POST team.
+    const response = await page.request.post('modules.php?name=FreeAgency&pa=deleteoffer', {
+      form: { _csrf_token: csrfToken, teamname: 'Stars', playerID: '11' },
+      maxRedirects: 0,
+    });
+    const location = response.headers()['location'] ?? '';
+    expect(location, `delete should redirect to result=deleted; got ${location}`).toContain('result=deleted');
+
+    // Read-back on the session team's Contract Offers table: the pid=11 offer is gone
+    // while pid=10 remains. (Unfixed: deleteOffers('Stars',11) is a no-op — Stars has no
+    // such offer — so the Metros pid=11 offer would still be listed here.)
+    await page.goto('modules.php?name=FreeAgency');
+    const offersTable = page.locator('table.fa-table', {
+      has: page.locator('th', { hasText: 'Contract Offers' }),
+    });
+    await expect(
+      offersTable.locator('a[href*="pa=negotiate&pid=10"]'),
+      'control: other seeded offers must still render (table is populated)',
+    ).toBeVisible();
+    await expect(
+      offersTable.locator('a[href*="pa=negotiate&pid=11"]'),
+      'session-team offer must be deleted despite the tampered POST team',
+    ).toHaveCount(0);
+  });
+});

@@ -176,7 +176,7 @@ class FreeAgencyProcessorTest extends TestCase
 
         $this->mockDb->setMockData([$this->getCompletePlayerData()]);
 
-        $processor->processOfferSubmission($this->buildValidPost());
+        $processor->processOfferSubmission($this->buildValidPost(), 'Test Team');
 
         $this->assertNotNull($capturingRepo->lastSavedOffer, 'Offer should have been saved');
         $this->assertIsFloat($capturingRepo->lastSavedOffer['modifier']);
@@ -197,7 +197,7 @@ class FreeAgencyProcessorTest extends TestCase
 
         $this->mockDb->setMockData([$this->getCompletePlayerData()]);
 
-        $processor->processOfferSubmission($this->buildValidPost());
+        $processor->processOfferSubmission($this->buildValidPost(), 'Test Team');
 
         $this->assertNotNull($capturingRepo->lastSavedOffer);
         $this->assertSame(3, $capturingRepo->lastSavedOffer['random']);
@@ -217,7 +217,7 @@ class FreeAgencyProcessorTest extends TestCase
 
         $this->mockDb->setMockData([$this->getCompletePlayerData()]);
 
-        $processor->processOfferSubmission($this->buildValidPost());
+        $processor->processOfferSubmission($this->buildValidPost(), 'Test Team');
 
         $this->assertNotNull($capturingRepo->lastSavedOffer);
         $this->assertSame(-5, $capturingRepo->lastSavedOffer['random']);
@@ -238,7 +238,7 @@ class FreeAgencyProcessorTest extends TestCase
 
         $this->mockDb->setMockData([$this->getCompletePlayerData()]);
 
-        $processor->processOfferSubmission($this->buildValidPost());
+        $processor->processOfferSubmission($this->buildValidPost(), 'Test Team');
 
         $this->assertNotNull($capturingRepo->lastSavedOffer);
         $this->assertEqualsWithDelta(0.95, $capturingRepo->lastSavedOffer['modifier'], 0.001);
@@ -258,7 +258,7 @@ class FreeAgencyProcessorTest extends TestCase
 
         $this->mockDb->setMockData([$this->getCompletePlayerData()]);
 
-        $processor->processOfferSubmission($this->buildValidPost());
+        $processor->processOfferSubmission($this->buildValidPost(), 'Test Team');
 
         $this->assertNotNull($capturingRepo->lastSavedOffer);
         $offer = $capturingRepo->lastSavedOffer;
@@ -282,7 +282,7 @@ class FreeAgencyProcessorTest extends TestCase
 
         $this->mockDb->setMockData([$this->getCompletePlayerData()]);
 
-        $processor->processOfferSubmission($this->buildValidPost());
+        $processor->processOfferSubmission($this->buildValidPost(), 'Test Team');
 
         $this->assertNotNull($capturingRepo->lastSavedOffer);
         $offer = $capturingRepo->lastSavedOffer;
@@ -291,6 +291,81 @@ class FreeAgencyProcessorTest extends TestCase
         $this->assertEqualsWithDelta(500.0, $offer['perceivedValue'], 0.01);
         $this->assertEqualsWithDelta(1.0, $offer['modifier'], 0.001);
         $this->assertSame(0, $offer['random']);
+    }
+
+    // ================================================================
+    // IDOR — D-07: acting team comes from the verified session param,
+    // never from POST. The processor looks the team up via
+    // Team::initialize($db, $verifiedTeamName); the bound WHERE value is
+    // recorded by the mock, so we assert the lookup used the verified name
+    // and the POST-supplied name never reaches the database.
+    // (lastSavedOffer['teamName'] is NOT a valid probe here: the mock row
+    // hardcodes team_name='Test Team' for any lookup.)
+    // ================================================================
+
+    public function testProcessOfferSubmissionSavesUnderVerifiedTeamNotPostTeam(): void
+    {
+        $capturingRepo = new CapturingRepository();
+
+        $processor = new FreeAgencyProcessor(
+            $this->mockDb,
+            self::createStub(TeamIdentityRepositoryInterface::class),
+            new StubDemandCalculator(),
+            $capturingRepo,
+        );
+
+        $this->mockDb->setMockData([$this->getCompletePlayerData()]);
+
+        // Attacker tampers the hidden POST team field to a victim team.
+        $post = array_merge($this->buildValidPost(), ['teamname' => 'Victim Team']);
+        $processor->processOfferSubmission($post, 'Test Team');
+
+        $queries = $this->mockDb->getExecutedQueries();
+
+        // The verified session team is the one looked up.
+        $verifiedLookup = array_filter(
+            $queries,
+            static fn (string $q): bool => stripos($q, 'ibl_team_info') !== false
+                && strpos($q, "'Test Team'") !== false
+        );
+        $this->assertNotEmpty($verifiedLookup, 'Team lookup must use the verified session team name');
+
+        // The POST-supplied team name must never reach the database.
+        $victimReferences = array_filter(
+            $queries,
+            static fn (string $q): bool => strpos($q, 'Victim Team') !== false
+        );
+        $this->assertEmpty($victimReferences, 'POST-supplied team name must be discarded (IDOR D-07)');
+
+        $this->assertNotNull($capturingRepo->lastSavedOffer, 'A valid offer should still be saved');
+    }
+
+    public function testProcessOfferSubmissionUsesVerifiedTeamWhenPostTeamAbsent(): void
+    {
+        $capturingRepo = new CapturingRepository();
+
+        $processor = new FreeAgencyProcessor(
+            $this->mockDb,
+            self::createStub(TeamIdentityRepositoryInterface::class),
+            new StubDemandCalculator(),
+            $capturingRepo,
+        );
+
+        $this->mockDb->setMockData([$this->getCompletePlayerData()]);
+
+        // POST carries no team field at all — the verified param drives the lookup.
+        $post = $this->buildValidPost();
+        unset($post['teamname']);
+        $processor->processOfferSubmission($post, 'Test Team');
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $verifiedLookup = array_filter(
+            $queries,
+            static fn (string $q): bool => stripos($q, 'ibl_team_info') !== false
+                && strpos($q, "'Test Team'") !== false
+        );
+        $this->assertNotEmpty($verifiedLookup, 'Verified team must be used even when POST team is absent');
+        $this->assertNotNull($capturingRepo->lastSavedOffer);
     }
 
     // ================================================================
@@ -343,7 +418,7 @@ class FreeAgencyProcessorTest extends TestCase
 
         $result = $processor->processOfferSubmission(array_merge($this->buildValidPost(), [
             'offerType' => 1, // 1-year MLE
-        ]));
+        ]), 'Test Team');
 
         $this->assertFalse($result['success']);
         $this->assertSame('validation_error', $result['type']);
@@ -370,7 +445,7 @@ class FreeAgencyProcessorTest extends TestCase
 
         $result = $processor->processOfferSubmission(array_merge($this->buildValidPost(), [
             'offerType' => 7, // LLE
-        ]));
+        ]), 'Test Team');
 
         $this->assertFalse($result['success']);
         $this->assertSame('validation_error', $result['type']);
@@ -405,7 +480,7 @@ class FreeAgencyProcessorTest extends TestCase
             $signingRepo,
         );
 
-        $result = $processor->processOfferSubmission($this->buildValidPost());
+        $result = $processor->processOfferSubmission($this->buildValidPost(), 'Test Team');
 
         $this->assertFalse($result['success']);
         $this->assertSame('already_signed', $result['type']);

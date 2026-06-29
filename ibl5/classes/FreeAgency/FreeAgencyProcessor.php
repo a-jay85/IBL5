@@ -50,11 +50,10 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
     /**
      * @see FreeAgencyProcessorInterface::processOfferSubmission()
      */
-    public function processOfferSubmission(array $postData): array
+    public function processOfferSubmission(array $postData, string $verifiedTeamName): array
     {
-        // Extract and sanitize input
-        /** @var string $teamName */
-        $teamName = $postData['teamname'] ?? '';
+        // Acting team is the verified session team — never read from POST (IDOR fix D-07).
+        $teamName = $verifiedTeamName;
         $rawPlayerID = $postData['playerID'] ?? 0;
         $playerID = is_numeric($rawPlayerID) ? (int) $rawPlayerID : 0;
 

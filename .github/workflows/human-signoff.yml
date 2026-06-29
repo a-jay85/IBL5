@@ -14,6 +14,10 @@ name: Human Sign-off
 # completes the merge while a required check is red. Non-feature work
 # (fix/refactor/chore/docs/ci/revert/…) passes automatically, so the automouse
 # pipeline can still auto-merge maintenance.
+#
+# The classifier itself lives in bin/lib/human-signoff-classifier.sh, sourced by
+# BOTH this workflow and bin/test-human-signoff-classifier so the gate's logic
+# cannot drift from its regression test.
 
 on:
   pull_request:
@@ -21,16 +25,13 @@ on:
     # labeled/unlabeled re-run the gate so applying the label flips red→green;
     # edited re-runs when the title (the classifier input) changes.
     types: [opened, reopened, synchronize, edited, ready_for_review, labeled, unlabeled]
-  # On a merge_group, github.event.pull_request is null; the run step resolves
-  # every batched PR from the commit range instead (ADR-0072 / D2).
-  merge_group:
 
 permissions:
   contents: read
   pull-requests: read
 
 concurrency:
-  group: human-signoff-${{ github.event.pull_request.number || github.ref }}
+  group: human-signoff-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
@@ -39,28 +40,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Checkout is required so the run step can source the shared classifier lib.
-      # fetch-depth: 0 lets the merge_group branch run `git log base..head`.
       - name: Checkout (for the shared classifier lib)
         uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
       - name: Require human sign-off for feature PRs
         env:
-          GH_TOKEN: ${{ github.token }}
-          EVENT_NAME: ${{ github.event_name }}
           TITLE: ${{ github.event.pull_request.title }}
           LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
-          MG_BASE_SHA: ${{ github.event.merge_group.base_sha }}
-          MG_HEAD_SHA: ${{ github.event.merge_group.head_sha }}
         run: |
           set -euo pipefail
           # shellcheck source=bin/lib/human-signoff-classifier.sh
           source bin/lib/human-signoff-classifier.sh
 
-          if [ "$EVENT_NAME" = "merge_group" ]; then
-            # Defense-in-depth: every batched PR re-checked (ADR-0072 / D3).
-            hs_eval_merge_group "$MG_BASE_SHA" "$MG_HEAD_SHA"
-          else
-            # Entry gate (unchanged behaviour) — blocks a feat: PR from the queue.
-            hs_eval_pull_request "$TITLE" "$LABELS"
-          fi
+          hs_eval_pull_request "$TITLE" "$LABELS"

@@ -36,7 +36,9 @@ define("_COMMENT", "comment");
 define("_CONFIGURE", "Configure");
 define("_LOGINCREATE", "Login/Create an Account");
 define("_THRESHOLD", "Threshold");
-define("_NOCOMMENTS", "No Comments");
+if (!defined('_NOCOMMENTS')) {
+    define("_NOCOMMENTS", "No Comments");
+}
 define("_NESTED", "Nested");
 define("_FLAT", "Flat");
 define("_THREAD", "Thread");
@@ -52,7 +54,9 @@ define("_NOSUBJECT", "No Subject");
 define("_NOANONCOMMENTS", "No Comments Allowed for Anonymous, please <a href=\"modules.php?name=YourAccount&amp;op=new_user\">register</a>");
 define("_PARENT", "Parent");
 define("_ROOT", "Root");
-define("_UCOMMENT", "Comment");
+if (!defined('_UCOMMENT')) {
+    define("_UCOMMENT", "Comment");
+}
 define("_ALLOWEDHTML", "Allowed HTML:");
 define("_POSTANON", "Post Anonymously");
 define("_EXTRANS", "Extrans (html tags to text)");

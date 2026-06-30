@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-automouse-stream-filter — regression test for bin/lib/automouse-stream-filter.
+#
+# The filter reads `claude -p --output-format stream-json` NDJSON and emits the
+# per-phase automouse log lines (tool: / exit: / COMPACTION:). This pins the
+# compaction recorder added so context compactions are no longer dropped silently:
+#   - a `system`/`compact_boundary` event is recorded as a COMPACTION line
+#   - both field casings extract: documented wire snake_case (compact_metadata.pre_tokens)
+#     AND stored-transcript camelCase (compactMetadata.preTokens)
+#   - a manual /compact (trigger=manual) is recorded too
+#   - FOOTGUN (load-bearing negative): a `system`/`init` event — emitted at the
+#     start of every stream-json session — must NOT produce a COMPACTION line
+#   - regression: tool: and exit: lines still emit (the new arm didn't break them)
+#
+# Run: bin/test-automouse-stream-filter  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+FILTER="$SCRIPT_DIR/lib/automouse-stream-filter"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP" 2>/dev/null' EXIT
+
+FAILED=0
+
+# run_filter <ndjson-on-stdin> → captured filter stdout
+# A `result` event always terminates the filter, so every fixture ends with one.
+run_filter() {
+    local hb="$TMP/hb"
+    printf '%s' "$1" | "$FILTER" "$hb" "" "test-plan" 2>/dev/null
+}
+
+# assert_contains <name> <output> <needle>
+assert_contains() {
+    local name="$1" out="$2" needle="$3"
+    if printf '%s' "$out" | grep -qF -- "$needle"; then
+        echo "ok: $name"
+    else
+        echo "FAIL: $name — expected output to contain '$needle'"
+        echo "  --- got ---"; printf '%s\n' "$out" | sed 's/^/  /'
+        FAILED=1
+    fi
+}
+
+# assert_not_contains <name> <output> <needle>
+assert_not_contains() {
+    local name="$1" out="$2" needle="$3"
+    if printf '%s' "$out" | grep -qF -- "$needle"; then
+        echo "FAIL: $name — output unexpectedly contained '$needle'"
+        echo "  --- got ---"; printf '%s\n' "$out" | sed 's/^/  /'
+        FAILED=1
+    else
+        echo "ok: $name"
+    fi
+}
+
+RESULT_LINE='{"type":"result","subtype":"success","stop_reason":"end_turn","num_turns":1,"duration_ms":1000,"total_cost_usd":0.01,"usage":{"input_tokens":1,"output_tokens":1}}'
+
+# c1 — documented wire schema (snake_case) compaction is recorded
+OUT=$(run_filter '{"type":"system","subtype":"compact_boundary","compact_metadata":{"trigger":"auto","pre_tokens":120000}}
+'"$RESULT_LINE"'
+')
+assert_contains "c1-wire-snakecase" "$OUT" "COMPACTION: subtype=compact_boundary trigger=auto pre_tokens=120000"
+
+# c2 — stored-transcript schema (camelCase) compaction is recorded
+OUT=$(run_filter '{"type":"system","subtype":"compact_boundary","compactMetadata":{"trigger":"auto","preTokens":167132}}
+'"$RESULT_LINE"'
+')
+assert_contains "c2-transcript-camelcase" "$OUT" "COMPACTION: subtype=compact_boundary trigger=auto pre_tokens=167132"
+
+# c3 — manual /compact (trigger=manual) is recorded
+OUT=$(run_filter '{"type":"system","subtype":"compact_boundary","compact_metadata":{"trigger":"manual","pre_tokens":80000}}
+'"$RESULT_LINE"'
+')
+assert_contains "c3-manual-trigger" "$OUT" "trigger=manual"
+
+# c4 (FOOTGUN, negative) — a system/init event must NOT be recorded as a compaction
+OUT=$(run_filter '{"type":"system","subtype":"init","session_id":"abc","tools":[]}
+'"$RESULT_LINE"'
+')
+assert_not_contains "c4-init-not-compaction" "$OUT" "COMPACTION"
+
+# c5 (regression) — tool and exit lines still emit with the new arm in place
+OUT=$(run_filter '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash"}]}}
+'"$RESULT_LINE"'
+')
+assert_contains "c5a-tool-still-emits" "$OUT" "tool: Bash (#1, turn 1)"
+assert_contains "c5b-exit-still-emits" "$OUT" "exit: stop_reason=end_turn"
+
+if [ "$FAILED" -ne 0 ]; then
+    echo "RESULT: FAILED"
+    exit 1
+fi
+echo "RESULT: all passed"
+exit 0

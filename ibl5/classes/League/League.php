@@ -118,10 +118,12 @@ class League extends BaseMysqliRepository
             $positions = self::ALL_STAR_BACKCOURT_POSITIONS;
         }
 
+        // $positions (fixed position-list constant) and $conferenceTids (int team-id
+        // constants) are class constants, never user input — concatenate, not interpolate.
         $query = "SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2
         FROM `ibl_plr` p
         JOIN `ibl_team_info` t ON p.teamid = t.teamid
-        WHERE p.pos IN ($positions)
+        WHERE p.pos IN (" . $positions . ")
           AND p.teamid IN ('" . $this->formatTidsForSqlQuery($conferenceTids) . "')
           AND p.retired = 0
           AND p.stats_gm > '14'

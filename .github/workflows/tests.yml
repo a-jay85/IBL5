@@ -532,6 +532,8 @@ jobs:
         run: bin/test-automouse-self-heal
       - name: bin/test-automouse-concurrency
         run: bin/test-automouse-concurrency
+      - name: bin/test-automouse-stream-filter
+        run: bin/test-automouse-stream-filter
       - name: bin/test-wt-status
         run: bin/test-wt-status
       - name: bin/test-check-plan

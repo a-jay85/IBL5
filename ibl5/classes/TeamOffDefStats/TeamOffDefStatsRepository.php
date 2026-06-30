@@ -303,7 +303,7 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
         FROM `ibl_box_scores_teams` bst
         JOIN `ibl_franchise_seasons` fs
             ON fs.team_name = bst.name AND fs.season_ending_year = bst.season_year
-        WHERE {$gameTypeFilter}{$filterClause}
+        WHERE " . $gameTypeFilter . $filterClause . "
         GROUP BY fs.franchise_id, fs.team_name, bst.season_year";
     }
 
@@ -338,7 +338,7 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
             AND my.name <> opp.name
         JOIN `ibl_franchise_seasons` fs
             ON fs.team_name = my.name AND fs.season_ending_year = my.season_year
-        WHERE {$gameTypeFilter}{$filterClause}
+        WHERE " . $gameTypeFilter . $filterClause . "
         GROUP BY fs.franchise_id, fs.team_name, my.season_year";
     }
 }

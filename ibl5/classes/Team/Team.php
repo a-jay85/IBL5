@@ -93,22 +93,22 @@ class Team extends \BaseMysqliRepository
         }
 
         if (is_int($identifier)) {
-            $query = "SELECT ibl_team_info.*,
-                     ibl_standings.league_record
+            $query = "SELECT `ibl_team_info`.*,
+                     `ibl_standings`.`league_record`
                 FROM `ibl_team_info`
                     LEFT JOIN `ibl_standings`
-                    ON ibl_team_info.teamid = ibl_standings.teamid
-                WHERE ibl_team_info.teamid = ?
+                    ON `ibl_team_info`.`teamid` = `ibl_standings`.`teamid`
+                WHERE `ibl_team_info`.`teamid` = ?
                 LIMIT 1";
             /** @var TeamWithStandingsRow|null $teamRow */
             $teamRow = $this->fetchOne($query, "i", $identifier);
         } else {
-            $query = "SELECT ibl_team_info.*,
-                     ibl_standings.league_record
+            $query = "SELECT `ibl_team_info`.*,
+                     `ibl_standings`.`league_record`
                 FROM `ibl_team_info`
                     LEFT JOIN `ibl_standings`
-                    ON ibl_team_info.teamid = ibl_standings.teamid
-                WHERE ibl_team_info.team_name = ?
+                    ON `ibl_team_info`.`teamid` = `ibl_standings`.`teamid`
+                WHERE `ibl_team_info`.`team_name` = ?
                 LIMIT 1";
             /** @var TeamWithStandingsRow|null $teamRow */
             $teamRow = $this->fetchOne($query, "s", $identifier);

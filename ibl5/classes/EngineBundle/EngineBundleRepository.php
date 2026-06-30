@@ -31,7 +31,7 @@ final class EngineBundleRepository extends \BaseMysqliRepository implements Engi
         $columns = implode(', ', Player::FIELDS);
 
         $rows = $this->fetchAll(
-            "SELECT $columns
+            "SELECT " . $columns . "
              FROM `ibl_plr`
              WHERE ordinal <= 1440 AND pid <> 0
              ORDER BY pid",

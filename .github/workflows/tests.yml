@@ -464,45 +464,32 @@ jobs:
           git push
         fi
 
-  infection-excludes:
-    name: Infection exclude staleness
+  static-guards:
+    name: Static guards
     runs-on: ubuntu-latest
-    # Runs unconditionally: a stale exclude can be introduced by editing
-    # ibl5/infection.json5 alone, which no path-filter covers — so gating this on
-    # `src`/`shell` would skip exactly when it matters. The check is a few seconds
-    # of grep with no dependencies.
+    # Folds three unconditional micro-guards into one sequential job to save runner
+    # startup overhead (mirrors the PR #1269 meta-checks fold). NO `if:` and NO
+    # `needs:` — every check below runs unconditionally because none is covered by a
+    # path-filter, so gating on `src`/`shell` would skip exactly when the bug lands.
+    # Each check is a few seconds of grep/bash with no dependencies.
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+      # infection-excludes: a stale exclude can be introduced by editing
+      # ibl5/infection.json5 alone, which no path-filter covers.
       - name: Check infection.json5 file excludes resolve
         working-directory: ibl5
         run: bin/check-infection-excludes
-
-  csrf-field-name:
-    name: CSRF field-name guard
-    runs-on: ubuntu-latest
-    # Runs unconditionally: a wrong CSRF field name (name="csrf_token" without the
-    # leading underscore) silently rejects every form submission and is invisible to
-    # PHPStan/tests. The check is a few seconds of grep with no dependencies.
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
+      # csrf-field-name: a wrong CSRF field name (name="csrf_token" without the
+      # leading underscore) silently rejects every form submission and is invisible
+      # to PHPStan/tests.
       - name: Check CSRF form field names
         working-directory: ibl5
         run: bin/check-csrf-field-name
-
-  workflow-lint:
-    name: Workflow composite-action lint
-    runs-on: ubuntu-latest
-    # Runs unconditionally: a job that `uses:` a local ./.github/actions/* action
-    # without a prior checkout fails only at runtime (and reusable cron/deploy jobs
-    # aren't exercised on the PR), and a composite that drops a pinned behavior
-    # contract fails silently — neither is covered by any path-filter. Both checks
-    # are a few seconds of bash with no dependencies. NOTE: no working-directory —
-    # these live in repo-root bin/ and scan repo-root .github/.
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
+      # workflow-lint: a job that `uses:` a local ./.github/actions/* action without
+      # a prior checkout fails only at runtime, and a composite that drops a pinned
+      # behavior contract fails silently. NOTE: NO working-directory — these scripts
+      # live in repo-root bin/ and scan repo-root .github/.
       - name: Local-action checkout ordering
         run: bin/check-workflow-checkout
       - name: Composite behavior contracts
@@ -560,7 +547,7 @@ jobs:
   gate:
     name: Tests and Analysis
     if: always()
-    needs: [changes, test, audit-php, audit-js, ibl6-checks, db-integration, phpstan, phpunit-hygiene, shellcheck, host-mariadb-guard, automouse-impl-model-test, update-baselines, infection-excludes, csrf-field-name, harness-tests, workflow-lint]
+    needs: [changes, test, audit-php, audit-js, ibl6-checks, db-integration, phpstan, phpunit-hygiene, shellcheck, host-mariadb-guard, automouse-impl-model-test, update-baselines, static-guards, harness-tests]
     runs-on: ubuntu-latest
     steps:
       - run: exit 1

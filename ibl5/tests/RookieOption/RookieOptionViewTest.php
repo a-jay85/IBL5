@@ -46,7 +46,7 @@ class RookieOptionViewTest extends TestCase
 
         $this->assertIsString($output);
         // Title is a standalone ibl-title with no player name (the name lives in the trading card).
-        $this->assertStringContainsString('<h2 class="ibl-title">Rookie Option</h2>', $output);
+        $this->assertStringContainsString('<h1 class="ibl-title">Rookie Option</h1>', $output);
         $this->assertStringNotContainsString('PG Test Player', $output);
         $this->assertStringContainsString('500', $output);
         $this->assertStringContainsString('Test Team', $output);

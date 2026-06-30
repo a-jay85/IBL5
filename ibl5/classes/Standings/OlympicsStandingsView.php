@@ -52,7 +52,7 @@ class OlympicsStandingsView implements OlympicsStandingsViewInterface
 
         ob_start();
         ?>
-        <h2 class="ibl-title"><?= HtmlSanitizer::e($this->seasonYear . ' Olympics Standings') ?></h2>
+        <h1 class="ibl-title"><?= HtmlSanitizer::e($this->seasonYear . ' Olympics Standings') ?></h1>
         <table class="ibl-data-table">
             <thead>
                 <tr>

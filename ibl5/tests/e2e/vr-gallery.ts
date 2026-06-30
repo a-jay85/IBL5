@@ -14,6 +14,17 @@ import pixelmatch from 'pixelmatch';
 import { PNG } from 'pngjs';
 import type { Viewport } from './vr-manifest';
 
+// Per-pixel YIQ-distance threshold for what counts as a "different" pixel. This
+// MIRRORS the VR gate: `toHaveScreenshot` in ibl5/playwright.visual.config.ts
+// sets only `maxDiffPixelRatio` and leaves `threshold` at Playwright's default
+// of 0.2 (Playwright drives the same pixelmatch under the hood). Matching it here
+// is the other half of gate parity: with pixelmatch's own stricter 0.1 default
+// the gallery would flag MORE anti-aliasing/font pixels per cell than the gate,
+// inflating the diff ratio above the gate's and re-surfacing sub-gate noise the
+// ratio floor alone can't suppress. See ADR-0074 Consequences for both sync
+// points (this threshold and the ratio floor).
+const GATE_PIXEL_THRESHOLD = 0.2;
+
 export type CellVerdict = 'changed' | 'unchanged' | 'flake' | 'new' | 'infra';
 
 export interface TriageInput {
@@ -48,7 +59,9 @@ function dimsEqual(a: PNG, b: PNG): boolean {
 function diffRatio(a: PNG, b: PNG): { ratio: number; diff: PNG } {
   const { width, height } = a;
   const diff = new PNG({ width, height });
-  const changed = pixelmatch(a.data, b.data, diff.data, width, height, { threshold: 0.1 });
+  const changed = pixelmatch(a.data, b.data, diff.data, width, height, {
+    threshold: GATE_PIXEL_THRESHOLD,
+  });
   return { ratio: changed / (width * height), diff };
 }
 

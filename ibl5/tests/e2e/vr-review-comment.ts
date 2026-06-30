@@ -44,11 +44,6 @@ export function titleToModule(title: string, manifest: VrRow[]): string | null {
   return best;
 }
 
-/** The trailing `-mobile` segment of a snapshot filename encodes the viewport. */
-function titleViewport(title: string): Viewport {
-  return title.endsWith('-mobile') ? 'mobile' : 'desktop';
-}
-
 /**
  * Classify each diff cell NEW vs CHANGED by whether its baseline snapshot is in
  * the git tracked index. `trackedTitles` is the set of titles whose snapshot

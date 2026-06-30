@@ -1,6 +1,6 @@
 ---
 description: The visual-review gallery is built from rows whose PR render differs from master's committed baseline (read via git show <base.sha>:<snapshot>), not from Playwright cells that failed pixel comparison; this makes the gallery immune to a baseline regen into the PR branch and lets it publish on pass OR fail.
-last_verified: 2026-06-29
+last_verified: 2026-06-30
 ---
 
 # ADR-0074: Change-driven visual-review gallery (render-diff, not comparison-failure)
@@ -72,6 +72,32 @@ differs from `master`'s committed baseline). The comment prose must therefore be
 red and green: it must not assert a check color, must not claim the check "stays red until then,"
 and must not say "failed to render" on the changed path.
 
+**Gallery tolerance matches the gate's effective per-row tolerance — on both axes.** A row is
+`changed` only when render A's diff against master's baseline **exceeds** the same tolerance the VR
+gate applies. The gate's tolerance has **two** knobs, and the gallery must mirror **both** or it
+re-introduces the very noise this fixes:
+
+- **Per-pixel threshold (what counts as a different pixel).** The gate's `toHaveScreenshot`
+  (`ibl5/playwright.visual.config.ts`) sets only `maxDiffPixelRatio` and leaves `threshold` at
+  Playwright's default of **0.2** (Playwright runs the same `pixelmatch` underneath). The gallery's
+  `diffRatio` (`ibl5/tests/e2e/vr-gallery.ts`) therefore passes `threshold: 0.2`
+  (`GATE_PIXEL_THRESHOLD`), not pixelmatch's own stricter 0.1 default — otherwise the gallery would
+  count **more** anti-aliasing / font pixels per cell than the gate, inflating the ratio above the
+  gate's and surfacing sub-gate noise the ratio floor alone cannot suppress.
+- **Diff-pixel ratio (how many such pixels are allowed).** The manifest row's
+  `extraMaxDiffPixelRatio` when set, else the gate's global floor (`maxDiffPixelRatio: 0.005`).
+  `bin/vr-build-gallery`'s `toleranceFor` returns `row.extraMaxDiffPixelRatio ?? 0.005` (never zero),
+  mirroring the gate's `row.extraMaxDiffPixelRatio ?? this default`.
+
+Without these two corrections the gallery triaged every cell at pixelmatch's stricter per-pixel
+threshold **and** at **zero** ratio tolerance, so sub-floor anti-aliasing / font-rendering noise that
+the gate correctly ignores (the gate was **green**) still surfaced ~70 "changed" cells — a confusing
+green-check / noisy-gallery split. Parity only suppresses **sub-gate** noise: because the "before" is
+master's **committed** baseline (`git show`), a real >0.005 delta still shows even when the gate is
+green from an in-branch regen, so parity does not defeat the gallery's purpose. The ratio floor also
+applies to the self-stability (A-vs-B) check, so a reload differing from its own first render by
+<0.5% is no longer demoted as a flake — intended, since sub-0.5% reload jitter is not a real flake.
+
 **Global-change banner:** the coverage map (`ibl5/tests/e2e/vr-coverage-map.ts`) no longer fans the
 gallery. A shared CSS/theme/class change (a `GLOBAL_GLOBS` hit, including `ibl5/classes/**`) trips a
 **standalone** "global change detected" coverage heads-up banner — shown whenever such a file
@@ -101,6 +127,17 @@ cell selection.
   (`…-snapshots/<title>.png`); a future snapshot-naming change needs a matching
   `bin/vr-build-gallery` update (covered by the unit tests, which would go red).
 - **Negative:** Each cell now renders twice (A + reload B), modestly increasing VR run time.
+- **Negative (two sync points):** Gate parity is mirrored in **two** places, neither
+  single-sourced from the Playwright config:
+  - `GATE_MAX_DIFF_PIXEL_RATIO = 0.005` in `bin/vr-build-gallery` mirrors the gate's
+    `maxDiffPixelRatio`.
+  - `GATE_PIXEL_THRESHOLD = 0.2` in `ibl5/tests/e2e/vr-gallery.ts` mirrors the per-pixel `threshold`
+    the gate leaves at Playwright's default.
+
+  Both literals are stable, so a mirror with a cross-reference comment was chosen over a new import
+  direction into the Playwright config; if the gate's `maxDiffPixelRatio` or `threshold` ever
+  changes, the matching mirror must move with it. Single-sourcing them is a fine follow-up but was
+  out of scope for this go-green fix.
 
 ## References
 

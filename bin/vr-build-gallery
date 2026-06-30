@@ -94,12 +94,24 @@ function gitShowBaseline(title: string): Buffer | null {
   }
 }
 
-/** Per-cell ratio tolerance from the manifest row (extraMaxDiffPixelRatio). */
-function toleranceFor(title: string): number | undefined {
+// The VR gate's global floor — mirrors `maxDiffPixelRatio` in
+// ibl5/playwright.visual.config.ts:38. Stable literal, so it is mirrored here,
+// not single-sourced (see ADR-0074 Consequences for the sync point).
+const GATE_MAX_DIFF_PIXEL_RATIO = 0.005;
+
+/**
+ * Per-cell ratio tolerance matching the VR gate's EFFECTIVE per-row tolerance:
+ * the manifest row's `extraMaxDiffPixelRatio` when set, else the gate floor
+ * (the gate itself computes `row.extraMaxDiffPixelRatio ?? 0.005`). Never
+ * undefined — a cell with no manifest row still inherits the floor, so the
+ * gallery never triages a cell at zero tolerance while the gate tolerates
+ * sub-floor anti-aliasing noise (the noisy-gallery-on-green-gate mismatch this
+ * fixes).
+ */
+function toleranceFor(title: string): number {
   const module = titleToModule(title, VR_MANIFEST);
-  if (module === null) return undefined;
-  const row = VR_MANIFEST.find((r: { name: string }) => r.name === module);
-  return row?.extraMaxDiffPixelRatio;
+  const row = module === null ? undefined : VR_MANIFEST.find((r: { name: string }) => r.name === module);
+  return row?.extraMaxDiffPixelRatio ?? GATE_MAX_DIFF_PIXEL_RATIO;
 }
 
 // ── Enumerate the PR's rendered cells from <actuals>/*.a.png ──────────────────

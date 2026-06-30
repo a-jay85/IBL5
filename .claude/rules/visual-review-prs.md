@@ -9,7 +9,7 @@ paths:
   - "bin/vr-changed-coverage"
   - "bin/vr-build-gallery"
   - "bin/vr-review-comment"
-last_verified: 2026-06-29
+last_verified: 2026-06-30
 ---
 
 # Visual-review PRs

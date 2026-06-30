@@ -197,7 +197,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 COALESCE(bs.game_of_that_day, 0) AS game_of_that_day,
                 CASE WHEN t.teamid = bs.visitor_teamid THEN bs.home_teamid ELSE bs.visitor_teamid END AS oppTid,
                 opp.team_name AS opp_team_name,
-                {$expression} AS value
+                " . $expression . " AS value
             FROM `ibl_box_scores_teams` bs
             JOIN `ibl_team_info` t ON t.team_name = bs.name
             LEFT JOIN `ibl_schedule` sch ON sch.game_date = bs.game_date
@@ -207,7 +207,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 ELSE bs.visitor_teamid END
             WHERE bs.visitor_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
                 AND bs.home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-            ORDER BY value {$safeOrder}, bs.game_date ASC
+            ORDER BY value " . $safeOrder . ", bs.game_date ASC
             LIMIT 5";
 
         $rows = $this->fetchAll($query);
@@ -262,7 +262,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                     CASE WHEN bs.visitorScore > bs.homeScore
                         THEN bs.home_teamid ELSE bs.visitor_teamid END AS loser_id
                 FROM vw_team_total_score bs
-                WHERE {$dateFilter}
+                WHERE " . $dateFilter . "
                     AND bs.visitor_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
                     AND bs.home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
                 GROUP BY bs.game_date, bs.visitor_teamid, bs.home_teamid
@@ -315,8 +315,8 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
             JOIN `ibl_team_info` ti ON ti.team_name = twl.currentname
             WHERE ti.teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
                 AND (twl.wins + twl.losses) > 0
-            ORDER BY (twl.wins / (twl.wins + twl.losses)) {$safeOrder},
-                twl.wins {$safeOrder}
+            ORDER BY (twl.wins / (twl.wins + twl.losses)) " . $safeOrder . ",
+                twl.wins " . $safeOrder . "
             LIMIT 5";
 
         $rows = $this->fetchAll($query);
@@ -360,7 +360,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 visitorScore,
                 homeScore
             FROM vw_team_total_score
-            WHERE {$regularSeasonFilter}
+            WHERE " . $regularSeasonFilter . "
                 AND visitor_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
                 AND home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
             GROUP BY game_date, visitor_teamid, home_teamid
@@ -476,7 +476,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
         foreach ($statExpressions as $label => $expression) {
             $safeLabel = str_replace("'", "''", $label);
             $unions[] = "(SELECT
-                    '{$safeLabel}' AS stat_type,
+                    '" . $safeLabel . "' AS stat_type,
                     bs.pid,
                     p.name,
                     h.teamid AS teamid,
@@ -486,7 +486,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                     COALESCE(bst.game_of_that_day, 0) AS game_of_that_day,
                     CASE WHEN h.teamid = bs.visitor_teamid THEN bs.home_teamid ELSE bs.visitor_teamid END AS oppTid,
                     opp.team_name AS opp_team_name,
-                    {$expression} AS value
+                    " . $expression . " AS value
                 FROM `ibl_box_scores` bs
                 JOIN `ibl_plr` p ON p.pid = bs.pid
                 JOIN `ibl_hist` h ON h.pid = bs.pid AND h.year = (" . self::SEASON_YEAR_EXPRESSION . ")
@@ -497,7 +497,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 LEFT JOIN `ibl_team_info` opp ON opp.teamid = CASE
                     WHEN h.teamid = bs.visitor_teamid THEN bs.home_teamid
                     ELSE bs.visitor_teamid END
-                WHERE {$dateFilter}
+                WHERE " . $dateFilter . "
                     AND bs.visitor_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
                     AND bs.home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
                 ORDER BY value DESC, bs.game_date ASC
@@ -552,7 +552,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
             $safeLabel = str_replace("'", "''", $label);
             $safeOrder = $config['order'] === 'ASC' ? 'ASC' : 'DESC';
             $unions[] = "(SELECT
-                    '{$safeLabel}' AS stat_type,
+                    '" . $safeLabel . "' AS stat_type,
                     t.teamid AS teamid,
                     t.team_name,
                     bs.game_date AS `date`,
@@ -560,7 +560,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                     COALESCE(bs.game_of_that_day, 0) AS game_of_that_day,
                     CASE WHEN t.teamid = bs.visitor_teamid THEN bs.home_teamid ELSE bs.visitor_teamid END AS oppTid,
                     opp.team_name AS opp_team_name,
-                    {$config['expression']} AS value
+                    " . $config['expression'] . " AS value
                 FROM `ibl_box_scores_teams` bs
                 JOIN `ibl_team_info` t ON t.team_name = bs.name
                 LEFT JOIN `ibl_schedule` sch ON sch.game_date = bs.game_date
@@ -568,10 +568,10 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 LEFT JOIN `ibl_team_info` opp ON opp.teamid = CASE
                     WHEN t.teamid = bs.visitor_teamid THEN bs.home_teamid
                     ELSE bs.visitor_teamid END
-                WHERE {$dateFilter}
+                WHERE " . $dateFilter . "
                     AND bs.visitor_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
                     AND bs.home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                ORDER BY value {$safeOrder}, bs.game_date ASC
+                ORDER BY value " . $safeOrder . ", bs.game_date ASC
                 LIMIT 5)";
         }
 
@@ -623,15 +623,15 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
             }
             $safeLabel = str_replace("'", "''", $label);
             $unions[] = "(SELECT
-                    '{$safeLabel}' AS stat_type,
+                    '" . $safeLabel . "' AS stat_type,
                     h.pid,
                     h.name,
                     h.teamid,
                     h.team,
                     h.year,
-                    ROUND(h.{$safeColumn} / h.{$safeGames}, 1) AS value
+                    ROUND(h." . $safeColumn . " / h." . $safeGames . ", 1) AS value
                 FROM `ibl_hist` h
-                WHERE h.{$safeGames} >= {$minGames}
+                WHERE h." . $safeGames . " >= " . $minGames . "
                     AND h.teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
                 ORDER BY value DESC
                 LIMIT 5)";

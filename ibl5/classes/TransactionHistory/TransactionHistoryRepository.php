@@ -65,7 +65,8 @@ class TransactionHistoryRepository extends \BaseMysqliRepository implements Tran
             $where->add('MONTH(time) = ?', 'i', $month);
         }
 
-        $query = "SELECT sid, catid, title, time FROM nuke_stories WHERE {$where->toWhereClause()} ORDER BY time DESC, sid DESC LIMIT 500";
+        // $where is a QueryConditions builder (bound params); concatenate its clause.
+        $query = "SELECT sid, catid, title, time FROM nuke_stories WHERE " . $where->toWhereClause() . " ORDER BY time DESC, sid DESC LIMIT 500";
 
         /** @var array<int, array{sid: string, catid: string, title: string, time: string}> */
         return $this->fetchAll($query, $where->getTypes(), ...$where->getParams());

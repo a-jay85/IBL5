@@ -116,11 +116,12 @@ class VotingRepository extends \BaseMysqliRepository implements VotingRepository
 
         $selectStatements = [];
         foreach ($columns as $column) {
-            $selectStatements[] = "SELECT {$column} AS name FROM " . self::ASG_TABLE;
+            // $column validated against ALLOWED_COLUMNS by validateColumns() above; concatenate.
+            $selectStatements[] = "SELECT " . $column . " AS name FROM " . self::ASG_TABLE;
         }
 
         $unionQuery = implode(' UNION ALL ', $selectStatements);
-        $query = "SELECT COUNT(name) AS votes, name FROM ({$unionQuery}) AS ballot GROUP BY name HAVING COUNT(name) > 0 ORDER BY votes DESC, name ASC";
+        $query = "SELECT COUNT(name) AS votes, name FROM (" . $unionQuery . ") AS ballot GROUP BY name HAVING COUNT(name) > 0 ORDER BY votes DESC, name ASC";
 
         $rows = $this->executeVoteQuery($query);
 
@@ -139,11 +140,13 @@ class VotingRepository extends \BaseMysqliRepository implements VotingRepository
 
         $selectStatements = [];
         foreach ($columnsWithWeights as $column => $score) {
-            $selectStatements[] = "SELECT {$column} AS name, {$score} AS score FROM " . self::EOY_TABLE;
+            // $column validated against ALLOWED_COLUMNS by validateColumns() above;
+            // $score is an integer weight (cast defensively) — concatenate both.
+            $selectStatements[] = "SELECT " . $column . " AS name, " . (int) $score . " AS score FROM " . self::EOY_TABLE;
         }
 
         $unionQuery = implode(' UNION ALL ', $selectStatements);
-        $query = "SELECT SUM(score) AS votes, name FROM ({$unionQuery}) AS ballot GROUP BY name HAVING SUM(score) > 0 ORDER BY votes DESC, name ASC";
+        $query = "SELECT SUM(score) AS votes, name FROM (" . $unionQuery . ") AS ballot GROUP BY name HAVING SUM(score) > 0 ORDER BY votes DESC, name ASC";
 
         $rows = $this->executeVoteQuery($query);
 

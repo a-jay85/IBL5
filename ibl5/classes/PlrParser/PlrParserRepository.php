@@ -369,8 +369,10 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
             $updateClauses[] = '`' . $col . '` = VALUES(`' . $col . '`)';
         }
 
-        $query = "INSERT INTO `ibl_plr_snapshots` ({$colList})
-            VALUES ({$placeholders})
+        // $colList / $placeholders derive from the fixed SNAPSHOT_COLUMNS constant
+        // (backticked identifiers / '?' placeholders) — concatenate, not interpolate.
+        $query = "INSERT INTO `ibl_plr_snapshots` (" . $colList . ")
+            VALUES (" . $placeholders . ")
             ON DUPLICATE KEY UPDATE " . implode(', ', $updateClauses);
 
         $types = '';

@@ -114,7 +114,9 @@ class Boxscore
 
     public static function playerInsertSql(string $table): string
     {
-        return "INSERT INTO {$table} (
+        // $table is a backticked table-name literal passed by the caller (constant
+        // identifier, no user input) — concatenate, not interpolate.
+        return "INSERT INTO " . $table . " (
         game_date,
         uuid,
         name,
@@ -150,7 +152,9 @@ class Boxscore
 
     public static function teamInsertSql(string $table): string
     {
-        return "INSERT INTO {$table} (
+        // $table is a backticked table-name literal passed by the caller (constant
+        // identifier, no user input) — concatenate, not interpolate.
+        return "INSERT INTO " . $table . " (
         game_date,
         name,
         game_of_that_day,

@@ -115,7 +115,7 @@ class ProjectedDraftOrderRepository extends \BaseMysqliRepository implements Pro
                 }
                 $this->execute(
                     "INSERT INTO `ibl_draft` (`year`, `round`, `pick`, `team`, `teamid`, `player`, `uuid`)
-                     VALUES $placeholders",
+                     VALUES " . $placeholders,
                     $types,
                     ...$params,
                 );

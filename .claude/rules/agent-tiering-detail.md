@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for agent-tiering — full Fable approval-gate procedure, flat-fan-out (nested sub-agent) rationale, and per-tier prompt style. Loads only when editing workflow orchestration defs, where this rationale applies.
-last_verified: 2026-06-27
+last_verified: 2026-06-30
 paths:
   - ".claude/commands/**/*.md"
   - ".claude/skills/**/SKILL.md"
@@ -25,6 +25,21 @@ This file holds the longer rationale, pulled out of the always-loaded budget.
 - **Recommendation**: a clear "I'd use Fable here" / "Opus is probably fine, flagging it" — not a neutral survey.
 
 Absent approval, proceed on Opus (or the correct lower tier) — flag and continue, don't block. Approval covers that one task; a new task re-triggers the gate. Use `AskUserQuestion` only when it's a genuine fork; otherwise inline the suggestion and keep going.
+
+## Boundary keys on task type, not model capability
+
+Re-validated 2026-06-30 against Sonnet 5 (now the `sonnet` alias, native 1M context). The
+Opus-only column (final code review, diff-triage, rule/ADR authoring, novel reasoning,
+ambiguous failures) stays Opus because **"never delegate understanding" is a *delegation*
+rule, not a "wait for a smarter model" rule** — a more capable Sonnet does not make
+delegating the judgment safe, because the cost was never Sonnet's raw ability, it was that
+the Opus session loses the findings it would otherwise filter (see the flat-fan-out
+rationale below, and `feedback_sonnet_proving_negatives` / `feedback_review_agent_full_diff`).
+Sonnet 5's larger context window only **strengthens** the existing "spawn Sonnet to absorb
+verbose output" rationale; it is not a reason to push understanding-class work down a tier.
+**Tripwire to revisit:** a model generation where the *delegation* failure mode itself
+changes (e.g. a coordinator that can surface its own filtered-out findings), not merely a
+higher per-task capability score.
 
 ## Nested Sub-Agents — Available, Deliberately Unused
 

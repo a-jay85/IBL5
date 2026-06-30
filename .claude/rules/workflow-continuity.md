@@ -1,6 +1,6 @@
 ---
 description: All work happens in a worktree (never the main checkout); worktree setup and the implementation→/post-plan handoff (auto-fired in a detached fresh session) for any verified-complete worktree work, plan-driven or ad-hoc.
-last_verified: 2026-06-28
+last_verified: 2026-06-30
 ---
 
 # Workflow Continuity Rule
@@ -39,7 +39,7 @@ bin/post-plan-now --auto
 
 (On an ad-hoc branch with no plan file, post-plan runs plan-blind — that's expected, not an error. The merge-arming decision still happens at `/post-plan` Phase 6.5, so auto-opening the PR never means auto-merging a `feat:`/`auto_merge: false`/visual PR without human signoff.)
 
-This spawns a detached, fresh **Sonnet 4.6** `/post-plan` on this branch (supervised by launchd, so it survives you closing Claude Code). It removes the manual "open a new session and hand off" step. Notes:
+This spawns a detached, fresh **Sonnet 5** `/post-plan` on this branch (supervised by launchd, so it survives you closing Claude Code). It removes the manual "open a new session and hand off" step. Notes:
 
 - **Do NOT commit first.** Leave the worktree **dirty** — `/post-plan` commits the uncommitted tree in its Phase 2 and opens the PR. Committing here would change what it ships.
 - **Only fire when verification passed.** If implementation did **not** verify clean (failing tests, unresolved blocker, you stopped to ask the user something), do **not** run it — leave the worktree dirty and hand off in prose instead. Turn-end ≠ done; that judgment is yours.

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# bin/post-plan-now — fire a fresh, detached Sonnet 4.6 /post-plan session on the
+# bin/post-plan-now — fire a fresh, detached Sonnet 5 /post-plan session on the
 # current worktree's branch, replacing the manual "open a new session and hand
 # off" step. The run is supervised by launchd (RunAtLoad one-shot), so it
 # survives closing Claude Code or the terminal — a plain `nohup … &` launched
@@ -91,7 +91,7 @@ cat > "$PLIST" <<PLIST_EOF
 	<array>
 		<string>/bin/bash</string>
 		<string>-lc</string>
-		<string>export PATH="/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH"; cd "$ROOT" &amp;&amp; CLAUDE_HEADLESS=1 caffeinate -s claude -p "$PROMPT" --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name "$LABEL"; rm -f "$PLIST"; launchctl bootout gui/\$(id -u)/$LABEL</string>
+		<string>export PATH="/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH"; cd "$ROOT" &amp;&amp; CLAUDE_HEADLESS=1 caffeinate -s claude -p "$PROMPT" --dangerously-skip-permissions --model claude-sonnet-5 --effort high --name "$LABEL"; rm -f "$PLIST"; launchctl bootout gui/\$(id -u)/$LABEL</string>
 	</array>
 	<key>RunAtLoad</key>
 	<true/>
@@ -108,7 +108,7 @@ PLIST_EOF
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
 
-echo "post-plan-now: fired a detached Sonnet 4.6 /post-plan on branch '$SLUG'."
+echo "post-plan-now: fired a detached Sonnet 5 /post-plan on branch '$SLUG'."
 echo "  supervised by launchd — survives closing Claude Code / the terminal"
 echo "  log:    tail -f $LOG"
 echo "  label:  $LABEL   (self-removes when post-plan finishes)"

@@ -40,7 +40,7 @@ assert() {
 }
 
 # c1 — line-1 frontmatter selects sonnet
-assert "c1-sonnet" "claude-sonnet-4-6" '---
+assert "c1-sonnet" "claude-sonnet-5" '---
 impl_model: sonnet
 ---
 # Plan
@@ -72,7 +72,7 @@ impl_model: opus
 # Plan'
 
 # c5 — leading/trailing whitespace around the value is tolerated
-assert "c5-whitespace" "claude-sonnet-4-6" '---
+assert "c5-whitespace" "claude-sonnet-5" '---
 impl_model:   sonnet
 ---
 # Plan'

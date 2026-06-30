@@ -1,37 +1,35 @@
 #!/usr/bin/env bun
 // bin/vr-review-comment — build the sticky `visual-review` PR comment markdown.
 //
-// Reads the Playwright JSON report (failed specs ⇒ diffing cells), the coverage
-// JSON (bin/vr-changed-coverage output), and the per-SHA Pages base URL, then
-// writes the comment markdown (consumed by marocchino/sticky-pull-request-comment
-// in .github/workflows/e2e-tests.yml). Models bin/lighthouse-comment.
+// Reads the change-driven gallery JSON (bin/vr-build-gallery output — cells are
+// already classified changed/new/flake against master's committed baseline), the
+// coverage JSON (bin/vr-changed-coverage output), and the per-SHA Pages base URL,
+// then writes the comment markdown (consumed by
+// marocchino/sticky-pull-request-comment in .github/workflows/e2e-tests.yml).
+// Models bin/lighthouse-comment.
 //
 // Usage:
-//   bin/vr-review-comment --results=ibl5/test-results.json --coverage=coverage.json \
+//   bin/vr-review-comment --gallery=ibl5/vr-gallery.json --coverage=coverage.json \
 //     --pages-url=https://a-jay85.github.io/IBL5/<sha>/visual-review/ --out=vr-review-comment.md
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { execFileSync } from 'child_process';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const ibl5Dir = resolve(__dir, '..', 'ibl5');
 
-const { VR_MANIFEST } = await import(resolve(ibl5Dir, 'tests/e2e/vr-manifest.ts'));
-const { buildComment, extractCells, classifyCells } = await import(
-  resolve(ibl5Dir, 'tests/e2e/vr-review-comment.ts')
-);
+const { buildComment } = await import(resolve(ibl5Dir, 'tests/e2e/vr-review-comment.ts'));
 
 const USAGE =
-  'Usage: bin/vr-review-comment --results=PATH --coverage=PATH --pages-url=URL [--out=PATH]';
+  'Usage: bin/vr-review-comment --gallery=PATH --coverage=PATH --pages-url=URL [--out=PATH]';
 
-let resultsPath: string | null = null;
+let galleryPath: string | null = null;
 let coveragePath: string | null = null;
 let pagesUrl: string | null = null;
 let outPath: string | null = null;
 
 for (const arg of process.argv.slice(2)) {
-  if (arg.startsWith('--results=')) resultsPath = arg.slice('--results='.length);
+  if (arg.startsWith('--gallery=')) galleryPath = arg.slice('--gallery='.length);
   else if (arg.startsWith('--coverage=')) coveragePath = arg.slice('--coverage='.length);
   else if (arg.startsWith('--pages-url=')) pagesUrl = arg.slice('--pages-url='.length);
   else if (arg.startsWith('--out=')) outPath = arg.slice('--out='.length);
@@ -59,57 +57,28 @@ if (coveragePath !== null && existsSync(coveragePath)) {
   }
 }
 
-// Playwright JSON report — absent/garbled ⇒ no diff cells (the uncovered/global
-// sections still render from coverage).
-let report: { suites?: unknown[] } = {};
-if (resultsPath !== null && existsSync(resultsPath)) {
+// Change-driven gallery JSON — cells are PRE-CLASSIFIED by bin/vr-build-gallery
+// (changed/new vs master's committed baseline; flake = self-disagreeing render).
+// Absent/garbled ⇒ no diff/infra cells (the uncovered/global sections still
+// render from coverage). No git ls-files here: the builder already did the
+// tracked-index check (ADR-0069) when it resolved `git show <base.sha>:…`.
+type LeanCell = { module: string; viewport: 'desktop' | 'mobile'; title: string };
+let gallery: { changedCells?: LeanCell[]; newCells?: LeanCell[]; flakeCells?: LeanCell[] } = {};
+if (galleryPath !== null && existsSync(galleryPath)) {
   try {
-    report = JSON.parse(readFileSync(resultsPath, 'utf-8'));
+    gallery = JSON.parse(readFileSync(galleryPath, 'utf-8'));
   } catch {
-    // keep empty report
+    // keep empty gallery
   }
 }
 
-const { diffCells, infraCells } = extractCells(report, VR_MANIFEST);
-
-// Classify NEW (no committed baseline) vs CHANGED (committed baseline = real
-// diff). Signal: `git ls-files <snapshot path>` reads the TRACKED INDEX, not the
-// working tree — so a brand-new row (whose .png Playwright `missing` mode just
-// wrote UNTRACKED into the working dir) returns NO output line, while a committed
-// baseline prints its path. existsSync is WRONG here: missing-mode writes the
-// untracked baseline during the run. Discriminator is the printed line, NOT the
-// exit code (both tracked and untracked paths exit 0).
-const repoRoot = resolve(__dir, '..'); // bin/ is at repo root; .. == repo root
-const SNAPSHOT_DIR = 'ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots';
-const snapshotPath = (title: string): string => `${SNAPSHOT_DIR}/${title}.png`;
-
-let trackedTitles = new Set<string>();
-if (diffCells.length > 0) {
-  // Guard: never call `git ls-files` with no pathspec — it lists the whole tree.
-  const paths = diffCells.map((c) => snapshotPath(c.title));
-  let tracked: string[] = [];
-  try {
-    const out = execFileSync('git', ['ls-files', '-z', '--', ...paths], {
-      cwd: repoRoot,
-      encoding: 'utf-8',
-    });
-    tracked = out.split('\0').filter((p) => p.length > 0);
-  } catch {
-    // git unavailable / not a repo ⇒ fail safe to "all CHANGED" (no NEW section),
-    // which is the existing behavior — never crash the comment build.
-    tracked = paths;
-  }
-  const trackedSet = new Set(tracked);
-  // Map tracked PATHS back to TITLES for the title-keyed classifier.
-  trackedTitles = new Set(
-    diffCells.map((c) => c.title).filter((t) => trackedSet.has(snapshotPath(t))),
-  );
-}
-
-const classifiedCells = classifyCells(diffCells, trackedTitles);
+const changedCells = (gallery.changedCells ?? []).map((c) => ({ ...c, isNew: false }));
+const newCells = (gallery.newCells ?? []).map((c) => ({ ...c, isNew: true }));
+const diffCells = [...changedCells, ...newCells];
+const infraCells = gallery.flakeCells ?? [];
 
 const markdown = buildComment({
-  diffCells: classifiedCells,
+  diffCells,
   infraCells,
   uncoveredChangedPaths: coverage.uncoveredChangedPaths ?? [],
   globalChange: coverage.globalChange ?? false,

@@ -84,7 +84,19 @@ export type CoverageResult = {
 
 /**
  * Map a changed-file list onto VR-manifest coverage.
- *  - A global change ⇒ every row is covered (fan-out) and `globalChange: true`.
+ *
+ * In the change-driven gallery (ADR-0074) the gallery is built from rows whose PR
+ * render actually differs from master's committed baseline — NOT from this coverage
+ * result. So `coveredRows` is no longer consumed to fan the gallery out, and a
+ * global change no longer forces every row into the gallery. `globalChange` now
+ * feeds ONLY the standalone "global change detected" banner in the PR comment (a
+ * coverage heads-up shown whenever a shared CSS/theme/class file changed,
+ * independent of whether any row diffed). Note `ibl5/classes/**` in `GLOBAL_GLOBS`
+ * (`bin/vr-changed-coverage`) therefore no longer fans the gallery — it only trips
+ * the banner.
+ *
+ *  - A global change ⇒ `globalChange: true` (banner only; `coveredRows` retained for
+ *    callers/tests but not used to select gallery cells).
  *  - Otherwise each changed path is intersected against every row's globs; a
  *    website-affecting path that matches no row lands in `uncoveredChangedPaths`
  *    (the silent-coverage gap a reviewer must be told about).

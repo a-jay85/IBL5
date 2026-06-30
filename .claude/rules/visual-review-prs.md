@@ -1,85 +1,104 @@
 ---
-description: On a visual-change PR, the visual-regression run publishes the Playwright HTML report to per-SHA GitHub Pages and posts a sticky visual-review PR comment grouped by module, with a "changed but NOT covered" coverage-gap section.
+description: On a visual-change PR, the visual-regression run builds a change-driven before/after gallery (rows whose render differs from master's committed baseline) and posts a sticky visual-review PR comment grouped by module, with a "changed but NOT covered" coverage-gap section.
 paths:
   - ".github/workflows/e2e-tests.yml"
   - "ibl5/tests/e2e/vr-manifest.ts"
   - "ibl5/tests/e2e/vr-coverage-map.ts"
+  - "ibl5/tests/e2e/vr-gallery.ts"
   - "ibl5/tests/e2e/vr-review-comment.ts"
   - "bin/vr-changed-coverage"
+  - "bin/vr-build-gallery"
   - "bin/vr-review-comment"
 last_verified: 2026-06-29
 ---
 
 # Visual-review PRs
 
-See ADR-0068 and ADR-0069 for the decisions and rationale.
+See ADR-0068, ADR-0069, ADR-0073, and ADR-0074 for the decisions and rationale. ADR-0074 is the
+current model: the gallery is **change-driven** (built from rows whose PR render differs from
+master's committed baseline), not failure-driven.
 
 ## What runs
 
-When the visual-regression (VR) step in `.github/workflows/e2e-tests.yml` (the `e2e`
-"Visual Regression" job) detects pixel diffs on a PR — and the `update-baselines` label
-is **absent** — four steps fire, in order, AFTER the VR run and BEFORE baseline regen:
+On a PR run of the visual-regression (VR) step in `.github/workflows/e2e-tests.yml` (the `e2e`
+"Visual Regression" job) — whenever the `update-baselines` label is **absent** — five steps fire,
+in order, AFTER the VR run and BEFORE baseline regen. They fire on **pass OR fail**: selection is
+decoupled from the VR check outcome (ADR-0074), so the gallery publishes even when VR is green.
+They are skipped only during baseline regen (the `update-baselines` label).
 
 1. **Compute coverage** — `git diff --name-only <base>...HEAD | bin/vr-changed-coverage`
-   maps the changed files onto `vr-manifest.ts` rows (covered rows, uncovered website
-   paths, and a global-change flag for shared CSS/theme/class edits).
-2. **Deploy report to per-SHA Pages** — pushes the generated Playwright HTML report (the
-   `playwright-report` output dir the VR run writes under ibl5/) to the `gh-pages` branch
-   under `<sha>/visual-review/` (multiple open PRs/SHAs coexist).
-3. **Build comment** — `bin/vr-review-comment` renders the sticky markdown.
-4. **Post sticky comment** — `marocchino/sticky-pull-request-comment@v3`, header `visual-review`.
+   maps the changed files onto `vr-manifest.ts` rows (uncovered website paths and a global-change
+   flag for shared CSS/theme/class edits). Coverage drives **only** the banner now — never the
+   gallery cell set.
+2. **Build gallery** — `bin/vr-build-gallery` reads the raw actuals the VR spec wrote to
+   `ibl5/vr-actuals` (each cell captured twice: render `.a.png` + reload `.b.png`), reads master's
+   committed baseline for each row via `git show <base.sha>:<snapshot-path>` (regen-immune), triages
+   each row, and writes the static side-by-side `index.html` (with `<title>` anchors) + per-SHA
+   artifacts into `ibl5/vr-gallery`, plus the pre-classified `gallery.json`
+   (`changedCells`/`newCells`/`flakeCells`).
+3. **Deploy gallery to per-SHA Pages** — pushes `ibl5/vr-gallery` to the `gh-pages` branch under
+   `<sha>/visual-review/` (multiple open PRs/SHAs coexist). The Playwright HTML report (traces) is
+   preserved under `<sha>/visual-review/playwright-report/`.
+4. **Build comment** — `bin/vr-review-comment` consumes the pre-classified `gallery.json` and renders
+   the sticky markdown.
+5. **Post sticky comment** — `marocchino/sticky-pull-request-comment@v3`, header `visual-review`.
 
 A `vr-pages-cleanup` job (push-to-master only, not part of the required gate) prunes
-per-SHA report dirs whose newest commit is older than 14 days.
+per-SHA gallery dirs whose newest commit is older than 14 days.
 
 ## Reading the comment
 
-- The PR is **red until approved** — by design. The VR check fails whenever pixels change.
-- Diffing views are grouped per module in `<details>` blocks; each link deep-links into the
-  per-SHA Playwright HTML report (filtered by test title) where the before/after/diff slider
-  shows desktop + mobile.
-- A **"🆕 New views (no prior baseline — review the render)"** section lists failing cells
-  whose baseline was never committed (a brand-new VR row). These have no before/after — the
-  link shows the first render; sanity-check it, then `update-baselines` commits it as the
-  baseline. NEW cells are excluded from the "changed view(s)" count so a first-render never
-  reads as a regression. Classification uses `git ls-files` on the tracked index (not disk),
-  per ADR-0069.
+- The comment makes **no claim about the check's red/green color.** In the regen-into-branch steady
+  state the VR gate can be **green** while the gallery still shows **changed** cells (the in-branch
+  baseline was refreshed, but the render still differs from master's committed baseline). The prose
+  is true in both states — it never says the check "stays red until then."
+- Diffing views are grouped per module in `<details>` blocks; each link points into the static
+  side-by-side gallery (the `<title>` anchor) where the master-vs-PR before/after shows desktop +
+  mobile. The Playwright report (traces) is preserved under `…/playwright-report/`.
+- A **"🆕 New views (no prior baseline — review the render)"** section lists cells whose baseline was
+  never committed (a brand-new VR row). These have no before — the link shows the first render;
+  sanity-check it, then `update-baselines` commits it as the baseline. NEW cells are excluded from the
+  "changed view(s)" count so a first-render never reads as a regression. The NEW-vs-CHANGED split
+  (ADR-0069) is computed in `bin/vr-build-gallery` from master's committed baseline set, not from
+  disk.
 - The per-SHA Pages URL shape is `https://a-jay85.github.io/IBL5/<sha>/visual-review/`.
 - A **"⚠️ Changed but NOT covered by the VR manifest"** section lists changed website paths
   that match no manifest row — review those by hand or add a `vr-manifest.ts` row. A
-  **global-change banner** appears when a shared CSS/theme/class file changed.
+  **global-change banner** appears as a standalone coverage heads-up whenever a shared
+  CSS/theme/class file changed, independent of whether any row diffed.
 
 ## Approving (sign-off)
 
 Apply the **`update-baselines`** label. That regenerates the baselines, auto-commits them,
 and re-runs VR green — the auto-commit is the durable approval record. There is no separate
-approval mechanism.
+approval mechanism. Because the gallery reads master's committed baseline via
+`git show <base.sha>:…`, the before/after evidence survives this regen instead of vanishing.
 
 ## When the comment is missing
 
 - Fork PR: the read-only token has no secrets, so the publish/comment steps no-op (expected).
-- No pixel diffs: VR passes, nothing to review, no comment.
+- No render diffs and no global change: nothing to review, no comment.
 
-## Infra/render failures vs pixel diffs
+## Self-stability (flake) vs real change
 
-A failed VR cell is a **pixel diff** only when it carries a `*-diff.png` screenshot attachment.
-A cell that failed before a screenshot could be taken — a `page.goto` navigation timeout, a blank
-render, an error — carries no triplet and is labeled an **infra/render failure** in a separate
-`⚠️ … failed to render` comment section whose remedy is **re-run the VR job**, NOT
-`update-baselines` (which cannot fix a timeout). The "changed pixels" headline and the global-change
-banner appear only when ≥1 genuine pixel diff exists. The VR spec uses `gotoWithRetry`
-(`tests/e2e/helpers/navigation.ts`) so transient navigation timeouts self-heal rather than
-producing these cells. See ADR-0073.
+Each cell is captured twice — render A (`.a.png`) and a reload render B (`.b.png`). A cell is a real
+**changed** cell only when A ≈ B but both differ from master's committed baseline. If A ≠ B
+(differing dimensions or pixels) the render is self-unstable; the cell is demoted to an
+**infra/flake** cell surfaced in a separate `⚠️ … failed to render` section whose remedy is
+**re-run the VR job**, NOT `update-baselines` (which cannot fix a flaky render). A `changed` cell
+whose reload `.b.png` is missing is likewise demoted to infra. See ADR-0073 for the
+infra-vs-pixel-diff labeling this reuses.
 
 ## Modifying the selection logic
 
-Changed-files → coverage selection lives in `ibl5/tests/e2e/vr-coverage-map.ts`
-(`classifyChangedFiles`, `deriveModuleGlob`, `rowGlobs`) and the comment markup in
-`ibl5/tests/e2e/vr-review-comment.ts` (`buildComment`). Both are pure and unit-tested
-(`ibl5/tests/ts-unit/vr-coverage-map.test.ts`, `ibl5/tests/ts-unit/vr-review-comment.test.ts`,
-run via `bun run test:unit` from `ibl5/`). Per-row source overrides use the optional
-`sourceGlobs` field on `VrRow`. **Changing this selection logic is a mechanical-enforcement
-surface and requires an ADR.**
+Gallery cell selection lives in `bin/vr-build-gallery` and `ibl5/tests/e2e/vr-gallery.ts`
+(`triageCell`, `buildGalleryHtml`); changed-files → coverage (banner only) lives in
+`ibl5/tests/e2e/vr-coverage-map.ts` (`classifyChangedFiles`, `deriveModuleGlob`, `rowGlobs`); the
+comment markup lives in `ibl5/tests/e2e/vr-review-comment.ts` (`buildComment`). The pure modules are
+unit-tested (`ibl5/tests/ts-unit/vr-gallery.test.ts`, `ibl5/tests/ts-unit/vr-coverage-map.test.ts`,
+`ibl5/tests/ts-unit/vr-review-comment.test.ts`, run via `bun run test:unit` from `ibl5/`). Per-row
+source overrides use the optional `sourceGlobs` field on `VrRow`. **Changing this selection logic is
+a mechanical-enforcement surface and requires an ADR** (current: ADR-0074).
 
 ## One-time deployment prerequisite
 

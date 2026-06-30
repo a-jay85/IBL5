@@ -161,43 +161,57 @@ jobs:
             "$PW_IMAGE" \
             npx playwright test --config=playwright.visual.config.ts
 
-      # --- Visual-review publishing (review run only) ---
-      # Fire on the PLAIN failing VR run (label absent) and NOT during baseline regen,
-      # so the committed baseline is still the "before". Ordering invariant: these steps
-      # run AFTER the VR run and BEFORE the regen step below — regenerating first would
-      # overwrite the before/after and destroy the comparison.
+      # --- Visual-review publishing (change-driven, every PR run) ---
+      # Fires on pass OR fail (the gallery's "before" is `git show base.sha:<snapshot>`,
+      # which is immune to an in-branch baseline regen, so a green-but-changed PR still
+      # surfaces). Skipped only during baseline regen (update-baselines label).
+      # Ordering invariant: coverage → build-gallery → deploy-gallery → build-comment →
+      # post-comment, all BEFORE the regen step below. The "before" is regen-immune, but
+      # the actuals/gallery must exist before the deploy.
       # Fork PRs receive a read-only token with no secrets, so these steps no-op there.
       - name: Compute VR coverage from changed files
         id: vr-coverage
-        if: always() && github.event_name == 'pull_request' && steps.visual-regression.outcome == 'failure' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
+        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
         run: |
           git diff --name-only "${{ github.event.pull_request.base.sha }}"...HEAD \
             | bin/vr-changed-coverage > coverage.json
           cat coverage.json
 
-      - name: Deploy Playwright report to per-SHA GitHub Pages
+      - name: Build VR gallery
+        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
+        run: |
+          bin/vr-build-gallery \
+            --actuals=ibl5/vr-actuals \
+            --base-sha=${{ github.event.pull_request.base.sha }} \
+            --out-dir=ibl5/vr-gallery \
+            --gallery-json=ibl5/vr-gallery.json
+          cat ibl5/vr-gallery.json
+
+      - name: Deploy VR gallery to per-SHA GitHub Pages
         id: vr-pages
-        if: always() && github.event_name == 'pull_request' && steps.visual-regression.outcome == 'failure' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
+        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ibl5/playwright-report
+          # The change-driven gallery; the Playwright report is preserved under
+          # <sha>/visual-review/playwright-report/ (copied in by bin/vr-build-gallery).
+          publish_dir: ibl5/vr-gallery
           # One subdirectory per commit SHA so multiple open PRs/SHAs coexist.
           destination_dir: ${{ github.sha }}/visual-review
           keep_files: true
 
       - name: Build visual-review comment
-        if: always() && github.event_name == 'pull_request' && steps.visual-regression.outcome == 'failure' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
+        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
         run: |
           bin/vr-review-comment \
-            --results=ibl5/test-results.json \
+            --gallery=ibl5/vr-gallery.json \
             --coverage=coverage.json \
             --pages-url=https://a-jay85.github.io/IBL5/${{ github.sha }}/visual-review/ \
             --out=vr-review-comment.md
           cat vr-review-comment.md
 
       - name: Post sticky visual-review comment
-        if: always() && github.event_name == 'pull_request' && steps.visual-regression.outcome == 'failure' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
+        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
         uses: marocchino/sticky-pull-request-comment@v3
         with:
           header: visual-review

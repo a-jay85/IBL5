@@ -44,6 +44,8 @@ const REFERENCE_ALLOWLIST = [
     '.claude/settings.local.json',
     '.claude/rules/codebase-map.md',  // gitignored — machine-generated per session (see CLAUDE.md §Interface-Driven Modules)
     'ibl5/themes/IBL/style/style.css',  // gitignored — compiled Tailwind build artifact (absent on clean CI checkout)
+    'ibl5/vr-actuals',                  // gitignored — per-run PR render scratch dir (written at CI runtime, never committed)
+    'ibl5/vr-gallery',                  // gitignored — per-run generated gallery scratch dir (written at CI runtime, never committed)
 ];
 
 function usage(): string

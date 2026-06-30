@@ -1,6 +1,7 @@
 // Pure builder for the sticky `visual-review` PR comment. No I/O — the
-// bin/vr-review-comment wrapper reads the Playwright JSON + coverage JSON and
-// calls these functions, so the markup is unit-testable (tests/ts-unit/vr-review-comment.test.ts).
+// bin/vr-review-comment wrapper reads the change-driven gallery JSON
+// (bin/vr-build-gallery output) + coverage JSON and calls these functions, so
+// the markup is unit-testable (tests/ts-unit/vr-review-comment.test.ts).
 //
 // Models the "script writes a .md consumed by marocchino" pattern of
 // bin/lighthouse-comment (consumed in .github/workflows/lighthouse.yml).
@@ -12,53 +13,21 @@ export type DiffCell = {
   /** Manifest row name (module group), e.g. `standings`. */
   module: string;
   viewport: Viewport;
-  /** The Playwright test title (snapshot filename without .png), e.g. `standings-mobile`. */
+  /** The cell title (snapshot filename without .png), e.g. `standings-mobile`. */
   title: string;
   /**
-   * True when this cell's baseline snapshot is NOT committed to the git index
-   * (a brand-new view rendered in Playwright `missing` mode — no prior baseline
-   * to diff against). Set by classifyCells from the wrapper's git ls-files
-   * result; absent/false ⇒ a real pixel regression against a committed baseline.
+   * True when this cell has NO committed baseline at the PR base SHA (a
+   * brand-new view — no "before" to diff against). The gallery builder
+   * (bin/vr-build-gallery) sets this from its `git show <base.sha>:…` /
+   * `git ls-files` index check; absent/false ⇒ a render that differs from
+   * master's committed baseline.
    */
   isNew?: boolean;
 };
 
-// ── Playwright JSON report (only the fields we read) ─────────────────────────
-type PwAttachment = { name?: string; contentType?: string; path?: string };
-type PwResult = { status?: string; attachments?: PwAttachment[]; error?: { message?: string }; errors?: Array<{ message?: string }> };
-type PwTest = { results?: PwResult[] };
-type PwSpec = { title?: string; ok?: boolean; tests?: PwTest[] };
-type PwSuite = { specs?: PwSpec[]; suites?: PwSuite[] };
-type PwReport = { suites?: PwSuite[] };
-
-/** A failed cell that carries no screenshot triplet — a navigation/render/error
- *  failure, NOT a pixel change. */
+/** A cell with no reliable before/after — it failed to render, or rendered
+ *  unstably across the two PR runs (self-disagreeing flake). NOT a real change. */
 export type InfraCell = { module: string; viewport: Viewport; title: string; error?: string };
-
-/** All attachments across a spec's results. */
-function specAttachments(spec: PwSpec): PwAttachment[] {
-  const out: PwAttachment[] = [];
-  for (const t of spec.tests ?? []) for (const r of t.results ?? []) for (const a of r.attachments ?? []) out.push(a);
-  return out;
-}
-/** A genuine screenshot mismatch attaches `<title>-diff.png`. */
-function specHasPixelDiff(spec: PwSpec): boolean {
-  return specAttachments(spec).some((a) => (a.name ?? '').endsWith('-diff.png'));
-}
-/** First error line, if the report carried one (for the infra section). */
-function specError(spec: PwSpec): string | undefined {
-  for (const t of spec.tests ?? []) for (const r of t.results ?? []) {
-    const m = r.error?.message ?? r.errors?.[0]?.message;
-    if (m) return m.split('\n')[0].slice(0, 140);
-  }
-  return undefined;
-}
-
-/** Flatten the nested suite tree into a flat spec list. */
-function collectSpecs(suite: PwSuite, out: PwSpec[]): void {
-  for (const s of suite.specs ?? []) out.push(s);
-  for (const child of suite.suites ?? []) collectSpecs(child, out);
-}
 
 /**
  * Map a test title to its manifest row name. Row names may contain hyphens, so
@@ -73,51 +42,6 @@ export function titleToModule(title: string, manifest: VrRow[]): string | null {
     }
   }
   return best;
-}
-
-/** The trailing `-mobile` segment of a snapshot filename encodes the viewport. */
-function titleViewport(title: string): Viewport {
-  return title.endsWith('-mobile') ? 'mobile' : 'desktop';
-}
-
-/**
- * Parse the Playwright JSON report into failing cells, split by failure KIND:
- *  - diffCells  — genuine pixel mismatches (carry a `*-diff.png` attachment).
- *  - infraCells — failed but with NO screenshot triplet (navigation/timeout/error).
- *
- * Legacy fallback: a failed spec with NO attachment info at all (the historical
- * `{title, ok}`-only fixture shape) is treated as a pixel diff, preserving prior
- * behavior. Real Playwright reports always attach ≥1 artifact on failure
- * (`error-context` at minimum), so this fallback only affects synthetic fixtures.
- */
-export function extractCells(report: PwReport, manifest: VrRow[]): { diffCells: DiffCell[]; infraCells: InfraCell[] } {
-  const specs: PwSpec[] = [];
-  for (const suite of report.suites ?? []) collectSpecs(suite, specs);
-
-  const diffCells: DiffCell[] = [];
-  const infraCells: InfraCell[] = [];
-  for (const spec of specs) {
-    if (spec.ok !== false) continue; // only failed specs
-    const title = spec.title;
-    if (!title) continue;
-    const module = titleToModule(title, manifest);
-    if (module === null) continue; // not a VR cell (defensive)
-    const viewport = titleViewport(title);
-    const atts = specAttachments(spec);
-    if (specHasPixelDiff(spec)) {
-      diffCells.push({ module, viewport, title });
-    } else if (atts.length > 0) {
-      infraCells.push({ module, viewport, title, error: specError(spec) });
-    } else {
-      diffCells.push({ module, viewport, title }); // legacy fallback (no attachment info)
-    }
-  }
-  return { diffCells, infraCells };
-}
-
-/** Back-compat: callers that only want pixel-diff cells. */
-export function extractDiffCells(report: PwReport, manifest: VrRow[]): DiffCell[] {
-  return extractCells(report, manifest).diffCells;
 }
 
 /**
@@ -141,13 +65,13 @@ export type BuildCommentInput = {
 
 function reportLink(pagesUrl: string, title: string): string {
   const base = pagesUrl.endsWith('/') ? pagesUrl : pagesUrl + '/';
-  return `${base}#?q=${encodeURIComponent(title)}`;
+  return `${base}#${encodeURIComponent(title)}`;
 }
 
 /**
  * Build the sticky-comment markdown. Three load-bearing properties:
  *  - diffing cells are grouped per module with desktop + mobile entries linking
- *    into the per-SHA Playwright HTML report (before/after/diff slider);
+ *    into the static side-by-side gallery (each cell is a `<title>` anchor);
  *  - a non-empty `uncoveredChangedPaths` ALWAYS renders a "⚠️ Changed but NOT
  *    covered" section (a coverage gap can never masquerade as "nothing to review");
  *  - the zero-diff branch produces a safe body with no broken links.
@@ -163,24 +87,34 @@ export function buildComment(input: BuildCommentInput): string {
 
   if (hasPixelWork) {
     lines.push(
-      'This PR changed pixels. Review the before/after/diff below, then **apply the ' +
-        '`update-baselines` label** to approve — that regenerates the baselines and ' +
-        'the auto-commit is the durable sign-off. The VR check stays red until then.',
+      "These views render differently from master's committed baseline. Review the " +
+        'before/after/diff below. If the change is intended, **apply the ' +
+        '`update-baselines` label** — the regenerated-baseline auto-commit is the ' +
+        'durable sign-off. (The VR check may already be green if baselines were ' +
+        "regenerated in-branch; this gallery compares against master's committed " +
+        'baseline regardless of the check color.)',
     );
     lines.push('');
-    if (globalChange) {
-      lines.push(
-        '> 🌐 **Global change detected** (shared CSS / theme / class) — every VR row ' +
-          'is treated as potentially affected; review broadly.',
-      );
-      lines.push('');
-    }
   } else if (infraCells.length > 0) {
     lines.push(
-      '⚠️ **The VR run failed to render — this is NOT a pixel change.** ' +
-        'The view(s) below errored on navigation/timeout, so there is no before/after to ' +
-        'review. **Re-run the VR job** — regenerating baselines cannot fix a render failure, ' +
-        'so do **not** apply the baseline-regeneration label.',
+      '⚠️ **No reliable before/after — this is NOT a confirmed change.** ' +
+        'The view(s) below either failed to render (navigation/timeout) **or rendered ' +
+        'unstably across two runs** (the two PR renders disagreed). Either way there is ' +
+        'nothing trustworthy to review — **re-run the VR job**; regenerating baselines ' +
+        'cannot fix a flake, so do **not** apply the baseline label.',
+    );
+    lines.push('');
+  }
+
+  // Global-change banner: coverage's shared-CSS/theme/class signal. In the
+  // change-driven design this NO LONGER fans the gallery out to every row — it is
+  // a standalone heads-up, shown whenever a shared file changed, independent of
+  // whether any row's render actually diffed (so coverage drives only the banner,
+  // never the gallery).
+  if (globalChange) {
+    lines.push(
+      '> 🌐 **Global change detected** (shared CSS / theme / class) — changes may ' +
+        'surface in views beyond those listed below; review broadly.',
     );
     lines.push('');
   }
@@ -242,12 +176,13 @@ export function buildComment(input: BuildCommentInput): string {
 
   if (infraCells.length > 0) {
     lines.push(
-      `### ⚠️ ${infraCells.length} view(s) failed to render (navigation/error — not a pixel change)`,
+      `### ⚠️ ${infraCells.length} view(s) with no reliable render (failed or self-disagreeing — not a confirmed change)`,
     );
     lines.push('');
     lines.push(
-      'These cells errored before a screenshot could be taken, so there is **no before/after**. ' +
-        'Re-run the VR job; this is a flake/infra failure, **not** a baseline issue.',
+      'These cells **failed to render, or rendered unstably across two runs ' +
+        '(self-disagreeing)**, so there is no reliable before/after. Re-run the VR job; ' +
+        'this is a flake/infra failure, **not** a baseline issue.',
     );
     lines.push('');
     for (const cell of [...infraCells].sort((a, b) => a.title.localeCompare(b.title))) {

@@ -1,0 +1,271 @@
+#!/usr/bin/env bun
+// bin/vr-build-gallery — build the CHANGE-driven visual-review gallery.
+//
+// Reads the PR's per-cell renders from <actuals>/ (each VR cell wrote two PNGs,
+// `<title>.a.png` and `<title>.b.png`, in visual-regression.spec.ts), pulls
+// master's COMMITTED baseline for each via `git show <base.sha>:<snapshot>`
+// (regen-immune), and triages each cell (tests/e2e/vr-gallery.ts → triageCell):
+//
+//   changed   — render differs from master's baseline (both PR renders agree)
+//   unchanged — render matches master (dropped from the gallery)
+//   new       — no committed baseline at base.sha
+//   flake     — the two PR renders self-disagree (surfaced as infra)
+//   infra     — the PR produced no render / a single-render would-be change
+//
+// Writes, under <out-dir>/:
+//   <title>.before.png / .after.png / .diff.png  (changed cells)
+//   <title>.after.png                            (new cells)
+//   index.html                                   (buildGalleryHtml — anchored per cell)
+//   playwright-report/                           (copied verbatim, for the trace)
+// and the machine-readable <gallery-json> ({changedCells,newCells,flakeCells})
+// consumed by bin/vr-review-comment.
+//
+// Usage:
+//   bin/vr-build-gallery --base-sha=<sha> [--actuals=ibl5/vr-actuals] \
+//     [--out-dir=ibl5/vr-gallery] [--gallery-json=ibl5/vr-gallery.json]
+import {
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  readdirSync,
+  mkdirSync,
+  rmSync,
+  cpSync,
+} from 'fs';
+import { resolve, dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+import { execFileSync } from 'child_process';
+
+const __dir = dirname(fileURLToPath(import.meta.url));
+const repoRoot = resolve(__dir, '..'); // bin/ is at repo root; .. == repo root
+const ibl5Dir = resolve(repoRoot, 'ibl5');
+
+const { VR_MANIFEST } = await import(resolve(ibl5Dir, 'tests/e2e/vr-manifest.ts'));
+const { titleToModule } = await import(resolve(ibl5Dir, 'tests/e2e/vr-review-comment.ts'));
+const { triageCell, buildGalleryHtml } = await import(resolve(ibl5Dir, 'tests/e2e/vr-gallery.ts'));
+
+type Viewport = 'desktop' | 'mobile';
+type GalleryCell = { module: string; viewport: Viewport; title: string; verdict: string; isNew?: boolean };
+
+const USAGE =
+  'Usage: bin/vr-build-gallery --base-sha=SHA [--actuals=PATH] [--out-dir=PATH] [--gallery-json=PATH]';
+
+let baseSha: string | null = null;
+let actualsDir = 'ibl5/vr-actuals';
+let outDir = 'ibl5/vr-gallery';
+let galleryJsonPath = 'ibl5/vr-gallery.json';
+
+for (const arg of process.argv.slice(2)) {
+  if (arg.startsWith('--base-sha=')) baseSha = arg.slice('--base-sha='.length);
+  else if (arg.startsWith('--actuals=')) actualsDir = arg.slice('--actuals='.length);
+  else if (arg.startsWith('--out-dir=')) outDir = arg.slice('--out-dir='.length);
+  else if (arg.startsWith('--gallery-json=')) galleryJsonPath = arg.slice('--gallery-json='.length);
+  else if (arg === '--help') {
+    process.stdout.write(USAGE + '\n');
+    process.exit(0);
+  } else {
+    process.stderr.write(`Unknown argument: ${arg}\n${USAGE}\n`);
+    process.exit(2);
+  }
+}
+
+if (baseSha === null || baseSha === '') {
+  process.stderr.write(`--base-sha is required\n${USAGE}\n`);
+  process.exit(2);
+}
+
+const SNAPSHOT_DIR = 'ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots';
+const snapshotPath = (title: string): string => `${SNAPSHOT_DIR}/${title}.png`;
+const viewportOf = (title: string): Viewport => (title.endsWith('-mobile') ? 'mobile' : 'desktop');
+
+/** master's committed baseline for a title, or null if base.sha lacks the file. */
+function gitShowBaseline(title: string): Buffer | null {
+  try {
+    return execFileSync('git', ['show', `${baseSha}:${snapshotPath(title)}`], {
+      cwd: repoRoot,
+      // no encoding ⇒ Buffer return, keeping the PNG bytes intact. stdio swallows
+      // git's "path does not exist" on stderr — a genuinely-new row is expected,
+      // not an error worth printing once per new cell into the CI log.
+      stdio: ['ignore', 'pipe', 'ignore'],
+      maxBuffer: 64 * 1024 * 1024,
+    });
+  } catch {
+    return null; // no such path at base.sha (brand-new row) — or unreadable
+  }
+}
+
+// The VR gate's global floor — mirrors `maxDiffPixelRatio` in
+// ibl5/playwright.visual.config.ts:38. Stable literal, so it is mirrored here,
+// not single-sourced (see ADR-0074 Consequences for the sync point).
+const GATE_MAX_DIFF_PIXEL_RATIO = 0.005;
+
+/**
+ * Per-cell ratio tolerance matching the VR gate's EFFECTIVE per-row tolerance:
+ * the manifest row's `extraMaxDiffPixelRatio` when set, else the gate floor
+ * (the gate itself computes `row.extraMaxDiffPixelRatio ?? 0.005`). Never
+ * undefined — a cell with no manifest row still inherits the floor, so the
+ * gallery never triages a cell at zero tolerance while the gate tolerates
+ * sub-floor anti-aliasing noise (the noisy-gallery-on-green-gate mismatch this
+ * fixes).
+ */
+function toleranceFor(title: string): number {
+  const module = titleToModule(title, VR_MANIFEST);
+  const row = module === null ? undefined : VR_MANIFEST.find((r: { name: string }) => r.name === module);
+  return row?.extraMaxDiffPixelRatio ?? GATE_MAX_DIFF_PIXEL_RATIO;
+}
+
+// ── Enumerate the PR's rendered cells from <actuals>/*.a.png ──────────────────
+const actualsAbs = resolve(repoRoot, actualsDir);
+let aFiles: string[] = [];
+if (existsSync(actualsAbs)) {
+  aFiles = readdirSync(actualsAbs).filter((f) => f.endsWith('.a.png'));
+}
+// Fail-safe: no actuals ⇒ empty gallery (the VR run produced nothing to triage).
+const titles = aFiles.map((f) => f.slice(0, -'.a.png'.length));
+
+// ── Prepare the output dir (clean rebuild) ───────────────────────────────────
+const outAbs = resolve(repoRoot, outDir);
+rmSync(outAbs, { recursive: true, force: true });
+mkdirSync(outAbs, { recursive: true });
+
+const changedCells: GalleryCell[] = [];
+const newCells: GalleryCell[] = [];
+const flakeCells: GalleryCell[] = [];
+
+// `git ls-files` reads the TRACKED INDEX of the PR branch (not disk), so it
+// disambiguates a genuinely-new row (untracked .png) from one whose committed
+// baseline `git show base.sha` simply could not read (e.g. a shallow clone where
+// base.sha was never fetched). Per ADR-0069: classify isNew off the index.
+function trackedTitleSet(forTitles: string[]): Set<string> {
+  if (forTitles.length === 0) return new Set();
+  const paths = forTitles.map(snapshotPath);
+  try {
+    const out = execFileSync('git', ['ls-files', '-z', '--', ...paths], {
+      cwd: repoRoot,
+      encoding: 'utf-8',
+    });
+    const trackedPaths = new Set(out.split('\0').filter((p) => p.length > 0));
+    return new Set(forTitles.filter((t) => trackedPaths.has(snapshotPath(t))));
+  } catch {
+    // git unavailable ⇒ fail safe to "all tracked" (no genuinely-new section).
+    return new Set(forTitles);
+  }
+}
+
+const writePng = (title: string, suffix: string, buf: Buffer): void => {
+  writeFileSync(join(outAbs, `${title}.${suffix}.png`), buf);
+};
+
+// First pass: triage every cell; remember which 'new'-verdict titles to
+// disambiguate against the index in one batched `git ls-files` call.
+type Triaged = {
+  title: string;
+  module: string;
+  viewport: Viewport;
+  verdict: string;
+  before: Buffer | null;
+  afterA: Buffer;
+  diff?: Buffer;
+};
+const triaged: Triaged[] = [];
+const newVerdictTitles: string[] = [];
+
+for (const title of titles.sort()) {
+  const module = titleToModule(title, VR_MANIFEST);
+  if (module === null) continue; // not a VR cell (defensive)
+  const viewport = viewportOf(title);
+
+  const afterAPath = join(actualsAbs, `${title}.a.png`);
+  const afterBPath = join(actualsAbs, `${title}.b.png`);
+  const afterA: Buffer | null = existsSync(afterAPath) ? readFileSync(afterAPath) : null;
+  const afterB: Buffer | null = existsSync(afterBPath) ? readFileSync(afterBPath) : null;
+  const before = gitShowBaseline(title);
+
+  const res = triageCell({
+    before,
+    afterA,
+    afterB,
+    maxDiffPixelRatio: toleranceFor(title),
+  });
+
+  if (res.verdict === 'unchanged') continue; // nothing to show
+
+  if (res.verdict === 'new') newVerdictTitles.push(title);
+
+  // afterA is non-null for every verdict except 'infra' (afterA===null ⇒ infra).
+  triaged.push({
+    title,
+    module,
+    viewport,
+    verdict: res.verdict,
+    before,
+    afterA: afterA as Buffer,
+    diff: res.diff,
+  });
+}
+
+const tracked = trackedTitleSet(newVerdictTitles);
+
+for (const t of triaged) {
+  const cell: GalleryCell = {
+    module: t.module,
+    viewport: t.viewport,
+    title: t.title,
+    verdict: t.verdict,
+  };
+
+  switch (t.verdict) {
+    case 'changed':
+      // before is guaranteed non-null for 'changed' (a null before ⇒ 'new').
+      if (t.before) writePng(t.title, 'before', t.before);
+      writePng(t.title, 'after', t.afterA);
+      if (t.diff) writePng(t.title, 'diff', t.diff);
+      changedCells.push(cell);
+      break;
+    case 'new':
+      // Genuinely new (untracked .png) ⇒ new section; tracked-but-unreadable
+      // baseline (shallow-clone anomaly) ⇒ surface as infra, never as a render.
+      if (tracked.has(t.title)) {
+        flakeCells.push(cell);
+      } else {
+        writePng(t.title, 'after', t.afterA);
+        newCells.push({ ...cell, isNew: true });
+      }
+      break;
+    case 'flake':
+    case 'infra':
+      flakeCells.push(cell);
+      break;
+    default:
+      break;
+  }
+}
+
+// ── Write index.html (changed + new cells, anchored per cell) ────────────────
+const galleryHtml = buildGalleryHtml([...changedCells, ...newCells]);
+writeFileSync(join(outAbs, 'index.html'), galleryHtml);
+
+// ── Copy the Playwright HTML report verbatim (kept for the trace viewer) ─────
+const reportSrc = resolve(ibl5Dir, 'playwright-report');
+if (existsSync(reportSrc)) {
+  cpSync(reportSrc, join(outAbs, 'playwright-report'), { recursive: true });
+}
+
+// ── Machine-readable manifest for bin/vr-review-comment ──────────────────────
+const lean = (c: GalleryCell) => ({ module: c.module, viewport: c.viewport, title: c.title });
+writeFileSync(
+  resolve(repoRoot, galleryJsonPath),
+  JSON.stringify(
+    {
+      changedCells: changedCells.map(lean),
+      newCells: newCells.map(lean),
+      flakeCells: flakeCells.map(lean),
+    },
+    null,
+    2,
+  ) + '\n',
+);
+
+process.stderr.write(
+  `vr-build-gallery: ${changedCells.length} changed, ${newCells.length} new, ${flakeCells.length} infra/flake\n`,
+);

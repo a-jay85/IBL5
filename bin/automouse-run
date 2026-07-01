@@ -675,7 +675,7 @@ PLAN_FILE=$PLAN_NAME" \
 
 PLAN_FILE=$PLAN_NAME" \
                 --dangerously-skip-permissions \
-                --model claude-sonnet-4-6 \
+                --model claude-sonnet-5 \
                 --effort high \
                 --output-format stream-json \
                 --verbose \

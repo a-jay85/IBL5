@@ -1,6 +1,6 @@
 ---
 description: Sub-agent decision rules — when to spawn, when to skip, and which model to pick
-last_verified: 2026-06-27
+last_verified: 2026-06-30
 ---
 
 # Agent Tiering
@@ -28,6 +28,8 @@ Each sub-agent pays fixed overhead (~3–5K tokens: system prompt + rules + memo
 | **Opus** | self (no delegation) | Novel reasoning, FK ordering, rule authoring, ADR writing, ambiguous test failures, final code review, diff-triage. Never delegate understanding. |
 | **Opus (delegated)** | `subagent_type: "plan-architect"` | Implementation **planning** only, via `/plan` Step 3. The def pins `model: opus` + `effort: xhigh` (the built-in Plan agent has no per-call effort override; A/B proved them equivalent), so planning runs at Opus depth in a clean sub-context. Do **not** pass an inline `model` override — the def owns it. |
 | **Fable** | **unavailable — do not select** | Currently inaccessible; never pick `model: "fable"`. When access returns it is the opt-in rung above Opus (ceiling-binding tasks), gated behind explicit approval — full procedure in `.claude/rules/agent-tiering-detail.md`. |
+
+> **The boundary keys on task *type* (judgment vs. mechanical), not raw model capability** — so a stronger Sonnet moves nothing across the line. Re-validated 2026-06-30 against Sonnet 5 (now the `sonnet` alias, native 1M context): boundary unchanged. Why a more-capable Sonnet doesn't shift work down a tier: `agent-tiering-detail.md`.
 
 ## Flat fan-out (no nested sub-agents)
 

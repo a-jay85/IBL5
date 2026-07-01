@@ -1,6 +1,6 @@
 ---
 description: "Commit, push, and open a PR via /post-plan, which decides whether auto-merge arms; /ship never arms directly."
-last_verified: 2026-06-22
+last_verified: 2026-06-30
 ---
 
 # /ship — Commit, push, PR via /post-plan
@@ -35,7 +35,7 @@ Then the actions:
 
 - **Do NOT commit.** Leave the worktree **dirty** — `/post-plan` Phase 2 commits the uncommitted tree and opens the PR; committing first would change what ships (see `.claude/rules/workflow-continuity.md`).
 - Fire **`bin/post-plan-now`** (bare, **not** `--auto`): a human invoking `/ship` IS the decision to ship; `--auto` only matters inside headless, which the Step 1 precondition already rejected.
-- Report: post-plan fired (detached Sonnet 4.6, launchd-supervised); the PR / code review / CI / auto-merge progress all land on the PR; list any predicted holds from the advisory step.
+- Report: post-plan fired (detached Sonnet 5, launchd-supervised); the PR / code review / CI / auto-merge progress all land on the PR; list any predicted holds from the advisory step.
 
 ## Decision-table recap
 

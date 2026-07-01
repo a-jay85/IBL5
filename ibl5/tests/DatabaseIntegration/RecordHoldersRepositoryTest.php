@@ -431,6 +431,153 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
         self::assertArrayHasKey('value', $pointsRecord);
     }
 
+    public function testGetTopPlayerSingleGameBatchOrdersDescAndCapsAtFive(): void
+    {
+        // 6 players with distinct calc_points (70..65); LIMIT 5 must drop the lowest.
+        // calc_points = game_2gm * 2 + game_ftm + game_3gm * 3.
+        $players = [
+            [200090510, 35, 0], // 70
+            [200090511, 34, 1], // 69
+            [200090512, 34, 0], // 68
+            [200090513, 33, 1], // 67
+            [200090514, 33, 0], // 66
+            [200090515, 32, 1], // 65 -> dropped
+        ];
+        foreach ($players as [$pid, $twos, $fts]) {
+            $name = 'Pts' . $pid; // varchar(16): keep <= 16 chars
+            $this->insertTestPlayer($pid, $name);
+            $this->insertHistRow($pid, $name, 2099);
+            $this->insertPlayerBoxscoreRow(
+                '2099-03-03', $pid, $name, 'PG', 2, 1, 1,
+                points2m: $twos, ftm: $fts, points3m: 0,
+            );
+        }
+
+        $result = $this->repo->getTopPlayerSingleGameBatch(
+            ['Most Points in a Single Game' => 'bs.calc_points'],
+            "bs.game_date = '2099-03-03' AND bs.game_type = 1"
+        );
+
+        $records = $result['Most Points in a Single Game'];
+        self::assertCount(5, $records);
+        self::assertSame(200090510, (int) $records[0]['pid']);
+        self::assertSame(
+            [70, 69, 68, 67, 66],
+            array_map(static fn (array $r): int => (int) $r['value'], $records),
+        );
+    }
+
+    public function testGetTopPlayerSingleGameBatchDropsRowsMissingHistSnapshot(): void
+    {
+        // Player X: highest value but NO ibl_hist snapshot -> dropped by the INNER JOIN.
+        $this->insertTestPlayer(200090520, 'NoHist X');
+        $this->insertPlayerBoxscoreRow(
+            '2099-03-10', 200090520, 'NoHist X', 'PG', 2, 1, 1,
+            points2m: 35, ftm: 0, points3m: 0, // 70
+        );
+        // Player Y: lower value but WITH snapshot -> occupies the slot.
+        $this->insertTestPlayer(200090521, 'HasHist Y');
+        $this->insertHistRow(200090521, 'HasHist Y', 2099);
+        $this->insertPlayerBoxscoreRow(
+            '2099-03-10', 200090521, 'HasHist Y', 'PG', 2, 1, 1,
+            points2m: 34, ftm: 1, points3m: 0, // 69
+        );
+
+        $result = $this->repo->getTopPlayerSingleGameBatch(
+            ['Most Points in a Single Game' => 'bs.calc_points'],
+            "bs.game_date = '2099-03-10' AND bs.game_type = 1"
+        );
+
+        $pids = array_map(
+            static fn (array $r): int => (int) $r['pid'],
+            $result['Most Points in a Single Game'],
+        );
+        self::assertNotContains(200090520, $pids);
+        self::assertContains(200090521, $pids);
+    }
+
+    public function testGetTopPlayerSingleGameBatchExcludesNonRealTeamRows(): void
+    {
+        // Row on a non-real team (All-Star Away, teamid 50 > MAX_REAL_TEAMID) -> excluded by
+        // the guard. Must reference an existing ibl_team_info row (FK fk_boxscore_home); 29
+        // does not exist, so 50 is used as a real >MAX_REAL_TEAMID team.
+        $this->insertTestPlayer(200090530, 'FakeTeam');
+        $this->insertHistRow(200090530, 'FakeTeam', 2099);
+        $this->insertPlayerBoxscoreRow(
+            '2099-03-12', 200090530, 'FakeTeam', 'PG', 2, 1, 1,
+            points2m: 35, ftm: 0, points3m: 0, // 70
+            overrides: ['home_teamid' => 50],
+        );
+        // Real-team row with a lower value.
+        $this->insertTestPlayer(200090531, 'RealTeam');
+        $this->insertHistRow(200090531, 'RealTeam', 2099);
+        $this->insertPlayerBoxscoreRow(
+            '2099-03-12', 200090531, 'RealTeam', 'PG', 2, 1, 1,
+            points2m: 34, ftm: 1, points3m: 0, // 69
+        );
+
+        $result = $this->repo->getTopPlayerSingleGameBatch(
+            ['Most Points in a Single Game' => 'bs.calc_points'],
+            "bs.game_date = '2099-03-12' AND bs.game_type = 1"
+        );
+
+        $pids = array_map(
+            static fn (array $r): int => (int) $r['pid'],
+            $result['Most Points in a Single Game'],
+        );
+        self::assertNotContains(200090530, $pids);
+        self::assertContains(200090531, $pids);
+    }
+
+    public function testGetTopPlayerSingleGameBatchPreservesGameDateTiebreak(): void
+    {
+        // Same value; earlier game_date must rank first (value DESC, game_date ASC).
+        $this->insertTestPlayer(200090540, 'Earlier');
+        $this->insertHistRow(200090540, 'Earlier', 2099);
+        $this->insertPlayerBoxscoreRow(
+            '2099-04-01', 200090540, 'Earlier', 'PG', 2, 1, 1,
+            points2m: 35, ftm: 0, points3m: 0, // 70
+        );
+        $this->insertTestPlayer(200090541, 'Later');
+        $this->insertHistRow(200090541, 'Later', 2099);
+        $this->insertPlayerBoxscoreRow(
+            '2099-04-02', 200090541, 'Later', 'PG', 2, 1, 1,
+            points2m: 35, ftm: 0, points3m: 0, // 70
+        );
+
+        $result = $this->repo->getTopPlayerSingleGameBatch(
+            ['Most Points in a Single Game' => 'bs.calc_points'],
+            "bs.game_date IN ('2099-04-01','2099-04-02') AND bs.game_type = 1"
+        );
+
+        $pids = array_map(
+            static fn (array $r): int => (int) $r['pid'],
+            $result['Most Points in a Single Game'],
+        );
+        self::assertSame([200090540, 200090541], $pids);
+    }
+
+    public function testGetTopPlayerSingleGameBatchReturnsFewerThanFiveWhenLimitNotReached(): void
+    {
+        // Only 3 qualifying rows -> the LIMIT 5 is never reached.
+        foreach ([200090550, 200090551, 200090552] as $i => $pid) {
+            $name = 'Few ' . $pid;
+            $this->insertTestPlayer($pid, $name);
+            $this->insertHistRow($pid, $name, 2099);
+            $this->insertPlayerBoxscoreRow(
+                '2099-04-05', $pid, $name, 'PG', 2, 1, 1,
+                points2m: 30 - $i, ftm: 0, points3m: 0,
+            );
+        }
+
+        $result = $this->repo->getTopPlayerSingleGameBatch(
+            ['Most Points in a Single Game' => 'bs.calc_points'],
+            "bs.game_date = '2099-04-05' AND bs.game_type = 1"
+        );
+
+        self::assertCount(3, $result['Most Points in a Single Game']);
+    }
+
     // --- Team Single Game Batch ---
 
     public function testGetTopTeamSingleGameBatchReturnsGroupedResults(): void

@@ -62,19 +62,142 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getQuadrupleDoubles();
 
-        $found = false;
-        foreach ($result as $record) {
-            if ($record['pid'] === $pid && $record['date'] === '2098-01-15') {
-                $found = true;
-                self::assertSame('QuadDouble Test', $record['name']);
-                self::assertGreaterThanOrEqual(10, $record['rebounds']);
-                self::assertGreaterThanOrEqual(10, $record['assists']);
-                self::assertGreaterThanOrEqual(10, $record['steals']);
-                self::assertGreaterThanOrEqual(10, $record['blocks']);
-                break;
-            }
-        }
-        self::assertTrue($found, 'Quadruple double record not found');
+        $matches = array_filter(
+            $result,
+            static fn (array $r): bool => $r['pid'] === $pid && $r['date'] === '2098-01-15',
+        );
+        self::assertCount(1, $matches, 'quad-double must appear once — guards against UNION ALL join fan-out');
+
+        $match = array_values($matches)[0];
+        self::assertSame('QuadDouble Test', $match['name']);
+        self::assertGreaterThanOrEqual(10, $match['rebounds']);
+        self::assertGreaterThanOrEqual(10, $match['assists']);
+        self::assertGreaterThanOrEqual(10, $match['steals']);
+        self::assertGreaterThanOrEqual(10, $match['blocks']);
+    }
+
+    public function testGetQuadrupleDoublesReturnedWithoutAssists(): void
+    {
+        // A quad-double whose assists are BELOW 10 — the candidate CTE must still
+        // capture the row via the steals/blocks legs, proving the UNION superset
+        // is complete even when the assists leg misses.
+        $pid = 200090411;
+        $this->insertTestPlayer($pid, 'NoAssist QD');
+        $this->insertHistRow($pid, 'NoAssist QD', 2098);
+
+        // calc_points = 6*2 + 4 + 2*3 = 22 ≥ 10 ✓; calc_rebounds = 5 + 5 = 10 ✓;
+        // ast 5 < 10; stl 10 ≥ 10 ✓; blk 10 ≥ 10 ✓ → 4 categories ≥ 10.
+        $this->insertPlayerBoxscoreRow(
+            '2098-01-20', $pid, 'NoAssist QD', 'C', 2, 1, 1,
+            points2m: 6, orb: 5, drb: 5, ast: 5, stl: 10, blk: 10,
+        );
+
+        $result = $this->repo->getQuadrupleDoubles();
+
+        $matches = array_filter(
+            $result,
+            static fn (array $r): bool => $r['pid'] === $pid && $r['date'] === '2098-01-20',
+        );
+        self::assertCount(1, $matches, 'quad-double without the assists leg must still be returned');
+    }
+
+    public function testGetQuadrupleDoublesExcludesThreeOfFiveWithRareStat(): void
+    {
+        // A CTE candidate (ast ≥ 10 puts it in the assists leg) that is only a
+        // TRIPLE double — the 4-of-5 WHERE must still exclude it, proving the
+        // candidate prune does not relax the qualifying filter.
+        $pid = 200090412;
+        $this->insertTestPlayer($pid, 'TripleOnly QD');
+        $this->insertHistRow($pid, 'TripleOnly QD', 2098);
+
+        // points 22 ✓; rebounds 10 ✓; ast 12 ✓; stl 3 < 10; blk 1 < 10 → only 3.
+        $this->insertPlayerBoxscoreRow(
+            '2098-01-21', $pid, 'TripleOnly QD', 'PG', 2, 1, 1,
+            points2m: 6, orb: 5, drb: 5, ast: 12, stl: 3, blk: 1,
+        );
+
+        $result = $this->repo->getQuadrupleDoubles();
+
+        $matches = array_filter(
+            $result,
+            static fn (array $r): bool => $r['pid'] === $pid && $r['date'] === '2098-01-21',
+        );
+        self::assertCount(0, $matches, 'triple-double candidate must not pass the 4-of-5 filter');
+    }
+
+    public function testGetQuadrupleDoublesDropsRowMissingHistSnapshot(): void
+    {
+        // A genuine quad-double whose player has NO ibl_hist snapshot for the
+        // season — the inner JOIN on ibl_hist must drop it.
+        $pid = 200090413;
+        $this->insertTestPlayer($pid, 'NoHist QD');
+        // deliberately NO insertHistRow — the season snapshot is absent
+
+        $this->insertPlayerBoxscoreRow(
+            '2098-01-22', $pid, 'NoHist QD', 'PF', 2, 1, 1,
+            points2m: 7, orb: 5, drb: 5, ast: 10, stl: 10, blk: 10,
+        );
+
+        $result = $this->repo->getQuadrupleDoubles();
+
+        $matches = array_filter(
+            $result,
+            static fn (array $r): bool => $r['pid'] === $pid && $r['date'] === '2098-01-22',
+        );
+        self::assertCount(0, $matches, 'quad-double without a hist snapshot must be dropped by the inner join');
+    }
+
+    public function testGetQuadrupleDoublesExcludesNonRealTeam(): void
+    {
+        // A quad-double in a game involving a non-real team (Rookies, id 40 >
+        // MAX_REAL_TEAMID) — the team-id BETWEEN filter must exclude it.
+        $pid = 200090414;
+        $this->insertTestPlayer($pid, 'NonReal QD');
+        $this->insertHistRow($pid, 'NonReal QD', 2098);
+
+        $this->insertPlayerBoxscoreRow(
+            '2098-01-23', $pid, 'NonReal QD', 'SF', 2, 40, 2,
+            points2m: 7, orb: 5, drb: 5, ast: 10, stl: 10, blk: 10,
+        );
+
+        $result = $this->repo->getQuadrupleDoubles();
+
+        $matches = array_filter(
+            $result,
+            static fn (array $r): bool => $r['pid'] === $pid && $r['date'] === '2098-01-23',
+        );
+        self::assertCount(0, $matches, 'quad-double in a non-real-team game must be excluded');
+    }
+
+    public function testGetQuadrupleDoublesOrdersByGameDateAsc(): void
+    {
+        // Two quad-doubles for the same player; insert the LATER date first so a
+        // dropped ORDER BY would surface. Both dates map to season_year 2098.
+        $pid = 200090415;
+        $this->insertTestPlayer($pid, 'Ordered QD');
+        $this->insertHistRow($pid, 'Ordered QD', 2098);
+
+        $this->insertPlayerBoxscoreRow(
+            '2098-03-20', $pid, 'Ordered QD', 'PG', 2, 1, 1,
+            points2m: 7, orb: 5, drb: 5, ast: 10, stl: 10, blk: 10,
+        );
+        $this->insertPlayerBoxscoreRow(
+            '2098-01-10', $pid, 'Ordered QD', 'PG', 2, 1, 1,
+            points2m: 7, orb: 5, drb: 5, ast: 10, stl: 10, blk: 10,
+        );
+
+        $result = $this->repo->getQuadrupleDoubles();
+
+        $dates = array_values(array_map(
+            static fn (array $r): string => $r['date'],
+            array_filter($result, static fn (array $r): bool => $r['pid'] === $pid),
+        ));
+
+        self::assertSame(
+            ['2098-01-10', '2098-03-20'],
+            $dates,
+            'quad-doubles must be returned ordered by game_date ASC',
+        );
     }
 
     // --- All-Star Appearances ---

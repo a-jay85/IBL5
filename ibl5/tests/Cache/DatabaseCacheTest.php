@@ -289,6 +289,116 @@ final class DatabaseCacheTest extends TestCase
 
         $this->assertFalse($mockDb->wasWriteCalled());
     }
+
+    public function testGetStaleReturnsExpiredValue(): void
+    {
+        // getStale must return a row even when its expiration is in the past.
+        $mockDb = new MockCacheDb();
+        $cache = new DatabaseCache($mockDb, null, new FixedClock(1_000_000));
+
+        $data = [['pid' => 7, 'name' => 'Stale Player']];
+        $mockDb->setCacheData('stale_key', (string) json_encode($data), 999_999); // expired
+
+        $this->assertNull($cache->get('stale_key'), 'sanity: get() treats it as expired');
+        $this->assertSame($data, $cache->getStale('stale_key'));
+    }
+
+    public function testGetStaleReturnsNullOnMiss(): void
+    {
+        $mockDb = new MockCacheDb();
+        $cache = new DatabaseCache($mockDb);
+
+        $this->assertNull($cache->getStale('absent_key'));
+    }
+
+    public function testGetStaleReturnsNullOnCorruptJson(): void
+    {
+        $mockDb = new MockCacheDb();
+        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $logger->expects($this->once())->method('warning')->with('cache_corrupt_json', \PHPUnit\Framework\Assert::anything());
+        $cache = new DatabaseCache($mockDb, $logger, new FixedClock(1_000_000));
+
+        $mockDb->setCacheData('corrupt_key', '{not valid json', 2_000_000);
+
+        $this->assertNull($cache->getStale('corrupt_key'));
+    }
+
+    public function testAcquireLockReturnsTrueWhenLockGranted(): void
+    {
+        $mockDb = new MockCacheDb();
+        $cache = new DatabaseCache($mockDb);
+
+        $mockDb->setLockResult(1);
+
+        $this->assertTrue($cache->acquireLock('rebuild_lock', 10));
+    }
+
+    public function testAcquireLockReturnsFalseOnTimeout(): void
+    {
+        $mockDb = new MockCacheDb();
+        $cache = new DatabaseCache($mockDb);
+
+        $mockDb->setLockResult(0);
+
+        $this->assertFalse($cache->acquireLock('rebuild_lock', 10));
+    }
+
+    public function testAcquireLockReturnsFalseWhenLockResultNull(): void
+    {
+        $mockDb = new MockCacheDb();
+        $cache = new DatabaseCache($mockDb);
+
+        $mockDb->setLockResult(null); // GET_LOCK returned NULL (error/killed)
+
+        $this->assertFalse($cache->acquireLock('rebuild_lock', 10));
+    }
+
+    public function testAcquireLockReturnsFalseOnPrepareFailure(): void
+    {
+        $mockDb = new MockCacheDb();
+        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $logger->expects($this->once())->method('error')->with('cache_lock_acquire_failed', \PHPUnit\Framework\Assert::anything());
+        $cache = new DatabaseCache($mockDb, $logger);
+
+        $mockDb->setPrepareShouldFail(true);
+
+        $this->assertFalse($cache->acquireLock('rebuild_lock', 10));
+    }
+
+    public function testReleaseLockExecutesReleaseStatement(): void
+    {
+        $mockDb = new MockCacheDb();
+        $cache = new DatabaseCache($mockDb);
+
+        $cache->releaseLock('rebuild_lock');
+
+        $this->assertTrue($mockDb->wasReleaseLockCalled());
+    }
+
+    public function testReleaseLockLogsOnPrepareFailure(): void
+    {
+        $mockDb = new MockCacheDb();
+        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $logger->expects($this->once())->method('error')->with('cache_lock_release_failed', \PHPUnit\Framework\Assert::anything());
+        $cache = new DatabaseCache($mockDb, $logger);
+
+        $mockDb->setPrepareShouldFail(true);
+        $cache->releaseLock('rebuild_lock');
+
+        $this->assertFalse($mockDb->wasReleaseLockCalled());
+    }
+
+    public function testLockSqlIsParameterized(): void
+    {
+        // Security: the lock name must NEVER be interpolated into the SQL string.
+        // GET_LOCK/RELEASE_LOCK must use bound placeholders (?), not string concat.
+        $source = (string) file_get_contents(__DIR__ . '/../../classes/Cache/DatabaseCache.php');
+
+        $this->assertStringContainsString('GET_LOCK(?, ?)', $source);
+        $this->assertStringContainsString('RELEASE_LOCK(?)', $source);
+        $this->assertStringNotContainsString('GET_LOCK(\'', $source);
+        $this->assertStringNotContainsString('RELEASE_LOCK(\'', $source);
+    }
 }
 
 /**
@@ -305,6 +415,9 @@ class MockCacheDb extends \mysqli
     private bool $deleteCalled = false;
     private bool $prepareShouldFail = false;
     private int $lastWrittenExpiration = 0;
+    /** Value GET_LOCK returns: 1 = acquired, 0 = timeout, null = error/killed. */
+    private ?int $lockResult = 1;
+    private bool $releaseLockCalled = false;
 
     public function __construct()
     {
@@ -331,6 +444,26 @@ class MockCacheDb extends \mysqli
     public function wasDeleteCalled(): bool
     {
         return $this->deleteCalled;
+    }
+
+    public function setLockResult(?int $result): void
+    {
+        $this->lockResult = $result;
+    }
+
+    public function getLockResult(): ?int
+    {
+        return $this->lockResult;
+    }
+
+    public function markReleaseLockCalled(): void
+    {
+        $this->releaseLockCalled = true;
+    }
+
+    public function wasReleaseLockCalled(): bool
+    {
+        return $this->releaseLockCalled;
     }
 
     public function getLastWrittenExpiration(): int
@@ -422,11 +555,19 @@ class MockCacheStmt
             $this->db->markDeleteCalled();
             $this->db->deleteKey($this->boundKey);
         }
+        if (str_contains($this->query, 'RELEASE_LOCK')) {
+            $this->db->markReleaseLockCalled();
+        }
         return true;
     }
 
     public function get_result(): MockCacheResult
     {
+        if (str_contains($this->query, 'GET_LOCK')) {
+            $lock = $this->db->getLockResult();
+            return new MockCacheResult($lock === null ? null : ['got' => $lock]);
+        }
+
         $entry = $this->db->getCacheEntry($this->boundKey);
         return new MockCacheResult($entry);
     }
@@ -438,12 +579,12 @@ class MockCacheStmt
 
 class MockCacheResult
 {
-    /** @var array{value: string, expiration: int}|null */
+    /** @var array<string, int|string>|null */
     private ?array $data;
     private bool $fetched = false;
 
     /**
-     * @param array{value: string, expiration: int}|null $data
+     * @param array<string, int|string>|null $data
      */
     public function __construct(?array $data)
     {
@@ -451,7 +592,7 @@ class MockCacheResult
     }
 
     /**
-     * @return array{value: string, expiration: int}|null
+     * @return array<string, int|string>|null
      */
     public function fetch_assoc(): ?array
     {

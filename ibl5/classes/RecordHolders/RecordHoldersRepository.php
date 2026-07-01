@@ -491,30 +491,41 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
             $safeLabel = str_replace("'", "''", $label);
             $unions[] = "(SELECT
                     '" . $safeLabel . "' AS stat_type,
-                    bs.pid,
+                    cand.pid,
                     p.name,
                     h.teamid AS teamid,
                     h.team AS team_name,
-                    bs.game_date AS `date`,
+                    cand.game_date AS `date`,
                     COALESCE(sch.box_id, 0) AS box_id,
                     COALESCE(bst.game_of_that_day, 0) AS game_of_that_day,
-                    CASE WHEN h.teamid = bs.visitor_teamid THEN bs.home_teamid ELSE bs.visitor_teamid END AS oppTid,
+                    CASE WHEN h.teamid = cand.visitor_teamid THEN cand.home_teamid ELSE cand.visitor_teamid END AS oppTid,
                     opp.team_name AS opp_team_name,
-                    " . $expression . " AS value
-                FROM `ibl_box_scores` bs
-                JOIN `ibl_plr` p ON p.pid = bs.pid
-                JOIN `ibl_hist` h ON h.pid = bs.pid AND h.year = (" . self::SEASON_YEAR_EXPRESSION . ")
-                LEFT JOIN `ibl_schedule` sch ON sch.game_date = bs.game_date
-                    AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
-                LEFT JOIN _game_of_day bst ON bst.game_date = bs.game_date
-                    AND bst.visitor_teamid = bs.visitor_teamid AND bst.home_teamid = bs.home_teamid
+                    cand.value
+                FROM (
+                    SELECT
+                        bs.pid,
+                        bs.game_date,
+                        bs.visitor_teamid,
+                        bs.home_teamid,
+                        (" . self::SEASON_YEAR_EXPRESSION . ") AS season_year,
+                        " . $expression . " AS value
+                    FROM `ibl_box_scores` bs
+                    WHERE " . $dateFilter . "
+                        AND bs.visitor_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
+                        AND bs.home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
+                    ORDER BY " . $expression . " DESC
+                    LIMIT 500
+                ) cand
+                JOIN `ibl_plr` p ON p.pid = cand.pid
+                JOIN `ibl_hist` h ON h.pid = cand.pid AND h.year = cand.season_year
+                LEFT JOIN `ibl_schedule` sch ON sch.game_date = cand.game_date
+                    AND sch.visitor_teamid = cand.visitor_teamid AND sch.home_teamid = cand.home_teamid
+                LEFT JOIN _game_of_day bst ON bst.game_date = cand.game_date
+                    AND bst.visitor_teamid = cand.visitor_teamid AND bst.home_teamid = cand.home_teamid
                 LEFT JOIN `ibl_team_info` opp ON opp.teamid = CASE
-                    WHEN h.teamid = bs.visitor_teamid THEN bs.home_teamid
-                    ELSE bs.visitor_teamid END
-                WHERE " . $dateFilter . "
-                    AND bs.visitor_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                    AND bs.home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                ORDER BY value DESC, bs.game_date ASC
+                    WHEN h.teamid = cand.visitor_teamid THEN cand.home_teamid
+                    ELSE cand.visitor_teamid END
+                ORDER BY cand.value DESC, cand.game_date ASC
                 LIMIT 5)";
         }
 

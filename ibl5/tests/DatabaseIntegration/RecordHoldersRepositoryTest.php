@@ -460,10 +460,10 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
 
         $records = $result['Most Points in a Single Game'];
         self::assertCount(5, $records);
-        self::assertSame(200090510, (int) $records[0]['pid']);
+        self::assertSame(200090510, $records[0]['pid']);
         self::assertSame(
             [70, 69, 68, 67, 66],
-            array_map(static fn (array $r): int => (int) $r['value'], $records),
+            array_map(static fn (array $r): int => $r['value'], $records),
         );
     }
 

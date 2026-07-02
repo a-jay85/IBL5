@@ -148,7 +148,7 @@ const publicPages: Array<{ name: string; url: string }> = [
   { name: 'topics', url: 'modules.php?name=Topics' },
   { name: 'voting results', url: 'modules.php?name=VotingResults' },
   { name: 'news index', url: 'modules.php?name=News' },
-  { name: 'news categories', url: 'modules.php?name=News&file=categories' },
+  { name: 'news categories', url: 'modules.php?name=News&file=categories&op=newindex&catid=15' },
   { name: 'news article', url: 'modules.php?name=News&file=article&sid=1' },
   { name: 'team schedule', url: 'modules.php?name=Schedule&teamid=1' },
 ];

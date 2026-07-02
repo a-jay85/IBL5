@@ -1,6 +1,6 @@
 ---
-description: Commit/PR work from the worktree; the Stop hook nudges to commit in a worktree and warns if the main checkout is dirty (work landed in the wrong place); amend when fixing unpushed work. Carries the one-line PR-title decision test (full rubric in commit-conventions.md).
-last_verified: 2026-06-27
+description: Commit/PR work from the worktree; the Stop hook nudges to commit in a worktree and warns when the main checkout is dirty; amend only unpushed fixes. Carries the one-line PR-title decision test (full rubric in commit-conventions.md).
+last_verified: 2026-07-01
 ---
 
 # Auto-Commit
@@ -9,14 +9,14 @@ All work happens in a worktree, never the main checkout (ADR-0062, `workflow-con
 
 **PR/commit title type** (when titling via `/commit-commands:*`): decision test — *"Would a league GM notice a new ability they didn't have before?"* Yes → `feat:` (trips the human-signoff hold — that's the gate working, not a cost to route around); invisible to a GM (dev tooling, a new slash command, an internal refactor, a doc, a dep bump) → `chore:`/`fix:`/`refactor:`/`docs:`. Classify by what the diff **is**, never by the desired merge outcome. Full rubric incl. edge cases: `.claude/rules/commit-conventions.md`.
 
-The `$HOME/.claude/hooks/auto-commit-reminder.sh` Stop hook fires at turn-end when there are uncommitted changes, and nudges the right action depending on **where** the work is:
+The `$HOME/.claude/hooks/auto-commit-reminder.sh` Stop hook fires at turn-end on uncommitted changes, nudging by **where** the work is:
 
-- **Main checkout** (master) dirty → **misplaced-work warning**: the work landed in the wrong place; move it into a worktree (`bin/wt-new`) — the main checkout is reference/read-only.
-- **Worktree** dirty → **commit nudge**: this is the correct place to work; if you finished a unit of work, commit it via `/commit-commands:commit` (or `commit-push-pr`).
+- **Main checkout** (master) dirty → **misplaced-work warning**: move it into a worktree (`bin/wt-new`) — the main checkout is reference/read-only.
+- **Worktree** dirty → **commit nudge**: correct place to work; if you finished a unit of work, commit via `/commit-commands:commit` (or `commit-push-pr`).
 
-It stays silent when the tree is clean, on loop re-fire, and while a plan workflow is active (which covers `/post-plan` auto-fire committing in a worktree). It nudges on **uncommitted** changes only — push is owned by `commit-push-pr`/`/post-plan`. It is a nudge, not a hard block — ignore it if you are mid-task, just exploring, or have a deliberate reason to be touching the main checkout.
+It stays silent when the tree is clean, on loop re-fire, and while a plan workflow is active (covers `/post-plan` auto-fire). It nudges on **uncommitted** changes only — push is owned by `commit-push-pr`/`/post-plan`. It's a nudge, not a hard block — ignore it if mid-task, exploring, or deliberately touching the main checkout.
 
-When you finish a unit of work in a worktree (impl, fix, refactor, config, docs) and are not using the `/post-plan` auto-fire handoff, invoke `/commit-commands:commit` (or `commit-push-pr`). Skip it when mid-task or when the user is only exploring.
+When you finish a unit of work in a worktree and are not using the `/post-plan` auto-fire handoff, invoke `/commit-commands:commit` (or `commit-push-pr`). Skip when mid-task or only exploring.
 
 ## Amend vs new commit
 

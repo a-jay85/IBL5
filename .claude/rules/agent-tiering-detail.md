@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for agent-tiering — full Fable approval-gate procedure, flat-fan-out (nested sub-agent) rationale, and per-tier prompt style. Loads only when editing workflow orchestration defs, where this rationale applies.
-last_verified: 2026-06-30
+last_verified: 2026-07-01
 paths:
   - ".claude/commands/**/*.md"
   - ".claude/skills/**/SKILL.md"
@@ -14,8 +14,10 @@ This file holds the longer rationale, pulled out of the always-loaded budget.
 
 ## Fable Approval Gate
 
-> **Status: Fable is currently unavailable — never select it** (see the parent's Tier
-> table). This full procedure applies *if* Fable access returns; until then it is dormant.
+> **Status: Fable is available again (2026-07-01) but tightly gated.** Never select it on
+> your own; use it *only* when a task is absolutely critical **and** Fable is 100% necessary
+> to solve it, and *only* after an explicit user yes. Default to Opus — treat Fable as a last
+> resort, not a routine capability upgrade.
 
 **Claude must never select Fable on its own** — neither the session model nor a `model: "fable"` sub-agent. When a task matches the Fable row, do not silently run on Opus *and* do not switch; **surface a suggestion** and wait for an explicit yes. The suggestion states:
 
@@ -24,7 +26,7 @@ This file holds the longer rationale, pulled out of the always-loaded budget.
 - **Cons**: ~2× cost ($10/$50 vs $5/$25 per MTok); Opus is *likely sufficient* (most tasks are); the gain is a ceiling-raise, not a guarantee.
 - **Recommendation**: a clear "I'd use Fable here" / "Opus is probably fine, flagging it" — not a neutral survey.
 
-Absent approval, proceed on Opus (or the correct lower tier) — flag and continue, don't block. Approval covers that one task; a new task re-triggers the gate. Use `AskUserQuestion` only when it's a genuine fork; otherwise inline the suggestion and keep going.
+Absent approval, proceed on Opus (or the correct lower tier) — flag and continue, don't block. Approval covers that one task; a new task re-triggers the gate. Because Fable is a last resort, any actual intent to run on Fable is itself a genuine fork — **always** use `AskUserQuestion` to get the explicit yes *before* selecting it; never proceed on Fable from an inline suggestion alone.
 
 ## Boundary keys on task type, not model capability
 

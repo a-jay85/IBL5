@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Boxscore;
 
+use Boxscore\Contracts\BoxscoreViewInterface;
 use Security\HtmlSanitizer;
 
 /**
@@ -13,7 +14,7 @@ use Security\HtmlSanitizer;
  *
  * @see BoxscoreProcessor For the processing logic
  */
-class BoxscoreView
+class BoxscoreView implements BoxscoreViewInterface
 {
     /**
      * Render parse results log

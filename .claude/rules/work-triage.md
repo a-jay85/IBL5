@@ -1,6 +1,6 @@
 ---
 description: Triage every non-trivial unit of work as ad-hoc vs /plan before starting, with an ad-hoc safety mirror; the gateway that feeds the deployment funnel (ADR-0067).
-last_verified: 2026-06-27
+last_verified: 2026-07-01
 ---
 
 # Work Triage Rule
@@ -13,7 +13,7 @@ This is the **gateway** of the deployment funnel (ADR-0067): triage decides plan
 
 ## The ad-hoc bar
 
-Work is ad-hoc-safe only when **all** hold:
+Ad-hoc-safe only when **all** hold:
 - **Known blast radius** — you can name every file/behavior it touches.
 - **An existing pattern to copy** — not novel infrastructure.
 - **No multi-phase reasoning** — a single coherent change, not a sequence with intermediate decisions.
@@ -25,7 +25,7 @@ If any are open, it wants a `/plan`.
 
 ## Ad-hoc safety mirror
 
-Even when the bar above says ad-hoc, run a quick safety check — the same surfaces `/plan` Step 4 gate 14 holds for. If the change touches any of:
+Even when the bar says ad-hoc, run a quick safety check — the same surfaces `/plan` Step 4 gate 14 holds for. If the change touches any of:
 - a **security surface** (SQL, POST/form endpoint, auth/authz-gated route, user-facing output rendering),
 - a **destructive or schema-tightening migration**,
 - **new or redesigned user-visible UI/UX**, or
@@ -35,6 +35,6 @@ then prefer `/plan`, so the defense and its verification are designed up front. 
 
 ## Calibration
 
-Surface the verdict only when scope is **non-trivial or borderline**. Skip the ritual for obviously trivial edits (typo, one-line fix) — just do them; don't add ceremony.
+Surface the verdict only when scope is **non-trivial or borderline**. Skip the ritual for obviously trivial edits (typo, one-line fix). 
 
 **Headless:** no-op under headless/automouse (no user to recommend `/plan` to; automouse runs only pre-vetted plans). Governs interactive work-start only.

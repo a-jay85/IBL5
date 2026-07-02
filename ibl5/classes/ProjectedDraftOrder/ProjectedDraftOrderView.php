@@ -47,7 +47,7 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
     {
         $label = $isFinalized ? 'Draft Order' : 'Projected Draft Order';
 
-        return '<h1 class="ibl-title">' . HtmlSanitizer::e($seasonYear) . ' ' . $label . '</h1>';
+        return '<h1 class="ibl-title">' . $label . ' (' . HtmlSanitizer::e($seasonYear) . ')</h1>';
     }
 
     private function renderDescription(): string

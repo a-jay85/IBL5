@@ -51,7 +51,7 @@ class FreeAgencyOfferView
 
         ob_start();
 
-        echo '<h2 class="ibl-title">Free Agency</h2>';
+        echo '<h1 class="ibl-title">Free Agency</h1>';
 
         // Error banner from PRG redirect
         if ($error !== null) {

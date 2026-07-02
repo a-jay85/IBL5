@@ -47,7 +47,7 @@ $searchResult = $service->search($_POST);
 // Render page
 PageLayout\PageLayout::header();
 
-echo '<h2 class="ibl-title">Player Search</h2>';
+echo '<h1 class="ibl-title">Player Search</h1>';
 
 // Render search form with current parameters
 echo $view->renderSearchForm($searchResult['params']);

@@ -44,7 +44,7 @@ test.describe('Player negotiate sub-page', () => {
     await assertNoPhpErrors(page, 'on Player negotiate page');
 
     await expect(
-      page.locator('h2.ibl-title').filter({ hasText: 'Contract Extension' }),
+      page.locator('h1.ibl-title').filter({ hasText: 'Contract Extension' }),
     ).toBeVisible();
     await expect(page.locator('.ibl-alert--error').first()).toBeVisible();
   });

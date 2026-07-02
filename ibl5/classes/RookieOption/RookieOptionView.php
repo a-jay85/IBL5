@@ -34,7 +34,7 @@ class RookieOptionView implements RookieOptionViewInterface
         // Title, then the flippable trading card (unwrapped), then the option card
         ?>
 
-<h2 class="ibl-title">Rookie Option</h2>
+<h1 class="ibl-title">Rookie Option</h1>
 
 <?= HtmlSanitizer::trusted($cardHtml ?? '') ?>
 

@@ -5,10 +5,20 @@ declare(strict_types=1);
 namespace Tests\Boxscore;
 
 use Boxscore\BoxscoreView;
+use Boxscore\Contracts\BoxscoreViewInterface;
 use PHPUnit\Framework\TestCase;
 
 final class BoxscoreViewXssTest extends TestCase
 {
+    public function testImplementsBoxscoreViewInterface(): void
+    {
+        $view = new BoxscoreView();
+
+        $this->assertTrue(
+            (new \ReflectionClass($view))->implementsInterface(BoxscoreViewInterface::class),
+        );
+    }
+
     public function testParseLogEscapesXssInMessagesAndError(): void
     {
         $xss = '<script>alert(1)</script>';

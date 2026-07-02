@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Negotiation;
+namespace Negotiation\Views;
 
 use BasketballStats\StatsFormatter;
 use Negotiation\Contracts\ExtensionContractDemandCalculatorInterface;
@@ -13,7 +13,7 @@ use Security\HtmlSanitizer;
  *
  * @phpstan-import-type DemandsBreakdown from ExtensionContractDemandCalculatorInterface
  */
-class NegotiationDemandsBreakdownView
+class DemandsBreakdownView
 {
     /**
      * @param DemandsBreakdown $breakdown

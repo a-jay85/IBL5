@@ -4,12 +4,20 @@ declare(strict_types=1);
 
 namespace Tests\Navigation;
 
+use Navigation\Contracts\NavigationViewInterface;
 use Navigation\NavigationConfig;
 use Navigation\NavigationView;
 use PHPUnit\Framework\TestCase;
 
 class NavigationViewTest extends TestCase
 {
+    public function testImplementsNavigationViewInterface(): void
+    {
+        $this->assertTrue(
+            (new \ReflectionClass(NavigationView::class))->implementsInterface(NavigationViewInterface::class),
+        );
+    }
+
     /**
      * Render navigation for a logged-in IBL user with the given settings.
      *

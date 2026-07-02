@@ -8,6 +8,7 @@ use Negotiation\Contracts\ExtensionContractDemandCalculatorInterface;
 use Negotiation\Contracts\NegotiationRepositoryInterface;
 use Negotiation\Contracts\NegotiationServiceInterface;
 use Negotiation\Contracts\NegotiationValidatorInterface;
+use Negotiation\Views\DemandsBreakdownView;
 use Player\Player;
 
 /**
@@ -53,7 +54,7 @@ class NegotiationService implements NegotiationServiceInterface
 
         if ($bypassOwnership) {
             $breakdown = $this->demandCalculator->calculateDemandsWithBreakdown($player, $teamFactors);
-            $output .= NegotiationDemandsBreakdownView::render($breakdown);
+            $output .= DemandsBreakdownView::render($breakdown);
             return self::wrapInFormContainer($output);
         }
 

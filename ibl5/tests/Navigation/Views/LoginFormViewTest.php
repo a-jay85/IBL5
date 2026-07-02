@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Navigation\Views;
 
+use Navigation\Contracts\LoginFormViewInterface;
 use Navigation\Views\LoginFormView;
 use PHPUnit\Framework\TestCase;
 
@@ -14,6 +15,13 @@ class LoginFormViewTest extends TestCase
     protected function setUp(): void
     {
         $this->view = new LoginFormView();
+    }
+
+    public function testImplementsLoginFormViewInterface(): void
+    {
+        $this->assertTrue(
+            (new \ReflectionClass(LoginFormView::class))->implementsInterface(LoginFormViewInterface::class),
+        );
     }
 
     public function testDesktopVariantHasDesktopSizingClasses(): void

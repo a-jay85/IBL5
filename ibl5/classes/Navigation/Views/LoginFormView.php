@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace Navigation\Views;
 
+use Navigation\Contracts\LoginFormViewInterface;
 use Security\HtmlSanitizer;
 
 /**
  * Renders the inline login form for both desktop and mobile navigation.
  * The forms are structurally identical; only CSS sizing classes differ.
  */
-class LoginFormView
+class LoginFormView implements LoginFormViewInterface
 {
     /**
      * Render the login form.

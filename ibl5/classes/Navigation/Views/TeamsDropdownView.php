@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Navigation\Views;
 
+use Navigation\Contracts\TeamsDropdownViewInterface;
 use Security\HtmlSanitizer;
 
 /**
@@ -11,7 +12,7 @@ use Security\HtmlSanitizer;
  *
  * @phpstan-import-type NavTeamsData from \Navigation\NavigationConfig
  */
-class TeamsDropdownView
+class TeamsDropdownView implements TeamsDropdownViewInterface
 {
     /**
      * Render the desktop Teams mega-menu with 2x2 conference/division grid.

@@ -18,65 +18,14 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use LeagueSchedule\LeagueScheduleRepository;
-use LeagueSchedule\LeagueScheduleService;
-use LeagueSchedule\LeagueScheduleView;
-use Standings\StandingsRepository;
-use TeamSchedule\TeamScheduleRepository;
-use TeamSchedule\TeamScheduleService;
-use TeamSchedule\TeamScheduleView;
+use Repositories\TeamIdentityRepository;
+use Schedule\ScheduleController;
 
-global $cookie, $mysqli_db, $leagueContext;
+global $mysqli_db, $leagueContext;
 
-$commonRepository = new Repositories\TeamIdentityRepository($mysqli_db);
-$season = new \Season\Season($mysqli_db, $leagueContext);
-$league = new \League\League($mysqli_db);
-
-// Load power rankings for SOS tier indicators
-$standingsRepo = new StandingsRepository($mysqli_db, $leagueContext);
-$allStreakData = $standingsRepo->getAllStreakData();
-/** @var array<int, float> $teamPowerRankings */
-$teamPowerRankings = [];
-foreach ($allStreakData as $teamid => $data) {
-    $teamPowerRankings[$teamid] = (float)$data['ranking'];
-}
-
-// Check for team ID parameter
-$teamid = isset($_GET['teamid']) ? (int)$_GET['teamid'] : 0;
-
-// Validate team ID exists (if provided)
-$isValidTeam = false;
-if ($teamid > 0) {
-    $team = \Team\Team::initialize($mysqli_db, $teamid);
-    $isValidTeam = ($team->teamid > 0);
-}
+$teamid = isset($_GET['teamid']) ? (int) $_GET['teamid'] : 0;
+$controller = new ScheduleController($mysqli_db, $leagueContext, new TeamIdentityRepository($mysqli_db));
 
 PageLayout\PageLayout::header();
-
-if ($isValidTeam) {
-    // Team-specific schedule with colors, logo, and win/loss tracking
-    $teamScheduleRepository = new TeamScheduleRepository($mysqli_db, $leagueContext);
-    $service = new TeamScheduleService($mysqli_db, $teamScheduleRepository, $teamPowerRankings);
-    $view = new TeamScheduleView();
-
-    // Set remaining SOS summary for the team
-    $teamStreakData = $allStreakData[$teamid] ?? null;
-    if ($teamStreakData !== null) {
-        $view->setSosSummary([
-            'remaining_sos' => $teamStreakData['remaining_sos'],
-            'remaining_sos_rank' => $teamStreakData['remaining_sos_rank'],
-        ]);
-    }
-
-    $games = $service->getProcessedSchedule($teamid, $season);
-    echo $view->render($team, $games, $league->getSimLengthInDays(), $season->phase);
-} else {
-    // League-wide schedule
-    $repository = new LeagueScheduleRepository($mysqli_db, $leagueContext);
-    $service = new LeagueScheduleService($repository, $teamPowerRankings);
-    $view = new LeagueScheduleView();
-    $pageData = $service->getSchedulePageData($season, $league, $commonRepository);
-    echo $view->render($pageData);
-}
-
+echo $controller->render($teamid);
 PageLayout\PageLayout::footer();

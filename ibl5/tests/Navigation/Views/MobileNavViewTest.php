@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Navigation\Views;
 
+use Navigation\Contracts\MobileNavViewInterface;
 use Navigation\NavigationConfig;
 use Navigation\Views\LoginFormView;
 use Navigation\Views\MobileNavView;
@@ -12,6 +13,11 @@ use PHPUnit\Framework\TestCase;
 
 class MobileNavViewTest extends TestCase
 {
+    public function testImplementsMobileNavViewInterface(): void
+    {
+        $this->assertInstanceOf(MobileNavViewInterface::class, $this->createView());
+    }
+
     private function createView(
         bool $isLoggedIn = true,
         ?string $username = 'TestUser',

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Navigation\Views;
 
+use Navigation\Contracts\TeamsDropdownViewInterface;
 use Navigation\Views\TeamsDropdownView;
 use PHPUnit\Framework\TestCase;
 

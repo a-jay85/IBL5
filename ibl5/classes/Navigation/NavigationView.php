@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Navigation;
 
 use Navigation\Contracts\NavigationMenuBuilderInterface;
+use Navigation\Contracts\NavigationViewInterface;
 use Navigation\Views\DesktopNavView;
 use Navigation\Views\LoginFormView;
 use Navigation\Views\MobileNavView;
@@ -19,7 +20,7 @@ use Security\HtmlSanitizer;
  * @phpstan-import-type NavMenuData from NavigationConfig
  * @phpstan-import-type NavTeamsData from NavigationConfig
  */
-class NavigationView
+class NavigationView implements NavigationViewInterface
 {
     private NavigationConfig $config;
     private NavigationMenuBuilderInterface $menuBuilder;

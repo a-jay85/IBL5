@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Navigation\Views;
 
+use Navigation\Contracts\DesktopNavViewInterface;
 use Navigation\NavigationConfig;
 use Navigation\Views\DesktopNavView;
 use Navigation\Views\LoginFormView;
@@ -12,6 +13,11 @@ use PHPUnit\Framework\TestCase;
 
 class DesktopNavViewTest extends TestCase
 {
+    public function testImplementsDesktopNavViewInterface(): void
+    {
+        $this->assertInstanceOf(DesktopNavViewInterface::class, $this->createView());
+    }
+
     private function createView(
         bool $isLoggedIn = true,
         ?string $username = 'TestUser',

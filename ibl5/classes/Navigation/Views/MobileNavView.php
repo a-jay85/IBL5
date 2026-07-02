@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Navigation\Views;
 
+use Navigation\Contracts\MobileNavViewInterface;
 use Navigation\NavigationConfig;
 use Security\HtmlSanitizer;
 
@@ -14,7 +15,7 @@ use Security\HtmlSanitizer;
  * @phpstan-import-type NavLink from \Navigation\NavigationConfig
  * @phpstan-import-type NavMenuData from \Navigation\NavigationConfig
  */
-class MobileNavView
+class MobileNavView implements MobileNavViewInterface
 {
     private NavigationConfig $config;
     private LoginFormView $loginFormView;

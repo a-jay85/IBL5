@@ -71,4 +71,38 @@ class TransactionHistoryRepository extends \BaseMysqliRepository implements Tran
         /** @var array<int, array{sid: string, catid: string, title: string, time: string}> */
         return $this->fetchAll($query, $where->getTypes(), ...$where->getParams());
     }
+
+    /**
+     * @see TransactionHistoryRepositoryInterface::getTransactionsForTeam()
+     */
+    public function getTransactionsForTeam(string $teamName): array
+    {
+        // Word-boundary REGEXP scoping. The log (nuke_stories) has no teamid column —
+        // team identity lives only in the free-text title — so the team name is matched
+        // with MariaDB's [[:<:]] / [[:>:]] word boundaries to exclude partial-word
+        // collisions (e.g. searching "Metros" must not match "Metroski"). The team name
+        // is bound as a parameter (never interpolated) AND escaped for POSIX ERE so a
+        // future team name containing a regex metacharacter cannot widen or break the match.
+        $escapedName = $this->escapePosixEre($teamName);
+
+        $query = "SELECT sid, catid, title, time FROM nuke_stories"
+            . " WHERE catid IN (" . self::CATEGORY_IDS . ")"
+            . " AND title REGEXP CONCAT('[[:<:]]', ?, '[[:>:]]')"
+            . " ORDER BY time DESC, sid DESC LIMIT 500";
+
+        /** @var array<int, array{sid: string, catid: string, title: string, time: string}> */
+        return $this->fetchAll($query, "s", $escapedName);
+    }
+
+    /**
+     * Escape POSIX ERE metacharacters in a value bound into a REGEXP predicate.
+     *
+     * preg_quote() targets PCRE, not POSIX ERE, so it is not used here. Only the ERE
+     * special set is escaped. For current alphanumeric team names this is a no-op;
+     * it is defense-in-depth against a future team name with special characters.
+     */
+    private function escapePosixEre(string $value): string
+    {
+        return preg_replace('/([\\\\.*+?()\[\]{}^$|])/', '\\\\$1', $value) ?? $value;
+    }
 }

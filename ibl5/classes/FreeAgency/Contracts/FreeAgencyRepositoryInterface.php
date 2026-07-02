@@ -13,6 +13,7 @@ namespace FreeAgency\Contracts;
  * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
  *
  * @phpstan-type OfferRow array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int}
+ * @phpstan-type TeamOfferRow array{name: string, pid: int, offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int}
  * @phpstan-type OfferData array{pid: int, teamid: int, teamName: string, playerName: string, offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, modifier: float, random: int, perceivedValue: float, mle: int, lle: int, offerType: int}
  */
 interface FreeAgencyRepositoryInterface
@@ -25,6 +26,17 @@ interface FreeAgencyRepositoryInterface
      * @return OfferRow|null Offer data with keys: offer1-6, or null if no offer exists
      */
     public function getExistingOffer(int $teamid, int $pid): ?array;
+
+    /**
+     * Get all of a team's pending free-agent bids.
+     *
+     * Returns every outstanding offer the team has made, ordered by player name.
+     * Used by the My Team Transactions view to list the GM's outstanding FA bids.
+     *
+     * @param int $teamid Team ID whose bids to list
+     * @return list<TeamOfferRow> Pending FA bids (name, pid, offer1-6), name-ordered
+     */
+    public function getOffersByTeam(int $teamid): array;
 
     /**
      * Delete an offer from a team to a player

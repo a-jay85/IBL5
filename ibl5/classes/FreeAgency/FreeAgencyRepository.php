@@ -18,6 +18,7 @@ use FreeAgency\Contracts\FreeAgencyRepositoryInterface;
  *
  * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
  * @phpstan-import-type OfferRow from \FreeAgency\Contracts\FreeAgencyRepositoryInterface
+ * @phpstan-import-type TeamOfferRow from \FreeAgency\Contracts\FreeAgencyRepositoryInterface
  * @phpstan-import-type OfferData from \FreeAgency\Contracts\FreeAgencyRepositoryInterface
  */
 class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRepositoryInterface
@@ -51,6 +52,24 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
         );
 
         return $result;
+    }
+
+    /**
+     * @see FreeAgencyRepositoryInterface::getOffersByTeam()
+     *
+     * @return list<TeamOfferRow>
+     */
+    public function getOffersByTeam(int $teamid): array
+    {
+        /** @var list<TeamOfferRow> */
+        return $this->fetchAll(
+            "SELECT name, pid, offer1, offer2, offer3, offer4, offer5, offer6
+             FROM `ibl_fa_offers`
+             WHERE teamid = ?
+             ORDER BY name ASC",
+            "i",
+            $teamid
+        );
     }
 
     /**

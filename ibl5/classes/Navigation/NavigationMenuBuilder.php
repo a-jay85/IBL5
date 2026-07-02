@@ -215,6 +215,7 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
         }
 
         $links[] = ['label' => 'Draft History', 'url' => 'modules.php?name=DraftHistory&teamid=' . $teamId];
+        $links[] = ['label' => 'My Transactions', 'url' => 'modules.php?name=MyTransactions'];
 
         if ($this->areWaiversAllowed()) {
             $links[] = ['rawHtml' => 'Waivers: <a href="modules.php?name=Waivers&amp;action=add">Add</a> | <a href="modules.php?name=Waivers&amp;action=waive">Waive</a>'];

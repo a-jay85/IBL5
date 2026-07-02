@@ -6,17 +6,20 @@ paths:
   - "ibl5/tests/e2e/vr-coverage-map.ts"
   - "ibl5/tests/e2e/vr-gallery.ts"
   - "ibl5/tests/e2e/vr-review-comment.ts"
+  - "ibl5/tests/e2e/vr-pr-body.ts"
   - "bin/vr-changed-coverage"
   - "bin/vr-build-gallery"
   - "bin/vr-review-comment"
-last_verified: 2026-06-30
+last_verified: 2026-07-02
 ---
 
 # Visual-review PRs
 
-See ADR-0068, ADR-0069, ADR-0073, and ADR-0074 for the decisions and rationale. ADR-0074 is the
-current model: the gallery is **change-driven** (built from rows whose PR render differs from
-master's committed baseline), not failure-driven.
+See ADR-0068, ADR-0069, ADR-0073, ADR-0074, and ADR-0076 for the decisions and rationale. ADR-0074
+is the current gallery-selection model: the gallery is **change-driven** (built from rows whose PR
+render differs from master's committed baseline), not failure-driven. ADR-0076 extends it: brand-new
+views (`gallery.newCells`) are additionally published inline at the top of the PR body, not only in
+the sticky comment.
 
 ## What runs
 
@@ -89,6 +92,26 @@ Each cell is captured twice — render A (`.a.png`) and a reload render B (`.b.p
 whose reload `.b.png` is missing is likewise demoted to infra. See ADR-0073 for the
 infra-vs-pixel-diff labeling this reuses.
 
+## New screens in the PR body
+
+In addition to the sticky comment, brand-new views (`gallery.newCells`) are published inline at the
+top of the PR body itself (ADR-0076) — no click required to see a first render. Two extra workflow
+steps run after "Deploy gallery to per-SHA Pages" and "Post sticky comment":
+
+- **Copy new-screen renders** — `bin/vr-review-comment --copy-new-screens=DEST` copies each new
+  cell's first-render PNG into a `new-screens/` subdirectory of the Pages deploy tree.
+- **Splice into the PR body** — `bin/vr-review-comment --update-pr-body=<PR#>` polls the first
+  new-screen image URL for readiness (bounded, ~30s), then splices a marker-delimited
+  (`<!-- vr-new-screens:begin/end -->`), idempotent block at offset 0 of the PR body via
+  `gh pr edit --body-file`. The block self-removes once `newCells` is empty (baseline committed via
+  `update-baselines`), so it never goes stale. `--dry-run` exercises the splice without mutating a
+  real PR.
+
+Both steps are `continue-on-error: true` — a failure here degrades to "no inline image," it never
+fails the VR job or blocks the sticky comment. The pure splice/copy-plan logic lives in
+`ibl5/tests/e2e/vr-pr-body.ts` (unit-tested in `ibl5/tests/ts-unit/vr-pr-body.test.ts`); only `gh`/
+`fetch`/`fs` I/O lives in the `bin/vr-review-comment` glue layer.
+
 ## Modifying the selection logic
 
 Gallery cell selection lives in `bin/vr-build-gallery` and `ibl5/tests/e2e/vr-gallery.ts`
@@ -98,7 +121,10 @@ comment markup lives in `ibl5/tests/e2e/vr-review-comment.ts` (`buildComment`). 
 unit-tested (`ibl5/tests/ts-unit/vr-gallery.test.ts`, `ibl5/tests/ts-unit/vr-coverage-map.test.ts`,
 `ibl5/tests/ts-unit/vr-review-comment.test.ts`, run via `bun run test:unit` from `ibl5/`). Per-row
 source overrides use the optional `sourceGlobs` field on `VrRow`. **Changing this selection logic is
-a mechanical-enforcement surface and requires an ADR** (current: ADR-0074).
+a mechanical-enforcement surface and requires an ADR** (current: ADR-0074). The PR-body new-screens
+publishing surface (`--copy-new-screens`/`--update-pr-body` on `bin/vr-review-comment`,
+`ibl5/tests/e2e/vr-pr-body.ts`, `ibl5/tests/ts-unit/vr-pr-body.test.ts`) is likewise a
+mechanical-enforcement surface, covered by **ADR-0076**.
 
 ## One-time deployment prerequisite
 

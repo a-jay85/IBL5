@@ -187,6 +187,14 @@ jobs:
             --gallery-json=ibl5/vr-gallery.json
           cat ibl5/vr-gallery.json
 
+      - name: Copy new-screen renders into gallery deploy tree
+        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
+        continue-on-error: true
+        run: |
+          bin/vr-review-comment \
+            --gallery=ibl5/vr-gallery.json \
+            --copy-new-screens=ibl5/vr-gallery/new-screens
+
       - name: Deploy VR gallery to per-SHA GitHub Pages
         id: vr-pages
         if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
@@ -216,6 +224,17 @@ jobs:
         with:
           header: visual-review
           path: vr-review-comment.md
+
+      - name: Splice new-screen images into PR body
+        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bin/vr-review-comment \
+            --gallery=ibl5/vr-gallery.json \
+            --pages-url=https://a-jay85.github.io/IBL5/${{ github.sha }}/visual-review/ \
+            --update-pr-body=${{ github.event.pull_request.number }}
 
       # --- Auto-update baselines when label is present ---
       - name: Regenerate visual regression baselines

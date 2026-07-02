@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
-// bin/vr-review-comment — build the sticky `visual-review` PR comment markdown.
+// bin/vr-review-comment — build the sticky `visual-review` PR comment markdown,
+// and (additive) publish brand-new VR screens inline at the top of the PR body.
 //
 // Reads the change-driven gallery JSON (bin/vr-build-gallery output — cells are
 // already classified changed/new/flake against master's committed baseline), the
@@ -8,10 +9,16 @@
 // marocchino/sticky-pull-request-comment in .github/workflows/e2e-tests.yml).
 // Models bin/lighthouse-comment.
 //
+// Additive modes (see ADR-0076):
+//   --copy-new-screens=DEST   copy each newCells render into DEST, then exit.
+//   --update-pr-body=N        splice a new-screens image section into PR #N's
+//                             body (offset 0, marker-delimited), then exit.
+//
 // Usage:
 //   bin/vr-review-comment --gallery=ibl5/vr-gallery.json --coverage=coverage.json \
 //     --pages-url=https://a-jay85.github.io/IBL5/<sha>/visual-review/ --out=vr-review-comment.md
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from 'fs';
+import { execFileSync } from 'child_process';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -19,20 +26,34 @@ const __dir = dirname(fileURLToPath(import.meta.url));
 const ibl5Dir = resolve(__dir, '..', 'ibl5');
 
 const { buildComment } = await import(resolve(ibl5Dir, 'tests/e2e/vr-review-comment.ts'));
+const { buildCopyPlan, buildNewScreensSection, newScreenUrl, normalizeBody, spliceBody } =
+  await import(resolve(ibl5Dir, 'tests/e2e/vr-pr-body.ts'));
 
 const USAGE =
-  'Usage: bin/vr-review-comment --gallery=PATH --coverage=PATH --pages-url=URL [--out=PATH]';
+  'Usage: bin/vr-review-comment --gallery=PATH --coverage=PATH --pages-url=URL [--out=PATH]\n' +
+  '   or: bin/vr-review-comment --gallery=PATH --copy-new-screens=DEST [--renders-dir=SRC]\n' +
+  '   or: bin/vr-review-comment --gallery=PATH --pages-url=URL --update-pr-body=N [--dry-run] [--body-file-in=PATH]';
 
 let galleryPath: string | null = null;
 let coveragePath: string | null = null;
 let pagesUrl: string | null = null;
 let outPath: string | null = null;
+let copyDest: string | null = null;
+let rendersDir = 'ibl5/vr-gallery';
+let updatePr: string | null = null;
+let dryRun = false;
+let bodyFileIn: string | null = null;
 
 for (const arg of process.argv.slice(2)) {
   if (arg.startsWith('--gallery=')) galleryPath = arg.slice('--gallery='.length);
   else if (arg.startsWith('--coverage=')) coveragePath = arg.slice('--coverage='.length);
   else if (arg.startsWith('--pages-url=')) pagesUrl = arg.slice('--pages-url='.length);
   else if (arg.startsWith('--out=')) outPath = arg.slice('--out='.length);
+  else if (arg.startsWith('--copy-new-screens=')) copyDest = arg.slice('--copy-new-screens='.length);
+  else if (arg.startsWith('--renders-dir=')) rendersDir = arg.slice('--renders-dir='.length);
+  else if (arg.startsWith('--update-pr-body=')) updatePr = arg.slice('--update-pr-body='.length);
+  else if (arg === '--dry-run') dryRun = true;
+  else if (arg.startsWith('--body-file-in=')) bodyFileIn = arg.slice('--body-file-in='.length);
   else if (arg === '--help') {
     process.stdout.write(USAGE + '\n');
     process.exit(0);
@@ -42,10 +63,79 @@ for (const arg of process.argv.slice(2)) {
   }
 }
 
+// Change-driven gallery JSON — cells are PRE-CLASSIFIED by bin/vr-build-gallery
+// (changed/new vs master's committed baseline; flake = self-disagreeing render).
+// Absent/garbled ⇒ no diff/infra cells (the uncovered/global sections still
+// render from coverage). No git ls-files here: the builder already did the
+// tracked-index check (ADR-0069) when it resolved `git show <base.sha>:…`.
+// Loaded here (right after arg parsing) because copy mode needs it but not a
+// pages URL.
+type LeanCell = { module: string; viewport: 'desktop' | 'mobile'; title: string };
+let gallery: { changedCells?: LeanCell[]; newCells?: LeanCell[]; flakeCells?: LeanCell[] } = {};
+if (galleryPath !== null && existsSync(galleryPath)) {
+  try {
+    gallery = JSON.parse(readFileSync(galleryPath, 'utf-8'));
+  } catch {
+    // keep empty gallery
+  }
+}
+const rawNewCells: LeanCell[] = gallery.newCells ?? [];
+
+// Copy mode — publish each NEW cell's first render into the deploy tree, then exit.
+if (copyDest !== null) {
+  const plan = buildCopyPlan(rawNewCells, rendersDir, copyDest);
+  if (plan.length > 0) mkdirSync(copyDest, { recursive: true });
+  for (const { src, dest } of plan) {
+    if (existsSync(src)) copyFileSync(src, dest);
+    else process.stderr.write(`vr-review-comment: missing render ${src}\n`); // defensive skip
+  }
+  process.stdout.write(`vr-review-comment: copied ${plan.length} new-screen render(s)\n`);
+  process.exit(0);
+}
+
 if (pagesUrl === null) {
   process.stderr.write(`--pages-url is required\n${USAGE}\n`);
   process.exit(2);
 }
+
+// Bounded readiness poll (I/O — glue only). Returns after first 200 or the cap.
+async function waitForFirstScreen(url: string): Promise<boolean> {
+  for (let i = 0; i < 6; i++) {
+    // ~6 attempts, hard cap ~30s
+    try {
+      const r = await fetch(url, { method: 'HEAD' });
+      if (r.ok) return true;
+    } catch {
+      // treat as not-ready; keep polling
+    }
+    await new Promise((res) => setTimeout(res, i < 5 ? 5000 : 0)); // 5s backoff, no tail wait
+  }
+  return false; // timed out -> proceed anyway
+}
+
+// Update-body mode — splice the new-screens section into the PR body, then exit.
+if (updatePr !== null) {
+  const section = buildNewScreensSection(rawNewCells, pagesUrl);
+  if (dryRun) {
+    const cur = bodyFileIn !== null && existsSync(bodyFileIn) ? readFileSync(bodyFileIn, 'utf-8') : '';
+    process.stdout.write(spliceBody(normalizeBody(cur), section));
+    process.exit(0);
+  }
+  if (rawNewCells.length > 0) {
+    const ok = await waitForFirstScreen(newScreenUrl(pagesUrl, rawNewCells[0].title));
+    if (!ok) process.stderr.write('vr-review-comment: new-screen URL not live; editing anyway\n');
+  }
+  const raw = execFileSync('gh', ['pr', 'view', updatePr, '--json', 'body', '-q', '.body'], {
+    encoding: 'utf-8',
+  });
+  const next = spliceBody(normalizeBody(raw), section);
+  const tmp = resolve(process.cwd(), 'vr-pr-body.tmp.md');
+  writeFileSync(tmp, next + '\n');
+  execFileSync('gh', ['pr', 'edit', updatePr, '--body-file', tmp], { stdio: 'inherit' });
+  process.exit(0);
+}
+
+// Comment mode (default) — reached only when neither new mode fired above.
 
 // Coverage JSON — fail safe to "review everything" if absent/garbled.
 let coverage = { coveredRows: [] as string[], uncoveredChangedPaths: [] as string[], globalChange: true };
@@ -54,21 +144,6 @@ if (coveragePath !== null && existsSync(coveragePath)) {
     coverage = JSON.parse(readFileSync(coveragePath, 'utf-8'));
   } catch {
     // keep the fail-safe default
-  }
-}
-
-// Change-driven gallery JSON — cells are PRE-CLASSIFIED by bin/vr-build-gallery
-// (changed/new vs master's committed baseline; flake = self-disagreeing render).
-// Absent/garbled ⇒ no diff/infra cells (the uncovered/global sections still
-// render from coverage). No git ls-files here: the builder already did the
-// tracked-index check (ADR-0069) when it resolved `git show <base.sha>:…`.
-type LeanCell = { module: string; viewport: 'desktop' | 'mobile'; title: string };
-let gallery: { changedCells?: LeanCell[]; newCells?: LeanCell[]; flakeCells?: LeanCell[] } = {};
-if (galleryPath !== null && existsSync(galleryPath)) {
-  try {
-    gallery = JSON.parse(readFileSync(galleryPath, 'utf-8'));
-  } catch {
-    // keep empty gallery
   }
 }
 

@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Tests\Scripts;
+namespace Tests\Maintenance;
 
 use PHPUnit\Framework\TestCase;
-use Scripts\CoverageResult;
+use Maintenance\CoverageResult;
 
 /**
- * @covers \Scripts\CoverageResult
+ * @covers \Maintenance\CoverageResult
  */
 class CoverageResultTest extends TestCase
 {

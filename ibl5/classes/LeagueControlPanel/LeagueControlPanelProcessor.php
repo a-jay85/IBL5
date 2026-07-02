@@ -8,7 +8,7 @@ use League\LeagueContext;
 use LeagueControlPanel\Contracts\AwardGenerationServiceInterface;
 use LeagueControlPanel\Contracts\LeagueControlPanelProcessorInterface;
 use LeagueControlPanel\Contracts\LeagueControlPanelRepositoryInterface;
-use Scripts\Contracts\MaintenanceRepositoryInterface;
+use Maintenance\Contracts\MaintenanceRepositoryInterface;
 use Discord\Discord;
 
 /**

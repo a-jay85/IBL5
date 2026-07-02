@@ -6,7 +6,7 @@ namespace Tests\DatabaseIntegration;
 
 use PHPUnit\Framework\Attributes\Group;
 
-use Scripts\MaintenanceRepository;
+use Maintenance\MaintenanceRepository;
 
 /**
  * Tests MaintenanceRepository against real MariaDB — team listings,

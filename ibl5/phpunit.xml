@@ -145,8 +145,8 @@
         <testsuite name="FranchiseHistory Module Tests">
             <directory>tests/FranchiseHistory</directory>
         </testsuite>
-        <testsuite name="Scripts Module Tests">
-            <directory>tests/Scripts</directory>
+        <testsuite name="Maintenance Module Tests">
+            <directory>tests/Maintenance</directory>
         </testsuite>
         <testsuite name="WideUnit Tests">
             <directory>tests/WideUnit</directory>

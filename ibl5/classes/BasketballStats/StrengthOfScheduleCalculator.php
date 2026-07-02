@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace StrengthOfSchedule;
+namespace BasketballStats;
 
 /**
  * StrengthOfScheduleCalculator - Pure calculation class for SOS metrics

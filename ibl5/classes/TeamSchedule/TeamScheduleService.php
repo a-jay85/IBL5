@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace TeamSchedule;
 
-use StrengthOfSchedule\StrengthOfScheduleCalculator;
+use BasketballStats\StrengthOfScheduleCalculator;
 use TeamSchedule\Contracts\TeamScheduleRepositoryInterface;
 use TeamSchedule\Contracts\TeamScheduleServiceInterface;
 use Team\Team;

@@ -31,6 +31,24 @@ parameters:
 			path: tests/AwardHistory/AwardHistoryViewTest.php
 
 		-
+			rawMessage: 'Parameter #1 $games of method BasketballStats\TeamStatsCalculator::calculate() expects list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}>, array{array{visitor_score: 100, home_score: 95}} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/BasketballStats/TeamStatsCalculatorTest.php
+
+		-
+			rawMessage: 'Parameter #1 $games of method BasketballStats\TeamStatsCalculator::calculate() expects list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}>, array{array{visitor_teamid: 1, home_teamid: 2}} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/BasketballStats/TeamStatsCalculatorTest.php
+
+		-
+			rawMessage: 'Parameter #1 $games of method BasketballStats\TeamStatsCalculator::calculate() expects list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}>, array{array{visitor_teamid: null, visitor_score: null, home_teamid: null, home_score: null}} given.'
+			identifier: argument.type
+			count: 1
+			path: tests/BasketballStats/TeamStatsCalculatorTest.php
+
+		-
 			rawMessage: 'Parameter #1 $teamsData of method CapSpace\Contracts\CapSpaceViewInterface::render() expects list<array{team: Team\Team, teamId: int, teamName: string, teamCity: string, color1: string, color2: string, availableSalary: array{year1: int, year2: int, year3: int, year4: int, year5: int, year6: int}, positionSalaries: array<string, int>, ...}>, array{array{teamid: 1, teamId: 1, teamCity: ''Test<script>'', teamName: ''Team&Name'', color1: ''000000'', color2: ''FFFFFF'', mle: false, lle: false, ...}} given.'
 			identifier: argument.type
 			count: 1
@@ -257,24 +275,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: tests/Player/PlayerImageHelperTest.php
-
-		-
-			rawMessage: 'Parameter #1 $games of method Statistics\TeamStatsCalculator::calculate() expects list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}>, array{array{visitor_score: 100, home_score: 95}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Statistics/TeamStatsCalculatorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $games of method Statistics\TeamStatsCalculator::calculate() expects list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}>, array{array{visitor_teamid: 1, home_teamid: 2}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Statistics/TeamStatsCalculatorTest.php
-
-		-
-			rawMessage: 'Parameter #1 $games of method Statistics\TeamStatsCalculator::calculate() expects list<array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}>, array{array{visitor_teamid: null, visitor_score: null, home_teamid: null, home_score: null}} given.'
-			identifier: argument.type
-			count: 1
-			path: tests/Statistics/TeamStatsCalculatorTest.php
 
 		-
 			rawMessage: 'Parameter #1 $pageData of method Team\TeamView::render() expects array{teamid: int, team: Team\Team, imagesPath: string, yr: string|null, display: string, insertyear: string, isActualTeam: bool, tableOutput: string, ...}, array<string, mixed> given.'

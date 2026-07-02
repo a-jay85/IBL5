@@ -6,7 +6,7 @@ namespace Tests\Updater;
 
 use PHPUnit\Framework\TestCase;
 use Season\Season;
-use Statistics\TeamStatsCalculator;
+use BasketballStats\TeamStatsCalculator;
 use Tests\WideUnit\Mocks\MockDatabase;
 use Updater\PowerRankingsUpdater;
 

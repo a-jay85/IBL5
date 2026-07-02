@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Tests\StrengthOfSchedule;
+namespace Tests\BasketballStats;
 
 use PHPUnit\Framework\TestCase;
-use StrengthOfSchedule\StrengthOfScheduleCalculator;
+use BasketballStats\StrengthOfScheduleCalculator;
 
 class StrengthOfScheduleCalculatorTest extends TestCase
 {

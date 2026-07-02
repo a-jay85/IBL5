@@ -6,7 +6,7 @@ namespace NextSim;
 
 use NextSim\Contracts\NextSimServiceInterface;
 use Player\Player;
-use StrengthOfSchedule\StrengthOfScheduleCalculator;
+use BasketballStats\StrengthOfScheduleCalculator;
 use Team\Contracts\TeamQueryRepositoryInterface;
 use TeamSchedule\Contracts\TeamScheduleRepositoryInterface;
 use Team\Team;

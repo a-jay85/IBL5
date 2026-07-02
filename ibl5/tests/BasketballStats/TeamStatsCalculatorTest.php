@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Tests\Statistics;
+namespace Tests\BasketballStats;
 
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
-use Statistics\TeamStatsCalculator;
+use BasketballStats\TeamStatsCalculator;
 use Tests\WideUnit\Mocks\MockDatabase;
 
 /**

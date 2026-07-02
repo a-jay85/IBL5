@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Scripts;
+namespace Maintenance;
 
 use League\League;
-use Scripts\Contracts\MaintenanceRepositoryInterface;
+use Maintenance\Contracts\MaintenanceRepositoryInterface;
 
 /**
  * MaintenanceRepository - Database operations for maintenance scripts

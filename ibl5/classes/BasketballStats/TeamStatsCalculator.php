@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Statistics;
+namespace BasketballStats;
 
 use League\LeagueContext;
 

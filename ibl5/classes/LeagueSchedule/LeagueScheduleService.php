@@ -7,7 +7,7 @@ namespace LeagueSchedule;
 use League\League;
 use LeagueSchedule\Contracts\LeagueScheduleRepositoryInterface;
 use LeagueSchedule\Contracts\LeagueScheduleServiceInterface;
-use StrengthOfSchedule\StrengthOfScheduleCalculator;
+use BasketballStats\StrengthOfScheduleCalculator;
 use Season\Season;
 
 /**

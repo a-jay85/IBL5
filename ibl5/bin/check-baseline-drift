@@ -27,7 +27,7 @@ $baselineFiles = [
 
 $updateMode = in_array('--update', $argv, true);
 
-$counter = new \Scripts\PhpstanBaselineCounter();
+$counter = new \Maintenance\PhpstanBaselineCounter();
 
 $zeroFloorFiles = [
     'classes/Trading/TradingView.php',

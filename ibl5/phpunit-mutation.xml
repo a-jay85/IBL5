@@ -157,11 +157,8 @@
         <testsuite name="FranchiseHistory Module Tests">
             <directory>tests/FranchiseHistory</directory>
         </testsuite>
-        <testsuite name="Statistics Module Tests">
-            <directory>tests/Statistics</directory>
-        </testsuite>
-        <testsuite name="Scripts Module Tests">
-            <directory>tests/Scripts</directory>
+        <testsuite name="Maintenance Module Tests">
+            <directory>tests/Maintenance</directory>
         </testsuite>
         <testsuite name="WideUnit Tests">
             <directory>tests/WideUnit</directory>
@@ -216,9 +213,6 @@
         </testsuite>
         <testsuite name="Mail Module Tests">
             <directory>tests/Mail</directory>
-        </testsuite>
-        <testsuite name="StrengthOfSchedule Module Tests">
-            <directory>tests/StrengthOfSchedule</directory>
         </testsuite>
         <testsuite name="JsbParser Module Tests">
             <directory>tests/JsbParser</directory>

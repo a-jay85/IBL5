@@ -8,7 +8,7 @@ use League\LeagueContext;
 use LeagueControlPanel\Contracts\AwardGenerationServiceInterface;
 use LeagueControlPanel\Contracts\LeagueControlPanelRepositoryInterface;
 use LeagueControlPanel\LeagueControlPanelProcessor;
-use Scripts\Contracts\MaintenanceRepositoryInterface;
+use Maintenance\Contracts\MaintenanceRepositoryInterface;
 use Logging\LoggerFactory;
 use Monolog\Handler\TestHandler;
 use PHPUnit\Framework\Attributes\DataProvider;

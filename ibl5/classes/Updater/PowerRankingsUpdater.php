@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Updater;
 
 use League\LeagueContext;
-use Statistics\TeamStatsCalculator;
-use StrengthOfSchedule\StrengthOfScheduleCalculator;
+use BasketballStats\TeamStatsCalculator;
+use BasketballStats\StrengthOfScheduleCalculator;
 use Season\Season;
 
 /**

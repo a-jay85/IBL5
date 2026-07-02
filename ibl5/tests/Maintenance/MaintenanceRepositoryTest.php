@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Tests\Scripts;
+namespace Tests\Maintenance;
 
-use Scripts\MaintenanceRepository;
+use Maintenance\MaintenanceRepository;
 use PHPUnit\Framework\TestCase;
 use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
- * @covers \Scripts\MaintenanceRepository
+ * @covers \Maintenance\MaintenanceRepository
  */
 class MaintenanceRepositoryTest extends TestCase
 {

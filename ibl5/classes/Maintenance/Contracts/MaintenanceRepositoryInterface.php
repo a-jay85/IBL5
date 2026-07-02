@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Scripts\Contracts;
+namespace Maintenance\Contracts;
 
 /**
  * MaintenanceRepositoryInterface - Database operations for maintenance scripts

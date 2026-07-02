@@ -12,7 +12,7 @@ require __DIR__ . '/../vendor/autoload.php';
 include __DIR__ . '/../config.php';
 include __DIR__ . '/../db/db.php';
 
-use Scripts\MaintenanceRepository;
+use Maintenance\MaintenanceRepository;
 
 $repository = new MaintenanceRepository($mysqli_db);
 

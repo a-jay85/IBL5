@@ -292,8 +292,8 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 | 2.26 | ✅ Implemented | — | Documented Updater web-POST placement (`classes/Updater/README.md`); audit's "CLI-only" was inaccurate — it is web-only. |
 | 2.27 | ⬜ Open | 🟦 | Root `leagueControlPanel.php`→module bypasses `ModuleAccessControl`; converting changes admin-auth path (security surface) → human-merge. (a11y fix kept standalone deliberately.) |
 | 2.28 | ⬜ Open | 🟨 | `faprep.php` exists (verified), inline SQL + unescaped output. Resolve with 3.9 (delete); if absorbed instead, XSS/admin-SQL = human-merge. |
-| 2.29 | ⬜ Open | 🟩 | `JSB.php`/`ContractRules.php`/`BaseMysqliRepository.php` still root-level. Namespace sweep (follow relocation checklist incl. phpunit-mutation.xml); green-green, wide blast radius. |
-| 2.30 | 📋 Planned | 🟩 | **Planned** in `tier1-namespace-relocations`: move `TeamStatsCalculator` + `StrengthOfScheduleCalculator` into `BasketballStats`. Skipped by `check-plan-staleness` FP 2026-06-27 (`moved` cue unrecognized); re-queue pending. |
+| 2.29 | ⬜ Open | 🟨 | DEFERRED — global-namespace elimination: JSB 129 callers, BaseMysqliRepository 117, ContractRules 27 (~270 files). L-effort, high-collision; needs its own sequenced PR (one class at a time), not an unattended wave item. |
+| 2.30 | ✅ Implemented | — | TeamStatsCalculator + StrengthOfScheduleCalculator moved into BasketballStats\ (this PR); old single-class dirs removed. |
 | 2.31 | ⬜ Open | 🟩 | UI/ 1 interface of 15; add interfaces systematically. Additive. |
 | 2.32 | ◑ Partial | 🟩 | Shipped: common `Api\Contracts\TransformerInterface` (7 uniform transformers) + flattened `Middleware/Contracts/`→`Api/Contracts/`. **Status:** partial 2026-06-26; residual = divergent-transformer interfaces (Boxscore/PlayerStats), responder interfaces (Csv/Json — disjoint shapes), `Response/Contracts/` flatten. |
 | 2.33 | ◑ Partial | 🟩 | `DebugController` added + sanitizeRedirect moved (see 2.16); residual: `DebugSession` still wraps `$_COOKIE/$_SERVER/getenv()` directly → inject. Green-green. |
@@ -528,6 +528,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Move both to `BasketballStats/` (alongside `StatsFormatter`) or a new `Analytics/`.
 **Est. effort:** S each
 **Risk if untouched:** Two-file dirs proliferate the pattern; codebase fragments.
+**Status:** ✅ Implemented (2026-07-02) — moved into BasketballStats\ namespace (this PR).
 
 ### 2.31 UI/ — 15 Files; Only 1 Interface in Contracts
 **Location:** `classes/UI/`
@@ -777,14 +778,14 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 | 4.17 | ✅ Implemented | — | sh_/sp_/ch_/cp_ prefixes documented (#1039). |
 | 4.18 | ✅ Implemented | — | Migration 121 added COMMENT to `game_2gm`/`game_2ga` on both `ibl_box_scores` and `ibl_box_scores_teams` (live DB confirmed 2026-06-28). |
 | 4.19 | ✅ Implemented | — | dc_* codes documented (#1039). |
-| 4.20 | ⬜ Open | 🟩 | `JSB.php` still root-level (verified). →`JsbConstants` into JsbParser/; namespace sweep, green-green (see 2.29). |
-| 4.21 | ⬜ Open | 🟩 | `JsbParser/JsbExportService` present (verified). Move to PlrParser/; green-green. |
+| 4.20 | ⬜ Open | 🟨 | DEFERRED with 2.29 — JSB is the 129-caller global class; bundle the JSB→JsbConstants move into the 2.29 global-namespace PR. |
+| 4.21 | ⬜ Open | 🟨 | DEFERRED — target is a domain-home decision (an exporter does not obviously belong in a parser namespace); wants a deliberate naming choice, not an auto-merged guess. |
 | 4.22 | ✅ Implemented | — | →NegotiationOfferView. |
 | 4.23 | ✅ Implemented | — | →VotingResultsView. |
 | 4.24 | ✅ Implemented | — | InjuriesRepository extracted (#970) (= 2.7). |
 | 4.25 | ✅ Implemented | — | →`Topics\News\NewsRepository` (ADR-0001). |
-| 4.26 | ⬜ Open | 🟩 | `Module/ModuleAccessControl` present (verified). Move/rename dir (access-control); green-green if behavior identical. |
-| 4.27 | 📋 Planned | 🟩 | **Planned** in `tier1-namespace-relocations`: move `PreseasonCleanupRepository` to `Updater` root. Skipped by staleness FP 2026-06-27; re-queue pending. |
+| 4.26 | ⬜ Open | 🟨 | DEFERRED — renaming the generic Module/ dir needs a chosen target name (design decision); 2 callers, low effort but not an auto-merge guess. |
+| 4.27 | ✅ Implemented | — | PreseasonCleanupRepository moved to Updater\ root (this PR); a Repository, not a Step. |
 
 ### 4.1 `Trading` vs `Trade` Prefix Within the Same Module
 **Location:** `ibl5/classes/Trading/`
@@ -967,11 +968,12 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Risk if untouched:** Access-control logic searched in `Auth/` and missed.
 
 ### 4.27 `Updater/Steps/PreseasonCleanupRepository.php` Misplaced
-**Location:** `ibl5/classes/Updater/Steps/PreseasonCleanupRepository.php`
+**Location:** `ibl5/classes/Updater/PreseasonCleanupRepository.php` (moved from `Updater/Steps/` — this PR)
 **Problem:** Repository nested in `Steps/` subdir; namespace `Updater\Steps`. All other Repositories live at module root.
 **Suggested direction:** Move to `Updater/` root with namespace `Updater`.
 **Est. effort:** S
 **Risk if untouched:** Agents grep `Updater/` root and miss it.
+**Status:** ✅ Implemented (2026-07-02) — moved to Updater\ root (this PR).
 
 ---
 
@@ -1221,20 +1223,20 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Status:** Partially completed (verified 2026-05-29 audit) — `tests/PageLayout/PageLayoutHeaderSideEffectTest.php` now exists (header side-effect coverage); broader structure/CSS-injection coverage still thin.
 
 ### 6.5 Statistics/TeamStatsCalculator — Zero Tests
-**Location:** `ibl5/classes/Statistics/TeamStatsCalculator.php`
+**Location:** `ibl5/classes/BasketballStats/TeamStatsCalculator.php` (moved from `classes/Statistics/` — see 2.30)
 **Problem:** PPG, FG%, rebounds, assists aggregation with no tests.
 **Suggested direction:** PHPUnit for aggregation, rounding, div-by-zero.
 **Est. effort:** M
 **Risk if untouched:** Stats mismatches vs player-level box scores.
-**Status:** Completed (verified 2026-05-29 audit) — `tests/Statistics/TeamStatsCalculatorTest.php` now exists.
+**Status:** Completed (verified 2026-05-29 audit) — `tests/BasketballStats/TeamStatsCalculatorTest.php` now exists.
 
 ### 6.6 StrengthOfScheduleCalculator — Zero Tests
-**Location:** `ibl5/classes/StrengthOfSchedule/StrengthOfScheduleCalculator.php`
+**Location:** `ibl5/classes/BasketballStats/StrengthOfScheduleCalculator.php` (moved from `classes/StrengthOfSchedule/` — see 2.30)
 **Problem:** Opponent weighting + win-rate normalization with no tests.
 **Suggested direction:** PHPUnit for weighting math.
 **Est. effort:** M
 **Risk if untouched:** SoS rankings mathematically wrong; playoff seeding affected.
-**Status:** Completed (verified 2026-05-29 audit) — `tests/StrengthOfSchedule/StrengthOfScheduleCalculatorTest.php` now exists.
+**Status:** Completed (verified 2026-05-29 audit) — `tests/BasketballStats/StrengthOfScheduleCalculatorTest.php` now exists.
 
 ### 6.7 LeagueStarters — Thin (7 files, 2 tests, 0.29 ratio)
 **Location:** `ibl5/classes/LeagueStarters`
@@ -1545,7 +1547,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 | 8.3 | ⬜ Open | 🟩 | kebab-case/`.sh` consistency. Rename + caller sweep (CI/hooks refs); green-green. |
 | 8.4 | ✅ Implemented | — | `shellScripts/` absent from tree + index (verified); follows 8.1. |
 | 8.5 | ◑ Partial | 🟩 | `tradition.php` deleted; `scripts/plrScratchpad.php` still present (verified) → archive it. |
-| 8.6 | 📋 Planned | 🟩 | **Planned** in `tier1-namespace-relocations`: rename `Scripts` namespace dir → `Maintenance`. Skipped by staleness FP 2026-06-27; re-queue pending. |
+| 8.6 | ✅ Implemented | — | classes/Scripts → classes/Maintenance namespace rename (16 callers swept) (this PR). |
 | 8.7 | ✅ Implemented | — | Document symlink strategy (docs). **Status:** Added `## Symlink strategy` to `bin/README.md` stating the convention (single tracked symlink `bin/db-query` → `ibl5/bin/db-query`; real files pinned to `ibl5/bin/` by the `./ibl5` Docker bind-mount; new symlinks discouraged) (this PR). |
 | 8.8 | ✅ Implemented | — | `scripts/archive/README.md` (docs). **Status:** Added `ibl5/scripts/archive/README.md` documenting the two retained-but-not-run 2007 box-score import scripts + the archive policy (this PR). |
 | 8.9 | ⬜ Open | 🟩 | bin/lib manifest + helper rename. |
@@ -1604,6 +1606,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Rename `classes/Scripts/` → `classes/Maintenance/`; document the split.
 **Est. effort:** M
 **Risk if untouched:** New scripts placed in wrong folder.
+**Status:** ✅ Implemented (2026-07-02) — classes/Scripts → classes/Maintenance (this PR).
 
 ### 8.7 Symlink Strategy Undocumented — RESOLVED
 **Location:** `/bin/db-query` → `../ibl5/bin/db-query`

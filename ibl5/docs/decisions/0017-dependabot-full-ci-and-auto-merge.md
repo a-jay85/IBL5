@@ -1,6 +1,6 @@
 ---
 description: Rationale for forcing all CI checks on Dependabot PRs and enabling squash auto-merge.
-last_verified: 2026-05-01
+last_verified: 2026-07-02
 ---
 
 # ADR-0017: Dependabot Full CI and Auto-Merge

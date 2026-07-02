@@ -73,7 +73,20 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
      */
     public function getQuadrupleDoubles(): array
     {
-        $query = "WITH _game_of_day AS " . $this->gameOfThatDaySubquery() . "
+        $query = "WITH _game_of_day AS " . $this->gameOfThatDaySubquery() . ",
+            _qd_candidates AS (
+                -- Provably-complete candidate prune: every quad-double has >= 2 of
+                -- {ast,stl,blk} >= 10, so this UNION is a superset of qualifying rows.
+                -- game_type IN (0,1,2,3) = the full domain of the generated column
+                -- (a tautology), which lets each leg use its (game_type,<stat>) index
+                -- as a range scan instead of a full table scan. UNION (not UNION ALL)
+                -- dedups ids so the PK join below cannot fan rows out.
+                SELECT id FROM `ibl_box_scores` WHERE game_type IN (0,1,2,3) AND game_ast >= 10
+                UNION
+                SELECT id FROM `ibl_box_scores` WHERE game_type IN (0,1,2,3) AND game_stl >= 10
+                UNION
+                SELECT id FROM `ibl_box_scores` WHERE game_type IN (0,1,2,3) AND game_blk >= 10
+            )
             SELECT
                 bs.pid,
                 p.name,
@@ -90,6 +103,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 bs.game_stl AS steals,
                 bs.game_blk AS blocks
             FROM `ibl_box_scores` bs
+            JOIN _qd_candidates c ON c.id = bs.id
             JOIN `ibl_plr` p ON p.pid = bs.pid
             JOIN `ibl_hist` h ON h.pid = bs.pid AND h.year = (" . self::SEASON_YEAR_EXPRESSION . ")
             LEFT JOIN `ibl_schedule` sch ON sch.game_date = bs.game_date

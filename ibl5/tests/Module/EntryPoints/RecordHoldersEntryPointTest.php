@@ -11,6 +11,8 @@ class RecordHoldersEntryPointTest extends ModuleEntryPointTestCase
         parent::setUp();
         $this->mockDb->setMockData([]);
         $this->mockDb->onQuery('cache', []);
+        // Cold cache → single-flight rebuild: the request must win GET_LOCK to build inline.
+        $this->mockDb->onQuery('GET_LOCK', [['got' => 1]]);
     }
 
     public function testRendersAllThreeRecordCategories(): void

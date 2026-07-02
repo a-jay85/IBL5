@@ -20,6 +20,8 @@ class CachedRecordHoldersService implements RecordHoldersServiceInterface
 {
     private const CACHE_KEY = 'record_holders';
     private const TTL_SECONDS = 86400; // 24 hours
+    private const LOCK_KEY = 'record_holders_rebuild';
+    private const LOCK_TIMEOUT_SECONDS = 10;
 
     private RecordHoldersServiceInterface $inner;
     private DatabaseCacheInterface $cache;
@@ -31,20 +33,86 @@ class CachedRecordHoldersService implements RecordHoldersServiceInterface
     }
 
     /**
+     * Serve-stale-first, single-flight cold build.
+     *
+     * 1. Fresh hit → return it.
+     * 2. Expired entry present → serve the stale value immediately; the cron (rebuildCache)
+     *    is the refresher, so no heavy inline rebuild happens on a user's request.
+     * 3. Cold/empty → only the request that wins the single-flight lock rebuilds inline;
+     *    concurrent requests fall through to an empty structure (thundering-herd guard).
+     *
      * @return AllRecordsData
      */
     public function getAllRecords(): array
     {
-        $cached = $this->cache->get(self::CACHE_KEY);
-        if ($cached !== null) {
-            /** @var AllRecordsData $cached */
-            return $cached;
+        $fresh = $this->cache->get(self::CACHE_KEY);
+        if ($fresh !== null) {
+            /** @var AllRecordsData $fresh */
+            return $fresh;
         }
 
-        $records = $this->inner->getAllRecords();
-        $this->cache->set(self::CACHE_KEY, $records, self::TTL_SECONDS);
+        $stale = $this->cache->getStale(self::CACHE_KEY);
+        if ($stale !== null) {
+            /** @var AllRecordsData $stale */
+            return $stale;
+        }
 
-        return $records;
+        if ($this->cache->acquireLock(self::LOCK_KEY, self::LOCK_TIMEOUT_SECONDS)) {
+            try {
+                // Another request may have built the entry while we waited for the lock.
+                $again = $this->cache->get(self::CACHE_KEY);
+                if ($again !== null) {
+                    /** @var AllRecordsData $again */
+                    return $again;
+                }
+
+                $records = $this->inner->getAllRecords();
+                $this->cache->set(self::CACHE_KEY, $records, self::TTL_SECONDS);
+
+                return $records;
+            } finally {
+                $this->cache->releaseLock(self::LOCK_KEY);
+            }
+        }
+
+        // Lock timed out — degrade: serve whatever a concurrent builder produced, else empty.
+        $again = $this->cache->get(self::CACHE_KEY);
+        if ($again !== null) {
+            /** @var AllRecordsData $again */
+            return $again;
+        }
+
+        return $this->emptyRecords();
+    }
+
+    /**
+     * Empty AllRecordsData structure served when the cache is cold and the single-flight
+     * lock could not be acquired (a concurrent request is already rebuilding).
+     *
+     * @return AllRecordsData
+     */
+    private function emptyRecords(): array
+    {
+        return [
+            'playerSingleGame' => [
+                'regularSeason' => [],
+                'playoffs' => [],
+                'heat' => [],
+            ],
+            'quadrupleDoubles' => [],
+            'allStarRecord' => [
+                'name' => '',
+                'pid' => null,
+                'teams' => '',
+                'teamTids' => '',
+                'amount' => 0,
+                'years' => '',
+            ],
+            'playerFullSeason' => [],
+            'teamGameRecords' => [],
+            'teamSeasonRecords' => [],
+            'teamFranchise' => [],
+        ];
     }
 
     /**

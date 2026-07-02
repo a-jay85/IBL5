@@ -282,4 +282,21 @@ class InMemoryCache implements DatabaseCacheInterface
     {
         unset($this->store[$key]);
     }
+
+    /**
+     * @return array<mixed>|null
+     */
+    public function getStale(string $key): ?array
+    {
+        return $this->store[$key]['data'] ?? null;
+    }
+
+    public function acquireLock(string $key, int $timeoutSeconds): bool
+    {
+        return true;
+    }
+
+    public function releaseLock(string $key): void
+    {
+    }
 }

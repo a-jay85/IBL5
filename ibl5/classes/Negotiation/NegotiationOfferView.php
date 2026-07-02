@@ -215,7 +215,7 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
      */
     public static function renderHeader(Player $player): string
     {
-        return '<h2 class="ibl-title">Contract Extension</h2>';
+        return '<h1 class="ibl-title">Contract Extension</h1>';
     }
 
 }

@@ -36,7 +36,7 @@ class VotingResultsController implements VotingResultsControllerInterface
      */
     public function renderAllStarView(): string
     {
-        return $this->renderer->renderTables($this->service->getAllStarResults());
+        return $this->renderer->renderTables($this->service->getAllStarResults(), 'All-Star Voting Results');
     }
 
     /**
@@ -44,7 +44,7 @@ class VotingResultsController implements VotingResultsControllerInterface
      */
     public function renderEndOfYearView(): string
     {
-        return $this->renderer->renderTables($this->service->getEndOfYearResults());
+        return $this->renderer->renderTables($this->service->getEndOfYearResults(), 'End-of-Year Voting Results');
     }
 
     private function isRegularSeason(): bool

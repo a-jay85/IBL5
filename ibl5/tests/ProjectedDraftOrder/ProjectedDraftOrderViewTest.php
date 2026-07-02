@@ -38,7 +38,7 @@ class ProjectedDraftOrderViewTest extends TestCase
     {
         $result = $this->view->render($this->emptyDraftOrder(), 2026);
 
-        $this->assertStringContainsString('Projected Draft Order', $result);
+        $this->assertStringContainsString('Projected Draft Order (2026)', $result);
     }
 
     public function testRenderContainsRoundHeaders(): void
@@ -284,7 +284,7 @@ class ProjectedDraftOrderViewTest extends TestCase
     {
         $result = $this->view->render($this->sampleDraftOrder(), 2026, false, true);
 
-        $this->assertStringContainsString('Draft Order', $result);
+        $this->assertStringContainsString('Draft Order (2026)', $result);
         $this->assertStringNotContainsString('Projected Draft Order', $result);
     }
 

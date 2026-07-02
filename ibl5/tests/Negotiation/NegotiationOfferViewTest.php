@@ -317,7 +317,7 @@ class NegotiationOfferViewTest extends TestCase
         $html = NegotiationOfferView::renderHeader($player);
 
         // Assert — header is a static title, player name is in the card
-        $this->assertStringContainsString('<h2', $html);
+        $this->assertStringContainsString('<h1', $html);
         $this->assertStringContainsString('Contract Extension', $html);
     }
 

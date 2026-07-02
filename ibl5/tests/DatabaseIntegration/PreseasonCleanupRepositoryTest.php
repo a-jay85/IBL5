@@ -6,7 +6,7 @@ namespace Tests\DatabaseIntegration;
 
 use PHPUnit\Framework\Attributes\Group;
 
-use Updater\Steps\PreseasonCleanupRepository;
+use Updater\PreseasonCleanupRepository;
 
 #[Group('database')]
 class PreseasonCleanupRepositoryTest extends DatabaseTestCase

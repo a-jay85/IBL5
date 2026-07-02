@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Updater\Steps;
+namespace Updater;
 
 use Season\Season;
 

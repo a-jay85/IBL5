@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/rebuild-css-if-source-changed — heal a stale compiled Tailwind stylesheet
+# after a git operation that the --watch container did not observe.
+#
+# The `ibl5-tailwind[-<slug>]` container runs `@tailwindcss/cli --watch`, which
+# reacts to filesystem events. Editor saves propagate (~1s rebuild), but git
+# BULK file replacement (rebase / checkout / merge / pull rewriting a source
+# file via rename) is not reliably delivered to @parcel/watcher through the
+# macOS→Docker bind mount — so the compiled `themes/IBL/style/style.css` silently
+# goes stale relative to `design/**`. `bin/wt-new`/`bin/wt-up` build it once at
+# worktree create/up; this heals the gap for every git op AFTER that.
+#
+# Wired (via bin/install-git-hooks) into post-checkout, post-merge, and
+# post-rewrite — the git ops that bulk-rewrite the working tree. Safe to call
+# unconditionally: it is a no-op when the compiled output is already fresh
+# (mtime-gated), and the rebuild is backgrounded so the git op returns at once.
+
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+IBL5="$REPO_ROOT/ibl5"
+INPUT="$IBL5/design/input.css"
+OUTPUT="$IBL5/themes/IBL/style/style.css"
+DESIGN="$IBL5/design"
+[ -f "$INPUT" ] || exit 0   # not an ibl5 checkout (or design/ absent) — nothing to do
+
+LOG_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/ibl5-hooks"
+mkdir -p "$LOG_DIR"
+LOG="$LOG_DIR/css-rebuild.log"
+
+# Gate: rebuild only when a CSS source under design/ is newer than the compiled
+# output (git sets a rewritten file's mtime to checkout time, so an unchanged op
+# leaves every source older than OUTPUT → no-op). Missing OUTPUT → rebuild.
+if [ -f "$OUTPUT" ] && [ -z "$(find "$DESIGN" -type f -newer "$OUTPUT" -print -quit 2>/dev/null)" ]; then
+    echo "$(date): css fresh, skip ($REPO_ROOT)" >> "$LOG"
+    exit 0
+fi
+
+# Rebuild in the background so the git operation returns immediately.
+(
+    slug="$(basename "$REPO_ROOT")"
+    echo "$(date): css source newer than output — rebuilding ($slug)" >> "$LOG"
+    if command -v bunx >/dev/null 2>&1 &&
+        (cd "$IBL5" && bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css) >> "$LOG" 2>&1; then
+        echo "$(date): css rebuilt on host ($slug)" >> "$LOG"
+    else
+        # Fallback: the tailwind container always has the toolchain. Worktree
+        # stacks are ibl5-tailwind-<slug>; the main stack is ibl5-tailwind.
+        container="ibl5-tailwind-$slug"
+        docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$container" || container="ibl5-tailwind"
+        if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$container" &&
+            docker exec "$container" bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css >> "$LOG" 2>&1; then
+            echo "$(date): css rebuilt in $container" >> "$LOG"
+        else
+            echo "$(date): css rebuild FAILED — no host bunx and no usable tailwind container ($slug)" >> "$LOG"
+        fi
+    fi
+) &
+disown 2>/dev/null || true
+
+exit 0

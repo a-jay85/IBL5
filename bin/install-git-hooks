@@ -1,21 +1,30 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 #
-# bin/install-git-hooks — install the pre-push ADR decision-trigger gate.
+# bin/install-git-hooks — install the pre-push ADR decision-trigger gate and the
+# CSS auto-heal trigger into the COMMON git hooks dir.
 #
-# Copies a thin shim into the COMMON git hooks dir (git rev-parse
+# Copies thin shims into the COMMON git hooks dir (git rev-parse
 # --git-common-dir), so a single install covers every worktree (worktrees share
-# the common .git). The shim chains git-lfs (preserving LFS pushes) then exec's
-# bin/pre-push-adr-hook, where the gate logic lives version-controlled.
+# the common .git). The pre-push shim chains git-lfs (preserving LFS pushes) then
+# exec's bin/pre-push-adr-hook, where the gate logic lives version-controlled.
+#
+# It also injects a version-controlled CSS auto-heal call into post-checkout,
+# post-merge, and post-rewrite. These git ops bulk-rewrite the working tree in a
+# way the @tailwindcss/cli --watch container does not reliably observe, leaving
+# the compiled stylesheet stale (see bin/rebuild-css-if-source-changed).
 #
 # We deliberately do NOT use core.hooksPath: it is all-or-nothing across the
 # shared common git dir and would orphan the existing untracked hooks (the git-lfs
 # pre-push, pre-commit's codebase-map + check-docs, post-merge wt-cleanup,
-# post-checkout). Copying one shim is surgical.
+# post-checkout). Copying/injecting shims is surgical.
 #
-# Idempotent: re-running detects our sentinel marker and rewrites in place; a
-# pre-existing NON-shim pre-push (the default git-lfs one) is backed up once to
-# pre-push.pre-adr.bak before we overwrite it.
+# Idempotent: re-running detects our sentinel markers and rewrites/skips in
+# place; a pre-existing NON-shim pre-push (the default git-lfs one) is backed up
+# once to pre-push.pre-adr.bak before we overwrite it. The CSS injection is a
+# no-op when its sentinel is already present, and preserves any existing hook
+# body (it inserts our call right after the shebang so it runs before a hook's
+# branch-gated early-exit).
 
 set -euo pipefail
 
@@ -46,3 +55,35 @@ EOF
 chmod 0755 "$SHIM"
 
 echo "Installed pre-push ADR hook: $SHIM"
+
+# --- CSS auto-heal: inject into post-checkout / post-merge / post-rewrite ------
+# These git ops bulk-rewrite the working tree; the --watch container misses that,
+# so the compiled stylesheet goes stale. Our call is placed right after the
+# shebang so it runs BEFORE any branch-gated early-exit already in the hook
+# (post-merge exits early on non-master, but worktrees live on feature branches).
+CSS_SENTINEL='# IBL5-CSS-REBUILD'
+CSS_BLOCK="$CSS_SENTINEL (installed by bin/install-git-hooks)
+\"\$(git rev-parse --show-toplevel 2>/dev/null)/bin/rebuild-css-if-source-changed\" >/dev/null 2>&1 || true"
+
+inject_css_heal() {
+    local hook="$HOOKS_DIR/$1"
+    if [ ! -e "$hook" ]; then
+        printf '#!/bin/sh\n%s\n' "$CSS_BLOCK" > "$hook"
+        chmod 0755 "$hook"
+        echo "Created $1 with CSS auto-heal: $hook"
+        return
+    fi
+    if grep -qF "$CSS_SENTINEL" "$hook"; then
+        return  # already injected
+    fi
+    # Insert our block after the first line (the shebang), preserving the rest.
+    local tmp="$hook.tmp.$$"
+    { head -n 1 "$hook"; printf '%s\n' "$CSS_BLOCK"; tail -n +2 "$hook"; } > "$tmp"
+    chmod 0755 "$tmp"
+    mv "$tmp" "$hook"
+    echo "Injected CSS auto-heal into $1: $hook"
+}
+
+inject_css_heal post-checkout
+inject_css_heal post-merge
+inject_css_heal post-rewrite

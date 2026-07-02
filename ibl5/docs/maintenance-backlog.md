@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-06-29
+last_verified: 2026-07-02
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -268,14 +268,14 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 | 2.2 | 🚫 Declined | — | **Status (2026-06-28):** Declined. ActivityTracker + AllStarAppearances `index.php` are single-repo R+V passthrough (one `repo->getX()` → `view->render()`, verified on disk). A Service would be single-implementor pass-through ceremony — no orchestration to house (cf. 2.5/2.8/2.3 passthrough declines). |
 | 2.3 | ◑ Partial | — | FranchiseHistory Service built (#1091); PlayerMovement **declined** (single JOIN, pass-through ceremony). |
 | 2.4 | 🚫 Declined | — | **Status (2026-06-28):** Declined for GMContactList. Its `index.php` is single-repo passthrough (`getAllTeamContacts()` → render). The "match Topics (#1030)" premise is invalid: `TopicsService` orchestrates **two** repos (Topics + Search → `getPageData`) — real aggregation, not uniformity. No equivalent need here. |
-| 2.5 | ◑ Partial | 🟩 | **Status (2026-06-28):** Processor→Service rename **declined** — `BoxscoreProcessor` is a mutating .sco import pipeline (every method drives DB writes; consumed by Updater steps/BulkImport/scripts; no user-facing Boxscore page). Additive `BoxscoreViewInterface` half is 📋 planned in `tier1-module-architecture-scaffold` (staleness-skipped 2026-06-27, re-queue pending). |
+| 2.5 | ◑ Partial | — | BoxscoreViewInterface added (this PR). Processor→Service rename **declined**: BoxscoreProcessor is a mutating .sco import pipeline (cf. 2.8/2.3 pass-through declines; Waivers carries S1+P1). Residual = declined rename. |
 | 2.6 | ✅ Implemented | — | DraftService + DraftController extracted; index.php globals removed; green-green. |
 | 2.7 | ✅ Implemented | — | InjuriesRepository extracted+injected (#970). |
 | 2.8 | 🚫 Declined | — | Search + Standings: pass-through Service = dead code; declined. |
 | 2.9 | 🚫 Declined | — | `*ApiHandler` is the HTMX-fragment convention (9 handlers); rename declined. |
 | 2.10 | ⬜ Open | 🟨 | Extension R+S+P+Vl, no View. Upfront decision (own module vs Player sub-action) **+** extension handler touches #1110 IDOR (sequence). |
 | 2.11 | ✅ Implemented | — | RookieOptionFormView→RookieOptionView (#1031); Service declined. |
-| 2.12 | 📋 Planned | 🟩 | **Planned** in `tier1-module-architecture-scaffold`: consolidate `NegotiationDemandsBreakdownView` into `Views/` (NegotiationOfferView already canonical via 4.22). Skipped by `check-plan-staleness` FP 2026-06-27 (`— NEW` cue unrecognized); re-queue pending. |
+| 2.12 | ✅ Implemented | — | OfferView already canonical (4.22); DemandsBreakdownView moved to Negotiation\Views\ sub-view (this PR). Calculator role tracked under 4.8. |
 | 2.13 | 📋 Planned | 🟨 | Characterization-pins plan queued (`freeagency-2-13-characterization-pins`); the admin/user split touches admin-mutation surface (→ human-merge) **+** collides with #1109 FA IDOR (sequence). |
 | 2.14 | ◑ Partial | 🟨 | TradingController+Service exist (#802) but `maketradeoffer/accepttradeoffer/rejecttradeoffer.php` standalone endpoints remain (verified). Promoting touches trade-mutation surface + collides with #1108 (sequence). |
 | 2.15 | ⬜ Open | 🟨 | `classes/VotingResults/` absent. Upfront decision: merge module dirs vs split namespace. |
@@ -283,11 +283,11 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 | 2.17 | 📋 Planned | 🟦 | News R/S/V extraction = PR #1166 open (queued `extract-news`); held `auto_merge:false` (SQL surface). |
 | 2.18 | ⬜ Open | 🟨 | Static HTML in index.php. Upfront decision: static page outside module vs minimal View. Low risk. |
 | 2.19 | ✅ Implemented | — | **Marker was missing/stale.** `modules/SiteStatistics/` deleted (#733, verified absent). |
-| 2.20 | 📋 Planned | 🟩 | **Planned** in `tier1-module-architecture-scaffold`: extract `ScheduleController::render(int): string` (header/footer stay in index.php). Verified: index.php still branches inline. Skipped by staleness FP 2026-06-27; re-queue pending. |
+| 2.20 | ✅ Implemented | — | ScheduleController owns the branch (this PR); index.php thin; league + team pages byte-identical (E2E). |
 | 2.21 | ⬜ Open | 🟨 | Same root cause as 2.15 (VotingResults namespace); resolve together. |
 | 2.22 | ✅ Implemented | — | `Services/` deleted (2026-05-16). |
 | 2.23 | ✅ Implemented | — | `Shared/` deleted; SalaryConverter→BasketballStats. |
-| 2.24 | 📋 Planned | 🟩 | **Planned** in `tier1-module-architecture-scaffold`: add `NavigationViewInterface` + 4 sub-view ifaces (additive, no constructor retype). Skipped by staleness FP 2026-06-27; re-queue pending. |
+| 2.24 | ✅ Implemented | — | NavigationViewInterface + 4 sub-view interfaces added; views implement them (this PR). |
 | 2.25 | ⬜ Open | 🟨 | index.php still defines `showpage/negotiate/rookieoption/processrookieoption` globals (verified); rookieoption/negotiate touch mutation → collides with #1107 (sequence). showpage extraction alone is green-green. |
 | 2.26 | ✅ Implemented | — | Documented Updater web-POST placement (`classes/Updater/README.md`); audit's "CLI-only" was inaccurate — it is web-only. |
 | 2.27 | ⬜ Open | 🟦 | Root `leagueControlPanel.php`→module bypasses `ModuleAccessControl`; converting changes admin-auth path (security surface) → human-merge. (a11y fix kept standalone deliberately.) |
@@ -338,6 +338,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Rename Processor → Service for read-heavy modules; add ViewInterface.
 **Est. effort:** S
 **Risk if untouched:** Naming confuses new contributors; missing view interface blocks integration tests.
+**Status:** ◑ Partial (2026-06-26) — `BoxscoreViewInterface` added. Processor→Service rename declined: every `BoxscoreProcessor` method mutates (it is a .sco import pipeline used by `Updater\Steps\ProcessBoxscoresStep`), so a Service would be pass-through ceremony (cf. 2.8/2.3). `Processor` is the correct house name (Waivers S1+P1).
 
 ### 2.6 Draft — No Service Layer; Two Legacy Globals + Mis-Named Handler
 **Location:** `classes/Draft/`, `modules/Draft/index.php`
@@ -393,6 +394,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Consolidate `BreakdownView` as a sub-view; document the Player sub-domain relationship.
 **Est. effort:** S
 **Risk if untouched:** Three view-ish files with different conventions confuse the View boundary.
+**Status:** ✅ Implemented (2026-06-26) — `NegotiationOfferView` canonicalized under 4.22; `NegotiationDemandsBreakdownView` → `Negotiation\Views\DemandsBreakdownView` sub-view (this PR). `NegotiationDemandCalculator` is a legitimate Calculator role (see 4.8).
 
 ### 2.13 FreeAgency — 14 Files; Admin Path Not Separated
 **Location:** `classes/FreeAgency/`
@@ -451,6 +453,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Create `Schedule\ScheduleController` that delegates to either service.
 **Est. effort:** S
 **Risk if untouched:** Branching only in `index.php`; untestable; new schedule types bolt onto it.
+**Status:** ✅ Implemented (2026-06-26) — `Schedule\ScheduleController::render(int)` owns the league/team branch; `modules/Schedule/index.php` is now thin glue. League + team pages verified byte-identical via existing E2E flows.
 
 ### 2.21 VotingResults — Namespace/Module Mismatch
 **Location:** `modules/VotingResults/index.php` instantiates `Voting\*` classes
@@ -481,6 +484,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Suggested direction:** Add `NavigationViewInterface`; consider sub-view interfaces; rename `Config` if applicable.
 **Est. effort:** S
 **Risk if untouched:** Views unmockable; architecture hard to explain.
+**Status:** ✅ Implemented (2026-06-26) — `NavigationViewInterface` + `DesktopNavViewInterface`/`MobileNavViewInterface`/`LoginFormViewInterface`/`TeamsDropdownViewInterface` added; all five views implement them.
 
 ### 2.25 Player — 42-File Mega-Module; 189-LOC `index.php` With Global Function
 **Location:** `classes/Player/`, `modules/Player/`

@@ -15,7 +15,9 @@ class DesktopNavViewTest extends TestCase
 {
     public function testImplementsDesktopNavViewInterface(): void
     {
-        $this->assertInstanceOf(DesktopNavViewInterface::class, $this->createView());
+        $this->assertTrue(
+            (new \ReflectionClass(DesktopNavView::class))->implementsInterface(DesktopNavViewInterface::class),
+        );
     }
 
     private function createView(

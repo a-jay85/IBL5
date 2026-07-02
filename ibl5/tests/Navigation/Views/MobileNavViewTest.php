@@ -15,7 +15,9 @@ class MobileNavViewTest extends TestCase
 {
     public function testImplementsMobileNavViewInterface(): void
     {
-        $this->assertInstanceOf(MobileNavViewInterface::class, $this->createView());
+        $this->assertTrue(
+            (new \ReflectionClass(MobileNavView::class))->implementsInterface(MobileNavViewInterface::class),
+        );
     }
 
     private function createView(

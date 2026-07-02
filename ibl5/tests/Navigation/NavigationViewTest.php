@@ -13,13 +13,9 @@ class NavigationViewTest extends TestCase
 {
     public function testImplementsNavigationViewInterface(): void
     {
-        $config = new NavigationConfig(
-            isLoggedIn: false,
-            username: null,
-            currentLeague: 'ibl',
+        $this->assertTrue(
+            (new \ReflectionClass(NavigationView::class))->implementsInterface(NavigationViewInterface::class),
         );
-
-        $this->assertInstanceOf(NavigationViewInterface::class, new NavigationView($config));
     }
 
     /**

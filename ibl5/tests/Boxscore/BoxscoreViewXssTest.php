@@ -14,7 +14,9 @@ final class BoxscoreViewXssTest extends TestCase
     {
         $view = new BoxscoreView();
 
-        $this->assertInstanceOf(BoxscoreViewInterface::class, $view);
+        $this->assertTrue(
+            (new \ReflectionClass($view))->implementsInterface(BoxscoreViewInterface::class),
+        );
     }
 
     public function testParseLogEscapesXssInMessagesAndError(): void

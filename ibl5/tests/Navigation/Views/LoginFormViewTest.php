@@ -19,7 +19,9 @@ class LoginFormViewTest extends TestCase
 
     public function testImplementsLoginFormViewInterface(): void
     {
-        $this->assertInstanceOf(LoginFormViewInterface::class, $this->view);
+        $this->assertTrue(
+            (new \ReflectionClass(LoginFormView::class))->implementsInterface(LoginFormViewInterface::class),
+        );
     }
 
     public function testDesktopVariantHasDesktopSizingClasses(): void

@@ -34,7 +34,7 @@ $searchResult = $service->search($_POST);
 // Render page
 PageLayout\PageLayout::header();
 
-echo '<h2 class="ibl-title">Player Awards</h2>';
+echo '<h1 class="ibl-title">Player Awards</h1>';
 echo $view->renderSearchForm($searchResult['params']);
 echo $view->renderTableHeader();
 

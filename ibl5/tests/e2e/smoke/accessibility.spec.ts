@@ -63,15 +63,10 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
     // Seeded empirically — see plan a11y-1-ratchet-best-practice
     'standings',
     'homepage',
-    'season leaderboards',
-    'career leaderboards',
     'player page',
-    'award history',
-    'player database',
     'news index',
     'news categories',
     'news article',
-    'team page',
     'voting results',
     // Auth pages
     'your account',

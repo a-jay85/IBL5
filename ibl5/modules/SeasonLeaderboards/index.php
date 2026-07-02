@@ -45,7 +45,7 @@ if ($isFirstLoad) {
 // Render page
 PageLayout\PageLayout::header();
 
-echo '<h2 class="ibl-title">Season Leaders</h2>';
+echo '<h1 class="ibl-title">Season Leaders</h1>';
 
 // Get data for dropdowns
 $teams = $repository->getTeams();

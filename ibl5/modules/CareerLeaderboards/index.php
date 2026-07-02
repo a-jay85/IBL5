@@ -32,7 +32,7 @@ $filters = [
 // Render page
 PageLayout\PageLayout::header();
 
-echo '<h2 class="ibl-title">Career Leaderboards</h2>';
+echo '<h1 class="ibl-title">Career Leaderboards</h1>';
 
 // Render filter form
 echo $view->renderFilterForm($filters);

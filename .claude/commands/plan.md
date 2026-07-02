@@ -3,7 +3,7 @@ description: "Plan an implementation task: enforces a verification matrix, direc
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
-last_verified: 2026-06-29
+last_verified: 2026-07-02
 
 ---
 
@@ -35,13 +35,18 @@ Read `.claude/commands/_plan-verification.md` and use its full content as `$VERI
 2. Run targeted `grep`/`find` via Bash for specific symbols, callers, or file paths
 3. Read key files directly (migrations, interfaces, existing tests)
 
-**Only spawn an Explore agent when** direct lookups leave unanswered questions. Tier per `.claude/rules/agent-tiering.md`:
+**Spawn an Explore agent when EITHER** trigger fires — read volume is a trigger in its own right, not only residual uncertainty:
+
+1. **Open questions** — direct lookups leave something genuinely unanswered.
+2. **Byte isolation** — answering would mean reading large source files (roughly: any file over ~300 lines, or a combined read budget past ~600 lines) into *this* session. `/plan` is **delegation-terminal**: the deliverable is produced by the `plan-architect` sub-agent in its own fresh window, so the orchestrator never needs those files resident. Even with zero open questions, pull the heavy reads into an Explore agent (or defer them to the plan-architect) so the bytes land in a disposable window, not the orchestrator's — three consecutive auto-compactions before any planning work is the failure this prevents. What you carry forward is **pointers** (`path:line` + the one load-bearing fact per file), never the file contents; the plan-architect re-reads at those pointers in its own window (targeted confirmation, not re-exploration — see Step 3 point 2).
+
+Tier per `.claude/rules/agent-tiering.md`:
 
 - Single-module change → 0 agents (direct tools suffice) or 1 Haiku for enumeration
 - Spans 2+ modules → up to 2 agents (Sonnet for cross-module traces, Haiku for file/grep lookups)
 - Never spawn 3 agents
 
-Provide each agent a single concrete question, pre-resolved paths, and a response cap (under 150 lines).
+Provide each agent a single concrete question, pre-resolved paths, and a response cap (under 150 lines). An agent spawned purely for byte isolation must return **distilled pointers** (`path:line` + the load-bearing fact), not pasted file bodies — pasting the contents back defeats the isolation.
 
 Collect: file paths, existing patterns, dependencies, blast radius, existing test coverage for affected code, **the specific existing helpers/services/repositories the implementation should reuse** (name the exact methods — e.g. `SalaryCapRepository::getTeamTotalSalary()` — so the plan directs reuse instead of leaving the impl agent to rediscover them), and **which security surfaces the change touches** (SQL queries, POST/form endpoints, auth/authz-gated routes, user-facing output rendering). If none of these surfaces are touched, record that explicitly. Also record **whether the task resolves a finding tracked in a status/tracking doc** (e.g. `ibl5/docs/maintenance-backlog.md`, an a11y/security backlog, a roadmap with per-item status markers) — if so, the doc path, the finding id, and its current status marker — so Step 3 can scope the status-flip edit into the **same** PR. Separately, record **whether the work leaves a follow-up that can only run *after* the PR merges** — something the merge event itself unblocks: a stale memory/doc/plan that stays valid until the change lands (e.g. a `MEMORY.md` "delete this entry when #N merges" pointer), a temporary compat shim that can be removed once its consumer deploys, a feature flag to retire post-rollout. Note each one so Step 3 can **mechanize** it as a merge-triggered watcher rather than leaving it to the user's memory.
 

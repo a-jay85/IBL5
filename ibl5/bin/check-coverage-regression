@@ -27,7 +27,7 @@ if ($argc < 3) {
 $cloverFile = $argv[1];
 $baselineFile = $argv[2];
 
-$checker = new \Scripts\CoverageChecker();
+$checker = new \Maintenance\CoverageChecker();
 $cloverResult = $checker->check($cloverFile, 0.0);
 
 if (!$cloverResult->passed() && $cloverResult->getPercentage() === 0.0) {
@@ -58,7 +58,7 @@ if (file_exists($baselineFile)) {
     $tolerance = isset($baseline['tolerance']) ? (float) $baseline['tolerance'] : 0.5;
 }
 
-$comparator = new \Scripts\CoverageComparator();
+$comparator = new \Maintenance\CoverageComparator();
 $result = $comparator->compare($currentCoverage, $previousCoverage, $tolerance);
 
 echo $result->getMessage() . "\n";

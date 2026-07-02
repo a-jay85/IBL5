@@ -11,6 +11,8 @@ use Repositories\Contracts\PlayerLookupRepositoryInterface;
  */
 class PlayerLookupRepository extends \BaseMysqliRepository implements PlayerLookupRepositoryInterface
 {
+    use PlayerTeamJoinQuery;
+
     /**
      * @return PlayerRow|null
      */
@@ -18,9 +20,7 @@ class PlayerLookupRepository extends \BaseMysqliRepository implements PlayerLook
     {
         /** @var PlayerRow|null */
         return $this->fetchOne(
-            "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
-            FROM `ibl_plr` p
-            LEFT JOIN `ibl_team_info` t ON p.teamid = t.teamid
+            $this->playerWithTeamSelect() . "
             WHERE p.pid = ?",
             "i",
             $playerID
@@ -46,9 +46,7 @@ class PlayerLookupRepository extends \BaseMysqliRepository implements PlayerLook
     {
         /** @var PlayerRow|null */
         return $this->fetchOne(
-            "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
-            FROM `ibl_plr` p
-            LEFT JOIN `ibl_team_info` t ON p.teamid = t.teamid
+            $this->playerWithTeamSelect() . "
             WHERE p.name = ?",
             "s",
             $playerName

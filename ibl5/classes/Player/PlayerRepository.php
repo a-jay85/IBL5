@@ -6,6 +6,7 @@ namespace Player;
 
 use BaseMysqliRepository;
 use Player\Contracts\PlayerRepositoryInterface;
+use Repositories\PlayerTeamJoinQuery;
 
 /**
  * PlayerRepository - Database operations for player data
@@ -24,6 +25,8 @@ use Player\Contracts\PlayerRepositoryInterface;
  */
 class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryInterface
 {
+    use PlayerTeamJoinQuery;
+
     private PlayerDataMapper $mapper;
 
     /** @var array{allStar: int, threePoint: int, dunkContest: int, rookieSoph: int}|null */
@@ -51,10 +54,8 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     {
         /** @var PlayerRow|null $plrRow */
         $plrRow = $this->fetchOne(
-            "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
-             FROM `ibl_plr` p
-             LEFT JOIN `ibl_team_info` t ON p.teamid = t.teamid
-             WHERE p.pid = ? LIMIT 1",
+            $this->playerWithTeamSelect() . "
+            WHERE p.pid = ? LIMIT 1",
             "i",
             $playerID
         );
@@ -212,6 +213,8 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
      * Get news articles mentioning a player
      *
      * @see PlayerRepositoryInterface::getPlayerNews()
+     * @see nuke_stories Legacy PHP-Nuke news table — intentional cross-module read;
+     *      no NewsRepository abstraction exists by design (backlog 7.17).
      *
      * @return list<PlayerNewsRow>
      */

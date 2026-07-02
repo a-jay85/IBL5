@@ -61,20 +61,13 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
   // Burn-down: a11y-2-heading-one-single-title (single-title views), supervised backlog (rest).
   'page-has-heading-one': new Set([
     // Seeded empirically — see plan a11y-1-ratchet-best-practice
-    'homepage',
     'season leaderboards',
     'career leaderboards',
-    'player page',
     'award history',
     'player database',
-    'news index',
-    'news categories',
-    'news article',
     'team page',
     // Auth pages
     'your account',
-    'voting ASG ballot',
-    'voting EOY ballot',
   ]),
 
   // Heading-level skip (h4 after h2, no h3). See ibl5/docs/a11y-backlog.md.
@@ -155,7 +148,7 @@ const publicPages: Array<{ name: string; url: string }> = [
   { name: 'topics', url: 'modules.php?name=Topics' },
   { name: 'voting results', url: 'modules.php?name=VotingResults' },
   { name: 'news index', url: 'modules.php?name=News' },
-  { name: 'news categories', url: 'modules.php?name=News&file=categories' },
+  { name: 'news categories', url: 'modules.php?name=News&file=categories&op=newindex&catid=15' },
   { name: 'news article', url: 'modules.php?name=News&file=article&sid=1' },
   { name: 'team schedule', url: 'modules.php?name=Schedule&teamid=1' },
 ];

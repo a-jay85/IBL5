@@ -88,6 +88,9 @@ class PlayerPageController
         $rooksoph = $playerRepository->getRookieSophChallengeCount($playerName);
 
         $contractDisplay = implode('/', $player->getRemainingContractArray());
+        $html .= '<tr><td colspan="2"><h1 class="ibl-title">'
+            . \Security\HtmlSanitizer::e($player->getName() ?? '')
+            . '</h1></td></tr>';
         $html .= '<tr><td colspan="2">';
         $html .= PlayerTradingCardFlipView::render(
             $player,

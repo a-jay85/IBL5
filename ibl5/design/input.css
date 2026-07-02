@@ -127,7 +127,6 @@
 @import './components/draft.css';
 @import './components/transaction-history.css';
 @import './components/next-sim.css';
-@import './components/depth-chart.css';
 @import './components/player-awards.css';
 @import './components/topics.css';
 @import './components/search.css';
@@ -139,7 +138,6 @@
 @import './components/tables/league-stats.css';
 @import './components/tables/contact-list.css';
 @import './components/tables/transaction-history.css';
-@import './components/tables/depth-chart.css';
 @import './components/tables/draft-pick-locator.css';
 @import './components/tables/record-holders.css';
 @import './components/tables/projected-draft-order.css';
@@ -153,7 +151,7 @@
 @import './components/player-views.css';
 @import './components/player-cards.css';
 @import './components/season-archive.css';
-@import './components/saved-depth-charts.css';
+@import './components/depth-chart.css';
 @import './components/sco-parser.css';
 @import './components/updater.css';
 @import './components/auth.css';

@@ -688,4 +688,157 @@
 }
 
 
+/* ==========================================================================
+   Depth Chart Table
+
+   Overrides for .ibl-data-table on the Depth Chart page.
+   Source: class="depth-chart-table ibl-data-table"
+   Only unique overrides — redundant base-table properties removed.
+   ========================================================================== */
+
+.depth-chart-table {
+    max-width: none;
+    margin-bottom: 1rem;
+}
+
+.depth-chart-table td {
+    padding: 0.25rem;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.depth-chart-table td:first-child,
+.depth-chart-table td:last-child {
+    padding: 0.25rem;
+}
+
+.depth-chart-table select {
+    padding: 0.25rem;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+}
+
+/* Minutes number input — matches the role-slot select's size/appearance.
+   The native browser stepper sits to the right of the digits. */
+.depth-chart-table input[type="number"].dc-minutes-input {
+    padding: 0.25rem;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+    width: 4rem;
+    text-align: center;
+}
+
+/* Active checkbox cell — centered horizontally and vertically. */
+.depth-chart-table td.dc-active-cell {
+    text-align: center;
+    vertical-align: middle;
+}
+
+.depth-chart-table input[type="checkbox"].dc-active-cb {
+    display: block;
+    width: 1.125rem;
+    height: 1.125rem;
+    margin: 0 auto;
+    cursor: pointer;
+    accent-color: var(--color-accent-500);
+}
+
+/* Saved Depth Charts - Dropdown, loading state, traded-player indicators */
+
+.saved-dc-dropdown-container {
+    text-align: center;
+    margin: 0.75rem 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.saved-dc-label {
+    font-weight: 600;
+    font-size: var(--text-sm);
+    white-space: nowrap;
+}
+
+.saved-dc-select-wrapper {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.saved-dc-select {
+    padding: 0.25rem 0.5rem;
+    font-size: var(--text-sm);
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-sm);
+    max-width: 480px;
+    cursor: pointer;
+}
+
+@media (max-width: 768px) {
+    .saved-dc-dropdown-container {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 0 var(--space-2);
+    }
+
+    .saved-dc-select-wrapper {
+        width: 100%;
+    }
+
+    .saved-dc-select {
+        width: 100%;
+        max-width: 100%;
+    }
+}
+
+.saved-dc-rename-btn {
+    background: none;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-sm);
+    padding: 0.2rem 0.4rem;
+    cursor: pointer;
+    font-size: var(--text-sm);
+    line-height: 1;
+    color: var(--gray-600);
+    transition: color 0.15s, border-color 0.15s;
+}
+
+.saved-dc-rename-btn:hover {
+    color: var(--gray-900);
+    border-color: var(--gray-400);
+}
+
+.saved-dc-loading {
+    font-size: var(--text-sm);
+    color: var(--gray-500);
+    font-style: italic;
+}
+
+/* Traded player row styling */
+tr.depth-chart-traded-player {
+    opacity: 0.5;
+}
+
+tr.depth-chart-traded-player select {
+    pointer-events: none;
+    background-color: var(--gray-100);
+}
+
+.traded-badge {
+    display: inline-block;
+    font-size: var(--text-2xs);
+    font-weight: 700;
+    text-transform: uppercase;
+    background-color: var(--error-500);
+    color: #fff;
+    padding: 0.05rem 0.3rem;
+    border-radius: var(--radius-sm);
+    margin-left: 0.35rem;
+    vertical-align: middle;
+    letter-spacing: var(--tracking-display);
+}
+
 } /* end @layer components */

@@ -48,8 +48,18 @@ class TeamView implements TeamViewInterface
 
         $yrSafe = \Security\HtmlSanitizer::safeHtmlOutput($yr ?? '');
         $teamNameSafe = \Security\HtmlSanitizer::safeHtmlOutput($team->name);
-        $yearHeading = ($yr !== null && $yr !== '')
-            ? "<h1 class=\"ibl-title\">$yrSafe $teamNameSafe</h1>"
+
+        // Non-actual page (Free Agents, teamid=0): the decorative fallback logo cannot be
+        // an <h1>, so emit a literal text <h1> to keep page-has-heading-one coverage.
+        $pageTitleHeading = $isActualTeam
+            ? ""
+            : "<h1 class=\"ibl-title\">Free Agents</h1>";
+
+        // Actual team: the banner logo is the page <h1> (see renderTeamBanner). When a
+        // historical year is selected, show "<year> <team>" as an <h2> in its own row
+        // between the banner and the roster table. Current season (yr null) shows no text.
+        $yearHeading = ($isActualTeam && $yr !== null && $yr !== '')
+            ? "<h2 class=\"ibl-title\">$yrSafe $teamNameSafe</h2>"
             : "";
 
         $bannerHtml = $isActualTeam
@@ -61,9 +71,10 @@ class TeamView implements TeamViewInterface
 <div class="team-page-layout">
     <div class="team-page-main">
         <div class="team-stats-block">
-            <?= HtmlSanitizer::trusted($yearHeading) ?>
+            <?= HtmlSanitizer::trusted($pageTitleHeading) ?>
             <?= HtmlSanitizer::trusted($bannerHtml) ?>
             <?= HtmlSanitizer::trusted($this->renderExtensionResultBanner($extensionResult, $extensionMsg)) ?>
+            <?= HtmlSanitizer::trusted($yearHeading) ?>
             <div class="table-scroll-wrapper">
                 <div class="table-scroll-container" tabindex="0" role="region" aria-label="Team roster">
                     <?= HtmlSanitizer::trusted($tableOutput) ?>
@@ -157,7 +168,7 @@ class TeamView implements TeamViewInterface
     <?= HtmlSanitizer::trusted($tradeButton) ?>
     <a href="modules.php?name=Schedule&amp;teamid=<?= HtmlSanitizer::e($teamid) ?>" class="team-action-link"><?= HtmlSanitizer::trusted($scheduleInner) ?></a>
     <div class="team-banner-logo">
-        <img src="./<?= HtmlSanitizer::trusted($imagesPath) ?>logo/<?= HtmlSanitizer::e($teamid) ?>.jpg" alt="<?= HtmlSanitizer::e($team->name ?? '') ?> logo">
+        <h1><img src="./<?= HtmlSanitizer::trusted($imagesPath) ?>logo/<?= HtmlSanitizer::e($teamid) ?>.jpg" alt="<?= HtmlSanitizer::e($team->name ?? '') ?>"></h1>
     </div>
     <a href="modules.php?name=DraftHistory&amp;teamid=<?= HtmlSanitizer::e($teamid) ?>" class="team-action-link"><?= HtmlSanitizer::trusted($draftHistoryInner) ?></a>
     <?= HtmlSanitizer::trusted($discordButton) ?>
@@ -178,7 +189,7 @@ class TeamView implements TeamViewInterface
         ?>
 <div class="team-card" style="<?= \UI\TableStyles::inlineTeamVars($team->color1, $team->color2) ?>">
     <div class="team-card__header">
-        <h3 class="team-card__title">Draft Picks</h3>
+        <h2 class="team-card__title">Draft Picks</h2>
     </div>
     <div class="team-card__body--flush">
         <?= HtmlSanitizer::trusted($draftPicksTable) ?>

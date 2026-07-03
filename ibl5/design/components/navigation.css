@@ -78,6 +78,13 @@
     text-align: center;
 }
 
+.team-banner-logo h1 {
+    margin: 0;
+    padding: 0;
+    line-height: 0;
+    border: 0;
+}
+
 .team-banner-logo img {
     display: block;
     margin: 0 18px;

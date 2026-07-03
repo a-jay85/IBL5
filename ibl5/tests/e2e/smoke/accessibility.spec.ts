@@ -62,15 +62,10 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
   'page-has-heading-one': new Set([
     // Seeded empirically — see plan a11y-1-ratchet-best-practice
     'homepage',
-    'season leaderboards',
-    'career leaderboards',
     'player page',
-    'award history',
-    'player database',
     'news index',
     'news categories',
     'news article',
-    'team page',
     // Auth pages
     'your account',
     'voting ASG ballot',

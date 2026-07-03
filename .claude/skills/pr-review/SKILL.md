@@ -2,7 +2,9 @@
 allowed-tools: Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh pr comment:*),
   Bash(gh issue view:*), Bash(gh search:*), Bash(gh pr list:*), Bash(gh api:*),
   Bash(git log:*), Bash(git rev-parse:*), Bash(git show:*), Bash(source:*)
+name: pr-review
 description: Token-efficient code review for pull requests
+disable-model-invocation: true
 model: sonnet
 last_verified: 2026-07-03
 ---

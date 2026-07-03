@@ -11,7 +11,7 @@
 # security-surface resolution, impl_model / auto_merge risk) stay in /plan —
 # they need reasoning a script cannot do.
 #
-# Gates implemented (numbering mirrors .claude/commands/plan.md Step 4):
+# Gates implemented (numbering mirrors .claude/skills/plan/SKILL.md Step 4):
 #   1  Matrix exists        — the verification matrix header is present.
 #   3  No false manuals      — a Truly-manual row whose text uses an automatable
 #                              verb (verify / check that / confirm / ensure) is an

@@ -226,7 +226,7 @@ Each Bash tool call runs in a fresh shell, so the classification flags are **not
 
 ## Phase 4: Code Review + Security Audit
 
-Agent definitions and scoring rubric live in shared include files under `.claude/commands/` so this skill, `/pr-review`, and `/security-audit` all share one source of truth. Read them as instructed below — do NOT inline the definitions or duplicate them.
+Agent definitions and scoring rubric live in shared include files under `.claude/review-shared/` so this skill, `/pr-review`, and `/security-audit` all share one source of truth. Read them as instructed below — do NOT inline the definitions or duplicate them.
 
 ### 4A: Fetch PR data (shared by both)
 

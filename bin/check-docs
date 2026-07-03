@@ -15,7 +15,6 @@ const IN_SCOPE_GLOBS = [
     'README.md',
     '.claude/rules/*.md',
     '.claude/skills/*/SKILL.md',
-    '.claude/commands/*.md',
     'ibl5/docs/*.md',
     'ibl5/docs/backlog/*.md',
     'ibl5/docs/decisions/*.md',

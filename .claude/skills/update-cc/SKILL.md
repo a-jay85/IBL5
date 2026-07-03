@@ -1,7 +1,9 @@
 ---
 allowed-tools: Bash(curl:*)
+name: update-cc
 description: Check the latest Claude Code release for anything actionable in our workflow
-last_verified: 2026-06-10
+disable-model-invocation: true
+last_verified: 2026-07-03
 ---
 
 Answer: **"Is there anything actionable for us in the latest version of Claude Code?"**
@@ -16,7 +18,7 @@ Outputs just the top `## <version>` section. Do not fetch more.
 
 ## Step 2: Assess against our setup
 
-Judge each bullet against IBL5's workflow (CLAUDE.md, `.claude/rules/`, `.claude/commands/`, `.claude/settings.json`, `bin/` scripts, hooks, memory, worktree usage). For each bullet, silently classify as **irrelevant** or **actionable**.
+Judge each bullet against IBL5's workflow (CLAUDE.md, `.claude/rules/`, `.claude/skills/`, `.claude/settings.json`, `bin/` scripts, hooks, memory, worktree usage). For each bullet, silently classify as **irrelevant** or **actionable**.
 
 Actionable = the change unlocks, improves, or invalidates something we actually do (hook, script, command, setting, rule, workflow habit).
 

@@ -1,6 +1,6 @@
 ---
 description: Sub-agent decision rules — when to spawn, when to skip, which model to pick, and how sub-agent delegation keeps orchestrator context low
-last_verified: 2026-07-02
+last_verified: 2026-07-03
 ---
 
 # Agent Tiering
@@ -54,4 +54,4 @@ Tier per prompt — don't default all Explore agents to one tier.
 
 **Heuristic:** notice connections / judge relevance / trace data flow → Sonnet. Answerable by grep + format → Haiku.
 
-Plan-authoring tiering (labeling each phase, mechanical-recipe agents, bulk-sweep patterns) lives in `.claude/commands/plan.md` Step 3.
+Plan-authoring tiering (labeling each phase, mechanical-recipe agents, bulk-sweep patterns) lives in `.claude/skills/plan/SKILL.md` Step 3.

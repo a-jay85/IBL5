@@ -1,0 +1,69 @@
+name: Deploy VR gallery to Pages
+
+on:
+  workflow_run:
+    workflows: ["E2E Tests"]
+    types: [completed]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Serialize Pages deploys and NEVER cancel an in-flight one (a cancelled deploy can leave the
+# site half-published). Concurrent PR/master runs queue and each re-serves the whole tree.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout gh-pages (the durable per-SHA accumulator)
+        uses: actions/checkout@v7
+        with:
+          ref: gh-pages
+          fetch-depth: 0
+
+      - name: Upload the whole gh-pages tree as the Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Assert a per-SHA gallery serves HTTP 200
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="${{ steps.deployment.outputs.page_url }}"
+          base="${base%/}"
+          # newest committed <sha>/visual-review/ dir on the checked-out gh-pages tree
+          newest=""
+          newest_ct=0
+          for d in */ ; do
+            [ -f "${d}visual-review/index.html" ] || continue
+            ct=$(git log -1 --format=%ct -- "$d" 2>/dev/null || echo 0)
+            if [ "$ct" -gt "$newest_ct" ]; then newest_ct="$ct"; newest="${d%/}"; fi
+          done
+          if [ -z "$newest" ]; then
+            echo "No <sha>/visual-review/index.html present yet — nothing to assert."
+            exit 0
+          fi
+          url="${base}/${newest}/visual-review/index.html"
+          echo "Asserting HTTP 200 for ${url}"
+          for i in $(seq 1 10); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "$url" || echo 000)
+            echo "attempt ${i}: HTTP ${code}"
+            [ "$code" = "200" ] && exit 0
+            sleep 20
+          done
+          echo "::error::VR gallery did not serve HTTP 200 at ${url} after retries"
+          exit 1

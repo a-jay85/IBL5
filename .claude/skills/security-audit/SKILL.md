@@ -1,7 +1,9 @@
 ---
 allowed-tools: Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh pr comment:*),
   Bash(gh api:*), Bash(git rev-parse:*), Bash(source:*)
+name: security-audit
 description: Token-efficient security audit for pull requests
+disable-model-invocation: true
 model: sonnet
 last_verified: 2026-07-03
 ---

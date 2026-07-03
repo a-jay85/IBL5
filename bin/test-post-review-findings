@@ -205,8 +205,8 @@ assert_absent "case6: no comment on empty"  "$COMMENT_OUT"
 # ── structural case 7: all 3 callers reference the helper ────────────────────
 for f in \
     "$REPO_ROOT/.claude/skills/post-plan/SKILL.md" \
-    "$REPO_ROOT/.claude/commands/pr-review.md" \
-    "$REPO_ROOT/.claude/commands/security-audit.md"
+    "$REPO_ROOT/.claude/skills/pr-review/SKILL.md" \
+    "$REPO_ROOT/.claude/skills/security-audit/SKILL.md"
 do
     name="$(basename "$f")"
     if grep -q 'post-review-findings.sh' "$f" 2>/dev/null; then
@@ -221,8 +221,8 @@ done
 # prior posting as a review body (not just an issue comment) is detected.
 # Assert "reviews" (plural) appears in the Step 1 → Step 2 region of each file.
 for f in \
-    "$REPO_ROOT/.claude/commands/pr-review.md" \
-    "$REPO_ROOT/.claude/commands/security-audit.md"
+    "$REPO_ROOT/.claude/skills/pr-review/SKILL.md" \
+    "$REPO_ROOT/.claude/skills/security-audit/SKILL.md"
 do
     name="$(basename "$f")"
     step1=$(awk '/^## Step 1/,/^## Step 2/' "$f" 2>/dev/null)

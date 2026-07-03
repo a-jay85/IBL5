@@ -1,6 +1,6 @@
 ---
 description: Unifies the deployment funnel so every PR-opening path flows through /post-plan; triage is a loaded rule, /plan auto-queues, /ship drops merge-intent tokens.
-last_verified: 2026-06-22
+last_verified: 2026-07-03
 ---
 
 # ADR-0067: Unified deployment funnel — one pipeline through /post-plan
@@ -36,7 +36,7 @@ Collapse the funnel to a single pipeline with one variable:
 
 - `.claude/rules/work-triage.md` — the triage gateway rule (added in this PR).
 - `.claude/rules/workflow-continuity.md` — the implementation → `/post-plan` auto-fire handoff.
-- `.claude/commands/plan.md` — `/plan` (auto-queue added in PR B).
-- `.claude/commands/ship.md` — `/ship` (simplified in PR C).
+- `.claude/skills/plan/SKILL.md` — `/plan` (auto-queue added in PR B).
+- `.claude/skills/ship/SKILL.md` — `/ship` (simplified in PR C).
 - `.claude/skills/post-plan/SKILL.md` — Phase 6.5, the single arming authority.
 - `bin/automouse-queue` — the queue command `/plan` invokes.

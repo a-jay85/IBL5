@@ -385,10 +385,19 @@ jobs:
     timeout-minutes: 20
     strategy:
       fail-fast: false
-      max-parallel: 3
+      # Single shard (was 4 shards, max-parallel 3). On the free-tier capped
+      # runner pool with many concurrent PRs, the pool is saturated, so total
+      # runner-minutes — not per-PR wall-clock — governs how fast the whole PR
+      # backlog clears. Each shard job re-pays a fixed ~100s setup (docker/DB
+      # bring-up), so cost ≈ n·setup + testTime is minimized at n=1; sharding's
+      # parallelism buys nothing when there are no idle runners to absorb it.
+      # In-job parallelism still comes from Playwright `workers` (playwright.config.ts),
+      # so total test time is unchanged. Restore the array to re-shard if the
+      # runner cap is ever raised. Kept as a 1-element matrix so job naming,
+      # blob-report artifact naming, and the merge-reports glob are untouched.
       matrix:
-        shard-index: [1, 2, 3, 4]
-        total-shards: [4]
+        shard-index: [1]
+        total-shards: [1]
 
     steps:
       - uses: actions/checkout@v7

@@ -18,7 +18,7 @@
 #   1  Does NOT affect website — callers may skip.
 #
 # Deny-set (a file is non-website if it matches ALL of the following):
-#   - matches the deny regex: (\.md$|^docs/|^ibl5/docs/|^\.claude/|^bin/)
+#   - matches the deny regex: (\.md$|^docs/|^ibl5/docs/|^\.claude/|^bin/|^engine/)
 #   - is NOT in the carve-out set (paths that must always trigger, even though
 #     they match the deny regex):
 #       bin/website-affecting  (the predicate itself — changing the gate must trigger it)
@@ -45,12 +45,19 @@
 #   ^ibl5/docs/  in-repo ibl5 docs
 #   ^\.claude/ local claude rules/commands
 #   \.md$      any markdown (docs) anywhere
+#   ^engine/   Go sim engine source — has its own CI (.github/workflows/engine.yml).
+#              E2E runs the PREBAKED jsbsim binary (from the :latest image) + seed
+#              fixtures, never the PR's engine/ source, so an engine-only change
+#              cannot alter an E2E/VR outcome. A PR that rebuilds the binary also
+#              touches docker/** or the image build (website-side, not denied), so
+#              those still trigger E2E. Note ibl5/bin/jsbsim (the baked binary) is
+#              under ^ibl5/, never matched by ^engine/.
 #
 # shellcheck shell=bash
 
 set -u
 
-DENY_REGEX='(\.md$|^docs/|^ibl5/docs/|^\.claude/|^bin/)'
+DENY_REGEX='(\.md$|^docs/|^ibl5/docs/|^\.claude/|^bin/|^engine/)'
 
 # Carve-out: paths that match the deny regex but must still trigger (exact match).
 is_carveout() {
@@ -94,6 +101,7 @@ Deny-set (non-website if matched and not in carve-out):
   ^ibl5/docs/    ibl5 internal docs
   ^\.claude/     local .claude rules/commands
   ^bin/          host repo bin/ scripts
+  ^engine/       Go sim engine source (own CI; E2E runs the prebaked binary)
 
 Carve-out (always website-side despite matching deny regex):
   bin/website-affecting  (the predicate itself)

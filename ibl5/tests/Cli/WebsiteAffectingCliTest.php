@@ -52,6 +52,16 @@ final class WebsiteAffectingCliTest extends TestCase
         self::assertSame(1, $result['exit'], $result['stderr']);
     }
 
+    public function testEngineOnlyDiffExitsOne(): void
+    {
+        // Row 4b: Go sim engine source only → SKIP. E2E runs the PREBAKED jsbsim
+        // binary + seed fixtures, never the PR's engine/ source, so an engine-only
+        // change can't affect an E2E/VR outcome; engine.yml covers it. Note
+        // ibl5/bin/jsbsim (the baked binary, ^ibl5/) is NOT matched by ^engine/.
+        $result = $this->runPredicate("engine/cmd/jsbsim/main.go\nengine/internal/backup/assemble.go\n");
+        self::assertSame(1, $result['exit'], $result['stderr']);
+    }
+
     // =========================================================================
     // RUN cases (exit 0 — website-affecting)
     // =========================================================================
@@ -143,6 +153,7 @@ final class WebsiteAffectingCliTest extends TestCase
         self::assertStringContainsString('^bin/', $result['output']);
         self::assertStringContainsString('^docs/', $result['output']);
         self::assertStringContainsString('^\.claude/', $result['output']);
+        self::assertStringContainsString('^engine/', $result['output']);
         self::assertStringContainsString('bin/website-affecting', $result['output']);
     }
 

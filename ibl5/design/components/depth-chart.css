@@ -156,11 +156,18 @@
  * Cells are sized to content (because table-layout: auto) and never wrap,
  * so both the abbreviated name and the minute-share annotation always
  * render on a single line with no ellipsis.
+ *
+ * padding/font-size are intentionally NOT set here: this selector is (0,1,1),
+ * identical specificity to tables.css's `.ibl-data-table td` (0,1,1), so the
+ * two are tied and whichever imports later in input.css wins the cascade.
+ * This consolidation moved depth-chart.css's import after tables.css, which
+ * would have flipped a previously-dead pair of declarations here into a live
+ * override, silently changing rendered padding/font-size on this table. Left
+ * unset to preserve pre-refactor behavior (`.ibl-data-table td` wins), same
+ * as before this file existed at its old import position.
  */
 .dc-lineup-preview td {
     text-align: center;
-    padding: var(--space-1) var(--space-2);
-    font-size: var(--text-sm);
     white-space: nowrap;
 }
 

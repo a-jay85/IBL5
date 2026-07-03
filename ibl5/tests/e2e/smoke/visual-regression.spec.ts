@@ -1,3 +1,7 @@
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
+import pixelmatch from 'pixelmatch';
+import { PNG } from 'pngjs';
 import type { Locator, Page } from '@playwright/test';
 import { test as publicTest } from '../fixtures/public';
 import { test as authTest } from '../fixtures/auth';
@@ -29,6 +33,70 @@ const ACTUALS_DIR = 'vr-actuals';
 
 function buildMasks(page: Page, extraMask: string[] = []): Locator[] {
   return [...GLOBAL_MASK_SELECTORS, ...extraMask].map((sel) => page.locator(sel));
+}
+
+// The VR gate (`toHaveScreenshot`, below) re-samples the render until it stops
+// changing before comparing to the baseline; the raw `.a`/`.b` gallery captures
+// were otherwise one-shot, so a render still settling — full-page mobile height,
+// a late font/image, or a transient capture throw — made A and B disagree and
+// demoted an otherwise-passing cell to infra/flake. Mirror the gate's discipline
+// for the raw captures: retry a thrown capture, and re-sample until two
+// consecutive shots agree before writing. This is capture FIDELITY, not the
+// ADR-gated triage selection (vr-gallery.ts / vr-build-gallery).
+const STABLE_MAX_ATTEMPTS = 5;
+const STABLE_SETTLE_MS = 250;
+// Two consecutive shots count as "settled" when under 0.5% of pixels differ —
+// the same GATE_MAX_DIFF_PIXEL_RATIO floor the gallery's A/B self-stability
+// check uses (bin/vr-build-gallery). GATE_PIXEL_THRESHOLD 0.2 mirrors the gate's
+// per-pixel YIQ threshold (vr-gallery.ts).
+const STABLE_MAX_DIFF_RATIO = 0.005;
+
+function consecutiveDiffRatio(a: Buffer, b: Buffer): number {
+  const pa = PNG.sync.read(a);
+  const pb = PNG.sync.read(b);
+  if (pa.width !== pb.width || pa.height !== pb.height) return 1;
+  const changed = pixelmatch(pa.data, pb.data, null, pa.width, pa.height, {
+    threshold: 0.2,
+  });
+  return changed / (pa.width * pa.height);
+}
+
+type CaptureOpts = { animations: 'disabled'; mask: Locator[]; fullPage?: boolean };
+
+// Capture the target repeatedly until two consecutive shots agree (the render
+// has settled), then write the settled buffer. If every attempt throws we write
+// nothing — the gallery triages the missing file as infra. If it renders but
+// never converges we write the last shot, so a genuine cross-render instability
+// still surfaces as an A≠B flake rather than being papered over.
+async function captureStable(
+  page: Page,
+  captureTarget: Locator | Page,
+  path: string,
+  opts: CaptureOpts,
+): Promise<void> {
+  let prev: Buffer | null = null;
+  for (let attempt = 0; attempt < STABLE_MAX_ATTEMPTS; attempt++) {
+    let shot: Buffer;
+    try {
+      shot = await captureTarget.screenshot(opts);
+    } catch {
+      // eslint-disable-next-line playwright/no-wait-for-timeout -- deliberate settle: let a transiently-failing render advance before retrying
+      await page.waitForTimeout(STABLE_SETTLE_MS);
+      continue;
+    }
+    if (prev && consecutiveDiffRatio(prev, shot) <= STABLE_MAX_DIFF_RATIO) {
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, shot);
+      return;
+    }
+    prev = shot;
+    // eslint-disable-next-line playwright/no-wait-for-timeout -- deliberate settle: let the render advance (fonts/images/height) before the next sample
+    await page.waitForTimeout(STABLE_SETTLE_MS);
+  }
+  if (prev) {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, prev);
+  }
 }
 
 async function captureSnapshot(
@@ -80,25 +148,17 @@ async function captureSnapshot(
     ...(fullPage ? { fullPage: true } : {}),
   };
 
-  // Render A — the PR's actual render of this cell.
-  try {
-    await captureTarget.screenshot({
-      path: `${ACTUALS_DIR}/${title}.a.png`,
-      ...captureOpts,
-    });
-  } catch {
-    // A failed render leaves no .a.png; the gallery builder triages it as infra.
-  }
+  // Render A — the PR's actual render of this cell. captureStable retries a
+  // thrown capture and re-samples until settled; if every attempt throws it
+  // writes no .a.png and the gallery builder triages the cell as infra.
+  await captureStable(page, captureTarget, `${ACTUALS_DIR}/${title}.a.png`, captureOpts);
 
   // Render B — an independent second render after a full reload, used to demote
   // self-disagreeing (flaky) cells out of the change gallery.
   try {
     await page.reload({ waitUntil: 'load' });
     await settle();
-    await captureTarget.screenshot({
-      path: `${ACTUALS_DIR}/${title}.b.png`,
-      ...captureOpts,
-    });
+    await captureStable(page, captureTarget, `${ACTUALS_DIR}/${title}.b.png`, captureOpts);
   } catch {
     // A missing .b.png skips the self-stability check (gallery handles null B).
   }

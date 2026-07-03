@@ -1,6 +1,6 @@
 ---
 description: E2E (Playwright + api-e2e) test-quality backlog — refactoring, perf, weak/tautological assertions, tests that don't prove functionality, and flake-prone patterns, with per-entry status + automouse-readiness. Each open entry is a candidate for a /plan.
-last_verified: 2026-06-29
+last_verified: 2026-07-03
 ---
 
 # E2E Test-Quality Backlog
@@ -48,6 +48,10 @@ Effort scale:
 > **Why so many 🟨 in Axis D:** strengthening a "doesn't-prove-functionality" test is green-green *only if the
 > feature actually works*. Each D fix must first confirm the happy path passes the tightened assertion; a
 > failure there is a genuine bug discovery, not a test regression. That branch needs a human.
+
+> **Planning note:** 🟨 items set `auto_merge: false` (STOP-guard, human signoff) — the plan must confirm the
+> happy path passes before treating a tightened assertion as green-green. Axis A, B, C, and E each package as
+> one plan apiece (single coherent worktree per axis); Axis D is planned per-cluster instead (see below).
 
 ## Roll-up (66 findings)
 
@@ -266,8 +270,8 @@ value). For fake-POST tests (D7), assert the banner *after a real submit*, not a
 
 ### D clusters for planning
 
-- **D-cluster-1 — submission tests that accept a failed mutation as success** *(plan this first)*: **D1, D2, D7** (all ✓verified) — uniform fix: require the success redirect/banner *after a real submit*, then read back the mutation. Tightest, highest-confidence, one coherent worktree. D6 is cluster-1-adjacent (same accept-info-as-success shape).
-- **D-cluster-2 — submission tests with no read-back of mutated state:** D3, D4, D5, D8, D9.
+- **D-cluster-1 — submission tests that accept a failed mutation as success** *(plan this first)*: **D1, D2, D7** (all ✓verified) — uniform fix: require the success redirect/banner *after a real submit*, then read back the mutation. Tightest, highest-confidence, one coherent worktree.
+- **D-cluster-2 — submission tests with no read-back of mutated state:** D3, D4, D5, D6, D8, D9. (D6 folded in here — same "no read-back" planning shape as D3/D4/D5/D8/D9, even though its accept-info-as-success symptom resembles cluster-1; cluster-1 is already ✓verified/done, so D6 groups with the still-open cluster.)
 - **D-cluster-3 — smoke/gating tests that don't prove the gate:** D10, D11, D12, D14, D15 (+ C17 as a sibling).
 
 ---

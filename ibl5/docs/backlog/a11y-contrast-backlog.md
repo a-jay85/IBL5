@@ -1,6 +1,6 @@
 ---
 description: WCAG 2.1 AA color-contrast failure inventory and burn-down backlog per page.
-last_verified: 2026-06-08
+last_verified: 2026-07-03
 ---
 
 # A11y Color-Contrast Backlog

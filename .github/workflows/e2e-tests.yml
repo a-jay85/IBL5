@@ -45,6 +45,10 @@ jobs:
       # True only for the `update-baselines` label. Gates the Visual Regression job
       # alone so applying that label reruns baseline regen without a CI storm.
       baseline: ${{ github.event.action == 'labeled' && github.event.label.name == 'update-baselines' }}
+      # True when a change touches IBL6 or the SHARED docker/e2e infra the IBL6 jobs
+      # run inside. Gates ibl6-visual/ibl6-e2e so a pure-ibl5 PR skips them (saving 2
+      # concurrent runner slots) while an IBL6 or shared-infra PR still runs them.
+      ibl6: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.ibl6filter.outputs.ibl6 == 'true' }}
     steps:
       - uses: actions/checkout@v7
         if: github.event_name == 'pull_request' && github.event.action != 'labeled'
@@ -63,6 +67,27 @@ jobs:
           else
             echo "src=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Detect IBL6-affecting changes
+        uses: dorny/paths-filter@v4
+        id: ibl6filter
+        if: github.event_name == 'pull_request' && github.event.action != 'labeled'
+        with:
+          filters: |
+            ibl6:
+              - 'IBL6/**'
+              - 'docker/Dockerfile.ibl6'
+              - 'docker-compose.ci.yml'
+              - '.github/actions/setup-docker-e2e/**'
+              - '.github/workflows/e2e-tests.yml'
+              # ibl6 connects to the SAME shared mariadb/ibl5 DB that
+              # setup-docker-e2e migrates and seeds; ibl6-visual asserts against
+              # seed-driven box-score snapshots. A migration/seed/runner-only PR
+              # must still run ibl6-e2e/ibl6-visual or a DB-driven regression
+              # would skip past the gate.
+              - 'ibl5/migrations/**'
+              - 'ibl5/tests/e2e/fixtures/ci-seed.sql'
+              - 'ibl5/bin/run-migrations-ci.sh'
 
   playwright-version-drift:
     name: Playwright version drift guard
@@ -360,6 +385,7 @@ jobs:
     timeout-minutes: 20
     strategy:
       fail-fast: false
+      max-parallel: 3
       matrix:
         shard-index: [1, 2, 3, 4]
         total-shards: [4]
@@ -564,7 +590,7 @@ jobs:
   ibl6-visual:
     name: IBL6 Visual Regression
     needs: [changes]
-    if: needs.changes.outputs.src == 'true' || needs.changes.outputs.baseline == 'true'
+    if: needs.changes.outputs.ibl6 == 'true' || needs.changes.outputs.baseline == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -670,7 +696,7 @@ jobs:
   ibl6-e2e:
     name: IBL6 E2E Tests
     needs: [changes]
-    if: needs.changes.outputs.src == 'true'
+    if: needs.changes.outputs.ibl6 == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 

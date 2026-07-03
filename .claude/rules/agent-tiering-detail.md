@@ -1,6 +1,6 @@
 ---
-description: Read-on-demand detail for agent-tiering — full Fable approval-gate procedure, flat-fan-out (nested sub-agent) rationale, and per-tier prompt style. Loads only when editing workflow orchestration defs, where this rationale applies.
-last_verified: 2026-07-01
+description: Read-on-demand detail for agent-tiering — Fable approval-gate procedure, flat-fan-out (nested sub-agent) rationale, orchestrator context economics (delegate-don't-dismiss, split-don't-self-clear), and per-tier prompt style. Loads only when editing workflow orchestration defs, where this rationale applies.
+last_verified: 2026-07-02
 paths:
   - ".claude/commands/**/*.md"
   - ".claude/skills/**/SKILL.md"
@@ -48,6 +48,16 @@ higher per-task capability score.
 Sub-agents can spawn sub-agents (5 deep), but we keep **flat fan-out**: the Opus session owns every fan-out and absorbs every agent's output. Do not nest in the recurring workflows (`/plan`, `/pr-review`, `/security-audit`, `/post-plan`, automouse). Why: our fan-out is narrow (1–4 agents/phase, not the wide verbose fan-out where nesting pays); the pipelines keep review/triage in Opus by design (the review→score→filter step *is* triage — a coordinator would blind Opus to the findings it filtered, and delegated judgment degrades — see `feedback_sonnet_proving_negatives`, `feedback_review_agent_full_diff`); and `/post-plan` is a single-context state machine whose Phase 3/5/6.5 gates read from main-session context, where nesting could only hide the filtered-out findings, not the survivor list Opus still needs.
 
 **Tripwire to revisit:** a *measured* post-plan context-window problem, or a new workflow with genuinely wide fan-out and verbose per-agent intermediates.
+
+## Orchestrator context economics — delegate to never-hold, split don't self-clear
+
+The context saving from a sub-agent comes from **delegation, not dismissal**. A sub-agent runs in its own window; when it finishes, only its final message returns — every intermediate tool call and result stays isolated and evaporates. So "spin up → dismiss → spin up fresh" beats inlining the same work because the bulk **never entered the orchestrator**, not because dismissal evicts it (dismissal reclaims nothing — the internals were never in the parent). Corollary: keep returns **thin** — pointers (`path:line`), not file bodies (`feedback_orchestrator_pass_pointers_not_contents`).
+
+**The orchestrator cannot clear itself.** Its context grows monotonically by the sum of return summaries across a run. The `/clear`-equivalent lives one layer down, in sub-agent lifecycle: a fresh `Agent()` spawn = clean context + cold cache + the ~3–5K spawn overhead; continuing an agent via `SendMessage` = warm cache but carries the prior task's context forward. **Fresh spawn = clear; `SendMessage` = keep talking** — pick by whether the next task actually needs the prior one's context.
+
+**The only true reset is the session boundary.** That is exactly why `/post-plan` runs in a **fresh** session (`workflow-continuity.md`: inline re-reads full implementation context every phase, costing several times a fresh run). For a run too large to fit one orchestrator context, the fix is **split into multiple plans/sessions**, not orchestrator-level sub-agent juggling — and nesting orchestrators is closed by design (see Nested Sub-Agents above).
+
+**Automouse:** same rules, headless. Lean-orchestrator + thin returns apply as-is, but it cannot self-clear between phases — a very long plan pays for its accumulating orchestrator context until the session ends. If that measurably hurts, split the plan into stacked pieces; don't reach for nested orchestrators. **Tripwire to revisit:** a *measured* automouse orchestrator-context problem — then split the plan first, before reconsidering nesting.
 
 ## Prompt Style by Tier
 

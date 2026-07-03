@@ -1,6 +1,6 @@
 ---
 description: WCAG 2.x full-rule (non-contrast) accessibility failure inventory and burn-down backlog per axe rule, with audited per-entry implementation + automouse-readiness status. Companion to a11y-contrast-backlog.md.
-last_verified: 2026-06-22
+last_verified: 2026-07-03
 ---
 
 # A11y Full-Rule Backlog (non-contrast)

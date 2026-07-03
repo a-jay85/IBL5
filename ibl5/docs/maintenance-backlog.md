@@ -2183,7 +2183,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 | 11.7 | ✅ Implemented | — | editor.css deleted (#1027). |
 | 11.8 | ✅ Implemented | — | menu GIFs deleted (#1027). |
 | 11.9 | ✅ Implemented | — | dual-token convention documented (#1027). |
-| 11.10 | ⬜ Open | 🟩 | Consolidate depth-chart CSS (load-order coupling); VR pin. |
+| 11.10 | ✅ Implemented | — | **Status:** 3 depth-chart CSS files → 1 (`depth-chart.css`); 2 satellites deleted, single `@import` placed after `tables.css`. VR-pinned pixel-identical (existing baseline unchanged). |
 | 11.11 | ✅ Implemented | — | themecenterbox content-sniff replaced with explicit `$type` param (#1232, merged 2026-06-28). |
 | 11.12 | ✅ Implemented | — | display:none→hidden cleared. |
 | 11.13 | ✅ Implemented | — | TradingView `str_replace` CSS-patch replaced with explicit render param (#1232, merged 2026-06-28). |
@@ -2266,6 +2266,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Suggested direction:** Consolidate into `depth-chart.css` (720 LOC combined — manageable).
 **Est. effort:** S
 **Risk if untouched:** `input.css` reorders silently break depth chart layout.
+**Status:** Implemented — `tables/depth-chart.css` + `saved-depth-charts.css` merged into `depth-chart.css`; single `@import` repositioned after `tables.css` to preserve the `.depth-chart-table td` vs `.ibl-data-table td` cascade tie-break; VR-pinned pixel-identical.
 
 ### 11.11 `themecenterbox()` Content-Sniffs HTML to Pick CSS Layout
 **Location:** `themes/IBL/theme.php` lines 281-314

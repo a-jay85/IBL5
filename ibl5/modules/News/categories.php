@@ -33,15 +33,12 @@ $cat = $catid;
 
 function theindex($catid)
 {
-    global $storyhome, $topicname, $topicimage, $topictext, $datetime, $user, $cookie, $nukeurl, $prefix, $multilingual, $currentlang, $articlecomm, $module_name, $userinfo, $authService, $mysqli_db;
+    global $storyhome, $topicname, $topicimage, $topictext, $datetime, $user, $cookie, $nukeurl, $prefix, $multilingual, $currentlang, $db, $articlecomm, $module_name, $userinfo, $authService, $mysqli_db;
     if (is_user($user)) {$userinfo = $authService->getUserInfo();}
-    $storyConditions = [];
-    $storyTypes = '';
-    $storyParams = [];
     if ($multilingual == 1) {
-        $storyConditions[] = "(alanguage = ? OR alanguage = '')";
-        $storyTypes .= 's';
-        $storyParams[] = $currentlang;
+        $querylang = "AND (alanguage='$currentlang' OR alanguage='')"; /* the OR is needed to display stories who are posted to ALL languages */
+    } else {
+        $querylang = "";
     }
     PageLayout\PageLayout::header();
     if (isset($userinfo['storynum'])) {
@@ -50,20 +47,11 @@ function theindex($catid)
         $storynum = $storyhome;
     }
     $catid = intval($catid);
-    $stmtCatUpdate = $mysqli_db->prepare("UPDATE " . $prefix . "_stories_cat SET counter = counter + 1 WHERE catid = ?");
-    $stmtCatUpdate->bind_param('i', $catid);
-    $stmtCatUpdate->execute();
-    $stmtCatUpdate->close();
-    array_unshift($storyConditions, "catid = ?");
-    $storyTypes = 'i' . $storyTypes;
-    array_unshift($storyParams, $catid);
-    $storyTypes .= 'i';
-    $storyParams[] = (int) $storynum;
-    $stmtStories = $mysqli_db->prepare("SELECT sid, aid, title, time, hometext, bodytext, comments, counter, topic, informant, notes, acomm FROM " . $prefix . "_stories WHERE " . implode(' AND ', $storyConditions) . " ORDER BY sid DESC LIMIT ?");
-    $stmtStories->bind_param($storyTypes, ...$storyParams);
-    $stmtStories->execute();
-    $result = $stmtStories->get_result();
-    while ($row = $result->fetch_assoc()) {
+    $newsService = new \Topics\News\NewsService($mysqli_db);
+    $newsService->bumpCategory($catid);
+    $stories = $newsService->getCategoryPageStories($catid, (int) $storynum, $querylang);
+    $viewModels = [];
+    foreach ($stories as $row) {
         $s_sid = intval($row['sid']);
         $aid = $row['aid'];
         $title = \Security\HtmlSanitizer::safeHtmlOutput($row['title']);
@@ -76,29 +64,17 @@ function theindex($catid)
         $informant = $row['informant'];
         $notes = \Security\HtmlSanitizer::safeHtmlOutput($row['notes']);
         $acomm = intval($row['acomm']);
-        $stmtTopics = $mysqli_db->prepare(
-            "SELECT t.topicid, t.topicname, t.topicimage, t.topictext
-             FROM {$prefix}_stories s
-             LEFT JOIN {$prefix}_topics t ON t.topicid = s.topic
-             WHERE s.sid = ?"
-        );
-        $stmtTopics->bind_param('i', $s_sid);
-        $stmtTopics->execute();
-        $topicRow = $stmtTopics->get_result()->fetch_assoc();
-        $stmtTopics->close();
+        $topicRow = $newsService->getTopicForStory($s_sid);
         $topicid = (int) ($topicRow['topicid'] ?? 0);
         $topicname = \Security\HtmlSanitizer::e($topicRow['topicname'] ?? '');
         $topicimage = \Security\HtmlSanitizer::e($topicRow['topicimage'] ?? '');
         $topictext = \Security\HtmlSanitizer::e($topicRow['topictext'] ?? '');
-        if (!is_numeric($time)) {
-            preg_match('/(\d{4})-(\d{1,2})-(\d{1,2}) (\d{1,2}):(\d{1,2}):(\d{1,2})/', $time, $dtParts);
-            $time = gmmktime((int) $dtParts[4], (int) $dtParts[5], (int) $dtParts[6], (int) $dtParts[2], (int) $dtParts[3], (int) $dtParts[1]);
-        }
-        $time -= date("Z");
+        $time = $newsService->normalizeStoryTime($time);
         $datetime = ucfirst(date(_DATESTRING, $time));
-        $introcount = strlen($hometext ?? '');
-        $fullcount = strlen($bodytext ?? '');
-        $totalcount = $introcount + $fullcount;
+        $counts = $newsService->computeByteCounts((string) ($hometext ?? ''), (string) ($bodytext ?? ''));
+        $introcount = $counts['intro'];
+        $fullcount = $counts['full'];
+        $totalcount = $counts['total'];
         $c_count = $comments;
         $r_options = "";
         if (isset($userinfo['umode'])) {$r_options .= "&amp;mode=" . $userinfo['umode'];}
@@ -118,16 +94,17 @@ function theindex($catid)
         $morelink .= " ";
         $morelink = str_replace(" |  | ", " | ", $morelink);
         $sid = intval($s_sid);
-        $stmtCat2 = $mysqli_db->prepare("SELECT title FROM " . $prefix . "_stories_cat WHERE catid = ?");
-        $stmtCat2->bind_param('i', $catid);
-        $stmtCat2->execute();
-        $row2 = $stmtCat2->get_result()->fetch_assoc();
-        $stmtCat2->close();
-        $title1 = \Security\HtmlSanitizer::safeHtmlOutput($row2['title'] ?? '');
+        $catTitle = $newsService->getCategoryTitle($catid);
+        $title1 = \Security\HtmlSanitizer::safeHtmlOutput($catTitle ?? '');
         $title = "$title1: $title";
-        themeindex($aid, $informant, $time, $title, $counter, $topic, $hometext, $notes, $morelink, $topicname, $topicimage, $topictext);
+        $viewModels[] = [
+            'aid' => $aid, 'informant' => $informant, 'time' => $time, 'title' => $title,
+            'counter' => $counter, 'topic' => $topic, 'hometext' => $hometext,
+            'notes' => $notes, 'morelink' => $morelink, 'topicname' => $topicname,
+            'topicimage' => $topicimage, 'topictext' => $topictext,
+        ];
     }
-    $stmtStories->close();
+    (new \Topics\News\NewsView())->renderStories($viewModels);
     PageLayout\PageLayout::footer();
 }
 

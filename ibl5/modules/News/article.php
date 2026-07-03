@@ -40,6 +40,8 @@ get_lang($module_name);
 $sid    = is_numeric($_REQUEST['sid']    ?? null) ? (int) $_REQUEST['sid']    : 0;
 $teamid = is_numeric($_REQUEST['teamid'] ?? null) ? (int) $_REQUEST['teamid'] : null;
 
+$newsService = new \Topics\News\NewsService($mysqli_db);
+
 $REQUEST_URI = $_SERVER['REQUEST_URI'] ?? '';
 
 if (stristr($REQUEST_URI, "mainfile")) {
@@ -56,29 +58,14 @@ if (stristr($REQUEST_URI, "mainfile")) {
 // Comment system removed - was deprecated and insecure
 // The "Reply" operation and comments.php include have been removed
 
-// Fetch article using prepared statement
-$stmt = $mysqli_db->prepare(
-    "SELECT catid, aid, time, title, hometext, bodytext, topic, informant, notes, acomm, haspoll, poll_id
-     FROM " . $prefix . "_stories
-     WHERE sid = ?"
-);
-if ($stmt === false) {
+// Fetch article via the News service (prepared statement inside the repository).
+// Preserves both legacy redirects (prepare-false + num_rows !== 1) — a missing
+// single row returns null here and redirects to index.php.
+$row = $newsService->getStory($sid);
+if ($row === null) {
     Header("Location: index.php");
     exit;
 }
-
-$stmt->bind_param('i', $sid);
-$stmt->execute();
-$result = $stmt->get_result();
-
-if ($result->num_rows !== 1) {
-    $stmt->close();
-    Header("Location: index.php");
-    exit;
-}
-
-$row = $result->fetch_assoc();
-$stmt->close();
 
 $catid = (int) ($row['catid'] ?? 0);
 $aaid = $row['aid'] ?? '';
@@ -100,24 +87,15 @@ if (empty($aaid)) {
     exit;
 }
 
-// Update view counter using prepared statement
-$stmtCounter = $mysqli_db->prepare("UPDATE " . $prefix . "_stories SET counter = counter + 1 WHERE sid = ?");
-if ($stmtCounter !== false) {
-    $stmtCounter->bind_param('i', $sid);
-    $stmtCounter->execute();
-    $stmtCounter->close();
-}
+// Update view counter (prepared statement inside the repository)
+$newsService->bumpStory($sid);
 
 $artpage = 1;
 $pagetitle = "- $title";
 PageLayout\PageLayout::header();
 $artpage = 0;
 
-if (!is_numeric($time)) {
-    preg_match('/(\d{4})-(\d{1,2})-(\d{1,2}) (\d{1,2}):(\d{1,2}):(\d{1,2})/', $time, $dtParts);
-    $time = gmmktime((int) $dtParts[4], (int) $dtParts[5], (int) $dtParts[6], (int) $dtParts[2], (int) $dtParts[3], (int) $dtParts[1]);
-}
-$time -= date("Z");
+$time = $newsService->normalizeStoryTime($time);
 $datetime = ucfirst(date(_DATESTRING, $time));
 if (!empty($notes)) {
     $notes = "\n\n<b>" . _NOTE . "</b> <i>$notes</i>";
@@ -135,40 +113,27 @@ if (empty($informant)) {
     $informant = $anonymous;
 }
 
-$stmtTopics = $mysqli_db->prepare(
-    "SELECT t.topicid, t.topicname, t.topicimage, t.topictext
-     FROM {$prefix}_stories s
-     LEFT JOIN {$prefix}_topics t ON t.topicid = s.topic
-     WHERE s.sid = ?"
-);
-$stmtTopics->bind_param('i', $sid);
-$stmtTopics->execute();
-$topicRow = $stmtTopics->get_result()->fetch_assoc();
-$stmtTopics->close();
+$topicRow = $newsService->getTopicForStory($sid);
 $topicid = (int) ($topicRow['topicid'] ?? 0);
 $topicname = \Security\HtmlSanitizer::e($topicRow['topicname'] ?? '');
 $topicimage = \Security\HtmlSanitizer::e($topicRow['topicimage'] ?? '');
 $topictext = \Security\HtmlSanitizer::e($topicRow['topictext'] ?? '');
 
-// Fetch category using prepared statement if catid is set
+// Fetch category title via the News service (prepared statement) if catid is set
 if ($catid !== 0) {
-    $stmtCat = $mysqli_db->prepare("SELECT title FROM " . $prefix . "_stories_cat WHERE catid = ?");
-    if ($stmtCat !== false) {
-        $stmtCat->bind_param('i', $catid);
-        $stmtCat->execute();
-        $catResult = $stmtCat->get_result();
-        $row2 = $catResult->fetch_assoc();
-        $stmtCat->close();
-
-        if ($row2 !== null) {
-            /** @var string $title1 */
-            $title1 = \Security\HtmlSanitizer::safeHtmlOutput($row2['title'] ?? '');
-            $title = "<a href=\"modules.php?name=$module_name&amp;file=categories&amp;op=newindex&amp;catid=$catid\"><font class=\"storycat\">$title1</font></a>: $title";
-        }
+    $catTitle = $newsService->getCategoryTitle($catid);
+    if ($catTitle !== null) {
+        /** @var string $title1 */
+        $title1 = \Security\HtmlSanitizer::safeHtmlOutput($catTitle);
+        $title = "<a href=\"modules.php?name=$module_name&amp;file=categories&amp;op=newindex&amp;catid=$catid\"><font class=\"storycat\">$title1</font></a>: $title";
     }
 }
 
-themearticle($aaid, $informant, $time, $title, $bodytext, $topic, $topicname, $topicimage, $topictext);
+(new \Topics\News\NewsView())->renderArticle([
+    'aid' => $aaid, 'informant' => $informant, 'time' => $time, 'title' => $title,
+    'bodytext' => $bodytext, 'topic' => $topic, 'topicname' => $topicname,
+    'topicimage' => $topicimage, 'topictext' => $topictext,
+]);
 
 if ($multilingual == 1) {
     $querylang = "AND (blanguage='$currentlang' OR blanguage='')";

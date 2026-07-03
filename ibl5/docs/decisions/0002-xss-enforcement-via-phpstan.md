@@ -44,5 +44,5 @@ The rule intentionally does **not** walk into variables or arbitrary function ca
 
 - `ibl5/phpstan-rules/RequireEscapedOutputRule.php` — the rule implementation and `SAFE_STATIC_CALLS` whitelist.
 - `.claude/rules/view-rendering.md` — the agent-facing rule file (cites this ADR).
-- `.claude/commands/_review-rubric.md` — the reviewer guidance that excludes re-checking this category.
+- `.claude/review-shared/_review-rubric.md` — the reviewer guidance that excludes re-checking this category.
 - `ibl5/classes/Security/HtmlSanitizer.php` — the wrapper that locks in `htmlspecialchars` flags.

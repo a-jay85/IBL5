@@ -55,7 +55,7 @@ Store all of these results — they will be passed as context to agents below.
 
 ## Step 3: Launch parallel agents (merged by tier)
 
-**Read** `.claude/commands/_review-agents.md` for the canonical agent definitions. It defines 3 merged agents (A=architecture+bugs+DB, B=git history+code comments, C=previous PRs).
+**Read** `.claude/review-shared/_review-agents.md` for the canonical agent definitions. It defines 3 merged agents (A=architecture+bugs+DB, B=git history+code comments, C=previous PRs).
 
 Launch applicable agents in parallel. Each agent receives:
 - The filtered diff from Step 2c
@@ -71,7 +71,7 @@ Launch applicable agents in parallel. Each agent receives:
 
 ## Step 4: Confidence scoring
 
-**Read** `.claude/commands/_review-rubric.md` for the canonical rubric, thresholds, Automatic-Zero rule list, and IBL5 false-positive list.
+**Read** `.claude/review-shared/_review-rubric.md` for the canonical rubric, thresholds, Automatic-Zero rule list, and IBL5 false-positive list.
 
 Collect all issues found in Step 3 into a numbered list. Launch a **single Haiku agent**, pass it the issues list plus the **Scoring scale and Thresholds sections** from `_review-rubric.md` (not the full Automatic Zero or false-positive lists — review agents have already filtered those). Instruct it to return JSON scores per the rubric.
 

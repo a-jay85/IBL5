@@ -243,7 +243,7 @@ Capture the `cat` output — that is `$DIFF` for every sub-agent prompt below. N
 
 ### 4B: Code Review — up to 3 parallel agents (merged by tier)
 
-**Read** `.claude/commands/_review-agents.md` (Agents A/B/C) and `.claude/commands/_test-spec-agent.md` (Agent D — E2E specs). The canonical agent definitions.
+**Read** `.claude/review-shared/_review-agents.md` (Agents A/B/C) and `.claude/review-shared/_test-spec-agent.md` (Agent D — E2E specs). The canonical agent definitions.
 
 Pass each agent: PR metadata, file list, and filtered `$DIFF`. **No agent calls `gh pr diff`.** Do not forward CLAUDE.md content (auto-loaded).
 
@@ -288,7 +288,7 @@ Pass each agent: PR metadata, file list, and filtered `$DIFF`. **No agent calls 
 
 **Skip entire 4C if** `! $HAS_PHP`. CSS, markdown, migrations, and lockfile bumps cannot introduce SQLi/CSRF/auth vulnerabilities.
 
-**Read** `.claude/commands/_security-agents.md` — the canonical security agent definition and pattern-detection bash block.
+**Read** `.claude/review-shared/_security-agents.md` — the canonical security agent definition and pattern-detection bash block.
 
 Run the pattern-detection block from that file to get SQL and Forms category counts. Build the `CATEGORIES:` line (always include Auth/Authz; add SQL Injection if SQL > 0; add CSRF Protection if Forms > 0). Launch a **single Haiku agent** with the categories line and the PHP-only subset of `$DIFF`. Do not forward CLAUDE.md content (auto-loaded).
 
@@ -298,7 +298,7 @@ Run the pattern-detection block from that file to get SQL and Forms category cou
 
 ### 4D: Score, filter, and post
 
-**Read** `.claude/commands/_review-rubric.md` — the canonical rubric, thresholds (`< 80` for code review, `< 75` for security), Automatic-Zero rule list, and IBL5 false-positive list.
+**Read** `.claude/review-shared/_review-rubric.md` — the canonical rubric, thresholds (`< 80` for code review, `< 75` for security), Automatic-Zero rule list, and IBL5 false-positive list.
 
 Combine ALL issues from 4B and 4C into one numbered list.
 

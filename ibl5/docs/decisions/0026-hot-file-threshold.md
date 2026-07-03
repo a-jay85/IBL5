@@ -14,7 +14,7 @@ A codebase audit (2026-05-14) found 23 files in `ibl5/classes/` exceeding 500 li
 
 ## Decision
 
-1. Add a "Hot-file thresholds" section to `.claude/commands/_plan-verification.md` requiring plans that add > 100 LOC to a > 500 LOC file to either propose extraction or justify the addition inline.
+1. Add a "Hot-file thresholds" section to `.claude/review-shared/_plan-verification.md` requiring plans that add > 100 LOC to a > 500 LOC file to either propose extraction or justify the addition inline.
 2. Add `bin/check-hot-files` — an advisory script that lists current hotspots and, with `--pr`, flags files in the current PR that grew > 100 LOC past the threshold.
 3. Add a CI workflow (the `hot-files` check in `.github/workflows/pr-meta-checks.yml`, consolidated from the former `hot-files.yml`) that runs the script on PRs and posts a sticky comment. Non-blocking (advisory only).
 

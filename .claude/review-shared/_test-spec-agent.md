@@ -19,7 +19,7 @@ Each agent receives: filtered PR diff, file list, and PR metadata from the paren
 
 Path-conditional loading covers `.claude/rules/playwright-tests.md` when the diff touches `ibl5/tests/e2e/**/*.ts`.
 
-**Mandatory calibration step:** Before judging, read `.claude/commands/_test-spec-corpus.md` to calibrate against known-good and known-bad examples.
+**Mandatory calibration step:** Before judging, read `.claude/review-shared/_test-spec-corpus.md` to calibrate against known-good and known-bad examples.
 
 **Graceful-degradation clause:** If the `submitFormAndAssertEffect` helper (`tests/e2e/helpers/submit-form-effect.ts` (example)) is absent from the repo (verify with a single `ls`), do not flag absence of that helper — instead check the underlying pattern directly: cross-page navigation (`page.goto(differentUrl)` or `waitForURL(differentUrl)`) followed by a web-first assertion on the destination. Same for `ibl5/tests/e2e/vr-manifest.ts` — if absent, do not flag missing manifest rows; treat the VR-coverage check in Section 3 as informational only.
 

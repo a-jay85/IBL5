@@ -58,7 +58,7 @@ export default defineConfig({
         storageState: 'playwright/.auth/user.json',
       },
       dependencies: ['setup'],
-      testIgnore: [/auth\.setup\.ts/, /auth-regular\.setup\.ts/, /visual-regression/, /updater-awards\.spec\.ts$/, /league-control-panel\.spec\.ts$/, /engine-shadow-spawn-on-update\.spec\.ts$/, /admin-pages\.spec\.ts$/, /olympics-admin\.spec\.ts$/, /contract-extension-submission\.spec\.ts$/],
+      testIgnore: [/auth\.setup\.ts/, /auth-regular\.setup\.ts/, /visual-regression/, /updater-awards\.spec\.ts$/, /league-control-panel\.spec\.ts$/, /engine-shadow-spawn-on-update\.spec\.ts$/, /admin-pages\.spec\.ts$/, /olympics-admin\.spec\.ts$/, /contract-extension-submission\.spec\.ts$/, /api-v1-rest\.spec\.ts$/],
     },
     {
       // Destructive full-season updater specs mutate GLOBAL DB rows (schedules,
@@ -75,16 +75,24 @@ export default defineConfig({
       // chromium's testIgnore, or it races a sharded worker reading the same row.
       // Sharding used to mask this (per-shard DBs isolated the mutation); the
       // 1-shard collapse (PR #1308) made every collision universal — that is how
-      // engine-shadow-spawn / admin-pages / olympics-admin were caught here, and
-      // how contract-extension-submission (races vr-anchors-discriminate's
-      // "negotiation" anchor read of pid=30) was caught one CI run later.
+      // engine-shadow-spawn / admin-pages / olympics-admin were caught here.
+      //
+      // The pid=30 "Extension Vet" negotiation fixture takes TWO independent
+      // mutators, both surfaced by vr-anchors-discriminate's "negotiation" anchor:
+      //   - contract-extension-submission — submits an extension → pid=30 becomes
+      //     renegotiation-INELIGIBLE (the ExtensionOffer form stops rendering).
+      //   - api-v1-rest — accepts trade offer 7, which moves pid=30 off the Metros
+      //     (teamid=1) → "not on your team", form absent. This one is DURABLE (no
+      //     cleanup), so it survived retries and outlived the first isolation pass.
+      // Mutation via a trade/ownership change carries no "pid=30" literal, which is
+      // exactly why a grep-for-pid audit misses it — hence the broader gate below.
       name: 'mutators',
       use: {
         ...devices['Desktop Chrome'],
         storageState: 'playwright/.auth/user.json',
       },
       dependencies: ['setup'],
-      testMatch: [/updater-awards\.spec\.ts$/, /league-control-panel\.spec\.ts$/, /engine-shadow-spawn-on-update\.spec\.ts$/, /admin-pages\.spec\.ts$/, /olympics-admin\.spec\.ts$/, /contract-extension-submission\.spec\.ts$/],
+      testMatch: [/updater-awards\.spec\.ts$/, /league-control-panel\.spec\.ts$/, /engine-shadow-spawn-on-update\.spec\.ts$/, /admin-pages\.spec\.ts$/, /olympics-admin\.spec\.ts$/, /contract-extension-submission\.spec\.ts$/, /api-v1-rest\.spec\.ts$/],
     },
   ],
 });

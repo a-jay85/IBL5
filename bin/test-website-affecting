@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-website-affecting — regression harness for bin/website-affecting.
+#
+# Pipes newline-separated repo-relative paths into bin/website-affecting and
+# asserts the EXIT CODE (0 = affects website / BUILD, 1 = non-website / SKIP).
+# Pins: the CI-meta exempt set (exit 1), the E2E/Lighthouse driver GUARD set
+# (exit 0 — the load-bearing anti-silent-skip proof), any-website-file-wins on a
+# mixed diff, and existing-behavior regressions (deny regex, app php, carve-out,
+# fail-safe empty diff).
+#
+# Run: bin/test-website-affecting  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+GUARD="$SCRIPT_DIR/website-affecting"
+
+FAILED=0
+
+pass()     { echo "ok: $1"; }
+failcase() { echo "FAIL: $1"; FAILED=1; }
+
+# assert_exit <name> <expected-exit> <path> [path...]
+# Feeds each path on its own line (trailing newline each, so `while read` sees
+# the final line) into the classifier and asserts its exit code.
+assert_exit() {
+    local name="$1" expected="$2"; shift 2
+    local actual
+    printf '%s\n' "$@" | "$GUARD" >/dev/null 2>&1
+    actual=$?
+    if [ "$actual" -eq "$expected" ]; then
+        pass "$name (exit $actual)"
+    else
+        failcase "$name — expected exit $expected, got $actual"
+    fi
+}
+
+# --- (a) CI-meta exempt set: each alone → exit 1 (non-website / SKIP) ---
+assert_exit "exempt-pages-deploy"  1 ".github/workflows/pages-deploy.yml"
+assert_exit "exempt-rebase-prs"    1 ".github/workflows/rebase-prs.yml"
+assert_exit "exempt-human-signoff" 1 ".github/workflows/human-signoff.yml"
+assert_exit "exempt-dependabot"    1 ".github/workflows/dependabot-auto-merge.yml"
+
+# --- (b) GUARD (LOAD-BEARING): E2E/Lighthouse drivers → exit 0 (website) ---
+# This block is the mechanical proof against the silent-skip failure mode: if a
+# future edit ever swept one of these into the exempt set, its PR would skip the
+# very E2E/Lighthouse run that validates it. These MUST classify website.
+assert_exit "guard-e2e-tests"         0 ".github/workflows/e2e-tests.yml"
+assert_exit "guard-setup-docker-e2e"  0 ".github/actions/setup-docker-e2e/action.yml"
+assert_exit "guard-docker-compose-ci" 0 "docker-compose.ci.yml"
+assert_exit "guard-lighthouse"        0 ".github/workflows/lighthouse.yml"
+
+# --- (b2) Exactness boundary: a non-exempt / look-alike workflow → exit 0 ---
+# Proves the exempt case is an EXACT full-path match and never sweeps a sibling
+# workflow. Fail-safe direction: unknown workflow still counts website.
+assert_exit "non-exempt-workflow"  0 ".github/workflows/tests.yml"
+assert_exit "exempt-lookalike"     0 ".github/workflows/pages-deploy-staging.yml"
+
+# --- (c) Mixed diff: exempt workflow + real app file → exit 0 (any website wins) ---
+assert_exit "mixed-exempt-plus-app" 0 \
+    ".github/workflows/pages-deploy.yml" "ibl5/index.php"
+
+# --- (d) Existing-behavior regression pins ---
+assert_exit "pin-markdown"      1 "README.md"          # \.md$ deny regex
+assert_exit "pin-app-php"       0 "ibl5/index.php"     # app code, website-side
+assert_exit "pin-carveout-self" 0 "bin/website-affecting"  # is_carveout forces website
+
+# Empty stdin → exit 0 (fail-safe BUILD). Tested with genuinely empty input.
+printf '' | "$GUARD" >/dev/null 2>&1
+empty_exit=$?
+if [ "$empty_exit" -eq 0 ]; then
+    pass "pin-empty-stdin (exit 0)"
+else
+    failcase "pin-empty-stdin — expected exit 0, got $empty_exit"
+fi
+
+# --- Results ---
+if [ "$FAILED" -ne 0 ]; then
+    echo "RESULT: FAILED"
+    exit 1
+fi
+echo "RESULT: all passed"
+exit 0

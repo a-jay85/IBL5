@@ -543,6 +543,8 @@ jobs:
         run: bin/test-check-workflow-checkout
       - name: bin/test-check-composite-contracts
         run: bin/test-check-composite-contracts
+      - name: bin/test-website-affecting
+        run: bin/test-website-affecting
 
   gate:
     name: Tests and Analysis

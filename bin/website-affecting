@@ -23,9 +23,21 @@
 #     they match the deny regex):
 #       bin/website-affecting  (the predicate itself — changing the gate must trigger it)
 #
-# Workflow files (.github/workflows/e2e-tests.yml, .github/workflows/lighthouse.yml)
-# are naturally website-side (none of their paths match the deny regex) — no
-# explicit carve-out needed.
+# Most naturally website-side files (they do NOT match the deny regex) always
+# count website — INCLUDING E2E/Lighthouse drivers like
+# .github/workflows/e2e-tests.yml and .github/workflows/lighthouse.yml.
+#
+# CI-meta exempt set (the INVERSE of the carve-out): a curated denylist of
+# workflow files that do NOT match the deny regex but PROVABLY run no app code
+# and cannot affect the E2E suite, Lighthouse, or the app. These classify
+# NON-website even though nothing denies them. This is a DENYLIST CARVE-OUT, not
+# a positive allowlist: its staleness fails SAFE/LOUD (a dropped or renamed
+# entry just over-runs E2E) — never a silent E2E skip. Each entry is a
+# deliberate assertion "this file can't break E2E or the app":
+#       .github/workflows/pages-deploy.yml           (post-E2E gh-pages deploy)
+#       .github/workflows/rebase-prs.yml             (git rebase of open PRs)
+#       .github/workflows/human-signoff.yml          (PR-title classifier gate)
+#       .github/workflows/dependabot-auto-merge.yml  (enables gh pr merge --auto)
 #
 # Anchoring is load-bearing:
 #   ^bin/      so ibl5/bin/* (app bin, website-side) is NOT denied
@@ -48,6 +60,26 @@ is_carveout() {
     return 1
 }
 
+# CI-meta exempt set: paths that do NOT match the deny regex (so they would
+# otherwise count website-side) but PROVABLY run no app code and cannot affect
+# the E2E suite, Lighthouse, or the app. This is a curated DENYLIST CARVE-OUT,
+# not a positive allowlist: its staleness fails SAFE (a dropped/renamed entry
+# just over-runs E2E) — never a silent E2E skip. Each entry is a deliberate
+# assertion "this file can't break E2E or the app." Match is EXACT (full
+# repo-relative path), so a sibling workflow is never accidentally swept in.
+# NEVER add: .github/workflows/e2e-tests.yml, .github/workflows/lighthouse.yml,
+# .github/actions/setup-docker-e2e/**, docker-compose.ci.yml, docker/Dockerfile*
+# — those drive E2E/Lighthouse and MUST stay website-side.
+is_ci_meta_exempt() {
+    case "$1" in
+        .github/workflows/pages-deploy.yml)          return 0 ;;  # workflow_run after E2E; checks out gh-pages + deploys Pages — no app code, consumes E2E output (can't change it)
+        .github/workflows/rebase-prs.yml)            return 0 ;;  # push:master trigger; rebases open PRs via git — no app code, no E2E/Lighthouse
+        .github/workflows/human-signoff.yml)         return 0 ;;  # PR-title classifier gate (bin/lib/human-signoff-classifier.sh) — no app code, no E2E/Lighthouse
+        .github/workflows/dependabot-auto-merge.yml) return 0 ;;  # enables gh pr merge --auto for dependabot PRs — no app code, no E2E/Lighthouse
+    esac
+    return 1
+}
+
 if [ "${1:-}" = "--help" ]; then
     cat <<'HELP'
 bin/website-affecting — classify changed files as website-affecting or not.
@@ -66,8 +98,16 @@ Deny-set (non-website if matched and not in carve-out):
 Carve-out (always website-side despite matching deny regex):
   bin/website-affecting  (the predicate itself)
 
-Naturally website-side (not denied, no carve-out needed):
-  ibl5/**  .github/**  docker/**  Dockerfile  docker-compose*.yml  *.php *.ts *.js *.css
+CI-meta exempt (NON-website despite not matching deny regex — provably can't
+affect E2E/Lighthouse/app; staleness over-runs, never silent-skips):
+  .github/workflows/pages-deploy.yml
+  .github/workflows/rebase-prs.yml
+  .github/workflows/human-signoff.yml
+  .github/workflows/dependabot-auto-merge.yml
+
+Naturally website-side (not denied, not exempt):
+  ibl5/**  .github/** (incl. e2e-tests.yml, lighthouse.yml)  docker/**
+  Dockerfile  docker-compose*.yml  *.php *.ts *.js *.css
 HELP
     exit 0
 fi
@@ -88,8 +128,14 @@ while IFS= read -r line; do
         fi
         # else: denied and not in carve-out — non-website, don't increment WEBSITE_COUNT
     else
-        # Does not match deny regex → website-affecting
-        WEBSITE_COUNT=$((WEBSITE_COUNT + 1))
+        # Does not match deny regex → website-side by DEFAULT, unless the path is
+        # in the curated CI-meta exempt set (workflow files that provably can't
+        # affect the E2E suite, Lighthouse, or the app). Fail-safe: anything not
+        # explicitly exempt still counts website.
+        if ! is_ci_meta_exempt "$line"; then
+            WEBSITE_COUNT=$((WEBSITE_COUNT + 1))
+        fi
+        # else: CI-meta exempt — non-website, don't increment WEBSITE_COUNT
     fi
 done
 

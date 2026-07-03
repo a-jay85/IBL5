@@ -1,6 +1,6 @@
 ---
 description: Publish the Playwright visual-regression HTML report to per-SHA GitHub Pages and post a sticky PR comment (grouped by module, with a coverage-gap section) so visual-change PRs are reviewed from the PR itself.
-last_verified: 2026-06-22
+last_verified: 2026-07-02
 ---
 
 # ADR-0068: Visual-review publishing for visual-change PRs
@@ -41,18 +41,21 @@ before/after (ordering invariant). Changed-files → manifest-coverage selection
 are pure, unit-tested functions; changing that selection logic is itself a
 mechanical-enforcement surface and requires a future ADR.
 
-Per-SHA hosting uses `peaceiris/actions-gh-pages@v4` with `keep_files: true` and
-`destination_dir: <sha>/visual-review`. `actions/deploy-pages` was rejected because it
-replaces the whole site with a single latest deploy, so it cannot host concurrent SHAs.
+Per-SHA accumulation uses `peaceiris/actions-gh-pages@v4` with `keep_files: true` and
+`destination_dir: <sha>/visual-review` to push each commit's gallery onto the `gh-pages`
+branch, which is the durable accumulator of every open PR's gallery. Serving is via GitHub
+Actions (Pages source = GitHub Actions, `build_type: workflow`) — see ADR-0078, which amends
+the serving layer of this decision.
 
 ## Alternatives Considered
 
 - **Hosted visual-review SaaS (Percy/Argos/Chromatic)** — Rejected: lower build effort
   but adds an external dependency and egresses screenshots, against the repo's
   self-hosted/Docker posture (ADR-0046/0062 lineage).
-- **`actions/deploy-pages` instead of a `gh-pages` branch** — Rejected: it replaces the
-  whole Pages site with one latest deploy, defeating the per-SHA requirement that lets
-  multiple open PRs/SHAs coexist.
+- **`actions/deploy-pages` uploading only the current run's gallery** — Rejected: a single
+  fresh-artifact deploy of just this SHA's output replaces the whole site and cannot host
+  concurrent SHAs. ADR-0078 instead uploads the ENTIRE `gh-pages` tree as the artifact, so
+  `actions/deploy-pages` serves every accumulated SHA at once — coexistence is preserved.
 - **A new opt-in `visual-review` label to trigger publishing** — Rejected: the comment is
   only built when VR detects diffing cells, so it is self-scoping; a label would add a
   step the reviewer must remember.
@@ -63,10 +66,11 @@ replaces the whole site with a single latest deploy, so it cannot host concurren
   off from the PR instead of loading each page in the Docker preview.
 - Positive: the coverage-gap section makes a changed-but-unreviewed page impossible to miss.
 - Negative: visual-change PRs sit red until a human applies `update-baselines` (by design).
-- Negative: a `gh-pages` branch is introduced and must be set as the Pages source — a
-  one-time owner enablement (Pages is currently disabled / 404). After the branch first
-  exists: `gh api -X POST repos/a-jay85/IBL5/pages -f 'source[branch]=gh-pages' -f 'source[path]=/'`
-  (or repo Settings → Pages).
+- Negative: the Pages source must be set to **GitHub Actions** (`build_type: workflow`) — a
+  one-time owner action (repo Settings → Pages → Build and deployment → Source → GitHub Actions,
+  or `gh api --method PUT repos/a-jay85/IBL5/pages -f build_type=workflow`). See ADR-0078. Until
+  it is flipped, the `Deploy VR gallery to Pages` `workflow_run` runs go red at the deploy step
+  (expected; self-clears once flipped).
 - Negative: fork PRs receive a read-only token with no secrets and cannot post the comment
   or push Pages — acceptable for this single-owner repo (consistent with the existing
   secrets-in-`pull_request` E2E model). The steps no-op there.
@@ -75,6 +79,9 @@ replaces the whole site with a single latest deploy, so it cannot host concurren
 
 - `.github/workflows/e2e-tests.yml` — the `e2e` job's publish/comment steps (gated to the
   review run, before regen) and the `vr-pages-cleanup` retention job.
+- `.github/workflows/pages-deploy.yml`, `ibl5/docs/decisions/0078-vr-pages-actions-serving.md` —
+  the `workflow_run`-triggered Actions deploy that serves the whole `gh-pages` tree, and the ADR
+  that amends this decision's serving layer.
 - `ibl5/tests/e2e/vr-coverage-map.ts` — pure changed-files → manifest-coverage mapper.
 - `ibl5/tests/e2e/vr-review-comment.ts` — pure sticky-comment markdown builder.
 - `bin/vr-changed-coverage`, `bin/vr-review-comment` — CLI wrappers consumed by the workflow.

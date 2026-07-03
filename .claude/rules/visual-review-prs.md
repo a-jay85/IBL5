@@ -2,6 +2,7 @@
 description: On a visual-change PR, the visual-regression run builds a change-driven before/after gallery (rows whose render differs from master's committed baseline) and posts a sticky visual-review PR comment grouped by module, with a "changed but NOT covered" coverage-gap section.
 paths:
   - ".github/workflows/e2e-tests.yml"
+  - ".github/workflows/pages-deploy.yml"
   - "ibl5/tests/e2e/vr-manifest.ts"
   - "ibl5/tests/e2e/vr-coverage-map.ts"
   - "ibl5/tests/e2e/vr-gallery.ts"
@@ -41,13 +42,18 @@ They are skipped only during baseline regen (the `update-baselines` label).
    (`changedCells`/`newCells`/`flakeCells`).
 3. **Deploy gallery to per-SHA Pages** — pushes `ibl5/vr-gallery` to the `gh-pages` branch under
    `<sha>/visual-review/` (multiple open PRs/SHAs coexist). The Playwright HTML report (traces) is
-   preserved under `<sha>/visual-review/playwright-report/`.
+   preserved under `<sha>/visual-review/playwright-report/`. The `gh-pages` branch is only the
+   durable accumulator; the site is **served** by `.github/workflows/pages-deploy.yml` (Pages
+   source = GitHub Actions, no Jekyll), which fires on `E2E Tests` completion and re-publishes the
+   whole tree.
 4. **Build comment** — `bin/vr-review-comment` consumes the pre-classified `gallery.json` and renders
    the sticky markdown.
 5. **Post sticky comment** — `marocchino/sticky-pull-request-comment@v3`, header `visual-review`.
 
 A `vr-pages-cleanup` job (push-to-master only, not part of the required gate) prunes
-per-SHA gallery dirs whose newest commit is older than 14 days.
+per-SHA gallery dirs whose newest commit is older than 14 days. Its `gh-pages` push is unchanged;
+a prune reaches the served site when `pages-deploy.yml` next re-publishes the tree (on the master
+run's `E2E Tests` completion).
 
 ## Reading the comment
 
@@ -128,11 +134,16 @@ mechanical-enforcement surface, covered by **ADR-0076**.
 
 ## One-time deployment prerequisite
 
-GitHub Pages must be enabled with source = the `gh-pages` branch, once, after the branch
-first exists (owner action — Pages is otherwise 404):
+GitHub Pages must be set to source = **GitHub Actions** (`build_type: workflow`) — a one-time
+owner action. The gallery is served by `.github/workflows/pages-deploy.yml`, which uploads the
+whole `gh-pages` tree as the Pages artifact; the `gh-pages` branch stays the durable per-SHA
+accumulator. Repo Settings → Pages → Build and deployment → Source → GitHub Actions, or:
 
 ```bash
-gh api -X POST repos/a-jay85/IBL5/pages -f 'source[branch]=gh-pages' -f 'source[path]=/'
+gh api --method PUT repos/a-jay85/IBL5/pages -f build_type=workflow
 ```
 
-(or repo Settings → Pages).
+Until the source is flipped, the `Deploy VR gallery to Pages` runs go red at the deploy step
+(expected; self-clears once flipped). After flipping, trigger one re-serve immediately via the
+workflow's `workflow_dispatch` (Actions → Deploy VR gallery to Pages → Run workflow) instead of
+waiting for the next PR.

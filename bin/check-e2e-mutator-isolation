@@ -1,0 +1,68 @@
+#!/bin/bash
+# Guards the "updater-firing specs live in the mutators project" invariant.
+#
+# The Playwright `mutators` project (ADR-0052) runs destructive full-season
+# updater specs on a dedicated, NON-sharded, single-worker DB. Any spec that
+# fires the updater pipeline (scripts/updateAllTheThings.php) while staying in
+# the sharded `chromium` pool plays the seed's unplayed games out from under
+# schedule-reader specs (team/league schedule, next-sim, last-sim-recap, ...).
+# Sharding masked this — per-shard DBs isolated the mutation — until the 1-shard
+# collapse (PR #1308) made every collision universal (17 schedule failures). This
+# guard fails CI if an updater-firing spec is missing from the mutators
+# testMatch allowlist in playwright.config.ts.
+#
+# Firing signal: a call to the triggerUpdater()/runUpdater() helpers, or a POST
+# to updateAllTheThings.php. A bare page.goto()/GET (the 403 role-gating and the
+# "redirects without running" smoke tests) does NOT fire the pipeline and is
+# intentionally NOT matched.
+#
+# The invariant is one-directional: firing ⇒ in mutators. A mutators spec that
+# does not fire the updater (e.g. league-control-panel, isolated for other global
+# mutations) is fine.
+#
+# Overridable for the self-test via E2E_MUTATOR_CONFIG / E2E_MUTATOR_SPECS_DIR.
+# Exits 0 (clean) or 1 (an updater-firing spec is outside the mutators project).
+set -euo pipefail
+
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo .)
+CONFIG="${E2E_MUTATOR_CONFIG:-$ROOT/ibl5/playwright.config.ts}"
+E2E="${E2E_MUTATOR_SPECS_DIR:-$ROOT/ibl5/tests/e2e}"
+
+# Firing signals — the helpers actually POST + run the pipeline; a direct POST to
+# updateAllTheThings.php does the same. GET/goto is excluded by design.
+FIRE_PATTERN='(triggerUpdater|runUpdater)\(|\.post\([^)]*updateAllTheThings'
+
+# Allowlist: spec basenames named in the mutators project's testMatch array. That
+# array is the single `testMatch:` line that lists updater-awards. Strip the
+# regex backslashes (\.spec\.ts) before extracting basenames.
+allowlist_line=$(grep -E 'testMatch:.*updater-awards' "$CONFIG" || true)
+if [ -z "$allowlist_line" ]; then
+  echo "ERROR: could not find the mutators testMatch allowlist in $CONFIG" >&2
+  echo "  (expected a 'testMatch:' line naming updater-awards.spec.ts)" >&2
+  exit 1
+fi
+# shellcheck disable=SC1003  # '\\' is a literal backslash for tr — strips the
+# regex escapes (\.spec\.ts) so the basenames extract cleanly; not a quote escape.
+allowlist=$(printf '%s\n' "$allowlist_line" | tr -d '\\' | grep -oE '[A-Za-z0-9._-]+\.spec\.ts')
+
+violations=0
+while IFS= read -r f; do
+  grep -Eq "$FIRE_PATTERN" "$f" || continue   # spec does not fire the updater
+  base=$(basename "$f")
+  if ! printf '%s\n' "$allowlist" | grep -qxF "$base"; then
+    echo "ERROR: $base fires the updater pipeline but is NOT in the mutators project." >&2
+    grep -nE "$FIRE_PATTERN" "$f" | sed 's/^/    /' >&2
+    violations=$((violations + 1))
+  fi
+done < <(find "$E2E" -name '*.spec.ts')
+
+if [ "$violations" -gt 0 ]; then
+  echo "" >&2
+  echo "Updater-firing specs must run in the Playwright 'mutators' project" >&2
+  echo "(dedicated, non-sharded, single-worker DB — see ADR-0052 and the mutators" >&2
+  echo "project header in ibl5/playwright.config.ts). For each offender, add its" >&2
+  echo "filename to BOTH the mutators testMatch AND the chromium testIgnore arrays." >&2
+  exit 1
+fi
+
+echo "OK: all updater-firing e2e specs are isolated in the mutators project."

@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-check-e2e-mutator-isolation — regression test for the mutator-isolation
+# gate. Builds throwaway playwright.config.ts + e2e spec trees and asserts the
+# check's exit code across the cases that matter: a firing spec inside vs. outside
+# the mutators allowlist, and the GET/goto non-firing forms that must NOT trip it.
+#
+# Run: bin/test-check-e2e-mutator-isolation  (exit 0 = all pass, 1 = a case failed)
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+CHECK="$SCRIPT_DIR/check-e2e-mutator-isolation"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+FAILED=0
+
+# A mutators testMatch line allowlisting exactly updater-awards + admin-pages,
+# mirroring the real playwright.config.ts regex-escaped form (\.spec\.ts).
+write_config() { # file
+  cat > "$1" <<'EOF'
+  projects: [
+    {
+      name: 'chromium',
+      testIgnore: [/updater-awards\.spec\.ts$/, /admin-pages\.spec\.ts$/],
+    },
+    {
+      name: 'mutators',
+      testMatch: [/updater-awards\.spec\.ts$/, /admin-pages\.spec\.ts$/],
+    },
+  ],
+EOF
+}
+
+fresh_specs() { # -> echoes a fresh empty specs dir
+  mktemp -d "$TMP/specs.XXXXXX"
+}
+
+put_spec() { # dir, basename, body
+  printf '%s\n' "$3" > "$dir/$2"
+}
+
+run_check() { # config, specsdir  -> sets RC
+  E2E_MUTATOR_CONFIG="$1" E2E_MUTATOR_SPECS_DIR="$2" "$CHECK" >/dev/null 2>&1
+  RC=$?
+}
+
+expect() { # name want got
+  if [ "$3" -eq "$2" ]; then
+    echo "ok: $1 (exit $3)"
+  else
+    echo "FAIL: $1 — expected exit $2, got $3"
+    FAILED=1
+  fi
+}
+
+CFG="$TMP/playwright.config.ts"
+write_config "$CFG"
+
+# Case 1: allowlisted firing spec (admin-pages calls triggerUpdater) → clean (0).
+dir=$(fresh_specs)
+put_spec "$dir" 'admin-pages.spec.ts' "await triggerUpdater(request);"
+run_check "$CFG" "$dir"
+expect "allowlisted firing spec passes" 0 "$RC"
+
+# Case 2: NON-allowlisted firing spec (helper call) → violation (1).
+dir=$(fresh_specs)
+put_spec "$dir" 'schedule-leaker.spec.ts' "await runUpdater(page);"
+run_check "$CFG" "$dir"
+expect "non-allowlisted helper-firing spec fails" 1 "$RC"
+
+# Case 3: NON-allowlisted firing spec (direct POST to updateAllTheThings) → 1.
+dir=$(fresh_specs)
+put_spec "$dir" 'poster.spec.ts' "const r = await request.post('scripts/updateAllTheThings.php', { form });"
+run_check "$CFG" "$dir"
+expect "non-allowlisted POST-firing spec fails" 1 "$RC"
+
+# Case 4: non-firing GET/goto (the 403 + redirect smoke tests) → must NOT trip (0).
+dir=$(fresh_specs)
+put_spec "$dir" 'role-gating.spec.ts' "$(printf '%s\n' \
+  "const response = await page.goto('scripts/updateAllTheThings.php');" \
+  "expect(response?.status()).toBe(403);")"
+run_check "$CFG" "$dir"
+expect "non-firing GET/goto is ignored" 0 "$RC"
+
+# Case 5: import-only (no call) must NOT trip.
+dir=$(fresh_specs)
+put_spec "$dir" 'importer.spec.ts' "import { triggerUpdater } from '../helpers/updater';"
+run_check "$CFG" "$dir"
+expect "import-without-call is ignored" 0 "$RC"
+
+# Case 6: missing/garbled allowlist line → hard error (1), never silent-pass.
+dir=$(fresh_specs)
+put_spec "$dir" 'admin-pages.spec.ts' "await triggerUpdater(request);"
+run_check "$TMP/nonexistent-config.ts" "$dir"
+expect "missing allowlist config errors" 1 "$RC"
+
+if [ "$FAILED" -eq 0 ]; then
+  echo "All test-check-e2e-mutator-isolation cases passed."
+else
+  echo "test-check-e2e-mutator-isolation: one or more cases FAILED." >&2
+fi
+exit "$FAILED"

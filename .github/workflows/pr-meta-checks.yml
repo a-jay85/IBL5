@@ -84,8 +84,10 @@ jobs:
               - '.github/workflows/pr-meta-checks.yml'
             e2ehygiene:
               - 'ibl5/tests/e2e/**'
+              - 'ibl5/playwright.config.ts'
               - 'bin/check-e2e-hygiene'
               - 'bin/check-e2e-fa-offers-owner'
+              - 'bin/check-e2e-mutator-isolation'
               - '.e2e-hygiene-skip-allowlist'
               - '.github/workflows/pr-meta-checks.yml'
 
@@ -130,6 +132,10 @@ jobs:
       - name: Run bin/check-e2e-fa-offers-owner
         if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.filter.outputs.e2ehygiene == 'true' }}
         run: bin/check-e2e-fa-offers-owner
+
+      - name: Run bin/check-e2e-mutator-isolation
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.filter.outputs.e2ehygiene == 'true' }}
+        run: bin/check-e2e-mutator-isolation
 
       # --- Advisory checks (path-gated): continue-on-error so they never fail
       # the job; each posts a sticky PR comment, same as today. ---

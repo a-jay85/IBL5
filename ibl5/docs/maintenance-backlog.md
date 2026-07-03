@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-07-02
+last_verified: 2026-07-03
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -1952,7 +1952,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 | 10.7 | ✅ Implemented | — | `BanDieExitInProductionRule` (0 baseline). |
 | 10.8 | ✅ Implemented | — | `BanCastFunctionsRule` (0). |
 | 10.9 | ✅ Implemented | — | `BanRawHtmlEscapeFunctionsRule` (0). |
-| 10.10 | ⬜ Open | 🟩 | `RequireTrustedAnnotationRule` NOT built (verified absent from phpstan-rules/). New rule + baseline + ADR; green-green. |
+| 10.10 | ✅ Implemented | 🟩 | `RequireTrustedAnnotationRule` (`ibl.trustedVariable`) guards `HtmlSanitizer::trusted()`; existing ~70 sites baselined (green-green), ADR-0077. |
 | 10.11 | ✅ Implemented | — | `BanDirectHeaderCallRule` (1 baseline). |
 | 10.12 | ✅ Implemented | 🟩 | `BanDirectMysqliQueryRule` landed; 7 Updater-step sites — burndown 🟩. **Status:** baseline cleared — 7 sites in 3 Refresh steps rerouted to `BaseMysqliRepository::execute()`. |
 | 10.13 | ✅ Implemented | — | `BanSqlStringInterpolationRule` landed; all sqlInterp baseline entries cleared (PR2 finisher). |
@@ -2045,9 +2045,10 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 ### 10.10 `HtmlSanitizer::trusted()` Is a 70-Site Escape Hatch
 **Location:** 70 calls across `FreeAgencyView`, `FreeAgencyOfferView`, `TradingView`, `WaiversView`
 **Problem:** `trusted()` is no-op whitelisted in `RequireEscapedOutputRule::SAFE_STATIC_CALLS`. Distinguishes only by code review whether arg is composed `$this->renderX()` (safe) or raw DB value (unsafe).
-**Suggested direction:** New `RequireTrustedAnnotationRule` — require `// @trusted` comment when arg is a variable (not method call on `$this`).
+**Direction (implemented):** `RequireTrustedAnnotationRule` fires `ibl.trustedVariable` when `trusted()`'s first arg is not a string/numeric literal, an `(int)/(float)/(bool)` cast, or a `$this->...()` call. Genuinely-safe new sites acknowledge with a native `// @phpstan-ignore ibl.trustedVariable` comment; existing sites are baselined.
 **Est. effort:** M
 **Risk if untouched:** Refactors silently extract `trusted($someVar)` with no signal.
+**Status:** ✅ Implemented — `RequireTrustedAnnotationRule` (`ibl.trustedVariable`) + ADR-0077. Existing sites baselined (green-green); no runtime code changed. Acknowledgment = native `@phpstan-ignore` suppression, not a bespoke `// @trusted` comment (rejected — see ADR-0077 Alternatives).
 
 ### 10.11 `header()` Outside Response Classes
 **Location:** `Utilities/HtmxHelper.php:29,31`

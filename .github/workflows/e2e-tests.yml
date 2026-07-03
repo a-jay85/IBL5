@@ -80,6 +80,14 @@ jobs:
               - 'docker-compose.ci.yml'
               - '.github/actions/setup-docker-e2e/**'
               - '.github/workflows/e2e-tests.yml'
+              # ibl6 connects to the SAME shared mariadb/ibl5 DB that
+              # setup-docker-e2e migrates and seeds; ibl6-visual asserts against
+              # seed-driven box-score snapshots. A migration/seed/runner-only PR
+              # must still run ibl6-e2e/ibl6-visual or a DB-driven regression
+              # would skip past the gate.
+              - 'ibl5/migrations/**'
+              - 'ibl5/tests/e2e/fixtures/ci-seed.sql'
+              - 'ibl5/bin/run-migrations-ci.sh'
 
   playwright-version-drift:
     name: Playwright version drift guard

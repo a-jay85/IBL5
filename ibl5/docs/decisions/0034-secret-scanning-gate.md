@@ -1,6 +1,6 @@
 ---
 description: Rationale for adding a gitleaks secret-scanning CI gate, scrubbing a rotated DB password, and hardening the demo-login token to fail closed.
-last_verified: 2026-05-28
+last_verified: 2026-07-03
 ---
 
 # ADR-0034: Secret-Scanning Gate
@@ -10,7 +10,7 @@ last_verified: 2026-05-28
 
 ## Context
 
-A holistic audit found the production DB password (already rotated by the maintainer) still committed in the tree at `ibl5/docs/maintenance-backlog.md` and surviving across git history. Separately, `ibl5/demo-login.php` accepted the guessable literal `'demo'` as its `DEMO_LOGIN_TOKEN`, so the public magic-link URL granted an authenticated read-only "Warriors GM" session to anyone who read the source. There was **no** automated secret-scanning gate among the CI workflows, so nothing prevented a future credential from being committed. The password was already rotated, so this is scrub-and-prevent, not incident response.
+A holistic audit found the production DB password (already rotated by the maintainer) still committed in the tree at `ibl5/docs/backlog/maintenance-backlog.md` and surviving across git history. Separately, `ibl5/demo-login.php` accepted the guessable literal `'demo'` as its `DEMO_LOGIN_TOKEN`, so the public magic-link URL granted an authenticated read-only "Warriors GM" session to anyone who read the source. There was **no** automated secret-scanning gate among the CI workflows, so nothing prevented a future credential from being committed. The password was already rotated, so this is scrub-and-prevent, not incident response.
 
 ## Decision
 
@@ -37,4 +37,4 @@ A holistic audit found the production DB password (already rotated by the mainta
 
 - `ibl5/demo-login.php`, `ibl5/classes/Auth/DemoLoginGate.php`, `ibl5/tests/Auth/DemoLoginGateTest.php`
 - `ibl5/tests/e2e/security/demo-login-weak-token.spec.ts`
-- `ibl5/config.php.example`, `ibl5/docs/maintenance-backlog.md` (findings 3.1, 3.2)
+- `ibl5/config.php.example`, `ibl5/docs/backlog/maintenance-backlog.md` (findings 3.1, 3.2)

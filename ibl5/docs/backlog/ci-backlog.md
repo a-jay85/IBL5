@@ -1,6 +1,6 @@
 ---
 description: CI/GitHub-Actions workflow simplification backlog — duplicated setup/notify boilerplate, job consolidation, and verified-not-redundant workflows, with per-entry status + automouse-readiness.
-last_verified: 2026-06-29
+last_verified: 2026-07-03
 ---
 
 # CI Workflow Simplification Backlog

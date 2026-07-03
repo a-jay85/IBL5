@@ -1,7 +1,6 @@
 ---
 name: plan
 description: "Plan an implementation task: enforces a verification matrix, directs code reuse, flags security surfaces, and requires negative-path tests so plans drive clean, secure, well-tested implementations."
-disable-model-invocation: true
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode

@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-06-28
+last_verified: 2026-07-03
 ---
 
 # Post-Plan Orchestrator

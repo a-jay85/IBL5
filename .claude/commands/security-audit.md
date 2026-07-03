@@ -3,7 +3,7 @@ allowed-tools: Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh pr comment:*),
   Bash(gh api:*), Bash(git rev-parse:*), Bash(source:*)
 description: Token-efficient security audit for pull requests
 model: sonnet
-last_verified: 2026-06-28
+last_verified: 2026-07-03
 ---
 
 Perform a security audit on the given pull request. This command optimizes token usage by fetching the diff once and passing it to a single merged security agent.

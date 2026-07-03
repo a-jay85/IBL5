@@ -1,6 +1,6 @@
 ---
 description: Why XSS is enforced mechanically by a PHPStan custom rule instead of runtime convention or templating.
-last_verified: 2026-05-15
+last_verified: 2026-07-03
 ---
 
 # ADR-0002: XSS enforcement via PHPStan `RequireEscapedOutputRule`

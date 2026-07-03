@@ -1,6 +1,6 @@
 ---
 description: ADR for advisory 500-LOC hot-file threshold rule and bin/check-hot-files script
-last_verified: 2026-06-29
+last_verified: 2026-07-03
 ---
 
 # ADR-0026: Hot-File Threshold Rule

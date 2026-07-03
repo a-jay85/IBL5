@@ -50,6 +50,11 @@ test.describe('Anonymous mutation lockdown', () => {
     const response = await request.post(
       'modules.php?name=Player&pa=processrookieoption',
       {
+        // Do NOT follow the redirect: with maxRedirects:0, HTTP 200 ⟺ loginbox
+        // rendered ⟺ the is_user() gate held. Every non-loginbox exit of
+        // processrookieoption() ends in HtmxHelper::redirect() → HTTP 302, so a
+        // regressed gate returns 302 (not 200) and fails the toBe(200) assert.
+        maxRedirects: 0,
         form: {
           teamname: 'Metros',
           playerID: '200000032',
@@ -58,11 +63,13 @@ test.describe('Anonymous mutation lockdown', () => {
         },
       },
     );
-    expect(response.status()).toBeLessThan(400);
+    // Discriminating assertion: loginbox() returns 200 with no Location header;
+    // a bypassed gate would 302 here.
+    expect(response.status()).toBe(200);
     const html = await response.text();
-    // loginbox() redirects unauthenticated users to the YourAccount login page.
+    // Secondary marker — meaningful ONLY paired with status===200: confirms the
+    // 200 is the loginbox page, not some other 200.
     expect(html).toContain('YourAccount');
-    expect(html).not.toContain('rookie_option_success');
     expectNoPhpErrors(html, 'on anon processrookieoption');
   });
 });

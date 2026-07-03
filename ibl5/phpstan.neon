@@ -41,6 +41,10 @@ services:
         tags:
             - phpstan.rules.rule
     -
+        class: PHPStanRules\RequireTrustedAnnotationRule
+        tags:
+            - phpstan.rules.rule
+    -
         class: PHPStanRules\BanRawSuperglobalsRule
         tags:
             - phpstan.rules.rule

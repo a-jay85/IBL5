@@ -3,7 +3,7 @@ description: "Plan an implementation task: enforces a verification matrix, direc
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
-last_verified: 2026-07-02
+last_verified: 2026-07-03
 
 ---
 
@@ -25,7 +25,7 @@ Fall back to `auto_merge: false` only when the judgment is **irreducible**: *dis
 
 ## Step 1: Verification rule
 
-Read `.claude/commands/_plan-verification.md` and use its full content as `$VERIFICATION_RULE` for injection into the Plan agent prompt in Step 3. Do not summarize or paraphrase the rule.
+Read `.claude/review-shared/_plan-verification.md` and use its full content as `$VERIFICATION_RULE` for injection into the Plan agent prompt in Step 3. Do not summarize or paraphrase the rule.
 
 ## Step 2: Orient on the codebase
 

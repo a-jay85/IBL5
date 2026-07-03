@@ -3,7 +3,7 @@ allowed-tools: Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh pr comment:*),
   Bash(gh api:*), Bash(git rev-parse:*), Bash(source:*)
 description: Token-efficient security audit for pull requests
 model: sonnet
-last_verified: 2026-06-28
+last_verified: 2026-07-03
 ---
 
 Perform a security audit on the given pull request. This command optimizes token usage by fetching the diff once and passing it to a single merged security agent.
@@ -48,7 +48,7 @@ Store all of these results — they will be passed as context to agents below.
 
 ## Step 3: Pattern detection and agent launch
 
-**Read** `.claude/commands/_security-agents.md` for the canonical pattern-detection bash block and agent definition.
+**Read** `.claude/review-shared/_security-agents.md` for the canonical pattern-detection bash block and agent definition.
 
 Run the pattern-detection block from that file to get SQL and Forms category counts. Build the `CATEGORIES:` line (always include Auth/Authz; add SQL Injection if SQL > 0; add CSRF Protection if Forms > 0). Launch a **single Haiku agent** with the categories line and the PHP-only diff from Step 2c. Do not forward CLAUDE.md content (auto-loaded).
 
@@ -58,7 +58,7 @@ Run the pattern-detection block from that file to get SQL and Forms category cou
 
 ## Step 4: Confidence scoring
 
-**Read** `.claude/commands/_review-rubric.md` for the canonical rubric, thresholds, Automatic-Zero rule list, and IBL5 false-positive list.
+**Read** `.claude/review-shared/_review-rubric.md` for the canonical rubric, thresholds, Automatic-Zero rule list, and IBL5 false-positive list.
 
 Collect all findings from Step 3 into a numbered list. Launch a **single Haiku agent**, pass it the findings plus the **Scoring scale and Thresholds sections** from `_review-rubric.md` (not the full Automatic Zero or false-positive lists — review agents have already filtered those). Instruct it to return JSON scores per the rubric.
 

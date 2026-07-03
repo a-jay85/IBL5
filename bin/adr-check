@@ -83,6 +83,37 @@ function diffAddedLines(string $mode, string $file): array
     return $added;
 }
 
+/** @return list<string> */
+function diffRemovedLines(string $mode, string $file): array
+{
+    $range = gitDiffRange($mode);
+    [$lines] = runCmd(sprintf('git diff %s -- %s', escapeshellarg($range), escapeshellarg($file)));
+    $removed = [];
+    foreach ($lines as $line) {
+        if (str_starts_with($line, '-') && !str_starts_with($line, '---')) {
+            $removed[] = substr($line, 1);
+        }
+    }
+    return $removed;
+}
+
+/**
+ * Extract Composer "vendor/package" keys from require/require-dev diff lines.
+ *
+ * @param list<string> $lines
+ * @return list<string>
+ */
+function composerPackageKeys(array $lines): array
+{
+    $keys = [];
+    foreach ($lines as $line) {
+        if (preg_match('#"([a-z0-9._-]+/[a-z0-9._-]+)"\s*:\s*"#i', $line, $m) === 1) {
+            $keys[] = strtolower($m[1]);
+        }
+    }
+    return $keys;
+}
+
 /**
  * Read the full contents of a file from the git object store (index for --staged,
  * HEAD for --pr). Returns [line_count, first_line].
@@ -149,11 +180,15 @@ function detectTriggers(string $mode): array
         if ($file !== 'ibl5/composer.json') {
             continue;
         }
-        foreach (diffAddedLines($mode, $file) as $line) {
-            if (preg_match('#"[a-z0-9._-]+/[a-z0-9._-]+"\s*:\s*"#i', $line) === 1) {
-                $triggers[] = ['type' => 'new-dependency', 'file' => $file];
-                break;
-            }
+        // A version bump modifies an existing require line: the same package key
+        // appears on both the added and removed sides. Only a genuinely new
+        // dependency has an added key with no removed counterpart. Diff the keys
+        // rather than scanning added lines alone, so dependabot/manual bumps
+        // don't false-trigger the gate.
+        $addedKeys = composerPackageKeys(diffAddedLines($mode, $file));
+        $removedKeys = composerPackageKeys(diffRemovedLines($mode, $file));
+        if (array_diff($addedKeys, $removedKeys) !== []) {
+            $triggers[] = ['type' => 'new-dependency', 'file' => $file];
         }
     }
 

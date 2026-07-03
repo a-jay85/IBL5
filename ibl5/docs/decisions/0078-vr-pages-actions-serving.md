@@ -1,6 +1,6 @@
 ---
 description: Serve the accumulated per-SHA visual-review gh-pages tree via a workflow_run-triggered GitHub Actions Pages deploy (build_type: workflow), replacing the stuck legacy Jekyll branch-build that 404'd.
-last_verified: 2026-07-02
+last_verified: 2026-07-03
 ---
 
 # ADR-0078: Serve the VR gallery via Actions (workflow_run → deploy-pages), not legacy Jekyll

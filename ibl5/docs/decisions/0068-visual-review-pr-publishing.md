@@ -1,6 +1,6 @@
 ---
 description: Publish the Playwright visual-regression HTML report to per-SHA GitHub Pages and post a sticky PR comment (grouped by module, with a coverage-gap section) so visual-change PRs are reviewed from the PR itself.
-last_verified: 2026-07-02
+last_verified: 2026-07-03
 ---
 
 # ADR-0068: Visual-review publishing for visual-change PRs

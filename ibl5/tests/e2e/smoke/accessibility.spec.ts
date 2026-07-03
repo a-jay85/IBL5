@@ -7,11 +7,11 @@ import { assertNoA11yViolations, type A11yOptions } from '../helpers/accessibili
 const SITE_WIDE_DISABLED_RULES: string[] = [];
 
 // Per-rule allowlist of pages with known failures — shrinking backlog tracker.
-// See ibl5/docs/a11y-backlog.md (non-contrast) and ibl5/docs/a11y-contrast-backlog.md (contrast).
+// See ibl5/docs/backlog/a11y-backlog.md (non-contrast) and ibl5/docs/backlog/a11y-contrast-backlog.md (contrast).
 // Each removal from a set = ratchet tightening (CI enforces that page/rule permanently).
 // Keys are axe rule ids; values are sets of page names from the spec page lists.
 const KNOWN_FAILING: Record<string, Set<string>> = {
-  // PHP-Nuke legacy palette debt. See ibl5/docs/a11y-contrast-backlog.md.
+  // PHP-Nuke legacy palette debt. See ibl5/docs/backlog/a11y-contrast-backlog.md.
   'color-contrast': new Set([
     // Public pages
     'homepage',
@@ -53,11 +53,11 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
     'gm contact list',
     'draft',
     'next sim',
-    // Legacy admin page — PHP-Nuke palette debt. See ibl5/docs/a11y-backlog.md.
+    // Legacy admin page — PHP-Nuke palette debt. See ibl5/docs/backlog/a11y-backlog.md.
     'league control panel',
   ]),
 
-  // No <h1> on page — most module pages use <h2 class="ibl-title">. See ibl5/docs/a11y-backlog.md.
+  // No <h1> on page — most module pages use <h2 class="ibl-title">. See ibl5/docs/backlog/a11y-backlog.md.
   // Burn-down: a11y-2-heading-one-single-title (single-title views), supervised backlog (rest).
   'page-has-heading-one': new Set([
     // Seeded empirically — see plan a11y-1-ratchet-best-practice
@@ -72,33 +72,33 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
     'voting EOY ballot',
   ]),
 
-  // Heading-level skip (h4 after h2, no h3). See ibl5/docs/a11y-backlog.md.
+  // Heading-level skip (h4 after h2, no h3). See ibl5/docs/backlog/a11y-backlog.md.
   // Burn-down: a11y-2-heading-one-single-title (record holders view, same render pass).
   'heading-order': new Set([
   ]),
 
   // Links with no discernible text. Remaining entry is the homepage last-sim-recap
   // team links (data-dependent — out of scope; News-template links carry aria-labels).
-  // See ibl5/docs/a11y-backlog.md §link-name.
+  // See ibl5/docs/backlog/a11y-backlog.md §link-name.
   'link-name': new Set([
     'homepage',
   ]),
 
-  // Touch targets < 24×24px. Seed-dependent for small-count hits. See ibl5/docs/a11y-backlog.md.
+  // Touch targets < 24×24px. Seed-dependent for small-count hits. See ibl5/docs/backlog/a11y-backlog.md.
   // Empirically clean on the CI seed (axe target-size: 0 violations on topics/homepage/news article) — ratchet tightened.
   'target-size': new Set([
   ]),
 
-  // Multiple landmarks share role+name. See ibl5/docs/a11y-backlog.md §landmark-unique.
+  // Multiple landmarks share role+name. See ibl5/docs/backlog/a11y-backlog.md §landmark-unique.
   'landmark-unique': new Set([
   ]),
 
-  // No <main> landmark — legacy root page bypasses PageLayout. See ibl5/docs/a11y-backlog.md §landmark-one-main.
+  // No <main> landmark — legacy root page bypasses PageLayout. See ibl5/docs/backlog/a11y-backlog.md §landmark-one-main.
   'landmark-one-main': new Set([
     'league control panel',
   ]),
 
-  // Content outside landmark regions — same root-page bypass. See ibl5/docs/a11y-backlog.md §region.
+  // Content outside landmark regions — same root-page bypass. See ibl5/docs/backlog/a11y-backlog.md §region.
   'region': new Set([
     'league control panel',
   ]),

@@ -3,6 +3,7 @@ includes:
     - phpstan-tests-baseline.neon
 
 parameters:
+    tmpDir: tmp-tests
     level: 6
     paths:
         - tests

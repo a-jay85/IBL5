@@ -23,6 +23,7 @@ jobs:
   changes:
     name: Detect changes
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       pull-requests: read
     outputs:
@@ -70,6 +71,7 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.src == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     permissions:
       contents: read
     strategy:
@@ -150,6 +152,7 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.src == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
     - name: Checkout code
@@ -170,6 +173,7 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.src == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
     - name: Checkout code
@@ -189,6 +193,7 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.ibl6 == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     steps:
     - name: Checkout code
@@ -211,6 +216,14 @@ jobs:
 
     # vite.config forces vitest browser mode (provider: playwright, chromium),
     # so the runner needs the browser binary before test:unit.
+    - name: Cache Playwright browsers
+      uses: actions/cache@v6
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ hashFiles('IBL6/package-lock.json') }}
+        restore-keys: |
+          playwright-${{ runner.os }}-
+
     - name: Install Playwright Chromium
       working-directory: IBL6
       run: npx playwright install chromium --with-deps
@@ -224,6 +237,7 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.src == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     services:
       mariadb:
@@ -268,6 +282,7 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.src == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
     - name: Checkout code
@@ -277,6 +292,16 @@ jobs:
       uses: ./.github/actions/setup-php-env
       with:
         create-config: 'false'
+
+    - name: Cache PHPStan result cache
+      uses: actions/cache@v6
+      with:
+        path: |
+          ibl5/tmp
+          ibl5/tmp-tests
+        key: phpstan-${{ hashFiles('ibl5/phpstan.neon', 'ibl5/phpstan-tests.neon', 'ibl5/phpstan-rules/**') }}
+        restore-keys: |
+          phpstan-
 
     - name: Run PHPStan
       working-directory: ibl5
@@ -295,6 +320,7 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.src == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
         with:
@@ -307,6 +333,7 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.shell == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout code
@@ -358,6 +385,7 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.shell == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout code
@@ -394,6 +422,7 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.shell == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -407,6 +436,7 @@ jobs:
     needs: [test, phpstan]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: write
 
@@ -467,6 +497,7 @@ jobs:
   static-guards:
     name: Static guards
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     # Folds three unconditional micro-guards into one sequential job to save runner
     # startup overhead (mirrors the PR #1269 meta-checks fold). NO `if:` and NO
     # `needs:` — every check below runs unconditionally because none is covered by a
@@ -500,6 +531,7 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.shell == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     # Each harness builds its own throwaway git repos under mktemp, so the
     # checkout depth and a global git identity are irrelevant.
     steps:
@@ -551,6 +583,7 @@ jobs:
     if: always()
     needs: [changes, test, audit-php, audit-js, ibl6-checks, db-integration, phpstan, phpunit-hygiene, shellcheck, host-mariadb-guard, automouse-impl-model-test, update-baselines, static-guards, harness-tests]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - run: exit 1
         if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')

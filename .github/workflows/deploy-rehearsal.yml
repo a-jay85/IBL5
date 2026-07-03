@@ -45,6 +45,7 @@ jobs:
   rehearse:
     name: Deploy Rehearsal (composer --no-dev + migrate + validate-schema)
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     env:
       DB_HOST: 127.0.0.1

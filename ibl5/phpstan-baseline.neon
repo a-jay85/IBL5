@@ -85,6 +85,12 @@ parameters:
 			path: classes/Debug/DebugSession.php
 
 		-
+			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
+			identifier: ibl.trustedVariable
+			count: 1
+			path: classes/DepthChartEntry/DepthChartEntryView.php
+
+		-
 			rawMessage: 'Direct now-returning time call is banned outside the Clock seam. Inject Clock\ClockInterface (constructor for instance classes; settable static clock with factory fallback for static classes) and call $clock->now(). Pass an explicit timestamp to date()/strtotime() for deterministic formatting.'
 			identifier: ibl.directTime
 			count: 1
@@ -113,6 +119,18 @@ parameters:
 			identifier: ibl.directTime
 			count: 1
 			path: classes/FreeAgency/FreeAgencyAdminRepository.php
+
+		-
+			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
+			identifier: ibl.trustedVariable
+			count: 10
+			path: classes/FreeAgency/FreeAgencyOfferView.php
+
+		-
+			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
+			identifier: ibl.trustedVariable
+			count: 2
+			path: classes/FreeAgency/FreeAgencyView.php
 
 		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
@@ -145,6 +163,12 @@ parameters:
 			path: classes/League/LeagueContext.php
 
 		-
+			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
+			identifier: ibl.trustedVariable
+			count: 1
+			path: classes/LeagueControlPanel/LeagueControlPanelView.php
+
+		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringConcatenation
 			count: 1
@@ -157,10 +181,46 @@ parameters:
 			path: classes/Migration/SchemaValidator.php
 
 		-
+			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
+			identifier: ibl.trustedVariable
+			count: 3
+			path: classes/Navigation/NavigationView.php
+
+		-
 			rawMessage: Hardcoded environment string "localhost" is banned. Inject an environment/config flag instead of branching on a literal host name.
 			identifier: ibl.hardcodedEnvString
 			count: 1
 			path: classes/Navigation/Views/DesktopNavView.php
+
+		-
+			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
+			identifier: ibl.trustedVariable
+			count: 5
+			path: classes/Navigation/Views/DesktopNavView.php
+
+		-
+			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
+			identifier: ibl.trustedVariable
+			count: 1
+			path: classes/Navigation/Views/LoginFormView.php
+
+		-
+			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
+			identifier: ibl.trustedVariable
+			count: 9
+			path: classes/Navigation/Views/MobileNavView.php
+
+		-
+			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
+			identifier: ibl.trustedVariable
+			count: 2
+			path: classes/Navigation/Views/TeamsDropdownView.php
+
+		-
+			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
+			identifier: ibl.trustedVariable
+			count: 6
+			path: classes/Negotiation/NegotiationOfferView.php
 
 		-
 			rawMessage: 'Direct now-returning time call is banned outside the Clock seam. Inject Clock\ClockInterface (constructor for instance classes; settable static clock with factory fallback for static classes) and call $clock->now(). Pass an explicit timestamp to date()/strtotime() for deterministic formatting.'
@@ -211,10 +271,22 @@ parameters:
 			path: classes/ProjectedDraftOrder/ProjectedDraftOrderRepository.php
 
 		-
+			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
+			identifier: ibl.trustedVariable
+			count: 1
+			path: classes/RookieOption/RookieOptionView.php
+
+		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringConcatenation
 			count: 5
 			path: classes/Search/SearchRepository.php
+
+		-
+			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
+			identifier: ibl.trustedVariable
+			count: 67
+			path: classes/Search/SearchView.php
 
 		-
 			rawMessage: 'Direct now-returning time call is banned outside the Clock seam. Inject Clock\ClockInterface (constructor for instance classes; settable static clock with factory fallback for static classes) and call $clock->now(). Pass an explicit timestamp to date()/strtotime() for deterministic formatting.'
@@ -251,6 +323,12 @@ parameters:
 			identifier: ibl.sqlStringConcatenation
 			count: 2
 			path: classes/Team/TeamQueryRepository.php
+
+		-
+			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
+			identifier: ibl.trustedVariable
+			count: 14
+			path: classes/Team/TeamView.php
 
 		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
@@ -301,6 +379,12 @@ parameters:
 			path: classes/Trading/TradingController.php
 
 		-
+			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
+			identifier: ibl.trustedVariable
+			count: 23
+			path: classes/Trading/TradingView.php
+
+		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringConcatenation
 			count: 1
@@ -323,3 +407,15 @@ parameters:
 			identifier: ibl.directTime
 			count: 1
 			path: classes/Waivers/WaiversService.php
+
+		-
+			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
+			identifier: ibl.trustedVariable
+			count: 1
+			path: classes/Waivers/WaiversView.php
+
+		-
+			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
+			identifier: ibl.trustedVariable
+			count: 1
+			path: classes/YourAccount/LoginView.php

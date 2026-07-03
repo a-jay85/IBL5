@@ -27,7 +27,8 @@ use PHPStan\Rules\RuleErrorBuilder;
  * `RequireEscapedOutputRule` whitelists `trusted()`'s *output* as safe HTML, but
  * nothing checks its *input*. This rule fires when `trusted()` receives an argument
  * that is not provably safe HTML, forcing either a refactor to a safe form or an
- * explicit, reviewed suppression (`// @phpstan-ignore ibl.trustedVariable`).
+ * explicit, reviewed suppression via a native PHPStan ignore comment targeting the
+ * `ibl.trustedVariable` identifier (see MESSAGE below for the exact wording).
  *
  * A `trusted()` argument is safe iff it is one of:
  *   - a string or numeric literal

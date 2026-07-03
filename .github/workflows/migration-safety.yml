@@ -22,6 +22,7 @@ jobs:
   idempotency-check:
     name: Bash/PHP Runner Idempotency
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     env:
       DB_HOST: 127.0.0.1
@@ -73,6 +74,7 @@ jobs:
   schema-parity-check:
     name: Bash vs PHP Schema Parity
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     # Only consumed by config.php.example getenv() in `php bin/migrate`; the
     # mysql/mysqldump CLI calls below pass creds via explicit flags, so DB_NAME
@@ -156,6 +158,7 @@ jobs:
   schema-completeness:
     name: Schema Completeness
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     env:
       DB_HOST: 127.0.0.1
@@ -267,6 +270,7 @@ jobs:
   destructive-migration-scan:
     name: Destructive Migration Scan
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -297,6 +301,7 @@ jobs:
     if: always()
     needs: [idempotency-check, schema-parity-check, schema-completeness, destructive-migration-scan]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - run: exit 1
         if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')

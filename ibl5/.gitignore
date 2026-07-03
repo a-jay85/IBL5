@@ -35,6 +35,10 @@ vr-gallery.json
 # Page cache (generated at runtime)
 cache/page/
 
+# PHPStan result cache (tmpDir set in phpstan.neon / phpstan-tests.neon for CI cache persistence)
+/tmp/
+/tmp-tests/
+
 # Security backlog — catalogs unpatched, reachable vulnerabilities (attacker roadmap).
 # Kept in-tree so Claude can read/track it, but MUST NOT be committed.
 docs/security-backlog.md

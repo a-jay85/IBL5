@@ -58,7 +58,7 @@ export default defineConfig({
         storageState: 'playwright/.auth/user.json',
       },
       dependencies: ['setup'],
-      testIgnore: [/auth\.setup\.ts/, /auth-regular\.setup\.ts/, /visual-regression/, /updater-awards\.spec\.ts$/, /league-control-panel\.spec\.ts$/],
+      testIgnore: [/auth\.setup\.ts/, /auth-regular\.setup\.ts/, /visual-regression/, /updater-awards\.spec\.ts$/, /league-control-panel\.spec\.ts$/, /engine-shadow-spawn-on-update\.spec\.ts$/, /admin-pages\.spec\.ts$/, /olympics-admin\.spec\.ts$/],
     },
     {
       // Destructive full-season updater specs mutate GLOBAL DB rows (schedules,
@@ -66,13 +66,21 @@ export default defineConfig({
       // into their own project so CI can run them in a dedicated, NON-sharded
       // job against a fresh DB — see ADR-0052. They are excluded from chromium's
       // testIgnore above so the sharded run never touches them.
+      //
+      // This testMatch is an ALLOWLIST: any spec that fires the updater pipeline
+      // (imports triggerUpdater/runUpdater, or POSTs updateAllTheThings.php) MUST
+      // be listed here AND in chromium's testIgnore, or it leaks into the sharded
+      // pool and plays the seed's unplayed games out from under schedule-reader
+      // specs. Sharding used to mask this (per-shard DBs isolated the mutation);
+      // the 1-shard collapse (PR #1308) made every collision universal — that is
+      // how engine-shadow-spawn / admin-pages / olympics-admin were caught here.
       name: 'mutators',
       use: {
         ...devices['Desktop Chrome'],
         storageState: 'playwright/.auth/user.json',
       },
       dependencies: ['setup'],
-      testMatch: [/updater-awards\.spec\.ts$/, /league-control-panel\.spec\.ts$/],
+      testMatch: [/updater-awards\.spec\.ts$/, /league-control-panel\.spec\.ts$/, /engine-shadow-spawn-on-update\.spec\.ts$/, /admin-pages\.spec\.ts$/, /olympics-admin\.spec\.ts$/],
     },
   ],
 });

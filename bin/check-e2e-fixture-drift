@@ -1,0 +1,98 @@
+#!/bin/bash
+# Runtime sibling of the static mutator-isolation gate (bin/check-e2e-mutator-isolation).
+#
+# The static grep gate catches only updater-firing specs (a narrow endpoint signal)
+# at PR-meta time. THIS gate catches any DURABLE net mutation of a curated shared
+# seed row during the chromium (non-mutator) E2E run: it snapshots a curated set of
+# shared seed rows AFTER seed / BEFORE the chromium run, snapshots again AFTER, and
+# diffs. Any net difference is a durably-leaked shared-row mutation and fails the
+# job with row-level attribution (the diff line names the exact table + business key,
+# e.g. `ibl_plr 30: teamid 1 -> 5`).
+#
+# Both gates enforce the same invariant — ADR-0052 (non-sharded mutator isolation).
+# Escape hatch: a spec that MUST durably mutate a shared row belongs in the Playwright
+# `mutators` project (a separate job on a dedicated DB), NOT the sharded chromium pool.
+#
+# Scope honesty: this catches DURABLE net drift and names the row; transient
+# self-cleaning mid-run races (mutate-then-reset within the same run) are structurally
+# invisible to a before/after snapshot — those stay the domain of isolation discipline
+# plus the static gate.
+#
+# Overridable for the self-test via FIXTURE_DRIFT_MANIFEST / FIXTURE_DRIFT_MYSQL.
+# Subcommands: `snapshot <outfile>` (dump curated rows) and `diff <before> <after>`.
+set -euo pipefail
+
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo .)
+MANIFEST="${FIXTURE_DRIFT_MANIFEST:-$ROOT/ibl5/tests/e2e/fixtures/shared-fixture-manifest.txt}"
+MYSQL="${FIXTURE_DRIFT_MYSQL:-docker compose -f docker-compose.ci.yml exec -T mariadb mariadb -u root -proot ibl5 -N}"
+
+usage() {
+  echo "usage: $(basename "$0") snapshot <outfile>" >&2
+  echo "       $(basename "$0") diff <before> <after>" >&2
+}
+
+# Trim leading/trailing whitespace from a field.
+trim() {
+  local s="$1"
+  s="${s#"${s%%[![:space:]]*}"}"
+  s="${s%"${s##*[![:space:]]}"}"
+  printf '%s' "$s"
+}
+
+do_snapshot() {
+  local outfile="${1:-}"
+  if [ -z "$outfile" ]; then usage; exit 2; fi
+  if [ ! -f "$MANIFEST" ]; then
+    echo "ERROR: fixture-drift manifest not found: $MANIFEST" >&2
+    exit 1
+  fi
+  : > "$outfile"
+  local line table columns orderby where
+  while IFS= read -r line || [ -n "$line" ]; do
+    # Skip blank lines and comments.
+    case "$(trim "$line")" in
+      ''|'#'*) continue ;;
+    esac
+    IFS='|' read -r table columns orderby where <<EOF
+$line
+EOF
+    table=$(trim "$table")
+    columns=$(trim "$columns")
+    orderby=$(trim "$orderby")
+    where=$(trim "$where")
+    if [ -z "$table" ] || [ -z "$columns" ] || [ -z "$orderby" ] || [ -z "$where" ]; then
+      echo "ERROR: malformed manifest line (need 4 pipe fields): $line" >&2
+      exit 1
+    fi
+    # Build the SELECT and pipe it on stdin to the (word-split) executor. Prefix
+    # every result row with its table name so each dump line self-identifies.
+    printf 'SELECT %s FROM %s WHERE %s ORDER BY %s;\n' "$columns" "$table" "$where" "$orderby" \
+      | $MYSQL \
+      | awk -v t="$table" 'BEGIN{OFS="\t"}{print t,$0}' >> "$outfile"
+  done < "$MANIFEST"
+}
+
+do_diff() {
+  local before="${1:-}" after="${2:-}" hunk rc=0
+  if [ -z "$before" ] || [ -z "$after" ]; then usage; exit 2; fi
+  hunk=$(diff "$before" "$after") || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    echo "OK: no shared-fixture drift during the chromium E2E run."
+    return 0
+  fi
+  echo "FIXTURE DRIFT DETECTED — a curated shared seed row was durably mutated during"
+  echo "the chromium (non-mutator) E2E run. Net before/after diff (< = seed, > = drifted):"
+  echo ""
+  printf '%s\n' "$hunk" | sed 's/^/  /'
+  echo ""
+  echo "Each line is <table> then the manifest's business columns. A spec that must"
+  echo "durably mutate a shared row belongs in the Playwright \`mutators\` project"
+  echo "(dedicated DB — ADR-0052), NOT the sharded chromium pool."
+  return 1
+}
+
+case "${1:-}" in
+  snapshot) shift; do_snapshot "$@" ;;
+  diff)     shift; do_diff "$@" ;;
+  *)        usage; exit 2 ;;
+esac

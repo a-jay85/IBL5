@@ -32,11 +32,45 @@ trap 'chmod -R u+w "$TMP" 2>/dev/null; rm -rf "$TMP" 2>/dev/null' EXIT
 
 FAILED=0
 
-# A stub gh that always fails, so cleanup's `gh pr view` yields no PR state and
-# Check 1 is skipped. Keeps merged-detection on the deterministic Check 2/3.
+# A table-driven gh stub keyed off an optional $GH_FIXTURE file. With no fixture
+# (unset or missing file) it exits 1 — byte-identical to the legacy always-fail
+# stub — so cleanup's `gh pr view` yields no PR state and Check 1 is skipped,
+# keeping every pre-existing case on the deterministic Check 2/3.
 STUBBIN="$TMP/stubbin"
 mkdir -p "$STUBBIN"
-printf '#!/bin/sh\nexit 1\n' > "$STUBBIN/gh"
+cat > "$STUBBIN/gh" <<'GH'
+#!/usr/bin/env bash
+# Table-driven gh stub. Reads $GH_FIXTURE (TAB-separated rows):
+#   view <ref>       <state> <headRefOid> <number>
+#   list <searchSha> <headRefOid> <state> <number>
+# No fixture -> exit 1 (== the legacy always-fail stub), so no-PR cases stay deterministic.
+[ -n "${GH_FIXTURE:-}" ] && [ -f "${GH_FIXTURE:-/nonexistent}" ] || exit 1
+[ "$1" = pr ] || exit 1
+sub="$2"; ref="${3:-}"
+args=("$@"); field=""; search=""
+for ((k=0; k<${#args[@]}; k++)); do
+  case "${args[k]}" in
+    -q|--jq)  field="${args[k+1]}" ;;
+    --search) search="${args[k+1]}" ;;
+  esac
+done
+case "$sub" in
+  view)
+    row="$(awk -F'\t' -v r="$ref" '$1=="view" && $2==r {print; exit}' "$GH_FIXTURE")"
+    [ -n "$row" ] || exit 1
+    case "$field" in
+      .state)      printf '%s\n' "$(printf '%s' "$row" | cut -f3)" ;;
+      .headRefOid) printf '%s\n' "$(printf '%s' "$row" | cut -f4)" ;;
+      .number)     printf '%s\n' "$(printf '%s' "$row" | cut -f5)" ;;
+      *)           exit 1 ;;
+    esac ;;
+  list)
+    # Mirror real gh's `-q '.[] | [.headRefOid,.state,.number] | @tsv'` output.
+    awk -F'\t' -v s="$search" '$1=="list" && $2==s {printf "%s\t%s\t%s\n",$3,$4,$5}' "$GH_FIXTURE" ;;
+  *) exit 1 ;;
+esac
+exit 0
+GH
 chmod +x "$STUBBIN/gh"
 
 pass()     { echo "ok: $1"; }
@@ -103,11 +137,34 @@ add_merged_wt() {
     git -C "$main" worktree add -q "$wt_path" "$name" 2>/dev/null
 }
 
+# add_open_wt <main> <name> [delete_remote:true|false] — branch with one pushed own-commit
+# and a live worktree. delete_remote=true removes origin/<name> after (so cleanup's
+# fetch --prune drops it -> "remote gone").
+add_open_wt() {
+    local main="$1" name="$2" del="${3:-false}"
+    git -C "$main" checkout -q -b "$name" master
+    printf 'x\n' > "$main/$name.txt"
+    git -C "$main" add "$name.txt"; git -C "$main" commit -qm "feat-$name"
+    git -C "$main" push -q -u origin "$name" 2>/dev/null
+    git -C "$main" checkout -q master
+    [ "$del" = true ] && git -C "$main" push -q origin --delete "$name" 2>/dev/null
+    git -C "$main" worktree add -q "$main/worktrees/$name" "$name" 2>/dev/null
+}
+# wt_tip <main> <ref> — echo the tip OID of a ref/worktree.
+wt_tip() { git -C "$1" rev-parse "$2" 2>/dev/null; }
+
 # run_cleanup <main> [extra-flags...] — run the cleanup under test, in dry-run,
 # from inside <main> (so REPO_ROOT resolves to the scratch repo). Echoes output.
 run_cleanup() {
     local main="$1"; shift
     ( cd "$main" && PATH="$STUBBIN:$PATH" "$CLEANUP" --all --dry-run "$@" 2>&1 )
+}
+
+# run_cleanup_gh <main> <fixture-file> [flags...] — like run_cleanup but with a table-driven
+# gh fixture, scoped to the subshell so it never leaks into a later no-fixture case.
+run_cleanup_gh() {
+    local main="$1" fx="$2"; shift 2
+    ( cd "$main" && GH_FIXTURE="$fx" PATH="$STUBBIN:$PATH" "$CLEANUP" --all --dry-run "$@" 2>&1 )
 }
 
 # ----------------------------------------------------------------------------
@@ -244,6 +301,14 @@ else
 fi
 
 # ----------------------------------------------------------------------------
+# Phase 1: bin/wt-down accepts --volumes (forwarded by wt-remove/cleanup). With
+# no worktree name it falls through to its usage block, NOT the unknown-option
+# error — Docker-free and deterministic.
+# ----------------------------------------------------------------------------
+wtd="$( "$SCRIPT_DIR/wt-down" --volumes 2>&1 || true )"
+assert_absent "wt-down-accepts-volumes" 'Unknown option' "$wtd"
+
+# ----------------------------------------------------------------------------
 # External layout (ADR-0046): worktrees now live OUTSIDE the repo at the
 # canonical-case sibling <parent>/IBL5-worktrees/<name>. cleanup must process
 # them — and apply the same safety guards — at the external root, not only the
@@ -288,6 +353,170 @@ if is_in_worktree "${hg%/main}/IBL5-worktrees/probe"; then
 else
     failcase "helper-is-in-worktree-wt-true"
 fi
+
+# ----------------------------------------------------------------------------
+# Phase 3: bare-branch Check 4 broadened to `^pr-?([0-9]+)$` so no-dash names
+# (pr1163) also resolve by PR number. The tip==headRefOid guard is preserved.
+# ----------------------------------------------------------------------------
+# Positive: no-dash pr1163, MERGED, tip==head -> deleted. Fixture has no
+# `view pr1163` row (Check 1 misses) and pr1163's own commit is NOT an ancestor
+# of origin/master (Check 3 no-ops), so flow reaches Check 4.
+e="$(new_env)"
+git -C "$e" checkout -q -b pr1163 master
+printf 'p\n' > "$e/pr.txt"; git -C "$e" add pr.txt; git -C "$e" commit -qm prwork
+tip="$(wt_tip "$e" pr1163)"; git -C "$e" checkout -q master     # leaves pr1163 as a bare branch
+fx="$e/ghfx"; printf 'view\t1163\tMERGED\t%s\t1163\n' "$tip" > "$fx"
+out="$(run_cleanup_gh "$e" "$fx")"
+assert_match "prN-nodash-merged-tip-eq-head-deleted" \
+    'WOULD delete bare branch: pr1163' "$out"
+
+# Negative: no-dash pr1163, MERGED, tip != head -> SKIP (stale/renamed guard).
+e="$(new_env)"
+git -C "$e" checkout -q -b pr1163 master
+printf 'p\n' > "$e/pr.txt"; git -C "$e" add pr.txt; git -C "$e" commit -qm prwork
+git -C "$e" checkout -q master
+fx="$e/ghfx"; printf 'view\t1163\tMERGED\tdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef\t1163\n' > "$fx"
+out="$(run_cleanup_gh "$e" "$fx")"
+assert_match "prN-nodash-tip-ne-head-skipped" \
+    'SKIP bare branch pr1163: PR #1163 MERGED but tip != PR head' "$out"
+
+# Regression: dash form pr-1163 still deletes on tip==head (broaden kept the dash).
+e="$(new_env)"
+git -C "$e" checkout -q -b pr-1163 master
+printf 'p\n' > "$e/pr.txt"; git -C "$e" add pr.txt; git -C "$e" commit -qm prwork
+tip="$(wt_tip "$e" pr-1163)"; git -C "$e" checkout -q master
+fx="$e/ghfx"; printf 'view\t1163\tMERGED\t%s\t1163\n' "$tip" > "$fx"
+out="$(run_cleanup_gh "$e" "$fx")"
+assert_match "prN-dash-still-deleted" 'WOULD delete bare branch: pr-1163' "$out"
+
+# ----------------------------------------------------------------------------
+# Phase 4: AGENT_OUTPUT.*.md carve-out. On a confirmed-merged worktree whose
+# SOLE untracked residue is stray AGENT_OUTPUT.*.md droppings, proceed (discard);
+# any other untracked file still pins it. (defect1-untracked-skipped above pins
+# the non-agent case stays SKIP.)
+# ----------------------------------------------------------------------------
+# Positive: sole untracked AGENT_OUTPUT.<pid>.md (two dots) -> WOULD clean + Discarding.
+e="$(new_env)"; add_merged_wt "$e" "feat"
+printf 'stray\n' > "$e/worktrees/feat/AGENT_OUTPUT.12345.md"
+out="$(run_cleanup "$e")"
+assert_match  "agentout-sole-untracked-cleaned" 'WOULD clean: feat' "$out"
+assert_absent "agentout-sole-untracked-no-skip" 'has untracked files' "$out"
+
+# Negative: AGENT_OUTPUT.<pid>.md PLUS a real untracked file -> still SKIP.
+e="$(new_env)"; add_merged_wt "$e" "feat"
+printf 'stray\n' > "$e/worktrees/feat/AGENT_OUTPUT.12345.md"
+printf 'real\n'  > "$e/worktrees/feat/scratch.md"
+out="$(run_cleanup "$e")"
+assert_match "agentout-mixed-still-skipped" 'SKIP feat: has untracked files' "$out"
+
+# ----------------------------------------------------------------------------
+# Phase 5: CLOSED-PR worktrees become cleanable, but the destructive delete is
+# gated on origin/<branch> still existing (recoverable). Remote-gone requires
+# opt-in --discard-closed. The disk (untracked/uncommitted) guards still win.
+# ----------------------------------------------------------------------------
+# (a) CLOSED + origin/<branch> exists -> cleanable.
+e="$(new_env)"; add_open_wt "$e" abandoned false
+tip="$(wt_tip "$e" abandoned)"
+fx="$e/ghfx"; printf 'view\tabandoned\tCLOSED\t%s\t7\n' "$tip" > "$fx"
+out="$(run_cleanup_gh "$e" "$fx")"
+assert_match "closed-remote-exists-cleaned" 'WOULD clean: abandoned' "$out"
+
+# (b) CLOSED + remote gone + no flag -> SKIP (reflog-only recovery).
+e="$(new_env)"; add_open_wt "$e" abandoned true
+tip="$(wt_tip "$e" abandoned)"
+fx="$e/ghfx"; printf 'view\tabandoned\tCLOSED\t%s\t7\n' "$tip" > "$fx"
+out="$(run_cleanup_gh "$e" "$fx")"
+assert_match "closed-remote-gone-skipped" 'SKIP abandoned: PR closed but remote gone' "$out"
+
+# (c) CLOSED + remote gone + --discard-closed -> cleanable.
+e="$(new_env)"; add_open_wt "$e" abandoned true
+tip="$(wt_tip "$e" abandoned)"
+fx="$e/ghfx"; printf 'view\tabandoned\tCLOSED\t%s\t7\n' "$tip" > "$fx"
+out="$(run_cleanup_gh "$e" "$fx" --discard-closed)"
+assert_match "closed-remote-gone-flag-cleaned" 'WOULD clean: abandoned' "$out"
+
+# (d) CLOSED + remote exists + an untracked real file -> disk guard still SKIPs.
+e="$(new_env)"; add_open_wt "$e" abandoned false
+printf 'real\n' > "$e/worktrees/abandoned/scratch.md"
+tip="$(wt_tip "$e" abandoned)"
+fx="$e/ghfx"; printf 'view\tabandoned\tCLOSED\t%s\t7\n' "$tip" > "$fx"
+out="$(run_cleanup_gh "$e" "$fx")"
+assert_match "closed-untracked-still-skipped" 'SKIP abandoned: has untracked files' "$out"
+
+# ----------------------------------------------------------------------------
+# Phase 6: detached-HEAD worktrees resolve their PR by tip OID (Check 0). Clean
+# only if that PR is MERGED (exact headRefOid==tip match). No branch to delete.
+# The [ -n "$branch" ] guards keep the normal-branch path byte-identical.
+# ----------------------------------------------------------------------------
+# Positive: detached tip == a MERGED PR's headRefOid -> WOULD clean.
+e="$(new_env)"
+git -C "$e" checkout -q -b tmp master
+printf 'd\n' > "$e/d.txt"; git -C "$e" add d.txt; git -C "$e" commit -qm detwork
+oid="$(wt_tip "$e" tmp)"; git -C "$e" checkout -q master
+git -C "$e" worktree add -q --detach "$e/worktrees/det" "$oid" 2>/dev/null
+git -C "$e" branch -D tmp        # worktree now detached at oid, no branch
+fx="$e/ghfx"; printf 'list\t%s\t%s\tMERGED\t9\n' "$oid" "$oid" > "$fx"
+out="$(run_cleanup_gh "$e" "$fx")"
+assert_match "detached-merged-oid-cleaned" 'WOULD clean: det' "$out"
+
+# Negative: detached tip matching no PR row -> SKIP.
+e="$(new_env)"
+git -C "$e" checkout -q -b tmp master
+printf 'd\n' > "$e/d.txt"; git -C "$e" add d.txt; git -C "$e" commit -qm detwork
+oid="$(wt_tip "$e" tmp)"; git -C "$e" checkout -q master
+git -C "$e" worktree add -q --detach "$e/worktrees/det" "$oid" 2>/dev/null
+git -C "$e" branch -D tmp
+fx="$e/ghfx"; : > "$fx"          # empty fixture -> gh pr list matches nothing
+out="$(run_cleanup_gh "$e" "$fx")"
+assert_match "detached-no-pr-skipped" 'SKIP det: detached HEAD, no merged PR at tip' "$out"
+
+# ----------------------------------------------------------------------------
+# Phase 7: surface-only stash sweep. DROP is quadruple-gated: --drop-merged-stashes
+# AND provably-in-master (reverse-apply -R clean) AND no untracked component (^3)
+# AND not nightly-autostash. Default surfaces candidates only.
+# ----------------------------------------------------------------------------
+# (6a) provably-in-master stash, no flag -> reported, not dropped.
+e="$(new_env)"
+printf 'init\nline\n' > "$e/README.md"; git -C "$e" stash -q               # stash the "+line" diff
+printf 'init\nline\n' > "$e/README.md"; git -C "$e" add README.md; git -C "$e" commit -qm addline  # same change now in master
+out="$(run_cleanup "$e")"
+assert_match  "stash-provably-merged-reported" 'Stash candidate: stash@\{0\} \(provably in master\)' "$out"
+assert_absent "stash-no-flag-not-dropped" 'WOULD drop stash' "$out"
+
+# (6a') same env + --drop-merged-stashes -> WOULD drop (dry-run mutates nothing).
+out="$(run_cleanup "$e" --drop-merged-stashes)"
+assert_match "stash-provably-merged-dropped-with-flag" 'WOULD drop stash: stash@\{0\} \(provably in master\)' "$out"
+
+# (6b) nightly-autostash, provably-merged, WITH flag -> candidate, never dropped.
+e="$(new_env)"
+printf 'init\nline\n' > "$e/README.md"; git -C "$e" stash push -q -m "nightly-autostash-20260101"
+printf 'init\nline\n' > "$e/README.md"; git -C "$e" add README.md; git -C "$e" commit -qm addline
+out="$(run_cleanup "$e" --drop-merged-stashes)"
+assert_match  "stash-nightly-candidate" 'Stash candidate: stash@\{0\} \(provably in master\)' "$out"
+assert_absent "stash-nightly-never-dropped" 'WOULD drop' "$out"
+
+# (6b') branch-gone but NOT provably-merged, WITH flag -> candidate (branch gone), never dropped.
+e="$(new_env)"
+git -C "$e" checkout -q -b gonebr master
+printf 'init\nunmerged\n' > "$e/README.md"; git -C "$e" stash push -q -m wip
+git -C "$e" checkout -q master; git -C "$e" branch -D gonebr
+out="$(run_cleanup "$e" --drop-merged-stashes)"
+assert_match  "stash-branch-gone-not-dropped" 'Stash candidate: stash@\{0\} \(branch gone\)' "$out"
+assert_absent "stash-branch-gone-no-drop" 'WOULD drop' "$out"
+
+# (6d) provably-merged-tracked stash that ALSO carries an untracked component (-u), WITH
+# flag -> reported, never dropped (the ^3 guard blocks the drop; data-loss guard).
+e="$(new_env)"
+printf 'init\nline\n' > "$e/README.md"          # tracked change
+printf 'extra\n'      > "$e/untracked.txt"       # untracked file -> becomes stash^3
+git -C "$e" stash push -u -q -m wipu
+printf 'init\nline\n' > "$e/README.md"; git -C "$e" add README.md; git -C "$e" commit -qm addline
+out="$(run_cleanup "$e" --drop-merged-stashes)"
+assert_match  "stash-untracked-component-reported" 'Stash candidate: stash@\{0\} \(provably in master\)' "$out"
+assert_absent "stash-untracked-component-not-dropped" 'WOULD drop' "$out"
+
+# (6c) zero stashes -> no Stashes: header, no error.
+assert_absent "stash-zero-no-header" 'Stashes:' "$(run_cleanup "$(new_env)")"
 
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"

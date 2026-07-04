@@ -46,7 +46,16 @@ do_snapshot() {
     echo "ERROR: fixture-drift manifest not found: $MANIFEST" >&2
     exit 1
   fi
-  : > "$outfile"
+  # Write to a temp file and rename into place only on full success, so a
+  # mid-loop failure (e.g. a transient mariadb exec hiccup on a later
+  # manifest line, fatal under `set -e`) never leaves a PARTIAL dump
+  # masquerading as a complete snapshot at $outfile — the caller's "does
+  # $outfile exist" guard would otherwise diff a partial BEFORE against a
+  # full AFTER and report nonsense drift instead of surfacing the real
+  # upstream failure.
+  local tmp_outfile
+  tmp_outfile="${outfile}.tmp.$$"
+  : > "$tmp_outfile"
   local line table columns orderby where
   while IFS= read -r line || [ -n "$line" ]; do
     # Skip blank lines and comments.
@@ -62,14 +71,16 @@ EOF
     where=$(trim "$where")
     if [ -z "$table" ] || [ -z "$columns" ] || [ -z "$orderby" ] || [ -z "$where" ]; then
       echo "ERROR: malformed manifest line (need 4 pipe fields): $line" >&2
+      rm -f "$tmp_outfile"
       exit 1
     fi
     # Build the SELECT and pipe it on stdin to the (word-split) executor. Prefix
     # every result row with its table name so each dump line self-identifies.
     printf 'SELECT %s FROM %s WHERE %s ORDER BY %s;\n' "$columns" "$table" "$where" "$orderby" \
       | $MYSQL \
-      | awk -v t="$table" 'BEGIN{OFS="\t"}{print t,$0}' >> "$outfile"
+      | awk -v t="$table" 'BEGIN{OFS="\t"}{print t,$0}' >> "$tmp_outfile"
   done < "$MANIFEST"
+  mv "$tmp_outfile" "$outfile"
 }
 
 do_diff() {

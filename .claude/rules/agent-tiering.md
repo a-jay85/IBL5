@@ -1,6 +1,6 @@
 ---
 description: Sub-agent decision rules — when to spawn, when to skip, which model to pick, and how sub-agent delegation keeps orchestrator context low
-last_verified: 2026-07-03
+last_verified: 2026-07-04
 ---
 
 # Agent Tiering
@@ -29,7 +29,7 @@ Each sub-agent costs ~3–5K tokens (system prompt + rules + memory, loaded befo
 | **Opus (delegated)** | `subagent_type: "plan-architect"` | Implementation **planning** only, via `/plan` Step 3. The def pins `model: opus` + `effort: xhigh`, so planning runs at Opus depth in a clean sub-context. Do **not** pass an inline `model` override — the def owns it. |
 | **Fable** | `model: "fable"` — **prompt first, last resort** | Opt-in rung above Opus. Use **only** when a task is absolutely critical **and** Fable is 100% necessary to solve it — and **never without prompting the user first** for explicit approval. Default to Opus; treat Fable as a last resort, not a routine capability upgrade. Full gate: `.claude/rules/agent-tiering-detail.md`. |
 
-> **The boundary keys on task *type* (judgment vs. mechanical), not raw model capability** — a stronger Sonnet moves nothing across the line. Re-validated 2026-06-30 vs Sonnet 5 (now the `sonnet` alias, native 1M context): unchanged. Why: `agent-tiering-detail.md`.
+> **The boundary keys on task *type* (judgment vs. mechanical), not raw model capability** — a stronger Sonnet moves nothing across the line. Re-validated 2026-06-30 vs Sonnet 5 (then the `sonnet` alias, native 1M context): unchanged. Why: `agent-tiering-detail.md`.
 
 ## Flat fan-out (no nested sub-agents)
 

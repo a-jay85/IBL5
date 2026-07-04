@@ -470,6 +470,54 @@ fx="$e/ghfx"; : > "$fx"          # empty fixture -> gh pr list matches nothing
 out="$(run_cleanup_gh "$e" "$fx")"
 assert_match "detached-no-pr-skipped" 'SKIP det: detached HEAD, no merged PR at tip' "$out"
 
+# ----------------------------------------------------------------------------
+# Phase 7: surface-only stash sweep. DROP is quadruple-gated: --drop-merged-stashes
+# AND provably-in-master (reverse-apply -R clean) AND no untracked component (^3)
+# AND not nightly-autostash. Default surfaces candidates only.
+# ----------------------------------------------------------------------------
+# (6a) provably-in-master stash, no flag -> reported, not dropped.
+e="$(new_env)"
+printf 'init\nline\n' > "$e/README.md"; git -C "$e" stash -q               # stash the "+line" diff
+printf 'init\nline\n' > "$e/README.md"; git -C "$e" add README.md; git -C "$e" commit -qm addline  # same change now in master
+out="$(run_cleanup "$e")"
+assert_match  "stash-provably-merged-reported" 'Stash candidate: stash@\{0\} \(provably in master\)' "$out"
+assert_absent "stash-no-flag-not-dropped" 'WOULD drop stash' "$out"
+
+# (6a') same env + --drop-merged-stashes -> WOULD drop (dry-run mutates nothing).
+out="$(run_cleanup "$e" --drop-merged-stashes)"
+assert_match "stash-provably-merged-dropped-with-flag" 'WOULD drop stash: stash@\{0\} \(provably in master\)' "$out"
+
+# (6b) nightly-autostash, provably-merged, WITH flag -> candidate, never dropped.
+e="$(new_env)"
+printf 'init\nline\n' > "$e/README.md"; git -C "$e" stash push -q -m "nightly-autostash-20260101"
+printf 'init\nline\n' > "$e/README.md"; git -C "$e" add README.md; git -C "$e" commit -qm addline
+out="$(run_cleanup "$e" --drop-merged-stashes)"
+assert_match  "stash-nightly-candidate" 'Stash candidate: stash@\{0\} \(provably in master\)' "$out"
+assert_absent "stash-nightly-never-dropped" 'WOULD drop' "$out"
+
+# (6b') branch-gone but NOT provably-merged, WITH flag -> candidate (branch gone), never dropped.
+e="$(new_env)"
+git -C "$e" checkout -q -b gonebr master
+printf 'init\nunmerged\n' > "$e/README.md"; git -C "$e" stash push -q -m wip
+git -C "$e" checkout -q master; git -C "$e" branch -D gonebr
+out="$(run_cleanup "$e" --drop-merged-stashes)"
+assert_match  "stash-branch-gone-not-dropped" 'Stash candidate: stash@\{0\} \(branch gone\)' "$out"
+assert_absent "stash-branch-gone-no-drop" 'WOULD drop' "$out"
+
+# (6d) provably-merged-tracked stash that ALSO carries an untracked component (-u), WITH
+# flag -> reported, never dropped (the ^3 guard blocks the drop; data-loss guard).
+e="$(new_env)"
+printf 'init\nline\n' > "$e/README.md"          # tracked change
+printf 'extra\n'      > "$e/untracked.txt"       # untracked file -> becomes stash^3
+git -C "$e" stash push -u -q -m wipu
+printf 'init\nline\n' > "$e/README.md"; git -C "$e" add README.md; git -C "$e" commit -qm addline
+out="$(run_cleanup "$e" --drop-merged-stashes)"
+assert_match  "stash-untracked-component-reported" 'Stash candidate: stash@\{0\} \(provably in master\)' "$out"
+assert_absent "stash-untracked-component-not-dropped" 'WOULD drop' "$out"
+
+# (6c) zero stashes -> no Stashes: header, no error.
+assert_absent "stash-zero-no-header" 'Stashes:' "$(run_cleanup "$(new_env)")"
+
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"
     exit 1

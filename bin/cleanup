@@ -18,6 +18,7 @@ ALL=false
 DRY_RUN=false
 DISCARD_GENERATED=false
 DISCARD_CLOSED=false
+DROP_MERGED_STASHES=false
 CLEANED=0
 SKIPPED=0
 
@@ -27,14 +28,15 @@ for arg in "$@"; do
         --dry-run) DRY_RUN=true ;;
         --discard-generated) DISCARD_GENERATED=true ;;
         --discard-closed) DISCARD_CLOSED=true ;;
+        --drop-merged-stashes) DROP_MERGED_STASHES=true ;;
         -*) echo "Unknown option: $arg" >&2; exit 1 ;;
         *) TARGET_NAME="$arg" ;;
     esac
 done
 
 if [ -z "$TARGET_NAME" ] && [ "$ALL" = false ]; then
-    echo "Usage: bin/wt-cleanup <worktree-name> [--dry-run] [--discard-generated] [--discard-closed]" >&2
-    echo "       bin/wt-cleanup --all [--dry-run] [--discard-generated] [--discard-closed]" >&2
+    echo "Usage: bin/wt-cleanup <worktree-name> [--dry-run] [--discard-generated] [--discard-closed] [--drop-merged-stashes]" >&2
+    echo "       bin/wt-cleanup --all [--dry-run] [--discard-generated] [--discard-closed] [--drop-merged-stashes]" >&2
     exit 1
 fi
 
@@ -632,6 +634,51 @@ if [ "$ALL" = true ]; then
         done < <(docker volume ls --format '{{.Name}}' \
             | grep -E '^ibl5-.+_.+$' \
             | sort -u)
+    fi
+
+    # Surface stashes (informational; DROP only with --drop-merged-stashes AND
+    # provably-in-master). Candidate = branch gone OR content provably already in master
+    # (reverse-apply -R clean). Branch-gone ALONE never drops (a gone branch may hold unmerged
+    # work). nightly-autostash-* is never dropped. A stash carrying an untracked component
+    # (stash^3) is never dropped — git stash show -p omits untracked files, so reverse-apply
+    # could pass while those files would be lost.
+    stash_rows=$(git -C "$REPO_ROOT" stash list --format='%gd%x09%gs' 2>/dev/null || true)
+    if [ -n "$stash_rows" ]; then
+        echo ""
+        echo "Stashes:"
+        while IFS=$'\t' read -r sref ssubj; do
+            [ -z "$sref" ] && continue
+            sbranch=$(printf '%s' "$ssubj" | sed -E 's/^(WIP on|On) ([^:]+):.*/\2/')
+            provably_merged=false
+            if git -C "$REPO_ROOT" stash show -p "$sref" 2>/dev/null \
+               | git -C "$REPO_ROOT" apply --check -R - 2>/dev/null; then
+                provably_merged=true
+            fi
+            branch_gone=false
+            if [ -n "$sbranch" ] \
+               && ! git -C "$REPO_ROOT" rev-parse --verify "$sbranch" &>/dev/null; then
+                branch_gone=true
+            fi
+            has_untracked_component=false
+            if git -C "$REPO_ROOT" rev-parse --verify "$sref^3" &>/dev/null; then
+                has_untracked_component=true
+            fi
+            [ "$provably_merged" = false ] && [ "$branch_gone" = false ] && continue
+            if [ "$provably_merged" = true ] && [ "$DROP_MERGED_STASHES" = true ] \
+               && [ "$has_untracked_component" = false ] \
+               && [[ "$ssubj" != *nightly-autostash* ]]; then
+                if [ "$DRY_RUN" = true ]; then
+                    echo "  WOULD drop stash: $sref (provably in master)"
+                else
+                    echo "  Dropping stash: $sref (provably in master)"
+                    git -C "$REPO_ROOT" stash drop "$sref" >/dev/null 2>&1 || true
+                fi
+                CLEANED=$((CLEANED + 1))
+            else
+                if [ "$provably_merged" = true ]; then swhy="provably in master"; else swhy="branch gone"; fi
+                echo "  Stash candidate: $sref ($swhy) — ${sbranch:-?}"
+            fi
+        done <<< "$stash_rows"
     fi
 
     # Informational only (non-fatal): surface worktrees whose work never

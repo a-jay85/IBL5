@@ -1,6 +1,6 @@
 ---
 description: "IBL5 project overview: what it is, the engineering practices behind it, and how to run it."
-last_verified: 2026-06-15
+last_verified: 2026-07-03
 ---
 
 # IBL5 — Internet Basketball League
@@ -16,11 +16,13 @@ The codebase began in 2020 as inherited PHP-Nuke legacy code and has been increm
 This is a solo-maintained, long-running application, so it doubles as a portfolio of sustained engineering discipline on a real system with real users:
 
 - **Strangler-fig modernization** — 80+ feature modules extracted from procedural legacy code into an interface-driven Repository / Service / View pattern, one slice at a time, behind passing tests.
-- **Tests as a safety net for legacy refactoring** — hundreds of PHPUnit test files plus a Playwright E2E suite, with characterization tests written *before* extracting each module so behavior is provably preserved.
-- **Static analysis at the ceiling** — PHPStan at `level: max` with strict-rules, deprecation-rules, bleedingEdge, and a set of custom project-specific PHPStan rules that ban known footguns (e.g. raw SQL identifier drift).
-- **Mutation testing** — Infection enforces test *effectiveness*, not just coverage, on critical modules.
-- **Heavy CI/CD** — 20+ GitHub Actions workflows covering unit/integration tests, E2E, static analysis, mutation, CodeQL, secret scanning, Lighthouse performance/a11y budgets, migration safety checks, and deploy rehearsals — path-gated so docs-only pushes skip the heavy suites and the PR auto-rebase storm.
-- **Decision records** — dozens of ADRs documenting the *why* behind architectural choices.
+- **Tests as a safety net for legacy refactoring** — 700+ PHPUnit test files plus a 100+ spec Playwright E2E suite, with characterization tests written *before* extracting each module so behavior is provably preserved. A CI coverage gate ratchets upward as coverage grows (currently 80%).
+- **Security hardening on a live multi-user app** — session-bound roster, trade, and waiver mutations to close IDOR holes; CSRF gates on every state-changing POST endpoint; authorization checks on the N-party trade flow — all covered by negative-path tests that prove an unauthorized actor is rejected.
+- **Static analysis at the ceiling** — PHPStan at `level: max` with strict-rules, deprecation-rules, bleedingEdge, and ~40 custom project-specific PHPStan rules that ban known footguns (raw SQL identifier drift, string-concatenated SQL, meaningless test assertions, and more).
+- **Mutation testing as a required gate** — Infection enforces test *effectiveness*, not just coverage; the mutation score is a required CI check, not an advisory one.
+- **Heavy CI/CD** — two dozen+ GitHub Actions workflows covering unit/integration tests, E2E, static analysis, mutation, CodeQL, secret scanning, Lighthouse performance/a11y budgets, migration safety checks, visual-regression review, and deploy rehearsals — path-gated so docs-only pushes skip the heavy suites and the PR auto-rebase storm.
+- **Visual-regression review** — change-driven before/after screenshots published per-PR (via GitHub Pages), so UI changes are reviewed visually before merge.
+- **Decision records** — 80+ ADRs documenting the *why* behind architectural choices.
 
 ## Tech Stack
 

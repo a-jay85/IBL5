@@ -17,6 +17,7 @@ TARGET_NAME=""
 ALL=false
 DRY_RUN=false
 DISCARD_GENERATED=false
+DISCARD_CLOSED=false
 CLEANED=0
 SKIPPED=0
 
@@ -25,14 +26,15 @@ for arg in "$@"; do
         --all) ALL=true ;;
         --dry-run) DRY_RUN=true ;;
         --discard-generated) DISCARD_GENERATED=true ;;
+        --discard-closed) DISCARD_CLOSED=true ;;
         -*) echo "Unknown option: $arg" >&2; exit 1 ;;
         *) TARGET_NAME="$arg" ;;
     esac
 done
 
 if [ -z "$TARGET_NAME" ] && [ "$ALL" = false ]; then
-    echo "Usage: bin/wt-cleanup <worktree-name> [--dry-run] [--discard-generated]" >&2
-    echo "       bin/wt-cleanup --all [--dry-run] [--discard-generated]" >&2
+    echo "Usage: bin/wt-cleanup <worktree-name> [--dry-run] [--discard-generated] [--discard-closed]" >&2
+    echo "       bin/wt-cleanup --all [--dry-run] [--discard-generated] [--discard-closed]" >&2
     exit 1
 fi
 
@@ -138,6 +140,19 @@ check_worktree() {
         pr_state=$(cd "$REPO_ROOT" && gh pr view "$branch" --json state -q .state 2>/dev/null || true)
         if [ "$pr_state" = "MERGED" ]; then
             is_merged=true
+        elif [ "$pr_state" = "CLOSED" ]; then
+            # Abandoned PR. Cleaning deletes the local branch; that is recoverable only while
+            # origin/<branch> still exists. If the remote is ALSO gone, deletion is
+            # reflog-only — require explicit opt-in.
+            if git -C "$REPO_ROOT" rev-parse --verify "origin/$branch" &>/dev/null; then
+                is_merged=true
+            elif [ "$DISCARD_CLOSED" = true ]; then
+                is_merged=true
+            else
+                echo "  SKIP $wt_name: PR closed but remote gone (pass --discard-closed to remove)"
+                SKIPPED=$((SKIPPED + 1))
+                return
+            fi
         elif [ "$pr_state" = "OPEN" ]; then
             local pr_num
             pr_num=$(cd "$REPO_ROOT" && gh pr view "$branch" --json number -q .number 2>/dev/null || true)
@@ -207,9 +222,22 @@ check_worktree() {
         # remove a worktree carrying them — reset --hard is a no-op on untracked
         # anyway, so the only safe action is to leave it.
         if has_untracked_files "$wt_path"; then
-            echo "  SKIP $wt_name: has untracked files"
-            SKIPPED=$((SKIPPED + 1))
-            return
+            local untracked non_agent
+            untracked=$(git -C "$wt_path" ls-files --others --exclude-standard 2>/dev/null)
+            non_agent=$(printf '%s\n' "$untracked" | grep -v '^$' \
+                        | grep -vE '(^|/)AGENT_OUTPUT\..*\.md$' || true)
+            if [ -n "$non_agent" ]; then
+                echo "  SKIP $wt_name: has untracked files"
+                SKIPPED=$((SKIPPED + 1))
+                return
+            fi
+            # Only stray AGENT_OUTPUT.*.md droppings remain — provably not work.
+            echo "  Discarding stray agent output: $(printf '%s' "$untracked" | tr '\n' ' ')"
+            if [ "$DRY_RUN" = false ]; then
+                while IFS= read -r f; do
+                    [ -n "$f" ] && rm -f "$wt_path/$f"
+                done <<< "$untracked"
+            fi
         fi
 
         if has_uncommitted_changes "$wt_path"; then

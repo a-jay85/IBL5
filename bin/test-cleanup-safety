@@ -389,6 +389,60 @@ fx="$e/ghfx"; printf 'view\t1163\tMERGED\t%s\t1163\n' "$tip" > "$fx"
 out="$(run_cleanup_gh "$e" "$fx")"
 assert_match "prN-dash-still-deleted" 'WOULD delete bare branch: pr-1163' "$out"
 
+# ----------------------------------------------------------------------------
+# Phase 4: AGENT_OUTPUT.*.md carve-out. On a confirmed-merged worktree whose
+# SOLE untracked residue is stray AGENT_OUTPUT.*.md droppings, proceed (discard);
+# any other untracked file still pins it. (defect1-untracked-skipped above pins
+# the non-agent case stays SKIP.)
+# ----------------------------------------------------------------------------
+# Positive: sole untracked AGENT_OUTPUT.<pid>.md (two dots) -> WOULD clean + Discarding.
+e="$(new_env)"; add_merged_wt "$e" "feat"
+printf 'stray\n' > "$e/worktrees/feat/AGENT_OUTPUT.12345.md"
+out="$(run_cleanup "$e")"
+assert_match  "agentout-sole-untracked-cleaned" 'WOULD clean: feat' "$out"
+assert_absent "agentout-sole-untracked-no-skip" 'has untracked files' "$out"
+
+# Negative: AGENT_OUTPUT.<pid>.md PLUS a real untracked file -> still SKIP.
+e="$(new_env)"; add_merged_wt "$e" "feat"
+printf 'stray\n' > "$e/worktrees/feat/AGENT_OUTPUT.12345.md"
+printf 'real\n'  > "$e/worktrees/feat/scratch.md"
+out="$(run_cleanup "$e")"
+assert_match "agentout-mixed-still-skipped" 'SKIP feat: has untracked files' "$out"
+
+# ----------------------------------------------------------------------------
+# Phase 5: CLOSED-PR worktrees become cleanable, but the destructive delete is
+# gated on origin/<branch> still existing (recoverable). Remote-gone requires
+# opt-in --discard-closed. The disk (untracked/uncommitted) guards still win.
+# ----------------------------------------------------------------------------
+# (a) CLOSED + origin/<branch> exists -> cleanable.
+e="$(new_env)"; add_open_wt "$e" abandoned false
+tip="$(wt_tip "$e" abandoned)"
+fx="$e/ghfx"; printf 'view\tabandoned\tCLOSED\t%s\t7\n' "$tip" > "$fx"
+out="$(run_cleanup_gh "$e" "$fx")"
+assert_match "closed-remote-exists-cleaned" 'WOULD clean: abandoned' "$out"
+
+# (b) CLOSED + remote gone + no flag -> SKIP (reflog-only recovery).
+e="$(new_env)"; add_open_wt "$e" abandoned true
+tip="$(wt_tip "$e" abandoned)"
+fx="$e/ghfx"; printf 'view\tabandoned\tCLOSED\t%s\t7\n' "$tip" > "$fx"
+out="$(run_cleanup_gh "$e" "$fx")"
+assert_match "closed-remote-gone-skipped" 'SKIP abandoned: PR closed but remote gone' "$out"
+
+# (c) CLOSED + remote gone + --discard-closed -> cleanable.
+e="$(new_env)"; add_open_wt "$e" abandoned true
+tip="$(wt_tip "$e" abandoned)"
+fx="$e/ghfx"; printf 'view\tabandoned\tCLOSED\t%s\t7\n' "$tip" > "$fx"
+out="$(run_cleanup_gh "$e" "$fx" --discard-closed)"
+assert_match "closed-remote-gone-flag-cleaned" 'WOULD clean: abandoned' "$out"
+
+# (d) CLOSED + remote exists + an untracked real file -> disk guard still SKIPs.
+e="$(new_env)"; add_open_wt "$e" abandoned false
+printf 'real\n' > "$e/worktrees/abandoned/scratch.md"
+tip="$(wt_tip "$e" abandoned)"
+fx="$e/ghfx"; printf 'view\tabandoned\tCLOSED\t%s\t7\n' "$tip" > "$fx"
+out="$(run_cleanup_gh "$e" "$fx")"
+assert_match "closed-untracked-still-skipped" 'SKIP abandoned: has untracked files' "$out"
+
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"
     exit 1

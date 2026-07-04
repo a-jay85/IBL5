@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-check-e2e-fixture-drift — regression test for the runtime fixture-drift
+# gate. Runs with NO docker/DB by driving the pure-file `diff` subcommand and a stub
+# `$FIXTURE_DRIFT_MYSQL` executor. Asserts the load-bearing matrix: a durable
+# curated-row mutation FAILS (exit 1) AND names the row (row-level attribution); a
+# clean snapshot passes; a reseed touching only the excluded auto-inc PK does NOT
+# drift; a missing manifest hard-errors; and the real checked-in manifest excludes
+# PKs and `*` (hygiene lint at source).
+#
+# Run: bin/test-check-e2e-fixture-drift  (exit 0 = all pass, 1 = a case failed)
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || echo "$SCRIPT_DIR/..")"
+CHECK="$SCRIPT_DIR/check-e2e-fixture-drift"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+FAILED=0
+
+expect() { # name want got
+  if [ "$3" -eq "$2" ]; then
+    echo "ok: $1 (exit $3)"
+  else
+    echo "FAIL: $1 — expected exit $2, got $3"
+    FAILED=1
+  fi
+}
+
+# set -e-safe capture of the pure-file diff subcommand: $RC = exit, $OUT = output.
+run_diff() { # before after
+  RC=0
+  OUT=$("$CHECK" diff "$1" "$2" 2>&1) || RC=$?
+}
+
+# A stub executor that ignores the piped SQL and echoes a fixed business row.
+# Models a snapshot that returns the SAME business columns regardless of an excluded
+# auto-increment PK changing underneath.
+make_stub() { # path
+  printf '#!/bin/sh\ncat >/dev/null; printf "10\\t1\\t700\\n"\n' > "$1"
+  chmod +x "$1"
+}
+
+# Case 1: TRUE-POSITIVE — a durable curated-row mutation must FAIL and name the row.
+printf 'ibl_plr\t30\t1\t2\t2\t1500\t1650\t0\t0\t0\t0\t20\t0\t0\n' > "$TMP/before1"
+printf 'ibl_plr\t30\t5\t2\t2\t1500\t1650\t0\t0\t0\t0\t20\t0\t0\n' > "$TMP/after1"
+run_diff "$TMP/before1" "$TMP/after1"
+expect "durable curated-row drift fails" 1 "$RC"
+printf '%s' "$OUT" | grep -q 'ibl_plr' && printf '%s' "$OUT" | grep -q $'\t30\t'
+expect "drift output names the row" 0 "$?"
+
+# Case 2: ZERO-FALSE-POSITIVE — identical before/after passes clean.
+cp "$TMP/before1" "$TMP/before2"
+cp "$TMP/before1" "$TMP/after2"
+run_diff "$TMP/before2" "$TMP/after2"
+expect "unmutated snapshot passes" 0 "$RC"
+
+# Case 3: missing manifest → hard error, never silent-pass.
+make_stub "$TMP/stub"
+FIXTURE_DRIFT_MANIFEST="$TMP/nonexistent.txt" FIXTURE_DRIFT_MYSQL="$TMP/stub" \
+  "$CHECK" snapshot "$TMP/out3" >/dev/null 2>&1
+expect "missing manifest errors" 1 "$?"
+
+# Case 4: PK-exclusion guard — a reseed changing only the excluded auto-inc `id`
+# leaves the business columns identical, so two snapshots do NOT drift.
+printf 'ibl_fa_offers | pid,teamid,offer1 | pid | 1=1\n' > "$TMP/manifest4"
+FIXTURE_DRIFT_MANIFEST="$TMP/manifest4" FIXTURE_DRIFT_MYSQL="$TMP/stub" \
+  "$CHECK" snapshot "$TMP/a4" >/dev/null 2>&1
+FIXTURE_DRIFT_MANIFEST="$TMP/manifest4" FIXTURE_DRIFT_MYSQL="$TMP/stub" \
+  "$CHECK" snapshot "$TMP/b4" >/dev/null 2>&1
+run_diff "$TMP/a4" "$TMP/b4"
+expect "reseed changing only the excluded PK does not drift" 0 "$RC"
+
+# Case 5: manifest-hygiene lint on the REAL checked-in file — exactly 4 pipe fields
+# per line, no `*` columns, no bare `id` token in any columns list.
+MANIFEST_FILE="$ROOT/ibl5/tests/e2e/fixtures/shared-fixture-manifest.txt"
+hygiene_rc=0
+if [ ! -f "$MANIFEST_FILE" ]; then
+  echo "FAIL: checked-in manifest not found at $MANIFEST_FILE"
+  hygiene_rc=1
+else
+  while IFS= read -r line || [ -n "$line" ]; do
+    trimmed="${line#"${line%%[![:space:]]*}"}"
+    case "$trimmed" in ''|'#'*) continue ;; esac
+    nfields=$(printf '%s' "$line" | awk -F'|' '{print NF}')
+    if [ "$nfields" -ne 4 ]; then
+      echo "FAIL: manifest line does not have exactly 4 fields: $line"
+      hygiene_rc=1
+      continue
+    fi
+    cols=$(printf '%s' "$line" | awk -F'|' '{print $2}')
+    if printf '%s' "$cols" | grep -q '\*'; then
+      echo "FAIL: manifest columns use '*': $line"
+      hygiene_rc=1
+    fi
+    # Split columns on comma, trim, and reject a bare `id` token (auto-inc PK trap).
+    OLDIFS=$IFS; IFS=','
+    for tok in $cols; do
+      t="${tok#"${tok%%[![:space:]]*}"}"; t="${t%"${t##*[![:space:]]}"}"
+      if [ "$t" = "id" ]; then
+        echo "FAIL: manifest columns include bare auto-inc PK 'id': $line"
+        hygiene_rc=1
+      fi
+    done
+    IFS=$OLDIFS
+  done < "$MANIFEST_FILE"
+fi
+expect "curated manifest excludes PKs and *" 0 "$hygiene_rc"
+
+if [ "$FAILED" -eq 0 ]; then
+  echo "All test-check-e2e-fixture-drift cases passed."
+else
+  echo "test-check-e2e-fixture-drift: one or more cases FAILED." >&2
+fi
+exit "$FAILED"

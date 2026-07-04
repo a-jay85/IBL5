@@ -435,7 +435,7 @@ if [ "$ALL" = true ]; then
         # OID before trusting the state — otherwise a stale/renamed pr-<N> branch
         # could be deleted on the strength of an unrelated PR's status.
         if [ "$should_delete" = false ] && command -v gh &>/dev/null \
-           && [[ "$bare_branch" =~ ^pr-([0-9]+)$ ]]; then
+           && [[ "$bare_branch" =~ ^pr-?([0-9]+)$ ]]; then
             num_pr="${BASH_REMATCH[1]}"
             num_pr_state=$(cd "$REPO_ROOT" && gh pr view "$num_pr" --json state -q .state 2>/dev/null || true)
             if [ "$num_pr_state" = "MERGED" ] || [ "$num_pr_state" = "CLOSED" ]; then

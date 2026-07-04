@@ -18,6 +18,7 @@ for arg in "$@"; do
     case "$arg" in
         --all) ALL=true ;;
         --force) FORCE=true ;;
+        --volumes|-v) : ;;   # volumes always removed via `down -v` (line 91); accept for wt-remove/cleanup compat
         -*) echo "Unknown option: $arg" >&2; exit 1 ;;
         *) WORKTREE_NAME="$arg" ;;
     esac

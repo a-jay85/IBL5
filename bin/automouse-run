@@ -583,7 +583,7 @@ PLAN_FILE=$PLAN_NAME" \
                 --verbose \
                 --name "automouse-impl-$(date +%Y-%m-%d-%H%M)" \
             2> >(grep -v 'thinking.type=enabled' >> "$LOG") \
-            | bin/lib/automouse-stream-filter "$HEARTBEAT_FILE" "$CMDPID_FILE" "$PLAN_SLUG" \
+            | bin/lib/automouse-stream-filter "$HEARTBEAT_FILE" "$CMDPID_FILE" "$PLAN_SLUG" impl \
             >> "$LOG" || IMPL_STATUS=$?
 
         kill "$WATCHER_PID" 2>/dev/null || true
@@ -681,7 +681,7 @@ PLAN_FILE=$PLAN_NAME" \
                 --verbose \
                 --name "automouse-postplan-$(date +%Y-%m-%d-%H%M)" \
             2> >(grep -v 'thinking.type=enabled' >> "$LOG") \
-            | bin/lib/automouse-stream-filter "$HEARTBEAT_FILE" "$CMDPID_FILE" "$PLAN_SLUG" \
+            | bin/lib/automouse-stream-filter "$HEARTBEAT_FILE" "$CMDPID_FILE" "$PLAN_SLUG" postplan \
             >> "$LOG" || PP_STATUS=$?
 
         kill "$WATCHER_PID" 2>/dev/null || true

@@ -1,23 +1,28 @@
 #!/bin/bash
-# Usage: claude ... --output-format stream-json | automouse-stream-filter <heartbeat_file> [<cmdpid_file>] [<slug>]
+# Usage: claude ... --output-format stream-json | automouse-stream-filter <heartbeat_file> [<cmdpid_file>] [<slug>] [<phase>]
 set -euo pipefail
 
-HEARTBEAT_FILE="${1:?Usage: automouse-stream-filter <heartbeat_file> [<cmdpid_file>] [<slug>]}"
+HEARTBEAT_FILE="${1:?Usage: automouse-stream-filter <heartbeat_file> [<cmdpid_file>] [<slug>] [<phase>]}"
 CMDPID_FILE="${2:-}"
 SLUG="${3:-}"
+PHASE="${4:-}"
 TOOL_COUNT=0
 TURN_COUNT=1
 START_EPOCH=$(date +%s)
 
 # Line prefix: the elapsed timestamp, plus the active plan slug when one was
 # passed. Concurrent runners interleave into per-day logs, so the slug column
-# right after the timestamp says which plan each line belongs to.
+# right after the timestamp says which plan each line belongs to. When a phase
+# (impl/postplan) is passed it is appended as `<slug>/<phase>`, so the two
+# phases of one plan are distinguishable within the interleaved day log.
 line_prefix() {
-    local now diff
+    local now diff tag
     now=$(date +%s)
     diff=$(( now - START_EPOCH ))
-    if [ -n "$SLUG" ]; then
-        printf '[%02d:%02d:%02d] %s' $(( diff / 3600 )) $(( (diff % 3600) / 60 )) $(( diff % 60 )) "$SLUG"
+    tag="$SLUG"
+    [ -n "$SLUG" ] && [ -n "$PHASE" ] && tag="$SLUG/$PHASE"
+    if [ -n "$tag" ]; then
+        printf '[%02d:%02d:%02d] %s' $(( diff / 3600 )) $(( (diff % 3600) / 60 )) $(( diff % 60 )) "$tag"
     else
         printf '[%02d:%02d:%02d]' $(( diff / 3600 )) $(( (diff % 3600) / 60 )) $(( diff % 60 ))
     fi

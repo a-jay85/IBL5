@@ -23,6 +23,7 @@ This is a solo-maintained, long-running application, so it doubles as a portfoli
 - **Heavy CI/CD** — two dozen+ GitHub Actions workflows covering unit/integration tests, E2E, static analysis, mutation, CodeQL, secret scanning, Lighthouse performance/a11y budgets, migration safety checks, visual-regression review, and deploy rehearsals — path-gated so docs-only pushes skip the heavy suites and the PR auto-rebase storm.
 - **Visual-regression review** — change-driven before/after screenshots published per-PR (via GitHub Pages), so UI changes are reviewed visually before merge.
 - **Decision records** — 80+ ADRs documenting the *why* behind architectural choices.
+- **Autonomous delivery pipeline with deterministic merge guardrails** — as a solo maintainer, I built a supervised pipeline that carries a pre-approved plan from branch to merge — commit, multi-agent code review, security audit, full CI, and visual-regression — without babysitting. The engineering is in the *guardrails*, not the automation: a deterministic classifier (with its own regression harness) blocks any user-visible feature from auto-merging until I attach an explicit human-approval label; worktree isolation keeps every in-flight change off the canonical checkout; and the required mutation and coverage gates must pass before anything lands. Autonomy is bounded by rules a human wrote and can audit, never by model judgment alone (ADR-0062, ADR-0067).
 
 ## Tech Stack
 

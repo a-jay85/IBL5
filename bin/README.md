@@ -11,7 +11,7 @@ container.
 |-------|---------|
 | Worktrees | `wt-new`, `wt-up`, `wt-down`, `wt-list`, `wt-rebase`, `wt-remove`, `wt-db-test`, `e2e-wt.sh` |
 | Automouse automation | `automouse-run`, `automouse-queue`, `automouse-prompt-impl`, `automouse-prompt-postplan` |
-| CI / quality gates | `adr-check`, `check-docs`, `check-hot-files`, `check-master-ci-green`, `check-plan`, `check-plan-staleness`, `check-vr-coverage`, `check-e2e-hygiene`, `check-e2e-fa-offers-owner`, `check-destructive-migrations`, `refactor-flag` |
+| CI / quality gates | `adr-check`, `check-docs`, `check-hot-files`, `check-master-ci-green`, `check-plan`, `check-plan-staleness`, `check-vr-coverage`, `check-e2e-hygiene`, `check-e2e-fa-offers-owner`, `check-e2e-mutator-isolation`, `check-destructive-migrations`, `refactor-flag` |
 | Prod ops (SSH) | `db-sync-prod`, `log-fetch-prod`, `merge-master-to-prod`, `smoke-prod` |
 | Dev / Docker env | `dev-up`, `db-test-up`, `db-migrate` |
 | Scaffolding | `next-adr`, `next-migration`, `generate-codebase-map`, `sync-branches` |

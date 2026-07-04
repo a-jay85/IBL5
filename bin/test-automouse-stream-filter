@@ -32,6 +32,12 @@ run_filter() {
     printf '%s' "$1" | "$FILTER" "$hb" "" "test-plan" 2>/dev/null
 }
 
+# run_filter_phase <phase> <ndjson-on-stdin> → captured filter stdout, phase tagged
+run_filter_phase() {
+    local hb="$TMP/hb"
+    printf '%s' "$2" | "$FILTER" "$hb" "" "test-plan" "$1" 2>/dev/null
+}
+
 # assert_contains <name> <output> <needle>
 assert_contains() {
     local name="$1" out="$2" needle="$3"
@@ -88,6 +94,20 @@ OUT=$(run_filter '{"type":"assistant","message":{"content":[{"type":"tool_use","
 ')
 assert_contains "c5a-tool-still-emits" "$OUT" "tool: Bash (#1, turn 1)"
 assert_contains "c5b-exit-still-emits" "$OUT" "exit: stop_reason=end_turn"
+
+# c6 — a passed phase is tagged onto the slug column as `<slug>/<phase>`
+OUT=$(run_filter_phase impl '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash"}]}}
+'"$RESULT_LINE"'
+')
+assert_contains "c6a-phase-tags-tool" "$OUT" "test-plan/impl tool: Bash"
+assert_contains "c6b-phase-tags-exit" "$OUT" "test-plan/impl exit: stop_reason=end_turn"
+
+# c7 (back-compat, negative) — no phase arg → bare slug, no trailing slash
+OUT=$(run_filter '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash"}]}}
+'"$RESULT_LINE"'
+')
+assert_contains "c7a-noPhase-bare-slug" "$OUT" "test-plan tool: Bash"
+assert_not_contains "c7b-noPhase-no-slash" "$OUT" "test-plan/"
 
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"

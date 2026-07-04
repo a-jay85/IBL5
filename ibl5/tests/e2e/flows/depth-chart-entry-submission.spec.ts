@@ -123,17 +123,24 @@ test.describe('Depth Chart submission', () => {
     await firstPg.selectOption(before === '3' ? '4' : '3');
 
     await page.locator('.depth-chart-buttons .depth-chart-submit-btn').click();
-    // PRG redirect completed (back on the module URL, not op=submit). The success
-    // flash is intentionally not asserted here — see the shared-session note at the
-    // top of this file. This test's contract is token rotation, asserted below.
-    await page.waitForURL(/modules\.php\?name=DepthChartEntry(?!.*op=submit)/, { timeout: 15_000 });
-
-    const tokenAfter = await page
-      .locator('input[name="_csrf_token"]')
-      .first()
-      .getAttribute('value');
+    // Do NOT rely on page.waitForURL here: beforeEach already navigated to a URL
+    // that matches this same regex, so waitForURL can resolve immediately against
+    // the pre-submit document — before the PRG redirect's new document has actually
+    // loaded — and a one-shot getAttribute() right after would then read the STALE
+    // pre-submit token (this is exactly what broke when the old success-flash
+    // .toBeVisible() wait — which only exists in the NEW document — was removed for
+    // the shared-session flash-steal race; see the note at the top of this file).
+    // Poll for the token to actually change instead, which only becomes true once
+    // the new document has loaded, without depending on the racy shared-session flash.
+    let tokenAfter: string | null = null;
+    await expect(async () => {
+      tokenAfter = await page
+        .locator('input[name="_csrf_token"]')
+        .first()
+        .getAttribute('value');
+      expect(tokenAfter).not.toBe(tokenBefore);
+    }).toPass({ timeout: 15_000 });
     expect(tokenAfter).toMatch(/^[a-f0-9]{64}$/);
-    expect(tokenAfter).not.toBe(tokenBefore);
   });
 
   test('back-to-depth-chart after submit still allows resubmit (regression)', async ({ page }) => {
@@ -149,8 +156,18 @@ test.describe('Depth Chart submission', () => {
       .locator('.depth-chart-table select[name^="pg"]')
       .first();
     await firstPg.selectOption('3');
-    await page.locator('.depth-chart-buttons .depth-chart-submit-btn').click();
-    await page.waitForURL(/modules\.php\?name=DepthChartEntry(?!.*op=submit)/, { timeout: 15_000 });
+    // Set up the URL wait BEFORE clicking (Promise.all), not after: beforeEach
+    // already navigated to a URL matching this same pattern, so a wait started
+    // AFTER the click can observe the still-current pre-submit URL as an
+    // immediate "match" and resolve before the PRG redirect actually lands —
+    // which then let the very next page.goto() below abort that still-in-flight
+    // navigation (net::ERR_ABORTED). Starting the wait first ties it to the
+    // navigation the click triggers, not to whatever URL happened to be current.
+    await Promise.all([
+      page.waitForURL(/modules\.php\?name=DepthChartEntry(?!.*op=submit)/, { timeout: 15_000 }),
+      page.locator('.depth-chart-buttons .depth-chart-submit-btn').click(),
+    ]);
+    await page.waitForLoadState('networkidle');
 
     // Leave the depth chart page and come back — minimal reliable repro of
     // the "user returns to the form later" pattern.
@@ -163,8 +180,10 @@ test.describe('Depth Chart submission', () => {
       .locator('.depth-chart-table select[name^="pg"]')
       .first()
       .selectOption('4');
-    await page.locator('.depth-chart-buttons .depth-chart-submit-btn').click();
-    await page.waitForURL(/modules\.php\?name=DepthChartEntry(?!.*op=submit)/, { timeout: 15_000 });
+    await Promise.all([
+      page.waitForURL(/modules\.php\?name=DepthChartEntry(?!.*op=submit)/, { timeout: 15_000 }),
+      page.locator('.depth-chart-buttons .depth-chart-submit-btn').click(),
+    ]);
 
     // The pre-PRG regression symptom: a stale-token resubmit rendered this error.
     // Redirected back to the module URL (asserted above) with that error absent is

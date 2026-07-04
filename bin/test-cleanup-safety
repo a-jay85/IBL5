@@ -443,6 +443,33 @@ fx="$e/ghfx"; printf 'view\tabandoned\tCLOSED\t%s\t7\n' "$tip" > "$fx"
 out="$(run_cleanup_gh "$e" "$fx")"
 assert_match "closed-untracked-still-skipped" 'SKIP abandoned: has untracked files' "$out"
 
+# ----------------------------------------------------------------------------
+# Phase 6: detached-HEAD worktrees resolve their PR by tip OID (Check 0). Clean
+# only if that PR is MERGED (exact headRefOid==tip match). No branch to delete.
+# The [ -n "$branch" ] guards keep the normal-branch path byte-identical.
+# ----------------------------------------------------------------------------
+# Positive: detached tip == a MERGED PR's headRefOid -> WOULD clean.
+e="$(new_env)"
+git -C "$e" checkout -q -b tmp master
+printf 'd\n' > "$e/d.txt"; git -C "$e" add d.txt; git -C "$e" commit -qm detwork
+oid="$(wt_tip "$e" tmp)"; git -C "$e" checkout -q master
+git -C "$e" worktree add -q --detach "$e/worktrees/det" "$oid" 2>/dev/null
+git -C "$e" branch -D tmp        # worktree now detached at oid, no branch
+fx="$e/ghfx"; printf 'list\t%s\t%s\tMERGED\t9\n' "$oid" "$oid" > "$fx"
+out="$(run_cleanup_gh "$e" "$fx")"
+assert_match "detached-merged-oid-cleaned" 'WOULD clean: det' "$out"
+
+# Negative: detached tip matching no PR row -> SKIP.
+e="$(new_env)"
+git -C "$e" checkout -q -b tmp master
+printf 'd\n' > "$e/d.txt"; git -C "$e" add d.txt; git -C "$e" commit -qm detwork
+oid="$(wt_tip "$e" tmp)"; git -C "$e" checkout -q master
+git -C "$e" worktree add -q --detach "$e/worktrees/det" "$oid" 2>/dev/null
+git -C "$e" branch -D tmp
+fx="$e/ghfx"; : > "$fx"          # empty fixture -> gh pr list matches nothing
+out="$(run_cleanup_gh "$e" "$fx")"
+assert_match "detached-no-pr-skipped" 'SKIP det: detached HEAD, no merged PR at tip' "$out"
+
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"
     exit 1

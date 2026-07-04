@@ -80,8 +80,10 @@ cleanup_worktree() {
         "$REPO_ROOT/bin/wt-remove" --force --volumes "$wt_name" 2>/dev/null \
             || git -C "$REPO_ROOT" worktree prune 2>/dev/null || true
     fi
-    git -C "$REPO_ROOT" branch -D "$branch" 2>/dev/null || \
-        echo "  Note: local branch '$branch' already deleted or not found"
+    if [ -n "$branch" ]; then
+        git -C "$REPO_ROOT" branch -D "$branch" 2>/dev/null || \
+            echo "  Note: local branch '$branch' already deleted or not found"
+    fi
     CLEANED=$((CLEANED + 1))
     echo "  Done."
 }
@@ -94,7 +96,7 @@ check_worktree() {
     local branch
     branch=$(get_branch_for_worktree "$wt_path")
 
-    if [ -z "$branch" ]; then
+    if [ -z "$branch" ] && ! command -v gh &>/dev/null; then
         echo "  SKIP $wt_name: could not determine branch (detached HEAD?)"
         SKIPPED=$((SKIPPED + 1))
         return
@@ -134,8 +136,31 @@ check_worktree() {
     # merged branches.
     local is_merged=false
 
+    # Check 0: detached HEAD (e.g. a resolve-* worktree with no local branch). Resolve the
+    # PR by the tip commit OID; clean only if that PR is MERGED (or CLOSED under the same
+    # remote-gone gate as the branch path, via --discard-closed). No branch to delete.
+    if [ -z "$branch" ]; then
+        local tip det_state
+        tip=$(git -C "$wt_path" rev-parse HEAD 2>/dev/null || true)
+        if [ -z "$tip" ]; then
+            echo "  SKIP $wt_name: could not determine branch (detached HEAD?)"
+            SKIPPED=$((SKIPPED + 1)); return
+        fi
+        det_state=$(cd "$REPO_ROOT" && gh pr list --search "$tip" --state all \
+            --json headRefOid,state,number \
+            -q '.[] | [.headRefOid, .state, .number] | @tsv' 2>/dev/null \
+            | awk -F'\t' -v t="$tip" '$1==t {print $2; exit}')
+        if [ "$det_state" = "MERGED" ] \
+           || { [ "$det_state" = "CLOSED" ] && [ "$DISCARD_CLOSED" = true ]; }; then
+            is_merged=true
+        else
+            echo "  SKIP $wt_name: detached HEAD, no merged PR at tip"
+            SKIPPED=$((SKIPPED + 1)); return
+        fi
+    fi
+
     # Check 1: PR state via GitHub CLI (handles squash merges)
-    if command -v gh &>/dev/null; then
+    if [ -n "$branch" ] && command -v gh &>/dev/null; then
         local pr_state
         pr_state=$(cd "$REPO_ROOT" && gh pr view "$branch" --json state -q .state 2>/dev/null || true)
         if [ "$pr_state" = "MERGED" ]; then
@@ -163,7 +188,7 @@ check_worktree() {
     fi
 
     # Check 2: Direct ancestor of master AND remote branch was pushed then deleted.
-    if [ "$is_merged" = false ]; then
+    if [ "$is_merged" = false ] && [ -n "$branch" ]; then
         local was_tracked
         was_tracked=$(git -C "$REPO_ROOT" config "branch.$branch.remote" 2>/dev/null || true)
         if [ -n "$was_tracked" ] \
@@ -186,7 +211,7 @@ check_worktree() {
     # commit beyond its fork-point instead; if the fork-point can't be resolved
     # or the branch has zero own-commits, treat as NOT merged (conservative —
     # genuinely-merged work is caught by Check 1's PR MERGED signal anyway).
-    if [ "$is_merged" = false ]; then
+    if [ "$is_merged" = false ] && [ -n "$branch" ]; then
         local local_tracking
         local_tracking=$(git -C "$REPO_ROOT" config "branch.$branch.remote" 2>/dev/null || true)
         if [ -z "$local_tracking" ] \

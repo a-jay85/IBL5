@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for agent-tiering — Fable approval-gate procedure, flat-fan-out (nested sub-agent) rationale, orchestrator context economics (delegate-don't-dismiss, split-don't-self-clear), and per-tier prompt style. Loads only when editing workflow orchestration defs, where this rationale applies.
-last_verified: 2026-07-03
+last_verified: 2026-07-04
 paths:
   - ".claude/skills/**/*.md"
   - ".claude/skills/**/SKILL.md"
@@ -30,7 +30,7 @@ Absent approval, proceed on Opus (or the correct lower tier) — flag and contin
 
 ## Boundary keys on task type, not model capability
 
-Re-validated 2026-06-30 against Sonnet 5 (now the `sonnet` alias, native 1M context). The
+Re-validated 2026-06-30 against Sonnet 5 (then the `sonnet` alias, native 1M context). The
 Opus-only column (final code review, diff-triage, rule/ADR authoring, novel reasoning,
 ambiguous failures) stays Opus because **"never delegate understanding" is a *delegation*
 rule, not a "wait for a smarter model" rule** — a more capable Sonnet does not make

@@ -42,6 +42,7 @@ services:
       retries: 10
 
   ibl6:
+    image: ghcr.io/a-jay85/ibl5/ibl6:latest
     build:
       context: .
       dockerfile: docker/Dockerfile.ibl6

@@ -25,6 +25,10 @@ inputs:
     description: 'Non-admin E2E test password (optional; enables role-gating tests)'
     required: false
     default: ''
+  ibl6-image:
+    description: 'How to obtain the ibl6 image: "pull" the pinned GHCR tag (default) or "build" from PR source (used by the ibl6 jobs so they test PR source, never master).'
+    required: false
+    default: 'pull'
 
 runs:
   using: 'composite'
@@ -91,6 +95,17 @@ runs:
       run: |
         docker compose -f docker-compose.ci.yml exec -T mariadb \
           mariadb -u root -proot ibl5 < ibl5/tests/e2e/fixtures/ci-seed.sql
+
+    - name: Prepare ibl6 image (pull pinned tag, or build from PR source)
+      shell: bash
+      run: |
+        if [ "${{ inputs.ibl6-image }}" = "build" ]; then
+          echo "Building ibl6 from PR source"
+          docker compose -f docker-compose.ci.yml build ibl6
+        else
+          docker pull ghcr.io/a-jay85/ibl5/ibl6:latest || \
+            docker compose -f docker-compose.ci.yml build ibl6
+        fi
 
     - name: Start remaining containers (Apache sees fully-migrated schema)
       shell: bash

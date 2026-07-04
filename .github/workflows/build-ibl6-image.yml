@@ -1,0 +1,52 @@
+name: Build IBL6 Image
+
+# Publishes ghcr.io/a-jay85/ibl5/ibl6:latest so CI e2e jobs that don't test
+# IBL6 can pull it instead of rebuilding it every run. Mirrors the php-apache
+# GHCR publish in cache-dependencies.yml. Path-scoped so it does NOT fire on
+# ibl5-dependency changes (and cache-dependencies does NOT fire on IBL6 changes).
+
+on:
+  # Rebuild when IBL6 source or its Dockerfile changes on master
+  push:
+    branches:
+      - master
+    paths:
+      - 'IBL6/**'
+      - 'docker/Dockerfile.ibl6'
+
+  # Daily to keep :latest fresh (and to publish it the first time)
+  schedule:
+    - cron: '0 0 * * *'  # Daily at midnight UTC
+
+  # Allow manual trigger (used by the post-merge watcher and for first publish)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-ibl6-image:
+    name: Build and push IBL6 image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push IBL6 image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/Dockerfile.ibl6
+          push: true
+          tags: ghcr.io/a-jay85/ibl5/ibl6:latest

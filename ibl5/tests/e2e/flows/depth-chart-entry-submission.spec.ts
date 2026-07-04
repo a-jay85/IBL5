@@ -12,6 +12,22 @@ import { submitFormAndAssertEffect } from '../helpers/submit-form';
 // the logged-in user's team to Monarchs (tid=8). The Monarchs roster has
 // exactly 12 active players with proper depth coverage (seeded in ci-seed.sql)
 // and is not referenced by any other spec, so parallel workers cannot pollute it.
+//
+// Why we do NOT assert the ".ibl-alert--success / depth chart saved" flash here:
+// the success flash lives in $_SESSION['flash_success'] and is single-use — the
+// FIRST PageLayout::header() render for that session consumes (unset)s it. All
+// authenticated E2E workers share ONE pinned server-side PHPSESSID (see
+// playwright-tests.md "Shared server session"), so any parallel worker that
+// renders any module in the ~ms window between this spec's submit-POST and its
+// redirect-GET can render the flash into ITS page and clear it, leaving this
+// spec's GET flash-less. That race made these tests intermittently red. The
+// flash render + single-use consumption is already unit-covered by
+// tests/Unit/PageLayout/PageLayoutTest.php, so here we assert the DURABLE proof
+// of success instead — the submitted depth value persisted to the DB (readable
+// back on the redirected form). (The ".ibl-alert--error" validation-failure test
+// below is NOT affected: its flash key `_ibl_depth_chart_flash` is module-scoped
+// and only this serial spec ever renders DepthChartEntry, so no parallel worker
+// can steal it.)
 test.describe.configure({ mode: 'serial' });
 
 test.describe('Depth Chart submission', () => {
@@ -61,7 +77,7 @@ test.describe('Depth Chart submission', () => {
     }
   });
 
-  test('submit redirects back to module URL with success flash and fresh form', async ({ page }) => {
+  test('submit redirects back to module URL with a fresh form and persisted change', async ({ page }) => {
     await expect(page.locator('.depth-chart-form')).toBeVisible({ timeout: 15000 });
 
     const firstPg = page
@@ -74,8 +90,10 @@ test.describe('Depth Chart submission', () => {
         await page.locator('.depth-chart-buttons .depth-chart-submit-btn').click();
       },
       expectSameSpot: async () => {
+        // PRG landed us back on the module URL (not op=submit) with a fresh form.
+        // The success flash is deliberately NOT asserted — see the shared-session
+        // note at the top of this file; the durable success proof is the readBack.
         await expect(page).toHaveURL(/modules\.php\?name=DepthChartEntry(?!.*op=submit)/);
-        await expect(page.locator('.ibl-alert--success', { hasText: /depth chart saved/i })).toBeVisible({ timeout: 15000 });
         await expect(page.locator('.depth-chart-form')).toBeVisible();
         await assertNoPhpErrors(page, 'after depth chart submission');
       },
@@ -105,8 +123,10 @@ test.describe('Depth Chart submission', () => {
     await firstPg.selectOption(before === '3' ? '4' : '3');
 
     await page.locator('.depth-chart-buttons .depth-chart-submit-btn').click();
+    // PRG redirect completed (back on the module URL, not op=submit). The success
+    // flash is intentionally not asserted here — see the shared-session note at the
+    // top of this file. This test's contract is token rotation, asserted below.
     await page.waitForURL(/modules\.php\?name=DepthChartEntry(?!.*op=submit)/, { timeout: 15_000 });
-    await expect(page.locator('.ibl-alert--success', { hasText: /depth chart saved/i })).toBeVisible({ timeout: 15000 });
 
     const tokenAfter = await page
       .locator('input[name="_csrf_token"]')
@@ -131,7 +151,6 @@ test.describe('Depth Chart submission', () => {
     await firstPg.selectOption('3');
     await page.locator('.depth-chart-buttons .depth-chart-submit-btn').click();
     await page.waitForURL(/modules\.php\?name=DepthChartEntry(?!.*op=submit)/, { timeout: 15_000 });
-    await expect(page.locator('.ibl-alert--success', { hasText: /depth chart saved/i })).toBeVisible({ timeout: 15000 });
 
     // Leave the depth chart page and come back — minimal reliable repro of
     // the "user returns to the form later" pattern.
@@ -147,7 +166,12 @@ test.describe('Depth Chart submission', () => {
     await page.locator('.depth-chart-buttons .depth-chart-submit-btn').click();
     await page.waitForURL(/modules\.php\?name=DepthChartEntry(?!.*op=submit)/, { timeout: 15_000 });
 
-    await expect(page.locator('.ibl-alert--success', { hasText: /depth chart saved/i })).toBeVisible({ timeout: 15000 });
+    // The pre-PRG regression symptom: a stale-token resubmit rendered this error.
+    // Redirected back to the module URL (asserted above) with that error absent is
+    // the exact regression proof. Success flash intentionally not asserted, and no
+    // read-back reload added here — value-persistence is already covered by the
+    // first submit test and the IDOR test, and a bare goto under parallel load is a
+    // blank-page flake vector we deliberately avoid (see the shared-session note).
     await expect(page.getByText(/Invalid or expired/i)).not.toBeVisible();
   });
 
@@ -253,7 +277,12 @@ test.describe('Depth Chart submission', () => {
     // Resubmit — must now pass validation with the fresh token.
     await page.locator('.depth-chart-buttons .depth-chart-submit-btn').click();
 
-    await expect(page.locator('.ibl-alert--success', { hasText: /depth chart saved/i })).toBeVisible();
+    // Both success and validation-failure take the PRG redirect, so the durable
+    // discriminator for "resubmit succeeded" is: we redirected back to the module
+    // URL AND no validation-error alert rendered. The success flash is not asserted
+    // (shared-session steal — see the note at the top of this file); the error flash
+    // key is module-scoped, so its absence here is not racy.
+    await page.waitForURL(/modules\.php\?name=DepthChartEntry(?!.*op=submit)/, { timeout: 15_000 });
     await expect(page.locator('.ibl-alert--error')).not.toBeVisible();
   });
 
@@ -349,13 +378,12 @@ test.describe('Depth Chart submission', () => {
     await page.locator('.depth-chart-buttons .depth-chart-submit-btn').click();
 
     // Treated as a normal Monarchs submission (Team_Name ignored): PRG back to
-    // the module with the success flash, and the change persisted on Monarchs.
+    // the module, and the change persisted on Monarchs. The success flash is not
+    // asserted (shared-session steal — see the note at the top of this file); the
+    // durable proof the write landed on Monarchs is the read-back below.
     await expect(page).toHaveURL(
       /modules\.php\?name=DepthChartEntry(?!.*op=submit)/,
     );
-    await expect(
-      page.locator('.ibl-alert--success', { hasText: /depth chart saved/i }),
-    ).toBeVisible({ timeout: 15000 });
     await expect(
       page.locator('.depth-chart-table select[name^="pg"]').first(),
     ).toHaveValue('3');

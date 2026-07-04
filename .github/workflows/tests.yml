@@ -577,6 +577,8 @@ jobs:
         run: bin/test-check-composite-contracts
       - name: bin/test-check-e2e-mutator-isolation
         run: bin/test-check-e2e-mutator-isolation
+      - name: bin/test-check-e2e-fixture-drift
+        run: bin/test-check-e2e-fixture-drift
       - name: bin/test-website-affecting
         run: bin/test-website-affecting
 

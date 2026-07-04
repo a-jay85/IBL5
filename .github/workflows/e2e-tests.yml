@@ -452,6 +452,10 @@ jobs:
           test-user-regular: ${{ secrets.IBL_TEST_USER_REGULAR || 'ci-e2e-regular' }}
           test-pass-regular: ${{ secrets.IBL_TEST_PASS_REGULAR || 'e2e-regular-pass' }}
 
+      # --- Fixture-drift baseline (runtime mutator-isolation gate — ADR-0052) ---
+      - name: Snapshot fixture baseline
+        run: bin/check-e2e-fixture-drift snapshot /tmp/fixture-before.txt
+
       # --- Run Sharded Tests ---
       - name: Run E2E tests
         env:
@@ -476,6 +480,16 @@ jobs:
               --project=chromium \
               --shard=${{ matrix.shard-index }}/${{ matrix.total-shards }} \
               --reporter=blob
+
+      - name: Assert no fixture drift
+        if: ${{ !cancelled() }}
+        run: |
+          if [ ! -f /tmp/fixture-before.txt ]; then
+            echo "Skipping drift check — baseline snapshot missing (upstream setup failed)."
+            exit 0
+          fi
+          bin/check-e2e-fixture-drift snapshot /tmp/fixture-after.txt
+          bin/check-e2e-fixture-drift diff /tmp/fixture-before.txt /tmp/fixture-after.txt
 
       - name: Upload blob report
         if: always()

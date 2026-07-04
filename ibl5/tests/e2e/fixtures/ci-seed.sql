@@ -1888,7 +1888,8 @@ INSERT INTO ibl_plr (
    50, 130, 35, 120, 150, 50,
    70, 15, 80,
    'a0000000-0000-0000-0000-000000000030')
-ON DUPLICATE KEY UPDATE name = VALUES(name), teamid = VALUES(teamid), cy = VALUES(cy), cyt = VALUES(cyt);
+ON DUPLICATE KEY UPDATE name = VALUES(name), teamid = VALUES(teamid), cy = VALUES(cy), cyt = VALUES(cyt),
+  salary_yr1 = VALUES(salary_yr1), salary_yr2 = VALUES(salary_yr2);
 
 -- ============================================================
 -- NOTE: Test user (auth_users) is created by the

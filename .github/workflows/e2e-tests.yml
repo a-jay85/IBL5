@@ -391,21 +391,15 @@ jobs:
     if: needs.changes.outputs.src == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      # Single shard (was 4 shards, max-parallel 3). On the free-tier capped
-      # runner pool with many concurrent PRs, the pool is saturated, so total
-      # runner-minutes — not per-PR wall-clock — governs how fast the whole PR
-      # backlog clears. Each shard job re-pays a fixed ~100s setup (docker/DB
-      # bring-up), so cost ≈ n·setup + testTime is minimized at n=1; sharding's
-      # parallelism buys nothing when there are no idle runners to absorb it.
-      # In-job parallelism still comes from Playwright `workers` (playwright.config.ts),
-      # so total test time is unchanged. Restore the array to re-shard if the
-      # runner cap is ever raised. Kept as a 1-element matrix so job naming,
-      # blob-report artifact naming, and the merge-reports glob are untouched.
-      matrix:
-        shard-index: [1]
-        total-shards: [1]
+    # Single shard (was 4 shards, max-parallel 3). On the free-tier capped
+    # runner pool with many concurrent PRs, the pool is saturated, so total
+    # runner-minutes — not per-PR wall-clock — governs how fast the whole PR
+    # backlog clears. Each shard job re-pays a fixed ~100s setup (docker/DB
+    # bring-up), so cost ≈ n·setup + testTime is minimized at n=1; sharding's
+    # parallelism buys nothing when there are no idle runners to absorb it.
+    # In-job parallelism still comes from Playwright `workers` (playwright.config.ts),
+    # so total test time is unchanged. Restore a matrix strategy to re-shard if
+    # the runner cap is ever raised.
 
     steps:
       - uses: actions/checkout@v7
@@ -478,7 +472,7 @@ jobs:
             "$PW_IMAGE" \
             npx playwright test \
               --project=chromium \
-              --shard=${{ matrix.shard-index }}/${{ matrix.total-shards }} \
+              --shard=1/1 \
               --reporter=blob
 
       - name: Assert no fixture drift
@@ -495,7 +489,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: blob-report-${{ matrix.shard-index }}
+          name: blob-report-1
           path: ibl5/blob-report/
           retention-days: 1
 
@@ -503,7 +497,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: test-results-shard-${{ matrix.shard-index }}
+          name: test-results-shard-1
           path: ibl5/test-results/
           retention-days: 1
 

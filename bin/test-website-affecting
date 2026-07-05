@@ -42,20 +42,43 @@ assert_exit "exempt-pages-deploy"  1 ".github/workflows/pages-deploy.yml"
 assert_exit "exempt-rebase-prs"    1 ".github/workflows/rebase-prs.yml"
 assert_exit "exempt-human-signoff" 1 ".github/workflows/human-signoff.yml"
 assert_exit "exempt-dependabot"    1 ".github/workflows/dependabot-auto-merge.yml"
+assert_exit "exempt-doc-freshness" 1 ".github/workflows/doc-freshness-audit.yml"
+assert_exit "exempt-tests-yml"     1 ".github/workflows/tests.yml"
+assert_exit "exempt-codeql"          1 ".github/workflows/codeql.yml"
+assert_exit "exempt-eslint"          1 ".github/workflows/eslint.yml"
+assert_exit "exempt-gitleaks"        1 ".github/workflows/gitleaks.yml"
+assert_exit "exempt-pr-meta-checks"  1 ".github/workflows/pr-meta-checks.yml"
+assert_exit "exempt-pr-collisions"   1 ".github/workflows/pr-collisions-cron.yml"
+assert_exit "exempt-log-review"      1 ".github/workflows/log-review.yml"
+assert_exit "exempt-db-backup"       1 ".github/workflows/db-backup.yml"
+assert_exit "exempt-mutation"        1 ".github/workflows/mutation.yml"
+assert_exit "exempt-migration-safety" 1 ".github/workflows/migration-safety.yml"
+assert_exit "exempt-engine-yml"      1 ".github/workflows/engine.yml"
+assert_exit "exempt-main-yml"        1 ".github/workflows/main.yml"
+assert_exit "exempt-smoke-prod"      1 ".github/workflows/smoke-prod.yml"
+assert_exit "exempt-cache-deps"      1 ".github/workflows/cache-dependencies.yml"
+assert_exit "exempt-build-ibl6"      1 ".github/workflows/build-ibl6-image.yml"
+assert_exit "exempt-deploy-rehearsal" 1 ".github/workflows/deploy-rehearsal.yml"
 
 # --- (b) GUARD (LOAD-BEARING): E2E/Lighthouse drivers → exit 0 (website) ---
 # This block is the mechanical proof against the silent-skip failure mode: if a
 # future edit ever swept one of these into the exempt set, its PR would skip the
-# very E2E/Lighthouse run that validates it. These MUST classify website.
+# very E2E/Lighthouse run that validates it. These MUST classify website. The
+# lighthouse-baseline/audit siblings drive Lighthouse too (baseline uploads the
+# manifest the PR run compares against), so they are guarded, NOT exempted.
 assert_exit "guard-e2e-tests"         0 ".github/workflows/e2e-tests.yml"
 assert_exit "guard-setup-docker-e2e"  0 ".github/actions/setup-docker-e2e/action.yml"
 assert_exit "guard-docker-compose-ci" 0 "docker-compose.ci.yml"
 assert_exit "guard-lighthouse"        0 ".github/workflows/lighthouse.yml"
+assert_exit "guard-lighthouse-baseline" 0 ".github/workflows/lighthouse-baseline.yml"
+assert_exit "guard-lighthouse-audit"    0 ".github/workflows/lighthouse-audit.yml"
 
 # --- (b2) Exactness boundary: a non-exempt / look-alike workflow → exit 0 ---
 # Proves the exempt case is an EXACT full-path match and never sweeps a sibling
-# workflow. Fail-safe direction: unknown workflow still counts website.
-assert_exit "non-exempt-workflow"  0 ".github/workflows/tests.yml"
+# workflow. Fail-safe direction: an arbitrary unclassified workflow still counts
+# website. Uses a synthetic name (not a real workflow that might later be
+# exempted) so the fail-safe-default intent stays unambiguous.
+assert_exit "non-exempt-workflow"  0 ".github/workflows/arbitrary-nonexempt.yml"
 assert_exit "exempt-lookalike"     0 ".github/workflows/pages-deploy-staging.yml"
 
 # --- (c) Mixed diff: exempt workflow + real app file → exit 0 (any website wins) ---

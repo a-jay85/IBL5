@@ -98,6 +98,35 @@ assert "arrow-rename-cue"    0 '`ibl5/classes/FreeAgency/FreeAgencyDemandCalcula
 # boundary on the move verb). A removed file on a cue-less-of-creation line stays stale.
 assert "remove-not-cue" 1 'Remove the deprecated `ibl5/classes/GoneForever.php` from the bootstrap.'
 
+# --- Structural exemptions (regression for the 2026-07-05 skip audit) --------
+# The guard drops fenced code blocks and non-dependency sections BEFORE token
+# extraction, because paths there are illustrative or explicitly-not-touched.
+# Each case pairs the exemption with its load-bearing negative so the guard can
+# never silently stop catching a genuinely vanished dependency.
+
+# A nonexistent path inside a ``` fence is an illustrative snippet, not a
+# dependency — exempt even on a cue-less "Modify the existing" line that would
+# otherwise flag. (Report 8: a regression-test literal inside a fenced block.)
+assert "fence-exempt" 0 $'Regression snippet:\n```\nassert 1 \'Modify the existing `ibl5/classes/NoSuchFencedThing.php`.\'\n```\nDone.'
+
+# Fence toggle must re-enable scanning once the block closes: a genuinely stale
+# dependency AFTER a fence still flags (guards against a swallowed-rest bug).
+assert "fence-closes" 1 $'```\nexample line\n```\nModify the existing `ibl5/classes/StaleAfterFenceXyz.php`.'
+
+# A path another PR creates, cited under `## Out of Scope` for context, is
+# exempt — with NO creation cue on the line, so only the section exemption can
+# save it. (The FP that skipped discord-pipeline-1: `bin/bug-pipeline-cron-setup`.)
+assert "out-of-scope-exempt" 0 $'## Phase 1\nEdit `bin/check-plan-staleness`.\n\n## Out of Scope\nThe `bin/future-script-from-another-pr` lives in a different PR.'
+
+# Load-bearing negative: a deleted dependency in an IN-scope section still flags
+# even when the plan ALSO has an Out of Scope section — the exemption is scoped
+# to the exempt section, it does not neuter the guard globally.
+assert "in-scope-stale-with-oos" 1 $'## Critical Files\nModify the existing `ibl5/classes/DeletedDependencyXyz.php`.\n\n## Out of Scope\nUnrelated `bin/future-thing`.'
+
+# Subsection nesting: a deeper heading under Out of Scope stays exempt; a sibling
+# `##` heading closes the section, so a deleted dep beneath the sibling flags.
+assert "oos-subsection-nesting" 1 $'## Out of Scope\n### Detail\nFuture `bin/nonexistent-under-sub`.\n\n## Verification\nModify the existing `ibl5/classes/AlsoDeletedAbc.php`.'
+
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"
     exit 1

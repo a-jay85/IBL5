@@ -17,6 +17,11 @@
 #   - glob/placeholder metacharacters and non-charset tokens are skipped
 #   - survivors are de-duplicated and tested with [ -e "$REPO_ROOT/$token" ]
 #
+# Two STRUCTURAL exemptions precede extraction (see the awk pass below): tokens
+# inside fenced code blocks and tokens under non-dependency headings (Out of
+# Scope / Non-Goals / Rejected / Alternatives) are dropped, because paths there
+# are illustrative or explicitly-not-touched, never dependencies the impl reads.
+#
 # Exit codes: 0 = all tokens resolve (or none), 1 = stale (unresolved tokens
 # printed as "STALE: <token>"), 2 = usage error / plan file missing.
 #
@@ -53,16 +58,67 @@ fi
 TOKENS_FILE="$(mktemp)"
 SEEN_FILE="$(mktemp)"
 MISSING_FILE="$(mktemp)"
-trap 'rm -f "$TOKENS_FILE" "$SEEN_FILE" "$MISSING_FILE"' EXIT
+SCAN_FILE="$(mktemp)"
+trap 'rm -f "$TOKENS_FILE" "$SEEN_FILE" "$MISSING_FILE" "$SCAN_FILE"' EXIT
 
-# Collect candidate tokens. grep follows the symlink at $PLAN_FILE for its
-# content. Markdown link targets and backtick-span contents are extracted, then
-# the surrounding syntax is stripped. A no-match grep exits 1 harmlessly (no
-# `set -e`).
+# Structural exemption pass. Before extracting tokens, drop plan regions that by
+# construction never carry a real path *dependency* the implementation reads:
+#
+#   1. Fenced code blocks (``` … ```) — illustrative snippets. Plan authors put
+#      example assertions and shell recipes here, often referencing deliberately
+#      non-existent paths (e.g. a regression test's `GoneForever.php` literal).
+#      The token-extraction grep is line-based and fence-blind, so without this
+#      those literals get flagged stale (recurring FP class — see report 8 of the
+#      2026-07-05 skip audit).
+#   2. Non-dependency sections — headings matching Out of Scope / Non-Goals /
+#      Rejected / Alternatives. Paths named there are things the plan explicitly
+#      does NOT touch, or files another PR creates, discussed for context. They
+#      are not dependencies, so their on-disk absence cannot poison a run (the FP
+#      that skipped discord-pipeline-1: `bin/bug-pipeline-cron-setup`, a file PR
+#      #5a creates, cited under `## Out of Scope`). Heading level is tracked so a
+#      subsection stays exempt until a sibling/ancestor heading closes it.
+#
+# This is deliberately narrow: the guard's whole job is catching a vanished
+# dependency, so IN-scope sections (Critical Files, phase bodies, Verification
+# Matrix) are still scanned in full and the same-line creation-cue logic below
+# still handles to-be-created paths there. Authoring convention that keeps
+# not-yet-existing paths in an exempt position lives in .claude/skills/plan.
+#
+# Known limitation: an UNCLOSED fence (odd number of ``` markers) leaves in_fence
+# toggled on to EOF, silently exempting every path below the last opener. Low risk
+# — an unbalanced fence also breaks markdown rendering, so it surfaces elsewhere —
+# but it is the one over-exemption path (a genuinely stale dependency below the
+# stray opener would be masked). Kept simple over adding a balance check.
+awk '
+    BEGIN { in_fence = 0; exempt_level = 0 }
+    /^[[:space:]]*```/ { in_fence = !in_fence; next }
+    in_fence { next }
+    /^#+[[:space:]]/ {
+        lvl = 0
+        while (substr($0, lvl + 1, 1) == "#") lvl++
+        htext = tolower($0)
+        # Match only when the section TITLE LEADS with a non-dependency keyword
+        # (anchored after the #s), so "## Rejected Alternatives" / "## Out of
+        # Scope" exempt but "## Trade-offs (rejected paths noted)" does not.
+        is_exempt = (htext ~ /^#+[[:space:]]+(out[ -]of[ -]scope|non-?goals?|rejected|alternatives?)/)
+        if (exempt_level > 0 && lvl <= exempt_level) exempt_level = 0
+        if (exempt_level == 0 && is_exempt) exempt_level = lvl
+        if (exempt_level > 0) next
+        print
+        next
+    }
+    exempt_level > 0 { next }
+    { print }
+' "$PLAN_FILE" > "$SCAN_FILE"
+
+# Collect candidate tokens from the filtered scan file (fences and non-dependency
+# sections already removed above). Markdown link targets and backtick-span
+# contents are extracted, then the surrounding syntax is stripped. A no-match
+# grep exits 1 harmlessly (no `set -e`).
 {
-    grep -oE '\[[^]]*\]\([^)[:space:]]+\)' "$PLAN_FILE" | sed -E 's/^\[[^]]*\]\(//; s/\)$//'
+    grep -oE '\[[^]]*\]\([^)[:space:]]+\)' "$SCAN_FILE" | sed -E 's/^\[[^]]*\]\(//; s/\)$//'
     # shellcheck disable=SC2016  # backticks are literal markdown-span delimiters, not command substitution
-    grep -oE '`[^`]+`' "$PLAN_FILE" | sed -E 's/^`//; s/`$//'
+    grep -oE '`[^`]+`' "$SCAN_FILE" | sed -E 's/^`//; s/`$//'
 } >> "$TOKENS_FILE"
 
 while IFS= read -r token; do

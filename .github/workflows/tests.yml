@@ -275,7 +275,7 @@ jobs:
         DB_USER: root
         DB_PASS: root
         DB_NAME: ibl5
-      run: vendor/bin/phpunit --group database --no-progress --no-output --testdox-summary
+      run: vendor/bin/phpunit --group database --no-progress --testdox-summary
 
   phpstan:
     name: PHPStan Analysis

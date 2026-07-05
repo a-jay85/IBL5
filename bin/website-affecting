@@ -17,6 +17,11 @@
 #   0  Affects website — callers should run/build.
 #   1  Does NOT affect website — callers may skip.
 #
+# Consumers (all run this predicate on the diff, PR-only): e2e-tests.yml `changes`
+# job (→ VR/E2E/api-e2e/mutators), lighthouse.yml's own `changes` job (→ PR
+# Lighthouse), and bin/wt-up (→ local Docker preview build). The exempt criterion
+# below therefore means "cannot alter a VR / E2E / Lighthouse / preview render."
+#
 # Deny-set (a file is non-website if it matches ALL of the following):
 #   - matches the deny regex: (\.md$|^docs/|^ibl5/docs/|^\.claude/|^bin/|^engine/)
 #   - is NOT in the carve-out set (paths that must always trigger, even though
@@ -28,16 +33,34 @@
 # .github/workflows/e2e-tests.yml and .github/workflows/lighthouse.yml.
 #
 # CI-meta exempt set (the INVERSE of the carve-out): a curated denylist of
-# workflow files that do NOT match the deny regex but PROVABLY run no app code
-# and cannot affect the E2E suite, Lighthouse, or the app. These classify
-# NON-website even though nothing denies them. This is a DENYLIST CARVE-OUT, not
-# a positive allowlist: its staleness fails SAFE/LOUD (a dropped or renamed
-# entry just over-runs E2E) — never a silent E2E skip. Each entry is a
+# workflow files that do NOT match the deny regex but PROVABLY cannot affect a
+# VR / E2E / Lighthouse / preview render. (Running PHPUnit/PHPStan/Infection is
+# NOT "affecting a render" — see tests.yml/mutation below.) These
+# classify NON-website even though nothing denies them. This is a DENYLIST
+# CARVE-OUT, not a positive allowlist: its staleness fails SAFE/LOUD (a dropped
+# or renamed entry just over-runs E2E) — never a silent E2E skip. Each entry is a
 # deliberate assertion "this file can't break E2E or the app":
 #       .github/workflows/pages-deploy.yml           (post-E2E gh-pages deploy)
 #       .github/workflows/rebase-prs.yml             (git rebase of open PRs)
 #       .github/workflows/human-signoff.yml          (PR-title classifier gate)
 #       .github/workflows/dependabot-auto-merge.yml  (enables gh pr merge --auto)
+#       .github/workflows/doc-freshness-audit.yml    (nightly doc-staleness audit + docfix launcher)
+#       .github/workflows/tests.yml                  (PHPUnit/PHPStan/audit; own paths-filter, not in e2e-tests.yml push-paths)
+#       .github/workflows/codeql.yml                 (CodeQL static analysis)
+#       .github/workflows/eslint.yml                 (ESLint of e2e specs; static lint)
+#       .github/workflows/gitleaks.yml               (secret scan)
+#       .github/workflows/pr-meta-checks.yml         (bin/ meta-checks; install:false, no app code)
+#       .github/workflows/pr-collisions-cron.yml     (gh + git PR-collision sweep)
+#       .github/workflows/log-review.yml             (SSH prod log digest)
+#       .github/workflows/db-backup.yml              (prod dump + restore self-test)
+#       .github/workflows/mutation.yml               (Infection/PHPUnit; renders nothing)
+#       .github/workflows/migration-safety.yml       (migrate/validate vs CI DB; SQL itself is website-side)
+#       .github/workflows/engine.yml                 (Go engine CI; E2E runs the prebaked jsbsim)
+#       .github/workflows/main.yml                   (push:production deploy pipeline)
+#       .github/workflows/smoke-prod.yml             (post-deploy prod smoke over SSH)
+#       .github/workflows/cache-dependencies.yml     (builds php-apache:latest; E2E pulls prebaked)
+#       .github/workflows/build-ibl6-image.yml       (builds ibl6:latest; E2E builds ibl6 from PR source)
+#       .github/workflows/deploy-rehearsal.yml       (self-contained migration smoke; no VR/E2E/LH)
 #
 # Anchoring is load-bearing:
 #   ^bin/      so ibl5/bin/* (app bin, website-side) is NOT denied
@@ -68,21 +91,40 @@ is_carveout() {
 }
 
 # CI-meta exempt set: paths that do NOT match the deny regex (so they would
-# otherwise count website-side) but PROVABLY run no app code and cannot affect
-# the E2E suite, Lighthouse, or the app. This is a curated DENYLIST CARVE-OUT,
-# not a positive allowlist: its staleness fails SAFE (a dropped/renamed entry
-# just over-runs E2E) — never a silent E2E skip. Each entry is a deliberate
-# assertion "this file can't break E2E or the app." Match is EXACT (full
-# repo-relative path), so a sibling workflow is never accidentally swept in.
+# otherwise count website-side) but PROVABLY cannot affect a VR / E2E / Lighthouse
+# / preview render. This is a curated DENYLIST CARVE-OUT, not a positive
+# allowlist: its staleness fails SAFE (a dropped/renamed entry just over-runs E2E)
+# — never a silent E2E skip. Each entry is a deliberate assertion "this file can't
+# break E2E or the app." Match is EXACT (full repo-relative path), so a sibling
+# workflow is never accidentally swept in.
 # NEVER add: .github/workflows/e2e-tests.yml, .github/workflows/lighthouse.yml,
+# .github/workflows/lighthouse-baseline.yml, .github/workflows/lighthouse-audit.yml,
 # .github/actions/setup-docker-e2e/**, docker-compose.ci.yml, docker/Dockerfile*
-# — those drive E2E/Lighthouse and MUST stay website-side.
+# — those drive E2E/Lighthouse (lighthouse-baseline uploads the manifest the PR
+# Lighthouse compares against) and MUST stay website-side.
 is_ci_meta_exempt() {
     case "$1" in
         .github/workflows/pages-deploy.yml)          return 0 ;;  # workflow_run after E2E; checks out gh-pages + deploys Pages — no app code, consumes E2E output (can't change it)
         .github/workflows/rebase-prs.yml)            return 0 ;;  # push:master trigger; rebases open PRs via git — no app code, no E2E/Lighthouse
         .github/workflows/human-signoff.yml)         return 0 ;;  # PR-title classifier gate (bin/lib/human-signoff-classifier.sh) — no app code, no E2E/Lighthouse
         .github/workflows/dependabot-auto-merge.yml) return 0 ;;  # enables gh pr merge --auto for dependabot PRs — no app code, no E2E/Lighthouse
+        .github/workflows/doc-freshness-audit.yml)   return 0 ;;  # nightly doc-staleness audit (bin/check-docs) + docfix launcher — no app code, no E2E/Lighthouse render
+        .github/workflows/tests.yml)                 return 0 ;;  # PHPUnit/PHPStan/audit suite — own dorny paths-filter; absent from e2e-tests.yml push-paths, so a tests.yml-only push already skips E2E
+        .github/workflows/codeql.yml)                return 0 ;;  # CodeQL static analysis of JS/TS + workflows — no app run, no E2E/Lighthouse render
+        .github/workflows/eslint.yml)                return 0 ;;  # ESLint of e2e specs (bun run lint:e2e) — static lint, no app run, no E2E/Lighthouse
+        .github/workflows/gitleaks.yml)              return 0 ;;  # gitleaks secret scan — no app run, no E2E/Lighthouse
+        .github/workflows/pr-meta-checks.yml)        return 0 ;;  # bin/ meta-checks (check-docs/adr/hot-files/orphan-css…), install:false — no composer/app code, no E2E/Lighthouse
+        .github/workflows/pr-collisions-cron.yml)    return 0 ;;  # gh CLI + git PR-collision sweep (schedule) — no app run, no E2E/Lighthouse
+        .github/workflows/log-review.yml)            return 0 ;;  # SSH prod log fetch + Discord DM (schedule) — no app run, no E2E/Lighthouse
+        .github/workflows/db-backup.yml)             return 0 ;;  # prod DB dump + restore self-test (schedule) — no app boot, no E2E/Lighthouse
+        .github/workflows/mutation.yml)              return 0 ;;  # Infection/PHPUnit mutation suite (own DB) — renders nothing, absent from e2e-tests.yml push-paths
+        .github/workflows/migration-safety.yml)      return 0 ;;  # migrate/validate vs CI DB; the SQL (ibl5/migrations/**) is website-side, this workflow file is not
+        .github/workflows/engine.yml)                return 0 ;;  # Go engine build/test; emits no jsbsim binary — E2E runs the prebaked one (same basis as ^engine/)
+        .github/workflows/main.yml)                  return 0 ;;  # push:production deploy pipeline — never runs on a master PR; can't touch PR E2E/Lighthouse
+        .github/workflows/smoke-prod.yml)            return 0 ;;  # workflow_run after "Build and Deploy" — SSH prod smoke; no PR-E2E impact (like pages-deploy)
+        .github/workflows/cache-dependencies.yml)    return 0 ;;  # builds php-apache:latest on push:master; E2E pulls the prebaked image (a PR edit doesn't rebuild it)
+        .github/workflows/build-ibl6-image.yml)      return 0 ;;  # builds ibl6:latest; E2E ibl6 jobs use ibl6-image:build from PR source, not this GHCR push
+        .github/workflows/deploy-rehearsal.yml)      return 0 ;;  # boots PHP for a self-contained migration smoke — drives no VR/E2E/Lighthouse/preview render
     esac
     return 1
 }
@@ -107,14 +149,31 @@ Carve-out (always website-side despite matching deny regex):
   bin/website-affecting  (the predicate itself)
 
 CI-meta exempt (NON-website despite not matching deny regex — provably can't
-affect E2E/Lighthouse/app; staleness over-runs, never silent-skips):
+affect a VR/E2E/Lighthouse/preview render; staleness over-runs, never silent-skips):
   .github/workflows/pages-deploy.yml
   .github/workflows/rebase-prs.yml
   .github/workflows/human-signoff.yml
   .github/workflows/dependabot-auto-merge.yml
+  .github/workflows/doc-freshness-audit.yml
+  .github/workflows/tests.yml
+  .github/workflows/codeql.yml
+  .github/workflows/eslint.yml
+  .github/workflows/gitleaks.yml
+  .github/workflows/pr-meta-checks.yml
+  .github/workflows/pr-collisions-cron.yml
+  .github/workflows/log-review.yml
+  .github/workflows/db-backup.yml
+  .github/workflows/mutation.yml
+  .github/workflows/migration-safety.yml
+  .github/workflows/engine.yml
+  .github/workflows/main.yml
+  .github/workflows/smoke-prod.yml
+  .github/workflows/cache-dependencies.yml
+  .github/workflows/build-ibl6-image.yml
+  .github/workflows/deploy-rehearsal.yml
 
 Naturally website-side (not denied, not exempt):
-  ibl5/**  .github/** (incl. e2e-tests.yml, lighthouse.yml)  docker/**
+  ibl5/**  .github/** (incl. e2e-tests.yml, lighthouse*.yml)  docker/**
   Dockerfile  docker-compose*.yml  *.php *.ts *.js *.css
 HELP
     exit 0

@@ -52,6 +52,41 @@ final class WebsiteAffectingCliTest extends TestCase
         self::assertSame(1, $result['exit'], $result['stderr']);
     }
 
+    public function testCiMetaExemptWorkflowsExitOne(): void
+    {
+        // Row 4c: provably-inert CI-meta workflows → SKIP (each alone). None of
+        // these renders the app, drives E2E/VR, runs Lighthouse, or feeds the local
+        // preview, and none is in e2e-tests.yml's push-path list — so a change to
+        // them can't affect an E2E/VR/Lighthouse/preview outcome. Running
+        // PHPUnit/PHPStan/Infection (tests.yml, mutation.yml) is NOT
+        // "affecting a render". The image-builders (cache-dependencies,
+        // build-ibl6-image) build on push:master; E2E pulls the prebaked php image
+        // and builds ibl6 from PR source, so a PR edit to those workflows changes
+        // no render.
+        foreach ([
+            '.github/workflows/doc-freshness-audit.yml',
+            '.github/workflows/tests.yml',
+            '.github/workflows/codeql.yml',
+            '.github/workflows/eslint.yml',
+            '.github/workflows/gitleaks.yml',
+            '.github/workflows/pr-meta-checks.yml',
+            '.github/workflows/pr-collisions-cron.yml',
+            '.github/workflows/log-review.yml',
+            '.github/workflows/db-backup.yml',
+            '.github/workflows/mutation.yml',
+            '.github/workflows/migration-safety.yml',
+            '.github/workflows/engine.yml',
+            '.github/workflows/main.yml',
+            '.github/workflows/smoke-prod.yml',
+            '.github/workflows/cache-dependencies.yml',
+            '.github/workflows/build-ibl6-image.yml',
+            '.github/workflows/deploy-rehearsal.yml',
+        ] as $path) {
+            $result = $this->runPredicate($path . "\n");
+            self::assertSame(1, $result['exit'], "$path should be CI-meta exempt: {$result['stderr']}");
+        }
+    }
+
     public function testEngineOnlyDiffExitsOne(): void
     {
         // Row 4b: Go sim engine source only → SKIP. E2E runs the PREBAKED jsbsim
@@ -129,6 +164,22 @@ final class WebsiteAffectingCliTest extends TestCase
             ".github/workflows/e2e-tests.yml\n.github/workflows/lighthouse.yml\n"
         );
         self::assertSame(0, $result['exit'], $result['stderr']);
+    }
+
+    public function testLighthouseDriversAreGuardedNotExempt(): void
+    {
+        // Row 13b: the Lighthouse siblings DRIVE Lighthouse (lighthouse-baseline
+        // uploads the manifest the PR run compares against; lighthouse-audit runs
+        // the same booted-stack audit), so a change to them CAN alter a Lighthouse
+        // outcome. They MUST stay website-side (guarded, never exempted) — the
+        // mechanical proof against silently skipping the run that validates them.
+        foreach ([
+            '.github/workflows/lighthouse-baseline.yml',
+            '.github/workflows/lighthouse-audit.yml',
+        ] as $path) {
+            $result = $this->runPredicate($path . "\n");
+            self::assertSame(0, $result['exit'], "$path must stay website-side: {$result['stderr']}");
+        }
     }
 
     public function testCiAdjacentPathsExitZero(): void

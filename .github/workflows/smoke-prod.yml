@@ -50,7 +50,7 @@ jobs:
       ibl5_inconclusive_reason: ${{ steps.ibl5.outputs.inconclusive_reason }}
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       # Back-to-back deploys each fire a workflow_run. The earlier smoke is
       # then stale AND burns requests against LiteSpeed's per-IP WAF counter,
@@ -170,7 +170,7 @@ jobs:
 
     steps:
       - name: Checkout production branch
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: production
           fetch-depth: 2
@@ -279,7 +279,7 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Setup SSH
         uses: ./.github/actions/setup-ssh
@@ -315,7 +315,7 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Setup SSH
         uses: ./.github/actions/setup-ssh
@@ -353,7 +353,7 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Setup SSH
         uses: ./.github/actions/setup-ssh

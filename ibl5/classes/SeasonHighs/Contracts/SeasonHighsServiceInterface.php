@@ -21,7 +21,8 @@ namespace SeasonHighs\Contracts;
  *     color2?: string,
  *     teamid?: int,
  *     boxId?: int,
- *     gameOfThatDay?: int
+ *     gameOfThatDay?: int,
+ *     sortId?: int
  * }
  *
  * @phpstan-type RcbSeasonHighEntry array{stat_category: string, ranking: int, player_name: string, player_position: string|null, stat_value: int, record_season_year: int}

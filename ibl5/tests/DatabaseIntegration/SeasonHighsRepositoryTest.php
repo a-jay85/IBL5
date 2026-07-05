@@ -188,6 +188,59 @@ class SeasonHighsRepositoryTest extends DatabaseTestCase
         self::assertSame(15, $result['ASSISTS'][0]['value']);
     }
 
+    public function testGetSeasonHighsBatchBreaksTiesDeterministicallyByBoxScoreId(): void
+    {
+        // Three players tying on both value (20 pts) and date. Without a unique
+        // final sort key the UNION ALL row order is undefined, so the displayed
+        // order would be indeterminate (the visual-regression flake). The PK
+        // (box-score id, ascending) must break the tie deterministically.
+        $this->insertTestPlayer(200090501, 'Tie Player One');
+        $this->insertTestPlayer(200090502, 'Tie Player Two', ['ordinal' => 2]);
+        $this->insertTestPlayer(200090503, 'Tie Player Three', ['ordinal' => 3]);
+
+        // calc_points = 10*2 = 20 for each; identical date.
+        $id1 = $this->insertPlayerBoxscoreRow(
+            '2098-02-10', 200090501, 'Tie Player One', 'PG', 2, 1, 1,
+            points2m: 10, points2a: 12, ftm: 0, fta: 0, points3m: 0, points3a: 0,
+        );
+        $id2 = $this->insertPlayerBoxscoreRow(
+            '2098-02-10', 200090502, 'Tie Player Two', 'SG', 2, 1, 1,
+            points2m: 10, points2a: 12, ftm: 0, fta: 0, points3m: 0, points3a: 0,
+        );
+        $id3 = $this->insertPlayerBoxscoreRow(
+            '2098-02-10', 200090503, 'Tie Player Three', 'SF', 2, 1, 1,
+            points2m: 10, points2a: 12, ftm: 0, fta: 0, points3m: 0, points3a: 0,
+        );
+
+        // Sanity: insertion order is strictly ascending, so id-asc == insertion order.
+        self::assertTrue($id1 < $id2 && $id2 < $id3, 'box-score ids must be strictly ascending');
+
+        $result = $this->repo->getSeasonHighsBatch(
+            ['POINTS' => '(`game_2gm`*2) + `game_ftm` + (`game_3gm`*3)'],
+            '',
+            '2098-02-01',
+            '2098-02-28',
+        );
+
+        $points = $result['POINTS'];
+        self::assertCount(3, $points);
+
+        // All tie on value+date, so the box-score id is the sole differentiator:
+        // rows must come back in ascending id order, every run.
+        self::assertSame(20, $points[0]['value']);
+        self::assertSame(20, $points[1]['value']);
+        self::assertSame(20, $points[2]['value']);
+        self::assertSame([$id1, $id2, $id3], [
+            $points[0]['sortId'] ?? null,
+            $points[1]['sortId'] ?? null,
+            $points[2]['sortId'] ?? null,
+        ]);
+        self::assertSame(
+            ['Tie Player One', 'Tie Player Two', 'Tie Player Three'],
+            [$points[0]['name'], $points[1]['name'], $points[2]['name']],
+        );
+    }
+
     public function testGetSeasonHighsBatchReturnsEmptyEntriesForUnmatchedStats(): void
     {
         $result = $this->repo->getSeasonHighsBatch(

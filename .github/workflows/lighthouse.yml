@@ -24,7 +24,7 @@ jobs:
     outputs:
       src: ${{ github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.src == 'true' }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
       - name: Compute website-affecting
@@ -50,7 +50,7 @@ jobs:
     timeout-minutes: 25
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - uses: ./.github/actions/lighthouse-setup
 
@@ -81,7 +81,7 @@ jobs:
       - name: Download master baseline
         id: baseline
         if: always()
-        uses: dawidd6/action-download-artifact@v21
+        uses: dawidd6/action-download-artifact@b6e2e70617bc3265edd6dab6c906732b2f1ae151 # v21
         continue-on-error: true
         with:
           workflow: lighthouse-baseline.yml
@@ -107,7 +107,7 @@ jobs:
 
       - name: Post sticky PR comment
         if: always() && github.event_name == 'pull_request' && hashFiles('ibl5/.lighthouseci/comment.md') != ''
-        uses: marocchino/sticky-pull-request-comment@v3
+        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
         with:
           header: lighthouse-comment
           path: ibl5/.lighthouseci/comment.md

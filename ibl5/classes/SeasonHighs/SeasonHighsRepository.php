@@ -68,7 +68,7 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
                 LEFT JOIN `ibl_team_info` t ON p.teamid = t.teamid
                 LEFT JOIN `ibl_schedule` sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
                 WHERE bs.`game_date` BETWEEN ? AND ?" . $locationCondition . "
-                ORDER BY `" . $safeStatName . "` DESC, bs.`game_date` ASC
+                ORDER BY `" . $safeStatName . "` DESC, bs.`game_date` ASC, bs.`id` ASC
                 LIMIT " . $limit;
         } else {
             // For team stats, JOIN with ibl_team_info to get team ID and colors for linking
@@ -82,7 +82,7 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
                 JOIN `ibl_team_info` t ON bs.name = t.team_name
                 LEFT JOIN `ibl_schedule` sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
                 WHERE bs.`game_date` BETWEEN ? AND ?
-                ORDER BY `" . $safeStatName . "` DESC, bs.`game_date` ASC
+                ORDER BY `" . $safeStatName . "` DESC, bs.`game_date` ASC, bs.`id` ASC
                 LIMIT " . $limit;
         }
 
@@ -140,7 +140,7 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
             if ($tableSuffix === '') {
                 $branches[] = "(SELECT ? AS stat_category, p.`pid`, p.`name`, p.`teamid`, t.`team_name` AS `teamname`,
                     t.`team_city`, t.`color1`, t.`color2`,
-                    bs.`game_date` AS `date`, sch.`box_id`,
+                    bs.`game_date` AS `date`, sch.`box_id`, bs.`id` AS sort_id,
                     COALESCE(bs.`game_of_that_day`, 0) AS game_of_that_day,
                     (" . $statExpression . ") AS stat_value
                     FROM `ibl_box_scores` bs
@@ -148,18 +148,18 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
                     LEFT JOIN `ibl_team_info` t ON p.teamid = t.teamid
                     LEFT JOIN `ibl_schedule` sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
                     WHERE bs.`game_date` BETWEEN ? AND ?" . $locationCondition . "
-                    ORDER BY stat_value DESC, bs.`game_date` ASC
+                    ORDER BY stat_value DESC, bs.`game_date` ASC, bs.`id` ASC
                     LIMIT " . $safeLimit . ")";
             } else {
                 $branches[] = "(SELECT ? AS stat_category, t.`teamid`, t.`team_city`, t.`color1`, t.`color2`,
-                    bs.`name`, bs.`game_date` AS `date`, sch.`box_id`,
+                    bs.`name`, bs.`game_date` AS `date`, sch.`box_id`, bs.`id` AS sort_id,
                     COALESCE(bs.`game_of_that_day`, 0) AS game_of_that_day,
                     (" . $statExpression . ") AS stat_value
                     FROM `ibl_box_scores_teams` bs
                     JOIN `ibl_team_info` t ON bs.name = t.team_name
                     LEFT JOIN `ibl_schedule` sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
                     WHERE bs.`game_date` BETWEEN ? AND ?
-                    ORDER BY stat_value DESC, bs.`game_date` ASC
+                    ORDER BY stat_value DESC, bs.`game_date` ASC, bs.`id` ASC
                     LIMIT " . $safeLimit . ")";
             }
             $params[] = $statName;
@@ -185,7 +185,13 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
                 if ($a['value'] !== $b['value']) {
                     return $b['value'] <=> $a['value'];
                 }
-                return strcmp($a['date'], $b['date']);
+                if ($a['date'] !== $b['date']) {
+                    return strcmp($a['date'], $b['date']);
+                }
+                // Total-order tiebreaker: box-score PK. The UNION ALL result has no
+                // outer ORDER BY, so its row order is undefined — without a unique
+                // final key, rows tying on (value, date) would sort indeterminately.
+                return ($a['sortId'] ?? 0) <=> ($b['sortId'] ?? 0);
             });
         }
         unset($entries);
@@ -223,6 +229,9 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
         }
         if (isset($row['game_of_that_day'])) {
             $entry['gameOfThatDay'] = (int) $row['game_of_that_day'];
+        }
+        if (isset($row['sort_id'])) {
+            $entry['sortId'] = (int) $row['sort_id'];
         }
         return $entry;
     }

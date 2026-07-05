@@ -57,7 +57,7 @@ plan_of()  { ls "$1/home/.claude/plans/docs-stale-refresh-"*.md 2>/dev/null | he
 SB="$(build_sandbox)"
 run_docfix "$SB" "" "" "4242" "ibl5/docs/foo.md,README.md" >/dev/null
 P="$(plist_of "$SB")"; PLAN="$(plan_of "$SB")"
-{ [ -n "$P" ] && grep -q 'cd "'"$SB"'/wts/docs-stale-refresh-.*/ibl5"' "$P" \
+{ [ -n "$P" ] && grep -q 'cd "'"$SB"'/wts/docs-stale-refresh-[^/]*"' "$P" \
     && grep -q 'Closes #4242' "$P" \
     && grep -q 'ibl5/docs/foo.md,README.md' "$P" \
     && grep -q 'claude-sonnet-4-6' "$P"; } \

@@ -46,7 +46,7 @@ fi
 # --- 4. Create the worktree (base = master) -----------------------------------
 SLUG="docs-stale-refresh-$(date +%Y%m%d)"
 bin/wt-new "$SLUG"                                   # cwd is $MAIN (step 2)
-WT_IBL5="$(worktrees_parent_dir "$MAIN")/$SLUG/ibl5"
+WT_ROOT="$(worktrees_parent_dir "$MAIN")/$SLUG"
 
 # --- 5. Seed the auto_merge:false hold plan (resolved by slug at post-plan) ----
 PLAN_FILE="$HOME/.claude/plans/$SLUG.md"
@@ -89,12 +89,12 @@ cat > "$PLIST" <<PLIST_EOF
 	<array>
 		<string>/bin/bash</string>
 		<string>-lc</string>
-		<string>export PATH="/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH"; cd "$WT_IBL5" &amp;&amp; CLAUDE_HEADLESS=1 caffeinate -s claude -p "$PROMPT" --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name "$LABEL"; rm -f "$PLIST"; launchctl bootout gui/\$(id -u)/$LABEL</string>
+		<string>export PATH="/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH"; cd "$WT_ROOT" &amp;&amp; CLAUDE_HEADLESS=1 caffeinate -s claude -p "$PROMPT" --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name "$LABEL"; rm -f "$PLIST"; launchctl bootout gui/\$(id -u)/$LABEL</string>
 	</array>
 	<key>RunAtLoad</key>
 	<true/>
 	<key>WorkingDirectory</key>
-	<string>$WT_IBL5</string>
+	<string>$WT_ROOT</string>
 	<key>StandardOutPath</key>
 	<string>$LOG</string>
 	<key>StandardErrorPath</key>

@@ -82,3 +82,25 @@ is_in_worktree() {
     gcd=$(git -C "$dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 1
     [ "$gd" != "$gcd" ]
 }
+
+# Materialize a REAL config.php at <dest> from <main_ibl5_dir>.
+# config.php can't be a symlink into a worktree: the absolute host target doesn't
+# resolve inside Docker, so every request 500s (`Failed to open stream`). It's
+# league-agnostic (DB host is env-injected), so a snapshot copy works everywhere.
+# Removes any pre-existing symlink first. Prefers the real config.php; falls back
+# to the tracked config.php.example (placeholders) with a warning; returns 1 if
+# neither source exists. Callers pass the CANONICAL main ibl5 dir — never a
+# worktree's own, or a from-worktree invocation would cp the file onto itself.
+materialize_worktree_config() {
+    local dest="$1" main_ibl5="$2"
+    [ -L "$dest" ] && rm -f "$dest"
+    if [ -s "$main_ibl5/config.php" ]; then
+        cp "$main_ibl5/config.php" "$dest"
+    elif [ -s "$main_ibl5/config.php.example" ]; then
+        echo "WARNING: $main_ibl5/config.php missing — copying config.php.example (placeholder values)." >&2
+        cp "$main_ibl5/config.php.example" "$dest"
+    else
+        echo "Error: no config.php or config.php.example in $main_ibl5 — worktree will 500 on every request." >&2
+        return 1
+    fi
+}

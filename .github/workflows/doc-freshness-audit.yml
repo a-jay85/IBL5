@@ -19,6 +19,10 @@ jobs:
     name: Repo-wide staleness audit
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      notify: ${{ steps.issue.outputs.notify }}
+      sig: ${{ steps.report.outputs.sig }}
+      issue-num: ${{ steps.issue.outputs.issue-num }}
 
     steps:
       - name: Checkout code
@@ -98,6 +102,11 @@ jobs:
             echo "notify=true" >> "$GITHUB_OUTPUT"
           fi
 
+          # Re-query the single open stale-docs issue so the docfix job can target it.
+          # gh issue create prints only a URL; both notify=true paths need the number.
+          ISSUE_NUM=$(gh issue list --label stale-docs --state open --json number --jq '.[0].number // empty')
+          echo "issue-num=$ISSUE_NUM" >> "$GITHUB_OUTPUT"
+
       - name: Publish to job summary
         run: |
           if [ "${{ steps.report.outputs.count }}" -gt 0 ]; then
@@ -132,3 +141,13 @@ jobs:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
           fail-on-delivery: 'false'
+
+  docfix:
+    name: Fire headless doc-fix on the Mac
+    needs: audit
+    if: needs.audit.outputs.notify == 'true'
+    runs-on: [self-hosted, macOS]
+    timeout-minutes: 10
+    steps:
+      - name: Launch the headless doc-fix run
+        run: /Users/ajaynicolas/GitHub/IBL5/bin/docfix-run "${{ needs.audit.outputs.issue-num }}" "${{ needs.audit.outputs.sig }}"

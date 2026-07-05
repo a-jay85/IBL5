@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+#
+# bin/docfix-run <issue-num> <sig> — Mac-side headless stale-docs remediation launcher.
+# Fired by the `docfix` job of .github/workflows/doc-freshness-audit.yml on a
+# self-hosted macOS runner when the nightly audit reports a NEW/CHANGED stale set.
+# Creates a worktree, seeds an auto_merge:false hold plan, and launches a detached
+# headless Claude run that refreshes exactly the stale docs and opens a PR (held for
+# human merge) that Closes the stale-docs issue.
+#
+# Detach mechanism cloned in structure from bin/post-plan-now:71-109 (launchd
+# RunAtLoad one-shot) — a plain `nohup … &` from the runner dies with the job.
+#
+# Usage: bin/docfix-run <issue-num> <sig>
+
+set -euo pipefail
+
+# --- 1. Validate args (negative path) -----------------------------------------
+ISSUE_NUM="${1:-}"
+SIG="${2:-}"
+if [ -z "$ISSUE_NUM" ] || [ -z "$SIG" ]; then
+    echo "docfix-run: usage: bin/docfix-run <issue-num> <sig> (both required)" >&2
+    exit 1
+fi
+
+# --- 2. Anchor to the CANONICAL main checkout (NOT $0) ------------------------
+# The self-hosted runner invokes us from its ephemeral, shallow _work checkout;
+# $0-relative resolution would misroute wt-new under _work (wrong layout, no
+# usable origin/master, reclaimed mid-run). Anchor to the real main checkout —
+# exactly as workflow-continuity says wt-new is run FROM it. IBL5_MAIN override
+# lets bin/test-docfix-run point this at its sandbox.
+MAIN="${IBL5_MAIN:-/Users/ajaynicolas/GitHub/IBL5}"
+cd "$MAIN"
+source "$MAIN/bin/lib/git-helpers.sh"   # worktrees_parent_dir
+
+# --- 3. Dedupe: never stack duplicate doc-fix runs ----------------------------
+if [ -n "$(git -C "$MAIN" branch --list 'docs-stale-refresh-*')" ]; then
+    echo "docfix-run: a docs-stale-refresh-* branch already exists — skipping (no stacking)."
+    exit 0
+fi
+if gh pr list --state open --json headRefName --jq '.[].headRefName' 2>/dev/null \
+     | grep -q '^docs-stale-refresh-'; then
+    echo "docfix-run: an open docs-stale-refresh-* PR is pending human merge — skipping."
+    exit 0
+fi
+
+# --- 4. Create the worktree (base = master) -----------------------------------
+SLUG="docs-stale-refresh-$(date +%Y%m%d)"
+bin/wt-new "$SLUG"                                   # cwd is $MAIN (step 2)
+WT_IBL5="$(worktrees_parent_dir "$MAIN")/$SLUG/ibl5"
+
+# --- 5. Seed the auto_merge:false hold plan (resolved by slug at post-plan) ----
+PLAN_FILE="$HOME/.claude/plans/$SLUG.md"
+cat > "$PLAN_FILE" <<PLAN_EOF
+---
+auto_merge: false
+---
+
+# Stale-docs auto-refresh ($SLUG)
+
+Runtime-seeded hold plan for the autonomous doc-fix run. Refreshes the docs the
+nightly Doc Freshness Audit flagged (issue #$ISSUE_NUM). Held for human merge.
+
+## Automouse Hold Justification
+
+auto_merge: false — this PR is opened autonomously by a self-hosted-runner Claude
+run with no human in the loop, and it modifies documentation a human should read
+before it lands. /post-plan Phase 6.5 condition (7) reads this frontmatter and
+refuses to arm auto-merge, leaving the PR open for a human to merge.
+PLAN_EOF
+
+# --- 6. Launch the detached headless doc-fix run ------------------------------
+TS=$(date +%Y%m%d-%H%M%S)
+LOG="/tmp/docfix-run-$SLUG-$TS.log"
+LABEL="com.ibl5.docfix-run-$SLUG-$TS"
+PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+TODAY="$(date -u +%Y-%m-%d)"
+
+PROMPT="You are refreshing stale documentation with NO human present — never ask questions or wait for input; make the safe choice and continue. Refresh ONLY these docs (comma-separated paths): $SIG. For each: re-verify its content against the current reality of the codebase, correct drifted content, and bump its \`last_verified\` to today ($TODAY). Then run \`bin/check-docs --fix-dates --since=master\` to bump any in-scope doc you changed but did not hand-bump. Do NOT touch any doc outside the list above. Commit with a message whose body contains the line \`Closes #$ISSUE_NUM\`. Then fire \`bin/post-plan-now\` (NOT --auto) to open the PR; the PR body MUST include \`Closes #$ISSUE_NUM\` so merging it closes the stale-docs issue."
+
+# launchd runs a minimal env → same PATH prelude as bin/post-plan-now:94.
+cat > "$PLIST" <<PLIST_EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>$LABEL</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>-lc</string>
+		<string>export PATH="/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH"; cd "$WT_IBL5" &amp;&amp; CLAUDE_HEADLESS=1 caffeinate -s claude -p "$PROMPT" --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name "$LABEL"; rm -f "$PLIST"; launchctl bootout gui/\$(id -u)/$LABEL</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>WorkingDirectory</key>
+	<string>$WT_IBL5</string>
+	<key>StandardOutPath</key>
+	<string>$LOG</string>
+	<key>StandardErrorPath</key>
+	<string>$LOG</string>
+</dict>
+</plist>
+PLIST_EOF
+
+launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
+launchctl bootstrap "gui/$(id -u)" "$PLIST"
+
+echo "docfix-run: fired detached doc-fix run on '$SLUG' (issue #$ISSUE_NUM)."
+echo "  worklist: $SIG"
+echo "  log:      tail -f $LOG"
+echo "  label:    $LABEL   (self-removes when the run finishes)"

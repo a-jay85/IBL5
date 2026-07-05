@@ -26,6 +26,30 @@ source "$REPO_ROOT/bin/lib/db-helpers.sh"
 source "$REPO_ROOT/bin/lib/git-helpers.sh"
 WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
 
+# The mariadb client is keg-only under Homebrew (the formula is NOT linked into
+# /opt/homebrew/bin), so a non-login shell — e.g. the one bin/wt-up spawns — can
+# have it installed yet absent from PATH (`line NNN: mariadb: command not found`).
+# Prepend the known keg dirs (Apple Silicon + Intel prefixes) so the host client
+# resolves regardless of the invoking shell's PATH. Only prepend until found, so
+# an already-on-PATH client is respected.
+for _kegbin in \
+    /opt/homebrew/opt/mariadb/bin \
+    /opt/homebrew/opt/mysql-client/bin \
+    /opt/homebrew/opt/mysql/bin \
+    /usr/local/opt/mariadb/bin \
+    /usr/local/opt/mysql-client/bin; do
+    if ! command -v mariadb-dump >/dev/null 2>&1 && [ -x "$_kegbin/mariadb-dump" ]; then
+        PATH="$_kegbin:$PATH"
+    fi
+done
+unset _kegbin
+if ! command -v mariadb >/dev/null 2>&1 || ! command -v mariadb-dump >/dev/null 2>&1; then
+    echo "Error: mariadb client not found on PATH (need both 'mariadb' and 'mariadb-dump')." >&2
+    echo "  Install it:  brew install mariadb" >&2
+    echo "  It's keg-only — db-sync-prod adds /opt/homebrew/opt/mariadb/bin to PATH automatically once installed." >&2
+    exit 1
+fi
+
 WORKTREE_ARG="${1:-}"
 
 # Load .env for REMOTE_* creds.

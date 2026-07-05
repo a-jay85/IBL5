@@ -389,7 +389,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Install pinact
-        run: go install github.com/suzuki-shunsuke/pinact/v3/cmd/pinact@v3.0.0
+        run: go install github.com/suzuki-shunsuke/pinact/v3/cmd/pinact@v3.10.1
 
       - name: Verify every external action is SHA-pinned
         env:

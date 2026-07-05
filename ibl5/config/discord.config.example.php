@@ -32,4 +32,5 @@ return [
         'waiver-wire' => 'https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN',
     ],
     'iblbot_url' => 'http://localhost:50000',
+    'bug_pipeline_approver_discord_id' => 'YOUR_APPROVER_DISCORD_ID',
 ];

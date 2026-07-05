@@ -67,6 +67,12 @@ parameters:
 			path: classes/Boxscore/Boxscore.php
 
 		-
+			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringConcatenation
+			count: 1
+			path: classes/BugPipeline/BugReportRepository.php
+
+		-
 			rawMessage: 'Direct now-returning time call is banned outside the Clock seam. Inject Clock\ClockInterface (constructor for instance classes; settable static clock with factory fallback for static classes) and call $clock->now(). Pass an explicit timestamp to date()/strtotime() for deterministic formatting.'
 			identifier: ibl.directTime
 			count: 1

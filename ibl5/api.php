@@ -40,6 +40,24 @@ $app->getContainer()->set('api.controllerFactory', static function (): \Closure 
             return new $controllerClass($db, $commonRepo);
         }
 
+        if ($controllerClass === \Api\Controller\EnqueueController::class) {
+            return new \Api\Controller\EnqueueController(
+                new \BugPipeline\BugReportRepository($db),
+                new \Repositories\TeamIdentityRepository($db)
+            );
+        }
+
+        $bugPipelineControllers = [
+            \Api\Controller\ThreadReplyController::class,
+            \Api\Controller\ReactionController::class,
+            \Api\Controller\LastSeenController::class,
+            \Api\Controller\PipelineStateController::class,
+            \Api\Controller\ThreadByPrController::class,
+        ];
+        if (in_array($controllerClass, $bugPipelineControllers, true)) {
+            return new $controllerClass(new \BugPipeline\BugReportRepository($db));
+        }
+
         return new $controllerClass($db);
     };
 });

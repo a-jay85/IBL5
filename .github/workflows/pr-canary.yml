@@ -2,8 +2,8 @@ name: PR Fast-Canary
 
 # Advisory early-signal: on each master push, trial-merge latest master into every
 # open PR head and run ONLY the cheap checks (PHPStan + default-group PHPUnit), skipping
-# the heavy E2E suite. Reports per-PR via a sticky comment. NOT a required check — the
-# merge queue owns the authoritative full-suite gate.
+# the heavy E2E suite. Reports per-PR via a sticky comment. NOT a required check — each
+# PR's own `gate` job owns the authoritative full-suite gate.
 
 on:
   push:

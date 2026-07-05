@@ -1,6 +1,6 @@
 ---
 description: Sub-agent decision rules — when to spawn, when to skip, which model to pick, and how sub-agent delegation keeps orchestrator context low
-last_verified: 2026-07-04
+last_verified: 2026-07-05
 ---
 
 # Agent Tiering
@@ -47,11 +47,16 @@ Prompting **Haiku**: compensate for its tendency to stop at "enough" — concret
 
 Tier per prompt — don't default all Explore agents to one tier.
 
-| Tier | Use for Explore | Examples |
-|------|-----------------|---------|
-| **Haiku** | Enumeration, single-file lookups, grep-and-list | "find all callers of getTeamByName", "which files import WaiverService", "does column X exist in migration Y" |
-| **Sonnet** | Multi-hop traces, cross-module synthesis, open-ended investigation | "trace the encoding pipeline from .plr read to Team page", "how does module A interact with B" |
+**Explore is pinned to Sonnet 4.6, not Sonnet 5.** The built-in agent is shadowed by a user def (`~/.claude/agents/Explore.md`, frontmatter `model: claude-sonnet-4-6`) to dodge Sonnet 5's ~30% token tax — its tokenizer inflates every token the run charges against a subscription's budget. The frontmatter pin wins **only when the `model` param is omitted**, so invoke by tier as:
 
-**Heuristic:** notice connections / judge relevance / trace data flow → Sonnet. Answerable by grep + format → Haiku.
+- **Sonnet-4.6 tier** (multi-hop / synthesis) → **omit the `model` param** — the def's 4.6 pin applies. Passing `model: "sonnet"` is **blocked** by `~/.claude/hooks/explore-model-gate.sh` (it resolves to Sonnet 5 and would override the pin).
+- **Haiku tier** (enumeration) → pass `model: "haiku"` (allowed, cheaper).
+
+| Tier | Model param | Use for Explore | Examples |
+|------|-------------|-----------------|---------|
+| **Haiku** | `model: "haiku"` | Enumeration, single-file lookups, grep-and-list | "find all callers of getTeamByName", "which files import WaiverService", "does column X exist in migration Y" |
+| **Sonnet 4.6** | *omit `model`* | Multi-hop traces, cross-module synthesis, open-ended investigation | "trace the encoding pipeline from .plr read to Team page", "how does module A interact with B" |
+
+**Heuristic:** notice connections / judge relevance / trace data flow → omit `model` (Sonnet 4.6). Answerable by grep + format → `model: "haiku"`.
 
 Plan-authoring tiering (labeling each phase, mechanical-recipe agents, bulk-sweep patterns) lives in `.claude/skills/plan/SKILL.md` Step 3.

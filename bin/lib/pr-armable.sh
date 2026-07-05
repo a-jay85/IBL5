@@ -5,11 +5,12 @@
 #
 # Usage: source "$(dirname "$0")/lib/pr-armable.sh"
 #
-# Covers the four live-derivable conditions:
+# Covers the five live-derivable conditions:
 #   (1) Manual-Testing clearance   -> pr_manual_testing_clearance <body>
 #   (5) golden-snapshot touch      -> pr_golden_hold <files_json>
 #   (6) Depends-on merge-order     -> pr_dep_holds <body>
 #   (8) feat: floor                -> pr_feat_hold <title> <labels_json>
+#   (10) pipeline-authored floor   -> pr_pipeline_authored_hold <labels_json>
 #
 # Conditions (2) review>=80, (3) MISSING-tests, (4) Phase-5 local verify, (7)
 # non-UI auto_merge:false, (9) realized-diff verdict are deliberately NOT here:
@@ -103,4 +104,20 @@ pr_dep_holds() {
         st=$("$GH_CMD" pr view "$d" --json state 2>/dev/null | jq -r '.state // empty')
         [ "$st" != "MERGED" ] && echo "depends-on:#$d"
     done
+}
+
+# pr_pipeline_authored_hold <labels_json>
+#   Phase 6.5 condition (10), the pipeline-authored floor. Every PR the Discord
+#   bug/feature pipeline opens carries the `pipeline-authored` label, so it is
+#   NEVER auto-merged regardless of commit type (closes the hole where a `fix:`
+#   pipeline PR would auto-merge to prod). UNCONDITIONAL -- unlike pr_feat_hold
+#   there is NO override label; a pipeline PR ALWAYS holds for a human merge.
+#   Echoes `pipeline-authored` when the label is present, nothing otherwise.
+#   Pass the `.labels` array, e.g. `gh pr view N --json labels --jq '.labels'`.
+pr_pipeline_authored_hold() {
+    local labels_json="$1"
+    if printf '%s' "$labels_json" \
+        | jq -e 'any(.[]?; .name == "pipeline-authored")' >/dev/null 2>&1; then
+        echo "pipeline-authored"
+    fi
 }

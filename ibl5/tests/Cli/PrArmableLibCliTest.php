@@ -11,7 +11,7 @@ use PHPUnit\Framework\Attributes\Group;
  * Characterization of the shared live-hold predicate bin/lib/pr-armable.sh.
  *
  * These rows pin the EXACT decision each function makes — the same logic that
- * /post-plan Phase 6.5 conditions (1)/(5)/(6)/(8) now call, so a refactor of
+ * /post-plan Phase 6.5 conditions (1)/(5)/(6)/(8)/(10) now call, so a refactor of
  * either consumer that diverges from these decisions fails here.
  */
 #[Group('cli')]
@@ -117,6 +117,24 @@ final class PrArmableLibCliTest extends TestCase
         self::assertSame(
             'feat-awaiting-signoff',
             $this->runFn('pr_feat_hold', ['feat!: breaking', '[]'])['output']
+        );
+    }
+
+    // --- (10) pipeline-authored floor — UNCONDITIONAL (no override label) ---
+
+    public function testPipelineAuthoredHoldFiresWhenLabelPresent(): void
+    {
+        self::assertSame(
+            'pipeline-authored',
+            $this->runFn('pr_pipeline_authored_hold', ['[{"name":"pipeline-authored"}]'])['output']
+        );
+    }
+
+    public function testPipelineAuthoredHoldEmptyWhenLabelAbsent(): void
+    {
+        self::assertSame(
+            '',
+            $this->runFn('pr_pipeline_authored_hold', ['[{"name":"chore"}]'])['output']
         );
     }
 

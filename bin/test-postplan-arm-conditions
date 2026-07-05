@@ -99,12 +99,14 @@ B1="$(extract_block '# condition (1)')"
 B5="$(extract_block '# condition (5)')"
 B6="$(extract_block '# condition (6)')"
 B8="$(extract_block '# condition (8)')"
+B10="$(extract_block '# condition (10)')"
 
 # --- structural: every predicate-using block must source the lib itself ---
 assert_self_contained '# condition (1)' "condition (1)"
 assert_self_contained '# condition (5)' "condition (5)"
 assert_self_contained '# condition (6)' "condition (6)"
 assert_self_contained '# condition (8)' "condition (8)"
+assert_self_contained '# condition (10)' "condition (10)"
 
 # --- behavioral: each block, run in isolation, holds correctly ---
 expect_block "(1) HELD manual rows -> BLOCK" BLOCK \
@@ -131,6 +133,11 @@ expect_block "(8) feat: + human-approved -> NONE" NONE \
     "$(run_isolated "$B8" '{"title":"feat: shiny","labels":[{"name":"human-approved"}]}' '' '')"
 expect_block "(8) fix: title -> NONE" NONE \
     "$(run_isolated "$B8" '{"title":"fix: bug","labels":[]}' '' '')"
+
+expect_block "(10) pipeline-authored label -> BLOCK" BLOCK \
+    "$(run_isolated "$B10" '{"labels":[{"name":"pipeline-authored"}]}' '' '')"
+expect_block "(10) no pipeline label -> NONE" NONE \
+    "$(run_isolated "$B10" '{"labels":[]}' '' '')"
 
 if [ "$FAILED" -eq 0 ]; then
     echo "All post-plan arm-condition checks passed."

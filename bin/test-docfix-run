@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# bin/test-docfix-run — regression guard for bin/docfix-run plumbing (autonomy lever 3).
+# Runs docfix-run in a mktemp sandbox fake-repo against git/gh/launchctl shims and a
+# wt-new stub — nothing real is launched or worktree'd. Asserts plist/prompt/plan
+# composition, dedupe skip, and empty-arg rejection, plus a static gate assertion on
+# the workflow. Run: bin/test-docfix-run  (exit 0 = all pass).
+set -u
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+REAL_DOCFIX="$REPO_ROOT/bin/docfix-run"
+WORKFLOW="$REPO_ROOT/.github/workflows/doc-freshness-audit.yml"
+FAILED=0
+ok()   { echo "ok: $1"; }
+bad()  { echo "FAIL: $1"; FAILED=1; }
+
+# build_sandbox -> prints sandbox path with fake-repo + shims wired.
+build_sandbox() {
+    local SB; SB="$(mktemp -d)"
+    mkdir -p "$SB/bin/lib" "$SB/home/Library/LaunchAgents" "$SB/home/.claude/plans" "$SB/shim"
+    # NOTE: do NOT symlink docfix-run in — the test drives the REAL script with
+    # IBL5_MAIN=$SB, exercising prod's own anchoring code (a $0-relative regression
+    # would then be caught, not masked). Only wt-new + git-helpers are stubbed.
+    printf 'worktrees_parent_dir(){ echo "%s/wts"; }\n' "$SB" > "$SB/bin/lib/git-helpers.sh"
+    cat > "$SB/bin/wt-new" <<'W'
+#!/usr/bin/env bash
+mkdir -p "$(cd "$(dirname "$0")/.." && pwd)/wts/$1/ibl5"
+W
+    chmod +x "$SB/bin/wt-new"
+    # git shim: dedupe consults `git -C <root> branch --list <pat>`
+    cat > "$SB/shim/git" <<'G'
+#!/usr/bin/env bash
+for a in "$@"; do [ "$a" = "branch" ] && { printf '%s' "${SHIM_BRANCH_OUT:-}"; exit 0; }; done
+exit 0
+G
+    # gh shim: dedupe consults `gh pr list … --jq '.[].headRefName'`
+    printf '#!/usr/bin/env bash\nprintf "%%s" "${SHIM_PR_OUT:-}"\nexit 0\n' > "$SB/shim/gh"
+    printf '#!/usr/bin/env bash\nexit 0\n' > "$SB/shim/launchctl"
+    chmod +x "$SB/shim/git" "$SB/shim/gh" "$SB/shim/launchctl"
+    printf '%s' "$SB"
+}
+
+# run_docfix <sandbox> <branch-out> <pr-out> <issue> <sig> -> runs, echoes "rc=<code>"
+# Drives the REAL bin/docfix-run with IBL5_MAIN=$SB so prod's anchoring code is
+# what gets exercised (not a $0 accident).
+run_docfix() {
+    local SB="$1"
+    IBL5_MAIN="$SB" HOME="$SB/home" PATH="$SB/shim:$PATH" \
+        SHIM_BRANCH_OUT="$2" SHIM_PR_OUT="$3" \
+        "$REAL_DOCFIX" "$4" "$5" >/dev/null 2>&1
+    echo "rc=$?"
+}
+plist_of() { ls "$1/home/Library/LaunchAgents/"*.plist 2>/dev/null | head -1; }
+plan_of()  { ls "$1/home/.claude/plans/docs-stale-refresh-"*.md 2>/dev/null | head -1; }
+
+# --- Case 1 + 2: happy path composes plist + prompt + hold plan ---------------
+SB="$(build_sandbox)"
+run_docfix "$SB" "" "" "4242" "ibl5/docs/foo.md,README.md" >/dev/null
+P="$(plist_of "$SB")"; PLAN="$(plan_of "$SB")"
+{ [ -n "$P" ] && grep -q 'cd "'"$SB"'/wts/docs-stale-refresh-[^/]*"' "$P" \
+    && grep -q 'Closes #4242' "$P" \
+    && grep -q 'ibl5/docs/foo.md,README.md' "$P" \
+    && grep -q 'claude-sonnet-4-6' "$P"; } \
+  && ok "(1) plist carries cd-to-worktree + doc-fix prompt + SIG + Closes #N" \
+  || bad "(1) plist composition"
+{ [ -n "$PLAN" ] && head -1 "$PLAN" | grep -q '^---$' \
+    && grep -q '^auto_merge: false$' "$PLAN" \
+    && grep -q '## Automouse Hold Justification' "$PLAN"; } \
+  && ok "(2) held plan seeded with auto_merge:false + hold section" \
+  || bad "(2) hold plan seeding"
+
+# --- Case 3: dedupe skips (branch OR PR present) — no plist written ------------
+SB="$(build_sandbox)"
+run_docfix "$SB" "docs-stale-refresh-20260704" "" "1" "a.md" >/dev/null
+[ -z "$(plist_of "$SB")" ] && ok "(3a) dedupe-skip on existing branch (no plist)" \
+                           || bad "(3a) dedupe branch skip"
+SB="$(build_sandbox)"
+run_docfix "$SB" "" "docs-stale-refresh-20260703" "1" "a.md" >/dev/null
+[ -z "$(plist_of "$SB")" ] && ok "(3b) dedupe-skip on open PR head (no plist)" \
+                           || bad "(3b) dedupe PR skip"
+
+# --- Case 4 + 5: empty-arg rejection (nonzero, nothing written) ---------------
+SB="$(build_sandbox)"
+[ "$(run_docfix "$SB" "" "" "" "a.md")" != "rc=0" ] && [ -z "$(plist_of "$SB")" ] \
+  && ok "(4) empty issue-num rejected" || bad "(4) empty issue-num not rejected"
+SB="$(build_sandbox)"
+[ "$(run_docfix "$SB" "" "" "42" "")" != "rc=0" ] && [ -z "$(plist_of "$SB")" ] \
+  && ok "(5) empty sig rejected" || bad "(5) empty sig not rejected"
+
+# --- Case 6: workflow-gating static assertion ---------------------------------
+{ grep -q "if: needs.audit.outputs.notify == 'true'" "$WORKFLOW" \
+    && grep -qF 'bin/docfix-run "${{ needs.audit.outputs.issue-num }}" "${{ needs.audit.outputs.sig }}"' "$WORKFLOW" \
+    && grep -qF 'issue-num: ${{ steps.issue.outputs.issue-num }}' "$WORKFLOW"; } \
+  && ok "(6) docfix job gated on notify + passes issue-num & sig; audit exposes issue-num" \
+  || bad "(6) workflow gate/output wiring"
+
+if [ "$FAILED" -eq 0 ]; then echo "All docfix-run checks passed."; else echo "Some docfix-run checks FAILED."; fi
+exit "$FAILED"

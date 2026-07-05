@@ -563,6 +563,8 @@ jobs:
         run: bin/test-adr-check
       - name: bin/test-postplan-arm-conditions
         run: bin/test-postplan-arm-conditions
+      - name: bin/test-docfix-run
+        run: bin/test-docfix-run
       - name: bin/test-post-review-findings
         run: bin/test-post-review-findings
       - name: bin/test-human-signoff-classifier

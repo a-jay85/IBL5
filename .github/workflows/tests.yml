@@ -394,7 +394,7 @@ jobs:
       - name: Verify every external action is SHA-pinned
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: "$(go env GOPATH)/bin/pinact" run --check
+        run: $(go env GOPATH)/bin/pinact run --check
 
   host-mariadb-guard:
     name: Host mariadb grep guard

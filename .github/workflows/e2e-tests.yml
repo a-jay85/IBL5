@@ -386,7 +386,7 @@ jobs:
         run: docker compose -f docker-compose.ci.yml down
 
   e2e-shards:
-    name: E2E Tests
+    name: ${{ matrix.total-shards == 1 && 'E2E Tests' || format('E2E Tests ({0}/{1})', matrix.shard-index, matrix.total-shards) }}
     needs: [changes]
     if: needs.changes.outputs.src == 'true'
     runs-on: ubuntu-latest
@@ -401,8 +401,8 @@ jobs:
       # parallelism buys nothing when there are no idle runners to absorb it.
       # In-job parallelism still comes from Playwright `workers` (playwright.config.ts),
       # so total test time is unchanged. Restore the array to re-shard if the
-      # runner cap is ever raised. Kept as a 1-element matrix so job naming,
-      # blob-report artifact naming, and the merge-reports glob are untouched.
+      # runner cap is ever raised. Job name uses a matrix expression so GitHub
+      # shows "E2E Tests" (single shard) or "E2E Tests (N/M)" (multi-shard).
       matrix:
         shard-index: [1]
         total-shards: [1]

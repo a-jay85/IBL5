@@ -58,7 +58,7 @@ final class WebsiteAffectingCliTest extends TestCase
         // these renders the app, drives E2E/VR, runs Lighthouse, or feeds the local
         // preview, and none is in e2e-tests.yml's push-path list — so a change to
         // them can't affect an E2E/VR/Lighthouse/preview outcome. Running
-        // PHPUnit/PHPStan/Infection (tests.yml, mutation.yml, pr-canary) is NOT
+        // PHPUnit/PHPStan/Infection (tests.yml, mutation.yml) is NOT
         // "affecting a render". The image-builders (cache-dependencies,
         // build-ibl6-image) build on push:master; E2E pulls the prebaked php image
         // and builds ibl6 from PR source, so a PR edit to those workflows changes

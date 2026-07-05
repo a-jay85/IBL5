@@ -35,7 +35,7 @@
 # CI-meta exempt set (the INVERSE of the carve-out): a curated denylist of
 # workflow files that do NOT match the deny regex but PROVABLY cannot affect a
 # VR / E2E / Lighthouse / preview render. (Running PHPUnit/PHPStan/Infection is
-# NOT "affecting a render" — see pr-canary/tests.yml/mutation below.) These
+# NOT "affecting a render" — see tests.yml/mutation below.) These
 # classify NON-website even though nothing denies them. This is a DENYLIST
 # CARVE-OUT, not a positive allowlist: its staleness fails SAFE/LOUD (a dropped
 # or renamed entry just over-runs E2E) — never a silent E2E skip. Each entry is a

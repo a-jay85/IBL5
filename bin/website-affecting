@@ -38,6 +38,8 @@
 #       .github/workflows/rebase-prs.yml             (git rebase of open PRs)
 #       .github/workflows/human-signoff.yml          (PR-title classifier gate)
 #       .github/workflows/dependabot-auto-merge.yml  (enables gh pr merge --auto)
+#       .github/workflows/doc-freshness-audit.yml    (nightly doc-staleness audit + docfix launcher)
+#       .github/workflows/tests.yml                  (PHPUnit/PHPStan/audit; own paths-filter, not in e2e-tests.yml push-paths)
 #
 # Anchoring is load-bearing:
 #   ^bin/      so ibl5/bin/* (app bin, website-side) is NOT denied
@@ -83,6 +85,8 @@ is_ci_meta_exempt() {
         .github/workflows/rebase-prs.yml)            return 0 ;;  # push:master trigger; rebases open PRs via git — no app code, no E2E/Lighthouse
         .github/workflows/human-signoff.yml)         return 0 ;;  # PR-title classifier gate (bin/lib/human-signoff-classifier.sh) — no app code, no E2E/Lighthouse
         .github/workflows/dependabot-auto-merge.yml) return 0 ;;  # enables gh pr merge --auto for dependabot PRs — no app code, no E2E/Lighthouse
+        .github/workflows/doc-freshness-audit.yml)   return 0 ;;  # nightly doc-staleness audit (bin/check-docs) + docfix launcher — no app code, no E2E/Lighthouse render
+        .github/workflows/tests.yml)                 return 0 ;;  # PHPUnit/PHPStan/audit suite — own dorny paths-filter; absent from e2e-tests.yml push-paths, so a tests.yml-only push already skips E2E
     esac
     return 1
 }
@@ -112,6 +116,8 @@ affect E2E/Lighthouse/app; staleness over-runs, never silent-skips):
   .github/workflows/rebase-prs.yml
   .github/workflows/human-signoff.yml
   .github/workflows/dependabot-auto-merge.yml
+  .github/workflows/doc-freshness-audit.yml
+  .github/workflows/tests.yml
 
 Naturally website-side (not denied, not exempt):
   ibl5/**  .github/** (incl. e2e-tests.yml, lighthouse.yml)  docker/**

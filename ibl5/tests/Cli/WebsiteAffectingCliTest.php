@@ -52,6 +52,22 @@ final class WebsiteAffectingCliTest extends TestCase
         self::assertSame(1, $result['exit'], $result['stderr']);
     }
 
+    public function testCiMetaExemptWorkflowsExitOne(): void
+    {
+        // Row 4c: provably-inert CI-meta workflows → SKIP (each alone). The doc
+        // audit runs bin/check-docs; tests.yml runs the PHPUnit/PHPStan suite via
+        // its own dorny paths-filter. Neither renders the app, drives E2E, or runs
+        // Lighthouse, and neither is in e2e-tests.yml's push-path list — so a change
+        // to them can't affect an E2E/VR/Lighthouse outcome.
+        foreach ([
+            '.github/workflows/doc-freshness-audit.yml',
+            '.github/workflows/tests.yml',
+        ] as $path) {
+            $result = $this->runPredicate($path . "\n");
+            self::assertSame(1, $result['exit'], "$path should be CI-meta exempt: {$result['stderr']}");
+        }
+    }
+
     public function testEngineOnlyDiffExitsOne(): void
     {
         // Row 4b: Go sim engine source only → SKIP. E2E runs the PREBAKED jsbsim

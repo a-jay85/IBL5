@@ -83,6 +83,7 @@ is_ci_meta_exempt() {
         .github/workflows/rebase-prs.yml)            return 0 ;;  # push:master trigger; rebases open PRs via git — no app code, no E2E/Lighthouse
         .github/workflows/human-signoff.yml)         return 0 ;;  # PR-title classifier gate (bin/lib/human-signoff-classifier.sh) — no app code, no E2E/Lighthouse
         .github/workflows/dependabot-auto-merge.yml) return 0 ;;  # enables gh pr merge --auto for dependabot PRs — no app code, no E2E/Lighthouse
+        .github/workflows/pr-canary.yml)             return 0 ;;  # push:master trigger; trial-merges PRs + cheap PHPStan/PHPUnit — no app code, cannot affect E2E/VR/Lighthouse
     esac
     return 1
 }

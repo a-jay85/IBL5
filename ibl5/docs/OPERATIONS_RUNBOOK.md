@@ -1,6 +1,6 @@
 ---
 description: Production operations runbook — deploy, rollback, DB restore, sim-file recovery, logs, and running the app without the Claude Code harness.
-last_verified: 2026-06-08
+last_verified: 2026-07-05
 ---
 
 # IBL5 Operations Runbook
@@ -33,6 +33,8 @@ git push origin <your-branch>:production
    - OPcache flush
    - IBL6 restart (pm2)
 3. **Post-deploy smoke** (`.github/workflows/smoke-prod.yml`) — curls `https://www.iblhoops.net` from the production box's own IP to avoid WAF bans. On real failure, auto-reverts the `production` branch and DMs Discord.
+
+> **Note — IBLbot slash-command OOM (resolved, #905):** registering IBLbot slash commands during deploy previously ran `tsx src/...`, which transpiles TypeScript through esbuild at runtime. On this memory-tight server the esbuild service was `SIGKILL`ed (`TransformError: The service was stopped`), failing the deploy. Fixed by running the compiled output (`npm run deploy-commands:prod` → `node dist/deploy-commands.js`, no runtime esbuild). The OOM path is gone — not a recurring failure. See the inline comment at `.github/workflows/main.yml` (IBLbot deploy step).
 
 ### Manual deploy (if GitHub Actions is unavailable)
 

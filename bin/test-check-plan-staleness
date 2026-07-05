@@ -127,6 +127,17 @@ assert "in-scope-stale-with-oos" 1 $'## Critical Files\nModify the existing `ibl
 # `##` heading closes the section, so a deleted dep beneath the sibling flags.
 assert "oos-subsection-nesting" 1 $'## Out of Scope\n### Detail\nFuture `bin/nonexistent-under-sub`.\n\n## Verification\nModify the existing `ibl5/classes/AlsoDeletedAbc.php`.'
 
+# Isolation: a path ONLY under a subsection of Out of Scope is exempt even when
+# there is no other stale dep to drive exit 1 — proves the subsection stays
+# exempt (oos-subsection-nesting cannot prove this on its own because its exit 1
+# is driven by the in-scope Verification dep, regardless of the sub-exemption).
+assert "oos-subsection-exempt" 0 $'## Out of Scope\n### Detail\nFuture `bin/nonexistent-under-sub`.'
+
+# Regression: a creation cue appearing ONLY inside a fenced block must NOT rescue
+# a cue-less stale dep in an in-scope section (the cue check must read $SCAN_FILE,
+# not $PLAN_FILE, so fenced cues are invisible to it).
+assert "cue-in-fence-leaks" 1 $'## Phase 1\nModify the existing `ibl5/classes/DefinitelyGoneXyz.php`.\n```\nCreate `ibl5/classes/DefinitelyGoneXyz.php`\n```'
+
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"
     exit 1

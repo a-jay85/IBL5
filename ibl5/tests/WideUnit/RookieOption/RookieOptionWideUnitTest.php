@@ -373,7 +373,7 @@ class RookieOptionWideUnitTest extends WideUnitTestCase
 
         // Assert - Expect exception
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Failed to execute query');
+        $this->expectExceptionMessageIsOrContains('Failed to execute query');
 
         // Act
         $this->repository->updatePlayerRookieOption($playerID, $draftRound, $extensionAmount);

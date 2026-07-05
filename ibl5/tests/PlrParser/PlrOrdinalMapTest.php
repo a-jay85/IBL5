@@ -143,7 +143,7 @@ class PlrOrdinalMapTest extends TestCase
     public function testFromPlrFileThrowsForUnreadableFile(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('PLR file not found');
+        $this->expectExceptionMessageIsOrContains('PLR file not found');
 
         PlrOrdinalMap::fromPlrFile('/nonexistent/path/to/file.plr');
     }

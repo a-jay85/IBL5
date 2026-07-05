@@ -15,7 +15,7 @@ class AwaFileParserTest extends TestCase
     public function testParseFileThrowsForMissingFile(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('not found');
+        $this->expectExceptionMessageIsOrContains('not found');
         AwaFileParser::parseFile('/nonexistent/IBL5.awa');
     }
 
@@ -27,7 +27,7 @@ class AwaFileParserTest extends TestCase
 
         try {
             $this->expectException(\RuntimeException::class);
-            $this->expectExceptionMessage('need at least 2000');
+            $this->expectExceptionMessageIsOrContains('need at least 2000');
             AwaFileParser::parseFile($tempFile);
         } finally {
             unlink($tempFile);
@@ -346,7 +346,7 @@ class AwaFileParserTest extends TestCase
     public function testParseThrowsForTooSmallData(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('need at least');
+        $this->expectExceptionMessageIsOrContains('need at least');
         AwaFileParser::parse(str_repeat(' ', 100));
     }
 

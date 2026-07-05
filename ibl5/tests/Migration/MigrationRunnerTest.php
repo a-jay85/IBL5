@@ -145,7 +145,7 @@ final class MigrationRunnerTest extends TestCase
         $runner = new MigrationRunner($this->stubRepository, $fakeResolver);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Migration file not found');
+        $this->expectExceptionMessageIsOrContains('Migration file not found');
 
         $runner->runPending();
     }

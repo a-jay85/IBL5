@@ -110,7 +110,7 @@ final class OneOnOneGameServiceTest extends TestCase
             ->willReturn(null);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Player 1 with ID 1 not found');
+        $this->expectExceptionMessageIsOrContains('Player 1 with ID 1 not found');
 
         $this->service->playGame(1, 2, 'Owner');
     }
@@ -126,7 +126,7 @@ final class OneOnOneGameServiceTest extends TestCase
             });
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Player 2 with ID 2 not found');
+        $this->expectExceptionMessageIsOrContains('Player 2 with ID 2 not found');
 
         $this->service->playGame(1, 2, 'Owner');
     }

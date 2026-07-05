@@ -108,6 +108,7 @@ is_ci_meta_exempt() {
         .github/workflows/rebase-prs.yml)            return 0 ;;  # push:master trigger; rebases open PRs via git — no app code, no E2E/Lighthouse
         .github/workflows/human-signoff.yml)         return 0 ;;  # PR-title classifier gate (bin/lib/human-signoff-classifier.sh) — no app code, no E2E/Lighthouse
         .github/workflows/dependabot-auto-merge.yml) return 0 ;;  # enables gh pr merge --auto for dependabot PRs — no app code, no E2E/Lighthouse
+        .github/workflows/pr-canary.yml)             return 0 ;;  # push:master trigger; trial-merges PRs + cheap PHPStan/PHPUnit — no app code, cannot affect E2E/VR/Lighthouse
         .github/workflows/doc-freshness-audit.yml)   return 0 ;;  # nightly doc-staleness audit (bin/check-docs) + docfix launcher — no app code, no E2E/Lighthouse render
         .github/workflows/tests.yml)                 return 0 ;;  # PHPUnit/PHPStan/audit suite — own dorny paths-filter; absent from e2e-tests.yml push-paths, so a tests.yml-only push already skips E2E
         .github/workflows/codeql.yml)                return 0 ;;  # CodeQL static analysis of JS/TS + workflows — no app run, no E2E/Lighthouse render

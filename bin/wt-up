@@ -7,6 +7,12 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$REPO_ROOT/bin/lib/db-helpers.sh"
 source "$REPO_ROOT/bin/lib/git-helpers.sh"
+# wt-up manages worktrees FROM the main checkout; every $REPO_ROOT reference below
+# (config.php source, node_modules, --env-file, compose file) must point at main.
+# If invoked from inside a worktree, $0/.. resolves to the worktree — pin it back
+# to canonical main. Without this, the config.php copy below would rm the symlink
+# then cp the file onto itself (source gone), DESTROYING config.php.
+REPO_ROOT="$(resolve_canonical_root "$REPO_ROOT")"
 WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
 
 WORKTREE_NAME=""
@@ -134,11 +140,12 @@ if [ -f "$BS_PID_FILE" ]; then
     rm -f "$BS_PID_FILE"
 fi
 
-# Copy config.php into worktree (can't use bind mount — VirtioFS fails on nested mounts)
+# Copy config.php into worktree (can't use bind mount — VirtioFS fails on nested
+# mounts). Safety net: wt-new already materializes a real file, so this only fires
+# for older symlinked worktrees. Sources from canonical main (REPO_ROOT above).
 CONFIG_PHP="$WORKTREE_PATH/ibl5/config.php"
 if [ ! -s "$CONFIG_PHP" ] || [ -L "$CONFIG_PHP" ]; then
-    [ -L "$CONFIG_PHP" ] && rm "$CONFIG_PHP"
-    cp "$REPO_ROOT/ibl5/config.php" "$CONFIG_PHP" 2>/dev/null || true
+    materialize_worktree_config "$CONFIG_PHP" "$REPO_ROOT/ibl5" || exit 1
 fi
 
 # Copy .env.test into worktree (absolute symlink target doesn't exist inside Docker)

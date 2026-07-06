@@ -120,6 +120,17 @@ class TeamIdentityRepository extends \BaseMysqliRepository implements TeamIdenti
         return $discordId !== null ? (int) $discordId : null;
     }
 
+    public function isKnownDiscordID(string $discordId): bool
+    {
+        // Bind the snowflake as "s"; MySQL coerces into the BIGINT UNSIGNED column.
+        // Existence test only — never (int)-cast the snowflake (contrast getTeamDiscordID).
+        return $this->fetchOne(
+            "SELECT 1 FROM `ibl_team_info` WHERE `discord_id` = ? LIMIT 1",
+            "s",
+            $discordId
+        ) !== null;
+    }
+
     /**
      * @return list<TeamInfoRow>
      */

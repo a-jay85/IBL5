@@ -39,6 +39,10 @@ VALUES
   (28, 'Oklahoma City','Thunder',      '007AC1', 'EF6100', '', '', '', NULL, 'db-team-uuid-28')
 ON DUPLICATE KEY UPDATE team_name = VALUES(team_name), team_city = VALUES(team_city), color1 = VALUES(color1), color2 = VALUES(color2);
 
+-- Bug-pipeline authz fixture: team 1 (New York Metros / testgm) carries a known Discord author id,
+-- consumed by the enqueue-endpoint authz DB-integration test (isKnownDiscordID true-path).
+UPDATE ibl_team_info SET discord_id = '100000000000000001' WHERE teamid = 1;
+
 -- Players: PID 1 (rostered on Metros), PID 2 (free agent)
 INSERT INTO ibl_plr (pid, name, age, teamid, pos, stamina, exp, bird, cy, cyt, salary_yr1, salary_yr2, retired, ordinal, droptime, uuid)
 VALUES (1, 'Test Player One', 27, 1, 'PG', 80, 5, 3, 1, 3, 1500, 1600, 0, 1, 0, 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')

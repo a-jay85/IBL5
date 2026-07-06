@@ -27,6 +27,9 @@ class Discord
     /** @var string IBLbot Express server URL for DM endpoint */
     private static string $iblbotUrl = '';
 
+    /** @var string Bug-pipeline approver Discord snowflake (as string), or '' if unconfigured */
+    private static string $bugPipelineApproverDiscordId = '';
+
     /** @var bool Whether config has been loaded */
     private static bool $configLoaded = false;
 
@@ -101,10 +104,10 @@ class Discord
         $examplePath = __DIR__ . '/../../config/discord.config.example.php';
 
         if (file_exists($configPath)) {
-            /** @var array{webhooks?: array<string, string>, iblbot_url?: string} $config */
+            /** @var array{webhooks?: array<string, string>, iblbot_url?: string, bug_pipeline_approver_discord_id?: string} $config */
             $config = require $configPath; /** @phpstan-ignore ibl.requireOnce (config file returns array; not a class) */
         } elseif (file_exists($examplePath)) {
-            /** @var array{webhooks?: array<string, string>, iblbot_url?: string} $config */
+            /** @var array{webhooks?: array<string, string>, iblbot_url?: string, bug_pipeline_approver_discord_id?: string} $config */
             $config = require $examplePath; /** @phpstan-ignore ibl.requireOnce (config file returns array; not a class) */
         } else {
             throw new \RuntimeException(
@@ -119,7 +122,19 @@ class Discord
 
         self::$webhooks = $config['webhooks'];
         self::$iblbotUrl = $config['iblbot_url'] ?? '';
+        self::$bugPipelineApproverDiscordId = $config['bug_pipeline_approver_discord_id'] ?? '';
         self::$configLoaded = true;
+    }
+
+    /**
+     * The approver's Discord snowflake (as a string) from config, or '' if unconfigured.
+     * Compared string-wise against a reaction's reactor_id in the bug-pipeline reaction endpoint.
+     * Empty string is fail-closed: it never equals a real snowflake, so no reaction advances.
+     */
+    public static function getBugPipelineApproverDiscordId(): string
+    {
+        self::loadConfig();
+        return self::$bugPipelineApproverDiscordId;
     }
 
     public function getDiscordIDFromTeamname(string $teamname): string

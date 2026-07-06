@@ -43,8 +43,14 @@ class Router implements RouterInterface
 
     /** @var array<string, string> POST route patterns to controller class names. */
     private const POST_ROUTES = [
-        'trades/{offerId}/accept'  => Controller\TradeAcceptController::class,
-        'trades/{offerId}/decline' => Controller\TradeDeclineController::class,
+        'trades/{offerId}/accept'   => Controller\TradeAcceptController::class,
+        'trades/{offerId}/decline'  => Controller\TradeDeclineController::class,
+        'bug-pipeline/enqueue'      => Controller\EnqueueController::class,
+        'bug-pipeline/thread-reply' => Controller\ThreadReplyController::class,
+        'bug-pipeline/reaction'     => Controller\ReactionController::class,
+        'bug-pipeline/last-seen'    => Controller\LastSeenController::class,
+        'bug-pipeline/state'        => Controller\PipelineStateController::class,
+        'bug-pipeline/thread-by-pr' => Controller\ThreadByPrController::class,
     ];
 
     /**

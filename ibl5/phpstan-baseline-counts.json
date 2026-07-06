@@ -3,7 +3,7 @@
         "ibl.directHeader": 1,
         "ibl.directTime": 13,
         "ibl.hardcodedEnvString": 8,
-        "ibl.sqlStringConcatenation": 32,
+        "ibl.sqlStringConcatenation": 33,
         "ibl.trustedVariable": 16
     },
     "phpstan-tests-baseline.neon": {

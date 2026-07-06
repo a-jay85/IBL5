@@ -30,7 +30,7 @@ runs:
   using: 'composite'
   steps:
     - name: Setup PHP
-      uses: shivammathur/setup-php@v2
+      uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # master
       with:
         php-version: ${{ inputs.php-version }}
         extensions: ${{ inputs.extensions }}
@@ -38,7 +38,7 @@ runs:
 
     - name: Cache vendor directory
       if: inputs.cache == 'true'
-      uses: actions/cache@v6
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ibl5/vendor
         key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}

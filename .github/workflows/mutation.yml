@@ -41,7 +41,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v7
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
     - name: Check infection excludes
       working-directory: ibl5
@@ -89,7 +89,7 @@ jobs:
 
     - name: Upload mutation reports
       if: always()
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: mutation-reports
         path: |
@@ -133,7 +133,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v7
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       with:
         fetch-depth: 0
 
@@ -244,14 +244,14 @@ jobs:
 
     - name: Post sticky mutation comment
       if: always() && steps.changes.outputs.skip == 'false' && hashFiles('ibl5/infection-summary.log') != ''
-      uses: marocchino/sticky-pull-request-comment@v3
+      uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
       with:
         header: mutation-comment
         path: /tmp/mutation-comment.md
 
     - name: Remove stale mutation comment
       if: always() && hashFiles('ibl5/infection-summary.log') == ''
-      uses: marocchino/sticky-pull-request-comment@v3
+      uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
       with:
         header: mutation-comment
         delete: true
@@ -275,7 +275,7 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Setup SSH
         # Real prod host — the IBLbot Discord-DM endpoint is reachable only there.

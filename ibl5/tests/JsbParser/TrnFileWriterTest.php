@@ -31,7 +31,7 @@ class TrnFileWriterTest extends TestCase
     public function testGenerateThrowsOnInvalidRecordSize(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('expected ' . TrnFileParser::RECORD_SIZE);
+        $this->expectExceptionMessageIsOrContains('expected ' . TrnFileParser::RECORD_SIZE);
 
         TrnFileWriter::generate(['too short']);
     }

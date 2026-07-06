@@ -50,7 +50,7 @@ class StandingsRepositoryTest extends DatabaseTestCase
     public function testGetStandingsByRegionThrowsForInvalidRegion(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Invalid region: Nonexistent');
+        $this->expectExceptionMessageIsOrContains('Invalid region: Nonexistent');
         $this->repo->getStandingsByRegion('Nonexistent');
     }
 
@@ -183,28 +183,28 @@ class StandingsRepositoryTest extends DatabaseTestCase
     public function testUpdateMagicNumberRejectsUnknownColumn(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Invalid magic number column');
+        $this->expectExceptionMessageIsOrContains('Invalid magic number column');
         $this->repo->updateMagicNumber(1, 5, 'conf_magic_number = 0; DROP TABLE ibl_standings');
     }
 
     public function testUpdateClinchedFlagRejectsUnknownColumn(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Invalid clinched column');
+        $this->expectExceptionMessageIsOrContains('Invalid clinched column');
         $this->repo->updateClinchedFlag('Some Team', 'clinched_league = 1 WHERE 1=1; --');
     }
 
     public function testFetchTeamsByRegionRejectsUnknownGrouping(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Invalid grouping column');
+        $this->expectExceptionMessageIsOrContains('Invalid grouping column');
         $this->repo->fetchTeamsByRegion('1=1', 'Eastern');
     }
 
     public function testFetchTopTeamsByWinsRejectsUnknownGrouping(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Invalid grouping column');
+        $this->expectExceptionMessageIsOrContains('Invalid grouping column');
         $this->repo->fetchTopTeamsByWins('teamid); DROP TABLE ibl_standings; --', 'Eastern');
     }
 

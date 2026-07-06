@@ -58,7 +58,7 @@ class ScheduleControllerTest extends WideUnitTestCase
         $controller = new ScheduleController($this->mockDb, new LeagueContext(), new TeamIdentityRepository($this->mockDb));
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Team not found: 99999');
+        $this->expectExceptionMessageIsOrContains('Team not found: 99999');
         $controller->render(99999);
     }
 }

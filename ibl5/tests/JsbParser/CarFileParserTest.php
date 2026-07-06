@@ -274,14 +274,14 @@ class CarFileParserTest extends TestCase
     public function testParseThrowsForTooSmallData(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('too small');
+        $this->expectExceptionMessageIsOrContains('too small');
         CarFileParser::parse(str_repeat(' ', 100));
     }
 
     public function testParseFileThrowsForMissingFile(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('CAR file not found');
+        $this->expectExceptionMessageIsOrContains('CAR file not found');
 
         CarFileParser::parseFile('/nonexistent/file.car');
     }
@@ -294,7 +294,7 @@ class CarFileParserTest extends TestCase
 
         try {
             $this->expectException(\RuntimeException::class);
-            $this->expectExceptionMessage('too small');
+            $this->expectExceptionMessageIsOrContains('too small');
             CarFileParser::parseFile($tmpFile);
         } finally {
             unlink($tmpFile);

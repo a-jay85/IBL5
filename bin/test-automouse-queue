@@ -155,7 +155,9 @@ ln -s "$PDIR/plan-h.md" "$NDIR/skipped/plan-h.md"
 set +e
 out=$(run_queue plan-h 2>&1)
 exit_code=$?
-set -e
+# Restore the top-level state (set -u only, never -e): a leaked `set -e` here
+# would silently abort rows 9-14 on any non-zero return instead of recording a
+# FAIL — which is exactly how the CI failure masqueraded as an early exit.
 if [ "$exit_code" -eq 0 ]; then
     echo "FAIL: row8 — expected non-zero exit for already-queued plan, got 0"
     FAILED=1
@@ -202,8 +204,12 @@ assert_order() {
         FAILED=1
     fi
 }
-# epoch mtime of a queue entry's readlink target (BSD/macOS stat)
-target_mtime() { stat -f %m "$(readlink "$NDIR/queue/$1")"; }
+# epoch mtime of a queue entry's readlink target, portable: GNU (-c %Y) first
+# for Linux CI, BSD (-f %m) fallback for macOS (mirrors bin/wt-status).
+target_mtime() {
+    local t; t="$(readlink "$NDIR/queue/$1")"
+    stat -c %Y "$t" 2>/dev/null || stat -f %m "$t"
+}
 
 # ---------------------------------------------------------------------------
 # Row 10 — happy path: reorder >=3 plans -> ls -1tr matches requested order
@@ -245,7 +251,7 @@ touch "$PDIR/plan-a.md" "$PDIR/plan-b.md" "$PDIR/plan-c.md"
 run_queue plan-a >/dev/null 2>&1; run_queue plan-b >/dev/null 2>&1; run_queue plan-c >/dev/null 2>&1
 run_queue reorder plan-a plan-b plan-c >/dev/null 2>&1
 before="$(queue_order)"
-set +e; out=$(run_queue reorder plan-a plan-b plan-z 2>&1); ec=$?; set -e
+set +e; out=$(run_queue reorder plan-a plan-b plan-z 2>&1); ec=$?; set +e
 [ "$ec" -eq 0 ] && { echo "FAIL: row12 — expected non-zero exit for unqueued slug"; FAILED=1; }
 echo "$out" | grep -q "not in the queue" || { echo "FAIL: row12 — missing not-in-queue error: $out"; FAILED=1; }
 assert_order "row12 order unchanged after reject" "$before"
@@ -260,11 +266,11 @@ run_queue plan-a >/dev/null 2>&1; run_queue plan-b >/dev/null 2>&1; run_queue pl
 run_queue reorder plan-a plan-b plan-c >/dev/null 2>&1
 before="$(queue_order)"
 # (a) missing entry -> count mismatch
-set +e; out=$(run_queue reorder plan-a plan-b 2>&1); ec=$?; set -e
+set +e; out=$(run_queue reorder plan-a plan-b 2>&1); ec=$?; set +e
 [ "$ec" -eq 0 ] && { echo "FAIL: row13a — expected non-zero for missing entry"; FAILED=1; }
 assert_order "row13a order unchanged" "$before"
 # (b) duplicate-as-extra -> dup rejection
-set +e; out=$(run_queue reorder plan-a plan-b plan-b 2>&1); ec=$?; set -e
+set +e; out=$(run_queue reorder plan-a plan-b plan-b 2>&1); ec=$?; set +e
 [ "$ec" -eq 0 ] && { echo "FAIL: row13b — expected non-zero for duplicate entry"; FAILED=1; }
 assert_order "row13b order unchanged" "$before"
 echo "ok: row13 — reject non-permutation (missing/extra)"
@@ -277,7 +283,7 @@ touch "$PDIR/plan-a.md" "$PDIR/plan-b.md" "$PDIR/plan-c.md"
 run_queue plan-a >/dev/null 2>&1; run_queue plan-b >/dev/null 2>&1; run_queue plan-c >/dev/null 2>&1
 run_queue reorder plan-a plan-b plan-c >/dev/null 2>&1
 a0=$(target_mtime plan-a.md); b0=$(target_mtime plan-b.md); c0=$(target_mtime plan-c.md)
-set +e; run_queue reorder plan-c plan-a plan-z >/dev/null 2>&1; set -e   # rejected: plan-z not queued
+set +e; run_queue reorder plan-c plan-a plan-z >/dev/null 2>&1; set +e   # rejected: plan-z not queued
 a1=$(target_mtime plan-a.md); b1=$(target_mtime plan-b.md); c1=$(target_mtime plan-c.md)
 if [ "$a0" != "$a1" ] || [ "$b0" != "$b1" ] || [ "$c0" != "$c1" ]; then
     echo "FAIL: row14 — target mtimes changed on a rejected reorder"

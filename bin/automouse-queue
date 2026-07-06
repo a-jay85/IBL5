@@ -187,7 +187,10 @@ if [ "$1" = "reorder" ]; then
     i=0
     for name in $ordered; do
         target=$(readlink "$QUEUE_DIR/$name")
-        stamp=$(date -r $(( base + i * 60 )) +%Y%m%d%H%M.%S)   # BSD/macOS: -r = epoch
+        # epoch -> touch stamp, portable: GNU (-d @epoch) first for Linux CI,
+        # BSD (-r epoch) fallback for the macOS automouse host.
+        epoch=$(( base + i * 60 ))
+        stamp=$(date -d "@$epoch" +%Y%m%d%H%M.%S 2>/dev/null || date -r "$epoch" +%Y%m%d%H%M.%S)
         touch -t "$stamp" "$target"
         i=$((i + 1))
     done

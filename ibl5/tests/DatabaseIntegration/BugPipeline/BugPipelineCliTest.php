@@ -154,6 +154,12 @@ class BugPipelineCliTest extends DatabaseTestCase
             'last_processed_at' => '2026-01-01 11:00:00',
         ]);
         $this->insertReport(self::ID_DROPPED, ['status' => 'dropped', 'class' => 'not_a_thing']);
+        // Ready-for-plan (approval NULLed) is actionable; still-parked (approval set) is NOT.
+        $this->insertReport(990005, ['status' => 'awaiting_ajay', 'class' => 'feature']); // approval_message_id NULL
+        $this->insertReport(990006, ['status' => 'awaiting_ajay', 'class' => 'feature', 'approval_message_id' => '990000000000000077']);
+        // Usage-limit parked with a future blocked_until must be skipped.
+        $future = date('Y-m-d H:i:s', time() + 3600);
+        $this->insertReport(990007, ['status' => 'queued', 'blocked_until' => $future]);
 
         $r = $this->runCli('list-active-conversations.php');
         self::assertSame(0, $r['code'], $r['stderr']);
@@ -162,7 +168,10 @@ class BugPipelineCliTest extends DatabaseTestCase
 
         $ids = array_column($rows, 'id');
         self::assertContains(self::ID_AWAITING, $ids, 'awaiting_info row must be actionable');
+        self::assertContains(990005, $ids, 'awaiting_ajay + approval NULL (ready-for-plan) must be actionable');
         self::assertNotContains(self::ID_DROPPED, $ids, 'dropped (terminal) row must be excluded');
+        self::assertNotContains(990006, $ids, 'awaiting_ajay + approval SET (parked) must be excluded');
+        self::assertNotContains(990007, $ids, 'future blocked_until (parked) must be excluded');
     }
 
     public function testTransitionAndReporterTechRoundTrip(): void

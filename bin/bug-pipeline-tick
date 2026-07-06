@@ -1,0 +1,463 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/bug-pipeline-tick — the poll-only Discord bug/feature pipeline driver (ADR-0080).
+#
+# Fired every 180s by the launchd LaunchAgent (bin/bug-pipeline-cron-setup). On an
+# EMPTY tick it exits 0 having spawned ZERO `claude` processes — the cost guard is
+# the single most important property of the whole pipeline.
+#
+# NOT set -e: one row's failure must never abort the tick. Risky calls are wrapped
+# in `if` (mirrors automouse-run's discipline). All *_id fields are read as STRINGS
+# with `jq -r` (snowflake rule — never `tonumber`/`(int)`).
+#
+# #5a ships NO hunter: the driver NEVER transitions a row into `hunting` and never
+# shells out to claim-next.php (the deadlock constraint). Bugs stop at queued /
+# awaiting_info; the feature path is live to `planned` (plan-on-disk, no implement).
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# ── Env seams (default to production values; tests override) ───────────────────
+export DB_NAME="${DB_NAME:-iblhoops_ibl5}"   # belt-and-suspenders over the plist EnvironmentVariables
+PHP_BIN="${PHP_BIN:-php}"
+SCRIPTS_DIR="${BUG_PIPELINE_SCRIPTS_DIR:-$REPO_ROOT/ibl5/scripts/bug-pipeline}"
+CLAUDE_BIN="${CLAUDE_BIN:-claude}"
+CURL_BIN="${CURL_BIN:-curl}"
+GH_BIN="${GH_BIN:-gh}"
+BOT_BASE_URL="${BOT_BASE_URL:-http://127.0.0.1:50001}"
+BUG_PIPELINE_ISSUE_REPO="${BUG_PIPELINE_ISSUE_REPO:-a-jay85/ibl5-bugs}"
+BUG_PIPELINE_APPROVER_ID="${BUG_PIPELINE_APPROVER_ID:-}"
+PLANS_DIR="${BUG_PIPELINE_PLANS_DIR:-$HOME/.claude/plans}"
+IDLE_SECS="${BUG_PIPELINE_IDLE_SECS:-3600}"
+BACKOFF_SECS="${BUG_PIPELINE_BACKOFF_SECS:-1800}"
+CLASSIFY_MODEL="${BUG_PIPELINE_CLASSIFY_MODEL:-claude-haiku-4-5-20251001}"
+PLAN_MODEL="${BUG_PIPELINE_PLAN_MODEL:-claude-sonnet-4-6}"
+CLAUDE_TIMEOUT="${BUG_PIPELINE_CLAUDE_TIMEOUT:-120}"
+PLAN_TIMEOUT="${BUG_PIPELINE_PLAN_TIMEOUT:-1800}"
+CLASSIFY_PROMPT_FILE="${BUG_PIPELINE_CLASSIFY_PROMPT:-$SCRIPT_DIR/bug-pipeline-classify-prompt}"
+GATHER_PROMPT_FILE="${BUG_PIPELINE_GATHER_PROMPT:-$SCRIPT_DIR/bug-pipeline-gather-prompt}"
+
+export GH_BIN BUG_PIPELINE_ISSUE_REPO
+# shellcheck source=bin/lib/bug-pipeline-gh.sh disable=SC1091
+source "$REPO_ROOT/bin/lib/bug-pipeline-gh.sh"
+
+# ── Logging ───────────────────────────────────────────────────────────────────
+log() { printf '[%s] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*"; }
+
+# ── One seam for every PHP-CLI wrapper call ───────────────────────────────────
+cli() {
+    local cmd="$1"; shift
+    "$PHP_BIN" "$SCRIPTS_DIR/${cmd}.php" "$@"
+}
+
+# ── Usage/rate-limit detector (regex copied from automouse-run:308-311) ───────
+# Returns 0 when the given text carries a Claude env/usage-limit signature.
+claude_env_error() {
+    printf '%s' "$1" | grep -qiE \
+        "hit your [a-z0-9 -]*limit|usage limit reached|api error:[[:space:]]*(401|403|429|529)|overloaded_error|rate_limit_error"
+}
+
+# ── Bot HTTP helpers (all snowflakes carried as strings via jq --arg) ─────────
+bot_get_thread_messages() { # thread_id
+    "$CURL_BIN" -s -X POST "$BOT_BASE_URL/get-thread-messages" \
+        -H 'Content-Type: application/json' \
+        -d "$(jq -nc --arg t "$1" '{thread_id:$t}')" 2>/dev/null
+}
+bot_create_thread() { # message_id name  -> echoes thread_id
+    "$CURL_BIN" -s -X POST "$BOT_BASE_URL/create-thread" \
+        -H 'Content-Type: application/json' \
+        -d "$(jq -nc --arg m "$1" --arg n "$2" '{message_id:$m,name:$n}')" 2>/dev/null \
+        | jq -r '.thread_id // empty' 2>/dev/null
+}
+bot_post_to_thread() { # thread_id message
+    "$CURL_BIN" -s -X POST "$BOT_BASE_URL/post-to-thread" \
+        -H 'Content-Type: application/json' \
+        -d "$(jq -nc --arg t "$1" --arg m "$2" '{thread_id:$t,message:$m}')" 2>/dev/null >/dev/null
+}
+bot_mention() { # thread_id discord_id message  -> echoes message_id
+    "$CURL_BIN" -s -X POST "$BOT_BASE_URL/mention" \
+        -H 'Content-Type: application/json' \
+        -d "$(jq -nc --arg t "$1" --arg d "$2" --arg m "$3" '{thread_id:$t,discord_id:$d,message:$m}')" 2>/dev/null \
+        | jq -r '.message_id // empty' 2>/dev/null
+}
+
+# ── Time helpers — the cron is Mac-local (BSD date), but the test harnesses run
+# in CI (GNU date), so both are supported: try BSD form, fall back to GNU. ──────
+epoch_of() { # 'YYYY-MM-DD HH:MM:SS' -> epoch
+    date -j -f '%Y-%m-%d %H:%M:%S' "$1" '+%s' 2>/dev/null || date -d "$1" '+%s' 2>/dev/null
+}
+future_ts() { # seconds-from-now -> 'YYYY-MM-DD HH:MM:SS'
+    local target=$(( $(date '+%s') + $1 ))
+    date -r "$target" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date -d "@$target" '+%Y-%m-%d %H:%M:%S'
+}
+
+# Park a row in place with a backoff (status/class preserved; enumerator skips future-blocked).
+park_blocked() { # id status
+    local until; until="$(future_ts "$BACKOFF_SECS")"
+    log "usage-limit — parking row $1 (status $2) until $until"
+    cli transition "$1" "$2" --blocked-until="$until" >/dev/null 2>&1 || true
+}
+
+# ── The classifier Haiku call (locked-down: schema-constrained, tool-starved) ─
+CLASSIFY_SCHEMA='{"type":"object","additionalProperties":false,"required":["class"],"properties":{"class":{"enum":["bug","feature","not_a_thing"]},"bug_has_enough_info":{"type":"boolean"},"feature_is_regression":{"type":"boolean"},"clarifying_question":{"type":"string"},"issue_title":{"type":"string","maxLength":70},"severity":{"enum":["low","medium","high"]}}}'
+GATHER_SCHEMA='{"type":"object","additionalProperties":false,"required":["enough_info"],"properties":{"enough_info":{"type":"boolean"},"next_question":{"type":"string"}}}'
+
+# run_structured_call <prompt> <schema> ; sets CJ_RC, CJ_OUT (raw envelope), CJ_ERR
+run_structured_call() {
+    local errf; errf="$(mktemp)"
+    # NO --dangerously-skip-permissions; empty --allowedTools = deny-all (capability starvation).
+    CJ_OUT="$(timeout "$CLAUDE_TIMEOUT" "$CLAUDE_BIN" -p "$1" \
+        --model "$CLASSIFY_MODEL" \
+        --output-format json \
+        --json-schema "$2" \
+        --allowedTools '' 2>"$errf")"
+    CJ_RC=$?
+    CJ_ERR="$(cat "$errf" 2>/dev/null)"; rm -f "$errf"
+}
+
+# Extract the schema-constrained result object from the envelope, or empty on any defect.
+envelope_result() { # raw_envelope
+    printf '%s' "$1" | jq -rc 'if (.is_error // false) == true then empty else (.result // empty) end' 2>/dev/null
+}
+
+# Build a prompt by safe bash substitution (never sed — untrusted content in replacement).
+render_prompt() { # template original_text transcript
+    local t="$1"
+    t="${t//\{\{original_text\}\}/$2}"
+    t="${t//\{\{transcript\}\}/$3}"
+    printf '%s' "$t"
+}
+
+# Fetch the live transcript for a row (or a placeholder when there is no thread yet).
+row_transcript() { # thread_id
+    if [ -n "$1" ] && [ "$1" != "null" ]; then
+        local msgs; msgs="$(bot_get_thread_messages "$1")"
+        printf '%s' "$msgs" | jq -r '(.messages // []) | map("\(.author_id): \(.content)") | join("\n")' 2>/dev/null
+    else
+        printf '(no thread yet)'
+    fi
+}
+
+# ── Branch: classify a queued/awaiting_info row ───────────────────────────────
+# Intentional word-splitting of $issue_opt / $clear_opt (controlled flag values,
+# no globs/spaces) — the empty case must vanish, so they are NOT quoted.
+# shellcheck disable=SC2086
+classify_row() { # row_json
+    local row="$1" id status thread_id blocked clear_opt
+    id="$(printf '%s' "$row" | jq -r '.id')"
+    status="$(printf '%s' "$row" | jq -r '.status')"
+    thread_id="$(printf '%s' "$row" | jq -r '.thread_id // empty')"
+    blocked="$(printf '%s' "$row" | jq -r '.blocked_until // empty')"
+    local original_text; original_text="$(printf '%s' "$row" | jq -r '.original_text // ""')"
+    clear_opt=""; [ -n "$blocked" ] && clear_opt="--clear-blocked"
+
+    local transcript prompt
+    transcript="$(row_transcript "$thread_id")"
+    prompt="$(render_prompt "$(cat "$CLASSIFY_PROMPT_FILE")" "$original_text" "$transcript")"
+
+    if ! run_structured_call "$prompt" "$CLASSIFY_SCHEMA"; then
+        : # rc captured in CJ_RC; handled below
+    fi
+
+    # (1) transport failure / empty / timeout → env-error parks, else safe fallback.
+    if [ "$CJ_RC" -ne 0 ] || [ -z "${CJ_OUT:-}" ]; then
+        if claude_env_error "${CJ_OUT:-}${CJ_ERR:-}"; then park_blocked "$id" "$status"; return 0; fi
+        log "classify $id: no usable classifier output (rc=$CJ_RC) — safe fallback, row unchanged"
+        return 0
+    fi
+    if claude_env_error "$CJ_OUT$CJ_ERR"; then park_blocked "$id" "$status"; return 0; fi
+
+    # (2) envelope defect → safe fallback.
+    local result; result="$(envelope_result "$CJ_OUT")"
+    if [ -z "$result" ]; then
+        log "classify $id: envelope is_error/unparseable — safe fallback, row unchanged"
+        return 0
+    fi
+
+    # (3) whitelist the class — anything off-list → safe fallback (never a spurious drop).
+    local class; class="$(printf '%s' "$result" | jq -r '.class // empty' 2>/dev/null)"
+    case "$class" in
+        bug|feature|not_a_thing) ;;
+        *) log "classify $id: off-whitelist class '$class' — safe fallback, row unchanged"; return 0 ;;
+    esac
+
+    # (4) advisory issue fields (never gate routing) — defaults applied on any miss.
+    local issue_title severity
+    issue_title="$(printf '%s' "$result" | jq -r '.issue_title // empty' 2>/dev/null)"
+    severity="$(printf '%s' "$result" | jq -r '.severity // empty' 2>/dev/null)"
+    case "$severity" in low|medium|high) ;; *) severity="low" ;; esac
+    export issue_title severity   # bpgh_ensure_issue reads these from caller scope
+
+    local issue_number; issue_number="$(printf '%s' "$row" | jq -r '.issue_number // empty')"
+    local issue_opt=""
+    if [ "$class" = "bug" ] || [ "$class" = "feature" ]; then
+        if [ -z "$issue_number" ] || [ "$issue_number" = "null" ]; then
+            local n; n="$(bpgh_ensure_issue "$row")"
+            [ -n "$n" ] && { issue_opt="--issue=$n"; issue_number="$n"; }
+        fi
+    fi
+
+    # ── §3e routing — NO `hunting` anywhere ──────────────────────────────────
+    if [ "$class" = "not_a_thing" ]; then
+        cli transition "$id" dropped --class=not_a_thing $clear_opt >/dev/null && \
+            log "classify $id: not_a_thing → dropped (silent)"
+        return 0
+    fi
+
+    local enough regression question
+    enough="$(printf '%s' "$result" | jq -r '.bug_has_enough_info // false' 2>/dev/null)"
+    regression="$(printf '%s' "$result" | jq -r '.feature_is_regression // false' 2>/dev/null)"
+    question="$(printf '%s' "$result" | jq -r '.clarifying_question // "Could you share more detail so a developer can reproduce this?"' 2>/dev/null)"
+
+    # feature-regression routes to the (deferred) bug path: treat like a bug.
+    local effective_class="$class"
+    if [ "$class" = "feature" ] && [ "$regression" = "true" ]; then
+        effective_class="bug-like-regression"
+    fi
+
+    case "$effective_class" in
+        bug)
+            if [ "$enough" = "true" ]; then
+                cli transition "$id" queued --class=bug $issue_opt $clear_opt >/dev/null && \
+                    log "bug $id classified enough — awaiting hunter (#5b)"
+            else
+                open_thread_and_ask "$row" "$id" "$thread_id" "$question" bug "$issue_opt" "$clear_opt" "$issue_number"
+            fi
+            ;;
+        bug-like-regression)
+            # #5b owns the bug path; #5a parks the regression as a classified feature (never hunts).
+            cli transition "$id" queued --class=feature $issue_opt $clear_opt >/dev/null && \
+                log "feature-regression $id parked — bug path is #5b"
+            ;;
+        feature)
+            # New feature → open a gathering thread, then hand to the feature path (Phase 5).
+            local tid="$thread_id"
+            if [ -z "$tid" ] || [ "$tid" = "null" ]; then
+                tid="$(bot_create_thread "$(printf '%s' "$row" | jq -r '.original_message_id')" "Feature: ${issue_title:-request}")"
+            fi
+            if [ -n "$tid" ]; then
+                bot_post_to_thread "$tid" "Thanks — let's flesh this out. What exactly should change, and on which screen?"
+                cli transition "$id" gathering --class=feature --thread-id="$tid" $issue_opt $clear_opt >/dev/null && \
+                    log "feature $id → gathering (thread $tid)"
+            else
+                log "feature $id: create-thread failed — safe fallback, row unchanged"
+            fi
+            ;;
+    esac
+}
+
+# Thin-bug route: open a thread if needed, post the question FIRST, then mark awaiting_info.
+# shellcheck disable=SC2086
+open_thread_and_ask() { # row id thread_id question class issue_opt clear_opt issue_number
+    local row="$1" id="$2" thread_id="$3" question="$4" klass="$5" issue_opt="$6" clear_opt="$7" issue_number="$8"
+    local tid="$thread_id"
+    if [ -z "$tid" ] || [ "$tid" = "null" ]; then
+        tid="$(bot_create_thread "$(printf '%s' "$row" | jq -r '.original_message_id')" "Bug: needs info")"
+    fi
+    if [ -z "$tid" ]; then
+        log "bug $id: create-thread failed — safe fallback, row unchanged"; return 0
+    fi
+    bot_post_to_thread "$tid" "$question"   # question BEFORE the awaiting_info transition
+    cli transition "$id" awaiting_info --class="$klass" --thread-id="$tid" $issue_opt $clear_opt >/dev/null && \
+        log "bug $id thin → awaiting_info (asked: $question)"
+    bpgh_add_label "$issue_number" needs-info
+}
+
+# ── Branch: feature path — gather (Case A) / ready-for-plan (Case B) ──────────
+# shellcheck disable=SC2086
+drive_feature_row() { # row_json
+    local row="$1" id status thread_id blocked clear_opt issue_number
+    id="$(printf '%s' "$row" | jq -r '.id')"
+    status="$(printf '%s' "$row" | jq -r '.status')"
+    thread_id="$(printf '%s' "$row" | jq -r '.thread_id // empty')"
+    blocked="$(printf '%s' "$row" | jq -r '.blocked_until // empty')"
+    issue_number="$(printf '%s' "$row" | jq -r '.issue_number // empty')"
+    local original_text; original_text="$(printf '%s' "$row" | jq -r '.original_text // ""')"
+    clear_opt=""; [ -n "$blocked" ] && clear_opt="--clear-blocked"
+
+    if [ "$status" = "awaiting_ajay" ]; then
+        drive_ready_for_plan "$row" "$id" "$thread_id" "$original_text" "$issue_number" "$clear_opt"
+        return 0
+    fi
+
+    # Case A — gathering with a fresh GM reply.
+    local transcript prompt
+    transcript="$(row_transcript "$thread_id")"
+    prompt="$(render_prompt "$(cat "$GATHER_PROMPT_FILE")" "$original_text" "$transcript")"
+
+    run_structured_call "$prompt" "$GATHER_SCHEMA" || true
+    if [ "$CJ_RC" -ne 0 ] || [ -z "${CJ_OUT:-}" ] || claude_env_error "${CJ_OUT:-}${CJ_ERR:-}"; then
+        if claude_env_error "${CJ_OUT:-}${CJ_ERR:-}"; then park_blocked "$id" "$status"; return 0; fi
+        log "gather $id: no usable output — safe fallback, stays gathering"; return 0
+    fi
+    local result; result="$(envelope_result "$CJ_OUT")"
+    if [ -z "$result" ]; then log "gather $id: envelope defect — safe fallback, stays gathering"; return 0; fi
+
+    # NOTE: `.enough_info // empty` is WRONG — jq's `//` treats a literal `false` as
+    # absent, collapsing false→empty. Use has() to distinguish true/false/missing.
+    local enough; enough="$(printf '%s' "$result" | jq -r 'if has("enough_info") then (.enough_info|tostring) else "missing" end' 2>/dev/null)"
+    case "$enough" in true|false) ;; *) log "gather $id: off-shape enough_info — safe fallback"; return 0 ;; esac
+
+    if [ "$enough" = "false" ]; then
+        local q; q="$(printf '%s' "$result" | jq -r '.next_question // "What else should this feature do?"' 2>/dev/null)"
+        [ -n "$thread_id" ] && bot_post_to_thread "$thread_id" "$q"
+        cli transition "$id" gathering --last-processed-now $clear_opt >/dev/null && \
+            log "gather $id: asked follow-up, stays gathering"
+    else
+        # enough_info=true → ping @A-Jay for a ✅ and record the ping message id.
+        local mid
+        mid="$(bot_mention "$thread_id" "$BUG_PIPELINE_APPROVER_ID" "Feature ready for a plan — react ✅ to approve.")"
+        if [ -n "$mid" ]; then
+            cli transition "$id" awaiting_ajay --approval-message-id="$mid" $clear_opt >/dev/null && \
+                log "gather $id: enough info → awaiting_ajay (approval msg $mid)"
+        else
+            log "gather $id: mention failed — safe fallback, stays gathering"
+        fi
+    fi
+}
+
+# Case B — ready-for-plan (awaiting_ajay AND approval_message_id IS NULL): drive Sonnet /plan.
+# shellcheck disable=SC2086,SC2012
+drive_ready_for_plan() { # row id thread_id original_text issue_number clear_opt
+    local row="$1" id="$2" thread_id="$3" original_text="$4" issue_number="$5" clear_opt="$6"
+    local transcript summary
+    transcript="$(row_transcript "$thread_id")"
+    summary="Implement this league feature request from a Discord thread. Request: ${original_text}. Discussion: ${transcript}"
+
+    mkdir -p "$PLANS_DIR"
+    local before after new_plan planlog rc
+    before="$(ls "$PLANS_DIR"/*.md 2>/dev/null | sort)"
+    planlog="$(mktemp)"
+    # --implement keeps the plan on disk, NOT auto-queued (§5 rule 1) — #5a must not implement.
+    timeout "$PLAN_TIMEOUT" "$CLAUDE_BIN" -p "/plan ${summary} --implement" \
+        --model "$PLAN_MODEL" \
+        --dangerously-skip-permissions \
+        --output-format stream-json \
+        --verbose \
+        --name "bug-pipeline-plan-${id}" \
+        > "$planlog" 2>&1
+    rc=$?
+
+    if claude_env_error "$(cat "$planlog" 2>/dev/null)"; then
+        rm -f "$planlog"; park_blocked "$id" awaiting_ajay; return 0
+    fi
+    after="$(ls "$PLANS_DIR"/*.md 2>/dev/null | sort)"
+    new_plan="$(comm -13 <(printf '%s\n' "$before") <(printf '%s\n' "$after") | grep -E '\.md$' | head -1)"
+    rm -f "$planlog"
+
+    # /plan-success: exit 0 AND no env-error AND a NEW plan file exists — all three.
+    if [ "$rc" -eq 0 ] && [ -n "$new_plan" ]; then
+        [ -n "$thread_id" ] && bot_post_to_thread "$thread_id" "Plan created — see the queue."
+        cli transition "$id" planned $clear_opt >/dev/null && log "feature $id → planned ($new_plan) — STOP"
+        bpgh_comment "$issue_number" "Plan queued: $new_plan"
+    else
+        log "feature $id: /plan did not produce a new plan (rc=$rc) — stays ready-for-plan, retry next tick"
+    fi
+}
+
+# ── Branch: idle reminder (at-most-once) + park ───────────────────────────────
+handle_idle_or_blocked() { # row_json
+    local row="$1" id status thread_id gm proc created reminder issue_number
+    id="$(printf '%s' "$row" | jq -r '.id')"
+    status="$(printf '%s' "$row" | jq -r '.status')"
+    thread_id="$(printf '%s' "$row" | jq -r '.thread_id // empty')"
+    gm="$(printf '%s' "$row" | jq -r '.last_gm_reply_at // empty')"
+    proc="$(printf '%s' "$row" | jq -r '.last_processed_at // empty')"
+    created="$(printf '%s' "$row" | jq -r '.created_at // empty')"
+    reminder="$(printf '%s' "$row" | jq -r '.reminder_sent_at // empty')"
+    issue_number="$(printf '%s' "$row" | jq -r '.issue_number // empty')"
+
+    local now; now="$(date '+%s')"
+    local idle_ref="$gm"; [ -n "$idle_ref" ] || idle_ref="$proc"; [ -n "$idle_ref" ] || idle_ref="$created"
+    [ -n "$idle_ref" ] || { log "idle $id: no reference timestamp — skip"; return 0; }
+    local ref_epoch; ref_epoch="$(epoch_of "$idle_ref")"
+    [ -n "$ref_epoch" ] || return 0
+
+    if [ -z "$reminder" ]; then
+        # First idle → send exactly ONE reminder.
+        if [ $(( now - ref_epoch )) -ge "$IDLE_SECS" ]; then
+            [ -n "$thread_id" ] && bot_post_to_thread "$thread_id" "Still need info on this — reply here or it'll be parked."
+            cli transition "$id" "$status" --reminder-now >/dev/null && log "idle $id: reminder sent (once)"
+        fi
+        return 0
+    fi
+
+    # Reminder already sent → park iff it went unanswered past the window.
+    local rem_epoch; rem_epoch="$(epoch_of "$reminder")"
+    [ -n "$rem_epoch" ] || return 0
+    local replied_since=false
+    if [ -n "$gm" ] && [ "$gm" \> "$reminder" ]; then replied_since=true; fi
+    if [ "$replied_since" = false ] && [ $(( now - rem_epoch )) -ge "$IDLE_SECS" ]; then
+        cli transition "$id" parked_idle >/dev/null && log "idle $id: reminder unanswered → parked_idle"
+        bpgh_add_label "$issue_number" stalled
+    fi
+}
+
+# ── Timestamp freshness: a GM reply newer than our last processing ────────────
+is_fresh_reply() { # gm proc
+    [ -n "$1" ] || return 1
+    [ -n "$2" ] || return 0          # never processed → any reply is fresh
+    [ "$1" \> "$2" ]
+}
+
+# ── Main: empty-tick guard then dispatch ──────────────────────────────────────
+main() {
+    local actionable normalized
+    actionable="$(cli list-active-conversations 2>/dev/null)"
+    normalized="$(printf '%s' "$actionable" | tr -d '[:space:]')"
+
+    # ★ EMPTY-TICK COST GUARD — exit cheap, spawn zero `claude`.
+    if [ "$normalized" = "[]" ]; then
+        log "no actionable rows — exiting cheap"
+        return 0
+    fi
+
+    # Fail-closed: a broken enumerator must NOT fall through to the expensive path.
+    if ! printf '%s' "$actionable" | jq -e 'type == "array"' >/dev/null 2>&1; then
+        log "ERROR: enumerator did not return a JSON array — aborting tick (no claude spawned)"
+        return 1
+    fi
+
+    local row status class gm proc
+    while IFS= read -r row; do
+        [ -n "$row" ] || continue
+        status="$(printf '%s' "$row" | jq -r '.status')"
+        class="$(printf '%s' "$row" | jq -r '.class // empty')"
+        gm="$(printf '%s' "$row" | jq -r '.last_gm_reply_at // empty')"
+        proc="$(printf '%s' "$row" | jq -r '.last_processed_at // empty')"
+
+        case "$status" in
+            queued)
+                # Only unclassified queued rows are surfaced; classify (first pass).
+                classify_row "$row"
+                ;;
+            awaiting_info)
+                if is_fresh_reply "$gm" "$proc"; then
+                    classify_row "$row"                 # GM replied → re-assess the bug
+                else
+                    handle_idle_or_blocked "$row"       # idle reminder / park
+                fi
+                ;;
+            gathering)
+                if is_fresh_reply "$gm" "$proc"; then
+                    drive_feature_row "$row"            # GM replied → gather assessment (Case A)
+                else
+                    handle_idle_or_blocked "$row"
+                fi
+                ;;
+            awaiting_ajay)
+                drive_feature_row "$row"                # ready-for-plan (Case B)
+                ;;
+            *)
+                log "dispatch: no #5a branch for status '$status' (id $(printf '%s' "$row" | jq -r '.id')) — skip"
+                ;;
+        esac
+    done < <(printf '%s' "$actionable" | jq -c '.[]' 2>/dev/null)
+
+    return 0
+}
+
+main "$@"

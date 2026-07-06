@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-bug-pipeline-feature — feature path: gather → @A-Jay → ✅ → /plan → planned.
+# Covers snowflake byte-for-byte round-trip, the 3-gate /plan-success detection, and
+# the ★ negatives (a /plan failure must NEVER falsely mark planned; no post-plan spawn).
+#
+# Run: bin/test-bug-pipeline-feature  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+# shellcheck source=bin/lib/bug-pipeline-test-stubs.sh
+source "$(cd "$(dirname "$0")" && pwd)/lib/bug-pipeline-test-stubs.sh"
+
+bpt_setup
+
+GATHERING='[{"id":9,"status":"gathering","class":"feature","original_text":"add a thing","thread_id":"880000000000000001","issue_number":11,"last_gm_reply_at":"2026-05-01 12:00:00","last_processed_at":"2026-05-01 11:00:00"}]'
+READY='[{"id":9,"status":"awaiting_ajay","class":"feature","original_text":"add a thing","thread_id":"880000000000000001","issue_number":11,"approval_message_id":null}]'
+
+# ── Case A: gather asks a question, stays gathering (no mention) ───────────────
+bpt_reset; bpt_set_actionable "$GATHERING"
+bpt_set_claude_result '{"enough_info":false,"next_question":"which season?"}'
+bpt_run
+bpt_log_has  "$STUB" curl.log "which season?" "gather posts the follow-up question"
+bpt_log_has  "$STUB" transition.log "gathering --last-processed-now" "gather stamps last_processed, stays gathering"
+bpt_log_lacks "$STUB" calls.log "MENTION" "gather (not enough) does not ping A-Jay"
+
+# ── Case A: enough_info → mention approver + record approval_message_id (byte-for-byte) ──
+bpt_reset; bpt_set_actionable "$GATHERING"
+bpt_set_claude_result '{"enough_info":true}'
+STUB_MESSAGE_ID=1420098765432109876 bpt_run
+bpt_log_has "$STUB" curl.log "770000000000000007" "mention targets the approver id"
+bpt_log_has "$STUB" transition.log "awaiting_ajay --approval-message-id=1420098765432109876" \
+    "approval_message_id round-trips byte-for-byte (19 digits, no truncation)"
+
+# ── Case B: ready-for-plan drives /plan → planned; no post-plan/implement spawn ─
+bpt_reset; bpt_set_actionable "$READY"
+STUB_MAKE_PLAN=1 bpt_run
+bpt_log_has  "$STUB" claude.log "/plan" "ready-for-plan drives /plan"
+bpt_log_has  "$STUB" claude.log "claude-sonnet-4-6" "/plan uses the sonnet-4-6 autonomous pin"
+bpt_log_has  "$STUB" transition.log " 9 planned" "new plan file → transition planned"
+bpt_log_lacks "$STUB" claude.log "post-plan-now" "no post-plan spawned"
+if grep -q -- '--implement' "$STUB/claude.log" && ! grep -q 'post-plan' "$STUB/claude.log"; then
+    bpt_ok "--implement appears only inside the /plan prompt (plan-on-disk, no auto-queue)"
+else
+    bpt_fail "--implement / post-plan authority check"
+fi
+
+# ── ★ NEG (a): /plan exits non-zero → NOT planned ─────────────────────────────
+bpt_reset; bpt_set_actionable "$READY"; bpt_set_claude_rc 1
+bpt_run
+bpt_log_lacks "$STUB" transition.log "planned" "plan non-zero exit → not planned"
+
+# ── ★ NEG (b): /plan exits 0 but creates NO plan file → NOT planned ───────────
+bpt_reset; bpt_set_actionable "$READY"   # STUB_MAKE_PLAN unset → no plan file
+bpt_run
+bpt_log_lacks "$STUB" transition.log "planned" "plan exit 0 but no new file → not planned"
+
+# ── ★ NEG (c): /plan usage-limit → blocked_until, NOT planned ─────────────────
+bpt_reset; bpt_set_actionable "$READY"; bpt_set_claude_raw 'api error: 429 rate_limit_error'
+bpt_run
+bpt_log_lacks "$STUB" transition.log "planned" "usage-limit → not planned"
+bpt_log_has   "$STUB" transition.log "awaiting_ajay --blocked-until=" "usage-limit → blocked_until in place"
+
+echo "----"
+[ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"
+exit "$FAILED"

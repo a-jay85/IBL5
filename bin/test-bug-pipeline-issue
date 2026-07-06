@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-bug-pipeline-issue — best-effort GitHub issue projection (§3f):
+# create-on-classify, idempotency (no double-create), best-effort (a gh failure
+# never fails the tick), state->label, not_a_thing creates nothing, and the
+# --bootstrap-issues idempotency in bin/bug-pipeline-cron-setup.
+#
+# Run: bin/test-bug-pipeline-issue  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=bin/lib/bug-pipeline-test-stubs.sh
+source "$SELF_DIR/lib/bug-pipeline-test-stubs.sh"
+
+bpt_setup
+BUG_NEW='[{"id":7,"status":"queued","class":null,"original_text":"the box score is wrong","thread_id":null,"issue_number":null}]'
+
+# ── Create on classification + persist number; title is ONE argv element ──────
+bpt_reset; bpt_set_actionable "$BUG_NEW"
+bpt_set_claude_result '{"class":"bug","bug_has_enough_info":true,"issue_title":"Box score total is off by two","severity":"medium"}'
+STUB_ISSUE_NUMBER=4242 bpt_run
+bpt_log_has "$STUB" gh.log "issue create" "classify creates a tracking issue"
+bpt_log_has "$STUB" gh.log "test/bugs-fake" "issue create targets the private tracking repo"
+bpt_log_has "$STUB" gh.log "severity:medium" "severity label applied"
+bpt_log_has "$STUB" gh.args.log "Box score total is off by two" "issue_title passed as ONE quoted arg (not word-split)"
+bpt_log_has "$STUB" transition.log "--issue=4242" "created number persisted via --issue"
+
+# ── ★ idempotent: row already has an issue_number → ZERO issue create ─────────
+bpt_reset
+NOW="$(date '+%Y-%m-%d %H:%M:%S')"; OLD='2020-01-01 00:00:00'
+bpt_set_actionable '[{"id":7,"status":"awaiting_info","class":"bug","original_text":"x","thread_id":"88","issue_number":99,"last_gm_reply_at":"'"$NOW"'","last_processed_at":"'"$OLD"'"}]'
+bpt_set_claude_result '{"class":"bug","bug_has_enough_info":true}'
+bpt_run
+bpt_log_lacks "$STUB" gh.log "issue create" "existing issue_number → no double-create"
+
+# ── ★ best-effort: gh failing on every call still lets the tick transition + exit 0 ─
+bpt_reset; bpt_set_actionable "$BUG_NEW"
+bpt_set_claude_result '{"class":"bug","bug_has_enough_info":true,"issue_title":"t","severity":"low"}'
+GH_FAIL=1 bpt_run
+bpt_expect_eq "gh-failure tick still exits 0" 0 "$BPT_RC"
+bpt_log_has "$STUB" transition.log "queued --class=bug" "gh failure → DB transition still fires"
+
+# ── state->label: thin-bug → needs-info ───────────────────────────────────────
+bpt_reset; bpt_set_actionable "$BUG_NEW"
+bpt_set_claude_result '{"class":"bug","bug_has_enough_info":false,"clarifying_question":"which team?","issue_title":"t","severity":"low"}'
+bpt_run
+bpt_log_has "$STUB" gh.log "needs-info" "thin-bug → needs-info label"
+
+# ── not_a_thing creates NOTHING ───────────────────────────────────────────────
+bpt_reset; bpt_set_actionable "$BUG_NEW"
+bpt_set_claude_result '{"class":"not_a_thing"}'
+bpt_run
+bpt_file_absent "$STUB/gh.log" "not_a_thing makes zero gh calls"
+
+# ── Bootstrap idempotency: --bootstrap-issues twice, exit 0, code-repo label ──
+bpt_reset
+run_bootstrap() { PATH="$STUB/bin:$PATH" BUG_PIPELINE_ISSUE_REPO="test/bugs-fake" "$SELF_DIR/bug-pipeline-cron-setup" --bootstrap-issues >/dev/null 2>&1; }
+run_bootstrap; r1=$?
+run_bootstrap; r2=$?
+bpt_expect_eq "bootstrap run 1 exits 0" 0 "$r1"
+bpt_expect_eq "bootstrap run 2 exits 0 (idempotent)" 0 "$r2"
+bpt_log_has "$STUB" gh.log "label create pipeline-authored" "code-repo pipeline-authored label created"
+bpt_log_has "$STUB" gh.log "a-jay85/IBL5" "pipeline-authored targets the CODE repo a-jay85/IBL5"
+
+echo "----"
+[ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"
+exit "$FAILED"

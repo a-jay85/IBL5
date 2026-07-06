@@ -599,6 +599,16 @@ jobs:
         run: bin/test-check-e2e-fixture-drift
       - name: bin/test-website-affecting
         run: bin/test-website-affecting
+      - name: bin/test-bug-pipeline-tick
+        run: bin/test-bug-pipeline-tick
+      - name: bin/test-bug-pipeline-classify
+        run: bin/test-bug-pipeline-classify
+      - name: bin/test-bug-pipeline-feature
+        run: bin/test-bug-pipeline-feature
+      - name: bin/test-bug-pipeline-park
+        run: bin/test-bug-pipeline-park
+      - name: bin/test-bug-pipeline-issue
+        run: bin/test-bug-pipeline-issue
 
   gate:
     name: Tests and Analysis

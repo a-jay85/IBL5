@@ -70,7 +70,7 @@ class BaseMysqliRepositoryHelpersTest extends DatabaseTestCase
     public function testFetchAllInListRejectsMultiCharType(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('fetchAllInList: $type must be a single mysqli type character');
+        $this->expectExceptionMessageIsOrContains('fetchAllInList: $type must be a single mysqli type character');
 
         $this->repo->callFetchAllInList(
             "SELECT * FROM `ibl_team_info` WHERE teamid IN ({IN})",

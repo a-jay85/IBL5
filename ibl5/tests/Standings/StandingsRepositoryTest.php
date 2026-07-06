@@ -23,7 +23,7 @@ class StandingsRepositoryTest extends TestCase
         $repository = new StandingsRepository($mockDb);
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Invalid region: InvalidRegion');
+        $this->expectExceptionMessageIsOrContains('Invalid region: InvalidRegion');
 
         $repository->getStandingsByRegion('InvalidRegion');
     }

@@ -228,7 +228,7 @@ class SchFileParserTest extends TestCase
     public function testParseFileThrowsForMissingFile(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Schedule file not found');
+        $this->expectExceptionMessageIsOrContains('Schedule file not found');
 
         SchFileParser::parseFile('/nonexistent/path/IBL5.sch');
     }
@@ -241,7 +241,7 @@ class SchFileParserTest extends TestCase
 
         try {
             $this->expectException(\RuntimeException::class);
-            $this->expectExceptionMessage('Invalid .sch data size');
+            $this->expectExceptionMessageIsOrContains('Invalid .sch data size');
 
             SchFileParser::parseFile($tmpFile);
         } finally {
@@ -270,7 +270,7 @@ class SchFileParserTest extends TestCase
     public function testParseThrowsOnWrongSize(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Invalid .sch data size');
+        $this->expectExceptionMessageIsOrContains('Invalid .sch data size');
 
         SchFileParser::parse(str_repeat("\0", 100));
     }

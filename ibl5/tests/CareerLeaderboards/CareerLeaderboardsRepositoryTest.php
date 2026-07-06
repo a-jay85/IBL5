@@ -42,7 +42,7 @@ final class CareerLeaderboardsRepositoryTest extends TestCase
         $repository = new CareerLeaderboardsRepository($mockDb);
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Invalid table name');
+        $this->expectExceptionMessageIsOrContains('Invalid table name');
 
         $repository->getLeaderboards(
             'malicious_table; DROP TABLE ibl_plr;',
@@ -58,7 +58,7 @@ final class CareerLeaderboardsRepositoryTest extends TestCase
         $repository = new CareerLeaderboardsRepository($mockDb);
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Invalid sort column');
+        $this->expectExceptionMessageIsOrContains('Invalid sort column');
 
         $repository->getLeaderboards(
             'ibl_hist',

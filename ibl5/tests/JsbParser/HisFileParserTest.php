@@ -209,7 +209,7 @@ class HisFileParserTest extends TestCase
     public function testParseFileThrowsForMissingFile(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('HIS file not found');
+        $this->expectExceptionMessageIsOrContains('HIS file not found');
 
         HisFileParser::parseFile('/nonexistent/file.his');
     }

@@ -104,7 +104,7 @@ class LgeFileParserTest extends TestCase
     public function testParseFileThrowsForMissingFile(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('League file not found');
+        $this->expectExceptionMessageIsOrContains('League file not found');
 
         LgeFileParser::parseFile('/nonexistent/path/IBL5.lge');
     }
@@ -117,7 +117,7 @@ class LgeFileParserTest extends TestCase
 
         try {
             $this->expectException(\RuntimeException::class);
-            $this->expectExceptionMessage('Invalid .lge data size');
+            $this->expectExceptionMessageIsOrContains('Invalid .lge data size');
 
             LgeFileParser::parseFile($tmpFile);
         } finally {
@@ -155,7 +155,7 @@ class LgeFileParserTest extends TestCase
     public function testParseThrowsOnWrongSize(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Invalid .lge data size');
+        $this->expectExceptionMessageIsOrContains('Invalid .lge data size');
 
         LgeFileParser::parse(str_repeat(' ', 100));
     }

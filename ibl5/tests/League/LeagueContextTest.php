@@ -134,7 +134,7 @@ class LeagueContextTest extends TestCase
     public function testSetLeagueThrowsExceptionForInvalid(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Invalid league: invalid');
+        $this->expectExceptionMessageIsOrContains('Invalid league: invalid');
         
         $this->leagueContext->setLeague('invalid');
     }

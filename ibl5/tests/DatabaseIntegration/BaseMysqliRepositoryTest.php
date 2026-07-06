@@ -176,7 +176,7 @@ class BaseMysqliRepositoryTest extends DatabaseTestCase
         $repo = new \Repositories\TeamIdentityRepository($this->db);
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage("Invalid orderBy 'team_city DESC'");
+        $this->expectExceptionMessageIsOrContains("Invalid orderBy 'team_city DESC'");
 
         $repo->getAllRealTeams('team_city DESC');
     }

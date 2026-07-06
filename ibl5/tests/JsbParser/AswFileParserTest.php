@@ -269,7 +269,7 @@ class AswFileParserTest extends TestCase
     public function testParseFileThrowsForMissingFile(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('ASW file not found');
+        $this->expectExceptionMessageIsOrContains('ASW file not found');
 
         AswFileParser::parseFile('/nonexistent/file.asw');
     }

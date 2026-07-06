@@ -161,7 +161,7 @@ class StandingsWideUnitTest extends WideUnitTestCase
 
         // Assert
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Invalid region: Invalid');
+        $this->expectExceptionMessageIsOrContains('Invalid region: Invalid');
 
         // Act
         $this->repository->getStandingsByRegion('Invalid');

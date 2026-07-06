@@ -368,7 +368,7 @@ class TrnFileParserTest extends TestCase
     public function testParseFileThrowsForMissingFile(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('TRN file not found');
+        $this->expectExceptionMessageIsOrContains('TRN file not found');
 
         TrnFileParser::parseFile('/nonexistent/file.trn');
     }
@@ -381,7 +381,7 @@ class TrnFileParserTest extends TestCase
 
         try {
             $this->expectException(\RuntimeException::class);
-            $this->expectExceptionMessage('Invalid .trn file size');
+            $this->expectExceptionMessageIsOrContains('Invalid .trn file size');
             TrnFileParser::parseFile($tmpFile);
         } finally {
             unlink($tmpFile);
@@ -477,7 +477,7 @@ class TrnFileParserTest extends TestCase
     public function testParseThrowsForInvalidSize(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Invalid .trn file size');
+        $this->expectExceptionMessageIsOrContains('Invalid .trn file size');
         TrnFileParser::parse('too short');
     }
 }

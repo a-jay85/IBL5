@@ -27,7 +27,7 @@ class TradeOfferRepositoryTest extends WideUnitTestCase
         $this->mockDb->onQuery('LAST_INSERT_ID', [['id' => 0]]);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Failed to generate trade offer ID');
+        $this->expectExceptionMessageIsOrContains('Failed to generate trade offer ID');
 
         $repo->generateNextTradeOfferId();
     }

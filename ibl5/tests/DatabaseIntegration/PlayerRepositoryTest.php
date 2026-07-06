@@ -43,7 +43,7 @@ class PlayerRepositoryTest extends DatabaseTestCase
     public function testLoadByIdThrowsForUnknownPlayer(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Player with ID 99999 not found');
+        $this->expectExceptionMessageIsOrContains('Player with ID 99999 not found');
 
         $this->repo->loadByID(99999);
     }

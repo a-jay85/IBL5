@@ -1,0 +1,67 @@
+name: Pipeline PR Fixed Notify
+
+# Fires when a PR is closed. The job below runs ONLY for merged PRs that carry
+# the pipeline-authored label, so it posts "Fixed!" to that PR's Discord thread
+# via the Mac-local bot. Closed-without-merge and non-pipeline merges do nothing.
+on:
+  pull_request:
+    types: [closed]
+
+# Least privilege: this job only reads PR event context and makes one outbound
+# curl. It needs no write scopes of any kind.
+permissions:
+  contents: read
+
+# Optional: coalesce duplicate "closed" deliveries for the same PR. Safe to omit
+# entirely — a single post is idempotent enough — but it costs nothing to keep.
+concurrency:
+  group: pipeline-fixed-notify-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  notify-fixed:
+    # Guard: BOTH conditions must hold, ANDed.
+    #  - merged == true  -> a close-without-merge is skipped (false).
+    #  - contains(labels, 'pipeline-authored') -> a non-pipeline merge is skipped.
+    # pipeline PRs are same-repo (bot-authored), so pull_request has secrets here;
+    # a fork PR would lack secrets, but we never produce fork pipeline PRs.
+    if: >-
+      github.event.pull_request.merged == true &&
+      contains(github.event.pull_request.labels.*.name, 'pipeline-authored')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Join tailnet (ephemeral)
+        # @v3 is the current major; pinning to a full commit SHA is the hardened
+        # option (supply-chain: an immutable ref cannot be re-tagged under you).
+        uses: tailscale/github-action@v3
+        with:
+          # PRIMARY auth path: OAuth client pair. The node is ephemeral and is
+          # torn down when the job ends; `tags:` scopes it to least privilege.
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          # `tags:` MUST match a tag defined in the Tailscale ACL policy AND be
+          # authorized for this OAuth client. tag:ci is the least-privilege scope.
+          tags: tag:ci
+          # ALTERNATIVE (mutually exclusive with oauth-* above): a pre-provisioned
+          # ephemeral auth key. Use one auth path, not both:
+          #   authkey: ${{ secrets.TS_AUTHKEY }}
+
+      - name: POST /prMerged to Mac bot
+        env:
+          # Event-controlled inputs travel via env, NEVER interpolated inline into
+          # the run: script -> a PR-controlled value cannot break out into the shell.
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          MAC_HOST: ${{ secrets.MAC_TAILSCALE_HOST }}
+        run: |
+          # pr_number is a REAL GitHub PR integer (NOT a Discord snowflake), so
+          # --argjson (numeric JSON) is correct — no string coercion needed here.
+          # PR_NUMBER is consumed ONLY through --argjson from the env var; it is
+          # never spliced into the curl string, preventing shell injection.
+          PAYLOAD=$(jq -n --argjson n "$PR_NUMBER" '{pr_number: $n}')
+          # Loud-fail on purpose: -f reds the job on any non-2xx, --max-time bounds
+          # a hung/unreachable bot, -s silences the progress meter. NO `|| true` —
+          # a silently-dropped "Fixed!" should be noticeable, so the job must red.
+          printf '%s' "$PAYLOAD" | curl -sf --max-time 10 \
+            -X POST "http://$MAC_HOST:50001/prMerged" \
+            -H "Content-Type: application/json" \
+            -d @-

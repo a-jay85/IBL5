@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-bug-pipeline-park — idle reminder (at-most-once) + park_idle + the
+# usage-limit park-in-place (blocked_until) that never crashes the tick.
+#
+# Run: bin/test-bug-pipeline-park  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+# shellcheck source=bin/lib/bug-pipeline-test-stubs.sh
+source "$(cd "$(dirname "$0")" && pwd)/lib/bug-pipeline-test-stubs.sh"
+
+bpt_setup
+OLD='2020-01-01 00:00:00'                       # far past IDLE window
+NOW="$(date '+%Y-%m-%d %H:%M:%S')"              # within the window
+
+# ── Idle sends EXACTLY ONE reminder (awaiting_info) ───────────────────────────
+bpt_reset
+bpt_set_actionable '[{"id":3,"status":"awaiting_info","class":"bug","thread_id":"88","last_gm_reply_at":null,"last_processed_at":"'"$OLD"'","created_at":"'"$OLD"'","reminder_sent_at":null,"issue_number":5}]'
+bpt_run
+bpt_expect_eq "idle tick exits 0" 0 "$BPT_RC"
+n="$(grep -c POST_TO_THREAD "$STUB/calls.log" 2>/dev/null || echo 0)"
+bpt_expect_eq "awaiting_info idle → exactly one reminder post" 1 "$n"
+bpt_log_has  "$STUB" transition.log "--reminder-now" "reminder stamped via --reminder-now"
+bpt_log_lacks "$STUB" transition.log "parked_idle" "first idle does not park"
+
+# ── Idle reminder also fires for a gathering row ──────────────────────────────
+bpt_reset
+bpt_set_actionable '[{"id":4,"status":"gathering","class":"feature","thread_id":"88","last_gm_reply_at":null,"last_processed_at":"'"$OLD"'","created_at":"'"$OLD"'","reminder_sent_at":null,"issue_number":6}]'
+bpt_run
+bpt_log_has "$STUB" transition.log "--reminder-now" "gathering idle → reminder stamped"
+
+# ── Second idle tick (reminder old, unanswered) → parked_idle ─────────────────
+bpt_reset
+bpt_set_actionable '[{"id":3,"status":"awaiting_info","class":"bug","thread_id":"88","last_gm_reply_at":null,"last_processed_at":"'"$OLD"'","created_at":"'"$OLD"'","reminder_sent_at":"'"$OLD"'","issue_number":5}]'
+bpt_run
+bpt_log_has  "$STUB" transition.log "parked_idle" "reminder unanswered → parked_idle"
+bpt_log_lacks "$STUB" calls.log "POST_TO_THREAD" "park sends no second reminder"
+bpt_log_has  "$STUB" gh.log "stalled" "parked issue labeled stalled"
+
+# ── ★ at-most-once: reminder recent (< window) → no 2nd reminder, no park ─────
+bpt_reset
+bpt_set_actionable '[{"id":3,"status":"awaiting_info","class":"bug","thread_id":"88","last_gm_reply_at":null,"last_processed_at":"'"$OLD"'","created_at":"'"$OLD"'","reminder_sent_at":"'"$NOW"'","issue_number":5}]'
+bpt_run
+bpt_file_absent "$STUB/transition.log" "reminder recent → row untouched (no re-remind, no park)"
+
+# ── reply after reminder → re-assessed, NOT parked ────────────────────────────
+bpt_reset
+bpt_set_actionable '[{"id":3,"status":"awaiting_info","class":"bug","original_text":"x","thread_id":"88","last_gm_reply_at":"'"$NOW"'","last_processed_at":"'"$OLD"'","reminder_sent_at":"'"$OLD"'","issue_number":5}]'
+bpt_set_claude_result '{"class":"bug","bug_has_enough_info":true}'
+bpt_run
+bpt_log_lacks "$STUB" transition.log "parked_idle" "reply after reminder → not parked (re-assessed)"
+
+# ── boundary: not-yet-idle → no reminder, no park ─────────────────────────────
+bpt_reset
+bpt_set_actionable '[{"id":3,"status":"awaiting_info","class":"bug","thread_id":"88","last_gm_reply_at":null,"last_processed_at":"'"$NOW"'","created_at":"'"$NOW"'","reminder_sent_at":null,"issue_number":5}]'
+bpt_run
+bpt_file_absent "$STUB/transition.log" "not-yet-idle → no reminder, no park"
+
+# ── ★ usage-limit on the classify path → blocked_until, exit 0, no drop/plan ──
+bpt_reset
+bpt_set_actionable '[{"id":8,"status":"queued","class":null,"original_text":"x","thread_id":null,"issue_number":null}]'
+bpt_set_claude_raw 'api error: 429 rate_limit_error'
+bpt_run
+bpt_expect_eq "usage-limit tick exits 0" 0 "$BPT_RC"
+bpt_log_has   "$STUB" transition.log "queued --blocked-until=" "usage-limit → blocked_until in place (status preserved)"
+bpt_log_lacks "$STUB" transition.log "dropped" "usage-limit never drops"
+bpt_log_lacks "$STUB" transition.log "hunting" "usage-limit never hunts"
+
+# ── resume: blocked_until past + queued → normal classify carries --clear-blocked ─
+bpt_reset
+bpt_set_actionable '[{"id":8,"status":"queued","class":null,"original_text":"x","thread_id":null,"issue_number":null,"blocked_until":"'"$OLD"'"}]'
+bpt_set_claude_result '{"class":"not_a_thing"}'
+bpt_run
+bpt_log_has "$STUB" transition.log "--clear-blocked" "resumed row clears blocked_until on success"
+
+echo "----"
+[ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"
+exit "$FAILED"

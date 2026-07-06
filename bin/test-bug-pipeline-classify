@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-bug-pipeline-classify — classifier routing (§3e), thin-bug ordering,
+# feature-regression-never-hunts, and the ★ defensive-JSON safe-fallback.
+#
+# Run: bin/test-bug-pipeline-classify  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+# shellcheck source=bin/lib/bug-pipeline-test-stubs.sh
+source "$(cd "$(dirname "$0")" && pwd)/lib/bug-pipeline-test-stubs.sh"
+
+bpt_setup
+
+QUEUED='[{"id":7,"status":"queued","class":null,"original_text":"the box score is wrong","thread_id":null,"issue_number":null}]'
+
+order_of() { grep -n "^$1" "$STUB/calls.log" 2>/dev/null | head -1 | cut -d: -f1; }
+
+# ── not_a_thing → dropped, no Discord output ──────────────────────────────────
+bpt_reset; bpt_set_actionable "$QUEUED"
+bpt_set_claude_result '{"class":"not_a_thing"}'
+bpt_run
+bpt_log_has  "$STUB" transition.log "dropped --class=not_a_thing" "not_a_thing → dropped"
+bpt_log_lacks "$STUB" calls.log "POST_TO_THREAD" "not_a_thing posts nothing to Discord"
+
+# ── bug + enough → queued --class=bug, no thread opened, NEVER hunting ─────────
+bpt_reset; bpt_set_actionable "$QUEUED"
+bpt_set_claude_result '{"class":"bug","bug_has_enough_info":true,"issue_title":"Box score wrong","severity":"medium"}'
+bpt_run
+bpt_log_has  "$STUB" transition.log "queued --class=bug" "bug+enough → queued --class=bug"
+bpt_log_lacks "$STUB" calls.log "CREATE_THREAD" "bug+enough opens no thread"
+bpt_log_lacks "$STUB" transition.log "hunting" "bug+enough never emits hunting"
+
+# ── feature + new → create-thread then gathering ──────────────────────────────
+bpt_reset; bpt_set_actionable "$QUEUED"
+bpt_set_claude_result '{"class":"feature","feature_is_regression":false,"issue_title":"Add export","severity":"low"}'
+bpt_run
+bpt_log_has "$STUB" calls.log "CREATE_THREAD" "feature+new opens a thread"
+bpt_log_has "$STUB" transition.log "gathering --class=feature" "feature+new → gathering"
+
+# ── ★ thin-bug ordering: create-thread → post-to-thread → transition ──────────
+bpt_reset; bpt_set_actionable "$QUEUED"
+bpt_set_claude_result '{"class":"bug","bug_has_enough_info":false,"clarifying_question":"which team?","issue_title":"Bug","severity":"low"}'
+bpt_run
+ct="$(order_of CREATE_THREAD)"; pt="$(order_of POST_TO_THREAD)"; tr_line="$(order_of TRANSITION)"
+if [ -n "$ct" ] && [ -n "$pt" ] && [ -n "$tr_line" ] && [ "$ct" -lt "$pt" ] && [ "$pt" -lt "$tr_line" ]; then
+    bpt_ok "thin-bug order: create-thread < post-question < awaiting_info transition"
+else
+    bpt_fail "thin-bug order wrong (create=$ct post=$pt transition=$tr_line)"
+fi
+bpt_log_has "$STUB" transition.log "awaiting_info --class=bug" "thin-bug → awaiting_info"
+bpt_log_has "$STUB" curl.log "which team?" "clarifying question posted"
+
+# ── feature-regression parks as feature, NEVER hunts ──────────────────────────
+bpt_reset; bpt_set_actionable "$QUEUED"
+bpt_set_claude_result '{"class":"feature","feature_is_regression":true,"issue_title":"Regressed","severity":"high"}'
+bpt_run
+bpt_log_has  "$STUB" transition.log "--class=feature" "feature-regression stays class=feature"
+bpt_log_lacks "$STUB" transition.log "hunting" "feature-regression never emits hunting"
+
+# ── issue projection: classify bug (issue_number null) → gh create + --issue ──
+bpt_reset; bpt_set_actionable "$QUEUED"
+bpt_set_claude_result '{"class":"bug","bug_has_enough_info":true,"issue_title":"Box score wrong","severity":"medium"}'
+STUB_ISSUE_NUMBER=4242 bpt_run
+bpt_log_has "$STUB" gh.log "issue create" "classified bug creates a tracking issue"
+bpt_log_has "$STUB" transition.log "--issue=4242" "created issue number persisted via --issue"
+
+# ── advisory-field defaults: missing severity/title still creates the issue ───
+bpt_reset; bpt_set_actionable "$QUEUED"
+bpt_set_claude_result '{"class":"bug","bug_has_enough_info":true}'
+bpt_run
+bpt_log_has "$STUB" gh.log "severity:low" "missing severity defaults to low"
+
+# ── ★ NEGATIVE — malformed classifier output → safe fallback (no transition) ──
+malformed_case() { # name  ; expects claude.out already set
+    bpt_run
+    bpt_expect_eq "$1 exits 0" 0 "$BPT_RC"
+    bpt_file_absent "$STUB/transition.log" "$1 → no transition (row stays queued,class NULL)"
+}
+bpt_reset; bpt_set_actionable "$QUEUED"; bpt_set_claude_raw 'not json at all'; malformed_case "malformed(a) non-JSON"
+bpt_reset; bpt_set_actionable "$QUEUED"; bpt_set_claude_raw '{"type":"result","is_error":true,"result":""}'; malformed_case "malformed(b) is_error:true"
+bpt_reset; bpt_set_actionable "$QUEUED"; bpt_set_claude_result '{"class":"garbage"}'; malformed_case "malformed(c) off-whitelist class"
+bpt_reset; bpt_set_actionable "$QUEUED"; : > "$STUB/claude.out"; malformed_case "malformed(d) empty stdout"
+bpt_reset; bpt_set_actionable "$QUEUED"; bpt_set_claude_raw '{"type":"result","is_error":false,"result":"{}"}'; bpt_set_claude_rc 3; malformed_case "malformed(e) non-zero exit"
+
+echo "----"
+[ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"
+exit "$FAILED"

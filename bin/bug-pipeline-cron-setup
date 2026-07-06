@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+# One-time setup for the Discord bug/feature pipeline cron (ADR-0080).
+#
+# Installs a Mac-local launchd LaunchAgent (com.ibl5.bug-pipeline-cron) that fires
+# the poll-only bash driver bin/bug-pipeline-tick every 180s via StartInterval —
+# host-durable, poll-only, cheap on empty ticks. The plist Program/WorkingDirectory
+# point at the durable MAIN checkout (never a worktree, which gets torn down).
+#
+# Also bootstraps the best-effort GitHub issue-tracking projection (§3f): the private
+# tracking repo, its issue labels, and the code-repo `pipeline-authored` hold label.
+#
+# Usage:
+#   bin/bug-pipeline-cron-setup --print-schedule      # emit the plist to stdout (no side effect)
+#   bin/bug-pipeline-cron-setup --install-schedule    # install + load the LaunchAgent + bootstrap issues
+#   bin/bug-pipeline-cron-setup --uninstall-schedule  # unload + remove the LaunchAgent
+#   bin/bug-pipeline-cron-setup --bootstrap-issues    # (re)create the tracking repo + labels only
+#
+# Install AFTER this lands on master — the launchd Program points at the main
+# checkout's bin/bug-pipeline-tick, which must exist there.
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ACTION=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --install-schedule) ACTION="install"; shift ;;
+    --uninstall-schedule) ACTION="uninstall"; shift ;;
+    --print-schedule) ACTION="print"; shift ;;      # internal: emit plist to stdout, no side effect
+    --bootstrap-issues) ACTION="bootstrap-issues"; shift ;;
+    -h|--help) awk 'NR==1{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"; exit 0 ;;
+    *) echo "Unknown option: $1" >&2; exit 1 ;;
+  esac
+done
+
+[ -n "$ACTION" ] || { echo "No action given. See --help." >&2; exit 1; }
+
+# --- Durable MAIN-checkout derivation ----------------------------------------
+# Program/WorkingDirectory MUST point at the main checkout, never this worktree
+# (a worktree gets torn down — the LaunchAgent would then point at a dead path).
+# The first `git worktree list` entry is the main working tree.
+MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree / {print $2; exit}')"
+[ -n "$MAIN_WT" ] || MAIN_WT="$REPO_ROOT"   # fallback: not in a git tree
+
+PLIST_LABEL="com.ibl5.bug-pipeline-cron"
+PLIST_PATH="$HOME/Library/LaunchAgents/${PLIST_LABEL}.plist"
+LOG_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/bug-pipeline/logs"
+PROGRAM="$MAIN_WT/bin/bug-pipeline-tick"   # the Phase-3 poll-only driver
+
+# The PRIVATE tracking repo the cron mirrors issues to (§3f). Override via env.
+BUG_PIPELINE_ISSUE_REPO="${BUG_PIPELINE_ISSUE_REPO:-a-jay85/ibl5-bugs}"
+# A-Jay's Discord snowflake (STRING) — the feature-path approver. A config value,
+# never derived from untrusted input. Empty until the operator sets it.
+BUG_PIPELINE_APPROVER_ID="${BUG_PIPELINE_APPROVER_ID:-}"
+
+# Single source of truth for the plist — used by both --print-schedule and
+# --install-schedule, so the MAIN-checkout derivation is exercised by tests.
+build_plist() {
+  cat <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>${PLIST_LABEL}</string>
+	<key>Program</key>
+	<string>${PROGRAM}</string>
+	<!-- StartInterval (net-new to the repo): the correct launchd primitive for a
+	     3-min poll. Do NOT "fix" this to a calendar-interval key — that is calendar-only. -->
+	<key>StartInterval</key>
+	<integer>180</integer>
+	<key>WorkingDirectory</key>
+	<string>${MAIN_WT}</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<!-- Host agent reaches Dockerized MySQL on 127.0.0.1 via config.php defaults;
+		     only DB_NAME must be overridden from the app default. -->
+		<key>DB_NAME</key>
+		<string>iblhoops_ibl5</string>
+		<!-- launchd agents start with a minimal PATH that omits Homebrew; claude, php,
+		     curl, git must resolve. No API-key env var — claude uses ambient CLI auth. -->
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+		<key>BUG_PIPELINE_ISSUE_REPO</key>
+		<string>${BUG_PIPELINE_ISSUE_REPO}</string>
+		<key>BUG_PIPELINE_APPROVER_ID</key>
+		<string>${BUG_PIPELINE_APPROVER_ID}</string>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>${LOG_DIR}/launchd-stdout.log</string>
+	<key>StandardErrorPath</key>
+	<string>${LOG_DIR}/launchd-stderr.log</string>
+</dict>
+</plist>
+PLIST
+}
+
+# One-time, idempotent, best-effort GitHub issue-tracking bootstrap (§3f). A `gh`
+# hiccup must NEVER fail the install — every call is `… || true`.
+bootstrap_issue_tracking() {
+  command -v gh >/dev/null 2>&1 || { echo "gh not found — skipping issue-tracking bootstrap." >&2; return 0; }
+
+  # Private tracking repo (holds raw GM text + reporter ids for RCA — must stay private).
+  gh repo view "$BUG_PIPELINE_ISSUE_REPO" >/dev/null 2>&1 \
+    || gh repo create "$BUG_PIPELINE_ISSUE_REPO" --private 2>/dev/null || true
+
+  # Tracking-repo labels (area:* / root-cause:* are open vocabularies created on demand by #5b).
+  local label
+  for label in bug enhancement severity:low severity:medium severity:high needs-info stalled needs-human; do
+    gh label create "$label" --repo "$BUG_PIPELINE_ISSUE_REPO" 2>/dev/null || true
+  done
+
+  # CODE-repo hold label (closes the PR #1/#6 label-creation gap; applying it is a separate gap).
+  gh label create pipeline-authored --repo a-jay85/IBL5 2>/dev/null || true
+}
+
+case "$ACTION" in
+  print)
+    build_plist
+    ;;
+  install)
+    mkdir -p "$HOME/Library/LaunchAgents" "$LOG_DIR"
+    launchctl bootout "gui/$(id -u)/${PLIST_LABEL}" 2>/dev/null || true  # idempotent: ignore "not loaded"
+    build_plist > "$PLIST_PATH"
+    launchctl bootstrap "gui/$(id -u)" "$PLIST_PATH"
+    bootstrap_issue_tracking
+    echo "Installed ${PLIST_LABEL} (StartInterval 180s). Program: $PROGRAM"
+    ;;
+  uninstall)
+    launchctl bootout "gui/$(id -u)/${PLIST_LABEL}" 2>/dev/null || true  # idempotent
+    rm -f "$PLIST_PATH"                                                  # idempotent: no error if absent
+    echo "Uninstalled ${PLIST_LABEL}."
+    ;;
+  bootstrap-issues)
+    bootstrap_issue_tracking
+    echo "Issue-tracking bootstrap complete (repo: $BUG_PIPELINE_ISSUE_REPO)."
+    ;;
+esac

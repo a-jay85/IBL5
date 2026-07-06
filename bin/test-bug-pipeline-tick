@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-bug-pipeline-tick — empty-tick cost guard, fail-closed enumerator,
+# env resolution, and dispatch wiring for bin/bug-pipeline-tick.
+#
+# Run: bin/test-bug-pipeline-tick  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+# shellcheck source=bin/lib/bug-pipeline-test-stubs.sh
+source "$(cd "$(dirname "$0")" && pwd)/lib/bug-pipeline-test-stubs.sh"
+
+bpt_setup
+
+# ── ★ EMPTY TICK spawns ZERO claude ───────────────────────────────────────────
+bpt_reset
+bpt_set_actionable '[]'
+bpt_run
+bpt_expect_eq "empty tick exits 0" 0 "$BPT_RC"
+bpt_log_has "$STUB" tick.out "no actionable rows — exiting cheap" "empty tick logs cheap-exit"
+bpt_file_absent "$STUB/claude.sentinel" "empty tick spawns zero claude"
+
+# ── Whitespace-wrapped [] still treated as empty ──────────────────────────────
+bpt_reset
+bpt_set_actionable '  []
+'
+bpt_run
+bpt_expect_eq "whitespace [] exits 0" 0 "$BPT_RC"
+bpt_file_absent "$STUB/claude.sentinel" "whitespace [] spawns zero claude"
+
+# ── NEG — non-JSON garbage → fail-closed (error exit, no claude) ──────────────
+bpt_reset
+bpt_set_actionable 'not json at all'
+bpt_run
+bpt_expect_eq "garbage enumerator → exit 1" 1 "$BPT_RC"
+bpt_file_absent "$STUB/claude.sentinel" "garbage enumerator spawns zero claude"
+
+# ── Env resolution: unset DB_NAME → driver exports iblhoops_ibl5 to children ──
+bpt_reset
+( unset DB_NAME; bpt_set_actionable '[]'; bpt_run )
+bpt_log_has "$STUB" env.log "DB_NAME=iblhoops_ibl5" "unset DB_NAME defaults to iblhoops_ibl5"
+
+# ── Non-empty tick reaches dispatch (a queued row spawns the classifier) ──────
+bpt_reset
+bpt_set_actionable '[{"id":1,"status":"queued","class":null,"original_text":"x","thread_id":null,"issue_number":null}]'
+bpt_set_claude_result '{"class":"not_a_thing"}'
+bpt_run
+bpt_expect_eq "non-empty tick exits 0" 0 "$BPT_RC"
+if [ -e "$STUB/claude.sentinel" ]; then
+    bpt_ok "queued row dispatched to classifier (claude spawned)"
+else
+    bpt_fail "queued row should dispatch to classifier"
+fi
+
+echo "----"
+[ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"
+exit "$FAILED"

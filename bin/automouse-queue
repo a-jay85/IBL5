@@ -191,7 +191,10 @@ if [ "$1" = "reorder" ]; then
         # BSD (-r epoch) fallback for the macOS automouse host.
         epoch=$(( base + i * 60 ))
         stamp=$(date -d "@$epoch" +%Y%m%d%H%M.%S 2>/dev/null || date -r "$epoch" +%Y%m%d%H%M.%S)
-        touch -t "$stamp" "$target"
+        # GNU ls -1tr sorts by symlink lstat mtime; BSD ls sorts by target stat mtime.
+        # Touch both so the reorder is visible on both Linux CI and macOS dev.
+        touch -h -t "$stamp" "$QUEUE_DIR/$name"
+        touch    -t "$stamp" "$target"
         i=$((i + 1))
     done
 

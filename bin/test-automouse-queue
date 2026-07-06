@@ -185,8 +185,9 @@ echo "ok: row9 — .staleness eviction"
 
 # ===========================================================================
 # reorder subcommand — permutation validation + spaced ascending-mtime touch.
-# Order is asserted via `ls -1tr` (target mtime, oldest-first) — exactly how
-# bin/automouse-run claims the next plan.
+# Order is asserted via `ls -1tr` (oldest-first) — exactly how
+# bin/automouse-run claims the next plan.  GNU ls uses symlink lstat mtime;
+# BSD ls uses target stat mtime.  reorder touches both, so results agree.
 # ===========================================================================
 
 # basenames of queue entries in ls -1tr (oldest-first = runs-first) order, space-joined

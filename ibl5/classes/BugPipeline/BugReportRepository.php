@@ -384,4 +384,83 @@ class BugReportRepository extends \BaseMysqliRepository
             ? (string) $row['thread_id']
             : null;
     }
+
+    // -------------------------------------------------------------------------
+    // Cron enumerator + conditional writers (PR #5a — the poll-only orchestrator)
+    //
+    // NOTE (scope): PR #3 deliberately deferred the cron's actionable-set query to
+    // #5a (see advanceOnApproval()'s comment: "so the cron can enumerate awaiting_ajay
+    // AND approval_message_id IS NULL"). These methods are the single home of that
+    // enumerator + the three conditional writers transition()'s value-bind can't express.
+    // -------------------------------------------------------------------------
+
+    /**
+     * The tick's actionable set — every row the poll-only driver must inspect this tick.
+     *
+     * Union (see discord-bug-pipeline-shared-context.md §3d + PR #5a Phase 3/5):
+     *   (a) queued AND class IS NULL          — needs first-classification
+     *   (b) awaiting_info / gathering          — GM reply re-assessment OR idle/park candidate
+     *                                            (the 1h idle POLICY lives in the bash driver, not here)
+     *   (c) awaiting_ajay AND approval_message_id IS NULL — ready-for-plan (A-Jay reacted ✅)
+     *
+     * Global gates: excludes `hunting` (no hunter in #5a — the deadlock constraint) and all
+     * terminal states, and excludes any row still parked by a future `blocked_until` (usage-limit
+     * backoff). A row whose `blocked_until` has passed re-surfaces in its real status and retries —
+     * so "skip while parked" and "auto-resume" both fall out of the one blocked-until gate.
+     *
+     * @phpstan-return list<BugReportRow>
+     */
+    public function listActiveConversations(): array
+    {
+        $rows = $this->fetchAll(
+            "SELECT * FROM `ibl_bug_reports`
+             WHERE status NOT IN ('hunting','dropped','fixed','needs_human','parked_idle','pr_open')
+               AND (blocked_until IS NULL OR blocked_until <= NOW())
+               AND (
+                     (status = 'queued' AND class IS NULL)
+                  OR (status IN ('awaiting_info','gathering'))
+                  OR (status = 'awaiting_ajay' AND approval_message_id IS NULL)
+               )
+             ORDER BY id ASC"
+        );
+        return array_values(array_map(fn (array $row): array => $this->castRow($row), $rows));
+    }
+
+    /**
+     * At-most-once idle reminder stamp. The `AND reminder_sent_at IS NULL` guard makes a repeat
+     * call a no-op, so a row can receive at most one reminder over its lifetime (PR #5a Phase 6).
+     * transition()'s value-bind cannot express this conditional WHERE, hence a dedicated method.
+     */
+    public function markReminderSent(int $id): bool
+    {
+        return $this->execute(
+            "UPDATE `ibl_bug_reports` SET reminder_sent_at = NOW(), updated_at = NOW()
+             WHERE id = ? AND reminder_sent_at IS NULL",
+            'i',
+            $id
+        ) === 1;
+    }
+
+    /** Stamp last_processed_at = NOW() so the same GM reply is not re-processed next tick. */
+    public function stampLastProcessed(int $id): bool
+    {
+        return $this->execute(
+            'UPDATE `ibl_bug_reports` SET last_processed_at = NOW(), updated_at = NOW() WHERE id = ?',
+            'i',
+            $id
+        ) === 1;
+    }
+
+    /**
+     * Clear a usage-limit park stamp (blocked_until = NULL). Literal NULL, no bound value —
+     * mirrors transition()'s $releaseLease idiom (bind_param has no NULL type). PR #5a Phase 6 resume.
+     */
+    public function clearBlocked(int $id): bool
+    {
+        return $this->execute(
+            'UPDATE `ibl_bug_reports` SET blocked_until = NULL, updated_at = NOW() WHERE id = ?',
+            'i',
+            $id
+        ) === 1;
+    }
 }

@@ -157,7 +157,7 @@ class VotingRepositoryTest extends DatabaseTestCase
     public function testValidateColumnsRejectsInvalidColumn(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Invalid vote column: bobby_tables');
+        $this->expectExceptionMessageIsOrContains('Invalid vote column: bobby_tables');
 
         $this->repo->fetchAllStarTotals(['bobby_tables']);
     }

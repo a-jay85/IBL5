@@ -34,7 +34,7 @@ class LeadersHtmParserTest extends TestCase
     public function testParseFileThrowsForMissingFile(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('not found');
+        $this->expectExceptionMessageIsOrContains('not found');
         LeadersHtmParser::parseFile('/nonexistent/Leaders.htm');
     }
 

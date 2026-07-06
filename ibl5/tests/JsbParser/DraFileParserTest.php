@@ -197,7 +197,7 @@ class DraFileParserTest extends TestCase
     public function testThrowsForMissingFile(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('DRA file not found');
+        $this->expectExceptionMessageIsOrContains('DRA file not found');
 
         DraFileParser::parseFile('/nonexistent/file.dra');
     }

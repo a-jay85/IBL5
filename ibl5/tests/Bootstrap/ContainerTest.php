@@ -38,7 +38,7 @@ final class ContainerTest extends TestCase
     public function testGetThrowsForMissingEntry(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Container entry not found: missing');
+        $this->expectExceptionMessageIsOrContains('Container entry not found: missing');
 
         $this->container->get('missing');
     }

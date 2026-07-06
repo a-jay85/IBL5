@@ -116,6 +116,88 @@ if [ "$1" = "requeue" ]; then
     exit 0
 fi
 
+# Reorder the queue by re-touching the TARGET plan files with ascending mtimes.
+# automouse-run claims the oldest-mtime plan first (`ls -1tr`, which dereferences
+# the queue symlinks), so first arg = oldest = runs first. The argument list must
+# be an EXACT permutation of the current queue: every arg queued, none repeated,
+# counts equal. Validation is a full first pass — no mtime is touched unless it
+# passes, so a rejected reorder leaves the queue untouched.
+if [ "$1" = "reorder" ]; then
+    shift
+    if [ $# -lt 1 ]; then
+        echo "Error: reorder requires the full queue in the desired order." >&2
+        echo "Usage: bin/automouse-queue reorder <slug1> <slug2> ... <slugN>" >&2
+        exit 1
+    fi
+
+    # Current queue basenames, space-wrapped for membership tests (" a.md b.md ").
+    queued=" "
+    queued_count=0
+    while IFS= read -r f; do
+        queued="$queued$(basename "$f") "
+        queued_count=$((queued_count + 1))
+    done < <(ls -1tr "$QUEUE_DIR"/*.md 2>/dev/null)
+
+    if [ "$queued_count" -eq 0 ]; then
+        echo "Error: the queue is empty; nothing to reorder." >&2
+        exit 1
+    fi
+
+    # Validate (touch nothing this pass). $ordered collects normalized names.
+    seen=" "
+    ordered=""
+    given_count=0
+    for arg in "$@"; do
+        # basename strips any leading path -> path-traversal / arbitrary-file defense.
+        name=$(basename "$arg")
+        case "$name" in
+            *.md) ;;
+            *) name="${name}.md" ;;
+        esac
+        case "$queued" in
+            *" $name "*) ;;
+            *)
+                echo "Error: $name is not in the queue." >&2
+                show_queue >&2
+                exit 1 ;;
+        esac
+        case "$seen" in
+            *" $name "*)
+                echo "Error: $name given more than once." >&2
+                exit 1 ;;
+        esac
+        seen="$seen$name "
+        ordered="$ordered$name "
+        given_count=$((given_count + 1))
+    done
+
+    # Membership + no-dup + equal counts ⟹ exact permutation (no adds/drops).
+    if [ "$given_count" -ne "$queued_count" ]; then
+        echo "Error: reorder needs an exact permutation of the queue" \
+             "($queued_count queued, $given_count given)." >&2
+        show_queue >&2
+        exit 1
+    fi
+
+    # Apply: distinct mtimes 60s apart, computed from one clock snapshot so
+    # loop drift can't tie two stamps (a same-second tie lets `ls` fall back to
+    # filename order and scramble the request). First arg = oldest = runs first.
+    now=$(date +%s)
+    base=$(( now - given_count * 60 ))
+    i=0
+    for name in $ordered; do
+        target=$(readlink "$QUEUE_DIR/$name")
+        stamp=$(date -r $(( base + i * 60 )) +%Y%m%d%H%M.%S)   # BSD/macOS: -r = epoch
+        touch -t "$stamp" "$target"
+        i=$((i + 1))
+    done
+
+    echo "Reordered $given_count plan(s)."
+    echo ""
+    show_queue
+    exit 0
+fi
+
 INPUT="$1"
 
 # Resolve the plan file path

@@ -181,6 +181,110 @@ assert_absent  "row9 staleness marker gone"  "$NDIR/skipped/plan-i.md.staleness"
 assert_present "row9 queued"                  "$NDIR/queue/plan-i.md"
 echo "ok: row9 — .staleness eviction"
 
+# ===========================================================================
+# reorder subcommand — permutation validation + spaced ascending-mtime touch.
+# Order is asserted via `ls -1tr` (target mtime, oldest-first) — exactly how
+# bin/automouse-run claims the next plan.
+# ===========================================================================
+
+# basenames of queue entries in ls -1tr (oldest-first = runs-first) order, space-joined
+queue_order() {
+    local out="" f
+    while IFS= read -r f; do out="$out $(basename "$f")"; done \
+        < <(ls -1tr "$NDIR/queue"/*.md 2>/dev/null)
+    echo "${out# }"
+}
+assert_order() {
+    local desc="$1" expected="$2" actual
+    actual="$(queue_order)"
+    if [ "$actual" != "$expected" ]; then
+        echo "FAIL: $desc — expected order [$expected], got [$actual]"
+        FAILED=1
+    fi
+}
+# epoch mtime of a queue entry's readlink target (BSD/macOS stat)
+target_mtime() { stat -f %m "$(readlink "$NDIR/queue/$1")"; }
+
+# ---------------------------------------------------------------------------
+# Row 10 — happy path: reorder >=3 plans -> ls -1tr matches requested order
+# ---------------------------------------------------------------------------
+setup
+touch "$PDIR/plan-a.md" "$PDIR/plan-b.md" "$PDIR/plan-c.md"
+run_queue plan-a >/dev/null 2>&1
+run_queue plan-b >/dev/null 2>&1
+run_queue plan-c >/dev/null 2>&1
+run_queue reorder plan-c plan-a plan-b >/dev/null 2>&1
+assert_order "row10 reorder applies requested order" "plan-c.md plan-a.md plan-b.md"
+echo "ok: row10 — reorder happy path"
+
+# ---------------------------------------------------------------------------
+# Row 11 — ordering: mtimes end >=1 min apart, no same-second tie-scramble.
+# Start from an identical-mtime state and request a non-alphabetical order —
+# a same-second touch loop would let `ls` filename-tiebreak and scramble it.
+# ---------------------------------------------------------------------------
+setup
+touch "$PDIR/plan-a.md" "$PDIR/plan-b.md" "$PDIR/plan-c.md"
+run_queue plan-a >/dev/null 2>&1
+run_queue plan-b >/dev/null 2>&1
+run_queue plan-c >/dev/null 2>&1
+touch -t 202601010000.00 "$PDIR/plan-a.md" "$PDIR/plan-b.md" "$PDIR/plan-c.md"
+run_queue reorder plan-c plan-b plan-a >/dev/null 2>&1
+assert_order "row11 non-alpha order survives identical start" "plan-c.md plan-b.md plan-a.md"
+m1=$(target_mtime plan-c.md); m2=$(target_mtime plan-b.md); m3=$(target_mtime plan-a.md)
+if [ $((m2 - m1)) -lt 60 ] || [ $((m3 - m2)) -lt 60 ]; then
+    echo "FAIL: row11 — target mtimes not >=60s apart: $m1 $m2 $m3"
+    FAILED=1
+fi
+echo "ok: row11 — spaced ascending mtimes, no tie-scramble"
+
+# ---------------------------------------------------------------------------
+# Row 12 — reject a slug not currently queued (non-zero exit, order unchanged)
+# ---------------------------------------------------------------------------
+setup
+touch "$PDIR/plan-a.md" "$PDIR/plan-b.md" "$PDIR/plan-c.md"
+run_queue plan-a >/dev/null 2>&1; run_queue plan-b >/dev/null 2>&1; run_queue plan-c >/dev/null 2>&1
+run_queue reorder plan-a plan-b plan-c >/dev/null 2>&1
+before="$(queue_order)"
+set +e; out=$(run_queue reorder plan-a plan-b plan-z 2>&1); ec=$?; set -e
+[ "$ec" -eq 0 ] && { echo "FAIL: row12 — expected non-zero exit for unqueued slug"; FAILED=1; }
+echo "$out" | grep -q "not in the queue" || { echo "FAIL: row12 — missing not-in-queue error: $out"; FAILED=1; }
+assert_order "row12 order unchanged after reject" "$before"
+echo "ok: row12 — reject unqueued slug"
+
+# ---------------------------------------------------------------------------
+# Row 13 — reject a non-permutation: missing entry AND duplicate-as-extra
+# ---------------------------------------------------------------------------
+setup
+touch "$PDIR/plan-a.md" "$PDIR/plan-b.md" "$PDIR/plan-c.md"
+run_queue plan-a >/dev/null 2>&1; run_queue plan-b >/dev/null 2>&1; run_queue plan-c >/dev/null 2>&1
+run_queue reorder plan-a plan-b plan-c >/dev/null 2>&1
+before="$(queue_order)"
+# (a) missing entry -> count mismatch
+set +e; out=$(run_queue reorder plan-a plan-b 2>&1); ec=$?; set -e
+[ "$ec" -eq 0 ] && { echo "FAIL: row13a — expected non-zero for missing entry"; FAILED=1; }
+assert_order "row13a order unchanged" "$before"
+# (b) duplicate-as-extra -> dup rejection
+set +e; out=$(run_queue reorder plan-a plan-b plan-b 2>&1); ec=$?; set -e
+[ "$ec" -eq 0 ] && { echo "FAIL: row13b — expected non-zero for duplicate entry"; FAILED=1; }
+assert_order "row13b order unchanged" "$before"
+echo "ok: row13 — reject non-permutation (missing/extra)"
+
+# ---------------------------------------------------------------------------
+# Row 14 — touch-nothing-on-rejection: target mtimes unchanged after a reject
+# ---------------------------------------------------------------------------
+setup
+touch "$PDIR/plan-a.md" "$PDIR/plan-b.md" "$PDIR/plan-c.md"
+run_queue plan-a >/dev/null 2>&1; run_queue plan-b >/dev/null 2>&1; run_queue plan-c >/dev/null 2>&1
+run_queue reorder plan-a plan-b plan-c >/dev/null 2>&1
+a0=$(target_mtime plan-a.md); b0=$(target_mtime plan-b.md); c0=$(target_mtime plan-c.md)
+set +e; run_queue reorder plan-c plan-a plan-z >/dev/null 2>&1; set -e   # rejected: plan-z not queued
+a1=$(target_mtime plan-a.md); b1=$(target_mtime plan-b.md); c1=$(target_mtime plan-c.md)
+if [ "$a0" != "$a1" ] || [ "$b0" != "$b1" ] || [ "$c0" != "$c1" ]; then
+    echo "FAIL: row14 — target mtimes changed on a rejected reorder"
+    FAILED=1
+fi
+echo "ok: row14 — touch-nothing on rejection"
+
 # ---------------------------------------------------------------------------
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"

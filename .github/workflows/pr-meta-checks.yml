@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
 
@@ -42,7 +42,7 @@ jobs:
       - name: Compute changed-path filters
         id: filter
         if: ${{ github.event_name == 'pull_request' }}
-        uses: dorny/paths-filter@v4
+        uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
         with:
           filters: |
             adr:
@@ -146,7 +146,7 @@ jobs:
 
       - name: Post hot-file comment
         if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.filter.outputs.hotfiles == 'true' }}
-        uses: marocchino/sticky-pull-request-comment@v3
+        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
         with:
           header: hot-files
           path: hot-files.txt
@@ -158,7 +158,7 @@ jobs:
 
       - name: Post orphan-css comment
         if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.filter.outputs.orphancss == 'true' }}
-        uses: marocchino/sticky-pull-request-comment@v3
+        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
         with:
           header: orphan-css
           path: orphan-css.txt
@@ -172,7 +172,7 @@ jobs:
 
       - name: Post collision comment
         if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.filter.outputs.prcollisions == 'true' }}
-        uses: marocchino/sticky-pull-request-comment@v3
+        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
         with:
           header: pr-collisions
           path: pr-collisions.txt

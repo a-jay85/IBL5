@@ -217,7 +217,7 @@ class PlrFileWriterTest extends TestCase
         $record = $this->buildSyntheticRecord();
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Unknown field');
+        $this->expectExceptionMessageIsOrContains('Unknown field');
 
         PlrFileWriter::applyChangesToRecord($record, ['nonexistent' => 1]);
     }
@@ -255,7 +255,7 @@ class PlrFileWriterTest extends TestCase
     public function testReadFileThrowsForMissingFile(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('PLR file not found');
+        $this->expectExceptionMessageIsOrContains('PLR file not found');
 
         PlrFileWriter::readFile('/nonexistent/file.plr');
     }

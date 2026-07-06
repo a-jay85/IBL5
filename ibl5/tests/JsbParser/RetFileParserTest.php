@@ -123,7 +123,7 @@ class RetFileParserTest extends TestCase
     public function testThrowsForMissingFile(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('RET file not found');
+        $this->expectExceptionMessageIsOrContains('RET file not found');
 
         RetFileParser::parseFile('/nonexistent/file.ret');
     }

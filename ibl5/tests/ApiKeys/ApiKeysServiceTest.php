@@ -54,7 +54,7 @@ class ApiKeysServiceTest extends TestCase
         $service = new ApiKeysService($stubRepo);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('already has an active API key');
+        $this->expectExceptionMessageIsOrContains('already has an active API key');
 
         $service->generateKeyForUser(1, 'testuser');
     }

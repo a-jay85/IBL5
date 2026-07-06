@@ -418,7 +418,7 @@ class RcbFileParserTest extends TestCase
     public function testParseFileThrowsForMissingFile(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('RCB file not found');
+        $this->expectExceptionMessageIsOrContains('RCB file not found');
         RcbFileParser::parseFile('/nonexistent/file.rcb');
     }
 
@@ -430,7 +430,7 @@ class RcbFileParserTest extends TestCase
 
         try {
             $this->expectException(\RuntimeException::class);
-            $this->expectExceptionMessage('expected at least');
+            $this->expectExceptionMessageIsOrContains('expected at least');
             RcbFileParser::parseFile($tmpFile);
         } finally {
             unlink($tmpFile);
@@ -562,7 +562,7 @@ class RcbFileParserTest extends TestCase
     public function testParseThrowsForTooFewLines(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('expected at least');
+        $this->expectExceptionMessageIsOrContains('expected at least');
         RcbFileParser::parse('too few lines');
     }
 }

@@ -76,7 +76,7 @@ class PlbFileParserTest extends TestCase
     public function testParseFileThrowsForMissingFile(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('PLB file not found');
+        $this->expectExceptionMessageIsOrContains('PLB file not found');
 
         PlbFileParser::parseFile('/nonexistent/path/to/file.plb');
     }

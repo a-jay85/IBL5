@@ -84,7 +84,7 @@ final class PhpstanBaselineCounterTest extends TestCase
     public function throwsForNonexistentFile(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('not found');
+        $this->expectExceptionMessageIsOrContains('not found');
 
         $this->counter->countByIdentifier('/nonexistent/baseline.neon');
     }

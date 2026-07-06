@@ -56,7 +56,7 @@ class VotingRepositoryTest extends WideUnitTestCase
     public function testFetchAllStarTotalsRejectsNonAllowlistedColumn(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Invalid vote column');
+        $this->expectExceptionMessageIsOrContains('Invalid vote column');
 
         $this->repository->fetchAllStarTotals(['east_f1; DROP TABLE']);
     }

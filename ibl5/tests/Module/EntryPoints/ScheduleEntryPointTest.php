@@ -80,7 +80,7 @@ class ScheduleEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Team not found: 99999');
+        $this->expectExceptionMessageIsOrContains('Team not found: 99999');
         $this->runModule('Schedule', ['teamid' => '99999']);
     }
 }

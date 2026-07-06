@@ -3,7 +3,7 @@
 A **second** Discord bot process — a distinct Discord app/token from the prod
 IBLbot — that turns a dedicated bug-report channel into a work queue. It runs on
 the Mac only, never on prod. It writes nothing to MySQL directly: every DB effect
-goes through PR #3's `/api/bug-pipeline/*` PHP endpoints.
+goes through PR #3's `/api/v1/bug-pipeline/*` PHP endpoints.
 
 Two I/O directions:
 - **Inbound (Discord → PHP):** `MessageCreate`, `MessageReactionAdd`, and a
@@ -22,7 +22,8 @@ Two I/O directions:
    Messages, Send Messages in Threads.
 3. `cp .env.bugbot.example .env.bugbot` and fill in:
    - `BUG_BOT_DISCORD_TOKEN` — the new app's token
-   - `BUG_PIPELINE_API_BASE_URL` — the Mac-local PHP/docker stack base (NOT prod)
+   - `BUG_PIPELINE_API_BASE_URL` — the always-up main stack `http://main.localhost/ibl5`
+     (NOT a worktree slug, torn down on merge; NOT prod)
    - `API_KEY` — a valid `ibl_api_keys` key; **must be a high/unlimited rate-limit
      tier** so startup backfill isn't 429-throttled into silently dropping reports
    - `BUG_CHANNEL_ID` — the dedicated bug-report channel snowflake
@@ -38,3 +39,7 @@ pm2 start ecosystem.bugbot.config.cjs   # run inside tmux so it survives termina
 The bug-bot uses its OWN PM2 ecosystem file (`ecosystem.bugbot.config.cjs`) — it is
 deliberately NOT added to the prod `ecosystem.config.cjs`, so a prod deploy never
 starts it.
+
+**Runtime dependency:** the bot targets `http://main.localhost/ibl5`, so the always-up
+main stack must be running (`bin/dev-up`, which prod-syncs the DB by default). It is not
+tied to any worktree stack (those are torn down on merge).

@@ -33,7 +33,7 @@ interface ApiEnvelope<T> {
  * fields straight off this return value ONLY because the envelope is stripped here.
  */
 export async function apiPost<T>(endpoint: string, payload: unknown): Promise<T> {
-    const urlString = `${config.phpApi.baseUrl}/api/bug-pipeline/${endpoint}`;
+    const urlString = `${config.phpApi.baseUrl}/api/v1/bug-pipeline/${endpoint}`;
     const response = await fetch(urlString, {
         method: 'POST',
         headers: {

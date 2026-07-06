@@ -34,7 +34,7 @@ describe('apiPost', () => {
 
         expect(fetchFn).toHaveBeenCalledTimes(1);
         const [url, opts] = fetchFn.mock.calls[0];
-        expect(url).toBe('http://test.localhost/api/bug-pipeline/enqueue');
+        expect(url).toBe('http://test.localhost/api/v1/bug-pipeline/enqueue');
         expect(opts.method).toBe('POST');
         expect(opts.headers['X-API-Key']).toBe('test-api-key');
         expect(opts.headers['Content-Type']).toBe('application/json');

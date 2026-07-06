@@ -24,8 +24,9 @@ export const config = {
         guildId: process.env['DISCORD_GUILD_ID'] ?? '',
     },
     phpApi: {
-        // Mac-local PHP/docker stack base (e.g. http://<slug>.localhost) — NOT the
-        // prod v1 API. php-client builds `${baseUrl}/api/bug-pipeline/<endpoint>`.
+        // Always-up main stack incl. the /ibl5 app prefix (http://main.localhost/ibl5)
+        // — serves master's endpoints; NOT a worktree slug (torn down on merge) nor
+        // prod. php-client builds `${baseUrl}/api/v1/bug-pipeline/<endpoint>`.
         baseUrl: requireEnv('BUG_PIPELINE_API_BASE_URL'),
         // Reused as the X-API-Key header value on the §3b POSTs.
         key: requireEnv('API_KEY'),

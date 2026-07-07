@@ -23,12 +23,19 @@ class OneOnOneGameService implements OneOnOneGameServiceInterface
     private OneOnOneGameRepositoryInterface $repository;
     private OneOnOneGameEngineInterface $gameEngine;
 
+    /**
+     * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('audit').
+     */
+    private \Psr\Log\LoggerInterface $logger;
+
     public function __construct(
         OneOnOneGameRepositoryInterface $repository,
-        ?OneOnOneGameEngineInterface $gameEngine = null
+        ?OneOnOneGameEngineInterface $gameEngine = null,
+        ?\Psr\Log\LoggerInterface $logger = null
     ) {
         $this->repository = $repository;
         $this->gameEngine = $gameEngine ?? new OneOnOneGameEngine();
+        $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('audit');
     }
 
     /**
@@ -63,7 +70,7 @@ class OneOnOneGameService implements OneOnOneGameServiceInterface
         // Post to Discord
         $this->postToDiscord($result, $gameId);
 
-        \Logging\LoggerFactory::getChannel('audit')->info('one_on_one_game_played', [
+        $this->logger->info('one_on_one_game_played', [
             'action' => 'one_on_one_game_played',
             'game_id' => $gameId,
             'player1_id' => $player1Id,

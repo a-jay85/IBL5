@@ -7,14 +7,16 @@ namespace Tests\FranchiseHistory;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use FranchiseHistory\FranchiseHistoryRepository;
-use FranchiseHistory\Contracts\FranchiseHistoryRepositoryInterface;
 
 /**
  * FranchiseHistoryRepositoryTest - Tests for FranchiseHistoryRepository
  *
- * Tests verify that title counts are sourced from vw_franchise_summary
- * (which internally derives them from vw_team_awards) and that playoff
- * records are derived from vw_playoff_series_results.
+ * The repository is now a thin raw-fetch layer: all cross-source merging and
+ * derived-field computation lives in FranchiseHistoryService (tested DB-free in
+ * FranchiseHistoryServiceTest). These tests assert only the repository's
+ * legitimate concern — that each raw-fetch method queries the expected
+ * view/table. Behavioral assembly assertions belong to the Service test;
+ * the live query chain is covered by the DB-integration suite.
  *
  * @covers \FranchiseHistory\FranchiseHistoryRepository
  */
@@ -31,93 +33,72 @@ class FranchiseHistoryRepositoryTest extends TestCase
         $this->repository = new FranchiseHistoryRepository($this->mockDb);
     }
 
-    /**
-     * Verify that titles are sourced from vw_franchise_summary
-     *
-     * vw_franchise_summary internally derives title counts from vw_team_awards,
-     * so querying it directly avoids redundant vw_team_awards materialization.
-     */
-    public function testTitlesSourcedFromFranchiseSummaryView(): void
+    public function testSummaryFetchQueriesFranchiseSummaryView(): void
     {
-        $reflectionClass = new \ReflectionClass($this->repository);
-        $fileName = $reflectionClass->getFileName();
-        $this->assertIsString($fileName);
-        $sourceCode = file_get_contents($fileName);
-        $this->assertIsString($sourceCode);
+        $sourceCode = $this->repositorySource();
 
-        // Verify the repository queries vw_franchise_summary (which contains title data)
+        // Summary rows come from vw_franchise_summary (which internally derives
+        // title counts from vw_team_awards), avoiding redundant materialization.
         $this->assertStringContainsString(
             'vw_franchise_summary',
             $sourceCode,
-            'Repository must query vw_franchise_summary to get title counts'
+            'Repository must query vw_franchise_summary for the all-time summary rows'
         );
 
-        // Verify title fields are selected from the summary
+        // Title columns are DB-supplied on the raw summary row.
+        foreach (['heat_titles', 'div_titles', 'conf_titles', 'ibl_titles'] as $titleColumn) {
+            $this->assertStringContainsString(
+                $titleColumn,
+                $sourceCode,
+                "Repository summary query must select $titleColumn from the franchise summary"
+            );
+        }
+    }
+
+    public function testFiveSeasonWindowFetchQueriesTeamWinLoss(): void
+    {
         $this->assertStringContainsString(
-            'heat_titles',
-            $sourceCode,
-            'Repository must include heat_titles from franchise summary'
-        );
-        $this->assertStringContainsString(
-            'div_titles',
-            $sourceCode,
-            'Repository must include div_titles from franchise summary'
-        );
-        $this->assertStringContainsString(
-            'conf_titles',
-            $sourceCode,
-            'Repository must include conf_titles from franchise summary'
-        );
-        $this->assertStringContainsString(
-            'ibl_titles',
-            $sourceCode,
-            'Repository must include ibl_titles from franchise summary'
+            'ibl_team_win_loss',
+            $this->repositorySource(),
+            'Repository must query ibl_team_win_loss for the rolling 5-season window'
         );
     }
 
-    /**
-     * Verify that getAllPlayoffTotals method exists and queries vw_playoff_series_results
-     *
-     * This test documents the expected behavior: playoff game records must be
-     * derived from series results in vw_playoff_series_results.
-     */
-    public function testRepositoryQueriesPlayoffSeriesResultsViewForPlayoffTotals(): void
+    public function testPlayoffFetchQueriesPlayoffSeriesResultsView(): void
     {
-        $reflectionClass = new \ReflectionClass($this->repository);
-
-        // Verify the private getAllPlayoffTotals method exists (bulk playoff calculation)
-        $this->assertTrue(
-            $reflectionClass->hasMethod('getAllPlayoffTotals'),
-            'Repository must have getAllPlayoffTotals method to calculate playoff records from vw_playoff_series_results'
-        );
-
-        $fileName = $reflectionClass->getFileName();
-        $this->assertIsString($fileName);
-        $sourceCode = file_get_contents($fileName);
-        $this->assertIsString($sourceCode);
-
-        // Verify that the repository queries vw_playoff_series_results view
         $this->assertStringContainsString(
             'vw_playoff_series_results',
-            $sourceCode,
-            'Repository must query vw_playoff_series_results view to calculate playoff records'
-        );
-
-        // Verify that playoff fields are present in the result array
-        $this->assertStringContainsString(
-            "'playoff_total_wins'",
-            $sourceCode,
-            'Repository must include playoff_total_wins in result'
+            $this->repositorySource(),
+            'Repository must query vw_playoff_series_results for raw playoff totals'
         );
     }
 
-    /**
-     * Regression test: Verify that title fields are populated in results
-     *
-     * This test documents that the repository MUST include title fields
-     * in the returned franchise data.
-     */
-    public function testTitleFieldsArePopulatedInResults(): void
+    public function testHeatFetchQueriesHeatWinLossTable(): void
+    {
+        $this->assertStringContainsString(
+            'ibl_heat_win_loss',
+            $this->repositorySource(),
+            'Repository must query ibl_heat_win_loss for raw HEAT totals'
+        );
+    }
+
+    public function testExposesRawFetchMethods(): void
+    {
+        // The repository sheds assembly: it exposes only raw-row fetches.
+        foreach ([
+            'getFranchiseSummaryRows',
+            'getFiveSeasonWindowRows',
+            'getRawPlayoffTotals',
+            'getRawHeatTotals',
+        ] as $method) {
+            $this->assertTrue(
+                method_exists($this->repository, $method),
+                "Repository must expose raw-fetch method $method"
+            );
+        }
+    }
+
+    private function repositorySource(): string
     {
         $reflectionClass = new \ReflectionClass($this->repository);
         $fileName = $reflectionClass->getFileName();
@@ -125,26 +106,6 @@ class FranchiseHistoryRepositoryTest extends TestCase
         $sourceCode = file_get_contents($fileName);
         $this->assertIsString($sourceCode);
 
-        // Verify that title fields are included in the result array
-        $this->assertStringContainsString(
-            "'heat_titles'",
-            $sourceCode,
-            'Repository result must include heat_titles field'
-        );
-        $this->assertStringContainsString(
-            "'div_titles'",
-            $sourceCode,
-            'Repository result must include div_titles field'
-        );
-        $this->assertStringContainsString(
-            "'conf_titles'",
-            $sourceCode,
-            'Repository result must include conf_titles field'
-        );
-        $this->assertStringContainsString(
-            "'ibl_titles'",
-            $sourceCode,
-            'Repository result must include ibl_titles field'
-        );
+        return $sourceCode;
     }
 }

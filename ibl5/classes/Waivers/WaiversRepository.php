@@ -16,13 +16,19 @@ use Waivers\Contracts\WaiversRepositoryInterface;
 class WaiversRepository extends BaseMysqliRepository implements WaiversRepositoryInterface
 {
     /**
+     * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('db').
+     */
+    private \Psr\Log\LoggerInterface $channelLogger;
+
+    /**
      * Constructor
      *
      * @param \mysqli $db Active mysqli connection
      */
-    public function __construct(\mysqli $db)
+    public function __construct(\mysqli $db, ?\Psr\Log\LoggerInterface $logger = null)
     {
         parent::__construct($db);
+        $this->channelLogger = $logger ?? \Logging\LoggerFactory::getChannel('db');
     }
     
     /**
@@ -75,7 +81,7 @@ class WaiversRepository extends BaseMysqliRepository implements WaiversRepositor
 
             return $affectedRows > 0;
         } catch (\RuntimeException $e) {
-            \Logging\LoggerFactory::getChannel('db')->error('Failed to sign player from waivers', ['error' => $e->getMessage()]);
+            $this->channelLogger->error('Failed to sign player from waivers', ['error' => $e->getMessage()]);
             return false;
         }
     }

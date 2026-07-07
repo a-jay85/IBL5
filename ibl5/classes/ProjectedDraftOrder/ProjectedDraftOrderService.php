@@ -25,9 +25,15 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
 
     private ProjectedDraftOrderRepositoryInterface $repository;
 
-    public function __construct(ProjectedDraftOrderRepositoryInterface $repository)
+    /**
+     * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('audit').
+     */
+    private \Psr\Log\LoggerInterface $logger;
+
+    public function __construct(ProjectedDraftOrderRepositoryInterface $repository, ?\Psr\Log\LoggerInterface $logger = null)
     {
         $this->repository = $repository;
+        $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('audit');
     }
 
     /** @return ProjectedDraftOrderResult */
@@ -181,7 +187,7 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
         $ownerName = $ownership !== null ? $ownership['ownerName'] : $firstTeamName;
         $this->repository->upsertLotteryWinnerAward($seasonYear, $ownerName);
 
-        \Logging\LoggerFactory::getChannel('audit')->info('lottery_order_saved', [
+        $this->logger->info('lottery_order_saved', [
             'action' => 'lottery_order_saved',
             'season_year' => $seasonYear,
             'first_pick_team' => $firstTeamName,

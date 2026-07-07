@@ -24,10 +24,16 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
     private FreeAgencyAdminRepositoryInterface $repository;
     private \mysqli $db;
 
-    public function __construct(FreeAgencyAdminRepositoryInterface $repository, \mysqli $db)
+    /**
+     * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('audit').
+     */
+    private \Psr\Log\LoggerInterface $logger;
+
+    public function __construct(FreeAgencyAdminRepositoryInterface $repository, \mysqli $db, ?\Psr\Log\LoggerInterface $logger = null)
     {
         $this->repository = $repository;
         $this->db = $db;
+        $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('audit');
     }
 
     /**
@@ -238,7 +244,7 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
         $successCount = $counts['successCount'];
         $errorCount = $counts['errorCount'];
 
-        \Logging\LoggerFactory::getChannel('audit')->info('fa_signings_executed', [
+        $this->logger->info('fa_signings_executed', [
             'action' => 'fa_signings_executed',
             'day' => $day,
             'success_count' => $successCount,
@@ -269,7 +275,7 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
     {
         $this->repository->clearAllOffers();
 
-        \Logging\LoggerFactory::getChannel('audit')->info('fa_offers_cleared', [
+        $this->logger->info('fa_offers_cleared', [
             'action' => 'fa_offers_cleared',
         ]);
 

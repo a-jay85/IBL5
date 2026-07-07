@@ -18,6 +18,7 @@ if (!defined('MODULE_FILE')) {
 }
 
 use FranchiseHistory\FranchiseHistoryRepository;
+use FranchiseHistory\FranchiseHistoryService;
 use FranchiseHistory\FranchiseHistoryView;
 
 global $mysqli_db;
@@ -28,10 +29,11 @@ PageLayout\PageLayout::header();
 
 // Initialize services
 $repository = new FranchiseHistoryRepository($mysqli_db);
+$service = new FranchiseHistoryService($repository);
 $view = new FranchiseHistoryView();
 
 // Get franchise history data
-$franchiseData = $repository->getAllFranchiseHistory($season->endingYear);
+$franchiseData = $service->getAllFranchiseHistory($season->endingYear);
 
 // Render output
 echo $view->render($franchiseData);

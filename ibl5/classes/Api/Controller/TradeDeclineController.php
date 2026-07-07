@@ -16,11 +16,17 @@ class TradeDeclineController implements ControllerInterface
     private TeamIdentityRepositoryInterface $commonRepository;
     private string $serverName;
 
-    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepository, string $serverName = '')
+    /**
+     * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('discord').
+     */
+    private \Psr\Log\LoggerInterface $logger;
+
+    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepository, string $serverName = '', ?\Psr\Log\LoggerInterface $logger = null)
     {
         $this->db = $db;
         $this->commonRepository = $commonRepository;
         $this->serverName = $serverName;
+        $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('discord');
     }
 
     /**
@@ -85,7 +91,7 @@ class TradeDeclineController implements ControllerInterface
                     Discord::sendDM($offeringGmDiscordId, $declineMessage);
                 } catch (\Exception $e) {
                     // Log but don't fail the decline
-                    \Logging\LoggerFactory::getChannel('discord')->error('Discord decline notification failed', ['error' => $e->getMessage()]);
+                    $this->logger->error('Discord decline notification failed', ['error' => $e->getMessage()]);
                 }
             }
         }

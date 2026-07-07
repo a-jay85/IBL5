@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+#
+# analyse-diff — changed-files-only PHPStan for the inner dev loop.
+#
+# Runs PHPStan on only the .php files this branch changed vs a base ref
+# (default: master), routing them through the same `composer run analyse`
+# / `analyse:tests` scripts CI uses — so they inherit the exact
+# --memory-limit / --autoload-file flags (per .claude/rules/phpstan-invocation.md)
+# and honor the baselines. This is an iteration tool, NOT the CI gate:
+# the full-project `composer run analyse` remains authoritative.
+#
+# Usage:
+#   bin/analyse-diff              # diff vs master (merge-base)
+#   bin/analyse-diff <base-ref>   # diff vs another ref, e.g. HEAD~3
+#
+set -euo pipefail
+
+BASE="${1:-master}"
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+APP_DIR="${REPO_ROOT}/ibl5"
+cd "$APP_DIR"
+
+# Changed .php files = union of: committed branch changes (merge-base..HEAD,
+# three-dot); uncommitted tracked edits (staged + unstaged); and untracked new
+# files. The uncommitted + untracked sources are the inner loop's whole point,
+# so `master...` alone would miss your live edits and brand-new classes.
+# Command substitution + here-string (not mapfile / process substitution) for
+# macOS bash 3.2 portability.
+CHANGED="$(
+    {
+        git -C "$REPO_ROOT" diff --name-only "${BASE}..." -- '*.php'
+        git -C "$REPO_ROOT" diff --name-only HEAD -- '*.php'
+        git -C "$REPO_ROOT" ls-files --others --exclude-standard -- '*.php'
+    } | sort -u
+)"
+
+# Classify into the two PHPStan configs by their neon `paths:`:
+#   phpstan.neon        -> classes/, phpstan-rules/   (production)
+#   phpstan-tests.neon  -> tests/                     (test code)
+# Everything else (or deleted files) is skipped -- not in either scope.
+prod=()
+tests=()
+while IFS= read -r f; do
+    [[ -n "$f" ]] || continue
+    # git paths are repo-root-relative (e.g. ibl5/classes/Foo.php); strip the
+    # ibl5/ prefix so they resolve from APP_DIR. Skip anything outside ibl5/.
+    case "$f" in
+        ibl5/*) rel="${f#ibl5/}" ;;
+        *) continue ;;
+    esac
+    # Skip deleted files — PHPStan errors on a path that no longer exists.
+    [[ -f "$rel" ]] || continue
+    case "$rel" in
+        tests/*) tests+=("$rel") ;;
+        classes/*|phpstan-rules/*) prod+=("$rel") ;;
+        *) : ;;  # outside both configs' paths -- nothing to analyse
+    esac
+done <<< "$CHANGED"
+
+if [[ ${#prod[@]} -eq 0 && ${#tests[@]} -eq 0 ]]; then
+    echo "analyse-diff: no analysable .php changes vs ${BASE} — nothing to do."
+    exit 0
+fi
+
+status=0
+
+if [[ ${#prod[@]} -gt 0 ]]; then
+    echo "==> analyse (${#prod[@]} file(s)): ${prod[*]}"
+    composer run analyse -- "${prod[@]}" || status=1
+fi
+
+if [[ ${#tests[@]} -gt 0 ]]; then
+    echo "==> analyse:tests (${#tests[@]} file(s)): ${tests[*]}"
+    composer run analyse:tests -- "${tests[@]}" || status=1
+fi
+
+exit "$status"

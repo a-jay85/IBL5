@@ -1,0 +1,102 @@
+#!/bin/bash
+# Open a local drag-and-drop page to reorder the automouse plan queue.
+#
+# Spawns an ephemeral `php -S` server bound to 127.0.0.1 ONLY, opens the browser,
+# and waits for a single Save (which shells out to `bin/automouse-queue reorder`)
+# or for Ctrl-C / a timeout. The server is always torn down on exit. All queue
+# mutation and validation live in the `reorder` engine — this launcher owns only
+# the server lifecycle.
+#
+# Usage: bin/automouse-queue-reorder-ui
+
+set -euo pipefail
+
+: "${NIGHTLY_DIR:=$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse}"
+: "${PLANS_DIR:=$HOME/.claude/plans}"
+QUEUE_DIR="$NIGHTLY_DIR/queue"
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+QUEUE_CMD="$SCRIPT_DIR/automouse-queue"                # sibling engine
+ROUTER="$SCRIPT_DIR/lib/automouse-reorder-router.php"  # sibling router + page
+
+command -v php >/dev/null 2>&1 || { echo "Error: php not found on PATH." >&2; exit 1; }
+[ -f "$ROUTER" ] || { echo "Error: router not found: $ROUTER" >&2; exit 1; }
+
+# Current run order (ls -1tr = target mtime, oldest-first = runs-first).
+# `|| true`: an empty queue makes `ls *.md` error, which pipefail + set -e would
+# otherwise abort on before the empty-check below.
+order="$(ls -1tr "$QUEUE_DIR"/*.md 2>/dev/null | while IFS= read -r f; do basename "$f"; done || true)"
+if [ -z "$order" ]; then
+    echo "Queue empty, nothing to reorder."
+    exit 0
+fi
+
+# Pick a free loopback port (small TOCTOU window is acceptable for a local tool;
+# the readiness probe below fails cleanly if the bind lost the race).
+pick_port() {
+    local p
+    for _ in $(seq 1 25); do
+        p=$(( (RANDOM % 10000) + 20000 ))          # 20000–29999
+        if ! nc -z 127.0.0.1 "$p" >/dev/null 2>&1; then echo "$p"; return 0; fi
+    done
+    echo "Error: could not find a free loopback port." >&2
+    return 1
+}
+PORT="$(pick_port)"
+
+WORKDIR="$(mktemp -d)"
+SENTINEL="$WORKDIR/result"        # router writes this ONLY on a successful apply
+PHP_PID=""
+cleanup() {
+    [ -n "$PHP_PID" ] && kill "$PHP_PID" 2>/dev/null || true
+    rm -rf "$WORKDIR"
+}
+trap cleanup EXIT INT TERM
+
+# Launch — bind 127.0.0.1 ONLY (never 0.0.0.0 / never bare :PORT).
+AUTOMOUSE_QUEUE_ORDER="$order" \
+AUTOMOUSE_QUEUE_CMD="$QUEUE_CMD" \
+AUTOMOUSE_SENTINEL="$SENTINEL" \
+NIGHTLY_DIR="$NIGHTLY_DIR" PLANS_DIR="$PLANS_DIR" \
+php -S 127.0.0.1:"$PORT" "$ROUTER" >/dev/null 2>&1 &
+PHP_PID=$!
+
+# Wait for the server to accept connections.
+ready=0
+for _ in $(seq 1 40); do
+    if nc -z 127.0.0.1 "$PORT" >/dev/null 2>&1; then ready=1; break; fi
+    if ! kill -0 "$PHP_PID" 2>/dev/null; then echo "Error: server failed to start." >&2; exit 1; fi
+    sleep 0.25
+done
+[ "$ready" = 1 ] || { echo "Error: server not ready on 127.0.0.1:$PORT." >&2; exit 1; }
+
+echo "Reorder UI: http://127.0.0.1:$PORT/  (drag to reorder, click Save; Ctrl-C to cancel)"
+command -v open >/dev/null 2>&1 && open "http://127.0.0.1:$PORT/" || true
+
+# Wait for Save (sentinel appears) or timeout / server death.
+timeout_halfsecs=1200            # ~10 min
+elapsed=0
+while [ ! -f "$SENTINEL" ]; do
+    if ! kill -0 "$PHP_PID" 2>/dev/null; then echo "Error: server exited before Save." >&2; exit 1; fi
+    sleep 0.5
+    elapsed=$((elapsed + 1))
+    if [ "$elapsed" -ge "$timeout_halfsecs" ]; then
+        echo "Timed out waiting for Save; no changes applied." >&2
+        exit 1
+    fi
+done
+
+# Save succeeded. Give php a moment to flush its HTTP response to the browser
+# before the EXIT trap kills it (the router writes the sentinel just before
+# echoing its JSON reply; without this grace the kill can clip that reply and
+# the page shows a spurious "Request failed" despite a successful reorder).
+sleep 0.3
+
+# cleanup() (EXIT trap) kills php + removes WORKDIR.
+echo ""
+echo "New run order (next to run first):"
+i=1
+while IFS= read -r f; do
+    printf "  %2d. %s\n" "$i" "$(basename "$f")"
+    i=$((i + 1))
+done < <(ls -1tr "$QUEUE_DIR"/*.md 2>/dev/null)

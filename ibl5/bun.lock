@@ -8,14 +8,14 @@
         "@axe-core/playwright": "^4.12.1",
         "@lhci/cli": "^0.15.1",
         "@playwright/test": "1.61.1",
-        "@tailwindcss/cli": "^4.3.1",
+        "@tailwindcss/cli": "^4.3.2",
         "browser-sync": "^3.0.4",
-        "eslint": "^10.5.0",
+        "eslint": "^10.6.0",
         "eslint-plugin-playwright": "^2.10.4",
-        "pixelmatch": "^6.0.0",
+        "pixelmatch": "^7.2.0",
         "pngjs": "^7.0.0",
         "tailwindcss": "^4.3.1",
-        "typescript-eslint": "^8.62.0",
+        "typescript-eslint": "^8.62.1",
         "vitest": "^4.1.9",
       },
     },
@@ -782,7 +782,7 @@
 
     "picomatch": ["picomatch@4.0.3", "", {}, "sha512-5gTmgEY/sqK6gFXLIsQNH19lWb4ebPDLA4SdLP7dsWkIXHWlG66oPuVvXSGFPppYZz8ZDZq0dYYrbHfBCVUb1Q=="],
 
-    "pixelmatch": ["pixelmatch@6.0.0", "", { "dependencies": { "pngjs": "^7.0.0" }, "bin": { "pixelmatch": "bin/pixelmatch" } }, "sha512-FYpL4XiIWakTnIqLqvt3uN4L9B3TsuHIvhLILzTiJZMJUsGvmKNeL4H3b6I99LRyerK9W4IuOXw+N28AtRgK2g=="],
+    "pixelmatch": ["pixelmatch@7.2.0", "", { "dependencies": { "pngjs": "^7.0.0" }, "bin": { "pixelmatch": "bin/pixelmatch" } }, "sha512-xhcb4yHu9sM/G7foGzoLtXYcC0zHEaOXXjRKhGup0fw78Nf2Tkiapv4EQyMzrbcmQPsllAI7DbFY2UT7PlI9Pg=="],
 
     "playwright": ["playwright@1.61.1", "", { "dependencies": { "playwright-core": "1.61.1" }, "optionalDependencies": { "fsevents": "2.3.2" }, "bin": { "playwright": "cli.js" } }, "sha512-DWnY5o3YbLWK4GovuAVwpqL+1VwGNdUGrRr++8j8PtQQzvAVZUIMjKQ90fY689sEJZJBbZVw1rXaOKSTitkzPQ=="],
 

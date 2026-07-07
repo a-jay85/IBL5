@@ -568,6 +568,17 @@ jobs:
       - name: Check CSRF form field names
         working-directory: ibl5
         run: bin/check-csrf-field-name
+      # seed-id-uniqueness: seed fixtures load with ON DUPLICATE KEY UPDATE, so a
+      # reused pid/teamid silently clobbers an earlier row instead of failing
+      # (PR #1024). Also catches hand-picked duplicate migration numbers.
+      - name: Check seed ids and migration numbers are unique
+        working-directory: ibl5
+        run: bin/check-seed-id-uniqueness
+      # config-example: CI copies config.php.example verbatim to config.php, so an
+      # empty/zero placeholder becomes the CI test environment (PR #1008).
+      - name: Check config.php.example placeholders
+        working-directory: ibl5
+        run: bin/check-config-example
       # workflow-lint: a job that `uses:` a local ./.github/actions/* action without
       # a prior checkout fails only at runtime, and a composite that drops a pinned
       # behavior contract fails silently. NOTE: NO working-directory — these scripts

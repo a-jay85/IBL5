@@ -55,6 +55,20 @@
 #                              FP-guards: skip tokens whose class is absent from
 #                              ibl5/ (could be Go/engine/external/renamed) and skip
 #                              forward references the plan itself creates.
+#   C  Context budget        — a marathon-sized plan (>= 500 lines OR >= 12
+#                              numbered Step/Phase headings) predicts an
+#                              implementation session that breaches the ~150K
+#                              context dumb-zone. Measured 2026-07-07 on the
+#                              automouse corpus: Opus implementation runs that
+#                              exceeded 150K peak context executed plans of
+#                              median ~566 lines / ~20 phases, while the runs
+#                              that stayed under ran ~100-line plans. The fix is
+#                              /plan Step 2.5 — split into stacked PR-sized
+#                              plans — not padding the plan to pass. A deliberate
+#                              exception (e.g. length is mostly fenced reference
+#                              material) carries a `context-budget:` marker with
+#                              a one-line justification; validity of that
+#                              justification stays Opus judgment.
 #
 # Deliberately NOT linted (kept as /plan Opus judgment): tests-woven-inline,
 # production-comparison classification, test-file-path presence, negative-path
@@ -350,6 +364,22 @@ while IFS= read -r token; do
     fi
 done < <(grep -iE 'reuse' "$PLAN_FILE" \
             | grep -oE '[A-Z][A-Za-z0-9_]*::[a-zA-Z_][A-Za-z0-9_]*')
+
+# ---------------------------------------------------------------------------
+# Gate C: Context budget — a marathon-sized plan predicts a dumb-zone run.
+# ---------------------------------------------------------------------------
+# Size proxies only (a script cannot estimate real context): total line count
+# and numbered Step/Phase headings. Thresholds calibrated 2026-07-07 against the
+# 235-plan corpus (flags ~11%, exactly the marathon tail) and the automouse
+# session data (150K+ Opus runs came from median-566-line plans). The
+# `context-budget:` marker clears a deliberate exception, mirroring `no-adr:`.
+CB_LINES=$(wc -l < "$PLAN_FILE" | tr -d '[:space:]')
+CB_PHASES=$(grep -cE '^#{2,3}[[:space:]]+([Ss]tep|[Pp]hase)[[:space:]]*[0-9]' "$PLAN_FILE")
+if [ "$CB_LINES" -ge 500 ] || [ "$CB_PHASES" -ge 12 ]; then
+    if ! grep -qF 'context-budget:' "$PLAN_FILE"; then
+        viol "[C] marathon-sized plan (${CB_LINES} lines, ${CB_PHASES} numbered phases; flags at >=500 lines or >=12 phases) — split into stacked PR-sized plans (/plan Step 2.5), or justify a deliberate exception with a 'context-budget:' marker"
+    fi
+fi
 
 # ---------------------------------------------------------------------------
 # Report.

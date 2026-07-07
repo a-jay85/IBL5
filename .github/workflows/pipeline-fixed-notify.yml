@@ -31,9 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Join tailnet (ephemeral)
-        # @v3 is the current major; pinning to a full commit SHA is the hardened
-        # option (supply-chain: an immutable ref cannot be re-tagged under you).
-        uses: tailscale/github-action@v3
+        uses: tailscale/github-action@6cae46e2d796f265265cfcf628b72a32b4d7cade # v3.3.0
         with:
           # PRIMARY auth path: OAuth client pair. The node is ephemeral and is
           # torn down when the job ends; `tags:` scopes it to least privilege.

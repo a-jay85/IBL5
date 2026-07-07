@@ -1,6 +1,6 @@
 ---
-description: Triage every non-trivial unit of work as ad-hoc vs /plan before starting, with an ad-hoc safety mirror; the gateway that feeds the deployment funnel (ADR-0067).
-last_verified: 2026-07-01
+description: Triage every non-trivial unit of work as ad-hoc vs /plan before starting, with an ad-hoc safety mirror and Sonnet execution-routing for resolved, machine-verifiable edit chunks; the gateway that feeds the deployment funnel (ADR-0067).
+last_verified: 2026-07-07
 ---
 
 # Work Triage Rule
@@ -32,6 +32,23 @@ Even when the bar says ad-hoc, run a quick safety check — the same surfaces `/
 - a property needing **subjective human judgment** to confirm,
 
 then prefer `/plan`, so the defense and its verification are designed up front. Whatever still ships ad-hoc is caught at PR time by `/post-plan` Phase 6.5 condition (9) — but designing it in the plan beats relying on the backstop.
+
+## Execution routing: an ad-hoc verdict does not mean Opus edits inline
+
+The plan-vs-ad-hoc verdict decides *whether to plan* — it does **not** decide *who executes the edits*. An ad-hoc verdict silently defaulting to "the Opus session implements inline" is the measured leak (2026-07-07 usage audit: ~90% of Opus main-thread tool calls were mechanical Bash/Read/Edit/Write, and 44% of interactive Opus sessions breached 150K peak context — the dumb-zone the delegation rules exist to prevent).
+
+**Before making a chunk of edits, route the execution.** The chunk is **Sonnet-executable** when both hold — the same criterion as `/plan` Step 4 gate 13:
+
+- **Design resolved** — you could write the full recipe now (files, exact changes, order); no edit re-opens a judgment call.
+- **Machine-verifiable** — a test/linter/script exists (or ships with the chunk) that fails on a wrong edit.
+
+When both hold, **hand off by default — do not pause for permission**: state the routing call in one line ("execution is Sonnet-suitable — delegating"), then spawn **one** Sonnet sub-agent with a delegation-packet-shaped prompt (scope, exact recipe, self-verify command it must run before returning, thin one-line report-back — the format in `.claude/skills/plan/SKILL.md` § Delegation packets). Design, the routing call itself, and final review of the returned diff stay on Opus — this routes *execution*, never understanding.
+
+Stay inline (Opus edits directly) only when:
+- the edits and the design are genuinely **entangled** — writing the recipe would mean making each edit-level judgment anyway, so the handoff buys nothing; or
+- the chunk is **trivial** — a one-or-two-edit change where the sub-agent's fixed spawn cost (~3–5K tokens, `agent-tiering.md` § Skip the Agent) exceeds the work being moved.
+
+Either way the routing decision is **stated, not silent** — one line, like the triage verdict. The user should see which way it went and be able to override in the moment.
 
 ## Calibration
 

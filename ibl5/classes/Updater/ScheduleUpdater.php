@@ -46,11 +46,17 @@ class ScheduleUpdater extends \BaseMysqliRepository {
 
     private string $basePath;
 
-    public function __construct(\mysqli $db, Season $season, ?LeagueContext $leagueContext = null, ?JsbSourceResolverInterface $sourceResolver = null, ?string $basePath = null) {
+    /**
+     * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('db').
+     */
+    private \Psr\Log\LoggerInterface $channelLogger;
+
+    public function __construct(\mysqli $db, Season $season, ?LeagueContext $leagueContext = null, ?JsbSourceResolverInterface $sourceResolver = null, ?string $basePath = null, ?\Psr\Log\LoggerInterface $logger = null) {
         parent::__construct($db, $leagueContext);
         $this->season = $season;
         $this->sourceResolver = $sourceResolver;
         $this->basePath = $basePath ?? \Bootstrap\AppPaths::root();
+        $this->channelLogger = $logger ?? \Logging\LoggerFactory::getChannel('db');
     }
 
     /**
@@ -325,7 +331,7 @@ class ScheduleUpdater extends \BaseMysqliRepository {
                     $log .= "Inserted game: {$visitorName} @ {$homeName} on {$date}<br>";
                 } catch (\Exception $e) {
                     $errorMessage = "Failed to insert schedule data for game between {$visitorName} and {$homeName}: " . $e->getMessage();
-                    \Logging\LoggerFactory::getChannel('db')->error('ScheduleUpdater database insert error', ['error' => $errorMessage]);
+                    $this->channelLogger->error('ScheduleUpdater database insert error', ['error' => $errorMessage]);
                     echo '<strong class="ibl-form-error">Script Error: Failed to insert schedule data for game between ' . HtmlSanitizer::e($visitorName) . ' and ' . HtmlSanitizer::e($homeName) . '.</strong>';
                     throw new \RuntimeException($errorMessage, 1002);
                 }

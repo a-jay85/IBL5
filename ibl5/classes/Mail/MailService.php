@@ -26,6 +26,11 @@ class MailService implements MailServiceInterface
     private array $smtpConfig;
     private string $defaultFromName;
 
+    /**
+     * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('mail').
+     */
+    private \Psr\Log\LoggerInterface $logger;
+
     private const VALID_TRANSPORTS = ['smtp', 'mail', 'log'];
 
     private const DEFAULT_CONFIG = [
@@ -44,7 +49,7 @@ class MailService implements MailServiceInterface
     /**
      * @param MailConfig $config
      */
-    public function __construct(array $config)
+    public function __construct(array $config, ?\Psr\Log\LoggerInterface $logger = null)
     {
         $transport = $config['transport'] ?? 'log';
         if (!in_array($transport, self::VALID_TRANSPORTS, true)) {
@@ -65,6 +70,8 @@ class MailService implements MailServiceInterface
         $this->defaultFromName = is_string($config['default_from_name'] ?? null)
             ? $config['default_from_name']
             : self::DEFAULT_CONFIG['default_from_name'];
+
+        $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('mail');
     }
 
     /**
@@ -184,7 +191,7 @@ class MailService implements MailServiceInterface
 
             return $mail->send();
         } catch (PHPMailerException $e) {
-            \Logging\LoggerFactory::getChannel('mail')->error('SMTP send failed', ['error' => $e->getMessage()]);
+            $this->logger->error('SMTP send failed', ['error' => $e->getMessage()]);
             return false;
         }
     }
@@ -200,7 +207,7 @@ class MailService implements MailServiceInterface
 
     private function sendViaLog(string $to, string $subject, string $body, string $fromEmail): bool
     {
-        \Logging\LoggerFactory::getChannel('mail')->info('LOG transport — mail sent', [
+        $this->logger->info('LOG transport — mail sent', [
             'to' => $to,
             'from' => $fromEmail,
             'subject' => $subject,

@@ -112,7 +112,6 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
                     ['label' => 'Prime Time Football', 'url' => 'http://www.thakfu.com/ptf/index.php', 'external' => true],
                     ['label' => 'Activity Tracker', 'url' => 'modules.php?name=ActivityTracker'],
                     ['label' => 'Topics (News)', 'url' => 'modules.php?name=Topics'],
-                    ['label' => 'Trade Block', 'url' => 'modules.php?name=TradeBlock'],
                     $this->config->isLoggedIn && $this->config->teamId !== null
                         ? ['label' => 'GM Contact List', 'url' => 'modules.php?name=GMContactList']
                         : null,
@@ -208,7 +207,6 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
             ['label' => 'Next Sim', 'url' => 'modules.php?name=NextSim'],
             ['label' => 'Depth Chart Entry', 'url' => 'modules.php?name=DepthChartEntry'],
             ['label' => 'Trading', 'url' => 'modules.php?name=Trading&op=reviewtrade'],
-            ['label' => 'Trade Block', 'url' => 'modules.php?name=TradeBlock&op=edit'],
             ['label' => 'Voting', 'url' => 'modules.php?name=Voting'],
         ];
 

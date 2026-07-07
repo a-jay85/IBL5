@@ -21,11 +21,17 @@ class FreeAgencyController
     private \Utilities\NukeCompat $nukeCompat;
     private AuthServiceInterface $authService;
 
+    /**
+     * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('audit').
+     */
+    private \Psr\Log\LoggerInterface $logger;
+
     public function __construct(
         \mysqli $db,
         TeamIdentityRepositoryInterface $commonRepository,
         AuthServiceInterface $authService,
-        ?\Utilities\NukeCompat $nukeCompat = null
+        ?\Utilities\NukeCompat $nukeCompat = null,
+        ?\Psr\Log\LoggerInterface $logger = null
     ) {
         $this->db = $db;
         $this->commonRepository = $commonRepository;
@@ -36,6 +42,7 @@ class FreeAgencyController
         $this->view = new FreeAgencyView($commonRepository);
         $this->processor = new FreeAgencyProcessor($db, $commonRepository);
         $this->nukeCompat = $nukeCompat ?? new \Utilities\NukeCompat();
+        $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('audit');
     }
 
     /**
@@ -115,7 +122,7 @@ class FreeAgencyController
             $postData = $_POST;
             $result = $this->processor->processOfferSubmission($postData);
         } catch (\Throwable $e) {
-            \Logging\LoggerFactory::getChannel('audit')->error('fa_offer_error', [
+            $this->logger->error('fa_offer_error', [
                 'error' => $e->getMessage(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
@@ -171,7 +178,7 @@ class FreeAgencyController
             $teamName = isset($_POST['teamname']) && is_string($_POST['teamname']) ? $_POST['teamname'] : '';
             $this->processor->deleteOffers($teamName, $playerID);
         } catch (\Throwable $e) {
-            \Logging\LoggerFactory::getChannel('audit')->error('fa_delete_error', [
+            $this->logger->error('fa_delete_error', [
                 'error' => $e->getMessage(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),

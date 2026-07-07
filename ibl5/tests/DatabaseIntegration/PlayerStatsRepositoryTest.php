@@ -338,4 +338,134 @@ class PlayerStatsRepositoryTest extends DatabaseTestCase
         }
         self::assertTrue($found, 'DNP row must be included in getBoxScoresBetweenDates (include-DNP site)');
     }
+
+    // ── DNP exclusion from career/per-season averages (maintenance-40b) ──
+    //
+    // Career per-game averages and games counts must exclude DNP rows
+    // (game_min = 0). A per-game average = total ÷ games-played, never
+    // ÷ total roster rows; DNP rows are bench appearances, not games played.
+    // The fix adds BaseMysqliRepository::playedCondition('bs') (game_min > 0)
+    // to buildCareerAveragesQuery() and buildPerSeasonStatsQuery().
+    //
+    // The CI seed has no game_min=0 rows, so these tests self-seed a
+    // 1-played + 1-DNP block (mirroring testGetBoxScoresBetweenDatesIncludesDnpRows).
+
+    public function testGetPlayoffCareerAveragesExcludeDnpRows(): void
+    {
+        $pid = 200000080;
+        $name = 'DB DNP Avg';
+        $this->insertTestPlayer($pid, $name);
+        $this->insertFranchiseSeasonRow(1, 2098, 'Metros');
+
+        // Played playoff game: 30 min, 8 pts (game_2gm 4 → 4·2), reb 6 (orb 2 + drb 4)
+        $this->insertPlayerBoxscoreRow(
+            '2098-06-10', $pid, $name, 'PG', 2, 1, 1,
+            minutes: 30, points2m: 4, points2a: 8,
+            ftm: 0, fta: 0, points3m: 0, points3a: 0,
+            orb: 2, drb: 4, ast: 0, stl: 0, tov: 0, blk: 0, pf: 0
+        );
+        // DNP playoff game: every stat 0
+        $this->insertPlayerBoxscoreRow(
+            '2098-06-12', $pid, $name, 'PG', 2, 1, 1,
+            minutes: 0, points2m: 0, points2a: 0,
+            ftm: 0, fta: 0, points3m: 0, points3a: 0,
+            orb: 0, drb: 0, ast: 0, stl: 0, tov: 0, blk: 0, pf: 0
+        );
+
+        $result = $this->repo->getPlayoffCareerAverages($name);
+
+        self::assertNotNull($result);
+        // DNP row excluded: games=1 (not 2), averages over the played game only.
+        // (Buggy pre-fix values were games=2, MIN=15.0, PTS=4.0, REB=3.0.)
+        self::assertSame(1, $result['games']);
+        self::assertSame(30.0, (float) $result['minutes']);
+        self::assertSame(8.0, (float) $result['pts']);
+        self::assertSame(6.0, (float) $result['reb']);
+    }
+
+    public function testGetPlayoffStatsExcludesDnpRowsFromGamesCount(): void
+    {
+        $pid = 200000081;
+        $name = 'DB DNP Szn';
+        $this->insertTestPlayer($pid, $name);
+        $this->insertFranchiseSeasonRow(1, 2098, 'Metros');
+
+        // One played + one DNP playoff game in the same season.
+        $this->insertPlayerBoxscoreRow(
+            '2098-06-10', $pid, $name, 'PG', 2, 1, 1,
+            minutes: 30, points2m: 4, points2a: 8,
+            ftm: 0, fta: 0, points3m: 0, points3a: 0,
+            orb: 2, drb: 4, ast: 0, stl: 0, tov: 0, blk: 0, pf: 0
+        );
+        $this->insertPlayerBoxscoreRow(
+            '2098-06-12', $pid, $name, 'PG', 2, 1, 1,
+            minutes: 0, points2m: 0, points2a: 0,
+            ftm: 0, fta: 0, points3m: 0, points3a: 0,
+            orb: 0, drb: 0, ast: 0, stl: 0, tov: 0, blk: 0, pf: 0
+        );
+
+        $result = $this->repo->getPlayoffStats($name);
+
+        self::assertCount(1, $result);
+        // SUM-based per-season row reflects only the played game (games=1, not 2).
+        self::assertSame(1, $result[0]['games']);
+        self::assertSame(30, $result[0]['minutes']);
+        self::assertSame(8, $result[0]['pts']);
+    }
+
+    public function testGetPlayoffCareerAveragesReturnsNullForAllDnpPlayer(): void
+    {
+        $pid = 200000082;
+        $name = 'DB All DNP';
+        $this->insertTestPlayer($pid, $name);
+        $this->insertFranchiseSeasonRow(1, 2098, 'Metros');
+
+        // Only DNP playoff rows — after the filter, no rows remain → no GROUP BY row.
+        $this->insertPlayerBoxscoreRow(
+            '2098-06-10', $pid, $name, 'PG', 2, 1, 1,
+            minutes: 0, points2m: 0, points2a: 0,
+            ftm: 0, fta: 0, points3m: 0, points3a: 0,
+            orb: 0, drb: 0, ast: 0, stl: 0, tov: 0, blk: 0, pf: 0
+        );
+        $this->insertPlayerBoxscoreRow(
+            '2098-06-12', $pid, $name, 'PG', 2, 1, 1,
+            minutes: 0, points2m: 0, points2a: 0,
+            ftm: 0, fta: 0, points3m: 0, points3a: 0,
+            orb: 0, drb: 0, ast: 0, stl: 0, tov: 0, blk: 0, pf: 0
+        );
+
+        // All rows filtered out → null (not a row with games=0 and zeroed averages).
+        self::assertNull($this->repo->getPlayoffCareerAverages($name));
+    }
+
+    public function testGetPlayoffCareerAveragesUnaffectedForPlayedOnlyPlayer(): void
+    {
+        $pid = 200000083;
+        $name = 'DB Played Only';
+        $this->insertTestPlayer($pid, $name);
+        $this->insertFranchiseSeasonRow(1, 2098, 'Metros');
+
+        // Two played playoff games, no DNP rows — the filter is a no-op here.
+        $this->insertPlayerBoxscoreRow(
+            '2098-06-10', $pid, $name, 'PG', 2, 1, 1,
+            minutes: 30, points2m: 4, points2a: 8,
+            ftm: 0, fta: 0, points3m: 0, points3a: 0,
+            orb: 2, drb: 4, ast: 0, stl: 0, tov: 0, blk: 0, pf: 0
+        );
+        $this->insertPlayerBoxscoreRow(
+            '2098-06-12', $pid, $name, 'PG', 2, 1, 1,
+            minutes: 20, points2m: 6, points2a: 10,
+            ftm: 0, fta: 0, points3m: 0, points3a: 0,
+            orb: 0, drb: 6, ast: 0, stl: 0, tov: 0, blk: 0, pf: 0
+        );
+
+        $result = $this->repo->getPlayoffCareerAverages($name);
+
+        self::assertNotNull($result);
+        // Both games count; averages over both: games=2, MIN=25, PTS=(8+12)/2=10, REB=(6+6)/2=6.
+        self::assertSame(2, $result['games']);
+        self::assertSame(25.0, (float) $result['minutes']);
+        self::assertSame(10.0, (float) $result['pts']);
+        self::assertSame(6.0, (float) $result['reb']);
+    }
 }

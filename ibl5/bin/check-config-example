@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# bin/check-config-example — CI gate for config.php.example placeholder quality.
+#
+# CI copies config.php.example verbatim to config.php before running the test
+# suites (tests.yml), so every constant's placeholder value IS the CI test
+# environment. An empty or zero literal breaks tests that assert on the
+# constant's behavior: PR #1008 shipped define('IBL6_BASE_URL', '') and broke
+# BoxScoreUrlBuilderTest in CI. A getenv() fallback that defaults to '' is
+# fine (the env var supplies the value; fail-closed constants rely on this).
+#
+# Run from ibl5/: bin/check-config-example
+
+bad=$(grep -nE "define\([[:space:]]*['\"][A-Z0-9_]+['\"][[:space:]]*,[[:space:]]*(''|\"\"|0)[[:space:]]*\)" config.php.example || true)
+
+if [ -n "$bad" ]; then
+  echo "✗ Empty/zero literal placeholder in config.php.example:" >&2
+  echo "$bad" >&2
+  echo "" >&2
+  echo "CI copies config.php.example verbatim to config.php, so this value is" >&2
+  echo "what every CI test runs against (PR #1008 broke BoxScoreUrlBuilderTest" >&2
+  echo "this way). Use a realistic non-empty placeholder, or an env fallback:" >&2
+  echo "  define('MY_CONST', getenv('MY_CONST') ?: 'realistic-default');" >&2
+  exit 1
+fi
+
+echo "✓ config.php.example placeholders OK"

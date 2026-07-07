@@ -1,0 +1,178 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * bin/check-seed-id-uniqueness — CI gate against silently-clobbering id reuse.
+ *
+ * Seed fixtures load with `INSERT ... ON DUPLICATE KEY UPDATE`, so a reused id
+ * does NOT fail at load time — the second row silently overwrites the first.
+ * PR #1024 reused pid 200000030 in ci-seed.sql and renamed/deactivated an
+ * unrelated test player, failing an unrelated-looking spec. This check parses
+ * the seed INSERT statements and fails on any duplicated id value for tables
+ * where a collision is destructive.
+ *
+ * Also rejects duplicate numeric prefixes among ibl5/migrations/*.sql —
+ * migration numbers must come from bin/next-migration, never hand-picked.
+ *
+ * Run from ibl5/: bin/check-seed-id-uniqueness
+ */
+
+// table => id column, per seed file (relative to ibl5/).
+$seedChecks = [
+    'tests/e2e/fixtures/ci-seed.sql' => ['ibl_plr' => 'pid', 'ibl_team_info' => 'teamid'],
+    'tests/DatabaseIntegration/Fixtures/db-seed.sql' => ['ibl_plr' => 'pid', 'ibl_team_info' => 'teamid'],
+];
+
+// Shipped before this check existed; migrations are tracked by filename, so
+// renaming either file would make prod re-run it. Grandfathered, not a license.
+$migrationNumberAllowlist = ['046'];
+
+// Pre-existing duplicates this check discovered on its own introduction:
+// pid 30 ('Spurs Guard' + 'Extension Vet') and pid 31 ('Flames Forward' +
+// 'Draft Rookie 2026'). The later INSERT's ON DUPLICATE KEY UPDATE clause
+// overlays the earlier row, so the live seeded row is a column-level MERGE of
+// both — specs currently pass against that merged state, and untangling them
+// means repointing pids and sweeping every spec that references the merged
+// row. Grandfathered until that cleanup lands; do NOT add new entries.
+$seedIdAllowlist = [
+    'tests/e2e/fixtures/ci-seed.sql' => ['ibl_plr' => ['30', '31']],
+];
+
+/**
+ * Split a VALUES body into tuples, respecting quoted strings and nesting.
+ * Returns arrays of raw field strings.
+ *
+ * @return list<list<string>>
+ */
+function parseTuples(string $sql, int $offset): array
+{
+    $tuples = [];
+    $fields = [];
+    $current = '';
+    $depth = 0;
+    $inString = false;
+    $len = strlen($sql);
+
+    for ($i = $offset; $i < $len; $i++) {
+        $c = $sql[$i];
+        if ($inString) {
+            if ($c === '\\') {
+                $current .= $c . ($sql[$i + 1] ?? '');
+                $i++;
+            } elseif ($c === "'" && ($sql[$i + 1] ?? '') === "'") {
+                $current .= "''";
+                $i++;
+            } else {
+                $current .= $c;
+                if ($c === "'") {
+                    $inString = false;
+                }
+            }
+            continue;
+        }
+        if ($c === "'") {
+            $inString = true;
+            $current .= $c;
+        } elseif ($c === '(') {
+            $depth++;
+            if ($depth === 1) {
+                $current = ''; // discard inter-tuple separators collected at depth 0
+            } else {
+                $current .= $c;
+            }
+        } elseif ($c === ')') {
+            $depth--;
+            if ($depth === 0) {
+                $fields[] = trim($current);
+                $current = '';
+                $tuples[] = $fields;
+                $fields = [];
+            } else {
+                $current .= $c;
+            }
+        } elseif ($c === ',' && $depth === 1) {
+            $fields[] = trim($current);
+            $current = '';
+        } elseif ($depth === 0 && ($c === ';' || substr_compare($sql, 'ON DUPLICATE', $i, 12, true) === 0)) {
+            // End of this INSERT's tuple list. Stopping before the ON DUPLICATE KEY
+            // UPDATE tail matters: its VALUES(col) parens would otherwise parse as tuples.
+            break;
+        } else {
+            $current .= $c;
+        }
+    }
+
+    return $tuples;
+}
+
+$failures = [];
+
+foreach ($seedChecks as $file => $tables) {
+    if (!is_file($file)) {
+        fwrite(STDERR, "✗ Seed file not found: {$file} (update bin/check-seed-id-uniqueness if it moved)\n");
+        exit(1);
+    }
+    $sql = (string) file_get_contents($file);
+
+    foreach ($tables as $table => $idColumn) {
+        $seen = [];
+        preg_match_all(
+            '/INSERT\s+INTO\s+`?' . preg_quote($table, '/') . '`?\s*\(([^)]*)\)\s*VALUES/i',
+            $sql,
+            $inserts,
+            PREG_OFFSET_CAPTURE | PREG_SET_ORDER
+        );
+        foreach ($inserts as $insert) {
+            $columns = array_map(
+                static fn (string $c): string => strtolower(trim($c, " \t\r\n`")),
+                explode(',', $insert[1][0])
+            );
+            $idIndex = array_search($idColumn, $columns, true);
+            if ($idIndex === false) {
+                continue; // Statement doesn't set the id column explicitly.
+            }
+            $bodyOffset = $insert[0][1] + strlen($insert[0][0]);
+            foreach (parseTuples($sql, $bodyOffset) as $tuple) {
+                $id = trim($tuple[$idIndex] ?? '', " '\"");
+                if ($id === '') {
+                    continue;
+                }
+                $allowed = $seedIdAllowlist[$file][$table] ?? [];
+                if (isset($seen[$id]) && !in_array($id, $allowed, true)) {
+                    $failures[] = "{$file}: {$table}.{$idColumn} = {$id} appears more than once";
+                }
+                $seen[$id] = true;
+            }
+        }
+    }
+}
+
+// Migration number uniqueness (ibl5/migrations/NNN_*.sql).
+$byNumber = [];
+foreach (glob('migrations/*.sql') ?: [] as $path) {
+    if (preg_match('/^(\d+)_/', basename($path), $m) === 1) {
+        $byNumber[$m[1]][] = basename($path);
+    }
+}
+foreach ($byNumber as $number => $names) {
+    if (count($names) > 1 && !in_array((string) $number, $migrationNumberAllowlist, true)) {
+        $failures[] = 'migrations: number ' . $number . ' used by ' . implode(', ', $names)
+            . ' — pick the number with bin/next-migration';
+    }
+}
+
+if ($failures !== []) {
+    fwrite(STDERR, "✗ Duplicate id values found:\n");
+    foreach ($failures as $failure) {
+        fwrite(STDERR, "  - {$failure}\n");
+    }
+    fwrite(STDERR, "\nSeed rows load with ON DUPLICATE KEY UPDATE, so a reused id silently\n");
+    fwrite(STDERR, "overwrites the earlier row instead of failing (see PR #1024). Pick a\n");
+    fwrite(STDERR, "genuinely free id: grep the seed file for the value first, or take\n");
+    fwrite(STDERR, "max(existing)+1. For migrations, use bin/next-migration.\n");
+    exit(1);
+}
+
+echo "✓ Seed ids and migration numbers are unique\n";

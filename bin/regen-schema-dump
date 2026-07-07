@@ -71,7 +71,7 @@ mysqldump -h "$HOST" -u "$USER" -p"$PASS" \
     --no-data --no-create-db --skip-comments --skip-triggers \
     --ignore-table="$DB".migrations \
     "$DB" 2> >(grep -v 'Using a password' >&2) \
-    | sed 's/DEFINER=`[^`]*`@`[^`]*`//g' \
+    | sed "s/DEFINER=\`[^\`]*\`@\`[^\`]*\`//g" \
     | sed -E 's/ AUTO_INCREMENT=[0-9]+//g' \
     | sed "s/\`$DB\`\.//g" \
     > "$OUT.tmp"

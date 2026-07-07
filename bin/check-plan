@@ -8,8 +8,11 @@
 # collapse to "run bin/check-plan, fix what it reports" instead of having the
 # Opus orchestrator re-execute them by reading ~40 lines of instructions every
 # invocation. The JUDGMENT gates (negative-path coverage, hot-file extraction,
-# security-surface resolution, impl_model / auto_merge risk) stay in /plan —
-# they need reasoning a script cannot do.
+# security-surface resolution, auto_merge risk) stay in /plan — they need
+# reasoning a script cannot do. impl_model risk used to be on that list too;
+# gate 13 below mechanizes the consistency half of it (does the marker match
+# the matrix?) — whether Sonnet is *trustworthy* for a given plan's content is
+# still Opus judgment at authoring time.
 #
 # Gates implemented (numbering mirrors .claude/skills/plan/SKILL.md Step 4):
 #   1  Matrix exists        — the verification matrix header is present.
@@ -29,6 +32,14 @@
 #                                a new ibl5/migrations/*.sql only when the plan
 #                                text mentions DROP TABLE/COLUMN/INDEX; a
 #                                require/require-dev add to ibl5/composer.json.
+#  13  impl_model consistency — a Truly-manual matrix row forbids
+#                              `impl_model: sonnet`; a zero-manual matrix
+#                              requires a deliberate `impl_model:` marker
+#                              (sonnet, or an explicit opus). Shared with
+#                              bin/automouse-queue's queue-time backstop via
+#                              bin/lib/plan-model-consistency so the two call
+#                              sites cannot drift — see that script for the
+#                              full rule table.
 #
 # Two parts of /plan's Step 4 are DELIBERATELY left in /plan as Opus judgment,
 # because a sweep over the real plan corpus proved them not false-positive-free:
@@ -72,11 +83,12 @@
 #
 # Deliberately NOT linted (kept as /plan Opus judgment): tests-woven-inline,
 # production-comparison classification, test-file-path presence, negative-path
-# coverage, hot-file extraction, security surface,
-# impl_model / auto_merge risk. Edit-anchor snippets are not linted: the real
-# plan corpus quotes them as drifting descriptions ("the Options struct", with
-# file:line refs that go stale), not verbatim lines, so a grep-the-snippet check
-# would false-positive constantly.
+# coverage, hot-file extraction, security surface, auto_merge risk (whether a
+# declared hold's rationale is actually valid — gate H below only checks a
+# justification section is PRESENT). Edit-anchor snippets are not linted: the
+# real plan corpus quotes them as drifting descriptions ("the Options struct",
+# with file:line refs that go stale), not verbatim lines, so a grep-the-snippet
+# check would false-positive constantly.
 #
 # Exit codes: 0 = clean, 1 = one or more violations (printed, prefixed by gate),
 #             2 = usage error / plan file missing.
@@ -289,6 +301,20 @@ if grep -iE 'composer\.json' "$PLAN_FILE" | grep -qiE '\brequire(-dev)?\b'; then
     if [ "$GATE8_RESOLVED" -eq 0 ]; then
         viol "[8] decision-trigger surface ibl5/composer.json (new-dependency) added without an ADR step or no-adr: marker"
     fi
+fi
+
+# ---------------------------------------------------------------------------
+# Gate 13: impl_model <-> Verification Matrix consistency.
+# ---------------------------------------------------------------------------
+# Delegates to bin/lib/plan-model-consistency, which BOTH this gate and
+# bin/automouse-queue's queue-time backstop call — kept in one place so the
+# two cannot drift. That script already skips silently (exit 0, no output)
+# when the plan has no Verification Matrix at all, so this gate never
+# double-reports gate 1's failure.
+GATE13_MSG=$("$SCRIPT_DIR/lib/plan-model-consistency" "$PLAN_FILE")
+GATE13_RC=$?
+if [ "$GATE13_RC" -eq 1 ]; then
+    viol "[13] ${GATE13_MSG}"
 fi
 
 # ---------------------------------------------------------------------------

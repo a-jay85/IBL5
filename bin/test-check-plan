@@ -38,8 +38,21 @@ assert() {
     fi
 }
 
+# Gate 13 (impl_model <-> matrix consistency, assert block further below)
+# requires a deliberate `impl_model:` marker whenever the matrix has zero
+# Truly-manual rows (rule b). Every fixture in this file that predates gate 13
+# and uses a clean 0-manual matrix with no frontmatter needs this minimal
+# prefix so its ORIGINAL gate-under-test attribution survives — exit 0/1 stays
+# attributable to what the fixture's own comment says it tests, not
+# reattributed to gate 13. FM starts at true line 1 (`---` is FM's first byte)
+# so it parses as real frontmatter wherever it is prepended.
+FM='---
+impl_model: sonnet
+---
+'
+
 # A minimal well-formed matrix passes (exit 0). Baseline / no false positives.
-assert "clean-minimal" 0 '
+assert "clean-minimal" 0 "$FM"'
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---------------|-----------|--------|---------------------|
 | 1 | cap rejects over-cap trade | PHPUnit | pre-impl | `tests/Trade/TradeValidatorTest.php` |
@@ -51,7 +64,7 @@ assert "no-matrix" 1 'Implementation steps only. No verification table here.'
 
 # Gate 1: 6-column `| PR |` header variant is still recognized as a matrix —
 # combined with valid rows it passes (exit 0). Regression for header detection.
-assert "pr-column-header" 0 '
+assert "pr-column-header" 0 "$FM"'
 | # | What to verify | Test type | Timing | Test file / location | PR |
 |---|---------------|-----------|--------|---------------------|----|
 | 1 | thing works | PHPUnit | post-impl | `tests/X.php` | 1 |
@@ -61,7 +74,7 @@ assert "pr-column-header" 0 '
 # corpus proved the type column open-ended (Go-archive-diagnostic, Documented
 # (domain rule), read-before-cut). So a row with an unusual type must NOT flag
 # on type grounds (exit 0). Left as /plan Opus judgment.
-assert "open-type-not-flagged" 0 '
+assert "open-type-not-flagged" 0 "$FM"'
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---------------|-----------|--------|---------------------|
 | 1 | engine attribution | Go-archive-diagnostic | post-impl | `engine/x_test.go` |
@@ -84,14 +97,14 @@ assert "real-manual-ok" 0 '
 '
 
 # Gate 7: a DECIDE token in a table row must flag (exit 1).
-assert "unresolved-decide" 1 '
+assert "unresolved-decide" 1 "$FM"'
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---------------|-----------|--------|---------------------|
 | 1 | DECIDE which validator to call | PHPUnit | post-impl | `tests/X.php` |
 '
 
 # Gate 7: TBD token likewise (exit 1).
-assert "unresolved-tbd" 1 '
+assert "unresolved-tbd" 1 "$FM"'
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---------------|-----------|--------|---------------------|
 | 1 | TBD which validator | PHPUnit | post-impl | `tests/X.php` |
@@ -100,7 +113,7 @@ assert "unresolved-tbd" 1 '
 # Gate 7: a benign "(or ...)" aside must NOT flag (exit 0). The corpus is full of
 # these (`≤5 (or 0 ideally)`, `(or extend existing)`); "(or " is left to /plan
 # judgment precisely so they do not false-positive here.
-assert "benign-or-aside-ok" 0 '
+assert "benign-or-aside-ok" 0 "$FM"'
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---------------|-----------|--------|---------------------|
 | 1 | baseline count is ≤ 5 (or 0 ideally) | CLI-executable | post-impl | `grep -c X file` |
@@ -109,7 +122,7 @@ assert "benign-or-aside-ok" 0 '
 
 # Reuse: a Class::method whose class is absent from ibl5/ (could be Go/external)
 # must NOT flag — the false-positive guard (exit 0).
-assert "reuse-unknown-class-ok" 0 '
+assert "reuse-unknown-class-ok" 0 "$FM"'
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---------------|-----------|--------|---------------------|
 | 1 | x | PHPUnit | post-impl | `tests/X.php` |
@@ -119,7 +132,7 @@ assert "reuse-unknown-class-ok" 0 '
 
 # Reuse: a forward-referenced method the plan creates must NOT flag (exit 0),
 # even if it does not exist yet.
-assert "reuse-forward-ref-ok" 0 '
+assert "reuse-forward-ref-ok" 0 "$FM"'
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---------------|-----------|--------|---------------------|
 | 1 | x | PHPUnit | post-impl | `tests/X.php` |
@@ -130,7 +143,7 @@ Create a new method `TotallyMadeUpClass::brandNewMethod()` and **reuse** it late
 # Reuse: a `Class::SCREAMING_CASE` token is a class CONSTANT, not a method — it
 # must NOT be method-existence-checked (exit 0). Regression for the corpus false
 # positive on `EngineBundleService::DEFAULT_GAME_TYPE`.
-assert "reuse-constant-not-method" 0 '
+assert "reuse-constant-not-method" 0 "$FM"'
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---------------|-----------|--------|---------------------|
 | 1 | x | PHPUnit | post-impl | `tests/X.php` |
@@ -153,26 +166,26 @@ M='
 '
 
 # Gate 8: a new `bin/foo` plus an ADR-step path resolves the trigger (exit 0).
-assert "gate8-bin-with-adr" 0 "$M"'
+assert "gate8-bin-with-adr" 0 "$FM$M"'
 Phase 1 — Create `bin/foo` to do the thing.
 Phase 2 — author the ADR `ibl5/docs/decisions/0099-x.md`.
 '
 
 # Gate 8: a new `.claude/rules/x.md` plus a `no-adr:` bypass marker resolves (exit 0).
-assert "gate8-bypass-marker" 0 "$M"'
+assert "gate8-bypass-marker" 0 "$FM$M"'
 Phase 1 — Create a new file `.claude/rules/x.md`.
 Resolution: no-adr: documented in the existing ADR-0001 already.
 '
 
 # Gate 8: a new `.claude/rules/x.md` with no resolution must flag (exit 1).
 # Load-bearing negative — always-flag path.
-assert "gate8-rule-no-resolution" 1 "$M"'
+assert "gate8-rule-no-resolution" 1 "$FM$M"'
 Phase 1 — Create `.claude/rules/x.md` for the new convention.
 '
 
 # Gate 8: a new `bin/foo` with no resolution must flag (exit 1).
 # Load-bearing negative — conservative bin trigger.
-assert "gate8-bin-no-resolution" 1 "$M"'
+assert "gate8-bin-no-resolution" 1 "$FM$M"'
 Phase 1 — Create `bin/foo` for the new tool.
 '
 
@@ -180,7 +193,7 @@ Phase 1 — Create `bin/foo` for the new tool.
 # verb anywhere, no resolution) must NOT flag (exit 0). This is the discriminating
 # regression for the creation-context include-filter: with `post-impl` in the cue
 # this fixture exits 1; the include-filter deliberately excludes `post-impl`.
-assert "gate8-post-impl-row-not-created" 0 '
+assert "gate8-post-impl-row-not-created" 0 "$FM"'
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---------------|-----------|--------|---------------------|
 | 1 | workflow runs green | CLI-executable | post-impl | `.github/workflows/tests.yml` |
@@ -189,19 +202,19 @@ assert "gate8-post-impl-row-not-created" 0 '
 
 # Gate 8: prose merely REFERENCING an existing trigger file (no creation cue) must
 # NOT flag (exit 0) — the include-filter again.
-assert "gate8-referenced-not-created" 0 "$M"'
+assert "gate8-referenced-not-created" 0 "$FM$M"'
 This step references the existing `.github/workflows/tests.yml` workflow.
 '
 
 # Gate 8: a new migration with NO `DROP` in the plan text must NOT flag (exit 0) —
 # conservative migration scoping.
-assert "gate8-migration-no-drop" 0 "$M"'
+assert "gate8-migration-no-drop" 0 "$FM$M"'
 Phase 1 — Create `ibl5/migrations/099_x.sql` to add a nullable column.
 '
 
 # Gate 8: a new migration whose plan text mentions `DROP TABLE`, no resolution,
 # must flag (exit 1) — destructive-migration trigger.
-assert "gate8-migration-drop-no-adr" 1 "$M"'
+assert "gate8-migration-drop-no-adr" 1 "$FM$M"'
 Phase 1 — Create `ibl5/migrations/099_x.sql`.
 The migration runs DROP TABLE foo to remove the legacy store.
 '
@@ -209,27 +222,34 @@ The migration runs DROP TABLE foo to remove the legacy store.
 # Gate 8 regression: a plan that CITES an existing ADR for context (no creation
 # verb on the ADR line) but CREATES a trigger file must still flag (exit 1).
 # Prevents GATE8_RESOLVED from being set by a bare ADR reference.
-assert "gate8-cited-adr-not-authored" 1 "$M"'
+assert "gate8-cited-adr-not-authored" 1 "$FM$M"'
 Phase 1 — Create `bin/foo` for the new tool.
 See ibl5/docs/decisions/0062-worktrees-outside-repo.md for context on the layout.
 '
 
 # Gate 8: a plan that both creates a trigger file AND authors a new ADR (creation
 # verb on the ADR line) must pass (exit 0) — confirms creation-verb check.
-assert "gate8-authored-adr-resolves" 0 "$M"'
+assert "gate8-authored-adr-resolves" 0 "$FM$M"'
 Phase 1 — Create `bin/foo` for the new tool.
 Phase 2 — Create ibl5/docs/decisions/0099-x.md documenting the decision.
 '
 
 # Gate H: a plan whose line-1 frontmatter declares `auto_merge: false` but has NO
-# `## Automouse Hold Justification` section must flag (exit 1).
+# `## Automouse Hold Justification` section must flag (exit 1). Frontmatter
+# also carries impl_model: sonnet so gate 13 (0 manual rows in M, no marker)
+# doesn't co-fire and reattribute this fixture's exit code.
 assert "gateH-hold-no-justification" 1 '---
 auto_merge: false
+impl_model: sonnet
 ---'"$M"
 
 # Gate H: the same hold WITH the justification section passes (exit 0).
+# Frontmatter carries impl_model: sonnet alongside auto_merge: false — without
+# it, gate 13 (0 manual rows, no impl_model marker) would fire rule (b) and
+# reattribute this fixture's exit code away from gate H.
 assert "gateH-hold-with-justification" 0 '---
 auto_merge: false
+impl_model: sonnet
 ---'"$M"'
 ## Automouse Hold Justification
 
@@ -244,32 +264,73 @@ impl_model: sonnet
 
 # Gate H FP-guard: a plan that merely DOCUMENTS the `auto_merge: false` syntax in
 # its body (not in line-1 frontmatter) must NOT flag (exit 0).
-assert "gateH-body-mentions-syntax-only" 0 "$M"'
+assert "gateH-body-mentions-syntax-only" 0 "$FM$M"'
 Note: setting `auto_merge: false` in the line-1 frontmatter holds the merge.
 '
 
 # ---------------------------------------------------------------------------
 # Gate C: context budget.
 # ---------------------------------------------------------------------------
-# Fixtures carry the clean matrix M so exit 0/1 is attributable solely to gate C.
+# All fixtures carry FM (impl_model: sonnet) alongside the clean matrix M so
+# gate 13 (0 manual rows in M, otherwise no marker) never co-fires — gate 13's
+# rule (b) doesn't scale with plan length, so it would fire on the exit-1
+# fixtures below too if FM were omitted, muddying "exit 1 == gate C caught this."
 FILLER="$(yes 'Filler prose line for the context-budget fixture.' | head -520)"
 PHASES11="$(for i in 1 2 3 4 5 6 7 8 9 10 11; do echo "## Phase $i — edit the widget"; done)"
 PHASES12="$PHASES11
 ## Phase 12 — edit the widget"
 
 # Gate C: a >=500-line plan with no marker must flag (exit 1).
-assert "gateC-long-plan-flags" 1 "$M$FILLER"
+assert "gateC-long-plan-flags" 1 "$FM$M$FILLER"
 
 # Gate C: the same long plan WITH a `context-budget:` justification passes (exit 0).
-assert "gateC-long-plan-marker-ok" 0 "$M$FILLER
+assert "gateC-long-plan-marker-ok" 0 "$FM$M$FILLER
 context-budget: length is fenced reference material; 3 phases, small diff.
 "
 
 # Gate C: >=12 numbered phases must flag even under 500 lines (exit 1).
-assert "gateC-many-phases-flags" 1 "$M$PHASES12"
+assert "gateC-many-phases-flags" 1 "$FM$M$PHASES12"
 
 # Gate C boundary: 11 phases and under 500 lines must NOT flag (exit 0).
-assert "gateC-eleven-phases-ok" 0 "$M$PHASES11"
+assert "gateC-eleven-phases-ok" 0 "$FM$M$PHASES11"
+
+# ---------------------------------------------------------------------------
+# Gate 13: impl_model <-> Verification Matrix consistency.
+# ---------------------------------------------------------------------------
+# EXIT-CODE ATTRIBUTION: every fixture here carries the clean minimal matrix
+# M (or a Truly-manual variant of it) with valid rows, no DECIDE/TBD, and no
+# automatable-verb manual row — so exit 0/1 is attributable solely to gate 13,
+# not any other gate.
+M_MANUAL='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | does the new dashboard feel polished | Truly-manual | post-impl | n/a |
+'
+
+# (a) A Truly-manual row plus `impl_model: sonnet` is a forbidden combo (exit 1).
+assert "gate13-manual-with-sonnet" 1 '---
+impl_model: sonnet
+---'"$M_MANUAL"
+
+# (b) A clean (zero-manual) matrix with NO impl_model marker at all must flag
+# (exit 1) — the model choice must be deliberate.
+assert "gate13-clean-matrix-absent" 1 "$M"
+
+# (c) A clean matrix with explicit `impl_model: sonnet` passes (exit 0) — the
+# encouraged case this gate exists to surface.
+assert "gate13-clean-sonnet-ok" 0 '---
+impl_model: sonnet
+---'"$M"
+
+# (d) A clean matrix with an explicit `impl_model: opus` passes (exit 0) — a
+# deliberate opus choice is a valid alternative to sonnet.
+assert "gate13-clean-explicit-opus-ok" 0 '---
+impl_model: opus
+---'"$M"
+
+# (e) A Truly-manual row with NO impl_model marker passes (exit 0) — absence
+# defaults to the safe Opus path, which is correct when a row is subjective.
+assert "gate13-manual-absent-ok" 0 "$M_MANUAL"
 
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"

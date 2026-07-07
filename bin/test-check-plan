@@ -248,6 +248,29 @@ assert "gateH-body-mentions-syntax-only" 0 "$M"'
 Note: setting `auto_merge: false` in the line-1 frontmatter holds the merge.
 '
 
+# ---------------------------------------------------------------------------
+# Gate C: context budget.
+# ---------------------------------------------------------------------------
+# Fixtures carry the clean matrix M so exit 0/1 is attributable solely to gate C.
+FILLER="$(yes 'Filler prose line for the context-budget fixture.' | head -520)"
+PHASES11="$(for i in 1 2 3 4 5 6 7 8 9 10 11; do echo "## Phase $i — edit the widget"; done)"
+PHASES12="$PHASES11
+## Phase 12 — edit the widget"
+
+# Gate C: a >=500-line plan with no marker must flag (exit 1).
+assert "gateC-long-plan-flags" 1 "$M$FILLER"
+
+# Gate C: the same long plan WITH a `context-budget:` justification passes (exit 0).
+assert "gateC-long-plan-marker-ok" 0 "$M$FILLER
+context-budget: length is fenced reference material; 3 phases, small diff.
+"
+
+# Gate C: >=12 numbered phases must flag even under 500 lines (exit 1).
+assert "gateC-many-phases-flags" 1 "$M$PHASES12"
+
+# Gate C boundary: 11 phases and under 500 lines must NOT flag (exit 0).
+assert "gateC-eleven-phases-ok" 0 "$M$PHASES11"
+
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"
     exit 1

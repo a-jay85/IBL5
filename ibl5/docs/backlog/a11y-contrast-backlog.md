@@ -1,12 +1,14 @@
 ---
 description: WCAG 2.1 AA color-contrast failure inventory and burn-down backlog per page.
-last_verified: 2026-07-03
+last_verified: 2026-07-07
 ---
 
 # A11y Color-Contrast Backlog
 
 **Purpose:** Track which pages have known `color-contrast` WCAG 2.1 AA failures (PHP-Nuke legacy palette).  
 **When to reference:** Removing an entry from `CONTRAST_KNOWN_FAILING` in `ibl5/tests/e2e/smoke/accessibility.spec.ts` after palette CSS fixes.
+
+**Companion to** [`a11y-backlog.md`](a11y-backlog.md) and the other backlogs in [README.md](README.md).
 
 ---
 

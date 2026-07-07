@@ -1,10 +1,13 @@
 {
     "phpstan-baseline.neon": {
+        "function.alreadyNarrowedType": 1,
         "ibl.directHeader": 1,
         "ibl.directTime": 13,
         "ibl.hardcodedEnvString": 8,
         "ibl.sqlStringConcatenation": 33,
-        "ibl.trustedVariable": 16
+        "ibl.trustedVariable": 16,
+        "nullCoalesce.offset": 1,
+        "variable.undefined": 7
     },
     "phpstan-tests-baseline.neon": {
         "argument.type": 73,

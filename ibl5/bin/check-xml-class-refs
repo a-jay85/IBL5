@@ -1,0 +1,91 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * bin/check-xml-class-refs — verify phpunit XML config file references resolve.
+ *
+ * Parses every ibl5/phpunit*.xml whose root element is <phpunit> and checks that
+ * every file/directory reference (bootstrap=, <directory>, <file>) exists on disk.
+ * Glob patterns (containing *) are skipped — they may legitimately match nothing.
+ *
+ * After a namespace relocation a test directory can be moved/renamed, leaving the
+ * old path in phpunit.xml or phpunit-mutation.xml. PHPUnit silently ignores a
+ * missing suite directory (it just finds zero tests), so the stale ref is invisible
+ * until the coverage or mutation run produces wrong numbers. This guard catches it.
+ */
+
+$root = dirname(__DIR__);
+$xmlGlob = glob($root . '/phpunit*.xml');
+if ($xmlGlob === false || $xmlGlob === []) {
+    echo "check-xml-class-refs: no phpunit*.xml files found in {$root}\n";
+    exit(1);
+}
+
+$failures = [];
+
+foreach ($xmlGlob as $xmlPath) {
+    $rel = basename($xmlPath);
+
+    $content = file_get_contents($xmlPath);
+    if ($content === false) {
+        $failures[] = "{$rel}: read error";
+        continue;
+    }
+
+    $doc = new \DOMDocument();
+    if (@$doc->loadXML($content) === false) {
+        $failures[] = "{$rel}: XML parse error";
+        continue;
+    }
+
+    $rootEl = $doc->documentElement;
+    if ($rootEl === null || $rootEl->nodeName !== 'phpunit') {
+        // Not a phpunit configuration file (e.g. phpunit-baseline.xml has <files> root)
+        continue;
+    }
+
+    $baseDir = dirname($xmlPath);
+
+    // Collect all path-valued references from the XML.
+    $refs = [];
+
+    // 1. bootstrap="" attribute on the root element
+    $bootstrap = $rootEl->getAttribute('bootstrap');
+    if ($bootstrap !== '') {
+        $refs[] = [$rel, 'bootstrap', $bootstrap];
+    }
+
+    // 2. All <directory> and <file> text-content nodes
+    foreach (['directory', 'file'] as $tag) {
+        $nodes = $doc->getElementsByTagName($tag);
+        foreach ($nodes as $node) {
+            $text = trim($node->textContent);
+            if ($text !== '') {
+                $refs[] = [$rel, "<{$tag}>", $text];
+            }
+        }
+    }
+
+    // Check each reference
+    foreach ($refs as [$file, $label, $path]) {
+        // Skip glob patterns — they may legitimately expand to nothing.
+        if (strpos($path, '*') !== false) {
+            continue;
+        }
+        $full = $baseDir . '/' . $path;
+        if (!file_exists($full)) {
+            $failures[] = "{$file}: stale {$label} reference — '{$path}' does not exist";
+        }
+    }
+}
+
+if ($failures !== []) {
+    echo "ERROR: stale phpunit XML reference(s) found:\n" . implode("\n", array_map(fn($f) => "  - {$f}", $failures)) . "\n";
+    echo "\nFix: update or remove the stale path from the phpunit XML config.\n";
+    exit(1);
+}
+
+echo 'OK: all phpunit XML file/directory references resolve.' . "\n";
+exit(0);

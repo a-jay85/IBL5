@@ -1,6 +1,60 @@
 parameters:
 	ignoreErrors:
 		-
+			rawMessage: 'Call to function is_array() with array will always evaluate to true.'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: bin/check-baseline-drift
+
+		-
+			rawMessage: 'Offset ''phpstan-baseline…'' on array{''phpstan-baseline.neon'': literal-string&non-falsy-string, ''phpstan-tests-baseline.neon'': literal-string&non-falsy-string} on left side of ?? always exists and is not nullable.'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: bin/check-baseline-drift
+
+		-
+			rawMessage: Variable $argv might not be defined.
+			identifier: variable.undefined
+			count: 1
+			path: bin/check-baseline-drift
+
+		-
+			rawMessage: Variable $argc might not be defined.
+			identifier: variable.undefined
+			count: 1
+			path: bin/check-coverage
+
+		-
+			rawMessage: Variable $argv might not be defined.
+			identifier: variable.undefined
+			count: 2
+			path: bin/check-coverage
+
+		-
+			rawMessage: Variable $argc might not be defined.
+			identifier: variable.undefined
+			count: 1
+			path: bin/check-coverage-regression
+
+		-
+			rawMessage: Variable $argv might not be defined.
+			identifier: variable.undefined
+			count: 2
+			path: bin/check-coverage-regression
+
+		-
+			rawMessage: Variable $argv might not be defined.
+			identifier: variable.undefined
+			count: 1
+			path: bin/migrate
+
+		-
+			rawMessage: Variable $argv might not be defined.
+			identifier: variable.undefined
+			count: 1
+			path: bin/rebuild-record-holders-cache
+
+		-
 			rawMessage: 'Direct now-returning time call is banned outside the Clock seam. Inject Clock\ClockInterface (constructor for instance classes; settable static clock with factory fallback for static classes) and call $clock->now(). Pass an explicit timestamp to date()/strtotime() for deterministic formatting.'
 			identifier: ibl.directTime
 			count: 1

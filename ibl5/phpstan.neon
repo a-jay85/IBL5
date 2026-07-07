@@ -8,6 +8,17 @@ parameters:
     paths:
         - classes
         - phpstan-rules
+        - bin/check-baseline-drift
+        - bin/check-coverage
+        - bin/check-coverage-regression
+        - bin/check-seed-id-uniqueness
+        - bin/check-xml-class-refs
+        - bin/migrate
+        - bin/migrate-seed
+        - bin/purge-page-cache
+        - bin/rebuild-record-holders-cache
+        - bin/validate-schema
+        - bin/warm-cache
     excludePaths:
         - classes/Bootstrap/LegacyFunctions.php
         - phpstan-rules/Fixtures

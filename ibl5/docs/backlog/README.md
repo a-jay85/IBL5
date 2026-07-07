@@ -1,6 +1,6 @@
 ---
-description: Index of tracked backlogs under docs/backlog/ — one row per LIVE backlog plus the archive pointer.
-last_verified: 2026-07-03
+description: Index of tracked backlogs under docs/backlog/ — one row per LIVE backlog plus the archive pointer, and the canonical status taxonomy shared by all backlogs.
+last_verified: 2026-07-07
 ---
 
 # Backlog index
@@ -16,6 +16,26 @@ a `/plan`.
 | [e2e-backlog.md](e2e-backlog.md) | E2E (Playwright + api-e2e) test-quality — refactoring, weak assertions, flake-prone patterns. |
 | [a11y-backlog.md](a11y-backlog.md) | WCAG 2.x full-rule (non-contrast) accessibility failures. |
 | [a11y-contrast-backlog.md](a11y-contrast-backlog.md) | WCAG 2.1 AA color-contrast failures per page. |
+| [token-spend-backlog.md](token-spend-backlog.md) | Token-economy of the Claude Code harness — resident context, caching, output spend. |
+| [dev-efficiency-backlog.md](dev-efficiency-backlog.md) | Development-efficiency tooling — inner-loop speed, CI caching, worktree lifecycle. |
+| [loop-engineering-backlog.md](loop-engineering-backlog.md) | Autonomous-loop robustness — automouse queue, self-healing, digests, autonomy contracts. |
+
+Note: `token-spend-backlog.md` and `loop-engineering-backlog.md` include entries whose deliverable lives
+**outside the repo** (`$HOME/.claude/` settings/hooks/memory — marked ⌂ in those files). Those are exempt
+from the worktree rule and ship as direct harness edits, not PRs.
+
+## Status taxonomy
+
+The canonical five-glyph status set used by every backlog in this directory:
+
+- ✅ **Implemented** — merged (or live, for harness-local entries); the named concern is resolved, verified on disk.
+- ◑ **Partial** — partially addressed; residual work named in the entry's note.
+- 📋 **Planned** — a plan file exists (queued or PR-open); not yet merged.
+- ⬜ **Open** — no plan yet.
+- 🚫 **Declined** — deliberately won't-do (rationale in the entry's Status line).
+
+Domain-specific **automouse-readiness** legends (🟩/🟦/🟨/🟥) and **effort scales** (S/M/L) stay defined
+per-file — their semantics vary by domain.
 
 ## Archive
 

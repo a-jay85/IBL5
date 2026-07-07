@@ -1,6 +1,6 @@
 ---
 description: E2E (Playwright + api-e2e) test-quality backlog — refactoring, perf, weak/tautological assertions, tests that don't prove functionality, and flake-prone patterns, with per-entry status + automouse-readiness. Each open entry is a candidate for a /plan.
-last_verified: 2026-07-03
+last_verified: 2026-07-07
 ---
 
 # E2E Test-Quality Backlog
@@ -32,12 +32,7 @@ Effort scale:
 
 ## Status taxonomy
 
-**Status** — where the fix stands:
-- ✅ **Implemented** — resolved on `master` (verified on disk).
-- ◑ **Partial** — partially addressed; residual named in the note.
-- 📋 **Planned** — a plan exists / PR open, not yet merged.
-- ⬜ **Open** — no plan yet.
-- 🚫 **Declined** — deliberately won't-do (rationale in the note).
+**Status** — canonical five-glyph set: see [README.md § Status taxonomy](README.md#status-taxonomy).
 
 **Automouse-readiness** (for items not ✅/🚫):
 - 🟩 **Auto-mergeable** — test-only, behavior-preserving for production (green-green); arms auto-merge unattended.

@@ -451,11 +451,12 @@ function checkAdrTransitions(string $repoRoot): array
             $yClaim = $claims[$y] ?? ['supersededBy' => null];
             if ($yClaim['supersededBy'] !== $num) {
                 $issues[] = sprintf(
-                    '%s: ## Supersedes references ADR-%s, but ADR-%s Status line does not say "Superseded by ADR-%s"',
+                    '%s: ## Supersedes references ADR-%s, but ADR-%s Status line does not say "Superseded by ADR-%s" (if ADR-%s is not genuinely superseded, rename the section to ## Lineage)',
                     $rel,
                     $y,
                     $y,
-                    $num
+                    $num,
+                    $y
                 );
             }
         }

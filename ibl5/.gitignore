@@ -27,6 +27,9 @@ composer.lock
 config.e2e.php
 test-results.json
 
+# Golden-master capture scratch (CAPTURE_GOLDENS=1 dumps; frozen into G_* test constants, never read at runtime)
+.goldens/
+
 # Visual-review scratch dirs (per-run PR renders + generated change-driven gallery)
 vr-actuals/
 vr-gallery/

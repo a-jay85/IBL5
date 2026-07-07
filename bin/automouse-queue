@@ -229,6 +229,25 @@ if [ -e "$QUEUE_DIR/$FILENAME" ]; then
     exit 1
 fi
 
+# impl_model <-> Verification Matrix consistency backstop. bin/check-plan gate
+# 13 catches this at plan-authoring time, but the plan archive predates the
+# gate — an old unmarked plan can still be sitting in ~/.claude/plans/ never
+# having been run through check-plan. Refuse to queue rather than let
+# automouse-run burn a full Opus-default implementation session (or a
+# forbidden Truly-manual-row-under-Sonnet run) on it. Shares the exact rule
+# with check-plan via bin/lib/plan-model-consistency so the two cannot drift.
+LIB_DIR="$(cd "$(dirname "$0")" && pwd)/lib"
+# `if VAR=$(cmd); then` (not a bare assignment) so `set -e` does not abort the
+# script on the script's non-zero exit — the exit code is tested, not thrown.
+if CONSISTENCY_MSG=$("$LIB_DIR/plan-model-consistency" "$SOURCE"); then
+    :
+else
+    echo "Error: $FILENAME fails impl_model <-> Verification Matrix consistency:" >&2
+    echo "  $CONSISTENCY_MSG" >&2
+    echo "Fix the plan's line-1 frontmatter (add/adjust the one-line impl_model: marker), then requeue." >&2
+    exit 1
+fi
+
 evict_dispositions "$FILENAME"
 
 ln -s "$SOURCE" "$QUEUE_DIR/$FILENAME"

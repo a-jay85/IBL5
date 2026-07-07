@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/lib/plan-model-consistency — shared impl_model <-> Verification-Matrix
+# consistency check. Used by BOTH bin/check-plan (gate M) and
+# bin/automouse-queue (queue-time backstop) so the two call sites cannot drift.
+#
+# Mechanizes /plan Step-4 gate 13's prose rule: a plan whose Verification Matrix
+# carries zero Truly-manual rows is (by definition) uniformly machine-checkable,
+# so `impl_model: sonnet` is the encouraged choice and its ABSENCE is now a
+# violation (a deliberate opus reason must be recorded instead); a plan carrying
+# at least one Truly-manual row can never declare `impl_model: sonnet` — Sonnet
+# cannot be trusted to self-judge a subjective row.
+#
+#   Truly-manual rows >= 1  AND impl_model: sonnet          -> VIOLATION (forbidden combo)
+#   Truly-manual rows == 0  AND impl_model absent            -> VIOLATION (undeclared default)
+#   Truly-manual rows == 0  AND impl_model: opus (explicit)  -> ok
+#   Truly-manual rows == 0  AND impl_model: sonnet           -> ok (the encouraged case)
+#   Truly-manual rows >= 1  AND impl_model absent or opus    -> ok
+#
+# Deliberately NOT bin/lib/plan-impl-model: that script RESOLVES impl_model to a
+# model id for `claude -p --model`, and its `case` statement collapses explicit
+# `impl_model: opus`, an absent field, and any garbled value to the same
+# `claude-opus-4-8` output (the "safe default" fallback) — so it cannot
+# distinguish "deliberately opus" from "never set," which is exactly the
+# distinction rule (b) above needs. Re-implementing the same line-1-anchored
+# frontmatter parse here (RAW value, not resolved) is the only way to keep that
+# distinction without changing plan-impl-model's contract for automouse-run.
+#
+# Skips silently (exit 0, no output) when the plan carries no Verification
+# Matrix at all — that failure belongs to bin/check-plan gate 1, not this
+# script; a plan with no matrix has nothing for this gate to be consistent
+# about.
+#
+# Usage: bin/lib/plan-model-consistency <plan-file>
+#   exit 0, no output           -> consistent, or nothing to check (no matrix)
+#   exit 1, one line on stdout  -> the violation message (caller prefixes/labels it)
+#   exit 2                      -> usage error (missing arg / file)
+
+set -u
+
+# Force the C locale — same rationale as bin/check-plan: deterministic
+# byte-wise glob/char-class matching across locales.
+export LC_ALL=C
+
+PLAN_FILE="${1:-}"
+if [ -z "$PLAN_FILE" ] || [ ! -e "$PLAN_FILE" ]; then
+    echo "Usage: bin/lib/plan-model-consistency <plan-file>" >&2
+    exit 2
+fi
+
+# No Verification Matrix at all -> not this script's gate to report.
+if ! grep -qiE '\|[[:space:]]*What to verify[[:space:]]*\|' "$PLAN_FILE"; then
+    exit 0
+fi
+
+# Isolate the matrix region and count Truly-manual rows: identical isolation +
+# detection pattern to bin/check-plan gate 3 ("false manuals"), kept in sync
+# deliberately — a row is "Truly-manual" for gate-3 mislabeling purposes and
+# for THIS gate's counting purposes by the exact same text match.
+MANUAL_COUNT=$(awk '
+    /\|[[:space:]]*[Ww]hat to verify[[:space:]]*\|/ { inm=1; next }
+    inm && /^[[:space:]]*\|/ { print; next }
+    inm && !/^[[:space:]]*\|/ { inm=0 }
+' "$PLAN_FILE" | tr '[:upper:]' '[:lower:]' | grep -cE 'truly[- ]manual')
+
+# Parse the RAW impl_model value from ONLY the first line-1-anchored
+# frontmatter block (mirrors bin/lib/plan-impl-model's awk verbatim, but
+# echoes the raw token instead of a resolved model id — see header note for
+# why plan-impl-model itself can't be reused here).
+RAW=$(awk '
+  NR==1 && /^---[[:space:]]*$/ {infm=1; next}
+  infm && /^---[[:space:]]*$/ {infm=0; exit}
+  infm && /^impl_model:[[:space:]]*/ {sub(/^impl_model:[[:space:]]*/,""); gsub(/[[:space:]]/,""); print; exit}
+' "$PLAN_FILE" 2>/dev/null)
+
+if [ "$MANUAL_COUNT" -ge 1 ] && [ "$RAW" = "sonnet" ]; then
+    echo "Truly-manual row forbids impl_model: sonnet — strip the marker or mechanize the row"
+    exit 1
+fi
+
+if [ "$MANUAL_COUNT" -eq 0 ] && [ -z "$RAW" ]; then
+    echo "model must be a deliberate choice: add \`impl_model: sonnet\` (all rows machine-checkable) or an explicit \`impl_model: opus\` with a reason in the plan body"
+    exit 1
+fi
+
+exit 0

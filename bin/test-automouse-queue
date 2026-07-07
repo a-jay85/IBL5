@@ -184,6 +184,52 @@ assert_present "row9 queued"                  "$NDIR/queue/plan-i.md"
 echo "ok: row9 — .staleness eviction"
 
 # ===========================================================================
+# impl_model <-> Verification Matrix consistency backstop (bin/lib/
+# plan-model-consistency). The plan archive predates bin/check-plan gate 13,
+# so an old unmarked plan can still be sitting in ~/.claude/plans/ — queuing
+# must refuse it rather than let automouse-run burn a session on it.
+# ===========================================================================
+
+# shellcheck disable=SC2016  # backtick span is a literal markdown code span,
+# not command substitution — single quotes are intentional.
+CLEAN_MATRIX='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | thing works | PHPUnit | post-impl | `tests/X.php` |
+'
+
+# ---------------------------------------------------------------------------
+# Row 15 — a plan with a clean (zero-manual) matrix and NO impl_model marker
+# is refused at queue time (nonzero exit); it must NOT land in queue/.
+# ---------------------------------------------------------------------------
+setup
+printf '%s\n' "$CLEAN_MATRIX" > "$PDIR/plan-j.md"
+set +e
+out=$(run_queue plan-j 2>&1)
+ec=$?
+set +e
+if [ "$ec" -eq 0 ]; then
+    echo "FAIL: row15 — expected non-zero exit for a plan missing impl_model"
+    FAILED=1
+fi
+if ! echo "$out" | grep -q "impl_model"; then
+    echo "FAIL: row15 — expected an impl_model-consistency error, got: $out"
+    FAILED=1
+fi
+assert_absent "row15 not queued" "$NDIR/queue/plan-j.md"
+echo "ok: row15 — refuses to queue a plan missing impl_model"
+
+# ---------------------------------------------------------------------------
+# Row 16 — the same clean matrix WITH a deliberate `impl_model: sonnet` marker
+# queues normally.
+# ---------------------------------------------------------------------------
+setup
+printf -- '---\nimpl_model: sonnet\n---\n%s\n' "$CLEAN_MATRIX" > "$PDIR/plan-k.md"
+run_queue plan-k >/dev/null 2>&1
+assert_present "row16 queued" "$NDIR/queue/plan-k.md"
+echo "ok: row16 — queues a clean, correctly-marked plan"
+
+# ===========================================================================
 # reorder subcommand — permutation validation + spaced ascending-mtime touch.
 # Order is asserted via `ls -1tr` (oldest-first) — exactly how
 # bin/automouse-run claims the next plan.  GNU ls uses symlink lstat mtime;

@@ -177,6 +177,16 @@ fi
 # Worktree Preview Environment — no human present to verify)
 export CLAUDE_HEADLESS=1
 
+# Headless sessions carry ~44K of fixed context (system prompt + rules +
+# memory + compaction summary). Under the interactive 120K autoCompactWindow
+# pin (~/.claude/settings.json, advisor-timeout fix) that leaves ~44K of
+# working room before the ~73% trigger — a compaction-thrash loop that
+# invalidates the whole prompt cache every few minutes (2026-07-07: 5
+# compactions in 19 min, 21% of the 5h budget, zero edits made). 200K keeps
+# peak context at/below the ~200K degradation and 2x-cost edge while tripling
+# working room. Env var overrides the settings.json pin per-process.
+export CLAUDE_CODE_AUTO_COMPACT_WINDOW=200000
+
 REPO="/Users/ajaynicolas/GitHub/IBL5"
 NIGHTLY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
 LOG_DIR="$NIGHTLY_DIR/logs"

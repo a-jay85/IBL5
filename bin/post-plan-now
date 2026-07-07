@@ -80,6 +80,8 @@ PROMPT="Invoke the /post-plan skill now on the current git branch. Resolve the p
 # marks the detached run unattended: /post-plan skips the Phase 10 preview rebuild
 # and BLOCKS auto-merge on a golden-snapshot change instead of merely warning.
 # caffeinate -s keeps the Mac awake on AC for the run's duration.
+# CLAUDE_CODE_AUTO_COMPACT_WINDOW=200000 lifts the interactive 120K
+# autoCompactWindow pin for this headless run — rationale in bin/automouse-run.
 cat > "$PLIST" <<PLIST_EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -91,7 +93,7 @@ cat > "$PLIST" <<PLIST_EOF
 	<array>
 		<string>/bin/bash</string>
 		<string>-lc</string>
-		<string>export PATH="/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH"; cd "$ROOT" &amp;&amp; CLAUDE_HEADLESS=1 caffeinate -s claude -p "$PROMPT" --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name "$LABEL"; rm -f "$PLIST"; launchctl bootout gui/\$(id -u)/$LABEL</string>
+		<string>export PATH="/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH"; cd "$ROOT" &amp;&amp; CLAUDE_HEADLESS=1 CLAUDE_CODE_AUTO_COMPACT_WINDOW=200000 caffeinate -s claude -p "$PROMPT" --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name "$LABEL"; rm -f "$PLIST"; launchctl bootout gui/\$(id -u)/$LABEL</string>
 	</array>
 	<key>RunAtLoad</key>
 	<true/>

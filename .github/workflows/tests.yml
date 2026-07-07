@@ -579,6 +579,21 @@ jobs:
       - name: Check config.php.example placeholders
         working-directory: ibl5
         run: bin/check-config-example
+      # th-aria-label: aria-label on <th> silently fails axe empty-table-header;
+      # the correct fix is a sr-only span inside the th (PR postmortem, a11y audit).
+      - name: Check th aria-label usage
+        working-directory: ibl5
+        run: bin/check-th-aria-label
+      # xml-class-refs: phpunit XML configs silently ignore missing suite directories,
+      # so a renamed/moved test directory leaves a stale ref with no error.
+      - name: Check phpunit XML file/directory references
+        working-directory: ibl5
+        run: php bin/check-xml-class-refs
+      # phpstan-bin-coverage: extension-less PHP scripts in bin/ dodge PHPStan's
+      # directory scan. This guard ensures every new one is explicitly listed.
+      - name: Check PHP bin scripts covered by PHPStan
+        working-directory: ibl5
+        run: bin/check-phpstan-bin-coverage
       # workflow-lint: a job that `uses:` a local ./.github/actions/* action without
       # a prior checkout fails only at runtime, and a composite that drops a pinned
       # behavior contract fails silently. NOTE: NO working-directory — these scripts

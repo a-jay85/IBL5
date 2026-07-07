@@ -132,6 +132,96 @@ class LeagueTest extends TestCase
     }
 
     // ============================================
+    // ALL-STAR CONFERENCE SPLIT CHARACTERIZATION TESTS
+    // ============================================
+
+    /**
+     * Regression lock: ASG conference split MUST use WESTERN_CONFERENCE_TEAMIDS,
+     * not ibl_standings.conference.
+     *
+     * getAllStarCandidatesResult('WC-*') must embed the Western teamid constants
+     * directly in the SQL WHERE clause — never join against ibl_standings.
+     * A teamid in WESTERN_CONFERENCE_TEAMIDS is Western even if the DB's conference
+     * column disagrees (the DB column is display metadata, not authoritative).
+     */
+    public function testGetAllStarCandidatesResultWestUsesWesternConferenceTeamids(): void
+    {
+        $league = new League($this->mockDb);
+
+        $league->getAllStarCandidatesResult('WC-CF');
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $this->assertCount(1, $queries, 'Expected exactly one query for a single candidate lookup');
+        $query = $queries[0];
+
+        // The query must NOT derive conference from ibl_standings — that column is
+        // display metadata, not the authoritative conference list.
+        $this->assertStringNotContainsStringIgnoringCase(
+            'ibl_standings',
+            $query,
+            'Conference bucketing must use WESTERN_CONFERENCE_TEAMIDS, not ibl_standings.conference'
+        );
+
+        // At least one Western teamid constant must appear verbatim in the SQL.
+        $foundWestTid = false;
+        foreach (League::WESTERN_CONFERENCE_TEAMIDS as $tid) {
+            if (str_contains($query, (string) $tid)) {
+                $foundWestTid = true;
+                break;
+            }
+        }
+        $this->assertTrue(
+            $foundWestTid,
+            'SQL must embed teamids from WESTERN_CONFERENCE_TEAMIDS directly in the WHERE clause'
+        );
+    }
+
+    public function testGetAllStarCandidatesResultEastUsesEasternConferenceTeamids(): void
+    {
+        $league = new League($this->mockDb);
+
+        $league->getAllStarCandidatesResult('EC-CB');
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $this->assertCount(1, $queries);
+        $query = $queries[0];
+
+        $this->assertStringNotContainsStringIgnoringCase('ibl_standings', $query);
+
+        $foundEastTid = false;
+        foreach (League::EASTERN_CONFERENCE_TEAMIDS as $tid) {
+            if (str_contains($query, (string) $tid)) {
+                $foundEastTid = true;
+                break;
+            }
+        }
+        $this->assertTrue(
+            $foundEastTid,
+            'SQL must embed teamids from EASTERN_CONFERENCE_TEAMIDS directly in the WHERE clause'
+        );
+    }
+
+    public function testGetAllStarCandidatesResultWestExcludesEasternTeamids(): void
+    {
+        $league = new League($this->mockDb);
+        $league->getAllStarCandidatesResult('WC-CF');
+
+        // Spot-check: teamid 1 is Eastern — must not appear in the Western query's
+        // teamid list. (It could appear in returned player data, but not in the IN clause.)
+        // We check the WESTERN constant itself doesn't contain Eastern ids.
+        $this->assertNotContains(
+            League::EASTERN_CONFERENCE_TEAMIDS[0],
+            League::WESTERN_CONFERENCE_TEAMIDS,
+            'WESTERN_CONFERENCE_TEAMIDS must not overlap with EASTERN_CONFERENCE_TEAMIDS'
+        );
+
+        // The constants partition all 28 real franchises with no overlap.
+        $all = array_merge(League::EASTERN_CONFERENCE_TEAMIDS, League::WESTERN_CONFERENCE_TEAMIDS);
+        sort($all);
+        $this->assertSame(range(1, 28), $all, 'East + West teamids must cover exactly franchises 1-28 with no gaps or overlaps');
+    }
+
+    // ============================================
     // ALL-STAR POSITION CONSTANTS TESTS
     // ============================================
 

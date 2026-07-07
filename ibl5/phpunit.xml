@@ -298,9 +298,6 @@
             <directory>classes/OneOnOneGame</directory>
             <directory>classes/Database</directory>
             <!-- Legacy god-class files -->
-            <file>classes/MySQL.php</file>
-            <file>classes/UI.php</file>
-            <file>classes/Game.php</file>
             <file>classes/JSB.php</file>
         </exclude>
     </source>

@@ -291,7 +291,6 @@
             <directory>classes/*/Contracts</directory>
             <directory>classes/OneOnOneGame</directory>
             <directory>classes/Database</directory>
-            <file>classes/MySQL.php</file>
             <file>classes/JSB.php</file>
         </exclude>
     </source>

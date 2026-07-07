@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Bans aria-label attributes on <th> elements.
+#
+# axe's empty-table-header rule fires when a <th> has no accessible text.
+# The instinctive fix is aria-label="…", but axe silently ignores aria-label on
+# <th> — the element still fails the audit. The correct fix is a visually-hidden
+# span inside the th:
+#
+#   <th><span class="sr-only">Column name</span></th>
+#
+# This rule catches the silent-failure pattern before it ships.
+
+PATTERN='<th[^>]*aria-label'
+
+matches=$(grep -rniP "$PATTERN" . \
+  --include='*.php' \
+  --include='*.phtml' \
+  --include='*.html' \
+  --include='*.twig' \
+  --exclude-dir=vendor \
+  --exclude-dir=node_modules \
+  --exclude-dir=.git \
+  --exclude-dir=cache \
+  --exclude-dir=__snapshots__ \
+  --exclude-dir=fixtures \
+  --exclude-dir=Fixtures \
+  2>/dev/null || true)
+
+if [ -n "$matches" ]; then
+  echo "ERROR: <th> element(s) with aria-label attribute found:" >&2
+  echo "$matches" >&2
+  echo "" >&2
+  echo 'Fix: aria-label on <th> silently fails axe empty-table-header — use' >&2
+  echo '     <span class="sr-only">…</span> inside the th instead.' >&2
+  exit 1
+fi
+
+echo 'OK: no <th aria-label="…"> found.'
+exit 0

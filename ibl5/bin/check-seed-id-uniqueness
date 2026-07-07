@@ -151,7 +151,8 @@ foreach ($seedChecks as $file => $tables) {
 
 // Migration number uniqueness (ibl5/migrations/NNN_*.sql).
 $byNumber = [];
-foreach (glob('migrations/*.sql') ?: [] as $path) {
+$migrationFiles = glob('migrations/*.sql');
+foreach ($migrationFiles !== false ? $migrationFiles : [] as $path) {
     if (preg_match('/^(\d+)_/', basename($path), $m) === 1) {
         $byNumber[$m[1]][] = basename($path);
     }

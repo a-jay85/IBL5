@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Guards that every extension-less PHP script in ibl5/bin/ is listed in phpstan.neon.
+#
+# PHPStan scans directories by extension (.php), so extension-less PHP shebang
+# scripts in bin/ are silently skipped unless explicitly added to phpstan.neon's
+# paths list. After a namespace relocation these files are the ones most likely
+# to accumulate stale class references that no static analysis catches.
+#
+# When you add a new extension-less PHP script to ibl5/bin/:
+#   1. Run: head -1 ibl5/bin/<your-script>   — confirm it says #!/usr/bin/env php
+#   2. Add it to the paths: list in ibl5/phpstan.neon (e.g. "- bin/<your-script>")
+#   3. Run: composer run analyse   — fix or baseline any new findings
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BIN_DIR="$SCRIPT_DIR"
+NEON="$SCRIPT_DIR/../phpstan.neon"
+
+missing=()
+
+for f in "$BIN_DIR"/*; do
+  [[ -f "$f" ]] || continue
+  base="$(basename "$f")"
+  # Only extension-less files (basename contains no dot)
+  [[ "$base" == *.* ]] && continue
+  # Only PHP shebang files
+  first_line=$(head -1 "$f")
+  [[ "$first_line" == '#!/usr/bin/env php' ]] || continue
+
+  # Check phpstan.neon mentions this file
+  if ! grep -qF "bin/${base}" "$NEON"; then
+    missing+=("$base")
+  fi
+done
+
+if [[ ${#missing[@]} -gt 0 ]]; then
+  echo "ERROR: extension-less PHP script(s) in bin/ missing from phpstan.neon paths:" >&2
+  for m in "${missing[@]}"; do
+    echo "  bin/${m}" >&2
+  done
+  echo "" >&2
+  echo "Fix: add each missing script to the paths: list in phpstan.neon, then" >&2
+  echo "     run 'composer run analyse' and fix or baseline any new findings." >&2
+  exit 1
+fi
+
+echo "OK: all extension-less PHP bin scripts are listed in phpstan.neon."
+exit 0

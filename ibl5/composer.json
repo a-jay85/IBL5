@@ -13,11 +13,13 @@
         "phpstan/phpstan-phpunit": "^2.0",
         "phpstan/phpstan-strict-rules": "^2.0",
         "phpstan/phpstan-deprecation-rules": "^2.0",
-        "infection/infection": "^0.34.0"
+        "infection/infection": "^0.34.0",
+        "brianium/paratest": "^7.23"
     },
     "scripts": {
         "pre-autoload-dump": "if [ -L vendor ]; then echo 'ERROR: vendor/ is a symlink (worktree). Do not run composer install/dump-autoload here — it corrupts shared autoload paths. Run from the main repo instead.' && exit 1; fi",
-        "test": "vendor/bin/phpunit",
+        "test": "vendor/bin/paratest",
+        "test:serial": "vendor/bin/phpunit",
         "test:db": "vendor/bin/phpunit --group database",
         "test:all": "vendor/bin/phpunit --group default --group database",
         "lint:php": "vendor/bin/phpcs --standard=PSR12 src",

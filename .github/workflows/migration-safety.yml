@@ -296,6 +296,63 @@ jobs:
               --since=${{ steps.base.outputs.sha }}
           fi
 
+  regen-schema-dump:
+    name: Regenerate current-schema.sql
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+
+    env:
+      DB_HOST: 127.0.0.1
+      DB_USER: root
+      DB_PASS: root
+      DB_NAME: ibl5_schema
+
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: ibl5_schema
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mariadb-admin ping -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        token: ${{ secrets.CI_PAT }}
+
+    - name: Setup PHP environment
+      uses: ./.github/actions/setup-php-env
+
+    - name: Apply all migrations to scratch DB
+      run: ibl5/bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot ibl5_schema
+
+    - name: Regenerate current-schema.sql
+      run: |
+        chmod +x bin/regen-schema-dump
+        bin/regen-schema-dump -h 127.0.0.1 -u root -proot -d ibl5_schema
+
+    - name: Commit regenerated schema if changed
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add ibl5/docs/schema/current-schema.sql
+        if git diff --cached --quiet; then
+          echo "No schema changes"
+        else
+          git commit -m "ci: regenerate current-schema.sql [auto]"
+          git push
+        fi
+
   gate:
     name: Migration Safety
     if: always()

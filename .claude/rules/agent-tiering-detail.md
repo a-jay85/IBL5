@@ -1,9 +1,8 @@
 ---
 description: Read-on-demand detail for agent-tiering — Fable approval-gate procedure, flat-fan-out (nested sub-agent) rationale, orchestrator context economics (delegate-don't-dismiss, split-don't-self-clear), and per-tier prompt style. Loads only when editing workflow orchestration defs, where this rationale applies.
-last_verified: 2026-07-04
+last_verified: 2026-07-07
 paths:
   - ".claude/skills/**/*.md"
-  - ".claude/skills/**/SKILL.md"
 ---
 
 # Agent Tiering — Detail

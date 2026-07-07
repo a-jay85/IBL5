@@ -1,6 +1,6 @@
 ---
 description: Sub-agent decision rules — when to spawn, when to skip, which model to pick, and how sub-agent delegation keeps orchestrator context low
-last_verified: 2026-07-05
+last_verified: 2026-07-07
 ---
 
 # Agent Tiering
@@ -15,7 +15,7 @@ Each sub-agent costs ~3–5K tokens (system prompt + rules + memory, loaded befo
 
 **Spawn an agent when ANY hold:** output unpredictably verbose (large grep, failing suites with stack traces) and the agent can return a summary · multiple independent verbose tasks run concurrently · the task is multiple sequential tool calls.
 
-**When you spawn, minimize invocation count** — the question is *how many agents are actually needed*, not *parallel vs. sequential*. Token spend is valued over wall-clock time, and parallel fan-out usually costs more than running sequentially — so weigh the ROI before assigning a fleet. Batch N related tasks into one agent (or do them yourself), not one agent per task; each spawn re-pays the ~3–5K overhead. Separate agents only when each genuinely needs its own context (independent worktrees, isolating verbose output), not merely because tasks are logically distinct.
+**When you spawn, minimize invocation count** — the question is *how many agents are needed*, not *parallel vs. sequential*; token spend outranks wall-clock time. Batch N related tasks into one agent (or do them yourself) — each spawn re-pays the ~3–5K overhead. Separate agents only when each genuinely needs its own context (independent worktrees, isolating verbose output), not because tasks are logically distinct.
 
 **PHPUnit and PHPStan are always direct Bash calls** — passing output is ~5 lines, failures usually under 50; agent overhead dwarfs it. Use `run_in_background` for parallelism without an agent — **but only in the interactive harness**, where a finished background task re-invokes you. In a **headless** run (`claude -p`, e.g. `/post-plan` under automouse) there is no re-invocation: a live background task at turn-end stall-kills the run — run blocking, or poll `BashOutput` to completion in-turn (post-plan `SKILL.md` Phase 5).
 
@@ -27,7 +27,7 @@ Each sub-agent costs ~3–5K tokens (system prompt + rules + memory, loaded befo
 | **Sonnet** | `model: "sonnet"` | Synthesis: "is this finding relevant?", cross-file traces, semantic compliance checks, rename sweeps needing call-site judgment. |
 | **Opus** | self (no delegation) | Novel reasoning, FK ordering, rule authoring, ADR writing, ambiguous test failures, final code review, diff-triage. Never delegate understanding. |
 | **Opus (delegated)** | `subagent_type: "plan-architect"` | Implementation **planning** only, via `/plan` Step 3. The def pins `model: opus` + `effort: xhigh`, so planning runs at Opus depth in a clean sub-context. Do **not** pass an inline `model` override — the def owns it. |
-| **Fable** | `model: "fable"` — **prompt first, last resort** | Opt-in rung above Opus. Use **only** when a task is absolutely critical **and** Fable is 100% necessary to solve it — and **never without prompting the user first** for explicit approval. Default to Opus; treat Fable as a last resort, not a routine capability upgrade. Full gate: `.claude/rules/agent-tiering-detail.md`. |
+| **Fable** | `model: "fable"` — **prompt first, last resort** | Rung above Opus (~2× cost). Use **only** when a task is absolutely critical **and** Fable is 100% necessary to solve it — and **never without prompting the user first** for explicit approval. Default to Opus. Full gate: `.claude/rules/agent-tiering-detail.md`. |
 
 > **The boundary keys on task *type* (judgment vs. mechanical), not raw model capability** — a stronger Sonnet moves nothing across the line. Re-validated 2026-06-30 vs Sonnet 5 (then the `sonnet` alias, native 1M context): unchanged. Why: `agent-tiering-detail.md`.
 
@@ -47,15 +47,12 @@ Prompting **Haiku**: compensate for its tendency to stop at "enough" — concret
 
 Tier per prompt — don't default all Explore agents to one tier.
 
-**Explore is pinned to Sonnet 4.6, not Sonnet 5.** The built-in agent is shadowed by a user def (`~/.claude/agents/Explore.md`, frontmatter `model: claude-sonnet-4-6`) to dodge Sonnet 5's ~30% token tax — its tokenizer inflates every token the run charges against a subscription's budget. The frontmatter pin wins **only when the `model` param is omitted**, so invoke by tier as:
-
-- **Sonnet-4.6 tier** (multi-hop / synthesis) → **omit the `model` param** — the def's 4.6 pin applies. Passing `model: "sonnet"` is **blocked** by `~/.claude/hooks/explore-model-gate.sh` (it resolves to Sonnet 5 and would override the pin).
-- **Haiku tier** (enumeration) → pass `model: "haiku"` (allowed, cheaper).
+**Explore is pinned to Sonnet 4.6, not Sonnet 5.** The built-in agent is shadowed by a user def (`~/.claude/agents/Explore.md`, frontmatter `model: claude-sonnet-4-6`) to dodge Sonnet 5's ~30% token tax — its tokenizer inflates every token the run charges against a subscription's budget. The pin wins **only when the `model` param is omitted**; passing `model: "sonnet"` is **blocked** by `~/.claude/hooks/explore-model-gate.sh` (it resolves to Sonnet 5 and would override the pin).
 
 | Tier | Model param | Use for Explore | Examples |
 |------|-------------|-----------------|---------|
-| **Haiku** | `model: "haiku"` | Enumeration, single-file lookups, grep-and-list | "find all callers of getTeamByName", "which files import WaiverService", "does column X exist in migration Y" |
-| **Sonnet 4.6** | *omit `model`* | Multi-hop traces, cross-module synthesis, open-ended investigation | "trace the encoding pipeline from .plr read to Team page", "how does module A interact with B" |
+| **Haiku** | `model: "haiku"` | Enumeration, single-file lookups, grep-and-list | "find all callers of getTeamByName", "does column X exist in migration Y" |
+| **Sonnet 4.6** | *omit `model`* | Multi-hop traces, cross-module synthesis, open-ended investigation | "trace the encoding pipeline from .plr read to Team page" |
 
 **Heuristic:** notice connections / judge relevance / trace data flow → omit `model` (Sonnet 4.6). Answerable by grep + format → `model: "haiku"`.
 

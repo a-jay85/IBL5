@@ -1,6 +1,6 @@
 ---
 description: Token-spend reduction backlog — resident-context diet, caching economics, output-spend guards, and LSP-first navigation for the Claude Code harness, with per-entry status.
-last_verified: 2026-07-07
+last_verified: 2026-07-08
 ---
 
 # Token-Spend Reduction Backlog

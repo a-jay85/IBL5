@@ -1,6 +1,6 @@
 ---
 description: Rationale for removing the broad *Repository* mutation testing exclusion and adding MariaDB to the mutation CI workflow.
-last_verified: 2026-05-05
+last_verified: 2026-07-07
 ---
 
 # ADR-0019: Mutation Testing Unlock — Repositories
@@ -31,8 +31,7 @@ Plan 15 (Views unlock) removed `*View*` from `infection.json5` but didn't addres
 
 ## Consequences
 
-- 78 of 82 Repository implementations are now subject to the 100% MSI mutation gate.
+- Pass 1 brought all but the four deferred repositories under the 100% MSI mutation gate. Pass 2 has since completed (PR #872), writing direct DB integration tests for the four deferred repositories and removing their per-file excludes. `infection.json5` no longer excludes any Repository — every Repository implementation is now subject to the mutation gate.
 - The mutation CI workflow takes longer (~30s for MariaDB startup + migrations + seed), but this is the same overhead already paid by the `db-integration` job in `tests.yml`.
 - The `phpunit-mutation.xml` config must be kept in sync with `phpunit.xml` when new test suites are added. The testsuites section is identical; only the `<groups>` and `<source>` blocks differ.
 - Running `composer mutation` locally now requires a running MariaDB instance (matching the CI service config) because `testFrameworkOptions` points at `phpunit-mutation.xml`, which includes DB integration tests. Developers without a local MariaDB will see connection failures during coverage generation.
-- Pass 2 (4 remaining repos) requires writing direct DB integration tests before they can be unlocked.

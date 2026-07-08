@@ -1,6 +1,6 @@
 ---
 description: Centralizes shared contract modifier formulas (winner, tradition, loyalty, playing time) into ContractRules static methods, eliminating three divergent implementations.
-last_verified: 2026-05-04
+last_verified: 2026-07-07
 ---
 
 # ADR-0014: Centralize Contract Modifier Formulas
@@ -10,11 +10,11 @@ last_verified: 2026-05-04
 
 ## Context
 
-Three contract calculators were independently extracted from legacy PHP files in 2025: `ExtensionOfferEvaluator` (PR #49), `NegotiationDemandCalculator` (PR #108), and `FreeAgencyDemandCalculator` (PR #132). Each faithfully ported its legacy source, but the legacy sources had drifted over years of separate maintenance. Winner and tradition used different scaling (raw differential vs normalized win-rate), and playing time had three distinct formulas across the modules. No canonical source was ever established, and the divergence caused incorrect extension evaluations and negotiation demands.
+Three contract calculators were independently extracted from legacy PHP files in 2025: `ExtensionOfferEvaluator` (PR #49), `ExtensionContractDemandCalculator` (PR #108), and `FreeAgencyMarketDemandCalculator` (PR #132). Each faithfully ported its legacy source, but the legacy sources had drifted over years of separate maintenance. Winner and tradition used different scaling (raw differential vs normalized win-rate), and playing time had three distinct formulas across the modules. No canonical source was ever established, and the divergence caused incorrect extension evaluations and negotiation demands.
 
 ## Decision
 
-All shared modifier formulas are centralized as static methods on `ContractRules`: `calculateWinnerModifier`, `calculateTraditionModifier`, `calculateLoyaltyModifier`, and `calculatePlayingTimeModifier`. Consumer classes (`ExtensionOfferEvaluator`, `NegotiationDemandCalculator`, `FreeAgencyDemandCalculator`) delegate to these methods instead of implementing their own formulas. `FreeAgencyDemandCalculator` is the canonical source for the unified formulas. Enforced by `ModifierConsistencyTest` integration test.
+All shared modifier formulas are centralized as static methods on `ContractRules`: `calculateWinnerModifier`, `calculateTraditionModifier`, `calculateLoyaltyModifier`, and `calculatePlayingTimeModifier`. Consumer classes (`ExtensionOfferEvaluator`, `ExtensionContractDemandCalculator`, `FreeAgencyMarketDemandCalculator`) delegate to these methods instead of implementing their own formulas. `FreeAgencyMarketDemandCalculator` is the canonical source for the unified formulas. Enforced by `ModifierConsistencyTest` integration test.
 
 ## Alternatives Considered
 

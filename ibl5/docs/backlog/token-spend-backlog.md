@@ -47,7 +47,7 @@ Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive
 | T2 | Always-loaded context budget gate | ⬜ Open | repo | S |
 | T4 | Driver-model downshift for babysitting loops | ⬜ Open | ⌂ | M |
 | T5 | Memory/rules dedup lint | ⬜ Open | ⌂ | S |
-| T7 | Resident-overlay diet (MEMORY.md + rules) | ⬜ Open | both | M |
+| T7 | Resident-overlay diet (MEMORY.md + rules) | 📋 Planned (resident-overlay-diet.md) | both | M |
 | T9 | Lazy-load plan/post-plan skills | 📋 Planned | repo | M |
 
 ### T1 Automouse token ledger

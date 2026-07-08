@@ -29,7 +29,7 @@ last_verified: 2026-07-08
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 4 |
+| ⬜ Open | 6 |
 | 📋 Planned | 1 |
 | ◑ Partial | 1 |
 | ✅ Implemented | 0 |
@@ -49,6 +49,8 @@ Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive
 | T5 | Memory/rules dedup lint | ⬜ Open | ⌂ | S |
 | T7 | Resident-overlay diet (MEMORY.md + rules) | 📋 Planned (resident-overlay-diet.md) | both | M |
 | T9 | Lazy-load plan/post-plan skills | 📋 Planned | repo | M |
+| T11 | Tier-boundary plan splitting | ⬜ Open | repo | S |
+| T12 | Sonnet plan-architect for recipe-backed plans | ⬜ Open | repo | M |
 
 ### T1 Automouse token ledger
 **Location:** `bin/lib/automouse-stream-filter` (parses `total_cost_usd` + token counts from the stream-json `result` event); `bin/automouse-run` (appends a per-plan, per-phase row to `automouse/reports/YYYY-MM-DD-costs.md`).
@@ -91,6 +93,20 @@ Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive
 **Suggested direction:** Thin orchestrator SKILL.md + per-phase reference files read on phase entry. Both restructures are planned: `$HOME/.claude/plans/lazy-load-plan-skill.md` and `$HOME/.claude/plans/lazy-load-post-plan-skill.md` (the post-plan one is in the automouse queue).
 **Risk if untouched:** ~20K tokens of dead weight resident in every `/plan` and `/post-plan` run.
 **Status (2026-07-07):** 📋 Planned — post-plan restructure queued; plan-skill restructure planned, not yet queued.
+
+### T11 Tier-boundary plan splitting
+**Location:** `.claude/skills/plan/SKILL.md` — Step 2.5 (split criteria) and Step 4 gate 13 (`impl_model` criterion).
+**Problem:** Gate 13's Sonnet criterion is all-or-nothing per plan: a single judgment phase or `Truly-manual` row drops the *entire* implementation to Opus (~1.7× per-token) even when the other 90% of phases are mechanical. Step 2.5's split criteria (review size, rollback boundary, context budget) never consider the model-tier boundary, so mixed plans are never restructured to isolate the Opus-forcing part.
+**Suggested direction:** Add a Step 2.5 split criterion: when a plan's Opus-tier phases (novel design, migration authoring, judgment sweeps) are *separable* from its mechanical phases, split at the tier boundary — a small Opus plan plus stacked `impl_model: sonnet` plan(s) carrying the bulk of the edits. Pairs with L13 in [loop-engineering-backlog.md](loop-engineering-backlog.md) (per-phase routing), which covers the *interleaved* case a split can't reach.
+**Risk if untouched:** Mixed plans keep running whole-hog at Opus; the gate-13(b) default only helps uniformly-mechanical plans.
+**Status (2026-07-08):** ⬜ Open.
+
+### T12 Sonnet plan-architect for recipe-backed plans
+**Location:** `.claude/agents/plan-architect.md` (pins `model: opus` + `effort: xhigh`); `/plan` Step 3 spawns it for every plan.
+**Problem:** Every plan pays an Opus-xhigh architect run even when the design was already resolved upstream — a backlog entry that names the recipe, the files, and the pattern to copy (the marker-swap / mechanical-sweep class). By the house tiering rule (task *type*, not model capability), composing a plan from a pre-resolved recipe is mechanical composition, not novel design.
+**Suggested direction:** A second architect def at Sonnet, selected in Step 3 only when the source backlog entry carries an explicit recipe + named existing pattern; Opus stays the default everywhere else. Gate rollout on measurement (T1 tier ledger + `bin/check-plan` failure rate per architect tier) so a plan-quality regression is visible before the cheap path becomes habit.
+**Risk if untouched:** Opus-xhigh spend on plans whose only hard thinking already happened in the backlog audit.
+**Status (2026-07-08):** ⬜ Open.
 
 ---
 

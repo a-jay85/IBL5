@@ -1,6 +1,6 @@
 ---
 description: CI/GitHub-Actions workflow simplification backlog — duplicated setup/notify boilerplate, job consolidation, and verified-not-redundant workflows, with per-entry status + automouse-readiness.
-last_verified: 2026-07-03
+last_verified: 2026-07-07
 ---
 
 # CI Workflow Simplification Backlog
@@ -13,12 +13,7 @@ last_verified: 2026-07-03
 
 ## Disposition taxonomy
 
-**Status** — where the fix stands:
-- ✅ **Implemented** — merged; the named concern is resolved on `master` (verified on disk).
-- ◑ **Partial** — partially addressed; residual named in the note.
-- 📋 **Planned** — a plan file exists (queued or PR-open); not yet merged.
-- ⬜ **Open** — no plan yet.
-- 🚫 **Declined** — deliberately won't-do (rationale in the Status line).
+**Status** — canonical five-glyph set: see [README.md § Status taxonomy](README.md#status-taxonomy).
 
 **Automouse-readiness** (assigned only for items not ✅/🚫):
 - 🟩 **Auto-mergeable** — behavior-preserving (green-green via existing CI) + no gate-14 trigger → arms auto-merge unattended.

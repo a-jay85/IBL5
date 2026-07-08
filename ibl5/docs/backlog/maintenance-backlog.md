@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-07-03
+last_verified: 2026-07-07
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -31,12 +31,7 @@ Effort scale:
 
 Every finding is classified on two orthogonal axes below, **verified against on-disk / git state** (not the prose description — `check-hot-files` LOC, `git log` PR map, `classes/` greps, plan/PR/queue cross-ref). A per-axis table heads each axis.
 
-**Status:**
-- ✅ **Implemented** — the finding's *specific named concern* is resolved on `master` (verified on disk).
-- ◑ **Partial** — partially addressed; residual work remains (named in the note).
-- 📋 **Planned** — a plan exists / PR is open, not yet merged.
-- ⬜ **Open** — no plan yet.
-- 🚫 **Declined** — deliberately won't-do (rationale in the finding's Status line).
+**Status** — canonical five-glyph set: see [README.md § Status taxonomy](README.md#status-taxonomy).
 
 **Automouse-readiness** (assigned only for items not ✅/🚫):
 - 🟩 **Auto-mergeable** — behavior-preserving (green-green) + pinnable; no gate-14 trigger → arms auto-merge unattended.

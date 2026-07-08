@@ -1,6 +1,6 @@
 ---
 description: Token-spend reduction backlog — resident-context diet, caching economics, output-spend guards, and LSP-first navigation for the Claude Code harness, with per-entry status.
-last_verified: 2026-07-07
+last_verified: 2026-07-08
 ---
 
 # Token-Spend Reduction Backlog
@@ -32,8 +32,10 @@ last_verified: 2026-07-07
 | ⬜ Open | 4 |
 | 📋 Planned | 1 |
 | ◑ Partial | 1 |
-| ✅ Implemented | 4 |
+| ✅ Implemented | 0 |
 | 🚫 Declined | 0 |
+
+Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive/token-spend-backlog-archive.md).
 
 ---
 
@@ -43,14 +45,10 @@ last_verified: 2026-07-07
 |---|-------|--------|-------|-------:|
 | T1 | Automouse token ledger | ◑ Partial | repo | M |
 | T2 | Always-loaded context budget gate | ⬜ Open | repo | S |
-| T3 | Wire PHP LSP + LSP-first rule | ✅ Implemented | repo | S |
 | T4 | Driver-model downshift for babysitting loops | ⬜ Open | ⌂ | M |
 | T5 | Memory/rules dedup lint | ⬜ Open | ⌂ | S |
-| T6 | Re-cap runtime context window | ✅ Implemented | ⌂ | S |
 | T7 | Resident-overlay diet (MEMORY.md + rules) | ⬜ Open | both | M |
-| T8 | Re-enable adaptive thinking | ✅ Implemented | ⌂ | S |
 | T9 | Lazy-load plan/post-plan skills | 📋 Planned | repo | M |
-| T10 | Tool-output token guards | ✅ Implemented | ⌂ | M |
 
 ### T1 Automouse token ledger
 **Location:** `bin/lib/automouse-stream-filter` (parses `total_cost_usd` + token counts from the stream-json `result` event); `bin/automouse-run` (appends a per-plan, per-phase row to `automouse/reports/YYYY-MM-DD-costs.md`).
@@ -66,11 +64,6 @@ last_verified: 2026-07-07
 **Risk if untouched:** Silent regrowth of the per-turn fixed tax that T7 pays down.
 **Status (2026-07-07):** ⬜ Open.
 
-### T3 Wire PHP LSP + LSP-first rule
-**Location:** `.claude/rules/lsp-first.md`; intelephense via the php-lsp plugin.
-**Problem (was):** Symbol navigation ran as grep-and-read-whole-file chains — the largest read-token sink in a 275K-line PHP codebase.
-**Status (2026-07-07):** ✅ Implemented — intelephense wired and the LSP-first rule shipped (measured ~10–30× cheaper than the grep-and-read path on `CsrfGuard::validateSubmittedToken`: ~320 tokens vs ~3–10K). Sub-item **SessionStart index warm-up: 🚫 Declined** — a `--stdio` server can't be reached by a shell hook (verified 2026-07-07); the tool blocks until indexed and the rule carries retry-once guidance instead.
-
 ### T4 Driver-model downshift for babysitting loops
 **Location:** Interactive workflow — CI-watching, merge-nudging, and re-run loops currently run in the main (Opus/Fable) session.
 **Problem:** Babysitting phases need no frontier-model reasoning; every polling turn re-reads the full session context at the top tier.
@@ -85,11 +78,6 @@ last_verified: 2026-07-07
 **Risk if untouched:** Redundant always-loaded lines dilute recall and re-inflate the T7 surface.
 **Status (2026-07-07):** ⬜ Open.
 
-### T6 Re-cap runtime context window
-**Location:** `$HOME/.claude/settings.json` — `autoCompactWindow: 200000`.
-**Problem (was):** Uncapped sessions reached 400K+ context; every turn of such a session re-reads the whole window from cache, and reasoning quality degrades well before that size.
-**Status (2026-07-07):** ✅ Implemented — capped at 200K (120K was tried and thrashed — back-to-back compactions — in both interactive and headless runs; 200K is the measured compromise).
-
 ### T7 Resident-overlay diet (MEMORY.md + rules)
 **Location:** Memory index `MEMORY.md` (~16KB, ~90 lines, 181 topic files behind it); `.claude/rules/agent-tiering.md` (~6.6KB, with an existing overflow file `.claude/rules/agent-tiering-detail.md`).
 **Problem:** Every request and every subagent spawn carries the full overlay; on a typical ~35K-token request it is ~27% of the read.
@@ -97,22 +85,12 @@ last_verified: 2026-07-07
 **Risk if untouched:** A permanent per-turn tax that compounds across every subagent.
 **Status (2026-07-07):** ⬜ Open — minor organic pruning only; no deliberate diet yet.
 
-### T8 Re-enable adaptive thinking
-**Location:** `$HOME/.claude/settings.json`.
-**Problem (was):** `CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING=1` forced full thinking (billed as output — the most expensive class) on every turn.
-**Status (2026-07-07):** ✅ Implemented — the env var is gone from settings; easy turns skip thinking again.
-
 ### T9 Lazy-load plan/post-plan skills
 **Location:** `.claude/skills/plan/SKILL.md` (~55KB ≈ 13K tokens) and `.claude/skills/post-plan/SKILL.md` (~68KB ≈ 17K tokens) — each a single file loaded whole at invocation and resident for the entire run.
 **Problem:** A long post-plan run re-reads ~17K tokens every turn, plus a fresh cache write per nightly session.
 **Suggested direction:** Thin orchestrator SKILL.md + per-phase reference files read on phase entry. Both restructures are planned: `$HOME/.claude/plans/lazy-load-plan-skill.md` and `$HOME/.claude/plans/lazy-load-post-plan-skill.md` (the post-plan one is in the automouse queue).
 **Risk if untouched:** ~20K tokens of dead weight resident in every `/plan` and `/post-plan` run.
 **Status (2026-07-07):** 📋 Planned — post-plan restructure queued; plan-skill restructure planned, not yet queued.
-
-### T10 Tool-output token guards
-**Location:** `$HOME/.claude/hooks/output-guard.sh` (PreToolUse, warn-only), extending the `ci-log-guard.sh` family.
-**Problem (was):** Unbounded Bash output (`cat`, unbounded `git log`/`find`, full Playwright runs) lands in context once and is re-billed as a cache read every remaining turn.
-**Status (2026-07-07):** ✅ Implemented — guards the four measured worst categories (scoped from 27,899 transcript Bash calls); warns with the bounded alternative; skips subagents. Plan archive: `$HOME/.claude/plans/output-guard-hook.md`.
 
 ---
 

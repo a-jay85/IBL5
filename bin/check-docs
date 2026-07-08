@@ -198,8 +198,12 @@ function scanReferences(string $content, string $repoRoot): array
             $tokens[] = $target;
         }
     }
-    if (preg_match_all('/`([^`\n]+)`/', $content, $m) > 0) {
-        foreach ($m[1] as $span) {
+    // Capture optional trailing (example) marker after closing backtick — signals intentional non-resolving path.
+    if (preg_match_all('/`([^`\n]+)`(\s*\(example\))?/', $content, $m) > 0) {
+        foreach ($m[1] as $i => $span) {
+            if (isset($m[2][$i]) && $m[2][$i] !== '') {
+                continue;
+            }
             $tokens[] = $span;
         }
     }

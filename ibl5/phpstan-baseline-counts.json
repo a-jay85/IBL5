@@ -11,6 +11,8 @@
     },
     "phpstan-tests-baseline.neon": {
         "argument.type": 73,
+        "classConstant.unused": 42,
+        "parameter.notFound": 1,
         "staticMethod.dynamicCall": 1
     }
 }

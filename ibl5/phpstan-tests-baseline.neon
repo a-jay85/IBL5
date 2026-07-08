@@ -61,6 +61,264 @@ parameters:
 			path: tests/DatabaseIntegration/FreeAgencyRepositoryTest.php
 
 		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_AWARDS_EMPTY_ACCOMPLISHMENTS is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_AWARDS_GM_AND_TEAM is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_BASELINE_AWARDSCARD is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_BASELINE_CURRENTSEASONCARD is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_BASELINE_DRAFTPICKSTABLE is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_BASELINE_FRANCHISEHISTORYCARD is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_BASELINE_RAFTERS is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_BASELINE_TABLEOUTPUT is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_CURRENT_FKA is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_CURRENT_NO_FKA is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_CURRENT_NO_POWER is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_CURRENT_POPULATED is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_DRAFT_EMPTY is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_DRAFT_POPULATED is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_FRANCHISE_BEST_BOLD is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_FRANCHISE_BEST_TIEBREAK is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_FRANCHISE_EMPTY_HISTORY is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_FRANCHISE_HEAT_HISTORY is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_FRANCHISE_NO_PLAYOFF is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_FRANCHISE_PLAYOFF_LOSS is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_FRANCHISE_PLAYOFF_MULTIROUND is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_FRANCHISE_PLAYOFF_WIN is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_FRANCHISE_REGULAR_HISTORY is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_FRANCHISE_ROUND5_DROPPED is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_RAFTERS_ALL_THREE is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_RAFTERS_AS_CLAUSE is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_RAFTERS_CONF_2V3 is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_RAFTERS_DIV_ARMS is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_RAFTERS_FIVE_PER_ROW is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_RAFTERS_UNKNOWN_DROPPED is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_TABLE_AVG_S is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_TABLE_BOGUS is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_TABLE_CHUNK is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_TABLE_CONTRACTS is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_TABLE_HISTORICAL is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_TABLE_PER36 is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_TABLE_RATINGS is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_TABLE_SPLIT_HOME is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_TABLE_SPLIT_NULL is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_TABLE_SPLIT_WINS is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_TABLE_TOTAL_S is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_TID0_TABLEOUTPUT is unused.
+			identifier: classConstant.unused
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
+			rawMessage: 'PHPDoc tag @param references unknown parameter: $extra'
+			identifier: parameter.notFound
+			count: 1
+			path: tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php
+
+		-
 			rawMessage: 'Parameter #1 $player of method DepthChartEntry\DepthChartEntryView::renderPlayerRow() expects array{pid: int, name: string, nickname: string|null, age: int|null, teamid: int, teamname: string|null, pos: string, stamina: int|null, ..., ...<string, mixed>}, array{pid: 1, name: ''Round Trip Player'', pos: ''SG'', injured: 0, stamina: 60, dc_pg_depth: 0, dc_sg_depth: 1, dc_sf_depth: 2, ...} given.'
 			identifier: argument.type
 			count: 2

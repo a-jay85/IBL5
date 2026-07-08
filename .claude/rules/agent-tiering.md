@@ -56,4 +56,4 @@ Tier per prompt — don't default all Explore agents to one tier.
 
 **Heuristic:** notice connections / judge relevance / trace data flow → omit `model` (Sonnet 4.6). Answerable by grep + format → `model: "haiku"`.
 
-Plan-authoring tiering (labeling each phase, mechanical-recipe agents, bulk-sweep patterns) lives in `.claude/skills/plan/SKILL.md` Step 3.
+Plan-authoring tiering (labeling each phase, mechanical-recipe agents, bulk-sweep patterns) lives in `.claude/skills/plan/_architect-contract.md`, the plan-architect's output contract that `/plan` Step 3 directs the architect to Read.

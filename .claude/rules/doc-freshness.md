@@ -1,6 +1,6 @@
 ---
 description: Frontmatter schema, 60-day staleness policy, on-touch verification rule, and dead-reference rules enforced by bin/check-docs
-last_verified: 2026-07-03
+last_verified: 2026-07-08
 paths: "**/*.md"
 ---
 
@@ -29,4 +29,4 @@ This is enforced in CI by `bin/check-docs --since=<base-ref>`, which fails any P
 
 ## Dead-Reference Rule
 
-`bin/check-docs` scans doc bodies for repo-path tokens (`bin/<name>`, `ibl5/<path>`, `.claude/<path>`, `.github/<path>`) and fails on any token that does not resolve to an existing file or directory. Shell variables like `$FOO/bar` are ignored. Use a trailing `(example)` marker for intentional non-resolving paths.
+`bin/check-docs` scans doc bodies for repo-path tokens (`bin/<name>`, `ibl5/<path>`, `.claude/<path>`, `.github/<path>`) and fails on any token that does not resolve to an existing file or directory. Shell variables like `$FOO/bar` are ignored. Paths with glob characters (`*`, `?`, `[`, `]`) are also skipped automatically. For intentional non-resolving literal paths, append `(example)` immediately after the closing backtick — e.g. `` `bin/some-path` (example) `` — and `bin/check-docs` will skip the reference.

@@ -1,6 +1,6 @@
 ---
-description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, and the human comprehension counter-loop, with per-entry status.
-last_verified: 2026-07-07
+description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, plan decomposition/tier-routing machinery, and the human comprehension counter-loop, with per-entry status.
+last_verified: 2026-07-08
 ---
 
 # Loop-Engineering Backlog
@@ -27,7 +27,7 @@ last_verified: 2026-07-07
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 6 |
+| ⬜ Open | 11 |
 | 📋 Planned | 2 |
 | ◑ Partial | 3 |
 | ✅ Implemented | 1 |
@@ -51,6 +51,11 @@ last_verified: 2026-07-07
 | L10 | Discord intake loop | ◑ Partial | 🟦 | L |
 | L11 | Comprehension-debt digest | ⬜ Open | 🟦 | S |
 | L12 | Autonomy contracts in plan frontmatter | ◑ Partial | 🟦 | M |
+| L13 | Per-phase impl-model routing | ⬜ Open | 🟦 | M |
+| L14 | Escalate-on-retry (Sonnet-first, just-in-time Opus) | ⬜ Open | 🟦 | S |
+| L15 | Sonnet-recipe completeness lint | ⬜ Open | 🟦 | S |
+| L16 | Context-budget gate v2 (work-size proxies + measured calibration) | ⬜ Open | 🟦 | M |
+| L17 | Shared-context artifact for multi-plan splits | ⬜ Open | 🟦 | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse-queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse-queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -128,6 +133,41 @@ last_verified: 2026-07-07
 **Suggested direction:** Per-plan `stop_condition` / `evidence` frontmatter fields that post-plan verification checks mechanically — goal, scope, stop condition, evidence, per the autonomy-contract framing.
 **Risk if untouched:** Autonomy increases (L1–L8) without a matching declared-contract surface.
 **Status (2026-07-07):** ◑ Partial — the one-bit levers + gates exist; structured contract fields don't. 🟦.
+
+### L13 Per-phase impl-model routing
+**Location:** `bin/automouse-run` (single `--model` per plan, resolved once by `bin/lib/plan-impl-model`); plans already label every phase Sonnet / Haiku / self per `.claude/skills/plan/_architect-contract.md` § Agent-tiering guidance — nothing consumes those labels at run time (verified 2026-07-08).
+**Problem:** Model selection is whole-run: a mixed plan runs every mechanical phase at the top tier, and the only relief is a tier-boundary split (T11 in [token-spend-backlog.md](token-spend-backlog.md)), which can't reach plans whose judgment and mechanical phases interleave.
+**Suggested direction:** Make the in-plan tier labels binding rather than advisory: the impl orchestrator MUST delegate a Sonnet/Haiku-labeled phase as a sub-agent per its delegation packet (mechanism exists; today it's agent discretion). Bulk spend moves down-tier AND out of the orchestrator's context — dumb-zone relief and tier savings from the same change. A runner-driven per-phase `claude -p` sequence with a state handoff is the heavier fallback if in-run delegation proves unreliable.
+**Risk if untouched:** Per-phase tiering stays a plan-authoring ritual with no runtime effect; mixed plans pay top-tier for mechanical sweeps.
+**Status (2026-07-08):** ⬜ Open — 🟦.
+
+### L14 Escalate-on-retry (Sonnet-first, just-in-time Opus)
+**Location:** `bin/automouse-run` — `MAX_ATTEMPTS=3`, every attempt at the same `impl_model`; genuine failures park the plan in `skipped/` after 3.
+**Problem:** `impl_model: sonnet` adoption is throttled by its downside: a plan that turns out to need judgment burns all three attempts on the same model, then a queue slot. The rational response is conservative labeling — Opus-by-default — which is the exact spend the marker exists to avoid.
+**Suggested direction:** On a genuine (non-environmental) failure of a Sonnet-model plan, escalate the final retry to Opus, feeding the prior attempt's failure report into the retry context (the L8 sidecar pattern already persists it). Cheap plans stay cheap; hard plans get Opus exactly when the evidence demands it. Once proven, this makes Sonnet-first safe enough to consider as the *default* for unmarked plans, inverting today's Opus-by-omission.
+**Risk if untouched:** Gate 13(b)'s Sonnet default stays capped at "obviously mechanical" plans; every borderline plan pre-commits to Opus.
+**Status (2026-07-08):** ⬜ Open — 🟦.
+
+### L15 Sonnet-recipe completeness lint
+**Location:** `bin/check-plan` — gates cover matrix presence, forbidden tokens, staleness, and size; none check *recipe completeness*. Gate 13 judges Sonnet-eligibility by verification (a machine check fails on a wrong edit) only.
+**Problem:** "Sonnet-capable" has two halves and only one is enforced: verifiable, but not *specified* — a Sonnet plan whose phases lack edit anchors, reuse notes, or self-verify commands passes `bin/check-plan`, then flails at 2am on judgment calls the plan never resolved. Those burned attempts read as model failure and push labeling back toward Opus.
+**Suggested direction:** A new gate for `impl_model: sonnet` plans: every numbered phase that edits an existing file must carry an edit-anchor cue (quoted snippet per the architect contract), and every delegation packet a Self-verify line; violations name the phase. Heuristic by nature, so support a clearing marker mirroring the existing `no-adr:` / `context-budget:` pattern.
+**Risk if untouched:** Sonnet-labeled plans fail for specification gaps, mis-attributed to model capability.
+**Status (2026-07-08):** ⬜ Open — 🟦.
+
+### L16 Context-budget gate v2 (work-size proxies + measured calibration)
+**Location:** `bin/check-plan` gate `[C]` (≥ 500 lines OR ≥ 12 numbered phases — thresholds hand-set once from the 2026-07-07 automouse-corpus audit); the T1 per-phase cost rows carry no peak-context column.
+**Problem:** Two blind spots. (1) Plan size ≠ work size: a 100-line plan phase saying "sweep every call site" triggers a marathon implementation the gate can't see, while a reference-heavy plan false-trips and gets papered over with a `context-budget:` marker. (2) No feedback loop: nothing re-checks the thresholds as plan style evolves, so the gate drifts from the dumb-zone reality it proxies.
+**Suggested direction:** (a) Add work-size proxies — Verification-Matrix row count, Critical-Files change-target count, and sweep-verb detection ("all call sites", "every occurrence") in a phase without a delegation packet. (b) Log peak context tokens per impl run into the T1 ledger (the stream-json usage events already carry them) and add a report correlating plan proxies against measured peaks — recalibrate thresholds from data, and flag any run breaching ~150K as a Step 2.5 split miss for the retro.
+**Risk if untouched:** Dumb-zone breaches keep happening under the gate's radar, and the thresholds stay a one-shot guess.
+**Status (2026-07-08):** ⬜ Open — 🟦. Pairs with T1 in [token-spend-backlog.md](token-spend-backlog.md).
+
+### L17 Shared-context artifact for multi-plan splits
+**Location:** `/plan` Step 2.5 multi-PR path (`.claude/skills/plan/SKILL.md`) — Steps 3–5 run once per unit, each plan fully self-contained; the Discord bug pipeline hand-rolled a shared-context spec file to avoid exactly this.
+**Problem:** When a task splits into N plans, each plan-architect run and each implementation session re-derives the shared orientation (blast radius, patterns, front-loaded decisions) independently — N× the exploration spend — and each plan re-inlines the shared background, inflating it toward gate `[C]`. This is a tax on splitting, i.e. a disincentive against the very decomposition the context-budget gate demands.
+**Suggested direction:** Formalize the pattern the Discord pipeline improvised: when Step 2.5 splits, persist Step 2's exploration pointers (`path:line` + load-bearing fact, never file bodies) plus recorded Step 3.5 decisions once to `$HOME/.claude/plans/<program>-shared-context.md`; each split plan references it instead of restating it. Plans get smaller, and each architect run becomes targeted confirmation instead of re-exploration.
+**Risk if untouched:** Splitting stays expensive, so plans skew large — working against L16/T11.
+**Status (2026-07-08):** ⬜ Open — 🟦.
 
 ---
 

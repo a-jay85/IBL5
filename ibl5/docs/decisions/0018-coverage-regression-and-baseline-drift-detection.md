@@ -1,6 +1,6 @@
 ---
 description: Rationale for adding coverage regression detection and PHPStan baseline drift detection to CI.
-last_verified: 2026-05-04
+last_verified: 2026-07-07
 ---
 
 # ADR-0018: Coverage Regression and Baseline Drift Detection

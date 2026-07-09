@@ -273,13 +273,26 @@ run_heartbeat_watcher() {
     done
 }
 
+# Map a Claude model id to its tier label for the cost roll-up. Prefix match so
+# a version bump (claude-opus-4-8 → claude-opus-5) keeps resolving; an unknown or
+# empty id yields "?" rather than a blank cell.
+model_tier() {
+    case "${1:-}" in
+        *opus*)   echo "Opus"   ;;
+        *sonnet*) echo "Sonnet" ;;
+        *haiku*)  echo "Haiku"  ;;
+        *)        echo "?"      ;;
+    esac
+}
+
 # Append a per-phase cost row to the night's cost roll-up. Cost is parsed from
 # the phase's `exit:` line (emitted by automouse-stream-filter into the log). One
 # row per phase keeps this robust across split impl/postplan invocations — no
 # cross-phase variable dependency. See .claude/rules/automouse-workflow.md.
 append_cost_row() {
-    local plan=$1 phase=$2 log_before=$3
-    local cost report
+    local plan=$1 phase=$2 log_before=$3 model=${4:-?}
+    local cost report tier
+    tier=$(model_tier "$model")
     # `|| true` is load-bearing: under `set -euo pipefail` a killed phase emits no
     # `cost=` line, so grep exits non-zero and this plain assignment would abort the
     # whole automouse loop before the `cost="?"` fallback below. Swallow it and continue.
@@ -288,10 +301,55 @@ append_cost_row() {
     report="$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-costs.md"
     mkdir -p "$(dirname "$report")"
     if [ ! -f "$report" ]; then
-        printf '# Automouse cost roll-up — %s\n\n| Plan | Phase | Cost ($) |\n|---|---|---|\n' \
+        printf '# Automouse cost roll-up — %s\n\n| Plan | Phase | Model | Tier | Cost ($) |\n|---|---|---|---|---|\n' \
             "$(date +%Y-%m-%d)" > "$report"
     fi
-    printf '| %s | %s | %s |\n' "$plan" "$phase" "$cost" >> "$report"
+    printf '| %s | %s | %s | %s | %s |\n' "$plan" "$phase" "$model" "$tier" "$cost" >> "$report"
+    regenerate_weekly_section "$report"
+}
+
+# Rebuild the trailing-7-days weekly aggregate at the bottom of today's costs
+# report. Idempotent: strips any prior "## Weekly aggregate" section (always the
+# last section) and rewrites it, so re-running per phase keeps it current and it
+# survives a mid-night run break. Cost-by-tier comes from the reports' Tier
+# column; token totals come from the logs' exit-line tags — each table from its
+# natural source. Every per-file read is piped through the same sed strip so a
+# prior day's weekly rows (which also start with a pipe) are never re-ingested.
+regenerate_weekly_section() {
+    local report=$1 reports_dir logs_dir tmp d f i
+    reports_dir=$(dirname "$report")
+    logs_dir="$NIGHTLY_DIR/logs"
+    tmp=$(mktemp)
+    sed '/^## Weekly aggregate/,$d' "$report" > "$tmp" && mv "$tmp" "$report"
+    {
+        printf '\n## Weekly aggregate (last 7 days)\n\n'
+        printf '### Cost by tier ($)\n\n| Tier | Cost ($) |\n|---|---|\n'
+        for i in 0 1 2 3 4 5 6; do
+            d=$(date -v-"${i}"d +%F); f="$reports_dir/$d-costs.md"
+            [ -f "$f" ] && sed '/^## Weekly aggregate/,$d' "$f" || true
+        done | awk -F'|' '
+            { if (NF==7) {tier=$5; cost=$6}
+              else if (NF==5) {tier="(untracked)"; cost=$4}
+              else next
+              gsub(/^[ \t]+|[ \t]+$/,"",tier); gsub(/^[ \t]+|[ \t]+$/,"",cost)
+              if (cost ~ /^[0-9]+(\.[0-9]+)?$/) {c[tier]+=cost; tot+=cost} }
+            END { for (t in c) printf "| %s | %.4f |\n", t, c[t]
+                  printf "| **Total** | %.4f |\n", tot+0 }'
+        printf '\n### Tokens by phase\n\n| Phase | Input | Cache-write | Cache-read | Output |\n|---|---|---|---|---|\n'
+        for i in 0 1 2 3 4 5 6; do
+            d=$(date -v-"${i}"d +%F); f="$logs_dir/$d.log"
+            [ -f "$f" ] && grep -h 'exit:' "$f" || true
+        done | awk '
+            { phase="?"; n=split($2,a,"/"); if (n>=2) phase=a[n]
+              for (j=1;j<=NF;j++) { if (split($j,kv,"=")==2) { k=kv[1]; v=kv[2]; sub(/^[$]/,"",v)
+                if (v ~ /^[0-9]+$/) { if (k=="in") {inp[phase]+=v; inpT+=v}
+                  else if (k=="out") {o[phase]+=v; oT+=v}
+                  else if (k=="cache") {cr[phase]+=v; crT+=v}
+                  else if (k=="cache_write") {cw[phase]+=v; cwT+=v} } } }
+              seen[phase]=1 }
+            END { for (p in seen) printf "| %s | %d | %d | %d | %d |\n", p, inp[p], cw[p], cr[p], o[p]
+                  printf "| **Total** | %d | %d | %d | %d |\n", inpT, cwT, crT, oT }'
+    } >> "$report"
 }
 
 # Decrement the current plan's attempt counter by one ("refund"). Used when a
@@ -606,7 +664,7 @@ PLAN_FILE=$PLAN_NAME" \
         fi
 
         echo "--- Plan #$PLANS_RUN impl finished at $(date) ---" >> "$LOG"
-        append_cost_row "$PLAN_NAME" impl "$IMPL_LOG_BEFORE"
+        append_cost_row "$PLAN_NAME" impl "$IMPL_LOG_BEFORE" "$IMPL_MODEL"
 
         IMPL_DUR=$(( $(date +%s) - IMPL_START ))
 
@@ -704,7 +762,7 @@ PLAN_FILE=$PLAN_NAME" \
         fi
 
         echo "--- Plan #$PLANS_RUN postplan finished at $(date) ---" >> "$LOG"
-        append_cost_row "$PLAN_NAME" postplan "$PP_LOG_BEFORE"
+        append_cost_row "$PLAN_NAME" postplan "$PP_LOG_BEFORE" claude-sonnet-4-6
 
         PP_DUR=$(( $(date +%s) - PP_START ))
 

@@ -38,7 +38,7 @@ function theindex($new_topic = "0")
     PageLayout\PageLayout::header();
 
     if (defined('HOME_FILE')) {
-        echo '<h1 class="ibl-title">' . \Security\HtmlSanitizer::e((string) $sitename) . '</h1>';
+        echo '<h1 class="ibl-title">IBL: Internet Basketball League</h1>';
     } else {
         echo '<h1 class="ibl-title">News</h1>';
     }

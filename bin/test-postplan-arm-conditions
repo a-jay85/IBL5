@@ -6,12 +6,14 @@
 # (conditions (1) Manual-Testing, (5) golden, (6) Depends-on, (8) feat:).
 #
 # Why this exists: those conditions live as separate ```bash blocks inside
-# SKILL.md, and the orchestrator may run each block in its OWN shell. A block
-# that relied on a hoisted `source` or a shared `PR_JSON` from a preamble would
-# then have an UNDEFINED predicate function — and for condition (8) that fails
-# OPEN (no BLOCKED line emitted → a feat: PR auto-arms). This test runs each
-# block in an isolated `bash -c` against a gh shim and asserts the holds, plus a
-# structural check that every predicate-using block re-`source`s the lib itself.
+# _phase-6.5-arm-auto-merge.md (extracted from SKILL.md by the lazy-load
+# refactor), and the orchestrator runs each block in its OWN shell after
+# Reading that file. A block that relied on a hoisted `source` or a shared
+# `PR_JSON` from a preamble would have an UNDEFINED predicate function — and
+# for condition (8) that fails OPEN (no BLOCKED line emitted → a feat: PR
+# auto-arms). This test runs each block in an isolated `bash -c` against a gh
+# shim and asserts the holds, plus a structural check that every
+# predicate-using block re-`source`s the lib itself.
 #
 # Run: bin/test-postplan-arm-conditions  (exit 0 = all pass, 1 = a case failed)
 
@@ -19,7 +21,7 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-SKILL="$REPO_ROOT/.claude/skills/post-plan/SKILL.md"
+SKILL="$REPO_ROOT/.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md"
 
 BASE_TMP="$(mktemp -d)"
 trap 'rm -rf "$BASE_TMP"' EXIT

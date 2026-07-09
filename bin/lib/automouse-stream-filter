@@ -87,9 +87,10 @@ while IFS= read -r line; do
             in_tokens=$(printf '%s' "$line" | jq -r '.usage.input_tokens // "?"' 2>/dev/null) || true
             out_tokens=$(printf '%s' "$line" | jq -r '.usage.output_tokens // "?"' 2>/dev/null) || true
             cache_tokens=$(printf '%s' "$line" | jq -r '.usage.cache_read_input_tokens // "?"' 2>/dev/null) || true
-            printf '%s exit: stop_reason=%s turns=%s tools=%d duration=%sms cost=$%s in=%s out=%s cache=%s\n' \
+            cache_write=$(printf '%s' "$line" | jq -r '.usage.cache_write_input_tokens // .usage.cache_creation_input_tokens // "?"' 2>/dev/null) || true
+            printf '%s exit: stop_reason=%s turns=%s tools=%d duration=%sms cost=$%s in=%s out=%s cache=%s cache_write=%s\n' \
                 "$(line_prefix)" "$stop_reason" "$num_turns" "$TOOL_COUNT" "$duration_ms" \
-                "$cost_usd" "$in_tokens" "$out_tokens" "$cache_tokens"
+                "$cost_usd" "$in_tokens" "$out_tokens" "$cache_tokens" "$cache_write"
             # result is the final stream-json event — terminate claude and exit
             if [ -n "$CMDPID_FILE" ]; then
                 _target_pid=$(cat "$CMDPID_FILE" 2>/dev/null) || true

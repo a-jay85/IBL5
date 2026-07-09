@@ -1,6 +1,6 @@
 ---
 description: Token-spend reduction backlog — resident-context diet, caching economics, output-spend guards, and LSP-first navigation for the Claude Code harness, with per-entry status.
-last_verified: 2026-07-08
+last_verified: 2026-07-09
 ---
 
 # Token-Spend Reduction Backlog
@@ -29,10 +29,10 @@ last_verified: 2026-07-08
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 6 |
+| ⬜ Open | 5 |
 | 📋 Planned | 1 |
 | ◑ Partial | 1 |
-| ✅ Implemented | 0 |
+| ✅ Implemented | 5 |
 | 🚫 Declined | 0 |
 
 Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive/token-spend-backlog-archive.md).
@@ -43,11 +43,11 @@ Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive
 
 | # | Title | Status | Locus | Effort |
 |---|-------|--------|-------|-------:|
-| T1 | Automouse token ledger | ◑ Partial | repo | M |
+| T1 | Automouse token ledger | ✅ Implemented | repo | M |
 | T2 | Always-loaded context budget gate | ⬜ Open | repo | S |
 | T4 | Driver-model downshift for babysitting loops | ⬜ Open | ⌂ | M |
 | T5 | Memory/rules dedup lint | ⬜ Open | ⌂ | S |
-| T7 | Resident-overlay diet (MEMORY.md + rules) | 📋 Planned (resident-overlay-diet.md) | both | M |
+| T7 | Resident-overlay diet (MEMORY.md + rules) | ◑ Partial | both | M |
 | T9 | Lazy-load plan/post-plan skills | 📋 Planned | repo | M |
 | T11 | Tier-boundary plan splitting | ⬜ Open | repo | S |
 | T12 | Sonnet plan-architect for recipe-backed plans | ⬜ Open | repo | M |
@@ -57,7 +57,7 @@ Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive
 **Problem:** The nightly queue is pure spend mechanism with only partial measurement: per-phase cost rows exist, but there is no tier breakdown, no weekly aggregate, and no equivalent report for interactive sessions (the 7-day analysis above was done by hand).
 **Suggested direction:** Extend the existing costs table with model/tier columns and a weekly roll-up; add a `token-report` script under `bin/` that runs the transcript analysis on demand so each shipped entry in this backlog can be verified for effect.
 **Risk if untouched:** No feedback signal — token-efficiency changes ship without evidence they pay off.
-**Status (2026-07-07):** ◑ Partial — live per-phase cost logging verified in `bin/automouse-run`; aggregation + interactive-session reporting absent.
+**Status (2026-07-09):** ✅ Implemented — `bin/lib/automouse-stream-filter` now emits `cache_write` on the exit line; `bin/automouse-run` cost rows carry Model + Tier columns and a per-phase-rebuilt `## Weekly aggregate (last 7 days)` section (cost-by-tier + tokens-by-phase); new `bin/token-report` runs the interactive-session token analysis on demand.
 
 ### T2 Always-loaded context budget gate
 **Location:** `.claude/rules/*.md` (path-unscoped subset ≈ 19KB) + the memory index (`MEMORY.md`, ≈ 16KB) — together ~9K tokens on every request and every subagent spawn.
@@ -85,7 +85,7 @@ Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive
 **Problem:** Every request and every subagent spawn carries the full overlay; on a typical ~35K-token request it is ~27% of the read.
 **Suggested direction:** Prune index lines for finished pipelines and dated status that has expired; merge one-line variants; target ≤ 8KB for the index. Move remaining `agent-tiering.md` prose into the detail file, keeping the tier table + Explore rules. Pairs with E8 in [dev-efficiency-backlog.md](dev-efficiency-backlog.md) (each mechanical gate built lets a memory line retire) and is held in place afterwards by T2/T5.
 **Risk if untouched:** A permanent per-turn tax that compounds across every subagent.
-**Status (2026-07-07):** ⬜ Open — minor organic pruning only; no deliberate diet yet.
+**Status (2026-07-09):** ◑ Partial — first-pass diet shipped: `agent-tiering.md` collapsed its Flat-fan-out / Context-economics / Prompt-style tail into one combined note (operative content already lives in `agent-tiering-detail.md`); MEMORY.md pruned harness-side (stale `project_authz_gate_deferred` line + backing file dropped now all four IDOR PRs #1107–#1110 are merged; Security-backlog hook corrected 6-queued → 4/6-done). Residual: full ≤8KB MEMORY.md diet + relocating the remaining `agent-tiering.md` prose still deferred.
 
 ### T9 Lazy-load plan/post-plan skills
 **Location:** `.claude/skills/plan/SKILL.md` (~55KB ≈ 13K tokens) and `.claude/skills/post-plan/SKILL.md` (~68KB ≈ 17K tokens) — each a single file loaded whole at invocation and resident for the entire run.

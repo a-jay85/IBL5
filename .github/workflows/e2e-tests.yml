@@ -49,6 +49,17 @@ jobs:
       # run inside. Gates ibl6-visual/ibl6-e2e so a pure-ibl5 PR skips them (saving 2
       # concurrent runner slots) while an IBL6 or shared-infra PR still runs them.
       ibl6: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.ibl6filter.outputs.ibl6 == 'true' }}
+      # True when a PR touches a runtime-affecting dep — the same 7-entry set that
+      # cache-dependencies.yml rebuilds `:latest` from (kept in sync; see Phase 5).
+      # Consumed by setup-docker-e2e (Phase 2): when true the six e2e jobs build the
+      # PHP image from the PR's Dockerfile/deps instead of pulling the stale `:latest`.
+      # NOTE the deliberate absence of the `push || dependabot` disjunction that `src`
+      # and `ibl6` carry: on a `push` event the runtimefilter step below is SKIPPED
+      # (pull_request-only guard) → this output is empty → falsy → jobs pull `:latest`
+      # (status quo; cache-dependencies already rebuilt it on that push). A dependabot
+      # runtime PR is a normal pull_request event, so the filter detects it with no
+      # special-case. Both fall-throughs are intended.
+      runtime: ${{ steps.runtimefilter.outputs.runtime == 'true' }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         if: github.event_name == 'pull_request' && github.event.action != 'labeled'
@@ -88,6 +99,36 @@ jobs:
               - 'ibl5/migrations/**'
               - 'ibl5/tests/e2e/fixtures/ci-seed.sql'
               - 'ibl5/bin/run-migrations-ci.sh'
+
+      - name: Detect runtime-affecting changes
+        uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
+        id: runtimefilter
+        # Unlike ibl6filter, this fires on ALL pull_request events INCLUDING `labeled`
+        # — do NOT copy ibl6filter's `&& github.event.action != 'labeled'` guard. A
+        # runtime PR that gets the `update-baselines` label fires a `labeled` event; if
+        # we skipped on it, `runtime` would default false and VR baselines would
+        # regenerate against the stale `:latest` instead of the PR's freshly-built
+        # image. The head SHA is unchanged on a label event, so the base…head diff —
+        # and thus the filter result — is identical to the prior synchronize; firing on
+        # labeled is safe and correct. dorny/paths-filter needs NO checkout for
+        # pull_request events (it diffs base…head via the GitHub compare API, which the
+        # job's existing `pull-requests: read` permission authorizes) — this matters
+        # because the `changes` job's checkout step is itself skipped on `labeled`.
+        if: github.event_name == 'pull_request'
+        with:
+          filters: |
+            runtime:
+              # Keep in sync with cache-dependencies.yml `push: paths` (lines 17-23) —
+              # the 7-entry set that rebuilds php-apache:latest. If these two lists
+              # drift, a runtime-affecting PR may test against a stale image (the exact
+              # gap this feature closes), or over-build. Update BOTH together.
+              - 'ibl5/composer.json'
+              - 'ibl5/composer.lock'
+              - 'ibl5/bun.lock'
+              - 'ibl5/package.json'
+              - 'Dockerfile'
+              - 'docker/opcache.ini'
+              - 'docker/entrypoint.sh'
 
   playwright-version-drift:
     name: Playwright version drift guard
@@ -157,6 +198,7 @@ jobs:
       # --- Docker E2E Setup ---
       - uses: ./.github/actions/setup-docker-e2e
         with:
+          php-image: ${{ needs.changes.outputs.runtime == 'true' && 'build' || 'pull' }}
           build-css: 'true'
           with-playwright: 'true'
           test-user: ${{ secrets.IBL_TEST_USER || 'ci-e2e-user' }}
@@ -373,6 +415,8 @@ jobs:
 
       # --- Docker E2E Setup ---
       - uses: ./.github/actions/setup-docker-e2e
+        with:
+          php-image: ${{ needs.changes.outputs.runtime == 'true' && 'build' || 'pull' }}
 
       - name: Run API E2E tests
         working-directory: ibl5
@@ -446,6 +490,7 @@ jobs:
       # --- Docker E2E Setup ---
       - uses: ./.github/actions/setup-docker-e2e
         with:
+          php-image: ${{ needs.changes.outputs.runtime == 'true' && 'build' || 'pull' }}
           build-css: 'true'
           with-playwright: 'true'
           test-user: ${{ secrets.IBL_TEST_USER || 'ci-e2e-user' }}
@@ -566,6 +611,7 @@ jobs:
       # --- Docker E2E Setup (fresh, dedicated DB for this job) ---
       - uses: ./.github/actions/setup-docker-e2e
         with:
+          php-image: ${{ needs.changes.outputs.runtime == 'true' && 'build' || 'pull' }}
           build-css: 'true'
           with-playwright: 'true'
           test-user: ${{ secrets.IBL_TEST_USER || 'ci-e2e-user' }}
@@ -650,6 +696,7 @@ jobs:
       - uses: ./.github/actions/setup-docker-e2e
         with:
           ibl6-image: build
+          php-image: ${{ needs.changes.outputs.runtime == 'true' && 'build' || 'pull' }}
 
       - name: Wait for ibl6 healthy
         run: |
@@ -755,6 +802,7 @@ jobs:
       - uses: ./.github/actions/setup-docker-e2e
         with:
           ibl6-image: build
+          php-image: ${{ needs.changes.outputs.runtime == 'true' && 'build' || 'pull' }}
 
       - name: Wait for ibl6 healthy
         run: |

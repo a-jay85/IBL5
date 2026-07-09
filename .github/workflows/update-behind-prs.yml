@@ -1,0 +1,116 @@
+name: Update BEHIND Auto-Merge PRs
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'   # every 15 min — worst-case unstick latency for an armed BEHIND PR
+  workflow_dispatch:          # manual trigger for on-demand runs + the dispatch smoke test
+
+permissions:
+  contents: write        # update-branch writes a merge commit onto the PR head branch
+  pull-requests: write   # enumerate PRs and invoke the update-branch endpoint
+
+concurrency:
+  group: update-behind-prs
+  cancel-in-progress: true
+
+jobs:
+  update-behind:
+    name: Update armed PRs stuck BEHIND master
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update BEHIND armed PRs
+        env:
+          GH_TOKEN: ${{ secrets.CI_PAT }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          OWNER="${REPO%/*}"
+          NAME="${REPO#*/}"
+
+          # 1. Enumerate ALL open, armed (auto-merge enabled) PRs targeting master, with
+          #    their merge state and head SHA. Categorization happens in the loop below so
+          #    the step summary can report conflict / already-current counts too.
+          armed=$(gh api graphql -f owner="$OWNER" -f name="$NAME" -f query='
+            query($owner:String!, $name:String!) {
+              repository(owner:$owner, name:$name) {
+                pullRequests(states:OPEN, baseRefName:"master", first:100) {
+                  nodes {
+                    number
+                    headRefOid
+                    mergeable
+                    mergeStateStatus
+                    autoMergeRequest { enabledAt }
+                  }
+                }
+              }
+            }' --jq '
+              .data.repository.pullRequests.nodes[]
+              | select(.autoMergeRequest != null)
+              | "\(.number) \(.headRefOid) \(.mergeStateStatus) \(.mergeable)"')
+
+          updated=0
+          skipped_ci=0
+          skipped_conflict=0
+          already_current=0
+
+          if [ -z "$armed" ]; then
+            echo "No open PRs have auto-merge enabled."
+          fi
+
+          while IFS=' ' read -r number sha state mergeable; do
+            [ -z "$number" ] && continue
+            echo "::group::PR #$number (state=$state mergeable=$mergeable)"
+
+            # Negative path: a conflicting PR (DIRTY / CONFLICTING) cannot be auto-updated —
+            # skip and log; a human must resolve the conflict. Never call update-branch here.
+            if [ "$state" = "DIRTY" ] || [ "$mergeable" = "CONFLICTING" ]; then
+              echo "Merge conflict — skipping (needs manual resolution)"
+              skipped_conflict=$((skipped_conflict + 1))
+              echo "::endgroup::"
+              continue
+            fi
+
+            # Only BEHIND PRs need updating. CLEAN/BLOCKED/UNSTABLE/HAS_HOOKS/UNKNOWN are not
+            # out of date w.r.t. master (UNKNOWN = GitHub hasn't computed it yet; it will
+            # resolve to BEHIND on a later tick if applicable). Treat all as already-current.
+            if [ "$state" != "BEHIND" ]; then
+              echo "Not BEHIND (state=$state) — nothing to update"
+              already_current=$((already_current + 1))
+              echo "::endgroup::"
+              continue
+            fi
+
+            # 2. Loop safety (step-level): skip if any check run on the head commit is still
+            #    running, so we never re-update the branch while CI from a prior update is live.
+            #    REST check-runs statuses are lowercase: queued / in_progress / completed.
+            running=$(gh api "repos/$REPO/commits/$sha/check-runs" \
+              --jq '[.check_runs[] | select(.status=="in_progress" or .status=="queued")] | length' \
+              || echo 0)
+
+            if [ "${running:-0}" -gt 0 ]; then
+              echo "CI in progress ($running check run(s) queued/in_progress) — skipping"
+              skipped_ci=$((skipped_ci + 1))
+              echo "::endgroup::"
+              continue
+            fi
+
+            # 3. Update the branch via merge commit from master. Authenticated as CI_PAT so the
+            #    resulting push triggers CI on the refreshed branch (GITHUB_TOKEN would not).
+            if gh api -X PUT "repos/$REPO/pulls/$number/update-branch"; then
+              echo "Updated PR #$number onto master"
+              updated=$((updated + 1))
+            else
+              echo "::warning::update-branch failed for PR #$number"
+            fi
+            echo "::endgroup::"
+          done <<< "$armed"
+
+          # 4. Step summary counts.
+          {
+            echo "## Update BEHIND Auto-Merge PRs"
+            echo "- Updated: $updated"
+            echo "- Skipped (CI running): $skipped_ci"
+            echo "- Skipped (merge conflict): $skipped_conflict"
+            echo "- Already current (not BEHIND): $already_current"
+          } >> "$GITHUB_STEP_SUMMARY"

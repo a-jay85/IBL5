@@ -40,21 +40,25 @@ evict_dispositions() {
 
 show_queue() {
     echo "Automouse queue (next to run first):"
+    printf "  %4s  %-44s %-8s %-6s  %s\n" "#" "PLAN" "MODEL" "MERGE" "TITLE"
     local found=0
     local i=1
     while IFS= read -r f; do
         found=1
-        local name
+        local name impl_model auto_merge title
         name=$(basename "$f")
-        local title
         if [ -e "$f" ]; then
-            # || true: a dangling symlink makes head exit non-zero, which under
-            # `set -e` + pipefail would abort the whole listing after the header.
-            title=$(head -1 "$f" 2>/dev/null | sed 's/^# //') || true
+            # Extract frontmatter values (between first pair of --- markers).
+            # || true: awk/grep under set -e + pipefail; keep going on any error.
+            impl_model=$(awk '/^---/{if(++n==1)next;exit} n==1&&/^impl_model:/{print $2}' "$f" 2>/dev/null) || true
+            auto_merge=$(awk '/^---/{if(++n==1)next;exit} n==1&&/^auto_merge:/{print $2}' "$f" 2>/dev/null) || true
+            title=$(grep -m1 '^# ' "$f" 2>/dev/null | sed 's/^# //') || true
         else
-            title="(BROKEN LINK -> $(readlink "$f"))"
+            impl_model="" auto_merge="" title="(BROKEN LINK -> $(readlink "$f"))"
         fi
-        printf "  %2d. %-40s %s\n" "$i" "$name" "$title"
+        impl_model=${impl_model:-opus}
+        auto_merge=${auto_merge:-true}
+        printf "  %4d. %-44s %-8s %-6s  %s\n" "$i" "$name" "$impl_model" "$auto_merge" "$title"
         i=$((i + 1))
     done < <(ls -1tr "$QUEUE_DIR"/*.md 2>/dev/null)
     if [ "$found" -eq 0 ]; then

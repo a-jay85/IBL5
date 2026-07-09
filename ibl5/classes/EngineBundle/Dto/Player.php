@@ -15,6 +15,8 @@ namespace EngineBundle\Dto;
  *
  * Every field is an int except `name`. Narrowing in {@see Player::fromRow()}
  * guarantees ints serialize as JSON numbers (the Go struct expects numbers).
+ *
+ * (Throwaway probe touch — verifies /post-plan phase-entry Reads; PR is a draft, never merges.)
  */
 final class Player
 {

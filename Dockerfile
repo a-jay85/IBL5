@@ -8,6 +8,12 @@ WORKDIR /src/engine
 COPY engine/ /src/engine
 RUN CGO_ENABLED=0 go build -o /opt/jsbsim ./cmd/jsbsim
 
+# This runtime stage IS the CI `php-apache:latest` image. On master/cron pushes,
+# cache-dependencies.yml rebuilds and publishes it; on a PR that touches a
+# runtime-affecting file (Dockerfile, docker/opcache.ini, docker/entrypoint.sh,
+# composer.json/lock, bun.lock, package.json) e2e-tests.yml builds it in-PR from
+# this source against the gha layer cache (setup-docker-e2e `php-image: build`),
+# so E2E exercises the PR's own runtime instead of the stale published tag.
 FROM php:8.5-apache
 
 RUN apt-get update && apt-get install -y --no-install-recommends \

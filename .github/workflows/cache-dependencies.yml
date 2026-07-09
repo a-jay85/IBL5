@@ -14,6 +14,9 @@ on:
   # Run when dependencies change
   push:
     paths:
+      # Keep in sync with e2e-tests.yml `changes` job `runtime:` filter — the in-PR
+      # build trigger. This list rebuilds php-apache:latest; that list decides when a
+      # PR builds the image in-PR. Drift → a runtime PR tests against a stale image.
       - 'ibl5/composer.json'
       - 'ibl5/composer.lock'
       - 'ibl5/bun.lock'

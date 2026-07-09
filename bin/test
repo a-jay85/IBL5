@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test — route a test invocation to the correct runner/container.
+#
+#   bin/test [unit]      host PHPUnit:   cd ibl5 && vendor/bin/phpunit
+#   bin/test db          DB-integration via bin/db-test-up (worktree-aware)
+#   bin/test e2e         Playwright via bin/e2e-wt.sh / ibl5/bin/e2e-local.sh
+#
+# Flags (must precede the subcommand):
+#   -n, --dry-run   print the command that would run; do not execute
+#   -h, --help      show this help
+# Any args after the subcommand are forwarded verbatim to the delegated runner
+# (e.g. bin/test unit --filter Foo ; bin/test -n e2e --headed).
+set -euo pipefail
+
+SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SELF_DIR/.." && pwd)"
+source "$SELF_DIR/lib/git-helpers.sh"   # provides is_in_worktree
+
+usage() {
+    cat <<'USAGE'
+Usage: bin/test [-n|--dry-run] [unit|db|e2e] [-- runner-args...]
+
+  unit   (default)  Host PHPUnit: cd ibl5 && vendor/bin/phpunit
+  db                DB-integration tests (worktree-aware) via bin/db-test-up
+  e2e               Playwright E2E (worktree-aware) via bin/e2e-wt.sh /
+                    ibl5/bin/e2e-local.sh
+
+  -n, --dry-run     Print the command that would run; do not execute.
+  -h, --help        Show this help.
+USAGE
+}
+
+DRY_RUN=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -n|--dry-run) DRY_RUN=1; shift ;;
+        -h|--help)    usage; exit 0 ;;
+        --)           shift; break ;;
+        -*)           printf 'Unknown option: %s\n' "$1" >&2; usage >&2; exit 2 ;;
+        *)            break ;;
+    esac
+done
+SUB="${1:-unit}"
+[ $# -gt 0 ] && shift
+FORWARD=("$@")
+
+emit() {   # print (dry-run) or exec the argv
+    if [ "$DRY_RUN" -eq 1 ]; then echo "${*}"; else exec "$@"; fi
+}
+
+case "$SUB" in
+    unit)
+        CMD=(vendor/bin/phpunit ${FORWARD[@]+"${FORWARD[@]}"})
+        if [ "$DRY_RUN" -eq 1 ]; then
+            echo "cd $REPO_ROOT/ibl5 && ${CMD[*]}"
+        else
+            cd "$REPO_ROOT/ibl5" && exec "${CMD[@]}"
+        fi
+        ;;
+    db)
+        if is_in_worktree; then
+            # show-toplevel returns the worktree root dir (e.g. IBL5-worktrees/<slug>);
+            # basename of that IS the slug — not dirname, which climbs one level too high.
+            WT_NAME="$(basename "$(git rev-parse --show-toplevel)")"
+            emit "$SELF_DIR/db-test-up" "$WT_NAME" ${FORWARD[@]+"${FORWARD[@]}"}
+        else
+            emit "$SELF_DIR/db-test-up" ${FORWARD[@]+"${FORWARD[@]}"}
+        fi
+        ;;
+    e2e)
+        if is_in_worktree; then
+            WT_NAME="$(basename "$(git rev-parse --show-toplevel)")"
+            emit "$SELF_DIR/e2e-wt.sh" "$WT_NAME" ${FORWARD[@]+"${FORWARD[@]}"}
+        else
+            emit "$REPO_ROOT/ibl5/bin/e2e-local.sh" ${FORWARD[@]+"${FORWARD[@]}"}
+        fi
+        ;;
+    *)
+        printf 'Unknown subcommand: %s\n' "$SUB" >&2
+        usage >&2
+        exit 2
+        ;;
+esac

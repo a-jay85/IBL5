@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-test — regression tests for bin/test dispatcher.
+#
+# Exercises routing via --dry-run so no docker/host infrastructure is needed.
+# Mirrors the structure of bin/test-check-phpunit-hygiene.
+#
+# Run: bin/test-test  (exit 0 = all pass, non-zero = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+DISPATCHER="$SCRIPT_DIR/test"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP" 2>/dev/null' EXIT
+FAILED=0
+pass()     { echo "ok: $1"; }
+failcase() { echo "FAIL: $1"; FAILED=1; }
+
+# Fresh non-worktree repo (main-checkout-like: git-dir == git-common-dir).
+mk_main() {
+    local d; d="$(mktemp -d "$TMP/main.XXXXXX")"
+    git init -q "$d" >/dev/null 2>&1
+    git -C "$d" config user.email t@example.com >/dev/null 2>&1
+    git -C "$d" config user.name tester >/dev/null 2>&1
+    git -C "$d" config commit.gpgsign false >/dev/null 2>&1
+    echo "$d"
+}
+
+# Real linked worktree whose root basename == <slug> (git-dir != git-common-dir).
+# Each call uses a unique base + unique parent dir so the fixed slug never collides.
+mk_worktree() {
+    local slug="$1" base parent wt
+    base="$(mktemp -d "$TMP/base.XXXXXX")"
+    git init -q "$base" >/dev/null 2>&1
+    git -C "$base" config user.email t@example.com >/dev/null 2>&1
+    git -C "$base" config user.name tester >/dev/null 2>&1
+    git -C "$base" config commit.gpgsign false >/dev/null 2>&1
+    git -C "$base" commit --allow-empty -q -m init >/dev/null 2>&1   # HEAD for worktree add
+    parent="$(mktemp -d "$TMP/wtp.XXXXXX")"
+    wt="$parent/$slug"
+    git -C "$base" worktree add -q "$wt" -b "b-$slug" >/dev/null 2>&1
+    echo "$wt"
+}
+
+# run_case <name> <ctx-dir> <want-exit> <want-regex|-> -- <dispatcher-args...>
+run_case() {
+    local name="$1" ctx="$2" want="$3" want_re="$4"; shift 4
+    [ "${1:-}" = "--" ] && shift
+    local out rc
+    out="$( ( cd "$ctx" && "$DISPATCHER" "$@" ) 2>&1 )"
+    rc=$?
+    if [ "$rc" -ne "$want" ]; then
+        failcase "$name — expected exit $want, got $rc"
+        printf '%s\n' "$out" | sed 's/^/    /'; return
+    fi
+    if [ "$want_re" != "-" ] && ! printf '%s' "$out" | grep -qE "$want_re"; then
+        failcase "$name — output did not match: $want_re"
+        printf '%s\n' "$out" | sed 's/^/    /'; return
+    fi
+    pass "$name (exit $rc)"
+}
+
+# --- Cases --------------------------------------------------------------------
+
+MAIN="$(mk_main)"
+WT_DB="$(mk_worktree db-slug)"
+WT_E2E="$(mk_worktree e2e-slug)"
+
+run_case "unit-explicit"         "$MAIN"   0 'cd .*/ibl5 && vendor/bin/phpunit'     -- --dry-run unit
+run_case "unit-default-no-sub"   "$MAIN"   0 'vendor/bin/phpunit'                   -- --dry-run
+run_case "db-worktree-derives-name" "$WT_DB"  0 'db-test-up[[:space:]]+db-slug([[:space:]]|$)'  -- --dry-run db
+run_case "db-main-no-arg"        "$MAIN"   0 'db-test-up[[:space:]]*$'              -- --dry-run db
+run_case "e2e-worktree"          "$WT_E2E" 0 'e2e-wt\.sh[[:space:]]+e2e-slug'       -- --dry-run e2e
+run_case "e2e-main"              "$MAIN"   0 'e2e-local\.sh([[:space:]]|$)'          -- --dry-run e2e
+run_case "unknown-subcommand"    "$MAIN"   2 'Usage|Unknown subcommand'              -- --dry-run bogus
+run_case "unknown-option"        "$MAIN"   2 'Unknown option|Usage'                  -- --bogus
+
+# --- Result -------------------------------------------------------------------
+
+if [ "$FAILED" -ne 0 ]; then
+    echo "RESULT: FAILED"
+    exit 1
+fi
+echo "RESULT: all passed"
+exit 0

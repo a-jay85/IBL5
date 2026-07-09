@@ -620,6 +620,8 @@ jobs:
         run: bin/test-check-pr-collisions
       - name: bin/test-check-phpunit-hygiene
         run: bin/test-check-phpunit-hygiene
+      - name: bin/test-test
+        run: bin/test-test
       - name: bin/test-refactor-flag
         run: bin/test-refactor-flag
       - name: bin/test-automouse-queue

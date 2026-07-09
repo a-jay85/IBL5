@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# bin/token-report — on-demand token-spend analysis of interactive Claude Code
+# session transcripts. Sums usage tokens per model over a trailing window and
+# prints a markdown table. Companion to the automouse nightly cost roll-up
+# (bin/automouse-run): that measures headless queue spend; this measures the
+# interactive sessions the nightly ledger never sees. See T1 in
+# ibl5/docs/backlog/token-spend-backlog.md.
+#
+# Usage: bin/token-report [--days N]   # N = trailing days by file mtime, default 7
+#
+# Reports TOKEN COUNTS ONLY (input / cache-write / cache-read / output), not USD:
+# per-model prices are volatile and are not carried in the transcript, so a
+# dollar figure would silently rot. Token counts are the durable, price-
+# independent signal a token-efficiency change is judged by.
+#
+# Completeness: sums usage.iterations[] when present, else the top-level usage
+# object. The nested iterations capture advisor/sub-agent turns that the top-
+# level input/output counters exclude — for a spend ledger that under-count is
+# material. Each iteration is credited to its own `model` when it declares one,
+# else the line's top-level model.
+set -euo pipefail
+
+DAYS=7
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --days)   DAYS="${2:?--days needs a value}"; shift 2 ;;
+        --days=*) DAYS="${1#--days=}"; shift ;;
+        -h|--help) grep '^#' "$0" | sed 's/^#\{1,\} \{0,1\}//'; exit 0 ;;
+        *) echo "unknown arg: $1" >&2; exit 2 ;;
+    esac
+done
+case "$DAYS" in
+    ''|*[!0-9]*) echo "--days must be a non-negative integer, got: $DAYS" >&2; exit 2 ;;
+esac
+
+PROJ="${TOKEN_REPORT_PROJ:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5}"
+[ -d "$PROJ" ] || { echo "No project transcript dir: $PROJ" >&2; exit 1; }
+
+# Top-level session transcripts only (maxdepth 1) — the automouse/ subdir holds
+# nightly logs, not interactive sessions.
+file_count=$(find "$PROJ" -maxdepth 1 -type f -name '*.jsonl' -mtime -"$DAYS" | wc -l | tr -d ' ')
+echo "# Token report — last $DAYS days"
+echo
+if [ "$file_count" -eq 0 ]; then
+    echo "No session transcripts modified in the last $DAYS days under $PROJ."
+    exit 0
+fi
+echo "_Source: $file_count interactive session transcript(s) under \`$PROJ\` (by file mtime)._"
+echo
+echo "| Model | Input | Cache-write | Cache-read | Output |"
+echo "|---|---:|---:|---:|---:|"
+
+find "$PROJ" -maxdepth 1 -type f -name '*.jsonl' -mtime -"$DAYS" -exec cat {} + \
+  | jq -rc -R '
+      try fromjson catch null
+      | select(. != null)
+      | (.message.usage // .usage) as $u
+      | select($u != null)
+      | (.message.model // .model // "unknown") as $m
+      | (if ($u.iterations | type) == "array" and ($u.iterations | length) > 0
+         then $u.iterations else [$u] end) as $its
+      | $its[]
+      | [ (.model // $m),
+          (.input_tokens // 0),
+          (.cache_creation_input_tokens // 0),
+          (.cache_read_input_tokens // 0),
+          (.output_tokens // 0) ] | @tsv
+    ' \
+  | awk -F'\t' '
+      { i[$1]+=$2; cw[$1]+=$3; cr[$1]+=$4; o[$1]+=$5
+        iT+=$2; cwT+=$3; crT+=$4; oT+=$5 }
+      END {
+        for (m in i) printf "| %s | %d | %d | %d | %d |\n", m, i[m], cw[m], cr[m], o[m]
+        printf "| **Total** | %d | %d | %d | %d |\n", iT, cwT, crT, oT
+      }'

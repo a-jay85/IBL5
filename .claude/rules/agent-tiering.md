@@ -1,6 +1,6 @@
 ---
 description: Sub-agent decision rules — when to spawn, when to skip, which model to pick, and how sub-agent delegation keeps orchestrator context low
-last_verified: 2026-07-07
+last_verified: 2026-07-09
 ---
 
 # Agent Tiering
@@ -31,17 +31,9 @@ Each sub-agent costs ~3–5K tokens (system prompt + rules + memory, loaded befo
 
 > **The boundary keys on task *type* (judgment vs. mechanical), not raw model capability** — a stronger Sonnet moves nothing across the line. Re-validated 2026-06-30 vs Sonnet 5 (then the `sonnet` alias, native 1M context): unchanged. Why: `agent-tiering-detail.md`.
 
-## Flat fan-out (no nested sub-agents)
+## Flat fan-out, context economics, and prompt style
 
-Sub-agents *can* nest (5 deep), but we keep **flat fan-out**: the Opus session owns every fan-out and absorbs every agent's output. Do **not** nest in `/plan`, `/pr-review`, `/security-audit`, `/post-plan`, or automouse. Rationale + tripwire: `.claude/rules/agent-tiering-detail.md`.
-
-## Context economics: delegate to never-hold, split don't self-clear
-
-A sub-agent's *intermediate* work never enters the orchestrator — only its final message returns. Delegating heavy work keeps it out of your context; **dismissing the agent reclaims nothing** (the internals were never yours), so the win is delegation, not eviction. Keep returns **thin** — `path:line` pointers, not file bodies. Your own context only grows and **can't self-clear mid-run**: the real reset is the **session boundary** (why `/post-plan` runs fresh). For a run too big to fit, **split into multiple plans/sessions** — never nest orchestrators. The fresh-`Agent()`-vs-`SendMessage` cache tradeoff and full rationale: `.claude/rules/agent-tiering-detail.md`.
-
-## Prompt style
-
-Prompting **Haiku**: compensate for its tendency to stop at "enough" — concrete grep/find command, "list EVERY match", pre-resolved absolute paths, structured output; never ask it to judge relevance or trace multi-hop flows. **Sonnet**'s current style is fine. Full guidance: `.claude/rules/agent-tiering-detail.md`.
+Keep **flat fan-out** — the Opus session owns every fan-out and absorbs each agent's output; never nest sub-agents in `/plan`, `/pr-review`, `/security-audit`, `/post-plan`, or automouse. The context win is **delegation, not dismissal** (a sub-agent's intermediate work never enters the orchestrator, so dismissing it reclaims nothing); keep returns **thin** (`path:line`, not file bodies), and since your own context can't self-clear mid-run, **split a too-big run into multiple plans/sessions** rather than nesting orchestrators. Prompt **Haiku** with a concrete grep/find command, "list EVERY match", pre-resolved absolute paths, and structured output — never relevance judgments or multi-hop traces; **Sonnet**'s current style is fine. Full rationale (nested-agent tripwire, the fresh-`Agent()`-vs-`SendMessage` cache tradeoff, per-tier prompt detail): `.claude/rules/agent-tiering-detail.md`.
 
 ## Explore Agents
 

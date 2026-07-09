@@ -31,8 +31,8 @@ last_verified: 2026-07-09
 |--------|------:|
 | ⬜ Open | 5 |
 | 📋 Planned | 1 |
-| ◑ Partial | 2 |
-| ✅ Implemented | 0 |
+| ◑ Partial | 1 |
+| ✅ Implemented | 5 |
 | 🚫 Declined | 0 |
 
 Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive/token-spend-backlog-archive.md).
@@ -43,7 +43,7 @@ Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive
 
 | # | Title | Status | Locus | Effort |
 |---|-------|--------|-------|-------:|
-| T1 | Automouse token ledger | ◑ Partial | repo | M |
+| T1 | Automouse token ledger | ✅ Implemented | repo | M |
 | T2 | Always-loaded context budget gate | ⬜ Open | repo | S |
 | T4 | Driver-model downshift for babysitting loops | ⬜ Open | ⌂ | M |
 | T5 | Memory/rules dedup lint | ⬜ Open | ⌂ | S |
@@ -57,7 +57,7 @@ Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive
 **Problem:** The nightly queue is pure spend mechanism with only partial measurement: per-phase cost rows exist, but there is no tier breakdown, no weekly aggregate, and no equivalent report for interactive sessions (the 7-day analysis above was done by hand).
 **Suggested direction:** Extend the existing costs table with model/tier columns and a weekly roll-up; add a `token-report` script under `bin/` that runs the transcript analysis on demand so each shipped entry in this backlog can be verified for effect.
 **Risk if untouched:** No feedback signal — token-efficiency changes ship without evidence they pay off.
-**Status (2026-07-07):** ◑ Partial — live per-phase cost logging verified in `bin/automouse-run`; aggregation + interactive-session reporting absent.
+**Status (2026-07-09):** ✅ Implemented — `bin/lib/automouse-stream-filter` now emits `cache_write` on the exit line; `bin/automouse-run` cost rows carry Model + Tier columns and a per-phase-rebuilt `## Weekly aggregate (last 7 days)` section (cost-by-tier + tokens-by-phase); new `bin/token-report` runs the interactive-session token analysis on demand.
 
 ### T2 Always-loaded context budget gate
 **Location:** `.claude/rules/*.md` (path-unscoped subset ≈ 19KB) + the memory index (`MEMORY.md`, ≈ 16KB) — together ~9K tokens on every request and every subagent spawn.

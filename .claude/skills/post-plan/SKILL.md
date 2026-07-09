@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-07-05
+last_verified: 2026-07-09
 ---
 
 # Post-Plan Orchestrator
@@ -100,125 +100,7 @@ If the working tree is clean and `git diff origin/master...HEAD` is also empty (
 
 Run this bash block once. It computes classification flags and writes the filtered diff to `/tmp/post-plan-diff-$PPID` (same `$PPID` pattern Phase 1 uses — stable across Bash tool calls in the session). Uses `gh pr diff` when a PR exists (correct base for stacked PRs), falls back to `git diff origin/master...HEAD` pre-PR. Every later phase consults these flags and reads the diff file — do not recompute.
 
-```bash
-DIFF_FILE=/tmp/post-plan-diff-$PPID
-
-# Detect whether a PR exists for this branch
-HAS_PR=false
-if gh pr diff --name-only &>/dev/null; then
-    HAS_PR=true
-fi
-
-# Changed file list (deleted files excluded — nothing to review)
-if $HAS_PR; then
-    FILES=$(gh pr diff --name-only)
-else
-    FILES=$(git diff --name-only origin/master...HEAD)
-fi
-
-# Per-type counts (grep -cE, default 0 if no match)
-COUNT_TOTAL=$(echo "$FILES" | grep -c . || true)
-COUNT_PHP=$(echo "$FILES" | grep -cE '\.php$' || true)
-COUNT_CSS=$(echo "$FILES" | grep -cE '\.css$|^ibl5/design/' || true)
-COUNT_MD=$(echo "$FILES" | grep -cE '\.md$' || true)
-COUNT_MIGRATION=$(echo "$FILES" | grep -cE '^ibl5/migrations/.*\.sql$' || true)
-COUNT_TEST=$(echo "$FILES" | grep -cE '^ibl5/tests/|\.test\.(ts|js|php)$|\.spec\.(ts|js)$' || true)
-COUNT_E2E_SPECS=$(echo "$FILES" | grep -cE '^ibl5/tests/e2e/.*\.ts$' || true)
-COUNT_LOCK=$(echo "$FILES" | grep -cE '(composer|package|bun)\.lock$' || true)
-COUNT_SNAPSHOT=$(echo "$FILES" | grep -cE '__snapshots__/|\.snap$' || true)
-COUNT_NON_CODE=$(( COUNT_MD + COUNT_LOCK + COUNT_SNAPSHOT ))
-# Go engine (repo-root engine/, NOT under ibl5/). Anchored at ^engine/ so other
-# worktree checkouts under IBL5-worktrees/<slug>/engine/*.go never false-positive —
-# PR file lists are repo-root-relative.
-COUNT_GO=$(echo "$FILES" | grep -cE '^engine/.*\.go$' || true)
-COUNT_IBL5=$(echo "$FILES" | grep -cE '^ibl5/' || true)
-GO_TOUCHED_COUNT=$(echo "$FILES" | grep -cE '^engine/' || true)
-
-# Derived flags (true/false strings for readable gates downstream)
-HAS_PHP=$([ "$COUNT_PHP" -gt 0 ] && echo true || echo false)
-HAS_CSS=$([ "$COUNT_CSS" -gt 0 ] && echo true || echo false)
-HAS_MIGRATION=$([ "$COUNT_MIGRATION" -gt 0 ] && echo true || echo false)
-HAS_TEST=$([ "$COUNT_TEST" -gt 0 ] && echo true || echo false)
-HAS_E2E_SPECS=$([ "$COUNT_E2E_SPECS" -gt 0 ] && echo true || echo false)
-HAS_GO=$([ "$COUNT_GO" -gt 0 ] && echo true || echo false)
-GO_TOUCHED=$([ "$GO_TOUCHED_COUNT" -gt 0 ] && echo true || echo false)
-# Engine-only = engine files touched and NOT a single ibl5/PHP file in the diff.
-# Drives Agent A skip (Phase 4B) and the Phase 10 Path A guard.
-ENGINE_ONLY=$([ "$GO_TOUCHED" = true ] && [ "$COUNT_PHP" -eq 0 ] && [ "$COUNT_IBL5" -eq 0 ] && echo true || echo false)
-# Golden-snapshot change — INDEPENDENT of HAS_GO (golden.json is not a .go file).
-# Drives the Phase 6.5 headless auto-merge block.
-GOLDEN_CHANGED=$(echo "$FILES" | grep -qxF 'engine/internal/sim/testdata/golden.json' && echo true || echo false)
-
-# E2E spec module extraction (drives Agent D cross-reference)
-E2E_SPEC_MODULES=""
-HAS_E2E_PROD_OVERLAP=false
-if [ "$COUNT_E2E_SPECS" -gt 0 ]; then
-    E2E_SPEC_FILES=$(echo "$FILES" | grep -E '^ibl5/tests/e2e/.*\.ts$')
-    E2E_SPEC_MODULES=$(
-      git diff origin/master...HEAD -- $E2E_SPEC_FILES \
-        | grep -E '^\+' \
-        | grep -oE "(modules\.php\?name=[A-Za-z][A-Za-z0-9_]*|modules/[A-Za-z][A-Za-z0-9_]*/)" \
-        | sed -E 's#modules\.php\?name=##; s#modules/##; s#/##' \
-        | sort -u
-    )
-    if [ -n "$E2E_SPEC_MODULES" ]; then
-        for M in $E2E_SPEC_MODULES; do
-            if echo "$FILES" | grep -qE "^ibl5/modules/$M/"; then
-                HAS_E2E_PROD_OVERLAP=true
-                break
-            fi
-        done
-    fi
-fi
-
-# "X-only" means every file in $FILES matches that category
-DOCS_ONLY=$([ "$COUNT_TOTAL" -gt 0 ] && [ "$COUNT_MD" -eq "$COUNT_TOTAL" ] && echo true || echo false)
-CSS_ONLY=$([ "$COUNT_TOTAL" -gt 0 ] && [ "$COUNT_CSS" -eq "$COUNT_TOTAL" ] && echo true || echo false)
-MIGRATION_ONLY=$([ "$COUNT_TOTAL" -gt 0 ] && [ "$COUNT_MIGRATION" -eq "$COUNT_TOTAL" ] && echo true || echo false)
-TEST_ONLY=$([ "$COUNT_TOTAL" -gt 0 ] && [ "$COUNT_TEST" -eq "$COUNT_TOTAL" ] && echo true || echo false)
-NON_CODE_ONLY=$([ "$COUNT_TOTAL" -gt 0 ] && [ "$COUNT_NON_CODE" -eq "$COUNT_TOTAL" ] && echo true || echo false)
-
-# "Has modified (not added) files" — gates Phase 4B Agent C (previous PRs)
-MODIFIED_COUNT=$(git diff --diff-filter=M --name-only origin/master...HEAD 2>/dev/null | grep -c . || true)
-HAS_MODIFIED=$([ "$MODIFIED_COUNT" -gt 0 ] && echo true || echo false)
-
-# Filtered diff -> temp file (single awk pass stripping migrations, lockfiles, snapshots)
-DIFF_AWK='
-  /^diff --git.*(migrations\/|composer\.lock|package-lock\.json|bun\.lock|__snapshots__\/|\.snap$)/ {skip=1; next}
-  /^diff --git/ {skip=0}
-  skip==0 {print}
-'
-if $HAS_PR; then
-    gh pr diff | awk "$DIFF_AWK" > "$DIFF_FILE"
-else
-    git diff origin/master...HEAD | awk "$DIFF_AWK" > "$DIFF_FILE"
-fi
-
-# Fallback: if filtered diff is still > 100KB and a PR exists, shrink via gh api
-if [ "$(wc -c < "$DIFF_FILE")" -gt 102400 ] && $HAS_PR; then
-  PR_NUM=$(gh pr view --json number --jq '.number')
-  gh api "repos/a-jay85/IBL5/pulls/$PR_NUM/files" --paginate \
-    --jq '.[] | select(.filename | test("migrations/|composer\\.lock|package-lock\\.json|bun\\.lock|__snapshots__/|\\.snap$") | not) | "--- " + .filename + " ---\n" + (.patch // "(binary or too large)")' \
-    > "$DIFF_FILE"
-fi
-
-# Code-comment detection on added lines only (gates Phase 4B Agent B)
-COMMENT_COUNT=$(grep -cE '^\+[[:space:]]*(//|#|/\*|\*)' "$DIFF_FILE" || true)
-HAS_COMMENTS_IN_DIFF=$([ "$COMMENT_COUNT" -gt 0 ] && echo true || echo false)
-
-# PHP lines changed (gates Phase 4B Agents B-C size threshold)
-LINES_PHP_CHANGED=$(git diff origin/master...HEAD -- '*.php' | grep -cE '^\+[^+]' || true)
-
-# Classification summary for the run log (Claude reads these and remembers them for later phases)
-echo "=== Diff classification ==="
-echo "  total=$COUNT_TOTAL php=$COUNT_PHP css=$COUNT_CSS md=$COUNT_MD migration=$COUNT_MIGRATION test=$COUNT_TEST lock=$COUNT_LOCK snapshot=$COUNT_SNAPSHOT"
-echo "  DOCS_ONLY=$DOCS_ONLY CSS_ONLY=$CSS_ONLY MIGRATION_ONLY=$MIGRATION_ONLY TEST_ONLY=$TEST_ONLY NON_CODE_ONLY=$NON_CODE_ONLY"
-echo "  HAS_PHP=$HAS_PHP HAS_CSS=$HAS_CSS HAS_MODIFIED=$HAS_MODIFIED HAS_COMMENTS_IN_DIFF=$HAS_COMMENTS_IN_DIFF LINES_PHP_CHANGED=$LINES_PHP_CHANGED"
-echo "  HAS_E2E_SPECS=$HAS_E2E_SPECS HAS_E2E_PROD_OVERLAP=$HAS_E2E_PROD_OVERLAP"
-echo "  HAS_GO=$HAS_GO GO_TOUCHED=$GO_TOUCHED ENGINE_ONLY=$ENGINE_ONLY GOLDEN_CHANGED=$GOLDEN_CHANGED COUNT_GO=$COUNT_GO"
-echo "  E2E_SPEC_MODULES=$(echo $E2E_SPEC_MODULES | tr '\n' ' ')"
-echo "  DIFF_FILE=$DIFF_FILE ($(wc -c < "$DIFF_FILE") bytes)"
-```
+> **Read `.claude/skills/post-plan/_phase-3-classify-diff.md` now and run its bash block exactly once**, then record the printed `=== Diff classification ===` summary. Those flags (enumerated in the top-of-file invariant above) are the gate inputs every later phase consults — never recompute them.
 
 Each Bash tool call runs in a fresh shell, so the classification flags are **not** bash state you can reference later — they're output Claude records from this block's stdout and applies as gates in later phases. The filtered diff is bridged via `$DIFF_FILE` (same `$PPID` across calls).
 
@@ -226,110 +108,9 @@ Each Bash tool call runs in a fresh shell, so the classification flags are **not
 
 ## Phase 4: Code Review + Security Audit
 
-Agent definitions and scoring rubric live in shared include files under `.claude/review-shared/` so this skill, `/pr-review`, and `/security-audit` all share one source of truth. Read them as instructed below — do NOT inline the definitions or duplicate them.
-
-### 4A: Fetch PR data (shared by both)
-
-Run these commands yourself (not via agents):
-
-```bash
-gh pr view --json number,headRefOid,headRefName,baseRefName,title,body,author
-cat /tmp/post-plan-diff-$PPID   # filtered diff written by Phase 3 (already < 100KB after the fallback)
-```
-
-Capture the `cat` output — that is `$DIFF` for every sub-agent prompt below. No sub-agent calls `gh pr diff`.
-
-**Do not forward CLAUDE.md content in agent prompts** — sub-agents auto-load CLAUDE.md on init, so forwarding it doubles the token cost (~5K × N agents). If directory-specific `CLAUDE.md` files exist for modified directories, read them and forward only those (they are not auto-loaded).
-
-### 4B: Code Review — up to 3 parallel agents (merged by tier)
-
-**Read** `.claude/review-shared/_review-agents.md` (Agents A/B/C) and `.claude/review-shared/_test-spec-agent.md` (Agent D — E2E specs). The canonical agent definitions.
-
-Pass each agent: PR metadata, file list, and filtered `$DIFF`. **No agent calls `gh pr diff`.** Do not forward CLAUDE.md content (auto-loaded).
-
-**Reuse conformance (Agent A only, when `PLAN_FOUND` and `$HAS_PLAN_REUSE`):** extract the plan's Reuse notes from `$PLAN_FILE` and append them to Agent A's prompt under a `PLANNED REUSE:` heading, instructing it to flag any step that hand-rolled logic the plan directed it to reuse (e.g. plan named `SalaryCapRepository::getTeamTotalSalary()`, impl wrote a raw query). This turns Section 1's open-ended architectural judgment into a concrete conformance check.
-
-**Model tiers:**
-
-- Agent A (Architecture + Bug detection + DB performance): **Sonnet**
-- Agent B (Git history + Code comments): **Sonnet**
-- Agent C (Previous PRs): **Haiku**
-- Agent D (E2E specs — POST-effect + assertion discrimination + coverage-branch): **Sonnet**
-
-**Launch gates** (consult Phase 3 variables — skip the launch entirely, don't let the agent exit early):
-
-- Agent A: skip if `$NON_CODE_ONLY` or `$ENGINE_ONLY`. (Agent A is a "Senior PHP Architect"; a pure-Go engine diff has no PHP architecture to review — skipping avoids low-signal PHP-rubric review of Go code. A **mixed** PR — `HAS_PHP=true`, `ENGINE_ONLY=false` — still launches Agent A to review the PHP portion.) If `$MIGRATION_ONLY`, instruct agent to skip Section 2 (bug detection). If `! $HAS_PHP`, instruct agent to skip Section 3 (DB performance).
-- Agent B: skip if BOTH sub-gates fail: (`! $HAS_PHP` or `$LINES_PHP_CHANGED <= 50`) AND (`$NON_CODE_ONLY` or `! $HAS_COMMENTS_IN_DIFF`). If only one sub-gate passes, instruct agent to run only that section.
-- Agent C: skip if `$NON_CODE_ONLY` or `! $HAS_MODIFIED` or `$LINES_PHP_CHANGED <= 50`
-- Agent D: skip if `! $HAS_E2E_SPECS`. When launched, pre-slice the diff into two temp files before forwarding to the agent:
-  ```bash
-  # Spec portion of the diff (only .ts under ibl5/tests/e2e/)
-  awk '
-    /^diff --git.*ibl5\/tests\/e2e\/.*\.ts/ {keep=1; print; next}
-    /^diff --git/ {keep=0}
-    keep==1 {print}
-  ' "$DIFF_FILE" > /tmp/post-plan-spec-diff-$PPID
-
-  # Production portion: only files under ibl5/modules/<M>/ for M in E2E_SPEC_MODULES
-  MODULES_REGEX=$(echo "$E2E_SPEC_MODULES" | tr '\n' '|' | sed 's/|$//')
-  if [ -n "$MODULES_REGEX" ]; then
-      awk -v re="ibl5/modules/($MODULES_REGEX)/" '
-        $0 ~ "^diff --git.*"re {keep=1; print; next}
-        /^diff --git/ {keep=0}
-        keep==1 {print}
-      ' "$DIFF_FILE" > /tmp/post-plan-spec-prod-diff-$PPID
-  else
-      : > /tmp/post-plan-spec-prod-diff-$PPID
-  fi
-  ```
-  Pass Agent D: PR metadata, the spec file list, `/tmp/post-plan-spec-diff-$PPID`, `/tmp/post-plan-spec-prod-diff-$PPID`, and `$HAS_E2E_PROD_OVERLAP`. The agent does **not** call `gh pr diff`.
-
-### 4C: Security Audit — single conditional Haiku agent
-
-**Skip entire 4C if** `! $HAS_PHP`. CSS, markdown, migrations, and lockfile bumps cannot introduce SQLi/CSRF/auth vulnerabilities.
-
-**Read** `.claude/review-shared/_security-agents.md` — the canonical security agent definition and pattern-detection bash block.
-
-Run the pattern-detection block from that file to get SQL and Forms category counts. Build the `CATEGORIES:` line (always include Auth/Authz; add SQL Injection if SQL > 0; add CSRF Protection if Forms > 0). Launch a **single Haiku agent** with the categories line and the PHP-only subset of `$DIFF`. Do not forward CLAUDE.md content (auto-loaded).
-
-**Plan-backed mode (when `PLAN_FOUND` and `$HAS_PLAN_SECURITY`):** the plan already declares each touched surface and its intended defense. Pass the plan's Security section to the agent as an `EXPECTED DEFENSES:` checklist and instruct it to (a) confirm each planned defense is present in the diff and (b) flag any state-changing surface the plan did *not* anticipate. You may build `CATEGORIES:` directly from the plan's declared surfaces instead of running the pattern-detection grep. This shifts the audit from discovery to verification — it catches "CSRF was planned but the impl omitted it" and cuts the false positives blind pattern-matching produces.
-
-**XSS and Input Validation are NOT audited here** — they're deterministically enforced by `RequireEscapedOutputRule` and `BanRawSuperglobalsRule` (run in PostToolUse and CI).
-
-### 4D: Score, filter, and post
-
-**Read** `.claude/review-shared/_review-rubric.md` — the canonical rubric, thresholds (`< 80` for code review, `< 75` for security), Automatic-Zero rule list, and IBL5 false-positive list.
-
-Combine ALL issues from 4B and 4C into one numbered list.
-
-**Skip the scoring agent if the combined list is empty** — jump straight to the `post_review_summary` no-issues path below.
-
-Otherwise launch a **single Haiku agent**, pass it the issues list plus the **Scoring scale and Thresholds sections** from `_review-rubric.md` (not the full Automatic Zero or false-positive lists — review agents have already filtered those). Instruct it to return JSON scores per that rubric. Parse the response and assign scores back to each issue.
-
-**Filter** per the thresholds in `_review-rubric.md`.
-
-**Re-check PR state:** `gh pr view --json state --jq '.state'` — skip posting if not `OPEN`.
-
-**Post results for code review and security audit** using the shared posting helper. Source it mirroring the pr-armable.sh idiom used by the Phase 6.5 condition blocks:
-
-```bash
-source "$(git rev-parse --show-toplevel)/bin/lib/post-review-findings.sh"
-```
-
-The helper provides two public functions:
-
-- `post_review_findings PR_NUMBER HEAD_SHA REVIEW_TITLE FINDINGS_FILE` — splits findings into on-diff (→ batch resolvable inline review threads) and out-of-diff (→ single fallback `gh pr comment`). Nothing is dropped. The `<!-- score: N -->` marker is appended automatically; the heading envelope and footer are emitted by the helper — do NOT re-add them.
-- `post_review_summary PR_NUMBER REVIEW_TITLE BODY` — for the no-issues path; posts a single `gh pr comment` with the heading, evidence body, and footer.
-
-**For code review:**
-- Issues survived filter → build a JSON findings array (one object per issue: `path` = repo-relative file, `line` = single anchor line on new-file side, `body` = `<description> (CLAUDE.md says "<rule>")` + full-SHA range link, `score` = Haiku score) to a temp file; call `post_review_findings "$PR" "$FULL_SHA" "Code review" <file>`.
-- No issues → call `post_review_summary "$PR" "Code review" "No issues found. <1-2 sentence evidence summary>"`.
-
-**For security audit:**
-- Issues survived filter → build findings JSON (`body` = `**[SEVERITY]** Type in \`Class::method()\` — description` + full-SHA range link, `score`); call `post_review_findings "$PR" "$FULL_SHA" "Security audit" <file>`. Severity: CRITICAL (SQLi/CMDi), HIGH (missing auth/open redirect), MEDIUM (CSRF/missing auth on non-critical endpoints), LOW (best practice).
-- No issues → call `post_review_summary "$PR" "Security audit" "No security issues found. <brief evidence per category> (XSS and input validation are enforced by PHPStan custom rules.)"`.
-
-**Link format (in `body` field):** `https://github.com/a-jay85/IBL5/blob/{FULL_SHA}/path/to/file#L{start}-L{end}` — expand SHA from 4A beforehand, never use bash interpolation in the body string. Include 1 line of context before/after the anchor line.
+> Phase 4 runs code review (up to four sub-agents A–D) and a conditional security audit, then scores, filters, and posts findings to the PR. Every sub-agent launch is gated on the Phase 3 flags (`NON_CODE_ONLY`, `ENGINE_ONLY`, `HAS_PHP`, `HAS_MODIFIED`, `HAS_COMMENTS_IN_DIFF`, `HAS_E2E_SPECS`, `LINES_PHP_CHANGED`) — a non-code diff skips the code agents cleanly. Phase 4 emits PR comments only; no Phase-4 output is a variable a later phase keys on.
+>
+> **Read `.claude/skills/post-plan/_phase-4-review-audit.md` now and follow 4A→4D in order.** It holds the PR-data fetch (4A), the Agent A/B/C/D launch gates + model tiers + Agent-D diff pre-slice (4B), the security-audit agent (4C), and the score/filter/post procedure including the `bin/lib/post-review-findings.sh` sourcing (4D).
 
 ---
 
@@ -337,106 +118,13 @@ The helper provides two public functions:
 
 ### Phase 5.0: Plan→test & Plan→file conformance — skip if `PLAN_FOUND=none` or `! $HAS_MATRIX`
 
-At Phase 5.0 START, clear the conformance bridge file so each run begins from a clean slate (an empty file means "nothing unresolved"):
+**INLINE invariant — Critical-Files must-appear rule (do NOT move to the reference file):** every file listed in the plan's `## Critical Files` section MUST appear in the PR diff, **unless** its annotation carries an explicit reference marker (`reference` / `read-only` / `verify` / `template` / `no-edit` / `unchanged` / `context`). A must-appear Critical File absent from the diff is a `MISSING-FILE:` finding that stays UNRESOLVED — and **blocks Phase 6.5 arming** — until you either make the dropped change (the #923 remedy) or note the legitimate cut in a PR comment. The matching regex, the `awk` that enforces it, and the sibling planned-test conformance check live in the reference file.
 
-```bash
-: > /tmp/post-plan-missing-tests-$PPID
-```
-
-Read the Verification Matrix from `$PLAN_FILE`. Collect the test-file path from the "Test file / location" column of every row whose Test type is PHPUnit, API-test, E2E, or Visual-regression. Confirm the PR diff actually wrote each one:
-
-```bash
-git diff --name-only origin/master...HEAD > /tmp/post-plan-changed-$PPID
-# For each planned test path $T extracted from the matrix:
-grep -qF "$T" /tmp/post-plan-changed-$PPID || echo "MISSING: $T (matrix planned a test the diff never wrote)"
-```
-
-For each `MISSING:` test the impl silently dropped planned coverage — now likelier to matter, since the matrix carries the negative-path and security rows `/plan` gates 9 and 12 require. Write the missing test, run it green, and checkpoint (same as Phase 6 test authoring). Skip a planned test **only** if its target behavior was cut from the implementation; note that in a PR comment rather than writing a hollow test.
-
-A `MISSING:` item is **resolved** when its test was authored-and-run-green OR was explicitly cut-from-implementation with a PR comment noting the cut. An item that is neither — a planned test the diff never wrote and which you did not author or explicitly cut — is **unresolved**.
-
-**Plan→file conformance.** The same failure mode that drops a planned test also drops a planned *non-test* edit: an impl agent can end its turn with a summary claiming files were changed that never landed in the commit (PR #923 claimed workflow + rule edits that were absent). The test-path check above only covers test files, so additionally verify every **must-appear** file in the plan's `## Critical Files` section actually shows up in the diff. A Critical File is **must-appear by default** — it is **exempt only when its annotation carries an explicit reference marker** (matches `reference|read-?only|verif(y|ication)|template|no[- ]edit|no[- ]change|unchanged|context`, case-insensitive, after stripping backticked tokens). Bare entries AND change-described entries (e.g. `— add the foo helper`, `(new)`, `(header comment only)`) are all must-appear — because authors routinely describe what each change-target does, exempting on *any* annotation silently lets a described-but-dropped file slip through (it inertly exempted every entry of this very plan in dog-food). The canonical marker is `(reference)` / `(read-only reference)`, mandated for non-changed entries by the `/plan` rule; the broader keyword set is a legacy fallback for plans written before that rule. **Failure mode by design: loud and resolvable** — a reference annotated without a recognized marker yields a `MISSING-FILE:` that the resolution step below dismisses with a one-line PR comment, vs. the old rule's silent, total non-coverage. Validated against the full 222-plan corpus: every must-appear entry is a genuine change-target, zero false-blocks. Plans with no `## Critical Files` section produce an empty loop and are silently skipped.
-
-```bash
-# Reuses /tmp/post-plan-changed-$PPID (written above) and $PLAN_FILE.
-EXEMPT_RE='reference|read-?only|verif(y|ication)|template|no[- ]edit|no[- ]change|unchanged|context'
-awk '/^## *Critical Files/{f=1;next} /^## /{f=0} f' "$PLAN_FILE" \
-  | grep -E '^[[:space:]]*-[[:space:]]*`' | while IFS= read -r LINE; do
-    CF=$(printf '%s\n' "$LINE" | grep -oE '`[^`]+`' | head -1 | tr -d '`')   # primary path only; inline `pattern from X` refs ignored
-    [ -z "$CF" ] && continue
-    REST=$(printf '%s\n' "$LINE" | sed -E 's/`[^`]*`//g')                    # annotation prose, backticks removed
-    printf '%s\n' "$REST" | grep -qiE "$EXEMPT_RE" && continue               # explicit reference marker => exempt
-    grep -qF "$CF" /tmp/post-plan-changed-$PPID \
-      || echo "MISSING-FILE: $CF (plan Critical File never appeared in the diff)"
-done
-```
-
-For each `MISSING-FILE:`, the impl dropped a planned change. Either (a) make the change now — the plan's implementation steps describe it (this is the #923 remedy: finish the work), run any relevant check, and checkpoint (commit + push) — or (b) if the file was legitimately cut from scope, or is a reference the plan author forgot to annotate, note that in a PR comment. A `MISSING-FILE:` item is **resolved** by (a) or (b); otherwise **unresolved**.
-
-At Phase 5.0 END, append each remaining **UNRESOLVED** `MISSING:` and `MISSING-FILE:` item (label + path + reason) to `/tmp/post-plan-missing-tests-$PPID`, one per line. Authored-green / implemented-and-checkpointed / cut-with-comment items are NOT written. This bridge file is consulted by the Phase 6.5 auto-merge gate.
-
-**PHPUnit + PHPStan — direct Bash (no agent):** **Skip if** `! $HAS_PHP`. The PostToolUse hook already ran both during edits, and a PHP-less diff cannot regress either suite. Run both as **blocking** (foreground) direct Bash calls — do **NOT** pass `run_in_background: true`. Both finish in ~1–2 min, well under the per-phase cap, and backgrounding them here is the trap that stall-killed the 2026-06-21 runs: when the E2E track is skipped there is nothing left to wait on in-turn, so the model backgrounds them and ends the turn expecting a re-invocation that headless mode never delivers. Running blocking returns their results in-turn and you proceed straight to Phase 6. Output is ~5 lines each — agent overhead (~25K tokens) is never justified. (If you ever do background them for parallelism with the E2E agent, the drain rule at the top of this skill is mandatory: poll `BashOutput` to completion before computing `PHASE5_VERIFY_STATUS` — never end the turn on a pending task.)
-
-```bash
-cd <worktree>/ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary | tail -n 3
-```
-```bash
-cd <worktree>/ibl5 && composer run analyse
-```
-
-**Go engine track — direct Bash (no agent):** **Skip if** `! $HAS_GO`. Runs **alongside** the PHP tracks (additive — a mixed PHP+Go PR runs both). All commands target the repo-root engine module; the `make` targets are defined in `engine/Makefile`.
-
-1. **Format + tests/golden/coverage (load-bearing local gate):**
-   ```bash
-   make -C <worktree>/engine fmt-check
-   make -C <worktree>/engine cover
-   ```
-   `cover` runs `go test ./...` — which includes `TestGolden`, the byte-for-byte snapshot comparison at `engine/internal/sim/testdata/golden.json` — and enforces the coverage floor (`COVER_MIN`). The Go toolchain is always present, so these always run. A non-zero exit from either is a **deterministic Go-track failure**.
-2. **Lint (conditional — CI is the fallback gate):**
-   ```bash
-   if command -v golangci-lint >/dev/null 2>&1; then
-       make -C <worktree>/engine lint
-   else
-       echo "golangci-lint not on PATH — deferring lint to engine.yml CI job (Phase 7)"
-   fi
-   ```
-   golangci-lint is not preinstalled in a fresh automouse env. A missing linter is **not** a Go-track `fail` — the `engine.yml` CI job enforces lint and is watched in Phase 7.
-3. If `fmt-check` or `cover` fails: fix in worktree, commit, push, and re-run the Go track (same fix-and-rerun discipline as the PHP tracks). **Never** resolve a red `TestGolden` by running `make -C <worktree>/engine golden-update` unless the output change was intentional and is called out in the PR — a silent regenerate masks a behavior regression (see Phase 6.5 condition (5)).
-
-**E2E agent (Haiku):**
-
-Steps:
-1. Run `bin/wt-down <worktree-name>` then `bin/wt-up <worktree-name> --seed`
-2. Run `bin/e2e-for-pr <worktree-name>` and capture both stdout and exit code
-3. Branch on the result:
-   - **Exit 0, empty stdout** → print "No E2E tests map to changed files — skipping E2E" and stop
-   - **Exit 2** → run full suite: `bin/e2e-wt.sh <worktree-name>`
-   - **Exit 0, test file list on stdout** → run targeted: `bin/e2e-wt.sh <worktree-name> <test-files-from-stdout>`
-
-Prompt MUST include: "Run these commands and report the summary output. Do NOT investigate, re-run, or diagnose individual test failures — just report the pass/fail counts and any error output."
-
-Prompt MUST ALSO include this long-run handling rule: "`bin/e2e-wt.sh` can exceed the Bash tool's 600s cap. If it does, invoke Bash with `run_in_background: true` and poll via the **BashOutput** tool — do NOT pipe to a file and shell-loop on `grep`. If you absolutely must shell-poll, the terminator must accept every Playwright outcome (`grep -qE 'passed|failed|did not run|timed out|error'` scanning `tail -10`, not a single last-line match): Playwright's trailing line is often `N did not run` after an early setup failure, which will hang a `passed|failed`-only check forever."
-
-If either fails, fix in worktree, commit, push, and re-run the failing track.
+Phase 5 consumes the Phase-3 flags `$HAS_PHP`, `$HAS_GO`, `$HAS_MATRIX`, `$PLAN_FOUND` — carried from Phase 3, never recomputed. **You MUST Read `.claude/skills/post-plan/_phase-5-final-verification.md` and run every block it lists, in order,** before computing the status. It writes the two carry-forward artifacts Phase 6.5 reads: the UNRESOLVED-items bridge `/tmp/post-plan-missing-tests-$PPID` and the status file `/tmp/post-plan-phase5-status-$PPID`.
 
 ### Phase 5 END: emit `PHASE5_VERIFY_STATUS`
 
-**Drain barrier (do this FIRST):** before computing the status, confirm **no background shell from this phase is still running** — poll `BashOutput` until every backgrounded track (a long-running E2E launched with `run_in_background`, or any backgrounded PHPUnit/PHPStan) reports a terminal result. You may not aggregate or advance to Phase 6 while a Phase 5 task is pending. "Still waiting on a track" is not a status — resolve it in-turn.
-
-**After** the fix-and-rerun loop above has resolved (every launched track green) or given up (a deterministic failure survives), aggregate the Phase 5 tracks — PHPUnit, PHPStan (both direct Bash, skipped when `! $HAS_PHP`), the **Go engine track** (direct Bash, skipped when `! $HAS_GO`), and the E2E Haiku sub-agent — into one status. The E2E track runs in a sub-agent whose shell state does not persist, so you (Opus) read its reported pass/fail from context, combine it with the PHPUnit/PHPStan/Go results, and write the flag. Persist it for durability across the per-phase cap (same `$PPID` temp-file pattern Phase 3 / Phase 5.0 use):
-
-```bash
-# PHASE5_VERIFY_STATUS: pass = at least one track ran and every launched track is green (or only-flaky-on-retry);
-#                       fail = a deterministic failure survived the fix-and-rerun loop in ANY launched track (PHPUnit, PHPStan, Go, or E2E);
-#                       skipped = no track ran at all (e.g. docs-only / CSS-only PR: ! $HAS_PHP and ! $HAS_GO and E2E mapped to nothing).
-echo "PHASE5_VERIFY_STATUS=$PHASE5_VERIFY_STATUS" > /tmp/post-plan-phase5-status-$PPID
-```
-
-Rules for the value:
-- A flaky failure (e.g. shared-session/CSRF) that passes on retry **with no code change** counts as `pass` — only a deterministic failure surviving the loop is `fail`.
-- `fail` if **any** launched track failed deterministically — the Go track (a red `cover`/`TestGolden`/coverage-floor) counts exactly like a red PHPUnit. An **engine-only** PR with the Go track green is `pass`, **not** `skipped` (this is the core fix: an engine PR is now verified, so it no longer slips through Phase 6.5 as `skipped`).
-- `skipped` is NOT `fail`: the value is `skipped` only when **no** track ran at all — a docs-only / CSS-only PR with no PHP, no Go, and E2E mapped to nothing (`bin/e2e-for-pr` exit 0 with empty stdout).
-- Record the status **after** the loop resolves or gives up — never mid-fix.
+Emit `PHASE5_VERIFY_STATUS` ∈ {`pass`, `fail`, `skipped`}: `pass` = at least one track ran and every launched track is green (or flaky-then-green on retry with no code change); `fail` = a deterministic failure survived the fix-and-rerun loop in ANY launched track (PHPUnit, PHPStan, Go, or E2E) — a red Go `cover`/`TestGolden` counts exactly like a red PHPUnit; `skipped` = **no** track ran at all (docs-only/CSS-only: `! $HAS_PHP` and `! $HAS_GO` and E2E mapped to nothing). `skipped` is NOT `fail`. **Drain barrier FIRST:** poll `BashOutput` until every backgrounded track reports a terminal result — never aggregate or advance to Phase 6 with a Phase-5 task still pending. The drain barrier, the `PHASE5_VERIFY_STATUS` status-file emit block, and the full value rules live in the reference file.
 
 ---
 
@@ -457,34 +145,7 @@ echo "$EXTRACTED"
 
 **Skip this gate when `PLAN_FOUND` and the surviving Manual Testing steps came from the plan's matrix** — `/plan` gates 3, 9, and 12 already classified automatable-vs-manual upstream and authoritatively, so re-litigating it here is wasted. Treat the remaining steps as truly-manual and leave them in the PR. Run the gate below only for plan-less PRs, where no upstream classification occurred.
 
-Launch a **single Sonnet agent** with this prompt (substitute the extracted steps and file list):
-
-> You are a **Senior QA Automation Engineer** reviewing manual testing steps from a PR. Your job: eliminate every step that can be replaced by automated verification. Be aggressive — manual testing is expensive and error-prone. Only steps requiring subjective human judgment on **new or redesigned** UI/UX should survive ("does this look/feel good?", "does this flow work well?").
->
-> **PR manual testing steps:**
-> {extracted steps from Step 1}
->
-> **Changed files:** {file list from Phase 4A}
->
-> Classify each step into exactly one category:
->
-> | Category | Description | Action |
-> |----------|-------------|--------|
-> | **CLI-executable** | A command or script Claude can run directly (curl, bin/db-query, grep output) | Opus runs it |
-> | **PHPUnit-replaceable** | Unit/integration test can assert the behavior (DB state, service output, calculation) | Opus writes PHPUnit test |
-> | **API-test-replaceable** | HTTP request/response can be verified programmatically (endpoint returns correct JSON/HTML, status codes, headers) | Opus writes integration or API test |
-> | **E2E-replaceable** | Browser interaction needed (form submit, page navigation, HTMX swap, DOM state) | Opus writes Playwright test |
-> | **Visual-regression-replaceable** | "Does output still match?" / production comparison where UI/UX was not intentionally redesigned | Opus writes Playwright visual-regression test or screenshot diff |
-> | **Truly manual** | Requires subjective human judgment on **new or redesigned** UI/UX that no automated test can replicate ("does this look/feel good?", "does this new flow work well?") | Stays in PR description |
->
-> For each step, return a JSON array:
-> ```json
-> [
->   {"step": "original step text", "category": "cli-executable|phpunit|api-test|e2e|visual-regression|truly-manual", "rationale": "why this category", "test_hint": "what the test should assert (omit for cli-executable and truly-manual)"}
-> ]
-> ```
->
-> **Bias toward automation.** If a step says "verify X works" or "check that Y returns Z", that is automatable — not manual. "Compare against production" is visual-regression-replaceable (screenshot diff) unless UI/UX was intentionally redesigned — it is NOT truly manual. Only subjective judgment on new/redesigned UI/UX is truly manual.
+Launch a **single Sonnet agent** with the QA-classification prompt in `.claude/skills/post-plan/_phase-6-manual-testing.md` (substitute the extracted steps from Step 1 and the changed-file list from Phase 4A). The prompt classifies each surviving manual step into CLI-executable / PHPUnit-replaceable / API-test-replaceable / E2E-replaceable / Visual-regression-replaceable / Truly-manual and returns a JSON array; the full prompt text + JSON schema live in that reference — Read it before spawning.
 
 ### Step 3: Execute findings
 
@@ -493,7 +154,7 @@ Using the Sonnet agent's classifications:
 1. **CLI-executable:** Run directly in the worktree. Fix failures, commit.
 2. **PHPUnit/API-test/E2E-replaceable:** Write the appropriate test type. Fix until green. Do not reclassify as truly manual — if the test is hard to write, that's a reason to spend more effort, not less. After 3 failed attempts, keep the item in the PR description as-is (not reclassified) and note what was tried.
 3. **Truly manual:** Keep in PR description.
-4. **Update PR:** Remove verified/automated steps. If none remain, replace section with `No manual testing needed — all changes are covered by automated tests.` Apply: `gh pr edit --body "<updated>"`
+4. **Update PR:** Remove verified/automated steps. If none remain, replace section with `No manual testing needed — all changes are covered by automated tests.` Apply: `gh pr edit --body "<updated>"` This `No manual testing needed` sentinel is exactly what **feeds Phase 6.5 condition (1)** (`pr_manual_testing_clearance`) to clear the manual-testing gate — if this write is skipped or reworded, condition (1) holds the PR for human review.
 5. **Checkpoint:** If any new tests were written or files modified, commit and push before continuing to Phase 6.5.
 
 ---
@@ -504,7 +165,18 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 
 **Already merged?** If `gh pr view --json state --jq '.state'` returns `MERGED`, there is nothing to arm — skip to Phase 7 (which will early-exit).
 
-**All ten** conditions must be true: (1) PR says "No manual testing needed", (2) no review/audit findings scored >= 80, (3) no unresolved `MISSING:` planned-test items NOR `MISSING-FILE:` planned-file items remain from Phase 5.0 — i.e. `/tmp/post-plan-missing-tests-$PPID` is absent or empty. Phase 5.0 is skipped entirely when `PLAN_FOUND=none` or `! $HAS_MATRIX`, so this bridge file frequently never exists; **absent/empty = PASS (non-blocking)**. Only a non-empty file blocks: `[ -s /tmp/post-plan-missing-tests-$PPID ]` → condition (3) fails. (4) Phase 5's local verification did not deterministically fail — i.e. `PHASE5_VERIFY_STATUS` is `pass` or `skipped`, **not** `fail`. This is the condition #887 lacked: it armed auto-merge with red E2E because no gate checked Phase 5's result. (5) golden-snapshot safety: a change to `engine/internal/sim/testdata/golden.json` does NOT auto-ship unattended (see below). (6) merge-order dependency: every PR named in a `Depends-on:` line in this PR's body is already `MERGED` (see below). (7) plan-time hold: the plan's line-1 `auto_merge: false` frontmatter is absent (see below). (8) commit-type floor: the PR title is not a conventional-commit `feat:` (see below). (9) PR-time safety verdict: the realized diff surfaces no reason to hold for a human (see below). (10) pipeline-authored floor: the PR does NOT carry the `pipeline-authored` label (see below).
+**All ten** conditions must be true — an AND-of-not-blocked set (any one can HOLD; none can RELEASE another):
+
+1. Manual testing cleared — the PR body carries the `No manual testing needed` sentinel Phase 6 writes.
+2. No review/audit finding scored `>= 80` (scored in Phase 4).
+3. No unresolved `MISSING:` planned-test **or** `MISSING-FILE:` planned-file items from Phase 5.0 — `/tmp/post-plan-missing-tests-$PPID` is absent or empty (absent/empty = PASS, non-blocking).
+4. Phase 5 did not deterministically fail — `PHASE5_VERIFY_STATUS` is `pass` or `skipped`, **not** `fail`.
+5. Golden-snapshot safety — a change to `engine/internal/sim/testdata/golden.json` does NOT auto-ship unattended (headless-only block).
+6. Merge-order — every PR named in a `Depends-on:` line is already `MERGED`.
+7. Plan-time hold — the plan's line-1 `auto_merge: false` frontmatter is absent.
+8. Commit-type floor — the PR title is not a conventional-commit `feat:` (unless `human-approved`-labeled).
+9. PR-time safety verdict — the realized diff surfaces no reason to hold for a human.
+10. Pipeline-authored floor — the PR does NOT carry the `pipeline-authored` label.
 
 **These conditions only ever HOLD, never RELEASE.** They are an AND-of-not-blocked set: every condition can *add* a block; none can clear another's. Conditions (7)–(9) are **additive brakes on top of** the deterministic floors (1)–(6), the pipeline-authored floor (10), and the independent `human-signoff` required GitHub check — they exist to catch what those miss, never to override them. post-plan **always runs and opens the PR**; these conditions decide only whether auto-merge *arms*. A held PR stays open for a human to merge.
 
@@ -512,108 +184,15 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 
 **Each condition block is SELF-CONTAINED** — it `source`s the predicate and fetches its own inputs in-block, exactly as condition (7) re-derives `$PLAN_FILE` and the original (6)/(8) ran their own `gh pr view`. **Do not** hoist the `source` or a shared `PR_JSON` into a preamble block: a sourced function or a shell variable does not survive into a separately-executed block (only exported env vars like `$CLAUDE_HEADLESS` do), and a missing `source` would make `pr_feat_hold` a no-op — **failing OPEN, auto-arming a `feat:` PR**. Each block re-`source`ing the lib is idempotent and cheap. Every block extracts gh output with `gh ... --jq` (gh does the decode — no `echo`/`printf` round-trip needed); when a block must round-trip a multi-field `PR_JSON` it uses `printf '%s'` (never `echo`, whose zsh `\n` expansion corrupts jq's parse).
 
-**Condition (1) — Manual-Testing clearance (mechanized via the shared predicate).** Previously a prose gate ("PR says No manual testing needed") the orchestrator eyeballed — itself a judgment-error surface. Now deterministic: `pr_manual_testing_clearance` returns `CLEARED` (the `No manual testing needed` sentinel is present — the positive signal Phase 6 writes after resolving every manual-testing item), `HELD` (real manual rows remain), or `UNKNOWN` (no `## Manual Testing` section at all). **Fail-closed: arm only on `CLEARED`.** Phase 6 always writes the section, so a post-plan PR is `CLEARED` or `HELD`, never `UNKNOWN` on this path — the armed set is unchanged; the stricter `UNKNOWN→block` only matters to `bin/pr-triage`'s cross-PR sweep of hand-made PRs:
+**You MUST Read `.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md` and run each condition's block, in order, BEFORE arming — do not arm without it.** The reference holds the seven per-condition bash blocks (conditions 1, 4, 5, 6, 7, 8, 10 — conditions 2/3/9 are the Phase-4 score check, the `/tmp/post-plan-missing-tests-$PPID` bridge check, and the realized-diff hold-enumeration, run against state you already hold), each **self-contained** per the SELF-CONTAINED invariant above (every block re-`source`s the predicate in-block — a hoisted `source` does not survive into a separately-executed block and would fail OPEN). It also holds the per-condition blocker-reporting detail. Phase 6.5 consumes carried state only — the Phase-3 flags `$GOLDEN_CHANGED`/`$HAS_MIGRATION`/`COUNT_*`, the env `$CLAUDE_HEADLESS`/`$PPID`, the Phase-4 finding scores, the Phase-6 manual-testing sentinel, and the Phase-5 status file — never recompute them.
 
-```bash
-# condition (1): block unless the Manual-Testing section is the positive sentinel.
-source "$(git rev-parse --show-toplevel)/bin/lib/pr-armable.sh"
-CLEAR=$(pr_manual_testing_clearance "$(gh pr view --json body --jq '.body')")
-[ "$CLEAR" != "CLEARED" ] && echo "BLOCKED: Manual-Testing not cleared (state=$CLEAR) — held for human review"
-```
+**Fail-closed default:** if any condition is indeterminate, errors, or you are unsure, treat it as **BLOCKED** and do NOT arm. A false HOLD costs one manual human merge; a false ARM ships unreviewed code — only under-holding is dangerous.
 
-**Condition (4) blocks on the VALUE, not file presence** — the status file is non-empty for `pass` and `skipped` too (it always contains `PHASE5_VERIFY_STATUS=...`), so the `[ -s ... ]` idiom condition (3) uses would wrongly block every `pass`/`skipped`. Block only on the literal `fail` value; **absent file OR `pass` OR `skipped` = PASS (non-blocking)** — a `skipped` status (docs-only / PHP-less PR with no mapped E2E) must NOT block, or every such PR would stop arming, a regression worse than #887:
+**If every condition passes:** arm with `gh pr merge --squash --auto --delete-branch` — `--auto` *queues* the merge (it does not merge now); GitHub fires it once required checks pass. Do not sync local to master here.
 
-```bash
-# condition (4): fails ONLY when the status is the literal `fail`
-grep -q 'PHASE5_VERIFY_STATUS=fail' /tmp/post-plan-phase5-status-$PPID 2>/dev/null && echo "BLOCKED: Phase 5 deterministic failure"
-```
+**If any condition blocks:** do NOT arm. Report which condition(s) blocked — the per-condition report text is in the reference (e.g. `cat /tmp/post-plan-missing-tests-$PPID` for (3); which Phase-5 track failed for (4)). Continue to Phase 7 regardless to monitor and fix CI; a re-run clears a red-track block, but the intent/type holds (7), (8), (10) stay held until a human acts.
 
-**Condition (5) — golden-snapshot safety (headless only).** If `$GOLDEN_CHANGED` is `true` AND `$CLAUDE_HEADLESS` is set, **block** auto-merge: a change to `engine/internal/sim/testdata/golden.json` means the engine's simulation output changed, and a snapshot change with no human present is exactly when not to auto-ship (an agent can turn a red `TestGolden` green by regenerating the snapshot, silently masking a regression). In **interactive** mode (`$CLAUDE_HEADLESS` unset), do **not** block — emit a prominent warning with the same text so the human confirms intent before merging. This condition is independent of `HAS_GO` (a golden-only diff is `HAS_GO=false` but must still trigger it):
-
-```bash
-# condition (5): blocks ONLY when golden changed AND running headless (automouse autonomous).
-# Self-contained: source the predicate and fetch the live file list here. Detection
-# is the Phase-3 diff flag $GOLDEN_CHANGED (a shell var — may be empty in a fresh
-# block) OR the shared predicate's live file-list check (pr_golden_hold, the same
-# one bin/pr-triage uses — reliable regardless of block isolation). Mode policy
-# (headless-only block) stays in the caller; $CLAUDE_HEADLESS is an env var so it
-# survives. Interactive (unset) still warns rather than blocks.
-source "$(git rev-parse --show-toplevel)/bin/lib/pr-armable.sh"
-{ [ "${GOLDEN_CHANGED:-}" = true ] || [ -n "$(pr_golden_hold "$(gh pr view --json files --jq '.files')")" ]; } \
-  && [ -n "${CLAUDE_HEADLESS:-}" ] \
-  && echo "BLOCKED: golden.json (simulation behavior) changed in headless mode — confirm this was an intentional 'make -C engine golden-update', not a masked regression"
-```
-
-**Condition (6) — merge-order dependency (both modes).** When a PR must not merge ahead of another (a refactor that ships first, a migration-number sequence, shared files that re-conflict on merge), its body declares the predecessors with a `Depends-on:` line, e.g. `Depends-on: #1066, #1071`. Arming auto-merge here would let GitHub queue the merge the instant checks pass — out of order — so block until every named PR is `MERGED`. Reads the **live** PR body via `gh` (independent of which branch's skill is running), so a stale local checkout can't bypass it. No `Depends-on:` line ⇒ no dependency ⇒ never blocks. This gate prevents *premature arming only*; it does not rebase — after a predecessor merges, the successor still needs its own `git merge master` + re-green before its checks pass and a later post-plan run can arm:
-
-```bash
-# condition (6): block if any Depends-on: predecessor is not yet MERGED — shared
-# predicate (also used by bin/pr-triage). Self-contained: source + fetch the body
-# here. pr_dep_holds anchors the marker to start-of-line (an inline prose mention
-# is ignored) and splits per-line (bash+zsh safe), echoing `depends-on:#N` for
-# each unmerged predecessor.
-source "$(git rev-parse --show-toplevel)/bin/lib/pr-armable.sh"
-pr_dep_holds "$(gh pr view --json body --jq '.body')" | while read -r dep; do
-  echo "BLOCKED: depends on ${dep#depends-on:} — not yet MERGED"
-done
-```
-
-**Condition (7) — plan-time hold (`auto_merge: false`).** The plan author predicts at plan-time (via `/plan` Step 4 gate 14) whether the change wants a human at merge, and records it as a line-1 frontmatter field. If the located plan file declares `auto_merge: false`, **block** — the PR opens and gets reviewed, but auto-merge does not arm. Parse the line-1 YAML frontmatter only (a body documenting the syntax can't self-select). **Derive `$PLAN_FILE` inside this block** — bash variables do not survive across phases/shells (see Phase 3's note), so a bare `$PLAN_FILE` assigned in Phase 1 would be empty here and the check would silently no-op. The snippet re-derives the path from the branch slug (the same derivation `bin/post-plan-now` and Phase 1's interactive fallback use; in automouse the authoritative path the postplan prompt supplies is identical, since the queue symlinks plans by branch slug). Absent file or absent field ⇒ no hold:
-
-```bash
-# condition (7): block if the plan declares auto_merge: false (line-1 frontmatter only).
-# Self-contained: derive PLAN_FILE here (honor an in-block-set value, else slug-derive) so
-# the check can't no-op on a non-surviving cross-phase variable.
-PLAN_FILE="${PLAN_FILE:-$HOME/.claude/plans/$(git rev-parse --abbrev-ref HEAD).md}"
-AUTO_MERGE=$(awk '
-    NR==1 && /^---[[:space:]]*$/ {infm=1; next}
-    infm && /^---[[:space:]]*$/ {infm=0; exit}
-    infm && /^auto_merge:[[:space:]]*/ { sub(/^auto_merge:[[:space:]]*/,""); gsub(/[[:space:]]/,""); print; exit }
-' "$PLAN_FILE" 2>/dev/null)
-[ "$AUTO_MERGE" = false ] && echo "BLOCKED: plan declares auto_merge: false — held for human merge"
-```
-
-**Condition (8) — commit-type floor (never arm `feat:`).** A literal PR-title grep, deterministic. Mirrors the required `human-signoff` check (`.github/workflows/human-signoff.yml`) as defense-in-depth, so post-plan **never arms a `feat:` PR in the first place** (no arm-then-strip). This is a floor, not a soft signal — commit-type weighs into condition (9) only to *add* holds on maintenance PRs; it can never *release* a `feat:`:
-
-```bash
-# condition (8): block a conventional-commit feature title — shared predicate
-# (also used by bin/pr-triage). REFINEMENT: pr_feat_hold is label-aware — a feat:
-# carrying the `human-approved` label does NOT block (the maintainer has signed
-# off, matching the human-signoff check). At post-plan's normal call time (PR
-# just created) no label is present, so this blocks every feat: exactly as before;
-# the label-aware path only releases on a later re-run after a human labeled it.
-source "$(git rev-parse --show-toplevel)/bin/lib/pr-armable.sh"
-FEAT_HOLD=$(pr_feat_hold "$(gh pr view --json title --jq '.title')" "$(gh pr view --json labels --jq '.labels')")
-[ -n "$FEAT_HOLD" ] && echo "BLOCKED: feat: PR — auto-merge held for the human-signoff floor (post-plan never arms an unlabeled feat:)"
-```
-
-**Condition (9) — PR-time safety verdict (both modes).** Read the realized diff (`/tmp/post-plan-diff-$PPID`) plus the Phase-3 flags (`HAS_MIGRATION`, `GOLDEN_CHANGED`, `COUNT_*`) and the PR title, and **enumerate every concrete reason this PR should wait for a human**. If the list is non-empty, **block**. This catches *drift* — a plan that looked auto-merge-safe at plan-time but whose realized implementation grew past it. Frame it as enumerating holds, **never** as certifying safe: certifying safe is proving a negative, which is unreliable, and the only dangerous failure is *under*-holding (a false ARM); a false HOLD merely costs a human merge. **Bias hard to HOLD on any doubt.** Hold-triggers to look for in the realized diff:
-
-- an introduced or expanded SQL / POST-form / auth-gated surface that a Phase-4 finding scored < 80 did not already flag;
-- a destructive or FK-ordering migration, or a column-rename sweep (`HAS_MIGRATION=true` with a diff that drops, renames, or backfills);
-- new or redesigned user-visible UI/UX that the plan's matrix did not classify (a CSS component, a rendered page/module, a nav entry / indicator / badge, a new multi-step flow);
-- any change whose blast radius or reversibility you cannot confidently bound.
-
-Emit one `BLOCKED: <reason>` line per reason found. Condition (9) can only *add* holds on top of (1)–(8); it never releases one, and it never overrides the `feat:` floor (8) or the required `human-signoff` check.
-
-**Condition (10) — pipeline-authored floor (never arm a pipeline PR).** Every PR the Discord bug/feature pipeline (`bin/post-plan-now`-shipped) opens carries the `pipeline-authored` label. This floor **unconditionally** holds any labeled PR from auto-merge regardless of commit type — a pipeline `fix:` must never auto-ship to prod. Unlike the `feat:` floor (8) there is **no** override label: a pipeline PR always waits for a human merge. Shared predicate (`pr_pipeline_authored_hold`, also usable by `bin/pr-triage`); self-contained — source the lib and fetch labels in-block, exactly like (8):
-
-```bash
-# condition (10): block if the PR carries the `pipeline-authored` label — shared
-# predicate. UNCONDITIONAL: unlike condition (8)'s feat: floor there is NO
-# override label; every bug/feature-pipeline PR holds for a human merge
-# regardless of commit type (a pipeline `fix:` must never auto-ship to prod).
-# Self-contained: source the predicate and fetch labels in-block.
-source "$(git rev-parse --show-toplevel)/bin/lib/pr-armable.sh"
-PIPELINE_HOLD=$(pr_pipeline_authored_hold "$(gh pr view --json labels --jq '.labels')")
-[ -n "$PIPELINE_HOLD" ] && echo "BLOCKED: pipeline-authored PR — auto-merge held; a human reviews and merges every bug-pipeline PR regardless of commit type"
-```
-
-If met: `gh pr merge --squash --auto --delete-branch`. The `--auto` flag queues the merge — it does **not** merge now, it arms; GitHub executes it once all required status checks pass. Do not sync local to master here; the merge has not happened yet.
-
-If not met: do **not** arm auto-merge. Report which condition(s) blocked — the user merges manually after review. When condition (3) is the blocker, cite which planned test (`MISSING:`) or planned Critical File (`MISSING-FILE:`) is missing by `cat`-ing the bridge file (`cat /tmp/post-plan-missing-tests-$PPID`) into the report. When condition (4) is the blocker, report which Phase 5 track failed (PHPUnit / PHPStan / Go / E2E). When condition (5) is the blocker (headless + golden changed), report that the golden snapshot changed and the merge needs a human to confirm the behavior change was intentional. When condition (6) is the blocker, report which `Depends-on:` PR(s) are not yet `MERGED` — this PR re-arms on a later post-plan run once the predecessor ships (and this PR has been `git merge master`'d + re-greened). When condition (7) is the blocker, report that the plan declared `auto_merge: false` — the PR is open and reviewed but held for a human merge by author intent. When condition (8) is the blocker, report that this is a `feat:` PR — it waits for a maintainer to apply the `human-approved` label (the required `human-signoff` check). When condition (9) is the blocker, list each enumerated hold-reason from the realized-diff verdict. When condition (10) is the blocker, report that this PR carries the `pipeline-authored` label — every bug-pipeline PR is held for a human merge regardless of commit type. Continue to Phase 7 regardless, to monitor and fix CI — the fix-and-rerun there clears any red track so a later run can arm (conditions (7), (8), and (10) are intent/type holds that a re-run will not clear — those PRs stay held until the human acts).
-
-**Interactive golden warning:** Whenever `$GOLDEN_CHANGED` is `true` and `$CLAUDE_HEADLESS` is unset (so condition (5) did not block), still surface the warning prominently in the report — "⚠️ golden.json changed: simulation behavior changed. Confirm this was an intentional `make -C engine golden-update`, not a masked regression." — so the human reviews intent before the queued merge fires.
+**Interactive golden warning:** when `$GOLDEN_CHANGED` is `true` and `$CLAUDE_HEADLESS` is unset (so condition 5 did not block), still surface the warning prominently so the human confirms the simulation change was an intentional `make -C engine golden-update`, not a masked regression.
 
 ---
 
@@ -633,16 +212,7 @@ If not met: do **not** arm auto-merge. Report which condition(s) blocked — the
 3. **If exit 0** → Phase 8. (Mid-watch merge detection was intentionally dropped: `gh pr checks --watch` exits as soon as the last check settles, so the only window auto-merge could fire inside the watch is the ~5–30s between final-check-pass and auto-merge action — not worth a hand-rolled poll loop. Step 0 already covers the case where the PR merged before Phase 7 started.)
 4. **If exit 8:** Get failed checks via `gh pr checks <pr> --json name,state,link --jq '[.[] | select(.state == "FAILURE")]'` (uppercase `FAILURE`, field is `state` not `conclusion`). Download logs (`gh run view <id> --log-failed`). **Fix all failures** — master's CI is green, so any failure on this PR is this PR's fault (even in files outside the diff). The only exception is a flaky test that passes on retry with no code change; note it in a PR comment and move on. Fix, commit, push, loop back to step 1.
 
-   **Escalate to Opus when out of depth.** Failures in the Opus row of agent-tiering — failing-check `name` matching `mutation|MSI|engine|golden|migration` (case-insensitive), or any FK-ordering / cross-track failure you can't localize from the log in one read. Triggers: category match → Opus on attempt 1; otherwise Sonnet does attempts 1–2, Opus takes attempt 3 instead of giving up.
-
-   Capture context to temp files and pass the **paths** — the agent `Read`s them; never summarize the log/diff into the prompt (summarizing → garbage fix, per the Phase 4 review-agent rule):
-   ```bash
-   gh run view <id> --log-failed > /tmp/post-plan-ci-fail-$PPID.log
-   git -C <worktree> diff origin/master...HEAD > /tmp/post-plan-diff-$PPID.patch
-   ```
-   Spawn **one** `Agent(model: "opus")` with: the two paths, PR number, worktree path, plan path, failing check names, what Sonnet tried. It fixes, runs the relevant track locally if it can, **commits and pushes itself**, returns a one-line summary. Don't forward CLAUDE.md (auto-loaded). Loop back to step 1.
-
-   The Opus attempt **counts toward** the 3-iteration ceiling; after 3 total, report surviving failures in a PR comment and continue to Phase 8. Keep it inside the Phase 7 budget — one bounded Opus attempt fits.
+   **When out of depth, escalate to Opus** — failing-check `name` matching `mutation|MSI|engine|golden|migration` (case-insensitive) → Opus on attempt 1; otherwise Sonnet does attempts 1–2 and Opus takes attempt 3. **Read `.claude/skills/post-plan/_phase-7-ci-monitoring.md`** for the escalation procedure: capture the failed log + `origin/master...HEAD` diff to temp paths and pass the **paths** (never summarize the log), spawn **one** `Agent(model: "opus")` that fixes/commits/pushes itself and returns one line. The Opus attempt **counts toward** the 3-iteration ceiling. Loop back to step 1.
 5. **If bash times out (20 min elapsed):** Run one final `gh pr checks <pr>` (no `--watch`) to capture settled state. If it now exits 0, continue to Phase 8. If 8, jump to step 4. Otherwise report to user and continue to Phase 8 — do not re-enter watch.
 
 ---
@@ -675,86 +245,7 @@ Check the PR state using the PR number captured in Phase 4A:
 PR_STATE=$(gh pr view <PR_NUMBER> --json state --jq '.state')
 ```
 
-### Path A: Main-stack rebuild (when `$PR_STATE` = `MERGED`)
-
-**Skip the rebuild if `$ENGINE_ONLY`** — an engine-only change touches no `ibl5/` PHP and cannot affect the rendered app, so tearing down and re-streaming prod data adds nothing. Print "Engine-only change — skipping Path A main-stack rebuild." and end Phase 10.
-
-The PR has been merged (either auto-merge fired during CI watch, or it was already merged before post-plan started). Run `cd <repo-root> && git checkout master && git pull origin master` to sync local, then rebuild the main Docker stack with fresh prod data.
-
-1. **Update vendor** (may be stale after merge):
-   ```bash
-   (cd <repo-root>/ibl5 && composer install)
-   ```
-
-2. **Check for prod credentials** before tearing down the running stack:
-   ```bash
-   grep -q '^REMOTE_HOST=' <repo-root>/.env \
-     && grep -q '^REMOTE_USER=' <repo-root>/.env \
-     && grep -q '^REMOTE_PASSWORD=' <repo-root>/.env
-   ```
-   If any `REMOTE_*` credential is missing: warn "Fresh prod data unavailable — REMOTE_* credentials not found in .env. Skipping main-stack rebuild." and **stop Phase 10** (leave the existing main stack untouched).
-
-3. **Tear down and restart** with stale seed skipped:
-   ```bash
-   cd <repo-root> && docker compose down -v
-   docker compose up -d
-   ```
-   `docker compose down -v` removes only the main project's volume (`ibl5-mariadb-data`) — worktree volumes are in separate compose projects and are not affected.
-
-4. **Wait for MariaDB to be healthy:**
-   ```bash
-   RETRIES=0
-   until docker exec ibl5-mariadb healthcheck.sh --connect --innodb_initialized &>/dev/null; do
-       RETRIES=$((RETRIES + 1))
-       if [ "$RETRIES" -ge 30 ]; then
-           echo "Error: MariaDB did not become healthy after 30 attempts"
-           break
-       fi
-       sleep 2
-   done
-   ```
-
-5. **Stream fresh prod data** (redirect to log to keep context clean):
-   ```bash
-   bin/db-sync-prod > /tmp/db-sync-prod.log 2>&1 && echo "PASS: db-sync-prod completed" && tail -20 /tmp/db-sync-prod.log || { echo "FAIL: db-sync-prod"; tail -40 /tmp/db-sync-prod.log; }
-   ```
-   With no arguments, targets the main `ibl5-mariadb` container. Streams from prod, handles generated columns, strips DEFINER clauses, backfills `schema_migrations`, and runs `bin/db-migrate` for pending migrations.
-
-6. **Smoke test** — verify main.localhost loads with prod content:
-   ```bash
-   HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' http://main.localhost/ibl5/)
-   if [ "$HTTP_CODE" != "200" ]; then
-       echo "FAIL: main.localhost returned HTTP $HTTP_CODE"
-       docker logs ibl5-php --tail 30
-   fi
-
-   BODY=$(curl -s http://main.localhost/ibl5/)
-   if echo "$BODY" | grep -qi 'fatal error\|500 Internal'; then
-       echo "FAIL: PHP fatal error detected in response"
-       docker logs ibl5-php --tail 30
-   fi
-
-   if echo "$BODY" | grep -qi 'standings\|scores\|roster'; then
-       echo "PASS: Prod content detected"
-   else
-       echo "WARN: Could not confirm prod content in response"
-   fi
-   ```
-   If the smoke test fails: print the error details. Do NOT retry the full rebuild — the logs are more useful for diagnosis.
-
-7. **Print preview URL:** `http://main.localhost/ibl5/`
-
-### Path B: Worktree preview (when `$PR_STATE` != `MERGED`)
-
-**Skip if** worktree was pre-existing or earlier phases left uncommitted fixes.
-
-1. Tear down and restart with production data:
-   ```bash
-   bin/wt-down <worktree-name>
-   bin/wt-up <worktree-name> --prod
-   ```
-2. Print preview URL: `http://<slug>.localhost/ibl5/`
-3. Do NOT run `wt-remove` or `git branch -D`
+**Branch on `$PR_STATE`:** if `MERGED` → **Path A** (sync local, then rebuild the main Docker stack with fresh prod data — skip Path A entirely if `$ENGINE_ONLY`, since an engine-only change touches no `ibl5/` PHP; requires `REMOTE_*` prod credentials in `.env`). Otherwise → **Path B** (worktree preview via `bin/wt-down`/`bin/wt-up --prod`; skip if the worktree pre-existed or earlier phases left uncommitted fixes). **Read `.claude/skills/post-plan/_phase-10-preview-environment.md`** for the full step-by-step of whichever path applies before running it. Do NOT run `wt-remove` or `git branch -D`.
 
 ---
 

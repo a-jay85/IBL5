@@ -23,10 +23,12 @@
 # below therefore means "cannot alter a VR / E2E / Lighthouse / preview render."
 #
 # Deny-set (a file is non-website if it matches ALL of the following):
-#   - matches the deny regex: (\.md$|^docs/|^ibl5/docs/|^\.claude/|^bin/|^engine/)
+#   - matches the deny regex: (\.md$|^docs/|^ibl5/docs/|^\.claude/|^bin/|^engine/|^ibl5/tests/)
 #   - is NOT in the carve-out set (paths that must always trigger, even though
 #     they match the deny regex):
 #       bin/website-affecting  (the predicate itself — changing the gate must trigger it)
+#       ibl5/tests/e2e/*       (Playwright browser specs — drive real renders)
+#       ibl5/tests/api-e2e/*   (API E2E specs — drive real requests)
 #
 # Most naturally website-side files (they do NOT match the deny regex) always
 # count website — INCLUDING E2E/Lighthouse drivers like
@@ -75,17 +77,33 @@
 #              touches docker/** or the image build (website-side, not denied), so
 #              those still trigger E2E. Note ibl5/bin/jsbsim (the baked binary) is
 #              under ^ibl5/, never matched by ^engine/.
+#   ^ibl5/tests/ PHPUnit test-only PHP (Cli/, Module/, DatabaseIntegration/, …).
+#              A PHPUnit .php test is never executed by the app-under-test, so
+#              changing one cannot alter any render — even HTML-rendering Module/
+#              entry-point tests only ASSERT the app's render, never produce it.
+#              CARVE-OUT: ibl5/tests/e2e/* and ibl5/tests/api-e2e/* are the real
+#              browser specs (Playwright) — they DRIVE renders, so they stay
+#              website-side. Prefix globs (…/e2e/*, NOT …/e2e*) so a sibling like
+#              ibl5/tests/e2e-helpers/ is NOT carved out; the case glob's * spans
+#              '/', so nested specs (…/e2e/smoke/foo.spec.ts) are covered.
+#              Conscious over-run: a .md-only change under ibl5/tests/e2e/ (e.g.
+#              ibl5/tests/e2e/README.md) now flips skip→RUN — the carve-out wins
+#              over \.md$. Rare and SAFE (extra E2E run, never a silent skip).
 #
 # shellcheck shell=bash
 
 set -u
 
-DENY_REGEX='(\.md$|^docs/|^ibl5/docs/|^\.claude/|^bin/|^engine/)'
+DENY_REGEX='(\.md$|^docs/|^ibl5/docs/|^\.claude/|^bin/|^engine/|^ibl5/tests/)'
 
-# Carve-out: paths that match the deny regex but must still trigger (exact match).
+# Carve-out: paths that match the deny regex but must still trigger. Exact match
+# for the predicate itself; prefix globs for the real browser-spec dirs (they
+# DRIVE renders, so they stay website-side despite matching ^ibl5/tests/).
 is_carveout() {
     case "$1" in
         bin/website-affecting) return 0 ;;
+        ibl5/tests/e2e/*)      return 0 ;;
+        ibl5/tests/api-e2e/*)  return 0 ;;
     esac
     return 1
 }
@@ -145,9 +163,12 @@ Deny-set (non-website if matched and not in carve-out):
   ^\.claude/     local .claude rules/commands
   ^bin/          host repo bin/ scripts
   ^engine/       Go sim engine source (own CI; E2E runs the prebaked binary)
+  ^ibl5/tests/   PHPUnit test-only PHP (never executed by the app-under-test)
 
 Carve-out (always website-side despite matching deny regex):
   bin/website-affecting  (the predicate itself)
+  ibl5/tests/e2e/*       (Playwright browser specs — drive real renders)
+  ibl5/tests/api-e2e/*   (API E2E specs — drive real requests)
 
 CI-meta exempt (NON-website despite not matching deny regex — provably can't
 affect a VR/E2E/Lighthouse/preview render; staleness over-runs, never silent-skips):

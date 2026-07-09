@@ -90,6 +90,23 @@ assert_exit "pin-markdown"      1 "README.md"          # \.md$ deny regex
 assert_exit "pin-app-php"       0 "ibl5/index.php"     # app code, website-side
 assert_exit "pin-carveout-self" 0 "bin/website-affecting"  # is_carveout forces website
 
+# --- (e) ^ibl5/tests/ deny + browser-spec carve-out ---
+# SAFE (exit 0 / stays website): the real Playwright/API browser specs must keep
+# triggering E2E/VR despite matching the new ^ibl5/tests/ deny — is_carveout wins.
+assert_exit "tests-e2e-spec"       0 "ibl5/tests/e2e/foo.spec.ts"          # carve-out ibl5/tests/e2e/*
+assert_exit "tests-api-e2e-spec"   0 "ibl5/tests/api-e2e/bar.ts"           # carve-out ibl5/tests/api-e2e/*
+assert_exit "tests-e2e-ci-seed"    0 "ibl5/tests/e2e/fixtures/ci-seed.sql" # seed under e2e/ → carved
+assert_exit "tests-e2e-nested"     0 "ibl5/tests/e2e/smoke/foo.spec.ts"    # case-glob * spans '/', nested covered
+# DANGEROUS (exit 1 / now SKIPs): PHPUnit test-only .php — never executed by the
+# app-under-test, so it cannot alter any render (Module/ entry-point tests only
+# ASSERT the render, never produce it).
+assert_exit "tests-cli-php"        1 "ibl5/tests/Cli/Foo.php"                        # ^ibl5/tests/ deny
+assert_exit "tests-dbintegration"  1 "ibl5/tests/DatabaseIntegration/Bar.php"        # ^ibl5/tests/ deny
+assert_exit "tests-module-entry"   1 "ibl5/tests/Module/EntryPoints/BazEntryPointTest.php"  # HTML-asserting but assert-only
+# BOUNDARY (exit 1): the e2e-helpers sibling must NOT match the ibl5/tests/e2e/*
+# carve-out (trailing-slash glob) — proves ^ibl5/tests/ deny still applies.
+assert_exit "tests-e2e-sibling"    1 "ibl5/tests/e2e-helpers/x.ts"         # sibling ≠ e2e/* carve-out
+
 # Empty stdin → exit 0 (fail-safe BUILD). Tested with genuinely empty input.
 printf '' | "$GUARD" >/dev/null 2>&1
 empty_exit=$?

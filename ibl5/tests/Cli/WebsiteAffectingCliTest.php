@@ -97,6 +97,36 @@ final class WebsiteAffectingCliTest extends TestCase
         self::assertSame(1, $result['exit'], $result['stderr']);
     }
 
+    public function testTestsCliDirDiffExitsOne(): void
+    {
+        // PHPUnit Cli test .php → SKIP (^ibl5/tests/ deny; never run by app-under-test)
+        $result = $this->runPredicate("ibl5/tests/Cli/Foo.php\n");
+        self::assertSame(1, $result['exit'], $result['stderr']);
+    }
+
+    public function testTestsDatabaseIntegrationDirExitsOne(): void
+    {
+        // PHPUnit DatabaseIntegration test .php → SKIP (^ibl5/tests/ deny)
+        $result = $this->runPredicate("ibl5/tests/DatabaseIntegration/Bar.php\n");
+        self::assertSame(1, $result['exit'], $result['stderr']);
+    }
+
+    public function testTestsModuleEntryPointDirExitsOne(): void
+    {
+        // Module entry-point test renders HTML but only ASSERTS the app's render,
+        // never produces it → SKIP (^ibl5/tests/ deny).
+        $result = $this->runPredicate("ibl5/tests/Module/EntryPoints/BazEntryPointTest.php\n");
+        self::assertSame(1, $result['exit'], $result['stderr']);
+    }
+
+    public function testTestsE2eSiblingDirExitsOne(): void
+    {
+        // BOUNDARY: e2e-helpers sibling must NOT match the ibl5/tests/e2e/* carve-out
+        // (trailing-slash glob) → still denied by ^ibl5/tests/ → SKIP.
+        $result = $this->runPredicate("ibl5/tests/e2e-helpers/x.ts\n");
+        self::assertSame(1, $result['exit'], $result['stderr']);
+    }
+
     // =========================================================================
     // RUN cases (exit 0 — website-affecting)
     // =========================================================================
@@ -126,6 +156,34 @@ final class WebsiteAffectingCliTest extends TestCase
     {
         // Row 8: ibl5/tests/e2e/ → RUN (E2E test dir stays website-side)
         $result = $this->runPredicate("ibl5/tests/e2e/foo.spec.ts\n");
+        self::assertSame(0, $result['exit'], $result['stderr']);
+    }
+
+    public function testTestsE2eDirStaysWebsite(): void
+    {
+        // Real Playwright spec under ibl5/tests/e2e/ → RUN via is_carveout (drives renders)
+        $result = $this->runPredicate("ibl5/tests/e2e/roster.spec.ts\n");
+        self::assertSame(0, $result['exit'], $result['stderr']);
+    }
+
+    public function testTestsApiE2eDirStaysWebsite(): void
+    {
+        // API E2E spec under ibl5/tests/api-e2e/ → RUN via is_carveout (drives requests)
+        $result = $this->runPredicate("ibl5/tests/api-e2e/standings.ts\n");
+        self::assertSame(0, $result['exit'], $result['stderr']);
+    }
+
+    public function testTestsE2eNestedPathStaysWebsite(): void
+    {
+        // Nested spec proves the case-glob * spans '/': ibl5/tests/e2e/* covers subdirs → RUN
+        $result = $this->runPredicate("ibl5/tests/e2e/smoke/foo.spec.ts\n");
+        self::assertSame(0, $result['exit'], $result['stderr']);
+    }
+
+    public function testCiSeedUnderE2eStaysWebsite(): void
+    {
+        // The E2E seed fixture lives under e2e/ → carved in → RUN (VR/E2E depend on it)
+        $result = $this->runPredicate("ibl5/tests/e2e/fixtures/ci-seed.sql\n");
         self::assertSame(0, $result['exit'], $result['stderr']);
     }
 
@@ -205,6 +263,7 @@ final class WebsiteAffectingCliTest extends TestCase
         self::assertStringContainsString('^docs/', $result['output']);
         self::assertStringContainsString('^\.claude/', $result['output']);
         self::assertStringContainsString('^engine/', $result['output']);
+        self::assertStringContainsString('^ibl5/tests/', $result['output']);
         self::assertStringContainsString('bin/website-affecting', $result['output']);
     }
 

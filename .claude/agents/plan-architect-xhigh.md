@@ -1,8 +1,8 @@
 ---
-name: plan-architect
-description: Software architect that designs implementation plans for the /plan command. Returns a step-by-step plan, identifies the critical files, and weighs architectural trade-offs. Runs at high effort. Use only as the Step-3 planning agent invoked by /plan; see plan-architect-xhigh for security/destructive/ship-pipeline tasks.
+name: plan-architect-xhigh
+description: Software architect for high-stakes implementation plans — tasks touching a security surface, trust boundary (auth/authz-gated route), destructive migration, or .claude/skills ship-pipeline invariants. Runs at xhigh effort. Use only as the Step-3 escalated planning agent invoked by /plan.
 model: opus
-effort: high
+effort: xhigh
 disallowedTools: Agent, ExitPlanMode, Edit, Write, NotebookEdit
 ---
 

@@ -1,0 +1,207 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-automouse-single — characterization + regression test for the
+# bin/automouse-run plan <slug> single-plan mode.
+#
+# Verifies: selection guard (only the named plan runs), untouched-queue contract,
+# self-heal gated OFF in single mode, auto-queue-if-absent, hard-fail on
+# unresolvable slug, and already-queued tolerance.
+#
+# macOS-only: automouse-run depends on launchd/BSD tools (caffeinate, stat -f, BSD date).
+#
+# Run: bin/test-automouse-single  (exit 0 = pass/skip, 1 = any assertion failed)
+
+set -u
+
+if [ "$(uname)" != "Darwin" ]; then
+    echo "SKIP: test-automouse-single is macOS-only (automouse-run depends on launchd/BSD tools)."
+    exit 0
+fi
+
+REPO="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$(mktemp -d)"
+trap 'rm -rf "$ROOT"' EXIT
+
+NDIR="$ROOT/automouse"
+PDIR="$ROOT/plans"
+STUBDIR="$ROOT/stub"
+mkdir -p "$NDIR/queue" "$NDIR/handoff" "$NDIR/logs" "$NDIR/reports" \
+         "$NDIR/done" "$NDIR/skipped" "$PDIR" "$STUBDIR"
+
+FAILED=0
+
+assert_present() {
+    local desc="$1" path="$2"
+    if [ ! -e "$path" ] && [ ! -L "$path" ]; then
+        echo "FAIL: $desc — expected present: $path"
+        FAILED=1
+    fi
+}
+
+assert_absent() {
+    local desc="$1" path="$2"
+    if [ -e "$path" ]; then
+        echo "FAIL: $desc — expected absent (exists): $path"
+        FAILED=1
+        return
+    fi
+    if [ -L "$path" ]; then
+        echo "FAIL: $desc — expected absent (dangling symlink): $path"
+        FAILED=1
+    fi
+}
+
+# --- Stub claude ------------------------------------------------------------
+# First call per plan (no handoff) = impl: writes handoff JSON.
+# Second call (handoff present) = postplan: moves plan to done/, clears handoff.
+# Emits a stream-json success result event. sleep 2 keeps runtime above the
+# sub-minute fast-fail threshold (MIN_VIABLE_SECS=60) without tripping it:
+# impl is safe because the handoff is written (should_impl_env_stop returns 1);
+# postplan is safe because the handoff is deleted before the sub-minute check.
+cat > "$STUBDIR/claude" <<STUB
+#!/usr/bin/env bash
+set -u
+NDIR="$NDIR"
+plan="\$(printf '%s\n' "\$*" | grep -oE 'PLAN_FILE=[^[:space:]]+' | tail -1 | cut -d= -f2)"
+sleep 2
+if [ -n "\$plan" ]; then
+    hf="\$NDIR/handoff/\$plan.json"
+    if [ ! -f "\$hf" ]; then
+        printf '{"branch":"x","plan":"%s"}\n' "\$plan" > "\$hf"
+    else
+        mv "\$NDIR/queue/\$plan" "\$NDIR/done/\$plan" 2>/dev/null || true
+        rm -f "\$hf" "\$NDIR/queue/\$plan.attempts" 2>/dev/null || true
+    fi
+fi
+printf '{"type":"result","subtype":"success","stop_reason":"end_turn","num_turns":1,"duration_ms":2000,"total_cost_usd":0.001,"usage":{"input_tokens":1,"output_tokens":1}}\n'
+exit 0
+STUB
+chmod +x "$STUBDIR/claude"
+
+# --- Copy real runner; redirect NIGHTLY_DIR + stub PATH --------------------
+RUNNER="$ROOT/automouse-run"
+sed -e "s#^NIGHTLY_DIR=.*#NIGHTLY_DIR=\"$NDIR\"#" \
+    -e "s#^export PATH=.*#export PATH=\"$STUBDIR:/usr/local/bin:/opt/homebrew/bin:\$PATH\"#" \
+    "$REPO/bin/automouse-run" > "$RUNNER"
+chmod +x "$RUNNER"
+
+# --- Helpers ---------------------------------------------------------------
+seed_plan() {
+    local slug="$1"
+    printf '# %s\n\nimpl_model: sonnet\n' "$slug" > "$PDIR/$slug.md"
+    ln -s "$PDIR/$slug.md" "$NDIR/queue/$slug.md"
+}
+
+run_single() {
+    PLANS_DIR="$PDIR" "$RUNNER" plan "$1" > "$ROOT/run.out" 2>&1
+}
+
+reset_state() {
+    rm -rf "$NDIR/queue" "$NDIR/handoff" "$NDIR/done" "$NDIR/skipped" \
+           "$NDIR/logs" "$NDIR/reports" "$PDIR"
+    mkdir -p "$NDIR/queue" "$NDIR/handoff" "$NDIR/logs" "$NDIR/reports" \
+             "$NDIR/done" "$NDIR/skipped" "$PDIR"
+}
+
+# ===========================================================================
+# Case 1 — only the named plan runs; others remain untouched (Phases 2 & 4)
+# ===========================================================================
+echo "--- case 1: named plan runs, others untouched ---"
+reset_state
+seed_plan plan-1
+seed_plan plan-2
+seed_plan plan-3
+run_single plan-2
+
+assert_present "case1 plan-2 completed"  "$NDIR/done/plan-2.md"
+assert_absent  "case1 plan-2 left queue" "$NDIR/queue/plan-2.md"
+for other in plan-1 plan-3; do
+    assert_present "case1 $other still queued"    "$NDIR/queue/$other.md"
+    assert_absent  "case1 $other not done"        "$NDIR/done/$other.md"
+    assert_absent  "case1 $other no lock"         "$NDIR/queue/$other.md.lock"
+    assert_absent  "case1 $other no attempts"     "$NDIR/queue/$other.md.attempts"
+    assert_absent  "case1 $other no handoff"      "$NDIR/handoff/$other.md.json"
+done
+
+# ===========================================================================
+# Case 2 — self-heal gated OFF in single mode (Phase 3)
+# ===========================================================================
+echo "--- case 2: self-heal gated off ---"
+reset_state
+seed_plan plan-run
+# plan-skip: no repo-path tokens → check-plan-staleness exits 0 → self-heal
+# would requeue it if not gated. Positive control proves this below.
+printf '# plan-skip\n\nimpl_model: sonnet\n' > "$PDIR/plan-skip.md"
+ln -s "$PDIR/plan-skip.md" "$NDIR/skipped/plan-skip.md"
+touch "$NDIR/skipped/plan-skip.md.staleness"
+
+# Positive control: verify self-heal WOULD requeue plan-skip without the gate.
+# Clone the state to a temp copy and run self-heal on it.
+CLONE="$ROOT/clone-case2"
+cp -r "$NDIR" "$CLONE"
+if NIGHTLY_DIR="$CLONE" PLANS_DIR="$PDIR" "$REPO/bin/automouse-self-heal" >/dev/null 2>&1; then
+    if [ -e "$CLONE/queue/plan-skip.md" ]; then
+        echo "positive-control: self-heal WOULD requeue plan-skip — fixture is non-vacuous."
+    else
+        echo "WARN: positive-control inconclusive (self-heal ran but plan-skip not in clone queue/)"
+    fi
+else
+    echo "WARN: positive-control self-heal exited non-zero — fixture may be vacuous"
+fi
+rm -rf "$CLONE"
+
+run_single plan-run
+assert_present "case2 plan-run completed"    "$NDIR/done/plan-run.md"
+assert_present "case2 skip still skipped"    "$NDIR/skipped/plan-skip.md"
+assert_present "case2 staleness marker kept" "$NDIR/skipped/plan-skip.md.staleness"
+assert_absent  "case2 skip NOT resurrected"  "$NDIR/queue/plan-skip.md"
+
+# ===========================================================================
+# Case 3 — auto-queue-if-absent (Phase 1)
+# ===========================================================================
+echo "--- case 3: auto-queue-if-absent ---"
+reset_state
+seed_plan plan-other
+printf '# plan-x\n\nimpl_model: sonnet\n' > "$PDIR/plan-x.md"   # NOT in queue/
+run_single plan-x
+
+assert_present "case3 plan-x auto-queued+ran" "$NDIR/done/plan-x.md"
+assert_present "case3 plan-other untouched"   "$NDIR/queue/plan-other.md"
+assert_absent  "case3 plan-other not done"    "$NDIR/done/plan-other.md"
+assert_absent  "case3 plan-other no lock"     "$NDIR/queue/plan-other.md.lock"
+
+# ===========================================================================
+# Case 4 — unresolvable slug hard-fails before the loop (Phases 1 & 4)
+# ===========================================================================
+echo "--- case 4: unresolvable slug hard-fails ---"
+reset_state
+set +e
+out=$(PLANS_DIR="$PDIR" "$RUNNER" plan nonexistent-slug 2>&1); exit_code=$?
+set -e
+[ "$exit_code" -ne 0 ] || { echo "FAIL: case4 expected non-zero exit, got 0"; FAILED=1; }
+echo "$out" | grep -qi "cannot resolve\|no such plan\|nonexistent-slug" \
+    || { echo "FAIL: case4 expected a loud unresolved-slug message, got: $out"; FAILED=1; }
+assert_absent "case4 no no-queue report" \
+    "$NDIR/reports/$(date +%Y-%m-%d)-no-queue.md"
+
+# ===========================================================================
+# Case 5 — already-queued tolerance (Phase 1 pre-check)
+# ===========================================================================
+echo "--- case 5: already-queued tolerance ---"
+reset_state
+seed_plan plan-dup            # writes $PDIR/plan-dup.md AND queue/ symlink
+run_single plan-dup           # must NOT abort on the already-queued symlink
+assert_present "case5 plan-dup completed"  "$NDIR/done/plan-dup.md"
+assert_absent  "case5 plan-dup left queue" "$NDIR/queue/plan-dup.md"
+grep -qi "already queued" "$ROOT/run.out" \
+    && { echo "FAIL: case5 leaked an 'already queued' error"; FAILED=1; }
+
+# ===========================================================================
+echo ""
+if [ "$FAILED" -ne 0 ]; then
+    echo "RESULT: FAILED"
+    exit 1
+fi
+echo "RESULT: all passed"
+exit 0

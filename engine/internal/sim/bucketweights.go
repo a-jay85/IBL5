@@ -1,5 +1,7 @@
 package sim
 
+import "github.com/a-jay85/IBL5/engine/internal/rng"
+
 // Play-outcome bucket-weight helpers — the faithful JSB 5.60 basis recovered in
 // COMPOSITE_DOUBLES_TRACE.md (2nd-pass RESOLUTION) and 00_MASTER_REFERENCE.md
 // (L1340 team-quality helpers, L653-690 HCA sites). Each helper is decoupled from
@@ -20,13 +22,13 @@ package sim
 //     equivalent, kept on the same O(10s) basis as 2pt so 3pt does not vanish.
 //   - and-one (andOneBucketWeight) = matchup×0.25 + made-rate, floored to 0.03
 //     (the verbatim JSB floor, _DAT…→0.03). A small minority of plays, as in JSB.
-//   - foul (foulBucketWeight) = the 0.6 FLOOR (the +0xDE0 composite is dead/always
-//     0; the bucket floors to 0.6), modulated by the team-quality divisor
-//     foul = (foul/offQ)×(defQ − teamDef×5/6) + foul, then the site-2 HCA nudge
-//     foul −= hcaDelta. offQ (offQualityWithHCA, teamquality.go) shrinks for the
-//     home team, growing foul/offQ — the dominant home-favorable mechanism. With
-//     2pt at O(10s) the 0.6-floored foul bucket settles at a realistic minority
-//     share (no whole-team foul-outs, FTA < FGA), so the sim stays non-degenerate.
+//   - foul (foulBucketWeight) = the faithful JSB 5.60 asymmetric pair (ADR-0082):
+//     HOME (hca>0): deterministic (defQ−5·(5/6)·teamDef)/5 + hca, defense-coupled.
+//     AWAY/NEUTRAL (hca<=0): stochastic U[0, 0.6), mean 0.3, no defense coupling.
+//     Both arms are multiplied by foulBucketScale (the raw-5.60-units →
+//     Go-bucket-basis conversion; see the const). With 2pt at O(10s) the scaled
+//     foul bucket settles at a realistic minority share (no whole-team
+//     foul-outs, FTA < FGA), so the sim stays non-degenerate.
 //
 // FAITHFULNESS / STAND-INS: the formula SHAPES (+0xD90 Branch-A, the 0.6 foul
 // floor + quality divisor, the per-lineup off/def sums, the ±0.2 HCA) are ported
@@ -87,6 +89,20 @@ const (
 	// foulDivisorTeamDefCoef = 5/6 (_DAT_0066d3a0 = 0.8333), the coefficient on the
 	// team-defense baseline in the foul divisor numerator (defQ − teamDef×5/6).
 	foulDivisorTeamDefCoef = 0.8333333333
+
+	// foulBucketScale is the bucket-basis conversion for the faithful foul pair
+	// (ADR-0082): the pair's pinned magnitudes are in 5.60's raw bucket units,
+	// while the Go engine's play-outcome basis is ~8× larger (2pt composite
+	// O(10s), ≈16.5 under default ratings). Applied to BOTH arms of
+	// foulBucketWeight — including the +hca term and the U[0, foulFloor) away
+	// draw — so the pinned home/away structure and ratio are preserved while the
+	// bucket competes on the engine's basis. Unscaled, the foul share collapses
+	// (~8× fewer fouls): FTA level, Var(lnPPS) (ADR-0055 SOLVED constraint), and
+	// the HCA margin all break against the .sco archive. The value is a
+	// corpus-calibrated STAND-IN swept against the archive fidelity gates
+	// (ADR-0082, same epistemic status as ADR-0061's offQualityConstant); the
+	// raw-unit RE of the defender/teamDef magnitudes remains the eventual pin.
+	foulBucketScale = 8.6
 
 	// andOneBucketFloor is the verbatim JSB and-one floor (0.03). Ensures the
 	// and-one path cannot be zeroed by a negative matchup quality. Unchanged from
@@ -182,38 +198,41 @@ func andOneBucketWeight(mq float64, p onCourt) float64 {
 	return w
 }
 
-// foulBucketWeight is the recovered faithful foul bucket (COMPOSITE_DOUBLES_
-// TRACE.md §RESOLUTION, 00_MASTER_REFERENCE.md L1340): the 0.6 floor, modulated by
-// the team-quality divisor and the site-2 HCA nudge:
+// foulBucketWeight is the faithful JSB 5.60 asymmetric foul bucket (ADR-0082,
+// superseding ADR-0061's offQ-divisor stand-in). The two roles use DIFFERENT
+// mechanisms, keyed on the game-type-aware HCA delta (NOT on team role):
 //
-//	foul = 0.6
-//	foul = (foul / offQ) × (defQ − teamDef×5/6) + foul   // site-3 divisor
-//	foul −= hcaDelta                                       // site-2 nudge
+//   - HOME (hca > 0): a deterministic, defense-coupled weight
+//     w = (defQ − defQualityCapTeamMult·foulDivisorTeamDefCoef·teamDefBaseline)/defQualityCapTeamMult + hca,
+//     i.e. (defQ − 5·(5/6)·1)/5 + 0.2. defQ = defMatchupQuality(defenders) is the
+//     compressed + capped team-defense stand-in, so a stronger defense draws MORE
+//     home fouls. defMatchupQuality's post-compression range [4.5155, 7.5] holds
+//     the raw home weight in [~0.27, ~0.87] (× foulBucketScale on return).
 //
-// offQ is the volume-NEUTRAL constant base offQualityConstant (ADR-0061 supersedes
-// ADR-0044's off-side compression — the Fork-B carrier fix); only defQ is narrowed
-// toward the corpus league mean by foulCompress (teamquality.go): the team-to-team
-// spread of the def arm of this divisor term is the lead negative-Cov(lnFGA,lnPPS)
-// driver (ADR-0043), so compressing it narrows the engine's too-wide FTA-rate
-// dispersion. The HCA delta is applied OUTSIDE that compression, so the home-favorable
-// sign and #955 magnitude are unchanged.
+//   - AWAY / NEUTRAL (hca <= 0, incl. ASG where hcaDelta == 0): a stochastic
+//     U[0, foulFloor) draw with NO defense coupling (mean foulFloor/2 = 0.3,
+//     × foulBucketScale on return).
+//     BOTH teams take this branch at a neutral (ASG) game type, so the foul path
+//     is symmetric there — the property TestSimulate_HomeCourtAdvantage_ASGNeutral
+//     locks. The branch keys on `hca`, NOT team role (`isHome`): an isHome-keyed
+//     branch would give the home-role team the deterministic ~0.87 weight even at
+//     ASG, breaking that symmetry test. In every regular game isHome ⟺ hca > 0, so
+//     the corpus/sweep/golden are numerically identical to the isHome variant.
 //
-// offQ = offQualityWithHCA(offense, hcaDelta) is the foul-bucket divisor; it
-// shrinks for the home team (the constant base reduced by len×0.2), so foul/offQ —
-// and thus the home foul bucket — GROWS. That multiplicative divisor growth is the
-// dominant home-favorable term; it dominates the (anti-home) additive site-2 nudge
-// (foul −= +0.2 for home), which is near-negligible against the divisor-adjusted
-// bucket. This is the net-home-favorable composition PR7a got wrong (it shipped
-// site-2 alone, anti-home). defQ = defMatchupQuality(defenders). offQualityFloor
-// (teamquality.go) guards the division. The faithful divisor replaces #952's
-// net×scale foul stand-in — so the foul bucket no longer reads net and the playoff
-// ×1.25 multiplier no longer leaks into it. weight() clamps any negative result to
-// 0.
-func foulBucketWeight(offense, defenders []onCourt, hcaDelta float64) float64 {
-	foul := foulFloor
-	offQ := offQualityWithHCA(offense, hcaDelta)
+// The `if w <= 0` redraw is faithful to the binary's non-positive-weight redraw.
+// It is UNREACHABLE through defMatchupQuality (floor 4.5155 keeps w ≥ ~0.27 > 0;
+// the threshold is defQ ≤ 3.1667); retained as a faithful guard, its ~2 lines the
+// only uncovered addition (package coverage stays well above the 90% floor).
+func foulBucketWeight(defenders []onCourt, hca float64, r *rng.RNG) float64 {
+	if hca <= 0 {
+		// away/neutral: U[0, 0.6)·scale, mean 0.3·scale
+		return r.Float64() * foulFloor * foulBucketScale
+	}
 	defQ := defMatchupQuality(defenders)
-	foul = (foul/offQ)*(defQ-teamDefBaseline*foulDivisorTeamDefCoef) + foul
-	foul -= hcaDelta
-	return foul
+	w := (defQ-defQualityCapTeamMult*foulDivisorTeamDefCoef*teamDefBaseline)/defQualityCapTeamMult + hca
+	if w <= 0 {
+		// faithful redraw (unreachable via defMatchupQuality)
+		return r.Float64() * foulFloor * foulBucketScale
+	}
+	return w * foulBucketScale
 }

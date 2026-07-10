@@ -34,9 +34,10 @@ func TestFreeze_SubstitutesAndAccumulates(t *testing.T) {
 	careless, pressure := 60.0, 100.0
 	wantTurn := stealTurnoverScale * careless * pressure // below the clamp
 	wantMake := shotValue2pt(5, 50, false)
-	off := []onCourt{oc(slotPG, mkPlayer(1, 7, slotPG, 46))}
 	def := []onCourt{oc(slotPG, mkPlayer(2, 3, slotPG, 50))}
-	wantFoul := foulBucketWeight(off, def, 0)
+	// Home arm (hca > 0) is deterministic and never draws rng, so exact-equality
+	// against base.foulWeight holds and the nil-rng gameState is safe.
+	wantFoul := foulBucketWeight(def, hcaMagnitude, nil)
 
 	if got := base.orebProb(100, 100); got != wantOreb {
 		t.Errorf("baseline orebProb = %v, want live %v", got, wantOreb)
@@ -47,7 +48,7 @@ func TestFreeze_SubstitutesAndAccumulates(t *testing.T) {
 	if got := base.makeValue2pt(5, 50, result.OriginInitial); got != wantMake {
 		t.Errorf("baseline makeValue2pt = %v, want live %v", got, wantMake)
 	}
-	if got := base.foulWeight(off, def, 0); got != wantFoul {
+	if got := base.foulWeight(def, hcaMagnitude); got != wantFoul {
 		t.Errorf("baseline foulWeight = %v, want live %v", got, wantFoul)
 	}
 
@@ -67,14 +68,13 @@ func TestFreeze_SubstitutesAndAccumulates(t *testing.T) {
 // reflects only that arm, because the injection point is localized to one
 // mechanism's output (not a shared rating that would spill into siblings).
 func TestFreeze_NoCrossConfound(t *testing.T) {
-	off := []onCourt{oc(slotPG, mkPlayer(1, 7, slotPG, 46))}
 	def := []onCourt{oc(slotPG, mkPlayer(2, 3, slotPG, 50))}
 
 	liveOreb := gate1Probability(120, 80, 0) // gs.gateBaseline is 0 in these cases
 	careless, pressure := 60.0, 100.0
 	liveTurn := stealTurnoverScale * careless * pressure // runtime eval, below the clamp
 	liveMake := shotValue2pt(5, 50, false)
-	liveFoul := foulBucketWeight(off, def, 0)
+	liveFoul := foulBucketWeight(def, hcaMagnitude, nil) // home arm — deterministic, rng unused
 
 	// Sentinel means, deliberately distinct from the live values so a leak is visible.
 	means := FreezeMeans{OrebProb: 0.31, TurnProb: 0.07, FoulWeight: 0.13, MakeVal2pt: 111.0}
@@ -94,7 +94,7 @@ func TestFreeze_NoCrossConfound(t *testing.T) {
 			gotOreb := gs.orebProb(120, 80)
 			gotTurn := gs.turnoverProb(60, 100)
 			gotMake := gs.makeValue2pt(5, 50, result.OriginInitial)
-			gotFoul := gs.foulWeight(off, def, 0)
+			gotFoul := gs.foulWeight(def, hcaMagnitude)
 
 			// The frozen arm returns the sentinel; every OTHER arm returns live.
 			wantOreb, wantTurn, wantMake, wantFoul := liveOreb, liveTurn, liveMake, liveFoul

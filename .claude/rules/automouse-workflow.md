@@ -1,6 +1,6 @@
 ---
 description: Automouse autonomous workflow (formerly "nightly") — launchd fires claude -p on a recurring schedule, running two context-isolated agents per plan (implementation + post-plan) with time guards and incremental checkpoints.
-last_verified: 2026-06-28
+last_verified: 2026-07-10
 paths: "bin/automouse-*"
 ---
 
@@ -8,7 +8,7 @@ paths: "bin/automouse-*"
 
 > **"Automouse" is this pipeline — the autonomous plan-execution machinery (`bin/automouse-*`, this rule).** It was **formerly called "nightly"**; the term was renamed because the user runs it outside nighttime too, so "nightly" was a misnomer that sent people hunting through `cron` / `/schedule` / `CronCreate` / launchd-by-hand. When you read "automouse" (or legacy "nightly") referring to autonomous plan execution, it means **`bin/automouse-run` fired by launchd**, draining the queue built by `bin/automouse-queue` — *not* a generic scheduler. (The macOS `launchd` agent is the scheduling substrate, but the concept lives in these scripts.)
 
-A headless `claude -p` process runs on a recurring schedule via macOS `launchd`. It loops through queued plans — two `claude -p` invocations per plan (implementation, then post-plan) — until the queue is empty or the time guard is exceeded.
+A headless `claude -p` process runs on a recurring schedule via macOS `launchd`. It loops through queued plans — two `claude -p` invocations per plan (implementation, then post-plan) — until the queue is empty or the time guard is exceeded. For a single watched run, `bin/automouse-run plan <slug>` executes exactly one named plan (auto-queuing it if absent) with the same guard machinery, then stops — leaving the rest of the queue untouched.
 
 ## Quick Reference
 
@@ -20,6 +20,7 @@ A headless `claude -p` process runs on a recurring schedule via macOS `launchd`.
 | Check morning results | `ls ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/reports/` |
 | Cancel the next run | `rm ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/queue/*.md` |
 | Schedule a one-shot run | `bin/automouse-run schedule "2026-05-28 20:00 PDT"` (self-cleaning launchd agent; TZ optional) |
+| Run one plan (one-off, foreground) | `bin/automouse-run plan <slug>` (impl + post-plan for exactly one named plan, then stops; auto-queues if absent, leaves the rest of the queue untouched) |
 | Disable the automouse job | `launchctl unload ~/Library/LaunchAgents/com.ibl5.automouse.plist` |
 | Re-enable the automouse job | `launchctl load ~/Library/LaunchAgents/com.ibl5.automouse.plist` |
 | Force-trigger now | `launchctl start com.ibl5.automouse` |

@@ -1,6 +1,6 @@
 ---
 description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, plan decomposition/tier-routing machinery, and the human comprehension counter-loop, with per-entry status.
-last_verified: 2026-07-08
+last_verified: 2026-07-10
 ---
 
 # Loop-Engineering Backlog
@@ -28,9 +28,9 @@ last_verified: 2026-07-08
 | Status | Count |
 |--------|------:|
 | ⬜ Open | 11 |
-| 📋 Planned | 2 |
+| 📋 Planned | 1 |
 | ◑ Partial | 3 |
-| ✅ Implemented | 1 |
+| ✅ Implemented | 2 |
 | 🚫 Declined | 0 |
 
 ---
@@ -44,7 +44,7 @@ last_verified: 2026-07-08
 | L3 | Morning digest | ⬜ Open | 🟦 | S |
 | L4 | Retro-miner | ⬜ Open | 🟥 | M |
 | L5 | Master-canary between runs | ⬜ Open | 🟦 | M |
-| L6 | Auto-update-branch unsticker | 📋 Planned | 🟦 | S |
+| L6 | Auto-update-branch unsticker | ✅ Implemented | — | S |
 | L7 | Queue-add shift-left preflight | 📋 Planned | 🟦 | S |
 | L8 | Failure self-heal / requeue | ✅ Implemented | — | M |
 | L9 | JSB AutoResearch loop | ⬜ Open | 🟥 | L |
@@ -93,9 +93,8 @@ last_verified: 2026-07-08
 **Status (2026-07-07):** ⬜ Open — 🟦.
 
 ### L6 Auto-update-branch unsticker
-**Location:** Plan: `$HOME/.claude/plans/update-behind-armed-prs.md` (queued) — a workflow calling GitHub's update-branch API for armed-auto-merge PRs stuck BEHIND master. No automation on disk yet (verified).
-**Problem:** Armed auto-merge silently never fires when the branch falls behind; unsticking is a recurring manual morning ritual.
-**Status (2026-07-07):** 📋 Planned — queued. 🟦.
+**Location:** `.github/workflows/update-behind-prs.yml` — scheduled every 15 min; calls the GitHub `update-branch` API for armed auto-merge PRs stuck BEHIND master. ADR-0081 records the CI_PAT token strategy, merge-vs-rebase decision, and loop-safety design.
+**Status (2026-07-10):** ✅ Implemented — merged PR #1390.
 
 ### L7 Queue-add shift-left preflight
 **Location:** `bin/automouse-queue` `add` runs zero preflight (verified); staleness is caught only at 2am by the impl agent, then self-heal requeues (L8). Plan: `$HOME/.claude/plans/staleness-guard-fp-fix-and-queue-check.md` (not yet queued).

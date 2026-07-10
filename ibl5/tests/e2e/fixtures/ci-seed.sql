@@ -419,6 +419,10 @@ INSERT INTO ibl_plr (
 -- Deactivated (dc_can_play_in_game=0 below) so it does not disturb the Metros
 -- 12-active roster baseline. exp=8 with draftround=1 stays off the rookie-option
 -- path (wasRookieOptioned requires exp===4).
+-- salary_yr2=600 (not 1650) — kept low so Metros' total cap stays ~5692, giving
+-- ≥1200 headroom under HARD_CAP_MAX (7000). Offer 1 (receive pid=4 salary=1800,
+-- send pid=2 salary=600; delta=1200) can then be accepted in the trade-review
+-- "accept offer via UI" E2E test without hitting the hard-cap error.
 INSERT INTO ibl_plr (
   pid, name, age, peak, teamid, pos, ordinal,
   stamina, oo, od, r_drive_off, dd, po, pd, r_trans_off, r_tvr,
@@ -433,7 +437,7 @@ INSERT INTO ibl_plr (
 ) VALUES
   (200000033, 'Extension Card Target', 30, 30, 1, 'SG', 22,
    85, 80, 75, 70, 65, 78, 74, 76, 71,
-   2, 2, 1500, 1650,
+   2, 2, 1500, 600,
    0, 8,
    6, 3, 200, 'Veteran College',
    1, 5, 2018, 'Metros', 'Metros',

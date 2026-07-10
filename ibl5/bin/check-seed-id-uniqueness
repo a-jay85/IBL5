@@ -29,16 +29,9 @@ $seedChecks = [
 // renaming either file would make prod re-run it. Grandfathered, not a license.
 $migrationNumberAllowlist = ['046'];
 
-// Pre-existing duplicates this check discovered on its own introduction:
-// pid 30 ('Spurs Guard' + 'Extension Vet') and pid 31 ('Flames Forward' +
-// 'Draft Rookie 2026'). The later INSERT's ON DUPLICATE KEY UPDATE clause
-// overlays the earlier row, so the live seeded row is a column-level MERGE of
-// both — specs currently pass against that merged state, and untangling them
-// means repointing pids and sweeping every spec that references the merged
-// row. Grandfathered until that cleanup lands; do NOT add new entries.
-$seedIdAllowlist = [
-    'tests/e2e/fixtures/ci-seed.sql' => ['ibl_plr' => ['30', '31']],
-];
+// No seed-id allowlist entries remain — the pids-30/31 grandfathering was
+// resolved by reassigning the ASG rows (Spurs Guard→pid 43, Flames Forward→pid 44).
+$seedIdAllowlist = [];
 
 /**
  * Split a VALUES body into tuples, respecting quoted strings and nesting.

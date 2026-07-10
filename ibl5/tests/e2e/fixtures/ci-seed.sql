@@ -351,8 +351,8 @@ INSERT INTO ibl_plr (
 -- Mutation-submission fixtures (waivers + rookie option)
 -- Synthetic high pids (200000031/032) mirror the 200000030 convention so they
 -- never collide with real dev-DB players (pids 1-42 are already load-bearing in
--- this seed). The plan referenced pid=31/32 but those are taken (Flames Forward
--- / Minutemen Guard), so these high pids are used instead.
+-- this seed). The plan referenced pid=31/32 but those are taken (Draft Rookie 2026 holds pid 31
+-- / Minutemen Guard holds pid 32), so these high pids are used instead.
 -- ============================================================
 
 -- pid=200000031 "Waive Target": Metros (tid=1) active player for the waive/drop
@@ -1079,7 +1079,7 @@ UPDATE ibl_team_info SET owner_name = 'GM Thunder'  WHERE teamid = 28;
 -- NOTE: ASG ballot conference split uses League::WESTERN_CONFERENCE_TEAMIDS
 -- constant (ids 6,13-21,23,24,26,28), NOT ibl_standings.conference.
 -- pid 6,7 (Phoenixes/teamid=14) → WCF/WCB (teamid 14 is in WESTERN constant)
--- pid 30-33 (Spurs/Flames/Minutemen/Royals) → ECF/ECB (teamids 10,9,5,12
+-- pid 43,44,32,33 (Spurs/Flames/Minutemen/Royals) → ECF/ECB (teamids 10,9,5,12
 --   are in EASTERN constant despite ibl_standings.conference saying Western)
 -- WCF needs: pid 7 (C/t14) = 1 → need 3 more on WESTERN teamids
 -- WCB needs: pid 6 (PG/t14) = 1 → need 3 more on WESTERN teamids
@@ -1098,7 +1098,7 @@ INSERT INTO ibl_plr (
   uuid
 ) VALUES
   -- Spurs PG (Western/Midwest backcourt)
-  (30, 'Spurs Guard', 25, 27, 10, 'PG', 1,
+  (43, 'Spurs Guard', 25, 27, 10, 'PG', 1,
    80, 75, 70, 65, 60, 72, 68, 70, 65,
    1, 2, 500, 550,
    0, 3,
@@ -1107,9 +1107,9 @@ INSERT INTO ibl_plr (
    41, 1260, 218, 475, 106, 128,
    65, 160, 40, 120, 180, 50,
    80, 20, 90,
-   'a0000000-0000-0000-0000-000000000030'),
+   'a0000000-0000-0000-0000-000000000043'),
   -- Flames SF (Western/Pacific frontcourt)
-  (31, 'Flames Forward', 27, 28, 9, 'SF', 1,
+  (44, 'Flames Forward', 27, 28, 9, 'SF', 1,
    78, 74, 68, 64, 58, 70, 66, 68, 63,
    1, 2, 600, 660,
    0, 5,
@@ -1118,7 +1118,7 @@ INSERT INTO ibl_plr (
    41, 1260, 186, 414, 93, 112,
    43, 126, 45, 140, 160, 48,
    65, 22, 88,
-   'a0000000-0000-0000-0000-000000000031'),
+   'a0000000-0000-0000-0000-000000000044'),
   -- Minutemen SG (Eastern/Atlantic backcourt)
   (32, 'Minutemen Guard', 26, 27, 5, 'SG', 1,
    79, 73, 69, 63, 59, 71, 67, 69, 64,
@@ -1224,8 +1224,8 @@ INSERT INTO ibl_plr (
    'a0000000-0000-0000-0000-000000000039');
 
 -- Starters for new players (needed to appear in voting)
-UPDATE ibl_plr SET dc_pg_depth = 1, pg_depth = 1 WHERE pid = 30;
-UPDATE ibl_plr SET dc_sf_depth = 1, sf_depth = 1 WHERE pid = 31;
+UPDATE ibl_plr SET dc_pg_depth = 1, pg_depth = 1 WHERE pid = 43;
+UPDATE ibl_plr SET dc_sf_depth = 1, sf_depth = 1 WHERE pid = 44;
 UPDATE ibl_plr SET dc_sg_depth = 1, sg_depth = 1 WHERE pid = 32;
 UPDATE ibl_plr SET dc_pf_depth = 1, pf_depth = 1 WHERE pid = 33;
 -- WCF/WCB players on Western constant teams
@@ -1242,10 +1242,10 @@ INSERT INTO ibl_plr_snapshots (
   stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta, stats_3gm, stats_3ga,
   stats_orb, stats_reb, stats_ast, stats_stl, stats_blk, stats_tvr, stats_pf, stats_pts
 ) VALUES
-  (30, 'Spurs Guard', 2026, 'finals', 'ci-seed', 10,
+  (43, 'Spurs Guard', 2026, 'finals', 'ci-seed', 10,
    41, 1260, 218, 475, 106, 128, 65, 160,
    40, 160, 180, 50, 20, 80, 90, 620),
-  (31, 'Flames Forward', 2026, 'finals', 'ci-seed', 9,
+  (44, 'Flames Forward', 2026, 'finals', 'ci-seed', 9,
    41, 1260, 186, 414, 93, 112, 43, 126,
    45, 185, 160, 48, 22, 65, 88, 565),
   (32, 'Minutemen Guard', 2026, 'finals', 'ci-seed', 5,

@@ -3,7 +3,7 @@
 # engine/go.mod toolchain so the build matches CI. The binary is copied to a path
 # OUTSIDE the ibl5 bind-mount; the entrypoint materializes it into ibl5/bin at
 # container start (the bind mount would otherwise shadow an image-built path).
-FROM golang:1.26.4 AS engine-builder
+FROM golang:1.26.5 AS engine-builder
 WORKDIR /src/engine
 COPY engine/ /src/engine
 RUN CGO_ENABLED=0 go build -o /opt/jsbsim ./cmd/jsbsim

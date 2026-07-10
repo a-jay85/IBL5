@@ -93,6 +93,10 @@ services:
         tags:
             - phpstan.rules.rule
     -
+        class: PHPStanRules\OrderByRequiresUniqueTiebreakerRule
+        tags:
+            - phpstan.rules.rule
+    -
         class: PHPStanRules\BanNonSnakeCaseColumnsRule
         tags:
             - phpstan.rules.rule

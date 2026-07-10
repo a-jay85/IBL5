@@ -1,6 +1,6 @@
 ---
 description: JSB native-engine backlog — the count-axis cut-over blocker chain, static RE pins, faithful ports, and validation gates, each tagged with the model tier that owns its load-bearing reasoning (Fable-gated items marked).
-last_verified: 2026-07-08
+last_verified: 2026-07-09
 ---
 
 # JSB Native-Engine Backlog
@@ -34,7 +34,7 @@ last_verified: 2026-07-08
 
 ```
 J1 faithful foul pair (📋, Sonnet impl)
-  └─→ J2 count-axis adjudication (🔮)  ←─ J4 pbp extraction (⚙️) ←─ J3 identifiability design (🔮)
+  └─→ J2 count-axis adjudication (🔮)  ←─ J4 pbp extraction (⚙️, spec ready) ←─ J3 identifiability design (✅ 2026-07-09)
         └─→ J12 HCA magnitude · J13 cut-over package (🧠)
 J5 unpinnable-claims sweep (📇→🧠→🔮) ─→ converts blocked runbooks into ⚙️ ports (J6, J9 pattern)
 ```
@@ -47,10 +47,10 @@ The single cut-over blocker is the wrong-signed count-axis covariance Cov(lnFGA,
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 13 |
+| ⬜ Open | 12 |
 | 📋 Planned | 1 |
 | ◑ Partial | 0 |
-| ✅ Implemented | 0 |
+| ✅ Implemented | 1 |
 | 🚫 Declined | 0 |
 
 ---
@@ -61,7 +61,7 @@ The single cut-over blocker is the wrong-signed count-axis covariance Cov(lnFGA,
 |---|-------|--------|------|-------:|
 | J1 | Faithful foul-bucket pair port | 📋 Planned | ⚙️ Sonnet | M |
 | J2 | Count-axis carrier adjudication (post-J1) | ⬜ Open | 🔮 Fable | L |
-| J3 | Per-origin efficiency identifiability (IBL5.log) | ⬜ Open | 🔮 Fable | M |
+| J3 | Per-origin efficiency identifiability (IBL5.log) | ✅ Implemented | 🔮 Fable | M |
 | J4 | Play-by-play extraction parser | ⬜ Open | ⚙️ Sonnet | M |
 | J5 | Unpinnable-claims sweep + static closures | ⬜ Open | 📇→🧠→🔮 ladder | M |
 | J6 | 2pt/3pt bucket-weight SCALE pins (+0xD90/+0xDB0, dVar60) | ⬜ Open | 🧠 Opus | M |
@@ -89,17 +89,15 @@ The single cut-over blocker is the wrong-signed count-axis covariance Cov(lnFGA,
 **Status (2026-07-08):** ⬜ Open — blocked on J1. 🔮 Fable (the measurement re-run itself is ⚙️/🧠).
 
 ### J3 Per-origin efficiency identifiability (IBL5.log)
-**Location:** `jsb-native/` IBL5.log — 1.18 GB, 23,714 games of 5.60 play-by-play (machine-local).
-**Problem:** The shots-per-possession make-value residual (initial/transition shot efficiency vs volume) is **data-limited**: `.sco` carries only season totals with no per-origin tag, so engine-only by-origin tests localize the dilution but cannot adjudicate faithfulness. The pbp log is the only untapped *real* 5.60 signal. Known limits: zero substitution markers and RNG-gated rotations (exact +/- impossible) — but shot events, running score, and possible fast-break/putback context may identify per-origin efficiency, which is all J2 needs.
-**Direction:** Identifiability study *before* any parser is built: what per-origin signal is actually recoverable from the stamp grammar, and what statistical design ties it to the within-season demeaned couplings. A wrong design here burns a multi-day extraction — this is the instrument-design class where prior Opus attempts needed advisor correction mid-flight.
-**Risk if untouched:** J2's "per-origin make-value" fork stays unadjudicable; a genuine carrier could be declared terminal for want of data.
-**Status (2026-07-08):** ⬜ Open. 🔮 Fable (design gate); output = a build spec for J4.
+**Location:** IBL5.log — 1.1 GB, **22,798 games** ≈ 19–20 seasons of 5.60 play-by-play (machine-local; earlier "23,714" was a miscount).
+**Result (Fable session, 2026-07-09):** **Identifiable.** The stamp grammar is a *closed* 509-template table compiled into jumpshot.exe `.data` (va 0x6ac184–0x6b0a3c); a template matcher achieved **100.00% sentence closure over the full corpus (22,797 parsed games, 15.6M sentences, 0 unmatched)**. Load-bearing pins, all static: (1) transition possessions are marked **deterministically** (FUN_004ee320 first-trip guard; RNG selects phrasing only) — P(miss)=P(false)=0, ~24.5 markers/game ⇒ ~1,000 transition possessions/team-season; (2) rebound side is text-partitioned between the ORB/DRB handlers except one shared string (`"Rebounded by %s."`, ~2.6% of rebounds, resolved exactly by roster join); (3) putback = sequence rule (ORB → same-team shot; putback text is flag-gated, sufficient-not-necessary), matching engine origin semantics (`possession.go`/`transition.go`: transition tags all trips, putback = trip>0 half-court); (4) running score after every stamp (5,320,495 == 5,320,495) gives per-event ground-truth points. Power: se(PPS_transition) ≈ 0.033/team-season vs total lnPPS sd ≈ 0.038 → split-half disattenuation over ~500 team-seasons, se(corr) ≈ 0.046. Full study + **J4 build spec**: `jsb-native/re-artifacts/jsb-pbp-identifiability-J3-20260709.md` (parser `j3_study.py` + full-corpus output preserved alongside).
+**Status (2026-07-09):** ✅ Implemented — study complete; J4 unblocked with spec.
 
 ### J4 Play-by-play extraction parser
-**Location:** New tooling (likely `engine/cmd/` or a build-tagged archive test) consuming IBL5.log per the J3 spec.
-**Problem:** None yet — this is the mechanical half of J3.
-**Direction:** Build to the J3 spec. Machine-verifiable: extracted per-game/season totals must reconcile exactly against the corresponding `.sco` aggregates (the same reconciliation trick that validated the FTA-by-outcome instrument).
-**Status (2026-07-08):** ⬜ Open — blocked on J3. ⚙️ Sonnet.
+**Location:** New machine-local tooling consuming IBL5.log per the J3 spec (`jsb-native/re-artifacts/jsb-pbp-identifiability-J3-20260709.md` § "J4 build spec"; the study parser `j3_study.py` next to it is ~80% of the matcher).
+**Problem:** None — mechanical half of J3, now fully specified: segmenter (header regex + digit-boundary team/score split + season-by-date-rollback), 509-template matcher (gate: 100% closure — any unmatched sentence is a parser bug), roster-join attribution, possession state machine with engine-aligned origin rules.
+**Direction:** Build to spec. Machine-verifiable gates: per-game Σ score-deltas == header final; **per-player per-game reconciliation against `ibl_box_scores`** (1988–2008, ~606K rows — stronger than the `.sco` season-total recon originally envisioned); Σ origin FGA == total FGA. Output: team-game per-origin {FGA,FTA,PTS,PPS} CSV → team-season demeaned couplings → J2's per-origin decomposition.
+**Status (2026-07-09):** ⬜ Open — **unblocked** (J3 ✅). ⚙️ Sonnet build; 🧠 Opus owns the J2 decomposition readout.
 
 ### J5 Unpinnable-claims sweep + static closures
 **Location:** `jsb-native/jsb_560/` master reference (287K; access via `bin/jsb-ref`, never full-read) + the 10.4M decompile + `jumpshot.exe` PE (`.rdata` constants are static-readable).

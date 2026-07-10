@@ -191,6 +191,7 @@ REPO="/Users/ajaynicolas/GitHub/IBL5"
 NIGHTLY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
 LOG_DIR="$NIGHTLY_DIR/logs"
 QUEUE_DIR="$NIGHTLY_DIR/queue"
+PLANS_DIR="${PLANS_DIR:-$HOME/.claude/plans}"
 MAX_ELAPSED=17100  # ~4h45m — stops around 4:45am, leaves headroom in the 5h usage window
 MAX_ATTEMPTS=3     # per-plan retry cap within one night (covers impl + postplan phases)
 MAX_IMPL_SECS=3600   # per-phase cap: impl gets at most 1h
@@ -211,6 +212,37 @@ MIN_VIABLE_SECS=60   # a real impl/postplan never finishes (pass OR fail) under 
 
 HANDOFF_DIR="$NIGHTLY_DIR/handoff"
 mkdir -p "$LOG_DIR" "$QUEUE_DIR" "$HANDOFF_DIR"
+
+# One-off single-plan mode: bin/automouse-run plan <slug>
+# Runs impl + post-plan for exactly ONE named plan, then stops. Reuses all
+# guard machinery (heartbeat/stall-kill, env-breaker, handoff resume, cost
+# roll-up, reports, lock). Foreground, streams to the dated log like a manual run.
+SINGLE_PLAN=""
+if [ "${1:-}" = "plan" ]; then
+    slug="${2:-}"
+    if [ -z "$slug" ]; then
+        echo "usage: bin/automouse-run plan <slug>" >&2
+        exit 1
+    fi
+    FILENAME="${slug%.md}.md"
+    if [ ! -e "$QUEUE_DIR/$FILENAME" ]; then
+        # Not already queued — queue it now, reusing automouse-queue's
+        # resolution (INPUT / $PLANS_DIR/$INPUT / $PLANS_DIR/$INPUT.md) and its
+        # evict_dispositions() cleanup of stale skipped/ + done/ sidecars.
+        if ! NIGHTLY_DIR="$NIGHTLY_DIR" PLANS_DIR="$PLANS_DIR" \
+                "$REPO/bin/automouse-queue" "$slug"; then
+            echo "automouse-run plan: cannot resolve or queue '$slug' — " \
+                 "no such plan under $PLANS_DIR" >&2
+            exit 1
+        fi
+    fi
+    if [ ! -e "$QUEUE_DIR/$FILENAME" ]; then
+        echo "automouse-run plan: '$slug' did not land in the queue after " \
+             "queuing — aborting" >&2
+        exit 1
+    fi
+    SINGLE_PLAN="$FILENAME"
+fi
 
 WATCHER_PID=""
 CURRENT_LOCK=""   # claim-lock dir held for the plan this runner is processing
@@ -472,6 +504,7 @@ claim_next_plan() {
     while IFS= read -r plan; do
         [ -n "$plan" ] || continue
         plan_name=$(basename "$plan")
+        [ -n "${SINGLE_PLAN:-}" ] && [ "$plan_name" != "$SINGLE_PLAN" ] && continue
         lock="$QUEUE_DIR/${plan_name}.lock"
         # Fast path: unlocked plan — claim atomically.
         if mkdir "$lock" 2>/dev/null; then
@@ -529,18 +562,24 @@ git -C "$REPO" merge --ff-only origin/master >> "$LOG" 2>&1 || true
 # archival so a marked plan isn't swept into skipped.archive/ first. Non-fatal
 # (|| true): a self-heal hiccup must never abort the night (mirrors the || true
 # on the archive_stale block).
-"$REPO/bin/automouse-self-heal" >> "$LOG" 2>&1 || true
+# Skipped in single-plan mode: requeuing other staleness-skipped plans would
+# violate "leaves the rest of the queue untouched".
+if [ -z "${SINGLE_PLAN:-}" ]; then
+    "$REPO/bin/automouse-self-heal" >> "$LOG" 2>&1 || true
+fi
 
 # Startup archival: shrink the accumulating output dirs by moving entries idle
 # for $ARCHIVE_AGE_DAYS into sibling `.archive/` folders. queue/ (pending work,
 # iterated below) and handoff/ (transient, cleaned at loop end) are excluded by
 # design. Whole block guarded so an archival hiccup never stops the night.
-{
-    archive_stale logs
-    archive_stale reports
-    archive_stale "done"
-    archive_stale skipped
-} || true
+if [ -z "${SINGLE_PLAN:-}" ]; then
+    {
+        archive_stale logs
+        archive_stale reports
+        archive_stale "done"
+        archive_stale skipped
+    } || true
+fi
 
 while true; do
     # Check if queue has plans
@@ -567,7 +606,11 @@ while true; do
     # If every queued plan is already claimed, there's nothing for us to do.
     NEXT_PLAN=$(claim_next_plan) || NEXT_PLAN=""
     if [ -z "$NEXT_PLAN" ]; then
-        echo "All queued plans are claimed by a concurrent runner — nothing to do." >> "$LOG"
+        if [ -n "${SINGLE_PLAN:-}" ]; then
+            echo "Plan ${SINGLE_PLAN%.md} is being processed by another runner — nothing to do." >> "$LOG"
+        else
+            echo "All queued plans are claimed by a concurrent runner — nothing to do." >> "$LOG"
+        fi
         break
     fi
     PLAN_NAME=$(basename "$NEXT_PLAN")
@@ -799,6 +842,10 @@ PLAN_FILE=$PLAN_NAME" \
         rm -rf "$CURRENT_LOCK" 2>/dev/null || true
         CURRENT_LOCK=""
     fi
+
+    # Single-plan mode: exactly one attempt, then stop — predictable for a
+    # watched one-off. A genuine failure does NOT retry to MAX_ATTEMPTS.
+    [ -n "${SINGLE_PLAN:-}" ] && break
 done
 
 # Clean up any leftover attempt files for plans that completed

@@ -106,7 +106,22 @@ func TestVolumeCountChannel_ZeroVolumeDegenerate(t *testing.T) {
 			}
 		}
 		if teamPoints(v) == teamPoints(h) {
-			t.Fatalf("seed %d: game did not resolve to a winner (tie persisted)", seed)
+			// A persisted tie is legal ONLY via the engine's documented
+			// termination design: maxOvertime (gameloop.go) hard-caps OT so a
+			// game between mutually starved teams (here: zero-rated visitor +
+			// a neutral five whose players all foul out, ADR-0082's larger
+			// foul bucket) always terminates. Verify the cap was actually
+			// exhausted — a tie WITHOUT the full OT run is a real loop bug.
+			maxPeriod := 0
+			for _, e := range g.Events {
+				if e.Kind == result.EventPeriodBoundary && e.Period > maxPeriod {
+					maxPeriod = e.Period
+				}
+			}
+			if maxPeriod < 4+maxOvertime {
+				t.Fatalf("seed %d: tie persisted after only %d periods — OT loop exited before the %d-OT cap",
+					seed, maxPeriod, maxOvertime)
+			}
 		}
 	}
 }

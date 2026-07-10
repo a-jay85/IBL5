@@ -23,17 +23,16 @@ func pathCounts(in outcomeInputs, n int, seed uint64) map[outcomeCode]int {
 // so path-selection tests are not diluted by the independent turnover override).
 //
 // Source: a slotPG starter (mkPlayer defaults: FGA=60, ORB=20, FTA=20, FGP=48,
-// OO=6) with five-man home (team 3) offense and five-man away (team 7) defense.
-func assembleInputs(hca float64) outcomeInputs {
+// OO=6) with five-man away (team 7) defense.
+func assembleInputs(foulWeight, hca float64) outcomeInputs {
 	bh := oc(slotPG, mkPlayer(1, 3, slotPG, 48))
-	offense := fiveStarters(3)
 	defenders := fiveStarters(7)
 	mq := matchupQuality(bh.FGP, bh.energy, defenders)
 	return outcomeInputs{
 		twoPtWeight:      twoPtBucketWeight(bh) + hca,
 		threePtWeight:    threePtBucketWeight(bh),
 		andOneWeight:     andOneBucketWeight(mq, bh),
-		foulOnlyWeight:   foulBucketWeight(offense, defenders, hca),
+		foulOnlyWeight:   foulWeight,
 		turnoverDefValue: 0,
 	}
 }
@@ -49,8 +48,11 @@ func TestBucketWeights_FoulPathMix(t *testing.T) {
 	const n = 200_000
 	const seed = uint64(1988)
 
-	homeIn := assembleInputs(hcaMagnitude)
-	awayIn := assembleInputs(-hcaMagnitude)
+	def := fiveStarters(7)
+	homeFoulW := foulBucketWeight(def, hcaMagnitude, rng.New(seed)) // deterministic home ~0.87·scale
+	awayFoulW := foulFloor / 2 * foulBucketScale                    // U[0, 0.6·scale) analytic mean = 0.3·scale
+	homeIn := assembleInputs(homeFoulW, hcaMagnitude)
+	awayIn := assembleInputs(awayFoulW, -hcaMagnitude)
 
 	homeCounts := pathCounts(homeIn, n, seed)
 	awayCounts := pathCounts(awayIn, n, seed)
@@ -63,11 +65,10 @@ func TestBucketWeights_FoulPathMix(t *testing.T) {
 	t.Logf("  home foul-frac=%.4f  away foul-frac=%.4f  (home−away=%+.4f)", homeFoul, awayFoul, homeFoul-awayFoul)
 
 	// Realistic minority: the foul path must be a small share (2pt-dominant), the
-	// non-degeneracy property the magnitudes are chosen to preserve. The committed
-	// offQualityConstant=1.575 (ADR-0061) holds this at 0.249, inside the band; smaller
-	// constants grow the home margin but inflate the foul share past 0.25 (and trip the
-	// stronger foul-out degeneracy guard, TestSimulate_FoulOutRate) — so the band is the
-	// floor on the GATE-1 home-margin calibration. NOT widened (no silent band-widen).
+	// non-degeneracy property the faithful pair preserves. The home deterministic
+	// weight (~0.87·scale) and the away mean (0.3·scale) keep the home foul share
+	// inside the Part-6 acceptance band (ADR-0082); the upper bound is the foul-out
+	// degeneracy ceiling (TestSimulate_FoulOutRate) and is NEVER raised. NOT widened.
 	if homeFoul < 0.02 || homeFoul > 0.25 {
 		t.Errorf("home foul share = %.4f, want a realistic minority in [0.02, 0.25]", homeFoul)
 	}
@@ -96,49 +97,66 @@ func TestBucketWeights_TwoPtComposite(t *testing.T) {
 		t.Errorf("twoPtBucketWeight = %.6f, want recovered D90 = %.6f", got, want)
 	}
 
-	// 2pt must dominate the foul bucket (foul is a realistic minority).
-	off := fiveStarters(3)
+	// 2pt must dominate the foul bucket (foul is a realistic minority). Use the home
+	// deterministic weight (~0.87), the largest foul weight, for the strongest test.
 	def := fiveStarters(7)
-	foul := foulBucketWeight(off, def, 0)
+	foul := foulBucketWeight(def, hcaMagnitude, rng.New(1))
 	if twoPtBucketWeight(p) <= foul {
 		t.Errorf("2pt bucket %.3f not dominant over foul %.3f", twoPtBucketWeight(p), foul)
 	}
-	t.Logf("2pt composite=%.4f foul(neutral)=%.4f 3pt=%.4f", twoPtBucketWeight(p), foul, threePtBucketWeight(p))
+	t.Logf("2pt composite=%.4f foul(home)=%.4f 3pt=%.4f", twoPtBucketWeight(p), foul, threePtBucketWeight(p))
 }
 
-// --- matrix #5: faithful foul bucket = 0.6 floor + quality divisor + HCA -----
+// --- matrix #5: faithful asymmetric foul bucket = home deterministic, away U[0,0.6) --
 //
-// Verifies the foul bucket equals the hand-computed 0.6 floor + divisor at neutral
-// HCA, GROWS when offQ shrinks (the home delta), and stays finite at the offQ
-// boundary (a floored, near-zero divisor must not divide-by-zero or produce NaN).
+// Verifies the HOME weight equals the hand-computed defense-coupled formula; the
+// AWAY/NEUTRAL weight is a finite stochastic draw in [0, foulFloor); the NEUTRAL
+// (hca==0) path matches the away distribution (the ASG-symmetry precondition); the
+// home MEAN exceeds the away mean (bucket-level HCA direction); and the faithful
+// redraw guard is unreachable — even an empty defense yields a positive home weight.
 func TestBucketWeights_FoulDivisor(t *testing.T) {
-	off := fiveStarters(3)
 	def := fiveStarters(7)
 
-	// Neutral: foul = 0.6 + (0.6/offQ)·(defQ − teamDef×5/6).
-	offQ := offQualityWithHCA(off, 0)
+	// Home (hca>0): deterministic ((defQ − 5·(5/6)·teamDef)/5 + hca)·scale.
 	defQ := defMatchupQuality(def)
-	wantNeutral := (foulFloor/offQ)*(defQ-teamDefBaseline*foulDivisorTeamDefCoef) + foulFloor
-	if got := foulBucketWeight(off, def, 0); math.Abs(got-wantNeutral) > 1e-9 {
-		t.Errorf("foulBucketWeight(neutral) = %.6f, want 0.6 floor + divisor = %.6f", got, wantNeutral)
+	wantHome := ((defQ-defQualityCapTeamMult*foulDivisorTeamDefCoef*teamDefBaseline)/defQualityCapTeamMult + hcaMagnitude) * foulBucketScale
+	if got := foulBucketWeight(def, hcaMagnitude, rng.New(1)); math.Abs(got-wantHome) > 1e-9 {
+		t.Errorf("home foulBucketWeight = %.6f, want deterministic %.6f", got, wantHome)
 	}
 
-	// HCA: home (offQ shrinks) → foul grows; away (offQ grows) → foul shrinks.
-	home := foulBucketWeight(off, def, hcaMagnitude)
-	neutral := foulBucketWeight(off, def, 0)
-	away := foulBucketWeight(off, def, -hcaMagnitude)
-	if !(home > neutral && neutral > away) {
-		t.Errorf("foul bucket not monotone in HCA: home=%.4f neutral=%.4f away=%.4f (want home>neutral>away)", home, neutral, away)
+	// Away/neutral: stochastic U[0, foulFloor·scale). Every draw finite and in range.
+	awayCeil := foulFloor * foulBucketScale
+	r := rng.New(1988)
+	for i := 0; i < 10_000; i++ {
+		got := foulBucketWeight(def, -hcaMagnitude, r)
+		if math.IsNaN(got) || math.IsInf(got, 0) || got < 0 || got >= awayCeil {
+			t.Fatalf("away draw #%d out of [0, %.2f): %v", i, awayCeil, got)
+		}
+	}
+	// Neutral (ASG, hca==0) takes the SAME stochastic path — the ASG-symmetry precondition.
+	if got := foulBucketWeight(def, 0, rng.New(7)); got < 0 || got >= awayCeil {
+		t.Errorf("neutral (hca==0) not on the stochastic [0, %.2f) path: %v", awayCeil, got)
 	}
 
-	// Boundary: a single unrated offensive player forces offQ to its floor; the foul
-	// bucket must stay finite (no divide-by-zero / NaN / Inf).
-	tinyOff := []onCourt{oc(slotPG, mkPlayer(1, 3, slotPG, 0))}
-	tinyOff[0].OO = 0
-	got := foulBucketWeight(tinyOff, def, hcaMagnitude)
-	if math.IsNaN(got) || math.IsInf(got, 0) {
-		t.Errorf("foulBucketWeight at the offQ floor produced a non-finite value: %v", got)
+	// Direction: home mean > away mean over a large sample.
+	rh, ra := rng.New(3), rng.New(4)
+	const m = 50_000
+	var homeSum, awaySum float64
+	for i := 0; i < m; i++ {
+		homeSum += foulBucketWeight(def, hcaMagnitude, rh)
+		awaySum += foulBucketWeight(def, -hcaMagnitude, ra)
 	}
+	if homeSum/m <= awaySum/m {
+		t.Errorf("home mean %.4f ≤ away mean %.4f — HCA not home-favorable at the bucket level", homeSum/m, awaySum/m)
+	}
+
+	// Redraw guard unreachable: an empty defense sits at defMatchupQuality's 4.5155
+	// floor, so the home weight is still positive and finite (`w <= 0` never fires).
+	minW := foulBucketWeight([]onCourt{}, hcaMagnitude, rng.New(5))
+	if math.IsNaN(minW) || math.IsInf(minW, 0) || minW <= 0 {
+		t.Errorf("home weight at the defMatchupQuality floor = %v, want positive finite (redraw must stay unreachable)", minW)
+	}
+	t.Logf("home(det)=%.4f away-mean=%.4f floor-home=%.4f (want home>away, away∈[0,%.2f))", wantHome, awaySum/m, minW, awayCeil)
 }
 
 // --- matrix #9: direction — EV(foul) > EV(2pt) from outcome realizations

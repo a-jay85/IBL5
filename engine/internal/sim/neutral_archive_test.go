@@ -7,9 +7,10 @@
 // def total is exactly the mean-preserving compression reference (a team AT the
 // neutral is unchanged by any foulCompress; see the const provenance).
 //
-// The OFFENSIVE neutral derivation is GONE (ADR-0061): offQ is now the volume-
-// neutral constant offQualityConstant, not a per-team summation to compress, so
-// there is no off-side league mean to derive. The def side is unchanged.
+// The OFFENSIVE neutral derivation is GONE: ADR-0061 first replaced the off-side
+// summation with a volume-neutral constant, and ADR-0082's faithful asymmetric
+// foul pair removed the off-quality divisor entirely — there is no off-side
+// league mean to derive. The def side is unchanged.
 //
 // This is the .sco-corpus analog of how offVolumeNeutral=161 was derived (real
 // per-starter composite means). It is build-tag gated behind `archive` so it is

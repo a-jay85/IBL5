@@ -53,6 +53,7 @@ jobs:
           skipped_ci=0
           skipped_conflict=0
           already_current=0
+          still_unknown=0
 
           if [ -z "$armed" ]; then
             echo "No open PRs have auto-merge enabled."
@@ -60,6 +61,32 @@ jobs:
 
           while IFS=' ' read -r number sha state mergeable; do
             [ -z "$number" ] && continue
+
+            # GitHub computes mergeStateStatus/mergeable LAZILY: the batch query above
+            # often returns UNKNOWN while GitHub recomputes in the background, then a
+            # later query returns the real value. Re-query this single PR until it
+            # resolves, so we don't skip a genuinely-BEHIND PR that merely got caught
+            # mid-compute — the defect that left armed PRs (dependabot bumps especially)
+            # stuck BEHIND across ticks, because every cold tick re-drew UNKNOWN.
+            attempt=0
+            while [ "$state" = "UNKNOWN" ] && [ "$attempt" -lt 5 ]; do
+              attempt=$((attempt + 1))
+              sleep 3
+              resolved=$(gh api graphql -f owner="$OWNER" -f name="$NAME" -F number="$number" -f query='
+                query($owner:String!, $name:String!, $number:Int!) {
+                  repository(owner:$owner, name:$name) {
+                    pullRequest(number:$number) {
+                      headRefOid
+                      mergeStateStatus
+                      mergeable
+                    }
+                  }
+                }' --jq '.data.repository.pullRequest | "\(.headRefOid) \(.mergeStateStatus) \(.mergeable)"' || true)
+              if [ -n "$resolved" ]; then
+                IFS=' ' read -r sha state mergeable <<< "$resolved"
+              fi
+            done
+
             echo "::group::PR #$number (state=$state mergeable=$mergeable)"
 
             # Negative path: a conflicting PR (DIRTY / CONFLICTING) cannot be auto-updated —
@@ -71,9 +98,19 @@ jobs:
               continue
             fi
 
-            # Only BEHIND PRs need updating. CLEAN/BLOCKED/UNSTABLE/HAS_HOOKS/UNKNOWN are not
-            # out of date w.r.t. master (UNKNOWN = GitHub hasn't computed it yet; it will
-            # resolve to BEHIND on a later tick if applicable). Treat all as already-current.
+            # Only BEHIND PRs need updating. CLEAN/BLOCKED/UNSTABLE/HAS_HOOKS are not out of
+            # date w.r.t. master, so treat as already-current. UNKNOWN here means the poll
+            # above exhausted its retries without GitHub settling the state — rare; leave it
+            # for the next tick rather than blindly calling update-branch on an unknown state.
+            # Poll exhausted without GitHub settling the state — surface it in the summary
+            # instead of silently folding into already_current (the skip that hid this bug).
+            if [ "$state" = "UNKNOWN" ]; then
+              echo "Still UNKNOWN after poll — leaving for next tick"
+              still_unknown=$((still_unknown + 1))
+              echo "::endgroup::"
+              continue
+            fi
+
             if [ "$state" != "BEHIND" ]; then
               echo "Not BEHIND (state=$state) — nothing to update"
               already_current=$((already_current + 1))
@@ -113,4 +150,5 @@ jobs:
             echo "- Skipped (CI running): $skipped_ci"
             echo "- Skipped (merge conflict): $skipped_conflict"
             echo "- Already current (not BEHIND): $already_current"
+            echo "- Still UNKNOWN after poll: $still_unknown"
           } >> "$GITHUB_STEP_SUMMARY"

@@ -940,8 +940,8 @@ INSERT INTO ibl_trade_info (tradeofferid, itemid, itemtype, trade_from, trade_to
 -- spares ids 7-8) leaves 0 visible cards for the Metros test user in the empty-state test.
 INSERT INTO ibl_trade_offers (id) VALUES (7), (8);
 INSERT INTO ibl_trade_info (tradeofferid, itemid, itemtype, trade_from, trade_to, approval) VALUES
-  (7, 30, '1', 'Spurs',      'Flames',    'test'),
-  (7, 31, '1', 'Flames',     'Spurs',     'test'),
+  (7, 43, '1', 'Spurs',      'Flames',    'test'),
+  (7, 44, '1', 'Flames',     'Spurs',     'test'),
   (8, 32, '1', 'Minutemen',  'Royals',    'test'),
   (8, 33, '1', 'Royals',     'Minutemen', 'test');
 

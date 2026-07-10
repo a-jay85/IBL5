@@ -36,7 +36,7 @@ last_verified: 2026-07-09
 J1 faithful foul pair (📋, Sonnet impl)
   └─→ J2 count-axis adjudication (🔮)  ←─ J4 pbp extraction (⚙️, spec ready) ←─ J3 identifiability design (✅ 2026-07-09)
         └─→ J12 HCA magnitude · J13 cut-over package (🧠)
-J5 unpinnable-claims sweep (📇→🧠→🔮) ─→ converts blocked runbooks into ⚙️ ports (J6, J9 pattern)
+J5 unpinnable-claims sweep (✅ 2026-07-09) ─→ closed all 4 residuals; spawned J15 (defQ≡0 port) + J16 (FUN_004e3860); J6 now ◑
 ```
 
 The single cut-over blocker is the wrong-signed count-axis covariance Cov(lnFGA,lnPPS) (engine ≈ −0.0008 vs real +0.0003); every fidelity axis besides dispersion is resolved (level −2.5 ppg, offense-coupling corr 0.673). J1 is the last *mapped* carrier; J2 decides what happens if the sign survives it.
@@ -49,8 +49,8 @@ The single cut-over blocker is the wrong-signed count-axis covariance Cov(lnFGA,
 |--------|------:|
 | ⬜ Open | 12 |
 | 📋 Planned | 1 |
-| ◑ Partial | 0 |
-| ✅ Implemented | 1 |
+| ◑ Partial | 1 |
+| ✅ Implemented | 2 |
 | 🚫 Declined | 0 |
 
 ---
@@ -63,8 +63,8 @@ The single cut-over blocker is the wrong-signed count-axis covariance Cov(lnFGA,
 | J2 | Count-axis carrier adjudication (post-J1) | ⬜ Open | 🔮 Fable | L |
 | J3 | Per-origin efficiency identifiability (IBL5.log) | ✅ Implemented | 🔮 Fable | M |
 | J4 | Play-by-play extraction parser | ⬜ Open | ⚙️ Sonnet | M |
-| J5 | Unpinnable-claims sweep + static closures | ⬜ Open | 📇→🧠→🔮 ladder | M |
-| J6 | 2pt/3pt bucket-weight SCALE pins (+0xD90/+0xDB0, dVar60) | ⬜ Open | 🧠 Opus | M |
+| J5 | Unpinnable-claims sweep + static closures | ✅ Implemented | 🔮 Fable | M |
+| J6 | 2pt/3pt bucket-weight SCALE pins (+0xD90/+0xDB0, dVar60) | ◑ Partial | 🧠 Opus | M |
 | J7 | Turnover volume-coupling fidelity RE | ⬜ Open | 🧠 Opus | M |
 | J8 | Transition trigger denominator 18 | ⬜ Open | ⚙️ Sonnet | S |
 | J9 | League-baseline faithful port (FUN_004385f0) | ⬜ Open | ⚙️ Sonnet | S |
@@ -73,6 +73,8 @@ The single cut-over blocker is the wrong-signed count-axis covariance Cov(lnFGA,
 | J12 | HCA magnitude calibration vs archive | ⬜ Open | 🧠 Opus | M |
 | J13 | Cut-over package: bands, leaders, decision | ⬜ Open | 🧠 Opus | L |
 | J14 | AutoResearch eval-harness ADR (loop L9 companion) | ⬜ Open | 🧠 Opus | L |
+| J15 | Faithful defQ ≡ 0 port (drop the Go OD-coupled stand-in) | ⬜ Open | 🧠 Opus | M |
+| J16 | FUN_004e3860 net-advantage formula via objdump | ⬜ Open | 🧠 Opus | S |
 
 ### J1 Faithful foul-bucket pair port
 **Location:** `engine/internal/sim/bucketweights.go` `foulBucketWeight` + `teamquality.go` (ADR-0061's `offQualityConstant = 1.575` corpus stand-in). Plan: `$HOME/.claude/plans/jsb-faithful-foul-pair.md` (written 2026-07-08, `impl_model: sonnet`, `auto_merge: true`).
@@ -84,7 +86,7 @@ The single cut-over blocker is the wrong-signed count-axis covariance Cov(lnFGA,
 ### J2 Count-axis carrier adjudication (post-J1)
 **Location:** The wrong-signed Cov(lnFGA,lnPPS) — the sole remaining cut-over blocker (PF dispersion ≈ ½ real while level and offense-coupling are fixed).
 **Problem:** The mapped search space is exhausted by measured NULLs: foulCompress, Branch-B, make-value variance and form (ADR-0053/0055), offVolumeScale and base_time form (ADR-0054 + RE), putback resolution, ORB intensity/level/retry-count (ADR-0056–0060, RE-faithful), transition gate (RE-faithful), the POSS channel (closed 2026-06-13 as a projection of the PPS-realization inversion, not a separable carrier), and TOV (an independent bug that goes the *wrong* direction). J1 spends the last mapped carrier. If the sign survives J1, naming the residual carrier — or ruling the model terminal-vs-shippable — is hypothesis generation over a refuted-premise space, the class Opus has repeatedly bounced off and Fable has cracked.
-**Direction:** Re-run the channel split after J1 merges (scratch `archive`-tagged test; recipes preserved in the re-artifacts and memory). If the sign flips or the standings residuals reach the ~3–5-win binomial floor → proceed straight to J13. If not → 🔮 Fable adjudication session (candidate forks: per-origin make-value armed with J3/J4 data; a novel carrier; accept-residual and cut over anyway).
+**Direction:** Re-run the channel split after J1 merges (scratch `archive`-tagged test; recipes preserved in the re-artifacts and memory). If the sign flips or the standings residuals reach the ~3–5-win binomial floor → proceed straight to J13. If not → 🔮 Fable adjudication session (candidate forks: per-origin make-value armed with J3/J4 data; a novel carrier; accept-residual and cut over anyway). **New named candidate (J5, 2026-07-09):** Go's `defQuality` injects a live OD coupling into the foul term that 5.60 provably lacks (defQ ≡ 0 — J15); an unfaithful coupling of foul share to roster quality is exactly the class that could carry a wrong-signed Cov — measure J15's effect before opening a Fable adjudication.
 **Risk if untouched:** The engine never cuts over; jumpshot.exe stays load-bearing.
 **Status (2026-07-08):** ⬜ Open — blocked on J1. 🔮 Fable (the measurement re-run itself is ⚙️/🧠).
 
@@ -100,17 +102,17 @@ The single cut-over blocker is the wrong-signed count-axis covariance Cov(lnFGA,
 **Status (2026-07-09):** ⬜ Open — **unblocked** (J3 ✅). ⚙️ Sonnet build; 🧠 Opus owns the J2 decomposition readout.
 
 ### J5 Unpinnable-claims sweep + static closures
-**Location:** `jsb-native/jsb_560/` master reference (287K; access via `bin/jsb-ref`, never full-read) + the 10.4M decompile + `jumpshot.exe` PE (`.rdata` constants are static-readable).
-**Problem:** Two "requires a live run / cannot be pinned statically" claims have now been refuted by pure static derivation (foul divisor 2026-07-07; CEngine runtime doubles 2026-07-08, closed by exact recomputation from `.plr`). Every remaining "unpinned / validation-phase / needs live debugging" marker in the master reference is therefore suspect. Each closed pin deletes an x32dbg/VM dependency (the Win-on-ARM VM is breakpoint-hostile: data BPs fault, stepping freezes) and converts a blocked runbook into a Sonnet-executable port.
-**Direction:** 📇 Haiku enumerates every unpinned/live-run marker with line refs → 🧠 Opus triages by leverage and attempts the precedented decompile closures → 🔮 Fable takes the residue that resists (the NaN-semantics / FPU-flag / encoded-operand class). Known named residuals to seed the list: the foul-pair's s-sign/home-slot, `+0x68a8`/`+0x68d8` write-sites, `param_6`/`param_8`, the `+0xDD0` per-player formula (all assessed static-traceable, none blocking J1).
-**Risk if untouched:** Future fidelity work keeps inheriting "needs VM" blockers that may be false.
-**Status (2026-07-08):** ⬜ Open. 📇→🧠→🔮 ladder.
+**Location:** `jsb-native/jsb_560/` master reference + decompile + `jumpshot.exe` PE. Full record: `jsb-native/re-artifacts/jsb-J5-static-closures-20260709.md`.
+**Result (Fable session, 2026-07-09):** **All four seed residuals closed statically — zero VM dependencies remain in them.** New load-bearing method: `llvm-objdump -d --start/--stop-address` on the PE recovers every operand Ghidra's `__ftol()`/`extraout` decompilation loses; `.rdata` doubles read via PE section parse. Closures: (1) HCA site-2 `s` = `2·(*(CEngine+0x33e4)) − 3` with +0x33e4 = offense team index, **home = teamIdx 2** (Go `hcaDelta` sign-match); `+0x4C18` is a ctor-set guard, ASG zeroes the magnitude not the guard. (2) `+0x68A8`/`+0x68D8` = league **STL/48** and **TOV/48** — the whole FUN_004385f0 league table is now identified (FGA/FTA/ORB/DRB/AST/STL/TOV/BLK/PF per 48). (3) `param_8` = shot-clock desperation flag (`+0x4c24 < 4`, restricts outcomes to {3pt, foul}); `param_6` = FUN_004e3860 return (internals → J16). (4) **Player `+0xDD0` has NO computed writer** (exhaustive `.text` store enumeration) ⇒ `FUN_004e3d90` (defQ) **≡ 0** — the :97163 foul coupling is roster-invariant in 5.60. Bonus: FUN_004cfa50 fully decoded (team rates = Σstat×`f`/D×48, D = ΣteamMIN/5, TOV/PF ×(2−f), STL ×44) — closes J6's `dVar60` fork and corrected ~15 master-ref rows (+0xDC8↔+0xDD0 swap, +0xDF0 = PF not PTS, +0xDA8 = 3PA not FTA).
+**Spawned:** J15 (Go defQ port), J16 (FUN_004e3860 decode); remaining `.rdata` pins (`00669fc0/0066d3d0/0066d3c0/0066d3c8/00669ac8`) are now trivial via the PE-parse method — fold into whichever item touches them next.
+**Status (2026-07-09):** ✅ Implemented.
 
 ### J6 2pt/3pt bucket-weight SCALE pins (+0xD90/+0xDB0, dVar60)
-**Location:** `engine/internal/sim/bucketweights.go` `twoPtBucketWeight`/`threePtBucketWeight` — admitted SHAPE stand-ins for 5.60's per-half composites (FUN_004cfa50, decompile ~91076–91110); includes the un-pinned Fork-A `dVar60` GP-vs-MIN divisor choice (Go chose MIN; scales magnitude, not sign).
-**Problem:** These weights are the foul-share DENOMINATOR and the largest unpinned formula surface left. Fork-A RE confirmed the *structure* faithful and the measured 2GA over-coupling downstream-of-Fork-B, but the SCALEs were never pinned — they gate any future share-level fidelity claim and feed J2's residual analysis.
-**Direction:** Decompile RE of the composite arithmetic (precedented Opus work); pin scale + divisor, then a ⚙️ Sonnet port PR if the Go values diverge. Escalate operands that resist static decode to J5's 🔮 lane.
-**Status (2026-07-08):** ⬜ Open. 🧠 Opus (🔮 fallback via J5).
+**Location:** `engine/internal/sim/bucketweights.go` `twoPtBucketWeight`/`threePtBucketWeight` — admitted SHAPE stand-ins for 5.60's per-half composites (FUN_004cfa50, decompile ~91076–91110).
+**Problem:** These weights are the foul-share DENOMINATOR and the largest unpinned formula surface left. Fork-A RE confirmed the *structure* faithful, but the composite SCALEs were never pinned — they gate any future share-level fidelity claim and feed J2's residual analysis.
+**Progress (J5, 2026-07-09):** The `dVar60` divisor fork is **closed** — D = ΣteamMIN/5 (asm :91005-06); **Go's MIN choice is faithful**. All team per-game-rate inputs to the composites are now identified with exact asm addresses, and the per-player projection structure (`f` good-stats / `2−f` TOV·PF) is decoded (`jsb-J5-static-closures-20260709.md` §5). Remaining: the +0xD90/+0xDB0 composite arithmetic itself and the `f` formula (localized to `4d3487–4d3553`) — both now objdump-tractable.
+**Direction:** Decompile/objdump RE of the composite arithmetic (precedented Opus work); pin scale, then a ⚙️ Sonnet port PR if the Go values diverge.
+**Status (2026-07-09):** ◑ Partial — divisor + input identities pinned; composite scales open. 🧠 Opus.
 
 ### J7 Turnover volume-coupling fidelity RE
 **Location:** Engine turnover model vs 5.60; measured corr(volume, TOV/POSS) engine **+0.163** vs real **−0.176** (gap +0.339).
@@ -159,3 +161,16 @@ The single cut-over blocker is the wrong-signed count-axis covariance Cov(lnFGA,
 **Problem:** Engine iteration is human-paced despite an objective metric. The unresolved design tension — and why this is an ADR, not a script — is that a "perturb params, keep improvements" loop **conflicts with the faithfulness bar** (every shipped change must be RE-grounded in 5.60, not tuned to the corpus): the search space must be constrained to admitted stand-in constants and instrument-only measurements, never RE-pinned formulas.
 **Direction:** ADR defining metric, legal parameter space (stand-ins only), acceptance rule, and how trial results feed RE prioritization rather than direct commits. Harness build afterward is ⚙️.
 **Status (2026-07-08):** ⬜ Open. 🧠 Opus (ADR); ⚙️ Sonnet (harness).
+
+### J15 Faithful defQ ≡ 0 port (drop the Go OD-coupled stand-in)
+**Location:** `engine/internal/sim/teamquality.go` `defQuality` (`Σ floor1(OD)×0.25`, cap `teamDefBaseline×5.0×1.5`, `defQualityNeutral = 8.21`) + its consumer `foulBucketWeight` in `bucketweights.go`. Answers the FOLLOW-UP comment at `teamquality.go` ~:62.
+**Problem:** J5 proved statically that 5.60's per-player defQ input (`+0xDD0`) is never computed — `FUN_004e3d90` returns **0.0 for every lineup, always**; the :97163 foul coupling reduces to a roster-invariant negative rescale (`e80 −= (e80/offQ)×5×leagueSTL48×5/6`). The Go model is an unfaithful substitution that injects OD-roster coupling into the foul numerator — the same class of invented carrier as the Fork-B OO stand-in that J1 removes.
+**Direction:** Replace defQuality with the faithful constant 0 and simplify `foulBucketWeight` accordingly; corpus re-validation required (changes foul-share coupling; A/B the headline Cov and the home-margin gap). **Sequence after J1 merges** — J1 restructures the same foul pair; landing both restructures independently invites conflicting golden regens. Interaction: measure whether removing the coupling moves J2's Cov readout (see J2's candidate note).
+**Risk if untouched:** The engine carries a phantom defensive-quality mechanism no 5.60 game ever expressed; every foul-share fidelity readout is confounded.
+**Status (2026-07-09):** ⬜ Open — sequence after J1. 🧠 Opus (design + A/B verdict); port mechanics ⚙️ Sonnet.
+
+### J16 FUN_004e3860 net-advantage formula via objdump
+**Location:** `jumpshot.exe` va 0x4e3860 — the play-outcome selector's `param_6` (net advantage). Ghidra fails to decompile it (`failed_decompile_004e3860_RAW.c` in the machine-local decompile dir).
+**Problem:** The one remaining unknown *input* to the play-outcome formula. Its identity is pinned (J5); its internal arithmetic is not.
+**Direction:** `llvm-objdump -d --start-address=0x4e3860` on the PE (the J5 method — Ghidra's failure is irrelevant to a direct disassembly read) → derive the formula → master-ref update; escalate only if the asm shows the NaN/FPU-flag class. Fold in the five remaining `.rdata` weight pins if they appear as operands.
+**Status (2026-07-09):** ⬜ Open. 🧠 Opus (🔮 only if the asm resists).

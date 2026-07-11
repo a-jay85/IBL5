@@ -29,9 +29,9 @@ last_verified: 2026-07-11
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 2 |
+| ⬜ Open | 1 |
 | 📋 Planned | 0 |
-| ✅ Implemented | 7 |
+| ✅ Implemented | 8 |
 | 🚫 Declined | 0 |
 
 > The 4 "verified-not-redundant" entries in Axis 4 are **decisions to keep**, not open work — they exist so a future audit does not re-flag them. Not counted above.
@@ -86,7 +86,7 @@ last_verified: 2026-07-11
 | 3.1 | audit-js runs `npm audit` with no install (vacuous pass) | ✅ Implemented | 🟩 | S |
 | 3.2 | db-backup redundant MariaDB wait loop | ✅ Implemented | 🟩 | S |
 | 3.3 | lighthouse-audit re-collects instead of reusing baseline artifact | ✅ Implemented | 🟩 | S |
-| 3.4 | `changes`-detection mechanism is inconsistent | ⬜ Open | 🟨 | M |
+| 3.4 | `changes`-detection mechanism is inconsistent | ✅ Implemented | 🟩 | M |
 | 3.5 | PHP extension set divergence in cache-dependencies | ✅ Implemented | 🟩 | S |
 
 ➜ 3.1 audit-js — ✅ Implemented (2026-07-11): see [archive](archive/ci-backlog-archive.md).
@@ -95,12 +95,7 @@ last_verified: 2026-07-11
 
 ➜ 3.3 lighthouse-audit.yml — ✅ Implemented (2026-07-11): see [archive](archive/ci-backlog-archive.md).
 
-### 3.4 Inconsistent change-detection across workflows
-**Location:** `dorny/paths-filter@v4` in `codeql.yml`/`engine.yml`/`eslint.yml`; `bin/website-affecting` git-diff in `e2e-tests.yml`/`lighthouse.yml`; static `paths:` filters elsewhere.
-**Problem:** Three different mechanisms answer "did relevant files change?". Harder to reason about why a given workflow did/didn't run.
-**Suggested direction:** Standardize where semantics allow (note `bin/website-affecting` encodes domain logic a static filter can't; not all are interchangeable). Modest payoff — defer unless it causes a miss.
-**Risk if untouched:** Cognitive overhead; subtle trigger-gap bugs.
-**Status (2026-06-28):** ⬜ Open — 🟨 (needs a per-workflow audit of which are truly interchangeable).
+➜ 3.4 Inconsistent change-detection across workflows — ✅ Implemented (2026-07-11): see [archive](archive/ci-backlog-archive.md).
 
 ### 3.5 cache-dependencies.yml PHP extensions diverge from consumers
 **Location:** `.github/workflows/cache-dependencies.yml` (`mbstring, intl, pdo, pdo_mysql`) vs every consumer (`mbstring, intl, mysqli`).

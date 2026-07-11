@@ -71,7 +71,7 @@ jobs:
       # CI-meta-exempt list that no dorny glob can replicate. A static glob would
       # both over-trigger (CI-meta edits) and under-trigger (a rendered file the
       # glob forgot). The ibl6 and runtime sub-filters below use dorny instead,
-      # because those ARE artifact/tool-scoped (IBL6 image, VR runtime image).
+      # because those ARE artifact/tool-scoped (IBL6 image, PHP app image).
       - name: Compute website-affecting
         id: filter
         if: github.event_name == 'pull_request' && github.event.action != 'labeled'
@@ -88,8 +88,8 @@ jobs:
 
       # Change-detection strategy (ibl6 + runtime below): dorny/paths-filter with
       # static globs. These are artifact-scoped, not rendering-scoped — run ibl6
-      # e2e only when the IBL6 app/image/shared-DB inputs change; rebuild the VR
-      # runtime image only when its Docker/deps inputs change. website-affecting
+      # e2e only when the IBL6 app/image/shared-DB inputs change; rebuild the PHP
+      # app image only when its Docker/deps inputs change. website-affecting
       # is the wrong tool here (it models PHP rendering impact, not build inputs).
       - name: Detect IBL6-affecting changes
         uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2

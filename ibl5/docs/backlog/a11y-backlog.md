@@ -57,7 +57,7 @@ This audit (2026-06-20, verified against the live `accessibility.spec.ts` `KNOWN
 **One-line takeaways for picking work:**
 - **Ready to plan as auto-mergeable now:** `page-has-heading-one` next sim (single-title promote) **and** schedule/team-schedule (stale allowlist removal — no code change). `label`/`select-name` already planned + queued.
 - **Auto-mergeable after a small scope/decision:** `page-has-heading-one` multi-title (which-`h2` decision).
-- **Automouse-safe but a human must merge:** `target-size` (VR), `page-has-heading-one` title-less (VR).
+- **Automouse-safe but a human must merge:** `page-has-heading-one` title-less (VR). (`target-size` — ✅ Implemented, #1428.)
 - **Not automouse-safe:** `landmark-one-main` + `region` on leagueControlPanel (2.27 refactor); everything on `faprep.php` (delete).
 
 ---
@@ -146,6 +146,7 @@ Tracked separately in [`a11y-contrast-backlog.md`](a11y-contrast-backlog.md). Th
 | `a11y-heading-one-multi-title` | ✅ Implemented — 6 multi-title pages promoted; standings + voting results deferred (page-level `<h1>` decision). |
 | `a11y-heading-one-standings-voting` | ✅ Implemented — page-level `<h1>` added to standings + voting results (VR change → human merge). |
 | `a11y-link-name-news` | ✅ Implemented — News-page `link-name` reproduce-gated removal (links already labeled); homepage deferred. |
+| `mobile-target-size-a11y-sitewide` | 📋 PR #1428 open (held for human visual review + VR baseline regen; auto_merge: false) — site-wide 375px target-size sweep + two CSS fixes + schedule-target-size.spec.ts retired. |
 
 ## Burn-down process
 

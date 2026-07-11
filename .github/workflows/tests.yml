@@ -606,6 +606,12 @@ jobs:
         run: bin/check-workflow-checkout
       - name: Composite behavior contracts
         run: bin/check-composite-contracts
+      # rules-byte-budget: a path-unscoped .claude/rules/*.md file (always loaded
+      # into every session's context) can grow past its token budget via an edit
+      # that no src/shell path-filter covers. bin/check-rules-byte-budget (NEW,
+      # Phase 1) caps it. Backlog: token-spend-backlog T2.
+      - name: Check path-unscoped rules byte budget
+        run: bin/check-rules-byte-budget
 
   harness-tests:
     name: Shell harness regression tests

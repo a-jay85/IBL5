@@ -29,9 +29,9 @@ last_verified: 2026-07-11
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 2 |
+| ⬜ Open | 1 |
 | 📋 Planned | 0 |
-| ✅ Implemented | 7 |
+| ✅ Implemented | 8 |
 | 🚫 Declined | 0 |
 
 > The 4 "verified-not-redundant" entries in Axis 4 are **decisions to keep**, not open work — they exist so a future audit does not re-flag them. Not counted above.
@@ -95,13 +95,7 @@ last_verified: 2026-07-11
 
 ➜ 3.3 lighthouse-audit.yml — ✅ Implemented (2026-07-11): see [archive](archive/ci-backlog-archive.md).
 
-### 3.4 Inconsistent change-detection across workflows
-**Location:** `dorny/paths-filter@v4` in `codeql.yml`/`engine.yml`/`eslint.yml`; `bin/website-affecting` git-diff in `e2e-tests.yml`/`lighthouse.yml`; static `paths:` filters elsewhere.
-**Problem:** Three different mechanisms answer "did relevant files change?". Harder to reason about why a given workflow did/didn't run.
-**Suggested direction:** Standardize where semantics allow (note `bin/website-affecting` encodes domain logic a static filter can't; not all are interchangeable). Modest payoff — defer unless it causes a miss.
-**Risk if untouched:** Cognitive overhead; subtle trigger-gap bugs.
-**Status (2026-07-11):** ✅ Implemented — 🟩 (per-workflow audit done; mechanisms are intentional, no standardization applied).
-**Audit outcome:** The three mechanisms are NOT interchangeable — each workflow uses the correct one. `dorny/paths-filter` (codeql/engine/eslint) is language/tool-scoped: run CodeQL only on JS/TS changes, engine CI only on Go changes, ESLint only on e2e/tooling changes. `bin/website-affecting` (e2e-tests/lighthouse `src`) encodes domain logic — "does this diff affect app rendering?" — via deny-regex + carve-outs + CI-meta-exempt list that a static glob cannot replicate; switching those to dorny would mis-fire (PHP-only PRs would wrongly skip, CI-meta edits would wrongly trigger). Switching codeql/engine/eslint to `website-affecting` would also be wrong (a PHP-only PR would trigger CodeQL). Static `paths:` on `on: push` triggers is a GitHub Actions constraint (scripts can't run in `on:` triggers), so dorny/website-affecting are inherently PR-only. Deliverable was rationale comments added to each affected workflow (this PR) documenting why each mechanism is the right one; no mechanical change was semantically valid.
+➜ 3.4 Inconsistent change-detection across workflows — ✅ Implemented (2026-07-11): see [archive](archive/ci-backlog-archive.md).
 
 ### 3.5 cache-dependencies.yml PHP extensions diverge from consumers
 **Location:** `.github/workflows/cache-dependencies.yml` (`mbstring, intl, pdo, pdo_mysql`) vs every consumer (`mbstring, intl, mysqli`).

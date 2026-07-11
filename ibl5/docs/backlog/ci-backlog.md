@@ -29,9 +29,9 @@ last_verified: 2026-07-11
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 3 |
+| ⬜ Open | 2 |
 | 📋 Planned | 0 |
-| ✅ Implemented | 6 |
+| ✅ Implemented | 7 |
 | 🚫 Declined | 0 |
 
 > The 4 "verified-not-redundant" entries in Axis 4 are **decisions to keep**, not open work — they exist so a future audit does not re-flag them. Not counted above.
@@ -66,7 +66,7 @@ last_verified: 2026-07-11
 | # | Title | Status | Automouse | Effort |
 |---|-------|--------|-----------|-------:|
 | 2.1 | Collapse smoke-prod's 4 notify jobs into one | ⬜ Open | 🟦 | S |
-| 2.2 | Merge migration-safety `idempotency-check` + `schema-completeness` | ⬜ Open | 🟩 | M |
+| 2.2 | Merge migration-safety `idempotency-check` + `schema-completeness` | ✅ Implemented | 🟩 | M |
 
 ### 2.1 smoke-prod.yml — four near-identical notify jobs
 **Location:** `.github/workflows/smoke-prod.yml` — jobs `rollback-and-notify`, `notify-scheduled-failure`, `notify-ibl6-degradation`, `notify-inconclusive`.
@@ -75,12 +75,7 @@ last_verified: 2026-07-11
 **Risk if untouched:** Notify logic forks across 4 jobs; a message-format change is repeated.
 **Status (2026-06-28):** ⬜ Open — sequence after 1.2. Deploy/notify surface → 🟦.
 
-### 2.2 migration-safety.yml — three jobs each rebuild a full DB stack
-**Location:** `.github/workflows/migration-safety.yml` — jobs `idempotency-check`, `schema-parity-check`, `schema-completeness`.
-**Problem:** All three spin up an independent MariaDB 10.11 service, run an independent composer install, and apply the full migration stack from zero. `idempotency-check` and `schema-completeness` both apply the same full stack; the latter just adds FK/table/column assertions afterward.
-**Suggested direction:** Merge `idempotency-check` into `schema-completeness` (one DB build, then both sets of assertions). Keep `schema-parity-check` separate — it needs two DBs by design. Costs some intra-workflow parallelism; nets fewer runner-minutes and one fewer composer install.
-**Risk if untouched:** Three full migration runs per push to a migrations file; setup duplication (mitigated once 1.1 lands).
-**Status (2026-06-28):** ⬜ Open — green-green (gate job unchanged, assertions preserved) → 🟩.
+➜ 2.2 migration-safety.yml — ✅ Implemented (2026-07-11): see [archive](archive/ci-backlog-archive.md).
 
 ---
 

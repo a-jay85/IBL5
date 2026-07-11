@@ -24,3 +24,4 @@ CREATE TABLE IF NOT EXISTS ibl_events (
   INDEX idx_team_id (team_id),
   INDEX idx_route_name (route_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+

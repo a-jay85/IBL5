@@ -1,6 +1,6 @@
 ---
-description: Read-on-demand detail for agent-tiering — Fable approval-gate procedure, flat-fan-out (nested sub-agent) rationale, orchestrator context economics (delegate-don't-dismiss, split-don't-self-clear), and per-tier prompt style. Loads only when editing workflow orchestration defs, where this rationale applies.
-last_verified: 2026-07-07
+description: Read-on-demand detail for agent-tiering — the skip-vs-spawn heuristic, Fable approval-gate procedure, flat-fan-out (nested sub-agent) rationale, orchestrator context economics (delegate-don't-dismiss, split-don't-self-clear), and per-tier prompt style. Loads only when editing workflow orchestration defs.
+last_verified: 2026-07-11
 paths:
   - ".claude/skills/**/*.md"
 ---
@@ -8,8 +8,21 @@ paths:
 # Agent Tiering — Detail
 
 Read-on-demand companion to `agent-tiering.md` (always-loaded). The parent holds the
-operative rules — the Tier table, the Skip-the-Agent heuristic, and Explore tiering.
-This file holds the longer rationale, pulled out of the always-loaded budget.
+operative Tier table and Explore tiering. This file holds the longer rationale — the
+skip-vs-spawn heuristic, the Fable gate, flat-fan-out and orchestrator context economics,
+and prompt style — pulled out of the always-loaded budget.
+
+## Skip the Agent — Direct Tool Calls
+
+Each sub-agent costs ~3–5K tokens (system prompt + rules + memory, loaded before its prompt), and its output re-loads in Opus's context every later turn.
+
+**Run directly (no agent) when ALL hold:** single command/tool call · output under ~50 lines · nothing else to run in parallel · output won't persist across turns.
+
+**Spawn an agent when ANY hold:** output unpredictably verbose (large grep, failing suites with stack traces) and the agent can return a summary · multiple independent verbose tasks run concurrently · the task is multiple sequential tool calls.
+
+**When you spawn, minimize invocation count** — the question is *how many agents are needed*, not *parallel vs. sequential*; token spend outranks wall-clock time. Batch N related tasks into one agent (or do them yourself) — each spawn re-pays the ~3–5K overhead. Separate agents only when each genuinely needs its own context (independent worktrees, isolating verbose output), not because tasks are logically distinct.
+
+**PHPUnit and PHPStan are always direct Bash calls** — passing output is ~5 lines, failures usually under 50; agent overhead dwarfs it. Use `run_in_background` for parallelism without an agent — **but only in the interactive harness**, where a finished background task re-invokes you. In a **headless** run (`claude -p`, e.g. `/post-plan` under automouse) there is no re-invocation: a live background task at turn-end stall-kills the run — run blocking, or poll `BashOutput` to completion in-turn (post-plan `SKILL.md` Phase 5).
 
 ## Fable Approval Gate
 

@@ -29,9 +29,9 @@ last_verified: 2026-07-11
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 4 |
+| ⬜ Open | 3 |
 | 📋 Planned | 0 |
-| ✅ Implemented | 5 |
+| ✅ Implemented | 6 |
 | 🚫 Declined | 0 |
 
 > The 4 "verified-not-redundant" entries in Axis 4 are **decisions to keep**, not open work — they exist so a future audit does not re-flag them. Not counted above.
@@ -90,7 +90,7 @@ last_verified: 2026-07-11
 |---|-------|--------|-----------|-------:|
 | 3.1 | audit-js runs `npm audit` with no install (vacuous pass) | ✅ Implemented | 🟩 | S |
 | 3.2 | db-backup redundant MariaDB wait loop | ✅ Implemented | 🟩 | S |
-| 3.3 | lighthouse-audit re-collects instead of reusing baseline artifact | ⬜ Open | 🟨 | S |
+| 3.3 | lighthouse-audit re-collects instead of reusing baseline artifact | ✅ Implemented | 🟩 | S |
 | 3.4 | `changes`-detection mechanism is inconsistent | ⬜ Open | 🟨 | M |
 | 3.5 | PHP extension set divergence in cache-dependencies | ✅ Implemented | 🟩 | S |
 
@@ -98,12 +98,7 @@ last_verified: 2026-07-11
 
 ➜ 3.2 db-backup.yml — ✅ Implemented (2026-07-11): see [archive](archive/ci-backlog-archive.md).
 
-### 3.3 lighthouse-audit.yml re-runs a full-site collect
-**Location:** `.github/workflows/lighthouse-audit.yml` vs `.github/workflows/lighthouse-baseline.yml`.
-**Problem:** Both do a full-site `lhci collect` with `numberOfRuns=1` over the same URL set (`bin/lighthouse-audit-urls`). The weekly audit could consume the `lighthouse-baseline-manifest` artifact the baseline workflow already uploads, instead of re-collecting.
-**Suggested direction:** Have the weekly audit download + report on the latest baseline manifest where freshness allows; re-collect only if the artifact is stale/absent.
-**Risk if untouched:** Duplicate 120-min-budget LHCI collect weekly. (Low priority — distinct outputs, see Axis 4.)
-**Status (2026-06-28):** ⬜ Open — 🟨 (needs a freshness-window decision).
+➜ 3.3 lighthouse-audit.yml — ✅ Implemented (2026-07-11): see [archive](archive/ci-backlog-archive.md).
 
 ### 3.4 Inconsistent change-detection across workflows
 **Location:** `dorny/paths-filter@v4` in `codeql.yml`/`engine.yml`/`eslint.yml`; `bin/website-affecting` git-diff in `e2e-tests.yml`/`lighthouse.yml`; static `paths:` filters elsewhere.

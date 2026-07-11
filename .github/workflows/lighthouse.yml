@@ -27,6 +27,11 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
+      # Change-detection strategy: bin/website-affecting (domain gate), NOT a
+      # static glob. Lighthouse audits rendered app pages, so the trigger must be
+      # "does this diff affect app rendering?" — the same domain question e2e-tests
+      # asks, sharing the one gate (bin/website-affecting) so the two workflows
+      # stay in lockstep. A static glob would drift out of sync with it.
       - name: Compute website-affecting
         id: filter
         run: |

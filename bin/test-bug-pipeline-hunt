@@ -1,0 +1,270 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-bug-pipeline-hunt — #5b hunter: claim-into-hunting, tiered ladder, cron ship
+# path, single-flight, usage-limit park/resume, RCA-label projection, and the SECURITY
+# row that EXERCISES the credential-starved env against a real git push / gh.
+#
+# Verification-Matrix rows covered here: 4,5,8,9,10,11,12,13,14,16,17,18,19,20,21,22,
+# 23,25,26,27,32,33,34,35,36. (DB rows 1,2,6,7,24,28 live in BugPipelineCliTest.php.)
+#
+# Run: bin/test-bug-pipeline-hunt  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+# shellcheck source=bin/lib/bug-pipeline-test-stubs.sh
+source "$(cd "$(dirname "$0")" && pwd)/lib/bug-pipeline-test-stubs.sh"
+DRIVER="$(cd "$(dirname "$0")" && pwd)/bug-pipeline-tick"
+PROMPT="$(cd "$(dirname "$0")" && pwd)/bug-pipeline-hunter-prompt"
+
+bpt_setup
+export STUB_HUNT_MODE=1   # claude stub impersonates the hunter agent
+
+# A classified, claimed bug row (snowflakes as strings; hunt_attempts is an int).
+CLAIM='{"id":"7","status":"hunting","class":"bug","thread_id":"880000000000000001","issue_number":"4242","original_text":"the trade button is broken","hunt_attempts":0}'
+
+# ── Row 4 — claimed queued bug → hunter dispatched exactly once with the claimed row ──
+bpt_reset
+bpt_set_claim "$CLAIM"; bpt_set_result '{"verdict":"fixed"}'; bpt_hunt_dirty
+bpt_run
+bpt_expect_eq "r4: exit 0" 0 "$BPT_RC"
+bpt_log_has  "$STUB" tick.out "claimed bug 7 into hunting" "r4: claims bug into hunting"
+bpt_count    "r4: hunter dispatched exactly once" 1 "$STUB/hunt-models.log"
+
+# ── Row 5 — NEG single-flight: claim-next empty → no hunter, tick exits 0 ──
+bpt_reset
+bpt_set_actionable '[]'   # claim-next.out empty by default
+bpt_run
+bpt_expect_eq   "r5: exit 0" 0 "$BPT_RC"
+bpt_file_absent "$STUB/claude.sentinel" "r5: empty claim spawns zero hunter"
+bpt_log_has     "$STUB" tick.out "no actionable rows" "r5: falls through to cheap exit"
+
+# ── Row 8 — wt-new called once as bug-<id>; worktree created ──
+bpt_reset
+bpt_set_claim "$CLAIM"; bpt_set_result '{"verdict":"fixed"}'; bpt_hunt_dirty
+bpt_run
+bpt_count   "r8: wt-new called exactly once" 1 "$STUB/wt-new.log"
+bpt_log_has "$STUB" wt-new.log "wt-new bug-7" "r8: worktree slug is bug-<id>"
+if [ -d "$STUB/wt/bug-7/ibl5" ]; then bpt_ok "r8: worktree tree created"; else bpt_fail "r8: worktree tree missing"; fi
+
+# ── Row 10 — NEG wt-new failure → re-queue + release-lease, no hunter, exit 0 ──
+bpt_reset
+bpt_set_claim "$CLAIM"; export WT_NEW_FAIL=1
+bpt_run
+unset WT_NEW_FAIL
+bpt_expect_eq   "r10: exit 0 (no crash)" 0 "$BPT_RC"
+bpt_log_has     "$STUB" transition.log "transition 7 queued --release-lease" "r10: re-queues with lease release"
+bpt_file_absent "$STUB/claude.sentinel" "r10: no hunter spawned on wt-new failure"
+
+# ── Row 11 — ladder order haiku→sonnet→opus, stops on first fixed (Opus last) ──
+bpt_reset
+bpt_set_claim "$CLAIM"
+bpt_set_result_for claude-haiku-4-5  '{"verdict":"escalate"}'
+bpt_set_result_for claude-sonnet-4-6 '{"verdict":"escalate"}'
+bpt_set_result_for claude-opus-4-8   '{"verdict":"fixed"}'
+bpt_hunt_dirty
+bpt_run
+bpt_count "r11: full ladder = 3 tiers" 3 "$STUB/hunt-models.log"
+order="$(tr '\n' ' ' < "$STUB/hunt-models.log")"
+bpt_expect_eq "r11: ladder order cheap→dear, Opus last" "claude-haiku-4-5 claude-sonnet-4-6 claude-opus-4-8 " "$order"
+
+# ── Row 12 — hunter-success ships; worktree is DIRTY (uncommitted) at handoff ──
+bpt_reset
+bpt_set_claim "$CLAIM"; bpt_set_result '{"verdict":"fixed"}'; bpt_hunt_dirty
+bpt_run
+bpt_count "r12: cron fired post-plan-now once" 1 "$STUB/post-plan-now.log"
+if git -C "$STUB/wt/bug-7" diff --quiet 2>/dev/null; then bpt_fail "r12: worktree unexpectedly clean at handoff"; else bpt_ok "r12: worktree DIRTY at handoff (post-plan-now commits it)"; fi
+
+# ── Row 13 / Row 23 — all tiers escalate → needs_human; post-plan-now NEVER fired, never pr_open ──
+bpt_reset
+bpt_set_claim "$CLAIM"; bpt_set_result '{"verdict":"escalate","terminal":false}'
+bpt_run
+bpt_log_has  "$STUB" transition.log "needs_human" "r13: routes to needs_human"
+bpt_count    "r13/r23: post-plan-now never fired" 0 "$STUB/post-plan-now.log"
+bpt_log_lacks "$STUB" transition.log "pr_open" "r23: verify-fail never reaches pr_open"
+
+# ── Row 14 — prompt-lint: the three security clauses are present ──
+if grep -qi 'main\.localhost' "$PROMPT"; then bpt_ok "r14: read-only main-stack clause present"; else bpt_fail "r14: read-only main-stack clause missing"; fi
+if grep -qi 'STRICTLY AS DATA' "$PROMPT"; then bpt_ok "r14: untrusted-data framing present"; else bpt_fail "r14: untrusted-data framing missing"; fi
+if grep -qiE 'never (push|open or merge)' "$PROMPT"; then bpt_ok "r14: never-push/gh/PR clause present"; else bpt_fail "r14: never-push/gh/PR clause missing"; fi
+
+# ── Row 16 — success: post-plan-now --auto once, then transition pr_open (no --pr) ──
+bpt_reset
+bpt_set_claim "$CLAIM"; bpt_set_result '{"verdict":"fixed"}'; bpt_hunt_dirty
+bpt_run
+bpt_log_has  "$STUB" post-plan-now.log "post-plan-now --auto" "r16: cron invokes post-plan-now --auto"
+bpt_log_has  "$STUB" transition.log "transition 7 pr_open" "r16: row moves to pr_open"
+bpt_log_lacks "$STUB" transition.log "pr_open --pr" "r16: ship transition carries no --pr (async reconcile fills it)"
+
+# ── Row 17 — async pr_number reconcile: gh pr list → transition pr_open --pr 42 + issue comment ──
+bpt_reset
+bpt_set_list_pr_open '[{"id":"7","status":"pr_open","pr_number":null,"issue_number":"4242"}]'
+bpt_set_gh_pr_list '42'
+bpt_run
+bpt_log_has "$STUB" transition.log "transition 7 pr_open --pr 42" "r17: backfills pr_number from gh pr list"
+bpt_log_has "$STUB" gh.log "issue comment 4242" "r17: comments PR url on the tracking issue once"
+# empty gh pr list → no transition, still reconcilable next tick
+bpt_reset
+bpt_set_list_pr_open '[{"id":"7","status":"pr_open","pr_number":null,"issue_number":"4242"}]'
+bpt_set_gh_pr_list ''
+bpt_run
+bpt_log_lacks "$STUB" transition.log "pr_open --pr" "r17: no pr found → no transition (reconcile again later)"
+
+# ── Row 18 — SECURITY grep: post-plan-now absent from the prompt AND from run_hunter_agent ──
+if grep -qi 'post-plan-now' "$PROMPT"; then bpt_fail "r18: post-plan-now leaked into hunter prompt"; else bpt_ok "r18: post-plan-now absent from hunter prompt"; fi
+rha_body="$(awk '/^run_hunter_agent\(\) \{/{f=1} f{print} f&&/^\}/{exit}' "$DRIVER")"
+if printf '%s' "$rha_body" | grep -qi 'post-plan-now'; then bpt_fail "r18: post-plan-now inside run_hunter_agent"; else bpt_ok "r18: post-plan-now absent from run_hunter_agent body"; fi
+
+# ── Row 19 — NEG fixed-but-CLEAN worktree → no empty PR; needs_human with a 'no diff' finding ──
+bpt_reset
+bpt_set_claim "$CLAIM"; bpt_set_result '{"verdict":"fixed"}'   # NO make-dirty → clean worktree
+bpt_run
+bpt_count   "r19: no PR opened on empty diff" 0 "$STUB/post-plan-now.log"
+bpt_log_has "$STUB" transition.log "needs_human" "r19: empty-diff 'fixed' routes to needs_human"
+bpt_log_has "$STUB" curl.log "no diff" "r19: 'no diff' finding posted to the thread"
+
+# ── Row 20 — first failed attempt (hunt_attempts<cap) → hunting --attempts 1, no human handoff ──
+# (in-tick retry then recovers on the next attempt: a single failure must never escalate to a human.)
+bpt_reset
+bpt_set_claim "$CLAIM"
+bpt_set_verdicts escalate escalate escalate fixed   # ladder-1 all escalate → attempt 1; ladder-2 haiku fixed
+bpt_hunt_dirty
+bpt_run
+bpt_log_has   "$STUB" transition.log "transition 7 hunting --attempts 1" "r20: first failure → hunting --attempts 1"
+bpt_log_lacks "$STUB" transition.log "needs_human" "r20: single failure never escalates to a human"
+bpt_count     "r20: no @mention on a single failure" 0 <(grep MENTION "$STUB/calls.log" 2>/dev/null)
+
+# ── Row 21 — 2-attempt cap: 2nd failure → needs_human --release-lease; exactly 1 post + 1 mention ──
+bpt_reset
+bpt_set_claim "$CLAIM"; bpt_set_result '{"verdict":"escalate","terminal":false}'
+bpt_run
+bpt_log_has "$STUB" transition.log "transition 7 needs_human --release-lease" "r21: cap → needs_human + lease release"
+bpt_count   "r21: exactly one post-to-thread" 1 <(grep POST_TO_THREAD "$STUB/calls.log" 2>/dev/null)
+bpt_count   "r21: exactly one mention"          1 <(grep MENTION "$STUB/calls.log" 2>/dev/null)
+bpt_log_has "$STUB" curl.log '"thread_id":"880000000000000001"' "r21: thread_id sent as a JSON string"
+bpt_log_has "$STUB" curl.log '"discord_id":"770000000000000007"' "r21: approver id sent as a JSON string"
+
+# ── Row 22 — terminal:true short-circuits the cap → needs_human after ONE ladder run ──
+bpt_reset
+bpt_set_claim "$CLAIM"; bpt_set_result '{"verdict":"escalate","terminal":true}'
+bpt_run
+bpt_count     "r22: exactly one ladder ran (no 2nd attempt)" 3 "$STUB/hunt-models.log"
+bpt_log_has   "$STUB" transition.log "needs_human" "r22: terminal failure → needs_human"
+bpt_log_lacks "$STUB" transition.log "--attempts 2" "r22: never reaches attempt 2"
+
+# ── Row 25 — usage-limit mid-hunt → blocked + future blocked_until; NOT needs_human; attempts unchanged ──
+bpt_reset
+bpt_set_claim "$CLAIM"; bpt_envfail   # blanket rate_limit line at every tier
+bpt_run
+bpt_expect_eq "r25: exit 0" 0 "$BPT_RC"
+bpt_log_has   "$STUB" transition.log "transition 7 blocked --blocked-until=" "r25: parks the hunt as blocked"
+bpt_log_lacks "$STUB" transition.log "needs_human" "r25: usage limit is NOT a human handoff"
+bpt_log_lacks "$STUB" transition.log "--attempts" "r25: hunt_attempts unchanged on an environmental park"
+
+# ── Row 26 — blocked row not-yet-ripe (resume claim empty) → not resumed, no hunter ──
+bpt_reset
+bpt_set_actionable '[{"id":"7","status":"blocked","class":"bug"}]'   # resume claim-next empty by default
+bpt_run
+bpt_file_absent "$STUB/claude.sentinel" "r26: future-blocked row spawns no hunter"
+bpt_count       "r26: no wt-new for an unresumed row" 0 "$STUB/wt-new.log"
+
+# ── Row 27 — ripe blocked row → atomic blocked→hunting, EXISTING worktree reused (no wt-new) ──
+bpt_reset
+mkdir -p "$STUB/wt/bug-7/ibl5"
+git -C "$STUB/wt/bug-7" init -q; git -C "$STUB/wt/bug-7" config user.email t@t; git -C "$STUB/wt/bug-7" config user.name t
+printf 'base\n' > "$STUB/wt/bug-7/ibl5/hunted.txt"
+git -C "$STUB/wt/bug-7" add -A; git -C "$STUB/wt/bug-7" commit -qm base
+bpt_set_actionable '[{"id":"7","status":"blocked","class":"bug"}]'
+bpt_set_resume '{"id":"7","status":"hunting","class":"bug","hunt_attempts":1,"issue_number":"4242"}'
+bpt_set_result '{"verdict":"fixed"}'; bpt_hunt_dirty
+bpt_run
+if grep -q . "$STUB/hunt-models.log" 2>/dev/null; then bpt_ok "r27: ripe blocked row is re-hunted"; else bpt_fail "r27: ripe blocked row was not hunted"; fi
+bpt_count "r27: existing worktree reused (no wt-new)" 0 "$STUB/wt-new.log"
+
+# ── Row 32 — RCA labels on ship: area/root_cause slugs → ensure+add label against the issue ──
+bpt_reset
+bpt_set_claim "$CLAIM"
+bpt_set_result '{"verdict":"fixed","area":"trades","root_cause":"missing-validation"}'; bpt_hunt_dirty
+bpt_run
+bpt_log_has "$STUB" gh.log "issue edit 4242" "r32: labels applied to the tracking issue"
+bpt_log_has "$STUB" gh.args.log "area:trades" "r32: area:<slug> label"
+bpt_log_has "$STUB" gh.args.log "root-cause:missing-validation" "r32: root-cause:<slug> label"
+
+# ── Row 33 — SECURITY arg-injection: malicious area/root_cause fails allowlist → dropped ──
+bpt_reset
+bpt_set_claim "$CLAIM"
+bpt_set_result '{"verdict":"fixed","area":"bad; rm -rf ~","root_cause":"clean-cause"}'; bpt_hunt_dirty
+bpt_run
+bpt_log_lacks "$STUB" gh.args.log "rm -rf" "r33: malicious area never reaches a gh arg"
+bpt_log_lacks "$STUB" gh.args.log "area:bad" "r33: malicious area dropped (no label)"
+bpt_log_has   "$STUB" gh.args.log "root-cause:clean-cause" "r33: the clean slug is still labeled"
+
+# ── Row 34 — needs_human → best-effort needs-human label + assign; gh failure doesn't block ──
+bpt_reset
+bpt_set_claim "$CLAIM"; bpt_set_result '{"verdict":"escalate","terminal":true}'; export GH_FAIL=1
+bpt_run
+unset GH_FAIL
+bpt_log_has   "$STUB" transition.log "needs_human" "r34: needs_human transition survives a failing gh"
+bpt_log_has   "$STUB" gh.args.log "needs-human" "r34: attempts the needs-human label"
+bpt_log_has   "$STUB" gh.args.log "a-jay85" "r34: attempts to assign a-jay85"
+bpt_log_lacks "$STUB" gh.log "issue close" "r34: the bug issue stays OPEN"
+
+# ── Row 35 — fixed-reconcile: gh pr view MERGED → transition fixed + close the issue ──
+bpt_reset
+bpt_set_list_pr_open '[{"id":"7","status":"pr_open","pr_number":"55","issue_number":"4242"}]'
+bpt_set_gh_pr_view 'MERGED'
+bpt_run
+bpt_log_has "$STUB" transition.log "transition 7 fixed" "r35: merged PR advances the row to fixed"
+bpt_log_has "$STUB" gh.log "issue close 4242" "r35: closes the tracking issue on merge"
+
+# ── Row 36 — best-effort projection: a failing gh does NOT derail the ship / DB transition ──
+bpt_reset
+bpt_set_claim "$CLAIM"; bpt_set_result '{"verdict":"fixed"}'; bpt_hunt_dirty; export GH_FAIL=1
+bpt_run
+unset GH_FAIL
+bpt_log_has "$STUB" transition.log "transition 7 pr_open" "r36: ship reaches pr_open despite failing gh"
+# NULL issue_number → issue ops no-op (no crash, still ships)
+bpt_reset
+bpt_set_claim '{"id":"9","status":"hunting","class":"bug","thread_id":"880000000000000009","hunt_attempts":0}'
+bpt_set_result '{"verdict":"fixed"}'; bpt_hunt_dirty
+bpt_run
+bpt_log_has "$STUB" transition.log "transition 9 pr_open" "r36: NULL issue_number row still ships (issue ops no-op)"
+
+# ── Row 9 — SECURITY (EXERCISED): under the starved env a real git push / gh cannot authenticate ──
+# Run in the PARENT shell (bpt_fail must reach $FAILED) as the LAST block: source the driver so
+# run_under_starved_env is callable, using the REAL hunter.gitconfig (not the stub scripts dir).
+unset BUG_PIPELINE_SCRIPTS_DIR
+export GIT_TERMINAL_PROMPT=0   # never hang on a username prompt; a missing cred fails fast
+# shellcheck disable=SC1090
+source "$DRIVER"               # tail-guard keeps main() from running when sourced
+R9="$(mktemp -d)"; git -C "$R9" init -q
+git -C "$R9" config user.email t@t; git -C "$R9" config user.name t
+printf 'x\n' > "$R9/f"; git -C "$R9" add -A; git -C "$R9" commit -qm x
+# credential.helper resolves BLANK (macOS-keychain path closed)
+helper="$(run_under_starved_env "$R9" git config --get credential.helper 2>/dev/null)"
+bpt_expect_eq "r9: credential.helper resolves blank" "" "$helper"
+# token / SSH vectors blanked inside the scrub
+tok="$(run_under_starved_env "$R9" sh -c 'printf %s "$GH_TOKEN$GITHUB_TOKEN"')"
+bpt_expect_eq "r9: GH_TOKEN/GITHUB_TOKEN blank" "" "$tok"
+sock="$(run_under_starved_env "$R9" sh -c 'printf %s "$SSH_AUTH_SOCK"')"
+bpt_expect_eq "r9: SSH_AUTH_SOCK empty" "" "$sock"
+# EXERCISE: a real push to an auth-required https remote must FAIL (no reachable credential)
+if timeout 30 run_under_starved_env "$R9" git push https://github.com/ibl5-pipeline-nonexistent/repo.git HEAD:refs/heads/x >/dev/null 2>&1; then
+    bpt_fail "r9: git push under starved env unexpectedly SUCCEEDED"
+else
+    bpt_ok "r9: git push under starved env fails (no token/keychain/SSH cred)"
+fi
+# EXERCISE: gh pr create (if gh is installed) cannot authenticate under the scrub
+if command -v gh >/dev/null 2>&1; then
+    if timeout 30 run_under_starved_env "$R9" gh pr create --fill >/dev/null 2>&1; then
+        bpt_fail "r9: gh pr create under starved env unexpectedly SUCCEEDED"
+    else
+        bpt_ok "r9: gh pr create under starved env fails (no token)"
+    fi
+else
+    bpt_ok "r9: gh not installed — git-push vector suffices"
+fi
+rm -rf "$R9"
+
+echo "----"
+if [ "$FAILED" -eq 0 ]; then echo "ALL PASS"; else echo "SOME FAILED"; fi
+exit "$FAILED"

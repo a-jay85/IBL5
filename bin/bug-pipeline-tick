@@ -495,6 +495,8 @@ run_hunt_ladder() { # claimed hunt_id wt_appdir
     for model in $HUNT_MODELS; do   # word-split intentional: fixed model-id list, no globs
         run_name="bug-pipeline-hunt-${hunt_id}-$(date +%H%M%S)"
         run_log="$(mktemp)"
+        # Clear any prior tier's result so a timed-out run can't inherit its verdict.
+        rm -f "$wt_appdir/.bug-pipeline/hunt-result.json"
         BUG_PIPELINE_HUNT_PROMPT_RENDERED="$rendered" \
             run_hunter_agent "$wt_appdir" "$model" "$rendered" "$run_name" "$run_log"
         cat "$run_log" >> "$HUNT_LOG" 2>/dev/null || true

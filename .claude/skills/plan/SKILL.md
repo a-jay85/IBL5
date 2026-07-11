@@ -4,7 +4,7 @@ description: "Plan an implementation task: enforces a verification matrix, direc
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
-last_verified: 2026-07-09
+last_verified: 2026-07-11
 ---
 
 # /plan — Implementation Planning with Verification Matrix
@@ -72,7 +72,7 @@ The Plan agent auto-loads CLAUDE.md, all always-loaded rules (agent-tiering, cor
 
 Launch a **single Plan agent** (`subagent_type: "plan-architect"` — its definition carries `model: opus` and `effort: high`; do NOT pass an inline `model` override) with a prompt containing ALL of these. **Escalate to `plan-architect-xhigh` (effort: xhigh) when Step 2 flagged any of: a security surface, a trust boundary (auth/authz-gated route), a destructive migration, or a change to `.claude/skills` ship-pipeline invariants.**
 
-**Run this step inline — never delegate `/plan` itself.** The orchestrating session owns Steps 1–5 directly and spawns exactly **one** `plan-architect` per PR-sized unit. Do NOT hand the whole `/plan` invocation to a `general-purpose`/`claude` sub-agent (or fan it out across several), and do NOT have any such agent fire `/plan` on your behalf. Those agent types carry `Tools: *` — they *can* spawn further agents, so delegating `/plan` to them produces a `general-purpose → plan-architect` nest, exactly the multi-level `plan-architect` tree the flat-fan-out rule forbids (`agent-tiering.md` § Flat fan-out). `plan-architect`/`Plan`/`Explore` cannot cause this themselves — they lack the `Agent` tool — so the only way the nest appears is an orchestrator delegating `/plan` outward. Keep planning one level deep: this session → one `plan-architect`.
+**Run this step inline — never delegate `/plan` itself.** The orchestrating session owns Steps 1–5 directly and spawns exactly **one** `plan-architect` per PR-sized unit. Do NOT hand the whole `/plan` invocation to a `general-purpose`/`claude` sub-agent (or fan it out across several), and do NOT have any such agent fire `/plan` on your behalf. Those agent types carry `Tools: *` — they *can* spawn further agents, so delegating `/plan` to them produces a `general-purpose → plan-architect` nest, exactly the multi-level `plan-architect` tree the flat-fan-out rule forbids (`agent-tiering-detail.md` § Nested Sub-Agents). `plan-architect`/`Plan`/`Explore` cannot cause this themselves — they lack the `Agent` tool — so the only way the nest appears is an orchestrator delegating `/plan` outward. Keep planning one level deep: this session → one `plan-architect`.
 
 1. **Task description** from `$ARGUMENTS` — when the work was split in Step 2.5, scope this to the single PR being planned and state which PR it is and what it depends on
 2. **Exploration results** from Step 2 — file paths, code traces, existing patterns, test coverage findings. **Tell the agent these findings are authoritative and that it must NOT re-explore them.** The agent already ran with `effort: xhigh`, so its instinct is to re-derive everything from scratch — but you've supplied the orientation, and every redundant `grep`/`Read`/agent call extends the run and raises the stall risk (each tool round-trip is another window for the idle timeout to land before the agent reaches its Bash-persist). Instruct it to spend tool calls only on **targeted confirmations** of anything the findings leave genuinely open — cap ~2–3 — then go straight to composing the plan. "Verify everything myself" is the failure mode here, not diligence.

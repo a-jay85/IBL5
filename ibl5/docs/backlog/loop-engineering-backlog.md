@@ -27,10 +27,10 @@ last_verified: 2026-07-12
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 10 |
+| ⬜ Open | 8 |
 | 📋 Planned | 1 |
 | ◑ Partial | 3 |
-| ✅ Implemented | 3 |
+| ✅ Implemented | 5 |
 | 🚫 Declined | 0 |
 
 ---
@@ -51,7 +51,7 @@ last_verified: 2026-07-12
 | L10 | Discord intake loop | ◑ Partial | 🟦 | L |
 | L11 | Comprehension-debt digest | ⬜ Open | 🟦 | S |
 | L12 | Autonomy contracts in plan frontmatter | ◑ Partial | 🟦 | M |
-| L13 | Per-phase impl-model routing | ⬜ Open | 🟦 | M |
+| L13 | Per-phase impl-model routing | ✅ Implemented | — | M |
 | L14 | Escalate-on-retry (Sonnet-first, just-in-time Opus) | ✅ Implemented | — | S |
 | L15 | Sonnet-recipe completeness lint | ⬜ Open | 🟦 | S |
 | L16 | Context-budget gate v2 (work-size proxies + measured calibration) | ⬜ Open | 🟦 | M |
@@ -134,11 +134,7 @@ last_verified: 2026-07-12
 **Status (2026-07-07):** ◑ Partial — the one-bit levers + gates exist; structured contract fields don't. 🟦.
 
 ### L13 Per-phase impl-model routing
-**Location:** `bin/automouse-run` (single `--model` per plan, resolved once by `bin/lib/plan-impl-model`); plans already label every phase Sonnet / Haiku / self per `.claude/skills/plan/_architect-contract.md` § Agent-tiering guidance — nothing consumes those labels at run time (verified 2026-07-08).
-**Problem:** Model selection is whole-run: a mixed plan runs every mechanical phase at the top tier, and the only relief is a tier-boundary split (T11 in [token-spend-backlog.md](token-spend-backlog.md)), which can't reach plans whose judgment and mechanical phases interleave.
-**Suggested direction:** Make the in-plan tier labels binding rather than advisory: the impl orchestrator MUST delegate a Sonnet/Haiku-labeled phase as a sub-agent per its delegation packet (packet-carrying phases were already bound from 2026-06-07; the residual gap was bare sub-tier labels carrying no packet). Bulk spend moves down-tier AND out of the orchestrator's context — dumb-zone relief and tier savings from the same change. A runner-driven per-phase `claude -p` sequence with a state handoff is the heavier fallback if in-run delegation proves unreliable.
-**Risk if untouched:** Per-phase tiering stays a plan-authoring ritual with no runtime effect; mixed plans pay top-tier for mechanical sweeps.
-**Status (2026-07-11):** ✅ Implemented — in-plan sub-tier labels are now binding: `.claude/skills/plan/_architect-contract.md` requires a `### Delegate` packet or an explicit `(inline — …)` marker on every below-run-model phase, `bin/check-plan` gate `[T]` enforces it, and `bin/automouse-prompt-impl` binds each case at run time. Packet-carrying phases were already bound (2026-06-07); this closes the bare-label gap. The heavier runner-driven per-phase `claude -p` fallback was not needed.
+✅ Implemented (2026-07-11) — see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
 ### L14 Escalate-on-retry (Sonnet-first, just-in-time Opus)
 ✅ Implemented (2026-07-11) — see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).

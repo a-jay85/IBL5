@@ -28,3 +28,13 @@ Read-only historical record of ✅ Implemented entries. For OPEN items see ../to
 **Location:** `$HOME/.claude/hooks/output-guard.sh` (PreToolUse, warn-only), extending the `ci-log-guard.sh` family.
 **Problem (was):** Unbounded Bash output (`cat`, unbounded `git log`/`find`, full Playwright runs) lands in context once and is re-billed as a cache read every remaining turn.
 **Status (2026-07-07):** ✅ Implemented — guards the four measured worst categories (scoped from 27,899 transcript Bash calls); warns with the bounded alternative; skips subagents. Plan archive: `$HOME/.claude/plans/output-guard-hook.md`.
+
+### T11 Tier-boundary plan splitting
+**Location:** `.claude/skills/plan/SKILL.md` — Step 2.5 (split criteria) and Step 4 gate 13 (`impl_model` criterion).
+**Problem (was):** Gate 13's Sonnet criterion is all-or-nothing per plan: a single judgment phase or `Truly-manual` row drops the *entire* implementation to Opus (~1.7× per-token) even when the other 90% of phases are mechanical. Step 2.5's split criteria never considered the model-tier boundary, so mixed plans were never restructured to isolate the Opus-forcing part.
+**Status (2026-07-11):** ✅ Implemented — added the Step 2.5 **Tier-boundary separability** split criterion and paired Step 4 gate 13 to prefer a tier-boundary split over dropping a mixed plan to Opus (`.claude/skills/plan/SKILL.md`); batched with T12.
+
+### T12 Sonnet plan-architect for recipe-backed plans
+**Location:** `.claude/agents/plan-architect.md` (pins `model: opus`); `/plan` Step 3 spawns it for every plan.
+**Problem (was):** Every plan paid an Opus-xhigh architect run even when the design was already resolved upstream — a backlog entry naming the recipe, the files, and the pattern to copy (the marker-swap / mechanical-sweep class). Composing a plan from a pre-resolved recipe is mechanical composition, not novel design.
+**Status (2026-07-11):** ✅ Implemented — added `.claude/agents/plan-architect-sonnet.md` and a recipe-backed Sonnet branch in `/plan` Step 3's ordered tier selection (xhigh > recipe-backed Sonnet > Opus default), with the `agent-tiering.md` Opus (delegated) row updated to match; rollout monitored via the T1 tier ledger.

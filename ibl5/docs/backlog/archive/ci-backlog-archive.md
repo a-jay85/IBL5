@@ -9,6 +9,13 @@ Read-only historical record of ✅ Implemented / 🚫 Declined findings. For OPE
 
 ---
 
+### 2.1 smoke-prod.yml — four near-identical notify jobs
+**Location:** `.github/workflows/smoke-prod.yml` — jobs `rollback-and-notify`, `notify-scheduled-failure`, `notify-ibl6-degradation`, `notify-inconclusive`.
+**Problem:** Four separate jobs each boot a fresh runner solely to SSH-tunnel one `curl` DM; they differ only in the trigger condition and message string. (Same notify shape recurs in `main.yml`, `mutation.yml`, `db-backup.yml`.)
+**Suggested direction:** Collapse the three notify-only jobs into one job that branches on the `smoke` outcome via `if:` (keep `rollback-and-notify` separate — it mutates git). Best done **after** 1.2 lands so the merged job calls the `notify-discord` composite.
+**Risk if untouched:** Notify logic forks across 4 jobs; a message-format change is repeated.
+**Status (2026-07-11):** ✅ Implemented — three notify-only jobs collapsed into one `notify` job with `always()` guard; message selects branch via `if/elif/else` on `SMOKE_RESULT`/`IBL5_INCONCLUSIVE`. `auto_merge: false` — deploy/notify path is prod-only, unreachable from CI. (#1423)
+
 ### 2.2 migration-safety.yml — three jobs each rebuild a full DB stack
 **Location:** `.github/workflows/migration-safety.yml` — jobs `idempotency-check`, `schema-parity-check`, `schema-completeness`.
 **Problem:** All three spin up an independent MariaDB 10.11 service, run an independent composer install, and apply the full migration stack from zero. `idempotency-check` and `schema-completeness` both apply the same full stack; the latter just adds FK/table/column assertions afterward.

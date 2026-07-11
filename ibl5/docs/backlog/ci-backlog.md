@@ -65,15 +65,10 @@ last_verified: 2026-07-11
 
 | # | Title | Status | Automouse | Effort |
 |---|-------|--------|-----------|-------:|
-| 2.1 | Collapse smoke-prod's 4 notify jobs into one | ⬜ Open | 🟦 | S |
+| 2.1 | Collapse smoke-prod's 4 notify jobs into one | ✅ Implemented | 🟦 | S |
 | 2.2 | Merge migration-safety `idempotency-check` + `schema-completeness` | ✅ Implemented | 🟩 | M |
 
-### 2.1 smoke-prod.yml — four near-identical notify jobs
-**Location:** `.github/workflows/smoke-prod.yml` — jobs `rollback-and-notify`, `notify-scheduled-failure`, `notify-ibl6-degradation`, `notify-inconclusive`.
-**Problem:** Four separate jobs each boot a fresh runner solely to SSH-tunnel one `curl` DM; they differ only in the trigger condition and message string. (Same notify shape recurs in `main.yml`, `mutation.yml`, `db-backup.yml`.)
-**Suggested direction:** Collapse the three notify-only jobs into one job that branches on the `smoke` outcome via `if:` (keep `rollback-and-notify` separate — it mutates git). Best done **after** 1.2 lands so the merged job calls the `notify-discord` composite.
-**Risk if untouched:** Notify logic forks across 4 jobs; a message-format change is repeated.
-**Status (2026-06-28):** ⬜ Open — sequence after 1.2. Deploy/notify surface → 🟦.
+➜ 2.1 smoke-prod.yml — ✅ Implemented (2026-07-11): see [archive](archive/ci-backlog-archive.md).
 
 ➜ 2.2 migration-safety.yml — ✅ Implemented (2026-07-11): see [archive](archive/ci-backlog-archive.md).
 

@@ -98,6 +98,6 @@ class RequestEventLoggingBootstrap implements BootstrapStepInterface
 
     private function trunc(string $value, int $max): string
     {
-        return \strlen($value) > $max ? \substr($value, 0, $max) : $value;
+        return mb_strcut($value, 0, $max, 'UTF-8');
     }
 }

@@ -120,20 +120,6 @@ jobs:
             ./prod-dump.sql.gz
           ls -l ./prod-dump.sql.gz
 
-      - name: Wait for verify MariaDB to be ready
-        run: |
-          set -euo pipefail
-          for i in $(seq 1 30); do
-            if mysqladmin ping -h 127.0.0.1 -P 3306 -uroot -proot --silent 2>/dev/null; then
-              echo "verify-db is ready"
-              exit 0
-            fi
-            echo "Waiting for verify-db ($i)..."
-            sleep 5
-          done
-          echo "verify-db did not become ready" >&2
-          exit 1
-
       - name: Restore dump into ephemeral MariaDB and run sanity queries
         run: |
           set -euo pipefail

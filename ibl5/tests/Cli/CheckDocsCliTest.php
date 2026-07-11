@@ -386,4 +386,124 @@ final class CheckDocsCliTest extends TestCase
         $this->assertIsArray($report, $output);
         $this->assertCount(0, $report);
     }
+
+    // --- Phase 5: --since backlog transitions gate ---
+
+    #[Test]
+    public function sinceBodyStatusDoneWithoutPointerExitsOne(): void
+    {
+        $this->commitFile(
+            'ibl5/docs/backlog/ci-backlog.md',
+            $this->doc($this->freshDate(), "### 1 Item\n\n**Status (2026-07-01):** ⬜ Open — an item.\n"),
+            'base'
+        );
+        $base = $this->currentSha();
+        $this->commitFile(
+            'ibl5/docs/backlog/ci-backlog.md',
+            $this->doc($this->freshDate(0), "### 1 Item\n\n**Status (2026-07-10):** ✅ Implemented — an item.\n"),
+            'mark done inline'
+        );
+
+        [$code, $output] = $this->runScript('--since=' . $base);
+        $this->assertSame(1, $code, $output);
+        $this->assertStringContainsString('marked done inline', $output);
+    }
+
+    #[Test]
+    public function sinceArchivePointerTargetMissingExitsOne(): void
+    {
+        $this->commitFile(
+            'ibl5/docs/backlog/e2e-backlog.md',
+            $this->doc($this->freshDate(), "### 1 Item\n\n**Status (2026-07-01):** ⬜ Open — an item.\n"),
+            'base'
+        );
+        $base = $this->currentSha();
+        $this->commitFile(
+            'ibl5/docs/backlog/e2e-backlog.md',
+            $this->doc($this->freshDate(0), "See [archive](archive/e2e-backlog-archive.md).\n"),
+            'add dead pointer'
+        );
+
+        [$code, $output] = $this->runScript('--since=' . $base);
+        $this->assertSame(1, $code, $output);
+        $this->assertStringContainsString('does not resolve', $output);
+    }
+
+    #[Test]
+    public function sinceNewPointerCanonicalSiblingMissingExitsOne(): void
+    {
+        $this->commitFile('ibl5/docs/backlog/archive/maintenance-backlog-archive.md', "archive\n", 'existing archive');
+        $this->commitFile(
+            'ibl5/docs/backlog/token-spend-backlog.md',
+            $this->doc($this->freshDate(), "### 1 Item\n\n**Status (2026-07-01):** ⬜ Open — an item.\n"),
+            'base'
+        );
+        $base = $this->currentSha();
+        $this->commitFile(
+            'ibl5/docs/backlog/token-spend-backlog.md',
+            $this->doc($this->freshDate(0), "See [archive](archive/maintenance-backlog-archive.md).\n"),
+            'add pointer to wrong sibling'
+        );
+
+        [$code, $output] = $this->runScript('--since=' . $base);
+        $this->assertSame(1, $code, $output);
+        $this->assertStringContainsString('canonical archive sibling', $output);
+    }
+
+    #[Test]
+    public function sinceArchivedWithSiblingAndPointerExitsZero(): void
+    {
+        $this->commitFile(
+            'ibl5/docs/backlog/a11y-backlog.md',
+            $this->doc($this->freshDate(), "### 1 Item\n\n**Status (2026-07-01):** ⬜ Open — an item.\n"),
+            'base'
+        );
+        $base = $this->currentSha();
+
+        @mkdir($this->tmpDir . '/ibl5/docs/backlog/archive', 0o777, true);
+        file_put_contents($this->tmpDir . '/ibl5/docs/backlog/archive/a11y-backlog-archive.md', "archive\n");
+        $this->commitFile(
+            'ibl5/docs/backlog/a11y-backlog.md',
+            $this->doc($this->freshDate(0), "➜ 1 Item — ✅ Implemented (2026-07-10): see [archive](archive/a11y-backlog-archive.md).\n"),
+            'archive item'
+        );
+
+        [$code, $output] = $this->runScript('--since=' . $base);
+        $this->assertSame(0, $code, $output);
+    }
+
+    #[Test]
+    public function sinceMaintenanceTableStatusDoneExemptExitsZero(): void
+    {
+        $this->commitFile(
+            'ibl5/docs/backlog/maintenance-backlog.md',
+            $this->doc($this->freshDate(), "| ID | Item | Status |\n|----|------|--------|\n| C1 | Foo | ⬜ |\n"),
+            'base'
+        );
+        $base = $this->currentSha();
+        $this->commitFile(
+            'ibl5/docs/backlog/maintenance-backlog.md',
+            $this->doc($this->freshDate(0), "| ID | Item | Status |\n|----|------|--------|\n| C1 | Foo | ✅ |\n"),
+            'flip row done'
+        );
+
+        [$code, $output] = $this->runScript('--since=' . $base);
+        $this->assertSame(0, $code, $output);
+    }
+
+    #[Test]
+    public function sinceUnchangedBadBacklogNotInDiffExitsZero(): void
+    {
+        $this->commitFile(
+            'ibl5/docs/backlog/jsb-native-backlog.md',
+            $this->doc($this->freshDate(), "### 1 Item\n\n**Status (2026-07-01):** ✅ Implemented — no pointer, deliberately bad.\n"),
+            'bad backlog'
+        );
+        $this->commitFile('ibl5/docs/sample.md', $this->doc($this->freshDate(), 'Original body.'), 'unrelated doc');
+        $base = $this->currentSha();
+        $this->commitFile('ibl5/docs/sample.md', $this->doc($this->freshDate(0), 'Edited body.'), 'edit unrelated');
+
+        [$code, $output] = $this->runScript('--since=' . $base);
+        $this->assertSame(0, $code, $output);
+    }
 }

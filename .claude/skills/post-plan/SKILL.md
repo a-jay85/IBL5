@@ -1,11 +1,11 @@
 ---
 name: post-plan
-description: Single orchestrator for the post-plan workflow. Runs commit/push/PR, diff classification, code review, security audit, verification, CI monitoring, retrospective, worktree teardown, and background process cleanup as one uninterrupted sequence.
+description: Single orchestrator for the post-plan workflow. Runs commit/push/PR, backlog housekeeping, diff classification, code review, security audit, verification, CI monitoring, retrospective, worktree teardown, and background process cleanup as one uninterrupted sequence.
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-07-09
+last_verified: 2026-07-10
 ---
 
 # Post-Plan Orchestrator
@@ -31,7 +31,7 @@ if ! git diff --cached --quiet; then
 fi
 ```
 
-Phase 2 makes the initial commit and opens the PR. Phases that may modify files after Phase 2 (Phase 4D follow-up fixes if review identifies real bugs, Phase 5 fix-and-rerun loops, Phase 6 test writing, Phase 7 CI fixes) MUST checkpoint before continuing. The squash-merge armed in Phase 6.5 collapses the chain.
+Phase 2 makes the initial commit and opens the PR. Phases that may modify files after Phase 2 (Phase 2.5 backlog housekeeping, Phase 4D follow-up fixes if review identifies real bugs, Phase 5 fix-and-rerun loops, Phase 6 test writing, Phase 7 CI fixes) MUST checkpoint before continuing. The squash-merge armed in Phase 6.5 collapses the chain.
 
 ---
 
@@ -93,6 +93,26 @@ If the working tree is clean and `git diff origin/master...HEAD` is also empty (
 2. **If no PR exists for the current branch:** create one with `gh pr create`. **Stacked PRs:** If branched from a feature branch (not `master`), use `--base <parent-branch>`. Skip if a PR already exists. **Merge-order dependency:** When this PR shares files with, or must merge after, a sibling PR that is also based on `master` (so stacking via `--base` is unavailable / fragile under squash-merge), add a `Depends-on: #<n>[, #<n>...]` line to the PR body — **on its own line** (the parser anchors to start-of-line, so an inline prose mention of the marker is ignored). Phase 6.5 condition (6) reads it and refuses to arm auto-merge until every named PR is `MERGED`, so the series cannot ship out of order. Use this rather than stacking when the repo squash-merges (a squash collapses the parent's commits, leaving a stacked child's branch carrying the pre-squash commits → conflict on auto-retarget).
 3. **Manual testing in PR description:** Check the plan file for a Verification Matrix. If one exists, copy only the rows classified as `Truly-manual` into the PR's `## Manual Testing` section. If the matrix has zero truly-manual rows (or the plan says "All verification is automated"), write: `No manual testing needed — all changes are covered by unit and E2E tests.` If no plan file or no matrix exists, fall back to the original rule: list only steps requiring subjective human judgment on new or redesigned UI/UX ("does this look/feel good?", "does this flow work well?"). Production comparison and "does output still match?" are visual-regression-replaceable, not manual. Do NOT list CLI commands or script invocations — Phase 6 executes those.
 4. Use Haiku agents for commit message generation if delegating
+
+---
+
+## Phase 2.5: Backlog Housekeeping
+
+If the shipped work implemented or resolved a backlog item, backlog housekeeping ships in **THIS** PR — not as a follow-up. The PR exists (Phase 2), so provenance stamps can reference `#<PR>`. Running here (before Phase 3 classifies and Phase 6.5 arms auto-merge) is what puts the housekeeping edits in the diff that gets reviewed and merged.
+
+**Detect (run once — the PR gives the correct base):**
+
+```bash
+BL_TOUCHED=$(gh pr diff --name-only 2>/dev/null | grep -E '^ibl5/docs/backlog/[^/]+-backlog\.md$' || true)
+```
+
+Also treat housekeeping as triggered if the plan file (`$PLAN_FILE` from Phase 1) declares a resolved or discovered backlog item (a `## Backlog` / tracking-doc status-update section, per `.claude/skills/plan/_architect-contract.md`). The regex **excludes** `README.md` (no `-backlog.md` suffix) and anything under `archive/` (`[^/]+` cannot cross `/`), so a README-only or archive-only diff does **not** trigger.
+
+**If neither signal fires:** print `Phase 2.5: no backlog item resolved — skipping.` and continue to Phase 3.
+
+**If triggered — run INLINE, no subagent.** Post-plan runs as **Sonnet 4.6** and its `disallowed-tools` includes **`Skill`**, so it **cannot** call `/backlog-housekeep`. Instead **Read `.claude/skills/backlog-housekeep/SKILL.md` and follow it inline**, taking that skill's **Sonnet/Haiku caller branch** (execute inline — a same-tier subagent spawn is pure overhead per `feedback_default_sonnet_execution`). Apply its housekeeping checklist with `#<PR>` as the `<ref>` and the PR base as the `--since` base (default `origin/master`; the PR's `baseRefName` for a stacked PR).
+
+**Self-verify + checkpoint (mandatory):** run `bin/check-docs --since=origin/master` (substitute the PR base for a stacked PR), fix any diagnostic, then **commit + push** the housekeeping edits. Per Incremental Checkpoints, this phase modifies files, so the edits must be committed and pushed before Phase 3 — they belong in the diff that Phase 3 classifies and Phase 6.5 arms on.
 
 ---
 

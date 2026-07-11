@@ -29,9 +29,9 @@ last_verified: 2026-07-11
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 5 |
+| ⬜ Open | 4 |
 | 📋 Planned | 1 |
-| ◑ Partial | 1 |
+| ◑ Partial | 2 |
 | ✅ Implemented | 5 |
 | 🚫 Declined | 0 |
 
@@ -44,7 +44,7 @@ Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive
 | # | Title | Status | Locus | Effort |
 |---|-------|--------|-------|-------:|
 | T1 | Automouse token ledger | ✅ Implemented | repo | M |
-| T2 | Always-loaded context budget gate | ⬜ Open | repo | S |
+| T2 | Always-loaded context budget gate | ◑ Partial | repo | S |
 | T4 | Driver-model downshift for babysitting loops | ⬜ Open | ⌂ | M |
 | T5 | Memory/rules dedup lint | ⬜ Open | ⌂ | S |
 | T7 | Resident-overlay diet (MEMORY.md + rules) | ◑ Partial | both | M |

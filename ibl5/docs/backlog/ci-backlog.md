@@ -75,12 +75,7 @@ last_verified: 2026-07-11
 **Risk if untouched:** Notify logic forks across 4 jobs; a message-format change is repeated.
 **Status (2026-06-28):** ⬜ Open — sequence after 1.2. Deploy/notify surface → 🟦.
 
-### 2.2 migration-safety.yml — three jobs each rebuild a full DB stack
-**Location:** `.github/workflows/migration-safety.yml` — jobs `idempotency-check`, `schema-parity-check`, `schema-completeness`.
-**Problem:** All three spin up an independent MariaDB 10.11 service, run an independent composer install, and apply the full migration stack from zero. `idempotency-check` and `schema-completeness` both apply the same full stack; the latter just adds FK/table/column assertions afterward.
-**Suggested direction:** Merge `idempotency-check` into `schema-completeness` (one DB build, then both sets of assertions). Keep `schema-parity-check` separate — it needs two DBs by design. Costs some intra-workflow parallelism; nets fewer runner-minutes and one fewer composer install.
-**Risk if untouched:** Three full migration runs per push to a migrations file; setup duplication (mitigated once 1.1 lands).
-**Status (2026-07-11):** ✅ Implemented — folded `idempotency-check`'s bash-apply→PHP-seed→`migrate --status` idempotency assertion into `schema-completeness` (shared MariaDB service + `setup-php-env`); removed the standalone job and dropped it from the `gate` job's `needs`. `schema-parity-check` kept separate (two DBs). Green-green — all assertions preserved.
+➜ 2.2 migration-safety.yml — ✅ Implemented (2026-07-11): see [archive](archive/ci-backlog-archive.md).
 
 ---
 

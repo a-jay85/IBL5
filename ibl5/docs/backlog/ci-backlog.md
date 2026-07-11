@@ -90,7 +90,7 @@ last_verified: 2026-07-11
 |---|-------|--------|-----------|-------:|
 | 3.1 | audit-js runs `npm audit` with no install (vacuous pass) | ✅ Implemented | 🟩 | S |
 | 3.2 | db-backup redundant MariaDB wait loop | ✅ Implemented | 🟩 | S |
-| 3.3 | lighthouse-audit re-collects instead of reusing baseline artifact | ⬜ Open | 🟨 | S |
+| 3.3 | lighthouse-audit re-collects instead of reusing baseline artifact | ✅ Done | 🟨 | S |
 | 3.4 | `changes`-detection mechanism is inconsistent | ⬜ Open | 🟨 | M |
 | 3.5 | PHP extension set divergence in cache-dependencies | ✅ Implemented | 🟩 | S |
 
@@ -99,6 +99,7 @@ last_verified: 2026-07-11
 ➜ 3.2 db-backup.yml — ✅ Implemented (2026-07-11): see [archive](archive/ci-backlog-archive.md).
 
 ### 3.3 lighthouse-audit.yml re-runs a full-site collect
+**Status:** ✅ Done (2026-07-11) — `lighthouse-audit.yml` now downloads the `lighthouse-baseline-manifest` artifact and, when present and ≤7 days old, skips Docker + `lhci collect` and generates the report from the downloaded manifest; absent/stale falls back to the unchanged full-collect path.
 **Location:** `.github/workflows/lighthouse-audit.yml` vs `.github/workflows/lighthouse-baseline.yml`.
 **Problem:** Both do a full-site `lhci collect` with `numberOfRuns=1` over the same URL set (`bin/lighthouse-audit-urls`). The weekly audit could consume the `lighthouse-baseline-manifest` artifact the baseline workflow already uploads, instead of re-collecting.
 **Suggested direction:** Have the weekly audit download + report on the latest baseline manifest where freshness allows; re-collect only if the artifact is stale/absent.

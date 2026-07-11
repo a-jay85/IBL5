@@ -121,11 +121,33 @@ class BugPipelineCliTest extends DatabaseTestCase
         return $row === null ? null : (string) $row['status'];
     }
 
+    /** @return array<string, string|null> The named columns of a fixture row. */
+    private function columnsOf(int $id, string ...$cols): array
+    {
+        $list = implode(', ', array_map(static fn (string $c): string => "`$c`", $cols));
+        $res = $this->db->query("SELECT $list FROM `ibl_bug_reports` WHERE id = $id");
+        self::assertNotFalse($res);
+        $row = $res->fetch_assoc();
+        self::assertNotNull($row, "row $id should exist");
+        return array_map(static fn ($v): ?string => $v === null ? null : (string) $v, $row);
+    }
+
+    private function futureTs(): string
+    {
+        return date('Y-m-d H:i:s', time() + 3600);
+    }
+
+    private function pastTs(): string
+    {
+        return date('Y-m-d H:i:s', time() - 3600);
+    }
+
     // ── Happy paths ───────────────────────────────────────────────────────────
 
     public function testClaimNextClaimsQueuedRow(): void
     {
-        $this->insertReport(self::ID_QUEUED, ['status' => 'queued']);
+        // Only a CLASSIFIED queued row (class IS NOT NULL) is huntable (#5b claim semantics).
+        $this->insertReport(self::ID_QUEUED, ['status' => 'queued', 'class' => 'bug']);
 
         $r = $this->runCli('claim-next.php', ['--owner=testworker:1']);
         self::assertSame(0, $r['code'], $r['stderr']);
@@ -227,7 +249,7 @@ class BugPipelineCliTest extends DatabaseTestCase
 
     public function testClaimRaceSecondCallEmpty(): void
     {
-        $this->insertReport(self::ID_QUEUED, ['status' => 'queued']);
+        $this->insertReport(self::ID_QUEUED, ['status' => 'queued', 'class' => 'bug']);
 
         $first = $this->runCli('claim-next.php', ['--owner=w1']);
         self::assertSame(0, $first['code']);
@@ -278,5 +300,181 @@ class BugPipelineCliTest extends DatabaseTestCase
         $count = $this->db->query('SELECT COUNT(*) c FROM `ibl_bug_reports`');
         self::assertNotFalse($count, 'ibl_bug_reports must still exist');
         self::assertGreaterThanOrEqual(1, (int) $count->fetch_assoc()['c']);
+    }
+
+    // ── Hunt lifecycle (PR #5b) ──────────────────────────────────────────────────
+
+    /**
+     * Classify-before-hunt: an UNclassified queued row (class IS NULL) is never
+     * claimed into hunting — it is still awaiting the classifier, and hunting it
+     * would reintroduce the exact deadlock #5a deferred.
+     */
+    public function testUnclassifiedQueuedRowNotClaimed(): void
+    {
+        $this->insertReport(self::ID_QUEUED, ['status' => 'queued']); // class NULL
+
+        $r = $this->runCli('claim-next.php', ['--owner=worker:1']);
+        self::assertSame(0, $r['code'], $r['stderr']);
+        self::assertSame('', trim($r['stdout']), 'unclassified queued row must not be claimable');
+        self::assertSame('queued', $this->statusOf(self::ID_QUEUED), 'row must remain queued');
+    }
+
+    /**
+     * Row 1: `transition <id> needs_human --release-lease` both sets the terminal
+     * status AND clears the lease columns, so a given-up hunt frees its slot.
+     */
+    public function testTransitionNeedsHumanReleasesLease(): void
+    {
+        $this->insertReport(self::ID_QUEUED, [
+            'status'        => 'hunting',
+            'class'         => 'bug',
+            'lease_owner'   => 'worker:1',
+            'lease_expires' => $this->futureTs(),
+        ]);
+
+        $r = $this->runCli('transition.php', [(string) self::ID_QUEUED, 'needs_human', '--release-lease']);
+        self::assertSame(0, $r['code'], $r['stderr']);
+
+        $cols = $this->columnsOf(self::ID_QUEUED, 'status', 'lease_owner', 'lease_expires');
+        self::assertSame('needs_human', $cols['status']);
+        self::assertNull($cols['lease_owner'], 'lease_owner must be released');
+        self::assertNull($cols['lease_expires'], 'lease_expires must be released');
+    }
+
+    /**
+     * Row 2: a malformed transition against a leased `hunting` row exits non-zero
+     * and leaves the row — status and lease — byte-for-byte unchanged.
+     */
+    public function testMalformedTransitionLeavesLeasedHuntingRowUntouched(): void
+    {
+        $lease = $this->futureTs();
+        $this->insertReport(self::ID_QUEUED, [
+            'status'        => 'hunting',
+            'class'         => 'bug',
+            'lease_owner'   => 'worker:1',
+            'lease_expires' => $lease,
+        ]);
+
+        foreach ([
+            [(string) self::ID_QUEUED, 'not_a_status'],
+            ['abc', 'hunting'],
+        ] as $badArgs) {
+            $r = $this->runCli('transition.php', $badArgs);
+            self::assertSame(1, $r['code'], 'expected exit 1 for: ' . implode(' ', $badArgs));
+        }
+
+        $cols = $this->columnsOf(self::ID_QUEUED, 'status', 'lease_owner', 'lease_expires');
+        self::assertSame('hunting', $cols['status'], 'status must be untouched');
+        self::assertSame('worker:1', $cols['lease_owner'], 'lease_owner must be untouched');
+        self::assertSame($lease, $cols['lease_expires'], 'lease_expires must be untouched');
+    }
+
+    /**
+     * Row 6: a `hunting` row with a FRESH lease is single-flight-protected —
+     * claim-next neither reclaims it (lease not expired) nor claims it (not queued),
+     * so it returns empty and the existing owner is preserved.
+     */
+    public function testFreshLeaseHuntingRowNotReclaimed(): void
+    {
+        $this->insertReport(self::ID_QUEUED, [
+            'status'        => 'hunting',
+            'class'         => 'bug',
+            'lease_owner'   => 'worker:1',
+            'lease_expires' => $this->futureTs(),
+        ]);
+
+        $r = $this->runCli('claim-next.php', ['--owner=worker:2']);
+        self::assertSame(0, $r['code'], $r['stderr']);
+        self::assertSame('', trim($r['stdout']), 'a fresh-lease hunting row must not be claimable');
+
+        $cols = $this->columnsOf(self::ID_QUEUED, 'status', 'lease_owner');
+        self::assertSame('hunting', $cols['status']);
+        self::assertSame('worker:1', $cols['lease_owner'], 'owner must be preserved');
+    }
+
+    /**
+     * Row 7: a `hunting` row whose lease has EXPIRED is reclaimed in place by
+     * claim-next — it stays `hunting` but is re-stamped to the new owner with a
+     * fresh lease, so a crashed worker's slot is recovered without losing the row.
+     */
+    public function testStaleLeaseHuntingRowIsReclaimed(): void
+    {
+        $this->insertReport(self::ID_QUEUED, [
+            'status'        => 'hunting',
+            'class'         => 'bug',
+            'lease_owner'   => 'worker:1',
+            'lease_expires' => $this->pastTs(),
+        ]);
+
+        $r = $this->runCli('claim-next.php', ['--owner=worker:2']);
+        self::assertSame(0, $r['code'], $r['stderr']);
+        $json = json_decode(trim($r['stdout']), true);
+        self::assertIsArray($json, 'stale-lease reclaim should print the row; got: ' . $r['stdout']);
+        self::assertSame('hunting', $json['status']);
+
+        $cols = $this->columnsOf(self::ID_QUEUED, 'status', 'lease_owner', 'lease_expires');
+        self::assertSame('hunting', $cols['status']);
+        self::assertSame('worker:2', $cols['lease_owner'], 'reclaim must re-stamp the new owner');
+        self::assertNotNull($cols['lease_expires']);
+        self::assertGreaterThan(date('Y-m-d H:i:s'), (string) $cols['lease_expires'], 'lease must be renewed into the future');
+    }
+
+    /**
+     * Row 24: a `needs_human` row is terminal for automation — claim-next never
+     * claims it and list-active-conversations never surfaces it.
+     */
+    public function testNeedsHumanRowIsNeitherClaimedNorSurfaced(): void
+    {
+        $this->insertReport(self::ID_QUEUED, ['status' => 'needs_human', 'class' => 'bug']);
+
+        $claim = $this->runCli('claim-next.php', ['--owner=worker:2']);
+        self::assertSame(0, $claim['code'], $claim['stderr']);
+        self::assertSame('', trim($claim['stdout']), 'needs_human must not be claimable');
+        self::assertSame('needs_human', $this->statusOf(self::ID_QUEUED), 'row must be untouched');
+
+        $list = $this->runCli('list-active-conversations.php');
+        self::assertSame(0, $list['code'], $list['stderr']);
+        $rows = json_decode(trim($list['stdout']), true);
+        self::assertIsArray($rows);
+        self::assertNotContains(self::ID_QUEUED, array_column($rows, 'id'), 'needs_human must not be surfaced');
+    }
+
+    /**
+     * Row 28: a `blocked` row with a past lease_expires is immune to stale-lease
+     * reclaim (that only targets `hunting`), and the enumerator surfaces it only
+     * once blocked_until has elapsed — never while still parked in the future.
+     */
+    public function testBlockedRowImmuneToReclaimAndSurfacesOnlyWhenRipe(): void
+    {
+        $this->insertReport(self::ID_QUEUED, [
+            'status'        => 'blocked',
+            'class'         => 'bug',
+            'lease_owner'   => 'worker:1',
+            'lease_expires' => $this->pastTs(),
+            'blocked_until' => $this->futureTs(),
+        ]);
+
+        // Stale-lease reclaim only targets `hunting` — a blocked row is left alone.
+        $claim = $this->runCli('claim-next.php', ['--owner=worker:2']);
+        self::assertSame(0, $claim['code'], $claim['stderr']);
+        self::assertSame('', trim($claim['stdout']), 'blocked row must not be reclaimed');
+        $cols = $this->columnsOf(self::ID_QUEUED, 'status', 'lease_owner');
+        self::assertSame('blocked', $cols['status']);
+        self::assertSame('worker:1', $cols['lease_owner']);
+
+        // Future blocked_until → not yet actionable.
+        $parked = $this->runCli('list-active-conversations.php');
+        self::assertSame(0, $parked['code'], $parked['stderr']);
+        $parkedRows = json_decode(trim($parked['stdout']), true);
+        self::assertIsArray($parkedRows);
+        self::assertNotContains(self::ID_QUEUED, array_column($parkedRows, 'id'), 'future-blocked row must be skipped');
+
+        // Once blocked_until has elapsed the row becomes actionable.
+        $this->db->query("UPDATE `ibl_bug_reports` SET blocked_until = '" . $this->pastTs() . "' WHERE id = " . self::ID_QUEUED);
+        $ripe = $this->runCli('list-active-conversations.php');
+        self::assertSame(0, $ripe['code'], $ripe['stderr']);
+        $ripeRows = json_decode(trim($ripe['stdout']), true);
+        self::assertIsArray($ripeRows);
+        self::assertContains(self::ID_QUEUED, array_column($ripeRows, 'id'), 'ripe blocked row must surface');
     }
 }

@@ -1,0 +1,20 @@
+# hunter.gitconfig — the CREDENTIAL-STARVED git identity the bug-pipeline hunter runs under.
+#
+# The driver points GIT_CONFIG_GLOBAL here (and GIT_CONFIG_SYSTEM=/dev/null) so the hunter's
+# git sees ONLY this file: a valid committing identity but NO credential helper. That closes
+# the macOS-keychain credential path (osxkeychain would otherwise resolve a push token from
+# the real ~/.gitconfig). Combined with blanked GH_TOKEN/SSH env, the hunter has no reachable
+# way to push or open a PR — only the trusted cron ship path (post-plan-now) does. See ADR-0081.
+#
+# Do NOT add a [credential] helper, a [url] insteadOf rewrite, or any token here — that would
+# re-arm the exact vector this file exists to close.
+
+[user]
+	name = IBL5 Bug Hunter (sandbox)
+	email = bug-hunter@localhost
+
+[credential]
+	helper =
+
+[commit]
+	gpgsign = false

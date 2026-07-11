@@ -3,16 +3,18 @@
 declare(strict_types=1);
 
 /**
- * claim-next.php — atomically claim the next huntable row into `hunting`.
+ * claim-next.php — atomically claim a row into `hunting` for the PR #5b hunter.
  *
- * ★ DEADLOCK CONSTRAINT (PR #5a): this script is BUILT + unit-tested but the #5a
- * driver NEVER shells out to it. #5a ships no hunter; a row claimed into `hunting`
- * with no hunter behind it would hold the single-flight lease slot forever. The
- * claim wiring goes live with the hunter in PR #5b.
+ * Two modes, both single-flight-safe and both printing the claimed row as JSON
+ * (ids as strings) on stdout, or nothing on an empty tick / lost race (exit 0
+ * either way — contention is success, mirroring runEngineShadow's lock convention):
  *
- * Usage: php claim-next.php [--owner=<lease-token>]
- *   Prints the claimed row as JSON (ids as strings) on stdout, or nothing on an
- *   empty tick / lost race (exit 0 either way — contention is success).
+ *   (default)        Reclaim a crashed hunt (expired lease) if one exists, else claim
+ *                    the oldest READY-TO-HUNT queued row (classified + not usage-parked).
+ *   --resume=<id>    Resume a specific usage-limit-parked hunt: `blocked` → `hunting`.
+ *                    The atomic `WHERE status='blocked'` guard makes overlapping ticks safe.
+ *
+ * Usage: php claim-next.php [--owner=<lease-token>] [--resume=<id>]
  */
 
 require __DIR__ . '/_bootstrap.php';
@@ -24,9 +26,15 @@ const LEASE_TTL_MINUTES = 10;
 
 $args = array_slice($argv, 1);
 $owner = gethostname() . ':' . getmypid();
+$resumeId = null;
 foreach ($args as $arg) {
-    if (is_string($arg) && str_starts_with($arg, '--owner=')) {
+    if (!is_string($arg)) {
+        continue;
+    }
+    if (str_starts_with($arg, '--owner=')) {
         $owner = substr($arg, strlen('--owner='));
+    } elseif (str_starts_with($arg, '--resume=')) {
+        $resumeId = substr($arg, strlen('--resume='));
     }
 }
 if ($owner === '' || $owner === false) {
@@ -37,13 +45,23 @@ $leaseExpires = date('Y-m-d H:i:s', time() + LEASE_TTL_MINUTES * 60);
 
 $repo = new BugReportRepository($mysqli_db);
 
-// First take over any crashed hunt whose lease expired; else claim the oldest queued row.
-$row = $repo->reclaimStaleLease($owner, $leaseExpires);
-if ($row === null) {
-    $row = $repo->claimNextQueued($owner, $leaseExpires);
+if ($resumeId !== null) {
+    if (!ctype_digit($resumeId)) {
+        fwrite(STDERR, "claim-next: --resume must be a positive integer.\n");
+        exit(1);
+    }
+    $id = (int) $resumeId;
+    // Lost-race safe: only the tick whose UPDATE still sees status='blocked' flips the row.
+    $row = $repo->resumeBlockedHunt($owner, $leaseExpires, $id) ? $repo->findById($id) : null;
+} else {
+    // First take over any crashed hunt whose lease expired; else claim the oldest huntable row.
+    $row = $repo->reclaimStaleLease($owner, $leaseExpires);
+    if ($row === null) {
+        $row = $repo->claimNextHuntable($owner, $leaseExpires);
+    }
 }
 
-// Empty tick / lost race: print nothing, exit 0 (mirrors runEngineShadow's lock-contention convention).
+// Empty tick / lost race: print nothing, exit 0.
 if ($row === null) {
     exit(0);
 }

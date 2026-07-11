@@ -292,6 +292,80 @@ class BugReportRepository extends \BaseMysqliRepository
         return $this->findById($id);
     }
 
+    /**
+     * Pick the oldest queued report that is READY TO HUNT and claim it into `hunting`.
+     * One attempt — lost-race returns null (PR #5b Phase 2 — the deadlock-closing claim).
+     *
+     * Narrower than claimNextQueued() by design: a hunt may only start on a row that has
+     * already been classified (`class IS NOT NULL`) and is not parked by a usage-limit
+     * backoff (`blocked_until` in the future). claimNextQueued() stays as-is for any caller
+     * that wants the raw oldest-queued primitive; this method never widens it.
+     *
+     * @phpstan-return BugReportRow|null
+     */
+    public function claimNextHuntable(string $leaseOwner, string $leaseExpires): ?array
+    {
+        $row = $this->fetchOne(
+            "SELECT id FROM `ibl_bug_reports`
+             WHERE status = 'queued'
+               AND class IS NOT NULL
+               AND (blocked_until IS NULL OR blocked_until <= NOW())
+             ORDER BY id ASC LIMIT 1"
+        );
+        if ($row === null) {
+            return null;
+        }
+        /** @var int $id */
+        $id = $row['id'];
+
+        // Lost-race safe: claimQueued re-asserts `status='queued'` in the UPDATE (0 rows => null).
+        if (!$this->claimQueued($id, $leaseOwner, $leaseExpires)) {
+            return null;
+        }
+        return $this->findById($id);
+    }
+
+    /**
+     * Atomically resume a usage-limit-parked hunt: `blocked` → `hunting`, re-stamping the lease.
+     * Returns true only when THIS call flipped the row (PR #5b Phase 7 — the resume guard).
+     *
+     * transition() is an unconditional `WHERE id = ?` write, so it cannot express the
+     * single-flight predicate two overlapping ticks need: both surface the ripe `blocked`
+     * row, both call this, only the one whose UPDATE still sees `status='blocked'` wins
+     * (affected_rows == 1); the loser gets 0 and skips. Re-stamping lease_expires closes the
+     * window where reclaimStaleLease() could immediately steal the freshly-resumed hunt.
+     */
+    public function resumeBlockedHunt(string $leaseOwner, string $leaseExpires, int $id): bool
+    {
+        return $this->execute(
+            "UPDATE `ibl_bug_reports`
+                SET status = 'hunting', lease_owner = ?, lease_expires = ?, updated_at = NOW()
+             WHERE id = ?
+               AND status = 'blocked'
+               AND (blocked_until IS NULL OR blocked_until <= NOW())",
+            'ssi',
+            $leaseOwner,
+            $leaseExpires,
+            $id
+        ) === 1;
+    }
+
+    /**
+     * Every row currently in the `pr_open` terminal-ish state, for the cron's async reconcile
+     * pass (PR #5b Phase 5 Fork B). The hunter leaves a shipped row at `pr_open` immediately
+     * (before the PR number is known); the trusted cron later fills `pr_number` from `gh` and,
+     * on merge, advances `pr_open` → `fixed`. Read-only enumerator — no lease, no state change.
+     *
+     * @phpstan-return list<BugReportRow>
+     */
+    public function listPrOpen(): array
+    {
+        $rows = $this->fetchAll(
+            "SELECT * FROM `ibl_bug_reports` WHERE status = 'pr_open' ORDER BY id ASC"
+        );
+        return array_values(array_map(fn (array $row): array => $this->castRow($row), $rows));
+    }
+
     // -------------------------------------------------------------------------
     // General state/metadata writer (Phase 4b)
     // -------------------------------------------------------------------------
@@ -402,11 +476,16 @@ class BugReportRepository extends \BaseMysqliRepository
      *   (b) awaiting_info / gathering          — GM reply re-assessment OR idle/park candidate
      *                                            (the 1h idle POLICY lives in the bash driver, not here)
      *   (c) awaiting_ajay AND approval_message_id IS NULL — ready-for-plan (A-Jay reacted ✅)
+     *   (d) blocked                              — a usage-limit-parked hunt whose backoff has
+     *                                              elapsed; the outer blocked_until gate only lets
+     *                                              a RIPE one through, so the bash driver resumes it
+     *                                              (blocked → hunting) via resumeBlockedHunt (#5b Phase 7)
      *
-     * Global gates: excludes `hunting` (no hunter in #5a — the deadlock constraint) and all
-     * terminal states, and excludes any row still parked by a future `blocked_until` (usage-limit
-     * backoff). A row whose `blocked_until` has passed re-surfaces in its real status and retries —
-     * so "skip while parked" and "auto-resume" both fall out of the one blocked-until gate.
+     * Global gates: excludes `hunting` (an in-flight hunt is invisible — the single-flight
+     * constraint) and all terminal states, and excludes any row still parked by a future
+     * `blocked_until` (usage-limit backoff). A row whose `blocked_until` has passed re-surfaces in
+     * its real status and retries — so "skip while parked" and "auto-resume" both fall out of the
+     * one blocked-until gate.
      *
      * @phpstan-return list<BugReportRow>
      */
@@ -420,6 +499,7 @@ class BugReportRepository extends \BaseMysqliRepository
                      (status = 'queued' AND class IS NULL)
                   OR (status IN ('awaiting_info','gathering'))
                   OR (status = 'awaiting_ajay' AND approval_message_id IS NULL)
+                  OR (status = 'blocked')
                )
              ORDER BY id ASC"
         );

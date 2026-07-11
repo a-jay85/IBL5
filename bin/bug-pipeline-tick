@@ -11,9 +11,13 @@
 # in `if` (mirrors automouse-run's discipline). All *_id fields are read as STRINGS
 # with `jq -r` (snowflake rule — never `tonumber`/`(int)`).
 #
-# #5a ships NO hunter: the driver NEVER transitions a row into `hunting` and never
-# shells out to claim-next.php (the deadlock constraint). Bugs stop at queued /
-# awaiting_info; the feature path is live to `planned` (plan-on-disk, no implement).
+# #5b closes the #5a deadlock: a classified `queued` bug is claimed into `hunting`
+# (single-flight, top-level maybe_hunt pass) and serviced by the hunter — an
+# injection-exposed agent run in a credential-STARVED worktree sandbox that authors
+# + verifies a fix, then STOPS at a dirty worktree. Only the trusted cron fires
+# `bin/post-plan-now` to open a HELD PR (auto_merge:false + pipeline-authored →
+# human-signoff blocks merge). See ADR-0081 for the trust-split. The hunter itself
+# never pushes, never runs `gh`, never opens a PR.
 
 set -u
 
@@ -39,6 +43,20 @@ CLAUDE_TIMEOUT="${BUG_PIPELINE_CLAUDE_TIMEOUT:-120}"
 PLAN_TIMEOUT="${BUG_PIPELINE_PLAN_TIMEOUT:-1800}"
 CLASSIFY_PROMPT_FILE="${BUG_PIPELINE_CLASSIFY_PROMPT:-$SCRIPT_DIR/bug-pipeline-classify-prompt}"
 GATHER_PROMPT_FILE="${BUG_PIPELINE_GATHER_PROMPT:-$SCRIPT_DIR/bug-pipeline-gather-prompt}"
+
+# ── Hunter seams (#5b) — all default to production; tests override ─────────────
+HUNT_PROMPT_FILE="${BUG_PIPELINE_HUNT_PROMPT:-$SCRIPT_DIR/bug-pipeline-hunter-prompt}"
+HUNT_MODELS="${BUG_PIPELINE_HUNT_MODELS:-claude-haiku-4-5 claude-sonnet-4-6 claude-opus-4-8}"  # cheap→dear, Opus last
+HUNTER_TIMEOUT_SECS="${BUG_PIPELINE_HUNTER_TIMEOUT:-1800}"
+HUNT_LOG="${BUG_PIPELINE_HUNT_LOG:-$HOME/.claude/logs/bug-pipeline-hunt.log}"
+WT_NEW_BIN="${BUG_PIPELINE_WT_NEW_BIN:-$REPO_ROOT/bin/wt-new}"
+POST_PLAN_NOW_BIN="${BUG_PIPELINE_POST_PLAN_NOW_BIN:-$REPO_ROOT/bin/post-plan-now}"
+# Worktrees live OUTSIDE the repo (ADR-0046): a canonical sibling of the checkout.
+WT_BASE="${BUG_PIPELINE_WT_BASE:-$(dirname "$REPO_ROOT")/IBL5-worktrees}"
+# The CODE repo (for `gh pr view` in the reconcile pass) — distinct from the private issue repo.
+BUG_PIPELINE_CODE_REPO="${BUG_PIPELINE_CODE_REPO:-a-jay85/IBL5}"
+HUNT_ATTEMPT_CAP="${BUG_PIPELINE_HUNT_ATTEMPT_CAP:-2}"
+mkdir -p "$(dirname "$HUNT_LOG")" 2>/dev/null || true
 
 export GH_BIN BUG_PIPELINE_ISSUE_REPO
 # shellcheck source=bin/lib/bug-pipeline-gh.sh disable=SC1091
@@ -403,8 +421,280 @@ is_fresh_reply() { # gm proc
     [ "$1" \> "$2" ]
 }
 
+# ══════════════════════════════════════════════════════════════════════════════
+# #5b HUNTER — claim-into-hunting, starved sandbox, tiered ladder, cron ship path.
+# The hunter is GM-influenced/injection-exposed and has NO push/gh/PR authority by
+# construction (starved env below + prompt); only the trusted cron ship path fires
+# post-plan-now. Trust-split rationale: ADR-0081.
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Run an arbitrary command under the hunter's CREDENTIAL-STARVED environment, cwd=$1.
+# Factored out (not inlined) so the security test can EXERCISE it: run a real
+# `git push` / `gh` under this exact env and assert non-zero (no reachable cred).
+# Closes all three local push vectors uniformly — do NOT branch on remote URL scheme.
+run_under_starved_env() { # cwd cmd...
+    local cwd="$1"; shift
+    local empty_gh; empty_gh="$(mktemp -d)"
+    (
+        cd "$cwd" || exit 127
+        env \
+            GH_TOKEN= GITHUB_TOKEN= GH_ENTERPRISE_TOKEN= GITHUB_ENTERPRISE_TOKEN= \
+            GH_CONFIG_DIR="$empty_gh" \
+            GIT_CONFIG_GLOBAL="$SCRIPTS_DIR/hunter.gitconfig" \
+            GIT_CONFIG_SYSTEM=/dev/null \
+            GIT_SSH_COMMAND='ssh -o IdentitiesOnly=yes -o IdentityAgent=none -o IdentityFile=/dev/null' \
+            SSH_AUTH_SOCK= \
+            DB_HOST= DB_USER= DB_PASSWORD= DB_NAME= \
+            ANTHROPIC_API_KEY= \
+            "$@"
+    )
+    local rc=$?; rm -rf "$empty_gh"; return $rc
+}
+
+# One tier of the ladder: run the hunter agent under the starved env, output → $5 (run log).
+# --dangerously-skip-permissions is acceptable ONLY here: the sandbox grants no outward
+# ship authority (no push/gh/PR reachable), matching automouse-run's own posture.
+run_hunter_agent() { # wt_appdir model prompt_file run_name run_log
+    run_under_starved_env "$1" \
+        timeout "$HUNTER_TIMEOUT_SECS" \
+            "$CLAUDE_BIN" -p "$(cat "$3")" \
+                --dangerously-skip-permissions \
+                --model "$2" \
+                --effort high \
+                --output-format stream-json --verbose \
+                --name "$4" \
+        > "$5" 2>&1
+}
+
+# Render the hunter prompt with the claimed row's data. Untrusted report/transcript
+# are substituted by bash param-expansion (NEVER sed/eval) — the template wraps them
+# in <report>/<transcript> blocks and frames them strictly as data (prompt-injection defense).
+render_hunter_prompt() { # claimed wt_appdir
+    local claimed="$1" wt_appdir="$2" id class report thread_id transcript t
+    id="$(printf '%s' "$claimed" | jq -r '.id')"
+    class="$(printf '%s' "$claimed" | jq -r '.class // "bug"')"
+    report="$(printf '%s' "$claimed" | jq -r '.original_text // ""')"
+    thread_id="$(printf '%s' "$claimed" | jq -r '.thread_id // empty')"
+    transcript="$(row_transcript "$thread_id")"
+    t="$(cat "$HUNT_PROMPT_FILE")"
+    t="${t//\{\{bug_id\}\}/$id}"
+    t="${t//\{\{class\}\}/$class}"
+    t="${t//\{\{worktree\}\}/$wt_appdir}"
+    t="${t//\{\{report\}\}/$report}"
+    t="${t//\{\{transcript\}\}/$transcript}"
+    printf '%s' "$t"
+}
+
+# Climb the tiered ladder (Haiku→Sonnet→Opus, Opus last). Sets LADDER_STATE to one of
+# fixed | escalate | blocked. A usage limit at ANY tier parks the whole hunt (blocked).
+LADDER_STATE="escalate"
+run_hunt_ladder() { # claimed hunt_id wt_appdir
+    local claimed="$1" hunt_id="$2" wt_appdir="$3" model run_name run_log result verdict rendered
+    LADDER_STATE="escalate"
+    rendered="$(mktemp)"; render_hunter_prompt "$claimed" "$wt_appdir" > "$rendered"
+    for model in $HUNT_MODELS; do   # word-split intentional: fixed model-id list, no globs
+        run_name="bug-pipeline-hunt-${hunt_id}-$(date +%H%M%S)"
+        run_log="$(mktemp)"
+        BUG_PIPELINE_HUNT_PROMPT_RENDERED="$rendered" \
+            run_hunter_agent "$wt_appdir" "$model" "$rendered" "$run_name" "$run_log"
+        cat "$run_log" >> "$HUNT_LOG" 2>/dev/null || true
+        # Usage/rate limit is ENVIRONMENTAL — park the hunt, never a failed attempt (Phase 7).
+        if claude_env_error "$(cat "$run_log" 2>/dev/null)"; then
+            rm -f "$run_log" "$rendered"; LADDER_STATE="blocked"; return 0
+        fi
+        rm -f "$run_log"
+        result="$(cat "$wt_appdir/.bug-pipeline/hunt-result.json" 2>/dev/null || echo '{}')"
+        verdict="$(printf '%s' "$result" | jq -r '.verdict // "escalate"' 2>/dev/null)"
+        if [ "$verdict" = "fixed" ]; then rm -f "$rendered"; LADDER_STATE="fixed"; return 0; fi
+        # escalate → next (dearer) tier
+    done
+    rm -f "$rendered"; LADDER_STATE="escalate"; return 0
+}
+
+# Best-effort RCA label projection on a fixed ship (§3f). area/root_cause are HUNTER
+# OUTPUT → injection-exposed: allowlist-sanitize to ^[a-z0-9-]{1,30}$ BEFORE any gh arg.
+project_rca_labels() { # claimed hunt_id wt_appdir
+    local claimed="$1" hunt_id="$2" wt_appdir="$3" issue res area cause
+    issue="$(printf '%s' "$claimed" | jq -r '.issue_number // empty')"
+    # Self-heal (§3f): a fixed bug must never be issue-less — create it now if classification missed it.
+    if [ -z "$issue" ]; then
+        issue="$(bpgh_ensure_issue "$claimed")"
+        [ -n "$issue" ] && cli transition "$hunt_id" pr_open --issue="$issue" >/dev/null 2>&1
+    fi
+    res="$wt_appdir/.bug-pipeline/hunt-result.json"
+    area="$(jq -r '.area // empty' "$res" 2>/dev/null | tr '[:upper:]' '[:lower:]' | grep -E '^[a-z0-9-]{1,30}$' || true)"
+    cause="$(jq -r '.root_cause // empty' "$res" 2>/dev/null | tr '[:upper:]' '[:lower:]' | grep -E '^[a-z0-9-]{1,30}$' || true)"
+    [ -n "$area" ]  && { bpgh_ensure_label "area:$area";        bpgh_add_label "$issue" "area:$area"; }
+    [ -n "$cause" ] && { bpgh_ensure_label "root-cause:$cause"; bpgh_add_label "$issue" "root-cause:$cause"; }
+    return 0
+}
+
+# CRON SHIP PATH (Phase 5) — the single point where push/gh authority is exercised, on
+# a NON-GM-controlled trigger. Reached ONLY on a `fixed` verdict (green in-worktree verify).
+ship_via_cron() { # claimed hunt_id wt_root wt_appdir
+    local claimed="$1" hunt_id="$2" wt_root="$3" wt_appdir="$4"
+    # ★ NEVER open an empty PR: a `fixed` verdict with no diff is a contract violation → needs_human.
+    if git -C "$wt_root" diff --quiet 2>/dev/null && git -C "$wt_root" diff --cached --quiet 2>/dev/null; then
+        log "hunter 'fixed' for $hunt_id but produced NO diff — routing to needs_human"
+        give_up_needs_human "$claimed" "$hunt_id" "$wt_appdir" "reported fixed but produced no diff"
+        return 1
+    fi
+    # The hunter left the tree DIRTY (Fork A): post-plan-now's detached /post-plan commits it.
+    ( cd "$wt_root" && "$POST_PLAN_NOW_BIN" --auto ) >> "$HUNT_LOG" 2>&1 \
+        || log "post-plan-now returned nonzero for $hunt_id (continuing to pr_open)"
+    # Leave `hunting` IMMEDIATELY (Fork B): pr_number is reconciled async — otherwise a
+    # stale-reclaim could re-hunt a row post-plan is already shipping (double-ship).
+    cli transition "$hunt_id" pr_open >/dev/null && \
+        log "fired post-plan-now for $hunt_id; row -> pr_open (pr_number pending async reconcile)"
+    project_rca_labels "$claimed" "$hunt_id" "$wt_appdir"
+    return 0
+}
+
+# Give-up terminal (Phase 6): findings → thread, @A-Jay, release lease → needs_human.
+# Order: post context BEFORE the terminal transition so the thread carries findings.
+give_up_needs_human() { # claimed hunt_id wt_appdir [override_finding]
+    local claimed="$1" hunt_id="$2" wt_appdir="$3" override="${4:-}" findings thread_id issue
+    if [ -n "$override" ]; then
+        findings="$override"
+    else
+        findings="$(jq -r '.findings // "hunt failed; no findings"' "$wt_appdir/.bug-pipeline/hunt-result.json" 2>/dev/null || echo "hunt failed; no findings")"
+    fi
+    thread_id="$(printf '%s' "$claimed" | jq -r '.thread_id // empty')"   # snowflake — STRING (§5)
+    if [ -n "$thread_id" ]; then
+        bot_post_to_thread "$thread_id" "$findings" || log "post-to-thread failed for $hunt_id (continuing)"
+        bot_mention "$thread_id" "$BUG_PIPELINE_APPROVER_ID" "This bug needs a human — see the findings above." >/dev/null \
+            || log "mention failed for $hunt_id (continuing)"
+    fi
+    # Best-effort issue mirror (§3f): flag + assign; issue stays OPEN (a real unsolved bug).
+    issue="$(printf '%s' "$claimed" | jq -r '.issue_number // empty')"
+    bpgh_add_label "$issue" needs-human
+    bpgh_assign "$issue" a-jay85
+    # Terminal + release the lease so no stale `hunting` row is left owned forever (Phase 1 flag).
+    cli transition "$hunt_id" needs_human --release-lease >/dev/null
+    log "hunt $hunt_id -> needs_human; lease released; worktree bug-$hunt_id left for human inspection"
+}
+
+# Usage-limit park (Phase 7): status → blocked, lease KEPT (owner unchanged), attempt UNCHANGED.
+# A `blocked` row is immune to the status='hunting'-scoped stale reclaim, so no timer juggling.
+park_hunt_blocked() { # hunt_id
+    local until; until="$(future_ts "$BACKOFF_SECS")"
+    cli transition "$1" blocked --blocked-until="$until" >/dev/null
+    log "hunt $1 hit usage limit -> blocked until $until (attempt count unchanged)"
+}
+
+# Drive a claimed hunt: create/reuse the worktree, climb the ladder up to the attempt cap,
+# then ship (fixed) / park (blocked) / give up (escalate+cap or terminal). Foreground —
+# the tick blocks until the hunt returns, so overlapping ticks can't double-hunt (invariant 1).
+drive_hunt_row() { # claimed_row_json
+    local claimed="$1" hunt_id slug wt_root wt_appdir attempts terminal
+    hunt_id="$(printf '%s' "$claimed" | jq -r '.id')"
+    attempts="$(printf '%s' "$claimed" | jq -r '.hunt_attempts // 0')"
+    slug="bug-${hunt_id}"; wt_root="$WT_BASE/$slug"; wt_appdir="$wt_root/ibl5"
+
+    if [ ! -d "$wt_root" ]; then
+        if ! "$WT_NEW_BIN" "$slug" >> "$HUNT_LOG" 2>&1; then
+            log "wt-new failed for $slug; releasing lease and re-queuing $hunt_id"
+            cli transition "$hunt_id" queued --release-lease >/dev/null   # no wedged 'hunting', no crash
+            return 0
+        fi
+    fi
+
+    while :; do
+        run_hunt_ladder "$claimed" "$hunt_id" "$wt_appdir"
+        case "$LADDER_STATE" in
+            blocked) park_hunt_blocked "$hunt_id"; return 0 ;;   # environmental pause — resume later
+            fixed)   ship_via_cron "$claimed" "$hunt_id" "$wt_root" "$wt_appdir"; return 0 ;;
+        esac
+        # escalate: a genuine localize/verify failure → count the attempt (persisted, crash-safe).
+        attempts=$((attempts + 1))
+        cli transition "$hunt_id" hunting --attempts "$attempts" >/dev/null
+        terminal="$(jq -r '.terminal // false' "$wt_appdir/.bug-pipeline/hunt-result.json" 2>/dev/null || echo true)"
+        if [ "$terminal" = "true" ] || [ "$attempts" -ge "$HUNT_ATTEMPT_CAP" ]; then
+            give_up_needs_human "$claimed" "$hunt_id" "$wt_appdir"
+            return 0
+        fi
+        # else: retry in-tick, lease still held (hunt_attempts intact → resumes at the right count)
+    done
+}
+
+# Top-level hunt pass (Phase 2): reclaim a crashed hunt / claim the next ripe queued bug and
+# drive it. Independent of the enumerator — a lone classified bug yields [] from the enumerator
+# yet must still be hunted. Returns 0 iff a hunt was driven (caller ends the tick — one/tick).
+maybe_hunt() {
+    local claimed hunt_id
+    claimed="$(cli claim-next 2>/dev/null)"
+    if [ -z "$claimed" ]; then
+        return 1   # nothing huntable / lost the claim race / already 'hunting'
+    fi
+    hunt_id="$(printf '%s' "$claimed" | jq -r '.id')"
+    log "claimed bug $hunt_id into hunting; dispatching hunter"
+    drive_hunt_row "$claimed"
+    return 0
+}
+
+# Resume a ripe parked hunt (Phase 7): atomic blocked→hunting, reuse the worktree, re-drive.
+resume_blocked_hunt() { # row_json (surfaced by the enumerator, blocked_until already elapsed)
+    local row="$1" id slug wt_root resumed
+    id="$(printf '%s' "$row" | jq -r '.id')"
+    resumed="$(cli claim-next --resume="$id" 2>/dev/null)"   # atomic WHERE status='blocked' guard
+    if [ -z "$resumed" ]; then
+        log "resume: $id already resumed by another tick — skip"; return 0
+    fi
+    slug="bug-${id}"; wt_root="$WT_BASE/$slug"
+    if [ ! -d "$wt_root" ]; then
+        log "resume: worktree $wt_root gone — recreating"
+        if ! "$WT_NEW_BIN" "$slug" >> "$HUNT_LOG" 2>&1; then
+            log "resume: wt-new failed for $slug; releasing lease"
+            cli transition "$id" queued --release-lease >/dev/null; return 0
+        fi
+    fi
+    drive_hunt_row "$resumed"   # hunt_attempts intact → the park consumed no attempt
+}
+
+# Async reconcile pass (Phase 5 Fork B): for each pr_open row, fill pr_number from `gh pr list`,
+# and on merge transition pr_open→fixed + close the tracking issue. The cron IS the trusted actor
+# and MAY read/write gh here — categorically distinct from the starved hunter (no gh at all).
+reconcile_pr_open_rows() {
+    local rows row id pr issue branch n state
+    rows="$(cli list-pr-open 2>/dev/null)"
+    printf '%s' "$rows" | jq -e 'type == "array"' >/dev/null 2>&1 || return 0
+    while IFS= read -r row; do
+        [ -n "$row" ] || continue
+        id="$(printf '%s' "$row" | jq -r '.id')"
+        pr="$(printf '%s' "$row" | jq -r '.pr_number // empty')"
+        issue="$(printf '%s' "$row" | jq -r '.issue_number // empty')"
+        branch="bug-${id}"
+        if [ -z "$pr" ] || [ "$pr" = "null" ]; then
+            n="$("$GH_BIN" pr list --repo "$BUG_PIPELINE_CODE_REPO" --head "$branch" --json number --jq '.[0].number // empty' 2>/dev/null || true)"
+            if [ -n "$n" ]; then
+                cli transition "$id" pr_open --pr "$n" >/dev/null && log "reconcile: $id pr_number=$n"
+                [ -n "$issue" ] && bpgh_comment "$issue" "PR opened: https://github.com/${BUG_PIPELINE_CODE_REPO}/pull/$n"
+            fi
+        else
+            state="$("$GH_BIN" pr view "$pr" --repo "$BUG_PIPELINE_CODE_REPO" --json state,mergedAt --jq '.state' 2>/dev/null || true)"
+            if [ "$state" = "MERGED" ]; then
+                cli transition "$id" fixed >/dev/null && log "reconcile: $id merged -> fixed"
+                [ -n "$issue" ] && bpgh_close "$issue"
+            fi
+        fi
+    done < <(printf '%s' "$rows" | jq -c '.[]' 2>/dev/null)
+    return 0
+}
+
 # ── Main: empty-tick guard then dispatch ──────────────────────────────────────
 main() {
+    # ── #5b hunt passes run FIRST, independent of the enumerator ──────────────
+    # A classified queued bug (class IS NOT NULL) is invisible to list-active-conversations
+    # (it whitelists class IS NULL), so it must be reached here or it never hunts. Both passes
+    # are cost-safe: reconcile only touches existing pr_open rows; maybe_hunt spawns zero
+    # `claude` unless it actually claims a row.
+    reconcile_pr_open_rows
+    # One hunt per tick: a claimed hunt runs foreground to completion, then the tick ends —
+    # overlapping ticks can't double-hunt the same row (single-flight invariant 1).
+    if maybe_hunt; then
+        return 0
+    fi
+
     local actionable normalized
     actionable="$(cli list-active-conversations 2>/dev/null)"
     normalized="$(printf '%s' "$actionable" | tr -d '[:space:]')"
@@ -451,6 +741,9 @@ main() {
             awaiting_ajay)
                 drive_feature_row "$row"                # ready-for-plan (Case B)
                 ;;
+            blocked)
+                resume_blocked_hunt "$row"              # usage-parked hunt, backoff elapsed (Phase 7)
+                ;;
             *)
                 log "dispatch: no #5a branch for status '$status' (id $(printf '%s' "$row" | jq -r '.id')) — skip"
                 ;;
@@ -460,4 +753,8 @@ main() {
     return 0
 }
 
-main "$@"
+# Sourceable for tests (row 9 sources the driver to exercise run_under_starved_env against a
+# real git push / gh under the scrubbed env) — only auto-run main when executed directly.
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+    main "$@"
+fi

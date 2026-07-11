@@ -196,6 +196,10 @@ jobs:
       with:
         node-version: '22'
 
+    - name: Install JS dependencies
+      working-directory: ibl5
+      run: npm ci
+
     - name: Audit JS dependencies
       working-directory: ibl5
       run: npm audit --audit-level=high

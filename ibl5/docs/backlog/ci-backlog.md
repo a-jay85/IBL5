@@ -29,9 +29,9 @@ last_verified: 2026-07-11
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 3 |
+| ⬜ Open | 2 |
 | 📋 Planned | 0 |
-| ✅ Implemented | 6 |
+| ✅ Implemented | 7 |
 | 🚫 Declined | 0 |
 
 > The 4 "verified-not-redundant" entries in Axis 4 are **decisions to keep**, not open work — they exist so a future audit does not re-flag them. Not counted above.
@@ -66,7 +66,7 @@ last_verified: 2026-07-11
 | # | Title | Status | Automouse | Effort |
 |---|-------|--------|-----------|-------:|
 | 2.1 | Collapse smoke-prod's 4 notify jobs into one | ⬜ Open | 🟦 | S |
-| 2.2 | Merge migration-safety `idempotency-check` + `schema-completeness` | ⬜ Open | 🟩 | M |
+| 2.2 | Merge migration-safety `idempotency-check` + `schema-completeness` | ✅ Implemented | 🟩 | M |
 
 ### 2.1 smoke-prod.yml — four near-identical notify jobs
 **Location:** `.github/workflows/smoke-prod.yml` — jobs `rollback-and-notify`, `notify-scheduled-failure`, `notify-ibl6-degradation`, `notify-inconclusive`.
@@ -80,7 +80,7 @@ last_verified: 2026-07-11
 **Problem:** All three spin up an independent MariaDB 10.11 service, run an independent composer install, and apply the full migration stack from zero. `idempotency-check` and `schema-completeness` both apply the same full stack; the latter just adds FK/table/column assertions afterward.
 **Suggested direction:** Merge `idempotency-check` into `schema-completeness` (one DB build, then both sets of assertions). Keep `schema-parity-check` separate — it needs two DBs by design. Costs some intra-workflow parallelism; nets fewer runner-minutes and one fewer composer install.
 **Risk if untouched:** Three full migration runs per push to a migrations file; setup duplication (mitigated once 1.1 lands).
-**Status (2026-06-28):** ⬜ Open — green-green (gate job unchanged, assertions preserved) → 🟩.
+**Status (2026-07-11):** ✅ Implemented — folded `idempotency-check`'s bash-apply→PHP-seed→`migrate --status` idempotency assertion into `schema-completeness` (shared MariaDB service + `setup-php-env`); removed the standalone job and dropped it from the `gate` job's `needs`. `schema-parity-check` kept separate (two DBs). Green-green — all assertions preserved.
 
 ---
 

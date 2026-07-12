@@ -76,17 +76,17 @@ func threePtPropensity(p onCourt) float64 {
 // BranchB is an OFF-by-default diagnostic. When active it passes the foul weight
 // through branchBShrink; acceptable because BranchB is not exercised by any shipped
 // path, golden snapshot, or sign gate. BranchB and freeze arms are exclusive.
-func (gs *gameState) playBuckets(bh onCourt, offense, defense *teamState, hca, hcaScaled float64, allow3pt bool) (twoPtW, threePtW, foulW float64) {
+func (gs *gameState) playBuckets(bh onCourt, offense, defense *teamState, hca, hcaScaled, mq float64, allow3pt bool) (twoPtW, threePtW, foulW float64) {
 	raw3pt := 0.0
 	if allow3pt {
 		raw3pt = threePtBucketWeight(bh)
 	}
 	if !gs.freeze.BranchB {
-		foul := gs.foulWeight(bh, offense.players, defense.players, hca)
+		foul := gs.foulWeight(bh, offense.players, defense.players, hca, mq)
 		return twoPtBucketWeight(bh) + hcaScaled, raw3pt, foul
 	}
 	raw2pt := twoPtBucketWeight(bh)
-	foul := foulBucketWeight(bh, offense.players, defense.players, hca, gs.rng)
+	foul := foulBucketWeight(bh, offense.players, defense.players, hca, mq, gs.rng)
 	s2, s3, sf := gs.branchBShrink(raw2pt, raw3pt, foul, offense.drbRate, offense.astRate, bh.TransOff)
 	return s2 + hcaScaled, s3, sf
 }
@@ -159,7 +159,7 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPen
 		// across the O(10s) 2pt basis (hcaSite2BasisScale, gametype.go).
 		hca := hcaDelta(gs.gameType, offense.isHome)
 		hcaScaled := hca * hcaSite2BasisScale
-		twoPtW, threePtW, foulW := gs.playBuckets(bh, offense, defense, hca, hcaScaled, true)
+		twoPtW, threePtW, foulW := gs.playBuckets(bh, offense, defense, hca, hcaScaled, mq, true)
 		// Putback 3pt suppression (ADR-0055): a half-court OReb continuation is never a
 		// 3pt attempt — 5.60 re-loops a 3pt outcome on the OReb flag forcing a 2pt
 		// (decompile 94022-94024). Zero the 3pt bucket weight (same mechanism as

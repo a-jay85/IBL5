@@ -121,7 +121,7 @@ func TestBucketWeights_TwoPtComposite(t *testing.T) {
 	baseline := foulDivisorTeamDefCoef * defQualityCapTeamMult * leagueSTL48
 	factor := 1.0 + (defQuality(def)-baseline)/offQuality(off)
 	wantFoul := base * factor * foulBucketScale
-	foul := foulBucketWeight(p, off, def, 0, rng.New(1))
+	foul := foulBucketWeight(p, off, def, 0, 0, rng.New(1))
 	if math.Abs(foul-wantFoul) > 1e-9 {
 		t.Errorf("foulBucketWeight = %.6f, want base·factor·scale = %.6f", foul, wantFoul)
 	}
@@ -154,7 +154,7 @@ func TestBucketWeights_FoulDivisor(t *testing.T) {
 		t.Fatalf("test setup: balanced-matchup factor %.4f should be > 0 (deterministic path, no redraw)", factor)
 	}
 	want := base * factor * foulBucketScale
-	if got := foulBucketWeight(bh, off, def, 0, rng.New(1)); math.Abs(got-want) > 1e-9 {
+	if got := foulBucketWeight(bh, off, def, 0, 0, rng.New(1)); math.Abs(got-want) > 1e-9 {
 		t.Errorf("foulBucketWeight = %.6f, want base·factor·scale = %.6f (factor=%.4f)", got, want, factor)
 	}
 
@@ -162,7 +162,7 @@ func TestBucketWeights_FoulDivisor(t *testing.T) {
 	// depends only on the (bh, offense, defense) inputs — the same seed yields the same
 	// value. (The ±0.2 half-court HCA legs are exercised separately; here hca=0 isolates
 	// the symmetric base. Structural, not a knob.)
-	if a, b := foulBucketWeight(bh, off, def, 0, rng.New(42)), foulBucketWeight(bh, off, def, 0, rng.New(42)); a != b {
+	if a, b := foulBucketWeight(bh, off, def, 0, 0, rng.New(42)), foulBucketWeight(bh, off, def, 0, 0, rng.New(42)); a != b {
 		t.Errorf("weight not lineup-deterministic: %v vs %v", a, b)
 	}
 
@@ -171,7 +171,7 @@ func TestBucketWeights_FoulDivisor(t *testing.T) {
 	// finite, non-negative value.
 	r := rng.New(1988)
 	for i := 0; i < 1_000; i++ {
-		got := foulBucketWeight(bh, off, def, 0, r)
+		got := foulBucketWeight(bh, off, def, 0, 0, r)
 		if math.IsNaN(got) || math.IsInf(got, 0) || got < 0 {
 			t.Fatalf("draw #%d non-finite/negative: %v", i, got)
 		}
@@ -201,7 +201,7 @@ func TestBucketWeights_FoulDivisor(t *testing.T) {
 	ceil := foulFloor * foulBucketScale
 	rr := rng.New(5)
 	for i := 0; i < 1000; i++ {
-		got := foulBucketWeight(loOff[0], loOff, weakDef, 0, rr)
+		got := foulBucketWeight(loOff[0], loOff, weakDef, 0, 0, rr)
 		if math.IsNaN(got) || math.IsInf(got, 0) || got < 0 || got >= ceil {
 			t.Fatalf("redraw #%d out of [0, %.2f): %v", i, ceil, got)
 		}
@@ -263,7 +263,7 @@ func TestBucketWeights_FoulBucketHCALegs_DecompilePin(t *testing.T) {
 		h    float64
 	}{{"symmetric", 0}, {"home", +hca}, {"away", -hca}} {
 		want := wantE80(tc.h)
-		got := foulBucketWeight(bh, off, def, tc.h, rng.New(1))
+		got := foulBucketWeight(bh, off, def, tc.h, 0, rng.New(1))
 		if math.Abs(got-want) > 1e-9 {
 			t.Errorf("%s: foulBucketWeight = %.9f, want hand-computed e80 = %.9f", tc.name, got, want)
 		}
@@ -302,6 +302,48 @@ func TestBucketWeights_FoulBucketHCALegs_DecompilePin(t *testing.T) {
 	if ratio < 3.0 {
 		t.Errorf("leg B should dominate leg C by a wide margin, got |B|/|C| = %.1f", ratio)
 	}
+}
+
+// --- decompile-arithmetic pin: the :97164 net-advantage shrink (J18 item 6) ----
+//
+// 5.60 multiplies the coupled foul weight by 1 − param_6/(4·leagueTOV48) after the
+// :97163 coupling factor and before the :97170 ≤0 redraw check, where param_6 is
+// FUN_004e3860's return (= matchupQuality; the :93276-93293 call site pins the
+// provenance). This pin asserts the exact multiplicative identity, that mq=0
+// recovers the pre-port weight, and that a large positive mq past the redraw
+// threshold 4·leagueTOV48 = 13.4126 (J16 §4) drives the weight through the
+// :97170 floor redraw — the reachability 5.60 has and realistic rosters never hit.
+func TestBucketWeights_FoulNetAdvantageShrink_DecompilePin(t *testing.T) {
+	off := fiveStarters(3)
+	def := fiveStarters(7)
+	bh := oc(slotPG, mkPlayer(1, 3, slotPG, 48))
+
+	w0 := foulBucketWeight(bh, off, def, 0, 0, rng.New(1))
+	if w0 <= 0 {
+		t.Fatalf("test setup: mq=0 weight %.6f should be > 0 (deterministic path)", w0)
+	}
+
+	// Exact identity across the realistic mq range (matchupQuality with Phase 3/4
+	// stubbed spans ~[−0.5, +0.8]; include wider values short of the threshold).
+	threshold := 4.0 * leagueTOV48 // 13.4126
+	for _, mq := range []float64{-0.5, -0.02, 0.18, 0.8, 5.0, 13.0} {
+		want := w0 * (1.0 - mq/threshold)
+		if got := foulBucketWeight(bh, off, def, 0, mq, rng.New(1)); math.Abs(got-want) > 1e-9 {
+			t.Errorf("mq=%.2f: foulBucketWeight = %.9f, want w0·(1 − mq/%.4f) = %.9f", mq, got, threshold, want)
+		}
+	}
+
+	// Past the threshold the shrink goes negative and the :97170 floor redraw fires:
+	// results are U[0, foulFloor)·scale, consuming the rng.
+	ceil := foulFloor * foulBucketScale
+	r := rng.New(5)
+	for i := 0; i < 1000; i++ {
+		got := foulBucketWeight(bh, off, def, 0, threshold+1.0, r)
+		if math.IsNaN(got) || math.IsInf(got, 0) || got < 0 || got >= ceil {
+			t.Fatalf("redraw #%d out of [0, %.2f): %v", i, ceil, got)
+		}
+	}
+	t.Logf("w0=%.6f threshold=4·leagueTOV48=%.4f (mq beyond it → floor redraw)", w0, threshold)
 }
 
 // --- matrix #9: direction — EV(foul) > EV(2pt) from outcome realizations

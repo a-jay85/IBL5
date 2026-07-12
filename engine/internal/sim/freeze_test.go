@@ -35,7 +35,7 @@ func TestFreeze_SubstitutesAndAccumulates(t *testing.T) {
 	off := []onCourt{oc(slotPG, mkPlayer(9, 3, slotPG, 50))}
 	def := []onCourt{oc(slotPG, mkPlayer(2, 3, slotPG, 50))}
 	bh := off[0]
-	wantFoul := foulBucketWeight(bh, off, def, 0, rng.New(foulSeed))
+	wantFoul := foulBucketWeight(bh, off, def, 0, 0, rng.New(foulSeed))
 	base := &gameState{accum: acc, rng: rng.New(foulSeed)}
 	wantOreb := gate1Probability(100, 100, base.gateBaseline) // live faithful gate-1 (base.gateBaseline is 0)
 	// float64 vars force runtime (not constant-folded) evaluation, matching the
@@ -53,7 +53,7 @@ func TestFreeze_SubstitutesAndAccumulates(t *testing.T) {
 	if got := base.makeValue2pt(5, 50, result.OriginInitial); got != wantMake {
 		t.Errorf("baseline makeValue2pt = %v, want live %v", got, wantMake)
 	}
-	if got := base.foulWeight(bh, off, def, 0); got != wantFoul {
+	if got := base.foulWeight(bh, off, def, 0, 0); got != wantFoul {
 		t.Errorf("baseline foulWeight = %v, want live %v", got, wantFoul)
 	}
 
@@ -86,7 +86,7 @@ func TestFreeze_NoCrossConfound(t *testing.T) {
 	// coupling factor negative (defQ from one defender sits far below the 5-man-
 	// normalized baseline), so foulBucketWeight redraws — seed each gs the same so
 	// its single redraw draw reproduces liveFoul (the only rng consumer here).
-	liveFoul := foulBucketWeight(bh, off, def, 0, rng.New(foulSeed))
+	liveFoul := foulBucketWeight(bh, off, def, 0, 0, rng.New(foulSeed))
 
 	// Sentinel means, deliberately distinct from the live values so a leak is visible.
 	means := FreezeMeans{OrebProb: 0.31, TurnProb: 0.07, FoulWeight: 0.13, MakeVal2pt: 111.0}
@@ -106,7 +106,7 @@ func TestFreeze_NoCrossConfound(t *testing.T) {
 			gotOreb := gs.orebProb(120, 80)
 			gotTurn := gs.turnoverProb(60, 100)
 			gotMake := gs.makeValue2pt(5, 50, result.OriginInitial)
-			gotFoul := gs.foulWeight(bh, off, def, 0)
+			gotFoul := gs.foulWeight(bh, off, def, 0, 0)
 
 			// The frozen arm returns the sentinel; every OTHER arm returns live.
 			wantOreb, wantTurn, wantMake, wantFoul := liveOreb, liveTurn, liveMake, liveFoul

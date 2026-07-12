@@ -119,13 +119,14 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 		// Play-outcome buckets use the same faithful helpers as the half-court path
 		// (bucketweights.go) — the second of the two outcomeInputs assembly sites. sv2
 		// (above) feeds shotAttempt on the 2pt path ONLY; it does not double as the
-		// 2pt bucket weight. HCA is wired here too (site 2 on the made-shot/foul
-		// buckets, site 3 on the offQuality divisor inside foulBucketWeight), so a
-		// home fast-break possession also grows the foul bucket.
-		hca := hcaDelta(gs.gameType, offense.isHome)
+		// 2pt bucket weight. HCA is NEUTRAL on the transition path (param_5==0 skips the
+		// four HCA legs); all buckets are side-symmetric on a fast break (J15 Phase 5).
+		// playBuckets threads this possession's bh through so its deterministic base
+		// (2−fatigue)·tovRate(bh) matches the fast-break ball handler, same as the
+		// half-court path.
 		// allow3pt=false: a fast break is never a 3pt attempt (allowedPaths excludes it),
 		// so the 3pt composite is 0 here and Branch-B's ΣD is 2pt+foul on the break.
-		twoPtW, _, foulW := gs.playBuckets(bh, offense, defense, hca, false)
+		twoPtW, _, foulW := gs.playBuckets(bh, offense, defense, 0, 0, false) // param_5==0: transition fully symmetric, no HCA legs (J15 Phase 5)
 		in := outcomeInputs{
 			twoPtWeight:      twoPtW,
 			threePtWeight:    0,

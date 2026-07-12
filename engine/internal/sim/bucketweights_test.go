@@ -37,44 +37,58 @@ func assembleInputs(foulWeight, hca float64) outcomeInputs {
 	}
 }
 
-// --- matrix #2: characterization — assembled foul-path mix, home vs away -----
+// --- characterization — assembled foul-path mix is side-symmetric ------------
 //
-// Records the post-change path-selection distribution on the symmetric pair, so
-// the magnitude shift from #952 is reviewable, and confirms the two structural
-// invariants the design rests on: (a) the foul path is a realistic minority share
-// (2pt-dominant, non-degenerate), and (b) the home assembly selects the foul path
-// MORE than the away assembly — the faithful HCA mechanism at the bucket level.
+// The faithful bucket is side-symmetric (J6/J16): the foul WEIGHT is identical for
+// the home and away assemblies (no hca inside the bucket). The only home/away
+// difference is the ±hca on the 2pt bucket, which shifts the foul SHARE slightly
+// (home's larger 2pt denominator makes foul a marginally smaller share). This test
+// confirms home and away foul shares are NEAR-EQUAL — the property that yields a
+// ≈1.0 home/away FTA ratio, superseding the old home>away asymmetry (ADR-0082).
+// After the Phase-6 re-anchor (foulBucketScale=0.50), the foul share is again a
+// 2pt-dominated realistic minority (~9%), so this test asserts BOTH the structural
+// side-symmetry AND the re-anchored LEVEL band (phase2-derivation.md).
 func TestBucketWeights_FoulPathMix(t *testing.T) {
 	const n = 200_000
 	const seed = uint64(1988)
 
+	off := fiveStarters(3)
 	def := fiveStarters(7)
-	homeFoulW := foulBucketWeight(def, hcaMagnitude, rng.New(seed)) // deterministic home ~0.87·scale
-	awayFoulW := foulFloor / 2 * foulBucketScale                    // U[0, 0.6·scale) analytic mean = 0.3·scale
-	homeIn := assembleInputs(homeFoulW, hcaMagnitude)
-	awayIn := assembleInputs(awayFoulW, -hcaMagnitude)
+	bh := oc(slotPG, mkPlayer(1, 3, slotPG, 48))
+	// Analytic foul weight: DETERMINISTIC base (2−fatigue)·tovRate(bh) [fatigue≡1.0
+	// under the engine curve ⇒ base = tovRate(bh)] × the C1-corrected coupling factor
+	// = 1 + (defQ − foulDivisorTeamDefCoef·defQualityCapTeamMult·leagueSTL48)/offQ
+	// (:97163, increasing in defQ) × scale. Identical for both sides — the bucket has
+	// no home/away term.
+	base := (foulBaseFatigueRef - bh.fatigue) * tovRate(bh)
+	baseline := foulDivisorTeamDefCoef * defQualityCapTeamMult * leagueSTL48
+	factor := 1.0 + (defQuality(def)-baseline)/offQuality(off)
+	meanFoul := base * factor * foulBucketScale
+	homeIn := assembleInputs(meanFoul, hcaMagnitude)
+	awayIn := assembleInputs(meanFoul, -hcaMagnitude)
 
 	homeCounts := pathCounts(homeIn, n, seed)
 	awayCounts := pathCounts(awayIn, n, seed)
 	homeFoul := float64(homeCounts[outcomeFoulOnly]) / n
 	awayFoul := float64(awayCounts[outcomeFoulOnly]) / n
 
-	t.Logf("assembled path mix (n=%d, seed %d):", n, seed)
-	t.Logf("  home weights: 2pt=%.3f 3pt=%.3f and-one=%.3f foul=%.3f",
-		homeIn.twoPtWeight, homeIn.threePtWeight, homeIn.andOneWeight, homeIn.foulOnlyWeight)
+	t.Logf("assembled path mix (n=%d, seed %d): factor=%.4f meanFoul=%.4f", n, seed, factor, meanFoul)
 	t.Logf("  home foul-frac=%.4f  away foul-frac=%.4f  (home−away=%+.4f)", homeFoul, awayFoul, homeFoul-awayFoul)
 
-	// Realistic minority: the foul path must be a small share (2pt-dominant), the
-	// non-degeneracy property the faithful pair preserves. The home deterministic
-	// weight (~0.87·scale) and the away mean (0.3·scale) keep the home foul share
-	// inside the Part-6 acceptance band (ADR-0082); the upper bound is the foul-out
-	// degeneracy ceiling (TestSimulate_FoulOutRate) and is NEVER raised. NOT widened.
-	if homeFoul < 0.02 || homeFoul > 0.25 {
-		t.Errorf("home foul share = %.4f, want a realistic minority in [0.02, 0.25]", homeFoul)
+	// LEVEL (restored after the Phase-6 re-anchor of foulBucketScale to 0.50): at the
+	// re-anchored scale the foul path is a realistic MINORITY share — observed home
+	// foul-frac ≈ 0.090 at this fixture (the 2pt composite 16.47 dominates foul 2.13).
+	// The band guards the LEVEL against scale drift: the pre-C2 8.6 gave a degenerate
+	// ~0.9 share; an unscaled bucket, ~0.01. A minority in [0.03, 0.15] is the faithful
+	// regime this dial was re-anchored to.
+	if homeFoul < 0.03 || homeFoul > 0.15 {
+		t.Errorf("home foul share = %.4f, want a realistic minority in [0.03, 0.15] (level re-anchored, foulBucketScale=0.50)", homeFoul)
 	}
-	// HCA: home selects the (higher-EV) foul path more than away.
-	if homeFoul <= awayFoul {
-		t.Errorf("home foul-frac %.4f ≤ away %.4f — HCA not home-favorable at the bucket level", homeFoul, awayFoul)
+	// Symmetry: home/away foul shares differ ONLY through the ±hca on the 2pt bucket,
+	// so they are near-equal (the discriminator property). NOT the old home>away arm.
+	if math.Abs(homeFoul-awayFoul) > 0.03 {
+		t.Errorf("home/away foul share differ by %.4f (home %.4f, away %.4f) — expected near-equal (symmetric bucket)",
+			math.Abs(homeFoul-awayFoul), homeFoul, awayFoul)
 	}
 }
 
@@ -97,66 +111,196 @@ func TestBucketWeights_TwoPtComposite(t *testing.T) {
 		t.Errorf("twoPtBucketWeight = %.6f, want recovered D90 = %.6f", got, want)
 	}
 
-	// 2pt must dominate the foul bucket (foul is a realistic minority). Use the home
-	// deterministic weight (~0.87), the largest foul weight, for the strongest test.
+	// The foul weight matches the hand-recomputed faithful formula AND — restored after
+	// the Phase-6 re-anchor (foulBucketScale=0.50) — the 2pt composite DOMINATES it
+	// (≈16.47 vs ≈2.13 at this fixture), the minority-foul-share invariant the original
+	// +0xD90 characterization pinned.
+	off := fiveStarters(3)
 	def := fiveStarters(7)
-	foul := foulBucketWeight(def, hcaMagnitude, rng.New(1))
-	if twoPtBucketWeight(p) <= foul {
-		t.Errorf("2pt bucket %.3f not dominant over foul %.3f", twoPtBucketWeight(p), foul)
+	base := (foulBaseFatigueRef - p.fatigue) * tovRate(p)
+	baseline := foulDivisorTeamDefCoef * defQualityCapTeamMult * leagueSTL48
+	factor := 1.0 + (defQuality(def)-baseline)/offQuality(off)
+	wantFoul := base * factor * foulBucketScale
+	foul := foulBucketWeight(p, off, def, 0, rng.New(1))
+	if math.Abs(foul-wantFoul) > 1e-9 {
+		t.Errorf("foulBucketWeight = %.6f, want base·factor·scale = %.6f", foul, wantFoul)
 	}
-	t.Logf("2pt composite=%.4f foul(home)=%.4f 3pt=%.4f", twoPtBucketWeight(p), foul, threePtBucketWeight(p))
+	if twoPtBucketWeight(p) <= foul {
+		t.Errorf("2pt composite %.4f must dominate the foul bucket %.4f (minority-foul-share invariant)", twoPtBucketWeight(p), foul)
+	}
+	t.Logf("2pt composite=%.4f foul=%.4f 3pt=%.4f", twoPtBucketWeight(p), foul, threePtBucketWeight(p))
 }
 
-// --- matrix #5: faithful asymmetric foul bucket = home deterministic, away U[0,0.6) --
+// --- faithful side-symmetric foul bucket: base·(1 + (defQ − baseline)/offQ) --
 //
-// Verifies the HOME weight equals the hand-computed defense-coupled formula; the
-// AWAY/NEUTRAL weight is a finite stochastic draw in [0, foulFloor); the NEUTRAL
-// (hca==0) path matches the away distribution (the ASG-symmetry precondition); the
-// home MEAN exceeds the away mean (bucket-level HCA direction); and the faithful
-// redraw guard is unreachable — even an empty defense yields a positive home weight.
+// Verifies the weight equals the hand-computed base·factor·scale (base is now
+// DETERMINISTIC — the old U[0,foulFloor) draw was the C2 error, only the ≤0 floor
+// redraw still draws); that it has NO home/away term (identical for either side);
+// that the deterministic value is finite and non-negative; and — the property the
+// old asymmetric arm lacked — that the faithful `w <= 0` redraw is REACHABLE
+// symmetrically (weak-STL defenders vs a low-TOV offense drive factor ≤ 0, per the
+// C1-corrected INCREASING-in-defQ coupling).
 func TestBucketWeights_FoulDivisor(t *testing.T) {
+	off := fiveStarters(3)
 	def := fiveStarters(7)
+	bh := oc(slotPG, mkPlayer(1, 3, slotPG, 48))
 
-	// Home (hca>0): deterministic ((defQ − 5·(5/6)·teamDef)/5 + hca)·scale.
-	defQ := defMatchupQuality(def)
-	wantHome := ((defQ-defQualityCapTeamMult*foulDivisorTeamDefCoef*teamDefBaseline)/defQualityCapTeamMult + hcaMagnitude) * foulBucketScale
-	if got := foulBucketWeight(def, hcaMagnitude, rng.New(1)); math.Abs(got-wantHome) > 1e-9 {
-		t.Errorf("home foulBucketWeight = %.6f, want deterministic %.6f", got, wantHome)
+	// Formula: base·factor·scale. base = (2−fatigue)·tovRate(bh), DETERMINISTIC (no
+	// rng draw at all when factor > 0 — the redraw guard below is never reached).
+	base := (foulBaseFatigueRef - bh.fatigue) * tovRate(bh)
+	baseline := foulDivisorTeamDefCoef * defQualityCapTeamMult * leagueSTL48
+	factor := 1.0 + (defQuality(def)-baseline)/offQuality(off)
+	if factor <= 0 {
+		t.Fatalf("test setup: balanced-matchup factor %.4f should be > 0 (deterministic path, no redraw)", factor)
+	}
+	want := base * factor * foulBucketScale
+	if got := foulBucketWeight(bh, off, def, 0, rng.New(1)); math.Abs(got-want) > 1e-9 {
+		t.Errorf("foulBucketWeight = %.6f, want base·factor·scale = %.6f (factor=%.4f)", got, want, factor)
 	}
 
-	// Away/neutral: stochastic U[0, foulFloor·scale). Every draw finite and in range.
-	awayCeil := foulFloor * foulBucketScale
+	// Base-symmetry: called with hca=0 (the symmetric/transition case), the weight
+	// depends only on the (bh, offense, defense) inputs — the same seed yields the same
+	// value. (The ±0.2 half-court HCA legs are exercised separately; here hca=0 isolates
+	// the symmetric base. Structural, not a knob.)
+	if a, b := foulBucketWeight(bh, off, def, 0, rng.New(42)), foulBucketWeight(bh, off, def, 0, rng.New(42)); a != b {
+		t.Errorf("weight not lineup-deterministic: %v vs %v", a, b)
+	}
+
+	// Deterministic (factor > 0): repeated calls on a SHARED rng never advance it —
+	// the base/factor path draws no randomness — so every call returns the identical
+	// finite, non-negative value.
 	r := rng.New(1988)
-	for i := 0; i < 10_000; i++ {
-		got := foulBucketWeight(def, -hcaMagnitude, r)
-		if math.IsNaN(got) || math.IsInf(got, 0) || got < 0 || got >= awayCeil {
-			t.Fatalf("away draw #%d out of [0, %.2f): %v", i, awayCeil, got)
+	for i := 0; i < 1_000; i++ {
+		got := foulBucketWeight(bh, off, def, 0, r)
+		if math.IsNaN(got) || math.IsInf(got, 0) || got < 0 {
+			t.Fatalf("draw #%d non-finite/negative: %v", i, got)
+		}
+		if math.Abs(got-want) > 1e-9 {
+			t.Fatalf("draw #%d = %.6f, want the deterministic %.6f (factor>0 path must not consume rng)", i, got, want)
 		}
 	}
-	// Neutral (ASG, hca==0) takes the SAME stochastic path — the ASG-symmetry precondition.
-	if got := foulBucketWeight(def, 0, rng.New(7)); got < 0 || got >= awayCeil {
-		t.Errorf("neutral (hca==0) not on the stochastic [0, %.2f) path: %v", awayCeil, got)
+
+	// Redraw REACHABLE, symmetrically: WEAK-STL defenders (low defQ, far below the
+	// league-baselined threshold) meeting a LOW-TOV offense (small offQ, which
+	// amplifies (defQ−baseline)/offQ) drives factor deeply negative — the
+	// C1-corrected coupling is INCREASING in defQ, so it is a WEAK defense (not a
+	// strong one) that now triggers the redraw. Result stays finite, non-negative,
+	// and bounded by the floor·scale ceiling (:97170).
+	weakDef := fiveStarters(7)
+	for i := range weakDef {
+		weakDef[i].STL = 1
+	}
+	loOff := fiveStarters(3)
+	for i := range loOff {
+		loOff[i].TVR = 1
+	}
+	redrawFactor := 1.0 + (defQuality(weakDef)-baseline)/offQuality(loOff)
+	if redrawFactor > 0 {
+		t.Fatalf("test setup: weak-STL/low-TOV factor %.4f should be ≤ 0 (redraw must be reachable)", redrawFactor)
+	}
+	ceil := foulFloor * foulBucketScale
+	rr := rng.New(5)
+	for i := 0; i < 1000; i++ {
+		got := foulBucketWeight(loOff[0], loOff, weakDef, 0, rr)
+		if math.IsNaN(got) || math.IsInf(got, 0) || got < 0 || got >= ceil {
+			t.Fatalf("redraw #%d out of [0, %.2f): %v", i, ceil, got)
+		}
+	}
+	t.Logf("factor(balanced)=%.4f  factor(redraw case)=%.4f  ceil=%.2f", factor, redrawFactor, ceil)
+}
+
+// --- decompile-arithmetic pin: the ±0.2 half-court HCA legs (B and C) ---------
+//
+// The faithfulness ORACLE for the foul bucket is the decompile arithmetic
+// (jsb560_decompiled.c FUN_004e1ba0 :97126/:97159-97163), NOT the .sco aggregate
+// home/away FTA split (which conflates the per-possession bucket with emergent,
+// unmodeled home-lead-driven late-game fouling). This pin computes local_e80 by
+// hand from the decompile block for concrete HOME (hca=+0.2), AWAY (hca=−0.2), and
+// SYMMETRIC (hca=0) inputs and asserts foulBucketWeight reproduces each — isolating
+// port-faithfulness from that aggregate noise (the paired-comparator rule, one
+// level down). It also MEASURES the leg-B-vs-leg-C balance rather than asserting an
+// a-priori ratio: the two half-court HCA legs are
+//   - leg B (:97160, local_e80 -= dVar5): the foul BASE loses s·hca (RAW).
+//   - leg C (:97159, fVar12 = FUN_004e3f80 computed WITH −s·hca per offensive
+//     player when param_5==1): the offQ DENOMINATOR loses 5·s·hca, pushing the
+//     coupling factor AWAY from 1 in the direction of sign(defQ − baseline). Leg C
+//     is thus pro-home ONLY when the defense's steal-quality exceeds the league
+//     baseline (defQ > baseline); at or below it (as with this fixture) leg C is
+//     itself anti-home. Its magnitude is bounded FAR below leg B — the defQ cap
+//     (defQualityCapMultiplier·defQualityCapTeamMult·leagueSTL48 ≈ 13.76) keeps
+//     (defQ − baseline) too small for leg C to ever rival leg B.
+// Leg B (a ~6% shift on the ~3.35 base) dominates leg C (a sub-1% shift on the
+// ~1.09 factor) by roughly an order of magnitude (measured ≈9.5× here), so the NET
+// is anti-home REGARDLESS of leg C's sign: the home foul weight is LOWER than the
+// away weight. This is faithful to the decompile; the real .sco pro-home FTA split
+// is an emergent effect this per-possession bucket does not (and is not meant to)
+// reproduce.
+func TestBucketWeights_FoulBucketHCALegs_DecompilePin(t *testing.T) {
+	off := fiveStarters(3)
+	def := fiveStarters(7)
+	bh := oc(slotPG, mkPlayer(1, 3, slotPG, 48))
+	const hca = hcaMagnitude // +0.2 home / −0.2 away (raw, in-basis for legs B/C)
+
+	// Hand-compute local_e80 exactly as the decompile does, for an explicit hca:
+	//   base   = (2.0 − fatigue)·tovRate(bh) − s·hca              (:97126 + :97160 leg B)
+	//   offQ   = Σ (tovRate − s·hca)                              (:97159 leg C, param_5==1)
+	//   factor = 1 + (defQ − baseline)/offQ                       (:97163)
+	//   w      = base·factor·foulBucketScale
+	baseline := foulDivisorTeamDefCoef * defQualityCapTeamMult * leagueSTL48
+	defQ := defQuality(def)
+	wantE80 := func(h float64) float64 {
+		base := (foulBaseFatigueRef-bh.fatigue)*tovRate(bh) - h
+		offQ := offQualityWithHCA(off, h)
+		factor := 1.0 + (defQ-baseline)/offQ
+		return base * factor * foulBucketScale
 	}
 
-	// Direction: home mean > away mean over a large sample.
-	rh, ra := rng.New(3), rng.New(4)
-	const m = 50_000
-	var homeSum, awaySum float64
-	for i := 0; i < m; i++ {
-		homeSum += foulBucketWeight(def, hcaMagnitude, rh)
-		awaySum += foulBucketWeight(def, -hcaMagnitude, ra)
-	}
-	if homeSum/m <= awaySum/m {
-		t.Errorf("home mean %.4f ≤ away mean %.4f — HCA not home-favorable at the bucket level", homeSum/m, awaySum/m)
+	// The port must reproduce the hand-computed e80 for each side (factor > 0 here,
+	// so no floor redraw — foulBucketWeight is deterministic and rng is unused).
+	for _, tc := range []struct {
+		name string
+		h    float64
+	}{{"symmetric", 0}, {"home", +hca}, {"away", -hca}} {
+		want := wantE80(tc.h)
+		got := foulBucketWeight(bh, off, def, tc.h, rng.New(1))
+		if math.Abs(got-want) > 1e-9 {
+			t.Errorf("%s: foulBucketWeight = %.9f, want hand-computed e80 = %.9f", tc.name, got, want)
+		}
 	}
 
-	// Redraw guard unreachable: an empty defense sits at defMatchupQuality's 4.5155
-	// floor, so the home weight is still positive and finite (`w <= 0` never fires).
-	minW := foulBucketWeight([]onCourt{}, hcaMagnitude, rng.New(5))
-	if math.IsNaN(minW) || math.IsInf(minW, 0) || minW <= 0 {
-		t.Errorf("home weight at the defMatchupQuality floor = %v, want positive finite (redraw must stay unreachable)", minW)
+	wSym := wantE80(0)
+	wHome := wantE80(+hca)
+	wAway := wantE80(-hca)
+
+	// NET direction: leg B dominates ⇒ the home foul weight is LOWER (anti-home),
+	// and the symmetric case sits between the two sides.
+	if !(wHome < wSym && wSym < wAway) {
+		t.Errorf("expected anti-home ordering wHome < wSym < wAway, got %.6f / %.6f / %.6f", wHome, wSym, wAway)
 	}
-	t.Logf("home(det)=%.4f away-mean=%.4f floor-home=%.4f (want home>away, away∈[0,%.2f))", wantHome, awaySum/m, minW, awayCeil)
+
+	// Decompose leg B (base −hca, factor held at the symmetric factor0) vs leg C
+	// (offQ −5·hca, base held at base0) to MEASURE the balance the comments claim.
+	base0 := (foulBaseFatigueRef - bh.fatigue) * tovRate(bh)
+	offQ0 := offQualityWithHCA(off, 0)
+	factor0 := 1.0 + (defQ-baseline)/offQ0
+	legBOnly := (base0-hca)*factor0*foulBucketScale - base0*factor0*foulBucketScale
+	factorCHome := 1.0 + (defQ-baseline)/offQualityWithHCA(off, hca)
+	legCOnly := base0*factorCHome*foulBucketScale - base0*factor0*foulBucketScale
+	ratio := math.Abs(legBOnly) / math.Abs(legCOnly)
+	t.Logf("HCA legs (home side): legB(base)=%+.5f legC(offQ)=%+.5f |B|/|C|=%.1f  net=wHome−wSym=%+.5f  ratio wHome/wAway=%.4f",
+		legBOnly, legCOnly, ratio, wHome-wSym, wHome/wAway)
+
+	// leg B (base −hca) is UNCONDITIONALLY anti-home (negative). Leg C's sign is
+	// conditional on sign(defQ − baseline) — here defQ < baseline so leg C is also
+	// anti-home; it is pro-home only for a strong-steal defense. What is invariant is
+	// that leg B dominates leg C by a wide margin (the defQ cap bounds |C|), so the
+	// net anti-home ordering above holds regardless of leg C's sign.
+	if legBOnly >= 0 {
+		t.Errorf("leg B (foul base −hca) must be anti-home (negative), got %+.5f", legBOnly)
+	}
+	if ratio < 3.0 {
+		t.Errorf("leg B should dominate leg C by a wide margin, got |B|/|C| = %.1f", ratio)
+	}
 }
 
 // --- matrix #9: direction — EV(foul) > EV(2pt) from outcome realizations

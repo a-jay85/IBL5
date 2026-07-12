@@ -56,6 +56,31 @@ type Band struct {
 // │ These wide bands are the recorded baseline of the engine-vs-jumpshot model │
 // │ gap; band WIDTH is the fidelity signal, and the bands tighten as the       │
 // │ engine matures.                                                            │
+// │                                                                            │
+// │ ── J15 UPDATE (2026-07-11, faithful foul bucket + re-homed HCA) ──────────  │
+// │ This PR replaced the offQualityRatingScale=0.059 quality stand-in above    │
+// │ with the faithful CEngine per-48 basis (leagueTOV48=3.353143, teamquality  │
+// │ .go), and dropped team FTA from the ~37.8 legacy mean to the faithful ~21  │
+// │ (foulBucketScale=0.47, paired .sco 21.32). The band literals below are     │
+// │ UNCHANGED and remain #957-derived — a deliberate call, verified three ways:│
+// │   1. The bands self-scale: RelPct×engineMean recenters on the current mean,│
+// │      so they never froze to the 37.8 era; only AbsFloor is a fixed number. │
+// │   2. jsbcalibrate --mode gate on the faithful distribution PASSES overall  │
+// │      (min-rate 0.9) with NO stat failing either game type; pf in-band 0.94 │
+// │      (gt 2) / 0.959 (gt 4) — exactly the "robust to occasional home-arm    │
+// │      expression" headroom the J15 plan asked pf to keep, so pf is NOT       │
+// │      re-tightened despite the plan naming it a target.                     │
+// │   3. Re-deriving would only TIGHTEN toward the p95 proposal (e.g. points   │
+// │      0.25 vs shipped 0.516) — the over-tighten the plan explicitly warns   │
+// │      against — so keeping is both empirically justified and the safer null.│
+// │ TOV FLOOR REFRESHED (ratified 2026-07-12, ADR-0084 Ratification D2): the   │
+// │ old `tov` AbsFloor=22 (gt4: 21) was sized to a defunct ~30 TOV mean; at    │
+// │ the faithful mean ~14.3 it was AbsFloor-dominated, so its width was stale, │
+// │ not fidelity. Refreshed to the calibrate proposal measured on this branch  │
+// │ (runs=20 stride=50, coverage 0.95): gt2 AbsFloor=9 (in-band 0.975), gt4    │
+// │ AbsFloor=11 (in-band 0.977). RelPct kept at the committed (wider) values   │
+// │ per rationale 3 above — the proposal (0.596/0.600) would only tighten.     │
+// │ Gate is reference-only (no CI workflow invokes jsbcalibrate).              │
 // └──────────────────────────────────────────────────────────────────────────┘
 
 // regularBands holds the calibrated regular-season (game_type 2) tolerances.
@@ -70,7 +95,7 @@ var regularBands = map[string]Band{
 	"reb":    {RelPct: 0.550388, AbsFloor: 22},
 	"ast":    {RelPct: 0.15, AbsFloor: 31},
 	"stl":    {RelPct: 0.791956, AbsFloor: 13},
-	"tov":    {RelPct: 0.735799, AbsFloor: 22},
+	"tov":    {RelPct: 0.735799, AbsFloor: 9},
 	"blk":    {RelPct: 9.843373, AbsFloor: 11},
 	"pf":     {RelPct: 1.350427, AbsFloor: 16},
 }
@@ -87,7 +112,7 @@ var playoffBands = map[string]Band{
 	"reb":    {RelPct: 0.584507, AbsFloor: 23},
 	"ast":    {RelPct: 0.15, AbsFloor: 31},
 	"stl":    {RelPct: 0.751861, AbsFloor: 12},
-	"tov":    {RelPct: 0.73565, AbsFloor: 21},
+	"tov":    {RelPct: 0.73565, AbsFloor: 11},
 	"blk":    {RelPct: 10.320755, AbsFloor: 12},
 	"pf":     {RelPct: 1.445652, AbsFloor: 16},
 }

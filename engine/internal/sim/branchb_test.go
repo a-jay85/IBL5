@@ -122,29 +122,31 @@ func TestBranchBShrink_OverShrinkClampedByWeight(t *testing.T) {
 	}
 }
 
-// #21 — BranchB scales bucket weights by s without corrupting signs. After ADR-0082
-// the foul weight is HCA-keyed (home: deterministic; away: stochastic), so `s`
-// depends on `hca` and the exact home-minus-away HCA delta is no longer invariant
-// across BranchB ON/OFF — that property is replaced by: (a) the 2pt home weight
-// gains +hca after s-scaling (sign preserved); (b) the home foul weight is positive
-// (guard against sign flip from s); (c) BranchB ON produces a lower home 2pt weight
-// than BranchB OFF (s < 1 — shrink engaged). BranchB is an OFF-by-default diagnostic
-// not exercised by any shipped path, golden snapshot, or SIGN gate.
+// #21 — BranchB scales bucket weights by s without corrupting signs. The faithful
+// foul bucket has a side-symmetric base plus the small ±0.2 half-court HCA legs
+// (superseding the ADR-0082 home-deterministic/away-stochastic stand-in), so `s`
+// depends on `hca` through the foul weight and the exact home-minus-away delta is not
+// invariant across BranchB ON/OFF — that property is replaced by: (a) the 2pt home
+// weight gains +hcaScaled after s-scaling (sign preserved); (b) the home foul weight
+// is positive (guard against sign flip from s); (c) BranchB ON produces a lower home
+// 2pt weight than BranchB OFF (s < 1 — shrink engaged). BranchB is an OFF-by-default
+// diagnostic not exercised by any shipped path, golden snapshot, or SIGN gate.
 func TestPlayBuckets_HCADeltaInvariantToBranchB(t *testing.T) {
 	bh := oc(slotPG, mkPlayer(1, 3, slotPG, 48))
 	offense := &teamState{players: fiveStarters(3), drbRate: 150, astRate: 90, isHome: true}
 	defense := &teamState{players: fiveStarters(7)}
 
-	hcaHome := hcaDelta(bundle.GameTypeRegular, true) // +0.2
+	hcaHome := hcaDelta(bundle.GameTypeRegular, true) // +0.2 (raw, foul legs B/C)
+	hcaScaled := hcaHome * hcaSite2BasisScale         // scaled site-2 addend (legs A/D)
 
 	// BranchB OFF: home 2pt = raw2pt + hca, home foul = det_home.
 	gsOff := &gameState{rng: rng.New(42)}
-	offH2, _, offHF := gsOff.playBuckets(bh, offense, defense, hcaHome, true)
+	offH2, _, offHF := gsOff.playBuckets(bh, offense, defense, hcaHome, hcaScaled, true)
 
 	// BranchB ON: home 2pt = s*raw2pt + hca, home foul = s*det_home (s < 1).
 	gsOn := &gameState{rng: rng.New(42)}
 	gsOn.freeze.BranchB = true
-	onH2, _, onHF := gsOn.playBuckets(bh, offense, defense, hcaHome, true)
+	onH2, _, onHF := gsOn.playBuckets(bh, offense, defense, hcaHome, hcaScaled, true)
 
 	// (a) BranchB shrinks the home 2pt weight (s < 1 with realistic rates).
 	if onH2 >= offH2 {

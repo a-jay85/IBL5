@@ -35,12 +35,12 @@ last_verified: 2026-07-13
 ```
 J1 faithful foul pair (✅ 2026-07-10, ADR-0082) ─→ J2 adjudications (✅ 2026-07-12): SHIPPABLE verdict
   └─→ J6 composite-scale pins (✅ 2026-07-10, Fable): OVERTURNS the defQ≡0 / +0xDE0 / +0xDC8 dead-zero pins
-        └─→ J15 faithful foul-bucket program (⬜ — RE-SCOPED: live defQ = Σ STL/MIN×44, offQ = Σ TOV/48)
-              ├─ absorbs J12 (HCA re-homing — corpus margin ground truth 4.12 unchanged)
-              ├─ prerequisite: J16 (✅ 2026-07-10) escape bound re-derived with LIVE AST/48 (J19)
+        └─→ J15 faithful foul-bucket program (✅ 2026-07-12, ADR-0084 — live defQ = Σ STL/MIN×44, offQ = Σ TOV/48)
+              ├─ absorbs J12 (HCA re-homing — corpus margin ground truth 4.12 unchanged) — ✅ absorbed
+              ├─ prerequisite: J16 escape bound re-derived with LIVE AST/48 (J19) — ✅ J19 done
               └─→ J2 verdict: SHIPPABLE with residual → successor = J20 empty-FGA restructure (J4 ✅ 2026-07-12 feeds it) → J13 (unblocked)
 J17 game-state foul coupling (⬜, new 2026-07-10) — real 5.60 mechanism the engine lacks entirely
-J18 composite fidelity ports (◑ — formula divergences shipped; f/shrink pending) · J19 J6-residue RE (⬜) — both spawned by J6
+J18 composite fidelity ports (◑ — formula divergences shipped; f/shrink pending) · J19 J6-residue RE (✅ 2026-07-12) — both spawned by J6
 ```
 
 The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dominant carrier** (J2 session 1, 2026-07-10): a mechanical Cov injection from unfaithful foul share. PPS = PF/FGA counts FT points in the numerator while foul plays displace FGA from the denominator, so excess foul-share level/dispersion injects negative Cov directly; the engine ran foul share at **1.8× real** (37.8 vs 20.65 FTA/g, a pre-ADR-0082 legacy). Zeroing defQ moved gt2 Cov **−0.000774 → −0.000340** (real +0.000269) — 56% of the residual, ~15× any prior single lever; that A/B stands as measurement. **But J6 (same day) overturned the static premise underneath it:** J5's "defQ ≡ 0" was a store-enumeration blindspot — 5.60 builds the player record on the STACK (FUN_004cfa50 → FUN_00405970 write-back), so +0xDD0 (STL/MIN×44), +0xDE0 (usage-shrunk TOV/48), and +0xDC8 (AST/48) are all **live**. The faithful foul coupling is therefore roster-VARYING (defQ = Σ defenders' STL/MIN×44; offQ = Σ offense TOV/48 − HCA, TOV-coupled not volume-neutral), and J2's "symmetric U[0,0.6) both sides" verdict plus the J15 program must be re-adjudicated against the live-composite semantics before any port ships. "Mapped carriers exhausted" stays refuted; the map had a foul-path hole — and a method hole (see J6's caveat).
@@ -51,10 +51,10 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 11 |
+| ⬜ Open | 8 |
 | 📋 Planned | 0 |
 | ◑ Partial | 1 |
-| ✅ Implemented | 8 |
+| ✅ Implemented | 11 |
 | 🚫 Declined | 0 |
 
 ---
@@ -74,14 +74,14 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 | J9 | League-baseline faithful port (FUN_004385f0) | ✅ Implemented | ⚙️ Sonnet | S |
 | J10 | `.plb` minutes reader + stamina=100 bundle fix | ⬜ Open | ⚙️ Sonnet | S |
 | J11 | Season-selection min-GP guard | ⬜ Open | ⚙️ Sonnet | S |
-| J12 | HCA re-homing to basis-scaled site-2 (absorbed into J15) | ⬜ Open | 🧠 Opus | M |
+| J12 | HCA re-homing to basis-scaled site-2 (absorbed into J15) | ✅ Implemented | 🧠 Opus | M |
 | J13 | Cut-over package: bands, leaders, decision | ⬜ Open | 🧠 Opus | L |
 | J14 | AutoResearch eval-harness ADR (loop L9 companion) | ⬜ Open | 🧠 Opus | L |
-| J15 | Faithful foul-bucket program (live composites + HCA re-homing + level re-anchor) | ⬜ Open | 🧠 Opus | L |
+| J15 | Faithful foul-bucket program (live composites + HCA re-homing + level re-anchor) | ✅ Implemented | 🧠 Opus | L |
 | J16 | FUN_004e3860 net-advantage formula via objdump | ✅ Implemented | 🔮 Fable | S |
 | J17 | Game-state foul coupling port (param_8 desperation + late-game fouling) | ⬜ Open | 🧠 Opus | M |
 | J18 | Composite fidelity ports (bucketweights/teamquality vs the J6 formula map) | ◑ Partial | 🧠 Opus | M |
-| J19 | J6-residue RE (energy operands, rec+0x18 semantics, escape re-derivation, +0xD58) | ⬜ Open | 🧠 Opus | M |
+| J19 | J6-residue RE (energy operands, rec+0x18 semantics, escape re-derivation, +0xD58) | ✅ Implemented | 🧠 Opus | M |
 | J20 | Empty-FGA / within-possession restructure (Cov possession channel) | ⬜ Open | 🧠 Opus | L |
 
 ### J1 Faithful foul-bucket pair port
@@ -152,7 +152,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 **Problem (re-scoped TWICE on 2026-07-10 — J2 then J6):** J2 proposed a *symmetric* program on J5's defQ ≡ 0 pin; **J6 overturned that pin**, so the faithful 5.60 pair is now statically known and roster-VARYING: **defQ = Σ five defenders' STL/MIN×44** (live +0xDD0), **offQ = Σ offense TOV/48 − HCA** (live +0xDE0 — TOV-coupled, so ADR-0061's `offQualityConstant = 1.575` and its volume-neutrality claim are unfaithful, and ADR-0082's shipped `defQuality` formula — floor1(OD)×0.25, neutral 8.21 — is the wrong composite entirely). Whether the away-side `≤ 0 → redraw` still dominates with live values is an EMPIRICAL question (the J2 corpus evidence — smooth winner-following FTA edge, no bimodality — bounds a deterministic arm but no longer proves it dead). What survives J2's A/B unconditionally: the FTA LEVEL must re-anchor to real 20.65 (37.8 shipped via A-relative gates), and HCA must re-home off the foul path (margin 3.44 → −0.06 under defQ0 while real = 4.12).
 **Direction:** One program PR, now design-first: (1) port the faithful pair — defQ = Σ STL/MIN×44, offQ = Σ TOV/48 − HCA, in 5.60's units with the k-scale derived, not swept; (2) HCA re-homed to basis-scaled site-2 (J12 — target real margin 4.12; account for the `e88 → e90` and-one arm J16 identified); (3) FTA-level re-anchor against **real 20.65**, never the A-baseline; (4) band/golden re-derivation. **Prerequisite:** J19's escape-bound re-derivation with live AST/48 (J16's "unreachable" verdict is void until redone) and a static check of whether live defQ keeps the home arm non-positive. `/plan` with `auto_merge: false` (gate re-grounding is judgment).
 **Risk if untouched:** every foul-share fidelity readout stays confounded, J2's final adjudication cannot run, and two shipped stand-ins (ADR-0061 offQ constant, ADR-0082 defQuality composite) keep wearing a faithfulness label J6 disproved.
-**Status (2026-07-10):** ⬜ Open — re-scoped by J6; design blocked only on J19's escape re-derivation. 🧠 Opus (design + gate re-grounding); port mechanics ⚙️ Sonnet.
+**Status (2026-07-12):** ✅ Implemented — faithful defQ/offQ pair + basis-scaled HCA (margin → paired .sco 3.32) + FTA re-anchor (37.8 → paired .sco 21.32) + kept self-scaling bands + regenerated golden; ADR-0084. 🧠 Opus.
 
 ### J16 FUN_004e3860 net-advantage formula via objdump
 ➜ J16 FUN_004e3860 net-advantage formula — ✅ Implemented (2026-07-10): formula + symmetry closures stand; reachability reopened under J19; see [archive](archive/jsb-native-backlog-archive.md).
@@ -165,7 +165,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 
 ### J18 Composite fidelity ports (bucketweights/teamquality vs the J6 formula map)
 **Location:** `engine/internal/sim/bucketweights.go` + `teamquality.go` — every divergence from the J6-pinned formulas, now enumerable against `jsb-native/re-artifacts/jsb-J6-composite-scales-20260710.md` §2/§6.
-**Problem:** J6 turned "unpinned stand-in" into "known-divergent." Confirmed divergences: (1) `bucketweights.go` comments (~:19, ~:180) assert "+0xDB0 is DEAD (always 0)" — false, it's usage-shrunk 3GA/MIN×48, so `threePtBucketWeight` needs re-derivation from the live composite (also a candidate for J2's residual: FTADisp 1.51, and the 3pt weight sits in the foul-share denominator); (2) `d70LeagueScalar = 1.0` (~:77) where 5.60 uses **S = (leaguePF48×5 − leagueTOV48×0.5)/(leagueFTA48×5)**, exactly computable from the FUN_004385f0 table the engine already models; (3) `d88` (~:159) uses `RealLifeFGA` where 5.60 uses **2PA** (and f-projected inputs); (4) the "+0xDE0 dead ⇒ foul floors" comment (~:85) premise is wrong; (5) `teamquality.go` faithful formulas per J15. Open modeling question: whether to port the `f = (Confidence + rec[+0x18] + 95)/200` ±2% projection modulation and the pass-2 usage shrink, or accept them as documented divergences (they need Confidence + the +0x18 marker in the bundle).
+**Problem:** J6 turned "unpinned stand-in" into "known-divergent." Confirmed divergences: (1) `bucketweights.go` comments (~:19, ~:180) assert "+0xDB0 is DEAD (always 0)" — false, it's usage-shrunk 3GA/MIN×48, so `threePtBucketWeight` needs re-derivation from the live composite (also a candidate for J2's residual: FTADisp 1.51, and the 3pt weight sits in the foul-share denominator); (2) `d70LeagueScalar = 1.0` (~:77) where 5.60 uses **S = (leaguePF48×5 − leagueTOV48×0.5)/(leagueFTA48×5)**, exactly computable from the FUN_004385f0 table the engine already models; (3) `d88` (~:159) uses `RealLifeFGA` where 5.60 uses **2PA** (and f-projected inputs); (4) the "+0xDE0 dead ⇒ foul floors" comment (~:85) premise is wrong; (5) `teamquality.go` faithful formulas per J15; (6) the `param_6` net-advantage foul shrink `e80 ×= 1 − param_6/(4·leagueTOV48)` (J16 exact identity, applied in 5.60 after the coupling and before the ≤0 redraw, both param_5 paths) is UNPORTED — the Go `netAdvantage` feeds shot_value only (found at J15 ratification, 2026-07-12; recorded in ADR-0084 Decision 2). Porting it changes foul share globally and re-opens the level/margin anchors, so it needs its own A/B. Open modeling question: whether to port the `f = (Confidence + rec[+0x18] + 95)/200` ±2% projection modulation and the pass-2 usage shrink, or accept them as documented divergences (they need Confidence + the +0x18 marker in the bundle).
 **Direction:** Foul-adjacent pieces (2)(4)(5) execute inside J15. The shot-mix pieces (1)(3) and the f/shrink question are a follow-on A/B'd PR — each changes bucket weights globally, so headline Cov + Var gates must be re-measured per change, not batched blind. Comment corrections ride the first PR that touches each file.
 **Update (2026-07-12):** All enumerated divergences ported/fixed, each individually A/B'd: (1) threePtBucketWeight = faithful 3GA/MIN×48 (PR #1438); (2) d70LeagueScalar = 0.6472241372826754, S computed exactly from the J9-validated league table (PR #1436); (3) d88 = 2PA/48 (PR #1439); (4) fixed in J15 (#1432); (5) in J15; (6, discovered during J16) :97164 mq foul shrink (PR #1435). Cov unchanged in every A/B — confirming the J2 s2 finding that shot-mix ports are fidelity work, not Cov levers. Follow-up shipped: foulBucketScale re-anchored 0.47 → 0.40 (PR #1440, its documented maintenance contract after the basis shrink); one more anchor check needed after the two stacks (#1436 vs #1437-40) merge. Ports live on two stacks and both edit `bucketweights.go` — expect a merge conflict.
 **Status (2026-07-12):** ◑ Partial — all six formula divergences shipped (PRs #1435–#1440, stacked, pending merge); remaining: the f = (Confidence + rec[+0x18] + 95)/200 projection-modulation / pass-2 usage-shrink port-vs-document question (🧠 user decision — J19's rec[+0x18] evidence favors documenting as divergence).
@@ -174,7 +174,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 **Location:** `jsb-native/` decompile + PE; open items recorded in `jsb-native/re-artifacts/jsb-J6-composite-scales-20260710.md` § still-open.
 **Problem:** J6 left four bounded unknowns, two of them load-bearing: (1) **J16 escape-bound re-derivation with live AST/48** — blocks J15's design (is the home arm's `≤ 0 → redraw` still the dominant path with defQ = Σ STL/MIN×44 and a sign-varying matched term?); (2) **rec[+0x18] in-season semantics** — pinned = 100 at reset, but constant-vs-decay determines `f`'s real spread (±2% vs wider) and whether the f-port matters (J18); (3) energy-formula operand identities (slots 0x1c/0x64/ebx in asm 4d4711–4d4774); (4) +0xD58 — computed and stored (4d42df) but no reader found; confirm dead or find the reader. Also parked here: the transition-retention re-trace (+0xDA0/+0xDA8 live for 3pt shooters — the master ref's vestigial claim was premise-corrected but the downstream retention path was never re-walked).
 **Direction:** Item (1) is arithmetic over already-pinned formulas + IBL5.plr distributions — do it first, it unblocks J15. Items (2)–(4) + the retention re-trace are one objdump session, precedented method. Escalate to 🔮 only if the asm hits the NaN/FPU-flag class.
-**Status (2026-07-10):** ⬜ Open — spawned by J6. 🧠 Opus.
+**Status (2026-07-12):** ✅ Implemented — the load-bearing item (1), J16's escape-bound re-derivation with live AST/48, was resolved inside the J15 program (ADR-0084: the deterministic home arm is effectively-not-perfectly non-positive; live +0xDC8 AST48 shaved the barrier ~15%, residual 57.16 → 48.42, redraw still dominant for any realistic roster). Bounded residue spun forward as a follow-on objdump session — item (2) rec[+0x18] in-season decay semantics, (3) energy-formula operand identities (asm 4d4711–4d4774), (4) +0xD58 dead-vs-reader confirm, plus the +0xDA0/+0xDA8 transition-retention re-trace. 🧠 Opus (🔮 only if the asm hits the NaN/FPU-flag class).
 
 ### J20 Empty-FGA / within-possession restructure (Cov possession channel)
 *(discovered 2026-07-12 during J2 session-2 adjudication)*

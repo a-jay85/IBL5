@@ -229,6 +229,7 @@ func TestBucketWeights_FoulDivisor(t *testing.T) {
 //     itself anti-home. Its magnitude is bounded FAR below leg B — the defQ cap
 //     (defQualityCapMultiplier·defQualityCapTeamMult·leagueSTL48 ≈ 13.76) keeps
 //     (defQ − baseline) too small for leg C to ever rival leg B.
+//
 // Leg B (a ~6% shift on the ~3.35 base) dominates leg C (a sub-1% shift on the
 // ~1.09 factor) by roughly an order of magnitude (measured ≈9.5× here), so the NET
 // is anti-home REGARDLESS of leg C's sign: the home foul weight is LOWER than the
@@ -365,11 +366,11 @@ func TestBucketWeights_RealLifeFallbackUnchanged(t *testing.T) {
 // 3GA > 0 case where twoPA diverges from FGA.
 func TestBucketWeights_RealLifeComposite(t *testing.T) {
 	pl := mkPlayer(1, 3, slotPG, 48)
-	pl.RealLifeMIN = 2400  // ~34 min/game over 70 games
-	pl.RealLifeFGA = 1280  // twoPA = 1280-0 = 1280; d88 = 1280/2400*48 = 25.6
-	pl.RealLife3GA = 0     // no threes → twoPA == FGA (see Row 15 for 3GA > 0)
-	pl.RealLifeORB = 160   // db8 = 160/2400*48  = 3.2
-	pl.RealLifeFTA = 320   // d70 = 320/2400*48  = 6.4 (×1.0)
+	pl.RealLifeMIN = 2400 // ~34 min/game over 70 games
+	pl.RealLifeFGA = 1280 // twoPA = 1280-0 = 1280; d88 = 1280/2400*48 = 25.6
+	pl.RealLife3GA = 0    // no threes → twoPA == FGA (see Row 15 for 3GA > 0)
+	pl.RealLifeORB = 160  // db8 = 160/2400*48  = 3.2
+	pl.RealLifeFTA = 320  // d70 = 320/2400*48  = 6.4 (×1.0)
 	p := oc(slotPG, pl)
 
 	twoPA := pl.RealLifeFGA - pl.RealLife3GA

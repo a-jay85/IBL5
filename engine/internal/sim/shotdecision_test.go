@@ -11,18 +11,18 @@ import (
 
 func TestShotValue_Assembly(t *testing.T) {
 	// 2pt normal: net × 500 / baseline + FGP × 9
-	want2 := 2.0*netToShotValue/leagueBaseline + 50*fgpToPermille
-	if got := shotValue2pt(2.0, 50, false); math.Abs(got-want2) > 1e-9 {
+	want2 := 2.0*netToShotValue/leagueBaselineFallback + 50*fgpToPermille
+	if got := shotValue2pt(2.0, 50, false, leagueBaselineFallback); math.Abs(got-want2) > 1e-9 {
 		t.Errorf("2pt = %v, want %v", got, want2)
 	}
 	// 2pt shot clock: FGP × 9 × 1.3333 (ignores net)
 	wantSC := 50 * fgpToPermille * shotClock2ptMult
-	if got := shotValue2pt(999.0, 50, true); math.Abs(got-wantSC) > 1e-6 {
+	if got := shotValue2pt(999.0, 50, true, leagueBaselineFallback); math.Abs(got-wantSC) > 1e-6 {
 		t.Errorf("2pt shot-clock = %v, want %v", got, wantSC)
 	}
 	// 3pt: baseline × 1.5
-	if got := shotValue3pt(); math.Abs(got-leagueBaseline*1.5) > 1e-9 {
-		t.Errorf("3pt = %v, want %v", got, leagueBaseline*1.5)
+	if got := shotValue3pt(leagueBaselineFallback); math.Abs(got-leagueBaselineFallback*1.5) > 1e-9 {
+		t.Errorf("3pt = %v, want %v", got, leagueBaselineFallback*1.5)
 	}
 	// FT: FTP × 10
 	if got := shotValueFT(75); math.Abs(got-750) > 1e-9 {
@@ -48,20 +48,20 @@ func TestShotValue2pt_Calibration(t *testing.T) {
 	// make-value for an average shooter (FGP 47) with a small positive net sits in a
 	// realistic ~44–56% band — neither degenerate-low (the pre-0045 underfit) nor
 	// absurd-high.
-	if v := shotValue2pt(5, 47, false); v < 440 || v > 560 {
+	if v := shotValue2pt(5, 47, false, leagueBaselineFallback); v < 440 || v > 560 {
 		t.Errorf("avg-FGP 2pt make-value = %.1f‰, want a realistic ~44–56%% band", v)
 	}
 	// Boundary FGP=0 → base2pt 0; a neutral-net value stays ≥ 0 (no underflow).
 	if got := base2pt(0); got != 0 {
 		t.Errorf("base2pt(0) = %v, want 0", got)
 	}
-	if v := shotValue2pt(0, 0, false); v < 0 {
+	if v := shotValue2pt(0, 0, false, leagueBaselineFallback); v < 0 {
 		t.Errorf("shotValue2pt(0,0) = %v, want ≥ 0 (no underflow)", v)
 	}
 	// The 3pt make-value is unchanged by the 2pt recalibration (depends only on
-	// leagueBaseline, which is set so 3pt% stays faithful ≈37.5%).
-	if got := shotValue3pt(); got != leagueBaseline*1.5 {
-		t.Errorf("3pt value = %v, want %v (unchanged by 2pt recalibration)", got, leagueBaseline*1.5)
+	// the baseline, whose fallback is set so 3pt% stays faithful ≈37.5%).
+	if got := shotValue3pt(leagueBaselineFallback); got != leagueBaselineFallback*1.5 {
+		t.Errorf("3pt value = %v, want %v (unchanged by 2pt recalibration)", got, leagueBaselineFallback*1.5)
 	}
 }
 
@@ -69,8 +69,26 @@ func TestShotValue2pt_Calibration(t *testing.T) {
 
 func TestShotValue3pt_IgnoresNet(t *testing.T) {
 	// There is no net parameter; the value is constant regardless of matchup.
-	if shotValue3pt() != leagueBaseline*1.5 {
+	if shotValue3pt(leagueBaselineFallback) != leagueBaselineFallback*1.5 {
 		t.Error("3pt shot value must be league-baseline×1.5, independent of net advantage")
+	}
+}
+
+// TestShotBaselineOrFallback pins the guard gameloop.go's gs.shotBaseline =
+// b.LeagueShotBaseline depends on: bundle.Bundle.LeagueShotBaseline is now
+// assembled at bundle-build time (backup.ToBundle's computeLeagueShotBaseline),
+// so a bundle whose builder never wired it (or whose raw .plr population had
+// no qualifying records) leaves gameState.shotBaseline at the Go zero value —
+// this must degrade to leagueBaselineFallback, never a zero divisor for
+// shotValue2pt/3pt.
+func TestShotBaselineOrFallback(t *testing.T) {
+	var zero gameState
+	if got := zero.shotBaselineOrFallback(); got != leagueBaselineFallback {
+		t.Errorf("zero-value gameState.shotBaselineOrFallback() = %v, want fallback %v", got, leagueBaselineFallback)
+	}
+	wired := gameState{shotBaseline: 19.7805}
+	if got := wired.shotBaselineOrFallback(); got != 19.7805 {
+		t.Errorf("wired gameState.shotBaselineOrFallback() = %v, want 19.7805 (pass-through)", got)
 	}
 }
 

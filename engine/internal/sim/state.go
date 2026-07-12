@@ -148,9 +148,31 @@ type gameState struct {
 	// leaves the read-only instrument inert.
 	gateCont     *GateContAccum
 	gateBaseline float64
+
+	// shotBaseline is the league 2PA-per-48-player-minutes shot baseline
+	// (CEngine+0x6638), copied ONCE per game from bundle.Bundle.LeagueShotBaseline
+	// (gameloop.go) — assembled at bundle-build time over raw .plr records
+	// (backup.ToBundle's computeLeagueShotBaseline), league-constant within a
+	// snapshot, like gateBaseline. It feeds shotValue2pt's net term and
+	// shotValue3pt (= baseline×1.5).
+	shotBaseline float64
 }
 
 func (g *gameState) emit(e result.Event) { g.events = append(g.events, e) }
+
+// shotBaselineOrFallback returns the per-game league 2PA/48 shot baseline, or
+// leagueBaselineFallback when unset — a zero-value gameState constructed
+// directly (as unit tests do), OR a bundle whose LeagueShotBaseline was never
+// wired (a hand-built test bundle, or computeLeagueShotBaseline finding no
+// qualifying raw records). This guards the shotValue2pt zero divisor: an
+// unset baseline must degrade to the documented constant, never to ±Inf
+// make-values.
+func (g *gameState) shotBaselineOrFallback() float64 {
+	if g.shotBaseline > 0 {
+		return g.shotBaseline
+	}
+	return leagueBaselineFallback
+}
 
 // fatigueFactor is the shared JSB fatigue curve: (energy/30 + 100) × 0.01,
 // capped at 1.0. Because PR3a energy is non-negative base stamina, this is

@@ -23,7 +23,7 @@ import (
 func TestPutbackFaithful_MakeValueOriginScoped(t *testing.T) {
 	const fgp = 50
 	net := 5.0
-	normal := shotValue2pt(net, fgp, false)
+	normal := shotValue2pt(net, fgp, false, leagueBaselineFallback)
 	putback := putbackValue2pt(fgp)
 	if putback == normal {
 		t.Fatalf("fixture too weak: putbackValue2pt(%d)=%v equals the normal value %v — cannot distinguish the forms", fgp, putback, normal)
@@ -56,7 +56,7 @@ func TestPutbackFaithful_MakeValueOriginScoped(t *testing.T) {
 func TestPutbackFaithful_HarvestUsesNewBaseline(t *testing.T) {
 	const fgp = 50
 	net := 5.0
-	normal := shotValue2pt(net, fgp, false)
+	normal := shotValue2pt(net, fgp, false, leagueBaselineFallback)
 	putback := putbackValue2pt(fgp)
 
 	accPut := &FreezeAccum{}
@@ -86,7 +86,7 @@ func TestPutbackFaithful_HarvestUsesNewBaseline(t *testing.T) {
 func TestPutbackFaithful_EscapeHatchRestoresMaster(t *testing.T) {
 	const fgp = 50
 	net := 5.0
-	normal := shotValue2pt(net, fgp, false)
+	normal := shotValue2pt(net, fgp, false, leagueBaselineFallback)
 
 	gs := &gameState{freeze: FreezeConfig{UnfaithfulPutback: true}}
 	if got := gs.makeValue2pt(net, fgp, result.OriginOffReb); got != normal {

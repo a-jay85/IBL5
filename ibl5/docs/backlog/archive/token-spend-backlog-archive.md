@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed token-spend reduction entries, extracted from token-spend-backlog.md.
-last_verified: 2026-07-07
+last_verified: 2026-07-11
 ---
 
 # Token-Spend Reduction Backlog — Archive
@@ -8,6 +8,11 @@ last_verified: 2026-07-07
 Read-only historical record of ✅ Implemented entries. For OPEN items see ../token-spend-backlog.md. Not governed by bin/check-docs (historical dead refs tolerated).
 
 ---
+
+### T1 Automouse token ledger
+**Location:** `bin/lib/automouse-stream-filter` (parses `total_cost_usd` + token counts from the stream-json `result` event); `bin/automouse-run` (appends a per-plan, per-phase row to `automouse/reports/YYYY-MM-DD-costs.md`).
+**Problem (was):** The nightly queue was pure spend mechanism with only partial measurement: per-phase cost rows existed, but there was no tier breakdown, no weekly aggregate, and no equivalent report for interactive sessions (the origin 7-day analysis was done by hand).
+**Status (2026-07-09):** ✅ Implemented — `bin/lib/automouse-stream-filter` now emits `cache_write` on the exit line; `bin/automouse-run` cost rows carry Model + Tier columns and a per-phase-rebuilt `## Weekly aggregate (last 7 days)` section (cost-by-tier + tokens-by-phase); new `bin/token-report` runs the interactive-session token analysis on demand.
 
 ### T3 Wire PHP LSP + LSP-first rule
 **Location:** `.claude/rules/lsp-first.md`; intelephense via the php-lsp plugin.

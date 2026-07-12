@@ -1,5 +1,5 @@
 ---
-description: Historical archive: completed JSB native-engine backlog entries, extracted from jsb-native-backlog.md.
+description: Historical archive: completed JSB native-engine backlog entries (J-items), extracted from jsb-native-backlog.md.
 last_verified: 2026-07-12
 ---
 
@@ -63,3 +63,17 @@ Read-only historical record of ✅ Implemented / 🚫 Declined entries. For OPEN
 **Direction:** Build to spec. Machine-verifiable gates: per-game Σ score-deltas == header final; **per-player per-game reconciliation against `ibl_box_scores`** (1988–2008, ~606K rows — stronger than the `.sco` season-total recon originally envisioned); Σ origin FGA == total FGA. Output: team-game per-origin {FGA,FTA,PTS,PPS} CSV → team-season demeaned couplings → J2's per-origin decomposition. **Spec addition (J2 session 1):** also emit home/away × per-quarter FTA — the clean instrument separating the static home-FTA component (~+1–2, confounded by FTA→margin reverse causality in box-score data) from game-state late-game fouling (J17), and the acceptance instrument for the static home-FTA channel — which J16 (2026-07-10) re-homed from param_6 (refuted: side-symmetric) to the site-2 HCA `e88 → e90` and-one feed.
 **Resolution (2026-07-12):** Built and gated. **23,714/23,714 games parsed, 100.0000% sentence closure** (16,236,695 sentences, zero unmatched — the J3 gate held); box join 23,133/23,714 (97.55% — the 581 unjoined are log stretches genuinely absent from `ibl_box_scores`, verified by exhaustive score+roster candidate scans); per-player reconciliation 0.111% bad cells (7,134/6,443,352), with 91.6% of those the engine's silent-block behavior (shooter FGA + blocker BLK recorded with no printed sentence — blocker identity provably text-unrecoverable), the rest cross-side same-surname twin ambiguity. Deliverables under `jsb-native/re-artifacts/j4-parser-20260712/` (machine-local): per-origin FGA shares by game_type (regular: initial 0.754 / putback 0.127 / transition 0.119; putback eFG% ≈ 0.62 vs ≈ 0.50 elsewhere, stable across types), team-game per-origin {FGA,FTA,PTS,PPS}, and the home/away × per-quarter FTA instrument (J17/J20 feed).
 **Status (2026-07-12):** ✅ Implemented — feeds J20 (possession-channel restructure) and J17 (game-state fouling instrument).
+
+---
+
+### J15 Faithful foul-bucket program (live composites + HCA re-homing + level re-anchor)
+
+**Status (2026-07-12):** ✅ Implemented — faithful defQ/offQ pair + basis-scaled HCA (margin → paired .sco 3.32) + FTA re-anchor (37.8 → paired .sco 21.32) + kept self-scaling bands + regenerated golden; ADR-0084. 🧠 Opus.
+
+Full detail: symmetric deterministic base `(2.0 − fatigue)·tovRate(bh)` (correcting the C2 asymmetric-stochastic ADR-0082 stand-in); live defQ = Σ STL/MIN×44 / offQ = Σ TOV/48 coupling factor confirmed increasing in defQ (C1 mis-transcription fixed); ±0.2 site HCA legs restored (Phase 5 re-symmetrization); foulFloor as redraw-only ceiling (not the base); foulBaseFatigueRef named. Absorbs J12 (HCA re-homing) and J19 item (1) (escape-bound re-derivation). Paired-comparator targets: hcaSite2BasisScale = 2.85, foulBucketScale = 0.47.
+
+---
+
+### J19 J6-residue RE (energy operands, rec+0x18 semantics, escape re-derivation, +0xD58)
+
+**Status (2026-07-12):** ✅ Implemented — the load-bearing item (1), J16's escape-bound re-derivation with live AST/48, was resolved inside the J15 program (ADR-0084: the deterministic home arm is effectively-not-perfectly non-positive; live +0xDC8 AST48 shaved the barrier ~15%, residual 57.16 → 48.42, redraw still dominant for any realistic roster). Bounded residue spun forward as a follow-on objdump session — item (2) rec[+0x18] in-season decay semantics, (3) energy-formula operand identities (asm 4d4711–4d4774), (4) +0xD58 dead-vs-reader confirm, plus the +0xDA0/+0xDA8 transition-retention re-trace. 🧠 Opus (🔮 only if the asm hits the NaN/FPU-flag class).

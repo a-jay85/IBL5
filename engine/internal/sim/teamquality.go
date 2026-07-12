@@ -42,10 +42,12 @@ const (
 
 	// leagueSTL48 is the real 5.60 league per-48 steal mean. J does not pin it (J16
 	// pins only TOV); it is a documented real-basketball anchor: real STL:TOV ≈ 0.547
-	// (steals-per-48 ≈ 1.83 vs turnovers-per-48 ≈ 3.35), the ratio that sets the
-	// balanced-matchup shrink 1 − (leagueSTL48/leagueTOV48)·(5/6) ≈ 0.545. Its ABSOLUTE
-	// value is not load-bearing (the cap below rarely binds; the RATIO drives the
-	// shrink; the level is foulBucketScale) — the STL:TOV ratio is the grounded input.
+	// (steals-per-48 ≈ 1.83 vs turnovers-per-48 ≈ 3.35). The baseline is subtracted in
+	// the faithful coupling factor (foulBucketWeight, :97163): factor = 1 + (defQ −
+	// (5/6)·5·leagueSTL48)/offQ, which at a balanced matchup ≈ 1.091 (AMPLIFIES, not
+	// shrinks). Its ABSOLUTE value is not load-bearing (the cap below rarely binds; the
+	// RATIO drives the factor offset; the level is foulBucketScale) — the STL:TOV ratio
+	// is the grounded input.
 	leagueSTL48 = 1.834
 
 	// ratingRefScale (50 = 0-99 rating mid-scale) anchors the rating→per-48 stand-in

@@ -45,7 +45,7 @@ func assembleInputs(foulWeight, hca float64) outcomeInputs {
 // (home's larger 2pt denominator makes foul a marginally smaller share). This test
 // confirms home and away foul shares are NEAR-EQUAL — the property that yields a
 // ≈1.0 home/away FTA ratio, superseding the old home>away asymmetry (ADR-0082).
-// After the Phase-6 re-anchor (foulBucketScale=0.50), the foul share is again a
+// After the Phase-6 re-anchor (foulBucketScale=0.47), the foul share is again a
 // 2pt-dominated realistic minority (~9%), so this test asserts BOTH the structural
 // side-symmetry AND the re-anchored LEVEL band (phase2-derivation.md).
 func TestBucketWeights_FoulPathMix(t *testing.T) {
@@ -82,7 +82,7 @@ func TestBucketWeights_FoulPathMix(t *testing.T) {
 	// ~0.9 share; an unscaled bucket, ~0.01. A minority in [0.03, 0.15] is the faithful
 	// regime this dial was re-anchored to.
 	if homeFoul < 0.03 || homeFoul > 0.15 {
-		t.Errorf("home foul share = %.4f, want a realistic minority in [0.03, 0.15] (level re-anchored, foulBucketScale=0.50)", homeFoul)
+		t.Errorf("home foul share = %.4f, want a realistic minority in [0.03, 0.15] (level re-anchored, foulBucketScale=0.47)", homeFoul)
 	}
 	// Symmetry: home/away foul shares differ ONLY through the ±hca on the 2pt bucket,
 	// so they are near-equal (the discriminator property). NOT the old home>away arm.
@@ -112,7 +112,7 @@ func TestBucketWeights_TwoPtComposite(t *testing.T) {
 	}
 
 	// The foul weight matches the hand-recomputed faithful formula AND — restored after
-	// the Phase-6 re-anchor (foulBucketScale=0.50) — the 2pt composite DOMINATES it
+	// the Phase-6 re-anchor (foulBucketScale=0.47) — the 2pt composite DOMINATES it
 	// (≈16.47 vs ≈2.13 at this fixture), the minority-foul-share invariant the original
 	// +0xD90 characterization pinned.
 	off := fiveStarters(3)

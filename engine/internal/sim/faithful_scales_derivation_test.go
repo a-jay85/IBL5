@@ -13,7 +13,9 @@ import (
 func TestFaithfulScales_Recompute(t *testing.T) {
 	const eps = 1e-9
 
-	// Coupling: 1 − defQ·(5/6)/offQ (J6 :97163, _DAT_0066d3a0 = 0.8333, PE 0x66D3A0).
+	// Coupling factor denominator coefficient: PE 0x66D3A0 = 5/6 ≈ 0.8333 (J6 :97163).
+	// The correct factor is 1 + (defQ − 5/6·5·leagueSTL48)/offQ — increasing in defQ;
+	// "1 − defQ·(5/6)/offQ" was the C1 mis-transcription, superseded by ADR-0084.
 	if math.Abs(foulDivisorTeamDefCoef-5.0/6.0) > eps {
 		t.Errorf("foulDivisorTeamDefCoef = %.10f, want 5/6 = %.10f", foulDivisorTeamDefCoef, 5.0/6.0)
 	}

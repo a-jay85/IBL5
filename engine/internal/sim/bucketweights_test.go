@@ -420,3 +420,57 @@ func TestBucketWeights_RealLifeZeroFGA(t *testing.T) {
 		t.Errorf("zero-FGA limit = %v, want 0 (d88)", got)
 	}
 }
+
+// --- J18 item 1: threePtBucketWeight faithful to the recovered +0xDB0 composite --
+
+// Row 12: with real-life minutes, threePtBucketWeight equals the faithful
+// per48Min(RealLife3GA, RealLifeMIN) rate directly — the recovered +0xDB0 composite
+// (FUN_004cfa50 stack-record store, copied by FUN_00405970), NOT the derived
+// 2pt-composite × propensity stand-in.
+func TestBucketWeights_RealLifeThreePt(t *testing.T) {
+	pl := mkPlayer(1, 3, slotPG, 48)
+	pl.RealLifeMIN = 2000
+	pl.RealLife3GA = 200 // per48Min(200, 2000) = 4.8
+	p := oc(slotPG, pl)
+
+	want := per48Min(200, 2000)
+	if got := threePtBucketWeight(p); math.Abs(got-want) > 1e-9 {
+		t.Errorf("threePtBucketWeight = %.6f, want faithful per48Min(RealLife3GA, RealLifeMIN) = %.6f", got, want)
+	}
+	if standin := twoPtBucketWeight(p) * threePtPropensity(p); math.Abs(want-standin) < 1e-9 {
+		t.Fatalf("test setup: faithful rate %.6f coincides with the derived stand-in %.6f — case does not discriminate", want, standin)
+	}
+}
+
+// Row 13 (boundary): RealLifeMIN>0 with RealLife3GA==0 (played real minutes, never
+// attempted a three) must yield an EXACT zero 3pt bucket — faithful to 5.60, which
+// gives a non-shooter a zero +0xDB0 weight, not a small propensity-derived residual.
+func TestBucketWeights_RealLifeThreePtZeroAttempts(t *testing.T) {
+	pl := mkPlayer(1, 3, slotPG, 48)
+	pl.RealLifeMIN, pl.RealLife3GA = 1800, 0
+	got := threePtBucketWeight(oc(slotPG, pl))
+
+	if got != 0 {
+		t.Errorf("non-shooter (RealLife3GA==0) 3pt bucket = %v, want exactly 0 (faithful to 5.60)", got)
+	}
+}
+
+// Row 14 (unchanged stand-in): with no real-life minutes (RealLifeMIN==0),
+// threePtBucketWeight still equals the previous derived stand-in — 2pt composite ×
+// 3pt propensity — byte-for-byte, the no-reference fallback this port preserves.
+func TestBucketWeights_ThreePtFallbackUnchanged(t *testing.T) {
+	p := oc(slotPG, mkPlayer(1, 3, slotPG, 48)) // RealLifeMIN==0 → fallback
+
+	want := twoPtBucketWeight(p) * threePtPropensity(p)
+	if got := threePtBucketWeight(p); math.Abs(got-want) > 1e-9 {
+		t.Errorf("fallback threePtBucketWeight = %.6f, want twoPtBucketWeight×threePtPropensity = %.6f", got, want)
+	}
+
+	// Sums present but MIN==0 → still the fallback (MIN gates the real path, same as
+	// twoPtBucketWeight's real-rate gate).
+	p2 := p
+	p2.RealLife3GA = 9999
+	if got := threePtBucketWeight(p2); math.Abs(got-want) > 1e-9 {
+		t.Errorf("MIN==0 with RealLife3GA set engaged the real path: got %.6f, want %.6f", got, want)
+	}
+}

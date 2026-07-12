@@ -86,8 +86,9 @@ type FreezeConfig struct {
 //   - FoulWeight: mean foulBucketWeight output
 //   - MakeVal2pt: mean PRE-clutch shotValue2pt output (per-mille)
 //
-// The 3pt make-value is a team-invariant constant (shotValue3pt = leagueBaseline×1.5),
-// so it carries no cross-team variance and the Make arm freezes only the 2pt channel.
+// The 3pt make-value is team-invariant within a snapshot (shotValue3pt =
+// gs.shotBaseline×1.5, league-constant per bundle), so it carries no cross-team
+// variance and the Make arm freezes only the 2pt channel.
 type FreezeMeans struct {
 	OrebProb   float64
 	TurnProb   float64
@@ -380,7 +381,7 @@ func (gs *gameState) makeValue2pt(net float64, fgp int, origin result.ShotOrigin
 	// freeze against the NEW baseline. The UnfaithfulPutback escape hatch restores the
 	// old net-coupled value for the ADR-0055 OFF walk only. OriginInitial and
 	// OriginTransition are unchanged (transition putback faithfulness is OOS — ADR-0055).
-	v := shotValue2pt(net, fgp, false)
+	v := shotValue2pt(net, fgp, false, gs.shotBaselineOrFallback())
 	if origin == result.OriginOffReb && !gs.freeze.UnfaithfulPutback {
 		v = putbackValue2pt(fgp)
 	}

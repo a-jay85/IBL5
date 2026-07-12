@@ -197,6 +197,43 @@ func TestReadPlr_SeasonBadField(t *testing.T) {
 	}
 }
 
+// TestReadPlr_RecordIndex pins RecordIndex to the 1-based position of a
+// player's line in the RAW file — counting every CRLF-separated line,
+// including a too-short padding row and a pid==0 team-summary row that never
+// become a PlrPlayer — NOT the post-filter position among appended players
+// and NOT the Ordinal roster-slot field. This is the FUN_004385f0 league-
+// table scan boundary computeLeagueShotBaseline (assemble.go) gates on.
+func TestReadPlr_RecordIndex(t *testing.T) {
+	short := "   1 short line under two hundred bytes"                       // line 1: skipped, still a record
+	teamRow := newPlrRecord(0, 0, 1, 0, "", "", 0, 0, 0)                     // line 2: pid==0, skipped
+	r1 := newPlrRecord(999, 100, 1, 25, "First Real Player", "PG", 70, 5, 5) // line 3
+	r2 := newPlrRecord(1, 200, 1, 30, "Second Real Player", "SG", 60, 4, 4)  // line 4
+	data := short + "\r\n" + teamRow + "\r\n" + r1 + "\r\n" + r2 + "\r\n"
+
+	players, err := ReadPlr(strings.NewReader(data))
+	if err != nil {
+		t.Fatalf("ReadPlr: %v", err)
+	}
+	if len(players) != 2 {
+		t.Fatalf("player count = %d, want 2", len(players))
+	}
+	// r1 is the 3rd raw line (short + teamRow precede it) -> RecordIndex 3,
+	// despite carrying Ordinal 999 -- the two must NOT be conflated.
+	if players[0].RecordIndex != 3 {
+		t.Errorf("player0 RecordIndex = %d, want 3 (short line + team row both count)", players[0].RecordIndex)
+	}
+	if players[0].Ordinal != 999 {
+		t.Errorf("player0 Ordinal = %d, want 999 (unchanged by RecordIndex)", players[0].Ordinal)
+	}
+	// r2 is the 4th raw line -> RecordIndex 4, despite carrying Ordinal 1.
+	if players[1].RecordIndex != 4 {
+		t.Errorf("player1 RecordIndex = %d, want 4", players[1].RecordIndex)
+	}
+	if players[1].Ordinal != 1 {
+		t.Errorf("player1 Ordinal = %d, want 1 (unchanged by RecordIndex)", players[1].Ordinal)
+	}
+}
+
 // Row 3: a non-numeric real-life field yields ErrBadField naming the offset
 // (boundary — the same guard every numeric field uses, now over the new block).
 func TestReadPlr_RealLifeBadField(t *testing.T) {

@@ -198,6 +198,135 @@ func TestToBundle_TeamRates(t *testing.T) {
 	}
 }
 
+// --- J9: faithful league 2PA/48 baseline (FUN_004385f0 port), over RAW .plr
+// records (RecordIndex-gated), NOT the assembled bundle player list ----------
+
+// mkBaselinePlr builds a minimal PlrPlayer carrying only the fields
+// computeLeagueShotBaseline reads: the raw-record scan gate (RecordIndex,
+// Name) and the real-life rate inputs (RealLifeGP/MIN/FGA/3GA).
+func mkBaselinePlr(recordIndex int, name string, gp, min, fga, tga int) PlrPlayer {
+	return PlrPlayer{
+		RecordIndex: recordIndex, Name: name,
+		RealLifeGP: gp, RealLifeMIN: min, RealLifeFGA: fga, RealLife3GA: tga,
+	}
+}
+
+// TestComputeLeagueShotBaseline pins the faithful computation on a synthetic
+// fixture: the RecordIndex ≤ 959 scan boundary (959 included, 960 excluded),
+// the non-empty-name gate, the MIN > 2×GP inclusion gate (strict >, so
+// MIN == 2×GP is excluded), the ratio-of-accumulated-sums arithmetic
+// (explicitly NOT the mean of per-player rates — the decompile write loop,
+// jsb560_decompiled.c:27124-27175, divides pre-accumulated sums), the
+// 2PA = FGA − 3GA subtraction, and the empty-population zero result (the
+// engine-side constant fallback is sim/shotdecision.go's concern, not this
+// function's — see TestShotBaselineOrFallback in the sim package).
+func TestComputeLeagueShotBaseline(t *testing.T) {
+	// Two qualifying players with DIFFERENT per-minute rates plus one gated-out
+	// player whose huge rate would poison the result if the gate leaked.
+	//   A: GP 70, MIN 2400 (> 140) — 2PA = 1000 − 200 = 800  → rate 16.0/48min
+	//   B: GP 80, MIN 1200 (> 160) — 2PA = 700 − 100  = 600  → rate 24.0/48min
+	//   C: GP 60, MIN 120 (NOT > 120 — boundary MIN == 2×GP fails a strict >),
+	//      2PA = 119 (would shift the sums if included)
+	base := []PlrPlayer{
+		mkBaselinePlr(1, "A", 70, 2400, 1000, 200),
+		mkBaselinePlr(2, "B", 80, 1200, 700, 100),
+		mkBaselinePlr(3, "C", 60, 120, 119, 0),
+	}
+
+	// Ratio of sums: (800+600)/(2400+1200) × 48 = 1400/3600 × 48 = 18.666…
+	want := 1400.0 / 3600.0 * 48.0
+	got := computeLeagueShotBaseline(base)
+	if math.Abs(got-want) > 1e-12 {
+		t.Errorf("computeLeagueShotBaseline = %v, want %v (ratio of sums)", got, want)
+	}
+	// Mean of per-player rates would be (16+24)/2 = 20.0 — must NOT match.
+	meanOfRates := (800.0/2400.0*48.0 + 600.0/1200.0*48.0) / 2.0
+	if math.Abs(got-meanOfRates) < 1e-9 {
+		t.Errorf("computeLeagueShotBaseline = %v equals the mean of per-player rates %v — must be the ratio of accumulated sums", got, meanOfRates)
+	}
+
+	// MIN==2×GP boundary gate: flipping C to qualifying (MIN 121 > 120) must
+	// change the result — proves the strict-> gate, not an off-by-one artifact.
+	incl := make([]PlrPlayer, len(base))
+	copy(incl, base)
+	incl[2] = mkBaselinePlr(3, "C", 60, 121, 119, 0)
+	if inc := computeLeagueShotBaseline(incl); math.Abs(inc-got) < 1e-9 {
+		t.Errorf("gate fixture too weak: including C (MIN 121 > 120) left the baseline at %v", inc)
+	}
+
+	// RecordIndex scan boundary: a record at 959 is IN the scan; the identical
+	// record at 960 is OUT — the FUN_004385f0 league-select loop bound.
+	at959 := append(append([]PlrPlayer{}, base...), mkBaselinePlr(959, "D", 70, 2400, 1000, 200))
+	at960 := append(append([]PlrPlayer{}, base...), mkBaselinePlr(960, "D", 70, 2400, 1000, 200))
+	got959 := computeLeagueShotBaseline(at959)
+	got960 := computeLeagueShotBaseline(at960)
+	if math.Abs(got959-got960) < 1e-9 {
+		t.Errorf("RecordIndex 959 vs 960 gave the same baseline (%v == %v) — scan boundary not enforced", got959, got960)
+	}
+	if math.Abs(got960-got) > 1e-9 {
+		t.Errorf("RecordIndex 960 leaked into the sum: got %v, want unchanged base %v", got960, got)
+	}
+	// (959 should differ from base since D is a qualifying additional record.)
+	if math.Abs(got959-got) < 1e-9 {
+		t.Error("RecordIndex 959 fixture too weak: record D did not affect the baseline")
+	}
+
+	// Empty-name gate: a record within the scan with no name is excluded even
+	// though its stats would otherwise qualify.
+	noName := append(append([]PlrPlayer{}, base...), mkBaselinePlr(4, "", 70, 2400, 1000, 200))
+	if got4 := computeLeagueShotBaseline(noName); math.Abs(got4-got) > 1e-9 {
+		t.Errorf("empty-name record leaked into the sum: got %v, want unchanged base %v", got4, got)
+	}
+
+	// Empty population → 0 (never leagueBaselineFallback — that constant is the
+	// sim package's concern, applied by shotBaselineOrFallback on a zero field).
+	if got := computeLeagueShotBaseline(nil); got != 0 {
+		t.Errorf("nil population baseline = %v, want 0", got)
+	}
+	allZero := []PlrPlayer{mkBaselinePlr(1, "E", 0, 0, 0, 0), mkBaselinePlr(2, "F", 0, 0, 0, 0)}
+	if got := computeLeagueShotBaseline(allZero); got != 0 {
+		t.Errorf("all-zero population baseline = %v, want 0", got)
+	}
+	// Qualifying minutes but zero attempts (degenerate Σ2PA) → 0, never a zero
+	// divisor downstream in shotValue2pt.
+	noShots := []PlrPlayer{mkBaselinePlr(1, "G", 10, 500, 0, 0)}
+	if got := computeLeagueShotBaseline(noShots); got != 0 {
+		t.Errorf("zero-attempt population baseline = %v, want 0", got)
+	}
+}
+
+// TestToBundle_LeagueShotBaseline confirms ToBundle wires computeLeagueShotBaseline's
+// result onto the assembled bundle's LeagueShotBaseline field — the end-to-end
+// path gameloop.go's gs.shotBaseline = b.LeagueShotBaseline depends on. teamRoster's
+// makePlayer sets no real-life sums, so an unwired roster assembles to the
+// empty-population zero (the sim-side fallback then applies via
+// shotBaselineOrFallback, not exercised here).
+func TestToBundle_LeagueShotBaseline(t *testing.T) {
+	players := append(teamRoster(1), teamRoster(2)...)
+	sched := []SchGame{{VisitorTeamID: 1, HomeTeamID: 2, Month: 11, Day: 2, Played: true}}
+
+	b, err := ToBundle(players, sched, AssembleOptions{})
+	if err != nil {
+		t.Fatalf("ToBundle: %v", err)
+	}
+	if b.LeagueShotBaseline != 0 {
+		t.Errorf("LeagueShotBaseline = %v, want 0 (no roster player has real-life sums wired)", b.LeagueShotBaseline)
+	}
+
+	roster := teamRoster(1)
+	roster[0].RecordIndex = 1
+	roster[0].RealLifeGP, roster[0].RealLifeMIN, roster[0].RealLifeFGA, roster[0].RealLife3GA = 70, 2400, 1000, 200
+	players2 := append(roster, teamRoster(2)...)
+	b2, err := ToBundle(players2, sched, AssembleOptions{})
+	if err != nil {
+		t.Fatalf("ToBundle: %v", err)
+	}
+	want := 800.0 / 2400.0 * 48.0
+	if math.Abs(b2.LeagueShotBaseline-want) > 1e-9 {
+		t.Errorf("LeagueShotBaseline = %v, want %v", b2.LeagueShotBaseline, want)
+	}
+}
+
 // Row #12: an unknown team and empty inputs are typed errors, not silent empty
 // bundles.
 func TestToBundle_Errors(t *testing.T) {

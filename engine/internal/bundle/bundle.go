@@ -106,9 +106,18 @@ type Player struct {
 	// zero MINUTES — a player with no prior-season reference, or a production bundle
 	// not yet wired — falls back to the rating stand-in (sim/bucketweights.go).
 	// RealLifeFGA is total FG attempts (incl. 3PA).
+	//
+	// RealLifeGP and RealLife3GA feed the league 2PA/48 shot baseline
+	// (sim/shotdecision.go leagueShotBaseline, the FUN_004385f0 league-table
+	// port): GP is the MIN > 2×GP inclusion gate; 3GA isolates pure 2-point
+	// attempts (2PA = RealLifeFGA − RealLife3GA). All-zero (a bundle builder
+	// that has not wired them) simply yields no qualifying players and the
+	// documented constant fallback.
+	RealLifeGP  int `json:"rl_gp"`
 	RealLifeMIN int `json:"rl_min"`
 	RealLifeFGA int `json:"rl_fga"`
 	RealLifeFTA int `json:"rl_fta"`
+	RealLife3GA int `json:"rl_3ga"`
 	RealLifeORB int `json:"rl_orb"`
 
 	// Attributes.
@@ -145,12 +154,24 @@ type Game struct {
 }
 
 // Bundle is the complete engine input for one sim run.
+//
+// LeagueShotBaseline is the league 2PA-per-48-player-minutes shot baseline
+// (CEngine+0x6638, the FUN_004385f0 league-table port — sim/shotdecision.go
+// shotValue2pt/shotValue3pt). It is assembled ONCE per snapshot from the raw
+// .plr records (backup.ToBundle's computeLeagueShotBaseline), NOT from the
+// bundle's player list: the qualifying population is .plr file records 1-959
+// with a non-empty name and RealLifeMIN > 2×RealLifeGP, which is narrower than
+// (and record-position-gated relative to) the assembled Players slice. A
+// bundle that has not wired this field (e.g. a hand-built test bundle) leaves
+// it 0, and the sim degrades to the documented constant fallback
+// (sim/state.go shotBaselineOrFallback) rather than dividing by zero.
 type Bundle struct {
-	LeagueID int      `json:"league_id"`
-	Seed     uint64   `json:"seed"`
-	Teams    []Team   `json:"teams"`
-	Players  []Player `json:"players"`
-	Schedule []Game   `json:"schedule"`
+	LeagueID           int      `json:"league_id"`
+	Seed               uint64   `json:"seed"`
+	Teams              []Team   `json:"teams"`
+	Players            []Player `json:"players"`
+	Schedule           []Game   `json:"schedule"`
+	LeagueShotBaseline float64  `json:"league_shot_baseline"`
 }
 
 // Validation errors surfaced at the contract boundary.

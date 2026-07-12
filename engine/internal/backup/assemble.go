@@ -23,6 +23,48 @@ const (
 	teamASTRateBase = 44.0
 )
 
+// leagueShotBaselineMaxRecordIndex is the FUN_004385f0 league-table scan
+// boundary: JSB 5.60 computes the league 2PA/48 baseline over .plr file
+// RECORDS 1-959 only, at league-select time — records 960+ (which hold
+// hundreds more named players on a full IBL5.plr) are outside that scan and
+// must never leak into the sum (see jsb-native/re-artifacts/jsb-J9-baseline-
+// pin-20260712.md, exact-reproduction pin 19.78050919336985, n=376).
+const leagueShotBaselineMaxRecordIndex = 959
+
+// computeLeagueShotBaseline is the faithful FUN_004385f0 league-table port
+// for the CEngine+0x6638 row: the league's 2-point attempts per 48 player-
+// minutes, (Σ2PA / ΣMIN) × 48 over qualifying RAW .plr records — deliberately
+// NOT over the assembled bundle player list, which is a different (and
+// larger) population. A record qualifies when its RecordIndex is within the
+// scan (≤ leagueShotBaselineMaxRecordIndex), it carries a non-empty Name, and
+// RealLifeMIN > 2×RealLifeGP (the decompile's inclusion gate). 2PA = FGA −
+// 3GA, since RealLifeFGA is the combined FG-attempts total. The ratio is of
+// ACCUMULATED SUMS, never a mean of per-player rates (write loop,
+// jsb560_decompiled.c:27124-27175). An empty qualifying population (e.g. a
+// synthetic/short test roster, or degenerate ΣMIN/Σ2PA) returns 0 — the
+// engine-side documented constant fallback lives in sim/shotdecision.go
+// (leagueBaselineFallback) and applies when it reads a zero
+// bundle.LeagueShotBaseline (sim/state.go shotBaselineOrFallback), never here.
+func computeLeagueShotBaseline(players []PlrPlayer) float64 {
+	var sum2PA, sumMIN float64
+	for _, p := range players {
+		if p.RecordIndex > leagueShotBaselineMaxRecordIndex {
+			continue
+		}
+		if p.Name == "" {
+			continue
+		}
+		if p.RealLifeMIN > 2*p.RealLifeGP {
+			sum2PA += float64(p.RealLifeFGA - p.RealLife3GA)
+			sumMIN += float64(p.RealLifeMIN)
+		}
+	}
+	if sumMIN <= 0 || sum2PA <= 0 {
+		return 0
+	}
+	return sum2PA / sumMIN * 48.0
+}
+
 // AssembleOptions carries the bundle-level metadata the backup files do not
 // themselves provide. The .sch has no game type, so the caller supplies one;
 // the zero value defaults to a regular-season game.
@@ -133,11 +175,12 @@ func ToBundle(players []PlrPlayer, sched []SchGame, opts AssembleOptions) (bundl
 	}
 
 	return bundle.Bundle{
-		LeagueID: opts.LeagueID,
-		Seed:     opts.Seed,
-		Teams:    teams,
-		Players:  bundlePlayers,
-		Schedule: games,
+		LeagueID:           opts.LeagueID,
+		Seed:               opts.Seed,
+		Teams:              teams,
+		Players:            bundlePlayers,
+		Schedule:           games,
+		LeagueShotBaseline: computeLeagueShotBaseline(players),
 	}, nil
 }
 
@@ -174,10 +217,15 @@ func toBundlePlayer(p PlrPlayer, minutes map[int]int) bundle.Player {
 		BLK: p.RatingBLK,
 		// Foul: no .plr source -> 0.
 
-		// Real-life / previous-season sums -> the per-48-minute rate composite inputs.
+		// Real-life / previous-season sums -> the per-48-minute rate composite
+		// inputs. GP/3GA are ALSO read directly off the raw PlrPlayer records
+		// (not this bundle.Player copy) by computeLeagueShotBaseline above, which
+		// runs over a different, narrower population (RecordIndex ≤ 959 + name).
+		RealLifeGP:  p.RealLifeGP,
 		RealLifeMIN: p.RealLifeMIN,
 		RealLifeFGA: p.RealLifeFGA,
 		RealLifeFTA: p.RealLifeFTA,
+		RealLife3GA: p.RealLife3GA,
 		RealLifeORB: p.RealLifeORB,
 
 		Age:         p.Age,

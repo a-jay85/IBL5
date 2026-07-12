@@ -188,7 +188,7 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPen
 			}
 			return false // made shot
 		case outcome3pt:
-			if made, _ := gs.shotAttempt(offense, defense, bh, shotValue3pt(), result.ShotThree, origin, periodIdx); !made {
+			if made, _ := gs.shotAttempt(offense, defense, bh, shotValue3pt(gs.shotBaselineOrFallback()), result.ShotThree, origin, periodIdx); !made {
 				gs.creditBlock(offense, defense, bh, def)
 				if cont, next := gs.rebound(offense, defense, periodIdx); cont {
 					bh = next

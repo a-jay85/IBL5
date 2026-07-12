@@ -66,6 +66,7 @@ func threePtPropensity(p onCourt) float64 {
 //     (leg A): +hcaScaled home / −hcaScaled away on the O(10s) 2pt bucket.
 //   - hca (RAW ±0.2) feeds the foul bucket, where the base (leg B) and offQ (leg C)
 //     carry the raw delta on the faithful CEngine TOV48 basis — see foulBucketWeight.
+//
 // Callers pass 0 for both on the transition path (param_5==0, fully symmetric) and
 // for ASG (hcaDelta returns 0). The and-one leg D (e90 inherits e88's +hca) is added
 // by the caller to andOneWeight, since that bucket is assembled outside playBuckets.

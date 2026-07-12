@@ -229,6 +229,7 @@ func TestBucketWeights_FoulDivisor(t *testing.T) {
 //     itself anti-home. Its magnitude is bounded FAR below leg B — the defQ cap
 //     (defQualityCapMultiplier·defQualityCapTeamMult·leagueSTL48 ≈ 13.76) keeps
 //     (defQ − baseline) too small for leg C to ever rival leg B.
+//
 // Leg B (a ~6% shift on the ~3.35 base) dominates leg C (a sub-1% shift on the
 // ~1.09 factor) by roughly an order of magnitude (measured ≈9.5× here), so the NET
 // is anti-home REGARDLESS of leg C's sign: the home foul weight is LOWER than the

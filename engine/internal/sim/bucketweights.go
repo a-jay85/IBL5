@@ -166,17 +166,25 @@ func per48Min(stat, minutes int) float64 {
 //
 //	D90 = D88 − (D88/(D70+D88)) × DB8 × ((D88/(DB8+D88)) × 0.5 + 0.25)
 //
-// where D88 = per-48 FGA rate, DB8 = per-48 ORB rate, D70 = the FTA-weighted rate.
-// The composite formula is unchanged; what changed (ADR-0040, candidate A) is its
-// INPUTS. When the bundle carries the real-life minutes (RealLifeMIN > 0) D88/DB8/
-// D70 are the FAITHFUL per-48-MINUTE rates (stat/MIN)×48 — the wide team-to-team
-// spread 5.60 disperses team offense on, in the same O(10s) magnitude as the
-// stand-in (a high-volume player ≈ 27 FGA/48). Absent them (rookie / unwired
-// production bundle) it falls back to the compressed rating stand-in (fgaRateScale
-// etc.), the behavior this PR preserves byte-for-byte for the no-reference case.
-// (Using minutes, not games, is load-bearing: per-48-GAMES would be ~55× larger,
-// driving the 2pt bucket to O(100s) and collapsing the foul/FTA play-outcome share
-// to ~0 — verified degenerate against the .sco corpus.)
+// where D88 = per-48 2PA rate (2PA = FGA − 3GA), DB8 = per-48 ORB rate, D70 = the
+// FTA-weighted rate. The composite formula is unchanged; what changed (ADR-0040,
+// candidate A) is its INPUTS. When the bundle carries the real-life minutes
+// (RealLifeMIN > 0) D88/DB8/D70 are the FAITHFUL per-48-MINUTE rates (stat/MIN)×48
+// — the wide team-to-team spread 5.60 disperses team offense on, in the same
+// O(10s) magnitude as the stand-in (a high-volume player ≈ 27 2PA/48). Absent them
+// (rookie / unwired production bundle) it falls back to the compressed rating
+// stand-in (fgaRateScale etc.), the behavior this PR preserves byte-for-byte for
+// the no-reference case. (Using minutes, not games, is load-bearing: per-48-GAMES
+// would be ~55× larger, driving the 2pt bucket to O(100s) and collapsing the
+// foul/FTA play-outcome share to ~0 — verified degenerate against the .sco
+// corpus.)
+//
+// 5.60's +0xD88 composite input is the two-point-attempt rate, not total FGA (J6
+// RE session 2026-07-10, FUN_004cfa50 stack-record store family — the same
+// provenance chain as +0xDB0/+0xDC8/+0xD70), parallel to the league 2PA/48
+// baseline at CEngine+0x6638 (assemble.go computeLeagueShotBaseline): both
+// subtract 3GA from the combined FGA total to isolate the two-point economy
+// 5.60 feeds this bucket.
 //
 // It is net-free: in JSB net enters only via shot_value, so the playoff ×1.25
 // multiplier never amplifies this bucket. The composite is O(10s), keeping the
@@ -185,7 +193,11 @@ func per48Min(stat, minutes int) float64 {
 func twoPtBucketWeight(p onCourt) float64 {
 	var d88, db8, d70 float64
 	if p.RealLifeMIN > 0 {
-		d88 = per48Min(p.RealLifeFGA, p.RealLifeMIN)
+		twoPA := p.RealLifeFGA - p.RealLife3GA
+		if twoPA < 0 {
+			twoPA = 0 // corrupt record guard: 3GA can never exceed FGA in valid .plr data
+		}
+		d88 = per48Min(twoPA, p.RealLifeMIN)
 		db8 = per48Min(p.RealLifeORB, p.RealLifeMIN)
 		d70 = per48Min(p.RealLifeFTA, p.RealLifeMIN) * d70LeagueScalar
 	} else {

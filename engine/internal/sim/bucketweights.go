@@ -206,7 +206,8 @@ func twoPtBucketWeight(p onCourt) float64 {
 		d70 = floor1(p.FTA) * ftaRateScale
 	}
 	// Guard both composite divisions. The real-rate path can yield d88 == 0 (a
-	// player who took no FGs) where the stand-in's floor1 always made d88 > 0; with
+	// player with twoPA == 0: no FGA, all-three shooter, or corrupt 3GA>FGA record)
+	// where the stand-in's floor1 always made d88 > 0; with
 	// d88 == 0 the faithful composite limit is d88 (the subtracted term carries d88
 	// as a factor), and without this guard makeShare's d88/(db8+d88) is 0/0 = NaN
 	// when db8 is also 0 — a NaN that would silently poison the weighted pick.

@@ -1,6 +1,6 @@
 ---
 description: JSB native-engine backlog — the count-axis cut-over blocker chain, static RE pins, faithful ports, and validation gates, each tagged with the model tier that owns its load-bearing reasoning (Fable-gated items marked).
-last_verified: 2026-07-11
+last_verified: 2026-07-12
 ---
 
 # JSB Native-Engine Backlog
@@ -51,10 +51,10 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 13 |
+| ⬜ Open | 11 |
 | 📋 Planned | 0 |
 | ◑ Partial | 1 |
-| ✅ Implemented | 5 |
+| ✅ Implemented | 7 |
 | 🚫 Declined | 0 |
 
 ---
@@ -96,7 +96,8 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 **Adjudication session 1 (🔮 Fable, 2026-07-10 — full record `jsb-native/re-artifacts/jsb-J2-adjudication-20260710.md`):** Both escape hatches failed post-J1 (sign survives at −0.000774; wins_resid_p50 7.75). Verdict: **not terminal — the exhausted-map premise is refuted.** The dominant carrier is a *mechanical* Cov injection from unfaithful foul share (PPS counts FT points while foul plays displace FGA), led by the 1.8× FTA level (legacy). Measured: defQ ≡ 0 full-corpus A/B moved gt2 Cov −0.000774 → **−0.000340** (real +0.000269; gt4 −0.001027 → −0.000365), FTA/g 37.8 → 23.3 (real 20.65), FTADisp 2.02 → 1.51 — while unmasking deficits the phantom FTA was paying for: margin 3.44 → −0.06 (real 4.12), level_gap_pf −2.27 → −4.05, Var(lnPPS)/Var(lnFGA) now UNDER real. New corpus instrument: real home/away FTA split (25,892 games) = 22.04/19.30 (1.142×), edge follows the *winner* (game-state fouling — J17); engine at master = 48.6/22.1 (2.20×). Explains ADR-0043's foul-only freeze arm carrying 47.6% of |Cov| and the inverted corr(realized PPS, roster FGP) = −0.14.
 **Premise overturned same day (J6):** session 1's static substitution rested on J5's "defQ ≡ 0" pin, which J6 overturned (+0xDD0 = live STL/MIN×44; +0xDE0 = live TOV/48). The A/B *numbers* stand as measurements of the defQ0 configuration, but the "faithful" label on defQ0 — and the "symmetric U[0,0.6) both sides / home arm dead" verdict — are void. The corpus evidence (winner-following FTA edge, no deterministic-arm bimodality) still constrains how large a live deterministic arm can be, but that is now an empirical question, not a static proof.
 **Direction:** **Session 2 first re-adjudicates against live composites** (what does the faithful pair look like with defQ = Σ STL/MIN×44 and offQ = Σ TOV/48 − HCA? does the redraw still dominate?), then re-runs the channel split on the re-scoped J15 engine. Residual (−0.00034) hunt order: J18 composite ports (foul-share *denominator* dispersion — FTADisp still 1.51) → J4 per-origin decomposition → then terminal-vs-shippable if the sign still holds.
-**Status (2026-07-10):** ◑ Partial — carrier named and measured; static premise overturned by J6; re-adjudication + final verdict pend the re-scoped J15. 🔮 Fable.
+**Adjudication session 2 (🔮 Fable, 2026-07-12 — full record `jsb-native/re-artifacts/jsb-J2s2-cov-adjudication-20260712.md`):** Channel split on the J15 engine: real gt2 Cov = +0.000612, of which the **possession-count channel carries +0.000498 (81%)**; engine −0.000441 = −0.000126 (poss) + −0.000315 (shots-per-poss). Arithmetic consequence: flipping the shot-mix term all the way to real still leaves −0.000012 ≤ 0 — **the sign flip is unreachable through the shot-mix channel**, retiring J18 ports as Cov levers (empirically confirmed: items 1/2/3/6 each left Cov unchanged within noise). The possession channel is budget-blocked (ADR-0054, generator-independent) behind the engine's within-possession structure: the empty-FGA retry loop over-disperses shots-per-poss and dilutes realized PPS on high-volume teams (corr −0.42) where 5.60 — itself a base_time generator producing this corpus — does not. **Verdict: SHIPPABLE with documented residual, not terminal.** Hunt order: (1) J4 real-side per-origin measurement; (2) restructure the empty-FGA/retry possession model against that evidence (successor item to ADR-0042's open item — needs its own RE + plan); (3) re-measure after PR4/coaching mature matchupQuality (emergent, no action).
+**Status (2026-07-12):** ✅ Adjudicated — verdict shippable-with-residual; successor work = empty-FGA restructure, gated on J4. 🔮 Fable.
 
 ### J3 Per-origin efficiency identifiability (IBL5.log)
 **Location:** IBL5.log — 1.1 GB, **22,798 games** ≈ 19–20 seasons of 5.60 play-by-play (machine-local; earlier "23,714" was a miscount).
@@ -138,7 +139,8 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 **Location:** `engine/internal/sim/shotdecision.go` `leagueBaseline` — a `.sco`-calibrated 250‰ stand-in whose comment repeats a wrong identity ("historical league-wide 2P%").
 **Problem:** The 2026-07-08 closure pinned the real thing: 5.60 computes league 2PA/48 and the position 2P%/FG% tables per-dataset from `.plr` real-life stats (records 1–959, gate MIN > 2×GP), verified by exact recomputation to every displayed digit. The engine's stand-in is calibration-anchored (nothing is *broken*), but a faithful per-dataset computation removes a corpus dependency and makes quick-league behavior faithful automatically.
 **Direction:** Comment fix rides along on any engine PR now; the actual swap is a small port with an A/B (calibration is anchored to the stand-in today). Full formula + inclusion rule are already written down — no RE remains.
-**Status (2026-07-08):** ⬜ Open. ⚙️ Sonnet build + 🧠 Opus A/B.
+**Resolution (2026-07-12):** The pin 19.7805091933698 reproduces EXACTLY (19.78050919336985, n=376) from the game-install `.plr` with population = file records 1–959 + non-empty name + MIN > 2·GP — simultaneously with the FTM/48 and TOV/48 pins; the repo snapshot gives 19.8286 (n=373). Ported at assemble level: `PlrPlayer.RecordIndex` gate, `Bundle.LeagueShotBaseline` (json `league_shot_baseline`), single consumption in gameloop, 250.0 fallback retained for zero/legacy bundles. A/B indistinguishable from base noise. Full record: `jsb-native/re-artifacts/jsb-J9-baseline-pin-20260712.md`.
+**Status (2026-07-12):** ✅ Implemented — PR #1437 (stacked on J15 #1432, pending merge).
 
 ### J10 `.plb` minutes reader + stamina=100 bundle fix
 **Location:** `engine/internal/backup` bundle assembly — `DCMinutes` zeroed and stamina defaulted to 0 at assemble time (line refs drift; grep `assemble.go` for the two TODO sites).
@@ -195,7 +197,8 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 **Location:** `engine/internal/sim/bucketweights.go` + `teamquality.go` — every divergence from the J6-pinned formulas, now enumerable against `jsb-native/re-artifacts/jsb-J6-composite-scales-20260710.md` §2/§6.
 **Problem:** J6 turned "unpinned stand-in" into "known-divergent." Confirmed divergences: (1) `bucketweights.go` comments (~:19, ~:180) assert "+0xDB0 is DEAD (always 0)" — false, it's usage-shrunk 3GA/MIN×48, so `threePtBucketWeight` needs re-derivation from the live composite (also a candidate for J2's residual: FTADisp 1.51, and the 3pt weight sits in the foul-share denominator); (2) `d70LeagueScalar = 1.0` (~:77) where 5.60 uses **S = (leaguePF48×5 − leagueTOV48×0.5)/(leagueFTA48×5)**, exactly computable from the FUN_004385f0 table the engine already models; (3) `d88` (~:159) uses `RealLifeFGA` where 5.60 uses **2PA** (and f-projected inputs); (4) the "+0xDE0 dead ⇒ foul floors" comment (~:85) premise is wrong; (5) `teamquality.go` faithful formulas per J15. Open modeling question: whether to port the `f = (Confidence + rec[+0x18] + 95)/200` ±2% projection modulation and the pass-2 usage shrink, or accept them as documented divergences (they need Confidence + the +0x18 marker in the bundle).
 **Direction:** Foul-adjacent pieces (2)(4)(5) execute inside J15. The shot-mix pieces (1)(3) and the f/shrink question are a follow-on A/B'd PR — each changes bucket weights globally, so headline Cov + Var gates must be re-measured per change, not batched blind. Comment corrections ride the first PR that touches each file.
-**Status (2026-07-10):** ⬜ Open — spawned by J6. 🧠 Opus (A/B verdicts + f-port decision); edits ⚙️ Sonnet.
+**Update (2026-07-12):** All enumerated divergences ported/fixed, each individually A/B'd: (1) threePtBucketWeight = faithful 3GA/MIN×48 (PR #1438); (2) d70LeagueScalar = 0.6472241372826754, S computed exactly from the J9-validated league table (PR #1436); (3) d88 = 2PA/48 (PR #1439); (4) fixed in J15 (#1432); (5) in J15; (6, discovered during J16) :97164 mq foul shrink (PR #1435). Cov unchanged in every A/B — confirming the J2 s2 finding that shot-mix ports are fidelity work, not Cov levers. Follow-up shipped: foulBucketScale re-anchored 0.47 → 0.40 (PR #1440, its documented maintenance contract after the basis shrink); one more anchor check needed after the two stacks (#1436 vs #1437-40) merge. Ports live on two stacks and both edit `bucketweights.go` — expect a merge conflict.
+**Status (2026-07-12):** ◑ Partial — all six formula divergences shipped (PRs #1435–#1440, stacked, pending merge); remaining: the f = (Confidence + rec[+0x18] + 95)/200 projection-modulation / pass-2 usage-shrink port-vs-document question (🧠 user decision — J19's rec[+0x18] evidence favors documenting as divergence).
 
 ### J19 J6-residue RE (energy operands, rec+0x18 semantics, escape re-derivation, +0xD58)
 **Location:** `jsb-native/` decompile + PE; open items recorded in `jsb-native/re-artifacts/jsb-J6-composite-scales-20260710.md` § still-open.

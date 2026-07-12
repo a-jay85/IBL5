@@ -34,8 +34,8 @@ mkdir -p "$QUEUE_DIR"
 # entry. rm -f is a no-op when nothing is there.
 evict_dispositions() {
     local name=$1
-    rm -f "$SKIPPED_DIR/$name" "$SKIPPED_DIR/${name}.attempts" "$SKIPPED_DIR/${name}.staleness" \
-          "$DONE_DIR/$name" "$DONE_DIR/${name}.attempts" "$DONE_DIR/${name}.staleness"
+    rm -f "$SKIPPED_DIR/$name" "$SKIPPED_DIR/${name}.attempts" "$SKIPPED_DIR/${name}.staleness" "$SKIPPED_DIR/${name}.failure" \
+          "$DONE_DIR/$name" "$DONE_DIR/${name}.attempts" "$DONE_DIR/${name}.staleness" "$DONE_DIR/${name}.failure"
 }
 
 show_queue() {
@@ -88,7 +88,7 @@ if [ "$1" = "remove" ] || [ "$1" = "rm" ]; then
         show_queue >&2
         exit 1
     fi
-    rm -f "$QUEUE_DIR/$TARGET" "$QUEUE_DIR/${TARGET}.attempts"
+    rm -f "$QUEUE_DIR/$TARGET" "$QUEUE_DIR/${TARGET}.attempts" "$QUEUE_DIR/${TARGET}.failure"
     echo "Removed from queue: $TARGET (original plan in $PLANS_DIR is untouched)"
     echo ""
     show_queue
@@ -108,7 +108,7 @@ if [ "$1" = "requeue" ]; then
             continue
         fi
         mv "$f" "$QUEUE_DIR/$name"
-        rm -f "$QUEUE_DIR/${name}.attempts"
+        rm -f "$QUEUE_DIR/${name}.attempts" "$QUEUE_DIR/${name}.failure"
         evict_dispositions "$name"
         count=$((count + 1))
         echo "  requeued: $name"

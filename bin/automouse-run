@@ -194,6 +194,11 @@ QUEUE_DIR="$NIGHTLY_DIR/queue"
 PLANS_DIR="${PLANS_DIR:-$HOME/.claude/plans}"
 MAX_ELAPSED=17100  # ~4h45m — stops around 4:45am, leaves headroom in the 5h usage window
 MAX_ATTEMPTS=3     # per-plan retry cap within one night (covers impl + postplan phases)
+# Failure-report caps (ADR-0084): the `.failure` sidecar fed to an escalated
+# retry is at most this many lines AND this many bytes (whichever is smaller),
+# so a multi-hour transcript can never blow the retry's context window.
+FAILURE_TAIL_LINES=200
+FAILURE_TAIL_BYTES=20000
 MAX_IMPL_SECS=3600   # per-phase cap: impl gets at most 1h
 MAX_PP_SECS=3600     # per-phase cap: post-plan gets at most 1h
 LOCK_TTL_SECS=9000   # max a single plan legitimately holds its claim lock
@@ -392,7 +397,7 @@ refund_attempt() {
     local current
     current=$(cat "$ATTEMPT_FILE" 2>/dev/null || echo 0)
     if [ "$current" -le 1 ]; then
-        rm -f "$ATTEMPT_FILE"
+        rm -f "$ATTEMPT_FILE" "$FAILURE_FILE"
     else
         echo $(( current - 1 )) > "$ATTEMPT_FILE"
     fi
@@ -465,6 +470,42 @@ write_env_stop_report() {
         tail -n +"$(( log_before + 1 ))" "$LOG" 2>/dev/null | tail -20 || true
         printf '\n```\n'
     } > "$reports_dir/$(date +%Y-%m-%d)-env-stop-$slug.md"
+}
+
+# Persist a per-attempt failure report for the escalated final retry (ADR-0084).
+# Writes a CAPPED tail of THIS attempt's log slice to a `.failure` sidecar in
+# QUEUE_DIR, a sibling of the `.attempts` counter, so it shares that counter's
+# lifecycle and is fed to the next attempt by bin/automouse-prompt-impl. Capped
+# because the slice can be a multi-hour transcript; a crashed/stall-killed agent
+# may have written nothing structured, so a raw log tail is the reliable,
+# agent-cooperation-free baseline.
+# Args: <plan_name> <log_before> <impl_model> <attempt_num>
+write_failure_report() {
+    _wfr_plan="$1"; _wfr_before="$2"; _wfr_model="$3"; _wfr_attempt="$4"
+    _wfr_file="$QUEUE_DIR/${_wfr_plan}.failure"
+    {
+        printf '# Prior attempt %d/%d failed (model: %s) at %s\n\n' \
+            "$_wfr_attempt" "$MAX_ATTEMPTS" "$_wfr_model" "$(date)"
+        printf 'This is the tail of the previous impl attempt that did NOT complete.\n'
+        printf 'Read it to avoid repeating the same failure; it is capped and may be truncated mid-line.\n\n'
+        printf '## Last %d lines of the failed attempt log (hard-capped to %d bytes)\n\n```\n' \
+            "$FAILURE_TAIL_LINES" "$FAILURE_TAIL_BYTES"
+        sed -n "$(( _wfr_before + 1 )),\$p" "$LOG" \
+            | tail -n "$FAILURE_TAIL_LINES" \
+            | tail -c "$FAILURE_TAIL_BYTES"
+        printf '\n```\n'
+    } > "$_wfr_file"
+}
+
+# Decide whether to feed the prior-failure report to this attempt's impl prompt.
+# YES iff escalation fired (impl model != base model) AND the sidecar is present.
+# DECOUPLED from the escalation trigger (ADR-0084): the report is fed only when
+# both hold, so (a) a leaked/stale sidecar on a NON-escalated attempt is never
+# fed, and (b) an escalation with no sidecar degrades gracefully to an
+# un-augmented Opus retry.
+# Args: <base_model> <impl_model> <failure_file>   → exit 0 = feed, 1 = do not
+should_feed_failure_report() {
+    [ "$1" != "$2" ] && [ -f "$3" ]
 }
 
 # Move entries in a automouse subdir untouched for $ARCHIVE_AGE_DAYS into a sibling
@@ -619,6 +660,7 @@ while true; do
 
     # Per-plan retry counter — skip poison pills
     ATTEMPT_FILE="$QUEUE_DIR/${PLAN_NAME}.attempts"
+    FAILURE_FILE="$QUEUE_DIR/${PLAN_NAME}.failure"   # capped tail of the last genuine impl failure (ADR-0084); lifecycle-tied to ATTEMPT_FILE
     ATTEMPTS=0
     if [ -f "$ATTEMPT_FILE" ]; then
         ATTEMPTS=$(cat "$ATTEMPT_FILE")
@@ -627,7 +669,7 @@ while true; do
         echo "Plan $PLAN_NAME failed $ATTEMPTS times — moving to skipped/." >> "$LOG"
         mkdir -p "$NIGHTLY_DIR/skipped"
         mv "$NEXT_PLAN" "$NIGHTLY_DIR/skipped/"
-        rm -f "$ATTEMPT_FILE"
+        rm -f "$ATTEMPT_FILE" "$FAILURE_FILE"
         REPORTS_DIR="$NIGHTLY_DIR/reports"
         mkdir -p "$REPORTS_DIR"
         SLUG=$(basename "$PLAN_NAME" .md)
@@ -680,13 +722,30 @@ while true; do
         # depth regardless of the user's interactive `/effort` setting (which
         # writes ~/.claude/settings.json effortLevel). Do not remove as
         # "redundant with the default" — the pin is the point.
-        IMPL_MODEL=$(bin/lib/plan-impl-model "$NEXT_PLAN")
+        BASE_MODEL=$(bin/lib/plan-impl-model "$NEXT_PLAN")
+        # Escalate a non-Opus plan to Opus on its FINAL attempt only (ADR-0084).
+        # $ATTEMPTS is the PRE-increment read (:621-624); the attempt now running
+        # is $(( ATTEMPTS + 1 )), which the helper compares against MAX_ATTEMPTS.
+        IMPL_MODEL=$(bin/lib/automouse-escalate-model "$BASE_MODEL" "$(( ATTEMPTS + 1 ))" "$MAX_ATTEMPTS")
+        if [ "$IMPL_MODEL" != "$BASE_MODEL" ]; then
+            echo "[$(date +%H:%M:%S)] ESCALATING impl model $BASE_MODEL -> $IMPL_MODEL (final attempt $(( ATTEMPTS + 1 ))/$MAX_ATTEMPTS) for $PLAN_NAME" >> "$LOG"
+        fi
         echo "[$(date +%H:%M:%S)] impl model: $IMPL_MODEL for $PLAN_NAME" >> "$LOG"
+        # Assemble the impl prompt. On the escalated final retry ONLY, append a
+        # second trailing context line (PRIOR_FAILURE_REPORT=<path>) in the same
+        # style as PLAN_FILE — report-if-present, decoupled from the escalation
+        # trigger (ADR-0084).
+        IMPL_PROMPT="$(cat bin/automouse-prompt-impl)
+
+PLAN_FILE=$PLAN_NAME"
+        if should_feed_failure_report "$BASE_MODEL" "$IMPL_MODEL" "$FAILURE_FILE"; then
+            IMPL_PROMPT="$IMPL_PROMPT
+PRIOR_FAILURE_REPORT=$FAILURE_FILE"
+            echo "[$(date +%H:%M:%S)] feeding prior failure report to escalated retry: $FAILURE_FILE for $PLAN_NAME" >> "$LOG"
+        fi
         NIGHTLY_CMDPID_FILE="$CMDPID_FILE" \
         timeout "$REMAINING_SECS" \
-            claude -p "$(cat bin/automouse-prompt-impl)
-
-PLAN_FILE=$PLAN_NAME" \
+            claude -p "$IMPL_PROMPT" \
                 --dangerously-skip-permissions \
                 --model "$IMPL_MODEL" \
                 --effort high \
@@ -748,9 +807,17 @@ PLAN_FILE=$PLAN_NAME" \
         # Handoff created → impl succeeded, reset attempt counter
         if [ -f "$HANDOFF_FILE" ]; then
             echo "Handoff file created — impl succeeded." >> "$LOG"
-            rm -f "$ATTEMPT_FILE"
+            rm -f "$ATTEMPT_FILE" "$FAILURE_FILE"
         elif [ ! -e "$NEXT_PLAN" ]; then
             echo "Impl made a deliberate disposition (plan left queue/, e.g. already-merged → done/ or a stale-plan skip) — not an environmental failure, continuing." >> "$LOG"
+        else
+            # Genuine (non-environmental) failure: handoff absent, plan STILL in
+            # queue/, and the env-stop guard did NOT fire (it breaks above). The
+            # incremented attempt stays in place (→ eventual poison-pill, unchanged).
+            # Persist the capped failure report so the NEXT attempt — escalated to
+            # Opus on the final retry (ADR-0084) — has this attempt's context.
+            write_failure_report "$PLAN_NAME" "$IMPL_LOG_BEFORE" "$IMPL_MODEL" "$(( ATTEMPTS + 1 ))"
+            echo "Genuine impl failure — wrote $FAILURE_FILE (attempt $(( ATTEMPTS + 1 ))/$MAX_ATTEMPTS)." >> "$LOG"
         fi
     fi
 
@@ -830,9 +897,9 @@ PLAN_FILE=$PLAN_NAME" \
         fi
     fi
 
-    # If the plan moved out of queue/ (to done/ or skipped/), clean up its attempt file
+    # If the plan moved out of queue/ (to done/ or skipped/), clean up its attempt file and failure report
     if [ ! -e "$NEXT_PLAN" ]; then
-        rm -f "$ATTEMPT_FILE"
+        rm -f "$ATTEMPT_FILE" "$FAILURE_FILE"
     fi
 
     # Release this plan's claim — done with it for this iteration. A genuine
@@ -854,6 +921,16 @@ for af in "$QUEUE_DIR"/*.attempts; do
     PLAN_FOR_ATTEMPT="${af%.attempts}"
     if [ ! -e "$PLAN_FOR_ATTEMPT" ]; then
         rm -f "$af"
+    fi
+done
+
+# Clean up any leftover failure reports for plans that completed (mirrors the
+# .attempts sweep above — .failure shares the .attempts lifecycle, ADR-0084)
+for ff in "$QUEUE_DIR"/*.failure; do
+    [ -e "$ff" ] || continue
+    PLAN_FOR_FAILURE="${ff%.failure}"
+    if [ ! -e "$PLAN_FOR_FAILURE" ]; then
+        rm -f "$ff"
     fi
 done
 

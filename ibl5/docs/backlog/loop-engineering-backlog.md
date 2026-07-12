@@ -1,6 +1,6 @@
 ---
 description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, plan decomposition/tier-routing machinery, and the human comprehension counter-loop, with per-entry status.
-last_verified: 2026-07-11
+last_verified: 2026-07-12
 ---
 
 # Loop-Engineering Backlog
@@ -52,7 +52,7 @@ last_verified: 2026-07-11
 | L11 | Comprehension-debt digest | ⬜ Open | 🟦 | S |
 | L12 | Autonomy contracts in plan frontmatter | ◑ Partial | 🟦 | M |
 | L13 | Per-phase impl-model routing | ⬜ Open | 🟦 | M |
-| L14 | Escalate-on-retry (Sonnet-first, just-in-time Opus) | ⬜ Open | 🟦 | S |
+| L14 | Escalate-on-retry (Sonnet-first, just-in-time Opus) | ✅ Implemented | — | S |
 | L15 | Sonnet-recipe completeness lint | ⬜ Open | 🟦 | S |
 | L16 | Context-budget gate v2 (work-size proxies + measured calibration) | ⬜ Open | 🟦 | M |
 | L17 | Shared-context artifact for multi-plan splits | ✅ Implemented | — | S |
@@ -141,11 +141,7 @@ last_verified: 2026-07-11
 **Status (2026-07-08):** ⬜ Open — 🟦.
 
 ### L14 Escalate-on-retry (Sonnet-first, just-in-time Opus)
-**Location:** `bin/automouse-run` — `MAX_ATTEMPTS=3`, every attempt at the same `impl_model`; genuine failures park the plan in `skipped/` after 3.
-**Problem:** `impl_model: sonnet` adoption is throttled by its downside: a plan that turns out to need judgment burns all three attempts on the same model, then a queue slot. The rational response is conservative labeling — Opus-by-default — which is the exact spend the marker exists to avoid.
-**Suggested direction:** On a genuine (non-environmental) failure of a Sonnet-model plan, escalate the final retry to Opus, feeding the prior attempt's failure report into the retry context (the L8 sidecar pattern already persists it). Cheap plans stay cheap; hard plans get Opus exactly when the evidence demands it. Once proven, this makes Sonnet-first safe enough to consider as the *default* for unmarked plans, inverting today's Opus-by-omission.
-**Risk if untouched:** Gate 13(b)'s Sonnet default stays capped at "obviously mechanical" plans; every borderline plan pre-commits to Opus.
-**Status (2026-07-08):** ⬜ Open — 🟦.
+✅ Implemented (2026-07-11) — see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
 ### L15 Sonnet-recipe completeness lint
 **Location:** `bin/check-plan` — gates cover matrix presence, forbidden tokens, staleness, and size; none check *recipe completeness*. Gate 13 judges Sonnet-eligibility by verification (a machine check fails on a wrong edit) only.

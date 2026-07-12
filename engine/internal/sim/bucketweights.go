@@ -119,19 +119,26 @@ const (
 	// 5/6 coupling are DERIVED (guarded by faithful_scales_derivation_test.go), and
 	// the home/away symmetry (ratio ≈ 1.0) is STRUCTURAL, independent of this scale.
 	// Unscaled, the foul share collapses and the FTA level breaks against the .sco
-	// archive. This value is the ADR-0082-status corpus-calibrated level, re-anchored
-	// (Phase 6, 2026-07-11) for the C2-corrected DETERMINISTIC base (2−fatigue)·TOV48
-	// — which is far larger than the old U[0,foulFloor) draw, so the pre-C2 8.6 gave a
-	// degenerate ~102 FTA/g. Empirically re-anchored on the archive harness to real
-	// FTA/g ≈ 21.32 (the 00-01 sample's paired .sco value): 0.47 → engine FTA 21.36
-	// (gap +0.04). FTA saturates sub-linearly in this dial (foul-outs cap minutes), so
-	// it was found by 1-D search (0.50→22.43, 0.45→20.67, 0.47→21.36), not the linear
-	// estimate. The level was tuned AFTER the Phase-5 margin lock (hcaSite2BasisScale
-	// 2.85): the two dials are only weakly coupled — sweeping this dial moved the gt=2
-	// home margin non-monotonically (3.332/3.304/3.287 for 0.50/0.45/0.47), i.e. WITHIN
-	// the ~±0.03 Monte-Carlo noise floor of the 20-run harness, so re-anchoring FTA did
-	// not disturb the locked margin. See the J15 program / phase2-derivation.md.
-	foulBucketScale = 0.47
+	// archive. This value is the ADR-0082-status corpus-calibrated level. Re-anchored
+	// a SECOND time (2026-07-12) after the J18 items 1+3 faithful bucket-basis changes
+	// (real 3GA/48 3pt bucket + 2PA-based d88 twoPtBucketWeight) shrank the competing
+	// 2pt/3pt bucket mass, which raised the foul bucket's normalized share and pushed
+	// engine FTA/g from 21.36 to 24.20 at the then-current 0.47 — breaking the anchor
+	// against the same 00-01 .sco target (FTA/g ≈ 21.32) without any change to this
+	// dial's own value. FTA saturates sub-linearly in this dial (foul-outs cap
+	// minutes), so it was re-found by 1-D search (0.39→20.99, 0.40→21.43, 0.41→21.81,
+	// 0.47→24.20), not a linear estimate. Re-anchored to 0.40 → engine FTA 21.43
+	// (gap +0.11). The level was re-tuned AFTER the Phase-5 margin lock
+	// (hcaSite2BasisScale 2.85, unchanged): the two dials remain only weakly coupled —
+	// moving this dial from 0.47 to 0.40 moved the gt=2 home margin gap from +0.459 to
+	// +0.470 (delta +0.011), i.e. WITHIN the ~±0.03 Monte-Carlo noise floor of the
+	// 20-run harness, so re-anchoring FTA a second time did not disturb the locked
+	// margin. (The gt=4 gap moved further, +1.284 → +1.752 — gt=4 was never part of
+	// the Phase-6 weak-coupling claim, which is scoped to gt=2; not re-litigated here.)
+	// See the J15 program / phase2-derivation.md and the Phase-6 (2026-07-11) history
+	// this supersedes for the first re-anchor's story (0.50→22.43, 0.45→20.67,
+	// 0.47→21.36).
+	foulBucketScale = 0.40
 
 	// andOneBucketFloor is the verbatim JSB and-one floor (0.03). Ensures the
 	// and-one path cannot be zeroed by a negative matchup quality. Unchanged from

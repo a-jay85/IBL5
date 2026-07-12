@@ -15,11 +15,15 @@ import "github.com/a-jay85/IBL5/engine/internal/rng"
 //     is the dominant, field-goal-heavy path. Net-free (net lives only in
 //     shot_value, not the bucket — so the playoff ×1.25 multiplier never amplifies
 //     the bucket).
-//   - 3pt (threePtBucketWeight) = the 2pt composite × the player's 3pt propensity.
-//     JSB's +0xDB0 is DEAD (always 0) and 3pt is decided upstream in the ball-
-//     handler stage (COMPOSITE_DOUBLES_TRACE.md §RESOLUTION); the Go engine folds
-//     3pt into the play-outcome pick at the propensity rate — functionally
-//     equivalent, kept on the same O(10s) basis as 2pt so 3pt does not vanish.
+//   - 3pt (threePtBucketWeight) = the recovered +0xDB0 composite (FUN_004cfa50's
+//     stack-built player record; copied into the league record by FUN_00405970 —
+//     the same provenance chain as +0xDC8/+0xD70): the player's season 3GA/MIN×48,
+//     an f-projected per-48-minute three-point-attempt rate. LIVE, not dead: the J6
+//     RE session (2026-07-10) overturned COMPOSITE_DOUBLES_TRACE.md §RESOLUTION's
+//     "always 0" finding — FUN_004e1ba0's Σ(de0+db0+d90) play-outcome normalization
+//     reads it directly. Faithful when the bundle carries real-life minutes; falls
+//     back to the previous derived stand-in (2pt composite × 3pt propensity)
+//     otherwise — see threePtBucketWeight.
 //   - and-one (andOneBucketWeight) = matchup×0.25 + made-rate, floored to 0.03
 //     (the verbatim JSB floor, _DAT…→0.03). A small minority of plays, as in JSB.
 //   - foul (foulBucketWeight) = the faithful JSB 5.60 foul bucket with a symmetric
@@ -201,13 +205,29 @@ func twoPtBucketWeight(p onCourt) float64 {
 	return d88 - (d88/(d70+d88))*db8*makeShare
 }
 
-// threePtBucketWeight keeps the 3pt path on the same O(10s) basis as the 2pt
-// composite, scaled by the player's 3pt propensity. JSB's +0xDB0 is dead and 3pt
-// is gated upstream in the ball-handler stage; folding it into the play-outcome
-// pick at the propensity rate is functionally equivalent (COMPOSITE_DOUBLES_
-// TRACE.md §RESOLUTION). Scaling off the 2pt composite (rather than a fixed O(1)
-// constant) prevents 3pt attempts from vanishing now that 2pt is O(10s).
+// threePtBucketWeight is the recovered +0xDB0 composite (FUN_004cfa50's
+// stack-built player record; copied into the league record by FUN_00405970 — the
+// same provenance chain as +0xDC8/+0xD70): the player's season 3GA/MIN×48, an
+// f-projected per-48-minute three-point-attempt rate. LIVE, not dead: the J6 RE
+// session (2026-07-10) overturned COMPOSITE_DOUBLES_TRACE.md §RESOLUTION's "always
+// 0" finding — FUN_004e1ba0's Σ(de0+db0+d90) play-outcome normalization reads it
+// directly. When the bundle carries real-life minutes (RealLifeMIN > 0) the weight
+// is the FAITHFUL per48Min(RealLife3GA, RealLifeMIN) rate — a non-shooter correctly
+// gets a zero 3pt bucket, mirroring 5.60. Absent real-life minutes (rookie / unwired
+// production bundle) it falls back to the previous derived stand-in (2pt composite ×
+// 3pt propensity), preserved byte-for-byte for the no-reference case — the same
+// two-branch shape as twoPtBucketWeight.
+//
+// Legacy-serialized-bundle caveat: a bundle written before this port's rl_3ga field
+// existed deserializes RealLife3GA as 0 while RealLifeMIN > 0 carries over, zeroing
+// the 3pt bucket for that player. Acceptable: bundles are assembled fresh from .plr
+// at runtime rather than persisted across ports — the same caveat the J9
+// LeagueShotBaseline field (RealLifeFGA) already carries for an identical
+// field-addition case.
 func threePtBucketWeight(p onCourt) float64 {
+	if p.RealLifeMIN > 0 {
+		return per48Min(p.RealLife3GA, p.RealLifeMIN)
+	}
 	return twoPtBucketWeight(p) * threePtPropensity(p)
 }
 

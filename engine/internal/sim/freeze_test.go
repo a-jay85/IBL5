@@ -184,7 +184,7 @@ func TestMakePutback_OriginScoped(t *testing.T) {
 	const fgp = 50
 	net := 5.0
 	live := shotValue2pt(net, fgp, false, leagueBaselineFallback) // initial/transition live value
-	putback := putbackValue2pt(fgp)       // faithful OriginOffReb live value (ADR-0055)
+	putback := putbackValue2pt(fgp)                               // faithful OriginOffReb live value (ADR-0055)
 	mean := 111.0
 
 	cases := []struct {

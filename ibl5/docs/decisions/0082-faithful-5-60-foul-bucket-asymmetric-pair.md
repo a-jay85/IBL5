@@ -1,11 +1,11 @@
 ---
 description: Faithful 5.60 asymmetric foul-bucket pair (home deterministic defense-coupled / away-neutral stochastic) with one swept bucket-basis scale constant, superseding ADR-0061's offQ-divisor stand-in.
-last_verified: 2026-07-10
+last_verified: 2026-07-12
 ---
 
 # ADR-0082: Faithful 5.60 foul bucket — asymmetric pair × bucket-basis scale
 
-**Status:** Accepted
+**Status:** Superseded by ADR-0084 (defMatchupQuality composite fidelity claim)
 **Date:** 2026-07-10
 
 ## Context

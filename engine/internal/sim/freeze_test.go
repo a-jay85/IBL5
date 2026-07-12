@@ -27,17 +27,22 @@ func TestFreeze_SubstitutesAndAccumulates(t *testing.T) {
 	// Baseline pass (accum set, no freeze): the live values are accumulated and
 	// Means() returns them exactly (single sample each).
 	acc := &FreezeAccum{}
-	base := &gameState{accum: acc}
+	// The faithful bucket is side-symmetric and stochastic (base draw), so seed a
+	// gameState rng and replay the SAME seed for wantFoul — foulWeight is the only rng
+	// consumer here (orebProb/turnoverProb/makeValue2pt are deterministic), so its
+	// single first draw reproduces exactly.
+	const foulSeed = uint64(4242)
+	off := []onCourt{oc(slotPG, mkPlayer(9, 3, slotPG, 50))}
+	def := []onCourt{oc(slotPG, mkPlayer(2, 3, slotPG, 50))}
+	bh := off[0]
+	wantFoul := foulBucketWeight(bh, off, def, 0, rng.New(foulSeed))
+	base := &gameState{accum: acc, rng: rng.New(foulSeed)}
 	wantOreb := gate1Probability(100, 100, base.gateBaseline) // live faithful gate-1 (base.gateBaseline is 0)
 	// float64 vars force runtime (not constant-folded) evaluation, matching the
 	// wrapper's accumulated rounding exactly.
 	careless, pressure := 60.0, 100.0
 	wantTurn := stealTurnoverScale * careless * pressure // below the clamp
 	wantMake := shotValue2pt(5, 50, false)
-	def := []onCourt{oc(slotPG, mkPlayer(2, 3, slotPG, 50))}
-	// Home arm (hca > 0) is deterministic and never draws rng, so exact-equality
-	// against base.foulWeight holds and the nil-rng gameState is safe.
-	wantFoul := foulBucketWeight(def, hcaMagnitude, nil)
 
 	if got := base.orebProb(100, 100); got != wantOreb {
 		t.Errorf("baseline orebProb = %v, want live %v", got, wantOreb)
@@ -48,7 +53,7 @@ func TestFreeze_SubstitutesAndAccumulates(t *testing.T) {
 	if got := base.makeValue2pt(5, 50, result.OriginInitial); got != wantMake {
 		t.Errorf("baseline makeValue2pt = %v, want live %v", got, wantMake)
 	}
-	if got := base.foulWeight(def, hcaMagnitude); got != wantFoul {
+	if got := base.foulWeight(bh, off, def, 0); got != wantFoul {
 		t.Errorf("baseline foulWeight = %v, want live %v", got, wantFoul)
 	}
 
@@ -68,13 +73,20 @@ func TestFreeze_SubstitutesAndAccumulates(t *testing.T) {
 // reflects only that arm, because the injection point is localized to one
 // mechanism's output (not a shared rating that would spill into siblings).
 func TestFreeze_NoCrossConfound(t *testing.T) {
+	const foulSeed = uint64(4242)
+	off := []onCourt{oc(slotPG, mkPlayer(9, 3, slotPG, 50))}
 	def := []onCourt{oc(slotPG, mkPlayer(2, 3, slotPG, 50))}
+	bh := off[0]
 
 	liveOreb := gate1Probability(120, 80, 0) // gs.gateBaseline is 0 in these cases
 	careless, pressure := 60.0, 100.0
 	liveTurn := stealTurnoverScale * careless * pressure // runtime eval, below the clamp
 	liveMake := shotValue2pt(5, 50, false)
-	liveFoul := foulBucketWeight(def, hcaMagnitude, nil) // home arm — deterministic, rng unused
+	// Symmetric bucket: this single-defender/single-offense fixture drives the
+	// coupling factor negative (defQ from one defender sits far below the 5-man-
+	// normalized baseline), so foulBucketWeight redraws — seed each gs the same so
+	// its single redraw draw reproduces liveFoul (the only rng consumer here).
+	liveFoul := foulBucketWeight(bh, off, def, 0, rng.New(foulSeed))
 
 	// Sentinel means, deliberately distinct from the live values so a leak is visible.
 	means := FreezeMeans{OrebProb: 0.31, TurnProb: 0.07, FoulWeight: 0.13, MakeVal2pt: 111.0}
@@ -90,11 +102,11 @@ func TestFreeze_NoCrossConfound(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			gs := &gameState{freeze: c.cfg}
+			gs := &gameState{freeze: c.cfg, rng: rng.New(foulSeed)}
 			gotOreb := gs.orebProb(120, 80)
 			gotTurn := gs.turnoverProb(60, 100)
 			gotMake := gs.makeValue2pt(5, 50, result.OriginInitial)
-			gotFoul := gs.foulWeight(def, hcaMagnitude)
+			gotFoul := gs.foulWeight(bh, off, def, 0)
 
 			// The frozen arm returns the sentinel; every OTHER arm returns live.
 			wantOreb, wantTurn, wantMake, wantFoul := liveOreb, liveTurn, liveMake, liveFoul

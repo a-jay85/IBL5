@@ -1,99 +1,130 @@
 package sim
 
-// Team-quality lineup aggregators. After ADR-0082 the foul bucket no longer uses
-// an offensive-quality divisor: only defMatchupQuality survives here, feeding the
-// faithful home foul weight in bucketweights.go.
+// Team-quality lineup aggregators for the faithful JSB 5.60 foul bucket (J6/J16,
+// 2026-07-10; site-3 HCA leg restored 2026-07-11, J15 Phase 5). The 5.60 foul
+// weight e80 is coupled to a defense/offense quality factor — NOT the ADR-0082
+// asymmetric two-arm stand-in it supersedes:
 //
-//   - defMatchupQuality (FUN_004e3d90) → fVar11: Σ a per-player defensive-rating
-//     stand-in over the defenders, narrowed toward the corpus league mean by
-//     foulCompress, then a ×1.5 universal cap (ceiling teamDefBaseline×5×1.5).
-//     Its output range is [4.5155, 7.5]; it is the sole team-quality input to the
-//     home foul weight (defQ − 5·(5/6)·teamDef)/5 + hca.
+//	factor = 1 + (defQ − baseline)/offQ                       // :97163
+//	defQ = Σ_{5 defenders}  STL/MIN×44   (player +0xDD0, LIVE, capped 1.5·5·leagueSTL48)
+//	offQ = Σ_{5 offense}     TOV/MIN×48   (player +0xDE0, LIVE)
 //
-// The offensive-quality divisor (the two constants + function from ADR-0061) is
-// DELETED: 5.60's home foul bucket is defense-coupled directly, and its away bucket
-// is a defense-independent U[0, 0.6) draw (bucketweights.go), so there is no
-// off-side quality term to port. The def per-player summed values remain documented
-// corpus-deferred STAND-INS (exact per-game player-double source offsets unpinned).
+// BASE-STRUCTURE SYMMETRY vs. the SMALL HCA LEG — these coexist:
+//   - The two-arm BASE structure IS side-symmetric (Fable-confirmed, refuting the
+//     ADR-0082 home-deterministic/away-stochastic stand-in): both defQ and the base
+//     read only lineup ratings.
+//   - BUT the small ±0.2 site-3 HCA delta is REAL (decompile :97159, param_5==1):
+//     each offensive player's offQ term is reduced by s·hca at half-court — the
+//     R1 rewrite over-symmetrized by stripping it. offQualityWithHCA restores it.
+//     Home (hca>0) → smaller offQ → the coupling factor moves AWAY from 1 in the
+//     direction of sign(defQ − baseline): leg C is pro-home only for a strong-steal
+//     defense (defQ > baseline), anti-home otherwise. This is the SECONDARY foul leg;
+//     the defQ cap bounds |leg C| far below leg B (foul base −hca, bucketweights.go),
+//     which dominates it by ~an order of magnitude (measured ≈9.5× on the default
+//     fixture, TestBucketWeights_FoulBucketHCALegs_DecompilePin), so the NET foul
+//     bucket is anti-home (ratio ~0.91) regardless of leg C's sign. offQuality (no-hca)
+//     is the transition/symmetric case; offQualityWithHCA is the half-court live path.
+//     See bucketweights.go foulBucketWeight for the coupling + faithful redraw.
+//
+// STAND-INS (bundle carries no rl_stl/rl_tov counting sums — only RealLifeMIN/FGA/
+// FTA/ORB): defQ/offQ use the 0-99 STL/TVR RATINGS as per-48 rate stand-ins, mapped
+// through ratingRefScale to the real league per-48 means (leagueSTL48, leagueTOV48).
+// Wiring real rl_stl/rl_tov is a production-bundle follow-on (Out of Scope, J6). Only
+// the defQ/offQ RATIO drives the shrink (both scales cancel a common factor at a
+// balanced matchup — see faithful_scales_derivation_test.go); the foul LEVEL is set
+// by the single foulBucketScale dial (bucketweights.go).
 
 const (
-	// defQualityRatingScale maps a defender's outside-defense rating (OD) to the
-	// per-player defensive-quality stand-in summed by defMatchupQuality. Documented
-	// stand-in; chosen with teamDefBaseline so the divisor numerator
-	// (defQ − teamDefBaseline×foulDivisorTeamDefCoef) is large enough that the
-	// multiplicative home/away divisor difference dominates the (anti-home) ±0.2
-	// site-2 foul nudge — the sign-robustness condition.
-	defQualityRatingScale = 0.25
+	// leagueTOV48 is the real 5.60 league per-48 turnover mean (CEngine[+0x68D8],
+	// J16 line 67 = 3.353143). offQuality's rating stand-in is normalized to reproduce
+	// this mean, so a rating-ratingRefScale offense sums to 5·leagueTOV48.
+	leagueTOV48 = 3.353143
 
-	// defQualityCapTeamMult (_DAT_00669ea0 = 5.0) and defQualityCapMultiplier
-	// (_DAT_00669ac0 = 1.5) form the def-quality cap ceiling teamDefBaseline×5×1.5
-	// (matchup_sub_calc_1_RAW.c). With realistic ratings the cap rarely binds; it is
-	// ported for faithfulness and as a boundary guard against an extreme lineup.
+	// leagueSTL48 is the real 5.60 league per-48 steal mean. J does not pin it (J16
+	// pins only TOV); it is a documented real-basketball anchor: real STL:TOV ≈ 0.547
+	// (steals-per-48 ≈ 1.83 vs turnovers-per-48 ≈ 3.35), the ratio that sets the
+	// balanced-matchup shrink 1 − (leagueSTL48/leagueTOV48)·(5/6) ≈ 0.545. Its ABSOLUTE
+	// value is not load-bearing (the cap below rarely binds; the RATIO drives the
+	// shrink; the level is foulBucketScale) — the STL:TOV ratio is the grounded input.
+	leagueSTL48 = 1.834
+
+	// ratingRefScale (50 = 0-99 rating mid-scale) anchors the rating→per-48 stand-in
+	// map: a mid-scale rating maps to the league per-48 mean. It CANCELS in the
+	// defQ/offQ ratio for any balanced matchup, so it affects only the (rarely-binding)
+	// cap and the absolute magnitude — never the shrink or the home/away symmetry.
+	ratingRefScale = 50.0
+
+	// stlComposite44 (+0xDD0 = STL/MIN×44, J6 line 51/93, PE 0x66D328) and
+	// tovDivisor48 (+0xDE0 = TOV/MIN×48, J6 line 52, PE 0x669ED0) are the faithful
+	// per-player composite forms. In the RATING stand-in they are folded into the
+	// pinned league means (leagueSTL48 already carries the ×44; leagueTOV48 the /48),
+	// so they are documented provenance for those means — asserted by the recompute
+	// test — not re-applied per player.
+	stlComposite44 = 44.0
+	tovDivisor48   = 48.0
+
+	// defQualityCapTeamMult (5.0, _DAT_00669ea0) and defQualityCapMultiplier (1.5,
+	// _DAT_00669ac0) form the defQ cap ceiling defQualityCapMultiplier·defQualityCapTeamMult·leagueSTL48
+	// (matchup_sub_calc_1_RAW.c, J6 line 94). With realistic ratings the cap rarely
+	// binds; it is ported for faithfulness and as a boundary guard against an extreme
+	// (all-max-STL) lineup driving the shrink past its redraw threshold.
 	defQualityCapTeamMult   = 5.0
 	defQualityCapMultiplier = 1.5
-
-	// teamDefBaseline is the team-defense baseline (CEngine[+0x68A8] stand-in) that
-	// sets both the def-quality cap ceiling and the foul-divisor numerator subtrahend
-	// teamDefBaseline×foulDivisorTeamDefCoef. Documented stand-in.
-	teamDefBaseline = 1.0
-
-	// foulCompress narrows the team-to-team dispersion of the DEFENSIVE quality
-	// aggregator toward the corpus league mean (defQualityNeutral), before the cap.
-	// compressed = total + (foulCompress−1)×(total − neutral): at 1.0 the exact
-	// identity, at <1.0 a mean-preserving narrowing of the spread that drives the
-	// foul-bucket divisor term (defQ − teamDef×5/6) in the home weight formula —
-	// the lead negative-covariance driver (ADR-0043: foul-only arm 47.6% of |Cov|).
-	// After ADR-0082, foulCompress acts on the DEF side only (the deleted off-quality
-	// divisor constants and ADR-0061's off-side compression no longer exist; see header).
-	//
-	// CALIBRATED against the corpus team-level FTA-rate dispersion (Constraint 1):
-	// the value at which the engine's FTADispersionRatio (calibrate.FidelitySummary,
-	// stdev(engine FTA/g)/stdev(sco FTA/g)) approaches 1.0. The baseline ratio is
-	// ≈2.9 (gt 2) — the engine's team-to-team FTA spread is far too WIDE, so
-	// foulCompress < 1.0 narrows it toward real. It is NOT tuned toward the emergent
-	// Cov(lnFGA,lnPPS) sign (that would be the metric-gaming ADR-0041 forbids); the
-	// covariance is the emergent acceptance readout, never a knob. See ADR-0044.
-	foulCompress = 0.45
-
-	// defQualityNeutral is the corpus league-mean PRE-CAP defensive total
-	// Σ floor1(OD)×defQualityRatingScale over a team's starters (the space the
-	// def-side compression is applied in, before the ×1.5 cap). DERIVED 2026-06-03
-	// from the same archive sample (mean pre-cap total = 8.21). defQualityRatingScale
-	// is NOT re-tuned, so this is stored directly. NOTE the cap binds for ~78% of
-	// teams (logged by the harness): the post-cap def output is therefore already
-	// near-constant at the 7.5 ceiling, so the def-side compression is largely inert
-	// (it only pulls the below-cap minority up toward the cap) — the foul-bucket
-	// dispersion the lever narrows comes mainly through the uncapped def-quality range.
-	defQualityNeutral = 8.21
 )
 
-// compressQuality narrows total toward neutral by foulCompress (a corpus-calibrated
-// factor in (0,1]): total + (factor−1)×(total − neutral). Written in this form so
-// factor == 1.0 is the EXACT floating-point identity (the (factor−1) term is 0×x =
-// 0, and total + 0.0 == total for any finite total), regardless of neutral — the
-// byte-stable identity the matrix-row-6 test locks. factor < 1.0 pulls total toward
-// neutral (mean-preserving when neutral is the true league mean); a team exactly AT
-// neutral is unchanged by any factor.
-func compressQuality(total, neutral, factor float64) float64 {
-	return total + (factor-1.0)*(total-neutral)
+// stlRate maps a defender's 0-99 STL rating to a per-48 steal-rate stand-in (the
+// +0xDD0 STL/MIN×44 composite, whose league mean is leagueSTL48). floor1 floors the
+// rating at 1, so stlRate > 0 always.
+func stlRate(p onCourt) float64 {
+	return floor1(p.STL) / ratingRefScale * leagueSTL48
 }
 
-// defMatchupQuality reimplements def_matchup_quality (FUN_004e3d90 → fVar11): the
-// summed per-player defensive-rating stand-in over the 5 defenders, then the ×1.5
-// universal cap (ceiling teamDefBaseline×5×1.5). Returns the team defensive value
-// that feeds the foul-bucket divisor numerator (defQ − teamDef×5/6).
-func defMatchupQuality(defenders []onCourt) float64 {
+// tovRate maps an offensive player's 0-99 TVR rating to a per-48 turnover-rate
+// stand-in (the +0xDE0 TOV/MIN×48 composite, whose league mean is leagueTOV48). NO
+// home/away term (J16 §3). floor1 floors at 1, so tovRate > 0 and offQuality > 0.
+func tovRate(p onCourt) float64 {
+	return floor1(p.TVR) / ratingRefScale * leagueTOV48
+}
+
+// defQuality reimplements the 5.60 defensive composite defQ = Σ_{5 defenders}
+// STL/MIN×44 (rating stand-in), capped at defQualityCapMultiplier·defQualityCapTeamMult·leagueSTL48.
+// A steal-generating (disciplined) defense yields a LARGER defQ, which shrinks the
+// opponent's foul bucket harder (fewer offensive fouls drawn) — the faithful sign.
+func defQuality(defenders []onCourt) float64 {
 	var total float64
 	for _, p := range defenders {
-		total += floor1(p.OD) * defQualityRatingScale
+		total += stlRate(p)
 	}
-	// Narrow the team-to-team defensive-quality spread toward the corpus league
-	// mean BEFORE the cap (so the cap stays the same boundary guard). At
-	// foulCompress == 1.0 this is the exact identity.
-	total = compressQuality(total, defQualityNeutral, foulCompress)
-	ceiling := teamDefBaseline * defQualityCapTeamMult * defQualityCapMultiplier
+	ceiling := defQualityCapMultiplier * defQualityCapTeamMult * leagueSTL48
 	if total > ceiling {
 		return ceiling
+	}
+	return total
+}
+
+// offQuality reimplements the 5.60 offensive composite offQ = Σ_{offense} TOV/MIN×48
+// (rating stand-in). It is the coupling DENOMINATOR: a turnover-prone offense (large
+// offQ) couples its own foul bucket to defQ LESS. This is the hca=0 case — the
+// transition/symmetric path; the half-court live path uses offQualityWithHCA.
+func offQuality(offense []onCourt) float64 {
+	return offQualityWithHCA(offense, 0)
+}
+
+// offQualityWithHCA is offQuality with the site-3 HCA leg (leg C) applied: each
+// offensive player's TOV-rate term is reduced by the per-team hca delta (decompile
+// :97159, fVar12 = offQ computed WITH the −s·hca per player when param_5==1 — the
+// half-court path). Home (hca>0) → smaller offQ → the coupling factor moves away from
+// 1 in the direction of sign(defQ − baseline) (pro-home only for a strong-steal
+// defense; net foul is still anti-home either way because leg B dominates — see
+// bucketweights.go). Uses the RAW hca (±0.2): offQuality is on
+// the faithful CEngine leagueTOV48 basis, so the decompile's raw 0.2 is in-basis (do
+// NOT apply hcaSite2BasisScale here — that basis-scale is for the O(10s) 2pt bucket
+// only). floor1 floors TVR at 1, so with the small hca the sum stays > 0 for any
+// realistic lineup; the /offQ divide is additionally guarded in foulBucketWeight.
+func offQualityWithHCA(offense []onCourt, hca float64) float64 {
+	var total float64
+	for _, p := range offense {
+		total += tovRate(p) - hca
 	}
 	return total
 }

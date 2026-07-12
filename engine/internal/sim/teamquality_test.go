@@ -6,7 +6,7 @@ import (
 )
 
 // fiveStarters builds a 5-man lineup of identical starters (mkPlayer defaults:
-// OO=6, OD=5) for the given team, used to exercise the lineup aggregators.
+// STL=30, TVR=70) for the given team, used to exercise the lineup aggregators.
 func fiveStarters(team int) []onCourt {
 	var lineup []onCourt
 	for slot := slotPG; slot <= slotC; slot++ {
@@ -17,97 +17,68 @@ func fiveStarters(team int) []onCourt {
 
 const teamQualityEps = 1e-9
 
-// --- matrix #6,7,8: compressQuality — identity / narrowing / fixed point -----
-
-// TestCompressQuality locks the three design properties of the foulCompress
-// transform compressQuality(total, neutral, factor) = total + (factor−1)(total−neutral):
+// --- faithful side-symmetric aggregators (J6/J16) ----------------------------
 //
-//	#6 identity     — factor == 1.0 is the EXACT (bit-stable) identity, any neutral.
-//	#7 narrowing    — factor < 1.0 strictly pulls total toward neutral, and two
-//	                  points straddling neutral converge: their spread scales by factor.
-//	#8 fixed point  — a total exactly AT neutral is unchanged by ANY factor
-//	                  (mean-preservation reference).
-func TestCompressQuality(t *testing.T) {
-	t.Run("identity at factor 1.0 (exact)", func(t *testing.T) {
-		for _, tc := range []struct{ total, neutral float64 }{
-			{1.77, 1.7253}, {0.25, 8.21}, {123.75, 6.0}, {0, 5}, {-2, 3},
-		} {
-			if got := compressQuality(tc.total, tc.neutral, 1.0); got != tc.total {
-				t.Errorf("compressQuality(%v,%v,1.0) = %v, want EXACT %v", tc.total, tc.neutral, got, tc.total)
-			}
-		}
-	})
-	t.Run("narrowing toward neutral for factor < 1.0", func(t *testing.T) {
-		const neutral = 1.7253
-		const factor = 0.4
-		hi, lo := 3.0, 0.5 // straddle the neutral
-		cHi := compressQuality(hi, neutral, factor)
-		cLo := compressQuality(lo, neutral, factor)
-		// Each pulled toward neutral (strictly inside the original distance).
-		if !(math.Abs(cHi-neutral) < math.Abs(hi-neutral) && math.Abs(cLo-neutral) < math.Abs(lo-neutral)) {
-			t.Errorf("compression did not pull toward neutral: hi %v→%v lo %v→%v (neutral %v)", hi, cHi, lo, cLo, neutral)
-		}
-		// The pair's spread scales by exactly the factor (the dispersion-narrowing claim).
-		if math.Abs((cHi-cLo)-factor*(hi-lo)) > teamQualityEps {
-			t.Errorf("spread %v did not scale by factor %v× original %v", cHi-cLo, factor, hi-lo)
-		}
-	})
-	t.Run("fixed point at neutral for any factor", func(t *testing.T) {
-		const neutral = 8.21
-		for _, factor := range []float64{1.0, 0.5, 0.34, 0.1, 0.0} {
-			if got := compressQuality(neutral, neutral, factor); math.Abs(got-neutral) > teamQualityEps {
-				t.Errorf("compressQuality(neutral,neutral,%v) = %v, want neutral %v", factor, got, neutral)
-			}
-		}
-	})
-	// Concrete LITERAL anchors (expected values hand-computed independently of the
-	// implementation), so a broken compressQuality formula fails here even though the
-	// formula-mirroring composition tests below would still pass.
-	t.Run("concrete literals", func(t *testing.T) {
-		for _, tc := range []struct {
-			total, neutral, factor, want float64
-		}{
-			{10, 0, 0.5, 5.0},         // 0 + 0.5·(10−0)
-			{10, 4, 0.5, 7.0},         // 4 + 0.5·(10−4)
-			{2, 8, 0.25, 6.5},         // 8 + 0.25·(2−8) = 8 − 1.5
-			{6.25, 8.21, 0.45, 7.328}, // the committed def OD=5 pre-cap value
-		} {
-			if got := compressQuality(tc.total, tc.neutral, tc.factor); math.Abs(got-tc.want) > 1e-9 {
-				t.Errorf("compressQuality(%v,%v,%v) = %v, want %v", tc.total, tc.neutral, tc.factor, got, tc.want)
-			}
-		}
-	})
+// stlRate/tovRate map the 0-99 STL/TVR ratings to per-48 rate stand-ins anchored
+// (via ratingRefScale) to the real league per-48 means. defQuality sums stlRate
+// over the 5 defenders (capped); offQuality sums tovRate over the offense, with NO
+// home/away term (J16 §3). Concrete literals are hand-computed independently of the
+// implementation so a drifted scale/mean fails here.
+func TestTeamQuality_RateStandIns(t *testing.T) {
+	p := oc(slotPG, mkPlayer(1, 3, slotPG, 48)) // STL=30, TVR=70
+	// stlRate = 30/50·1.834 = 0.6·1.834 = 1.1004
+	if got := stlRate(p); math.Abs(got-1.1004) > teamQualityEps {
+		t.Errorf("stlRate(STL=30) = %.6f, want 1.1004", got)
+	}
+	// tovRate = 70/50·3.353143 = 1.4·3.353143 = 4.6944002
+	if got := tovRate(p); math.Abs(got-4.6944002) > teamQualityEps {
+		t.Errorf("tovRate(TVR=70) = %.7f, want 4.6944002", got)
+	}
+	// floor1 floors the rating at 1, so a 0-rated player still yields a positive rate
+	// (offQuality > 0 is what guards the shrink's divide).
+	z := oc(slotPG, mkPlayer(1, 3, slotPG, 48))
+	z.STL, z.TVR = 0, 0
+	if stlRate(z) <= 0 || tovRate(z) <= 0 {
+		t.Errorf("floor1 broken: stlRate/tovRate of a 0-rated player must stay > 0 (got %.6f / %.6f)", stlRate(z), tovRate(z))
+	}
 }
 
-// --- matrix #3,7: defMatchupQuality — compose(compress, cap) -----------------
+// TestDefQuality_SumAndCap: defQuality = min(Σ_5 stlRate, cap), cap =
+// defQualityCapMultiplier·defQualityCapTeamMult·leagueSTL48 = 1.5·5·1.834 = 13.755.
+func TestDefQuality_SumAndCap(t *testing.T) {
+	ceiling := defQualityCapMultiplier * defQualityCapTeamMult * leagueSTL48
 
-func TestDefMatchupQuality_SumAndCap(t *testing.T) {
-	ceiling := teamDefBaseline * defQualityCapTeamMult * defQualityCapMultiplier
-
-	// Exact composition: defMatchupQuality = min(compress(rawΣ, defQualityNeutral,
-	// foulCompress), ceiling). Asserted symbolically so it holds at any committed
-	// foulCompress. OD=5 (raw 6.25) exercises the (possibly-)uncapped branch.
+	// Uncapped: 5 defenders at STL=30 → 5·1.1004 = 5.502 < ceiling.
 	def := fiveStarters(7)
-	rawSum := 5 * floor1(5) * defQualityRatingScale // 5 × 5 × 0.25 = 6.25
-	want := compressQuality(rawSum, defQualityNeutral, foulCompress)
-	if want > ceiling {
-		want = ceiling
-	}
-	if got := defMatchupQuality(def); math.Abs(got-want) > teamQualityEps {
-		t.Errorf("defMatchupQuality(OD=5) = %.4f, want compose(compress,cap) = %.4f", got, want)
+	if got := defQuality(def); math.Abs(got-5.502) > teamQualityEps {
+		t.Errorf("defQuality(STL=30 ×5) = %.4f, want 5.502 (uncapped)", got)
 	}
 
-	// Capped: 5 defenders at OD=99 → raw 123.75, compressed toward defQualityNeutral
-	// is still far above the ceiling for any factor>0 → returns ceiling.
+	// Capped: 5 defenders at STL=99 → 5·(99/50·1.834) = 18.1566 > ceiling → returns ceiling.
 	hi := fiveStarters(7)
 	for i := range hi {
-		hi[i].OD = 99
+		hi[i].STL = 99
 	}
-	rawHi := 5 * floor1(99) * defQualityRatingScale
-	if compressQuality(rawHi, defQualityNeutral, foulCompress) <= ceiling {
-		t.Fatalf("test setup: compressed high-OD %.3f should exceed ceiling %.3f", compressQuality(rawHi, defQualityNeutral, foulCompress), ceiling)
+	if raw := 5 * floor1(99) / ratingRefScale * leagueSTL48; raw <= ceiling {
+		t.Fatalf("test setup: raw high-STL %.3f should exceed ceiling %.3f", raw, ceiling)
 	}
-	if got := defMatchupQuality(hi); math.Abs(got-ceiling) > teamQualityEps {
-		t.Errorf("defMatchupQuality (capped) = %.4f, want ceiling %.4f", got, ceiling)
+	if got := defQuality(hi); math.Abs(got-ceiling) > teamQualityEps {
+		t.Errorf("defQuality (capped) = %.4f, want ceiling %.4f", got, ceiling)
+	}
+}
+
+// TestOffQuality_SumNoHCA: offQuality = Σ tovRate, and — the J16 §3 property — it
+// depends ONLY on the lineup, never on any home/away input (there is no hca arg).
+func TestOffQuality_SumNoHCA(t *testing.T) {
+	off := fiveStarters(3)
+	// 5 offense at TVR=70 → 5·4.6944002 = 23.472001.
+	if got := offQuality(off); math.Abs(got-23.472001) > teamQualityEps {
+		t.Errorf("offQuality(TVR=70 ×5) = %.5f, want 23.472001", got)
+	}
+	// Side-symmetry sanity: the SAME lineup used as "home offense" or "away offense"
+	// yields the identical offQ (there is no channel to differ) — the structural
+	// property that makes the foul bucket produce a ≈1.0 home/away FTA ratio.
+	if offQuality(fiveStarters(3)) != offQuality(fiveStarters(99)) {
+		t.Errorf("offQuality varies with team id — it must depend only on ratings (side-symmetric)")
 	}
 }

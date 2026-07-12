@@ -1,11 +1,11 @@
 ---
 description: The foul-bucket offQ divisor (offQualityWithHCA) is replaced by a volume-NEUTRAL constant base (offQualityConstant), faithful to 5.60's dead-zero +0xDE0; this measurably relaxes (≈30% on the shots-per-poss axis, not a sign flip) the Fork-B foul-share volume-inversion the old per-player ΣOO·scale divisor injected, re-homes the GATE-1 home-margin calibration knob from offQualityRatingScale to offQualityConstant (corpus stand-in, x32dbg pin is a follow-up), and partially supersedes ADR-0044's off-side compression.
-last_verified: 2026-06-12
+last_verified: 2026-07-12
 ---
 
 # ADR-0061: Foul-bucket volume-neutral divisor (Fork-B carrier fix)
 
-**Status:** Accepted
+**Status:** Superseded by ADR-0084 (offQualityConstant volume-neutrality fidelity claim)
 **Date:** 2026-06-12
 
 ## Context

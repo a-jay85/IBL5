@@ -95,7 +95,7 @@ func TestMeasureBaseline_Archive(t *testing.T) {
 	// but accumulates FTA via ftaFor instead of points via pointsFor, and
 	// reads the ENGINE value (EngineMean) on both sides — the same accessor
 	// CollectHomeMargins uses for its engine margin — never ScoVal.
-	var sumHomeFTA, sumAwayFTA float64      // ENGINE split
+	var sumHomeFTA, sumAwayFTA float64       // ENGINE split
 	var scoSumHomeFTA, scoSumAwayFTA float64 // REAL (.sco) split — the sign the engine must match
 	var nSplit int
 	for _, rep := range reports {

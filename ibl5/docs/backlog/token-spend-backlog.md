@@ -1,6 +1,6 @@
 ---
 description: Token-spend reduction backlog — resident-context diet, caching economics, output-spend guards, and LSP-first navigation for the Claude Code harness, with per-entry status.
-last_verified: 2026-07-11
+last_verified: 2026-07-12
 ---
 
 # Token-Spend Reduction Backlog
@@ -30,8 +30,8 @@ last_verified: 2026-07-11
 | Status | Count |
 |--------|------:|
 | ⬜ Open | 2 |
-| 📋 Planned | 1 |
-| ◑ Partial | 2 |
+| 📋 Planned | 0 |
+| ◑ Partial | 3 |
 | ✅ Implemented | 7 |
 | 🚫 Declined | 0 |
 
@@ -43,19 +43,11 @@ Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive
 
 | # | Title | Status | Locus | Effort |
 |---|-------|--------|-------|-------:|
-| T1 | Automouse token ledger | ✅ Implemented | repo | M |
 | T2 | Always-loaded context budget gate | ◑ Partial | repo | S |
 | T4 | Driver-model downshift for babysitting loops | ⬜ Open | ⌂ | M |
 | T5 | Memory/rules dedup lint | ⬜ Open | ⌂ | S |
 | T7 | Resident-overlay diet (MEMORY.md + rules) | ◑ Partial | both | M |
-| T9 | Lazy-load plan/post-plan skills | 📋 Planned | repo | M |
-
-### T1 Automouse token ledger
-**Location:** `bin/lib/automouse-stream-filter` (parses `total_cost_usd` + token counts from the stream-json `result` event); `bin/automouse-run` (appends a per-plan, per-phase row to `automouse/reports/YYYY-MM-DD-costs.md`).
-**Problem:** The nightly queue is pure spend mechanism with only partial measurement: per-phase cost rows exist, but there is no tier breakdown, no weekly aggregate, and no equivalent report for interactive sessions (the 7-day analysis above was done by hand).
-**Suggested direction:** Extend the existing costs table with model/tier columns and a weekly roll-up; add a `token-report` script under `bin/` that runs the transcript analysis on demand so each shipped entry in this backlog can be verified for effect.
-**Risk if untouched:** No feedback signal — token-efficiency changes ship without evidence they pay off.
-**Status (2026-07-09):** ✅ Implemented — `bin/lib/automouse-stream-filter` now emits `cache_write` on the exit line; `bin/automouse-run` cost rows carry Model + Tier columns and a per-phase-rebuilt `## Weekly aggregate (last 7 days)` section (cost-by-tier + tokens-by-phase); new `bin/token-report` runs the interactive-session token analysis on demand.
+| T9 | Lazy-load plan/post-plan skills | ◑ Partial | repo | M |
 
 ### T2 Always-loaded context budget gate
 **Location:** `.claude/rules/*.md` (path-unscoped subset ≈ 19KB) + the memory index (`MEMORY.md`, ≈ 16KB) — together ~9K tokens on every request and every subagent spawn.
@@ -90,7 +82,9 @@ Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive
 **Problem:** A long post-plan run re-reads ~17K tokens every turn, plus a fresh cache write per nightly session.
 **Suggested direction:** Thin orchestrator SKILL.md + per-phase reference files read on phase entry. Both restructures are planned: `$HOME/.claude/plans/lazy-load-plan-skill.md` and `$HOME/.claude/plans/lazy-load-post-plan-skill.md` (the post-plan one is in the automouse queue).
 **Risk if untouched:** ~20K tokens of dead weight resident in every `/plan` and `/post-plan` run.
-**Status (2026-07-07):** 📋 Planned — post-plan restructure queued; plan-skill restructure planned, not yet queued.
+**Status (2026-07-11):** ◑ Partial — post-plan restructure shipped (#1389): `.claude/skills/post-plan/SKILL.md` cut from ~68KB to ~30KB, split into seven `_phase-*.md` reference files read on phase entry. Residual: the plan-skill restructure (`.claude/skills/plan/SKILL.md`, still ~48KB whole) is planned, not yet queued.
+
+➜ T1 Automouse token ledger — ✅ Implemented (2026-07-09): see [archive](archive/token-spend-backlog-archive.md).
 
 ➜ T11 Tier-boundary plan splitting — ✅ Implemented (2026-07-11): see [archive](archive/token-spend-backlog-archive.md).
 

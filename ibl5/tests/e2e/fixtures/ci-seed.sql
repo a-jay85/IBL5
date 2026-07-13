@@ -997,6 +997,21 @@ INSERT INTO ibl_schedule (season_year, game_date, visitor_teamid, home_teamid, v
   (2026, '2026-03-12', 1, 14, 0, 0, 0, 'c0000000-0000-0000-0000-000000000003');
 
 -- ============================================================
+-- Center block: League Leaders (block-Leaders.php) on the homepage.
+-- index.php calls blocks("Center") when HOME_FILE is defined; the dispatcher
+-- (LegacyFunctions::blocks) includes blocks/<blockfile> for an active center
+-- row with an empty bkey. block-Leaders.php renders `.leaders-tabbed__leader-team`
+-- links, making the 375px target-size a11y sweep non-vacuous for that selector
+-- (0 occurrences on the CI seed before this row). content is NOT NULL with no
+-- default, so it must be set explicitly ('' — the block include populates it).
+-- view=0 → public. Players 1,2,4,5,6 have stats_gm>0, so the leaders query
+-- returns rows. NOTE: this changes the full-page 'index' and 'error-invalid-module'
+-- VR baselines (the 'article' anchor is settle-only, not a crop).
+-- ============================================================
+INSERT INTO nuke_blocks (bkey, title, content, bposition, weight, active, blockfile, view) VALUES
+  ('', 'League Leaders', '', 'c', 1, 1, 'block-Leaders.php', 0);
+
+-- ============================================================
 -- Topics (nuke_topics) for Topics module E2E tests
 -- PK is `id`, topicid is an auto-increment index
 -- ============================================================
@@ -1011,6 +1026,16 @@ INSERT INTO nuke_stories (catid, aid, title, time, hometext, bodytext, topic) VA
   (0, 'admin', 'Metros win season opener',             '2026-03-05 10:00:00', 'Great start to the season', '', 1),
   (0, 'admin', 'Stars acquire top free agent',          '2026-03-04 10:00:00', 'Big move for the Stars',    '', 1),
   (0, 'admin', 'Blockbuster trade shakes up the league', '2026-03-03 10:00:00', 'Three-team deal completed',  '', 2);
+
+-- One story with a non-zero catid (15 = 'General', defined below) so the Topics
+-- page renders a `.topic-card__cat` category chip. Without a catid>0 story whose
+-- category has a non-empty title, TopicsView suppresses the chip (catId>0 &&
+-- catTitle!=='' — TopicsView.php:367). This makes the 375px target-size a11y
+-- sweep non-vacuous for `.topic-card__cat`. ihome=1 keeps it off the homepage
+-- news feed (NewsRepository WHERE ihome='0' OR catid='0'), isolating the index
+-- VR baseline change to the League Leaders block added below.
+INSERT INTO nuke_stories (catid, aid, title, time, hometext, bodytext, topic, ihome) VALUES
+  (15, 'admin', 'League roundup: category feature', '2026-03-06 10:00:00', 'Category-chip render fixture', '', 1, 1);
 
 -- Categories for search filter dropdown
 INSERT INTO nuke_stories_cat (catid, title) VALUES

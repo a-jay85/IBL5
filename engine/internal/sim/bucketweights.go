@@ -143,8 +143,16 @@ const (
 	// the Phase-6 weak-coupling claim, which is scoped to gt=2; not re-litigated here.)
 	// See the J15 program / phase2-derivation.md and the Phase-6 (2026-07-11) history
 	// this supersedes for the first re-anchor's story (0.50→22.43, 0.45→20.67,
-	// 0.47→21.36).
-	foulBucketScale = 0.40
+	// 0.47→21.36). Re-anchored a THIRD time (2026-07-13) after J18 item 2 pinned
+	// d70LeagueScalar 1.0→0.6472 (a faithful basis change: it shrank the d70 FTA-rate
+	// term inside twoPtBucketWeight, lowering 2pt bucket mass and raising the foul
+	// share — combined-master FTA/g read 21.82 at the then-current 0.40). 1-D search
+	// on the combined basis: 0.39→21.36, 0.40→21.82 → re-anchored to 0.39 (gap +0.04
+	// vs the .sco 21.32 target). The gt=2 home-margin gap moved +0.498 (at 0.40) →
+	// +0.491 (at 0.39), delta −0.007, within the ~±0.03 noise floor — the dial stayed
+	// side-symmetric and did not disturb the Phase-5 margin lock, consistent with the
+	// weak-coupling claim above.
+	foulBucketScale = 0.39
 
 	// andOneBucketFloor is the verbatim JSB and-one floor (0.03). Ensures the
 	// and-one path cannot be zeroed by a negative matchup quality. Unchanged from

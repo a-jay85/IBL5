@@ -1,6 +1,6 @@
 ---
 description: JSB native-engine backlog — the count-axis cut-over blocker chain, static RE pins, faithful ports, and validation gates, each tagged with the model tier that owns its load-bearing reasoning (Fable-gated items marked).
-last_verified: 2026-07-12
+last_verified: 2026-07-13
 ---
 
 # JSB Native-Engine Backlog
@@ -94,11 +94,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 ➜ J3 Per-origin efficiency identifiability — ✅ Implemented (2026-07-09): study complete; J4 unblocked with spec; see [archive](archive/jsb-native-backlog-archive.md).
 
 ### J4 Play-by-play extraction parser
-**Location:** New machine-local tooling consuming IBL5.log per the J3 spec (`jsb-native/re-artifacts/jsb-pbp-identifiability-J3-20260709.md` § "J4 build spec"; the study parser `j3_study.py` next to it is ~80% of the matcher).
-**Problem:** None — mechanical half of J3, now fully specified: segmenter (header regex + digit-boundary team/score split + season-by-date-rollback), 509-template matcher (gate: 100% closure — any unmatched sentence is a parser bug), roster-join attribution, possession state machine with engine-aligned origin rules.
-**Direction:** Build to spec. Machine-verifiable gates: per-game Σ score-deltas == header final; **per-player per-game reconciliation against `ibl_box_scores`** (1988–2008, ~606K rows — stronger than the `.sco` season-total recon originally envisioned); Σ origin FGA == total FGA. Output: team-game per-origin {FGA,FTA,PTS,PPS} CSV → team-season demeaned couplings → J2's per-origin decomposition. **Spec addition (J2 session 1):** also emit home/away × per-quarter FTA — the clean instrument separating the static home-FTA component (~+1–2, confounded by FTA→margin reverse causality in box-score data) from game-state late-game fouling (J17), and the acceptance instrument for the static home-FTA channel — which J16 (2026-07-10) re-homed from param_6 (refuted: side-symmetric) to the site-2 HCA `e88 → e90` and-one feed.
-**Resolution (2026-07-12):** Built and gated. **23,714/23,714 games parsed, 100.0000% sentence closure** (16,236,695 sentences, zero unmatched — the J3 gate held); box join 23,133/23,714 (97.55% — the 581 unjoined are log stretches genuinely absent from `ibl_box_scores`, verified by exhaustive score+roster candidate scans); per-player reconciliation 0.111% bad cells (7,134/6,443,352), with 91.6% of those the engine's silent-block behavior (shooter FGA + blocker BLK recorded with no printed sentence — blocker identity provably text-unrecoverable), the rest cross-side same-surname twin ambiguity. Deliverables under `jsb-native/re-artifacts/j4-parser-20260712/` (machine-local): per-origin FGA shares by game_type (regular: initial 0.754 / putback 0.127 / transition 0.119; putback eFG% ≈ 0.62 vs ≈ 0.50 elsewhere, stable across types), team-game per-origin {FGA,FTA,PTS,PPS}, and the home/away × per-quarter FTA instrument (J17/J20 feed).
-**Status (2026-07-12):** ✅ Implemented — feeds J20 (possession-channel restructure) and J17 (game-state fouling instrument).
+➜ J4 Play-by-play extraction parser — ✅ Implemented (2026-07-12): 23,714/23,714 games parsed, 100% sentence closure; feeds J20 + J17 instruments; see [archive](archive/jsb-native-backlog-archive.md).
 
 ### J5 Unpinnable-claims sweep + static closures
 ➜ J5 Unpinnable-claims sweep + static closures — ✅ Implemented (2026-07-09): closures 1–3 + team decode stand; closure 4 overturned by J6; see [archive](archive/jsb-native-backlog-archive.md).

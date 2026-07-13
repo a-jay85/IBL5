@@ -45,7 +45,7 @@ func assembleInputs(foulWeight, hca float64) outcomeInputs {
 // (home's larger 2pt denominator makes foul a marginally smaller share). This test
 // confirms home and away foul shares are NEAR-EQUAL — the property that yields a
 // ≈1.0 home/away FTA ratio, superseding the old home>away asymmetry (ADR-0082).
-// After the Phase-6 re-anchor (foulBucketScale=0.47), the foul share is again a
+// After the Phase-6 re-anchor (foulBucketScale=0.40), the foul share is again a
 // 2pt-dominated realistic minority (~9%), so this test asserts BOTH the structural
 // side-symmetry AND the re-anchored LEVEL band (phase2-derivation.md).
 func TestBucketWeights_FoulPathMix(t *testing.T) {
@@ -82,7 +82,7 @@ func TestBucketWeights_FoulPathMix(t *testing.T) {
 	// ~0.9 share; an unscaled bucket, ~0.01. A minority in [0.03, 0.15] is the faithful
 	// regime this dial was re-anchored to.
 	if homeFoul < 0.03 || homeFoul > 0.15 {
-		t.Errorf("home foul share = %.4f, want a realistic minority in [0.03, 0.15] (level re-anchored, foulBucketScale=0.47)", homeFoul)
+		t.Errorf("home foul share = %.4f, want a realistic minority in [0.03, 0.15] (level re-anchored, foulBucketScale=0.40)", homeFoul)
 	}
 	// Symmetry: home/away foul shares differ ONLY through the ±hca on the 2pt bucket,
 	// so they are near-equal (the discriminator property). NOT the old home>away arm.
@@ -112,7 +112,7 @@ func TestBucketWeights_TwoPtComposite(t *testing.T) {
 	}
 
 	// The foul weight matches the hand-recomputed faithful formula AND — restored after
-	// the Phase-6 re-anchor (foulBucketScale=0.47) — the 2pt composite DOMINATES it
+	// the Phase-6 re-anchor (foulBucketScale=0.40) — the 2pt composite DOMINATES it
 	// (≈16.47 vs ≈2.13 at this fixture), the minority-foul-share invariant the original
 	// +0xD90 characterization pinned.
 	off := fiveStarters(3)
@@ -121,7 +121,7 @@ func TestBucketWeights_TwoPtComposite(t *testing.T) {
 	baseline := foulDivisorTeamDefCoef * defQualityCapTeamMult * leagueSTL48
 	factor := 1.0 + (defQuality(def)-baseline)/offQuality(off)
 	wantFoul := base * factor * foulBucketScale
-	foul := foulBucketWeight(p, off, def, 0, rng.New(1))
+	foul := foulBucketWeight(p, off, def, 0, 0, rng.New(1))
 	if math.Abs(foul-wantFoul) > 1e-9 {
 		t.Errorf("foulBucketWeight = %.6f, want base·factor·scale = %.6f", foul, wantFoul)
 	}
@@ -154,7 +154,7 @@ func TestBucketWeights_FoulDivisor(t *testing.T) {
 		t.Fatalf("test setup: balanced-matchup factor %.4f should be > 0 (deterministic path, no redraw)", factor)
 	}
 	want := base * factor * foulBucketScale
-	if got := foulBucketWeight(bh, off, def, 0, rng.New(1)); math.Abs(got-want) > 1e-9 {
+	if got := foulBucketWeight(bh, off, def, 0, 0, rng.New(1)); math.Abs(got-want) > 1e-9 {
 		t.Errorf("foulBucketWeight = %.6f, want base·factor·scale = %.6f (factor=%.4f)", got, want, factor)
 	}
 
@@ -162,7 +162,7 @@ func TestBucketWeights_FoulDivisor(t *testing.T) {
 	// depends only on the (bh, offense, defense) inputs — the same seed yields the same
 	// value. (The ±0.2 half-court HCA legs are exercised separately; here hca=0 isolates
 	// the symmetric base. Structural, not a knob.)
-	if a, b := foulBucketWeight(bh, off, def, 0, rng.New(42)), foulBucketWeight(bh, off, def, 0, rng.New(42)); a != b {
+	if a, b := foulBucketWeight(bh, off, def, 0, 0, rng.New(42)), foulBucketWeight(bh, off, def, 0, 0, rng.New(42)); a != b {
 		t.Errorf("weight not lineup-deterministic: %v vs %v", a, b)
 	}
 
@@ -171,7 +171,7 @@ func TestBucketWeights_FoulDivisor(t *testing.T) {
 	// finite, non-negative value.
 	r := rng.New(1988)
 	for i := 0; i < 1_000; i++ {
-		got := foulBucketWeight(bh, off, def, 0, r)
+		got := foulBucketWeight(bh, off, def, 0, 0, r)
 		if math.IsNaN(got) || math.IsInf(got, 0) || got < 0 {
 			t.Fatalf("draw #%d non-finite/negative: %v", i, got)
 		}
@@ -201,7 +201,7 @@ func TestBucketWeights_FoulDivisor(t *testing.T) {
 	ceil := foulFloor * foulBucketScale
 	rr := rng.New(5)
 	for i := 0; i < 1000; i++ {
-		got := foulBucketWeight(loOff[0], loOff, weakDef, 0, rr)
+		got := foulBucketWeight(loOff[0], loOff, weakDef, 0, 0, rr)
 		if math.IsNaN(got) || math.IsInf(got, 0) || got < 0 || got >= ceil {
 			t.Fatalf("redraw #%d out of [0, %.2f): %v", i, ceil, got)
 		}
@@ -263,7 +263,7 @@ func TestBucketWeights_FoulBucketHCALegs_DecompilePin(t *testing.T) {
 		h    float64
 	}{{"symmetric", 0}, {"home", +hca}, {"away", -hca}} {
 		want := wantE80(tc.h)
-		got := foulBucketWeight(bh, off, def, tc.h, rng.New(1))
+		got := foulBucketWeight(bh, off, def, tc.h, 0, rng.New(1))
 		if math.Abs(got-want) > 1e-9 {
 			t.Errorf("%s: foulBucketWeight = %.9f, want hand-computed e80 = %.9f", tc.name, got, want)
 		}
@@ -302,6 +302,48 @@ func TestBucketWeights_FoulBucketHCALegs_DecompilePin(t *testing.T) {
 	if ratio < 3.0 {
 		t.Errorf("leg B should dominate leg C by a wide margin, got |B|/|C| = %.1f", ratio)
 	}
+}
+
+// --- decompile-arithmetic pin: the :97164 net-advantage shrink (J18 item 6) ----
+//
+// 5.60 multiplies the coupled foul weight by 1 − param_6/(4·leagueTOV48) after the
+// :97163 coupling factor and before the :97170 ≤0 redraw check, where param_6 is
+// FUN_004e3860's return (= matchupQuality; the :93276-93293 call site pins the
+// provenance). This pin asserts the exact multiplicative identity, that mq=0
+// recovers the pre-port weight, and that a large positive mq past the redraw
+// threshold 4·leagueTOV48 = 13.4126 (J16 §4) drives the weight through the
+// :97170 floor redraw — the reachability 5.60 has and realistic rosters never hit.
+func TestBucketWeights_FoulNetAdvantageShrink_DecompilePin(t *testing.T) {
+	off := fiveStarters(3)
+	def := fiveStarters(7)
+	bh := oc(slotPG, mkPlayer(1, 3, slotPG, 48))
+
+	w0 := foulBucketWeight(bh, off, def, 0, 0, rng.New(1))
+	if w0 <= 0 {
+		t.Fatalf("test setup: mq=0 weight %.6f should be > 0 (deterministic path)", w0)
+	}
+
+	// Exact identity across the realistic mq range (matchupQuality with Phase 3/4
+	// stubbed spans ~[−0.5, +0.8]; include wider values short of the threshold).
+	threshold := 4.0 * leagueTOV48 // 13.4126
+	for _, mq := range []float64{-0.5, -0.02, 0.18, 0.8, 5.0, 13.0} {
+		want := w0 * (1.0 - mq/threshold)
+		if got := foulBucketWeight(bh, off, def, 0, mq, rng.New(1)); math.Abs(got-want) > 1e-9 {
+			t.Errorf("mq=%.2f: foulBucketWeight = %.9f, want w0·(1 − mq/%.4f) = %.9f", mq, got, threshold, want)
+		}
+	}
+
+	// Past the threshold the shrink goes negative and the :97170 floor redraw fires:
+	// results are U[0, foulFloor)·scale, consuming the rng.
+	ceil := foulFloor * foulBucketScale
+	r := rng.New(5)
+	for i := 0; i < 1000; i++ {
+		got := foulBucketWeight(bh, off, def, 0, threshold+1.0, r)
+		if math.IsNaN(got) || math.IsInf(got, 0) || got < 0 || got >= ceil {
+			t.Fatalf("redraw #%d out of [0, %.2f): %v", i, ceil, got)
+		}
+	}
+	t.Logf("w0=%.6f threshold=4·leagueTOV48=%.4f (mq beyond it → floor redraw)", w0, threshold)
 }
 
 // --- matrix #9: direction — EV(foul) > EV(2pt) from outcome realizations
@@ -359,18 +401,22 @@ func TestBucketWeights_RealLifeFallbackUnchanged(t *testing.T) {
 }
 
 // Row 9: with real-life minutes the bucket equals the hand-computed +0xD90 over the
-// faithful per-48-MINUTE rates (stat/MIN)×48 (D70 scaled by d70LeagueScalar). The
-// magnitude lands in the O(10s) stand-in regime (d88 ≈ 25.6), not the O(100s) the
-// per-48-games divisor would give.
+// faithful per-48-MINUTE rates (stat/MIN)×48 (D70 scaled by d70LeagueScalar). D88 is
+// the 2PA rate (2PA = FGA − 3GA); RealLife3GA is left at its zero default here, so
+// twoPA == FGA and the magnitude lands in the O(10s) stand-in regime (d88 ≈ 25.6),
+// not the O(100s) the per-48-games divisor would give. Row 15 below exercises the
+// 3GA > 0 case where twoPA diverges from FGA.
 func TestBucketWeights_RealLifeComposite(t *testing.T) {
 	pl := mkPlayer(1, 3, slotPG, 48)
 	pl.RealLifeMIN = 2400 // ~34 min/game over 70 games
-	pl.RealLifeFGA = 1280 // d88 = 1280/2400*48 = 25.6
+	pl.RealLifeFGA = 1280 // twoPA = 1280-0 = 1280; d88 = 1280/2400*48 = 25.6
+	pl.RealLife3GA = 0    // no threes → twoPA == FGA (see Row 15 for 3GA > 0)
 	pl.RealLifeORB = 160  // db8 = 160/2400*48  = 3.2
 	pl.RealLifeFTA = 320  // d70 = 320/2400*48  = 6.4 (×1.0)
 	p := oc(slotPG, pl)
 
-	d88 := per48Min(1280, 2400)
+	twoPA := pl.RealLifeFGA - pl.RealLife3GA
+	d88 := per48Min(twoPA, 2400)
 	db8 := per48Min(160, 2400)
 	d70 := per48Min(320, 2400) * d70LeagueScalar
 	makeShare := (d88/(db8+d88))*d90MakeShareHalf + d90MakeShareQuarter
@@ -384,10 +430,11 @@ func TestBucketWeights_RealLifeComposite(t *testing.T) {
 	}
 }
 
-// Row 10: two players with IDENTICAL FGA ratings but DIFFERENT real-life FGA rates
-// produce different 2pt weights — the volume signal the compressed rating stand-in
-// flattened away (the dispersion mechanism, ADR-0040). Both also differ from the
-// rating-only stand-in.
+// Row 10: two players with IDENTICAL FGA ratings but DIFFERENT real-life 2PA rates
+// (RealLife3GA left at its zero default, so twoPA == FGA here) produce different
+// 2pt weights — the volume signal the compressed rating stand-in flattened away
+// (the dispersion mechanism, ADR-0040). Both also differ from the rating-only
+// stand-in.
 func TestBucketWeights_RealRateDisperses(t *testing.T) {
 	lo := mkPlayer(1, 3, slotPG, 48) // FGA rating 60
 	lo.RealLifeMIN, lo.RealLifeFGA, lo.RealLifeFTA, lo.RealLifeORB = 2400, 800, 200, 80
@@ -408,7 +455,9 @@ func TestBucketWeights_RealRateDisperses(t *testing.T) {
 
 // Row 11 (boundary): RealLifeMIN>0 with FGA==0 ∧ ORB==0 (played, only ever shot FTs)
 // must yield a finite weight, not the 0/0 NaN the real-rate path reopens (the guard).
-// The faithful limiting value is d88 == 0.
+// The faithful limiting value is d88 == 0 (twoPA == FGA-3GA == 0-0 == 0 here). Rows
+// 16/17 below exercise the two OTHER routes to a zero twoPA: an all-three shooter
+// and a corrupt 3GA>FGA record.
 func TestBucketWeights_RealLifeZeroFGA(t *testing.T) {
 	pl := mkPlayer(1, 3, slotPG, 48)
 	pl.RealLifeMIN, pl.RealLifeFGA, pl.RealLifeORB, pl.RealLifeFTA = 1200, 0, 0, 300
@@ -419,6 +468,83 @@ func TestBucketWeights_RealLifeZeroFGA(t *testing.T) {
 	}
 	if got != 0 {
 		t.Errorf("zero-FGA limit = %v, want 0 (d88)", got)
+	}
+}
+
+// --- J18 item 3: twoPtBucketWeight's D88 is the 2PA rate, not total FGA ------
+
+// Row 15: with RealLife3GA > 0 the faithful d88 is per-48 TWO-point-attempt rate
+// (2PA = FGA − 3GA), not per-48 total FGA. The case is chosen so the two bases
+// diverge (280 of 1280 attempts are threes), pinning the exact faithful value and
+// guarding against a regression to the pre-J18-item-3 total-FGA basis.
+func TestBucketWeights_RealLifeTwoPAExcludesThrees(t *testing.T) {
+	pl := mkPlayer(1, 3, slotPG, 48)
+	pl.RealLifeMIN = 2400
+	pl.RealLifeFGA = 1280
+	pl.RealLife3GA = 280 // twoPA = 1280-280 = 1000, NOT 1280 (the old total-FGA basis)
+	pl.RealLifeORB = 160
+	pl.RealLifeFTA = 320
+	p := oc(slotPG, pl)
+
+	twoPA := pl.RealLifeFGA - pl.RealLife3GA
+	d88 := per48Min(twoPA, 2400) // = 20.0
+	db8 := per48Min(160, 2400)
+	d70 := per48Min(320, 2400) * d70LeagueScalar
+	makeShare := (d88/(db8+d88))*d90MakeShareHalf + d90MakeShareQuarter
+	want := d88 - (d88/(d70+d88))*db8*makeShare
+
+	got := twoPtBucketWeight(p)
+	if math.Abs(got-want) > 1e-9 {
+		t.Errorf("2PA-basis composite = %.6f, want %.6f", got, want)
+	}
+
+	// Guard against a regression to the old total-FGA basis: computing d88 straight
+	// from FGA (ignoring 3GA) gives a materially different composite.
+	oldD88 := per48Min(pl.RealLifeFGA, 2400)
+	oldMakeShare := (oldD88/(db8+oldD88))*d90MakeShareHalf + d90MakeShareQuarter
+	oldWant := oldD88 - (oldD88/(d70+oldD88))*db8*oldMakeShare
+	if math.Abs(got-oldWant) < 1e-6 {
+		t.Errorf("composite %.6f matches the old total-FGA basis %.6f — 3GA subtraction not applied", got, oldWant)
+	}
+}
+
+// Row 16: a pure three-point shooter (FGA == 3GA, every real-life attempt a three)
+// with real-life minutes yields twoPA == 0, so the faithful d88 == 0 and the
+// guarded composite returns exactly 0 — the same zero-d88 limit as Row 11's
+// empty-box-score case, now reached via the 2PA subtraction rather than FGA itself
+// being 0.
+func TestBucketWeights_RealLifePureThreePointShooterZeroTwoPt(t *testing.T) {
+	pl := mkPlayer(1, 3, slotPG, 48)
+	pl.RealLifeMIN, pl.RealLifeFGA, pl.RealLife3GA = 1500, 400, 400
+	pl.RealLifeORB, pl.RealLifeFTA = 50, 100
+	got := twoPtBucketWeight(oc(slotPG, pl))
+
+	if math.IsNaN(got) || math.IsInf(got, 0) {
+		t.Fatalf("FGA==3GA produced a non-finite weight: %v", got)
+	}
+	if got != 0 {
+		t.Errorf("pure-3pt-shooter (twoPA==0) 2pt bucket = %v, want exactly 0", got)
+	}
+}
+
+// Row 17 (corrupt-record guard): RealLife3GA > RealLifeFGA cannot occur in valid
+// .plr data (3PA is a subset of total FGA), but a corrupt record must not produce
+// a negative twoPA — the guard floors it to 0, giving the same zero-d88 limit as
+// Row 16 rather than a negative weight that would poison the weighted pick.
+func TestBucketWeights_RealLifeThreeGAExceedsFGAGuard(t *testing.T) {
+	pl := mkPlayer(1, 3, slotPG, 48)
+	pl.RealLifeMIN, pl.RealLifeFGA, pl.RealLife3GA = 1500, 300, 400 // corrupt: 3GA > FGA
+	pl.RealLifeORB, pl.RealLifeFTA = 50, 100
+	got := twoPtBucketWeight(oc(slotPG, pl))
+
+	if math.IsNaN(got) || math.IsInf(got, 0) {
+		t.Fatalf("3GA>FGA produced a non-finite weight: %v", got)
+	}
+	if got < 0 {
+		t.Errorf("3GA>FGA (corrupt record) produced a negative weight: %v, want >= 0 (twoPA floored to 0)", got)
+	}
+	if got != 0 {
+		t.Errorf("3GA>FGA guard = %v, want exactly 0 (twoPA floored to 0 == d88 limit)", got)
 	}
 }
 

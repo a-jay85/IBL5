@@ -79,13 +79,19 @@ const (
 	orbRateScale = 0.15
 	ftaRateScale = 0.30
 
-	// d70LeagueScalar carries D70's league-relative factor
-	// ((C[+0x6938]×5 − C[+0x68D8]×0.5)/(C[+0x6728]×5), COMPOSITE_DOUBLES_TRACE.md §3),
-	// which reads runtime CEngine LEAGUE aggregates absent from the IBL data path
-	// (ADR-0040 negative finding 2 — the "loader-populated, not modeled" class, like
-	// league_baseline). It is a uniform league scalar, so it degrades to a documented
-	// calibrated constant: 1.0 (neutral) here, corpus-tunable on PR2's instrument.
-	d70LeagueScalar = 1.0
+	// d70LeagueScalar carries D70's league-relative factor S =
+	// (leaguePF48×5 − leagueTOV48×0.5)/(leagueFTA48×5) — asm 4d4380–4d43cd
+	// (COMPOSITE_DOUBLES_TRACE.md §3; RE artifact
+	// jsb-J6-composite-scales-20260710.md §2). The three inputs are FUN_004385f0
+	// league-table means computed from the 5.60 game-install IBL5.plr (records
+	// 1–959, non-empty name, MIN>2·GP, n=376): leaguePF48 = 4.294130331651356,
+	// leagueTOV48 = 3.3531432843116113 (matches the leagueTOV48 pin in
+	// teamquality.go exactly), leagueFTA48 = 6.116607485995505 — giving S =
+	// 0.6472241372826754. This is a static pin from the same league table as
+	// teamquality.go's leagueTOV48/leagueSTL48, not a runtime CEngine read (ADR-0040
+	// negative finding 2 — the "loader-populated, not modeled" class); a per-season
+	// dynamic league table is a tracked follow-up, not this change.
+	d70LeagueScalar = 0.6472241372826754
 
 	// +0xD90 Branch-A pinned constants (COMPOSITE_DOUBLES_TRACE.md §5): the 0.5
 	// (_DAT_00669ef0) and 0.25 (_DAT_00669f58) factors in the make-share weighting.
@@ -119,19 +125,26 @@ const (
 	// 5/6 coupling are DERIVED (guarded by faithful_scales_derivation_test.go), and
 	// the home/away symmetry (ratio ≈ 1.0) is STRUCTURAL, independent of this scale.
 	// Unscaled, the foul share collapses and the FTA level breaks against the .sco
-	// archive. This value is the ADR-0082-status corpus-calibrated level, re-anchored
-	// (Phase 6, 2026-07-11) for the C2-corrected DETERMINISTIC base (2−fatigue)·TOV48
-	// — which is far larger than the old U[0,foulFloor) draw, so the pre-C2 8.6 gave a
-	// degenerate ~102 FTA/g. Empirically re-anchored on the archive harness to real
-	// FTA/g ≈ 21.32 (the 00-01 sample's paired .sco value): 0.47 → engine FTA 21.36
-	// (gap +0.04). FTA saturates sub-linearly in this dial (foul-outs cap minutes), so
-	// it was found by 1-D search (0.50→22.43, 0.45→20.67, 0.47→21.36), not the linear
-	// estimate. The level was tuned AFTER the Phase-5 margin lock (hcaSite2BasisScale
-	// 2.85): the two dials are only weakly coupled — sweeping this dial moved the gt=2
-	// home margin non-monotonically (3.332/3.304/3.287 for 0.50/0.45/0.47), i.e. WITHIN
-	// the ~±0.03 Monte-Carlo noise floor of the 20-run harness, so re-anchoring FTA did
-	// not disturb the locked margin. See the J15 program / phase2-derivation.md.
-	foulBucketScale = 0.47
+	// archive. This value is the ADR-0082-status corpus-calibrated level. Re-anchored
+	// a SECOND time (2026-07-12) after the J18 items 1+3 faithful bucket-basis changes
+	// (real 3GA/48 3pt bucket + 2PA-based d88 twoPtBucketWeight) shrank the competing
+	// 2pt/3pt bucket mass, which raised the foul bucket's normalized share and pushed
+	// engine FTA/g from 21.36 to 24.20 at the then-current 0.47 — breaking the anchor
+	// against the same 00-01 .sco target (FTA/g ≈ 21.32) without any change to this
+	// dial's own value. FTA saturates sub-linearly in this dial (foul-outs cap
+	// minutes), so it was re-found by 1-D search (0.39→20.99, 0.40→21.43, 0.41→21.81,
+	// 0.47→24.20), not a linear estimate. Re-anchored to 0.40 → engine FTA 21.43
+	// (gap +0.11). The level was re-tuned AFTER the Phase-5 margin lock
+	// (hcaSite2BasisScale 2.85, unchanged): the two dials remain only weakly coupled —
+	// moving this dial from 0.47 to 0.40 moved the gt=2 home margin gap from +0.459 to
+	// +0.470 (delta +0.011), i.e. WITHIN the ~±0.03 Monte-Carlo noise floor of the
+	// 20-run harness, so re-anchoring FTA a second time did not disturb the locked
+	// margin. (The gt=4 gap moved further, +1.284 → +1.752 — gt=4 was never part of
+	// the Phase-6 weak-coupling claim, which is scoped to gt=2; not re-litigated here.)
+	// See the J15 program / phase2-derivation.md and the Phase-6 (2026-07-11) history
+	// this supersedes for the first re-anchor's story (0.50→22.43, 0.45→20.67,
+	// 0.47→21.36).
+	foulBucketScale = 0.40
 
 	// andOneBucketFloor is the verbatim JSB and-one floor (0.03). Ensures the
 	// and-one path cannot be zeroed by a negative matchup quality. Unchanged from
@@ -166,17 +179,25 @@ func per48Min(stat, minutes int) float64 {
 //
 //	D90 = D88 − (D88/(D70+D88)) × DB8 × ((D88/(DB8+D88)) × 0.5 + 0.25)
 //
-// where D88 = per-48 FGA rate, DB8 = per-48 ORB rate, D70 = the FTA-weighted rate.
-// The composite formula is unchanged; what changed (ADR-0040, candidate A) is its
-// INPUTS. When the bundle carries the real-life minutes (RealLifeMIN > 0) D88/DB8/
-// D70 are the FAITHFUL per-48-MINUTE rates (stat/MIN)×48 — the wide team-to-team
-// spread 5.60 disperses team offense on, in the same O(10s) magnitude as the
-// stand-in (a high-volume player ≈ 27 FGA/48). Absent them (rookie / unwired
-// production bundle) it falls back to the compressed rating stand-in (fgaRateScale
-// etc.), the behavior this PR preserves byte-for-byte for the no-reference case.
-// (Using minutes, not games, is load-bearing: per-48-GAMES would be ~55× larger,
-// driving the 2pt bucket to O(100s) and collapsing the foul/FTA play-outcome share
-// to ~0 — verified degenerate against the .sco corpus.)
+// where D88 = per-48 2PA rate (2PA = FGA − 3GA), DB8 = per-48 ORB rate, D70 = the
+// FTA-weighted rate. The composite formula is unchanged; what changed (ADR-0040,
+// candidate A) is its INPUTS. When the bundle carries the real-life minutes
+// (RealLifeMIN > 0) D88/DB8/D70 are the FAITHFUL per-48-MINUTE rates (stat/MIN)×48
+// — the wide team-to-team spread 5.60 disperses team offense on, in the same
+// O(10s) magnitude as the stand-in (a high-volume player ≈ 27 2PA/48). Absent them
+// (rookie / unwired production bundle) it falls back to the compressed rating
+// stand-in (fgaRateScale etc.), the behavior this PR preserves byte-for-byte for
+// the no-reference case. (Using minutes, not games, is load-bearing: per-48-GAMES
+// would be ~55× larger, driving the 2pt bucket to O(100s) and collapsing the
+// foul/FTA play-outcome share to ~0 — verified degenerate against the .sco
+// corpus.)
+//
+// 5.60's +0xD88 composite input is the two-point-attempt rate, not total FGA (J6
+// RE session 2026-07-10, FUN_004cfa50 stack-record store family — the same
+// provenance chain as +0xDB0/+0xDC8/+0xD70), parallel to the league 2PA/48
+// baseline at CEngine+0x6638 (assemble.go computeLeagueShotBaseline): both
+// subtract 3GA from the combined FGA total to isolate the two-point economy
+// 5.60 feeds this bucket.
 //
 // It is net-free: in JSB net enters only via shot_value, so the playoff ×1.25
 // multiplier never amplifies this bucket. The composite is O(10s), keeping the
@@ -185,7 +206,11 @@ func per48Min(stat, minutes int) float64 {
 func twoPtBucketWeight(p onCourt) float64 {
 	var d88, db8, d70 float64
 	if p.RealLifeMIN > 0 {
-		d88 = per48Min(p.RealLifeFGA, p.RealLifeMIN)
+		twoPA := p.RealLifeFGA - p.RealLife3GA
+		if twoPA < 0 {
+			twoPA = 0 // corrupt record guard: 3GA can never exceed FGA in valid .plr data
+		}
+		d88 = per48Min(twoPA, p.RealLifeMIN)
 		db8 = per48Min(p.RealLifeORB, p.RealLifeMIN)
 		d70 = per48Min(p.RealLifeFTA, p.RealLifeMIN) * d70LeagueScalar
 	} else {
@@ -252,7 +277,7 @@ func andOneBucketWeight(mq float64, p onCourt) float64 {
 //	defQ    = Σ_{5 defenders} STL/MIN×44 (capped)                  // defQuality (teamquality.go)
 //	offQ    = Σ_{offense} (TOV/MIN×48 − s·hca)                     // offQualityWithHCA, leg C, RAW hca
 //	factor  = 1 + (defQ − foulDivisorTeamDefCoef·defQualityCapTeamMult·leagueSTL48)/offQ  // :97163
-//	w       = base · factor
+//	w       = base · factor · (1 − mq/(4·leagueTOV48))             // :97163 coupling, :97164 shrink
 //	if w <= 0 { w = rng.Float64()·foulFloor }                      // :97170 floor redraw ONLY
 //	return w · foulBucketScale
 //
@@ -279,15 +304,18 @@ func andOneBucketWeight(mq float64, p onCourt) float64 {
 // side. offQ > 0 always (floor1 floors TVR at 1, small hca), so the divide is
 // guarded; a defensive guard on offQ ≤ 0 returns base only (no factor applied).
 //
-// DOCUMENTED DIVERGENCE (J18 item 6, found at ratification 2026-07-12): 5.60
-// additionally multiplies e80 ×= 1 − param_6/(4·leagueTOV48) (the J16-pinned
-// net-advantage shrink, after the coupling and before the ≤0 redraw check, on
-// BOTH param_5 paths) — unported here; the Go netAdvantage feeds shot_value
-// only. So this redraw fires only on factor ≤ 0, rarer than in 5.60 (where
-// param_6 > 13.41 occasionally triggers it). Porting it changes foul share
-// globally and re-opens the level/margin anchors — it gets its own A/B'd PR
-// (ADR-0084 Decision 2).
-func foulBucketWeight(bh onCourt, offense, defenders []onCourt, hca float64, r *rng.RNG) float64 {
+// The :97164 net-advantage shrink (J18 item 6, ported 2026-07-12) multiplies the
+// coupled weight by 1 − mq/(4·leagueTOV48) before the ≤0 redraw check, on both
+// param_5 (home/away) paths. Its 5.60 operand is param_6 = FUN_004e3860's return
+// (pinned at the :93276-93293 call site: fVar22 → dVar1 → the double arg slot),
+// which is matchupQuality — NOT the ODPT netAdvantage, whose O(10s) scale would
+// blow past the 4·leagueTOV48 = 13.4126 redraw threshold every possession. With
+// matchupQuality's Phase 3/4 aggregates still stubbed to 0 (matchup.go), mq =
+// −(FGP·0.2 − 9.9)·0.2 ∈ roughly [−0.5, +0.8], so the shrink is a ±few-% foul-
+// share modulation today and matures automatically when those aggregates land.
+// The redraw threshold (mq > 13.4126, J16 §4) stays unreachable at stub values —
+// exactly 5.60's behavior, where realistic rosters never reach it either.
+func foulBucketWeight(bh onCourt, offense, defenders []onCourt, hca, mq float64, r *rng.RNG) float64 {
 	// leg B (site-2 e80, decompile :97160): the foul BASE is reduced by the RAW s·hca
 	// BEFORE the coupling factor. Home (hca>0) → smaller base → home draws FEWER fouls
 	// (anti-home). RAW, not scaled: the base is on the faithful CEngine TOV48 basis.
@@ -297,13 +325,16 @@ func foulBucketWeight(bh onCourt, offense, defenders []onCourt, hca float64, r *
 	// (pro-home only for a strong-steal defense). leg B dominates leg C by ~an order of
 	// magnitude, so the net is anti-home (ratio ~0.91) regardless of leg C's sign.
 	offQ := offQualityWithHCA(offense, hca)
+	// :97164 net-advantage shrink (J18 item 6): straight-line in 5.60, so it applies
+	// on the defensive offQ ≤ 0 path too.
+	shrink := 1.0 - mq/(4.0*leagueTOV48)
 	if offQ <= 0 {
 		// divide-by-zero guard (unreachable: floor1 ⇒ offQ > 0); base only, no factor.
-		return base * foulBucketScale
+		return base * shrink * foulBucketScale
 	}
 	baseline := foulDivisorTeamDefCoef * defQualityCapTeamMult * leagueSTL48
 	factor := 1.0 + (defQuality(defenders)-baseline)/offQ
-	w := base * factor
+	w := base * factor * shrink
 	if w <= 0 {
 		// faithful floor redraw (:97170) — reachable symmetrically.
 		return r.Float64() * foulFloor * foulBucketScale

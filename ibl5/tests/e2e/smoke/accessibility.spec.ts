@@ -104,7 +104,7 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
 // enforces that page/rule at 375px.
 //
 // target-size ships EMPTY on purpose: the two 375px offenders (topics'
-// .topic-card__cat, news-article's .leaders-tabbed__leader-team) are FIXED in CSS
+// .topic-card__cat, homepage's .leaders-tabbed__leader-team) are FIXED in CSS
 // by this PR (Phases 4–5), not allowlisted. This key exists for future-regression
 // tracking and to give the viewport-aware machinery a home. See
 // ibl5/docs/backlog/a11y-backlog.md §target-size.

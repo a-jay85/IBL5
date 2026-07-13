@@ -111,7 +111,7 @@ $firstCategory = $categories[0] ?? 'Points';
 // Compact tabbed layout with header
 $content = '<div class="leaders-tabbed" id="' . $blockId . '">
     <div class="leaders-tabbed__header">
-        <h3 class="leaders-tabbed__title">League Leaders</h3>
+        <h2 class="leaders-tabbed__title">League Leaders</h2>
     </div>
     <div class="ibl-tabs" role="tablist">';
 

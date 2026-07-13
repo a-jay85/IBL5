@@ -1004,7 +1004,7 @@ INSERT INTO ibl_schedule (season_year, game_date, visitor_teamid, home_teamid, v
 -- links, making the 375px target-size a11y sweep non-vacuous for that selector
 -- (0 occurrences on the CI seed before this row). content is NOT NULL with no
 -- default, so it must be set explicitly ('' — the block include populates it).
--- view=0 → public. Players 1,2,4,5,6 have stats_gm>0, so the leaders query
+-- view=0 → public. Players 1,2,4,5,6,7 have stats_gm>0, so the leaders query
 -- returns rows. NOTE: this changes the full-page 'index' and 'error-invalid-module'
 -- VR baselines (the 'article' anchor is settle-only, not a crop).
 -- ============================================================

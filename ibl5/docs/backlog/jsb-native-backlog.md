@@ -51,10 +51,10 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 8 |
+| ⬜ Open | 7 |
 | 📋 Planned | 0 |
 | ◑ Partial | 1 |
-| ✅ Implemented | 11 |
+| ✅ Implemented | 12 |
 | 🚫 Declined | 0 |
 
 ---
@@ -72,7 +72,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 | J7 | Turnover volume-coupling fidelity RE | ⬜ Open | 🧠 Opus | M |
 | J8 | Transition trigger denominator 18 | ⬜ Open | ⚙️ Sonnet | S |
 | J9 | League-baseline faithful port (FUN_004385f0) | ✅ Implemented | ⚙️ Sonnet | S |
-| J10 | `.plb` minutes reader + stamina=100 bundle fix | ⬜ Open | ⚙️ Sonnet | S |
+| J10 | `.plb` minutes reader + stamina=100 bundle fix | ✅ Implemented | ⚙️ Sonnet | S |
 | J11 | Season-selection min-GP guard | ⬜ Open | ⚙️ Sonnet | S |
 | J12 | HCA re-homing to basis-scaled site-2 (absorbed into J15) | ✅ Implemented | 🧠 Opus | M |
 | J13 | Cut-over package: bands, leaders, decision | ⬜ Open | 🧠 Opus | L |
@@ -121,7 +121,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 **Location:** `engine/internal/backup` bundle assembly — `DCMinutes` zeroed and stamina defaulted to 0 at assemble time (line refs drift; grep `assemble.go` for the two TODO sites).
 **Problem:** Zeroed `dc_minutes` flattens rotation selection (the engine uses it in lineup quality scoring); stamina 0 is a degenerate energy ceiling where 5.60's faithful value is a uniform 100 (verified: `.plr` offset 546 constant across all players; no per-player stamina exists in JSB).
 **Direction:** Add a Go `.plb` reader (32 team lines × 30 slots × 12 chars; slot→player via the ordinal formula in `ibl5/classes/PlrParser/PlrOrdinalMap.php`), wire `DCMinutes` into the bundle, set stamina ceiling to constant 100. One PR; recipe fully specified in the acceptance-bar record.
-**Status (2026-07-08):** ⬜ Open. ⚙️ Sonnet.
+**Status (2026-07-12):** ✅ Implemented. Merged via PR #949 (`engine/internal/backup/plb.go` + `assemble.go`) — confirmed still live; archive regression re-run clean. ⚙️ Sonnet.
 
 ### J11 Season-selection min-GP guard
 **Location:** `engine/internal/calibrate` season selection (season.go) — picked TRUNCATED snapshots for 5/19 seasons (medGP 3–46 instead of ~82) when last measured.

@@ -40,6 +40,7 @@ J1 faithful foul pair (✅ 2026-07-10, ADR-0082) ─→ J2 adjudications (✅ 20
               ├─ prerequisite: J16 escape bound re-derived with LIVE AST/48 (J19) — ✅ J19 done
               └─→ J2 verdict: SHIPPABLE with residual → successor = J20 empty-FGA restructure (J4 ✅ 2026-07-12 feeds it) → J13 (unblocked)
 J17 game-state foul coupling (⬜, new 2026-07-10) — real 5.60 mechanism the engine lacks entirely
+J21 gt=4 playoff-margin audit (⬜, new 2026-07-13) · J22 per-player STL/TOV bundle wiring (⬜, new 2026-07-13) — cut-over-gate fidelity inputs to J13; NEITHER is a count-axis (J20) lever
 J18 composite fidelity ports (✅ 2026-07-13 — all divergences merged; f/shrink port declined as documented divergence) · J19 J6-residue RE (✅ 2026-07-12) — both spawned by J6
 ```
 
@@ -51,7 +52,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 5 |
+| ⬜ Open | 7 |
 | 📋 Planned | 0 |
 | ◑ Partial | 0 |
 | ✅ Implemented | 15 |
@@ -83,6 +84,8 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 | J18 | Composite fidelity ports (bucketweights/teamquality vs the J6 formula map) | ✅ Implemented | 🧠 Opus | M |
 | J19 | J6-residue RE (energy operands, rec+0x18 semantics, escape re-derivation, +0xD58) | ✅ Implemented | 🧠 Opus | M |
 | J20 | Empty-FGA / within-possession restructure (Cov possession channel) | ⬜ Open | 🧠 Opus | L |
+| J21 | gt=4 playoff-margin overshoot audit (playoffNetMultiplier ×1.25) | ⬜ Open | 🧠 Opus | S |
+| J22 | Per-player rl_stl/rl_tov production-bundle wiring (PF dispersion) | ⬜ Open | 🧠 Opus | M |
 
 ### J1 Faithful foul-bucket pair port
 ➜ J1 Faithful foul-bucket pair port — ✅ Implemented (2026-07-10): see [archive](archive/jsb-native-backlog-archive.md).
@@ -172,3 +175,18 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 **Problem:** The possession-count channel carries **81% of real gt2 Cov** (+0.000498 of +0.000612) and is the only channel that can flip the engine's sign — the shot-mix channel is arithmetically capped at −0.000012 ≤ 0 even fully faithful (J2 s2), triple-confirmed by the J18 A/Bs (Cov unchanged in every port). The engine's empty-FGA retry loop over-disperses shots-per-possession and dilutes realized PPS on high-volume teams (corr −0.42) where 5.60 does not. Successor to ADR-0042's open item; the ADR-0054 possession budget constraint is generator-independent and binds any redesign.
 **Direction:** Design against J4's real per-origin ground truth (initial/putback/transition FGA shares + per-origin efficiency): restructure how empty possessions/retries generate FGA so within-possession dispersion matches the corpus, without breaking the possession budget or the fta/margin anchors. Needs its own RE pass on 5.60's possession flow + a `/plan`; A/B gates = gt2/gt4 Cov, fta_per_g, margin. Sequence J7 (turnover coupling) with it — J7's faithful fix pressures Cov the wrong way and should be priced into the same adjudication.
 **Status (2026-07-12):** ⬜ Open — unblocked (J4 ✅). 🧠 Opus design + adjudication; escalate 🔮 Fable (user-gated) only if the asm possession-loop derivation hits the refuted-premise class.
+
+### J21 gt=4 playoff-margin overshoot audit
+*(discovered 2026-07-13 during jsb-native RE-tooling feasibility review)*
+**Location:** `engine/internal/sim/gametype.go:16` (`playoffNetMultiplier = 1.25`, pinned from `jsb-native/00_MASTER_REFERENCE.md` L1022-1027: net × 1.25 when `game_type == 4`), applied at `engine/internal/sim/netadvantage.go:31-32` (`net *= playoffNetMultiplier` on the signed 2pt half-court net).
+**Problem:** the ×1.25 *constant* is RE-grounded, but the resulting playoff-margin distribution has never been audited against 5.60's `.sco` playoff corpus — Fable flagged a gt=4 margin **overshoot** (engine playoff margins run hotter than real). Unknown whether the cause is the multiplier's application scope (it amplifies the signed net *before* the corpus-anchored basis-conversion dials — foulBucketScale etc. — so a playoff-only interaction could compound them) or an independent playoff mechanism 5.60 applies that the engine lacks. Never adjudicated.
+**Direction:** measure engine gt=4 margin (mean + dispersion) vs the `.sco` playoff-game subset, A/B against gt=2; if it overshoots, RE 5.60's playoff net path (is ×1.25 the only playoff amplifier?) and adjudicate whether the fix is a scope correction or a missing mechanism. Sequence with J13 (cut-over needs authoritative playoff bands). A/B gate = gt4 margin mean/dispersion vs corpus. **Not a count-axis lever** (that is J20).
+**Status (2026-07-13):** ⬜ Open — new. 🧠 Opus (audit + verdict); any port ⚙️ Sonnet.
+
+### J22 Per-player rl_stl/rl_tov production-bundle wiring
+*(discovered 2026-07-13 during jsb-native RE-tooling feasibility review)*
+**Location:** `engine/internal/sim/teamquality.go:29-32` (the STAND-INS block — "bundle carries no `rl_stl`/`rl_tov` counting sums… defQ/offQ use the 0-99 STL/TVR **ratings** as per-48 rate stand-ins, mapped through `ratingRefScale`"); bundle feed at `engine/internal/backup/assemble.go:215` (`STL: p.RatingSTL` — the 0-99 rating, not a real per-player steal count).
+**Problem:** ADR-0084's composites are faithful in **formula** (defQ = Σ STL/MIN×44, offQ = Σ TOV/48) but fed **rating stand-ins**, not real per-player `rl_stl`/`rl_tov`. The engine's PF is under-dispersed — Var(lnPF) ratio ≈ 0.22, PF dispersion ≈ ½ real (J13 monitor; J2 residual context) — because rating stand-ins compress the per-player STL/TOV spread the live composites exist to express. `teamquality.go:32` already marks this "Out of Scope, J6"; this entry formalizes that deferred follow-on so it is tracked, not just code-commented.
+**Not the count-axis:** wiring real STL/TOV raises PF *dispersion* — a fidelity fix, **not** a Cov(lnFGA,lnPPS) lever (that is J20). File as a dispersion-fidelity follow-on, never a cut-over sign blocker.
+**Direction:** confirm whether the production-bundle SOURCE (`.plr` / real-life stat feed) carries per-player steal/turnover counting sums; if so, add them to the bundle reader + wire into the composites replacing the rating stand-ins; if not, RE where 5.60 sources them. A/B gate = Var(lnPF) ratio toward real, no regression on margin/fta anchors or gt2/gt4 Cov. Sequence after J20 (Cov structure first) so the dispersion A/B reads clean.
+**Status (2026-07-13):** ⬜ Open — new. 🧠 Opus (source question + Var(lnPF) A/B judgment); port ⚙️ Sonnet once source confirmed.

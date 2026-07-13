@@ -1,6 +1,6 @@
 ---
-description: Index of tracked backlogs under docs/backlog/ — one row per LIVE backlog plus the archive pointer, and the canonical status taxonomy shared by all backlogs.
-last_verified: 2026-07-08
+description: Index of tracked backlogs under docs/backlog/ — one row per LIVE backlog plus the archive pointer, and the canonical status taxonomy shared by all backlogs; and the archive / dated-pointer / supersession housekeeping conventions.
+last_verified: 2026-07-12
 ---
 
 # Backlog index
@@ -38,11 +38,31 @@ The canonical five-glyph status set used by every backlog in this directory:
 Domain-specific **automouse-readiness** legends (🟩/🟦/🟨/🟥) and **effort scales** (S/M/L) stay defined
 per-file — their semantics vary by domain.
 
+## Housekeeping conventions
+
+- **Discovered-item provenance:** a backlog item surfaced while implementing another change is stamped
+  `(discovered YYYY-MM-DD during <ref>)`, where `<ref>` is the PR number or plan slug — a greppable origin.
+- **Cross-backlog supersession:** when a change makes an item in *another* backlog redundant, stamp that
+  item `**Superseded by:** <ref> — <reason>` (verbatim, greppable). Do not delete it — the stamp is the audit trail.
+- **Ship it with the work:** run `/backlog-housekeep` (the `.claude/rules/backlog-housekeep.md` rule surfaces
+  this when you touch a backlog file); it applies the flips, stamps, archive moves, and README reconciliation,
+  then self-verifies via `bin/check-docs`.
+
 ## Archive
 
 [`archive/`](archive/) holds the read-only historical record of ✅ Implemented / 🚫 Declined findings,
-extracted out of `maintenance-backlog.md` so the LIVE file stays short. Not governed by `bin/check-docs`
-(historical dead refs are tolerated there).
+extracted out of the LIVE backlogs so they stay short. Not governed by `bin/check-docs` (historical dead
+refs are tolerated there).
+
+- **Sibling pairing:** each LIVE `<x>-backlog.md` pairs with `archive/<x>-backlog-archive.md` (e.g.
+  `token-spend-backlog.md` ↔ `archive/token-spend-backlog-archive.md`).
+- **Archiving an item:** when an item reaches ✅ Implemented or 🚫 Declined in a **body-status** backlog,
+  move its body into the sibling archive and replace the LIVE entry with a one-line **dated pointer**, e.g.
+  `➜ <id> <title> — ✅ Implemented (YYYY-MM-DD): see [archive](archive/<x>-backlog-archive.md).`
+- **Table-status backlogs** (`maintenance-backlog.md`) keep their glyphs in-place per row — no per-item
+  pointer; bulk-resolved sections still extract to the archive.
+- **Enforced by** `bin/check-docs --since=<base>`: a newly-added archive pointer must resolve to its
+  sibling, and a body-status item flipped done must become a pointer (the diff-scoped backstop).
 
 ## Not part of this directory
 

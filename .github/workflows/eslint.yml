@@ -13,6 +13,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Change-detection strategy: dorny/paths-filter with a static glob list.
+  # ESLint only needs to run when the e2e specs or their JS/TS tooling config
+  # (playwright/eslint config, package.json, bun.lock) change, so a tool-scoped
+  # glob is exactly right. bin/website-affecting is NOT used: linting the e2e
+  # test suite is unrelated to whether a change affects app rendering.
   changes:
     name: Detect changes
     runs-on: ubuntu-latest

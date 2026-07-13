@@ -1,23 +1,11 @@
 ---
-description: Sub-agent decision rules — when to spawn, when to skip, which model to pick, and how sub-agent delegation keeps orchestrator context low
-last_verified: 2026-07-09
+description: Which tier to pick for each sub-agent, plus how to tier Explore agents. Skip-vs-spawn heuristic and deeper rationale live in agent-tiering-detail.md.
+last_verified: 2026-07-11
 ---
 
 # Agent Tiering
 
 Tier every sub-agent (and every agent a plan spawns) by the reasoning the task actually needs — never default to Opus.
-
-## Skip the Agent — Direct Tool Calls
-
-Each sub-agent costs ~3–5K tokens (system prompt + rules + memory, loaded before its prompt), and its output re-loads in Opus's context every later turn.
-
-**Run directly (no agent) when ALL hold:** single command/tool call · output under ~50 lines · nothing else to run in parallel · output won't persist across turns.
-
-**Spawn an agent when ANY hold:** output unpredictably verbose (large grep, failing suites with stack traces) and the agent can return a summary · multiple independent verbose tasks run concurrently · the task is multiple sequential tool calls.
-
-**When you spawn, minimize invocation count** — the question is *how many agents are needed*, not *parallel vs. sequential*; token spend outranks wall-clock time. Batch N related tasks into one agent (or do them yourself) — each spawn re-pays the ~3–5K overhead. Separate agents only when each genuinely needs its own context (independent worktrees, isolating verbose output), not because tasks are logically distinct.
-
-**PHPUnit and PHPStan are always direct Bash calls** — passing output is ~5 lines, failures usually under 50; agent overhead dwarfs it. Use `run_in_background` for parallelism without an agent — **but only in the interactive harness**, where a finished background task re-invokes you. In a **headless** run (`claude -p`, e.g. `/post-plan` under automouse) there is no re-invocation: a live background task at turn-end stall-kills the run — run blocking, or poll `BashOutput` to completion in-turn (post-plan `SKILL.md` Phase 5).
 
 ## Tiers
 
@@ -26,14 +14,10 @@ Each sub-agent costs ~3–5K tokens (system prompt + rules + memory, loaded befo
 | **Haiku** | `model: "haiku"` | Command output, pattern-matching named checklists, grep-and-format, mechanical lookups — answerable by running commands and reporting, without judging relevance. |
 | **Sonnet** | `model: "sonnet"` | Synthesis: "is this finding relevant?", cross-file traces, semantic compliance checks, rename sweeps needing call-site judgment. |
 | **Opus** | self (no delegation) | Novel reasoning, FK ordering, rule authoring, ADR writing, ambiguous test failures, final code review, diff-triage. Never delegate understanding. |
-| **Opus (delegated)** | `subagent_type: "plan-architect"` | Implementation **planning** only, via `/plan` Step 3. The def pins `model: opus` + `effort: high`; escalate to `plan-architect-xhigh` (`effort: xhigh`) for security surfaces, trust boundaries, destructive migrations, or ship-pipeline invariant changes. Do **not** pass an inline `model` override — the def owns it. |
+| **Opus (delegated)** | `subagent_type: "plan-architect"` | Implementation **planning** only, via `/plan` Step 3 — three defs selected by ONE ordered precedence (mirrors Step 3): **`plan-architect-xhigh`** (`effort: xhigh`) FIRST for security surfaces, trust boundaries, destructive migrations, or ship-pipeline invariant changes; else **`plan-architect-sonnet`** (`model: sonnet`) when the task is recipe-backed — an explicit recipe plus a named existing pattern to copy — since composing a plan from a pre-resolved recipe is mechanical composition, not novel design (no understanding is delegated, only recipe composition, so it does not breach the Opus (self) row's "never delegate understanding"); else the default **`plan-architect`** (`model: opus` + `effort: high`). Do **not** pass an inline `model` override — each def owns it. |
 | **Fable** | `model: "fable"` — **prompt first, last resort** | Rung above Opus (~2× cost). Use **only** when a task is absolutely critical **and** Fable is 100% necessary to solve it — and **never without prompting the user first** for explicit approval. Default to Opus. Full gate: `.claude/rules/agent-tiering-detail.md`. |
 
 > **The boundary keys on task *type* (judgment vs. mechanical), not raw model capability** — a stronger Sonnet moves nothing across the line. Re-validated 2026-06-30 vs Sonnet 5 (then the `sonnet` alias, native 1M context): unchanged. Why: `agent-tiering-detail.md`.
-
-## Flat fan-out, context economics, and prompt style
-
-Keep **flat fan-out** — the Opus session owns every fan-out and absorbs each agent's output; never nest sub-agents in `/plan`, `/pr-review`, `/security-audit`, `/post-plan`, or automouse. The context win is **delegation, not dismissal** (a sub-agent's intermediate work never enters the orchestrator, so dismissing it reclaims nothing); keep returns **thin** (`path:line`, not file bodies), and since your own context can't self-clear mid-run, **split a too-big run into multiple plans/sessions** rather than nesting orchestrators. Prompt **Haiku** with a concrete grep/find command, "list EVERY match", pre-resolved absolute paths, and structured output — never relevance judgments or multi-hop traces; **Sonnet**'s current style is fine. Full rationale (nested-agent tripwire, the fresh-`Agent()`-vs-`SendMessage` cache tradeoff, per-tier prompt detail): `.claude/rules/agent-tiering-detail.md`.
 
 ## Explore Agents
 

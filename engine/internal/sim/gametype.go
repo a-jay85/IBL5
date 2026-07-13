@@ -28,9 +28,9 @@ const (
 	// constructor FUN_004cee00). It is applied at the three HCA sites as
 	// (team×2−3)×0.2 → +0.2 for the home team, −0.2 for the away team. ASG init
 	// overwrites the magnitude to 0.0 (L669) — HCA is neutralized for all-star
-	// games. The two HCA sites this engine models (the play-outcome made-shot/
-	// foul buckets at L97159 and the offensive-quality divisor at L98300) are
-	// wired in possession.go / transition.go / bucketweights.go.
+	// games. The four HCA legs this engine models (leg A: scaled made-shot 2pt;
+	// leg B: raw foul base; leg C: raw offQ divisor; leg D: scaled and-one — all
+	// at decompile :97157-97163) are wired in possession.go / bucketweights.go.
 	hcaMagnitude = 0.2
 
 	// hcaSite2BasisScale converts the raw ±0.2 HCA delta (5.60 native e88 units,

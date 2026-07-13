@@ -19,57 +19,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  idempotency-check:
-    name: Bash/PHP Runner Idempotency
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    env:
-      DB_HOST: 127.0.0.1
-      DB_USER: root
-      DB_PASS: root
-      DB_NAME: iblhoops_ibl5
-
-    services:
-      mariadb:
-        image: mariadb:10.11
-        env:
-          MARIADB_ROOT_PASSWORD: root
-          MARIADB_DATABASE: iblhoops_ibl5
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mariadb-admin ping -proot"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
-    # config.php.example reads DB creds from getenv(); the job-level DB_* env
-    # vars point it at the CI MariaDB service.
-    - name: Setup PHP environment
-      uses: ./.github/actions/setup-php-env
-
-    - name: Apply migrations via bash runner
-      run: ibl5/bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot iblhoops_ibl5
-
-    - name: Seed PHP migration tracker
-      working-directory: ibl5
-      run: php bin/migrate-seed
-
-    - name: Assert PHP runner sees nothing pending
-      working-directory: ibl5
-      run: |
-        output=$(php bin/migrate --status)
-        echo "$output"
-        if [ "$output" != "Nothing to migrate." ]; then
-          echo "FAIL: PHP runner has pending migrations after bash runner applied all."
-          echo "This means the bash and PHP runners disagree on which files exist."
-          exit 1
-        fi
 
   schema-parity-check:
     name: Bash vs PHP Schema Parity
@@ -193,6 +142,21 @@ jobs:
       run: |
         chmod +x ibl5/bin/run-migrations-ci.sh
         ibl5/bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot ibl5_completeness
+
+    - name: Seed PHP migration tracker
+      working-directory: ibl5
+      run: php bin/migrate-seed
+
+    - name: Assert PHP runner sees nothing pending
+      working-directory: ibl5
+      run: |
+        output=$(php bin/migrate --status)
+        echo "$output"
+        if [ "$output" != "Nothing to migrate." ]; then
+          echo "FAIL: PHP runner has pending migrations after bash runner applied all."
+          echo "This means the bash and PHP runners disagree on which files exist."
+          exit 1
+        fi
 
     - name: Check for stale renamed-column references
       env:
@@ -356,7 +320,7 @@ jobs:
   gate:
     name: Migration Safety
     if: always()
-    needs: [idempotency-check, schema-parity-check, schema-completeness, destructive-migration-scan]
+    needs: [schema-parity-check, schema-completeness, destructive-migration-scan]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

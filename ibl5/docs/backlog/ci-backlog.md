@@ -1,6 +1,6 @@
 ---
 description: CI/GitHub-Actions workflow simplification backlog — duplicated setup/notify boilerplate, job consolidation, and verified-not-redundant workflows, with per-entry status + automouse-readiness.
-last_verified: 2026-07-07
+last_verified: 2026-07-11
 ---
 
 # CI Workflow Simplification Backlog
@@ -29,9 +29,9 @@ last_verified: 2026-07-07
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 7 |
-| 📋 Planned | 1 |
-| ✅ Implemented | 1 |
+| ⬜ Open | 1 |
+| 📋 Planned | 0 |
+| ✅ Implemented | 8 |
 | 🚫 Declined | 0 |
 
 > The 4 "verified-not-redundant" entries in Axis 4 are **decisions to keep**, not open work — they exist so a future audit does not re-flag them. Not counted above.
@@ -65,22 +65,12 @@ last_verified: 2026-07-07
 
 | # | Title | Status | Automouse | Effort |
 |---|-------|--------|-----------|-------:|
-| 2.1 | Collapse smoke-prod's 4 notify jobs into one | ⬜ Open | 🟦 | S |
-| 2.2 | Merge migration-safety `idempotency-check` + `schema-completeness` | ⬜ Open | 🟩 | M |
+| 2.1 | Collapse smoke-prod's 4 notify jobs into one | ✅ Implemented | 🟦 | S |
+| 2.2 | Merge migration-safety `idempotency-check` + `schema-completeness` | ✅ Implemented | 🟩 | M |
 
-### 2.1 smoke-prod.yml — four near-identical notify jobs
-**Location:** `.github/workflows/smoke-prod.yml` — jobs `rollback-and-notify`, `notify-scheduled-failure`, `notify-ibl6-degradation`, `notify-inconclusive`.
-**Problem:** Four separate jobs each boot a fresh runner solely to SSH-tunnel one `curl` DM; they differ only in the trigger condition and message string. (Same notify shape recurs in `main.yml`, `mutation.yml`, `db-backup.yml`.)
-**Suggested direction:** Collapse the three notify-only jobs into one job that branches on the `smoke` outcome via `if:` (keep `rollback-and-notify` separate — it mutates git). Best done **after** 1.2 lands so the merged job calls the `notify-discord` composite.
-**Risk if untouched:** Notify logic forks across 4 jobs; a message-format change is repeated.
-**Status (2026-06-28):** ⬜ Open — sequence after 1.2. Deploy/notify surface → 🟦.
+➜ 2.1 smoke-prod.yml — ✅ Implemented (2026-07-11): see [archive](archive/ci-backlog-archive.md).
 
-### 2.2 migration-safety.yml — three jobs each rebuild a full DB stack
-**Location:** `.github/workflows/migration-safety.yml` — jobs `idempotency-check`, `schema-parity-check`, `schema-completeness`.
-**Problem:** All three spin up an independent MariaDB 10.11 service, run an independent composer install, and apply the full migration stack from zero. `idempotency-check` and `schema-completeness` both apply the same full stack; the latter just adds FK/table/column assertions afterward.
-**Suggested direction:** Merge `idempotency-check` into `schema-completeness` (one DB build, then both sets of assertions). Keep `schema-parity-check` separate — it needs two DBs by design. Costs some intra-workflow parallelism; nets fewer runner-minutes and one fewer composer install.
-**Risk if untouched:** Three full migration runs per push to a migrations file; setup duplication (mitigated once 1.1 lands).
-**Status (2026-06-28):** ⬜ Open — green-green (gate job unchanged, assertions preserved) → 🟩.
+➜ 2.2 migration-safety.yml — ✅ Implemented (2026-07-11): see [archive](archive/ci-backlog-archive.md).
 
 ---
 
@@ -88,39 +78,19 @@ last_verified: 2026-07-07
 
 | # | Title | Status | Automouse | Effort |
 |---|-------|--------|-----------|-------:|
-| 3.1 | audit-js runs `npm audit` with no install (vacuous pass) | ⬜ Open | 🟩 | S |
-| 3.2 | db-backup redundant MariaDB wait loop | ⬜ Open | 🟩 | S |
-| 3.3 | lighthouse-audit re-collects instead of reusing baseline artifact | ⬜ Open | 🟨 | S |
-| 3.4 | `changes`-detection mechanism is inconsistent | ⬜ Open | 🟨 | M |
+| 3.1 | audit-js runs `npm audit` with no install (vacuous pass) | ✅ Implemented | 🟩 | S |
+| 3.2 | db-backup redundant MariaDB wait loop | ✅ Implemented | 🟩 | S |
+| 3.3 | lighthouse-audit re-collects instead of reusing baseline artifact | ✅ Implemented | 🟩 | S |
+| 3.4 | `changes`-detection mechanism is inconsistent | ✅ Implemented | 🟩 | M |
 | 3.5 | PHP extension set divergence in cache-dependencies | ✅ Implemented | 🟩 | S |
 
-### 3.1 audit-js — `npm audit` without a prior install
-**Location:** `.github/workflows/tests.yml`, job `audit-js`.
-**Problem:** Runs `npm audit --audit-level=high` with no `npm ci`/`npm install` first, relying on the bare runner Node — it may pass vacuously (no lockfile-resolved tree to scan). This is a **correctness** gap, not just tidiness.
-**Suggested direction:** Install deps (or point at the lockfile) before `npm audit`; or move JS audit onto the Bun toolchain the rest of the repo uses.
-**Risk if untouched:** A high-severity JS advisory could slip through unflagged.
-**Status (2026-06-28):** ⬜ Open — 🟩.
+➜ 3.1 audit-js — ✅ Implemented (2026-07-11): see [archive](archive/ci-backlog-archive.md).
 
-### 3.2 db-backup.yml — manual MariaDB wait loop on top of a health-check
-**Location:** `.github/workflows/db-backup.yml`, job `backup`, step "Wait for verify MariaDB to be ready".
-**Problem:** A 30×5s manual retry loop runs even though the service container already declares `--health-retries=10`; by the time steps run the service is healthy. Dead wait.
-**Suggested direction:** Drop the loop; rely on the service health-check (as other DB-using workflows do).
-**Risk if untouched:** Up to 150s of wasted wall-time per nightly run; misleading "wait" step.
-**Status (2026-06-28):** ⬜ Open — 🟩.
+➜ 3.2 db-backup.yml — ✅ Implemented (2026-07-11): see [archive](archive/ci-backlog-archive.md).
 
-### 3.3 lighthouse-audit.yml re-runs a full-site collect
-**Location:** `.github/workflows/lighthouse-audit.yml` vs `.github/workflows/lighthouse-baseline.yml`.
-**Problem:** Both do a full-site `lhci collect` with `numberOfRuns=1` over the same URL set (`bin/lighthouse-audit-urls`). The weekly audit could consume the `lighthouse-baseline-manifest` artifact the baseline workflow already uploads, instead of re-collecting.
-**Suggested direction:** Have the weekly audit download + report on the latest baseline manifest where freshness allows; re-collect only if the artifact is stale/absent.
-**Risk if untouched:** Duplicate 120-min-budget LHCI collect weekly. (Low priority — distinct outputs, see Axis 4.)
-**Status (2026-06-28):** ⬜ Open — 🟨 (needs a freshness-window decision).
+➜ 3.3 lighthouse-audit.yml — ✅ Implemented (2026-07-11): see [archive](archive/ci-backlog-archive.md).
 
-### 3.4 Inconsistent change-detection across workflows
-**Location:** `dorny/paths-filter@v4` in `codeql.yml`/`engine.yml`/`eslint.yml`; `bin/website-affecting` git-diff in `e2e-tests.yml`/`lighthouse.yml`; static `paths:` filters elsewhere.
-**Problem:** Three different mechanisms answer "did relevant files change?". Harder to reason about why a given workflow did/didn't run.
-**Suggested direction:** Standardize where semantics allow (note `bin/website-affecting` encodes domain logic a static filter can't; not all are interchangeable). Modest payoff — defer unless it causes a miss.
-**Risk if untouched:** Cognitive overhead; subtle trigger-gap bugs.
-**Status (2026-06-28):** ⬜ Open — 🟨 (needs a per-workflow audit of which are truly interchangeable).
+➜ 3.4 Inconsistent change-detection across workflows — ✅ Implemented (2026-07-11): see [archive](archive/ci-backlog-archive.md).
 
 ### 3.5 cache-dependencies.yml PHP extensions diverge from consumers
 **Location:** `.github/workflows/cache-dependencies.yml` (`mbstring, intl, pdo, pdo_mysql`) vs every consumer (`mbstring, intl, mysqli`).

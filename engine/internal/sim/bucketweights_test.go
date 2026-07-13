@@ -359,18 +359,22 @@ func TestBucketWeights_RealLifeFallbackUnchanged(t *testing.T) {
 }
 
 // Row 9: with real-life minutes the bucket equals the hand-computed +0xD90 over the
-// faithful per-48-MINUTE rates (stat/MIN)×48 (D70 scaled by d70LeagueScalar). The
-// magnitude lands in the O(10s) stand-in regime (d88 ≈ 25.6), not the O(100s) the
-// per-48-games divisor would give.
+// faithful per-48-MINUTE rates (stat/MIN)×48 (D70 scaled by d70LeagueScalar). D88 is
+// the 2PA rate (2PA = FGA − 3GA); RealLife3GA is left at its zero default here, so
+// twoPA == FGA and the magnitude lands in the O(10s) stand-in regime (d88 ≈ 25.6),
+// not the O(100s) the per-48-games divisor would give. Row 15 below exercises the
+// 3GA > 0 case where twoPA diverges from FGA.
 func TestBucketWeights_RealLifeComposite(t *testing.T) {
 	pl := mkPlayer(1, 3, slotPG, 48)
 	pl.RealLifeMIN = 2400 // ~34 min/game over 70 games
-	pl.RealLifeFGA = 1280 // d88 = 1280/2400*48 = 25.6
+	pl.RealLifeFGA = 1280 // twoPA = 1280-0 = 1280; d88 = 1280/2400*48 = 25.6
+	pl.RealLife3GA = 0    // no threes → twoPA == FGA (see Row 15 for 3GA > 0)
 	pl.RealLifeORB = 160  // db8 = 160/2400*48  = 3.2
 	pl.RealLifeFTA = 320  // d70 = 320/2400*48  = 6.4 (×1.0)
 	p := oc(slotPG, pl)
 
-	d88 := per48Min(1280, 2400)
+	twoPA := pl.RealLifeFGA - pl.RealLife3GA
+	d88 := per48Min(twoPA, 2400)
 	db8 := per48Min(160, 2400)
 	d70 := per48Min(320, 2400) * d70LeagueScalar
 	makeShare := (d88/(db8+d88))*d90MakeShareHalf + d90MakeShareQuarter
@@ -384,10 +388,11 @@ func TestBucketWeights_RealLifeComposite(t *testing.T) {
 	}
 }
 
-// Row 10: two players with IDENTICAL FGA ratings but DIFFERENT real-life FGA rates
-// produce different 2pt weights — the volume signal the compressed rating stand-in
-// flattened away (the dispersion mechanism, ADR-0040). Both also differ from the
-// rating-only stand-in.
+// Row 10: two players with IDENTICAL FGA ratings but DIFFERENT real-life 2PA rates
+// (RealLife3GA left at its zero default, so twoPA == FGA here) produce different
+// 2pt weights — the volume signal the compressed rating stand-in flattened away
+// (the dispersion mechanism, ADR-0040). Both also differ from the rating-only
+// stand-in.
 func TestBucketWeights_RealRateDisperses(t *testing.T) {
 	lo := mkPlayer(1, 3, slotPG, 48) // FGA rating 60
 	lo.RealLifeMIN, lo.RealLifeFGA, lo.RealLifeFTA, lo.RealLifeORB = 2400, 800, 200, 80
@@ -408,7 +413,9 @@ func TestBucketWeights_RealRateDisperses(t *testing.T) {
 
 // Row 11 (boundary): RealLifeMIN>0 with FGA==0 ∧ ORB==0 (played, only ever shot FTs)
 // must yield a finite weight, not the 0/0 NaN the real-rate path reopens (the guard).
-// The faithful limiting value is d88 == 0.
+// The faithful limiting value is d88 == 0 (twoPA == FGA-3GA == 0-0 == 0 here). Rows
+// 16/17 below exercise the two OTHER routes to a zero twoPA: an all-three shooter
+// and a corrupt 3GA>FGA record.
 func TestBucketWeights_RealLifeZeroFGA(t *testing.T) {
 	pl := mkPlayer(1, 3, slotPG, 48)
 	pl.RealLifeMIN, pl.RealLifeFGA, pl.RealLifeORB, pl.RealLifeFTA = 1200, 0, 0, 300
@@ -419,6 +426,83 @@ func TestBucketWeights_RealLifeZeroFGA(t *testing.T) {
 	}
 	if got != 0 {
 		t.Errorf("zero-FGA limit = %v, want 0 (d88)", got)
+	}
+}
+
+// --- J18 item 3: twoPtBucketWeight's D88 is the 2PA rate, not total FGA ------
+
+// Row 15: with RealLife3GA > 0 the faithful d88 is per-48 TWO-point-attempt rate
+// (2PA = FGA − 3GA), not per-48 total FGA. The case is chosen so the two bases
+// diverge (280 of 1280 attempts are threes), pinning the exact faithful value and
+// guarding against a regression to the pre-J18-item-3 total-FGA basis.
+func TestBucketWeights_RealLifeTwoPAExcludesThrees(t *testing.T) {
+	pl := mkPlayer(1, 3, slotPG, 48)
+	pl.RealLifeMIN = 2400
+	pl.RealLifeFGA = 1280
+	pl.RealLife3GA = 280 // twoPA = 1280-280 = 1000, NOT 1280 (the old total-FGA basis)
+	pl.RealLifeORB = 160
+	pl.RealLifeFTA = 320
+	p := oc(slotPG, pl)
+
+	twoPA := pl.RealLifeFGA - pl.RealLife3GA
+	d88 := per48Min(twoPA, 2400) // = 20.0
+	db8 := per48Min(160, 2400)
+	d70 := per48Min(320, 2400) * d70LeagueScalar
+	makeShare := (d88/(db8+d88))*d90MakeShareHalf + d90MakeShareQuarter
+	want := d88 - (d88/(d70+d88))*db8*makeShare
+
+	got := twoPtBucketWeight(p)
+	if math.Abs(got-want) > 1e-9 {
+		t.Errorf("2PA-basis composite = %.6f, want %.6f", got, want)
+	}
+
+	// Guard against a regression to the old total-FGA basis: computing d88 straight
+	// from FGA (ignoring 3GA) gives a materially different composite.
+	oldD88 := per48Min(pl.RealLifeFGA, 2400)
+	oldMakeShare := (oldD88/(db8+oldD88))*d90MakeShareHalf + d90MakeShareQuarter
+	oldWant := oldD88 - (oldD88/(d70+oldD88))*db8*oldMakeShare
+	if math.Abs(got-oldWant) < 1e-6 {
+		t.Errorf("composite %.6f matches the old total-FGA basis %.6f — 3GA subtraction not applied", got, oldWant)
+	}
+}
+
+// Row 16: a pure three-point shooter (FGA == 3GA, every real-life attempt a three)
+// with real-life minutes yields twoPA == 0, so the faithful d88 == 0 and the
+// guarded composite returns exactly 0 — the same zero-d88 limit as Row 11's
+// empty-box-score case, now reached via the 2PA subtraction rather than FGA itself
+// being 0.
+func TestBucketWeights_RealLifePureThreePointShooterZeroTwoPt(t *testing.T) {
+	pl := mkPlayer(1, 3, slotPG, 48)
+	pl.RealLifeMIN, pl.RealLifeFGA, pl.RealLife3GA = 1500, 400, 400
+	pl.RealLifeORB, pl.RealLifeFTA = 50, 100
+	got := twoPtBucketWeight(oc(slotPG, pl))
+
+	if math.IsNaN(got) || math.IsInf(got, 0) {
+		t.Fatalf("FGA==3GA produced a non-finite weight: %v", got)
+	}
+	if got != 0 {
+		t.Errorf("pure-3pt-shooter (twoPA==0) 2pt bucket = %v, want exactly 0", got)
+	}
+}
+
+// Row 17 (corrupt-record guard): RealLife3GA > RealLifeFGA cannot occur in valid
+// .plr data (3PA is a subset of total FGA), but a corrupt record must not produce
+// a negative twoPA — the guard floors it to 0, giving the same zero-d88 limit as
+// Row 16 rather than a negative weight that would poison the weighted pick.
+func TestBucketWeights_RealLifeThreeGAExceedsFGAGuard(t *testing.T) {
+	pl := mkPlayer(1, 3, slotPG, 48)
+	pl.RealLifeMIN, pl.RealLifeFGA, pl.RealLife3GA = 1500, 300, 400 // corrupt: 3GA > FGA
+	pl.RealLifeORB, pl.RealLifeFTA = 50, 100
+	got := twoPtBucketWeight(oc(slotPG, pl))
+
+	if math.IsNaN(got) || math.IsInf(got, 0) {
+		t.Fatalf("3GA>FGA produced a non-finite weight: %v", got)
+	}
+	if got < 0 {
+		t.Errorf("3GA>FGA (corrupt record) produced a negative weight: %v, want >= 0 (twoPA floored to 0)", got)
+	}
+	if got != 0 {
+		t.Errorf("3GA>FGA guard = %v, want exactly 0 (twoPA floored to 0 == d88 limit)", got)
 	}
 }
 

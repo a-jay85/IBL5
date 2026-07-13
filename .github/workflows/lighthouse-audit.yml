@@ -22,12 +22,51 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
+      - name: Download baseline manifest
+        id: dl-baseline
+        uses: dawidd6/action-download-artifact@b6e2e70617bc3265edd6dab6c906732b2f1ae151 # v21
+        continue-on-error: true
+        with:
+          workflow: lighthouse-baseline.yml
+          branch: master
+          name: lighthouse-baseline-manifest
+          path: /tmp/baseline/
+          if_no_artifact_found: warn
+
+      - name: Check baseline freshness
+        id: freshness
+        run: |
+          echo "use_baseline=false" >> "$GITHUB_OUTPUT"
+          if [ ! -f /tmp/baseline/manifest.json ]; then
+            exit 0
+          fi
+          CREATED_AT=$(gh api \
+            "repos/${{ github.repository }}/actions/artifacts?name=lighthouse-baseline-manifest&per_page=5" \
+            --jq '[.artifacts[] | select(.expired == false)] | sort_by(.created_at) | last | .created_at // empty' \
+            2>/dev/null || true)
+          if [ -z "$CREATED_AT" ]; then exit 0; fi
+          AGE_DAYS=$(( ($(date +%s) - $(date -d "$CREATED_AT" +%s)) / 86400 ))
+          if [ "$AGE_DAYS" -le 7 ]; then
+            echo "use_baseline=true" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Use baseline manifest
+        if: steps.freshness.outputs.use_baseline == 'true'
+        run: |
+          mkdir -p ibl5/.lighthouseci
+          cp /tmp/baseline/manifest.json ibl5/.lighthouseci/manifest-filtered.json
+
       - uses: ./.github/actions/lighthouse-setup
+        if: steps.freshness.outputs.use_baseline != 'true'
 
       - name: Generate URL list
+        if: steps.freshness.outputs.use_baseline != 'true'
         run: bin/lighthouse-audit-urls --json > /tmp/urls.json
 
       - name: Generate Lighthouse config
+        if: steps.freshness.outputs.use_baseline != 'true'
         run: |
           jq -n --argjson urls "$(cat /tmp/urls.json)" '{
             ci: {
@@ -42,12 +81,14 @@ jobs:
           }' > .lighthouserc-audit.json
 
       - name: Run Lighthouse CI
+        if: steps.freshness.outputs.use_baseline != 'true'
         working-directory: ibl5
         run: bunx @lhci/cli collect --config=../.lighthouserc-audit.json
         env:
           CHROME_PATH: /usr/bin/google-chrome-stable
 
       - name: Write manifest
+        if: steps.freshness.outputs.use_baseline != 'true'
         working-directory: ibl5
         run: |
           bunx @lhci/cli upload \
@@ -101,5 +142,5 @@ jobs:
           cat /tmp/issue-body.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Teardown
-        if: always()
+        if: always() && steps.freshness.outputs.use_baseline != 'true'
         run: docker compose -f docker-compose.ci.yml down --volumes

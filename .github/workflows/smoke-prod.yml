@@ -268,88 +268,23 @@ jobs:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
 
-  notify-scheduled-failure:
-    name: Notify Scheduled Failure
+  notify:
+    name: Notify Smoke Outcome
     runs-on: ubuntu-latest
     needs: smoke
+    # Single notify-only job replacing notify-scheduled-failure,
+    # notify-ibl6-degradation, and notify-inconclusive (ci-backlog 2.1).
+    # Outer if: is the OR of the three original conditions; the message
+    # step branches on the smoke outcome. rollback-and-notify stays
+    # separate — it mutates git (revert + push production).
+    # always() is REQUIRED: a needs: smoke job is skipped when smoke
+    # fails, so without it the scheduled-failure branch never fires.
     if: >-
-      always() &&
-      needs.smoke.result == 'failure' &&
-      github.event_name != 'workflow_run'
-    timeout-minutes: 5
-
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
-      - name: Setup SSH
-        uses: ./.github/actions/setup-ssh
-        with:
-          host: ${{ secrets.HOST }}
-          port: ${{ secrets.PORT }}
-          private-key: ${{ secrets.PRIVATE_KEY }}
-
-      - name: Build Discord message
-        run: |
-          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          TRIGGER="${{ github.event_name }}"
-          MSG=$(printf 'Production smoke test FAILED (%s trigger — no auto-rollback).\n\nThis may be a transient issue. Check the run for details: %s' "$TRIGGER" "$RUN_URL")
-          printf '%s' "$MSG" > /tmp/discord-msg.txt
-
-      - name: Send Discord DM
-        uses: ./.github/actions/notify-discord
-        with:
-          discord-id: ${{ secrets.OWNER_DISCORD_ID }}
-          port: ${{ secrets.PORT }}
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-
-  notify-ibl6-degradation:
-    name: Notify IBL6 Degradation
-    runs-on: ubuntu-latest
-    needs: smoke
-    if: >-
-      always() &&
-      needs.smoke.outputs.ibl6_failed == 'true' &&
-      needs.smoke.outputs.ibl5_inconclusive != 'true' &&
-      needs.smoke.result == 'success'
-    timeout-minutes: 5
-
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
-      - name: Setup SSH
-        uses: ./.github/actions/setup-ssh
-        with:
-          host: ${{ secrets.HOST }}
-          port: ${{ secrets.PORT }}
-          private-key: ${{ secrets.PRIVATE_KEY }}
-
-      - name: Build Discord message
-        run: |
-          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          MSG=$(printf 'IBL6 smoke FAILED; IBL5 unaffected. No rollback.\n\nRun: %s' "$RUN_URL")
-          printf '%s' "$MSG" > /tmp/discord-msg.txt
-
-      - name: Send Discord DM
-        uses: ./.github/actions/notify-discord
-        with:
-          discord-id: ${{ secrets.OWNER_DISCORD_ID }}
-          port: ${{ secrets.PORT }}
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-
-  notify-inconclusive:
-    name: Notify Smoke Inconclusive
-    runs-on: ubuntu-latest
-    needs: smoke
-    # Fire ONLY when IBL5 smoke was inconclusive (on-box prober WAF-blocked, or
-    # the box was unreachable over SSH). Both conjuncts are required: a plain
-    # success lacks ibl5_inconclusive, and a real failure sets smoke.result ==
-    # 'failure' (→ rollback path, not here).
-    if: >-
-      always() &&
-      needs.smoke.outputs.ibl5_inconclusive == 'true' &&
-      needs.smoke.result == 'success'
+      always() && (
+        (needs.smoke.result == 'failure' && github.event_name != 'workflow_run') ||
+        (needs.smoke.outputs.ibl6_failed == 'true' && needs.smoke.outputs.ibl5_inconclusive != 'true' && needs.smoke.result == 'success') ||
+        (needs.smoke.outputs.ibl5_inconclusive == 'true' && needs.smoke.result == 'success')
+      )
     timeout-minutes: 5
 
     steps:
@@ -364,13 +299,27 @@ jobs:
 
       - name: Build Discord message
         env:
+          SMOKE_RESULT: ${{ needs.smoke.result }}
+          IBL5_INCONCLUSIVE: ${{ needs.smoke.outputs.ibl5_inconclusive }}
           INCONCLUSIVE_REASON: ${{ needs.smoke.outputs.ibl5_inconclusive_reason }}
+          TRIGGER: ${{ github.event_name }}
         run: |
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          if [ "$INCONCLUSIVE_REASON" = "ssh-unreachable" ]; then
-            MSG=$(printf 'IBL5 smoke INCONCLUSIVE — could not reach the production box over SSH; deploy verdict unknown. NO rollback; production untouched — please check the host. Run: %s' "$RUN_URL")
+          # Branches are mutually exclusive under the job-level if:. Order:
+          #  1. result==failure          → scheduled-failure DM
+          #  2. ibl5_inconclusive==true  → inconclusive DM (ssh vs waf sub-branch)
+          #  3. else (ibl6_failed==true && ibl5_inconclusive!=true && result==success)
+          #                              → IBL6-degradation DM
+          if [ "$SMOKE_RESULT" = "failure" ]; then
+            MSG=$(printf 'Production smoke test FAILED (%s trigger — no auto-rollback).\n\nThis may be a transient issue. Check the run for details: %s' "$TRIGGER" "$RUN_URL")
+          elif [ "$IBL5_INCONCLUSIVE" = "true" ]; then
+            if [ "$INCONCLUSIVE_REASON" = "ssh-unreachable" ]; then
+              MSG=$(printf 'IBL5 smoke INCONCLUSIVE — could not reach the production box over SSH; deploy verdict unknown. NO rollback; production untouched — please check the host. Run: %s' "$RUN_URL")
+            else
+              MSG=$(printf 'IBL5 smoke INCONCLUSIVE (on-box prober hit a uniform WAF-class block). NO rollback; production untouched. Run: %s' "$RUN_URL")
+            fi
           else
-            MSG=$(printf 'IBL5 smoke INCONCLUSIVE (on-box prober hit a uniform WAF-class block). NO rollback; production untouched. Run: %s' "$RUN_URL")
+            MSG=$(printf 'IBL6 smoke FAILED; IBL5 unaffected. No rollback.\n\nRun: %s' "$RUN_URL")
           fi
           printf '%s' "$MSG" > /tmp/discord-msg.txt
 

@@ -9,10 +9,9 @@ import (
 const (
 	// transitionTriggerDenom is the Stage-2 trigger roll domain: a random on-court
 	// starter fires the break iff rand_int(1..transitionTriggerDenom) ≤ its
-	// TransOff rating (00_MASTER_REFERENCE.md L878-896). The denom (20) sits above
-	// the 1-9 TransOff scale so a max roll never fires for a real rating; it stands
-	// in for the unpinned coaching-mod threshold. Documented stand-in.
-	transitionTriggerDenom = 20
+	// TransOff rating (00_MASTER_REFERENCE.md L878-896). Asm-pinned jumpshot 5.60
+	// value (push 0x12 before the rand_int call) — 18.
+	transitionTriggerDenom = 18
 
 	// transitionShotRateDecay / transitionShotRateFloor implement the Stage-3
 	// per-period decay (L912): the team shot-rate threshold drops by 2.0 on each

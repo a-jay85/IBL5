@@ -29,6 +29,7 @@ final class WebApplicationFactory
         $app->addStep(new ErrorHandlerBootstrap(ErrorHandlerBootstrap::MODE_WEB));
         $app->addStep(new AuthBootstrap($basePath));
         $app->addStep(new DemoModeBootstrap($basePath));
+        $app->addStep(new RequestEventLoggingBootstrap());
         return $app;
     }
 }

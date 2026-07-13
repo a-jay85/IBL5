@@ -1,6 +1,6 @@
 ---
 description: Triage every non-trivial unit of work as ad-hoc vs /plan before starting, with an ad-hoc safety mirror and Sonnet execution-routing for resolved, machine-verifiable edit chunks; the gateway that feeds the deployment funnel (ADR-0067).
-last_verified: 2026-07-07
+last_verified: 2026-07-11
 ---
 
 # Work Triage Rule
@@ -46,7 +46,7 @@ When both hold, **hand off by default — do not pause for permission**: state t
 
 Stay inline (Opus edits directly) only when:
 - the edits and the design are genuinely **entangled** — writing the recipe would mean making each edit-level judgment anyway, so the handoff buys nothing; or
-- the chunk is **trivial** — a one-or-two-edit change where the sub-agent's fixed spawn cost (~3–5K tokens, `agent-tiering.md` § Skip the Agent) exceeds the work being moved.
+- the chunk is **trivial** — a one-or-two-edit change where the sub-agent's fixed spawn cost (~3–5K tokens, `agent-tiering-detail.md` § Skip the Agent) exceeds the work being moved.
 
 Either way the routing decision is **stated, not silent** — one line, like the triage verdict. The user should see which way it went and be able to override in the moment.
 

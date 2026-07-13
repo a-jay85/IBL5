@@ -1,6 +1,6 @@
 ---
 description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, plan decomposition/tier-routing machinery, and the human comprehension counter-loop, with per-entry status.
-last_verified: 2026-07-10
+last_verified: 2026-07-11
 ---
 
 # Loop-Engineering Backlog
@@ -27,10 +27,10 @@ last_verified: 2026-07-10
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 11 |
+| ⬜ Open | 10 |
 | 📋 Planned | 1 |
 | ◑ Partial | 3 |
-| ✅ Implemented | 2 |
+| ✅ Implemented | 3 |
 | 🚫 Declined | 0 |
 
 ---
@@ -55,7 +55,7 @@ last_verified: 2026-07-10
 | L14 | Escalate-on-retry (Sonnet-first, just-in-time Opus) | ⬜ Open | 🟦 | S |
 | L15 | Sonnet-recipe completeness lint | ⬜ Open | 🟦 | S |
 | L16 | Context-budget gate v2 (work-size proxies + measured calibration) | ⬜ Open | 🟦 | M |
-| L17 | Shared-context artifact for multi-plan splits | ⬜ Open | 🟦 | S |
+| L17 | Shared-context artifact for multi-plan splits | ✅ Implemented | — | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse-queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse-queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -162,11 +162,7 @@ last_verified: 2026-07-10
 **Status (2026-07-08):** ⬜ Open — 🟦. Pairs with T1 in [token-spend-backlog.md](token-spend-backlog.md).
 
 ### L17 Shared-context artifact for multi-plan splits
-**Location:** `/plan` Step 2.5 multi-PR path (`.claude/skills/plan/SKILL.md`) — Steps 3–5 run once per unit, each plan fully self-contained; the Discord bug pipeline hand-rolled a shared-context spec file to avoid exactly this.
-**Problem:** When a task splits into N plans, each plan-architect run and each implementation session re-derives the shared orientation (blast radius, patterns, front-loaded decisions) independently — N× the exploration spend — and each plan re-inlines the shared background, inflating it toward gate `[C]`. This is a tax on splitting, i.e. a disincentive against the very decomposition the context-budget gate demands.
-**Suggested direction:** Formalize the pattern the Discord pipeline improvised: when Step 2.5 splits, persist Step 2's exploration pointers (`path:line` + load-bearing fact, never file bodies) plus recorded Step 3.5 decisions once to `$HOME/.claude/plans/<program>-shared-context.md`; each split plan references it instead of restating it. Plans get smaller, and each architect run becomes targeted confirmation instead of re-exploration.
-**Risk if untouched:** Splitting stays expensive, so plans skew large — working against L16/T11.
-**Status (2026-07-08):** ⬜ Open — 🟦.
+✅ Implemented (2026-07-11) — see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
 ---
 

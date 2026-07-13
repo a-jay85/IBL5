@@ -31,6 +31,7 @@ $migrationNumberAllowlist = ['046'];
 
 // No seed-id allowlist entries remain — the pids-30/31 grandfathering was
 // resolved by reassigning the ASG rows (Spurs Guard→pid 43, Flames Forward→pid 44).
+/** @var array<string, array<string, list<string>>> $seedIdAllowlist */
 $seedIdAllowlist = [];
 
 /**

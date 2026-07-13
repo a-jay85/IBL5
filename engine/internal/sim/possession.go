@@ -61,32 +61,34 @@ func threePtPropensity(p onCourt) float64 {
 }
 
 // playBuckets assembles the 2pt/3pt/foul play-outcome bucket weights for one
-// attempt, applying home-court advantage at the two modeled JSB sites:
+// attempt, threading the two HCA magnitudes (decompile :97157-97164, param_5==1):
+//   - hcaScaled (= hca·hcaSite2BasisScale) is the SCALED site-2 made-shot addend
+//     (leg A): +hcaScaled home / −hcaScaled away on the O(10s) 2pt bucket.
+//   - hca (RAW ±0.2) feeds the foul bucket, where the base (leg B) and offQ (leg C)
+//     carry the raw delta on the faithful CEngine TOV48 basis — see foulBucketWeight.
 //
-//   - Site 2: the 2pt bucket gains +hca (positive for home, negative for away).
-//   - The foul bucket carries hca intrinsically: home (hca>0) = deterministic
-//     defense-coupled weight; away/neutral (hca<=0) = stochastic U[0,0.6).
-//     The old site-3 off-quality divisor shrink is REMOVED (ADR-0082).
+// Callers pass 0 for both on the transition path (param_5==0, fully symmetric) and
+// for ASG (hcaDelta returns 0). The and-one leg D (e90 inherits e88's +hca) is added
+// by the caller to andOneWeight, since that bucket is assembled outside playBuckets.
 //
 // allow3pt is false on a fast break (3pt path excluded).
 //
 // BranchB is an OFF-by-default diagnostic. When active it passes the foul weight
-// (with intrinsic hca) through branchBShrink — note the intrinsic hca IS scaled
-// by s; this is acceptable because BranchB is not exercised by any shipped path,
-// golden snapshot, or sign gate. BranchB and the freeze arms are mutually exclusive.
-func (gs *gameState) playBuckets(bh onCourt, offense, defense *teamState, hca float64, allow3pt bool) (twoPtW, threePtW, foulW float64) {
+// through branchBShrink; acceptable because BranchB is not exercised by any shipped
+// path, golden snapshot, or sign gate. BranchB and freeze arms are exclusive.
+func (gs *gameState) playBuckets(bh onCourt, offense, defense *teamState, hca, hcaScaled float64, allow3pt bool) (twoPtW, threePtW, foulW float64) {
 	raw3pt := 0.0
 	if allow3pt {
 		raw3pt = threePtBucketWeight(bh)
 	}
 	if !gs.freeze.BranchB {
-		foul := gs.foulWeight(defense.players, hca)
-		return twoPtBucketWeight(bh) + hca, raw3pt, foul
+		foul := gs.foulWeight(bh, offense.players, defense.players, hca)
+		return twoPtBucketWeight(bh) + hcaScaled, raw3pt, foul
 	}
 	raw2pt := twoPtBucketWeight(bh)
-	foul := foulBucketWeight(defense.players, hca, gs.rng)
+	foul := foulBucketWeight(bh, offense.players, defense.players, hca, gs.rng)
 	s2, s3, sf := gs.branchBShrink(raw2pt, raw3pt, foul, offense.drbRate, offense.astRate, bh.TransOff)
-	return s2 + hca, s3, sf
+	return s2 + hcaScaled, s3, sf
 }
 
 // possession resolves one offensive trip: ball-handler selection, shot-type and
@@ -149,13 +151,15 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPen
 		// (freeze.go): live values in the normal/baseline path, league-mean
 		// substitutes when an arm is frozen for the ADR-0043 attribution.
 		sv2 := applyClutch(gs.makeValue2pt(net, bh.FGP, origin), bh.Clutch, gs.period, scoreDiff)
-		// Home-court advantage, applied at the two modeled JSB sites (delta = +0.2
-		// home / −0.2 away, 0 for ASG). Site 2: the made-shot (2pt) bucket gains
-		// +delta, the foul bucket loses delta (handled inside foulBucketWeight).
-		// Site 3: each offensive player's offQuality term is reduced by delta inside
-		// foulBucketWeight's divisor — the dominant, home-favorable term.
+		// Home-court advantage (raw delta = +0.2 home / −0.2 away, 0 for ASG),
+		// re-homed to all four half-court legs (J15 Phase 5, decompile :97157-97164):
+		// the 2pt made-shot bucket (leg A) and and-one (leg D, below) take the SCALED
+		// delta; the foul base (leg B) and offQ (leg C) take the RAW delta inside
+		// foulBucketWeight. hcaScaled preserves the ~10% proportional made-bucket effect
+		// across the O(10s) 2pt basis (hcaSite2BasisScale, gametype.go).
 		hca := hcaDelta(gs.gameType, offense.isHome)
-		twoPtW, threePtW, foulW := gs.playBuckets(bh, offense, defense, hca, true)
+		hcaScaled := hca * hcaSite2BasisScale
+		twoPtW, threePtW, foulW := gs.playBuckets(bh, offense, defense, hca, hcaScaled, true)
 		// Putback 3pt suppression (ADR-0055): a half-court OReb continuation is never a
 		// 3pt attempt — 5.60 re-loops a 3pt outcome on the OReb flag forcing a 2pt
 		// (decompile 94022-94024). Zero the 3pt bucket weight (same mechanism as
@@ -167,7 +171,7 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPen
 		in := outcomeInputs{
 			twoPtWeight:      twoPtW,
 			threePtWeight:    threePtW,
-			andOneWeight:     andOneBucketWeight(mq, bh),
+			andOneWeight:     andOneBucketWeight(mq, bh) + hcaScaled, // leg D: e90 inherits e88's +hca
 			foulOnlyWeight:   foulW,
 			turnoverDefValue: energyCeiling(bh),
 		}

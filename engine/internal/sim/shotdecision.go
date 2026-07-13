@@ -11,7 +11,7 @@ import "github.com/a-jay85/IBL5/engine/internal/rng"
 // leagueBaseline were calibrated against the .sco archive (ADR-0045): 2pt% ≈ 49.8%
 // and 3pt% ≈ 37.2% (the JSB 3pt make = baseline×1.5, so leagueBaseline = sco 3pt%
 // × 666.7 ≈ 248). Documented validation-phase stand-ins, same class as
-// offVolumeScale / foulCompress.
+// offVolumeScale / foulBucketScale.
 const (
 	leagueBaseline = 250.0 // per-mille; 3pt make = baseline×1.5 = 375‰ (~37.5%, sco-implied)
 	fgpToPermille  = 9.4   // base 2pt make = FGP × this (calibrated to 2pt% ≈ 50%)

@@ -28,10 +28,33 @@ const (
 	// constructor FUN_004cee00). It is applied at the three HCA sites as
 	// (team×2−3)×0.2 → +0.2 for the home team, −0.2 for the away team. ASG init
 	// overwrites the magnitude to 0.0 (L669) — HCA is neutralized for all-star
-	// games. The two HCA sites this engine models (the play-outcome made-shot/
-	// foul buckets at L97159 and the offensive-quality divisor at L98300) are
-	// wired in possession.go / transition.go / bucketweights.go.
+	// games. The four HCA legs this engine models (leg A: scaled made-shot 2pt;
+	// leg B: raw foul base; leg C: raw offQ divisor; leg D: scaled and-one — all
+	// at decompile :97157-97163) are wired in possession.go / bucketweights.go.
 	hcaMagnitude = 0.2
+
+	// hcaSite2BasisScale converts the raw ±0.2 HCA delta (5.60 native e88 units,
+	// where the made-shot bucket is O(1)) onto the engine's twoPtBucketWeight basis
+	// — the admitted VALIDATION-PHASE stand-in composite at O(10s) (≈16.5 under
+	// default ratings; bucketweights.go). Raw 0.2 on that basis is ~1.2%, but the
+	// faithful proportional made-bucket effect (J16 e88 += s·0.2, where e88 is O(1))
+	// is ~10%; scaling by this factor preserves the proportion across the basis
+	// change. It is the SINGLE margin dial — tuned on the archive harness (1-D
+	// search) so the engine's gt=2 home margin matches the PAIRED .sco value measured
+	// on the SAME games (2.85 → engine 3.332 vs .sco 3.319, gap +0.014). The target is
+	// that paired .sco margin (≈3.32), NOT the pooled-corpus 4.12 — which has no
+	// runnable instrument here; see the J15 program's paired-comparator note.
+	//
+	// It applies ONLY to the SCALED legs — the site-2 made-shot bucket (leg A) and
+	// the and-one channel (leg D, e90 = param_6·0.25 + e88, which inherits e88's
+	// +hca). The FOUL legs use the RAW ±0.2: the foul base (leg B, e80 −= s·hca) and
+	// the offensive-quality divisor (leg C, offQ −= s·hca per player) are built on
+	// the faithful CEngine per-48 basis (leagueTOV48 = 3.353143 IS the 5.60 value,
+	// teamquality.go), so the decompile's raw 0.2 is already in-basis there — scaling
+	// them by ~2.85× would over-apply HCA and drive the foul ratio absurd. Half-court
+	// only (decompile param_5==1); the transition path (param_5==0) is fully symmetric
+	// and receives 0 for both legs.
+	hcaSite2BasisScale = 2.85
 )
 
 // isPlayoff reports whether the game type is a playoff game (the only type that
@@ -47,12 +70,24 @@ func isASG(gt bundle.GameType) bool {
 
 // hcaDelta is the per-team home-court-advantage delta for the given game type:
 // +hcaMagnitude for the home team, −hcaMagnitude for the away team, and 0 for
-// either team in an ASG (where the magnitude is zeroed). It feeds the two modeled
-// HCA sites: site 2 (the made-shot bucket gains +delta, the foul bucket loses
-// delta) and site 3 (each offensive player's offQuality term is reduced by delta,
-// shrinking the foul-bucket divisor for the home team — the dominant, home-
-// favorable mechanism; 00_MASTER_REFERENCE.md L661 site table, COMPOSITE_DOUBLES_
-// TRACE.md §RESOLUTION).
+// either team in an ASG (where the magnitude is zeroed). It feeds all four modeled
+// HCA legs at the half-court play-outcome selector (decompile :97157-97164,
+// param_5==1; 00_MASTER_REFERENCE.md L657-712 site table):
+//   - leg A (site-2 e88): the made-shot bucket gains +delta·hcaSite2BasisScale (PRO-home scoring).
+//   - leg D (e90 and-one): inherits e88's +delta·hcaSite2BasisScale.
+//   - leg B (site-2 e80): the foul BASE loses raw delta before the factor (ANTI-home).
+//   - leg C (site-3 offQ): each offensive player's offQuality term loses raw delta,
+//     shrinking the foul divisor for the home team so the coupling factor moves off 1
+//     toward sign(defQ−baseline) — pro-home only for a strong-steal defense (defQ >
+//     baseline), anti-home otherwise.
+//
+// Net foul effect: leg B (±delta on the ~3.35 base, ~6%) DOMINATES leg C (±delta on
+// the ~1.09 factor, sub-1%) by ~an order of magnitude (measured ≈9.5×, the defQ cap
+// keeps leg C bounded), so the foul bucket nets ANTI-home (home draws slightly FEWER
+// fouls, ratio ~0.91) regardless of leg C's sign. This is NOT a bug — the home MARGIN
+// is a SCORING phenomenon carried by legs A/D, not a foul-drawing one; the real .sco
+// pro-home FTA split is an emergent (home-lead-driven) effect this per-possession
+// bucket does not model. The transition path (param_5==0) is fully symmetric, receives 0.
 func hcaDelta(gt bundle.GameType, isHome bool) float64 {
 	if isASG(gt) {
 		return 0

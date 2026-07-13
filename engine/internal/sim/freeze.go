@@ -346,10 +346,11 @@ func (gs *gameState) turnoverProb(careless, pressure float64) float64 {
 }
 
 // foulWeight returns the foul-only bucket weight; frozen → the league-mean foul
-// weight. (Freezing the post-HCA output also removes HCA's small foul-bucket effect,
-// which is negligible against cross-team scoring dispersion — the target here.)
-func (gs *gameState) foulWeight(defenders []onCourt, hca float64) float64 {
-	w := foulBucketWeight(defenders, hca, gs.rng)
+// weight. It takes the ball handler, offense, and defense lineups plus the per-team
+// hca delta (raw ±0.2 half-court, 0 transition/ASG): the foul BASE (leg B) and offQ
+// (leg C) carry the RAW HCA — see foulBucketWeight. hca=0 recovers the symmetric path.
+func (gs *gameState) foulWeight(bh onCourt, offense, defenders []onCourt, hca float64) float64 {
+	w := foulBucketWeight(bh, offense, defenders, hca, gs.rng)
 	if gs.accum != nil {
 		gs.accum.foulSum += w
 		gs.accum.foulN++

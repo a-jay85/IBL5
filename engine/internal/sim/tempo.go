@@ -55,7 +55,10 @@ const (
 	// LEVER-2 RE-TEST (2026-06-03, ADR-0044): the Lever-2 pair proposed RAISING
 	// this concurrently with foulCompress (the idea: foulCompress cuts the
 	// negative-Cov foul-arm dispersion, freeing room to add make-coupled volume
-	// dispersion here). The archive sweep REFUTED the raise on its OWN target:
+	// dispersion here). NOTE (J15, 2026-07-11): foulCompress was the pre-faithful
+	// foul-dispersion dial; the faithful foul bucket + foulBucketScale supersede it,
+	// but this re-test's conclusion (raising offVolumeScale games metrics) is
+	// unchanged. The archive sweep REFUTED the raise on its OWN target:
 	// after foulCompress=0.45, EngineVarLnFGA (0.00265 gt2) is still ABOVE real
 	// (0.00141) — foulCompress narrows it but never undershoots, so there is no
 	// room to refill. A 0.02→0.14 sweep (fc=0.45) only widens VarLnFGA further

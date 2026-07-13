@@ -40,7 +40,7 @@ J1 faithful foul pair (✅ 2026-07-10, ADR-0082) ─→ J2 adjudications (✅ 20
               ├─ prerequisite: J16 escape bound re-derived with LIVE AST/48 (J19) — ✅ J19 done
               └─→ J2 verdict: SHIPPABLE with residual → successor = J20 empty-FGA restructure (J4 ✅ 2026-07-12 feeds it) → J13 (unblocked)
 J17 game-state foul coupling (⬜, new 2026-07-10) — real 5.60 mechanism the engine lacks entirely
-J18 composite fidelity ports (◑ — all divergences merged; f/shrink question pending) · J19 J6-residue RE (✅ 2026-07-12) — both spawned by J6
+J18 composite fidelity ports (✅ 2026-07-13 — all divergences merged; f/shrink port declined as documented divergence) · J19 J6-residue RE (✅ 2026-07-12) — both spawned by J6
 ```
 
 The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dominant carrier** (J2 session 1, 2026-07-10): a mechanical Cov injection from unfaithful foul share. PPS = PF/FGA counts FT points in the numerator while foul plays displace FGA from the denominator, so excess foul-share level/dispersion injects negative Cov directly; the engine ran foul share at **1.8× real** (37.8 vs 20.65 FTA/g, a pre-ADR-0082 legacy). Zeroing defQ moved gt2 Cov **−0.000774 → −0.000340** (real +0.000269) — 56% of the residual, ~15× any prior single lever; that A/B stands as measurement. **But J6 (same day) overturned the static premise underneath it:** J5's "defQ ≡ 0" was a store-enumeration blindspot — 5.60 builds the player record on the STACK (FUN_004cfa50 → FUN_00405970 write-back), so +0xDD0 (STL/MIN×44), +0xDE0 (usage-shrunk TOV/48), and +0xDC8 (AST/48) are all **live**. The faithful foul coupling is therefore roster-VARYING (defQ = Σ defenders' STL/MIN×44; offQ = Σ offense TOV/48 − HCA, TOV-coupled not volume-neutral), and J2's "symmetric U[0,0.6) both sides" verdict plus the J15 program must be re-adjudicated against the live-composite semantics before any port ships. "Mapped carriers exhausted" stays refuted; the map had a foul-path hole — and a method hole (see J6's caveat).
@@ -53,8 +53,8 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 |--------|------:|
 | ⬜ Open | 5 |
 | 📋 Planned | 0 |
-| ◑ Partial | 1 |
-| ✅ Implemented | 14 |
+| ◑ Partial | 0 |
+| ✅ Implemented | 15 |
 | 🚫 Declined | 0 |
 
 ---
@@ -80,7 +80,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 | J15 | Faithful foul-bucket program (live composites + HCA re-homing + level re-anchor) | ✅ Implemented | 🧠 Opus | L |
 | J16 | FUN_004e3860 net-advantage formula via objdump | ✅ Implemented | 🔮 Fable | S |
 | J17 | Game-state foul coupling port (param_8 desperation + late-game fouling) | ⬜ Open | 🧠 Opus | M |
-| J18 | Composite fidelity ports (bucketweights/teamquality vs the J6 formula map) | ◑ Partial | 🧠 Opus | M |
+| J18 | Composite fidelity ports (bucketweights/teamquality vs the J6 formula map) | ✅ Implemented | 🧠 Opus | M |
 | J19 | J6-residue RE (energy operands, rec+0x18 semantics, escape re-derivation, +0xD58) | ✅ Implemented | 🧠 Opus | M |
 | J20 | Empty-FGA / within-possession restructure (Cov possession channel) | ⬜ Open | 🧠 Opus | L |
 
@@ -158,11 +158,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 **Status (2026-07-10):** ⬜ Open — new (spawned by J2 session 1). 🧠 Opus (RE + verdict); port ⚙️ Sonnet.
 
 ### J18 Composite fidelity ports (bucketweights/teamquality vs the J6 formula map)
-**Location:** `engine/internal/sim/bucketweights.go` + `teamquality.go` — every divergence from the J6-pinned formulas, now enumerable against `jsb-native/re-artifacts/jsb-J6-composite-scales-20260710.md` §2/§6.
-**Problem:** J6 turned "unpinned stand-in" into "known-divergent." Confirmed divergences: (1) `bucketweights.go` comments (~:19, ~:180) assert "+0xDB0 is DEAD (always 0)" — false, it's usage-shrunk 3GA/MIN×48, so `threePtBucketWeight` needs re-derivation from the live composite (also a candidate for J2's residual: FTADisp 1.51, and the 3pt weight sits in the foul-share denominator); (2) `d70LeagueScalar = 1.0` (~:77) where 5.60 uses **S = (leaguePF48×5 − leagueTOV48×0.5)/(leagueFTA48×5)**, exactly computable from the FUN_004385f0 table the engine already models; (3) `d88` (~:159) uses `RealLifeFGA` where 5.60 uses **2PA** (and f-projected inputs); (4) the "+0xDE0 dead ⇒ foul floors" comment (~:85) premise is wrong; (5) `teamquality.go` faithful formulas per J15; (6) the `param_6` net-advantage foul shrink `e80 ×= 1 − param_6/(4·leagueTOV48)` (J16 exact identity, applied in 5.60 after the coupling and before the ≤0 redraw, both param_5 paths) — ✅ PORTED 2026-07-12 (jsb-j2s2-j18-composites). Provenance correction from the port: 5.60's `param_6` at the FUN_004e1ba0 site is FUN_004e3860's return (`:93276-93293` fVar22→dVar1→double arg), i.e. the Go **`matchupQuality`** — NOT the ODPT `netAdvantage` ADR-0084 Decision 2 assumed (whose O(10s) scale would trip the 13.4126 redraw threshold every possession). With matchupQuality's Phase 3/4 aggregates stubbed to 0, mq spans ~[−0.5,+0.8] so the shrink is a ±few-% modulation that matures when those aggregates land. Open modeling question: whether to port the `f = (Confidence + rec[+0x18] + 95)/200` ±2% projection modulation and the pass-2 usage shrink, or accept them as documented divergences (they need Confidence + the +0x18 marker in the bundle).
-**Direction:** Foul-adjacent pieces (2)(4)(5) execute inside J15. The shot-mix pieces (1)(3) and the f/shrink question are a follow-on A/B'd PR — each changes bucket weights globally, so headline Cov + Var gates must be re-measured per change, not batched blind. Comment corrections ride the first PR that touches each file.
-**Update (2026-07-12):** All enumerated divergences ported/fixed, each individually A/B'd: (1) threePtBucketWeight = faithful 3GA/MIN×48 (PR #1438); (2) d70LeagueScalar = 0.6472241372826754, S computed exactly from the J9-validated league table (PR #1436); (3) d88 = 2PA/48 (PR #1439); (4) fixed in J15 (#1432); (5) in J15; (6, discovered during J16) :97164 mq foul shrink (PR #1435). Cov unchanged in every A/B — confirming the J2 s2 finding that shot-mix ports are fidelity work, not Cov levers. All ports MERGED to master 2026-07-13: (1) via #1437 (stack parent, absorbing #1438); (3) via #1443 (replacement PR — #1439 was auto-closed when its stacked base branch was deleted); (2) #1436; (6) #1435; denom18 #1433. foulBucketScale maintenance contract executed twice: 0.47→0.40 (PR #1440, post-items-1+3 basis) and 0.40→0.39 (PR #1444, after item 2's d70 pin landed — combined-master check read FTA/g 21.82 vs the .sco 21.32 target; 1-D search 0.39→21.36, 0.40→21.82; gt=2 margin gap +0.498→+0.491, within the ±0.03 noise floor, Phase-5 margin lock intact).
-**Status (2026-07-13):** ◑ Partial — all six formula divergences MERGED (#1433, #1435–#1437, #1440, #1443, #1444); combined FTA anchor verified on final master (21.36 vs .sco 21.32). Remaining: the f = (Confidence + rec[+0x18] + 95)/200 projection-modulation / pass-2 usage-shrink port-vs-document question (🧠 user decision — J19's rec[+0x18] evidence favors documenting as divergence).
+➜ J18 Composite fidelity ports — ✅ Implemented (2026-07-13): six formula divergences merged (#1433, #1435–#1437, #1440, #1443, #1444); f/pass-2 usage-shrink port decided as a documented divergence (bundle lacks Confidence + `+0x18`; J19 bounds real `f` spread to ±2%); see [archive](archive/jsb-native-backlog-archive.md).
 
 ### J19 J6-residue RE (energy operands, rec+0x18 semantics, escape re-derivation, +0xD58)
 **Location:** `jsb-native/` decompile + PE; open items recorded in `jsb-native/re-artifacts/jsb-J6-composite-scales-20260710.md` § still-open.

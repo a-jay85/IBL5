@@ -43,6 +43,21 @@ type possCouplingArtifact struct {
 	Aggregate SeasonAggregateReport `json:"aggregate"`
 }
 
+// RECORDED BASELINE (current engine, gt2, archive 20-run of record, 2026-07-13):
+//   Cov(lnFGA,lnPPS) total  = engine -0.000364   real +0.000269   (wrong sign)
+//     possession-count term = engine -0.000184   real +0.000241   (89% of real total)
+//     shots-per-poss term   = engine -0.000180   real +0.000027   (real ≈ 0)
+//   Var(lnPOSS) = engine 0.000254  real 0.000721   (engine under-disperses pace ~2.8x)
+//
+// FINDING (J20 within-possession restructure, Phase 3 — mechanism VOID, not implemented):
+// The dominant wrong-signed term is the possession-COUNT channel (89% of the real
+// positive Cov). Possession count is set by gameloop.go's `clock / avg(ball-time)` —
+// fixed up front from tempo ratings; offensive rebounds continue a possession without
+// adding to the count. So NO within-possession putback lever can move Cov(lnPOSS,lnPPS):
+// the carrier is cross-team tempo/pace dispersion, a separate subsystem. Per-origin
+// putback share (12.58% vs J4 12.65%) and efficiency (eFG 0.608 vs 0.622) are already
+// J4-faithful — there was nothing to re-weight. The real carrier is a pace-generation
+// plan, not this one. These numbers are characterization of record, not a J20 target.
 func TestRealArchive_PossessionCoupling(t *testing.T) {
 	dir := os.Getenv("JSB_ARCHIVE_DIR")
 	if dir == "" {

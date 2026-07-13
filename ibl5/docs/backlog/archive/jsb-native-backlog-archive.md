@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed JSB native-engine backlog entries (J-items), extracted from jsb-native-backlog.md.
-last_verified: 2026-07-12
+last_verified: 2026-07-13
 ---
 
 # JSB Native-Engine Backlog — Archive
@@ -77,3 +77,24 @@ Full detail: symmetric deterministic base `(2.0 − fatigue)·tovRate(bh)` (corr
 ### J19 J6-residue RE (energy operands, rec+0x18 semantics, escape re-derivation, +0xD58)
 
 **Status (2026-07-12):** ✅ Implemented — the load-bearing item (1), J16's escape-bound re-derivation with live AST/48, was resolved inside the J15 program (ADR-0084: the deterministic home arm is effectively-not-perfectly non-positive; live +0xDC8 AST48 shaved the barrier ~15%, residual 57.16 → 48.42, redraw still dominant for any realistic roster). Bounded residue spun forward as a follow-on objdump session — item (2) rec[+0x18] in-season decay semantics, (3) energy-formula operand identities (asm 4d4711–4d4774), (4) +0xD58 dead-vs-reader confirm, plus the +0xDA0/+0xDA8 transition-retention re-trace. 🧠 Opus (🔮 only if the asm hits the NaN/FPU-flag class).
+
+---
+
+### J8 Transition trigger denominator 18
+
+**Status (2026-07-13):** ✅ Implemented — PR #1433 ported the asm-confirmed `transitionTriggerDenom = 18` (was 20). ⚙️ Sonnet.
+
+**Location:** `engine/internal/sim/transition.go` `transitionTriggerDenom = 20` (comment admits "unpinned stand-in") vs asm-confirmed 5.60 value **18** (`push 0x12` before the rand_int call).
+**Problem:** Engine under-fires transition ~11% with a ~10%-too-shallow TransOff slope. Like J7 this corrects fidelity while nudging the count-axis headline the WRONG way (more transition volume → more dilution).
+**Direction:** One-constant port + A/B (expect a small negative headline nudge; ship on fidelity grounds with the A/B in the PR). Sequence after the J2 verdict.
+
+---
+
+### J11 Season-selection min-GP guard
+
+**Status (2026-07-13):** ✅ Verified already-implemented — the verify-first check found the guard shipped in PR #975: `minSeasonMedianGP = 70` with a proxy-medGP (2·games/teams) pre-sim skip in `engine/internal/calibrate/season.go`, exactly the truncated-season protection this item wanted. No further work. ⚙️ Sonnet.
+
+**Location:** `engine/internal/calibrate` season selection (season.go) — picked TRUNCATED snapshots for 5/19 seasons (medGP 3–46 instead of ~82) when last measured.
+**Problem:** Silently biases any committed standings gate that walks the archive.
+**Direction:** Verify first — later corpus-completeness work (era-dependent complete-season counts, medGP normalization) may already cover it; if not, add the guard + a regression test. Measurement recipes in the re-artifacts assume it is still open.
+

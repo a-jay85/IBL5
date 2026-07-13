@@ -1,6 +1,6 @@
 ---
 description: WCAG 2.x full-rule (non-contrast) accessibility failure inventory and burn-down backlog per axe rule, with audited per-entry implementation + automouse-readiness status. Companion to a11y-contrast-backlog.md.
-last_verified: 2026-07-11
+last_verified: 2026-07-13
 ---
 
 # A11y Full-Rule Backlog (non-contrast)
@@ -146,7 +146,7 @@ Tracked separately in [`a11y-contrast-backlog.md`](a11y-contrast-backlog.md). Th
 | `a11y-heading-one-multi-title` | ✅ Implemented — 6 multi-title pages promoted; standings + voting results deferred (page-level `<h1>` decision). |
 | `a11y-heading-one-standings-voting` | ✅ Implemented — page-level `<h1>` added to standings + voting results (VR change → human merge). |
 | `a11y-link-name-news` | ✅ Implemented — News-page `link-name` reproduce-gated removal (links already labeled); homepage deferred. |
-| `mobile-target-size-a11y-sitewide` | 📋 PR #1428 open (held for human visual review + VR baseline regen; auto_merge: false) — site-wide 375px target-size sweep + two CSS fixes + schedule-target-size.spec.ts retired. |
+| `mobile-target-size-a11y-sitewide` | 📋 PR #1448 open (held for human visual review + VR baseline regen; auto_merge: false) — site-wide 375px target-size sweep + two CSS fixes + schedule-target-size.spec.ts retired; CI seed grounded (#1448 on branch topic-leaders-ci-seed supersedes #1428 on mobile-target-size-a11y-sitewide). |
 
 ## Burn-down process
 

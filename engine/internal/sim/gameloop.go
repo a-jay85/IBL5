@@ -59,6 +59,13 @@ func simGameWith(b bundle.Bundle, g bundle.Game, r *rng.RNG, opts Options) (resu
 	} else {
 		gs.gateBaseline = leagueReboundBaseline(b)
 	}
+	// The shot baseline (league 2PA/48, CEngine+0x6638) is likewise league-
+	// constant: it is assembled ONCE per snapshot at bundle-build time, over
+	// raw .plr records 1-959 (backup.ToBundle's computeLeagueShotBaseline) —
+	// NOT over the bundle's player list, which is a different, larger
+	// population. A zero/unwired field (e.g. a hand-built test bundle) falls
+	// back to leagueBaselineFallback via shotBaselineOrFallback below.
+	gs.shotBaseline = b.LeagueShotBaseline
 
 	// One shared possession length per game: the average of the two teams' base
 	// times (factor 1.0). Each team's base_time now carries its offensive volume

@@ -79,13 +79,19 @@ const (
 	orbRateScale = 0.15
 	ftaRateScale = 0.30
 
-	// d70LeagueScalar carries D70's league-relative factor
-	// ((C[+0x6938]×5 − C[+0x68D8]×0.5)/(C[+0x6728]×5), COMPOSITE_DOUBLES_TRACE.md §3),
-	// which reads runtime CEngine LEAGUE aggregates absent from the IBL data path
-	// (ADR-0040 negative finding 2 — the "loader-populated, not modeled" class, like
-	// league_baseline). It is a uniform league scalar, so it degrades to a documented
-	// calibrated constant: 1.0 (neutral) here, corpus-tunable on PR2's instrument.
-	d70LeagueScalar = 1.0
+	// d70LeagueScalar carries D70's league-relative factor S =
+	// (leaguePF48×5 − leagueTOV48×0.5)/(leagueFTA48×5) — asm 4d4380–4d43cd
+	// (COMPOSITE_DOUBLES_TRACE.md §3; RE artifact
+	// jsb-J6-composite-scales-20260710.md §2). The three inputs are FUN_004385f0
+	// league-table means computed from the 5.60 game-install IBL5.plr (records
+	// 1–959, non-empty name, MIN>2·GP, n=376): leaguePF48 = 4.294130331651356,
+	// leagueTOV48 = 3.3531432843116113 (matches the leagueTOV48 pin in
+	// teamquality.go exactly), leagueFTA48 = 6.116607485995505 — giving S =
+	// 0.6472241372826754. This is a static pin from the same league table as
+	// teamquality.go's leagueTOV48/leagueSTL48, not a runtime CEngine read (ADR-0040
+	// negative finding 2 — the "loader-populated, not modeled" class); a per-season
+	// dynamic league table is a tracked follow-up, not this change.
+	d70LeagueScalar = 0.6472241372826754
 
 	// +0xD90 Branch-A pinned constants (COMPOSITE_DOUBLES_TRACE.md §5): the 0.5
 	// (_DAT_00669ef0) and 0.25 (_DAT_00669f58) factors in the make-share weighting.

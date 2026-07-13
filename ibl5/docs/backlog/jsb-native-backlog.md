@@ -38,7 +38,7 @@ J1 faithful foul pair (✅ 2026-07-10, ADR-0082) ─→ J2 adjudications (✅ 20
         └─→ J15 faithful foul-bucket program (⬜ — RE-SCOPED: live defQ = Σ STL/MIN×44, offQ = Σ TOV/48)
               ├─ absorbs J12 (HCA re-homing — corpus margin ground truth 4.12 unchanged)
               ├─ prerequisite: J16 (✅ 2026-07-10) escape bound re-derived with LIVE AST/48 (J19)
-              └─→ J2 verdict: SHIPPABLE with residual → successor = empty-FGA restructure (J4 first) → J13 (unblocked)
+              └─→ J2 verdict: SHIPPABLE with residual → successor = J20 empty-FGA restructure (J4 ✅ 2026-07-12 feeds it) → J13 (unblocked)
 J17 game-state foul coupling (⬜, new 2026-07-10) — real 5.60 mechanism the engine lacks entirely
 J18 composite fidelity ports (◑ — formula divergences shipped; f/shrink pending) · J19 J6-residue RE (⬜) — both spawned by J6
 ```
@@ -54,7 +54,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 | ⬜ Open | 11 |
 | 📋 Planned | 0 |
 | ◑ Partial | 1 |
-| ✅ Implemented | 7 |
+| ✅ Implemented | 8 |
 | 🚫 Declined | 0 |
 
 ---
@@ -66,7 +66,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 | J1 | Faithful foul-bucket pair port | ✅ Implemented | ⚙️ Sonnet | M |
 | J2 | Count-axis carrier adjudication (post-J1) | ✅ Implemented | 🔮 Fable | L |
 | J3 | Per-origin efficiency identifiability (IBL5.log) | ✅ Implemented | 🔮 Fable | M |
-| J4 | Play-by-play extraction parser | ⬜ Open | ⚙️ Sonnet | M |
+| J4 | Play-by-play extraction parser | ✅ Implemented | ⚙️ Sonnet | M |
 | J5 | Unpinnable-claims sweep + static closures | ✅ Implemented | 🔮 Fable | M |
 | J6 | Composite-scale pins (+0xD90/+0xDB0, `f`, full player formula map) | ✅ Implemented | 🔮 Fable | M |
 | J7 | Turnover volume-coupling fidelity RE | ⬜ Open | 🧠 Opus | M |
@@ -82,12 +82,13 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 | J17 | Game-state foul coupling port (param_8 desperation + late-game fouling) | ⬜ Open | 🧠 Opus | M |
 | J18 | Composite fidelity ports (bucketweights/teamquality vs the J6 formula map) | ◑ Partial | 🧠 Opus | M |
 | J19 | J6-residue RE (energy operands, rec+0x18 semantics, escape re-derivation, +0xD58) | ⬜ Open | 🧠 Opus | M |
+| J20 | Empty-FGA / within-possession restructure (Cov possession channel) | ⬜ Open | 🧠 Opus | L |
 
 ### J1 Faithful foul-bucket pair port
 ➜ J1 Faithful foul-bucket pair port — ✅ Implemented (2026-07-10): see [archive](archive/jsb-native-backlog-archive.md).
 
 ### J2 Count-axis carrier adjudication (post-J1)
-➜ J2 Count-axis carrier adjudication — ✅ Adjudicated (2026-07-12): SHIPPABLE verdict; successor = empty-FGA restructure (gated on J4); see [archive](archive/jsb-native-backlog-archive.md).
+➜ J2 Count-axis carrier adjudication — ✅ Adjudicated (2026-07-12): SHIPPABLE verdict; successor = J20 empty-FGA restructure (J4 ✅); see [archive](archive/jsb-native-backlog-archive.md).
 
 ### J3 Per-origin efficiency identifiability (IBL5.log)
 ➜ J3 Per-origin efficiency identifiability — ✅ Implemented (2026-07-09): study complete; J4 unblocked with spec; see [archive](archive/jsb-native-backlog-archive.md).
@@ -96,7 +97,8 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 **Location:** New machine-local tooling consuming IBL5.log per the J3 spec (`jsb-native/re-artifacts/jsb-pbp-identifiability-J3-20260709.md` § "J4 build spec"; the study parser `j3_study.py` next to it is ~80% of the matcher).
 **Problem:** None — mechanical half of J3, now fully specified: segmenter (header regex + digit-boundary team/score split + season-by-date-rollback), 509-template matcher (gate: 100% closure — any unmatched sentence is a parser bug), roster-join attribution, possession state machine with engine-aligned origin rules.
 **Direction:** Build to spec. Machine-verifiable gates: per-game Σ score-deltas == header final; **per-player per-game reconciliation against `ibl_box_scores`** (1988–2008, ~606K rows — stronger than the `.sco` season-total recon originally envisioned); Σ origin FGA == total FGA. Output: team-game per-origin {FGA,FTA,PTS,PPS} CSV → team-season demeaned couplings → J2's per-origin decomposition. **Spec addition (J2 session 1):** also emit home/away × per-quarter FTA — the clean instrument separating the static home-FTA component (~+1–2, confounded by FTA→margin reverse causality in box-score data) from game-state late-game fouling (J17), and the acceptance instrument for the static home-FTA channel — which J16 (2026-07-10) re-homed from param_6 (refuted: side-symmetric) to the site-2 HCA `e88 → e90` and-one feed.
-**Status (2026-07-09):** ⬜ Open — **unblocked** (J3 ✅). ⚙️ Sonnet build; 🧠 Opus owns the J2 decomposition readout.
+**Resolution (2026-07-12):** Built and gated. **23,714/23,714 games parsed, 100.0000% sentence closure** (16,236,695 sentences, zero unmatched — the J3 gate held); box join 23,133/23,714 (97.55% — the 581 unjoined are log stretches genuinely absent from `ibl_box_scores`, verified by exhaustive score+roster candidate scans); per-player reconciliation 0.111% bad cells (7,134/6,443,352), with 91.6% of those the engine's silent-block behavior (shooter FGA + blocker BLK recorded with no printed sentence — blocker identity provably text-unrecoverable), the rest cross-side same-surname twin ambiguity. Deliverables under `jsb-native/re-artifacts/j4-parser-20260712/` (machine-local): per-origin FGA shares by game_type (regular: initial 0.754 / putback 0.127 / transition 0.119; putback eFG% ≈ 0.62 vs ≈ 0.50 elsewhere, stable across types), team-game per-origin {FGA,FTA,PTS,PPS}, and the home/away × per-quarter FTA instrument (J17/J20 feed).
+**Status (2026-07-12):** ✅ Implemented — feeds J20 (possession-channel restructure) and J17 (game-state fouling instrument).
 
 ### J5 Unpinnable-claims sweep + static closures
 ➜ J5 Unpinnable-claims sweep + static closures — ✅ Implemented (2026-07-09): closures 1–3 + team decode stand; closure 4 overturned by J6; see [archive](archive/jsb-native-backlog-archive.md).
@@ -177,3 +179,10 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 **Problem:** J6 left four bounded unknowns, two of them load-bearing: (1) **J16 escape-bound re-derivation with live AST/48** — blocks J15's design (is the home arm's `≤ 0 → redraw` still the dominant path with defQ = Σ STL/MIN×44 and a sign-varying matched term?); (2) **rec[+0x18] in-season semantics** — pinned = 100 at reset, but constant-vs-decay determines `f`'s real spread (±2% vs wider) and whether the f-port matters (J18); (3) energy-formula operand identities (slots 0x1c/0x64/ebx in asm 4d4711–4d4774); (4) +0xD58 — computed and stored (4d42df) but no reader found; confirm dead or find the reader. Also parked here: the transition-retention re-trace (+0xDA0/+0xDA8 live for 3pt shooters — the master ref's vestigial claim was premise-corrected but the downstream retention path was never re-walked).
 **Direction:** Item (1) is arithmetic over already-pinned formulas + IBL5.plr distributions — do it first, it unblocks J15. Items (2)–(4) + the retention re-trace are one objdump session, precedented method. Escalate to 🔮 only if the asm hits the NaN/FPU-flag class.
 **Status (2026-07-10):** ⬜ Open — spawned by J6. 🧠 Opus.
+
+### J20 Empty-FGA / within-possession restructure (Cov possession channel)
+*(discovered 2026-07-12 during J2 session-2 adjudication)*
+**Location:** Engine possession loop — the empty-FGA retry structure (`engine/internal/sim/gameloop.go` shot-decision path); evidence in `jsb-native/re-artifacts/jsb-J2s2-cov-adjudication-20260712.md` and the J4 corpus measurements (`jsb-native/re-artifacts/j4-parser-20260712/`, machine-local).
+**Problem:** The possession-count channel carries **81% of real gt2 Cov** (+0.000498 of +0.000612) and is the only channel that can flip the engine's sign — the shot-mix channel is arithmetically capped at −0.000012 ≤ 0 even fully faithful (J2 s2), triple-confirmed by the J18 A/Bs (Cov unchanged in every port). The engine's empty-FGA retry loop over-disperses shots-per-possession and dilutes realized PPS on high-volume teams (corr −0.42) where 5.60 does not. Successor to ADR-0042's open item; the ADR-0054 possession budget constraint is generator-independent and binds any redesign.
+**Direction:** Design against J4's real per-origin ground truth (initial/putback/transition FGA shares + per-origin efficiency): restructure how empty possessions/retries generate FGA so within-possession dispersion matches the corpus, without breaking the possession budget or the fta/margin anchors. Needs its own RE pass on 5.60's possession flow + a `/plan`; A/B gates = gt2/gt4 Cov, fta_per_g, margin. Sequence J7 (turnover coupling) with it — J7's faithful fix pressures Cov the wrong way and should be priced into the same adjudication.
+**Status (2026-07-12):** ⬜ Open — unblocked (J4 ✅). 🧠 Opus design + adjudication; escalate 🔮 Fable (user-gated) only if the asm possession-loop derivation hits the refuted-premise class.

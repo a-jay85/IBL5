@@ -19,6 +19,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Change-detection strategy: dorny/paths-filter with a static glob list.
+  # CodeQL only needs to run when JS/TS source (or a workflow) changes, so a
+  # language-scoped glob is exactly right here. bin/website-affecting is
+  # deliberately NOT used: it answers "does this touch app rendering?" and would
+  # green-light PHP-only PRs that CodeQL's JS/TS analysis has no reason to scan.
   changes:
     name: Detect changes
     runs-on: ubuntu-latest

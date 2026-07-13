@@ -10,6 +10,7 @@ use Bootstrap\DemoModeBootstrap;
 use Bootstrap\ErrorHandlerBootstrap;
 use Bootstrap\HeadersBootstrap;
 use Bootstrap\LeagueBootstrap;
+use Bootstrap\RequestEventLoggingBootstrap;
 use Bootstrap\SecurityBootstrap;
 use Bootstrap\SessionBootstrap;
 use Bootstrap\WebApplicationFactory;
@@ -25,7 +26,7 @@ final class WebApplicationFactoryTest extends TestCase
         /** @var list<\Bootstrap\Contracts\BootstrapStepInterface> $steps */
         $steps = $reflection->getValue($app);
 
-        self::assertCount(8, $steps);
+        self::assertCount(9, $steps);
         self::assertInstanceOf(SecurityBootstrap::class, $steps[0]);
         self::assertInstanceOf(SessionBootstrap::class, $steps[1]);
         self::assertInstanceOf(HeadersBootstrap::class, $steps[2]);
@@ -34,5 +35,6 @@ final class WebApplicationFactoryTest extends TestCase
         self::assertInstanceOf(ErrorHandlerBootstrap::class, $steps[5]);
         self::assertInstanceOf(AuthBootstrap::class, $steps[6]);
         self::assertInstanceOf(DemoModeBootstrap::class, $steps[7]);
+        self::assertInstanceOf(RequestEventLoggingBootstrap::class, $steps[8]);
     }
 }

@@ -80,9 +80,17 @@ const (
 	// here citing "offsets 88/92" was wrong: 88/92 are not the DRB/AST source; the
 	// faithful JSB team rate is (Σ_player season_DRB / Σ_player season_GP)×48 — see
 	// offSeasonGP and assemble.go.)
+	//
+	// offRealLifeGP and offRealLife3GA feed the league 2PA/48 shot baseline
+	// (assemble.go computeLeagueShotBaseline, the FUN_004385f0 league-table
+	// port, over raw RECORDS — RecordIndex ≤ 959, not the bundle player list):
+	// GP is the MIN > 2×GP inclusion gate, and 3GA isolates pure 2-point attempts
+	// (2PA = FGA_total − 3GA, since offRealLifeFGA is the combined total).
+	offRealLifeGP  = 52 // width 4 — games played (league-baseline inclusion gate)
 	offRealLifeMIN = 56 // width 4 — minutes played (the per-48 rate divisor)
 	offRealLifeFGA = 64 // width 4 — total FG attempts (D88)
 	offRealLifeFTA = 72 // width 4 — FT attempts (D70 per-player part)
+	offRealLife3GA = 80 // width 4 — 3pt attempts (subtracted from FGA for the 2PA/48 baseline)
 	offRealLifeORB = 84 // width 4 — offensive rebounds (DB8)
 
 	// Per-player IN-SEASON box-score totals (record-relative, width 4 each), the
@@ -164,6 +172,19 @@ type PlrPlayer struct {
 	Age     int
 	Peak    int
 
+	// RecordIndex is the 1-based position of this player's line in the raw .plr
+	// file (every CRLF-separated line counts, including short/padding rows and
+	// pid==0 team-summary rows that never become a PlrPlayer — the parse is
+	// sequential, so this is simply the loop position, NOT the roster-slot
+	// Ordinal above). It is the FUN_004385f0 league-table scan boundary: JSB
+	// 5.60 computes the league 2PA/48 baseline over records 1-959 ONLY (records
+	// 960+ hold hundreds more named players outside that scan). Ordinal
+	// happens to coincide with RecordIndex on some files but is a DIFFERENT
+	// concept (a roster slot the .plr text itself carries) and must not be
+	// used as the gate — see jsb-native/re-artifacts/jsb-J9-baseline-pin-
+	// 20260712.md.
+	RecordIndex int
+
 	Clutch        int
 	Consistency   int
 	Talent        int
@@ -181,9 +202,14 @@ type PlrPlayer struct {
 	// the 2pt-bucket composite reads ((stat/MIN)×48; RealLifeFGA is total FG attempts
 	// incl. 3PA). Zero MINUTES means no prior-season reference (e.g. a rookie); the
 	// engine falls back to the rating stand-in (sim/bucketweights.go twoPtBucketWeight).
+	// RealLifeGP (the MIN > 2×GP inclusion gate) and RealLife3GA (2PA = FGA − 3GA)
+	// feed the league 2PA/48 shot baseline (assemble.go computeLeagueShotBaseline),
+	// gated jointly with RecordIndex ≤ 959 and a non-empty Name.
+	RealLifeGP  int
 	RealLifeMIN int
 	RealLifeFGA int
 	RealLifeFTA int
+	RealLife3GA int
 	RealLifeORB int
 
 	// Per-player IN-SEASON box-score totals (offSeasonGP/DRB/AST), the Branch-B
@@ -251,7 +277,11 @@ func ReadPlr(r io.Reader) ([]PlrPlayer, error) {
 			continue // team-summary row (pid==0) or padding slot
 		}
 
-		p := PlrPlayer{Ordinal: ordinal, PID: pid, Name: decodeCP1252(plrSlice(line, offName, 32))}
+		// RecordIndex is the 1-based position of THIS line in the raw file (i is
+		// the index into every CRLF-separated line, including skipped short/
+		// padding/team-summary rows before it) — the FUN_004385f0 scan boundary,
+		// deliberately independent of Ordinal (see the PlrPlayer doc comment).
+		p := PlrPlayer{Ordinal: ordinal, PID: pid, RecordIndex: i + 1, Name: decodeCP1252(plrSlice(line, offName, 32))}
 		p.Pos = strings.TrimSpace(plrSlice(line, offPos, 2))
 
 		// Parse every numeric field; the first non-numeric one short-circuits.
@@ -266,8 +296,10 @@ func ReadPlr(r io.Reader) ([]PlrPlayer, error) {
 			{&p.CanPlayInGame, offCanPlayInGame, 1},
 			{&p.PGDepth, offPGDepth, 1}, {&p.SGDepth, offSGDepth, 1}, {&p.SFDepth, offSFDepth, 1},
 			{&p.PFDepth, offPFDepth, 1}, {&p.CDepth, offCDepth, 1},
+			{&p.RealLifeGP, offRealLifeGP, 4},
 			{&p.RealLifeMIN, offRealLifeMIN, 4}, {&p.RealLifeFGA, offRealLifeFGA, 4},
-			{&p.RealLifeFTA, offRealLifeFTA, 4}, {&p.RealLifeORB, offRealLifeORB, 4},
+			{&p.RealLifeFTA, offRealLifeFTA, 4}, {&p.RealLife3GA, offRealLife3GA, 4},
+			{&p.RealLifeORB, offRealLifeORB, 4},
 			{&p.SeasonGP, offSeasonGP, 4}, {&p.SeasonDRB, offSeasonDRB, 4},
 			{&p.SeasonAST, offSeasonAST, 4},
 			{&p.RatingFGA, offRating2GA, 3}, {&p.RatingFGP, offRating2GP, 3},

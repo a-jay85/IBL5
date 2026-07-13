@@ -18,6 +18,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Change-detection strategy: dorny/paths-filter with a static glob list.
+  # Engine CI only needs to run when Go engine sources (or this workflow) change,
+  # so an engine/** glob is exactly right. bin/website-affecting is NOT used: it
+  # models PHP app-rendering impact, which is unrelated to the Go engine build.
   changes:
     name: Detect changes
     runs-on: ubuntu-latest

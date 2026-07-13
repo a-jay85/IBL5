@@ -42,7 +42,7 @@ func TestFreeze_SubstitutesAndAccumulates(t *testing.T) {
 	// wrapper's accumulated rounding exactly.
 	careless, pressure := 60.0, 100.0
 	wantTurn := stealTurnoverScale * careless * pressure // below the clamp
-	wantMake := shotValue2pt(5, 50, false)
+	wantMake := shotValue2pt(5, 50, false, leagueBaselineFallback)
 
 	if got := base.orebProb(100, 100); got != wantOreb {
 		t.Errorf("baseline orebProb = %v, want live %v", got, wantOreb)
@@ -81,7 +81,7 @@ func TestFreeze_NoCrossConfound(t *testing.T) {
 	liveOreb := gate1Probability(120, 80, 0) // gs.gateBaseline is 0 in these cases
 	careless, pressure := 60.0, 100.0
 	liveTurn := stealTurnoverScale * careless * pressure // runtime eval, below the clamp
-	liveMake := shotValue2pt(5, 50, false)
+	liveMake := shotValue2pt(5, 50, false, leagueBaselineFallback)
 	// Symmetric bucket: this single-defender/single-offense fixture drives the
 	// coupling factor negative (defQ from one defender sits far below the 5-man-
 	// normalized baseline), so foulBucketWeight redraws — seed each gs the same so
@@ -183,8 +183,8 @@ func TestFreeze_MisconfigErrors(t *testing.T) {
 func TestMakePutback_OriginScoped(t *testing.T) {
 	const fgp = 50
 	net := 5.0
-	live := shotValue2pt(net, fgp, false) // initial/transition live value
-	putback := putbackValue2pt(fgp)       // faithful OriginOffReb live value (ADR-0055)
+	live := shotValue2pt(net, fgp, false, leagueBaselineFallback) // initial/transition live value
+	putback := putbackValue2pt(fgp)                               // faithful OriginOffReb live value (ADR-0055)
 	mean := 111.0
 
 	cases := []struct {

@@ -141,12 +141,12 @@ func TestPlayBuckets_HCADeltaInvariantToBranchB(t *testing.T) {
 
 	// BranchB OFF: home 2pt = raw2pt + hca, home foul = det_home.
 	gsOff := &gameState{rng: rng.New(42)}
-	offH2, _, offHF := gsOff.playBuckets(bh, offense, defense, hcaHome, hcaScaled, true)
+	offH2, _, offHF := gsOff.playBuckets(bh, offense, defense, hcaHome, hcaScaled, 0, true)
 
 	// BranchB ON: home 2pt = s*raw2pt + hca, home foul = s*det_home (s < 1).
 	gsOn := &gameState{rng: rng.New(42)}
 	gsOn.freeze.BranchB = true
-	onH2, _, onHF := gsOn.playBuckets(bh, offense, defense, hcaHome, hcaScaled, true)
+	onH2, _, onHF := gsOn.playBuckets(bh, offense, defense, hcaHome, hcaScaled, 0, true)
 
 	// (a) BranchB shrinks the home 2pt weight (s < 1 with realistic rates).
 	if onH2 >= offH2 {

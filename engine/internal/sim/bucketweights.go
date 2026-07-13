@@ -271,7 +271,7 @@ func andOneBucketWeight(mq float64, p onCourt) float64 {
 //	defQ    = Σ_{5 defenders} STL/MIN×44 (capped)                  // defQuality (teamquality.go)
 //	offQ    = Σ_{offense} (TOV/MIN×48 − s·hca)                     // offQualityWithHCA, leg C, RAW hca
 //	factor  = 1 + (defQ − foulDivisorTeamDefCoef·defQualityCapTeamMult·leagueSTL48)/offQ  // :97163
-//	w       = base · factor
+//	w       = base · factor · (1 − mq/(4·leagueTOV48))             // :97163 coupling, :97164 shrink
 //	if w <= 0 { w = rng.Float64()·foulFloor }                      // :97170 floor redraw ONLY
 //	return w · foulBucketScale
 //
@@ -298,15 +298,18 @@ func andOneBucketWeight(mq float64, p onCourt) float64 {
 // side. offQ > 0 always (floor1 floors TVR at 1, small hca), so the divide is
 // guarded; a defensive guard on offQ ≤ 0 returns base only (no factor applied).
 //
-// DOCUMENTED DIVERGENCE (J18 item 6, found at ratification 2026-07-12): 5.60
-// additionally multiplies e80 ×= 1 − param_6/(4·leagueTOV48) (the J16-pinned
-// net-advantage shrink, after the coupling and before the ≤0 redraw check, on
-// BOTH param_5 paths) — unported here; the Go netAdvantage feeds shot_value
-// only. So this redraw fires only on factor ≤ 0, rarer than in 5.60 (where
-// param_6 > 13.41 occasionally triggers it). Porting it changes foul share
-// globally and re-opens the level/margin anchors — it gets its own A/B'd PR
-// (ADR-0084 Decision 2).
-func foulBucketWeight(bh onCourt, offense, defenders []onCourt, hca float64, r *rng.RNG) float64 {
+// The :97164 net-advantage shrink (J18 item 6, ported 2026-07-12) multiplies the
+// coupled weight by 1 − mq/(4·leagueTOV48) before the ≤0 redraw check, on both
+// param_5 (home/away) paths. Its 5.60 operand is param_6 = FUN_004e3860's return
+// (pinned at the :93276-93293 call site: fVar22 → dVar1 → the double arg slot),
+// which is matchupQuality — NOT the ODPT netAdvantage, whose O(10s) scale would
+// blow past the 4·leagueTOV48 = 13.4126 redraw threshold every possession. With
+// matchupQuality's Phase 3/4 aggregates still stubbed to 0 (matchup.go), mq =
+// −(FGP·0.2 − 9.9)·0.2 ∈ roughly [−0.5, +0.8], so the shrink is a ±few-% foul-
+// share modulation today and matures automatically when those aggregates land.
+// The redraw threshold (mq > 13.4126, J16 §4) stays unreachable at stub values —
+// exactly 5.60's behavior, where realistic rosters never reach it either.
+func foulBucketWeight(bh onCourt, offense, defenders []onCourt, hca, mq float64, r *rng.RNG) float64 {
 	// leg B (site-2 e80, decompile :97160): the foul BASE is reduced by the RAW s·hca
 	// BEFORE the coupling factor. Home (hca>0) → smaller base → home draws FEWER fouls
 	// (anti-home). RAW, not scaled: the base is on the faithful CEngine TOV48 basis.
@@ -316,13 +319,16 @@ func foulBucketWeight(bh onCourt, offense, defenders []onCourt, hca float64, r *
 	// (pro-home only for a strong-steal defense). leg B dominates leg C by ~an order of
 	// magnitude, so the net is anti-home (ratio ~0.91) regardless of leg C's sign.
 	offQ := offQualityWithHCA(offense, hca)
+	// :97164 net-advantage shrink (J18 item 6): straight-line in 5.60, so it applies
+	// on the defensive offQ ≤ 0 path too.
+	shrink := 1.0 - mq/(4.0*leagueTOV48)
 	if offQ <= 0 {
 		// divide-by-zero guard (unreachable: floor1 ⇒ offQ > 0); base only, no factor.
-		return base * foulBucketScale
+		return base * shrink * foulBucketScale
 	}
 	baseline := foulDivisorTeamDefCoef * defQualityCapTeamMult * leagueSTL48
 	factor := 1.0 + (defQuality(defenders)-baseline)/offQ
-	w := base * factor
+	w := base * factor * shrink
 	if w <= 0 {
 		// faithful floor redraw (:97170) — reachable symmetrically.
 		return r.Float64() * foulFloor * foulBucketScale

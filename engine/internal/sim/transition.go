@@ -125,7 +125,7 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 		// half-court path.
 		// allow3pt=false: a fast break is never a 3pt attempt (allowedPaths excludes it),
 		// so the 3pt composite is 0 here and Branch-B's ΣD is 2pt+foul on the break.
-		twoPtW, _, foulW := gs.playBuckets(bh, offense, defense, 0, 0, false) // param_5==0: transition fully symmetric, no HCA legs (J15 Phase 5)
+		twoPtW, _, foulW := gs.playBuckets(bh, offense, defense, 0, 0, mq, false) // param_5==0: transition fully symmetric, no HCA legs (J15 Phase 5)
 		in := outcomeInputs{
 			twoPtWeight:      twoPtW,
 			threePtWeight:    0,

@@ -57,6 +57,9 @@ func TestCollectHomeMargins_DerivesMargin(t *testing.T) {
 	if m.WinShareGap != 0 {
 		t.Errorf("WinShareGap = %v, want 0", m.WinShareGap)
 	}
+	if m.EngineMarginStdDev != 0 || m.ScoMarginStdDev != 0 {
+		t.Errorf("std devs = (%v, %v), want (0, 0) at N=1", m.EngineMarginStdDev, m.ScoMarginStdDev)
+	}
 }
 
 // Row #2 (sign/zero boundary): when the engine home margin agrees with the .sco
@@ -143,5 +146,33 @@ func TestCollectHomeMargins_AggregatesAcrossGames(t *testing.T) {
 	}
 	if math.Abs(m.EngineHomeWinShare-0.5) > 1e-9 {
 		t.Errorf("EngineHomeWinShare = %v, want 0.5 (one win of two)", m.EngineHomeWinShare)
+	}
+	if math.Abs(m.EngineMarginStdDev-6) > 1e-9 {
+		t.Errorf("EngineMarginStdDev = %v, want 6 (population sd of +10 and −2)", m.EngineMarginStdDev)
+	}
+	if math.Abs(m.ScoMarginStdDev-6) > 1e-9 {
+		t.Errorf("ScoMarginStdDev = %v, want 6 (population sd of +10 and −2)", m.ScoMarginStdDev)
+	}
+}
+
+// Row #7 (clamp guard / NaN boundary): two games with IDENTICAL margins →
+// population variance is exactly 0; the sumSq/n − mean² clamp must keep the std
+// dev at 0, never NaN from a float-negative variance.
+func TestCollectHomeMargins_StdDevZeroForIdenticalMargins(t *testing.T) {
+	got := CollectHomeMargins([]validate.Report{
+		marginReport(bundle.GameTypeRegular,
+			ptsGame(7, 3, 105, 105, 100, 100), // +5 on both sides
+			ptsGame(7, 3, 105, 105, 100, 100), // +5 on both sides
+		),
+	})
+	if len(got) != 1 {
+		t.Fatalf("len = %d, want 1", len(got))
+	}
+	m := got[0]
+	if math.IsNaN(m.EngineMarginStdDev) || m.EngineMarginStdDev != 0 {
+		t.Errorf("EngineMarginStdDev = %v, want exactly 0 (identical margins, no NaN)", m.EngineMarginStdDev)
+	}
+	if math.IsNaN(m.ScoMarginStdDev) || m.ScoMarginStdDev != 0 {
+		t.Errorf("ScoMarginStdDev = %v, want exactly 0 (identical margins, no NaN)", m.ScoMarginStdDev)
 	}
 }

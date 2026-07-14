@@ -1,6 +1,7 @@
 package calibrate
 
 import (
+	"math"
 	"sort"
 
 	"github.com/a-jay85/IBL5/engine/internal/bundle"
@@ -22,6 +23,8 @@ type HomeMarginCalibration struct {
 	EngineHomeMargin   float64 `json:"engine_home_margin"`    // mean(home pts EngineMean − visitor pts EngineMean)
 	ScoHomeMargin      float64 `json:"sco_home_margin"`       // mean(home pts ScoVal − visitor pts ScoVal)
 	MarginGap          float64 `json:"margin_gap"`            // EngineHomeMargin − ScoHomeMargin
+	EngineMarginStdDev float64 `json:"engine_margin_std_dev"` // population std dev of per-game engine (home−visitor) margins
+	ScoMarginStdDev    float64 `json:"sco_margin_std_dev"`    // population std dev of per-game .sco (home−visitor) margins
 	EngineHomeWinShare float64 `json:"engine_home_win_share"` // fraction of games with engine home margin > 0
 	ScoHomeWinShare    float64 `json:"sco_home_win_share"`    // fraction of games with .sco home margin > 0
 	WinShareGap        float64 `json:"win_share_gap"`         // EngineHomeWinShare − ScoHomeWinShare
@@ -30,11 +33,13 @@ type HomeMarginCalibration struct {
 // homeMarginAcc accumulates one game type's running sums while CollectHomeMargins
 // walks the reports.
 type homeMarginAcc struct {
-	n          int
-	sumEngine  float64
-	sumSco     float64
-	engineWins int
-	scoWins    int
+	n           int
+	sumEngine   float64
+	sumEngineSq float64
+	sumSco      float64
+	sumScoSq    float64
+	engineWins  int
+	scoWins     int
 }
 
 // CollectHomeMargins derives the per-game-type home-court margin from already-built
@@ -64,9 +69,13 @@ func CollectHomeMargins(reports []validate.Report) []HomeMarginCalibration {
 				acc = &homeMarginAcc{}
 				byType[rep.GameType] = acc
 			}
+			engMargin := homePts.EngineMean - visPts.EngineMean
+			scoMargin := homePts.ScoVal - visPts.ScoVal
 			acc.n++
-			acc.sumEngine += homePts.EngineMean - visPts.EngineMean
-			acc.sumSco += homePts.ScoVal - visPts.ScoVal
+			acc.sumEngine += engMargin
+			acc.sumEngineSq += engMargin * engMargin
+			acc.sumSco += scoMargin
+			acc.sumScoSq += scoMargin * scoMargin
 			if homePts.EngineMean > visPts.EngineMean {
 				acc.engineWins++
 			}
@@ -96,12 +105,32 @@ func CollectHomeMargins(reports []validate.Report) []HomeMarginCalibration {
 			EngineHomeMargin:   eng,
 			ScoHomeMargin:      sco,
 			MarginGap:          eng - sco,
+			EngineMarginStdDev: stdDev(acc.sumEngineSq, acc.sumEngine, acc.n),
+			ScoMarginStdDev:    stdDev(acc.sumScoSq, acc.sumSco, acc.n),
 			EngineHomeWinShare: engWin,
 			ScoHomeWinShare:    scoWin,
 			WinShareGap:        engWin - scoWin,
 		})
 	}
 	return out
+}
+
+// stdDev returns the POPULATION standard deviation (÷n, not ÷n−1) for a running
+// sum / sum-of-squares pair. Population — not sample — for two reasons: (1) it is
+// divide-by-zero-safe at n=1 (a game type can have a single contributing game;
+// sample ÷(n−1) would divide by zero), and (2) the audit wants the corpus's own
+// dispersion, not an inferential estimate of a larger population. Variance is
+// clamped to ≥0 before the sqrt: sumSq/n − mean² is exact algebra, but float
+// reassociation on a near-zero-variance bucket (all margins equal) can produce a
+// tiny negative that would make math.Sqrt return NaN.
+func stdDev(sumSq, sum float64, n int) float64 {
+	fn := float64(n)
+	mean := sum / fn
+	variance := sumSq/fn - mean*mean
+	if variance < 0 {
+		variance = 0
+	}
+	return math.Sqrt(variance)
 }
 
 // pointsFor returns the "points" StatRow for the given team in a game and whether

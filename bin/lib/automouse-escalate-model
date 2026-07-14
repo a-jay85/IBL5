@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/lib/automouse-escalate-model — decide the impl model for the CURRENT
+# automouse attempt, escalating a non-Opus plan to Opus on its FINAL retry.
+#
+# Pure decision (no filesystem, no env, no side effects): given the plan's
+# resolved BASE model (from bin/lib/plan-impl-model), the 1-based number of the
+# attempt now running (i.e. AFTER bin/automouse-run's pre-impl increment at
+# :647), and MAX_ATTEMPTS, echo exactly one model id for `claude -p --model`.
+#
+# Escalate (echo claude-opus-4-8) iff BOTH hold:
+#   * this is the final attempt         — current_attempt >= max_attempts
+#   * the base model is not already Opus — base != claude-opus-4-8
+# Otherwise echo the base model unchanged. Malformed numeric input never
+# escalates (fail-safe to the declared tier), so a garbled counter cannot
+# spuriously burn an Opus run or escalate an early attempt. See ADR-0085.
+#
+# Usage: bin/lib/automouse-escalate-model <base_model> <current_attempt> <max_attempts>
+
+set -u
+
+BASE="${1:?Usage: automouse-escalate-model <base_model> <current_attempt> <max_attempts>}"
+CUR="${2:?Usage: automouse-escalate-model <base_model> <current_attempt> <max_attempts>}"
+MAX="${3:?Usage: automouse-escalate-model <base_model> <current_attempt> <max_attempts>}"
+
+# Escalation target — MUST equal the default bin/lib/plan-impl-model emits.
+OPUS="claude-opus-4-8"
+
+# Non-numeric attempt or max → do NOT escalate (preserve the declared tier).
+case "$CUR" in *[!0-9]*|'') echo "$BASE"; exit 0 ;; esac
+case "$MAX" in *[!0-9]*|'') echo "$BASE"; exit 0 ;; esac
+
+if [ "$CUR" -ge "$MAX" ] && [ "$BASE" != "$OPUS" ]; then
+  echo "$OPUS"
+else
+  echo "$BASE"
+fi

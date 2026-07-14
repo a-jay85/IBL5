@@ -1,0 +1,262 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-automouse-escalation — regression test for bin/lib/automouse-escalate-model.
+#
+# The helper decides the impl model for the CURRENT automouse attempt: it
+# escalates a non-Opus plan to Opus on its FINAL retry, and is otherwise a
+# no-op. This pins (see ADR-0085):
+#   - any non-Opus base on the final attempt escalates to Opus (Sonnet AND Haiku)
+#   - a non-final (earlier) attempt leaves the declared tier unchanged
+#   - an already-Opus base is unchanged on the final attempt (no-op)
+#   - the boundary is attempt >= MAX_ATTEMPTS (MAX=1 => attempt 1 is final)
+#   - malformed numeric input fails safe to the base model (no spurious Opus)
+#
+# Run: bin/test-automouse-escalation  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+HELPER="$SCRIPT_DIR/lib/automouse-escalate-model"
+
+FAILED=0
+
+# assert <name> <expected-model> <base_model> <current_attempt> <max_attempts>
+assert() {
+    name="$1"; want="$2"; base="$3"; cur="$4"; max="$5"
+    got=$("$HELPER" "$base" "$cur" "$max")
+    if [ "$got" != "$want" ]; then
+        echo "FAIL: $name — expected '$want', got '$got'"
+        FAILED=1
+    else
+        echo "ok: $name ($got)"
+    fi
+}
+
+# --- escalation fires: non-Opus base on the FINAL attempt -> Opus ---
+assert "c1-sonnet-final-escalates" "claude-opus-4-8" "claude-sonnet-4-6" 3 3
+assert "c2-haiku-final-escalates"  "claude-opus-4-8" "claude-haiku-4-5"  3 3
+
+# --- no escalation: earlier attempts leave the declared tier untouched ---
+assert "c3-sonnet-attempt2-unchanged" "claude-sonnet-4-6" "claude-sonnet-4-6" 2 3
+assert "c4-sonnet-attempt1-unchanged" "claude-sonnet-4-6" "claude-sonnet-4-6" 1 3
+
+# --- no-op: an already-Opus base is unchanged even on the final attempt ---
+assert "c5-opus-final-noop" "claude-opus-4-8" "claude-opus-4-8" 3 3
+
+# --- boundary: escalate when attempt >= MAX (MAX=1 => attempt 1 is final) ---
+assert "c6-boundary-max1-escalates" "claude-opus-4-8" "claude-sonnet-4-6" 1 1
+
+# --- fail-safe: malformed numeric input never escalates (preserve base) ---
+assert "c7-nonnumeric-attempt-failsafe" "claude-sonnet-4-6" "claude-sonnet-4-6" x 3
+assert "c8-nonnumeric-max-failsafe"     "claude-sonnet-4-6" "claude-sonnet-4-6" 3 x
+
+# ---------------------------------------------------------------------------
+# write_failure_report (bin/automouse-run) — capped .failure sidecar writer.
+#
+# Extracted (not copied) from bin/automouse-run so this test can never drift
+# from the implementation — same technique as bin/test-automouse-env-breaker.
+# ---------------------------------------------------------------------------
+
+RUNNER="$SCRIPT_DIR/automouse-run"
+
+if [ ! -f "$RUNNER" ]; then
+    echo "FAIL: cannot find $RUNNER"
+    FAILED=1
+else
+    FN_SRC="$(awk '
+        /^write_failure_report\(\) \{/ { capture = 1 }
+        capture { print }
+        capture && /^\}/ { exit }
+    ' "$RUNNER")"
+
+    if [ -z "$FN_SRC" ]; then
+        echo "FAIL: could not extract write_failure_report from $RUNNER"
+        FAILED=1
+    else
+        eval "$FN_SRC"
+
+        # --- w1: happy path — sidecar contains the LOG's last line, fenced ---
+        LOG=$(mktemp)
+        QUEUE_DIR=$(mktemp -d)
+        # shellcheck disable=SC2034  # consumed inside the eval'd write_failure_report, invisible to shellcheck
+        MAX_ATTEMPTS=3
+        # shellcheck disable=SC2034  # consumed inside the eval'd write_failure_report, invisible to shellcheck
+        FAILURE_TAIL_LINES=200
+        FAILURE_TAIL_BYTES=20000
+
+        printf 'line1\nline2\nline3-last\n' > "$LOG"
+        write_failure_report "plan" 0 "claude-sonnet-4-6" 3
+        if grep -q 'line3-last' "$QUEUE_DIR/plan.failure" 2>/dev/null; then
+            echo "ok: w1-happy-path-contains-last-log-line"
+        else
+            echo "FAIL: w1-happy-path-contains-last-log-line — sidecar missing last log line"
+            FAILED=1
+        fi
+        rm -f "$LOG"
+        rm -rf "$QUEUE_DIR"
+
+        # --- w2: slice isolation (negative) — pre-slice content never leaks ---
+        LOG=$(mktemp)
+        QUEUE_DIR=$(mktemp -d)
+        printf 'PRE-SLICE-MARKER\nafter1\nafter2\n' > "$LOG"
+        write_failure_report "plan" 1 "claude-sonnet-4-6" 3
+        if grep -q 'PRE-SLICE-MARKER' "$QUEUE_DIR/plan.failure" 2>/dev/null; then
+            echo "FAIL: w2-slice-isolation — report leaked pre-slice content"
+            FAILED=1
+        else
+            echo "ok: w2-slice-isolation (marker excluded)"
+        fi
+        rm -f "$LOG"
+        rm -rf "$QUEUE_DIR"
+
+        # --- w3: byte cap (boundary) — fenced body never exceeds FAILURE_TAIL_BYTES ---
+        LOG=$(mktemp)
+        QUEUE_DIR=$(mktemp -d)
+        BODY_FILE=$(mktemp)
+        FAILURE_TAIL_BYTES=100   # local override: smaller cap, faster to exceed
+        for i in $(seq 1 300); do
+            printf 'padding-line-%03d-of-considerable-length-to-exceed-the-byte-cap\n' "$i"
+        done > "$LOG"
+        write_failure_report "plan" 0 "claude-sonnet-4-6" 3
+        awk '/^```$/ { c++; next } c == 1' "$QUEUE_DIR/plan.failure" > "$BODY_FILE"
+        # $(...)  strips the trailing newline the closing-fence printf always
+        # adds (template formatting, not part of the capped tail itself) before
+        # counting bytes.
+        BYTES=$(printf '%s' "$(cat "$BODY_FILE")" | wc -c | tr -d ' ')
+        if [ "$BYTES" -le "$FAILURE_TAIL_BYTES" ]; then
+            echo "ok: w3-byte-cap-boundary ($BYTES <= $FAILURE_TAIL_BYTES)"
+        else
+            echo "FAIL: w3-byte-cap-boundary — body is $BYTES bytes, cap is $FAILURE_TAIL_BYTES"
+            FAILED=1
+        fi
+        FAILURE_TAIL_BYTES=20000   # restore for any later case
+        rm -f "$LOG" "$BODY_FILE"
+        rm -rf "$QUEUE_DIR"
+
+        # --- w4: idempotent overwrite — sidecar holds ONLY the second call's content ---
+        LOG=$(mktemp)
+        QUEUE_DIR=$(mktemp -d)
+        printf 'first-content-marker\n' > "$LOG"
+        write_failure_report "plan" 0 "claude-sonnet-4-6" 3
+        printf 'second-content-marker\n' > "$LOG"
+        write_failure_report "plan" 0 "claude-sonnet-4-6" 3
+        if grep -q 'second-content-marker' "$QUEUE_DIR/plan.failure" 2>/dev/null \
+            && ! grep -q 'first-content-marker' "$QUEUE_DIR/plan.failure" 2>/dev/null; then
+            echo "ok: w4-idempotent-overwrite"
+        else
+            echo "FAIL: w4-idempotent-overwrite — sidecar not cleanly overwritten"
+            FAILED=1
+        fi
+        rm -f "$LOG"
+        rm -rf "$QUEUE_DIR"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# should_feed_failure_report (bin/automouse-run) — decides whether to feed the
+# prior-failure sidecar into an escalated retry's impl prompt (ADR-0085).
+#
+# Extracted (not copied) from bin/automouse-run so this test can never drift
+# from the implementation — same technique as bin/test-automouse-env-breaker.
+# ---------------------------------------------------------------------------
+
+if [ ! -f "$RUNNER" ]; then
+    echo "FAIL: cannot find $RUNNER"
+    FAILED=1
+else
+    SFFR_SRC="$(awk '
+        /^should_feed_failure_report\(\) \{/ { capture = 1 }
+        capture { print }
+        capture && /^\}/ { exit }
+    ' "$RUNNER")"
+
+    if [ -z "$SFFR_SRC" ]; then
+        echo "FAIL: could not extract should_feed_failure_report from $RUNNER"
+        FAILED=1
+    else
+        eval "$SFFR_SRC"
+
+        # assert_feed <name> <base_model> <impl_model> <sidecar_exists 0|1> <expect: feed|skip>
+        assert_feed() {
+            name="$1"; base="$2"; impl="$3"; sidecar_exists="$4"; want="$5"
+            SIDECAR=$(mktemp)
+            if [ "$sidecar_exists" -eq 0 ]; then
+                rm -f "$SIDECAR"
+            fi
+            if should_feed_failure_report "$base" "$impl" "$SIDECAR"; then
+                got="feed"
+            else
+                got="skip"
+            fi
+            rm -f "$SIDECAR"
+            if [ "$got" != "$want" ]; then
+                echo "FAIL: $name — expected '$want', got '$got'"
+                FAILED=1
+            else
+                echo "ok: $name ($got)"
+            fi
+        }
+
+        # p1 FEED: escalation fired AND sidecar present
+        assert_feed "p1-feed-escalation-with-sidecar" "claude-sonnet-4-6" "claude-opus-4-8" 1 feed
+        # p2 escalation-no-sidecar (negative): escalation fired but no sidecar
+        assert_feed "p2-escalation-no-sidecar" "claude-sonnet-4-6" "claude-opus-4-8" 0 skip
+        # p3 leaked-sidecar-no-escalation (negative): sidecar present but no escalation
+        assert_feed "p3-leaked-sidecar-no-escalation" "claude-sonnet-4-6" "claude-sonnet-4-6" 1 skip
+        # p4 neither (negative): no escalation, no sidecar
+        assert_feed "p4-neither" "claude-sonnet-4-6" "claude-sonnet-4-6" 0 skip
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Static parity guards — grep-based checks that every `.attempts`/ATTEMPT_FILE
+# eviction site also evicts its `.failure` sibling (Phase 7, ADR-0085), and
+# that the escalated-retry prompt wiring is in place (Phase 6).
+# ---------------------------------------------------------------------------
+
+QUEUE_SCRIPT="$SCRIPT_DIR/automouse-queue"
+
+# run-parity: every bare `rm -f "$ATTEMPT_FILE"` in automouse-run must also
+# remove "$FAILURE_FILE" on the same line.
+bad=$(grep -F 'rm -f "$ATTEMPT_FILE"' "$RUNNER" | grep -vF '"$FAILURE_FILE"' || true)
+if [ -z "$bad" ]; then
+    echo "ok: run-parity-attempt-failure-eviction"
+else
+    echo "FAIL: run-parity-attempt-failure-eviction — found ATTEMPT_FILE removal without FAILURE_FILE:"
+    echo "$bad"
+    FAILED=1
+fi
+
+# sweep-exists: the end-of-session orphan sweep for .failure sidecars is present.
+if grep -qF '"$QUEUE_DIR"/*.failure' "$RUNNER"; then
+    echo "ok: sweep-exists-failure-orphan-sweep"
+else
+    echo "FAIL: sweep-exists-failure-orphan-sweep — missing end-of-session .failure sweep"
+    FAILED=1
+fi
+
+# queue-parity: every `.attempts` removal in automouse-queue also removes `.failure`.
+qbad=$(grep -F 'rm -f' "$QUEUE_SCRIPT" | grep -F '.attempts' | grep -vF '.failure' || true)
+if [ -z "$qbad" ]; then
+    echo "ok: queue-parity-attempt-failure-eviction"
+else
+    echo "FAIL: queue-parity-attempt-failure-eviction — found .attempts removal without .failure:"
+    echo "$qbad"
+    FAILED=1
+fi
+
+# wiring: the impl claude invocation uses the assembled IMPL_PROMPT variable.
+if grep -q 'claude -p "\$IMPL_PROMPT"' "$RUNNER"; then
+    echo "ok: wiring-impl-prompt-variable"
+else
+    echo "FAIL: wiring-impl-prompt-variable — impl invocation does not pass \$IMPL_PROMPT"
+    FAILED=1
+fi
+
+if [ "$FAILED" -ne 0 ]; then
+    echo "RESULT: FAILED"
+    exit 1
+fi
+echo "RESULT: all passed"
+exit 0

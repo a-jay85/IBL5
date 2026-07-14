@@ -48,6 +48,18 @@ if [ -d "$WT_ROOT" ]; then
     exit 1
 fi
 
+# Sync local $BASE_BRANCH with origin before branching — avoids forking from a stale tip.
+echo "Fetching origin/$BASE_BRANCH..."
+if git -C "$REPO_ROOT" fetch origin "$BASE_BRANCH" --quiet 2>/dev/null; then
+    BEHIND=$(git -C "$REPO_ROOT" rev-list --count "$BASE_BRANCH..origin/$BASE_BRANCH" 2>/dev/null || echo 0)
+    if [ "$BEHIND" -gt 0 ]; then
+        echo "Fast-forwarding local $BASE_BRANCH ($BEHIND commit(s) behind origin)..."
+        git -C "$REPO_ROOT" merge --ff-only "origin/$BASE_BRANCH" --quiet
+    fi
+else
+    echo "Warning: could not reach origin; creating worktree from local $BASE_BRANCH." >&2
+fi
+
 # Create worktree + branch in one step
 echo "Creating worktree '$NAME' from $BASE_BRANCH..."
 git -C "$REPO_ROOT" worktree add "$WT_ROOT" -b "$NAME" "$BASE_BRANCH"

@@ -29,10 +29,10 @@ last_verified: 2026-07-14
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 1 |
+| ⬜ Open | 0 |
 | 📋 Planned | 0 |
 | ◑ Partial | 0 |
-| ✅ Implemented | 12 |
+| ✅ Implemented | 13 |
 | 🚫 Declined | 0 |
 
 Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive/token-spend-backlog-archive.md).
@@ -41,17 +41,9 @@ Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive
 
 ## Entries
 
-| # | Title | Status | Locus | Effort |
-|---|-------|--------|-------|-------:|
-| T4 | Driver-model downshift for babysitting loops | ⬜ Open | ⌂ | M |
+All entries are ✅ Implemented — see the dated pointers below and [token-spend-backlog-archive.md](archive/token-spend-backlog-archive.md).
 
-### T4 Driver-model downshift for babysitting loops
-**Location:** Interactive workflow — CI-watching, merge-nudging, and re-run loops currently run in the main (Opus/Fable) session.
-**Problem:** Babysitting phases need no frontier-model reasoning; every polling turn re-reads the full session context at the top tier.
-**Suggested direction:** A Sonnet wrapper session (or `/loop`-driven routine) for watch/nudge phases, reserving the top-tier session for design and review. Partially substituted by L6/L8 in [loop-engineering-backlog.md](loop-engineering-backlog.md), which remove the need to babysit at all.
-**Risk if untouched:** Top-tier token burn on mechanical polling.
-**Status (2026-07-07):** ⬜ Open. **(2026-07-14):** L6/L8 in [loop-engineering-backlog.md](loop-engineering-backlog.md) have both since shipped ✅ Implemented, so nightly babysitting is largely removed; residual scope narrows to interactive CI-watch/merge-nudge sessions.
-
+➜ T4 Driver-model downshift for babysitting loops — ✅ Implemented (2026-07-14): resolved by substitution (L6+L8+post-plan-Sonnet+`/loop`); residual measured empty. See [archive](archive/token-spend-backlog-archive.md).
 
 ➜ T13 Aggregate always-loaded rules budget — ✅ Implemented (2026-07-14): see [archive](archive/token-spend-backlog-archive.md).
 

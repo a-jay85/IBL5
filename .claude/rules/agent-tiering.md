@@ -21,13 +21,12 @@ Tier every sub-agent (and every agent a plan spawns) by the reasoning the task a
 
 ## `/plan` orchestrator model
 
-The rows above tier the **sub-agents** a plan spawns. The model you run **`/plan` itself** as (the orchestrator session) is a separate call — and it does **not** set the plan's design tier. `/plan` is delegation-terminal: the plan is authored by the `plan-architect` sub-agent in its own window, tiered independently by the Step-3 precedence in the "Opus (delegated)" row (xhigh → sonnet → opus). A Sonnet orchestrator spawning an Opus `plan-architect` still gets an Opus-authored plan.
+The rows above tier sub-agents; the `/plan` session model is a separate call. The `plan-architect` is tiered by Step-3 precedence (xhigh → sonnet → opus) regardless of the orchestrator — a Sonnet `/plan` spawning `plan-architect` still gets an Opus-authored plan.
 
-So tier the orchestrator by the judgment **it** retains, not the architect's:
+Tier the orchestrator by the judgment **it** retains:
 
-- **Single backlog item** (known blast radius, a recipe, a named pattern) → **Sonnet**. The orchestrator's own calls — one-PR-vs-split (Step 2.5), architect-tier selection (Step 3), the Step 4 gates — are light for a well-scoped item; this is the same recipe-backed class the "Opus (delegated)" row routes to `plan-architect-sonnet`.
-- **Multiple items in one pass** → **Opus**. Cross-item PR decomposition, **dependency ordering** (the FK-ordering class the Opus (self) row reserves), shared-context seeding, and tier-boundary splits push novel reasoning onto the orchestrator itself.
-  - Cheaper alternative: run each item as its own single-item **Sonnet** `/plan`, and make only the cross-item ordering/stacking call yourself — keeping the per-token-expensive model off the mechanical per-item passes.
+- **Single backlog item** → **Sonnet** (Steps 2.5/3/4 orchestrator calls are light; same recipe-backed class the "Opus (delegated)" row routes to `plan-architect-sonnet`).
+- **Multiple items in one pass** → **Opus** (cross-item PR decomposition, **dependency ordering**, tier-boundary splits). Cheaper: run each as its own **Sonnet** `/plan` and make only the ordering call yourself.
 
 ## Explore Agents
 

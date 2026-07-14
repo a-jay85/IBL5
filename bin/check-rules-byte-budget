@@ -4,15 +4,20 @@
 # context, so their size is a permanent token cost. Path-scoped rules (those
 # with a `paths:` frontmatter key) load only for matching files and are exempt.
 #
-# Backlog: ibl5/docs/backlog/token-spend-backlog.md T2.
+# Two checks (T2 + T13 — ibl5/docs/backlog/token-spend-backlog.md):
+#   1. Per-file cap: each path-unscoped file <= RULES_BYTE_BUDGET (default 5000)
+#   2. Aggregate cap: total path-unscoped bytes <= RULES_TOTAL_BUDGET (default 30000)
+#
 # Extend-before-add (meta-tooling-bar.md): distinct trigger (size budget) vs
-# bin/check-docs (freshness / dead-refs). ~40 lines bash => no ADR (<50 lines).
+# bin/check-docs (freshness / dead-refs). ~50 lines bash => no ADR (<50 lines).
 set -euo pipefail
 
 MAX_BYTES="${RULES_BYTE_BUDGET:-5000}"
+MAX_TOTAL="${RULES_TOTAL_BUDGET:-30000}"
 RULES_DIR="$(git rev-parse --show-toplevel)/.claude/rules"
 
 fail=0
+total_bytes=0
 for f in "$RULES_DIR"/*.md; do
   # Frontmatter = lines between the first two `---` markers.
   fm="$(awk '/^---$/{c++; next} c==1{print} c>=2{exit}' "$f")"
@@ -21,21 +26,31 @@ for f in "$RULES_DIR"/*.md; do
     continue
   fi
   bytes="$(wc -c < "$f")"
+  total_bytes=$(( total_bytes + bytes ))
   if (( bytes > MAX_BYTES )); then
-    printf 'FAIL  %s  %d bytes  (budget %d)\n' "$f" "$bytes" "$MAX_BYTES" >&2
+    printf 'FAIL  %s  %d bytes  (per-file budget %d)\n' "$f" "$bytes" "$MAX_BYTES" >&2
     fail=1
   fi
 done
 
+if (( total_bytes > MAX_TOTAL )); then
+  printf 'FAIL  aggregate path-unscoped rules: %d bytes  (total budget %d)\n' \
+    "$total_bytes" "$MAX_TOTAL" >&2
+  fail=1
+fi
+
 if (( fail )); then
   cat >&2 <<MSG
 
-One or more path-unscoped .claude/rules/*.md files exceed the ${MAX_BYTES}-byte
-budget. These load into EVERY session's context. Trim them, or move detail into
-a path-scoped *-detail.md companion (see agent-tiering-detail.md).
-Override the budget only deliberately: RULES_BYTE_BUDGET=<n> bin/check-rules-byte-budget
+One or more path-unscoped .claude/rules/*.md files exceed the per-file
+${MAX_BYTES}-byte budget, or the aggregate total (${total_bytes} bytes) exceeds
+the ${MAX_TOTAL}-byte aggregate budget. These files load into EVERY session's
+context. Trim them, move detail into a path-scoped *-detail.md companion (see
+agent-tiering-detail.md), or archive superseded rules.
+Override budgets only deliberately:
+  RULES_BYTE_BUDGET=<n> RULES_TOTAL_BUDGET=<n> bin/check-rules-byte-budget
 MSG
   exit 1
 fi
 
-echo "OK: all path-unscoped .claude/rules/*.md within ${MAX_BYTES}-byte budget"
+echo "OK: all path-unscoped .claude/rules/*.md within per-file ${MAX_BYTES}-byte and aggregate ${MAX_TOTAL}-byte budgets (${total_bytes} bytes total)"

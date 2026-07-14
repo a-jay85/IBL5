@@ -59,6 +59,11 @@ Read-only historical record of ✅ Implemented entries. For OPEN items see ../to
 **Problem (was):** Every plan paid an Opus-xhigh architect run even when the design was already resolved upstream — a backlog entry naming the recipe, the files, and the pattern to copy (the marker-swap / mechanical-sweep class). Composing a plan from a pre-resolved recipe is mechanical composition, not novel design.
 **Status (2026-07-11):** ✅ Implemented — added `.claude/agents/plan-architect-sonnet.md` and a recipe-backed Sonnet branch in `/plan` Step 3's ordered tier selection (xhigh > recipe-backed Sonnet > Opus default), with the `agent-tiering.md` Opus (delegated) row updated to match; rollout monitored via the T1 tier ledger.
 
+### T13 Aggregate always-loaded rules budget
+**Location:** `bin/check-rules-byte-budget` + `.claude/rules/*.md` (path-unscoped subset).
+**Problem (was):** T2's shipped gate capped each path-unscoped rules file at 5000 bytes but capped neither the file COUNT nor the TOTAL — the always-loaded surface could regrow one new 4.9KB file at a time without the CI gate firing.
+**Status (2026-07-14):** ✅ Implemented (discovered 2026-07-14 during token-spend-triage) — extended `bin/check-rules-byte-budget` with a `RULES_TOTAL_BUDGET` (default 30,000 bytes) aggregate cap for path-unscoped rules. At implementation the 9 path-unscoped files totalled 24,523 bytes; the cap gives ~22% headroom and fires before a second unchecked file can land. Wire stays in the existing `static-guards` CI job — no new gate or script added (extend-before-add).
+
 ### T9 Lazy-load plan/post-plan skills
 **Location:** `.claude/skills/plan/SKILL.md` (~55KB ≈ 13K tokens) and `.claude/skills/post-plan/SKILL.md` (~68KB ≈ 17K tokens) — each a single file loaded whole at invocation and resident for the entire run.
 **Problem (was):** A long post-plan run re-reads ~17K tokens every turn, plus a fresh cache write per nightly session.

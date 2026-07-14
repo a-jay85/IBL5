@@ -1,6 +1,6 @@
 ---
 description: CI/GitHub-Actions workflow simplification backlog — duplicated setup/notify boilerplate, job consolidation, and verified-not-redundant workflows, with per-entry status + automouse-readiness.
-last_verified: 2026-07-11
+last_verified: 2026-07-14
 ---
 
 # CI Workflow Simplification Backlog
@@ -29,7 +29,7 @@ last_verified: 2026-07-11
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 1 |
+| ⬜ Open | 2 |
 | 📋 Planned | 0 |
 | ✅ Implemented | 8 |
 | 🚫 Declined | 0 |
@@ -111,6 +111,22 @@ These look like duplicate workflows but each occupies a distinct, justified role
 | `pr-collisions.yml` vs `pr-collisions-cron.yml` | Event-driven single-PR check (posts a sticky comment) vs daily `--sweep` of all open PRs (catches collisions that arise when another PR merges). Complementary triggers. |
 | `lighthouse.yml` / `lighthouse-baseline.yml` / `lighthouse-audit.yml` | PR-delta + sticky comment / push-to-master baseline-artifact producer / weekly full-site GitHub issue. Distinct consumers and outputs. (Minor collect-dedup tracked as 3.3.) |
 | The small gate workflows (`adr-required`, `refactor-flag`, `hot-files`, `orphan-css`, `e2e-hygiene`, `pr-collisions`, `human-signoff`, etc.) | Each is a separate **required-check name** with its own path filter and independent failure isolation. Folding into `tests.yml` would trade away granular required-checks + path-scoped triggering for nothing. Keep split. |
+
+---
+
+## Axis 5: Deploy-server build offload
+
+| # | Title | Status | Automouse | Effort |
+|---|-------|--------|-----------|-------:|
+| 5.1 | Build IBLbot's TypeScript on the CI runner; ship only `dist/` | ⬜ Open | 🟦 | M |
+
+### 5.1 IBLbot's TS is compiled on the memory-tight deploy droplet
+*(discovered 2026-07-14 during #1453)*
+**Location:** `.github/workflows/main.yml` "Deploy and restart IBLbot" step (`cd www/ibl5/IBLbot && npm install --include=dev && npm run build` over SSH); `ibl5/IBLbot/package.json` (`build: tsc`).
+**Problem:** The deploy runs `npm install` + `tsc` **on the production droplet**, which is memory-constrained. This has already broken deploys twice as the toolchain got heavier: tsx/esbuild was SIGKILLed (worked around by running `node dist/` instead of `tsx src/`), and TypeScript 7's native **Go** compiler fatally failed with `newosproc` (can't spawn OS threads) — forcing a pin back to the JS-based `typescript@5.x` (PR #1453, 2026-07-13) plus a Dependabot major-version block on `typescript`. Each fix is a workaround for the root cause: **a compiler runs on a server that can't afford one.**
+**Suggested direction:** Compile IBLbot on the CI runner (where it already builds during tests), upload `dist/` as an artifact, and have the deploy step `rsync`/scp the prebuilt `dist/` to the droplet + `npm ci --omit=dev` (runtime deps only) + pm2 restart — no compiler on the server. This also unblocks the `typescript@7` Dependabot pin (the Go compiler is fine on a CI runner). Mirrors how compiled CSS is already built in CI and deployed as an artifact (`main.yml` "Build CSS" → "Deploy compiled CSS to server").
+**Risk if untouched:** Every future bump to a heavier build tool (TS, esbuild, a bundler) risks re-breaking the deploy on server memory limits; each is caught only at deploy time, blocking the whole production pipeline until hand-patched.
+**Status (2026-07-14):** ⬜ Open — surfaced by the PR #1453 deploy-failure investigation; needs a `/plan` (touches the deploy/notify path → expect `auto_merge: false`, 🟦).
 
 ---
 

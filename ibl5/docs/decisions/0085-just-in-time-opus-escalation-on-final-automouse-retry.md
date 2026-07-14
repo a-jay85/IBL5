@@ -4,7 +4,7 @@ last_verified: 2026-07-11
 owner: A-Jay
 ---
 
-# ADR-0084: Just-in-time Opus escalation on the final automouse retry
+# ADR-0085: Just-in-time Opus escalation on the final automouse retry
 
 **Status:** Accepted
 **Date:** 2026-07-11

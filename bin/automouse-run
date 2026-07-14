@@ -194,7 +194,7 @@ QUEUE_DIR="$NIGHTLY_DIR/queue"
 PLANS_DIR="${PLANS_DIR:-$HOME/.claude/plans}"
 MAX_ELAPSED=17100  # ~4h45m — stops around 4:45am, leaves headroom in the 5h usage window
 MAX_ATTEMPTS=3     # per-plan retry cap within one night (covers impl + postplan phases)
-# Failure-report caps (ADR-0084): the `.failure` sidecar fed to an escalated
+# Failure-report caps (ADR-0085): the `.failure` sidecar fed to an escalated
 # retry is at most this many lines AND this many bytes (whichever is smaller),
 # so a multi-hour transcript can never blow the retry's context window.
 FAILURE_TAIL_LINES=200
@@ -472,7 +472,7 @@ write_env_stop_report() {
     } > "$reports_dir/$(date +%Y-%m-%d)-env-stop-$slug.md"
 }
 
-# Persist a per-attempt failure report for the escalated final retry (ADR-0084).
+# Persist a per-attempt failure report for the escalated final retry (ADR-0085).
 # Writes a CAPPED tail of THIS attempt's log slice to a `.failure` sidecar in
 # QUEUE_DIR, a sibling of the `.attempts` counter, so it shares that counter's
 # lifecycle and is fed to the next attempt by bin/automouse-prompt-impl. Capped
@@ -499,7 +499,7 @@ write_failure_report() {
 
 # Decide whether to feed the prior-failure report to this attempt's impl prompt.
 # YES iff escalation fired (impl model != base model) AND the sidecar is present.
-# DECOUPLED from the escalation trigger (ADR-0084): the report is fed only when
+# DECOUPLED from the escalation trigger (ADR-0085): the report is fed only when
 # both hold, so (a) a leaked/stale sidecar on a NON-escalated attempt is never
 # fed, and (b) an escalation with no sidecar degrades gracefully to an
 # un-augmented Opus retry.
@@ -660,7 +660,7 @@ while true; do
 
     # Per-plan retry counter — skip poison pills
     ATTEMPT_FILE="$QUEUE_DIR/${PLAN_NAME}.attempts"
-    FAILURE_FILE="$QUEUE_DIR/${PLAN_NAME}.failure"   # capped tail of the last genuine impl failure (ADR-0084); lifecycle-tied to ATTEMPT_FILE
+    FAILURE_FILE="$QUEUE_DIR/${PLAN_NAME}.failure"   # capped tail of the last genuine impl failure (ADR-0085); lifecycle-tied to ATTEMPT_FILE
     ATTEMPTS=0
     if [ -f "$ATTEMPT_FILE" ]; then
         ATTEMPTS=$(cat "$ATTEMPT_FILE")
@@ -723,7 +723,7 @@ while true; do
         # writes ~/.claude/settings.json effortLevel). Do not remove as
         # "redundant with the default" — the pin is the point.
         BASE_MODEL=$(bin/lib/plan-impl-model "$NEXT_PLAN")
-        # Escalate a non-Opus plan to Opus on its FINAL attempt only (ADR-0084).
+        # Escalate a non-Opus plan to Opus on its FINAL attempt only (ADR-0085).
         # $ATTEMPTS is the PRE-increment read (:621-624); the attempt now running
         # is $(( ATTEMPTS + 1 )), which the helper compares against MAX_ATTEMPTS.
         IMPL_MODEL=$(bin/lib/automouse-escalate-model "$BASE_MODEL" "$(( ATTEMPTS + 1 ))" "$MAX_ATTEMPTS")
@@ -734,7 +734,7 @@ while true; do
         # Assemble the impl prompt. On the escalated final retry ONLY, append a
         # second trailing context line (PRIOR_FAILURE_REPORT=<path>) in the same
         # style as PLAN_FILE — report-if-present, decoupled from the escalation
-        # trigger (ADR-0084).
+        # trigger (ADR-0085).
         IMPL_PROMPT="$(cat bin/automouse-prompt-impl)
 
 PLAN_FILE=$PLAN_NAME"
@@ -815,7 +815,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             # queue/, and the env-stop guard did NOT fire (it breaks above). The
             # incremented attempt stays in place (→ eventual poison-pill, unchanged).
             # Persist the capped failure report so the NEXT attempt — escalated to
-            # Opus on the final retry (ADR-0084) — has this attempt's context.
+            # Opus on the final retry (ADR-0085) — has this attempt's context.
             write_failure_report "$PLAN_NAME" "$IMPL_LOG_BEFORE" "$IMPL_MODEL" "$(( ATTEMPTS + 1 ))"
             echo "Genuine impl failure — wrote $FAILURE_FILE (attempt $(( ATTEMPTS + 1 ))/$MAX_ATTEMPTS)." >> "$LOG"
         fi
@@ -925,7 +925,7 @@ for af in "$QUEUE_DIR"/*.attempts; do
 done
 
 # Clean up any leftover failure reports for plans that completed (mirrors the
-# .attempts sweep above — .failure shares the .attempts lifecycle, ADR-0084)
+# .attempts sweep above — .failure shares the .attempts lifecycle, ADR-0085)
 for ff in "$QUEUE_DIR"/*.failure; do
     [ -e "$ff" ] || continue
     PLAN_FOR_FAILURE="${ff%.failure}"

@@ -14,7 +14,7 @@
 #   * the base model is not already Opus — base != claude-opus-4-8
 # Otherwise echo the base model unchanged. Malformed numeric input never
 # escalates (fail-safe to the declared tier), so a garbled counter cannot
-# spuriously burn an Opus run or escalate an early attempt. See ADR-0084.
+# spuriously burn an Opus run or escalate an early attempt. See ADR-0085.
 #
 # Usage: bin/lib/automouse-escalate-model <base_model> <current_attempt> <max_attempts>
 

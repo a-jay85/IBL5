@@ -5,7 +5,7 @@
 #
 # The helper decides the impl model for the CURRENT automouse attempt: it
 # escalates a non-Opus plan to Opus on its FINAL retry, and is otherwise a
-# no-op. This pins (see ADR-0084):
+# no-op. This pins (see ADR-0085):
 #   - any non-Opus base on the final attempt escalates to Opus (Sonnet AND Haiku)
 #   - a non-final (earlier) attempt leaves the declared tier unchanged
 #   - an already-Opus base is unchanged on the final attempt (no-op)
@@ -155,7 +155,7 @@ fi
 
 # ---------------------------------------------------------------------------
 # should_feed_failure_report (bin/automouse-run) — decides whether to feed the
-# prior-failure sidecar into an escalated retry's impl prompt (ADR-0084).
+# prior-failure sidecar into an escalated retry's impl prompt (ADR-0085).
 #
 # Extracted (not copied) from bin/automouse-run so this test can never drift
 # from the implementation — same technique as bin/test-automouse-env-breaker.
@@ -211,7 +211,7 @@ fi
 
 # ---------------------------------------------------------------------------
 # Static parity guards — grep-based checks that every `.attempts`/ATTEMPT_FILE
-# eviction site also evicts its `.failure` sibling (Phase 7, ADR-0084), and
+# eviction site also evicts its `.failure` sibling (Phase 7, ADR-0085), and
 # that the escalated-retry prompt wiring is in place (Phase 6).
 # ---------------------------------------------------------------------------
 

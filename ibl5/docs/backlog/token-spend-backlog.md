@@ -29,10 +29,10 @@ last_verified: 2026-07-14
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 3 |
+| ⬜ Open | 2 |
 | 📋 Planned | 0 |
-| ◑ Partial | 2 |
-| ✅ Implemented | 8 |
+| ◑ Partial | 1 |
+| ✅ Implemented | 10 |
 | 🚫 Declined | 0 |
 
 Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive/token-spend-backlog-archive.md).
@@ -43,18 +43,9 @@ Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive
 
 | # | Title | Status | Locus | Effort |
 |---|-------|--------|-------|-------:|
-| T2 | Always-loaded context budget gate | ◑ Partial | repo | S |
 | T4 | Driver-model downshift for babysitting loops | ⬜ Open | ⌂ | M |
-| T5 | Memory/rules dedup lint | ⬜ Open | ⌂ | S |
 | T7 | Resident-overlay diet (MEMORY.md + rules) | ◑ Partial | both | M |
 | T13 | Aggregate always-loaded rules budget | ⬜ Open | repo | S |
-
-### T2 Always-loaded context budget gate
-**Location:** `.claude/rules/*.md` (path-unscoped subset ≈ 19KB) + the memory index (`MEMORY.md`, ≈ 16KB) — together ~9K tokens on every request and every subagent spawn.
-**Problem:** The always-loaded surface only ever grows; nothing pushes back. No CI check caps it (verified: no size/budget check in `.github/workflows/` or `bin/check-docs`).
-**Suggested direction:** A small CI job (wired into the `gate` job's `needs:`, per house convention) failing when path-unscoped rules bytes or the MEMORY.md index exceed a budget. MEMORY.md lives outside the repo, so the gate checks rules in CI and the hook surface checks the index locally (pairs with T5).
-**Risk if untouched:** Silent regrowth of the per-turn fixed tax that T7 pays down.
-**Status (2026-07-11):** ◑ Partial — CI rules byte-budget gate shipped: `bin/check-rules-byte-budget` caps path-unscoped `.claude/rules/*.md` files at 5000 bytes, folded into the `static-guards` job (already in the `gate` `needs:`, so a regrowth fails the required gate). Residual: the local MEMORY.md index-budget hook (out-of-repo, pairs with T5) still deferred.
 
 ### T4 Driver-model downshift for babysitting loops
 **Location:** Interactive workflow — CI-watching, merge-nudging, and re-run loops currently run in the main (Opus/Fable) session.
@@ -62,13 +53,6 @@ Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive
 **Suggested direction:** A Sonnet wrapper session (or `/loop`-driven routine) for watch/nudge phases, reserving the top-tier session for design and review. Partially substituted by L6/L8 in [loop-engineering-backlog.md](loop-engineering-backlog.md), which remove the need to babysit at all.
 **Risk if untouched:** Top-tier token burn on mechanical polling.
 **Status (2026-07-07):** ⬜ Open. **(2026-07-14):** L6/L8 in [loop-engineering-backlog.md](loop-engineering-backlog.md) have both since shipped ✅ Implemented, so nightly babysitting is largely removed; residual scope narrows to interactive CI-watch/merge-nudge sessions.
-
-### T5 Memory/rules dedup lint
-**Location:** `$HOME/.claude/hooks/memory-expiry.py` (SessionStart hook; currently expiry-only).
-**Problem:** The "MEMORY.md never duplicates `.claude/rules/`" norm is manual discipline; overlap can silently re-grow in the always-loaded index.
-**Suggested direction:** Add a similarity check (index hooks vs rule headings/bodies) to the existing hook, surfacing suspected duplicates the way expiry lines are surfaced.
-**Risk if untouched:** Redundant always-loaded lines dilute recall and re-inflate the T7 surface.
-**Status (2026-07-07):** ⬜ Open.
 
 ### T7 Resident-overlay diet (MEMORY.md + rules)
 **Location:** Memory index `MEMORY.md` (18.1KB measured 2026-07-14, up from ~16KB/181 files on 2026-07-07, ~90 lines, 191 topic files behind it); `.claude/rules/agent-tiering.md` (~6.6KB, with an existing overflow file `.claude/rules/agent-tiering-detail.md`).
@@ -85,6 +69,10 @@ Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive
 **Status (2026-07-14):** ⬜ Open (discovered 2026-07-14 during token-spend-triage).
 
 ➜ T1 Automouse token ledger — ✅ Implemented (2026-07-09): see [archive](archive/token-spend-backlog-archive.md).
+
+➜ T2 Always-loaded context budget gate — ✅ Implemented (2026-07-14): see [archive](archive/token-spend-backlog-archive.md).
+
+➜ T5 Memory/rules dedup lint — ✅ Implemented (2026-07-14): see [archive](archive/token-spend-backlog-archive.md).
 
 ➜ T9 Lazy-load plan/post-plan skills — ✅ Implemented (2026-07-14): see [archive](archive/token-spend-backlog-archive.md).
 

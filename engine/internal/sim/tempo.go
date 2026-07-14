@@ -134,7 +134,7 @@ func teamBaseTimeWith(starters []onCourt, scale float64) float64 {
 // generation miscalibration (engine center 14.5s vs real effective ~13.8s = 1440/
 // 104.6 — base_time ~0.7s too slow). The faithful fix is round-half-up COUPLED with a base_time
 // re-centering (offVolumeNeutral), landing both the step rule and the mean pace
-// correctly — that coupled change is J22. Until then truncation stays: it is the
+// correctly — that coupled change is J23. Until then truncation stays: it is the
 // mean-closer of the two imperfect states. See ADR-0085 for the RE evidence, the
 // four-term A/B, and the mean-regression finding.
 func possessionTime(baseTime float64) int {

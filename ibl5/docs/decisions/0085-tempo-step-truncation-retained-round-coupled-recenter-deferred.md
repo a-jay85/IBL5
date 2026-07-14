@@ -78,9 +78,11 @@ No change to `possessionTime`'s output, the Pin A characterization, the `tempo_c
 - **`auto_merge: false` (honored).** The disposition (accept-vs-hold) was an irreducible human adjudication over an A/B on data unreachable from CI — exactly the reason the plan set `auto_merge: false`. The human chose HOLD; the PR opens for review rather than auto-merging.
 - **Two known-imperfect states remain, both documented.** `int()` truncation is not faithful to 5.60's round-half-up, AND base_time generation is ~0.7s too slow. They partially cancel on the mean today. J22 fixes both together.
 
-## Open follow-on — J22 (the coupled faithful fix)
+## Open follow-on — J23 (the coupled faithful fix)
 
-Ship round-half-up in `possessionTime` **paired with** a base_time re-centering (`offVolumeNeutral`, and/or the `offVolumeScale`/`defRatingScale` calibration) so the faithful step rule lands the mean at ~104.6, then re-run the four-term archive A/B and re-establish the Phase-1 characterization pins. The J22 plan must A/B the recenter on its own (it interacts with `Var(lnPOSS)` via the 13s clamp floor) and re-derive the mean/variance targets against the paired `.sco` comparators on the same sampled games (the J15/ADR-0084 paired-comparator principle).
+Ship round-half-up in `possessionTime` **paired with** a base_time re-centering (`offVolumeNeutral`, and/or the `offVolumeScale`/`defRatingScale` calibration) so the faithful step rule lands the mean at ~104.6, then re-run the four-term archive A/B and re-establish the Phase-1 characterization pins. The J23 plan must A/B the recenter on its own (it interacts with `Var(lnPOSS)` via the 13s clamp floor) and re-derive the mean/variance targets against the paired `.sco` comparators on the same sampled games (the J15/ADR-0084 paired-comparator principle).
+
+(Note: J22 was already assigned to per-player rl_stl/rl_tov production-bundle wiring — STL/TOV PF-dispersion; see the JSB backlog. This follow-on is J23.)
 
 ## Lineage
 

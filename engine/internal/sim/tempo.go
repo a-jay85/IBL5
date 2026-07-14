@@ -118,8 +118,25 @@ func teamBaseTimeWith(starters []onCourt, scale float64) float64 {
 	return bt
 }
 
-// possessionTime is the seconds one possession removes from the game clock:
-// (2.0 − factor) × base_time. At factor 1.0 it equals base_time.
+// possessionTime is the integer seconds one possession removes from the game
+// clock: (2.0 − factor) × base_time, truncated. At factor 1.0 it equals base_time.
+//
+// TRUNCATION RETAINED — round-half-up deferred to J22 (ADR-0085). 5.60 rounds this
+// step HALF-UP, it does NOT truncate: FUN_004e42e0 (the possession-clock update,
+// jsb560_decompiled.c:98406-98418) truncates possession_time via __ftol then adds
+// 1 when the fractional part ≥ 0.5 (`_DAT_00669ef0` = 0.5, confirmed from the raw
+// .rdata bytes 0x3fe0000000000000). So Go's int() truncation here IS a confirmed
+// infidelity. But the J21 archive A/B (ADR-0085) showed the faithful round-half-up,
+// shipped ALONE, does NOT flip the wrong-signed Cov(lnPOSS,lnPPS) (Δ within
+// sampling noise) and REGRESSES mean pace: it lengthens the central baseTimeMid =
+// 14.5 step to 15, dropping mean possessions from ~101.9 (trunc) to ~97.6 vs real
+// ~104.6. Truncation's downward bias was accidentally MASKING a base_time-
+// generation miscalibration (engine center 14.5s vs real effective ~13.8s = 1440/
+// 104.6 — base_time ~0.7s too slow). The faithful fix is round-half-up COUPLED with a base_time
+// re-centering (offVolumeNeutral), landing both the step rule and the mean pace
+// correctly — that coupled change is J22. Until then truncation stays: it is the
+// mean-closer of the two imperfect states. See ADR-0085 for the RE evidence, the
+// four-term A/B, and the mean-regression finding.
 func possessionTime(baseTime float64) int {
 	pt := (2.0 - tempoFactor) * baseTime
 	if pt < 1.0 || pt > 24.0 {

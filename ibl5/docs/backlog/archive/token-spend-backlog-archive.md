@@ -14,10 +14,20 @@ Read-only historical record of ✅ Implemented entries. For OPEN items see ../to
 **Problem (was):** The nightly queue was pure spend mechanism with only partial measurement: per-phase cost rows existed, but there was no tier breakdown, no weekly aggregate, and no equivalent report for interactive sessions (the origin 7-day analysis was done by hand).
 **Status (2026-07-09):** ✅ Implemented — `bin/lib/automouse-stream-filter` now emits `cache_write` on the exit line; `bin/automouse-run` cost rows carry Model + Tier columns and a per-phase-rebuilt `## Weekly aggregate (last 7 days)` section (cost-by-tier + tokens-by-phase); new `bin/token-report` runs the interactive-session token analysis on demand.
 
+### T2 Always-loaded context budget gate
+**Location:** `bin/check-rules-byte-budget` (CI per-file rules cap) + `$HOME/.claude/hooks/memory-expiry.py` (SessionStart MEMORY.md byte-budget check).
+**Problem (was):** The always-loaded surface (path-unscoped `.claude/rules/*.md` + the `MEMORY.md` index) only ever grew; nothing pushed back, and no CI or hook check capped it.
+**Status (2026-07-14):** ✅ Implemented — CI rules byte-budget gate shipped first (`bin/check-rules-byte-budget`, 5000-byte per-file cap, folded into the `static-guards` job). Residual local MEMORY.md index-budget check now closed: `memory-expiry.py` warns when the index exceeds an 8192-byte budget (ratcheted to hold the T7 diet; index was dieted to ~6.1KB the same day). Pairs with T5 (same hook).
+
 ### T3 Wire PHP LSP + LSP-first rule
 **Location:** `.claude/rules/lsp-first.md`; intelephense via the php-lsp plugin.
 **Problem (was):** Symbol navigation ran as grep-and-read-whole-file chains — the largest read-token sink in a 275K-line PHP codebase.
 **Status (2026-07-07):** ✅ Implemented — intelephense wired and the LSP-first rule shipped (measured ~10–30× cheaper than the grep-and-read path on `CsrfGuard::validateSubmittedToken`: ~320 tokens vs ~3–10K). Sub-item **SessionStart index warm-up: 🚫 Declined** — a `--stdio` server can't be reached by a shell hook (verified 2026-07-07); the tool blocks until indexed and the rule carries retry-once guidance instead.
+
+### T5 Memory/rules dedup lint
+**Location:** `$HOME/.claude/hooks/memory-expiry.py` (SessionStart hook).
+**Problem (was):** The "MEMORY.md never duplicates `.claude/rules/`" norm was manual discipline; overlap could silently re-grow in the always-loaded index.
+**Status (2026-07-14):** ✅ Implemented — added a dedup check to the SessionStart hook: each index line is scored against every rule's signature (description + headings) and near-exact overlaps surface for retirement. Thresholds (overlap-coef ≥0.6 ∧ shared ≥5 ∧ Jaccard ≥0.35) were calibrated on the real corpus — silent on the current clean index (top coincidental overlap oc 0.50), fires on a genuine duplicate (oc 1.0). Pairs with T2 (same hook).
 
 ### T6 Re-cap runtime context window
 **Location:** `$HOME/.claude/settings.json` — `autoCompactWindow: 200000`.

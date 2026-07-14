@@ -1,6 +1,7 @@
 import { test as publicTest } from '../fixtures/public';
 import { test as authTest } from '../fixtures/auth';
 import { assertNoA11yViolations, type A11yOptions } from '../helpers/accessibility';
+import { gotoWithRetry } from '../helpers/navigation';
 
 // Site-wide exclusions — explicit a11y debt tracker.
 // Each entry should have a comment explaining why it's excluded.
@@ -97,9 +98,28 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
   ]),
 };
 
-function getA11yOptions(pageName: string): A11yOptions {
+// Per-rule allowlist of MOBILE-viewport (375px) known failures — separate from the
+// desktop map above because a page can be desktop-clean yet mobile-fail (hit-area
+// shrink at 375px) or vice-versa. Same ratchet semantics: each removal permanently
+// enforces that page/rule at 375px.
+//
+// target-size ships EMPTY on purpose: the two 375px offenders (topics'
+// .topic-card__cat, homepage's .leaders-tabbed__leader-team) are FIXED in CSS
+// by this PR (Phases 4–5), not allowlisted. This key exists for future-regression
+// tracking and to give the viewport-aware machinery a home. See
+// ibl5/docs/backlog/a11y-backlog.md §target-size.
+const MOBILE_KNOWN_FAILING: Record<string, Set<string>> = {
+  'target-size': new Set([]),
+};
+
+function getA11yOptions(
+  pageName: string,
+  viewport: 'desktop' | 'mobile' = 'desktop',
+): A11yOptions {
   const disableRules = [...SITE_WIDE_DISABLED_RULES];
-  for (const [rule, pages] of Object.entries(KNOWN_FAILING)) {
+  const allowlist =
+    viewport === 'mobile' ? MOBILE_KNOWN_FAILING : KNOWN_FAILING;
+  for (const [rule, pages] of Object.entries(allowlist)) {
     if (pages.has(pageName)) {
       disableRules.push(rule);
     }
@@ -207,6 +227,49 @@ authTest.describe('Authenticated page accessibility', () => {
       }
       await page.goto(url);
       await assertNoA11yViolations(page, `on ${url}`, getA11yOptions(name));
+    });
+  }
+});
+
+// --- Mobile (375px) tap-target sweep — WCAG 2.2 SC 2.5.8 ---
+// Site-wide generalization of the retired schedule-target-size.spec.ts (Phase 3).
+// axe measures each element's own getBoundingClientRect at 375px, catching hit-area
+// shrink that screenshot VR diffs are blind to (GH #909; reviewer m13v). Reuses the
+// publicPages / authPages arrays and the viewport-aware ratchet (MOBILE_KNOWN_FAILING).
+// gotoWithRetry guards blank-page retries under parallel PHP-built-in-server load.
+
+publicTest.describe('Public mobile tap-target size (WCAG 2.2 SC 2.5.8)', () => {
+  publicTest.describe.configure({ timeout: 60_000 }); // league schedule renders all teams — slow under shard load
+  publicTest.use({ viewport: { width: 375, height: 812 } });
+
+  publicTest.beforeEach(async ({ appState }) => {
+    await appState({ 'Trivia Mode': 'Off', 'Current Season Ending Year': '2026' });
+  });
+
+  for (const { name, url } of publicPages) {
+    publicTest(`${name} has no target-size violations @mobile`, async ({ page }) => {
+      await gotoWithRetry(page, url);
+      await assertNoA11yViolations(page, `target-size on ${url} @mobile`, {
+        ...getA11yOptions(name, 'mobile'),
+        onlyRules: ['target-size'],
+      });
+    });
+  }
+});
+
+authTest.describe('Authenticated mobile tap-target size (WCAG 2.2 SC 2.5.8)', () => {
+  authTest.use({ viewport: { width: 375, height: 812 } });
+
+  for (const { name, url, state } of authPages) {
+    authTest(`${name} has no target-size violations @mobile`, async ({ appState, page }) => {
+      if (state) {
+        await appState(state);
+      }
+      await gotoWithRetry(page, url);
+      await assertNoA11yViolations(page, `target-size on ${url} @mobile`, {
+        ...getA11yOptions(name, 'mobile'),
+        onlyRules: ['target-size'],
+      });
     });
   }
 });

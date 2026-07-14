@@ -1,6 +1,6 @@
 ---
 description: WCAG 2.x full-rule (non-contrast) accessibility failure inventory and burn-down backlog per axe rule, with audited per-entry implementation + automouse-readiness status. Companion to a11y-contrast-backlog.md.
-last_verified: 2026-07-07
+last_verified: 2026-07-13
 ---
 
 # A11y Full-Rule Backlog (non-contrast)
@@ -43,7 +43,7 @@ This audit (2026-06-20, verified against the live `accessibility.spec.ts` `KNOWN
 | **page-has-heading-one** — multi-title / loop-rendered (standings, trading, season archive, franchise record book, compare players, waivers, depth chart entry, voting results, olympics standings; **big board, trade block — blocked on Phase-4 re-land**) | ◑ Partial | 🟨 decision | **DONE:** trading, season archive, franchise record book, compare players, waivers, depth chart entry promoted to `<h1>` (record book + `heading-order` h3→h2 co-fix). **DONE:** standings (`<h1>Standings</h1>`) + voting results (`All-Star` / `End-of-Year Voting Results`) — page-level `<h1>` added, `a11y-heading-one-standings-voting` (VR → human merge). **STILL OPEN:** olympics standings (not spec-tracked); big board / trade block blocked on Phase-4 re-land. |
 | **page-has-heading-one** — title-less add (homepage, player page, your account, voting ASG/EOY ballot, news index/categories/article) | ⬜ Open | 🟨 decision → 🟦 | Needs an `<h1>` **added** with invented title text (decision) **and** the new visible heading changes VR baselines (human review). After the text decision, lands as 🟦 (not auto-mergeable). |
 | **link-name** (homepage, news index/categories/article) | ◑ Partial | 🟨 scope | `aria-label` add is invisible → auto-mergeable in principle, **but** seed-dependent: add a CI-seed reproduce phase first. News-template subset → 🟩 once reproduced; homepage sim-recap subset is data-dependent (may go green with no fix). **DONE (this plan):** News pages (index/categories/article) — links already carried aria-labels; reproduce-gated stale-allowlist removal, rule now enforced. **STILL OPEN:** homepage last-sim-recap team links (data-dependent, out of scope). |
-| **target-size** (topics ×100, homepage, news article) | ⬜ Open | 🟦 not auto-mergeable | Fix is **CSS** `min-height`/`min-width`/padding → changes rendered pixels → VR baseline regen + human review. Automouse can implement; merge is held. Small-count hits also seed-dependent. |
+| **target-size** (topics `.topic-card__cat`, news-article `.leaders-tabbed__leader-team`) | ✅ Implemented | 🟦 not auto-mergeable | Desktop already clean (ratchet tightened, `KNOWN_FAILING['target-size']` empty). Mobile 375px target-size now guarded **site-wide** in `accessibility.spec.ts`; the two 375px offenders enlarged to ≥24×24px via CSS (`topics.css`, `leaders.css`), not allowlisted; `schedule-target-size.spec.ts` retired as redundant. VR mobile baselines regenerated + human review → merge held. |
 | **landmark-unique** — standings | ✅ Implemented | — | #1164 merged; `StandingsView::renderHeader()` derives per-region `aria-label`; removed from `KNOWN_FAILING`. |
 | **landmark-unique** — schedule + team schedule | ✅ Implemented | — | **Re-checked:** the duplicate is each schedule View's **own** `<nav class="ibl-jump-menu">` (`LeagueScheduleView.php:84`, `TeamScheduleView.php:144`) colliding with the site nav — NOT a shared-nav change. One invisible `aria-label` per View (e.g. "Jump to month") → like standings. **DONE:** each schedule View's jump-menu nav now carries `aria-label="Jump to month"`; removed from `KNOWN_FAILING['landmark-unique']`. |
 | **landmark-unique** — league starters + next sim | ✅ Implemented | — | **DONE:** league-starters threads per-position `aria-label` through the shared renderers (optional param, char-pinned); next-sim sets an inline per-position `aria-label`; both removed from `KNOWN_FAILING['landmark-unique']`. |
@@ -57,7 +57,7 @@ This audit (2026-06-20, verified against the live `accessibility.spec.ts` `KNOWN
 **One-line takeaways for picking work:**
 - **Ready to plan as auto-mergeable now:** `page-has-heading-one` next sim (single-title promote) **and** schedule/team-schedule (stale allowlist removal — no code change). `label`/`select-name` already planned + queued.
 - **Auto-mergeable after a small scope/decision:** `page-has-heading-one` multi-title (which-`h2` decision).
-- **Automouse-safe but a human must merge:** `target-size` (VR), `page-has-heading-one` title-less (VR).
+- **Automouse-safe but a human must merge:** `page-has-heading-one` title-less (VR). (`target-size` — ✅ Implemented, #1428.)
 - **Not automouse-safe:** `landmark-one-main` + `region` on leagueControlPanel (2.27 refactor); everything on `faprep.php` (delete).
 
 ---
@@ -94,8 +94,8 @@ Was a single `<h4>`-after-`<h2>` skip on `record holders`; fixed in `a11y-2-head
 ### link-name — wcag2a (level A), serious — 📋 News subset implemented; homepage open
 **Location (allowlisted — homepage only):** homepage (`last-sim-recap` team links). **News subset ✅ Implemented:** news index/categories/article links already carried `aria-label` attributes (added in prior PRs); reproduce-gated stale-allowlist removal via `a11y-link-name-news`; rule now enforced on those three pages. **STILL OPEN:** homepage `last-sim-recap` team links — data-dependent (out of scope, user decision).
 
-### target-size — wcag22aa (WCAG 2.2), serious — ⬜ Open, 🟦 not auto-mergeable
-**Location (allowlisted):** topics (~100 nodes, dense small-link list), homepage, news article. **Problem:** touch targets < 24×24px. **Direction:** CSS `min-height`/`min-width`/padding. **Why held:** CSS sizing changes rendered pixels → VR baseline regen + human visual review. Automouse can implement; the merge is held (`auto_merge: false`). Small-count hits are also sim-recap seed-dependent — verify topics(100) on the CI seed.
+### target-size — wcag22aa (WCAG 2.2), serious — ✅ Implemented, 🟦 not auto-mergeable
+**Status:** Mobile (375px) target-size is now guarded **site-wide** across all 48 public+auth pages in `accessibility.spec.ts` (viewport-scoped `@mobile` describe blocks reusing the viewport-aware `KNOWN_FAILING` ratchet); desktop target-size was already clean (`KNOWN_FAILING['target-size']` empty, ratchet tightened). The two 375px offenders were **enlarged to ≥24×24px via CSS, not allowlisted**: `.topic-card__cat` (`topics.css` — inline-flex + `min-height`/`min-width: 24px`) and `.leaders-tabbed__leader-team` (`leaders.css` — `min-height: 24px` + padding, ellipsis preserved). The redundant `schedule-target-size.spec.ts` was retired (both schedule pages are covered by the site-wide sweep). Grounded on the CI seed (`tests/e2e/fixtures/ci-seed.sql`), not the dev DB. **Why 🟦 held:** the CSS restyle moves rendered pixels → mobile VR baselines (`topics`, `news-article`, `news`) regenerated + human visual review (`auto_merge: false`).
 
 ### landmark-unique — best-practice, moderate
 **standings — ✅ Implemented** (#1164): `StandingsView::renderHeader()` derives a unique `aria-label` per region from the in-scope `$region`/`$groupingType` vars; removed from `KNOWN_FAILING`.
@@ -146,6 +146,7 @@ Tracked separately in [`a11y-contrast-backlog.md`](a11y-contrast-backlog.md). Th
 | `a11y-heading-one-multi-title` | ✅ Implemented — 6 multi-title pages promoted; standings + voting results deferred (page-level `<h1>` decision). |
 | `a11y-heading-one-standings-voting` | ✅ Implemented — page-level `<h1>` added to standings + voting results (VR change → human merge). |
 | `a11y-link-name-news` | ✅ Implemented — News-page `link-name` reproduce-gated removal (links already labeled); homepage deferred. |
+| `mobile-target-size-a11y-sitewide` | 📋 PR #1428 open (held for human visual review + VR baseline regen; auto_merge: false) — site-wide 375px target-size sweep + two CSS fixes + schedule-target-size.spec.ts retired. Stacked PR #1448 (branch `topic-leaders-ci-seed`, based on #1428) grounds the CI seed so the sweep is non-vacuous for the two data-dependent selectors (`.topic-card__cat`, `.leaders-tabbed__leader-team`), and fixes an exposed homepage heading-order violation (block-Leaders `h3`→`h2`). Both PRs merge — #1448 does not supersede #1428. |
 
 ## Burn-down process
 

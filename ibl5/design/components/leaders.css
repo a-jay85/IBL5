@@ -151,6 +151,8 @@
     overflow: hidden;
     text-overflow: ellipsis;
     display: block;
+    min-height: 24px;
+    padding: 3px 0;
 }
 
 .leaders-tabbed__leader-team:hover {

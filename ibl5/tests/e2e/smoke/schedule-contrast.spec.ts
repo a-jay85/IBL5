@@ -14,7 +14,7 @@ const PHP_ERROR_STRINGS = ['Fatal error', 'Warning:', 'Parse error', 'Uncaught',
 
 test.describe('Schedule color-contrast (issue #908)', () => {
   // League schedule renders all teams — slower under parallel CI shard load.
-  // schedule-target-size.spec.ts (PR #1022) hits the same URL concurrently; 60s gives both headroom.
+  // accessibility.spec.ts's mobile target-size sweep hits the same URL concurrently; 60s gives both headroom.
   test.setTimeout(60000);
 
   test('default phase — no color-contrast violations in .schedule-container', async ({ page, appState }) => {

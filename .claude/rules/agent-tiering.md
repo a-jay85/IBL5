@@ -1,6 +1,6 @@
 ---
 description: Which tier to pick for each sub-agent, plus how to tier Explore agents. Skip-vs-spawn heuristic and deeper rationale live in agent-tiering-detail.md.
-last_verified: 2026-07-11
+last_verified: 2026-07-14
 ---
 
 # Agent Tiering
@@ -18,6 +18,15 @@ Tier every sub-agent (and every agent a plan spawns) by the reasoning the task a
 | **Fable** | `model: "fable"` — **prompt first, last resort** | Rung above Opus (~2× cost). Use **only** when a task is absolutely critical **and** Fable is 100% necessary to solve it — and **never without prompting the user first** for explicit approval. Default to Opus. Full gate: `.claude/rules/agent-tiering-detail.md`. |
 
 > **The boundary keys on task *type* (judgment vs. mechanical), not raw model capability** — a stronger Sonnet moves nothing across the line. Re-validated 2026-06-30 vs Sonnet 5 (then the `sonnet` alias, native 1M context): unchanged. Why: `agent-tiering-detail.md`.
+
+## `/plan` orchestrator model
+
+The rows above tier sub-agents; the `/plan` session model is a separate call. The `plan-architect` is tiered by Step-3 precedence (xhigh → sonnet → opus) regardless of the orchestrator — a Sonnet `/plan` spawning `plan-architect` still gets an Opus-authored plan.
+
+Tier the orchestrator by the judgment **it** retains:
+
+- **Single backlog item** → **Sonnet** (Steps 2.5/3/4 orchestrator calls are light; same recipe-backed class the "Opus (delegated)" row routes to `plan-architect-sonnet`).
+- **Multiple items in one pass** → **Opus** (cross-item PR decomposition, **dependency ordering**, tier-boundary splits). Cheaper: run each as its own **Sonnet** `/plan` and make only the ordering call yourself.
 
 ## Explore Agents
 

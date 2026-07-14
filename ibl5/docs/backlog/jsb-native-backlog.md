@@ -138,7 +138,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 **Location:** `engine/internal/validate/bands.go` (placeholder ±15%, explicitly non-authoritative); per-player leaders validation (never built); the standings-residual gate (floor ≈ 3–5 wins / ~0 ppg); Var(lnPPS) sits ~2% under real as a monitor-only watch item.
 **Problem:** Even with the dispersion blocker resolved, cut-over needs authoritative bands derived from the archive, a per-player sanity layer, and the actual go/no-go decision (env-flag swap of the jumpshot.exe invocation, `.sco` import path kept for one-command rollback; SHADOW as the live distributional check).
 **Direction:** Gated on the J2 verdict. Band derivation and the leaders instrument are ⚙️-delegable; the acceptance judgment and the cut-over ADR are 🧠.
-**Status (2026-07-12):** ⬜ Open — **unblocked** (J2 verdict in: SHIPPABLE with documented residual). Band derivation and per-player instrument are ⚙️-delegable; the acceptance judgment and cut-over ADR are 🧠.
+**Status (2026-07-13):** ⬜ Open — **bands sub-item VERIFIED post-J18** (`jsbcalibrate --mode gate` re-run on the post-J15+J18 engine, runs=20 stride=50: PASS, no literal change; provenance in `engine/internal/validate/bands.go` J18 block). Leaders instrument (J13-2) + cut-over ADR (J13-3) still open. Band derivation and per-player instrument are ⚙️-delegable; the acceptance judgment and cut-over ADR are 🧠.
 
 ### J14 AutoResearch eval-harness ADR (loop L9 companion)
 **Location:** No harness exists; instrumentation groundwork (calibration walk ≈ 8 min full-corpus, freeze arms, channel-split tests) is merged. Cross-ref: [loop-engineering-backlog.md](loop-engineering-backlog.md) L9.

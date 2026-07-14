@@ -27,10 +27,10 @@ last_verified: 2026-07-14
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 5 |
+| ⬜ Open | 4 |
 | 📋 Planned | 2 |
 | ◑ Partial | 2 |
-| ✅ Implemented | 2 |
+| ✅ Implemented | 3 |
 | 🚫 Declined | 0 |
 
 ---
@@ -44,7 +44,7 @@ last_verified: 2026-07-14
 | E3 | PHPStan result-cache in CI | ⬜ Open | 🟩 | S |
 | E4 | Flake-quarantine ledger | ⬜ Open | 🟨 | M |
 | E5 | Scheduled stale-worktree GC | ◑ Partial | 🟨 | S |
-| E6 | Diff-scoped PHPStan wrapper | ⬜ Open | 🟩 | S |
+| E6 | Diff-scoped PHPStan wrapper | ✅ Implemented | — | S |
 | E7 | Parallel PHPUnit | ✅ Implemented | — | M |
 | E8 | Memory lines → mechanical gates (umbrella) | ◑ Partial | 🟨 | M |
 | E9 | Meta-tooling growth bar | 📋 Planned | 🟦 | S |
@@ -86,12 +86,7 @@ last_verified: 2026-07-14
 **Risk if untouched:** Disk/RAM held by dead Docker stacks; stale worktrees confuse session coordination.
 **Status (2026-07-07):** ◑ Partial — sweep + classifier merged; scheduling absent. 🟨 (the schedule itself is host-local, not PR-shippable).
 
-### E6 Diff-scoped PHPStan wrapper
-**Location:** `ibl5/composer.json` — only full-project `analyse` scripts exist; nothing diff-scoped in `bin/`.
-**Problem:** Inner-loop iteration pays a full-project analysis for a 3-file change.
-**Suggested direction:** An `analyse-diff` wrapper under `bin/`: `git diff --name-only master... -- '*.php'` fed to PHPStan with the same memory-limit/autoload flags the composer scripts set. Full run remains the CI gate.
-**Risk if untouched:** Slow verify step in every mechanical-sweep loop, local and automouse.
-**Status (2026-07-07):** ⬜ Open — 🟩.
+➜ E6 Diff-scoped PHPStan wrapper — ✅ Implemented (2026-07-14): see [archive](archive/dev-efficiency-backlog-archive.md).
 
 ### E7 Parallel PHPUnit
 **Location:** `ibl5/composer.json:17,21` — `brianium/paratest ^7.23`; `composer run test` runs paratest.

@@ -31,8 +31,8 @@ last_verified: 2026-07-14
 |--------|------:|
 | ⬜ Open | 3 |
 | 📋 Planned | 0 |
-| ◑ Partial | 3 |
-| ✅ Implemented | 7 |
+| ◑ Partial | 2 |
+| ✅ Implemented | 8 |
 | 🚫 Declined | 0 |
 
 Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive/token-spend-backlog-archive.md).
@@ -47,7 +47,6 @@ Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive
 | T4 | Driver-model downshift for babysitting loops | ⬜ Open | ⌂ | M |
 | T5 | Memory/rules dedup lint | ⬜ Open | ⌂ | S |
 | T7 | Resident-overlay diet (MEMORY.md + rules) | ◑ Partial | both | M |
-| T9 | Lazy-load plan/post-plan skills | ◑ Partial | repo | M |
 | T13 | Aggregate always-loaded rules budget | ⬜ Open | repo | S |
 
 ### T2 Always-loaded context budget gate
@@ -78,13 +77,6 @@ Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive
 **Risk if untouched:** A permanent per-turn tax that compounds across every subagent.
 **Status (2026-07-11):** ◑ Partial — `agent-tiering.md` relocation now complete: its `## Skip the Agent` heuristic moved into `agent-tiering-detail.md` and the redundant Flat-fan-out / Context-economics / Prompt-style tail removed, leaving only the Tier table + Explore rules in the always-loaded file (down from ~5.9KB to under the 5000-byte T2 budget). Cross-refs in `work-triage.md` and `.claude/skills/plan/SKILL.md` repointed to the detail file. Residual: the full ≤8KB MEMORY.md index diet (out-of-repo, harness-side) still deferred.
 
-### T9 Lazy-load plan/post-plan skills
-**Location:** `.claude/skills/plan/SKILL.md` (~55KB ≈ 13K tokens) and `.claude/skills/post-plan/SKILL.md` (~68KB ≈ 17K tokens) — each a single file loaded whole at invocation and resident for the entire run.
-**Problem:** A long post-plan run re-reads ~17K tokens every turn, plus a fresh cache write per nightly session.
-**Suggested direction:** Thin orchestrator SKILL.md + per-phase reference files read on phase entry. Both restructures are planned: `$HOME/.claude/plans/lazy-load-plan-skill.md` and `$HOME/.claude/plans/lazy-load-post-plan-skill.md` (the post-plan one is in the automouse queue).
-**Risk if untouched:** ~20K tokens of dead weight resident in every `/plan` and `/post-plan` run.
-**Status (2026-07-11):** ◑ Partial — post-plan restructure shipped (#1389): `.claude/skills/post-plan/SKILL.md` cut from ~68KB to ~30KB, split into seven `_phase-*.md` reference files read on phase entry. Residual: the plan-skill restructure (`.claude/skills/plan/SKILL.md`, still ~48KB whole) is planned, not yet queued.
-
 ### T13 Aggregate always-loaded rules budget
 **Location:** `bin/check-rules-byte-budget` + `.claude/rules/*.md` (path-unscoped subset).
 **Problem:** T2's shipped gate caps each path-unscoped rules file at 5000 bytes but caps neither the file COUNT nor the TOTAL — the always-loaded surface can still regrow one new 4.9KB file at a time (28 rules files exist per `.claude/rules/meta-tooling-bar.md`'s 2026-07-09 census).
@@ -93,6 +85,8 @@ Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive
 **Status (2026-07-14):** ⬜ Open (discovered 2026-07-14 during token-spend-triage).
 
 ➜ T1 Automouse token ledger — ✅ Implemented (2026-07-09): see [archive](archive/token-spend-backlog-archive.md).
+
+➜ T9 Lazy-load plan/post-plan skills — ✅ Implemented (2026-07-14): see [archive](archive/token-spend-backlog-archive.md).
 
 ➜ T11 Tier-boundary plan splitting — ✅ Implemented (2026-07-11): see [archive](archive/token-spend-backlog-archive.md).
 

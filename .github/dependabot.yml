@@ -24,3 +24,10 @@ updates:
     directory: "/ibl5/IBLbot"
     schedule:
       interval: "weekly"
+    ignore:
+      # TypeScript 7+ is the native Go compiler; its `tsc` fatally fails with
+      # `newosproc` on the memory-tight deploy droplet (can't spawn OS threads).
+      # Stay on the JS-based 5.x compiler. Liftable once IBLbot's TS is built on
+      # the CI runner and only `dist/` ships to the server.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]

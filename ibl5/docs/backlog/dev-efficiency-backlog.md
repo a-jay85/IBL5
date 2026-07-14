@@ -27,10 +27,10 @@ last_verified: 2026-07-14
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 4 |
+| ⬜ Open | 3 |
 | 📋 Planned | 2 |
 | ◑ Partial | 2 |
-| ✅ Implemented | 3 |
+| ✅ Implemented | 4 |
 | 🚫 Declined | 0 |
 
 ---
@@ -41,7 +41,7 @@ last_verified: 2026-07-14
 |---|-------|--------|-----------|-------:|
 | E1 | Warm-standby worktree pool | ⬜ Open | 🟨 | M |
 | E2 | Dependabot grouping | ⬜ Open | 🟩 | S |
-| E3 | PHPStan result-cache in CI | ⬜ Open | 🟩 | S |
+| E3 | PHPStan result-cache in CI | ✅ Implemented | — | S |
 | E4 | Flake-quarantine ledger | ⬜ Open | 🟨 | M |
 | E5 | Scheduled stale-worktree GC | ◑ Partial | 🟨 | S |
 | E6 | Diff-scoped PHPStan wrapper | ✅ Implemented | — | S |
@@ -65,12 +65,7 @@ last_verified: 2026-07-14
 **Risk if untouched:** ~5× redundant CI runs per bump wave.
 **Status (2026-07-07):** ⬜ Open — 🟩.
 
-### E3 PHPStan result-cache in CI
-**Location:** `.github/workflows/` — no `resultCache` persistence (verified); every PR re-analyzes the world.
-**Problem:** Most PRs touch a handful of files but pay a full-project PHPStan run.
-**Suggested direction:** Persist `resultCachePath` via `actions/cache` keyed on `composer.lock` + the phpstan config; PHPStan's own file-hash invalidation keeps it correct.
-**Risk if untouched:** The longest single step in the most-run workflow stays O(project) instead of O(diff).
-**Status (2026-07-07):** ⬜ Open — 🟩.
+➜ E3 PHPStan result-cache in CI — ✅ Implemented (2026-07-03): see [archive](archive/dev-efficiency-backlog-archive.md).
 
 ### E4 Flake-quarantine ledger
 **Location:** E2E CI (`.github/workflows/`) — no quarantine mechanism (verified; "flake" mentions are VR-specific).

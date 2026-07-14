@@ -44,10 +44,11 @@ type possCouplingArtifact struct {
 }
 
 // RECORDED BASELINE (current engine, gt2, archive 20-run of record, 2026-07-13):
-//   Cov(lnFGA,lnPPS) total  = engine -0.000364   real +0.000269   (wrong sign)
-//     possession-count term = engine -0.000184   real +0.000241   (89% of real total)
-//     shots-per-poss term   = engine -0.000180   real +0.000027   (real ≈ 0)
-//   Var(lnPOSS) = engine 0.000254  real 0.000721   (engine under-disperses pace ~2.8x)
+//
+//	Cov(lnFGA,lnPPS) total  = engine -0.000364   real +0.000269   (wrong sign)
+//	  possession-count term = engine -0.000184   real +0.000241   (89% of real total)
+//	  shots-per-poss term   = engine -0.000180   real +0.000027   (real ≈ 0)
+//	Var(lnPOSS) = engine 0.000254  real 0.000721   (engine under-disperses pace ~2.8x)
 //
 // FINDING (J20 within-possession restructure, Phase 3 — mechanism VOID, not implemented):
 // The dominant wrong-signed term is the possession-COUNT channel (89% of the real

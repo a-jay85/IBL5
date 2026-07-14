@@ -81,6 +81,21 @@ type Band struct {
 // │ AbsFloor=11 (in-band 0.977). RelPct kept at the committed (wider) values   │
 // │ per rationale 3 above — the proposal (0.596/0.600) would only tighten.     │
 // │ Gate is reference-only (no CI workflow invokes jsbcalibrate).              │
+// │                                                                            │
+// │ ── J18 UPDATE (2026-07-13, post-J18 formula-divergence re-gate) ──────────│
+// │ jsbcalibrate --mode gate re-run on the post-J15 + post-J18 engine (six    │
+// │ formula-divergence fixes: #1433, #1435-1437, #1440, #1443, #1444). Run    │
+// │ params match J15: --runs 20 --sample-stride 50 --selection season,        │
+// │ coverage 0.95, min-rate 0.90, corpus ibl5/backups.                        │
+// │ RESULT: PASS overall. Per-stat in-band rates (non-1.000 shown):           │
+// │   gt2: tgm=0.985, tga=0.970, ast=0.976, stl=0.990, tov=0.984,            │
+// │        blk=0.983, pf=0.946 (all others 1.000)                             │
+// │   gt4: tgm=0.976, tga=0.959, reb=0.994, ast=0.941, stl=0.965,            │
+// │        tov=0.976, pf=0.959 (all others 1.000)                             │
+// │ Literals: UNCHANGED — all stats in-band both game types.                  │
+// │ RelPct never re-derived (rationale 3); AbsFloor updated only when the     │
+// │ calibrate proposal is LOWER than committed.                                │
+// │ date: 2026-07-13                                                          │
 // └──────────────────────────────────────────────────────────────────────────┘
 
 // regularBands holds the calibrated regular-season (game_type 2) tolerances.

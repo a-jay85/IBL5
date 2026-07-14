@@ -1,6 +1,6 @@
 ---
 description: Token-spend reduction backlog — resident-context diet, caching economics, output-spend guards, and LSP-first navigation for the Claude Code harness, with per-entry status.
-last_verified: 2026-07-12
+last_verified: 2026-07-14
 ---
 
 # Token-Spend Reduction Backlog
@@ -29,7 +29,7 @@ last_verified: 2026-07-12
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 2 |
+| ⬜ Open | 3 |
 | 📋 Planned | 0 |
 | ◑ Partial | 3 |
 | ✅ Implemented | 7 |
@@ -48,6 +48,7 @@ Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive
 | T5 | Memory/rules dedup lint | ⬜ Open | ⌂ | S |
 | T7 | Resident-overlay diet (MEMORY.md + rules) | ◑ Partial | both | M |
 | T9 | Lazy-load plan/post-plan skills | ◑ Partial | repo | M |
+| T13 | Aggregate always-loaded rules budget | ⬜ Open | repo | S |
 
 ### T2 Always-loaded context budget gate
 **Location:** `.claude/rules/*.md` (path-unscoped subset ≈ 19KB) + the memory index (`MEMORY.md`, ≈ 16KB) — together ~9K tokens on every request and every subagent spawn.
@@ -61,7 +62,7 @@ Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive
 **Problem:** Babysitting phases need no frontier-model reasoning; every polling turn re-reads the full session context at the top tier.
 **Suggested direction:** A Sonnet wrapper session (or `/loop`-driven routine) for watch/nudge phases, reserving the top-tier session for design and review. Partially substituted by L6/L8 in [loop-engineering-backlog.md](loop-engineering-backlog.md), which remove the need to babysit at all.
 **Risk if untouched:** Top-tier token burn on mechanical polling.
-**Status (2026-07-07):** ⬜ Open.
+**Status (2026-07-07):** ⬜ Open. **(2026-07-14):** L6/L8 in [loop-engineering-backlog.md](loop-engineering-backlog.md) have both since shipped ✅ Implemented, so nightly babysitting is largely removed; residual scope narrows to interactive CI-watch/merge-nudge sessions.
 
 ### T5 Memory/rules dedup lint
 **Location:** `$HOME/.claude/hooks/memory-expiry.py` (SessionStart hook; currently expiry-only).
@@ -71,7 +72,7 @@ Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive
 **Status (2026-07-07):** ⬜ Open.
 
 ### T7 Resident-overlay diet (MEMORY.md + rules)
-**Location:** Memory index `MEMORY.md` (~16KB, ~90 lines, 181 topic files behind it); `.claude/rules/agent-tiering.md` (~6.6KB, with an existing overflow file `.claude/rules/agent-tiering-detail.md`).
+**Location:** Memory index `MEMORY.md` (18.1KB measured 2026-07-14, up from ~16KB/181 files on 2026-07-07, ~90 lines, 191 topic files behind it); `.claude/rules/agent-tiering.md` (~6.6KB, with an existing overflow file `.claude/rules/agent-tiering-detail.md`).
 **Problem:** Every request and every subagent spawn carries the full overlay; on a typical ~35K-token request it is ~27% of the read.
 **Suggested direction:** Prune index lines for finished pipelines and dated status that has expired; merge one-line variants; target ≤ 8KB for the index. Move remaining `agent-tiering.md` prose into the detail file, keeping the tier table + Explore rules. Pairs with E8 in [dev-efficiency-backlog.md](dev-efficiency-backlog.md) (each mechanical gate built lets a memory line retire) and is held in place afterwards by T2/T5.
 **Risk if untouched:** A permanent per-turn tax that compounds across every subagent.
@@ -84,11 +85,24 @@ Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive
 **Risk if untouched:** ~20K tokens of dead weight resident in every `/plan` and `/post-plan` run.
 **Status (2026-07-11):** ◑ Partial — post-plan restructure shipped (#1389): `.claude/skills/post-plan/SKILL.md` cut from ~68KB to ~30KB, split into seven `_phase-*.md` reference files read on phase entry. Residual: the plan-skill restructure (`.claude/skills/plan/SKILL.md`, still ~48KB whole) is planned, not yet queued.
 
+### T13 Aggregate always-loaded rules budget
+**Location:** `bin/check-rules-byte-budget` + `.claude/rules/*.md` (path-unscoped subset).
+**Problem:** T2's shipped gate caps each path-unscoped rules file at 5000 bytes but caps neither the file COUNT nor the TOTAL — the always-loaded surface can still regrow one new 4.9KB file at a time (28 rules files exist per `.claude/rules/meta-tooling-bar.md`'s 2026-07-09 census).
+**Suggested direction:** Extend `bin/check-rules-byte-budget` (extend-before-add — no new gate) with a total-bytes budget for the path-unscoped subset; wire stays in the existing `static-guards` job.
+**Risk if untouched:** Per-file cap passes while the per-turn fixed tax regrows via file proliferation.
+**Status (2026-07-14):** ⬜ Open (discovered 2026-07-14 during token-spend-triage).
+
 ➜ T1 Automouse token ledger — ✅ Implemented (2026-07-09): see [archive](archive/token-spend-backlog-archive.md).
 
 ➜ T11 Tier-boundary plan splitting — ✅ Implemented (2026-07-11): see [archive](archive/token-spend-backlog-archive.md).
 
 ➜ T12 Sonnet plan-architect for recipe-backed plans — ✅ Implemented (2026-07-11): see [archive](archive/token-spend-backlog-archive.md).
+
+**Token-relevant entries tracked elsewhere:**
+- L2 residual (token-budget circuit breaker) — [loop-engineering-backlog.md](loop-engineering-backlog.md).
+- L15 (Sonnet-recipe completeness lint) — [loop-engineering-backlog.md](loop-engineering-backlog.md).
+- L16 (context-budget gate v2) — [loop-engineering-backlog.md](loop-engineering-backlog.md).
+- E8 (memory-lines→gates umbrella, pairs with T7) — [dev-efficiency-backlog.md](dev-efficiency-backlog.md).
 
 ---
 

@@ -79,7 +79,11 @@ Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive
 - L2 residual (token-budget circuit breaker) — [loop-engineering-backlog.md](loop-engineering-backlog.md).
 - L15 (Sonnet-recipe completeness lint) — [loop-engineering-backlog.md](loop-engineering-backlog.md).
 - L16 (context-budget gate v2) — [loop-engineering-backlog.md](loop-engineering-backlog.md).
-- E8 (memory-lines→gates umbrella, pairs with T7) — [dev-efficiency-backlog.md](dev-efficiency-backlog.md).
+- E8 (memory-lines→gates umbrella, pairs with T7) — [dev-efficiency-backlog.md](dev-efficiency-backlog.md). ◑ Partial as of 2026-07-14; one item remains (free-agents teamid write guard).
+- E6 (diff-scoped PHPStan wrapper) — [dev-efficiency-backlog.md](dev-efficiency-backlog.md): every agent verify iteration (local + automouse) drops from O(project) to O(diff) analysis — fewer polling turns and less output per loop. (Cross-referenced 2026-07-14, token-spend sweep.)
+- E3 (PHPStan result-cache in CI) — [dev-efficiency-backlog.md](dev-efficiency-backlog.md): shorter CI runs → fewer CI-watch polling turns per PR. (Cross-referenced 2026-07-14, token-spend sweep.)
+- E4 (flake-quarantine ledger) — [dev-efficiency-backlog.md](dev-efficiency-backlog.md): removes flake-triggered re-run cycles and lost nightly-queue runs. (Cross-referenced 2026-07-14, token-spend sweep.)
+- 5.1 (build IBLbot TypeScript on the CI runner) — [ci-backlog.md](ci-backlog.md): each droplet-side build failure (2 to date) costs manual-intervention sessions plus CI-watch re-run cycles. (Cross-referenced 2026-07-14, token-spend sweep.)
 
 ---
 

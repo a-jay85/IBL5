@@ -31,8 +31,8 @@ last_verified: 2026-07-14
 |--------|------:|
 | ⬜ Open | 2 |
 | 📋 Planned | 0 |
-| ◑ Partial | 1 |
-| ✅ Implemented | 10 |
+| ◑ Partial | 0 |
+| ✅ Implemented | 11 |
 | 🚫 Declined | 0 |
 
 Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive/token-spend-backlog-archive.md).
@@ -44,7 +44,6 @@ Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive
 | # | Title | Status | Locus | Effort |
 |---|-------|--------|-------|-------:|
 | T4 | Driver-model downshift for babysitting loops | ⬜ Open | ⌂ | M |
-| T7 | Resident-overlay diet (MEMORY.md + rules) | ◑ Partial | both | M |
 | T13 | Aggregate always-loaded rules budget | ⬜ Open | repo | S |
 
 ### T4 Driver-model downshift for babysitting loops
@@ -54,12 +53,6 @@ Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive
 **Risk if untouched:** Top-tier token burn on mechanical polling.
 **Status (2026-07-07):** ⬜ Open. **(2026-07-14):** L6/L8 in [loop-engineering-backlog.md](loop-engineering-backlog.md) have both since shipped ✅ Implemented, so nightly babysitting is largely removed; residual scope narrows to interactive CI-watch/merge-nudge sessions.
 
-### T7 Resident-overlay diet (MEMORY.md + rules)
-**Location:** Memory index `MEMORY.md` (18.1KB measured 2026-07-14, up from ~16KB/181 files on 2026-07-07, ~90 lines, 191 topic files behind it); `.claude/rules/agent-tiering.md` (~6.6KB, with an existing overflow file `.claude/rules/agent-tiering-detail.md`).
-**Problem:** Every request and every subagent spawn carries the full overlay; on a typical ~35K-token request it is ~27% of the read.
-**Suggested direction:** Prune index lines for finished pipelines and dated status that has expired; merge one-line variants; target ≤ 8KB for the index. Move remaining `agent-tiering.md` prose into the detail file, keeping the tier table + Explore rules. Pairs with E8 in [dev-efficiency-backlog.md](dev-efficiency-backlog.md) (each mechanical gate built lets a memory line retire) and is held in place afterwards by T2/T5.
-**Risk if untouched:** A permanent per-turn tax that compounds across every subagent.
-**Status (2026-07-11):** ◑ Partial — `agent-tiering.md` relocation now complete: its `## Skip the Agent` heuristic moved into `agent-tiering-detail.md` and the redundant Flat-fan-out / Context-economics / Prompt-style tail removed, leaving only the Tier table + Explore rules in the always-loaded file (down from ~5.9KB to under the 5000-byte T2 budget). Cross-refs in `work-triage.md` and `.claude/skills/plan/SKILL.md` repointed to the detail file. Residual: the full ≤8KB MEMORY.md index diet (out-of-repo, harness-side) still deferred.
 
 ### T13 Aggregate always-loaded rules budget
 **Location:** `bin/check-rules-byte-budget` + `.claude/rules/*.md` (path-unscoped subset).
@@ -67,6 +60,8 @@ Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive
 **Suggested direction:** Extend `bin/check-rules-byte-budget` (extend-before-add — no new gate) with a total-bytes budget for the path-unscoped subset; wire stays in the existing `static-guards` job.
 **Risk if untouched:** Per-file cap passes while the per-turn fixed tax regrows via file proliferation.
 **Status (2026-07-14):** ⬜ Open (discovered 2026-07-14 during token-spend-triage).
+
+➜ T7 Resident-overlay diet (MEMORY.md + rules) — ✅ Implemented (2026-07-14): see [archive](archive/token-spend-backlog-archive.md).
 
 ➜ T1 Automouse token ledger — ✅ Implemented (2026-07-09): see [archive](archive/token-spend-backlog-archive.md).
 

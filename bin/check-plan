@@ -80,6 +80,27 @@
 #                              material) carries a `context-budget:` marker with
 #                              a one-line justification; validity of that
 #                              justification stays Opus judgment.
+#   T  Tier binding         — an implementation phase whose `**Tier:**` line
+#                              names a tier BELOW the plan's whole-run model
+#                              (bin/lib/plan-impl-model, ranked opus>sonnet>haiku)
+#                              must be acted on, one of two ways: a `### Delegate`
+#                              packet (the automouse impl agent fires a sub-agent)
+#                              or an `(inline — reason)` marker on that Tier line
+#                              (it stays inline by an explicit decision). A bare
+#                              below-run-model `**Tier:** Haiku`/`Sonnet` with
+#                              neither is an un-acted-on tiering intent — the impl
+#                              orchestrator has nothing to bind — so flag it.
+#                              Fence-aware: a packet is authored inside a
+#                              4-backtick fence, so `### Delegate` is detected on
+#                              the raw line while a `**Tier:**` line counts only
+#                              OUTSIDE any fence (a fenced/illustrative Tier line
+#                              never flags); phase regions reset at every level-2
+#                              `## ` heading, and a packet's presence is judged at
+#                              region end so a packet after the bare line in the
+#                              same phase still resolves it. Mirrors the
+#                              .claude/skills/plan/_architect-contract.md Binding
+#                              rule; whether a given tier CHOICE is correct stays
+#                              Opus judgment — this only binds the label to an act.
 #
 # Deliberately NOT linted (kept as /plan Opus judgment): tests-woven-inline,
 # production-comparison classification, test-file-path presence, negative-path
@@ -406,6 +427,72 @@ if [ "$CB_LINES" -ge 500 ] || [ "$CB_PHASES" -ge 12 ]; then
         viol "[C] marathon-sized plan (${CB_LINES} lines, ${CB_PHASES} numbered phases; flags at >=500 lines or >=12 phases) — split into stacked PR-sized plans (/plan Step 2.5), or justify a deliberate exception with a 'context-budget:' marker"
     fi
 fi
+
+# ---------------------------------------------------------------------------
+# Gate T: below-run-model tier labels are bound (packet or inline marker).
+# ---------------------------------------------------------------------------
+# Resolve the whole-plan run model with the same resolver bin/automouse-run uses,
+# then rank it opus=3 > sonnet=2 > haiku=1 (unknown/default → opus). A phase whose
+# **Tier:** line names a tier BELOW that rank must be acted on: a ### Delegate
+# packet, or an `(inline — reason)` marker on the Tier line. A bare below-run-model
+# label with neither is what we flag — see the header note for the fence-aware
+# parse rationale and .claude/skills/plan/_architect-contract.md for the contract.
+RUN_MODEL="$("$SCRIPT_DIR/lib/plan-impl-model" "$PLAN_FILE" 2>/dev/null)"
+case "$RUN_MODEL" in
+    *sonnet*) RUN_RANK=2 ;;
+    *haiku*)  RUN_RANK=1 ;;
+    *)        RUN_RANK=3 ;;
+esac
+while IFS= read -r tviol; do
+    [ -n "$tviol" ] && viol "$tviol"
+done < <(awk -v run_rank="$RUN_RANK" '
+    function fence_ticks(s,   t) {
+        if (match(s, /^[ \t]*`+/)) {
+            t = substr(s, RSTART, RLENGTH); gsub(/[^`]/, "", t); return length(t)
+        }
+        return 0
+    }
+    function tier_rank(s,   ls) {
+        ls = tolower(s)
+        if (ls ~ /haiku/)     return 1
+        if (ls ~ /sonnet/)    return 2
+        if (ls ~ /self|opus/) return 3
+        return 0
+    }
+    function flush_region(   i) {
+        if (!has_delegate) { for (i = 1; i <= ncand; i++) print cand[i] }
+        has_delegate = 0; ncand = 0
+    }
+    BEGIN { infence = 0; fence_len = 0; has_delegate = 0; ncand = 0 }
+    {
+        # The ### Delegate heading lives INSIDE the 4-backtick packet fence, so
+        # detect it on the raw line regardless of fence state.
+        if ($0 ~ /^[ \t]*###[ \t]+Delegate/) has_delegate = 1
+        nt = fence_ticks($0)
+        if (infence) {
+            # A closing fence is backticks-only and at least as long as the open.
+            if (nt >= fence_len && $0 ~ /^[ \t]*`+[ \t]*$/) { infence = 0; fence_len = 0 }
+            next
+        }
+        if (nt >= 3) { infence = 1; fence_len = nt; next }
+        # Any level-2 heading bounds a phase region (packet in one phase does not
+        # excuse a bare label in another).
+        if ($0 ~ /^##[ \t]/) { flush_region(); next }
+        # A canonical **Tier:** line counts only outside any fence AND only when
+        # `**Tier:**` is the first content on the line (after optional blockquote
+        # `>` and an optional `-`/`*` bullet). This anchor is load-bearing: an
+        # un-anchored match fires on mid-sentence code spans (a prose line reading
+        # "a `**Tier:**` line …") and on blockquote packet headers
+        # (`> **Delegate packet** — **Tier:** Sonnet`), neither of which is a phase
+        # tier declaration — both are corpus false positives.
+        if ($0 ~ /^[ \t]*>?[ \t]*([-*][ \t]+)?\*\*Tier:\*\*/) {
+            r = tier_rank($0)
+            if (r > 0 && r < run_rank && index($0, "(inline") == 0)
+                cand[++ncand] = "[T] below-run-model tier label lacks a ### Delegate packet or an (inline — reason) marker: " $0
+        }
+    }
+    END { flush_region() }
+' "$PLAN_FILE")
 
 # ---------------------------------------------------------------------------
 # Report.

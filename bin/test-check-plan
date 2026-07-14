@@ -332,6 +332,146 @@ impl_model: opus
 # defaults to the safe Opus path, which is correct when a row is subjective.
 assert "gate13-manual-absent-ok" 0 "$M_MANUAL"
 
+# ---------------------------------------------------------------------------
+# Gate T: below-run-model tier labels must bind to a packet or an inline marker.
+# ---------------------------------------------------------------------------
+# The run model is resolved from line-1 `impl_model:` (bin/lib/plan-impl-model)
+# and ranked opus=3 > sonnet=2 > haiku=1. Each fixture carries the clean minimal
+# matrix M plus explicit frontmatter so exit 0/1 is attributable solely to gate T
+# (M is 0-manual, so gate 13 is satisfied only by the deliberate impl_model line).
+TFM='---
+impl_model: opus
+---'
+
+# (T1) A bare below-run-model `**Tier:** Haiku` with no packet and no (inline —)
+# marker is an un-acted-on tiering intent (exit 1). Under impl_model: opus, Haiku
+# is below the run model.
+assert "gateT-bare-subtier-flags" 1 "$TFM$M"'
+## Phase 1
+- **Tier:** Haiku
+
+Do the mechanical thing.
+'
+
+# (T2) The same bare tier resolves when the phase carries a ### Delegate packet
+# (exit 0). The packet is authored inside a 4-backtick fence and appears AFTER
+# the bare line — has_delegate is judged at region end, so it still suppresses.
+assert "gateT-packet-resolves" 0 "$TFM$M"'
+## Phase 1
+- **Tier:** Sonnet
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** ibl5/foo.php
+- **Recipe:** apply the change
+- **Self-verify:** composer run analyse
+- **Report back:** one line
+````
+'
+
+# (T3) An `(inline — reason)` marker on the Tier line resolves it inline (exit 0).
+assert "gateT-inline-marker-ok" 0 "$TFM$M"'
+## Phase 1
+- **Tier:** Haiku (inline — one-shot marker swap, well below the ~15K bar)
+
+Apply the edit.
+'
+
+# (T4) A same-/above-run-model tier needs no marker (exit 0). `self` ranks at the
+# opus run model, so it is never below and never flags.
+assert "gateT-at-model-self-ok" 0 "$TFM$M"'
+## Phase 1
+- **Tier:** self
+
+Opus implements this inline.
+'
+
+# (T5) The run model comes from impl_model, not a fixed opus assumption: under
+# impl_model: sonnet, a bare `**Tier:** Haiku` is below the run model and flags
+# (exit 1). (A bare `**Tier:** Sonnet` here would be AT model and must not flag —
+# covered implicitly: this fixture uses Haiku so only the below-model path fires.)
+assert "gateT-sonnet-runmodel-haiku-flags" 1 '---
+impl_model: sonnet
+---'"$M"'
+## Phase 1
+- **Tier:** Haiku
+
+Do the thing.
+'
+
+# (T6) A `**Tier:** Haiku` that appears INSIDE a fence (an illustrative example,
+# not a real phase label) never flags (exit 0). Fence-awareness guard.
+assert "gateT-fenced-tier-not-flagged" 0 "$TFM$M"'
+## Phase 1
+An example of the canonical form:
+
+```
+- **Tier:** Haiku
+```
+
+The real phase runs on Opus inline.
+'
+
+# (T7) Region scoping: a packet in phase B does NOT excuse a bare below-model
+# label in phase A (exit 1). Regions reset at every level-2 `## ` heading.
+assert "gateT-packet-in-other-phase-still-flags" 1 "$TFM$M"'
+## Phase A
+- **Tier:** Haiku
+
+Bare, un-acted-on.
+
+## Phase B
+
+````
+### Delegate — Phase B
+- **Tier:** Sonnet
+- **Scope:** ibl5/bar.php
+- **Recipe:** do it
+- **Self-verify:** composer run analyse
+- **Report back:** one line
+````
+'
+
+# (T8) A packet-only phase whose 4-backtick fence contains a 3-backtick recipe
+# fence resolves cleanly (exit 0) — the inner 3-tick fence must not close the
+# outer 4-tick block, and the packet's own inside-fence Tier line never flags.
+assert "gateT-nested-fence-packet-ok" 0 "$TFM$M"'
+## Phase 1
+
+````
+### Delegate — Phase 1
+- **Tier:** Haiku
+- **Scope:** ibl5/baz.php
+- **Recipe:**
+```
+git mv a b
+```
+- **Self-verify:** composer run analyse
+- **Report back:** one line
+````
+'
+
+# ---------------------------------------------------------------------------
+# Directive presence: the runtime prompt (bin/automouse-prompt-impl) must keep
+# BOTH the packet-delegation instruction AND the exhaustive-and-pre-resolved
+# tier mandate that gate T's authoring contract binds to. A silent deletion of
+# either unbinds the label from the act at runtime — the layer gate T cannot see.
+# ---------------------------------------------------------------------------
+PROMPT_IMPL="$SCRIPT_DIR/automouse-prompt-impl"
+if ! grep -qF 'do NOT implement that phase inline' "$PROMPT_IMPL"; then
+    echo "FAIL: automouse-prompt-impl missing 'do NOT implement that phase inline' directive"
+    FAILED=1
+else
+    echo "ok: automouse-prompt-impl retains packet-delegation directive"
+fi
+if ! grep -qF 'exhaustive and pre-resolved' "$PROMPT_IMPL"; then
+    echo "FAIL: automouse-prompt-impl missing 'exhaustive and pre-resolved' tier mandate"
+    FAILED=1
+else
+    echo "ok: automouse-prompt-impl retains exhaustive-and-pre-resolved tier mandate"
+fi
+
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"
     exit 1

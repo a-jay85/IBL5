@@ -4,7 +4,7 @@ description: "Plan an implementation task: enforces a verification matrix, direc
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
-last_verified: 2026-07-11
+last_verified: 2026-07-14
 ---
 
 # /plan — Implementation Planning with Verification Matrix
@@ -49,6 +49,23 @@ Tier per `.claude/rules/agent-tiering.md`:
 Provide each agent a single concrete question, pre-resolved paths, and a response cap (under 150 lines). An agent spawned purely for byte isolation must return **distilled pointers** (`path:line` + the load-bearing fact), not pasted file bodies — pasting the contents back defeats the isolation.
 
 Collect: file paths, existing patterns, dependencies, blast radius, existing test coverage for affected code, **the specific existing helpers/services/repositories the implementation should reuse** (name the exact methods — e.g. `SalaryCapRepository::getTeamTotalSalary()` — so the plan directs reuse instead of leaving the impl agent to rediscover them), and **which security surfaces the change touches** (SQL queries, POST/form endpoints, auth/authz-gated routes, user-facing output rendering). If none of these surfaces are touched, record that explicitly. Also record **whether the task resolves a finding tracked in a status/tracking doc** (e.g. `ibl5/docs/backlog/maintenance-backlog.md`, an a11y/security backlog, a roadmap with per-item status markers) — if so, the doc path, the finding id, and its current status marker — so Step 3 can scope the status-flip edit into the **same** PR. Separately, record **whether the work leaves a follow-up that can only run *after* the PR merges** — something the merge event itself unblocks: a stale memory/doc/plan that stays valid until the change lands (e.g. a `MEMORY.md` "delete this entry when #N merges" pointer), a temporary compat shim that can be removed once its consumer deploys, a feature flag to retire post-rollout. Note each one so Step 3 can **mechanize** it as a merge-triggered watcher rather than leaving it to the user's memory. When Step 2.5 splits the work into multiple PRs, these pointers (`path:line` + the one load-bearing fact per file) are the **source** of the shared-context artifact's exploration-pointers section — Step 2.5 persists them **once** at SEED so no unit re-derives them, and Step 3 hands each `plan-architect` the artifact rather than re-inlining them. Keep them as pointers here (never file bodies) so they transcribe straight into the artifact.
+
+## Step 2.1: Prior-art check — is this already done?
+
+Before designing anything, verify the work **does not already exist** — merged to master or sitting in an open PR. Backlog/status markers go stale (a finding gets implemented but its marker is never flipped), so the marker Step 2 recorded is a *claim*, not ground truth — verify it against the repo THIS run. Repeatedly, a plan has been designed (and sometimes implemented) for work that was already merged, discoverable only by reading the code, never the marker. This gate spends a few cheap tool calls at the end of orientation to bail *before* the expensive Step 3 `plan-architect` spawn.
+
+Check **three signals**, strongest first — using the deliverable paths Step 2 surfaced:
+
+1. **Deliverables already exist** (strongest) — `ls`/`grep` the concrete files/symbols the plan would create (new files present = done; the plan's would-be "Critical Files"). A behavior-changing edit to an existing file won't show here — fall through to signals 2–3.
+2. **Already merged** — `git log --oneline --all | grep -iE '<slug|keywords|ADR-number>'` and `git log` the target paths for a commit that already made this change.
+3. **Open (or recently-merged) PR** — `gh pr list --state open --search '<keywords>'` (add `--state merged` for a PR merged so recently master orientation may not reflect it). **This is the only signal that sees the open-PR half** — signals 1–2 are master-based and blind to unmerged work. Do not skip it: the user named the open-PR case explicitly.
+
+**On a hit, classify (Opus judgment — do not delegate):**
+- **Fully done** → **HALT**. Do not proceed to Step 2.5/3. Report the evidence (PR #, commit SHA, or existing file paths) and point at the real next step (e.g. "already merged as #N — the marker in `<doc>` is stale; flip it"). If Step 2 found a stale status marker, surface that it needs flipping.
+- **Partially done** → re-scope the plan to the *remainder* only, and note in the Approach section what already exists and is therefore out of scope.
+- **False positive** → proceed. Guard against crying wolf: surface a hit only on a **real** signal (a deliverable file exists, or a substantive PR-title/commit match), not any incidental keyword collision. A gate that fires on every plan gets ignored.
+
+If all three signals are clean, record "prior-art check: clean" and proceed to Step 2.5.
 
 ## Step 2.5: Scope into PRs
 

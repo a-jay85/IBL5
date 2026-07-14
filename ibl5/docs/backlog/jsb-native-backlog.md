@@ -40,7 +40,7 @@ J1 faithful foul pair (✅ 2026-07-10, ADR-0082) ─→ J2 adjudications (✅ 20
               ├─ prerequisite: J16 escape bound re-derived with LIVE AST/48 (J19) — ✅ J19 done
               └─→ J2 verdict: SHIPPABLE with residual → successor = J20 empty-FGA restructure (J4 ✅ 2026-07-12 feeds it) → J13 (unblocked)
 J17 game-state foul coupling (⬜, new 2026-07-10) — real 5.60 mechanism the engine lacks entirely
-J21 gt=4 playoff-margin audit (⬜, new 2026-07-13) · J22 per-player STL/TOV bundle wiring (⬜, new 2026-07-13) — cut-over-gate fidelity inputs to J13; NEITHER is a count-axis (J20) lever
+J21 gt=4 playoff-margin audit (✅ 2026-07-14 — no overshoot, engine under-disperses globally) · J22 per-player STL/TOV bundle wiring (⬜, new 2026-07-13) — cut-over-gate fidelity inputs to J13; NEITHER is a count-axis (J20) lever
 J23 round-half-up + base_time re-center (⬜, new 2026-07-13, #1452) — coupled faithful fix deferred from J21; ADR-0085 records the hold finding; J23 must A/B the recenter alongside the step-rule change
 J18 composite fidelity ports (✅ 2026-07-13 — all divergences merged; f/shrink port declined as documented divergence) · J19 J6-residue RE (✅ 2026-07-12) — both spawned by J6
 ```
@@ -53,10 +53,10 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 7 |
+| ⬜ Open | 6 |
 | 📋 Planned | 0 |
 | ◑ Partial | 0 |
-| ✅ Implemented | 15 |
+| ✅ Implemented | 16 |
 | 🚫 Declined | 0 |
 
 ---
@@ -85,7 +85,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 | J18 | Composite fidelity ports (bucketweights/teamquality vs the J6 formula map) | ✅ Implemented | 🧠 Opus | M |
 | J19 | J6-residue RE (energy operands, rec+0x18 semantics, escape re-derivation, +0xD58) | ✅ Implemented | 🧠 Opus | M |
 | J20 | Empty-FGA / within-possession restructure (Cov possession channel) | ⬜ Open | 🧠 Opus | L |
-| J21 | gt=4 playoff-margin overshoot audit (playoffNetMultiplier ×1.25) | ⬜ Open | 🧠 Opus | S |
+| J21 | gt=4 playoff-margin overshoot audit (playoffNetMultiplier ×1.25) | ✅ Implemented | 🧠 Opus | S |
 | J22 | Per-player rl_stl/rl_tov production-bundle wiring (PF dispersion) | ⬜ Open | 🧠 Opus | M |
 | J23 | round-half-up + base_time re-center (coupled pace faithful fix) | ⬜ Open | 🧠 Opus | M |
 
@@ -183,7 +183,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 **Location:** `engine/internal/sim/gametype.go:16` (`playoffNetMultiplier = 1.25`, pinned from `jsb-native/00_MASTER_REFERENCE.md` L1022-1027: net × 1.25 when `game_type == 4`), applied at `engine/internal/sim/netadvantage.go:31-32` (`net *= playoffNetMultiplier` on the signed 2pt half-court net).
 **Problem:** the ×1.25 *constant* is RE-grounded, but the resulting playoff-margin distribution has never been audited against 5.60's `.sco` playoff corpus — Fable flagged a gt=4 margin **overshoot** (engine playoff margins run hotter than real). Unknown whether the cause is the multiplier's application scope (it amplifies the signed net *before* the corpus-anchored basis-conversion dials — foulBucketScale etc. — so a playoff-only interaction could compound them) or an independent playoff mechanism 5.60 applies that the engine lacks. Never adjudicated.
 **Direction:** measure engine gt=4 margin (mean + dispersion) vs the `.sco` playoff-game subset, A/B against gt=2; if it overshoots, RE 5.60's playoff net path (is ×1.25 the only playoff amplifier?) and adjudicate whether the fix is a scope correction or a missing mechanism. Sequence with J13 (cut-over needs authoritative playoff bands). A/B gate = gt4 margin mean/dispersion vs corpus. **Not a count-axis lever** (that is J20).
-**Status (2026-07-13):** ⬜ Open — new. 🧠 Opus (audit + verdict); any port ⚙️ Sonnet.
+**Status (2026-07-14):** ✅ Implemented — PR `jsb-j21-playoff-margin-audit`. Audit ran on the `.sco` corpus (runs=20 stride=1 seed=20240601): gt2 engine margin +3.892±7.909 vs sco +4.124±17.519 (N=19843); gt4 engine margin +4.306±7.188 vs sco +4.590±16.061 (N=1009). Overshoot A/B: gt4−gt2 |MarginGap| delta +0.051 pts (thr 1.00), dispersion-ratio delta −0.004 (thr 0.15). **Verdict: NO overshoot** — the Fable-flagged gt=4 hot-margin is not confirmed. Notable: engine margin sd (~7–8) runs ~½ the `.sco` sd (~16–17) and the gt4 engine mean (4.306) is COOLER than `.sco` (4.590) — the engine UNDER-disperses and runs cooler, the *opposite* of the flagged overshoot; and that under-dispersion is GLOBAL (present at gt2 too), not a gt4-specific lever, so **no follow-on fix filed**. Pinned in `engine/internal/calibrate/playoffmargin_archive_test.go`. 🧠 Opus.
 
 ### J22 Per-player rl_stl/rl_tov production-bundle wiring
 *(discovered 2026-07-13 during jsb-native RE-tooling feasibility review)*

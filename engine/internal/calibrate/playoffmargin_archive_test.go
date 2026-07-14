@@ -36,27 +36,33 @@ func findMargin(ms []HomeMarginCalibration, gt bundle.GameType) (HomeMarginCalib
 	return HomeMarginCalibration{}, false
 }
 
-// RECORDED BASELINE (current engine, committed run config below): [FILLED IN PHASE 4]
+// RECORDED BASELINE — run of record 2026-07-14, config runs=20 stride=1 seed=20240601:
 //
-//	gt2: engine margin=____ sd=____ | sco margin=____ sd=____
-//	gt4: engine margin=____ sd=____ | sco margin=____ sd=____
-//	OVERSHOOT A/B: |MarginGap| delta=____ pts; dispersion-ratio delta=____
-//	VERDICT: [confirmed / not confirmed] — see backlog J21.
+//	gt2 (N=19843): engine margin=+3.892 sd=7.909 | sco margin=+4.124 sd=17.519
+//	gt4 (N=1009):  engine margin=+4.306 sd=7.188 | sco margin=+4.590 sd=16.061
+//	OVERSHOOT A/B: gt4−gt2 |MarginGap| delta=+0.051 pts (thr 1.00); dispersion-ratio delta=−0.004 (thr 0.15)
+//	VERDICT: NOT confirmed — no playoff-specific margin overshoot. See backlog J21.
+//
+// Notable (informs the verdict, does NOT flip it): engine margin sd (~7–8) is
+// roughly HALF the .sco sd (~16–17), and gt4 engine mean (4.306) runs COOLER than
+// .sco (4.590) — the engine UNDER-disperses and runs cooler, the opposite of the
+// Fable-flagged "runs hotter." That under-dispersion is GLOBAL (present at gt2
+// too), not a gt4-specific lever, so the A/B verdict is correctly NO overshoot.
 //
 // Tolerance-band pins are calibrated to the committed DEFAULT run config
 // (runs=20 stride=1 seed=20240601) and enforced only at that config; an env
 // override changing runs/stride/seed logs the numbers but skips the hard pins,
 // because a coarser stride legitimately shifts the engine mean.
 const (
-	// [FILLED IN PHASE 4 from the run of record]
-	pinGt2EngineMargin = 0.0
-	pinGt2EngineStdDev = 0.0
-	pinGt4EngineMargin = 0.0
-	pinGt4EngineStdDev = 0.0
-	pinGt2ScoMargin    = 0.0
-	pinGt2ScoStdDev    = 0.0
-	pinGt4ScoMargin    = 0.0
-	pinGt4ScoStdDev    = 0.0
+	// Filled from the run of record (2026-07-14, runs=20 stride=1 seed=20240601).
+	pinGt2EngineMargin = 3.892150884
+	pinGt2EngineStdDev = 7.908589026
+	pinGt4EngineMargin = 4.306442022
+	pinGt4EngineStdDev = 7.188251835
+	pinGt2ScoMargin    = 4.124225168
+	pinGt2ScoStdDev    = 17.519076628
+	pinGt4ScoMargin    = 4.589692765
+	pinGt4ScoStdDev    = 16.060593045
 
 	marginPinTol    = 0.75 // engine-side band (pts): absorbs float reassociation, not distribution shifts
 	minPlayoffGames = 20   // dispersion floor: never compute stddev on 1–2 playoff games
@@ -124,9 +130,11 @@ func TestRealArchive_PlayoffMargin(t *testing.T) {
 
 	// Full readout — every {engine,sco}×{mean,stddev}×{gt2,gt4} + MarginGap, so the
 	// verdict is auditable whichever way it fires.
-	t.Logf("REGULAR (gt2)  N=%d  engine margin=%+.3f sd=%.3f | sco margin=%+.3f sd=%.3f | gap=%+.3f",
+	// %.9f so the recorded values are auditable at pin precision (sco pins band
+	// ±1e-6; a coarser readout could not be re-pinned against them).
+	t.Logf("REGULAR (gt2)  N=%d  engine margin=%+.9f sd=%.9f | sco margin=%+.9f sd=%.9f | gap=%+.9f",
 		gt2.N, gt2.EngineHomeMargin, gt2.EngineMarginStdDev, gt2.ScoHomeMargin, gt2.ScoMarginStdDev, gt2.MarginGap)
-	t.Logf("PLAYOFF (gt4)  N=%d  engine margin=%+.3f sd=%.3f | sco margin=%+.3f sd=%.3f | gap=%+.3f",
+	t.Logf("PLAYOFF (gt4)  N=%d  engine margin=%+.9f sd=%.9f | sco margin=%+.9f sd=%.9f | gap=%+.9f",
 		gt4.N, gt4.EngineHomeMargin, gt4.EngineMarginStdDev, gt4.ScoHomeMargin, gt4.ScoMarginStdDev, gt4.MarginGap)
 
 	// Overshoot A/B (engine-vs-sco, gt4 relative to gt2). dispRatio = engine sd ÷

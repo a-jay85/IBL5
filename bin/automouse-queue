@@ -53,6 +53,7 @@ show_queue() {
             impl_model=$(awk '/^---/{if(++n==1)next;exit} n==1&&/^impl_model:/{print $2}' "$f" 2>/dev/null) || true
             auto_merge=$(awk '/^---/{if(++n==1)next;exit} n==1&&/^auto_merge:/{print $2}' "$f" 2>/dev/null) || true
             title=$(grep -m1 '^# ' "$f" 2>/dev/null | sed 's/^# //') || true
+            [ -z "$title" ] && title=$(awk '/^---/{if(++n==1)next;exit} n==1&&/^title:/{sub(/^title:[[:space:]]*/,""); gsub(/^["\x27]|["\x27]$/,""); print; exit}' "$f" 2>/dev/null) || true
         else
             impl_model="" auto_merge="" title="(BROKEN LINK -> $(readlink "$f"))"
         fi

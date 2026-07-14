@@ -48,7 +48,7 @@
     "@playwright/test": "1.61.1",
     "@tailwindcss/cli": "^4.3.2",
     "browser-sync": "^3.0.4",
-    "eslint": "^10.6.0",
+    "eslint": "^10.7.0",
     "eslint-plugin-playwright": "^2.10.5",
     "pixelmatch": "^7.2.0",
     "pngjs": "^7.0.0",

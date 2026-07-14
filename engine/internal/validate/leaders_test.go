@@ -7,18 +7,6 @@ import (
 	"github.com/a-jay85/IBL5/engine/internal/backup"
 )
 
-// boxOf constructs a ScoBox for test cases.
-func boxOf(team, pid, twoGM, threeGM, ftm int) backup.ScoBox {
-	return backup.ScoBox{
-		TeamID:   team,
-		PlayerID: pid,
-		TwoGM:    twoGM,
-		ThreeGM:  threeGM,
-		FTM:      ftm,
-		Min:      20,
-	}
-}
-
 // boxFull constructs a ScoBox with all 13 counting stats set.
 func boxFull(team, pid int, vals [13]int) backup.ScoBox {
 	return backup.ScoBox{

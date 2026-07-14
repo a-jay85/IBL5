@@ -187,8 +187,8 @@ type BReport struct {
 	TeamSeasons       int       // teams that yielded a finite rho
 	Correlations      []float64 // one finite rho per qualifying team
 	Mean              float64
-	StdDev            float64  // population std dev of Correlations
-	FractionAboveHalf float64  // fraction with rho > 0.5
+	StdDev            float64 // population std dev of Correlations
+	FractionAboveHalf float64 // fraction with rho > 0.5
 	NegativeTeams     []BNegative
 	Skipped           int     // teams dropped: < minPlayers, or degenerate (zero variance)
 	MaxPlayerAvg      float64 // max per-player .sco scoring average (cumulative-misread guardrail)

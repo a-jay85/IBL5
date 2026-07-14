@@ -15,13 +15,13 @@ import (
 
 // leadersCheckASummary is the program-wide aggregate written to the artifact.
 type leadersCheckASummary struct {
-	Games          int              `json:"games"`
-	GamesPassed    int              `json:"games_passed"`
-	MismatchCount  int              `json:"mismatch_count"`
-	NegativeCount  int              `json:"negative_count"`
-	DominanceCount int              `json:"dominance_count"`
-	MismatchSample []validate.AMismatch  `json:"mismatch_sample,omitempty"`
-	NegativeSample []validate.ANegative  `json:"negative_sample,omitempty"`
+	Games           int                   `json:"games"`
+	GamesPassed     int                   `json:"games_passed"`
+	MismatchCount   int                   `json:"mismatch_count"`
+	NegativeCount   int                   `json:"negative_count"`
+	DominanceCount  int                   `json:"dominance_count"`
+	MismatchSample  []validate.AMismatch  `json:"mismatch_sample,omitempty"`
+	NegativeSample  []validate.ANegative  `json:"negative_sample,omitempty"`
 	DominanceSample []validate.ADominance `json:"dominance_sample,omitempty"`
 }
 
@@ -185,11 +185,11 @@ func TestLeadersCheckBArchive(t *testing.T) {
 	}
 
 	var (
-		allCorrelations []float64
-		allNegatives    []validate.BNegative
-		totalSkipped    int
+		allCorrelations  []float64
+		allNegatives     []validate.BNegative
+		totalSkipped     int
 		maxAcrossSeasons float64
-		teamSeasons     int
+		teamSeasons      int
 	)
 
 	for _, s := range seasons {

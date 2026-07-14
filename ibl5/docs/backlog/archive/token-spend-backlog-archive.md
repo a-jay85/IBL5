@@ -34,6 +34,11 @@ Read-only historical record of ✅ Implemented entries. For OPEN items see ../to
 **Problem (was):** Uncapped sessions reached 400K+ context; every turn of such a session re-reads the whole window from cache, and reasoning quality degrades well before that size.
 **Status (2026-07-07):** ✅ Implemented — capped at 200K (120K was tried and thrashed — back-to-back compactions — in both interactive and headless runs; 200K is the measured compromise).
 
+### T7 Resident-overlay diet (MEMORY.md + rules)
+**Location:** Memory index `MEMORY.md` (was 18.1KB, ~90 lines, 191 topic files behind it); `.claude/rules/agent-tiering.md`.
+**Problem (was):** Every request and every subagent spawn carried the full overlay; on a typical ~35K-token request it was ~27% of the read.
+**Status (2026-07-14):** ✅ Implemented in two parts. **(1) Rules half (2026-07-11):** `agent-tiering.md` prose relocated into `agent-tiering-detail.md` — its `## Skip the Agent` heuristic moved and the redundant Flat-fan-out / Context-economics / Prompt-style tail removed, leaving only the Tier table + Explore rules (down from ~5.9KB to under the 5000-byte T2 budget); cross-refs in `work-triage.md` and `.claude/skills/plan/SKILL.md` repointed. **(2) Index half (2026-07-14):** MEMORY.md dieted from 18.1KB → ~6.1KB (well under the ≤8KB target). Key finding — recall surfaces topic files by their `description:` frontmatter **independent** of the index (70 of 190 topic files already lived unindexed), so the diet is **lossless de-residenting**, not deletion: only *preventive* memories (must fire before a path — user profile, guardrails, "don't re-audit" pipeline status, dated ⏰ reminders) stay resident; *reactive* ones (DB/testing/E2E/domain/CI-gotcha/refactoring/web-server/tooling references) moved out, files intact, recalled on demand. Added `description:` frontmatter to `migrations.md` (it had none) so it recalls after de-residenting. Held in place afterwards by T2/T13 (rules budget) and the deferred T5 index-dedup hook.
+
 ### T8 Re-enable adaptive thinking
 **Location:** `$HOME/.claude/settings.json`.
 **Problem (was):** `CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING=1` forced full thinking (billed as output — the most expensive class) on every turn.

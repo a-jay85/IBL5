@@ -1,6 +1,6 @@
 ---
 description: Development-efficiency backlog — inner-loop speed (diff-scoped analysis, parallel tests), CI caching, dependency-bump batching, and worktree lifecycle automation, with per-entry status.
-last_verified: 2026-07-07
+last_verified: 2026-07-14
 ---
 
 # Development-Efficiency Backlog
@@ -100,9 +100,11 @@ last_verified: 2026-07-07
 ### E8 Memory lines → mechanical gates (umbrella)
 **Location:** The memory index (`MEMORY.md`) and its context→mechanical audit; delivered gates land in `bin/` + `.github/workflows/`.
 **Problem:** Norms that live only as memory lines are always-loaded context tax and fail silently when stale; a gate enforces the norm at zero per-turn cost.
-**Suggested direction:** Keep converting: **done** — memory-expiry marker + SessionStart hook; **queued** — a `test` dispatcher under `bin/` routing unit/db/e2e to the correct runner (`$HOME/.claude/plans/test-dispatcher.md`), seed-pid collision CI gate (`$HOME/.claude/plans/seed-pid-collision-check.md`); **open** — remaining bucket-B gates from the audit. Each shipped gate retires its memory line (pairs with T7 in [token-spend-backlog.md](token-spend-backlog.md)).
+**Suggested direction:** Keep converting each mechanizable norm to a gate that retires its memory line (pairs with T7 in [token-spend-backlog.md](token-spend-backlog.md)).
+**Delivered:** memory-expiry marker + SessionStart hook; the `bin/test` unit/db/e2e dispatcher; the seed-id collision gate (`ibl5/bin/check-seed-id-uniqueness`, CI-wired) — both previously "queued" here, now shipped; plus the bucket-B round-2/3 sweep — bash-guard checks (plans-rm, force-push, worktree-stash, prod-migration SQL), `ibl5/bin/check-config-example`, `ibl5/bin/check-xml-class-refs` + extension-less `bin/` scripts enrolled in `ibl5/phpstan.neon`, `ibl5/bin/check-th-aria-label`, and the ASG conference-split regression lock (`ibl5/tests/LeagueTest.php`).
+**Open (2026-07-14):** exactly one — the **free-agents teamid write guard** (`FREE_AGENTS_TEAM_NAME`/null team must not write `teamid=0`). Not cleanly mechanizable as a lint (the guards live legitimately in ~8 sibling controllers, so a call-graph rule is false-positive-prone); the tractable route is characterization tests per write path (the ASG precedent). Needs its own `/plan` — not an ad-hoc, not a today-ship.
 **Risk if untouched:** Recall dilution plus repeat failures the gates would have caught.
-**Status (2026-07-07):** ◑ Partial — expiry mechanism merged; two gates queued; audit backlog open. 🟨 per gate.
+**Status (2026-07-14):** ◑ Partial — cheap-gate well exhausted; the only remaining item (free-agents guard) is a standalone `/plan`. 🟨.
 
 ### E9 Meta-tooling growth bar
 **Location:** Plan: `$HOME/.claude/plans/meta-tooling-bar.md` (queued) — extend-before-add rule + quarterly cull.

@@ -29,10 +29,10 @@ last_verified: 2026-07-14
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 2 |
+| ⬜ Open | 1 |
 | 📋 Planned | 0 |
 | ◑ Partial | 0 |
-| ✅ Implemented | 11 |
+| ✅ Implemented | 12 |
 | 🚫 Declined | 0 |
 
 Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive/token-spend-backlog-archive.md).
@@ -44,7 +44,6 @@ Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive
 | # | Title | Status | Locus | Effort |
 |---|-------|--------|-------|-------:|
 | T4 | Driver-model downshift for babysitting loops | ⬜ Open | ⌂ | M |
-| T13 | Aggregate always-loaded rules budget | ⬜ Open | repo | S |
 
 ### T4 Driver-model downshift for babysitting loops
 **Location:** Interactive workflow — CI-watching, merge-nudging, and re-run loops currently run in the main (Opus/Fable) session.
@@ -54,12 +53,7 @@ Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive
 **Status (2026-07-07):** ⬜ Open. **(2026-07-14):** L6/L8 in [loop-engineering-backlog.md](loop-engineering-backlog.md) have both since shipped ✅ Implemented, so nightly babysitting is largely removed; residual scope narrows to interactive CI-watch/merge-nudge sessions.
 
 
-### T13 Aggregate always-loaded rules budget
-**Location:** `bin/check-rules-byte-budget` + `.claude/rules/*.md` (path-unscoped subset).
-**Problem:** T2's shipped gate caps each path-unscoped rules file at 5000 bytes but caps neither the file COUNT nor the TOTAL — the always-loaded surface can still regrow one new 4.9KB file at a time (28 rules files exist per `.claude/rules/meta-tooling-bar.md`'s 2026-07-09 census).
-**Suggested direction:** Extend `bin/check-rules-byte-budget` (extend-before-add — no new gate) with a total-bytes budget for the path-unscoped subset; wire stays in the existing `static-guards` job.
-**Risk if untouched:** Per-file cap passes while the per-turn fixed tax regrows via file proliferation.
-**Status (2026-07-14):** ⬜ Open (discovered 2026-07-14 during token-spend-triage).
+➜ T13 Aggregate always-loaded rules budget — ✅ Implemented (2026-07-14): see [archive](archive/token-spend-backlog-archive.md).
 
 ➜ T7 Resident-overlay diet (MEMORY.md + rules) — ✅ Implemented (2026-07-14): see [archive](archive/token-spend-backlog-archive.md).
 

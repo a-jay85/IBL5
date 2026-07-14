@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed token-spend reduction entries, extracted from token-spend-backlog.md.
-last_verified: 2026-07-11
+last_verified: 2026-07-14
 ---
 
 # Token-Spend Reduction Backlog — Archive
@@ -43,3 +43,8 @@ Read-only historical record of ✅ Implemented entries. For OPEN items see ../to
 **Location:** `.claude/agents/plan-architect.md` (pins `model: opus`); `/plan` Step 3 spawns it for every plan.
 **Problem (was):** Every plan paid an Opus-xhigh architect run even when the design was already resolved upstream — a backlog entry naming the recipe, the files, and the pattern to copy (the marker-swap / mechanical-sweep class). Composing a plan from a pre-resolved recipe is mechanical composition, not novel design.
 **Status (2026-07-11):** ✅ Implemented — added `.claude/agents/plan-architect-sonnet.md` and a recipe-backed Sonnet branch in `/plan` Step 3's ordered tier selection (xhigh > recipe-backed Sonnet > Opus default), with the `agent-tiering.md` Opus (delegated) row updated to match; rollout monitored via the T1 tier ledger.
+
+### T9 Lazy-load plan/post-plan skills
+**Location:** `.claude/skills/plan/SKILL.md` (~55KB ≈ 13K tokens) and `.claude/skills/post-plan/SKILL.md` (~68KB ≈ 17K tokens) — each a single file loaded whole at invocation and resident for the entire run.
+**Problem (was):** A long post-plan run re-reads ~17K tokens every turn, plus a fresh cache write per nightly session.
+**Status (2026-07-14):** ✅ Implemented — both restructures shipped. Post-plan (#1389, merged 2026-07-09): `.claude/skills/post-plan/SKILL.md` cut from ~68KB to ~30KB, split into seven `_phase-*.md` reference files read on phase entry. Plan-skill (#1363, merged 2026-07-08): `.claude/skills/plan/SKILL.md` Step 3 slimmed (Regions A/B removed, contract pointer wired), extracting the architect contract into on-demand `.claude/skills/plan/_architect-contract.md`. The two restructures were deliberately different shapes: plan-skill did not mirror post-plan's per-phase orchestrator split — instead it moved the architect contract into the plan-architect subagent's throwaway context, since the orchestrator's Steps 1–4 are too interdependent/reasoning-heavy to split. That contract extraction was the complete intended optimization for plan-skill, not a partial step toward a fuller split — both halves of T9 are done.

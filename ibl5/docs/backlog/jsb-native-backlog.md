@@ -1,6 +1,6 @@
 ---
 description: JSB native-engine backlog — the count-axis cut-over blocker chain, static RE pins, faithful ports, and validation gates, each tagged with the model tier that owns its load-bearing reasoning (Fable-gated items marked).
-last_verified: 2026-07-13
+last_verified: 2026-07-14
 ---
 
 # JSB Native-Engine Backlog
@@ -41,6 +41,7 @@ J1 faithful foul pair (✅ 2026-07-10, ADR-0082) ─→ J2 adjudications (✅ 20
               └─→ J2 verdict: SHIPPABLE with residual → successor = J20 empty-FGA restructure (J4 ✅ 2026-07-12 feeds it) → J13 (unblocked)
 J17 game-state foul coupling (⬜, new 2026-07-10) — real 5.60 mechanism the engine lacks entirely
 J21 gt=4 playoff-margin audit (⬜, new 2026-07-13) · J22 per-player STL/TOV bundle wiring (⬜, new 2026-07-13) — cut-over-gate fidelity inputs to J13; NEITHER is a count-axis (J20) lever
+J23 round-half-up + base_time re-center (⬜, new 2026-07-13, #1452) — coupled faithful fix deferred from J21; ADR-0085 records the hold finding; J23 must A/B the recenter alongside the step-rule change
 J18 composite fidelity ports (✅ 2026-07-13 — all divergences merged; f/shrink port declined as documented divergence) · J19 J6-residue RE (✅ 2026-07-12) — both spawned by J6
 ```
 
@@ -86,6 +87,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 | J20 | Empty-FGA / within-possession restructure (Cov possession channel) | ⬜ Open | 🧠 Opus | L |
 | J21 | gt=4 playoff-margin overshoot audit (playoffNetMultiplier ×1.25) | ⬜ Open | 🧠 Opus | S |
 | J22 | Per-player rl_stl/rl_tov production-bundle wiring (PF dispersion) | ⬜ Open | 🧠 Opus | M |
+| J23 | round-half-up + base_time re-center (coupled pace faithful fix) | ⬜ Open | 🧠 Opus | M |
 
 ### J1 Faithful foul-bucket pair port
 ➜ J1 Faithful foul-bucket pair port — ✅ Implemented (2026-07-10): see [archive](archive/jsb-native-backlog-archive.md).
@@ -190,3 +192,10 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 **Not the count-axis:** wiring real STL/TOV raises PF *dispersion* — a fidelity fix, **not** a Cov(lnFGA,lnPPS) lever (that is J20). File as a dispersion-fidelity follow-on, never a cut-over sign blocker.
 **Direction:** confirm whether the production-bundle SOURCE (`.plr` / real-life stat feed) carries per-player steal/turnover counting sums; if so, add them to the bundle reader + wire into the composites replacing the rating stand-ins; if not, RE where 5.60 sources them. A/B gate = Var(lnPF) ratio toward real, no regression on margin/fta anchors or gt2/gt4 Cov. Sequence after J20 (Cov structure first) so the dispersion A/B reads clean.
 **Status (2026-07-13):** ⬜ Open — new. 🧠 Opus (source question + Var(lnPF) A/B judgment); port ⚙️ Sonnet once source confirmed.
+
+### J23 round-half-up + base_time re-center (coupled pace faithful fix)
+*(deferred from J21 pace-dispersion investigation, 2026-07-13, PR #1452)*
+**Location:** `engine/internal/sim/tempo.go` (`possessionTime` function, `offVolumeNeutral` / `defRatingNeutral` constants); `engine/internal/calibrate/possessioncoupling_archive_test.go` (four-term A/B harness).
+**Problem:** ADR-0085 (J21 finding) established two coupled imperfections: (1) `possessionTime` uses `int()` truncation where 5.60 uses round-half-up (`FUN_004e42e0`, `_DAT_00669ef0=0.5` confirmed from `.rdata`); (2) the engine's neutral center `baseTimeMid=14.5s` is ~0.7s too slow (real effective step ≈ 13.8s = 1440/104.6). These partially cancel: truncation's downward bias accidentally compensates the too-slow center. The J21 A/B confirmed shipping round-alone regresses mean pace (101.9→97.6 vs real 104.6) and does not flip the wrong-signed Cov(lnPOSS,lnPPS). The faithful end-state requires both changes together.
+**Direction:** ship round-half-up in `possessionTime` paired with a base_time re-centering (reduce `offVolumeNeutral` and/or adjust `offVolumeScale`/`defRatingScale` so the mean pace lands near real ~104.6); A/B the recenter independently first (it interacts with `Var(lnPOSS)` via the 13s clamp floor); then run the coupled round+recenter A/B on the four-term gate (Cov(lnPOSS,lnPPS) sign flip, Cov(lnFGA,lnPPS) total, Var(lnPOSS) toward 0.000721 without overshoot, Var(lnFGA) ≤ real 0.001330); re-establish the characterization pins from `possession_pace_pin_test.go`. Derive mean/variance targets against the paired `.sco` comparators per the J15/ADR-0084 paired-comparator principle.
+**Status (2026-07-13):** ⬜ Open — deferred from J21. Sequence after J20 (the Cov-structure question) and J22 (STL/TOV bundle wiring). 🧠 Opus (recenter design + four-term adjudication).

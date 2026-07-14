@@ -142,6 +142,10 @@ func TestRealArchive_PossessionCoupling(t *testing.T) {
 	t.Logf("  └ Cov(lnPOSS,lnPPS):       engine=%+.6f real=%+.6f", fid.EngineCovLnPossLnPPS, fid.RealCovLnPossLnPPS)
 	t.Logf("  └ Cov(lnFGA/POSS,lnPPS):   engine=%+.6f real=%+.6f", fid.EngineCovLnShotsPerPossLnPPS, fid.RealCovLnShotsPerPossLnPPS)
 	t.Logf("  Var(lnPOSS): engine=%.6f real=%.6f  poss_dispersion=%.2f", fid.EngineVarLnPoss, fid.RealVarLnPoss, fid.PossDispersionRatio)
+	// Budget-mirror term (ADR-0054/J21): widening pace dispersion propagates into
+	// FGA dispersion via Var(lnFGA) ≈ Var(lnPOSS) + Var(ln(FGA/POSS)) + 2·Cov. The
+	// engine value must stay ≤ real (headroom, not overshoot) — the 4th A/B gate term.
+	t.Logf("  Var(lnFGA):  engine=%.6f real=%.6f  (budget-mirror ceiling — engine must stay ≤ real)", fid.EngineVarLnFGA, fid.RealVarLnFGA)
 	t.Logf("VERDICT: the factor whose Cov term carries the wrong sign (engine − vs real +) is where the ADR-0049 build PR must intervene.")
 
 	// Cheap cross-check (advisor): the per-team engine proxy mean should land near the

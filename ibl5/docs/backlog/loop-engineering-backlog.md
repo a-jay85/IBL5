@@ -1,6 +1,6 @@
 ---
 description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, plan decomposition/tier-routing machinery, and the human comprehension counter-loop, with per-entry status.
-last_verified: 2026-07-12
+last_verified: 2026-07-14
 ---
 
 # Loop-Engineering Backlog
@@ -27,8 +27,8 @@ last_verified: 2026-07-12
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 8 |
-| 📋 Planned | 1 |
+| ⬜ Open | 7 |
+| 📋 Planned | 2 |
 | ◑ Partial | 3 |
 | ✅ Implemented | 5 |
 | 🚫 Declined | 0 |
@@ -54,7 +54,7 @@ last_verified: 2026-07-12
 | L13 | Per-phase impl-model routing | ✅ Implemented | — | M |
 | L14 | Escalate-on-retry (Sonnet-first, just-in-time Opus) | ✅ Implemented | — | S |
 | L15 | Sonnet-recipe completeness lint | ⬜ Open | 🟦 | S |
-| L16 | Context-budget gate v2 (work-size proxies + measured calibration) | ⬜ Open | 🟦 | M |
+| L16 | Context-budget gate v2 (work-size proxies + measured calibration) | 📋 Planned | 🟦 | M |
 | L17 | Shared-context artifact for multi-plan splits | ✅ Implemented | — | S |
 
 ### L1 Plan dependency DAG
@@ -151,7 +151,7 @@ last_verified: 2026-07-12
 **Problem:** Two blind spots. (1) Plan size ≠ work size: a 100-line plan phase saying "sweep every call site" triggers a marathon implementation the gate can't see, while a reference-heavy plan false-trips and gets papered over with a `context-budget:` marker. (2) No feedback loop: nothing re-checks the thresholds as plan style evolves, so the gate drifts from the dumb-zone reality it proxies.
 **Suggested direction:** (a) Add work-size proxies — Verification-Matrix row count, Critical-Files change-target count, and sweep-verb detection ("all call sites", "every occurrence") in a phase without a delegation packet. (b) Log peak context tokens per impl run into the T1 ledger (the stream-json usage events already carry them) and add a report correlating plan proxies against measured peaks — recalibrate thresholds from data, and flag any run breaching ~150K as a Step 2.5 split miss for the retro.
 **Risk if untouched:** Dumb-zone breaches keep happening under the gate's radar, and the thresholds stay a one-shot guess.
-**Status (2026-07-08):** ⬜ Open — 🟦. Pairs with T1 in [token-spend-backlog.md](token-spend-backlog.md).
+**Status (2026-07-14):** 📋 Planned — plan slug `context-budget-gate-v2`; ships check-plan [C] proxy counts, [W] sweep-verb advisory, stream-filter peak_ctx tracking, and costs.md Peak Ctx column.
 
 ### L17 Shared-context artifact for multi-plan splits
 ✅ Implemented (2026-07-11) — see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).

@@ -69,12 +69,12 @@ test.describe('League Schedule — box score links', () => {
     await page.goto(SCHEDULE_URL);
   });
 
-  test('played game with game_of_that_day has IBL6 link', async ({ page }) => {
+  test('played game with game_of_that_day has internal GameBoxscore link', async ({ page }) => {
     // Feb 20 game has ibl_box_scores_teams row with game_of_that_day=1
-    const ibl6Link = page.locator(
-      '.schedule-game a.schedule-game__score-link[href*="boxscore"]',
+    const boxscoreLink = page.locator(
+      '.schedule-game a.schedule-game__score-link[href*="GameBoxscore"]',
     );
-    await expect(ibl6Link.first()).toBeVisible();
+    await expect(boxscoreLink.first()).toBeVisible();
   });
 
   test('played game with box_id has legacy link', async ({ page }) => {

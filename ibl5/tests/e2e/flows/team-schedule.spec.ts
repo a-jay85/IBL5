@@ -219,12 +219,12 @@ test.describe('Team Schedule — box score links', () => {
     await page.goto(TEAM_SCHEDULE_URL);
   });
 
-  test('IBL6 link on game with game_of_that_day', async ({ page }) => {
+  test('internal GameBoxscore link on game with game_of_that_day', async ({ page }) => {
     // Feb 20 game has ibl_box_scores_teams row with game_of_that_day=1
-    const ibl6Link = page.locator(
-      '.schedule-game a.schedule-game__score-link[href*="boxscore"]',
+    const boxscoreLink = page.locator(
+      '.schedule-game a.schedule-game__score-link[href*="GameBoxscore"]',
     );
-    await expect(ibl6Link.first()).toBeVisible();
+    await expect(boxscoreLink.first()).toBeVisible();
   });
 
   test('legacy link on game with box_id only', async ({ page }) => {

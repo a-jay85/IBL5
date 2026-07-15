@@ -550,6 +550,13 @@ sed -i s/a/b/ file.txt
 ````
 '
 
+# (S9) Word-boundary guard: a plan with "baseline 1" in the body (no standalone
+# "line NN" ref) still flags (exit 1) — "baseline 1" must NOT match \bline [0-9].
+assert "gateS-anchor-word-boundary-flags" 1 "$FM$M"'
+## Phase 1 — edit the widget
+The baseline 1 approach handles this; see guideline 5 for reference.
+'
+
 # ---------------------------------------------------------------------------
 # Directive presence: the runtime prompt (bin/automouse-prompt-impl) must keep
 # BOTH the packet-delegation instruction AND the exhaustive-and-pre-resolved

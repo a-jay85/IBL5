@@ -647,7 +647,7 @@ case "$RUN_MODEL" in
             # #{2,3} Step/Phase detector — reuse it, do not recount. A plan with
             # zero phase headings (creation-only / prose) is exempt.
             if [ "${CB_PHASES:-0}" -ge 1 ]; then
-                if ! grep -qiE 'anchor|line [0-9]' "$PLAN_FILE" \
+                if ! grep -qiE 'anchor|\bline [0-9]' "$PLAN_FILE" \
                    && ! grep -qE '^[[:space:]]*`{4,}' "$PLAN_FILE"; then
                     viol "[S] impl_model: sonnet plan has no edit-anchor signal (Anchor keyword, 'line NN' reference, or 4-backtick fence); add anchors or suppress with 'sonnet-recipe: ...'"
                 fi

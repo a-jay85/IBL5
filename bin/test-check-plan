@@ -472,6 +472,150 @@ else
     echo "ok: automouse-prompt-impl retains exhaustive-and-pre-resolved tier mandate"
 fi
 
+# ---------------------------------------------------------------------------
+# Gate [W]: sweep-verb advisory tests
+# ---------------------------------------------------------------------------
+
+# Test 4a: [W]-clean-pass — no sweep verbs exits 0 with no advisory
+assert "[W]-clean-pass" 0 "$FM
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | setting renamed correctly | PHPUnit | post-impl | \`tests/ConfigTest.php\` |
+
+## Phase 1: Update the configuration
+
+**Tier:** self
+
+Rename the setting in config.php.
+
+## Critical Files
+
+- \`config.php\`
+"
+
+# Test 4b: [W]-sweep-verb-advisory — sweep verb WITHOUT delegation fires advisory but exits 0
+assert "[W]-sweep-verb-advisory" 0 "$FM
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | helper renamed | PHPUnit | post-impl | \`tests/ServiceTest.php\` |
+
+## Phase 1: Rename all call sites of old helper
+
+**Tier:** self
+
+Update all call sites of \`legacyHelper()\` to use \`newHelper()\` in all PHP files.
+
+## Critical Files
+
+- \`src/Service/OldService.php\`
+"
+
+# Companion: confirm the advisory was emitted
+_body="$FM
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | helper renamed | PHPUnit | post-impl | \`tests/ServiceTest.php\` |
+
+## Phase 1: Rename all call sites of old helper
+
+**Tier:** self
+
+Update all call sites of \`legacyHelper()\` to use \`newHelper()\` in all PHP files.
+
+## Critical Files
+
+- \`src/Service/OldService.php\`
+"
+_f=$(mktemp)
+printf '%s\n' "$_body" > "$_f"
+if ! "$GUARD" "$_f" 2>&1 | grep -q '\[W\]'; then
+    echo "FAIL: [W]-sweep-verb-advisory — expected [W] advisory in stderr, got none"
+    FAILED=1
+else
+    echo "ok: [W]-sweep-verb-advisory advisory emission confirmed"
+fi
+
+# Test 4c: [W]-sweep-verb-with-delegation-pass — sweep verb WITH delegation packet exits 0, no advisory
+_body="$FM
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | helper renamed | PHPUnit | post-impl | \`tests/ServiceTest.php\` |
+
+## Phase 1: Rename all call sites of old helper
+
+**Tier:** Haiku (inline — small single-file sweep, below 15K bar)
+
+### Delegate — rename sweep
+
+- **Tier:** Haiku
+- **Scope:** \`src/Service/OldService.php\` — rename legacyHelper to newHelper
+- **Recipe:** sed replacement on one file
+- **Self-verify:** grep confirms zero remaining old name
+- **Report back:** one-line summary
+
+Update all call sites of \`legacyHelper()\`.
+
+## Critical Files
+
+- \`src/Service/OldService.php\`
+"
+_f=$(mktemp)
+printf '%s\n' "$_body" > "$_f"
+if "$GUARD" "$_f" 2>&1 | grep -q '\[W\]'; then
+    echo "FAIL: [W]-sweep-verb-with-delegation-pass — unexpected [W] advisory"
+    FAILED=1
+else
+    echo "ok: [W]-sweep-verb-with-delegation-pass"
+fi
+
+# Test 4d: [C]-message-contains-proxy-counts — overlong plan violation message includes proxy count fields
+_f=$(mktemp)
+printf '%s\n' \
+  '---' 'title: "Test over-long plan"' 'slug: test-over-long' \
+  'impl_model: sonnet' 'auto_merge: true' '---' '' \
+  '| # | What to verify | Test type | Timing | Test file / location |' \
+  '|---|---|---|---|---|' \
+  '| 1 | Dummy check | PHPUnit | post-impl | tests/DummyTest.php |' '' \
+  '## Phase 1: Do thing' '' '**Tier:** self' '' 'Change file X.' '' \
+  '## Critical Files' '' '- `bin/check-plan`' '' > "$_f"
+yes '# padding line' | head -490 >> "$_f"
+output=$("$GUARD" "$_f" 2>&1)
+if echo "$output" | grep -q '\[C\]' && echo "$output" | grep -q 'matrix rows'; then
+    echo "ok: [C]-message-contains-proxy-counts"
+else
+    echo "FAIL: [C]-message-contains-proxy-counts — expected [C] with 'matrix rows' in output"
+    echo "Got: $output"
+    FAILED=1
+fi
+
+# Negative-path check 4n — sweep verb in Out-of-Scope section does NOT fire advisory
+_f=$(mktemp)
+printf '%s\n' "$FM
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | thing works | PHPUnit | post-impl | \`tests/X.php\` |
+
+## Phase 1: Normal phase
+
+**Tier:** self
+
+Do a thing.
+
+## Out of Scope
+
+Does not touch all call sites of the old API.
+
+## Critical Files
+
+- \`bin/check-plan\`
+" > "$_f"
+if "$GUARD" "$_f" 2>&1 | grep -q '\[W\]'; then
+    echo "FAIL: sweep verb in Out-of-Scope should not fire [W]"
+    FAILED=1
+else
+    echo "ok: Out-of-Scope sweep-verb non-fire confirmed"
+fi
+
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"
     exit 1

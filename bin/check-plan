@@ -152,12 +152,14 @@ if [ "$REPO_ROOT" = "/" ]; then
 fi
 
 VIOL_FILE="$(mktemp)"
+WARN_FILE="$(mktemp)"
 MATRIX_FILE="$(mktemp)"
 SEEN_FILE="$(mktemp)"
 GATE8_SEEN="$(mktemp)"
-trap 'rm -f "$VIOL_FILE" "$MATRIX_FILE" "$SEEN_FILE" "$GATE8_SEEN"' EXIT
+trap 'rm -f "$VIOL_FILE" "$WARN_FILE" "$MATRIX_FILE" "$SEEN_FILE" "$GATE8_SEEN"' EXIT
 
 viol() { printf '%s\n' "$1" >> "$VIOL_FILE"; }
+warn() { printf '%s\n' "$1" >> "$WARN_FILE"; }
 
 # ---------------------------------------------------------------------------
 # Gate 1: Matrix exists.
@@ -422,11 +424,94 @@ done < <(grep -iE 'reuse' "$PLAN_FILE" \
 # `context-budget:` marker clears a deliberate exception, mirroring `no-adr:`.
 CB_LINES=$(wc -l < "$PLAN_FILE" | tr -d '[:space:]')
 CB_PHASES=$(grep -cE '^#{2,3}[[:space:]]+([Ss]tep|[Pp]hase)[[:space:]]*[0-9]' "$PLAN_FILE")
+CB_VM_ROWS=$(grep -cE '^\|[[:space:]]*[0-9]' "$PLAN_FILE" || true)
+CB_CF_COUNT=$(awk '
+    /^## Critical Files/{in_cf=1; next}
+    /^## /{in_cf=0}
+    in_cf && /^- `[^`]+`/ {
+        line=$0
+        if (line !~ /\(reference\)/ && line !~ /\(read-only\)/ && \
+            line !~ /\(verify\)/ && line !~ /\(template\)/ && \
+            line !~ /\(no-edit\)/ && line !~ /\(unchanged\)/ && \
+            line !~ /\(context\)/) count++
+    }
+    END {print count+0}
+' "$PLAN_FILE")
 if [ "$CB_LINES" -ge 500 ] || [ "$CB_PHASES" -ge 12 ]; then
     if ! grep -qF 'context-budget:' "$PLAN_FILE"; then
-        viol "[C] marathon-sized plan (${CB_LINES} lines, ${CB_PHASES} numbered phases; flags at >=500 lines or >=12 phases) — split into stacked PR-sized plans (/plan Step 2.5), or justify a deliberate exception with a 'context-budget:' marker"
+        viol "[C] marathon-sized plan (${CB_LINES} lines, ${CB_PHASES} numbered phases, ${CB_VM_ROWS} matrix rows, ${CB_CF_COUNT} critical-file targets; flags at >=500 lines or >=12 phases) — split into stacked PR-sized plans (/plan Step 2.5), or justify a deliberate exception with a 'context-budget:' marker"
     fi
 fi
+
+# ---------------------------------------------------------------------------
+# Gate [W]: Sweep-verb advisory (non-blocking).
+# Fires when a numbered implementation phase body contains a sweep verb
+# ("all call sites", "every occurrence", etc.) AND that phase has no
+# ### Delegate heading — a potential unbounded-scope signal.
+# Advisory only: emits warn(), does not set exit 1.
+# Bash 3.2-compatible: no mapfile, no declare -A, uses temp files for state.
+# ---------------------------------------------------------------------------
+_PHASE_TMP="$(mktemp)"
+awk -v phase_tmp="$_PHASE_TMP" '
+    # Track numbered phase headings (## Phase N / ## Step N)
+    /^#{2,3}[[:space:]]+(Phase|Step|phase|step)[[:space:]]*[0-9]/ {
+        if (in_phase && phase_num != "") {
+            # flush prior phase
+            printf "%s\t%s\t%s\n", phase_num, has_delegate, body > phase_tmp
+        }
+        in_phase = 1
+        phase_num = $0
+        has_delegate = 0
+        body = ""
+        next
+    }
+    # A top-level ## heading that is NOT a numbered phase ends the prior phase
+    /^## / && !/^#{2,3}[[:space:]]+(Phase|Step|phase|step)[[:space:]]*[0-9]/ {
+        if (in_phase && phase_num != "") {
+            printf "%s\t%s\t%s\n", phase_num, has_delegate, body > phase_tmp
+        }
+        in_phase = 0; phase_num = ""; body = ""; has_delegate = 0
+        next
+    }
+    # Detect a delegation packet heading inside this phase
+    in_phase && /^### Delegate/ { has_delegate = 1 }
+    # Skip fenced code blocks
+    in_phase && /^```/ { in_code = !in_code }
+    in_phase && !in_code { body = body " " $0 }
+    END {
+        if (in_phase && phase_num != "") {
+            printf "%s\t%s\t%s\n", phase_num, has_delegate, body > phase_tmp
+        }
+    }
+' "$PLAN_FILE"
+
+while IFS='	' read -r phase_heading has_delegate body; do
+    if [ "$has_delegate" = "0" ]; then
+        # Check for sweep verbs (case-insensitive via tr)
+        body_lower=$(printf '%s' "$body" | tr '[:upper:]' '[:lower:]')
+        matched=""
+        for pattern in \
+            "all call sites" "every occurrence" "all occurrences" \
+            "every caller" "all callers" "all uses" "all instances"; do
+            if printf '%s' "$body_lower" | grep -qF "$pattern"; then
+                matched="$pattern"
+                break
+            fi
+        done
+        # "every file" only matches when NOT followed by "-level"
+        if [ -z "$matched" ]; then
+            if printf '%s' "$body_lower" | grep -q 'every file' \
+               && ! printf '%s' "$body_lower" | grep -q 'every file-level\|every file level'; then
+                matched="every file"
+            fi
+        fi
+        if [ -n "$matched" ]; then
+            short_heading=$(printf '%s' "$phase_heading" | sed 's/^#*[[:space:]]*//')
+            warn "[W] sweep-verb advisory: '${short_heading}' contains '${matched}' without a delegation packet — consider delegating if scope is unbounded (add a ### Delegate block to suppress)"
+        fi
+    fi
+done < "$_PHASE_TMP"
+rm -f "$_PHASE_TMP"
 
 # ---------------------------------------------------------------------------
 # Gate T: below-run-model tier labels are bound (packet or inline marker).
@@ -501,6 +586,10 @@ if [ -s "$VIOL_FILE" ]; then
     echo "check-plan: violations in $PLAN_FILE" >&2
     cat "$VIOL_FILE" >&2
     exit 1
+fi
+if [ -s "$WARN_FILE" ]; then
+    echo "check-plan: advisories in $PLAN_FILE" >&2
+    cat "$WARN_FILE" >&2
 fi
 
 echo "check-plan: OK ($PLAN_FILE)"

@@ -328,20 +328,22 @@ model_tier() {
 # cross-phase variable dependency. See .claude/rules/automouse-workflow.md.
 append_cost_row() {
     local plan=$1 phase=$2 log_before=$3 model=${4:-?}
-    local cost report tier
+    local cost report tier peak_raw peak_k
     tier=$(model_tier "$model")
     # `|| true` is load-bearing: under `set -euo pipefail` a killed phase emits no
     # `cost=` line, so grep exits non-zero and this plain assignment would abort the
     # whole automouse loop before the `cost="?"` fallback below. Swallow it and continue.
     cost=$(tail -n +"$((log_before + 1))" "$LOG" | grep -oE 'cost=\$[0-9.]+' | tail -1 | sed 's/cost=\$//') || true
     [ -n "$cost" ] || cost="?"
+    peak_raw=$(tail -n +"$((log_before + 1))" "$LOG" | grep -oE 'peak_ctx=[0-9]+' | tail -1 | sed 's/peak_ctx=//') || true
+    peak_k=$(( ${peak_raw:-0} / 1000 ))
     report="$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-costs.md"
     mkdir -p "$(dirname "$report")"
     if [ ! -f "$report" ]; then
-        printf '# Automouse cost roll-up — %s\n\n| Plan | Phase | Model | Tier | Cost ($) |\n|---|---|---|---|---|\n' \
+        printf '# Automouse cost roll-up — %s\n\n| Plan | Phase | Model | Tier | Cost ($) | Peak Ctx (K) |\n|---|---|---|---|---|---|\n' \
             "$(date +%Y-%m-%d)" > "$report"
     fi
-    printf '| %s | %s | %s | %s | %s |\n' "$plan" "$phase" "$model" "$tier" "$cost" >> "$report"
+    printf '| %s | %s | %s | %s | %s | %dK |\n' "$plan" "$phase" "$model" "$tier" "$cost" "$peak_k" >> "$report"
     regenerate_weekly_section "$report"
 }
 
@@ -365,7 +367,7 @@ regenerate_weekly_section() {
             d=$(date -v-"${i}"d +%F); f="$reports_dir/$d-costs.md"
             [ -f "$f" ] && sed '/^## Weekly aggregate/,$d' "$f" || true
         done | awk -F'|' '
-            { if (NF==7) {tier=$5; cost=$6}
+            { if (NF==7 || NF==8) {tier=$5; cost=$6}
               else if (NF==5) {tier="(untracked)"; cost=$4}
               else next
               gsub(/^[ \t]+|[ \t]+$/,"",tier); gsub(/^[ \t]+|[ \t]+$/,"",cost)
@@ -382,10 +384,14 @@ regenerate_weekly_section() {
                 if (v ~ /^[0-9]+$/) { if (k=="in") {inp[phase]+=v; inpT+=v}
                   else if (k=="out") {o[phase]+=v; oT+=v}
                   else if (k=="cache") {cr[phase]+=v; crT+=v}
-                  else if (k=="cache_write") {cw[phase]+=v; cwT+=v} } } }
+                  else if (k=="cache_write") {cw[phase]+=v; cwT+=v}
+                  else if (k=="peak_ctx") { v=v+0; if (v>pkmax[phase]) pkmax[phase]=v } } } }
               seen[phase]=1 }
             END { for (p in seen) printf "| %s | %d | %d | %d | %d |\n", p, inp[p], cw[p], cr[p], o[p]
-                  printf "| **Total** | %d | %d | %d | %d |\n", inpT, cwT, crT, oT }'
+                  printf "| **Total** | %d | %d | %d | %d |\n", inpT, cwT, crT, oT
+                  flag=""
+                  for (p in pkmax) if (pkmax[p]>150000) flag=flag " " p "(" int(pkmax[p]/1000) "K)"
+                  if (flag!="") printf "\n> **Split-miss candidates (peak ctx >150K):**%s\n", flag }'
     } >> "$report"
 }
 

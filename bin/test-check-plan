@@ -51,6 +51,11 @@ impl_model: sonnet
 ---
 '
 
+FM_OPUS='---
+impl_model: opus
+---
+'
+
 # A minimal well-formed matrix passes (exit 0). Baseline / no false positives.
 assert "clean-minimal" 0 "$FM"'
 | # | What to verify | Test type | Timing | Test file / location |
@@ -582,7 +587,8 @@ fi
 # ---------------------------------------------------------------------------
 
 # Test 4a: [W]-clean-pass — no sweep verbs exits 0 with no advisory
-assert "[W]-clean-pass" 0 "$FM
+# Uses FM_OPUS (impl_model: opus) so gate S (sonnet-recipe completeness) does not apply.
+assert "[W]-clean-pass" 0 "$FM_OPUS
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---|---|---|---|
 | 1 | setting renamed correctly | PHPUnit | post-impl | \`tests/ConfigTest.php\` |
@@ -599,7 +605,8 @@ Rename the setting in config.php.
 "
 
 # Test 4b: [W]-sweep-verb-advisory — sweep verb WITHOUT delegation fires advisory but exits 0
-assert "[W]-sweep-verb-advisory" 0 "$FM
+# Uses FM_OPUS so gate S does not interfere with the [W] advisory check.
+assert "[W]-sweep-verb-advisory" 0 "$FM_OPUS
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---|---|---|---|
 | 1 | helper renamed | PHPUnit | post-impl | \`tests/ServiceTest.php\` |
@@ -616,7 +623,7 @@ Update all call sites of \`legacyHelper()\` to use \`newHelper()\` in all PHP fi
 "
 
 # Companion: confirm the advisory was emitted
-_body="$FM
+_body="$FM_OPUS
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---|---|---|---|
 | 1 | helper renamed | PHPUnit | post-impl | \`tests/ServiceTest.php\` |

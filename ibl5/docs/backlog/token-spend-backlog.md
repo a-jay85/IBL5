@@ -1,6 +1,6 @@
 ---
 description: Token-spend reduction backlog — resident-context diet, caching economics, output-spend guards, and LSP-first navigation for the Claude Code harness, with per-entry status.
-last_verified: 2026-07-14
+last_verified: 2026-07-15
 ---
 
 # Token-Spend Reduction Backlog
@@ -62,7 +62,7 @@ All entries are ✅ Implemented — see the dated pointers below and [token-spen
 ➜ T12 Sonnet plan-architect for recipe-backed plans — ✅ Implemented (2026-07-11): see [archive](archive/token-spend-backlog-archive.md).
 
 **Token-relevant entries tracked elsewhere:**
-- L2 residual (token-budget circuit breaker) — [loop-engineering-backlog.md](loop-engineering-backlog.md).
+- L18 (tier-default correction — `impl_model:` fails open to Opus) — [loop-engineering-backlog.md](loop-engineering-backlog.md). Supersedes the former L2 token-budget-breaker residual, closed 2026-07-15 as empirically refuted (PR #1477 closed unmerged): impl spend doesn't predict postplan spend, and the measured waste is tier misallocation (~82% of impl spend is Opus; ~$27/week routed to Opus purely by a missing `impl_model:` field), not plan length.
 - L15 (Sonnet-recipe completeness lint) — [loop-engineering-backlog.md](loop-engineering-backlog.md).
 - L16 (context-budget gate v2) — [loop-engineering-backlog.md](loop-engineering-backlog.md).
 - E8 (memory-lines→gates umbrella, pairs with T7) — [dev-efficiency-backlog.md](dev-efficiency-backlog.md). ◑ Partial as of 2026-07-14; one item remains (free-agents teamid write guard).

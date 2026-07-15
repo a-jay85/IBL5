@@ -1,6 +1,6 @@
 ---
 description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, plan decomposition/tier-routing machinery, and the human comprehension counter-loop, with per-entry status.
-last_verified: 2026-07-14
+last_verified: 2026-07-15
 ---
 
 # Loop-Engineering Backlog
@@ -40,7 +40,7 @@ last_verified: 2026-07-14
 | # | Title | Status | Automouse | Effort |
 |---|-------|--------|-----------|-------:|
 | L1 | Plan dependency DAG | ⬜ Open | 🟦 | M |
-| L2 | Per-plan circuit breaker | ◑ Partial | 🟦 | S |
+| L2 | Per-plan circuit breaker | ✅ Implemented | — | S |
 | L3 | Morning digest | ⬜ Open | 🟦 | S |
 | L4 | Retro-miner | ⬜ Open | 🟥 | M |
 | L5 | Master-canary between runs | ⬜ Open | 🟦 | M |
@@ -56,6 +56,7 @@ last_verified: 2026-07-14
 | L15 | Sonnet-recipe completeness lint | ⬜ Open | 🟦 | S |
 | L16 | Context-budget gate v2 (work-size proxies + measured calibration) | 📋 Planned | 🟦 | M |
 | L17 | Shared-context artifact for multi-plan splits | ✅ Implemented | — | S |
+| L18 | Tier-default correction (`impl_model:` fails open to Opus) | ⬜ Open | 🟦 | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse-queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse-queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -67,9 +68,14 @@ last_verified: 2026-07-14
 ### L2 Per-plan circuit breaker
 **Location:** `bin/automouse-run` — per-phase `timeout` caps (`MAX_IMPL_SECS`/`MAX_PP_SECS` = 3600s), outer `MAX_ELAPSED` ≈ 4h45m, `MAX_ATTEMPTS=3` then the plan is parked in `skipped/` with a report.
 **Problem (was):** One runaway plan could eat the night.
-**Suggested direction (residual):** Add a token-budget breaker alongside the wall-clock one — the cost data is already parsed per phase (T1 in [token-spend-backlog.md](token-spend-backlog.md)); breach parks the plan as needs-human and continues the queue.
-**Risk if untouched:** A plan can stay under the time cap while burning an outsized token budget.
-**Status (2026-07-07):** ◑ Partial — wall-clock + attempts breakers live; token cap absent. 🟦.
+**Residual (token-budget breaker) — ✖ Won't do, empirically refuted.** Built as PR #1477 (`MAX_PLAN_COST_USD`, default $5.00, parks the plan in `skipped/` before postplan), then **closed unmerged 2026-07-15**. Measured against 47 `exit:` lines (2026-07-07→07-15):
+- **Keys on the wrong variable.** Impl cost does not predict postplan cost — the most expensive impl in the dataset (`ibl6-retirement-1-boxscore-php-port`, $18.72) had nearly the *cheapest* postplan ($1.95), while the three most expensive postplans ($5.68, $5.41, $4.22) all rode cheap impls that never trip the cap. Correlation across 17 paired plans r ≈ 0.08 (noisy at n=17; the inversions are the robust signal).
+- **Destroys completed work.** The breaker is gated on `$HANDOFF_FILE`, so it fires *only on impls that succeeded*, then `mv`s the plan away and `rm`s the handoff. At $5.00 it would discard ~$83.49 of working implementation across 7 of 28 runs to avoid postplans averaging ~$3.35; recovery means re-running impl, spending model-hours twice to save a notional figure once.
+- **Wrong unit.** automouse runs on subscription auth (bare `claude -p`, no `ANTHROPIC_API_KEY`), so `cost=$X` is an API list-price equivalent, not spend. Weekly automouse load is ~10.4 model-hours — a small fraction of a Max 5x weekly cap. Long overnight impls are *desirable* use of otherwise-idle budget, not waste.
+- **Doesn't bound the real constraint.** A per-plan cap can't bound a queue total: on 2026-07-11 the queue ran 5.8 model-hours (breaching a 5-hour session window) and this breaker would have fired once, saving ~14 minutes.
+
+**Superseded by:** L18 (tier-default correction) — the measured waste is tier misallocation, not plan length.
+**Status (2026-07-15):** ✅ Implemented — wall-clock + attempts breakers live and sufficient; the token-cap residual is closed as refuted (above), not deferred. 🟦.
 
 ### L3 Morning digest
 **Location:** `bin/automouse-run` writes per-run reports (`done`/`skipped`/`env-stop`/`error`) plus a daily costs table; nothing aggregates or notifies (verified).
@@ -155,6 +161,14 @@ last_verified: 2026-07-14
 
 ### L17 Shared-context artifact for multi-plan splits
 ✅ Implemented (2026-07-11) — see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
+
+### L18 Tier-default correction (`impl_model:` fails open to Opus)
+**Location:** `bin/lib/plan-impl-model` — resolves a plan's impl model from line-1-anchored `impl_model:` frontmatter. Its fallthrough is `*) echo "claude-opus-4-8" ;; # opus, empty, garbled, or unknown → safe default`. `bin/lib/automouse-escalate-model` already escalates any non-Opus base → Opus on the final attempt (ADR-0085); `bin/check-plan` gate `[T]` enforces per-phase sub-tier labels but does **not** require the top-level `impl_model:` field.
+**Problem:** The default is the *most expensive* model, so a plan that omits `impl_model:` silently buys Opus at ~5.4× Sonnet's per-run cost. Measured 2026-07-07→07-15 (28 impl runs): Opus 13 runs / $99.11 total / $7.62 avg vs Sonnet 15 runs / $21.33 / $1.42 avg — Opus is **82% of impl spend**. Two plans reached the queue with no `impl_model:` field at all and were silently routed to Opus: `ibl6-retirement-1-boxscore-php-port` ($18.72 — the single most expensive run in the dataset) and `mobile-target-size-a11y-sitewide` ($7.38 + $0.94 retry). Both are mechanical work (a PHP port; a sitewide a11y sweep) — textbook Sonnet jobs. That's **~$27, ~15% of the week, spent on Opus because a YAML field was absent** — nobody ever made a tier decision.
+**Suggested direction:** Invert the fallthrough so the ladder starts at its bottom rung, since the Opus safety net already exists above it. Either (a) **fail closed** — `bin/check-plan` rejects a plan with no `impl_model:`, forcing an explicit tier decision at authoring time; or (b) **fail cheap** — default to `claude-sonnet-4-6` and let `automouse-escalate-model` promote to Opus on the final attempt. (b) is self-correcting and needs no new gate: a wrongly-Sonnet'd plan costs ~$1.42 + $7.62 ≈ $9 worst case versus $7.62 guaranteed today, while every correctly-Sonnet'd plan drops from $7.62 to $1.42. Prefer (b), optionally with (a)'s lint as a nudge. Keep `garbled/unknown → Opus` distinct from `missing → Sonnet`; only the *absent* case should fail cheap.
+**Risk if untouched:** Every plan authored without the field silently bills top-tier for mechanical work — the exact failure `.claude/rules/agent-tiering.md` ("never default to Opus") forbids for sub-agents, reproduced in the runner's own default.
+**Provenance:** Surfaced 2026-07-15 while reviewing L2/PR #1477; the cost telemetry gathered to refute the token-budget breaker located the real waste here.
+**Status (2026-07-15):** ⬜ Open — 🟦.
 
 ---
 

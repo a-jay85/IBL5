@@ -41,3 +41,8 @@ Read-only historical record of ✅ Implemented entries. For OPEN items see ../lo
 
 **Superseded by:** L18 (tier-default correction) — the measured waste is tier misallocation, not plan length.
 **Status (2026-07-15):** ✅ Implemented — wall-clock + attempts breakers live and sufficient; the token-cap residual is closed as refuted (above), not deferred. Surfaced L18 as the real measured cost driver. PR #1481.
+
+### L15 Sonnet-recipe completeness lint
+**Location:** `bin/check-plan` — gates cover matrix presence, forbidden tokens, staleness, and size; none check *recipe completeness*. Gate 13 judges Sonnet-eligibility by verification (a machine check fails on a wrong edit) only.
+**Problem (was):** "Sonnet-capable" has two halves and only one is enforced: verifiable, but not *specified*.
+**Status (2026-07-15):** ✅ Implemented — `bin/check-plan` gate `[S]` now checks, for `impl_model: sonnet` plans only: every `### Delegate` packet carries a `**Self-verify:**` line (fence-aware, reusing gate T's parse), and a phased plan carries >=1 edit-anchor signal (Anchor keyword / `line NN` ref / 4-backtick fence). A `sonnet-recipe:` marker clears the gate. Tested in `bin/test-check-plan` (gateS-* cases).

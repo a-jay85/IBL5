@@ -51,6 +51,11 @@ impl_model: sonnet
 ---
 '
 
+FM_OPUS='---
+impl_model: opus
+---
+'
+
 # A minimal well-formed matrix passes (exit 0). Baseline / no false positives.
 assert "clean-minimal" 0 "$FM"'
 | # | What to verify | Test type | Timing | Test file / location |
@@ -291,8 +296,12 @@ context-budget: length is fenced reference material; 3 phases, small diff.
 # Gate C: >=12 numbered phases must flag even under 500 lines (exit 1).
 assert "gateC-many-phases-flags" 1 "$FM$M$PHASES12"
 
-# Gate C boundary: 11 phases and under 500 lines must NOT flag (exit 0).
-assert "gateC-eleven-phases-ok" 0 "$FM$M$PHASES11"
+# Gate C boundary: 11 phases and under 500 lines must NOT flag (exit 0). The
+# sonnet-recipe: marker clears the new gate S (these synthetic phases carry no
+# edit anchors), keeping exit 0 attributable to gate C alone.
+assert "gateC-eleven-phases-ok" 0 "$FM$M$PHASES11
+sonnet-recipe: gate-C size fixture; recipe completeness not under test.
+"
 
 # ---------------------------------------------------------------------------
 # Gate 13: impl_model <-> Verification Matrix consistency.
@@ -453,6 +462,107 @@ git mv a b
 '
 
 # ---------------------------------------------------------------------------
+# Gate S: Sonnet-recipe completeness (impl_model: sonnet only).
+# ---------------------------------------------------------------------------
+# (S1) A ### Delegate packet WITH a **Self-verify:** line passes (exit 0). The
+# 4-backtick fence doubles as the anchor signal, so only Self-verify is under test.
+assert "gateS-selfverify-present-ok" 0 "$FM$M"'
+## Phase 1 — edit the report block
+Anchor: the change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
+# (S2) The same packet MISSING its **Self-verify:** line flags (exit 1). Anchor
+# present (fence + Anchor keyword) so exit 1 is attributable to the Self-verify
+# sub-check alone; the fenced ### Delegate suppresses any gate T co-fire.
+assert "gateS-selfverify-missing-flags" 1 "$FM$M"'
+## Phase 1 — edit the report block
+Anchor: the change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+- **Report back:** one line
+````
+'
+
+# (S3) A phased plan with an Anchor keyword and no packet passes (exit 0).
+assert "gateS-anchor-keyword-ok" 0 "$FM$M"'
+## Phase 1 — edit the widget
+Anchor: the unique surrounding snippet is quoted here.
+'
+
+# (S4) A phased Sonnet plan with NO anchor signal and no packet flags (exit 1) —
+# the anchor sub-check. No below-model tier, short, clean matrix => gate S alone.
+assert "gateS-anchor-missing-flags" 1 "$FM$M"'
+## Phase 1 — edit the widget
+Change the report block to add the gate.
+'
+
+# (S5) A `sonnet-recipe:` marker suppresses the WHOLE gate — a packet missing
+# Self-verify (would be exit 1) passes (exit 0) with the marker present.
+assert "gateS-clearing-marker-suppresses" 0 "$FM$M"'
+## Phase 1 — edit the report block
+
+sonnet-recipe: mechanical gate edit; recipe completeness cleared deliberately.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Recipe:** do it
+- **Report back:** one line
+````
+'
+
+# (S6) A phases-less Sonnet plan with no anchor is EXEMPT (exit 0) — the anchor
+# sub-check keys on $CB_PHASES >= 1, so creation-only / prose plans never flag.
+assert "gateS-no-phase-heading-ok" 0 "$FM$M"'
+Prose plan with no phase headings and no delegation packets. A creation note.
+'
+
+# (S7) Gate S is impl_model-gated: an OPUS plan, phased, anchor-less, no
+# Self-verify, still passes (exit 0) — gate S runs only for impl_model: sonnet.
+assert "gateS-opus-plan-exempt" 0 "$TFM$M"'
+## Phase 1 — edit the widget
+Edits the report block; opus run, no packet.
+'
+
+# (S8) A valid packet whose **Recipe:** holds a nested 3-backtick fence, with the
+# **Self-verify:** line AFTER it, passes (exit 0) — the inner 3-tick fence must
+# NOT close the outer 4-tick packet (guards nt >= fence_len). Mirrors gate T's T8.
+assert "gateS-nested-fence-selfverify-ok" 0 "$FM$M"'
+## Phase 1 — edit the report block
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Recipe:**
+```
+sed -i s/a/b/ file.txt
+```
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
+# (S9) Word-boundary guard: a plan with "baseline 1" in the body (no standalone
+# "line NN" ref) still flags (exit 1) — "baseline 1" must NOT match \bline [0-9].
+assert "gateS-anchor-word-boundary-flags" 1 "$FM$M"'
+## Phase 1 — edit the widget
+The baseline 1 approach handles this; see guideline 5 for reference.
+'
+
+# ---------------------------------------------------------------------------
 # Directive presence: the runtime prompt (bin/automouse-prompt-impl) must keep
 # BOTH the packet-delegation instruction AND the exhaustive-and-pre-resolved
 # tier mandate that gate T's authoring contract binds to. A silent deletion of
@@ -477,7 +587,8 @@ fi
 # ---------------------------------------------------------------------------
 
 # Test 4a: [W]-clean-pass — no sweep verbs exits 0 with no advisory
-assert "[W]-clean-pass" 0 "$FM
+# Uses FM_OPUS (impl_model: opus) so gate S (sonnet-recipe completeness) does not apply.
+assert "[W]-clean-pass" 0 "$FM_OPUS
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---|---|---|---|
 | 1 | setting renamed correctly | PHPUnit | post-impl | \`tests/ConfigTest.php\` |
@@ -494,7 +605,8 @@ Rename the setting in config.php.
 "
 
 # Test 4b: [W]-sweep-verb-advisory — sweep verb WITHOUT delegation fires advisory but exits 0
-assert "[W]-sweep-verb-advisory" 0 "$FM
+# Uses FM_OPUS so gate S does not interfere with the [W] advisory check.
+assert "[W]-sweep-verb-advisory" 0 "$FM_OPUS
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---|---|---|---|
 | 1 | helper renamed | PHPUnit | post-impl | \`tests/ServiceTest.php\` |
@@ -511,7 +623,7 @@ Update all call sites of \`legacyHelper()\` to use \`newHelper()\` in all PHP fi
 "
 
 # Companion: confirm the advisory was emitted
-_body="$FM
+_body="$FM_OPUS
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---|---|---|---|
 | 1 | helper renamed | PHPUnit | post-impl | \`tests/ServiceTest.php\` |

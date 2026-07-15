@@ -105,7 +105,7 @@ final class RecordHoldersViewTest extends TestCase
                     'teamAbbr' => 'min',
                     'teamTid' => 14,
                     'teamYr' => '1996',
-                    'boxScoreUrl' => 'https://ibl6.iblhoops.net/1996-01-16-game-3/boxscore',
+                    'boxScoreUrl' => 'modules.php?name=GameBoxscore&date=1996-01-16&game=3',
                     'dateDisplay' => 'January 16, 1996',
                     'oppAbbr' => 'van',
                     'oppTid' => 20,
@@ -117,7 +117,7 @@ final class RecordHoldersViewTest extends TestCase
 
         $html = $this->view->render($records);
 
-        $this->assertStringContainsString('1996-01-16-game-3/boxscore', $html);
+        $this->assertStringContainsString('modules.php?name=GameBoxscore&amp;date=1996-01-16&amp;game=3', $html);
     }
 
     public function testRenderDateWithoutLinkWhenNoBoxScoreUrl(): void
@@ -635,7 +635,7 @@ final class RecordHoldersViewTest extends TestCase
                         'teamAbbr' => 'mia',
                         'teamTid' => 2,
                         'teamYr' => '1994',
-                        'boxScoreUrl' => '1994-05-01-game-7/boxscore',
+                        'boxScoreUrl' => 'modules.php?name=GameBoxscore&date=1994-05-01&game=7',
                         'dateDisplay' => 'May 1, 1994',
                         'oppAbbr' => 'nyk',
                         'oppTid' => 18,

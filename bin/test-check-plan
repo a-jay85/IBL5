@@ -291,8 +291,12 @@ context-budget: length is fenced reference material; 3 phases, small diff.
 # Gate C: >=12 numbered phases must flag even under 500 lines (exit 1).
 assert "gateC-many-phases-flags" 1 "$FM$M$PHASES12"
 
-# Gate C boundary: 11 phases and under 500 lines must NOT flag (exit 0).
-assert "gateC-eleven-phases-ok" 0 "$FM$M$PHASES11"
+# Gate C boundary: 11 phases and under 500 lines must NOT flag (exit 0). The
+# sonnet-recipe: marker clears the new gate S (these synthetic phases carry no
+# edit anchors), keeping exit 0 attributable to gate C alone.
+assert "gateC-eleven-phases-ok" 0 "$FM$M$PHASES11
+sonnet-recipe: gate-C size fixture; recipe completeness not under test.
+"
 
 # ---------------------------------------------------------------------------
 # Gate 13: impl_model <-> Verification Matrix consistency.
@@ -448,6 +452,100 @@ assert "gateT-nested-fence-packet-ok" 0 "$TFM$M"'
 git mv a b
 ```
 - **Self-verify:** composer run analyse
+- **Report back:** one line
+````
+'
+
+# ---------------------------------------------------------------------------
+# Gate S: Sonnet-recipe completeness (impl_model: sonnet only).
+# ---------------------------------------------------------------------------
+# (S1) A ### Delegate packet WITH a **Self-verify:** line passes (exit 0). The
+# 4-backtick fence doubles as the anchor signal, so only Self-verify is under test.
+assert "gateS-selfverify-present-ok" 0 "$FM$M"'
+## Phase 1 — edit the report block
+Anchor: the change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
+# (S2) The same packet MISSING its **Self-verify:** line flags (exit 1). Anchor
+# present (fence + Anchor keyword) so exit 1 is attributable to the Self-verify
+# sub-check alone; the fenced ### Delegate suppresses any gate T co-fire.
+assert "gateS-selfverify-missing-flags" 1 "$FM$M"'
+## Phase 1 — edit the report block
+Anchor: the change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+- **Report back:** one line
+````
+'
+
+# (S3) A phased plan with an Anchor keyword and no packet passes (exit 0).
+assert "gateS-anchor-keyword-ok" 0 "$FM$M"'
+## Phase 1 — edit the widget
+Anchor: the unique surrounding snippet is quoted here.
+'
+
+# (S4) A phased Sonnet plan with NO anchor signal and no packet flags (exit 1) —
+# the anchor sub-check. No below-model tier, short, clean matrix => gate S alone.
+assert "gateS-anchor-missing-flags" 1 "$FM$M"'
+## Phase 1 — edit the widget
+Change the report block to add the gate.
+'
+
+# (S5) A `sonnet-recipe:` marker suppresses the WHOLE gate — a packet missing
+# Self-verify (would be exit 1) passes (exit 0) with the marker present.
+assert "gateS-clearing-marker-suppresses" 0 "$FM$M"'
+## Phase 1 — edit the report block
+
+sonnet-recipe: mechanical gate edit; recipe completeness cleared deliberately.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Recipe:** do it
+- **Report back:** one line
+````
+'
+
+# (S6) A phases-less Sonnet plan with no anchor is EXEMPT (exit 0) — the anchor
+# sub-check keys on $CB_PHASES >= 1, so creation-only / prose plans never flag.
+assert "gateS-no-phase-heading-ok" 0 "$FM$M"'
+Prose plan with no phase headings and no delegation packets. A creation note.
+'
+
+# (S7) Gate S is impl_model-gated: an OPUS plan, phased, anchor-less, no
+# Self-verify, still passes (exit 0) — gate S runs only for impl_model: sonnet.
+assert "gateS-opus-plan-exempt" 0 "$TFM$M"'
+## Phase 1 — edit the widget
+Edits the report block; opus run, no packet.
+'
+
+# (S8) A valid packet whose **Recipe:** holds a nested 3-backtick fence, with the
+# **Self-verify:** line AFTER it, passes (exit 0) — the inner 3-tick fence must
+# NOT close the outer 4-tick packet (guards nt >= fence_len). Mirrors gate T's T8.
+assert "gateS-nested-fence-selfverify-ok" 0 "$FM$M"'
+## Phase 1 — edit the report block
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Recipe:**
+```
+sed -i s/a/b/ file.txt
+```
+- **Self-verify:** bin/test-check-plan
 - **Report back:** one line
 ````
 '

@@ -101,15 +101,29 @@
 #                              .claude/skills/plan/_architect-contract.md Binding
 #                              rule; whether a given tier CHOICE is correct stays
 #                              Opus judgment — this only binds the label to an act.
+#   S  Sonnet-recipe completeness — for impl_model: sonnet plans only, checks the
+#                              "specified" half of Sonnet-eligibility gate 13
+#                              ignores: (1) every ### Delegate packet carries a
+#                              **Self-verify:** line (fence-aware, reusing gate T's
+#                              4-backtick parse; violations name the packet phase),
+#                              and (2) a phased plan carries >=1 edit-anchor SIGNAL
+#                              (Anchor keyword, a `line NN` ref, or a 4-backtick
+#                              fence) somewhere in the body — a plan-LEVEL presence
+#                              check, not per-phase verbatim matching. A
+#                              `sonnet-recipe:` marker clears the whole gate,
+#                              mirroring no-adr: / context-budget:.
 #
 # Deliberately NOT linted (kept as /plan Opus judgment): tests-woven-inline,
 # production-comparison classification, test-file-path presence, negative-path
 # coverage, hot-file extraction, security surface, auto_merge risk (whether a
 # declared hold's rationale is actually valid — gate H below only checks a
-# justification section is PRESENT). Edit-anchor snippets are not linted: the
-# real plan corpus quotes them as drifting descriptions ("the Options struct",
-# with file:line refs that go stale), not verbatim lines, so a grep-the-snippet
-# check would false-positive constantly.
+# justification section is PRESENT). Edit-anchor snippet VERBATIM matching is
+# still not linted: the real plan corpus quotes anchors as drifting descriptions
+# ("the Options struct", with file:line refs that go stale), not verbatim lines,
+# so a grep-the-snippet check would false-positive constantly. Gate S adds only a
+# weaker plan-LEVEL presence check (impl_model: sonnet plans) — that the plan
+# carries at least one anchor SIGNAL somewhere — never that a given phase's
+# snippet matches a source line.
 #
 # Exit codes: 0 = clean, 1 = one or more violations (printed, prefixed by gate),
 #             2 = usage error / plan file missing.
@@ -578,6 +592,69 @@ done < <(awk -v run_rank="$RUN_RANK" '
     }
     END { flush_region() }
 ' "$PLAN_FILE")
+
+# ---------------------------------------------------------------------------
+# Gate S: Sonnet-recipe completeness (impl_model: sonnet plans only).
+# ---------------------------------------------------------------------------
+# gate 13 checks a Sonnet plan is machine-executable in principle; gate S checks
+# the plan actually SPECIFIES the recipe: (1) every ### Delegate packet carries a
+# **Self-verify:** line, and (2) the plan body carries an edit-anchor signal
+# (Phase 2). A `sonnet-recipe:` marker anywhere clears the whole gate (mirrors
+# no-adr: / context-budget:). $RUN_MODEL was resolved above for gate T; reuse it.
+case "$RUN_MODEL" in
+    *sonnet*)
+        if ! grep -qF 'sonnet-recipe:' "$PLAN_FILE"; then
+            # Sub-check 1: every ### Delegate packet needs a **Self-verify:** line.
+            while IFS= read -r sviol; do
+                [ -n "$sviol" ] && viol "$sviol"
+            done < <(awk -v q="'" '
+                function fence_ticks(s,   t) {
+                    if (match(s, /^[ \t]*`+/)) {
+                        t = substr(s, RSTART, RLENGTH); gsub(/[^`]/, "", t); return length(t)
+                    }
+                    return 0
+                }
+                function report(   msg) {
+                    if (in_packet && !has_sv) {
+                        msg = "[S] delegation packet " q pname q " lacks a **Self-verify:** line (required for impl_model: sonnet plans)"
+                        print msg
+                    }
+                }
+                BEGIN { infence=0; fence_len=0; in_packet=0; has_sv=0; pname="" }
+                {
+                    # Delegate heading lives INSIDE the 4-backtick fence; match raw.
+                    if ($0 ~ /^[ \t]*###[ \t]+Delegate/) {
+                        report()          # a prior unterminated packet, if any
+                        in_packet=1; has_sv=0; pname=$0
+                        sub(/^[ \t]*###[ \t]+Delegate[^A-Za-z0-9]*/, "", pname)
+                        if (pname == "") pname = "(unnamed)"
+                    }
+                    if (in_packet && $0 ~ /\*\*Self-verify:\*\*/) has_sv=1
+                    nt = fence_ticks($0)
+                    if (infence) {
+                        if (nt >= fence_len && $0 ~ /^[ \t]*`+[ \t]*$/) {
+                            infence=0; fence_len=0
+                            report(); in_packet=0; has_sv=0; pname=""
+                        }
+                        next
+                    }
+                    if (nt >= 3) { infence=1; fence_len=nt; next }
+                }
+                END { report() }
+            ' "$PLAN_FILE")
+            # Sub-check 2: a phased Sonnet plan must carry >=1 edit-anchor signal.
+            # $CB_PHASES was counted by gate C (line ~424) with the shared
+            # #{2,3} Step/Phase detector — reuse it, do not recount. A plan with
+            # zero phase headings (creation-only / prose) is exempt.
+            if [ "${CB_PHASES:-0}" -ge 1 ]; then
+                if ! grep -qiE 'anchor|line [0-9]' "$PLAN_FILE" \
+                   && ! grep -qE '^[[:space:]]*`{4,}' "$PLAN_FILE"; then
+                    viol "[S] impl_model: sonnet plan has no edit-anchor signal (Anchor keyword, 'line NN' reference, or 4-backtick fence); add anchors or suppress with 'sonnet-recipe: ...'"
+                fi
+            fi
+        fi
+        ;;
+esac
 
 # ---------------------------------------------------------------------------
 # Report.

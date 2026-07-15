@@ -53,7 +53,7 @@ last_verified: 2026-07-15
 | L12 | Autonomy contracts in plan frontmatter | ◑ Partial | 🟦 | M |
 | L13 | Per-phase impl-model routing | ✅ Implemented | — | M |
 | L14 | Escalate-on-retry (Sonnet-first, just-in-time Opus) | ✅ Implemented | — | S |
-| L15 | Sonnet-recipe completeness lint | ⬜ Open | 🟦 | S |
+| L15 | Sonnet-recipe completeness lint | ✅ Implemented | — | S |
 | L16 | Context-budget gate v2 (work-size proxies + measured calibration) | 📋 Planned | 🟦 | M |
 | L17 | Shared-context artifact for multi-plan splits | ✅ Implemented | — | S |
 | L18 | Tier-default correction (`impl_model:` fails open to Opus) | ⬜ Open | 🟦 | S |
@@ -137,11 +137,7 @@ last_verified: 2026-07-15
 ✅ Implemented (2026-07-11) — see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
 ### L15 Sonnet-recipe completeness lint
-**Location:** `bin/check-plan` — gates cover matrix presence, forbidden tokens, staleness, and size; none check *recipe completeness*. Gate 13 judges Sonnet-eligibility by verification (a machine check fails on a wrong edit) only.
-**Problem:** "Sonnet-capable" has two halves and only one is enforced: verifiable, but not *specified* — a Sonnet plan whose phases lack edit anchors, reuse notes, or self-verify commands passes `bin/check-plan`, then flails at 2am on judgment calls the plan never resolved. Those burned attempts read as model failure and push labeling back toward Opus.
-**Suggested direction:** A new gate for `impl_model: sonnet` plans: every numbered phase that edits an existing file must carry an edit-anchor cue (quoted snippet per the architect contract), and every delegation packet a Self-verify line; violations name the phase. Heuristic by nature, so support a clearing marker mirroring the existing `no-adr:` / `context-budget:` pattern.
-**Risk if untouched:** Sonnet-labeled plans fail for specification gaps, mis-attributed to model capability.
-**Status (2026-07-08):** ⬜ Open — 🟦.
+✅ Implemented (2026-07-15) — see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
 ### L16 Context-budget gate v2 (work-size proxies + measured calibration)
 **Location:** `bin/check-plan` gate `[C]` (≥ 500 lines OR ≥ 12 numbered phases — thresholds hand-set once from the 2026-07-07 automouse-corpus audit); the T1 per-phase cost rows carry no peak-context column.

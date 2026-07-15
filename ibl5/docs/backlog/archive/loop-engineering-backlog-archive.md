@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed autonomous-loop engineering entries, extracted from loop-engineering-backlog.md.
-last_verified: 2026-07-12
+last_verified: 2026-07-15
 ---
 
 # Autonomous-Loop Engineering Backlog — Archive
@@ -29,3 +29,9 @@ Read-only historical record of ✅ Implemented entries. For OPEN items see ../lo
 **Suggested direction (was):** Make the in-plan tier labels binding rather than advisory: the impl orchestrator MUST delegate a Sonnet/Haiku-labeled phase as a sub-agent per its delegation packet (packet-carrying phases were already bound from 2026-06-07; the residual gap was bare sub-tier labels carrying no packet). Bulk spend moves down-tier AND out of the orchestrator's context — dumb-zone relief and tier savings from the same change. A runner-driven per-phase `claude -p` sequence with a state handoff is the heavier fallback if in-run delegation proves unreliable.
 **Risk if untouched (was):** Per-phase tiering stays a plan-authoring ritual with no runtime effect; mixed plans pay top-tier for mechanical sweeps.
 **Status (2026-07-11):** ✅ Implemented — in-plan sub-tier labels are now binding: `.claude/skills/plan/_architect-contract.md` requires a `### Delegate` packet or an explicit `(inline — …)` marker on every below-run-model phase, `bin/check-plan` gate `[T]` enforces it, and `bin/automouse-prompt-impl` binds each case at run time. Packet-carrying phases were already bound (2026-06-07); this closes the bare-label gap. The heavier runner-driven per-phase `claude -p` fallback was not needed.
+
+### L2 Per-plan circuit breaker
+**Location:** `bin/automouse-run` — per-phase `timeout` caps (`MAX_IMPL_SECS`/`MAX_PP_SECS` = 3600s), outer `MAX_ELAPSED` ≈ 4h45m, `MAX_ATTEMPTS=3` then the plan is parked in `skipped/` with a report.
+**Problem (was):** One runaway plan could stay under the time cap while burning an outsized token/cost budget.
+**Suggested direction (was):** Add a token-budget breaker alongside the wall-clock one — the cost data is already parsed per phase (T1 in [token-spend-backlog.md](../token-spend-backlog.md)); breach parks the plan as needs-human and continues the queue.
+**Status (2026-07-15):** ✅ Implemented — `bin/automouse-run` gained `MAX_PLAN_COST_USD` (default $5.00, env-overridable) and a third circuit breaker: after a successful impl phase, if the impl-phase dollar spend exceeds the cap, the plan is parked in `skipped/` with a "Cost budget exceeded." report and the queue continues (postplan skipped). Mirrors the existing attempts breaker; wall-clock and attempts breakers unchanged.

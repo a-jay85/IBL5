@@ -201,6 +201,7 @@ FAILURE_TAIL_LINES=200
 FAILURE_TAIL_BYTES=20000
 MAX_IMPL_SECS=3600   # per-phase cap: impl gets at most 1h
 MAX_PP_SECS=3600     # per-phase cap: post-plan gets at most 1h
+MAX_PLAN_COST_USD="${MAX_PLAN_COST_USD:-5.00}"  # per-plan impl-phase cost cap (USD); breach parks the plan in skipped/ and continues the queue (L2)
 LOCK_TTL_SECS=9000   # max a single plan legitimately holds its claim lock
                      # (impl 1h + postplan 1h + overhead); a lock older than this
                      # whose owner PID is gone is presumed crashed and stolen.
@@ -818,6 +819,36 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             # Opus on the final retry (ADR-0085) — has this attempt's context.
             write_failure_report "$PLAN_NAME" "$IMPL_LOG_BEFORE" "$IMPL_MODEL" "$(( ATTEMPTS + 1 ))"
             echo "Genuine impl failure — wrote $FAILURE_FILE (attempt $(( ATTEMPTS + 1 ))/$MAX_ATTEMPTS)." >> "$LOG"
+        fi
+
+        # Token/cost circuit breaker (L2): a plan whose impl-phase spend blew the
+        # budget is parked in skipped/ BEFORE the (expensive) postplan phase runs.
+        # Gated on impl success ($HANDOFF_FILE present) so a killed / env-stopped /
+        # genuinely-failed / deliberately-disposed impl is left entirely to the
+        # env-stop, attempts, and disposition paths above. Cost is re-extracted with
+        # the same idiom append_cost_row uses (:337); the impl phase is the only one
+        # to have run in this slice, so the last cost= line is the impl cost.
+        if [ -f "$HANDOFF_FILE" ]; then
+            plan_cost_usd=$(tail -n +"$((IMPL_LOG_BEFORE + 1))" "$LOG" | grep -oE 'cost=\$[0-9.]+' | tail -1 | sed 's/cost=\$//') || true
+            if [ -n "$plan_cost_usd" ] && awk -v c="$plan_cost_usd" -v m="$MAX_PLAN_COST_USD" 'BEGIN{exit (c > m) ? 0 : 1}'; then
+                echo "Plan $PLAN_NAME impl-phase cost \$$plan_cost_usd exceeded budget \$$MAX_PLAN_COST_USD — moving to skipped/." >> "$LOG"
+                mkdir -p "$NIGHTLY_DIR/skipped"
+                mv "$NEXT_PLAN" "$NIGHTLY_DIR/skipped/"
+                rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$HANDOFF_FILE"
+                REPORTS_DIR="$NIGHTLY_DIR/reports"
+                mkdir -p "$REPORTS_DIR"
+                SLUG=$(basename "$PLAN_NAME" .md)
+                {
+                    printf 'Plan "%s" skipped: impl-phase cost $%s exceeded budget $%s. Cost budget exceeded. Needs human review.\n\n' \
+                        "$SLUG" "$plan_cost_usd" "$MAX_PLAN_COST_USD"
+                    printf '## Last attempt log tail\n\n```\n'
+                    tail -30 "$LOG"
+                    printf '\n```\n'
+                } > "$REPORTS_DIR/$(date +%Y-%m-%d)-skipped-$SLUG.md"
+                rm -rf "$CURRENT_LOCK" 2>/dev/null || true
+                CURRENT_LOCK=""
+                continue
+            fi
         fi
     fi
 

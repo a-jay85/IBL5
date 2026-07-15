@@ -1,6 +1,6 @@
 ---
 description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, plan decomposition/tier-routing machinery, and the human comprehension counter-loop, with per-entry status.
-last_verified: 2026-07-12
+last_verified: 2026-07-15
 ---
 
 # Loop-Engineering Backlog
@@ -29,8 +29,8 @@ last_verified: 2026-07-12
 |--------|------:|
 | ⬜ Open | 8 |
 | 📋 Planned | 1 |
-| ◑ Partial | 3 |
-| ✅ Implemented | 5 |
+| ◑ Partial | 2 |
+| ✅ Implemented | 6 |
 | 🚫 Declined | 0 |
 
 ---
@@ -40,7 +40,7 @@ last_verified: 2026-07-12
 | # | Title | Status | Automouse | Effort |
 |---|-------|--------|-----------|-------:|
 | L1 | Plan dependency DAG | ⬜ Open | 🟦 | M |
-| L2 | Per-plan circuit breaker | ◑ Partial | 🟦 | S |
+| L2 | Per-plan circuit breaker | ✅ Implemented | 🟦 | S |
 | L3 | Morning digest | ⬜ Open | 🟦 | S |
 | L4 | Retro-miner | ⬜ Open | 🟥 | M |
 | L5 | Master-canary between runs | ⬜ Open | 🟦 | M |
@@ -65,11 +65,7 @@ last_verified: 2026-07-12
 **Status (2026-07-07):** ⬜ Open — 🟦.
 
 ### L2 Per-plan circuit breaker
-**Location:** `bin/automouse-run` — per-phase `timeout` caps (`MAX_IMPL_SECS`/`MAX_PP_SECS` = 3600s), outer `MAX_ELAPSED` ≈ 4h45m, `MAX_ATTEMPTS=3` then the plan is parked in `skipped/` with a report.
-**Problem (was):** One runaway plan could eat the night.
-**Suggested direction (residual):** Add a token-budget breaker alongside the wall-clock one — the cost data is already parsed per phase (T1 in [token-spend-backlog.md](token-spend-backlog.md)); breach parks the plan as needs-human and continues the queue.
-**Risk if untouched:** A plan can stay under the time cap while burning an outsized token budget.
-**Status (2026-07-07):** ◑ Partial — wall-clock + attempts breakers live; token cap absent. 🟦.
+✅ Implemented (2026-07-15) — see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
 ### L3 Morning digest
 **Location:** `bin/automouse-run` writes per-run reports (`done`/`skipped`/`env-stop`/`error`) plus a daily costs table; nothing aggregates or notifies (verified).

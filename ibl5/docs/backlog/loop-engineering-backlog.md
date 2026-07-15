@@ -66,16 +66,7 @@ last_verified: 2026-07-15
 **Status (2026-07-07):** ⬜ Open — 🟦.
 
 ### L2 Per-plan circuit breaker
-**Location:** `bin/automouse-run` — per-phase `timeout` caps (`MAX_IMPL_SECS`/`MAX_PP_SECS` = 3600s), outer `MAX_ELAPSED` ≈ 4h45m, `MAX_ATTEMPTS=3` then the plan is parked in `skipped/` with a report.
-**Problem (was):** One runaway plan could eat the night.
-**Residual (token-budget breaker) — ✖ Won't do, empirically refuted.** Built as PR #1477 (`MAX_PLAN_COST_USD`, default $5.00, parks the plan in `skipped/` before postplan), then **closed unmerged 2026-07-15**. Measured against 47 `exit:` lines (2026-07-07→07-15):
-- **Keys on the wrong variable.** Impl cost does not predict postplan cost — the most expensive impl in the dataset (`ibl6-retirement-1-boxscore-php-port`, $18.72) had nearly the *cheapest* postplan ($1.95), while the three most expensive postplans ($5.68, $5.41, $4.22) all rode cheap impls that never trip the cap. Correlation across 17 paired plans r ≈ 0.08 (noisy at n=17; the inversions are the robust signal).
-- **Destroys completed work.** The breaker is gated on `$HANDOFF_FILE`, so it fires *only on impls that succeeded*, then `mv`s the plan away and `rm`s the handoff. At $5.00 it would discard ~$83.49 of working implementation across 7 of 28 runs to avoid postplans averaging ~$3.35; recovery means re-running impl, spending model-hours twice to save a notional figure once.
-- **Wrong unit.** automouse runs on subscription auth (bare `claude -p`, no `ANTHROPIC_API_KEY`), so `cost=$X` is an API list-price equivalent, not spend. Weekly automouse load is ~10.4 model-hours — a small fraction of a Max 5x weekly cap. Long overnight impls are *desirable* use of otherwise-idle budget, not waste.
-- **Doesn't bound the real constraint.** A per-plan cap can't bound a queue total: on 2026-07-11 the queue ran 5.8 model-hours (breaching a 5-hour session window) and this breaker would have fired once, saving ~14 minutes.
-
-**Superseded by:** L18 (tier-default correction) — the measured waste is tier misallocation, not plan length.
-**Status (2026-07-15):** ✅ Implemented — wall-clock + attempts breakers live and sufficient; the token-cap residual is closed as refuted (above), not deferred. 🟦.
+➜ L2 Per-plan circuit breaker — ✅ Implemented (2026-07-15): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
 ### L3 Morning digest
 **Location:** `bin/automouse-run` writes per-run reports (`done`/`skipped`/`env-stop`/`error`) plus a daily costs table; nothing aggregates or notifies (verified).

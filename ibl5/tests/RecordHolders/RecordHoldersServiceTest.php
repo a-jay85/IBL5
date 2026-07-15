@@ -376,7 +376,7 @@ final class RecordHoldersServiceTest extends TestCase
 
         $regSeason = $result['playerSingleGame']['regularSeason'];
         $firstCategory = array_values($regSeason)[0];
-        $this->assertStringContainsString('1996-01-16-game-3/boxscore', $firstCategory[0]['boxScoreUrl']);
+        $this->assertStringContainsString('modules.php?name=GameBoxscore&date=1996-01-16&game=3', $firstCategory[0]['boxScoreUrl']);
     }
 
     public function testBoxScoreUrlFallsBackToLegacyWhenNoGameOfThatDay(): void
@@ -442,7 +442,7 @@ final class RecordHoldersServiceTest extends TestCase
         $this->assertSame('mia', $record['oppAbbr']);
         $this->assertSame('162', $record['amount']);
         $this->assertSame('March 12, 1995', $record['dateDisplay']);
-        $this->assertStringContainsString('1995-03-12-game-2/boxscore', $record['boxScoreUrl']);
+        $this->assertStringContainsString('modules.php?name=GameBoxscore&date=1995-03-12&game=2', $record['boxScoreUrl']);
     }
 
     public function testBestSeasonRecordFormatsWinLoss(): void

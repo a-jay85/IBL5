@@ -102,7 +102,18 @@ echo "GH $*" >> "$STUB/calls.log"
 printf '%s\n' "$@" >> "$STUB/gh.args.log"   # one arg per line — proves title is a single argv element
 case "$*" in
   *"issue create"*) [ "${GH_FAIL:-0}" = 1 ] && exit 1; echo "https://github.com/${BUG_PIPELINE_ISSUE_REPO}/issues/${STUB_ISSUE_NUMBER:-4242}" ;;
-  *"pr list"*)      [ "${GH_FAIL:-0}" = 1 ] && exit 1; cat "$STUB/gh-pr-list.out" 2>/dev/null || true ;;  # driver's --jq already applied → emit the final value
+  *"pr list"*)
+      [ "${GH_FAIL:-0}" = 1 ] && exit 1
+      # Vary output by --head so a case can encode "this head has no PR, but the legacy
+      # head does" (PR #1487 cutover). Falls back to the head-agnostic gh-pr-list.out.
+      head=""; prev=""
+      for a in "$@"; do [ "$prev" = "--head" ] && head="$a"; prev="$a"; done
+      if [ -n "$head" ] && [ -f "$STUB/gh-pr-list-$head.out" ]; then
+          cat "$STUB/gh-pr-list-$head.out"
+      else
+          cat "$STUB/gh-pr-list.out" 2>/dev/null || true   # driver's --jq already applied → emit the final value
+      fi
+      ;;
   *"pr view"*)      [ "${GH_FAIL:-0}" = 1 ] && exit 1; cat "$STUB/gh-pr-view.out" 2>/dev/null || true ;;
   *) [ "${GH_FAIL:-0}" = 1 ] && exit 1; : ;;
 esac
@@ -195,7 +206,7 @@ bpt_reset() {
           "$STUB"/claim-next-resume.out "$STUB"/list-pr-open.out "$STUB"/plans/*.md \
           "$STUB"/result*.json "$STUB"/envfail* "$STUB"/make-dirty \
           "$STUB"/verdicts "$STUB"/verdict-idx \
-          "$STUB"/gh-pr-list.out "$STUB"/gh-pr-view.out 2>/dev/null
+          "$STUB"/gh-pr-list.out "$STUB"/gh-pr-list-*.out "$STUB"/gh-pr-view.out 2>/dev/null
     rm -rf "$STUB"/wt/* 2>/dev/null
     printf '[]' > "$STUB/actionable.json"
     unset GH_FAIL STUB_THREAD_ID STUB_MESSAGE_ID STUB_ISSUE_NUMBER WT_NEW_FAIL
@@ -218,6 +229,7 @@ bpt_set_verdicts()     { printf '%s\n' "$@" > "$STUB/verdicts"; }             # 
 bpt_hunt_dirty()       { : > "$STUB/make-dirty"; }                            # ship path sees a real diff
 bpt_envfail()          { : > "$STUB/envfail${1:+-$1}"; }                      # [model] usage-limit at a tier
 bpt_set_gh_pr_list()   { printf '%s' "$1" > "$STUB/gh-pr-list.out"; }
+bpt_set_gh_pr_list_for() { printf '%s' "$2" > "$STUB/gh-pr-list-$1.out"; }   # <head> <value>
 bpt_set_gh_pr_view()   { printf '%s' "$1" > "$STUB/gh-pr-view.out"; }
 # bpt_count <name> <want> <file>  — assert a stub log has exactly <want> non-blank lines
 # (grep -c prints 0 and exits 1 on no-match, so read its stdout and default empty→0; no `|| echo`).

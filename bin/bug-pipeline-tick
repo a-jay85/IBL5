@@ -586,7 +586,7 @@ give_up_needs_human() { # claimed hunt_id wt_appdir [override_finding]
     bpgh_assign "$issue" a-jay85
     # Terminal + release the lease so no stale `hunting` row is left owned forever (Phase 1 flag).
     cli transition "$hunt_id" needs_human --release-lease >/dev/null
-    log "hunt $hunt_id -> needs_human; lease released; worktree bug-$hunt_id left for human inspection"
+    log "hunt $hunt_id -> needs_human; lease released; worktree $(basename "$(dirname "$wt_appdir")") left for human inspection"
 }
 
 # Usage-limit park (Phase 7): status → blocked, lease KEPT (owner unchanged), attempt UNCHANGED.
@@ -597,6 +597,19 @@ park_hunt_blocked() { # hunt_id
     log "hunt $1 hit usage limit -> blocked until $until (attempt count unchanged)"
 }
 
+# Derive the worktree/branch slug: bug-<id>-<kebab-from-original_text>.
+# Deterministic (pure function of the immutable row) so reclaim/resume/reconcile
+# all recompute the identical slug. SECURITY: original_text is UNTRUSTED GM text —
+# strict [a-z0-9-] allowlist output only; always a valid git ref / Docker hostname.
+bug_slug() { # id original_text
+    local id="$1" desc
+    desc="$(printf '%s' "$2" | LC_ALL=C tr '[:upper:]' '[:lower:]' | LC_ALL=C tr -cs 'a-z0-9' '-')"
+    desc="${desc#-}"
+    desc="$(printf '%.30s' "$desc")"
+    desc="${desc%-}"
+    if [ -n "$desc" ]; then printf 'bug-%s-%s' "$id" "$desc"; else printf 'bug-%s' "$id"; fi
+}
+
 # Drive a claimed hunt: create/reuse the worktree, climb the ladder up to the attempt cap,
 # then ship (fixed) / park (blocked) / give up (escalate+cap or terminal). Foreground —
 # the tick blocks until the hunt returns, so overlapping ticks can't double-hunt (invariant 1).
@@ -604,7 +617,10 @@ drive_hunt_row() { # claimed_row_json
     local claimed="$1" hunt_id slug wt_root wt_appdir attempts terminal
     hunt_id="$(printf '%s' "$claimed" | jq -r '.id')"
     attempts="$(printf '%s' "$claimed" | jq -r '.hunt_attempts // 0')"
-    slug="bug-${hunt_id}"; wt_root="$WT_BASE/$slug"; wt_appdir="$wt_root/ibl5"
+    slug="$(bug_slug "$hunt_id" "$(printf '%s' "$claimed" | jq -r '.original_text // empty')")"
+    # Legacy cutover: a pre-rename hunt left a bug-<id> worktree — reuse it, don't fork a second one.
+    if [ ! -d "$WT_BASE/$slug" ] && [ -d "$WT_BASE/bug-${hunt_id}" ]; then slug="bug-${hunt_id}"; fi
+    wt_root="$WT_BASE/$slug"; wt_appdir="$wt_root/ibl5"
 
     if [ ! -d "$wt_root" ]; then
         if ! "$WT_NEW_BIN" "$slug" >> "$HUNT_LOG" 2>&1; then
@@ -655,7 +671,10 @@ resume_blocked_hunt() { # row_json (surfaced by the enumerator, blocked_until al
     if [ -z "$resumed" ]; then
         log "resume: $id already resumed by another tick — skip"; return 0
     fi
-    slug="bug-${id}"; wt_root="$WT_BASE/$slug"
+    slug="$(bug_slug "$id" "$(printf '%s' "$row" | jq -r '.original_text // empty')")"
+    # Legacy cutover: a pre-rename hunt left a bug-<id> worktree — reuse it, don't fork a second one.
+    if [ ! -d "$WT_BASE/$slug" ] && [ -d "$WT_BASE/bug-${id}" ]; then slug="bug-${id}"; fi
+    wt_root="$WT_BASE/$slug"
     if [ ! -d "$wt_root" ]; then
         log "resume: worktree $wt_root gone — recreating"
         if ! "$WT_NEW_BIN" "$slug" >> "$HUNT_LOG" 2>&1; then
@@ -678,9 +697,13 @@ reconcile_pr_open_rows() {
         id="$(printf '%s' "$row" | jq -r '.id')"
         pr="$(printf '%s' "$row" | jq -r '.pr_number // empty')"
         issue="$(printf '%s' "$row" | jq -r '.issue_number // empty')"
-        branch="bug-${id}"
+        branch="$(bug_slug "$id" "$(printf '%s' "$row" | jq -r '.original_text // empty')")"
         if [ -z "$pr" ] || [ "$pr" = "null" ]; then
             n="$("$GH_BIN" pr list --repo "$BUG_PIPELINE_CODE_REPO" --head "$branch" --json number --jq '.[0].number // empty' 2>/dev/null || true)"
+            # Legacy cutover: a pre-rename hunt shipped under the bare bug-<id> branch name.
+            if [ -z "$n" ] && [ "$branch" != "bug-${id}" ]; then
+                n="$("$GH_BIN" pr list --repo "$BUG_PIPELINE_CODE_REPO" --head "bug-${id}" --json number --jq '.[0].number // empty' 2>/dev/null || true)"
+            fi
             if [ -n "$n" ]; then
                 cli transition "$id" pr_open --pr="$n" >/dev/null && log "reconcile: $id pr_number=$n"
                 # Trusted-cron seam is the only actor allowed to touch gh, so the

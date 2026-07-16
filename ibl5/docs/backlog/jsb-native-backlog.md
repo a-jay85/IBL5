@@ -56,7 +56,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 | ⬜ Open | 5 |
 | 📋 Planned | 0 |
 | ◑ Partial | 0 |
-| ✅ Implemented | 16 |
+| ✅ Implemented | 17 |
 | 🚫 Declined | 1 |
 
 ---
@@ -178,11 +178,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 ➜ J21 gt=4 playoff-margin overshoot audit — ✅ Implemented (2026-07-14): NO overshoot; engine under-disperses globally; no follow-on fix; see [archive](archive/jsb-native-backlog-archive.md).
 
 ### J22 Per-player rl_stl/rl_tov production-bundle wiring
-*(discovered 2026-07-13 during jsb-native RE-tooling feasibility review)*
-**Location:** `engine/internal/sim/teamquality.go` (`stlRate`/`tovRate`); `engine/internal/bundle/bundle.go` (`RealLifeSTL`/`RealLifeTVR` JSON fields); `engine/internal/backup/plr.go` (offset 96/100); `engine/internal/backup/assemble.go` (RealLife mappings).
-**Problem:** ADR-0084's composites are faithful in **formula** (defQ = Σ STL/MIN×44, offQ = Σ TOV/48) but fed **rating stand-ins**, not real per-player `rl_stl`/`rl_tov`. The engine's PF is under-dispersed — Var(lnPF) ratio ≈ 0.22, PF dispersion ≈ ½ real (J13 monitor; J2 residual context) — because rating stand-ins compress the per-player STL/TOV spread the live composites exist to express.
-**Not the count-axis:** wiring real STL/TOV raises PF *dispersion* — a fidelity fix, **not** a Cov(lnFGA,lnPPS) lever (that is J23's domain).
-**Status:** Done (PR #<n>) — per-player real career STL/TOV composites now feed defQ/offQ (STL/MIN×44, TOV/MIN×48); rating stand-in retained as RealLifeMIN==0 fallback. Backup path via `plr.go`→`bundle`→`assemble`; production path via `bundle.Player` `rl_stl`/`rl_tvr` JSON tags (PHP `PlrParserService` already emitted them).
+➜ J22 Per-player rl_stl/rl_tov production-bundle wiring — ✅ Implemented (2026-07-16): PR #1490; real per-player STL/TOV composites feed defQ/offQ; rating stand-in retained as RealLifeMIN==0 fallback; see [archive](archive/jsb-native-backlog-archive.md).
 
 ### J23 round-half-up + base_time re-center (coupled pace faithful fix)
 *(deferred from J21 pace-dispersion investigation, 2026-07-13, PR #1452)*

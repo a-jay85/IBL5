@@ -131,3 +131,12 @@ Full detail: symmetric deterministic base `(2.0 − fatigue)·tovRate(bh)` (corr
 **Finding — mechanism void:** OReb continuations execute inside a single `possession()` call via the `for trip := 0; trip <= maxOffensiveRebounds; trip++` loop (`possession.go:123`). Clock decrement (`gs.clock -= step`) happens once per `possession()` call in `gameloop.go`, AFTER the trip loop completes. Therefore Var(lnPOSS) = f(base_time dispersion) exclusively — no within-possession restructure of any kind can move it. Per-origin putback share was already J4-faithful (engine 12.58% vs J4 12.65%), confirming nothing to re-weight. The real Cov carrier is pace/base_time dispersion, which is J23's domain.
 **Status (2026-07-16):** 🚫 Declined — mechanism void. Evidence pinned at `engine/internal/calibrate/possessioncoupling_archive_test.go:51-64`. Successor: J23 (round-half-up + base_time re-center) targets Var(lnPOSS) toward 0.000721 and Cov(lnPOSS,lnPPS) sign flip. 🧠 Opus.
 
+---
+
+### J22 Per-player rl_stl/rl_tov production-bundle wiring
+*(discovered 2026-07-13 during jsb-native RE-tooling feasibility review)*
+**Location:** `engine/internal/sim/teamquality.go` (`stlRate`/`tovRate`); `engine/internal/bundle/bundle.go` (`RealLifeSTL`/`RealLifeTVR` JSON fields); `engine/internal/backup/plr.go` (offset 96/100); `engine/internal/backup/assemble.go` (RealLife mappings).
+**Problem:** ADR-0084's composites are faithful in **formula** (defQ = Σ STL/MIN×44, offQ = Σ TOV/48) but fed **rating stand-ins**, not real per-player `rl_stl`/`rl_tov`. The engine's PF is under-dispersed — Var(lnPF) ratio ≈ 0.22, PF dispersion ≈ ½ real (J13 monitor; J2 residual context) — because rating stand-ins compress the per-player STL/TOV spread the live composites exist to express.
+**Not the count-axis:** wiring real STL/TOV raises PF *dispersion* — a fidelity fix, **not** a Cov(lnFGA,lnPPS) lever (that is J23's domain).
+**Status (2026-07-16):** ✅ Implemented — PR #1490. Per-player real career STL/TOV composites now feed defQ/offQ (STL/MIN×44, TOV/MIN×48); rating stand-in retained as RealLifeMIN==0 fallback. Backup path via `plr.go`→`bundle`→`assemble`; production path via `bundle.Player` `rl_stl`/`rl_tvr` JSON tags (PHP `PlrParserService` already emitted them). ⚙️ Sonnet.
+

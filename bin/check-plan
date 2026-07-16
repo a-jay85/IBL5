@@ -32,6 +32,10 @@
 #                                a new ibl5/migrations/*.sql only when the plan
 #                                text mentions DROP TABLE/COLUMN/INDEX; a
 #                                require/require-dev add to ibl5/composer.json.
+#                                A token that resolves to an existing file on
+#                                disk is skipped outright — creation-cue prose
+#                                about an existing path ("add a new check to
+#                                bin/check-docs") is a modify, not a new file.
 #  13  impl_model consistency — a Truly-manual matrix row forbids
 #                              `impl_model: sonnet`; a zero-manual matrix
 #                              requires a deliberate `impl_model:` marker
@@ -90,6 +94,10 @@
 #                              below-run-model `**Tier:** Haiku`/`Sonnet` with
 #                              neither is an un-acted-on tiering intent — the impl
 #                              orchestrator has nothing to bind — so flag it.
+#                              The tier is the FIRST model name after `**Tier:**`
+#                              on the line, so a reason clause may mention other
+#                              tiers ("self — too entangled for Sonnet") without
+#                              being misread as a below-run-model label.
 #                              Fence-aware: a packet is authored inside a
 #                              4-backtick fence, so `### Delegate` is detected on
 #                              the raw line while a `**Tier:**` line counts only
@@ -301,6 +309,12 @@ while IFS= read -r token; do
     # De-duplicate.
     if grep -qxF "$token" "$GATE8_SEEN"; then continue; fi
     printf '%s\n' "$token" >> "$GATE8_SEEN"
+
+    # Existing-file skip: a token that already resolves on disk cannot be a
+    # NEW file, however the surrounding prose reads — "add a new check to
+    # bin/check-docs" MODIFIES an existing script, which is not an ADR
+    # decision trigger. Only a genuinely-new path can fire gate 8.
+    [ -e "$REPO_ROOT/$token" ] && continue
 
     # INCLUDE filter: only a NEW (creation-context) file counts.
     gate8_is_created "$token" || continue
@@ -551,12 +565,20 @@ done < <(awk -v run_rank="$RUN_RANK" '
         }
         return 0
     }
-    function tier_rank(s,   ls) {
+    function tier_rank(s,   ls, p, best, r) {
+        # Rank by the FIRST model name after the **Tier:** field, not by a
+        # fixed haiku>sonnet>opus match priority. A line like
+        # `**Tier:** self — too entangled for Sonnet` declares SELF; the
+        # trailing Sonnet in the reason clause must not demote it (the old
+        # priority order misread exactly that corpus line as rank 2).
         ls = tolower(s)
-        if (ls ~ /haiku/)     return 1
-        if (ls ~ /sonnet/)    return 2
-        if (ls ~ /self|opus/) return 3
-        return 0
+        sub(/^.*\*\*tier:\*\*/, "", ls)
+        best = 0; r = 0
+        p = index(ls, "haiku");  if (p && (!best || p < best)) { best = p; r = 1 }
+        p = index(ls, "sonnet"); if (p && (!best || p < best)) { best = p; r = 2 }
+        p = index(ls, "self");   if (p && (!best || p < best)) { best = p; r = 3 }
+        p = index(ls, "opus");   if (p && (!best || p < best)) { best = p; r = 3 }
+        return r
     }
     function flush_region(   i) {
         if (!has_delegate) { for (i = 1; i <= ncand; i++) print cand[i] }

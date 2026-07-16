@@ -1,0 +1,70 @@
+name: Docs Refreshed Notify
+
+# Fires when a pull_request is opened or reopened. The job below guards on
+# same-repo origin AND a docs-stale-refresh-* head ref, so only doc-fix PRs
+# opened from this repo send a DM.
+#
+# Why this trigger fires at all (load-bearing fact): a PR opened by the default
+# Actions GITHUB_TOKEN does NOT trigger pull_request workflows. This one fires
+# because bin/docfix-run opens its PR from the Mac with the owner's persistent
+# `gh` PAT, so GitHub attributes it to a real user. That same fact is the
+# anti-recursion guarantee.
+on:
+  pull_request:
+    types: [opened, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read      # `gh pr view --json files` for the refreshed file list
+
+concurrency:
+  group: docs-refreshed-notify-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  notify-refreshed:
+    # Guard: BOTH conditions ANDed.
+    #  - same-repo: a FORK PR is skipped. This repo is PUBLIC, the event fires for
+    #    fork PRs, and a fork can name its branch docs-stale-refresh-x to pass a
+    #    head-ref-only guard. (Not an RCE — pull_request is read-only and secretless —
+    #    but it is fork-triggerable noise, gated out at the source.)
+    #  - head.ref prefix: only doc-refresh PRs send a DM.
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'docs-stale-refresh-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Build Discord message
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # PR_NUMBER travels via env, never interpolated inline — prevents shell injection.
+          # PR title is deliberately excluded: it is author-controlled text.
+          FILES=$(gh pr view "$PR_NUMBER" --json files --jq '.files[].path')
+          {
+            printf 'Claude refreshed your stale docs — ready for your review. PR #%s:\n' "$PR_NUMBER"
+            echo "$FILES" | sed 's/^/  /'
+            printf 'Review and merge: %s\n' "$PR_URL"
+          } > /tmp/discord-msg.txt
+
+      - name: Setup SSH
+        uses: ./.github/actions/setup-ssh
+        with:
+          host: ${{ secrets.HOST }}
+          port: ${{ secrets.PORT }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Send Discord DM
+        uses: ./.github/actions/notify-discord
+        with:
+          discord-id: ${{ secrets.OWNER_DISCORD_ID }}
+          port: ${{ secrets.PORT }}
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}

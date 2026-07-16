@@ -1,0 +1,266 @@
+#!/usr/bin/env bash
+#
+# bin/docfix-poll — Runnerless Mac poll for stale-docs auto-remediation (ADR-0086).
+# Replaces the deleted `docfix` job in doc-freshness-audit.yml: GitHub schedules
+# nothing on this Mac (no self-hosted runner is registered — the public-repo runner
+# security constraint, stated in ADR-0086, makes that permanently unsafe). Instead,
+# launchd drives this poller from the owner's Mac at 09:17 local daily.
+#
+# Install AFTER this PR lands on master: the launchd Program points at the MAIN
+# checkout's copy of this file, so a pre-merge install silently runs a stale version.
+#
+# Usage:
+#   bin/docfix-poll                    # nightly poll (run by launchd)
+#   bin/docfix-poll --install-schedule   # install the 09:17 launchd job (post-merge)
+#   bin/docfix-poll --uninstall-schedule # remove the launchd job (rollback)
+#   bin/docfix-poll --print-schedule     # emit plist to stdout — test seam, no side effect
+#   bin/docfix-poll --health-report [ISSUE_NUM]  # print 3 key=value lines; always exits 0
+#   bin/docfix-poll -h                 # this help
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# --- MAIN checkout derivation (Divergence 1 from backups-sync-setup template) ---
+# IBL5_MAIN lets bin/test-docfix-run sandbox this script without touching the real
+# checkout. Falls back to the worktree-list awk (mirrors bin/docfix-run:31).
+MAIN="${IBL5_MAIN:-}"
+if [ -z "$MAIN" ]; then
+    MAIN="$(git -C "$SCRIPT_DIR/.." worktree list --porcelain 2>/dev/null \
+             | awk '/^worktree / {print $2; exit}')"
+fi
+[ -n "$MAIN" ] || MAIN="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+SCHEDULE_ACTION=""
+HEALTH_ISSUE_ARG=""
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --install-schedule)   SCHEDULE_ACTION="install";   shift ;;
+        --uninstall-schedule) SCHEDULE_ACTION="uninstall"; shift ;;
+        --print-schedule)     SCHEDULE_ACTION="print";     shift ;;
+        --health-report)      SCHEDULE_ACTION="health";    shift
+                              [ $# -gt 0 ] && { HEALTH_ISSUE_ARG="$1"; shift; } || true ;;
+        -h|--help) awk 'NR==1{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"; exit 0 ;;
+        *) echo "Unknown option: $1" >&2; exit 1 ;;
+    esac
+done
+
+# --- Schedule management (launchd) -------------------------------------------
+PLIST_LABEL="com.ibl5.docfix-poll"
+PLIST_PATH="$HOME/Library/LaunchAgents/${PLIST_LABEL}.plist"
+PROGRAM="$MAIN/bin/docfix-poll"
+LOG_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/docfix-poll/logs"
+
+# Single source of truth for the plist — shared by --print-schedule and
+# --install-schedule, so the MAIN-checkout derivation is exercised by tests.
+build_plist() {
+    cat <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>${PLIST_LABEL}</string>
+	<key>Program</key>
+	<string>${PROGRAM}</string>
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Hour</key>
+		<integer>9</integer>
+		<key>Minute</key>
+		<integer>17</integer>
+	</dict>
+	<key>WorkingDirectory</key>
+	<string>${MAIN}</string>
+	<key>StandardOutPath</key>
+	<string>${LOG_DIR}/launchd-stdout.log</string>
+	<key>StandardErrorPath</key>
+	<string>${LOG_DIR}/launchd-stderr.log</string>
+</dict>
+</plist>
+PLIST
+}
+
+if [ -n "$SCHEDULE_ACTION" ] && [ "$SCHEDULE_ACTION" != "health" ]; then
+    case "$SCHEDULE_ACTION" in
+        print)
+            build_plist
+            ;;
+        install)
+            # Fail-closed guard (Divergence 2): launchd accepts a plist whose Program
+            # does not exist and then silently never runs it — the exact silent-failure
+            # class that killed this pipeline the first time. Refuse rather than install
+            # a job that can never fire, and name the fix.
+            if [ ! -x "$PROGRAM" ]; then
+                echo "FAILED: $PROGRAM is not an executable file." >&2
+                echo "  The launchd job runs the MAIN checkout's copy, so merge this PR first:" >&2
+                echo "    cd \"$MAIN\" && git pull && bin/docfix-poll --install-schedule" >&2
+                exit 1
+            fi
+            mkdir -p "$HOME/Library/LaunchAgents" "$LOG_DIR"
+            launchctl bootout "gui/$(id -u)/${PLIST_LABEL}" 2>/dev/null || true
+            build_plist > "$PLIST_PATH"
+            launchctl bootstrap "gui/$(id -u)" "$PLIST_PATH"
+            if ! launchctl print "gui/$(id -u)/${PLIST_LABEL}" >/dev/null 2>&1; then
+                echo "FAILED: ${PLIST_LABEL} did not load." >&2
+                exit 1
+            fi
+            echo "Installed ${PLIST_LABEL} (daily 09:17 local). Program: $PROGRAM"
+            ;;
+        uninstall)
+            launchctl bootout "gui/$(id -u)/${PLIST_LABEL}" 2>/dev/null || true
+            rm -f "$PLIST_PATH"
+            echo "Uninstalled ${PLIST_LABEL}."
+            ;;
+    esac
+    exit 0
+fi
+
+# --- Shared helpers (poll and --health-report both use these) -----------------
+
+iso_to_epoch() {
+    # BSD (macOS) and GNU date disagree on the parsing flag; try both.
+    date -u -d "$1" +%s 2>/dev/null || date -u -j -f '%Y-%m-%dT%H:%M:%SZ' "$1" +%s
+}
+
+# The ONE definition of "a human already declined a refresh covering these docs".
+# Coverage, not equality: --fix-dates can make the PR touch more docs than the
+# worklist, and if the stale set later grows beyond what was declined the pipeline
+# resumes on its own.
+uncovered_count() {   # $1 = path to a --staleness-report JSON file
+    local declined
+    declined="$(gh pr list --state closed --limit 20 --json headRefName,mergedAt,files \
+      --jq '[.[] | select(.headRefName | startswith("docs-stale-refresh-"))
+                 | select(.mergedAt == null)] | .[0].files // [] | map(.path)' 2>/dev/null || echo '[]')"
+    jq -r --argjson d "$declined" '[.[].path] - $d | length' "$1"
+}
+
+# Seam for the `died` branch: shimmed in bin/test-docfix-run so the git ls-remote
+# call is testable without hitting the network. Do NOT inline this call.
+git_remote_refresh_branches() {
+    git ls-remote --heads origin 'refs/heads/docs-stale-refresh-*' | sed 's#.*refs/heads/##'
+}
+
+# A branch on origin with NO PR of ANY state = a run that pushed and then died
+# before opening one. NOT merely "a branch exists": nothing ever deletes a DECLINED
+# PR's remote branch (bin/cleanup only READS origin/<branch> at :174 — GitHub's
+# delete_branch_on_merge reaps the MERGED case, and there is no closed-unmerged
+# equivalent), so a lingering branch is the normal residue of a decline. Keying on
+# branch-existence alone would fire `died` forever on every later stale set.
+# Verified against bin/cleanup 2026-07-15.
+orphaned_refresh_branch() {   # echoes the first branch with no PR at all; empty if none
+    local b
+    while read -r b; do
+        [ -z "$b" ] && continue
+        if [ "$(gh pr list --state all --head "$b" --json number --jq 'length' 2>/dev/null || echo 1)" -eq 0 ]; then
+            printf '%s' "$b"; return
+        fi
+    done < <(git_remote_refresh_branches)
+}
+
+# Epoch at which the CURRENT stale set was first filed. NOT the issue's createdAt:
+# the audit keeps ONE long-lived `stale-docs` issue (workflow :77-103 — created only
+# when none is open, EDITED when the signature changes, closed only at count 0), so
+# createdAt marks the FIRST episode ever, possibly weeks stale. The audit rebuilds
+# the body exactly when an episode starts, so a body marker carries the right
+# timestamp. Fallback to createdAt covers the pre-existing issue whose body predates
+# the marker: there the fallback is CORRECT — an old createdAt with no PR is a
+# genuinely uninstalled poll, which is the bootstrap alert this plan needs on day one.
+issue_episode_epoch() {   # $1 = issue number
+    local since
+    since="$(gh issue view "$1" --json body --jq .body 2>/dev/null | tr -d '\r' \
+             | sed -n 's/.*<!-- stale-since: \(.*\) -->.*/\1/p' | head -1)"
+    [ -z "$since" ] && since="$(gh issue view "$1" --json createdAt --jq .createdAt)"
+    iso_to_epoch "$since"
+}
+
+# --- --health-report: is the refresh pipeline broken? -------------------------
+# Emits three `key=value` lines on stdout (alert/kind/detail); always exits 0 —
+# a report, not a gate, mirroring `check-docs --staleness-report`. The audit
+# workflow appends them to $GITHUB_OUTPUT verbatim.
+health_report() {
+    local alert=false kind="" detail="" report count pr_json pr_num red orphan age_h
+    report="$(mktemp)"; trap 'rm -f "$report"' RETURN
+    "$MAIN/bin/check-docs" --staleness-report > "$report"
+    count="$(jq 'length' "$report")"
+    local issue_num="${1:-}"
+
+    if [ "${count:-0}" -gt 0 ] && [ -n "$issue_num" ]; then
+        pr_json="$(gh pr list --state open --json number,headRefName,url \
+          --jq '[.[] | select(.headRefName | startswith("docs-stale-refresh-"))] | .[0] // empty')"
+        if [ -n "$pr_json" ]; then
+            # An open PR is the DESIGNED steady state (auto_merge:false — the user
+            # reviews it). Only a RED check is a failure; green/pending stay silent.
+            pr_num="$(jq -r .number <<<"$pr_json")"
+            red="$(gh pr view "$pr_num" --json statusCheckRollup \
+              --jq '[.statusCheckRollup[]? | select(.conclusion == "FAILURE" or .conclusion == "TIMED_OUT"
+                     or .conclusion == "CANCELLED" or .conclusion == "ACTION_REQUIRED")] | length')"
+            if [ "${red:-0}" -gt 0 ]; then
+                alert=true; kind="ci-red"
+                detail="Refresh PR $(jq -r .url <<<"$pr_json") has ${red} failing check(s) — the doc refresh needs a fix before you can merge it."
+            fi
+        elif [ "$(uncovered_count "$report")" -eq 0 ]; then
+            : # a human declined a refresh covering these docs — stay quiet
+        elif orphan="$(orphaned_refresh_branch)"; [ -n "$orphan" ]; then
+            alert=true; kind="died"
+            detail="Refresh branch ${orphan} is on origin with no PR — the doc-fix run died mid-flight. Log: ls -t /tmp/docfix-run-*.log | head -1"
+        else
+            age_h=$(( ( $(date -u +%s) - $(issue_episode_epoch "$issue_num") ) / 3600 ))
+            if [ "$age_h" -ge 36 ]; then
+                alert=true; kind="never-ran"
+                detail="No refresh PR has been opened in ${age_h}h. The Mac poll is probably not installed: cd ~/GitHub/IBL5 && git pull && bin/docfix-poll --install-schedule"
+            fi
+        fi
+    fi
+    printf 'alert=%s\nkind=%s\ndetail=%s\n' "$alert" "$kind" "$detail"
+}
+
+if [ "$SCHEDULE_ACTION" = "health" ]; then
+    health_report "${HEALTH_ISSUE_ARG:-}"
+    exit 0
+fi
+
+# --- The poll -----------------------------------------------------------------
+cd "$MAIN"
+
+REPORT="$(mktemp)"
+trap 'rm -f "$REPORT"' EXIT
+"$MAIN/bin/check-docs" --staleness-report > "$REPORT"
+COUNT="$(jq 'length' "$REPORT")"
+SIG="$(jq -r '.[].path' "$REPORT" | sort | paste -sd, -)"
+[ "$COUNT" -eq 0 ] && { echo "docfix-poll: no stale docs — nothing to do."; exit 0; }
+
+# Reap leftovers whose PR is finished (merged or declined). An OPEN PR's branch
+# stays: it is waiting on the user's review, which is the designed steady state.
+while IFS= read -r branch; do
+    [ -n "$branch" ] || continue
+    state="$(gh pr view "$branch" --json state -q .state 2>/dev/null || true)"
+    case "$state" in
+        MERGED|CLOSED)
+            # Named mode needs the worktree DIRECTORY (bin/cleanup:695-704 → exit 1
+            # without it). post-plan leaves it in place, so that's the happy path;
+            # tolerate a nonzero exit and let the nightly alert report a real stall.
+            "$MAIN/bin/cleanup" "$branch" \
+                && echo "docfix-poll: reaped '$branch' (PR $state)." \
+                || echo "docfix-poll: could not reap '$branch' — leaving it." >&2 ;;
+        *)  echo "docfix-poll: leaving '$branch' (PR state: ${state:-none})." ;;
+    esac
+done < <(git -C "$MAIN" branch --list 'docs-stale-refresh-*' --format='%(refname:short)')
+
+# Did a human already decline a refresh COVERING this exact stale set?
+UNCOVERED="$(uncovered_count "$REPORT")"
+if [ "$UNCOVERED" -eq 0 ]; then
+    echo "docfix-poll: a human declined a refresh covering all $COUNT stale doc(s) — staying quiet."
+    exit 0
+fi
+
+ISSUE_NUM="$(gh issue list --label stale-docs --state open --json number \
+              --jq '.[0].number // empty')"
+if [ -z "$ISSUE_NUM" ]; then
+    echo "docfix-poll: $COUNT stale doc(s) but no open stale-docs issue — the audit owns issue creation; skipping."
+    exit 0
+fi
+
+echo "docfix-poll: $COUNT stale doc(s), issue #$ISSUE_NUM — firing bin/docfix-run."
+"$MAIN/bin/docfix-run" "$ISSUE_NUM" "$SIG"   # no `exec`: it would skip the EXIT trap

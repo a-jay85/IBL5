@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 #
 # bin/docfix-run <issue-num> <sig> — Mac-side headless stale-docs remediation launcher.
-# Fired by the `docfix` job of .github/workflows/doc-freshness-audit.yml on a
-# self-hosted macOS runner when the nightly audit reports a NEW/CHANGED stale set.
-# Creates a worktree, seeds an auto_merge:false hold plan, and launches a detached
-# headless Claude run that refreshes exactly the stale docs and opens a PR (held for
-# human merge) that Closes the stale-docs issue.
+# Fired by bin/docfix-poll (launchd, daily) when the nightly audit has flagged a
+# stale set. Creates a worktree, seeds an auto_merge:false hold plan, and launches
+# a detached headless Claude run that refreshes exactly the stale docs and opens a
+# PR (held for human merge) that Closes the stale-docs issue.
 #
 # Detach mechanism cloned in structure from bin/post-plan-now:71-109 (launchd
-# RunAtLoad one-shot) — a plain `nohup … &` from the runner dies with the job.
+# RunAtLoad one-shot) — a plain `nohup … &` from the poll dies with it.
 #
 # Usage: bin/docfix-run <issue-num> <sig>
 
@@ -23,11 +22,10 @@ if [ -z "$ISSUE_NUM" ] || [ -z "$SIG" ]; then
 fi
 
 # --- 2. Anchor to the CANONICAL main checkout (NOT $0) ------------------------
-# The self-hosted runner invokes us from its ephemeral, shallow _work checkout;
-# $0-relative resolution would misroute wt-new under _work (wrong layout, no
-# usable origin/master, reclaimed mid-run). Anchor to the real main checkout —
-# exactly as workflow-continuity says wt-new is run FROM it. IBL5_MAIN override
-# lets bin/test-docfix-run point this at its sandbox.
+# The poller invokes us from $MAIN itself, but launchd sets an arbitrary cwd, and
+# bin/test-docfix-run needs the IBL5_MAIN override. Anchor to the real main
+# checkout — exactly as workflow-continuity says wt-new is run FROM it. IBL5_MAIN
+# override lets bin/test-docfix-run point this at its sandbox.
 MAIN="${IBL5_MAIN:-/Users/ajaynicolas/GitHub/IBL5}"
 cd "$MAIN"
 source "$MAIN/bin/lib/git-helpers.sh"   # worktrees_parent_dir
@@ -62,7 +60,7 @@ nightly Doc Freshness Audit flagged (issue #$ISSUE_NUM). Held for human merge.
 
 ## Automouse Hold Justification
 
-auto_merge: false — this PR is opened autonomously by a self-hosted-runner Claude
+auto_merge: false — this PR is opened autonomously by a launchd-scheduled Claude
 run with no human in the loop, and it modifies documentation a human should read
 before it lands. /post-plan Phase 6.5 condition (7) reads this frontmatter and
 refuses to arm auto-merge, leaving the PR open for a human to merge.

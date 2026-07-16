@@ -9,6 +9,7 @@ on:
 permissions:
   contents: read
   issues: write
+  pull-requests: read
 
 concurrency:
   group: doc-freshness-audit
@@ -19,11 +20,6 @@ jobs:
     name: Repo-wide staleness audit
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    outputs:
-      notify: ${{ steps.issue.outputs.notify }}
-      sig: ${{ steps.report.outputs.sig }}
-      issue-num: ${{ steps.issue.outputs.issue-num }}
-
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -60,6 +56,7 @@ jobs:
             echo "**Remediation:** re-verify each doc against reality, then bump its \`last_verified\` to today and commit (on a branch that touches the doc, \`bin/check-docs --fix-dates --since=master\` bumps the changed-but-unbumped ones)."
             echo ""
             echo "<!-- stale-set: ${{ steps.report.outputs.sig }} -->"
+            echo "<!-- stale-since: $(date -u +%Y-%m-%dT%H:%M:%SZ) -->"
           } > /tmp/issue-body.md
 
       - name: Ensure stale-docs label exists
@@ -115,8 +112,16 @@ jobs:
             echo "No stale docs — all in-scope docs are within the 60-day window." >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      - name: Evaluate refresh-pipeline health
+        id: health
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUM: ${{ steps.issue.outputs.issue-num }}
+        run: |
+          bin/docfix-poll --health-report "$ISSUE_NUM" | tee -a "$GITHUB_OUTPUT"
+
       - name: Setup SSH
-        if: steps.issue.outputs.notify == 'true'
+        if: steps.health.outputs.alert == 'true'
         uses: ./.github/actions/setup-ssh
         with:
           host: ${{ secrets.HOST }}
@@ -124,30 +129,20 @@ jobs:
           private-key: ${{ secrets.PRIVATE_KEY }}
 
       - name: Build Discord message
-        if: steps.issue.outputs.notify == 'true'
+        if: steps.health.outputs.alert == 'true'
         env:
           COUNT: ${{ steps.report.outputs.count }}
+          DETAIL: ${{ steps.health.outputs.detail }}
         run: |
-          MSG=$(printf 'Doc Freshness Audit: %s doc(s) past the 60-day staleness window.\nIssue + details: https://github.com/%s/actions/runs/%s' \
-            "$COUNT" "${{ github.repository }}" "${{ github.run_id }}")
+          MSG=$(printf 'Doc refresh needs you: %s doc(s) are stale and the pipeline could not clear them on its own.\n%s\nRun: https://github.com/%s/actions/runs/%s' \
+            "$COUNT" "$DETAIL" "${{ github.repository }}" "${{ github.run_id }}")
           printf '%s' "$MSG" > /tmp/discord-msg.txt
 
       - name: Send Discord DM
-        if: steps.issue.outputs.notify == 'true'
+        if: steps.health.outputs.alert == 'true'
         uses: ./.github/actions/notify-discord
         with:
           discord-id: ${{ secrets.OWNER_DISCORD_ID }}
           port: ${{ secrets.PORT }}
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
-          fail-on-delivery: 'false'
-
-  docfix:
-    name: Fire headless doc-fix on the Mac
-    needs: audit
-    if: needs.audit.outputs.notify == 'true'
-    runs-on: [self-hosted, macOS]
-    timeout-minutes: 10
-    steps:
-      - name: Launch the headless doc-fix run
-        run: /Users/ajaynicolas/GitHub/IBL5/bin/docfix-run "${{ needs.audit.outputs.issue-num }}" "${{ needs.audit.outputs.sig }}"

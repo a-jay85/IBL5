@@ -1,59 +1,124 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# bin/test-docfix-run — regression guard for bin/docfix-run plumbing (autonomy lever 3).
-# Runs docfix-run in a mktemp sandbox fake-repo against git/gh/launchctl shims and a
-# wt-new stub — nothing real is launched or worktree'd. Asserts plist/prompt/plan
-# composition, dedupe skip, and empty-arg rejection, plus a static gate assertion on
-# the workflow. Run: bin/test-docfix-run  (exit 0 = all pass).
+# bin/test-docfix-run — regression guard for bin/docfix-run and bin/docfix-poll
+# (autonomy lever 3). Runs both scripts in a mktemp sandbox against shims —
+# nothing real is launched or worktree'd. Guards: plist/prompt/plan composition,
+# dedupe skip, empty-arg rejection, poll logic (reap, decline, fire), and the
+# health predicate (all three ALERT branches + every silent one).
+# Run: bin/test-docfix-run  (exit 0 = all pass).
 set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 REAL_DOCFIX="$REPO_ROOT/bin/docfix-run"
+REAL_POLL="$REPO_ROOT/bin/docfix-poll"
 WORKFLOW="$REPO_ROOT/.github/workflows/doc-freshness-audit.yml"
+NOTIFY_WORKFLOW="$REPO_ROOT/.github/workflows/docs-refreshed-notify.yml"
 FAILED=0
 ok()   { echo "ok: $1"; }
 bad()  { echo "FAIL: $1"; FAILED=1; }
 
 # build_sandbox -> prints sandbox path with fake-repo + shims wired.
+# Shim convention: every SHIM_* variable holds POST-jq output — the shims ignore
+# --jq entirely. A shim that must return nothing returns "" not "[]".
 build_sandbox() {
     local SB; SB="$(mktemp -d)"
     mkdir -p "$SB/bin/lib" "$SB/home/Library/LaunchAgents" "$SB/home/.claude/plans" "$SB/shim"
     # NOTE: do NOT symlink docfix-run in — the test drives the REAL script with
-    # IBL5_MAIN=$SB, exercising prod's own anchoring code (a $0-relative regression
-    # would then be caught, not masked). Only wt-new + git-helpers are stubbed.
+    # IBL5_MAIN=$SB, exercising prod's own anchoring code.
     printf 'worktrees_parent_dir(){ echo "%s/wts"; }\n' "$SB" > "$SB/bin/lib/git-helpers.sh"
     cat > "$SB/bin/wt-new" <<'W'
 #!/usr/bin/env bash
 mkdir -p "$(cd "$(dirname "$0")/.." && pwd)/wts/$1/ibl5"
 W
     chmod +x "$SB/bin/wt-new"
-    # git shim: dedupe consults `git -C <root> branch --list <pat>`
+
+    # Stubs for helpers the poll calls via "$MAIN/bin/<name>".
+    # check-docs: prints SHIM_STALE_JSON (post-jq: a JSON array of {path} objects).
+    printf '#!/usr/bin/env bash\nprintf "%%s" "${SHIM_STALE_JSON:-[]}"\n' \
+        > "$SB/bin/check-docs"
+    # cleanup: logs branch to cleanup-calls, exits SHIM_CLEANUP_RC (default 0).
+    printf '#!/usr/bin/env bash\necho "$1" >> "%s/cleanup-calls"\nexit "${SHIM_CLEANUP_RC:-0}"\n' \
+        "$SB" > "$SB/bin/cleanup"
+    # docfix-run: logs "issue|sig" to docfix-calls.
+    printf '#!/usr/bin/env bash\necho "$1|$2" >> "%s/docfix-calls"\n' \
+        "$SB" > "$SB/bin/docfix-run"
+    chmod +x "$SB/bin/check-docs" "$SB/bin/cleanup" "$SB/bin/docfix-run"
+
+    # git shim: seam for ls-remote (died branch) AND branch --list (reap + dedupe).
+    # branch: printf with newline so `while IFS= read -r` picks up the last line.
+    # ls-remote: printf without newline when empty = no branches (a bare \n would
+    #   give orphaned_refresh_branch a spurious empty branch to check).
     cat > "$SB/shim/git" <<'G'
 #!/usr/bin/env bash
-for a in "$@"; do [ "$a" = "branch" ] && { printf '%s' "${SHIM_BRANCH_OUT:-}"; exit 0; }; done
-exit 0
+if [ "$1" = "ls-remote" ]; then
+    [ -n "${SHIM_LS_REMOTE:-}" ] && printf '%s\n' "$SHIM_LS_REMOTE" || true
+    exit 0
+fi
+for a in "$@"; do
+    [ "$a" = "branch" ] && { [ -n "${SHIM_BRANCH_OUT:-}" ] && printf '%s\n' "$SHIM_BRANCH_OUT" || true; exit 0; }
+done
+exec /usr/bin/git "$@"
 G
-    # gh shim: dedupe consults `gh pr list … --jq '.[].headRefName'`
-    printf '#!/usr/bin/env bash\nprintf "%%s" "${SHIM_PR_OUT:-}"\nexit 0\n' > "$SB/shim/gh"
+
+    # gh shim: every SHIM_* holds post-jq output; the shim ignores --jq.
+    cat > "$SB/shim/gh" <<'H'
+#!/usr/bin/env bash
+args="$*"
+case "$1 $2" in
+  "issue list") printf '%s' "${SHIM_ISSUE_OUT:-}" ;;
+  "issue view")
+      case "$args" in
+        *"--json body"*) printf '%s' "${SHIM_ISSUE_BODY:-}" ;;
+        *)               printf '%s' "${SHIM_ISSUE_CREATED:-}" ;;
+      esac ;;
+  "pr list")
+      case "$args" in
+        *"--state all"*)    printf '%s' "${SHIM_PR_FOR_BRANCH:-0}" ;;
+        *"--state closed"*) printf '%s' "${SHIM_PR_CLOSED:-[]}" ;;
+        *)                  printf '%s' "${SHIM_PR_OPEN:-}" ;;
+      esac ;;
+  "pr view")
+      case "$args" in
+        *statusCheckRollup*) printf '%s' "${SHIM_PR_ROLLUP:-0}" ;;
+        *)                   printf '%s' "${SHIM_PR_STATE:-}" ;;
+      esac ;;
+esac
+exit 0
+H
     printf '#!/usr/bin/env bash\nexit 0\n' > "$SB/shim/launchctl"
     chmod +x "$SB/shim/git" "$SB/shim/gh" "$SB/shim/launchctl"
     printf '%s' "$SB"
 }
 
-# run_docfix <sandbox> <branch-out> <pr-out> <issue> <sig> -> runs, echoes "rc=<code>"
-# Drives the REAL bin/docfix-run with IBL5_MAIN=$SB so prod's anchoring code is
-# what gets exercised (not a $0 accident).
+# run_docfix: drives the REAL bin/docfix-run with IBL5_MAIN=$SB.
+# $2=SHIM_BRANCH_OUT  $3=SHIM_PR_OPEN (renamed from old SHIM_PR_OUT)
 run_docfix() {
     local SB="$1"
     IBL5_MAIN="$SB" HOME="$SB/home" PATH="$SB/shim:$PATH" \
-        SHIM_BRANCH_OUT="$2" SHIM_PR_OUT="$3" \
+        SHIM_BRANCH_OUT="$2" SHIM_PR_OPEN="$3" \
         "$REAL_DOCFIX" "$4" "$5" >/dev/null 2>&1
     echo "rc=$?"
 }
+
+# run_poll: drives the REAL bin/docfix-poll (poll path) with IBL5_MAIN=$SB.
+# Caller sets SHIM_* vars before calling (they're inherited by the subshell).
+run_poll() {
+    local SB="$1"
+    ( IBL5_MAIN="$SB" HOME="$SB/home" PATH="$SB/shim:$SB/bin:$PATH" \
+      "$REAL_POLL" >/dev/null 2>&1 ) || true
+}
+
+# run_health: drives bin/docfix-poll --health-report <issue>; prints output.
+run_health() {
+    local SB="$1" ISSUE="${2:-}"
+    IBL5_MAIN="$SB" HOME="$SB/home" PATH="$SB/shim:$SB/bin:$PATH" \
+        "$REAL_POLL" --health-report "$ISSUE" 2>/dev/null
+}
+
 plist_of() { ls "$1/home/Library/LaunchAgents/"*.plist 2>/dev/null | head -1; }
 plan_of()  { ls "$1/home/.claude/plans/docs-stale-refresh-"*.md 2>/dev/null | head -1; }
 
-# --- Case 1 + 2: happy path composes plist + prompt + hold plan ---------------
+# --- Cases 1-5: bin/docfix-run launcher ----------------------------------------
 SB="$(build_sandbox)"
 run_docfix "$SB" "" "" "4242" "ibl5/docs/foo.md,README.md" >/dev/null
 P="$(plist_of "$SB")"; PLAN="$(plan_of "$SB")"
@@ -69,7 +134,6 @@ P="$(plist_of "$SB")"; PLAN="$(plan_of "$SB")"
   && ok "(2) held plan seeded with auto_merge:false + hold section" \
   || bad "(2) hold plan seeding"
 
-# --- Case 3: dedupe skips (branch OR PR present) — no plist written ------------
 SB="$(build_sandbox)"
 run_docfix "$SB" "docs-stale-refresh-20260704" "" "1" "a.md" >/dev/null
 [ -z "$(plist_of "$SB")" ] && ok "(3a) dedupe-skip on existing branch (no plist)" \
@@ -79,7 +143,6 @@ run_docfix "$SB" "" "docs-stale-refresh-20260703" "1" "a.md" >/dev/null
 [ -z "$(plist_of "$SB")" ] && ok "(3b) dedupe-skip on open PR head (no plist)" \
                            || bad "(3b) dedupe PR skip"
 
-# --- Case 4 + 5: empty-arg rejection (nonzero, nothing written) ---------------
 SB="$(build_sandbox)"
 [ "$(run_docfix "$SB" "" "" "" "a.md")" != "rc=0" ] && [ -z "$(plist_of "$SB")" ] \
   && ok "(4) empty issue-num rejected" || bad "(4) empty issue-num not rejected"
@@ -87,12 +150,253 @@ SB="$(build_sandbox)"
 [ "$(run_docfix "$SB" "" "" "42" "")" != "rc=0" ] && [ -z "$(plist_of "$SB")" ] \
   && ok "(5) empty sig rejected" || bad "(5) empty sig not rejected"
 
-# --- Case 6: workflow-gating static assertion ---------------------------------
-{ grep -q "if: needs.audit.outputs.notify == 'true'" "$WORKFLOW" \
-    && grep -qF 'bin/docfix-run "${{ needs.audit.outputs.issue-num }}" "${{ needs.audit.outputs.sig }}"' "$WORKFLOW" \
-    && grep -qF 'issue-num: ${{ steps.issue.outputs.issue-num }}' "$WORKFLOW"; } \
-  && ok "(6) docfix job gated on notify + passes issue-num & sig; audit exposes issue-num" \
-  || bad "(6) workflow gate/output wiring"
+# --- Case 6: doc-freshness-audit.yml static assertions (NEGATIVE) -------------
+{ ! grep -q 'self-hosted' "$WORKFLOW" \
+    && ! grep -q 'docfix:' "$WORKFLOW" \
+    && ! grep -qF 'bin/docfix-run' "$WORKFLOW" \
+    && grep -q 'pull-requests: read' "$WORKFLOW" \
+    && grep -qF "steps.health.outputs.alert == 'true'" "$WORKFLOW" \
+    && ! grep -qF "notify == 'true'" "$WORKFLOW" \
+    && ! grep -q "fail-on-delivery" "$WORKFLOW"; } \
+  && ok "(6) audit: no self-hosted/docfix/docfix-run; health.alert gate; pull-requests:read; no fail-on-delivery" \
+  || bad "(6) audit static assertions"
+
+# --- Case 7: docs-refreshed-notify.yml static assertion -----------------------
+{ grep -q "github.event.pull_request.head.repo.full_name == github.repository" "$NOTIFY_WORKFLOW" \
+    && grep -q "startsWith(github.event.pull_request.head.ref, 'docs-stale-refresh-')" "$NOTIFY_WORKFLOW"; } \
+  && ok "(7) docs-refreshed-notify ANDs same-repo guard and head prefix" \
+  || bad "(7) docs-refreshed-notify static assertion"
+
+# --- Case 8: carry-forward — bin/docfix-run still has auto_merge:false --------
+{ grep -q '^auto_merge: false$' "$REAL_DOCFIX" \
+    && grep -q '## Automouse Hold Justification' "$REAL_DOCFIX"; } \
+  && ok "(8) bin/docfix-run: auto_merge:false and hold section preserved" \
+  || bad "(8) carry-forward check"
+
+# --- Case 9: --print-schedule -------------------------------------------------
+SB="$(build_sandbox)"
+SCHED="$(IBL5_MAIN="$SB" HOME="$SB/home" PATH="$SB/shim:$PATH" \
+    "$REAL_POLL" --print-schedule 2>&1)"
+{ echo "$SCHED" | grep -q 'StartCalendarInterval' \
+    && echo "$SCHED" | grep -q '<integer>9</integer>' \
+    && echo "$SCHED" | grep -q '<integer>17</integer>' \
+    && echo "$SCHED" | grep -qF "<string>$SB/bin/docfix-poll</string>"; } \
+  && ok "(9) --print-schedule emits Hour 9 / Minute 17 and MAIN-checkout Program" \
+  || bad "(9) --print-schedule"
+
+# --- Case 10: --install-schedule / --uninstall-schedule -----------------------
+SB="$(build_sandbox)"
+PLIST_F="$SB/home/Library/LaunchAgents/com.ibl5.docfix-poll.plist"
+# Negative: no executable at $SB/bin/docfix-poll
+IBL5_MAIN="$SB" HOME="$SB/home" PATH="$SB/shim:$PATH" \
+    "$REAL_POLL" --install-schedule >/dev/null 2>&1 && _RC=0 || _RC=$?
+{ [ "$_RC" -ne 0 ] && [ ! -f "$PLIST_F" ]; } \
+  && ok "(10) --install-schedule exits nonzero and writes no plist without executable" \
+  || bad "(10) --install-schedule negative"
+# Positive: create executable
+printf '#!/usr/bin/env bash\n' > "$SB/bin/docfix-poll"; chmod +x "$SB/bin/docfix-poll"
+IBL5_MAIN="$SB" HOME="$SB/home" PATH="$SB/shim:$PATH" \
+    "$REAL_POLL" --install-schedule >/dev/null 2>&1 && _RC=0 || _RC=$?
+{ [ "$_RC" -eq 0 ] && [ -f "$PLIST_F" ]; } \
+  && ok "(10) --install-schedule exits 0 and writes plist when program exists" \
+  || bad "(10) --install-schedule positive"
+# Uninstall
+IBL5_MAIN="$SB" HOME="$SB/home" PATH="$SB/shim:$PATH" \
+    "$REAL_POLL" --uninstall-schedule >/dev/null 2>&1
+[ ! -f "$PLIST_F" ] \
+  && ok "(10) --uninstall-schedule removes plist (idempotent)" \
+  || bad "(10) --uninstall-schedule"
+
+# --- Poll cases: shared stale fixture -----------------------------------------
+STALE_TWO='[{"path":"b.md"},{"path":"a.md"}]'
+STALE_ONE='[{"path":"a.md"}]'
+
+# Case 11: happy path — fires launcher with SELF-DERIVED sig and issue number
+SB="$(build_sandbox)"
+SHIM_STALE_JSON="$STALE_TWO" SHIM_ISSUE_OUT="77" SHIM_PR_CLOSED='[]' \
+    run_poll "$SB"
+{ [ -f "$SB/docfix-calls" ] && grep -qF "77|a.md,b.md" "$SB/docfix-calls"; } \
+  && ok "(11) poll fires launcher with self-derived sig (sorted) and issue number" \
+  || bad "(11) poll happy path"
+
+# Case 12: NEGATIVE — empty staleness report (exit 0 from check-docs) fires nothing
+SB="$(build_sandbox)"
+SHIM_STALE_JSON='[]' SHIM_ISSUE_OUT="77" run_poll "$SB"
+[ ! -f "$SB/docfix-calls" ] \
+  && ok "(12) poll fires nothing when staleness report is empty (exit 0 is not a gate)" \
+  || bad "(12) poll empty report"
+
+# Case 13: NEGATIVE — no open stale-docs issue → fires nothing, no empty issue-num
+SB="$(build_sandbox)"
+SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="" SHIM_PR_CLOSED='[]' run_poll "$SB"
+[ ! -f "$SB/docfix-calls" ] \
+  && ok "(13) poll fires nothing when no open stale-docs issue exists" \
+  || bad "(13) poll no-issue guard"
+
+# Case 14: NEGATIVE, decline-respect — closed PR covers full stale set → quiet
+SB="$(build_sandbox)"
+SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" SHIM_PR_CLOSED='["a.md"]' \
+    run_poll "$SB"
+[ ! -f "$SB/docfix-calls" ] \
+  && ok "(14) poll stays silent when a declined PR covers all stale docs" \
+  || bad "(14) poll decline-respect"
+
+# Case 15: auto-resume — stale set grown beyond declined set → fires
+SB="$(build_sandbox)"
+SHIM_STALE_JSON="$STALE_TWO" SHIM_ISSUE_OUT="77" SHIM_PR_CLOSED='["a.md"]' \
+    run_poll "$SB"
+{ [ -f "$SB/docfix-calls" ] && grep -qF "77|" "$SB/docfix-calls"; } \
+  && ok "(15) poll resumes when stale set grows beyond the declined set" \
+  || bad "(15) poll auto-resume"
+
+# Case 16a: reap MERGED branch
+SB="$(build_sandbox)"
+SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" SHIM_PR_CLOSED='[]' \
+SHIM_BRANCH_OUT="docs-stale-refresh-merged" SHIM_PR_STATE="MERGED" \
+    run_poll "$SB"
+{ [ -f "$SB/cleanup-calls" ] && grep -q "docs-stale-refresh-merged" "$SB/cleanup-calls"; } \
+  && ok "(16a) poll reaps a MERGED leftover branch" \
+  || bad "(16a) reap MERGED"
+
+# Case 16b: reap CLOSED-unmerged branch
+SB="$(build_sandbox)"
+SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" SHIM_PR_CLOSED='[]' \
+SHIM_BRANCH_OUT="docs-stale-refresh-closed" SHIM_PR_STATE="CLOSED" \
+    run_poll "$SB"
+{ [ -f "$SB/cleanup-calls" ] && grep -q "docs-stale-refresh-closed" "$SB/cleanup-calls"; } \
+  && ok "(16b) poll reaps a CLOSED-unmerged leftover branch" \
+  || bad "(16b) reap CLOSED"
+
+# Case 16c: NEGATIVE — OPEN PR's branch is never reaped; poll still reaches launcher
+SB="$(build_sandbox)"
+SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" SHIM_PR_CLOSED='[]' \
+SHIM_BRANCH_OUT="docs-stale-refresh-open" SHIM_PR_STATE="OPEN" \
+    run_poll "$SB"
+{ [ ! -f "$SB/cleanup-calls" ] && [ -f "$SB/docfix-calls" ]; } \
+  && ok "(16c) OPEN PR's branch is not reaped; poll still reaches launcher" \
+  || bad "(16c) no-reap OPEN + launcher reaches"
+
+# Case 16d: failed cleanup does not abort the poll; launcher still fires
+SB="$(build_sandbox)"
+SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" SHIM_PR_CLOSED='[]' \
+SHIM_BRANCH_OUT="docs-stale-refresh-fail" SHIM_PR_STATE="CLOSED" SHIM_CLEANUP_RC=1 \
+    run_poll "$SB"
+{ [ -f "$SB/cleanup-calls" ] && [ -f "$SB/docfix-calls" ]; } \
+  && ok "(16d) failed cleanup (rc=1) does not abort poll; launcher still fires" \
+  || bad "(16d) cleanup failure tolerated"
+
+# --- Health-report helper: generate portable timestamps -----------------------
+_ts_ago() {  # $1=seconds_ago -> ISO-8601 UTC timestamp
+    local epoch; epoch=$(( $(date -u +%s) - $1 ))
+    date -u -r "$epoch" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
+        || date -u -d "@$epoch" +%Y-%m-%dT%H:%M:%SZ
+}
+TS_40H="$(_ts_ago $(( 40*3600 )))"
+TS_20H="$(_ts_ago $(( 20*3600 )))"
+TS_2H="$(_ts_ago $(( 2*3600 )))"
+TS_30D="$(_ts_ago $(( 30*24*3600 )))"
+
+PR_OBJ='{"number":42,"headRefName":"docs-stale-refresh-test","url":"https://example.com/pull/42"}'
+
+# --- Cases 17a-17e: --health-report alert branches ---------------------------
+
+# Case 17a: ALERT ci-red — open PR with failing checks
+SB="$(build_sandbox)"
+OUT="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="$PR_OBJ" SHIM_PR_ROLLUP=2 \
+    run_health "$SB" 77)"
+{ echo "$OUT" | grep -q 'alert=true' \
+    && echo "$OUT" | grep -q 'kind=ci-red' \
+    && echo "$OUT" | grep -q 'https://example.com/pull/42'; } \
+  && ok "(17a) health: ALERT ci-red on open PR with failing checks" \
+  || bad "(17a) health ci-red"
+
+# Case 17b: NEGATIVE no-nag — open PR with green CI stays silent
+SB="$(build_sandbox)"
+OUT="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="$PR_OBJ" SHIM_PR_ROLLUP=0 \
+    run_health "$SB" 77)"
+{ echo "$OUT" | grep -q 'alert=false'; } \
+  && ok "(17b) health: no alert on green/pending open PR (no-nag property)" \
+  || bad "(17b) health no-nag"
+
+# Case 17c: ALERT died — refresh branch on origin has no PR of any state
+SB="$(build_sandbox)"
+LS="abcdef123	refs/heads/docs-stale-refresh-x"
+OUT="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" SHIM_PR_CLOSED='[]' \
+    SHIM_LS_REMOTE="$LS" SHIM_PR_FOR_BRANCH=0 \
+    run_health "$SB" 77)"
+{ echo "$OUT" | grep -q 'alert=true' \
+    && echo "$OUT" | grep -q 'kind=died' \
+    && echo "$OUT" | grep -q 'docs-stale-refresh-x'; } \
+  && ok "(17c) health: ALERT died on orphan branch with no PR" \
+  || bad "(17c) health died"
+
+# Case 17d: ALERT never-ran — no PR, no branch, stale-since 40h ago
+SB="$(build_sandbox)"
+BODY="<!-- stale-since: $TS_40H -->"
+OUT="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" SHIM_PR_CLOSED='[]' \
+    SHIM_LS_REMOTE="" SHIM_ISSUE_BODY="$BODY" \
+    run_health "$SB" 77)"
+{ echo "$OUT" | grep -q 'alert=true' \
+    && echo "$OUT" | grep -q 'kind=never-ran' \
+    && echo "$OUT" | grep -q 'install-schedule'; } \
+  && ok "(17d) health: ALERT never-ran after 36h grace (40h marker)" \
+  || bad "(17d) health never-ran"
+
+# Case 17e: NEGATIVE — same as 17d but 20h marker stays below grace
+SB="$(build_sandbox)"
+BODY="<!-- stale-since: $TS_20H -->"
+OUT="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" SHIM_PR_CLOSED='[]' \
+    SHIM_LS_REMOTE="" SHIM_ISSUE_BODY="$BODY" \
+    run_health "$SB" 77)"
+{ echo "$OUT" | grep -q 'alert=false'; } \
+  && ok "(17e) health: no alert within 36h grace (20h marker)" \
+  || bad "(17e) health grace"
+
+# --- Cases 18a-18d: false-alarm negatives -------------------------------------
+
+# Case 18a: NEGATIVE — empty stale set → alert=false regardless of everything else
+SB="$(build_sandbox)"
+OUT="$(SHIM_STALE_JSON='[]' SHIM_PR_OPEN="$PR_OBJ" SHIM_PR_ROLLUP=99 \
+    run_health "$SB" 77)"
+{ echo "$OUT" | grep -q 'alert=false'; } \
+  && ok "(18a) health: no alert on empty stale set" \
+  || bad "(18a) health empty set"
+
+# Case 18b: NEGATIVE, decline-respect — declined branch present but set covered → quiet
+# Decline-before-died ordering: if decline check short-circuits, the orphan branch
+# must NOT trigger a died alert.
+SB="$(build_sandbox)"
+LS="abcdef123	refs/heads/docs-stale-refresh-declined"
+OUT="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" SHIM_PR_CLOSED='["a.md"]' \
+    SHIM_LS_REMOTE="$LS" \
+    run_health "$SB" 77)"
+{ echo "$OUT" | grep -q 'alert=false'; } \
+  && ok "(18b) health: no alert when declined PR covers set even with lingering branch" \
+  || bad "(18b) health decline-before-died ordering"
+
+# Case 18c: NEGATIVE — declined branch (partial decline) has a closed PR; not orphaned
+# The stale set grew past the decline, so uncovered_count > 0, but the branch still
+# has a PR → not orphaned → died must NOT fire. stale-since ~1h → never-ran silent.
+SB="$(build_sandbox)"
+LS="abcdef123	refs/heads/docs-stale-refresh-partial"
+BODY1H="<!-- stale-since: $TS_2H -->"
+OUT="$(SHIM_STALE_JSON="$STALE_TWO" SHIM_PR_OPEN="" SHIM_PR_CLOSED='["a.md"]' \
+    SHIM_LS_REMOTE="$LS" SHIM_PR_FOR_BRANCH=1 SHIM_ISSUE_BODY="$BODY1H" \
+    run_health "$SB" 77)"
+{ echo "$OUT" | grep -q 'alert=false'; } \
+  && ok "(18c) health: no false died on declined PR's lingering branch (has closed PR)" \
+  || bad "(18c) health died must not fire on declined branch"
+
+# Case 18d: NEGATIVE, episode anchor — 2h stale-since marker beats 30d createdAt
+# A long-lived issue with a recent episode start must not fire never-ran.
+SB="$(build_sandbox)"
+BODY2H="<!-- stale-since: $TS_2H -->"
+OUT="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" SHIM_PR_CLOSED='[]' \
+    SHIM_LS_REMOTE="" SHIM_ISSUE_BODY="$BODY2H" SHIM_ISSUE_CREATED="$TS_30D" \
+    run_health "$SB" 77)"
+{ echo "$OUT" | grep -q 'alert=false'; } \
+  && ok "(18d) health: stale-since marker (2h) beats createdAt (30d) — no false never-ran" \
+  || bad "(18d) health episode anchor"
 
 if [ "$FAILED" -eq 0 ]; then echo "All docfix-run checks passed."; else echo "Some docfix-run checks FAILED."; fi
 exit "$FAILED"

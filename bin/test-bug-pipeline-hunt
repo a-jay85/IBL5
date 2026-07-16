@@ -95,7 +95,7 @@ bpt_reset
 bpt_set_claim "$CLAIM"; bpt_set_result '{"verdict":"fixed"}'; bpt_hunt_dirty
 bpt_run
 bpt_count "r12: cron fired post-plan-now once" 1 "$STUB/post-plan-now.log"
-if git -C "$STUB/wt/bug-7" diff --quiet 2>/dev/null; then bpt_fail "r12: worktree unexpectedly clean at handoff"; else bpt_ok "r12: worktree DIRTY at handoff (post-plan-now commits it)"; fi
+if git -C "$STUB/wt/bug-7-the-trade-button-is-broken" diff --quiet 2>/dev/null; then bpt_fail "r12: worktree unexpectedly clean at handoff"; else bpt_ok "r12: worktree DIRTY at handoff (post-plan-now commits it)"; fi
 
 # ── Row 13 / Row 23 — all tiers escalate → needs_human; post-plan-now NEVER fired, never pr_open ──
 bpt_reset

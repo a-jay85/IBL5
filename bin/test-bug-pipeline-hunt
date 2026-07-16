@@ -97,19 +97,23 @@ bpt_log_has  "$STUB" post-plan-now.log "post-plan-now --auto" "r16: cron invokes
 bpt_log_has  "$STUB" transition.log "transition 7 pr_open" "r16: row moves to pr_open"
 bpt_log_lacks "$STUB" transition.log "pr_open --pr" "r16: ship transition carries no --pr (async reconcile fills it)"
 
-# ── Row 17 — async pr_number reconcile: gh pr list → transition pr_open --pr 42 + issue comment ──
+# ── Row 17 — async pr_number reconcile: gh pr list → transition pr_open --pr=42 + label + comment ──
+# The --pr=42 assertion is deliberately the `=` form: transition.php parses ONLY --opt=value, so a
+# space-form `--pr 42` silently drops the value (live-caught 2026-07-16 — pr_number stayed NULL).
 bpt_reset
 bpt_set_list_pr_open '[{"id":"7","status":"pr_open","pr_number":null,"issue_number":"4242"}]'
 bpt_set_gh_pr_list '42'
 bpt_run
-bpt_log_has "$STUB" transition.log "transition 7 pr_open --pr 42" "r17: backfills pr_number from gh pr list"
+bpt_log_has "$STUB" transition.log "transition 7 pr_open --pr=42" "r17: backfills pr_number from gh pr list"
+bpt_log_has "$STUB" gh.log "pr edit 42 --repo test/code-fake --add-label pipeline-authored" "r17: applies pipeline-authored label at reconcile"
 bpt_log_has "$STUB" gh.log "issue comment 4242" "r17: comments PR url on the tracking issue once"
-# empty gh pr list → no transition, still reconcilable next tick
+# empty gh pr list → no transition, no label, still reconcilable next tick
 bpt_reset
 bpt_set_list_pr_open '[{"id":"7","status":"pr_open","pr_number":null,"issue_number":"4242"}]'
 bpt_set_gh_pr_list ''
 bpt_run
 bpt_log_lacks "$STUB" transition.log "pr_open --pr" "r17: no pr found → no transition (reconcile again later)"
+bpt_log_lacks "$STUB" gh.log "pr edit" "r17: no pr found → no label attempt"
 
 # ── Row 18 — SECURITY grep: post-plan-now absent from the prompt AND from run_hunter_agent ──
 if grep -qi 'post-plan-now' "$PROMPT"; then bpt_fail "r18: post-plan-now leaked into hunter prompt"; else bpt_ok "r18: post-plan-now absent from hunter prompt"; fi
@@ -124,14 +128,14 @@ bpt_count   "r19: no PR opened on empty diff" 0 "$STUB/post-plan-now.log"
 bpt_log_has "$STUB" transition.log "needs_human" "r19: empty-diff 'fixed' routes to needs_human"
 bpt_log_has "$STUB" curl.log "no diff" "r19: 'no diff' finding posted to the thread"
 
-# ── Row 20 — first failed attempt (hunt_attempts<cap) → hunting --attempts 1, no human handoff ──
+# ── Row 20 — first failed attempt (hunt_attempts<cap) → hunting --attempts=1, no human handoff ──
 # (in-tick retry then recovers on the next attempt: a single failure must never escalate to a human.)
 bpt_reset
 bpt_set_claim "$CLAIM"
 bpt_set_verdicts escalate escalate escalate fixed   # ladder-1 all escalate → attempt 1; ladder-2 haiku fixed
 bpt_hunt_dirty
 bpt_run
-bpt_log_has   "$STUB" transition.log "transition 7 hunting --attempts 1" "r20: first failure → hunting --attempts 1"
+bpt_log_has   "$STUB" transition.log "transition 7 hunting --attempts=1" "r20: first failure → hunting --attempts=1 (= form — space form drops the value)"
 bpt_log_lacks "$STUB" transition.log "needs_human" "r20: single failure never escalates to a human"
 bpt_count     "r20: no @mention on a single failure" 0 <(grep MENTION "$STUB/calls.log" 2>/dev/null)
 
@@ -151,7 +155,7 @@ bpt_set_claim "$CLAIM"; bpt_set_result '{"verdict":"escalate","terminal":true}'
 bpt_run
 bpt_count     "r22: exactly one ladder ran (no 2nd attempt)" 3 "$STUB/hunt-models.log"
 bpt_log_has   "$STUB" transition.log "needs_human" "r22: terminal failure → needs_human"
-bpt_log_lacks "$STUB" transition.log "--attempts 2" "r22: never reaches attempt 2"
+bpt_log_lacks "$STUB" transition.log "--attempts=2" "r22: never reaches attempt 2"
 
 # ── Row 25 — usage-limit mid-hunt → blocked + future blocked_until; NOT needs_human; attempts unchanged ──
 bpt_reset

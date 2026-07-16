@@ -51,6 +51,17 @@ export async function handleEnqueue(msg: Message): Promise<void> {
         message_id: msg.id,
         text: msg.content,
     });
+    // Instant ack (bot-side of "ack + thread"): react ✴️ so a GM sees pickup with no
+    // cron round-trip. Also fires for Phase-6 backfilled messages (same shared path) —
+    // desirable: it signals the bot picked the report up on catch-up, not just live.
+    // Must never throw past this handler — Phase-6 backfill (backfill.ts) awaits
+    // handleEnqueue in a plain loop with no per-message try/catch, so an uncaught
+    // react rejection here would abort replay of every message after it.
+    try {
+        await msg.react('✴️');
+    } catch (err) {
+        console.error('handleEnqueue: react ack failed (swallowed):', err);
+    }
 }
 
 // A thread's own channel id IS the thread id — that's what §3b thread-reply

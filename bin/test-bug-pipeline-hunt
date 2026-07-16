@@ -128,6 +128,7 @@ bpt_run
 bpt_log_has "$STUB" transition.log "transition 7 pr_open --pr=42" "r17: backfills pr_number from gh pr list"
 bpt_log_has "$STUB" gh.log "pr edit 42 --repo test/code-fake --add-label pipeline-authored" "r17: applies pipeline-authored label at reconcile"
 bpt_log_has "$STUB" gh.log "issue comment 4242" "r17: comments PR url on the tracking issue once"
+bpt_log_lacks "$STUB" calls.log "POST_TO_THREAD" "r17: row has no thread_id → no PR-opened thread post"
 # empty gh pr list → no transition, no label, still reconcilable next tick
 bpt_reset
 bpt_set_list_pr_open '[{"id":"7","status":"pr_open","pr_number":null,"issue_number":"4242"}]'
@@ -153,6 +154,15 @@ bpt_log_has "$STUB" gh.log "pr list --repo test/code-fake --head bug-1 --json" \
     "r17-cutover: falls back to the legacy bare bug-<id> head"
 bpt_log_has "$STUB" transition.log "transition 1 pr_open --pr=77" \
     "r17-cutover: backfills pr_number from the legacy-head PR"
+
+# ── Row 17b — PR-opened thread post: row carries thread_id → posts "Opened a fix PR" to it ──
+bpt_reset
+bpt_set_list_pr_open '[{"id":"7","status":"pr_open","pr_number":null,"issue_number":"4242","thread_id":"880000000000000001"}]'
+bpt_set_gh_pr_list '42'
+bpt_run
+bpt_log_has "$STUB" transition.log "transition 7 pr_open --pr=42" "r17b: backfills pr_number same as r17"
+bpt_log_has "$STUB" calls.log "POST_TO_THREAD" "r17b: thread_id present → posts to the thread"
+bpt_log_has "$STUB" curl.log "Opened a fix PR: https://github.com/test/code-fake/pull/42" "r17b: PR-opened message names the exact PR URL"
 
 # ── Row 18 — SECURITY grep: post-plan-now absent from the prompt AND from run_hunter_agent ──
 if grep -qi 'post-plan-now' "$PROMPT"; then bpt_fail "r18: post-plan-now leaked into hunter prompt"; else bpt_ok "r18: post-plan-now absent from hunter prompt"; fi

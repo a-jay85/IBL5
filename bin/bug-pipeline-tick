@@ -121,7 +121,7 @@ park_blocked() { # id status
 
 # ── The classifier Haiku call (locked-down: schema-constrained, tool-starved) ─
 CLASSIFY_SCHEMA='{"type":"object","additionalProperties":false,"required":["class"],"properties":{"class":{"enum":["bug","feature","not_a_thing"]},"bug_has_enough_info":{"type":"boolean"},"feature_is_regression":{"type":"boolean"},"clarifying_question":{"type":"string"},"issue_title":{"type":"string","maxLength":70},"severity":{"enum":["low","medium","high"]}}}'
-GATHER_SCHEMA='{"type":"object","additionalProperties":false,"required":["enough_info"],"properties":{"enough_info":{"type":"boolean"},"next_question":{"type":"string"}}}'
+GATHER_SCHEMA='{"type":"object","additionalProperties":false,"required":["enough_info"],"properties":{"enough_info":{"type":"boolean"},"next_question":{"type":"string"},"scope_estimate":{"enum":["single_pr","multi_pr"]}}}'
 
 # run_structured_call <prompt> <schema> ; sets CJ_RC, CJ_OUT (raw envelope), CJ_ERR
 run_structured_call() {
@@ -326,8 +326,14 @@ drive_feature_row() { # row_json
             log "gather $id: asked follow-up, stays gathering"
     else
         # enough_info=true → ping @A-Jay for a ✅ and record the ping message id.
+        local scope_est ping_text
+        scope_est="$(printf '%s' "$result" | jq -r 'if has("scope_estimate") then .scope_estimate else "missing" end' 2>/dev/null)"
+        ping_text="Feature ready for a plan — react ✅ to approve."
+        if [ "$scope_est" = "multi_pr" ]; then
+            ping_text="Feature ready for a plan — react ✅ to approve. ⚠️ looks multi-PR — consider planning this interactively instead of reacting ✅"
+        fi
         local mid
-        mid="$(bot_mention "$thread_id" "$BUG_PIPELINE_APPROVER_ID" "Feature ready for a plan — react ✅ to approve.")"
+        mid="$(bot_mention "$thread_id" "$BUG_PIPELINE_APPROVER_ID" "$ping_text")"
         if [ -n "$mid" ]; then
             cli transition "$id" awaiting_ajay --approval-message-id="$mid" $clear_opt >/dev/null && \
                 log "gather $id: enough info → awaiting_ajay (approval msg $mid)"
@@ -372,7 +378,14 @@ drive_ready_for_plan() { # row id thread_id original_text issue_number clear_opt
         cli transition "$id" planned $clear_opt >/dev/null && log "feature $id → planned ($new_plan) — STOP"
         bpgh_comment "$issue_number" "Plan queued: $new_plan"
     else
-        log "feature $id: /plan did not produce a new plan (rc=$rc) — stays ready-for-plan, retry next tick"
+        log "feature $id: /plan did not produce a new plan (rc=$rc) — escalating to needs_human"
+        cli transition "$id" needs_human $clear_opt >/dev/null && \
+            log "feature $id → needs_human"
+        [ -n "$thread_id" ] && bot_post_to_thread "$thread_id" \
+            "Auto-planning failed — this looks too big for the pipeline; let's plan it together"
+        bpgh_add_label "$issue_number" "needs-human" || true
+        bpgh_comment "$issue_number" \
+            "Auto-planning failed — /plan did not produce a plan (rc=$rc); transitioning to needs_human for interactive planning." || true
     fi
 }
 

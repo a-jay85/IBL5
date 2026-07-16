@@ -49,17 +49,39 @@ fi
 bpt_reset; bpt_set_actionable "$READY"; bpt_set_claude_rc 1
 bpt_run
 bpt_log_lacks "$STUB" transition.log "planned" "plan non-zero exit → not planned"
+bpt_log_has   "$STUB" transition.log "needs_human"  "plan non-zero exit → needs_human"
+bpt_log_has   "$STUB" calls.log     "POST_TO_THREAD" "plan failure posts to thread"
+bpt_log_has   "$STUB" calls.log     "GH"             "plan failure best-effort gh label/comment"
 
 # ── ★ NEG (b): /plan exits 0 but creates NO plan file → NOT planned ───────────
 bpt_reset; bpt_set_actionable "$READY"   # STUB_MAKE_PLAN unset → no plan file
 bpt_run
 bpt_log_lacks "$STUB" transition.log "planned" "plan exit 0 but no new file → not planned"
+bpt_log_has   "$STUB" transition.log "needs_human"  "plan exit 0 no file → needs_human"
+bpt_log_has   "$STUB" calls.log     "POST_TO_THREAD" "plan exit 0 no file posts to thread"
+bpt_log_has   "$STUB" calls.log     "GH"             "plan exit 0 no file gh label/comment"
 
 # ── ★ NEG (c): /plan usage-limit → blocked_until, NOT planned ─────────────────
 bpt_reset; bpt_set_actionable "$READY"; bpt_set_claude_raw 'api error: 429 rate_limit_error'
 bpt_run
 bpt_log_lacks "$STUB" transition.log "planned" "usage-limit → not planned"
 bpt_log_has   "$STUB" transition.log "awaiting_ajay --blocked-until=" "usage-limit → blocked_until in place"
+
+# ── scope_estimate=multi_pr → warning appended to mention ping ────────────────
+bpt_reset; bpt_set_actionable "$GATHERING"
+bpt_set_claude_result '{"enough_info":true,"scope_estimate":"multi_pr"}'
+STUB_MESSAGE_ID=1420098765432109877 bpt_run
+bpt_log_has   "$STUB" curl.log "looks multi-PR" "scope_estimate=multi_pr appends warning to ping"
+bpt_log_has   "$STUB" transition.log "awaiting_ajay --approval-message-id=" \
+    "scope_estimate=multi_pr still transitions awaiting_ajay normally"
+
+# ── scope_estimate absent → ping text unchanged (off-shape guard) ──────────────
+bpt_reset; bpt_set_actionable "$GATHERING"
+bpt_set_claude_result '{"enough_info":true}'
+STUB_MESSAGE_ID=1420098765432109878 bpt_run
+bpt_log_lacks "$STUB" curl.log "looks multi-PR" "scope_estimate absent → ping unchanged"
+bpt_log_has   "$STUB" transition.log "awaiting_ajay --approval-message-id=" \
+    "scope_estimate absent still transitions awaiting_ajay normally"
 
 echo "----"
 [ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"

@@ -89,6 +89,7 @@ describe('handleEnqueue', () => {
             channelId: '222222222222222222',
             id: '333333333333333333',
             content: 'a bug',
+            react: vi.fn().mockResolvedValue(undefined),
         } as unknown as Message;
 
         await handleEnqueue(msg);
@@ -103,6 +104,41 @@ describe('handleEnqueue', () => {
         });
         expect(typeof arg.author_id).toBe('string');
         expect(typeof arg.message_id).toBe('string');
+    });
+
+    it('reacts ✴️ to the original message after a successful enqueue', async () => {
+        const msg = {
+            author: { id: '111111111111111111' },
+            channelId: '222222222222222222',
+            id: '333333333333333333',
+            content: 'a bug',
+            react: vi.fn().mockResolvedValue(undefined),
+        } as unknown as Message;
+
+        await handleEnqueue(msg);
+
+        expect(phpClient.enqueue).toHaveBeenCalledTimes(1);
+        expect(msg.react).toHaveBeenCalledTimes(1);
+        expect(msg.react).toHaveBeenCalledWith('✴️');
+        // enqueue must complete before the ack react fires
+        const enqueueOrder = vi.mocked(phpClient.enqueue).mock.invocationCallOrder[0];
+        const reactOrder = vi.mocked(msg.react).mock.invocationCallOrder[0];
+        expect(enqueueOrder).toBeLessThan(reactOrder);
+    });
+
+    it('swallows a react() rejection — handleEnqueue still resolves, enqueue still fired', async () => {
+        const msg = {
+            author: { id: '111111111111111111' },
+            channelId: '222222222222222222',
+            id: '333333333333333333',
+            content: 'a bug',
+            react: vi.fn().mockRejectedValue(new Error('Missing Permissions')),
+        } as unknown as Message;
+
+        await expect(handleEnqueue(msg)).resolves.toBeUndefined();
+
+        expect(phpClient.enqueue).toHaveBeenCalledTimes(1);
+        expect(msg.react).toHaveBeenCalledTimes(1);
     });
 });
 

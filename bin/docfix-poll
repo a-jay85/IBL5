@@ -182,7 +182,8 @@ issue_episode_epoch() {   # $1 = issue number
 health_report() {
     local alert=false kind="" detail="" report count pr_json pr_num red orphan age_h
     report="$(mktemp)"; trap 'rm -f "$report"' RETURN
-    "$MAIN/bin/check-docs" --staleness-report > "$report"
+    "$MAIN/bin/check-docs" --staleness-report > "$report" \
+        || { printf 'alert=false\nkind=\ndetail=\n'; return 0; }
     count="$(jq 'length' "$report")"
     local issue_num="${1:-}"
 

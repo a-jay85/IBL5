@@ -35,14 +35,14 @@ then prefer `/plan`, so the defense and its verification are designed up front. 
 
 ## Execution routing: an ad-hoc verdict does not mean Opus edits inline
 
-The plan-vs-ad-hoc verdict decides *whether to plan* — it does **not** decide *who executes the edits*. An ad-hoc verdict silently defaulting to "the Opus session implements inline" is the measured leak (2026-07-07 usage audit: ~90% of Opus main-thread tool calls were mechanical Bash/Read/Edit/Write, and 44% of interactive Opus sessions breached 150K peak context — the dumb-zone the delegation rules exist to prevent).
+The plan-vs-ad-hoc verdict decides *whether to plan* — it does **not** decide *who executes the edits*. An ad-hoc verdict silently defaulting to "the Opus session implements inline" is the measured leak (2026-07-07: ~90% of Opus main-thread calls were mechanical; 44% of sessions breached 150K context — the dumb-zone delegation rules exist to prevent).
 
 **Before making a chunk of edits, route the execution.** The chunk is **Sonnet-executable** when both hold — the same criterion as `/plan` Step 4 gate 13:
 
 - **Design resolved** — you could write the full recipe now (files, exact changes, order); no edit re-opens a judgment call.
 - **Machine-verifiable** — a test/linter/script exists (or ships with the chunk) that fails on a wrong edit.
 
-When both hold, **hand off by default — do not pause for permission**: state the routing call in one line ("execution is Sonnet-suitable — delegating"), then spawn **one** Sonnet sub-agent with a delegation-packet-shaped prompt (scope, exact recipe, self-verify command it must run before returning, thin one-line report-back — the format in `.claude/skills/plan/SKILL.md` § Delegation packets). Design, the routing call itself, and final review of the returned diff stay on Opus — this routes *execution*, never understanding.
+When both hold, **hand off by default — do not pause for permission**: state the routing call in one line ("execution is Sonnet-suitable — delegating"), then spawn **one** Sonnet sub-agent (format: `.claude/skills/plan/SKILL.md` § Delegation packets). Design, routing call, and final diff review stay on Opus — this routes *execution*, never understanding.
 
 Stay inline (Opus edits directly) only when:
 - the edits and the design are genuinely **entangled** — writing the recipe would mean making each edit-level judgment anyway, so the handoff buys nothing; or
@@ -52,16 +52,11 @@ Either way the routing decision is **stated, not silent** — one line, like the
 
 ## Execution routing: repeat-polling is a spend bug
 
-Each poll call re-reads the full context window. At a measured ~81K-token average per call, a loop of eight 60-second checks burns ~650K tokens to learn something one deferred check at completion would reveal for ~81K. Never spin a poll loop on the main thread.
+A poll loop re-reads the full context every call (~81K tokens); eight 60s checks burns ~650K tokens vs ~81K for one deferred check. **Never poll on the main thread.**
 
-**Use these instead:**
+**Instead:** `run_in_background: true` + Monitor (re-invokes on completion, main thread free), or ScheduleWakeup matched to the expected completion time (one ~480s wakeup for a CI run beats eight 60s checks). Avoid repeated `gh pr checks` / `gh run watch` inline loops — both re-read full context per call.
 
-- **`run_in_background` + Monitor** — pass `run_in_background: true` to the Bash tool, then open a Monitor stream on the process. The Monitor tool re-invokes on each stdout line and on completion; no polling is needed. The main thread is free.
-- **Matched-interval `/loop` via ScheduleWakeup** — when the wait is known and long (e.g. a CI run), schedule a single wakeup at the expected completion time rather than peppering short-interval checks. One ~480-second check for a typical CI run beats eight 60-second ones at every cost axis: tokens, latency headroom, and wall-clock accuracy.
-
-**Pattern to avoid:** calling `gh pr checks` or `gh run watch` repeatedly in a loop on the main thread. Both pull CI state synchronously on every iteration; in a tight loop they combine the full-context-re-read cost with the latency of a remote API call per iteration.
-
-**Headless exception:** `run_in_background` has no re-invocation mechanism in headless/automouse mode — the Monitor wakeup path is interactive-only. Under headless, prefer blocking until the subprocess exits (omit `run_in_background`) or structure the plan so long waits are sequenced as separate phases. See `agent-tiering-detail.md` for context.
+**Headless exception:** no re-invocation in headless/automouse — block until exit or structure as sequenced plan phases. See `agent-tiering-detail.md`.
 
 ## Calibration
 

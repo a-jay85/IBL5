@@ -152,6 +152,8 @@ func TestReadPlr_RealLifeBlock(t *testing.T) {
 	plrField(buf, 64, itoaPad(1400, 4)) // realLifeFGA (total FG attempts)
 	plrField(buf, 72, itoaPad(360, 4))  // realLifeFTA
 	plrField(buf, 84, itoaPad(120, 4))  // realLifeORB
+	plrField(buf, 96, itoaPad(137, 4))  // realLifeSTL
+	plrField(buf, 100, itoaPad(205, 4)) // realLifeTVR
 
 	players, err := ReadPlr(strings.NewReader(string(buf) + "\r\n"))
 	if err != nil {
@@ -161,6 +163,38 @@ func TestReadPlr_RealLifeBlock(t *testing.T) {
 	if p.RealLifeMIN != 2520 || p.RealLifeFGA != 1400 || p.RealLifeFTA != 360 || p.RealLifeORB != 120 {
 		t.Errorf("real-life block = MIN%d FGA%d FTA%d ORB%d, want 2520/1400/360/120",
 			p.RealLifeMIN, p.RealLifeFGA, p.RealLifeFTA, p.RealLifeORB)
+	}
+	if p.RealLifeSTL != 137 || p.RealLifeTVR != 205 {
+		t.Errorf("real-life STL/TVR = %d/%d, want 137/205", p.RealLifeSTL, p.RealLifeTVR)
+	}
+}
+
+// TestReadPlr_RealLifeSTLTVR_BlankZero: blank STL/TVR columns (all-spaces) parse to 0, no error.
+func TestReadPlr_RealLifeSTLTVR_BlankZero(t *testing.T) {
+	buf := []byte(newPlrRecord(1, 100, 1, 25, "Rookie", "PG", 70, 5, 5))
+	// Leave offsets 96/100 as spaces (newPlrRecord fills with spaces) — blank field → 0.
+
+	players, err := ReadPlr(strings.NewReader(string(buf) + "\r\n"))
+	if err != nil {
+		t.Fatalf("ReadPlr: %v", err)
+	}
+	p := players[0]
+	if p.RealLifeSTL != 0 || p.RealLifeTVR != 0 {
+		t.Errorf("blank STL/TVR should be 0, got STL=%d TVR=%d", p.RealLifeSTL, p.RealLifeTVR)
+	}
+}
+
+// TestReadPlr_RealLifeSTLTVR_BadField: non-numeric STL field returns ErrBadField, nil record.
+func TestReadPlr_RealLifeSTLTVR_BadField(t *testing.T) {
+	buf := []byte(newPlrRecord(1, 100, 1, 25, "Bad STL", "PG", 70, 5, 5))
+	copy(buf[96:100], "12x4") // non-numeric at offset 96
+
+	_, err := ReadPlr(strings.NewReader(string(buf) + "\r\n"))
+	if !errors.Is(err, ErrBadField) {
+		t.Fatalf("err = %v, want ErrBadField", err)
+	}
+	if !strings.Contains(err.Error(), "96") {
+		t.Errorf("error should name offset 96: %v", err)
 	}
 }
 

@@ -26,13 +26,12 @@ package sim
 //     is the transition/symmetric case; offQualityWithHCA is the half-court live path.
 //     See bucketweights.go foulBucketWeight for the coupling + faithful redraw.
 //
-// STAND-INS (bundle carries no rl_stl/rl_tov counting sums — only RealLifeMIN/FGA/
-// FTA/ORB): defQ/offQ use the 0-99 STL/TVR RATINGS as per-48 rate stand-ins, mapped
-// through ratingRefScale to the real league per-48 means (leagueSTL48, leagueTOV48).
-// Wiring real rl_stl/rl_tov is a production-bundle follow-on (Out of Scope, J6). Only
-// the defQ/offQ RATIO drives the shrink (both scales cancel a common factor at a
-// balanced matchup — see faithful_scales_derivation_test.go); the foul LEVEL is set
-// by the single foulBucketScale dial (bucketweights.go).
+// Per-player defQ/offQ now use real career STL/TOV composites sourced from
+// bundle.Player.RealLifeSTL/RealLifeTVR (J22): stlRate = STL/MIN×44, tovRate = TOV/MIN×48.
+// The 0-99 STL/TVR ratings are retained as the RealLifeMIN==0 fallback (rookies, un-wired
+// bundles). Only the defQ/offQ RATIO drives the shrink (both scales cancel at a balanced
+// matchup — see faithful_scales_derivation_test.go); the foul LEVEL is set by the single
+// foulBucketScale dial (bucketweights.go).
 
 const (
 	// leagueTOV48 is the real 5.60 league per-48 turnover mean (CEngine[+0x68D8],
@@ -58,10 +57,10 @@ const (
 
 	// stlComposite44 (+0xDD0 = STL/MIN×44, J6 line 51/93, PE 0x66D328) and
 	// tovDivisor48 (+0xDE0 = TOV/MIN×48, J6 line 52, PE 0x669ED0) are the faithful
-	// per-player composite forms. In the RATING stand-in they are folded into the
-	// pinned league means (leagueSTL48 already carries the ×44; leagueTOV48 the /48),
-	// so they are documented provenance for those means — asserted by the recompute
-	// test — not re-applied per player.
+	// per-player composite forms. In the real path (RealLifeMIN>0) they are applied
+	// per player against real minutes. In the rating stand-in fallback they are folded
+	// into the pinned league means (leagueSTL48 already carries the ×44; leagueTOV48
+	// the /48) — asserted by the recompute test.
 	stlComposite44 = 44.0
 	tovDivisor48   = 48.0
 
@@ -74,17 +73,31 @@ const (
 	defQualityCapMultiplier = 1.5
 )
 
-// stlRate maps a defender's 0-99 STL rating to a per-48 steal-rate stand-in (the
-// +0xDD0 STL/MIN×44 composite, whose league mean is leagueSTL48). floor1 floors the
-// rating at 1, so stlRate > 0 always.
+// stlRate returns a defender's per-44 steal composite (the +0xDD0 STL/MIN×44 form).
+// When the player has real career minutes, uses real career STL/MIN×44 (J22 wiring).
+// Falls back to the 0-99 rating stand-in for players with no real minutes (rookie /
+// un-wired bundle); floor1 floors the rating at 1, so stlRate > 0 always.
+// The RealLifeMIN > 0 guard also prevents division by zero.
 func stlRate(p onCourt) float64 {
+	if p.RealLifeMIN > 0 {
+		// Real career steals per-44 composite — the faithful defQ signal (STL/MIN×44).
+		return float64(p.RealLifeSTL) / float64(p.RealLifeMIN) * stlComposite44
+	}
+	// Fallback: rating stand-in for players with no real minutes (rookie / un-wired bundle).
 	return floor1(p.STL) / ratingRefScale * leagueSTL48
 }
 
-// tovRate maps an offensive player's 0-99 TVR rating to a per-48 turnover-rate
-// stand-in (the +0xDE0 TOV/MIN×48 composite, whose league mean is leagueTOV48). NO
-// home/away term (J16 §3). floor1 floors at 1, so tovRate > 0 and offQuality > 0.
+// tovRate returns an offensive player's per-48 turnover composite (the +0xDE0 TOV/MIN×48 form).
+// When the player has real career minutes, uses real career TVR/MIN×48 (J22 wiring).
+// Falls back to the 0-99 rating stand-in for players with no real minutes. NO
+// home/away term (J16 §3). floor1 floors the rating at 1, so tovRate > 0 and offQuality > 0.
+// The RealLifeMIN > 0 guard also prevents division by zero.
 func tovRate(p onCourt) float64 {
+	if p.RealLifeMIN > 0 {
+		// Real career turnovers per-48 composite — the faithful offQ signal (TOV/MIN×48).
+		return float64(p.RealLifeTVR) / float64(p.RealLifeMIN) * tovDivisor48
+	}
+	// Fallback: rating stand-in for players with no real minutes (rookie / un-wired bundle).
 	return floor1(p.TVR) / ratingRefScale * leagueTOV48
 }
 

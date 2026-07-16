@@ -99,26 +99,27 @@ type Player struct {
 	Foul int `json:"r_foul"`
 
 	// Real-life / previous-season counting-stat sums — the engine's per-48-MINUTE
-	// shot-volume rate inputs (D88/DB8/D70 = (stat/MIN)×48) for the 2pt-bucket
-	// composite. JSON tags match the PHP PlrParserService rl_* derived columns so the
-	// production bundle-builder (a follow-on PR) maps 1:1. The Go backup assembler
-	// populates them from the static real-life .plr block (offsets 52-111). Absent/
-	// zero MINUTES — a player with no prior-season reference, or a production bundle
-	// not yet wired — falls back to the rating stand-in (sim/bucketweights.go).
-	// RealLifeFGA is total FG attempts (incl. 3PA).
+	// rate inputs. JSON tags match PHP PlrParserService rl_* columns; the Go backup
+	// assembler populates them from the static real-life .plr block (offsets 52-111).
+	// Absent/zero MINUTES — rookie or un-wired bundle — falls back to rating stand-ins.
 	//
-	// RealLifeGP and RealLife3GA feed the league 2PA/48 shot baseline
-	// (sim/shotdecision.go leagueShotBaseline, the FUN_004385f0 league-table
-	// port): GP is the MIN > 2×GP inclusion gate; 3GA isolates pure 2-point
-	// attempts (2PA = RealLifeFGA − RealLife3GA). All-zero (a bundle builder
-	// that has not wired them) simply yields no qualifying players and the
-	// documented constant fallback.
+	// Shot-volume rate inputs (D88/DB8/D70 = (stat/MIN)×48) for the 2pt-bucket
+	// composite: RealLifeMIN/FGA/FTA/3GA/ORB. RealLifeFGA is total FG attempts (incl. 3PA).
+	// RealLifeGP and RealLife3GA also feed the league 2PA/48 shot baseline
+	// (sim/shotdecision.go leagueShotBaseline).
+	//
+	// Quality composite inputs for defQ/offQ (sim/teamquality.go):
+	// RealLifeSTL (STL/MIN×44) and RealLifeTVR (TOV/MIN×48) — the faithful per-player
+	// J22 wiring. PHP PlrParserService already emits rl_stl/rl_tvr; these JSON tags are
+	// the matching Go half. Zero MINUTES → rating stand-in fallback (RealLifeMIN==0 guard).
 	RealLifeGP  int `json:"rl_gp"`
 	RealLifeMIN int `json:"rl_min"`
 	RealLifeFGA int `json:"rl_fga"`
 	RealLifeFTA int `json:"rl_fta"`
 	RealLife3GA int `json:"rl_3ga"`
 	RealLifeORB int `json:"rl_orb"`
+	RealLifeSTL int `json:"rl_stl"`
+	RealLifeTVR int `json:"rl_tvr"`
 
 	// Attributes.
 	Age         int `json:"age"`

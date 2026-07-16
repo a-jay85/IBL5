@@ -198,6 +198,59 @@ func TestToBundle_TeamRates(t *testing.T) {
 	}
 }
 
+// TestToBundlePlayer_RealLifeSTLTVR_Mapping: RealLifeSTL/TVR map through assembler correctly;
+// rating fields are not cross-wired into the real-life fields.
+func TestToBundlePlayer_RealLifeSTLTVR_Mapping(t *testing.T) {
+	roster := teamRoster(1)
+	roster[0].RealLifeSTL = 110
+	roster[0].RealLifeTVR = 150
+	// Distinct rating values so we can prove no cross-wiring.
+	roster[0].RatingSTL = 45
+	roster[0].RatingTVR = 55
+	players := append(roster, teamRoster(2)...)
+	sched := []SchGame{{VisitorTeamID: 1, HomeTeamID: 2, Month: 11, Day: 2, Played: true}}
+
+	b, err := ToBundle(players, sched, AssembleOptions{})
+	if err != nil {
+		t.Fatalf("ToBundle: %v", err)
+	}
+	var got bundle.Player
+	for _, p := range b.Players {
+		if p.PID == roster[0].PID {
+			got = p
+		}
+	}
+	if got.RealLifeSTL != 110 || got.RealLifeTVR != 150 {
+		t.Errorf("RealLifeSTL/TVR = %d/%d, want 110/150", got.RealLifeSTL, got.RealLifeTVR)
+	}
+	// Isolation: real-life sums must not equal the rating (they are different sources).
+	if got.RealLifeSTL == got.STL {
+		t.Errorf("RealLifeSTL (%d) must not equal STL rating (%d) — cross-wiring!", got.RealLifeSTL, got.STL)
+	}
+	if got.RealLifeTVR == got.TVR {
+		t.Errorf("RealLifeTVR (%d) must not equal TVR rating (%d) — cross-wiring!", got.RealLifeTVR, got.TVR)
+	}
+}
+
+// TestToBundlePlayer_RealLifeSTLTVR_EndToEnd: ReadPlr → toBundlePlayer carries
+// STL(96)/TVR(100) columns all the way to bundle.Player fields.
+func TestToBundlePlayer_RealLifeSTLTVR_EndToEnd(t *testing.T) {
+	buf := []byte(newPlrRecord(1, 100, 1, 25, "Defender", "SG", 70, 5, 5))
+	plrField(buf, 56, itoaPad(2000, 4)) // RealLifeMIN (> 0 so guard passes)
+	plrField(buf, 96, itoaPad(110, 4))  // RealLifeSTL
+	plrField(buf, 100, itoaPad(150, 4)) // RealLifeTVR
+	plrField(buf, 137, "1")             // CanPlayInGame
+
+	parsed, err := ReadPlr(strings.NewReader(string(buf) + "\r\n"))
+	if err != nil {
+		t.Fatalf("ReadPlr: %v", err)
+	}
+	bp := toBundlePlayer(parsed[0], nil)
+	if bp.RealLifeSTL != 110 || bp.RealLifeTVR != 150 {
+		t.Errorf("end-to-end RealLifeSTL/TVR = %d/%d, want 110/150", bp.RealLifeSTL, bp.RealLifeTVR)
+	}
+}
+
 // --- J9: faithful league 2PA/48 baseline (FUN_004385f0 port), over RAW .plr
 // records (RecordIndex-gated), NOT the assembled bundle player list ----------
 

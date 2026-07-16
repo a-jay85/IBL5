@@ -31,10 +31,10 @@ last_verified: 2026-07-16
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 2 |
+| ⬜ Open | 1 |
 | 📋 Planned | 0 |
 | ◑ Partial | 0 |
-| ✅ Implemented | 14 |
+| ✅ Implemented | 15 |
 | 🚫 Declined | 0 |
 
 Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive/token-spend-backlog-archive.md).
@@ -45,14 +45,7 @@ Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive
 
 First-wave entries (T1–T13) are ✅ Implemented — see the dated pointers below and [token-spend-backlog-archive.md](archive/token-spend-backlog-archive.md). T14–T16 are the second wave, from the 2026-07-16 re-measure.
 
-### T14 In-session context-ceiling nudge (dumb-zone spend tax)
-**Locus:** ⌂ harness-local. **Effort:** S–M.
-**Location:** No surface owns it today. T6 caps the window at 200K (`autoCompactWindow`), and the context-dumb-zone memory says "keep peak ~100K" — but nothing fires *during* a session as context crosses 100K, so the band between 100K and the 200K compaction cap is entirely unguarded.
-**Problem:** Measured 2026-07-16 (7-day window): **47.9% of all weekly cache-read (~911M of 1.90B tokens) is issued at ≥100K context**; 26.9% at ≥125K; 256 calls ran at 200–225K. The fat tail is extreme — the top 15 sessions carry 34% of weekly reads, with the top two at ~98M and ~89M cache-read across ~900 calls each. Every call in a bloated session re-reads the whole window, so a session that should have split at 100K pays roughly double per remaining call — and reasons worse while doing it (the dumb-zone the memory warns about). The work-triage rule already names the cause (mechanical work staying inline on the main thread); what's missing is the in-the-moment signal.
-**Suggested direction:** Extend an existing hook surface rather than add one (meta-tooling-bar): the PostToolUse/PreToolUse guard family (e.g. `$HOME/.claude/hooks/output-guard.sh`) can read the last `usage` block from the session transcript and emit a one-line advisory when context first crosses ~100K and again at ~125K — "context ≥100K: delegate remaining mechanical work (work-triage § execution routing), or split/hand off the session." Warn-only, once per threshold, skip subagents/headless (automouse peak-context is L16's territory). Verify effect via `bin/token-report` bucket distribution after two weeks.
-**Risk if untouched:** The single largest residual spend class (~half of weekly cache-read) stays invisible at the moment it's created; T6's 200K cap only bounds the worst case.
-**Provenance:** discovered 2026-07-16 during the post-backlog re-measure (advisory session).
-**Status (2026-07-16):** ⬜ Open.
+**T14** ✅ Implemented 2026-07-16 — archived in [token-spend-backlog-archive.md](archive/token-spend-backlog-archive.md).
 
 ### T16 Poll-shaped Bash round-trips → background/Monitor routing
 **Locus:** ⌂ harness-local (hook or rule line). **Effort:** S.

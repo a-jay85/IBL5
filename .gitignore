@@ -100,3 +100,6 @@ ibl5/*.dra
 ibl5/*.ret
 ibl5/*.hof
 ibl5/*.plb
+
+# Bug-pipeline hunter scratch (bin/bug-pipeline-tick writes hunt-result.json into the worktree)
+ibl5/.bug-pipeline/

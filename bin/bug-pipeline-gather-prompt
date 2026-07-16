@@ -11,6 +11,10 @@ schema; no prose.
   and the acceptance outcome are all clear enough to plan against; else false.
 - When enough_info=false, put ONE concise, specific follow-up question in
   next_question (the single most useful thing still missing). Omit it when true.
+- `scope_estimate` (optional string, omit when uncertain): set to `"single_pr"` when the
+  request clearly fits one focused PR, or `"multi_pr"` when it spans multiple independent
+  subsystems or would require multiple sequential PRs. Omit entirely when you cannot
+  estimate from the request text.
 <untrusted>
 ORIGINAL REQUEST: {{original_text}}
 THREAD TRANSCRIPT (oldest->newest): {{transcript}}

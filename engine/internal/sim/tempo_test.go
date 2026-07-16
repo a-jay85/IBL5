@@ -104,8 +104,9 @@ func TestTeamBaseTimeWith_ScaleBoundary(t *testing.T) {
 }
 
 // TestPossessionTime_FallbackBounds locks the (2.0−factor) form and the 24.0
-// out-of-range fallback: an in-range base_time passes through (truncated to int),
-// while a base_time below 1.0 or above 24.0 resets to the JSB fallback of 24.
+// out-of-range fallback: an in-range base_time passes through (rounded half-up
+// per J23), while a base_time below 1.0 or above 24.0 resets to the JSB fallback
+// of 24.
 func TestPossessionTime_FallbackBounds(t *testing.T) {
 	if got := possessionTime(14.0); got != 14 {
 		t.Fatalf("in-range possessionTime(14.0) = %d, want 14", got)
@@ -118,5 +119,17 @@ func TestPossessionTime_FallbackBounds(t *testing.T) {
 	}
 	if got := possessionTime(0.5); got != 24 {
 		t.Fatalf("under-range possessionTime(0.5) = %d, want 24 fallback", got)
+	}
+	// J23 round-half-up boundary (5.60 _DAT_00669ef0 = 0.5): exactly-.5 rounds UP,
+	// below-.5 floors. This is the Matrix-row-1 boundary that distinguishes the
+	// shipped round-half-up from the retired int() truncation.
+	if got := possessionTime(14.5); got != 15 {
+		t.Fatalf("round-half-up possessionTime(14.5) = %d, want 15", got)
+	}
+	if got := possessionTime(14.4); got != 14 {
+		t.Fatalf("round-half-up possessionTime(14.4) = %d, want 14", got)
+	}
+	if got := possessionTime(15.5); got != 16 {
+		t.Fatalf("round-half-up possessionTime(15.5) = %d, want 16", got)
 	}
 }

@@ -7,22 +7,22 @@ import (
 	"github.com/a-jay85/IBL5/engine/internal/result"
 )
 
-// This file pins the CURRENT (shipped) pace/possession-count behavior — int()
-// TRUNCATION of the base_time -> possession-step mapping (tempo.go possessionTime,
-// gameloop.go clock loop). It is the green-green characterization tripwire for J22,
-// the coupled round-half-up + base_time re-center fix (ADR-0085): when J22 changes
-// the step rule and re-centers base_time, Pin A fires and is re-baselined there.
+// This file characterizes the SHIPPED (J23-faithful) pace/possession-count
+// behavior — ROUND-HALF-UP of the base_time -> possession-step mapping (tempo.go
+// possessionTime, FUN_004e42e0 / _DAT_00669ef0 = 0.5) coupled with the re-centered
+// baseTimeMid (tempo.go const — ADR-0085 Update, J23). The pins lock that shipped
+// state; a later tempo-step or re-center change fires them for re-baselining.
 //
 //	Pin A (TestPossessionStepDistributionPin_Current) — the UNIT step
 //	  distribution of possessionTime() across a base_time sweep of [13,16].
-//	    - shipped int() truncation: 4 integer buckets, mass ~0.333/0.333/0.333 in
-//	      {13,14,15} and only the closed endpoint (bt==16) in 16 (~1/samples).
-//	    - RE-FAITHFUL round-half-up (FUN_004e42e0, _DAT_00669ef0 = 0.5) would shift
-//	      mass to ~0.167/0.333/0.333/0.167 — the round boundaries at 13.5/14.5/15.5
-//	      hand a half-width of mass to buckets 13 and 16. J21 measured that faithful
-//	      form and HELD it (ADR-0085): shipped alone it does not flip the wrong-
-//	      signed Cov(lnPOSS,lnPPS) and regresses mean pace (the coupled base_time
-//	      re-center is J22). So truncation is retained and pinned here.
+//	    - shipped round-half-up: the round boundaries at 13.5/14.5/15.5 partition
+//	      [13,16] into a half-width [13,13.5) for bucket 13, full widths for 14 and
+//	      15, and a half-width [15.5,16] for bucket 16 — mass ~1/6, 1/3, 1/3, 1/6.
+//	    - the RETIRED int() truncation (pre-J23) put ~1/3 in each of {13,14,15}
+//	      and only the closed endpoint (bt==16) in 16; J21 held round-half-up
+//	      (ADR-0085) because shipped ALONE it regressed mean pace — J23 shipped it
+//	      COUPLED with the baseTimeMid re-center, and this pin now locks that
+//	      faithful state.
 //
 //	Pin B (TestPossessionCountLoopPin_Current) — the full-loop per-team
 //	  possession COUNT over richBundle. This is a characterization + permanent
@@ -32,16 +32,16 @@ import (
 //	    averages the two (identical) team base_times and steps the clock by the
 //	    shared value, and strict offense/defense alternation then hands BOTH
 //	    teams the SAME possession count every seed. Empirically that count is
-//	    exactly 96/team every game (var = 0) — cross-team possession-count
+//	    exactly 104/team every game (var = 0) — cross-team possession-count
 //	    dispersion is STRUCTURALLY ZERO in this fixed fixture and cannot be
-//	    pinned as a tripwire here. It is also invariant to int/round of the step
-//	    (~15.29 -> 15 either way here). The real cross-team Var(lnPOSS) gate lives
+//	    pinned as a tripwire here. The real cross-team Var(lnPOSS) gate lives
 //	    in the archive test TestRealArchive_PossessionCoupling (internal/calibrate),
 //	    which measures it on the multi-team corpus. So Pin B locks the loop-level
-//	    count characterization (mean 96/team) plus the permanent sanity invariants.
+//	    count characterization (mean 104/team) plus the permanent sanity invariants.
 //
 // See plan jsb-j21-pace-dispersion-fidelity.md Phase 1 (characterization pins) and
-// ADR-0085 (the round-vs-truncate fidelity finding this pin's centers record).
+// ADR-0085 (the round-vs-truncate fidelity finding + the J23 Update these pins'
+// centers record).
 
 // possessionStepSweep evaluates possessionTime() at `samples` evenly-spaced
 // base_time points across the [baseTimeLow, baseTimeHigh] clamp range and
@@ -66,19 +66,19 @@ func TestPossessionStepDistributionPin_Current(t *testing.T) {
 
 	const band = 0.02
 	// PIN: re-baseline if a later tempo-step change moves these. Centers read off the
-	// shipped int() truncation sweep: floor partitions [13,16] into 13->[13,14)
-	// 14->[14,15) 15->[15,16) at 1/3 each, and 16 catches only the closed endpoint
-	// bt==16 (a single sample). Under the RE-faithful round-half-up (deferred to J22,
-	// ADR-0085) these become 1/6, 1/3, 1/3, 1/6 — that shift is the J22 tripwire.
+	// shipped round-half-up sweep (J23, ADR-0085 Update): the .5 boundaries partition
+	// [13,16] into 13->[13,13.5) (half width), 14->[13.5,14.5), 15->[14.5,15.5), and
+	// 16->[15.5,16] (half width + the closed endpoint) — 1/6, 1/3, 1/3, 1/6. Exact
+	// shares at 3001 samples: 500/3001, 1000/3001, 1000/3001, 501/3001.
 	type bucket struct {
 		step   int
 		center float64
 	}
 	for _, b := range []bucket{
-		{13, 0.333222},
+		{13, 0.166611},
 		{14, 0.333222},
 		{15, 0.333222},
-		{16, 0.000333},
+		{16, 0.166944},
 	} {
 		if got := shares[b.step]; math.Abs(got-b.center) > band {
 			t.Errorf("step %d share drifted: got %.6f, want %.6f ± %.2f", b.step, got, b.center, band)
@@ -87,8 +87,9 @@ func TestPossessionStepDistributionPin_Current(t *testing.T) {
 
 	// Permanent invariants (not pinned/re-baselined): the int-returning mapping
 	// yields exactly the four integers in the [13,16] clamp, and the shares
-	// partition the sweep. Under the shipped truncation, bucket 16 holds only the
-	// closed endpoint (unlike the deferred round-half-up, where all four carry mass).
+	// partition the sweep. Under the shipped round-half-up all four buckets carry
+	// real mass (13 and 16 each a half-width — unlike the retired truncation,
+	// where 16 held only the closed endpoint).
 	var sum float64
 	for step, share := range shares {
 		if step < int(baseTimeLow) || step > int(baseTimeHigh) {
@@ -159,10 +160,11 @@ func TestPossessionCountLoopPin_Current(t *testing.T) {
 	// This is NOT a step-rule tripwire (richBundle's identical-volume rosters make
 	// cross-team count dispersion structurally zero — see file header; the archive
 	// test owns the real Var(lnPOSS) gate). Re-baseline if a change intentionally
-	// moves the loop-level count on this fixture.
+	// moves the loop-level count on this fixture. Re-baselined 96 → 104 for J23:
+	// the baseTimeMid re-center moved richBundle's shared step 15s → 14s.
 	const (
-		center = 96.0
-		band   = 2.0 // ~2% of 96
+		center = 104.0
+		band   = 2.0 // ~2% of 104
 	)
 	if math.Abs(mean-center) > band {
 		t.Errorf("mean per-team possessions/game drifted: got %.4f, want %.1f ± %.1f", mean, center, band)

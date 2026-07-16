@@ -42,9 +42,10 @@ NIGHTLY_DIR="$TMPROOT"
 LOG="$TMPROOT/logs/$(date +%F).log"
 : > "$LOG"
 
-# Source only the three functions under test — automouse-run is a long-running
+# Source only the functions under test — automouse-run is a long-running
 # driver, so extract rather than execute it.
 eval "$(awk '/^model_tier\(\)/,/^}/'             "$REPO_ROOT/bin/automouse-run")"
+eval "$(awk '/^_date_ago\(\)/,/^}/'              "$REPO_ROOT/bin/automouse-run")"
 eval "$(awk '/^append_cost_row\(\)/,/^}/'        "$REPO_ROOT/bin/automouse-run")"
 eval "$(awk '/^strip_weekly_section\(\)/,/^}/'   "$REPO_ROOT/bin/automouse-run")"
 eval "$(awk '/^regenerate_weekly_section\(\)/,/^}/' "$REPO_ROOT/bin/automouse-run")"

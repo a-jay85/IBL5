@@ -365,6 +365,10 @@ strip_weekly_section() {
     ' "$report" > "$tmp" && mv "$tmp" "$report"
 }
 
+# Return the date N days ago in YYYY-MM-DD format. Works on both BSD (macOS,
+# date -v) and GNU (Linux/CI, date -d) date implementations.
+_date_ago() { date -v-"$1"d +%F 2>/dev/null || date -d "$1 days ago" +%F; }
+
 # Rebuild the trailing-7-days weekly aggregate at the bottom of today's costs
 # report. Idempotent: strips any prior "## Weekly aggregate" section (always the
 # last section) and rewrites it, so re-running per phase keeps it current and it
@@ -381,7 +385,7 @@ regenerate_weekly_section() {
         printf '\n## Weekly aggregate (last 7 days)\n\n'
         printf '### Cost by tier ($)\n\n| Tier | Cost ($) |\n|---|---|\n'
         for i in 0 1 2 3 4 5 6; do
-            d=$(date -v-"${i}"d +%F); f="$reports_dir/$d-costs.md"
+            d=$(_date_ago "$i"); f="$reports_dir/$d-costs.md"
             [ -f "$f" ] && sed '/^## Weekly aggregate/,$d' "$f" || true
         done | awk -F'|' '
             { if (NF==7 || NF==8) {tier=$5; cost=$6}
@@ -393,7 +397,7 @@ regenerate_weekly_section() {
                   printf "| **Total** | %.4f |\n", tot+0 }'
         printf '\n### Tokens by phase\n\n| Phase | Input | Cache-write | Cache-read | Output |\n|---|---|---|---|---|\n'
         for i in 0 1 2 3 4 5 6; do
-            d=$(date -v-"${i}"d +%F); f="$logs_dir/$d.log"
+            d=$(_date_ago "$i"); f="$logs_dir/$d.log"
             [ -f "$f" ] && grep -h 'exit:' "$f" || true
         done | awk '
             { phase="?"; n=split($2,a,"/"); if (n>=2) phase=a[n]

@@ -31,10 +31,10 @@ last_verified: 2026-07-16
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 3 |
+| ⬜ Open | 2 |
 | 📋 Planned | 0 |
 | ◑ Partial | 0 |
-| ✅ Implemented | 13 |
+| ✅ Implemented | 14 |
 | 🚫 Declined | 0 |
 
 Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive/token-spend-backlog-archive.md).
@@ -61,7 +61,7 @@ First-wave entries (T1–T13) are ✅ Implemented — see the dated pointers bel
 **Suggested direction:** Extend `$HOME/.claude/hooks/output-guard.sh` (same family as T10, an extend not an add): PreToolUse warn when a Read call targets a file over ~500 lines with no `offset`/`limit` — advisory names the LSP-first rule (symbol questions) and Explore/fork delegation (multi-file surveys) as the cheaper paths. Warn-only; skip subagents (their contexts are discarded, which is exactly where big reads *should* go).
 **Risk if untouched:** The dominant tool-result payload keeps feeding T14's accretion; the two entries compound.
 **Provenance:** discovered 2026-07-16 during the post-backlog re-measure (advisory session).
-**Status (2026-07-16):** ⬜ Open.
+**Status (2026-07-16):** ✅ Implemented (2026-07-16) — `output-guard.sh` Check E: warns on Read of >500-line file with no offset/limit; skips subagents. See [archive](archive/token-spend-backlog-archive.md).
 
 ### T16 Poll-shaped Bash round-trips → background/Monitor routing
 **Locus:** ⌂ harness-local (hook or rule line). **Effort:** S.
@@ -76,6 +76,7 @@ First-wave entries (T1–T13) are ✅ Implemented — see the dated pointers bel
 ➜ T4 Driver-model downshift for babysitting loops — ✅ Implemented (2026-07-14): resolved by substitution (L6+L8+post-plan-Sonnet+`/loop`); residual measured empty. See [archive](archive/token-spend-backlog-archive.md).
 
 ➜ T13 Aggregate always-loaded rules budget — ✅ Implemented (2026-07-14): see [archive](archive/token-spend-backlog-archive.md).
+➜ T15 Read-payload accretion guard — ✅ Implemented (2026-07-16): see [archive](archive/token-spend-backlog-archive.md).
 
 ➜ T7 Resident-overlay diet (MEMORY.md + rules) — ✅ Implemented (2026-07-14): see [archive](archive/token-spend-backlog-archive.md).
 

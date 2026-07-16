@@ -343,8 +343,26 @@ append_cost_row() {
         printf '# Automouse cost roll-up — %s\n\n| Plan | Phase | Model | Tier | Cost ($) | Peak Ctx (K) |\n|---|---|---|---|---|---|\n' \
             "$(date +%Y-%m-%d)" > "$report"
     fi
+    # Strip the weekly section BEFORE appending, so the row lands at the end of
+    # the per-phase table rather than below the section regenerate_weekly_section
+    # is about to delete — the bug that ate every row but the day's first.
+    strip_weekly_section "$report"
     printf '| %s | %s | %s | %s | %s | %dK |\n' "$plan" "$phase" "$model" "$tier" "$cost" "$peak_k" >> "$report"
     regenerate_weekly_section "$report"
+}
+
+# Truncate a costs report back to its per-phase table: drop the weekly-aggregate
+# section and the blank lines that separate it from the table, leaving the file
+# ending on the last row. Trailing blanks must go too — a blank line between two
+# rows splits the markdown table in half.
+strip_weekly_section() {
+    local report=$1 tmp
+    tmp=$(mktemp)
+    awk '
+        /^## Weekly aggregate/ { exit }
+        /^[[:space:]]*$/       { blanks++; next }
+        { for (i = 0; i < blanks; i++) print ""; blanks = 0; print }
+    ' "$report" > "$tmp" && mv "$tmp" "$report"
 }
 
 # Rebuild the trailing-7-days weekly aggregate at the bottom of today's costs
@@ -352,14 +370,13 @@ append_cost_row() {
 # last section) and rewrites it, so re-running per phase keeps it current and it
 # survives a mid-night run break. Cost-by-tier comes from the reports' Tier
 # column; token totals come from the logs' exit-line tags — each table from its
-# natural source. Every per-file read is piped through the same sed strip so a
-# prior day's weekly rows (which also start with a pipe) are never re-ingested.
+# natural source. Every per-file read strips the weekly section first so a prior
+# day's weekly rows (which also start with a pipe) are never re-ingested.
 regenerate_weekly_section() {
-    local report=$1 reports_dir logs_dir tmp d f i
+    local report=$1 reports_dir logs_dir d f i
     reports_dir=$(dirname "$report")
     logs_dir="$NIGHTLY_DIR/logs"
-    tmp=$(mktemp)
-    sed '/^## Weekly aggregate/,$d' "$report" > "$tmp" && mv "$tmp" "$report"
+    strip_weekly_section "$report"
     {
         printf '\n## Weekly aggregate (last 7 days)\n\n'
         printf '### Cost by tier ($)\n\n| Tier | Cost ($) |\n|---|---|\n'

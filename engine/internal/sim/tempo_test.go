@@ -80,7 +80,7 @@ func TestTeamBaseTimeWith_ConstWrapperIdentity(t *testing.T) {
 		lineup(175, 24), lineup(147, 30), lineup(int(offVolumeNeutral), int(defRatingNeutral)),
 		lineup(0, 0), nil,
 	} {
-		if w, c := teamBaseTimeWith(l, offVolumeScale), teamBaseTime(l); w != c {
+		if w, c := teamBaseTimeWith(l, offVolumeScale, baseTimeMid), teamBaseTime(l); w != c {
 			t.Fatalf("teamBaseTimeWith(_, const)=%.9f != teamBaseTime(_)=%.9f", w, c)
 		}
 	}
@@ -89,15 +89,15 @@ func TestTeamBaseTimeWith_ConstWrapperIdentity(t *testing.T) {
 // TestTeamBaseTimeWith_ScaleBoundary is the scale-aware boundary: a larger sweep scale
 // never escapes the [13,16] clamp, and the empty-lineup guard is scale-independent.
 func TestTeamBaseTimeWith_ScaleBoundary(t *testing.T) {
-	if hot := teamBaseTimeWith(lineup(400, 24), 0.06); hot != baseTimeLow {
+	if hot := teamBaseTimeWith(lineup(400, 24), 0.06, baseTimeMid); hot != baseTimeLow {
 		t.Fatalf("scale=0.06 extreme-volume base_time = %.4f, want clamp to %.1f", hot, baseTimeLow)
 	}
-	if empty := teamBaseTimeWith(nil, 0.06); empty != baseTimeLow {
+	if empty := teamBaseTimeWith(nil, 0.06, baseTimeMid); empty != baseTimeLow {
 		t.Fatalf("scale=0.06 empty lineup base_time = %.4f, want %.1f", empty, baseTimeLow)
 	}
 	// scale=0 disables the offensive-volume term: a high-volume roster no longer
 	// shortens below a neutral one (the channel is off), but stays finite in-clamp.
-	off0 := teamBaseTimeWith(lineup(200, int(defRatingNeutral)), 0)
+	off0 := teamBaseTimeWith(lineup(200, int(defRatingNeutral)), 0, baseTimeMid)
 	if math.Abs(off0-baseTimeMid) > 1e-9 {
 		t.Fatalf("scale=0 should null the volume term → baseTimeMid, got %.6f", off0)
 	}

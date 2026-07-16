@@ -89,14 +89,16 @@ const (
 // teamBaseTime uses the package-const offVolumeScale — the thin wrapper so existing
 // callers and tempo_test.go are unchanged.
 func teamBaseTime(starters []onCourt) float64 {
-	return teamBaseTimeWith(starters, offVolumeScale)
+	return teamBaseTimeWith(starters, offVolumeScale, baseTimeMid)
 }
 
-// teamBaseTimeWith is teamBaseTime with the offensive-volume scale supplied by the
-// caller — the ADR-0054 possession-count dispersion sweep seam. scale==offVolumeScale
-// reproduces teamBaseTime byte-for-byte (so a nil Options.OffVolumeScale is
-// golden-stable). Pure function: no Options/config in scope.
-func teamBaseTimeWith(starters []onCourt, scale float64) float64 {
+// teamBaseTimeWith is teamBaseTime with the offensive-volume scale AND the neutral
+// base-time center supplied by the caller — the ADR-0054 possession-count dispersion
+// sweep seam (scale) and the J23 mean-pace re-center sweep seam (mid).
+// scale==offVolumeScale && mid==baseTimeMid reproduces teamBaseTime byte-for-byte
+// (so nil Options.OffVolumeScale/BaseTimeMid are golden-stable). Pure function: no
+// Options/config in scope.
+func teamBaseTimeWith(starters []onCourt, scale, mid float64) float64 {
 	if len(starters) == 0 {
 		return baseTimeLow
 	}
@@ -108,7 +110,7 @@ func teamBaseTimeWith(starters []onCourt, scale float64) float64 {
 	n := float64(len(starters))
 	offAvg := offSum / n
 	defAvg := defSum / n
-	bt := baseTimeMid - scale*(offAvg-offVolumeNeutral) + defRatingScale*(defAvg-defRatingNeutral)
+	bt := mid - scale*(offAvg-offVolumeNeutral) + defRatingScale*(defAvg-defRatingNeutral)
 	if bt < baseTimeLow {
 		bt = baseTimeLow
 	}

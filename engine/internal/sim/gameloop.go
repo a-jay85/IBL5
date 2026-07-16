@@ -35,6 +35,16 @@ func resolveOffVolumeScale(opts Options) float64 {
 	return offVolumeScale
 }
 
+// resolveBaseTimeMid returns the neutral base-time center for this run: the package
+// const baseTimeMid (tempo.go) when opts.BaseTimeMid is nil — byte-identical to the
+// live engine — else the overridden value (the J23 mean-pace re-center sweep seam).
+func resolveBaseTimeMid(opts Options) float64 {
+	if opts.BaseTimeMid != nil {
+		return *opts.BaseTimeMid
+	}
+	return baseTimeMid
+}
+
 // simGameWith is simGame plus the freeze/accumulation Options (freeze.go). A zero
 // Options leaves every possession decision byte-identical to simGame; a non-zero
 // Options either harvests league-mean derived values (opts.Accum) or substitutes a
@@ -75,7 +85,8 @@ func simGameWith(b bundle.Bundle, g bundle.Game, r *rng.RNG, opts Options) (resu
 	// step is needed; the season-level FGA channel emerges because a high-volume
 	// team's games average faster across its varied opponents.
 	scale := resolveOffVolumeScale(opts)
-	baseTime := (teamBaseTimeWith(visitor.players, scale) + teamBaseTimeWith(home.players, scale)) / 2.0
+	mid := resolveBaseTimeMid(opts)
+	baseTime := (teamBaseTimeWith(visitor.players, scale, mid) + teamBaseTimeWith(home.players, scale, mid)) / 2.0
 	step := possessionTime(baseTime)
 
 	// Tip-off winner starts on offense; possessions strictly alternate.

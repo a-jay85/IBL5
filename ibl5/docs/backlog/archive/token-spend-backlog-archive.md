@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed token-spend reduction entries, extracted from token-spend-backlog.md.
-last_verified: 2026-07-14
+last_verified: 2026-07-16
 ---
 
 # Token-Spend Reduction Backlog — Archive
@@ -73,3 +73,8 @@ Read-only historical record of ✅ Implemented entries. For OPEN items see ../to
 **Location:** `.claude/skills/plan/SKILL.md` (~55KB ≈ 13K tokens) and `.claude/skills/post-plan/SKILL.md` (~68KB ≈ 17K tokens) — each a single file loaded whole at invocation and resident for the entire run.
 **Problem (was):** A long post-plan run re-reads ~17K tokens every turn, plus a fresh cache write per nightly session.
 **Status (2026-07-14):** ✅ Implemented — both restructures shipped. Post-plan (#1389, merged 2026-07-09): `.claude/skills/post-plan/SKILL.md` cut from ~68KB to ~30KB, split into seven `_phase-*.md` reference files read on phase entry. Plan-skill (#1363, merged 2026-07-08): `.claude/skills/plan/SKILL.md` Step 3 slimmed (Regions A/B removed, contract pointer wired), extracting the architect contract into on-demand `.claude/skills/plan/_architect-contract.md`. The two restructures were deliberately different shapes: plan-skill did not mirror post-plan's per-phase orchestrator split — instead it moved the architect contract into the plan-architect subagent's throwaway context, since the orchestrator's Steps 1–4 are too interdependent/reasoning-heavy to split. That contract extraction was the complete intended optimization for plan-skill, not a partial step toward a fuller split — both halves of T9 are done.
+
+### T15 Read-payload accretion guard
+**Location:** `$HOME/.claude/hooks/output-guard.sh` (Check E, PreToolUse warn-only); `~/GitHub/IBL5/.claude/settings.local.json` (new `"Read"` matcher entry).
+**Problem (was):** Read results injected 17.3M chars (~4.3M tokens) into contexts over 7 days — 67% of all tool-result bytes. A full-file Read early in a long session is the compounding version of the T10 problem: its tokens are re-billed as cache-read on every subsequent call. The Read tool supports `offset`/`limit` but nothing pushed back on a no-limit Read of a large file.
+**Status (2026-07-16):** ✅ Implemented — `output-guard.sh` extended with Check E: PreToolUse warn when a Read call targets a file over 500 lines with no `offset`/`limit` parameter. Advisory names the LSP-first rule and Explore sub-agent delegation as cheaper paths. Warn-only; skips subagents (their contexts are discarded at SubagentStop). Wired via a new `"Read"` matcher entry in `settings.local.json`. Harness extended with 6 new tests (18–23). Plan: `$HOME/.claude/plans/t15-read-payload-accretion-guard.md`.

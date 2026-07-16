@@ -642,6 +642,8 @@ jobs:
         run: bin/test-automouse-concurrency
       - name: bin/test-automouse-stream-filter
         run: bin/test-automouse-stream-filter
+      - name: bin/test-automouse-cost-rows
+        run: bin/test-automouse-cost-rows
       - name: bin/test-wt-status
         run: bin/test-wt-status
       - name: bin/test-check-plan

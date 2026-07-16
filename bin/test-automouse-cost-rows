@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-automouse-cost-rows — regression test for automouse-run's cost roll-up.
+#
+# The bug this pins (shipped 2026-07-09 in b42dfb6b2 / #1381, live 6 days):
+# append_cost_row appended the row at EOF — BELOW the "## Weekly aggregate"
+# section — and then called regenerate_weekly_section, whose strip deletes from
+# that header to EOF. Every row but the day's first was written and immediately
+# deleted, leaving one blank line each. Nine phases ran 2026-07-15; the report
+# kept ONE row and nine blank lines, and the weekly total read $9.75 for a ~$120
+# week.
+#
+# The load-bearing assertion is CONTIGUITY, not presence: a blank line between
+# two rows splits the markdown table in half, so "all 3 rows are in the file" can
+# pass while the rendered table is still broken.
+#
+# Run: bin/test-automouse-cost-rows  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+FAILED=0
+
+# assert_eq <actual> <expected> <label>
+assert_eq() {
+    if [ "$1" = "$2" ]; then
+        printf '  ok   %s (%s)\n' "$3" "$1"
+    else
+        printf '  FAIL %s: got %s, expected %s\n' "$3" "$1" "$2"
+        FAILED=1
+    fi
+}
+
+# Sandbox NIGHTLY_DIR so the real roll-up is never touched.
+TMPROOT=$(mktemp -d)
+trap 'rm -rf "$TMPROOT"' EXIT
+mkdir -p "$TMPROOT/reports" "$TMPROOT/logs"
+
+# shellcheck disable=SC2034  # read by the append_cost_row/regenerate_* funcs sourced below
+NIGHTLY_DIR="$TMPROOT"
+LOG="$TMPROOT/logs/$(date +%F).log"
+: > "$LOG"
+
+# Source only the functions under test — automouse-run is a long-running
+# driver, so extract rather than execute it.
+eval "$(awk '/^model_tier\(\)/,/^}/'             "$REPO_ROOT/bin/automouse-run")"
+eval "$(awk '/^_date_ago\(\)/,/^}/'              "$REPO_ROOT/bin/automouse-run")"
+eval "$(awk '/^append_cost_row\(\)/,/^}/'        "$REPO_ROOT/bin/automouse-run")"
+eval "$(awk '/^strip_weekly_section\(\)/,/^}/'   "$REPO_ROOT/bin/automouse-run")"
+eval "$(awk '/^regenerate_weekly_section\(\)/,/^}/' "$REPO_ROOT/bin/automouse-run")"
+
+REPORT="$TMPROOT/reports/$(date +%F)-costs.md"
+
+# Three phases, each with its own exit: line — mirrors a real multi-plan night.
+for n in 1 2 3; do
+    before=$(wc -l < "$LOG")
+    printf '[00:0%d:00] plan-%d/impl exit: cost=$%d.5000 peak_ctx=%d000\n' "$n" "$n" "$n" "$((100 + n))" >> "$LOG"
+    append_cost_row "plan-$n.md" "impl" "$before" "claude-sonnet-4-6"
+done
+
+# 1. Every row survives.
+rows=$(grep -c '^| plan-' "$REPORT")
+assert_eq "$rows" 3 "all 3 rows survive"
+
+# 2. THE regression: rows are contiguous — no blank line splits the table.
+gap=$(awk '/^\| plan-/ {if (last && NR-last > 1) bad=1; last=NR} END {print bad+0}' "$REPORT")
+assert_eq "$gap" 0 "rows are contiguous (no table-splitting blanks)"
+
+# 3. The weekly section stays single and last.
+weeklies=$(grep -c '^## Weekly aggregate' "$REPORT")
+assert_eq "$weeklies" 1 "exactly 1 weekly section (idempotent regen)"
+
+# 4. The aggregate totals every row, not just the first ($1.50+$2.50+$3.50).
+total=$(awk -F'|' '/\*\*Total\*\*/ {gsub(/[ \t]/,"",$3); print $3; exit}' "$REPORT")
+assert_eq "$total" "7.5000" "weekly total sums all rows"
+
+# 5. Peak-ctx column is populated (guards the 5-col header regression).
+peaks=$(grep -c '| 10[123]K |' "$REPORT")
+assert_eq "$peaks" 3 "peak-ctx column carries all 3 peaks"
+
+exit "$FAILED"

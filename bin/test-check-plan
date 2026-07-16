@@ -224,6 +224,19 @@ Phase 1 — Create `ibl5/migrations/099_x.sql`.
 The migration runs DROP TABLE foo to remove the legacy store.
 '
 
+# Gate 8 regression: creation-cue prose about an EXISTING file must NOT flag
+# (exit 0) — "add a new check to bin/check-docs" modifies an existing script,
+# not a new trigger surface. The existing-file skip resolves the token on disk.
+assert "gate8-existing-file-modify-ok" 0 "$FM$M"'
+Phase 1 — Add a new check to `bin/check-docs` for stale frontmatter.
+'
+
+# Gate 8: the same "Add a new" phrasing on a NONEXISTENT bin path must still
+# flag (exit 1) — the existing-file skip must not soften the genuine-new case.
+assert "gate8-addnew-nonexistent-flags" 1 "$FM$M"'
+Phase 1 — Add a new `bin/wholly-new-tool` for the sweep.
+'
+
 # Gate 8 regression: a plan that CITES an existing ADR for context (no creation
 # verb on the ADR line) but CREATES a trigger file must still flag (exit 1).
 # Prevents GATE8_RESOLVED from being set by a bare ADR reference.
@@ -446,6 +459,26 @@ Bare, un-acted-on.
 - **Self-verify:** composer run analyse
 - **Report back:** one line
 ````
+'
+
+# (T9) A `**Tier:** self` line whose REASON clause mentions a lower tier must
+# NOT flag (exit 0) — the rank comes from the FIRST model name after **Tier:**,
+# so "self — too entangled for Sonnet" is self (rank 3), not Sonnet. Regression
+# for the fixed-priority tier_rank that misread exactly this corpus line.
+assert "gateT-self-with-lower-mention-ok" 0 "$TFM$M"'
+## Phase 1
+- **Tier:** self — too entangled for Sonnet
+
+Opus implements this inline.
+'
+
+# (T10) First-token ranking must not soften the load-bearing negative: a bare
+# `**Tier:** Sonnet — <reason>` under impl_model: opus still flags (exit 1).
+assert "gateT-bare-sonnet-reason-still-flags" 1 "$TFM$M"'
+## Phase 1
+- **Tier:** Sonnet — mechanical sweep with a provided mapping
+
+Do the thing.
 '
 
 # (T8) A packet-only phase whose 4-backtick fence contains a 3-backtick recipe

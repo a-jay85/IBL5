@@ -9,7 +9,17 @@ const tempoFactor = 1.0
 const (
 	baseTimeLow  = 13.0
 	baseTimeHigh = 16.0
-	baseTimeMid  = (baseTimeLow + baseTimeHigh) / 2.0 // 14.5 — a neutral team's pace
+	baseTimeMid  = 13.65 // J23 re-center (PROVISIONAL — see below): neutral team's
+	// pace. NO LONGER the clamp midpoint (was (low+high)/2 = 14.5) — with
+	// round-half-up (possessionTime), 14.5 rounded the central step to 15s and
+	// dropped mean pace to ~97.6 vs real ~104.6. 13.65 restores the mean toward
+	// ~104.6 (smoke: 13.6 → 104.585 poss/g, JSB_ARCHIVE_RUNS=4 STRIDE=4) and is
+	// the lower edge of the coupling-sign window mid ∈ [13.622, ~14.07) that
+	// TestVolumeCountChannel_CouplingSign requires under round-half-up.
+	// PROVISIONAL: selected from the smoke bracket; the 20-run stride-1 archive
+	// sweep of record over {13.65, 13.7} (basetimemid_sweep_archive_test.go)
+	// adjudicates the final literal before merge (auto_merge: false — human
+	// signoff). See ADR-0085.
 )
 
 // teamBaseTime constants — the volume-rate → shot-COUNT channel (ADR-0042).

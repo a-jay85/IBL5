@@ -1,6 +1,6 @@
 ---
 description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, plan decomposition/tier-routing machinery, and the human comprehension counter-loop, with per-entry status.
-last_verified: 2026-07-15
+last_verified: 2026-07-16
 ---
 
 # Loop-Engineering Backlog
@@ -27,10 +27,10 @@ last_verified: 2026-07-15
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 7 |
+| ⬜ Open | 6 |
 | 📋 Planned | 2 |
 | ◑ Partial | 3 |
-| ✅ Implemented | 5 |
+| ✅ Implemented | 6 |
 | 🚫 Declined | 0 |
 
 ---
@@ -56,7 +56,7 @@ last_verified: 2026-07-15
 | L15 | Sonnet-recipe completeness lint | ✅ Implemented | — | S |
 | L16 | Context-budget gate v2 (work-size proxies + measured calibration) | 📋 Planned | 🟦 | M |
 | L17 | Shared-context artifact for multi-plan splits | ✅ Implemented | — | S |
-| L18 | Tier-default correction (`impl_model:` fails open to Opus) | ⬜ Open | 🟦 | S |
+| L18 | Tier-default correction (`impl_model:` fails open to Opus) | ✅ Implemented | — | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse-queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse-queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -150,13 +150,7 @@ last_verified: 2026-07-15
 ✅ Implemented (2026-07-11) — see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
 ### L18 Tier-default correction (`impl_model:` fails open to Opus)
-**Location:** `bin/lib/plan-model-consistency` — the shared gate-13 check, called by **both** `bin/check-plan` (authoring time) and `bin/automouse-queue` (queue time) so the two cannot drift. It reads the **raw** `impl_model:` frontmatter and already requires a deliberate tier choice — except for one exempt branch: `Truly-manual rows >= 1 AND impl_model absent -> ok`. Downstream, `bin/lib/plan-impl-model` **resolves** the raw value, with fallthrough `*) echo "claude-opus-4-8" ;; # opus, empty, garbled, or unknown → safe default`, so an exempted absence silently resolves to Opus. `bin/lib/automouse-escalate-model` escalates any non-Opus base → Opus on the final attempt (ADR-0085), but never fired in the measured window — every retried plan was already Opus base.
-**Problem:** A single `Truly-manual` row exempts a plan from declaring a tier at all, and the absent field then silently buys Opus at ~5.4× Sonnet's per-run cost. Measured 2026-07-07→07-15 (28 impl runs): Opus 13 runs / $99.11 total / $7.62 avg vs Sonnet 15 runs / $21.33 / $1.42 avg — Opus is **82% of impl spend**. Two plans reached the queue through the exemption and were silently routed to Opus: `ibl6-retirement-1-boxscore-php-port` ($18.72 — the single most expensive run in the dataset) and `mobile-target-size-a11y-sitewide` ($7.38 + $0.94 retry). Both carry exactly one `Truly-manual` row and no `impl_model:`; both **post-date** gate 13 (shipped 2026-07-07, `abbde03d5`, PR #1372) and both **pass** `bin/lib/plan-model-consistency` today. Both are mechanical work (a PHP port; a sitewide a11y sweep) — textbook Sonnet jobs. That's **~$27, ~15% of the week, spent on Opus because a YAML field was absent** — nobody ever made a tier decision. The exemption conflates two different things: a `Truly-manual` row is about **verification** (a human eyeballs subjective UI/UX at PR time; it also forces `auto_merge: false`), while `impl_model:` is about **implementation**. Needing a human to *look at* the result is not evidence that Opus must *write* it.
-**Suggested direction:** **Fail closed at the gate, not at the resolver.** Flip the exempt branch in `bin/lib/plan-model-consistency` to a violation: `Truly-manual rows >= 1 AND impl_model absent -> VIOLATION`, so a manual-row plan must declare `impl_model: opus` **explicitly** (with a reason in the body, as the existing zero-manual-row rule already demands). ~3 lines in the shared script; closes `bin/check-plan` and `bin/automouse-queue` at once; an **extend**, not a new gate (`.claude/rules/meta-tooling-bar.md`). **Do not invert `plan-impl-model`'s fallthrough to Sonnet** — the gate reads the raw value and the resolver resolves it, so inverting the resolver changes nothing the gate passes: an exempt plan would still sail through and now silently run **Sonnet**, flipping gate 13(a) ("a `Truly-manual` row strips the sonnet marker so the plan runs at the Opus default") *below* the gate where nothing reviews it. That trades silent-expensive for silent-wrong. Keep the Opus fallthrough as the garbled/unknown safety net; the fix is to make absence impossible, not to redefine what it means.
-**Risk if untouched:** Every manual-row plan silently bills top-tier for mechanical work — the exact failure `.claude/rules/agent-tiering.md` ("never default to Opus") forbids for sub-agents, reproduced in the runner's own default.
-**Related:** Both flagged plans are *mixed* (a mechanical bulk plus one subjective UI row) — the case `/plan` Step 2.5 says to **split at the tier boundary** (a small Opus judgment plan + a stacked `impl_model: sonnet` mechanical plan) rather than force whole to Opus. Neither was split, so the separability lever also failed to fire; closing the exemption makes the Opus choice explicit enough to argue with, but does not by itself produce the split. L13 (per-phase routing) tracks the interleaved variant.
-**Provenance:** Surfaced 2026-07-15 while reviewing L2/PR #1477; the cost telemetry gathered to refute the token-budget breaker located the real waste here. Direction corrected 2026-07-15 (PR #1481 shipped the resolver-inversion version, which targets the wrong layer).
-**Status (2026-07-15):** ⬜ Open — 🟦.
+➜ L18 Tier-default correction — ✅ Implemented (2026-07-16): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
 ---
 

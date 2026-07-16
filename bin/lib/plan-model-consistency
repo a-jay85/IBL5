@@ -16,7 +16,8 @@
 #   Truly-manual rows == 0  AND impl_model absent            -> VIOLATION (undeclared default)
 #   Truly-manual rows == 0  AND impl_model: opus (explicit)  -> ok
 #   Truly-manual rows == 0  AND impl_model: sonnet           -> ok (the encouraged case)
-#   Truly-manual rows >= 1  AND impl_model absent or opus    -> ok
+#   Truly-manual rows >= 1  AND impl_model absent            -> VIOLATION (must declare impl_model: opus)
+#   Truly-manual rows >= 1  AND impl_model: opus (explicit)  -> ok
 #
 # Deliberately NOT bin/lib/plan-impl-model: that script RESOLVES impl_model to a
 # model id for `claude -p --model`, and its `case` statement collapses explicit
@@ -76,6 +77,11 @@ RAW=$(awk '
 
 if [ "$MANUAL_COUNT" -ge 1 ] && [ "$RAW" = "sonnet" ]; then
     echo "Truly-manual row forbids impl_model: sonnet — strip the marker or mechanize the row"
+    exit 1
+fi
+
+if [ "$MANUAL_COUNT" -ge 1 ] && [ -z "$RAW" ]; then
+    echo "Truly-manual row requires an explicit impl_model: add \`impl_model: opus\` (keep the manual row) or mechanize the row and use \`impl_model: sonnet\`"
     exit 1
 fi
 

@@ -87,7 +87,7 @@ assert "open-type-not-flagged" 0 "$FM"'
 '
 
 # Gate 3: a Truly-manual row using an automatable verb must flag (exit 1).
-assert "false-manual" 1 '
+assert "false-manual" 1 "$FM_OPUS"'
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---------------|-----------|--------|---------------------|
 | 1 | verify the redirect works | Truly-manual | post-impl | n/a |
@@ -95,7 +95,7 @@ assert "false-manual" 1 '
 
 # Gate 3: a legitimately subjective Truly-manual row (no automatable verb) must
 # NOT flag (exit 0).
-assert "real-manual-ok" 0 '
+assert "real-manual-ok" 0 "$FM_OPUS"'
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---------------|-----------|--------|---------------------|
 | 1 | does the new dashboard feel polished | Truly-manual | post-impl | n/a |
@@ -337,9 +337,15 @@ assert "gate13-clean-explicit-opus-ok" 0 '---
 impl_model: opus
 ---'"$M"
 
-# (e) A Truly-manual row with NO impl_model marker passes (exit 0) — absence
-# defaults to the safe Opus path, which is correct when a row is subjective.
-assert "gate13-manual-absent-ok" 0 "$M_MANUAL"
+# (e) A Truly-manual row with NO impl_model marker is now a VIOLATION (exit 1) —
+# the model choice must be deliberate; add `impl_model: opus` explicitly.
+assert "gate13-manual-absent-violation" 1 "$M_MANUAL"
+
+# (f) A Truly-manual row with explicit `impl_model: opus` passes (exit 0) — the
+# only valid model declaration when a plan carries a subjective row.
+assert "gate13-manual-explicit-opus-ok" 0 '---
+impl_model: opus
+---'"$M_MANUAL"
 
 # ---------------------------------------------------------------------------
 # Gate T: below-run-model tier labels must bind to a packet or an inline marker.

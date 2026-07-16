@@ -1,6 +1,6 @@
 ---
 description: Triage every non-trivial unit of work as ad-hoc vs /plan before starting, with an ad-hoc safety mirror and Sonnet execution-routing for resolved, machine-verifiable edit chunks; the gateway that feeds the deployment funnel (ADR-0067).
-last_verified: 2026-07-11
+last_verified: 2026-07-16
 ---
 
 # Work Triage Rule
@@ -35,20 +35,28 @@ then prefer `/plan`, so the defense and its verification are designed up front. 
 
 ## Execution routing: an ad-hoc verdict does not mean Opus edits inline
 
-The plan-vs-ad-hoc verdict decides *whether to plan* — it does **not** decide *who executes the edits*. An ad-hoc verdict silently defaulting to "the Opus session implements inline" is the measured leak (2026-07-07 usage audit: ~90% of Opus main-thread tool calls were mechanical Bash/Read/Edit/Write, and 44% of interactive Opus sessions breached 150K peak context — the dumb-zone the delegation rules exist to prevent).
+The plan-vs-ad-hoc verdict decides *whether to plan* — it does **not** decide *who executes the edits*. An ad-hoc verdict silently defaulting to "the Opus session implements inline" is the measured leak (2026-07-07: ~90% of Opus main-thread calls were mechanical; 44% of sessions breached 150K context — the dumb-zone delegation rules exist to prevent).
 
 **Before making a chunk of edits, route the execution.** The chunk is **Sonnet-executable** when both hold — the same criterion as `/plan` Step 4 gate 13:
 
 - **Design resolved** — you could write the full recipe now (files, exact changes, order); no edit re-opens a judgment call.
 - **Machine-verifiable** — a test/linter/script exists (or ships with the chunk) that fails on a wrong edit.
 
-When both hold, **hand off by default — do not pause for permission**: state the routing call in one line ("execution is Sonnet-suitable — delegating"), then spawn **one** Sonnet sub-agent with a delegation-packet-shaped prompt (scope, exact recipe, self-verify command it must run before returning, thin one-line report-back — the format in `.claude/skills/plan/SKILL.md` § Delegation packets). Design, the routing call itself, and final review of the returned diff stay on Opus — this routes *execution*, never understanding.
+When both hold, **hand off by default — do not pause for permission**: state the routing call in one line ("execution is Sonnet-suitable — delegating"), then spawn **one** Sonnet sub-agent (format: `.claude/skills/plan/SKILL.md` § Delegation packets). Design, routing call, and final diff review stay on Opus — this routes *execution*, never understanding.
 
 Stay inline (Opus edits directly) only when:
 - the edits and the design are genuinely **entangled** — writing the recipe would mean making each edit-level judgment anyway, so the handoff buys nothing; or
 - the chunk is **trivial** — a one-or-two-edit change where the sub-agent's fixed spawn cost (~3–5K tokens, `agent-tiering-detail.md` § Skip the Agent) exceeds the work being moved.
 
 Either way the routing decision is **stated, not silent** — one line, like the triage verdict. The user should see which way it went and be able to override in the moment.
+
+## Execution routing: repeat-polling is a spend bug
+
+A poll loop re-reads the full context every call (~81K tokens); eight 60s checks burns ~650K tokens vs ~81K for one deferred check. **Never poll on the main thread.**
+
+**Instead:** `run_in_background: true` + Monitor (re-invokes on completion, main thread free), or ScheduleWakeup matched to the expected completion time (one ~480s wakeup for a CI run beats eight 60s checks). Avoid repeated `gh pr checks` / `gh run watch` inline loops — both re-read full context per call.
+
+**Headless exception:** no re-invocation in headless/automouse — block until exit or structure as sequenced plan phases. See `agent-tiering-detail.md`.
 
 ## Calibration
 

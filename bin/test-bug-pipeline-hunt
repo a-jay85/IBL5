@@ -40,13 +40,34 @@ bpt_expect_eq   "r5: exit 0" 0 "$BPT_RC"
 bpt_file_absent "$STUB/claude.sentinel" "r5: empty claim spawns zero hunter"
 bpt_log_has     "$STUB" tick.out "no actionable rows" "r5: falls through to cheap exit"
 
-# ── Row 8 — wt-new called once as bug-<id>; worktree created ──
+# ── Row 8 — wt-new called once as bug-<id>-<descriptive-slug>; worktree created ──
+# Full-line exact match (not bpt_log_has substring) so a legacy "wt-new bug-7" run
+# can never false-green this: it would fail the exact comparison below.
 bpt_reset
 bpt_set_claim "$CLAIM"; bpt_set_result '{"verdict":"fixed"}'; bpt_hunt_dirty
 bpt_run
-bpt_count   "r8: wt-new called exactly once" 1 "$STUB/wt-new.log"
-bpt_log_has "$STUB" wt-new.log "wt-new bug-7" "r8: worktree slug is bug-<id>"
-if [ -d "$STUB/wt/bug-7/ibl5" ]; then bpt_ok "r8: worktree tree created"; else bpt_fail "r8: worktree tree missing"; fi
+bpt_count "r8: wt-new called exactly once" 1 "$STUB/wt-new.log"
+r8_line="$(cat "$STUB/wt-new.log" 2>/dev/null)"
+bpt_expect_eq "r8: worktree slug is bug-<id>-<descriptive-slug> (exact)" \
+    "wt-new bug-7-the-trade-button-is-broken" "$r8_line"
+if [ -d "$STUB/wt/bug-7-the-trade-button-is-broken/ibl5" ]; then bpt_ok "r8: worktree tree created"; else bpt_fail "r8: worktree tree missing"; fi
+
+# ── sanity — bug_slug() unit rows, exercised directly against the driver's own function
+# (not a re-implementation) via a fresh subshell that sources $DRIVER. $0 is deliberately
+# NOT set to $DRIVER (must differ from the sourced BASH_SOURCE[0]) — the driver's
+# `[ "${BASH_SOURCE[0]}" = "${0}" ]` tail guard would otherwise match and auto-run main().
+# All env-seam vars main() would need are already exported by bpt_setup, so the
+# REPO_ROOT-derived fallbacks this mismatched $0 skips are never actually consulted.
+bpt_bug_slug() { bash -c 'source "$1"; bug_slug "$2" "$3"' bpt-unit-shim "$DRIVER" "$1" "$2" 2>/dev/null; }
+bpt_expect_eq "sanity: empty original_text → bug-<id> fallback" \
+    "bug-9" "$(bpt_bug_slug 9 "")"
+bpt_expect_eq "sanity: emoji-only original_text → bug-<id> fallback" \
+    "bug-9" "$(bpt_bug_slug 9 "🎉🎉🎉")"
+bpt_expect_eq "sanity: long text → 30-char cap, no trailing hyphen" \
+    "bug-1-nav-dropdown-re-triggers-stagg" \
+    "$(bpt_bug_slug 1 "nav dropdown re-triggers staggered animation")"
+bpt_expect_eq "sanity: mixed-case/punctuation squeezes to single hyphens" \
+    "bug-3-a-b-c" "$(bpt_bug_slug 3 "A!! b__C")"
 
 # ── Row 10 — NEG wt-new failure → re-queue + release-lease, no hunter, exit 0 ──
 bpt_reset
@@ -115,6 +136,24 @@ bpt_run
 bpt_log_lacks "$STUB" transition.log "pr_open --pr" "r17: no pr found → no transition (reconcile again later)"
 bpt_log_lacks "$STUB" gh.log "pr edit" "r17: no pr found → no label attempt"
 
+# ── Row 17 — PR #1487 cutover: pre-rename hunt row shipped under the bare bug-<id> branch.
+# gh pr list against the NEW descriptive head returns empty, but the LEGACY bug-1 head
+# still has the PR (opened before the rename) → reconcile must fall back and backfill it.
+bpt_reset
+bpt_set_list_pr_open '[{"id":"1","status":"pr_open","pr_number":null,"issue_number":"9","original_text":"nav dropdown re-triggers staggered animation"}]'
+bpt_set_gh_pr_list_for "bug-1-nav-dropdown-re-triggers-stagg" ''
+bpt_set_gh_pr_list_for "bug-1" '77'
+bpt_run
+bpt_log_has "$STUB" gh.log "pr list --repo test/code-fake --head bug-1-nav-dropdown-re-triggers-stagg" \
+    "r17-cutover: reconcile first tries the NEW descriptive head"
+# NOTE: "--head bug-1 --json" (not bare "--head bug-1") — bug-1 is a PREFIX of the
+# descriptive head above, so an un-anchored substring match would false-green here
+# even without the fallback query actually firing.
+bpt_log_has "$STUB" gh.log "pr list --repo test/code-fake --head bug-1 --json" \
+    "r17-cutover: falls back to the legacy bare bug-<id> head"
+bpt_log_has "$STUB" transition.log "transition 1 pr_open --pr=77" \
+    "r17-cutover: backfills pr_number from the legacy-head PR"
+
 # ── Row 18 — SECURITY grep: post-plan-now absent from the prompt AND from run_hunter_agent ──
 if grep -qi 'post-plan-now' "$PROMPT"; then bpt_fail "r18: post-plan-now leaked into hunter prompt"; else bpt_ok "r18: post-plan-now absent from hunter prompt"; fi
 rha_body="$(awk '/^run_hunter_agent\(\) \{/{f=1} f{print} f&&/^\}/{exit}' "$DRIVER")"
@@ -174,17 +213,35 @@ bpt_file_absent "$STUB/claude.sentinel" "r26: future-blocked row spawns no hunte
 bpt_count       "r26: no wt-new for an unresumed row" 0 "$STUB/wt-new.log"
 
 # ── Row 27 — ripe blocked row → atomic blocked→hunting, EXISTING worktree reused (no wt-new) ──
+# original_text must match on BOTH fixtures: resume_blocked_hunt derives its slug from $row
+# (the enumerator's listActiveConversations row) to decide reuse-vs-create, but then hands off
+# to drive_hunt_row($resumed) which independently recomputes from claim-next --resume's row
+# (findById). Both are `SELECT *` on the SAME db row in production, so original_text always
+# agrees there — the fixture must mirror that or the two slug computations diverge.
+bpt_reset
+R27_SLUG="bug-7-roster-page-throws-a-fatal-err"
+mkdir -p "$STUB/wt/$R27_SLUG/ibl5"
+git -C "$STUB/wt/$R27_SLUG" init -q; git -C "$STUB/wt/$R27_SLUG" config user.email t@t; git -C "$STUB/wt/$R27_SLUG" config user.name t
+printf 'base\n' > "$STUB/wt/$R27_SLUG/ibl5/hunted.txt"
+git -C "$STUB/wt/$R27_SLUG" add -A; git -C "$STUB/wt/$R27_SLUG" commit -qm base
+bpt_set_actionable '[{"id":"7","status":"blocked","class":"bug","original_text":"roster page throws a fatal error"}]'
+bpt_set_resume '{"id":"7","status":"hunting","class":"bug","hunt_attempts":1,"issue_number":"4242","original_text":"roster page throws a fatal error"}'
+bpt_set_result '{"verdict":"fixed"}'; bpt_hunt_dirty
+bpt_run
+if grep -q . "$STUB/hunt-models.log" 2>/dev/null; then bpt_ok "r27: ripe blocked row is re-hunted"; else bpt_fail "r27: ripe blocked row was not hunted"; fi
+bpt_count "r27: existing worktree reused (no wt-new)" 0 "$STUB/wt-new.log"
+
+# ── NEW — legacy-worktree-reuse (hunt path): claim row WITH original_text, but only the
+# LEGACY bug-<id> dir pre-exists → drive_hunt_row must reuse it, never fork a second worktree.
 bpt_reset
 mkdir -p "$STUB/wt/bug-7/ibl5"
 git -C "$STUB/wt/bug-7" init -q; git -C "$STUB/wt/bug-7" config user.email t@t; git -C "$STUB/wt/bug-7" config user.name t
 printf 'base\n' > "$STUB/wt/bug-7/ibl5/hunted.txt"
 git -C "$STUB/wt/bug-7" add -A; git -C "$STUB/wt/bug-7" commit -qm base
-bpt_set_actionable '[{"id":"7","status":"blocked","class":"bug"}]'
-bpt_set_resume '{"id":"7","status":"hunting","class":"bug","hunt_attempts":1,"issue_number":"4242"}'
-bpt_set_result '{"verdict":"fixed"}'; bpt_hunt_dirty
+bpt_set_claim "$CLAIM"; bpt_set_result '{"verdict":"fixed"}'; bpt_hunt_dirty
 bpt_run
-if grep -q . "$STUB/hunt-models.log" 2>/dev/null; then bpt_ok "r27: ripe blocked row is re-hunted"; else bpt_fail "r27: ripe blocked row was not hunted"; fi
-bpt_count "r27: existing worktree reused (no wt-new)" 0 "$STUB/wt-new.log"
+bpt_count "r-legacy: no wt-new call (legacy dir reused)" 0 "$STUB/wt-new.log"
+bpt_log_has "$STUB" transition.log "transition 7 pr_open" "r-legacy: hunt still ships using the reused legacy worktree"
 
 # ── Row 32 — RCA labels on ship: area/root_cause slugs → ensure+add label against the issue ──
 bpt_reset

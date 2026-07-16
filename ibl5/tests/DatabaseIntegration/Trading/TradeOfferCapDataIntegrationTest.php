@@ -90,9 +90,13 @@ class TradeOfferCapDataIntegrationTest extends DatabaseTestCase
      * createTradeOffer(), and return the cap-data array the calculator produced —
      * captured off the validator's validateSalaryCaps() argument.
      *
+     * NOTE: \Season\Season is aliased to Tests\WideUnit\Mocks\Season by TestAliasesBootstrap,
+     * so new Season($db) never reads the DB. Control the phase via $season->phase.
+     *
+     * @param \Season\Season|null $season Season to inject (null = default mock, phase 'Regular Season')
      * @return array{userCurrentSeasonCapTotal: int, partnerCurrentSeasonCapTotal: int, userCapSentToPartner: int, partnerCapSentToUser: int}
      */
-    private function captureCapData(): array
+    private function captureCapData(?\Season\Season $season = null): array
     {
         $validator = $this->createMock(TradeValidator::class);
         $validator->method('validateMinimumCashAmounts')->willReturn(['valid' => true, 'error' => null]);
@@ -121,7 +125,7 @@ class TradeOfferCapDataIntegrationTest extends DatabaseTestCase
             null, // assetRepository  (real)
             null, // cashRepository   (real)
             null, // cashConsiderationRepository (real — drives the SQL under test)
-            null, // season (real — drives advancesContractYears())
+            $season, // null → TradeOffer creates new \Season\Season (aliased mock, phase 'Regular Season')
             $validator,
         );
 
@@ -163,19 +167,21 @@ class TradeOfferCapDataIntegrationTest extends DatabaseTestCase
     }
 
     /**
-     * Playoffs counts as offseason for trade cap math → real advancesContractYears()
-     * = true → cy 1→2 → salary_yr2 is the current slot. The user total must reflect
+     * Playoffs counts as offseason for trade cap math → advancesContractYears() = true
+     * → cy 1→2 → salary_yr2 is the current slot. The user total must reflect
      * the next-year amount (350), NOT salary_yr1 (999).
+     *
+     * NOTE: \Season\Season is aliased to the mock (TestAliasesBootstrap), so we set
+     * phase directly on the injected mock instead of via a DB UPDATE.
      */
     public function testCashRecordSalaryUsesNextYearSlotInOffseason(): void
     {
-        $this->db->query(
-            "UPDATE ibl_settings SET value = 'Playoffs'
-             WHERE setting_key = 'Current Season Phase' AND league = 'ibl'"
-        );
+        $season = new \Season\Season($this->db);
+        $season->phase = 'Playoffs';
+
         $this->seedCash(self::METROS_TID, cy: 1, yr1: 999, yr2: 350);
 
-        $capData = $this->captureCapData();
+        $capData = $this->captureCapData($season);
 
         self::assertSame(350, $capData['userCurrentSeasonCapTotal']);
     }

@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed JSB native-engine backlog entries (J-items), extracted from jsb-native-backlog.md.
-last_verified: 2026-07-14
+last_verified: 2026-07-16
 ---
 
 # JSB Native-Engine Backlog — Archive
@@ -120,4 +120,14 @@ Full detail: symmetric deterministic base `(2.0 − fatigue)·tovRate(bh)` (corr
 **Problem:** the ×1.25 *constant* is RE-grounded, but the resulting playoff-margin distribution has never been audited against 5.60's `.sco` playoff corpus — Fable flagged a gt=4 margin **overshoot** (engine playoff margins run hotter than real). Unknown whether the cause is the multiplier's application scope (it amplifies the signed net *before* the corpus-anchored basis-conversion dials — foulBucketScale etc. — so a playoff-only interaction could compound them) or an independent playoff mechanism 5.60 applies that the engine lacks. Never adjudicated.
 **Direction:** measure engine gt=4 margin (mean + dispersion) vs the `.sco` playoff-game subset, A/B against gt=2; if it overshoots, RE 5.60's playoff net path (is ×1.25 the only playoff amplifier?) and adjudicate whether the fix is a scope correction or a missing mechanism. Sequence with J13 (cut-over needs authoritative playoff bands). A/B gate = gt4 margin mean/dispersion vs corpus. **Not a count-axis lever** (that is J20).
 **Status (2026-07-14):** ✅ Implemented — PR `jsb-j21-playoff-margin-audit`. Audit ran on the `.sco` corpus (runs=20 stride=1 seed=20240601): gt2 engine margin +3.892±7.909 vs sco +4.124±17.519 (N=19843); gt4 engine margin +4.306±7.188 vs sco +4.590±16.061 (N=1009). Overshoot A/B: gt4−gt2 |MarginGap| delta +0.051 pts (thr 1.00), dispersion-ratio delta −0.004 (thr 0.15). **Verdict: NO overshoot** — the Fable-flagged gt=4 hot-margin is not confirmed. Notable: engine margin sd (~7–8) runs ~½ the `.sco` sd (~16–17) and the gt4 engine mean (4.306) is COOLER than `.sco` (4.590) — the engine UNDER-disperses and runs cooler, the *opposite* of the flagged overshoot; and that under-dispersion is GLOBAL (present at gt2 too), not a gt4-specific lever, so **no follow-on fix filed**. Pinned in `engine/internal/calibrate/playoffmargin_archive_test.go`. 🧠 Opus.
+
+---
+
+### J20 Empty-FGA / within-possession restructure (Cov possession channel)
+*(discovered 2026-07-12 during J2 session-2 adjudication; declined 2026-07-16)*
+
+**Location:** Engine possession loop — the empty-FGA retry structure (`engine/internal/sim/gameloop.go` + `possession.go:123` OReb continuation loop); channel-split baseline in `engine/internal/calibrate/possessioncoupling_archive_test.go:51-64` (committed 2026-07-13).
+**Problem:** The possession-count channel carries 89% of real gt2 Cov (+0.000241 of +0.000269, 2026-07-13 20-run baseline) and is wrong-signed (engine −0.000184 vs real +0.000241). Var(lnPOSS) = engine 0.000254 vs real 0.000721 (~2.8× under-dispersed). The hypothesis was that a within-possession OReb continuation restructure could move this.
+**Finding — mechanism void:** OReb continuations execute inside a single `possession()` call via the `for trip := 0; trip <= maxOffensiveRebounds; trip++` loop (`possession.go:123`). Clock decrement (`gs.clock -= step`) happens once per `possession()` call in `gameloop.go`, AFTER the trip loop completes. Therefore Var(lnPOSS) = f(base_time dispersion) exclusively — no within-possession restructure of any kind can move it. Per-origin putback share was already J4-faithful (engine 12.58% vs J4 12.65%), confirming nothing to re-weight. The real Cov carrier is pace/base_time dispersion, which is J23's domain.
+**Status (2026-07-16):** 🚫 Declined — mechanism void. Evidence pinned at `engine/internal/calibrate/possessioncoupling_archive_test.go:51-64`. Successor: J23 (round-half-up + base_time re-center) targets Var(lnPOSS) toward 0.000721 and Cov(lnPOSS,lnPPS) sign flip. 🧠 Opus.
 

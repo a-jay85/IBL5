@@ -1,6 +1,6 @@
 ---
 description: JSB native-engine backlog — the count-axis cut-over blocker chain, static RE pins, faithful ports, and validation gates, each tagged with the model tier that owns its load-bearing reasoning (Fable-gated items marked).
-last_verified: 2026-07-14
+last_verified: 2026-07-16
 ---
 
 # JSB Native-Engine Backlog
@@ -38,9 +38,9 @@ J1 faithful foul pair (✅ 2026-07-10, ADR-0082) ─→ J2 adjudications (✅ 20
         └─→ J15 faithful foul-bucket program (✅ 2026-07-12, ADR-0084 — live defQ = Σ STL/MIN×44, offQ = Σ TOV/48)
               ├─ absorbs J12 (HCA re-homing — corpus margin ground truth 4.12 unchanged) — ✅ absorbed
               ├─ prerequisite: J16 escape bound re-derived with LIVE AST/48 (J19) — ✅ J19 done
-              └─→ J2 verdict: SHIPPABLE with residual → successor = J20 empty-FGA restructure (J4 ✅ 2026-07-12 feeds it) → J13 (unblocked)
+              └─→ J2 verdict: SHIPPABLE with residual → J20 🚫 void (within-possession lever cannot move Var(lnPOSS); pace/base_time dispersion is J23's domain) → J13 (unblocked)
 J17 game-state foul coupling (⬜, new 2026-07-10) — real 5.60 mechanism the engine lacks entirely
-J21 gt=4 playoff-margin audit (✅ 2026-07-14 — no overshoot, engine under-disperses globally) · J22 per-player STL/TOV bundle wiring (⬜, new 2026-07-13) — cut-over-gate fidelity inputs to J13; NEITHER is a count-axis (J20) lever
+J21 gt=4 playoff-margin audit (✅ 2026-07-14 — no overshoot, engine under-disperses globally) · J22 per-player STL/TOV bundle wiring (⬜, new 2026-07-13) — cut-over-gate fidelity inputs to J13; NEITHER is a Cov(lnFGA,lnPPS) lever
 J23 round-half-up + base_time re-center (⬜, new 2026-07-13, #1452) — coupled faithful fix deferred from J21; ADR-0085 records the hold finding; J23 must A/B the recenter alongside the step-rule change
 J18 composite fidelity ports (✅ 2026-07-13 — all divergences merged; f/shrink port declined as documented divergence) · J19 J6-residue RE (✅ 2026-07-12) — both spawned by J6
 ```
@@ -53,11 +53,11 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 6 |
+| ⬜ Open | 5 |
 | 📋 Planned | 0 |
 | ◑ Partial | 0 |
 | ✅ Implemented | 16 |
-| 🚫 Declined | 0 |
+| 🚫 Declined | 1 |
 
 ---
 
@@ -84,7 +84,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 | J17 | Game-state foul coupling port (param_8 desperation + late-game fouling) | ⬜ Open | 🧠 Opus | M |
 | J18 | Composite fidelity ports (bucketweights/teamquality vs the J6 formula map) | ✅ Implemented | 🧠 Opus | M |
 | J19 | J6-residue RE (energy operands, rec+0x18 semantics, escape re-derivation, +0xD58) | ✅ Implemented | 🧠 Opus | M |
-| J20 | Empty-FGA / within-possession restructure (Cov possession channel) | ⬜ Open | 🧠 Opus | L |
+| J20 | Empty-FGA / within-possession restructure (Cov possession channel) | 🚫 Declined | 🧠 Opus | L |
 | J21 | gt=4 playoff-margin overshoot audit (playoffNetMultiplier ×1.25) | ✅ Implemented | 🧠 Opus | S |
 | J22 | Per-player rl_stl/rl_tov production-bundle wiring (PF dispersion) | ⬜ Open | 🧠 Opus | M |
 | J23 | round-half-up + base_time re-center (coupled pace faithful fix) | ⬜ Open | 🧠 Opus | M |
@@ -93,13 +93,13 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 ➜ J1 Faithful foul-bucket pair port — ✅ Implemented (2026-07-10): see [archive](archive/jsb-native-backlog-archive.md).
 
 ### J2 Count-axis carrier adjudication (post-J1)
-➜ J2 Count-axis carrier adjudication — ✅ Adjudicated (2026-07-12): SHIPPABLE verdict; successor = J20 empty-FGA restructure (J4 ✅); see [archive](archive/jsb-native-backlog-archive.md).
+➜ J2 Count-axis carrier adjudication — ✅ Adjudicated (2026-07-12): SHIPPABLE verdict; J20 🚫 void (pace/base_time dispersion is the real Cov carrier → J23); see [archive](archive/jsb-native-backlog-archive.md).
 
 ### J3 Per-origin efficiency identifiability (IBL5.log)
 ➜ J3 Per-origin efficiency identifiability — ✅ Implemented (2026-07-09): study complete; J4 unblocked with spec; see [archive](archive/jsb-native-backlog-archive.md).
 
 ### J4 Play-by-play extraction parser
-➜ J4 Play-by-play extraction parser — ✅ Implemented (2026-07-12): 23,714/23,714 games parsed, 100% sentence closure; feeds J20 + J17 instruments; see [archive](archive/jsb-native-backlog-archive.md).
+➜ J4 Play-by-play extraction parser — ✅ Implemented (2026-07-12): 23,714/23,714 games parsed, 100% sentence closure; feeds J17 instruments (J20 🚫 void); see [archive](archive/jsb-native-backlog-archive.md).
 
 ### J5 Unpinnable-claims sweep + static closures
 ➜ J5 Unpinnable-claims sweep + static closures — ✅ Implemented (2026-07-09): closures 1–3 + team decode stand; closure 4 overturned by J6; see [archive](archive/jsb-native-backlog-archive.md).
@@ -172,11 +172,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 **Status (2026-07-12):** ✅ Implemented — item (1) resolved inside J15 program (ADR-0084); items (2)–(4) + retention re-trace spun forward as follow-on objdump session. Full detail in [archive](archive/jsb-native-backlog-archive.md).
 
 ### J20 Empty-FGA / within-possession restructure (Cov possession channel)
-*(discovered 2026-07-12 during J2 session-2 adjudication)*
-**Location:** Engine possession loop — the empty-FGA retry structure (`engine/internal/sim/gameloop.go` shot-decision path); evidence in `jsb-native/re-artifacts/jsb-J2s2-cov-adjudication-20260712.md` and the J4 corpus measurements (`jsb-native/re-artifacts/j4-parser-20260712/`, machine-local).
-**Problem:** The possession-count channel carries **81% of real gt2 Cov** (+0.000498 of +0.000612) and is the only channel that can flip the engine's sign — the shot-mix channel is arithmetically capped at −0.000012 ≤ 0 even fully faithful (J2 s2), triple-confirmed by the J18 A/Bs (Cov unchanged in every port). The engine's empty-FGA retry loop over-disperses shots-per-possession and dilutes realized PPS on high-volume teams (corr −0.42) where 5.60 does not. Successor to ADR-0042's open item; the ADR-0054 possession budget constraint is generator-independent and binds any redesign.
-**Direction:** Design against J4's real per-origin ground truth (initial/putback/transition FGA shares + per-origin efficiency): restructure how empty possessions/retries generate FGA so within-possession dispersion matches the corpus, without breaking the possession budget or the fta/margin anchors. Needs its own RE pass on 5.60's possession flow + a `/plan`; A/B gates = gt2/gt4 Cov, fta_per_g, margin. Sequence J7 (turnover coupling) with it — J7's faithful fix pressures Cov the wrong way and should be priced into the same adjudication.
-**Status (2026-07-12):** ⬜ Open — unblocked (J4 ✅). 🧠 Opus design + adjudication; escalate 🔮 Fable (user-gated) only if the asm possession-loop derivation hits the refuted-premise class.
+➜ J20 Empty-FGA / within-possession restructure — 🚫 Declined (2026-07-16): mechanism void — within-possession putback lever cannot move Var(lnPOSS); OReb continuations loop inside one `possession()` call without decrementing clock, so Var(lnPOSS) = f(base_time dispersion) only; per-origin shares already J4-faithful (putback 12.58% vs 12.65%); real Cov carrier is pace/base_time dispersion → J23's domain; evidence: `engine/internal/calibrate/possessioncoupling_archive_test.go:51-64` (2026-07-13); see [archive](archive/jsb-native-backlog-archive.md).
 
 ### J21 gt=4 playoff-margin overshoot audit
 ➜ J21 gt=4 playoff-margin overshoot audit — ✅ Implemented (2026-07-14): NO overshoot; engine under-disperses globally; no follow-on fix; see [archive](archive/jsb-native-backlog-archive.md).
@@ -185,8 +181,8 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 *(discovered 2026-07-13 during jsb-native RE-tooling feasibility review)*
 **Location:** `engine/internal/sim/teamquality.go:29-32` (the STAND-INS block — "bundle carries no `rl_stl`/`rl_tov` counting sums… defQ/offQ use the 0-99 STL/TVR **ratings** as per-48 rate stand-ins, mapped through `ratingRefScale`"); bundle feed at `engine/internal/backup/assemble.go:215` (`STL: p.RatingSTL` — the 0-99 rating, not a real per-player steal count).
 **Problem:** ADR-0084's composites are faithful in **formula** (defQ = Σ STL/MIN×44, offQ = Σ TOV/48) but fed **rating stand-ins**, not real per-player `rl_stl`/`rl_tov`. The engine's PF is under-dispersed — Var(lnPF) ratio ≈ 0.22, PF dispersion ≈ ½ real (J13 monitor; J2 residual context) — because rating stand-ins compress the per-player STL/TOV spread the live composites exist to express. `teamquality.go:32` already marks this "Out of Scope, J6"; this entry formalizes that deferred follow-on so it is tracked, not just code-commented.
-**Not the count-axis:** wiring real STL/TOV raises PF *dispersion* — a fidelity fix, **not** a Cov(lnFGA,lnPPS) lever (that is J20). File as a dispersion-fidelity follow-on, never a cut-over sign blocker.
-**Direction:** confirm whether the production-bundle SOURCE (`.plr` / real-life stat feed) carries per-player steal/turnover counting sums; if so, add them to the bundle reader + wire into the composites replacing the rating stand-ins; if not, RE where 5.60 sources them. A/B gate = Var(lnPF) ratio toward real, no regression on margin/fta anchors or gt2/gt4 Cov. Sequence after J20 (Cov structure first) so the dispersion A/B reads clean.
+**Not the count-axis:** wiring real STL/TOV raises PF *dispersion* — a fidelity fix, **not** a Cov(lnFGA,lnPPS) lever (that is J23's domain). File as a dispersion-fidelity follow-on, never a cut-over sign blocker.
+**Direction:** confirm whether the production-bundle SOURCE (`.plr` / real-life stat feed) carries per-player steal/turnover counting sums; if so, add them to the bundle reader + wire into the composites replacing the rating stand-ins; if not, RE where 5.60 sources them. A/B gate = Var(lnPF) ratio toward real, no regression on margin/fta anchors or gt2/gt4 Cov. Sequence before J23 (J20 sequencing constraint removed — J20 🚫 void); J23 reads on this baseline.
 **Status (2026-07-13):** ⬜ Open — new. 🧠 Opus (source question + Var(lnPF) A/B judgment); port ⚙️ Sonnet once source confirmed.
 
 ### J23 round-half-up + base_time re-center (coupled pace faithful fix)
@@ -194,4 +190,4 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 **Location:** `engine/internal/sim/tempo.go` (`possessionTime` function, `offVolumeNeutral` / `defRatingNeutral` constants); `engine/internal/calibrate/possessioncoupling_archive_test.go` (four-term A/B harness).
 **Problem:** ADR-0085 (J21 finding) established two coupled imperfections: (1) `possessionTime` uses `int()` truncation where 5.60 uses round-half-up (`FUN_004e42e0`, `_DAT_00669ef0=0.5` confirmed from `.rdata`); (2) the engine's neutral center `baseTimeMid=14.5s` is ~0.7s too slow (real effective step ≈ 13.8s = 1440/104.6). These partially cancel: truncation's downward bias accidentally compensates the too-slow center. The J21 A/B confirmed shipping round-alone regresses mean pace (101.9→97.6 vs real 104.6) and does not flip the wrong-signed Cov(lnPOSS,lnPPS). The faithful end-state requires both changes together.
 **Direction:** ship round-half-up in `possessionTime` paired with a base_time re-centering (reduce `offVolumeNeutral` and/or adjust `offVolumeScale`/`defRatingScale` so the mean pace lands near real ~104.6); A/B the recenter independently first (it interacts with `Var(lnPOSS)` via the 13s clamp floor); then run the coupled round+recenter A/B on the four-term gate (Cov(lnPOSS,lnPPS) sign flip, Cov(lnFGA,lnPPS) total, Var(lnPOSS) toward 0.000721 without overshoot, Var(lnFGA) ≤ real 0.001330); re-establish the characterization pins from `possession_pace_pin_test.go`. Derive mean/variance targets against the paired `.sco` comparators per the J15/ADR-0084 paired-comparator principle.
-**Status (2026-07-13):** ⬜ Open — deferred from J21. Sequence after J20 (the Cov-structure question) and J22 (STL/TOV bundle wiring). 🧠 Opus (recenter design + four-term adjudication).
+**Status (2026-07-13):** ⬜ Open — deferred from J21. Sequence after J22 (STL/TOV bundle wiring); J20 sequencing constraint removed (J20 🚫 void). 🧠 Opus (recenter design + four-term adjudication).

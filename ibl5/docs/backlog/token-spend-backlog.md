@@ -54,15 +54,6 @@ First-wave entries (T1–T13) are ✅ Implemented — see the dated pointers bel
 **Provenance:** discovered 2026-07-16 during the post-backlog re-measure (advisory session).
 **Status (2026-07-16):** ⬜ Open.
 
-### T15 Read-payload accretion guard
-**Locus:** ⌂ harness-local. **Effort:** S.
-**Location:** `$HOME/.claude/hooks/output-guard.sh` guards unbounded **Bash** output (T10) — the **Read** tool is unguarded.
-**Problem:** Measured 2026-07-16: Read results injected **17.3M chars (~4.3M tokens) into contexts over 7 days — 67% of all tool-result bytes** (next largest: Bash at 8.0M). A full-file Read early in a long session is the compounding version of the T10 problem: its tokens are re-billed as cache-read on every subsequent call, so a 5K-token Read at call 50 of a 500-call session costs ~2.25M cache-read tokens by session end. The Read tool supports `offset`/`limit` and the harness guidance says "read only the part you need," but nothing pushes back on a no-limit Read of a large file.
-**Suggested direction:** Extend `$HOME/.claude/hooks/output-guard.sh` (same family as T10, an extend not an add): PreToolUse warn when a Read call targets a file over ~500 lines with no `offset`/`limit` — advisory names the LSP-first rule (symbol questions) and Explore/fork delegation (multi-file surveys) as the cheaper paths. Warn-only; skip subagents (their contexts are discarded, which is exactly where big reads *should* go).
-**Risk if untouched:** The dominant tool-result payload keeps feeding T14's accretion; the two entries compound.
-**Provenance:** discovered 2026-07-16 during the post-backlog re-measure (advisory session).
-**Status (2026-07-16):** ✅ Implemented (2026-07-16) — `output-guard.sh` Check E: warns on Read of >500-line file with no offset/limit; skips subagents. See [archive](archive/token-spend-backlog-archive.md).
-
 ### T16 Poll-shaped Bash round-trips → background/Monitor routing
 **Locus:** ⌂ harness-local (hook or rule line). **Effort:** S.
 **Problem:** Measured 2026-07-16: **329 `gh pr`/`gh run` calls plus ~120 nightly-queue status checks in 7 days**, largely poll loops (run, read, run again). At the measured ~81K-token average context per call, each poll is a full-window cache re-read just to ask "is it done yet" — order of 30M+ cache-read tokens/week spent on waiting. The harness already has the cheap substitutes (`run_in_background` + Monitor re-invokes on completion; `/loop` self-pacing with matched intervals; ScheduleWakeup's own guidance says one ~480s check beats eight 60s ones), but adoption is norm-level and the poll pattern persists in transcripts.

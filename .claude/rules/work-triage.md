@@ -1,6 +1,6 @@
 ---
 description: Triage every non-trivial unit of work as ad-hoc vs /plan before starting, with an ad-hoc safety mirror and Sonnet execution-routing for resolved, machine-verifiable edit chunks; the gateway that feeds the deployment funnel (ADR-0067).
-last_verified: 2026-07-11
+last_verified: 2026-07-16
 ---
 
 # Work Triage Rule
@@ -49,6 +49,19 @@ Stay inline (Opus edits directly) only when:
 - the chunk is **trivial** — a one-or-two-edit change where the sub-agent's fixed spawn cost (~3–5K tokens, `agent-tiering-detail.md` § Skip the Agent) exceeds the work being moved.
 
 Either way the routing decision is **stated, not silent** — one line, like the triage verdict. The user should see which way it went and be able to override in the moment.
+
+## Execution routing: repeat-polling is a spend bug
+
+Each poll call re-reads the full context window. At a measured ~81K-token average per call, a loop of eight 60-second checks burns ~650K tokens to learn something one deferred check at completion would reveal for ~81K. Never spin a poll loop on the main thread.
+
+**Use these instead:**
+
+- **`run_in_background` + Monitor** — pass `run_in_background: true` to the Bash tool, then open a Monitor stream on the process. The Monitor tool re-invokes on each stdout line and on completion; no polling is needed. The main thread is free.
+- **Matched-interval `/loop` via ScheduleWakeup** — when the wait is known and long (e.g. a CI run), schedule a single wakeup at the expected completion time rather than peppering short-interval checks. One ~480-second check for a typical CI run beats eight 60-second ones at every cost axis: tokens, latency headroom, and wall-clock accuracy.
+
+**Pattern to avoid:** calling `gh pr checks` or `gh run watch` repeatedly in a loop on the main thread. Both pull CI state synchronously on every iteration; in a tight loop they combine the full-context-re-read cost with the latency of a remote API call per iteration.
+
+**Headless exception:** `run_in_background` has no re-invocation mechanism in headless/automouse mode — the Monitor wakeup path is interactive-only. Under headless, prefer blocking until the subprocess exits (omit `run_in_background`) or structure the plan so long waits are sequenced as separate phases. See `agent-tiering-detail.md` for context.
 
 ## Calibration
 

@@ -609,7 +609,7 @@ drive_hunt_row() { # claimed_row_json
         esac
         # escalate: a genuine localize/verify failure → count the attempt (persisted, crash-safe).
         attempts=$((attempts + 1))
-        cli transition "$hunt_id" hunting --attempts "$attempts" >/dev/null
+        cli transition "$hunt_id" hunting --attempts="$attempts" >/dev/null
         terminal="$(jq -r '.terminal // false' "$wt_appdir/.bug-pipeline/hunt-result.json" 2>/dev/null || echo true)"
         if [ "$terminal" = "true" ] || [ "$attempts" -ge "$HUNT_ATTEMPT_CAP" ]; then
             give_up_needs_human "$claimed" "$hunt_id" "$wt_appdir"
@@ -669,7 +669,11 @@ reconcile_pr_open_rows() {
         if [ -z "$pr" ] || [ "$pr" = "null" ]; then
             n="$("$GH_BIN" pr list --repo "$BUG_PIPELINE_CODE_REPO" --head "$branch" --json number --jq '.[0].number // empty' 2>/dev/null || true)"
             if [ -n "$n" ]; then
-                cli transition "$id" pr_open --pr "$n" >/dev/null && log "reconcile: $id pr_number=$n"
+                cli transition "$id" pr_open --pr="$n" >/dev/null && log "reconcile: $id pr_number=$n"
+                # Trusted-cron seam is the only actor allowed to touch gh, so the
+                # pipeline-authored label (post-plan Phase 6.5 condition 10's hold) is applied here.
+                "$GH_BIN" pr edit "$n" --repo "$BUG_PIPELINE_CODE_REPO" --add-label pipeline-authored \
+                    >/dev/null 2>&1 || log "reconcile: $id pipeline-authored label failed (best-effort)"
                 [ -n "$issue" ] && bpgh_comment "$issue" "PR opened: https://github.com/${BUG_PIPELINE_CODE_REPO}/pull/$n"
             fi
         else

@@ -144,10 +144,19 @@ func TestRealArchive_BaseTimeMidSweep(t *testing.T) {
 		return midResult{fid: fid, countPace: countPace, proxyPace: proxyPace, rows: rows}
 	}
 
-	// Coarse bracket straddling the real effective center (1440 / 104.6 ≈ 13.77s)
-	// and below today's 14.5. Phase 3 narrows this if the closest config still
-	// misses ~104.6.
-	mids := []float64{13.4, 13.6, 13.8, 14.0}
+	// Narrowed bracket (J23 Phase 3). The coarse first pass {13.4, 13.6, 13.8, 14.0}
+	// ran as a smoke (runs 4, stride 4): 13.4 → 106.35, 13.6 → 104.585 poss/g —
+	// 13.6 lands mean pace dead-on real ~104.6. But the shipped const must ALSO
+	// satisfy the non-archive merge gates, and TestVolumeCountChannel_CouplingSign
+	// (tempo_coupling_test.go) constrains it deterministically: with round-half-up,
+	// its high-volume fixture out-steps the low-volume one only when a .5 rounding
+	// boundary falls between their game base_times (H = mid−0.572 clamped, L =
+	// mid−0.122), i.e. mid ∈ [13.622, ~14.07). 13.6 fails that sign invariant
+	// (H and L collapse into the same 13s step); 13.65/13.7 keep it. So the
+	// candidates of record are the pace-closest in-window values, straddling
+	// nothing below 13.622 — the real effective center (1440 / 104.6 ≈ 13.77s)
+	// remains inside the window.
+	mids := []float64{13.65, 13.7}
 	results := make(map[float64]midResult, len(mids))
 	for _, mid := range mids {
 		results[mid] = midFid(mid)

@@ -1,11 +1,11 @@
 ---
-description: J21 finding — 5.60 rounds the possession clock-step half-up (int() truncation is a confirmed infidelity), but the archive A/B shows the faithful round-half-up shipped ALONE fails to flip the wrong-signed Cov(lnPOSS,lnPPS) and regresses mean pace by exposing a base_time-generation miscalibration truncation was masking; truncation is HELD and the faithful round+recenter fix is deferred to J22.
-last_verified: 2026-07-13
+description: J21 finding — 5.60 rounds the possession clock-step half-up (int() truncation is a confirmed infidelity), but the archive A/B shows the faithful round-half-up shipped ALONE fails to flip the wrong-signed Cov(lnPOSS,lnPPS) and regresses mean pace by exposing a base_time-generation miscalibration truncation was masking; truncation was HELD; the coupled fix (round-half-up + baseTimeMid re-center 14.5→13.65) shipped in J23 (#1495); hold lifted.
+last_verified: 2026-07-16
 ---
 
 # ADR-0085: Tempo step truncation retained; faithful round-half-up + base_time re-center deferred to J22
 
-**Status:** Accepted
+**Status:** Accepted (hold lifted — the coupled fix shipped in J23, PR #1495; see Update below)
 **Date:** 2026-07-13
 
 ## Context
@@ -83,6 +83,28 @@ No change to `possessionTime`'s output, the Pin A characterization, the `tempo_c
 Ship round-half-up in `possessionTime` **paired with** a base_time re-centering (`offVolumeNeutral`, and/or the `offVolumeScale`/`defRatingScale` calibration) so the faithful step rule lands the mean at ~104.6, then re-run the four-term archive A/B and re-establish the Phase-1 characterization pins. The J23 plan must A/B the recenter on its own (it interacts with `Var(lnPOSS)` via the 13s clamp floor) and re-derive the mean/variance targets against the paired `.sco` comparators on the same sampled games (the J15/ADR-0084 paired-comparator principle).
 
 (Note: J22 was already assigned to per-player rl_stl/rl_tov production-bundle wiring — STL/TOV PF-dispersion; see the JSB backlog. This follow-on is J23.)
+
+## Update: J23 shipped the coupled fix (2026-07-16, PR #1495)
+
+**What shipped.** `int(pt + 0.5)` (round-half-up) is now live in `possessionTime` (`engine/internal/sim/tempo.go`), COUPLED with `baseTimeMid` re-centered from 14.5 to **13.65** (a 20-run archive sweep over `{13.4, 13.6, 13.65, 13.7}` selected 13.65 as the value closest to real ~104.6 poss/g without overshooting the four-term ceilings).
+
+**Re-center lever chosen: `baseTimeMid` directly, NOT `offVolumeNeutral`.** The follow-on note in this ADR suggested re-centering via `offVolumeNeutral` (and/or the scales). J23 re-centered `baseTimeMid` directly instead: shifting the neutral center ~0.85s via `offVolumeNeutral` at `scale = 0.02` would require a ~42-unit move of `offVolumeNeutral` (0.85 / 0.02), distorting a documented validation-phase stand-in (`161.2 ± 13.8`, the real per-starter composite mean) far beyond its physical meaning and silently re-scaling the whole volume→count channel's zero point. `baseTimeMid` is the direct, single-purpose neutral-center knob — moving it changes exactly the mean pace and nothing else structural. Changing the name from `baseTimeMid` to `baseTimeNeutral` was considered and rejected as scope creep across unrelated files.
+
+**Four-term outcome (20-run archive of record at `baseTimeMid = 13.65`):**
+
+| term | pre-J23 (trunc) | J23 (round + recenter) | real | result |
+|------|------|------|------|------|
+| Cov(lnPOSS,lnPPS) [possession-count] | −0.000184 | −0.000095 | +0.000241 | **documented-null** — moved toward real but did NOT flip positive |
+| Cov(lnFGA,lnPPS) total | −0.000364 | −0.000347 | +0.000269 | improved (less negative) ✓ |
+| Var(lnPOSS) | 0.000254 | 0.000339 | 0.000721 | moved toward real; no overshoot ✓ |
+| Var(lnFGA) [budget mirror] | 0.000792 | ≤ 0.001330 | 0.001330 | ceiling respected ✓ |
+| **mean poss/team** | **101.9** | **~104.5** | **~104.6** | **restored ✓** |
+
+**Cov(lnPOSS,lnPPS) documented-null.** The PRIMARY Cov sign did not flip positive at 13.65. This is consistent with the `possessioncoupling_archive_test.go:51-64` J20 finding (committed 2026-07-13): possession count is set from `clock / avg(ball-time)` — fixed up front from tempo ratings; the within-possession lever cannot move it. The real carrier of `Cov(lnPOSS,lnPPS)` is cross-team pace/base_time DISPERSION (`Var(lnPOSS)`), a separate subsystem. `Var(lnPOSS)` moved from 0.000254 → 0.000339 (toward real 0.000721) as expected, but the dispersion is still insufficient to flip the sign at 13.65. A larger `baseTimeMid` reduction would widen `Var(lnPOSS)` further but risks overshooting real 0.000721 or undershooting real mean pace. The documented-null is accepted: round-half-up + mean-pace restoration are headline faithfulness wins independent of the Cov sign, and holding both hostage to a metric carried by a separate subsystem would repeat the J21 over-hold this ADR supersedes.
+
+**Mean pace restored.** `EnginePossCountPerG` (the authoritative EventPossessionStart tally, averaged across gt2 team standings) moved from ~101.9 (truncation) to ~104.5 (round + re-center), within sampling noise of real ~104.6.
+
+**Pins re-established.** `possession_pace_pin_test.go` Pin A re-baselined to the round-half-up ~1/6, 1/3, 1/3, ~1/6 bucket distribution; Pin B re-baselined from 96 → 104 (step dropped 15→14 at re-centered base_time ~14.45 < 14.5 round boundary). The `possessioncoupling_archive_test.go` recorded baseline comment requires update to the J23 four-term values (exact Var(lnFGA) deferred to human reviewer with access to the full coupling-gate artifacts).
 
 ## Lineage
 

@@ -31,10 +31,10 @@ last_verified: 2026-07-17
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 1 |
+| ⬜ Open | 0 |
 | 📋 Planned | 0 |
 | ◑ Partial | 0 |
-| ✅ Implemented | 15 |
+| ✅ Implemented | 16 |
 | 🚫 Declined | 0 |
 
 Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive/token-spend-backlog-archive.md).
@@ -47,13 +47,7 @@ First-wave entries (T1–T13) are ✅ Implemented — see the dated pointers bel
 
 **T14** ✅ Implemented 2026-07-16 — archived in [token-spend-backlog-archive.md](archive/token-spend-backlog-archive.md).
 
-### T16 Poll-shaped Bash round-trips → background/Monitor routing
-**Locus:** ⌂ harness-local (hook or rule line). **Effort:** S.
-**Problem:** Measured 2026-07-16: **329 `gh pr`/`gh run` calls plus ~120 nightly-queue status checks in 7 days**, largely poll loops (run, read, run again). At the measured ~81K-token average context per call, each poll is a full-window cache re-read just to ask "is it done yet" — order of 30M+ cache-read tokens/week spent on waiting. The harness already has the cheap substitutes (`run_in_background` + Monitor re-invokes on completion; `/loop` self-pacing with matched intervals; ScheduleWakeup's own guidance says one ~480s check beats eight 60s ones), but adoption is norm-level and the poll pattern persists in transcripts.
-**Suggested direction:** Cheapest lever first (meta-tooling-bar): a rule-line in an existing always-loaded rule — "repeat-polling an external state (CI, deploy, queue) from the main thread is a spend bug; route it through `run_in_background`+Monitor or a matched-interval `/loop`." If transcripts still show poll loops after two weeks, escalate to an `$HOME/.claude/hooks/output-guard.sh` advisory on a repeated identical `gh pr checks`/`gh run watch`-class command within a session. Verify via `bin/token-report` call-count trend.
-**Risk if untouched:** Steady ~2%-of-weekly-reads tax, and each poll turn also re-invokes the model for zero-information output.
-**Provenance:** discovered 2026-07-16 during the post-backlog re-measure (advisory session).
-**Status (2026-07-16):** ⬜ Open.
+**T16** ✅ Implemented 2026-07-17 — archived in [token-spend-backlog-archive.md](archive/token-spend-backlog-archive.md).
 
 ---
 

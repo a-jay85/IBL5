@@ -151,6 +151,12 @@ type gameState struct {
 	// engaged vs fell back to Branch-A, plus the s distribution. Shared across a run's
 	// games (like accum); nil outside the Phase-7 A/B harness. Internal, never serialized.
 	branchB *BranchBAccum
+	// fastClass, when non-nil, receives per-class step-count increments for
+	// the J24 fast-class arming-share instrument (freeze.go FastClassAccum).
+	// A nil pointer (a plain run) is a no-op at all three nil-guard sites in
+	// gameloop.go's step-routing switch — no rng draw, no state mutation beyond
+	// the counter fields. Internal, never serialized.
+	fastClass *FastClassAccum
 
 	// gateCont, when non-nil, harvests the L1 gate-1 decomposition instrument
 	// (freeze.go accumulateGateCont, ADR-0057/0058): per offensive-rebound resolution,

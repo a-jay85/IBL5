@@ -180,7 +180,7 @@ issue_episode_epoch() {   # $1 = issue number
 # a report, not a gate, mirroring `check-docs --staleness-report`. The audit
 # workflow appends them to $GITHUB_OUTPUT verbatim.
 health_report() {
-    local alert=false kind="" detail="" report count pr_json pr_num red orphan age_h
+    local alert=false kind="" detail="" report count pr_json pr_num red orphan age_h episode
     report="$(mktemp)"; trap 'rm -f "$report"' RETURN
     "$MAIN/bin/check-docs" --staleness-report > "$report" \
         || { printf 'alert=false\nkind=\ndetail=\n'; return 0; }
@@ -188,15 +188,21 @@ health_report() {
     local issue_num="${1:-}"
 
     if [ "${count:-0}" -gt 0 ] && [ -n "$issue_num" ]; then
+        # `|| var=""` on every bare gh assignment: set -e is live in this function
+        # body, so an unguarded transient gh failure (rate limit, network) would
+        # abort before the final printf — the exact silent-skip the guard above
+        # exists to prevent. Fail-quiet, same contract as the check-docs guard.
         pr_json="$(gh pr list --state open --json number,headRefName,url \
-          --jq '[.[] | select(.headRefName | startswith("docs-stale-refresh-"))] | .[0] // empty')"
+          --jq '[.[] | select(.headRefName | startswith("docs-stale-refresh-"))] | .[0] // empty')" \
+          || pr_json=""
         if [ -n "$pr_json" ]; then
             # An open PR is the DESIGNED steady state (auto_merge:false — the user
             # reviews it). Only a RED check is a failure; green/pending stay silent.
             pr_num="$(jq -r .number <<<"$pr_json")"
             red="$(gh pr view "$pr_num" --json statusCheckRollup \
               --jq '[.statusCheckRollup[]? | select(.conclusion == "FAILURE" or .conclusion == "TIMED_OUT"
-                     or .conclusion == "CANCELLED" or .conclusion == "ACTION_REQUIRED")] | length')"
+                     or .conclusion == "CANCELLED" or .conclusion == "ACTION_REQUIRED")] | length')" \
+              || red=""
             if [ "${red:-0}" -gt 0 ]; then
                 alert=true; kind="ci-red"
                 detail="Refresh PR $(jq -r .url <<<"$pr_json") has ${red} failing check(s) — the doc refresh needs a fix before you can merge it."
@@ -207,7 +213,12 @@ health_report() {
             alert=true; kind="died"
             detail="Refresh branch ${orphan} is on origin with no PR — the doc-fix run died mid-flight. Log: ls -t /tmp/docfix-run-*.log | head -1"
         else
-            age_h=$(( ( $(date -u +%s) - $(issue_episode_epoch "$issue_num") ) / 3600 ))
+            # gh dying inside issue_episode_epoch yields empty output, and an empty
+            # arithmetic operand is a syntax error that kills the function. Fall back
+            # to "now" (age 0 → no alert) — fail-quiet like every guard above.
+            episode="$(issue_episode_epoch "$issue_num")" && [ -n "$episode" ] \
+                || episode="$(date -u +%s)"
+            age_h=$(( ( $(date -u +%s) - episode ) / 3600 ))
             if [ "$age_h" -ge 36 ]; then
                 alert=true; kind="never-ran"
                 detail="No refresh PR has been opened in ${age_h}h. The Mac poll is probably not installed: cd ~/GitHub/IBL5 && git pull && bin/docfix-poll --install-schedule"

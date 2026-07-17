@@ -33,8 +33,9 @@ W
     chmod +x "$SB/bin/wt-new"
 
     # Stubs for helpers the poll calls via "$MAIN/bin/<name>".
-    # check-docs: prints SHIM_STALE_JSON (post-jq: a JSON array of {path} objects).
-    printf '#!/usr/bin/env bash\nprintf "%%s" "${SHIM_STALE_JSON:-[]}"\n' \
+    # check-docs: prints SHIM_STALE_JSON (post-jq: a JSON array of {path} objects);
+    # exits SHIM_CHECKDOCS_RC (default 0) for the health fail-quiet contract cases.
+    printf '#!/usr/bin/env bash\nprintf "%%s" "${SHIM_STALE_JSON:-[]}"\nexit "${SHIM_CHECKDOCS_RC:-0}"\n' \
         > "$SB/bin/check-docs"
     # cleanup: logs branch to cleanup-calls, exits SHIM_CLEANUP_RC (default 0).
     printf '#!/usr/bin/env bash\necho "$1" >> "%s/cleanup-calls"\nexit "${SHIM_CLEANUP_RC:-0}"\n' \
@@ -63,6 +64,8 @@ G
     # gh shim: every SHIM_* holds post-jq output; the shim ignores --jq.
     cat > "$SB/shim/gh" <<'H'
 #!/usr/bin/env bash
+# SHIM_GH_FAIL: simulate a transient gh outage (rate limit/network) — every call fails.
+[ -n "${SHIM_GH_FAIL:-}" ] && exit 1
 args="$*"
 case "$1 $2" in
   "issue list") printf '%s' "${SHIM_ISSUE_OUT:-}" ;;
@@ -397,6 +400,28 @@ OUT="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" SHIM_PR_CLOSED='[]' \
 { echo "$OUT" | grep -q 'alert=false'; } \
   && ok "(18d) health: stale-since marker (2h) beats createdAt (30d) — no false never-ran" \
   || bad "(18d) health episode anchor"
+
+# --- Cases 18e-18f: the always-exits-0 contract under set -euo pipefail -------
+# health_report must emit all 3 key=value lines and exit 0 even when a dependency
+# dies mid-function — otherwise steps.health.outputs.alert is never written and
+# every downstream DM step is silently skipped.
+
+# Case 18e: check-docs itself fails → guarded early-return (alert=false, 3 lines, rc 0)
+SB="$(build_sandbox)"
+OUT="$(SHIM_CHECKDOCS_RC=1 run_health "$SB" 77)"; RC=$?
+{ [ "$RC" -eq 0 ] && [ "$(printf '%s\n' "$OUT" | grep -c '^')" -eq 3 ] \
+    && printf '%s\n' "$OUT" | grep -q '^alert=false$'; } \
+  && ok "(18e) health: check-docs failure still prints 3 lines + exits 0" \
+  || bad "(18e) health check-docs failure contract"
+
+# Case 18f: every gh call fails mid-function (stale set nonempty, so the gh
+# branches are reached) → still 3 lines, rc 0, fail-quiet alert=false
+SB="$(build_sandbox)"
+OUT="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_GH_FAIL=1 run_health "$SB" 77)"; RC=$?
+{ [ "$RC" -eq 0 ] && [ "$(printf '%s\n' "$OUT" | grep -c '^')" -eq 3 ] \
+    && printf '%s\n' "$OUT" | grep -q '^alert=false$'; } \
+  && ok "(18f) health: gh outage mid-function still prints 3 lines + exits 0" \
+  || bad "(18f) health gh outage contract"
 
 if [ "$FAILED" -eq 0 ]; then echo "All docfix-run checks passed."; else echo "Some docfix-run checks FAILED."; fi
 exit "$FAILED"

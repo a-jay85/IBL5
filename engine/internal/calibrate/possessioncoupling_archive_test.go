@@ -59,6 +59,21 @@ type possCouplingArtifact struct {
 // putback share (12.58% vs J4 12.65%) and efficiency (eFG 0.608 vs 0.622) are already
 // J4-faithful — there was nothing to re-weight. The real carrier is a pace-generation
 // plan, not this one. These numbers are characterization of record, not a J20 target.
+//
+// J24 UPDATE (fast-class mix port, Phase 5 NO-GO — 2026-07-17, archive smoke
+// runs=4 stride=4, seed 20240601, baseTimeMid re-centered 13.65 → 17.7):
+//
+//	Cov(lnPOSS,lnPPS) = engine -0.000055   real +0.000241   (still negative;
+//	  was -0.000184 pre-port — moved toward real, did NOT flip)
+//	Var(lnPOSS)       = engine 0.000270    real 0.000721    (unchanged vs the
+//	  0.000254 pre-port record — the mix added pace classes, NOT dispersion)
+//	mean pace 104.25 poss/g @ 17.7 (restored; 132.14 @ the old 13.65)
+//
+// The steal {0,1,2}s / DRB-push {2,3,4}s / half-court-jitter step classes are
+// ported (sim/tempo.go, gameloop.go), but the engine ARMS them at ~29% of
+// possessions vs real ~11.5%, so the provisional center sits at 17.7 instead of
+// the faithful 16.0, and the dispersion/Cov carriers remain unidentified. See
+// the tempo.go NO-GO block and ADR-0085 for the residual RE sub-steps.
 func TestRealArchive_PossessionCoupling(t *testing.T) {
 	dir := os.Getenv("JSB_ARCHIVE_DIR")
 	if dir == "" {

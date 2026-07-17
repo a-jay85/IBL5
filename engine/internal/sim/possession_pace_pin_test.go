@@ -5,103 +5,105 @@ import (
 	"testing"
 
 	"github.com/a-jay85/IBL5/engine/internal/result"
+	"github.com/a-jay85/IBL5/engine/internal/rng"
 )
 
-// This file characterizes the SHIPPED (J23-faithful) pace/possession-count
-// behavior — ROUND-HALF-UP of the base_time -> possession-step mapping (tempo.go
-// possessionTime, FUN_004e42e0 / _DAT_00669ef0 = 0.5) coupled with the re-centered
-// baseTimeMid (tempo.go const — ADR-0085 Update, J23). The pins lock that shipped
-// state; a later tempo-step or re-center change fires them for re-baselining.
+// This file characterizes the SHIPPED pace/possession-count behavior.
 //
 //	Pin A (TestPossessionStepDistributionPin_Current) — the UNIT step
-//	  distribution of possessionTime() across a base_time sweep of [13,16].
-//	    - shipped round-half-up: the round boundaries at 13.5/14.5/15.5 partition
-//	      [13,16] into a half-width [13,13.5) for bucket 13, full widths for 14 and
-//	      15, and a half-width [15.5,16] for bucket 16 — mass ~1/6, 1/3, 1/3, 1/6.
-//	    - the RETIRED int() truncation (pre-J23) put ~1/3 in each of {13,14,15}
-//	      and only the closed endpoint (bt==16) in 16; J21 held round-half-up
-//	      (ADR-0085) because shipped ALONE it regressed mean pace — J23 shipped it
-//	      COUPLED with the baseTimeMid re-center, and this pin now locks that
-//	      faithful state.
+//	  distribution of possessionTime() at the shipped baseTimeMid center.
+//	    J24 Phase 2 retired the deterministic round-half-up(base_time) mapping
+//	    (FUN_004e4150's composite ratio is dead code — tempo.go const block,
+//	    J24 Phase 0/1) in favor of a PER-POSSESSION jittered draw off the
+//	    constant base_time: round-half-up(pt/2 + U[0,pt)), with a single
+//	    {3..23} redraw on the rare trunc(pt) hit (FUN_004e42e0 half-court step
+//	    class, code 6). Pin A now locks that jittered draw's sample mean and
+//	    support at the provisional baseTimeMid center, superseding the retired
+//	    four-bucket (13/14/15/16, ~1/6-1/3-1/3-1/6) deterministic-sweep pin.
 //
 //	Pin B (TestPossessionCountLoopPin_Current) — the full-loop per-team
 //	  possession COUNT over richBundle. This is a characterization + permanent
 //	  invariants, NOT a step-rule tripwire, and deliberately so:
-//	    richBundle's two teams carry IDENTICAL volume ratings (only FGP differs),
-//	    so teamBaseTimeWith yields ONE base_time for the matchup; gameloop.go
-//	    averages the two (identical) team base_times and steps the clock by the
-//	    shared value, and strict offense/defense alternation then hands BOTH
-//	    teams the SAME possession count every seed. Empirically that count is
-//	    exactly 104/team every game (var = 0) — cross-team possession-count
-//	    dispersion is STRUCTURALLY ZERO in this fixed fixture and cannot be
-//	    pinned as a tripwire here. The real cross-team Var(lnPOSS) gate lives
-//	    in the archive test TestRealArchive_PossessionCoupling (internal/calibrate),
-//	    which measures it on the multi-team corpus. So Pin B locks the loop-level
-//	    count characterization (mean 104/team) plus the permanent sanity invariants.
+//	    base_time is CONSTANT (J24 Phase 1: 5.60's composite ratio is dead
+//	    code — tempo.go const block); the jittered PER-POSSESSION step (J24
+//	    Phase 2) means possession count can now vary slightly team-to-team and
+//	    seed-to-seed (unlike the fully-deterministic pre-Phase-2 shared step),
+//	    but the mean stays close to the retired deterministic-step center. The
+//	    real cross-team Var(lnPOSS) gate lives in the archive test
+//	    TestRealArchive_PossessionCoupling (internal/calibrate), which
+//	    measures it on the multi-team corpus. So Pin B locks the loop-level
+//	    count characterization (mean ~104/team) plus the permanent sanity
+//	    invariants.
 //
-// See plan jsb-j21-pace-dispersion-fidelity.md Phase 1 (characterization pins) and
-// ADR-0085 (the round-vs-truncate fidelity finding + the J23 Update these pins'
-// centers record).
-
-// possessionStepSweep evaluates possessionTime() at `samples` evenly-spaced
-// base_time points across the [baseTimeLow, baseTimeHigh] clamp range and
-// returns the share of results landing in each integer step bucket. Deterministic
-// and self-contained so the pinned shares are reproducible.
-func possessionStepSweep(samples int) map[int]float64 {
-	counts := map[int]int{}
-	for i := 0; i < samples; i++ {
-		bt := baseTimeLow + (baseTimeHigh-baseTimeLow)*float64(i)/float64(samples-1)
-		counts[possessionTime(bt)]++
-	}
-	shares := map[int]float64{}
-	for step, c := range counts {
-		shares[step] = float64(c) / float64(samples)
-	}
-	return shares
-}
+// See plan jsb-j21-pace-dispersion-fidelity.md Phase 1 (characterization pins),
+// ADR-0085 (the round-vs-truncate fidelity finding), and the J24 Phase 2 port
+// (FUN_004e42e0 half-court jitter) for the mechanics these pins record.
 
 func TestPossessionStepDistributionPin_Current(t *testing.T) {
-	const samples = 3001
-	shares := possessionStepSweep(samples)
-
-	const band = 0.02
-	// PIN: re-baseline if a later tempo-step change moves these. Centers read off the
-	// shipped round-half-up sweep (J23, ADR-0085 Update): the .5 boundaries partition
-	// [13,16] into 13->[13,13.5) (half width), 14->[13.5,14.5), 15->[14.5,15.5), and
-	// 16->[15.5,16] (half width + the closed endpoint) — 1/6, 1/3, 1/3, 1/6. Exact
-	// shares at 3001 samples: 500/3001, 1000/3001, 1000/3001, 501/3001.
-	type bucket struct {
-		step   int
-		center float64
-	}
-	for _, b := range []bucket{
-		{13, 0.166611},
-		{14, 0.333222},
-		{15, 0.333222},
-		{16, 0.166944},
-	} {
-		if got := shares[b.step]; math.Abs(got-b.center) > band {
-			t.Errorf("step %d share drifted: got %.6f, want %.6f ± %.2f", b.step, got, b.center, band)
-		}
-	}
-
-	// Permanent invariants (not pinned/re-baselined): the int-returning mapping
-	// yields exactly the four integers in the [13,16] clamp, and the shares
-	// partition the sweep. Under the shipped round-half-up all four buckets carry
-	// real mass (13 and 16 each a half-width — unlike the retired truncation,
-	// where 16 held only the closed endpoint).
+	r := rng.New(1)
+	const n = 100000
+	counts := map[int]int{}
 	var sum float64
-	for step, share := range shares {
-		if step < int(baseTimeLow) || step > int(baseTimeHigh) {
-			t.Errorf("possessionTime returned step %d outside [%d,%d]", step, int(baseTimeLow), int(baseTimeHigh))
+	for i := 0; i < n; i++ {
+		step := possessionTime(baseTimeMid, r)
+		counts[step]++
+		sum += float64(step)
+	}
+	mean := sum / n
+
+	// PIN: the observed sample mean at seed=1, n=100000 (measured directly, not
+	// the theoretical pt=17.7 the jitter targets in expectation — the {3..23}
+	// redraw floor pulls the sample slightly below pt at this sample size).
+	// Re-baselined for the J24 Phase 5 NO-GO re-center (13.65 -> 17.7, tempo.go):
+	// 13.63 -> 17.46 (measured directly, seed=1 n=100000). Re-baseline again if a
+	// later tempo-step change moves the observed mean outside the band.
+	const center = 17.46
+	const band = 0.15
+	if math.Abs(mean-center) > band {
+		t.Errorf("jittered step mean drifted: got %.4f, want %.2f ± %.2f", mean, center, band)
+	}
+
+	// Permanent invariant: support ⊂ [3,27] (the {3..23} redraw floor/ceiling
+	// and the pre-redraw round-half-up(pt/2 + U[0,pt)) ceiling both bound here
+	// at baseTimeMid=17.7 — pt=17.7, pre-redraw step ∈ {9..27}). Widened from
+	// [3,23] for the Phase 5 re-center: the pre-redraw ceiling now exceeds the
+	// {3..23} redraw's own ceiling (27 > 23), so the full support's upper bound
+	// comes from the pre-redraw draw, not the redraw.
+	for step := range counts {
+		if step < 3 || step > 27 {
+			t.Errorf("possessionTime returned step %d outside support [3,27]", step)
 		}
-		sum += share
 	}
-	if math.Abs(sum-1.0) > 1e-9 {
-		t.Errorf("step shares do not sum to 1.0: got %.9f", sum)
+	// Permanent invariant: every ordinary bucket {10..26} except the
+	// redraw-drained trunc(pt)=17 bucket carries real mass. Buckets 9 and 27
+	// are deliberately EXCLUDED from this loop: they are the pre-redraw
+	// round-half-up mapping's edge buckets (partial rounding width — 9 covers
+	// raw draws in [8.85,9.5), width 0.65 vs the interior buckets' full width
+	// 1.0; 27 covers only [26.5,26.55), width 0.05) and so carry real but much
+	// thinner mass (measured: bucket 9 ~4% of draws, bucket 27 ~0.27% —
+	// nonzero, just far below the interior buckets' ~5-6% each). The
+	// below-pre-redraw-floor assertion below still requires steps < 9 to
+	// appear, which is the redraw's own evidence.
+	for step := 10; step <= 26; step++ {
+		if step == 17 {
+			continue
+		}
+		if counts[step] == 0 {
+			t.Errorf("bucket %d carries no mass across %d draws", step, n)
+		}
 	}
-	if len(shares) != 4 {
-		t.Errorf("possessionTime must yield exactly 4 integer buckets {13,14,15,16}, got %d: %v", len(shares), shares)
+	// Permanent invariant: redraw evidence. Steps below the pre-redraw floor
+	// (9) can ONLY come from the {3..23} redraw firing on a trunc(pt)=17 hit,
+	// so at least one such step must appear across n=100000 draws.
+	sawBelowFloor := false
+	for step := 3; step < 9; step++ {
+		if counts[step] > 0 {
+			sawBelowFloor = true
+			break
+		}
+	}
+	if !sawBelowFloor {
+		t.Errorf("no below-pre-redraw-floor step (3..8) observed across %d draws — redraw may not be firing", n)
 	}
 }
 
@@ -121,7 +123,11 @@ func TestPossessionCountLoopPin_Current(t *testing.T) {
 			t.Fatalf("seed %d: expected 2 teams with possessions, got %d: %v", seed, len(byTeam), byTeam)
 		}
 		// Permanent invariant: both teams must run possessions, and neither may
-		// dominate the other implausibly (strict alternation keeps them equal).
+		// dominate the other implausibly. Pre-Phase-2 this held under strict
+		// equality (shared deterministic step kept both teams' counts equal);
+		// the J24 Phase 2 per-possession jitter can now split a trailing
+		// half-possession between teams, so the ratio bound (not exact
+		// equality) is what's permanent.
 		var lo, hi, total int
 		first := true
 		for _, c := range byTeam {
@@ -141,9 +147,21 @@ func TestPossessionCountLoopPin_Current(t *testing.T) {
 		if lo > 0 && float64(hi)/float64(lo) > 1.25 {
 			t.Errorf("seed %d: per-team possession ratio implausible: %v", seed, byTeam)
 		}
-		// Permanent invariant: total possessions per game in an NBA-plausible band.
-		if total < 150 || total > 230 {
-			t.Errorf("seed %d: total possessions %d outside plausible [150,230]", seed, total)
+		// Permanent invariant: total possessions per game in an NBA-plausible
+		// band. RE-BASELINED for the J24 Phase 5 NO-GO re-center (tempo.go
+		// baseTimeMid 13.65 -> 17.7): the slower half-court jittered step
+		// (mean ~17.46s vs ~13.63s, Pin A) pulls possession COUNT back down
+		// substantially even with the fast steal/DRB-push classes still live.
+		// Measured directly (seeds 1-40, richBundle): total possessions/game
+		// ranged [204,236]; a 200-seed sweep of the same fixture (not part of
+		// this pin, ad hoc verification) ranged [195,254]. [150,340] no longer
+		// brackets this range tightly, so it's TIGHTENED to [180,300]: floor
+		// 180 keeps headroom below the observed 195-204 low end, ceiling 300
+		// keeps ~46 possessions of headroom above the observed 236-254 high
+		// end for an overtime game (rare in these sweeps) or a double-OT game
+		// (very rare) — a further re-baseline past 300 would not be a bug.
+		if total < 180 || total > 300 {
+			t.Errorf("seed %d: total possessions %d outside plausible [180,300]", seed, total)
 		}
 	}
 
@@ -157,14 +175,44 @@ func TestPossessionCountLoopPin_Current(t *testing.T) {
 	mean /= float64(len(perTeam))
 
 	// PIN: characterization of the current loop-level per-team possession count.
-	// This is NOT a step-rule tripwire (richBundle's identical-volume rosters make
-	// cross-team count dispersion structurally zero — see file header; the archive
-	// test owns the real Var(lnPOSS) gate). Re-baseline if a change intentionally
-	// moves the loop-level count on this fixture. Re-baselined 96 → 104 for J23:
-	// the baseTimeMid re-center moved richBundle's shared step 15s → 14s.
+	// This is NOT a step-rule tripwire — re-baseline if a change intentionally
+	// moves the loop-level count on this fixture.
+	//
+	// Re-baselined for J24 Phase 3 steal-transition step class: 107.0 -> 122.5.
+	// gameloop.go now routes a possession's step draw off the PRIOR
+	// possession's outcome (possOutcome, possession.go): following a steal
+	// (possSteal) the step is r.IntN(3) ∈ {0,1,2}s (mean 1s) instead of the
+	// half-court jittered possessionTime() draw (mean ~13.65s at baseTimeMid,
+	// the then-shipped center). Steal-driven turnovers are the dominant
+	// turnover source (ADR-0045), so a meaningful share of possessions now draw
+	// the fast class, pulling the per-game mean step down and possession count
+	// up substantially — measured directly at seed=1..40 on richBundle:
+	// 122.4500 (matches a 200-seed sweep of the same fixture at 123.1000
+	// within noise, ad hoc verification, not part of this pin).
+	//
+	// Re-baselined AGAIN for J24 Phase 4 DRB-push step class: 122.5 -> 138.3.
+	// A possession following a DRB-ending possession (possDRB) now ALSO draws a
+	// fast step (r.IntN(3)+2 ∈ {2,3,4}s, mean 3s) whenever the shared Stage-2
+	// gate fires (gs.drbPushFired, captured once in possession.go's fbPending
+	// branch — see transition.go's transitionTriggers docblock), instead of
+	// falling through to the half-court jittered draw unconditionally. Since a
+	// defensive rebound is a common non-scoring ending, a further share of
+	// possessions now draw a fast step, pulling the mean step down and
+	// possession count up again — measured directly at seed=1..40 on
+	// richBundle: 138.3375. The total-possessions-per-game invariant above was
+	// unaffected at that center: measured range over the same sweep was
+	// [255,319], well inside the then-shipped [150,340].
+	//
+	// Re-baselined AGAIN for the J24 Phase 5 NO-GO tempo.go re-center
+	// (baseTimeMid 13.65 -> 17.7): 138.3 -> 109.4. The slower half-court
+	// jittered step (mean ~17.46s vs ~13.63s, Pin A) is the DOMINANT step class
+	// (the fast steal/DRB-push classes only fire on the possession FOLLOWING
+	// those outcomes, not every possession), so slowing it down pulls the
+	// per-team count back down substantially even though the fast classes are
+	// unchanged — measured directly at seed=1..40 on richBundle: 109.3750.
 	const (
-		center = 104.0
-		band   = 2.0 // ~2% of 104
+		center = 109.4
+		band   = 3.0
 	)
 	if math.Abs(mean-center) > band {
 		t.Errorf("mean per-team possessions/game drifted: got %.4f, want %.1f ± %.1f", mean, center, band)

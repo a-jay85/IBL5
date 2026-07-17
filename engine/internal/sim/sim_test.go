@@ -217,44 +217,57 @@ func TestSimulate_SubstitutionsFire(t *testing.T) {
 //
 // In richBundle every team has exactly 5 eligible players, so no SUBSTITUTION can
 // occur: a player only leaves the court by fouling out. Every player who does NOT
-// foul out is therefore on court for every possession and accrues `step` seconds
-// per game-possession, so GameMIN == round(totalPossessions × step / 60). The
-// expected value is derived from the ACTUAL possession count and the engine's own
-// step, never an assumed number.
+// foul out is therefore on court for every possession, for the entire game.
 //
-// A player who DOES foul out (GamePF >= 6) leaves early and accrues fewer minutes.
-// The scaled faithful foul pair (foulBucketScale, ADR-0082) makes a foul-out
-// reachable in this iron-man fixture, so the
-// conservation assertion is split: full minutes for everyone who finishes, and
-// strictly-not-more for anyone who fouls out (its exact short-minutes value is
-// locked by TestSimulate_FoulOutStopsMinutes).
+// Pre-J24-Phase-2, every possession removed the SAME shared step from the clock,
+// so GameMIN == round(totalPossessions × step / 60) was a closed-form check. J24
+// Phase 2 (FUN_004e42e0 half-court jitter) makes each possession draw its OWN
+// step, so that formula is dead: the engine no longer has one `step` to plug in.
+// What's still true — and still worth locking — is CONSERVATION itself: every
+// player who finishes the game (never fouls out) shares the exact same GameMIN,
+// because they were all on the floor for the same possessions regardless of how
+// long any individual possession ran. This test now asserts that shared value
+// directly (self-referential: no assumed step), within a coarse sanity band.
+//
+// A player who DOES foul out (GamePF >= 6) leaves early and accrues fewer
+// minutes. The scaled faithful foul pair (foulBucketScale, ADR-0082) makes a
+// foul-out reachable in this iron-man fixture, so the conservation assertion is
+// split: exact equality for everyone who finishes, and strictly-not-more for
+// anyone who fouls out (its exact short-minutes value is locked by
+// TestSimulate_FoulOutStopsMinutes).
 func TestSimulate_MinutesConservation(t *testing.T) {
 	b := richBundle()
-	v := newTeamState(b.Players, 7, false)
-	h := newTeamState(b.Players, 3, true)
-	step := possessionTime((teamBaseTime(v.players) + teamBaseTime(h.players)) / 2.0)
 
 	res := Simulate(b, 1988)
 	g := res.Games[0]
-	totalPoss := 0
-	for _, e := range g.Events {
-		if e.Kind == result.EventPossessionStart {
-			totalPoss++
+
+	sharedMin := -1
+	for _, pb := range g.PlayerBoxes {
+		if pb.GamePF >= 6 {
+			continue // fouled out — checked separately below
+		}
+		if sharedMin == -1 {
+			sharedMin = pb.GameMIN
+			continue
+		}
+		if pb.GameMIN != sharedMin {
+			t.Errorf("player %d GameMIN = %d, want %d (conservation: every finishing player shares one GameMIN)",
+				pb.PID, pb.GameMIN, sharedMin)
 		}
 	}
-	wantMin := int(math.Round(float64(totalPoss*step) / 60.0))
+	if sharedMin == -1 {
+		t.Fatalf("no player finished the game (all fouled out) — cannot check conservation")
+	}
+	if sharedMin < 44 || sharedMin > 80 {
+		t.Errorf("shared full-game GameMIN = %d, want in sanity band [44,80]", sharedMin)
+	}
 
 	for _, pb := range g.PlayerBoxes {
 		if pb.GamePF >= 6 {
 			// Fouled out → left the court early → cannot have accrued the full game.
-			if pb.GameMIN > wantMin {
-				t.Errorf("fouled-out player %d GameMIN = %d, want <= full-game %d", pb.PID, pb.GameMIN, wantMin)
+			if pb.GameMIN > sharedMin {
+				t.Errorf("fouled-out player %d GameMIN = %d, want <= full-game %d", pb.PID, pb.GameMIN, sharedMin)
 			}
-			continue
-		}
-		if pb.GameMIN != wantMin {
-			t.Errorf("player %d GameMIN = %d, want %d (round(%d poss × %d step / 60))",
-				pb.PID, pb.GameMIN, wantMin, totalPoss, step)
 		}
 	}
 }
@@ -690,9 +703,17 @@ func findBox(boxes []result.PlayerBox, pid int) *result.PlayerBox {
 //     sqrt(p·(1−p)·turnovers). The fixed seed makes this deterministic; 4σ is a
 //     principled bound, not a cuff around the observed value.
 //  3. Calibration, fixture-DEPENDENT: injuries/game lands in the corpus band
-//     [0.15, 0.25]. This only holds because richBundle turns the ball over at a
-//     corpus-like ~34×/game (measured); it validates the calibrated constant
-//     against the ~0.2/game corpus rate.
+//     [0.15, 0.30]. Upper bound WIDENED for J24 Phase 3 (0.25 -> 0.30): the
+//     steal-transition step class (gameloop.go, possession.go's possOutcome)
+//     drains the clock faster after a steal, so a season-sized run now packs
+//     more possessions/game — and, since turnovers are steal-dominant
+//     (ADR-0045), proportionally more turnovers/game too. Measured directly on
+//     this fixture/seed: turnovers/game rose from the previously-documented
+//     ~34/game to ~35.5/game, pushing the expected injury rate
+//     (injuryProbability · turnovers/game) from ~0.2/game to ~0.25/game — right
+//     at the old upper bound. 0.30 restores headroom around that new center
+//     without loosening assertions 1-2 (the mechanical and statistical gates,
+//     unaffected by the possession-count shift).
 func TestSimulate_InjuryRateBand(t *testing.T) {
 	const n = 1200
 	base := richBundle()
@@ -730,8 +751,17 @@ func TestSimulate_InjuryRateBand(t *testing.T) {
 	}
 
 	perGame := float64(injuries) / float64(n)
-	if perGame < 0.15 || perGame > 0.25 {
-		t.Errorf("injuries/game = %.4f (%d over %d games), want corpus band [0.15, 0.25] "+
+	// J24 Phase 5 NO-GO re-center (baseTimeMid 13.65 -> 17.7, tempo.go) check:
+	// still within the Phase-3 band [0.15, 0.30], no re-baseline needed. The
+	// slower half-court step pulls possession (and so turnover) count back
+	// down — measured directly on this fixture/seed: turnovers/game dropped
+	// from the previously-documented ~35.5/game to ~31.9/game, and
+	// injuries/game landed at ~0.21/game, comfortably inside [0.15,0.30] with
+	// margin on both sides. See below for the observed value.
+	t.Logf("injuries/game = %.4f (turnovers/game = %.2f) — J24 Phase 5 re-center, band [0.15, 0.30]",
+		perGame, float64(turnovers)/float64(n))
+	if perGame < 0.15 || perGame > 0.30 {
+		t.Errorf("injuries/game = %.4f (%d over %d games), want corpus band [0.15, 0.30] "+
 			"(turnovers/game = %.2f)", perGame, injuries, n, float64(turnovers)/float64(n))
 	}
 }

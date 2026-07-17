@@ -156,7 +156,15 @@ func TestRealArchive_BaseTimeMidSweep(t *testing.T) {
 	// candidates of record are the pace-closest in-window values, straddling
 	// nothing below 13.622 — the real effective center (1440 / 104.6 ≈ 13.77s)
 	// remains inside the window.
-	mids := []float64{13.65, 13.7}
+	// J24 Phase 5 NO-GO re-center bracket OF RECORD (2026-07-17, runs 4 stride 4).
+	// The GO/NO-GO smoke (mids {13.65, 16.0}) measured pace 132.14 @ 13.65 and
+	// 114.68 @ 16.0 with the Phase 2-4 fast-class mix live — the old 13.65
+	// provisional double-discounts, and the faithful 16.0 overshoots pace because
+	// the engine's fast-class share is ~29% vs real ~11.5% (tempo.go NO-GO block).
+	// This bracket measured 17.5 → 105.38, 17.7 → 104.25, 17.9 → 103.06 poss/g
+	// (real ~104.6): 17.7 selected as the re-centered provisional. Re-run against
+	// any change to the fast-class arming rates.
+	mids := []float64{17.5, 17.7, 17.9}
 	results := make(map[float64]midResult, len(mids))
 	for _, mid := range mids {
 		results[mid] = midFid(mid)

@@ -145,5 +145,5 @@ func TestRealArchive_PutbackFaithfulResolution(t *testing.T) {
 	varFGANarrowed := math.Abs(fidOn.EngineVarLnFGA-fidOn.RealVarLnFGA) < math.Abs(fidOff.EngineVarLnFGA-fidOff.RealVarLnFGA)
 	t.Logf("  VERDICT SIGNALS: factor_moved_toward_real=%v  headline_moved_toward_plus=%v  pps_regressed=%v  var_fga_narrowed=%v",
 		factorMovedTowardReal, headlineMovedTowardPlus, ppsRegressed, varFGANarrowed)
-	t.Logf("  GATE (ADR-0055): SUCCESS = factor_moved_toward_real AND NOT pps_regressed; PARTIAL = factor moved but pps_regressed (re-measure offVolumeScale/count axis); NULL = factor did NOT move (re-open RE audit, do NOT tune)")
+	t.Logf("  GATE (ADR-0055): SUCCESS = factor_moved_toward_real AND NOT pps_regressed; PARTIAL = factor moved but pps_regressed (re-measure the possession-count axis); NULL = factor did NOT move (re-open RE audit, do NOT tune)")
 }

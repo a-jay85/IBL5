@@ -96,17 +96,11 @@ type Options struct {
 	// engine (the ON walk is a zero Options). Consumes no FreezeMeans (no harvest pass).
 	UnfaithfulOreb bool
 
-	// OffVolumeScale, when non-nil, overrides the sim package-const offVolumeScale in
-	// the default (non-injected) engine runs — the ADR-0054 possession-count dispersion
-	// sweep. Captured by resolveValidate's real default closure (an injected
-	// Options.Validate test seam ignores it). nil leaves every existing caller + the
-	// committed calibration byte-identical (the const path). 0 is a valid sweep value
-	// (channel off), distinct from nil (use const) — hence the pointer.
-	OffVolumeScale *float64
-
 	// BaseTimeMid, when non-nil, overrides the sim package-const baseTimeMid (tempo.go)
-	// in the default (non-injected) engine runs — the J23 mean-pace re-center sweep.
-	// nil leaves every existing caller + the committed calibration byte-identical (the
+	// — the constant per-game base_time (J24 Phase 1) — in the default (non-injected)
+	// engine runs — the J23 mean-pace re-center sweep. Captured by resolveValidate's
+	// real default closure (an injected Options.Validate test seam ignores it). nil
+	// leaves every existing caller + the committed calibration byte-identical (the
 	// const path). The pointer distinguishes "unset" (nil ⇒ const) from a real value.
 	BaseTimeMid *float64
 

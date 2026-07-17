@@ -88,7 +88,8 @@ func TestRealArchive_CalibrateEndToEnd(t *testing.T) {
 
 	// ADR-0042 REPORTED diagnostic (never a gate): the volume→count channel's
 	// effect on Engine Var(lnFGA) and Cov(lnFGA,lnPPS) vs the Real targets, plus
-	// the engine-only by-origin FGA decomposition. OBSERVED at offVolumeScale=0.02:
+	// the engine-only by-origin FGA decomposition. OBSERVED under the retired
+	// additive base_time channel (offVolumeScale=0.02, pre-J24):
 	// the channel widens Var(lnFGA) and does NOT flip Cov — the empty-FGA source it
 	// would need to REPLACE is not isolated (ADR-0042's bounded open item).
 	agg := CollectSeasonAggregates(reports)

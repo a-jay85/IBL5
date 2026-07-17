@@ -24,20 +24,11 @@ func simGame(b bundle.Bundle, g bundle.Game, r *rng.RNG) (result.GameResult, int
 	return simGameWith(b, g, r, Options{})
 }
 
-// resolveOffVolumeScale returns the offensive-volume scale for this run: the package
-// const offVolumeScale (tempo.go) when opts.OffVolumeScale is nil — byte-identical to
-// the live engine — else the overridden value (the ADR-0054 sweep seam). A pure
-// function so "resolves the const when nil" is a direct unit test, not through-the-sim.
-func resolveOffVolumeScale(opts Options) float64 {
-	if opts.OffVolumeScale != nil {
-		return *opts.OffVolumeScale
-	}
-	return offVolumeScale
-}
-
-// resolveBaseTimeMid returns the neutral base-time center for this run: the package
+// resolveBaseTimeMid returns the constant base-time for this run: the package
 // const baseTimeMid (tempo.go) when opts.BaseTimeMid is nil — byte-identical to the
 // live engine — else the overridden value (the J23 mean-pace re-center sweep seam).
+// A pure function so "resolves the const when nil" is a direct unit test, not
+// through-the-sim.
 func resolveBaseTimeMid(opts Options) float64 {
 	if opts.BaseTimeMid != nil {
 		return *opts.BaseTimeMid
@@ -77,17 +68,16 @@ func simGameWith(b bundle.Bundle, g bundle.Game, r *rng.RNG, opts Options) (resu
 	// back to leagueBaselineFallback via shotBaselineOrFallback below.
 	gs.shotBaseline = b.LeagueShotBaseline
 
-	// One shared possession length per game: the average of the two teams' base
-	// times (factor 1.0). Each team's base_time now carries its offensive volume
-	// composite (the ADR-0042 volume→count channel, tempo.go). Under strict
-	// alternation a shared-average step and a per-team step yield the SAME
-	// possession COUNT per team (clock / avg(BT_v, BT_h)), so no per-possession
-	// step is needed; the season-level FGA channel emerges because a high-volume
-	// team's games average faster across its varied opponents.
-	scale := resolveOffVolumeScale(opts)
-	mid := resolveBaseTimeMid(opts)
-	baseTime := (teamBaseTimeWith(visitor.players, scale, mid) + teamBaseTimeWith(home.players, scale, mid)) / 2.0
-	step := possessionTime(baseTime)
+	// base_time is CONSTANT per game in 5.60 — the composite ratio is dead code
+	// (u = 0; tempo.go const block, J24 Phase 0). This retired the ADR-0042
+	// roster-dependent teamBaseTime stand-in. baseTimeMid is the provisional
+	// center until the Phase 5 GO installs the faithful 16.0. But base_time being
+	// a per-game constant does NOT mean the possession step is: each possession
+	// draws its OWN jittered length from it (FUN_004e42e0 half-court step class,
+	// J24 Phase 2 — see possessionTime's docblock); the steal (Phase 3) and
+	// DRB-push (Phase 4) fast classes widen the mix further, drawn off the
+	// PRIOR possession's outcome below.
+	baseTime := resolveBaseTimeMid(opts)
 
 	// Tip-off winner starts on offense; possessions strictly alternate.
 	offense, defense := visitor, home
@@ -99,14 +89,51 @@ func simGameWith(b bundle.Bundle, g bundle.Game, r *rng.RNG, opts Options) (resu
 		gs.period = period
 		gs.clock = seconds
 		gs.transitionShotRate = 0 // Stage-3 decay resets per period ("within a period")
-		pending := false
+		prevOutcome := possNormal
 		for gs.clock > 0 {
 			// Dead-ball substitution sweep for both teams before the possession
 			// (foul-out / foul-trouble / fatigue). Zero RNG — see checkSubstitutions.
 			checkSubstitutions(offense, period, gs.clock, gs.emit)
 			checkSubstitutions(defense, period, gs.clock, gs.emit)
 
-			pending = possession(gs, offense, defense, period-1, pending)
+			// One-iteration offset: prevOutcome going INTO possession() this
+			// iteration is what armed (or didn't) THIS possession's fast break —
+			// so it's also what governs THIS possession's step class, drawn
+			// below. The value RETURNED by possession() (how THIS one ended)
+			// only takes effect as prevOutcome on the NEXT iteration.
+			outcome := possession(gs, offense, defense, period-1, prevOutcome)
+
+			// Per-possession step draw, routed by prevOutcome (the outcome that
+			// armed THIS possession) and, for the DRB-push class, gs.drbPushFired
+			// (set by THIS iteration's possession() call above — see its
+			// docblock and state.go's drbPushFired field comment):
+			//   - possSteal: the possession followed a steal → FAST steal-
+			//     transition class, {0,1,2}s (FUN_004e42e0 steal step class,
+			//     J24 Phase 3).
+			//   - prevOutcome == possDRB AND gs.drbPushFired: the possession
+			//     followed a defensive rebound AND the shared Stage-2 gate
+			//     (drawn once inside possession(), never re-drawn here — see
+			//     possession.go's fbPending branch) fired → DRB-push class,
+			//     {2,3,4}s (FUN_004e42e0 code 7, J24 Phase 4, strategy_adj=0 —
+			//     see transition.go's transitionTriggers docblock).
+			//   - default (possNormal, or possDRB with the gate failed):
+			//     half-court jittered step (J24 Phase 2).
+			//
+			// Ordering note: possession() (called above, this same iteration)
+			// already read prevOutcome==possDRB to decide whether to capture
+			// gs.drbPushFired, so the flag reflects exactly the possession
+			// whose step is being drawn here — no additional offset beyond the
+			// existing one documented above.
+			var step int
+			switch {
+			case prevOutcome == possSteal:
+				step = r.IntN(3) // steal transition: {0,1,2}s (FUN_004e42e0 steal class)
+			case gs.drbPushFired:
+				step = r.IntN(3) + 2 // DRB push (code 7): {2,3,4}s
+			default:
+				step = possessionTime(baseTime, r) // half-court jitter (Phase 2)
+			}
+			prevOutcome = outcome
 
 			// Both fives were on the floor: drain on-court energy + accrue minutes,
 			// recover the benches.

@@ -66,27 +66,95 @@ func meanFGAandPPS(t *testing.T, team []bundle.Player, n int) (meanFGA, meanPPS 
 	return sumFGA / float64(n), sumPPS / float64(n)
 }
 
-// TestVolumeCountChannel_CouplingSign verifies the ADR-0042 channel restores the
-// positive volume↔scoring coupling SIGN (not a magnitude target): a high-volume,
-// high-efficiency team H takes MORE shots per game than a low-volume,
-// low-efficiency team L (the volume→count channel), AND H is more efficient
-// (higher PPS). Together the higher-FGA team is also the higher-PPS team — the
-// positive FGA↔PPS coupling the engine previously inverted.
+// TestVolumeCountChannel_CouplingSign — REBASED at J24 Phase 1. The ADR-0042
+// base_time volume→count channel is RETIRED (5.60's base_time is constant — the
+// composite ratio is dead code, u = 0; tempo.go const block), so the old
+// hFGA > lFGA assertion has no mechanism to enforce it: with a constant shared
+// step both teams draw equal possessions and FGA differs only by within-possession
+// noise. What remains locked here is the efficiency half (higher FGP → higher
+// PPS). The faithful count/pace coupling is re-established by the possession-type
+// mix (J24 Phases 2-4: steal transitions, DRB pushes, half-court jitter), and its
+// SIGN gate lives at the corpus level (TestRealArchive_PossessionCoupling /
+// the J24 Phase 5 GO/NO-GO), not in this two-team fixture.
 func TestVolumeCountChannel_CouplingSign(t *testing.T) {
 	const n = 40
-	// H: high volume (offAvg ≈ 185, near real max) + high FGP. L: low volume
-	// (offAvg ≈ 140, near real min) + low FGP. Volume and efficiency are coupled,
-	// mirroring the real corr(VOL,FGP) = +0.265.
+	// H: high volume + high FGP. L: low volume + low FGP — coupled, mirroring the
+	// real corr(VOL,FGP) = +0.265.
 	hFGA, hPPS := meanFGAandPPS(t, volTeam(1, 110, 45, 30, 54, 100), n)
 	lFGA, lPPS := meanFGAandPPS(t, volTeam(1, 82, 35, 23, 44, 200), n)
 
-	if !(hFGA > lFGA) {
-		t.Fatalf("count channel: high-volume mean FGA (%.2f) must exceed low-volume (%.2f)", hFGA, lFGA)
-	}
 	if !(hPPS > lPPS) {
 		t.Fatalf("coupling: high-efficiency mean PPS (%.4f) must exceed low (%.4f)", hPPS, lPPS)
 	}
 	t.Logf("H: FGA=%.2f PPS=%.4f   L: FGA=%.2f PPS=%.4f", hFGA, hPPS, lFGA, lPPS)
+}
+
+// pearsonR is a plain Pearson correlation coefficient, used only by the
+// fixture-level sanity check below (no external dependency needed for one
+// caller).
+func pearsonR(xs, ys []float64) float64 {
+	n := float64(len(xs))
+	var sx, sy, sxy, sxx, syy float64
+	for i := range xs {
+		sx += xs[i]
+		sy += ys[i]
+		sxy += xs[i] * ys[i]
+		sxx += xs[i] * xs[i]
+		syy += ys[i] * ys[i]
+	}
+	num := n*sxy - sx*sy
+	den := math.Sqrt((n*sxx - sx*sx) * (n*syy - sy*sy))
+	if den == 0 {
+		return 0
+	}
+	return num / den
+}
+
+// TestFastArmCountCorrelatesWithPossessionCount is a CHEAP, fixture-level
+// sanity check for the J24 Phase 2-4 pace/possession-count coupling this
+// file's docblock (TestVolumeCountChannel_CouplingSign) says is re-established
+// by the possession-type mix. It is NOT the authoritative coupling gate — that
+// is TestRealArchive_PossessionCoupling (internal/calibrate), which measures
+// Cov(lnPOSS,lnPPS) on the real multi-team, 53GB local corpus this repo must
+// not touch from a unit test. This is a mechanism-level smoke check on
+// richBundle only: within a single game, more possessions ending in a steal or
+// a defensive rebound (segmentOutcome != possNormal — the two endings that ARM
+// a next-possession fast-class draw: steal unconditionally, DRB when the
+// shared Stage-2 gate fires) should mean more fast (short) steps drawn, which
+// should mean MORE total possessions fit in the same clock. Measured directly
+// (not part of this pin, ad hoc verification before adding this test): Pearson
+// r over richBundle seeds 1-150 was 0.78-0.82 stable across n∈{40,60,100} — a
+// strong, non-flaky positive correlation. The threshold below (>0.3) is set
+// well under that observed range for headroom; if this ever proves noisy or
+// flaky in CI it should be removed rather than loosened further, since the
+// archive test is the real gate.
+func TestFastArmCountCorrelatesWithPossessionCount(t *testing.T) {
+	const n = 60
+	b := richBundle()
+	var arms, totals []float64
+	for seed := uint64(1); seed <= n; seed++ {
+		g := Simulate(b, seed).Games[0]
+		segs := possessionSegments(g.Events)
+		var armed, total int
+		for _, e := range g.Events {
+			if e.Kind == result.EventPossessionStart {
+				total++
+			}
+		}
+		for _, s := range segs {
+			if segmentOutcome(s.events) != possNormal {
+				armed++
+			}
+		}
+		arms = append(arms, float64(armed))
+		totals = append(totals, float64(total))
+	}
+	r := pearsonR(arms, totals)
+	t.Logf("fast-arm-count vs possession-count Pearson r = %.4f over %d seeds", r, n)
+	if r <= 0.3 {
+		t.Errorf("Pearson r = %.4f, want > 0.3 (steal/DRB-armed possessions should positively "+
+			"correlate with total possession count via the fast step classes)", r)
+	}
 }
 
 // TestVolumeCountChannel_ZeroVolumeDegenerate is the boundary: a team with

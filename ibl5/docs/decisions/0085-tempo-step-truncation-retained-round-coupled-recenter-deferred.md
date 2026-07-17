@@ -1,6 +1,6 @@
 ---
-description: J21 finding — 5.60 rounds the possession clock-step half-up (int() truncation is a confirmed infidelity), but the archive A/B shows the faithful round-half-up shipped ALONE fails to flip the wrong-signed Cov(lnPOSS,lnPPS) and regresses mean pace by exposing a base_time-generation miscalibration truncation was masking; truncation was HELD; the coupled fix (round-half-up + baseTimeMid re-center 14.5→13.65) shipped in J23 (#1495); hold lifted.
-last_verified: 2026-07-16
+description: J21 finding — 5.60 rounds the possession clock-step half-up (int() truncation is a confirmed infidelity), but the archive A/B shows the faithful round-half-up shipped ALONE fails to flip the wrong-signed Cov(lnPOSS,lnPPS) and regresses mean pace; truncation was HELD, the coupled fix shipped in J23 (#1495); J24 then ported the full per-possession step-class mix (half-court jitter + steal + DRB-push) with a NO-GO on the faithful 16.0 center — provisional re-centered 13.65→17.7, dispersion/Cov residual open.
+last_verified: 2026-07-17
 ---
 
 # ADR-0085: Tempo step truncation retained; faithful round-half-up + base_time re-center deferred to J22
@@ -109,6 +109,28 @@ Ship round-half-up in `possessionTime` **paired with** a base_time re-centering 
 ## Update: J24 RE shows the round-half-up pin was incomplete (2026-07-16)
 
 The J24 static RE session (`jsb-native/re-artifacts/jsb-J24-pace-dispersion-RE-20260716.md`, machine-local) re-derived `FUN_004e42e0` in full: 5.60 does round half-up, but it rounds a **per-possession jittered draw** — `pt/2 + uniform[0, pt)` (mean pt, width pt) with a `{3..23}` redraw when the rounded step equals `trunc(pt)` — and two whole step classes bypass the draw entirely (steal transition `rand(3)` = 0–2s; DRB push `rand(3)+2` = 2–4s, gated on the outlet's TO rating and the team tempo strategy). This ADR's A/B compared truncation vs rounding of a **deterministic** step; both arms were unfaithful to the step's distribution, which is why the Cov sign could not flip here. The "separate subsystem" this Update's documented-null paragraph pointed at is now fully pinned; the faithful port is backlogged as **J24** (`ibl5/docs/backlog/jsb-native-backlog.md`). The 13.65 `baseTimeMid` re-center is superseded-in-principle: 5.60's pt for typical rosters is ~15.3–15.5, and the effective mean step ≈ 13.8 emerges from the fast-class mix — 13.65 was absorbing the missing fast paths into the midpoint. Nothing shipped here regresses; J23's round-half-up survives as a component of the faithful rule.
+
+## Update: J24 shipped the step-class mix; faithful center NO-GO, provisional re-centered 13.65 → 17.7 (2026-07-17)
+
+**What shipped (J24 Phases 0-4).** The full FUN_004e42e0 per-possession step-class mix is now live in `engine/internal/sim/`:
+
+- **u = 0 ground truth (Phase 0, binary-proven).** `CEngine+0x38` — the multiplier on every composite/param term of FUN_004e4150's base_time ratio — is unconditionally 0.0 (single writer averages two stack doubles whose only writers are prologue zero-stores; exhaustive modrm scan). With u = 0 the ratio evaluates 2880/0 → +inf → clamped to the 16.0 ceiling **every call**: 5.60's base_time is a per-matchup CONSTANT and the composite ratio is dead code. This retired the ADR-0042 roster-dependent additive `teamBaseTime` stand-in (Phase 1) — it modeled dispersion 5.60 does not have. Full proof chain: `jsb-native/re-artifacts/jsb-J24-pace-dispersion-RE-20260716.md` §8 (machine-local).
+- **Half-court jitter (Phase 2).** `possessionTime(baseTime, r)` draws `round-half-up(pt/2 + U[0,pt))` per possession, with a single `{3..23}` redraw on the trunc(pt) hit (no loop — faithful). J23's round-half-up survives as the rounding rule of the jittered draw.
+- **Steal-transition class (Phase 3).** A possession following a steal drains `rand_int(3)` → {0,1,2}s. `possession()` now returns a 3-valued `possOutcome` (normal/steal/DRB) instead of the old fast-break bool.
+- **DRB-push class (Phase 4).** A possession following a defensive rebound, when the (single-draw, captured) `transitionTriggers` gate fires, drains `rand_int(3)+2` → {2,3,4}s. `strategy_adj = 0` stand-in documented (`.lge +0x12c` coach/tempo term not yet pinned).
+
+**Phase 5 GO/NO-GO: NO-GO.** The gate asked for Var(lnPOSS) ≥ ~0.0006 with positive Cov (GO-1) and mean pace ∈ [103.5, 105.5] at the faithful 16.0 center (GO-2). Archive smoke (runs=4 stride=4, seed 20240601):
+
+| config | mean pace (poss/g) | Cov(lnPOSS,lnPPS) | Var(lnPOSS) |
+|--------|-------------------|-------------------|-------------|
+| baseTimeMid 13.65 (old provisional) | 132.14 | −0.000049 | 0.000247 |
+| baseTimeMid 16.0 (faithful) | 114.68 | −0.000057 | 0.000262 |
+| **baseTimeMid 17.7 (new provisional)** | **104.25** | −0.000055 | 0.000270 |
+| real | ~104.6 | +0.000241 | 0.000721 |
+
+Both gates fail. The mix ports the step CLASSES faithfully but the engine ARMS them at ~29% of possessions (implied half-court weight 0.706 from the 13.65/16.0 pace pair) vs real ~11.5% (~24 transition markers / ~209 possessions) — ~2.5× the real share. Consequences: (a) the faithful 16.0 center overshoots pace by ~10 poss/g, so the provisional center is retained and re-centered to **17.7** (bracket of record 17.5 → 105.38, 17.7 → 104.25, 17.9 → 103.06; deliberately above the faithful [13,16] clamp — it compensates the over-armed fast classes); (b) Var(lnPOSS) is **unchanged** vs the pre-port 0.000254 record and Cov did not flip — the class MIX as armed by the engine's own steal/transition rates carries pace, not cross-team dispersion. The Var/Cov carrier in 5.60 remains unidentified.
+
+**J24 status: ◑ Partial.** Residual sub-steps carried in the backlog: (1) close the fast-class arming-share gap (~29% → ~11.5%) — likely the steal class needs the same gating as the transition RUN, and/or the DRB gate rate is high; (2) trace the `CEngine+0x30` forced-redraw flag writer; (3) pin `.lge +0x12c` for the real `strategy_adj`; (4) once the share closes, walk `baseTimeMid` back to the faithful 16.0 and re-run this gate. Instruments kept: `basetimemid_sweep_archive_test.go` (re-center bracket of record), `possessioncoupling_archive_test.go` (J24 UPDATE block records the post-port four-term numbers).
 
 ## Lineage
 

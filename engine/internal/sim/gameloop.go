@@ -49,7 +49,7 @@ func simGameWith(b bundle.Bundle, g bundle.Game, r *rng.RNG, opts Options) (resu
 	visitor.drbRate, visitor.astRate = teamRates(b, g.VisitorTeamID)
 	home.drbRate, home.astRate = teamRates(b, g.HomeTeamID)
 
-	gs := &gameState{rng: r, gameType: g.GameType, madeFG: map[int]int{}, freeze: opts.Freeze, accum: opts.Accum, branchB: opts.BranchBAccum, gateCont: opts.GateCont}
+	gs := &gameState{rng: r, gameType: g.GameType, madeFG: map[int]int{}, freeze: opts.Freeze, accum: opts.Accum, branchB: opts.BranchBAccum, gateCont: opts.GateCont, fastClass: opts.FastClassAccum}
 	// The L1 gate-1 baseline is league-constant, so resolve it ONCE per game. The live
 	// faithful ORB roll (gs.orebProb) reads gs.gateBaseline on EVERY run (ADR-0058), so
 	// this MUST populate unconditionally — a zero baseline biases the sqrt branch and
@@ -128,10 +128,22 @@ func simGameWith(b bundle.Bundle, g bundle.Game, r *rng.RNG, opts Options) (resu
 			switch {
 			case prevOutcome == possSteal:
 				step = r.IntN(3) // steal transition: {0,1,2}s (FUN_004e42e0 steal class)
+				if gs.fastClass != nil {
+					gs.fastClass.StealClass++
+					gs.fastClass.TotalPossessions++
+				}
 			case gs.drbPushFired:
 				step = r.IntN(3) + 2 // DRB push (code 7): {2,3,4}s
+				if gs.fastClass != nil {
+					gs.fastClass.DRBPushClass++
+					gs.fastClass.TotalPossessions++
+				}
 			default:
 				step = possessionTime(baseTime, r) // half-court jitter (Phase 2)
+				if gs.fastClass != nil {
+					gs.fastClass.HalfCourt++
+					gs.fastClass.TotalPossessions++
+				}
 			}
 			prevOutcome = outcome
 

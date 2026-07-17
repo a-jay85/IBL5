@@ -155,6 +155,25 @@ func (a *BranchBAccum) MeanS() float64 {
 	return a.SumS / float64(a.Taken)
 }
 
+// FastClassAccum accumulates per-class possession-step counts across all games
+// in a run. StealClass counts possessions whose step was drawn from the steal-
+// transition class ({0,1,2}s, J24 Phase 3); DRBPushClass counts the DRB-push
+// class ({2,3,4}s, J24 Phase 4); HalfCourt counts the half-court jitter class
+// (J24 Phase 2). TotalPossessions is the exhaustive cross-check sum —
+// StealClass + DRBPushClass + HalfCourt must equal TotalPossessions and the
+// game's EventPossessionStart count.
+//
+// The caller owns it (passed via Options.FastClassAccum), shares ONE instance
+// across every game in a run, and reads the counters after the pass. The
+// instrument issues NO rng draw and alters no game decision, so attaching it
+// stays byte-identical to a plain run. NOT concurrency-safe.
+type FastClassAccum struct {
+	StealClass       int // possessions routed through the steal-transition class
+	DRBPushClass     int // possessions routed through the DRB-push class
+	HalfCourt        int // possessions routed through the half-court jitter class
+	TotalPossessions int // sum of all three — exhaustive cross-check
+}
+
 // GateContAccum harvests the L1 gate-1 decomposition instrument (ADR-0057/0058),
 // read-only. At every offensive-rebound RESOLUTION (gs.rebound, before the continuation
 // outcome roll), it records — keyed by the OFFENSIVE team ID — the gate-1 sqrt team-pick
@@ -242,6 +261,13 @@ type Options struct {
 	// Read on EVERY run (ADR-0058: the live faithful ORB roll consumes gs.gateBaseline),
 	// so gameloop.go populates it unconditionally.
 	GateBaseline *float64
+	// FastClassAccum, when non-nil, harvests per-class possession-step counts
+	// across the run: one tally per class in the three-way step-routing switch
+	// (gameloop.go). No rng draw is issued; the instrument is read-only and
+	// does not alter any game outcome. The caller owns it and shares one
+	// instance across a run's games. nil (a zero Options) leaves counting inert,
+	// so a zero Options stays byte-identical to Simulate. NOT concurrency-safe.
+	FastClassAccum *FastClassAccum
 }
 
 // validate rejects a config that freezes an arm with no precomputed (zero) mean — a

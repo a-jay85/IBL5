@@ -1,6 +1,6 @@
 ---
 description: All work happens in a worktree (never the main checkout); worktree setup and the implementation→/post-plan handoff (auto-fired in a detached fresh session) for any verified-complete worktree work, plan-driven or ad-hoc.
-last_verified: 2026-07-04
+last_verified: 2026-07-16
 ---
 
 # Workflow Continuity Rule

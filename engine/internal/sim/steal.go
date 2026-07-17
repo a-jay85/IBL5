@@ -18,7 +18,7 @@ const (
 	// stealTurnoverScale converts carelessness × steal-pressure into a
 	// per-possession turnover probability, calibrated so league TO/team ≈ 14.5
 	// against the .sco archive (internal/calibrate/possession_archive_test.go). A
-	// documented validation-phase stand-in in the same class as offVolumeScale /
+	// documented validation-phase stand-in in the same class as
 	// foulBucketScale — the carelessness and pressure SHAPES are faithful (TVR
 	// orientation + defensive STL); this scalar pins only the LEVEL.
 	stealTurnoverScale = 2.75e-5

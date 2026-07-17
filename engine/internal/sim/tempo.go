@@ -1,155 +1,93 @@
 package sim
 
+import "github.com/a-jay85/IBL5/engine/internal/rng"
+
 // tempoFactor is the JSB "Gameplay Adjustment Factor" (CEngine+0x63b8). IBL runs
 // it at 1.0 (confirmed from IBL5.lge), so possession_time == base_time — neutral
 // NBA pace. See 00_MASTER_REFERENCE.md "Gameplay Adjustment Factor / Tempo".
 const tempoFactor = 1.0
 
-// base_time clamp bounds (00_MASTER_REFERENCE.md: hard-clamped to [13.0, 16.0]).
+// base_time is CONSTANT per matchup in JSB 5.60 — the composite ratio is dead code.
+//
+// Binary-verified 2026-07-17 (J24 Phase 0; full proof chain in jsb-native/
+// re-artifacts/jsb-J24-pace-dispersion-RE-20260716.md §8): FUN_004e4150's every
+// composite/param term is multiplied by u = CEngine+0x38, and u is unconditionally
+// 0.0 — its single writer (FUN_004cfa50 epilogue, VA 0x4d4e5a-0x4d4e79) averages two
+// stack doubles whose ONLY writers are the prologue zero-stores (VA 0x4cfb90-0x4cfbab;
+// exhaustive modrm scan of 0x4cfa50-0x4d5100). With u = 0 the ratio evaluates
+// 2880 / 0 → +inf (x87 masked div-by-zero) → clamped to the 16.0 ceiling, every call.
+// So ALL cross-matchup pace dispersion — Var(lnPOSS) ≈ 0.000721 and the positive
+// Cov(lnPOSS,lnPPS) in the archives — comes from the possession-type MIX (steal
+// transitions, DRB pushes, half-court jitter), the J24 Phases 2-4 port, NOT from a
+// roster-dependent base_time. This retired the ADR-0042 additive teamBaseTime
+// stand-in (offVolumeScale/defRatingScale channel): it modeled dispersion 5.60 does
+// not have.
+//
+// The [13,16] clamp bounds below are FUN_004e4150's (00_MASTER_REFERENCE.md); with
+// u = 0 only the 16.0 ceiling is reachable — 16.0 is the FAITHFUL constant center.
+//
+// J24 PHASE 5 NO-GO (2026-07-17, archive smoke runs=4 stride=4, seed 20240601):
+// the faithful 16.0 could NOT be installed. With the Phase 2-4 fast-class mix
+// live, mean pace at 16.0 lands 114.68 poss/g (real ~104.6, gate [103.5,105.5])
+// because the engine's fast-class share is ~29% of possessions (implied
+// half-court weight 0.706 from the {13.65, 16.0} pace pair) vs real ~11.5%
+// (~24 transition markers / ~209 possessions). Var(lnPOSS) also stayed at
+// ~0.00027 (target ≥ 0.0006) and Cov(lnPOSS,lnPPS) stayed negative (−0.000049
+// vs real +0.000241) — the mix ports the step CLASSES faithfully but their
+// ARMING RATES are the engine's own steal/transition-gate rates, which fire
+// ~2.5× the real share. Closing that share gap (and the CEngine+0x30 redraw
+// flag + .lge +0x12c strategy_adj open RE sub-steps) is the J24 residual; the
+// provisional center walks back to the faithful 16.0 when it closes. ADR-0085.
 const (
 	baseTimeLow  = 13.0
 	baseTimeHigh = 16.0
-	baseTimeMid  = 13.65 // J23 re-center (PROVISIONAL — see below): neutral team's
-	// pace. NO LONGER the clamp midpoint (was (low+high)/2 = 14.5) — with
-	// round-half-up (possessionTime), 14.5 rounded the central step to 15s and
-	// dropped mean pace to ~97.6 vs real ~104.6. 13.65 restores the mean toward
-	// ~104.6 (smoke: 13.6 → 104.585 poss/g, JSB_ARCHIVE_RUNS=4 STRIDE=4) and is
-	// the lower edge of the coupling-sign window mid ∈ [13.622, ~14.07) that
-	// TestVolumeCountChannel_CouplingSign requires under round-half-up.
-	// PROVISIONAL: selected from the smoke bracket; the 20-run stride-1 archive
-	// sweep of record over {13.65, 13.7} (basetimemid_sweep_archive_test.go)
-	// adjudicates the final literal before merge (auto_merge: false — human
-	// signoff). See ADR-0085.
+	baseTimeMid  = 17.7 // J24 Phase 5 re-center (PROVISIONAL, deliberately above
+	// the faithful [13,16] — see NO-GO block above): the constant base_time
+	// that restores mean pace under the over-armed fast-class mix. Bracket
+	// smoke of record (basetimemid_sweep_archive_test.go, runs=4 stride=4):
+	// 17.5 → 105.38, 17.7 → 104.25, 17.9 → 103.06 poss/g vs real ~104.6 —
+	// 17.7 is the pace-closest measured config (auto_merge: false — human
+	// signoff adjudicates the literal before merge).
 )
 
-// teamBaseTime constants — the volume-rate → shot-COUNT channel (ADR-0042).
+// possessionTime is the integer seconds ONE POSSESSION removes from the game
+// clock. pt = (2.0 − factor) × base_time is the same per-game constant as
+// before (at factor 1.0, pt == base_time; out-of-range pt clamps to the JSB
+// 24.0 fallback) — but unlike the retired deterministic round-half-up of pt
+// itself, each CALL now draws its OWN jittered step from pt, so possessions
+// within a game no longer share one shared length.
 //
-// FUN_004e4150 (00_MASTER_REFERENCE.md L685-705, re-verified 2026-05-30) confirms
-// base_time is a clamped ratio of team OFFENSIVE/DEFENSIVE per-game stat
-// aggregates; the original port kept ONLY the defensive side, so a team's
-// shot-volume rates never reached its shot COUNT and team FGA varied (wrongly) by
-// misses, not makes (ADR-0041/0042). This restores the offensive side: a higher
-// offensive volume composite SHORTENS base_time → more possessions → more FGA,
-// make-coupled (volume rates corr +0.265 with FGP), so FGA tracks scoring.
-//
-// FAITHFULNESS: only the [13,16] clamp, the (2.0−factor) form (possessionTime),
-// and the 24.0 fallback are confirmed; the exact per-game stat-offset inputs are
-// "validation-phase." So this additive offensive-minus-defensive form and its two
-// scales are CORPUS-CALIBRATED STAND-INS for the ratio — exactly like the
-// defensive-only stand-in this replaces. The neutral reference points are the real dev-DB per-starter
-// minutes-weighted composite means (offense 161.2 ± 13.8, defense 23.8 ± 1.4;
-// 28 teams, 2026-06); they center a league-average roster at baseTimeMid.
-const (
-	// offVolumeScale: seconds the base_time shortens per unit of offensive volume
-	// composite above neutral — the channel's strength, and the primary
-	// corpus-calibration knob.
-	//
-	// CALIBRATED CONSERVATIVELY to 0.02 (2026-06, ibl5/backups, realarchive
-	// diagnostic). The orientation is correct — archive roster
-	// corr(volume composite, FGP) = +0.55 (TestRealArchive_VolumeFGPCoupling),
-	// confirming the trace §3.1 assumption that high-volume teams are more
-	// efficient. But an offVolumeScale=0/0.02/0.04/0.055 sweep at fixed
-	// stride/runs shows the channel MONOTONICALLY widens engine Var(lnFGA) and
-	// deepens the (still-negative) Cov(lnFGA,lnPPS) — it ADDS a dispersion source
-	// rather than REPLACING one (ADR-0042's requirement), because the offsetting
-	// empty-FGA reduction (the "which within-possession source carries the
-	// miss-driven FGA" split) is NOT isolated — it remains ADR-0042's bounded,
-	// sim-instrumentation open item, and tuning a constant against the size-
-	// dominated by-origin decomposition would be porting a guessed lever. 0.02 is
-	// the largest scale whose marginal effect on Var(lnFGA)/Cov stays within corpus
-	// sampling noise vs the scale=0 reference, so the channel ships present,
-	// directionally faithful, and fully instrumented (origin tags +
-	// decomposeByOrigin) without regressing the corpus. Raising it toward real
-	// Var(lnPF) is deferred until the empty-FGA source is isolated.
-	//
-	// LEVER-2 RE-TEST (2026-06-03, ADR-0044): the Lever-2 pair proposed RAISING
-	// this concurrently with foulCompress (the idea: foulCompress cuts the
-	// negative-Cov foul-arm dispersion, freeing room to add make-coupled volume
-	// dispersion here). NOTE (J15, 2026-07-11): foulCompress was the pre-faithful
-	// foul-dispersion dial; the faithful foul bucket + foulBucketScale supersede it,
-	// but this re-test's conclusion (raising offVolumeScale games metrics) is
-	// unchanged. The archive sweep REFUTED the raise on its OWN target:
-	// after foulCompress=0.45, EngineVarLnFGA (0.00265 gt2) is still ABOVE real
-	// (0.00141) — foulCompress narrows it but never undershoots, so there is no
-	// room to refill. A 0.02→0.14 sweep (fc=0.45) only widens VarLnFGA further
-	// from real (0.00265→0.00392) and does NOT improve Cov (−0.00176→−0.00189) —
-	// raising it would be tuning toward the emergent Cov flip at the expense of
-	// VarLnFGA→real, the metric-gaming Constraint 1/ADR-0041 forbid. So it stays
-	// at the ADR-0042 minimal-presence floor 0.02.
-	offVolumeScale = 0.02
-	// defRatingScale: seconds base_time LENGTHENS per unit of defensive composite
-	// above neutral — a stronger defense slows the pace, as in the original port.
-	// Kept minor (def sd ≈ 1.4 → ≈ ±0.12s, the trace's ~0.8% defense-pace term);
-	// offense, not defense, drives the count channel.
-	defRatingScale = 0.083
-	// offVolumeNeutral / defRatingNeutral: the real per-starter composite means
-	// (dev DB, minutes-weighted) at which a roster lands exactly at baseTimeMid.
-	// Validation-phase stand-in reference points.
-	offVolumeNeutral = 161.0
-	defRatingNeutral = 24.0
-)
-
-// teamBaseTime derives a per-team base possession length in [13,16] seconds from
-// the team's offensive volume composite (Σ starters' r_fga+r_3ga+r_fta, the
-// volume→count channel) and defensive ODPT composite (Σ OD+DD+PD+TD). Higher
-// offensive volume → shorter (faster) base_time; stronger defense → longer
-// (slower). Additive stand-in for FUN_004e4150's offensive/defensive ratio (see
-// the const block). No division is used, so a degenerate (e.g. all-zero-rated)
-// lineup clamps into [13,16] rather than producing NaN/Inf.
-// teamBaseTime uses the package-const offVolumeScale — the thin wrapper so existing
-// callers and tempo_test.go are unchanged.
-func teamBaseTime(starters []onCourt) float64 {
-	return teamBaseTimeWith(starters, offVolumeScale, baseTimeMid)
-}
-
-// teamBaseTimeWith is teamBaseTime with the offensive-volume scale AND the neutral
-// base-time center supplied by the caller — the ADR-0054 possession-count dispersion
-// sweep seam (scale) and the J23 mean-pace re-center sweep seam (mid).
-// scale==offVolumeScale && mid==baseTimeMid reproduces teamBaseTime byte-for-byte
-// (so nil Options.OffVolumeScale/BaseTimeMid are golden-stable). Pure function: no
-// Options/config in scope.
-func teamBaseTimeWith(starters []onCourt, scale, mid float64) float64 {
-	if len(starters) == 0 {
-		return baseTimeLow
-	}
-	var offSum, defSum float64
-	for _, p := range starters {
-		offSum += float64(p.FGA + p.TGA + p.FTA)     // r_fga+r_3ga+r_fta volume rates
-		defSum += float64(p.OD + p.DD + p.PD + p.TD) // 1-9 ODPT scale → 0..36
-	}
-	n := float64(len(starters))
-	offAvg := offSum / n
-	defAvg := defSum / n
-	bt := mid - scale*(offAvg-offVolumeNeutral) + defRatingScale*(defAvg-defRatingNeutral)
-	if bt < baseTimeLow {
-		bt = baseTimeLow
-	}
-	if bt > baseTimeHigh {
-		bt = baseTimeHigh
-	}
-	return bt
-}
-
-// possessionTime is the integer seconds one possession removes from the game
-// clock: (2.0 − factor) × base_time, ROUNDED HALF-UP. At factor 1.0 it equals
-// round-half-up(base_time).
-//
-// ROUND-HALF-UP (5.60-faithful, J23 — supersedes the ADR-0085 deferral). 5.60
-// rounds this step HALF-UP, it does NOT truncate: FUN_004e42e0 (the possession-
-// clock update, jsb560_decompiled.c:98386-98438) truncates possession_time via
+// ROUND-HALF-UP PROVENANCE (5.60-faithful, J23): FUN_004e42e0 (the possession-
+// clock update, jsb560_decompiled.c:98386-98438) truncates its float step via
 // __ftol then adds 1 when the fractional part ≥ 0.5 (`_DAT_00669ef0` = 0.5,
-// confirmed from the raw .rdata bytes 0x3fe0000000000000). The prior int()
-// truncation was a confirmed infidelity retained under ADR-0085 ONLY because its
-// downward bias masked a too-slow base_time center. J21's archive A/B showed
-// round-half-up shipped ALONE regresses mean pace (~101.9 → ~97.6 poss/g vs real
-// ~104.6) and does NOT flip the wrong-signed Cov(lnPOSS,lnPPS). J23 ships the
-// faithful round-half-up COUPLED with a baseTimeMid re-center (see the baseTimeMid
-// const above) so both the step rule and the mean pace land correct. See ADR-0085
-// for the RE evidence, the four-term A/B, and the mean-regression finding.
-func possessionTime(baseTime float64) int {
+// confirmed from the raw .rdata bytes 0x3fe0000000000000). This engine uses the
+// `int(x + 0.5)` idiom for that round-half-up throughout.
+//
+// J24 PHASE 2 — HALF-COURT JITTER (RE-derived from FUN_004e42e0's half-court
+// step class, code 6; full derivation in jsb-native/re-artifacts/
+// jsb-J24-pace-dispersion-RE-20260716.md):
+//
+//	step = round-half-up(pt/2 + U[0,pt))
+//
+// U[0,pt) ports 5.60's `rand() × (1/32768) × pt` — this engine's r.Float64()
+// stands in for that normalized rand() draw. When the draw truncates to
+// exactly pt (i.e. step lands on trunc(pt), which happens for ~1/pt of draws),
+// 5.60 redraws ONCE into {3..23} via r.IntN(21)+3; that single redraw may
+// land back on trunc(pt) again — faithful to the binary, which does not loop.
+//
+// OPEN RE SUB-STEP: the binary also gates this redraw on a CEngine+0x30 flag
+// whose writer has not been identified; this port defaults it false (the
+// forced-redraw path is off) until that flag's source is traced.
+func possessionTime(baseTime float64, r *rng.RNG) int {
 	pt := (2.0 - tempoFactor) * baseTime
 	if pt < 1.0 || pt > 24.0 {
 		pt = 24.0 // JSB out-of-range fallback
 	}
-	return int(pt + 0.5) // round half-up (5.60 FUN_004e42e0, _DAT_00669ef0 = 0.5)
+	step := int(pt/2.0 + r.Float64()*pt + 0.5) // round-half-up(pt/2 + U[0,pt))
+	if step == int(pt) {
+		// trunc(pt) hit: single redraw into {3..23}, no loop (faithful to
+		// FUN_004e42e0 — see docblock above).
+		step = r.IntN(21) + 3
+	}
+	return step
 }

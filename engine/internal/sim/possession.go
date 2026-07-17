@@ -91,20 +91,42 @@ func (gs *gameState) playBuckets(bh onCourt, offense, defense *teamState, hca, h
 	return s2 + hcaScaled, s3, sf
 }
 
+// possOutcome classifies how a possession ended, so the caller can route both
+// the next possession's fast-break eligibility (fbPending, unchanged) and its
+// step-class draw (J24 Phase 3+): a steal arms the FAST steal-transition class
+// (0-2s, Phase 3), a defensive rebound arms the DRB-push class (2-4s, Phase 4),
+// and everything else (a make or a non-arming turnover) draws the normal
+// half-court jittered step.
+type possOutcome int
+
+const (
+	possNormal possOutcome = iota // ended in make / non-arming turnover — no break armed
+	possSteal                     // ended in a steal -> arms steal fast break (step 0-2)
+	possDRB                       // ended in a defensive rebound -> arms DRB push (step 2-4, Phase 4)
+)
+
 // possession resolves one offensive trip: ball-handler selection, shot-type and
 // matchup resolution, the play-outcome path, and any free throws or rebounds.
 // Offensive rebounds continue the trip; a made shot, defensive rebound, or
 // turnover ends it. The caller flips possession after every trip.
 //
-// fbPending is the fast-break flag set by the prior possession (its defensive
-// rebound or steal). It is consumed unconditionally: when Stage 2 (TransOff
-// trigger) and Stage 3 (steal-success) both pass, the possession runs as a fast
-// break; otherwise it falls through to the normal half-court loop. The named
-// return fbNext re-arms the flag when THIS possession ends via a defensive
-// rebound or a steal (the team that gained the ball gets the next break).
-func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPending bool) (fbNext bool) {
+// prev is the outcome of the PRIOR possession (its defensive rebound, steal, or
+// neither). Its fast-break eligibility (fbPending, derived below) is consumed
+// unconditionally: when Stage 2 (TransOff trigger) and Stage 3 (steal-success)
+// both pass, the possession runs as a fast break; otherwise it falls through to
+// the normal half-court loop. The named return outcome re-arms possSteal or
+// possDRB when THIS possession ends via a steal or a defensive rebound
+// respectively (the team that gained the ball gets the next break); it also lets
+// the caller (gameloop.go) route the NEXT possession's step-class draw off how
+// THIS one ended.
+func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev possOutcome) (outcome possOutcome) {
+	fbPending := prev != possNormal
+	// Reset on EVERY call (not just the DRB-armed branch below) so a stale
+	// true from a prior possession never leaks into this one, including the
+	// empty-roster early return.
+	gs.drbPushFired = false
 	if len(offense.players) == 0 || len(defense.players) == 0 {
-		return false
+		return possNormal
 	}
 	gs.emit(result.Event{
 		Kind: result.EventPossessionStart, Period: gs.period, Clock: gs.clock, TeamID: offense.teamID,
@@ -114,7 +136,15 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPen
 		if gs.transitionShotRate <= 0 {
 			gs.transitionShotRate = resetTransitionShotRate(offense)
 		}
-		if transitionTriggers(offense, gs.gameType, gs.rng) && gs.transitionStealSucceeds(defense) {
+		// Draw the Stage-2 gate exactly ONCE and capture it for the DRB-push
+		// clock class (J24 Phase 4) — re-drawing it in gameloop.go would pull a
+		// second (starter-pick, rand_int(18)) pair off the RNG stream and let
+		// the clock class disagree with whether the break actually ran.
+		trig := transitionTriggers(offense, gs.gameType, gs.rng)
+		if prev == possDRB {
+			gs.drbPushFired = trig // DRB-push clock class (strategy_adj=0, J24 Phase 4)
+		}
+		if trig && gs.transitionStealSucceeds(defense) {
 			return gs.runTransitionPossession(offense, defense, periodIdx)
 		}
 	}
@@ -132,7 +162,7 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPen
 		// defense's fast break. Rolled before the shot path; the negligible
 		// independent [2,5] check stays inside selectOutcome below.
 		if gs.stealTurnover(offense, defense, bh) {
-			return true // steal → fast-break pending for the defense
+			return possSteal // steal → steal fast-break pending for the defense
 		}
 		scoreDiff := offense.score - defense.score
 		matched := defenderAtSlot(defense, bh.slot)
@@ -184,9 +214,9 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPen
 					bh = next
 					continue
 				}
-				return true // defensive rebound → fast-break pending
+				return possDRB // defensive rebound → DRB-push fast-break pending
 			}
-			return false // made shot
+			return possNormal // made shot
 		case outcome3pt:
 			if made, _ := gs.shotAttempt(offense, defense, bh, shotValue3pt(gs.shotBaselineOrFallback()), result.ShotThree, origin, periodIdx); !made {
 				gs.creditBlock(offense, defense, bh, def)
@@ -194,16 +224,16 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPen
 					bh = next
 					continue
 				}
-				return true // defensive rebound → fast-break pending
+				return possDRB // defensive rebound → DRB-push fast-break pending
 			}
-			return false // made shot
+			return possNormal // made shot
 		case outcomeAndOne:
 			gs.madeFieldGoal(offense, bh, result.ShotTwoPoint, origin, periodIdx)
 			gs.freeThrows(offense, defense, bh, def, 1, periodIdx)
-			return false
+			return possNormal
 		case outcomeFoulOnly:
 			gs.freeThrows(offense, defense, bh, def, 2, periodIdx)
-			return false
+			return possNormal
 		case outcomeTurnover:
 			// The negligible independent [2,5] check (energyCeiling): an UNFORCED
 			// change of possession — no stealer, no fast break (the dominant
@@ -213,10 +243,10 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, fbPen
 				TeamID: offense.teamID, PlayerID: bh.PID,
 			})
 			gs.maybeInjure(offense, bh) // per-turnover injury check on the committer
-			return false
+			return possNormal
 		}
 	}
-	return false
+	return possNormal
 }
 
 // shotAttempt records a field-goal attempt of the given type, rolls make/miss,

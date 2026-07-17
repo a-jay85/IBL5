@@ -214,19 +214,19 @@ type Options struct {
 	Accum        *FreezeAccum  // non-nil only during a baseline accumulation pass
 	BranchBAccum *BranchBAccum // non-nil only when harvesting the Branch-B engagement instrument
 
-	// OffVolumeScale overrides the package const offVolumeScale (tempo.go) for the
-	// ADR-0054 possession-count dispersion sweep. nil → use the const (a zero Options
-	// stays byte-identical to Simulate); non-nil → use *OffVolumeScale (0 is a valid
-	// sweep value — it disables the volume→count channel, so a plain float default-0
-	// could not mean "unset"; the pointer distinguishes the two). The override is
-	// always a valid float, so validate() needs no zero-mean guard for it (unlike the
-	// freeze arms). The only knob this seam moves.
-	OffVolumeScale *float64
-
-	// BaseTimeMid overrides the package const baseTimeMid (tempo.go) for the J23
-	// mean-pace re-center sweep. nil → use the const (a zero Options stays byte-
-	// identical to Simulate); non-nil → use *BaseTimeMid. Always a valid float when
-	// set, so validate() needs no zero-mean guard (like OffVolumeScale).
+	// BaseTimeMid overrides the package const baseTimeMid (tempo.go) — the constant
+	// per-game base_time (J24 Phase 0: 5.60's composite ratio is dead code) — for
+	// the J23 mean-pace re-center sweep. nil → use the const (a zero Options stays
+	// byte-identical to Simulate); non-nil → use *BaseTimeMid. Always a valid float
+	// when set, so validate() needs no zero-mean guard (unlike the freeze arms).
+	//
+	// NOT retired at J24 Phase 5 — Phase 5 was a NO-GO (tempo.go const block):
+	// the faithful 16.0 center could not be installed because the engine arms
+	// fast possession classes at ~29% vs real ~11.5%, so 16.0 overshoots mean
+	// pace (114.68 vs real ~104.6). This seam is RETAINED as the sweep
+	// instrument's re-center knob (baseTimeMid now provisionally 17.7) until
+	// that fast-class arming-share gap closes and the center can walk back
+	// down to the faithful 16.0. See the tempo.go NO-GO block and ADR-0085.
 	BaseTimeMid *float64
 
 	// GateCont, when non-nil, harvests the L1 gate-1 decomposition instrument

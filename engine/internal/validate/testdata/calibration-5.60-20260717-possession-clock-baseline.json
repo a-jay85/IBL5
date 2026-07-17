@@ -1,0 +1,16 @@
+{
+  "generated": "2026-07-17T02:28:05-07:00",
+  "stride": 4,
+  "snapshots": 175,
+  "team_games": 4732,
+  "preport_step": {
+    "n": 4732,
+    "mean": 13.943998309382925,
+    "sd": 0.5285907579084952,
+    "min": 13,
+    "max": 15
+  },
+  "corr_step_pps_proxy": -0.3722066361727328,
+  "corr_n": 4732,
+  "faithful_base_time": 16
+}

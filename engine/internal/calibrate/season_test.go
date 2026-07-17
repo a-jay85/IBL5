@@ -71,12 +71,11 @@ func TestValidateWithArms(t *testing.T) {
 	})
 }
 
-// TestValidateWithArms_OffVolumeScale (ADR-0054): the OffVolumeScale override is
+// TestValidateWithArms_BaseTimeMid (J23/J24): the BaseTimeMid override is
 // propagated onto the base sim.Options BEFORE the makePutbackActive early return, so
-// it reaches both the single-pass (no arm) and two-pass (arm) paths. A non-nil pointer
-// — including a pointer to 0 (a valid sweep value that disables the channel) — must
-// arrive intact, never dropped as "unset".
-func TestValidateWithArms_OffVolumeScale(t *testing.T) {
+// it reaches both the single-pass (no arm) and two-pass (arm) paths. A non-nil
+// pointer must arrive intact, never dropped as "unset".
+func TestValidateWithArms_BaseTimeMid(t *testing.T) {
 	capture := func(got *sim.Options) func(string, int, uint64, bundle.GameType, sim.Options) (validate.Report, error) {
 		return func(_ string, _ int, _ uint64, _ bundle.GameType, o sim.Options) (validate.Report, error) {
 			*got = o
@@ -85,47 +84,33 @@ func TestValidateWithArms_OffVolumeScale(t *testing.T) {
 	}
 	ptr := func(f float64) *float64 { return &f }
 
-	t.Run("ptr(0.04) reaches base on the no-arm path", func(t *testing.T) {
+	t.Run("ptr(16.0) reaches base on the no-arm path", func(t *testing.T) {
 		var got sim.Options
-		fn := validateWithArms(Options{OffVolumeScale: ptr(0.04)}, capture(&got))
+		fn := validateWithArms(Options{BaseTimeMid: ptr(16.0)}, capture(&got))
 		if _, err := fn("dir", 5, 99, bundle.GameTypeRegular); err != nil {
 			t.Fatalf("fn: %v", err)
 		}
-		if got.OffVolumeScale == nil || *got.OffVolumeScale != 0.04 {
-			t.Fatalf("base.OffVolumeScale=%v, want *0.04", got.OffVolumeScale)
+		if got.BaseTimeMid == nil || *got.BaseTimeMid != 16.0 {
+			t.Fatalf("base.BaseTimeMid=%v, want *16.0", got.BaseTimeMid)
 		}
 	})
 
-	t.Run("ptr(0) reaches base as non-nil *0 (not dropped)", func(t *testing.T) {
-		var got sim.Options
-		fn := validateWithArms(Options{OffVolumeScale: ptr(0)}, capture(&got))
-		if _, err := fn("dir", 5, 99, bundle.GameTypeRegular); err != nil {
-			t.Fatalf("fn: %v", err)
-		}
-		if got.OffVolumeScale == nil {
-			t.Fatal("base.OffVolumeScale is nil; the explicit 0 sweep config was dropped as unset")
-		}
-		if *got.OffVolumeScale != 0 {
-			t.Fatalf("base.OffVolumeScale=*%v, want *0", *got.OffVolumeScale)
-		}
-	})
-
-	t.Run("nil leaves base.OffVolumeScale nil (const path)", func(t *testing.T) {
+	t.Run("nil leaves base.BaseTimeMid nil (const path)", func(t *testing.T) {
 		var got sim.Options
 		fn := validateWithArms(Options{}, capture(&got))
 		if _, err := fn("dir", 5, 99, bundle.GameTypeRegular); err != nil {
 			t.Fatalf("fn: %v", err)
 		}
-		if got.OffVolumeScale != nil {
-			t.Fatalf("base.OffVolumeScale=%v, want nil (use const)", got.OffVolumeScale)
+		if got.BaseTimeMid != nil {
+			t.Fatalf("base.BaseTimeMid=%v, want nil (use const)", got.BaseTimeMid)
 		}
 	})
 }
 
-// TestResolveValidate_InjectedSeamIgnoresScale (ADR-0054): when an Options.Validate
-// seam is injected, resolveValidate returns it directly — bypassing validateWithArms,
-// where OffVolumeScale lives. The injected ValidateFunc has no sim.Options parameter,
-// so the scale structurally cannot reach the sim through the test seam.
+// TestResolveValidate_InjectedSeamIgnoresScale: when an Options.Validate seam is
+// injected, resolveValidate returns it directly — bypassing validateWithArms, where
+// BaseTimeMid lives. The injected ValidateFunc has no sim.Options parameter, so the
+// override structurally cannot reach the sim through the test seam.
 func TestResolveValidate_InjectedSeamIgnoresScale(t *testing.T) {
 	called := false
 	seam := func(string, int, uint64, bundle.GameType) (validate.Report, error) {
@@ -133,7 +118,7 @@ func TestResolveValidate_InjectedSeamIgnoresScale(t *testing.T) {
 		return validate.Report{}, nil
 	}
 	ptr := func(f float64) *float64 { return &f }
-	fn := resolveValidate(Options{Validate: seam, OffVolumeScale: ptr(0.04)})
+	fn := resolveValidate(Options{Validate: seam, BaseTimeMid: ptr(16.0)})
 	if _, err := fn("dir", 5, 99, bundle.GameTypeRegular); err != nil {
 		t.Fatalf("fn: %v", err)
 	}

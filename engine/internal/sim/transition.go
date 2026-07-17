@@ -41,6 +41,25 @@ func resetTransitionShotRate(breakingTeam *teamState) float64 {
 // fast breaks fire slightly less often (coaching_mod is 0 — neutral coaching).
 // The two RNG draws (starter pick, then trigger roll) are unchanged in count and
 // order, so determinism is preserved for non-playoff games.
+//
+// This same gate doubles as the J24 Phase 4 DRB-push clock gate (FUN_004e42e0
+// code 7): possession.go's fbPending branch calls this ONCE per fast-break-
+// eligible possession and, when prev == possDRB, captures the result into
+// gs.drbPushFired for gameloop.go to route the {2,3,4}s DRB-push step class —
+// see possession.go's fbPending branch and state.go's drbPushFired field.
+// gameloop.go never re-calls transitionTriggers itself: a second call would
+// draw a fresh (starter-pick, rand_int(18)) pair off the RNG stream, shifting
+// the stream and letting the clock class disagree with the run decision.
+//
+// RE threshold note: the reference-engine formula is
+// r_trans_off − (gt==playoff?1:0) + strategy_adj, where strategy_adj derives
+// from the offensive team's .lge tempo/coach setting at offset +0x12c
+// (values 1-5: 5 → +1, 4 → +1 iff rand_int(2), 1 → −1, 2 → −1 iff rand_int(2),
+// 3 → 0). This port omits the term entirely, which is exactly strategy_adj = 0
+// (the neutral/coach-3 case) — so no gate-code change was needed for the J24
+// Phase 4 DRB-push stand-in, only this documentation. This is an OPEN RE
+// SUB-STEP pending the .lge +0x12c field being pinned and wired through
+// bundle.Team/Player; until then every team is treated as coach-neutral.
 func transitionTriggers(offense *teamState, gt bundle.GameType, r *rng.RNG) bool {
 	if len(offense.players) == 0 {
 		return false
@@ -90,16 +109,17 @@ func transitionNet(defender onCourt) float64 {
 // transition defender supplies the 5.0−TD net. The outcome routes through the
 // existing shot/free-throw/rebound machinery with stealPlay=true, so the attempt
 // can never be a 3-pointer (allowedPaths). A defensive rebound or steal ending
-// the break re-arms the fast-break flag (returned as fbNext). Offensive rebounds
-// continue the break, bounded by maxOffensiveRebounds.
-func (gs *gameState) runTransitionPossession(offense, defense *teamState, periodIdx int) (fbNext bool) {
+// the break re-arms the fast-break flag (returned as the possOutcome — possDRB or
+// possSteal respectively). Offensive rebounds continue the break, bounded by
+// maxOffensiveRebounds.
+func (gs *gameState) runTransitionPossession(offense, defense *teamState, periodIdx int) (outcome possOutcome) {
 	gs.transitions++
 	bh := selectBallHandler(offense, gs.rng)
 	for trip := 0; trip <= maxOffensiveRebounds; trip++ {
 		// Steal-driven turnover on the break too (ADR-0045), mirroring the half-court
 		// path so fast-break possessions use the same model.
 		if gs.stealTurnover(offense, defense, bh) {
-			return true // steal → fast-break pending for the defense
+			return possSteal // steal → steal fast-break pending for the defense
 		}
 		scoreDiff := offense.score - defense.score
 		matched := defenderAtSlot(defense, bh.slot)
@@ -146,16 +166,16 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 					bh = next
 					continue
 				}
-				return true // defensive rebound re-arms the fast break
+				return possDRB // defensive rebound re-arms the DRB-push fast break
 			}
-			return false // made shot
+			return possNormal // made shot
 		case outcomeAndOne:
 			gs.madeFieldGoal(offense, bh, result.ShotTwoPoint, result.OriginTransition, periodIdx)
 			gs.freeThrows(offense, defense, bh, def, 1, periodIdx)
-			return false
+			return possNormal
 		case outcomeFoulOnly:
 			gs.freeThrows(offense, defense, bh, def, 2, periodIdx)
-			return false
+			return possNormal
 		case outcomeTurnover:
 			// Negligible independent [2,5] check: unforced change of possession, no
 			// stealer (steal-driven turnovers are rolled at the top of the trip).
@@ -164,8 +184,8 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 				TeamID: offense.teamID, PlayerID: bh.PID,
 			})
 			gs.maybeInjure(offense, bh) // per-turnover injury check on the committer
-			return false
+			return possNormal
 		}
 	}
-	return false
+	return possNormal
 }

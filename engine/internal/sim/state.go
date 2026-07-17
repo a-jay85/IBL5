@@ -121,6 +121,19 @@ type gameState struct {
 	// top of each period.
 	transitionShotRate float64
 
+	// drbPushFired reports, for the possession about to be stepped, whether the
+	// Stage-2 transitionTriggers gate fired on a DRB-armed possession (prev ==
+	// possDRB) THIS iteration (J24 Phase 4, FUN_004e42e0 code 7). possession()
+	// captures the gate result ONCE (in its fbPending branch — the same draw
+	// that decides whether the possession runs as a transition break) rather
+	// than gameloop.go re-evaluating transitionTriggers, which would draw a
+	// second (starter-pick, rand_int(18)) pair and desync the step class from
+	// the run decision. gameloop.go reads this flag to route the DRB-push clock
+	// step ({2,3,4}s) instead of re-drawing the gate. Reset to false at the top
+	// of EVERY possession() call so a stale true never leaks into a later
+	// iteration or a non-DRB-armed possession.
+	drbPushFired bool
+
 	// transitions counts fast-break possessions that actually fired this game
 	// (Stage 2 and Stage 3 both passed). It is internal observability for tests;
 	// it is never serialized into the result contract.

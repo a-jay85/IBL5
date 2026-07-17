@@ -247,35 +247,49 @@ func classifyEnding(evs []result.Event) (dreb, steal, made bool) {
 	return
 }
 
-// --- matrix #15/#16/#17: fbNext == (defensive rebound OR steal) --------------
-
+// --- matrix #15/#16/#17: outcome == possSteal/possDRB/possNormal by ending ----
+//
+// J24 Phase 3: possession() now returns a 3-valued possOutcome instead of a bool,
+// so a steal-ending and a defensive-rebound-ending are distinguishable (Phase 3
+// routes possSteal to the fast steal-transition step class; Phase 4 will route
+// possDRB). This asserts the exact mapping — a clean defensive rebound must
+// return possDRB, NOT possSteal, and vice versa.
 func TestPossession_FastBreakFlagMatchesEnding(t *testing.T) {
 	var seenMade, seenDReb, seenSteal bool
 	for seed := uint64(1); seed <= 400; seed++ {
 		offense, defense := twoTeams()
 		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500}
-		fbNext := possession(gs, offense, defense, 0, false)
+		outcome := possession(gs, offense, defense, 0, possNormal)
 		dreb, steal, made := classifyEnding(gs.events)
-		if want := dreb || steal; fbNext != want {
-			t.Fatalf("seed %d: fbNext = %v, want %v (dreb=%v steal=%v)", seed, fbNext, want, dreb, steal)
+		var want possOutcome
+		switch {
+		case steal:
+			want = possSteal
+		case dreb:
+			want = possDRB
+		default:
+			want = possNormal
+		}
+		if outcome != want {
+			t.Fatalf("seed %d: outcome = %v, want %v (dreb=%v steal=%v)", seed, outcome, want, dreb, steal)
 		}
 		switch {
 		case steal:
 			seenSteal = true // #17
 		case dreb:
 			seenDReb = true // #16
-		case made && !fbNext:
+		case made && outcome == possNormal:
 			seenMade = true // #15: a made-shot possession clears the flag
 		}
 	}
 	if !seenMade {
-		t.Error("never observed a made-shot possession returning fbNext=false")
+		t.Error("never observed a made-shot possession returning possNormal")
 	}
 	if !seenDReb {
-		t.Error("never observed a defensive-rebound possession returning fbNext=true")
+		t.Error("never observed a defensive-rebound possession returning possDRB")
 	}
 	if !seenSteal {
-		t.Error("never observed a steal possession returning fbNext=true")
+		t.Error("never observed a steal possession returning possSteal")
 	}
 }
 
@@ -286,21 +300,131 @@ func TestPossession_PendingConsumedOnStageTwoFail(t *testing.T) {
 	for seed := uint64(1); seed <= 400; seed++ {
 		offense, defense := noTransitionTeams()
 		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500}
-		// fbPending = true, but TransOff=0 means Stage 2 always fails.
-		fbNext := possession(gs, offense, defense, 0, true)
+		// fbPending = true (prev == possSteal), but TransOff=0 means Stage 2 always fails.
+		outcome := possession(gs, offense, defense, 0, possSteal)
 		if gs.transitions != 0 {
 			t.Fatalf("seed %d: a transition fired despite TransOff=0", seed)
 		}
 		dreb, steal, made := classifyEnding(gs.events)
 		// The return reflects THIS possession, not the stale input flag.
-		if want := dreb || steal; fbNext != want {
-			t.Fatalf("seed %d: fbNext = %v, want %v", seed, fbNext, want)
+		var want possOutcome
+		switch {
+		case steal:
+			want = possSteal
+		case dreb:
+			want = possDRB
+		default:
+			want = possNormal
 		}
-		if made && !fbNext {
+		if outcome != want {
+			t.Fatalf("seed %d: outcome = %v, want %v", seed, outcome, want)
+		}
+		if made && outcome == possNormal {
 			seenClearedDespitePending = true
 		}
 	}
 	if !seenClearedDespitePending {
 		t.Error("never observed the pending flag cleared by a made-shot possession")
+	}
+}
+
+// --- J24 Phase 4: DRB-push clock gate (gs.drbPushFired) ----------------------
+//
+// possession.go's fbPending branch draws transitionTriggers exactly ONCE and,
+// when prev == possDRB, captures the result into gs.drbPushFired for
+// gameloop.go to route the {2,3,4}s DRB-push step class (state.go's
+// drbPushFired field, gameloop.go's step switch). These tests drive
+// possession() directly with a rigged TransOff so the Stage-2 gate is
+// deterministic (mirroring TestTransitionTriggers_Boundary), isolating the
+// flag from Stage-3 (transitionStealSucceeds) and from the step-value overlap
+// between the DRB-push support {2,3,4} and the half-court jitter's support
+// [3,27] (widened from [3,23] by the J24 Phase 5 NO-GO baseTimeMid re-center,
+// 13.65 -> 17.7 — see possession_pace_pin_test.go Pin A) — asserting on
+// gs.drbPushFired directly sidesteps that overlap.
+
+// alwaysTransitionTeams builds offense (TransOff=transitionTriggerDenom,
+// Stage-2 always fires) and a normal defense.
+func alwaysTransitionTeams() (*teamState, *teamState) {
+	var ps []bundle.Player
+	pid := 400
+	for slot := slotPG; slot <= slotC; slot++ {
+		pid++
+		p := mkPlayer(pid, 7, slot, 46)
+		p.TransOff = transitionTriggerDenom
+		ps = append(ps, p)
+	}
+	for slot := slotPG; slot <= slotC; slot++ {
+		pid++
+		ps = append(ps, mkPlayer(pid, 3, slot, 50))
+	}
+	return newTeamState(ps, 7, false), newTeamState(ps, 3, true)
+}
+
+// TestDRBPushGate_FiresSetsFlag is required assertion (a)'s unit-level half:
+// prev == possDRB with a deterministically-firing Stage-2 gate must set
+// gs.drbPushFired true. (The gameloop-level half — that the drawn step then
+// lands in {2,3,4} over a real game — is TestDRBPushClassStepRange below.)
+func TestDRBPushGate_FiresSetsFlag(t *testing.T) {
+	for seed := uint64(1); seed <= 300; seed++ {
+		offense, defense := alwaysTransitionTeams()
+		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500}
+		possession(gs, offense, defense, 0, possDRB)
+		if !gs.drbPushFired {
+			t.Fatalf("seed %d: TransOff=denom + prev=possDRB must always set drbPushFired", seed)
+		}
+	}
+}
+
+// TestDRBPushGate_FailsClearsFlag is required assertion (b): a Stage-2
+// gate-fail (TransOff=0) with prev == possDRB must leave gs.drbPushFired
+// false, asserted on the flag itself — NOT on the drawn step value, since the
+// DRB-push support {2,3,4} overlaps the half-court jitter's support [3,27] at
+// steps 3-4 (a purely observational split would be ambiguous there).
+func TestDRBPushGate_FailsClearsFlag(t *testing.T) {
+	for seed := uint64(1); seed <= 300; seed++ {
+		offense, defense := noTransitionTeams()
+		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500}
+		possession(gs, offense, defense, 0, possDRB)
+		if gs.drbPushFired {
+			t.Fatalf("seed %d: TransOff=0 must never set drbPushFired", seed)
+		}
+	}
+}
+
+// TestDRBPushGate_OnlyArmsOnDRBPrev confirms the flag is scoped to
+// prev == possDRB specifically: a fast-break-eligible possession armed by a
+// STEAL (prev == possSteal), even with a deterministically-firing Stage-2
+// gate, must never set gs.drbPushFired — that flag is reserved for the
+// DRB-push class, not the steal-transition class (which routes off
+// prevOutcome == possSteal directly in gameloop.go, no flag needed).
+func TestDRBPushGate_OnlyArmsOnDRBPrev(t *testing.T) {
+	for seed := uint64(1); seed <= 300; seed++ {
+		offense, defense := alwaysTransitionTeams()
+		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500}
+		possession(gs, offense, defense, 0, possSteal)
+		if gs.drbPushFired {
+			t.Fatalf("seed %d: prev=possSteal must never set drbPushFired even when Stage-2 always fires", seed)
+		}
+	}
+}
+
+// TestDRBPushGate_ResetsAcrossPossessions is required assertion (c): after a
+// possession sets gs.drbPushFired true, the NEXT possession — armed normally
+// (prev == possNormal), so fbPending is false and the fbPending branch never
+// runs — must leave the flag false (the top-of-possession reset in
+// possession.go), not carry the stale true forward into a possession that
+// will draw the half-court step.
+func TestDRBPushGate_ResetsAcrossPossessions(t *testing.T) {
+	for seed := uint64(1); seed <= 300; seed++ {
+		offense, defense := alwaysTransitionTeams()
+		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500}
+		possession(gs, offense, defense, 0, possDRB)
+		if !gs.drbPushFired {
+			t.Fatalf("seed %d: setup failed — drbPushFired not set by the first (DRB-armed) possession", seed)
+		}
+		possession(gs, offense, defense, 0, possNormal)
+		if gs.drbPushFired {
+			t.Fatalf("seed %d: drbPushFired leaked true into a possNormal-armed possession (fbPending branch never runs)", seed)
+		}
 	}
 }

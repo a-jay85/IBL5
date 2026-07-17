@@ -9,10 +9,10 @@ import (
 
 // TestFastClassCounters verifies the FastClassAccum instrument is:
 //
-//   (A) read-only — attaching the accumulator must not alter any game outcome;
-//   (B) exhaustive and mutually exclusive — every EventPossessionStart increments
-//       exactly one class counter, summing to TotalPossessions; and
-//   (C) all three classes reachable across a modest seed sweep.
+//	(A) read-only — attaching the accumulator must not alter any game outcome;
+//	(B) exhaustive and mutually exclusive — every EventPossessionStart increments
+//	    exactly one class counter, summing to TotalPossessions; and
+//	(C) all three classes reachable across a modest seed sweep.
 func TestFastClassCounters(t *testing.T) {
 	b := richBundle()
 

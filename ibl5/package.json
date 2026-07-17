@@ -52,7 +52,7 @@
     "eslint-plugin-playwright": "^2.10.5",
     "pixelmatch": "^7.2.0",
     "pngjs": "^7.0.0",
-    "tailwindcss": "^4.3.1",
+    "tailwindcss": "^4.3.3",
     "typescript-eslint": "^8.64.0",
     "vitest": "^4.1.10"
   }

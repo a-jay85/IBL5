@@ -42,6 +42,7 @@ J1 faithful foul pair (✅ 2026-07-10, ADR-0082) ─→ J2 adjudications (✅ 20
 J17 game-state foul coupling (⬜, new 2026-07-10) — real 5.60 mechanism the engine lacks entirely
 J21 gt=4 playoff-margin audit (✅ 2026-07-14 — no overshoot, engine under-disperses globally) · J22 per-player STL/TOV bundle wiring (✅ 2026-07-16) — cut-over-gate fidelity inputs to J13; NEITHER is a Cov(lnFGA,lnPPS) lever
 J23 round-half-up + base_time re-center (✅, 2026-07-16, #1495) — coupled faithful fix deferred from J21; ADR-0085 records the hold finding; shipped round-half-up + baseTimeMid re-center 14.5→13.65 (J23)
+  └─→ J24 possession-clock subsystem port (⬜, RE ✅ 2026-07-16 🔮) — the pace/base_time dispersion carrier J20/J23 pointed at, now fully pinned: three step classes + per-possession jitter + the full FUN_004e4150 ratio; the named path to Var(lnPOSS) and the Cov(lnPOSS,lnPPS) sign
 J18 composite fidelity ports (✅ 2026-07-13 — all divergences merged; f/shrink port declined as documented divergence) · J19 J6-residue RE (✅ 2026-07-12) — both spawned by J6
 ```
 
@@ -53,7 +54,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 4 |
+| ⬜ Open | 5 |
 | 📋 Planned | 0 |
 | ◑ Partial | 0 |
 | ✅ Implemented | 18 |
@@ -181,3 +182,9 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 ➜ J22 Per-player rl_stl/rl_tov production-bundle wiring — ✅ Implemented (2026-07-16): PR #1490; real per-player STL/TOV composites feed defQ/offQ; rating stand-in retained as RealLifeMIN==0 fallback; see [archive](archive/jsb-native-backlog-archive.md).
 
 ➜ J23 round-half-up + base_time re-center — ✅ Implemented (2026-07-16, PR #1495): round-half-up (`int(pt+0.5)`) in `possessionTime` COUPLED with `baseTimeMid` re-centered 14.5→13.65; mean pace ~104.5 poss/g restored; four-term gate documented-null on Cov sign; ADR-0085 hold lifted; see [archive](archive/jsb-native-backlog-archive.md).
+
+### J24 Possession-clock subsystem faithful port (step classes + jitter + FUN_004e4150 ratio)
+**Location:** `engine/internal/sim/tempo.go` + `gameloop.go` (one deterministic per-game step, additive base_time stand-in) vs 5.60 `FUN_004e42e0`/`FUN_004e4150` — **both now fully pinned statically** (2026-07-16 Fable RE session, user-directed; artifact: `jsb-native/re-artifacts/jsb-J24-pace-dispersion-RE-20260716.md`).
+**Problem:** 5.60's possession clock has THREE step classes the engine collapses into one constant: steal transition = `rand(3)` (0–2s); DRB push (code 7) = `rand(3)+2` (2–4s), gated per possession by `rand(18) ≤ TO rating (+0x1e8 = bundle r_trans_off) − (gt==4) + tempo-strategy adj` (team `.lge` strategy 1–5: ±1, half-prob at 2/4); half-court = round-half-up(pt/2 + U[0,pt)) with a {3..23} redraw when the rounded step hits trunc(pt). pt itself is a per-matchup RATIO of seven volume composites + league constants (all weights pinned: 2880/0.625/1.4/1.25/4.0; typical pt ≈ 15.3–15.5, effective mean step 13.8 = 2880/209.2 ✓ — the engine's `baseTimeMid=13.65` re-center silently absorbed the missing fast paths). This subsystem is the named carrier of the Var(lnPOSS) gap (0.000339 vs real 0.000721) and the wrong-signed Cov(lnPOSS,lnPPS) (−0.000095 vs positive; 81–89% of real Cov(lnFGA,lnPPS) per J2s2) — the cross-team dispersion enters via steal rate, TO ratings, and tempo strategy, channels the engine's clock never sees. Corrects two stale premises: ADR-0085's "rounds half-up" pin was radically incomplete (it rounds a JITTERED draw), and the June poss-channel closure (corr −0.42) predates the foul program and is re-opened.
+**Direction:** Own `/plan`, `auto_merge: false`. Phases: (0) instrument — faithful-pt distribution across archive rosters + re-measure the −0.42 premise on current master; (1) faithful FUN_004e4150 ratio replacing the additive stand-in (composites live post-J22); (2) per-possession jittered step + redraw, retiring the per-game constant; (3) steal-transition 0–2s step; (4) DRB-push class on `r_trans_off` + tempo strategy (**bundle gap:** `.lge` strategy field needs offset pin + extraction); (5) retire `baseTimeMid`. Gates: mean pace ~104.6 preserved; Var(lnPOSS) → 0.000721; Cov(lnPOSS,lnPPS) sign; per-class shares vs J4 instrument.
+**Status (2026-07-16):** ⬜ Open — RE ✅ complete (🔮 Fable, this session); port `/plan`-ready: design 🧠 Opus, mechanical phases ⚙️ Sonnet. Bounded unknowns recorded in the artifact (CEngine+0x38 scalar, +0x30 flag writer, `.lge` strategy offset, J4 marker coverage).

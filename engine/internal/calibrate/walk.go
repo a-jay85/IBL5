@@ -104,6 +104,12 @@ type Options struct {
 	// (channel off), distinct from nil (use const) — hence the pointer.
 	OffVolumeScale *float64
 
+	// BaseTimeMid, when non-nil, overrides the sim package-const baseTimeMid (tempo.go)
+	// in the default (non-injected) engine runs — the J23 mean-pace re-center sweep.
+	// nil leaves every existing caller + the committed calibration byte-identical (the
+	// const path). The pointer distinguishes "unset" (nil ⇒ const) from a real value.
+	BaseTimeMid *float64
+
 	// GateBaseline, when non-nil, overrides the L1 gate-1 baseline term (the league
 	// offensive-rebound share × 100) in the default (non-injected) engine runs — the
 	// ADR-0058 gate-continuation baseline sensitivity sweep. Threaded into sim.Options by

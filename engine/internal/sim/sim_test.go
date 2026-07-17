@@ -269,9 +269,13 @@ func TestSimulate_MinutesConservation(t *testing.T) {
 // injury draws shifted the RNG sequence so the historical seed 1988 no longer
 // forces a foul-out. The test's intent is the foul-out → minutes-stop invariant,
 // not any particular seed, so it uses the first seed that produces a foul-out.
+// The bound is 1000 (was 200): the J23 base-time re-center moved the rotation
+// game's step 14s → 13s, re-shuffling the RNG stream — the lone C's mean PF is
+// unchanged (~1.1/game, probed 2026-07-16), but a 6-PF game is a deep-tail event
+// and the first qualifying seed moved past 200 (322 at baseTimeMid 13.8).
 func TestSimulate_FoulOutStopsMinutes(t *testing.T) {
 	var g result.GameResult
-	for seed := uint64(1); seed <= 200; seed++ {
+	for seed := uint64(1); seed <= 1000; seed++ {
 		res := Simulate(rotationBundle(), seed)
 		for _, pb := range res.Games[0].PlayerBoxes {
 			if pb.GamePF >= 6 {

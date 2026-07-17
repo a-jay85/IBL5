@@ -9,7 +9,17 @@ const tempoFactor = 1.0
 const (
 	baseTimeLow  = 13.0
 	baseTimeHigh = 16.0
-	baseTimeMid  = (baseTimeLow + baseTimeHigh) / 2.0 // 14.5 — a neutral team's pace
+	baseTimeMid  = 13.65 // J23 re-center (PROVISIONAL — see below): neutral team's
+	// pace. NO LONGER the clamp midpoint (was (low+high)/2 = 14.5) — with
+	// round-half-up (possessionTime), 14.5 rounded the central step to 15s and
+	// dropped mean pace to ~97.6 vs real ~104.6. 13.65 restores the mean toward
+	// ~104.6 (smoke: 13.6 → 104.585 poss/g, JSB_ARCHIVE_RUNS=4 STRIDE=4) and is
+	// the lower edge of the coupling-sign window mid ∈ [13.622, ~14.07) that
+	// TestVolumeCountChannel_CouplingSign requires under round-half-up.
+	// PROVISIONAL: selected from the smoke bracket; the 20-run stride-1 archive
+	// sweep of record over {13.65, 13.7} (basetimemid_sweep_archive_test.go)
+	// adjudicates the final literal before merge (auto_merge: false — human
+	// signoff). See ADR-0085.
 )
 
 // teamBaseTime constants — the volume-rate → shot-COUNT channel (ADR-0042).
@@ -89,14 +99,16 @@ const (
 // teamBaseTime uses the package-const offVolumeScale — the thin wrapper so existing
 // callers and tempo_test.go are unchanged.
 func teamBaseTime(starters []onCourt) float64 {
-	return teamBaseTimeWith(starters, offVolumeScale)
+	return teamBaseTimeWith(starters, offVolumeScale, baseTimeMid)
 }
 
-// teamBaseTimeWith is teamBaseTime with the offensive-volume scale supplied by the
-// caller — the ADR-0054 possession-count dispersion sweep seam. scale==offVolumeScale
-// reproduces teamBaseTime byte-for-byte (so a nil Options.OffVolumeScale is
-// golden-stable). Pure function: no Options/config in scope.
-func teamBaseTimeWith(starters []onCourt, scale float64) float64 {
+// teamBaseTimeWith is teamBaseTime with the offensive-volume scale AND the neutral
+// base-time center supplied by the caller — the ADR-0054 possession-count dispersion
+// sweep seam (scale) and the J23 mean-pace re-center sweep seam (mid).
+// scale==offVolumeScale && mid==baseTimeMid reproduces teamBaseTime byte-for-byte
+// (so nil Options.OffVolumeScale/BaseTimeMid are golden-stable). Pure function: no
+// Options/config in scope.
+func teamBaseTimeWith(starters []onCourt, scale, mid float64) float64 {
 	if len(starters) == 0 {
 		return baseTimeLow
 	}
@@ -108,7 +120,7 @@ func teamBaseTimeWith(starters []onCourt, scale float64) float64 {
 	n := float64(len(starters))
 	offAvg := offSum / n
 	defAvg := defSum / n
-	bt := baseTimeMid - scale*(offAvg-offVolumeNeutral) + defRatingScale*(defAvg-defRatingNeutral)
+	bt := mid - scale*(offAvg-offVolumeNeutral) + defRatingScale*(defAvg-defRatingNeutral)
 	if bt < baseTimeLow {
 		bt = baseTimeLow
 	}
@@ -119,28 +131,25 @@ func teamBaseTimeWith(starters []onCourt, scale float64) float64 {
 }
 
 // possessionTime is the integer seconds one possession removes from the game
-// clock: (2.0 − factor) × base_time, truncated. At factor 1.0 it equals base_time.
+// clock: (2.0 − factor) × base_time, ROUNDED HALF-UP. At factor 1.0 it equals
+// round-half-up(base_time).
 //
-// TRUNCATION RETAINED — round-half-up deferred to J23 (ADR-0085). 5.60 rounds this
-// step HALF-UP, it does NOT truncate: FUN_004e42e0 (the possession-clock update,
-// jsb560_decompiled.c:98386-98438) truncates possession_time via __ftol then adds
-// 1 when the fractional part ≥ 0.5 (`_DAT_00669ef0` = 0.5, confirmed from the raw
-// .rdata bytes 0x3fe0000000000000). So Go's int() truncation here IS a confirmed
-// infidelity. But the J21 archive A/B (ADR-0085) showed the faithful round-half-up,
-// shipped ALONE, does NOT flip the wrong-signed Cov(lnPOSS,lnPPS) (Δ within
-// sampling noise) and REGRESSES mean pace: it lengthens the central baseTimeMid =
-// 14.5 step to 15, dropping mean possessions from ~101.9 (trunc) to ~97.6 vs real
-// ~104.6. Truncation's downward bias was accidentally MASKING a base_time-
-// generation miscalibration (engine center 14.5s vs real effective ~13.8s = 1440/
-// 104.6 — base_time ~0.7s too slow). The faithful fix is round-half-up COUPLED with a base_time
-// re-centering (offVolumeNeutral), landing both the step rule and the mean pace
-// correctly — that coupled change is J23. Until then truncation stays: it is the
-// mean-closer of the two imperfect states. See ADR-0085 for the RE evidence, the
-// four-term A/B, and the mean-regression finding.
+// ROUND-HALF-UP (5.60-faithful, J23 — supersedes the ADR-0085 deferral). 5.60
+// rounds this step HALF-UP, it does NOT truncate: FUN_004e42e0 (the possession-
+// clock update, jsb560_decompiled.c:98386-98438) truncates possession_time via
+// __ftol then adds 1 when the fractional part ≥ 0.5 (`_DAT_00669ef0` = 0.5,
+// confirmed from the raw .rdata bytes 0x3fe0000000000000). The prior int()
+// truncation was a confirmed infidelity retained under ADR-0085 ONLY because its
+// downward bias masked a too-slow base_time center. J21's archive A/B showed
+// round-half-up shipped ALONE regresses mean pace (~101.9 → ~97.6 poss/g vs real
+// ~104.6) and does NOT flip the wrong-signed Cov(lnPOSS,lnPPS). J23 ships the
+// faithful round-half-up COUPLED with a baseTimeMid re-center (see the baseTimeMid
+// const above) so both the step rule and the mean pace land correct. See ADR-0085
+// for the RE evidence, the four-term A/B, and the mean-regression finding.
 func possessionTime(baseTime float64) int {
 	pt := (2.0 - tempoFactor) * baseTime
 	if pt < 1.0 || pt > 24.0 {
 		pt = 24.0 // JSB out-of-range fallback
 	}
-	return int(pt)
+	return int(pt + 0.5) // round half-up (5.60 FUN_004e42e0, _DAT_00669ef0 = 0.5)
 }

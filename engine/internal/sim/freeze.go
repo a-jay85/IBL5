@@ -223,6 +223,12 @@ type Options struct {
 	// freeze arms). The only knob this seam moves.
 	OffVolumeScale *float64
 
+	// BaseTimeMid overrides the package const baseTimeMid (tempo.go) for the J23
+	// mean-pace re-center sweep. nil → use the const (a zero Options stays byte-
+	// identical to Simulate); non-nil → use *BaseTimeMid. Always a valid float when
+	// set, so validate() needs no zero-mean guard (like OffVolumeScale).
+	BaseTimeMid *float64
+
 	// GateCont, when non-nil, harvests the L1 gate-1 decomposition instrument
 	// (ADR-0057/0058) across the run: at every offensive-rebound resolution it records
 	// the gate-1 P (live since ADR-0058), the linear gate-2 P, and their product, keyed

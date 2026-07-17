@@ -227,6 +227,8 @@ func toBundlePlayer(p PlrPlayer, minutes map[int]int) bundle.Player {
 		RealLifeFTA: p.RealLifeFTA,
 		RealLife3GA: p.RealLife3GA,
 		RealLifeORB: p.RealLifeORB,
+		RealLifeSTL: p.RealLifeSTL,
+		RealLifeTVR: p.RealLifeTVR,
 
 		Age:         p.Age,
 		Clutch:      p.Clutch,

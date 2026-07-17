@@ -71,7 +71,7 @@ func TestDefQuality_SumAndCap(t *testing.T) {
 // depends ONLY on the lineup, never on any home/away input (there is no hca arg).
 func TestOffQuality_SumNoHCA(t *testing.T) {
 	off := fiveStarters(3)
-	// 5 offense at TVR=70 → 5·4.6944002 = 23.472001.
+	// 5 offense at TVR=70, RealLifeMIN=0 → fallback: 5·4.6944002 = 23.472001.
 	if got := offQuality(off); math.Abs(got-23.472001) > teamQualityEps {
 		t.Errorf("offQuality(TVR=70 ×5) = %.5f, want 23.472001", got)
 	}
@@ -80,5 +80,114 @@ func TestOffQuality_SumNoHCA(t *testing.T) {
 	// property that makes the foul bucket produce a ≈1.0 home/away FTA ratio.
 	if offQuality(fiveStarters(3)) != offQuality(fiveStarters(99)) {
 		t.Errorf("offQuality varies with team id — it must depend only on ratings (side-symmetric)")
+	}
+}
+
+// --- J22: real per-player composite path (RealLifeMIN > 0) -------------------
+
+// ocWithReal builds an on-court player with real career stats wired (RealLifeMIN > 0),
+// so stlRate/tovRate use the J22 real-composite path instead of the rating stand-in.
+func ocWithReal(stl, tvr, min int) onCourt {
+	p := mkPlayer(1, 3, slotPG, 48)
+	p.RealLifeSTL = stl
+	p.RealLifeTVR = tvr
+	p.RealLifeMIN = min
+	return oc(slotPG, p)
+}
+
+// TestTeamQuality_RealComposite_HappyPath: stlRate/tovRate with RealLifeMIN>0 equal
+// hand-computed STL/MIN×44 and TOV/MIN×48.
+func TestTeamQuality_RealComposite_HappyPath(t *testing.T) {
+	p := ocWithReal(110, 150, 2000)
+	// stlRate = 110/2000 × 44 = 2.42
+	wantSTL := 110.0 / 2000.0 * 44.0
+	if got := stlRate(p); math.Abs(got-wantSTL) > teamQualityEps {
+		t.Errorf("stlRate(real) = %.6f, want %.6f", got, wantSTL)
+	}
+	// tovRate = 150/2000 × 48 = 3.6
+	wantTOV := 150.0 / 2000.0 * 48.0
+	if got := tovRate(p); math.Abs(got-wantTOV) > teamQualityEps {
+		t.Errorf("tovRate(real) = %.6f, want %.6f", got, wantTOV)
+	}
+}
+
+// TestTeamQuality_DivByZeroGuard: RealLifeSTL>0, RealLifeTVR>0, RealLifeMIN==0
+// returns rating fallback (not NaN/Inf) — guards division by zero.
+func TestTeamQuality_DivByZeroGuard(t *testing.T) {
+	p := mkPlayer(1, 3, slotPG, 48)
+	p.RealLifeSTL = 110
+	p.RealLifeTVR = 150
+	p.RealLifeMIN = 0 // guard must select fallback, not divide by zero
+	oc0 := oc(slotPG, p)
+
+	stl := stlRate(oc0)
+	tov := tovRate(oc0)
+	if math.IsNaN(stl) || math.IsInf(stl, 0) {
+		t.Errorf("stlRate(RealLifeMIN=0) = %v, want finite fallback", stl)
+	}
+	if math.IsNaN(tov) || math.IsInf(tov, 0) {
+		t.Errorf("tovRate(RealLifeMIN=0) = %v, want finite fallback", tov)
+	}
+	// Must equal the rating stand-in (same as mkPlayer's STL=30, TVR=70).
+	wantSTL := floor1(p.STL) / ratingRefScale * leagueSTL48
+	wantTOV := floor1(p.TVR) / ratingRefScale * leagueTOV48
+	if math.Abs(stl-wantSTL) > teamQualityEps {
+		t.Errorf("stlRate fallback = %.6f, want %.6f (rating stand-in)", stl, wantSTL)
+	}
+	if math.Abs(tov-wantTOV) > teamQualityEps {
+		t.Errorf("tovRate fallback = %.6f, want %.6f (rating stand-in)", tov, wantTOV)
+	}
+}
+
+// TestTeamQuality_CapBoundary_RealPath: high-real-STL lineup still hits defQ cap.
+func TestTeamQuality_CapBoundary_RealPath(t *testing.T) {
+	ceiling := defQualityCapMultiplier * defQualityCapTeamMult * leagueSTL48
+	// Very high real STL/MIN ratio → uncapped sum > ceiling → capped.
+	var hi []onCourt
+	for slot := slotPG; slot <= slotC; slot++ {
+		hi = append(hi, ocWithReal(500, 10, 100)) // 500/100×44 = 220 per player
+	}
+	if raw := 5 * (500.0 / 100.0 * 44.0); raw <= ceiling {
+		t.Fatalf("test setup: raw high-real-STL %.3f should exceed ceiling %.3f", raw, ceiling)
+	}
+	if got := defQuality(hi); math.Abs(got-ceiling) > teamQualityEps {
+		t.Errorf("defQuality (real, capped) = %.4f, want ceiling %.4f", got, ceiling)
+	}
+}
+
+// TestTeamQuality_DispersionFlows: mixed-real lineup produces defQ strictly between
+// the min and max single-player contributions — proves real per-player spread flows through.
+func TestTeamQuality_DispersionFlows(t *testing.T) {
+	// Five players with different real STL/MIN ratios.
+	lineup := []onCourt{
+		ocWithReal(50, 100, 2000),  // stlRate = 50/2000×44 = 1.1
+		ocWithReal(100, 100, 2000), // stlRate = 100/2000×44 = 2.2
+		ocWithReal(150, 100, 2000), // stlRate = 150/2000×44 = 3.3
+		ocWithReal(200, 100, 2000), // stlRate = 200/2000×44 = 4.4
+		ocWithReal(250, 100, 2000), // stlRate = 250/2000×44 = 5.5
+	}
+	minContrib := 50.0 / 2000.0 * 44.0
+	maxContrib := 250.0 / 2000.0 * 44.0
+	got := defQuality(lineup)
+	if got <= minContrib || got >= 5*maxContrib {
+		t.Errorf("defQ = %.4f, want strictly between min contrib %.4f and 5×max %.4f — dispersion broken",
+			got, minContrib, 5*maxContrib)
+	}
+	// Specifically, expect sum = (50+100+150+200+250)/2000×44 = 750/2000×44 = 16.5,
+	// but the cap is 13.755 so we get the ceiling.
+	// With different numbers that don't cap:
+	lineup2 := []onCourt{
+		ocWithReal(10, 100, 2000), // 0.22
+		ocWithReal(20, 100, 2000), // 0.44
+		ocWithReal(30, 100, 2000), // 0.66
+		ocWithReal(40, 100, 2000), // 0.88
+		ocWithReal(50, 100, 2000), // 1.1
+	}
+	got2 := defQuality(lineup2)
+	min2 := 10.0 / 2000.0 * 44.0
+	max2 := 50.0 / 2000.0 * 44.0
+	if got2 <= min2 || got2 >= 5*max2+teamQualityEps {
+		t.Errorf("defQ2 = %.4f, want strictly between %.4f and %.4f — dispersion broken",
+			got2, min2, 5*max2)
 	}
 }

@@ -93,6 +93,57 @@ func TestDecode_RealLifeAbsentZero(t *testing.T) {
 	}
 }
 
+// TestPlayer_RealLifeSTLTVR_JSONRoundTrip: rl_stl/rl_tvr decode by tag and survive round-trip.
+func TestPlayer_RealLifeSTLTVR_JSONRoundTrip(t *testing.T) {
+	j := `{"seed":1,"players":[{"pid":1,"teamid":3,"rl_stl":137,"rl_tvr":205}],` +
+		`"schedule":[{"home_team_id":3,"visitor_team_id":7,"date":"d","game_type":2}]}`
+	b, err := Decode([]byte(j))
+	if err != nil {
+		t.Fatalf("Decode: %v", err)
+	}
+	p := b.Players[0]
+	if p.RealLifeSTL != 137 || p.RealLifeTVR != 205 {
+		t.Errorf("RealLifeSTL/TVR = %d/%d, want 137/205", p.RealLifeSTL, p.RealLifeTVR)
+	}
+	// Round-trip: marshal → unmarshal → same values.
+	out, err := json.Marshal(b)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	b2, err := Decode(out)
+	if err != nil {
+		t.Fatalf("re-Decode: %v", err)
+	}
+	if b2.Players[0].RealLifeSTL != 137 || b2.Players[0].RealLifeTVR != 205 {
+		t.Errorf("round-trip RealLifeSTL/TVR = %d/%d, want 137/205", b2.Players[0].RealLifeSTL, b2.Players[0].RealLifeTVR)
+	}
+}
+
+// TestPlayer_RealLifeSTLTVR_ZeroDefault: omitting rl_stl/rl_tvr decodes to 0 (graceful-degradation contract).
+func TestPlayer_RealLifeSTLTVR_ZeroDefault(t *testing.T) {
+	b, err := Decode([]byte(validBundleJSON)) // validBundleJSON has no rl_stl/rl_tvr
+	if err != nil {
+		t.Fatalf("Decode: %v", err)
+	}
+	p := b.Players[0]
+	if p.RealLifeSTL != 0 || p.RealLifeTVR != 0 {
+		t.Errorf("absent rl_stl/rl_tvr should default to 0, got STL=%d TVR=%d", p.RealLifeSTL, p.RealLifeTVR)
+	}
+}
+
+// TestPlayer_RealLifeSTLTVR_WrongKey: wrong key (rl_steals) leaves RealLifeSTL==0.
+func TestPlayer_RealLifeSTLTVR_WrongKey(t *testing.T) {
+	j := `{"seed":1,"players":[{"pid":1,"teamid":3,"rl_steals":99}],` +
+		`"schedule":[{"home_team_id":3,"visitor_team_id":7,"date":"d","game_type":2}]}`
+	b, err := Decode([]byte(j))
+	if err != nil {
+		t.Fatalf("Decode: %v", err)
+	}
+	if b.Players[0].RealLifeSTL != 0 {
+		t.Errorf("wrong key rl_steals should not bind: RealLifeSTL = %d, want 0", b.Players[0].RealLifeSTL)
+	}
+}
+
 // #3 (boundary) — an unknown game_type value is rejected at decode time.
 func TestDecode_RejectsUnknownGameType(t *testing.T) {
 	for _, gt := range []int{0, 1, 7, 99} {

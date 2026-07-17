@@ -92,6 +92,9 @@ const (
 	offRealLifeFTA = 72 // width 4 — FT attempts (D70 per-player part)
 	offRealLife3GA = 80 // width 4 — 3pt attempts (subtracted from FGA for the 2PA/48 baseline)
 	offRealLifeORB = 84 // width 4 — offensive rebounds (DB8)
+	// not read: DRB=88, AST=92 (defQ/offQ need only STL and TVR — skipped deliberately)
+	offRealLifeSTL = 96  // width 4 — career steals (real-life), PlrLineParser.php:53 substr(line,96,4)
+	offRealLifeTVR = 100 // width 4 — career turnovers (real-life), PlrLineParser.php:54 substr(line,100,4)
 
 	// Per-player IN-SEASON box-score totals (record-relative, width 4 each), the
 	// Branch-B team-rate inputs. JSB's per-half setup (FUN_004cfa50, COMPOSITE_DOUBLES_
@@ -211,6 +214,8 @@ type PlrPlayer struct {
 	RealLifeFTA int
 	RealLife3GA int
 	RealLifeORB int
+	RealLifeSTL int
+	RealLifeTVR int
 
 	// Per-player IN-SEASON box-score totals (offSeasonGP/DRB/AST), the Branch-B
 	// team-rate inputs. Summed per team in assemble.go into bundle.Team.DRBRate/
@@ -300,6 +305,8 @@ func ReadPlr(r io.Reader) ([]PlrPlayer, error) {
 			{&p.RealLifeMIN, offRealLifeMIN, 4}, {&p.RealLifeFGA, offRealLifeFGA, 4},
 			{&p.RealLifeFTA, offRealLifeFTA, 4}, {&p.RealLife3GA, offRealLife3GA, 4},
 			{&p.RealLifeORB, offRealLifeORB, 4},
+			{&p.RealLifeSTL, offRealLifeSTL, 4},
+			{&p.RealLifeTVR, offRealLifeTVR, 4},
 			{&p.SeasonGP, offSeasonGP, 4}, {&p.SeasonDRB, offSeasonDRB, 4},
 			{&p.SeasonAST, offSeasonAST, 4},
 			{&p.RatingFGA, offRating2GA, 3}, {&p.RatingFGP, offRating2GP, 3},

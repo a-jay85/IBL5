@@ -3,6 +3,7 @@ package backup
 import (
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 
 	"github.com/a-jay85/IBL5/engine/internal/bundle"
@@ -63,6 +64,31 @@ func computeLeagueShotBaseline(players []PlrPlayer) float64 {
 		return 0
 	}
 	return sum2PA / sumMIN * 48.0
+}
+
+// computeLeagueBlk48 assembles the league BLK-per-48-player-minutes rate
+// (bundle.Bundle.LeagueBlk48), the block-modifier denominator for shotValue3pt/2pt.
+// Same qualifying population as computeLeagueShotBaseline: RecordIndex ≤
+// leagueShotBaselineMaxRecordIndex, non-empty Name, RealLifeMIN > 2×RealLifeGP.
+// Expected ~1.7484 on the game-install IBL5.plr. Returns 0 on empty pop.
+func computeLeagueBlk48(players []PlrPlayer) float64 {
+	var sumBLK, sumMIN float64
+	for _, p := range players {
+		if p.RecordIndex > leagueShotBaselineMaxRecordIndex {
+			continue
+		}
+		if p.Name == "" {
+			continue
+		}
+		if p.RealLifeMIN > 2*p.RealLifeGP {
+			sumBLK += float64(p.RealLifeBLK)
+			sumMIN += float64(p.RealLifeMIN)
+		}
+	}
+	if sumMIN <= 0 {
+		return 0
+	}
+	return sumBLK / sumMIN * 48.0
 }
 
 // AssembleOptions carries the bundle-level metadata the backup files do not
@@ -181,6 +207,7 @@ func ToBundle(players []PlrPlayer, sched []SchGame, opts AssembleOptions) (bundl
 		Players:            bundlePlayers,
 		Schedule:           games,
 		LeagueShotBaseline: computeLeagueShotBaseline(players),
+		LeagueBlk48:        computeLeagueBlk48(players),
 	}, nil
 }
 
@@ -189,6 +216,32 @@ func ToBundle(players []PlrPlayer, sched []SchGame, opts AssembleOptions) (bundl
 // TO=transition offense -> r_trans_off. minutes maps player ordinal ->
 // dc_minutes from the .plb (nil -> 0).
 func toBundlePlayer(p PlrPlayer, minutes map[int]int) bundle.Player {
+	// Per-player derived make-rate composites (D-fields). Faithful to the JSB
+	// +0xD80/+0xD60/+0xD64/+0xDE8 per-player offsets. Zero when real-life data
+	// is absent — shotdecision.go falls back to fgpToPermille for D60/D64==0.
+	// D88=(FGA-3GA)/MIN×48, D90=3GA/MIN×48 match bucketweights.go:260-265 locals.
+	var d80, d60, d64 int
+	var de8 float64
+	if p.RealLifeMIN > 0 {
+		de8 = float64(p.RealLifeBLK) / float64(p.RealLifeMIN) * 48.0
+	}
+	if p.RealLife3GA > 0 {
+		d80 = int(math.Round(float64(p.RealLife3GM) / float64(p.RealLife3GA) * 1000))
+	}
+	twoPA := p.RealLifeFGA - p.RealLife3GA
+	if twoPA > 0 {
+		d60 = int(math.Round(float64(p.RealLifeFGM-p.RealLife3GM) / float64(twoPA) * 1000))
+		if p.RealLifeMIN > 0 {
+			d88 := float64(twoPA) / float64(p.RealLifeMIN) * 48.0
+			d90 := float64(p.RealLife3GA) / float64(p.RealLifeMIN) * 48.0
+			if d90 > 0 {
+				d64 = int(math.Round(float64(d60) * (4*d90 - d88) / (3 * d90)))
+				if d64 < 0 {
+					d64 = 0
+				} // floor: rare high-volume 2PA skew
+			}
+		}
+	}
 	return bundle.Player{
 		PID:    p.PID,
 		Name:   p.Name,
@@ -229,6 +282,13 @@ func toBundlePlayer(p PlrPlayer, minutes map[int]int) bundle.Player {
 		RealLifeORB: p.RealLifeORB,
 		RealLifeSTL: p.RealLifeSTL,
 		RealLifeTVR: p.RealLifeTVR,
+		RealLifeFGM: p.RealLifeFGM,
+		RealLife3GM: p.RealLife3GM,
+		RealLifeBLK: p.RealLifeBLK,
+		D80:         d80,
+		D60:         d60,
+		D64:         d64,
+		DE8:         de8,
 
 		Age:         p.Age,
 		Clutch:      p.Clutch,

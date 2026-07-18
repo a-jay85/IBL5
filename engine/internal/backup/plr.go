@@ -88,13 +88,16 @@ const (
 	// (2PA = FGA_total − 3GA, since offRealLifeFGA is the combined total).
 	offRealLifeGP  = 52 // width 4 — games played (league-baseline inclusion gate)
 	offRealLifeMIN = 56 // width 4 — minutes played (the per-48 rate divisor)
+	offRealLifeFGM = 60 // width 4 — field goals made (feeds D60/D64 per-player make-rate)
 	offRealLifeFGA = 64 // width 4 — total FG attempts (D88)
 	offRealLifeFTA = 72 // width 4 — FT attempts (D70 per-player part)
+	offRealLife3GM = 76 // width 4 — 3-point field goals made (feeds D80 per-player 3pt make-rate)
 	offRealLife3GA = 80 // width 4 — 3pt attempts (subtracted from FGA for the 2PA/48 baseline)
 	offRealLifeORB = 84 // width 4 — offensive rebounds (DB8)
 	// not read: DRB=88, AST=92 (defQ/offQ need only STL and TVR — skipped deliberately)
 	offRealLifeSTL = 96  // width 4 — career steals (real-life), PlrLineParser.php:53 substr(line,96,4)
 	offRealLifeTVR = 100 // width 4 — career turnovers (real-life), PlrLineParser.php:54 substr(line,100,4)
+	offRealLifeBLK = 104 // width 4 — blocks (feeds DE8 per-player block-rate; also LeagueBlk48)
 
 	// Per-player IN-SEASON box-score totals (record-relative, width 4 each), the
 	// Branch-B team-rate inputs. JSB's per-half setup (FUN_004cfa50, COMPOSITE_DOUBLES_
@@ -210,12 +213,15 @@ type PlrPlayer struct {
 	// gated jointly with RecordIndex ≤ 959 and a non-empty Name.
 	RealLifeGP  int
 	RealLifeMIN int
+	RealLifeFGM int
 	RealLifeFGA int
 	RealLifeFTA int
+	RealLife3GM int
 	RealLife3GA int
 	RealLifeORB int
 	RealLifeSTL int
 	RealLifeTVR int
+	RealLifeBLK int
 
 	// Per-player IN-SEASON box-score totals (offSeasonGP/DRB/AST), the Branch-B
 	// team-rate inputs. Summed per team in assemble.go into bundle.Team.DRBRate/
@@ -302,11 +308,14 @@ func ReadPlr(r io.Reader) ([]PlrPlayer, error) {
 			{&p.PGDepth, offPGDepth, 1}, {&p.SGDepth, offSGDepth, 1}, {&p.SFDepth, offSFDepth, 1},
 			{&p.PFDepth, offPFDepth, 1}, {&p.CDepth, offCDepth, 1},
 			{&p.RealLifeGP, offRealLifeGP, 4},
-			{&p.RealLifeMIN, offRealLifeMIN, 4}, {&p.RealLifeFGA, offRealLifeFGA, 4},
-			{&p.RealLifeFTA, offRealLifeFTA, 4}, {&p.RealLife3GA, offRealLife3GA, 4},
+			{&p.RealLifeMIN, offRealLifeMIN, 4},
+			{&p.RealLifeFGM, offRealLifeFGM, 4}, {&p.RealLifeFGA, offRealLifeFGA, 4},
+			{&p.RealLifeFTA, offRealLifeFTA, 4},
+			{&p.RealLife3GM, offRealLife3GM, 4}, {&p.RealLife3GA, offRealLife3GA, 4},
 			{&p.RealLifeORB, offRealLifeORB, 4},
 			{&p.RealLifeSTL, offRealLifeSTL, 4},
 			{&p.RealLifeTVR, offRealLifeTVR, 4},
+			{&p.RealLifeBLK, offRealLifeBLK, 4},
 			{&p.SeasonGP, offSeasonGP, 4}, {&p.SeasonDRB, offSeasonDRB, 4},
 			{&p.SeasonAST, offSeasonAST, 4},
 			{&p.RatingFGA, offRating2GA, 3}, {&p.RatingFGP, offRating2GP, 3},

@@ -175,6 +175,14 @@ type gameState struct {
 	// snapshot, like gateBaseline. It feeds shotValue2pt's net term and
 	// shotValue3pt (= baseline×1.5).
 	shotBaseline float64
+	// leagueBlk48 is the league BLK-per-48-player-minutes rate
+	// (bundle.Bundle.LeagueBlk48), copied once per game from the bundle.
+	// Feeds blockMod in shotValue3pt/2pt (shotdecision.go). A zero value
+	// (unwired bundle or synthetically-constructed gameState) is intentional:
+	// the defBlkSum cap (≤ 1.5×5×leagueBlk48) forces defBlkSum to 0 when
+	// leagueBlk48=0, so blockMod returns 0 — a no-op fallback requiring no
+	// separate accessor.
+	leagueBlk48 float64
 }
 
 func (g *gameState) emit(e result.Event) { g.events = append(g.events, e) }

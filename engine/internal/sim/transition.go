@@ -134,7 +134,15 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 		// OriginTransition: the ADR-0053 MakePutback arm is OriginOffReb-scoped, so a
 		// fast-break shot (and any rebound continuation within the break, which the
 		// transition path also tags OriginTransition) keeps its live make-value.
-		sv2 := applyClutch(gs.makeValue2pt(net, bh.FGP, result.OriginTransition), bh.Clutch, gs.period, scoreDiff)
+		var defBlkSum float64
+		for _, dp := range defense.players {
+			defBlkSum += dp.DE8
+		}
+		blkCap := 1.5 * 5 * gs.leagueBlk48
+		if defBlkSum > blkCap {
+			defBlkSum = blkCap
+		}
+		sv2 := applyClutch(gs.makeValue2pt(net, bh, mq, result.OriginTransition, gs.leagueBlk48, defBlkSum), bh.Clutch, gs.period, scoreDiff)
 		// Play-outcome buckets use the same faithful helpers as the half-court path
 		// (bucketweights.go) — the second of the two outcomeInputs assembly sites. sv2
 		// (above) feeds shotAttempt on the 2pt path ONLY; it does not double as the

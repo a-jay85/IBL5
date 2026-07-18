@@ -42,8 +42,12 @@ func TestOriginSharePin_Current(t *testing.T) {
 	const band = 0.02
 
 	// PIN: re-baseline if a future within-possession-generation change moves this
-	if math.Abs(initialShare-0.721140) > band {
-		t.Errorf("initial share drifted: got %.6f, want %.6f ± %.2f", initialShare, 0.721140, band)
+	// Re-baselined for J24 Phase 5 steal-split + nonStealTurnover: 0.721140 -> 0.694298.
+	// nonStealTurnover fires before the shot path, removing some initial FGA;
+	// transition shots are unaffected (runTransitionPossession doesn't call it),
+	// so the transition fraction grows relative to total FGA. Measured seed=1..40.
+	if math.Abs(initialShare-0.694298) > band {
+		t.Errorf("initial share drifted: got %.6f, want %.6f ± %.2f", initialShare, 0.694298, band)
 	}
 	// PIN: re-baseline if a future within-possession-generation change moves this
 	if math.Abs(orebShare-0.137482) > band {

@@ -407,16 +407,16 @@ func (gs *gameState) foulWeight(bh onCourt, offense, defenders []onCourt, hca, m
 // halfway blend (live + mean)/2 instead of the full mean. The accumulator write is
 // ALWAYS on the live value v (so a baseline harvest sees the real distribution
 // regardless of which arm is on).
-func (gs *gameState) makeValue2pt(net float64, fgp int, origin result.ShotOrigin) float64 {
+func (gs *gameState) makeValue2pt(net float64, bh onCourt, mq float64, origin result.ShotOrigin, leagueBlk48, defBlkSum float64) float64 {
 	// Faithful putback make-value (ADR-0055): a half-court putback (OriginOffReb)
 	// uses the net-free 4/3-boosted putbackValue2pt form (decompile 93880-93883),
 	// computed BEFORE the accum capture so the Make/MakePutback/MakePutbackHalf arms
 	// freeze against the NEW baseline. The UnfaithfulPutback escape hatch restores the
 	// old net-coupled value for the ADR-0055 OFF walk only. OriginInitial and
 	// OriginTransition are unchanged (transition putback faithfulness is OOS — ADR-0055).
-	v := shotValue2pt(net, fgp, false, gs.shotBaselineOrFallback())
+	v := shotValue2pt(net, bh, mq, false, gs.shotBaselineOrFallback(), leagueBlk48, defBlkSum)
 	if origin == result.OriginOffReb && !gs.freeze.UnfaithfulPutback {
-		v = putbackValue2pt(fgp)
+		v = putbackValue2pt(bh)
 	}
 	if gs.accum != nil {
 		gs.accum.makeSum += v

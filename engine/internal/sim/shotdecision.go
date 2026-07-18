@@ -48,36 +48,112 @@ const (
 	clutchOffset     = 0.98
 )
 
-// base2pt is the player's baseline 2pt make value in per-mille (player[+0xD64]
-// stand-in), derived from the FGP rating.
-func base2pt(fgp int) float64 { return float64(fgp) * fgpToPermille }
+// base2ptFallback returns fgp × fgpToPermille — the FGP-rating stand-in used
+// when a player's real-life D64/D60 is zero (no prior-season 2PA data, e.g.
+// rookies or DB-built bundles). Mirrors shotBaselineOrFallback: the faithful
+// real-life value takes precedence; the rating stand-in is the degraded path.
+func base2ptFallback(fgp int) float64 { return float64(fgp) * fgpToPermille }
 
-// shotValue2pt assembles the 2-point make value. Normal:
-// net × 500 / baseline + base_2pt. Shot clock: base_2pt × 1.3333 (the corrected
-// per-player +0xD60 form — a rushed look ignores the matchup net advantage).
-// baseline is the per-snapshot league 2PA/48 (gameState.shotBaseline).
-func shotValue2pt(net float64, fgp int, shotClock bool, baseline float64) float64 {
-	if shotClock {
-		return base2pt(fgp) * shotClock2ptMult
+// blockMod is the per-shot block-modifier: (5×leagueBlk48 − defBlkSum) × 500 / (5×b)
+// where b = baseline×1.5 for 3pt or baseline for 2pt. Positive when the defending
+// lineup blocks less than league average; negative when they block more. Zero when
+// leagueBlk48=0 (unwired bundle: the cap in defBlkSum already forces defBlkSum=0,
+// so (0-0)×500/... = 0).
+func blockMod(b, leagueBlk48, defBlkSum float64) float64 {
+	if b <= 0 {
+		return 0
 	}
-	return net*netToShotValue/baseline + base2pt(fgp)
+	return (5*leagueBlk48 - defBlkSum) * netToShotValue / (5 * b)
+}
+
+// computeD64Base assembles the putback-adjusted 2P‰ base (JSB player[+0xD64]) at
+// shot-time from the ball-handler's real-life shot distribution. D90 is the
+// twoPtBucketWeight composite (JSB +0xD90 Branch-A cold composite) and D88 is the
+// per-48 2PA rate — "D88/D90 already exist in bucketweights" (RE §6.3). The
+// plan-architect's annotation "D90=3GA/MIN×48" was wrong; it read threePtBucketWeight
+// (line 261) instead of the D90 composite (line 214). Falls back to
+// base2ptFallback(fgp) when D60==0 (no real-life 2PA data), RealLifeMIN==0, or the
+// formula floors (bucket-weight D90≤0 or d64≤0).
+func computeD64Base(bh onCourt) float64 {
+	if bh.D60 == 0 || bh.RealLifeMIN <= 0 {
+		return base2ptFallback(bh.FGP)
+	}
+	twoPA := bh.RealLifeFGA - bh.RealLife3GA
+	if twoPA < 0 {
+		twoPA = 0
+	}
+	d88 := per48Min(twoPA, bh.RealLifeMIN)
+	d90 := twoPtBucketWeight(bh)
+	if d90 <= 0 {
+		return base2ptFallback(bh.FGP)
+	}
+	d64 := float64(bh.D60) * (4*d90 - d88) / (3 * d90)
+	if d64 <= 0 {
+		return base2ptFallback(bh.FGP)
+	}
+	return d64
+}
+
+// shotValue2pt assembles the faithful 2-point make value using JSB player[+0xD64].
+// D64 is computed at shot-time via computeD64Base (D90=twoPtBucketWeight, D88=2PA/48).
+// Normal: computeD64Base(bh) + net×500/baseline + blockMod(baseline, leagueBlk48, defBlkSum) + flowTerm.
+// mq is the matchupQuality for the possession; the flow term +mq×250/d88 (JSB 5.60
+// faithful, RE §3: +flow×250/player[+0xD88]) is applied only on the NORMAL path —
+// not shot-clock and not putback (putbackValue2pt is the putback form).
+// Shot-clock (rushed look): float64(bh.D60) × 1.3333, net-free, faithful to the
+//
+//	+0xD60 form. Falls back to base2ptFallback(fgp) when D60==0 (no real-life data).
+//
+// baseline is the per-snapshot league 2PA/48 (gameState.shotBaseline).
+func shotValue2pt(net float64, bh onCourt, mq float64, shotClock bool, baseline, leagueBlk48, defBlkSum float64) float64 {
+	if shotClock {
+		base := base2ptFallback(bh.FGP)
+		if bh.D60 > 0 {
+			base = float64(bh.D60)
+		}
+		return base * shotClock2ptMult
+	}
+	// flow term: +mq*250/d88 (JSB 5.60 faithful, RE §3: +flow×250/player[+0xD88]).
+	// d88 = per-48 2PA rate (same as twoPtBucketWeight's D88). Zero when no real-life
+	// 2PA data or zero minutes. Phase 3/4 of matchupQuality are stubs (zero) until
+	// PR4/PR-coaching lands — the term matures automatically when they're wired.
+	var flowTerm float64
+	if bh.RealLifeMIN > 0 {
+		twoPA := bh.RealLifeFGA - bh.RealLife3GA
+		if twoPA < 0 {
+			twoPA = 0
+		}
+		if twoPA > 0 {
+			d88 := per48Min(twoPA, bh.RealLifeMIN)
+			if d88 > 0 {
+				flowTerm = mq * 250.0 / d88
+			}
+		}
+	}
+	return computeD64Base(bh) + net*netToShotValue/baseline + blockMod(baseline, leagueBlk48, defBlkSum) + flowTerm
 }
 
 // putbackValue2pt is the JSB 5.60 putback (OReb-continuation) 2pt make-value:
-// player[+0xD60] × 1.3333 — net-advantage-free and 4/3-boosted (decompile
-// jsb560_decompiled.c:93880-93883). base2pt(fgp) is the engine's +0xD60 2P%-rating
-// stand-in; shotClock2ptMult is the 4/3 boost. This is the SAME assembled form as
-// the shotValue2pt shotClock==true branch, named for its distinct concept (a
-// putback, not a rushed shot-clock look) so the call site reads its intent.
-func putbackValue2pt(fgp int) float64 {
-	return base2pt(fgp) * shotClock2ptMult
+// player[+0xD60] × 1.3333 — net-free and 4/3-boosted (decompile :93880-93883).
+// Uses D60 (the raw 2P‰, not the putback-adjusted D64). Falls back to
+// base2ptFallback(fgp) when bh.D60==0 (no real-life data).
+func putbackValue2pt(bh onCourt) float64 {
+	base := base2ptFallback(bh.FGP)
+	if bh.D60 > 0 {
+		base = float64(bh.D60)
+	}
+	return base * shotClock2ptMult
 }
 
-// shotValue3pt is league-baseline × 1.5 (decompile :94025, ×_DAT_0066d388) —
-// deliberately independent of net advantage. ODPT ratings decide whether a 3pt
-// is *attempted*, but once attempted, make probability is identical for all
-// players. baseline is the per-snapshot league 2PA/48 (gameState.shotBaseline).
-func shotValue3pt(baseline float64) float64 { return baseline * 1.5 }
+// shotValue3pt assembles the faithful 3-point make value (JSB player[+0xD80]).
+// = float64(d80) + net×500/(baseline×1.5) + blockMod(baseline×1.5, leagueBlk48, defBlkSum).
+// d80 is the player's real-life 3P‰ (0 if no real-life 3GA — faithful, since
+// a player with no 3pt attempts provides no real base, but a positive net term
+// can still make the value positive). baseline is the per-snapshot league 2PA/48.
+func shotValue3pt(net float64, d80 int, baseline, leagueBlk48, defBlkSum float64) float64 {
+	b := baseline * 1.5
+	return float64(d80) + net*netToShotValue/b + blockMod(b, leagueBlk48, defBlkSum)
+}
 
 // shotValueFT is the per-attempt free-throw value: the FTP rating, per-mille.
 func shotValueFT(ftp int) float64 { return float64(ftp) * ftpToPermille }

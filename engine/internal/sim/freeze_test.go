@@ -42,7 +42,7 @@ func TestFreeze_SubstitutesAndAccumulates(t *testing.T) {
 	// wrapper's accumulated rounding exactly.
 	careless, pressure := 60.0, 100.0
 	wantTurn := stealTurnoverScale * careless * pressure // below the clamp
-	wantMake := shotValue2pt(5, 50, false, leagueBaselineFallback)
+	wantMake := shotValue2pt(5, bh, 0, false, leagueBaselineFallback, 0, 0)
 
 	if got := base.orebProb(100, 100); got != wantOreb {
 		t.Errorf("baseline orebProb = %v, want live %v", got, wantOreb)
@@ -50,7 +50,7 @@ func TestFreeze_SubstitutesAndAccumulates(t *testing.T) {
 	if got := base.turnoverProb(60, 100); got != wantTurn {
 		t.Errorf("baseline turnoverProb = %v, want live %v", got, wantTurn)
 	}
-	if got := base.makeValue2pt(5, 50, result.OriginInitial); got != wantMake {
+	if got := base.makeValue2pt(5, bh, 0, result.OriginInitial, 0, 0); got != wantMake {
 		t.Errorf("baseline makeValue2pt = %v, want live %v", got, wantMake)
 	}
 	if got := base.foulWeight(bh, off, def, 0, 0); got != wantFoul {
@@ -81,7 +81,7 @@ func TestFreeze_NoCrossConfound(t *testing.T) {
 	liveOreb := gate1Probability(120, 80, 0) // gs.gateBaseline is 0 in these cases
 	careless, pressure := 60.0, 100.0
 	liveTurn := stealTurnoverScale * careless * pressure // runtime eval, below the clamp
-	liveMake := shotValue2pt(5, 50, false, leagueBaselineFallback)
+	liveMake := shotValue2pt(5, bh, 0, false, leagueBaselineFallback, 0, 0)
 	// Symmetric bucket: this single-defender/single-offense fixture drives the
 	// coupling factor negative (defQ from one defender sits far below the 5-man-
 	// normalized baseline), so foulBucketWeight redraws — seed each gs the same so
@@ -105,7 +105,7 @@ func TestFreeze_NoCrossConfound(t *testing.T) {
 			gs := &gameState{freeze: c.cfg, rng: rng.New(foulSeed)}
 			gotOreb := gs.orebProb(120, 80)
 			gotTurn := gs.turnoverProb(60, 100)
-			gotMake := gs.makeValue2pt(5, 50, result.OriginInitial)
+			gotMake := gs.makeValue2pt(5, bh, 0, result.OriginInitial, 0, 0)
 			gotFoul := gs.foulWeight(bh, off, def, 0, 0)
 
 			// The frozen arm returns the sentinel; every OTHER arm returns live.
@@ -183,8 +183,9 @@ func TestFreeze_MisconfigErrors(t *testing.T) {
 func TestMakePutback_OriginScoped(t *testing.T) {
 	const fgp = 50
 	net := 5.0
-	live := shotValue2pt(net, fgp, false, leagueBaselineFallback) // initial/transition live value
-	putback := putbackValue2pt(fgp)                               // faithful OriginOffReb live value (ADR-0055)
+	bh50 := oc(slotPG, mkPlayer(1, 1, slotPG, fgp))                         // FGP=50, D64=D60=0 → fallback path
+	live := shotValue2pt(net, bh50, 0, false, leagueBaselineFallback, 0, 0) // initial/transition live value
+	putback := putbackValue2pt(bh50)                                        // faithful OriginOffReb live value (ADR-0055)
 	mean := 111.0
 
 	cases := []struct {
@@ -204,7 +205,7 @@ func TestMakePutback_OriginScoped(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			acc := &FreezeAccum{}
 			gs := &gameState{freeze: c.cfg, accum: acc}
-			if got := gs.makeValue2pt(net, fgp, c.origin); got != c.wantMake {
+			if got := gs.makeValue2pt(net, bh50, 0, c.origin, 0, 0); got != c.wantMake {
 				t.Errorf("makeValue2pt(%s) = %v, want %v", c.origin, got, c.wantMake)
 			}
 			// The harvest captures the LIVE value for this origin (faithful for a putback).

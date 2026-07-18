@@ -49,12 +49,12 @@ type endingMixCounts struct {
 	Possessions int `json:"possessions"`
 
 	// Possession endings (each possession classified exactly once).
-	EndSteal    int `json:"end_steal"`     // EventSteal present (steal IS the turnover)
-	EndTOInd    int `json:"end_to_ind"`    // EventTurnover without a steal (independent check)
-	EndDReb     int `json:"end_dreb"`      // defensive rebound (always trip-terminal)
-	EndMade     int `json:"end_made"`      // made FG, no FT sequence
-	EndFT       int `json:"end_ft"`        // FT sequence last (and-one or foul-only; engine FTs never rebound)
-	EndOther    int `json:"end_other"`     // OREB-cap exhaustion / empty possession
+	EndSteal   int `json:"end_steal"`    // EventSteal present (steal IS the turnover)
+	EndTOInd   int `json:"end_to_ind"`   // EventTurnover without a steal (independent check)
+	EndDReb    int `json:"end_dreb"`     // defensive rebound (always trip-terminal)
+	EndMade    int `json:"end_made"`     // made FG, no FT sequence
+	EndFT      int `json:"end_ft"`       // FT sequence last (and-one or foul-only; engine FTs never rebound)
+	EndOther   int `json:"end_other"`    // OREB-cap exhaustion / empty possession
 	ORebCont   int `json:"oreb_cont"`    // offensive-rebound CONTINUATIONS (not endings)
 	AndOneSeqs int `json:"and_one_seqs"` // and-one FT sequences (FTAttempts==1) inside EndFT
 
@@ -156,16 +156,16 @@ type endingMixArtifact struct {
 	OtherSharePct float64 `json:"end_other_share_pct"`
 
 	// Sub-model rates.
-	FGPct        float64 `json:"fg_pct"`          // FGM/FGA
-	ORebRatePct  float64 `json:"oreb_rate_pct"`   // OReb/(OReb+DReb)
-	PossPerGame  float64 `json:"poss_per_game"`   // both teams pooled
-	FGAPerGame   float64 `json:"fga_per_game"`    // both teams pooled
-	StealPerGame float64 `json:"steal_per_game"`  // both teams pooled
-	TOPerGame    float64 `json:"tov_per_game"`    // both teams pooled (incl. steals)
-	DRebPerGame  float64 `json:"dreb_per_game"`   // both teams pooled
-	ORebPerGame  float64 `json:"oreb_per_game"`   // both teams pooled
-	FTAPerGame   float64 `json:"fta_per_game"`    // both teams pooled
-	ArmedPct     float64 `json:"armed_pct"`       // 0.94×DRebShare + StealShare (faithful 5.60 arming over THIS mix)
+	FGPct        float64 `json:"fg_pct"`            // FGM/FGA
+	ORebRatePct  float64 `json:"oreb_rate_pct"`     // OReb/(OReb+DReb)
+	PossPerGame  float64 `json:"poss_per_game"`     // both teams pooled
+	FGAPerGame   float64 `json:"fga_per_game"`      // both teams pooled
+	StealPerGame float64 `json:"steal_per_game"`    // both teams pooled
+	TOPerGame    float64 `json:"tov_per_game"`      // both teams pooled (incl. steals)
+	DRebPerGame  float64 `json:"dreb_per_game"`     // both teams pooled
+	ORebPerGame  float64 `json:"oreb_per_game"`     // both teams pooled
+	FTAPerGame   float64 `json:"fta_per_game"`      // both teams pooled
+	ArmedPct     float64 `json:"armed_pct"`         // 0.94×DRebShare + StealShare (faithful 5.60 arming over THIS mix)
 	ImpliedCode7 float64 `json:"implied_code7_pct"` // ArmedPct × 0.300 (archive-mean gate (4.40+1)/18)
 }
 

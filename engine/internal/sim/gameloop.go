@@ -67,6 +67,7 @@ func simGameWith(b bundle.Bundle, g bundle.Game, r *rng.RNG, opts Options) (resu
 	// population. A zero/unwired field (e.g. a hand-built test bundle) falls
 	// back to leagueBaselineFallback via shotBaselineOrFallback below.
 	gs.shotBaseline = b.LeagueShotBaseline
+	gs.leagueBlk48 = b.LeagueBlk48
 
 	// base_time is CONSTANT per game in 5.60 — the composite ratio is dead code
 	// (u = 0; tempo.go const block, J24 Phase 0). This retired the ADR-0042

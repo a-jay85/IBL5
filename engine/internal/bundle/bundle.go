@@ -120,6 +120,25 @@ type Player struct {
 	RealLifeORB int `json:"rl_orb"`
 	RealLifeSTL int `json:"rl_stl"`
 	RealLifeTVR int `json:"rl_tvr"`
+	RealLifeFGM int `json:"rl_fgm"`
+	RealLife3GM int `json:"rl_3gm"`
+	RealLifeBLK int `json:"rl_blk"`
+
+	// Per-player derived make-rate composites computed at bundle-build time
+	// (backup/assemble.go toBundlePlayer). D80/D60/D64 are per-mille values;
+	// DE8 is BLK/MIN×48. Zero when the player has no real-life counting-stat data
+	// (rookies, DB-built bundles) — shotdecision.go falls back to fgpToPermille
+	// for D64==0 and D60==0 (mirror of shotBaselineOrFallback).
+	//
+	// D80 = round(3GM/3GA×1000), 0 if 3GA≤0       [3pt make %‰]
+	// D60 = round((FGM-3GM)/(FGA-3GA)×1000), 0 if (FGA-3GA)≤0  [2pt make %‰]
+	// D64 = round(D60×(4×D90−D88)/(3×D90)), 0 if D90≤0 [putback-adjusted 2P‰;
+	//        D90=3GA/MIN×48, D88=(FGA-3GA)/MIN×48 — same derivation as bucketweights.go:260-265]
+	// DE8 = BLK/MIN×48, 0 if MIN≤0                [blocks per 48 min]
+	D80 int     `json:"d80"`
+	D60 int     `json:"d60"`
+	D64 int     `json:"d64"`
+	DE8 float64 `json:"de8"`
 
 	// Attributes.
 	Age         int `json:"age"`
@@ -173,6 +192,13 @@ type Bundle struct {
 	Players            []Player `json:"players"`
 	Schedule           []Game   `json:"schedule"`
 	LeagueShotBaseline float64  `json:"league_shot_baseline"`
+	// LeagueBlk48 is the league BLK-per-48-player-minutes rate (analogous to
+	// LeagueShotBaseline), assembled once per snapshot by backup.ToBundle's
+	// computeLeagueBlk48 over raw .plr records ≤959 with MIN>2×GP and non-empty
+	// Name. Expected ~1.7484 on the game-install IBL5.plr. A zero value (unwired
+	// bundle) leaves blockMod returning 0 — a graceful no-op, since the cap
+	// defBlkSum ≤ 1.5×5×leagueBlk48 forces defBlkSum to 0 when leagueBlk48=0.
+	LeagueBlk48 float64 `json:"league_blk48"`
 }
 
 // Validation errors surfaced at the contract boundary.

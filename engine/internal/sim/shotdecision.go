@@ -17,9 +17,12 @@ import (
 // :27124-27175, e.g. pdVar11[0xc] = (Σ2PA/ΣMIN)×_DAT_00669ed0 at :27131).
 // Qualifying players are .plr records 1-959 with MIN > 2×GP. Consumption sites
 // confirm the identity byte-for-byte: 2pt normal shot_value divides by
-// *(double*)(param_1+0x6638) at :93886-93887, and 3pt shot_value multiplies it
-// by 1.5 at :94025 — exactly the shotValue3pt() = leagueBaseline×1.5 form
-// below. (Prior comment here mislabeled it "the historical league-wide 2P%";
+// *(double*)(param_1+0x6638) at :93886-93887; the 3pt path multiplies it by 1.5
+// at :94025 to form the net DIVISOR (baseline×1.5), NOT the make value —
+// shotValue3pt() = d80 + net×500/(baseline×1.5) + block_term below, so 3pt DOES
+// take net advantage, ~1.5× weaker than 2pt (corrected 2026-07-17 per
+// jsb-native/re-artifacts/jsb-J24-3pt-consumption-RE-20260717.md §2).
+// (Prior comment here mislabeled +0x6638 "the historical league-wide 2P%";
 // corrected 2026-07-12 per jsb-native/00_MASTER_REFERENCE.md and the J5
 // RE artifact's offset row-map — both pin +0x6638 as the 2PA/48 row, and the
 // true 2P%/FG% table lives at a different offset, +0x6698.)
@@ -32,13 +35,17 @@ import (
 // leagueBaselineFallback is the documented fallback when a snapshot has no
 // qualifying records (e.g. a synthetic test bundle that never wired
 // LeagueShotBaseline): it is the prior .sco-calibrated stand-in (ADR-0045):
-// 2pt% ≈ 49.8% and 3pt% ≈ 37.2% (JSB 3pt make = baseline×1.5, so fallback =
-// sco 3pt% × 666.7 ≈ 248) — a different scale than the true ~19.78 (IBL5.plr)
+// 2pt% ≈ 49.8% and 3pt% ≈ 37.2% (fallback = sco 3pt% × 666.7 ≈ 248, derived
+// under the pre-2026-07-17 model where baseline×1.5 was taken as the 3pt make
+// value; under the corrected §2 formula baseline×1.5 is the net DIVISOR and d80
+// carries the make level, so that derivation no longer holds and 250 is
+// unverified against the corrected formula — test-only path, not re-derived
+// here) — a different scale than the true ~19.78 (IBL5.plr)
 // 2PA/48 volume-rate value, since it was fit to reproduce output shooting-%,
 // not to be a faithful port of the raw attempt-rate. fgpToPermille shares
 // that calibration.
 const (
-	leagueBaselineFallback = 250.0 // per-mille stand-in; 3pt make = fallback×1.5 = 375‰ (~37.5%, sco-implied)
+	leagueBaselineFallback = 250.0 // per-mille stand-in (sco-implied); its ×1.5 is the 3pt net DIVISOR, not the make value (corrected 2026-07-17); 250 unverified vs corrected formula, test-only path
 	fgpToPermille          = 9.4   // base 2pt make = FGP × this (calibrated to 2pt% ≈ 50%)
 	ftpToPermille          = 10.0  // FT make = FTP × this  (FTP 75 → 750‰)
 
@@ -172,7 +179,8 @@ func clutchMultiplier(clutch int) float64 {
 
 // applyClutch scales a 2pt shot_value by the clutch multiplier, but only in the
 // clutch window: period 4 or later AND score differential within 5 points.
-// The 3pt path applies no clutch (its value stays league-baseline×1.5).
+// The 3pt path applies no clutch multiplier — but its value still takes net:
+// d80 + net×500/(baseline×1.5) + block_term (corrected 2026-07-17).
 func applyClutch(shotValue float64, clutch, period, scoreDiff int) float64 {
 	if period >= 4 && absInt(scoreDiff) < 6 {
 		return clutchMultiplier(clutch) * shotValue

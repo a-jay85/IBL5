@@ -132,8 +132,9 @@ type Player struct {
 	//
 	// D80 = round(3GM/3GA×1000), 0 if 3GA≤0       [3pt make %‰]
 	// D60 = round((FGM-3GM)/(FGA-3GA)×1000), 0 if (FGA-3GA)≤0  [2pt make %‰]
-	// D64 = round(D60×(4×D90−D88)/(3×D90)), 0 if D90≤0 [putback-adjusted 2P‰;
-	//        D90=3GA/MIN×48, D88=(FGA-3GA)/MIN×48 — same derivation as bucketweights.go:260-265]
+	// D64 is precomputed by assemble.go (same formula) but superseded at shot-time by
+	// computeD64Base (shotdecision.go), which uses D90=twoPtBucketWeight(bh) (the
+	// +0xD90 Branch-A cold composite, NOT 3GA/MIN×48). Field retained for JSON stability.
 	// DE8 = BLK/MIN×48, 0 if MIN≤0                [blocks per 48 min]
 	D80 int     `json:"d80"`
 	D60 int     `json:"d60"`

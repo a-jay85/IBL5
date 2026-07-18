@@ -518,3 +518,85 @@ func TestToBundle_Deterministic(t *testing.T) {
 		t.Errorf("teams = %+v, want sorted [1,2]", b1.Teams)
 	}
 }
+
+// Row 9: a bundle.Bundle JSON without the "league_blk48" field decodes cleanly
+// and yields LeagueBlk48==0 (zero-value default).
+func TestBundle_MissingLeagueBlk48_DecodesZero(t *testing.T) {
+	raw := []byte(`{"league_id":1,"seed":1,"teams":[],"players":[],"schedule":[]}`)
+	var b bundle.Bundle
+	if err := json.Unmarshal(raw, &b); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+	if b.LeagueBlk48 != 0 {
+		t.Errorf("LeagueBlk48 = %v on missing field, want 0", b.LeagueBlk48)
+	}
+}
+
+// Row 11: D-field zero-guards — DE8=0 when MIN=0; D80=0 when 3GA=0; D60=D64=0 when 2PA=0.
+func TestToBundlePlayer_DFieldZeroGuards(t *testing.T) {
+	sched := []SchGame{{VisitorTeamID: 1, HomeTeamID: 2, Month: 11, Day: 2, Played: true}}
+
+	assemble := func(p0 PlrPlayer) bundle.Player {
+		t.Helper()
+		players := append([]PlrPlayer{p0}, teamRoster(2)...)
+		b, err := ToBundle(players, sched, AssembleOptions{})
+		if err != nil {
+			t.Fatalf("ToBundle: %v", err)
+		}
+		for _, p := range b.Players {
+			if p.PID == p0.PID {
+				return p
+			}
+		}
+		t.Fatal("assembled player not found")
+		return bundle.Player{}
+	}
+
+	// DE8=0 when MIN=0: BLK/MIN is undefined; guard must yield 0, not Inf.
+	p0 := teamRoster(1)[0]
+	p0.RealLifeMIN = 0
+	p0.RealLifeBLK = 50 // would produce Inf without the MIN guard
+	if got := assemble(p0).DE8; got != 0 {
+		t.Errorf("MIN=0: DE8=%v, want 0", got)
+	}
+
+	// D80=0 when 3GA=0: no 3pt attempts means no 3pt make rate.
+	p1 := teamRoster(1)[0]
+	p1.PID += 100
+	p1.RealLife3GA = 0
+	p1.RealLife3GM = 0
+	if got := assemble(p1).D80; got != 0 {
+		t.Errorf("3GA=0: D80=%v, want 0", got)
+	}
+
+	// D60=0 when 2PA=0 (FGA==3GA: all attempts are 3-pointers).
+	p2 := teamRoster(1)[0]
+	p2.PID += 200
+	p2.RealLifeFGA = 400
+	p2.RealLife3GA = 400 // 2PA = FGA-3GA = 0
+	p2.RealLifeFGM = 180
+	p2.RealLife3GM = 180
+	got2 := assemble(p2)
+	if got2.D60 != 0 {
+		t.Errorf("2PA=0: D60=%v, want 0", got2.D60)
+	}
+}
+
+// Row 12: computeLeagueBlk48 returns 0 on an empty qualifying population.
+func TestComputeLeagueBlk48_EmptyReturnsZero(t *testing.T) {
+	// All players have RecordIndex > 959 → none qualify.
+	players := []PlrPlayer{
+		{RecordIndex: 960, Name: "A", RealLifeGP: 10, RealLifeMIN: 30, RealLifeBLK: 5},
+		{RecordIndex: 961, Name: "B", RealLifeGP: 10, RealLifeMIN: 30, RealLifeBLK: 5},
+	}
+	if got := computeLeagueBlk48(players); got != 0 {
+		t.Errorf("empty qualifying pop: got %v, want 0", got)
+	}
+	// All players have empty Name → none qualify.
+	players2 := []PlrPlayer{
+		{RecordIndex: 1, Name: "", RealLifeGP: 10, RealLifeMIN: 30, RealLifeBLK: 5},
+	}
+	if got := computeLeagueBlk48(players2); got != 0 {
+		t.Errorf("empty-name pop: got %v, want 0", got)
+	}
+}

@@ -185,6 +185,72 @@ func TestStealTurnover_CreditsDefenderVictimKeepsTOV(t *testing.T) {
 	t.Fatal("no seed in range produced a steal-driven turnover")
 }
 
+// --- nonStealTurnover: rows 14, 15, 23 ----------------------------------------
+
+// countNonStealTurnovers runs `seeds` independent rolls with a ball-handler of the
+// given TVR and returns how many resolved to a nonStealTurnover.
+func countNonStealTurnovers(tvr int, seeds uint64) int {
+	count := 0
+	for s := uint64(1); s <= seeds; s++ {
+		off, _ := stealLineups(tvr, 30)
+		gs := &gameState{rng: rng.New(s), period: 1, clock: 500}
+		if gs.nonStealTurnover(off, off.players[0]) {
+			count++
+		}
+	}
+	return count
+}
+
+// Row 14: prob at TVR=99 (carelessness=1) equals nonStealTurnoverScale×1.
+func TestNonStealTurnover_ProbAtMaxSecurity(t *testing.T) {
+	got := nonStealTurnoverScale * turnoverCarelessness(99)
+	if got != nonStealTurnoverScale {
+		t.Errorf("TVR=99 prob=%v, want nonStealTurnoverScale=%v", got, nonStealTurnoverScale)
+	}
+	if got <= 0 || got >= 0.01 {
+		t.Errorf("TVR=99 prob=%v outside (0, 0.01)", got)
+	}
+}
+
+// Row 15: nonStealTurnover rate scales with carelessness (higher TVR → fewer TOs).
+func TestNonStealTurnover_RateScalesWithCarelessness(t *testing.T) {
+	const seeds = 4000
+	secure := countNonStealTurnovers(90, seeds)
+	careless := countNonStealTurnovers(20, seeds)
+	if secure >= careless {
+		t.Errorf("higher TVR should yield fewer nonSteal TOs: TVR=90 got %d >= TVR=20 got %d (of %d)", secure, careless, seeds)
+	}
+}
+
+// Row 23: nonStealTurnover emits EventTurnover but NOT EventSteal (non-arming).
+func TestNonStealTurnover_NoEventSteal(t *testing.T) {
+	offense, _ := stealLineups(0, 30) // TVR=0: max carelessness for high probability
+	victim := offense.players[0]
+	for seed := uint64(1); seed < 500; seed++ {
+		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500}
+		if !gs.nonStealTurnover(offense, victim) {
+			continue
+		}
+		var tos, steals int
+		for _, e := range gs.events {
+			switch e.Kind {
+			case result.EventTurnover:
+				tos++
+			case result.EventSteal:
+				steals++
+			}
+		}
+		if tos != 1 {
+			t.Errorf("seed=%d: expected 1 EventTurnover, got %d", seed, tos)
+		}
+		if steals != 0 {
+			t.Errorf("seed=%d: nonStealTurnover emitted %d EventSteal(s), want 0 (non-arming)", seed, steals)
+		}
+		return
+	}
+	t.Fatal("no seed in range [1,500) triggered a nonStealTurnover")
+}
+
 // --- matrix #4: all-zero STL weights → players[0] fallback, no divide-by-zero --
 
 func TestSelectStealer_AllZeroWeightsFallsBack(t *testing.T) {

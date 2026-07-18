@@ -218,8 +218,10 @@ func ToBundle(players []PlrPlayer, sched []SchGame, opts AssembleOptions) (bundl
 func toBundlePlayer(p PlrPlayer, minutes map[int]int) bundle.Player {
 	// Per-player derived make-rate composites (D-fields). Faithful to the JSB
 	// +0xD80/+0xD60/+0xD64/+0xDE8 per-player offsets. Zero when real-life data
-	// is absent — shotdecision.go falls back to fgpToPermille for D60/D64==0.
-	// D88=(FGA-3GA)/MIN×48, D90=3GA/MIN×48 match bucketweights.go:260-265 locals.
+	// is absent — shotdecision.go falls back to fgpToPermille for D60==0.
+	// D64 is precomputed here but superseded at shot-time by computeD64Base
+	// (shotdecision.go). The correct D90 is twoPtBucketWeight (the +0xD90 Branch-A
+	// cold composite), not 3GA/MIN×48 — that was a plan-architect misread.
 	var d80, d60, d64 int
 	var de8 float64
 	if p.RealLifeMIN > 0 {

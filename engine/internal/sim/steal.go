@@ -16,12 +16,21 @@ import (
 // gets the GameSTL.
 const (
 	// stealTurnoverScale converts carelessness × steal-pressure into a
-	// per-possession turnover probability, calibrated so league TO/team ≈ 14.5
-	// against the .sco archive (internal/calibrate/possession_archive_test.go). A
-	// documented validation-phase stand-in in the same class as
-	// foulBucketScale — the carelessness and pressure SHAPES are faithful (TVR
-	// orientation + defensive STL); this scalar pins only the LEVEL.
-	stealTurnoverScale = 2.75e-5
+	// per-possession steal-driven turnover probability. Recalibrated from
+	// 2.75e-5 (which targeted total TOs ≈14.5/team) to target steal-only rate
+	// STL ≈ 8.9/team (17.8/g both teams); archive gate: 17.8±0.7/g.
+	// Starting value ≈ 1.69e-5 (≈ 2.75e-5 × 8.9/14.5); tune via the
+	// ending-mix archive test (Phase 8).
+	stealTurnoverScale = 1.69e-5
+
+	// nonStealTurnoverScale is the per-possession independent (non-steal)
+	// turnover probability constant, driven by offensive carelessness only
+	// (no defensive steal-pressure factor — there is no stealer).
+	// Calibrated to produce non-steal TO ≈ 10.2/g both teams (≈5.1/team),
+	// minus the existing negligible [2,5] selectOutcome energyCeiling TOs
+	// (≈0.3/g both teams). Archive gate: non-steal TO endings 4.9±0.5% of
+	// possessions. Starting value: tune from ~0.001.
+	nonStealTurnoverScale = 0.00175
 
 	// carelessnessBase orients the ball-handler's TVR rating (0-99, higher = better
 	// ball security) into a carelessness weight: a max-rated handler is the least
@@ -84,6 +93,29 @@ func (gs *gameState) stealTurnover(offense, defense *teamState, victim onCourt) 
 		Kind: result.EventSteal, Period: gs.period, Clock: gs.clock,
 		TeamID: offense.teamID, PlayerID: victim.PID, DefenderID: stealer.PID,
 	})
+	return true
+}
+
+// nonStealTurnover rolls the independent (non-steal) turnover for one trip.
+// On a turnover it emits EventTurnover (the victim keeps GameTOV) and runs
+// the per-turnover injury check, but does NOT emit EventSteal — this turnover
+// is non-arming (returns possNormal to the caller, not possSteal). The
+// probability uses only offensive carelessness (no defensive steal pressure
+// since there is no stealer). A gs.rng.Float64() roll is drawn unconditionally
+// so the RNG stream is deterministic regardless of outcome.
+func (gs *gameState) nonStealTurnover(offense *teamState, victim onCourt) bool {
+	prob := nonStealTurnoverScale * turnoverCarelessness(victim.TVR)
+	if prob > maxTurnoverProb {
+		prob = maxTurnoverProb
+	}
+	if gs.rng.Float64() >= prob {
+		return false
+	}
+	gs.emit(result.Event{
+		Kind: result.EventTurnover, Period: gs.period, Clock: gs.clock,
+		TeamID: offense.teamID, PlayerID: victim.PID,
+	})
+	gs.maybeInjure(offense, victim)
 	return true
 }
 

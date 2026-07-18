@@ -210,8 +210,13 @@ func TestPossessionCountLoopPin_Current(t *testing.T) {
 	// those outcomes, not every possession), so slowing it down pulls the
 	// per-team count back down substantially even though the fast classes are
 	// unchanged — measured directly at seed=1..40 on richBundle: 109.3750.
+	//
+	// Re-baselined AGAIN for J24 mix-fixes-2 steal split + nonStealTurnover:
+	// 109.4 -> 104.4625. nonStealTurnover draws an unconditional Float64 per
+	// possession, shifting the RNG stream and altering subsequent step draws.
+	// Measured directly at seed=1..40 on richBundle: 104.4625.
 	const (
-		center = 109.4
+		center = 104.4625
 		band   = 3.0
 	)
 	if math.Abs(mean-center) > band {

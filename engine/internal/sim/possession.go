@@ -149,6 +149,20 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 		}
 	}
 
+	// defBlkSum is the defending lineup's cumulative DE8 (BLK/MIN×48), capped at
+	// 1.5×5×leagueBlk48 when the sum exceeds that ceiling. Computed ONCE per
+	// possession since the defending lineup is constant within a trip. When
+	// gs.leagueBlk48==0 (unwired bundle), the cap forces defBlkSum=0 so
+	// blockMod returns 0 — graceful no-op.
+	var defBlkSum float64
+	for _, dp := range defense.players {
+		defBlkSum += dp.DE8
+	}
+	blkCap := 1.5 * 5 * gs.leagueBlk48
+	if defBlkSum > blkCap {
+		defBlkSum = blkCap
+	}
+
 	bh := selectBallHandler(offense, gs.rng)
 	for trip := 0; trip <= maxOffensiveRebounds; trip++ {
 		// trip 0 is the initial attempt; trip > 0 is reached only via a `continue`
@@ -163,6 +177,11 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 		// independent [2,5] check stays inside selectOutcome below.
 		if gs.stealTurnover(offense, defense, bh) {
 			return possSteal // steal → steal fast-break pending for the defense
+		}
+		// Independent (non-steal) turnover: carelessness only, no arming.
+		// Checked after the dominant steal path; returns possNormal (no fast break).
+		if gs.nonStealTurnover(offense, bh) {
+			return possNormal
 		}
 		scoreDiff := offense.score - defense.score
 		matched := defenderAtSlot(defense, bh.slot)
@@ -180,7 +199,7 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 		// Make/foul/turnover arms route through the gameState freeze wrappers
 		// (freeze.go): live values in the normal/baseline path, league-mean
 		// substitutes when an arm is frozen for the ADR-0043 attribution.
-		sv2 := applyClutch(gs.makeValue2pt(net, bh.FGP, origin), bh.Clutch, gs.period, scoreDiff)
+		sv2 := applyClutch(gs.makeValue2pt(net, bh, mq, origin, gs.leagueBlk48, defBlkSum), bh.Clutch, gs.period, scoreDiff)
 		// Home-court advantage (raw delta = +0.2 home / −0.2 away, 0 for ASG),
 		// re-homed to all four half-court legs (J15 Phase 5, decompile :97157-97164):
 		// the 2pt made-shot bucket (leg A) and and-one (leg D, below) take the SCALED
@@ -218,7 +237,7 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 			}
 			return possNormal // made shot
 		case outcome3pt:
-			if made, _ := gs.shotAttempt(offense, defense, bh, shotValue3pt(gs.shotBaselineOrFallback()), result.ShotThree, origin, periodIdx); !made {
+			if made, _ := gs.shotAttempt(offense, defense, bh, shotValue3pt(net, bh.D80, gs.shotBaselineOrFallback(), gs.leagueBlk48, defBlkSum), result.ShotThree, origin, periodIdx); !made {
 				gs.creditBlock(offense, defense, bh, def)
 				if cont, next := gs.rebound(offense, defense, periodIdx); cont {
 					bh = next

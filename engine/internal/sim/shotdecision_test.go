@@ -4,25 +4,27 @@ import (
 	"math"
 	"testing"
 
+	"github.com/a-jay85/IBL5/engine/internal/bundle"
 	"github.com/a-jay85/IBL5/engine/internal/rng"
 )
 
 // --- matrix #15: shot_value assembly + clutch + fatigue --------------------
 
 func TestShotValue_Assembly(t *testing.T) {
-	// 2pt normal: net × 500 / baseline + FGP × 9
-	want2 := 2.0*netToShotValue/leagueBaselineFallback + 50*fgpToPermille
-	if got := shotValue2pt(2.0, 50, false, leagueBaselineFallback); math.Abs(got-want2) > 1e-9 {
+	// 2pt normal (fallback path: D60==0 → base2ptFallback): base + net×500/baseline
+	want2 := 50*fgpToPermille + 2.0*netToShotValue/leagueBaselineFallback
+	if got := shotValue2pt(2.0, onCourt{Player: bundle.Player{FGP: 50}}, 0, false, leagueBaselineFallback, 0, 0); math.Abs(got-want2) > 1e-9 {
 		t.Errorf("2pt = %v, want %v", got, want2)
 	}
-	// 2pt shot clock: FGP × 9 × 1.3333 (ignores net)
+	// 2pt shot clock (fallback path: D60==0 → base2ptFallback): FGP × 9.4 × 1.3333 (ignores net)
 	wantSC := 50 * fgpToPermille * shotClock2ptMult
-	if got := shotValue2pt(999.0, 50, true, leagueBaselineFallback); math.Abs(got-wantSC) > 1e-6 {
+	if got := shotValue2pt(999.0, onCourt{Player: bundle.Player{FGP: 50}}, 0, true, leagueBaselineFallback, 0, 0); math.Abs(got-wantSC) > 1e-6 {
 		t.Errorf("2pt shot-clock = %v, want %v", got, wantSC)
 	}
-	// 3pt: baseline × 1.5
-	if got := shotValue3pt(leagueBaselineFallback); math.Abs(got-leagueBaselineFallback*1.5) > 1e-9 {
-		t.Errorf("3pt = %v, want %v", got, leagueBaselineFallback*1.5)
+	// 3pt: float64(d80) + net×500/(baseline×1.5) + blockMod (with leagueBlk48=defBlkSum=0)
+	want3 := float64(375) + 2.0*netToShotValue/(leagueBaselineFallback*1.5)
+	if got := shotValue3pt(2.0, 375, leagueBaselineFallback, 0, 0); math.Abs(got-want3) > 1e-9 {
+		t.Errorf("3pt = %v, want %v", got, want3)
 	}
 	// FT: FTP × 10
 	if got := shotValueFT(75); math.Abs(got-750) > 1e-9 {
@@ -40,37 +42,47 @@ func TestShotValue_Assembly(t *testing.T) {
 // average shooter's neutral-net value lands near 498‰ (≈49.8% 2pt, the .sco level),
 // while the 3pt channel — independent of net and of fgpToPermille — is untouched.
 func TestShotValue2pt_Calibration(t *testing.T) {
-	// Formula: base2pt = FGP × fgpToPermille (per-mille).
-	if got := base2pt(50); got != 50*fgpToPermille {
-		t.Errorf("base2pt(50) = %v, want %v", got, 50*fgpToPermille)
+	// Formula: base2ptFallback = FGP × fgpToPermille (per-mille).
+	if got := base2ptFallback(50); got != 50*fgpToPermille {
+		t.Errorf("base2ptFallback(50) = %v, want %v", got, 50*fgpToPermille)
 	}
 	// The archive proves the in-game 2pt% lands ≈50% (matrix #9). Here we assert the
-	// make-value for an average shooter (FGP 47) with a small positive net sits in a
-	// realistic ~44–56% band — neither degenerate-low (the pre-0045 underfit) nor
+	// make-value for an average shooter (FGP 47, D60==0 → base2ptFallback fallback) with a small positive net
+	// sits in a realistic ~44–56% band — neither degenerate-low (the pre-0045 underfit) nor
 	// absurd-high.
-	if v := shotValue2pt(5, 47, false, leagueBaselineFallback); v < 440 || v > 560 {
+	if v := shotValue2pt(5, onCourt{Player: bundle.Player{FGP: 47}}, 0, false, leagueBaselineFallback, 0, 0); v < 440 || v > 560 {
 		t.Errorf("avg-FGP 2pt make-value = %.1f‰, want a realistic ~44–56%% band", v)
 	}
-	// Boundary FGP=0 → base2pt 0; a neutral-net value stays ≥ 0 (no underflow).
-	if got := base2pt(0); got != 0 {
-		t.Errorf("base2pt(0) = %v, want 0", got)
+	// Boundary FGP=0 → base2ptFallback 0; a neutral-net value stays ≥ 0 (no underflow).
+	if got := base2ptFallback(0); got != 0 {
+		t.Errorf("base2ptFallback(0) = %v, want 0", got)
 	}
-	if v := shotValue2pt(0, 0, false, leagueBaselineFallback); v < 0 {
+	if v := shotValue2pt(0, onCourt{}, 0, false, leagueBaselineFallback, 0, 0); v < 0 {
 		t.Errorf("shotValue2pt(0,0) = %v, want ≥ 0 (no underflow)", v)
 	}
-	// The 3pt make-value is unchanged by the 2pt recalibration (depends only on
-	// the baseline, whose fallback is set so 3pt% stays faithful ≈37.5%).
-	if got := shotValue3pt(leagueBaselineFallback); got != leagueBaselineFallback*1.5 {
-		t.Errorf("3pt value = %v, want %v (unchanged by 2pt recalibration)", got, leagueBaselineFallback*1.5)
+	// The 3pt make-value does not depend on fgpToPermille (the 2pt recalibration knob).
+	// With d80=375 (= leagueBaselineFallback×1.5), net=0, leagueBlk48=defBlkSum=0:
+	// shotValue3pt = float64(d80) + 0 + 0 = 375 = leagueBaselineFallback×1.5.
+	if got := shotValue3pt(0, 375, leagueBaselineFallback, 0, 0); got != leagueBaselineFallback*1.5 {
+		t.Errorf("3pt value = %v, want %v (independent of fgpToPermille)", got, leagueBaselineFallback*1.5)
 	}
 }
 
-// --- matrix #16: boundaries — 3pt ignores net, rand bounds, clutch gate ----
+// --- matrix #16: boundaries — 3pt uses net + d80, rand bounds, clutch gate ---
 
-func TestShotValue3pt_IgnoresNet(t *testing.T) {
-	// There is no net parameter; the value is constant regardless of matchup.
-	if shotValue3pt(leagueBaselineFallback) != leagueBaselineFallback*1.5 {
-		t.Error("3pt shot value must be league-baseline×1.5, independent of net advantage")
+func TestShotValue3pt_UsesNetAndD80(t *testing.T) {
+	// 3pt base is float64(d80); d80=0 → base 0; d80=400 → base 400.
+	if got := shotValue3pt(0.0, 0, leagueBaselineFallback, 0, 0); got != 0.0 {
+		t.Errorf("3pt with d80=0, net=0 = %v, want 0", got)
+	}
+	if got := shotValue3pt(0.0, 400, leagueBaselineFallback, 0, 0); got != 400.0 {
+		t.Errorf("3pt with d80=400, net=0 = %v, want 400", got)
+	}
+	// Net advantage moves the value: a positive net adds a positive term.
+	netTerm := 2.0 * netToShotValue / (leagueBaselineFallback * 1.5)
+	got := shotValue3pt(2.0, 0, leagueBaselineFallback, 0, 0)
+	if math.Abs(got-netTerm) > 1e-9 {
+		t.Errorf("3pt net term = %v, want %v", got, netTerm)
 	}
 }
 

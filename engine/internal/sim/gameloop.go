@@ -109,15 +109,26 @@ func simGameWith(b bundle.Bundle, g bundle.Game, r *rng.RNG, opts Options) (resu
 			// armed THIS possession) and, for the DRB-push class, gs.drbPushFired
 			// (set by THIS iteration's possession() call above — see its
 			// docblock and state.go's drbPushFired field comment):
-			//   - possSteal: the possession followed a steal → FAST steal-
-			//     transition class, {0,1,2}s (FUN_004e42e0 steal step class,
-			//     J24 Phase 3).
+			//   - possSteal: the possession followed a steal → FAST {0,1,2}s
+			//     class (J24 Phase 3). LABEL CORRECTION (RE re-derived
+			//     2026-07-17, jsb-J24-arming-share-RE): FUN_004e42e0's {0,1,2}s
+			//     class is the OREB quick-putback class (param_2==1, reached
+			//     only from the rebound handler); a steal-sourced break is
+			//     faithfully a code-7 transition PUSH ({2,3,4}s) — the same
+			//     class as a DRB push, since the arming flag (CEngine+0x4be4)
+			//     is set unconditionally by steals. Routing steals to {0,1,2}s
+			//     here is therefore a known unfaithful stand-in (the J24 §1d
+			//     wrong-class residual — jsb-native-backlog / ADR-0085), to be
+			//     corrected by the arming-share port, not by this comment.
 			//   - prevOutcome == possDRB AND gs.drbPushFired: the possession
 			//     followed a defensive rebound AND the shared Stage-2 gate
 			//     (drawn once inside possession(), never re-drawn here — see
-			//     possession.go's fbPending branch) fired → DRB-push class,
-			//     {2,3,4}s (FUN_004e42e0 code 7, J24 Phase 4, strategy_adj=0 —
-			//     see transition.go's transitionTriggers docblock).
+			//     possession.go's fbPending branch) fired → transition-push
+			//     class, {2,3,4}s (FUN_004e42e0 code 7, J24 Phase 4,
+			//     strategy_adj=0 — see transition.go's transitionTriggers
+			//     docblock). Faithfully this code-7 class is steal- OR
+			//     DRB-sourced; the engine currently reaches it only via DRB
+			//     (steals mis-route to {0,1,2}s — see the possSteal note above).
 			//   - default (possNormal, or possDRB with the gate failed):
 			//     half-court jittered step (J24 Phase 2).
 			//
@@ -129,7 +140,7 @@ func simGameWith(b bundle.Bundle, g bundle.Game, r *rng.RNG, opts Options) (resu
 			var step int
 			switch {
 			case prevOutcome == possSteal:
-				step = r.IntN(3) // steal transition: {0,1,2}s (FUN_004e42e0 steal class)
+				step = r.IntN(3) // {0,1,2}s (FUN_004e42e0's OREB-putback class per corrected RE; steals mis-routed here — J24 §1d wrong-class stand-in)
 				if gs.fastClass != nil {
 					gs.fastClass.StealClass++
 					gs.fastClass.TotalPossessions++

@@ -6,11 +6,11 @@ package sim
 //
 // J24 Phase 3/4 note: Phase 3 sums per-game defender aggregates — a MATCHED
 // term (struct +0xDC8, keyed on the ball-handler's covered slot) and a static
-// per-depth-chart NON-MATCHED term (struct +0x350, bundle-baked NonMatchedTerm)
-// — and Phase 4 adds the coaching-gated accumulator (CEngine+0x33F0, still
-// stubbed to 0 pending the .lge +0x12c strategy-field pin — see the
-// phase4Accumulator comment below). The full four-phase shape is implemented
-// so later PRs populate any remaining aggregates without changing callers.
+// per-depth-chart NON-MATCHED term (struct +0x350, bundle-baked NonMatchedTerm,
+// live as of J25 — backup/assemble.go computeNonMatchedTerm) — and Phase 4
+// adds the coaching-gated accumulator (CEngine+0x33F0, still stubbed to 0
+// pending the .lge +0x12c strategy-field pin — see the phase4Accumulator
+// comment below).
 func matchupQuality(bh onCourt, defenders []onCourt, leagueAST48ByPos [6]float64) float64 {
 	// Phase 1 — rating normalization (composite defaults to 50 when zero).
 	composite := bh.FGP
@@ -35,8 +35,12 @@ func matchupQuality(bh onCourt, defenders []onCourt, leagueAST48ByPos [6]float64
 	// defenderAtSlot(defense, bh.slot), so bh.slot is the consistent proxy here. The
 	// term (defAST48[s] − leagueAST48[s])·0.8 is mean-zero in expectation for any slot
 	// s, so the proxy cannot materially shift league-average FG%. The non-matched arm
-	// is inert in production (NonMatchedTerm==0 deferral), so the artifact's PG-slot
-	// weight-gate (weight=0 if param_1==1) and skip-self are moot until +0x350 lands.
+	// is LIVE as of J25 (NonMatchedTerm = the FUN_00561c00 +0x350 bake, computed at
+	// bundle-assembly time — backup/assemble.go computeNonMatchedTerm). The artifact's
+	// PG-slot weight-gate (weight=0 if param_1==1) and skip-self remain unported:
+	// param_1 (possession-context flag) and the pass-target model (FUN_004e2ad0) have
+	// no sim counterpart; teamWeight=1.0 keeps every non-matched defender weighted,
+	// the same adjudicated divergence class as the bh.slot proxy above.
 	var accumulated float64
 	const teamWeight = 1.0    // no §6 .rdata pin overrides 1.0
 	const matchedWeight = 0.8 // §6 pin 0x669E78

@@ -108,6 +108,155 @@ func computeLeagueBlk48(players []PlrPlayer) float64 {
 	return sumBLK / sumMIN * 48.0
 }
 
+// nonMatchedLeagueParams carries the ten league per-48 rates FUN_00561c00
+// receives as params 2-11 when it bakes each player's +0x350 NON-MATCHED
+// matchupQuality term (bundle.Player.NonMatchedTerm). Provenance: the season
+// class fills them from its stat bank (writer 0x439d87-0x439f6f), each cell =
+// (Σ stat over roster records 1-960) / ΣMIN × 48 for the ALL-positions bucket
+// — see re-artifacts/jsb-J25-nonmatched-0x350-20260718.md §3. Field order
+// matches the call's stack-slot order (ebp+8 … ebp+0x50).
+type nonMatchedLeagueParams struct {
+	TwoPA48 float64 // p2:  league 2PA/48 (Σ(FGA−3PA)/ΣMIN×48)
+	FTA48   float64 // p3:  league FTA/48
+	TPA48   float64 // p4:  league 3PA/48
+	Prod48  float64 // p5:  league production-composite/48 (FUN_0043bef0 mode 2)
+	ORB48   float64 // p6:  league ORB/48
+	DRB48   float64 // p7:  league DRB/48 (Σ(REB−ORB))
+	AST48   float64 // p8:  league AST/48
+	STL48   float64 // p9:  league STL/48
+	TOV48   float64 // p10: league TOV/48
+	BLK48   float64 // p11: league BLK/48
+}
+
+// productionComposite is the FUN_0043bef0 mode-2 production scalar over a
+// player's raw season totals — the bank's this+0xCD8 accumulator input
+// (accumulation block 0x439b6d-0x439d2d: push $0x2 / call FUN_0043bef0 per
+// record). Shooting side × 1.5 (.rdata 0x669ac0), floor side × 0.75 (0x669f60).
+func productionComposite(p PlrPlayer) float64 {
+	fgm := float64(p.RealLifeFGM)
+	fga := float64(p.RealLifeFGA)
+	ftm := float64(p.RealLifeFTM)
+	fta := float64(p.RealLifeFTA)
+	tpm := float64(p.RealLife3GM)
+	orb := float64(p.RealLifeORB)
+	drb := float64(p.RealLifeREB - p.RealLifeORB)
+	shoot := (fta-ftm)*(1.0/6.0) +
+		((tpm + fgm) - (fga-fgm)*(2.0/3.0) + ftm - fta*0.5)
+	floor := float64(p.RealLifeAST)*0.8 +
+		(orb*(2.0/3.0) + drb*(1.0/3.0) + float64(p.RealLifeSTL)) -
+		float64(p.RealLifeTVR) + float64(p.RealLifeBLK)
+	return shoot*1.5 + floor*0.75
+}
+
+// computeLeagueNonMatchedParams accumulates the ten-param bank over the raw
+// .plr records. Population: RecordIndex ≤ leagueShotBaselineMaxRecordIndex
+// ONLY — deliberately NO name gate and NO MIN>2×GP gate, because the bank's
+// accumulation loop (0x4397d5, outer stride 0xE28 over records 1-960) is
+// ungated; empty records contribute zero to every sum, so the ratio is
+// unchanged by including them. This population differs from
+// computeLeagueShotBaseline's gated one — both are faithful to their own
+// binary loops. Returns the zero value when ΣMIN ≤ 0 (per-player terms then
+// stay 0 via the RealLifeMIN gate in computeNonMatchedTerm).
+func computeLeagueNonMatchedParams(players []PlrPlayer) nonMatchedLeagueParams {
+	var sumMIN, sum2PA, sumFTA, sum3PA, sumProd float64
+	var sumORB, sumDRB, sumAST, sumSTL, sumTOV, sumBLK float64
+	for _, p := range players {
+		if p.RecordIndex > leagueShotBaselineMaxRecordIndex {
+			continue
+		}
+		sumMIN += float64(p.RealLifeMIN)
+		sum2PA += float64(p.RealLifeFGA - p.RealLife3GA)
+		sumFTA += float64(p.RealLifeFTA)
+		sum3PA += float64(p.RealLife3GA)
+		sumProd += productionComposite(p)
+		sumORB += float64(p.RealLifeORB)
+		sumDRB += float64(p.RealLifeREB - p.RealLifeORB)
+		sumAST += float64(p.RealLifeAST)
+		sumSTL += float64(p.RealLifeSTL)
+		sumTOV += float64(p.RealLifeTVR)
+		sumBLK += float64(p.RealLifeBLK)
+	}
+	if sumMIN <= 0 {
+		return nonMatchedLeagueParams{}
+	}
+	per48 := func(sum float64) float64 { return sum / sumMIN * 48.0 }
+	return nonMatchedLeagueParams{
+		TwoPA48: per48(sum2PA),
+		FTA48:   per48(sumFTA),
+		TPA48:   per48(sum3PA),
+		Prod48:  per48(sumProd),
+		ORB48:   per48(sumORB),
+		DRB48:   per48(sumDRB),
+		AST48:   per48(sumAST),
+		STL48:   per48(sumSTL),
+		TOV48:   per48(sumTOV),
+		BLK48:   per48(sumBLK),
+	}
+}
+
+// computeNonMatchedTerm is the faithful FUN_00561c00 port: the static
+// per-depth-chart +0x350 NON-MATCHED matchupQuality term (store: fstpl
+// 0x350(%ecx) at 0x561e5f). Shape: (A48 − p5) − B + C where A48 is the
+// player's own production composite per 48, p5 the league's, B the same
+// composite rebuilt from the player's per-48 rates with shooting replaced by
+// pct × league-volume products, and C the league counting-stat composite that
+// B omits. NOTE the +C sign — the J16 §5 rendering (−C) was a Ghidra artifact;
+// the raw FPU trace (de c1 FADDP at the tail) is decisive. Term = 0 when the
+// player has no real minutes (binary gates on MIN via fild/ftst up front).
+// Expression grouping mirrors the traced FPU evaluation order so float64
+// results match the x87 sequence as closely as Go permits.
+func computeNonMatchedTerm(p PlrPlayer, lp nonMatchedLeagueParams) float64 {
+	if p.RealLifeMIN <= 0 {
+		return 0
+	}
+	min := float64(p.RealLifeMIN)
+	fgm := float64(p.RealLifeFGM)
+	fga := float64(p.RealLifeFGA)
+	ftm := float64(p.RealLifeFTM)
+	fta := float64(p.RealLifeFTA)
+	tpm := float64(p.RealLife3GM)
+	tpa := float64(p.RealLife3GA)
+	orb := float64(p.RealLifeORB)
+	reb := float64(p.RealLifeREB)
+	ast := float64(p.RealLifeAST)
+	stl := float64(p.RealLifeSTL)
+	tov := float64(p.RealLifeTVR)
+	blk := float64(p.RealLifeBLK)
+
+	// pct × league-volume products; 0 when the attempt denominator is 0.
+	var t2, t3, tf float64
+	if twoPA := fga - tpa; twoPA != 0 {
+		t2 = (fgm - tpm) / twoPA * lp.TwoPA48
+	}
+	if tpa != 0 {
+		t3 = tpm / tpa * lp.TPA48
+	}
+	if fta != 0 {
+		tf = ftm / fta * lp.FTA48
+	}
+
+	// A: raw-total production numerator, then per-48.
+	aNum := ((fgm + tpm) - (fga-fgm)*(2.0/3.0)) + ftm - fta*0.5 + (fta-ftm)*(1.0/6.0) +
+		(reb-orb)*(1.0/3.0) + orb*(2.0/3.0) + stl - tov + blk + ast*0.8
+	a48 := aNum / min * 48.0
+
+	// B: same composite over the player's own per-48 rates, shooting terms
+	// swapped for the pct × league-volume products. The ORB·(2/3) piece is
+	// built as ORB/MIN × 32.0 (.rdata 0x669ec8) in the binary — kept verbatim.
+	reb48 := reb / min * 48.0
+	orb48 := orb / min * 48.0
+	b := t2 - (lp.TwoPA48-(t2-t3))*(2.0/3.0) + tf - lp.FTA48*0.5 + (lp.FTA48-tf)*(1.0/6.0) +
+		(reb48-orb48)*(1.0/3.0) + orb/min*32.0 +
+		stl/min*48.0 - tov/min*48.0 + blk/min*48.0
+
+	// C: league per-48 counting-stat composite (the pieces B's league-relative
+	// form subtracted out).
+	c := 0.8*lp.AST48 + (2.0/3.0)*lp.ORB48 + (1.0/3.0)*lp.DRB48 +
+		lp.STL48 - lp.TOV48 + lp.BLK48
+
+	return (a48 - lp.Prod48) - b + c
+}
+
 // computeLeagueAST48ByPos assembles the league AST-per-48-min mean per lineup
 // position (index 1-5 = PG/SG/SF/PF/C; index 0 unused/self-slot), the Phase 3
 // MATCHED-term baseline leagueAST48[pos] (matchup.go, RE §5 +0xDC8). Same
@@ -241,6 +390,10 @@ func ToBundle(players []PlrPlayer, sched []SchGame, opts AssembleOptions) (bundl
 	if ast48N > 0 {
 		leagueAST48Standin = ast48Sum / float64(ast48N)
 	}
+	// Ten-param bank for the per-player +0x350 NON-MATCHED term — computed
+	// once over the raw records (its own ungated population, see
+	// computeLeagueNonMatchedParams), consumed per player in toBundlePlayer.
+	nmParams := computeLeagueNonMatchedParams(players)
 
 	rosterTeams := make(map[int]bool, 32)
 	bundlePlayers := make([]bundle.Player, 0, len(players))
@@ -250,7 +403,7 @@ func ToBundle(players []PlrPlayer, sched []SchGame, opts AssembleOptions) (bundl
 	rates := make(map[int]*rateAcc, 32)
 	for _, p := range players {
 		rosterTeams[p.TeamID] = true
-		bundlePlayers = append(bundlePlayers, toBundlePlayer(p, opts.Minutes, leagueAST48Standin))
+		bundlePlayers = append(bundlePlayers, toBundlePlayer(p, opts.Minutes, leagueAST48Standin, nmParams))
 		ra := rates[p.TeamID]
 		if ra == nil {
 			ra = &rateAcc{}
@@ -311,7 +464,7 @@ func ToBundle(players []PlrPlayer, sched []SchGame, opts AssembleOptions) (bundl
 // follows the .plr rating names: DO=drive offense -> r_drive_off,
 // TO=transition offense -> r_trans_off. minutes maps player ordinal ->
 // dc_minutes from the .plb (nil -> 0).
-func toBundlePlayer(p PlrPlayer, minutes map[int]int, leagueAST48Standin float64) bundle.Player {
+func toBundlePlayer(p PlrPlayer, minutes map[int]int, leagueAST48Standin float64, nmParams nonMatchedLeagueParams) bundle.Player {
 	// Per-player derived make-rate composites (D-fields). Faithful to the JSB
 	// +0xD80/+0xD60/+0xD64/+0xDE8 per-player offsets. Zero when real-life data
 	// is absent — shotdecision.go falls back to fgpToPermille for D60==0.
@@ -398,16 +551,12 @@ func toBundlePlayer(p PlrPlayer, minutes map[int]int, leagueAST48Standin float64
 		D64:         d64,
 		DE8:         de8,
 		DefAST48:    defAST48,
-		// NonMatchedTerm deferred to 0: the +0x350 setter-chain (FUN_00561c00
-		// params 2-11) traces into an untraced setter family the RE artifact itself
-		// records as "an optional J15 follow-up, not needed for this verdict"
-		// (re-artifacts/jsb-J16-fun004e3860-20260710.md §5 L92-94); its param
-		// offsets (+0x4b0..0x5a0) are not even covered by the artifact's cited
-		// setter block. Zeroing an unpinned term is the faithful degrade (same
-		// class as the phase4Accumulator strategy_adj=0 stub), NOT a tuned value.
-		// matchupQuality's non-matched loop stays intact so the field goes live
-		// when the +0x350 distribution is later pinned.
-		NonMatchedTerm: 0,
+		// The +0x350 NON-MATCHED matchupQuality term, live as of J25: the full
+		// FUN_00561c00 port (computeNonMatchedTerm) fed by the ten-param league
+		// bank (computeLeagueNonMatchedParams) — provenance in
+		// re-artifacts/jsb-J25-nonmatched-0x350-20260718.md. Zero for players
+		// with no real-life minutes, matching the binary's MIN gate.
+		NonMatchedTerm: computeNonMatchedTerm(p, nmParams),
 
 		Age:         p.Age,
 		Clutch:      p.Clutch,

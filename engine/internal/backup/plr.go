@@ -90,11 +90,16 @@ const (
 	offRealLifeMIN = 56 // width 4 — minutes played (the per-48 rate divisor)
 	offRealLifeFGM = 60 // width 4 — field goals made (feeds D60/D64 per-player make-rate)
 	offRealLifeFGA = 64 // width 4 — total FG attempts (D88)
+	offRealLifeFTM = 68 // width 4 — FT made (record +0x154; NonMatchedTerm pctFT + FT-draw terms)
 	offRealLifeFTA = 72 // width 4 — FT attempts (D70 per-player part)
 	offRealLife3GM = 76 // width 4 — 3-point field goals made (feeds D80 per-player 3pt make-rate)
 	offRealLife3GA = 80 // width 4 — 3pt attempts (subtracted from FGA for the 2PA/48 baseline)
 	offRealLifeORB = 84 // width 4 — offensive rebounds (DB8)
-	// not read: DRB=88 (defQ/offQ need only STL and TVR — skipped deliberately)
+	// offRealLifeREB is TOTAL rebounds, not DRB: the binary's record map has REB at
+	// +0x168 (FUN_0043c680 reads it as local_cd4 and forms DRB = REB − ORB for both
+	// the production composite and the league DRB/48 bucket totals). The earlier
+	// comment here calling offset 88 "DRB" was an unverified label.
+	offRealLifeREB = 88  // width 4 — total rebounds (record +0x168; DRB = REB − ORB)
 	offRealLifeAST = 92  // width 4 — career assists (real-life), feeds DefAST48 = AST/MIN×48 + LeagueAST48ByPos
 	offRealLifeSTL = 96  // width 4 — career steals (real-life), PlrLineParser.php:53 substr(line,96,4)
 	offRealLifeTVR = 100 // width 4 — career turnovers (real-life), PlrLineParser.php:54 substr(line,100,4)
@@ -216,10 +221,12 @@ type PlrPlayer struct {
 	RealLifeMIN int
 	RealLifeFGM int
 	RealLifeFGA int
+	RealLifeFTM int
 	RealLifeFTA int
 	RealLife3GM int
 	RealLife3GA int
 	RealLifeORB int
+	RealLifeREB int // TOTAL rebounds (record +0x168); DRB = REB − ORB
 	RealLifeAST int
 	RealLifeSTL int
 	RealLifeTVR int
@@ -312,9 +319,9 @@ func ReadPlr(r io.Reader) ([]PlrPlayer, error) {
 			{&p.RealLifeGP, offRealLifeGP, 4},
 			{&p.RealLifeMIN, offRealLifeMIN, 4},
 			{&p.RealLifeFGM, offRealLifeFGM, 4}, {&p.RealLifeFGA, offRealLifeFGA, 4},
-			{&p.RealLifeFTA, offRealLifeFTA, 4},
+			{&p.RealLifeFTM, offRealLifeFTM, 4}, {&p.RealLifeFTA, offRealLifeFTA, 4},
 			{&p.RealLife3GM, offRealLife3GM, 4}, {&p.RealLife3GA, offRealLife3GA, 4},
-			{&p.RealLifeORB, offRealLifeORB, 4},
+			{&p.RealLifeORB, offRealLifeORB, 4}, {&p.RealLifeREB, offRealLifeREB, 4},
 			{&p.RealLifeAST, offRealLifeAST, 4},
 			{&p.RealLifeSTL, offRealLifeSTL, 4},
 			{&p.RealLifeTVR, offRealLifeTVR, 4},

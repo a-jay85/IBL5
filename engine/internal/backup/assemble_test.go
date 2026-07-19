@@ -245,7 +245,7 @@ func TestToBundlePlayer_RealLifeSTLTVR_EndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadPlr: %v", err)
 	}
-	bp := toBundlePlayer(parsed[0], nil, 0)
+	bp := toBundlePlayer(parsed[0], nil, 0, nonMatchedLeagueParams{})
 	if bp.RealLifeSTL != 110 || bp.RealLifeTVR != 150 {
 		t.Errorf("end-to-end RealLifeSTL/TVR = %d/%d, want 110/150", bp.RealLifeSTL, bp.RealLifeTVR)
 	}
@@ -604,14 +604,11 @@ func TestComputeLeagueBlk48_EmptyReturnsZero(t *testing.T) {
 // --- J24 matchupQuality Phase 3/4: NonMatchedTerm deferral + DefAST48 +
 // computeLeagueAST48ByPos --------------------------------------------------
 
-// TestNonMatchedTerm_Deferred_Zero (deviation 1, plan Phase 2 P2a/P2b collapsed
-// into one test): NonMatchedTerm is deferred to 0 for every assembled player —
-// the +0x350 setter-chain (FUN_00561c00 params 2-11) traces into an untraced
-// setter family the RE artifact records as an optional J15 follow-up, not the
-// full port. This locks the deferred-zero contract (a documented degrade, not
-// a tuned/computed formula value); matchupQuality's non-matched loop stays
-// intact so this field goes live once the +0x350 distribution is pinned.
-func TestNonMatchedTerm_Deferred_Zero(t *testing.T) {
+// TestNonMatchedTerm_MinGate_Zero: the synthetic roster carries no real-life
+// stats (RealLifeMIN=0), so every assembled player's NonMatchedTerm is 0 via
+// the FUN_00561c00 MIN gate — the faithful no-data degrade, replacing the
+// pre-J25 deferred-zero contract.
+func TestNonMatchedTerm_MinGate_Zero(t *testing.T) {
 	players := append(teamRoster(1), teamRoster(2)...)
 	sched := []SchGame{{VisitorTeamID: 1, HomeTeamID: 2, Month: 11, Day: 2, Played: true}}
 	b, err := ToBundle(players, sched, AssembleOptions{})
@@ -620,8 +617,42 @@ func TestNonMatchedTerm_Deferred_Zero(t *testing.T) {
 	}
 	for _, p := range b.Players {
 		if p.NonMatchedTerm != 0 {
-			t.Errorf("player %d NonMatchedTerm = %v, want 0 (deferred)", p.PID, p.NonMatchedTerm)
+			t.Errorf("player %d NonMatchedTerm = %v, want 0 (MIN gate)", p.PID, p.NonMatchedTerm)
 		}
+	}
+}
+
+// TestNonMatchedTerm_Computed: hand-derived +0x350 value for a single-player
+// league (the player IS the league, so the ten params come from its own
+// totals). Worked by hand from the J25 formula — NOT by re-running the code:
+// M=1000 → p2=31.2 p3=9.6 p4=7.2 p6=4.8 p7=9.6 p8=12 p9=3.84 p10=5.76
+// p11=1.92; Prod=612.5 → p5=29.4; A_num=575 → A48=27.6; B=14.8; C=16.0;
+// term = (27.6−29.4) − 14.8 + 16.0 = −0.6. Locks the +C sign (a −C
+// misread yields −32.6) and the full A/B/C shape.
+func TestNonMatchedTerm_Computed(t *testing.T) {
+	pl := PlrPlayer{
+		RecordIndex: 1, Name: "NM Fixture",
+		RealLifeGP: 50, RealLifeMIN: 1000,
+		RealLifeFGM: 400, RealLifeFGA: 800,
+		RealLifeFTM: 150, RealLifeFTA: 200,
+		RealLife3GM: 50, RealLife3GA: 150,
+		RealLifeORB: 100, RealLifeREB: 300,
+		RealLifeAST: 250, RealLifeSTL: 80,
+		RealLifeTVR: 120, RealLifeBLK: 40,
+	}
+	lp := computeLeagueNonMatchedParams([]PlrPlayer{pl})
+	if math.Abs(lp.Prod48-29.4) > 1e-9 || math.Abs(lp.TwoPA48-31.2) > 1e-9 {
+		t.Fatalf("league params: Prod48 = %v (want 29.4), TwoPA48 = %v (want 31.2)", lp.Prod48, lp.TwoPA48)
+	}
+	if got, want := computeNonMatchedTerm(pl, lp), -0.6; math.Abs(got-want) > 1e-9 {
+		t.Errorf("NonMatchedTerm = %v, want %v", got, want)
+	}
+
+	// Records beyond the 1-960 scan never feed the param bank.
+	out := pl
+	out.RecordIndex = leagueShotBaselineMaxRecordIndex + 1
+	if lp := computeLeagueNonMatchedParams([]PlrPlayer{out}); lp != (nonMatchedLeagueParams{}) {
+		t.Errorf("out-of-scan record leaked into params: %+v", lp)
 	}
 }
 

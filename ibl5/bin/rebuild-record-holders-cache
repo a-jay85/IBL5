@@ -16,43 +16,32 @@ require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/vendor/autoload.php';
 include $_SERVER['DOCUMENT_ROOT'] . '/ibl5/config.php';
 include $_SERVER['DOCUMENT_ROOT'] . '/ibl5/db/db.php';
 
+\Discord\Discord::init($_SERVER['SERVER_NAME']);
+
 /** @var \mysqli $mysqli_db */
 
-echo "Record Holders cache rebuild started\n";
+try {
+    $recordHoldersRepository = new \RecordHolders\RecordHoldersRepository($mysqli_db);
+    $lastAnnouncedDate = $recordHoldersRepository->getLastAnnouncedDate();
+    $newDates = $recordHoldersRepository->getUnannouncedGameDates($lastAnnouncedDate);
 
-// --- Detect broken/tied records for new game dates ---
-
-$recordHoldersRepository = new \RecordHolders\RecordHoldersRepository($mysqli_db);
-$lastAnnouncedDate = $recordHoldersRepository->getLastAnnouncedDate();
-$newDates = $recordHoldersRepository->getUnannouncedGameDates($lastAnnouncedDate);
-
-if ($newDates !== []) {
-    $latestDate = $newDates[count($newDates) - 1];
-    echo 'Checking ' . count($newDates) . ' game date(s) for records (' . $newDates[0] . ' to ' . $latestDate . ")\n";
-
-    $detector = new \RecordHolders\RecordBreakingDetector($recordHoldersRepository);
-    $announcements = $detector->detectAndAnnounce($newDates);
-
-    if ($announcements !== []) {
-        foreach ($announcements as $msg) {
-            echo "  RECORD: {$msg}\n";
-        }
-    } else {
-        echo "  No records broken or tied\n";
+    if ($newDates !== []) {
+        $latestDate = $newDates[count($newDates) - 1];
+        $detector = new \RecordHolders\RecordBreakingDetector($recordHoldersRepository);
+        $detector->detectAndAnnounce($newDates);
+        $recordHoldersRepository->markAnnouncementsProcessed($latestDate);
     }
 
-    $recordHoldersRepository->markAnnouncementsProcessed($latestDate);
-} else {
-    echo "No new game dates to check\n";
+    $innerService = new \RecordHolders\RecordHoldersService($recordHoldersRepository);
+    $cache = new \Cache\DatabaseCache($mysqli_db);
+    $cachedService = new \RecordHolders\CachedRecordHoldersService($innerService, $cache);
+    $cachedService->rebuildCache();
+} catch (\Throwable $e) {
+    try {
+        \Discord\Discord::sendDM('283183467804491776', 'rebuild-record-holders-cache failed: ' . $e->getMessage());
+    } catch (\Throwable) {
+        // DM delivery failed; fall through to stderr
+    }
+    fwrite(STDERR, 'rebuild-record-holders-cache failed: ' . $e->getMessage() . "\n");
+    exit(1);
 }
-
-// --- Rebuild the cache atomically ---
-
-echo "Rebuilding cache...\n";
-
-$innerService = new \RecordHolders\RecordHoldersService($recordHoldersRepository);
-$cache = new \Cache\DatabaseCache($mysqli_db);
-$cachedService = new \RecordHolders\CachedRecordHoldersService($innerService, $cache);
-$cachedService->rebuildCache();
-
-echo "Cache rebuilt successfully\n";

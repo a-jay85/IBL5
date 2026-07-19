@@ -513,10 +513,11 @@ function fixDates(array $files, \DateTimeImmutable $today): int
 }
 
 /**
- * Default-tz calendar date (Y-m-d) of the most recent commit in $base..HEAD that
- * touched $rel — the date the change was committed. Read from the author
- * timestamp (%at), an absolute instant, then formatted in the same default
- * timezone as $today so the two share one frame.
+ * Calendar date (Y-m-d) of the most recent commit in $base..HEAD that touched
+ * $rel, in the **author's own timezone**. Read from the author timestamp (%aI,
+ * ISO 8601 with embedded tz offset) so the date reflects the author's calendar
+ * day, not the CI runner's (which is UTC and can be one day ahead for
+ * late-evening commits made in a negative-offset timezone like PDT).
  *
  * Immutable per commit, so comparing last_verified against it is independent of
  * when CI runs: a same-day re-edit of a doc already verified today passes without
@@ -530,7 +531,7 @@ function fixDates(array $files, \DateTimeImmutable $today): int
 function editCommitDate(string $repoRoot, string $base, string $rel): ?string
 {
     $cmd = sprintf(
-        'git -C %s log -1 --format=%%at %s..HEAD -- %s 2>/dev/null',
+        'git -C %s log -1 --format=%%aI %s..HEAD -- %s 2>/dev/null',
         escapeshellarg($repoRoot),
         escapeshellarg($base),
         escapeshellarg($rel)
@@ -538,14 +539,18 @@ function editCommitDate(string $repoRoot, string $base, string $rel): ?string
     $out = [];
     $code = 0;
     exec($cmd, $out, $code);
-    $ts = trim(implode('', $out));
-    if ($code !== 0 || $ts === '' || ctype_digit($ts) === false) {
+    $iso = trim(implode('', $out));
+    if ($code !== 0 || $iso === '') {
         return null;
     }
 
-    return (new \DateTimeImmutable('@' . $ts))
-        ->setTimezone(new \DateTimeZone(date_default_timezone_get()))
-        ->format('Y-m-d');
+    try {
+        // PHP parses the ISO 8601 string preserving the embedded tz offset, so
+        // format('Y-m-d') returns the date in the author's timezone, not UTC.
+        return (new \DateTimeImmutable($iso))->format('Y-m-d');
+    } catch (\Exception $e) {
+        return null;
+    }
 }
 
 /**

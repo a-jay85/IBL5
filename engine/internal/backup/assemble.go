@@ -24,6 +24,23 @@ const (
 	teamASTRateBase = 44.0
 )
 
+// astRatingRefScale is the DefAST48 rating stand-in's rating-to-scale divisor
+// (0-99 rating mid-scale), mirroring teamquality.go's pinned ratingRefScale =
+// 50.0 anchor used by stlRate/tovRate. leagueAST48Standin is NOT a §6 .rdata
+// pin — the J16 artifact does not surface a CEngine leagueAST48 offset, so
+// (per plan §3b) it is computed at bundle-build time as the population mean
+// of the assembled LeagueAST48ByPos buckets (computeLeagueAST48ByPos) — the
+// same real-data source the matchupQuality matched term subtracts against —
+// rather than an invented literal.
+const astRatingRefScale = 50.0
+
+// floor1AST floors a 0-99 AST rating at 1 (teamquality.go stlRate's floor1
+// idiom — not exported from sim, so redefined locally here) so the DefAST48
+// rating stand-in is always > 0, never a divide/multiply-by-zero degenerate.
+func floor1AST(r int) float64 {
+	return math.Max(1, float64(r))
+}
+
 // leagueShotBaselineMaxRecordIndex is the FUN_004385f0 league-table scan
 // boundary: JSB 5.60 computes the league 2PA/48 baseline over .plr file
 // RECORDS 1-959 only, at league-select time — records 960+ (which hold
@@ -91,6 +108,64 @@ func computeLeagueBlk48(players []PlrPlayer) float64 {
 	return sumBLK / sumMIN * 48.0
 }
 
+// computeLeagueAST48ByPos assembles the league AST-per-48-min mean per lineup
+// position (index 1-5 = PG/SG/SF/PF/C; index 0 unused/self-slot), the Phase 3
+// MATCHED-term baseline leagueAST48[pos] (matchup.go, RE §5 +0xDC8). Same
+// qualifying population as computeLeagueBlk48: RecordIndex ≤ leagueShotBaseline
+// MaxRecordIndex, non-empty Name, RealLifeMIN > 2×RealLifeGP. A bucket with no
+// qualifying players stays 0 (graceful degrade — matched term reduces to
+// DefAST48·0.8·fatigue).
+func computeLeagueAST48ByPos(players []PlrPlayer) [6]float64 {
+	var sum [6]float64
+	var n [6]int
+	for _, p := range players {
+		if p.RecordIndex > leagueShotBaselineMaxRecordIndex || p.Name == "" {
+			continue
+		}
+		if p.RealLifeMIN > 2*p.RealLifeGP && p.RealLifeMIN > 0 {
+			pos := primaryDepthPos(p) // 1..5 from PGDepth==1 → 1, …, CDepth==1 → 5
+			if pos >= 1 && pos <= 5 {
+				sum[pos] += float64(p.RealLifeAST) / float64(p.RealLifeMIN) * 48.0
+				n[pos]++
+			}
+		}
+	}
+	var out [6]float64
+	for i := 1; i <= 5; i++ {
+		if n[i] > 0 {
+			out[i] = sum[i] / float64(n[i])
+		}
+	}
+	return out
+}
+
+// primaryDepthPos returns the position slot whose depth-chart rank is the
+// starter (PGDepth==1→1, SGDepth==1→2, SFDepth==1→3, PFDepth==1→4, CDepth==1→5);
+// when none is exactly 1 (bench player), it picks the slot with the lowest
+// depth value (best rank), ties broken by position order PG→C. This buckets
+// each real player into exactly one primary position, matching how the
+// matched term indexes leagueAST48[pos] by the ball-handler's covered slot.
+func primaryDepthPos(p PlrPlayer) int {
+	depths := [6]int{0, p.PGDepth, p.SGDepth, p.SFDepth, p.PFDepth, p.CDepth}
+	for i := 1; i <= 5; i++ {
+		if depths[i] == 1 {
+			return i
+		}
+	}
+	best := 0
+	bestDepth := 0
+	for i := 1; i <= 5; i++ {
+		if depths[i] <= 0 {
+			continue
+		}
+		if best == 0 || depths[i] < bestDepth {
+			best = i
+			bestDepth = depths[i]
+		}
+	}
+	return best
+}
+
 // AssembleOptions carries the bundle-level metadata the backup files do not
 // themselves provide. The .sch has no game type, so the caller supplies one;
 // the zero value defaults to a regular-season game.
@@ -147,6 +222,26 @@ func ToBundle(players []PlrPlayer, sched []SchGame, opts AssembleOptions) (bundl
 		gameType = bundle.GameTypeRegular
 	}
 
+	// Computed once, over the raw players slice, BEFORE the per-player assembly
+	// loop: computeLeagueAST48ByPos is both a Bundle-level league field (wired
+	// below, alongside LeagueShotBaseline/LeagueBlk48) AND the source of the
+	// DefAST48 rating stand-in's leagueAST48Standin scalar (per-player loop,
+	// toBundlePlayer) — computed here once and reused in both places rather
+	// than calling the pure function twice.
+	leagueAST48ByPos := computeLeagueAST48ByPos(players)
+	var ast48Sum float64
+	var ast48N int
+	for i := 1; i <= 5; i++ {
+		if leagueAST48ByPos[i] > 0 {
+			ast48Sum += leagueAST48ByPos[i]
+			ast48N++
+		}
+	}
+	var leagueAST48Standin float64
+	if ast48N > 0 {
+		leagueAST48Standin = ast48Sum / float64(ast48N)
+	}
+
 	rosterTeams := make(map[int]bool, 32)
 	bundlePlayers := make([]bundle.Player, 0, len(players))
 	// Accumulate each team's Σ season GP/DRB/AST over its player rows — the faithful
@@ -155,7 +250,7 @@ func ToBundle(players []PlrPlayer, sched []SchGame, opts AssembleOptions) (bundl
 	rates := make(map[int]*rateAcc, 32)
 	for _, p := range players {
 		rosterTeams[p.TeamID] = true
-		bundlePlayers = append(bundlePlayers, toBundlePlayer(p, opts.Minutes))
+		bundlePlayers = append(bundlePlayers, toBundlePlayer(p, opts.Minutes, leagueAST48Standin))
 		ra := rates[p.TeamID]
 		if ra == nil {
 			ra = &rateAcc{}
@@ -208,6 +303,7 @@ func ToBundle(players []PlrPlayer, sched []SchGame, opts AssembleOptions) (bundl
 		Schedule:           games,
 		LeagueShotBaseline: computeLeagueShotBaseline(players),
 		LeagueBlk48:        computeLeagueBlk48(players),
+		LeagueAST48ByPos:   leagueAST48ByPos,
 	}, nil
 }
 
@@ -215,7 +311,7 @@ func ToBundle(players []PlrPlayer, sched []SchGame, opts AssembleOptions) (bundl
 // follows the .plr rating names: DO=drive offense -> r_drive_off,
 // TO=transition offense -> r_trans_off. minutes maps player ordinal ->
 // dc_minutes from the .plb (nil -> 0).
-func toBundlePlayer(p PlrPlayer, minutes map[int]int) bundle.Player {
+func toBundlePlayer(p PlrPlayer, minutes map[int]int, leagueAST48Standin float64) bundle.Player {
 	// Per-player derived make-rate composites (D-fields). Faithful to the JSB
 	// +0xD80/+0xD60/+0xD64/+0xDE8 per-player offsets. Zero when real-life data
 	// is absent — shotdecision.go falls back to fgpToPermille for D60==0.
@@ -226,6 +322,15 @@ func toBundlePlayer(p PlrPlayer, minutes map[int]int) bundle.Player {
 	var de8 float64
 	if p.RealLifeMIN > 0 {
 		de8 = float64(p.RealLifeBLK) / float64(p.RealLifeMIN) * 48.0
+	}
+	var defAST48 float64
+	if p.RealLifeMIN > 0 && p.RealLifeAST > 0 {
+		defAST48 = float64(p.RealLifeAST) / float64(p.RealLifeMIN) * 48.0
+	} else {
+		// Rating stand-in for players with no real minutes/assists (rookie / un-wired
+		// bundle) — the exact form teamquality.go stlRate uses: floor1(rating)/50 ×
+		// leagueAST48 mean. floor1AST floors the 0-99 rating at 1 so defAST48 > 0 always.
+		defAST48 = floor1AST(p.RatingAST) / astRatingRefScale * leagueAST48Standin
 	}
 	if p.RealLife3GA > 0 {
 		d80 = int(math.Round(float64(p.RealLife3GM) / float64(p.RealLife3GA) * 1000))
@@ -282,6 +387,7 @@ func toBundlePlayer(p PlrPlayer, minutes map[int]int) bundle.Player {
 		RealLifeFTA: p.RealLifeFTA,
 		RealLife3GA: p.RealLife3GA,
 		RealLifeORB: p.RealLifeORB,
+		RealLifeAST: p.RealLifeAST,
 		RealLifeSTL: p.RealLifeSTL,
 		RealLifeTVR: p.RealLifeTVR,
 		RealLifeFGM: p.RealLifeFGM,
@@ -291,6 +397,17 @@ func toBundlePlayer(p PlrPlayer, minutes map[int]int) bundle.Player {
 		D60:         d60,
 		D64:         d64,
 		DE8:         de8,
+		DefAST48:    defAST48,
+		// NonMatchedTerm deferred to 0: the +0x350 setter-chain (FUN_00561c00
+		// params 2-11) traces into an untraced setter family the RE artifact itself
+		// records as "an optional J15 follow-up, not needed for this verdict"
+		// (re-artifacts/jsb-J16-fun004e3860-20260710.md §5 L92-94); its param
+		// offsets (+0x4b0..0x5a0) are not even covered by the artifact's cited
+		// setter block. Zeroing an unpinned term is the faithful degrade (same
+		// class as the phase4Accumulator strategy_adj=0 stub), NOT a tuned value.
+		// matchupQuality's non-matched loop stays intact so the field goes live
+		// when the +0x350 distribution is later pinned.
+		NonMatchedTerm: 0,
 
 		Age:         p.Age,
 		Clutch:      p.Clutch,

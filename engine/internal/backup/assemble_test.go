@@ -245,7 +245,7 @@ func TestToBundlePlayer_RealLifeSTLTVR_EndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadPlr: %v", err)
 	}
-	bp := toBundlePlayer(parsed[0], nil)
+	bp := toBundlePlayer(parsed[0], nil, 0)
 	if bp.RealLifeSTL != 110 || bp.RealLifeTVR != 150 {
 		t.Errorf("end-to-end RealLifeSTL/TVR = %d/%d, want 110/150", bp.RealLifeSTL, bp.RealLifeTVR)
 	}
@@ -598,5 +598,130 @@ func TestComputeLeagueBlk48_EmptyReturnsZero(t *testing.T) {
 	}
 	if got := computeLeagueBlk48(players2); got != 0 {
 		t.Errorf("empty-name pop: got %v, want 0", got)
+	}
+}
+
+// --- J24 matchupQuality Phase 3/4: NonMatchedTerm deferral + DefAST48 +
+// computeLeagueAST48ByPos --------------------------------------------------
+
+// TestNonMatchedTerm_Deferred_Zero (deviation 1, plan Phase 2 P2a/P2b collapsed
+// into one test): NonMatchedTerm is deferred to 0 for every assembled player —
+// the +0x350 setter-chain (FUN_00561c00 params 2-11) traces into an untraced
+// setter family the RE artifact records as an optional J15 follow-up, not the
+// full port. This locks the deferred-zero contract (a documented degrade, not
+// a tuned/computed formula value); matchupQuality's non-matched loop stays
+// intact so this field goes live once the +0x350 distribution is pinned.
+func TestNonMatchedTerm_Deferred_Zero(t *testing.T) {
+	players := append(teamRoster(1), teamRoster(2)...)
+	sched := []SchGame{{VisitorTeamID: 1, HomeTeamID: 2, Month: 11, Day: 2, Played: true}}
+	b, err := ToBundle(players, sched, AssembleOptions{})
+	if err != nil {
+		t.Fatalf("ToBundle: %v", err)
+	}
+	for _, p := range b.Players {
+		if p.NonMatchedTerm != 0 {
+			t.Errorf("player %d NonMatchedTerm = %v, want 0 (deferred)", p.PID, p.NonMatchedTerm)
+		}
+	}
+}
+
+// TestDefAST48_KnownStats (P3a): DefAST48 = RealLifeAST/RealLifeMIN×48 for a
+// player with known real-life AST/MIN.
+func TestDefAST48_KnownStats(t *testing.T) {
+	roster := teamRoster(1)
+	roster[0].RealLifeMIN = 2000
+	roster[0].RealLifeAST = 300 // 300/2000×48 = 7.2
+	players := append(roster, teamRoster(2)...)
+	sched := []SchGame{{VisitorTeamID: 1, HomeTeamID: 2, Month: 11, Day: 2, Played: true}}
+	b, err := ToBundle(players, sched, AssembleOptions{})
+	if err != nil {
+		t.Fatalf("ToBundle: %v", err)
+	}
+	var got bundle.Player
+	for _, p := range b.Players {
+		if p.PID == roster[0].PID {
+			got = p
+		}
+	}
+	want := 300.0 / 2000.0 * 48.0
+	if math.Abs(got.DefAST48-want) > 1e-9 {
+		t.Errorf("DefAST48 = %v, want %v", got.DefAST48, want)
+	}
+}
+
+// TestDefAST48_StandIn_NoRealLife (P3b): a player with RealLifeMIN==0 (no
+// real-life AST data) falls back to the rating stand-in — floor1AST(rating)/50
+// × leagueAST48Standin — and yields a positive, finite value (no divide-by-
+// zero / NaN). A second roster player carries qualifying real-life AST/MIN so
+// leagueAST48Standin (the population mean of computeLeagueAST48ByPos) is
+// itself non-zero, proving the stand-in path is non-degenerate.
+func TestDefAST48_StandIn_NoRealLife(t *testing.T) {
+	roster := teamRoster(1)
+	// roster[0] (PG, primary slot 1): no real-life AST/MIN -> stand-in path.
+	roster[0].RatingAST = 70
+	// roster[1] (SG, primary slot 2): qualifying real-life AST/MIN so the league
+	// mean (leagueAST48Standin) is non-zero.
+	roster[1].RealLifeGP = 10
+	roster[1].RealLifeMIN = 500 // > 2×10
+	roster[1].RealLifeAST = 100 // 100/500×48 = 9.6
+	players := append(roster, teamRoster(2)...)
+	sched := []SchGame{{VisitorTeamID: 1, HomeTeamID: 2, Month: 11, Day: 2, Played: true}}
+	b, err := ToBundle(players, sched, AssembleOptions{})
+	if err != nil {
+		t.Fatalf("ToBundle: %v", err)
+	}
+	var got bundle.Player
+	for _, p := range b.Players {
+		if p.PID == roster[0].PID {
+			got = p
+		}
+	}
+	if got.DefAST48 <= 0 {
+		t.Errorf("DefAST48 stand-in = %v, want > 0 (no MIN/AST -> rating stand-in path)", got.DefAST48)
+	}
+	if math.IsNaN(got.DefAST48) || math.IsInf(got.DefAST48, 0) {
+		t.Errorf("DefAST48 stand-in = %v, want finite", got.DefAST48)
+	}
+	// Exact: floor1AST(70)/50 × leagueAST48Standin(=9.6, the sole qualifying bucket).
+	want := 70.0 / 50.0 * 9.6
+	if math.Abs(got.DefAST48-want) > 1e-9 {
+		t.Errorf("DefAST48 stand-in = %v, want %v", got.DefAST48, want)
+	}
+}
+
+// TestComputeLeagueAST48ByPos (P3c): per-bucket mean AST48 over the qualifying
+// population, and an all-zero result for buckets/populations with no
+// qualifying players.
+func TestComputeLeagueAST48ByPos(t *testing.T) {
+	players := []PlrPlayer{
+		// PG bucket (index 1): two qualifying players -> mean (9.6+24.0)/2 = 16.8.
+		{RecordIndex: 1, Name: "A", PGDepth: 1, RealLifeGP: 10, RealLifeMIN: 500, RealLifeAST: 100},
+		{RecordIndex: 2, Name: "B", PGDepth: 1, RealLifeGP: 10, RealLifeMIN: 1000, RealLifeAST: 500},
+		// SG bucket (index 2): one qualifying player -> mean 12.0.
+		{RecordIndex: 3, Name: "C", SGDepth: 1, RealLifeGP: 5, RealLifeMIN: 200, RealLifeAST: 50},
+		// Non-qualifying: MIN not > 2×GP (boundary, strict >) — excluded.
+		{RecordIndex: 4, Name: "D", PGDepth: 1, RealLifeGP: 100, RealLifeMIN: 200, RealLifeAST: 999},
+		// Empty name: excluded despite otherwise-qualifying stats.
+		{RecordIndex: 5, Name: "", PGDepth: 1, RealLifeGP: 10, RealLifeMIN: 500, RealLifeAST: 999},
+		// RecordIndex beyond the scan boundary: excluded.
+		{RecordIndex: 960, Name: "F", PGDepth: 1, RealLifeGP: 10, RealLifeMIN: 500, RealLifeAST: 999},
+	}
+	got := computeLeagueAST48ByPos(players)
+	wantPG := (100.0/500.0*48.0 + 500.0/1000.0*48.0) / 2.0
+	wantSG := 50.0 / 200.0 * 48.0
+	if math.Abs(got[1]-wantPG) > 1e-9 {
+		t.Errorf("PG bucket = %v, want %v", got[1], wantPG)
+	}
+	if math.Abs(got[2]-wantSG) > 1e-9 {
+		t.Errorf("SG bucket = %v, want %v", got[2], wantSG)
+	}
+	// SF/PF/C buckets have no qualifying players -> 0.
+	if got[3] != 0 || got[4] != 0 || got[5] != 0 {
+		t.Errorf("empty buckets = %+v, want all zero", got)
+	}
+
+	// Fully-empty population -> [6]float64{} (all zero) — the graceful degrade.
+	if empty := computeLeagueAST48ByPos(nil); empty != ([6]float64{}) {
+		t.Errorf("empty population = %+v, want all-zero", empty)
 	}
 }

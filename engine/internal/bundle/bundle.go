@@ -123,6 +123,7 @@ type Player struct {
 	RealLifeFGM int `json:"rl_fgm"`
 	RealLife3GM int `json:"rl_3gm"`
 	RealLifeBLK int `json:"rl_blk"`
+	RealLifeAST int `json:"rl_ast"`
 
 	// Per-player derived make-rate composites computed at bundle-build time
 	// (backup/assemble.go toBundlePlayer). D80/D60/D64 are per-mille values;
@@ -140,6 +141,19 @@ type Player struct {
 	D60 int     `json:"d60"`
 	D64 int     `json:"d64"`
 	DE8 float64 `json:"de8"`
+	// DefAST48 is the defender's f-projected assists-per-48-min career rate
+	// (RealLifeAST/RealLifeMIN×48), feeding the matchupQuality Phase 3 MATCHED
+	// term (matchup.go): (DefAST48 − LeagueAST48ByPos[pos]) · 0.8 · fatigue
+	// (RE artifact §5, +0xDC8). Same STL/MIN×44 → RealLifeSTL precedent used by
+	// defQ/offQ (teamquality.go). Zero MINUTES → AST-rating stand-in fallback
+	// (RealLifeMIN==0 guard), identical to the RealLifeSTL/RealLifeTVR pattern.
+	DefAST48 float64 `json:"def_ast48"`
+	// NonMatchedTerm is the static per-depth-chart Phase 3 NON-MATCHED term
+	// (RE artifact §5, +0x350), computed once per player at bundle-build time
+	// from record doubles params 2-11 (assemble.go). Written by the port of
+	// FUN_00561c00; consumed by matchupQuality's non-matched accumulation.
+	// Precedent: DE8 is likewise a build-time derived float, not a raw column.
+	NonMatchedTerm float64 `json:"non_matched_term"`
 
 	// Attributes.
 	Age         int `json:"age"`
@@ -200,6 +214,14 @@ type Bundle struct {
 	// bundle) leaves blockMod returning 0 — a graceful no-op, since the cap
 	// defBlkSum ≤ 1.5×5×leagueBlk48 forces defBlkSum to 0 when leagueBlk48=0.
 	LeagueBlk48 float64 `json:"league_blk48"`
+	// LeagueAST48ByPos is the league AST-per-48-player-minutes rate per lineup
+	// position (index 1-5 = PG/SG/SF/PF/C; index 0 unused/self-slot), the
+	// matchupQuality Phase 3 MATCHED-term baseline leagueAST48[pos] (RE artifact
+	// §5, +0xDC8). Assembled once per snapshot by backup.ToBundle
+	// (computeLeagueAST48ByPos), analogous to LeagueShotBaseline/LeagueBlk48. A
+	// zero entry (unwired bundle) makes the matched term reduce to DefAST48·0.8·
+	// fatigue — a graceful degrade, no divide-by-zero.
+	LeagueAST48ByPos [6]float64 `json:"league_ast48_by_pos"`
 }
 
 // Validation errors surfaced at the contract boundary.

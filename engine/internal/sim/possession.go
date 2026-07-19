@@ -194,7 +194,7 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 		// offensive-rate composite). The 2pt bucket weight is now net-free (see
 		// bucketweights.go), so the playoff multiplier no longer amplifies it.
 		net := netAdvantage(pt, bh, def, penalty, false, gs.gameType)
-		mq := matchupQuality(bh.FGP, bh.energy, defense.players) // live energy (inert under current curve)
+		mq := matchupQuality(bh, defense.players, gs.leagueAST48ByPos) // live energy (inert under current curve)
 
 		// Make/foul/turnover arms route through the gameState freeze wrappers
 		// (freeze.go): live values in the normal/baseline path, league-mean

@@ -56,8 +56,8 @@ func matchupQuality(bh onCourt, defenders []onCourt, leagueAST48ByPos [6]float64
 	// ==4/==3/==2 gate). Stubbed to 0 pending the .lge +0x12c strategy-field offset
 	// pin — J24 residual (4). This is the same faithful strategy_adj=0 degrade the
 	// engine already applies at transition.go:55-61 / tempo.go:39 for the unpinned
-	// +0x12c. Phase 3 (this PR) alone moves FG% into [47.5%, 48.9%]; Phase 4 is
-	// additive-only and does not gate acceptance.
+	// +0x12c. Phase 3 complete (J24 matched +0xDC8 + J25 non-matched +0x350) yields
+	// FG% 46.42% — outside [47.5%, 48.9%]; Phase 4 (+0x33F0) is the next candidate.
 	const phase4Accumulator = 0.0
 	return (accumulated + phase4Accumulator - normalized) * 0.2
 }

@@ -1,6 +1,6 @@
 ---
 description: J21 finding — 5.60 rounds the possession clock-step half-up (int() truncation is a confirmed infidelity), but the archive A/B shows the faithful round-half-up shipped ALONE fails to flip the wrong-signed Cov(lnPOSS,lnPPS) and regresses mean pace; truncation was HELD, the coupled fix shipped in J23 (#1495); J24 then ported the full per-possession step-class mix (half-court jitter + steal + DRB-push) with a NO-GO on the faithful 16.0 center — provisional re-centered 13.65→17.7, dispersion/Cov residual open.
-last_verified: 2026-07-17
+last_verified: 2026-07-19
 ---
 
 # ADR-0085: Tempo step truncation retained; faithful round-half-up + base_time re-center deferred to J22
@@ -116,7 +116,7 @@ The J24 static RE session (`jsb-native/re-artifacts/jsb-J24-pace-dispersion-RE-2
 
 - **u = 0 ground truth (Phase 0, binary-proven).** `CEngine+0x38` — the multiplier on every composite/param term of FUN_004e4150's base_time ratio — is unconditionally 0.0 (single writer averages two stack doubles whose only writers are prologue zero-stores; exhaustive modrm scan). With u = 0 the ratio evaluates 2880/0 → +inf → clamped to the 16.0 ceiling **every call**: 5.60's base_time is a per-matchup CONSTANT and the composite ratio is dead code. This retired the ADR-0042 roster-dependent additive `teamBaseTime` stand-in (Phase 1) — it modeled dispersion 5.60 does not have. Full proof chain: `jsb-native/re-artifacts/jsb-J24-pace-dispersion-RE-20260716.md` §8 (machine-local).
 - **Half-court jitter (Phase 2).** `possessionTime(baseTime, r)` draws `round-half-up(pt/2 + U[0,pt))` per possession, with a single `{3..23}` redraw on the trunc(pt) hit (no loop — faithful). J23's round-half-up survives as the rounding rule of the jittered draw.
-- **Steal-transition class (Phase 3).** A possession following a steal drains `rand_int(3)` → {0,1,2}s. `possession()` now returns a 3-valued `possOutcome` (normal/steal/DRB) instead of the old fast-break bool.
+- **Steal-transition class (Phase 3).** A possession following a steal drains `rand_int(3)` → {0,1,2}s. `possession()` now returns a 3-valued `possOutcome` (normal/steal/DRB) instead of the old fast-break bool. **(LABEL CORRECTED 2026-07-17 — see the step-class label-correction Update below: FUN_004e42e0's `rand_int(3)` {0,1,2}s class is the OREB quick-putback class, NOT the steal class; a steal is faithfully a code-7 transition PUSH. The engine's steal→{0,1,2}s routing is a known wrong-class stand-in, not a faithful mapping.)**
 - **DRB-push class (Phase 4).** A possession following a defensive rebound, when the (single-draw, captured) `transitionTriggers` gate fires, drains `rand_int(3)+2` → {2,3,4}s. `strategy_adj = 0` stand-in documented (`.lge +0x12c` coach/tempo term not yet pinned).
 
 **Phase 5 GO/NO-GO: NO-GO.** The gate asked for Var(lnPOSS) ≥ ~0.0006 with positive Cov (GO-1) and mean pace ∈ [103.5, 105.5] at the faithful 16.0 center (GO-2). Archive smoke (runs=4 stride=4, seed 20240601):
@@ -130,7 +130,21 @@ The J24 static RE session (`jsb-native/re-artifacts/jsb-J24-pace-dispersion-RE-2
 
 Both gates fail. The mix ports the step CLASSES faithfully but the engine ARMS them at ~29% of possessions (implied half-court weight 0.706 from the 13.65/16.0 pace pair) vs real ~11.5% (~24 transition markers / ~209 possessions) — ~2.5× the real share. Consequences: (a) the faithful 16.0 center overshoots pace by ~10 poss/g, so the provisional center is retained and re-centered to **17.7** (bracket of record 17.5 → 105.38, 17.7 → 104.25, 17.9 → 103.06; deliberately above the faithful [13,16] clamp — it compensates the over-armed fast classes); (b) Var(lnPOSS) is **unchanged** vs the pre-port 0.000254 record and Cov did not flip — the class MIX as armed by the engine's own steal/transition rates carries pace, not cross-team dispersion. The Var/Cov carrier in 5.60 remains unidentified.
 
-**J24 status: ◑ Partial.** Residual sub-steps carried in the backlog: (1) close the fast-class arming-share gap (~29% → ~11.5%) — likely the steal class needs the same gating as the transition RUN, and/or the DRB gate rate is high; (2) trace the `CEngine+0x30` forced-redraw flag writer; (3) pin `.lge +0x12c` for the real `strategy_adj`; (4) once the share closes, walk `baseTimeMid` back to the faithful 16.0 and re-run this gate. Instruments kept: `basetimemid_sweep_archive_test.go` (re-center bracket of record), `possessioncoupling_archive_test.go` (J24 UPDATE block records the post-port four-term numbers).
+**J24 status: ◑ Partial.** Residual sub-steps carried in the backlog: (1) close the fast-class arming-share gap (~29% → ~11.5%) — **[DIAGNOSIS CORRECTED 2026-07-17, see the label-correction Update below] steals are in the wrong step CLASS entirely**: 5.60 routes a steal-sourced break through the code-7 transition-PUSH gate ({2,3,4}s, the outlet TO-rating roll — the same gate DRB pushes use), NOT through an ungated {0,1,2}s draw, and reserves {0,1,2}s for OREB quick-putbacks. The engine over-arms because steals bypass the push gate and always fire a fast class; the fix routes steals to the gated code-7 class (and adds an OREB-putback {0,1,2}s class), rather than "the steal class needs the same gating as the transition RUN"; (2) trace the `CEngine+0x30` forced-redraw flag writer; (3) pin `.lge +0x12c` for the real `strategy_adj`; (4) once the share closes, walk `baseTimeMid` back to the faithful 16.0 and re-run this gate. Instruments kept: `basetimemid_sweep_archive_test.go` (re-center bracket of record), `possessioncoupling_archive_test.go` (J24 UPDATE block records the post-port four-term numbers).
+
+## Update: FUN_004e42e0 step-class label correction (2026-07-17)
+
+The J24 arming-share RE re-trace (`jsb-native/re-artifacts/jsb-J24-arming-share-RE-20260717.md`, machine-local) corrected the labeling of FUN_004e42e0's fast step classes as recorded in the two Updates above. The `param_2` argument was mislabeled a "steal-transition" flag; it is the **OREB quick-putback** flag (`param_2==1`, set only from the rebound handler). The corrected class map:
+
+| FUN_004e42e0 class | trigger | step (s) |
+|---|---|---|
+| **OREB quick putback** | `param_2==1` (rebound handler only) | `rand_int(3)` → {0,1,2} |
+| **transition push (steal OR DRB sourced)** | `param_3==7` (code 7) | `rand_int(3)+2` → {2,3,4} |
+| half-court | `param_3==6` (code 6) | round-half-up jitter |
+
+A steal-sourced fast break is faithfully a **code-7 transition push** ({2,3,4}s), the same class as a DRB push — the fast-break arming flag (`CEngine+0x4be4`) is set unconditionally by steals and at 94% by DREBs, then consumed by ONE outlet TO-rating roll. FUN_004e42e0 is the clock-step function throughout; the outlet player-pick / arming trigger is the SEPARATE `CEngine+0x4be4` gate, not FUN_004e42e0.
+
+**Effect on the shipped engine (unchanged by this Update — documentation only):** `engine/internal/sim/gameloop.go` still routes `possSteal` → an ungated {0,1,2}s draw and reaches the code-7 {2,3,4}s class only via DRB. That steal→{0,1,2}s routing is now understood as a **wrong-class stand-in** (the J24 §1d residual, restated in residual (1) above), to be corrected by the arming-share port — not by this ADR. Nothing shipped changes here; only the labels and the residual-(1) diagnosis are corrected. Authoritative reference: `jsb-native/jsb_560/decompiled/00_MASTER_REFERENCE.md` "Possession clock step — FUN_004e42e0".
 
 ## Lineage
 

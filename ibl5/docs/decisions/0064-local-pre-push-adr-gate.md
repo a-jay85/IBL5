@@ -1,6 +1,6 @@
 ---
 description: Local pre-push hook that front-runs the CI ADR decision-trigger gate, catching missing-ADR triggers before the round-trip to CI.
-last_verified: 2026-06-29
+last_verified: 2026-07-19
 ---
 
 # ADR-0064: Local pre-push ADR decision-trigger gate
@@ -18,7 +18,7 @@ Add a tracked pre-push hook (`bin/pre-push-adr-hook`) and an idempotent installe
 
 ## Alternatives Considered
 
-- **Warning-level pre-push hook** (mirror the `auto-commit-reminder` Stop hook) — Rejected because: a Stop hook surfaces in Claude's turn-end UI where it is read; pre-push output competes with git push spam and is scrolled past, reproducing the #1117 miss.
+- **Warning-level pre-push hook** — Rejected because: pre-push output competes with git push spam and is scrolled past, reproducing the #1117 miss.
 - **`git config core.hooksPath` to a tracked `.githooks/` dir** — Rejected because: it is all-or-nothing across the shared common git dir and would orphan the four working untracked hooks (git-lfs pre-push, pre-commit's codebase-map + check-docs, post-merge wt-cleanup, post-checkout) — turning "add one check" into "migrate the whole hook system".
 - **A new `bin/adr-check --no-pr-body` mode** — Rejected because: `--pr --bypass-from-stdin` already composes (`fetchPrBody` reads STDIN before the mode check and already tolerates a missing PR), so no `bin/adr-check` change is needed and its CI behavior cannot regress.
 

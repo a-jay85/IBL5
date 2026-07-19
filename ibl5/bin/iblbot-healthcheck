@@ -1,0 +1,17 @@
+#!/bin/bash
+# IBLbot pm2 watchdog. Redirects all output to the IBLbot healthcheck log so
+# cron never sends email. Connection-refused errors are transient (pm2 restarted);
+# pm2 start/save output is informational. Neither warrants a notification.
+set -euo pipefail
+
+LOG=/home/iblhoops/.pm2/iblbot-healthcheck.log
+NVM_PM2=/home/iblhoops/.nvm/versions/node/v22.7.0/bin/pm2
+IBLBOT=/home/iblhoops/public_html/ibl5/IBLbot
+
+exec >> "$LOG" 2>&1
+
+if ! curl -fsS --max-time 5 -o /dev/null http://127.0.0.1:50000/; then
+    cd "$IBLBOT"
+    "$NVM_PM2" start ecosystem.config.cjs --update-env
+    "$NVM_PM2" save
+fi

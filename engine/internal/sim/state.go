@@ -183,6 +183,10 @@ type gameState struct {
 	// leagueBlk48=0, so blockMod returns 0 — a no-op fallback requiring no
 	// separate accessor.
 	leagueBlk48 float64
+	// leagueAST48ByPos is bundle.Bundle.LeagueAST48ByPos, copied once per game;
+	// matchupQuality Phase 3 matched-term baseline. Zero bucket → matched term
+	// reduces to DefAST48·0.8·fatigue.
+	leagueAST48ByPos [6]float64
 }
 
 func (g *gameState) emit(e result.Event) { g.events = append(g.events, e) }

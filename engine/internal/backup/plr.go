@@ -94,7 +94,8 @@ const (
 	offRealLife3GM = 76 // width 4 — 3-point field goals made (feeds D80 per-player 3pt make-rate)
 	offRealLife3GA = 80 // width 4 — 3pt attempts (subtracted from FGA for the 2PA/48 baseline)
 	offRealLifeORB = 84 // width 4 — offensive rebounds (DB8)
-	// not read: DRB=88, AST=92 (defQ/offQ need only STL and TVR — skipped deliberately)
+	// not read: DRB=88 (defQ/offQ need only STL and TVR — skipped deliberately)
+	offRealLifeAST = 92  // width 4 — career assists (real-life), feeds DefAST48 = AST/MIN×48 + LeagueAST48ByPos
 	offRealLifeSTL = 96  // width 4 — career steals (real-life), PlrLineParser.php:53 substr(line,96,4)
 	offRealLifeTVR = 100 // width 4 — career turnovers (real-life), PlrLineParser.php:54 substr(line,100,4)
 	offRealLifeBLK = 104 // width 4 — blocks (feeds DE8 per-player block-rate; also LeagueBlk48)
@@ -219,6 +220,7 @@ type PlrPlayer struct {
 	RealLife3GM int
 	RealLife3GA int
 	RealLifeORB int
+	RealLifeAST int
 	RealLifeSTL int
 	RealLifeTVR int
 	RealLifeBLK int
@@ -313,6 +315,7 @@ func ReadPlr(r io.Reader) ([]PlrPlayer, error) {
 			{&p.RealLifeFTA, offRealLifeFTA, 4},
 			{&p.RealLife3GM, offRealLife3GM, 4}, {&p.RealLife3GA, offRealLife3GA, 4},
 			{&p.RealLifeORB, offRealLifeORB, 4},
+			{&p.RealLifeAST, offRealLifeAST, 4},
 			{&p.RealLifeSTL, offRealLifeSTL, 4},
 			{&p.RealLifeTVR, offRealLifeTVR, 4},
 			{&p.RealLifeBLK, offRealLifeBLK, 4},

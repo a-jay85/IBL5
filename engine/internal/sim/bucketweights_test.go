@@ -27,7 +27,7 @@ func pathCounts(in outcomeInputs, n int, seed uint64) map[outcomeCode]int {
 func assembleInputs(foulWeight, hca float64) outcomeInputs {
 	bh := oc(slotPG, mkPlayer(1, 3, slotPG, 48))
 	defenders := fiveStarters(7)
-	mq := matchupQuality(bh.FGP, bh.energy, defenders)
+	mq := matchupQuality(bh, defenders, [6]float64{})
 	return outcomeInputs{
 		twoPtWeight:      twoPtBucketWeight(bh) + hca,
 		threePtWeight:    threePtBucketWeight(bh),

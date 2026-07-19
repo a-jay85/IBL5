@@ -194,9 +194,10 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 		// offensive-rate composite). The 2pt bucket weight is now net-free (see
 		// bucketweights.go), so the playoff multiplier no longer amplifies it.
 		net := netAdvantage(pt, bh, def, penalty, false, gs.gameType)
-		offFlags := computeUsageDominanceFlags(offense.players)
-		defFlags := computeUsageDominanceFlags(defense.players)
-		mq := matchupQuality(bh, defense.players, gs.leagueAST48ByPos, offFlags, defFlags) // live usage-dominance flags (J26 Phase 4)
+		// Phase 4 deferred (J26): pass inert flags so phase4 == 0. A faithful
+		// per-possession usage-dominance port is a scoped follow-up, not this
+		// approximate inline term (matchup.go, jsb-native-backlog J26 note).
+		mq := matchupQuality(bh, defense.players, gs.leagueAST48ByPos, [6]bool{}, [6]bool{})
 
 		// Make/foul/turnover arms route through the gameState freeze wrappers
 		// (freeze.go): live values in the normal/baseline path, league-mean

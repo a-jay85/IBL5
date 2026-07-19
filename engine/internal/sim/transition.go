@@ -127,9 +127,10 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 		def := selectDefender(defense, pt, gs.rng)
 
 		net := transitionNet(def)
-		offFlags := computeUsageDominanceFlags(offense.players)
-		defFlags := computeUsageDominanceFlags(defense.players)
-		mq := matchupQuality(bh, defense.players, gs.leagueAST48ByPos, offFlags, defFlags) // live usage-dominance flags (J26 Phase 4)
+		// Phase 4 deferred (J26): pass inert flags so phase4 == 0. A faithful
+		// per-possession usage-dominance port is a scoped follow-up, not this
+		// approximate inline term (matchup.go, jsb-native-backlog J26 note).
+		mq := matchupQuality(bh, defense.players, gs.leagueAST48ByPos, [6]bool{}, [6]bool{})
 		// Make/foul/turnover arms route through the gameState freeze wrappers
 		// (freeze.go) on the transition path too, so a frozen Make/Foul/TVR arm
 		// applies to fast-break FGA — not only the half-court loop.

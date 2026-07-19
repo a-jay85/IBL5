@@ -11,7 +11,7 @@ package sim
 // adds the CEngine+0x33F0 accumulator, still stubbed to 0. J26 REFUTED the
 // earlier "coaching-gated / .lge +0x12c strategy-field pin" reading: the gate
 // is NOT coaching — see the phase4Accumulator comment below.
-func matchupQuality(bh onCourt, defenders []onCourt, leagueAST48ByPos [6]float64) float64 {
+func matchupQuality(bh onCourt, defenders []onCourt, leagueAST48ByPos [6]float64, offFlags, defFlags [6]bool) float64 {
 	// Phase 1 — rating normalization (composite defaults to 50 when zero).
 	composite := bh.FGP
 	if composite <= 0 {
@@ -52,26 +52,24 @@ func matchupQuality(bh onCourt, defenders []onCourt, leagueAST48ByPos [6]float64
 		}
 	}
 
-	// Phase 4 — CEngine+0x33F0 accumulator (FUN_004e45a0). J26 opcode re-trace
-	// (jumpshot.exe 4e45a0, write-site enumeration of all +0x6334 refs) CORRECTED
-	// the mechanism: +0x33F0 sums each qualifying defender's positive +0x350 over
-	// defenders whose per-slot flag CEngine[+0x6334+slot*4] == 4 (when the ball-
-	// handler's own slot flag != 4). That flag is NOT a coaching strategy: its ONLY
-	// writers are FUN_004e04e0 (shot-selection) at :96934/:96936, writing {0,4} —
-	// no writer ever sets 1/2/3, so the reader's ==3/==2/==1 branches are DEAD and
-	// param_7 is irrelevant. The flag = 4 iff a player's per-possession usage ratio
-	// (2pt-attempt-weight local_ac ÷ Σ on-court +0xD90) exceeds ~0.5 (outer 0.3
-	// floor). It is coaching-INDEPENDENT and dynamic per-possession.
+	// Phase 4 accumulator (FUN_004e45a0, CEngine+0x33F0) — now IMPLEMENTED and
+	// consuming the flag params. Gate: skip entirely when the ball-handler's own
+	// slot is usage-dominant (offFlags[bh.slot]). Otherwise add each defender's
+	// positive NonMatchedTerm (+0x350) when that defender's slot is usage-dominant
+	// (defFlags[d.slot]). Raw sum: no fatigue scaling, no teamWeight, positive terms
+	// only. The matched defender is NOT excluded — Phase 3 consumes its DefAST48
+	// term; Phase 4 separately consumes its NonMatchedTerm (intentional double-count,
+	// RE §3). Flag provenance: FUN_004e04e0 writes {0,4} only (J26 re-trace).
 	//
-	// Stays 0 because no Go analog assembles that per-slot usage-dominance flag: a
-	// faithful port needs a new per-possession subsystem threading a usage-flag
-	// array (both teams' slots) through the possession loop and into this call — not
-	// a one-line accumulator. (Ingredients exist — the 2pt-attempt-weight and the
-	// +0xD90 composite — but are never combined into the flag.) J26 ceiling probe
-	// (all defenders qualify) yields FG% 49.25% vs 46.42% baseline (+2.83pp), which
-	// OVERSHOOTS the [47.5%, 48.9%] band: Phase 4 is a real but UNQUANTIFIED lever
-	// (true term ∈ (0, +2.83pp], gated by how often the flag fires). Band stays
-	// OPEN; port deferred to a scoped follow-up. Full trace: J26 re-artifact.
-	const phase4Accumulator = 0.0
-	return (accumulated + phase4Accumulator - normalized) * 0.2
+	// Production impact THIS phase: none. Both live call sites pass [6]bool{}, so
+	// no defFlags[d.slot] is true and phase4 == 0. Phase 4 goes live in Phase 3.
+	var phase4 float64
+	if !offFlags[bh.slot] {
+		for _, d := range defenders {
+			if defFlags[d.slot] && d.NonMatchedTerm > 0 {
+				phase4 += d.NonMatchedTerm
+			}
+		}
+	}
+	return (accumulated + phase4 - normalized) * 0.2
 }

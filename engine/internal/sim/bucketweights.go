@@ -182,6 +182,21 @@ func per48Min(stat, minutes int) float64 {
 	return float64(stat) / float64(minutes) * 48.0
 }
 
+// twoPARate is the +0xD88 per-48 two-point-attempt rate (2PA = FGA − 3GA),
+// bucketweights.go:203 / J6 RE. Extracted verbatim from twoPtBucketWeight so the
+// same rate can serve as the usage-dominance numerator (usagedominance.go) without
+// duplicating the two-branch real-life-minutes vs stand-in computation.
+func twoPARate(p onCourt) float64 {
+	if p.RealLifeMIN > 0 {
+		twoPA := p.RealLifeFGA - p.RealLife3GA
+		if twoPA < 0 {
+			twoPA = 0 // corrupt record guard: 3GA can never exceed FGA in valid .plr data
+		}
+		return per48Min(twoPA, p.RealLifeMIN)
+	}
+	return floor1(p.FGA) * fgaRateScale
+}
+
 // twoPtBucketWeight is the recovered +0xD90 Branch-A cold composite
 // (jsb560_decompiled.c:91078-91086, COMPOSITE_DOUBLES_TRACE.md §4):
 //
@@ -212,17 +227,12 @@ func per48Min(stat, minutes int) float64 {
 // 0.6-floored foul bucket a realistic minority share and field-goal attempts the
 // majority path.
 func twoPtBucketWeight(p onCourt) float64 {
-	var d88, db8, d70 float64
+	d88 := twoPARate(p)
+	var db8, d70 float64
 	if p.RealLifeMIN > 0 {
-		twoPA := p.RealLifeFGA - p.RealLife3GA
-		if twoPA < 0 {
-			twoPA = 0 // corrupt record guard: 3GA can never exceed FGA in valid .plr data
-		}
-		d88 = per48Min(twoPA, p.RealLifeMIN)
 		db8 = per48Min(p.RealLifeORB, p.RealLifeMIN)
 		d70 = per48Min(p.RealLifeFTA, p.RealLifeMIN) * d70LeagueScalar
 	} else {
-		d88 = floor1(p.FGA) * fgaRateScale
 		db8 = floor1(p.ORB) * orbRateScale
 		d70 = floor1(p.FTA) * ftaRateScale
 	}

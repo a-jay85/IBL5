@@ -127,7 +127,9 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 		def := selectDefender(defense, pt, gs.rng)
 
 		net := transitionNet(def)
-		mq := matchupQuality(bh, defense.players, gs.leagueAST48ByPos) // live energy (inert under current curve)
+		offFlags := computeUsageDominanceFlags(offense.players)
+		defFlags := computeUsageDominanceFlags(defense.players)
+		mq := matchupQuality(bh, defense.players, gs.leagueAST48ByPos, offFlags, defFlags) // live usage-dominance flags (J26 Phase 4)
 		// Make/foul/turnover arms route through the gameState freeze wrappers
 		// (freeze.go) on the transition path too, so a frozen Make/Foul/TVR arm
 		// applies to fast-break FGA — not only the half-court loop.

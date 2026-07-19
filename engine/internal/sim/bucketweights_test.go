@@ -4,6 +4,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/a-jay85/IBL5/engine/internal/bundle"
 	"github.com/a-jay85/IBL5/engine/internal/rng"
 )
 
@@ -27,7 +28,7 @@ func pathCounts(in outcomeInputs, n int, seed uint64) map[outcomeCode]int {
 func assembleInputs(foulWeight, hca float64) outcomeInputs {
 	bh := oc(slotPG, mkPlayer(1, 3, slotPG, 48))
 	defenders := fiveStarters(7)
-	mq := matchupQuality(bh, defenders, [6]float64{})
+	mq := matchupQuality(bh, defenders, [6]float64{}, [6]bool{}, [6]bool{})
 	return outcomeInputs{
 		twoPtWeight:      twoPtBucketWeight(bh) + hca,
 		threePtWeight:    threePtBucketWeight(bh),
@@ -599,5 +600,68 @@ func TestBucketWeights_ThreePtFallbackUnchanged(t *testing.T) {
 	p2.RealLife3GA = 9999
 	if got := threePtBucketWeight(p2); math.Abs(got-want) > 1e-9 {
 		t.Errorf("MIN==0 with RealLife3GA set engaged the real path: got %.6f, want %.6f", got, want)
+	}
+}
+
+// TestTwoPtBucketWeightUnchangedAfterTwoPARateExtraction asserts that extracting
+// twoPARate from twoPtBucketWeight was behavior-preserving. It pins the expected
+// output for three canonical cases so the test fails if the extraction changed d88.
+func TestTwoPtBucketWeightUnchangedAfterTwoPARateExtraction(t *testing.T) {
+	const eps = 1e-9
+
+	// (a) Real-life-minutes player: RealLifeMIN > 0, non-zero FGA/3GA/ORB/FTA.
+	// Use simple MIN=100 so per48Min values are multiples of 0.48.
+	pReal := oc(slotPG, bundle.Player{
+		RealLifeMIN: 100, RealLifeFGA: 50, RealLife3GA: 10,
+		RealLifeORB: 10, RealLifeFTA: 20,
+		FGA: 60, ORB: 20, FTA: 20, Stamina: 50,
+	})
+	// twoPARate: twoPA = 50-10 = 40; per48Min(40,100) = 40/100*48 = 19.2
+	if got := twoPARate(pReal); math.Abs(got-19.2) > eps {
+		t.Errorf("twoPARate (real MIN) = %v, want 19.2", got)
+	}
+	// twoPtBucketWeight — hand-compute from same formula:
+	// d88=19.2, db8=per48Min(10,100)=4.8, d70=per48Min(20,100)*d70LeagueScalar=9.6*d70LeagueScalar
+	// makeShare = (19.2/(4.8+19.2))*0.5+0.25 = (19.2/24)*0.5+0.25 = 0.8*0.5+0.25 = 0.65
+	// return = 19.2 - (19.2/(9.6*d70LeagueScalar+19.2)) * 4.8 * 0.65
+	wantRealBucket := func() float64 {
+		d88 := 19.2
+		db8 := 4.8
+		d70 := 9.6 * d70LeagueScalar
+		makeShare := (d88/(db8+d88))*d90MakeShareHalf + d90MakeShareQuarter
+		return d88 - (d88/(d70+d88))*db8*makeShare
+	}()
+	if got := twoPtBucketWeight(pReal); math.Abs(got-wantRealBucket) > eps {
+		t.Errorf("twoPtBucketWeight (real MIN) = %v, want %v", got, wantRealBucket)
+	}
+
+	// (b) Stand-in player (RealLifeMIN == 0): mkPlayer FGA=60 ORB=20 FTA=20.
+	pStandin := oc(slotPG, mkPlayer(1, 3, slotPG, 48)) // RealLifeMIN==0
+	// twoPARate: floor1(60)*fgaRateScale = 60*0.30 = 18.0
+	if got := twoPARate(pStandin); math.Abs(got-18.0) > eps {
+		t.Errorf("twoPARate (stand-in) = %v, want 18.0", got)
+	}
+	// twoPtBucketWeight for stand-in — same formula with rating stand-ins:
+	// d88=18, db8=floor1(20)*orbRateScale=3.0, d70=floor1(20)*ftaRateScale=6.0
+	// (NO d70LeagueScalar: only the real-life path multiplies by it)
+	wantStandinBucket := func() float64 {
+		d88 := 18.0
+		db8 := 3.0
+		d70 := 6.0 // floor1(20)*ftaRateScale = 20*0.30
+		makeShare := (d88/(db8+d88))*d90MakeShareHalf + d90MakeShareQuarter
+		return d88 - (d88/(d70+d88))*db8*makeShare
+	}()
+	if got := twoPtBucketWeight(pStandin); math.Abs(got-wantStandinBucket) > eps {
+		t.Errorf("twoPtBucketWeight (stand-in) = %v, want %v", got, wantStandinBucket)
+	}
+
+	// (c) Corrupt record: RealLife3GA > RealLifeFGA → guard must clamp twoPA to 0
+	// → twoPARate must return 0 (never a negative rate).
+	pCorrupt := oc(slotPG, bundle.Player{
+		RealLifeMIN: 100, RealLifeFGA: 3, RealLife3GA: 10, // 3GA exceeds FGA
+		FGA: 60, ORB: 20, FTA: 20, Stamina: 50,
+	})
+	if got := twoPARate(pCorrupt); got != 0 {
+		t.Errorf("twoPARate (corrupt: 3GA>FGA) = %v, want 0 (guard preserved)", got)
 	}
 }

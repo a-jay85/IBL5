@@ -1,26 +1,19 @@
 ---
-description: Commit/PR work from the worktree; the Stop hook nudges to commit in a worktree and warns when the main checkout is dirty; amend only unpushed fixes. Carries the one-line PR-title decision test (full rubric in commit-conventions.md).
-last_verified: 2026-07-01
+description: Commit/PR work from the worktree autonomously when finished; never ask the user whether to commit. Amend only unpushed fixes. Carries the one-line PR-title decision test (full rubric in commit-conventions.md).
+last_verified: 2026-07-19
 ---
 
 # Auto-Commit
 
-All work happens in a worktree, never the main checkout (ADR-0062, `workflow-continuity.md`). Worktree work is committed by `/post-plan` (auto-fired) or `/commit-commands:commit-push-pr` — not by this hook.
+All work happens in a worktree, never the main checkout (ADR-0062, `workflow-continuity.md`). Worktree work is committed by `/post-plan` (auto-fired) or `/commit-commands:commit-push-pr`.
 
 **PR/commit title type** (when titling via `/commit-commands:*`): decision test — *"Would a league GM notice a new ability they didn't have before?"* Yes → `feat:` (trips the human-signoff hold — that's the gate working, not a cost to route around); invisible to a GM (dev tooling, a new slash command, an internal refactor, a doc, a dep bump) → `chore:`/`fix:`/`refactor:`/`docs:`. Classify by what the diff **is**, never by the desired merge outcome. Full rubric incl. edge cases: `.claude/rules/commit-conventions.md`.
-
-The `$HOME/.claude/hooks/auto-commit-reminder.sh` Stop hook fires at turn-end on uncommitted changes, nudging by **where** the work is:
-
-- **Main checkout** (master) dirty → **misplaced-work warning**: move it into a worktree (`bin/wt-new`) — the main checkout is reference/read-only.
-- **Worktree** dirty → **commit nudge**: correct place to work; if you finished a unit of work, commit via `/commit-commands:commit` (or `commit-push-pr`).
-
-It stays silent when the tree is clean, on loop re-fire, and while a plan workflow is active (covers `/post-plan` auto-fire). It nudges on **uncommitted** changes only — push is owned by `commit-push-pr`/`/post-plan`. It's a nudge, not a hard block — ignore it if mid-task, exploring, or deliberately touching the main checkout.
 
 When you finish a unit of work in a worktree and are not using the `/post-plan` auto-fire handoff, invoke `/commit-commands:commit` (or `commit-push-pr`). Skip when mid-task or only exploring.
 
 ## Amend vs new commit
 
-The hook does not decide this — you do.
+You decide.
 
 **Amend** (`--amend`) when ALL hold: the immediately preceding commit in this conversation is what you're fixing; the user asked for a correction/tweak; it's NOT pushed yet.
 

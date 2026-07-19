@@ -291,14 +291,15 @@ func TestEndingMixBaseline(t *testing.T) {
 	// residual, not a hard gate. History: matched term alone 46.19% (mean-zero in
 	// expectation, baseline 46.08%); the J25 +0x350 NON-MATCHED port (the full
 	// FUN_00561c00 formula, re-artifacts/jsb-J25-nonmatched-0x350-20260718.md)
-	// measured 46.42% — a real but small move toward the band, NOT closure. The
-	// remaining candidate lever is the +0x33F0 Phase 4 accumulator (.lge +0x12c
-	// strategy pin). Tracked as an OPEN sub-step in
-	// ibl5/docs/backlog/jsb-native-backlog.md (J24). Logged, not asserted, so this
-	// archive suite stays green until that lever lands (or the band is re-derived).
+	// measured 46.42%; Phase 4 +0x33F0 is NOW LIVE (2026-07-19) and measured 46.42%
+	// — the Phase-4 accumulator fires only when a player's per-possession usage ratio
+	// exceeds 0.5; real-world .plr lineups don't trigger it in a typical game, so
+	// the FG% is unchanged from the J25 baseline. Other J24 levers remain open.
+	// Logged, not asserted, so this archive suite stays green (or the band is
+	// re-derived).
 	if art.FGPct < 47.5 || art.FGPct > 48.9 {
 		t.Logf("  [J24 OPEN] FG%% = %.2f%%, target band [47.5%%, 48.9%%] NOT closed "+
-			"(+0x350 live as of J25, measured 46.42%%; Phase 4 +0x33F0 still stubbed)", art.FGPct)
+			"(+0x350 live as of J25; Phase 4 +0x33F0 now live, measured 46.42%%)", art.FGPct)
 	}
 	// Steal/indep-TO ARE hard regression guards — they currently pass and must not
 	// drift when future work makes the matchupQuality flow term live.

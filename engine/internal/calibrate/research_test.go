@@ -1,9 +1,84 @@
 package calibrate
 
 import (
+	"bytes"
 	"math"
+	"os"
+	"strings"
 	"testing"
+
+	"github.com/a-jay85/IBL5/engine/internal/result"
 )
+
+// TestTeamBoxPts verifies the points-for helper sums Q1–Q4 plus OT correctly.
+func TestTeamBoxPts(t *testing.T) {
+	tb := result.TeamBox{Q1: 20, Q2: 18, Q3: 24, Q4: 15, OT: []int{5, 3}}
+	want := float64(20 + 18 + 24 + 15 + 5 + 3)
+	if got := teamBoxPts(tb); got != want {
+		t.Errorf("teamBoxPts = %v, want %v", got, want)
+	}
+	// No OT — should not panic.
+	if got := teamBoxPts(result.TeamBox{Q1: 10, Q2: 10, Q3: 10, Q4: 10}); got != 40 {
+		t.Errorf("teamBoxPts no-OT = %v, want 40", got)
+	}
+}
+
+// TestWriteResearchReport verifies the writer emits one line per LeveragePoint
+// with the correct ABOVE NOISE / sub-noise tag and sorts by |Delta| descending.
+func TestWriteResearchReport(t *testing.T) {
+	rep := ResearchReport{
+		NoiseFloor: map[string]float64{"steal_share": 0.001},
+		Points: []LeveragePoint{
+			{StandInID: "steal_turnover_scale", Value: 1.8e-5, Term: "steal_share", Delta: 0.005, NoiseFloor: 0.001, AboveNoise: true},
+			{StandInID: "steal_turnover_scale", Value: 1.8e-5, Term: "cov_poss_pps", Delta: 0.0001, NoiseFloor: 0.002, AboveNoise: false},
+		},
+	}
+	var buf bytes.Buffer
+	WriteResearchReport(&buf, rep)
+	out := buf.String()
+	if !strings.Contains(out, "[ABOVE NOISE]") {
+		t.Errorf("WriteResearchReport missing [ABOVE NOISE]: %q", out)
+	}
+	if !strings.Contains(out, "[sub-noise]") {
+		t.Errorf("WriteResearchReport missing [sub-noise]: %q", out)
+	}
+	// Sorted by |Delta| descending: steal_share (0.005) before cov_poss_pps (0.0001).
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("want 2 lines, got %d", len(lines))
+	}
+	if !strings.Contains(lines[0], "steal_share") {
+		t.Errorf("first line should be steal_share (largest |Delta|): %q", lines[0])
+	}
+}
+
+// TestRunResearch_EmptyRoot calls RunResearch against a temp dir with no zip
+// files. researchWalk should list zero zips, return zero terms for every walk,
+// and RunResearch should return a valid ResearchReport (not error).
+func TestRunResearch_EmptyRoot(t *testing.T) {
+	dir, err := os.MkdirTemp("", "jsbresearch-test-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+
+	rep, err := RunResearch(dir, Options{Runs: 1, SampleStride: 1})
+	if err != nil {
+		t.Fatalf("RunResearch empty root: %v", err)
+	}
+	// With no games simulated all terms are zero.
+	for term, nf := range rep.NoiseFloor {
+		if nf != 0 {
+			t.Errorf("NoiseFloor[%q] = %v, want 0 (no archive)", term, nf)
+		}
+	}
+	// No above-noise points since all deltas are zero.
+	for _, p := range rep.Points {
+		if p.AboveNoise {
+			t.Errorf("unexpected AboveNoise=true from empty archive: %+v", p)
+		}
+	}
+}
 
 // copyTermMap returns a shallow copy of a fidelity-term map.
 func copyTermMap(m map[string]float64) map[string]float64 {

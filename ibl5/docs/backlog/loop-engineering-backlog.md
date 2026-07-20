@@ -1,6 +1,6 @@
 ---
 description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, plan decomposition/tier-routing machinery, and the human comprehension counter-loop, with per-entry status.
-last_verified: 2026-07-16
+last_verified: 2026-07-20
 ---
 
 # Loop-Engineering Backlog
@@ -110,6 +110,7 @@ last_verified: 2026-07-16
 **Suggested direction:** An eval harness that perturbs engine params in a worktree, sims N seasons, scores distribution error, keeps only improvements, and logs each trial — overnight, hundreds of trials. Wants an ADR (metric definition, param search space, acceptance rule).
 **Risk if untouched:** RE convergence stays bottlenecked on human iteration bandwidth.
 **Status (2026-07-07):** ⬜ Open — 🟥 (the loop design itself is the judgment).
+**ADR:** satisfied by ADR-0087 (2026-07-20) — metric/legal-space/acceptance rule defined; harness build remains open.
 
 ### L10 Discord intake loop
 **Location:** `bin/bug-pipeline-tick`, `bin/bug-pipeline-cron-setup`, `bin/bug-pipeline-classify-prompt`, `bin/bug-pipeline-gather-prompt` (live); remainder of the 6-PR Discord bug pipeline program per its shared-context spec.

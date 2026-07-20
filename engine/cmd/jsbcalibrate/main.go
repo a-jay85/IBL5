@@ -58,7 +58,7 @@ func runWith(args []string, stdout, stderr io.Writer, c collectors) int {
 	fs := flag.NewFlagSet("jsbcalibrate", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	archive := fs.String("archive", "", "root dir of JSB backup zips (required)")
-	mode := fs.String("mode", "calibrate", "calibrate | gate | measure")
+	mode := fs.String("mode", "calibrate", "calibrate | gate | measure | research")
 	selection := fs.String("selection", "season", "snapshot selection: season (one regular snapshot/season, clean regular bucket) | flat (every zip, type by filename)")
 	runs := fs.Int("runs", 50, "seeded engine runs per corpus game")
 	seed := fs.Uint64("seed", 0, "base seed; per-game seeds derive deterministically from it")
@@ -77,8 +77,8 @@ func runWith(args []string, stdout, stderr io.Writer, c collectors) int {
 		_, _ = fmt.Fprintln(stderr, "jsbcalibrate: --archive <dir> is required")
 		return 2
 	}
-	if *mode != "calibrate" && *mode != "gate" && *mode != "measure" {
-		_, _ = fmt.Fprintf(stderr, "jsbcalibrate: invalid --mode %q (valid: calibrate, gate, measure)\n", *mode)
+	if *mode != "calibrate" && *mode != "gate" && *mode != "measure" && *mode != "research" {
+		_, _ = fmt.Fprintf(stderr, "jsbcalibrate: invalid --mode %q (valid: calibrate, gate, measure, research)\n", *mode)
 		return 2
 	}
 	var collect collectFunc
@@ -102,6 +102,15 @@ func runWith(args []string, stdout, stderr io.Writer, c collectors) int {
 		MakePutbackHalf: *makePutbackHalf,
 		UnfaithfulOreb:  *unfaithfulOreb,
 		Progress:        stderr,
+	}
+	if *mode == "research" {
+		rep, err := calibrate.RunResearch(*archive, opts)
+		if err != nil {
+			_, _ = fmt.Fprintln(stderr, "jsbcalibrate:", err)
+			return 1
+		}
+		calibrate.WriteResearchReport(stdout, rep)
+		return 0
 	}
 	reports, skips, err := collect(*archive, opts)
 	if err != nil {

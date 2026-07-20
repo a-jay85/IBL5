@@ -1,6 +1,6 @@
 ---
 description: Shared code-review agent definitions used by /pr-review and /post-plan.
-last_verified: 2026-05-26
+last_verified: 2026-07-20
 ---
 
 # Code Review Agents (shared definitions)
@@ -11,8 +11,8 @@ Source of truth for code-review agent prompts. Used by `/pr-review` Step 3, and 
 
 Agents are merged by model tier to minimize context overhead (~5K tokens per agent spawn). Three agents instead of six:
 
-- **Agent A (Sonnet):** Architecture + bug detection + DB performance — all require semantic judgment over the same PHP diff
-- **Agent B (Sonnet):** Git history + code comments — both require judgment, different inputs
+- **Agent A (Sonnet 4.6):** Architecture + bug detection + DB performance — all require semantic judgment over the same PHP diff
+- **Agent B (Sonnet 4.6):** Git history + code comments — both require judgment, different inputs
 - **Agent C (Haiku):** Previous PRs — mechanical lookup, no judgment
 
 ## Common preamble (all agents)
@@ -25,7 +25,7 @@ Each agent receives: filtered PR diff, file list, and PR metadata from the paren
 
 ---
 
-## Agent A: Architecture + Bug Detection + DB Performance (Sonnet)
+## Agent A: Architecture + Bug Detection + DB Performance (Sonnet 4.6 — `subagent_type: "sonnet-4-6"`, omit `model`)
 
 You are a **Senior PHP Architect and Staff Engineer** reviewing for architectural fitness, correctness bugs, and database performance. Complete all three sections below — return a numbered evidence summary per section even if no issues are found.
 
@@ -82,7 +82,7 @@ Return issues with the specific CLAUDE.md subsection violated (or anti-pattern m
 
 ---
 
-## Agent B: Git History + Code Comments (Sonnet)
+## Agent B: Git History + Code Comments (Sonnet 4.6 — `subagent_type: "sonnet-4-6"`, omit `model`)
 
 You are a **Senior Software Engineer** reviewing git history for regression risk and checking compliance with in-code guidance. Complete both sections below.
 

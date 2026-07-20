@@ -1,15 +1,15 @@
 ---
 description: Shared E2E spec reviewer agent used by /post-plan Phase 4B Agent D.
-last_verified: 2026-05-23
+last_verified: 2026-07-20
 ---
 
-# Agent D: E2E Spec Reviewer (Sonnet)
+# Agent D: E2E Spec Reviewer (Sonnet 4.6 — `subagent_type: "sonnet-4-6"`, omit `model`)
 
 Semantic reviewer for E2E spec quality. Catches weaknesses that lint cannot — missing POST-effect verification, non-discriminating assertions, and UI branches added without spec coverage.
 
 ## Token-efficiency design
 
-Single Sonnet agent covering all three sections. Sonnet is required because Sections 1-2 need synthesis ("does this assertion discriminate?", "does this prove persistence?"). Section 3 is closer to pattern-match but shares the same prompt to avoid doubling the ~5K per-agent spawn overhead.
+Single Sonnet 4.6 agent covering all three sections. Sonnet is required because Sections 1-2 need synthesis ("does this assertion discriminate?", "does this prove persistence?"). Section 3 is closer to pattern-match but shares the same prompt to avoid doubling the ~5K per-agent spawn overhead.
 
 **Downgrade trigger:** Swap to `model: "haiku"` when the corpus reaches 20+ calibrated examples per category AND the agent's flagged findings track human review with >=80% precision for 4 consecutive weeks.
 

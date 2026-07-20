@@ -4,7 +4,7 @@ description: "Plan an implementation task: enforces a verification matrix, direc
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
-last_verified: 2026-07-16
+last_verified: 2026-07-20
 ---
 
 # /plan — Implementation Planning with Verification Matrix
@@ -43,7 +43,7 @@ Read `.claude/review-shared/_plan-verification.md` and use its full content as `
 Tier per `.claude/rules/agent-tiering.md`:
 
 - Single-module change → 0 agents (direct tools suffice) or 1 Haiku for enumeration
-- Spans 2+ modules → up to 2 agents (Sonnet for cross-module traces, Haiku for file/grep lookups)
+- Spans 2+ modules → up to 2 agents (Explore for cross-module traces — already pinned Sonnet 4.6, use `subagent_type: "Explore"` omit `model`; Haiku for file/grep lookups)
 - Never spawn 3 agents
 
 Provide each agent a single concrete question, pre-resolved paths, and a response cap (under 150 lines). An agent spawned purely for byte isolation must return **distilled pointers** (`path:line` + the load-bearing fact), not pasted file bodies — pasting the contents back defeats the isolation.

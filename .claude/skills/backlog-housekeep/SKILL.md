@@ -1,7 +1,7 @@
 ---
 name: backlog-housekeep
 description: "Ship backlog housekeeping with an implemented backlog item: flip its status, stamp discovered items with provenance, sweep sibling and cross-backlog redundancy, archive done items behind a dated pointer, and reconcile the README index — then self-verify via bin/check-docs."
-last_verified: 2026-07-10
+last_verified: 2026-07-20
 ---
 
 # Backlog Housekeeping
@@ -23,7 +23,7 @@ The base drives both the `--since=<base>` self-verify and, for a PR, the `#<PR>`
 
 **Detect your own tier from your system prompt** — the model executing this skill *is* the caller (there is no runtime model-id API; the orchestrator self-identifies, as `work-triage.md` § Execution routing and `feedback_default_sonnet_execution` assume). If genuinely unsure, default to **inline** — a wrong-way delegation costs more than a same-tier inline pass.
 
-- **Caller is Opus or Fable → delegate; do NOT Read backlog files.** Reason from resident context about *what the work did*: which item it resolved, which items it newly surfaced, which siblings shifted scope. Seed those known effects into the semantic delegation packet (below), then spawn **ONE** Sonnet subagent (`subagent_type: general-purpose`, `model: sonnet`) that Reads the backlog files, runs the cross-backlog redundancy grep sweep (the expensive multi-file read), applies every edit / archive move / index update, self-verifies via `bin/check-docs --since=<base>`, and returns a thin one-line report. The backlog bodies enter the *subagent's* context, never the orchestrator's — that is the entire point of the branch.
+- **Caller is Opus or Fable → delegate; do NOT Read backlog files.** Reason from resident context about *what the work did*: which item it resolved, which items it newly surfaced, which siblings shifted scope. Seed those known effects into the semantic delegation packet (below), then spawn **ONE** Sonnet 4.6 subagent (`subagent_type: "sonnet-4-6"`, omit `model`) that Reads the backlog files, runs the cross-backlog redundancy grep sweep (the expensive multi-file read), applies every edit / archive move / index update, self-verifies via `bin/check-docs --since=<base>`, and returns a thin one-line report. The backlog bodies enter the *subagent's* context, never the orchestrator's — that is the entire point of the branch.
 - **Caller is Sonnet or Haiku (e.g. `/post-plan` runs Sonnet 4.6) → execute inline, no subagent.** Read the backlog files, run the sweep, apply the edits, self-verify — all in the current context. Spawning a same-tier subagent is pure overhead (`feedback_default_sonnet_execution`: if the orchestrator IS Sonnet, edit inline).
 
 Both branches run the identical checklist below; only *who reads the files* differs.

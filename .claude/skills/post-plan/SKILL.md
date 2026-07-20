@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-07-10
+last_verified: 2026-07-20
 ---
 
 # Post-Plan Orchestrator
@@ -165,7 +165,7 @@ echo "$EXTRACTED"
 
 **Skip this gate when `PLAN_FOUND` and the surviving Manual Testing steps came from the plan's matrix** — `/plan` gates 3, 9, and 12 already classified automatable-vs-manual upstream and authoritatively, so re-litigating it here is wasted. Treat the remaining steps as truly-manual and leave them in the PR. Run the gate below only for plan-less PRs, where no upstream classification occurred.
 
-Launch a **single Sonnet agent** with the QA-classification prompt in `.claude/skills/post-plan/_phase-6-manual-testing.md` (substitute the extracted steps from Step 1 and the changed-file list from Phase 4A). The prompt classifies each surviving manual step into CLI-executable / PHPUnit-replaceable / API-test-replaceable / E2E-replaceable / Visual-regression-replaceable / Truly-manual and returns a JSON array; the full prompt text + JSON schema live in that reference — Read it before spawning.
+Launch a **single Sonnet 4.6 agent** (`subagent_type: "sonnet-4-6"`, omit `model`) with the QA-classification prompt in `.claude/skills/post-plan/_phase-6-manual-testing.md` (substitute the extracted steps from Step 1 and the changed-file list from Phase 4A). The prompt classifies each surviving manual step into CLI-executable / PHPUnit-replaceable / API-test-replaceable / E2E-replaceable / Visual-regression-replaceable / Truly-manual and returns a JSON array; the full prompt text + JSON schema live in that reference — Read it before spawning.
 
 ### Step 3: Execute findings
 

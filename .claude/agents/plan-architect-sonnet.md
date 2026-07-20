@@ -1,7 +1,7 @@
 ---
 name: plan-architect-sonnet
 description: Software architect (Sonnet tier) that designs implementation plans for the /plan command from a pre-resolved recipe. Returns a step-by-step plan, identifies the critical files, and weighs architectural trade-offs. Selected by /plan Step 3 ONLY when the source task/backlog entry carries an explicit recipe plus a named existing pattern to copy (the marker-swap / mechanical-sweep class) AND no plan-architect-xhigh trigger (security surface, trust boundary, destructive migration, .claude/skills ship-pipeline invariant) applies. The default Opus plan-architect is used everywhere else.
-model: sonnet
+model: claude-sonnet-4-6
 effort: high
 disallowedTools: Agent, ExitPlanMode, Edit, Write, NotebookEdit
 ---

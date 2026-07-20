@@ -5,8 +5,8 @@ allowed-tools: Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh pr comment:*),
 name: pr-review
 description: Token-efficient code review for pull requests
 disable-model-invocation: true
-model: sonnet
-last_verified: 2026-07-03
+model: claude-sonnet-4-6
+last_verified: 2026-07-20
 ---
 
 Provide a code review for the given pull request. This command optimizes token usage by fetching the diff once and distributing only what each agent needs.
@@ -65,8 +65,8 @@ Launch applicable agents in parallel. Each agent receives:
 - Directory-specific CLAUDE.md content(s) from Step 2d (if any)
 
 **Model tiers** (see `agent-tiering.md` for rationale):
-- Agent A (Architecture + Bug detection + DB performance): **Sonnet** — skip if no code files; omit DB section if no PHP
-- Agent B (Git history + Code comments): **Sonnet** — skip if no PHP and no code comments in diff
+- Agent A (Architecture + Bug detection + DB performance): **Sonnet 4.6** (`subagent_type: "sonnet-4-6"`, omit `model`) — skip if no code files; omit DB section if no PHP
+- Agent B (Git history + Code comments): **Sonnet 4.6** (`subagent_type: "sonnet-4-6"`, omit `model`) — skip if no PHP and no code comments in diff
 - Agent C (Previous PRs): **Haiku** — skip if no modified (non-added) files
 
 **CRITICAL: No agent should call `gh pr diff`.** The diff was already fetched in Step 2.

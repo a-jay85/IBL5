@@ -135,7 +135,10 @@ generalize.** Its acceptance test is:
   the leverage it reports matches the hand-run sweep within the noise floor.
 - Re-run the **J26 ceiling probe** (zeroing a Phase-4 term moved FG% +2.83pp in
   the manual prototype) and confirm the harness recovers the same lever
-  magnitude.
+  magnitude. *(Steal/non-steal turnover-scale arm: automated by the J14 harness —
+  `steal_turnover_scale` and `non_steal_turnover_scale` are registered stand-ins in
+  `StandInRegistry()` (`engine/internal/calibrate/standinregistry.go`); the sweep
+  runs automatically via `jsbcalibrate --mode research`.)*
 
 Seed/determinism is controlled via the freeze arms so these are exact
 comparisons, not eyeballed. A harness that cannot reproduce a known A/B is not

@@ -94,6 +94,8 @@ If the working tree is clean and `git diff origin/master...HEAD` is also empty (
 3. **Manual testing in PR description:** Check the plan file for a Verification Matrix. If one exists, copy only the rows classified as `Truly-manual` into the PR's `## Manual Testing` section. If the matrix has zero truly-manual rows (or the plan says "All verification is automated"), write: `No manual testing needed — all changes are covered by unit and E2E tests.` If no plan file or no matrix exists, fall back to the original rule: list only steps requiring subjective human judgment on new or redesigned UI/UX ("does this look/feel good?", "does this flow work well?"). Production comparison and "does output still match?" are visual-regression-replaceable, not manual. Do NOT list CLI commands or script invocations — Phase 6 executes those.
 4. Use Haiku agents for commit message generation if delegating
 
+**Static-guard self-verify (mandatory when a path-unscoped rule is touched):** if `git diff origin/master...HEAD --name-only` (substitute the PR base for a stacked PR) lists any `.claude/rules/*.md`, run `bin/check-rules-byte-budget` **before pushing**. On failure, trim the offending rule (or move detail into a path-scoped `*-detail.md` companion) and re-commit. This mirrors the git pre-commit hook so a byte-budget overflow is caught here instead of only in CI (the Static guards job) — and covers post-plan runs where the pre-commit hook did not fire (e.g. a harness commit path).
+
 ---
 
 ## Phase 2.5: Backlog Housekeeping

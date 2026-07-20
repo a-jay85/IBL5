@@ -287,20 +287,23 @@ func TestEndingMixBaseline(t *testing.T) {
 		art.ArmedPct, art.ImpliedCode7)
 
 	// --- Machine-verifiable gates (J24 matchupQuality Phase 3/4) ---
-	// FG% is the headline acceptance band [47.5%, 48.9%], but it is a KNOWN-OPEN
-	// residual, not a hard gate. History: matched term alone 46.19% (mean-zero in
-	// expectation, baseline 46.08%); the J25 +0x350 NON-MATCHED port (the full
-	// FUN_00561c00 formula, re-artifacts/jsb-J25-nonmatched-0x350-20260718.md)
-	// measured 46.42%; Phase 4 +0x33F0 is NOW LIVE (2026-07-19) and measured 46.42%
-	// — the Phase-4 accumulator fires only when a player's per-possession usage ratio
-	// exceeds 0.5; real-world .plr lineups don't trigger it in a typical game, so
-	// the FG% is unchanged from the J25 baseline. Other J24 levers remain open.
-	// Logged, not asserted, so this archive suite stays green (or the band is
-	// re-derived).
-	if art.FGPct < 47.5 || art.FGPct > 48.9 {
-		t.Logf("  [J24 OPEN] FG%% = %.2f%%, target band [47.5%%, 48.9%%] NOT closed "+
-			"(+0x350 live as of J25; Phase 4 +0x33F0 now live, measured 46.42%%)", art.FGPct)
-	}
+	// FG% band [47.5%, 48.9%] is now CLOSED and asserted. The closer is the J26
+	// faithful +0xD58 penalty-minutes port (re-artifacts/jsb-J26-penalty-minutes-
+	// 20260720.md, positionpenalty.go penaltyBaseMinutes): the binary feeds the
+	// GM's Game-Plan minutes target (dc_minutes) or MPG=MIN/GP into the
+	// position-penalty base, but Go used raw DCMinutes — always 0 in the test path
+	// (.plb game-plan minutes unwired) — pinning base at 1.0 (maximal penalty). The
+	// MPG fallback restores base≈1.29, cutting the penalty and lifting FG% from the
+	// J25 baseline 46.42% into band. The binary reads the real .plb, so its faithful
+	// target is ~48.5% (real dc_minutes wired); this gate asserts the committed
+	// ~48.3% MPG-fallback approximation because the .plb reader is not yet
+	// production-tested (wiring is a separate follow-on). CAVEAT: the
+	// band closes at the AGGREGATE level; the empirical 2P/3P split shows 3P
+	// undershooting the population's real-life 3P baseline by ~2.8pp (a separate,
+	// still-open 3pt lever — see the J26 artifact). Per-component 2P faithfulness
+	// vs the binary's output on these snapshots is unverified (binary not run on
+	// this population), but the closure survives every candidate interpretation.
+	assertBand(t, "FG%", art.FGPct, 47.5, 48.9)
 	// Steal/indep-TO ARE hard regression guards — they currently pass and must not
 	// drift when future work makes the matchupQuality flow term live.
 	assertBand(t, "steal share%", art.StealSharePct, 8.0, 9.0)

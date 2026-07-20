@@ -47,7 +47,7 @@ func countStealTurnovers(victimTVR, defenderSTL int, seeds uint64) int {
 	count := 0
 	for s := uint64(1); s <= seeds; s++ {
 		off, def := stealLineups(victimTVR, defenderSTL)
-		gs := &gameState{rng: rng.New(s), period: 1, clock: 500}
+		gs := &gameState{rng: rng.New(s), period: 1, clock: 500, stealTurnoverScale: stealTurnoverScale, nonStealTurnoverScale: nonStealTurnoverScale}
 		if gs.stealTurnover(off, def, off.players[0]) {
 			count++
 		}
@@ -121,7 +121,7 @@ func TestStealTurnover_AllZeroSTLNoTurnover(t *testing.T) {
 func TestTurnoverProb_NoNaNOnEmptyRatings(t *testing.T) {
 	// All-zero TVR (carelessness = base) and all-zero STL (pressure 0): the weight
 	// must be finite, never NaN/Inf, and exactly 0 (no pressure).
-	gs := &gameState{}
+	gs := &gameState{stealTurnoverScale: stealTurnoverScale, nonStealTurnoverScale: nonStealTurnoverScale}
 	pressure := teamStealPressure(newTeamState(stealLineupPlayers(3, 0, 0), 3, true))
 	p := gs.turnoverProb(turnoverCarelessness(0), pressure)
 	if math.IsNaN(p) || math.IsInf(p, 0) {
@@ -143,7 +143,7 @@ func TestStealTurnover_CreditsDefenderVictimKeepsTOV(t *testing.T) {
 	for seed := uint64(1); seed < 200; seed++ {
 		offense, defense := stealLineups(10, 45)
 		victim := offense.players[0]
-		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500}
+		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500, stealTurnoverScale: stealTurnoverScale, nonStealTurnoverScale: nonStealTurnoverScale}
 		if !gs.stealTurnover(offense, defense, victim) {
 			continue
 		}
@@ -193,7 +193,7 @@ func countNonStealTurnovers(tvr int, seeds uint64) int {
 	count := 0
 	for s := uint64(1); s <= seeds; s++ {
 		off, _ := stealLineups(tvr, 30)
-		gs := &gameState{rng: rng.New(s), period: 1, clock: 500}
+		gs := &gameState{rng: rng.New(s), period: 1, clock: 500, stealTurnoverScale: stealTurnoverScale, nonStealTurnoverScale: nonStealTurnoverScale}
 		if gs.nonStealTurnover(off, off.players[0]) {
 			count++
 		}
@@ -227,7 +227,7 @@ func TestNonStealTurnover_NoEventSteal(t *testing.T) {
 	offense, _ := stealLineups(0, 30) // TVR=0: max carelessness for high probability
 	victim := offense.players[0]
 	for seed := uint64(1); seed < 500; seed++ {
-		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500}
+		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500, stealTurnoverScale: stealTurnoverScale, nonStealTurnoverScale: nonStealTurnoverScale}
 		if !gs.nonStealTurnover(offense, victim) {
 			continue
 		}

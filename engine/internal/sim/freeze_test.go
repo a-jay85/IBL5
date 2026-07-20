@@ -36,7 +36,7 @@ func TestFreeze_SubstitutesAndAccumulates(t *testing.T) {
 	def := []onCourt{oc(slotPG, mkPlayer(2, 3, slotPG, 50))}
 	bh := off[0]
 	wantFoul := foulBucketWeight(bh, off, def, 0, 0, rng.New(foulSeed))
-	base := &gameState{accum: acc, rng: rng.New(foulSeed)}
+	base := &gameState{accum: acc, rng: rng.New(foulSeed), stealTurnoverScale: stealTurnoverScale, nonStealTurnoverScale: nonStealTurnoverScale}
 	wantOreb := gate1Probability(100, 100, base.gateBaseline) // live faithful gate-1 (base.gateBaseline is 0)
 	// float64 vars force runtime (not constant-folded) evaluation, matching the
 	// wrapper's accumulated rounding exactly.
@@ -102,7 +102,7 @@ func TestFreeze_NoCrossConfound(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			gs := &gameState{freeze: c.cfg, rng: rng.New(foulSeed)}
+			gs := &gameState{freeze: c.cfg, rng: rng.New(foulSeed), stealTurnoverScale: stealTurnoverScale, nonStealTurnoverScale: nonStealTurnoverScale}
 			gotOreb := gs.orebProb(120, 80)
 			gotTurn := gs.turnoverProb(60, 100)
 			gotMake := gs.makeValue2pt(5, bh, 0, result.OriginInitial, 0, 0)

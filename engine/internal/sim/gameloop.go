@@ -36,6 +36,19 @@ func resolveBaseTimeMid(opts Options) float64 {
 	return baseTimeMid
 }
 
+func resolveStealTurnoverScale(opts Options) float64 {
+	if opts.StealTurnoverScale != nil {
+		return *opts.StealTurnoverScale
+	}
+	return stealTurnoverScale
+}
+func resolveNonStealTurnoverScale(opts Options) float64 {
+	if opts.NonStealTurnoverScale != nil {
+		return *opts.NonStealTurnoverScale
+	}
+	return nonStealTurnoverScale
+}
+
 // simGameWith is simGame plus the freeze/accumulation Options (freeze.go). A zero
 // Options leaves every possession decision byte-identical to simGame; a non-zero
 // Options either harvests league-mean derived values (opts.Accum) or substitutes a
@@ -80,6 +93,8 @@ func simGameWith(b bundle.Bundle, g bundle.Game, r *rng.RNG, opts Options) (resu
 	// DRB-push (Phase 4) fast classes widen the mix further, drawn off the
 	// PRIOR possession's outcome below.
 	baseTime := resolveBaseTimeMid(opts)
+	gs.stealTurnoverScale = resolveStealTurnoverScale(opts)
+	gs.nonStealTurnoverScale = resolveNonStealTurnoverScale(opts)
 
 	// Tip-off winner starts on offense; possessions strictly alternate.
 	offense, defense := visitor, home

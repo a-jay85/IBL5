@@ -79,7 +79,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 | J11 | Season-selection min-GP guard | ✅ Implemented | ⚙️ Sonnet | S |
 | J12 | HCA re-homing to basis-scaled site-2 (absorbed into J15) | ✅ Implemented | 🧠 Opus | M |
 | J13 | Cut-over package: bands, leaders, decision | ⬜ Open | 🧠 Opus | L |
-| J14 | AutoResearch eval-harness ADR (loop L9 companion) | ⬜ Open | 🧠 Opus | L |
+| J14 | AutoResearch eval-harness ADR (loop L9 companion) | ✅ Implemented | 🧠 Opus | L |
 | J15 | Faithful foul-bucket program (live composites + HCA re-homing + level re-anchor) | ✅ Implemented | 🧠 Opus | L |
 | J16 | FUN_004e3860 net-advantage formula via objdump | ✅ Implemented | 🔮 Fable | S |
 | J17 | Game-state foul coupling port (param_8 desperation + late-game fouling) | ⬜ Open | 🧠 Opus | M |
@@ -148,10 +148,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 **Status (2026-07-13):** ⬜ Open — **bands sub-item VERIFIED post-J18** (`jsbcalibrate --mode gate` re-run on the post-J15+J18 engine, runs=20 stride=50: PASS, no literal change; provenance in `engine/internal/validate/bands.go` J18 block). **Leaders instrument (J13-2) SHIPPED** (2026-07-14, PR #1463 `6899910ea` — per-player leaders validation instrument); **cut-over ADR (J13-3) still open** — the only remaining J13 sub-item. Band derivation and per-player instrument are ⚙️-delegable; the acceptance judgment and cut-over ADR are 🧠.
 
 ### J14 AutoResearch eval-harness ADR (loop L9 companion)
-**Location:** No harness exists; instrumentation groundwork (calibration walk ≈ 8 min full-corpus, freeze arms, channel-split tests) is merged. Cross-ref: [loop-engineering-backlog.md](loop-engineering-backlog.md) L9.
-**Problem:** Engine iteration is human-paced despite an objective metric. The unresolved design tension — and why this is an ADR, not a script — is that a "perturb params, keep improvements" loop **conflicts with the faithfulness bar** (every shipped change must be RE-grounded in 5.60, not tuned to the corpus): the search space must be constrained to admitted stand-in constants and instrument-only measurements, never RE-pinned formulas.
-**Direction:** ADR defining metric, legal parameter space (stand-ins only), acceptance rule, and how trial results feed RE prioritization rather than direct commits. Harness build afterward is ⚙️.
-**Status (2026-07-20):** ◑ Partial — ADR-0087 shipped (metric = ADR-0049 four-term + ending-mix bands; legal param space = default-deny stand-in allowlist; acceptance = leverage report for RE prioritization, never auto-commit; harness self-validation vs J23/J26 A/Bs). ⚙️ harness build deferred.
+➜ J14 AutoResearch eval-harness ADR (loop L9 companion) — ✅ Implemented (2026-07-20): see [archive](archive/jsb-native-backlog-archive.md).
 
 ### J15 Faithful foul-bucket program (live composites + HCA re-homing + level re-anchor)
 **Location:** `engine/internal/sim/bucketweights.go` `foulBucketWeight` + `teamquality.go` `defQuality`/`offQuality` + `possession.go` site-2 HCA + `engine/internal/validate` bands/goldens. Measured ground: `jsb-native/re-artifacts/jsb-J2-adjudication-20260710.md` §4/§6; faithful formulas: `jsb-J6-composite-scales-20260710.md`.

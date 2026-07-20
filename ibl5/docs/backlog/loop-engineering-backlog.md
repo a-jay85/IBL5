@@ -47,7 +47,7 @@ last_verified: 2026-07-20
 | L6 | Auto-update-branch unsticker | ✅ Implemented | — | S |
 | L7 | Queue-add shift-left preflight | 📋 Planned | 🟦 | S |
 | L8 | Failure self-heal / requeue | ✅ Implemented | — | M |
-| L9 | JSB AutoResearch loop | ⬜ Open | 🟥 | L |
+| L9 | JSB AutoResearch loop | ◑ Partial | 🟥 | L |
 | L10 | Discord intake loop | ◑ Partial | 🟦 | L |
 | L11 | Comprehension-debt digest | ⬜ Open | 🟦 | S |
 | L12 | Autonomy contracts in plan frontmatter | ◑ Partial | 🟦 | M |
@@ -109,7 +109,7 @@ last_verified: 2026-07-20
 **Problem:** Engine-parameter tuning is human-paced despite having exactly what a self-improvement loop needs: an objective metric (simulated stat distributions vs real targets).
 **Suggested direction:** An eval harness that perturbs engine params in a worktree, sims N seasons, scores distribution error, keeps only improvements, and logs each trial — overnight, hundreds of trials. Wants an ADR (metric definition, param search space, acceptance rule).
 **Risk if untouched:** RE convergence stays bottlenecked on human iteration bandwidth.
-**Status (2026-07-07):** ⬜ Open — 🟥 (the loop design itself is the judgment).
+**Status (2026-07-20):** ◑ Partial — harness shipped (J14); loop orchestration / automouse wiring remains. 🟥.
 **ADR:** satisfied by ADR-0087 (2026-07-20) — metric/legal-space/acceptance rule defined; harness build remains open.
 
 ### L10 Discord intake loop

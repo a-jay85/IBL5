@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed JSB native-engine backlog entries (J-items), extracted from jsb-native-backlog.md.
-last_verified: 2026-07-16
+last_verified: 2026-07-20
 ---
 
 # JSB Native-Engine Backlog — Archive
@@ -148,3 +148,11 @@ Full detail: symmetric deterministic base `(2.0 − fatigue)·tovRate(bh)` (corr
 **Problem:** ADR-0085 (J21 finding) established two coupled imperfections: (1) `possessionTime` uses `int()` truncation where 5.60 uses round-half-up (`FUN_004e42e0`, `_DAT_00669ef0=0.5` confirmed from `.rdata`); (2) the engine's neutral center `baseTimeMid=14.5s` is ~0.7s too slow (real effective step ≈ 13.8s = 1440/104.6). These partially cancel: truncation's downward bias accidentally compensates the too-slow center. The J21 A/B confirmed shipping round-alone regresses mean pace (101.9→97.6 vs real 104.6) and does not flip the wrong-signed Cov(lnPOSS,lnPPS). The faithful end-state requires both changes together.
 **Direction:** ship round-half-up in `possessionTime` paired with a base_time re-centering via `baseTimeMid` directly (the direct neutral-center knob, NOT `offVolumeNeutral` — see ADR-0085 Update and plan Architectural trade-offs); run coupled round+recenter A/B on the four-term gate; re-establish the characterization pins from `possession_pace_pin_test.go`.
 **Status (2026-07-16):** ✅ Implemented — PR #1495. Round-half-up (`int(pt+0.5)`) in `possessionTime` COUPLED with `baseTimeMid` re-centered 14.5→13.65 (20-run archive sweep selected 13.65 as closest to real ~104.6 poss/g). Mean pace ~104.5 poss/g restored (was ~101.9 truncation / ~97.6 round-alone). Four-term gate (20-run archive of record): Cov(lnPOSS,lnPPS) documented-null — sign flip NOT achieved (Cov carrier is cross-team pace-dispersion subsystem per J20 finding, consistent with `possessioncoupling_archive_test.go:51-64`); Var(lnPOSS) 0.000339 (toward 0.000721, no overshoot ✓); Cov(lnFGA,lnPPS) total −0.000347 (improved from −0.000364 ✓); Var(lnFGA) within ≤0.001330 ceiling ✓. Pins re-established (Pin A ~1/6,1/3,1/3,~1/6 round-half-up buckets; Pin B re-baselined 96→104 — step dropped 15→14 at re-centered base_time). ADR-0085 hold lifted. 🧠 Opus.
+
+---
+
+### J14 AutoResearch eval-harness ADR (loop L9 companion)
+**Location:** No harness prior to this PR; instrumentation groundwork (calibration walk ≈ 8 min full-corpus, freeze arms, channel-split tests) is merged. Cross-ref: [loop-engineering-backlog.md](loop-engineering-backlog.md) L9.
+**Problem:** Engine iteration is human-paced despite an objective metric. The unresolved design tension — and why this is an ADR, not a script — is that a "perturb params, keep improvements" loop **conflicts with the faithfulness bar** (every shipped change must be RE-grounded in 5.60, not tuned to the corpus): the search space must be constrained to admitted stand-in constants and instrument-only measurements, never RE-pinned formulas.
+**Direction:** ADR defining metric, legal parameter space (stand-ins only), acceptance rule, and how trial results feed RE prioritization rather than direct commits. Harness build is ⚙️ Sonnet-executable once the ADR is written.
+**Status (2026-07-20):** ✅ Implemented — ADR-0087 (metric = ADR-0049 four-term + ending-mix bands; legal param space = default-deny stand-in allowlist; acceptance = leverage report for RE prioritization, never auto-commit; harness self-validation vs J23/J26 A/Bs) + eval harness shipped (`engine/internal/calibrate/research.go`, `standinregistry.go`; `jsbcalibrate --mode research`; archive-gated self-validation in `research_archive_test.go`). Loop orchestration / automouse wiring is L9's separate residual.

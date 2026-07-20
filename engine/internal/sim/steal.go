@@ -104,7 +104,7 @@ func (gs *gameState) stealTurnover(offense, defense *teamState, victim onCourt) 
 // since there is no stealer). A gs.rng.Float64() roll is drawn unconditionally
 // so the RNG stream is deterministic regardless of outcome.
 func (gs *gameState) nonStealTurnover(offense *teamState, victim onCourt) bool {
-	prob := nonStealTurnoverScale * turnoverCarelessness(victim.TVR)
+	prob := gs.nonStealTurnoverScale * turnoverCarelessness(victim.TVR)
 	if prob > maxTurnoverProb {
 		prob = maxTurnoverProb
 	}

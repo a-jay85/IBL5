@@ -258,7 +258,7 @@ func TestPossession_FastBreakFlagMatchesEnding(t *testing.T) {
 	var seenMade, seenDReb, seenSteal bool
 	for seed := uint64(1); seed <= 400; seed++ {
 		offense, defense := twoTeams()
-		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500}
+		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500, stealTurnoverScale: stealTurnoverScale, nonStealTurnoverScale: nonStealTurnoverScale}
 		outcome := possession(gs, offense, defense, 0, possNormal)
 		dreb, steal, made := classifyEnding(gs.events)
 		var want possOutcome

@@ -140,6 +140,21 @@ func TestRun_InvalidMode(t *testing.T) {
 	}
 }
 
+// J14: --mode research is accepted (passes the mode-validation gate, does NOT
+// exit 2) even when the archive dir does not exist (it exits 1 from the walk
+// error, which is the normal non-existent-archive path). Negative row: --mode
+// bogus still exits 2 (covered by TestRun_InvalidMode above).
+func TestRun_ResearchModeAccepted(t *testing.T) {
+	var out, errBuf bytes.Buffer
+	// /tmp/jsbcal-nonexistent-dir-for-test is guaranteed absent; RunResearch will
+	// fail to walk it → exit 1, not exit 2 (the invalid-mode exit).
+	code := runWith([]string{"--archive", "/tmp/jsbcal-nonexistent-dir-for-test", "--mode", "research"},
+		&out, &errBuf, stubCollectors(nil, nil))
+	if code == 2 {
+		t.Fatalf("--mode research treated as invalid (exit 2), want exit 0 or 1; stderr: %q", errBuf.String())
+	}
+}
+
 // Negative: an invalid --selection is a usage error (exit 2).
 func TestRun_InvalidSelection(t *testing.T) {
 	var out, errBuf bytes.Buffer

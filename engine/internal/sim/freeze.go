@@ -248,6 +248,13 @@ type Options struct {
 	// down to the faithful 16.0. See the tempo.go NO-GO block and ADR-0085.
 	BaseTimeMid *float64
 
+	// StealTurnoverScale / NonStealTurnoverScale override the package consts
+	// stealTurnoverScale / nonStealTurnoverScale (steal.go) for the J14 research
+	// turnover-scale sweep. nil → use the const (a zero Options stays byte-identical
+	// to Simulate); non-nil → use the pointed-to value. Always a valid float when set.
+	StealTurnoverScale    *float64
+	NonStealTurnoverScale *float64
+
 	// GateCont, when non-nil, harvests the L1 gate-1 decomposition instrument
 	// (ADR-0057/0058) across the run: at every offensive-rebound resolution it records
 	// the gate-1 P (live since ADR-0058), the linear gate-2 P, and their product, keyed
@@ -361,7 +368,7 @@ func (gs *gameState) accumulateGateCont(offTeamID int, off, def float64) {
 // Cov(lnFGA,lnPPS) (the ADR-0045 Cov re-run). The caller draws its gs.rng.Float64()
 // roll unconditionally, so live and frozen passes consume the RNG identically.
 func (gs *gameState) turnoverProb(careless, pressure float64) float64 {
-	p := stealTurnoverScale * careless * pressure
+	p := gs.stealTurnoverScale * careless * pressure
 	if p < 0 {
 		p = 0
 	}

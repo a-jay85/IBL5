@@ -1,6 +1,6 @@
 ---
-description: Which tier to pick for each sub-agent, including the two Sonnet 4.6 def-pins (Explore + automouse delegates). Skip-vs-spawn heuristic and deeper rationale live in agent-tiering-detail.md.
-last_verified: 2026-07-15
+description: Which tier to pick for each sub-agent, including the Sonnet 4.6 def-pins (Explore, automouse-delegate, sonnet-4-6, plan-architect-sonnet). Skip-vs-spawn heuristic and deeper rationale live in agent-tiering-detail.md.
+last_verified: 2026-07-20
 ---
 
 # Agent Tiering
@@ -12,9 +12,9 @@ Tier every sub-agent (and every agent a plan spawns) by the reasoning the task a
 | Tier | Model param | Use for |
 |------|-------------|---------|
 | **Haiku** | `model: "haiku"` | Command output, pattern-matching named checklists, grep-and-format, mechanical lookups — answerable by running commands and reporting, without judging relevance. |
-| **Sonnet** | `model: "sonnet"` | Synthesis: "is this finding relevant?", cross-file traces, semantic compliance checks, rename sweeps needing call-site judgment. Two surfaces are **pinned to 4.6** — see § Sonnet 4.6 pins. |
+| **Sonnet** | `subagent_type: "sonnet-4-6"`, omit `model` — see § Sonnet 4.6 pins | Synthesis: "is this finding relevant?", cross-file traces, semantic compliance checks, rename sweeps needing call-site judgment, review agents, backlog housekeeping, manual-test classification. Never pass `model: "sonnet"` — the alias now resolves to Sonnet 5. |
 | **Opus** | self (no delegation) | Novel reasoning, FK ordering, rule authoring, ADR writing, ambiguous test failures, final code review, diff-triage. Never delegate understanding. |
-| **Opus (delegated)** | `subagent_type: "plan-architect"` | Implementation **planning** only, via `/plan` Step 3 — three defs selected by ONE ordered precedence (mirrors Step 3): **`plan-architect-xhigh`** (`effort: xhigh`) FIRST for security surfaces, trust boundaries, destructive migrations, or ship-pipeline invariant changes; else **`plan-architect-sonnet`** (`model: sonnet`) when the task is recipe-backed — an explicit recipe plus a named existing pattern to copy — since composing a plan from a pre-resolved recipe is mechanical composition, not novel design (no understanding is delegated, only recipe composition, so it does not breach the Opus (self) row's "never delegate understanding"); else the default **`plan-architect`** (`model: opus` + `effort: high`). Do **not** pass an inline `model` override — each def owns it. |
+| **Opus (delegated)** | `subagent_type: "plan-architect"` | Implementation **planning** only, via `/plan` Step 3 — three defs selected by ONE ordered precedence (mirrors Step 3): **`plan-architect-xhigh`** (`effort: xhigh`) FIRST for security surfaces, trust boundaries, destructive migrations, or ship-pipeline invariant changes; else **`plan-architect-sonnet`** (`model: claude-sonnet-4-6`) when the task is recipe-backed — an explicit recipe plus a named existing pattern to copy — since composing a plan from a pre-resolved recipe is mechanical composition, not novel design (no understanding is delegated, only recipe composition, so it does not breach the Opus (self) row's "never delegate understanding"); else the default **`plan-architect`** (`model: opus` + `effort: high`). Do **not** pass an inline `model` override — each def owns it. |
 | **Fable** | `model: "fable"` — **prompt first, last resort** | Rung above Opus (~2× cost). Use **only** when a task is absolutely critical **and** Fable is 100% necessary to solve it — and **never without prompting the user first** for explicit approval. Default to Opus. Full gate: `.claude/rules/agent-tiering-detail.md`. |
 
 > **The boundary keys on task *type* (judgment vs. mechanical), not raw model capability** — a stronger Sonnet moves nothing across the line. Re-validated 2026-06-30 vs Sonnet 5 (then the `sonnet` alias, native 1M context): unchanged. Why: `agent-tiering-detail.md`.
@@ -30,12 +30,18 @@ Tier the orchestrator by the judgment **it** retains:
 
 ## Sonnet 4.6 pins
 
-Two high-volume Sonnet surfaces are pinned to 4.6 via an agent def — the `model` enum can't express a specific version; the def's frontmatter is the only way, and **the pin wins only when `model` is omitted**.
+Sonnet surfaces are pinned to 4.6 via an agent def or skill frontmatter — the `model` enum can't express a specific version; the def/frontmatter is the only way, and **the def-based pin wins only when `model` is omitted**.
 
-| Surface | Def | Spawn with |
-|---------|-----|-----------|
+**Never pass `model: "sonnet"` to Agent()** — that alias now resolves to Sonnet 5.
+
+| Surface | Def / File | Spawn / invoke with |
+|---------|-----------|---------------------|
 | **Explore** | `~/.claude/agents/Explore.md` (machine-local) | `subagent_type: "Explore"`, **omit `model`**. Blocked by `~/.claude/hooks/explore-model-gate.sh` if you pass `model: "sonnet"`. |
 | **Automouse impl delegates** | `.claude/agents/automouse-delegate.md` (in-repo) | `subagent_type: "automouse-delegate"`, **omit `model`**. Fired by `bin/automouse-prompt-impl` for each `### Delegate` packet. |
+| **General Sonnet tasks** (review agents A/B/D, backlog housekeeping, manual-test classification, and any other Sonnet-tier spawn) | `.claude/agents/sonnet-4-6.md` (in-repo) | `subagent_type: "sonnet-4-6"`, **omit `model`**. Full tool access — use wherever a Sonnet spawn previously used `model: "sonnet"`. |
+| **Plan architect (Sonnet tier)** | `.claude/agents/plan-architect-sonnet.md` (in-repo) | `subagent_type: "plan-architect-sonnet"`, **omit `model`**. Selected by `/plan` Step 3 precedence. |
+| **`/pr-review` runner** | `.claude/skills/pr-review/SKILL.md` frontmatter | Pinned via `model: claude-sonnet-4-6` in skill frontmatter. No spawn change needed. |
+| **`/security-audit` runner** | `.claude/skills/security-audit/SKILL.md` frontmatter | Pinned via `model: claude-sonnet-4-6` in skill frontmatter. No spawn change needed. |
 
 ## Explore Agents
 

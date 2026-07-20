@@ -27,10 +27,10 @@ Pass each agent: PR metadata, file list, and filtered `$DIFF`. **No agent calls 
 
 **Model tiers:**
 
-- Agent A (Architecture + Bug detection + DB performance): **Sonnet**
-- Agent B (Git history + Code comments): **Sonnet**
+- Agent A (Architecture + Bug detection + DB performance): **Sonnet 4.6** (`subagent_type: "sonnet-4-6"`, omit `model`)
+- Agent B (Git history + Code comments): **Sonnet 4.6** (`subagent_type: "sonnet-4-6"`, omit `model`)
 - Agent C (Previous PRs): **Haiku**
-- Agent D (E2E specs — POST-effect + assertion discrimination + coverage-branch): **Sonnet**
+- Agent D (E2E specs — POST-effect + assertion discrimination + coverage-branch): **Sonnet 4.6** (`subagent_type: "sonnet-4-6"`, omit `model`)
 
 **Launch gates** (consult Phase 3 variables — skip the launch entirely, don't let the agent exit early):
 

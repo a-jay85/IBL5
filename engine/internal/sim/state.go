@@ -112,6 +112,12 @@ type gameState struct {
 	// Game2GM/Game3GM are now derived from the event stream by aggregateBoxes.
 	madeFG map[int]int
 
+	// stealTurnoverScale / nonStealTurnoverScale are the per-possession turnover
+	// scales for THIS run: the package const on a live run, or the Options override
+	// (J14 research sweep). Populated once per game in simGameWith.
+	stealTurnoverScale    float64
+	nonStealTurnoverScale float64
+
 	// transitionShotRate is the Stage-3 decaying team shot-rate threshold for
 	// fast-break steal-success (00_MASTER_REFERENCE.md L900-914). It is seeded
 	// once per period on the first possession that carries the fast-break pending

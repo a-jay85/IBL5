@@ -107,6 +107,60 @@ func TestValidateWithArms_BaseTimeMid(t *testing.T) {
 	})
 }
 
+// TestValidateWithArms_TurnoverScale (J14): StealTurnoverScale / NonStealTurnoverScale
+// are propagated onto the base sim.Options by validateWithArms (row 6 of J14 matrix).
+// A non-nil pointer must arrive intact; a nil pointer must stay nil (const path).
+func TestValidateWithArms_TurnoverScale(t *testing.T) {
+	capture := func(got *sim.Options) func(string, int, uint64, bundle.GameType, sim.Options) (validate.Report, error) {
+		return func(_ string, _ int, _ uint64, _ bundle.GameType, o sim.Options) (validate.Report, error) {
+			*got = o
+			return validate.Report{}, nil
+		}
+	}
+	ptr := func(f float64) *float64 { return &f }
+
+	t.Run("set pointer reaches base (steal)", func(t *testing.T) {
+		var got sim.Options
+		fn := validateWithArms(Options{StealTurnoverScale: ptr(1.5e-5)}, capture(&got))
+		if _, err := fn("dir", 5, 99, bundle.GameTypeRegular); err != nil {
+			t.Fatalf("fn: %v", err)
+		}
+		if got.StealTurnoverScale == nil || *got.StealTurnoverScale != 1.5e-5 {
+			t.Fatalf("StealTurnoverScale=%v, want *1.5e-5", got.StealTurnoverScale)
+		}
+	})
+	t.Run("nil stays nil (steal const path)", func(t *testing.T) {
+		var got sim.Options
+		fn := validateWithArms(Options{}, capture(&got))
+		if _, err := fn("dir", 5, 99, bundle.GameTypeRegular); err != nil {
+			t.Fatalf("fn: %v", err)
+		}
+		if got.StealTurnoverScale != nil {
+			t.Fatalf("StealTurnoverScale=%v, want nil", got.StealTurnoverScale)
+		}
+	})
+	t.Run("set pointer reaches base (non-steal)", func(t *testing.T) {
+		var got sim.Options
+		fn := validateWithArms(Options{NonStealTurnoverScale: ptr(0.002)}, capture(&got))
+		if _, err := fn("dir", 5, 99, bundle.GameTypeRegular); err != nil {
+			t.Fatalf("fn: %v", err)
+		}
+		if got.NonStealTurnoverScale == nil || *got.NonStealTurnoverScale != 0.002 {
+			t.Fatalf("NonStealTurnoverScale=%v, want *0.002", got.NonStealTurnoverScale)
+		}
+	})
+	t.Run("nil stays nil (non-steal const path)", func(t *testing.T) {
+		var got sim.Options
+		fn := validateWithArms(Options{}, capture(&got))
+		if _, err := fn("dir", 5, 99, bundle.GameTypeRegular); err != nil {
+			t.Fatalf("fn: %v", err)
+		}
+		if got.NonStealTurnoverScale != nil {
+			t.Fatalf("NonStealTurnoverScale=%v, want nil", got.NonStealTurnoverScale)
+		}
+	})
+}
+
 // TestResolveValidate_InjectedSeamIgnoresScale: when an Options.Validate seam is
 // injected, resolveValidate returns it directly — bypassing validateWithArms, where
 // BaseTimeMid lives. The injected ValidateFunc has no sim.Options parameter, so the

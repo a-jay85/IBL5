@@ -289,10 +289,12 @@ func (o Options) makePutbackActive() bool { return o.MakePutback || o.MakePutbac
 func validateWithArms(opts Options, validateFn func(string, int, uint64, bundle.GameType, sim.Options) (validate.Report, error)) ValidateFunc {
 	return func(dir string, runs int, seed uint64, gt bundle.GameType) (validate.Report, error) {
 		base := sim.Options{}
-		base.BaseTimeMid = opts.BaseTimeMid                    // J23 sweep seam: nil ⇒ const path; survives both the early-return and two-pass paths below
-		base.GateBaseline = opts.GateBaseline                  // ADR-0058 gate-baseline sweep seam: nil ⇒ bundle-derived baseline; survives both paths below
-		base.Freeze.UnfaithfulPutback = opts.UnfaithfulPutback // ADR-0055 OFF walk: restore master's coupled putback; survives both paths (copied into harvest/frozen)
-		base.Freeze.UnfaithfulOreb = opts.UnfaithfulOreb       // ADR-0058 OFF walk: restore linear gate-2 ORB continuation; survives both paths
+		base.BaseTimeMid = opts.BaseTimeMid                     // J23 sweep seam: nil ⇒ const path; survives both the early-return and two-pass paths below
+		base.StealTurnoverScale = opts.StealTurnoverScale       // J14 research turnover-scale sweep seam
+		base.NonStealTurnoverScale = opts.NonStealTurnoverScale // J14 research turnover-scale sweep seam
+		base.GateBaseline = opts.GateBaseline                   // ADR-0058 gate-baseline sweep seam: nil ⇒ bundle-derived baseline; survives both paths below
+		base.Freeze.UnfaithfulPutback = opts.UnfaithfulPutback  // ADR-0055 OFF walk: restore master's coupled putback; survives both paths (copied into harvest/frozen)
+		base.Freeze.UnfaithfulOreb = opts.UnfaithfulOreb        // ADR-0058 OFF walk: restore linear gate-2 ORB continuation; survives both paths
 		if opts.BranchB {
 			base.Freeze.BranchB = true
 			base.BranchBAccum = opts.BranchBAccum

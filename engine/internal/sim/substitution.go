@@ -84,9 +84,16 @@ func checkSubstitutions(t *teamState, period, clock int, emit func(result.Event)
 			continue
 		}
 
-		in, ok := t.bestBackup(out.slot, taken)
-		if ok && fatigued && t.energy[in.PID] <= t.energy[out.PID] {
-			ok = false // fatigue sub needs a strictly fresher option
+		var in onCourt
+		var ok bool
+		if fatigued {
+			// PR4b: fatigue subs pick the highest-TransOff strictly-fresher backup,
+			// not the DC/qualityScore top-ranked one, to concentrate minutes on
+			// higher-TransOff players (closes the J24 minute-allocation gap). The
+			// strictly-fresher gate now lives inside bestFatigueBackup.
+			in, ok = t.bestFatigueBackup(out.slot, taken, t.energy[out.PID])
+		} else {
+			in, ok = t.bestBackup(out.slot, taken)
 		}
 		if !ok {
 			if foulOut || inj {
@@ -114,6 +121,36 @@ func (t *teamState) bestBackup(slot int, taken map[int]bool) (onCourt, bool) {
 		return onCourt{}, false
 	}
 	in := onCourt{Player: cands[0].player, slot: slot}
+	t.refreshOnCourt(&in)
+	return in, true
+}
+
+// bestFatigueBackup returns the eligible backup a *fatigue* sub should bring in:
+// among slot candidates strictly fresher than the outgoing player (live energy >
+// outEnergy), the one with the highest r_trans_off. candidatesForSlot supplies
+// the eligible pool already ranked by the PR4a DC/qualityScore comparator, so a
+// TransOff tie deterministically keeps the earlier (better-ranked) candidate via
+// the strict `>` compare — no RNG, no new tie-break. ok is false when no strictly
+// fresher eligible backup exists (fatigue subs require a strictly fresher option;
+// same freshness gate the old inline check enforced). Unlike bestBackup, this does
+// NOT restrict itself to the top-ranked candidate: it scans the whole strictly-
+// fresher pool so a high-TransOff, lower-DC bench player can win the minutes the
+// real binary concentrates on higher-TransOff players (see J24 PR4b RE artifact).
+func (t *teamState) bestFatigueBackup(slot int, taken map[int]bool, outEnergy float64) (onCourt, bool) {
+	cands := candidatesForSlot(t.roster, slot, taken)
+	best := -1
+	for i := range cands {
+		if t.energy[cands[i].player.PID] <= outEnergy {
+			continue // not strictly fresher than the outgoing player
+		}
+		if best < 0 || cands[i].player.TransOff > cands[best].player.TransOff {
+			best = i
+		}
+	}
+	if best < 0 {
+		return onCourt{}, false
+	}
+	in := onCourt{Player: cands[best].player, slot: slot}
 	t.refreshOnCourt(&in)
 	return in, true
 }

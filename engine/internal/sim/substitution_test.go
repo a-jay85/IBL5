@@ -225,3 +225,90 @@ func TestCheckSubstitutions_InjuredNoBackupPlaysShort(t *testing.T) {
 		t.Errorf("events = %d, want 0 (no replacement to swap in)", len(events))
 	}
 }
+
+// subTeam2PG builds a team with TWO PG backups (PID 11 depth 2, PID 12 depth 3)
+// so fatigue-sub TransOff ranking is observable. Starter PG is PID 1 (depth 1,
+// TransOff 5). Backup TransOffs are parameterized; all start at Stamina 50.
+func subTeam2PG(to11, to12 int) *teamState {
+	players := []bundle.Player{
+		{PID: 1, TeamID: 7, DCPGDepth: 1, DCMinutes: 30, Stamina: 50, DCCanPlayInGame: 1, TransOff: 5},
+		{PID: 11, TeamID: 7, DCPGDepth: 2, DCMinutes: 20, Stamina: 50, DCCanPlayInGame: 1, TransOff: to11},
+		{PID: 12, TeamID: 7, DCPGDepth: 3, DCMinutes: 15, Stamina: 50, DCCanPlayInGame: 1, TransOff: to12},
+		{PID: 2, TeamID: 7, DCSGDepth: 1, DCMinutes: 30, Stamina: 50, DCCanPlayInGame: 1},
+		{PID: 3, TeamID: 7, DCSFDepth: 1, DCMinutes: 30, Stamina: 50, DCCanPlayInGame: 1},
+		{PID: 4, TeamID: 7, DCPFDepth: 1, DCMinutes: 30, Stamina: 50, DCCanPlayInGame: 1},
+		{PID: 5, TeamID: 7, DCCDepth: 1, DCMinutes: 30, Stamina: 50, DCCanPlayInGame: 1},
+	}
+	return newTeamState(players, 7, true)
+}
+
+// Fatigue sub picks the highest-TransOff strictly-fresher backup, NOT the DC-top
+// one. PID 12 (DC depth 3, TransOff 8) beats PID 11 (DC depth 2, TransOff 3).
+func TestCheckSubstitutions_FatigueSubPicksHighestTransOff(t *testing.T) {
+	tm := subTeam2PG(3, 8)
+	tm.energy[1] = -5 // starter fatigued
+	tm.energy[11] = 40
+	tm.energy[12] = 40
+
+	var events []result.Event
+	checkSubstitutions(tm, 1, 600, func(e result.Event) { events = append(events, e) })
+
+	on := onCourtPIDs(tm)
+	if on[1] || on[11] || !on[12] {
+		t.Errorf("fatigue sub picked wrong backup: on-court = %v, want 12 in / 1,11 out", on)
+	}
+	if len(events) != 2 || events[1].PlayerID != 12 {
+		t.Errorf("events = %+v, want out 1 / in 12", events)
+	}
+}
+
+// Negative/boundary: the higher-TransOff candidate is NOT strictly fresher, so it
+// is excluded and the lower-TransOff fresh backup wins. PID 12 (TransOff 8) sits
+// at energy == out energy (not strictly fresher); PID 11 (TransOff 3) is fresh.
+func TestCheckSubstitutions_FatigueSubSkipsHigherTransOffButNotFresher(t *testing.T) {
+	tm := subTeam2PG(3, 8)
+	tm.energy[1] = -5
+	tm.energy[12] = -5 // equal to out → NOT strictly fresher, excluded
+	tm.energy[11] = 40 // strictly fresher
+
+	var events []result.Event
+	checkSubstitutions(tm, 1, 600, func(e result.Event) { events = append(events, e) })
+
+	on := onCourtPIDs(tm)
+	if on[1] || on[12] || !on[11] {
+		t.Errorf("strictly-fresher gate failed: on-court = %v, want 11 in / 12 excluded", on)
+	}
+}
+
+// TransOff tie is broken deterministically by DC/qualityScore rank (strict `>`
+// keeps the earlier, better-ranked candidate): PID 11 (depth 2) beats PID 12
+// (depth 3) when both have equal TransOff and both are fresh.
+func TestCheckSubstitutions_FatigueSubTransOffTieKeepsDCRank(t *testing.T) {
+	tm := subTeam2PG(5, 5)
+	tm.energy[1] = -5
+	tm.energy[11] = 40
+	tm.energy[12] = 40
+
+	var events []result.Event
+	checkSubstitutions(tm, 1, 600, func(e result.Event) { events = append(events, e) })
+
+	on := onCourtPIDs(tm)
+	if on[1] || on[12] || !on[11] {
+		t.Errorf("TransOff-tie tie-break failed: on-court = %v, want 11 in (DC-top)", on)
+	}
+}
+
+// Foul-out (and foul-trouble) stay TransOff-blind — they use bestBackup, which
+// picks the DC-top (PID 11), even though PID 12 has higher TransOff.
+func TestCheckSubstitutions_FoulOutIgnoresTransOff(t *testing.T) {
+	tm := subTeam2PG(1, 9) // PID 12 has far higher TransOff
+	tm.fouls[1] = 6        // PG fouls out (not fatigue)
+
+	var events []result.Event
+	checkSubstitutions(tm, 1, 600, func(e result.Event) { events = append(events, e) })
+
+	on := onCourtPIDs(tm)
+	if on[1] || on[12] || !on[11] {
+		t.Errorf("foul-out should stay DC-ranked: on-court = %v, want 11 in / 12 out", on)
+	}
+}

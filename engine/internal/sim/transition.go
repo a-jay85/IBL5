@@ -127,9 +127,8 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 		def := selectDefender(defense, pt, gs.rng)
 
 		net := transitionNet(def)
-		// Phase 4 deferred (J26): pass inert flags so phase4 == 0. A faithful
-		// per-possession usage-dominance port is a scoped follow-up, not this
-		// approximate inline term (matchup.go, jsb-native-backlog J26 note).
+		// Phase 4 stays INERT (J-fgpct-re): usage-dominance flag RE-pinned + MEASURED
+		// not to move FG% (0.0005% fire rate → +0.01pp). Pass [6]bool{} so phase4 == 0.
 		mq := matchupQuality(bh, defense.players, gs.leagueAST48ByPos, [6]bool{}, [6]bool{})
 		// Make/foul/turnover arms route through the gameState freeze wrappers
 		// (freeze.go) on the transition path too, so a frozen Make/Foul/TVR arm

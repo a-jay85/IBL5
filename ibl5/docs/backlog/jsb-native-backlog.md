@@ -54,9 +54,9 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 4 |
+| ⬜ Open | 3 |
 | 📋 Planned | 0 |
-| ◑ Partial | 1 |
+| ◑ Partial | 2 |
 | ✅ Implemented | 18 |
 | 🚫 Declined | 1 |
 
@@ -72,7 +72,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 | J4 | Play-by-play extraction parser | ✅ Implemented | ⚙️ Sonnet | M |
 | J5 | Unpinnable-claims sweep + static closures | ✅ Implemented | 🔮 Fable | M |
 | J6 | Composite-scale pins (+0xD90/+0xDB0, `f`, full player formula map) | ✅ Implemented | 🔮 Fable | M |
-| J7 | Turnover volume-coupling fidelity RE | ⬜ Open | 🧠 Opus | M |
+| J7 | Turnover volume-coupling fidelity RE | ◑ Partial | 🧠 Opus | M |
 | J8 | Transition trigger denominator 18 | ✅ Implemented | ⚙️ Sonnet | S |
 | J9 | League-baseline faithful port (FUN_004385f0) | ✅ Implemented | ⚙️ Sonnet | S |
 | J10 | `.plb` minutes reader + stamina=100 bundle fix | ✅ Implemented | ⚙️ Sonnet | S |
@@ -110,10 +110,15 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 ➜ J6 Composite-scale pins — ✅ Implemented (2026-07-10): every target pinned + mechanism discovered; spawned J15/J18/J19; see [archive](archive/jsb-native-backlog-archive.md).
 
 ### J7 Turnover volume-coupling fidelity RE
-**Location:** Engine turnover model vs 5.60; measured corr(volume, TOV/POSS) engine **+0.163** vs real **−0.176** (gap +0.339).
-**Problem:** Real high-volume teams turn it over LESS per possession; the engine gives them MORE. An independent, sizeable fidelity bug — but the faithful fix RAISES FGA for inefficient teams and therefore **regresses** the count axis (deeper negative Cov). Filed as a bug, never as a count-axis fix.
-**Direction:** RE 5.60's turnover generation for the coupling structure; sequence the port AFTER the J2 verdict so its wrong-direction pressure is priced in. A/B on the headline Cov required before shipping.
+**Location:** Engine turnover model vs 5.60; measured `corr(volume, TOV/POSS)` engine **+0.163** vs real **−0.176** (gap +0.339). RE artifact: `jsb-native/re-artifacts/jsb-J7-tov-coupling-RE-20260720.md` (machine-local, git-excluded).
+**Mechanism (pinned 2026-07-20 — primary source master-ref :436-443, :478, :505-506):**
+- **5.60:** `P(turnover)` = offense's own per-48 TOV-rate composite (`+0xDD8` = `TOV/MIN×48`), applied per-possession as a **volume-normalized share**: `TVR_rate / (total_shot_rate + TVR_rate)`. High shot-volume grows the denominator without touching the numerator → `P(TO)` diluted → `TOV/POSS` falls as volume rises → real **−0.176**. The per-48 normalization cancels in the ratio; what governs is the pure share, not rates. The fast-break conversion path (`:436-443`: `total_shot_rate / (total_shot_rate + TVR_rate)`) is a **secondary, same-signed channel** (high-volume teams also *convert* fast breaks more / lose fewer) — corroborated at :443, but it is NOT the turnover generator.
+- **Go (`steal.go:82`):** `prob = stealTurnoverScale × (100−TVR_rating) × Σ(defender STL × fatigue)` — absolute product, no shot_rate in the denominator, no share. The offense's TOV-rate self-coupling is severed and replaced with a rating×opponent-steal-pool product that carries no roster shot/TOV anti-correlation → residual nets **+0.163**.
+**Verdict:** Sign flip = **stat-vs-rating + self-vs-opponent** substitution in the turnover-probability anchor — the same `offQ`/`defQ` divergence pattern at `00_MASTER_REFERENCE.md:1488`. This is a **normalization-kind** mismatch, not a mechanical-competition difference (steal-before-shot competition exists in both engines — confirmed; not the discriminator). An independent, sizeable fidelity bug. Confirms and quantifies the June closure (`jsb-poss-channel-RE-20260613.md:77-80`).
+**A/B (estimated):** A faithful port **regresses** the headline `Cov(lnFGA,lnPPS)` by ≈ **−0.0001..−0.0002** (from engine −0.000807 toward ≈ −0.0009..−0.0010, further from real +0.000269) — it raises FGA for high-volume/low-PPS teams, compounding with the empty-FGA anti-coupling. Confirm A/B on current master (post-J22/J24) before shipping. Filed as bug, never as count-axis fix.
+**Port:** ⚙️ Sonnet from the pinned mechanism; sequence after J13 (count-axis fix must be in place before this regression is acceptable).
 **Status (2026-07-08):** ⬜ Open. 🧠 Opus (RE + verdict); port likely ⚙️ Sonnet.
+**Status (2026-07-20):** ◑ Partial — RE and verdict complete (artifact above). Port is a ⚙️ Sonnet follow-on, sequenced after J13.
 
 ### J8 Transition trigger denominator 18
 ➜ J8 Transition trigger denominator 18 — ✅ Implemented (2026-07-13): PR #1433 (`transitionTriggerDenom` 20→18, asm-verified); see [archive](archive/jsb-native-backlog-archive.md).

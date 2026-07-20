@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for agent-tiering — the skip-vs-spawn heuristic, Fable approval-gate procedure, flat-fan-out (nested sub-agent) rationale, orchestrator context economics (delegate-don't-dismiss, split-don't-self-clear), and per-tier prompt style. Loads only when editing workflow orchestration defs.
-last_verified: 2026-07-11
+last_verified: 2026-07-20
 paths:
   - ".claude/skills/**/*.md"
 ---
@@ -76,3 +76,23 @@ The context saving from a sub-agent comes from **delegation, not dismissal**. A 
 **Haiku** (compensate for its tendency to stop at "enough"): lead with a concrete grep/find command · say "list EVERY match" / "do NOT skip files" when exhaustiveness matters · pre-resolve absolute paths · request structured output (table/list) · for checklists, "check EACH pattern, cite file:line or state not found" · never ask it to judge relevance, trace multi-hop flows, or relate a past event to the current context.
 
 **Sonnet**: open-ended exploration, multi-file synthesis, ambiguous queries where the first grep might miss — current style is fine.
+
+## `/plan` orchestrator model
+
+The rows in agent-tiering.md tier sub-agents; the `/plan` session model is a separate call. The `plan-architect` is tiered by Step-3 precedence (xhigh → sonnet → opus) regardless of the orchestrator — a Sonnet `/plan` spawning `plan-architect` still gets an Opus-authored plan.
+
+Tier the orchestrator by the judgment **it** retains:
+
+- **Single backlog item** → **Sonnet** (Steps 2.5/3/4 orchestrator calls are light; same recipe-backed class the "Opus (delegated)" row routes to `plan-architect-sonnet`).
+- **Multiple items in one pass** → **Opus** (cross-item PR decomposition, **dependency ordering**, tier-boundary splits). Cheaper: run each as its own **Sonnet** `/plan` and make only the ordering call yourself.
+
+## Explore Agent Tiering
+
+Tier per prompt — don't default all Explore agents to one tier. Explore itself is pinned to Sonnet 4.6 (see agent-tiering.md § Sonnet 4.6 pins); the choice below is Haiku-vs-Sonnet-4.6 for the Explore *task*.
+
+| Tier | Model param | Use for Explore | Examples |
+|------|-------------|-----------------|---------|
+| **Haiku** | `model: "haiku"` | Enumeration, single-file lookups, grep-and-list | "find all callers of getTeamByName", "does column X exist in migration Y" |
+| **Sonnet 4.6** | *omit `model`* | Multi-hop traces, cross-module synthesis, open-ended investigation | "trace the encoding pipeline from .plr read to Team page" |
+
+**Heuristic:** notice connections / judge relevance / trace data flow → omit `model` (Sonnet 4.6). Answerable by grep + format → `model: "haiku"`.

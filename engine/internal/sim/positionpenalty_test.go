@@ -52,3 +52,30 @@ func TestPositionPenalty_FloorAt1(t *testing.T) {
 		t.Fatalf("penalty = %v, want finite", got)
 	}
 }
+
+// --- +0xD58 base-minutes faithful port (J26) -------------------------------
+// penaltyBaseMinutes reproduces the binary's player[+0xD58]: the GM's Game-Plan
+// minutes target (DCMinutes>0) when set, else MPG = RealLifeMIN/RealLifeGP, else
+// 0 (no games, no target → base stays 1.0). See positionpenalty.go docblock and
+// re-artifacts/jsb-J26-penalty-minutes-20260720.md §3.
+func TestPenaltyBaseMinutes(t *testing.T) {
+	cases := []struct {
+		name           string
+		dcMin, min, gp int
+		want           float64
+	}{
+		{"game-plan target set wins", 30, 2400, 80, 30}, // DCMinutes>0 → dc, ignore MPG
+		{"target overrides even when MPG differs", 18, 2400, 80, 18},
+		{"no target → MPG fallback", 0, 2400, 80, 30}, // MIN/GP = 2400/80
+		{"no target, MPG fractional", 0, 2450, 79, 2450.0 / 79.0},
+		{"no target, no games → 0", 0, 0, 0, 0},        // preserves base=1.0
+		{"no target, MIN but GP==0 → 0", 0, 500, 0, 0}, // GP guard avoids div-by-zero
+	}
+	for _, c := range cases {
+		p := oc(slotPG, bundle.Player{DCMinutes: c.dcMin, RealLifeMIN: c.min, RealLifeGP: c.gp})
+		if got := penaltyBaseMinutes(p); math.Abs(got-c.want) > 1e-9 {
+			t.Errorf("%s: penaltyBaseMinutes(dc=%d,min=%d,gp=%d) = %v, want %v",
+				c.name, c.dcMin, c.min, c.gp, got, c.want)
+		}
+	}
+}

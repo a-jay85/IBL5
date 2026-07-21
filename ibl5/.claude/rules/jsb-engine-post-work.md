@@ -1,6 +1,6 @@
 ---
 description: After JSB engine work ships, update the frontier memory and run /backlog-housekeep — both required before post-plan fires.
-last_verified: 2026-07-20
+last_verified: 2026-07-21
 ---
 
 # JSB Engine Post-Work Checklist
@@ -9,17 +9,23 @@ last_verified: 2026-07-20
 
 Both steps are **required before `bin/post-plan-now --auto` fires**. Step 1 is also enforced by `.claude/rules/backlog-housekeep.md` and `/post-plan` Phase 2.5 — the overlap is intentional; engine work routinely surfaces new items and the double-trigger prevents "I'll update the backlog after the PR" drift.
 
-## Step 1 — Backlog (`ibl5/docs/backlog/jsb-native-backlog.md`)
+## Division of labor (read first)
 
-Run `/backlog-housekeep`. Flips status, archives done items, stamps new items, reconciles the README index. Do this inside the worktree (it ships with the PR).
+`ibl5/docs/backlog/jsb-native-backlog.md` is the **single source of truth** for J-series work: the OPEN list, each item's current state, AND its "Do NOT re-open / NOT-A-LEVER" trap list all live **in the backlog J-entry**, self-standing. The frontier memory carries **only** the one thing the tracked backlog deliberately omits — the **git-verified merged-PR commit hashes**. Do NOT re-add OPEN or NOT-A-LEVER prose to the frontier: that split-brain is exactly what this consolidation (2026-07-21) removed, and re-accreting it silently regresses the backlog's authority.
 
-## Step 2 — Frontier memory
+## Step 1 — Backlog (`ibl5/docs/backlog/jsb-native-backlog.md`) — the source of truth
+
+Run `/backlog-housekeep`. Flips status, archives done items, stamps new items, reconciles the README index. Do this inside the worktree (it ships with the PR). Beyond housekeeping, this is where the durable engine knowledge lands:
+
+1. **Current state** of each touched J-entry (what shipped, the live blocker, the next lever). Dated measurement paragraphs that are now just history belong in `docs/backlog/archive/jsb-native-backlog-archive.md` behind a dated pointer — keep the live entry to a single forward-looking current-state block.
+
+2. **NOT-A-LEVER:** if this session proved a mechanism *cannot* move a target metric (measured A/B or exhaustive trace, not just reasoning), add it to the relevant J-entry's "Do NOT re-open" list with its **discriminating proof** (the measurement or the `jsb-native/re-artifacts/...` citation). Items that "might not help" don't belong; items proven not to help do.
+
+## Step 2 — Frontier memory (hashes only)
 
 **File:** `~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/memory/project_jsb_engine_frontier.md`
 
 Memory files live outside the repo — edit in place, no worktree. Do this **before tearing down the worktree** (need `git log` while the branch still exists).
-
-### Required updates
 
 1. **Capture hashes first:** run `git log --oneline -10 origin/master` after merge — grab every PR hash this work produced.
 
@@ -29,12 +35,4 @@ Memory files live outside the repo — edit in place, no worktree. Do this **bef
    ```
    Include the git-verified `origin/master` hash. Bump the `(git-verified YYYY-MM-DD, origin/master HEAD \`<hash>\`)` line at the top of the SHIPPED block.
 
-3. **NOT-A-LEVER block:** if this session proved a mechanism *cannot* move a target metric (measured A/B or exhaustive trace, not just reasoning), add a bullet. This is the trap-prevention record — the value comes from the empirical proof, so include the measurement or cite the artifact. Items that "might not help" don't belong here; items proven not to help do.
-
-4. **OPEN block:** remove items this work closed; add brief "don't re-run blind" trap context for newly opened or newly constrained items. The authoritative open list is `ibl5/docs/backlog/jsb-native-backlog.md` — the frontier's OPEN block is the delta, not a copy.
-
-### What to omit
-
-- Measurement numbers likely to shift with future work (those belong in RE artifacts / ADRs).
-- Items that add no trap-prevention value beyond what the backlog already says.
-- Speculative "this might be the lever" notes — frontier memory records what is *proven*, not hypothesized.
+That is the frontier's whole job now. Do **not** maintain an OPEN block or a NOT-A-LEVER block here — both live in the backlog (Step 1). The frontier's one-line pointer to the backlog stays; everything else is a hash ledger.

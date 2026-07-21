@@ -54,7 +54,7 @@
     "pixelmatch": "^7.2.0",
     "pngjs": "^7.0.0",
     "tailwindcss": "^4.3.3",
-    "typescript-eslint": "^8.64.0",
+    "typescript-eslint": "^8.65.0",
     "vitest": "^4.1.10"
   }
 }

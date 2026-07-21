@@ -78,7 +78,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 | J10 | `.plb` minutes reader + stamina=100 bundle fix | ✅ Implemented | ⚙️ Sonnet | S |
 | J11 | Season-selection min-GP guard | ✅ Implemented | ⚙️ Sonnet | S |
 | J12 | HCA re-homing to basis-scaled site-2 (absorbed into J15) | ✅ Implemented | 🧠 Opus | M |
-| J13 | Cut-over package: bands, leaders, decision | ⬜ Open | 🧠 Opus | L |
+| J13 | Cut-over package: bands, leaders, decision | ✅ Implemented | 🧠 Opus | L |
 | J14 | AutoResearch eval-harness ADR (loop L9 companion) | ✅ Implemented | 🧠 Opus | L |
 | J15 | Faithful foul-bucket program (live composites + HCA re-homing + level re-anchor) | ✅ Implemented | 🧠 Opus | L |
 | J16 | FUN_004e3860 net-advantage formula via objdump | ✅ Implemented | 🔮 Fable | S |
@@ -144,7 +144,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 **Location:** `engine/internal/validate/bands.go` (placeholder ±15%, explicitly non-authoritative); per-player leaders validation (never built); the standings-residual gate (floor ≈ 3–5 wins / ~0 ppg); Var(lnPPS) sits ~2% under real as a monitor-only watch item.
 **Problem:** Even with the dispersion blocker resolved, cut-over needs authoritative bands derived from the archive, a per-player sanity layer, and the actual go/no-go decision (env-flag swap of the jumpshot.exe invocation, `.sco` import path kept for one-command rollback; SHADOW as the live distributional check).
 **Direction:** Gated on the J2 verdict. Band derivation and the leaders instrument are ⚙️-delegable; the acceptance judgment and the cut-over ADR are 🧠.
-**Status (2026-07-13):** ⬜ Open — **bands sub-item VERIFIED post-J18** (`jsbcalibrate --mode gate` re-run on the post-J15+J18 engine, runs=20 stride=50: PASS, no literal change; provenance in `engine/internal/validate/bands.go` J18 block). **Leaders instrument (J13-2) SHIPPED** (2026-07-14, PR #1463 `6899910ea` — per-player leaders validation instrument); **cut-over ADR (J13-3) still open** — the only remaining J13 sub-item. Band derivation and per-player instrument are ⚙️-delegable; the acceptance judgment and cut-over ADR are 🧠.
+**Status (2026-07-21):** ✅ Implemented — **bands sub-item VERIFIED post-J18** (`jsbcalibrate --mode gate` re-run on the post-J15+J18 engine, runs=20 stride=50: PASS, no literal change; provenance in `engine/internal/validate/bands.go` J18 block). **Leaders instrument (J13-2) SHIPPED** (2026-07-14, PR #1463 `6899910ea` — per-player leaders validation instrument); **cut-over ADR (J13-3) SHIPPED** — ADR-0090 written (HOLD). Re-open when gate-1 DRBPushSharePct ≥ 12.42% (see ADR-0090 § Re-open criteria). Band derivation and per-player instrument are ⚙️-delegable; the acceptance judgment and cut-over ADR are 🧠.
 
 ### J14 AutoResearch eval-harness ADR (loop L9 companion)
 ➜ J14 AutoResearch eval-harness ADR (loop L9 companion) — ✅ Implemented (2026-07-20): see [archive](archive/jsb-native-backlog-archive.md).

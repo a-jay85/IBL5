@@ -1,0 +1,89 @@
+name: npm audit fix
+
+on:
+  # Weekly keeps the ibl5 transitive vulns (body-parser, brace-expansion,
+  # js-yaml) fixed so the audit-js gate stops red-Xing unrelated PRs.
+  schedule:
+    - cron: '0 6 * * 1'   # Mondays 06:00 UTC
+  # On-demand escape hatch: a newly-published vuln reds open PRs until the next
+  # scheduled run — dispatch this to fix it immediately rather than waiting.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-audit-fix
+  cancel-in-progress: true
+
+jobs:
+  audit-fix:
+    name: npm audit fix across lockfile dirs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          # CI_PAT is MANDATORY. A push made with the default GITHUB_TOKEN is
+          # silently ignored by GitHub's anti-recursion guard and does NOT
+          # trigger pull_request CI on the opened/updated PR — so the generated
+          # PR's audit-js gate would never run. Pushing via CI_PAT makes the
+          # PR's CI fire naturally. This is the entire reason for the pattern.
+          token: ${{ secrets.CI_PAT }}
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Run npm audit fix and open/update PR
+        env:
+          GH_TOKEN: ${{ secrets.CI_PAT }}
+        run: |
+          set -euo pipefail
+
+          BRANCH="chore/npm-audit-fix"
+
+          # Reset the fixed working branch to the tip of the default branch so
+          # each run starts clean (idempotent single PR — never stacks history).
+          git checkout -B "$BRANCH" origin/master
+
+          # Semver-safe transitive fixes only — NO --force (never a breaking
+          # major bump). Loop every lockfile directory.
+          for dir in ibl5 IBL6 ibl5/IBLbot; do
+            echo "::group::npm audit fix — $dir"
+            ( cd "$dir" && npm ci && npm audit fix )
+            echo "::endgroup::"
+          done
+
+          # If no lockfile (or package.json) changed, there is nothing to ship —
+          # do NOT commit and do NOT open a PR.
+          if git diff --quiet; then
+            echo "No dependency changes from npm audit fix — nothing to do."
+            exit 0
+          fi
+
+          git add -A
+          git commit -m "chore(deps): npm audit fix"
+
+          # Force-push via CI_PAT. If a PR for this branch is already open, this
+          # UPDATES it (never opens a duplicate).
+          git push --force origin "$BRANCH"
+
+          # Open a PR only when none is already open for this branch.
+          open_pr=$(gh pr list --head "$BRANCH" --state open --json number --jq 'length')
+          if [ "$open_pr" -eq 0 ]; then
+            gh pr create \
+              --base master \
+              --head "$BRANCH" \
+              --title "chore(deps): npm audit fix" \
+              --body "Automated \`npm audit fix\` across ibl5, IBL6, and ibl5/IBLbot. Keeps transitive vulns fixed so the audit-js gate stops failing unrelated PRs."
+          else
+            echo "PR already open for $BRANCH (#$open_pr) — force-push updated it."
+          fi

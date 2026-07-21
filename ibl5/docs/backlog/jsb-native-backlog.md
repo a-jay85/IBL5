@@ -39,7 +39,7 @@ J1 faithful foul pair (✅ 2026-07-10, ADR-0082) ─→ J2 adjudications (✅ 20
               ├─ absorbs J12 (HCA re-homing — corpus margin ground truth 4.12 unchanged) — ✅ absorbed
               ├─ prerequisite: J16 escape bound re-derived with LIVE AST/48 (J19) — ✅ J19 done
               └─→ J2 verdict: SHIPPABLE with residual → J20 🚫 void (within-possession lever cannot move Var(lnPOSS); pace/base_time dispersion is J23's domain) → J13 (unblocked)
-J17 game-state foul coupling (◑ Partial 2026-07-21, PR #1536 SHIPPED standalone) — param_8 + trailing-by-3 shotClock + leading-by-1-3 forcedMake ported; J17c doForcedMakeMax PINNED=10 (objdump, was 120 est); J17b +0x30 pace-flag WRITER found (RE done), port deferred to J24 residual (3) — not a #1536 blocker; J17 closes when J17b lands
+J17 game-state foul coupling (✅ 2026-07-21, PR #1536) — param_8 + trailing-by-3 shotClock + leading-by-1-3 forcedMake ported; J17c doForcedMakeMax PINNED=10 (objdump); J17b +0x30 WRITER found, reader/port deferred → J24 residual (3)
 J21 gt=4 playoff-margin audit (✅ 2026-07-14 — no overshoot, engine under-disperses globally) · J22 per-player STL/TOV bundle wiring (✅ 2026-07-16) — cut-over-gate fidelity inputs to J13; NEITHER is a Cov(lnFGA,lnPPS) lever
 J23 round-half-up + base_time re-center (✅, 2026-07-16, #1495) — coupled faithful fix deferred from J21; ADR-0085 records the hold finding; shipped round-half-up + baseTimeMid re-center 14.5→13.65 (J23)
   └─→ J24 possession-clock subsystem port (◑ Partial) — step classes + jitter, steal split + faithful shotValue2pt/3pt, matchupQuality Phase-3 matched (+0xDC8) & non-matched (+0x350, J25) terms, FG% band CLOSED via +0xD58 penalty-minutes (#1544), and the §1d steal-gating partition (#1547) all SHIPPED. **Gate-1 code-7 arming share re-adjudicated WITHIN-NOISE (was "NO-GO vs floor 12.94" — a denomination artifact): 12.94 = markers/g 27.13 ÷ the all-era 209.2 poss/g, but the engine sims recent 05-08 rosters whose real poss/g is 216.58; re-denominated, master's 12.37% is INSIDE the recent between-season drift band [11.97, 12.54]. NOT a clean GO — master is −0.05pp under the tightest 2-season floor ~12.42 (SEM caveat). Gate-1 decided by ADR-0090 (J13-3 FINAL). See ADR-0088/0090.** Open residuals: (7) 3P undershoot ~2.8pp, (6) `.plb dc_minutes` wiring, (3) CEngine+0x30 reader (with J17b writer), (5) baseTimeMid walkback. See the J24 entry for the full current-state + NOT-A-LEVER trap list
@@ -56,8 +56,8 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 |--------|------:|
 | ⬜ Open | 0 |
 | 📋 Planned | 0 |
-| ◑ Partial | 3 |
-| ✅ Implemented | 20 |
+| ◑ Partial | 2 |
+| ✅ Implemented | 21 |
 | 🚫 Declined | 1 |
 
 ---
@@ -82,7 +82,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 | J14 | AutoResearch eval-harness ADR (loop L9 companion) | ✅ Implemented | 🧠 Opus | L |
 | J15 | Faithful foul-bucket program (live composites + HCA re-homing + level re-anchor) | ✅ Implemented | 🧠 Opus | L |
 | J16 | FUN_004e3860 net-advantage formula via objdump | ✅ Implemented | 🔮 Fable | S |
-| J17 | Game-state foul coupling port (param_8 desperation + late-game fouling) | ◑ Partial | 🧠 Opus | M |
+| J17 | Game-state foul coupling port (param_8 desperation + late-game fouling) | ✅ Implemented | 🧠 Opus | M |
 | J18 | Composite fidelity ports (bucketweights/teamquality vs the J6 formula map) | ✅ Implemented | 🧠 Opus | M |
 | J19 | J6-residue RE (energy operands, rec+0x18 semantics, escape re-derivation, +0xD58) | ✅ Implemented | 🧠 Opus | M |
 | J20 | Empty-FGA / within-possession restructure (Cov possession channel) | 🚫 Declined | 🧠 Opus | L |
@@ -160,12 +160,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 ➜ J16 FUN_004e3860 net-advantage formula — ✅ Implemented (2026-07-10): formula + symmetry closures stand; reachability reopened under J19; see [archive](archive/jsb-native-backlog-archive.md).
 
 ### J17 Game-state foul coupling port (param_8 desperation + late-game fouling)
-**Location:** `engine/internal/sim/possession.go` — `selectOutcome` half-court call site (`gameState.lateGameForcing`); `engine/internal/sim/lategame_test.go`; `engine/internal/sim/endingmix_share_archive_test.go` (FTA/g band + Q4 gate).
-**Problem (found by J2 session 1's corpus instrument):** real 5.60's home/away FTA split (22.04/19.30) **follows the winner, not the side** — home-won games 23.25/18.03, visitor-won 20.28/21.15; margin-banded edge monotone −3.2 → +7.3. The bulk of the real FTA asymmetry is game-state-coupled (trailing teams foul late), a mechanism the Go engine lacked entirely. Also a candidate contributor to the residual FTADisp gap (1.51 vs ~1.0) and thus J2's residual Cov.
-**Direction:** RE the game-state fouling surface (param_8 desperation pinned by J5; late-game intentional-foul trigger), then port + wire real shot-clock/margin state into the half-court call site. Acceptance: reproduce the corpus margin-banded FTA-edge curve; Q4 winner/loser FTA gate.
-**Status (2026-07-21):** ◑ Partial — core port SHIPPED (PR #1536). `gameState.lateGameForcing(scoreDiff, bh)` returns `(forcedMake, shotClock)`: Mechanism 1 (param_8 / J5-pinned) `clock < 4s` → shotClock; Mechanism 2A (Q4+, `clock < 25s`, `scoreDiff == -3`) → shotClock; Mechanism 2B (Q4+, `clock < 25s`, `scoreDiff ∈ [1,3]`, `bh.DriveOff < rand_int(doForcedMakeMax)+1`) → forcedMake. Wired at the half-court call site only; transition path unchanged (J5 pin). 15-row truth-table CI test (`TestLateGameForcing`); FTA/g `assertBand [33.0, 37.2]` (baseline 34.8 ✓); Q4 winner≥loser margin≥4 **hard gate**. 🧠 Opus (RE + verdict); ⚙️ Sonnet (port).
-**J17c — CLOSED (2026-07-20):** `doForcedMakeMax` PINNED to **10** (was a 120 estimate) via objdump of `jumpshot.exe` — `push 0xa` @VA 0x4d87fc feeds rand_int @0x4d881c returning [1,10], so Go `IntN(10)+1` is faithful; makes 2B selective (fires only for low-DriveOff handlers). Also proved `0x33e4` is the possessing-team index (not a strategy flag) → the possessor-relative scoreDiff structure has no fidelity gap. RE: `jsb-native/re-artifacts/jsb-J17-forcing-gate-RE-20260720.md` (machine-local).
-**Why still ◑ Partial — J17b deferred to J24 (not a merge blocker):** Mechanism 2C (+0x30 pace/hurry flag) is **RE-done, port deferred**. The writer is three direct `movb $imm8,0x30(esi)` sites (0x4d88a0/0x4d88cf → 1 when the possessor leads & !forcedMake; 0x4d88d5 → 0) — the **same CEngine+0x30 surface as J24 residual (3)**; its reader / quick-redraw path is J24 pace territory. Porting the writer alone is a no-op, so J17b wires in when J24 lands the +0x30 reader — independent of #1536, which shipped the three faithful, tested game-state mechanisms standalone. J17 closes when J17b lands.
+➜ J17 Game-state foul coupling port — ✅ Implemented (2026-07-21, PR #1536): param_8/clock-desperation + Q4 trailing-by-3 shotClock + Q4 leading-by-1-3 forcedMake ported; J17c doForcedMakeMax PINNED=10 (objdump); J17b CEngine+0x30 WRITER found, reader/port deferred → J24 residual (3); see [archive](archive/jsb-native-backlog-archive.md).
 
 ### J18 Composite fidelity ports (bucketweights/teamquality vs the J6 formula map)
 ➜ J18 Composite fidelity ports — ✅ Implemented (2026-07-13): six formula divergences merged (#1433, #1435–#1437, #1440, #1443, #1444); f/pass-2 usage-shrink port decided as a documented divergence (bundle lacks Confidence + `+0x18`; J19 bounds real `f` spread to ±2%); see [archive](archive/jsb-native-backlog-archive.md).

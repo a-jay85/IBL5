@@ -58,7 +58,7 @@ jobs:
           # major bump). Loop every lockfile directory.
           for dir in ibl5 IBL6 ibl5/IBLbot; do
             echo "::group::npm audit fix — $dir"
-            ( cd "$dir" && npm ci && npm audit fix )
+            ( cd "$dir" && npm ci && npm audit fix || true )
             echo "::endgroup::"
           done
 

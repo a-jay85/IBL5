@@ -42,6 +42,14 @@ import (
 	"github.com/a-jay85/IBL5/engine/internal/result"
 )
 
+// q4FTAByMargin is Q4 free-throw-attempt averages per team role (winner/loser)
+// for games in a given final-margin bucket (J17 Phase 6b diagnostic).
+type q4FTAByMargin struct {
+	WinnerAvg float64 `json:"winner_avg"`
+	LoserAvg  float64 `json:"loser_avg"`
+	Games     int     `json:"games"`
+}
+
 // endingMixArtifact is the committed diagnostic output from one archive pass.
 type endingMixArtifact struct {
 	Generated string          `json:"generated"`
@@ -71,6 +79,14 @@ type endingMixArtifact struct {
 	FTAPerGame   float64 `json:"fta_per_game"`      // both teams pooled
 	ArmedPct     float64 `json:"armed_pct"`         // 0.94×DRebShare + StealShare (faithful 5.60 arming over THIS mix)
 	ImpliedCode7 float64 `json:"implied_code7_pct"` // ArmedPct × 0.300 (archive-mean gate (4.40+1)/18)
+
+	// J17 Phase 6b: Q4 FTA by winner/loser bucketed by final margin.
+	// winner≥loser for margin≥4 buckets is asserted (hard gate) since J17c pinned
+	// doForcedMakeMax=10 (2026-07-20); the margin 0-3 bucket stays logged-only.
+	Q4FTAMargin0to3   q4FTAByMargin `json:"q4_fta_margin_0_3"`
+	Q4FTAMargin4to7   q4FTAByMargin `json:"q4_fta_margin_4_7"`
+	Q4FTAMargin8to15  q4FTAByMargin `json:"q4_fta_margin_8_15"`
+	Q4FTAMargin16plus q4FTAByMargin `json:"q4_fta_margin_16plus"`
 }
 
 func TestEndingMixBaseline(t *testing.T) {
@@ -99,6 +115,12 @@ func TestEndingMixBaseline(t *testing.T) {
 	var c EndingMixCounts
 	snapshots := 0
 
+	// J17 Phase 6b: Q4 FTA accumulation by margin bucket.
+	type q4Accum struct {
+		winnerTotal, loserTotal, games int
+	}
+	var q4m0to3, q4m4to7, q4m8to15, q4m16plus q4Accum
+
 	for i := 0; i < len(zips); i += stride {
 		players, sched, ok := readSnapshotP0(zips[i])
 		if !ok {
@@ -125,6 +147,55 @@ func TestEndingMixBaseline(t *testing.T) {
 					cur = append(cur, e)
 				}
 				ClassifyPossession(cur, &c)
+
+				// Q4 FTA per team (period==4 EventFreeThrow).
+				q4FTA := map[int]int{}
+				for _, e := range g.Events {
+					if e.Kind == result.EventFreeThrow && e.Period == 4 {
+						q4FTA[e.TeamID] += e.FTAttempts
+					}
+				}
+
+				// Determine winner/loser from TeamBoxes and add to margin bucket.
+				if len(g.TeamBoxes) >= 2 {
+					score := func(tb result.TeamBox) int {
+						s := tb.Q1 + tb.Q2 + tb.Q3 + tb.Q4
+						for _, ot := range tb.OT {
+							s += ot
+						}
+						return s
+					}
+					s0, s1 := score(g.TeamBoxes[0]), score(g.TeamBoxes[1])
+					if s0 == s1 {
+						// Tie — skip (shouldn't happen with OT)
+					} else {
+						winTeam, loseTeam := g.TeamBoxes[0].TeamID, g.TeamBoxes[1].TeamID
+						margin := s0 - s1
+						if s1 > s0 {
+							winTeam, loseTeam = g.TeamBoxes[1].TeamID, g.TeamBoxes[0].TeamID
+							margin = s1 - s0
+						}
+						wFTA, lFTA := q4FTA[winTeam], q4FTA[loseTeam]
+						switch {
+						case margin <= 3:
+							q4m0to3.winnerTotal += wFTA
+							q4m0to3.loserTotal += lFTA
+							q4m0to3.games++
+						case margin <= 7:
+							q4m4to7.winnerTotal += wFTA
+							q4m4to7.loserTotal += lFTA
+							q4m4to7.games++
+						case margin <= 15:
+							q4m8to15.winnerTotal += wFTA
+							q4m8to15.loserTotal += lFTA
+							q4m8to15.games++
+						default:
+							q4m16plus.winnerTotal += wFTA
+							q4m16plus.loserTotal += lFTA
+							q4m16plus.games++
+						}
+					}
+				}
 			}
 		}
 		snapshots++
@@ -164,6 +235,22 @@ func TestEndingMixBaseline(t *testing.T) {
 	art.ArmedPct = 0.94*art.DRebSharePct + art.StealSharePct
 	art.ImpliedCode7 = art.ArmedPct * 0.300
 
+	// J17 Phase 6b: populate Q4 FTA diagnostic fields.
+	q4avg := func(acc q4Accum) q4FTAByMargin {
+		if acc.games == 0 {
+			return q4FTAByMargin{}
+		}
+		return q4FTAByMargin{
+			WinnerAvg: float64(acc.winnerTotal) / float64(acc.games),
+			LoserAvg:  float64(acc.loserTotal) / float64(acc.games),
+			Games:     acc.games,
+		}
+	}
+	art.Q4FTAMargin0to3 = q4avg(q4m0to3)
+	art.Q4FTAMargin4to7 = q4avg(q4m4to7)
+	art.Q4FTAMargin8to15 = q4avg(q4m8to15)
+	art.Q4FTAMargin16plus = q4avg(q4m16plus)
+
 	out := filepath.Join("..", "validate", "testdata",
 		fmt.Sprintf("calibration-5.60-%s-ending-mix.json", time.Now().Format("20060102")))
 	blob, err := json.MarshalIndent(art, "", "  ")
@@ -190,6 +277,46 @@ func TestEndingMixBaseline(t *testing.T) {
 	t.Logf("  armed (0.94×DREB + steal): %.2f%% (real ~38.9%%)  implied code-7 @0.300 gate: %.2f%% (target 11.7%%)",
 		art.ArmedPct, art.ImpliedCode7)
 
+	// J17 Phase 6b: Q4 FTA winner/loser by margin.
+	// Expected winner≥loser for margin≥4 from J4 corpus (23,525 games).
+	t.Logf("  Q4 FTA winner/loser by margin (J17):")
+	logQ4 := func(label string, b q4FTAByMargin) {
+		dir := ""
+		if b.Games > 0 && b.WinnerAvg >= b.LoserAvg {
+			dir = " ✓ directional"
+		} else if b.Games > 0 {
+			dir = " ✗ unexpected"
+		}
+		t.Logf("    margin %s: winner=%.2f loser=%.2f (%d games)%s",
+			label, b.WinnerAvg, b.LoserAvg, b.Games, dir)
+	}
+	logQ4("0-3 ", art.Q4FTAMargin0to3)
+	logQ4("4-7 ", art.Q4FTAMargin4to7)
+	logQ4("8-15", art.Q4FTAMargin8to15)
+	logQ4("16+ ", art.Q4FTAMargin16plus)
+
+	// J17c (doForcedMakeMax pinned to 10, objdump 2026-07-20): the winner≥loser
+	// direction for margin≥4 is now a HARD gate (was logged-only pending the pin —
+	// see jsb-native/re-artifacts/jsb-J17-forcing-gate-RE-20260720.md). Measured at
+	// bound 10 the per-bucket effect is monotone in margin: +0.09 (4-7), +0.23
+	// (8-15), +0.46 (16+) — logged above per bucket. The HARD gate pools all three
+	// margin≥4 buckets into one games-weighted comparison rather than asserting the
+	// thin 4-7 bucket alone (+0.09 ≈ 2 SE, could dip negative at another seed); the
+	// pooled effect draws on ~all margin≥4 games and is robustly positive. The
+	// margin 0-3 bucket is intentionally NOT included: in tight games the trailing
+	// team fouls to extend, so loser≥winner there is the expected direction.
+	poolWinner := q4m4to7.winnerTotal + q4m8to15.winnerTotal + q4m16plus.winnerTotal
+	poolLoser := q4m4to7.loserTotal + q4m8to15.loserTotal + q4m16plus.loserTotal
+	poolGames := q4m4to7.games + q4m8to15.games + q4m16plus.games
+	if poolGames > 0 {
+		pw := float64(poolWinner) / float64(poolGames)
+		pl := float64(poolLoser) / float64(poolGames)
+		if pw < pl {
+			t.Errorf("Q4 FTA margin≥4 (pooled): winner=%.2f < loser=%.2f (%d games) — "+
+				"expected winner≥loser for margin≥4 (J4 corpus)", pw, pl, poolGames)
+		}
+	}
+
 	// --- Machine-verifiable gates (J24 matchupQuality Phase 3/4) ---
 	// FG% band [47.5%, 48.9%] is now CLOSED and asserted. The closer is the J26
 	// faithful +0xD58 penalty-minutes port (re-artifacts/jsb-J26-penalty-minutes-
@@ -212,6 +339,9 @@ func TestEndingMixBaseline(t *testing.T) {
 	// drift when future work makes the matchupQuality flow term live.
 	assertBand(t, "steal share%", art.StealSharePct, 8.0, 9.0)
 	assertBand(t, "indep-TO share%", art.TOIndSharePct, 4.4, 5.4)
+	// J17: foul-only endings increase from trailing-by-3 crunch-time shotClock.
+	// Pre-J17 baseline 33.68/g (2026-07-19 artifact, stride=10). Band: +3.5/g max.
+	assertBand(t, "fta/game", art.FTAPerGame, 33.0, 37.2)
 }
 
 // assertBand fails the test if val is outside [lo, hi]. Used as a hard

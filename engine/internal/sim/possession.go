@@ -105,6 +105,56 @@ const (
 	possDRB                       // ended in a defensive rebound -> arms DRB push (step 2-4, Phase 4)
 )
 
+// doForcedMakeMax is the rand_int upper bound for Mechanism 2B (forced-make DO check).
+// 5.60 source: FUN_0047f5a0() (rand_int) at possession_handler_RAW.c:224.
+//
+// PINNED (J17c, objdump of jsb_560/app/jumpshot.exe, 2026-07-20): the rand_int
+// argument is `pushl $0xa` at VA 0x4d87fc — the sole argument feeding the
+// `calll 0x47f5a0` at 0x4d881c — so the bound is 10, NOT the earlier 120 estimate.
+// rand_int returns [1,bound] (FUN_0047f5a0 = __ftol(rand()) + 1), so Go's
+// rng.IntN(10)+1 ∈ [1,10] is byte-faithful. The gate at 0x4d8821 (`cmpl %edi,%eax`;
+// edi=bh.DriveOff, eax=rand) sets forcedMake (movb $0x1,0x16(%esp) at 0x4d8825)
+// when DriveOff < rand. Full derivation: jsb-native/re-artifacts/
+// jsb-J17-forcing-gate-RE-20260720.md. DriveOff is a small-integer rating
+// (~[0,13]), so at bound 10 the mechanism is selective (fires only for low-DO
+// handlers) rather than near-always as the 120 estimate produced.
+const doForcedMakeMax = 10
+
+// lateGameForcing returns (forcedMake, shotClock) flags for a half-court crunch-time
+// possession per 5.60's game-state foul-coupling mechanisms.
+//
+// Mechanism 1 (param_8 clock-expiry, J5-pinned): clock < 4 → shotClock.
+// Mechanism 2A (trailing-by-3): Q4+, clock < 25, scoreDiff == -3 → shotClock.
+//
+//	Trailing offense heaves a 3 to tie, or gets fouled for 2 FTs by leading defense.
+//
+// Mechanism 2B (leading-by-1-3): Q4+, clock < 25, scoreDiff ∈ [1,3],
+//
+//	bh.DriveOff < rand_int(doForcedMakeMax) → forcedMake. Low-DO players fire more.
+//
+// scoreDiff = offense.score − defense.score (positive = offense leading).
+// Only the half-court possession path calls this; transition.go is unchanged.
+func (gs *gameState) lateGameForcing(scoreDiff int, bh onCourt) (forcedMake, shotClock bool) {
+	// Mechanism 1: clock expiry (fires regardless of period/margin)
+	if gs.clock < 4 {
+		shotClock = true
+		return
+	}
+	// Mechanisms 2A/2B: late-game crunch block (Q4 or OT, < 25 seconds)
+	if gs.period >= 4 && gs.clock < 25 {
+		switch {
+		case scoreDiff == -3:
+			shotClock = true
+		case scoreDiff >= 1 && scoreDiff <= 3:
+			// 5.60: local_15e=1 when bh.DriveOff < rand_int(max)
+			if bh.DriveOff < gs.rng.IntN(doForcedMakeMax)+1 {
+				forcedMake = true
+			}
+		}
+	}
+	return
+}
+
 // possession resolves one offensive trip: ball-handler selection, shot-type and
 // matchup resolution, the play-outcome path, and any free throws or rebounds.
 // Offensive rebounds continue the trip; a made shot, defensive rebound, or
@@ -232,7 +282,8 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 			turnoverDefValue: energyCeiling(bh),
 		}
 
-		switch selectOutcome(in, false, false, false, gs.rng) {
+		fm, sc := gs.lateGameForcing(scoreDiff, bh)
+		switch selectOutcome(in, fm, sc, false, gs.rng) {
 		case outcome2pt:
 			if made, _ := gs.shotAttempt(offense, defense, bh, sv2, result.ShotTwoPoint, origin, periodIdx); !made {
 				gs.creditBlock(offense, defense, bh, def)

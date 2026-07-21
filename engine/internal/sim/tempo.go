@@ -75,9 +75,15 @@ const (
 // 5.60 redraws ONCE into {3..23} via r.IntN(21)+3; that single redraw may
 // land back on trunc(pt) again — faithful to the binary, which does not loop.
 //
-// OPEN RE SUB-STEP: the binary also gates this redraw on a CEngine+0x30 flag
-// whose writer has not been identified; this port defaults it false (the
-// forced-redraw path is off) until that flag's source is traced.
+// OPEN RE SUB-STEP: the binary also gates this redraw on a CEngine+0x30 flag.
+// The WRITER is now identified (J17b, objdump 2026-07-20, jsb-native/re-artifacts/
+// jsb-J17-forcing-gate-RE-20260720.md): three direct movb $imm8,0x30(esi) sites
+// at VA 0x4d88a0/0x4d88cf (=1 when the possessing team is leading and forcedMake
+// is off) and 0x4d88d5 (=0 default). The READER (this quick-redraw path) is still
+// unported and this port defaults the flag false — porting it changes the late-
+// game pace model, so it is DEFERRED to J24 (same surface as J24 residual (2)) to
+// be designed + re-validated against the pace gates alongside the fast-class
+// share gap. See the NO-GO block above.
 func possessionTime(baseTime float64, r *rng.RNG) int {
 	pt := (2.0 - tempoFactor) * baseTime
 	if pt < 1.0 || pt > 24.0 {

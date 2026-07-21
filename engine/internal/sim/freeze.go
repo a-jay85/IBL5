@@ -156,22 +156,23 @@ func (a *BranchBAccum) MeanS() float64 {
 }
 
 // FastClassAccum accumulates per-class possession-step counts across all games
-// in a run. StealClass counts possessions whose step was drawn from the steal-
-// transition class ({0,1,2}s, J24 Phase 3); DRBPushClass counts the DRB-push
-// class ({2,3,4}s, J24 Phase 4); HalfCourt counts the half-court jitter class
+// in a run. DRBPushClass counts the code-7 {2,3,4}s class — gated fast-break
+// survivors from BOTH steal-sourced AND DRB-sourced possessions (J24 §1d: the
+// 5.60 binary routes steal and DRB survivors through the SAME code-7 clock step,
+// so they share one counter); HalfCourt counts the half-court jitter class,
+// which now also absorbs steal-armed possessions that FAIL the Stage-2 gate
 // (J24 Phase 2). TotalPossessions is the exhaustive cross-check sum —
-// StealClass + DRBPushClass + HalfCourt must equal TotalPossessions and the
-// game's EventPossessionStart count.
+// DRBPushClass + HalfCourt must equal TotalPossessions and the game's
+// EventPossessionStart count.
 //
 // The caller owns it (passed via Options.FastClassAccum), shares ONE instance
 // across every game in a run, and reads the counters after the pass. The
 // instrument issues NO rng draw and alters no game decision, so attaching it
 // stays byte-identical to a plain run. NOT concurrency-safe.
 type FastClassAccum struct {
-	StealClass       int // possessions routed through the steal-transition class
-	DRBPushClass     int // possessions routed through the DRB-push class
-	HalfCourt        int // possessions routed through the half-court jitter class
-	TotalPossessions int // sum of all three — exhaustive cross-check
+	DRBPushClass     int // code-7 {2,3,4}s gated survivors (steal- AND DRB-sourced)
+	HalfCourt        int // half-court jitter class (incl. steal-armed gate failures)
+	TotalPossessions int // DRBPushClass + HalfCourt — exhaustive cross-check
 }
 
 // GateContAccum harvests the L1 gate-1 decomposition instrument (ADR-0057/0058),

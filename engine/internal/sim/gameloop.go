@@ -121,44 +121,53 @@ func simGameWith(b bundle.Bundle, g bundle.Game, r *rng.RNG, opts Options) (resu
 			outcome := possession(gs, offense, defense, period-1, prevOutcome)
 
 			// Per-possession step draw, routed by prevOutcome (the outcome that
-			// armed THIS possession) and, for the DRB-push class, gs.drbPushFired
-			// (set by THIS iteration's possession() call above — see its
-			// docblock and state.go's drbPushFired field comment):
-			//   - possSteal: the possession followed a steal → FAST {0,1,2}s
-			//     class (J24 Phase 3). LABEL CORRECTION (RE re-derived
-			//     2026-07-17, jsb-J24-arming-share-RE): FUN_004e42e0's {0,1,2}s
-			//     class is the OREB quick-putback class (param_2==1, reached
-			//     only from the rebound handler); a steal-sourced break is
-			//     faithfully a code-7 transition PUSH ({2,3,4}s) — the same
-			//     class as a DRB push, since the arming flag (CEngine+0x4be4)
-			//     is set unconditionally by steals. Routing steals to {0,1,2}s
-			//     here is therefore a known unfaithful stand-in (the J24 §1d
-			//     wrong-class residual — jsb-native-backlog / ADR-0085), to be
-			//     corrected by the arming-share port, not by this comment.
+			// armed THIS possession) and the per-possession gate flags
+			// gs.drbPushFired / gs.stealPushFired (set by THIS iteration's
+			// possession() call above — see its docblock and state.go's field
+			// comments):
+			//   - possSteal AND gs.stealPushFired: the possession followed a
+			//     steal AND the Stage-2 transitionTriggers gate fired (captured
+			//     once in possession() as gs.stealPushFired — §1d faithful per
+			//     jsb-J24-arming-share-RE-20260717.md: the 5.60 binary arms
+			//     +0x4be4 unconditionally for steals and runs the SAME gate as
+			//     DRB) → code-7 {2,3,4}s, counted in DRBPushClass alongside
+			//     DRB survivors (steal and DRB survivors share code 7).
+			//   - possSteal AND NOT gs.stealPushFired: gate failed → half-court
+			//     step (same as a failed-DRB possession).
 			//   - prevOutcome == possDRB AND gs.drbPushFired: the possession
-			//     followed a defensive rebound AND the shared Stage-2 gate
-			//     (drawn once inside possession(), never re-drawn here — see
-			//     possession.go's fbPending branch) fired → transition-push
-			//     class, {2,3,4}s (FUN_004e42e0 code 7, J24 Phase 4,
-			//     strategy_adj=0 — see transition.go's transitionTriggers
-			//     docblock). Faithfully this code-7 class is steal- OR
-			//     DRB-sourced; the engine currently reaches it only via DRB
-			//     (steals mis-route to {0,1,2}s — see the possSteal note above).
-			//   - default (possNormal, or possDRB with the gate failed):
+			//     followed a defensive rebound AND the shared Stage-2 gate fired
+			//     → transition-push class, {2,3,4}s (FUN_004e42e0 code 7, J24
+			//     Phase 4, strategy_adj=0 — see transition.go's transitionTriggers
+			//     docblock). Steal and DRB survivors both count in DRBPushClass.
+			//   - default (possNormal, possDRB or possSteal with gate failed):
 			//     half-court jittered step (J24 Phase 2).
 			//
 			// Ordering note: possession() (called above, this same iteration)
-			// already read prevOutcome==possDRB to decide whether to capture
-			// gs.drbPushFired, so the flag reflects exactly the possession
-			// whose step is being drawn here — no additional offset beyond the
-			// existing one documented above.
+			// already read prevOutcome to decide which flag to capture, so both
+			// flags reflect exactly the possession whose step is being drawn
+			// here — no additional offset beyond the existing one documented above.
 			var step int
 			switch {
 			case prevOutcome == possSteal:
-				step = r.IntN(3) // {0,1,2}s (FUN_004e42e0's OREB-putback class per corrected RE; steals mis-routed here — J24 §1d wrong-class stand-in)
-				if gs.fastClass != nil {
-					gs.fastClass.StealClass++
-					gs.fastClass.TotalPossessions++
+				// §1d faithful: steal-armed possessions run the SAME Stage-2
+				// transitionTriggers gate as DRB (captured once in possession()
+				// as gs.stealPushFired). Gate pass → code-7 {2,3,4}s, counted in
+				// DRBPushClass alongside DRB survivors (steal & DRB survivors share
+				// code 7 in the 5.60 binary). Gate fail → half-court step. The old
+				// unconditional r.IntN(3) StealClass routing was the J24 §1d
+				// wrong-class stand-in and is removed.
+				if gs.stealPushFired {
+					step = r.IntN(3) + 2 // code-7 {2,3,4}s (steal-sourced, gated — §1d faithful)
+					if gs.fastClass != nil {
+						gs.fastClass.DRBPushClass++
+						gs.fastClass.TotalPossessions++
+					}
+				} else {
+					step = possessionTime(baseTime, r) // gate failed → half-court
+					if gs.fastClass != nil {
+						gs.fastClass.HalfCourt++
+						gs.fastClass.TotalPossessions++
+					}
 				}
 			case gs.drbPushFired:
 				step = r.IntN(3) + 2 // DRB push (code 7): {2,3,4}s

@@ -148,20 +148,15 @@ func TestPossessionCountLoopPin_Current(t *testing.T) {
 			t.Errorf("seed %d: per-team possession ratio implausible: %v", seed, byTeam)
 		}
 		// Permanent invariant: total possessions per game in an NBA-plausible
-		// band. RE-BASELINED for the J24 Phase 5 NO-GO re-center (tempo.go
-		// baseTimeMid 13.65 -> 17.7): the slower half-court jittered step
-		// (mean ~17.46s vs ~13.63s, Pin A) pulls possession COUNT back down
-		// substantially even with the fast steal/DRB-push classes still live.
+		// band. RE-BASELINED for J24 §1d steal-gating partition: steal-armed
+		// gate-FAIL possessions (≈65% of steal-followed possessions) switch from
+		// r.IntN(3) ∈ {0,1,2}s (mean 1s) to possessionTime() ∈ [3,27]s (mean
+		// ~17.46s), a much longer drain that reduces total possessions per game.
 		// Measured directly (seeds 1-40, richBundle): total possessions/game
-		// ranged [204,236]; a 200-seed sweep of the same fixture (not part of
-		// this pin, ad hoc verification) ranged [195,254]. [150,340] no longer
-		// brackets this range tightly, so it's TIGHTENED to [180,300]: floor
-		// 180 keeps headroom below the observed 195-204 low end, ceiling 300
-		// keeps ~46 possessions of headroom above the observed 236-254 high
-		// end for an overtime game (rare in these sweeps) or a double-OT game
-		// (very rare) — a further re-baseline past 300 would not be a bug.
-		if total < 180 || total > 300 {
-			t.Errorf("seed %d: total possessions %d outside plausible [180,300]", seed, total)
+		// ranged [178,218]; floor LOWERED from 180 to 160 to provide headroom
+		// below the observed 178, ceiling unchanged at 300 for overtime games.
+		if total < 160 || total > 300 {
+			t.Errorf("seed %d: total possessions %d outside plausible [160,300]", seed, total)
 		}
 	}
 
@@ -215,8 +210,16 @@ func TestPossessionCountLoopPin_Current(t *testing.T) {
 	// 109.4 -> 104.4625. nonStealTurnover draws an unconditional Float64 per
 	// possession, shifting the RNG stream and altering subsequent step draws.
 	// Measured directly at seed=1..40 on richBundle: 104.4625.
+	//
+	// Re-baselined AGAIN for J24 §1d steal-gating partition: 104.4625 -> 97.9000.
+	// Steal-armed gate-FAIL possessions (≈65% of steal-followed) switch from
+	// r.IntN(3) ∈ {0,1,2}s (mean 1s) to possessionTime() ∈ [3,27]s (mean ~17.46s).
+	// Gate-pass steal possessions keep r.IntN(3)+2 ∈ {2,3,4}s (mean 3s, same draw
+	// count as before). Since steals are a common turnover source (ADR-0045), the
+	// gate-fail path's longer draw pulls mean step UP and possession count DOWN
+	// substantially — measured directly at seed=1..40 on richBundle: 97.9000.
 	const (
-		center = 104.4625
+		center = 97.9000
 		band   = 3.0
 	)
 	if math.Abs(mean-center) > band {

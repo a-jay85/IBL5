@@ -3,11 +3,10 @@
 // J24 fast-class arming-share diagnostic over the REAL ~53 GB JSB backup archive.
 //
 // Measures what fraction of possessions route through each J24 step class
-// (steal-transition {0,1,2}s, DRB-push {2,3,4}s, half-court jitter). This is
-// the instrument for closing the J24 Phase 5 NO-GO residual: the engine arms
-// fast classes at ~29% of possessions vs real ~11.5% (~24 transition markers /
-// ~209 possessions per game). No assertion failure — the test logs shares and
-// writes a dated artifact for human interpretation.
+// (DRBPushClass = merged code-7 {2,3,4}s gated survivors from steal- AND
+// DRB-sourced fast breaks per §1d; HalfCourt = half-court jitter). No assertion
+// failure — the test logs shares and writes a dated artifact for human
+// interpretation. Gate-1 target band: DRBPushSharePct ∈ [12.94, 13.41].
 //
 // Reuses listZipsP0, readSnapshotP0, envIntP0 from
 // possessionclock_baseline_archive_test.go (same package sim, same build tag).
@@ -43,14 +42,14 @@ type fastClassShareArtifact struct {
 	Seed              uint64  `json:"seed"`
 	Snapshots         int     `json:"snapshots"`
 	TotalPossessions  int     `json:"total_possessions"`
-	StealClass        int     `json:"steal_class"`
 	DRBPushClass      int     `json:"drb_push_class"`
 	HalfCourt         int     `json:"half_court"`
-	StealSharePct     float64 `json:"steal_share_pct"`
 	DRBPushSharePct   float64 `json:"drb_push_share_pct"`
 	HalfCourtSharePct float64 `json:"half_court_share_pct"`
-	// J24 residual: StealSharePct + DRBPushSharePct should approach ~11.5%.
-	// Current engine (J24 Phase 5 NO-GO): ~29% — arming-share gap to close.
+	// J24 gate-1 share: DRBPushSharePct is the single band-comparable code-7 share
+	// (gated {2,3,4}s survivors, steal- AND DRB-sourced merged per §1d). Target
+	// band [12.94, 13.41]. Expected post-merge ≈ 12.3–12.5% — marginally under the
+	// floor (scope-honest: this ships "gate-1 becomes band-comparable," not GO).
 }
 
 func TestFastClassArmingShareBaseline(t *testing.T) {
@@ -93,7 +92,6 @@ func TestFastClassArmingShareBaseline(t *testing.T) {
 			if _, err := SimulateWith(b, seed+uint64(run), Options{FastClassAccum: acc}); err != nil {
 				continue
 			}
-			total.StealClass += acc.StealClass
 			total.DRBPushClass += acc.DRBPushClass
 			total.HalfCourt += acc.HalfCourt
 			total.TotalPossessions += acc.TotalPossessions
@@ -112,10 +110,8 @@ func TestFastClassArmingShareBaseline(t *testing.T) {
 		Seed:              seed,
 		Snapshots:         snapshots,
 		TotalPossessions:  total.TotalPossessions,
-		StealClass:        total.StealClass,
 		DRBPushClass:      total.DRBPushClass,
 		HalfCourt:         total.HalfCourt,
-		StealSharePct:     100 * float64(total.StealClass) / tot,
 		DRBPushSharePct:   100 * float64(total.DRBPushClass) / tot,
 		HalfCourtSharePct: 100 * float64(total.HalfCourt) / tot,
 	}
@@ -133,11 +129,9 @@ func TestFastClassArmingShareBaseline(t *testing.T) {
 
 	t.Logf("J24 FAST-CLASS ARMING-SHARE BASELINE (%d snapshots, %d runs, stride %d):",
 		snapshots, runs, stride)
-	t.Logf("  steal-class share:    %.2f%% (%d possessions)",
-		art.StealSharePct, total.StealClass)
 	t.Logf("  DRB-push-class share: %.2f%% (%d possessions)",
 		art.DRBPushSharePct, total.DRBPushClass)
 	t.Logf("  half-court share:     %.2f%% (%d possessions)",
 		art.HalfCourtSharePct, total.HalfCourt)
-	t.Logf("  J24 residual target: steal+DRB-push ≈ 11.5%% (current engine ~29%% — arming-share gap)")
+	t.Logf("  J24 gate-1 band: DRBPushSharePct target [12.94, 13.41]%% (merged code-7 share)")
 }

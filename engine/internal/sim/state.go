@@ -140,6 +140,23 @@ type gameState struct {
 	// iteration or a non-DRB-armed possession.
 	drbPushFired bool
 
+	// stealPushFired reports, for the possession about to be stepped, whether the
+	// Stage-2 transitionTriggers gate fired on a STEAL-armed possession (prev ==
+	// possSteal) THIS iteration. It is the steal-side twin of drbPushFired: the
+	// J24 §1d RE (jsb-native/re-artifacts/jsb-J24-arming-share-RE-20260717.md)
+	// proves the 5.60 binary arms the SAME +0x4be4 flag for steals as for DRB and
+	// runs ONE transitionTriggers gate on the next possession — pass → code 7 →
+	// {2,3,4}s clock step; fail → half-court. possession() captures this gate
+	// result ONCE (in its fbPending branch — the same draw that decides whether
+	// the possession runs as a transition break) rather than gameloop.go
+	// re-evaluating transitionTriggers, which would draw a second (starter-pick,
+	// rand_int(18)) pair and desync the step class from the run decision.
+	// gameloop.go reads this flag to route the steal-sourced code-7 clock step
+	// ({2,3,4}s) vs the half-court step. Reset to false at the top of EVERY
+	// possession() call so a stale true never leaks into a later iteration or a
+	// non-steal-armed possession.
+	stealPushFired bool
+
 	// transitions counts fast-break possessions that actually fired this game
 	// (Stage 2 and Stage 3 both passed). It is internal observability for tests;
 	// it is never serialized into the result contract.

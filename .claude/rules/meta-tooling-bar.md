@@ -1,6 +1,10 @@
 ---
 description: Before adding a new hook, CI gate, workflow, or bin/ script, first ask whether an existing one can be extended; quarterly cull retires dead meta-tooling.
-last_verified: 2026-07-09
+last_verified: 2026-07-21
+paths:
+  - "bin/**"
+  - ".github/workflows/**"
+  - ".claude/**"
 ---
 
 # Meta-Tooling Bar

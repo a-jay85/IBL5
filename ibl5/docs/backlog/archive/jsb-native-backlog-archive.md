@@ -190,3 +190,33 @@ Dated measurement log, moved verbatim from `jsb-native-backlog.md` 2026-07-21 (t
 **Status update (2026-07-21, steal-gating partition SHIPPED — j24-steal-gating-partition PR):** J24 residual (1) partition is **complete.** The §1d-faithful merge landed: steal-armed possessions now run the SAME single `transitionTriggers` gate as DRB (captured once in `possession()` as `gs.stealPushFired`), gate survivors route to the code-7 `{2,3,4}s` class alongside DRB survivors, gate failures fall to half-court. The unfaithful ungated `{0,1,2}s` steal routing (§1d wrong-class stand-in) is removed. `StealClass` is deleted from `FastClassAccum` (`freeze.go`); `DRBPushClass` is now the single band-comparable code-7 quantity, aggregating steal- AND DRB-sourced gated survivors. Archive diagnostic (Phase 9, local-only): `DRBPushSharePct` expected ≈**12.3–12.5%**, marginally UNDER the gate-1 band floor `[12.94, 13.41]`. **Gate-1 is now measurable/band-comparable on master but STILL NO-GO (under floor)** — scope shipped is "legible," not "GO"; no constant was tuned toward the band. **Residual lever (open):** the under-floor gap is armed-fraction + on-court-`TransOff` composition (real recent armed ~41.1% vs engine ~37.58%; on-court-5 mean picked TransOff ~6.15 vs engine ~5.658) — already decomposed in `jsb-native/re-artifacts/jsb-J24-armed-transoff-RE-20260719.md`; gate-1 re-adjudication pends the Phase 9 archive diagnostic. `TestGolden` rebased (steal-follower clock steps shifted); `TestDeterminism` unaffected. `TestStealClassStepRange` and `TestPossessionCountLoopPin_Current` re-baselined for the new routing (steal-gate-fail path now draws `possessionTime` instead of `r.IntN(3)`). Residual (1) status: **partition complete; gate-1 re-adjudication pending archive diagnostic.**
 
 **Status update (2026-07-20, Phase 9 diagnostic MEASURED — NO-GO CONFIRMED at 12.37%):** re-ran `TestFastClassArmingShareBaseline` (`-tags archive`) on merged master (`84ff51085`), recent-era 05-08 (98 zips), stride 1 / runs 4 / seed 20240601 / `baseTimeMid` 17.7 / 97 snapshots / 85.77M possessions: **`DRBPushSharePct` = 12.37%** (10,608,830 code-7 / 75,158,396 half-court). Band floor 12.94 → **0.57pp UNDER, gate-1 NO-GO stands** (lands at the low end of the ~12.3–12.5% projection). The §1d partition did its job — code-7 is a single band-comparable quantity now instead of the 9.48%/18.44% split — but the share sits just under the floor. Gate-1 remains the SOLE cut-over blocker; the residual −0.57pp is the armed-fraction / on-court-`TransOff` lever (RE `jsb-J24-armed-transoff-RE-20260719.md`). The regenerated `engine/internal/validate/testdata/calibration-5.60-*-fastclass-share.json` was reverted (measurement-only; the committed one is a stale stride-100/8-snap all-era sample still showing the pre-partition `steal_class` split — refresh separately). Residual (1) status: **partition complete; gate-1 re-adjudicated NO-GO (12.37% < 12.94); next = armed-fraction / on-court-TransOff lever.**
+
+---
+
+### Frontier-memory retirement (2026-07-21) — provenance snapshot + orphaned historical notes
+
+The `project_jsb_engine_frontier.md` memory (a hand-maintained hash ledger + FROZEN-LEGACY OPEN/NOT-A-LEVER blocks) was **eliminated 2026-07-21**: the backlog is now the single source of truth, and git is the authority for merged-PR hashes (`git log --all --grep '#<PR>'`). Its current-state content was already resident in the live backlog / this archive / the `project_j24_arming_share_nogo.md` memory. Four items lived *only* in the frontier and are preserved here (historical; a one-time snapshot, never maintained):
+
+**(a) Git-verified merged-PR hash ledger** (as of origin/master HEAD `134d88536`, git-verified 2026-07-21 — retained for provenance; regenerate any entry with `git log --all --grep '#<PR>' --oneline`):
+
+| PR | Merged commit | What shipped |
+|----|---------------|--------------|
+| #1551 | `134d88536` | J24 gate-1 band recent-era re-denomination (ADR-0088) → WITHIN-NOISE |
+| #1550 | `9139edf9b` | fatigue-sub energy-threshold recorded NOT-A-LEVER (docs-only) |
+| #1548 | `baeb0d371` | backlog/frontier split established (`jsb-engine-post-work.md`) |
+| #1547 | `84ff51085` | §1d steal-gating partition (`DRBPushClass` single band-comparable quantity) |
+| #1546 | `60859d61b` | post-PR4b NO-GO record (superseded by #1547/#1551) |
+| #1545 | `28d6733b6` | J14 AutoResearch eval-harness build (ADR-0087) |
+| #1544 | `7aeaf6faf` | FG% band CLOSED via `+0xD58` penalty-minutes port |
+| #1541 | `09412c81e` | Phase-4 usage-dominance flag pinned +0xD90, proven NOT-A-LEVER |
+| #1535 | `79e000203` | J24 PR4b TransOff-aware fatigue substitution |
+| #1519 | `6813bc225` | steal-split + faithful `shotValue2pt`/`shotValue3pt` |
+| #1520 | `3e2612d40` | shotdecision 3pt-doc divisor correction |
+| J13-2 | `6899910ea` (#1463) | per-player leaders validation instrument |
+| J22 | `cd110e1ad` (#1490) | real per-player `rl_stl`/`rl_tov` into defQ/offQ |
+
+**(b) `offVolumeScale` measured-NULL (NOT-A-LEVER, #1515 `7366b5bf8`):** the ADR-0054 count-axis variance lever was RETIRED after measuring **NULL / Var(lnFGA)-budget-blocked** — it cannot move the count-axis Cov. Distinct from the J20 decline (within-possession lever); do not re-attempt as a Cov carrier.
+
+**(c) spp-channel carriers ruled exhausted (June decomp):** the shots-per-possession structural carriers were RE'd faithful on both ends — transition **source** and OREB **sink** — verdict `/plan ON HOLD; next is judgment, NOT another spp-count RE`. The live descendants of that dispersion thread are the J-series → gate-1 arming share and J22 (shipped).
+
+**(d) #1520 shotdecision 3pt formula correction:** the `×1.5` at decompile `:94025` is the net **DIVISOR** (`baseline×1.5`), NOT the make value → `shotValue3pt = d80 + net×500/(baseline×1.5) + block`. The correction also lives in `engine/internal/sim/shotdecision.go`'s header and `00_MASTER_REFERENCE.md`.

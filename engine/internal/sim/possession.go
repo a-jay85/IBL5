@@ -125,6 +125,7 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 	// true from a prior possession never leaks into this one, including the
 	// empty-roster early return.
 	gs.drbPushFired = false
+	gs.stealPushFired = false
 	if len(offense.players) == 0 || len(defense.players) == 0 {
 		return possNormal
 	}
@@ -143,6 +144,9 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 		trig := transitionTriggers(offense, gs.gameType, gs.rng)
 		if prev == possDRB {
 			gs.drbPushFired = trig // DRB-push clock class (strategy_adj=0, J24 Phase 4)
+		}
+		if prev == possSteal {
+			gs.stealPushFired = trig // steal-sourced code-7 clock class (§1d faithful)
 		}
 		if trig && gs.transitionStealSucceeds(defense) {
 			return gs.runTransitionPossession(offense, defense, periodIdx)

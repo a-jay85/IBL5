@@ -7,15 +7,20 @@ import (
 	"github.com/a-jay85/IBL5/engine/internal/rng"
 )
 
-// --- J24 Phase 3: steal-transition step class -------------------------------
+// --- J24 §1d: steal-gating partition (faithful code-7 routing) --------------
 //
 // gameloop.go routes each possession's clock-drain step off the PRIOR
 // possession's possOutcome (possession.go): when the prior possession ended in
-// a steal (possSteal), THIS possession draws the FAST steal-transition class
-// r.IntN(3) ∈ {0,1,2}s instead of the half-court jittered possessionTime()
-// draw. These tests drive full games (Simulate) and reconstruct each
-// possession's step from consecutive EventPossessionStart clock values, so
-// they exercise the real gameloop.go routing rather than re-implementing it.
+// a steal (possSteal), THIS possession runs the SAME Stage-2 transitionTriggers
+// gate as a DRB-armed possession (captured once as gs.stealPushFired). Gate
+// pass → r.IntN(3)+2 ∈ {2,3,4}s (code-7 class, faithful per §1d RE);
+// gate fail → possessionTime() ∈ [3,27]s (half-court jitter). The union of
+// both outcomes is [2,27]. The old ungated {0,1,2}s steal-class routing was
+// the J24 §1d wrong-class stand-in and is removed.
+//
+// These tests drive full games (Simulate) and reconstruct each possession's
+// step from consecutive EventPossessionStart clock values, so they exercise
+// the real gameloop.go routing rather than re-implementing it.
 
 // possessionSegment is one possession's slice of the event stream: the events
 // from its EventPossessionStart (exclusive) up to (but not including) the next
@@ -61,13 +66,20 @@ func segmentOutcome(evs []result.Event) possOutcome {
 
 // TestStealClassStepRange drives many seeded full games and checks every
 // possession immediately following a steal-ending possession (same period)
-// drains the clock by a step in {0,1,2} — the FAST steal-transition class.
+// drains the clock by a step in [2,27] — the union of the gate-pass code-7
+// class {2,3,4}s (r.IntN(3)+2) and the gate-fail half-court jitter [3,27].
 //
 // One-iteration offset (matches gameloop.go): segs[i] ending in a steal arms
 // possSteal as the `prev` INPUT to segs[i+1]'s possession() call, and it is
 // THAT value which selects segs[i+1]'s OWN step (clock[i+1]-clock[i+2]) — not
-// segs[i]'s step. So the fast-class check below is offset by one segment from
+// segs[i]'s step. So the gating check below is offset by one segment from
 // the steal-ending segment.
+//
+// Updated for J24 §1d steal-gating partition (was: step ∈ {0,1,2} for the old
+// ungated steal class). The {0,1} steps are now unreachable for steal-following
+// possessions — step==2 is the LOWEST possible value (r.IntN(3)+2 min when the
+// gate passes). Their absence would not be observable from the range check alone,
+// but the step==2 liveness guard below asserts the gate-pass path fires.
 func TestStealClassStepRange(t *testing.T) {
 	b := richBundle()
 	var stealFollowSteps int
@@ -83,22 +95,37 @@ func TestStealClassStepRange(t *testing.T) {
 				continue
 			}
 			// segs[i] ended in a steal -> segs[i+1] runs with fbPending=true and
-			// its OWN step (drained after it resolves) is the fast class.
+			// its OWN step (drained after it resolves) is either the gate-pass
+			// code-7 class or the gate-fail half-court jitter.
 			step := segs[i+1].clock - segs[i+2].clock
 			stealFollowSteps++
 			stepCounts[step]++
-			if step < 0 || step > 2 {
-				t.Fatalf("seed %d: possession following a steal drained %ds, want in {0,1,2}", seed, step)
+			if step < 2 || step > 27 {
+				t.Fatalf("seed %d: possession following a steal drained %ds, want in [2,27] (union of gate-pass {2,3,4} and gate-fail half-court [3,27])", seed, step)
 			}
 		}
 	}
 	if stealFollowSteps == 0 {
 		t.Fatal("no steal-followed possessions observed over the seed sweep")
 	}
-	// The support should show real mass at more than one value across enough
-	// draws — otherwise the fast class isn't actually the r.IntN(3) draw.
-	if len(stepCounts) < 2 {
-		t.Errorf("steal-class step support too narrow: %v (want mass at multiple of {0,1,2})", stepCounts)
+	// Unambiguous gate-pass evidence: step==2 can ONLY come from r.IntN(3)+2
+	// (the code-7 gate-pass draw); possessionTime's floor is 3, so step==2
+	// is impossible on the gate-fail path. Its presence confirms the steal
+	// gate-pass class is reachable through gameloop.go's §1d routing.
+	if stepCounts[2] == 0 {
+		t.Error("never observed step==2 following a steal-ended possession — the §1d gate-pass code-7 class ({2,3,4}s) appears unreachable")
+	}
+	// Gate-fail evidence: steps beyond the code-7 ceiling (>4) can only come
+	// from possessionTime, confirming the gate-fail half-court path is also live.
+	var sawBeyondGatePass bool
+	for step := range stepCounts {
+		if step > 4 {
+			sawBeyondGatePass = true
+			break
+		}
+	}
+	if !sawBeyondGatePass {
+		t.Error("never observed a step >4 following a steal-ended possession — the gate-fail half-court path appears unreachable")
 	}
 	t.Logf("steal-followed possession step distribution over %d seeds: %v", 60, stepCounts)
 }

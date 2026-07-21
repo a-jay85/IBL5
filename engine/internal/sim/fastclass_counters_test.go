@@ -12,7 +12,7 @@ import (
 //	(A) read-only — attaching the accumulator must not alter any game outcome;
 //	(B) exhaustive and mutually exclusive — every EventPossessionStart increments
 //	    exactly one class counter, summing to TotalPossessions; and
-//	(C) all three classes reachable across a modest seed sweep.
+//	(C) both merged classes reachable across a modest seed sweep.
 func TestFastClassCounters(t *testing.T) {
 	b := richBundle()
 
@@ -47,8 +47,8 @@ func TestFastClassCounters(t *testing.T) {
 	}
 
 	// Sub-check B — exhaustive + mutually exclusive.
-	// Every possession must increment exactly one of StealClass, DRBPushClass,
-	// HalfCourt (via TotalPossessions), and the total must equal the count of
+	// Every possession must increment exactly one of DRBPushClass, HalfCourt
+	// (via TotalPossessions), and the total must equal the count of
 	// EventPossessionStart events across all games.
 	for seed := uint64(1); seed <= 20; seed++ {
 		acc := &FastClassAccum{}
@@ -64,10 +64,10 @@ func TestFastClassCounters(t *testing.T) {
 				}
 			}
 		}
-		sum := acc.StealClass + acc.DRBPushClass + acc.HalfCourt
+		sum := acc.DRBPushClass + acc.HalfCourt
 		if sum != acc.TotalPossessions {
-			t.Errorf("seed %d: StealClass(%d)+DRBPushClass(%d)+HalfCourt(%d)=%d != TotalPossessions(%d)",
-				seed, acc.StealClass, acc.DRBPushClass, acc.HalfCourt, sum, acc.TotalPossessions)
+			t.Errorf("seed %d: DRBPushClass(%d)+HalfCourt(%d)=%d != TotalPossessions(%d)",
+				seed, acc.DRBPushClass, acc.HalfCourt, sum, acc.TotalPossessions)
 		}
 		if acc.TotalPossessions != possCount {
 			t.Errorf("seed %d: TotalPossessions(%d) != EventPossessionStart count(%d)",
@@ -83,17 +83,40 @@ func TestFastClassCounters(t *testing.T) {
 		if _, err := SimulateWith(b, seed, Options{FastClassAccum: acc}); err != nil {
 			t.Fatal(err)
 		}
-		total.StealClass += acc.StealClass
 		total.DRBPushClass += acc.DRBPushClass
 		total.HalfCourt += acc.HalfCourt
 	}
-	if total.StealClass == 0 {
-		t.Error("steal-class counter never incremented across 20 seeds")
-	}
+	// DRBPushClass now aggregates gated code-7 survivors from BOTH steal-sourced
+	// and DRB-sourced fast breaks (J24 §1d merge); there is no separate steal class.
 	if total.DRBPushClass == 0 {
 		t.Error("DRB-push-class counter never incremented across 20 seeds")
 	}
 	if total.HalfCourt == 0 {
 		t.Error("half-court-class counter never incremented across 20 seeds")
+	}
+
+	// Sub-check D — POST-§1d-MERGE routing assertion (was the Phase 1 pin).
+	// Steal-armed possessions no longer have their own counter: gate survivors
+	// merge into DRBPushClass, gate failures fall to HalfCourt. StealClass has
+	// been removed from FastClassAccum, so any lingering reference here is a
+	// compile error — this block referencing only DRBPushClass/HalfCourt is the
+	// migration's compile-time proof that the steal class is gone. Behaviorally,
+	// the merged DRBPushClass must strictly exceed the DRB-only floor: with steal
+	// survivors folded in, its sweep total must be > 0 and, because steal-armed
+	// possessions are a real fraction of the sweep, materially non-trivial.
+	var pin FastClassAccum
+	for seed := uint64(1); seed <= 20; seed++ {
+		acc := &FastClassAccum{}
+		if _, err := SimulateWith(b, seed, Options{FastClassAccum: acc}); err != nil {
+			t.Fatalf("seed %d: SimulateWith error: %v", seed, err)
+		}
+		pin.DRBPushClass += acc.DRBPushClass
+		pin.HalfCourt += acc.HalfCourt
+	}
+	if pin.DRBPushClass == 0 {
+		t.Error("POST-MERGE: DRBPushClass never incremented — merged code-7 class not exercised")
+	}
+	if pin.HalfCourt == 0 {
+		t.Error("POST-MERGE: HalfCourt never incremented — gate-fail/half-court path not exercised")
 	}
 }

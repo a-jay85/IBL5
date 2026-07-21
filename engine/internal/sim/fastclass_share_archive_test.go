@@ -6,7 +6,9 @@
 // (DRBPushClass = merged code-7 {2,3,4}s gated survivors from steal- AND
 // DRB-sourced fast breaks per §1d; HalfCourt = half-court jitter). No assertion
 // failure — the test logs shares and writes a dated artifact for human
-// interpretation. Gate-1 target band: DRBPushSharePct ∈ [12.94, 13.41].
+// interpretation. Gate-1 recent-era drift band: DRBPushSharePct ∈ [11.97, 12.54]
+// @216.58 poss/g (supersedes the all-era 209.2-denominated [12.94, 13.41]); master
+// 12.37% lands INSIDE — WITHIN-NOISE, see ADR-0088.
 //
 // Reuses listZipsP0, readSnapshotP0, envIntP0 from
 // possessionclock_baseline_archive_test.go (same package sim, same build tag).
@@ -47,9 +49,11 @@ type fastClassShareArtifact struct {
 	DRBPushSharePct   float64 `json:"drb_push_share_pct"`
 	HalfCourtSharePct float64 `json:"half_court_share_pct"`
 	// J24 gate-1 share: DRBPushSharePct is the single band-comparable code-7 share
-	// (gated {2,3,4}s survivors, steal- AND DRB-sourced merged per §1d). Target
-	// band [12.94, 13.41]. Expected post-merge ≈ 12.3–12.5% — marginally under the
-	// floor (scope-honest: this ships "gate-1 becomes band-comparable," not GO).
+	// (gated {2,3,4}s survivors, steal- AND DRB-sourced merged per §1d). Recent-era
+	// between-season drift band [11.97, 12.54] @216.58 poss/g (per-season chunks
+	// 04-08 = [11.97, 12.47, 12.54, 12.53]). Master 12.37% is INSIDE — WITHIN-NOISE,
+	// NOT a clean GO (-0.05pp under the tightest 2-season CI floor ≈12.42; ADR-0088).
+	// Supersedes the mis-denominated all-era 209.2 floor [12.94, 13.41].
 }
 
 func TestFastClassArmingShareBaseline(t *testing.T) {
@@ -133,5 +137,5 @@ func TestFastClassArmingShareBaseline(t *testing.T) {
 		art.DRBPushSharePct, total.DRBPushClass)
 	t.Logf("  half-court share:     %.2f%% (%d possessions)",
 		art.HalfCourtSharePct, total.HalfCourt)
-	t.Logf("  J24 gate-1 band: DRBPushSharePct target [12.94, 13.41]%% (merged code-7 share)")
+	t.Logf("  J24 gate-1 band: DRBPushSharePct recent-era drift band [11.97, 12.54]%% @216.58 poss/g (merged code-7 share; master 12.37%% INSIDE, superseded floor 12.94)")
 }

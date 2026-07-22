@@ -489,4 +489,14 @@ return [
     new SchemaAssertion('ibl_olympics_schedule', 'visitor_score'),
     new SchemaAssertion('ibl_olympics_schedule', 'home_teamid'),
     new SchemaAssertion('ibl_olympics_schedule', 'home_score'),
+
+    // Migration 155 — sim recap queue
+    new SchemaAssertion('ibl_sim_summaries', 'sim'),
+    new SchemaAssertion('ibl_sim_summaries', 'status'),
+    new SchemaAssertion('ibl_sim_summaries', 'recap_text'),
+    new SchemaAssertion('ibl_sim_summaries', 'themes_used'),
+    new SchemaAssertion('ibl_sim_summaries', 'claimed_at'),
+    new SchemaAssertion('ibl_sim_summaries', 'generated_at'),
+    new SchemaAssertion('ibl_sim_summaries', 'attempts'),
+    new SchemaAssertion('ibl_sim_summaries', 'blocked_until'),
 ];

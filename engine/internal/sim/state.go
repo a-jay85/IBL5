@@ -184,6 +184,7 @@ type gameState struct {
 	// possession.go) with the d80/net/block make-value components. Mirrors accum/fastClass:
 	// caller-owned, shared across a run's games, nil outside the 3pt-undershoot instrument.
 	threePtDiag *ThreePtDiagAccum
+	outcomeDiag *OutcomeDiagAccum
 
 	// gateCont, when non-nil, harvests the L1 gate-1 decomposition instrument
 	// (freeze.go accumulateGateCont, ADR-0057/0058): per offensive-rebound resolution,

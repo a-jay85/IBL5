@@ -281,6 +281,12 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 			foulOnlyWeight:   foulW,
 			turnoverDefValue: energyCeiling(bh),
 		}
+		if gs.outcomeDiag != nil {
+			// eligible3pt is false exactly when the OReb-continuation suppression zeroed
+			// threePtW above, matching selectOutcome's real path set.
+			elig := !(origin == result.OriginOffReb && !gs.freeze.UnfaithfulPutback)
+			gs.outcomeDiag.Add(twoPtW, threePtW, foulW, in.andOneWeight, elig, false /*transition*/, bh.RealLifeMIN == 0)
+		}
 
 		fm, sc := gs.lateGameForcing(scoreDiff, bh)
 		switch selectOutcome(in, fm, sc, false, gs.rng) {

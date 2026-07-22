@@ -163,6 +163,11 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 			foulOnlyWeight:   foulW,
 			turnoverDefValue: energyCeiling(bh),
 		}
+		if gs.outcomeDiag != nil {
+			// A fired fast break routes selectOutcome with threePtWeight==0 and stealPlay=true
+			// (allowedPaths excludes 3pt) — always suppressed, always transition.
+			gs.outcomeDiag.Add(twoPtW, 0, foulW, in.andOneWeight, false /*eligible3pt*/, true /*transition*/, bh.RealLifeMIN == 0)
+		}
 
 		switch selectOutcome(in, false, false, true, gs.rng) {
 		case outcome2pt:

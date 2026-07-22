@@ -159,6 +159,16 @@ Full detail: symmetric deterministic base `(2.0 − fatigue)·tovRate(bh)` (corr
 
 ---
 
+### J17 Game-state foul coupling port (param_8 desperation + late-game fouling)
+**Location:** `engine/internal/sim/possession.go` — `selectOutcome` half-court call site (`gameState.lateGameForcing`); `engine/internal/sim/lategame_test.go`; `engine/internal/sim/endingmix_share_archive_test.go` (FTA/g band + Q4 gate).
+**Problem (found by J2 session 1's corpus instrument):** real 5.60's home/away FTA split (22.04/19.30) **follows the winner, not the side** — home-won games 23.25/18.03, visitor-won 20.28/21.15; margin-banded edge monotone −3.2 → +7.3. The bulk of the real FTA asymmetry is game-state-coupled (trailing teams foul late), a mechanism the Go engine lacked entirely. Also a candidate contributor to the residual FTADisp gap (1.51 vs ~1.0) and thus J2's residual Cov.
+**Direction:** RE the game-state fouling surface (param_8 desperation pinned by J5; late-game intentional-foul trigger), then port + wire real shot-clock/margin state into the half-court call site. Acceptance: reproduce the corpus margin-banded FTA-edge curve; Q4 winner/loser FTA gate.
+**Status (2026-07-21):** ✅ Implemented — core port PR #1536. `gameState.lateGameForcing(scoreDiff, bh)` returns `(forcedMake, shotClock)`: Mechanism 1 (param_8 / J5-pinned) `clock < 4s` → shotClock; Mechanism 2A (Q4+, `clock < 25s`, `scoreDiff == -3`) → shotClock; Mechanism 2B (Q4+, `clock < 25s`, `scoreDiff ∈ [1,3]`, `bh.DriveOff < rand_int(doForcedMakeMax)+1`) → forcedMake. Wired at the half-court call site only; transition path unchanged (J5 pin). 15-row truth-table CI test (`TestLateGameForcing`); FTA/g `assertBand [33.0, 37.2]` (baseline 34.8 ✓); Q4 winner≥loser margin≥4 **hard gate**. 🧠 Opus (RE + verdict); ⚙️ Sonnet (port).
+**J17c — CLOSED (2026-07-20):** `doForcedMakeMax` PINNED to **10** (was a 120 estimate) via objdump of `jumpshot.exe` — `push 0xa` @VA 0x4d87fc feeds rand_int @0x4d881c returning [1,10], so Go `IntN(10)+1` is faithful; makes 2B selective (fires only for low-DriveOff handlers). Also proved `0x33e4` is the possessing-team index (not a strategy flag) → the possessor-relative scoreDiff structure has no fidelity gap. RE: `jsb-native/re-artifacts/jsb-J17-forcing-gate-RE-20260720.md` (machine-local).
+**J17b deferred to J24 residual (3):** Mechanism 2C (+0x30 pace/hurry flag) is **RE-done, port deferred**. The writer is three direct `movb $imm8,0x30(esi)` sites (0x4d88a0/0x4d88cf → 1 when the possessor leads & !forcedMake; 0x4d88d5 → 0) — the **same CEngine+0x30 surface as J24 residual (3)**; its reader / quick-redraw path is J24 pace territory. Porting the writer alone is a no-op, so J17b wires in when J24 lands the +0x30 reader. J17 is closed here; the +0x30 residual is tracked in J24 residual (3).
+
+---
+
 ### J24 Possession-clock subsystem port → gate-1 arming-share NO-GO (dated status log)
 
 Dated measurement log, moved verbatim from `jsb-native-backlog.md` 2026-07-21 (the live file keeps only the consolidated current-state block). Chronological; earliest first.

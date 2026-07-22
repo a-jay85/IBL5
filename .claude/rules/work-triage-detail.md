@@ -22,10 +22,10 @@ The prose routing guidance in `work-triage.md` is a judgment call, and judgment 
 
 ### Gate properties
 
-`~/.claude/hooks/plan-gate-edit.sh` § Check 1 enforces the ≥3-distinct-files rule by **denying** the Edit/Write tool call. Properties worth knowing:
+`~/.claude/hooks/plan-gate-edit.sh` § Check 1 enforces the ≥5-distinct-files rule by **denying** the Edit/Write tool call. The threshold is the hook's `SWEEP_LIMIT` constant — raised from 3 to 5 on 2026-07-22, once repo-scoping had removed the scratch-file false positives and 3 proved to bind on ordinary multi-file changes rather than on sweeps. The self-test reads `SWEEP_LIMIT` from the hook, so retuning it needs no test edit. Properties worth knowing:
 
 - **Sub-agent edits are exempt** (`agent_id` present in the PreToolUse payload). The delegate you spawn in response is never blocked — otherwise the gate would brick the delegation it exists to force. Note sub-agents share the parent's `session_id` *and* `transcript_path`, so `agent_id` is the only usable discriminator.
-- **Per user turn, not per session** (keyed on `prompt_id`). Three unrelated one-file edits across a long session are not a sweep and don't trip it.
+- **Per user turn, not per session** (keyed on `prompt_id`). A handful of unrelated one-file edits spread across a long session is not a sweep and doesn't trip it.
 - **Distinct files, not calls** — editing one file ten times counts once.
 - **Repo files only** — a path counts only when it resolves inside a git working tree; `/tmp` scratch and `~/.claude` hook/settings edits never accrue, so they can't push a later repo file over the line. A new file in a not-yet-created repo subdirectory still counts, because the check walks up to the nearest existing ancestor directory.
 - **Fails open** on a malformed payload; never blocks editing because a field was missing.

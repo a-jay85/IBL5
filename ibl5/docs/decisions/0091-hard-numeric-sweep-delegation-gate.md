@@ -1,9 +1,9 @@
 ---
-description: Batched main-thread edits are capped at a hard numeric ≥3-distinct-files-per-turn limit, enforced by a PreToolUse deny rather than a warning.
+description: Batched main-thread edits are capped at a hard numeric ≥5-distinct-repo-files-per-turn limit, enforced by a PreToolUse deny rather than a warning.
 last_verified: 2026-07-22
 ---
 
-# ADR-0091: Hard numeric sweep-delegation gate (≥3 files per turn)
+# ADR-0091: Hard numeric sweep-delegation gate (≥5 repo files per turn)
 
 **Status:** Accepted
 **Date:** 2026-07-22
@@ -14,7 +14,7 @@ last_verified: 2026-07-22
 
 ## Decision
 
-The **third distinct file** edited on the main thread within one user turn is the handoff point: route the remainder to one `subagent_type: "sonnet-4-6"` sub-agent. This is enforced, not documented — `~/.claude/hooks/plan-gate-edit.sh` § Check 1 **denies** the `Edit`/`Write` PreToolUse call (exit 2). The gate is scoped by four properties, the first three grounded in an empirical probe of the PreToolUse payload: sub-agent calls are exempt (they carry `agent_id`; main-thread calls do not), state is keyed per user turn on `prompt_id` rather than per session, the count is of distinct files rather than tool calls, and only paths that resolve inside a git working tree accrue (`/tmp` scratch and `~/.claude` hook/settings edits never count, so they cannot push a later repo file over the limit). It fails open on any malformed payload. The escape hatch is `touch /tmp/claude-sweep-override-<prompt_id>` (example), to be used out loud with a stated reason when the edits are genuinely entangled with the design.
+The **fifth distinct repo file** edited on the main thread within one user turn is the handoff point: route the remainder to one `subagent_type: "sonnet-4-6"` sub-agent. This is enforced, not documented — `~/.claude/hooks/plan-gate-edit.sh` § Check 1 **denies** the `Edit`/`Write` PreToolUse call (exit 2). The gate is scoped by four properties, the first three grounded in an empirical probe of the PreToolUse payload: sub-agent calls are exempt (they carry `agent_id`; main-thread calls do not), state is keyed per user turn on `prompt_id` rather than per session, the count is of distinct files rather than tool calls, and only paths that resolve inside a git working tree accrue (`/tmp` scratch and `~/.claude` hook/settings edits never count, so they cannot push a later repo file over the limit). It fails open on any malformed payload. The escape hatch is `touch /tmp/claude-sweep-override-<prompt_id>` (example), to be used out loud with a stated reason when the edits are genuinely entangled with the design.
 
 ## Alternatives Considered
 
@@ -28,11 +28,13 @@ The **third distinct file** edited on the main thread within one user turn is th
 
 - Positive: the routing rule is now unreadable-past. A denied tool call forces the delegation decision to be made explicitly.
 - Positive: the sub-agent exemption is load-bearing and locked in by test — the forced delegate is never itself blocked.
-- Negative: a legitimate multi-file design turn confined to the repo (for example authoring a rule doc, its detail companion, and an ADR together) still trips the gate and needs the override; `SWEEP_LIMIT` is a single constant if the threshold wants raising.
+- Negative: a legitimate design turn touching five or more repo files still trips the gate and needs the override. The threshold is the hook's `SWEEP_LIMIT` constant, retunable in one line; the self-test reads it from the hook rather than hard-coding it, so a change needs no test edit.
+
+**Threshold history.** Shipped at 3 on 2026-07-21, raised to **5** on 2026-07-22. Two things drove the raise: repo-scoping had already removed the scratch-file false positives that made 3 fire spuriously, and 3 proved to bind on ordinary coherent multi-file changes (a rule doc plus its detail companion plus an ADR is three files and one thought) rather than on the 18-file sweep the gate was built for. Five keeps the sweep case caught while leaving normal multi-file work unblocked.
 
 ## References
 
-- `.claude/rules/work-triage.md` — § "The hard trigger: ≥3 distinct files in one turn".
+- `.claude/rules/work-triage.md` — § "The hard trigger: ≥5 distinct files in one turn".
 - `.claude/rules/work-triage-detail.md` — § Hard trigger: full gate properties and the measured incident.
 - `.claude/rules/meta-tooling-bar.md` — the extend-before-add bar that placed this in an existing hook.
 - `~/.claude/hooks/plan-gate-edit.sh` § Check 1 — the enforcement (outside the repo tree).

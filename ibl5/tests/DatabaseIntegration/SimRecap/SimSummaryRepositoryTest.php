@@ -248,6 +248,46 @@ final class SimSummaryRepositoryTest extends DatabaseTestCase
         self::assertTrue($found, 'Malformed JSON must be returned as-is without throwing');
     }
 
+    // ── listAll() — the admin viewer index ─────────────────────────────────────
+
+    public function testListAllReturnsEveryRowNewestSimFirst(): void
+    {
+        $this->clearSummaries();
+        $this->repo->queuePendingIfAbsent(999001);
+        $this->repo->queuePendingIfAbsent(999003);
+        $this->repo->markDone(999003, 'Intro three.', 'Outro three.', 'Body three.', [], null);
+        $this->repo->queuePendingIfAbsent(999002);
+        $this->db->query("UPDATE `ibl_sim_summaries` SET `status` = 'failed' WHERE `sim` = 999002");
+
+        $rows = $this->repo->listAll();
+
+        self::assertCount(3, $rows);
+        self::assertSame([999003, 999002, 999001], array_map(
+            static fn (array $row): int => (int) $row['sim'],
+            $rows
+        ));
+    }
+
+    public function testListAllExposesRecapLengthWithoutTheBody(): void
+    {
+        $this->clearSummaries();
+        $this->repo->queuePendingIfAbsent(999003);
+        $this->repo->markDone(999003, 'Intro three.', 'Outro three.', 'Body three.', [], null);
+
+        $rows = $this->repo->listAll();
+
+        self::assertCount(1, $rows);
+        self::assertSame(11, (int) $rows[0]['recap_length']);
+        self::assertArrayNotHasKey('recap_text', $rows[0], 'The index must never load MEDIUMTEXT bodies');
+    }
+
+    public function testListAllReturnsAnEmptyArrayWhenNoRowsExist(): void
+    {
+        $this->clearSummaries();
+
+        self::assertSame([], $this->repo->listAll());
+    }
+
     // ── findGameRecaps tests ───────────────────────────────────────────────────
 
     public function testMarkDoneStoresGameRecapsInSortOrder(): void
@@ -333,6 +373,17 @@ final class SimSummaryRepositoryTest extends DatabaseTestCase
     }
 
     // ── Private helpers ────────────────────────────────────────────────────────
+
+    /**
+     * Migration 155 seeds one `done` row (MAX(ibl_sim_dates.sim)) into every
+     * migrated database, so any test asserting an exact row set must clear the
+     * table first. DELETE (not TRUNCATE) — TRUNCATE auto-commits in MySQL and
+     * would break DatabaseTestCase's per-test transaction rollback.
+     */
+    private function clearSummaries(): void
+    {
+        $this->db->query('DELETE FROM `ibl_sim_summaries`');
+    }
 
     /**
      * Build a minimal valid game recap array for markDone's $gameRecaps parameter.

@@ -62,6 +62,19 @@ INSERT INTO ibl_sim_dates (sim, start_date, end_date) VALUES
   (689, '2026-03-01', '2026-03-07');
 
 -- ============================================================
+-- Sim recap summaries (admin viewer — simSummaries.php)
+-- Cleared first: migration 155 seeds MAX(ibl_sim_dates.sim) as a
+-- done row with recap_text NULL, which would make the viewer's
+-- row count and newest-first assertions nondeterministic.
+-- ============================================================
+DELETE FROM ibl_sim_summaries;
+INSERT INTO ibl_sim_summaries (sim, status, recap_text, themes_used, attempts, generated_at, created_at) VALUES
+  (686, 'failed',  NULL, NULL, 2, NULL, '2026-02-08 09:00:00'),
+  (687, 'pending', NULL, NULL, 0, NULL, '2026-02-15 09:00:00'),
+  (688, 'done',    'Sim 688 recap: a wire-to-wire blowout behind a 41-point night from the rookie.', '["blowout","rookie"]', 1, '2026-02-22 10:05:00', '2026-02-22 09:00:00'),
+  (689, 'done',    'Sim 689 recap: the Cannons erased a nine-point fourth-quarter deficit to win by three.', '["comeback"]', 1, '2026-03-01 10:05:00', '2026-03-01 09:00:00');
+
+-- ============================================================
 -- Teams (28 real franchises + Free Agents)
 -- Only columns required by the app; others use table defaults.
 -- ============================================================

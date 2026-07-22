@@ -342,4 +342,22 @@ class SimSummaryRepository extends \BaseMysqliRepository
             $limit
         );
     }
+
+    /**
+     * Every recap row, newest sim first, for the admin viewer index.
+     *
+     * `recap_text` is deliberately excluded: the index renders metadata only,
+     * and the bodies are MEDIUMTEXT.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listAll(): array
+    {
+        $sql = "SELECT `sim`, `status`, `attempts`, `generated_at`, `created_at`,"
+            . " CHAR_LENGTH(`recap_text`) AS `recap_length`"
+            . " FROM `ibl_sim_summaries`"
+            . " ORDER BY `sim` DESC"; // @phpstan-ignore ibl.orderByMissingTiebreaker (sim is the PK of ibl_sim_summaries — inherently unique)
+        /** @var list<array<string, mixed>> */
+        return $this->fetchAll($sql);
+    }
 }

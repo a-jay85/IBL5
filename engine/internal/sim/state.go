@@ -180,6 +180,10 @@ type gameState struct {
 	// gameloop.go's step-routing switch — no rng draw, no state mutation beyond
 	// the counter fields. Internal, never serialized.
 	fastClass *FastClassAccum
+	// threePtDiag, when non-nil, receives one Add() per 3pt attempt (case outcome3pt,
+	// possession.go) with the d80/net/block make-value components. Mirrors accum/fastClass:
+	// caller-owned, shared across a run's games, nil outside the 3pt-undershoot instrument.
+	threePtDiag *ThreePtDiagAccum
 
 	// gateCont, when non-nil, harvests the L1 gate-1 decomposition instrument
 	// (freeze.go accumulateGateCont, ADR-0057/0058): per offensive-rebound resolution,

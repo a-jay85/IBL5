@@ -62,7 +62,7 @@ func simGameWith(b bundle.Bundle, g bundle.Game, r *rng.RNG, opts Options) (resu
 	visitor.drbRate, visitor.astRate = teamRates(b, g.VisitorTeamID)
 	home.drbRate, home.astRate = teamRates(b, g.HomeTeamID)
 
-	gs := &gameState{rng: r, gameType: g.GameType, madeFG: map[int]int{}, freeze: opts.Freeze, accum: opts.Accum, branchB: opts.BranchBAccum, gateCont: opts.GateCont, fastClass: opts.FastClassAccum}
+	gs := &gameState{rng: r, gameType: g.GameType, madeFG: map[int]int{}, freeze: opts.Freeze, accum: opts.Accum, branchB: opts.BranchBAccum, gateCont: opts.GateCont, fastClass: opts.FastClassAccum, threePtDiag: opts.ThreePtDiag}
 	// The L1 gate-1 baseline is league-constant, so resolve it ONCE per game. The live
 	// faithful ORB roll (gs.orebProb) reads gs.gateBaseline on EVERY run (ADR-0058), so
 	// this MUST populate unconditionally — a zero baseline biases the sqrt branch and

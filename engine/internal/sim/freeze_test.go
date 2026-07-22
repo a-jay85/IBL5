@@ -387,6 +387,140 @@ func TestGateCont_Accumulates(t *testing.T) {
 	}
 }
 
+// matrix row 2 — ThreePtDiagAccum.Add() with known inputs yields correct Pp means (‰→pp /10).
+func TestThreePtDiagAccum_Add(t *testing.T) {
+	a := &ThreePtDiagAccum{}
+	a.Add(400.0, -80.0, 20.0, true, 1.0, 340.0)  // first attempt — made (sv=340)
+	a.Add(380.0, -60.0, 10.0, false, 1.0, 330.0) // second attempt — missed (sv=330)
+	if a.Count != 2 {
+		t.Errorf("Count = %d, want 2", a.Count)
+	}
+	// MeanD80Pp: (400+380)/2 / 10 = 39.0
+	if got, want := a.MeanD80Pp(), 39.0; math.Abs(got-want) > 1e-12 {
+		t.Errorf("MeanD80Pp = %v, want %v", got, want)
+	}
+	// MeanNetTermPp: (-80-60)/2 / 10 = -7.0
+	if got, want := a.MeanNetTermPp(), -7.0; math.Abs(got-want) > 1e-12 {
+		t.Errorf("MeanNetTermPp = %v, want %v", got, want)
+	}
+	// MeanBlockTermPp: (20+10)/2 / 10 = 1.5
+	if got, want := a.MeanBlockTermPp(), 1.5; math.Abs(got-want) > 1e-12 {
+		t.Errorf("MeanBlockTermPp = %v, want %v", got, want)
+	}
+	// MadeCount = 1 (one made of two); MadePct = 50.0; MeanFatigue = 1.0.
+	if a.MadeCount != 1 {
+		t.Errorf("MadeCount = %d, want 1", a.MadeCount)
+	}
+	if got, want := a.MadePct(), 50.0; math.Abs(got-want) > 1e-12 {
+		t.Errorf("MadePct = %v, want %v", got, want)
+	}
+	if got, want := a.MeanFatigue(), 1.0; math.Abs(got-want) > 1e-12 {
+		t.Errorf("MeanFatigue = %v, want %v", got, want)
+	}
+	// MeanSvActualPp: (340+330)/2 / 10 = 33.5.
+	if got, want := a.MeanSvActualPp(), 33.5; math.Abs(got-want) > 1e-12 {
+		t.Errorf("MeanSvActualPp = %v, want %v", got, want)
+	}
+}
+
+// matrix row 2b — clamp/dispersion tallies: Add() folds sv=d80+net+block into the
+// upper (sv≥1000) and lower (sv≤0) clamp buckets, and the clamp identity holds:
+// MeanClampLossPp − MeanClampGainPp == E[sv/1000]×100 − E[clamp(sv/1000)]×100.
+func TestThreePtDiagAccum_Clamp(t *testing.T) {
+	a := &ThreePtDiagAccum{}
+	a.Add(900.0, 300.0, 50.0, true, 1.0, 1250.0) // sv=1250 → upper-clamped, loss 250
+	a.Add(400.0, -60.0, 10.0, false, 1.0, 350.0) // sv=350  → interior, no clamp
+	a.Add(200.0, -260.0, 0.0, false, 1.0, -60.0) // sv=-60  → lower-clamped, gain 60
+	a.Add(1000.0, 0.0, 0.0, true, 1.0, 1000.0)   // sv=1000 → boundary, upper bucket, loss 0
+	if a.Count != 4 {
+		t.Fatalf("Count = %d, want 4", a.Count)
+	}
+	if a.CountSvGe1000 != 2 {
+		t.Errorf("CountSvGe1000 = %d, want 2", a.CountSvGe1000)
+	}
+	if a.CountSvLe0 != 1 {
+		t.Errorf("CountSvLe0 = %d, want 1", a.CountSvLe0)
+	}
+	// FracSvGe1000 = 2/4 = 0.5; FracSvLe0 = 1/4 = 0.25.
+	if got, want := a.FracSvGe1000(), 0.5; math.Abs(got-want) > 1e-12 {
+		t.Errorf("FracSvGe1000 = %v, want %v", got, want)
+	}
+	if got, want := a.FracSvLe0(), 0.25; math.Abs(got-want) > 1e-12 {
+		t.Errorf("FracSvLe0 = %v, want %v", got, want)
+	}
+	// MeanClampLossPp = (250+0)/4 / 10 = 6.25; MeanClampGainPp = 60/4 / 10 = 1.5.
+	if got, want := a.MeanClampLossPp(), 6.25; math.Abs(got-want) > 1e-12 {
+		t.Errorf("MeanClampLossPp = %v, want %v", got, want)
+	}
+	if got, want := a.MeanClampGainPp(), 1.5; math.Abs(got-want) > 1e-12 {
+		t.Errorf("MeanClampGainPp = %v, want %v", got, want)
+	}
+	// Clamp identity: (loss−gain)pp must equal E[sv/1000]×100 − E[clamp]×100.
+	// sv/1000: 1.25, 0.35, -0.06, 1.00 → E=0.635 → ×100 = 63.5pp.
+	// clamp:    1.00, 0.35,  0.00, 1.00 → E=0.5875 → ×100 = 58.75pp.
+	// diff = 4.75pp == MeanClampLossPp − MeanClampGainPp = 6.25 − 1.5.
+	if got, want := a.MeanClampLossPp()-a.MeanClampGainPp(), 4.75; math.Abs(got-want) > 1e-12 {
+		t.Errorf("clamp identity: loss−gain = %v, want %v", got, want)
+	}
+	// Upper-clamped component means (over the 2 sv≥1000 attempts):
+	// d80 (900+1000)/2 /10 = 95.0; net (300+0)/2 /10 = 15.0; blk (50+0)/2 /10 = 2.5.
+	if got, want := a.MeanD80InClampPp(), 95.0; math.Abs(got-want) > 1e-12 {
+		t.Errorf("MeanD80InClampPp = %v, want %v", got, want)
+	}
+	if got, want := a.MeanNetInClampPp(), 15.0; math.Abs(got-want) > 1e-12 {
+		t.Errorf("MeanNetInClampPp = %v, want %v", got, want)
+	}
+	if got, want := a.MeanBlkInClampPp(), 2.5; math.Abs(got-want) > 1e-12 {
+		t.Errorf("MeanBlkInClampPp = %v, want %v", got, want)
+	}
+}
+
+// matrix row 3 — zero-count boundary: fresh ThreePtDiagAccum returns 0 from all three
+// Pp methods, no divide-by-zero panic.
+func TestThreePtDiagAccum_ZeroCount(t *testing.T) {
+	a := &ThreePtDiagAccum{}
+	if got := a.MeanD80Pp(); got != 0 {
+		t.Errorf("MeanD80Pp (zero count) = %v, want 0", got)
+	}
+	if got := a.MeanNetTermPp(); got != 0 {
+		t.Errorf("MeanNetTermPp (zero count) = %v, want 0", got)
+	}
+	if got := a.MeanBlockTermPp(); got != 0 {
+		t.Errorf("MeanBlockTermPp (zero count) = %v, want 0", got)
+	}
+	// Clamp accessors are also zero-safe (Count==0 and CountSvGe1000==0 guards).
+	for name, got := range map[string]float64{
+		"MeanClampLossPp": a.MeanClampLossPp(), "MeanClampGainPp": a.MeanClampGainPp(),
+		"FracSvGe1000": a.FracSvGe1000(), "FracSvLe0": a.FracSvLe0(),
+		"MeanD80InClampPp": a.MeanD80InClampPp(), "MeanNetInClampPp": a.MeanNetInClampPp(),
+		"MeanBlkInClampPp": a.MeanBlkInClampPp(),
+		"MadePct":          a.MadePct(), "MeanFatigue": a.MeanFatigue(),
+		"MeanSvActualPp": a.MeanSvActualPp(),
+	} {
+		if got != 0 {
+			t.Errorf("%s (zero count) = %v, want 0", name, got)
+		}
+	}
+}
+
+// matrix row 4 — non-perturbation + reachability: SimulateWith(sub,seed,{ThreePtDiag:&{}})
+// GameResult deep-equals Simulate(sub,seed) AND accum Count > 0.
+func TestThreePtDiagAccum_NonPerturbationAndReachability(t *testing.T) {
+	b := richBundle()
+	diag := &ThreePtDiagAccum{}
+	withDiag, err := SimulateWith(b, 7, Options{ThreePtDiag: diag})
+	if err != nil {
+		t.Fatalf("SimulateWith: %v", err)
+	}
+	plain := Simulate(b, 7)
+	if !reflect.DeepEqual(withDiag, plain) {
+		t.Error("attaching ThreePtDiag changed the GameResult — the instrument is not byte-identical")
+	}
+	if diag.Count == 0 {
+		t.Error("ThreePtDiag.Count == 0 after sim — accum never reached (3pt site unwired)")
+	}
+}
+
 // TestGateCont_AllDefensiveRebounds — the accumulator fires at every rebound RESOLUTION
 // (a miss reaching gs.rebound), NOT only when the offense RETAINS. So per offensive team
 // the resolution count strictly exceeds its credited offensive rebounds (every ORB is a

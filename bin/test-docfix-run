@@ -22,7 +22,7 @@ bad()  { echo "FAIL: $1"; FAILED=1; }
 # --jq entirely. A shim that must return nothing returns "" not "[]".
 build_sandbox() {
     local SB; SB="$(mktemp -d)"
-    mkdir -p "$SB/bin/lib" "$SB/home/Library/LaunchAgents" "$SB/home/.claude/plans" "$SB/shim"
+    mkdir -p "$SB/bin/lib" "$SB/home/Library/LaunchAgents" "$SB/home/claude-plans" "$SB/shim"
     # NOTE: do NOT symlink docfix-run in — the test drives the REAL script with
     # IBL5_MAIN=$SB, exercising prod's own anchoring code.
     printf 'worktrees_parent_dir(){ echo "%s/wts"; }\n' "$SB" > "$SB/bin/lib/git-helpers.sh"
@@ -119,7 +119,7 @@ run_health() {
 }
 
 plist_of() { ls "$1/home/Library/LaunchAgents/"*.plist 2>/dev/null | head -1; }
-plan_of()  { ls "$1/home/.claude/plans/docs-stale-refresh-"*.md 2>/dev/null | head -1; }
+plan_of()  { ls "$1/home/claude-plans/docs-stale-refresh-"*.md 2>/dev/null | head -1; }
 
 # --- Cases 1-5: bin/docfix-run launcher ----------------------------------------
 SB="$(build_sandbox)"

@@ -2,7 +2,7 @@
 # Queue a plan for automouse autonomous execution.
 #
 # Creates a symlink in the automouse queue pointing to the original plan
-# in ~/.claude/plans/. The original plan stays in place; the symlink
+# in ~/claude-plans/. The original plan stays in place; the symlink
 # is what gets moved to done/ or skipped/ after execution.
 #
 # Usage:
@@ -14,14 +14,14 @@
 # Examples:
 #   bin/automouse-queue velvet-brewing-starlight
 #   bin/automouse-queue velvet-brewing-starlight.md
-#   bin/automouse-queue ~/.claude/plans/velvet-brewing-starlight.md
+#   bin/automouse-queue ~/claude-plans/velvet-brewing-starlight.md
 #   bin/automouse-queue requeue
 #   bin/automouse-queue remove velvet-brewing-starlight
 
 set -euo pipefail
 
 : "${NIGHTLY_DIR:=$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse}"
-: "${PLANS_DIR:=$HOME/.claude/plans}"
+: "${PLANS_DIR:=$HOME/claude-plans}"
 QUEUE_DIR="$NIGHTLY_DIR/queue"
 SKIPPED_DIR="$NIGHTLY_DIR/skipped"
 DONE_DIR="$NIGHTLY_DIR/done"
@@ -236,7 +236,7 @@ fi
 
 # impl_model <-> Verification Matrix consistency backstop. bin/check-plan gate
 # 13 catches this at plan-authoring time, but the plan archive predates the
-# gate — an old unmarked plan can still be sitting in ~/.claude/plans/ never
+# gate — an old unmarked plan can still be sitting in ~/claude-plans/ never
 # having been run through check-plan. Refuse to queue rather than let
 # automouse-run burn a full Opus-default implementation session (or a
 # forbidden Truly-manual-row-under-Sonnet run) on it. Shares the exact rule

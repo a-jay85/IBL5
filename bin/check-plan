@@ -160,7 +160,7 @@ if [ -z "$PLAN_FILE" ] || [ ! -e "$PLAN_FILE" ]; then
 fi
 
 # Resolve the repo root from THIS SCRIPT's own location — never from the plan
-# file (which lives outside the repo under ~/.claude/plans/) or the cwd. Walk up
+# file (which lives outside the repo under ~/claude-plans/) or the cwd. Walk up
 # until a .git dir/file is found. Same load-bearing point as check-plan-staleness:
 # the reuse check searches $REPO_ROOT/ibl5, so a wrong root breaks it.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

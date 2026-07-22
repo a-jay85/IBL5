@@ -186,7 +186,7 @@ echo "ok: row9 — .staleness eviction"
 # ===========================================================================
 # impl_model <-> Verification Matrix consistency backstop (bin/lib/
 # plan-model-consistency). The plan archive predates bin/check-plan gate 13,
-# so an old unmarked plan can still be sitting in ~/.claude/plans/ — queuing
+# so an old unmarked plan can still be sitting in ~/claude-plans/ — queuing
 # must refuse it rather than let automouse-run burn a session on it.
 # ===========================================================================
 

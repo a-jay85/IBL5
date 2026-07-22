@@ -52,9 +52,9 @@ Either way the routing decision is **stated, not silent** — one line, like the
 
 ### The hard trigger: ≥3 distinct files in one turn
 
-**The numeric rule: the third distinct file you edit on the main thread within one user turn is the handoff point.** Two files is a change; three is a sweep. Route the remainder to one `subagent_type: "sonnet-4-6"` sub-agent (omit `model`) before making that third edit — don't wait to be stopped.
+**The numeric rule: the third distinct repo file you edit on the main thread within one user turn is the handoff point.** Two files is a change; three is a sweep. Route the remainder to one `subagent_type: "sonnet-4-6"` sub-agent (omit `model`) before making that third edit — don't wait to be stopped.
 
-This is enforced by `~/.claude/hooks/plan-gate-edit.sh` — the hook **denies** the Edit/Write so the gate cannot be read past. Escape hatch: `touch /tmp/claude-sweep-override-<prompt_id>` (example) (say why, out loud). Full properties (sub-agent exemption, per-turn scoping, fail-open): `work-triage-detail.md` § Hard trigger.
+This is enforced by `~/.claude/hooks/plan-gate-edit.sh` — the hook **denies** the Edit/Write so the gate cannot be read past. Escape hatch: `touch /tmp/claude-sweep-override-<prompt_id>` (example) (say why, out loud). Full gate properties (incl. what counts as a repo file): `work-triage-detail.md` § Hard trigger.
 
 Self-test: `bash ~/.claude/hooks/test-plan-gate-edit.sh`.
 

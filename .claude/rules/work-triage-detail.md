@@ -27,8 +27,9 @@ The prose routing guidance in `work-triage.md` is a judgment call, and judgment 
 - **Sub-agent edits are exempt** (`agent_id` present in the PreToolUse payload). The delegate you spawn in response is never blocked — otherwise the gate would brick the delegation it exists to force. Note sub-agents share the parent's `session_id` *and* `transcript_path`, so `agent_id` is the only usable discriminator.
 - **Per user turn, not per session** (keyed on `prompt_id`). Three unrelated one-file edits across a long session are not a sweep and don't trip it.
 - **Distinct files, not calls** — editing one file ten times counts once.
+- **Repo files only** — a path counts only when it resolves inside a git working tree; `/tmp` scratch and `~/.claude` hook/settings edits never accrue, so they can't push a later repo file over the line. A new file in a not-yet-created repo subdirectory still counts, because the check walks up to the nearest existing ancestor directory.
 - **Fails open** on a malformed payload; never blocks editing because a field was missing.
-- **Escape hatch, deliberately loud:** `touch /tmp/claude-sweep-override-<prompt_id>` (example) releases it for that turn. Legitimate when the edits are genuinely *entangled* with the design — for example authoring a hook, its test, and its rule doc together. Using it silently defeats the gate: **say out loud that you're overriding and why**, in the same turn.
+- **Escape hatch, deliberately loud:** `touch /tmp/claude-sweep-override-<prompt_id>` (example) releases it for that turn. Legitimate when the edits are genuinely *entangled* with the design — for example authoring a rule doc, its detail companion, and the ADR recording the decision together. Using it silently defeats the gate: **say out loud that you're overriding and why**, in the same turn.
 
 ## Repeat-polling
 

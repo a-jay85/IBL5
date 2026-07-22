@@ -14,7 +14,7 @@ last_verified: 2026-07-22
 
 ## Decision
 
-The **third distinct file** edited on the main thread within one user turn is the handoff point: route the remainder to one `subagent_type: "sonnet-4-6"` sub-agent. This is enforced, not documented — `~/.claude/hooks/plan-gate-edit.sh` § Check 1 **denies** the `Edit`/`Write` PreToolUse call (exit 2). The gate is scoped by three properties, each grounded in an empirical probe of the PreToolUse payload: sub-agent calls are exempt (they carry `agent_id`; main-thread calls do not), state is keyed per user turn on `prompt_id` rather than per session, and the count is of distinct files rather than tool calls. It fails open on any malformed payload. The escape hatch is `touch /tmp/claude-sweep-override-<prompt_id>` (example), to be used out loud with a stated reason when the edits are genuinely entangled with the design.
+The **third distinct file** edited on the main thread within one user turn is the handoff point: route the remainder to one `subagent_type: "sonnet-4-6"` sub-agent. This is enforced, not documented — `~/.claude/hooks/plan-gate-edit.sh` § Check 1 **denies** the `Edit`/`Write` PreToolUse call (exit 2). The gate is scoped by four properties, the first three grounded in an empirical probe of the PreToolUse payload: sub-agent calls are exempt (they carry `agent_id`; main-thread calls do not), state is keyed per user turn on `prompt_id` rather than per session, the count is of distinct files rather than tool calls, and only paths that resolve inside a git working tree accrue (`/tmp` scratch and `~/.claude` hook/settings edits never count, so they cannot push a later repo file over the limit). It fails open on any malformed payload. The escape hatch is `touch /tmp/claude-sweep-override-<prompt_id>` (example), to be used out loud with a stated reason when the edits are genuinely entangled with the design.
 
 ## Alternatives Considered
 
@@ -28,7 +28,7 @@ The **third distinct file** edited on the main thread within one user turn is th
 
 - Positive: the routing rule is now unreadable-past. A denied tool call forces the delegation decision to be made explicitly.
 - Positive: the sub-agent exemption is load-bearing and locked in by test — the forced delegate is never itself blocked.
-- Negative: the limit counts *any* path, including `/tmp` scratch and out-of-repo hook edits, so legitimate 3-file design turns (authoring a hook, its test, and its rule doc together) trip it and need the override. `SWEEP_LIMIT` is a single constant if the threshold wants raising.
+- Negative: a legitimate multi-file design turn confined to the repo (for example authoring a rule doc, its detail companion, and an ADR together) still trips the gate and needs the override; `SWEEP_LIMIT` is a single constant if the threshold wants raising.
 
 ## References
 

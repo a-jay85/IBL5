@@ -169,15 +169,75 @@ type ThreePtDiagAccum struct {
 	SumNetTerm   float64 `json:"sum_net_term"`   // Σ net*netToShotValue/(baseline*1.5) (‰)
 	SumBlockTerm float64 `json:"sum_block_term"` // Σ blockMod(baseline*1.5,...) (‰)
 	Count        int     `json:"count"`          // 3pt attempts observed (== Σ Game3GA)
+
+	// Clamp / dispersion instrument (advisor 2026-07-21). rollMake makes when
+	// effective ≥ rand_int(1,1000), with effective = sv×fatigue and fatigue ≡ 1.0 in
+	// PR3a (fatigueFactor caps to 1.0 for energy ≥ 0 — state.go), so the realized
+	// per-attempt make probability is NOT sv/1000 but clamp(sv/1000) to [0,1]:
+	// sv ≥ 1000‰ makes at 100% (not sv/1000 > 1), sv ≤ 0 misses at 100% (not sv/1000 < 0).
+	// The additive value model therefore over-counts the upper tail and under-counts the
+	// lower tail, and the reconstruction residual (E[sv/1000] − realized 3P%) is EXACTLY
+	// the net clamp loss E[(sv/1000−1)⁺] − E[(−sv/1000)⁺]. A null modifier MEAN does not
+	// exonerate a modifier: a zero-mean, high-VARIANCE term pushes mass past 1000 and
+	// bleeds value to the clamp. These fields split that residual and — among the
+	// upper-clamped (sv ≥ 1000) attempts — record the component means that name WHICH feed
+	// (d80 vs net) drives the excess. sv = d80+net+block; all sums in ‰.
+	CountSvGe1000 int     `json:"count_sv_ge_1000"` // attempts with sv ≥ 1000‰ (upper-clamped, make 100%)
+	CountSvLe0    int     `json:"count_sv_le_0"`    // attempts with sv ≤ 0‰ (lower-clamped, miss 100%)
+	SumClampLoss  float64 `json:"sum_clamp_loss"`   // Σ max(0, sv−1000) (‰) — value discarded above the ceiling
+	SumClampGain  float64 `json:"sum_clamp_gain"`   // Σ max(0, −sv) (‰) — negative value floored at 0
+	SumD80GeClamp float64 `json:"sum_d80_ge_clamp"` // Σ d80 over sv ≥ 1000 attempts (‰)
+	SumNetGeClamp float64 `json:"sum_net_ge_clamp"` // Σ net-term over sv ≥ 1000 attempts (‰)
+	SumBlkGeClamp float64 `json:"sum_blk_ge_clamp"` // Σ block-term over sv ≥ 1000 attempts (‰)
+
+	// Direct make-realization instrument (advisor 2026-07-21, clamp hypothesis REFUTED).
+	// The clamp fields above showed ≈0 clamping yet the reconstruction still overshoots
+	// realized 3P% by ~9pp — so the drag is neither tail-clamp nor (statically) fatigue.
+	// These two record the roll's OWN verdict and fatigue on the EXACT diag population,
+	// so E[sv/1000]×100 (recon) vs MadePct() discriminates directly:
+	//   MadePct ≈ recon (≈40%)  ⇒ rollMake is faithful; the drag is downstream box
+	//                              crediting/aggregation (gm3 undercounts rollMake==true).
+	//   MadePct ≈ realized 3P% (≈31%) AND MeanFatigue ≈ 0.77 ⇒ fatigue is NOT 1.0 at
+	//                              runtime; the static read is fed something unexpected.
+	//   MadePct ≈ 31% AND MeanFatigue = 1.0 ⇒ impossible given sv computed once — a bug.
+	MadeCount  int     `json:"made_count"`  // Σ rollMake==true — realized makes on the diag population
+	SumFatigue float64 `json:"sum_fatigue"` // Σ fatigueFactor(stamina) at each attempt (proves ≡1.0, or not)
+	// SumSvActual is Σ of the ACTUAL shotValue passed into rollMake (not the diag's
+	// reconstructed d80+net+block). If MeanSvActualPp diverges from the recon (d80+net+block),
+	// the reconstruction is wrong — a term is missing/transformed between the components and
+	// the value the roll sees. If they agree yet MadePct is lower, the roll itself is the site.
+	SumSvActual float64 `json:"sum_sv_actual"`
 }
 
-// Add records one 3pt attempt's three make-value components (all ‰). Nil-safe so the
-// call site can guard with `if gs.threePtDiag != nil`.
-func (a *ThreePtDiagAccum) Add(d80Base, netTerm, blockTerm float64) {
+// Add records one 3pt attempt's three make-value components (all ‰), the roll's realized
+// make verdict, and the fatigue applied. Nil-safe so the call site can guard with
+// `if gs.threePtDiag != nil`. It also folds the attempt into the clamp/dispersion tallies
+// from the total shot value sv = d80+net+block. Add is called AFTER the roll so `made` and
+// `fatigue` are the actual runtime values (it issues no rng draw, so post-roll ordering
+// leaves the GameResult byte-identical — the diag-on/off non-perturbation invariant holds).
+func (a *ThreePtDiagAccum) Add(d80Base, netTerm, blockTerm float64, made bool, fatigue, svActual float64) {
 	a.SumD80 += d80Base
 	a.SumNetTerm += netTerm
 	a.SumBlockTerm += blockTerm
 	a.Count++
+	if made {
+		a.MadeCount++
+	}
+	a.SumFatigue += fatigue
+	a.SumSvActual += svActual
+
+	sv := d80Base + netTerm + blockTerm
+	switch {
+	case sv >= 1000:
+		a.CountSvGe1000++
+		a.SumClampLoss += sv - 1000
+		a.SumD80GeClamp += d80Base
+		a.SumNetGeClamp += netTerm
+		a.SumBlkGeClamp += blockTerm
+	case sv <= 0:
+		a.CountSvLe0++
+		a.SumClampGain += -sv
+	}
 }
 
 // MeanD80Pp is the per-attempt mean d80 base in pp (‰/10). By construction this is the
@@ -205,6 +265,97 @@ func (a *ThreePtDiagAccum) MeanBlockTermPp() float64 {
 		return 0
 	}
 	return a.SumBlockTerm / float64(a.Count) / 10.0
+}
+
+// MeanClampLossPp is the per-attempt mean value discarded above the make ceiling, in pp:
+// E[(sv/1000−1)⁺]×100. MeanClampLossPp − MeanClampGainPp reconciles with the archive
+// test's ReconResidualPp to Monte-Carlo tolerance — the machine-verifiable cross-check.
+func (a *ThreePtDiagAccum) MeanClampLossPp() float64 {
+	if a.Count == 0 {
+		return 0
+	}
+	return a.SumClampLoss / float64(a.Count) / 10.0
+}
+
+// MeanClampGainPp is the per-attempt mean value floored at 0 below the make floor, in pp:
+// E[(−sv/1000)⁺]×100.
+func (a *ThreePtDiagAccum) MeanClampGainPp() float64 {
+	if a.Count == 0 {
+		return 0
+	}
+	return a.SumClampGain / float64(a.Count) / 10.0
+}
+
+// FracSvGe1000 is the fraction of 3pt attempts whose total shot value clamps at the make
+// ceiling (sv ≥ 1000‰ → 100% make). A material fraction here IS the make-realization drag.
+func (a *ThreePtDiagAccum) FracSvGe1000() float64 {
+	if a.Count == 0 {
+		return 0
+	}
+	return float64(a.CountSvGe1000) / float64(a.Count)
+}
+
+// FracSvLe0 is the fraction of 3pt attempts whose total shot value clamps at the make
+// floor (sv ≤ 0‰ → 0% make).
+func (a *ThreePtDiagAccum) FracSvLe0() float64 {
+	if a.Count == 0 {
+		return 0
+	}
+	return float64(a.CountSvLe0) / float64(a.Count)
+}
+
+// MeanD80InClampPp / MeanNetInClampPp / MeanBlkInClampPp are the component means (pp) over
+// ONLY the upper-clamped (sv ≥ 1000) attempts. Whichever is large names the feed pushing
+// shots past the ceiling: a large net mean here (vs the ~0 all-attempt net mean) is the
+// net-term-dispersion signature — the 3pt net-term SCALE is then the RE target.
+func (a *ThreePtDiagAccum) MeanD80InClampPp() float64 {
+	if a.CountSvGe1000 == 0 {
+		return 0
+	}
+	return a.SumD80GeClamp / float64(a.CountSvGe1000) / 10.0
+}
+
+func (a *ThreePtDiagAccum) MeanNetInClampPp() float64 {
+	if a.CountSvGe1000 == 0 {
+		return 0
+	}
+	return a.SumNetGeClamp / float64(a.CountSvGe1000) / 10.0
+}
+
+func (a *ThreePtDiagAccum) MeanBlkInClampPp() float64 {
+	if a.CountSvGe1000 == 0 {
+		return 0
+	}
+	return a.SumBlkGeClamp / float64(a.CountSvGe1000) / 10.0
+}
+
+// MadePct is the roll's OWN realized 3pt make rate (%) over the diag population — the
+// direct measurement that reconciles (or not) with the reconstructed E[sv/1000]×100. If it
+// tracks the recon but the box-score 3P% is lower, the drag is downstream of the roll.
+func (a *ThreePtDiagAccum) MadePct() float64 {
+	if a.Count == 0 {
+		return 0
+	}
+	return float64(a.MadeCount) / float64(a.Count) * 100.0
+}
+
+// MeanFatigue is the mean fatigue multiplier applied at the 3pt make roll. Proves whether
+// fatigueFactor(stamina) is ≡1.0 at runtime (the static-read claim) or something less.
+func (a *ThreePtDiagAccum) MeanFatigue() float64 {
+	if a.Count == 0 {
+		return 0
+	}
+	return a.SumFatigue / float64(a.Count)
+}
+
+// MeanSvActualPp is the mean of the ACTUAL shotValue fed to rollMake, in pp (‰/10). Compare
+// to the recon (MeanD80Pp+MeanNetTermPp+MeanBlockTermPp): a gap means the diag's component
+// reconstruction does not equal the value the roll sees — the drag is a reconstruction error.
+func (a *ThreePtDiagAccum) MeanSvActualPp() float64 {
+	if a.Count == 0 {
+		return 0
+	}
+	return a.SumSvActual / float64(a.Count) / 10.0
 }
 
 // FastClassAccum accumulates per-class possession-step counts across all games

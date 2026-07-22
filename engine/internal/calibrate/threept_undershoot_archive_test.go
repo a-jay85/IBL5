@@ -181,6 +181,36 @@ type threePtUndershootArtifact struct {
 	MeanBlockTermPp       float64 `json:"mean_block_term_pp"`
 	ReconResidualPp       float64 `json:"recon_residual_pp"`
 	NetSuspectThresholdPp float64 `json:"net_suspect_threshold_pp"` // -5.0
+
+	// Clamp / dispersion decomposition of the reconstruction residual (advisor 2026-07-21).
+	// rollMake makes at clamp(sv/1000) not sv/1000 (fatigue ≡ 1.0), so the ~9pp residual is
+	// net clamp loss, and a null net MEAN does not exonerate net: a high-VARIANCE net term
+	// pushes mass past the ceiling. MeanClampLossPp − MeanClampGainPp reconciles with
+	// ReconResidualPp to MC tolerance (asserted). The InClamp component means say WHICH feed
+	// (d80 vs net) drives the sv ≥ 1000 excess — a large NetInClamp vs the ~0 all-attempt net
+	// mean is the net-term-dispersion signature (RE target: the 3pt net-term scale vs 5.60).
+	FracSvGe1000     float64 `json:"frac_sv_ge_1000"`
+	FracSvLe0        float64 `json:"frac_sv_le_0"`
+	MeanClampLossPp  float64 `json:"mean_clamp_loss_pp"`
+	MeanClampGainPp  float64 `json:"mean_clamp_gain_pp"`
+	ClampNetResidPp  float64 `json:"clamp_net_residual_pp"` // MeanClampLossPp − MeanClampGainPp (== ReconResidualPp ± MC)
+	CountSvGe1000    int     `json:"count_sv_ge_1000"`
+	MeanD80InClampPp float64 `json:"mean_d80_in_clamp_pp"`
+	MeanNetInClampPp float64 `json:"mean_net_in_clamp_pp"`
+	MeanBlkInClampPp float64 `json:"mean_blk_in_clamp_pp"`
+
+	// Direct make-realization cut (advisor 2026-07-21, clamp REFUTED). DiagMadePct is the
+	// roll's OWN 3P% over the diag population; DiagMeanFatigue the mean fatigue at the roll.
+	// The decisive discriminator: DiagMadePct ≈ ReconMakePct (E[sv/1000]×100) ⇒ rollMake
+	// faithful, drag is downstream box crediting; DiagMadePct ≈ PopEngine3Pct with fatigue
+	// < 1 ⇒ runtime fatigue is the drag. MadeVsBoxGapPp = DiagMadePct − PopEngine3Pct isolates
+	// any roll-vs-box divergence (nonzero ⇒ makes lost between the roll and the box counter).
+	DiagMadePct     float64 `json:"diag_made_pct"`
+	DiagMeanFatigue float64 `json:"diag_mean_fatigue"`
+	ReconMakePct    float64 `json:"recon_make_pct"`     // MeanD80BasePp + MeanNetTermPp + MeanBlockTermPp (= E[sv/1000]×100)
+	MadeVsBoxGapPp  float64 `json:"made_vs_box_gap_pp"` // DiagMadePct − PopEngine3Pct
+	MeanSvActualPp  float64 `json:"mean_sv_actual_pp"`  // mean of the ACTUAL sv fed to rollMake (‰/10)
+	ReconVsSvGapPp  float64 `json:"recon_vs_sv_gap_pp"` // ReconMakePct − MeanSvActualPp: nonzero ⇒ reconstruction error
 }
 
 // teamShoot is one side's summed shooting components for one snapshot (or, when
@@ -290,14 +320,31 @@ func TestRealArchive_ThreePtUndershoot(t *testing.T) {
 			d80ByPID[p.PID] = p.D80
 		}
 
-		// Engine side: sim a capped sample of the scheduled matchups, 1 seed each
-		// (mirrors possession_archive_test.go:136-159).
+		// Engine side: sim a capped sample of the scheduled matchups.
+		//
+		// The seed MUST vary per game (seed+gi). Passing a constant `seed` to every
+		// single-game SimulateWith restarts the PCG stream from state 0 for each game, so
+		// every game draws an *overlapping prefix* of one fixed sequence. Only the first
+		// few hundred draws of that one stream are ever consulted, and they are sampled
+		// thousands of times over; whatever bias that prefix happens to carry is amplified
+		// rather than averaged away. This seed's prefix runs high: measured with a constant
+		// seed, the 3pt make-roll mean was 565.7 (uniform expects 500.5), manufacturing a
+		// spurious 9.1pp "3pt undershoot" (engine 31.05% vs the 40.15% E[sv]/1000 demands).
+		//
+		// Why 40.15% is the *correct* value and not merely a less-biased one: P(make) is
+		// linear in the effective shot value, so for uniform independent rolls the realized
+		// rate is forced to equal E[sv]/1000 — no distribution shape can bend it. 31.05%
+		// violated that identity, which is what marks it (not the model) as the error.
+		// With seed+gi the residual collapses to −0.19pp.
+		//
+		// See also possession_archive_test.go:141 and threept_attemptrouting_archive_test.go:119,
+		// which still use the constant-seed single-game form and carry the same artifact.
 		for gi, g := range b.Schedule {
 			if gi >= gameCap {
 				break
 			}
 			sub := bundle.Bundle{LeagueID: b.LeagueID, Teams: b.Teams, Players: b.Players, Schedule: []bundle.Game{g}}
-			res, err := sim.SimulateWith(sub, seed, sim.Options{ThreePtDiag: diag})
+			res, err := sim.SimulateWith(sub, seed+uint64(gi), sim.Options{ThreePtDiag: diag})
 			if err != nil {
 				t.Fatalf("SimulateWith: %v", err)
 			}
@@ -463,6 +510,35 @@ func TestRealArchive_ThreePtUndershoot(t *testing.T) {
 	art.NetSuspectThresholdPp = -5.0
 	art.ReconResidualPp = (diag.MeanD80Pp() + diag.MeanNetTermPp() + diag.MeanBlockTermPp()) - art.PopEngine3Pct
 
+	// Clamp / dispersion decomposition (advisor 2026-07-21). The residual is net clamp loss.
+	art.FracSvGe1000 = diag.FracSvGe1000()
+	art.FracSvLe0 = diag.FracSvLe0()
+	art.MeanClampLossPp = diag.MeanClampLossPp()
+	art.MeanClampGainPp = diag.MeanClampGainPp()
+	art.ClampNetResidPp = art.MeanClampLossPp - art.MeanClampGainPp
+	art.CountSvGe1000 = diag.CountSvGe1000
+	art.MeanD80InClampPp = diag.MeanD80InClampPp()
+	art.MeanNetInClampPp = diag.MeanNetInClampPp()
+	art.MeanBlkInClampPp = diag.MeanBlkInClampPp()
+
+	// Direct make-realization cut. ReconMakePct = E[sv/1000]×100 (the additive model's
+	// analytic make prob); DiagMadePct = the roll's OWN realized 3P% on the SAME attempts.
+	art.DiagMadePct = diag.MadePct()
+	art.DiagMeanFatigue = diag.MeanFatigue()
+	art.ReconMakePct = diag.MeanD80Pp() + diag.MeanNetTermPp() + diag.MeanBlockTermPp()
+	art.MadeVsBoxGapPp = art.DiagMadePct - art.PopEngine3Pct
+	art.MeanSvActualPp = diag.MeanSvActualPp()
+	art.ReconVsSvGapPp = art.ReconMakePct - art.MeanSvActualPp
+
+	// Clamp-identity cross-check — LOGGED, NOT asserted. The clamp hypothesis was REFUTED
+	// 2026-07-21: clamping is ≈0 yet the residual is ~9pp, so (clampLoss−clampGain) does NOT
+	// equal ReconResidualPp. A broken identity is now the FINDING, not a wiring failure, so it
+	// no longer fails the run. The direct make-realization cut below is the live discriminator.
+	if d := art.ClampNetResidPp - art.ReconResidualPp; d < -1.0 || d > 1.0 {
+		t.Logf("  clamp identity DOES NOT HOLD (expected — clamp refuted): (clampLoss−clampGain)=%.4f vs recon_residual=%.4f (Δ=%.4f) ⇒ the residual is NOT tail-clamp loss",
+			art.ClampNetResidPp, art.ReconResidualPp, d)
+	}
+
 	// HARD same-sample cross-check: the accum's Game3GA-weighted d80 mean must equal the
 	// player-grouped sim_weighted_d80_pct (both weight d80 by realized Game3GA over the
 	// same games). Tolerance is floating-point slack only.
@@ -472,6 +548,31 @@ func TestRealArchive_ThreePtUndershoot(t *testing.T) {
 	}
 	t.Logf("3pt modifier means (pp): d80=%.3f net=%.3f block=%.3f | recon_residual=%.3f (logged, not asserted)",
 		art.MeanD80BasePp, art.MeanNetTermPp, art.MeanBlockTermPp, art.ReconResidualPp)
+	t.Logf("  CLAMP DECOMP: recon_residual %.3fpp = clamp_loss %.3f − clamp_gain %.3f (=%.3f, MC-reconciled) | sv≥1000 frac %.4f (%d attempts), sv≤0 frac %.4f",
+		art.ReconResidualPp, art.MeanClampLossPp, art.MeanClampGainPp, art.ClampNetResidPp, art.FracSvGe1000, art.CountSvGe1000, art.FracSvLe0)
+	t.Logf("    → WHICH FEED (over sv≥1000 attempts, pp): d80=%.2f net=%.2f block=%.2f. Large net here vs ~%.2f all-attempt net ⇒ net-term DISPERSION drives the clamp (RE: 3pt net-term scale vs 5.60).",
+		art.MeanD80InClampPp, art.MeanNetInClampPp, art.MeanBlkInClampPp, art.MeanNetTermPp)
+	t.Logf("  MAKE-REALIZATION CUT (decisive): recon_make %.2f%% (E[sv/1000]×100) vs roll's own DiagMadePct %.2f%% vs box PopEngine3Pct %.2f%% | mean_fatigue %.4f | made-vs-box gap %.3fpp",
+		art.ReconMakePct, art.DiagMadePct, art.PopEngine3Pct, art.DiagMeanFatigue, art.MadeVsBoxGapPp)
+	t.Logf("  ACTUAL-SV CUT: mean_sv_actual %.2f%% (the real value fed to rollMake) vs recon %.2f%% → recon−sv gap %.3fpp. Nonzero ⇒ the d80+net+block reconstruction ≠ the value the roll sees.",
+		art.MeanSvActualPp, art.ReconMakePct, art.ReconVsSvGapPp)
+	switch {
+	// Leading case: all three rates agree ⇒ no make-realization residual at all. This is
+	// the state after the per-game seed fix below (2026-07-21): the 9.1pp "undershoot"
+	// was a harness artifact (every single-game SimulateWith replayed one PCG stream from
+	// the same seed, so the make-roll subsequence was a short, repeated, high-biased slice
+	// — measured roll mean 565.7 vs the uniform 500.5), NOT an engine defect.
+	case math.Abs(art.ReconResidualPp) < 1.0 && math.Abs(art.MadeVsBoxGapPp) < 1.0:
+		t.Logf("    → VERDICT: CLOSED — recon, roll, and box all agree within 1pp (residual %.3fpp). The 3pt make model is faithful; no undershoot to explain.", art.ReconResidualPp)
+	case math.Abs(art.DiagMadePct-art.ReconMakePct) < 1.0 && math.Abs(art.MadeVsBoxGapPp) > 1.0:
+		t.Logf("    → VERDICT: roll REALIZES the recon (DiagMadePct≈recon) but the BOX 3P%% is lower ⇒ makes lost DOWNSTREAM of the roll (box crediting/aggregation). RE target: made-3 crediting path, NOT the value model.")
+	case math.Abs(art.DiagMadePct-art.PopEngine3Pct) < 1.0 && art.DiagMeanFatigue < 0.99:
+		t.Logf("    → VERDICT: roll makes at the box rate with mean_fatigue<1 ⇒ RUNTIME FATIGUE is the drag (fatigueFactor is NOT ≡1.0 in practice). RE target: the stamina→fatigue curve.")
+	case math.Abs(art.DiagMadePct-art.PopEngine3Pct) < 1.0 && art.DiagMeanFatigue >= 0.99:
+		t.Logf("    → VERDICT: roll makes at the box rate at fatigue≈1 while recon is higher ⇒ recon over-states sv (a value-model/units error upstream of the roll). RE target: the sv reconstruction terms.")
+	default:
+		t.Logf("    → VERDICT: unclassified — DiagMadePct sits between recon and box; inspect the three rates above.")
+	}
 
 	// Self-consistency (matrix row 5): the derived population ratios must
 	// reconcile against the raw sums to floating-point tolerance.

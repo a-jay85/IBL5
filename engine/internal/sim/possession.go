@@ -295,13 +295,19 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 			}
 			return possNormal // made shot
 		case outcome3pt:
+			// sv computed ONCE and passed to both the roll and the diag — eliminates any
+			// "diag sv differs from roll sv" branch. Diag recorded AFTER the roll so it
+			// captures the roll's actual make verdict and fatigue (it issues no rng draw,
+			// so post-roll ordering keeps the GameResult byte-identical).
+			sv := shotValue3pt(net, bh.D80, gs.shotBaselineOrFallback(), gs.leagueBlk48, defBlkSum)
+			made, _ := gs.shotAttempt(offense, defense, bh, sv, result.ShotThree, origin, periodIdx)
 			if gs.threePtDiag != nil {
 				b3 := gs.shotBaselineOrFallback() * 1.5
 				netTerm := net * netToShotValue / b3
 				blockTerm := blockMod(b3, gs.leagueBlk48, defBlkSum)
-				gs.threePtDiag.Add(float64(bh.D80), netTerm, blockTerm)
+				gs.threePtDiag.Add(float64(bh.D80), netTerm, blockTerm, made, fatigueFactor(bh.Stamina), sv)
 			}
-			if made, _ := gs.shotAttempt(offense, defense, bh, shotValue3pt(net, bh.D80, gs.shotBaselineOrFallback(), gs.leagueBlk48, defBlkSum), result.ShotThree, origin, periodIdx); !made {
+			if !made {
 				gs.creditBlock(offense, defense, bh, def)
 				if cont, next := gs.rebound(offense, defense, periodIdx); cont {
 					bh = next

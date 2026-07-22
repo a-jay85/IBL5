@@ -268,8 +268,8 @@ func (a *ThreePtDiagAccum) MeanBlockTermPp() float64 {
 }
 
 // MeanClampLossPp is the per-attempt mean value discarded above the make ceiling, in pp:
-// E[(sv/1000−1)⁺]×100. MeanClampLossPp − MeanClampGainPp reconciles with the archive
-// test's ReconResidualPp to Monte-Carlo tolerance — the machine-verifiable cross-check.
+// E[(sv/1000−1)⁺]×100. MeanClampLossPp − MeanClampGainPp is logged against ReconResidualPp
+// in the archive test (t.Logf, not asserted — logged because the MC closure is diagnostic).
 func (a *ThreePtDiagAccum) MeanClampLossPp() float64 {
 	if a.Count == 0 {
 		return 0

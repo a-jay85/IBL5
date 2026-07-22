@@ -530,12 +530,12 @@ func TestRealArchive_ThreePtUndershoot(t *testing.T) {
 	art.MeanSvActualPp = diag.MeanSvActualPp()
 	art.ReconVsSvGapPp = art.ReconMakePct - art.MeanSvActualPp
 
-	// Clamp-identity cross-check — LOGGED, NOT asserted. The clamp hypothesis was REFUTED
-	// 2026-07-21: clamping is ≈0 yet the residual is ~9pp, so (clampLoss−clampGain) does NOT
-	// equal ReconResidualPp. A broken identity is now the FINDING, not a wiring failure, so it
-	// no longer fails the run. The direct make-realization cut below is the live discriminator.
+	// Clamp-identity cross-check — LOGGED, NOT asserted. With the per-game seed fix the
+	// residual is ~−0.19pp and clamping is ≈0, so (clampLoss−clampGain) ≈ recon_residual
+	// within the ±1pp MC tolerance. Kept as t.Logf to surface any future divergence
+	// without hard-failing the archive run.
 	if d := art.ClampNetResidPp - art.ReconResidualPp; d < -1.0 || d > 1.0 {
-		t.Logf("  clamp identity DOES NOT HOLD (expected — clamp refuted): (clampLoss−clampGain)=%.4f vs recon_residual=%.4f (Δ=%.4f) ⇒ the residual is NOT tail-clamp loss",
+		t.Logf("  clamp identity gap outside ±1pp: (clampLoss−clampGain)=%.4f vs recon_residual=%.4f (Δ=%.4f)",
 			art.ClampNetResidPp, art.ReconResidualPp, d)
 	}
 

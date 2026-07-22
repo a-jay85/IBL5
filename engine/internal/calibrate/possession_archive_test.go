@@ -132,13 +132,17 @@ func TestRealArchive_PossessionAccounting(t *testing.T) {
 		}
 		used++
 
-		// Engine: sim a capped sample of real scheduled matchups, 1 seed each.
+		// Engine: sim a capped sample of real scheduled matchups, one game per seed.
 		for gi, g := range b.Schedule {
 			if gi >= gameCap {
 				break
 			}
 			sub := bundle.Bundle{LeagueID: b.LeagueID, Teams: b.Teams, Players: b.Players, Schedule: []bundle.Game{g}}
-			res := sim.Simulate(sub, 20240601)
+			// seed MUST vary per game — see threept_attemptrouting_archive_test.go:~119 and
+			// threept_undershoot_archive_test.go:~340. A constant seed over single-game
+			// bundles re-draws overlapping prefixes of one PCG stream, amplifying that
+			// prefix's bias instead of averaging it away.
+			res := sim.Simulate(sub, 20240601+uint64(gi))
 			for _, tb := range res.Games[0].TeamBoxes {
 				pts := tb.Q1 + tb.Q2 + tb.Q3 + tb.Q4
 				for _, o := range tb.OT {

@@ -47,7 +47,7 @@ bin/wt-new "$SLUG"                                   # cwd is $MAIN (step 2)
 WT_ROOT="$(worktrees_parent_dir "$MAIN")/$SLUG"
 
 # --- 5. Seed the auto_merge:false hold plan (resolved by slug at post-plan) ----
-PLAN_FILE="$HOME/.claude/plans/$SLUG.md"
+PLAN_FILE="$HOME/claude-plans/$SLUG.md"
 cat > "$PLAN_FILE" <<PLAN_EOF
 ---
 auto_merge: false

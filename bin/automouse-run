@@ -191,7 +191,7 @@ REPO="/Users/ajaynicolas/GitHub/IBL5"
 NIGHTLY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
 LOG_DIR="$NIGHTLY_DIR/logs"
 QUEUE_DIR="$NIGHTLY_DIR/queue"
-PLANS_DIR="${PLANS_DIR:-$HOME/.claude/plans}"
+PLANS_DIR="${PLANS_DIR:-$HOME/claude-plans}"
 MAX_ELAPSED=17100  # ~4h45m — stops around 4:45am, leaves headroom in the 5h usage window
 MAX_ATTEMPTS=3     # per-plan retry cap within one night (covers impl + postplan phases)
 # Failure-report caps (ADR-0085): the `.failure` sidecar fed to an escalated

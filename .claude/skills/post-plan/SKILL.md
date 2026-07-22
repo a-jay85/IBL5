@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-07-20
+last_verified: 2026-07-21
 ---
 
 # Post-Plan Orchestrator
@@ -67,10 +67,10 @@ Then locate the plan backing this branch so later phases can verify the implemen
 
 ```bash
 # Authoritative in automouse mode: the handoff JSON's plan_file (the postplan prompt passes its path).
-# Interactive fallback: branch slug -> ~/.claude/plans/<slug>.md.
+# Interactive fallback: branch slug -> ~/claude-plans/<slug>.md.
 SLUG=$(git rev-parse --abbrev-ref HEAD)
 PLAN_FILE=""
-[ -f "$HOME/.claude/plans/$SLUG.md" ] && PLAN_FILE="$HOME/.claude/plans/$SLUG.md"
+[ -f "$HOME/claude-plans/$SLUG.md" ] && PLAN_FILE="$HOME/claude-plans/$SLUG.md"
 if [ -n "$PLAN_FILE" ]; then
     echo "PLAN_FOUND=$PLAN_FILE"
     grep -qiE '^\s*\|.*Test type' "$PLAN_FILE" && echo "HAS_MATRIX=true" || echo "HAS_MATRIX=false"

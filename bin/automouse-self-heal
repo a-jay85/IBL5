@@ -14,7 +14,7 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 : "${NIGHTLY_DIR:=$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse}"
-: "${PLANS_DIR:=$HOME/.claude/plans}"
+: "${PLANS_DIR:=$HOME/claude-plans}"
 : "${STALENESS_GUARD:=$SCRIPT_DIR/check-plan-staleness}"
 
 SKIPPED_DIR="$NIGHTLY_DIR/skipped"

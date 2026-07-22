@@ -54,7 +54,7 @@ done
 # condition (7): block if the plan declares auto_merge: false (line-1 frontmatter only).
 # Self-contained: derive PLAN_FILE here (honor an in-block-set value, else slug-derive) so
 # the check can't no-op on a non-surviving cross-phase variable.
-PLAN_FILE="${PLAN_FILE:-$HOME/.claude/plans/$(git rev-parse --abbrev-ref HEAD).md}"
+PLAN_FILE="${PLAN_FILE:-$HOME/claude-plans/$(git rev-parse --abbrev-ref HEAD).md}"
 AUTO_MERGE=$(awk '
     NR==1 && /^---[[:space:]]*$/ {infm=1; next}
     infm && /^---[[:space:]]*$/ {infm=0; exit}

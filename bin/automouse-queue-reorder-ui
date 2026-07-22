@@ -12,7 +12,7 @@
 set -euo pipefail
 
 : "${NIGHTLY_DIR:=$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse}"
-: "${PLANS_DIR:=$HOME/.claude/plans}"
+: "${PLANS_DIR:=$HOME/claude-plans}"
 QUEUE_DIR="$NIGHTLY_DIR/queue"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

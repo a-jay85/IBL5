@@ -29,7 +29,7 @@ Verify the worktree exists and the branch has commits ahead of master. If not, w
 
 ## Step 3: Run /post-plan
 
-The plan backing this branch is the symlink at `$NIGHTLY_DIR/queue/<PLAN_FILE>` (resolve it to its target under `~/.claude/plans/`). This is the **authoritative** plan path for this run. When /post-plan Phase 1 locates the plan, set `PLAN_FILE` to this path directly — do NOT rely on its branch-slug derivation, because the branch slug (derived from the plan title) need not match the plan filename. The plan-conformance steps in Phases 4–6 depend on this path resolving correctly.
+The plan backing this branch is the symlink at `$NIGHTLY_DIR/queue/<PLAN_FILE>` (resolve it to its target under `~/claude-plans/`). This is the **authoritative** plan path for this run. When /post-plan Phase 1 locates the plan, set `PLAN_FILE` to this path directly — do NOT rely on its branch-slug derivation, because the branch slug (derived from the plan title) need not match the plan filename. The plan-conformance steps in Phases 4–6 depend on this path resolving correctly.
 
 Invoke /post-plan using the Skill tool and let it run to completion. Completion means Phase 11 (Background Process Cleanup) has executed — do not end your turn before that. Do NOT invoke /simplify, /commit, /code-review, or /security-audit separately — /post-plan orchestrates all of them.
 

@@ -2,7 +2,7 @@
 name: ship
 description: "Commit, push, and open a PR via /post-plan, which decides whether auto-merge arms; /ship never arms directly."
 disable-model-invocation: true
-last_verified: 2026-07-04
+last_verified: 2026-07-21
 ---
 
 # /ship — Commit, push, PR via /post-plan
@@ -31,7 +31,7 @@ First, a cheap **advisory prediction** — clearly label it *"advisory only; `/p
 
 - PR/commit title matches `^feat(\(|!|:)` → Phase 6.5 condition **(8)** (the `feat:` floor) will **HOLD**.
 - `git diff HEAD --name-only` includes `engine/internal/sim/testdata/golden.json` → condition **(5)** holds under headless (warns interactively).
-- A plan at `~/.claude/plans/<branch-slug>.md` whose **line-1** frontmatter has `auto_merge: false` → condition **(7)** will **HOLD**.
+- A plan at `~/claude-plans/<branch-slug>.md` whose **line-1** frontmatter has `auto_merge: false` → condition **(7)** will **HOLD**.
 
 Then the actions:
 

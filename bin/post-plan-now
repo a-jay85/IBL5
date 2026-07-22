@@ -48,7 +48,7 @@ case "$SLUG" in
         exit 1 ;;
 esac
 
-PLAN_FILE="$HOME/.claude/plans/$SLUG.md"
+PLAN_FILE="$HOME/claude-plans/$SLUG.md"
 
 # --auto is the impl agent's automatic closing action. One gate applies only here;
 # a bare (human) invocation always fires, because running it by hand IS the

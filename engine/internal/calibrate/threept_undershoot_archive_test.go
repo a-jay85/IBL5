@@ -168,6 +168,19 @@ type threePtUndershootArtifact struct {
 	PerRosterDPctMilder bool   `json:"perroster_dpct_milder_than_population"`
 	SelectedBranch      string `json:"selected_branch"`
 	BranchRationale     string `json:"branch_rationale"`
+
+	// 3pt make-value modifier decomposition (J24 residual 7). The per-attempt means
+	// of shotValue3pt's three additive components (pp), harvested by ThreePtDiagAccum
+	// over the SAME archive pass. MeanD80BasePp must reconcile with SimWeightedD80Pct
+	// (same population, Game3GA-weighted). ReconResidualPp is LOGGED (non-fatal) —
+	// rollMake clamps effective<1→0% and >1000→100% and applies fatigue, so the additive
+	// value model is only approximate. NetSuspectThresholdPp documents the Phase-6 branch.
+	DiagCount             int     `json:"diag_count"`
+	MeanD80BasePp         float64 `json:"mean_d80_base_pp"`
+	MeanNetTermPp         float64 `json:"mean_net_term_pp"`
+	MeanBlockTermPp       float64 `json:"mean_block_term_pp"`
+	ReconResidualPp       float64 `json:"recon_residual_pp"`
+	NetSuspectThresholdPp float64 `json:"net_suspect_threshold_pp"` // -5.0
 }
 
 // teamShoot is one side's summed shooting components for one snapshot (or, when
@@ -225,6 +238,10 @@ func TestRealArchive_ThreePtUndershoot(t *testing.T) {
 	// and Σ sim3GA over every simmed player-box across all snapshots.
 	var simD80Weighted, simSum3GA float64
 
+	// 3pt make-value modifier decomposition (J24 residual 7): one shared accum across
+	// ALL snapshots and ALL games so its means are population-framed.
+	diag := &sim.ThreePtDiagAccum{}
+
 	// Filter to the recent-era 05-08 corpus and iterate ALL cumulative snapshots
 	// in those season dirs (per-snapshot = per-roster granularity, ~97 expected).
 	seasonZips := make([]string, 0, len(zips))
@@ -280,7 +297,10 @@ func TestRealArchive_ThreePtUndershoot(t *testing.T) {
 				break
 			}
 			sub := bundle.Bundle{LeagueID: b.LeagueID, Teams: b.Teams, Players: b.Players, Schedule: []bundle.Game{g}}
-			res := sim.Simulate(sub, seed)
+			res, err := sim.SimulateWith(sub, seed, sim.Options{ThreePtDiag: diag})
+			if err != nil {
+				t.Fatalf("SimulateWith: %v", err)
+			}
 			for _, tb := range res.Games[0].TeamBoxes {
 				eng.add(teamShoot{
 					gm3: float64(tb.Game3GM), ga3: float64(tb.Game3GA),
@@ -428,6 +448,30 @@ func TestRealArchive_ThreePtUndershoot(t *testing.T) {
 	art.PerRosterDPctMilder = included > 0 && math.Abs(art.PerRosterDPct) < math.Abs(popDPct)
 
 	art.SelectedBranch, art.BranchRationale = selectBranch(art.PopDRatePer100, popDPct, art.PerRosterDPctMilder)
+
+	if diag.Count == 0 {
+		t.Fatal("no 3pt attempts accumulated — ThreePtDiag accum is unwired (check Phase 3 edits)")
+	}
+	if diag.Count != int(simSum3GA) {
+		t.Fatalf("diag.Count=%d != sim_sum_3ga=%.0f — accum population diverges from box-score 3GA",
+			diag.Count, simSum3GA)
+	}
+	art.DiagCount = diag.Count
+	art.MeanD80BasePp = diag.MeanD80Pp()
+	art.MeanNetTermPp = diag.MeanNetTermPp()
+	art.MeanBlockTermPp = diag.MeanBlockTermPp()
+	art.NetSuspectThresholdPp = -5.0
+	art.ReconResidualPp = (diag.MeanD80Pp() + diag.MeanNetTermPp() + diag.MeanBlockTermPp()) - art.PopEngine3Pct
+
+	// HARD same-sample cross-check: the accum's Game3GA-weighted d80 mean must equal the
+	// player-grouped sim_weighted_d80_pct (both weight d80 by realized Game3GA over the
+	// same games). Tolerance is floating-point slack only.
+	if d := art.MeanD80BasePp - art.SimWeightedD80Pct; d < -0.5 || d > 0.5 {
+		t.Fatalf("d80 base mismatch: accum MeanD80BasePp=%.4f vs sim_weighted_d80_pct=%.4f (Δ=%.4f) — accum not on the same population",
+			art.MeanD80BasePp, art.SimWeightedD80Pct, d)
+	}
+	t.Logf("3pt modifier means (pp): d80=%.3f net=%.3f block=%.3f | recon_residual=%.3f (logged, not asserted)",
+		art.MeanD80BasePp, art.MeanNetTermPp, art.MeanBlockTermPp, art.ReconResidualPp)
 
 	// Self-consistency (matrix row 5): the derived population ratios must
 	// reconcile against the raw sums to floating-point tolerance.

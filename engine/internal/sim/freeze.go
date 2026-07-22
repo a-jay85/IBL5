@@ -202,10 +202,22 @@ type ThreePtDiagAccum struct {
 	//   MadePct ≈ 31% AND MeanFatigue = 1.0 ⇒ impossible given sv computed once — a bug.
 	MadeCount  int     `json:"made_count"`  // Σ rollMake==true — realized makes on the diag population
 	SumFatigue float64 `json:"sum_fatigue"` // Σ fatigueFactor(stamina) at each attempt (proves ≡1.0, or not)
-	// SumSvActual is Σ of the ACTUAL shotValue passed into rollMake (not the diag's
-	// reconstructed d80+net+block). If MeanSvActualPp diverges from the recon (d80+net+block),
-	// the reconstruction is wrong — a term is missing/transformed between the components and
-	// the value the roll sees. If they agree yet MadePct is lower, the roll itself is the site.
+	// SumSvActual is Σ of the ACTUAL shotValue passed into rollMake.
+	//
+	// SCOPE — read this before treating recon-vs-svActual as evidence. shotValue3pt
+	// (shotdecision.go:160) IS `d80 + net*netToShotValue/b + blockMod(b, …)`, and the diag
+	// call site recomputes those same three terms from the same b. So recon ≡ svActual
+	// *by construction*: the observed gap is float64 associativity noise (~1e-13), and no
+	// value of the inputs can make it anything else. This comparison is an identity check
+	// on the diag's OWN arithmetic — it catches a transcription slip (wrong baseline, a
+	// dropped term, a unit error in this file) and nothing more. It canNOT detect a term
+	// missing from the *model*, because the diag mirrors the model rather than deriving
+	// sv independently. Do not cite a ~0 gap as evidence that the value model is right.
+	//
+	// A real independent check needs sv reconstructed from a different source than
+	// shotValue3pt (e.g. the realized make rate against E[sv]/1000, which is what actually
+	// closed residual (7) — P(make) is linear in sv, so the realized rate is forced to
+	// equal E[sv]/1000 and cannot be bent by distribution shape).
 	SumSvActual float64 `json:"sum_sv_actual"`
 }
 

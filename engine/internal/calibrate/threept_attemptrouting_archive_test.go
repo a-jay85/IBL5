@@ -116,7 +116,12 @@ func TestRealArchive_ThreePtAttemptRouting(t *testing.T) {
 				break
 			}
 			sub := bundle.Bundle{LeagueID: b.LeagueID, Teams: b.Teams, Players: b.Players, Schedule: []bundle.Game{g}}
-			res := sim.Simulate(sub, seed)
+			// seed MUST vary per game. A constant seed over single-game bundles restarts the
+			// PCG stream from state 0 every game, so the run only ever draws overlapping
+			// *prefixes* of one fixed sequence — that prefix's bias is amplified rather than
+			// averaged away. See threept_undershoot_archive_test.go:~340 for the full writeup
+			// and the 9.1pp spurious residual it manufactured.
+			res := sim.Simulate(sub, seed+uint64(gi))
 			for _, pb := range res.Games[0].PlayerBoxes {
 				simMINByPID[pb.PID] += float64(pb.GameMIN)
 				sim3GAByPID[pb.PID] += float64(pb.Game3GA)

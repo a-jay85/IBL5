@@ -1,6 +1,6 @@
 ---
 description: Triage every non-trivial unit of work as ad-hoc vs /plan before starting, with an ad-hoc safety mirror and Sonnet execution-routing for resolved, machine-verifiable edit chunks; the gateway that feeds the deployment funnel (ADR-0067).
-last_verified: 2026-07-16
+last_verified: 2026-07-22
 ---
 
 # Work Triage Rule
@@ -9,7 +9,7 @@ last_verified: 2026-07-16
 
 Before starting **any non-trivial unit of work** — whether you proposed it or the user assigned it — decide: implement **ad-hoc** (just do it, then `/ship`) or route through **`/plan`**. State the call and one line of why, then proceed. The user should never have to ask "is this big enough for a `/plan`?" — that judgment is yours to volunteer.
 
-This is the **gateway** of the deployment funnel (ADR-0067): triage decides plan-vs-ad-hoc; everything downstream (`/post-plan`, auto-queue, auto-merge arming) flows from there.
+This is the **gateway** of the deployment funnel (ADR-0067): everything downstream flows from this call.
 
 ## The ad-hoc bar
 
@@ -21,7 +21,7 @@ Ad-hoc-safe only when **all** hold:
 
 If any are open, it wants a `/plan`.
 
-**Resolve empirical unknowns first.** Run the cheap scan (existing occurrences, false-positive risk, how the thing is emitted) *before* declaring the verdict — the scan often collapses an apparent design fork into an ad-hoc change.
+**Resolve empirical unknowns first** (occurrences, false-positive risk) — the scan often collapses a design fork into ad-hoc.
 
 ## Ad-hoc safety mirror
 
@@ -35,7 +35,7 @@ then prefer `/plan`, so the defense and its verification are designed up front. 
 
 ## Execution routing: an ad-hoc verdict does not mean Opus edits inline
 
-The plan-vs-ad-hoc verdict decides *whether to plan* — it does **not** decide *who executes the edits*. An ad-hoc verdict silently defaulting to "the Opus session implements inline" is the measured leak (2026-07-07: ~90% of Opus main-thread calls were mechanical; 44% of sessions breached 150K context — the dumb-zone delegation rules exist to prevent).
+The plan-vs-ad-hoc verdict decides *whether to plan*, not *who executes the edits*. Defaulting silently to inline Opus is the measured leak — see `work-triage-detail.md` § Execution routing context.
 
 **Before making a chunk of edits, route the execution.** The chunk is **Sonnet-executable** when both hold — the same criterion as `/plan` Step 4 gate 13:
 
@@ -50,13 +50,17 @@ Stay inline (Opus edits directly) only when:
 
 Either way the routing decision is **stated, not silent** — one line, like the triage verdict. The user should see which way it went and be able to override in the moment.
 
+### The hard trigger: ≥3 distinct files in one turn
+
+**The numeric rule: the third distinct file you edit on the main thread within one user turn is the handoff point.** Two files is a change; three is a sweep. Route the remainder to one `subagent_type: "sonnet-4-6"` sub-agent (omit `model`) before making that third edit — don't wait to be stopped.
+
+This is enforced by `~/.claude/hooks/plan-gate-edit.sh` — the hook **denies** the Edit/Write so the gate cannot be read past. Escape hatch: `touch /tmp/claude-sweep-override-<prompt_id>` (example) (say why, out loud). Full properties (sub-agent exemption, per-turn scoping, fail-open): `work-triage-detail.md` § Hard trigger.
+
+Self-test: `bash ~/.claude/hooks/test-plan-gate-edit.sh`.
+
 ## Execution routing: repeat-polling is a spend bug
 
-A poll loop re-reads the full context every call (~81K tokens); eight 60s checks burns ~650K tokens vs ~81K for one deferred check. **Never poll on the main thread.**
-
-**Instead:** `run_in_background: true` + Monitor (re-invokes on completion, main thread free), or ScheduleWakeup matched to the expected completion time (one ~480s wakeup for a CI run beats eight 60s checks). Avoid repeated `gh pr checks` / `gh run watch` inline loops — both re-read full context per call.
-
-**Headless exception:** no re-invocation in headless/automouse — block until exit or structure as sequenced plan phases. See `agent-tiering-detail.md`.
+Never poll on the main thread — a poll loop re-reads full context per call. Use `run_in_background: true` + Monitor, or ScheduleWakeup matched to expected completion time. Full rationale: `work-triage-detail.md` § Repeat-polling.
 
 ## Calibration
 

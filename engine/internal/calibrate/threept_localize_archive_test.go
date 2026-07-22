@@ -105,7 +105,14 @@ type threePtLocalizeArtifact struct {
 	GateDeltaCRaw    float64 `json:"gate_delta_c_raw"`
 	GateDeltaCExcess float64 `json:"gate_delta_c_excess"`
 
-	// (d) closure
+	// (d) closure. DecisionsPerMin / IdealPAPerMin / DecRateDeltaE NAME what the three
+	// plan-time carriers cannot reach: the shot-DECISION rate per minute itself. IdealPAPerMin
+	// is the rate a fully-faithful engine would produce at the MEASURED decision rate but with
+	// reference eligibility and reference 3pt share — so DecRateDeltaE is the part of the gap
+	// no eligibility or bucket-share fix could ever recover.
+	DecisionsPerMin          float64 `json:"decisions_per_min"`
+	IdealPAPerMin            float64 `json:"ideal_pa_per_min"`
+	DecRateDeltaE            float64 `json:"dec_rate_delta_e"`
 	ReconstructedSimPAPerMin float64 `json:"reconstructed_sim_pa_per_min"`
 	ClosureResidualD         float64 `json:"closure_residual_d"`
 	ResidualFracOfGap        float64 `json:"residual_frac_of_gap"`
@@ -155,6 +162,7 @@ func TestRealArchive_ThreePtLocalize(t *testing.T) {
 		sumShare2, sumShareFull, sumRealShareFGA, sumDenomB float64
 		sumSuppFrac, sumTransFrac, sumGateRaw, sumGateExc   float64
 		sumRecon, sumResidD                                 float64
+		sumDecPerMin, sumIdealPA, sumDecRateE               float64
 		snapshots, validSnapshots                           int
 	)
 
@@ -175,13 +183,11 @@ func TestRealArchive_ThreePtLocalize(t *testing.T) {
 		// Real-side per-player feed, for the (a) audit's minute-weighted implied rate.
 		realMINByPID := make(map[int]float64, len(b.Players))
 		real3GAByPID := make(map[int]float64, len(b.Players))
-		var sumRealMIN, sumReal3GA, sumRealFGA float64
+		realFGAByPID := make(map[int]float64, len(b.Players))
 		for _, p := range b.Players {
 			realMINByPID[p.PID] = float64(p.RealLifeMIN)
 			real3GAByPID[p.PID] = float64(p.RealLife3GA)
-			sumRealMIN += float64(p.RealLifeMIN)
-			sumReal3GA += float64(p.RealLife3GA)
-			sumRealFGA += float64(p.RealLifeFGA)
+			realFGAByPID[p.PID] = float64(p.RealLifeFGA)
 		}
 
 		simMINByPID := make(map[int]float64)
@@ -208,6 +214,23 @@ func TestRealArchive_ThreePtLocalize(t *testing.T) {
 			}
 		}
 		cleanup()
+
+		// REAL-SIDE BASIS — strict inner-join (simMIN>0 AND realMIN>0), matching
+		// TestRealArchive_ThreePtAttemptRouting. This is load-bearing, not cosmetic: the raw
+		// all-bundle-players aggregate is diluted by rostered players the sim never plays and
+		// yields real 3PA/min ≈ 0.076, NOT the adjudicated 0.110 — which would understate
+		// TotalGap by more than half and make the feed audit compare two different player
+		// populations. Measured both ways during Phase 4; the inner-join basis reproduces the
+		// adjudicated rate effect, so it is the basis of record.
+		var sumRealMIN, sumReal3GA, sumRealFGA float64
+		for pid, sm := range simMINByPID {
+			if sm <= 0 || realMINByPID[pid] <= 0 {
+				continue
+			}
+			sumRealMIN += realMINByPID[pid]
+			sumReal3GA += real3GAByPID[pid]
+			sumRealFGA += realFGAByPID[pid]
+		}
 
 		// Reachability at the corpus level (Phase 2's richBundle deliberately left this here:
 		// a short test game may fire zero transitions, but a 60-game season cannot).
@@ -276,6 +299,13 @@ func TestRealArchive_ThreePtLocalize(t *testing.T) {
 		// sum to (decPerMin·eligFrac·shareFull − decPerMin·(1−ref)·realShareFGA) by construction.
 		denomDeltaB := decPerMin * eligFrac * (shareFull - realShareFGA)
 
+		// The reference point of the walk: measured decision rate, reference eligibility,
+		// reference 3pt share. Whatever separates THIS from realPArate is a shot-decision-RATE
+		// divergence — invisible to candidates (a)/(b)/(c) and therefore the concrete content
+		// of candidate (d) when the partition fails to close.
+		idealPArate := decPerMin * (1.0 - realFBShareRef) * realShareFGA
+		decRateDeltaE := idealPArate - realPArate
+
 		// Model fit: does the multiplicative reconstruction recover the measured sim rate?
 		reconstructed := decPerMin * eligFrac * shareFull
 		if simPArate > 0 && math.Abs(reconstructed-simPArate)/simPArate > 0.05 {
@@ -303,6 +333,9 @@ func TestRealArchive_ThreePtLocalize(t *testing.T) {
 		sumGateExc += gateDeltaCExcess
 		sumRecon += reconstructed
 		sumResidD += residD
+		sumDecPerMin += decPerMin
+		sumIdealPA += idealPArate
+		sumDecRateE += decRateDeltaE
 		validSnapshots++
 
 		t.Logf("  %s: simPA/min %.6f real %.6f gap %.6f | supp %.4f (trans %.4f) share3full %.4f realFGAshare %.4f | A %.6f B %.6f C %.6f D %.6f",
@@ -341,6 +374,9 @@ func TestRealArchive_ThreePtLocalize(t *testing.T) {
 		GateDeltaCRaw:    sumGateRaw / n,
 		GateDeltaCExcess: sumGateExc / n,
 
+		DecisionsPerMin:          sumDecPerMin / n,
+		IdealPAPerMin:            sumIdealPA / n,
+		DecRateDeltaE:            sumDecRateE / n,
 		ReconstructedSimPAPerMin: sumRecon / n,
 		ClosureResidualD:         sumResidD / n,
 	}
@@ -371,6 +407,8 @@ func TestRealArchive_ThreePtLocalize(t *testing.T) {
 		art.SuppressionFrac, art.TransitionFrac, art.RealFBShareRef, art.GateDeltaCExcess, art.GateDeltaCRaw)
 	t.Logf("  (d) closure:     reconstructed %.6f  ClosureResidualD %.6f  ResidualFracOfGap %.4f",
 		art.ReconstructedSimPAPerMin, art.ClosureResidualD, art.ResidualFracOfGap)
+	t.Logf("      decision-rate: %.4f decisions/min  ideal-at-that-rate %.6f  DecRateDeltaE %.6f",
+		art.DecisionsPerMin, art.IdealPAPerMin, art.DecRateDeltaE)
 	t.Logf("  NAMED CARRIER: %s", art.NamedCarrier)
 }
 

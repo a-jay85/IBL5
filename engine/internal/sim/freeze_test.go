@@ -387,6 +387,61 @@ func TestGateCont_Accumulates(t *testing.T) {
 	}
 }
 
+// matrix row 2 — ThreePtDiagAccum.Add() with known inputs yields correct Pp means (‰→pp /10).
+func TestThreePtDiagAccum_Add(t *testing.T) {
+	a := &ThreePtDiagAccum{}
+	a.Add(400.0, -80.0, 20.0) // first attempt
+	a.Add(380.0, -60.0, 10.0) // second attempt
+	if a.Count != 2 {
+		t.Errorf("Count = %d, want 2", a.Count)
+	}
+	// MeanD80Pp: (400+380)/2 / 10 = 39.0
+	if got, want := a.MeanD80Pp(), 39.0; math.Abs(got-want) > 1e-12 {
+		t.Errorf("MeanD80Pp = %v, want %v", got, want)
+	}
+	// MeanNetTermPp: (-80-60)/2 / 10 = -7.0
+	if got, want := a.MeanNetTermPp(), -7.0; math.Abs(got-want) > 1e-12 {
+		t.Errorf("MeanNetTermPp = %v, want %v", got, want)
+	}
+	// MeanBlockTermPp: (20+10)/2 / 10 = 1.5
+	if got, want := a.MeanBlockTermPp(), 1.5; math.Abs(got-want) > 1e-12 {
+		t.Errorf("MeanBlockTermPp = %v, want %v", got, want)
+	}
+}
+
+// matrix row 3 — zero-count boundary: fresh ThreePtDiagAccum returns 0 from all three
+// Pp methods, no divide-by-zero panic.
+func TestThreePtDiagAccum_ZeroCount(t *testing.T) {
+	a := &ThreePtDiagAccum{}
+	if got := a.MeanD80Pp(); got != 0 {
+		t.Errorf("MeanD80Pp (zero count) = %v, want 0", got)
+	}
+	if got := a.MeanNetTermPp(); got != 0 {
+		t.Errorf("MeanNetTermPp (zero count) = %v, want 0", got)
+	}
+	if got := a.MeanBlockTermPp(); got != 0 {
+		t.Errorf("MeanBlockTermPp (zero count) = %v, want 0", got)
+	}
+}
+
+// matrix row 4 — non-perturbation + reachability: SimulateWith(sub,seed,{ThreePtDiag:&{}})
+// GameResult deep-equals Simulate(sub,seed) AND accum Count > 0.
+func TestThreePtDiagAccum_NonPerturbationAndReachability(t *testing.T) {
+	b := richBundle()
+	diag := &ThreePtDiagAccum{}
+	withDiag, err := SimulateWith(b, 7, Options{ThreePtDiag: diag})
+	if err != nil {
+		t.Fatalf("SimulateWith: %v", err)
+	}
+	plain := Simulate(b, 7)
+	if !reflect.DeepEqual(withDiag, plain) {
+		t.Error("attaching ThreePtDiag changed the GameResult — the instrument is not byte-identical")
+	}
+	if diag.Count == 0 {
+		t.Error("ThreePtDiag.Count == 0 after sim — accum never reached (3pt site unwired)")
+	}
+}
+
 // TestGateCont_AllDefensiveRebounds — the accumulator fires at every rebound RESOLUTION
 // (a miss reaching gs.rebound), NOT only when the offense RETAINS. So per offensive team
 // the resolution count strictly exceeds its credited offensive rebounds (every ORB is a

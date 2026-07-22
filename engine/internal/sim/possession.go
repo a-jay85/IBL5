@@ -295,6 +295,12 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 			}
 			return possNormal // made shot
 		case outcome3pt:
+			if gs.threePtDiag != nil {
+				b3 := gs.shotBaselineOrFallback() * 1.5
+				netTerm := net * netToShotValue / b3
+				blockTerm := blockMod(b3, gs.leagueBlk48, defBlkSum)
+				gs.threePtDiag.Add(float64(bh.D80), netTerm, blockTerm)
+			}
 			if made, _ := gs.shotAttempt(offense, defense, bh, shotValue3pt(net, bh.D80, gs.shotBaselineOrFallback(), gs.leagueBlk48, defBlkSum), result.ShotThree, origin, periodIdx); !made {
 				gs.creditBlock(offense, defense, bh, def)
 				if cont, next := gs.rebound(offense, defense, periodIdx); cont {

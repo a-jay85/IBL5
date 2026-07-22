@@ -155,6 +155,58 @@ func (a *BranchBAccum) MeanS() float64 {
 	return a.SumS / float64(a.Taken)
 }
 
+// ThreePtDiagAccum harvests the per-3pt-attempt make-value decomposition across a run:
+// at every case-outcome3pt attempt (possession.go) it records the three ADDITIVE
+// components of shotValue3pt — the d80 real-life base, the net-advantage term
+// net*netToShotValue/(baseline*1.5), and the block-modifier term — all in per-mille (‰).
+// The caller owns it (passed via Options.ThreePtDiag), shares ONE instance across every
+// game in a run, and reads the means after the pass. It issues NO rng draw and alters no
+// decision (pure arithmetic on values shotValue3pt already computes), so attaching it
+// stays byte-identical to a plain run. NOT concurrency-safe: the archive harness sims
+// sequentially. Count is the exact 3pt-attempt count and equals Σ box-score Game3GA.
+type ThreePtDiagAccum struct {
+	SumD80       float64 `json:"sum_d80"`        // Σ d80 base (‰) over 3pt attempts
+	SumNetTerm   float64 `json:"sum_net_term"`   // Σ net*netToShotValue/(baseline*1.5) (‰)
+	SumBlockTerm float64 `json:"sum_block_term"` // Σ blockMod(baseline*1.5,...) (‰)
+	Count        int     `json:"count"`          // 3pt attempts observed (== Σ Game3GA)
+}
+
+// Add records one 3pt attempt's three make-value components (all ‰). Nil-safe so the
+// call site can guard with `if gs.threePtDiag != nil`.
+func (a *ThreePtDiagAccum) Add(d80Base, netTerm, blockTerm float64) {
+	a.SumD80 += d80Base
+	a.SumNetTerm += netTerm
+	a.SumBlockTerm += blockTerm
+	a.Count++
+}
+
+// MeanD80Pp is the per-attempt mean d80 base in pp (‰/10). By construction this is the
+// Game3GA-weighted d80 (one add per attempt), so it must reconcile with the archive
+// test's sim_weighted_d80_pct on the SAME population — the accum-wiring cross-check.
+func (a *ThreePtDiagAccum) MeanD80Pp() float64 {
+	if a.Count == 0 {
+		return 0
+	}
+	return a.SumD80 / float64(a.Count) / 10.0
+}
+
+// MeanNetTermPp is the per-attempt mean net-advantage term in pp (‰/10). The Phase-6
+// branch discriminator: < -5pp ⇒ net-advantage FEED is the prime suspect.
+func (a *ThreePtDiagAccum) MeanNetTermPp() float64 {
+	if a.Count == 0 {
+		return 0
+	}
+	return a.SumNetTerm / float64(a.Count) / 10.0
+}
+
+// MeanBlockTermPp is the per-attempt mean block-modifier term in pp (‰/10).
+func (a *ThreePtDiagAccum) MeanBlockTermPp() float64 {
+	if a.Count == 0 {
+		return 0
+	}
+	return a.SumBlockTerm / float64(a.Count) / 10.0
+}
+
 // FastClassAccum accumulates per-class possession-step counts across all games
 // in a run. DRBPushClass counts the code-7 {2,3,4}s class — gated fast-break
 // survivors from BOTH steal-sourced AND DRB-sourced possessions (J24 §1d: the
@@ -276,6 +328,11 @@ type Options struct {
 	// instance across a run's games. nil (a zero Options) leaves counting inert,
 	// so a zero Options stays byte-identical to Simulate. NOT concurrency-safe.
 	FastClassAccum *FastClassAccum
+	// ThreePtDiag, when non-nil, harvests the per-3pt-attempt make-value decomposition
+	// (d80 base, net term, block term in ‰) across the run. Read-only, no rng draw, so a
+	// zero Options stays byte-identical to Simulate. The caller owns one instance across a
+	// run's games (nil outside the 3pt-undershoot archive instrument). NOT concurrency-safe.
+	ThreePtDiag *ThreePtDiagAccum
 }
 
 // validate rejects a config that freezes an arm with no precomputed (zero) mean — a

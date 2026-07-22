@@ -75,6 +75,14 @@ test.describe('Sim recap admin viewer', () => {
     await assertNoPhpErrors(page);
   });
 
+  test('a signed sim is rejected before any cast', async ({ page }) => {
+    // The sign character fails ctype_digit(), so no cast and no query happen.
+    const response = await page.goto('simSummaries.php?sim=-3');
+
+    expect(response?.status()).toBe(400);
+    await expect(page.locator('#recap-error')).toHaveText('Invalid sim number.');
+  });
+
   test('sim=0 is rejected by the lower bound', async ({ page }) => {
     // All digits, so ctype_digit() passes — the `< 1` floor is what rejects it.
     const response = await page.goto('simSummaries.php?sim=0');
@@ -116,6 +124,9 @@ test.describe('Sim recap plain-text export', () => {
     expect(response.status()).toBe(200);
     expect(response.headers()['content-type']).toMatch(/^text\/plain/);
     expect(response.headers()['content-disposition']).toContain('sim-689-recap.txt');
+    // nosniff is re-asserted by the export itself, so a recap body containing
+    // markup is displayed as text rather than sniffed as HTML.
+    expect(response.headers()['x-content-type-options']).toBe('nosniff');
     expect(await response.text()).toBe(SIM_689_BODY);
   });
 

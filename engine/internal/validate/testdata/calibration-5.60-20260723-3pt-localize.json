@@ -1,5 +1,5 @@
 {
-  "generated": "2026-07-23T10:34:03-07:00",
+  "generated": "2026-07-23T11:20:48-07:00",
   "snapshots": 98,
   "games_cap": 60,
   "seed": 20240601,
@@ -8,8 +8,8 @@
   "real_pa_per_min": 0.10994433095217027,
   "total_gap": -0.05003919248790908,
   "pct_real_min_zero_decisions": 0,
-  "bundle_implied_3pa_rate": 0.10970361120664802,
-  "feed_delta_a": -0.00024071974552225737,
+  "bundle_implied_3pa_rate": 0.10970361120664804,
+  "feed_delta_a": -0.0002407197455222582,
   "mean_three_share_2": 0.1887614003251272,
   "mean_three_share_full": 0.17759660131981958,
   "real_share_fga": 0.1959415757450001,

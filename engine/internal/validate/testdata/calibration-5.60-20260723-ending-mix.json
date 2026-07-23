@@ -1,0 +1,67 @@
+{
+  "generated": "2026-07-23T11:26:49-07:00",
+  "stride": 100,
+  "runs": 4,
+  "seed": 20240601,
+  "snapshots": 8,
+  "counts": {
+    "games": 35904,
+    "possessions": 6691612,
+    "end_steal": 586039,
+    "end_to_ind": 320377,
+    "end_dreb": 2158853,
+    "end_made": 3007228,
+    "end_ft": 619115,
+    "end_other": 0,
+    "oreb_cont": 1193844,
+    "and_one_seqs": 138621,
+    "fga": 6498546,
+    "fgm": 3145849,
+    "fga3": 991711,
+    "fgm3": 362155,
+    "oreb": 1193844,
+    "dreb": 2158853,
+    "steals": 586039,
+    "turnovers": 906416,
+    "fta": 1099609,
+    "ftm": 807912,
+    "fouls": 619115
+  },
+  "end_steal_share_pct": 8.7578150078038,
+  "end_to_ind_share_pct": 4.787740233593938,
+  "end_dreb_share_pct": 32.26207676117504,
+  "end_made_share_pct": 44.940262525681405,
+  "end_ft_share_pct": 9.252105471745821,
+  "end_other_share_pct": 0,
+  "fg_pct": 48.408505533391626,
+  "oreb_rate_pct": 35.60846685519151,
+  "poss_per_game": 186.37511140819964,
+  "fga_per_game": 180.99782754010695,
+  "steal_per_game": 16.32238747771836,
+  "tov_per_game": 25.24554367201426,
+  "dreb_per_game": 60.128481506238856,
+  "oreb_per_game": 33.25100267379679,
+  "fta_per_game": 30.62636475044563,
+  "armed_pct": 39.08416716330834,
+  "implied_code7_pct": 11.725250148992501,
+  "q4_fta_margin_0_3": {
+    "winner_avg": 3.8137310073157007,
+    "loser_avg": 3.9212155317951605,
+    "games": 5331
+  },
+  "q4_fta_margin_4_7": {
+    "winner_avg": 3.875636799520527,
+    "loser_avg": 3.804015582858855,
+    "games": 6674
+  },
+  "q4_fta_margin_8_15": {
+    "winner_avg": 3.9035784359525367,
+    "loser_avg": 3.7586657946370177,
+    "games": 10703
+  },
+  "q4_fta_margin_16plus": {
+    "winner_avg": 4.002500757805396,
+    "loser_avg": 3.6527735677478024,
+    "games": 13196
+  }
+}

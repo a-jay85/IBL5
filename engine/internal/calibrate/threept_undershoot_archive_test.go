@@ -241,12 +241,17 @@ func (s *teamShoot) add(o teamShoot) {
 //     walk (make-value site only, not the 3pt suppression). Kept for reference;
 //     it moves a DIFFERENT mechanism than "unfaithful3pt". Toggling a mechanism,
 //     never a constant (ADR-0090).
+//   - "suppress_transition": sim.FreezeConfig{SuppressTransition3pt: true} — the
+//     pre-port baseline arm (transition 3pt suppressed, matching the pre-j24
+//     behavior). Used to measure the gate contribution before removing it.
 func abFreeze() sim.FreezeConfig {
 	switch os.Getenv("JSB_3PT_AB") {
 	case "unfaithful3pt":
 		return sim.FreezeConfig{UnfaithfulPutback3pt: true}
 	case "putback":
 		return sim.FreezeConfig{UnfaithfulPutback: true}
+	case "suppress_transition":
+		return sim.FreezeConfig{SuppressTransition3pt: true}
 	default:
 		return sim.FreezeConfig{}
 	}

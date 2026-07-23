@@ -107,11 +107,12 @@ func transitionNet(defender onCourt) float64 {
 // runTransitionPossession resolves a fired fast break (Stage 4). The ball handler
 // is reselected by the normal Phase-4 weighted random (L922-923); the contesting
 // transition defender supplies the 5.0−TD net. The outcome routes through the
-// existing shot/free-throw/rebound machinery with stealPlay=true, so the attempt
-// can never be a 3-pointer (allowedPaths). A defensive rebound or steal ending
-// the break re-arms the fast-break flag (returned as the possOutcome — possDRB or
-// possSteal respectively). Offensive rebounds continue the break, bounded by
-// maxOffensiveRebounds.
+// standard four-bucket selector (stealPlay=false) — a code-7 fast break runs the
+// same selector as the half-court path, per the adjudication proof in
+// jsb-native/re-artifacts/jsb-J24-transition-3pt-ADJUDICATION-20260723.md. A defensive
+// rebound or steal ending the break re-arms the fast-break flag (returned as the
+// possOutcome — possDRB or possSteal respectively). Offensive rebounds continue
+// the break, bounded by maxOffensiveRebounds.
 func (gs *gameState) runTransitionPossession(offense, defense *teamState, periodIdx int) (outcome possOutcome) {
 	gs.transitions++
 	bh := selectBallHandler(offense, gs.rng)
@@ -153,23 +154,24 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 		// playBuckets threads this possession's bh through so its deterministic base
 		// (2−fatigue)·tovRate(bh) matches the fast-break ball handler, same as the
 		// half-court path.
-		// allow3pt=false: a fast break is never a 3pt attempt (allowedPaths excludes it),
-		// so the 3pt composite is 0 here and Branch-B's ΣD is 2pt+foul on the break.
-		twoPtW, _, foulW := gs.playBuckets(bh, offense, defense, 0, 0, mq, false) // param_5==0: transition fully symmetric, no HCA legs (J15 Phase 5)
+		// allow3pt=true: faithful JSB port — fast break can be a 3pt attempt.
+		// SuppressTransition3pt (FreezeConfig) zeroes threePtW for the A/B suppress arm.
+		twoPtW, threePtW, foulW := gs.playBuckets(bh, offense, defense, 0, 0, mq, true) // param_5==0: transition fully symmetric, no HCA legs (J15 Phase 5); allow3pt=true: faithful JSB port
+		if gs.freeze.SuppressTransition3pt {
+			threePtW = 0 // A/B suppress arm: restores pre-port baseline for measurement
+		}
 		in := outcomeInputs{
 			twoPtWeight:      twoPtW,
-			threePtWeight:    0,
+			threePtWeight:    threePtW,
 			andOneWeight:     andOneBucketWeight(mq, bh),
 			foulOnlyWeight:   foulW,
 			turnoverDefValue: energyCeiling(bh),
 		}
 		if gs.outcomeDiag != nil {
-			// A fired fast break routes selectOutcome with threePtWeight==0 and stealPlay=true
-			// (allowedPaths excludes 3pt) — always suppressed, always transition.
-			gs.outcomeDiag.Add(twoPtW, 0, foulW, in.andOneWeight, false /*eligible3pt*/, true /*transition*/, bh.RealLifeMIN == 0)
+			gs.outcomeDiag.Add(twoPtW, threePtW, foulW, in.andOneWeight, threePtW > 0 /*eligible3pt*/, true /*transition*/, bh.RealLifeMIN == 0)
 		}
 
-		switch selectOutcome(in, false, false, true, gs.rng) {
+		switch selectOutcome(in, false, false, false, gs.rng) {
 		case outcome2pt:
 			// Every shot on a fired fast break is tagged transition — including a
 			// putback after an offensive rebound within the break (the possession
@@ -184,6 +186,23 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 				return possDRB // defensive rebound re-arms the DRB-push fast break
 			}
 			return possNormal // made shot
+		case outcome3pt:
+			// Faithful fast-break 3pt resolution — mirrors possession.go:311-332.
+			sv3 := shotValue3pt(net, bh.D80, gs.shotBaselineOrFallback(), gs.leagueBlk48, defBlkSum)
+			made, _ := gs.shotAttempt(offense, defense, bh, sv3, result.ShotThree, result.OriginTransition, periodIdx)
+			if gs.threePtDiag != nil {
+				b3 := gs.shotBaselineOrFallback() * 1.5
+				gs.threePtDiag.Add(float64(bh.D80), net*netToShotValue/b3, blockMod(b3, gs.leagueBlk48, defBlkSum), made, fatigueFactor(bh.Stamina), sv3)
+			}
+			if !made {
+				gs.creditBlock(offense, defense, bh, def)
+				if cont, next := gs.rebound(offense, defense, periodIdx); cont {
+					bh = next
+					continue
+				}
+				return possDRB
+			}
+			return possNormal
 		case outcomeAndOne:
 			gs.madeFieldGoal(offense, bh, result.ShotTwoPoint, result.OriginTransition, periodIdx)
 			gs.freeThrows(offense, defense, bh, def, 1, periodIdx)

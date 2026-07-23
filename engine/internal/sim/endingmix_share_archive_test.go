@@ -341,7 +341,11 @@ func TestEndingMixBaseline(t *testing.T) {
 	assertBand(t, "indep-TO share%", art.TOIndSharePct, 4.4, 5.4)
 	// J17: foul-only endings increase from trailing-by-3 crunch-time shotClock.
 	// Pre-J17 baseline 33.68/g (2026-07-19 artifact, stride=10). Band: +3.5/g max.
-	assertBand(t, "fta/game", art.FTAPerGame, 33.0, 37.2)
+	// Re-baselined 2026-07-23: transition-3pt gate removed, fta/game 33.77 → 30.63.
+	// Transition 3-point shots replace transition 2-point shots and draw fewer
+	// shooting fouls; J17 crunch-time foul-only endings remain and their headroom
+	// still caps the upper bound.
+	assertBand(t, "fta/game", art.FTAPerGame, 29.5, 34.2)
 }
 
 // assertBand fails the test if val is outside [lo, hi]. Used as a hard

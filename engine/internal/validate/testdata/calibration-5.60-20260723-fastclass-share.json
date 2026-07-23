@@ -1,0 +1,12 @@
+{
+  "generated": "2026-07-23T11:27:30-07:00",
+  "stride": 100,
+  "runs": 4,
+  "seed": 20240601,
+  "snapshots": 8,
+  "total_possessions": 6691612,
+  "drb_push_class": 820918,
+  "half_court": 5870694,
+  "drb_push_share_pct": 12.267866098632139,
+  "half_court_share_pct": 87.73213390136786
+}

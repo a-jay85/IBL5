@@ -1,0 +1,169 @@
+{
+  "games": 21886,
+  "games_passed": 29,
+  "mismatch_count": 67337,
+  "negative_count": 0,
+  "dominance_count": 0,
+  "mismatch_sample": [
+    {
+      "GameIndex": 0,
+      "TeamID": 15,
+      "Stat": "ORB",
+      "TeamTotal": 17,
+      "PlayerSum": 14,
+      "Delta": -3
+    },
+    {
+      "GameIndex": 0,
+      "TeamID": 15,
+      "Stat": "DRB",
+      "TeamTotal": 43,
+      "PlayerSum": 41,
+      "Delta": -2
+    },
+    {
+      "GameIndex": 0,
+      "TeamID": 22,
+      "Stat": "DRB",
+      "TeamTotal": 32,
+      "PlayerSum": 29,
+      "Delta": -3
+    },
+    {
+      "GameIndex": 1,
+      "TeamID": 17,
+      "Stat": "ORB",
+      "TeamTotal": 22,
+      "PlayerSum": 18,
+      "Delta": -4
+    },
+    {
+      "GameIndex": 1,
+      "TeamID": 17,
+      "Stat": "DRB",
+      "TeamTotal": 34,
+      "PlayerSum": 31,
+      "Delta": -3
+    },
+    {
+      "GameIndex": 1,
+      "TeamID": 20,
+      "Stat": "DRB",
+      "TeamTotal": 40,
+      "PlayerSum": 35,
+      "Delta": -5
+    },
+    {
+      "GameIndex": 2,
+      "TeamID": 9,
+      "Stat": "ORB",
+      "TeamTotal": 26,
+      "PlayerSum": 25,
+      "Delta": -1
+    },
+    {
+      "GameIndex": 2,
+      "TeamID": 9,
+      "Stat": "DRB",
+      "TeamTotal": 37,
+      "PlayerSum": 34,
+      "Delta": -3
+    },
+    {
+      "GameIndex": 2,
+      "TeamID": 25,
+      "Stat": "DRB",
+      "TeamTotal": 30,
+      "PlayerSum": 29,
+      "Delta": -1
+    },
+    {
+      "GameIndex": 3,
+      "TeamID": 1,
+      "Stat": "DRB",
+      "TeamTotal": 43,
+      "PlayerSum": 38,
+      "Delta": -5
+    },
+    {
+      "GameIndex": 3,
+      "TeamID": 8,
+      "Stat": "ORB",
+      "TeamTotal": 16,
+      "PlayerSum": 14,
+      "Delta": -2
+    },
+    {
+      "GameIndex": 3,
+      "TeamID": 8,
+      "Stat": "DRB",
+      "TeamTotal": 43,
+      "PlayerSum": 40,
+      "Delta": -3
+    },
+    {
+      "GameIndex": 4,
+      "TeamID": 18,
+      "Stat": "DRB",
+      "TeamTotal": 33,
+      "PlayerSum": 32,
+      "Delta": -1
+    },
+    {
+      "GameIndex": 4,
+      "TeamID": 13,
+      "Stat": "DRB",
+      "TeamTotal": 44,
+      "PlayerSum": 41,
+      "Delta": -3
+    },
+    {
+      "GameIndex": 5,
+      "TeamID": 11,
+      "Stat": "DRB",
+      "TeamTotal": 35,
+      "PlayerSum": 34,
+      "Delta": -1
+    },
+    {
+      "GameIndex": 5,
+      "TeamID": 16,
+      "Stat": "ORB",
+      "TeamTotal": 16,
+      "PlayerSum": 12,
+      "Delta": -4
+    },
+    {
+      "GameIndex": 6,
+      "TeamID": 7,
+      "Stat": "ORB",
+      "TeamTotal": 26,
+      "PlayerSum": 23,
+      "Delta": -3
+    },
+    {
+      "GameIndex": 6,
+      "TeamID": 7,
+      "Stat": "DRB",
+      "TeamTotal": 44,
+      "PlayerSum": 41,
+      "Delta": -3
+    },
+    {
+      "GameIndex": 6,
+      "TeamID": 21,
+      "Stat": "ORB",
+      "TeamTotal": 19,
+      "PlayerSum": 18,
+      "Delta": -1
+    },
+    {
+      "GameIndex": 6,
+      "TeamID": 21,
+      "Stat": "DRB",
+      "TeamTotal": 53,
+      "PlayerSum": 48,
+      "Delta": -5
+    }
+  ]
+}

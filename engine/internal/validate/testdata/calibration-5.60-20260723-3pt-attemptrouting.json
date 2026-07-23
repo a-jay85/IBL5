@@ -1,0 +1,15 @@
+{
+  "generated": "2026-07-23T11:20:37-07:00",
+  "snapshots": 98,
+  "games_cap": 60,
+  "seed": 20240601,
+  "valid_players": 26833,
+  "excluded_players": 10202,
+  "sim_pa_per_min": 0.05990513846426121,
+  "real_pa_per_min": 0.1099443309521703,
+  "total_gap": -0.05003919248790912,
+  "rate_effect": -0.04987568007610333,
+  "minute_effect": -0.00024071974552224525,
+  "interaction": 0.00007720733371649886,
+  "closure_residual": 4.531522549490435e-17
+}

@@ -1,0 +1,16 @@
+{
+  "team_seasons": 568,
+  "mean": 0.7628817582793874,
+  "std_dev": 0.13615565144054426,
+  "fraction_above_half": 0.9454225352112676,
+  "skipped": 22,
+  "negative_team_count": 1,
+  "negative_sample": [
+    {
+      "TeamID": 5,
+      "Rho": -0.027972027972027972,
+      "N": 12
+    }
+  ],
+  "max_player_avg": 39.36842105263158
+}

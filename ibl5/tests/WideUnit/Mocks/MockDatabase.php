@@ -54,6 +54,7 @@ class MockDatabase extends \mysqli
      */
     private array $operationLog = [];
     private int $affectedRows = 0;
+    private bool $affectedRowsOverridden = false;
     private ?int $failOnNthInsert = null;
     private int $insertCount = 0;
 
@@ -142,8 +143,8 @@ class MockDatabase extends \mysqli
                     return false;
                 }
             }
-            // Set affected rows for UPDATE/DELETE operations (default to 1 for successful operations)
-            if ($this->returnTrue) {
+            // Default to 1 for successful write ops; honour an explicit setAffectedRows() override
+            if ($this->returnTrue && !$this->affectedRowsOverridden) {
                 $this->affectedRows = 1;
             }
             return $this->returnTrue;
@@ -379,6 +380,7 @@ class MockDatabase extends \mysqli
     public function setAffectedRows(int $affectedRows): void
     {
         $this->affectedRows = $affectedRows;
+        $this->affectedRowsOverridden = true;
     }
     
     public function setReturnTrue(bool $returnTrue = true): void

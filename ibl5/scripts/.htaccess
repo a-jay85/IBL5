@@ -1,0 +1,10 @@
+# Deny web access to CLI-only scripts in this directory.
+# storeSimRecap.php is a privileged writer (writes ibl_sim_summaries, posts to
+# Discord) and is invoked only as `php ibl5/scripts/storeSimRecap.php --sim=N`.
+# Defense in depth: the script itself refuses non-CLI SAPIs (security constraint 4).
+#
+# Scoped to storeSimRecap.php only — a directory-wide deny would block
+# the other browser-invoked scripts in this directory.
+<Files "storeSimRecap.php">
+    Require all denied
+</Files>

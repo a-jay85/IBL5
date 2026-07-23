@@ -42,6 +42,7 @@ depthcharts
 !/IBL6
 .htaccess
 !/ibl5/ibl/IBL/.htaccess
+!/ibl5/scripts/.htaccess
 
 # Logs — runtime-generated (e.g. ibl5/IBL5.log, the multi-GB simulation log).
 # Never committed; lives next to source only because the sim writes it there.

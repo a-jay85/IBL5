@@ -1,6 +1,6 @@
 ---
 description: ADR for completing Bootstrap\Application as the single composition root for web, api, and test entry points
-last_verified: 2026-05-17
+last_verified: 2026-07-22
 ---
 
 # 0030 — Bootstrap unified composition (web/api/test)
@@ -29,7 +29,7 @@ Three bootstrap paths (mainfile.php / api.php / tests/bootstrap.php) each contai
 
 - New bootstrap concerns are added as a Step class registered in one or more factories. No duplicate code paths.
 - `LegacyFunctions.php` is the authoritative source for legacy globals (`include_secure`, `filter`, `blocks`, etc.).
-- mainfile.php reduced from 410 to 65 lines; tests/bootstrap.php from 96 to 7 lines (+ worktree autoloader).
+- mainfile.php reduced from 410 to 65 lines; tests/bootstrap.php from 96 to 7 lines (+ worktree autoloader). (Update 2026-07-22: both files subsequently grew as worktree autoloader blocks were added. Current counts: mainfile.php 72 lines, tests/bootstrap.php 40 lines.)
 - Test path benefits from the same container pipeline (future test parity wins).
 - The `blocks()` function now uses `real_escape_string()` in production (previously only the unused LegacyFunctions copy did).
 

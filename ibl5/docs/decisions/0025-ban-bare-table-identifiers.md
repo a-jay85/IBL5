@@ -1,6 +1,6 @@
 ---
 description: ADR for BanBareTableIdentifierRule PHPStan custom rule enforcing backtick-quoted table names
-last_verified: 2026-05-15
+last_verified: 2026-07-22
 ---
 
 # ADR-0025: Ban Bare Table Identifiers
@@ -34,6 +34,8 @@ The sweep is split into two PRs:
 - Positive: Future table renames get significant static-analysis coverage once PR B lands (see Known Gaps below).
 - Negative: 133 baseline entries added (temporary — PR B will remove them).
 - Negative: Test assertions that match SQL strings must include backticks, adding minor friction.
+
+**Update 2026-07-22:** `phpstan-baseline.neon` now contains **0** `ibl.bareTableIdentifier` entries (measured 2026-07-22). The PR B high-touch module sweep has been completed and the baseline entries removed. Remaining grep hits for `FROM/JOIN/UPDATE/INTO/DELETE FROM ibl_*` without backticks in `classes/` are in PHPDoc comments, docblocks, and `.md` files — outside the `String_`-node scope the rule scans, so they are not caught (and not in the baseline). The rule and its file-scope restriction (`str_contains($file, '/classes/')`) are unchanged.
 
 ## Known Gaps
 

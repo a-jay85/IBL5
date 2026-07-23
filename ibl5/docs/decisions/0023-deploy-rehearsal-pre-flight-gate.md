@@ -1,6 +1,6 @@
 ---
-description: Deploy rehearsal workflow gates production deploys by dry-running composer --no-dev, migrations, and schema validation against a disposable MariaDB before SSH steps touch prod.
-last_verified: 2026-05-13
+description: Deploy rehearsal workflow gates production deploys by dry-running composer --no-dev, migrations, and schema validation against a prod-cloned disposable MariaDB before SSH steps touch prod.
+last_verified: 2026-07-22
 ---
 
 # ADR-0023: Deploy Rehearsal Pre-Flight Gate
@@ -35,3 +35,5 @@ A reusable workflow `.github/workflows/deploy-rehearsal.yml` mirrors the exact `
 - `.github/workflows/migration-safety.yml` — template for MariaDB service + tracker-seed pattern
 - `ibl5/bin/validate-schema` — schema assertion runner
 - `ibl5/config/schema-assertions.php` — assertion definitions
+
+**Update 2026-07-22:** The deploy rehearsal no longer runs migrations against a fresh/empty MariaDB schema. Following a live production failure (migration 144, FK on real orphan rows — see ADR-0059), the rehearsal was changed to clone production data into the CI MariaDB via `bin/rehearsal-prod-dump` over SSH. The `composer install --no-dev` + `php bin/migrate` + `php bin/validate-schema` sequence and the `needs: pre-flight` gate in `main.yml` are unchanged; only the database seed changed from a snapshot to a prod clone. The MariaDB image remains 10.11.

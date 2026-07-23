@@ -1,6 +1,6 @@
 ---
 description: Post-refactoring roadmap and priority queue.
-last_verified: 2026-05-19
+last_verified: 2026-07-22
 ---
 
 # Strategic Development Priorities for IBL5
@@ -11,22 +11,22 @@ IBL5 has completed its full-stack modernization from a PHP-Nuke monolith to an i
 
 ### What's Built
 
-- **All IBL modules** follow Repository/Service/View pattern with `Contracts/` interfaces
-- **REST API** with 17 controllers, API key auth, rate limiting, ETag caching, pagination, CSV export
+- **IBL modules** follow the Repository/Service/View pattern with `Contracts/` interfaces (newer namespaces such as `SimRecap` and `BugPipeline` are not yet fully interface-backed)
+- **REST API** with 24 controllers, API key auth, rate limiting, ETag caching, pagination, CSV export
 - **Security stack**: CSP + HSTS + X-Frame-Options headers, CSRF on all forms, `HtmlSanitizer::e()` on all output, prepared statements everywhere
 - **HTMX frontend**: boosted navigation (SPA-like), tab switching via `hx-get`, partial-page loading, form boost
 - **Test pyramid**: PHPUnit (unit + integration + module entry point), Playwright E2E (functional + visual regression), Infection mutation testing at 100% MSI
 - **CI/CD**: PHPUnit + PHPStan + Playwright + Lighthouse + CodeQL + migration safety + mutation testing + production smoke tests + auto-rebase
 - **Docker dev environment**: multi-worktree with Traefik routing, isolated DBs, automated migration runner
-- **IBL6 SvelteKit frontend** in early development (`IBL6/`)
+- **IBL6 SvelteKit frontend** in early development — a separate sibling repo (`~/GitHub/IBL6`), not a subdirectory of this one; its container image is built here by `.github/workflows/build-ibl6-image.yml`
 
 ### Quality Gates (enforced by CI)
 
 - PHPStan level `max` with `strict-rules` and `bleedingEdge` — zero errors
 - PHPUnit — full suite green, zero skips
-- Coverage threshold — 70% (ratcheted; actual ~80%)
+- Coverage threshold — 80% floor (`ibl5/bin/check-coverage`), plus a no-regression check against `ibl5/coverage-baseline.json` (actual 84.26%)
 - Mutation testing — 100% MSI / 100% Covered MSI (weekly + on-demand)
-- Playwright E2E — 4-shard parallel, visual regression baselines
+- Playwright E2E — single shard (was 4; collapsed to fit free-tier runner caps), visual regression baselines
 - Lighthouse — performance audits on every PR
 
 ---
@@ -65,29 +65,34 @@ HTMX is partially adopted — boosted navigation, tab switching, and form boost 
 
 ### 4. Test Coverage Expansion
 
-Coverage is at ~80% with the 70% CI threshold. The test suite is mature (PHPUnit, Playwright, mutation testing all enforced), but there are still gaps in integration test coverage for some modules.
+Coverage is at 84.26% with an 80% CI floor plus a no-regression check. The test suite is mature (PHPUnit, Playwright, mutation testing all enforced), but there are still gaps in integration test coverage for some modules.
 
 **Remaining work:**
-- Ratchet coverage threshold as new tests are added (next target: 75%)
+- Ratchet the coverage floor upward as new tests are added (the floor is manual — set in the `Check coverage threshold` step of `.github/workflows/tests.yml`)
 - Add module entry point tests for untested modules (using `ModuleEntryPointTestCase`)
 - Expand E2E coverage for form submission flows that currently only have read-only tests
 
 ### 5. API Maturation
 
-The REST API has 17 controllers covering players, teams, games, standings, schedule, leaders, injuries, trade actions, and CSV export. Auth (API keys), rate limiting, ETag caching, and pagination are all in place.
+The REST API has 24 controllers covering players (list/detail/stats/history/export), teams (list/detail/roster), games (list/detail/boxscore), standings, seasons, leaders, injuries, trade actions, PR threads/reactions, and pipeline/health/enqueue operations. Auth (API keys), rate limiting, ETag caching, and pagination are all in place.
 
 **Remaining work:**
 - OpenAPI/Swagger documentation generation
 - Additional endpoints as IBL6 frontend needs arise
 - Consider JWT auth alongside API keys for user-scoped operations
 
+### 6. JSB Native Sim Engine (Go)
+
+A native Go re-implementation of the jumpshot 5.60 sim engine lives under `engine/`, scaffolded May 2026. The goal is cut-over fidelity with the legacy Windows binary so simulation stops depending on it.
+
+**Remaining work:** tracked item-by-item in [backlog/jsb-native-backlog.md](backlog/jsb-native-backlog.md) — the count-axis cut-over blocker chain, static RE pins, faithful ports, and validation gates. That backlog is the single source of truth for engine status; do not duplicate item state here.
+
 ---
 
 ## Lower Priority / Future
 
 - **Performance optimization**: Query analysis, Redis caching layer, page fragment caching. Not urgent — current page loads are acceptable.
-- **PowerRankings module**: The only display module without `Contracts/` interfaces. Low impact, refactor opportunistically.
-- **Generic PHP-Nuke modules** (Web_Links, Your_Account, News, Content, etc.): Will be replaced by IBL6 SvelteKit equivalents rather than refactored in PHP.
+- **Generic PHP-Nuke modules**: `Web_Links` and `Content` are already gone; `News`, `Topics`, and `YourAccount` remain and will be replaced by IBL6 SvelteKit equivalents rather than refactored in PHP.
 
 ---
 
@@ -97,3 +102,4 @@ The REST API has 17 controllers covering players, teams, games, standings, sched
 - **Jan 2026**: 80% test coverage target achieved; all display modules refactored
 - **Feb 2026**: REST API launched with auth, rate limiting, caching
 - **Mar 2026**: HTMX frontend phases 1-3 shipped; mutation testing at 100% MSI; legacy `nuke_*` tables reduced to 10 (from 30+); TradingRepository god class split; CSV player export; production deploy smoke tests; worktree Docker simplification
+- **Apr – Jul 2026**: coverage floor ratcheted 70% → 80% (actual 84.26%) with a no-regression baseline check; REST API grown 17 → 24 controllers (PR threads/reactions, pipeline state, health, enqueue); native Go sim engine scaffolded under `engine/` (May 2026); E2E resharded 4 → 1 to fit free-tier runner caps

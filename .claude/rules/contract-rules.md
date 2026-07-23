@@ -8,7 +8,7 @@ paths:
   - "ibl5/classes/Player/Contract/**/*"
   - "ibl5/classes/Waivers/**/*"
   - "ibl5/classes/ContractList/**/*"
-last_verified: 2026-05-16
+last_verified: 2026-07-22
 ---
 
 # IBL Contract Rules (CBA)
@@ -50,9 +50,14 @@ Player must play **3+ consecutive years** with the same team.
 ## Key Methods
 
 ```php
-ContractRules::hasBirdRights(int $yearsWithTeam): bool
-ContractRules::getMaxRaisePercentage(int $yearsWithTeam): float  // 0.10 or 0.125
+ContractRules::hasBirdRights(int $birdYears): bool
+ContractRules::getMaxRaisePercentage(int $birdYears): float  // 0.10 or 0.125
+ContractRules::calculateMaxRaise(int $yearOneOffer, int $birdYears): int
 ContractRules::getVeteranMinimumSalary(int $experience): int
 ContractRules::getMaxContractSalary(int $experience): int
 ContractRules::getMLEOffers(int $years): array
 ```
+
+All raise calculations (validators, preset buttons, display hints) MUST go through
+`calculateMaxRaise()` — it `floor()`s the result, so bypassing it reintroduces
+off-by-one rounding inconsistencies between the UI and the validator.

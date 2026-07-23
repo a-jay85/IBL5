@@ -1,6 +1,6 @@
 ---
 description: ADR for Lighthouse PR sticky comments with per-URL scores and deltas vs master baseline
-last_verified: 2026-05-13
+last_verified: 2026-07-22
 ---
 
 # ADR-0022: Lighthouse PR Comments
@@ -28,6 +28,8 @@ Post a sticky PR comment with per-URL scores, deltas against master, and direct 
 - Positive: Direct report links in the comment eliminate the hunt-the-storage-URL friction.
 - Negative: `pull-requests: write` permission added to the Lighthouse workflow (small attack surface increase).
 - Negative: Third-party action dependency (`marocchino/sticky-pull-request-comment@v2`).
+
+**Update 2026-07-22:** The action has been upgraded to v3.0.5 (pin `5770ad5eb8f42dd2c4f34da00c94c5381e49af88`). The sticky-comment behaviour is unchanged.
 - Negative: `numberOfRuns: 3` increases CI wall-clock time from ~5 min to ~12 min for the Lighthouse job.
 
 ## References

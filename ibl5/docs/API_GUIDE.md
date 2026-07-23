@@ -1,11 +1,11 @@
 ---
-description: REST API architectural overview — auth, rate limiting, ETag caching, controller inventory.
-last_verified: 2026-05-19
+description: REST API architectural overview — auth, rate limiting, ETag caching, controller inventory, route table.
+last_verified: 2026-07-22
 ---
 
 # API Guide
 
-**Status:** Implemented ✅ — 17 controllers, API key auth, rate limiting, ETag caching, pagination, CSV export.
+**Status:** Implemented ✅ — 24 controllers, API key auth, rate limiting, ETag caching, pagination, CSV export.
 
 ## Architecture
 
@@ -14,34 +14,89 @@ ibl5/classes/Api/
 ├── Router.php                     # Route dispatch
 ├── Cache/
 │   └── ETagHandler.php            # HTTP ETag caching
-├── Controller/                    # 17 endpoint controllers
+├── Contracts/                     # API interfaces
+│   ├── AuthenticatorInterface.php
+│   ├── ControllerInterface.php
+│   ├── RateLimiterInterface.php
+│   ├── RouterInterface.php
+│   └── TransformerInterface.php
+├── Controller/                    # 24 controllers
+│   ├── EnqueueController.php
 │   ├── GameBoxscoreController.php
 │   ├── GameDetailController.php
 │   ├── GameListController.php
+│   ├── HealthController.php
 │   ├── InjuriesController.php
+│   ├── LastSeenController.php
 │   ├── LeadersController.php
+│   ├── PipelineStateController.php
 │   ├── PlayerDetailController.php
 │   ├── PlayerExportController.php
 │   ├── PlayerHistoryController.php
 │   ├── PlayerListController.php
 │   ├── PlayerStatsController.php
+│   ├── ReactionController.php
 │   ├── SeasonController.php
 │   ├── StandingsController.php
 │   ├── TeamDetailController.php
 │   ├── TeamListController.php
 │   ├── TeamRosterController.php
+│   ├── ThreadByPrController.php
+│   ├── ThreadReplyController.php
 │   ├── TradeAcceptController.php
 │   └── TradeDeclineController.php
-└── Middleware/
-    ├── Contracts/
-    ├── ApiKeyAuthenticator.php    # API key validation
-    ├── RateLimiter.php            # Per-key rate limiting
-    └── SystemClock.php
+├── Middleware/
+│   ├── ApiKeyAuthenticator.php    # API key validation
+│   └── RateLimiter.php            # Per-key rate limiting
+├── Pagination/
+│   └── Paginator.php
+├── Repository/                    # Data access layer
+├── Response/                      # JSON, CSV, HTML responders
+└── Transformer/                   # Response shape transformers
 ```
+
+## Route Inventory
+
+All routes are registered in `ibl5/classes/Api/Router.php`.
+
+### GET routes (API key required except `health`)
+
+| Route | Controller |
+|-------|------------|
+| `health` | `HealthController` — public, no auth |
+| `players` | `PlayerListController` |
+| `players/export` | `PlayerExportController` |
+| `players/{uuid}` | `PlayerDetailController` |
+| `players/{uuid}/stats` | `PlayerStatsController` |
+| `players/{uuid}/history` | `PlayerHistoryController` |
+| `teams` | `TeamListController` |
+| `teams/{uuid}` | `TeamDetailController` |
+| `teams/{uuid}/roster` | `TeamRosterController` |
+| `standings` | `StandingsController` |
+| `standings/{conference}` | `StandingsController` |
+| `games` | `GameListController` |
+| `games/{uuid}` | `GameDetailController` |
+| `games/{uuid}/boxscore` | `GameBoxscoreController` |
+| `stats/leaders` | `LeadersController` |
+| `injuries` | `InjuriesController` |
+| `season` | `SeasonController` |
+
+### POST routes (API key required)
+
+| Route | Controller |
+|-------|------------|
+| `trades/{offerId}/accept` | `TradeAcceptController` |
+| `trades/{offerId}/decline` | `TradeDeclineController` |
+| `bug-pipeline/enqueue` | `EnqueueController` |
+| `bug-pipeline/thread-reply` | `ThreadReplyController` |
+| `bug-pipeline/reaction` | `ReactionController` |
+| `bug-pipeline/last-seen` | `LastSeenController` |
+| `bug-pipeline/state` | `PipelineStateController` |
+| `bug-pipeline/thread-by-pr` | `ThreadByPrController` |
 
 ## Features
 
-- **Authentication:** API key validation via `ApiKeyAuthenticator`
+- **Authentication:** API key validation via `ApiKeyAuthenticator` (the `health` route is public — no key required)
 - **Rate Limiting:** Per-key enforcement via `RateLimiter`
 - **Caching:** HTTP ETag support via `ETagHandler` using `updated_at` timestamps
 - **Pagination:** Built into list controllers

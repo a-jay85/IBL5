@@ -1,6 +1,6 @@
 ---
 description: Docker Compose setup for local PHP-Apache + MariaDB stack.
-last_verified: 2026-05-22
+last_verified: 2026-07-22
 ---
 
 # Docker Development Setup
@@ -40,7 +40,7 @@ The site is available at **http://main.localhost/ibl5/**.
 | PHP-Apache | http://main.localhost/ibl5/ | Application |
 | MariaDB | localhost:3306 | Database |
 | Mailpit | http://localhost:8025 | Email testing UI |
-| Adminer | http://localhost:8082 | Database browser |
+| Adminer | http://adminer.localhost/ | Database browser |
 | Traefik Dashboard | http://localhost:8081 | Reverse proxy routes |
 
 ### Adminer Login
@@ -172,7 +172,7 @@ bin/wt-down --all --volumes
 
 ### Adminer Access
 
-Connect to any worktree's database via Adminer at http://localhost:8082:
+Connect to any worktree's database via Adminer at http://adminer.localhost/ (routes through Traefik):
 - Server: `ibl5-db-<slug>` (e.g., `ibl5-db-my-feature`)
 - Username: `root`
 - Password: `root`

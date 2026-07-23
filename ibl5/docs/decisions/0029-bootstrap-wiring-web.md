@@ -1,6 +1,6 @@
 ---
 description: ADR for wiring Bootstrap\Application as mainfile.php composition root (web mode)
-last_verified: 2026-05-17
+last_verified: 2026-07-22
 ---
 
 # 0029 — Bootstrap\Application wired as mainfile.php composition root (web)

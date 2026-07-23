@@ -1,6 +1,6 @@
 ---
 description: Why PHPStan level max plus strict-rules plus RequireStrictTypesRule is the non-negotiable type floor.
-last_verified: 2026-05-14
+last_verified: 2026-07-22
 ---
 
 # ADR-0005: Strict types + typed properties enforcement
@@ -21,7 +21,7 @@ Every PHP file inside `ibl5/classes/` must begin with `declare(strict_types=1);`
 - **Strict equality:** always `===` / `!==`, never `==` / `!=`.
 - **Null handling:** nullable types (`?string`) and null coalescing (`??`), no implicit null-to-empty.
 
-The rule fires in PostToolUse during editing and in CI via `tests.yml` PHPStan job.
+The rule fires in PostToolUse on task completion (not per-edit) and in CI via `tests.yml` PHPStan job.
 
 ## Alternatives Considered
 

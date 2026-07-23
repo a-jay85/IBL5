@@ -1,6 +1,6 @@
 ---
 description: PHPStan rules ban implicit superglobals and global keyword outside bootstrap, enforcing constructor injection.
-last_verified: 2026-05-17
+last_verified: 2026-07-22
 ---
 
 # ADR-0032: Ban Implicit Superglobals and Global Keyword

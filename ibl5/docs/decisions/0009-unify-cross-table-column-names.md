@@ -1,6 +1,6 @@
 ---
 description: Rationale for unifying turnover, 3-pointer rating, and team-id column names across the schema (Tier 2 of the sql-column-naming audit), enforced by a new PHPStan rule.
-last_verified: 2026-05-20
+last_verified: 2026-07-22
 ---
 
 # ADR-0009: Unify Cross-Table Column Names

@@ -2884,6 +2884,23 @@ CREATE TABLE `ibl_sim_dates` (
   PRIMARY KEY (`sim`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `ibl_sim_summaries`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ibl_sim_summaries` (
+  `sim` int(10) unsigned NOT NULL COMMENT 'PK — one row per sim; idempotency key for the queue insert and the seed.',
+  `status` enum('pending','generating','done','failed') NOT NULL DEFAULT 'pending' COMMENT 'Lifecycle: pending → generating → done|failed.',
+  `recap_text` mediumtext DEFAULT NULL COMMENT 'The generated prose (up to 16 MB).',
+  `themes_used` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL COMMENT 'Anti-repetition ledger — the themes used in this recap, read back over the last 5 sims.' CHECK (json_valid(`themes_used`)),
+  `claimed_at` datetime DEFAULT NULL COMMENT 'When the tick claimed this row for generation.',
+  `generated_at` datetime DEFAULT NULL COMMENT 'When the recap was stored.',
+  `attempts` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Number of generation attempts; ceiling 2 before → failed.',
+  `blocked_until` datetime DEFAULT NULL COMMENT 'Usage-limit backoff — row is not eligible until this time.',
+  `created_at` datetime NOT NULL DEFAULT current_timestamp() COMMENT 'Row creation timestamp.',
+  PRIMARY KEY (`sim`),
+  KEY `idx_claim` (`status`,`blocked_until`,`sim`) COMMENT 'The composite index the oldest-pending-first selection scans.'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_sophomore_career_totals`;
 /*!50001 DROP VIEW IF EXISTS `ibl_sophomore_career_totals`*/;
 SET @saved_cs_client     = @@character_set_client;

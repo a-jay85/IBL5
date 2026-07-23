@@ -19,7 +19,6 @@ a `/plan`.
 | [token-spend-backlog.md](token-spend-backlog.md) | Token-economy of the Claude Code harness — resident context, caching, output spend. |
 | [dev-efficiency-backlog.md](dev-efficiency-backlog.md) | Development-efficiency tooling — inner-loop speed, CI caching, worktree lifecycle. |
 | [loop-engineering-backlog.md](loop-engineering-backlog.md) | Autonomous-loop robustness — automouse queue, self-healing, digests, autonomy contracts. |
-| [jsb-native-backlog.md](jsb-native-backlog.md) | JSB native-engine cut-over — count-axis blocker chain, static RE pins, faithful ports; every entry model-tiered (incl. Fable-gated). |
 
 Note: `token-spend-backlog.md` and `loop-engineering-backlog.md` include entries whose deliverable lives
 **outside the repo** (`$HOME/.claude/` settings/hooks/memory — marked ⌂ in those files). Those are exempt

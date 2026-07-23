@@ -495,7 +495,7 @@ final class CheckDocsCliTest extends TestCase
     public function sinceUnchangedBadBacklogNotInDiffExitsZero(): void
     {
         $this->commitFile(
-            'ibl5/docs/backlog/jsb-native-backlog.md',
+            'ibl5/docs/backlog/sample-backlog.md',
             $this->doc($this->freshDate(), "### 1 Item\n\n**Status (2026-07-01):** ✅ Implemented — no pointer, deliberately bad.\n"),
             'bad backlog'
         );

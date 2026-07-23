@@ -499,4 +499,19 @@ return [
     new SchemaAssertion('ibl_sim_summaries', 'generated_at'),
     new SchemaAssertion('ibl_sim_summaries', 'attempts'),
     new SchemaAssertion('ibl_sim_summaries', 'blocked_until'),
+    new SchemaAssertion('ibl_sim_summaries', 'intro_text'),
+    new SchemaAssertion('ibl_sim_summaries', 'outro_text'),
+
+    // Migration 155 — sim recap per-game child table
+    new SchemaAssertion('ibl_sim_game_recaps', 'id'),
+    new SchemaAssertion('ibl_sim_game_recaps', 'sim'),
+    new SchemaAssertion('ibl_sim_game_recaps', 'season_year'),
+    new SchemaAssertion('ibl_sim_game_recaps', 'game_date'),
+    new SchemaAssertion('ibl_sim_game_recaps', 'visitor_teamid'),
+    new SchemaAssertion('ibl_sim_game_recaps', 'home_teamid'),
+    new SchemaAssertion('ibl_sim_game_recaps', 'game_of_that_day'),
+    new SchemaAssertion('ibl_sim_game_recaps', 'box_id'),
+    new SchemaAssertion('ibl_sim_game_recaps', 'sort_order'),
+    new SchemaAssertion('ibl_sim_game_recaps', 'recap_text'),
+    new SchemaAssertion('ibl_sim_game_recaps', 'created_at'),
 ];

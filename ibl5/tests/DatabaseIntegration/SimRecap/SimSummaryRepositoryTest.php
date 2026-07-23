@@ -52,19 +52,28 @@ final class SimSummaryRepositoryTest extends DatabaseTestCase
         $this->repo->queuePendingIfAbsent(999001);
         $this->repo->claimPending(999001);
 
-        $this->repo->markDone(999001, 'Recap prose.', '["comeback"]');
+        $gameRecap = $this->gameRecap(sortOrder: 0, gameOfThatDay: 1);
+        $this->repo->markDone(999001, 'Intro.', 'Outro.', 'Recap prose.', [$gameRecap], '["comeback"]');
 
         $row = $this->repo->find(999001);
         self::assertNotNull($row);
         self::assertSame('done', $row['status']);
         self::assertSame('Recap prose.', $row['recap_text']);
+        self::assertSame('Intro.', $row['intro_text']);
+        self::assertSame('Outro.', $row['outro_text']);
         self::assertSame('["comeback"]', $row['themes_used']);
         self::assertNotNull($row['generated_at']);
+
+        $recaps = $this->repo->findGameRecaps(999001);
+        self::assertCount(1, $recaps);
+        self::assertSame(2025, $recaps[0]['season_year']);
+        self::assertSame('2025-01-01', $recaps[0]['game_date']);
+        self::assertSame(0, $recaps[0]['sort_order']);
     }
 
     public function testMarkDoneUpsertsWhenNoRowWasQueued(): void
     {
-        $this->repo->markDone(999005, 'Upserted recap.', null);
+        $this->repo->markDone(999005, 'Intro.', 'Outro.', 'Upserted recap.', [], null);
 
         $row = $this->repo->find(999005);
         self::assertNotNull($row);
@@ -75,7 +84,7 @@ final class SimSummaryRepositoryTest extends DatabaseTestCase
     {
         // Insert six done rows for sims 999010–999015 with distinct themes
         for ($sim = 999010; $sim <= 999015; $sim++) {
-            $this->repo->markDone($sim, "Recap for sim {$sim}.", "[\"theme-{$sim}\"]");
+            $this->repo->markDone($sim, 'Intro.', 'Outro.', "Recap for sim {$sim}.", [], "[\"theme-{$sim}\"]");
         }
 
         $rows = $this->repo->recentThemes(5);
@@ -180,7 +189,7 @@ final class SimSummaryRepositoryTest extends DatabaseTestCase
 
     public function testParkOrFailReturnsNoneWhenNotGenerating(): void
     {
-        $this->repo->markDone(999001, 'text', null);
+        $this->repo->markDone(999001, 'i', 'o', 'text', [], null);
 
         $result = $this->repo->parkOrFail(999001);
         self::assertSame('none', $result);
@@ -224,7 +233,7 @@ final class SimSummaryRepositoryTest extends DatabaseTestCase
 
     public function testRecentThemesToleratesMalformedJson(): void
     {
-        $this->repo->markDone(999001, 'text', '"not-a-list"');
+        $this->repo->markDone(999001, 'i', 'o', 'text', [], '"not-a-list"');
 
         $rows = $this->repo->recentThemes(5);
 
@@ -237,5 +246,111 @@ final class SimSummaryRepositoryTest extends DatabaseTestCase
             }
         }
         self::assertTrue($found, 'Malformed JSON must be returned as-is without throwing');
+    }
+
+    // ── findGameRecaps tests ───────────────────────────────────────────────────
+
+    public function testMarkDoneStoresGameRecapsInSortOrder(): void
+    {
+        // Insert sort_order=1 first, sort_order=0 second — findGameRecaps must return 0,1
+        $games = [
+            $this->gameRecap(sortOrder: 1, gameOfThatDay: 1),
+            $this->gameRecap(sortOrder: 0, gameOfThatDay: 2),
+        ];
+        $this->repo->markDone(999001, 'Intro.', 'Outro.', 'Recap.', $games, null);
+
+        $recaps = $this->repo->findGameRecaps(999001);
+
+        self::assertCount(2, $recaps);
+        self::assertSame(0, $recaps[0]['sort_order'], 'First row must have sort_order=0');
+        self::assertSame(1, $recaps[1]['sort_order'], 'Second row must have sort_order=1');
+        // Natural-key and prose round-trip
+        self::assertSame(2025, $recaps[0]['season_year']);
+        self::assertSame('2025-01-01', $recaps[0]['game_date']);
+        self::assertSame('Recap for game 2.', $recaps[0]['recap_text']);
+        self::assertSame('Recap for game 1.', $recaps[1]['recap_text']);
+    }
+
+    public function testMarkDoneWithNullBoxIdRoundTripsAsNull(): void
+    {
+        $game = $this->gameRecap(sortOrder: 0, gameOfThatDay: 1, boxId: null);
+        $this->repo->markDone(999001, 'Intro.', 'Outro.', 'Recap.', [$game], null);
+
+        $recaps = $this->repo->findGameRecaps(999001);
+
+        self::assertCount(1, $recaps);
+        self::assertNull($recaps[0]['box_id'], 'A null box_id must round-trip as null');
+    }
+
+    public function testMarkDoneReStoreIsIdempotent(): void
+    {
+        $game = $this->gameRecap(sortOrder: 0, gameOfThatDay: 1);
+        $this->repo->markDone(999001, 'First intro.', 'First outro.', 'First recap.', [$game], null);
+
+        // Second call with updated prose — ODKU must update in place, not duplicate
+        $this->repo->markDone(999001, 'Second intro.', 'Second outro.', 'Second recap.', [$game], null);
+
+        $recaps = $this->repo->findGameRecaps(999001);
+        self::assertCount(1, $recaps, 'Re-store must not create duplicate game rows');
+
+        $row = $this->repo->find(999001);
+        self::assertNotNull($row);
+        self::assertSame('Second recap.', $row['recap_text'], 'recap_text must reflect the second call');
+    }
+
+    public function testMarkDoneRollsBackEnvelopeWhenAChildFails(): void
+    {
+        // 'not-a-date' is an invalid DATE value; MariaDB strict mode rejects it
+        // mid-transaction, causing the SAVEPOINT to roll back the envelope too.
+        $badGame = [
+            'season_year'      => 2025,
+            'game_date'        => 'not-a-date',
+            'visitor_teamid'   => 1,
+            'home_teamid'      => 2,
+            'game_of_that_day' => 1,
+            'box_id'           => null,
+            'sort_order'       => 0,
+            'recap_text'       => 'A recap.',
+        ];
+
+        $threw = false;
+        try {
+            $this->repo->markDone(999099, 'Intro.', 'Outro.', 'Recap.', [$badGame], null);
+        } catch (\Throwable) {
+            $threw = true;
+        }
+
+        self::assertTrue($threw, 'markDone must throw when a child game insert is rejected by the DB');
+        self::assertNull(
+            $this->repo->find(999099),
+            'Envelope row must not persist after the transaction rolls back'
+        );
+        self::assertSame(
+            [],
+            $this->repo->findGameRecaps(999099),
+            'Game recap rows must not persist after the transaction rolls back'
+        );
+    }
+
+    // ── Private helpers ────────────────────────────────────────────────────────
+
+    /**
+     * Build a minimal valid game recap array for markDone's $gameRecaps parameter.
+     * Vary $gameOfThatDay to produce distinct natural keys (avoiding UNIQUE violations).
+     *
+     * @return array{season_year: int, game_date: string, visitor_teamid: int, home_teamid: int, game_of_that_day: int, box_id: ?int, sort_order: int, recap_text: string}
+     */
+    private function gameRecap(int $sortOrder, int $gameOfThatDay = 1, ?int $boxId = 42): array
+    {
+        return [
+            'season_year'      => 2025,
+            'game_date'        => '2025-01-01',
+            'visitor_teamid'   => 1,
+            'home_teamid'      => 2,
+            'game_of_that_day' => $gameOfThatDay,
+            'box_id'           => $boxId,
+            'sort_order'       => $sortOrder,
+            'recap_text'       => "Recap for game {$gameOfThatDay}.",
+        ];
     }
 }

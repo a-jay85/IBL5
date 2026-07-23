@@ -15,9 +15,14 @@ set -euo pipefail
 MAX_BYTES="${RULES_BYTE_BUDGET:-5000}"
 MAX_TOTAL="${RULES_TOTAL_BUDGET:-30000}"
 RULES_DIR="$(git rev-parse --show-toplevel)/.claude/rules"
+# Allowlist: the ONLY top-level rules permitted to be always-loaded (path-unscoped).
+# Any path-unscoped file NOT listed here — or any listed file that gains a paths:
+# key or is removed — fails the gate. Update deliberately, with justification.
+ALLOWLIST="agent-tiering auto-commit work-triage workflow-continuity worktree-hostname"
 
 fail=0
 total_bytes=0
+unscoped_names=()
 for f in "$RULES_DIR"/*.md; do
   # Frontmatter = lines between the first two `---` markers.
   fm="$(awk '/^---$/{c++; next} c==1{print} c>=2{exit}' "$f")"
@@ -25,6 +30,7 @@ for f in "$RULES_DIR"/*.md; do
   if grep -q '^paths:' <<<"$fm"; then
     continue
   fi
+  unscoped_names+=("$(basename "$f" .md)")
   bytes="$(wc -c < "$f")"
   total_bytes=$(( total_bytes + bytes ))
   if (( bytes > MAX_BYTES )); then
@@ -36,6 +42,19 @@ done
 if (( total_bytes > MAX_TOTAL )); then
   printf 'FAIL  aggregate path-unscoped rules: %d bytes  (total budget %d)\n' \
     "$total_bytes" "$MAX_TOTAL" >&2
+  fail=1
+fi
+# Allowlist assertion: the path-unscoped set must equal ALLOWLIST exactly.
+actual_sorted="$(printf '%s\n' "${unscoped_names[@]}" | sort -u)"
+allow_sorted="$(printf '%s\n' $ALLOWLIST | sort -u)"
+unexpected="$(comm -23 <(printf '%s\n' "$actual_sorted") <(printf '%s\n' "$allow_sorted"))"
+missing="$(comm -13 <(printf '%s\n' "$actual_sorted") <(printf '%s\n' "$allow_sorted"))"
+if [[ -n "$unexpected" ]]; then
+  printf 'FAIL  always-loaded rule NOT in allowlist (add a paths: key to scope it, or extend ALLOWLIST with justification):\n%s\n' "$unexpected" >&2
+  fail=1
+fi
+if [[ -n "$missing" ]]; then
+  printf 'FAIL  allowlisted always-loaded rule missing or newly path-scoped:\n%s\n' "$missing" >&2
   fail=1
 fi
 

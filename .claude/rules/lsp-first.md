@@ -1,6 +1,7 @@
 ---
 description: For symbol lookups (definition, references, signature), call the LSP tool before Grep/Explore — one semantic call replaces a noisy multi-file grep-and-read.
-last_verified: 2026-07-07
+last_verified: 2026-07-22
+paths: "**/*.php"
 ---
 
 # LSP-First Symbol Lookup

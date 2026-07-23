@@ -85,7 +85,7 @@ The REST API has 24 controllers covering players (list/detail/stats/history/expo
 
 A native Go re-implementation of the jumpshot 5.60 sim engine lives under `engine/`, scaffolded May 2026. The goal is cut-over fidelity with the legacy Windows binary so simulation stops depending on it.
 
-**Remaining work:** tracked item-by-item in [backlog/jsb-native-backlog.md](backlog/jsb-native-backlog.md) — the count-axis cut-over blocker chain, static RE pins, faithful ports, and validation gates. That backlog is the single source of truth for engine status; do not duplicate item state here.
+**Remaining work:** tracked item-by-item in [engine/docs/backlog/jsb-native-backlog.md](engine/docs/backlog/jsb-native-backlog.md) — the count-axis cut-over blocker chain, static RE pins, faithful ports, and validation gates. That backlog is the single source of truth for engine status; do not duplicate item state here.
 
 ---
 

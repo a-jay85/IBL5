@@ -229,6 +229,38 @@ func (s *teamShoot) add(o teamShoot) {
 	s.orb += o.orb
 }
 
+// abFreeze selects the A/B arm from JSB_3PT_AB.
+//   - Unset (default): sim.FreezeConfig{} — the ported engine; putback 3pt is
+//     REACHABLE (faithful JSB 5.60 per 2026-07-22 decompile). Reproduces the
+//     committed baseline artifact.
+//   - "suppress": sim.FreezeConfig{SuppressPutback3pt: true} — the pre-port
+//     baseline with putback-3pt zeroing RESTORED in ISOLATION. This is the
+//     attributable arm: it isolates the 3pt suppression mechanism (make-value
+//     untouched) and is the direct J24 candidate-(a) A/B comparator.
+//   - "putback": sim.FreezeConfig{UnfaithfulPutback: true} — the ADR-0055 OFF
+//     walk (make-value site only, not the 3pt suppression). Kept for reference;
+//     it moves a DIFFERENT mechanism than "suppress". Toggling a mechanism, never
+//     a constant (ADR-0090).
+func abFreeze() sim.FreezeConfig {
+	switch os.Getenv("JSB_3PT_AB") {
+	case "suppress":
+		return sim.FreezeConfig{SuppressPutback3pt: true}
+	case "putback":
+		return sim.FreezeConfig{UnfaithfulPutback: true}
+	default:
+		return sim.FreezeConfig{}
+	}
+}
+
+// abSuffix keeps each arm's artifact on its own path so a run cannot silently
+// overwrite the other arm's measurement.
+func abSuffix() string {
+	if arm := os.Getenv("JSB_3PT_AB"); arm != "" {
+		return "-ab-" + arm
+	}
+	return ""
+}
+
 func TestRealArchive_ThreePtUndershoot(t *testing.T) {
 	dir := os.Getenv("JSB_ARCHIVE_DIR")
 	if dir == "" {
@@ -344,7 +376,7 @@ func TestRealArchive_ThreePtUndershoot(t *testing.T) {
 				break
 			}
 			sub := bundle.Bundle{LeagueID: b.LeagueID, Teams: b.Teams, Players: b.Players, Schedule: []bundle.Game{g}}
-			res, err := sim.SimulateWith(sub, seed+uint64(gi), sim.Options{ThreePtDiag: diag})
+			res, err := sim.SimulateWith(sub, seed+uint64(gi), sim.Options{ThreePtDiag: diag, Freeze: abFreeze()})
 			if err != nil {
 				t.Fatalf("SimulateWith: %v", err)
 			}
@@ -584,7 +616,7 @@ func TestRealArchive_ThreePtUndershoot(t *testing.T) {
 	}
 
 	out := filepath.Join("..", "validate", "testdata",
-		fmt.Sprintf("calibration-5.60-%s-3pt-undershoot.json", time.Now().Format("20060102")))
+		fmt.Sprintf("calibration-5.60-%s-3pt-undershoot%s.json", time.Now().Format("20060102"), abSuffix()))
 	blob, err := json.MarshalIndent(art, "", "  ")
 	if err != nil {
 		t.Fatalf("marshal artifact: %v", err)

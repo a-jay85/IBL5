@@ -64,6 +64,17 @@ type FreezeConfig struct {
 	// (validate() ignores it, mirroring BranchB). Production NEVER sets it.
 	UnfaithfulPutback bool
 
+	// SuppressPutback3pt is a NORMAL-polarity diagnostic arm — zero value IS the live
+	// engine. Default false = the faithful JSB 5.60 behaviour: an OriginOffReb
+	// continuation reaches the FULL four-bucket outcome set, 3pt included. Set true to
+	// restore the pre-2026-07-22 zeroing of threePtW on OriginOffReb as an A/B baseline.
+	// Decoupled from UnfaithfulPutback on 2026-07-22: that hatch still gates the putback
+	// 2pt make-value (a separate, still-faithful ADR-0055 mechanism), and conflating the
+	// two made the 3PA measurement non-attributable. Proof the zeroing is unfaithful:
+	// jsb-native/re-artifacts/jsb-j24-oreb-3pt-eligibility-20260722.md. It consumes no
+	// Means (validate() must ignore it, mirroring BranchB). Production NEVER sets it.
+	SuppressPutback3pt bool
+
 	// UnfaithfulOreb is an INVERTED-POLARITY escape hatch — zero value is NOT "live
 	// engine." Default false = the FAITHFUL JSB 5.60 offensive-rebound continuation
 	// (ADR-0058): gs.orebProb resolves the single determination roll via the sqrt

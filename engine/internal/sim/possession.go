@@ -266,12 +266,16 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 		hca := hcaDelta(gs.gameType, offense.isHome)
 		hcaScaled := hca * hcaSite2BasisScale
 		twoPtW, threePtW, foulW := gs.playBuckets(bh, offense, defense, hca, hcaScaled, mq, true)
-		// Putback 3pt suppression (ADR-0055): a half-court OReb continuation is never a
-		// 3pt attempt — 5.60 re-loops a 3pt outcome on the OReb flag forcing a 2pt
-		// (decompile 94022-94024). Zero the 3pt bucket weight (same mechanism as
-		// transition.go's allow3pt=false) so selectOutcome cannot pick outcome3pt. The
-		// UnfaithfulPutback escape hatch leaves it reachable for the ADR-0055 OFF walk.
-		if origin == result.OriginOffReb && !gs.freeze.UnfaithfulPutback {
+		// Putback 3pt is NOT suppressed (2026-07-22). ADR-0055 zeroed threePtW here on a
+		// misread of decompile 94022-94024: local_15c is the OReb *continuation* flag
+		// (loop condition at 94379), assigned from the rebound routine on 94019, so that
+		// goto is the loop-back for the next possession iteration — not a 3pt→2pt re-roll.
+		// 5.60 goes further and CLEARS the shot-clock flag on an OReb continuation
+		// (93278-93280), guaranteeing the full four-bucket set; FUN_004e1ba0's reject-retry
+		// (97194-97196) has no OReb branch at all. Proof:
+		// jsb-native/re-artifacts/jsb-j24-oreb-3pt-eligibility-20260722.md.
+		// SuppressPutback3pt restores the old zeroing as an A/B baseline only.
+		if origin == result.OriginOffReb && gs.freeze.SuppressPutback3pt {
 			threePtW = 0
 		}
 		in := outcomeInputs{
@@ -283,8 +287,8 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 		}
 		if gs.outcomeDiag != nil {
 			// eligible3pt is false exactly when the OReb-continuation suppression zeroed
-			// threePtW above (origin==OffReb and NOT UnfaithfulPutback), matching selectOutcome's real path set.
-			elig := origin != result.OriginOffReb || gs.freeze.UnfaithfulPutback
+			// threePtW above — an A/B-only arm now (SuppressPutback3pt), off in production.
+			elig := origin != result.OriginOffReb || !gs.freeze.SuppressPutback3pt
 			gs.outcomeDiag.Add(twoPtW, threePtW, foulW, in.andOneWeight, elig, false /*transition*/, bh.RealLifeMIN == 0)
 		}
 

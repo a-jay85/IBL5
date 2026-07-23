@@ -7,12 +7,17 @@ import (
 	"github.com/a-jay85/IBL5/engine/internal/rng"
 )
 
-// ADR-0055 — faithful putback shot resolution. Two decompile-verified divergences
-// become the default live engine behavior: (1) the OriginOffReb (putback) 2pt
-// make-value uses the net-free 4/3-boosted putbackValue2pt form (93880-93883),
-// and (2) putback 3pt is suppressed (94022-94024). The UnfaithfulPutback escape
-// hatch (FreezeConfig) restores master's old net-coupled, 3pt-reachable behavior
-// for the archive A/B's OFF walk only.
+// ADR-0055 — faithful putback shot resolution. One decompile-verified divergence
+// remains default live engine behavior: (1) the OriginOffReb (putback) 2pt
+// make-value uses the net-free 4/3-boosted putbackValue2pt form (93880-93883).
+// The UnfaithfulPutback escape hatch (FreezeConfig) restores master's old
+// net-coupled behavior for the ADR-0055 archive A/B's OFF walk (make-value site
+// only). Divergence (2) — putback 3pt suppressed — was REVERTED 2026-07-22: the
+// decompile misread 94022-94024 (local_15c is the OReb continuation flag, not a
+// 3pt→2pt re-roll), and 5.60 actually CLEARS the shot-clock flag on OReb
+// (93278-93280), guaranteeing the full four-bucket set. Putback 3pt is now
+// REACHABLE by default (faithful). SuppressPutback3pt (FreezeConfig) restores the
+// old zeroing as an A/B baseline only.
 
 // matrix #2,#3,#4 — make-value is origin-scoped.
 //
@@ -104,19 +109,22 @@ func TestPutbackFaithful_EscapeHatchRestoresMaster(t *testing.T) {
 	}
 }
 
-// matrix #5,#7 — putback 3pt suppression (faithful default) and reachability under
-// the escape hatch.
+// matrix #5,#7 — putback 3pt reachability (faithful default) and suppression under
+// the SuppressPutback3pt A/B arm.
 //
-// Over a full-game seed sweep: the faithful engine emits ZERO ShotThree attempts
-// tagged OriginOffReb (a putback is never a 3pt), while OriginInitial 3pt attempts
-// remain (the suppression is putback-scoped) and OriginOffReb attempts DO occur (the
-// fixture exercises putbacks). With the UnfaithfulPutback escape hatch, OriginOffReb
-// 3pt becomes reachable again — proving the fixture CAN produce them and the
-// suppression is doing real work.
-func TestPutbackFaithful_ThreePtSuppressed(t *testing.T) {
+// Over a full-game seed sweep: the faithful engine (default Simulate) MUST emit at
+// least one ShotThree attempt tagged OriginOffReb — putback 3pt is reachable since
+// the 2026-07-22 revert of the ADR-0055 suppression (the decompile misread of
+// 94022-94024 is documented in
+// jsb-native/re-artifacts/jsb-j24-oreb-3pt-eligibility-20260722.md). OriginInitial
+// 3pt attempts remain and OriginOffReb attempts DO occur (fixture exercises putbacks).
+// With SuppressPutback3pt set, the old zeroing is restored and OriginOffReb 3pt must
+// return to exactly 0 — proving the arm does real work and the fixture CAN produce
+// putback 3pt in the default path.
+func TestPutbackFaithful_ThreePtReachable(t *testing.T) {
 	b := richBundle()
 
-	// Faithful (default Simulate): count putback 3pt, putback attempts, initial 3pt.
+	// Faithful (default Simulate): putback 3pt must be reachable (>0).
 	var putback3pt, putbackAtt, initial3pt int
 	for seed := uint64(1); seed <= 200; seed++ {
 		for _, e := range Simulate(b, seed).Games[0].Events {
@@ -136,31 +144,31 @@ func TestPutbackFaithful_ThreePtSuppressed(t *testing.T) {
 			}
 		}
 	}
-	if putback3pt != 0 {
-		t.Errorf("faithful engine: %d OriginOffReb 3pt attempts, want 0 (putback 3pt must be suppressed)", putback3pt)
+	if putback3pt == 0 {
+		t.Errorf("faithful engine: 0 OriginOffReb 3pt attempts — putback 3pt must be reachable (faithful JSB 5.60)")
 	}
 	if putbackAtt == 0 {
 		t.Fatal("no OriginOffReb attempts observed — fixture cannot exercise the putback path")
 	}
 	if initial3pt == 0 {
-		t.Error("no OriginInitial 3pt attempts — suppression must be putback-scoped, but the fixture shows no initial 3pt")
+		t.Error("no OriginInitial 3pt attempts — fixture shows no initial 3pt at all")
 	}
 
-	// Escape hatch: OriginOffReb 3pt must become reachable again.
-	var hatchPutback3pt int
+	// SuppressPutback3pt arm: OriginOffReb 3pt must be zeroed back to 0.
+	var suppressPutback3pt int
 	for seed := uint64(1); seed <= 200; seed++ {
-		res, err := SimulateWith(b, seed, Options{Freeze: FreezeConfig{UnfaithfulPutback: true}})
+		res, err := SimulateWith(b, seed, Options{Freeze: FreezeConfig{SuppressPutback3pt: true}})
 		if err != nil {
-			t.Fatalf("SimulateWith escape hatch: %v", err)
+			t.Fatalf("SimulateWith SuppressPutback3pt: %v", err)
 		}
 		for _, e := range res.Games[0].Events {
 			if e.Kind == result.EventShotAttempt && e.Origin == result.OriginOffReb && e.ShotType == result.ShotThree {
-				hatchPutback3pt++
+				suppressPutback3pt++
 			}
 		}
 	}
-	if hatchPutback3pt == 0 {
-		t.Error("escape hatch: 0 OriginOffReb 3pt attempts — the fixture cannot produce putback 3pt, so the suppression test proves nothing")
+	if suppressPutback3pt != 0 {
+		t.Errorf("SuppressPutback3pt arm: %d OriginOffReb 3pt attempts, want 0 (suppression must zero putback 3pt)", suppressPutback3pt)
 	}
 }
 

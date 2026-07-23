@@ -8,3 +8,11 @@
 <Files "storeSimRecap.php">
     Require all denied
 </Files>
+
+# simRecapQueue.php is a second privileged CLI-only entry point (drives the sim
+# queue with production credentials) and is invoked only as
+# `php ibl5/scripts/simRecapQueue.php <verb>`. Same file-scoped deny; the PHP
+# PHP_SAPI guard in the script is the real control (security constraint 4).
+<Files "simRecapQueue.php">
+    Require all denied
+</Files>

@@ -686,6 +686,8 @@ jobs:
         run: bin/test-bug-pipeline-issue
       - name: bin/test-bug-pipeline-hunt
         run: bin/test-bug-pipeline-hunt
+      - name: bin/test-sim-recap-tick
+        run: bin/test-sim-recap-tick
 
   gate:
     name: Tests and Analysis

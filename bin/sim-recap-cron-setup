@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+# One-time setup for the sim recap poll cron (Phase 6 of sim-recap-automation plan).
+#
+# Installs a Mac-local launchd LaunchAgent (com.ibl5.sim-recap-poll) that fires
+# the poll-only bash driver bin/sim-recap-tick every 300s via StartInterval —
+# host-durable, poll-only, cheap on empty ticks (zero claude spawns when no new
+# sims are present). The plist Program/WorkingDirectory point at the durable MAIN
+# checkout (never a worktree, which gets torn down after its PR merges).
+#
+# Usage:
+#   bin/sim-recap-cron-setup --print-schedule      # emit the plist to stdout (no side effect; masks DB password)
+#   bin/sim-recap-cron-setup --install-schedule    # install + load the LaunchAgent
+#   bin/sim-recap-cron-setup --uninstall-schedule  # unload + remove the LaunchAgent
+#
+# Install AFTER this lands on master — the launchd Program points at the main
+# checkout's bin/sim-recap-tick, which must exist there.
+#
+# Environment variables read at generation time (must be exported before running
+# --install-schedule):
+#   SIM_RECAP_SSH_HOST      remote host running the sim database
+#   SIM_RECAP_REMOTE_ROOT   root path on the remote host
+#   SIM_RECAP_DB_USER       MySQL user on the remote host
+#   SIM_RECAP_DB_NAME       MySQL database name
+#   SIM_RECAP_DB_PASSWORD   MySQL password (REQUIRED for --install-schedule)
+#
+# No API-key env var is needed — claude uses ambient CLI auth, exactly as the
+# bug-pipeline plist does.
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ACTION=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --install-schedule)   ACTION="install";   shift ;;
+    --uninstall-schedule) ACTION="uninstall"; shift ;;
+    --print-schedule)     ACTION="print";     shift ;;
+    -h|--help) awk 'NR==1{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"; exit 0 ;;
+    *) echo "Unknown option: $1" >&2; exit 1 ;;
+  esac
+done
+
+[ -n "$ACTION" ] || { echo "No action given. See --help." >&2; exit 1; }
+
+# --- Durable MAIN-checkout derivation -----------------------------------------
+# Program/WorkingDirectory MUST point at the main checkout, never this worktree
+# (a worktree gets torn down — the LaunchAgent would then point at a dead path).
+# The first `git worktree list` entry is the main working tree.
+MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree / {print $2; exit}')"
+[ -n "$MAIN_WT" ] || MAIN_WT="$REPO_ROOT"   # fallback: not in a git tree
+
+PLIST_LABEL="com.ibl5.sim-recap-poll"
+PLIST_PATH="$HOME/Library/LaunchAgents/${PLIST_LABEL}.plist"
+LOG_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/sim-recap/logs"
+PROGRAM="$MAIN_WT/bin/sim-recap-tick"
+
+# Single source of truth for the plist — used by both --print-schedule and
+# --install-schedule, so the MAIN-checkout derivation is exercised by tests.
+# $1 = value to embed for SIM_RECAP_DB_PASSWORD ("***" for --print-schedule,
+#      the real value for --install-schedule).
+build_plist() {
+  local db_pw="$1"
+  cat <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>${PLIST_LABEL}</string>
+	<key>Program</key>
+	<string>${PROGRAM}</string>
+	<!-- StartInterval: the correct launchd primitive for a repeating poll.
+	     300s is frozen by the decisions digest (D6) — do NOT change it here.
+	     Do NOT "fix" this to a calendar-interval key — that is calendar-only. -->
+	<key>StartInterval</key>
+	<integer>300</integer>
+	<key>WorkingDirectory</key>
+	<string>${MAIN_WT}</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<!-- launchd agents start with a minimal PATH that omits Homebrew; claude, ssh,
+		     mysql, git must resolve. No API-key env var — claude uses ambient CLI auth. -->
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+		<key>SIM_RECAP_SSH_HOST</key>
+		<string>${SIM_RECAP_SSH_HOST:-}</string>
+		<key>SIM_RECAP_REMOTE_ROOT</key>
+		<string>${SIM_RECAP_REMOTE_ROOT:-}</string>
+		<key>SIM_RECAP_DB_USER</key>
+		<string>${SIM_RECAP_DB_USER:-}</string>
+		<key>SIM_RECAP_DB_NAME</key>
+		<string>${SIM_RECAP_DB_NAME:-}</string>
+		<key>SIM_RECAP_DB_PASSWORD</key>
+		<string>${db_pw}</string>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>${LOG_DIR}/launchd-stdout.log</string>
+	<key>StandardErrorPath</key>
+	<string>${LOG_DIR}/launchd-stderr.log</string>
+</dict>
+</plist>
+PLIST
+}
+
+case "$ACTION" in
+  print)
+    build_plist "***"
+    ;;
+  install)
+    # Refusal 1 (checked first so both guards are testable from the worktree):
+    # SIM_RECAP_DB_PASSWORD must be set — don't install a job that fails every 300s.
+    if [ -z "${SIM_RECAP_DB_PASSWORD:-}" ]; then
+      echo "Error: SIM_RECAP_DB_PASSWORD is unset. Export it before running --install-schedule." >&2
+      exit 1
+    fi
+    # Refusal 2: must be run from the main checkout — worktrees are torn down after
+    # their PR merges; a plist pointing into one silently stops working.
+    if [ "$REPO_ROOT" != "$MAIN_WT" ]; then
+      echo "Error: --install-schedule must be run from the main checkout (${MAIN_WT})." >&2
+      echo "Current location: ${REPO_ROOT}" >&2
+      echo "cd to ${MAIN_WT} and re-run." >&2
+      exit 1
+    fi
+    mkdir -p "$HOME/Library/LaunchAgents" "$LOG_DIR"
+    launchctl bootout "gui/$(id -u)/${PLIST_LABEL}" 2>/dev/null || true  # idempotent: ignore "not loaded"
+    build_plist "$SIM_RECAP_DB_PASSWORD" > "$PLIST_PATH"
+    launchctl bootstrap "gui/$(id -u)" "$PLIST_PATH"
+    echo "Installed ${PLIST_LABEL} (StartInterval 300s). Program: $PROGRAM"
+    ;;
+  uninstall)
+    launchctl bootout "gui/$(id -u)/${PLIST_LABEL}" 2>/dev/null || true  # idempotent
+    rm -f "$PLIST_PATH"                                                    # idempotent: no error if absent
+    echo "Uninstalled ${PLIST_LABEL}."
+    ;;
+esac

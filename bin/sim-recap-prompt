@@ -1,0 +1,255 @@
+#!/usr/bin/env bash
+# bin/sim-recap-prompt
+#
+# Prints the assembled sim-recap Claude prompt to stdout.
+# Performs NO database access of any kind — the agent that receives this prompt
+# queries live game data itself via mysql.
+#
+# Usage:
+#   bin/sim-recap-prompt --sim=N --mentions=<path> --themes=<path>
+#
+# --mentions JSON shape: {"Team Name": "snowflake-string-or-null", ...}
+#   Keys are teams that played in the sim. Values are Discord snowflakes as
+#   STRINGS (never numbers — values exceed 2^53; see D11) or null for teams
+#   with no Discord ID. Null-value teams render as plain team names.
+#
+# --themes JSON shape: ["narrative angle used", ...] or [] for empty ledger
+#
+# Env seams (SIM_RECAP_* convention):
+#   SIM_RECAP_EXEMPLAR  Path to the pinned exemplar txt file.
+#                       Default: <repo_root>/bin/lib/sim-recap-exemplar.txt
+#   SIM_RECAP_DB_HOST   MySQL host for the agent to connect to. Default: 127.0.0.1
+#   SIM_RECAP_DB_PORT   MySQL port. Default: 13306
+#   SIM_RECAP_DB_USER   MySQL user (no default — must be set in env)
+#   SIM_RECAP_DB_NAME   MySQL database name (no default — must be set in env)
+#
+# The database password is NEVER injected into the prompt. It travels via
+# MYSQL_PWD in the agent's environment. Prompts appear in logs and process
+# arguments; a credential in the prompt text is a credential leaked.
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# --- Env seams ---
+SIM_RECAP_EXEMPLAR="${SIM_RECAP_EXEMPLAR:-$REPO_ROOT/bin/lib/sim-recap-exemplar.txt}"
+SIM_RECAP_DB_HOST="${SIM_RECAP_DB_HOST:-127.0.0.1}"
+SIM_RECAP_DB_PORT="${SIM_RECAP_DB_PORT:-13306}"
+SIM_RECAP_DB_USER="${SIM_RECAP_DB_USER:-}"
+SIM_RECAP_DB_NAME="${SIM_RECAP_DB_NAME:-}"
+
+# --- Arg parsing ---
+sim=""
+mentions_path=""
+themes_path=""
+for arg in "$@"; do
+    case "$arg" in
+        --sim=*)      sim="${arg#--sim=}" ;;
+        --mentions=*) mentions_path="${arg#--mentions=}" ;;
+        --themes=*)   themes_path="${arg#--themes=}" ;;
+    esac
+done
+
+# --- Fail closed: exemplar must exist ---
+# Emitting a prompt without the anchor would silently produce off-format output —
+# the worst failure mode available here. Exit 1 instead.
+if [[ ! -f "$SIM_RECAP_EXEMPLAR" ]]; then
+    echo "Error: sim-recap exemplar not found at: $SIM_RECAP_EXEMPLAR" >&2
+    exit 1
+fi
+
+# =============================================================================
+# Block 1: Voice spec (verbatim from /tmp/sim-recap-decisions-digest.md)
+#
+# The original voice spec ends with: "add a standings-context paragraph at the end,
+# as a big wrap-up summary of what transpired during the entire sim."
+#
+# The pinned exemplar (below) opens with WHERE THINGS STAND at the TOP — before any
+# per-game recaps. These contradict. Resolution (plan 2b): the exemplar wins on layout.
+# That single clause is replaced here with the exemplar-authoritative ordering sentence.
+#
+# Do NOT restore "at the end" or any variant. If both instructions reach the model,
+# it emits two standings sections — one at the top and a second at the end.
+# =============================================================================
+cat <<'VOICE_EOF'
+
+== VOICE SPEC ==
+
+on production, the most recent sim results are up. write a summary paragraph for each simmed game, similar to an ESPN-style write-up. write in the voice of Bill Simmons. avoid writing like an LLM (e.g. no em-dashes, short punchy sentences, "it's not this, it's that", "and here's the thing", "load-bearing" – all of those cliché LLM patterns of speech). try to use Simmons' humor (ideally his actually funny humor, not just what's funny to him). whenever you find yourself repeating an old theme, try to tie in a pop culture reference, whether of the player's real-life era, the era the games are simulated in, or of the real-life era of today. these paragraphs will be posted on Discord. before each paragraph, write the team names and the final scores, and on a line below, @mention the GM's of each team. don't list GM names next to the Discord mentions, it will look redundant. use mysql to pull data. ibl_sim_dates holds the dates of the last sim. ibl_box_scores and ibl_box_scores_teams has the raw box score data. ibl_schedule and ibl_standings will tell you the league schedule and where teams are in the standings. ibl_jsb_transactions lists injuries during the sim – mention the injuries in each game when possible. ibl_power contains post-sim win/loss streak information. Use it to call out any long streaks and to know when a big streak was snapped. open with a WHERE THINGS STAND standings-context section at the top of the output, first, before any per-game recaps — the pinned exemplar's ordering is authoritative. here's a sample of what you produced last time – ok to improve, expand upon, or change it for the better. if you don't continuously improve, expand, or change it up, referencing old content to create new content will become an ouroboros and get stale too quickly.
+
+VOICE_EOF
+
+# =============================================================================
+# Block 2: Anti-LLM-tell prohibitions (explicit, by name — user required these)
+# =============================================================================
+cat <<'TELLS_EOF'
+
+== ANTI-LLM-TELL PROHIBITIONS ==
+
+These are hard bans. Not suggestions. Every one of these will get called out if you use them:
+
+  - No em-dashes (—). Not a single one. Use a comma, a period, or restructure the sentence.
+  - No "it's not this, it's that" constructions. Not in any form or disguise.
+  - No "and here's the thing" — not that phrase or anything that works the same way.
+  - Never use the word "load-bearing" under any circumstances.
+  - Short, punchy sentences. If a sentence has more than two clauses, cut it in half.
+
+TELLS_EOF
+
+# =============================================================================
+# Block 3: Data access (expands DB env seams — never expands MYSQL_PWD or any
+# credential. The password travels via MYSQL_PWD in the agent's environment only.)
+# =============================================================================
+cat <<DATA_EOF
+
+== DATA ACCESS ==
+
+Sim number: ${sim}
+
+Query live game data using the mysql client. Connect with:
+
+  mysql -h ${SIM_RECAP_DB_HOST} -P ${SIM_RECAP_DB_PORT} -u ${SIM_RECAP_DB_USER} ${SIM_RECAP_DB_NAME}
+
+The database password is available in your environment as MYSQL_PWD. Do not pass it on
+the command line — mysql reads it from MYSQL_PWD automatically.
+
+Relevant tables:
+
+  ibl_sim_dates         — sim, start_date, end_date (identifies which dates are in this sim)
+  ibl_box_scores        — raw box score data per game
+  ibl_box_scores_teams  — per-team box score lines (scores, player stats)
+  ibl_schedule          — league schedule
+  ibl_standings         — current standings: wins, losses, pct, conference, division,
+                          leagueRecord, confRecord, divRecord, homeRecord, awayRecord,
+                          gamesUnplayed, confMagicNumber, divMagicNumber
+  ibl_jsb_transactions  — injuries and transactions during the sim: injury_games_missed,
+                          injury_description, transaction_type, player_name, from_teamid, to_teamid
+  ibl_power             — post-sim power rankings: ranking, streak_type (W/L), streak length,
+                          sos, remaining_sos
+
+DATA_EOF
+
+# =============================================================================
+# Block 4: Discord mention map
+# Snowflakes rendered as strings via jq -r (never arithmetic, never int-cast —
+# Discord IDs exceed 2^53 and cannot be represented as IEEE 754 doubles).
+# Teams with null values render as plain team names (no angle brackets).
+# =============================================================================
+echo ""
+echo "== DISCORD MENTION MAP =="
+echo ""
+echo "Use these @mentions when writing each game recap."
+echo "Format: away-team-mention · home-team-mention (middle-dot separated, on one line below the score header)."
+echo ""
+
+if [[ -n "$mentions_path" && -f "$mentions_path" ]]; then
+    jq -r 'to_entries[] | if .value == null then .key else "\(.key) → <@\(.value)>" end' \
+        "$mentions_path"
+else
+    echo "(no mentions map provided)"
+fi
+
+echo ""
+
+# =============================================================================
+# Block 5: Themes ledger (narrative angles used in the last 5 sims — avoid them)
+# This is the ONLY anti-repetition input. The agent never sees prior recap prose.
+# An empty ledger builds cleanly — "(none recorded yet)" instead of null or [].
+# =============================================================================
+echo "== THEMES LEDGER =="
+echo ""
+echo "These narrative angles were used in the last five sims. Avoid repeating them:"
+echo ""
+
+if [[ -n "$themes_path" && -f "$themes_path" ]]; then
+    themes_list=$(jq -r '.[]' "$themes_path" 2>/dev/null)
+    if [[ -z "$themes_list" ]]; then
+        echo "(none recorded yet)"
+    else
+        echo "$themes_list" | while IFS= read -r theme; do
+            echo "- $theme"
+        done
+    fi
+else
+    echo "(none recorded yet)"
+fi
+
+echo ""
+
+# =============================================================================
+# Block 6: Output contract
+# Write exactly ONE file to cwd: payload.json satisfying SimRecapPayload::fromJson()
+# =============================================================================
+cat <<'CONTRACT_EOF'
+
+== OUTPUT CONTRACT ==
+
+Write exactly ONE file to your current working directory using the Write tool:
+
+  payload.json
+
+This must be a valid JSON document satisfying SimRecapPayload::fromJson(). Required shape:
+
+{
+  "intro_text": "…",
+  "outro_text": "…",
+  "recap_text": "…",
+  "themes": ["…"],
+  "games": [
+    {
+      "season_year": N,
+      "game_date": "YYYY-MM-DD",
+      "visitor_teamid": N,
+      "home_teamid": N,
+      "game_of_that_day": N,
+      "box_id": N_or_null,
+      "sort_order": N,
+      "recap_text": "…"
+    }
+  ]
+}
+
+Strict field types:
+  - season_year, visitor_teamid, home_teamid, game_of_that_day, sort_order: JSON integers
+  - game_date: non-empty string, format YYYY-MM-DD
+  - recap_text (per game and top-level): non-empty strings
+  - box_id: integer or null
+  - game_of_that_day: use 0 (integer zero, not null) when there was exactly one game on that date
+  - themes: array of strings — narrative angles you used this run (for the next ledger)
+
+Write nothing else, anywhere. One file. payload.json. That is all.
+
+CONTRACT_EOF
+
+# =============================================================================
+# Block 7: Pinned exemplar (authoritative format reference — printed last)
+# This file is the anti-ouroboros anchor: it never absorbs the pipeline's own output.
+# Match its structure, voice, and energy. Do not copy its content.
+# =============================================================================
+cat <<'EXEMPLAR_HEADER_EOF'
+
+== PINNED EXEMPLAR ==
+
+The following is the authoritative format reference. Match its structure exactly:
+  - Title line (e.g. "IBL SIM RECAPS — Month DD – Month DD, YYYY (N games)")
+  - Voice/Format preamble lines
+  - 80-character = separator
+  - WHERE THINGS STAND section (standings, scene-setter) — at the TOP, before game recaps
+  - 80-character = separator
+  - Per date: ================================ Mon DD ========================================= separator
+  - Per game: **Away Team NNN @ Home Team NNN** header (bold), then <@id> · <@id> mentions
+    line (away snowflake · home snowflake, middle-dot separated), then one prose paragraph
+
+Injuries woven into prose. Long streaks called out. Pop culture references tied to the era.
+
+--------------------------------------------------------------------------------
+EXEMPLAR_HEADER_EOF
+
+cat "$SIM_RECAP_EXEMPLAR"
+
+cat <<EXEMPLAR_FOOTER_EOF
+--------------------------------------------------------------------------------
+
+End of pinned exemplar. Write the recap for sim ${sim} now, using live data from the database.
+EXEMPLAR_FOOTER_EOF

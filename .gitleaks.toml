@@ -28,6 +28,10 @@ regexes = [
   # tests/Logging/PiiRedactionProcessorTest.php.
   '''ibl_(test|headerkey|abcdef|abc12345)''',
 
+  # Sentinel value used in bin/test-sim-recap-tick to verify passwords are never
+  # logged — deliberately fake, never a real credential.
+  '''hunter2_sentinel_xyz''',
+
   # Sequential placeholder Discord snowflake IDs in test fixtures
   # (tests/Discord/*, tests/Team/TeamViewTest.php).
   '''123456789012345678''',

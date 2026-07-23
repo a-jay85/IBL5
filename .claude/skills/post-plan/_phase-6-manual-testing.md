@@ -28,3 +28,5 @@ Purpose: the Senior-QA-Engineer manual-testing classification prompt for Phase 6
 > ```
 >
 > **Bias toward automation.** If a step says "verify X works" or "check that Y returns Z", that is automatable — not manual. "Compare against production" is visual-regression-replaceable (screenshot diff) unless UI/UX was intentionally redesigned — it is NOT truly manual. Only subjective judgment on new/redesigned UI/UX is truly manual.
+>
+> **Pre-merge performability.** A truly-manual step must be one a reviewer can perform on the *open PR* against the worktree/local stack — a UI/UX taste judgment always qualifies. If a step's judgment can only be rendered after *this PR's own* change is live on prod (its file/endpoint deployed, its migration applied, its daemon registered), keep the `truly-manual` category but **prefix its `rationale` with `POST-MERGE-ONLY:`** — it must be surfaced for a human to move to a `## Post-merge verification` note, not left silently gating the merge. Do NOT strip it yourself, and never use "not pre-merge-performable" to drop a genuine UI/UX row.

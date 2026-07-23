@@ -283,8 +283,8 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 		}
 		if gs.outcomeDiag != nil {
 			// eligible3pt is false exactly when the OReb-continuation suppression zeroed
-			// threePtW above, matching selectOutcome's real path set.
-			elig := !(origin == result.OriginOffReb && !gs.freeze.UnfaithfulPutback)
+			// threePtW above (origin==OffReb and NOT UnfaithfulPutback), matching selectOutcome's real path set.
+			elig := origin != result.OriginOffReb || gs.freeze.UnfaithfulPutback
 			gs.outcomeDiag.Add(twoPtW, threePtW, foulW, in.andOneWeight, elig, false /*transition*/, bh.RealLifeMIN == 0)
 		}
 

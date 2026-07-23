@@ -506,4 +506,18 @@ final class CheckDocsCliTest extends TestCase
         [$code, $output] = $this->runScript('--since=' . $base);
         $this->assertSame(0, $code, $output);
     }
+
+    #[Test]
+    public function engineBacklogInScopeStaleFlagged(): void
+    {
+        // Phase 4 scope extension: engine/docs/backlog/*.md is now freshness-gated.
+        $this->commitFile(
+            'engine/docs/backlog/jsb-native-backlog.md',
+            $this->doc($this->freshDate(61), "### J1 Item\n\nbody\n"),
+            'stale engine backlog'
+        );
+        [$code, $output] = $this->runScript();
+        $this->assertNotSame(0, $code, $output);
+        $this->assertStringContainsString('engine/docs/backlog/jsb-native-backlog.md', $output);
+    }
 }

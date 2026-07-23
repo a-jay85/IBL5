@@ -1,6 +1,6 @@
 ---
 description: Why IBL5 local dev is Docker-only, with MAMP sunset and native PHP stacks rejected.
-last_verified: 2026-05-22
+last_verified: 2026-07-22
 ---
 
 # ADR-0004: Docker-only development environment
@@ -27,7 +27,7 @@ Local development uses Docker Compose only. `docker compose up -d` starts PHP-Ap
 
 - Positive: every contributor runs identical PHP version, MariaDB version, Apache config, and request routing. "Works on my machine" is no longer a legitimate diagnosis.
 - Positive: git worktrees can run in parallel — each worktree gets an isolated Docker stack via `bin/wt-up`.
-- Positive: CI parity is automatic. The same `docker-compose.yml` that CI uses is what developers use locally, so PHPUnit and Playwright behave the same in both environments.
+- Positive: CI parity is automatic. Local dev uses `docker-compose.yml` (full stack: Traefik, MariaDB 10.11, Mailpit, Adminer). CI PHPUnit uses GitHub Actions native `services:` containers (same MariaDB 10.11 image); CI E2E Playwright uses the minimal `docker-compose.ci.yml` (no Traefik/Mailpit/Adminer). All three share the same MariaDB 10.11 image, achieving the parity the decision aimed for. *Update 2026-07-22: the original claim "The same docker-compose.yml that CI uses is what developers use locally" was imprecise; CI has always used separate service definitions. The underlying parity (matching MariaDB and PHP versions) holds.*
 - Positive: Playwright E2E tests can rely on `http://main.localhost/ibl5/` being the single canonical URL.
 - Negative: Docker Desktop is a heavyweight prerequisite for onboarding. Accepted because the alternative was worse.
 - Negative: First-time setup requires creating the shared `ibl5-proxy` Docker network manually. Documented in `ibl5/docs/DOCKER_SETUP.md`.
@@ -37,7 +37,8 @@ Local development uses Docker Compose only. `docker compose up -d` starts PHP-Ap
 ## References
 
 - `ibl5/docs/DOCKER_SETUP.md` — the step-by-step onboarding guide.
-- `docker-compose.yml` — the canonical service definition.
+- `docker-compose.yml` — the canonical local dev service definition (full stack).
+- `docker-compose.ci.yml` — the minimal CI E2E stack (no Traefik/Mailpit/Adminer).
 - `bin/wt-new`, `bin/wt-up`, `bin/wt-down` — worktree lifecycle commands that assume Docker.
 - `docker/Dockerfile.tailwind` — the Tailwind CSS watcher sidecar image.
 - `.claude/rules/workflow-continuity.md` — the agent-facing worktree rule (cites this ADR).

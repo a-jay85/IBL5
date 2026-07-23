@@ -1,6 +1,6 @@
 ---
 description: Rationale for removing the broad *Controller* and *Handler* mutation testing exclusions and refining overly broad module-level excludes.
-last_verified: 2026-05-13
+last_verified: 2026-07-22
 ---
 
 # ADR-0020: Mutation Testing Unlock — Controllers + Handlers
@@ -35,3 +35,5 @@ last_verified: 2026-05-13
 - All 998 mutations are killed by existing tests — no backfill was needed.
 - The `Cache`, `SiteStatistics`, and `Discord` module exclusions are now file-specific, avoiding accidental shadowing of files in other modules.
 - Pass 2 (14 untested files) remains deferred with specific per-file excludes.
+
+*Update 2026-07-22: Pass 2 is complete. The 14 per-file Controller/Handler excludes listed above have been removed from `ibl5/infection.json5`; direct test files now exist for the previously deferred classes (confirmed: `PlayerPageControllerTest.php`, `UpdaterControllerTest.php`). The `Cache`/`SiteStatistics`/`Discord` file-specific excludes are also no longer present in `infection.json5`. ADR-0065 (2026-06-18) made the `mutation-pr` job a required merge gate — see `ibl5/docs/decisions/0065-mutation-testing-required-gate.md`.*

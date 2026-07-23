@@ -342,4 +342,58 @@ class SimSummaryRepository extends \BaseMysqliRepository
             $limit
         );
     }
+
+    /**
+     * Every recap row, newest sim first, for the admin viewer index.
+     *
+     * `recap_text` is deliberately excluded: the index renders metadata only,
+     * and the bodies are MEDIUMTEXT.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listAll(): array
+    {
+        $sql = "SELECT `sim`, `status`, `attempts`, `generated_at`, `created_at`,"
+            . " CHAR_LENGTH(`recap_text`) AS `recap_length`"
+            . " FROM `ibl_sim_summaries`"
+            . " ORDER BY `sim` DESC"; // @phpstan-ignore ibl.orderByMissingTiebreaker (sim is the PK of ibl_sim_summaries — inherently unique)
+        /** @var list<array<string, mixed>> */
+        return $this->fetchAll($sql);
+    }
+
+    /**
+     * Per-game recap rows for one sim that have a verified archived box score,
+     * sorted by sort_order ascending — the admin viewer's display read.
+     *
+     * Distinct from findGameRecaps(), which is the unfiltered write-verification
+     * read. The INNER JOIN here is an existence filter: only games with an
+     * archived box-score record are displayed. Join partner is
+     * `ibl_box_scores_teams`, NOT `ibl_schedule` (shared-context decision 51 —
+     * `ibl_schedule` is churned on every sim upload and is an unreliable archive
+     * source). Returns an empty array when no per-game rows qualify; the View
+     * must handle that case.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function findDisplayableGameRecaps(int $sim): array
+    {
+        // EXISTS, not INNER JOIN: ibl_box_scores_teams stores one row per TEAM
+        // side, so a join on the game's natural key matches twice and would
+        // render every per-game recap twice.
+        $sql = "SELECT gr.`game_date`, gr.`visitor_teamid`, gr.`home_teamid`,"
+            . " gr.`game_of_that_day`, gr.`sort_order`, gr.`recap_text`"
+            . " FROM `ibl_sim_game_recaps` gr"
+            . " WHERE gr.`sim` = ?"
+            . " AND EXISTS ("
+            . "     SELECT 1 FROM `ibl_box_scores_teams` bst"
+            . "     WHERE bst.`game_date` = gr.`game_date`"
+            . "       AND bst.`visitor_teamid` = gr.`visitor_teamid`"
+            . "       AND bst.`home_teamid` = gr.`home_teamid`"
+            . "       AND COALESCE(bst.`game_of_that_day`, 0) = gr.`game_of_that_day`"
+            . " )"
+            . " ORDER BY gr.`sort_order` ASC, gr.`id` ASC";
+
+        /** @var list<array<string, mixed>> */
+        return $this->fetchAll($sql, 'i', $sim);
+    }
 }

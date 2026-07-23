@@ -49,6 +49,21 @@ test.describe('Admin entry-point scripts: non-admin gets 403', () => {
     expect(response?.status()).toBe(403);
   });
 
+  test('simSummaries.php returns 403', async ({ page }) => {
+    const response = await page.goto('simSummaries.php');
+    expect(response?.status()).toBe(403);
+  });
+
+  test('simSummaries.php?sim=689&format=txt returns 403 without leaking the recap', async ({
+    request,
+  }) => {
+    const response = await request.get('simSummaries.php?sim=689&format=txt');
+    expect(response.status()).toBe(403);
+    // Seeded body of sim 689 (tests/e2e/fixtures/ci-seed.sql) — a 403 that still
+    // wrote the payload would pass a status-only assertion.
+    expect(await response.text()).not.toContain('the Cannons erased a nine-point');
+  });
+
   test('leagueControlPanel.php returns 403', async ({ page }) => {
     const response = await page.goto('leagueControlPanel.php');
     expect(response?.status()).toBe(403);

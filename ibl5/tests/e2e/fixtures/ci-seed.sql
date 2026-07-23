@@ -62,6 +62,22 @@ INSERT INTO ibl_sim_dates (sim, start_date, end_date) VALUES
   (689, '2026-03-01', '2026-03-07');
 
 -- ============================================================
+-- Sim recap summaries (admin viewer — simSummaries.php)
+-- Cleared first: migration 155 seeds MAX(ibl_sim_dates.sim) as a
+-- done row with recap_text NULL, which would make the viewer's
+-- row count and newest-first assertions nondeterministic.
+-- ============================================================
+DELETE FROM ibl_sim_game_recaps;
+DELETE FROM ibl_sim_summaries;
+INSERT INTO ibl_sim_summaries (sim, status, recap_text, intro_text, outro_text, themes_used, attempts, generated_at, created_at) VALUES
+  (686, 'failed',  NULL, NULL, NULL, NULL, 2, NULL, '2026-02-08 09:00:00'),
+  (687, 'pending', NULL, NULL, NULL, NULL, 0, NULL, '2026-02-15 09:00:00'),
+  (688, 'done',    'Sim 688 recap: a wire-to-wire blowout behind a 41-point night from the rookie.', NULL, NULL, '["blowout","rookie"]', 1, '2026-02-22 10:05:00', '2026-02-22 09:00:00'),
+  (689, 'done',    'Sim 689 recap: the Cannons erased a nine-point fourth-quarter deficit to win by three.', 'Another week of IBL action delivered drama from tip-off to the final buzzer.', 'The Cannons are one to watch as the season reaches its final stretch.', '["comeback"]', 1, '2026-03-01 10:05:00', '2026-03-01 09:00:00');
+-- The per-game rows are inserted further down, after ibl_team_info: they carry
+-- FKs to ibl_team_info(teamid), so inserting them here aborts the whole seed.
+
+-- ============================================================
 -- Teams (28 real franchises + Free Agents)
 -- Only columns required by the app; others use table defaults.
 -- ============================================================
@@ -96,6 +112,16 @@ INSERT INTO ibl_team_info (teamid, team_city, team_name, color1, color2, uuid) V
   (26, 'Indiana',      'Pacers',       '002D62', 'FDBB30', 'b0000000-0000-0000-0000-000000000026'),
   (27, 'Utah',         'Jazz',         '002B5C', '00471B', 'b0000000-0000-0000-0000-000000000027'),
   (28, 'Oklahoma City','Thunder',      '007AC1', 'EF6100', 'b0000000-0000-0000-0000-000000000028');
+
+-- Per-game recaps for sim 689 (see the sim-summaries block above). Deferred to
+-- here because ibl_sim_game_recaps FKs visitor_teamid/home_teamid to
+-- ibl_team_info(teamid). Each natural key below has a matching pair of
+-- ibl_box_scores_teams rows further down, so all three pass the admin viewer's
+-- archived-box-score existence filter.
+INSERT INTO ibl_sim_game_recaps (sim, season_year, game_date, visitor_teamid, home_teamid, game_of_that_day, box_id, sort_order, recap_text) VALUES
+  (689, 2026, '2026-02-20', 1, 2, 1, NULL, 0, 'The Metros dominated from the opening tip, cruising to a 105-98 victory.'),
+  (689, 2026, '2026-03-03', 1, 3, 1, NULL, 1, 'A balanced offensive attack lifted the Metros past the Cougars in a tightly contested game.'),
+  (689, 2026, '2026-03-05', 2, 1, 1, NULL, 2, 'The Stars held off a late Metros rally to steal a road win, 95-88.');
 
 -- ============================================================
 -- Standings (28 teams — FK to ibl_team_info)

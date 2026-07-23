@@ -34,3 +34,24 @@ test.describe('Unauthenticated redirect tests', () => {
     });
   }
 });
+
+// Top-level admin scripts guard with is_user() BEFORE is_admin(), so an
+// unauthenticated request redirects to login rather than returning 403.
+test.describe('Unauthenticated redirect tests: admin entry-point scripts', () => {
+  test('simSummaries.php redirects unauthenticated users to login', async ({ page }) => {
+    await page.goto('simSummaries.php');
+
+    await page.waitForURL(/name=YourAccount/, { timeout: 10_000 });
+    await expect(page.locator('#login-username'), 'YourAccount login form must render after redirect').toBeVisible();
+  });
+
+  test('simSummaries.php?sim=689&format=txt redirects unauthenticated users to login', async ({
+    page,
+  }) => {
+    // The plain-text export sits behind the same guard — it cannot bypass it.
+    await page.goto('simSummaries.php?sim=689&format=txt');
+
+    await page.waitForURL(/name=YourAccount/, { timeout: 10_000 });
+    await expect(page.locator('#login-username'), 'YourAccount login form must render after redirect').toBeVisible();
+  });
+});

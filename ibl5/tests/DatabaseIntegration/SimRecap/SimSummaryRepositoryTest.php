@@ -248,6 +248,46 @@ final class SimSummaryRepositoryTest extends DatabaseTestCase
         self::assertTrue($found, 'Malformed JSON must be returned as-is without throwing');
     }
 
+    // ── listAll() — the admin viewer index ─────────────────────────────────────
+
+    public function testListAllReturnsEveryRowNewestSimFirst(): void
+    {
+        $this->clearSummaries();
+        $this->repo->queuePendingIfAbsent(999001);
+        $this->repo->queuePendingIfAbsent(999003);
+        $this->repo->markDone(999003, 'Intro three.', 'Outro three.', 'Body three.', [], null);
+        $this->repo->queuePendingIfAbsent(999002);
+        $this->db->query("UPDATE `ibl_sim_summaries` SET `status` = 'failed' WHERE `sim` = 999002");
+
+        $rows = $this->repo->listAll();
+
+        self::assertCount(3, $rows);
+        self::assertSame([999003, 999002, 999001], array_map(
+            static fn (array $row): int => (int) $row['sim'],
+            $rows
+        ));
+    }
+
+    public function testListAllExposesRecapLengthWithoutTheBody(): void
+    {
+        $this->clearSummaries();
+        $this->repo->queuePendingIfAbsent(999003);
+        $this->repo->markDone(999003, 'Intro three.', 'Outro three.', 'Body three.', [], null);
+
+        $rows = $this->repo->listAll();
+
+        self::assertCount(1, $rows);
+        self::assertSame(11, (int) $rows[0]['recap_length']);
+        self::assertArrayNotHasKey('recap_text', $rows[0], 'The index must never load MEDIUMTEXT bodies');
+    }
+
+    public function testListAllReturnsAnEmptyArrayWhenNoRowsExist(): void
+    {
+        $this->clearSummaries();
+
+        self::assertSame([], $this->repo->listAll());
+    }
+
     // ── findGameRecaps tests ───────────────────────────────────────────────────
 
     public function testMarkDoneStoresGameRecapsInSortOrder(): void
@@ -332,7 +372,51 @@ final class SimSummaryRepositoryTest extends DatabaseTestCase
         );
     }
 
+    // ── findDisplayableGameRecaps tests ──────────────────────────────────────────
+
+    public function testFindDisplayableGameRecapsReturnsOnlyGamesWithBoxScores(): void
+    {
+        // Two game recaps: gotd=1 (will have a matching box score) and gotd=2 (will not).
+        $games = [
+            $this->gameRecap(sortOrder: 0, gameOfThatDay: 1),
+            $this->gameRecap(sortOrder: 1, gameOfThatDay: 2),
+        ];
+        $this->repo->markDone(999001, 'Intro.', 'Outro.', 'Recap.', $games, null);
+
+        // Two team-side rows for gotd=1 only (unique key includes `name`, so both persist).
+        $this->db->query(
+            "INSERT INTO `ibl_box_scores_teams` (`game_date`, `visitor_teamid`, `home_teamid`, `game_of_that_day`, `name`)" .
+            " VALUES ('2025-01-01', 1, 2, 1, 'Metros'), ('2025-01-01', 1, 2, 1, 'Stars')"
+        );
+
+        $displayable = $this->repo->findDisplayableGameRecaps(999001);
+
+        self::assertCount(1, $displayable, 'Only games with a matching box score are returned');
+        self::assertSame(1, $displayable[0]['game_of_that_day'], 'The returned game is the one backed by a box score');
+    }
+
+    public function testFindDisplayableGameRecapsReturnsEmptyArrayWhenNoBoxScoresExist(): void
+    {
+        // Store one game recap with no corresponding ibl_box_scores_teams row.
+        $this->repo->markDone(999001, 'Intro.', 'Outro.', 'Recap.', [$this->gameRecap(sortOrder: 0)], null);
+
+        $displayable = $this->repo->findDisplayableGameRecaps(999001);
+
+        self::assertSame([], $displayable, 'No box score match → no displayable game recaps');
+    }
+
     // ── Private helpers ────────────────────────────────────────────────────────
+
+    /**
+     * Migration 155 seeds one `done` row (MAX(ibl_sim_dates.sim)) into every
+     * migrated database, so any test asserting an exact row set must clear the
+     * table first. DELETE (not TRUNCATE) — TRUNCATE auto-commits in MySQL and
+     * would break DatabaseTestCase's per-test transaction rollback.
+     */
+    private function clearSummaries(): void
+    {
+        $this->db->query('DELETE FROM `ibl_sim_summaries`');
+    }
 
     /**
      * Build a minimal valid game recap array for markDone's $gameRecaps parameter.

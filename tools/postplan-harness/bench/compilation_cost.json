@@ -1,0 +1,21 @@
+{
+ "session_files": [
+  "5f2baff5-8728-4312-ac9f-4ba2be5a24c8.jsonl",
+  "fa495471-2f76-4907-a637-286cf4a7438d.jsonl"
+ ],
+ "assistant_turns": 275,
+ "gross_tokens": 28730529,
+ "non_cached_tokens": 1254549,
+ "breakdown": {
+  "in": 537,
+  "cc": 901702,
+  "cr": 27475980,
+  "out": 352310
+ },
+ "models": {
+  "claude-fable-5": 275
+ },
+ "first_ts": "2026-07-15T18:46:24.843Z",
+ "last_ts": "2026-07-15T20:58:05.317Z",
+ "note": "reasoning tokens not separately reported in traces (unavailable)"
+}

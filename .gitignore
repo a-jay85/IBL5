@@ -104,3 +104,10 @@ ibl5/*.plb
 
 # Bug-pipeline hunter scratch (bin/bug-pipeline-tick writes hunt-result.json into the worktree)
 ibl5/.bug-pipeline/
+
+# Compiled post-plan harness — runtime/real-data artifacts, never committed
+tools/postplan-harness/out/
+tools/postplan-harness/fixtures/scenarios/
+tools/postplan-harness/**/__pycache__/
+tools/postplan-harness/**/*.pyc
+tools/postplan-harness/.pytest_cache/

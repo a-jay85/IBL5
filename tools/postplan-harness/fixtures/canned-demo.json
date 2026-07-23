@@ -1,0 +1,6 @@
+{
+  "pr-copy": {"type": "docs", "title": "docs(backlog): mark L6 auto-update-branch unsticker as implemented", "summary_md": "## Summary\n- Marks backlog item L6 implemented after PR #1390 merged.\n"},
+  "safety-verdict": {"holds": []},
+  "manual-classify": [],
+  "retrospective": {"save": false}
+}

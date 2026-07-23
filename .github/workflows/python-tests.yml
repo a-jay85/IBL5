@@ -1,0 +1,44 @@
+name: Python tests (post-plan harness)
+
+# Regression gate for the compiled post-plan harness (tools/postplan-harness/).
+# Kept separate from tests.yml so a dev-tool test flake never blocks the required
+# "Tests and Analysis" app gate (ADR-0092). Zero external deps: only pytest is installed.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'tools/postplan-harness/**'
+      - '.github/workflows/python-tests.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'tools/postplan-harness/**'
+      - '.github/workflows/python-tests.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    name: pytest (stdlib harness)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Install pytest
+        run: python -m pip install --upgrade pip pytest
+      - name: Run harness tests (skip live gh/git suites)
+        run: |
+          python -m pytest tools/postplan-harness/tests/ \
+            --ignore=tools/postplan-harness/tests/test_ghad_live.py \
+            --ignore=tools/postplan-harness/tests/test_gitad_live.py \
+            -q

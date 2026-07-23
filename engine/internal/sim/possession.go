@@ -266,16 +266,19 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 		hca := hcaDelta(gs.gameType, offense.isHome)
 		hcaScaled := hca * hcaSite2BasisScale
 		twoPtW, threePtW, foulW := gs.playBuckets(bh, offense, defense, hca, hcaScaled, mq, true)
-		// Putback 3pt is NOT suppressed (2026-07-22). ADR-0055 zeroed threePtW here on a
-		// misread of decompile 94022-94024: local_15c is the OReb *continuation* flag
-		// (loop condition at 94379), assigned from the rebound routine on 94019, so that
-		// goto is the loop-back for the next possession iteration — not a 3pt→2pt re-roll.
-		// 5.60 goes further and CLEARS the shot-clock flag on an OReb continuation
-		// (93278-93280), guaranteeing the full four-bucket set; FUN_004e1ba0's reject-retry
-		// (97194-97196) has no OReb branch at all. Proof:
-		// jsb-native/re-artifacts/jsb-j24-oreb-3pt-eligibility-20260722.md.
-		// SuppressPutback3pt restores the old zeroing as an A/B baseline only.
-		if origin == result.OriginOffReb && gs.freeze.SuppressPutback3pt {
+		// Putback 3pt IS suppressed by default (JSB 5.60 faithful — ADJUDICATION
+		// 2026-07-23). FUN_004e1ba0's reject-retry clause: param_3 (= local_15c, the
+		// OReb continuation flag, pushed as edi at 0x4d8f7e) == '\x01' → reject
+		// outcomes 2 and 4, restricting an OReb putback to {1,3} = {2pt, foul}.
+		// The 2026-07-22 removal of this zero was itself the misread: the caller's
+		// shot-clock clear at 0x4d8f2c is a livelock guard (with both param_3==1 and
+		// param_8==1 live every outcome would be rejected), not evidence of a widened
+		// bucket set. The 2026-07-23 adjudication (param_6 is a double, consuming two
+		// stack slots — shifting naive slot→param mapping) reversed the removal.
+		// Proof: jsb-native/re-artifacts/jsb-J24-transition-3pt-ADJUDICATION-20260723.md.
+		// Set UnfaithfulPutback3pt=true to restore the 2026-07-22-to-2026-07-23
+		// reachable-3pt behavior as an A/B arm only.
+		if origin == result.OriginOffReb && !gs.freeze.UnfaithfulPutback3pt {
 			threePtW = 0
 		}
 		in := outcomeInputs{
@@ -287,8 +290,9 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 		}
 		if gs.outcomeDiag != nil {
 			// eligible3pt is false exactly when the OReb-continuation suppression zeroed
-			// threePtW above — an A/B-only arm now (SuppressPutback3pt), off in production.
-			elig := origin != result.OriginOffReb || !gs.freeze.SuppressPutback3pt
+			// threePtW above — the faithful default (UnfaithfulPutback3pt=false); true only
+			// when UnfaithfulPutback3pt is set (the A/B arm).
+			elig := origin != result.OriginOffReb || gs.freeze.UnfaithfulPutback3pt
 			gs.outcomeDiag.Add(twoPtW, threePtW, foulW, in.andOneWeight, elig, false /*transition*/, bh.RealLifeMIN == 0)
 		}
 

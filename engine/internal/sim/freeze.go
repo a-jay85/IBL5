@@ -62,18 +62,24 @@ type FreezeConfig struct {
 	// ADR-0055 archive A/B's OFF walk to RESTORE master's old net-coupled,
 	// 3pt-reachable putback behavior as the diagnostic baseline. It consumes no Means
 	// (validate() ignores it, mirroring BranchB). Production NEVER sets it.
+	//
+	// SCOPE NARROWED 2026-07-22 (decoupling), still in force: this flag now gates the
+	// make-value site ONLY. Reproducing ADR-0055's original OFF arm — net-coupled
+	// make-value AND reachable putback 3pt — therefore requires BOTH flags:
+	// FreezeConfig{UnfaithfulPutback: true, UnfaithfulPutback3pt: true}. Setting this
+	// one alone leaves putback 3pt suppressed (the faithful default).
 	UnfaithfulPutback bool
 
-	// SuppressPutback3pt is a NORMAL-polarity diagnostic arm — zero value IS the live
-	// engine. Default false = the faithful JSB 5.60 behaviour: an OriginOffReb
-	// continuation reaches the FULL four-bucket outcome set, 3pt included. Set true to
-	// restore the pre-2026-07-22 zeroing of threePtW on OriginOffReb as an A/B baseline.
-	// Decoupled from UnfaithfulPutback on 2026-07-22: that hatch still gates the putback
-	// 2pt make-value (a separate, still-faithful ADR-0055 mechanism), and conflating the
-	// two made the 3PA measurement non-attributable. Proof the zeroing is unfaithful:
-	// jsb-native/re-artifacts/jsb-j24-oreb-3pt-eligibility-20260722.md. It consumes no
-	// Means (validate() must ignore it, mirroring BranchB). Production NEVER sets it.
-	SuppressPutback3pt bool
+	// UnfaithfulPutback3pt is an INVERTED-POLARITY escape hatch — zero value is NOT "live
+	// engine." Default false = the FAITHFUL JSB 5.60 behavior: an OriginOffReb continuation
+	// is restricted to {2pt, foul} and cannot be a 3pt attempt, because FUN_004e1ba0's
+	// reject-retry clause param_3 == '\x01' (param_3 = the OReb continuation flag local_15c,
+	// pushed as edi at 0x4d8f7e) rejects outcomes 2 and 4. Set true to restore the unfaithful
+	// 2026-07-22-to-2026-07-23 behavior (3pt reachable on a putback) as an A/B arm. Proof:
+	// jsb-native/re-artifacts/jsb-J24-transition-3pt-ADJUDICATION-20260723.md. Decoupled from
+	// UnfaithfulPutback (which still gates the putback 2pt make-value only). It consumes no
+	// Means / production never sets it.
+	UnfaithfulPutback3pt bool
 
 	// UnfaithfulOreb is an INVERTED-POLARITY escape hatch — zero value is NOT "live
 	// engine." Default false = the FAITHFUL JSB 5.60 offensive-rebound continuation

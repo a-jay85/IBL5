@@ -40,7 +40,7 @@ SCAN_PATHS="ibl5/scripts/ ibl5/bin/ ibl5/api.php"
 # Common English / short SQL-reserved words. When a renamed old-name is one of these,
 # require an unambiguous SQL context (backtick- or quote-wrapped) to avoid matching the
 # word in comments, shell/PHP variables, and prose. See ADR-0071.
-COMMON_WORD_DENYLIST=" from to key name value line order set group by select table column index type status date id "
+COMMON_WORD_DENYLIST=" from to key name value line order set group by select table column index type status date id do old new home year "
 
 usage() {
     cat <<'EOF'
@@ -168,6 +168,14 @@ trap cleanup EXIT
 while IFS= read -r migfile; do
     migbase="$(basename "$migfile")"
     while IFS= read -r line; do
+        # Strip SQL comments before parsing (D4). A migration that *describes*
+        # `RENAME COLUMN old TO new` in prose is not performing one — without this,
+        # 113_rename_reserved_word_rating_columns.sql:31 registers a phantom
+        # `old` -> `new` rename that then matches $row['old'], "old path", etc.
+        # A column name can never contain `--` or `#`, so truncating is lossless.
+        line="${line%%--*}"
+        line="${line%%#*}"
+
         old_name=""
         new_name=""
 
@@ -218,8 +226,11 @@ fi
 HITS=""
 while IFS='	' read -r old_name mig_basename; do
     [ -n "$old_name" ] || continue
-    # Skip if old_name is still in the live schema (FP-filter, D2)
-    if grep -qxF "$old_name" "$TMP_COLUMNS_FILE" 2>/dev/null; then
+    # Skip if old_name is still in the live schema (FP-filter, D2).
+    # Case-insensitive (D5): MySQL column names are case-insensitive, so a
+    # pure case change such as `Sim` -> `sim` (120_misc_snake_case_cleanup.sql)
+    # is not a rename that can leave a stale reference behind.
+    if grep -qixF "$old_name" "$TMP_COLUMNS_FILE" 2>/dev/null; then
         continue
     fi
     # Choose match expression: denylisted words require backtick- or quote-wrapped token.

@@ -291,6 +291,87 @@ final class CheckColumnRenameSweepCliTest extends TestCase
         self::assertStringContainsString('from', $result['output']);
     }
 
+    public function testRenameDescribedInSqlCommentIsNotParsed(): void
+    {
+        // A migration that *describes* a rename in prose performs none. Parsing the
+        // comment harvested a phantom `old` -> `new` rename that matched English prose.
+        $this->writeMigration(
+            '113_rename_rating.sql',
+            "-- The guarded form is `RENAME COLUMN IF EXISTS old TO new` followed by a check.\n"
+            . "# Also not a rename: CHANGE COLUMN legacyZorp new_zorp\n"
+            . "ALTER TABLE ibl_plr RENAME COLUMN `r_to` TO `r_tvr`;\n"
+        );
+        file_put_contents(
+            $this->tmpDir . '/ibl5/scripts/foo.php',
+            "echo \$change['old'] . ' -> ' . \$change['new'];  // old path\n"
+            . "echo legacyZorp;\n"
+        );
+        $colFile = $this->writeColumnsFile(['r_tvr']);
+
+        $result = $this->runScript(['--columns-file=' . $colFile]);
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('No stale renamed-column references detected', $result['output']);
+    }
+
+    public function testCaseOnlyRenameIsNotFlagged(): void
+    {
+        // MySQL column names are case-insensitive, so `Sim` -> `sim` cannot leave a
+        // stale reference behind — the live-schema filter must match case-insensitively.
+        $this->writeMigration(
+            '120_misc_snake_case_cleanup.sql',
+            "ALTER TABLE ibl_sim_summaries CHANGE COLUMN `Sim` `sim` INT;\n"
+        );
+        file_put_contents(
+            $this->tmpDir . '/ibl5/scripts/foo.php',
+            "echo \"Sim {\$sim} recap is ready for review.\";\n"
+        );
+        $colFile = $this->writeColumnsFile(['sim', 'other_col']);
+
+        $result = $this->runScript(['--columns-file=' . $colFile]);
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('No stale renamed-column references detected', $result['output']);
+    }
+
+    public function testShellKeywordRenameNotFlaggedAsBareword(): void
+    {
+        // `do` is a real column rename in migration 113 but also a shell keyword.
+        $this->writeMigration(
+            '113_rename_rating.sql',
+            "ALTER TABLE ibl_plr RENAME COLUMN `do` TO `r_drive_off`;\n"
+        );
+        file_put_contents(
+            $this->tmpDir . '/ibl5/bin/foo',
+            "for f in \"\$DIR\"/*; do :; done\n"
+        );
+        $colFile = $this->writeColumnsFile(['r_drive_off']);
+
+        $result = $this->runScript(['--columns-file=' . $colFile]);
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('No stale renamed-column references detected', $result['output']);
+    }
+
+    public function testShellKeywordRenameStillFlaggedWhenBackticked(): void
+    {
+        // Denylisting `do` must not blind the check to a genuine SQL reference.
+        $this->writeMigration(
+            '113_rename_rating.sql',
+            "ALTER TABLE ibl_plr RENAME COLUMN `do` TO `r_drive_off`;\n"
+        );
+        file_put_contents(
+            $this->tmpDir . '/ibl5/scripts/ratings.php',
+            "\$sql = 'SELECT `do` FROM ibl_plr';\n"
+        );
+        $colFile = $this->writeColumnsFile(['r_drive_off']);
+
+        $result = $this->runScript(['--columns-file=' . $colFile]);
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('113_rename_rating.sql', $result['output']);
+    }
+
     /**
      * @param list<string> $args
      * @return array{output: string, exit: int}

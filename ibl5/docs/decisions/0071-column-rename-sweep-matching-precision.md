@@ -1,6 +1,6 @@
 ---
 description: Per-column matching strictness in check-column-rename-sweep to eliminate bareword false positives for common English / SQL-reserved words.
-last_verified: 2026-06-28
+last_verified: 2026-07-22
 ---
 
 # ADR-0071: Column-rename sweep matching precision (denylist design)
@@ -39,7 +39,13 @@ Introduce **per-column matching strictness** keyed on a common-word denylist.
 
 A bash variable `COMMON_WORD_DENYLIST` lists common English words and short SQL reserved
 words: `from`, `to`, `key`, `name`, `value`, `line`, `order`, `set`, `group`, `by`,
-`select`, `table`, `column`, `index`, `type`, `status`, `date`, `id`.
+`select`, `table`, `column`, `index`, `type`, `status`, `date`, `id`, `do`, `old`, `new`,
+`home`, `year`.
+
+`do` is a real rename in `ibl5/migrations/113_rename_reserved_word_rating_columns.sql`
+(`do` → `r_drive_off`) and also the shell loop keyword, so bareword matching hit every
+`; do` in `ibl5/bin/`. `old`/`new`/`home`/`year` are defensive: common English words that
+appear in prose far more often than as unquoted column references.
 
 ### Matching rule
 
@@ -51,6 +57,24 @@ words: `from`, `to`, `key`, `name`, `value`, `line`, `order`, `set`, `group`, `b
 - **Old name is NOT in the denylist** — keep the existing bareword `\b${old_name}\b` match,
   so an unquoted `SELECT legacyZorp FROM …` in a `scripts/` file is still caught (the PR
   #637 blind spot this gate exists to defend).
+
+### D4 — SQL comments are not rename statements
+
+The rename-map parser strips everything from the first `--` or `#` on each migration line
+before matching. A column name can never contain either token, so the truncation is
+lossless. Without it, prose such as
+`` -- is now `RENAME COLUMN IF EXISTS old TO new` followed by a guarded … ``
+(`ibl5/migrations/113_rename_reserved_word_rating_columns.sql`) registered a phantom
+`old` → `new` rename, which then matched `$change['old']`, `// old path`, and similar.
+
+### D5 — the live-schema filter is case-insensitive
+
+MySQL column names are case-insensitive, so a pure case change such as `Sim` → `sim`
+(`ibl5/migrations/120_misc_snake_case_cleanup.sql`) cannot leave a stale reference behind.
+The D2 filter therefore compares against `information_schema.COLUMNS` with `grep -qixF`.
+Previously the case-sensitive compare made `Sim` look absent from the live schema, so it
+fell through to bareword matching and hit English prose ("Sim date update", a Discord
+notification label).
 
 ### Accepted residual
 
@@ -70,11 +94,15 @@ genuine edge cases not covered by this rule.
   per-PR bypass markers.
 - Non-denylisted column renames (the typical case) continue to be caught by the bareword
   match — the PR #637 blind spot remains defended.
-- Six new PHPUnit tests in `CheckColumnRenameSweepCliTest` cover the four false-positive
-  cases (exit 0) and two true-positive cases (exit 1) introduced by this rule.
-- The implementation is confined to `bin/check-column-rename-sweep` (denylist constant +
-  one conditional before the grep call); the surrounding rename-map / D2-filter logic is
-  unchanged.
+- `CheckColumnRenameSweepCliTest` covers each false-positive case (exit 0) and its matching
+  true-positive counterpart (exit 1): the six denylist cases from the original rule, plus
+  the commented-rename (D4), case-only-rename (D5), and shell-keyword `do` cases.
+- The implementation is confined to `bin/check-column-rename-sweep`: the denylist constant,
+  one conditional before the grep call, a comment strip in the rename-map parser (D4), and
+  a `-i` flag on the D2 membership test (D5).
+- D4/D5 (added 2026-07-22) close the residual that left `master` red on `Migration Safety`
+  after PR #1583 merged: PR runs could bypass via the PR-body marker, but `push` events
+  carry no PR body and so had no escape hatch.
 
 ## Lineage
 

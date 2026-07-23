@@ -1,0 +1,282 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/sim-recap-tick — the poll-only sim-recap pipeline driver (ADR-0092).
+#
+# Fired every 300s by the launchd LaunchAgent (bin/sim-recap-cron-setup). On an
+# EMPTY tick it exits 0 having spawned ZERO `claude` processes — the cost guard,
+# and the property that makes this branch safe to merge ahead of unit 3b (the
+# producer QueueSimSummaryStep is still unregistered, so the queue is always
+# empty and this is the only path the tick ever takes today).
+#
+# Trust split (ADR-0092): the Mac holds ONE credential — a SELECT-only MySQL
+# user reached over an SSH tunnel — handed only to the generation agent for game
+# data. Every privileged queue action is a prod-side `ssh php simRecapQueue.php`
+# call the agent cannot make (claiming a row is an UPDATE the read-only user is
+# refused). All *_id fields are read as STRINGS with `jq -r` (snowflake rule).
+#
+# NOT set -e: one sim's failure must never abort the tick before its park branch
+# runs. Backoff and stale-lease timers are computed SERVER-side by parkOrFail /
+# reclaimStaleClaim, so this file needs no local timestamp math.
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# ── Env seams (default to production values; the test harness overrides) ───────
+SIM_RECAP_SSH_BIN="${SIM_RECAP_SSH_BIN:-ssh}"
+SIM_RECAP_JQ_BIN="${SIM_RECAP_JQ_BIN:-jq}"
+SIM_RECAP_CLAUDE_BIN="${SIM_RECAP_CLAUDE_BIN:-claude}"
+SIM_RECAP_PROMPT_BIN="${SIM_RECAP_PROMPT_BIN:-$REPO_ROOT/bin/sim-recap-prompt}"
+SIM_RECAP_SSH_HOST="${SIM_RECAP_SSH_HOST:-}"
+SIM_RECAP_REMOTE_ROOT="${SIM_RECAP_REMOTE_ROOT:-}"
+SIM_RECAP_MODEL="${SIM_RECAP_MODEL:-claude-opus-4-8}"
+SIM_RECAP_CLAUDE_TIMEOUT="${SIM_RECAP_CLAUDE_TIMEOUT:-1800}"
+SIM_RECAP_DB_HOST="${SIM_RECAP_DB_HOST:-127.0.0.1}"
+SIM_RECAP_DB_PORT="${SIM_RECAP_DB_PORT:-13306}"
+SIM_RECAP_DB_USER="${SIM_RECAP_DB_USER:-}"
+SIM_RECAP_DB_NAME="${SIM_RECAP_DB_NAME:-}"
+# SIM_RECAP_DB_PASSWORD is read from the environment ONLY (never defaulted, never
+# argv, never logged). require_password() enforces its presence on the live path.
+
+# The prompt builder reads the DB coordinates from its environment (never the
+# password — that reaches the agent through MYSQL_PWD at spawn time).
+export SIM_RECAP_DB_HOST SIM_RECAP_DB_PORT SIM_RECAP_DB_USER SIM_RECAP_DB_NAME
+
+# ── Per-run temp working dir (security constraint 7 / ADR-0062) ───────────────
+# Global so the EXIT trap can see it; assigned in generate()/dry_run().
+WORKDIR=""
+cleanup_workdir() {
+    [ -n "${SIM_RECAP_KEEP_WORKDIR:-}" ] && return 0
+    [ -n "$WORKDIR" ] && rm -rf "$WORKDIR"
+    return 0
+}
+trap cleanup_workdir EXIT
+
+# ── Logging (prints messages, never the environment) ──────────────────────────
+# Diagnostics go to stderr, never stdout: in --dry-run stdout carries the
+# generated payload.json alone (a clean, pipeable document — row 60/61), so no
+# log line may interleave with it. launchd captures both streams in live mode.
+log() { printf '[%s] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*" >&2; }
+
+# ── Usage/rate-limit detector (regex copied from bin/bug-pipeline-tick:76-79) ──
+claude_env_error() {
+    printf '%s' "$1" | grep -qiE \
+        "hit your [a-z0-9 -]*limit|usage limit reached|api error:[[:space:]]*(401|403|429|529)|overloaded_error|rate_limit_error"
+}
+
+# ── One seam for every prod-side queue call ───────────────────────────────────
+# q <verb> [flags...] -> one JSON object on stdout.
+q() {
+    "$SIM_RECAP_SSH_BIN" "$SIM_RECAP_SSH_HOST" \
+        "php $SIM_RECAP_REMOTE_ROOT/ibl5/scripts/simRecapQueue.php $*"
+}
+
+# jq_ok <json> <filter> -> true when the filter succeeds (fail-closed on garbage).
+jq_ok() { printf '%s' "$1" | "$SIM_RECAP_JQ_BIN" -e "$2" >/dev/null 2>&1; }
+
+# Refuse to run the live path without the one credential, BEFORE any ssh/agent.
+require_password() {
+    if [ -z "${SIM_RECAP_DB_PASSWORD:-}" ]; then
+        log "ERROR: SIM_RECAP_DB_PASSWORD is unset — refusing to run (it belongs in the launchd plist EnvironmentVariables)"
+        exit 1
+    fi
+}
+
+# ── Park a failed sim, branching on the three-valued queue outcome ────────────
+# 'none' is a DISTINCT outcome (lost claim — another run owns the sim now), not
+# an error and not a retry. Never collapse it into a failure path.
+park() { # sim
+    local sim="$1" resp outcome
+    resp="$(q park --sim="$sim")"
+    outcome="$(printf '%s' "$resp" | "$SIM_RECAP_JQ_BIN" -r '.outcome // empty' 2>/dev/null)"
+    case "$outcome" in
+        pending) log "sim $sim: parked — re-queued with backoff; a later tick retries" ;;
+        failed)  log "sim $sim: parked FAILED — attempt ceiling reached; terminal" ;;
+        none)    log "sim $sim: park returned 'none' — lost the claim; another run owns it now, stopping" ;;
+        *)       log "sim $sim: park returned an unexpected outcome '$outcome'" ;;
+    esac
+    return 0
+}
+
+# ── Fetch the two DB-derived inputs the agent gets, into the workdir ──────────
+# Returns non-zero if either fetch is unusable, so the caller can park.
+fetch_agent_inputs() { # sim  (writes mentions.json + themes-ledger.json into WORKDIR)
+    local sim="$1" mm rt
+    mm="$(q mention-map)"
+    if ! jq_ok "$mm" '.ok == true'; then
+        log "sim $sim: mention-map fetch failed"
+        return 1
+    fi
+    printf '%s' "$mm" | "$SIM_RECAP_JQ_BIN" '.teams' > "$WORKDIR/mentions.json" 2>/dev/null
+
+    rt="$(q recent-themes)"
+    if ! jq_ok "$rt" '.ok == true'; then
+        log "sim $sim: recent-themes fetch failed"
+        return 1
+    fi
+    # .themes is a flat JSON array of strings — string-safe by construction.
+    printf '%s' "$rt" | "$SIM_RECAP_JQ_BIN" '.themes' > "$WORKDIR/themes-ledger.json" 2>/dev/null
+    return 0
+}
+
+# ── Run the generation agent in the temp dir; leaves payload.json on success ──
+run_agent() { # sim prompt
+    local sim="$1" prompt="$2"
+    # --allowedTools is the STRUCTURAL enforcement of security constraint 2: with
+    # only Bash(mysql:*) and Write, the agent has no ssh, no curl, no gh. The
+    # password reaches it via MYSQL_PWD in this subshell env — never in the prompt,
+    # never in argv, never logged.
+    ( cd "$WORKDIR" && MYSQL_PWD="${SIM_RECAP_DB_PASSWORD:-}" \
+        timeout "$SIM_RECAP_CLAUDE_TIMEOUT" "$SIM_RECAP_CLAUDE_BIN" -p "$prompt" \
+            --model "$SIM_RECAP_MODEL" --output-format json \
+            --allowedTools "Bash(mysql:*)" "Write" ) > "$WORKDIR/agent.json" 2>&1
+    return $?
+}
+
+# ── generate <sim> — inject, prompt, run agent, store or park ─────────────────
+generate() { # sim
+    local sim="$1"
+    WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/sim-recap-XXXXXX")"
+    log "workdir $WORKDIR for sim $sim"
+
+    if ! fetch_agent_inputs "$sim"; then
+        park "$sim"; return 0
+    fi
+
+    local prompt
+    if ! prompt="$("$SIM_RECAP_PROMPT_BIN" --sim="$sim" \
+            --mentions="$WORKDIR/mentions.json" --themes="$WORKDIR/themes-ledger.json")"; then
+        log "sim $sim: prompt build failed (missing exemplar?) — parking"
+        park "$sim"; return 0
+    fi
+
+    local agent_rc
+    run_agent "$sim" "$prompt"; agent_rc=$?
+
+    if claude_env_error "$(cat "$WORKDIR/agent.json" 2>/dev/null)"; then
+        log "sim $sim: agent hit a usage limit — parking with a backoff"
+        park "$sim"; return 0
+    fi
+
+    if [ ! -f "$WORKDIR/payload.json" ] || \
+       ! "$SIM_RECAP_JQ_BIN" -e '(.games | type == "array") and (.games | length > 0)' \
+            "$WORKDIR/payload.json" >/dev/null 2>&1; then
+        log "sim $sim: agent produced no valid payload.json (rc=$agent_rc) — parking"
+        park "$sim"; return 0
+    fi
+
+    # Store: pipe the payload on stdin (never argv — multi-KB, ps-visible).
+    local store store_rc
+    store="$("$SIM_RECAP_SSH_BIN" "$SIM_RECAP_SSH_HOST" \
+        "php $SIM_RECAP_REMOTE_ROOT/ibl5/scripts/storeSimRecap.php --sim=$sim" \
+        < "$WORKDIR/payload.json" 2>&1)"
+    store_rc=$?
+    if [ "$store_rc" -eq 0 ] && jq_ok "$store" '.ok == true'; then
+        log "sim $sim: stored ($(printf '%s' "$store" | "$SIM_RECAP_JQ_BIN" -r '.games' 2>/dev/null) game recaps)"
+        return 0
+    fi
+    log "sim $sim: store failed (rc=$store_rc): $store — parking"
+    park "$sim"
+    return 0
+}
+
+# ── --dry-run --sim=N — regenerate for tuning; touches NO queue row, NO DB write.
+# Fetches read-only inputs, runs the agent, prints the complete payload.json to
+# stdout (themes included, under .themes). Never claims, parks, stores, or posts.
+dry_run() {
+    local sim="$DRY_SIM"
+    if [ -z "$sim" ] || ! printf '%s' "$sim" | grep -qE '^[0-9]+$'; then
+        log "ERROR: --dry-run requires an explicit --sim=N (it never chooses a sim implicitly)"
+        exit 1
+    fi
+    WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/sim-recap-XXXXXX")"
+    log "workdir $WORKDIR for dry-run sim $sim"
+
+    # Read-only fetches only; a failure here is not worth parking a row we don't own.
+    fetch_agent_inputs "$sim" || true
+    [ -f "$WORKDIR/mentions.json" ] || printf '{}' > "$WORKDIR/mentions.json"
+    [ -f "$WORKDIR/themes-ledger.json" ] || printf '[]' > "$WORKDIR/themes-ledger.json"
+
+    local prompt
+    if ! prompt="$("$SIM_RECAP_PROMPT_BIN" --sim="$sim" \
+            --mentions="$WORKDIR/mentions.json" --themes="$WORKDIR/themes-ledger.json")"; then
+        log "dry-run sim $sim: prompt build failed (missing exemplar?)"
+        exit 1
+    fi
+
+    run_agent "$sim" "$prompt"
+
+    if [ ! -f "$WORKDIR/payload.json" ]; then
+        log "dry-run sim $sim: agent produced no payload.json"
+        exit 1
+    fi
+    # stdout carries the complete generated document, pretty-printed: a human
+    # reads it against the exemplar (row 60) and 3b's contract test pipes it
+    # through SimRecapPayload::fromJson() (row 61). Themes live inside .themes of
+    # this same payload, so there is nothing to echo separately — one channel,
+    # one document. All diagnostics have gone to stderr via log().
+    "$SIM_RECAP_JQ_BIN" '.' "$WORKDIR/payload.json"
+    return 0
+}
+
+# ── main — flag parse, then the claim loop with the empty-tick invariant ──────
+main() {
+    local DRY_RUN=0
+    DRY_SIM=""
+    local arg
+    for arg in "$@"; do
+        case "$arg" in
+            --dry-run) DRY_RUN=1 ;;
+            --sim=*)   DRY_SIM="${arg#--sim=}" ;;
+            *) log "unknown argument: $arg"; exit 2 ;;
+        esac
+    done
+
+    if [ "$DRY_RUN" -eq 1 ]; then
+        dry_run
+        return $?
+    fi
+
+    # Live path: refuse without the credential BEFORE any ssh or agent call.
+    require_password
+
+    # Reclaim first, unconditionally — a crashed run's sim is recoverable on the
+    # very next tick. Rides the multiplexed ssh connection, so ~tens of ms.
+    local rec sim_rec
+    rec="$(q reclaim-stale)"
+    if jq_ok "$rec" '.ok == true'; then
+        sim_rec="$(printf '%s' "$rec" | "$SIM_RECAP_JQ_BIN" -r '.sim // empty' 2>/dev/null)"
+        [ -n "$sim_rec" ] && [ "$sim_rec" != "null" ] && \
+            log "reclaimed stale sim $sim_rec back to pending"
+    fi
+
+    local claim normalized sim
+    claim="$(q claim-next)"
+    normalized="$(printf '%s' "$claim" | tr -d '[:space:]')"
+
+    # ★ EMPTY-TICK COST GUARD — no work, spawn zero `claude`, exit cheap.
+    if [ -z "$normalized" ]; then
+        log "no pending sim — exiting cheap"
+        return 0
+    fi
+
+    # Fail-closed: a truncated ssh, an HTML error page, or a stub returning
+    # garbage must NOT be parsed into a bogus sim number and spawn the agent.
+    if ! jq_ok "$claim" 'type == "object" and .ok == true'; then
+        log "ERROR: claim-next did not return a valid queue object — aborting tick (no claude spawned)"
+        return 1
+    fi
+
+    sim="$(printf '%s' "$claim" | "$SIM_RECAP_JQ_BIN" -r '.sim // empty' 2>/dev/null)"
+    if [ -z "$sim" ] || [ "$sim" = "null" ]; then
+        log "no pending sim — exiting cheap"
+        return 0
+    fi
+
+    log "claimed sim $sim"
+    generate "$sim"
+}
+
+main "$@"

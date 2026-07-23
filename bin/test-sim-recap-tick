@@ -1,0 +1,390 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-sim-recap-tick — harness for bin/sim-recap-tick (tick cases) and
+# bin/sim-recap-prompt (prompt cases).
+#
+# Stubs for ssh/claude/sim-recap-prompt are injected via env seams only —
+# no PATH modification.  jq is real.
+#
+# Run: bin/test-sim-recap-tick  (exit 0 = all pass, 1 = failures)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SRT_DRIVER="$SCRIPT_DIR/sim-recap-tick"
+SRT_PROMPT_BIN="$SCRIPT_DIR/sim-recap-prompt"
+SRT_EXEMPLAR="$SCRIPT_DIR/lib/sim-recap-exemplar.txt"
+
+FAILED=0
+SRT_RC=0
+SRT_PROMPT_RC=0
+
+srt_ok()   { echo "ok: $1"; }
+srt_fail() { echo "FAIL: $1"; FAILED=1; }
+
+# srt_expect_eq <name> <want> <got>
+srt_expect_eq() {
+    if [ "$2" = "$3" ]; then srt_ok "$1"
+    else srt_fail "$1 — want [$2] got [$3]"; fi
+}
+# srt_log_has   <stub-dir> <file> <pattern> <name>
+# srt_log_lacks <stub-dir> <file> <pattern> <name>
+srt_log_has() {
+    if grep -qF -- "$3" "$1/$2" 2>/dev/null; then srt_ok "$4"
+    else srt_fail "$4 — '$3' absent from $2"; fi
+}
+srt_log_lacks() {
+    if grep -qF -- "$3" "$1/$2" 2>/dev/null; then srt_fail "$4 — '$3' unexpectedly present in $2"
+    else srt_ok "$4"; fi
+}
+# srt_file_absent <path> <name>
+srt_file_absent() {
+    if [ -e "$1" ]; then srt_fail "$2 — $1 exists"
+    else srt_ok "$2"; fi
+}
+# srt_count <name> <want> <file>  — count non-blank lines
+srt_count() {
+    local got
+    got="$(grep -c . "$3" 2>/dev/null)"
+    srt_expect_eq "$1" "$2" "${got:-0}"
+}
+
+# ── One-time scaffolding ───────────────────────────────────────────────────────
+srt_setup() {
+    STUB="$(mktemp -d)"
+    trap 'rm -rf "$STUB"' EXIT
+
+    # ssh stub: log every call; dispatch on storeSimRecap.php vs verb.
+    # $STUB is exported and available to the stub at exec time.
+    cat > "$STUB/ssh" <<'SH'
+#!/usr/bin/env bash
+echo "$*" >> "$STUB/ssh.log"
+cmd="$2"
+if printf '%s' "$cmd" | grep -q 'storeSimRecap\.php'; then
+    if [ -f "$STUB/store-fails" ]; then
+        printf '{"ok":false,"error":"stub store failure"}\n'
+        exit 1
+    fi
+    cat "$STUB/resp.store" 2>/dev/null || printf '{"ok":true,"sim":42,"games":5}\n'
+    exit 0
+fi
+verb=$(printf '%s' "$cmd" | grep -oE 'simRecapQueue\.php [a-z-]+' | awk '{print $2}')
+if [ -f "$STUB/resp.$verb" ]; then
+    cat "$STUB/resp.$verb"
+else
+    case "$verb" in
+        reclaim-stale) printf '{"ok":true,"cmd":"reclaim-stale","sim":null}\n' ;;
+        claim-next)    printf '{"ok":true,"cmd":"claim-next","sim":null}\n' ;;
+        mention-map)   printf '{"ok":true,"cmd":"mention-map","teams":{}}\n' ;;
+        recent-themes) printf '{"ok":true,"cmd":"recent-themes","themes":[]}\n' ;;
+        park)          printf '{"ok":true,"cmd":"park","sim":42,"outcome":"pending"}\n' ;;
+        *)             printf '{"error":"unknown verb %s"}\n' "$verb"; exit 1 ;;
+    esac
+fi
+SH
+
+    # claude stub: touch sentinel, log call; write valid payload.json unless
+    # agent-fails is set; emit usage-limit line when agent-usage-limit is set.
+    cat > "$STUB/claude" <<'SH'
+#!/usr/bin/env bash
+echo "claude $*" >> "$STUB/claude.log"
+touch "$STUB/claude.sentinel"
+if [ -f "$STUB/agent-usage-limit" ]; then
+    printf 'api error: 429 rate_limit_error\n'
+    exit 0
+fi
+if [ ! -f "$STUB/agent-fails" ]; then
+    printf '%s\n' \
+        '{"intro_text":"intro","outro_text":"outro","recap_text":"recap",' \
+        '"themes":["theme1"],' \
+        '"games":[{"season_year":2008,"game_date":"2026-07-23",' \
+        '"visitor_teamid":1,"home_teamid":2,"game_of_that_day":0,' \
+        '"box_id":null,"sort_order":1,"recap_text":"game recap"}]}' \
+        | tr -d '\n' > payload.json
+fi
+exit 0
+SH
+
+    # sim-recap-prompt stub: echo a fixed marker (tick plumbing only).
+    cat > "$STUB/prompt" <<'SH'
+#!/usr/bin/env bash
+printf 'PROMPT_MARKER_SIM_RECAP\n'
+SH
+
+    chmod +x "$STUB/ssh" "$STUB/claude" "$STUB/prompt"
+
+    export STUB
+    export SIM_RECAP_SSH_BIN="$STUB/ssh"
+    export SIM_RECAP_CLAUDE_BIN="$STUB/claude"
+    export SIM_RECAP_PROMPT_BIN="$STUB/prompt"
+    export SIM_RECAP_SSH_HOST="test-host"
+    export SIM_RECAP_REMOTE_ROOT=""
+    export SIM_RECAP_DB_HOST="127.0.0.1"
+    export SIM_RECAP_DB_PORT="13306"
+    export SIM_RECAP_DB_USER="testuser"
+    export SIM_RECAP_DB_NAME="testdb"
+    export SIM_RECAP_DB_PASSWORD="test_db_password"
+    export SIM_RECAP_MODEL="test-model"
+    export SIM_RECAP_CLAUDE_TIMEOUT="30"
+}
+
+# Per-case reset: wipe logs and all per-case control sentinels.
+srt_reset() {
+    rm -f "$STUB"/ssh.log "$STUB"/claude.log "$STUB"/claude.sentinel \
+          "$STUB"/tick.out "$STUB"/agent-fails "$STUB"/agent-usage-limit \
+          "$STUB"/store-fails "$STUB"/resp.* 2>/dev/null
+    export SIM_RECAP_DB_PASSWORD="test_db_password"
+    unset SIM_RECAP_KEEP_WORKDIR 2>/dev/null || true
+}
+
+# srt_run [args…] — invoke the tick with combined stdout+stderr → tick.out.
+srt_run() {
+    "$SRT_DRIVER" "$@" > "$STUB/tick.out" 2>&1
+    SRT_RC=$?
+}
+
+srt_setup
+
+# ══ TICK CASES ════════════════════════════════════════════════════════════════
+
+# ── empty_tick_exits_zero / empty_tick_spawns_zero_claude /
+#    empty_tick_logs_cheap_exit / claim_next_null_short_circuits
+# Default claim-next → {"ok":true,"cmd":"claim-next","sim":null}
+srt_reset
+srt_run
+srt_expect_eq "empty_tick_exits_zero" 0 "$SRT_RC"
+srt_file_absent "$STUB/claude.sentinel" "empty_tick_spawns_zero_claude"
+srt_log_has "$STUB" tick.out "no pending sim — exiting cheap" "empty_tick_logs_cheap_exit"
+# Same run: valid JSON object with null sim still short-circuits (no claude)
+srt_file_absent "$STUB/claude.sentinel" "claim_next_null_short_circuits"
+
+# ── whitespace_payload_is_empty ───────────────────────────────────────────────
+srt_reset
+printf '  \n ' > "$STUB/resp.claim-next"
+srt_run
+srt_expect_eq "whitespace_payload_is_empty" 0 "$SRT_RC"
+srt_file_absent "$STUB/claude.sentinel" "whitespace_payload_is_empty — zero claude"
+
+# ── malformed_queue_json_fails_closed ─────────────────────────────────────────
+srt_reset
+printf 'not json at all' > "$STUB/resp.claim-next"
+srt_run
+srt_expect_eq "malformed_queue_json_fails_closed" 1 "$SRT_RC"
+srt_file_absent "$STUB/claude.sentinel" "malformed_queue_json_fails_closed — no claude"
+
+# ── pending_sim_dispatches_one_claude ─────────────────────────────────────────
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+srt_run
+srt_count "pending_sim_dispatches_one_claude" 1 "$STUB/claude.log"
+
+# ── stale_reclaim_fires ───────────────────────────────────────────────────────
+# reclaim-stale returns a non-null sim; claim-next still returns null (cheap exit)
+srt_reset
+printf '{"ok":true,"cmd":"reclaim-stale","sim":"7"}' > "$STUB/resp.reclaim-stale"
+srt_run
+r_line="$(grep -n "reclaim-stale" "$STUB/ssh.log" 2>/dev/null | head -1 | cut -d: -f1)"
+c_line="$(grep -n "claim-next"    "$STUB/ssh.log" 2>/dev/null | head -1 | cut -d: -f1)"
+if [ -n "$r_line" ] && [ -n "$c_line" ] && [ "$r_line" -lt "$c_line" ]; then
+    srt_ok "stale_reclaim_fires — reclaim-stale before claim-next in ssh.log"
+else
+    srt_fail "stale_reclaim_fires — reclaim-stale not before claim-next (r:${r_line:-?} c:${c_line:-?})"
+fi
+srt_log_has "$STUB" tick.out "reclaimed stale sim 7" "stale_reclaim_fires — logged reclaim"
+
+# ── park_none_is_distinct ─────────────────────────────────────────────────────
+# outcome "none" → exit 0, "lost the claim" log, NO store call
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+touch "$STUB/agent-fails"
+printf '{"ok":true,"cmd":"park","sim":42,"outcome":"none"}' > "$STUB/resp.park"
+srt_run
+srt_expect_eq "park_none_is_distinct — exit 0" 0 "$SRT_RC"
+srt_log_has  "$STUB" tick.out "lost the claim" "park_none_is_distinct — lost-claim log line"
+srt_log_lacks "$STUB" ssh.log "storeSimRecap"  "park_none_is_distinct — no store call"
+
+# ── park_failed_is_terminal ───────────────────────────────────────────────────
+# outcome "failed" → exit 0, "terminal" log line
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+touch "$STUB/agent-fails"
+printf '{"ok":true,"cmd":"park","sim":42,"outcome":"failed"}' > "$STUB/resp.park"
+srt_run
+srt_expect_eq "park_failed_is_terminal — exit 0" 0 "$SRT_RC"
+srt_log_has "$STUB" tick.out "terminal" "park_failed_is_terminal — terminal log line"
+
+# ── missing_payload_parks_not_stores ─────────────────────────────────────────
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+touch "$STUB/agent-fails"
+srt_run
+srt_log_has  "$STUB" ssh.log "park"         "missing_payload_parks_not_stores — park in ssh.log"
+srt_log_lacks "$STUB" ssh.log "storeSimRecap" "missing_payload_parks_not_stores — no store"
+
+# ── usage_limit_parks_with_reason ─────────────────────────────────────────────
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+touch "$STUB/agent-usage-limit"
+srt_run
+srt_log_has "$STUB" tick.out "usage limit" "usage_limit_parks_with_reason — logged"
+srt_log_has "$STUB" ssh.log  "park"        "usage_limit_parks_with_reason — park in ssh.log"
+
+# ── dry_run_touches_nothing ───────────────────────────────────────────────────
+# --dry-run --sim=N: calls mention-map/recent-themes (read-only) but NO
+# claim-next, park, or storeSimRecap.
+srt_reset
+srt_run --dry-run --sim=42
+srt_log_has  "$STUB" ssh.log "mention-map"   "dry_run_touches_nothing — mention-map"
+srt_log_has  "$STUB" ssh.log "recent-themes" "dry_run_touches_nothing — recent-themes"
+srt_log_lacks "$STUB" ssh.log "claim-next"    "dry_run_touches_nothing — no claim-next"
+srt_log_lacks "$STUB" ssh.log "park"          "dry_run_touches_nothing — no park"
+srt_log_lacks "$STUB" ssh.log "storeSimRecap" "dry_run_touches_nothing — no store"
+
+# ── dry_run_requires_sim ──────────────────────────────────────────────────────
+srt_reset
+"$SRT_DRIVER" --dry-run > "$STUB/tick.out" 2>&1
+SRT_RC=$?
+srt_expect_eq "dry_run_requires_sim" 1 "$SRT_RC"
+
+# ── workdir_removed_on_success ────────────────────────────────────────────────
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+srt_run
+_wd="$(sed -n 's/.*\] workdir \(\/[^ ]*\) .*/\1/p' "$STUB/tick.out" | head -1)"
+if [ -z "$_wd" ]; then
+    srt_fail "workdir_removed_on_success — workdir path not found in tick.out"
+elif [ -d "$_wd" ]; then
+    srt_fail "workdir_removed_on_success — workdir still exists: $_wd"
+else
+    srt_ok "workdir_removed_on_success"
+fi
+
+# ── workdir_removed_on_failure ────────────────────────────────────────────────
+# Drive via store failure: workdir is created, store fails, park is called,
+# EXIT trap still fires and removes the workdir.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+touch "$STUB/store-fails"
+srt_run
+_wd="$(sed -n 's/.*\] workdir \(\/[^ ]*\) .*/\1/p' "$STUB/tick.out" | head -1)"
+if [ -z "$_wd" ]; then
+    srt_fail "workdir_removed_on_failure — workdir path not found in tick.out"
+elif [ -d "$_wd" ]; then
+    srt_fail "workdir_removed_on_failure — workdir still exists: $_wd"
+else
+    srt_ok "workdir_removed_on_failure"
+fi
+
+# ── missing_password_exits_before_ssh ────────────────────────────────────────
+srt_reset
+( unset SIM_RECAP_DB_PASSWORD; "$SRT_DRIVER" > "$STUB/tick.out" 2>&1 )
+SRT_RC=$?
+srt_expect_eq "missing_password_exits_before_ssh — exit 1" 1 "$SRT_RC"
+srt_file_absent "$STUB/ssh.log" "missing_password_exits_before_ssh — no ssh called"
+
+# ── password_never_logged ─────────────────────────────────────────────────────
+# Use a claimed sim so more code paths run; sentinel value must not appear in output.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+touch "$STUB/agent-fails"
+export SIM_RECAP_DB_PASSWORD="hunter2_sentinel_xyz"
+srt_run
+export SIM_RECAP_DB_PASSWORD="test_db_password"
+srt_log_lacks "$STUB" tick.out "hunter2_sentinel_xyz" "password_never_logged"
+
+# ── seams_resolve_from_env ────────────────────────────────────────────────────
+# Full generation path: every stub reached via env seam, no PATH modification.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+srt_run
+srt_expect_eq "seams_resolve_from_env — exit 0" 0 "$SRT_RC"
+srt_log_has "$STUB" ssh.log "mention-map" "seams_resolve_from_env — ssh stub reached"
+if [ -f "$STUB/claude.sentinel" ]; then
+    srt_ok "seams_resolve_from_env — claude stub reached"
+else
+    srt_fail "seams_resolve_from_env — claude stub not reached"
+fi
+
+# ── no_plist_committed ────────────────────────────────────────────────────────
+_repo_root="$(cd "$SCRIPT_DIR/.." && pwd)"
+_plist_count="$(git -C "$_repo_root" ls-files '*.plist' 2>/dev/null | wc -l | tr -d ' ')"
+if [ "${_plist_count:-0}" -eq 0 ]; then
+    srt_ok "no_plist_committed"
+else
+    srt_fail "no_plist_committed — found: $(git -C "$_repo_root" ls-files '*.plist')"
+fi
+
+# ══ PROMPT GROUP — real bin/sim-recap-prompt ══════════════════════════════════
+
+_FIX="$STUB/fixtures"
+mkdir -p "$_FIX"
+printf '{"Team Alpha": "123456789012345678", "Team Beta": "987654321098765432"}' \
+    > "$_FIX/mentions.json"
+printf '["past theme one", "past theme two"]'    > "$_FIX/themes.json"
+printf '{"Known Team": "123456789012345678", "Unknown Team": null}' \
+    > "$_FIX/mentions-unmapped.json"
+printf '[]' > "$_FIX/themes-empty.json"
+
+# Run the real builder; output → prompt.out, errors → prompt.err.
+run_prompt() {
+    SIM_RECAP_EXEMPLAR="$SRT_EXEMPLAR" \
+        "$SRT_PROMPT_BIN" "$@" > "$STUB/prompt.out" 2>"$STUB/prompt.err"
+    SRT_PROMPT_RC=$?
+}
+
+# ── exemplar_embedded ─────────────────────────────────────────────────────────
+run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json"
+srt_log_has "$STUB" prompt.out "WHERE THINGS STAND" "exemplar_embedded — WHERE THINGS STAND"
+srt_log_has "$STUB" prompt.out "===== "             "exemplar_embedded — date separator"
+
+# ── anti_tell_list_present ────────────────────────────────────────────────────
+# Reuse same output from exemplar_embedded run.
+srt_log_has "$STUB" prompt.out "load-bearing"          "anti_tell_list_present — load-bearing"
+srt_log_has "$STUB" prompt.out "em-dash"               "anti_tell_list_present — em-dash"
+srt_log_has "$STUB" prompt.out "and here's the thing"  "anti_tell_list_present — and here's the thing"
+
+# ── standings_placement_singular ─────────────────────────────────────────────
+srt_log_has  "$STUB" prompt.out "before any per-game recaps" \
+    "standings_placement_singular — exemplar-authoritative ordering present"
+srt_log_lacks "$STUB" prompt.out "paragraph at the end" \
+    "standings_placement_singular — superseded 'at the end' phrasing absent"
+
+# ── mentions_render_as_strings ────────────────────────────────────────────────
+# Snowflake digit-for-digit in output (same run, but rerun for clarity).
+run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json"
+srt_log_has "$STUB" prompt.out "123456789012345678" \
+    "mentions_render_as_strings — snowflake digit-for-digit"
+
+# ── negative_unmapped_team ────────────────────────────────────────────────────
+run_prompt --sim=1 --mentions="$_FIX/mentions-unmapped.json" --themes="$_FIX/themes.json"
+srt_log_has  "$STUB" prompt.out "Unknown Team" "negative_unmapped_team — plain name present"
+srt_log_lacks "$STUB" prompt.out "<@>"          "negative_unmapped_team — no empty mention tag"
+srt_log_lacks "$STUB" prompt.out "<@null>"      "negative_unmapped_team — no null mention tag"
+
+# ── negative_empty_ledger ─────────────────────────────────────────────────────
+run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes-empty.json"
+srt_log_has "$STUB" prompt.out "(none recorded yet)" \
+    "negative_empty_ledger — none-recorded-yet for empty themes"
+
+# ── negative_missing_exemplar ─────────────────────────────────────────────────
+SIM_RECAP_EXEMPLAR="/nonexistent/exemplar.txt" \
+    "$SRT_PROMPT_BIN" --sim=1 \
+    --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json" \
+    > "$STUB/prompt.out" 2>"$STUB/prompt.err"
+SRT_PROMPT_RC=$?
+srt_expect_eq "negative_missing_exemplar — exit 1" 1 "$SRT_PROMPT_RC"
+_stdout_size="$(wc -c < "$STUB/prompt.out" | tr -d ' ')"
+srt_expect_eq "negative_missing_exemplar — empty stdout" "0" "$_stdout_size"
+
+# ── negative_no_credential_leak ───────────────────────────────────────────────
+# MYSQL_PWD value must not appear in any stdout (the var name 'MYSQL_PWD' may appear).
+MYSQL_PWD="s3cr3t_pw_xyz" SIM_RECAP_EXEMPLAR="$SRT_EXEMPLAR" \
+    "$SRT_PROMPT_BIN" --sim=1 \
+    --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json" \
+    > "$STUB/prompt.out" 2>"$STUB/prompt.err"
+srt_log_lacks "$STUB" prompt.out "s3cr3t_pw_xyz" "negative_no_credential_leak"
+
+echo "----"
+[ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"
+exit "$FAILED"

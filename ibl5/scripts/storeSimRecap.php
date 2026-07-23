@@ -6,8 +6,9 @@ declare(strict_types=1);
  * CLI-only writer for the sim-recap pipeline.
  *
  * Usage: php ibl5/scripts/storeSimRecap.php --sim=N
- *   Recap prose is read from stdin (never argv — prose is multi-KB, multi-line,
- *   and would be visible in `ps`).
+ *   A structured JSON recap document is read from stdin (never argv — the prose
+ *   is multi-KB, multi-line, and would be visible in `ps`). Parsing and
+ *   validation live in SimRecap\SimRecapPayload, which fails closed.
  *
  * This is the single privileged writer for ibl_sim_summaries (security constraint 3).
  * Protected by both a PHP_SAPI guard (below, first executable statement) and
@@ -76,16 +77,27 @@ if ($sim < 1) {
     fail('--sim must be >= 1');
 }
 
-// ── Read stdin ────────────────────────────────────────────────────────────────
-$recap = stream_get_contents(STDIN);
-$recap = is_string($recap) ? trim($recap) : '';
-if ($recap === '') {
-    fail('no recap text on stdin');
+// ── Read + parse stdin (structured JSON — fail closed) ────────────────────────
+$json = stream_get_contents(STDIN);
+if (!is_string($json) || trim($json) === '') {
+    fail('no JSON payload on stdin');
+}
+try {
+    $payload = \SimRecap\SimRecapPayload::fromJson($json);
+} catch (\Throwable $e) {
+    fail('malformed payload: ' . $e->getMessage());
 }
 
 // ── Write, then confirm ───────────────────────────────────────────────────────
 $repo = new \SimRecap\SimSummaryRepository($mysqli_db);
-$repo->markDone($sim, $recap, null);
+$repo->markDone(
+    $sim,
+    $payload->getIntroText(),
+    $payload->getOutroText(),
+    $payload->getRecapText(),
+    $payload->getGames(),
+    $payload->getThemesJson()
+);
 $row = $repo->find($sim);
 if ($row === null || $row['status'] !== 'done') {
     fail("store failed: sim {$sim} is not in state done after write");
@@ -95,5 +107,5 @@ if ($row === null || $row['status'] !== 'done') {
 \Discord\Discord::postToChannel('#admin-chat', "Sim {$sim} recap is ready for review.");
 
 // ── Success output ────────────────────────────────────────────────────────────
-echo json_encode(['ok' => true, 'sim' => $sim, 'bytes' => strlen($recap)]), "\n";
+echo json_encode(['ok' => true, 'sim' => $sim, 'games' => count($payload->getGames())]), "\n";
 exit(0);

@@ -141,58 +141,184 @@ class SimSummaryRepository extends \BaseMysqliRepository
     }
 
     /**
-     * Store a completed recap. Upserts so a manually-backfilled sim with no
-     * queued row still stores. themes_used=null uses the two-statement branch
-     * (bind_param has no NULL type).
+     * Store a completed recap: the envelope row plus every per-game child row,
+     * in ONE transaction. A mid-write failure rolls the whole thing back, so a
+     * partial recap can never surface.
+     *
+     * Upserts so a manually-backfilled sim with no queued row still stores.
+     * themes_used=null uses the two-statement branch (bind_param has no NULL type);
+     * the child INSERT uses the same two-variant idiom for a null box_id.
      *
      * Returns void — an idempotent re-store of identical text legitimately yields
-     * affected_rows=0, so callers confirm with find().
+     * affected_rows=0, so callers confirm with find() / findGameRecaps().
+     *
+     * @param list<array{season_year: int, game_date: string, visitor_teamid: int, home_teamid: int, game_of_that_day: int, box_id: ?int, sort_order: int, recap_text: string}> $gameRecaps
      */
-    public function markDone(int $sim, string $recapText, ?string $themesJson): void
-    {
+    public function markDone(
+        int $sim,
+        string $introText,
+        string $outroText,
+        string $recapText,
+        array $gameRecaps,
+        ?string $themesJson
+    ): void {
+        $this->transactional(function () use (
+            $sim,
+            $introText,
+            $outroText,
+            $recapText,
+            $gameRecaps,
+            $themesJson
+        ): void {
+            $this->upsertEnvelope($sim, $introText, $outroText, $recapText, $themesJson);
+
+            foreach ($gameRecaps as $game) {
+                $this->upsertGameRecap($sim, $game);
+            }
+        });
+    }
+
+    /**
+     * Envelope upsert. Two branches because bind_param has no NULL type.
+     */
+    private function upsertEnvelope(
+        int $sim,
+        string $introText,
+        string $outroText,
+        string $recapText,
+        ?string $themesJson
+    ): void {
         if ($themesJson === null) {
             $this->execute(
-                "INSERT INTO `ibl_sim_summaries` (`sim`, `status`, `recap_text`, `generated_at`)
-                 VALUES (?, 'done', ?, NOW())
-                 ON DUPLICATE KEY UPDATE
-                     `status` = 'done', `recap_text` = ?,
-                     `generated_at` = NOW(), `blocked_until` = NULL",
-                'iss',
-                $sim,
-                $recapText,
-                $recapText
-            );
-        } else {
-            $this->execute(
                 "INSERT INTO `ibl_sim_summaries`
-                     (`sim`, `status`, `recap_text`, `themes_used`, `generated_at`)
-                 VALUES (?, 'done', ?, ?, NOW())
+                     (`sim`, `status`, `recap_text`, `intro_text`, `outro_text`, `generated_at`)
+                 VALUES (?, 'done', ?, ?, ?, NOW())
                  ON DUPLICATE KEY UPDATE
-                     `status` = 'done', `recap_text` = ?, `themes_used` = ?,
+                     `status` = 'done', `recap_text` = ?, `intro_text` = ?, `outro_text` = ?,
                      `generated_at` = NOW(), `blocked_until` = NULL",
-                'issss',
+                'issssss',
                 $sim,
                 $recapText,
-                $themesJson,
+                $introText,
+                $outroText,
                 $recapText,
-                $themesJson
+                $introText,
+                $outroText
             );
+
+            return;
         }
+
+        $this->execute(
+            "INSERT INTO `ibl_sim_summaries`
+                 (`sim`, `status`, `recap_text`, `intro_text`, `outro_text`, `themes_used`, `generated_at`)
+             VALUES (?, 'done', ?, ?, ?, ?, NOW())
+             ON DUPLICATE KEY UPDATE
+                 `status` = 'done', `recap_text` = ?, `intro_text` = ?, `outro_text` = ?,
+                 `themes_used` = ?, `generated_at` = NOW(), `blocked_until` = NULL",
+            'issssssss',
+            $sim,
+            $recapText,
+            $introText,
+            $outroText,
+            $themesJson,
+            $recapText,
+            $introText,
+            $outroText,
+            $themesJson
+        );
+    }
+
+    /**
+     * Child upsert, keyed on uniq_game so a re-store updates prose in place.
+     * Two variants: a null box_id omits the column (defaults NULL) rather than
+     * binding null, and sets box_id = NULL in the UPDATE clause.
+     *
+     * @param array{season_year: int, game_date: string, visitor_teamid: int, home_teamid: int, game_of_that_day: int, box_id: ?int, sort_order: int, recap_text: string} $game
+     */
+    private function upsertGameRecap(int $sim, array $game): void
+    {
+        if ($game['box_id'] === null) {
+            $this->execute(
+                "INSERT INTO `ibl_sim_game_recaps`
+                     (`sim`, `season_year`, `game_date`, `visitor_teamid`, `home_teamid`,
+                      `game_of_that_day`, `sort_order`, `recap_text`)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE
+                     `sim` = ?, `box_id` = NULL, `sort_order` = ?, `recap_text` = ?",
+                'iisiiiisiis',
+                $sim,
+                $game['season_year'],
+                $game['game_date'],
+                $game['visitor_teamid'],
+                $game['home_teamid'],
+                $game['game_of_that_day'],
+                $game['sort_order'],
+                $game['recap_text'],
+                $sim,
+                $game['sort_order'],
+                $game['recap_text']
+            );
+
+            return;
+        }
+
+        $this->execute(
+            "INSERT INTO `ibl_sim_game_recaps`
+                 (`sim`, `season_year`, `game_date`, `visitor_teamid`, `home_teamid`,
+                  `game_of_that_day`, `box_id`, `sort_order`, `recap_text`)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE
+                 `sim` = ?, `box_id` = ?, `sort_order` = ?, `recap_text` = ?",
+            'iisiiiiisiiis',
+            $sim,
+            $game['season_year'],
+            $game['game_date'],
+            $game['visitor_teamid'],
+            $game['home_teamid'],
+            $game['game_of_that_day'],
+            $game['box_id'],
+            $game['sort_order'],
+            $game['recap_text'],
+            $sim,
+            $game['box_id'],
+            $game['sort_order'],
+            $game['recap_text']
+        );
     }
 
     /**
      * Read back a sim summary row, or null if absent.
      *
-     * @return array{sim: int, status: string, recap_text: ?string, themes_used: ?string, attempts: int, claimed_at: ?string, blocked_until: ?string, generated_at: ?string}|null
+     * @return array{sim: int, status: string, recap_text: ?string, intro_text: ?string, outro_text: ?string, themes_used: ?string, attempts: int, claimed_at: ?string, blocked_until: ?string, generated_at: ?string}|null
      */
     public function find(int $sim): ?array
     {
-        /** @var array{sim: int, status: string, recap_text: ?string, themes_used: ?string, attempts: int, claimed_at: ?string, blocked_until: ?string, generated_at: ?string}|null */
+        /** @var array{sim: int, status: string, recap_text: ?string, intro_text: ?string, outro_text: ?string, themes_used: ?string, attempts: int, claimed_at: ?string, blocked_until: ?string, generated_at: ?string}|null */
         return $this->fetchOne(
-            "SELECT `sim`, `status`, `recap_text`, `themes_used`,
+            "SELECT `sim`, `status`, `recap_text`, `intro_text`, `outro_text`, `themes_used`,
                     `attempts`, `claimed_at`, `blocked_until`, `generated_at`
              FROM `ibl_sim_summaries`
              WHERE `sim` = ?",
+            'i',
+            $sim
+        );
+    }
+
+    /**
+     * Read back a sim's per-game recaps in presentation order.
+     *
+     * @return list<array{id: int, sim: int, season_year: int, game_date: string, visitor_teamid: int, home_teamid: int, game_of_that_day: int, box_id: ?int, sort_order: int, recap_text: string, created_at: string}>
+     */
+    public function findGameRecaps(int $sim): array
+    {
+        /** @var list<array{id: int, sim: int, season_year: int, game_date: string, visitor_teamid: int, home_teamid: int, game_of_that_day: int, box_id: ?int, sort_order: int, recap_text: string, created_at: string}> */
+        return $this->fetchAll(
+            "SELECT `id`, `sim`, `season_year`, `game_date`, `visitor_teamid`, `home_teamid`,
+                    `game_of_that_day`, `box_id`, `sort_order`, `recap_text`, `created_at`
+             FROM `ibl_sim_game_recaps`
+             WHERE `sim` = ?
+             ORDER BY `sort_order` ASC, `id` ASC",
             'i',
             $sim
         );

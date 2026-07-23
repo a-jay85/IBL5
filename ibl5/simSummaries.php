@@ -66,6 +66,13 @@ if ($wantsTxt) {
 
 $rows = $repo->listAll();
 
+// Per-game recaps only accompany a stored envelope body; a pending/failed row
+// renders its status message instead of a game list (plan Phase 3b).
+$gameRecaps = [];
+if ($sim !== null && $row !== null && $row['recap_text'] !== null) {
+    $gameRecaps = $repo->findDisplayableGameRecaps($sim);
+}
+
 if ($simError === 'malformed') {
     http_response_code(400);
 } elseif ($simError === 'notfound') {
@@ -73,4 +80,4 @@ if ($simError === 'malformed') {
 }
 
 // $sim is passed so the 'notfound' notice can name the sim it could not find.
-echo (new \SimRecap\SimSummariesView())->render($rows, $row, $simError, $sim);
+echo (new \SimRecap\SimSummariesView())->render($rows, $row, $gameRecaps, $simError, $sim);

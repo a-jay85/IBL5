@@ -372,6 +372,39 @@ final class SimSummaryRepositoryTest extends DatabaseTestCase
         );
     }
 
+    // ── findDisplayableGameRecaps tests ──────────────────────────────────────────
+
+    public function testFindDisplayableGameRecapsReturnsOnlyGamesWithBoxScores(): void
+    {
+        // Two game recaps: gotd=1 (will have a matching box score) and gotd=2 (will not).
+        $games = [
+            $this->gameRecap(sortOrder: 0, gameOfThatDay: 1),
+            $this->gameRecap(sortOrder: 1, gameOfThatDay: 2),
+        ];
+        $this->repo->markDone(999001, 'Intro.', 'Outro.', 'Recap.', $games, null);
+
+        // Two team-side rows for gotd=1 only (unique key includes `name`, so both persist).
+        $this->db->query(
+            "INSERT INTO `ibl_box_scores_teams` (`game_date`, `visitor_teamid`, `home_teamid`, `game_of_that_day`, `name`)" .
+            " VALUES ('2025-01-01', 1, 2, 1, 'Metros'), ('2025-01-01', 1, 2, 1, 'Stars')"
+        );
+
+        $displayable = $this->repo->findDisplayableGameRecaps(999001);
+
+        self::assertCount(1, $displayable, 'Only games with a matching box score are returned');
+        self::assertSame(1, $displayable[0]['game_of_that_day'], 'The returned game is the one backed by a box score');
+    }
+
+    public function testFindDisplayableGameRecapsReturnsEmptyArrayWhenNoBoxScoresExist(): void
+    {
+        // Store one game recap with no corresponding ibl_box_scores_teams row.
+        $this->repo->markDone(999001, 'Intro.', 'Outro.', 'Recap.', [$this->gameRecap(sortOrder: 0)], null);
+
+        $displayable = $this->repo->findDisplayableGameRecaps(999001);
+
+        self::assertSame([], $displayable, 'No box score match → no displayable game recaps');
+    }
+
     // ── Private helpers ────────────────────────────────────────────────────────
 
     /**

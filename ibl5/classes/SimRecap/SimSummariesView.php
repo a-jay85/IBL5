@@ -24,10 +24,11 @@ class SimSummariesView
     /**
      * @param list<array<string, mixed>> $rows         From SimSummaryRepository::listAll()
      * @param array<string, mixed>|null  $recap        From SimSummaryRepository::find(), or null
+     * @param list<array<string, mixed>> $gameRecaps   From SimSummaryRepository::findDisplayableGameRecaps(), sorted by sort_order
      * @param string|null                $error        'malformed' | 'notfound' | null
      * @param int|null                   $requestedSim The validated sim behind a 'notfound' notice
      */
-    public function render(array $rows, ?array $recap, ?string $error, ?int $requestedSim = null): string
+    public function render(array $rows, ?array $recap, array $gameRecaps, ?string $error, ?int $requestedSim = null): string
     {
         ob_start();
         ?>
@@ -90,6 +91,29 @@ class SimSummariesView
 <?php if (!is_string($body)): ?>
         <p id="recap-missing">No recap text stored yet — status: <?= HtmlSanitizer::e($recap['status'] ?? '') ?>.</p>
 <?php else: ?>
+<?php $intro = $recap['intro_text'] ?? null; ?>
+<?php if (is_string($intro) && $intro !== ''): ?>
+        <p id="recap-intro"><?= HtmlSanitizer::e($intro) ?></p>
+<?php endif; ?>
+<?php if ($gameRecaps !== []): ?>
+        <ol id="recap-games">
+<?php foreach ($gameRecaps as $game): ?>
+<?php
+            $gDate = $game['game_date'] ?? null;
+            $gVid  = $game['visitor_teamid'] ?? null;
+            $gHid  = $game['home_teamid'] ?? null;
+?>
+            <li class="recap-game">
+                <span class="recap-game__meta"><?= HtmlSanitizer::e(is_string($gDate) ? $gDate : '') ?> · team <?= HtmlSanitizer::e(is_scalar($gVid) ? (string) $gVid : '') ?> at team <?= HtmlSanitizer::e(is_scalar($gHid) ? (string) $gHid : '') ?></span>
+                <p class="recap-game__text"><?= HtmlSanitizer::e($game['recap_text'] ?? '') ?></p>
+            </li>
+<?php endforeach; ?>
+        </ol>
+<?php endif; ?>
+<?php $outro = $recap['outro_text'] ?? null; ?>
+<?php if (is_string($outro) && $outro !== ''): ?>
+        <p id="recap-outro"><?= HtmlSanitizer::e($outro) ?></p>
+<?php endif; ?>
         <textarea id="recap-body" readonly rows="24" cols="100"><?= HtmlSanitizer::e($body) ?></textarea>
         <p>
             <button type="button" id="recap-copy">Copy</button>

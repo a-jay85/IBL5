@@ -42,6 +42,18 @@ test.describe('Sim recap admin viewer', () => {
     expect(response?.status()).toBe(200);
     await expect(page.locator('#recap-body')).toHaveValue(SIM_689_BODY);
     await expect(page.locator('#recap-themes')).toContainText('comeback');
+    await expect(page.locator('#recap-intro')).toContainText(
+      'Another week of IBL action delivered drama from tip-off to the final buzzer.',
+    );
+    await expect(page.locator('#recap-outro')).toContainText(
+      'The Cannons are one to watch as the season reaches its final stretch.',
+    );
+    const gameItems = page.locator('#recap-games li');
+    await expect(gameItems).toHaveCount(3);
+    // Games must appear in sort_order order: 2026-02-20 → 2026-03-03 → 2026-03-05.
+    await expect(gameItems.nth(0)).toContainText('2026-02-20');
+    await expect(gameItems.nth(1)).toContainText('2026-03-03');
+    await expect(gameItems.nth(2)).toContainText('2026-03-05');
     await assertNoPhpErrors(page);
   });
 
@@ -62,6 +74,7 @@ test.describe('Sim recap admin viewer', () => {
     expect(response?.status()).toBe(200);
     await expect(page.locator('#recap-body')).toHaveCount(0);
     await expect(page.locator('#recap-download')).toHaveCount(0);
+    await expect(page.locator('#recap-games')).toHaveCount(0);
     await expect(page.locator('#recap-missing')).toContainText('pending');
     await assertNoPhpErrors(page);
   });

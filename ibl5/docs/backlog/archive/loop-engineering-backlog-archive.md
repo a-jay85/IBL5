@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed autonomous-loop engineering entries, extracted from loop-engineering-backlog.md.
-last_verified: 2026-07-16
+last_verified: 2026-07-23
 ---
 
 # Autonomous-Loop Engineering Backlog — Archive
@@ -46,6 +46,14 @@ Read-only historical record of ✅ Implemented entries. For OPEN items see ../lo
 **Location:** `bin/check-plan` — gates cover matrix presence, forbidden tokens, staleness, and size; none check *recipe completeness*. Gate 13 judges Sonnet-eligibility by verification (a machine check fails on a wrong edit) only.
 **Problem (was):** "Sonnet-capable" has two halves and only one is enforced: verifiable, but not *specified*.
 **Status (2026-07-15):** ✅ Implemented — `bin/check-plan` gate `[S]` now checks, for `impl_model: sonnet` plans only: every `### Delegate` packet carries a `**Self-verify:**` line (fence-aware, reusing gate T's parse), and a phased plan carries >=1 edit-anchor signal (Anchor keyword / `line NN` ref / 4-backtick fence). A `sonnet-recipe:` marker clears the gate. Tested in `bin/test-check-plan` (gateS-* cases).
+
+### L9 JSB AutoResearch loop
+**Location:** JSB sim engine + RE distribution targets; instrumentation groundwork exists (`$HOME/.claude/plans/jsb-l1-gate1-counterfactual-instrument.md` and siblings).
+**Problem (was):** Engine-parameter tuning is human-paced despite having exactly what a self-improvement loop needs: an objective metric (simulated stat distributions vs real targets).
+**Suggested direction (was):** An eval harness that perturbs engine params in a worktree, sims N seasons, scores distribution error, keeps only improvements, and logs each trial — overnight, hundreds of trials. Wants an ADR (metric definition, param search space, acceptance rule).
+**Risk if untouched (was):** RE convergence stays bottlenecked on human iteration bandwidth.
+**Status (2026-07-23):** ✅ Closed — harness shipped as J14 (PR #1545); this PR wires it into use — stand-in registry re-centered to the live 17.7 pace baseline, a `make research` overnight run path, and a leverage-report review gate in `jsb-engine-post-work.md` — completing the loop. Per ADR-0087 §3 the loop is deliberately human-in-loop: the harness emits a ranked leverage table and NEVER auto-commits, so the original "keeps only improvements" auto-accept framing was superseded by the faithfulness-constrained design, not left unbuilt.
+**ADR:** satisfied by ADR-0087 (2026-07-20) — metric/legal-space/acceptance rule defined; harness built (J14, PR #1545) and wired into use by this PR (#1594).
 
 ### L18 Tier-default correction (`impl_model:` fails open to Opus)
 **Location:** `bin/lib/plan-model-consistency` — the shared gate-13 check, called by **both** `bin/check-plan` (authoring time) and `bin/automouse-queue` (queue time) so the two cannot drift. It reads the **raw** `impl_model:` frontmatter and already requires a deliberate tier choice — except for one exempt branch: `Truly-manual rows >= 1 AND impl_model absent -> ok`. Downstream, `bin/lib/plan-impl-model` **resolves** the raw value, with fallthrough `*) echo "claude-opus-4-8" ;; # opus, empty, garbled, or unknown → safe default`, so an exempted absence silently resolves to Opus. `bin/lib/automouse-escalate-model` escalates any non-Opus base → Opus on the final attempt (ADR-0085), but never fired in the measured window — every retried plan was already Opus base.

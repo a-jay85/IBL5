@@ -14,16 +14,22 @@ func onePlayerTeam(p bundle.Player) *teamState {
 	return &teamState{players: []onCourt{oc(slotPG, p)}}
 }
 
-// --- matrix #10: a transition possession resolves and is never a 3pt ---------
+// --- matrix #10: transition 3pt gate — faithful port and suppress arm ---------
+//
+// Positive: the faithful default (SuppressTransition3pt=false) must produce at
+// least one 3pt attempt over many seeds — the gate is open.
+// Negative: with SuppressTransition3pt=true the suppress arm zeroes threePtW
+// before selectOutcome, so transition 3pt must remain unreachable.
 
-func TestRunTransitionPossession_NeverThreePoint(t *testing.T) {
-	var attempts, threes, resolved int
+func TestRunTransitionPossession_ThreePtReachableAndSuppressable(t *testing.T) {
+	var attempts, threes, threesSupp int
 	for seed := uint64(1); seed <= 300; seed++ {
 		offense, defense := twoTeams()
+
+		// Default arm: faithful port — 3pt is eligible on fast breaks.
 		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500}
 		gs.transitionShotRate = resetTransitionShotRate(offense)
 		gs.runTransitionPossession(offense, defense, 0)
-		resolved++
 		for _, e := range gs.events {
 			if e.Kind == result.EventShotAttempt {
 				attempts++
@@ -32,15 +38,25 @@ func TestRunTransitionPossession_NeverThreePoint(t *testing.T) {
 				}
 			}
 		}
-	}
-	if resolved == 0 {
-		t.Fatal("no transition possessions ran")
+
+		// Suppress arm: SuppressTransition3pt=true must block all transition 3pt.
+		gs2 := &gameState{rng: rng.New(seed), period: 1, clock: 500, freeze: FreezeConfig{SuppressTransition3pt: true}}
+		gs2.transitionShotRate = resetTransitionShotRate(offense)
+		gs2.runTransitionPossession(offense, defense, 0)
+		for _, e := range gs2.events {
+			if e.Kind == result.EventShotAttempt && e.ShotType == result.ShotThree {
+				threesSupp++
+			}
+		}
 	}
 	if attempts == 0 {
 		t.Fatal("transition possessions produced no shot attempts")
 	}
-	if threes != 0 {
-		t.Errorf("transition produced %d three-point attempts, want 0", threes)
+	if threes == 0 {
+		t.Errorf("faithful default produced 0 transition 3pt attempts over 300 seeds — gate appears closed")
+	}
+	if threesSupp != 0 {
+		t.Errorf("suppress arm produced %d transition 3pt attempts, want 0", threesSupp)
 	}
 }
 

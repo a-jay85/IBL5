@@ -81,6 +81,13 @@ type FreezeConfig struct {
 	// Means / production never sets it.
 	UnfaithfulPutback3pt bool
 
+	// SuppressTransition3pt is an INVERTED-POLARITY escape hatch — zero value is the
+	// FAITHFUL default (no suppression on fast breaks). Set true ONLY to restore the
+	// pre-port baseline (3pt bucket weight zeroed after playBuckets) for A/B measurement.
+	// Proof: jsb-native/re-artifacts/jsb-J24-transition-3pt-ADJUDICATION-20260723.md.
+	// Production NEVER sets it; it consumes no Means (validate() must ignore it).
+	SuppressTransition3pt bool
+
 	// UnfaithfulOreb is an INVERTED-POLARITY escape hatch — zero value is NOT "live
 	// engine." Default false = the FAITHFUL JSB 5.60 offensive-rebound continuation
 	// (ADR-0058): gs.orebProb resolves the single determination roll via the sqrt
@@ -417,7 +424,7 @@ type OutcomeDiagAccum struct {
 	ShotDecisions int // total Add() calls (the denominator)
 	Eligible3pt   int // decisions where 3pt was an allowed path (half-court, non-OReb)
 	Suppressed    int // decisions where 3pt was forced out (transition OR OReb continuation)
-	Transition    int // subset of Suppressed: fired fast-break decisions (allow3pt=false)
+	Transition    int // subset of Suppressed: fast-break decisions with threePtW==0 (SuppressTransition3pt arm or pre-port)
 	RealMinZero   int // decisions whose ball handler had RealLifeMIN==0 (stand-in bucket path)
 	// Sums over the ELIGIBLE subset only (a suppressed decision has threePtW==0
 	// by construction and must not dilute the denominator-dilution ratio).

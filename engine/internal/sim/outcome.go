@@ -69,7 +69,8 @@ func (in outcomeInputs) weight(c outcomeCode) float64 {
 // set up front — an equivalent, guaranteed-terminating formulation. Per spec:
 // forced_make forces {2pt-attempt(1), and-one(3)} (a high-percentage look);
 // shot_clock forces {3pt-attempt(2), foul-only(4)} (a heave or a clock-expiry
-// foul); a steal/transition play cannot be a 3pt attempt(2).
+// foul); stealPlay (no longer used by the transition path — see J24 adjudication)
+// restricts to {2pt, and-one, foul-only}.
 func allowedPaths(forcedMake, shotClock, stealPlay bool) []outcomeCode {
 	switch {
 	case forcedMake:

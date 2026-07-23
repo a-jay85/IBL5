@@ -1,6 +1,6 @@
 ---
 description: After JSB engine work ships, run /backlog-housekeep — the backlog is the single source of truth; git is the authority for merged-PR hashes.
-last_verified: 2026-07-22
+last_verified: 2026-07-23
 ---
 
 # JSB Engine Post-Work Checklist
@@ -28,3 +28,15 @@ Run `/backlog-housekeep`. Flips status, archives done items, stamps new items, r
 1. **Current state** of each touched J-entry (what shipped, the live blocker, the next lever). Dated measurement paragraphs that are now just history belong in `ibl5/docs/backlog/archive/jsb-native-backlog-archive.md` behind a dated pointer — keep the live entry to a single forward-looking current-state block.
 
 2. **NOT-A-LEVER:** if this session proved a mechanism *cannot* move a target metric (measured A/B or exhaustive trace, not just reasoning), add it to the relevant J-entry's "Do NOT re-open" list with its **discriminating proof** (the measurement or the `jsb-native/re-artifacts/...` citation). Items that "might not help" don't belong; items proven not to help do.
+
+## Read the leverage report before the next RE lever
+
+The AutoResearch harness (ADR-0087, shipped as J14 in PR #1545) ranks every registered stand-in by measured leverage over the archive corpus. Per **ADR-0087 §3 it NEVER auto-commits** — its only deliverable is the leverage table, and a human must read it before choosing what to touch next.
+
+**Before picking the next J-series RE lever**, read the most recent report:
+
+```bash
+ls -t jsb-native/re-artifacts/leverage-*.txt | head -1   # newest dated leverage report
+```
+
+Prefer the highest-|Delta| ABOVE-NOISE stand-in as the next lever. A lever the table ranks below the noise floor is not a lever: per the ADR-0085 precedent a better corpus fit can mask two cancelling fidelity bugs, so **leverage rank — not corpus loss — drives the pick**. If no current report exists, regenerate one with `make research` (`engine/Makefile`) before deciding.

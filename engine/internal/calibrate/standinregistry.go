@@ -51,12 +51,15 @@ func StandInRegistry() []StandIn {
 			ID:   "base_time_mid",
 			Term: "pace",
 			Justification: "baseTimeMid (tempo.go) is the per-game constant possession-clock center " +
-				"(ADR-0085, J23 re-center sweep). Provisional value 16.0 is calibrated to the " +
-				"faithful JSB 5.60 possession-clock; the archive sweep PR #1495 confirmed it as " +
-				"the pace lever. Perturbable as a research lever — the harness can reproduce the " +
-				"direction and rough magnitude of the #1495 sweep as a self-validation arm " +
-				"(ADR-0087 §4 base_time arm).",
-			Sweep: []float64{16.0, 15.0, 17.0},
+				"(ADR-0085, J23 re-center sweep). The live engine runs the PROVISIONAL value 17.7 " +
+				"(J24 Phase 5 re-center, deliberately above the faithful [13,16] band per tempo.go); " +
+				"the provisional center is expected to walk back toward the faithful 16.0 when that " +
+				"arm closes. The sweep baseline is therefore the current operational 17.7, bracketed " +
+				"by the faithful floor 16.0 and an upper 19.0. Perturbable as a research lever — the " +
+				"harness reproduces the direction and rough magnitude of the archive sweep (PR #1495) " +
+				"as a self-validation arm (ADR-0087 §4 base_time arm); that arm only requires some " +
+				"pace sweep point above noise, which any reasonable bracketing of 17.7 satisfies.",
+			Sweep: []float64{17.7, 16.0, 19.0},
 			Apply: func(o *Options, v float64) { o.BaseTimeMid = ptr(v) },
 		},
 	}

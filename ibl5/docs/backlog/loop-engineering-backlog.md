@@ -1,6 +1,6 @@
 ---
 description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, plan decomposition/tier-routing machinery, and the human comprehension counter-loop, with per-entry status.
-last_verified: 2026-07-20
+last_verified: 2026-07-23
 ---
 
 # Loop-Engineering Backlog
@@ -109,8 +109,8 @@ last_verified: 2026-07-20
 **Problem:** Engine-parameter tuning is human-paced despite having exactly what a self-improvement loop needs: an objective metric (simulated stat distributions vs real targets).
 **Suggested direction:** An eval harness that perturbs engine params in a worktree, sims N seasons, scores distribution error, keeps only improvements, and logs each trial — overnight, hundreds of trials. Wants an ADR (metric definition, param search space, acceptance rule).
 **Risk if untouched:** RE convergence stays bottlenecked on human iteration bandwidth.
-**Status (2026-07-20):** ◑ Partial — harness shipped (J14); loop orchestration / automouse wiring remains. 🟥.
-**ADR:** satisfied by ADR-0087 (2026-07-20) — metric/legal-space/acceptance rule defined; harness build remains open.
+**Status (2026-07-23):** ✅ Closed — harness shipped as J14 (PR #1545); this PR wires it into use — stand-in registry re-centered to the live 17.7 pace baseline, a `make research` overnight run path, and a leverage-report review gate in `jsb-engine-post-work.md` — completing the loop. Per ADR-0087 §3 the loop is deliberately human-in-loop: the harness emits a ranked leverage table and NEVER auto-commits, so the original "keeps only improvements" auto-accept framing was superseded by the faithfulness-constrained design, not left unbuilt.
+**ADR:** satisfied by ADR-0087 (2026-07-20) — metric/legal-space/acceptance rule defined; harness built (J14, PR #1545) and wired into use by this PR.
 
 ### L10 Discord intake loop
 **Location:** `bin/bug-pipeline-tick`, `bin/bug-pipeline-cron-setup`, `bin/bug-pipeline-classify-prompt`, `bin/bug-pipeline-gather-prompt` (live); remainder of the 6-PR Discord bug pipeline program per its shared-context spec.

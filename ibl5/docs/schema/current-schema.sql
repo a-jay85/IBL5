@@ -2884,6 +2884,32 @@ CREATE TABLE `ibl_sim_dates` (
   PRIMARY KEY (`sim`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `ibl_sim_game_recaps`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ibl_sim_game_recaps` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT 'Surrogate PK.',
+  `sim` int(10) unsigned NOT NULL COMMENT 'FK to ibl_sim_summaries.sim (the envelope).',
+  `season_year` smallint(5) unsigned NOT NULL COMMENT 'Season year — first component of the natural game key.',
+  `game_date` date NOT NULL COMMENT 'Game date — natural-key component.',
+  `visitor_teamid` int(11) NOT NULL COMMENT 'Visitor team id — natural-key component.',
+  `home_teamid` int(11) NOT NULL COMMENT 'Home team id — natural-key component.',
+  `game_of_that_day` int(11) NOT NULL DEFAULT 0 COMMENT 'Nth game of that matchup that day; NULL->0 normalised (matches ibl_box_scores_teams).',
+  `box_id` int(11) DEFAULT NULL COMMENT 'Convenience pointer to the box score when known; NULL when unresolved.',
+  `sort_order` smallint(5) unsigned NOT NULL COMMENT 'Presentation order within the sim.',
+  `recap_text` mediumtext NOT NULL COMMENT 'The per-game recap prose.',
+  `created_at` datetime NOT NULL DEFAULT current_timestamp() COMMENT 'Row creation timestamp.',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_game` (`season_year`,`game_date`,`visitor_teamid`,`home_teamid`,`game_of_that_day`) COMMENT 'One recap per game — the natural game key.',
+  KEY `idx_sim` (`sim`,`sort_order`) COMMENT 'Ordered read-back of a sim''s game recaps.',
+  KEY `idx_game` (`game_date`,`visitor_teamid`,`home_teamid`) COMMENT 'Join to ibl_box_scores_teams by natural key.',
+  KEY `fk_sgr_visitor` (`visitor_teamid`),
+  KEY `fk_sgr_home` (`home_teamid`),
+  CONSTRAINT `fk_sgr_home` FOREIGN KEY (`home_teamid`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE,
+  CONSTRAINT `fk_sgr_sim` FOREIGN KEY (`sim`) REFERENCES `ibl_sim_summaries` (`sim`) ON DELETE CASCADE,
+  CONSTRAINT `fk_sgr_visitor` FOREIGN KEY (`visitor_teamid`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_sim_summaries`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -2891,6 +2917,8 @@ CREATE TABLE `ibl_sim_summaries` (
   `sim` int(10) unsigned NOT NULL COMMENT 'PK — one row per sim; idempotency key for the queue insert and the seed.',
   `status` enum('pending','generating','done','failed') NOT NULL DEFAULT 'pending' COMMENT 'Lifecycle: pending → generating → done|failed.',
   `recap_text` mediumtext DEFAULT NULL COMMENT 'The generated prose (up to 16 MB).',
+  `intro_text` mediumtext DEFAULT NULL COMMENT 'League-wide intro prose bracketing the per-game recaps.',
+  `outro_text` mediumtext DEFAULT NULL COMMENT 'League-wide outro prose bracketing the per-game recaps.',
   `themes_used` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL COMMENT 'Anti-repetition ledger — the themes used in this recap, read back over the last 5 sims.' CHECK (json_valid(`themes_used`)),
   `claimed_at` datetime DEFAULT NULL COMMENT 'When the tick claimed this row for generation.',
   `generated_at` datetime DEFAULT NULL COMMENT 'When the recap was stored.',

@@ -46,16 +46,25 @@ func TestOriginSharePin_Current(t *testing.T) {
 	// nonStealTurnover fires before the shot path, removing some initial FGA;
 	// transition shots are unaffected (runTransitionPossession doesn't call it),
 	// so the transition fraction grows relative to total FGA. Measured seed=1..40.
-	if math.Abs(initialShare-0.694298) > band {
-		t.Errorf("initial share drifted: got %.6f, want %.6f ± %.2f", initialShare, 0.694298, band)
+	//
+	// Re-baselined again 2026-07-22 for the putback-3pt revert (possession.go: the
+	// OReb-continuation threePtW zeroing was unfaithful — see
+	// jsb-native/re-artifacts/jsb-j24-oreb-3pt-eligibility-20260722.md). Putback 3pt
+	// attempts now occur, and they convert at a lower rate than putback 2pt, so more
+	// putback misses feed further OReb continuations: oreb 0.137482 -> 0.165285, with
+	// initial 0.694298 -> 0.680608 and transition 0.141379 -> 0.154107 giving back the
+	// share. Only the oreb pin was out of band; all three re-measured seed=1..40 for
+	// consistency.
+	if math.Abs(initialShare-0.680608) > band {
+		t.Errorf("initial share drifted: got %.6f, want %.6f ± %.2f", initialShare, 0.680608, band)
 	}
 	// PIN: re-baseline if a future within-possession-generation change moves this
-	if math.Abs(orebShare-0.137482) > band {
-		t.Errorf("oreb_continuation share drifted: got %.6f, want %.6f ± %.2f", orebShare, 0.137482, band)
+	if math.Abs(orebShare-0.165285) > band {
+		t.Errorf("oreb_continuation share drifted: got %.6f, want %.6f ± %.2f", orebShare, 0.165285, band)
 	}
 	// PIN: re-baseline if a future within-possession-generation change moves this
-	if math.Abs(transitionShare-0.141379) > band {
-		t.Errorf("transition share drifted: got %.6f, want %.6f ± %.2f", transitionShare, 0.141379, band)
+	if math.Abs(transitionShare-0.154107) > band {
+		t.Errorf("transition share drifted: got %.6f, want %.6f ± %.2f", transitionShare, 0.154107, band)
 	}
 
 	// Permanent invariants (not pinned/re-baselined): the three origin shares

@@ -1,6 +1,7 @@
 ---
 description: Localhost browsing is logged-out by default; set an `_auto_login=1` cookie to auto-authenticate via DEV_AUTO_LOGIN. Identity matrix for all test layers.
-last_verified: 2026-07-01
+last_verified: 2026-07-22
+paths: "ibl5/**"
 ---
 
 # Browser Auto-Login

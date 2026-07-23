@@ -1,6 +1,6 @@
 ---
 description: After JSB engine work ships, run /backlog-housekeep — the backlog is the single source of truth; git is the authority for merged-PR hashes.
-last_verified: 2026-07-21
+last_verified: 2026-07-22
 ---
 
 # JSB Engine Post-Work Checklist
@@ -11,7 +11,7 @@ This step is **required before `bin/post-plan-now --auto` fires**. It is also en
 
 ## One source, one edit site
 
-`ibl5/docs/backlog/jsb-native-backlog.md` is the **single source of truth** for J-series work: the OPEN list, each item's current state, AND its "Do NOT re-open / NOT-A-LEVER" trap list all live **in the backlog J-entry**, self-standing with each item's proof. There is no companion memory to keep in sync — that split-brain (a hand-maintained frontier hash ledger) was **eliminated 2026-07-21** because it drifted against git and against the backlog. Do not re-create it.
+`engine/docs/backlog/jsb-native-backlog.md` is the **single source of truth** for J-series work: the OPEN list, each item's current state, AND its "Do NOT re-open / NOT-A-LEVER" trap list all live **in the backlog J-entry**, self-standing with each item's proof. There is no companion memory to keep in sync — that split-brain (a hand-maintained frontier hash ledger) was **eliminated 2026-07-21** because it drifted against git and against the backlog. Do not re-create it.
 
 **Merged-PR commit hashes: git is the authority, not a stored ledger.** The backlog records PR **numbers**; the squash-merge commit carries that number in its title, so any hash is recoverable on demand:
 
@@ -19,12 +19,12 @@ This step is **required before `bin/post-plan-now --auto` fires**. It is also en
 git log --all --grep '#<PR>' --oneline    # resolve a PR number → its merged commit
 ```
 
-Do NOT backfill hashes into the live backlog — that just relocates the cache you're eliminating. If a one-time provenance snapshot is ever wanted, it belongs in `docs/backlog/archive/jsb-native-backlog-archive.md` (history, never maintained), not the live doc.
+Do NOT backfill hashes into the live backlog — that just relocates the cache you're eliminating. If a one-time provenance snapshot is ever wanted, it belongs in `ibl5/docs/backlog/archive/jsb-native-backlog-archive.md` (history, never maintained), not the live doc.
 
 ## Backlog housekeeping (the source of truth)
 
 Run `/backlog-housekeep`. Flips status, archives done items, stamps new items, reconciles the README index. Do this inside the worktree (it ships with the PR). Beyond housekeeping, this is where the durable engine knowledge lands:
 
-1. **Current state** of each touched J-entry (what shipped, the live blocker, the next lever). Dated measurement paragraphs that are now just history belong in `docs/backlog/archive/jsb-native-backlog-archive.md` behind a dated pointer — keep the live entry to a single forward-looking current-state block.
+1. **Current state** of each touched J-entry (what shipped, the live blocker, the next lever). Dated measurement paragraphs that are now just history belong in `ibl5/docs/backlog/archive/jsb-native-backlog-archive.md` behind a dated pointer — keep the live entry to a single forward-looking current-state block.
 
 2. **NOT-A-LEVER:** if this session proved a mechanism *cannot* move a target metric (measured A/B or exhaustive trace, not just reasoning), add it to the relevant J-entry's "Do NOT re-open" list with its **discriminating proof** (the measurement or the `jsb-native/re-artifacts/...` citation). Items that "might not help" don't belong; items proven not to help do.

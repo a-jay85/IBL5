@@ -1,6 +1,9 @@
 ---
 description: Always use composer scripts for PHPStan — never call vendor/bin/phpstan directly
-last_verified: 2026-05-24
+last_verified: 2026-07-22
+paths:
+  - "**/*.php"
+  - "ibl5/composer.json"
 ---
 
 # PHPStan Invocation

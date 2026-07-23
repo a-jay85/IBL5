@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-07-11
+last_verified: 2026-07-23
 ---
 
 # IBL5 Architecture Decision Records
@@ -28,6 +28,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0023](0023-deploy-rehearsal-pre-flight-gate.md) | Deploy rehearsal pre-flight gate | Accepted | Reusable workflow dry-runs `composer --no-dev` + migrate + validate-schema against disposable MariaDB before prod deploy. |
 | [0079](0079-sha-pin-github-actions.md) | SHA-pin all external GitHub Actions + drift-guard | Accepted | Pin every external `uses:` ref to a full commit SHA via pinact; `pinact --check` guard in the `gate` enforces it; local `./` composite refs exempt. |
 | [0085](0085-just-in-time-opus-escalation-on-final-automouse-retry.md) | Just-in-time Opus escalation on the final automouse retry | Accepted | Non-Opus plans escalate only their final retry to Opus with the prior attempt's capped failure report; env-stops never escalate. |
+| [0092](0092-postplan-harness-in-repo-with-python-ci.md) | Post-plan harness in-repo with dedicated Python CI | Accepted | Harness ships under `tools/postplan-harness/` gated by a path-scoped `python-tests.yml`; real-data dirs gitignored; `bin/post-plan-now` pinned to the main checkout. |
 
 ## When an ADR is Required
 

@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Compiled post-plan harness entry point.
+#   ./run replay <fixture.json> [outdir]           — historical replay (benchmark path)
+#   ./run demo [outdir]                            — offline demo: bundled fixture + canned LLM (zero cost)
+#   ./run isolated <worktree> [outdir] [--live]    — live git+verify; without --live gh mutations are
+#                                                    recorded intents; --live is the INSTALLED mode
+#                                                    (push origin, execute allowlisted gh, watch CI)
+set -euo pipefail
+cd "$(dirname "$0")"
+case "${1:-}" in
+  replay)   exec python3 runner.py --mode replay --fixture "$2" --out "${3:-out/replay-$(basename "$(dirname "$2")")}" ;;
+  demo)     exec python3 runner.py --mode replay --fixture fixtures/scenarios/backlog-l6-done/fixture.json \
+                 --canned fixtures/canned-demo.json --out "${2:-out/demo}" ;;
+  isolated)
+    WT="$2"; OUT="out/isolated"; shift 2
+    if [ "${1:-}" ] && [ "${1#-}" = "$1" ]; then OUT="$1"; shift; fi
+    exec python3 runner.py --mode isolated --worktree "$WT" --out "$OUT" "$@" ;;
+  test)     exec python3 -m pytest tests/ -q ;;
+  *) grep '^#   ' "$0" | sed 's/^#   //'; exit 2 ;;
+esac

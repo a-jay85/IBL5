@@ -88,7 +88,7 @@ PROMPT="Invoke the /post-plan skill now on the current git branch. Resolve the p
 # Compiled-harness engine (see header). The harness command chains `|| skill`
 # inside the launchd job, so a harness failure degrades to the skill session
 # in the same supervised run instead of silently shipping nothing.
-HARNESS="$HOME/GitHub/postplan-harness"
+HARNESS="/Users/ajaynicolas/GitHub/IBL5/tools/postplan-harness"
 HARNESS_TRY=""
 ENGINE="Sonnet 4.6 /post-plan skill session"
 if [ "${POST_PLAN_SKILL:-0}" != "1" ] && [ -x "$HARNESS/run" ]; then

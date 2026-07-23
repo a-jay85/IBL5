@@ -1,0 +1,782 @@
+{
+ "primary": [
+  {
+   "slug": "backlog-l6-done",
+   "verdict": "PASS",
+   "notes": [],
+   "terminal": "shipped-armed",
+   "error": null,
+   "parity": {
+    "classification": {
+     "status": "PASS",
+     "mismatches": []
+    },
+    "armed": {
+     "new": true,
+     "hist": true,
+     "false_arm": false,
+     "new_holds": [],
+     "hist_holds": []
+    },
+    "phase5": {
+     "new": "skipped",
+     "hist": "skipped",
+     "status": "PASS"
+    },
+    "findings": {
+     "status": "PASS",
+     "hallucinated_paths": [],
+     "surviving_findings": []
+    }
+   },
+   "new": {
+    "llm_invocations": 3,
+    "gross_tokens": 30526,
+    "non_cached_tokens": 16100,
+    "output_tokens": 2899,
+    "cost_usd": 0.0423,
+    "retries": 0,
+    "wall_seconds": 43.3,
+    "calls": [
+     {
+      "purpose": "pr-copy",
+      "model": "claude-haiku-4-5-20251001",
+      "in": 10,
+      "cache_create": 9427,
+      "cache_read": 0,
+      "out": 1068,
+      "cost_usd": 0.0242,
+      "ms": 17537,
+      "retries": 0,
+      "ok": true
+     },
+     {
+      "purpose": "safety-verdict",
+      "model": "claude-haiku-4-5-20251001",
+      "in": 10,
+      "cache_create": 2587,
+      "cache_read": 7213,
+      "out": 1064,
+      "cost_usd": 0.0112,
+      "ms": 14537,
+      "retries": 0,
+      "ok": true
+     },
+     {
+      "purpose": "retrospective",
+      "model": "claude-haiku-4-5-20251001",
+      "in": 10,
+      "cache_create": 1157,
+      "cache_read": 7213,
+      "out": 767,
+      "cost_usd": 0.0069,
+      "ms": 9297,
+      "retries": 0,
+      "ok": true
+     }
+    ]
+   },
+   "old": {
+    "gross_tokens": 3307961,
+    "non_cached_tokens": 133265,
+    "output_tokens": 19068,
+    "llm_invocations": 59,
+    "tool_calls": 33,
+    "wall_minutes": 4.1,
+    "agent_spawns": 0
+   }
+  },
+  {
+   "slug": "context-budget-gate-v2",
+   "verdict": "PASS",
+   "notes": [],
+   "terminal": "shipped-armed",
+   "error": null,
+   "parity": {
+    "classification": {
+     "status": "PASS",
+     "mismatches": []
+    },
+    "armed": {
+     "new": true,
+     "hist": true,
+     "false_arm": false,
+     "new_holds": [],
+     "hist_holds": []
+    },
+    "phase5": {
+     "new": "skipped",
+     "hist": "pass",
+     "status": "UNAVAILABLE"
+    },
+    "findings": {
+     "status": "PASS",
+     "hallucinated_paths": [],
+     "surviving_findings": []
+    }
+   },
+   "new": {
+    "llm_invocations": 5,
+    "gross_tokens": 133147,
+    "non_cached_tokens": 93665,
+    "output_tokens": 31861,
+    "cost_usd": 1.0359,
+    "retries": 0,
+    "wall_seconds": 651.3,
+    "calls": [
+     {
+      "purpose": "pr-copy",
+      "model": "claude-haiku-4-5-20251001",
+      "in": 10,
+      "cache_create": 16975,
+      "cache_read": 0,
+      "out": 3036,
+      "cost_usd": 0.0491,
+      "ms": 25229,
+      "retries": 0,
+      "ok": true
+     },
+     {
+      "purpose": "review-agent-a",
+      "model": "claude-sonnet-4-6",
+      "in": 4,
+      "cache_create": 26668,
+      "cache_read": 17846,
+      "out": 12766,
+      "cost_usd": 0.6972,
+      "ms": 330071,
+      "retries": 0,
+      "ok": true
+     },
+     {
+      "purpose": "review-agent-b",
+      "model": "claude-sonnet-4-6",
+      "in": 3,
+      "cache_create": 8224,
+      "cache_read": 7210,
+      "out": 13649,
+      "cost_usd": 0.2563,
+      "ms": 260102,
+      "retries": 0,
+      "ok": true
+     },
+     {
+      "purpose": "safety-verdict",
+      "model": "claude-haiku-4-5-20251001",
+      "in": 10,
+      "cache_create": 8715,
+      "cache_read": 7213,
+      "out": 1944,
+      "cost_usd": 0.0279,
+      "ms": 26318,
+      "retries": 0,
+      "ok": true
+     },
+     {
+      "purpose": "retrospective",
+      "model": "claude-haiku-4-5-20251001",
+      "in": 10,
+      "cache_create": 1185,
+      "cache_read": 7213,
+      "out": 466,
+      "cost_usd": 0.0054,
+      "ms": 5857,
+      "retries": 0,
+      "ok": true
+     }
+    ]
+   },
+   "old": {
+    "gross_tokens": 10721827,
+    "non_cached_tokens": 354510,
+    "output_tokens": 72900,
+    "llm_invocations": 132,
+    "tool_calls": 66,
+    "wall_minutes": 16.8,
+    "agent_spawns": 2
+   }
+  },
+  {
+   "slug": "mobile-target-size-a11y-sitewide",
+   "verdict": "PASS",
+   "notes": [
+    "extra fail-closed holds vs history: [3]"
+   ],
+   "terminal": "shipped-held",
+   "error": null,
+   "parity": {
+    "classification": {
+     "status": "PASS",
+     "mismatches": []
+    },
+    "armed": {
+     "new": false,
+     "hist": false,
+     "false_arm": false,
+     "new_holds": [
+      1,
+      3,
+      7
+     ],
+     "hist_holds": [
+      1,
+      7
+     ]
+    },
+    "phase5": {
+     "new": "skipped",
+     "hist": "pass",
+     "status": "UNAVAILABLE"
+    },
+    "findings": {
+     "status": "PASS",
+     "hallucinated_paths": [],
+     "surviving_findings": []
+    }
+   },
+   "new": {
+    "llm_invocations": 6,
+    "gross_tokens": 236899,
+    "non_cached_tokens": 84600,
+    "output_tokens": 23914,
+    "cost_usd": 2.4444,
+    "retries": 0,
+    "wall_seconds": 887.5,
+    "calls": [
+     {
+      "purpose": "pr-copy",
+      "model": "claude-haiku-4-5-20251001",
+      "in": 10,
+      "cache_create": 15010,
+      "cache_read": 0,
+      "out": 4136,
+      "cost_usd": 0.0507,
+      "ms": 49281,
+      "retries": 0,
+      "ok": true
+     },
+     {
+      "purpose": "review-agent-a",
+      "model": "claude-sonnet-4-6",
+      "in": 7,
+      "cache_create": 21685,
+      "cache_read": 85471,
+      "out": 8038,
+      "cost_usd": 1.4368,
+      "ms": 448837,
+      "retries": 0,
+      "ok": true
+     },
+     {
+      "purpose": "review-agent-b",
+      "model": "claude-sonnet-4-6",
+      "in": 5,
+      "cache_create": 17294,
+      "cache_read": 45192,
+      "out": 9926,
+      "cost_usd": 0.9156,
+      "ms": 360559,
+      "retries": 0,
+      "ok": true
+     },
+     {
+      "purpose": "review-agent-d",
+      "model": "claude-sonnet-4-6",
+      "in": 3,
+      "cache_create": 3809,
+      "cache_read": 7210,
+      "out": 4,
+      "cost_usd": 0.0251,
+      "ms": 1455,
+      "retries": 0,
+      "ok": true
+     },
+     {
+      "purpose": "score-findings",
+      "model": "claude-haiku-4-5-20251001",
+      "in": 10,
+      "cache_create": 1508,
+      "cache_read": 7213,
+      "out": 814,
+      "cost_usd": 0.0078,
+      "ms": 9934,
+      "retries": 0,
+      "ok": true
+     },
+     {
+      "purpose": "retrospective",
+      "model": "claude-haiku-4-5-20251001",
+      "in": 10,
+      "cache_create": 1335,
+      "cache_read": 7213,
+      "out": 996,
+      "cost_usd": 0.0084,
+      "ms": 13020,
+      "retries": 0,
+      "ok": true
+     }
+    ]
+   },
+   "old": {
+    "gross_tokens": 10499979,
+    "non_cached_tokens": 350527,
+    "output_tokens": 104418,
+    "llm_invocations": 132,
+    "tool_calls": 62,
+    "wall_minutes": 21.1,
+    "agent_spawns": 4
+   }
+  },
+  {
+   "slug": "request-event-logging",
+   "verdict": "PASS",
+   "notes": [
+    "extra fail-closed holds vs history: [3, 9]"
+   ],
+   "terminal": "shipped-held",
+   "error": null,
+   "parity": {
+    "classification": {
+     "status": "PASS",
+     "mismatches": []
+    },
+    "armed": {
+     "new": false,
+     "hist": false,
+     "false_arm": false,
+     "new_holds": [
+      3,
+      7,
+      9
+     ],
+     "hist_holds": [
+      7
+     ]
+    },
+    "phase5": {
+     "new": "pass",
+     "hist": "pass",
+     "status": "PASS"
+    },
+    "findings": {
+     "status": "PASS",
+     "hallucinated_paths": [],
+     "surviving_findings": []
+    }
+   },
+   "new": {
+    "llm_invocations": 6,
+    "gross_tokens": 166751,
+    "non_cached_tokens": 105873,
+    "output_tokens": 34743,
+    "cost_usd": 1.7593,
+    "retries": 0,
+    "wall_seconds": 865.0,
+    "calls": [
+     {
+      "purpose": "pr-copy",
+      "model": "claude-haiku-4-5-20251001",
+      "in": 10,
+      "cache_create": 15921,
+      "cache_read": 0,
+      "out": 1231,
+      "cost_usd": 0.038,
+      "ms": 14478,
+      "retries": 0,
+      "ok": true
+     },
+     {
+      "purpose": "review-agent-a",
+      "model": "claude-sonnet-4-6",
+      "in": 4,
+      "cache_create": 23050,
+      "cache_read": 17288,
+      "out": 10224,
+      "cost_usd": 0.7952,
+      "ms": 348696,
+      "retries": 0,
+      "ok": true
+     },
+     {
+      "purpose": "review-agent-b",
+      "model": "claude-sonnet-4-6",
+      "in": 4,
+      "cache_create": 21459,
+      "cache_read": 21957,
+      "out": 13712,
+      "cost_usd": 0.8547,
+      "ms": 383722,
+      "retries": 0,
+      "ok": true
+     },
+     {
+      "purpose": "security-audit",
+      "model": "claude-haiku-4-5-20251001",
+      "in": 10,
+      "cache_create": 8087,
+      "cache_read": 7211,
+      "out": 6860,
+      "cost_usd": 0.0512,
+      "ms": 74765,
+      "retries": 0,
+      "ok": true
+     },
+     {
+      "purpose": "score-findings",
+      "model": "claude-haiku-4-5-20251001",
+      "in": 10,
+      "cache_create": 1321,
+      "cache_read": 7211,
+      "out": 1650,
+      "cost_usd": 0.0116,
+      "ms": 25203,
+      "retries": 0,
+      "ok": true
+     },
+     {
+      "purpose": "retrospective",
+      "model": "claude-haiku-4-5-20251001",
+      "in": 10,
+      "cache_create": 1244,
+      "cache_read": 7211,
+      "out": 1066,
+      "cost_usd": 0.0085,
+      "ms": 13718,
+      "retries": 0,
+      "ok": true
+     }
+    ]
+   },
+   "old": {
+    "gross_tokens": 17617090,
+    "non_cached_tokens": 447958,
+    "output_tokens": 111481,
+    "llm_invocations": 167,
+    "tool_calls": 96,
+    "wall_minutes": 28.2,
+    "agent_spawns": 5
+   }
+  },
+  {
+   "slug": "sort-determinism-phpstan-gate",
+   "verdict": "PASS",
+   "notes": [
+    "extra fail-closed holds vs history: [3]"
+   ],
+   "terminal": "shipped-held",
+   "error": null,
+   "parity": {
+    "classification": {
+     "status": "PASS",
+     "mismatches": []
+    },
+    "armed": {
+     "new": false,
+     "hist": false,
+     "false_arm": false,
+     "new_holds": [
+      3,
+      7
+     ],
+     "hist_holds": [
+      7
+     ]
+    },
+    "phase5": {
+     "new": "pass",
+     "hist": "pass",
+     "status": "PASS"
+    },
+    "findings": {
+     "status": "PASS",
+     "hallucinated_paths": [],
+     "surviving_findings": []
+    }
+   },
+   "new": {
+    "llm_invocations": 6,
+    "gross_tokens": 258230,
+    "non_cached_tokens": 169501,
+    "output_tokens": 43697,
+    "cost_usd": 2.6819,
+    "retries": 0,
+    "wall_seconds": 1141.7,
+    "calls": [
+     {
+      "purpose": "pr-copy",
+      "model": "claude-haiku-4-5-20251001",
+      "in": 10,
+      "cache_create": 28854,
+      "cache_read": 0,
+      "out": 1407,
+      "cost_usd": 0.0648,
+      "ms": 18639,
+      "retries": 0,
+      "ok": true
+     },
+     {
+      "purpose": "review-agent-a",
+      "model": "claude-sonnet-4-6",
+      "in": 4,
+      "cache_create": 39140,
+      "cache_read": 31226,
+      "out": 15346,
+      "cost_usd": 1.1933,
+      "ms": 488036,
+      "retries": 0,
+      "ok": true
+     },
+     {
+      "purpose": "review-agent-b",
+      "model": "claude-sonnet-4-6",
+      "in": 4,
+      "cache_create": 33184,
+      "cache_read": 35870,
+      "out": 20816,
+      "cost_usd": 1.3419,
+      "ms": 562126,
+      "retries": 0,
+      "ok": true
+     },
+     {
+      "purpose": "security-audit",
+      "model": "claude-haiku-4-5-20251001",
+      "in": 10,
+      "cache_create": 21461,
+      "cache_read": 7211,
+      "out": 3024,
+      "cost_usd": 0.0588,
+      "ms": 33488,
+      "retries": 0,
+      "ok": true
+     },
+     {
+      "purpose": "score-findings",
+      "model": "claude-haiku-4-5-20251001",
+      "in": 10,
+      "cache_create": 1499,
+      "cache_read": 7211,
+      "out": 1147,
+      "cost_usd": 0.0095,
+      "ms": 11503,
+      "retries": 0,
+      "ok": true
+     },
+     {
+      "purpose": "retrospective",
+      "model": "claude-haiku-4-5-20251001",
+      "in": 10,
+      "cache_create": 1618,
+      "cache_read": 7211,
+      "out": 1957,
+      "cost_usd": 0.0138,
+      "ms": 23814,
+      "retries": 0,
+      "ok": true
+     }
+    ]
+   },
+   "old": {
+    "gross_tokens": 9174141,
+    "non_cached_tokens": 346446,
+    "output_tokens": 78990,
+    "llm_invocations": 105,
+    "tool_calls": 52,
+    "wall_minutes": 19.5,
+    "agent_spawns": 5
+   }
+  }
+ ],
+ "holdout": [
+  {
+   "slug": "jsb-j18-item1-3ga-bucket",
+   "verdict": "PASS",
+   "notes": [],
+   "terminal": "shipped-armed",
+   "error": null,
+   "parity": {
+    "classification": {
+     "status": "PASS",
+     "mismatches": []
+    },
+    "armed": {
+     "new": true,
+     "hist": true,
+     "false_arm": false,
+     "new_holds": [],
+     "hist_holds": []
+    },
+    "phase5": {
+     "new": "pass",
+     "hist": "pass",
+     "status": "PASS"
+    },
+    "findings": {
+     "status": "PASS",
+     "hallucinated_paths": [],
+     "surviving_findings": []
+    }
+   },
+   "new": {
+    "llm_invocations": 4,
+    "gross_tokens": 73133,
+    "non_cached_tokens": 45429,
+    "output_tokens": 12611,
+    "cost_usd": 0.7466,
+    "retries": 0,
+    "wall_seconds": 362.9,
+    "calls": [
+     {
+      "purpose": "pr-copy",
+      "model": "claude-haiku-4-5-20251001",
+      "in": 10,
+      "cache_create": 10913,
+      "cache_read": 0,
+      "out": 1868,
+      "cost_usd": 0.0312,
+      "ms": 22837,
+      "retries": 0,
+      "ok": true
+     },
+     {
+      "purpose": "review-agent-b",
+      "model": "claude-sonnet-4-6",
+      "in": 4,
+      "cache_create": 16841,
+      "cache_read": 13274,
+      "out": 7492,
+      "cost_usd": 0.6877,
+      "ms": 297228,
+      "retries": 0,
+      "ok": true
+     },
+     {
+      "purpose": "safety-verdict",
+      "model": "claude-haiku-4-5-20251001",
+      "in": 10,
+      "cache_create": 4088,
+      "cache_read": 7215,
+      "out": 2847,
+      "cost_usd": 0.0231,
+      "ms": 34167,
+      "retries": 0,
+      "ok": true
+     },
+     {
+      "purpose": "retrospective",
+      "model": "claude-haiku-4-5-20251001",
+      "in": 10,
+      "cache_create": 942,
+      "cache_read": 7215,
+      "out": 404,
+      "cost_usd": 0.0046,
+      "ms": 5983,
+      "retries": 0,
+      "ok": true
+     }
+    ]
+   },
+   "old": {
+    "gross_tokens": 6851111,
+    "non_cached_tokens": 231355,
+    "output_tokens": 42414,
+    "llm_invocations": 98,
+    "tool_calls": 51,
+    "wall_minutes": 12.3,
+    "agent_spawns": 1
+   }
+  },
+  {
+   "slug": "token-t7-index-diet",
+   "verdict": "PASS",
+   "notes": [],
+   "terminal": "shipped-armed",
+   "error": null,
+   "parity": {
+    "classification": {
+     "status": "PASS",
+     "mismatches": []
+    },
+    "armed": {
+     "new": true,
+     "hist": true,
+     "false_arm": false,
+     "new_holds": [],
+     "hist_holds": []
+    },
+    "phase5": {
+     "new": "skipped",
+     "hist": "skipped",
+     "status": "PASS"
+    },
+    "findings": {
+     "status": "PASS",
+     "hallucinated_paths": [],
+     "surviving_findings": []
+    }
+   },
+   "new": {
+    "llm_invocations": 3,
+    "gross_tokens": 34008,
+    "non_cached_tokens": 19578,
+    "output_tokens": 3314,
+    "cost_usd": 0.0505,
+    "retries": 0,
+    "wall_seconds": 43.6,
+    "calls": [
+     {
+      "purpose": "pr-copy",
+      "model": "claude-haiku-4-5-20251001",
+      "in": 10,
+      "cache_create": 11075,
+      "cache_read": 0,
+      "out": 1395,
+      "cost_usd": 0.0291,
+      "ms": 15891,
+      "retries": 0,
+      "ok": true
+     },
+     {
+      "purpose": "safety-verdict",
+      "model": "claude-haiku-4-5-20251001",
+      "in": 10,
+      "cache_create": 4001,
+      "cache_read": 7215,
+      "out": 1240,
+      "cost_usd": 0.0149,
+      "ms": 16593,
+      "retries": 0,
+      "ok": true
+     },
+     {
+      "purpose": "retrospective",
+      "model": "claude-haiku-4-5-20251001",
+      "in": 10,
+      "cache_create": 1158,
+      "cache_read": 7215,
+      "out": 679,
+      "cost_usd": 0.0064,
+      "ms": 9250,
+      "retries": 0,
+      "ok": true
+     }
+    ]
+   },
+   "old": {
+    "gross_tokens": 3765809,
+    "non_cached_tokens": 144955,
+    "output_tokens": 23767,
+    "llm_invocations": 68,
+    "tool_calls": 40,
+    "wall_minutes": 4.7,
+    "agent_spawns": 0
+   }
+  }
+ ],
+ "excluded": [
+  {
+   "slug": "jsb-j15-faithful-foul-bucket",
+   "reason": "fixture unrecoverable: head SHA never captured; only a 3.2KB partial docs diff survives vs the real 131KB 23-file Go+golden diff \u2014 replay would benchmark a different PR than history saw"
+  }
+ ]
+}

@@ -7,46 +7,33 @@ last_verified: 2026-07-23
 
 ## The practice (ground truth)
 
-GitHub merge settings: `mergeCommitAllowed: false`, `squashMergeAllowed: true`,
-`rebaseMergeAllowed: true`. Every commit on `master` is a single squashed commit
-titled `<type>(scope): summary (#NNNN)`; `git log origin/master --first-parent` is linear
-with **no** merge commits.
-
-**Consequence:** when a PR merges, its branch's individual commit SHAs are
-**discarded** and replaced by one new squash commit with a **different** SHA. The
+This repo squash/rebase-merges and **disallows merge commits**, so `master` is linear
+(`git log origin/master --first-parent`, no merge commits). When a PR merges, its
+branch's commits are **replaced by one new squash commit with a different SHA** — the
 original SHAs never land in `master`.
 
 ## The diagnostic trap this prevents
 
-`git branch --contains <sha>` / `git merge-base` showing a merged feature branch's
-SHA **absent from master is the NORMAL squash artifact — not** a stale fetch, not
-an unmerged parent, not a lost commit.
-
-- ❌ Wrong reaction: `git fetch` again, assume the parent didn't merge, or replay
-  the whole stack.
-- ✅ Right reaction: confirm the change is in `master` **by content** (the files /
-  diff are present), then treat the parent as merged.
+`git branch --contains <sha>` / `git merge-base` showing a merged branch's SHA
+**absent from master is the NORMAL squash artifact** — not a stale fetch, not an
+unmerged parent, not a lost commit. Don't re-`fetch` or assume the parent didn't
+merge: confirm the change is in `master` **by content** (files/diff present), then
+treat the parent as merged.
 
 ## Rebasing a stacked branch after its parent merged
 
-When a stacked PR's parent squash-merges, rebase **only your own commits** onto
-the new master tip — do not replay the parent's already-merged work:
+Replay **only your own commits** onto the new master tip — not the parent's
+already-squashed work:
 
 ```bash
-git fetch origin
-git rebase --onto origin/master <parent-branch-tip-before-merge> <your-branch>
+git rebase --onto origin/master <parent-tip-before-merge> <your-branch>
 ```
 
-`<parent-branch-tip-before-merge>` is the last commit that belonged to the parent;
-everything after it is yours. This drops the parent's commits (now squashed into
-master) and replays only your delta. Expect a clean replay; conflicts here usually
-mean the range is wrong.
+`<parent-tip-before-merge>` is the last commit that belonged to the parent;
+everything after it is yours. Expect a clean replay; conflicts here usually mean the
+range is wrong.
 
-## When you're the post-plan skill fallback
-
-The compiled post-plan harness rebases with a plain `git rebase origin/master`
-(`gitad.py` `rebase_onto`). For a stacked branch whose parent already squash-merged,
-that replays the parent's now-duplicated commits → conflict → the harness **aborts
-and fails closed**, handing conflict judgment to a fresh `/post-plan` skill session.
-If you are that fallback: this is the squash trap, not a broken branch. Confirm the
-parent's change is in `master` by content, then use the `--onto` rebase above.
+The post-plan harness rebases with a plain `git rebase origin/master` (`gitad.py`
+`rebase_onto`), which on such a branch replays the parent's now-duplicated commits →
+conflict → it **fails closed** to a fresh `/post-plan` skill session. If you're that
+fallback: this is the squash trap, not a broken branch — use the `--onto` form above.

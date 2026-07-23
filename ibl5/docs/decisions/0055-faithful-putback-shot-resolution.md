@@ -1,15 +1,98 @@
 ---
-description: Faithful JSB 5.60 putback (OReb-continuation, OriginOffReb) shot resolution shipped UNCONDITIONALLY ON as the default live engine. The RE faithfulness audit found two decompile-verified divergences in how the engine resolves a half-court putback: (1) make-value — 5.60 (jsb560_decompiled.c:93880-93883) computes the putback 2pt make as player[+0xD60] × 1.3333 (net-advantage-free, 4/3-boosted), but the engine routed putbacks through the normal net-coupled shotValue2pt(net,fgp,false); (2) 3pt suppression — 5.60 (94022-94024) re-loops a 3pt outcome on the OReb flag forcing a 2pt, so putbacks are never 3pt, but the engine let outcome3pt be selected. Both are fixed via a net-free boosted putbackValue2pt helper in makeValue2pt and a threePtW=0 zero in the half-court trip loop. The net-coupled un-boosted putback make-value is the suspected carrier of the empty-FGA shots-per-possession anti-coupling (ADR-0049 Cov(ln(FGA/POSS),lnPPS) ≈ −0.00087, real ≈ 0): low-efficiency teams miss putbacks more → more miss→ORB→retry loops → extra empty FGA → wrong-signed factor. INVERTED-POLARITY escape hatch FreezeConfig.UnfaithfulPutback (default false = faithful = production) restores master's coupled behavior for the archive A/B's OFF walk ONLY. Golden bytes change BY DESIGN (regenerated with -update); TestDeterminism stays green. Measured as a 2-config A/B (OFF=UnfaithfulPutback / ON=faithful) over the full backup archive (705 zips, stride 1, runs 20). VERDICT — SUCCESS per the pre-registered gate: the FACTOR Cov(ln(FGA/POSS),lnPPS) moves toward real (OFF −0.000873 → ON −0.000800, real +0.000027) with NO Var(lnPPS) regression — Var(lnPPS) in fact improves to ≈ real (0.001570 → 0.001458, real 0.001451), and headline/count-residual/both variances all move the correct direction. Magnitude caveat: the factor gap closes ~8% and the headline does not flip (−0.001210 → −0.001120, real +0.000269) — the faithful form is A carrier, not THE dominant one, refining ADR-0053's null (make-value VARIANCE is not the carrier; the make-value FORM is, but the bulk stays structural to the empty-FGA volume loop, left to the OOS count axis ADR-0054 / offVolumeScale #974). Ships as faithful production behavior on RE-verified merits independent of magnitude. CORRECTION 2026-07-22 — divergence (2) is REVERSED: the 3pt-suppression claim rests on a decompile MISREAD. local_15c is the OReb *continuation* flag (the possession do-while's loop condition at 94379), assigned from the rebound routine at 94019, so the goto at 94024 is the loop-back for the next iteration, NOT a 3pt→2pt re-roll. 5.60 in fact CLEARS the shot-clock restriction on an OReb continuation (93278-93280), guaranteeing the full four-bucket set, and FUN_004e1ba0's reject-retry (97194-97196) has no OReb branch at all — putback 3pt IS reachable in 5.60. The threePtW=0 zero is removed; a new NORMAL-polarity FreezeConfig.SuppressPutback3pt reproduces the old behavior for the A/B only. Divergence (1) (make-value) and UnfaithfulPutback's gating of it are UNCHANGED and still faithful. Proof + A/B: jsb-native/re-artifacts/jsb-j24-oreb-3pt-eligibility-20260722.md.
-last_verified: 2026-07-22
+description: Faithful JSB 5.60 putback (OReb-continuation, OriginOffReb) shot resolution shipped UNCONDITIONALLY ON as the default live engine. The RE faithfulness audit found two decompile-verified divergences in how the engine resolves a half-court putback: (1) make-value — 5.60 (jsb560_decompiled.c:93880-93883) computes the putback 2pt make as player[+0xD60] × 1.3333 (net-advantage-free, 4/3-boosted), but the engine routed putbacks through the normal net-coupled shotValue2pt(net,fgp,false); (2) 3pt suppression — 5.60 (94022-94024) re-loops a 3pt outcome on the OReb flag forcing a 2pt, so putbacks are never 3pt, but the engine let outcome3pt be selected. Both are fixed via a net-free boosted putbackValue2pt helper in makeValue2pt and a threePtW=0 zero in the half-court trip loop. The net-coupled un-boosted putback make-value is the suspected carrier of the empty-FGA shots-per-possession anti-coupling (ADR-0049 Cov(ln(FGA/POSS),lnPPS) ≈ −0.00087, real ≈ 0): low-efficiency teams miss putbacks more → more miss→ORB→retry loops → extra empty FGA → wrong-signed factor. INVERTED-POLARITY escape hatch FreezeConfig.UnfaithfulPutback (default false = faithful = production) restores master's coupled behavior for the archive A/B's OFF walk ONLY. Golden bytes change BY DESIGN (regenerated with -update); TestDeterminism stays green. Measured as a 2-config A/B (OFF=UnfaithfulPutback / ON=faithful) over the full backup archive (705 zips, stride 1, runs 20). VERDICT — SUCCESS per the pre-registered gate: the FACTOR Cov(ln(FGA/POSS),lnPPS) moves toward real (OFF −0.000873 → ON −0.000800, real +0.000027) with NO Var(lnPPS) regression — Var(lnPPS) in fact improves to ≈ real (0.001570 → 0.001458, real 0.001451), and headline/count-residual/both variances all move the correct direction. Magnitude caveat: the factor gap closes ~8% and the headline does not flip (−0.001210 → −0.001120, real +0.000269) — the faithful form is A carrier, not THE dominant one, refining ADR-0053's null (make-value VARIANCE is not the carrier; the make-value FORM is, but the bulk stays structural to the empty-FGA volume loop, left to the OOS count axis ADR-0054 / offVolumeScale #974). Ships as faithful production behavior on RE-verified merits independent of magnitude. CORRECTION 2026-07-22 — divergence (2) is REVERSED: the 3pt-suppression claim rests on a decompile MISREAD. local_15c is the OReb *continuation* flag (the possession do-while's loop condition at 94379), assigned from the rebound routine at 94019, so the goto at 94024 is the loop-back for the next iteration, NOT a 3pt→2pt re-roll. 5.60 in fact CLEARS the shot-clock restriction on an OReb continuation (93278-93280), guaranteeing the full four-bucket set, and FUN_004e1ba0's reject-retry (97194-97196) has no OReb branch at all — putback 3pt IS reachable in 5.60. The threePtW=0 zero is removed; a new NORMAL-polarity FreezeConfig.SuppressPutback3pt reproduces the old behavior for the A/B only. Divergence (1) (make-value) and UnfaithfulPutback's gating of it are UNCHANGED and still faithful. Proof + A/B: jsb-native/re-artifacts/jsb-j24-oreb-3pt-eligibility-20260722.md. CORRECTION 2, 2026-07-23 — that reversal is WITHDRAWN and divergence (2) is REINSTATED on a corrected citation. Correction 1 was right that 94022-94024 is the OReb loop-back, wrong that the selector has no OReb branch: FUN_004e1ba0's param_6 is a double (two stack slots), so the decompile's parameter numbering was misbound. Derived from the pushes at the selector's sole call site 0x4d8f61-0x4d8f82, param_3 = edi = [esp+0x18] = local_15c, the OReb continuation flag (pinned independently by the shot-clock clear at 0x4d8f1d-0x4d8f2c). The reject-retry's first clause (97195) therefore rejects outcomes 2 and 4 on an OReb continuation — putbacks are restricted to {1,3} and are never 3pt, as originally concluded. The shot-clock clear is a livelock guard (param_8==1 forces {2,4}, param_3==1 rejects {2,4}), not a widened bucket set. threePtW=0 is restored as the default; the A/B knob survives renamed and re-polarised as INVERTED-POLARITY FreezeConfig.UnfaithfulPutback3pt (default false = faithful = suppressed). The 2026-07-22 +1.70pp 3PA-share gain is not disputed but is a calibration gain from an unfaithful mechanism (ADR-0090), so the J24 residual-(7) attempt-share gap is LARGER than the recorded −2.76pp. Also superseded: Correction 1's "transition allow3pt=false IS faithful" — param_7 is the interactive coach play call (CEngine+0x63ac, 5 = "Three"), not a fast-break code, so that clause is unreachable; transition.go is left unchanged here and reversing it is a separate measured change. Adjudication: jsb-native/re-artifacts/jsb-J24-transition-3pt-ADJUDICATION-20260723.md.
+last_verified: 2026-07-23
 ---
 
 # ADR-0055: Faithful putback shot resolution
 
-**Status:** Accepted — **divergence (2) REVERSED 2026-07-22** (see Correction)
+**Status:** Accepted — divergence (2) **REINSTATED 2026-07-23** on a corrected citation
+(the 2026-07-22 reversal is itself withdrawn; see Correction 2)
 
 **Date:** 2026-06-10
 
-## Correction (2026-07-22): divergence (2) was a decompile misread
+## Correction 2 (2026-07-23): divergence (2) is REINSTATED — the reversal was wrong
+
+**The 2026-07-22 correction below is withdrawn. Putback 3pt IS suppressed in 5.60, and
+the engine suppresses it again.** Read both corrections together: Correction 1 was right
+about the *citation* and wrong about the *conclusion*.
+
+Correction 1 correctly showed that `jsb560_decompiled.c:94022-94024` is the OReb
+loop-back, not a 3pt→2pt re-roll — that part stands, and the original ADR's citation for
+divergence (2) was indeed bad. But it then concluded "`FUN_004e1ba0`'s reject-retry has no
+OReb branch at all." **It has one.** The reject-retry's *first* clause is the OReb branch;
+it was misattributed because the argument binding of `FUN_004e1ba0` was read off the
+decompile's parameter numbering without checking the pushes.
+
+**The binding, derived from the disassembly** at the selector's sole call site
+`0x4d8f61-0x4d8f82`. Ghidra declares
+`__thiscall FUN_004e1ba0(int,int,char,int,int,double,int,char)` — `param_6` is a
+**`double`**, consuming two stack slots, which is what makes the naive slot→param mapping
+come out one short:
+
+| Ghidra param | slot | caller value |
+|---|---|---|
+| `param_1` | ECX | `this` |
+| `param_2` | `[ebp+8]` | `[esp0+0x10]` |
+| **`param_3`** | `[ebp+0xC]` | `edi` = `[esp+0x18]` = **`local_15c`** — the OReb continuation flag |
+| `param_4` | `[ebp+0x10]` | `this+0x58` |
+| `param_5` | `[ebp+0x14]` | `byte [this+0x4c18]` |
+| `param_6` | `[ebp+0x18]`,`[ebp+0x1C]` | `ebx`:`ebp` (double) |
+| `param_7` | `[ebp+0x20]` | `local_154` — the coach play call |
+| `param_8` | `[ebp+0x24]` | `[esp+0x54]` = `local_120` — the shot clock |
+
+`[esp+0x18]` is pinned as `local_15c` independently by `0x4d8f1d-0x4d8f2c`
+(`mov al,[esp+0x18]; cmp al,1; jne; mov byte [esp+0x54],0`) — exactly the decompile's
+`if ((char)local_15c == '\x01') { local_120 = local_120 & 0xffffff00; }`.
+
+So the reject-retry at `:97195`,
+`(param_3 == '\x01') && ((iVar8 == 2 || (iVar8 == 4)))`, **rejects outcomes 2 (3pt) and 4
+(foul) whenever the OReb continuation flag is set** — a putback continuation is restricted
+to `{1,3}`. Putbacks are never 3pt, exactly as the original ADR concluded.
+
+This also re-reads Correction 1's positive evidence. The shot-clock *clear* at `0x4d8f2c`
+is a **livelock guard**, not a widening: `param_8 == 1` forces `{2,4}` while `param_3 == 1`
+rejects `{2,4}`, so with both live every outcome would be rejected and the retry loop would
+never terminate. 5.60 clears the shot clock precisely *because* the OReb restriction is
+active.
+
+**Restored behaviour.** The `threePtW = 0` zero returns to the half-court trip loop as the
+default. The A/B knob added on 2026-07-22 survives — usefully, since it decoupled 3pt
+eligibility from the putback make-value — but is renamed and re-polarised to
+`FreezeConfig.UnfaithfulPutback3pt`, **inverted polarity** (default `false` = faithful =
+suppressed), matching the `UnfaithfulOreb` convention. `UnfaithfulPutback` is unchanged and
+still gates the make-value site only. Divergence (1) is untouched throughout.
+
+**Consequence for this ADR's own A/B, worth stating explicitly:** because the two are now
+decoupled, `UnfaithfulPutback: true` **alone no longer reproduces the OFF arm measured
+below** — it restores the net-coupled make-value but leaves putback 3pt suppressed. Re-running
+the ADR-0055 archive A/B against its published numbers requires
+`FreezeConfig{UnfaithfulPutback: true, UnfaithfulPutback3pt: true}`. The published verdict
+stands; only the way to reconstruct its OFF walk has changed.
+
+**On the 2026-07-22 A/B.** Removing the gate moved 3PA share 14.424% → 16.125% against
+sco's 18.888% and was recorded as closing +1.70pp of the J24 residual-(7) gap. That
+measurement is not disputed — but it is a **calibration gain from an unfaithful
+mechanism**, which ADR-0090 forbids as a basis for shipping. The J24 attempt-share residual
+is correspondingly **larger** than the post-#1590 −2.76pp, and its real carrier is now the
+transition gate (see below), not the putback gate.
+
+**Superseded — do NOT act on:** Correction 1's "transition `allow3pt=false` IS faithful
+(`param_7 == 5 && iVar8 == 2` is a genuine 5.60 rejection)". `param_7` is the interactive
+coach play call (`CEngine+0x63ac`, 5 = the "Three" item on `CBBallCoachView`), not a
+fast-break code; the fast break is `local_c4 == 7`, a different variable never passed to
+the selector. That clause is unreachable, so `transition.go`'s suppression has no 5.60
+warrant. It is **left in place here** — reversing it is a separate, measured change
+(J24 residual (7)), not a drive-by of this correction.
+
+Adjudication, disassembly citations and the sole-call-site proof:
+`jsb-native/re-artifacts/jsb-J24-transition-3pt-ADJUDICATION-20260723.md`.
+Superseded artifact: `jsb-native/re-artifacts/jsb-j24-oreb-3pt-eligibility-20260722.md`.
+Backlog: J24 residual (7).
+
+## Correction 1 (2026-07-22): WITHDRAWN 2026-07-23 — retained for provenance
+
+> Superseded in full by Correction 2 above. Its citation analysis of `:94022-94024` is
+> correct; its conclusion is not. Do not act on this section.
 
 Everything below about the **make-value** (divergence (1)) stands. The **3pt-suppression**
 half (divergence (2)) does not: it was read off `jsb560_decompiled.c:94022-94024` as "5.60
@@ -26,26 +109,6 @@ re-loops a 3pt outcome on the OReb flag, forcing a 2pt." It does not.
   restricts outcomes to `{3pt, foul}`; cleared, the full four-bucket set applies.
 - `FUN_004e1ba0`'s reject-retry (`:97194-97196`) is exhaustive and has **no OReb branch**.
   Nothing zeroes `local_8c` (the `+0xDB0` 3pt bucket weight) on it.
-
-**Putback 3pt is reachable in 5.60.** The `threePtW = 0` zero in the half-court trip loop
-is therefore removed from the live engine; a new **normal-polarity**
-`FreezeConfig.SuppressPutback3pt` (default `false` = live) reproduces the old behavior for
-the A/B baseline only. `UnfaithfulPutback` keeps its inverted polarity and now gates the
-**make-value site only** — the two were deliberately decoupled so the 3PA attribution is
-clean. Transition `allow3pt=false` (`transition.go`) is untouched and **is** faithful
-(`param_7 == 5 && iVar8 == 2` is a genuine 5.60 rejection).
-
-Measured on the J24 recent-era 05-08 corpus (98 snapshots, seed 20240601, 60 games each):
-3PA share of FGA **14.424% → 16.125%** against sco's 18.888%, closing **+1.70pp of the
-−4.46pp** J24 residual-(7) attempt-share gap (38%); `dRate/100poss` −4.165 → −2.502.
-Engine 3P% moves *toward* sco too (+1.17pp → +0.75pp), and ORB lands at **+0.47%** vs sco
-— the engine is not over-producing continuations. Disclosed cost: FTA worsens −19.65% →
-−21.83% (putback 3s draw fewer shooting fouls than putback 2s) against an already-open
-−20% FTA gap; per ADR-0090 that is not a reason to re-add an unfaithful gate.
-
-Full trace, negative evidence and A/B tables:
-`jsb-native/re-artifacts/jsb-j24-oreb-3pt-eligibility-20260722.md`. Backlog: J24
-residual (7).
 
 ## Context
 

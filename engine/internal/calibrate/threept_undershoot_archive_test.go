@@ -230,21 +230,21 @@ func (s *teamShoot) add(o teamShoot) {
 }
 
 // abFreeze selects the A/B arm from JSB_3PT_AB.
-//   - Unset (default): sim.FreezeConfig{} — the ported engine; putback 3pt is
-//     REACHABLE (faithful JSB 5.60 per 2026-07-22 decompile). Reproduces the
-//     committed baseline artifact.
-//   - "suppress": sim.FreezeConfig{SuppressPutback3pt: true} — the pre-port
-//     baseline with putback-3pt zeroing RESTORED in ISOLATION. This is the
-//     attributable arm: it isolates the 3pt suppression mechanism (make-value
-//     untouched) and is the direct J24 candidate-(a) A/B comparator.
+//   - Unset (default): sim.FreezeConfig{} — faithful JSB 5.60: putback 3pt is
+//     SUPPRESSED (OriginOffReb restricted to {2pt, foul} per the 2026-07-23
+//     adjudication). Reproduces the committed baseline artifact.
+//   - "unfaithful3pt": sim.FreezeConfig{UnfaithfulPutback3pt: true} — restores the
+//     2026-07-22-to-2026-07-23 behavior (putback 3pt reachable) as an A/B arm. The
+//     attributable arm for the 3pt-suppression mechanism; make-value untouched.
+//     Direct J24 candidate-(a) A/B comparator.
 //   - "putback": sim.FreezeConfig{UnfaithfulPutback: true} — the ADR-0055 OFF
 //     walk (make-value site only, not the 3pt suppression). Kept for reference;
-//     it moves a DIFFERENT mechanism than "suppress". Toggling a mechanism, never
-//     a constant (ADR-0090).
+//     it moves a DIFFERENT mechanism than "unfaithful3pt". Toggling a mechanism,
+//     never a constant (ADR-0090).
 func abFreeze() sim.FreezeConfig {
 	switch os.Getenv("JSB_3PT_AB") {
-	case "suppress":
-		return sim.FreezeConfig{SuppressPutback3pt: true}
+	case "unfaithful3pt":
+		return sim.FreezeConfig{UnfaithfulPutback3pt: true}
 	case "putback":
 		return sim.FreezeConfig{UnfaithfulPutback: true}
 	default:

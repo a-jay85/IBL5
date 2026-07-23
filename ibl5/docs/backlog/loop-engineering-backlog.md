@@ -29,8 +29,8 @@ last_verified: 2026-07-23
 |--------|------:|
 | ⬜ Open | 6 |
 | 📋 Planned | 2 |
-| ◑ Partial | 3 |
-| ✅ Implemented | 6 |
+| ◑ Partial | 2 |
+| ✅ Implemented | 7 |
 | 🚫 Declined | 0 |
 
 ---
@@ -47,7 +47,7 @@ last_verified: 2026-07-23
 | L6 | Auto-update-branch unsticker | ✅ Implemented | — | S |
 | L7 | Queue-add shift-left preflight | 📋 Planned | 🟦 | S |
 | L8 | Failure self-heal / requeue | ✅ Implemented | — | M |
-| L9 | JSB AutoResearch loop | ◑ Partial | 🟥 | L |
+| L9 | JSB AutoResearch loop | ✅ Implemented | — | L |
 | L10 | Discord intake loop | ◑ Partial | 🟦 | L |
 | L11 | Comprehension-debt digest | ⬜ Open | 🟦 | S |
 | L12 | Autonomy contracts in plan frontmatter | ◑ Partial | 🟦 | M |
@@ -105,12 +105,7 @@ last_verified: 2026-07-23
 **Status (2026-07-07):** ✅ Implemented, multi-layer — environmental failures (rate-limit/auth/stall) refund the attempt and stop the run with the queue intact; genuine failures increment a per-plan attempts counter, parking to `skipped/` after 3; staleness skips write a sidecar that `automouse-self-heal` re-checks and requeues at next run start; already-merged plans move to `done/`. (Covers the original "failure-as-tuning-signal" suggestion's requeue half; feeding the failure note back into the retry's context remains a possible refinement under L4.)
 
 ### L9 JSB AutoResearch loop
-**Location:** JSB sim engine + RE distribution targets; instrumentation groundwork exists (`$HOME/.claude/plans/jsb-l1-gate1-counterfactual-instrument.md` and siblings).
-**Problem:** Engine-parameter tuning is human-paced despite having exactly what a self-improvement loop needs: an objective metric (simulated stat distributions vs real targets).
-**Suggested direction:** An eval harness that perturbs engine params in a worktree, sims N seasons, scores distribution error, keeps only improvements, and logs each trial — overnight, hundreds of trials. Wants an ADR (metric definition, param search space, acceptance rule).
-**Risk if untouched:** RE convergence stays bottlenecked on human iteration bandwidth.
-**Status (2026-07-23):** ✅ Closed — harness shipped as J14 (PR #1545); this PR wires it into use — stand-in registry re-centered to the live 17.7 pace baseline, a `make research` overnight run path, and a leverage-report review gate in `jsb-engine-post-work.md` — completing the loop. Per ADR-0087 §3 the loop is deliberately human-in-loop: the harness emits a ranked leverage table and NEVER auto-commits, so the original "keeps only improvements" auto-accept framing was superseded by the faithfulness-constrained design, not left unbuilt.
-**ADR:** satisfied by ADR-0087 (2026-07-20) — metric/legal-space/acceptance rule defined; harness built (J14, PR #1545) and wired into use by this PR.
+➜ L9 JSB AutoResearch loop — ✅ Implemented (2026-07-23): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
 ### L10 Discord intake loop
 **Location:** `bin/bug-pipeline-tick`, `bin/bug-pipeline-cron-setup`, `bin/bug-pipeline-classify-prompt`, `bin/bug-pipeline-gather-prompt` (live); remainder of the 6-PR Discord bug pipeline program per its shared-context spec.

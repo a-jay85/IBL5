@@ -521,6 +521,57 @@ func TestThreePtDiagAccum_NonPerturbationAndReachability(t *testing.T) {
 	}
 }
 
+// TestOutcomeDiagAccum_NonPerturbationAndReachability — attaching OutcomeDiag must
+// not perturb the engine (byte-identical GameResult vs a zero-Options Simulate) AND
+// must reach both Add sites (ShotDecisions > 0, Eligible3pt > 0). This is the sole
+// mechanical proof the Phase-1 side-channel is accumulation-only, which is what
+// guarantees DRBPushSharePct (gate-1, ADR-0090) cannot move as a side effect.
+func TestOutcomeDiagAccum_NonPerturbationAndReachability(t *testing.T) {
+	b := richBundle()
+	diag := &OutcomeDiagAccum{}
+	withDiag, err := SimulateWith(b, 7, Options{OutcomeDiag: diag})
+	if err != nil {
+		t.Fatalf("SimulateWith: %v", err)
+	}
+	plain := Simulate(b, 7)
+	if !reflect.DeepEqual(withDiag, plain) {
+		t.Error("attaching OutcomeDiag changed the GameResult — the instrument is not byte-identical")
+	}
+	if diag.ShotDecisions == 0 {
+		t.Error("OutcomeDiag.ShotDecisions == 0 — accumulator never reached (hooks unwired)")
+	}
+	if diag.Eligible3pt == 0 {
+		t.Error("OutcomeDiag.Eligible3pt == 0 — half-court hook never recorded an eligible decision")
+	}
+	// Suppressed reachability is asserted in the corpus run (the archive instrument), not
+	// here: a short richBundle game may fire zero transitions, so Transition>0 is not a
+	// per-game invariant. ShotDecisions == Eligible3pt + Suppressed always holds.
+	if diag.ShotDecisions != diag.Eligible3pt+diag.Suppressed {
+		t.Errorf("partition broken: ShotDecisions=%d != Eligible3pt=%d + Suppressed=%d",
+			diag.ShotDecisions, diag.Eligible3pt, diag.Suppressed)
+	}
+}
+
+// TestOutcomeDiagAccum_DRBPushShareUntouched — the fast-class counters that yield
+// DRBPushSharePct (gate-1 12.37%, ADR-0090 forbids tuning toward it) are identical
+// whether or not OutcomeDiag is attached. Independent of the GameResult DeepEqual:
+// it reads the arming-share instrument's own accumulator across the same seed.
+func TestOutcomeDiagAccum_DRBPushShareUntouched(t *testing.T) {
+	b := richBundle()
+	base := &FastClassAccum{}
+	if _, err := SimulateWith(b, 7, Options{FastClassAccum: base}); err != nil {
+		t.Fatalf("baseline SimulateWith: %v", err)
+	}
+	withDiag := &FastClassAccum{}
+	if _, err := SimulateWith(b, 7, Options{FastClassAccum: withDiag, OutcomeDiag: &OutcomeDiagAccum{}}); err != nil {
+		t.Fatalf("with-diag SimulateWith: %v", err)
+	}
+	if base.DRBPushClass != withDiag.DRBPushClass || base.TotalPossessions != withDiag.TotalPossessions {
+		t.Errorf("OutcomeDiag perturbed fast-class counters: base{DRB:%d,Total:%d} != withDiag{DRB:%d,Total:%d}",
+			base.DRBPushClass, base.TotalPossessions, withDiag.DRBPushClass, withDiag.TotalPossessions)
+	}
+}
+
 // TestGateCont_AllDefensiveRebounds — the accumulator fires at every rebound RESOLUTION
 // (a miss reaching gs.rebound), NOT only when the offense RETAINS. So per offensive team
 // the resolution count strictly exceeds its credited offensive rebounds (every ORB is a

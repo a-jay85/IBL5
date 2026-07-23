@@ -390,6 +390,55 @@ type FastClassAccum struct {
 	TotalPossessions int // DRBPushClass + HalfCourt — exhaustive cross-check
 }
 
+// OutcomeDiagAccum harvests, per play-outcome shot-DECISION (one Add per
+// selectOutcome call on BOTH the half-court and transition assembly sites), the
+// four bucket weights and the 3pt-eligibility/feed flags the J24 3PA-gap
+// localization instrument decomposes. Accumulation-ONLY: no rng, no field the
+// engine reads — proven byte-identical by TestOutcomeDiagAccum_NonPerturbationAndReachability.
+// The caller owns it (Options.OutcomeDiag) and shares ONE instance across games.
+type OutcomeDiagAccum struct {
+	ShotDecisions int // total Add() calls (the denominator)
+	Eligible3pt   int // decisions where 3pt was an allowed path (half-court, non-OReb)
+	Suppressed    int // decisions where 3pt was forced out (transition OR OReb continuation)
+	Transition    int // subset of Suppressed: fired fast-break decisions (allow3pt=false)
+	RealMinZero   int // decisions whose ball handler had RealLifeMIN==0 (stand-in bucket path)
+	// Sums over the ELIGIBLE subset only (a suppressed decision has threePtW==0
+	// by construction and must not dilute the denominator-dilution ratio).
+	Sum2ptW           float64 // Σ twoPtWeight
+	Sum3ptW           float64 // Σ threePtWeight
+	SumFoulW          float64 // Σ foulOnlyWeight
+	SumAndOneW        float64 // Σ andOneWeight
+	SumThreeShare2    float64 // Σ threePtW / (twoPtW+threePtW)                      — 2-bucket ratio (candidate b)
+	SumThreeShareFull float64 // Σ threePtW / (twoPtW+threePtW+foulW+andOneW)        — full ratio (foul/andOne lever)
+}
+
+// Add records one shot-decision. Guards mirror selectOutcome's own total>0 guard
+// so a degenerate all-zero-weight decision cannot inject a NaN into the means.
+func (a *OutcomeDiagAccum) Add(twoPtW, threePtW, foulW, andOneW float64, eligible3pt, transition, realMinZero bool) {
+	a.ShotDecisions++
+	if realMinZero {
+		a.RealMinZero++
+	}
+	if !eligible3pt {
+		a.Suppressed++
+		if transition {
+			a.Transition++
+		}
+		return
+	}
+	a.Eligible3pt++
+	a.Sum2ptW += twoPtW
+	a.Sum3ptW += threePtW
+	a.SumFoulW += foulW
+	a.SumAndOneW += andOneW
+	if twoPtW+threePtW > 0 {
+		a.SumThreeShare2 += threePtW / (twoPtW + threePtW)
+	}
+	if full := twoPtW + threePtW + foulW + andOneW; full > 0 {
+		a.SumThreeShareFull += threePtW / full
+	}
+}
+
 // GateContAccum harvests the L1 gate-1 decomposition instrument (ADR-0057/0058),
 // read-only. At every offensive-rebound RESOLUTION (gs.rebound, before the continuation
 // outcome roll), it records — keyed by the OFFENSIVE team ID — the gate-1 sqrt team-pick
@@ -496,6 +545,10 @@ type Options struct {
 	// zero Options stays byte-identical to Simulate. The caller owns one instance across a
 	// run's games (nil outside the 3pt-undershoot archive instrument). NOT concurrency-safe.
 	ThreePtDiag *ThreePtDiagAccum
+	// OutcomeDiag, when non-nil, harvests one Add per play-outcome shot-decision
+	// (both assembly sites) for the J24 3PA-gap localization instrument. Nil in
+	// every shipped path; a zero-value run is byte-identical to Simulate.
+	OutcomeDiag *OutcomeDiagAccum
 }
 
 // validate rejects a config that freezes an arm with no precomputed (zero) mean — a

@@ -140,16 +140,31 @@ jobs:
       # --- Advisory checks (path-gated): continue-on-error so they never fail
       # the job; each posts a sticky PR comment, same as today. ---
       - name: Run bin/check-hot-files
+        id: hotfiles
         if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.filter.outputs.hotfiles == 'true' }}
         continue-on-error: true
-        run: bin/check-hot-files --pr | tee hot-files.txt
+        env:
+          HOT_FILE_BASE_REF: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if bin/check-hot-files --pr | tee hot-files.txt; then
+            echo "crossed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "crossed=false" >> "$GITHUB_OUTPUT"
+          fi
 
-      - name: Post hot-file comment
-        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.filter.outputs.hotfiles == 'true' }}
+      - name: Post hot-file crossing comment
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.filter.outputs.hotfiles == 'true' && steps.hotfiles.outputs.crossed == 'true' }}
         uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
         with:
           header: hot-files
           path: hot-files.txt
+
+      - name: Remove stale hot-file comment
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.filter.outputs.hotfiles == 'true' && steps.hotfiles.outputs.crossed != 'true' }}
+        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
+        with:
+          header: hot-files
+          delete: true
 
       - name: Run bin/check-orphan-css
         if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.filter.outputs.orphancss == 'true' }}

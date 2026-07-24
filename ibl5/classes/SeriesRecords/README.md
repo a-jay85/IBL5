@@ -1,3 +1,8 @@
+---
+description: Head-to-head series records grid display for all team matchups, color-coded by winning, losing, or tied record.
+last_verified: 2026-07-24
+---
+
 # SeriesRecords Module
 
 The SeriesRecords module displays head-to-head series records between all teams in a grid format. Each cell shows the wins-losses record for the row team versus the column team.

@@ -1,3 +1,8 @@
+---
+description: Annual IBL draft process — repository, validator, processor, view, service, and controller with interface-driven architecture.
+last_verified: 2026-07-24
+---
+
 # Draft Module Architecture
 
 **Last Updated:** June 28, 2026  

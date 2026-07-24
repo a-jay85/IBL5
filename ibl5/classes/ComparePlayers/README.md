@@ -1,3 +1,8 @@
+---
+description: Side-by-side comparison of two players' ratings, current season stats, and career stats with jQuery UI autocomplete search.
+last_verified: 2026-07-24
+---
+
 # ComparePlayers Module
 
 Modern refactored implementation of the player comparison feature using interface-driven architecture.
@@ -287,7 +292,7 @@ Status: ✅ ALL PASSING
 
 ## Migration from Legacy
 
-The old module (`ibl5/modules/Compare_Players/index.php`) should be updated to use these classes as a thin controller. See the refactored index.php for the implementation pattern.
+The old module (`ibl5/modules/ComparePlayers/index.php`) should be updated to use these classes as a thin controller. See the refactored index.php for the implementation pattern.
 
 **Benefits:**
 - 95% code reduction in module file

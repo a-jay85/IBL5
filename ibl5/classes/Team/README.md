@@ -1,3 +1,8 @@
+---
+description: Team page — roster, stats, history, and accomplishments — following Controller/Service/View/Repository pattern with multiple stat display modes.
+last_verified: 2026-07-24
+---
+
 # Team Module
 
 The Team module provides comprehensive team management functionality including roster display, statistics visualization, historical records, and team accomplishments.

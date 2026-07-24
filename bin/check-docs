@@ -18,6 +18,7 @@ const IN_SCOPE_GLOBS = [
     'ibl5/docs/*.md',
     'ibl5/docs/backlog/*.md',
     'ibl5/docs/decisions/*.md',
+    'ibl5/classes/*/README.md',
     'engine/docs/backlog/*.md',
     'engine/.claude/rules/*.md',
 ];

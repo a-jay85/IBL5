@@ -1,3 +1,8 @@
+---
+description: Conference and division standings display with clinched-indicator badges (Z-, Y-, X-) and dynamic HTML generation.
+last_verified: 2026-07-24
+---
+
 # Standings Module
 
 The Standings module displays league standings for conferences and divisions.

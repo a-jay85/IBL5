@@ -1,3 +1,8 @@
+---
+description: Static utility classes for consistent basketball stat formatting (percentages, per-game averages, totals) and safe type conversion.
+last_verified: 2026-07-24
+---
+
 # BasketballStats Module - Basketball Statistics Formatting and Utilities
 
 ## Overview

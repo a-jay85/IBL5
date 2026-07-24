@@ -46,8 +46,24 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.CI_PAT }}
         run: |
-          # Get all open PRs targeting master
-          prs=$(gh pr list --base master --state open --json number,headRefName --jq '.[] | "\(.number) \(.headRefName)"')
+          # Get all open PRs targeting master, ordered so that PRs currently
+          # passing all their checks rebase (and thus re-enter the CI queue)
+          # before PRs with failing/pending checks. A PR is "green" when its
+          # status-check rollup has no entry outside SUCCESS/NEUTRAL/SKIPPED
+          # (an empty rollup — no checks — also counts as green). sort_by is
+          # stable, so relative order within each group is preserved. This is a
+          # scheduling-under-contention optimization: when runners are free it's
+          # a no-op; when they're scarce, green PRs re-confirm first.
+          prs=$(gh pr list --base master --state open \
+            --json number,headRefName,statusCheckRollup \
+            --jq '
+              map(.green = (
+                [.statusCheckRollup[]? | (.conclusion // .state)
+                  | select(. != "SUCCESS" and . != "NEUTRAL" and . != "SKIPPED")]
+                | length == 0
+              ))
+              | sort_by(.green | not)
+              | .[] | "\(.number) \(.headRefName)"')
 
           if [ -z "$prs" ]; then
             echo "No open PRs targeting master"

@@ -1,6 +1,6 @@
 ---
-description: All work happens in a worktree (never the main checkout); worktree setup and the implementation→/post-plan handoff (auto-fired in a detached fresh session) for any verified-complete worktree work, plan-driven or ad-hoc.
-last_verified: 2026-07-16
+description: All work happens in a worktree (never the main checkout); where plans live (~/claude-plans/<branch-slug>.md, outside the repo); worktree setup and the implementation→/post-plan handoff (auto-fired in a detached fresh session) for any verified-complete worktree work, plan-driven or ad-hoc.
+last_verified: 2026-07-24
 ---
 
 # Workflow Continuity Rule
@@ -14,6 +14,14 @@ Exempt — files that physically live **outside** the repo tree: Claude hooks (`
 ## Planning
 
 Use `/plan <task description>` for implementation planning.
+
+**Plans live OUTSIDE the repo at `~/claude-plans/<branch-slug>.md`.** There is no `plans/` directory in the repo, so a repo-relative search finds nothing. The path is deterministic from the branch name — resolve it, don't search:
+
+```bash
+ls ~/claude-plans/"$(git rev-parse --abbrev-ref HEAD)".md
+```
+
+This is exactly how `bin/post-plan-now` resolves the plan for a branch. `~/.claude/plans/` is a **pre-migration path** that still holds old plan files — reading there looks like it worked while missing everything recent.
 
 ## Worktree Setup
 

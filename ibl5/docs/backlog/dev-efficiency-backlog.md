@@ -1,6 +1,6 @@
 ---
 description: Development-efficiency backlog — inner-loop speed (diff-scoped analysis, parallel tests), CI caching, dependency-bump batching, and worktree lifecycle automation, with per-entry status.
-last_verified: 2026-07-14
+last_verified: 2026-07-24
 ---
 
 # Development-Efficiency Backlog
@@ -97,7 +97,7 @@ last_verified: 2026-07-14
 **Status (2026-07-14):** ◑ Partial — cheap-gate well exhausted; the only remaining item (free-agents guard) is a standalone `/plan`. 🟨.
 
 ### E9 Meta-tooling growth bar
-**Location:** Plan: `$HOME/.claude/plans/meta-tooling-bar.md` (queued) — extend-before-add rule + quarterly cull.
+**Location:** Plan: `$HOME/claude-plans/meta-tooling-bar.md` (queued) — extend-before-add rule + quarterly cull.
 **Problem:** ~27 of 101 `bin/` scripts exist to test the other scripts; the gate layer itself has had bugs. Nothing pushes back on meta-tooling growth.
 **Status (2026-07-07):** 📋 Planned — queued. 🟦 (rule authoring wants human eyes on merge).
 
@@ -107,7 +107,7 @@ last_verified: 2026-07-14
 **Status (2026-07-07):** ✅ Implemented — on every master push, CI rebuilds the schema from migrations and auto-commits `ibl5/docs/schema/current-schema.sql` if changed. (The `000_baseline` migration snapshot itself is intentionally untouched — the regenerated dump is the source of truth for schema questions.)
 
 ### E11 In-PR pre-baked image build
-**Location:** Plan: `$HOME/.claude/plans/in-pr-prebaked-image-build.md` (queued). Today only `.github/workflows/cache-dependencies.yml` builds the image, on schedule/push — never in-PR.
+**Location:** Plan: `$HOME/claude-plans/in-pr-prebaked-image-build.md` (queued). Today only `.github/workflows/cache-dependencies.yml` builds the image, on schedule/push — never in-PR.
 **Problem:** A PR changing the Dockerfile or composer deps is E2E-tested against the *previous* master image; the mismatch surfaces only after merge.
 **Status (2026-07-07):** 📋 Planned — queued; paths-filtered so normal PRs are unaffected. 🟦.
 

@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed JSB native-engine backlog entries (J-items), extracted from engine/docs/backlog/jsb-native-backlog.md.
-last_verified: 2026-07-22
+last_verified: 2026-07-24
 ---
 
 # JSB Native-Engine Backlog — Archive
@@ -10,7 +10,7 @@ Read-only historical record of ✅ Implemented / 🚫 Declined entries. For OPEN
 ---
 
 ### J1 Faithful foul-bucket pair port
-**Location:** `engine/internal/sim/bucketweights.go` `foulBucketWeight` + `teamquality.go` (ADR-0061's `offQualityConstant = 1.575` corpus stand-in). Plan: `$HOME/.claude/plans/jsb-faithful-foul-pair.md` (written 2026-07-08, `impl_model: sonnet`, `auto_merge: true`).
+**Location:** `engine/internal/sim/bucketweights.go` `foulBucketWeight` + `teamquality.go` (ADR-0061's `offQualityConstant = 1.575` corpus stand-in). Plan: `$HOME/claude-plans/jsb-faithful-foul-pair.md` (written 2026-07-08, `impl_model: sonnet`, `auto_merge: true`).
 **Problem:** The stand-in is structurally unfaithful — it couples BOTH teams' foul weights to defense at ~0.38, where the statically-pinned 5.60 behavior is an asymmetric pair: HOME = deterministic defense-coupled weight `(defQ − (5/6)·teamDef)/5 + 0.2`; AWAY/NEUTRAL = a stochastic `U[0, 0.6)` redraw with zero coupling. This is also why ADR-0061's GATE-1 (±0.5 home margin) was proven unsatisfiable in the healthy foul range.
 **Result:** Merged 2026-07-10 (PR #1395, ADR-0082, k = 8.6 pair). Count-axis effect ~3% of the Cov gap (gt2 −0.000807 → −0.000774); sign survived, arming J2.
 **Caveat (J2 session 1, then re-corrected by J6 — all same day):** the k-sweep's A-relative gates calibrated the pair to reproduce the pre-existing 1.8× FTA-level inflation (37.8 vs real 20.65/g) — still true, corrected by J15's level re-anchor. J2 additionally called the home arm "dynamically dead" via J5's defQ ≡ 0 pin, but J6 overturned that pin (+0xDD0 is live STL/MIN×44), so the shipped home arm's coupling STRUCTURE is closer to faithful than J2 concluded — its inputs (Go's defQuality formula) and scale are what remain unfaithful. Resolution owner: J15.

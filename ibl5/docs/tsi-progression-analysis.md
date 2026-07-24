@@ -1,6 +1,6 @@
 ---
 description: TSI (total skill index) progression analysis for player development tracking.
-last_verified: 2026-06-10
+last_verified: 2026-07-24
 ---
 
 # TSI → Rating Progression Analysis Results (Revised)
@@ -46,4 +46,4 @@ All ratings monotonic. Cross-validated across early and late eras.
 
 ## For Custom Sim Engine
 
-Use `tsi_sum = T + S + I` as a single progression modifier. No need to differentiate T/S/I for progression mechanics. See full analysis: `~/.claude/plans/TSI_PROGRESSION_ANALYSIS.md`
+Use `tsi_sum = T + S + I` as a single progression modifier. No need to differentiate T/S/I for progression mechanics. See full analysis: `~/claude-plans/TSI_PROGRESSION_ANALYSIS.md`

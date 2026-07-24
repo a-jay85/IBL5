@@ -1,6 +1,6 @@
 ---
 description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, plan decomposition/tier-routing machinery, and the human comprehension counter-loop, with per-entry status.
-last_verified: 2026-07-23
+last_verified: 2026-07-24
 ---
 
 # Loop-Engineering Backlog
@@ -85,7 +85,7 @@ last_verified: 2026-07-23
 ### L5 Master-canary between runs
 **Location:** `bin/automouse-run` refreshes master between plans (fetch + `--ff-only` merge) but runs no health check; `bin/check-master-ci-green` exists as a building block.
 **Problem:** After an overnight auto-merge, the next plan builds on the new master with no smoke check — a poisoned master cascades failures through every remaining plan.
-**Suggested direction:** Between plans, gate on `bin/check-master-ci-green` plus a cheap local smoke (main-stack curl); on red, park the queue rather than continue. (Adjacent: `$HOME/.claude/plans/pr-canary-fast-conflict-signal.md` covers the PR-level pre-merge signal.)
+**Suggested direction:** Between plans, gate on `bin/check-master-ci-green` plus a cheap local smoke (main-stack curl); on red, park the queue rather than continue. (Adjacent: `$HOME/claude-plans/pr-canary-fast-conflict-signal.md` covers the PR-level pre-merge signal.)
 **Risk if untouched:** One bad merge converts the rest of the night into cascading noise.
 **Status (2026-07-07):** ⬜ Open — 🟦.
 
@@ -94,7 +94,7 @@ last_verified: 2026-07-23
 **Status (2026-07-10):** ✅ Implemented — merged PR #1390.
 
 ### L7 Queue-add shift-left preflight
-**Location:** `bin/automouse-queue` `add` runs zero preflight (verified); staleness is caught only at 2am by the impl agent, then self-heal requeues (L8). Plan: `$HOME/.claude/plans/staleness-guard-fp-fix-and-queue-check.md` (not yet queued).
+**Location:** `bin/automouse-queue` `add` runs zero preflight (verified); staleness is caught only at 2am by the impl agent, then self-heal requeues (L8). Plan: `$HOME/claude-plans/staleness-guard-fp-fix-and-queue-check.md` (not yet queued).
 **Problem:** A stale anchor costs a night when it could be fixed in 30 seconds at queue-add time, while a human is at the keyboard.
 **Suggested direction (per the plan):** Run `bin/check-plan` + `bin/check-plan-staleness` at add time; also fixes known staleness-check false positives.
 **Risk if untouched:** Recurring burned queue slots for trivially-fixable staleness.

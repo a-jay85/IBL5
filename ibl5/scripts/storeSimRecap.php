@@ -103,9 +103,23 @@ if ($row === null || $row['status'] !== 'done') {
     fail("store failed: sim {$sim} is not in state done after write");
 }
 
+// ── Resolve the canonical host (prod-side config only, never from argv) ───────
+// One value feeds both jobs below. A real bare hostname makes Discord's
+// isProduction() true so the post routes to #admin-chat; an empty host — CI,
+// dev, any machine without the constant — leaves it on the testing webhook and
+// keeps the link relative. Empty is the safe default, never an error.
+$rawHost = defined('IBL5_CANONICAL_HOST') ? constant('IBL5_CANONICAL_HOST') : '';
+$host = is_string($rawHost) ? $rawHost : '';
+
+\Discord\Discord::init($host);
+
+$viewerUrl = $host === ''
+    ? \SimRecap\SimSummaryLink::path($sim)
+    : \SimRecap\SimSummaryLink::absolute($sim, $host);
+
 // ── Post to Discord, only after a confirmed write ─────────────────────────────
-\Discord\Discord::postToChannel('#admin-chat', "Sim {$sim} recap is ready for review.");
+\Discord\Discord::postToChannel('#admin-chat', "Sim {$sim} recap is ready for review: {$viewerUrl}");
 
 // ── Success output ────────────────────────────────────────────────────────────
-echo json_encode(['ok' => true, 'sim' => $sim, 'games' => count($payload->getGames())]), "\n";
+echo json_encode(['ok' => true, 'sim' => $sim, 'games' => count($payload->getGames()), 'url' => $viewerUrl]), "\n";
 exit(0);

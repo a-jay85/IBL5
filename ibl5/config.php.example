@@ -61,6 +61,15 @@ define('IBL6_BASE_URL', 'https://ibl6.iblhoops.net');
 # precedence over this constant (see Auth\DemoLoginGate, ADR-0034).
 define('DEMO_LOGIN_TOKEN', getenv('DEMO_LOGIN_TOKEN') ?: '');
 
+# IBL5_CANONICAL_HOST — the bare production hostname (no scheme, no www., no
+# trailing slash, e.g. iblhoops.net) used from CLI context for two things: it is
+# passed to Discord::init() so a prod-side sim-recap post routes to #admin-chat
+# instead of the testing webhook, and it builds the absolute viewer link the
+# post carries. Leave it EMPTY on every non-production machine — empty is the
+# safe default (Discord stays on the testing webhook, links stay relative).
+# Set the real value only in production's gitignored config.php.
+define('IBL5_CANONICAL_HOST', getenv('IBL5_CANONICAL_HOST') ?: '');
+
 /**********************************************************************/
 /* You finished to configure the Database. Now you can change all     */
 /* you want in the Administration Section.   To enter just launch     */

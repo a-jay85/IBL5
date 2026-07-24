@@ -222,6 +222,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
     except HarnessError as e:
         res.terminal = TerminalState.FAILED
         res.error = f"{e.kind}: {e.detail}"
+        res.error_kind = e.kind
         log(f"FAILED: {res.error}")
     return _finish(res, out_dir)
 
@@ -234,6 +235,16 @@ def _finish(res: RunResult, out_dir: str) -> RunResult:
     with open(os.path.join(out_dir, "audit.log"), "w") as fh:
         fh.write("\n".join(res.audit) + "\n")
     return res
+
+
+def exit_code_for(res: RunResult) -> int:
+    """Process exit code from a terminal RunResult.
+    3 = rebase-conflict fail-closed sentinel: bin/post-plan-now MUST NOT escalate to
+        the /post-plan skill session; a human resolves the stacked-branch rebase.
+    1 = any other typed failure.  0 = success / nothing-to-ship."""
+    if res.terminal == TerminalState.FAILED and res.error_kind == "rebase-conflict":
+        return 3
+    return 0 if res.terminal != TerminalState.FAILED else 1
 
 
 def main() -> int:
@@ -276,7 +287,7 @@ def main() -> int:
     print(f"llm: {t['llm_invocations']} calls, {t['gross_tokens']} gross tok, "
           f"{t['non_cached_tokens']} non-cached tok, ${t['cost_usd']}, {t['wall_seconds']}s")
     print(f"outputs: {args.out}/result.json, {args.out}/audit.log, {args.out}/actions.jsonl")
-    return 0 if res.terminal != TerminalState.FAILED else 1
+    return exit_code_for(res)
 
 
 if __name__ == "__main__":

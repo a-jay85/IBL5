@@ -32,6 +32,20 @@
 #
 # Run from anywhere inside the target worktree.
 
+# should_fallback <rc> — decide whether to escalate to the /post-plan skill session after the
+# compiled harness exits with <rc>. Returns 0 (DO fall back) for a generic harness failure;
+# returns 1 (do NOT fall back) for success (0) and the rebase-conflict fail-closed sentinel (3)
+# emitted by runner.py exit_code_for(). A stacked-branch rebase conflict is NOT auto-resolvable
+# and must NOT silently escalate to a --dangerously-skip-permissions skill session on an
+# unreviewed tree. This function is embedded verbatim into the launchd plist below via
+# `declare -f`, so the tested logic here is exactly what runs there.
+should_fallback() { case "$1" in 0|3) return 1 ;; *) return 0 ;; esac; }
+
+# Sourced-guard: the unit test does `source bin/post-plan-now` to load should_fallback, then this
+# returns before the body executes. Must sit before `set -euo pipefail` (sourcing must not alter
+# the caller's shell options).
+[ "${BASH_SOURCE[0]}" != "${0}" ] && return 0
+
 set -euo pipefail
 
 AUTO=0
@@ -85,15 +99,22 @@ PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 
 PROMPT="Invoke the /post-plan skill now on the current git branch. Resolve the plan from the branch slug per the skill Phase 1, then execute every phase. No human is present: never ask questions or wait for input — make the safe choice and continue."
 
-# Compiled-harness engine (see header). The harness command chains `|| skill`
-# inside the launchd job, so a harness failure degrades to the skill session
-# in the same supervised run instead of silently shipping nothing.
+# Compiled-harness engine (see header). The launchd job runs the harness, captures its exit code,
+# and escalates to the skill session ONLY when should_fallback permits it. Exit 3 (rebase-conflict
+# fail-closed sentinel from runner.py exit_code_for) is NOT a fallback trigger: it stops for a
+# human instead of escalating to a --dangerously-skip-permissions skill session on an unreviewed tree.
 HARNESS="/Users/ajaynicolas/GitHub/IBL5/tools/postplan-harness"
-HARNESS_TRY=""
+FALLBACK_FN=""
+HARNESS_SEG=""
+GATE_OPEN=""
+GATE_CLOSE=""
 ENGINE="Sonnet 4.6 /post-plan skill session"
 if [ "${POST_PLAN_SKILL:-0}" != "1" ] && [ -x "$HARNESS/run" ]; then
-    HARNESS_TRY="CLAUDE_HEADLESS=1 caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS/out/live-$SLUG-$TS\" --live || "
-    ENGINE="compiled post-plan harness (falls back to the skill session on failure)"
+    FALLBACK_FN="$(declare -f should_fallback); "
+    HARNESS_SEG="CLAUDE_HEADLESS=1 caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS/out/live-$SLUG-$TS\" --live; rc=\$?; "
+    GATE_OPEN="if should_fallback \"\$rc\"; then "
+    GATE_CLOSE="; elif [ \"\$rc\" = 3 ]; then echo \"post-plan-now: harness exited 3 (rebase-conflict fail-closed sentinel). SKIPPING the /post-plan skill fallback; a human must resolve the stacked-branch rebase conflict, then re-run bin/post-plan-now. See $LOG.\"; fi"
+    ENGINE="compiled post-plan harness (fails CLOSED on rebase conflict; falls back to the skill on other failures)"
 fi
 
 # launchd runs with a minimal env, so prepend the same PATH bin/automouse-run uses
@@ -114,7 +135,7 @@ cat > "$PLIST" <<PLIST_EOF
 	<array>
 		<string>/bin/bash</string>
 		<string>-lc</string>
-		<string>export PATH="/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH"; cd "$ROOT" &amp;&amp; { ${HARNESS_TRY}CLAUDE_HEADLESS=1 CLAUDE_CODE_AUTO_COMPACT_WINDOW=200000 caffeinate -s claude -p "$PROMPT" --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name "$LABEL"; }; rm -f "$PLIST"; launchctl bootout gui/\$(id -u)/$LABEL</string>
+		<string>export PATH="/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH"; cd "$ROOT" &amp;&amp; { ${FALLBACK_FN}${HARNESS_SEG}${GATE_OPEN}CLAUDE_HEADLESS=1 CLAUDE_CODE_AUTO_COMPACT_WINDOW=200000 caffeinate -s claude -p "$PROMPT" --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name "$LABEL"${GATE_CLOSE}; }; rm -f "$PLIST"; launchctl bootout gui/\$(id -u)/$LABEL</string>
 	</array>
 	<key>RunAtLoad</key>
 	<true/>

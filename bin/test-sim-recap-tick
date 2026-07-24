@@ -62,6 +62,10 @@ srt_setup() {
 echo "$*" >> "$STUB/ssh.log"
 cmd="$2"
 if printf '%s' "$cmd" | grep -q 'storeSimRecap\.php'; then
+    if [ -f "$STUB/record-stdin" ]; then
+        printf '%s\n' "$2" > "$STUB/store.cmd"
+        cat > "$STUB/store.stdin"
+    fi
     if [ -f "$STUB/store-fails" ]; then
         printf '{"ok":false,"error":"stub store failure"}\n'
         exit 1
@@ -133,7 +137,8 @@ SH
 srt_reset() {
     rm -f "$STUB"/ssh.log "$STUB"/claude.log "$STUB"/claude.sentinel \
           "$STUB"/tick.out "$STUB"/agent-fails "$STUB"/agent-usage-limit \
-          "$STUB"/store-fails "$STUB"/resp.* 2>/dev/null
+          "$STUB"/store-fails "$STUB"/resp.* \
+          "$STUB"/record-stdin "$STUB"/store.cmd "$STUB"/store.stdin 2>/dev/null
     export SIM_RECAP_DB_PASSWORD="test_db_password"
     unset SIM_RECAP_KEEP_WORKDIR 2>/dev/null || true
 }
@@ -313,6 +318,58 @@ if [ "${_plist_count:-0}" -eq 0 ]; then
     srt_ok "no_plist_committed"
 else
     srt_fail "no_plist_committed — found: $(git -C "$_repo_root" ls-files '*.plist')"
+fi
+
+# ── payload_contract_stdin_and_command ───────────────────────────────────────
+# Verify: tick emits --sim= in the storeSimRecap command (no --themes= flag),
+# and the payload piped on stdin is valid JSON that passes
+# SimRecapPayload::fromJson() in the same shape storeSimRecap.php consumes.
+srt_reset
+touch "$STUB/record-stdin"
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+srt_run
+srt_expect_eq "payload_contract — exit 0" 0 "$SRT_RC"
+
+if [ -f "$STUB/store.cmd" ]; then
+    srt_log_has   "$STUB" store.cmd "--sim="    "payload_contract — command has --sim="
+    srt_log_lacks "$STUB" store.cmd "--themes=" "payload_contract — command has no --themes="
+else
+    srt_fail "payload_contract — store.cmd not created (ssh stub did not record the command)"
+fi
+
+_ibl5_dir="$(cd "${SCRIPT_DIR}/.." && pwd)/ibl5"
+if [ -f "$STUB/store.stdin" ]; then
+    _validate_php="$(mktemp /tmp/payload-validate-XXXXXX.php)"
+    cat > "$_validate_php" << 'PHPEOF'
+<?php
+$ibl5Dir = $argv[1];
+require $ibl5Dir . '/vendor/autoload.php';
+$localClassesDir = realpath($ibl5Dir . '/classes');
+if ($localClassesDir !== false) {
+    spl_autoload_register(static function (string $class) use ($localClassesDir): void {
+        $path = $localClassesDir . '/' . str_replace('\\', '/', $class) . '.php';
+        if (file_exists($path)) {
+            require_once $path;
+        }
+    });
+}
+$json = (string) stream_get_contents(STDIN);
+try {
+    \SimRecap\SimRecapPayload::fromJson($json);
+    exit(0);
+} catch (Throwable $e) {
+    fwrite(STDERR, 'error: ' . $e->getMessage() . PHP_EOL);
+    exit(1);
+}
+PHPEOF
+    if php "$_validate_php" "$_ibl5_dir" < "$STUB/store.stdin" 2>/dev/null; then
+        srt_ok "payload_contract — stdin passes SimRecapPayload::fromJson()"
+    else
+        srt_fail "payload_contract — stdin fails SimRecapPayload::fromJson()"
+    fi
+    rm -f "$_validate_php"
+else
+    srt_fail "payload_contract — store.stdin not created (ssh stub did not record stdin)"
 fi
 
 # ══ PROMPT GROUP — real bin/sim-recap-prompt ══════════════════════════════════

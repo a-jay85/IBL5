@@ -1,6 +1,6 @@
 ---
 description: J13-3 go/no-go for JSB native-engine cut-over. Accepted — HOLD (corrected): the old all-era 12.94 floor is overturned as a denomination artifact (ADR-0088), but master DRBPushSharePct 12.37% sits inside the between-season drift band [11.97, 12.54] yet still −0.05pp under the era-matched 2-season CI floor ~12.42 (bootstrap CI [12.374, 12.698]) elected as the cut-over bar. Cut-over NOT authorized; re-open when gate-1 reaches ≥12.42% or the 2-season CI recalibrates to cover 12.37%. Records open non-blocking residuals, conceptual cut-over mechanism, and re-open criteria.
-last_verified: 2026-07-21
+last_verified: 2026-07-24
 ---
 
 # ADR-0090: JSB native-engine cut-over — go/no-go
@@ -48,6 +48,8 @@ Why the 2-season floor, not band membership, is the gate (per § Architectural t
 The elected bar is the **era-matched 2-season CI floor ~12.42** (216.58 poss/g, bootstrap CI [12.374, 12.698]) — NOT the overturned all-era 12.94 artifact (ADR-0088). Cut-over is authorized (amend this ADR or create successor ADR) when **either**:
 1. `TestFastClassArmingShareBaseline -tags archive` (recent-era 05-08, `JSB_ARCHIVE_DIR` set) returns `DRBPushSharePct ≥ 12.42%` (the era-matched 216.58 floor), OR
 2. The 2-season bootstrap CI is recalibrated such that its lower bound covers 12.37%.
+
+> **Criterion #2 audited (ADR-0094, 2026-07-23):** an adversarial construction audit of the elected ~12.42 / 2-season floor returned **Verdict A = NO** (no construction defect) and **Verdict B = NO** (cut-over not authorized). The un-derived "~12.42" is a *provenance* gap — recoverable as the √2-shrink of the reproduced 1-season CI (12.4216) and corroborated by a direct 2-season game bootstrap [12.418, 12.653]; the honestly-computed 1-season lower bound is **12.374**, still above master 12.37%. Every candidate defect (denominator uncertainty, reproduction-interval-as-gate, missing engine error bar, season-level clustering) is a NOT-A-DEFECT, PREFERENCE, or provenance finding whose method-faithful (percentile) corrected bound stays at or above 12.37%; the only values below come from a symmetric delta-method approximation or a misspecified iid-season resampling, both refused on the merits. **HOLD stands; criterion #2 is not met.**
 
 Re-open process: re-run the gate, confirm the threshold is met, then proceed to the cut-over mechanism phase (§ Conceptual cut-over mechanism).
 

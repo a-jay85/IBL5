@@ -87,7 +87,13 @@ SH
 echo "curl $*" >> "$STUB/curl.log"
 case "$*" in *create-thread*) echo "CREATE_THREAD" >> "$STUB/calls.log";; *post-to-thread*) echo "POST_TO_THREAD" >> "$STUB/calls.log";; *mention*) echo "MENTION" >> "$STUB/calls.log";; esac
 case "$*" in
-  *create-thread*)       echo '{"thread_id":"'"${STUB_THREAD_ID:-880000000000000001}"'"}' ;;
+  *create-thread*)
+    if [ "${STUB_CREATE_THREAD_FAIL:-0}" = 1 ]; then
+      echo '{}'   # no thread_id key → bot_create_thread's `jq -r '.thread_id // empty'` yields empty
+    else
+      echo '{"thread_id":"'"${STUB_THREAD_ID:-880000000000000001}"'"}'
+    fi
+    ;;
   *mention*)             echo '{"message_id":"'"${STUB_MESSAGE_ID:-1420098765432109876}"'"}' ;;
   *get-thread-messages*) cat "$STUB/transcript.json" 2>/dev/null || echo '{"messages":[]}' ;;
   *)                     echo '{}' ;;
@@ -209,7 +215,7 @@ bpt_reset() {
           "$STUB"/gh-pr-list.out "$STUB"/gh-pr-list-*.out "$STUB"/gh-pr-view.out 2>/dev/null
     rm -rf "$STUB"/wt/* 2>/dev/null
     printf '[]' > "$STUB/actionable.json"
-    unset GH_FAIL STUB_THREAD_ID STUB_MESSAGE_ID STUB_ISSUE_NUMBER WT_NEW_FAIL
+    unset GH_FAIL STUB_THREAD_ID STUB_MESSAGE_ID STUB_ISSUE_NUMBER WT_NEW_FAIL STUB_CREATE_THREAD_FAIL
 }
 
 bpt_set_actionable()  { printf '%s' "$1" > "$STUB/actionable.json"; }

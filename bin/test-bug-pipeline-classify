@@ -23,13 +23,35 @@ bpt_run
 bpt_log_has  "$STUB" transition.log "dropped --class=not_a_thing" "not_a_thing → dropped"
 bpt_log_lacks "$STUB" calls.log "POST_TO_THREAD" "not_a_thing posts nothing to Discord"
 
-# ── bug + enough → queued --class=bug, no thread opened, NEVER hunting ─────────
+# ── bug + enough → thread opened, ack posted, thread_id persisted, NEVER hunting ──
 bpt_reset; bpt_set_actionable "$QUEUED"
 bpt_set_claude_result '{"class":"bug","bug_has_enough_info":true,"issue_title":"Box score wrong","severity":"medium"}'
 bpt_run
+bpt_log_has  "$STUB" calls.log "CREATE_THREAD" "bug+enough opens a thread"
+bpt_log_has  "$STUB" curl.log "Looks like a bug" "bug+enough posts the pickup ack"
 bpt_log_has  "$STUB" transition.log "queued --class=bug" "bug+enough → queued --class=bug"
-bpt_log_lacks "$STUB" calls.log "CREATE_THREAD" "bug+enough opens no thread"
+bpt_log_has  "$STUB" transition.log "--thread-id=880000000000000001" "bug+enough persists thread_id on the transition"
 bpt_log_lacks "$STUB" transition.log "hunting" "bug+enough never emits hunting"
+
+# ── ★ bug-fast-path ordering: create-thread → post-ack → queued transition ────
+bpt_reset; bpt_set_actionable "$QUEUED"
+bpt_set_claude_result '{"class":"bug","bug_has_enough_info":true,"issue_title":"Box score wrong","severity":"medium"}'
+bpt_run
+ct="$(order_of CREATE_THREAD)"; pt="$(order_of POST_TO_THREAD)"; tr_line="$(order_of TRANSITION)"
+if [ -n "$ct" ] && [ -n "$pt" ] && [ -n "$tr_line" ] && [ "$ct" -lt "$pt" ] && [ "$pt" -lt "$tr_line" ]; then
+    bpt_ok "bug-fast-path order: create-thread < post-ack < queued transition"
+else
+    bpt_fail "bug-fast-path order wrong (create=$ct post=$pt transition=$tr_line)"
+fi
+
+# ── ★ NEGATIVE — create-thread fails → transition still proceeds, no --thread-id ──
+bpt_reset; bpt_set_actionable "$QUEUED"
+bpt_set_claude_result '{"class":"bug","bug_has_enough_info":true,"issue_title":"Box score wrong","severity":"medium"}'
+STUB_CREATE_THREAD_FAIL=1 bpt_run
+bpt_log_has  "$STUB" calls.log "CREATE_THREAD" "create-thread was attempted"
+bpt_log_lacks "$STUB" calls.log "POST_TO_THREAD" "no thread_id → no ack posted"
+bpt_log_has  "$STUB" transition.log "queued --class=bug" "create-thread failure does NOT block the queued transition"
+bpt_log_lacks "$STUB" transition.log "--thread-id=" "create-thread failure → transition carries no --thread-id"
 
 # ── feature + new → create-thread then gathering ──────────────────────────────
 bpt_reset; bpt_set_actionable "$QUEUED"

@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/auth';
-import { assertNoPhpErrors, PHP_ERROR_PATTERNS } from '../helpers/php-errors';
+import { assertNoPhpErrors, PHP_ERROR_PATTERNS, PHP_WARNING_REGEX } from '../helpers/php-errors';
 import { triggerUpdater } from '../helpers/updater';
 
 // Admin-only page smoke tests — require roles_mask = 1 (ADMIN) on the test user.
@@ -20,6 +20,14 @@ test.describe('Admin page smoke tests', () => {
     // The page renders an Initialization section and a completion summary.
     expect(body).toContain('Initialization');
     expect(body).toMatch(/\d+\s+(steps?\s+completed|succeeded)/i);
+    // (20) QueueSimSummaryStep state (b): CI seed has sim 689 as 'done', so
+    // queuePendingIfAbsent returns false → noNewSimHtml() runs every time.
+    expect(body, 'updater output must contain state-(b) no-new-sim copy').toContain('No new sim to recap this run');
+    // (21) The step always renders a simSummaries.php viewer link (state a or b).
+    expect(body, 'updater output must contain a sim recap viewer href').toContain('simSummaries.php?sim=');
+    // (22) No PHP warnings, notices, or undefined-variable errors from the new step.
+    expect(body, 'PHP Warning in updater output').not.toMatch(PHP_WARNING_REGEX);
+    expect(body, 'Undefined variable/constant in updater output').not.toContain('Undefined');
   });
 
   test('admin GET to updateAllTheThings redirects to LCP without running pipeline', async ({

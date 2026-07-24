@@ -1,0 +1,185 @@
+{
+  "schema": "gate1-fastclass-share-multiseed-summary/v1",
+  "generated": "2026-07-24",
+  "what": "Matched-config re-measurement of gate-1 DRBPushSharePct, superseding ADR-0088's headline 12.37%.",
+  "test": "TestFastClassArmingShareBaseline (engine/internal/sim/fastclass_share_archive_test.go, -tags archive)",
+  "commit": "77b9be48b",
+  "READ_THIS_FIRST": "The per-run artifact JSON this test writes has NO era/corpus field (backlog J26). Corpus and era are recorded HERE, out-of-band. Do not cite a bare per-run artifact without its corpus.",
+  "config": {
+    "stride": 1,
+    "runs_per_invocation": 4,
+    "seed_block_note": "runs=4 consumes seed..seed+3; blocks MUST be spaced >=4 apart. A first replication at 20240602/03/04 overlapped the baseline block by 3/2/1 draws and was DISCARDED.",
+    "era": "recent-era 05-08 (seasons 05-06, 06-07, 07-08)"
+  },
+  "arms": {
+    "matched_98zip": {
+      "corpus": "recent-era 05-08 MINUS the two 07-08 zips added after the ADR-0088 publish moment (07-08_27_reg-sim16.zip, 07-08_28_reg-sim17.zip)",
+      "zips": 98,
+      "snapshots": 97,
+      "corpus_provenance": "VERIFIED not inferred: find -newermt '2026-07-21 10:28:42' AND the -newerct variant each return exactly those two zips; ctime agreeing rules out an in-place rewrite with preserved mtime.",
+      "purpose": "Config-matched to ADR-0088 (which also saw 97 snapshots) so the delta is a pure engine delta.",
+      "seed_blocks": [
+        {
+          "seed": 20240601,
+          "block": "20240601-20240604",
+          "snapshots": 97,
+          "total_possessions": 85851688,
+          "drb_push_class": 10683150,
+          "half_court": 75168538,
+          "drb_push_share_pct": 12.4437
+        },
+        {
+          "seed": 20240605,
+          "block": "20240605-20240608",
+          "snapshots": 97,
+          "total_possessions": 85781026,
+          "drb_push_class": 10640176,
+          "half_court": 75140850,
+          "drb_push_share_pct": 12.4039
+        },
+        {
+          "seed": 20240609,
+          "block": "20240609-20240612",
+          "snapshots": 97,
+          "total_possessions": 85813481,
+          "drb_push_class": 10653393,
+          "half_court": 75160088,
+          "drb_push_share_pct": 12.4146
+        },
+        {
+          "seed": 20240613,
+          "block": "20240613-20240616",
+          "snapshots": 97,
+          "total_possessions": 85832237,
+          "drb_push_class": 10667256,
+          "half_court": 75164981,
+          "drb_push_share_pct": 12.428
+        },
+        {
+          "seed": 20240617,
+          "block": "20240617-20240620",
+          "snapshots": 97,
+          "total_possessions": 85812761,
+          "drb_push_class": 10620746,
+          "half_court": 75192015,
+          "drb_push_share_pct": 12.3767
+        },
+        {
+          "seed": 20240621,
+          "block": "20240621-20240624",
+          "snapshots": 97,
+          "total_possessions": 85814725,
+          "drb_push_class": 10659239,
+          "half_court": 75155486,
+          "drb_push_share_pct": 12.4212
+        },
+        {
+          "seed": 20240625,
+          "block": "20240625-20240628",
+          "snapshots": 97,
+          "total_possessions": 85819853,
+          "drb_push_class": 10651237,
+          "half_court": 75168616,
+          "drb_push_share_pct": 12.4112
+        }
+      ],
+      "n": 7,
+      "mean_pct": 12.4142,
+      "sd_pct": 0.021,
+      "se_pct": 0.0079
+    },
+    "current_100zip": {
+      "corpus": "recent-era 05-08, all zips as of 2026-07-24",
+      "zips": 100,
+      "snapshots": 99,
+      "purpose": "Today's-truth corpus.",
+      "seed_blocks": [
+        {
+          "seed": 20240601,
+          "block": "20240601-20240604",
+          "snapshots": 99,
+          "total_possessions": 87577601,
+          "drb_push_class": 10909696,
+          "half_court": 76667905,
+          "drb_push_share_pct": 12.4572
+        },
+        {
+          "seed": 20240605,
+          "block": "20240605-20240608",
+          "snapshots": 99,
+          "total_possessions": 87504617,
+          "drb_push_class": 10865593,
+          "half_court": 76639024,
+          "drb_push_share_pct": 12.4172
+        },
+        {
+          "seed": 20240609,
+          "block": "20240609-20240612",
+          "snapshots": 99,
+          "total_possessions": 87538472,
+          "drb_push_class": 10879204,
+          "half_court": 76659268,
+          "drb_push_share_pct": 12.4279
+        },
+        {
+          "seed": 20240613,
+          "block": "20240613-20240616",
+          "snapshots": 99,
+          "total_possessions": 87557394,
+          "drb_push_class": 10893870,
+          "half_court": 76663524,
+          "drb_push_share_pct": 12.442
+        }
+      ],
+      "n": 4,
+      "mean_pct": 12.4361,
+      "sd_pct": 0.0174,
+      "se_pct": 0.0087,
+      "paired_corpus_delta_pct": 0.0135,
+      "paired_corpus_delta_sd_pct": 0.00031,
+      "paired_estimate_pct": 12.4277,
+      "CITE_THIS": "paired_estimate_pct (12.4277). The raw mean 12.4361 is biased HIGH: this arm ran only blocks 01/05/09/13, whose matched mean is +0.0065pp above the 7-block matched mean. The paired delta's SD is 0.00031 (~70x tighter than the seed SD), so the paired estimator is strictly more precise than extending this arm to its own n=7."
+    }
+  },
+  "attribution_bisect": {
+    "commit": "0df86dbdc (#1585 - after the 3pt diagnostic instruments, before the first 3pt port; test file byte-identical to master's)",
+    "config": "same matched 98-zip corpus, stride 1, seed 20240601",
+    "drb_push_share_pct": 12.3652,
+    "snapshots": 97,
+    "total_possessions": 85791332,
+    "window_84ff51085_to_0df86dbdc_pct": -0.0041,
+    "window_84ff51085_to_0df86dbdc_contents": "#1536 J17 foul coupling, #1575/#1576/#1585 instruments, #1582 - NEUTRAL (~0.2 seed-SD)",
+    "window_0df86dbdc_to_77b9be48b_pct": 0.049,
+    "window_0df86dbdc_to_77b9be48b_contents": "#1590 + #1593 (putback 3pt eligibility restore), #1595 (transition allow3pt=false gate removal). Only non-test internal/sim changes in range are possession.go, transition.go, outcome.go, freeze.go. #1594 touched only internal/calibrate/standinregistry.go, which internal/sim does not import.",
+    "verdict": "The entire gain is owned by FAITHFUL 5.60 ports - legitimate under ADR-0090's faithfulness rule, which forbids only gains from unfaithful mechanisms."
+  },
+  "harness_confound": "RULED OUT. git diff 84ff51085..77b9be48b on the test file is comments + one t.Logf band string, zero code change. #1582's seed-per-game fix touched only internal/calibrate tests plus a docblock-only hunk in sim/freeze.go.",
+  "floors": [
+    {
+      "name": "ADR-0090 re-open criterion #1",
+      "value": 12.42
+    },
+    {
+      "name": "ADR-0094 sqrt2-shrink of reproduced 1-season CI",
+      "value": 12.4216
+    },
+    {
+      "name": "ADR-0094 direct 2280-game 2-season bootstrap LB",
+      "value": 12.418
+    }
+  ],
+  "verdict": {
+    "supersedes": "ADR-0088 headline DRBPushSharePct = 12.37% (published artifact calibration-5.60-20260721-fastclass-share.json, 12.3693 at 84ff51085).",
+    "new_headline_pct": 12.4142,
+    "adr_0090_reopen_criterion_1": "NOT MET",
+    "detail": "Matched-config mean 12.4142 is -0.0058pp (-0.73 SE) below 12.42 and -0.0074pp (-0.94 SE) below 12.4216; 3 of 7 and 2 of 7 blocks respectively sit above. The current-corpus paired estimate 12.4277 is +0.77 SE above 12.4216. Every estimate is within +/-1 SE of the floor and the matched point estimate is BELOW it.",
+    "consequence": "Cut-over HOLD stands. ADR-0094 Verdict B untouched. No new ADR warranted for a non-event.",
+    "engine_did_move": "Yes: 12.3652 (0df86dbdc) -> 12.4142 (77b9be48b) = +0.0490pp, attributed by bisect to the faithful ports above.",
+    "refutes": "Backlog J24's prior 'direction is below 12.37, further from GO' claim. Its 11.81% (stride 8) and ~12.27% (stride 100) readings were ALL-ERA subsamples (720/8=87 and 720/100=8 snapshots), never band-comparable to a recent-era floor. The engine moved UP."
+  },
+  "seed_sd_correction": {
+    "observed_pct": 0.021,
+    "adr_0094_phase6_cited_pct": 0.012,
+    "guidance": "Use 0.021 as the gate-1 noise floor. Compatible at these n, but if ADR-0094 Phase 6's 8 seeds were spaced <4 apart they shared draws (the exact overlap bug caught and discarded this session), which would make 0.012 an underestimate."
+  }
+}

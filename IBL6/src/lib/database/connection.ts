@@ -36,7 +36,7 @@ class DatabaseConnection {
 
 	async query(text: string, params: unknown[] = []): Promise<mysql.RowDataPacket[]> {
 		const pool = await this.getPool();
-		const [rows] = await pool.execute(text, params);
+		const [rows] = await pool.execute(text, params as mysql.ExecuteValues);
 		return rows as mysql.RowDataPacket[];
 	}
 
@@ -47,13 +47,13 @@ class DatabaseConnection {
 
 	async execute(text: string, params: unknown[] = []): Promise<number> {
 		const pool = await this.getPool();
-		const [result] = await pool.execute(text, params);
+		const [result] = await pool.execute(text, params as mysql.ExecuteValues);
 		return (result as mysql.ResultSetHeader).affectedRows || 0;
 	}
 
 	async insert(text: string, params: unknown[] = []): Promise<number> {
 		const pool = await this.getPool();
-		const [result] = await pool.execute(text, params);
+		const [result] = await pool.execute(text, params as mysql.ExecuteValues);
 		return (result as mysql.ResultSetHeader).insertId || 0;
 	}
 

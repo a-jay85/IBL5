@@ -189,6 +189,7 @@ class RunResult:
     final_pr_state: str = ""
     retrospective: Optional[dict] = None
     error: Optional[str] = None
+    error_kind: Optional[str] = None   # stable HarnessError.kind of a FAILED run (e.g. "rebase-conflict")
     ledger: Optional[UsageLedger] = None
     audit: list[str] = field(default_factory=list)
 

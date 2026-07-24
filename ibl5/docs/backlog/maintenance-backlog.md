@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-07-07
+last_verified: 2026-07-24
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -23,7 +23,7 @@ Effort scale:
 - **M** — multi-step plan, 1-3 days, may touch several modules
 - **L** — refactor or platform shift, > 3 days, likely needs ADR
 
-**Status:** Complete — 15-axis audit, 312 findings (+2 post-audit follow-ups from the PR #1107 review, +1 from the #1066 reject-IDOR review → 315 tracked).
+**Status:** Complete — 15-axis audit, 312 findings (+2 post-audit follow-ups from the PR #1107 review, +1 from the #1066 reject-IDOR review → 315 tracked; +11 Axis-1 size seeds 1.21–1.31 from the hot-files comment→backlog migration 2026-07-24 → 326 tracked).
 
 ---
 
@@ -41,25 +41,25 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 > A file still >500 LOC after a ✅ does **not** reopen the finding when the finding's named concern was narrower than "shrink below 500 LOC"; residual size is noted, not re-flagged.
 
-### Roll-up (315 findings)
+### Roll-up (326 findings)
 
 | Status | Count |
 |--------|------:|
 | ✅ Implemented | 205 |
 | ◑ Partial | 27 |
 | 📋 Planned (plan queued / PR open) | 11 |
-| ⬜ Open | 64 |
+| ⬜ Open | 75 |
 | 🚫 Declined | 8 |
 
-> Status counts re-verified 2026-06-28 (exact, from the per-axis tables); **6.20 / 6.21 added 2026-06-29** from the PR #1107 review (⬜ Open +2); **6.22 added 2026-06-29** from the #1066 reject-IDOR review (⬜ Open +1). Four rows carry an **open PR that owns its own status-flip step**, so they still show their pre-merge glyph here and flip on that PR's merge — do **not** pre-flip them (the #1233 collision lesson): **2.6** (#1240), **2.31 / 2.32** (#1230), **5.18** (#1204). Two stale-Open rows were flipped directly (no plan owned them): **13.3**, **13.9** (✅ +2, ⬜ −2 vs the master re-count).
+> Status counts re-verified 2026-06-28 (exact, from the per-axis tables); **6.20 / 6.21 added 2026-06-29** from the PR #1107 review (⬜ Open +2); **6.22 added 2026-06-29** from the #1066 reject-IDOR review (⬜ Open +1). Four rows carry an **open PR that owns its own status-flip step**, so they still show their pre-merge glyph here and flip on that PR's merge — do **not** pre-flip them (the #1233 collision lesson): **2.6** (#1240), **2.31 / 2.32** (#1230), **5.18** (#1204). Two stale-Open rows were flipped directly (no plan owned them): **13.3**, **13.9** (✅ +2, ⬜ −2 vs the master re-count). **1.21–1.31 added 2026-07-24** from the hot-files comment→backlog migration (⬜ Open +11: 8 🟩 auto-mergeable, 3 🟨 conditional — 1.23/1.25/1.31 need characterization/endpoint pins).
 
 **Automouse-readiness of the not-yet-complete (⬜/◑/📋) items:**
 
 | Bucket | Count | What it means |
 |--------|------:|---------------|
-| 🟩 Auto-mergeable | ~103 | green-green + pinnable; arms unattended |
+| 🟩 Auto-mergeable | ~111 | green-green + pinnable; arms unattended |
 | 🟦 Safe, human-merge | 10 | gate-14 trigger (security / UI-UX / destructive schema) → `auto_merge: false` |
-| 🟨 Conditional | 34 | needs one mechanical-scope add, one upfront decision, or a collision-PR to merge first |
+| 🟨 Conditional | 37 | needs one mechanical-scope add, one upfront decision, or a collision-PR to merge first |
 | 🟥 Not automouse-safe | 1 | 12.11 — `git filter-repo` history rewrite (irreversible, coordinated) |
 
 (A few ✅ rows also carry a 🟩 for an *optional* residual burndown — e.g. PHPStan-rule baselines — so automouse tags slightly exceed the not-done count. Counts verified by grep of the per-axis tables; treat as ±2.)
@@ -96,6 +96,17 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 1.18 | ◑ Partial | 🟩 | StandingsUpdater. `82`→`League::REGULAR_SEASON_GAMES` DONE (refactor PR). echo→logger + `$log` removal DEFERRED: behavior-changing — echoes feed the rendered pipeline `capturedLog` (UpdateStandingsStep→UpdaterController); `$log` feeds admin-rendered `DebugOutput::display`. Needs a non-`refactor:` PR. |
 | 1.19 | ⬜ Open | 🟨 | `processPlrData`+`processPlrDataForYear` 80% duplicated; 510 LOC. `.plr` parse is engine-fidelity-critical → add characterization pins (mechanical scope) before merging the two paths, then 🟩. |
 | 1.20 | ✅ Implemented | 🟩 | SearchView 485 LOC string-concat. Extracted `renderResultList()` + ob_start migration; VR pin. |
+| 1.21 | ⬜ Open | 🟩 | RecordHoldersRepository 848 LOC — largest untracked class. 18 per-category record-query methods (single-game/season/team/franchise batches). Extract per-category query collaborators; green-green with DB-integration pins. Distinct from 1.1 (the RecordHolders *Service*, now 281 LOC). |
+| 1.22 | ⬜ Open | 🟩 | TradingView 606 LOC — offer-form/review/closed renderers + row/pick/cash builders in one view. Split into per-page views or extract row-builders; behavior-preserving golden-master pin. |
+| 1.23 | ⬜ Open | 🟨 | OneOnOneGameEngine 604 LOC — possession/shot-resolution simulation. Extract possession + shot-result collaborators, but sim-fidelity-critical → add characterization pins first (cf. 1.19). |
+| 1.24 | ⬜ Open | 🟩 | RecordHoldersView 578 LOC — 18 per-category block renderers. Extract per-category renderer collaborators / shared category-table builder; golden-master pin. Distinct from 1.1 (Service). |
+| 1.25 | ⬜ Open | 🟨 | BoxscoreProcessor 559 LOC — mutating .sco import pipeline; regular/all-star/rising-stars game processors in one class. Extract per-game-type processors; import-fidelity-critical → characterization pins first. Size finding only; the Processor→Service *rename* is separately declined at 2.5. |
+| 1.26 | ⬜ Open | 🟩 | BugReportRepository 546 LOC — 24 methods spanning claim/lease/transition state-machine + reporter-profile + queue queries. Split by query group; green-green with DB-integration pins. |
+| 1.27 | ⬜ Open | 🟩 | JsbImportRepository 539 LOC — 15 `upsert*`/`replace*` methods, one per imported record type. Group upserts by domain or extract per-entity collaborators; green-green DB pin. |
+| 1.28 | ⬜ Open | 🟩 | SeasonArchiveService 530 LOC — season-detail assembly mixing award/coach extraction + playoff-bracket building. Extract award-extraction and bracket collaborators; green-green. |
+| 1.29 | ⬜ Open | 🟩 | LastSimRecapView 518 LOC — 19 render methods (header/tabs/panels/injury/battles). Extract sub-view renderers; behavior-preserving golden-master pin. |
+| 1.30 | ⬜ Open | 🟩 | TradingService 516 LOC — page-data orchestration + offer-grouping + future-salary calc. Extract offer-grouping and salary collaborators; green-green. |
+| 1.31 | ⬜ Open | 🟨 | TradeRosterPreviewApiHandler 508 LOC — API handler mixing param validation + cash-row building + table render. Extract validation and cash-row collaborators; endpoint (request-handling) → add an E2E/characterization pin. |
 
 ### 1.15 YourAccountView — Six Inline SVG Icons + Six Page Variants
 **Location:** `ibl5/classes/YourAccount/YourAccountView.php` (548 lines)
@@ -118,6 +129,94 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Merge into one method with a mode enum; extract common loop body.
 **Est. effort:** S
 **Risk if untouched:** Bug fixes applied twice; optional param is an invisible branching point.
+
+### 1.21 RecordHoldersRepository — Oversized Query Repository (848 LOC)
+**Location:** `ibl5/classes/RecordHolders/RecordHoldersRepository.php` (848 lines)
+**Problem:** 18 methods, each a bespoke record-category query (`getTopPlayerSingleGameBatch`, `getTopTeamSingleGameBatch`, `getTopSeasonAverageBatch`, `getMostTitlesByType`, plus streak/margin/season-record getters). Cohesive but the single largest class in the codebase.
+**Suggested direction:** Extract per-category query collaborators (single-game vs season-average vs team vs franchise/title) behind the existing `RecordHoldersRepositoryInterface`, keeping the repo a thin aggregator.
+**Est. effort:** M
+**Risk if untouched:** Grows with every new record category; largest untracked class. Distinct from finding 1.1, whose concern was the RecordHolders *Service* (now 281 LOC), not this repository.
+**Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
+
+### 1.22 TradingView — Multi-Page Trade Renderer (606 LOC)
+**Location:** `ibl5/classes/Trading/TradingView.php` (606 lines)
+**Problem:** One view renders the offer form, trade review, and trades-closed pages and also builds player/pick/cash rows and roster previews — several page concerns plus row-building helpers in a single class.
+**Suggested direction:** Split into per-page views (offer / review / closed) or extract the row-builder helpers into a shared collaborator.
+**Est. effort:** M
+**Risk if untouched:** Every trade-page tweak inflates one class; row-building logic can't be reused. Distinct from 11.13 (a CSS `str_replace` fix, already done).
+**Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
+
+### 1.23 OneOnOneGameEngine — Monolithic Simulation Engine (604 LOC)
+**Location:** `ibl5/classes/OneOnOneGame/OneOnOneGameEngine.php` (604 lines)
+**Problem:** Possession loop, shot-type selection, shot-attempt resolution, rebound/block/steal/foul checks, and final-score rendering all live in one engine class.
+**Suggested direction:** Extract possession-resolution and shot-result collaborators; keep the engine as the orchestrator.
+**Est. effort:** M
+**Risk if untouched:** Simulation-fidelity-critical (like `PlrParserService`, 1.19) — a wrong extraction silently changes game outcomes; needs characterization pins before any refactor. 🟨 until those pins exist.
+**Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
+
+### 1.24 RecordHoldersView — Per-Category Block Renderer (578 LOC)
+**Location:** `ibl5/classes/RecordHolders/RecordHoldersView.php` (578 lines)
+**Problem:** 18 render methods, most one-per-record-category block builder (player single-game / full-season / playoff / heat, team-game / team-season / franchise, all-star), sharing only a category-table shell.
+**Suggested direction:** Extract per-category renderer collaborators or a parameterized shared category-table builder; golden-master pin.
+**Est. effort:** M
+**Risk if untouched:** Every new record category inflates the view. Distinct from finding 1.1 (the RecordHolders *Service*).
+**Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
+
+### 1.25 BoxscoreProcessor — Multi-Game-Type Import Pipeline (559 LOC)
+**Location:** `ibl5/classes/Boxscore/BoxscoreProcessor.php` (559 lines)
+**Problem:** One class parses and upserts regular, all-star, and rising-stars game lines from `.sco` files (`processGameLine`, `processAllStarGame`, `processRisingStarsGame`, `processGameUpsert`, `updateSimDates`) — a size/god-class concern.
+**Suggested direction:** Extract per-game-type processors behind a common interface; keep `BoxscoreProcessor` as the file-level dispatcher.
+**Est. effort:** M
+**Risk if untouched:** Import-fidelity-critical mutating pipeline — needs characterization pins before refactor (🟨). This is a **size** finding only; the separate Processor→Service *rename* was deliberately declined at 2.5 (mutating pipeline ⇒ `Processor` is the correct house name) and is not reopened here.
+**Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
+
+### 1.26 BugReportRepository — State-Machine + Profile + Queue in One Repo (546 LOC)
+**Location:** `ibl5/classes/BugPipeline/BugReportRepository.php` (546 lines)
+**Problem:** 24 methods spanning the claim/lease/transition state machine (`claimQueued`, `reclaimStaleLease`, `resumeBlockedHunt`, `transition`), reporter-profile upserts, and queue/conversation lookups.
+**Suggested direction:** Split into query-group collaborators (lease/claim vs profile vs transition/lookup) behind the existing interface.
+**Est. effort:** M
+**Risk if untouched:** The bug-pipeline's central repo keeps accreting query methods; green-green with DB-integration pins.
+**Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
+
+### 1.27 JsbImportRepository — One Upsert Per Record Type (539 LOC)
+**Location:** `ibl5/classes/JsbParser/JsbImportRepository.php` (539 lines)
+**Problem:** 15 `upsert*`/`replace*` methods, one per imported entity (transaction, history, all-star roster/score, award, draft result, retired player, HoF inductee, RCB records, PLB snapshot), all in one repo.
+**Suggested direction:** Group the upserts by domain or extract per-entity upsert collaborators; keep a thin aggregator.
+**Est. effort:** M
+**Risk if untouched:** Grows with every new JSB-imported record type; green-green with DB pins.
+**Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
+
+### 1.28 SeasonArchiveService — Season-Detail Assembly God Method (530 LOC)
+**Location:** `ibl5/classes/SeasonArchive/SeasonArchiveService.php` (530 lines)
+**Problem:** `getSeasonDetail` orchestrates award extraction, GM/coach resolution, playoff-bracket building, and finals/heat-champion derivation across a dozen private helpers in one service.
+**Suggested direction:** Extract an award-extraction collaborator and a playoff-bracket builder; keep the service as the assembler.
+**Est. effort:** M
+**Risk if untouched:** Season-detail logic concentrated in one service; green-green.
+**Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
+
+### 1.29 LastSimRecapView — 19-Method Recap Renderer (518 LOC)
+**Location:** `ibl5/classes/LastSimRecap/LastSimRecapView.php` (518 lines)
+**Problem:** 19 render methods build the recap slate (header, tabs, panels, verdict strip, quarter chart, injury groups, head-to-head battles, player rows) in one view.
+**Suggested direction:** Extract sub-view renderers (e.g. injury, battles, quarter-chart) behind the main view; behavior-preserving golden-master pin.
+**Est. effort:** M
+**Risk if untouched:** Every recap-UI addition inflates the view.
+**Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
+
+### 1.30 TradingService — Page-Data + Offer-Grouping + Salary Calc (516 LOC)
+**Location:** `ibl5/classes/Trading/TradingService.php` (516 lines)
+**Problem:** Assembles offer/review page data, groups trade offers, computes future salaries, and enriches offers with preview data across several private helpers in one service.
+**Suggested direction:** Extract an offer-grouping collaborator and a future-salary calculator; keep the service as the page-data assembler.
+**Est. effort:** M
+**Risk if untouched:** Trade page-data logic concentrated in one service; green-green.
+**Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
+
+### 1.31 TradeRosterPreviewApiHandler — Validation + Cash + Render in One Handler (508 LOC)
+**Location:** `ibl5/classes/Trading/TradeRosterPreviewApiHandler.php` (508 lines)
+**Problem:** One request handler validates params (`validateTeamID`, `validatePidList`, `validateCashAmount`, `validateStringParam`), builds cash rows, and renders the roster-preview table.
+**Suggested direction:** Extract a request-validation collaborator and a cash-row builder; keep `handle()` thin.
+**Est. effort:** M
+**Risk if untouched:** A request-handling API endpoint — a wrong extraction can alter validation behavior, so add an E2E/characterization pin before refactor (🟨).
+**Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
 
 ## Axis 2: Module Structure Inconsistency
 

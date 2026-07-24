@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-token-report — regression harness for bin/token-report's two fixes:
+#   1. Dedup: a repeated message.id must be counted once, not per duplicate line.
+#   2. Subagent inclusion: <proj>/<uuid>/subagents/*.jsonl must be summed too.
+#   3. Automouse exclusion: automouse/ subtree must stay out of totals.
+#   4. No-subagents graceful: project dir with no subagent dirs exits 0.
+#
+# Builds a synthetic TOKEN_REPORT_PROJ fixture tree, runs the real bin/token-report
+# against it, and asserts the **Total** row Input value. No live transcripts touched.
+# Requires jq (already a hard dependency of bin/token-report).
+#
+# Run: bin/test-token-report   (exit 0 = all pass, 1 = a case failed)
+set -u
+DIR="$(cd "$(dirname "$0")" && pwd)"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+FAILED=0
+
+# total_input <proj-dir> — run the report, echo the Input cell of the **Total** row.
+total_input() {
+    TOKEN_REPORT_PROJ="$1" "$DIR/token-report" --days 3650 \
+      | awk -F'|' '/\*\*Total\*\*/ { gsub(/ /, "", $3); print $3 }'
+}
+
+check() { # name want got
+    if [ "$3" = "$2" ]; then echo "ok: $1 (Total Input $3)"
+    else echo "FAIL: $1 — expected $2, got $3"; FAILED=1; fi
+}
+
+# Case 1 — dedup: one message.id (M1) written 3×, input 100 each. Expect 100, not 300.
+P1="$TMP/dedup"; mkdir -p "$P1"
+L='{"message":{"id":"M1","model":"claude-x","usage":{"input_tokens":100,"output_tokens":10}}}'
+printf '%s\n%s\n%s\n' "$L" "$L" "$L" > "$P1/main.jsonl"
+check "dedup collapses 3x message.id" 100 "$(total_input "$P1")"
+
+# Case 2 — subagent inclusion: main (input 100) + subagent (input 50). Expect 150.
+P2="$TMP/subs"; mkdir -p "$P2/1111-uuid/subagents"
+printf '%s\n' '{"message":{"id":"A","model":"m","usage":{"input_tokens":100}}}' > "$P2/main.jsonl"
+printf '%s\n' '{"message":{"id":"B","model":"m","usage":{"input_tokens":50}}}'  > "$P2/1111-uuid/subagents/sub.jsonl"
+check "subagent transcript is counted" 150 "$(total_input "$P2")"
+
+# Case 3 — automouse exclusion: add automouse subagent (input 999). Expect still 150.
+mkdir -p "$P2/automouse/aut-uuid/subagents"
+printf '%s\n' '{"message":{"id":"C","model":"m","usage":{"input_tokens":999}}}' \
+  > "$P2/automouse/aut-uuid/subagents/aut.jsonl"
+check "automouse subagent excluded" 150 "$(total_input "$P2")"
+
+# Case 4 — no-subagents graceful: project dir with no subagent dirs exits 0.
+P4="$TMP/nosubs"; mkdir -p "$P4"
+printf '%s\n' '{"message":{"id":"D","model":"m","usage":{"input_tokens":77}}}' > "$P4/main.jsonl"
+check "no-subagents dir exits 0 with correct total" 77 "$(total_input "$P4")"
+
+exit "$FAILED"

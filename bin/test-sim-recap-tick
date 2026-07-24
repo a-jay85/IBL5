@@ -343,7 +343,10 @@ if [ -f "$STUB/store.stdin" ]; then
     cat > "$_validate_php" << 'PHPEOF'
 <?php
 $ibl5Dir = $argv[1];
-require $ibl5Dir . '/vendor/autoload.php';
+$autoload = $ibl5Dir . '/vendor/autoload.php';
+if (file_exists($autoload)) {
+    require $autoload;
+}
 $localClassesDir = realpath($ibl5Dir . '/classes');
 if ($localClassesDir !== false) {
     spl_autoload_register(static function (string $class) use ($localClassesDir): void {

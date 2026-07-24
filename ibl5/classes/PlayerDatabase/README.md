@@ -1,3 +1,8 @@
+---
+description: Advanced multi-criteria player search with prepared-statement security, dynamic WHERE building, and PlayerData object results.
+last_verified: 2026-07-24
+---
+
 # PlayerDatabase Module
 
 **Status:** ✅ Complete (November 2025)

@@ -45,13 +45,13 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 | Status | Count |
 |--------|------:|
-| ✅ Implemented | 225 |
+| ✅ Implemented | 227 |
 | ◑ Partial | 26 |
 | 📋 Planned (plan queued / PR open) | 1 |
-| ⬜ Open | 69 |
+| ⬜ Open | 67 |
 | 🚫 Declined | 10 |
 
-> Status counts re-verified 2026-06-28 (exact, from the per-axis tables); **6.20 / 6.21 added 2026-06-29** from the PR #1107 review (⬜ Open +2); **6.22 added 2026-06-29** from the #1066 reject-IDOR review (⬜ Open +1). Two stale-Open rows were flipped directly (no plan owned them): **13.3**, **13.9** (✅ +2, ⬜ −2 vs the master re-count). **1.21–1.31 added 2026-07-24** from the hot-files comment→backlog migration (⬜ Open +11: 8 🟩 auto-mergeable, 3 🟨 conditional — 1.23/1.25/1.31 need characterization/endpoint pins). **Ground-truth audit 2026-07-24:** 7 stale-Open items flipped ✅, 2 false findings marked 🚫, 5 new Axis-1 rows seeded (1.32–1.36); IDOR PRs #1107–1110 merged 2026-06-29 (unblocking 2.10/2.13/2.14/2.25/7.7/14.6); PRs #1240/#1230/#1204 merged (2.6/2.31/2.32/5.18 already ✅/Open on own merits).
+> Status counts re-verified 2026-06-28 (exact, from the per-axis tables); **6.20 / 6.21 added 2026-06-29** from the PR #1107 review (⬜ Open +2); **6.22 added 2026-06-29** from the #1066 reject-IDOR review (⬜ Open +1). Two stale-Open rows were flipped directly (no plan owned them): **13.3**, **13.9** (✅ +2, ⬜ −2 vs the master re-count). **1.21–1.31 added 2026-07-24** from the hot-files comment→backlog migration (⬜ Open +11: 8 🟩 auto-mergeable, 3 🟨 conditional — 1.23/1.25/1.31 need characterization/endpoint pins). **Ground-truth audit 2026-07-24:** 7 stale-Open items flipped ✅, 2 false findings marked 🚫, 5 new Axis-1 rows seeded (1.32–1.36); IDOR PRs #1107–1110 merged 2026-06-29 (unblocking 2.10/2.13/2.14/2.25/7.7/14.6); PRs #1240/#1230/#1204 merged (2.6/2.31/2.32/5.18 already ✅/Open on own merits). **9.19 and 9.20 implemented 2026-07-24** — added READMEs to all 68 missing class dirs + frontmatter to all 16 existing class READMEs that lacked it; extended bin/check-docs IN_SCOPE_GLOBS (✅ +2, ⬜ −2); roll-up recomputed from grep (331 rows total, unchanged).
 
 **Automouse-readiness of the not-yet-complete (⬜/◑/📋) items:**
 
@@ -876,8 +876,8 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 9.16 | ✅ Implemented | — | REFACTORING_HISTORY archived (#1044). |
 | 9.17 | ✅ Implemented | — | PLR_VS_BOXSCORES hook added (#1044). |
 | 9.18 | ✅ Implemented | — | Coverage figures aligned (~80%/70%). |
-| 9.19 | ⬜ Open | 🟩 | 19 class READMEs exist; 70 of 89 dirs missing README (verified 2026-07-24). Additive docs (M top-10 / L all). |
-| 9.20 | ⬜ Open | 🟩 | 19 READMEs exist; 5 have frontmatter, 14 do not. Add frontmatter + extend IN_SCOPE_GLOBS in the same PR. Additive. |
+| 9.19 | ✅ Implemented | — | Added READMEs to all 68 class dirs that lacked one (2026-07-24); all new files carry doc-freshness frontmatter. |
+| 9.20 | ✅ Implemented | — | Added frontmatter to the 16 existing class READMEs that lacked it; extended bin/check-docs IN_SCOPE_GLOBS to include ibl5/classes/*/README.md (2026-07-24). |
 | 9.21 | ✅ Implemented | — | migrations/README stale FK removed (#1044). |
 | 9.22 | ✅ Implemented | 🟩 | Opportunistic-backfill README policy added to DOCUMENTATION_STANDARDS; docs-only. |
 | 9.23 | ✅ Implemented | — | IBL6/README replaced (#1044). |
@@ -908,6 +908,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Prioritize READMEs for top-10 modules; add to doc-freshness CI scope.
 **Est. effort:** M (top 10) / L (all)
 **Risk if untouched:** Agent reverse-engineers module from code; orientation tokens wasted.
+**Status:** Implemented 2026-07-24 — added READMEs to all 68 class dirs that lacked one (actual count after re-verification: 87 dirs, 19 existing, 68 missing); all new files carry frontmatter with description and last_verified; no invented behavior, no dead path references.
 
 ### 9.20 Most Class README Files Lack Frontmatter
 **Location:** `ibl5/classes/*/README.md`
@@ -915,6 +916,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Add frontmatter; extend `IN_SCOPE_GLOBS` to include them.
 **Est. effort:** S (frontmatter) / M (CI)
 **Risk if untouched:** Class READMEs silently become wrong.
+**Status:** Implemented 2026-07-24 — added frontmatter to the 16 existing class READMEs that lacked it (actual count: 3 of 19 already had frontmatter, not 5); extended bin/check-docs IN_SCOPE_GLOBS to include `ibl5/classes/*/README.md`; all 87 class READMEs now in CI scope.
 
 ### 9.24 `codebase-map.md` — Machine-Generated But No Auto-Regen
 **Location:** CLAUDE.md line 36 + repo-root `.claude/rules/codebase-map.md` (NOT under `ibl5/` — corrected 2026-05-29 audit)

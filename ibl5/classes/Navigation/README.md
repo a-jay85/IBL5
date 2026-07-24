@@ -1,3 +1,8 @@
+---
+description: Main site navigation bar (desktop and mobile) rendered via Repository/Service/View pattern with sub-views for teams, login, and menus.
+last_verified: 2026-07-24
+---
+
 # Navigation Module
 
 Renders the main site navigation bar (desktop + mobile) using the Repository/Service/View pattern.

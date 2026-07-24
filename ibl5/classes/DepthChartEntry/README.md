@@ -1,3 +1,8 @@
+---
+description: Depth chart submission form, validation, and database update for GM team management; positions and offensive sets simplified.
+last_verified: 2026-07-24
+---
+
 # Depth Chart Entry Module - Refactoring Documentation
 
 ## Overview

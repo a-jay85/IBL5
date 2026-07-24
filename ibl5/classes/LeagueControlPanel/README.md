@@ -1,3 +1,8 @@
+---
+description: Admin control panel for managing season phases, league toggles, and system-wide settings via the leagueControlPanel.php entry point.
+last_verified: 2026-07-24
+---
+
 # LeagueControlPanel Module
 
 Admin control panel for managing league settings, season phases, and system-wide toggles.

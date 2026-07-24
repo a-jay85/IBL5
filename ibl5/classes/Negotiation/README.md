@@ -1,3 +1,8 @@
+---
+description: Contract negotiation demand calculation, eligibility validation, and offer rendering — refactored from a 382-line procedural function.
+last_verified: 2026-07-24
+---
+
 # Contract Negotiation Refactoring - Summary
 
 ## Overview

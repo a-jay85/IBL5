@@ -1,3 +1,8 @@
+---
+description: Player data facade with specialized classes for contract calculation, validation, name decoration, injury dates, and stats repositories.
+last_verified: 2026-07-24
+---
+
 # Player Module
 
 ## Overview

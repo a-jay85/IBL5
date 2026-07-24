@@ -1,3 +1,8 @@
+---
+description: Fan-created one-on-one basketball mini-game (first to 21) with simulation engine, Discord result posting, and game replay support.
+last_verified: 2026-07-24
+---
+
 # One-on-One Module
 
 > **Note:** This is a fan-created mini-game. It is **not** a representation of how the Jump Shot Basketball (JSB) simulation engine works. The game mechanics here are original and should not be used to understand JSB logic.

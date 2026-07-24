@@ -1,3 +1,8 @@
+---
+description: Updater pipeline web entry point — triggered via the League Control Panel's "Update All The Things" button at scripts/updateAllTheThings.php.
+last_verified: 2026-07-24
+---
+
 # Updater
 
 The `classes/Updater/` pipeline (Controller → Service → View + Steps) has exactly one entry point: the root-level web POST endpoint `scripts/updateAllTheThings.php`.

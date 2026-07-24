@@ -97,7 +97,7 @@ Every **method-faithful** corrected bound — computed by the same percentile ru
 
 - **"~12.42 is un-derived, so elect a different bar."** Criterion-selection PREFERENCE; the provenance repair is to cite the computed 12.374, not to swap gates.
 - **"Master is inside the drift band, so elect the band."** ADR-0090 line 42 knowingly declined this; a wider *game* window yields a *tighter* floor, so the band is not the same kind of object.
-- **"Both sides are noisy, so use a two-sample overlap test."** A different gating object; the engine-side term is ~100× smaller (ADR-0049) and quantitatively immaterial.
+- **"Both sides are noisy, so use a two-sample overlap test."** A different gating object; the engine-side term is quantitatively immaterial. **[CORRECTED 2026-07-24 — see § Addendum. This bullet originally read "~100× smaller (ADR-0049)"; that was ADR-0049's own *corpus*-vs-seed ratio misapplied to this comparison, and it also divided a 1-SD engine spread by a ~1.96-SE CI half-width. Apples-to-apples is SE-to-SE: engine SD ≈0.016pp vs a real-world SE of ≈0.083pp (half-width 0.162 ÷ 1.96) — **~5×**, or ~4× at the conservative 0.021pp. The disposal is unaffected: it rests on the PREFERENCE classification, and the SD needed to reach 12.42 is 0.0255pp.]**
 - **"Resample seasons (n = 4) to widen the interval below 12.37."** The between-season spread is a secular *trend* (signal); an iid-season bootstrap treats a trend as exchangeable noise and inflates illegitimately.
 
 ## Measurement currency

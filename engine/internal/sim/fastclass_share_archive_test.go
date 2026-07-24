@@ -7,8 +7,25 @@
 // DRB-sourced fast breaks per §1d; HalfCourt = half-court jitter). No assertion
 // failure — the test logs shares and writes a dated artifact for human
 // interpretation. Gate-1 recent-era drift band: DRBPushSharePct ∈ [11.97, 12.54]
-// @216.58 poss/g (supersedes the all-era 209.2-denominated [12.94, 13.41]); master
-// 12.37% lands INSIDE — WITHIN-NOISE, see ADR-0088.
+// @216.58 poss/g (supersedes the all-era 209.2-denominated [12.94, 13.41]).
+//
+// Master reads 12.4142% (seed SD 0.0210, SE 0.0079, n=7 disjoint seed blocks;
+// matched 98-zip recent-era 05-08 corpus, stride 1, commit 77b9be48b, 2026-07-24)
+// — INSIDE the band but −0.73 SE BELOW ADR-0090's ≥12.42 re-open bar, so the
+// cut-over HOLD stands. This supersedes ADR-0088's 12.37%.
+//
+// The matched 98-zip corpus is canonical here BECAUSE it reproduces ADR-0088's
+// config; the current 100-zip corpus gives a seed-paired 12.4277, which clears
+// 12.42 but is still below ADR-0094's √2-shrink floor 12.4216. Verdict unchanged
+// on either corpus — see the multiseed artifact for both arms.
+//
+// ⚠ THIS ARTIFACT DOES NOT RECORD ITS CORPUS (backlog J26). A single run's
+// drb_push_share_pct is meaningless without the era + zip set it was measured on,
+// and the numbers above are a 7-seed MEAN — one run will not reproduce them
+// (observed seed SD 0.0210pp; runs=4 consumes seed..seed+3, so replication seeds
+// must be spaced ≥4 apart or they share draws). Corpus, seed blocks, floors, and
+// the bisect attribution live out-of-band in
+// internal/validate/testdata/calibration-5.60-20260724-fastclass-share-matched-multiseed.json.
 //
 // Reuses listZipsP0, readSnapshotP0, envIntP0 from
 // possessionclock_baseline_archive_test.go (same package sim, same build tag).
@@ -51,9 +68,11 @@ type fastClassShareArtifact struct {
 	// J24 gate-1 share: DRBPushSharePct is the single band-comparable code-7 share
 	// (gated {2,3,4}s survivors, steal- AND DRB-sourced merged per §1d). Recent-era
 	// between-season drift band [11.97, 12.54] @216.58 poss/g (per-season chunks
-	// 04-08 = [11.97, 12.47, 12.54, 12.53]). Master 12.37% is INSIDE — WITHIN-NOISE,
-	// NOT a clean GO (-0.05pp under the tightest 2-season CI floor ≈12.42; ADR-0088).
-	// Supersedes the mis-denominated all-era 209.2 floor [12.94, 13.41].
+	// 04-08 = [11.97, 12.47, 12.54, 12.53]). Master 12.4142% (7-seed mean, matched
+	// 98-zip corpus, 77b9be48b) is INSIDE — WITHIN-NOISE, NOT a clean GO (-0.006pp,
+	// -0.73 SE, under ADR-0090's ≥12.42 re-open bar). Supersedes ADR-0088's 12.37%
+	// and the mis-denominated all-era 209.2 floor [12.94, 13.41]. NOTE: this struct
+	// records no era/corpus field (backlog J26) — a bare artifact is uninterpretable.
 }
 
 func TestFastClassArmingShareBaseline(t *testing.T) {
@@ -137,5 +156,8 @@ func TestFastClassArmingShareBaseline(t *testing.T) {
 		art.DRBPushSharePct, total.DRBPushClass)
 	t.Logf("  half-court share:     %.2f%% (%d possessions)",
 		art.HalfCourtSharePct, total.HalfCourt)
-	t.Logf("  J24 gate-1 band: DRBPushSharePct recent-era drift band [11.97, 12.54]%% @216.58 poss/g (merged code-7 share; master 12.37%% INSIDE, superseded floor 12.94)")
+	t.Logf("  corpus: %s (%d snapshots) — READ THIS: the band below is recent-era 05-08; it does NOT apply to any other corpus", dir, snapshots)
+	t.Logf("  J24 gate-1 band: DRBPushSharePct recent-era drift band [11.97, 12.54]%% @216.58 poss/g (merged code-7 share; superseded floor 12.94)")
+	t.Logf("  master reference: 12.4142%% (seed SD 0.0210, SE 0.0079, n=7; matched 98-zip corpus, stride 1, 77b9be48b) — INSIDE the band, but −0.73 SE BELOW ADR-0090's ≥12.42 re-open bar; HOLD stands. Supersedes ADR-0088's 12.37%%.")
+	t.Logf("  ⚠ one run is NOT comparable to that mean (seed SD 0.0210pp) and this artifact records no corpus — see calibration-5.60-20260724-fastclass-share-matched-multiseed.json")
 }

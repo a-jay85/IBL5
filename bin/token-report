@@ -36,39 +36,47 @@ esac
 PROJ="${TOKEN_REPORT_PROJ:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5}"
 [ -d "$PROJ" ] || { echo "No project transcript dir: $PROJ" >&2; exit 1; }
 
-# Top-level session transcripts only (maxdepth 1) — the automouse/ subdir holds
-# nightly logs, not interactive sessions.
-file_count=$(find "$PROJ" -maxdepth 1 -type f -name '*.jsonl' -mtime -"$DAYS" | wc -l | tr -d ' ')
+# Interactive session transcripts: top-level sessions (maxdepth 1) plus subagent
+# transcripts nested at <session>/subagents/*.jsonl (depth 3). The automouse/
+# subtree holds nightly logs, not interactive sessions, and stays excluded.
+file_count=$( { find "$PROJ" -maxdepth 1 -type f -name '*.jsonl' -mtime -"$DAYS"; \
+                find "$PROJ" -mindepth 3 -maxdepth 3 -type f -name '*.jsonl' -path '*/subagents/*' ! -path '*/automouse/*' -mtime -"$DAYS"; \
+              } | wc -l | tr -d ' ')
 echo "# Token report — last $DAYS days"
 echo
 if [ "$file_count" -eq 0 ]; then
     echo "No session transcripts modified in the last $DAYS days under $PROJ."
     exit 0
 fi
-echo "_Source: $file_count interactive session transcript(s) under \`$PROJ\` (by file mtime)._"
+echo "_Source: $file_count session + subagent transcript file(s) under \`$PROJ\` (by file mtime)._"
 echo
 echo "| Model | Input | Cache-write | Cache-read | Output |"
 echo "|---|---:|---:|---:|---:|"
 
-find "$PROJ" -maxdepth 1 -type f -name '*.jsonl' -mtime -"$DAYS" -exec cat {} + \
+{ find "$PROJ" -maxdepth 1 -type f -name '*.jsonl' -mtime -"$DAYS" -exec cat {} +; \
+  find "$PROJ" -mindepth 3 -maxdepth 3 -type f -name '*.jsonl' -path '*/subagents/*' ! -path '*/automouse/*' -mtime -"$DAYS" -exec cat {} +; \
+} \
   | jq -rc -R '
       try fromjson catch null
       | select(. != null)
       | (.message.usage // .usage) as $u
       | select($u != null)
       | (.message.model // .model // "unknown") as $m
+      | (.message.id // .uuid // "no-id") as $mid
       | (if ($u.iterations | type) == "array" and ($u.iterations | length) > 0
          then $u.iterations else [$u] end) as $its
-      | $its[]
-      | [ (.model // $m),
-          (.input_tokens // 0),
-          (.cache_creation_input_tokens // 0),
-          (.cache_read_input_tokens // 0),
-          (.output_tokens // 0) ] | @tsv
+      | range($its | length) as $i
+      | $its[$i] as $it
+      | [ ($mid + "::" + ($i | tostring)),
+          ($it.model // $m),
+          ($it.input_tokens // 0),
+          ($it.cache_creation_input_tokens // 0),
+          ($it.cache_read_input_tokens // 0),
+          ($it.output_tokens // 0) ] | @tsv
     ' \
   | awk -F'\t' '
-      { i[$1]+=$2; cw[$1]+=$3; cr[$1]+=$4; o[$1]+=$5
-        iT+=$2; cwT+=$3; crT+=$4; oT+=$5 }
+      !seen[$1]++ { i[$2]+=$3; cw[$2]+=$4; cr[$2]+=$5; o[$2]+=$6
+        iT+=$3; cwT+=$4; crT+=$5; oT+=$6 }
       END {
         for (m in i) printf "| %s | %d | %d | %d | %d |\n", m, i[m], cw[m], cr[m], o[m]
         printf "| **Total** | %d | %d | %d | %d |\n", iT, cwT, crT, oT

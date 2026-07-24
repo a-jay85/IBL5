@@ -1,6 +1,6 @@
 ---
-description: Read-on-demand detail for agent-tiering — the skip-vs-spawn heuristic, Fable approval-gate procedure, flat-fan-out (nested sub-agent) rationale, orchestrator context economics (delegate-don't-dismiss, split-don't-self-clear), and per-tier prompt style. Loads only when editing workflow orchestration defs.
-last_verified: 2026-07-20
+description: Read-on-demand detail for agent-tiering — the skip-vs-spawn heuristic, Fable approval-gate procedure (incl. the asm-level static-RE exception where Fable is the recommended tier), flat-fan-out (nested sub-agent) rationale, orchestrator context economics (delegate-don't-dismiss, split-don't-self-clear), and per-tier prompt style. Loads only when editing workflow orchestration defs.
+last_verified: 2026-07-23
 paths:
   - ".claude/skills/**/*.md"
 ---
@@ -39,6 +39,16 @@ Each sub-agent costs ~3–5K tokens (system prompt + rules + memory, loaded befo
 - **Recommendation**: a clear "I'd use Fable here" / "Opus is probably fine, flagging it" — not a neutral survey.
 
 Absent approval, proceed on Opus (or the correct lower tier) — flag and continue, don't block. Approval covers that one task; a new task re-triggers the gate. Because Fable is a last resort, any actual intent to run on Fable is itself a genuine fork — **always** use `AskUserQuestion` to get the explicit yes *before* selecting it; never proceed on Fable from an inline suggestion alone.
+
+### Exception — asm-level static RE (JSB engine): Fable is the *recommended* tier, not merely last-resort
+
+For **asm-level static reverse-engineering** — the class the Fable row names (argument-binding derivations, NaN/FPU-flag paths, encoded operands; e.g. pinning a `FUN_*`/`+0xNNN` operand or a faithful-vs-divergent port verdict from `objdump`/decompile) — Fable is not a ceiling-raise, it is the **empirically-warranted** tier, because Opus has a **track record of provably-false conclusions here**. Precedents: the 2026-07-23 J24 putback-3pt misread (Ghidra mis-numbered params because `param_6` was a `double` consuming two stack slots → an Opus session recorded, shipped, and then had to *reverse* a remove-the-gate change across an ADR, a golden regen, and test rebaselines) and the 2026-07-07 foul-divisor pin (a Fable session overturned an Opus-era "requires live debugging" premise). One wrong asm verdict that ships costs far more than Fable's ~2× — the redo loop dwarfs the per-call delta.
+
+**How to apply** (the gate still holds — surface the suggestion, get the explicit `AskUserQuestion` yes; never self-select):
+
+- **Prefer Fable from the start** when the RE's load-bearing step *is* the asm derivation (the token-efficient path — it avoids the redo loop rather than paying to unwind it).
+- **Otherwise, Fable-verify before recording** — if Opus drafts the RE, a `model: "fable"` sub-agent should check the faithful-vs-divergent / NOT-A-LEVER verdict *before* it lands in the backlog, an ADR, or a port. The `advisor()` tool cannot be repointed to Fable, so this verification is a spawned Fable sub-agent, not an advisor call.
+- **Not for the empirical layer** — measured A/B sweeps, corpus statistics, and CI-floor construction are **not** this class (Opus/measurement is correct there; Fable's edge is asm reads, not arithmetic). Scope this exception to conclusions whose proof is a disassembly, not a measurement.
 
 ## Boundary keys on task type, not model capability
 

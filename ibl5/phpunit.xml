@@ -272,6 +272,9 @@
         <testsuite name="PageLayout Module Tests">
             <directory>tests/PageLayout</directory>
         </testsuite>
+        <testsuite name="GameBoxscore Module Tests">
+            <directory>tests/GameBoxscore</directory>
+        </testsuite>
     </testsuites>
     <groups>
         <exclude>

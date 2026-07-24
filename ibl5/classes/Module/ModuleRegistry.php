@@ -25,6 +25,7 @@ final class ModuleRegistry
         'FranchiseRecordBook',
         'FreeAgency',
         'FreeAgencyPreview',
+        'GameBoxscore',
         'GMContactList',
         'Injuries',
         'LeagueStarters',

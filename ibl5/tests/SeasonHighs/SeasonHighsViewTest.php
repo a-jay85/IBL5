@@ -99,7 +99,7 @@ class SeasonHighsViewTest extends TestCase
 
         $html = $this->view->render('Regular Season', $data);
 
-        $this->assertStringContainsString('2024-12-15-game-3/boxscore', $html);
+        $this->assertStringContainsString('modules.php?name=GameBoxscore&amp;date=2024-12-15&amp;game=3', $html);
     }
 
     public function testRenderHandlesEmptyData(): void
@@ -147,7 +147,7 @@ class SeasonHighsViewTest extends TestCase
         ];
         $html = $this->view->renderHomeAwayHighs('Regular Season', $data, []);
 
-        $this->assertStringContainsString('2024-12-15-game-2/boxscore', $html);
+        $this->assertStringContainsString('modules.php?name=GameBoxscore&amp;date=2024-12-15&amp;game=2', $html);
     }
 
     public function testRenderHomeAwayHighsHidesDiscrepanciesWhenEmpty(): void

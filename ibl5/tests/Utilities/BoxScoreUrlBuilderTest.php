@@ -13,7 +13,7 @@ class BoxScoreUrlBuilderTest extends TestCase
     {
         $url = BoxScoreUrlBuilder::buildUrl('2025-01-15', 3);
 
-        $this->assertStringContainsString('2025-01-15-game-3/boxscore', $url);
+        $this->assertStringContainsString('modules.php?name=GameBoxscore&date=2025-01-15&game=3', $url);
     }
 
     public function testBuildUrlFallsBackToLegacyBoxIdUrl(): void
@@ -23,11 +23,11 @@ class BoxScoreUrlBuilderTest extends TestCase
         $this->assertSame('./ibl/IBL/box545.htm', $url);
     }
 
-    public function testBuildUrlPrefersIbl6OverLegacy(): void
+    public function testBuildUrlPrefersInternalOverLegacy(): void
     {
         $url = BoxScoreUrlBuilder::buildUrl('2025-01-15', 3, 545);
 
-        $this->assertStringContainsString('2025-01-15-game-3/boxscore', $url);
+        $this->assertStringContainsString('modules.php?name=GameBoxscore&date=2025-01-15&game=3', $url);
         $this->assertStringNotContainsString('box545', $url);
     }
 
@@ -59,11 +59,11 @@ class BoxScoreUrlBuilderTest extends TestCase
         $this->assertSame('./ibl/IBL/box545.htm', $url);
     }
 
-    public function testBuildUrlContainsBaseUrl(): void
+    public function testBuildUrlIsInternalModuleUrl(): void
     {
         $url = BoxScoreUrlBuilder::buildUrl('2025-03-10', 1);
 
-        $this->assertStringStartsWith('https://', $url);
+        $this->assertStringStartsWith('modules.php?name=GameBoxscore', $url);
     }
 
     public function testBuildUrlWithDifferentGameNumbers(): void
@@ -71,7 +71,7 @@ class BoxScoreUrlBuilderTest extends TestCase
         $url1 = BoxScoreUrlBuilder::buildUrl('2025-01-15', 1);
         $url5 = BoxScoreUrlBuilder::buildUrl('2025-01-15', 5);
 
-        $this->assertStringContainsString('-game-1/', $url1);
-        $this->assertStringContainsString('-game-5/', $url5);
+        $this->assertStringContainsString('&game=1', $url1);
+        $this->assertStringContainsString('&game=5', $url5);
     }
 }

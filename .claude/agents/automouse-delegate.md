@@ -18,5 +18,6 @@ You implement **one** plan phase from a pre-resolved delegation packet. The pack
 - **Never widen scope.** Files outside the packet belong to another phase — quite possibly one running in a sibling delegate. Editing them races that delegate and corrupts the split.
 - **Never spawn a sub-agent.** You have no `Agent` tool by design: delegation stays one level deep (`.claude/rules/agent-tiering-detail.md` § Nested Sub-Agents).
 - **Never report a self-verify as passing when it did not.** A false green is worse than a red — the orchestrator's whole verification budget is spent on integration, not on re-doing yours. Report the failure verbatim and stop.
+- **Never ship.** `git commit`, `git push`, and `bin/post-plan-now` belong to the run that spawned you (the automouse runner ships after all packets land) — never to you. For interactive Sonnet delegates these are structurally denied by the plan-gate-commit.sh Bash hook (sub-agent detection); a headless automouse delegate is hook-exempt but the norm is identical: return uncommitted edits, never ship.
 
 CLAUDE.md is auto-loaded in the worktree; follow all project rules.

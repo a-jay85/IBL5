@@ -20,13 +20,17 @@ Blocking checks on PHPUnit tests:
                      #[Group('database')] — the attribute is NOT inherited, so
                      it would run in the no-DB job and fail. Abstract base
                      classes are exempt.
+  set-accessible     Reflection setAccessible() — a no-op since PHP 8.1 and
+                     deprecated since 8.5 (fatal in PHP 9). getValue()/invoke()
+                     already reach private members; delete the call.
 
 Modes:
   (no args)  Scan all ibl5/tests/**/*.php
   --pr       Scan only files changed vs origin/master
 
 Exceptions (inline allow markers, reason >= 20 chars):
-  // phpunit-hygiene-allow: <reason>             (mark-test-skipped; on the
+  // phpunit-hygiene-allow: <reason>             (mark-test-skipped and
+                                                 set-accessible; on the
                                                  matched or preceding line)
   // phpunit-hygiene-allow-no-db-group: <reason> (no-db-group; anywhere in file)
 
@@ -85,26 +89,39 @@ has_inline_allow() {
 BLOCKING_HITS=()
 BLOCKING_TOTAL=0
 
+# ONE `grep -nH` over the whole file set — never a per-file loop. A per-file
+# `< <(grep ...)` over ~1k files corrupts bash 3.2's heap on macOS
+# (nondeterministic SIGABRT/SIGBUS), and a second such pass reliably crashed it.
+# `-H` forces the filename prefix even when SCAN_FILES holds a single file (--pr),
+# so the `file:lineno:line` parse below is uniform. `--` keeps a pattern starting
+# with `-` (e.g. `->foo`) from being read as an option flag.
 run_pattern() {
   local severity="$1"
   local label="$2"
   shift 2
-  local grep_args=("$@")
 
-  for f in "${SCAN_FILES[@]}"; do
-    while IFS=: read -r line_num matched_line; do
-      [ -z "$line_num" ] && continue
-      if has_inline_allow "$matched_line" "$f" "$line_num"; then
-        continue
-      fi
-      local rel="${f#"$ROOT/"}"
-      local entry="[$label] $rel:$line_num: $matched_line"
-      if [ "$severity" = "blocking" ]; then
-        BLOCKING_HITS+=("$entry")
-        BLOCKING_TOTAL=$((BLOCKING_TOTAL + 1))
-      fi
-    done < <(grep -nE "${grep_args[@]}" "$f" 2>/dev/null || true)
-  done
+  local out
+  out=$(grep -nH -E -- "$@" "${SCAN_FILES[@]}" 2>/dev/null || true)
+  [ -n "$out" ] || return 0
+
+  local hit f rest line_num matched_line rel entry
+  while IFS= read -r hit; do
+    [ -n "$hit" ] || continue
+    # Split only the first two fields — a matched line may itself contain colons.
+    f="${hit%%:*}"
+    rest="${hit#*:}"
+    line_num="${rest%%:*}"
+    matched_line="${rest#*:}"
+    if has_inline_allow "$matched_line" "$f" "$line_num"; then
+      continue
+    fi
+    rel="${f#"$ROOT/"}"
+    entry="[$label] $rel:$line_num: $matched_line"
+    if [ "$severity" = "blocking" ]; then
+      BLOCKING_HITS+=("$entry")
+      BLOCKING_TOTAL=$((BLOCKING_TOTAL + 1))
+    fi
+  done <<< "$out"
 }
 
 # --- Per-file check: concrete DatabaseTestCase subclass missing #[Group('database')] ---
@@ -141,13 +158,13 @@ check_db_group() {
 }
 
 # === BLOCKING patterns (exit 1 if any found) ===
-# check_db_group runs FIRST (on a clean heap). run_pattern's per-file process
-# substitutions over the whole tree leave bash 3.2's heap in a state where a
-# following subprocess-heavy pass crashes (SIGABRT/SIGBUS); the cheap report that
-# follows run_pattern is fine, so ordering the heavier scan ahead of it avoids it.
+# Every check below is whole-fileset-grep based (one subprocess per pass), so
+# ordering no longer matters — see the bash 3.2 heap note on run_pattern for why
+# per-file grep loops are banned here.
 
 check_db_group
 run_pattern blocking "mark-test-skipped" 'markTestSkipped\('
+run_pattern blocking "set-accessible" '->setAccessible\('
 
 # --- Report ---
 if [ "$BLOCKING_TOTAL" -eq 0 ]; then
@@ -181,10 +198,12 @@ echo "FAIL: $BLOCKING_TOTAL blocking hits across ${#HIT_FILES[@]} files."
 
 has_skip=false
 has_dbgroup=false
+has_setaccessible=false
 for hit in "${BLOCKING_HITS[@]}"; do
   case "$hit" in
     *"[mark-test-skipped]"*) has_skip=true ;;
     *"[no-db-group]"*)       has_dbgroup=true ;;
+    *"[set-accessible]"*)    has_setaccessible=true ;;
   esac
 done
 
@@ -200,6 +219,12 @@ if [ "$has_dbgroup" = true ]; then
   echo "inherited from DatabaseTestCase; without it the test runs in the no-DB 'test'"
   echo "job and fails. For a class that legitimately must not carry it, add a file-level"
   echo "marker: // phpunit-hygiene-allow-no-db-group: <reason >= 20 chars>"
+fi
+if [ "$has_setaccessible" = true ]; then
+  echo ""
+  echo "[set-accessible] Reflection setAccessible() has been a no-op since PHP 8.1 and is"
+  echo "DEPRECATED since 8.5 (fatal in PHP 9) — it emits a deprecation on every run."
+  echo "getValue()/setValue()/invoke() already reach private members: delete the call."
 fi
 echo ""
 echo "See .claude/rules/phpunit-tests.md."

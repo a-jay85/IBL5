@@ -1,7 +1,7 @@
 ---
 description: PHPUnit testing rules: output parsing, behavior-focused patterns.
 paths: ibl5/tests/**/*.php
-last_verified: 2026-06-11
+last_verified: 2026-07-24
 ---
 
 # PHPUnit Testing Rules
@@ -65,6 +65,7 @@ class ModuleServiceTest extends TestCase
 - **NEVER** `createMock()` with no `expects()` — use `createStub()` (mocks without expectations emit a notice).
 - **NEVER** `ReflectionClass` for private methods — test via public APIs; if a private method needs direct testing, extract it to a class with a public interface.
 - **NEVER** `markTestSkipped()` to silently disable — delete instead. Sole exception: integration-availability skip (service unreachable) with an inline `// phpunit-hygiene-allow: <reason ≥20 chars>` marker; `bin/check-phpunit-hygiene` enforces this.
+- **NEVER** `setAccessible(true)` on a `ReflectionProperty`/`ReflectionMethod` — a no-op since PHP 8.1 and **deprecated since 8.5** (fatal in PHP 9). `getValue()`/`invoke()` already reach private members; just delete the call. `bin/check-phpunit-hygiene` enforces this.
 - **NEVER** assert full SQL structure (columns, WHERE, bind strings) except in security tests. For void writes, `assertQueryExecuted('table_name')` verifies the target table was hit — don't match beyond the table name.
 
 ## Mock vs Stub

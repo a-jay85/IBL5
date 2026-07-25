@@ -3,7 +3,7 @@
 #
 # bin/test-check-phpunit-hygiene — regression test for bin/check-phpunit-hygiene.
 #
-# Pins TWO checks the gate enforces:
+# Pins THREE checks the gate enforces:
 #   mark-test-skipped  markTestSkipped() is a blocking hit; an inline
 #                      `// phpunit-hygiene-allow:` marker suppresses it.
 #   no-db-group        a CONCRETE class extending DatabaseTestCase that lacks
@@ -11,13 +11,22 @@
 #                      is not inherited; without it the test runs in the no-DB
 #                      job and fails). An `abstract` base class is exempt, as is
 #                      a class carrying `// phpunit-hygiene-allow-no-db-group:`.
+#   set-accessible     a Reflection `->setAccessible(` call is a blocking hit —
+#                      a no-op since PHP 8.1, deprecated since 8.5 (fatal in
+#                      PHP 9), so it emits a deprecation on every suite run. An
+#                      inline `// phpunit-hygiene-allow:` marker suppresses it.
 #
 # Each case builds a throwaway git repo under mktemp (check-phpunit-hygiene
 # resolves its scan root from `git rev-parse --show-toplevel`) with a single
 # fixture under ibl5/tests/, runs the gate in MODE=all from inside, and asserts
-# the exit code + output. MODE=all exercises the same per-file check logic as
+# the exit code + output. MODE=all exercises the same pattern-matching logic as
 # --pr; only the file-set builder differs, and that is unchanged pre-existing
 # code.
+#
+# BLIND SPOT: every fixture repo holds ONE file, so this test cannot exercise the
+# gate at scale — the bash 3.2 heap crash that a per-file grep loop in
+# run_pattern triggers over ~1k files is invisible here. After touching
+# run_pattern, also run `bin/check-phpunit-hygiene` on the real tree.
 #
 # Run: bin/test-check-phpunit-hygiene  (exit 0 = all pass, 1 = a case failed)
 
@@ -142,6 +151,48 @@ use PHPUnit\Framework\TestCase;
 class PlainTest extends TestCase
 {
     public function testThing(): void {}
+}'
+
+# --- New: set-accessible check ------------------------------------------------
+
+run_case "set-accessible-flagged" 1 'set-accessible' "ibl5/tests/ReflectTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class ReflectTest extends TestCase
+{
+    public function testThing(): void
+    {
+        $prop = (new \ReflectionClass($this))->getProperty("x");
+        $prop->setAccessible(true);
+    }
+}'
+
+run_case "set-accessible-marker-suppresses" 0 '-' "ibl5/tests/ReflectMarkedTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class ReflectMarkedTest extends TestCase
+{
+    public function testThing(): void
+    {
+        // phpunit-hygiene-allow: pinned here to characterize the 8.5 deprecation itself
+        $prop->setAccessible(true);
+    }
+}'
+
+# A `setAccessible` that is not a method call on a Reflection object must not hit —
+# the pattern anchors on `->` so a same-named local/string is left alone.
+run_case "set-accessible-word-only-ok" 0 '-' "ibl5/tests/NoReflectTest.php" \
+'<?php
+namespace Tests\X;
+use PHPUnit\Framework\TestCase;
+class NoReflectTest extends TestCase
+{
+    public function testThing(): void
+    {
+        $this->assertSame("setAccessible(true)", $doc);
+    }
 }'
 
 if [ "$FAILED" -ne 0 ]; then

@@ -301,7 +301,6 @@ class ScheduleUpdaterTest extends TestCase
 
         $reflection = new \ReflectionClass($updater);
         $prop = $reflection->getProperty('basePath');
-        $prop->setAccessible(true);
 
         $this->assertSame($customPath, $prop->getValue($updater), 'explicit $basePath must override AppPaths::root()');
     }

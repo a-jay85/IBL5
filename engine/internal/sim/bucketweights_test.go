@@ -603,6 +603,91 @@ func TestBucketWeights_ThreePtFallbackUnchanged(t *testing.T) {
 	}
 }
 
+// TestFoulBucketWeightScalesLinearly asserts that all three return branches of
+// foulBucketWeight are a pure multiplication by scale. Re-seeding with rng.New for
+// each call is load-bearing: a shared rng would consume different draws on the floor-
+// redraw path and break the identity for reasons unrelated to the seam.
+//
+// Cases drive from the same inputs as the existing foul-bucket tests above:
+//   - "normal/plain-w": balanced matchup → return w * scale (path 3).
+//   - "hca-home": ±hca legs shift base and offQ, but still return w * scale (path 3).
+//   - "mq-shrink": net-advantage shrink < 1, still path 3.
+//   - "floor-redraw/w<=0": weak-STL def + low-TOV off → factor ≤ 0 → floor redraw
+//     (return r.Float64() * foulFloor * scale, path 2).
+//   - "offQ<=0/guard": hca=100 drives Σ(tovRate−hca) < 0 → early return (path 1).
+//     Unreachable in production (floor1 keeps tovRate > 0 for realistic hca); directly
+//     testable by passing an extreme hca.
+func TestFoulBucketWeightScalesLinearly(t *testing.T) {
+	bh := oc(slotPG, mkPlayer(1, 3, slotPG, 48))
+	off := fiveStarters(3)
+	def := fiveStarters(7)
+
+	// Floor-redraw inputs from TestBucketWeights_FoulDivisor (confirmed reachable).
+	weakDef := fiveStarters(7)
+	for i := range weakDef {
+		weakDef[i].STL = 1
+	}
+	loOff := fiveStarters(3)
+	for i := range loOff {
+		loOff[i].TVR = 1
+	}
+
+	cases := []struct {
+		name string
+		bh   onCourt
+		off  []onCourt
+		def  []onCourt
+		hca  float64
+		mq   float64
+		seed uint64
+	}{
+		{"normal/plain-w", bh, off, def, 0, 0, 1},
+		{"hca-home", bh, off, def, hcaMagnitude, 0, 1},
+		{"mq-shrink", bh, off, def, 0, 5.0, 1},
+		{"floor-redraw/w<=0", loOff[0], loOff, weakDef, 0, 0, 5},
+		{"offQ<=0/guard", bh, off, def, 100, 0, 1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			a := foulBucketWeight(tc.bh, tc.off, tc.def, tc.hca, tc.mq, rng.New(tc.seed), foulBucketScale)
+			b := foulBucketWeight(tc.bh, tc.off, tc.def, tc.hca, tc.mq, rng.New(tc.seed), 2*foulBucketScale)
+			if math.Abs(b-2*a) > 1e-12 {
+				t.Fatalf("doubling scale gave %v, want 2×%v=%v (missed multiplication site)", b, a, 2*a)
+			}
+		})
+	}
+}
+
+// TestAndOneBucketWeightRespondsToScale asserts two properties of the
+// andOneMadeRateScale seam:
+//
+//  1. Liveness: increasing scale raises the output when the computed weight is above
+//     the andOneBucketFloor (the common case for realistic FGP ratings).
+//
+//  2. Floor clamp is scale-invariant: when both scale values yield a weight below
+//     andOneBucketFloor, the floor is returned regardless of scale. Note that
+//     floor1(FGP=0)=1 (floor1 floors all ratings at 1), so the scale term never
+//     truly vanishes — but with mq=0 and floor1(FGP)=1, both
+//     0*0.25+1*andOneMadeRateScale=0.0008 and
+//     0*0.25+1*10×andOneMadeRateScale=0.008 are under the 0.03 floor, so
+//     the floor clamp fires for both and the output is scale-invariant.
+func TestAndOneBucketWeightRespondsToScale(t *testing.T) {
+	// Liveness: FGP=48, mq=0.5. Weights are 0.1634 and 0.2018 — both above the floor.
+	bh := oc(slotPG, mkPlayer(1, 3, slotPG, 48))
+	lo := andOneBucketWeight(0.5, bh, andOneMadeRateScale)
+	hi := andOneBucketWeight(0.5, bh, 2*andOneMadeRateScale)
+	if !(hi > lo) {
+		t.Fatalf("scale has no effect: lo=%v hi=%v (seam is dead)", lo, hi)
+	}
+
+	// Floor-clamp invariance: FGP=0 (floor1=1), mq=0. Both calls yield
+	// 0*0.25+1*scale < andOneBucketFloor (0.03) → floor returned, not the scale term.
+	zeroFGP := oc(slotPG, mkPlayer(2, 3, slotPG, 0))
+	if andOneBucketWeight(0, zeroFGP, andOneMadeRateScale) != andOneBucketWeight(0, zeroFGP, 10*andOneMadeRateScale) {
+		t.Fatal("scale leaked into the floor-clamp path (floor must be scale-invariant)")
+	}
+}
+
 // TestTwoPtBucketWeightUnchangedAfterTwoPARateExtraction asserts that extracting
 // twoPARate from twoPtBucketWeight was behavior-preserving. It pins the expected
 // output for three canonical cases so the test fails if the extraction changed d88.

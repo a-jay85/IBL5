@@ -278,6 +278,9 @@
         <testsuite name="GameBoxscore Module Tests">
             <directory>tests/GameBoxscore</directory>
         </testsuite>
+        <testsuite name="SimRecap Module Tests">
+            <directory>tests/SimRecap</directory>
+        </testsuite>
     </testsuites>
     <groups>
         <exclude>

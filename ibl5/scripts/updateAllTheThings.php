@@ -267,6 +267,10 @@ try {
             $plrService, $jsbRepo, $season->endingYear, $sourceResolver,
         ));
         $updaterService->addStep(new Updater\Steps\RefreshIblHistStep($mysqli_db));
+        $updaterService->addStep(new Updater\Steps\QueueSimSummaryStep(
+            new \SimRecap\SimSummaryRepository($mysqli_db),
+            new \Season\SeasonQueryRepository($mysqli_db),
+        ));
     }
 
     $controller = new Updater\UpdaterController($updaterService, $view);

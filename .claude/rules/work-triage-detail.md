@@ -1,6 +1,6 @@
 ---
-description: Read-on-demand detail for work-triage — measurement context for the inline-Opus leak, hard-trigger gate properties (sub-agent exemption, per-turn scoping, escape hatch), and repeat-polling spend rationale.
-last_verified: 2026-07-22
+description: Read-on-demand detail for work-triage — measurement context for the inline-Opus leak, ADR-0067 gateway framing, hard-trigger gate properties (sub-agent exemption, per-turn scoping, escape hatch, self-test), inline-vs-delegated criteria, safety-mirror backstop, and repeat-polling spend rationale.
+last_verified: 2026-07-25
 paths:
   - ".claude/rules/work-triage.md"
   - "~/.claude/hooks/plan-gate-edit.sh"
@@ -13,6 +13,8 @@ Read-on-demand companion to `work-triage.md` (always-loaded).
 ## Execution routing context
 
 The measured leak (2026-07-07): ~90% of Opus main-thread calls were mechanical; 44% of sessions breached 150K context — the dumb-zone delegation rules exist to prevent this. An ad-hoc verdict silently defaulting to "the Opus session implements inline" is exactly what the Sonnet-execution-routing rule guards against.
+
+The user should never have to ask "is this big enough for a `/plan`?" — that judgment is yours to volunteer. This is the **gateway** of the deployment funnel (ADR-0067): everything downstream flows from this call.
 
 ## Hard trigger
 
@@ -31,6 +33,8 @@ The prose routing guidance in `work-triage.md` is a judgment call, and judgment 
 - **Fails open** on a malformed payload; never blocks editing because a field was missing.
 - **Escape hatch, deliberately loud:** `touch /tmp/claude-sweep-override-<prompt_id>` (example) releases it for that turn. Legitimate when the edits are genuinely *entangled* with the design — for example authoring a rule doc, its detail companion, and the ADR recording the decision together. Using it silently defeats the gate: **say out loud that you're overriding and why**, in the same turn.
 
+Self-test: `bash ~/.claude/hooks/test-plan-gate-edit.sh`
+
 ## Repeat-polling
 
 A poll loop re-reads the full context every call (~81K tokens); eight 60s checks burns ~650K tokens vs ~81K for one deferred check. **Never poll on the main thread.**
@@ -38,3 +42,15 @@ A poll loop re-reads the full context every call (~81K tokens); eight 60s checks
 **Instead:** `run_in_background: true` + Monitor (re-invokes on completion, main thread free), or ScheduleWakeup matched to the expected completion time (one ~480s wakeup for a CI run beats eight 60s checks). Avoid repeated `gh pr checks` / `gh run watch` inline loops — both re-read full context per call.
 
 **Headless exception:** no re-invocation in headless/automouse — block until exit or structure as sequenced plan phases. See `agent-tiering-detail.md`.
+
+## Safety mirror backstop
+
+Whatever still ships ad-hoc is caught at PR time by `/post-plan` Phase 6.5 condition (9) — but designing it in the plan beats relying on the backstop. The safety-mirror trigger list in `work-triage.md` routes security work into `/plan` *before* the backstop exists; losing it strands the backstop as the only protection.
+
+## Inline vs. delegated
+
+Stay inline (Opus edits directly) only when:
+- the edits and the design are genuinely **entangled** — writing the recipe would mean making each edit-level judgment anyway, so the handoff buys nothing; or
+- the chunk is **trivial** — a one-or-two-edit change where the sub-agent's fixed spawn cost (~3–5K tokens, `agent-tiering-detail.md` § Skip the Agent) exceeds the work being moved.
+
+Either way the routing decision is **stated, not silent** — one line, like the triage verdict. The user should see which way it went and be able to override in the moment.

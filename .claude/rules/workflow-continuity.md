@@ -1,6 +1,6 @@
 ---
-description: All work happens in a worktree (never the main checkout); where plans live (~/claude-plans/<branch-slug>.md, outside the repo); worktree setup and the implementation→/post-plan handoff (auto-fired in a detached fresh session) for any verified-complete worktree work, plan-driven or ad-hoc.
-last_verified: 2026-07-24
+description: All work happens in a worktree (never the main checkout); where plans live (~/claude-plans/<branch-slug>.md, outside the repo); worktree setup; and post-plan handoff triggers — when to auto-fire, do-NOT-commit-first, and only-when-verified-clean. Engine internals: workflow-continuity-detail.md.
+last_verified: 2026-07-25
 ---
 
 # Workflow Continuity Rule
@@ -37,20 +37,13 @@ Use `--base <branch>` for stacked PRs. Work in `IBL5-worktrees/<slug>/ibl5/` (wo
 
 Never run `/post-plan` **inline** — it re-reads full implementation context every phase, so an inline run after a long session (especially Opus) costs several times a fresh run. Run it in a **fresh** session, cwd = this worktree.
 
-### Interactive sessions — auto-fire the handoff
-
-For **any** verified-complete unit of work in a worktree — plan-driven **or ad-hoc**. When it has verified clean and only the mechanical push + open-PR remains, that ship step needs **no** confirmation prompt — do **not** ask "want me to push and open the PR?". The global "confirm before outward-facing actions" default is **durably overridden here**: shipping verified-complete worktree work is pre-authorized. Final action:
+For **any** verified-complete unit of work in a worktree — plan-driven **or ad-hoc** — when it has verified clean and only the mechanical push + open-PR remains, that ship step needs **no** confirmation prompt. Do **not** ask "want me to push and open the PR?". The global "confirm before outward-facing actions" default is **durably overridden here**: shipping verified-complete worktree work is pre-authorized. Final action:
 
 ```bash
 bin/post-plan-now --auto
 ```
 
-(Ad-hoc branch with no plan file → post-plan runs plan-blind; expected, not an error. The merge-arming decision still happens at `/post-plan` Phase 6.5, so auto-opening the PR never auto-merges a `feat:`/`auto_merge: false`/visual PR without human signoff.)
-
-This spawns a detached, launchd-supervised post-plan run on this branch (survives you closing Claude Code). Engine: the **compiled post-plan harness** (`tools/postplan-harness`, deterministic sequencer + bounded LLM calls; `bin/post-plan-now` pins the MAIN-CHECKOUT copy, never the worktree's — ADR-0092) when present, falling back to a fresh **Sonnet 4.6** `/post-plan` skill session if the harness fails or is absent (`POST_PLAN_SKILL=1` forces the skill). Notes:
-
 - **Do NOT commit first.** Leave the worktree **dirty** — `/post-plan` commits the uncommitted tree in Phase 2 and opens the PR. Committing here changes what it ships.
 - **Only fire when verification passed.** If implementation did **not** verify clean (failing tests, unresolved blocker, you stopped to ask the user something), do **not** fire — leave the worktree dirty and hand off in prose. Turn-end ≠ done; that judgment is yours.
-- **No deadlock.** `/post-plan` resolves the plan from the branch slug (no handoff file needed); the detached child reparents under launchd and clears its own plan-gate independently.
 
-`--auto` adds one safety gate (a bare `bin/post-plan-now` skips it — running it by hand IS the decision to ship): it **skips** when already inside a headless/automouse run (the automouse runner fires post-plan itself). It no longer holds post-plan for a "risky" plan — post-plan **always** runs and opens the PR. Whether the PR then **auto-merges** is decided at `/post-plan` Phase 6.5, which honors a plan's `auto_merge: false` (see `/plan` Step 4) and otherwise leaves the PR open for a human to merge.
+Engine (harness vs. Sonnet skill fallback), what `--auto`'s skip gate does, plan-blind ad-hoc runs, and where auto-merge is armed: `.claude/rules/workflow-continuity-detail.md`.

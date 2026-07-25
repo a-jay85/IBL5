@@ -79,9 +79,15 @@ build_plist() {
 		<key>DB_NAME</key>
 		<string>iblhoops_ibl5</string>
 		<!-- launchd agents start with a minimal PATH that omits Homebrew; claude, php,
-		     curl, git must resolve. No API-key env var — claude uses ambient CLI auth. -->
+		     curl, git must resolve. No API-key env var — claude uses ambient CLI auth.
+		     ~/.local/bin is where the Claude Code NATIVE installer puts the claude
+		     binary — omitting it is not a cosmetic gap: every tick then dies rc=127
+		     inside timeout, which reads downstream as "the agent produced nothing". That
+		     silently killed this pipeline for days. HOME interpolates HERE, at
+		     generation time — launchd does NOT expand variables in
+		     EnvironmentVariables, so a literal $HOME would bake in a dead path. -->
 		<key>PATH</key>
-		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${HOME}/.local/bin</string>
 		<key>BUG_PIPELINE_ISSUE_REPO</key>
 		<string>${BUG_PIPELINE_ISSUE_REPO}</string>
 		<key>BUG_PIPELINE_APPROVER_ID</key>

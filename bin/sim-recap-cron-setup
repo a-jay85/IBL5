@@ -81,9 +81,15 @@ build_plist() {
 	<key>EnvironmentVariables</key>
 	<dict>
 		<!-- launchd agents start with a minimal PATH that omits Homebrew; claude, ssh,
-		     mysql, git must resolve. No API-key env var — claude uses ambient CLI auth. -->
+		     mysql, git must resolve. No API-key env var — claude uses ambient CLI auth.
+		     ~/.local/bin is where the Claude Code NATIVE installer puts the claude
+		     binary — omitting it is not a cosmetic gap: the tick then dies rc=127
+		     inside timeout, which generate() reads as "no payload" and parks, burning an
+		     attempt per poll (sim 721, 2026-07-25). HOME interpolates HERE, at
+		     generation time — launchd does NOT expand variables in
+		     EnvironmentVariables, so a literal $HOME would bake in a dead path. -->
 		<key>PATH</key>
-		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${HOME}/.local/bin</string>
 		<key>SIM_RECAP_SSH_HOST</key>
 		<string>${SIM_RECAP_SSH_HOST:-}</string>
 		<key>SIM_RECAP_REMOTE_ROOT</key>

@@ -284,6 +284,19 @@ main() {
         esac
     done
 
+    # Preflight: the agent binary must actually resolve, BEFORE anything claims a
+    # sim. An unresolvable $SIM_RECAP_CLAUDE_BIN makes `timeout` exit 127, which
+    # generate() cannot tell apart from "the agent ran and produced nothing" — so
+    # it parks and burns an attempt, every poll, until parkOrFail's ceiling marks
+    # the sim permanently `failed`. That is exactly what happened when the Claude
+    # Code native installer moved `claude` to ~/.local/bin, off the launchd PATH
+    # (sim 721, 2026-07-25). Abort loudly instead: a broken environment must cost
+    # zero attempts.
+    if ! command -v "$SIM_RECAP_CLAUDE_BIN" >/dev/null 2>&1; then
+        log "ERROR: agent binary '$SIM_RECAP_CLAUDE_BIN' not found on PATH ($PATH) — aborting tick (no sim claimed)"
+        return 1
+    fi
+
     if [ "$DRY_RUN" -eq 1 ]; then
         dry_run
         return $?

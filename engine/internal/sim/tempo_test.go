@@ -52,7 +52,7 @@ func TestPossessionTime_FallbackBounds(t *testing.T) {
 // pt/2, so pt/2 + pt/2 = pt), and the rare {3..23} redraw on the trunc(pt) hit
 // does not materially move that mean at 100000+ draws. baseTime=13.65 is a
 // representative in-range base_time (the pre-J24-Phase-5 center) — not the
-// shipped baseTimeMid (17.7, tempo.go); the shipped center's mean is separately
+// shipped baseTimeMid (16.0, tempo.go, J25 faithful walkback); the shipped center's mean is separately
 // pinned by TestPossessionStepDistributionPin_Current (possession_pace_pin_test.go).
 func TestPossessionTime_JitterMeanPreservation(t *testing.T) {
 	r := rng.New(1)

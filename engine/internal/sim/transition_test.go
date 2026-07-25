@@ -354,8 +354,8 @@ func TestPossession_PendingConsumedOnStageTwoFail(t *testing.T) {
 // deterministic (mirroring TestTransitionTriggers_Boundary), isolating the
 // flag from Stage-3 (transitionStealSucceeds) and from the step-value overlap
 // between the DRB-push support {2,3,4} and the half-court jitter's support
-// [3,27] (widened from [3,23] by the J24 Phase 5 NO-GO baseTimeMid re-center,
-// 13.65 -> 17.7 — see possession_pace_pin_test.go Pin A) — asserting on
+// [3,24] (narrowed from [3,27] by the J25 faithful 16.0 walkback,
+// baseTimeMid 17.7 -> 16.0 — see possession_pace_pin_test.go Pin A) — asserting on
 // gs.drbPushFired directly sidesteps that overlap.
 
 // alwaysTransitionTeams builds offense (TransOff=transitionTriggerDenom,
@@ -394,7 +394,7 @@ func TestDRBPushGate_FiresSetsFlag(t *testing.T) {
 // TestDRBPushGate_FailsClearsFlag is required assertion (b): a Stage-2
 // gate-fail (TransOff=0) with prev == possDRB must leave gs.drbPushFired
 // false, asserted on the flag itself — NOT on the drawn step value, since the
-// DRB-push support {2,3,4} overlaps the half-court jitter's support [3,27] at
+// DRB-push support {2,3,4} overlaps the half-court jitter's support [3,24] at
 // steps 3-4 (a purely observational split would be ambiguous there).
 func TestDRBPushGate_FailsClearsFlag(t *testing.T) {
 	for seed := uint64(1); seed <= 300; seed++ {

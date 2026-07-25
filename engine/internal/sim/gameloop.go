@@ -85,8 +85,10 @@ func simGameWith(b bundle.Bundle, g bundle.Game, r *rng.RNG, opts Options) (resu
 
 	// base_time is CONSTANT per game in 5.60 — the composite ratio is dead code
 	// (u = 0; tempo.go const block, J24 Phase 0). This retired the ADR-0042
-	// roster-dependent teamBaseTime stand-in. baseTimeMid is the provisional
-	// center until the Phase 5 GO installs the faithful 16.0. But base_time being
+	// roster-dependent teamBaseTime stand-in. baseTimeMid is now the faithful
+	// 16.0 (J25 walkback: u=0 ⇒ the [13,16] ceiling; installed on faithfulness
+	// grounds, not pace-match — the fast-class arming-share gap is still open).
+	// But base_time being
 	// a per-game constant does NOT mean the possession step is: each possession
 	// draws its OWN jittered length from it (FUN_004e42e0 half-court step class,
 	// J24 Phase 2 — see possessionTime's docblock); the steal (Phase 3) and

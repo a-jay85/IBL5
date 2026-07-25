@@ -751,14 +751,15 @@ func TestSimulate_InjuryRateBand(t *testing.T) {
 	}
 
 	perGame := float64(injuries) / float64(n)
-	// J24 Phase 5 NO-GO re-center (baseTimeMid 13.65 -> 17.7, tempo.go) check:
-	// still within the Phase-3 band [0.15, 0.30], no re-baseline needed. The
-	// slower half-court step pulls possession (and so turnover) count back
-	// down — measured directly on this fixture/seed: turnovers/game dropped
-	// from the previously-documented ~35.5/game to ~31.9/game, and
-	// injuries/game landed at ~0.21/game, comfortably inside [0.15,0.30] with
-	// margin on both sides. See below for the observed value.
-	t.Logf("injuries/game = %.4f (turnovers/game = %.2f) — J24 Phase 5 re-center, band [0.15, 0.30]",
+	// J25 faithful 16.0 re-center (baseTimeMid 17.7 -> 16.0, tempo.go) check:
+	// still within the Phase-3 band [0.15, 0.30], no re-baseline needed.
+	// At the retired 17.7 center this fixture/seed measured turnovers/game 27.71
+	// and injuries/game 0.1783 (the previously-documented ~31.9/~0.21 pair was
+	// stale). The J25 walkback to the faithful 16.0 raises them to
+	// turnovers/game 30.40, injuries/game 0.1833 — turnovers rise with possession
+	// count, as expected. Both remain comfortably inside the UNCHANGED [0.15,0.30]
+	// band with margin on both sides. See below for the observed value.
+	t.Logf("injuries/game = %.4f (turnovers/game = %.2f) — J25 faithful 16.0 center, band [0.15, 0.30]",
 		perGame, float64(turnovers)/float64(n))
 	if perGame < 0.15 || perGame > 0.30 {
 		t.Errorf("injuries/game = %.4f (%d over %d games), want corpus band [0.15, 0.30] "+

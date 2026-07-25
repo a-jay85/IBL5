@@ -1,0 +1,255 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# bin/test-backlog-open — regression harness for bin/backlog-open.
+# Uses inline heredoc fixtures only — never asserts counts or IDs against live
+# backlogs, since backlog-archive-sweep rewrites them regularly.
+# Run: bin/test-backlog-open   (exit 0 = all passed, 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+FILTER="$SCRIPT_DIR/backlog-open"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+FAILED=0
+
+# ── test helpers ─────────────────────────────────────────────────────────────
+
+run() {
+    printf '%s\n' "$1" > "$TMP/fixture.md"
+    "$FILTER" "$TMP/fixture.md" > "$TMP/out" 2> "$TMP/err"
+    RC=$?
+}
+
+assert_has() {
+    if grep -qF -- "$2" "$TMP/out"; then
+        echo "ok: $1"
+    else
+        echo "FAIL: $1 — expected output to contain: $2"
+        FAILED=1
+    fi
+}
+
+assert_lacks() {
+    if grep -qF -- "$2" "$TMP/out"; then
+        echo "FAIL: $1 — expected output NOT to contain: $2"
+        FAILED=1
+    else
+        echo "ok: $1"
+    fi
+}
+
+# ── fixtures ─────────────────────────────────────────────────────────────────
+
+# TABLE_FIXTURE: maintenance-backlog.md shape — 2-cell roll-up count table,
+# 4-cell work-item axis table, then detail bodies.
+TABLE_FIXTURE='### Roll-up (4 findings)
+
+| Status | Count |
+|--------|------:|
+| ✅ Implemented | 2 |
+| ⬜ Open | 2 |
+
+| ID | Status | Priority | Description |
+|----|--------|----------|-------------|
+| 1.1 | ✅ Implemented | — | Resolved finding |
+| 1.2 | ⬜ Open | 🟨 | Open finding |
+| 1.3 | ◑ Partial | 🟨 | Partial finding |
+| 1.4 | 📋 Planned | 🟩 | Planned finding |
+| 1.5 |  | 🟨 | No status cell |
+| 1.6 | Weird status | 🟨 | Unknown glyph |
+
+### 1.1 Resolved Detail
+
+Body of resolved finding.
+
+### 1.2 Open Detail
+
+Body of open finding.
+
+### 13.7b Letter-Suffixed ID
+
+Body of letter-suffixed finding (open — no row → no rowstat entry, no bodystat).
+
+### Some Title Without An ID
+
+Body of ID-less heading.'
+
+# BODY_FIXTURE: loop-engineering-backlog.md shape — 5-cell summary table with
+# Status in col 3, body **Status** lines, ➜ archive pointers, and a section
+# resolved only by its body **Status** line (no matching table row).
+BODY_FIXTURE='| # | Title | Status | Automouse | Effort |
+|---|-------|--------|-----------|-------:|
+| L1 | Plan dependency DAG | ⬜ Open | 🟦 | M |
+| L2 | Per-plan circuit breaker | ✅ Implemented | — | S |
+| L3 | No-status-body section | ⬜ Open | 🟦 | S |
+
+### L1 Plan dependency DAG
+
+**Status (2026-07-07):** ⬜ Open — 🟦.
+
+### L2 Per-plan circuit breaker
+➜ L2 Per-plan circuit breaker — ✅ Implemented (2026-07-15): see [archive](archive/loop-engineering-backlog-archive.md).
+
+### L3 No status line at all
+
+**Delivered:** n/a
+**Open (2026-07-07):** awaiting design.
+
+### L4 Resolved by body only
+
+**Status (2026-07-02):** ✅ Implemented — shipped in #1400.'
+
+# FENCE_FIXTURE: a fenced block containing a fake resolved heading and row must
+# be treated as opaque — the fence content emits while the real resolved row
+# (above the fence) is dropped. Note cells differ so assert_has/assert_lacks
+# fire on distinct needles.
+FENCE_FIXTURE='| ID | Status | Priority | Note |
+|----|--------|----------|------|
+| 1.1 | ✅ Implemented | — | resolved-summary |
+| 2.1 | ⬜ Open | 🟨 | open-summary |
+
+### 2.1 Open Section
+
+This open section contains a fenced block with a fake resolved entry.
+
+| 1.1 | ✅ Implemented | — | real-row |
+
+```bash
+### 1.1 Resolved Detail
+| 1.1 | ✅ Implemented | — | fenced-row |
+```'
+
+# ── cases ────────────────────────────────────────────────────────────────────
+
+# Case 1: open row and its detail body emitted
+run "$TABLE_FIXTURE"
+assert_has "1-open-row-emitted"       "| 1.2 | ⬜ Open | 🟨 | Open finding |"
+assert_has "1-open-body-emitted"      "### 1.2 Open Detail"
+
+# Case 2: resolved row and its detail body removed
+run "$TABLE_FIXTURE"
+assert_lacks "2-resolved-row-removed"  "| 1.1 | ✅ Implemented | — | Resolved finding |"
+assert_lacks "2-resolved-body-removed" "### 1.1 Resolved Detail"
+assert_lacks "2-resolved-body-content" "Body of resolved finding."
+
+# Case 3: ◑ and 📋 rows emitted
+run "$TABLE_FIXTURE"
+assert_has "3-partial-row-emitted"    "| 1.3 | ◑ Partial |"
+assert_has "3-planned-row-emitted"    "| 1.4 | 📋 Planned |"
+
+# Case 4: open body-status section emitted
+run "$BODY_FIXTURE"
+assert_has "4-open-body-section"      "### L1 Plan dependency DAG"
+assert_has "4-open-status-line"       "**Status (2026-07-07):** ⬜ Open"
+
+# Case 5: ➜ … ✅ pointer removed
+run "$BODY_FIXTURE"
+assert_lacks "5-arrow-resolved-removed" "➜ L2 Per-plan circuit breaker"
+
+# Case 6: section resolved by body **Status** line only (no table row) removed
+run "$BODY_FIXTURE"
+assert_lacks "6-body-only-resolved-heading" "### L4 Resolved by body only"
+assert_lacks "6-body-only-resolved-content" "shipped in #1400"
+
+# Case 7: fail-open — empty and unrecognized status cells emitted
+run "$TABLE_FIXTURE"
+assert_has "7-empty-status-emitted"   "| 1.5 |  | 🟨 |"
+assert_has "7-unknown-glyph-emitted"  "| 1.6 | Weird status |"
+
+# Case 8: fail-open — ID-less ### section emitted
+run "$TABLE_FIXTURE"
+assert_has "8-idless-heading-emitted" "### Some Title Without An ID"
+
+# Case 9: fail-open — section with no **Status line emitted
+run "$BODY_FIXTURE"
+assert_has "9-no-status-section"      "### L3 No status line at all"
+
+# Case 10: fail-open — 2-cell roll-up row carrying ✅ emitted
+run "$TABLE_FIXTURE"
+assert_has "10-rollup-count-emitted"  "| ✅ Implemented | 2 |"
+
+# Case 11: fail-open — letter-suffixed ID (13.7b) treated as valid ID; emitted
+run "$TABLE_FIXTURE"
+assert_has "11-letter-suffix-emitted" "### 13.7b Letter-Suffixed ID"
+
+# Case 12: byte-identity — emitted 1.3 row equals source line exactly
+run "$TABLE_FIXTURE"
+if diff <(grep -F '| 1.3 |' "$TMP/fixture.md") \
+        <(grep -F '| 1.3 |' "$TMP/out") > /dev/null 2>&1; then
+    echo "ok: 12-byte-identical-row"
+else
+    echo "FAIL: 12-byte-identical-row — emitted 1.3 row differs from source"
+    FAILED=1
+fi
+
+# Case 13: fenced block opaque — fenced lines survive while real resolved row dropped
+run "$FENCE_FIXTURE"
+assert_has   "13-fenced-heading-emitted" "### 1.1 Resolved Detail"
+assert_has   "13-fenced-row-emitted"     "fenced-row"
+assert_lacks "13-real-row-dropped"       "real-row"
+
+# Case 14: stderr isolation — summary on stderr only, never stdout
+run "$TABLE_FIXTURE"
+assert_lacks "14-stdout-no-summary" "kept "
+if grep -q 'kept ' "$TMP/err"; then
+    echo "ok: 14-stderr-has-summary"
+else
+    echo "FAIL: 14-stderr-has-summary — summary line missing from stderr"
+    FAILED=1
+fi
+
+# Case 15: explicitly-named missing file exits 1
+"$FILTER" "$TMP/nope.md" > /dev/null 2>&1
+if [ $? -eq 1 ]; then
+    echo "ok: 15-missing-file-exits-1"
+else
+    echo "FAIL: 15-missing-file-exits-1 — expected exit 1 for nonexistent file"
+    FAILED=1
+fi
+
+# Case 16: all 8 default backlog paths exist (drift detector — existence only)
+ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || echo "")"
+DEFAULT_NAMES=(
+    maintenance-backlog.md ci-backlog.md e2e-backlog.md a11y-backlog.md
+    a11y-contrast-backlog.md token-spend-backlog.md dev-efficiency-backlog.md
+    loop-engineering-backlog.md
+)
+case16_ok=1
+for name in "${DEFAULT_NAMES[@]}"; do
+    path="$ROOT/ibl5/docs/backlog/$name"
+    if [ ! -f "$path" ]; then
+        echo "FAIL: 16-default-paths-exist — missing: $path"
+        FAILED=1
+        case16_ok=0
+    fi
+done
+[ "$case16_ok" = "1" ] && echo "ok: 16-default-paths-exist"
+
+# Case 17: default mode exits 0 and emits non-empty output
+"$FILTER" > "$TMP/smoke" 2>/dev/null
+smoke_rc=$?
+if [ "$smoke_rc" -eq 0 ] && [ -s "$TMP/smoke" ]; then
+    echo "ok: 17-default-mode-smoke"
+else
+    echo "FAIL: 17-default-mode-smoke — exit=$smoke_rc size=$(wc -c < "$TMP/smoke" 2>/dev/null)"
+    FAILED=1
+fi
+
+# Case 18: --help exits 0 and prints Usage:
+if "$FILTER" --help 2>/dev/null | grep -q 'Usage:'; then
+    echo "ok: 18-help-exits-0-prints-usage"
+else
+    echo "FAIL: 18-help-exits-0-prints-usage"
+    FAILED=1
+fi
+
+# ── result ───────────────────────────────────────────────────────────────────
+
+if [ "$FAILED" -ne 0 ]; then
+    echo "RESULT: FAILED"
+    exit 1
+fi
+echo "RESULT: all passed"
+exit 0

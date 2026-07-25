@@ -652,6 +652,8 @@ jobs:
         run: bin/test-check-plan
       - name: bin/test-check-plan-staleness
         run: bin/test-check-plan-staleness
+      - name: bin/test-backlog-open
+        run: bin/test-backlog-open
       - name: bin/test-adr-check
         run: bin/test-adr-check
       - name: bin/test-postplan-arm-conditions

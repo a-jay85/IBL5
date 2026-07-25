@@ -58,6 +58,11 @@ jobs:
           mkdir -p ibl5/.lighthouseci
           cp /tmp/baseline/manifest.json ibl5/.lighthouseci/manifest-filtered.json
 
+      - name: Install PHP dependencies (baseline path)
+        if: steps.freshness.outputs.use_baseline == 'true'
+        working-directory: ibl5
+        run: composer install --no-interaction --no-progress --prefer-dist --ignore-platform-reqs
+
       - uses: ./.github/actions/lighthouse-setup
         if: steps.freshness.outputs.use_baseline != 'true'
 

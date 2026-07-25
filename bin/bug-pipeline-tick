@@ -740,6 +740,19 @@ reconcile_pr_open_rows() {
 
 # ── Main: empty-tick guard then dispatch ──────────────────────────────────────
 main() {
+    # Preflight: the agent binary must actually resolve, BEFORE any row is claimed.
+    # An unresolvable $CLAUDE_BIN makes `timeout` exit 127, and nothing downstream
+    # reads that as environmental: claude_env_error only matches usage/rate-limit
+    # signatures, so run_hunt_ladder falls through every tier as "escalate", and the
+    # missing hunt-result.json then defaults terminal=true — giving up on a real bug
+    # after zero agent runs. That is exactly what happened when the Claude Code
+    # native installer moved `claude` to ~/.local/bin, off the launchd PATH
+    # (2026-07-25). Abort loudly instead: a broken environment must cost zero rows.
+    if ! command -v "$CLAUDE_BIN" >/dev/null 2>&1; then
+        log "ERROR: agent binary '$CLAUDE_BIN' not found on PATH ($PATH) — aborting tick (no row claimed)"
+        return 1
+    fi
+
     # ── #5b hunt passes run FIRST, independent of the enumerator ──────────────
     # A classified queued bug (class IS NOT NULL) is invisible to list-active-conversations
     # (it whitelists class IS NULL), so it must be reached here or it never hunts. Both passes

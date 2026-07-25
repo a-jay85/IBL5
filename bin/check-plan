@@ -920,7 +920,8 @@ gatep_declared_tokens() {
             /^## Critical Files/ { in_cf=1; next }
             /^## /               { in_cf=0 }
             in_cf && /^- `[^`]+`/ {
-                if ($0 ~ /\(reference\)/ || $0 ~ /\(read-only\)/ || $0 ~ /\(verify\)/ || \
+                if ($0 ~ /\(reference\)/ || $0 ~ /\(read-only\)/ || $0 ~ /\(read-only reference\)/ || \
+                    $0 ~ /\(verify\)/ || \
                     $0 ~ /\(template\)/  || $0 ~ /\(no-edit\)/   || $0 ~ /\(unchanged\)/ || \
                     $0 ~ /\(context\)/) next
                 line=$0

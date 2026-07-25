@@ -1047,6 +1047,27 @@ Read the tick script for its scheduling shape; change nothing in it.
 - \`bin/sim-recap-tick\` (reference)
 "
 
+# FALSE-POSITIVE REGRESSION — the COMPOUND \`(read-only reference)\` annotation
+# (63 corpus occurrences) evades the exact \`(reference)\`/\`(read-only)\` matches.
+# Found by the acceptance corpus sweep firing on verification-forced-integration-
+# triggers.md. Pins the compound clause added to Arm A's annotation-exclusion set.
+assert "[P]-compound-readonly-reference-does-not-fire" 0 "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | gate letter is registered | CLI-executable | post-impl | \`bin/check-plan\` |
+
+## Phase 1: Cite the cron-setup shape
+
+**Tier:** self
+
+Read the cron-setup script for its launchd shape; change nothing in it.
+
+## Critical Files
+
+- \`bin/check-plan\`
+- \`bin/sim-recap-cron-setup\` (read-only reference)
+"
+
 # FALSE-NEGATIVE REGRESSION — a QUOTED marker must not clear. Every plan about
 # this gate quotes the token in prose; only the line-anchored HTML-comment form
 # is a real marker. This is the case a bare grep -qF would get wrong.

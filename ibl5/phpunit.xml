@@ -253,6 +253,9 @@
         <testsuite name="Bootstrap Module Tests">
             <directory>tests/Bootstrap</directory>
         </testsuite>
+        <testsuite name="EventLog Tests">
+            <directory>tests/EventLog</directory>
+        </testsuite>
         <testsuite name="Unit Tests">
             <directory>tests/Unit</directory>
         </testsuite>

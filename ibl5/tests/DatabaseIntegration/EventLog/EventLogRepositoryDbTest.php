@@ -21,55 +21,60 @@ final class EventLogRepositoryDbTest extends DatabaseTestCase
 
     public function testInsertWritesFullyPopulatedRow(): void
     {
-        $affected = $this->repo->insert(
-            '/ibl5/modules.php?name=Team_Info',
-            'Team_Info',
+        $id = $this->repo->insert(
+            'SENTINEL_URI',
+            'SENTINEL_ROUTE',
             'GET',
-            'testgm',
+            'SENTINEL_USER',
             1,
-            'https://example.com/ref',
-            'UA/1.0'
+            'SENTINEL_REFERER',
+            'SENTINEL_UA',
+            'SENTINEL_SESSION',
+            'SENTINEL_CLASS'
         );
 
-        self::assertSame(1, $affected);
+        self::assertGreaterThan(0, $id);
 
         $stmt = $this->db->prepare(
-            'SELECT request_uri, route_name, http_method, username, team_id, referer, user_agent'
-            . ' FROM `ibl_events` WHERE username = ? ORDER BY id DESC LIMIT 1'
+            'SELECT request_uri, route_name, http_method, username, team_id, referer, user_agent, session_id, traffic_class'
+            . ' FROM `ibl_events` WHERE id = ?'
         );
         self::assertNotFalse($stmt);
-        $username = 'testgm';
-        $stmt->bind_param('s', $username);
+        $stmt->bind_param('i', $id);
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
 
         self::assertNotNull($row);
-        self::assertSame('/ibl5/modules.php?name=Team_Info', $row['request_uri']);
-        self::assertSame('Team_Info', $row['route_name']);
+        self::assertSame('SENTINEL_URI', $row['request_uri']);
+        self::assertSame('SENTINEL_ROUTE', $row['route_name']);
         self::assertSame('GET', $row['http_method']);
-        self::assertSame('testgm', $row['username']);
+        self::assertSame('SENTINEL_USER', $row['username']);
         self::assertSame(1, $row['team_id']);
-        self::assertSame('https://example.com/ref', $row['referer']);
-        self::assertSame('UA/1.0', $row['user_agent']);
+        self::assertSame('SENTINEL_REFERER', $row['referer']);
+        self::assertSame('SENTINEL_UA', $row['user_agent']);
+        self::assertSame('SENTINEL_SESSION', $row['session_id']);
+        self::assertSame('SENTINEL_CLASS', $row['traffic_class']);
     }
 
     public function testInsertNullableColumnsStoreSqlNull(): void
     {
-        $affected = $this->repo->insert(
+        $id = $this->repo->insert(
             '/ibl5/index.php',
             null,
             'GET',
             null,
             null,
             null,
+            null,
+            null,
             null
         );
 
-        self::assertSame(1, $affected);
+        self::assertGreaterThan(0, $id);
 
         $stmt = $this->db->prepare(
-            'SELECT route_name, username, team_id, referer, user_agent'
+            'SELECT route_name, username, team_id, referer, user_agent, session_id, traffic_class'
             . ' FROM `ibl_events` ORDER BY id DESC LIMIT 1'
         );
         self::assertNotFalse($stmt);
@@ -83,6 +88,8 @@ final class EventLogRepositoryDbTest extends DatabaseTestCase
         self::assertNull($row['team_id']);
         self::assertNull($row['referer']);
         self::assertNull($row['user_agent']);
+        self::assertNull($row['session_id']);
+        self::assertNull($row['traffic_class']);
     }
 
     public function testInsertIsParameterizedAdversarialInputStoredVerbatim(): void
@@ -91,17 +98,19 @@ final class EventLogRepositoryDbTest extends DatabaseTestCase
         $adversarialRoute = "a')--";
         $adversarialUa = "Mozilla')/**/";
 
-        $affected = $this->repo->insert(
+        $id = $this->repo->insert(
             $adversarialUri,
             $adversarialRoute,
             'GET',
             null,
             null,
             null,
-            $adversarialUa
+            $adversarialUa,
+            null,
+            null
         );
 
-        self::assertSame(1, $affected);
+        self::assertGreaterThan(0, $id);
 
         // Table must still exist (no injection succeeded).
         $result = $this->db->query('SELECT 1 FROM `ibl_events` LIMIT 1');
@@ -120,5 +129,112 @@ final class EventLogRepositoryDbTest extends DatabaseTestCase
         self::assertSame($adversarialUri, $row['request_uri']);
         self::assertSame($adversarialRoute, $row['route_name']);
         self::assertSame($adversarialUa, $row['user_agent']);
+    }
+
+    public function testInsertReturnsUsableRowId(): void
+    {
+        $id = $this->repo->insert(
+            '/ibl5/check-id.php',
+            'check_id',
+            'GET',
+            'testgm',
+            1,
+            null,
+            'TestUA/1.0',
+            null,
+            null
+        );
+
+        self::assertGreaterThan(0, $id);
+
+        $stmt = $this->db->prepare('SELECT * FROM `ibl_events` WHERE id = ?');
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('i', $id);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        self::assertNotNull($row, "Row with id=$id must exist");
+        self::assertSame('/ibl5/check-id.php', $row['request_uri']);
+        self::assertSame('check_id', $row['route_name']);
+    }
+
+    public function testUpdateOutcomeSetsStatusAndAction(): void
+    {
+        $id = $this->repo->insert(
+            '/ibl5/trade.php',
+            'trading',
+            'POST',
+            'testgm',
+            1,
+            null,
+            'TestUA/1.0',
+            null,
+            null
+        );
+        self::assertGreaterThan(0, $id);
+
+        $affected = $this->repo->updateOutcome($id, 404, 'trade_submitted');
+        self::assertSame(1, $affected);
+
+        $stmt = $this->db->prepare(
+            'SELECT request_uri, route_name, http_method, username, team_id, user_agent, http_status, action'
+            . ' FROM `ibl_events` WHERE id = ?'
+        );
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('i', $id);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        self::assertNotNull($row);
+        self::assertSame(404, $row['http_status']);
+        self::assertSame('trade_submitted', $row['action']);
+        // Original columns must be untouched.
+        self::assertSame('/ibl5/trade.php', $row['request_uri']);
+        self::assertSame('trading', $row['route_name']);
+        self::assertSame('POST', $row['http_method']);
+        self::assertSame('testgm', $row['username']);
+        self::assertSame(1, $row['team_id']);
+        self::assertSame('TestUA/1.0', $row['user_agent']);
+    }
+
+    public function testUpdateOutcomeAcceptsNullsAndLeavesColumnsNull(): void
+    {
+        $id = $this->repo->insert(
+            '/ibl5/page.php',
+            'page',
+            'GET',
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+        );
+        self::assertGreaterThan(0, $id);
+
+        // First set non-null values so the subsequent null update is a real change.
+        $this->repo->updateOutcome($id, 200, 'some_action');
+
+        // Now clear them — must store SQL NULL, not 0/''.
+        $this->repo->updateOutcome($id, null, null);
+
+        $stmt = $this->db->prepare('SELECT http_status, action FROM `ibl_events` WHERE id = ?');
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('i', $id);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        self::assertNotNull($row);
+        self::assertNull($row['http_status']);
+        self::assertNull($row['action']);
+    }
+
+    public function testUpdateOutcomeOnMissingRowAffectsNothing(): void
+    {
+        $affected = $this->repo->updateOutcome(PHP_INT_MAX, 200, 'x');
+        self::assertSame(0, $affected);
     }
 }

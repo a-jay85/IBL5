@@ -1761,10 +1761,30 @@ assert "v-unescaped-pipe" 1 "$FM"'
 | 1 | docs clean | CLI-executable | post-impl | bin/check-docs | grep -c foo |
 '
 
+# 8. Go package wildcards (`./...`, `dir/...`) are runnable, not elisions → pass
+# (exit 0). Corpus calibration surfaced 16 such cells false-flagged before the
+# Go-wildcard mask landed in Edit D; this pins the fix.
+assert "v-go-wildcard" 0 "$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | engine builds and tests pass | CLI-executable | post-impl | `cd engine && go build ./... && go test ./...` |
+'
+
+# 9. Survivor guard for case 8: a Go command whose `...` is an elided ARGUMENT
+# (`--archive ...`), not a package wildcard, must STILL fire (exit 1). Without
+# this, a future loosening of the Go-wildcard mask that also swallowed bare `...`
+# args would pass silently. The mask keys on a `/` right before `...`, which this
+# cell lacks, so it stays flagged — that boundary is what this case defends.
+assert "v-go-wildcard-arg-elision" 1 "$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | calibrate runs | CLI-executable | post-impl | `go run ./cmd/jsbcalibrate --archive ... --mode gate` |
+'
+
 # Message-content check (not just an exit code): gate V must name the offending
 # cell text so an author knows which row to fix. Copies the `2>&1 | grep -q`
 # idiom used for the [W] check above. Named without a `v-` prefix so the
-# `grep -c '^ok: v-'` count stays at the 7 assert cases.
+# `grep -c '^ok: v-'` count stays at the 9 assert cases.
 _f="$TMP/v-msg.md"
 printf '%s\n' "$FM"'
 | # | What to verify | Test type | Timing | Test file / location |

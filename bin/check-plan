@@ -324,7 +324,14 @@ while IFS= read -r row; do
         # A `...` between two ref-ish tokens is a git range (origin/master...HEAD),
         # not an elision — mask ranges before testing. Corpus-verified: without this
         # mask, 2 of 79 flagged cells were valid `git diff origin/master...HEAD`.
-        _probe=$(printf '%s' "$MC_LOC" | sed -E 's#[A-Za-z0-9_/@^~.-]+\.\.\.[A-Za-z0-9_/@^~-]+#RANGE#g')
+        # A trailing `path/...` is a Go package wildcard (`go build ./...`), also not
+        # an elision — mask it too. The `(^|space)…/\.\.\.` anchor keys on a `/`
+        # immediately before `...`, so it clears `./...` and `dir/...` but leaves a
+        # genuine path elision (`~/.claude/plans/...`, leading `.../ibl5`) flagged.
+        # Corpus-verified: 16 bare `go build/test/vet ./...` cells were false-flagged.
+        _probe=$(printf '%s' "$MC_LOC" \
+            | sed -E 's#[A-Za-z0-9_/@^~.-]+\.\.\.[A-Za-z0-9_/@^~-]+#RANGE#g' \
+            | sed -E 's#(^|[[:space:]])[A-Za-z0-9_./@-]*/\.\.\.#\1WILD#g')
         if printf '%s' "$MC_LOC" | grep -qiE '^(phase|step|row)[[:space:]]+[0-9]'; then
             _bad="a phase/step pointer, not a command"
         elif printf '%s' "$_probe" | grep -q '…' || printf '%s' "$_probe" | grep -qF '...'; then

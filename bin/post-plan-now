@@ -3,8 +3,8 @@
 # bin/post-plan-now — fire a detached post-plan run on the current worktree's
 # branch, replacing the manual "open a new session and hand off" step.
 #
-# Engine selection: when the compiled post-plan harness is installed
-# (~/GitHub/postplan-harness, see its README) it runs `./run isolated <root>
+# Engine selection: when the compiled post-plan harness is present in the main
+# checkout (tools/postplan-harness, see its README) it runs `./run isolated <root>
 # --live` — the deterministic phase sequencer with bounded LLM calls (~65-100x
 # fewer gross tokens than a skill session). If the harness exits nonzero, or is
 # absent on this machine, the same launchd job falls back to the original

@@ -62,5 +62,35 @@ func StandInRegistry() []StandIn {
 			Sweep: []float64{17.7, 16.0, 19.0},
 			Apply: func(o *Options, v float64) { o.BaseTimeMid = ptr(v) },
 		},
+		{
+			ID:   "foul_bucket_scale",
+			Term: "cov_shots_per_poss_pps",
+			Justification: "sim/bucketweights.go:155 foulBucketScale=0.39 is a stand-in, not a pinned JSB " +
+				"constant: no JSB source line specifies it. It is an RE-fitted multiplier applied at all three " +
+				"foulBucketWeight return sites, re-anchored 0.47 -> 0.40 -> 0.39 against the corpus (see the " +
+				"const comment). Sweep spans that documented re-anchor range: 0.47 is the original RE anchor, " +
+				"0.31 the symmetric low end. FTA response is sub-linear because foul-outs cap minutes " +
+				"(0.39=21.36, 0.40=21.82, 0.47=24.20 FTA/g against a .sco target of 21.32), so the bracket is " +
+				"defined in constant space over the plausible fidelity range and brackets the target on both " +
+				"sides; it is NOT chosen to move DRBPushSharePct toward 12.42. Term is an informational label " +
+				"only -- fidelityTerms carries no FTA axis, so transmission is indirect (foul share shifts FGA " +
+				"and points-per-shot) and all four terms are reported for this dial regardless.",
+			Sweep: []float64{0.39, 0.31, 0.47},
+			Apply: func(o *Options, v float64) { o.FoulBucketScale = ptr(v) },
+		},
+		{
+			ID:   "and_one_made_rate_scale",
+			Term: "cov_shots_per_poss_pps",
+			Justification: "sim/bucketweights.go:164 andOneMadeRateScale=0.0008 is a stand-in, not a pinned " +
+				"JSB constant: the whole linear form in andOneBucketWeight (w = mq*0.25 + floor1(FGP)*scale, " +
+				"bucketweights.go:282) is an RE reconstruction with no JSB source line behind the coefficient, " +
+				"and unlike the sibling andOneBucketFloor=0.03 it has never been anchored against the corpus. " +
+				"Sweep is a half/double bracket (0.0004, 0.0016) reflecting pure formula uncertainty -- there is " +
+				"no prior measurement to narrow it and no target it is aimed at. Term is an informational label " +
+				"only -- fidelityTerms carries no and-one or FTA axis, so transmission is indirect (and-one share " +
+				"shifts points-per-shot) and all four terms are reported for this dial regardless.",
+			Sweep: []float64{0.0008, 0.0004, 0.0016},
+			Apply: func(o *Options, v float64) { o.AndOneMadeRateScale = ptr(v) },
+		},
 	}
 }

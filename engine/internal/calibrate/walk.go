@@ -112,6 +112,11 @@ type Options struct {
 	StealTurnoverScale    *float64
 	NonStealTurnoverScale *float64
 
+	// FoulBucketScale / AndOneMadeRateScale override the J24 bucket-weight
+	// stand-ins. nil ⇒ the const path, byte-identical to production.
+	FoulBucketScale     *float64
+	AndOneMadeRateScale *float64
+
 	// GateBaseline, when non-nil, overrides the L1 gate-1 baseline term (the league
 	// offensive-rebound share × 100) in the default (non-injected) engine runs — the
 	// ADR-0058 gate-continuation baseline sensitivity sweep. Threaded into sim.Options by

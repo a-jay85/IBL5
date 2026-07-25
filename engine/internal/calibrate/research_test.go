@@ -204,3 +204,40 @@ func TestResearchWalk_ZeroDelta(t *testing.T) {
 		}
 	})
 }
+
+// TestResearchWalkPropagatesBucketScales asserts that bucketSimOpts correctly
+// copies FoulBucketScale / AndOneMadeRateScale pointers without dereferencing:
+//   - a non-nil calibrate-side field produces a non-nil sim-side field with
+//     the same value (non-nil → non-nil); and
+//   - a nil calibrate-side field produces a nil sim-side field (nil → nil), so
+//     the sim resolver takes the const path and the seam is inert by default.
+func TestResearchWalkPropagatesBucketScales(t *testing.T) {
+	v := 0.47
+	got := bucketSimOpts(Options{FoulBucketScale: &v})
+	if got.FoulBucketScale == nil {
+		t.Fatal("FoulBucketScale: want non-nil, got nil")
+	}
+	if *got.FoulBucketScale != 0.47 {
+		t.Errorf("FoulBucketScale: want 0.47, got %v", *got.FoulBucketScale)
+	}
+
+	// nil calibrate-side field must propagate as nil (const path in sim).
+	nilGot := bucketSimOpts(Options{})
+	if nilGot.FoulBucketScale != nil {
+		t.Errorf("FoulBucketScale nil-in: want nil, got %v", nilGot.FoulBucketScale)
+	}
+
+	w := 0.0016
+	got2 := bucketSimOpts(Options{AndOneMadeRateScale: &w})
+	if got2.AndOneMadeRateScale == nil {
+		t.Fatal("AndOneMadeRateScale: want non-nil, got nil")
+	}
+	if *got2.AndOneMadeRateScale != 0.0016 {
+		t.Errorf("AndOneMadeRateScale: want 0.0016, got %v", *got2.AndOneMadeRateScale)
+	}
+
+	// nil calibrate-side field must propagate as nil (const path in sim).
+	if nilGot.AndOneMadeRateScale != nil {
+		t.Errorf("AndOneMadeRateScale nil-in: want nil, got %v", nilGot.AndOneMadeRateScale)
+	}
+}

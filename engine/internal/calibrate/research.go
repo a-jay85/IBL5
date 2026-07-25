@@ -66,6 +66,21 @@ func teamBoxPts(tb result.TeamBox) float64 {
 	return float64(pts)
 }
 
+// bucketSimOpts constructs the sim.Options from calibrate.Options, copying all
+// override pointers without dereferencing — a nil calibrate-side field must
+// propagate as nil so the sim-side resolver takes the const path.
+// This is the sole crossing point between the two Options types in the research
+// walk; keeping it in one unexported helper makes the crossing testable.
+func bucketSimOpts(opts Options) sim.Options {
+	return sim.Options{
+		BaseTimeMid:           opts.BaseTimeMid,
+		StealTurnoverScale:    opts.StealTurnoverScale,
+		NonStealTurnoverScale: opts.NonStealTurnoverScale,
+		FoulBucketScale:       opts.FoulBucketScale,
+		AndOneMadeRateScale:   opts.AndOneMadeRateScale,
+	}
+}
+
 // researchWalk is the real archive-walking fidelity-term collector.
 //
 // It applies the stand-in override by calling apply on a copy of opts, then
@@ -93,11 +108,7 @@ func researchWalk(root string, opts Options, apply func(*Options)) (map[string]f
 	}
 	seed := optsCopy.Seed
 
-	simOpts := sim.Options{
-		BaseTimeMid:           optsCopy.BaseTimeMid,
-		StealTurnoverScale:    optsCopy.StealTurnoverScale,
-		NonStealTurnoverScale: optsCopy.NonStealTurnoverScale,
-	}
+	simOpts := bucketSimOpts(optsCopy)
 
 	zips, _, err := listArchiveZips(root)
 	if err != nil {

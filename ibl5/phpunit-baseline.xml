@@ -22,4 +22,55 @@
    <issue><![CDATA[Delight\Auth\UserManager::createUserInternal(): Implicitly marking parameter $callback as nullable is deprecated, the explicit nullable type must be used instead]]></issue>
   </line>
  </file>
+ <file path="vendor/delight-im/db/src/Database.php">
+  <line number="31" hash="24536ab7c77f25279020ff0e8fa631473b7c4f0d">
+   <issue><![CDATA[Delight\Db\Database::select(): Implicitly marking parameter $bindValues as nullable is deprecated, the explicit nullable type must be used instead]]></issue>
+  </line>
+  <line number="44" hash="0249e49b1e3831be0443fb7e10cdaaa8ccc58f08">
+   <issue><![CDATA[Delight\Db\Database::selectValue(): Implicitly marking parameter $bindValues as nullable is deprecated, the explicit nullable type must be used instead]]></issue>
+  </line>
+  <line number="57" hash="977b204a1a02c9adbfaddd9f2836eaaed5dbaa54">
+   <issue><![CDATA[Delight\Db\Database::selectRow(): Implicitly marking parameter $bindValues as nullable is deprecated, the explicit nullable type must be used instead]]></issue>
+  </line>
+  <line number="70" hash="2a41b0b94ca155849058a9d009ddf0db063f4620">
+   <issue><![CDATA[Delight\Db\Database::selectColumn(): Implicitly marking parameter $bindValues as nullable is deprecated, the explicit nullable type must be used instead]]></issue>
+  </line>
+  <line number="117" hash="152f486f5d77a1fcda697b12cbd4fdb42a782629">
+   <issue><![CDATA[Delight\Db\Database::exec(): Implicitly marking parameter $bindValues as nullable is deprecated, the explicit nullable type must be used instead]]></issue>
+  </line>
+  <line number="183" hash="a3e18a52a552b5323f0b9139beeffb852b3784b9">
+   <issue><![CDATA[Delight\Db\Database::setProfiler(): Implicitly marking parameter $profiler as nullable is deprecated, the explicit nullable type must be used instead]]></issue>
+  </line>
+ </file>
+ <file path="vendor/delight-im/db/src/PdoDatabase.php">
+  <line number="49" hash="88c361e847d2ef326289781fac88e8a984099310">
+   <issue><![CDATA[Delight\Db\PdoDatabase::__construct(): Implicitly marking parameter $pdoDsn as nullable is deprecated, the explicit nullable type must be used instead]]></issue>
+   <issue><![CDATA[Delight\Db\PdoDatabase::__construct(): Implicitly marking parameter $pdoInstance as nullable is deprecated, the explicit nullable type must be used instead]]></issue>
+  </line>
+  <line number="117" hash="483fb11eb98969289db74e9f6752893ad89d04df">
+   <issue><![CDATA[Delight\Db\PdoDatabase::select(): Implicitly marking parameter $bindValues as nullable is deprecated, the explicit nullable type must be used instead]]></issue>
+  </line>
+  <line number="127" hash="2be9111fa94ff93b861f897d93279b2cc87c8391">
+   <issue><![CDATA[Delight\Db\PdoDatabase::selectValue(): Implicitly marking parameter $bindValues as nullable is deprecated, the explicit nullable type must be used instead]]></issue>
+  </line>
+  <line number="137" hash="3af8afc0641fe9eb107c5a59fa381cefe4c71ede">
+   <issue><![CDATA[Delight\Db\PdoDatabase::selectRow(): Implicitly marking parameter $bindValues as nullable is deprecated, the explicit nullable type must be used instead]]></issue>
+  </line>
+  <line number="147" hash="871c8075fb38148f2b6fd90cf647f779a6b24697">
+   <issue><![CDATA[Delight\Db\PdoDatabase::selectColumn(): Implicitly marking parameter $bindValues as nullable is deprecated, the explicit nullable type must be used instead]]></issue>
+  </line>
+  <line number="258" hash="d7a6e3208cd4865f630a04e79c3a7ee9b28b768c">
+   <issue><![CDATA[Delight\Db\PdoDatabase::exec(): Implicitly marking parameter $bindValues as nullable is deprecated, the explicit nullable type must be used instead]]></issue>
+  </line>
+  <line number="376" hash="2c35c2137b6f3d097631cc1032e45a2ef1097cd2">
+   <issue><![CDATA[Delight\Db\PdoDatabase::setProfiler(): Implicitly marking parameter $profiler as nullable is deprecated, the explicit nullable type must be used instead]]></issue>
+  </line>
+  <line number="526" hash="34b89eb1a70c10e8519a45424c4fdb5b540971dc">
+   <issue><![CDATA[Delight\Db\PdoDatabase::configureConnection(): Implicitly marking parameter $newAttributes as nullable is deprecated, the explicit nullable type must be used instead]]></issue>
+   <issue><![CDATA[Delight\Db\PdoDatabase::configureConnection(): Implicitly marking parameter $oldAttributes as nullable is deprecated, the explicit nullable type must be used instead]]></issue>
+  </line>
+  <line number="579" hash="9757dc724a4cf89ff5cbb92770da86e388ed6bff">
+   <issue><![CDATA[Delight\Db\PdoDatabase::selectInternal(): Implicitly marking parameter $bindValues as nullable is deprecated, the explicit nullable type must be used instead]]></issue>
+  </line>
+ </file>
 </files>

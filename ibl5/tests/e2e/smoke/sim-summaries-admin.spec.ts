@@ -11,10 +11,28 @@ import { assertNoPhpErrors } from '../helpers/php-errors';
  * "valid but absent" path has a stable fixture.
  */
 
-// Byte-exact `recap_text` of the newest seeded row — the download/copy paths
-// must reproduce it without HTML wrapping or entity encoding.
-const SIM_689_BODY =
-  'Sim 689 recap: the Cannons erased a nine-point fourth-quarter deficit to win by three.';
+// Full assembled recap document for sim 689 (RecapDocument::assemble output) — the
+// textarea and plain-text export must reproduce it byte-for-byte without HTML wrapping.
+const SIM_689_BODY = `Another week of IBL action delivered drama from tip-off to the final buzzer.
+
+
+================================ Feb 20 =========================================
+
+The Metros dominated from the opening tip, cruising to a 105-98 victory.
+
+
+================================ Mar 3 =========================================
+
+A balanced offensive attack lifted the Metros past the Cougars in a tightly contested game.
+
+
+================================ Mar 5 =========================================
+
+The Stars held off a late Metros rally to steal a road win, 95-88.
+
+
+The Cannons are one to watch as the season reaches its final stretch.
+`;
 
 const SEEDED_ROW_COUNT = 4;
 

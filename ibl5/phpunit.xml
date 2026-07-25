@@ -163,6 +163,9 @@
         <testsuite name="API Module Tests">
             <directory>tests/Api</directory>
         </testsuite>
+        <testsuite name="Clock Module Tests">
+            <directory>tests/Clock</directory>
+        </testsuite>
         <testsuite name="ApiKeys Module Tests">
             <directory>tests/ApiKeys</directory>
         </testsuite>

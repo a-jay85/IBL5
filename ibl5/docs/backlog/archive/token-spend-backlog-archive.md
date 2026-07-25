@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed token-spend reduction entries, extracted from token-spend-backlog.md.
-last_verified: 2026-07-16
+last_verified: 2026-07-24
 ---
 
 # Token-Spend Reduction Backlog — Archive
@@ -47,7 +47,7 @@ Read-only historical record of ✅ Implemented entries. For OPEN items see ../to
 ### T10 Tool-output token guards
 **Location:** `$HOME/.claude/hooks/output-guard.sh` (PreToolUse, warn-only), extending the `ci-log-guard.sh` family.
 **Problem (was):** Unbounded Bash output (`cat`, unbounded `git log`/`find`, full Playwright runs) lands in context once and is re-billed as a cache read every remaining turn.
-**Status (2026-07-07):** ✅ Implemented — guards the four measured worst categories (scoped from 27,899 transcript Bash calls); warns with the bounded alternative; skips subagents. Plan archive: `$HOME/.claude/plans/output-guard-hook.md`.
+**Status (2026-07-07):** ✅ Implemented — guards the four measured worst categories (scoped from 27,899 transcript Bash calls); warns with the bounded alternative; skips subagents. Plan archive: `$HOME/claude-plans/output-guard-hook.md`.
 
 ### T11 Tier-boundary plan splitting
 **Location:** `.claude/skills/plan/SKILL.md` — Step 2.5 (split criteria) and Step 4 gate 13 (`impl_model` criterion).
@@ -81,12 +81,12 @@ Read-only historical record of ✅ Implemented entries. For OPEN items see ../to
 **Suggested direction (was):** Extend an existing hook surface rather than add one (meta-tooling-bar): the PostToolUse/PreToolUse guard family (e.g. `$HOME/.claude/hooks/output-guard.sh`) can read the last `usage` block from the session transcript and emit a one-line advisory when context first crosses ~100K and again at ~125K — "context ≥100K: delegate remaining mechanical work (work-triage § execution routing), or split/hand off the session." Warn-only, once per threshold, skip subagents/headless (automouse peak-context is L16's territory). Verify effect via `bin/token-report` bucket distribution after two weeks.
 **Risk if untouched (was):** The single largest residual spend class (~half of weekly cache-read) stays invisible at the moment it's created; T6's 200K cap only bounds the worst case.
 **Provenance:** discovered 2026-07-16 during the post-backlog re-measure (advisory session).
-**Status (2026-07-16):** ✅ Implemented — context-ceiling hook added to `~/.claude/hooks/output-guard.sh`; warns at 100K and 125K tokens, once per threshold per session; skips subagents and headless runs. 10 new tests added (24–33) to `~/.claude/hooks/test-output-guard.sh`. Plan: `$HOME/.claude/plans/t14-context-ceiling-nudge.md`.
+**Status (2026-07-16):** ✅ Implemented — context-ceiling hook added to `~/.claude/hooks/output-guard.sh`; warns at 100K and 125K tokens, once per threshold per session; skips subagents and headless runs. 10 new tests added (24–33) to `~/.claude/hooks/test-output-guard.sh`. Plan: `$HOME/claude-plans/t14-context-ceiling-nudge.md`.
 
 ### T15 Read-payload accretion guard
 **Location:** `$HOME/.claude/hooks/output-guard.sh` (Check E, PreToolUse warn-only); `~/GitHub/IBL5/.claude/settings.local.json` (new `"Read"` matcher entry).
 **Problem (was):** Read results injected 17.3M chars (~4.3M tokens) into contexts over 7 days — 67% of all tool-result bytes. A full-file Read early in a long session is the compounding version of the T10 problem: its tokens are re-billed as cache-read on every subsequent call. The Read tool supports `offset`/`limit` but nothing pushed back on a no-limit Read of a large file.
-**Status (2026-07-16):** ✅ Implemented — `output-guard.sh` extended with Check E: PreToolUse warn when a Read call targets a file over 500 lines with no `offset`/`limit` parameter. Advisory names the LSP-first rule and Explore sub-agent delegation as cheaper paths. Warn-only; skips subagents (their contexts are discarded at SubagentStop). Wired via a new `"Read"` matcher entry in `settings.local.json`. Harness extended with 6 new tests (18–23). Plan: `$HOME/.claude/plans/t15-read-payload-accretion-guard.md`.
+**Status (2026-07-16):** ✅ Implemented — `output-guard.sh` extended with Check E: PreToolUse warn when a Read call targets a file over 500 lines with no `offset`/`limit` parameter. Advisory names the LSP-first rule and Explore sub-agent delegation as cheaper paths. Warn-only; skips subagents (their contexts are discarded at SubagentStop). Wired via a new `"Read"` matcher entry in `settings.local.json`. Harness extended with 6 new tests (18–23). Plan: `$HOME/claude-plans/t15-read-payload-accretion-guard.md`.
 
 ### T16 Poll-shaped Bash round-trips → background/Monitor routing
 **Location:** `.claude/rules/work-triage.md` (new "Execution routing: repeat-polling is a spend bug" section).

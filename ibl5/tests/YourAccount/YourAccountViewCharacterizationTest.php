@@ -13,7 +13,7 @@ use YourAccount\YourAccountView;
  * byte-identical equality against the pre-refactor fixture, guaranteeing
  * the delegating facade produces unchanged HTML.
  *
- * @see /Users/ajaynicolas/.claude/plans/extract-youraccountview-page-variants.md
+ * @see /Users/ajaynicolas/claude-plans/extract-youraccountview-page-variants.md
  */
 final class YourAccountViewCharacterizationTest extends TestCase
 {

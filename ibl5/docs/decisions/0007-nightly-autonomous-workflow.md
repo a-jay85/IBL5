@@ -1,6 +1,6 @@
 ---
 description: ADR for the automouse autonomous workflow (formerly "nightly") — headless Claude executes queued plans via launchd on a recurring schedule.
-last_verified: 2026-06-20
+last_verified: 2026-07-24
 ---
 
 # ADR-0007: Nightly Autonomous Workflow
@@ -29,7 +29,7 @@ Enforcement: `launchd` plist at `~/Library/LaunchAgents/com.ibl5.automouse.plist
 ## Consequences
 
 - Positive: Plans execute overnight without human presence, producing review-ready PRs by morning.
-- Positive: Symlink-based queue preserves original plans in `~/.claude/plans/` while tracking execution state.
+- Positive: Symlink-based queue preserves original plans in `~/claude-plans/` while tracking execution state.
 - Positive: `CLAUDE_HEADLESS` env var is a clean, extensible gate for headless-specific behavior in any skill.
 - Negative: Mac must remain awake overnight (clamshell mode with external monitor and power connected, or display-sleep-only with lid open). System sleep prevents `launchd` from firing; clamshell mode avoids this.
 - Negative: `--dangerously-skip-permissions` grants full tool access to the headless agent — mitigated by plan validation and skip-on-ambiguity behavior.

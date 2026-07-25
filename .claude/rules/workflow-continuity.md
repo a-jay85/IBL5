@@ -21,7 +21,7 @@ Use `/plan <task description>` for implementation planning.
 ls ~/claude-plans/"$(git rev-parse --abbrev-ref HEAD)".md
 ```
 
-This is exactly how `bin/post-plan-now` resolves the plan for a branch. `~/.claude/plans/` is a **pre-migration path** that still holds old plan files — reading there looks like it worked while missing everything recent.
+This is exactly how `bin/post-plan-now` resolves the plan for a branch. `~/claude-plans/` is the single source of truth — no other directory holds plan files.
 
 ## Worktree Setup
 

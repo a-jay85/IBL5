@@ -92,11 +92,6 @@ def locate_plan(slug: str, plans_dir: str | None = None, explicit_path: str | No
         path = explicit_path or os.path.join(
             plans_dir or os.environ.get("PLANS_DIR")
             or os.path.expanduser("~/claude-plans"), f"{slug}.md")
-        if not os.path.isfile(path) and plans_dir is None and explicit_path is None:
-            # Pre-migration archive; retire once no plans remain there.
-            legacy = os.path.join(os.path.expanduser("~/.claude/plans"), f"{slug}.md")
-            if os.path.isfile(legacy):
-                path = legacy
         if not os.path.isfile(path):
             return info
         info.path = path

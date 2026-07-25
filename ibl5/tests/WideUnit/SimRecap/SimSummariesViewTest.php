@@ -164,6 +164,31 @@ final class SimSummariesViewTest extends TestCase
         self::assertSame(3, substr_count($html, '&lt;script&gt;alert(1)&lt;/script&gt;'));
     }
 
+    /**
+     * The recap arrives as plain text whose newlines carry its shape (score header,
+     * mention line, then prose). HTML collapses those newlines, so the three prose
+     * paragraphs must opt into `white-space: pre-line`. Escaping is the reason this
+     * is a CSS class and not nl2br(): `<br>` would have to be echoed unescaped, and
+     * LLM prose never goes through HtmlSanitizer::trusted().
+     */
+    public function testProseParagraphsPreserveNewlines(): void
+    {
+        $html = $this->view->render(
+            [],
+            $this->recapRow('Body.', null, "Intro line one\nIntro line two", "Outro line one\nOutro line two"),
+            [['game_date' => '2025-01-01', 'visitor_teamid' => 1, 'home_teamid' => 2, 'game_of_that_day' => 1, 'sort_order' => 0, 'recap_text' => "**A 1 @ B 2**\nGame prose."]],
+            null
+        );
+
+        self::assertStringContainsString('<p id="recap-intro" class="whitespace-pre-line">', $html);
+        self::assertStringContainsString('<p class="recap-game__text whitespace-pre-line">', $html);
+        self::assertStringContainsString('<p id="recap-outro" class="whitespace-pre-line">', $html);
+        // The newlines themselves must survive escaping — pre-line has nothing to act on otherwise.
+        self::assertStringContainsString("Intro line one\nIntro line two", $html);
+        self::assertStringContainsString("**A 1 @ B 2**\nGame prose.", $html);
+        self::assertStringContainsString("Outro line one\nOutro line two", $html);
+    }
+
     public function testOmitsPerGameListWhenRecapTextIsNull(): void
     {
         // When a row has no recap_text the caller passes [] for $gameRecaps;

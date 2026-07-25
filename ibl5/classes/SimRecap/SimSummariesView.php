@@ -93,7 +93,7 @@ class SimSummariesView
 <?php else: ?>
 <?php $intro = $recap['intro_text'] ?? null; ?>
 <?php if (is_string($intro) && $intro !== ''): ?>
-        <p id="recap-intro"><?= HtmlSanitizer::e($intro) ?></p>
+        <p id="recap-intro" class="whitespace-pre-line"><?= HtmlSanitizer::e($intro) ?></p>
 <?php endif; ?>
 <?php if ($gameRecaps !== []): ?>
         <ol id="recap-games">
@@ -105,14 +105,14 @@ class SimSummariesView
 ?>
             <li class="recap-game">
                 <span class="recap-game__meta"><?= HtmlSanitizer::e(is_string($gDate) ? $gDate : '') ?> · team <?= HtmlSanitizer::e(is_scalar($gVid) ? (string) $gVid : '') ?> at team <?= HtmlSanitizer::e(is_scalar($gHid) ? (string) $gHid : '') ?></span>
-                <p class="recap-game__text"><?= HtmlSanitizer::e($game['recap_text'] ?? '') ?></p>
+                <p class="recap-game__text whitespace-pre-line"><?= HtmlSanitizer::e($game['recap_text'] ?? '') ?></p>
             </li>
 <?php endforeach; ?>
         </ol>
 <?php endif; ?>
 <?php $outro = $recap['outro_text'] ?? null; ?>
 <?php if (is_string($outro) && $outro !== ''): ?>
-        <p id="recap-outro"><?= HtmlSanitizer::e($outro) ?></p>
+        <p id="recap-outro" class="whitespace-pre-line"><?= HtmlSanitizer::e($outro) ?></p>
 <?php endif; ?>
         <textarea id="recap-body" readonly rows="24" cols="100"><?= HtmlSanitizer::e($body) ?></textarea>
         <p>

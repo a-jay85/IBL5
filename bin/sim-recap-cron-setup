@@ -114,8 +114,9 @@ case "$ACTION" in
     # An unset var is NOT harmless here: build_plist writes `${VAR:-}`, so it lands
     # as a well-formed <string></string> and launchd hands the tick an empty value
     # that reads exactly like a configured one. That is not hypothetical — an empty
-    # SIM_RECAP_DB_NAME shipped this way and every mysql call ran with no default
-    # database until it was caught by hand. Fail at install time instead.
+    # SIM_RECAP_DB_NAME shipped this way and sat live in the plist until a hand
+    # check found it; nothing in the tick would ever have reported it. Fail at
+    # install time instead.
     missing=""
     for var in SIM_RECAP_SSH_HOST SIM_RECAP_REMOTE_ROOT \
                SIM_RECAP_DB_USER SIM_RECAP_DB_NAME SIM_RECAP_DB_PASSWORD; do

@@ -1,6 +1,6 @@
 ---
 description: Docker MariaDB connection details, query patterns, and schema verification rules.
-last_verified: 2026-05-28
+last_verified: 2026-07-24
 paths:
   - "**/*Repository.php"
   - "**/migrations/000_baseline_schema.sql"
@@ -8,30 +8,37 @@ paths:
   - "**/db/**"
   - "**/seed*.php"
   - "**/seed*.sql"
-last_verified: 2026-05-25
 ---
 
 # Database Access Reference
 
 ## Local Docker MariaDB Connection
 
-**Connection Details:**
+**Connection Details (from the host):**
 - Host: `127.0.0.1`
-- Port: `3306`
+- Port: `3306` — published by the **main** stack's `ibl5-mariadb` only
 - Database: `iblhoops_ibl5`
 - Credentials: See `ibl5/config.php` (`$dbuname`, `$dbpass`)
+
+`ibl5/config.php` is untracked and env-driven (`getenv('DB_NAME') ?: <fallback>`, template at `ibl5/config.php.example`). Inside the containers docker-compose injects `DB_NAME=iblhoops_ibl5`, so the env wins; on a **host** shell there is no `DB_NAME`, so whatever fallback that local file happens to carry is what gets used. A stale local edit there silently retargets every PHP/`db-query` call — check the file before believing a surprising result.
 
 **Start the database:**
 ```bash
 docker compose up -d   # from repo root
 ```
 
-**PHP Connection (app standard):**
+**PHP Connection (app standard):** Composer PSR-4 autoloading, not a hand-rolled autoloader.
+
 ```php
-// Via app bootstrap (standard way)
-require_once 'autoloader.php';
-include 'config.php';
-include 'db/db.php';
+// Web request: mainfile.php wires config + DB via the Bootstrap factories.
+require_once 'mainfile.php';
+
+// CLI script: bootstrap by hand — see ibl5/scripts/bug-pipeline/_bootstrap.php
+// for the canonical version (it also re-registers the worktree's classes/ dir,
+// which matters because vendor/ symlinks to the main repo).
+require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../db/db.php';
 // $mysqli_db and $db are now available globally
 ```
 
@@ -44,13 +51,15 @@ mariadb -h 127.0.0.1 --skip-ssl -u root -proot iblhoops_ibl5
 
 ```bash
 # Use this wrapper script for database queries - it auto-approves without user confirmation
-# Works from BOTH the repo root and ibl5/ — a symlink at bin/db-query points to ibl5/bin/db-query
+# Invokable from BOTH the repo root and ibl5/ — a symlink at bin/db-query points to ibl5/bin/db-query
 ./bin/db-query "SELECT * FROM ibl_plr LIMIT 5"
 ./bin/db-query "SELECT COUNT(*) FROM ibl_team_info"
 ./bin/db-query "DESCRIBE ibl_plr"
 ```
 
 **When to use `db-query`:** Use this script to explore the database schema, verify data after making changes, check record counts, and validate your work. This is the preferred method for Claude to query the local database since it's configured for auto-approval in the user's Claude Code settings.
+
+**Which database it hits:** the wrapper resolves its own symlink and always reads `ibl5/config.php` (never the repo-root `config.php`), then connects over `127.0.0.1:3306`. Both of those are fixed regardless of the directory you invoke it from — so it targets the **main** stack, using `ibl5/config.php`'s `$dbname`. On `Unknown database '<name>'`, read that file's `$dbname` fallback rather than assuming the container is down.
 
 ## Migration Runner
 
@@ -76,19 +85,20 @@ Bootstraps a sibling `ibl5_test` database for `phpunit --group database` runs. D
 
 ## BaseMysqliRepository API
 
-All repositories extend `BaseMysqliRepository`. Core methods:
+All repositories extend `BaseMysqliRepository`. Its data-access helpers are **`protected`** — they are the API you call *from inside* a repository subclass, not from a controller or a test. Callers get a repository's own public methods.
 
-| Method | Returns | Use |
+| Method (protected) | Returns | Use |
 |--------|---------|-----|
 | `executeQuery($query, $types, ...$params)` | `mysqli_stmt` | Raw prepared statement (caller closes) |
 | `fetchOne($query, $types, ...$params)` | `?array` | Single row or null |
 | `fetchAll($query, $types, ...$params)` | `array` | All rows |
 | `execute($query, $types, ...$params)` | `int` | INSERT/UPDATE/DELETE — affected rows |
 | `getLastInsertId()` | `int` | Auto-increment ID after INSERT |
+| `transactional(callable $fn)` | `mixed` | Runs `$fn` in a transaction; nests via SAVEPOINT when already inside one |
 
 **Type-spec characters:** `i` (INT), `s` (VARCHAR/TEXT), `d` (FLOAT/DOUBLE), `b` (BLOB).
 
-**Error codes:** 1001 = type/param count mismatch, 1002 = prepare failed (bad SQL), 1003 = execute failed (constraint violation).
+**Error codes:** 1001 = type/param count mismatch, 1002 = prepare failed (bad SQL — also thrown by the constructor on an invalid or closed connection), 1003 = execute failed (constraint violation).
 
 ## Multiple Claude Instances Protocol
 

@@ -14,8 +14,9 @@ import (
 // a steal (possSteal), THIS possession runs the SAME Stage-2 transitionTriggers
 // gate as a DRB-armed possession (captured once as gs.stealPushFired). Gate
 // pass → r.IntN(3)+2 ∈ {2,3,4}s (code-7 class, faithful per §1d RE);
-// gate fail → possessionTime() ∈ [3,27]s (half-court jitter). The union of
-// both outcomes is [2,27]. The old ungated {0,1,2}s steal-class routing was
+// gate fail → possessionTime() ∈ [3,24]s (half-court jitter; J25 walkback,
+// baseTimeMid 17.7 -> 16.0 narrows ceiling 27 -> 24). The union of
+// both outcomes is [2,24]. The old ungated {0,1,2}s steal-class routing was
 // the J24 §1d wrong-class stand-in and is removed.
 //
 // These tests drive full games (Simulate) and reconstruct each possession's
@@ -66,8 +67,8 @@ func segmentOutcome(evs []result.Event) possOutcome {
 
 // TestStealClassStepRange drives many seeded full games and checks every
 // possession immediately following a steal-ending possession (same period)
-// drains the clock by a step in [2,27] — the union of the gate-pass code-7
-// class {2,3,4}s (r.IntN(3)+2) and the gate-fail half-court jitter [3,27].
+// drains the clock by a step in [2,24] — the union of the gate-pass code-7
+// class {2,3,4}s (r.IntN(3)+2) and the gate-fail half-court jitter [3,24].
 //
 // One-iteration offset (matches gameloop.go): segs[i] ending in a steal arms
 // possSteal as the `prev` INPUT to segs[i+1]'s possession() call, and it is
@@ -100,8 +101,8 @@ func TestStealClassStepRange(t *testing.T) {
 			step := segs[i+1].clock - segs[i+2].clock
 			stealFollowSteps++
 			stepCounts[step]++
-			if step < 2 || step > 27 {
-				t.Fatalf("seed %d: possession following a steal drained %ds, want in [2,27] (union of gate-pass {2,3,4} and gate-fail half-court [3,27])", seed, step)
+			if step < 2 || step > 24 {
+				t.Fatalf("seed %d: possession following a steal drained %ds, want in [2,24] (union of gate-pass {2,3,4} and gate-fail half-court [3,24])", seed, step)
 			}
 		}
 	}
@@ -143,10 +144,12 @@ func TestStealClassStepRange(t *testing.T) {
 // every {3,4} to one class or the other — see the required unit-level
 // flag-only assertions in transition_test.go for that.
 //
-// Upper bound WIDENED for the J24 Phase 5 NO-GO re-center (baseTimeMid
-// 13.65 -> 17.7, tempo.go): the half-court jitter's own support widened to
-// [3,27] (Pin A, possession_pace_pin_test.go), so the union with the push
-// class's {2,3,4} is now [2,27], not [2,23].
+// Upper bound history: [2,23] at the original 13.65 center → widened to
+// [2,27] at the provisional 17.7 center (J24 Phase 5 NO-GO re-center,
+// tempo.go) → narrowed to [2,24] at the faithful 16.0 center (J25 walkback,
+// baseTimeMid 17.7 -> 16.0). 16.0 > 13.65 so the union is still one wider
+// than the original [2,23]; the half-court jitter's support [3,24] (Pin A,
+// possession_pace_pin_test.go) sets the new ceiling.
 func TestDRBPushClassStepRange(t *testing.T) {
 	b := richBundle()
 	var drbFollowSteps int
@@ -169,8 +172,8 @@ func TestDRBPushClassStepRange(t *testing.T) {
 			step := segs[i+1].clock - segs[i+2].clock
 			drbFollowSteps++
 			stepCounts[step]++
-			if step < 2 || step > 27 {
-				t.Fatalf("seed %d: possession following a DRB drained %ds, want in [2,27] (union of push {2,3,4} and half-court [3,27])", seed, step)
+			if step < 2 || step > 24 {
+				t.Fatalf("seed %d: possession following a DRB drained %ds, want in [2,24] (union of push {2,3,4} and half-court [3,24])", seed, step)
 			}
 		}
 	}

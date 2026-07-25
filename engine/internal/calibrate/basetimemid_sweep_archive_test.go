@@ -144,27 +144,30 @@ func TestRealArchive_BaseTimeMidSweep(t *testing.T) {
 		return midResult{fid: fid, countPace: countPace, proxyPace: proxyPace, rows: rows}
 	}
 
-	// Narrowed bracket (J23 Phase 3). The coarse first pass {13.4, 13.6, 13.8, 14.0}
-	// ran as a smoke (runs 4, stride 4): 13.4 → 106.35, 13.6 → 104.585 poss/g —
-	// 13.6 lands mean pace dead-on real ~104.6. But the shipped const must ALSO
-	// satisfy the non-archive merge gates, and TestVolumeCountChannel_CouplingSign
-	// (tempo_coupling_test.go) constrains it deterministically: with round-half-up,
-	// its high-volume fixture out-steps the low-volume one only when a .5 rounding
-	// boundary falls between their game base_times (H = mid−0.572 clamped, L =
-	// mid−0.122), i.e. mid ∈ [13.622, ~14.07). 13.6 fails that sign invariant
-	// (H and L collapse into the same 13s step); 13.65/13.7 keep it. So the
-	// candidates of record are the pace-closest in-window values, straddling
-	// nothing below 13.622 — the real effective center (1440 / 104.6 ≈ 13.77s)
-	// remains inside the window.
-	// J24 Phase 5 NO-GO re-center bracket OF RECORD (2026-07-17, runs 4 stride 4).
-	// The GO/NO-GO smoke (mids {13.65, 16.0}) measured pace 132.14 @ 13.65 and
-	// 114.68 @ 16.0 with the Phase 2-4 fast-class mix live — the old 13.65
-	// provisional double-discounts, and the faithful 16.0 overshoots pace because
-	// the engine's fast-class share is ~29% vs real ~11.5% (tempo.go NO-GO block).
-	// This bracket measured 17.5 → 105.38, 17.7 → 104.25, 17.9 → 103.06 poss/g
-	// (real ~104.6): 17.7 selected as the re-centered provisional. Re-run against
-	// any change to the fast-class arming rates.
-	mids := []float64{17.5, 17.7, 17.9}
+	// Historical bracket (J23 Phase 3), SUPERSEDED — kept as dated provenance only.
+	// The coarse first pass {13.4, 13.6, 13.8, 14.0} ran as a smoke (runs 4,
+	// stride 4): 13.4 → 106.35, 13.6 → 104.585 poss/g. (The J23-era window claim
+	// that TestVolumeCountChannel_CouplingSign confined mid to [13.622, ~14.07) is
+	// DELETED, not merely dated: that FGA/count constraint was rebased away at J24
+	// Phase 1 when the deterministic round-half-up(base_time) mapping was retired
+	// for the per-possession jittered draw. Left standing it would wrongly argue
+	// the now-shipped 16.0 is illegal.)
+	//
+	// J24 Phase 5 NO-GO re-center bracket (2026-07-17, runs 4 stride 4) —
+	// SUPERSEDED, dated provenance only. That GO/NO-GO smoke (mids {13.65, 16.0})
+	// measured pace 132.14 @ 13.65 and 114.68 @ 16.0, and its narrowed bracket
+	// measured 17.5 → 105.38, 17.7 → 104.25, 17.9 → 103.06 poss/g (real ~104.6),
+	// selecting 17.7 as a provisional re-center. Those readings were taken on a
+	// PRE-2026-07-22 engine state; only post-2026-07-22 corrected pace readings are
+	// valid input, so none of them may be reused as a live figure for any mid.
+	//
+	// LIVE bracket (J25 faithful walkback, 2026-07-24): the shipped center is the
+	// faithful 16.0 — with u = CEngine+0x38 = 0.0 the FUN_004e4150 composite ratio
+	// is dead code and base_time collapses to the [13,16] ceiling (tempo.go). The
+	// bracket straddles it tightly. NOTE this bracket carries NO pace figures: no
+	// valid post-correction sweep has been run at these mids yet, and inventing one
+	// would poison the calibration record. Populate them from an actual run.
+	mids := []float64{15.8, 16.0, 16.2}
 	results := make(map[float64]midResult, len(mids))
 	for _, mid := range mids {
 		results[mid] = midFid(mid)

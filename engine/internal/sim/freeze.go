@@ -529,12 +529,13 @@ type Options struct {
 	// when set, so validate() needs no zero-mean guard (unlike the freeze arms).
 	//
 	// NOT retired at J24 Phase 5 — Phase 5 was a NO-GO (tempo.go const block):
-	// the faithful 16.0 center could not be installed because the engine arms
-	// fast possession classes at ~29% vs real ~11.5%, so 16.0 overshoots mean
-	// pace (114.68 vs real ~104.6). This seam is RETAINED as the sweep
-	// instrument's re-center knob (baseTimeMid now provisionally 17.7) until
-	// that fast-class arming-share gap closes and the center can walk back
-	// down to the faithful 16.0. See the tempo.go NO-GO block and ADR-0085.
+	// the fast-class arming-share gap (engine ~29% vs real ~11.5%) caused 16.0
+	// to overshoot mean pace. That gap is still open; the J25 walkback installs
+	// 16.0 on faithfulness grounds alone (u=0 ⇒ the [13,16] ceiling per the RE
+	// proof), not because the pace overshoot resolved. Pace is measured higher
+	// at 16.0 than at the provisional 17.7 center, as expected. This seam is
+	// RETAINED as the sweep instrument's re-center knob for future J-series
+	// work. See tempo.go and ADR-0085.
 	BaseTimeMid *float64
 
 	// StealTurnoverScale / NonStealTurnoverScale override the package consts

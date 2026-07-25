@@ -38,16 +38,23 @@ const tempoFactor = 1.0
 // ~2.5× the real share. Closing that share gap (and the CEngine+0x30 redraw
 // flag + .lge +0x12c strategy_adj open RE sub-steps) is the J24 residual; the
 // provisional center walks back to the faithful 16.0 when it closes. ADR-0085.
+//
+// J25 RESOLUTION (2026-07-24): superseded. The NO-GO smoke above (114.68 poss/g at
+// base_time 16.0, 132.14 at 13.65) was taken on a pre-2026-07-22 engine state; only
+// post-2026-07-22 corrected pace readings are valid input, so no pace figure in that
+// block may be reused as a live reading. The walkback proceeds on the u=0 faithfulness
+// proof rather than on a pace target. Live value is now 16.0.
 const (
 	baseTimeLow  = 13.0
 	baseTimeHigh = 16.0
-	baseTimeMid  = 17.7 // J24 Phase 5 re-center (PROVISIONAL, deliberately above
-	// the faithful [13,16] — see NO-GO block above): the constant base_time
-	// that restores mean pace under the over-armed fast-class mix. Bracket
-	// smoke of record (basetimemid_sweep_archive_test.go, runs=4 stride=4):
-	// 17.5 → 105.38, 17.7 → 104.25, 17.9 → 103.06 poss/g vs real ~104.6 —
-	// 17.7 is the pace-closest measured config (auto_merge: false — human
-	// signoff adjudicates the literal before merge).
+	baseTimeMid  = 16.0 // FAITHFUL center (J25 walkback from the provisional 17.7).
+	// With u = CEngine+0x38 = 0.0 the FUN_004e4150 composite base_time ratio is dead
+	// code, so base_time collapses to the constant ceiling of the faithful [13,16]
+	// band: baseTimeMid coincides with baseTimeHigh BY CONSTRUCTION — the u=0 proof's
+	// conclusion, not a coincidence. Installed on faithfulness grounds alone: the
+	// fast-class arming-share gap is still open, and this constant is NOT a lever on
+	// it (measured — see the "Do NOT re-open" list in
+	// engine/docs/backlog/jsb-native-backlog.md).
 )
 
 // possessionTime is the integer seconds ONE POSSESSION removes from the game

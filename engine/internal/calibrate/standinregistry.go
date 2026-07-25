@@ -51,15 +51,20 @@ func StandInRegistry() []StandIn {
 			ID:   "base_time_mid",
 			Term: "pace",
 			Justification: "baseTimeMid (tempo.go) is the per-game constant possession-clock center " +
-				"(ADR-0085, J23 re-center sweep). The live engine runs the PROVISIONAL value 17.7 " +
-				"(J24 Phase 5 re-center, deliberately above the faithful [13,16] band per tempo.go); " +
-				"the provisional center is expected to walk back toward the faithful 16.0 when that " +
-				"arm closes. The sweep baseline is therefore the current operational 17.7, bracketed " +
-				"by the faithful floor 16.0 and an upper 19.0. Perturbable as a research lever — the " +
-				"harness reproduces the direction and rough magnitude of the archive sweep (PR #1495) " +
-				"as a self-validation arm (ADR-0087 §4 base_time arm); that arm only requires some " +
-				"pace sweep point above noise, which any reasonable bracketing of 17.7 satisfies.",
-			Sweep: []float64{17.7, 16.0, 19.0},
+				"(ADR-0085). The live engine runs the FAITHFUL value 16.0: with u = CEngine+0x38 = 0.0 " +
+				"the FUN_004e4150 composite base_time ratio is dead code, so base_time collapses to the " +
+				"constant ceiling of the faithful [13,16] band — 16.0 coincides with baseTimeHigh by " +
+				"construction. The J25 walkback from the provisional 17.7 happened on that faithfulness " +
+				"proof alone, WITH THE FAST-CLASS ARMING-SHARE GAP STILL OPEN — this constant is not a " +
+				"lever on that gap (measured; see the 'Do NOT re-open' list in " +
+				"docs/backlog/jsb-native-backlog.md). The sweep baseline is therefore the shipped 16.0, " +
+				"bracketed symmetrically inside the faithful band by 13.65 (the retired J23 center) and " +
+				"above it by 17.7 (the retired provisional), so the bracket still spans a pace range " +
+				"wide enough to clear noise. Perturbable as a research lever — the harness reproduces " +
+				"the direction and rough magnitude of the archive sweep (PR #1495) as a self-validation " +
+				"arm (ADR-0087 §4 base_time arm); that arm only requires some pace sweep point above " +
+				"noise, which this 13.65/17.7 bracketing of 16.0 satisfies.",
+			Sweep: []float64{16.0, 13.65, 17.7},
 			Apply: func(o *Options, v float64) { o.BaseTimeMid = ptr(v) },
 		},
 	}

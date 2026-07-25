@@ -61,7 +61,8 @@ type possCouplingArtifact struct {
 // plan, not this one. These numbers are characterization of record, not a J20 target.
 //
 // J24 UPDATE (fast-class mix port, Phase 5 NO-GO — 2026-07-17, archive smoke
-// runs=4 stride=4, seed 20240601, baseTimeMid re-centered 13.65 → 17.7):
+// runs=4 stride=4, seed 20240601) — TAKEN AT THE NOW-RETIRED 17.7 CENTER, and on a
+// pre-2026-07-22 engine state. Retained as dated provenance; NOT live figures:
 //
 //	Cov(lnPOSS,lnPPS) = engine -0.000055   real +0.000241   (still negative;
 //	  was -0.000184 pre-port — moved toward real, did NOT flip)
@@ -69,11 +70,22 @@ type possCouplingArtifact struct {
 //	  0.000254 pre-port record — the mix added pace classes, NOT dispersion)
 //	mean pace 104.25 poss/g @ 17.7 (restored; 132.14 @ the old 13.65)
 //
+// J25 STATUS (2026-07-24): the live center is now the FAITHFUL 16.0 — with
+// u = CEngine+0x38 = 0.0 the FUN_004e4150 composite ratio is dead code, so
+// base_time collapses to the constant ceiling of the faithful [13,16] band
+// (sim/tempo.go). The walkback was made on that proof alone, not on a pace target.
+// Consequently EVERY coupling figure above is PENDING RE-MEASUREMENT at 16.0: no
+// valid post-2026-07-22 corrected reading exists at the live center yet, and none
+// is substituted here — fabricating a replacement number would poison the
+// calibration record. Re-run this archive test to populate them.
+//
 // The steal {0,1,2}s / DRB-push {2,3,4}s / half-court-jitter step classes are
 // ported (sim/tempo.go, gameloop.go), but the engine ARMS them at ~29% of
-// possessions vs real ~11.5%, so the provisional center sits at 17.7 instead of
-// the faithful 16.0, and the dispersion/Cov carriers remain unidentified. See
-// the tempo.go NO-GO block and ADR-0085 for the residual RE sub-steps.
+// possessions vs real ~11.5%. That arming-share gap is STILL OPEN at 16.0 — the
+// walkback did not close it and this constant is not a lever on it (measured; see
+// the "Do NOT re-open" list in docs/backlog/jsb-native-backlog.md). The
+// dispersion/Cov carriers likewise remain unidentified. See ADR-0085 and the
+// tempo.go const block for the residual RE sub-steps.
 func TestRealArchive_PossessionCoupling(t *testing.T) {
 	dir := os.Getenv("JSB_ARCHIVE_DIR")
 	if dir == "" {

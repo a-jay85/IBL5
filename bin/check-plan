@@ -124,6 +124,33 @@
 #                              check, not per-phase verbatim matching. A
 #                              `sonnet-recipe:` marker clears the whole gate,
 #                              mirroring no-adr: / context-budget:.
+#   P  Pre-prod exercise path — a plan that DECLARES a scheduled/daemon
+#                              artifact (bin/<x>-tick, bin/<x>-cron-setup, a
+#                              *.plist) must carry a verification-matrix ROW
+#                              that plausibly RUNS it: the full declared path,
+#                              word-bounded, together with either an invocation
+#                              form (`<path> --flag`) or a pre-prod environment
+#                              word (--dry-run/--once/--sim=/workflow_dispatch/
+#                              CI/worktree/localhost/deploy-rehearsal). Failing
+#                              that, a line-anchored `<!-- pre-prod-exception:
+#                              -->` marker plus a `## Pre-prod Exception
+#                              Justification` section (presence only — which
+#                              slice is truly intrinsic stays Opus judgment,
+#                              exactly like gate H). Mechanizes the FIRST of
+#                              /plan Step 4 gate 16's three failure shapes: no
+#                              row at all. DECLARATION POSITION only — an
+#                              unannotated `## Critical Files` bullet (same
+#                              parse as gate C's CB_CF_COUNT) or a table row
+#                              carrying a creation cue — never a prose mention,
+#                              which would fire on every plan that discusses
+#                              the failure class. Every read is ````-AWARE and
+#                              clears are bound to the MATRIX REGION: a body-
+#                              wide seam grep is cleared by prose, and a
+#                              basename match lets bin/test-<x>-tick (a stub
+#                              harness) clear bin/<x>-tick. Unlike gate 8 there
+#                              is no on-disk existence skip: activating or newly
+#                              scheduling an EXISTING tick script is the change
+#                              this gate exists to catch.
 #
 # Deliberately NOT linted (kept as /plan Opus judgment): tests-woven-inline,
 # production-comparison classification, test-file-path presence, negative-path
@@ -136,6 +163,13 @@
 # weaker plan-LEVEL presence check (impl_model: sonnet plans) — that the plan
 # carries at least one anchor SIGNAL somewhere — never that a given phase's
 # snippet matches a source line.
+# Gate P's two harder siblings are on this list by the same logic: whether
+# coverage is STUB-ONLY (a mock/fake standing in for a live-service or
+# cross-process call) and whether a row covers the deploy-dependent behavior or
+# merely something ADJACENT to it are both undecidable from plan text — a
+# stub-mention heuristic fires on every legitimately-stubbed unit test. Those
+# stay in /plan Step 4 gate 16 and .claude/skills/plan/_architect-contract.md,
+# read by an agent with understanding. Do not mechanize them here.
 #
 # Exit codes: 0 = clean, 1 = one or more violations (printed, prefixed by gate),
 #             2 = usage error / plan file missing.
@@ -200,7 +234,10 @@ WARN_FILE="$(mktemp)"
 MATRIX_FILE="$(mktemp)"
 SEEN_FILE="$(mktemp)"
 GATE8_SEEN="$(mktemp)"
-trap 'rm -f "$VIOL_FILE" "$WARN_FILE" "$MATRIX_FILE" "$SEEN_FILE" "$GATE8_SEEN"' EXIT
+GATEP_SEEN="$(mktemp)"
+GATEP_BODY="$(mktemp)"
+GATEP_MATRIX="$(mktemp)"
+trap 'rm -f "$VIOL_FILE" "$WARN_FILE" "$MATRIX_FILE" "$SEEN_FILE" "$GATE8_SEEN" "$GATEP_SEEN" "$GATEP_BODY" "$GATEP_MATRIX"' EXIT
 
 viol() { printf '%s\n' "$1" >> "$VIOL_FILE"; }
 warn() { printf '%s\n' "$1" >> "$WARN_FILE"; }
@@ -819,6 +856,110 @@ case "$RUN_MODEL" in
         fi
         ;;
 esac
+
+# ---------------------------------------------------------------------------
+# Gate P: Pre-prod exercise path for a declared deploy-dependent artifact.
+# ---------------------------------------------------------------------------
+# See the header block for the full rule. Trigger reads DECLARATION POSITIONS
+# only; the only clears are an exercising matrix row and a line-anchored
+# pre-prod-exception: marker.
+
+# Every [P] read is ````-AWARE. This plan file (and the two docs it edits)
+# embed complete plan fixtures inside fences; a fence-blind read makes a plan
+# that DOCUMENTS the marker read as CARRYING it, and lets a fixture's matrix row
+# clear a real declared artifact. Fence logic is gate T's, verbatim.
+awk '
+    function fence_ticks(s,   t) {
+        if (match(s, /^[ \t]*`+/)) {
+            t = substr(s, RSTART, RLENGTH); gsub(/[^`]/, "", t); return length(t)
+        }
+        return 0
+    }
+    BEGIN { in_fence = 0; fence_len = 0 }
+    {
+        n = fence_ticks($0)
+        # A closing fence is backticks-only AND at least as long as the opener.
+        if (in_fence) { if (n >= fence_len && $0 ~ /^[ \t]*`+[ \t]*$/) { in_fence = 0; fence_len = 0 }; next }
+        if (n >= 3)   { in_fence = 1; fence_len = n; next }
+        print
+    }
+' "$PLAN_FILE" > "$GATEP_BODY"
+
+# [P]'s own matrix parse — same shape as :201-205 but over the fence-stripped
+# body. NOT $MATRIX_FILE, which is built from the raw file and would let a
+# fenced fixture row clear a real artifact.
+awk '
+    /\|[[:space:]]*[Ww]hat to verify[[:space:]]*\|/ { inm=1; next }
+    inm && /^[[:space:]]*\|/ { print; next }
+    inm && !/^[[:space:]]*\|/ { inm=0 }
+' "$GATEP_BODY" > "$GATEP_MATRIX"
+
+# Marker: line-anchored HTML-comment form ONLY (see header) — a bare grep -qF
+# would be cleared by any plan that merely quotes the token in prose.
+GATEP_MARKER=0
+if grep -qE '^[[:space:]]*<!--[[:space:]]*pre-prod-exception:' "$GATEP_BODY"; then
+    GATEP_MARKER=1
+fi
+
+# A declared exception must carry its recorded rationale (mirrors gate H:
+# PRESENCE only; whether the slice is genuinely intrinsic is Step 4.5 judgment).
+if [ "$GATEP_MARKER" -eq 1 ] \
+   && ! grep -qiE '^##[[:space:]]+Pre-prod Exception Justification[[:space:]]*$' "$GATEP_BODY"; then
+    viol "[P] plan carries a pre-prod-exception: marker but has no '## Pre-prod Exception Justification' section (/plan Step 4 gate 16 — name the intrinsic slice: scheduling, reachability, or credential)"
+fi
+
+# Declaration-position token stream: unannotated Critical Files bullets (same
+# parse + annotation set as gate C's CB_CF_COUNT) plus table rows carrying a
+# creation cue. The anchored shape regex also does the charset/metacharacter
+# hygiene gate 8 does inline, so `bin/*-tick` and `bin/<name>-tick` meta-notation
+# cannot become tokens. bin/test-* is dropped: a stub harness is never the
+# deploy-dependent artifact, and letting it in re-creates the #1500 failure.
+gatep_declared_tokens() {
+    {
+        awk '
+            /^## Critical Files/ { in_cf=1; next }
+            /^## /               { in_cf=0 }
+            in_cf && /^- `[^`]+`/ {
+                if ($0 ~ /\(reference\)/ || $0 ~ /\(read-only\)/ || $0 ~ /\(verify\)/ || \
+                    $0 ~ /\(template\)/  || $0 ~ /\(no-edit\)/   || $0 ~ /\(unchanged\)/ || \
+                    $0 ~ /\(context\)/) next
+                line=$0
+                sub(/^- `/, "", line)
+                sub(/`.*$/, "", line)
+                print line
+            }
+        ' "$GATEP_BODY"
+        # shellcheck disable=SC2016  # backticks are literal markdown-span delimiters
+        grep -E '^[[:space:]]*\|' "$GATEP_BODY" \
+            | grep -E '([Cc]reate|[Nn]ew file|[Aa]dd(s|ing)? (a )?new|[Ii]ntroduce|[Ss]caffold)' \
+            | grep -oE '`[^`]+`' | sed -E 's/^`//; s/`$//'
+    } | grep -E '^(bin/[A-Za-z0-9._-]*-(tick|cron-setup)|[A-Za-z0-9._/-]+\.plist)$' \
+      | grep -v '^bin/test-'
+}
+
+# Skip entirely when the plan has no matrix at all: gate 1 already fired and
+# already blocks, and re-reporting it as a coverage miss is noise (same
+# double-report avoidance as gate 13).
+if [ "$GATEP_MARKER" -eq 0 ] && [ -s "$GATEP_MATRIX" ]; then
+    while IFS= read -r gatep_token; do
+        [ -n "$gatep_token" ] || continue
+        grep -qxF "$gatep_token" "$GATEP_SEEN" && continue
+        printf '%s\n' "$gatep_token" >> "$GATEP_SEEN"
+        gatep_esc=$(printf '%s' "$gatep_token" | sed 's/[.[\*^$]/\\&/g')
+        # Clear 1a: a row invokes the artifact directly -- `<path> --flag`.
+        if grep -qE "(^|[^A-Za-z0-9._/-])${gatep_esc}[[:space:]]+--[a-z]" "$GATEP_MATRIX"; then
+            continue
+        fi
+        # Clear 1b: a row names the artifact (word-bounded, FULL path) AND that
+        # same row carries a pre-prod environment word. The conjunction is what
+        # stops a `shellcheck <path>` lint row from clearing (MUST-HIT #1500).
+        if grep -E "(^|[^A-Za-z0-9._/-])${gatep_esc}([^A-Za-z0-9._-]|$)" "$GATEP_MATRIX" \
+           | grep -qE '(--dry-run|--once|--sim=|workflow_dispatch|(^|[^A-Za-z])(CI|worktree|localhost|deploy-rehearsal)([^A-Za-z]|$))'; then
+            continue
+        fi
+        viol "[P] ${gatep_token} is declared as a deliverable but no verification-matrix row exercises it - build a pre-prod exercise path (run it on the worktree Docker stack, in CI, or via the deploy-rehearsal job) and add the matrix row; see /plan Step 4 gate 16"
+    done < <(gatep_declared_tokens)
+fi
 
 # ---------------------------------------------------------------------------
 # Report.

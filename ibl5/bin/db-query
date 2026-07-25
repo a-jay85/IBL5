@@ -26,12 +26,47 @@ if [ ! -f "$CONFIG" ]; then
     exit 1
 fi
 
+# config.php resolves $dbname as getenv('DB_NAME') ?: '<fallback>', and php -r
+# inherits this shell's environment — so an exported DB_NAME still wins. Capture
+# it before the assignment below clobbers it, for the diagnostic.
+ENV_DB_NAME="${DB_NAME:-}"
+
 DB_USER=$(php -r "error_reporting(0); include '$CONFIG'; echo \$dbuname;" 2>/dev/null)
 DB_PASS=$(php -r "error_reporting(0); include '$CONFIG'; echo \$dbpass;" 2>/dev/null)
 DB_NAME=$(php -r "error_reporting(0); include '$CONFIG'; echo \$dbname;" 2>/dev/null)
+
+STDERR_FILE=$(mktemp)
+trap 'rm -f "$STDERR_FILE"' EXIT
 
 mariadb -h 127.0.0.1 --skip-ssl \
     -u "$DB_USER" -p"$DB_PASS" \
     --table \
     "$DB_NAME" \
-    -e "$1"
+    -e "$1" 2>"$STDERR_FILE"
+STATUS=$?
+
+cat "$STDERR_FILE" >&2
+
+# ERROR 1049 means the database named in config.php does not exist. That fails
+# loudly but names no cause, so a stale $dbname fallback can sit unnoticed for
+# weeks. Print where the name came from — never the credentials.
+if [ "$STATUS" -ne 0 ] && grep -q "ERROR 1049" "$STDERR_FILE"; then
+    {
+        echo
+        echo "db-query: that database does not exist. Where the name came from:"
+        echo "  \$dbname resolved to : $DB_NAME"
+        echo "  read from           : $CONFIG"
+        if [ -n "$ENV_DB_NAME" ]; then
+            echo "  DB_NAME in env      : $ENV_DB_NAME — env wins over the config fallback"
+        else
+            echo "  DB_NAME in env      : unset — the config fallback above is load-bearing"
+        fi
+        echo "  databases present   :"
+        mariadb -h 127.0.0.1 --skip-ssl -u "$DB_USER" -p"$DB_PASS" \
+            -N -B -e "SHOW DATABASES" 2>/dev/null | sed 's/^/    /'
+        echo
+        echo "Fix: correct \$dbname in $CONFIG, or export DB_NAME before running."
+    } >&2
+fi
+
+exit "$STATUS"

@@ -59,7 +59,11 @@ mariadb -h 127.0.0.1 --skip-ssl -u root -proot iblhoops_ibl5
 
 **When to use `db-query`:** Use this script to explore the database schema, verify data after making changes, check record counts, and validate your work. This is the preferred method for Claude to query the local database since it's configured for auto-approval in the user's Claude Code settings.
 
-**Which database it hits:** the wrapper resolves its own symlink and always reads `ibl5/config.php` (never the repo-root `config.php`), then connects over `127.0.0.1:3306`. Both of those are fixed regardless of the directory you invoke it from — so it targets the **main** stack, using `ibl5/config.php`'s `$dbname`. On `Unknown database '<name>'`, read that file's `$dbname` fallback rather than assuming the container is down.
+**Which database it hits:** the wrapper resolves its own symlink and always reads `ibl5/config.php` (never the repo-root `config.php`), then connects over `127.0.0.1:3306`. Both of those are fixed regardless of the directory you invoke it from — so it targets the **main** stack, using `ibl5/config.php`'s `$dbname`.
+
+**On `ERROR 1049` (unknown database), `db-query` self-diagnoses.** It prints the resolved `$dbname`, the absolute `config.php` it was read from, whether `DB_NAME` was set in the environment, and the databases that do exist. On a host shell `DB_NAME` is normally **unset**, so the file's fallback *is* the value that gets used — the env line is there to tell you the exceptions (`php -r` inherits the shell's environment, so an exported `DB_NAME` overrides the fallback). Read that block instead of assuming the container is down. The diagnostic fires **only** for 1049 — an ordinary bad-table or syntax error still just prints MariaDB's message — and the script's exit status is still MariaDB's.
+
+The companion guard is in `materialize_worktree_config` (`bin/lib/git-helpers.sh`), which copies main's `config.php` into every new worktree: when no `DB_NAME` is in the environment it echoes the `$dbname` fallback it just propagated. It validates nothing (the file is deliberately league-agnostic) — it only makes the inherited name visible, since a stale fallback in the main checkout otherwise fans out silently to every worktree created afterwards.
 
 ## Migration Runner
 

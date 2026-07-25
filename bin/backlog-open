@@ -1,0 +1,209 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# bin/backlog-open — emit only open (⬜/◑/📋) work from a backlog file.
+# Resolved (✅/🚫) rows and their detail bodies are removed; everything else
+# passes through byte-for-byte so a quoted table row stays a valid edit anchor.
+#
+# Usage: bin/backlog-open [file ...]     (no args = the 8 LIVE backlogs)
+#        bin/backlog-open --help
+
+set -uo pipefail
+
+if [ "${1-}" = "--help" ] || [ "${1-}" = "-h" ]; then
+    cat <<'USAGE'
+Usage: bin/backlog-open [file ...]
+
+Emit only open (⬜ / ◑ / 📋) rows and their detail bodies from backlog files.
+Resolved (✅ / 🚫) rows and sections are removed. Everything else passes through
+byte-for-byte, so a quoted table row is still a valid edit anchor.
+
+Output: stdout. Per-file summary (kept/total lines): stderr only — never stdout,
+so > /tmp/backlog-open.md is uncontaminated.
+
+With no arguments, processes the 8 LIVE backlogs in ibl5/docs/backlog/:
+  maintenance-backlog.md  ci-backlog.md  e2e-backlog.md  a11y-backlog.md
+  a11y-contrast-backlog.md  token-spend-backlog.md  dev-efficiency-backlog.md
+  loop-engineering-backlog.md
+
+maintenance-backlog.md (~93 KB filtered) exceeds the Bash output cap — redirect:
+  bin/backlog-open ibl5/docs/backlog/maintenance-backlog.md > /tmp/backlog-open.md
+  # then Read /tmp/backlog-open.md (Read paginates; Bash does not)
+
+The seven smaller backlogs capture fine inline.
+
+If a default backlog file is missing, a warning is printed to stderr and the script
+continues (exit 0). An explicitly-named missing file exits 1.
+
+Exit: 0 on success (including missing default files).
+      1 if any explicitly-named file does not exist.
+USAGE
+    exit 0
+fi
+
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+
+DEFAULTS=(
+    maintenance-backlog.md
+    ci-backlog.md
+    e2e-backlog.md
+    a11y-backlog.md
+    a11y-contrast-backlog.md
+    token-spend-backlog.md
+    dev-efficiency-backlog.md
+    loop-engineering-backlog.md
+)
+
+rc=0
+files=()
+use_defaults=0
+
+if [ $# -eq 0 ]; then
+    use_defaults=1
+    for name in "${DEFAULTS[@]}"; do
+        files+=("$ROOT/ibl5/docs/backlog/$name")
+    done
+else
+    files=("$@")
+fi
+
+for f in "${files[@]}"; do
+    if [ ! -f "$f" ]; then
+        if [ "$use_defaults" = "1" ]; then
+            printf 'backlog-open: warning: missing default backlog: %s\n' "$f" >&2
+        else
+            printf 'backlog-open: no such file: %s\n' "$f" >&2
+            rc=1
+        fi
+        continue
+    fi
+    printf '<!-- backlog-open: %s -->\n\n' "$f"
+    awk -v src="$f" -F'|' '
+# ── helpers ────────────────────────────────────────────────────────────────
+function trim(s,    r) {
+    r = s
+    gsub(/^[[:space:]]+/, "", r)
+    gsub(/[[:space:]]+$/, "", r)
+    return r
+}
+function is_valid_id(s) {
+    return (s ~ /^[0-9]+\.[0-9]+[a-z]*$/ || s ~ /^[A-Za-z]+[0-9]+[a-z]*$/)
+}
+function cell_status(c,    t) {
+    t = trim(c)
+    if (t ~ /^✅/ || t ~ /^🚫/) return "resolved"
+    if (t ~ /^⬜/ || t ~ /^◑/ || t ~ /^📋/) return "open"
+    return ""
+}
+function row_status(    i, st) {
+    for (i = 2; i <= NF - 1; i++) {
+        st = cell_status($i)
+        if (st != "") return st
+    }
+    return ""
+}
+function data_cells() { return NF - 2 }
+function row_id(    t) {
+    t = trim($2)
+    if (is_valid_id(t)) return t
+    return ""
+}
+function is_sep(    i, t, ok) {
+    if (NF <= 2) return 0
+    ok = 1
+    for (i = 2; i <= NF - 1; i++) {
+        t = trim($i)
+        if (t != "" && t !~ /^:?-+:?$/) { ok = 0; break }
+    }
+    return ok
+}
+
+# ── Pass 1: classify every finding by ID ───────────────────────────────────
+FNR == NR {
+    if (FNR == 1) { infence = 0; cur_id = "" }
+
+    if ($0 ~ /^[[:space:]]*```/ || $0 ~ /^[[:space:]]*~~~/) {
+        infence = !infence; next
+    }
+    if (infence) next
+
+    if ($0 ~ /^### /) {
+        split(substr($0, 5), _hp, " ")
+        if (is_valid_id(_hp[1])) cur_id = _hp[1]; else cur_id = ""
+    } else if ($0 ~ /^#{1,6} /) {
+        cur_id = ""
+    }
+
+    if ($0 ~ /^[[:space:]]*\|.*\|[[:space:]]*$/ && data_cells() >= 3 && !is_sep()) {
+        _rid = row_id()
+        if (_rid != "") {
+            _rst = row_status()
+            if (_rst != "") rowstat[_rid] = _rst
+        }
+    }
+
+    if (cur_id != "" && $0 ~ /^\*\*Status/) {
+        if ($0 ~ /✅/ || $0 ~ /🚫/) {
+            if (bodystat[cur_id] != "open") bodystat[cur_id] = "resolved"
+        } else if ($0 ~ /⬜/ || $0 ~ /◑/ || $0 ~ /📋/) {
+            if (!(cur_id in bodystat)) bodystat[cur_id] = "open"
+        }
+    }
+    next
+}
+
+# ── Pass 2: stream and emit ─────────────────────────────────────────────────
+FNR == 1 { infence = 0; suppress = 0; kept = 0; total = 0 }
+
+{
+    total++
+
+    # 1. Fence markers toggle state and always emit
+    if ($0 ~ /^[[:space:]]*```/ || $0 ~ /^[[:space:]]*~~~/) {
+        infence = !infence
+        print $0; kept++; next
+    }
+
+    # 2. Inside fence: emit without interpretation (opaque block)
+    if (infence) { print $0; kept++; next }
+
+    # 3. Headings reset suppression; ### with a resolved ID enters suppression
+    if ($0 ~ /^#{1,6} /) {
+        suppress = 0
+        if ($0 ~ /^### /) {
+            split(substr($0, 5), _hp, " ")
+            if (is_valid_id(_hp[1])) {
+                _id = _hp[1]
+                _rs = (_id in rowstat) ? rowstat[_id] : ""
+                _bs = (_id in bodystat) ? bodystat[_id] : ""
+                if ((_rs == "resolved" || _bs == "resolved") && _rs != "open" && _bs != "open") {
+                    suppress = 1; next
+                }
+            }
+        }
+        print $0; kept++; next
+    }
+
+    # 4. Inside suppressed section: skip
+    if (suppress) next
+
+    # 5. Table rows: drop only resolved work-item rows (≥3 data cells, not sep)
+    if ($0 ~ /^[[:space:]]*\|.*\|[[:space:]]*$/) {
+        if (data_cells() >= 3 && !is_sep() && row_status() == "resolved") next
+        print $0; kept++; next
+    }
+
+    # 6. Archive pointer lines: drop only when resolved glyph present
+    if ($0 ~ /^➜/) {
+        if ($0 ~ /✅/ || $0 ~ /🚫/) next
+        print $0; kept++; next
+    }
+
+    # 7. Everything else
+    print $0; kept++
+}
+
+END { printf "backlog-open: %s — kept %d/%d lines\n", src, kept, total > "/dev/stderr" }
+' "$f" "$f"
+done
+
+exit "$rc"

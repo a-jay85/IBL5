@@ -1,6 +1,6 @@
 ---
 description: Before adding a new hook, CI gate, workflow, or bin/ script, first ask whether an existing one can be extended; quarterly cull retires dead meta-tooling.
-last_verified: 2026-07-21
+last_verified: 2026-07-25
 paths:
   - "bin/**"
   - ".github/workflows/**"
@@ -9,7 +9,7 @@ paths:
 
 # Meta-Tooling Bar
 
-As of 2026-07-09 (UTC), the repo carries: 113 files in `bin/` (30 `test-*`, 18 `check-*`), 27 CI workflows in `.github/workflows/`, 20 hooks in `~/.claude/hooks/`, and 28 always-loaded rules in `.claude/rules/`. Roughly a quarter of `bin/` (`test-*`) exists to maintain the other three-quarters — every gate is itself code that needs upkeep and can carry its own bugs. Evidence that gates need upkeep (not that they are broken now): the persist-gate append blindspot (fixed 2026-07-04) and the check-docs rebase author-date bug (fixed PR #1262). This rule caps growth two ways: an **extend-before-add bar** checked at creation time, and a **quarterly cull** that retires dead tooling.
+The repo carries a large and growing meta-tooling surface — `bin/` scripts, CI workflows, hooks, and always-loaded rules (recount them with the block below; the numbers move too fast to pin here). Roughly a quarter of `bin/` (`test-*`) exists to maintain the other three-quarters — every gate is itself code that needs upkeep and can carry its own bugs. Evidence that gates need upkeep (not that they are broken now): the persist-gate append blindspot (fixed 2026-07-04) and the check-docs rebase author-date bug (fixed PR #1262). This rule caps growth two ways: an **extend-before-add bar** checked at creation time, and a **quarterly cull** that retires dead tooling.
 
 Recount at any time:
 

@@ -65,9 +65,9 @@ jobs:
               - '.claude/skills/post-plan/SKILL.md'
               - '.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md'
               # bin/test-post-review-findings reads the Step 7 / Step 1 blocks here,
-              # so a command-only edit must run the harness job too.
-              - '.claude/commands/pr-review.md'
-              - '.claude/commands/security-audit.md'
+              # so a skill-only edit must run the harness job too.
+              - '.claude/skills/pr-review/SKILL.md'
+              - '.claude/skills/security-audit/SKILL.md'
               # bin/test-human-signoff-classifier guards the classifier lib that
               # human-signoff.yml sources, so a workflow-only edit must run it too.
               - '.github/workflows/human-signoff.yml'

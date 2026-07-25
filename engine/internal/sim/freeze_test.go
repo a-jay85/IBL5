@@ -16,7 +16,7 @@ import (
 // harvested.
 func TestFreeze_SubstitutesAndAccumulates(t *testing.T) {
 	// Frozen ORB: gs.orebProb returns the mean for any inputs.
-	frozen := &gameState{freeze: FreezeConfig{ORB: true, Means: FreezeMeans{OrebProb: 0.4}}}
+	frozen := &gameState{freeze: FreezeConfig{ORB: true, Means: FreezeMeans{OrebProb: 0.4}}, foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 	if got := frozen.orebProb(999, 1); got != 0.4 {
 		t.Errorf("frozen orebProb = %v, want 0.4 (the league mean, input-independent)", got)
 	}
@@ -35,8 +35,8 @@ func TestFreeze_SubstitutesAndAccumulates(t *testing.T) {
 	off := []onCourt{oc(slotPG, mkPlayer(9, 3, slotPG, 50))}
 	def := []onCourt{oc(slotPG, mkPlayer(2, 3, slotPG, 50))}
 	bh := off[0]
-	wantFoul := foulBucketWeight(bh, off, def, 0, 0, rng.New(foulSeed))
-	base := &gameState{accum: acc, rng: rng.New(foulSeed), stealTurnoverScale: stealTurnoverScale, nonStealTurnoverScale: nonStealTurnoverScale}
+	wantFoul := foulBucketWeight(bh, off, def, 0, 0, rng.New(foulSeed), foulBucketScale)
+	base := &gameState{accum: acc, rng: rng.New(foulSeed), stealTurnoverScale: stealTurnoverScale, nonStealTurnoverScale: nonStealTurnoverScale, foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 	wantOreb := gate1Probability(100, 100, base.gateBaseline) // live faithful gate-1 (base.gateBaseline is 0)
 	// float64 vars force runtime (not constant-folded) evaluation, matching the
 	// wrapper's accumulated rounding exactly.
@@ -86,7 +86,7 @@ func TestFreeze_NoCrossConfound(t *testing.T) {
 	// coupling factor negative (defQ from one defender sits far below the 5-man-
 	// normalized baseline), so foulBucketWeight redraws — seed each gs the same so
 	// its single redraw draw reproduces liveFoul (the only rng consumer here).
-	liveFoul := foulBucketWeight(bh, off, def, 0, 0, rng.New(foulSeed))
+	liveFoul := foulBucketWeight(bh, off, def, 0, 0, rng.New(foulSeed), foulBucketScale)
 
 	// Sentinel means, deliberately distinct from the live values so a leak is visible.
 	means := FreezeMeans{OrebProb: 0.31, TurnProb: 0.07, FoulWeight: 0.13, MakeVal2pt: 111.0}
@@ -102,7 +102,7 @@ func TestFreeze_NoCrossConfound(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			gs := &gameState{freeze: c.cfg, rng: rng.New(foulSeed), stealTurnoverScale: stealTurnoverScale, nonStealTurnoverScale: nonStealTurnoverScale}
+			gs := &gameState{freeze: c.cfg, rng: rng.New(foulSeed), stealTurnoverScale: stealTurnoverScale, nonStealTurnoverScale: nonStealTurnoverScale, foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 			gotOreb := gs.orebProb(120, 80)
 			gotTurn := gs.turnoverProb(60, 100)
 			gotMake := gs.makeValue2pt(5, bh, 0, result.OriginInitial, 0, 0)
@@ -204,7 +204,7 @@ func TestMakePutback_OriginScoped(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			acc := &FreezeAccum{}
-			gs := &gameState{freeze: c.cfg, accum: acc}
+			gs := &gameState{freeze: c.cfg, accum: acc, foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 			if got := gs.makeValue2pt(net, bh50, 0, c.origin, 0, 0); got != c.wantMake {
 				t.Errorf("makeValue2pt(%s) = %v, want %v", c.origin, got, c.wantMake)
 			}
@@ -302,7 +302,7 @@ func TestFreeze_MakeReachesTransitionPath(t *testing.T) {
 		for seed := uint64(1); seed <= 300; seed++ {
 			offense := newTeamState(b.Players, 7, false)
 			defense := newTeamState(b.Players, 3, true)
-			gs := &gameState{rng: rng.New(seed), period: 1, clock: 500, madeFG: map[int]int{}, freeze: cfg}
+			gs := &gameState{rng: rng.New(seed), period: 1, clock: 500, madeFG: map[int]int{}, freeze: cfg, foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 			gs.runTransitionPossession(offense, defense, 0)
 			for _, e := range gs.events {
 				if e.Origin != result.OriginTransition || e.ShotType != result.ShotTwoPoint {

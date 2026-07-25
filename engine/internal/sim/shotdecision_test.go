@@ -98,7 +98,7 @@ func TestShotBaselineOrFallback(t *testing.T) {
 	if got := zero.shotBaselineOrFallback(); got != leagueBaselineFallback {
 		t.Errorf("zero-value gameState.shotBaselineOrFallback() = %v, want fallback %v", got, leagueBaselineFallback)
 	}
-	wired := gameState{shotBaseline: 19.7805}
+	wired := gameState{shotBaseline: 19.7805, foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 	if got := wired.shotBaselineOrFallback(); got != 19.7805 {
 		t.Errorf("wired gameState.shotBaselineOrFallback() = %v, want 19.7805 (pass-through)", got)
 	}

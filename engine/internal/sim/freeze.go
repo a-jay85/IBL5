@@ -543,6 +543,12 @@ type Options struct {
 	// to Simulate); non-nil → use the pointed-to value. Always a valid float when set.
 	StealTurnoverScale    *float64
 	NonStealTurnoverScale *float64
+	// FoulBucketScale overrides the foulBucketScale stand-in (bucketweights.go).
+	// nil ⇒ the const path, byte-identical to production.
+	FoulBucketScale *float64
+	// AndOneMadeRateScale overrides the andOneMadeRateScale stand-in
+	// (bucketweights.go). nil ⇒ the const path, byte-identical to production.
+	AndOneMadeRateScale *float64
 
 	// GateCont, when non-nil, harvests the L1 gate-1 decomposition instrument
 	// (ADR-0057/0058) across the run: at every offensive-rebound resolution it records
@@ -689,7 +695,7 @@ func (gs *gameState) turnoverProb(careless, pressure float64) float64 {
 // (leg C) carry the RAW HCA — see foulBucketWeight. hca=0 recovers the symmetric path.
 // mq is the possession's matchupQuality, the :97164 shrink operand (J18 item 6).
 func (gs *gameState) foulWeight(bh onCourt, offense, defenders []onCourt, hca, mq float64) float64 {
-	w := foulBucketWeight(bh, offense, defenders, hca, mq, gs.rng)
+	w := foulBucketWeight(bh, offense, defenders, hca, mq, gs.rng, gs.foulBucketScale)
 	if gs.accum != nil {
 		gs.accum.foulSum += w
 		gs.accum.foulN++

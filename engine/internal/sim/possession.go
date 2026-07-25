@@ -86,7 +86,7 @@ func (gs *gameState) playBuckets(bh onCourt, offense, defense *teamState, hca, h
 		return twoPtBucketWeight(bh) + hcaScaled, raw3pt, foul
 	}
 	raw2pt := twoPtBucketWeight(bh)
-	foul := foulBucketWeight(bh, offense.players, defense.players, hca, mq, gs.rng)
+	foul := foulBucketWeight(bh, offense.players, defense.players, hca, mq, gs.rng, gs.foulBucketScale)
 	s2, s3, sf := gs.branchBShrink(raw2pt, raw3pt, foul, offense.drbRate, offense.astRate, bh.TransOff)
 	return s2 + hcaScaled, s3, sf
 }
@@ -284,7 +284,7 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 		in := outcomeInputs{
 			twoPtWeight:      twoPtW,
 			threePtWeight:    threePtW,
-			andOneWeight:     andOneBucketWeight(mq, bh) + hcaScaled, // leg D: e90 inherits e88's +hca
+			andOneWeight:     andOneBucketWeight(mq, bh, gs.andOneMadeRateScale) + hcaScaled, // leg D: e90 inherits e88's +hca
 			foulOnlyWeight:   foulW,
 			turnoverDefValue: energyCeiling(bh),
 		}

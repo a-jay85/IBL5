@@ -117,6 +117,8 @@ type gameState struct {
 	// (J14 research sweep). Populated once per game in simGameWith.
 	stealTurnoverScale    float64
 	nonStealTurnoverScale float64
+	foulBucketScale       float64
+	andOneMadeRateScale   float64
 
 	// transitionShotRate is the Stage-3 decaying team shot-rate threshold for
 	// fast-break steal-success (00_MASTER_REFERENCE.md L900-914). It is seeded

@@ -100,7 +100,7 @@ func TestFreeThrows_ChargesDefenderAndShooter(t *testing.T) {
 	defense := newTeamState(b.Players, 3, true)
 	shooter := offense.players[0]
 	defender := defense.players[0]
-	gs := &gameState{rng: rng.New(1), period: 1, clock: 600}
+	gs := &gameState{rng: rng.New(1), period: 1, clock: 600, foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 
 	gs.freeThrows(offense, defense, shooter, defender, 2, 0)
 

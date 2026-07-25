@@ -44,7 +44,7 @@ func TestPutbackFaithful_MakeValueOriginScoped(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(string(c.origin), func(t *testing.T) {
-			gs := &gameState{} // zero freeze ⇒ faithful (production)
+			gs := &gameState{foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale} // zero freeze ⇒ faithful (production)
 			if got := gs.makeValue2pt(net, bh, 0, c.origin, 0, 0); got != c.want {
 				t.Errorf("makeValue2pt(%s) = %v, want %v", c.origin, got, c.want)
 			}
@@ -66,7 +66,7 @@ func TestPutbackFaithful_HarvestUsesNewBaseline(t *testing.T) {
 	putback := putbackValue2pt(bhFgp)
 
 	accPut := &FreezeAccum{}
-	gsPut := &gameState{accum: accPut}
+	gsPut := &gameState{accum: accPut, foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 	gsPut.makeValue2pt(net, bhFgp, 0, result.OriginOffReb, 0, 0)
 	if accPut.makeN != 1 || accPut.makeSum != putback {
 		t.Errorf("putback harvest = {n:%d sum:%v}, want {n:1 sum:%v (faithful putbackValue2pt)}", accPut.makeN, accPut.makeSum, putback)
@@ -76,7 +76,7 @@ func TestPutbackFaithful_HarvestUsesNewBaseline(t *testing.T) {
 	}
 
 	accInit := &FreezeAccum{}
-	gsInit := &gameState{accum: accInit}
+	gsInit := &gameState{accum: accInit, foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 	gsInit.makeValue2pt(net, bhFgp, 0, result.OriginInitial, 0, 0)
 	if accInit.makeSum != normal {
 		t.Errorf("initial harvest = %v, want normal %v (unchanged)", accInit.makeSum, normal)
@@ -95,13 +95,13 @@ func TestPutbackFaithful_EscapeHatchRestoresMaster(t *testing.T) {
 	bh := oc(slotPG, mkPlayer(1, 1, slotPG, fgp)) // FGP=50, D64=D60=0 → fallback path
 	normal := shotValue2pt(net, bh, 0, false, leagueBaselineFallback, 0, 0)
 
-	gs := &gameState{freeze: FreezeConfig{UnfaithfulPutback: true}}
+	gs := &gameState{freeze: FreezeConfig{UnfaithfulPutback: true}, foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 	if got := gs.makeValue2pt(net, bh, 0, result.OriginOffReb, 0, 0); got != normal {
 		t.Errorf("escape-hatch putback make-value = %v, want OLD net-coupled %v", got, normal)
 	}
 	// And the harvest under the escape hatch records the old value too (a faithful OFF baseline).
 	acc := &FreezeAccum{}
-	gsAcc := &gameState{freeze: FreezeConfig{UnfaithfulPutback: true}, accum: acc}
+	gsAcc := &gameState{freeze: FreezeConfig{UnfaithfulPutback: true}, accum: acc, foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 	gsAcc.makeValue2pt(net, bh, 0, result.OriginOffReb, 0, 0)
 	if acc.makeSum != normal {
 		t.Errorf("escape-hatch harvest = %v, want OLD net-coupled %v", acc.makeSum, normal)

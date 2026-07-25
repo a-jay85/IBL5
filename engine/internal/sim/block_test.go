@@ -17,7 +17,7 @@ func TestCreditBlock_CreditsDefenderOnMiss(t *testing.T) {
 		offense, defense := twoTeams()
 		shooter := offense.players[0]
 		defender := defense.players[0]
-		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500}
+		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500, foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 
 		score0 := offense.score
 		made0 := gs.madeFG[shooter.PID]
@@ -67,7 +67,7 @@ func TestCreditBlock_NeverFlipsMake(t *testing.T) {
 	shooter := offense.players[0]
 	defender := defense.players[0]
 	// Pre-credit a made shot, as the half-court loop would on a make.
-	gs := &gameState{rng: rng.New(1), period: 1, clock: 500}
+	gs := &gameState{rng: rng.New(1), period: 1, clock: 500, foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 	gs.creditMadeFieldGoal(offense, shooter, result.ShotTwoPoint, result.OriginInitial, 0)
 	made0 := gs.madeFG[shooter.PID]
 	score0 := offense.score
@@ -104,7 +104,7 @@ func TestFreeThrows_NeverBlocked(t *testing.T) {
 		offense, defense := twoTeams()
 		shooter := offense.players[0]
 		defender := defense.players[0]
-		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500}
+		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500, foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 		gs.freeThrows(offense, defense, shooter, defender, 2, 0)
 		for _, e := range gs.events {
 			if e.Kind == result.EventBlock {

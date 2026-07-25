@@ -32,7 +32,7 @@ func assembleInputs(foulWeight, hca float64) outcomeInputs {
 	return outcomeInputs{
 		twoPtWeight:      twoPtBucketWeight(bh) + hca,
 		threePtWeight:    threePtBucketWeight(bh),
-		andOneWeight:     andOneBucketWeight(mq, bh),
+		andOneWeight:     andOneBucketWeight(mq, bh, andOneMadeRateScale),
 		foulOnlyWeight:   foulWeight,
 		turnoverDefValue: 0,
 	}
@@ -122,7 +122,7 @@ func TestBucketWeights_TwoPtComposite(t *testing.T) {
 	baseline := foulDivisorTeamDefCoef * defQualityCapTeamMult * leagueSTL48
 	factor := 1.0 + (defQuality(def)-baseline)/offQuality(off)
 	wantFoul := base * factor * foulBucketScale
-	foul := foulBucketWeight(p, off, def, 0, 0, rng.New(1))
+	foul := foulBucketWeight(p, off, def, 0, 0, rng.New(1), foulBucketScale)
 	if math.Abs(foul-wantFoul) > 1e-9 {
 		t.Errorf("foulBucketWeight = %.6f, want base·factor·scale = %.6f", foul, wantFoul)
 	}
@@ -155,7 +155,7 @@ func TestBucketWeights_FoulDivisor(t *testing.T) {
 		t.Fatalf("test setup: balanced-matchup factor %.4f should be > 0 (deterministic path, no redraw)", factor)
 	}
 	want := base * factor * foulBucketScale
-	if got := foulBucketWeight(bh, off, def, 0, 0, rng.New(1)); math.Abs(got-want) > 1e-9 {
+	if got := foulBucketWeight(bh, off, def, 0, 0, rng.New(1), foulBucketScale); math.Abs(got-want) > 1e-9 {
 		t.Errorf("foulBucketWeight = %.6f, want base·factor·scale = %.6f (factor=%.4f)", got, want, factor)
 	}
 
@@ -163,7 +163,7 @@ func TestBucketWeights_FoulDivisor(t *testing.T) {
 	// depends only on the (bh, offense, defense) inputs — the same seed yields the same
 	// value. (The ±0.2 half-court HCA legs are exercised separately; here hca=0 isolates
 	// the symmetric base. Structural, not a knob.)
-	if a, b := foulBucketWeight(bh, off, def, 0, 0, rng.New(42)), foulBucketWeight(bh, off, def, 0, 0, rng.New(42)); a != b {
+	if a, b := foulBucketWeight(bh, off, def, 0, 0, rng.New(42), foulBucketScale), foulBucketWeight(bh, off, def, 0, 0, rng.New(42), foulBucketScale); a != b {
 		t.Errorf("weight not lineup-deterministic: %v vs %v", a, b)
 	}
 
@@ -172,7 +172,7 @@ func TestBucketWeights_FoulDivisor(t *testing.T) {
 	// finite, non-negative value.
 	r := rng.New(1988)
 	for i := 0; i < 1_000; i++ {
-		got := foulBucketWeight(bh, off, def, 0, 0, r)
+		got := foulBucketWeight(bh, off, def, 0, 0, r, foulBucketScale)
 		if math.IsNaN(got) || math.IsInf(got, 0) || got < 0 {
 			t.Fatalf("draw #%d non-finite/negative: %v", i, got)
 		}
@@ -202,7 +202,7 @@ func TestBucketWeights_FoulDivisor(t *testing.T) {
 	ceil := foulFloor * foulBucketScale
 	rr := rng.New(5)
 	for i := 0; i < 1000; i++ {
-		got := foulBucketWeight(loOff[0], loOff, weakDef, 0, 0, rr)
+		got := foulBucketWeight(loOff[0], loOff, weakDef, 0, 0, rr, foulBucketScale)
 		if math.IsNaN(got) || math.IsInf(got, 0) || got < 0 || got >= ceil {
 			t.Fatalf("redraw #%d out of [0, %.2f): %v", i, ceil, got)
 		}
@@ -264,7 +264,7 @@ func TestBucketWeights_FoulBucketHCALegs_DecompilePin(t *testing.T) {
 		h    float64
 	}{{"symmetric", 0}, {"home", +hca}, {"away", -hca}} {
 		want := wantE80(tc.h)
-		got := foulBucketWeight(bh, off, def, tc.h, 0, rng.New(1))
+		got := foulBucketWeight(bh, off, def, tc.h, 0, rng.New(1), foulBucketScale)
 		if math.Abs(got-want) > 1e-9 {
 			t.Errorf("%s: foulBucketWeight = %.9f, want hand-computed e80 = %.9f", tc.name, got, want)
 		}
@@ -319,7 +319,7 @@ func TestBucketWeights_FoulNetAdvantageShrink_DecompilePin(t *testing.T) {
 	def := fiveStarters(7)
 	bh := oc(slotPG, mkPlayer(1, 3, slotPG, 48))
 
-	w0 := foulBucketWeight(bh, off, def, 0, 0, rng.New(1))
+	w0 := foulBucketWeight(bh, off, def, 0, 0, rng.New(1), foulBucketScale)
 	if w0 <= 0 {
 		t.Fatalf("test setup: mq=0 weight %.6f should be > 0 (deterministic path)", w0)
 	}
@@ -329,7 +329,7 @@ func TestBucketWeights_FoulNetAdvantageShrink_DecompilePin(t *testing.T) {
 	threshold := 4.0 * leagueTOV48 // 13.4126
 	for _, mq := range []float64{-0.5, -0.02, 0.18, 0.8, 5.0, 13.0} {
 		want := w0 * (1.0 - mq/threshold)
-		if got := foulBucketWeight(bh, off, def, 0, mq, rng.New(1)); math.Abs(got-want) > 1e-9 {
+		if got := foulBucketWeight(bh, off, def, 0, mq, rng.New(1), foulBucketScale); math.Abs(got-want) > 1e-9 {
 			t.Errorf("mq=%.2f: foulBucketWeight = %.9f, want w0·(1 − mq/%.4f) = %.9f", mq, got, threshold, want)
 		}
 	}
@@ -339,7 +339,7 @@ func TestBucketWeights_FoulNetAdvantageShrink_DecompilePin(t *testing.T) {
 	ceil := foulFloor * foulBucketScale
 	r := rng.New(5)
 	for i := 0; i < 1000; i++ {
-		got := foulBucketWeight(bh, off, def, 0, threshold+1.0, r)
+		got := foulBucketWeight(bh, off, def, 0, threshold+1.0, r, foulBucketScale)
 		if math.IsNaN(got) || math.IsInf(got, 0) || got < 0 || got >= ceil {
 			t.Fatalf("redraw #%d out of [0, %.2f): %v", i, ceil, got)
 		}

@@ -278,8 +278,8 @@ func threePtBucketWeight(p onCourt) float64 {
 // andOneBucketFloor (0.03, the verbatim JSB floor). The mq term (≈−0.02 under
 // default ratings) contributes negligible negative weight; the made-rate term
 // carries the bucket above the floor. Unchanged from the faithful #952 basis.
-func andOneBucketWeight(mq float64, p onCourt) float64 {
-	w := mq*0.25 + float64(floor1(p.FGP))*andOneMadeRateScale
+func andOneBucketWeight(mq float64, p onCourt, scale float64) float64 {
+	w := mq*0.25 + float64(floor1(p.FGP))*scale
 	if w < andOneBucketFloor {
 		return andOneBucketFloor
 	}
@@ -333,7 +333,7 @@ func andOneBucketWeight(mq float64, p onCourt) float64 {
 // share modulation today and matures automatically when those aggregates land.
 // The redraw threshold (mq > 13.4126, J16 §4) stays unreachable at stub values —
 // exactly 5.60's behavior, where realistic rosters never reach it either.
-func foulBucketWeight(bh onCourt, offense, defenders []onCourt, hca, mq float64, r *rng.RNG) float64 {
+func foulBucketWeight(bh onCourt, offense, defenders []onCourt, hca, mq float64, r *rng.RNG, scale float64) float64 {
 	// leg B (site-2 e80, decompile :97160): the foul BASE is reduced by the RAW s·hca
 	// BEFORE the coupling factor. Home (hca>0) → smaller base → home draws FEWER fouls
 	// (anti-home). RAW, not scaled: the base is on the faithful CEngine TOV48 basis.
@@ -348,14 +348,14 @@ func foulBucketWeight(bh onCourt, offense, defenders []onCourt, hca, mq float64,
 	shrink := 1.0 - mq/(4.0*leagueTOV48)
 	if offQ <= 0 {
 		// divide-by-zero guard (unreachable: floor1 ⇒ offQ > 0); base only, no factor.
-		return base * shrink * foulBucketScale
+		return base * shrink * scale
 	}
 	baseline := foulDivisorTeamDefCoef * defQualityCapTeamMult * leagueSTL48
 	factor := 1.0 + (defQuality(defenders)-baseline)/offQ
 	w := base * factor * shrink
 	if w <= 0 {
 		// faithful floor redraw (:97170) — reachable symmetrically.
-		return r.Float64() * foulFloor * foulBucketScale
+		return r.Float64() * foulFloor * scale
 	}
-	return w * foulBucketScale
+	return w * scale
 }

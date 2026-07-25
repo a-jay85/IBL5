@@ -19,7 +19,7 @@ func expectedUsage(transOff int, drbRate, astRate float64) float64 {
 // bucket ×= s. Pinned against the literal constants, not a recomputation.
 func TestBranchBShrink_Arithmetic(t *testing.T) {
 	acc := &BranchBAccum{}
-	gs := &gameState{branchB: acc}
+	gs := &gameState{branchB: acc, foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 	raw2pt, raw3pt, rawFoul := 20.0, 5.0, 0.6
 	drbRate, astRate, transOff := 150.0, 90.0, 7
 
@@ -52,7 +52,7 @@ func TestBranchBShrink_Arithmetic(t *testing.T) {
 // their pairwise ratios are preserved (NOT 2pt-only). Uses three distinct nonzero
 // composites so a 2pt-only shrink would visibly skew the ratios.
 func TestBranchBShrink_Proportional(t *testing.T) {
-	gs := &gameState{}
+	gs := &gameState{foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 	raw2pt, raw3pt, rawFoul := 22.0, 6.0, 0.8
 	s2, s3, sf := gs.branchBShrink(raw2pt, raw3pt, rawFoul, 120.0, 80.0, 5)
 
@@ -84,7 +84,7 @@ func TestBranchBShrink_BranchAColdStart(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			acc := &BranchBAccum{}
-			gs := &gameState{branchB: acc}
+			gs := &gameState{branchB: acc, foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 			s2, s3, sf := gs.branchBShrink(c.raw2pt, c.raw3pt, c.rawFoul, c.drbRate, c.astRate, c.transOff)
 			if s2 != c.raw2pt || s3 != c.raw3pt || sf != c.rawFoul {
 				t.Errorf("buckets changed: got (%v,%v,%v), want (%v,%v,%v)", s2, s3, sf, c.raw2pt, c.raw3pt, c.rawFoul)
@@ -105,7 +105,7 @@ func TestBranchBShrink_BranchAColdStart(t *testing.T) {
 // go negative; outcomeInputs.weight() clamps each to 0 and the selector still
 // normalizes over whatever non-negative mass remains.
 func TestBranchBShrink_OverShrinkClampedByWeight(t *testing.T) {
-	gs := &gameState{}
+	gs := &gameState{foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 	// huge rates + high TransOff drive usage far above ΣD (≈25.6).
 	s2, s3, sf := gs.branchBShrink(20, 5, 0.6, 900, 600, 9)
 	if s2 >= 0 {
@@ -140,11 +140,11 @@ func TestPlayBuckets_HCADeltaInvariantToBranchB(t *testing.T) {
 	hcaScaled := hcaHome * hcaSite2BasisScale         // scaled site-2 addend (legs A/D)
 
 	// BranchB OFF: home 2pt = raw2pt + hca, home foul = det_home.
-	gsOff := &gameState{rng: rng.New(42)}
+	gsOff := &gameState{rng: rng.New(42), foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 	offH2, _, offHF := gsOff.playBuckets(bh, offense, defense, hcaHome, hcaScaled, 0, true)
 
 	// BranchB ON: home 2pt = s*raw2pt + hca, home foul = s*det_home (s < 1).
-	gsOn := &gameState{rng: rng.New(42)}
+	gsOn := &gameState{rng: rng.New(42), foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 	gsOn.freeze.BranchB = true
 	onH2, _, onHF := gsOn.playBuckets(bh, offense, defense, hcaHome, hcaScaled, 0, true)
 

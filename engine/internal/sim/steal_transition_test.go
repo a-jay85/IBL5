@@ -211,7 +211,7 @@ func TestPossession_MadeShotReturnsNormal_DRBReturnsNotSteal(t *testing.T) {
 	var seenMadeNormal, seenDRBNotSteal bool
 	for seed := uint64(1); seed <= 400; seed++ {
 		offense, defense := twoTeams()
-		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500}
+		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500, foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 		outcome := possession(gs, offense, defense, 0, possNormal)
 		dreb, steal, made := classifyEnding(gs.events)
 		switch {

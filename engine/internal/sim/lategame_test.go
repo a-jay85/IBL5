@@ -57,7 +57,7 @@ func TestLateGameForcing(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			gs := &gameState{rng: rng.New(0), period: tc.period, clock: tc.clock}
+			gs := &gameState{rng: rng.New(0), period: tc.period, clock: tc.clock, foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 			bh := onCourt{Player: bundle.Player{DriveOff: tc.driveOff}}
 			gotForced, gotClock := gs.lateGameForcing(tc.scoreDiff, bh)
 			if gotForced != tc.wantForced || gotClock != tc.wantClock {

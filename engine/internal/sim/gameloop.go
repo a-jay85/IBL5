@@ -49,6 +49,20 @@ func resolveNonStealTurnoverScale(opts Options) float64 {
 	return nonStealTurnoverScale
 }
 
+func resolveFoulBucketScale(opts Options) float64 {
+	if opts.FoulBucketScale != nil {
+		return *opts.FoulBucketScale
+	}
+	return foulBucketScale
+}
+
+func resolveAndOneMadeRateScale(opts Options) float64 {
+	if opts.AndOneMadeRateScale != nil {
+		return *opts.AndOneMadeRateScale
+	}
+	return andOneMadeRateScale
+}
+
 // simGameWith is simGame plus the freeze/accumulation Options (freeze.go). A zero
 // Options leaves every possession decision byte-identical to simGame; a non-zero
 // Options either harvests league-mean derived values (opts.Accum) or substitutes a
@@ -95,6 +109,8 @@ func simGameWith(b bundle.Bundle, g bundle.Game, r *rng.RNG, opts Options) (resu
 	baseTime := resolveBaseTimeMid(opts)
 	gs.stealTurnoverScale = resolveStealTurnoverScale(opts)
 	gs.nonStealTurnoverScale = resolveNonStealTurnoverScale(opts)
+	gs.foulBucketScale = resolveFoulBucketScale(opts)
+	gs.andOneMadeRateScale = resolveAndOneMadeRateScale(opts)
 
 	// Tip-off winner starts on offense; possessions strictly alternate.
 	offense, defense := visitor, home

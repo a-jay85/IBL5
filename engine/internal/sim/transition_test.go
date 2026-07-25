@@ -27,7 +27,7 @@ func TestRunTransitionPossession_ThreePtReachableAndSuppressable(t *testing.T) {
 		offense, defense := twoTeams()
 
 		// Default arm: faithful port — 3pt is eligible on fast breaks.
-		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500}
+		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500, foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 		gs.transitionShotRate = resetTransitionShotRate(offense)
 		gs.runTransitionPossession(offense, defense, 0)
 		for _, e := range gs.events {
@@ -40,7 +40,7 @@ func TestRunTransitionPossession_ThreePtReachableAndSuppressable(t *testing.T) {
 		}
 
 		// Suppress arm: SuppressTransition3pt=true must block all transition 3pt.
-		gs2 := &gameState{rng: rng.New(seed), period: 1, clock: 500, freeze: FreezeConfig{SuppressTransition3pt: true}}
+		gs2 := &gameState{rng: rng.New(seed), period: 1, clock: 500, freeze: FreezeConfig{SuppressTransition3pt: true}, foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 		gs2.transitionShotRate = resetTransitionShotRate(offense)
 		gs2.runTransitionPossession(offense, defense, 0)
 		for _, e := range gs2.events {
@@ -77,7 +77,7 @@ func TestRunTransitionPossession_FoulBucketSideSymmetric(t *testing.T) {
 		for seed := uint64(1); seed <= 3000; seed++ {
 			offense := newTeamState(b.Players, offTeam, isHome)
 			defense := newTeamState(b.Players, defTeam, !isHome)
-			gs := &gameState{rng: rng.New(seed), gameType: bundle.GameTypeRegular, period: 1, clock: 500}
+			gs := &gameState{rng: rng.New(seed), gameType: bundle.GameTypeRegular, period: 1, clock: 500, foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 			gs.transitionShotRate = resetTransitionShotRate(offense)
 			gs.runTransitionPossession(offense, defense, 0)
 			for _, e := range gs.events {
@@ -193,7 +193,7 @@ func TestTransitionStealSucceeds_DecayFloors(t *testing.T) {
 	z.BLK = 0
 	defense := onePlayerTeam(z)
 
-	gs := &gameState{rng: rng.New(1), period: 1, clock: 500}
+	gs := &gameState{rng: rng.New(1), period: 1, clock: 500, foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 	gs.transitionShotRate = 5.0
 	want := []float64{3.0, 2.0, 2.0, 2.0, 2.0} // 5→3→floor 2, then stays
 	for i, w := range want {
@@ -218,7 +218,7 @@ func TestTransitionStealSucceeds_FailsWhenRateZero(t *testing.T) {
 	big.BLK = 100
 	defense := onePlayerTeam(big)
 	for seed := uint64(1); seed <= 200; seed++ {
-		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500}
+		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500, foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 		gs.transitionShotRate = 0
 		if gs.transitionStealSucceeds(defense) {
 			t.Fatalf("seed %d: steal-success must fail when rate=0, blk>0", seed)
@@ -274,7 +274,7 @@ func TestPossession_FastBreakFlagMatchesEnding(t *testing.T) {
 	var seenMade, seenDReb, seenSteal bool
 	for seed := uint64(1); seed <= 400; seed++ {
 		offense, defense := twoTeams()
-		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500, stealTurnoverScale: stealTurnoverScale, nonStealTurnoverScale: nonStealTurnoverScale}
+		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500, stealTurnoverScale: stealTurnoverScale, nonStealTurnoverScale: nonStealTurnoverScale, foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 		outcome := possession(gs, offense, defense, 0, possNormal)
 		dreb, steal, made := classifyEnding(gs.events)
 		var want possOutcome
@@ -315,7 +315,7 @@ func TestPossession_PendingConsumedOnStageTwoFail(t *testing.T) {
 	var seenClearedDespitePending bool
 	for seed := uint64(1); seed <= 400; seed++ {
 		offense, defense := noTransitionTeams()
-		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500}
+		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500, foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 		// fbPending = true (prev == possSteal), but TransOff=0 means Stage 2 always fails.
 		outcome := possession(gs, offense, defense, 0, possSteal)
 		if gs.transitions != 0 {
@@ -383,7 +383,7 @@ func alwaysTransitionTeams() (*teamState, *teamState) {
 func TestDRBPushGate_FiresSetsFlag(t *testing.T) {
 	for seed := uint64(1); seed <= 300; seed++ {
 		offense, defense := alwaysTransitionTeams()
-		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500}
+		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500, foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 		possession(gs, offense, defense, 0, possDRB)
 		if !gs.drbPushFired {
 			t.Fatalf("seed %d: TransOff=denom + prev=possDRB must always set drbPushFired", seed)
@@ -399,7 +399,7 @@ func TestDRBPushGate_FiresSetsFlag(t *testing.T) {
 func TestDRBPushGate_FailsClearsFlag(t *testing.T) {
 	for seed := uint64(1); seed <= 300; seed++ {
 		offense, defense := noTransitionTeams()
-		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500}
+		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500, foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 		possession(gs, offense, defense, 0, possDRB)
 		if gs.drbPushFired {
 			t.Fatalf("seed %d: TransOff=0 must never set drbPushFired", seed)
@@ -416,7 +416,7 @@ func TestDRBPushGate_FailsClearsFlag(t *testing.T) {
 func TestDRBPushGate_OnlyArmsOnDRBPrev(t *testing.T) {
 	for seed := uint64(1); seed <= 300; seed++ {
 		offense, defense := alwaysTransitionTeams()
-		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500}
+		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500, foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 		possession(gs, offense, defense, 0, possSteal)
 		if gs.drbPushFired {
 			t.Fatalf("seed %d: prev=possSteal must never set drbPushFired even when Stage-2 always fires", seed)
@@ -433,7 +433,7 @@ func TestDRBPushGate_OnlyArmsOnDRBPrev(t *testing.T) {
 func TestDRBPushGate_ResetsAcrossPossessions(t *testing.T) {
 	for seed := uint64(1); seed <= 300; seed++ {
 		offense, defense := alwaysTransitionTeams()
-		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500}
+		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500, foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 		possession(gs, offense, defense, 0, possDRB)
 		if !gs.drbPushFired {
 			t.Fatalf("seed %d: setup failed — drbPushFired not set by the first (DRB-armed) possession", seed)

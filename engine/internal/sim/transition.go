@@ -163,7 +163,7 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 		in := outcomeInputs{
 			twoPtWeight:      twoPtW,
 			threePtWeight:    threePtW,
-			andOneWeight:     andOneBucketWeight(mq, bh),
+			andOneWeight:     andOneBucketWeight(mq, bh, gs.andOneMadeRateScale),
 			foulOnlyWeight:   foulW,
 			turnoverDefValue: energyCeiling(bh),
 		}

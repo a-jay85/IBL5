@@ -156,7 +156,7 @@ func TestMaybeInjure_FiresAndMarks(t *testing.T) {
 	bh := oc(slotPG, mkPlayer(101, 7, slotPG, 50))
 
 	// Seed 21's first Float64() < injuryProbability → the injury fires.
-	gsFire := &gameState{rng: rng.New(21), period: 2, clock: 333}
+	gsFire := &gameState{rng: rng.New(21), period: 2, clock: 333, foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 	team := injTeam(7)
 	gsFire.maybeInjure(team, bh)
 	if len(gsFire.events) != 1 || gsFire.events[0].Kind != result.EventInjury {
@@ -177,7 +177,7 @@ func TestMaybeInjure_FiresAndMarks(t *testing.T) {
 	}
 
 	// Seed 1's first Float64() ≥ injuryProbability → no injury.
-	gsNo := &gameState{rng: rng.New(1), period: 1, clock: 600}
+	gsNo := &gameState{rng: rng.New(1), period: 1, clock: 600, foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 	teamNo := injTeam(7)
 	gsNo.maybeInjure(teamNo, bh)
 	if len(gsNo.events) != 0 {
@@ -235,7 +235,7 @@ func TestMaybeInjure_DrawCount(t *testing.T) {
 
 	// No injury (seed 1): exactly 1 draw consumed. A reference RNG advanced by 1
 	// must then track gs.rng exactly.
-	gs1 := &gameState{rng: rng.New(1)}
+	gs1 := &gameState{rng: rng.New(1), foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 	gs1.maybeInjure(injTeam(7), bh)
 	ref1 := rng.New(1)
 	ref1.Float64() // the single probability roll
@@ -244,7 +244,7 @@ func TestMaybeInjure_DrawCount(t *testing.T) {
 	}
 
 	// Injury (seed 21): exactly 3 draws consumed (prob, severity, games-missed).
-	gs3 := &gameState{rng: rng.New(21)}
+	gs3 := &gameState{rng: rng.New(21), foulBucketScale: foulBucketScale, andOneMadeRateScale: andOneMadeRateScale}
 	gs3.maybeInjure(injTeam(7), bh)
 	ref3 := rng.New(21)
 	ref3.Float64() // probability roll (fires)

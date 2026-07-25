@@ -53,6 +53,21 @@ class GameBoxscoreView implements GameBoxscoreViewInterface
     private const COLUMN_COUNT = 17;
 
     /**
+     * Right-border separators marking stat-group boundaries, keyed by the
+     * STAT_COLUMNS key of the LAST column in each group. Team-colored for
+     * major boundaries, gray for the shooting-pair splits.
+     *
+     * @var array<string, string>
+     */
+    private const COLUMN_SEPARATORS = [
+        'min' => 'sep-r-team',
+        'fga' => 'sep-r-weak',
+        'fta' => 'sep-r-weak',
+        'tpa' => 'sep-r-team',
+        'pts' => 'sep-r-team',
+    ];
+
+    /**
      * @see GameBoxscoreViewInterface::render()
      *
      * @param GameBoxscoreViewModel $viewModel
@@ -183,7 +198,8 @@ class GameBoxscoreView implements GameBoxscoreViewInterface
             . ' data-team-panel="' . $side . '">';
         $output .= '<h2 class="ibl-table-title">' . $safeCity . ' ' . $safeName . '</h2>';
         $output .= '<div class="table-scroll-wrapper"><div class="table-scroll-container">';
-        $output .= '<table class="ibl-data-table sortable game-boxscore__table">';
+        $output .= '<table class="ibl-data-table team-table sortable game-boxscore__table"'
+            . ' style="' . TableStyles::inlineTeamVars($team['color1'], $team['color2']) . '">';
         $output .= $this->renderTableHead();
         $output .= '<tbody>';
 
@@ -211,10 +227,12 @@ class GameBoxscoreView implements GameBoxscoreViewInterface
      */
     private function renderTableHead(): string
     {
-        $output = '<thead><tr><th>Pos</th><th>Name</th>';
+        $output = '<thead><tr><th>Pos</th><th class="sep-r-team">Name</th>';
 
         foreach (self::STAT_COLUMNS as $key => $label) {
-            $attr = $key === 'pts' ? ' data-col="pts"' : '';
+            $separator = self::COLUMN_SEPARATORS[$key] ?? '';
+            $attr = $separator !== '' ? ' class="' . $separator . '"' : '';
+            $attr .= $key === 'pts' ? ' data-col="pts"' : '';
             $output .= '<th' . $attr . '>' . $label . '</th>';
         }
 
@@ -235,15 +253,17 @@ class GameBoxscoreView implements GameBoxscoreViewInterface
     {
         /** @var string $safePos */
         $safePos = HtmlSanitizer::safeHtmlOutput($player['pos']);
-        $nameCell = PlayerImageHelper::renderPlayerLink((int) $player['pid'], $player['name']);
 
         $output = '<tr>';
         $output .= '<td>' . $safePos . '</td>';
-        $output .= '<td class="player-cell">' . $nameCell . '</td>';
+        $output .= PlayerImageHelper::renderFlexiblePlayerCell(
+            (int) $player['pid'],
+            $player['name'],
+            'sep-r-team',
+        );
 
         foreach (array_keys(self::STAT_COLUMNS) as $key) {
-            $class = $key === 'pts' ? ' class="game-boxscore__cell--pts"' : '';
-            $output .= '<td' . $class . '>' . (int) $player[$key] . '</td>';
+            $output .= '<td' . self::statCellAttr($key) . '>' . (int) $player[$key] . '</td>';
         }
 
         $output .= '</tr>';
@@ -259,16 +279,30 @@ class GameBoxscoreView implements GameBoxscoreViewInterface
      */
     private function renderTotalsRow(array $totals): string
     {
-        $output = '<tr class="game-boxscore__totals"><td>Totals</td><td></td>';
+        $output = '<tr class="game-boxscore__totals"><td>Totals</td><td class="sep-r-team"></td>';
 
         foreach (array_keys(self::STAT_COLUMNS) as $key) {
-            $class = $key === 'pts' ? ' class="game-boxscore__cell--pts"' : '';
-            $output .= '<td' . $class . '>' . (int) $totals[$key] . '</td>';
+            $output .= '<td' . self::statCellAttr($key) . '>' . (int) $totals[$key] . '</td>';
         }
 
         $output .= '</tr>';
 
         return $output;
+    }
+
+    /**
+     * Build the class attribute for one stat cell: its group separator (if any)
+     * plus the PTS emphasis class. Returns '' when neither applies.
+     */
+    private static function statCellAttr(string $key): string
+    {
+        $classes = self::COLUMN_SEPARATORS[$key] ?? '';
+
+        if ($key === 'pts') {
+            $classes = trim($classes . ' game-boxscore__cell--pts');
+        }
+
+        return $classes === '' ? '' : ' class="' . $classes . '"';
     }
 
     /**

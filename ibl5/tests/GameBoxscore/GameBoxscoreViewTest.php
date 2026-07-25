@@ -43,27 +43,57 @@ class GameBoxscoreViewTest extends TestCase
 
         self::assertStringContainsString('data-team-panel="away"', $output);
         self::assertStringContainsString('data-team-panel="home"', $output);
-        self::assertSame(2, substr_count($output, 'class="ibl-data-table sortable game-boxscore__table"'));
+        self::assertSame(
+            2,
+            substr_count($output, 'class="ibl-data-table team-table sortable game-boxscore__table"'),
+        );
 
         // Home is the default-selected side.
         self::assertStringContainsString('id="boxscore-team-home" checked', $output);
         self::assertStringNotContainsString('id="boxscore-team-away" checked', $output);
     }
 
+    public function testEachTableCarriesItsOwnTeamColorVariables(): void
+    {
+        $output = $this->view->render($this->buildViewModel());
+
+        // Away table takes the away team's colour pair, home table the home pair.
+        self::assertStringContainsString(
+            'game-boxscore__table" style="--team-color-primary: #FF0000; --team-color-secondary: #0000FF;"',
+            $output,
+        );
+        self::assertStringContainsString(
+            'game-boxscore__table" style="--team-color-primary: #00FF00; --team-color-secondary: #FFFF00;"',
+            $output,
+        );
+    }
+
+    public function testNameCellUsesIblPlayerCell(): void
+    {
+        $output = $this->view->render($this->buildViewModel());
+
+        self::assertStringContainsString('<td class="ibl-player-cell sep-r-team">', $output);
+        self::assertStringNotContainsString('<td class="player-cell">', $output);
+    }
+
     public function testRendersAllSeventeenColumnsInOrder(): void
     {
         $output = $this->view->render($this->buildViewModel());
 
+        // Group boundaries carry sep-r-* right borders: after Name, Min, 3PA and PTS
+        // (team-coloured) and after each shooting pair's attempts column (weak).
         $expectedOrder = [
-            '<th>Pos</th>', '<th>Name</th>', '<th>Min</th>', '<th>FGM</th>', '<th>FGA</th>',
-            '<th>FTM</th>', '<th>FTA</th>', '<th>3PM</th>', '<th>3PA</th>',
-            '<th data-col="pts">PTS</th>', '<th>ORB</th>', '<th>REB</th>', '<th>AST</th>',
+            '<th>Pos</th>', '<th class="sep-r-team">Name</th>', '<th class="sep-r-team">Min</th>',
+            '<th>FGM</th>', '<th class="sep-r-weak">FGA</th>',
+            '<th>FTM</th>', '<th class="sep-r-weak">FTA</th>',
+            '<th>3PM</th>', '<th class="sep-r-team">3PA</th>',
+            '<th class="sep-r-team" data-col="pts">PTS</th>', '<th>ORB</th>', '<th>REB</th>', '<th>AST</th>',
             '<th>STL</th>', '<th>BLK</th>', '<th>TOV</th>', '<th>PF</th>',
         ];
 
         self::assertCount(17, $expectedOrder);
         self::assertStringContainsString(implode('', $expectedOrder), $output);
-        self::assertStringContainsString('<td class="game-boxscore__cell--pts">30</td>', $output);
+        self::assertStringContainsString('<td class="sep-r-team game-boxscore__cell--pts">30</td>', $output);
     }
 
     public function testRendersTotalsRowInTfoot(): void
@@ -73,9 +103,10 @@ class GameBoxscoreViewTest extends TestCase
         self::assertStringContainsString('<tfoot><tr class="game-boxscore__totals">', $output);
         // Away totals: 30 + 20 = 50 points.
         self::assertStringContainsString(
-            '<tr class="game-boxscore__totals"><td>Totals</td><td></td>'
-                . '<td>60</td><td>18</td><td>34</td><td>8</td><td>10</td><td>4</td><td>11</td>'
-                . '<td class="game-boxscore__cell--pts">50</td>',
+            '<tr class="game-boxscore__totals"><td>Totals</td><td class="sep-r-team"></td>'
+                . '<td class="sep-r-team">60</td><td>18</td><td class="sep-r-weak">34</td>'
+                . '<td>8</td><td class="sep-r-weak">10</td><td>4</td><td class="sep-r-team">11</td>'
+                . '<td class="sep-r-team game-boxscore__cell--pts">50</td>',
             $output,
         );
     }

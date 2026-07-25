@@ -152,9 +152,10 @@
     font-weight: 700;
 }
 
+/* Background comes from .team-table tfoot tr (--team-row-highlight-bg), which
+   outspecifies this rule anyway — only the weight belongs here. */
 .game-boxscore__totals {
     font-weight: 700;
-    background: var(--gray-100);
 }
 
 .game-boxscore__empty {

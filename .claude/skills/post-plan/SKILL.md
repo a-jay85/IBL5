@@ -336,7 +336,54 @@ Auto-merge was already armed (or deliberately not armed) in Phase 6.5 — this p
 
 ## Phase 9: Retrospective
 
-Before saving any memory, ask: **"Can this be a PHPStan rule instead?"** If the mistake is mechanical and deterministic, it belongs in `ibl5/phpstan-rules/` as a new custom rule — open a TODO comment in the plan file rather than a memory entry. (For an **engine-side** learning, the analog is: "Can this be a `golangci-lint` linter or a `go vet` rule?" — a mechanical, deterministic Go mistake belongs in `engine/.golangci.yml` config or a custom analyzer, not memory.) Memories are for things a linter cannot express (architectural judgment, environment quirks, incident context).
+Read `IS_FIX_OF_PLAN_BEHAVIOR` from the Phase 3 classification summary already in this session's
+context — do not re-derive it.
+
+**If `IS_FIX_OF_PLAN_BEHAVIOR=false`** (this branch shipped something new), ask only the original
+question: **"Can this be a PHPStan rule instead?"** If the mistake is mechanical and deterministic, it
+belongs in `ibl5/phpstan-rules/` as a new custom rule — open a TODO comment in the plan file rather
+than a memory entry. (For an **engine-side** learning, the analog is: "Can this be a `golangci-lint`
+linter or a `go vet` rule?" — a mechanical, deterministic Go mistake belongs in `engine/.golangci.yml`
+config or a custom analyzer, not memory.) Then continue to the memory rule below.
+
+**If `IS_FIX_OF_PLAN_BEHAVIOR=true`** (this branch fixes behavior a merged plan shipped), the fix is
+evidence that a *class* of defect got past planning. Name the class in one sentence — the general
+shape, not this instance — then walk the ladder and stop at the **first** rung that can express it.
+Most mechanical first:
+
+**Rung 1 — a static-analysis rule.** A PHPStan rule in `ibl5/phpstan-rules/`, or for Go a
+`golangci-lint` linter or analyzer via `engine/.golangci.yml`. Use when the defect is decidable from
+source text alone.
+
+**Rung 2 — extend an existing `bin/check-*` gate.** Add the assertion to a gate that already runs in
+CI. Use when the defect is decidable from repo state (files, docs, config) but not from a single
+source file. Extend an existing gate; do not add a new one.
+
+**Rung 3 — a forced-trigger row in `.claude/review-shared/_plan-verification.md`.** Use when the
+defect is only catchable by a test the plan should have required. That file already carries the
+forced E2E trigger table and the forced manual-verification trigger table; add a row to whichever
+fits. A forced integration-verification trigger table is being added by the
+verification-forced-integration-triggers work — once it lands, cross-script wire contracts and
+environment preconditions belong there.
+
+**Rung 4 — a rule doc.** A new or amended file under `.claude/rules/`. Use when the defect needs
+judgment applied at a decision point, so no gate can decide it, but the guidance applies to every
+session.
+
+**Rung 5 — memory.** The fallback, governed by the paragraph below. Use only when the class is
+environment- or incident-specific and would not generalize into a rule doc.
+
+Then append one line to the `## Class registry` table in
+`ibl5/docs/backlog/loop-engineering-backlog.md`, in that section's existing format:
+
+```
+| <YYYY-MM-DD> | #<this PR> | class: <one-sentence class> | routed to: Rung <n> - <destination> | prior: <#PR, #PR or --> |
+```
+
+Before writing it, scan the existing rows for the same class. If one matches, put its PR numbers in
+`prior:` and route **one rung more mechanical** than that earlier line did — a recurrence means the
+rung chosen last time was too weak. If none matches, `prior:` is `--`. The table is append-only:
+never edit or delete an existing row.
 
 Save to memory only if something was learned that would **prevent a bug** in a future session AND cannot be mechanized AND isn't already in MEMORY.md, CLAUDE.md, `.claude/rules/`, or an existing PHPStan rule. Read the target memory file first to avoid duplicates. If nothing qualifies, skip silently.
 

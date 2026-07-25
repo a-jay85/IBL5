@@ -52,6 +52,32 @@ else
     bpt_fail "queued row should dispatch to classifier"
 fi
 
+# ── NEG — cron-setup refuses to install with an empty BUG_PIPELINE_APPROVER_ID ──
+# The var has no default, so an unset one interpolates into the plist as a
+# well-formed <string></string> and launchd hands the tick a value that reads exactly
+# like a configured one — both consumers then fail soft forever. Only the refusal path
+# is asserted: the success path would really bootstrap the live LaunchAgent.
+# `launchctl`/`gh` are stubbed and their logs asserted ABSENT, so a mis-ordered guard
+# fails a case here instead of tearing down the running job.
+_cs_home="$(mktemp -d)"
+mkdir -p "$_cs_home/bin"
+for _cs_bin in launchctl gh; do
+    cat > "$_cs_home/bin/$_cs_bin" <<SH
+#!/usr/bin/env bash
+echo "\$0 \$*" >> "$_cs_home/$_cs_bin.log"
+SH
+done
+chmod +x "$_cs_home"/bin/*
+env -u BUG_PIPELINE_APPROVER_ID HOME="$_cs_home" PATH="$_cs_home/bin:$PATH" \
+    "$(dirname "$BPT_DRIVER")/bug-pipeline-cron-setup" --install-schedule \
+    > "$_cs_home/guard.out" 2>&1
+bpt_expect_eq "empty APPROVER_ID → cron-setup exits 1" 1 "$?"
+bpt_log_has "$_cs_home" guard.out "BUG_PIPELINE_APPROVER_ID" "refusal names the unset var"
+bpt_file_absent "$_cs_home/Library/LaunchAgents/com.ibl5.bug-pipeline-cron.plist" \
+    "refusal writes no plist"
+bpt_file_absent "$_cs_home/launchctl.log" "refusal precedes every launchctl call"
+bpt_file_absent "$_cs_home/gh.log" "refusal precedes issue-tracking bootstrap"
+
 echo "----"
 [ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"
 exit "$FAILED"

@@ -272,6 +272,14 @@ class BugPipelineCliTest extends DatabaseTestCase
         foreach ([
             [(string) self::ID_QUEUED, 'not_a_status'],
             ['abc', 'queued'],
+            // A value opt passed space-separated: used to register a meaningless
+            // $flags['attempts'] and silently drop the 5 (the parser accepted anything).
+            [(string) self::ID_QUEUED, 'fixed', '--attempts', '5'],
+            // A typo'd/unknown option is a no-op UPDATE unless the parser rejects it.
+            [(string) self::ID_QUEUED, 'fixed', '--realese-lease'],
+            [(string) self::ID_QUEUED, 'fixed', '--bogus=1'],
+            // A flag given a value is equally a caller bug.
+            [(string) self::ID_QUEUED, 'fixed', '--release-lease=1'],
         ] as $badArgs) {
             $r = $this->runCli('transition.php', $badArgs);
             self::assertSame(1, $r['code'], 'expected exit 1 for: ' . implode(' ', $badArgs));

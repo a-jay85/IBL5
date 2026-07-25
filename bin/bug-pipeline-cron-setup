@@ -126,6 +126,28 @@ case "$ACTION" in
     build_plist
     ;;
   install)
+    # Refusal (checked first, before any launchctl call, so it is testable from a
+    # worktree): every required var must be set — don't install a job that fails every
+    # 180s. An unset var is NOT harmless here: build_plist writes ${VAR:-}, so it lands
+    # as a well-formed <string></string> and launchd hands the tick an empty value that
+    # reads exactly like a configured one. Both consumers of APPROVER_ID fail soft
+    # (gather stays gathering; give_up_needs_human logs "continuing"), so an empty id
+    # would silently mean no human is ever pinged — one log line per tick, forever.
+    # The same defect shipped live as an empty SIM_RECAP_DB_NAME (PR #1646). Fail at
+    # install time instead. Vars with a real non-empty default (BUG_PIPELINE_ISSUE_REPO)
+    # are deliberately NOT listed — they cannot be empty.
+    missing=""
+    # One-element loop on purpose: same shape as bin/sim-recap-cron-setup's refusal,
+    # so adding a second required var is a one-word edit.
+    # shellcheck disable=SC2043
+    for var in BUG_PIPELINE_APPROVER_ID; do
+      [ -n "${!var:-}" ] || missing="${missing} ${var}"
+    done
+    if [ -n "$missing" ]; then
+      echo "Error: unset required env var(s):${missing}" >&2
+      echo "Export them before running --install-schedule (see --help)." >&2
+      exit 1
+    fi
     mkdir -p "$HOME/Library/LaunchAgents" "$LOG_DIR"
     launchctl bootout "gui/$(id -u)/${PLIST_LABEL}" 2>/dev/null || true  # idempotent: ignore "not loaded"
     build_plist > "$PLIST_PATH"

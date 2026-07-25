@@ -1,6 +1,6 @@
 ---
-description: Read-on-demand detail for agent-tiering — the skip-vs-spawn heuristic, Fable approval-gate procedure (incl. the asm-level static-RE exception where Fable is the recommended tier), flat-fan-out (nested sub-agent) rationale, orchestrator context economics (delegate-don't-dismiss, split-don't-self-clear), and per-tier prompt style. Loads only when editing workflow orchestration defs.
-last_verified: 2026-07-24
+description: Read-on-demand detail for agent-tiering — the skip-vs-spawn heuristic, Fable approval-gate procedure (incl. the asm-level static-RE exception where Fable is the recommended tier), flat-fan-out (nested sub-agent) rationale, the bounded-checklist diff-triage exception that scopes the Opus row's open-ended diff-triage, orchestrator context economics (delegate-don't-dismiss, split-don't-self-clear), and per-tier prompt style. Loads only when editing workflow orchestration defs.
+last_verified: 2026-07-25
 paths:
   - ".claude/skills/**/*.md"
 ---
@@ -57,7 +57,7 @@ Opus-only column (final code review, diff-triage, rule/ADR authoring, novel reas
 ambiguous failures) stays Opus because **"never delegate understanding" is a *delegation*
 rule, not a "wait for a smarter model" rule** — a more capable Sonnet does not make
 delegating the judgment safe, because the cost was never Sonnet's raw ability, it was that
-the Opus session loses the findings it would otherwise filter (see the flat-fan-out
+the orchestrator session loses the findings it would otherwise filter (see the flat-fan-out
 rationale below, and `feedback_sonnet_proving_negatives` / `feedback_review_agent_full_diff`).
 Sonnet 5's larger context window only **strengthens** the existing "spawn Sonnet to absorb
 verbose output" rationale; it is not a reason to push understanding-class work down a tier.
@@ -67,9 +67,41 @@ higher per-task capability score.
 
 ## Nested Sub-Agents — Available, Deliberately Unused
 
-Sub-agents can spawn sub-agents (5 deep), but we keep **flat fan-out**: the Opus session owns every fan-out and absorbs every agent's output. Do not nest in the recurring workflows (`/plan`, `/pr-review`, `/security-audit`, `/post-plan`, automouse). Why: our fan-out is narrow (1–4 agents/phase, not the wide verbose fan-out where nesting pays); the pipelines keep review/triage in Opus by design (the review→score→filter step *is* triage — a coordinator would blind Opus to the findings it filtered, and delegated judgment degrades — see `feedback_sonnet_proving_negatives`, `feedback_review_agent_full_diff`); and `/post-plan` is a single-context state machine whose Phase 3/5/6.5 gates read from main-session context, where nesting could only hide the filtered-out findings, not the survivor list Opus still needs.
+Sub-agents can spawn sub-agents (5 deep), but we keep **flat fan-out**: the orchestrator session owns every fan-out and absorbs every agent's output. Do not nest in the recurring workflows (`/plan`, `/pr-review`, `/security-audit`, `/post-plan`, automouse). Why: our fan-out is narrow (1–4 agents/phase, not the wide verbose fan-out where nesting pays); the pipelines keep review/triage **in the orchestrator session** by design, whatever tier that session runs at (the review→score→filter step *is* triage — a coordinator would blind the orchestrator to the findings it filtered, and delegated judgment degrades — see `feedback_sonnet_proving_negatives`, `feedback_review_agent_full_diff`); and `/post-plan` is a single-context state machine whose Phase 3/5/6.5 gates read from main-session context, where nesting could only hide the filtered-out findings, not the survivor list the orchestrator still needs.
 
 **Tripwire to revisit:** a *measured* post-plan context-window problem, or a new workflow with genuinely wide fan-out and verbose per-agent intermediates.
+
+## Bounded-checklist diff-triage (post-plan exception)
+
+The Opus row's "open-ended diff-triage" means: read a diff you have no checklist for, reason
+from scratch about what could be wrong, and decide what matters. That stays Opus — the
+failure mode is missing what you didn't know to look for (`feedback_sonnet_proving_negatives`).
+
+**`/post-plan` Phase 6.5 condition (9) is not that.** It is *bounded* hold-enumeration: read
+the realized diff plus the carried Phase-3 flags (`HAS_MIGRATION`, `GOLDEN_CHANGED`,
+`COUNT_*`) and enumerate holds against a **named trigger list** — introduced or expanded
+SQL / POST-form / auth-gated surfaces; destructive or FK-ordering migrations and
+column-rename sweeps; new or redesigned user-visible UI/UX; any change whose blast radius
+or reversibility you cannot bound. It is framed as enumerating holds, **never** as certifying safe, and it biases hard to HOLD on any doubt.
+
+That asymmetry is what licenses the Sonnet tier here. A checklist run below Opus fails by
+**over**-holding (the PR waits for a human — already the default) or by missing an item on a
+list it was handed. It cannot fail by silently certifying a diff safe, because it is never
+asked to. Open-ended triage has no such floor. **Phase 4D is likewise rubric-scoring** —
+findings arrive from the Phase-4 review agents and are scored against a fixed scale, then
+threshold-filtered; the "is this finding real?" judgment happened upstream, in each agent's
+own analysis of the diff.
+
+This is a **scope correction, not a capability argument**: bounded checklist enumeration was
+never the diff-triage the Opus row meant. `/pr-review` and `/security-audit` do open-ended
+triage and run on Sonnet 4.6 by deliberate def/frontmatter pin (`agent-tiering.md`
+§ Sonnet 4.6 pins) — sanctioned pins, not exceptions this section carves out.
+
+**Tripwire to revisit:** a *measured* miss where a shipped diff was unsafe for a reason
+**not** on condition (9)'s trigger list (a listed trigger that a run simply failed to spot is
+a prompt bug, not a tier bug). Escalating then means copying Phase 7's pattern in
+`.claude/skills/post-plan/_phase-7-ci-monitoring.md` and adding an `opus` key to `MODEL_MAP`
+in `tools/postplan-harness/harness/adapters/llm.py`, which has none today.
 
 ## Orchestrator context economics — delegate to never-hold, split don't self-clear
 

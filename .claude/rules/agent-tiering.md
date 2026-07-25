@@ -1,6 +1,6 @@
 ---
 description: Which tier to pick for each sub-agent, including the Sonnet 4.6 def-pins. Skip-vs-spawn heuristic and deeper rationale live in agent-tiering-detail.md.
-last_verified: 2026-07-24
+last_verified: 2026-07-25
 ---
 
 # Agent Tiering
@@ -13,9 +13,9 @@ Tier every sub-agent (and every agent a plan spawns) by the reasoning the task a
 |------|-------------|---------|
 | **Haiku** | `model: "haiku"` | Command output, pattern-matching named checklists, grep-and-format, mechanical lookups — answerable by running commands and reporting, without judging relevance. |
 | **Sonnet** | `subagent_type: "sonnet-4-6"`, omit `model` — see § Sonnet 4.6 pins | Synthesis: "is this finding relevant?", cross-file traces, semantic compliance checks, rename sweeps needing call-site judgment, review agents, backlog housekeeping, manual-test classification. Never pass `model: "sonnet"` — the alias now resolves to Sonnet 5. |
-| **Opus** | self (no delegation) | Novel reasoning, FK ordering, rule authoring, ADR writing, ambiguous test failures, final code review, diff-triage. Never delegate understanding. |
+| **Opus** | self (no delegation) | Novel reasoning, FK ordering, rule authoring, ADR writing, ambiguous test failures, final code review, open-ended diff-triage (see detail file). Never delegate understanding. |
 | **Opus (delegated)** | `subagent_type: "plan-architect"` | Implementation **planning** only, via `/plan` Step 3 — three defs selected by ONE ordered precedence (mirrors Step 3): **`plan-architect-xhigh`** (`effort: xhigh`) FIRST for security surfaces, trust boundaries, destructive migrations, or ship-pipeline invariant changes; else **`plan-architect-sonnet`** (`model: claude-sonnet-4-6`) when the task is recipe-backed — an explicit recipe plus a named existing pattern to copy (mechanical composition of a pre-resolved recipe, so no understanding is delegated); else the default **`plan-architect`** (`model: opus` + `effort: high`). Do **not** pass an inline `model` override — each def owns it. |
-| **Fable** | `model: "fable"` — **prompt first, last resort** | Rung above Opus (~2× cost). Use **only** when a task is absolutely critical **and** Fable is 100% necessary to solve it — and **never without prompting the user first** for explicit approval. Default to Opus. Full gate: `.claude/rules/agent-tiering-detail.md`. |
+| **Fable** | `model: "fable"` — **prompt first, last resort** | Rung above Opus (~2× cost). Use **only** when a task is absolutely critical **and** Fable is 100% necessary to solve it — and **never without prompting the user first** for explicit approval. Default to Opus. Full gate: `agent-tiering-detail.md`. |
 
 > **The boundary keys on task *type* (judgment vs. mechanical), not raw model capability** — a stronger Sonnet moves nothing across the line. Re-validated 2026-06-30 vs Sonnet 5 (then the `sonnet` alias, native 1M context): unchanged. Why: `agent-tiering-detail.md`.
 

@@ -15,13 +15,14 @@
 # Install AFTER this lands on master — the launchd Program points at the main
 # checkout's bin/sim-recap-tick, which must exist there.
 #
-# Environment variables read at generation time (must be exported before running
-# --install-schedule):
+# Environment variables read at generation time. ALL are REQUIRED for
+# --install-schedule, which refuses to install if any is unset — an unset var would
+# otherwise be baked into the plist as an empty string that reads like a real value:
 #   SIM_RECAP_SSH_HOST      remote host running the sim database
 #   SIM_RECAP_REMOTE_ROOT   root path on the remote host
 #   SIM_RECAP_DB_USER       MySQL user on the remote host
 #   SIM_RECAP_DB_NAME       MySQL database name
-#   SIM_RECAP_DB_PASSWORD   MySQL password (REQUIRED for --install-schedule)
+#   SIM_RECAP_DB_PASSWORD   MySQL password
 #
 # No API-key env var is needed — claude uses ambient CLI auth, exactly as the
 # bug-pipeline plist does.
@@ -109,9 +110,20 @@ case "$ACTION" in
     ;;
   install)
     # Refusal 1 (checked first so both guards are testable from the worktree):
-    # SIM_RECAP_DB_PASSWORD must be set — don't install a job that fails every 300s.
-    if [ -z "${SIM_RECAP_DB_PASSWORD:-}" ]; then
-      echo "Error: SIM_RECAP_DB_PASSWORD is unset. Export it before running --install-schedule." >&2
+    # every required var must be set — don't install a job that fails every 300s.
+    # An unset var is NOT harmless here: build_plist writes `${VAR:-}`, so it lands
+    # as a well-formed <string></string> and launchd hands the tick an empty value
+    # that reads exactly like a configured one. That is not hypothetical — an empty
+    # SIM_RECAP_DB_NAME shipped this way and every mysql call ran with no default
+    # database until it was caught by hand. Fail at install time instead.
+    missing=""
+    for var in SIM_RECAP_SSH_HOST SIM_RECAP_REMOTE_ROOT \
+               SIM_RECAP_DB_USER SIM_RECAP_DB_NAME SIM_RECAP_DB_PASSWORD; do
+      [ -n "${!var:-}" ] || missing="${missing} ${var}"
+    done
+    if [ -n "$missing" ]; then
+      echo "Error: unset required env var(s):${missing}" >&2
+      echo "Export them before running --install-schedule (see --help)." >&2
       exit 1
     fi
     # Refusal 2: must be run from the main checkout — worktrees are torn down after

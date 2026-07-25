@@ -342,7 +342,7 @@ Then run the mechanical linter on each plan file you wrote and fix anything it r
 bin/check-plan "$PLAN_PATH"
 ```
 
-It enforces the deterministic gates from Step 4 (matrix present, no false manuals, no `DECIDE`/`TBD`/`subject to …` tokens, no unresolved decision-trigger surface, reuse targets resolve, context budget). A non-zero exit prints each violation prefixed by its gate (`[1]`/`[3]`/`[7]`/`[8]`/`[13]`/`[B]`/`[H]`/`[R]`/`[C]`/`[T]`/`[S]`); resolve each and re-run. Do not leave a plan written until `bin/check-plan` passes. A `[C]` (context-budget) violation is resolved by **returning to Step 2.5 and splitting the plan into stacked PR-sized units** — reach for a `context-budget:` justification marker only when the size is illusory (e.g. the length is mostly fenced reference material or delegation-packet recipes and the actual phase count is small).
+It enforces the deterministic gates from Step 4 (matrix present, no false manuals, no `DECIDE`/`TBD`/`subject to …` tokens, no unresolved decision-trigger surface, reuse targets resolve, context budget, pre-prod exercise path). A non-zero exit prints each violation prefixed by its gate (`[1]`/`[3]`/`[7]`/`[8]`/`[13]`/`[B]`/`[H]`/`[R]`/`[C]`/`[T]`/`[S]`/`[P]`); resolve each and re-run. `[W]` (sweep-verb) also prints, but is **advisory and non-blocking** — it is emitted as a warning and never affects the exit code, so a `[W]` line alongside a clean exit is expected, not a violation you must clear. Do not leave a plan written until `bin/check-plan` passes. A `[C]` (context-budget) violation is resolved by **returning to Step 2.5 and splitting the plan into stacked PR-sized units** — reach for a `context-budget:` justification marker only when the size is illusory (e.g. the length is mostly fenced reference material or delegation-packet recipes and the actual phase count is small).
 
 ### Declaring the implementation model (required)
 
@@ -391,6 +391,7 @@ Tell the user:
 - A one-line matrix summary per plan (e.g., "12 items: 7 PHPUnit, 3 E2E, 2 CLI-executable, 0 truly-manual")
 - Whether any security surface was flagged and how each is defended (or "no security surface touched")
 - Whether the PR is eligible to auto-merge on green CI (default) or is held for a human merge (`auto_merge: false`, per Step 4 gate 14) — and why, if held
+- Whether every deploy-dependent behavior has a pre-prod exercise path (Step 4 gate 16) — and, for any recorded `pre-prod-exception:`, which slice is intrinsic (scheduling / reachability / credential) and what was built for the reducible slice — or "no deploy-dependent behavior"
 - Whether any post-merge follow-up was mechanized (the merge-triggered watcher and what it runs on merge), or "no post-merge follow-up"
 - For a multi-PR split: the PR sequence and dependency order (which lands first, what each stacks on)
 - Whether each plan is ready for implementation or has open questions

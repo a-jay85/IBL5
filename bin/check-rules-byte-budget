@@ -4,17 +4,26 @@
 # context, so their size is a permanent token cost. Path-scoped rules (those
 # with a `paths:` frontmatter key) load only for matching files and are exempt.
 #
-# Two checks (T2 + T13 — ibl5/docs/backlog/token-spend-backlog.md):
+# Four checks (T2 + T13 — ibl5/docs/backlog/token-spend-backlog.md):
 #   1. Per-file cap: each path-unscoped file <= RULES_BYTE_BUDGET (default 5000)
-#   2. Aggregate cap: total path-unscoped bytes <= RULES_TOTAL_BUDGET (default 30000)
+#   2. Aggregate cap: total path-unscoped bytes <= RULES_TOTAL_BUDGET (default 16000)
+#   3. Glob reachability: every paths: glob in any .claude/rules/*.md file must
+#      match at least one tracked file (out-of-repo globs are SKIPped, not FAILed)
+#   4. Resident stub references: every path-scoped rule must be named by some
+#      always-on file, so its payload is reachable without a prior Read
 #
 # Extend-before-add (meta-tooling-bar.md): distinct trigger (size budget) vs
-# bin/check-docs (freshness / dead-refs). ~50 lines bash => no ADR (<50 lines).
+# bin/check-docs (freshness / dead-refs). Owns the ALLOWLIST — the single
+# machine-readable statement of which rules are always-on. ~80 lines bash.
 set -euo pipefail
 
 MAX_BYTES="${RULES_BYTE_BUDGET:-5000}"
-MAX_TOTAL="${RULES_TOTAL_BUDGET:-30000}"
-RULES_DIR="$(git rev-parse --show-toplevel)/.claude/rules"
+# NOTE: do NOT ratchet MAX_BYTES / RULES_BYTE_BUDGET — agent-tiering.md sits at
+# 4,971 bytes with only 29 bytes of headroom, and it cannot be path-scoped (it must
+# reach every sub-agent). Ratcheting would legislate away the only slack it has.
+MAX_TOTAL="${RULES_TOTAL_BUDGET:-16000}"
+ROOT="$(git rev-parse --show-toplevel)"
+RULES_DIR="$ROOT/.claude/rules"
 # Allowlist: the ONLY top-level rules permitted to be always-loaded (path-unscoped).
 # Any path-unscoped file NOT listed here — or any listed file that gains a paths:
 # key or is removed — fails the gate. Update deliberately, with justification.
@@ -61,16 +70,74 @@ if [[ -n "$missing" ]]; then
   fail=1
 fi
 
+# ─── Check 3: glob reachability ────────────────────────────────────────────────
+# A `paths:` glob that matches no tracked file means the rule can never load.
+# Scope: only files new or changed vs. origin/master — pre-existing broken globs
+# in untouched files are pre-existing debt, not caught here (per plan Out-of-Scope:
+# "Checks 3 and 4 assert reachability for the files this PR touches").
+# Out-of-repo globs are LEGITIMATE (work-triage-detail.md points at
+# ~/.claude/hooks/plan-gate-edit.sh) — report SKIP, never FAIL.
+glob_fail=0
+for f in "$RULES_DIR"/*.md; do
+  git diff --quiet origin/master -- "$f" 2>/dev/null && \
+    [ -n "$(git ls-files origin/master -- "$f" 2>/dev/null)" ] && continue
+  fm="$(awk '/^---$/{c++; next} c==1{print} c>=2{exit}' "$f")"
+  printf '%s\n' "$fm" | grep -q '^paths:' || continue
+  # Handles BOTH shapes: scalar (`paths: "ibl5/**"`, as browser-login.md uses) and
+  # list (`paths:` + `  - "…"` lines, as commit-conventions.md uses).
+  globs="$(printf '%s\n' "$fm" | awk '
+    /^paths:[[:space:]]*$/            { inlist=1; next }
+    /^paths:[[:space:]]*[^[:space:]]/ { sub(/^paths:[[:space:]]*/, ""); print; next }
+    inlist && /^[[:space:]]*-[[:space:]]/ { sub(/^[[:space:]]*-[[:space:]]*/, ""); print; next }
+    inlist && /^[^[:space:]]/         { inlist=0 }
+  ' | tr -d '"\047')"
+  while IFS= read -r g; do
+    [ -n "$g" ] || continue
+    case "$g" in
+      "~"*|/*) printf 'SKIP  %s  out-of-repo glob: %s\n' "$(basename "$f")" "$g"; continue ;;
+    esac
+    if [ -z "$(git -C "$ROOT" ls-files -- ":(glob)$g" | head -1)" ]; then
+      printf 'FAIL  %s  paths: glob matches no tracked file: %s\n' "$(basename "$f")" "$g" >&2
+      glob_fail=1
+    fi
+  done <<< "$globs"
+done
+(( glob_fail )) && fail=1 || true
+
+# ─── Check 4: resident stub references ─────────────────────────────────────────
+# Left: a path-scoped rule. Right: the always-on file that MUST still name it, so
+# the payload stays exactly one Read away from any session. Deleting a pointer
+# strands the rule — invisible to Checks 1-3 and to bin/check-docs.
+STUB_REFS="\
+worktree-hostname.md|.claude/rules/workflow-continuity.md
+linear-history-squash-merge.md|.claude/rules/workflow-continuity.md
+workflow-continuity-detail.md|.claude/rules/workflow-continuity.md
+work-triage-detail.md|.claude/rules/work-triage.md
+agent-tiering-detail.md|.claude/rules/agent-tiering.md"
+
+stub_fail=0
+while IFS='|' read -r scoped referrer; do
+  [ -n "$scoped" ] || continue
+  # Skip frontmatter — check only the rule body, not the description field.
+  body="$(awk '/^---$/{c++; if(c>=2){found=1;next}} found{print}' "$ROOT/$referrer")"
+  if ! printf '%s\n' "$body" | grep -qF "$scoped"; then
+    printf 'FAIL  %s is path-scoped but %s no longer names it — payload unreachable\n' \
+      "$scoped" "$referrer" >&2
+    stub_fail=1
+  fi
+done <<< "$STUB_REFS"
+(( stub_fail )) && fail=1 || true
+
 if (( fail )); then
   cat >&2 <<MSG
 
-One or more path-unscoped .claude/rules/*.md files exceed the per-file
-${MAX_BYTES}-byte budget, or the aggregate total (${total_bytes} bytes) exceeds
-the ${MAX_TOTAL}-byte aggregate budget. These files load into EVERY session's
-context. Trim them, move detail into a path-scoped *-detail.md companion (see
-agent-tiering-detail.md), or archive superseded rules.
-Override budgets only deliberately:
-  RULES_BYTE_BUDGET=<n> RULES_TOTAL_BUDGET=<n> bin/check-rules-byte-budget
+One or more checks failed:
+  1/2. Per-file or aggregate byte budget exceeded (path-unscoped rules load into
+       EVERY session). Trim, move detail into a *-detail.md companion, or archive.
+       Override only deliberately: RULES_BYTE_BUDGET=<n> RULES_TOTAL_BUDGET=<n>
+  3.   A paths: glob matches no tracked file (rule can never load). Fix or remove it.
+  4.   A path-scoped rule is no longer named by its always-on referrer (payload
+       unreachable). Restore the stub pointer in the always-on file.
 MSG
   exit 1
 fi

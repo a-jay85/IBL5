@@ -147,6 +147,7 @@ function submitAsgVote(mixed $user): void
     if ($result->hasErrors()) {
         echo $view->renderErrors($result->errors);
     } else {
+        \EventLog\EventLogger::setAction('asg_vote_submitted');
         echo $view->renderAsgConfirmation($teamName, $ballot);
     }
 
@@ -201,6 +202,7 @@ function submitEoyVote(mixed $user): void
     if ($result->hasErrors()) {
         echo $view->renderErrors($result->errors);
     } else {
+        \EventLog\EventLogger::setAction('eoy_vote_submitted');
         echo $view->renderEoyConfirmation($teamName, $ballot);
     }
 

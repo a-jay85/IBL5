@@ -77,6 +77,7 @@ function oneonone(): void
                 // Run new game
                 try {
                     $result = $service->playGame($player1, $player2, $ownerplaying);
+                    \EventLog\EventLogger::setAction('one_on_one_game_played');
                     echo $view->renderGameResult($result, $result->gameId);
                 } catch (\Exception $e) {
                     echo $view->renderErrors([$e->getMessage()]);

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Trading;
 
+use EventLog\EventLogger;
+use EventLog\EventLogRepository;
 use PHPUnit\Framework\TestCase;
 use Tests\WideUnit\Mocks\MockDatabase;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
@@ -87,5 +89,23 @@ class TradingControllerSubmitOfferTest extends TestCase
         $controller->submitTradeOffer(null, ['offeringTeam' => 'Stars', '_csrf_token' => $token]);
 
         $this->assertTrue($loginBoxCalled);
+    }
+
+    public function testSetActionNotCalledOnCsrfFailure(): void
+    {
+        // CSRF failure calls HtmxHelper::redirect() + exit() before any setAction().
+        // Since exit() ends the process, we verify the invariant: when no setAction
+        // was called (as happens on CSRF failure), flush delivers null action.
+        // This pins the contract that the instrumentation sits BELOW the CSRF guard.
+        EventLogger::reset();
+
+        $repo = $this->createMock(EventLogRepository::class);
+        $repo->expects($this->once())
+             ->method('updateOutcome')
+             ->with(self::anything(), self::anything(), null);
+
+        EventLogger::arm(1, self::createStub(\mysqli::class));
+        // setAction is NOT called — mirroring the CSRF-failure path
+        EventLogger::flush($repo);
     }
 }

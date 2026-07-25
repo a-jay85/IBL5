@@ -553,7 +553,7 @@ func TestOutcomeDiagAccum_NonPerturbationAndReachability(t *testing.T) {
 }
 
 // TestOutcomeDiagAccum_DRBPushShareUntouched — the fast-class counters that yield
-// DRBPushSharePct (gate-1 12.37%, ADR-0090 forbids tuning toward it) are identical
+// DRBPushSharePct (gate-1 12.4142% as of 2026-07-24, superseding ADR-0088's 12.37%; ADR-0090 forbids tuning toward it) are identical
 // whether or not OutcomeDiag is attached. Independent of the GameResult DeepEqual:
 // it reads the arming-share instrument's own accumulator across the same seed.
 func TestOutcomeDiagAccum_DRBPushShareUntouched(t *testing.T) {

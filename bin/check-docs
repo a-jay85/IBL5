@@ -66,6 +66,47 @@ const TABLE_STATUS_BACKLOGS = [
     'maintenance-backlog.md',
 ];
 
+// Figures that a dated correction retired. The observed failure mode (PRs #1620,
+// #1622, #1626) is a superseded number re-surfacing in a doc that the correction
+// sweep missed — a string check, not judgment. Each entry fails the full scan when
+// its pattern appears in a doc body with no correction marker nearby.
+//
+// Deliberately narrow. A figure only belongs here when its retired form is
+// distinctive enough that a legitimate live use is implausible — "~100× smaller",
+// for instance, was considered and REJECTED, because ADR-0094 uses that exact
+// phrase for a different and still-correct comparison (ADR-0049's corpus-vs-seed
+// ratio), so gating it would force stamping correct prose as if it were retired.
+// Scope limit worth knowing: this catches the `pp`-suffixed prose form only. It
+// would NOT have caught the #1622 miss, which lived in a JSON artifact field
+// (`"guidance": "... 0.012 ..."`) outside the in-scope doc globs.
+const RETIRED_FIGURES = [
+    [
+        'pattern' => '/0\.012[ ]*pp|0\.01189/i',
+        'label'   => 'gate-1 engine seed SD 0.012pp',
+        'why'     => 'ADR-0094 Phase 6 spaced seed blocks 1 apart while runs=4 consumes seed..seed+3, so the 8 readings were a sliding window over 11 draws; the sample SD is deflated ~x0.781',
+        'use'     => 'use 0.016pp (de-overlapped Phase 6, all-era) or 0.021pp (matched recent-era, PR #1620) — see ibl5/docs/decisions/0094-gate1-ci-construction-audit.md § Addendum',
+    ],
+];
+
+// A retired figure may be quoted legitimately inside its own correction. Any of
+// these on the line, or within CORRECTION_WINDOW lines of it, exempts the hit.
+// `⚠` is deliberately NOT a marker: it is a generic emphasis glyph, so accepting
+// it would let an unrelated nearby warning silently exempt a genuinely stale
+// figure — and a false negative in this gate is invisible.
+const CORRECTION_MARKERS = [
+    '[CORRECTED',
+    '[SUPERSEDED',
+    '**Superseded by:**',
+    'RETIRED-OK',
+];
+
+const CORRECTION_WINDOW = 3;
+
+// A heading whose text announces a correction scopes the exemption to its whole
+// section — an Addendum discusses the retired figure throughout, and stamping
+// every line of it would be noise.
+const CORRECTION_HEADING_RE = '/^#{1,6}\s.*\b(addendum|correction|corrected|supersed)/i';
+
 function usage(): string
 {
     return <<<USAGE
@@ -73,8 +114,9 @@ Usage: bin/check-docs [options]
 
 Enforces the Living Documentation policy defined in
 .claude/rules/doc-freshness.md. Validates YAML frontmatter
-(description, last_verified), staleness (60-day max), and
-dead repo-path references on every in-scope markdown file.
+(description, last_verified), staleness (60-day max),
+dead repo-path references, and un-stamped citations of retired
+figures on every in-scope markdown file.
 
 Options:
   --fix-dates        Requires --since=<ref>. Bumps last_verified to today only
@@ -98,6 +140,9 @@ Options:
                      ([{path, last_verified, age_days, days_over}]) and exit 0
                      regardless of whether any doc is stale. A report, not a
                      gate. Consumed by the doc-freshness-audit workflow.
+  --self-test        Run the retired-figure exemption fixtures and exit. No repo
+                     scan. Covers the exemption logic only — a wrong pattern
+                     fails loudly on the next PR, a wrong exemption is silent.
   --verbose, -v      Show passing files too.
   --help, -h         Show this message.
 
@@ -791,6 +836,169 @@ function checkBacklogTransitions(string $base, string $repoRoot): array
     return $issues;
 }
 
+/**
+ * Line numbers (1-indexed) in $content where a retired figure appears without an
+ * adjacent correction marker. Pure over the file body so --self-test can exercise
+ * the exemption logic — the half of this check where a bug is silent.
+ *
+ * @return list<array{line: int, label: string, why: string, use: string, text: string}>
+ */
+function retiredFigureHits(string $content): array
+{
+    // Split on explicit newline sequences, NOT \R: outside UTF-8 mode \R also
+    // matches the bare byte 0x85, which is a UTF-8 continuation byte in glyphs
+    // these docs use heavily (`✅` is E2 9C 85) — that splits mid-character and
+    // silently shifts every subsequent line number.
+    $lines = preg_split("/\r\n|\n|\r/", $content);
+    if ($lines === false) {
+        return [];
+    }
+
+    // Frontmatter is a summary, not a claim site, and a bracketed stamp reads
+    // badly in a `description:` value — exempt it wholesale.
+    $bodyStart = 0;
+    if (isset($lines[0]) && trim($lines[0]) === '---') {
+        foreach ($lines as $i => $line) {
+            if ($i > 0 && trim($line) === '---') {
+                $bodyStart = $i + 1;
+                break;
+            }
+        }
+    }
+
+    $hasMarker = static function (string $line): bool {
+        foreach (CORRECTION_MARKERS as $marker) {
+            if (str_contains($line, $marker)) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    $hits = [];
+    $inCorrectionSection = false;
+    foreach ($lines as $i => $line) {
+        if ($i < $bodyStart) {
+            continue;
+        }
+        if (preg_match('/^#{1,6}\s/', $line) === 1) {
+            $inCorrectionSection = preg_match(CORRECTION_HEADING_RE, $line) === 1;
+        }
+        if ($inCorrectionSection) {
+            continue;
+        }
+        foreach (RETIRED_FIGURES as $fig) {
+            if (preg_match($fig['pattern'], $line) !== 1) {
+                continue;
+            }
+            $exempt = false;
+            $from = max($bodyStart, $i - CORRECTION_WINDOW);
+            $to = min(count($lines) - 1, $i + CORRECTION_WINDOW);
+            for ($j = $from; $j <= $to; $j++) {
+                if ($hasMarker($lines[$j])) {
+                    $exempt = true;
+                    break;
+                }
+            }
+            if ($exempt) {
+                continue;
+            }
+            $hits[] = [
+                'line'  => $i + 1,
+                'label' => $fig['label'],
+                'why'   => $fig['why'],
+                'use'   => $fig['use'],
+                'text'  => trim($line),
+            ];
+        }
+    }
+    return $hits;
+}
+
+/**
+ * @param list<string> $files absolute paths, as returned by collectFiles()
+ * @return list<string>
+ */
+function checkRetiredFigures(array $files, string $repoRoot): array
+{
+    $issues = [];
+    foreach ($files as $path) {
+        $content = @file_get_contents($path);
+        if ($content === false) {
+            continue;
+        }
+        $rel = str_starts_with($path, $repoRoot . '/') ? substr($path, strlen($repoRoot) + 1) : $path;
+        foreach (retiredFigureHits($content) as $hit) {
+            $issues[] = sprintf(
+                "%s:%d cites retired figure (%s) with no correction marker within %d lines — %s. Fix: %s. If the mention is deliberate (quoting the old claim), stamp the line with [CORRECTED …], [SUPERSEDED …], or RETIRED-OK.\n         > %s",
+                $rel,
+                $hit['line'],
+                $hit['label'],
+                CORRECTION_WINDOW,
+                $hit['why'],
+                $hit['use'],
+                $hit['text']
+            );
+        }
+    }
+    return $issues;
+}
+
+/**
+ * Exercise retiredFigureHits()'s exemption logic. Only the exemption half is
+ * fixture-tested: a wrong *pattern* fails loudly on the next PR, but a wrong
+ * *exemption* is a silent false negative that nothing else surfaces.
+ */
+function selfTestRetiredFigures(): int
+{
+    $cases = [
+        ['bare figure flags', "# Doc\n\nSeed SD was 0.012pp across 8 seeds.\n", 1],
+        ['population-SD form flags', "# Doc\n\nThe ADR quoted 0.01189 here.\n", 1],
+        ['same-line CORRECTED exempts', "# Doc\n\nSeed SD 0.012pp [CORRECTED 2026-07-24 — see § Addendum].\n", 0],
+        ['same-line SUPERSEDED exempts', "# Doc\n\n[SUPERSEDED 2026-07-24] Seed SD 0.012pp across 8 seeds.\n", 0],
+        ['RETIRED-OK exempts', "# Doc\n\nSeed SD 0.012pp <!-- RETIRED-OK: quoted deliberately -->\n", 0],
+        ['Superseded by: field exempts', "# Doc\n\n**Superseded by:** #1622 — overlap\n\nSeed SD 0.012pp.\n", 0],
+        ['marker 3 lines above exempts', "# Doc\n\n[CORRECTED 2026-07-24]\n\n\nSeed SD 0.012pp.\n", 0],
+        ['marker 4 lines above does not exempt', "# Doc\n\n[CORRECTED 2026-07-24]\n\n\n\nSeed SD 0.012pp.\n", 1],
+        ['marker 3 lines below exempts', "# Doc\n\nSeed SD 0.012pp.\n\n\n[CORRECTED 2026-07-24]\n", 0],
+        ['Addendum heading scopes its section', "# Doc\n\n## Addendum (2026-07-24): SD 0.012pp -> 0.016pp\n\nThe 0.012pp figure came from overlapping blocks.\n", 0],
+        ['section scope ends at next heading', "# Doc\n\n## Addendum (2026-07-24)\n\nfine\n\n## Phase 6\n\nSeed SD 0.012pp across 8 seeds.\n", 1],
+        ['frontmatter is exempt', "---\ndescription: corrects seed SD 0.012pp to 0.016pp\nlast_verified: 2026-07-24\n---\n\n# Doc\n", 0],
+        ['frontmatter exemption does not leak into body', "---\ndescription: a doc\nlast_verified: 2026-07-24\n---\n\nSeed SD 0.012pp.\n", 1],
+        ['unrelated nearby figure does not flag', "# Doc\n\nSeed SD 0.0125pp and 0.021pp are fine.\n", 0],
+        ['warning glyph alone does not exempt', "# Doc\n\n⚠ heads up\n\nSeed SD 0.012pp across 8 seeds.\n", 1],
+        // Regression guard: \R would split inside `✅` (E2 9C 85) and shift the
+        // line number, so this asserts the reported line, not just the count.
+        ['multi-byte glyphs do not shift line numbers', "# Doc\n\n✅ done ✅\n\nSeed SD 0.012pp.\n", 1, 5],
+    ];
+
+    $failed = 0;
+    foreach ($cases as $case) {
+        [$name, $body, $want] = $case;
+        $wantLine = $case[3] ?? null;
+        $hits = retiredFigureHits($body);
+        $got = count($hits);
+        if ($got !== $want) {
+            echo "FAIL {$name}: want {$want} hit(s), got {$got}\n";
+            $failed++;
+            continue;
+        }
+        if ($wantLine !== null && $hits[0]['line'] !== $wantLine) {
+            echo "FAIL {$name}: want hit on line {$wantLine}, got line {$hits[0]['line']}\n";
+            $failed++;
+            continue;
+        }
+        echo "ok   {$name}\n";
+    }
+    $total = count($cases);
+    if ($failed === 0) {
+        echo "\nretired-figure exemption self-test: {$total} case(s) passed.\n";
+        return 0;
+    }
+    echo "\nretired-figure exemption self-test: {$failed}/{$total} case(s) FAILED.\n";
+    return 1;
+}
+
 // --- main ---
 
 $opts = ['fix_dates' => false, 'include_memory' => false, 'verbose' => false, 'since' => null, 'no_staleness' => false, 'staleness_report' => false];
@@ -821,6 +1029,8 @@ foreach (array_slice($argv, 1) as $arg) {
         case '--staleness-report':
             $opts['staleness_report'] = true;
             break;
+        case '--self-test':
+            exit(selfTestRetiredFigures());
         case '--help':
         case '-h':
             echo usage();
@@ -901,6 +1111,17 @@ foreach ($files as $path) {
     foreach ($issues as $i) {
         echo "     - {$i}\n";
     }
+}
+
+// Corpus-wide, not --since-scoped: a retired figure sitting in a doc nobody
+// touched is exactly the miss this exists to catch.
+$retiredIssues = checkRetiredFigures($files, $root);
+if ($retiredIssues !== []) {
+    echo "FAIL retired-figure citations\n";
+    foreach ($retiredIssues as $issue) {
+        echo "     - {$issue}\n";
+    }
+    $failures++;
 }
 
 $transitionIssues = checkAdrTransitions($root);

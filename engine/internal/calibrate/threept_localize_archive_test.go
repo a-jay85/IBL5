@@ -16,7 +16,7 @@
 //
 // It consumes the Phase-1 sim.OutcomeDiagAccum side-channel (accumulation-only, proven
 // byte-identical by TestOutcomeDiagAccum_NonPerturbationAndReachability, so DRBPushSharePct
-// — gate-1 12.37%, ADR-0090 — cannot move as a side effect of measuring).
+// — gate-1 12.4142% as of 2026-07-24 (supersedes ADR-0088's 12.37%), ADR-0090 — cannot move as a side effect of measuring).
 //
 // CLOSURE MODEL. Unlike the sibling K-O decomposition (self-closing by construction), the
 // four-way partition closes only via an EXPLICIT multiplicative model of the sim rate:

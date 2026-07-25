@@ -11,7 +11,22 @@ CLEAR=$(pr_manual_testing_clearance "$(gh pr view --json body --jq '.body')")
 [ "$CLEAR" != "CLEARED" ] && echo "BLOCKED: Manual-Testing not cleared (state=$CLEAR) — held for human review"
 ```
 
-**Condition (4) blocks on the VALUE, not file presence** — the status file is non-empty for `pass` and `skipped` too (it always contains `PHASE5_VERIFY_STATUS=...`), so the `[ -s ... ]` idiom condition (3) uses would wrongly block every `pass`/`skipped`. Block only on the literal `fail` value; **absent file OR `pass` OR `skipped` = PASS (non-blocking)** — a `skipped` status (docs-only / PHP-less PR with no mapped E2E) must NOT block, or every such PR would stop arming, a regression worse than #887:
+**Condition (3) is three-state, and an indeterminate Phase 5.0 BLOCKS.** The bridge file `/tmp/post-plan-missing-tests-$PPID` is truncated at 5.0 START and appended to at 5.0 END, so *empty* is ambiguous on its own: it is byte-identical for "5.0 ran and found nothing unresolved" and "5.0 died before it finished". Reading empty as PASS is a fail-OPEN that contradicts the fail-closed default. The disambiguator is the **done-marker** `/tmp/post-plan-conformance-done-$PPID`, written as the last action of Phase 5.0 on **both** the normal path and the skip path (`PLAN_FOUND=none` or `! $HAS_MATRIX` — see `SKILL.md` Phase 5.0). Marker absent ⇒ indeterminate ⇒ **BLOCKED**; marker present + empty bridge ⇒ clean ⇒ pass. The skip-path write is what keeps this from blocking every plan-blind PR (the dominant case), so treat it as load-bearing, not defensive. The compiled harness computes conformance in-process and uses neither file:
+
+```bash
+# condition (3): three-state — missing done-marker means Phase 5.0 never finished,
+# which is INDETERMINATE, not clean, so it blocks (fail-closed). $DONE_MARK/$BRIDGE
+# are overridable only so bin/test-postplan-arm-conditions can exercise this block.
+DONE_MARK="${DONE_MARK:-/tmp/post-plan-conformance-done-$PPID}"
+BRIDGE="${BRIDGE:-/tmp/post-plan-missing-tests-$PPID}"
+if [ ! -f "$DONE_MARK" ]; then
+  echo "BLOCKED: Phase 5.0 conformance never reached its end (no done-marker) — indeterminate, not clean"
+elif [ -s "$BRIDGE" ]; then
+  echo "BLOCKED: unresolved Phase 5.0 conformance items:"; cat "$BRIDGE"
+fi
+```
+
+**Condition (4) blocks on the VALUE, not file presence** — the status file is non-empty for `pass` and `skipped` too (it always contains `PHASE5_VERIFY_STATUS=...`), so the `[ -s ... ]` idiom condition (3) uses on its bridge file would wrongly block every `pass`/`skipped`. Block only on the literal `fail` value; **absent file OR `pass` OR `skipped` = PASS (non-blocking)** — a `skipped` status (docs-only / PHP-less PR with no mapped E2E) must NOT block, or every such PR would stop arming, a regression worse than #887:
 
 ```bash
 # condition (4): fails ONLY when the status is the literal `fail`

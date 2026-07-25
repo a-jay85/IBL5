@@ -4,10 +4,11 @@ Purpose: the full Phase 5 final-verification how-to (all prose steps + all bash 
 
 ### Phase 5.0: Plan→test & Plan→file conformance — skip if `PLAN_FOUND=none` or `! $HAS_MATRIX`
 
-At Phase 5.0 START, clear the conformance bridge file so each run begins from a clean slate (an empty file means "nothing unresolved"):
+At Phase 5.0 START, clear the conformance bridge file AND remove the done-marker, so each run begins from a clean slate. An empty bridge file alone is **not** enough to mean "nothing unresolved" — it is byte-identical to "5.0 died before writing anything", which is why the separate done-marker exists (Phase 6.5 condition (3) treats a missing marker as indeterminate → BLOCKED):
 
 ```bash
 : > /tmp/post-plan-missing-tests-$PPID
+rm -f /tmp/post-plan-conformance-done-$PPID
 ```
 
 Read the Verification Matrix from `$PLAN_FILE`. Collect the test-file path from the "Test file / location" column of every row whose Test type is PHPUnit, API-test, E2E, or Visual-regression. Confirm the PR diff actually wrote each one:
@@ -41,6 +42,16 @@ done
 For each `MISSING-FILE:`, the impl dropped a planned change. Either (a) make the change now — the plan's implementation steps describe it (this is the #923 remedy: finish the work), run any relevant check, and checkpoint (commit + push) — or (b) if the file was legitimately cut from scope, or is a reference the plan author forgot to annotate, note that in a PR comment. A `MISSING-FILE:` item is **resolved** by (a) or (b); otherwise **unresolved**.
 
 At Phase 5.0 END, append each remaining **UNRESOLVED** `MISSING:` and `MISSING-FILE:` item (label + path + reason) to `/tmp/post-plan-missing-tests-$PPID`, one per line. Authored-green / implemented-and-checkpointed / cut-with-comment items are NOT written. This bridge file is consulted by the Phase 6.5 auto-merge gate.
+
+Then — **last action of Phase 5.0, after the appends above** — write the done-marker:
+
+```bash
+touch /tmp/post-plan-conformance-done-$PPID
+```
+
+The marker is the positive assertion that 5.0 reached its end; the bridge file only says *what* was unresolved. Without it, "5.0 ran and found nothing" and "5.0 died mid-section" are indistinguishable and condition (3) would fail OPEN. **The marker must also be written on the skip path** (`PLAN_FOUND=none` or `! $HAS_MATRIX`) — that instruction lives in `SKILL.md` Phase 5.0, because a run that skips 5.0 may never read this file. Omitting the skip-path write would block auto-merge on every plan-blind PR, which is the dominant case.
+
+Compiled-harness note: `tools/postplan-harness` computes conformance in-process (`harness/conformance.py` returns the unresolved list to `armable.py`) and never touches either `/tmp` file. The marker is a **skill-path** mechanism only — do not "port" it to the harness.
 
 **PHPUnit + PHPStan — direct Bash (no agent):** **Skip if** `! $HAS_PHP`. The PostToolUse hook already ran both during edits, and a PHP-less diff cannot regress either suite. Run both as **blocking** (foreground) direct Bash calls — do **NOT** pass `run_in_background: true`. Both finish in ~1–2 min, well under the per-phase cap, and backgrounding them here is the trap that stall-killed the 2026-06-21 runs: when the E2E track is skipped there is nothing left to wait on in-turn, so the model backgrounds them and ends the turn expecting a re-invocation that headless mode never delivers. Running blocking returns their results in-turn and you proceed straight to Phase 6. Output is ~5 lines each — agent overhead (~25K tokens) is never justified. (If you ever do background them for parallelism with the E2E agent, the drain rule at the top of this skill is mandatory: poll `BashOutput` to completion before computing `PHASE5_VERIFY_STATUS` — never end the turn on a pending task.)
 

@@ -19,6 +19,13 @@
 #   3  No false manuals      — a Truly-manual row whose text uses an automatable
 #                              verb (verify / check that / confirm / ensure) is an
 #                              automatable assertion mislabeled manual.
+#   V  CLI-executable runnable — a CLI-executable row's "Test file / location"
+#                              cell must be ONE runnable shell command, because
+#                              /post-plan Phase 5.0 now executes every post-impl
+#                              one unattended. A phase pointer, an ellipsis, an
+#                              unbound <placeholder>, a bare file path, bare SQL,
+#                              or "same …"/"re-run …" prose is not runnable.
+#                              Silent when the plan has no CLI-executable row.
 #   7  No unresolved decisions — any table row carrying DECIDE / TBD /
 #                              "subject to validation" / "subject to review" is a
 #                              deferred question the automouse agent cannot resolve.
@@ -242,6 +249,38 @@ trap 'rm -f "$VIOL_FILE" "$WARN_FILE" "$MATRIX_FILE" "$SEEN_FILE" "$GATE8_SEEN" 
 viol() { printf '%s\n' "$1" >> "$VIOL_FILE"; }
 warn() { printf '%s\n' "$1" >> "$WARN_FILE"; }
 
+# --- Shared matrix-row cell extraction (gate V; mirrored by /post-plan Phase 5.0) ---
+# A matrix row is `| N | what | type | timing | location |`, optionally with a
+# trailing `| PR |` column. A pipe *inside* a cell must be written `\|`, so swap
+# the escaped form for a sentinel byte before splitting on `|`, then swap back —
+# the restored cell IS the runnable command, so no separate un-escape step exists.
+# Deliberately NOT `sed 's/\\|/\x01/g' | cut -d'|' -f6 | tr '\x01' '|'`: BSD sed
+# and BSD tr do not honour \x01, so that idiom emits the literal text "x01" on
+# macOS, which is where this script runs most. Pure bash 3.2, no external tools.
+MSEN=$'\001'
+MC_NUM=""; MC_TYPE=""; MC_TIME=""; MC_LOC=""; MC_PIPES=0
+
+mtrim() { _s="${1#"${1%%[![:space:]]*}"}"; printf '%s' "${_s%"${_s##*[![:space:]]}"}"; }
+
+# matrix_split <row> — sets MC_NUM / MC_TYPE / MC_TIME / MC_LOC (trimmed, any
+# surrounding backticks stripped, pipes restored) and MC_PIPES (count of
+# STRUCTURAL pipes, i.e. after escaped pipes are hidden). Returns 1 for a
+# separator row or a row with no location cell.
+matrix_split() {
+    case "$1" in
+        *[!\ \|:-]*) : ;;
+        *) return 1 ;;              # separator / all-dashes row
+    esac
+    _r="${1//\\|/$MSEN}"
+    IFS='|' read -r _lead MC_NUM _what MC_TYPE MC_TIME MC_LOC _rest <<< "$_r"
+    MC_PIPES=$(printf '%s' "$_r" | tr -cd '|' | wc -c | tr -d ' ')
+    MC_NUM=$(mtrim "$MC_NUM"); MC_TYPE=$(mtrim "$MC_TYPE"); MC_TIME=$(mtrim "$MC_TIME")
+    MC_LOC=$(mtrim "${MC_LOC//$MSEN/|}")
+    case "$MC_LOC" in '`'*'`') MC_LOC=$(mtrim "${MC_LOC#\`}"); MC_LOC=$(mtrim "${MC_LOC%\`}") ;; esac
+    [ -n "$MC_LOC" ] || return 1
+    return 0
+}
+
 # ---------------------------------------------------------------------------
 # Gate 1: Matrix exists.
 # ---------------------------------------------------------------------------
@@ -263,12 +302,46 @@ awk '
     inm && !/^[[:space:]]*\|/ { inm=0 }
 ' "$PLAN_FILE" > "$MATRIX_FILE"
 
+# The isolation awk consumes the header row, but gate V needs its column count to
+# tell an escaped pipe from a raw one. Grab it separately; 0 means "unknown, skip
+# that sub-check". A legal trailing `| PR |` column simply raises the number.
+MHDR_PIPES=$(grep -m1 -iE '\|[[:space:]]*What to verify[[:space:]]*\|' "$PLAN_FILE" \
+    | tr -cd '|' | wc -c | tr -d ' ')
+[ -n "$MHDR_PIPES" ] || MHDR_PIPES=0
+
 while IFS= read -r row; do
     low="$(printf '%s' "$row" | tr '[:upper:]' '[:lower:]')"
     # Gate 3: a Truly-manual row using an automatable verb is mislabeled.
     if printf '%s' "$low" | grep -qE 'truly[- ]manual'; then
         if printf '%s' "$low" | grep -qE 'verify|check that|confirm|ensure'; then
             viol "[3] truly-manual row uses an automatable verb (reclassify): ${row}"
+        fi
+    fi
+    # Gate V: a CLI-executable row's location cell must be ONE runnable command.
+    # Fires only on CLI-executable rows, so a plan with none passes silently.
+    if printf '%s' "$low" | grep -qE 'cli[- ]executable' && matrix_split "$row"; then
+        _bad=""
+        # A `...` between two ref-ish tokens is a git range (origin/master...HEAD),
+        # not an elision — mask ranges before testing. Corpus-verified: without this
+        # mask, 2 of 79 flagged cells were valid `git diff origin/master...HEAD`.
+        _probe=$(printf '%s' "$MC_LOC" | sed -E 's#[A-Za-z0-9_/@^~.-]+\.\.\.[A-Za-z0-9_/@^~-]+#RANGE#g')
+        if printf '%s' "$MC_LOC" | grep -qiE '^(phase|step|row)[[:space:]]+[0-9]'; then
+            _bad="a phase/step pointer, not a command"
+        elif printf '%s' "$_probe" | grep -q '…' || printf '%s' "$_probe" | grep -qF '...'; then
+            _bad="an elided command (ellipsis)"
+        elif printf '%s' "$MC_LOC" | grep -qE '<[A-Za-z_][A-Za-z0-9_./-]*>'; then
+            _bad="an unbound <placeholder> — bind it with \$(…) or a \$VAR that has a stated default"
+        elif printf '%s' "$MC_LOC" | grep -qE '^(ibl5|tests|engine|\.claude|\.github)/[^ ]+$'; then
+            _bad="a bare file path with no command verb (reclassify the row, or run it)"
+        elif printf '%s' "$MC_LOC" | grep -qiE '^(SELECT|INSERT|UPDATE|DELETE|ALTER|CREATE[[:space:]]+TABLE|DROP)[[:space:]]'; then
+            _bad="bare SQL — wrap it in bin/db-query"
+        elif printf '%s' "$MC_LOC" | grep -qiE '^(same[[:space:]]|re-run)'; then
+            _bad="prose referring to another row, not a command"
+        fi
+        if [ -n "$_bad" ]; then
+            viol "[V] CLI-executable row (row ${MC_NUM:-?}) has a non-runnable location cell: \"${MC_LOC}\" — ${_bad}. It must be a single shell command. Not accepted: 'Phase N' pointers, '...' ellipsis, '<placeholder>' tokens, bare file paths, bare SQL. Valid examples: bin/check-docs / grep -c 'FunctionName' ibl5/classes/Foo.php / python3 -c \"import sys; sys.exit(0)\""
+        elif [ "$MHDR_PIPES" -gt 0 ] && [ "$MC_PIPES" -gt "$MHDR_PIPES" ]; then
+            viol "[V] CLI-executable row (row ${MC_NUM:-?}) has ${MC_PIPES} structural pipes where the matrix header has ${MHDR_PIPES} — a pipe inside a cell must be written \\| or the cell parses truncated, and /post-plan Phase 5.0 then runs the truncated command: ${row}"
         fi
     fi
 done < "$MATRIX_FILE"

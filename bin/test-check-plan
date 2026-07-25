@@ -251,10 +251,15 @@ Phase 1 — Create `bin/foo` for the new tool.
 # verb anywhere, no resolution) must NOT flag (exit 0). This is the discriminating
 # regression for the creation-context include-filter: with `post-impl` in the cue
 # this fixture exits 1; the include-filter deliberately excludes `post-impl`.
+# Row 1's type is E2E (not CLI-executable) on purpose: gate [V] rejects a bare
+# `.github/...` path in a CLI-executable cell, and this fixture needs that exact
+# path token in a post-impl row to test gate 8's include-filter. Retyping keeps
+# gate 8 byte-identical (it keys on `post-impl`, not the type) while gate [V]
+# skips the row — do not restore CLI-executable here.
 assert "gate8-post-impl-row-not-created" 0 "$FM"'
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---------------|-----------|--------|---------------------|
-| 1 | workflow runs green | CLI-executable | post-impl | `.github/workflows/tests.yml` |
+| 1 | workflow runs green | E2E | post-impl | `.github/workflows/tests.yml` |
 | 2 | form submits and redirects | E2E | post-impl | `tests/e2e/trade.spec.ts` |
 '
 
@@ -1688,6 +1693,105 @@ assert_viol "gateG-non-bin-command-ok" 0 '[G]' "$FM"'
 |---|---------------|-----------|--------|---------------------|
 | 1 | run something | CLI-executable | post-impl | curl + bin/db-query |
 '
+
+# ---------------------------------------------------------------------------
+# Gate V: a CLI-executable row's location cell must be ONE runnable command.
+# Every fixture carries "$FM" (impl_model: sonnet) so a 0-manual matrix does
+# not reattribute the exit code to gate 13 — the trap the header comment at
+# :41-52 documents. Header + separator are copied from `clean-minimal` (:61-62).
+# ---------------------------------------------------------------------------
+
+# 1. A phase/step pointer is not a command → fire (exit 1).
+assert "v-phase-pointer" 1 "$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | probe P1 passes | CLI-executable | post-impl | Phase 1d probe P1 |
+'
+
+# 2. False-positive guard (exit 0): four runnable cells — a bin/ command (bin is
+# NOT in the bare-path alternation), a python one-liner, an escaped-pipe command
+# (\| must not fire the pipe-count check), and a git range (the `...` ellipsis
+# mask must keep origin/master...HEAD). Also proves the backtick strip.
+assert "v-clean-commands" 0 "$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | docs clean | CLI-executable | post-impl | bin/check-docs |
+| 2 | python exits 0 | CLI-executable | post-impl | `python3 -c "import sys; sys.exit(0)"` |
+| 3 | foo count | CLI-executable | post-impl | `bin/check-docs \| grep -c foo` |
+| 4 | changed files | CLI-executable | post-impl | `git diff --name-only origin/master...HEAD` |
+'
+
+# 3. Bare SQL is not a shell command → fire (exit 1).
+assert "v-bare-sql" 1 "$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | sim row exists | CLI-executable | post-impl | SELECT sim FROM ibl_sim_summaries WHERE sim = 999999; |
+'
+
+# 4. A bare file path on a CLI-executable row (a mislabeled PHPUnit row) → fire.
+assert "v-bare-path" 1 "$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | foo unit passes | CLI-executable | post-impl | `ibl5/tests/Unit/FooTest.php` |
+'
+
+# 5. Prose referring to another row is not a command → fire (exit 1).
+assert "v-prose-pointer" 1 "$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | repeat prior check | CLI-executable | post-impl | same command as row 1 |
+'
+
+# 6. A matrix with zero CLI-executable rows → gate V silent (exit 0). Also the
+# `set -u` running proof: matrix_split is never called, MC_* stay at their inits.
+assert "v-no-cli-rows" 0 "$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | cap rejects over-cap trade | PHPUnit | pre-impl | `tests/Trade/TradeValidatorTest.php` |
+| 2 | form submits and redirects | E2E | post-impl | `tests/e2e/trade.spec.ts` |
+'
+
+# 7. A raw (unescaped) pipe inside the location cell → fire the PIPE message,
+# not a pattern message. The truncated cell (bin/check-docs) passes every
+# pattern rule, so only the MC_PIPES > MHDR_PIPES check catches it — proving
+# Edit C captured the header pipe count.
+assert "v-unescaped-pipe" 1 "$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | docs clean | CLI-executable | post-impl | bin/check-docs | grep -c foo |
+'
+
+# Message-content check (not just an exit code): gate V must name the offending
+# cell text so an author knows which row to fix. Copies the `2>&1 | grep -q`
+# idiom used for the [W] check above. Named without a `v-` prefix so the
+# `grep -c '^ok: v-'` count stays at the 7 assert cases.
+_f="$TMP/v-msg.md"
+printf '%s\n' "$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | probe P1 passes | CLI-executable | post-impl | Phase 1d probe P1 |
+' > "$_f"
+_out=$("$GUARD" "$_f" 2>&1)
+if printf '%s' "$_out" | grep -q '\[V\]' && printf '%s' "$_out" | grep -qF 'Phase 1d probe P1'; then
+    echo "ok: [V]-message-names-row"
+else
+    echo "FAIL: [V] message must contain '[V]' and the cell text 'Phase 1d probe P1'"
+    FAILED=1
+fi
+
+# The pipe fixture (case 7) must fire the PIPE message, not a pattern message.
+_f="$TMP/v-pipe.md"
+printf '%s\n' "$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | docs clean | CLI-executable | post-impl | bin/check-docs | grep -c foo |
+' > "$_f"
+if "$GUARD" "$_f" 2>&1 | grep -qF 'must be written \|'; then
+    echo "ok: [V]-pipe-message-confirmed"
+else
+    echo "FAIL: [V] unescaped-pipe fixture must fire the pipe-escaping message"
+    FAILED=1
+fi
 
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"

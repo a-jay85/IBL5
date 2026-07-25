@@ -19,6 +19,21 @@
 
 set -euo pipefail
 
+# --- launchd PATH supplement --------------------------------------------------
+# launchd runs jobs with a minimal PATH (/usr/bin:/bin:/usr/sbin:/sbin), which has
+# neither php (bin/check-docs is `#!/usr/bin/env php`) nor gh — so every scheduled
+# run died at the first check-docs call with `env: php: No such file or directory`
+# and exit 127, silently, from install (2026-07-16) until this fix. The dirs are the
+# same set the plist in bin/docfix-run:90 already preludes for its spawned session —
+# .bun/bin included, because the run chain reaches bin/wt-new's `bunx tailwindcss`
+# CSS build, which is soft-guarded (falls back to copying main's style.css) but would
+# otherwise degrade on every run.
+#
+# APPEND, never prepend: bin/test-docfix-run sandboxes this script by putting stub
+# gh/git shims first on PATH. Prepending /opt/homebrew/bin would shadow those with
+# the REAL gh and let the test suite hit the live repo.
+export PATH="$PATH:/usr/local/bin:/opt/homebrew/bin:${HOME:-}/.bun/bin:${HOME:-}/.local/bin"
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # --- MAIN checkout derivation (Divergence 1 from backups-sync-setup template) ---

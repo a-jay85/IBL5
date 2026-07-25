@@ -423,5 +423,37 @@ OUT="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_GH_FAIL=1 run_health "$SB" 77)"; RC=$?
   && ok "(18f) health: gh outage mid-function still prints 3 lines + exits 0" \
   || bad "(18f) health gh outage contract"
 
+# --- Cases 19a-19c: launchd PATH supplement -----------------------------------
+# launchd hands the job a minimal PATH (/usr/bin:/bin:/usr/sbin:/sbin) with no
+# php and no gh, so every scheduled run died at the first check-docs call with
+# exit 127 — silently, for 8 days. bin/docfix-poll now supplements PATH itself
+# rather than only in the plist it writes, so the fix reaches the ALREADY-INSTALLED
+# job on a plain `git pull` with no reinstall.
+
+# Case 19a: the export exists and names the Homebrew/local dirs launchd omits
+PATH_LINE="$(grep -m1 '^export PATH=' "$REAL_POLL")"
+{ [ -n "$PATH_LINE" ] \
+    && printf '%s' "$PATH_LINE" | grep -qF '/opt/homebrew/bin' \
+    && printf '%s' "$PATH_LINE" | grep -qF '/usr/local/bin'; } \
+  && ok "(19a) docfix-poll supplements PATH with the dirs launchd omits" \
+  || bad "(19a) missing launchd PATH supplement"
+
+# Case 19b: it APPENDS. Prepending would put the real /opt/homebrew/bin/gh ahead
+# of this suite's stub shims and point the tests at the live repo.
+printf '%s' "$PATH_LINE" | grep -q '^export PATH="\$PATH:' \
+  && ok "(19b) PATH is appended, not prepended (sandbox shims keep precedence)" \
+  || bad "(19b) PATH prepended — would shadow test shims with real binaries"
+
+# Case 19c: behavioral — under launchd's exact minimal PATH the poll still runs
+# end to end and fires the launcher, via the shims that stay ahead of the append.
+SB="$(build_sandbox)"
+( IBL5_MAIN="$SB" HOME="$SB/home" \
+  PATH="$SB/shim:$SB/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
+  SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" SHIM_PR_CLOSED='[]' \
+  "$REAL_POLL" >/dev/null 2>&1 ) || true
+{ [ -f "$SB/docfix-calls" ] && grep -qF "77|a.md" "$SB/docfix-calls"; } \
+  && ok "(19c) poll completes under launchd's minimal PATH and fires the launcher" \
+  || bad "(19c) poll broken under launchd minimal PATH"
+
 if [ "$FAILED" -eq 0 ]; then echo "All docfix-run checks passed."; else echo "Some docfix-run checks FAILED."; fi
 exit "$FAILED"

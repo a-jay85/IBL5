@@ -23,6 +23,39 @@ For each `MISSING:` test the impl silently dropped planned coverage — now like
 
 A `MISSING:` item is **resolved** when its test was authored-and-run-green OR was explicitly cut-from-implementation with a PR comment noting the cut. An item that is neither — a planned test the diff never wrote and which you did not author or explicitly cut — is **unresolved**. A `MISSING-METHOD:` item resolves identically — the named method is authored and run green, **or** explicitly cut with a PR comment stating why the plan-named assertion was dropped; anything else is **unresolved** and holds the arm. Renaming the method in the plan after the fact is not a resolution.
 
+> **Run the CLI-executable rows.** A `CLI-executable` row is a command, not a file, so the path check above cannot see it. Execute the location cell of every **`post-impl`** `CLI-executable` row. `bin/check-plan` gate `[V]` guarantees each such cell is a single runnable shell command with any pipe written `\|`.
+
+```bash
+# Reuses $PLAN_FILE. Runs from the WORKTREE ROOT (the dir holding bin/, ibl5/,
+# engine/) — never <worktree>/ibl5: a cell like `bin/check-docs` is root-relative.
+cd "$(git rev-parse --show-toplevel)"
+TO=$(command -v gtimeout || command -v timeout || true)   # macOS ships neither by default
+MSEN=$'\001'   # same escaped-pipe sentinel as bin/check-plan's matrix_split()
+if [ -z "$TO" ]; then echo "SKIP: no timeout binary — CLI-executable rows not run"; fi
+awk '/\|[[:space:]]*[Ww]hat to verify[[:space:]]*\|/{m=1;next} m&&/^[[:space:]]*\|/{print;next} m{m=0}' "$PLAN_FILE" \
+  | while IFS= read -r ROW; do
+    [ -z "$TO" ] && break
+    case "$ROW" in *[!\ \|:-]*) : ;; *) continue ;; esac        # skip the |---|---| row
+    R="${ROW//\\|/$MSEN}"
+    IFS='|' read -r _lead NUM _WHAT TYPE TIMING CELL _REST <<< "$R"
+    printf '%s' "$TYPE"   | grep -qiE 'cli[- ]executable' || continue
+    printf '%s' "$TIMING" | grep -qiE 'post-impl'         || continue   # Timing CELL only
+    CELL=$(printf '%s' "${CELL//$MSEN/|}" | sed -E 's/^[[:space:]]*`?//; s/`?[[:space:]]*$//')
+    [ -z "$CELL" ] && continue
+    "$TO" 30 bash -c "$CELL" </dev/null >/dev/null 2>&1
+    rc=$?   # capture BEFORE the row-number $(printf|tr) below, else $? reads tr's exit (0)
+    [ "$rc" -ne 0 ] && echo "MISSING: row $(printf '%s' "$NUM" | tr -d ' ') — $CELL (CLI-executable row exited non-zero: $rc)"
+done
+```
+
+> **`pre-impl` rows are excluded, deliberately.** A `pre-impl` cell asserts the state the implementation *destroys* (a characterization grep of the old code, a baseline count). Running it after the change reports failure for a change that worked, so a whole-row `grep post-impl` is wrong too: it matches a row whose "What to verify" prose merely mentions post-impl. Read the Timing cell — the 5th pipe-delimited field, `cut -d'|' -f5` counting the leading empty field — and nothing else.
+>
+> Exit **124** is `timeout`'s kill code and counts as non-zero: a cell that needs more than 30s is not a Phase 5.0 check. Tell the planner, not the executor — a `CLI-executable` cell must be a **fast, read-only, non-prompting** command, because this block runs it unattended in a headless run. `</dev/null` makes non-prompting mechanical; `>/dev/null 2>&1` keeps a chatty cell out of the log; the timeout caps the run.
+>
+> A failing row follows the same **resolution** discipline as every other `MISSING:` item: resolved when the underlying defect is fixed and the command re-runs exit 0, or when the failure is environmental / the row was cut and a PR comment says so. Only items still **unresolved** at Phase 5.0 END reach `/tmp/post-plan-missing-tests-$PPID` via the existing append step. Writing to the bridge file *inline* here would be wrong — a row you then fix would still block auto-merge at Phase 6.5 condition (3).
+>
+> Scope: skill path only. As `:54` already states, `tools/postplan-harness` computes conformance in-process and never touches these `/tmp` files; do not port this executor to the harness.
+
 **Plan→file conformance.** The same failure mode that drops a planned test also drops a planned *non-test* edit: an impl agent can end its turn with a summary claiming files were changed that never landed in the commit (PR #923 claimed workflow + rule edits that were absent). The test-path check above only covers test files, so additionally verify every **must-appear** file in the plan's `## Critical Files` section actually shows up in the diff. A Critical File is **must-appear by default** — it is **exempt only when its annotation contains a parenthesized group whose contents include a canonical token** (implemented in `bin/lib/critical-files.sh`, the single source of truth for this rule). A keyword in surrounding prose does **not** exempt — only parentheses signal "this is a marker, not a description." Canonical markers: `(reference)`, `(read-only)`, `(read-only reference)`, `(verify)`, `(verification)`, `(template)`, `(no-edit)`, `(no-change)`, `(unchanged)`, `(context)`, `(conditional)` — case-insensitive; tokens match as **whole words** (`(filename references the affected class)` is not exempt). An explanatory tail inside the same parens is allowed for the non-`conditional` tokens (`(reference — pattern to mirror)`). Use `(conditional)` for entries that may or may not appear in the diff depending on implementation choices — **`conditional` must *open* the group and be immediately followed by `)` or a separator (`—`/`–`/`-`/`:`/`;`/`,`)**: `(conditional — Phase 4 only)` → EXEMPT; `(conditional Phase 4 only)` → MUST_APPEAR. Bare entries AND change-described entries (e.g. `— add the foo helper`, `(new)`, `(header comment only)`) are all must-appear. **Failure mode by design: loud and resolvable** — a reference annotated without a recognized parenthesized marker yields a `MISSING-FILE:` that the resolution step below dismisses with a one-line PR comment, vs. the old rule's silent, total non-coverage. Across the 259-plan corpus (1578 `## Critical Files` entries), 61 annotations that the old unscoped keyword match exempted are must-appear under the current rule — 46 of the 1121 entries carrying a parenthesized group, plus all 15 prose-only exemptions; pre-existing plans carrying a prose-only exemption now yield a MISSING-FILE that path **(b)** below dismisses with a one-line PR comment — the accepted, bounded migration cost (only plans whose branch is still unmerged can ever re-run Phase 5.0). Plans with no `## Critical Files` section produce an empty loop and are silently skipped.
 
 ```bash

@@ -1,6 +1,6 @@
 ---
 description: Which tier to pick for each sub-agent, including the Sonnet 4.6 def-pins. Skip-vs-spawn heuristic and deeper rationale live in agent-tiering-detail.md.
-last_verified: 2026-07-20
+last_verified: 2026-07-24
 ---
 
 # Agent Tiering

@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for agent-tiering — the skip-vs-spawn heuristic, Fable approval-gate procedure (incl. the asm-level static-RE exception where Fable is the recommended tier), flat-fan-out (nested sub-agent) rationale, orchestrator context economics (delegate-don't-dismiss, split-don't-self-clear), and per-tier prompt style. Loads only when editing workflow orchestration defs.
-last_verified: 2026-07-23
+last_verified: 2026-07-24
 paths:
   - ".claude/skills/**/*.md"
 ---
@@ -95,6 +95,8 @@ Tier the orchestrator by the judgment **it** retains:
 
 - **Single backlog item** → **Sonnet** (Steps 2.5/3/4 orchestrator calls are light; same recipe-backed class the "Opus (delegated)" row routes to `plan-architect-sonnet`).
 - **Multiple items in one pass** → **Opus** (cross-item PR decomposition, **dependency ordering**, tier-boundary splits). Cheaper: run each as its own **Sonnet** `/plan` and make only the ordering call yourself.
+
+**Getting to a Sonnet orchestrator from an Opus session:** when an expensive session has already done the design thinking, don't run `/plan` inline — run `/plan-prompt` (`.claude/skills/plan-prompt/SKILL.md`), which drafts a paste-ready `/plan` prompt carrying the ground-truth pointers, the already-measured evidence, and an explicit Step-3 tier directive. A fresh Sonnet session then orchestrates, and the tier directive is what keeps the *design* on Opus. Sonnet-orchestrating is only cheaper than Opus-orchestrating if the context actually crosses the session boundary — that handoff prompt is the thing that carries it.
 
 ## Explore Agent Tiering
 

@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed/declined maintenance-audit findings, extracted from maintenance-backlog.md.
-last_verified: 2026-07-03
+last_verified: 2026-07-24
 ---
 
 # Maintenance-Cost Reduction Backlog — Archive
@@ -119,6 +119,14 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Risk if untouched:** Cap bugs buried in offer-creation code; CY-offset logic mixed with offer-writing.
 **Status:** Completed (merged #1143) — extracted `TradeCapCalculator`; cap-math (`calculateSalaryCapData`/`sumCashRecordSalaries`) moved out of the offer class.
 
+### 1.15 YourAccountView — Six Inline SVG Icons + Six Page Variants
+**Location:** `ibl5/classes/YourAccount/YourAccountView.php` (122 lines)
+**Problem:** Six private SVG-icon methods + six distinct `renderXxxPage()` methods (login, register, forgot-password, registration-complete, error pages) sharing only card layout and icons.
+**Suggested direction:** Move icons to shared `IconHelper`; split page renders into separate views or parameterized `renderAuthPage(string $type, array $data)`.
+**Est. effort:** S
+**Risk if untouched:** Every new auth page inflates the class; SVG helpers can't be reused.
+**Status:** Done (verified 2026-07-24, no plan — stale-Open) — `YourAccountView` is now 122 LOC; extraction already done (was reported as 536/548 LOC in the original audit).
+
 ### 1.16 DepthChartEntryView — Business Logic Inside View
 **Location:** `ibl5/classes/DepthChartEntry/DepthChartEntryView.php` line 167
 **Problem:** `computeJsbProduction()` implements a JSB engine formula (`2×FGM + TGM + FTM + ORB + DRB + AST + STL + BLK`) inside a View. View also `echo`s directly (inconsistent with codebase).
@@ -219,6 +227,14 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Risk if untouched:** `sanitizeRedirect()` is security-sensitive and shadowable as a global.
 **Status:** Completed — `toggleExtensions()`/`sanitizeRedirect()` moved into `Debug\DebugController`; `modules/DebugMenu/index.php` now `use`s it (verified 2026-06-20).
 
+### 2.17 News Module — No `classes/News/`; 452 Lines of Legacy
+**Location:** `modules/News/index.php` (152), `article.php` (179), `categories.php` (121); also `Topics/copyright.php`
+**Problem:** All business logic + DB queries (via old `$db` global) + inline HTML in entrypoints. `Services\NewsService` exists only for story creation.
+**Suggested direction:** Create `classes/News/` with R/S/V; migrate `NewsService` from `Services/`.
+**Est. effort:** L
+**Risk if untouched:** Display logic untestable; DB-abstraction upgrades will break it.
+**Status:** Done (verified 2026-07-24) — PR #1166 (`refactor(news): extract READ/DISPLAY into Topics\News\Repository/Service/View`, merged 2026-07-03) delivered `Topics\News\NewsRepository`, `NewsService`, and `NewsView`.
+
 ### 2.19 SiteStatistics Module — Empty Placeholder
 **Location:** `modules/SiteStatistics/` (only `language/` subdir)
 **Problem:** No `index.php`, no classes — listed in nav, renders nothing.
@@ -274,6 +290,14 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Est. effort:** S each
 **Risk if untouched:** Two-file dirs proliferate the pattern; codebase fragments.
 **Status:** ✅ Implemented (2026-07-02) — moved into BasketballStats\ namespace (this PR).
+
+### 2.33 Debug — Single-Class Module With Globals Wrapper
+**Location:** `classes/Debug/`
+**Problem:** `DebugSession` constructor takes `$_COOKIE`, `$_SERVER`, `getenv()` directly — wrapper around globals, not injectable. `DebugMenu/index.php` defines `sanitizeRedirect()` as global security function.
+**Suggested direction:** Move `sanitizeRedirect()` to `DebugSession` or `DebugController`; add the controller.
+**Est. effort:** S
+**Risk if untouched:** Security function shadowable as a global; properties not in interface.
+**Status:** Done (verified 2026-07-24, no plan — stale-Open) — `DebugSession::__construct(?string $username, ?string $serverName, ?string $cookieValue = null, bool $isE2ETesting = false)` takes explicit params (line 17); `DebugController` reads the superglobals and passes them in (lines 29–34). `sanitizeRedirect` moved to `DebugController` (see 2.16).
 
 ### 2.34 Draft Selection — Standalone POST Handler
 **Status:** Completed — collapsed into `modules/Draft/index.php?op=select`.
@@ -826,6 +850,14 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Risk if untouched:** Award voting corruption; duplicates counted.
 **Status:** Implemented (verified 2026-06-27) — tests/Voting/VotingRepositoryTest.php (vote aggregation, column-allowlist rejection, save/cooldown writes, name→pid mapping) + tests/Voting/SubmissionResultTest.php added. Results service/controller/view already covered under tests/VotingResults/.
 
+### 6.16 Api Module — Subthreshold (48 files, 22 tests, 0.46 ratio)
+**Location:** `ibl5/classes/Api`
+**Problem:** `ApiKeyAuthenticator`, `RateLimiter`, `Paginator`, repository classes undertested.
+**Suggested direction:** Header parsing, token-bucket logic, pagination offset/limit edges.
+**Est. effort:** L
+**Risk if untouched:** Auth bypass; rate limiter broken; pagination off-by-one.
+**Status:** ✅ Implemented (2026-07-24). Prior coverage: ApiKeyAuthenticator/RateLimiter/Paginator/ApiKeyRepository/RateLimitRepository. All named residuals now covered: `ibl5/tests/Api/Repository/ApiGameRepositoryTest.php`, `ApiInjuriesRepositoryTest.php`, `ApiLeadersRepositoryTest.php`, `ApiPlayerRepositoryTest.php`, `ApiPlayerStatsRepositoryTest.php`, `ApiStandingsRepositoryTest.php`, `ApiTeamRepositoryTest.php`, `HealthRepositoryTest.php` (unreachable-false branch via anonymous subclass override), `ibl5/tests/Api/Response/JsonResponderTest.php` (ob_start/ob_get_clean capture pattern), `ibl5/tests/Clock/SystemClockTest.php` (Clock module testsuite added to phpunit.xml).
+
 ### 6.20 Anonymous rookie-option lockdown E2E assertion is non-discriminating
 **Location:** `tests/e2e/security/draft-rookie-anon-lockdown.spec.ts` (under `ibl5/`; added by PR #1107, not yet on `master`)
 **Problem:** The unauthenticated `processrookieoption` lockdown test asserts the response `toContain('YourAccount')` — a string emitted by `loginbox()` / global nav chrome on *every* anonymous page. It therefore does not discriminate a working auth gate from a broken one: if the `is_user()` gate regressed, the success marker (`result=rookie_option_success`) appears only in the redirect *URL*, not the response body, so the test would still pass. (The sibling Draft lockdown test is independently saved by its `not.toMatch(/select\s*\*\*.*!\*\*/)` negative matcher; the rookie test has no such backstop.)
@@ -941,6 +973,22 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Risk if untouched:** Reuse across long-lived processes returns stale data invisibly.
 **Status:** Completed (merged #1040, maintenance-38) — dropped hidden caches in RecordHolders layering.
 
+### 7.17 `PlayerRepository::getPlayerNews` Queries `nuke_stories`
+**Location:** `ibl5/classes/Player/PlayerRepository.php` lines 547-564
+**Problem:** Cross-system query into PHP-Nuke table with no interface annotation. Not caught by ban rules.
+**Suggested direction:** Annotate `@see nuke_stories`; or extract `LegacyNewsRepository`.
+**Est. effort:** S
+**Risk if untouched:** Schema migration of `nuke_stories` silently returns empty.
+**Status:** Done (verified 2026-07-24, no plan — stale-Open) — `@see nuke_stories` annotation present at `PlayerRepository.php:216`.
+
+### 7.18 `PlayerRepository::loadByID` vs `CommonMysqliRepository::getPlayerByID` — Duplicate Queries
+**Location:** `Player/PlayerRepository.php:165-181` vs `Services/CommonMysqliRepository.php:173-183`
+**Problem:** Nearly identical JOIN queries; column sets already drifted.
+**Suggested direction:** Delegate one to the other; or deprecate the `CommonMysqliRepository` player lookups.
+**Est. effort:** M
+**Risk if untouched:** JOIN-alias or column changes must be applied twice.
+**Status:** Done (verified 2026-07-24, no plan — stale-Open) — shared `PlayerTeamJoinQuery` trait at `classes/Repositories/PlayerTeamJoinQuery.php:12`; used by `Repositories/PlayerLookupRepository.php:14` and `Player/PlayerRepository.php:28`.
+
 
 ## Axis 8: Scripts Proliferation
 
@@ -1014,6 +1062,14 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Est. effort:** S
 **Risk if untouched:** CI jobs misinterpret check results.
 **Status:** ✅ Implemented (2026-06-21) — documented the existing de-facto standard (exit 0 = pass, 1 = violation, 2 = usage/env error; stdout violations with UPPERCASE prefix tags, stderr diagnostics) in `bin/README.md`. A shared `check-helpers.sh` helper under `bin/lib/` is deferred as a separate item (a new `bin/` script would trip `adr-check`).
+
+### 8.17 No Tests for Scripts
+**Location:** All script directories
+**Problem:** 40+ executables mutate state with no tests.
+**Suggested direction:** Add ShellCheck linting; smoke tests in `tests/bin/` for high-risk scripts.
+**Est. effort:** M
+**Risk if untouched:** Silent failures; workarounds instead of fixes.
+**Status:** Done (verified 2026-07-24, no plan — stale-Open) — ShellCheck bash-3.2-compat CI job exists in `.github/workflows/tests.yml:370` (`ShellCheck (bash 3.2 compat)` job).
 
 
 ## Axis 9: Documentation Drift and Onboarding Cost
@@ -1122,6 +1178,14 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Risk if untouched:** Low — note for completeness.
 **Status:** Implemented — verified accurate, no change needed. css-architecture.md carries paths: frontmatter, so the harness loads it path-conditionally; zero by-name imports is expected for a path-triggered rule, not a defect. Backlog-only resolution.
 
+### 9.15 `lighthouse-pr-comments.md` and `refactor-flag.md` Always-Loaded
+**Location:** `.claude/rules/lighthouse-pr-comments.md`, `refactor-flag.md`
+**Problem:** 39 + 43 LOC of PR-workflow content loaded every session; only relevant during post-plan.
+**Suggested direction:** Path-trigger to commit/PR contexts, or merge into `workflow-continuity.md`.
+**Est. effort:** S
+**Risk if untouched:** ~80 LOC of always-loaded budget for ~20% relevance.
+**Status:** Done (verified 2026-07-24, no plan — stale-Open) — `lighthouse-pr-comments.md:5` and `refactor-flag.md:3` now carry `paths:` frontmatter scoping each rule to the relevant file patterns.
+
 ### 9.16 REFACTORING_HISTORY — Living Doc Indexed in Onboarding
 **Location:** `ibl5/docs/REFACTORING_HISTORY.md`
 **Problem:** "100% complete" — purely historical; indexed under "For New Contributors."
@@ -1145,6 +1209,22 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Est. effort:** S
 **Risk if untouched:** Wrong coverage target cited in PR reviews.
 **Status:** Completed branch `doc-freshness-catchup` (2026-05-19) — coverage figures aligned across STRATEGIC_PRIORITIES + DEVELOPMENT_GUIDE (~80%, 70% threshold).
+
+### 9.19 70 of 89 Class Directories Have No README
+**Location:** `ibl5/classes/` (70 dirs missing)
+**Problem:** 19 READMEs exist across 89 class dirs (2026-07-24 audit); 70 don't (Trading, FreeAgency, Api, JsbParser, PlrParser, Waivers, Auth, Bootstrap, BulkImport, Season, and more).
+**Suggested direction:** Prioritize READMEs for top-10 modules; add to doc-freshness CI scope.
+**Est. effort:** M (top 10) / L (all)
+**Risk if untouched:** Agent reverse-engineers module from code; orientation tokens wasted.
+**Status:** Implemented 2026-07-24 — added READMEs to all 68 class dirs that lacked one (actual count after re-verification: 87 dirs, 19 existing, 68 missing); all new files carry frontmatter with description and last_verified; no invented behavior, no dead path references.
+
+### 9.20 Most Class README Files Lack Frontmatter
+**Location:** `ibl5/classes/*/README.md`
+**Problem:** 19 READMEs exist; only 5 have frontmatter, 14 lack `description`/`last_verified`; out of `bin/check-docs` scope; can drift indefinitely.
+**Suggested direction:** Add frontmatter; extend `IN_SCOPE_GLOBS` to include them.
+**Est. effort:** S (frontmatter) / M (CI)
+**Risk if untouched:** Class READMEs silently become wrong.
+**Status:** Implemented 2026-07-24 — added frontmatter to the 16 existing class READMEs that lacked it (actual count: 3 of 19 already had frontmatter, not 5); extended bin/check-docs IN_SCOPE_GLOBS to include `ibl5/classes/*/README.md`; all 87 class READMEs now in CI scope.
 
 ### 9.21 `ibl5/migrations/README.md` — Dead Reference to Dropped Table FK
 **Location:** `ibl5/migrations/README.md` line 282
@@ -1295,6 +1375,14 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Risk if untouched:** Pattern is contagious; first user-controlled use is a real injection.
 **Status:** Rule landed (2026-05-31) — `BanSqlStringInterpolationRule` (`ibl.sqlStringInterpolation`). Flags `InterpolatedString` SQL literals via an anchored SQL-statement pattern, so prose mentioning SQL keywords as English words is NOT matched. `SeasonLeaderboards:80` is dot-concatenation, correctly NOT a site. Plan estimated 3 sites; the rule found 66 genuine interpolated-SQL sites across ~40 files (32 baseline entries) — all baselined. Refactoring (e.g. AwardHistory `$sortColumn` → match-validated enum) deferred to a separate plan.
 **Status (2026-06-25, burndown complete):** All interpolated-SQL sites converted to bound `?` params (values) or validated allowlist/`match()`/concatenated-literal identifiers (table/column names, ORDER BY, grouping columns); every `ibl.sqlStringInterpolation` baseline entry cleared. Done across the burndown PR1/PR2 pair (PR2 the finisher). `grep -c 'ibl.sqlStringInterpolation' phpstan-baseline.neon` → 0; `composer run analyse` green.
+
+### 10.14 `time()` / `date()` / `strtotime()` — No Clock Abstraction
+**Location:** `Draft/DraftSelectionHandler.php:60`, `Cache/PageCache.php:87,112`, `Cache/DatabaseCache.php:52,83`, `Security/CsrfGuard.php:98,209,263`, `LeagueSchedule/LeagueScheduleView.php:89-121`, several more
+**Problem:** No `Clock` interface; time-dependent tests must wait or freeze OS clock.
+**Suggested direction:** Introduce `Services\ClockInterface::now(): int` first; then `BanDirectTimeCallsRule`; allow `NukeCompat`, `LegacyFunctions`, Clock impl.
+**Est. effort:** L
+**Risk if untouched:** CSRF expiry, cache TTL, draft timestamps not unit-testable.
+**Status:** Done (verified 2026-07-24) — PR #1160 (`refactor(clock): global Clock abstraction + ban direct time calls`, merged 2026-06-28) promoted a global Clock seam (`classes/Clock/ClockInterface.php`) and added `BanDirectTimeCallsRule`. (Previously deferred by `maintenance-25`; `ClockInterface`/`SystemClock` existed only under `classes/Api/Middleware/`.)
 
 ### 10.15 `echo ob_get_clean()` Anti-Pattern in `DebugOutput`
 **Location:** `UI/DebugOutput.php:61,79`
@@ -1553,6 +1641,14 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Risk if untouched:** Dedup logic change requires updating 5 copies.
 **Status:** ✅ Implemented (verified 2026-06-28) — the protected-helper option was taken: `BaseMysqliRepository::gameOfThatDaySubquery()` returns the canonical derived-table fragment, called from `LeagueScheduleRepository`, `TeamScheduleRepository`, and `RecordHoldersRepository` (3 methods). No inline `MIN(game_of_that_day)` copies remain outside the helper. The doc had this stale-Open (no plan owned it).
 
+### 13.4 `FreeAgencyOfferValidator` Duplicates `CommonContractValidator`
+**Location:** `FreeAgency/FreeAgencyOfferValidator.php` (private methods).
+**Problem:** FA validator has its own private raise-percentage / salary-decrease / continuity / max-contract checks. `ExtensionService` correctly delegates; FA doesn't.
+**Suggested direction:** Inject `CommonContractValidator` into `FreeAgencyOfferValidator`; replace private methods with delegation.
+**Est. effort:** M
+**Risk if untouched:** CBA rule change applied in two places; private copy easy to miss.
+**Status:** 🚫 Declined — Premise invalid. `CommonContractValidator` was not deleted: it exists at `classes/FreeAgency/CommonContractValidator.php:22` (verified 2026-07-24). `Services/` was deleted per 2.22, but the validator moved to `FreeAgency/`. The "re-identify/extract the shared CBA comparator first" step that was blocking this row is not needed. The injection of `CommonContractValidator` into `FreeAgencyOfferValidator` remains valid future work but is no longer blocked.
+
 ### 13.5 `vw_series_records` Query Duplicated in Two Modules
 **Location:** `Standings/StandingsRepository.php:261`, `SeriesRecords/SeriesRecordsRepository.php:44`
 **Problem:** Identical `SELECT self, opponent, wins, losses FROM vw_series_records` in two repos.
@@ -1677,6 +1773,14 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Est. effort:** M
 **Risk if untouched:** Log impl swaps require editing factory class; mock injection impossible in tests.
 **Status:** Completed — per-channel `logger.<channel>` bindings registered in container (PR1, 2026-05-19); static call-site burndown done: `?LoggerInterface` injected into 20 single-channel classes (merged #1093, maintenance-48 / chunk C16c) and into 7 multi-channel classes (merged #1094, maintenance-52). `Auth\DevAutoLogin` also converted static→instance with an injectable `'auth'` logger (merged #1095).
+
+### 14.16 Front Controller Includes Module by `$name` String Concatenation
+**Location:** `ibl5/index.php` lines 38-60: `$modpath = "modules/$name/" . $mod_file . ".php"; include $modpath;`
+**Problem:** Module resolved by concatenating user-influenced `$name` (from `$_REQUEST` via `$GLOBALS`). The original audit described traversal protection as a single `str_contains($name, '..')`, but ground-truth verification (2026-07-24) found two guards already in place: `preg_match('/^[a-zA-Z0-9_]+$/', $name)` at `modules.php:26` (character allowlist that prohibits `.` and `/`) AND `ModuleRegistry::isValid($name)` (42-entry allowlist) at `modules.php:31`; `index.php:50` also calls `ModuleRegistry::isValid`. No `str_contains('..')` exists in the codebase.
+**Suggested direction:** N/A — guards already exceed the "dispatch table" recommendation.
+**Est. effort:** —
+**Risk if untouched:** N/A.
+**Status:** 🚫 Declined (verified 2026-07-24) — Premise invalid. The "single `str_contains('..')`" description was wrong. Two independent guards exist: character-class regex (prohibits traversal chars) + 42-entry name allowlist. Defense-in-depth is already present.
 
 
 ## Axis 15: Migrations and Schema Clarity

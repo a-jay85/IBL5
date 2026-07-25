@@ -113,13 +113,13 @@ export function teamYearUrl(teamId: number, year: number): string {
 }
 
 /**
- * Build a URL to a box score page on the IBL6 SvelteKit site.
+ * Build a URL to a box score page on the PHP site.
  */
 export function boxScoreUrl(date: string, gameOfThatDay: number): string {
     if (gameOfThatDay <= 0) {
         return '';
     }
-    return `${config.ibl6BaseUrl}/${date}-game-${gameOfThatDay}/boxscore`;
+    return `${siteBase}/modules.php?name=GameBoxscore&date=${date}&game=${gameOfThatDay}`;
 }
 
 /**

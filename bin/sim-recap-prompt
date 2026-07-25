@@ -156,7 +156,7 @@ echo ""
 echo "== DISCORD MENTION MAP =="
 echo ""
 echo "Use these @mentions when writing each game recap."
-echo "Format: away-team-mention · home-team-mention (middle-dot separated, on one line below the score header)."
+echo "Format: away-team-mention · home-team-mention (middle-dot separated, on one line below the score header). The prose paragraph follows after a blank line."
 echo ""
 
 if [[ -n "$mentions_path" && -f "$mentions_path" ]]; then
@@ -273,7 +273,8 @@ The following is the authoritative format reference. Match its structure exactly
   - 80-character = separator
   - Per date: ================================ Mon DD ========================================= separator
   - Per game: **Away Team NNN @ Home Team NNN** header (bold), then <@id> · <@id> mentions
-    line (away snowflake · home snowflake, middle-dot separated), then one prose paragraph
+    line (away snowflake · home snowflake, middle-dot separated), then a blank line, then
+    one prose paragraph
 
 Injuries woven into prose. Long streaks called out. Pop culture references tied to the era.
 

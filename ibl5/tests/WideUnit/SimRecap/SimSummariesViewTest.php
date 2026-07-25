@@ -160,8 +160,9 @@ final class SimSummariesViewTest extends TestCase
 
         // None of the LLM-sourced payloads may appear unescaped anywhere in the output.
         self::assertStringNotContainsString('<script>alert(1)</script>', $html);
-        // All three occurrences (intro, game recap, outro) must be entity-encoded.
-        self::assertSame(3, substr_count($html, '&lt;script&gt;alert(1)&lt;/script&gt;'));
+        // 3 occurrences in the per-field display panels (intro <p>, game <p>, outro <p>)
+        // plus 3 more in the assembled document inside the textarea (intro + game + outro) = 6.
+        self::assertSame(6, substr_count($html, '&lt;script&gt;alert(1)&lt;/script&gt;'));
     }
 
     /**
@@ -216,5 +217,61 @@ final class SimSummariesViewTest extends TestCase
         self::assertIsInt($thirdPos);
         self::assertLessThan($secondPos, $firstPos, 'Game recaps must appear in the order the caller provides');
         self::assertLessThan($thirdPos, $secondPos, 'Game recaps must appear in the order the caller provides');
+    }
+
+    /**
+     * The textarea must carry the full assembled document (intro + date rules + game prose +
+     * outro), not merely the ~220-char teaser stored in recap_text.
+     */
+    public function testTextareaCarriesAssembledDocumentNotTeaser(): void
+    {
+        $game1 = ['game_date' => '2008-02-26', 'visitor_teamid' => 1, 'home_teamid' => 2, 'game_of_that_day' => 1, 'sort_order' => 0, 'recap_text' => 'First game prose here.'];
+        $game2 = ['game_date' => '2008-03-01', 'visitor_teamid' => 3, 'home_teamid' => 4, 'game_of_that_day' => 1, 'sort_order' => 1, 'recap_text' => 'Second game prose here.'];
+        $html  = $this->view->render(
+            [],
+            $this->recapRow('Teaser body.', null, 'Intro text.', 'Outro text.'),
+            [$game1, $game2],
+            null
+        );
+
+        $markerOpen  = '<textarea id="recap-body" readonly rows="24" cols="100">';
+        $markerClose = '</textarea>';
+        $startOffset = strpos($html, $markerOpen);
+        self::assertIsInt($startOffset);
+        $bodyStart    = $startOffset + strlen($markerOpen);
+        $bodyEnd      = strpos($html, $markerClose, $bodyStart);
+        self::assertIsInt($bodyEnd);
+        $textareaBody = substr($html, $bodyStart, $bodyEnd - $bodyStart);
+
+        // The assembled document is present: game prose and the date separator rule.
+        self::assertStringContainsString('First game prose here.', $textareaBody);
+        self::assertStringContainsString('================================ Feb 26 =', $textareaBody);
+        // The textarea holds more than the teaser alone.
+        self::assertNotSame('Teaser body.', $textareaBody);
+    }
+
+    /**
+     * When there is nothing to assemble (no intro, no games, no outro), the textarea
+     * must fall back to the teaser so Copy is never empty.
+     */
+    public function testTextareaFallsBackToTeaserWhenAssemblyIsEmpty(): void
+    {
+        $html = $this->view->render(
+            [],
+            $this->recapRow('Fallback teaser.'),
+            [],
+            null
+        );
+
+        $markerOpen  = '<textarea id="recap-body" readonly rows="24" cols="100">';
+        $markerClose = '</textarea>';
+        $startOffset = strpos($html, $markerOpen);
+        self::assertIsInt($startOffset);
+        $bodyStart    = $startOffset + strlen($markerOpen);
+        $bodyEnd      = strpos($html, $markerClose, $bodyStart);
+        self::assertIsInt($bodyEnd);
+        $textareaBody = substr($html, $bodyStart, $bodyEnd - $bodyStart);
+
+        self::assertStringContainsString('Fallback teaser.', $textareaBody);
     }
 }

@@ -3,7 +3,8 @@
 #
 # bin/test-postplan-arm-conditions — regression guard for the /post-plan Phase 6.5
 # auto-merge conditions that call the shared predicate bin/lib/pr-armable.sh
-# (conditions (1) Manual-Testing, (5) golden, (6) Depends-on, (8) feat:).
+# (conditions (1) Manual-Testing, (5) golden, (6) Depends-on, (8) feat:), plus
+# condition (3), the Phase-5.0 conformance gate (no predicate; /tmp state only).
 #
 # Why this exists: those conditions live as separate ```bash blocks inside
 # _phase-6.5-arm-auto-merge.md (extracted from SKILL.md by the lazy-load
@@ -70,6 +71,20 @@ run_isolated() {
         bash -c "$1" 2>&1
 }
 
+# run_cond3 <block> <marker: yes|no> <bridge: absent|empty|items> — condition (3)
+# reads /tmp state rather than gh, so it gets its own runner: the block's
+# $DONE_MARK/$BRIDGE defaults are overridden to point into $BASE_TMP.
+run_cond3() {
+    local mark="$BASE_TMP/done-marker" bridge="$BASE_TMP/bridge"
+    rm -f "$mark" "$bridge"
+    [ "$2" = "yes" ] && touch "$mark"
+    case "$3" in
+        empty) : > "$bridge" ;;
+        items) echo 'MISSING: ibl5/tests/FooTest.php (matrix planned a test the diff never wrote)' > "$bridge" ;;
+    esac
+    DONE_MARK="$mark" BRIDGE="$bridge" bash -c "$1" 2>&1
+}
+
 expect_block() { # name  BLOCK|NONE  output
     local got_block=0
     [[ "$3" == *BLOCKED* ]] && got_block=1
@@ -98,6 +113,7 @@ assert_self_contained() { # marker name
 }
 
 B1="$(extract_block '# condition (1)')"
+B3="$(extract_block '# condition (3)')"
 B5="$(extract_block '# condition (5)')"
 B6="$(extract_block '# condition (6)')"
 B8="$(extract_block '# condition (8)')"
@@ -117,6 +133,19 @@ expect_block "(1) cleared sentinel -> NONE" NONE \
     "$(run_isolated "$B1" '{"body":"## Manual Testing\nNo manual testing needed — automated."}' '' '')"
 expect_block "(1) no section (UNKNOWN) -> BLOCK (fail-closed)" BLOCK \
     "$(run_isolated "$B1" '{"body":"hand-made PR, no manual testing heading"}' '' '')"
+
+# condition (3) — the fail-open this gate closed: an empty bridge file is
+# byte-identical for "5.0 ran clean" and "5.0 died", so only the done-marker
+# distinguishes them. The marker+absent-bridge case is the plan-blind majority
+# (Phase 5.0 skipped) — if it ever BLOCKs, nearly every PR stops arming.
+expect_block "(3) no done-marker -> BLOCK (indeterminate, fail-closed)" BLOCK \
+    "$(run_cond3 "$B3" no empty)"
+expect_block "(3) marker + unresolved items -> BLOCK" BLOCK \
+    "$(run_cond3 "$B3" yes items)"
+expect_block "(3) marker + empty bridge -> NONE (5.0 ran clean)" NONE \
+    "$(run_cond3 "$B3" yes empty)"
+expect_block "(3) marker + absent bridge -> NONE (5.0 skipped, plan-blind)" NONE \
+    "$(run_cond3 "$B3" yes absent)"
 
 expect_block "(5) golden + headless -> BLOCK" BLOCK \
     "$(run_isolated "$B5" '{"files":[{"path":"engine/internal/sim/testdata/golden.json"}]}' '' '1')"

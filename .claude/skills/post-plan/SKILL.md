@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-07-21
+last_verified: 2026-07-25
 ---
 
 # Post-Plan Orchestrator
@@ -142,7 +142,13 @@ Each Bash tool call runs in a fresh shell, so the classification flags are **not
 
 **INLINE invariant — Critical-Files must-appear rule (do NOT move to the reference file):** every file listed in the plan's `## Critical Files` section MUST appear in the PR diff, **unless** its annotation carries an explicit reference marker (`reference` / `read-only` / `verify` / `template` / `no-edit` / `unchanged` / `context`). A must-appear Critical File absent from the diff is a `MISSING-FILE:` finding that stays UNRESOLVED — and **blocks Phase 6.5 arming** — until you either make the dropped change (the #923 remedy) or note the legitimate cut in a PR comment. The matching regex, the `awk` that enforces it, and the sibling planned-test conformance check live in the reference file.
 
-Phase 5 consumes the Phase-3 flags `$HAS_PHP`, `$HAS_GO`, `$HAS_MATRIX`, `$PLAN_FOUND` — carried from Phase 3, never recomputed. **You MUST Read `.claude/skills/post-plan/_phase-5-final-verification.md` and run every block it lists, in order,** before computing the status. It writes the two carry-forward artifacts Phase 6.5 reads: the UNRESOLVED-items bridge `/tmp/post-plan-missing-tests-$PPID` and the status file `/tmp/post-plan-phase5-status-$PPID`.
+Phase 5 consumes the Phase-3 flags `$HAS_PHP`, `$HAS_GO`, `$HAS_MATRIX`, `$PLAN_FOUND` — carried from Phase 3, never recomputed. **You MUST Read `.claude/skills/post-plan/_phase-5-final-verification.md` and run every block it lists, in order,** before computing the status. It writes the three carry-forward artifacts Phase 6.5 reads: the UNRESOLVED-items bridge `/tmp/post-plan-missing-tests-$PPID`, the Phase-5.0 done-marker `/tmp/post-plan-conformance-done-$PPID`, and the status file `/tmp/post-plan-phase5-status-$PPID`.
+
+**Write the done-marker whether 5.0 runs or is skipped — this is mandatory on BOTH paths.** An empty bridge file cannot distinguish "5.0 ran clean" from "5.0 never finished", so condition (3) blocks when the marker is absent. When you **skip** Phase 5.0 (`PLAN_FOUND=none` or `! $HAS_MATRIX` — the majority case, since most PRs are plan-blind), write it here, before moving on; the reference file's END-of-5.0 write never executes on this path:
+
+```bash
+touch /tmp/post-plan-conformance-done-$PPID
+```
 
 ### Phase 5 END: emit `PHASE5_VERIFY_STATUS`
 
@@ -191,7 +197,7 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 
 1. Manual testing cleared — the PR body carries the `No manual testing needed` sentinel Phase 6 writes.
 2. No review/audit finding scored `>= 80` (scored in Phase 4).
-3. No unresolved `MISSING:` planned-test **or** `MISSING-FILE:` planned-file items from Phase 5.0 — `/tmp/post-plan-missing-tests-$PPID` is absent or empty (absent/empty = PASS, non-blocking).
+3. No unresolved `MISSING:` planned-test **or** `MISSING-FILE:` planned-file items from Phase 5.0 — **and Phase 5.0 provably finished**: the done-marker `/tmp/post-plan-conformance-done-$PPID` exists AND the bridge `/tmp/post-plan-missing-tests-$PPID` is absent or empty. Marker absent = indeterminate = BLOCKED (an empty bridge file alone means nothing — 5.0 truncates it at START).
 4. Phase 5 did not deterministically fail — `PHASE5_VERIFY_STATUS` is `pass` or `skipped`, **not** `fail`.
 5. Golden-snapshot safety — a change to `engine/internal/sim/testdata/golden.json` does NOT auto-ship unattended (headless-only block).
 6. Merge-order — every PR named in a `Depends-on:` line is already `MERGED`.
@@ -206,13 +212,13 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 
 **Each condition block is SELF-CONTAINED** — it `source`s the predicate and fetches its own inputs in-block, exactly as condition (7) re-derives `$PLAN_FILE` and the original (6)/(8) ran their own `gh pr view`. **Do not** hoist the `source` or a shared `PR_JSON` into a preamble block: a sourced function or a shell variable does not survive into a separately-executed block (only exported env vars like `$CLAUDE_HEADLESS` do), and a missing `source` would make `pr_feat_hold` a no-op — **failing OPEN, auto-arming a `feat:` PR**. Each block re-`source`ing the lib is idempotent and cheap. Every block extracts gh output with `gh ... --jq` (gh does the decode — no `echo`/`printf` round-trip needed); when a block must round-trip a multi-field `PR_JSON` it uses `printf '%s'` (never `echo`, whose zsh `\n` expansion corrupts jq's parse).
 
-**You MUST Read `.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md` and run each condition's block, in order, BEFORE arming — do not arm without it.** The reference holds the seven per-condition bash blocks (conditions 1, 4, 5, 6, 7, 8, 10 — conditions 2/3/9 are the Phase-4 score check, the `/tmp/post-plan-missing-tests-$PPID` bridge check, and the realized-diff hold-enumeration, run against state you already hold), each **self-contained** per the SELF-CONTAINED invariant above (every block re-`source`s the predicate in-block — a hoisted `source` does not survive into a separately-executed block and would fail OPEN). It also holds the per-condition blocker-reporting detail. Phase 6.5 consumes carried state only — the Phase-3 flags `$GOLDEN_CHANGED`/`$HAS_MIGRATION`/`COUNT_*`, the env `$CLAUDE_HEADLESS`/`$PPID`, the Phase-4 finding scores, the Phase-6 manual-testing sentinel, and the Phase-5 status file — never recompute them.
+**You MUST Read `.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md` and run each condition's block, in order, BEFORE arming — do not arm without it.** The reference holds the eight per-condition bash blocks (conditions 1, 3, 4, 5, 6, 7, 8, 10 — conditions 2/9 are the Phase-4 score check and the realized-diff hold-enumeration, run against state you already hold), each **self-contained** per the SELF-CONTAINED invariant above (every block re-`source`s the predicate in-block — a hoisted `source` does not survive into a separately-executed block and would fail OPEN). It also holds the per-condition blocker-reporting detail. Phase 6.5 consumes carried state only — the Phase-3 flags `$GOLDEN_CHANGED`/`$HAS_MIGRATION`/`COUNT_*`, the env `$CLAUDE_HEADLESS`/`$PPID`, the Phase-4 finding scores, the Phase-6 manual-testing sentinel, and the Phase-5 status file — never recompute them.
 
 **Fail-closed default:** if any condition is indeterminate, errors, or you are unsure, treat it as **BLOCKED** and do NOT arm. A false HOLD costs one manual human merge; a false ARM ships unreviewed code — only under-holding is dangerous.
 
 **If every condition passes:** arm with `gh pr merge --squash --auto --delete-branch` — `--auto` *queues* the merge (it does not merge now); GitHub fires it once required checks pass. Do not sync local to master here.
 
-**If any condition blocks:** do NOT arm. Report which condition(s) blocked — the per-condition report text is in the reference (e.g. `cat /tmp/post-plan-missing-tests-$PPID` for (3); which Phase-5 track failed for (4)). Continue to Phase 7 regardless to monitor and fix CI; a re-run clears a red-track block, but the intent/type holds (7), (8), (10) stay held until a human acts.
+**If any condition blocks:** do NOT arm. Report which condition(s) blocked — the per-condition report text is in the reference (for (3), report whether the block hit the no-done-marker branch — "Phase 5.0 never reached its end" — or listed unresolved items from `/tmp/post-plan-missing-tests-$PPID`; which Phase-5 track failed for (4)). Continue to Phase 7 regardless to monitor and fix CI; a re-run clears a red-track block, but the intent/type holds (7), (8), (10) stay held until a human acts.
 
 **Interactive golden warning:** when `$GOLDEN_CHANGED` is `true` and `$CLAUDE_HEADLESS` is unset (so condition 5 did not block), still surface the warning prominently so the human confirms the simulation change was an intentional `make -C engine golden-update`, not a masked regression.
 
@@ -283,7 +289,7 @@ Kill known lingering patterns so their tool results deliver immediately (cache w
 pkill -f 'bin/e2e-wt\.sh' 2>/dev/null
 pkill -f 'bunx.*playwright' 2>/dev/null
 pkill -f 'gh pr checks.*--watch' 2>/dev/null
-rm -f /tmp/post-plan-spec-diff-$PPID /tmp/post-plan-spec-prod-diff-$PPID /tmp/post-plan-missing-tests-$PPID 2>/dev/null
+rm -f /tmp/post-plan-spec-diff-$PPID /tmp/post-plan-spec-prod-diff-$PPID /tmp/post-plan-missing-tests-$PPID /tmp/post-plan-conformance-done-$PPID 2>/dev/null
 echo "Background process cleanup complete"
 ```
 

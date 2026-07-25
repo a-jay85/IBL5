@@ -4,7 +4,7 @@ description: "Plan an implementation task: enforces a verification matrix, direc
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
-last_verified: 2026-07-21
+last_verified: 2026-07-24
 ---
 
 # /plan — Implementation Planning with Verification Matrix
@@ -53,6 +53,8 @@ Collect: file paths, existing patterns, dependencies, blast radius, existing tes
 ## Step 2.1: Prior-art check — is this already done?
 
 Before designing anything, verify the work **does not already exist** — merged to master or sitting in an open PR. Backlog/status markers go stale (a finding gets implemented but its marker is never flipped), so the marker Step 2 recorded is a *claim*, not ground truth — verify it against the repo THIS run. Repeatedly, a plan has been designed (and sometimes implemented) for work that was already merged, discoverable only by reading the code, never the marker. This gate spends a few cheap tool calls at the end of orientation to bail *before* the expensive Step 3 `plan-architect` spawn.
+
+**A fact asserted in `$ARGUMENTS` is a claim too.** A caller — a human, or an upstream session that drafted the task via `/plan-prompt` — can state "this isn't built yet," "the helper doesn't exist," or "no migration touches this table" in perfect good faith and be wrong: the assertion was true when it was written and the branch it described has since merged. Hold caller-asserted facts to the same standard as a status marker — the three signals below are cheap, and they are the only thing standing between a stale premise and a fully designed plan for work that already exists. This does **not** mean re-deriving everything the caller hands you; it means the *specific* claim "this work does not already exist" is never taken on trust, whatever its source.
 
 Check **three signals**, strongest first — using the deliverable paths Step 2 surfaced:
 

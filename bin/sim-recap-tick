@@ -4,10 +4,14 @@
 # bin/sim-recap-tick — the poll-only sim-recap pipeline driver (ADR-0092).
 #
 # Fired every 300s by the launchd LaunchAgent (bin/sim-recap-cron-setup). On an
-# EMPTY tick it exits 0 having spawned ZERO `claude` processes — the cost guard,
-# and the property that makes this branch safe to merge ahead of unit 3b (the
-# producer QueueSimSummaryStep is still unregistered, so the queue is always
-# empty and this is the only path the tick ever takes today).
+# EMPTY tick it exits 0 having spawned ZERO `claude` processes — the cost guard
+# that makes a 300s poll cheap enough to run unattended forever.
+#
+# "Empty" means the queue call SUCCEEDED and reported no sim. A queue call that
+# FAILS returns empty stdout too — byte-identical to an idle queue — so every
+# call goes through q(), which logs a distinct ERROR and returns non-zero, and
+# main() aborts the tick rather than reporting a cheap exit. Without that, a
+# broken pipeline is indistinguishable from a quiet one in the launchd log.
 #
 # Trust split (ADR-0092): the Mac holds ONE credential — a SELECT-only MySQL
 # user reached over an SSH tunnel — handed only to the generation agent for game
@@ -67,10 +71,21 @@ claude_env_error() {
 }
 
 # ── One seam for every prod-side queue call ───────────────────────────────────
-# q <verb> [flags...] -> one JSON object on stdout.
+# q <verb> [flags...] -> one JSON object on stdout; exit status of the call.
+#
+# A dead ssh, an undeployed simRecapQueue.php, or a PHP fatal all yield EMPTY
+# stdout plus a non-zero exit. Empty stdout alone is ambiguous (an idle queue
+# looks the same), so the exit status is the ONLY signal that separates them —
+# name the verb here so one grep of the launchd log identifies the broken call.
 q() {
+    local verb="$1" rc
     "$SIM_RECAP_SSH_BIN" "$SIM_RECAP_SSH_HOST" \
         "php $SIM_RECAP_REMOTE_ROOT/ibl5/scripts/simRecapQueue.php $*"
+    rc=$?
+    if [ "$rc" -ne 0 ]; then
+        log "ERROR: queue call '$verb' failed (exit $rc) — remote simRecapQueue.php did not complete"
+    fi
+    return "$rc"
 }
 
 # jq_ok <json> <filter> -> true when the filter succeeds (fail-closed on garbage).
@@ -244,8 +259,16 @@ main() {
 
     # Reclaim first, unconditionally — a crashed run's sim is recoverable on the
     # very next tick. Rides the multiplexed ssh connection, so ~tens of ms.
-    local rec sim_rec
+    local rec sim_rec rc
     rec="$(q reclaim-stale)"
+    rc=$?
+    # Fail-closed on the FIRST queue call: if the remote side is unreachable or
+    # undeployed, nothing downstream can work, and continuing would land in the
+    # cheap-exit path and log an idle queue that was never actually consulted.
+    if [ "$rc" -ne 0 ]; then
+        log "ERROR: reclaim-stale did not complete — aborting tick (no claude spawned)"
+        return 1
+    fi
     if jq_ok "$rec" '.ok == true'; then
         sim_rec="$(printf '%s' "$rec" | "$SIM_RECAP_JQ_BIN" -r '.sim // empty' 2>/dev/null)"
         [ -n "$sim_rec" ] && [ "$sim_rec" != "null" ] && \
@@ -254,6 +277,15 @@ main() {
 
     local claim normalized sim
     claim="$(q claim-next)"
+    rc=$?
+    # This check MUST precede the empty-tick guard below: a failed call returns
+    # empty stdout, so the guard would swallow it and report an idle queue. That
+    # is not hypothetical — the poller logged 342 consecutive "exiting cheap"
+    # ticks while simRecapQueue.php was simply absent from the remote root.
+    if [ "$rc" -ne 0 ]; then
+        log "ERROR: claim-next did not complete — aborting tick (no claude spawned)"
+        return 1
+    fi
     normalized="$(printf '%s' "$claim" | tr -d '[:space:]')"
 
     # ★ EMPTY-TICK COST GUARD — no work, spawn zero `claude`, exit cheap.

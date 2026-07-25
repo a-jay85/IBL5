@@ -18,21 +18,29 @@ namespace SimRecap;
 final class SimSummaryLink
 {
     /**
-     * The relative viewer path for a given sim, e.g. `simSummaries.php?sim=689`.
+     * The root-absolute viewer path for a given sim, e.g.
+     * `/ibl5/simSummaries.php?sim=689`.
+     *
+     * Root-absolute so it resolves independently of the rendering page's own
+     * directory depth and of whether that page emits a `<base href>`. The
+     * viewer lives at the `ibl5/` root, but the updater page that links to it
+     * is served from `ibl5/scripts/` and builds a `<head>` with no `<base>`, so
+     * a bare relative path resolved to `/ibl5/scripts/simSummaries.php` and 404'd.
      */
     public static function path(int $sim): string
     {
-        return 'simSummaries.php?sim=' . $sim;
+        return '/ibl5/simSummaries.php?sim=' . $sim;
     }
 
     /**
      * The absolute viewer URL for a given sim on a bare canonical host.
      *
      * `$host` is a bare hostname with no scheme and no trailing slash (e.g.
-     * `iblhoops.net`); this method supplies the scheme and the `/ibl5/` prefix.
+     * `iblhoops.net`); this method supplies the scheme, and `path()` already
+     * carries the leading `/ibl5/`.
      */
     public static function absolute(int $sim, string $host): string
     {
-        return 'https://' . $host . '/ibl5/' . self::path($sim);
+        return 'https://' . $host . self::path($sim);
     }
 }

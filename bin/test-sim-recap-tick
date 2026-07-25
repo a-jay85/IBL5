@@ -74,6 +74,12 @@ if printf '%s' "$cmd" | grep -q 'storeSimRecap\.php'; then
     exit 0
 fi
 verb=$(printf '%s' "$cmd" | grep -oE 'simRecapQueue\.php [a-z-]+' | awk '{print $2}')
+# fail.<verb> reproduces a dead ssh / undeployed remote script: EMPTY stdout
+# with a non-zero exit — deliberately indistinguishable from an idle queue on
+# stdout alone, so only the exit status can catch it.
+if [ -f "$STUB/fail.$verb" ]; then
+    exit 255
+fi
 if [ -f "$STUB/resp.$verb" ]; then
     cat "$STUB/resp.$verb"
 else
@@ -137,7 +143,7 @@ SH
 srt_reset() {
     rm -f "$STUB"/ssh.log "$STUB"/claude.log "$STUB"/claude.sentinel \
           "$STUB"/tick.out "$STUB"/agent-fails "$STUB"/agent-usage-limit \
-          "$STUB"/store-fails "$STUB"/resp.* \
+          "$STUB"/store-fails "$STUB"/resp.* "$STUB"/fail.* \
           "$STUB"/record-stdin "$STUB"/store.cmd "$STUB"/store.stdin 2>/dev/null
     export SIM_RECAP_DB_PASSWORD="test_db_password"
     unset SIM_RECAP_KEEP_WORKDIR 2>/dev/null || true
@@ -170,6 +176,39 @@ printf '  \n ' > "$STUB/resp.claim-next"
 srt_run
 srt_expect_eq "whitespace_payload_is_empty" 0 "$SRT_RC"
 srt_file_absent "$STUB/claude.sentinel" "whitespace_payload_is_empty — zero claude"
+# The distinction that matters: whitespace with exit 0 IS an empty queue, so the
+# cheap exit is correct here. The two cases below are the same stdout with a
+# non-zero exit, and must NOT reach this path.
+srt_log_has "$STUB" tick.out "no pending sim — exiting cheap" "whitespace_with_rc0_is_still_a_cheap_exit"
+
+# ── claim_next_remote_failure_fails_closed ────────────────────────────────────
+# A dead ssh / undeployed simRecapQueue.php returns empty stdout with a non-zero
+# exit. Before this guard the empty-tick cost guard swallowed it and the tick
+# logged an idle queue — 342 consecutive ticks reported "exiting cheap" while
+# the remote script was never present at all.
+srt_reset
+touch "$STUB/fail.claim-next"
+srt_run
+srt_expect_eq "claim_next_remote_failure_exits_nonzero" 1 "$SRT_RC"
+srt_log_has "$STUB" tick.out "queue call 'claim-next' failed" \
+    "claim_next_remote_failure_names_the_verb"
+srt_log_lacks "$STUB" tick.out "no pending sim — exiting cheap" \
+    "claim_next_remote_failure_is_not_a_cheap_exit"
+srt_file_absent "$STUB/claude.sentinel" "claim_next_remote_failure — zero claude"
+
+# ── reclaim_stale_remote_failure_fails_closed ─────────────────────────────────
+# reclaim-stale is the FIRST queue call; its failure used to log nothing at all
+# (the jq_ok guard just skipped the log line), which is strictly worse than a
+# misleading cheap exit. Failing the first call aborts the tick.
+srt_reset
+touch "$STUB/fail.reclaim-stale"
+srt_run
+srt_expect_eq "reclaim_stale_remote_failure_exits_nonzero" 1 "$SRT_RC"
+srt_log_has "$STUB" tick.out "queue call 'reclaim-stale' failed" \
+    "reclaim_stale_remote_failure_names_the_verb"
+srt_log_lacks "$STUB" tick.out "no pending sim — exiting cheap" \
+    "reclaim_stale_remote_failure_is_not_a_cheap_exit"
+srt_file_absent "$STUB/claude.sentinel" "reclaim_stale_remote_failure — zero claude"
 
 # ── malformed_queue_json_fails_closed ─────────────────────────────────────────
 srt_reset

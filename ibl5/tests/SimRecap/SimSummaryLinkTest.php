@@ -9,14 +9,24 @@ use SimRecap\SimSummaryLink;
 
 final class SimSummaryLinkTest extends TestCase
 {
-    public function testPathReturnsRelativeViewerRoute(): void
+    public function testPathReturnsRootAbsoluteViewerRoute(): void
     {
-        self::assertSame('simSummaries.php?sim=689', SimSummaryLink::path(689));
+        self::assertSame('/ibl5/simSummaries.php?sim=689', SimSummaryLink::path(689));
     }
 
     public function testPathComposesSimNumber(): void
     {
-        self::assertSame('simSummaries.php?sim=1', SimSummaryLink::path(1));
+        self::assertSame('/ibl5/simSummaries.php?sim=1', SimSummaryLink::path(1));
+    }
+
+    /**
+     * The updater page is served from `ibl5/scripts/` and emits no `<base href>`,
+     * so a bare relative path resolved to `/ibl5/scripts/simSummaries.php` — a 404.
+     * The leading slash is what makes the link depth-independent; guard it directly.
+     */
+    public function testPathIsRootAbsoluteSoItSurvivesADeeperRenderingPage(): void
+    {
+        self::assertStringStartsWith('/ibl5/', SimSummaryLink::path(689));
     }
 
     public function testAbsoluteComposesSchemeHostPrefixAndPath(): void

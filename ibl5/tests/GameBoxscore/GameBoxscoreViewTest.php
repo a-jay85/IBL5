@@ -80,12 +80,13 @@ class GameBoxscoreViewTest extends TestCase
     {
         $output = $this->view->render($this->buildViewModel());
 
-        // Group boundaries carry sep-r-* right borders: after Name, Min, 3PA and PTS
-        // (team-coloured) and after each shooting pair's attempts column (weak).
+        // Only the team-coloured boundaries (after Name, Min, 3PA and PTS) carry a
+        // separator in the header; the weak shooting-pair splits are body-only, so
+        // the FGA/FTA headers stay bare.
         $expectedOrder = [
             '<th>Pos</th>', '<th class="sep-r-team">Name</th>', '<th class="sep-r-team">Min</th>',
-            '<th>FGM</th>', '<th class="sep-r-weak">FGA</th>',
-            '<th>FTM</th>', '<th class="sep-r-weak">FTA</th>',
+            '<th>FGM</th>', '<th>FGA</th>',
+            '<th>FTM</th>', '<th>FTA</th>',
             '<th>3PM</th>', '<th class="sep-r-team">3PA</th>',
             '<th class="sep-r-team" data-col="pts">PTS</th>', '<th>ORB</th>', '<th>REB</th>', '<th>AST</th>',
             '<th>STL</th>', '<th>BLK</th>', '<th>TOV</th>', '<th>PF</th>',

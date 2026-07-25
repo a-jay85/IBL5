@@ -224,13 +224,17 @@ class GameBoxscoreView implements GameBoxscoreViewInterface
 
     /**
      * Render the fixed 17-column header row. All values are static literals.
+     *
+     * Only the team-coloured separators carry over into the header: a weak
+     * (gray) hairline on the team-primary header bar reads as an artifact, so
+     * `sep-r-weak` stays body-only — matching Ratings/SeasonTotals.
      */
     private function renderTableHead(): string
     {
         $output = '<thead><tr><th>Pos</th><th class="sep-r-team">Name</th>';
 
         foreach (self::STAT_COLUMNS as $key => $label) {
-            $separator = self::COLUMN_SEPARATORS[$key] ?? '';
+            $separator = (self::COLUMN_SEPARATORS[$key] ?? '') === 'sep-r-team' ? 'sep-r-team' : '';
             $attr = $separator !== '' ? ' class="' . $separator . '"' : '';
             $attr .= $key === 'pts' ? ' data-col="pts"' : '';
             $output .= '<th' . $attr . '>' . $label . '</th>';

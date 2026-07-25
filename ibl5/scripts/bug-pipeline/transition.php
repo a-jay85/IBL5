@@ -36,6 +36,18 @@ const VALID_STATUSES = [
 ];
 const VALID_CLASSES = ['bug', 'feature', 'not_a_thing'];
 
+/**
+ * The exact option vocabularies from the usage block above. Anything else is a caller
+ * bug: `--attempts 5` (space instead of `=`) used to register a meaningless
+ * `$flags['attempts']` and silently drop the 5, and a typo'd `--realese-lease` was a
+ * no-op UPDATE. Rejecting an unrecognized key catches both at the CLI boundary rather
+ * than one call site at a time.
+ */
+const VALID_VAL_OPTS = [
+    'class', 'pr', 'issue', 'attempts', 'thread-id', 'approval-message-id', 'blocked-until',
+];
+const VALID_FLAGS = ['release-lease', 'reminder-now', 'last-processed-now', 'clear-blocked'];
+
 function fail(string $msg): never
 {
     fwrite(STDERR, "transition: {$msg}\n");
@@ -51,8 +63,20 @@ foreach (array_slice($argv, 1) as $arg) {
         $body = substr($arg, 2);
         if (str_contains($body, '=')) {
             [$k, $v] = explode('=', $body, 2);
+            if (!in_array($k, VALID_VAL_OPTS, true)) {
+                fail(in_array($k, VALID_FLAGS, true)
+                    ? "--{$k} is a flag and takes no value."
+                    : "unknown option --{$k}. Valid: --" . implode('=, --', VALID_VAL_OPTS)
+                        . '=, --' . implode(', --', VALID_FLAGS) . '.');
+            }
             $valOpts[$k] = $v;
         } else {
+            if (!in_array($body, VALID_FLAGS, true)) {
+                fail(in_array($body, VALID_VAL_OPTS, true)
+                    ? "--{$body} takes a value: --{$body}=<value> (not --{$body} <value>)."
+                    : "unknown flag --{$body}. Valid: --" . implode(', --', VALID_FLAGS)
+                        . '; value opts: --' . implode('=, --', VALID_VAL_OPTS) . '=.');
+            }
             $flags[$body] = true;
         }
     } else {

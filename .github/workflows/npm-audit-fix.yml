@@ -56,7 +56,7 @@ jobs:
 
           # Semver-safe transitive fixes only — NO --force (never a breaking
           # major bump). Loop every lockfile directory.
-          for dir in ibl5 IBL6 ibl5/IBLbot; do
+          for dir in ibl5 ibl5/IBLbot; do
             echo "::group::npm audit fix — $dir"
             ( cd "$dir" && npm ci && npm audit fix || true )
             echo "::endgroup::"
@@ -83,7 +83,7 @@ jobs:
               --base master \
               --head "$BRANCH" \
               --title "chore(deps): npm audit fix" \
-              --body "Automated \`npm audit fix\` across ibl5, IBL6, and ibl5/IBLbot. Keeps transitive vulns fixed so the audit-js gate stops failing unrelated PRs."
+              --body "Automated \`npm audit fix\` across ibl5 and ibl5/IBLbot. Keeps transitive vulns fixed so the audit-js gate stops failing unrelated PRs."
           else
             echo "PR already open for $BRANCH (#$open_pr) — force-push updated it."
           fi

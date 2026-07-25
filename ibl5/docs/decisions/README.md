@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-07-23
+last_verified: 2026-07-24
 ---
 
 # IBL5 Architecture Decision Records
@@ -29,6 +29,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0079](0079-sha-pin-github-actions.md) | SHA-pin all external GitHub Actions + drift-guard | Accepted | Pin every external `uses:` ref to a full commit SHA via pinact; `pinact --check` guard in the `gate` enforces it; local `./` composite refs exempt. |
 | [0085](0085-just-in-time-opus-escalation-on-final-automouse-retry.md) | Just-in-time Opus escalation on the final automouse retry | Accepted | Non-Opus plans escalate only their final retry to Opus with the prior attempt's capped failure report; env-stops never escalate. |
 | [0092](0092-postplan-harness-in-repo-with-python-ci.md) | Post-plan harness in-repo with dedicated Python CI | Accepted | Harness ships under `tools/postplan-harness/` gated by a path-scoped `python-tests.yml`; real-data dirs gitignored; `bin/post-plan-now` pinned to the main checkout. |
+| [0095](0095-retire-ibl6-svelte-frontend.md) | Retire the IBL6 SvelteKit frontend; site stays PHP+HTMX | Accepted | Ported IBL6's one page (boxscore) into IBL5 as a PHP module; deleted the second stack + all its CI/Docker/deploy/smoke surface. |
 
 ## When an ADR is Required
 

@@ -57,7 +57,6 @@ assert_exit "exempt-engine-yml"      1 ".github/workflows/engine.yml"
 assert_exit "exempt-main-yml"        1 ".github/workflows/main.yml"
 assert_exit "exempt-smoke-prod"      1 ".github/workflows/smoke-prod.yml"
 assert_exit "exempt-cache-deps"      1 ".github/workflows/cache-dependencies.yml"
-assert_exit "exempt-build-ibl6"      1 ".github/workflows/build-ibl6-image.yml"
 assert_exit "exempt-deploy-rehearsal" 1 ".github/workflows/deploy-rehearsal.yml"
 
 # --- (b) GUARD (LOAD-BEARING): E2E/Lighthouse drivers → exit 0 (website) ---

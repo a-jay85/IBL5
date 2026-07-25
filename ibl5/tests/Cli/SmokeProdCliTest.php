@@ -31,7 +31,7 @@ final class SmokeProdCliTest extends TestCase
 
     protected function tearDown(): void
     {
-        foreach ($this->servers as $name => $proc) {
+        foreach ($this->servers as $proc) {
             if (is_resource($proc)) {
                 $status = proc_get_status($proc);
                 if ($status['running']) {
@@ -56,35 +56,22 @@ final class SmokeProdCliTest extends TestCase
     public function testAllEndpointsHealthyExitsZero(): void
     {
         $this->startServer('ibl5', healthy: true);
-        $this->startServer('ibl6', healthy: true);
 
         $result = $this->runSmoke(scope: 'all');
 
         self::assertSame(0, $result['exit'], "Output: {$result['output']}");
         self::assertStringContainsString('OK: Homepage', $result['output']);
-        self::assertStringContainsString('OK: IBL6 app', $result['output']);
+        self::assertStringNotContainsString('IBL6 checks', $result['output']);
     }
 
     public function testIbl5EndpointReturns500ExitsOne(): void
     {
         $this->startServer('ibl5', healthy: false);
-        $this->startServer('ibl6', healthy: true);
 
         $result = $this->runSmoke(scope: 'all');
 
         self::assertSame(1, $result['exit']);
         self::assertStringContainsString('FAIL: Homepage', $result['output']);
-    }
-
-    public function testIbl6UnreachableExitsOne(): void
-    {
-        $this->startServer('ibl5', healthy: true);
-        // no IBL6 server → connection refused
-
-        $result = $this->runSmoke(scope: 'all', ibl6Url: 'http://127.0.0.1:1/');
-
-        self::assertSame(1, $result['exit']);
-        self::assertStringContainsString('FAIL: IBL6 app', $result['output']);
     }
 
     // =========================================================================
@@ -94,7 +81,6 @@ final class SmokeProdCliTest extends TestCase
     public function testScopeIbl5IgnoresIbl6Failures(): void
     {
         $this->startServer('ibl5', healthy: true);
-        // IBL6 deliberately broken (no server)
 
         $result = $this->runSmoke(scope: 'ibl5');
 
@@ -106,7 +92,6 @@ final class SmokeProdCliTest extends TestCase
     public function testScopeIbl5FailsWhenIbl5Broken(): void
     {
         $this->startServer('ibl5', healthy: false);
-        $this->startServer('ibl6', healthy: true);
 
         $result = $this->runSmoke(scope: 'ibl5');
 
@@ -115,44 +100,18 @@ final class SmokeProdCliTest extends TestCase
     }
 
     // =========================================================================
-    // Post-impl: --scope=ibl6
-    // =========================================================================
-
-    public function testScopeIbl6IgnoresIbl5Failures(): void
-    {
-        // IBL5 deliberately broken
-        $this->startServer('ibl6', healthy: true);
-
-        $result = $this->runSmoke(scope: 'ibl6');
-
-        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
-        self::assertStringContainsString('IBL6 checks', $result['output']);
-        self::assertStringNotContainsString('IBL5 checks', $result['output']);
-    }
-
-    public function testScopeIbl6FailsWhenIbl6Broken(): void
-    {
-        $this->startServer('ibl5', healthy: true);
-
-        $result = $this->runSmoke(scope: 'ibl6', ibl6Url: 'http://127.0.0.1:1/');
-
-        self::assertSame(1, $result['exit']);
-        self::assertStringContainsString('FAIL: IBL6 app', $result['output']);
-    }
-
-    // =========================================================================
     // Post-impl: --scope=all (default) preserves prior behavior
     // =========================================================================
 
-    public function testScopeAllFailsWhenEitherBroken(): void
+    public function testScopeAllFailsWhenIbl5Broken(): void
     {
-        $this->startServer('ibl5', healthy: true);
-        // IBL6 broken
+        $this->startServer('ibl5', healthy: false);
 
-        $result = $this->runSmoke(scope: 'all', ibl6Url: 'http://127.0.0.1:1/');
+        $result = $this->runSmoke(scope: 'all');
 
         self::assertSame(1, $result['exit']);
-        self::assertStringContainsString('FAIL: IBL6 app', $result['output']);
+        self::assertStringContainsString('FAIL: Homepage', $result['output']);
+        self::assertStringNotContainsString('IBL6 checks', $result['output']);
     }
 
     // =========================================================================
@@ -179,21 +138,13 @@ final class SmokeProdCliTest extends TestCase
         self::assertStringContainsString('unknown scope', $result['output']);
     }
 
-    // =========================================================================
-    // Post-impl: SMOKE_IBL6_URL env var
-    // =========================================================================
-
-    public function testIbl6UrlEnvVarOverridesDefault(): void
+    public function testScopeIbl6NowRejected(): void
     {
-        $this->startServer('ibl6', healthy: true);
+        $result = $this->runSmoke(scope: 'ibl6');
 
-        $result = $this->runSmoke(
-            scope: 'ibl6',
-            ibl6Url: 'http://127.0.0.1:' . $this->ports['ibl6'] . '/',
-        );
-
-        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
-        self::assertStringContainsString('OK: IBL6 app', $result['output']);
+        self::assertSame(2, $result['exit']);
+        self::assertStringContainsString('unknown scope: ibl6', $result['output']);
+        self::assertStringContainsString('expected ibl5 or all', $result['output']);
     }
 
     // =========================================================================
@@ -351,7 +302,6 @@ final class SmokeProdCliTest extends TestCase
      */
     private function runSmoke(
         string $scope,
-        ?string $ibl6Url = null,
         bool $rehearsalMode = false,
     ): array {
         $baseUrl = isset($this->ports['ibl5'])
@@ -362,14 +312,6 @@ final class SmokeProdCliTest extends TestCase
 
         if ($rehearsalMode) {
             $env .= ' SMOKE_REHEARSAL_MODE=1';
-        }
-
-        if ($ibl6Url !== null) {
-            $env .= ' SMOKE_IBL6_URL=' . escapeshellarg($ibl6Url);
-        } elseif (isset($this->ports['ibl6'])) {
-            $env .= ' SMOKE_IBL6_URL=' . escapeshellarg(
-                'http://127.0.0.1:' . $this->ports['ibl6'] . '/',
-            );
         }
 
         $cmd = sprintf(

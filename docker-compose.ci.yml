@@ -41,18 +41,3 @@ services:
       timeout: 5s
       retries: 10
 
-  ibl6:
-    image: ghcr.io/a-jay85/ibl5/ibl6:latest
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.ibl6
-    environment:
-      DB_HOST: mariadb
-      DB_NAME: ibl5
-      DB_USER: root
-      DB_PASSWORD: root
-      NODE_ENV: production
-      PORT: 3001
-    depends_on:
-      mariadb:
-        condition: service_healthy

@@ -1,6 +1,6 @@
 ---
 description: Production operations runbook — deploy, rollback, DB restore, sim-file recovery, logs, and running the app without the Claude Code harness.
-last_verified: 2026-07-05
+last_verified: 2026-07-24
 ---
 
 # IBL5 Operations Runbook
@@ -31,7 +31,6 @@ git push origin <your-branch>:production
    - `php ibl5/bin/validate-schema`
    - SCP compiled CSS (`ibl5/themes/IBL/style/style.css`)
    - OPcache flush
-   - IBL6 restart (pm2)
 3. **Post-deploy smoke** (`.github/workflows/smoke-prod.yml`) — curls `https://www.iblhoops.net` from the production box's own IP to avoid WAF bans. On real failure, auto-reverts the `production` branch and DMs Discord.
 
 > **Note — IBLbot slash-command OOM (resolved, #905):** registering IBLbot slash commands during deploy previously ran `tsx src/...`, which transpiles TypeScript through esbuild at runtime. On this memory-tight server the esbuild service was `SIGKILL`ed (`TransformError: The service was stopped`), failing the deploy. Fixed by running the compiled output (`npm run deploy-commands:prod` → `node dist/deploy-commands.js`, no runtime esbuild). The OOM path is gone — not a recurring failure. See the inline comment at `.github/workflows/main.yml` (IBLbot deploy step).
@@ -60,6 +59,38 @@ npx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css --minify
 ```
 
 After a manual deploy, trigger `bin/smoke-prod` manually or curl the health endpoint (see §5) to confirm the app is up.
+
+---
+
+## IBL6 Decommission — one-time post-merge step (manual, on the box)
+
+After `ibl6-retirement-2-decommission` merges **and** the resulting `production` deploy completes, the IBL6 SvelteKit app (`ibl6.iblhoops.net`, pm2) no longer exists in the repo. Do this **once**, by hand, over SSH — it is a production reverse-proxy change, out of CI reach:
+
+1. **Remove the healthcheck cron entry FIRST** — the box runs a cron job invoking the (now-deleted) `ibl6-healthcheck` watchdog, which re-`pm2 start`s IBL6 whenever `http://127.0.0.1:3001/` stops answering. Tear down pm2 without removing the cron entry and the watchdog resurrects the app on its next tick:
+   ```bash
+   crontab -l | grep -i 'ibl6\|healthcheck'     # confirm the entry before editing
+   crontab -e                                    # delete the ibl6-healthcheck line, save
+   crontab -l | grep -i 'ibl6\|healthcheck' && echo "STILL PRESENT — do not proceed" || echo "cron clean"
+   ```
+2. **Tear down the pm2 app:**
+   ```bash
+   pm2 delete ibl6 2>/dev/null || true
+   pm2 save
+   rm -rf www/IBL6
+   ```
+3. **Add a box-level 301 redirect** so old boxscore links resolve to the new in-stack PHP page. On the vhost serving `ibl6.iblhoops.net` (LiteSpeed/Apache reads `.htaccess`), map the boxscore slug to the `GameBoxscore` module (the param names are load-bearing — do not rename `date`/`game`):
+   ```apache
+   RewriteEngine On
+   # /{YYYY-MM-DD}-game-{n}/boxscore  ->  new PHP boxscore module (301)
+   RewriteRule ^(\d{4}-\d{2}-\d{2})-game-(\d+)/boxscore/?$ https://iblhoops.net/ibl5/modules.php?name=GameBoxscore&date=$1&game=$2 [R=301,L]
+   # any other ibl6 path -> site home (301)
+   RewriteRule ^ https://iblhoops.net/ [R=301,L]
+   ```
+4. **Verify** one real slug redirects (301) to the working PHP page:
+   ```bash
+   curl -sI 'https://ibl6.iblhoops.net/2026-02-20-game-1/boxscore' | grep -i '^location:'
+   # expect: Location: https://iblhoops.net/ibl5/modules.php?name=GameBoxscore&date=2026-02-20&game=1
+   ```
 
 ---
 

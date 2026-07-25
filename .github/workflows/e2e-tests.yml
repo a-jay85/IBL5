@@ -17,8 +17,6 @@ on:
       - 'docker-compose*.yml'
       - 'docker/**'
       - 'ibl5/tests/e2e/**'
-      - 'IBL6/**'
-      - 'docker/Dockerfile.ibl6'
       - '.github/workflows/e2e-tests.yml'
       - '.github/actions/setup-docker-e2e/**'
       - '.github/scripts/**'
@@ -45,16 +43,12 @@ jobs:
       # True only for the `update-baselines` label. Gates the Visual Regression job
       # alone so applying that label reruns baseline regen without a CI storm.
       baseline: ${{ github.event.action == 'labeled' && github.event.label.name == 'update-baselines' }}
-      # True when a change touches IBL6 or the SHARED docker/e2e infra the IBL6 jobs
-      # run inside. Gates ibl6-visual/ibl6-e2e so a pure-ibl5 PR skips them (saving 2
-      # concurrent runner slots) while an IBL6 or shared-infra PR still runs them.
-      ibl6: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.ibl6filter.outputs.ibl6 == 'true' }}
       # True when a PR touches a runtime-affecting dep — the same 7-entry set that
       # cache-dependencies.yml rebuilds `:latest` from (kept in sync; see Phase 5).
       # Consumed by setup-docker-e2e (Phase 2): when true the six e2e jobs build the
       # PHP image from the PR's Dockerfile/deps instead of pulling the stale `:latest`.
       # NOTE the deliberate absence of the `push || dependabot` disjunction that `src`
-      # and `ibl6` carry: on a `push` event the runtimefilter step below is SKIPPED
+      # carries: on a `push` event the runtimefilter step below is SKIPPED
       # (pull_request-only guard) → this output is empty → falsy → jobs pull `:latest`
       # (status quo; cache-dependencies already rebuilt it on that push). A dependabot
       # runtime PR is a normal pull_request event, so the filter detects it with no
@@ -70,8 +64,8 @@ jobs:
       # rendering?" — a question encoded as a deny-regex + carve-outs + a
       # CI-meta-exempt list that no dorny glob can replicate. A static glob would
       # both over-trigger (CI-meta edits) and under-trigger (a rendered file the
-      # glob forgot). The ibl6 and runtime sub-filters below use dorny instead,
-      # because those ARE artifact/tool-scoped (IBL6 image, PHP app image).
+      # glob forgot). The runtime sub-filter below uses dorny instead,
+      # because it is artifact/tool-scoped (PHP app image).
       - name: Compute website-affecting
         id: filter
         if: github.event_name == 'pull_request' && github.event.action != 'labeled'
@@ -86,38 +80,11 @@ jobs:
             echo "src=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # Change-detection strategy (ibl6 + runtime below): dorny/paths-filter with
-      # static globs. These are artifact-scoped, not rendering-scoped — run ibl6
-      # e2e only when the IBL6 app/image/shared-DB inputs change; rebuild the PHP
-      # app image only when its Docker/deps inputs change. website-affecting
-      # is the wrong tool here (it models PHP rendering impact, not build inputs).
-      - name: Detect IBL6-affecting changes
-        uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
-        id: ibl6filter
-        if: github.event_name == 'pull_request' && github.event.action != 'labeled'
-        with:
-          filters: |
-            ibl6:
-              - 'IBL6/**'
-              - 'docker/Dockerfile.ibl6'
-              - 'docker-compose.ci.yml'
-              - '.github/actions/setup-docker-e2e/**'
-              - '.github/workflows/e2e-tests.yml'
-              # ibl6 connects to the SAME shared mariadb/ibl5 DB that
-              # setup-docker-e2e migrates and seeds; ibl6-visual asserts against
-              # seed-driven box-score snapshots. A migration/seed/runner-only PR
-              # must still run ibl6-e2e/ibl6-visual or a DB-driven regression
-              # would skip past the gate.
-              - 'ibl5/migrations/**'
-              - 'ibl5/tests/e2e/fixtures/ci-seed.sql'
-              - 'ibl5/bin/run-migrations-ci.sh'
-
       - name: Detect runtime-affecting changes
         uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
         id: runtimefilter
-        # Unlike ibl6filter, this fires on ALL pull_request events INCLUDING `labeled`
-        # — do NOT copy ibl6filter's `&& github.event.action != 'labeled'` guard. A
-        # runtime PR that gets the `update-baselines` label fires a `labeled` event; if
+        # This fires on ALL pull_request events INCLUDING `labeled`. A runtime PR
+        # that gets the `update-baselines` label fires a `labeled` event; if
         # we skipped on it, `runtime` would default false and VR baselines would
         # regenerate against the stale `:latest` instead of the PR's freshly-built
         # image. The head SHA is unchanged on a label event, so the base…head diff —
@@ -685,189 +652,9 @@ jobs:
         if: always()
         run: docker compose -f docker-compose.ci.yml down
 
-  ibl6-visual:
-    name: IBL6 Visual Regression
-    needs: [changes]
-    if: needs.changes.outputs.ibl6 == 'true' || needs.changes.outputs.baseline == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          token: ${{ contains(github.event.pull_request.labels.*.name, 'update-baselines') && secrets.CI_PAT || github.token }}
-          ref: ${{ github.head_ref || github.sha }}
-
-      - name: Setup Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: IBL6/package-lock.json
-
-      - uses: ./.github/actions/setup-docker-e2e
-        with:
-          ibl6-image: build
-          php-image: ${{ needs.changes.outputs.runtime == 'true' && 'build' || 'pull' }}
-
-      - name: Wait for ibl6 healthy
-        run: |
-          deadline=$((SECONDS + 120))
-          while ! docker compose -f docker-compose.ci.yml exec -T ibl6 wget -qO /dev/null http://127.0.0.1:3001/health 2>/dev/null; do
-            if [ $SECONDS -ge $deadline ]; then
-              echo "::error::ibl6 container not healthy after 2 min"
-              docker compose -f docker-compose.ci.yml logs ibl6
-              exit 1
-            fi
-            sleep 2
-          done
-          echo "ibl6 is healthy"
-
-      - name: Derive Playwright image tag
-        run: |
-          tag="$(bin/playwright-image-tag IBL6/package.json)"
-          echo "PW_IMAGE=$tag" >> "$GITHUB_ENV"
-
-      - name: Pull Playwright image
-        run: docker pull "$PW_IMAGE"
-
-      - name: Install IBL6 dependencies
-        working-directory: IBL6
-        run: npm ci
-
-      - name: Run IBL6 visual regression tests
-        id: ibl6-visual-regression
-        continue-on-error: ${{ contains(github.event.pull_request.labels.*.name, 'update-baselines') }}
-        run: |
-          docker run --rm \
-            --network ibl5-e2e \
-            --user "$(id -u):$(id -g)" \
-            -v "${{ github.workspace }}/IBL6:/IBL6" \
-            -w /IBL6 \
-            -e "BASE_URL=http://ibl6:3001" \
-            -e "HOME=/tmp" \
-            "$PW_IMAGE" \
-            npx playwright test --config=playwright.visual.config.ts
-
-      - name: Regenerate IBL6 visual regression baselines
-        id: ibl6-regen-baselines
-        if: github.event_name == 'pull_request' && steps.ibl6-visual-regression.outcome == 'failure' && contains(github.event.pull_request.labels.*.name, 'update-baselines')
-        run: |
-          docker run --rm \
-            --network ibl5-e2e \
-            --user "$(id -u):$(id -g)" \
-            -v "${{ github.workspace }}/IBL6:/IBL6" \
-            -w /IBL6 \
-            -e "BASE_URL=http://ibl6:3001" \
-            -e "HOME=/tmp" \
-            "$PW_IMAGE" \
-            npx playwright test --config=playwright.visual.config.ts --update-snapshots
-
-      - name: Commit and push updated IBL6 baselines
-        if: always() && github.event_name == 'pull_request' && steps.ibl6-visual-regression.outcome == 'failure' && contains(github.event.pull_request.labels.*.name, 'update-baselines')
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add IBL6/e2e/boxscore.visual.spec.ts-snapshots/
-          if git diff --cached --quiet; then
-            echo "No baseline changes detected"
-          else
-            git commit -m "test: update IBL6 visual regression baselines [auto]"
-            git push
-          fi
-
-      - name: Remove update-baselines label
-        if: always() && steps.ibl6-regen-baselines.outcome != 'skipped' && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'update-baselines')
-        env:
-          GH_TOKEN: ${{ secrets.CI_PAT }}
-        run: gh pr edit ${{ github.event.pull_request.number }} --remove-label update-baselines
-
-      - name: Upload IBL6 visual regression report
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: ibl6-visual-regression-report
-          path: IBL6/test-results/
-          retention-days: 7
-
-      - name: Stop Docker containers
-        if: always()
-        run: docker compose -f docker-compose.ci.yml down
-
-  ibl6-e2e:
-    name: IBL6 E2E Tests
-    needs: [changes]
-    if: needs.changes.outputs.ibl6 == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Setup Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: IBL6/package-lock.json
-
-      - uses: ./.github/actions/setup-docker-e2e
-        with:
-          ibl6-image: build
-          php-image: ${{ needs.changes.outputs.runtime == 'true' && 'build' || 'pull' }}
-
-      - name: Wait for ibl6 healthy
-        run: |
-          deadline=$((SECONDS + 120))
-          while ! docker compose -f docker-compose.ci.yml exec -T ibl6 wget -qO /dev/null http://127.0.0.1:3001/health 2>/dev/null; do
-            if [ $SECONDS -ge $deadline ]; then
-              echo "::error::ibl6 container not healthy after 2 min"
-              docker compose -f docker-compose.ci.yml logs ibl6
-              exit 1
-            fi
-            sleep 2
-          done
-          echo "ibl6 is healthy"
-
-      - name: Derive Playwright image tag
-        run: |
-          tag="$(bin/playwright-image-tag IBL6/package.json)"
-          echo "PW_IMAGE=$tag" >> "$GITHUB_ENV"
-
-      - name: Pull Playwright image
-        run: docker pull "$PW_IMAGE"
-
-      - name: Install IBL6 dependencies
-        working-directory: IBL6
-        run: npm ci
-
-      - name: Run IBL6 E2E tests
-        run: |
-          docker run --rm \
-            --network ibl5-e2e \
-            --user "$(id -u):$(id -g)" \
-            -v "${{ github.workspace }}/IBL6:/IBL6" \
-            -w /IBL6 \
-            -e "BASE_URL=http://ibl6:3001" \
-            -e "HOME=/tmp" \
-            "$PW_IMAGE" \
-            npx playwright test
-
-      - name: Upload IBL6 E2E report
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: ibl6-e2e-report
-          path: IBL6/test-results/
-          retention-days: 7
-
-      - name: Stop Docker containers
-        if: always()
-        run: docker compose -f docker-compose.ci.yml down
-
   merge-reports:
     name: Merge E2E Reports
-    needs: [changes, e2e, e2e-shards, e2e-mutators, api-e2e, ibl6-visual, ibl6-e2e]
+    needs: [changes, e2e, e2e-shards, e2e-mutators, api-e2e]
     if: always() && needs.changes.outputs.src == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -969,7 +756,7 @@ jobs:
   gate:
     name: E2E Tests
     if: always()
-    needs: [changes, e2e, api-e2e, e2e-shards, e2e-mutators, ibl6-visual, ibl6-e2e]
+    needs: [changes, e2e, api-e2e, e2e-shards, e2e-mutators]
     runs-on: ubuntu-latest
     steps:
       - run: exit 1

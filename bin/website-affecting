@@ -61,7 +61,6 @@
 #       .github/workflows/main.yml                   (push:production deploy pipeline)
 #       .github/workflows/smoke-prod.yml             (post-deploy prod smoke over SSH)
 #       .github/workflows/cache-dependencies.yml     (builds php-apache:latest; E2E pulls prebaked)
-#       .github/workflows/build-ibl6-image.yml       (builds ibl6:latest; E2E builds ibl6 from PR source)
 #       .github/workflows/deploy-rehearsal.yml       (self-contained migration smoke; no VR/E2E/LH)
 #
 # Anchoring is load-bearing:
@@ -142,7 +141,6 @@ is_ci_meta_exempt() {
         .github/workflows/main.yml)                  return 0 ;;  # push:production deploy pipeline — never runs on a master PR; can't touch PR E2E/Lighthouse
         .github/workflows/smoke-prod.yml)            return 0 ;;  # workflow_run after "Build and Deploy" — SSH prod smoke; no PR-E2E impact (like pages-deploy)
         .github/workflows/cache-dependencies.yml)    return 0 ;;  # builds php-apache:latest on push:master; E2E pulls the prebaked image (a PR edit doesn't rebuild it)
-        .github/workflows/build-ibl6-image.yml)      return 0 ;;  # builds ibl6:latest; E2E ibl6 jobs use ibl6-image:build from PR source, not this GHCR push
         .github/workflows/deploy-rehearsal.yml)      return 0 ;;  # boots PHP for a self-contained migration smoke — drives no VR/E2E/Lighthouse/preview render
     esac
     return 1
@@ -191,7 +189,6 @@ affect a VR/E2E/Lighthouse/preview render; staleness over-runs, never silent-ski
   .github/workflows/main.yml
   .github/workflows/smoke-prod.yml
   .github/workflows/cache-dependencies.yml
-  .github/workflows/build-ibl6-image.yml
   .github/workflows/deploy-rehearsal.yml
 
 Naturally website-side (not denied, not exempt):

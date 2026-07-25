@@ -1,6 +1,6 @@
 ---
 description: REST API architectural overview — auth, rate limiting, ETag caching, controller inventory, route table.
-last_verified: 2026-07-22
+last_verified: 2026-07-24
 ---
 
 # API Guide
@@ -172,7 +172,7 @@ $stmt->execute();
 ## Remaining Work
 
 - OpenAPI/Swagger documentation generation (endpoint-by-endpoint reference deferred — see backlog 9.4 follow-up)
-- Additional endpoints as IBL6 frontend needs arise
+- Additional endpoints as new module and UI needs arise
 - Consider JWT auth alongside API keys for user-scoped operations
 
 ## Resources

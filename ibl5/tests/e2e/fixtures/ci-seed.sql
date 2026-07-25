@@ -760,7 +760,7 @@ INSERT INTO ibl_box_scores (
    3, 5, 3, 2, 1, 2, 2,
    '00000000-0000-0000-0000-000000000002');
 
--- IBL6 boxscore coverage: player-level rows for 2026-02-20 game 1 (Metros@Stars)
+-- Boxscore coverage: player-level rows for 2026-02-20 game 1 (Metros@Stars)
 -- 4 Metros (visitor, tid=1) + 3 Stars (home, tid=2) = 7 rows
 -- calc_points, calc_rebounds, calc_fg_made are generated columns
 INSERT INTO ibl_box_scores (
@@ -1364,7 +1364,7 @@ ON DUPLICATE KEY UPDATE visitor_score=VALUES(visitor_score);
 -- ============================================================
 
 -- Regular season pair: 2026-02-20, Metros(visitor=1) vs Stars(home=2), game_type=1
--- Quarter-points backfilled so IBL6 boxscore page header shows real scores
+-- Quarter-points backfilled so the boxscore page header shows real scores
 -- (q1+q2+q3+q4+COALESCE(ot,0)): Metros 28+26+27+24=105, Stars 24+25+24+25=98
 INSERT INTO ibl_box_scores_teams (game_date, visitor_teamid, home_teamid, game_of_that_day, name,
   game_2gm, game_2ga, game_ftm, game_fta, game_3gm, game_3ga,

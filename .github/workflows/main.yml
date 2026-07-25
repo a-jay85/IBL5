@@ -51,13 +51,6 @@ jobs:
           port: ${{ secrets.PORT }}
           private-key: ${{ secrets.PRIVATE_KEY }}
 
-      - name: Stop IBL6 to free resources for deploy
-        run: |
-          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
-            echo "Stop IBL6 to free resources for deploy" > /tmp/ibl5-last-deploy-step
-            pm2 stop ibl6 2>/dev/null && echo "IBL6 stopped" || echo "IBL6 was not running"
-          '
-
       - name: Pull latest code on server
         run: |
           ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
@@ -151,90 +144,6 @@ jobs:
 
             echo "IBLbot deployed successfully (PID: $(pm2 pid iblbot))"
           '
-
-      - name: Check for IBL6 changes
-        id: ibl6-changes
-        run: |
-          if git diff --name-only ${{ github.event.before }}..${{ github.sha }} | grep -qE '^(IBL6/|\.github/workflows/main\.yml)'; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Build IBL6
-        if: steps.ibl6-changes.outputs.changed == 'true'
-        run: npm ci && npm run build
-        working-directory: IBL6
-
-      - name: Deploy IBL6 build to server
-        if: steps.ibl6-changes.outputs.changed == 'true'
-        run: |
-          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} 'rm -rf www/IBL6/build'
-          scp -r -P ${{ secrets.PORT }} -i ~/.ssh/id_deploy IBL6/build ${{ secrets.USERNAME }}@${{ secrets.HOST }}:www/IBL6/
-
-      - name: Install IBL6 deps and deploy build
-        if: steps.ibl6-changes.outputs.changed == 'true'
-        run: |
-          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
-            set -e
-            cd www/IBL6
-
-            echo "Installing production dependencies..."
-            npm ci --omit=dev
-          '
-
-      - name: Start IBL6
-        if: ${{ !cancelled() }}
-        run: |
-          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
-            echo "Start IBL6" > /tmp/ibl5-last-deploy-step
-            cd www/IBL6
-            mkdir -p logs
-            # delete + start (not restart --update-env) so pm2 re-reads script,
-            # wait_ready, and listen_timeout from ecosystem.config.cjs. With
-            # wait_ready, this start call blocks until IBL6 signals ready, so it
-            # is itself the readiness gate. The app is already stopped (see the
-            # "Stop IBL6 to free resources" step), so delete adds no real downtime.
-            pm2 delete ibl6 2>/dev/null || true
-            pm2 start ecosystem.config.cjs --only ibl6 --update-env
-            pm2 save
-            echo "IBL6 started (PID: $(pm2 pid ibl6))"
-          '
-
-      - name: Smoke test IBL6
-        if: ${{ !cancelled() }}
-        run: |
-          # Poll IBL6's public /health FROM the box (whitelisted egress IP), not
-          # from the runner. LiteSpeed mod_security bans the GitHub runner IP and
-          # returns a uniform 415, which made a runner-side `curl -fsS` fail even
-          # when IBL6 was healthy. SSH-piping the curl reuses the box's own IP and
-          # bypasses that false positive — same fix #1014/ADR-0039 applied to the
-          # notify-only smoke-prod.yml, now applied to this gating step. The ~30s
-          # warmup poll still covers the proxy/TLS race after pm2 reports ready.
-          poll() {
-            ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
-              for i in $(seq 1 6); do
-                if curl -fsS --max-time 10 https://ibl6.iblhoops.net/health >/dev/null 2>&1; then
-                  echo "IBL6 healthy (attempt $i)"
-                  exit 0
-                fi
-                echo "Attempt $i failed, waiting 5s..."
-                sleep 5
-              done
-              exit 1
-            '
-          }
-          if poll; then exit 0; fi
-          echo "Smoke test failed after warmup, restarting IBL6..."
-          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} 'pm2 restart ibl6'
-          # Retry the poll instead of a single un-retried curl; restart re-honors
-          # the wait_ready config it was started with.
-          if poll; then
-            echo "IBL6 recovered after restart"
-            exit 0
-          fi
-          echo "IBL6 still down after restart"
-          exit 1
 
   notify-deploy-failure:
     name: Notify Deploy Failure

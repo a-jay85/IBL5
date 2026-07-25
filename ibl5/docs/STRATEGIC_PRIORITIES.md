@@ -1,13 +1,13 @@
 ---
 description: Post-refactoring roadmap and priority queue.
-last_verified: 2026-07-22
+last_verified: 2026-07-24
 ---
 
 # Strategic Development Priorities for IBL5
 
 ## Current State
 
-IBL5 has completed its full-stack modernization from a PHP-Nuke monolith to an interface-driven architecture with Repository/Service/View separation, a REST API layer, HTMX-powered frontend, and comprehensive CI/CD. The codebase is in **maturation mode** — the architecture is established, and work focuses on extending capabilities, hardening quality gates, and retiring legacy debt.
+IBL5 has completed its full-stack modernization from a PHP-Nuke monolith to an interface-driven architecture with Repository/Service/View separation, a REST API layer, HTMX-powered frontend, and comprehensive CI/CD. The codebase is in **maturation mode** — the architecture is established, and work focuses on extending capabilities, hardening quality gates, and retiring legacy debt. The frontend stays server-rendered PHP with HTMX for interactivity; the earlier SvelteKit experiment (IBL6) was retired in favor of in-stack PHP modules — see ADR-0095.
 
 ### What's Built
 
@@ -18,7 +18,6 @@ IBL5 has completed its full-stack modernization from a PHP-Nuke monolith to an i
 - **Test pyramid**: PHPUnit (unit + integration + module entry point), Playwright E2E (functional + visual regression), Infection mutation testing at 100% MSI
 - **CI/CD**: PHPUnit + PHPStan + Playwright + Lighthouse + CodeQL + migration safety + mutation testing + production smoke tests + auto-rebase
 - **Docker dev environment**: multi-worktree with Traefik routing, isolated DBs, automated migration runner
-- **IBL6 SvelteKit frontend** in early development — a separate sibling repo (`~/GitHub/IBL6`), not a subdirectory of this one; its container image is built here by `.github/workflows/build-ibl6-image.yml`
 
 ### Quality Gates (enforced by CI)
 
@@ -45,16 +44,7 @@ IBL5 has completed its full-stack modernization from a PHP-Nuke monolith to an i
 - Remove PHP-Nuke framework functions still called from bootstrap (`mainfile.php`)
 - Goal: eliminate `nuke_*` dependency entirely so the schema only contains `ibl_*` and `auth_*` tables
 
-### 2. IBL6 Frontend (SvelteKit)
-
-A SvelteKit frontend (`IBL6/`) is under early development, deployed at `ibl6.iblhoops.net`. It consumes the REST API built in the IBL5 backend.
-
-**Remaining work:**
-- Build out routes for core pages (teams, players, standings, schedule)
-- Replace PHP-rendered pages with SvelteKit equivalents as they mature
-- The REST API continues to expand to serve IBL6's needs
-
-### 3. HTMX Expansion
+### 2. HTMX Expansion
 
 HTMX is partially adopted — boosted navigation, tab switching, and form boost are in place. Several modules still do full page reloads for form submissions.
 
@@ -63,7 +53,7 @@ HTMX is partially adopted — boosted navigation, tab switching, and form boost 
 - Add `hx-get` partial loading to more data-heavy pages (leaderboards, player database)
 - Evaluate `HX-Location` for SPA-preserving form redirects (currently uses `HX-Redirect` which triggers full page reload)
 
-### 4. Test Coverage Expansion
+### 3. Test Coverage Expansion
 
 Coverage is at 84.26% with an 80% CI floor plus a no-regression check. The test suite is mature (PHPUnit, Playwright, mutation testing all enforced), but there are still gaps in integration test coverage for some modules.
 
@@ -72,16 +62,16 @@ Coverage is at 84.26% with an 80% CI floor plus a no-regression check. The test 
 - Add module entry point tests for untested modules (using `ModuleEntryPointTestCase`)
 - Expand E2E coverage for form submission flows that currently only have read-only tests
 
-### 5. API Maturation
+### 4. API Maturation
 
 The REST API has 24 controllers covering players (list/detail/stats/history/export), teams (list/detail/roster), games (list/detail/boxscore), standings, seasons, leaders, injuries, trade actions, PR threads/reactions, and pipeline/health/enqueue operations. Auth (API keys), rate limiting, ETag caching, and pagination are all in place.
 
 **Remaining work:**
 - OpenAPI/Swagger documentation generation
-- Additional endpoints as IBL6 frontend needs arise
+- Additional endpoints as new module and UI needs arise
 - Consider JWT auth alongside API keys for user-scoped operations
 
-### 6. JSB Native Sim Engine (Go)
+### 5. JSB Native Sim Engine (Go)
 
 A native Go re-implementation of the jumpshot 5.60 sim engine lives under `engine/`, scaffolded May 2026. The goal is cut-over fidelity with the legacy Windows binary so simulation stops depending on it.
 
@@ -92,7 +82,7 @@ A native Go re-implementation of the jumpshot 5.60 sim engine lives under `engin
 ## Lower Priority / Future
 
 - **Performance optimization**: Query analysis, Redis caching layer, page fragment caching. Not urgent — current page loads are acceptable.
-- **Generic PHP-Nuke modules**: `Web_Links` and `Content` are already gone; `News`, `Topics`, and `YourAccount` remain and will be replaced by IBL6 SvelteKit equivalents rather than refactored in PHP.
+- **Generic PHP-Nuke modules**: `Web_Links` and `Content` are already gone; `News`, `Topics`, and `YourAccount` remain. Refactor into IBL-native PHP modules (Repository/Service/View) or retire; no longer slated for a SvelteKit rewrite (see ADR-0095).
 
 ---
 

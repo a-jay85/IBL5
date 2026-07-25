@@ -11,7 +11,7 @@ on:
       # IBLbot (Discord bot + bug-bot HTTP server) has no other CI host — without
       # this line an IBLbot-only push to master never triggers this workflow, so
       # the iblbot job would gate PRs but not master. Every `changes` output is
-      # blanket-true on push, so such a push also fans out to the PHP/IBL6 jobs;
+      # blanket-true on push, so such a push also fans out to the PHP jobs;
       # that is pre-existing sibling behaviour (`bin/**` does the same), not new.
       - 'ibl5/IBLbot/**'
   pull_request:
@@ -35,7 +35,6 @@ jobs:
     outputs:
       src: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.src == 'true' }}
       shell: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.shell == 'true' }}
-      ibl6: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.ibl6 == 'true' }}
       ibl5ts: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.ibl5ts == 'true' }}
       iblbot: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.iblbot == 'true' }}
     steps:
@@ -70,9 +69,6 @@ jobs:
               # bin/test-human-signoff-classifier guards the classifier lib that
               # human-signoff.yml sources, so a workflow-only edit must run it too.
               - '.github/workflows/human-signoff.yml'
-            ibl6:
-              - 'IBL6/**'
-              - '.github/workflows/tests.yml'
             ibl5ts:
               # Everything the ibl5 TS unit suite executes or imports
               # (tests/ts-unit/ specs cover the pure VR-review helpers and
@@ -217,50 +213,6 @@ jobs:
     - name: Audit JS dependencies
       working-directory: ibl5
       run: npm audit --audit-level=high
-
-  ibl6-checks:
-    name: IBL6 Type Check & Unit Tests
-    needs: [changes]
-    if: needs.changes.outputs.ibl6 == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-    - name: Setup Node
-      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-      with:
-        node-version: '22'
-        cache: 'npm'
-        cache-dependency-path: IBL6/package-lock.json
-
-    - name: Install dependencies
-      working-directory: IBL6
-      run: npm ci
-
-    - name: Type check (svelte-check)
-      working-directory: IBL6
-      run: npm run check
-
-    # vite.config forces vitest browser mode (provider: playwright, chromium),
-    # so the runner needs the browser binary before test:unit.
-    - name: Cache Playwright browsers
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-      with:
-        path: ~/.cache/ms-playwright
-        key: playwright-${{ runner.os }}-${{ hashFiles('IBL6/package-lock.json') }}
-        restore-keys: |
-          playwright-${{ runner.os }}-
-
-    - name: Install Playwright Chromium
-      working-directory: IBL6
-      run: npx playwright install chromium --with-deps
-
-    - name: Unit tests (vitest)
-      working-directory: IBL6
-      run: npm run test:unit -- --run
 
   ibl5-ts-unit:
     name: IBL5 TS Unit Tests
@@ -739,7 +691,7 @@ jobs:
   gate:
     name: Tests and Analysis
     if: always()
-    needs: [changes, test, audit-php, audit-js, ibl6-checks, ibl5-ts-unit, iblbot, db-integration, phpstan, phpunit-hygiene, shellcheck, host-mariadb-guard, automouse-impl-model-test, update-baselines, static-guards, harness-tests, pinact-check]
+    needs: [changes, test, audit-php, audit-js, ibl5-ts-unit, iblbot, db-integration, phpstan, phpunit-hygiene, shellcheck, host-mariadb-guard, automouse-impl-model-test, update-baselines, static-guards, harness-tests, pinact-check]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

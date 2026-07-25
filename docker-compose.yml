@@ -101,31 +101,6 @@ services:
       - default
       - ibl5-proxy
 
-  ibl6:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.ibl6
-    container_name: ibl5-ibl6
-    restart: unless-stopped
-    environment:
-      DB_HOST: mariadb
-      DB_PORT: "3306"
-      DB_NAME: iblhoops_ibl5
-      DB_USER: root
-      DB_PASSWORD: root
-      NODE_ENV: production
-      PORT: "3001"
-    depends_on:
-      mariadb:
-        condition: service_healthy
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.ibl6.rule=Host(`ibl6.localhost`)
-      - traefik.http.services.ibl6.loadbalancer.server.port=3001
-    networks:
-      - default
-      - ibl5-proxy
-
   browsersync:
     build:
       context: .

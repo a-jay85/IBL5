@@ -11,6 +11,7 @@ use Trading\Contracts\TradeOfferInterface;
 use Trading\Contracts\TradingViewInterface;
 use Trading\Contracts\TradeExecutionServiceInterface;
 use Auth\Contracts\AuthServiceInterface;
+use EventLog\EventLogger;
 
 /**
  * @see TradingControllerInterface
@@ -240,6 +241,7 @@ class TradingController implements TradingControllerInterface
                 'offering_team' => $tradeData['offeringTeam'],
                 'listening_team' => $tradeData['listeningTeam'],
             ]);
+            EventLogger::setAction('trade_offer_submitted');
             \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=offer_sent');
         }
 
@@ -302,6 +304,7 @@ class TradingController implements TradingControllerInterface
             $result = $this->executionService->validateAndExecute($offerId, $actingTeam);
 
             if ($result['success']) {
+                EventLogger::setAction('trade_offer_accepted');
                 \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=trade_accepted');
             } else {
                 $errors = isset($result['errors']) && is_array($result['errors']) ? $result['errors'] : [];
@@ -378,6 +381,7 @@ class TradingController implements TradingControllerInterface
             // The trade rejection itself has already succeeded
         }
 
+        EventLogger::setAction('trade_offer_rejected');
         \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=trade_rejected');
     }
 

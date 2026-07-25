@@ -8,6 +8,7 @@ use Auth\Contracts\AuthServiceInterface;
 use Team\Team;
 use Season\Season;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
+use EventLog\EventLogger;
 
 class FreeAgencyController
 {
@@ -153,6 +154,7 @@ class FreeAgencyController
         $pid = $result['playerID'];
 
         if ($result['success']) {
+            EventLogger::setAction('free_agent_offer_submitted');
             \Utilities\HtmxHelper::redirect('modules.php?name=FreeAgency&result=offer_success');
         } elseif ($result['type'] === 'already_signed') {
             \Utilities\HtmxHelper::redirect('modules.php?name=FreeAgency&result=already_signed');
@@ -211,6 +213,7 @@ class FreeAgencyController
             \Utilities\HtmxHelper::redirect('modules.php?name=FreeAgency&result=error');
         }
 
+        EventLogger::setAction('free_agent_offer_deleted');
         \Utilities\HtmxHelper::redirect('modules.php?name=FreeAgency&result=deleted');
     }
 }

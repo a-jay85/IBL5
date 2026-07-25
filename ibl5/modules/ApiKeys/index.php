@@ -40,6 +40,7 @@ $userId = $authService->getUserId();
 if ($op === 'revoke' && $_SERVER['REQUEST_METHOD'] === 'POST' && $userId !== null) {
     if (\Security\CsrfGuard::validateSubmittedToken('api_keys_revoke')) {
         $service->revokeKeyForUser($userId);
+        \EventLog\EventLogger::setAction('api_key_revoked');
         header('Location: modules.php?name=ApiKeys');
         return;
     }
@@ -111,6 +112,7 @@ function handleGenerate(ApiKeysService $service, ApiKeysView $view, int $userId,
 
     try {
         $result = $service->generateKeyForUser($userId, $username);
+        \EventLog\EventLogger::setAction('api_key_generated');
         echo $view->renderNewKeyState($result['raw_key']);
     } catch (\RuntimeException $e) {
         echo '<div class="ibl-alert ibl-alert--error">' . \Security\HtmlSanitizer::e($e->getMessage()) . '</div>';

@@ -95,12 +95,16 @@ jobs:
       # PR and push, never path-gated. A code-only change (e.g. deleting bin/foo)
       # can orphan a doc reference while touching no .md, so path-gating would
       # silently skip exactly the PR that needs checking. Hard gate. ---
-      - name: Run bin/check-docs (frontmatter, dead-refs, ADR transitions)
+      - name: Run bin/check-docs (frontmatter, dead-refs, ADR transitions, retired figures)
         # Staleness is deliberately suppressed here: an untouched stale doc must
         # not block an unrelated PR. Repo-wide staleness is owned by the nightly
         # doc-freshness-audit workflow; on-touch staleness is enforced below.
         if: ${{ !cancelled() }}
-        run: bin/check-docs --no-staleness
+        # --self-test first: the retired-figure exemption logic is the one part of
+        # this gate whose bug is a SILENT false negative, so it gets fixtures.
+        run: |
+          bin/check-docs --self-test
+          bin/check-docs --no-staleness
 
       - name: Run bin/check-docs (on-touch / changed-files)
         if: ${{ !cancelled() && github.event_name == 'pull_request' }}

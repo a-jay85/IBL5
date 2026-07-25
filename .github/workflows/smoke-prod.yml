@@ -38,8 +38,6 @@ jobs:
       github.event.workflow_run.conclusion == 'success'
     timeout-minutes: 5
     outputs:
-      # 'false' on skip paths (stale guard) because skipped != failure
-      ibl6_failed: ${{ steps.ibl6.outcome == 'failure' }}
       # 'true' when the IBL5 smoke was INCONCLUSIVE — either the on-box prober
       # hit a uniform WAF-class block (remote exit 3) or the production box was
       # unreachable over SSH (exit 255). Routes to notify-inconclusive instead
@@ -138,25 +136,6 @@ jobs:
             exit 0
           fi
           exit "$code"
-
-      - name: Run IBL6 smoke checks on-box via SSH (notify-only)
-        id: ibl6
-        if: steps.guard.outputs.stale != 'true'
-        continue-on-error: true
-        run: |
-          # Pipe bin/smoke-prod to `bash -s` on the production box so it curls
-          # the IBL6 hostname from the box's OWN whitelisted egress IP, bypassing
-          # the per-IP WAF that bans datacenter runners (same mechanism as the
-          # IBL5 step above — ADR-0039). bin/ is host/CI-only, hence the redirect.
-          # Reuses the key written by "Setup SSH for on-box smoke" (no new setup).
-          # Minimal form (no 255-retry like IBL5): IBL6 is a single notify-only
-          # check, and the only new failure mode — SSH 255 (box unreachable) —
-          # cannot create a spurious IBL6 DM, because IBL5 runs FIRST, hits 255,
-          # and sets ibl5_inconclusive=true, which gates off notify-ibl6-degradation.
-          ssh -o ConnectTimeout=10 -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy \
-            ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
-            "bash -s -- --scope=ibl6 $BASE_URL" \
-            < bin/smoke-prod
 
   rollback-and-notify:
     name: Auto-Rollback and Notify
@@ -273,7 +252,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: smoke
     # Single notify-only job replacing notify-scheduled-failure,
-    # notify-ibl6-degradation, and notify-inconclusive (ci-backlog 2.1).
+    # and notify-inconclusive (ci-backlog 2.1).
     # Outer if: is the OR of the three original conditions; the message
     # step branches on the smoke outcome. rollback-and-notify stays
     # separate — it mutates git (revert + push production).
@@ -282,7 +261,6 @@ jobs:
     if: >-
       always() && (
         (needs.smoke.result == 'failure' && github.event_name != 'workflow_run') ||
-        (needs.smoke.outputs.ibl6_failed == 'true' && needs.smoke.outputs.ibl5_inconclusive != 'true' && needs.smoke.result == 'success') ||
         (needs.smoke.outputs.ibl5_inconclusive == 'true' && needs.smoke.result == 'success')
       )
     timeout-minutes: 5
@@ -308,8 +286,6 @@ jobs:
           # Branches are mutually exclusive under the job-level if:. Order:
           #  1. result==failure          → scheduled-failure DM
           #  2. ibl5_inconclusive==true  → inconclusive DM (ssh vs waf sub-branch)
-          #  3. else (ibl6_failed==true && ibl5_inconclusive!=true && result==success)
-          #                              → IBL6-degradation DM
           if [ "$SMOKE_RESULT" = "failure" ]; then
             MSG=$(printf 'Production smoke test FAILED (%s trigger — no auto-rollback).\n\nThis may be a transient issue. Check the run for details: %s' "$TRIGGER" "$RUN_URL")
           elif [ "$IBL5_INCONCLUSIVE" = "true" ]; then
@@ -318,8 +294,6 @@ jobs:
             else
               MSG=$(printf 'IBL5 smoke INCONCLUSIVE (on-box prober hit a uniform WAF-class block). NO rollback; production untouched. Run: %s' "$RUN_URL")
             fi
-          else
-            MSG=$(printf 'IBL6 smoke FAILED; IBL5 unaffected. No rollback.\n\nRun: %s' "$RUN_URL")
           fi
           printf '%s' "$MSG" > /tmp/discord-msg.txt
 

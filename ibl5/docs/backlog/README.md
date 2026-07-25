@@ -1,6 +1,6 @@
 ---
 description: Index of tracked backlogs under docs/backlog/ — one row per LIVE backlog plus the archive pointer, and the canonical status taxonomy shared by all backlogs; and the archive / dated-pointer / supersession housekeeping conventions.
-last_verified: 2026-07-22
+last_verified: 2026-07-25
 ---
 
 # Backlog index
@@ -58,10 +58,14 @@ refs are tolerated there).
 - **Archiving an item:** when an item reaches ✅ Implemented or 🚫 Declined in a **body-status** backlog,
   move its body into the sibling archive and replace the LIVE entry with a one-line **dated pointer**, e.g.
   `➜ <id> <title> — ✅ Implemented (YYYY-MM-DD): see [archive](archive/<x>-backlog-archive.md).`
-- **Table-status backlogs** (`maintenance-backlog.md`) keep their glyphs in-place per row — no per-item
-  pointer; bulk-resolved sections still extract to the archive.
+- **Table-status backlogs** (`maintenance-backlog.md`) keep only **unresolved** (⬜ / ◑ / 📋) rows in their
+  per-axis tables. A row that reaches ✅ Implemented or 🚫 Declined is **collapsed**: its id joins the axis's
+  `> ✅ resolved (N): …` / `> 🚫 declined (N): …` summary line (placed above the table header), and its
+  `Evidence / note` prose moves **verbatim** into the sibling archive under `### <id>`. No per-item dated
+  pointer — the summary line is the pointer.
 - **Enforced by** `bin/check-docs --since=<base>`: a newly-added archive pointer must resolve to its
-  sibling, and a body-status item flipped done must become a pointer (the diff-scoped backstop).
+  sibling, and a body-status item flipped done must become a pointer (the diff-scoped backstop); and a
+  table-status backlog may contain no ✅/🚫 table row at all (corpus-wide, not diff-scoped — see `checkMaintenanceResolved`).
 
 ## Not part of this directory
 

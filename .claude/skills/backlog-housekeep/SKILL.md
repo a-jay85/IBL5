@@ -1,7 +1,7 @@
 ---
 name: backlog-housekeep
 description: "Ship backlog housekeeping with an implemented backlog item: flip its status, stamp discovered items with provenance, sweep sibling and cross-backlog redundancy, archive done items behind a dated pointer, and reconcile the README index — then self-verify via bin/check-docs."
-last_verified: 2026-07-20
+last_verified: 2026-07-25
 ---
 
 # Backlog Housekeeping
@@ -30,11 +30,11 @@ Both branches run the identical checklist below; only *who reads the files* diff
 
 ## Housekeeping checklist (7 operations)
 
-1. **Source-backlog status flip.** In the backlog that owns the implemented item, flip its status glyph to the resolved state (`✅ Implemented` / `🚫 Declined`) with today's date on its `**Status (YYYY-MM-DD):**` line.
+1. **Source-backlog status flip.** In the backlog that owns the implemented item, flip its status glyph to the resolved state (`✅ Implemented` / `🚫 Declined`) with today's date on its `**Status (YYYY-MM-DD):**` line. In a **table-status** backlog (`maintenance-backlog.md`) the flip is not a glyph swap: **remove** the row, add its id to the axis's `> ✅ resolved (N): …` (or `> 🚫 declined (N): …`) summary line — incrementing that line's `(N)` — and carry out op 5 with its evidence prose.
 2. **Provenance-stamped discoveries.** For each item surfaced *during* this work, add a new backlog entry stamped `(discovered YYYY-MM-DD during <ref>)` so its origin is greppable.
 3. **Sibling-scope edits.** Edit sibling items in the same backlog whose scope shifted because of this change (narrowed, split, or now-blocked), noting the shift in the entry.
 4. **Cross-backlog redundancy sweep.** Grep the OTHER backlogs for items this change makes redundant; on each, add the greppable field `**Superseded by:** <ref> — <reason>` (verbatim format — `<ref>` = this PR/plan, `<reason>` = one clause). Do NOT delete the superseded item; the stamp is the audit trail.
-5. **Archive move + dated pointer.** For every item now done or declined in a **body-status** backlog: move its body into the sibling archive file `archive/<x>-backlog-archive.md` (create it if absent — the gate's (b) invariant requires the canonical sibling), and replace the LIVE entry with a one-line dated pointer into that archive. Table-status backlogs (`maintenance-backlog.md`) keep their glyphs in-place per row — no archive move.
+5. **Archive move + dated pointer.** For every item now done or declined in a **body-status** backlog: move its body into the sibling archive file `archive/<x>-backlog-archive.md` (create it if absent — the gate's (b) invariant requires the canonical sibling), and replace the LIVE entry with a one-line dated pointer into that archive. Table-status backlogs (`maintenance-backlog.md`) archive too, in a different shape: append the removed row's `Evidence / note` cell **verbatim** to the archive's `### <id>` section as `**Table evidence (YYYY-MM-DD):** <cell>`, creating `### <id> — Finding <id>` with a `**Status:**` line if no section exists. Never reword, reflow, or de-duplicate the cell — the archive is the byte-faithful record, and the LIVE summary line keeps only the id.
 6. **README index/count reconciliation.** Update `ibl5/docs/backlog/README.md` counts and any index rows affected by the flips/additions/archives, and bump its `last_verified` to today (the convention this step follows is codified in that README).
 7. **Self-verify (mandatory gate).** Run `bin/check-docs --since=<base>` — the backstop that catches an unresolved pointer, a missing sibling, or an inline-done item. Fix every diagnostic before returning. This is the machine check that the housekeeping is internally consistent.
 

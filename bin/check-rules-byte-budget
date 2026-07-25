@@ -77,10 +77,22 @@ fi
 # "Checks 3 and 4 assert reachability for the files this PR touches").
 # Out-of-repo globs are LEGITIMATE (work-triage-detail.md points at
 # ~/.claude/hooks/plan-gate-edit.sh) — report SKIP, never FAIL.
+#
+# In CI the checkout may be shallow (fetch-depth: 1), so `git diff origin/master`
+# can fail non-fatally due to missing objects. Explicitly fetch the base branch
+# first to guarantee origin/<base> is available, then compute the changed-files
+# set once before the loop.
+_BASE_BRANCH="${GITHUB_BASE_REF:-master}"
+git fetch --depth=1 origin "$_BASE_BRANCH" 2>/dev/null || true
+_CHANGED_RULES="$(git diff --name-only "origin/$_BASE_BRANCH" -- .claude/rules/ 2>/dev/null || true)"
+
 glob_fail=0
 for f in "$RULES_DIR"/*.md; do
-  git diff --quiet origin/master -- "$f" 2>/dev/null && \
-    [ -n "$(git ls-files origin/master -- "$f" 2>/dev/null)" ] && continue
+  # Skip files not in this PR's changeset — pre-existing broken globs are out-of-scope debt.
+  _rel=".claude/rules/$(basename "$f")"
+  if [ -n "$_CHANGED_RULES" ] && ! printf '%s\n' "$_CHANGED_RULES" | grep -qxF "$_rel"; then
+    continue
+  fi
   fm="$(awk '/^---$/{c++; next} c==1{print} c>=2{exit}' "$f")"
   printf '%s\n' "$fm" | grep -q '^paths:' || continue
   # Handles BOTH shapes: scalar (`paths: "ibl5/**"`, as browser-login.md uses) and

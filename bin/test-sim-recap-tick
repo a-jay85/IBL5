@@ -60,6 +60,15 @@ srt_setup() {
     cat > "$STUB/ssh" <<'SH'
 #!/usr/bin/env bash
 echo "$*" >> "$STUB/ssh.log"
+# Tunnel calls carry a -L forward and no remote command. Matched on the flag
+# rather than on $1 so reordering the fallback's flags can't drop them into the
+# verb dispatch below (where they'd hit the unknown-verb branch and exit 1).
+case " $* " in
+    *" -L "*)
+        [ -f "$STUB/fail.tunnel" ] && exit 255
+        exit 0
+        ;;
+esac
 cmd="$2"
 if printf '%s' "$cmd" | grep -q 'storeSimRecap\.php'; then
     if [ -f "$STUB/record-stdin" ]; then
@@ -273,6 +282,39 @@ touch "$STUB/agent-usage-limit"
 srt_run
 srt_log_has "$STUB" tick.out "usage limit" "usage_limit_parks_with_reason — logged"
 srt_log_has "$STUB" ssh.log  "park"        "usage_limit_parks_with_reason — park in ssh.log"
+
+# ── tunnel_attached_before_agent ──────────────────────────────────────────────
+# The generation path must attach the SELECT-only MySQL forward to the existing
+# ControlMaster before spawning claude — nothing else opens it (the poller runs
+# unattended), so without this every tick after a reboot queries a dead port.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+srt_run
+srt_log_has "$STUB" ssh.log "-O forward -L 13306:127.0.0.1:3306" \
+    "tunnel_attached_before_agent — forward requested"
+
+# ── tunnel_failure_parks_without_spawning_claude ──────────────────────────────
+# Both ssh paths fail (no master to attach to, and opening one fails). The tick
+# must park WITHOUT burning an agent run — the empty-tick cost guard applies to
+# a broken tunnel too. Asserting zero claude (not just the log line) is what
+# catches ensure_tunnel being wired in after run_agent.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+touch "$STUB/fail.tunnel"
+srt_run
+srt_expect_eq "tunnel_failure_parks_without_spawning_claude — exit 0" 0 "$SRT_RC"
+srt_log_has   "$STUB" tick.out "could not bring up the DB tunnel" \
+    "tunnel_failure_parks_without_spawning_claude — names the failure"
+srt_log_has   "$STUB" ssh.log  "park"          "tunnel_failure — park in ssh.log"
+srt_log_lacks "$STUB" ssh.log  "storeSimRecap" "tunnel_failure — no store"
+srt_file_absent "$STUB/claude.sentinel" "tunnel_failure — zero claude"
+
+# ── dry_run_tunnel_failure_exits_nonzero ──────────────────────────────────────
+srt_reset
+touch "$STUB/fail.tunnel"
+srt_run --dry-run --sim=42
+srt_expect_eq "dry_run_tunnel_failure_exits_nonzero" 1 "$SRT_RC"
+srt_file_absent "$STUB/claude.sentinel" "dry_run_tunnel_failure — zero claude"
 
 # ── dry_run_touches_nothing ───────────────────────────────────────────────────
 # --dry-run --sim=N: calls mention-map/recent-themes (read-only) but NO

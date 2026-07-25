@@ -18,6 +18,8 @@
 # data. Every privileged queue action is a prod-side `ssh php simRecapQueue.php`
 # call the agent cannot make (claiming a row is an UPDATE the read-only user is
 # refused). All *_id fields are read as STRINGS with `jq -r` (snowflake rule).
+# This script OWNS bringing that tunnel up (ensure_tunnel, called on every
+# generation path) — the poller runs unattended, so nothing else can.
 #
 # NOT set -e: one sim's failure must never abort the tick before its park branch
 # runs. Backoff and stale-lease timers are computed SERVER-side by parkOrFail /
@@ -136,6 +138,27 @@ fetch_agent_inputs() { # sim  (writes mentions.json + themes-ledger.json into WO
     return 0
 }
 
+# ── Ensure the SELECT-only MySQL tunnel is up before the agent runs ───────────
+# Nothing else opens it: the poller runs unattended, so a reboot (or the
+# ControlMaster exiting) would otherwise leave every tick generating against a
+# dead port. `-O forward` attaches the forward to the master the queue calls
+# already keep alive (ControlMaster auto / ControlPersist 10m in ~/.ssh/config)
+# and is idempotent — rc 0, no duplicate listener, when the forward exists.
+# Fails CLOSED: a bare "port 13306 is open" probe would green-light a LOCAL
+# MySQL bound to the same port and recap the wrong database, so a port we could
+# not establish ourselves is treated as no tunnel at all.
+ensure_tunnel() {
+    local fwd="${SIM_RECAP_DB_PORT}:127.0.0.1:3306"
+    "$SIM_RECAP_SSH_BIN" -O forward -L "$fwd" "$SIM_RECAP_SSH_HOST" >/dev/null 2>&1 && return 0
+    log "no ssh ControlMaster to attach the DB tunnel to — opening one"
+    # ExitOnForwardFailure=yes is load-bearing: without it a bind conflict leaves
+    # a stray background ssh with rc 0 — one leaked process per tick, forever.
+    "$SIM_RECAP_SSH_BIN" -f -N -o ExitOnForwardFailure=yes -L "$fwd" "$SIM_RECAP_SSH_HOST" \
+        >/dev/null 2>&1 && return 0
+    log "ERROR: could not bring up the DB tunnel on port $SIM_RECAP_DB_PORT — parking rather than querying a dead port"
+    return 1
+}
+
 # ── Run the generation agent in the temp dir; leaves payload.json on success ──
 run_agent() { # sim prompt
     local sim="$1" prompt="$2"
@@ -164,6 +187,13 @@ generate() { # sim
     if ! prompt="$("$SIM_RECAP_PROMPT_BIN" --sim="$sim" \
             --mentions="$WORKDIR/mentions.json" --themes="$WORKDIR/themes-ledger.json")"; then
         log "sim $sim: prompt build failed (missing exemplar?) — parking"
+        park "$sim"; return 0
+    fi
+
+    # Before spawning claude — a dead tunnel means every mysql call it makes
+    # fails, burning a full agent run to produce nothing.
+    if ! ensure_tunnel; then
+        log "sim $sim: no DB tunnel — parking without spawning the agent"
         park "$sim"; return 0
     fi
 
@@ -218,6 +248,11 @@ dry_run() {
     if ! prompt="$("$SIM_RECAP_PROMPT_BIN" --sim="$sim" \
             --mentions="$WORKDIR/mentions.json" --themes="$WORKDIR/themes-ledger.json")"; then
         log "dry-run sim $sim: prompt build failed (missing exemplar?)"
+        exit 1
+    fi
+
+    if ! ensure_tunnel; then
+        log "dry-run sim $sim: no DB tunnel — not spawning the agent"
         exit 1
     fi
 

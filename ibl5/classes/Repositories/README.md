@@ -1,6 +1,6 @@
 ---
 description: Cross-cutting repositories for team/player/salary lookups used across the codebase
-last_verified: 2026-05-16
+last_verified: 2026-07-24
 ---
 
 # Repositories

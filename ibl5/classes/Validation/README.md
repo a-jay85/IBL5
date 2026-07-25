@@ -1,6 +1,6 @@
 ---
 description: Cross-cutting validation primitives used by 3+ modules
-last_verified: 2026-05-16
+last_verified: 2026-07-24
 ---
 
 # Validation

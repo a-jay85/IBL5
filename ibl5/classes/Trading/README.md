@@ -1,6 +1,6 @@
 ---
 description: Trading module naming convention — Trading* prefix vs Trade* prefix rule.
-last_verified: 2026-05-20
+last_verified: 2026-07-24
 ---
 
 # Trading Module Naming Convention

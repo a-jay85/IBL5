@@ -1,20 +1,23 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 #
-# bin/test-postplan-arm-conditions — regression guard for the /post-plan Phase 6.5
-# auto-merge conditions that call the shared predicate bin/lib/pr-armable.sh
+# bin/test-postplan-arm-conditions — regression guard for the /post-plan blocks
+# that must survive being run in their own shell — the Phase 6.5 auto-merge
+# conditions and the Phase 2.5 backlog trigger.
+# Phase 6.5 conditions call the shared predicate bin/lib/pr-armable.sh
 # (conditions (1) Manual-Testing, (5) golden, (6) Depends-on, (8) feat:), plus
 # condition (3), the Phase-5.0 conformance gate (no predicate; /tmp state only).
 #
-# Why this exists: those conditions live as separate ```bash blocks inside
-# _phase-6.5-arm-auto-merge.md (extracted from SKILL.md by the lazy-load
-# refactor), and the orchestrator runs each block in its OWN shell after
-# Reading that file. A block that relied on a hoisted `source` or a shared
-# `PR_JSON` from a preamble would have an UNDEFINED predicate function — and
-# for condition (8) that fails OPEN (no BLOCKED line emitted → a feat: PR
-# auto-arms). This test runs each block in an isolated `bash -c` against a gh
-# shim and asserts the holds, plus a structural check that every
-# predicate-using block re-`source`s the lib itself.
+# Why this exists: those blocks live as separate ```bash blocks inside
+# _phase-6.5-arm-auto-merge.md and SKILL.md, and the orchestrator runs each
+# block in its OWN shell after Reading those files. A block that relied on a
+# hoisted `source` or a shared `PR_JSON` from a preamble would have an UNDEFINED
+# predicate function — and for condition (8) that fails OPEN (no BLOCKED line
+# emitted → a feat: PR auto-arms). A Phase 2.5 block that emitted no verdict,
+# or fell through to `none` on a plan-blind code PR, would silently restore the
+# 87%-of-PRs skip this trigger exists to fix. This test runs each block in an
+# isolated `bash -c` against a gh shim and asserts the holds, plus a structural
+# check that every predicate-using block re-`source`s the lib itself.
 #
 # Run: bin/test-postplan-arm-conditions  (exit 0 = all pass, 1 = a case failed)
 
@@ -23,18 +26,28 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SKILL="$REPO_ROOT/.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md"
+P25_SKILL="$REPO_ROOT/.claude/skills/post-plan/SKILL.md"
 
 BASE_TMP="$(mktemp -d)"
 trap 'rm -rf "$BASE_TMP"' EXIT
 FAILED=0
 
 # A gh shim emulating the only calls the condition blocks make:
+#   gh pr diff --name-only               -> $GH_DIFF_FIXTURE contents (or exit 1 if unset/missing)
 #   gh pr view <n> --json state          -> predecessor state (#1100 OPEN else MERGED)
 #   gh pr view --json <fields> --jq F    -> jq -r F applied to $GH_PR_FIXTURE
 SHIMD="$BASE_TMP/shim"
 mkdir -p "$SHIMD"
 cat > "$SHIMD/gh" <<'SHIM'
 #!/usr/bin/env bash
+if [ "$1" = "pr" ] && [ "$2" = "diff" ]; then
+  # gh pr diff --name-only -> the fixture path list. An unset/missing fixture
+  # emulates a gh failure (no PR, network error), which the Phase 2.5 block must
+  # survive with BL_TRIGGER=none rather than aborting.
+  [ -n "${GH_DIFF_FIXTURE:-}" ] && [ -f "$GH_DIFF_FIXTURE" ] || exit 1
+  cat "$GH_DIFF_FIXTURE"
+  exit 0
+fi
 if [ "$1" = "pr" ] && [ "$2" = "view" ]; then
   if [[ "$3" =~ ^[0-9]+$ ]]; then
     case "$3" in 1100) echo '{"state":"OPEN"}' ;; *) echo '{"state":"MERGED"}' ;; esac
@@ -51,15 +64,16 @@ exit 1
 SHIM
 chmod +x "$SHIMD/gh"
 
-# extract_block <literal-marker> — print the first ```bash fenced block whose
-# body contains the literal marker substring (e.g. "# condition (8)"). Uses
-# index() (literal), not regex, so the parens in the marker are matched verbatim.
+# extract_block <literal-marker> [file] — print the first ```bash fenced block
+# whose body contains the literal marker substring (e.g. "# condition (8)").
+# Uses index() (literal), not regex, so the parens in the marker are matched
+# verbatim. File defaults to $SKILL when omitted.
 extract_block() {
     awk -v want="$1" '
         /^```bash$/ { inb=1; buf=""; next }
         /^```$/     { if (inb && index(buf, want) > 0) { printf "%s", buf } ; inb=0; next }
         inb         { buf = buf $0 "\n" }
-    ' "$SKILL"
+    ' "${2:-$SKILL}"
 }
 
 # run_isolated <block> <fixture-json> <golden_changed> <headless> — run the block
@@ -112,12 +126,56 @@ assert_self_contained() { # marker name
     fi
 }
 
+# run_p25 <block> <changed-paths|__GHFAIL__> <plan-body|""> <bl-dir> — the Phase 2.5
+# block reads `gh pr diff --name-only`, an optional plan file, and $BL_DIR; all
+# three are env-overridable in-block, so supply them from $BASE_TMP and run the
+# block in its OWN fresh shell (the failure model this whole test guards).
+run_p25() {
+    local diff_f="$BASE_TMP/p25-diff.txt" plan_f="$BASE_TMP/p25-plan.md"
+    rm -f "$diff_f" "$plan_f"
+    [ "$2" != "__GHFAIL__" ] && printf '%s' "$2" > "$diff_f"
+    [ -n "$3" ] && printf '%s' "$3" > "$plan_f"
+    PATH="$SHIMD:$PATH" GH_DIFF_FIXTURE="$diff_f" \
+        PLAN_FILE="$plan_f" BL_DIR="$4" \
+        bash -c "$1" 2>&1
+}
+
+# expect_p25 <name> <A|B|C|none> <hit|miss|absent> <output> — assert the verdict,
+# the probe state, and that EXACTLY ONE verdict line was printed (a second one
+# would mean a fallthrough, and the orchestrator reads only the first).
+expect_p25() {
+    local v p n
+    v="$(printf '%s\n' "$4" | grep -m1 '^BL_TRIGGER=' | cut -d= -f2)"
+    p="$(printf '%s\n' "$4" | grep -m1 '^BL_PROBE=' | cut -d= -f2)"
+    n="$(printf '%s\n' "$4" | grep -c '^BL_TRIGGER=')"
+    [ -z "$p" ] && p="absent"
+    if [ "$v" = "$2" ] && [ "$p" = "$3" ] && [ "$n" -eq 1 ]; then
+        echo "ok: $1"
+    else
+        echo "FAIL: $1 — expected trigger=$2 probe=$3 (1 verdict), got trigger='$v' probe='$p' verdicts=$n; output: '$4'"
+        FAILED=1
+    fi
+}
+
+# mk_bl_dir <name> <entry-location> — fixture backlog dir with ONE entry whose
+# **Location:** names <entry-location>, plus a README.md and an archive/ entry
+# that name the SAME path. The probe must ignore those two.
+mk_bl_dir() {
+    local d="$BASE_TMP/bl-$1"
+    mkdir -p "$d/archive"
+    printf $'# X\n\n**Location:** `%s`\n' "$2" > "$d/x-backlog.md"
+    printf $'# Index\n\n**Location:** `%s`\n' "$2" > "$d/README.md"
+    printf $'# Old\n\n**Location:** `%s`\n' "$2" > "$d/archive/old-backlog.md"
+    echo "$d"
+}
+
 B1="$(extract_block '# condition (1)')"
 B3="$(extract_block '# condition (3)')"
 B5="$(extract_block '# condition (5)')"
 B6="$(extract_block '# condition (6)')"
 B8="$(extract_block '# condition (8)')"
 B10="$(extract_block '# condition (10)')"
+B25="$(extract_block '# phase 2.5 trigger' "$P25_SKILL")"
 
 # --- structural: every predicate-using block must source the lib itself ---
 assert_self_contained '# condition (1)' "condition (1)"
@@ -125,6 +183,21 @@ assert_self_contained '# condition (5)' "condition (5)"
 assert_self_contained '# condition (6)' "condition (6)"
 assert_self_contained '# condition (8)' "condition (8)"
 assert_self_contained '# condition (10)' "condition (10)"
+
+# The Phase 2.5 failure model: each /post-plan block runs in its own shell, so a
+# block that read Phase 1's $PLAN_FILE without re-deriving it would silently take
+# the C branch on EVERY PR, including plan-present ones.
+# shellcheck disable=SC2016  # grep patterns match literal ${VAR:-...} text in the block
+if [ -z "$B25" ]; then
+    echo "FAIL: phase 2.5 — no block matching '# phase 2.5 trigger' in $P25_SKILL"
+    FAILED=1
+elif printf '%s' "$B25" | grep -q 'PLAN_FILE="${PLAN_FILE:-' \
+    && printf '%s' "$B25" | grep -q 'BL_DIR="${BL_DIR:-'; then
+    echo "ok: phase 2.5 block re-derives PLAN_FILE and BL_DIR in-block"
+else
+    echo "FAIL: phase 2.5 block does NOT re-derive PLAN_FILE/BL_DIR in-block (cross-shell state = wrong verdict)"
+    FAILED=1
+fi
 
 # --- behavioral: each block, run in isolation, holds correctly ---
 expect_block "(1) HELD manual rows -> BLOCK" BLOCK \
@@ -170,9 +243,66 @@ expect_block "(10) pipeline-authored label -> BLOCK" BLOCK \
 expect_block "(10) no pipeline label -> NONE" NONE \
     "$(run_isolated "$B10" '{"labels":[]}' '' '')"
 
+# --- Phase 2.5 backlog trigger cases ---
+BL_HIT="$(mk_bl_dir hit ibl5/classes/Updater/StandingsUpdater.php)"
+BL_MISS="$(mk_bl_dir miss ibl5/classes/Unrelated.php)"
+BL_EMPTY="$BASE_TMP/bl-empty"
+mkdir -p "$BL_EMPTY"
+BL_NOBL="$(mk_bl_dir nobl ibl5/classes/Updater/StandingsUpdater.php)"
+rm "$BL_NOBL/x-backlog.md"
+
+# Trigger A fires when a backlog file is in the diff; probe does not run.
+expect_p25 'p25_trigger_a' 'A' 'absent' \
+    "$(run_p25 "$B25" "$(printf 'ibl5/docs/backlog/ci-backlog.md\nbin/foo')" '' "$BL_MISS")"
+
+# Trigger B outranks C when both would match.
+expect_p25 'p25_trigger_b_precedence' 'B' 'absent' \
+    "$(run_p25 "$B25" 'bin/foo' "$(printf '## Backlog\n- resolved x')" "$BL_MISS")"
+
+# Trigger C fires on plan-blind PRs with substantive code changes.
+expect_p25 'p25_trigger_c_planblind_code' 'C' 'miss' \
+    "$(run_p25 "$B25" 'ibl5/classes/Updater/StandingsUpdater.php' '' "$BL_MISS")"
+
+# Trigger C also fires on tooling-only diffs (.claude/, bin/).
+expect_p25 'p25_trigger_c_tooling' 'C' 'miss' \
+    "$(run_p25 "$B25" "$(printf '.claude/skills/foo/SKILL.md\nbin/wt-new')" '' "$BL_MISS")"
+
+# Trivial diffs (docs/README/lockfile/workflow only) yield none.
+expect_p25 'p25_trigger_none_trivial' 'none' 'absent' \
+    "$(run_p25 "$B25" "$(printf 'ibl5/docs/x.md\nREADME.md\nibl5/composer.lock\n.github/workflows/tests.yml')" '' "$BL_MISS")"
+
+# backlog/README.md and backlog/archive/* fire neither A nor C.
+expect_p25 'p25_trigger_backlog_readme_archive' 'none' 'absent' \
+    "$(run_p25 "$B25" "$(printf 'ibl5/docs/backlog/README.md\nibl5/docs/backlog/archive/old-backlog.md')" '' "$BL_MISS")"
+
+# gh failure: block must yield none with exit 0, not crash.
+out_ghfail="$(run_p25 "$B25" '__GHFAIL__' '' "$BL_MISS")"
+rc_ghfail=$?
+expect_p25 'p25_trigger_gh_failure' 'none' 'absent' "$out_ghfail"
+if [ "$rc_ghfail" -ne 0 ]; then
+    echo "FAIL: p25_trigger_gh_failure — block exited $rc_ghfail (not 0); gh failure must not abort the block"
+    FAILED=1
+fi
+
+# Probe hit: a changed path named by a backlog entry yields BL_PROBE=hit.
+expect_p25 'p25_probe_hit' 'C' 'hit' \
+    "$(run_p25 "$B25" 'ibl5/classes/Updater/StandingsUpdater.php' '' "$BL_HIT")"
+
+# Probe miss: substantive changes no entry references yield BL_PROBE=miss.
+expect_p25 'p25_probe_miss' 'C' 'miss' \
+    "$(run_p25 "$B25" 'ibl5/classes/Unrelated2.php' '' "$BL_MISS")"
+
+# Probe excludes README.md and archive/: only those name the path → miss.
+expect_p25 'p25_probe_excludes_readme_archive' 'C' 'miss' \
+    "$(run_p25 "$B25" 'ibl5/classes/Updater/StandingsUpdater.php' '' "$BL_NOBL")"
+
+# Empty BL_DIR (glob stays literal) yields miss, not a crash.
+expect_p25 'p25_probe_empty_dir' 'C' 'miss' \
+    "$(run_p25 "$B25" 'ibl5/classes/Updater/StandingsUpdater.php' '' "$BL_EMPTY")"
+
 if [ "$FAILED" -eq 0 ]; then
-    echo "All post-plan arm-condition checks passed."
+    echo "All post-plan block checks passed."
 else
-    echo "Some post-plan arm-condition checks FAILED."
+    echo "Some post-plan block checks FAILED."
 fi
 exit "$FAILED"

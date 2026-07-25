@@ -106,5 +106,7 @@ intent log — without touching GitHub.
    harness records a Phase 9 intent only.
 
 Known scope reductions vs the full skill (accepted at install): no backlog
-housekeeping, no worktree teardown, no E2E verify track (Docker stack), no
+housekeeping (the skill's Phase 2.5 now fires on plan-blind PRs too via its
+Trigger C, so this gap widened — a harness run ships no housekeeping on ANY
+PR class), no worktree teardown, no E2E verify track (Docker stack), no
 review Agent C (prior-PR feedback). The skill fallback retains all of them.

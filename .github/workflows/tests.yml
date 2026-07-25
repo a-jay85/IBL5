@@ -60,8 +60,10 @@ jobs:
               - 'ibl5/bin/**'
               - '.github/workflows/tests.yml'
               # bin/test-postplan-arm-conditions reads the Phase 6.5 condition
-              # blocks here, so a SKILL.md-only edit must run the harness job.
+              # blocks AND the Phase 2.5 backlog trigger block from these two
+              # files, so an edit to either alone must run the harness job.
               - '.claude/skills/post-plan/SKILL.md'
+              - '.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md'
               # bin/test-post-review-findings reads the Step 7 / Step 1 blocks here,
               # so a command-only edit must run the harness job too.
               - '.claude/commands/pr-review.md'

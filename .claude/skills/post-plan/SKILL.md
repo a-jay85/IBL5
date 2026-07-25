@@ -105,16 +105,80 @@ If the shipped work implemented or resolved a backlog item, backlog housekeeping
 **Detect (run once — the PR gives the correct base):**
 
 ```bash
-BL_TOUCHED=$(gh pr diff --name-only 2>/dev/null | grep -E '^ibl5/docs/backlog/[^/]+-backlog\.md$' || true)
+# phase 2.5 trigger: emits exactly ONE verdict line, BL_TRIGGER=A|B|C|none, as the
+# first line of stdout. Self-contained on purpose — every /post-plan Bash block runs
+# in its own fresh shell, so nothing from Phase 1 is in scope here. $PLAN_FILE is
+# overridable only so bin/test-postplan-arm-conditions can exercise this block (and
+# so an automouse run can pass Phase 1's authoritative handoff path instead of the
+# slug guess).
+PLAN_FILE="${PLAN_FILE:-$HOME/claude-plans/$(git rev-parse --abbrev-ref HEAD).md}"
+CHANGED=$(gh pr diff --name-only 2>/dev/null || true)
+
+# Trigger A — a backlog file is already in the diff. Excludes README.md (no
+# -backlog.md suffix) and archive/ ([^/]+ cannot cross /), so a README-only or
+# archive-only diff does not fire.
+BL_TOUCHED=$(printf '%s\n' "$CHANGED" | grep -E '^ibl5/docs/backlog/[^/]+-backlog\.md$' || true)
+
+# Trigger C — plan-blind or plan-present PR whose diff carries substantive
+# (non-doc, non-asset, non-generated) changes. Deliberately INCLUSIVE: .claude/
+# and bin/ count as substantive because maintenance-backlog.md is heavily
+# dev-tooling. A false C costs one bounded grep (stage 2 below); a false "none"
+# is the bug this trigger exists to fix.
+SUBSTANTIVE=$(printf '%s\n' "$CHANGED" \
+    | grep -vE '\.(lock|snap|css|scss|json|ya?ml)$|^\.github/|^ibl5/docs/|(^|/)README\.md$|^ibl5/migrations/[^/]*\.sql$' \
+    | grep -v '^$' || true)
+
+if [ -n "$BL_TOUCHED" ]; then
+    VERDICT=A; echo "BL_TRIGGER=A"; printf '%s\n' "$BL_TOUCHED"
+elif [ -f "$PLAN_FILE" ] && grep -qiE '^#+.*backlog' "$PLAN_FILE"; then
+    VERDICT=B; echo "BL_TRIGGER=B"; echo "PLAN_FILE=$PLAN_FILE"
+elif [ -n "$SUBSTANTIVE" ]; then
+    VERDICT=C; echo "BL_TRIGGER=C"; printf '%s\n' "$SUBSTANTIVE"
+else
+    VERDICT=none; echo "BL_TRIGGER=none"
+fi
+
+# phase 2.5 probe: stage 2 of Trigger C — a BOUNDED evidence gate, not a second
+# trigger. Greps existing backlog entries for the paths this PR actually changed
+# (and their basenames — entries carry a structured **Location:** `<path>` field).
+# A miss licenses a one-line no-op WITHOUT reading any backlog body (~2,381 lines
+# across 9 files). $BL_DIR is overridable only so bin/test-postplan-arm-conditions
+# can point this at a fixture directory.
+if [ "$VERDICT" = "C" ]; then
+    BL_DIR="${BL_DIR:-$(git rev-parse --show-toplevel)/ibl5/docs/backlog}"
+    BL_HITS=$(printf '%s\n' "$SUBSTANTIVE" | head -40 | while read -r f; do
+        [ -n "$f" ] || continue
+        grep -n -F -- "$f" "$BL_DIR"/*-backlog.md 2>/dev/null
+        grep -n -F -- "$(basename "$f")" "$BL_DIR"/*-backlog.md 2>/dev/null
+    done | sort -u | head -40)
+    if [ -n "$BL_HITS" ]; then
+        echo "BL_PROBE=hit"; printf '%s\n' "$BL_HITS"
+    else
+        echo "BL_PROBE=miss"
+    fi
+fi
 ```
 
-Also treat housekeeping as triggered if the plan file (`$PLAN_FILE` from Phase 1) declares a resolved or discovered backlog item (a `## Backlog` / tracking-doc status-update section, per `.claude/skills/plan/_architect-contract.md`). The regex **excludes** `README.md` (no `-backlog.md` suffix) and anything under `archive/` (`[^/]+` cannot cross `/`), so a README-only or archive-only diff does **not** trigger.
+Also treat housekeeping as triggered if the plan file (`$PLAN_FILE` from Phase 1) declares a resolved or discovered backlog item (a `## Backlog` / tracking-doc status-update section, per `.claude/skills/plan/_architect-contract.md`). The block mechanizes the common case (`grep -qiE '^#+.*backlog'` over the plan file); it is a floor, not a ceiling. If the plan declares a resolved or discovered backlog item in prose that the heading grep misses, treat the verdict as `B` anyway. No case that fired before this block existed stops firing. The regex **excludes** `README.md` (no `-backlog.md` suffix) and anything under `archive/` (`[^/]+` cannot cross `/`), so a README-only or archive-only diff does **not** fire Trigger A.
 
-**If neither signal fires:** print `Phase 2.5: no backlog item resolved — skipping.` and continue to Phase 3.
+**Deliberate fallback direction:** when `$PLAN_FILE` does not exist (the plan-blind case, `PLAN_FOUND=none`), the `[ -f "$PLAN_FILE" ]` guard fails and evaluation falls through to C. That is the intended widening, not an accident: a missing plan means *less* information, so the PR must be probed rather than silently skipped.
+
+The block prints exactly one `BL_TRIGGER=` line first, then its evidence (matched paths, or the plan path). Read the verdict from that first line — `A` and `B` run the full `backlog-housekeep` checklist; `C` runs the evidence-anchored subset in *Trigger C scope* below; `none` skips.
+
+**If `BL_TRIGGER=none`:** print `Phase 2.5: no backlog item resolved — skipping.` and continue to Phase 3.
+
+**Trigger C scope (plan-blind and code-only PRs)**
+
+1. **`BL_PROBE=miss` → stop.** Print `Phase 2.5: no backlog entry references this PR's changes — skipping.` and continue to Phase 3. **Do not Read any backlog file.** This is the expected outcome for most Trigger C PRs and is a success, not a failure.
+2. **`BL_PROBE=hit` → Read only the files named in the hit lines**, not the whole directory, then follow `.claude/skills/backlog-housekeep/SKILL.md` inline as the existing paragraph already directs.
+3. **Evidence anchoring (the no-fabrication rule).** Under Trigger C you may only act on entries the probe surfaced. Every edit must trace to a `BL_HITS` line. If an entry the probe surfaced is *not* actually resolved by this PR's diff, leave it alone. *"If nothing qualifies (no flip, no discovery, no archive), **no-op** and say so in one line — never fabricate edits."*
+4. **Narrowed operation set.** Trigger C runs only operations **1 (source-backlog status flip)**, **4 (cross-backlog redundancy sweep / `**Superseded by:**` stamp)** and **7 (self-verify `bin/check-docs`)** from `backlog-housekeep/SKILL.md`. Operation **2 (provenance-stamped discoveries)** is explicitly **out of reach** under Trigger C, because Phase 2.5 runs *before Phase 4 review* — there is no discovery source yet, so any "discovered" item would be invented. Operations 3, 5 and 6 remain available under Triggers A and B, where a human-authored plan or an already-edited backlog file supplies the intent. **Triggers A and B are unchanged and still run the full checklist**.
 
 **If triggered — run INLINE, no subagent.** Post-plan runs as **Sonnet 4.6** and its `disallowed-tools` includes **`Skill`**, so it **cannot** call `/backlog-housekeep`. Instead **Read `.claude/skills/backlog-housekeep/SKILL.md` and follow it inline**, taking that skill's **Sonnet/Haiku caller branch** (execute inline — a same-tier subagent spawn is pure overhead per `feedback_default_sonnet_execution`). Apply its housekeeping checklist with `#<PR>` as the `<ref>` and the PR base as the `--since` base (default `origin/master`; the PR's `baseRefName` for a stacked PR).
 
 **Self-verify + checkpoint (mandatory):** run `bin/check-docs --since=origin/master` (substitute the PR base for a stacked PR), fix any diagnostic, then **commit + push** the housekeeping edits. Per Incremental Checkpoints, this phase modifies files, so the edits must be committed and pushed before Phase 3 — they belong in the diff that Phase 3 classifies and Phase 6.5 arms on.
+
+**Engine divergence.** Triggers A, B and C are **skill-only**. The compiled harness (`tools/postplan-harness`) runs no Phase 2.5 at all — backlog housekeeping is a documented, accepted scope reduction there (`tools/postplan-harness/README.md`), so a harness-driven run ships no housekeeping regardless of verdict. A harness run that should have done housekeeping is not a bug in this section; it is that scope reduction. Only a skill run (the fallback path, or `POST_PLAN_SKILL=1 bin/post-plan-now`) exercises Trigger C.
 
 ---
 

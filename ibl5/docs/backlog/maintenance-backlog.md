@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-07-24
+last_verified: 2026-07-25
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -1054,7 +1054,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 12.4 | ⬜ Open | 🟨 | Deferred — delivery is via tracked git commits (see Status). |
 | 12.5 | ⬜ Open | 🟨 | Standings.htm — upfront: verify legacy view unused → delete + redirect. |
 | 12.6 | ✅ Implemented | — | tests-baseline reduced 9519→7557 (2026-05-16). |
-| 12.7 | ⬜ Open | 🟨 | VR PNG baselines — 121 PNGs / 27 MB (grown 2.5× from original audit); infra decision (Git LFS vs force-updated baselines branch). |
+| 12.7 | ⬜ Open | 🟨 | VR PNG baselines — 121 PNGs / 27 MB (grown 2.5× from original audit); infra decision (Git LFS vs force-updated baselines branch). **Deferred 2026-07-25** — see Status below. |
 | 12.8 | ⬜ Open | 🟨 | Player images 20MB — decision + infra (S3/CDN vs LFS) + admin upload tooling. |
 | 12.9 | ⬜ Open | 🟨 | HoF images — bundle with the 12.8 decision. |
 | 12.10 | ✅ Implemented | — | Thumbs.db git rm'd + ignored. |
@@ -1084,6 +1084,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Git LFS, or separate force-updated `baselines` branch.
 **Est. effort:** M
 **Risk if untouched:** ~27 MB per regen cycle; clone time grows.
+**Status (decided 2026-07-25):** **Deferred — leave as-is.** Plain-git storage at 27 MB is accepted for now; neither Git LFS nor a force-updated `baselines` branch is worth its migration and workflow cost at this size. This decision explicitly **unblocks Axis 11 work**, which no longer needs to wait on a baselines-storage migration. Re-evaluate when the directory passes roughly **50 MB or ~200 PNGs** (about 2× today) — that trigger is a proposed threshold, not a measured cliff, so treat it as a prompt to re-decide rather than a commitment to migrate.
 
 ### 12.8 `ibl5/images/player/` — 20 MB, 1,980 Player Photos
 **Location:** `ibl5/images/player/`

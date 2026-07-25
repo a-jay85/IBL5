@@ -18,7 +18,10 @@ RULES_DIR="$(git rev-parse --show-toplevel)/.claude/rules"
 # Allowlist: the ONLY top-level rules permitted to be always-loaded (path-unscoped).
 # Any path-unscoped file NOT listed here — or any listed file that gains a paths:
 # key or is removed — fails the gate. Update deliberately, with justification.
-ALLOWLIST="agent-tiering auto-commit linear-history-squash-merge work-triage workflow-continuity worktree-hostname"
+# 2026-07-25: worktree-hostname + linear-history-squash-merge de-residented behind
+# paths: globs; both keep a one-line trigger stub in workflow-continuity.md, which
+# names the scoped file so the payload stays one Read away. See Check 4 below.
+ALLOWLIST="agent-tiering auto-commit work-triage workflow-continuity"
 
 fail=0
 total_bytes=0

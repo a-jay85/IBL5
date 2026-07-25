@@ -1,6 +1,9 @@
 ---
-description: How to derive the correct Docker hostname for the current worktree or main repo. Prevents using stale slugs.
-last_verified: 2026-07-01
+description: Worktree Docker hostnames, URL paths, and slug-derivation rules — path-scoped, loads only for ibl5/** and bin/wt-up work.
+last_verified: 2026-07-25
+paths:
+  - "ibl5/**"
+  - "bin/wt-up"
 ---
 
 # Worktree Hostname

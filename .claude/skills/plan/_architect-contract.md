@@ -85,7 +85,10 @@ Format each packet as a fenced block within the plan:
 ### Delegate — <phase name>
 - **Tier:** Haiku | Sonnet  (per the agent-tiering guidance above)
 - **Scope:** which files, what change
+- **Rules:** (optional) `.claude/rules/` files this packet's sub-agent must Read first — name any **path-scoped** rule the phase depends on; always-on rules load automatically and need no entry
 - **Recipe:** the exact commands / edits to run
 - **Self-verify:** the command the sub-agent runs *before returning* (e.g. `composer run analyse`, expected test count, green-green) — the packet owns its own verification
 - **Report back:** a one-line summary only
 ````
+
+**`Rules:` — when to fill it.** Always-on `.claude/rules/*.md` (those with no `paths:` frontmatter key) load verbatim into every sub-agent, so never list them. List a **path-scoped** rule when the delegate's work depends on it and the packet's own file edits would not match its globs — e.g. `linear-history-squash-merge.md` for a phase that rebases a stacked branch, `worktree-hostname.md` for a phase that curls or drives the app, or a `*-detail.md` companion whose parent rule the phase must apply in full. Omit the field entirely when the phase needs nothing beyond the always-on set.

@@ -6,7 +6,6 @@ namespace Tests\Cli;
 
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\Group;
-use PHPUnit\Framework\Attributes\DataProvider;
 
 #[Group('cli')]
 final class WebsiteAffectingCliTest extends TestCase
@@ -59,10 +58,9 @@ final class WebsiteAffectingCliTest extends TestCase
         // preview, and none is in e2e-tests.yml's push-path list — so a change to
         // them can't affect an E2E/VR/Lighthouse/preview outcome. Running
         // PHPUnit/PHPStan/Infection (tests.yml, mutation.yml) is NOT
-        // "affecting a render". The image-builders (cache-dependencies,
-        // build-ibl6-image) build on push:master; E2E pulls the prebaked php image
-        // and builds ibl6 from PR source, so a PR edit to those workflows changes
-        // no render.
+        // "affecting a render". The image-builder (cache-dependencies) builds
+        // php-apache:latest on push:master; E2E pulls the prebaked image, so a
+        // PR edit to that workflow changes no render.
         foreach ([
             '.github/workflows/doc-freshness-audit.yml',
             '.github/workflows/tests.yml',
@@ -79,7 +77,6 @@ final class WebsiteAffectingCliTest extends TestCase
             '.github/workflows/main.yml',
             '.github/workflows/smoke-prod.yml',
             '.github/workflows/cache-dependencies.yml',
-            '.github/workflows/build-ibl6-image.yml',
             '.github/workflows/deploy-rehearsal.yml',
         ] as $path) {
             $result = $this->runPredicate($path . "\n");

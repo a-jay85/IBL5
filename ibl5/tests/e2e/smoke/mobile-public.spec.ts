@@ -43,9 +43,9 @@ const PAGES = [
   // only because the "Sorry, such file doesn't exist" fallback rendered an OpenTable
   // wrapper that matched the `table` selector. PR2 module-dispatch lockdown
   // (ModuleRegistry::isValid) now redirects unknown module names to index, which
-  // exposes the test as testing a non-existent module. Box scores are served as
-  // static IBL6 SvelteKit URLs or legacy box{N}.htm files (see BoxScoreUrlBuilder),
-  // never via modules.php.
+  // exposes the test as testing a non-existent module. Box scores now render via
+  // modules.php?name=GameBoxscore (see BoxScoreUrlBuilder); legacy seasons still
+  // resolve to static box{N}.htm files.
   { name: 'season archive', url: 'modules.php?name=SeasonArchive', selector: '.ibl-data-table', hasWideTables: false },
   { name: 'one-on-one game', url: 'modules.php?name=OneOnOneGame', selector: 'form[name="OneOnOneGame"]', hasWideTables: false },
   { name: 'topics', url: 'modules.php?name=Topics', selector: '.topics-page', hasWideTables: false },

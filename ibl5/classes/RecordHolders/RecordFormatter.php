@@ -418,7 +418,7 @@ class RecordFormatter implements RecordFormatterInterface
     }
 
     /**
-     * Build a box score URL using the IBL6 SvelteKit URL pattern.
+     * Build a box score URL via BoxScoreUrlBuilder (GameBoxscore module URL, or a legacy box{N}.htm file).
      *
      * Returns empty string if gameOfThatDay is not available (historical records).
      */

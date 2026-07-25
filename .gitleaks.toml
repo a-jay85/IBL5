@@ -55,8 +55,4 @@ paths = [
   # Archived API documentation — contains placeholder tokens, not secrets.
   '''^\.archive/''',
 
-  # Firebase WEB app config. Firebase web API keys are public by design (shipped
-  # in client JS; access is gated by Firebase security rules, not key secrecy).
-  # See https://firebase.google.com/docs/projects/api-keys
-  '''^IBL6/src/lib/firebase/''',
 ]

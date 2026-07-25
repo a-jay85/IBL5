@@ -6,8 +6,12 @@
 // (DRBPushClass = merged code-7 {2,3,4}s gated survivors from steal- AND
 // DRB-sourced fast breaks per §1d; HalfCourt = half-court jitter). No assertion
 // failure — the test logs shares and writes a dated artifact for human
-// interpretation. Gate-1 recent-era drift band: DRBPushSharePct ∈ [11.97, 12.54]
-// @216.58 poss/g (supersedes the all-era 209.2-denominated [12.94, 13.41]).
+// interpretation. The artifact records the corpus path and derived era (J26).
+// Gate-1 band (recent-era 04-08 only — ADR-0088's derivation window; the engine
+// reference corpus below is the narrower 05-08, a different object):
+// DRBPushSharePct ∈ [11.97, 12.54]
+// @216.58 poss/g (supersedes the all-era 209.2-denominated [12.94, 13.41]);
+// the t.Logf at the bottom suppresses this band for other corpora.
 //
 // Master reads 12.4142% (seed SD 0.0210, SE 0.0079, n=7 disjoint seed blocks;
 // matched 98-zip recent-era 05-08 corpus, stride 1, commit 77b9be48b, 2026-07-24)
@@ -19,12 +23,11 @@
 // 12.42 but is still below ADR-0094's √2-shrink floor 12.4216. Verdict unchanged
 // on either corpus — see the multiseed artifact for both arms.
 //
-// ⚠ THIS ARTIFACT DOES NOT RECORD ITS CORPUS (backlog J26). A single run's
-// drb_push_share_pct is meaningless without the era + zip set it was measured on,
-// and the numbers above are a 7-seed MEAN — one run will not reproduce them
-// (observed seed SD 0.0210pp; runs=4 consumes seed..seed+3, so replication seeds
-// must be spaced ≥4 apart or they share draws). Corpus, seed blocks, floors, and
-// the bisect attribution live out-of-band in
+// ⚠ A single run's drb_push_share_pct is only interpretable with the corpus it was
+// measured on. This artifact records era + corpus path (J26 implemented). The numbers
+// above are a 7-seed MEAN — one run will not reproduce them (observed seed SD 0.0210pp;
+// runs=4 consumes seed..seed+3, so replication seeds must be spaced ≥4 apart or they
+// share draws). Seed blocks, floors, and the bisect attribution live out-of-band in
 // internal/validate/testdata/calibration-5.60-20260724-fastclass-share-matched-multiseed.json.
 //
 // Reuses listZipsP0, readSnapshotP0, envIntP0 from
@@ -47,6 +50,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -56,6 +61,8 @@ import (
 // fastClassShareArtifact is the committed diagnostic output from one archive pass.
 type fastClassShareArtifact struct {
 	Generated         string  `json:"generated"`
+	Corpus            string  `json:"corpus"` // archive dir (J26: corpus must always be recorded)
+	Era               string  `json:"era"`    // "recent (04-08)" or "all" (J26: derived from zip prefixes)
 	Stride            int     `json:"stride"`
 	Runs              int     `json:"runs"`
 	Seed              uint64  `json:"seed"`
@@ -71,8 +78,7 @@ type fastClassShareArtifact struct {
 	// 04-08 = [11.97, 12.47, 12.54, 12.53]). Master 12.4142% (7-seed mean, matched
 	// 98-zip corpus, 77b9be48b) is INSIDE — WITHIN-NOISE, NOT a clean GO (-0.006pp,
 	// -0.73 SE, under ADR-0090's ≥12.42 re-open bar). Supersedes ADR-0088's 12.37%
-	// and the mis-denominated all-era 209.2 floor [12.94, 13.41]. NOTE: this struct
-	// records no era/corpus field (backlog J26) — a bare artifact is uninterpretable.
+	// and the mis-denominated all-era 209.2 floor [12.94, 13.41].
 }
 
 func TestFastClassArmingShareBaseline(t *testing.T) {
@@ -96,6 +102,42 @@ func TestFastClassArmingShareBaseline(t *testing.T) {
 	}
 	if len(zips) == 0 {
 		t.Skipf("no .zip snapshots under %q", dir)
+	}
+
+	// J26: derive era from the set of distinct 5-char season prefixes in zips.
+	// Zip names are <season-prefix>_<N>_<desc>.zip (e.g. "07-08_26_reg-sim15.zip");
+	// the first 5 chars are the season prefix. If every prefix is in the
+	// recent-era set, era = "recent (04-08)"; otherwise era = "all" (any prefix
+	// outside the set, or mixed corpora). The label names 04-08 because that is
+	// the classifying set AND the band's own derivation window (ADR-0088 chunks
+	// 04-05/05-06/06-07/07-08 = [11.97, 12.47, 12.54, 12.53]) — do NOT relabel it
+	// "05-08" to match the engine reference corpus, which is a different object.
+	// Seasons is logged alongside so the reader sees the exact subset scanned.
+	recentSeasons := map[string]bool{"04-05": true, "05-06": true, "06-07": true, "07-08": true}
+	prefixes := map[string]bool{}
+	for _, z := range zips {
+		base := filepath.Base(z)
+		if len(base) >= 5 {
+			prefixes[base[:5]] = true
+		}
+	}
+	seasons := make([]string, 0, len(prefixes))
+	for p := range prefixes {
+		seasons = append(seasons, p)
+	}
+	sort.Strings(seasons)
+	era := "all"
+	if len(prefixes) > 0 {
+		allRecent := true
+		for p := range prefixes {
+			if !recentSeasons[p] {
+				allRecent = false
+				break
+			}
+		}
+		if allRecent {
+			era = "recent (04-08)"
+		}
 	}
 
 	var total FastClassAccum
@@ -128,6 +170,8 @@ func TestFastClassArmingShareBaseline(t *testing.T) {
 	tot := float64(total.TotalPossessions)
 	art := fastClassShareArtifact{
 		Generated:         time.Now().Format(time.RFC3339),
+		Corpus:            dir,
+		Era:               era,
 		Stride:            stride,
 		Runs:              runs,
 		Seed:              seed,
@@ -156,8 +200,13 @@ func TestFastClassArmingShareBaseline(t *testing.T) {
 		art.DRBPushSharePct, total.DRBPushClass)
 	t.Logf("  half-court share:     %.2f%% (%d possessions)",
 		art.HalfCourtSharePct, total.HalfCourt)
-	t.Logf("  corpus: %s (%d snapshots) — READ THIS: the band below is recent-era 05-08; it does NOT apply to any other corpus", dir, snapshots)
-	t.Logf("  J24 gate-1 band: DRBPushSharePct recent-era drift band [11.97, 12.54]%% @216.58 poss/g (merged code-7 share; superseded floor 12.94)")
-	t.Logf("  master reference: 12.4142%% (seed SD 0.0210, SE 0.0079, n=7; matched 98-zip corpus, stride 1, 77b9be48b) — INSIDE the band, but −0.73 SE BELOW ADR-0090's ≥12.42 re-open bar; HOLD stands. Supersedes ADR-0088's 12.37%%.")
-	t.Logf("  ⚠ one run is NOT comparable to that mean (seed SD 0.0210pp) and this artifact records no corpus — see calibration-5.60-20260724-fastclass-share-matched-multiseed.json")
+	t.Logf("  corpus: %s (era: %s, %d snapshots, seasons: %s)",
+		art.Corpus, art.Era, snapshots, strings.Join(seasons, ","))
+	if art.Era == "recent (04-08)" {
+		t.Logf("  J24 gate-1 band: DRBPushSharePct recent-era drift band [11.97, 12.54]%% @216.58 poss/g (merged code-7 share; superseded floor 12.94)")
+		t.Logf("  master reference: 12.4142%% (seed SD 0.0210, SE 0.0079, n=7; matched 98-zip corpus, stride 1, 77b9be48b) — INSIDE the band, but −0.73 SE BELOW ADR-0090's ≥12.42 re-open bar; HOLD stands. Supersedes ADR-0088's 12.37%%.")
+	} else {
+		t.Logf("  no comparable band for era=%s — gate-1 band [11.97, 12.54] applies to recent (04-08) only", art.Era)
+	}
+	t.Logf("  ⚠ one run is NOT comparable to the 7-seed mean (seed SD 0.0210pp) — see calibration-5.60-20260724-fastclass-share-matched-multiseed.json")
 }

@@ -45,13 +45,13 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 | Status | Count |
 |--------|------:|
-| ✅ Implemented | 227 |
-| ◑ Partial | 26 |
+| ✅ Implemented | 228 |
+| ◑ Partial | 25 |
 | 📋 Planned (plan queued / PR open) | 1 |
 | ⬜ Open | 67 |
 | 🚫 Declined | 10 |
 
-> Status counts re-verified 2026-06-28 (exact, from the per-axis tables); **6.20 / 6.21 added 2026-06-29** from the PR #1107 review (⬜ Open +2); **6.22 added 2026-06-29** from the #1066 reject-IDOR review (⬜ Open +1). Two stale-Open rows were flipped directly (no plan owned them): **13.3**, **13.9** (✅ +2, ⬜ −2 vs the master re-count). **1.21–1.31 added 2026-07-24** from the hot-files comment→backlog migration (⬜ Open +11: 8 🟩 auto-mergeable, 3 🟨 conditional — 1.23/1.25/1.31 need characterization/endpoint pins). **Ground-truth audit 2026-07-24:** 7 stale-Open items flipped ✅, 2 false findings marked 🚫, 5 new Axis-1 rows seeded (1.32–1.36); IDOR PRs #1107–1110 merged 2026-06-29 (unblocking 2.10/2.13/2.14/2.25/7.7/14.6); PRs #1240/#1230/#1204 merged (2.6/2.31/2.32/5.18 already ✅/Open on own merits). **9.19 and 9.20 implemented 2026-07-24** — added READMEs to all 68 missing class dirs + frontmatter to all 16 existing class READMEs that lacked it; extended bin/check-docs IN_SCOPE_GLOBS (✅ +2, ⬜ −2); roll-up recomputed from grep (331 rows total, unchanged).
+> Status counts re-verified 2026-06-28 (exact, from the per-axis tables); **6.20 / 6.21 added 2026-06-29** from the PR #1107 review (⬜ Open +2); **6.22 added 2026-06-29** from the #1066 reject-IDOR review (⬜ Open +1). Two stale-Open rows were flipped directly (no plan owned them): **13.3**, **13.9** (✅ +2, ⬜ −2 vs the master re-count). **1.21–1.31 added 2026-07-24** from the hot-files comment→backlog migration (⬜ Open +11: 8 🟩 auto-mergeable, 3 🟨 conditional — 1.23/1.25/1.31 need characterization/endpoint pins). **Ground-truth audit 2026-07-24:** 7 stale-Open items flipped ✅, 2 false findings marked 🚫, 5 new Axis-1 rows seeded (1.32–1.36); IDOR PRs #1107–1110 merged 2026-06-29 (unblocking 2.10/2.13/2.14/2.25/7.7/14.6); PRs #1240/#1230/#1204 merged (2.6/2.31/2.32/5.18 already ✅/Open on own merits). **9.19 and 9.20 implemented 2026-07-24** — added READMEs to all 68 missing class dirs + frontmatter to all 16 existing class READMEs that lacked it; extended bin/check-docs IN_SCOPE_GLOBS (✅ +2, ⬜ −2); roll-up recomputed from grep (331 rows total, unchanged). **6.16 flipped ✅ 2026-07-24** (all Api data repos + JsonResponder + SystemClock tested; ✅ +1, ◑ −1). **6.14 Status updated 2026-07-24** (ProcessBoxscoresStep/GenerateSeasonAwardsStep/ParseJsbFilesStep added; still ◑).
 
 **Automouse-readiness of the not-yet-complete (⬜/◑/📋) items:**
 
@@ -611,9 +611,9 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 6.11 | ✅ Implemented | 🟩 | SeasonHighs thin; additive. |
 | 6.12 | ✅ Implemented | 🟩 | TeamSchedule thin; additive. |
 | 6.13 | ◑ Partial | 🟩 | Player ~0.45 ratio (69 prod / 31 test files); additive (L — chunk it). |
-| 6.14 | ◑ Partial | 🟩 | Updater steps; additive. |
+| 6.14 | ◑ Partial | 🟩 | ProcessBoxscoresStep/GenerateSeasonAwardsStep/ParseJsbFilesStep added (2026-07-24); ~19 step classes + OlympicsFlatStandingsUpdater/UpdaterView/JsbSourceResolver remain. |
 | 6.15 | ✅ Implemented | — | VotingRepositoryTest + SubmissionResultTest added (aggregation, column allowlist). |
-| 6.16 | ◑ Partial | 🟩 | ApiKeyRepositoryTest + RateLimitRepositoryTest added; data repos + JsonResponder/SystemClock still untested. |
+| 6.16 | ✅ Implemented | — | All data repos (ApiGame/Injuries/Leaders/Player/PlayerStats/Standings/Team + Health) + JsonResponder + SystemClock tested (2026-07-24). |
 | 6.17 | ◑ Partial | 🟩 | TradeAssetRepositoryTest + TradeOfferRepositoryTest added (draft-pick mapping, offer lifecycle); TradeExecutionRepository untested + TradeFormRepository partial. |
 | 6.18 | ◑ Partial | 🟩 | Unit tests added: DraftPickLocator repo, LeagueSchedule Game, TransactionHistory repo, CapSpace repo. NextSim/SavedDepthChart/DepthChartEntry verified covered. Residual: SQL aggregation/ordering + SDC write-path are DB-integration-only. |
 | 6.19 | ◑ Partial | 🟩 | AllStarAppearances + GMContactList repo unit tests added. Season entity predicates blocked by `Season\Season`→mock alias (QueryRepo plumbing covered). `Shared` N/A (deleted 2.23). |
@@ -650,7 +650,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Per-step W-L aggregation, date ordering, format parsing.
 **Est. effort:** L
 **Risk if untouched:** Nightly automation corrupts standings/schedules/stats silently.
-**Status:** ◑ Partial (this PR, 2026-06-27). Added `ibl5/tests/Updater/StandingsUpdaterTest.php` (league/home/away/conference/division W-L aggregation, plus unknown-team-skip, empty-config, and zero-games boundaries) and `ibl5/tests/Updater/PowerRankingsUpdaterTest.php` (ranking formula + div-by-zero guard); extended `ibl5/tests/Updater/RecordParserTest.php` with empty/non-numeric/leading-dash boundaries. `ScheduleUpdater` already covered (`ibl5/tests/Updater/ScheduleUpdaterTest.php`). **Residual:** `Updater/Steps/` (22 step classes), `OlympicsFlatStandingsUpdater`, `UpdaterView`, and `JsbSourceResolver` remain untested; the 37-file module is still well below a 0.5 ratio.
+**Status:** ◑ Partial (this PR, 2026-06-27). Added `ibl5/tests/Updater/StandingsUpdaterTest.php` (league/home/away/conference/division W-L aggregation, plus unknown-team-skip, empty-config, and zero-games boundaries) and `ibl5/tests/Updater/PowerRankingsUpdaterTest.php` (ranking formula + div-by-zero guard); extended `ibl5/tests/Updater/RecordParserTest.php` with empty/non-numeric/leading-dash boundaries. `ScheduleUpdater` already covered (`ibl5/tests/Updater/ScheduleUpdaterTest.php`). Added `ibl5/tests/Updater/ProcessBoxscoresStepTest.php`, `ibl5/tests/Updater/GenerateSeasonAwardsStepTest.php`, `ibl5/tests/Updater/ParseJsbFilesStepTest.php` (2026-07-24). **Residual:** `Updater/Steps/` (~19 step classes remain), `OlympicsFlatStandingsUpdater`, `UpdaterView`, and `JsbSourceResolver` untested; module still below 0.5 ratio.
 
 ### 6.16 Api Module — Subthreshold (48 files, 22 tests, 0.46 ratio)
 **Location:** `ibl5/classes/Api`
@@ -658,7 +658,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Header parsing, token-bucket logic, pagination offset/limit edges.
 **Est. effort:** L
 **Risk if untouched:** Auth bypass; rate limiter broken; pagination off-by-one.
-**Status:** Partial (verified 2026-06-27) — tests/Api/Repository/ApiKeyRepositoryTest.php + tests/Api/Repository/RateLimitRepositoryTest.php added (active-key-only lookup, token-bucket upsert/window count). ApiKeyAuthenticator/RateLimiter/Paginator already well-covered. Residual: data repositories (ApiGameRepository, ApiInjuriesRepository, ApiLeadersRepository, ApiPlayerRepository, ApiPlayerStatsRepository, ApiStandingsRepository, ApiTeamRepository, HealthRepository) + JsonResponder + SystemClock.
+**Status:** ✅ Implemented (2026-07-24). Prior coverage: ApiKeyAuthenticator/RateLimiter/Paginator/ApiKeyRepository/RateLimitRepository. All named residuals now covered: `ibl5/tests/Api/Repository/ApiGameRepositoryTest.php`, `ApiInjuriesRepositoryTest.php`, `ApiLeadersRepositoryTest.php`, `ApiPlayerRepositoryTest.php`, `ApiPlayerStatsRepositoryTest.php`, `ApiStandingsRepositoryTest.php`, `ApiTeamRepositoryTest.php`, `HealthRepositoryTest.php` (unreachable-false branch via anonymous subclass override), `ibl5/tests/Api/Response/JsonResponderTest.php` (ob_start/ob_get_clean capture pattern), `ibl5/tests/Clock/SystemClockTest.php` (Clock module testsuite added to phpunit.xml).
 
 ### 6.17 Trading Module — Subthreshold (27 files, 12 tests, 0.44 ratio)
 **Location:** `ibl5/classes/Trading`

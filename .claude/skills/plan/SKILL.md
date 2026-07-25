@@ -4,7 +4,7 @@ description: "Plan an implementation task: enforces a verification matrix, direc
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
-last_verified: 2026-08-05
+last_verified: 2026-08-08
 ---
 
 # /plan — Implementation Planning with Verification Matrix
@@ -177,8 +177,11 @@ When Step 2.5 splits the work into **multiple PRs**, the per-unit Steps 3–5 lo
 - **Content = Step 2 pointers, never file bodies.** Fill the exploration-pointers section from the `path:line` + one-load-bearing-fact-per-file pointers you already carry out of Step 2 (see Step 2 "Collect"). Copy **pointers only** — never paste file contents. The artifact is an index each unit re-reads *at*, not a cache of source; pasting bodies reintroduces the very bloat this removes.
 - **Lifecycle (append-only; survives to implementation).** After seeding, the artifact is **append-only**: Step 3.5 appends each unit's resolved shared decisions as they freeze. It **survives until every split plan is implemented — do NOT delete it at Step 5.** This is unlike the per-unit draft at `$HOME/claude-plans/.drafts/<slug>.draft.md`, which IS `rm`'d at Step 5: queued split plans are implemented later (automouse, possibly days after planning), and each needs this shared context *then*. Cleanup is out of scope — the file persists (formalizing the Discord-pipeline precedent, whose shared-context file likewise persists).
 
-Seed the file with this standard shape — a Purpose line, a how-to note, an exploration-pointers section filled from Step 2, and an **empty** resolved-decisions section that Step 3.5 fills:
+Seed the file with this standard shape — a Purpose line, a how-to note, an exploration-pointers section filled from Step 2, and an **empty** resolved-decisions section that Step 3.5 fills.
 
+**Add the `## Program acceptance` section ONLY when this split has a cross-component seam** — a unit whose output is consumed across a language, process, transport, or schema boundary by a later unit (TS -> PHP over HTTP, migration -> query layer, plist -> runner script). When it applies, **you** fill it here at Step 2.5 — before unit 1's `plan-architect` runs, because that architect is accountable to it (see `.claude/skills/plan/_architect-contract.md`, the multi-PR-split bullet). It is written **once** by you and never rewritten by a unit; units only flip their own row in its status table. **Omit the whole section** for a single-PR plan, and for a split whose units share no seam — an absent section means "no cross-component seam", which is a real and common answer, not an oversight.
+
+The template:
 ```markdown
 # Shared Planning Context — <program>
 
@@ -192,6 +195,25 @@ Seed the file with this standard shape — a Purpose line, a how-to note, an exp
 
 ## Resolved design decisions
 <!-- Append-only. For a multi-PR split: empty at seed time — each unit's Step 3.5 decisions are appended here as they freeze (see Step 3.5), and later units reference earlier units' frozen decisions. For a trusted-context seed: PRE-FILLED at seed time from the caller's `## Resolved design decisions`. Append-only holds either way — add, never rewrite. -->
+
+## Program acceptance
+<!-- Written ONCE at Step 2.5 by the seeder, before unit 1 begins. Units never rewrite this section — they only flip their own row in the status table below. Omit the whole section if this split has no cross-component seam. -->
+
+**Acceptance test file:** `<path/to/acceptance-test.(ts|php|sh)>` — NEW (created by unit 1)
+
+**Seams covered:**
+- `<component A>` -> `<component B>` over `<HTTP | process | schema | filesystem>` — proven by: `<the observable fact, e.g. HTTP 200 + {"status":"success"} from the real server route>`
+
+**Final unit:** `<unit-N slug>` — last unit in dependency order. This unit runs the acceptance test green.
+
+**Per-unit seam status:**
+
+| Unit | Makes a seam newly exercisable? | Acceptance test state after this unit |
+|------|---------------------------------|---------------------------------------|
+| `<unit-1 slug>` | no | landed, skipped |
+| `<unit-N slug>` | yes | un-skipped, runs green |
+
+**Acceptance rule:** Unit 1 creates the acceptance test file, so it is present in the tree from unit 1 onward. A unit that does NOT make a seam newly exercisable lands it **skipped** — `it.skip(...)` (vitest), `markTestSkipped('<seam> not wired until <unit-N slug>')` (PHPUnit), or an early `exit 0` printing a SKIP reason (shell) — and says so in prose in its Approach. The **Final unit** above MUST carry a `CLI-executable` Verification Matrix row that runs this exact file by path and asserts it passes; un-skipping it is part of that unit's diff. Read the seam's real address (URL prefix, file path, CLI flag) from the serving code at implementation time — never from a prose table in this document.
 ```
 
 For a single-PR trusted-context seed, substitute the plan's `<slug>` for `<program>` in the title, fill both sections from the caller's `$ARGUMENTS`, then run Steps 3–5 once.

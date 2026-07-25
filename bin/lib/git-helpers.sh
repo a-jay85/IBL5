@@ -96,6 +96,16 @@ materialize_worktree_config() {
     [ -L "$dest" ] && rm -f "$dest"
     if [ -s "$main_ibl5/config.php" ]; then
         cp "$main_ibl5/config.php" "$dest"
+        # Announce the $dbname being propagated when no DB_NAME is in the
+        # environment — that's exactly when the copied fallback becomes
+        # load-bearing. A stale one silently fans out to every new worktree
+        # otherwise (observed: 40 worktrees inheriting 'iblhoops_rehearsal').
+        # Echo only, no policy: the name is league-agnostic by design.
+        if [ -z "${DB_NAME:-}" ] && command -v php >/dev/null 2>&1; then
+            local propagated_db
+            propagated_db=$(php -r "error_reporting(0); include '$dest'; echo \$dbname;" 2>/dev/null)
+            [ -n "$propagated_db" ] && echo "config.php: DB_NAME unset — worktree will use \$dbname fallback '$propagated_db'." >&2
+        fi
     elif [ -s "$main_ibl5/config.php.example" ]; then
         echo "WARNING: $main_ibl5/config.php missing — copying config.php.example (placeholder values)." >&2
         cp "$main_ibl5/config.php.example" "$dest"

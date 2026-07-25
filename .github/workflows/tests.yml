@@ -450,8 +450,9 @@ jobs:
           set -e
           # Worktrees run a separate dockerized MariaDB per worktree. Calling the host
           # `mariadb` client with -h 127.0.0.1 bypasses worktree isolation and will read
-          # or mutate the wrong database. Only bin/db-query is allowed to do this because
-          # it hands off to docker exec internally.
+          # or mutate the wrong database. Only bin/db-query is allowed to do this: it
+          # deliberately targets the main stack's published 3306 and, on ERROR 1049,
+          # names the $dbname it used and where that name came from.
           offenders=$(
             grep -rEn '^[[:space:]]*mariadb[[:space:]]+(-h[[:space:]]*127|-u[[:space:]]*root)' \
               bin/ ibl5/bin/ 2>/dev/null \

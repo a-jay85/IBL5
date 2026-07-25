@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Clock;
 
 use Clock\SystemClock;
-use Clock\ClockInterface;
 use PHPUnit\Framework\TestCase;
 
 class SystemClockTest extends TestCase
@@ -30,10 +29,5 @@ class SystemClockTest extends TestCase
 
         self::assertGreaterThanOrEqual($before, $result);
         self::assertLessThanOrEqual($after, $result);
-    }
-
-    public function testImplementsClockInterface(): void
-    {
-        self::assertInstanceOf(ClockInterface::class, $this->clock);
     }
 }

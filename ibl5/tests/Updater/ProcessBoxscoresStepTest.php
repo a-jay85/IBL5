@@ -31,7 +31,7 @@ class ProcessBoxscoresStepTest extends TestCase
     {
         $scoData = 'IBL5.sco file data';
 
-        $processor = $this->createStub(BoxscoreProcessor::class);
+        $processor = self::createStub(BoxscoreProcessor::class);
         $processor->method('processScoData')->willReturn([
             'success' => true,
             'gamesInserted' => 2,
@@ -41,10 +41,10 @@ class ProcessBoxscoresStepTest extends TestCase
             'messages' => [],
         ]);
 
-        $view = $this->createStub(BoxscoreView::class);
+        $view = self::createStub(BoxscoreView::class);
         $view->method('renderParseLog')->willReturn('<div>Parse log</div>');
 
-        $resolver = $this->createStub(JsbSourceResolverInterface::class);
+        $resolver = self::createStub(JsbSourceResolverInterface::class);
         $resolver->method('getContents')->willReturn($scoData);
 
         $step = new ProcessBoxscoresStep($processor, $view, $resolver);
@@ -57,10 +57,10 @@ class ProcessBoxscoresStepTest extends TestCase
 
     private function buildStep(?string $scoContents): ProcessBoxscoresStep
     {
-        $processor = $this->createStub(BoxscoreProcessor::class);
-        $view = $this->createStub(BoxscoreView::class);
+        $processor = self::createStub(BoxscoreProcessor::class);
+        $view = self::createStub(BoxscoreView::class);
 
-        $resolver = $this->createStub(JsbSourceResolverInterface::class);
+        $resolver = self::createStub(JsbSourceResolverInterface::class);
         $resolver->method('getContents')->willReturn($scoContents);
 
         return new ProcessBoxscoresStep($processor, $view, $resolver);

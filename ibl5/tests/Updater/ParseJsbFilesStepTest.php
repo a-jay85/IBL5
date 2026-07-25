@@ -33,10 +33,10 @@ class ParseJsbFilesStepTest extends TestCase
         $trnResult = new JsbImportResult();
         $trnResult->addInserted(3);
 
-        $service = $this->createStub(JsbImportService::class);
+        $service = self::createStub(JsbImportService::class);
         $service->method('processTrnData')->willReturn($trnResult);
 
-        $resolver = $this->createStub(JsbSourceResolverInterface::class);
+        $resolver = self::createStub(JsbSourceResolverInterface::class);
         $resolver->method('getContents')
             ->willReturnCallback(static fn (string $ext) => $ext === 'trn' ? 'trn-data' : null);
 
@@ -57,11 +57,11 @@ class ParseJsbFilesStepTest extends TestCase
         $carResult = new JsbImportResult();
         $carResult->addUpdated(5);
 
-        $service = $this->createStub(JsbImportService::class);
+        $service = self::createStub(JsbImportService::class);
         $service->method('processTrnData')->willReturn($trnResult);
         $service->method('processCarData')->willReturn($carResult);
 
-        $resolver = $this->createStub(JsbSourceResolverInterface::class);
+        $resolver = self::createStub(JsbSourceResolverInterface::class);
         $resolver->method('getContents')
             ->willReturnCallback(static function (string $ext): ?string {
                 return in_array($ext, ['trn', 'car'], true) ? $ext . '-data' : null;
@@ -80,10 +80,10 @@ class ParseJsbFilesStepTest extends TestCase
         $hisResult = new JsbImportResult();
         $hisResult->addError('Unknown player ID 999');
 
-        $service = $this->createStub(JsbImportService::class);
+        $service = self::createStub(JsbImportService::class);
         $service->method('processHisData')->willReturn($hisResult);
 
-        $resolver = $this->createStub(JsbSourceResolverInterface::class);
+        $resolver = self::createStub(JsbSourceResolverInterface::class);
         $resolver->method('getContents')
             ->willReturnCallback(static fn (string $ext) => $ext === 'his' ? 'his-data' : null);
 
@@ -102,14 +102,14 @@ class ParseJsbFilesStepTest extends TestCase
     {
         $emptyResult = new JsbImportResult();
 
-        $service = $this->createStub(JsbImportService::class);
+        $service = self::createStub(JsbImportService::class);
         $service->method('processTrnData')->willReturn($emptyResult);
         $service->method('processCarData')->willReturn($emptyResult);
         $service->method('processHisData')->willReturn($emptyResult);
         $service->method('processAswData')->willReturn($emptyResult);
         $service->method('processRcbData')->willReturn($emptyResult);
 
-        $resolver = $this->createStub(JsbSourceResolverInterface::class);
+        $resolver = self::createStub(JsbSourceResolverInterface::class);
         $resolver->method('getContents')
             ->willReturnCallback(static fn (string $ext) => in_array($ext, $files, true) ? $ext . '-data' : null);
 

@@ -77,7 +77,7 @@ class TableViewDropdown implements TableViewDropdownInterface
         $safeBaseUrl = HtmlSanitizer::safeHtmlOutput($this->baseUrl);
         $onchange = "if(window.htmx)return;"
             . "var v=this.value,d=v,s='';"
-            . "if(v.indexOf('split:')===0){d='split';s='&amp;split='+v.substring(6)}"
+            . "if(v.indexOf('split:')===0){d='split';s='&amp;split='+encodeURIComponent(v.substring(6))}else{d=encodeURIComponent(d)}"
             . "window.location.href='" . $safeBaseUrl . "&amp;display='+d+s";
 
         $htmxAttrs = '';

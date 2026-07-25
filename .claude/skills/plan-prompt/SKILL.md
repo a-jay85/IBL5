@@ -1,0 +1,132 @@
+---
+name: plan-prompt
+description: "Draft a paste-ready /plan prompt to hand to a fresh Sonnet session, distilled from the current conversation — ground-truth pointers, already-measured evidence, scope, constraints, verification, and the Step-3 architect tier. Use after a design discussion when the planning run should be offloaded off the expensive session."
+disable-model-invocation: true
+last_verified: 2026-07-24
+---
+
+# Draft a `/plan` handoff prompt for a fresh Sonnet session
+
+Emit a paste-ready prompt that a **fresh Sonnet session** can run as `/plan`, carrying
+everything this conversation figured out.
+
+**Why this exists.** A `/plan` run costs mostly orchestration, not design: the design
+happens in one `plan-architect` sub-agent spawn (`.claude/rules/agent-tiering.md`
+§ Tiers). A Sonnet orchestrator driving an Opus architect costs far less than an Opus
+orchestrator doing the same, and a fresh session survives a mid-plan network failure
+that would otherwise cost this whole context. The handoff prompt is the only thing
+carrying design context across that boundary — everything the prompt omits, Sonnet
+either re-derives (expensive) or gets wrong.
+
+## Step 0 — Draft from this conversation only
+
+**Spawn no agents. Re-read no source files. Run no scans.** The skill exists to
+*offload* context, so growing this one defeats it.
+
+If a fact isn't already established here, do not resolve it now — emit it as a
+**Read first** pointer for Sonnet to resolve, or as an open question outside the
+block. "Sonnet, go read `X`" is cheap; Opus reading `X` right now is the exact cost
+this skill removes.
+
+## Step 1 — Decide what to plan
+
+`$ARGUMENTS` has three shapes:
+
+| Argument | Meaning |
+|---|---|
+| *(empty)* — the common case | Plan the thing this conversation converged on. If the conversation covered several things, pick the one most recently discussed and say which you picked outside the block. |
+| A selector — `items 1-3`, `just the migration part` | Narrow to that slice; state what you dropped as out-of-scope. |
+| A fresh description | Plan that, using this conversation only as background. |
+
+## Step 2 — Split by PR before composing
+
+**One plan = one PR** (`.claude/skills/plan/SKILL.md`). If the work spans multiple
+PRs, emit **one prompt block per PR**, in dependency order, each naming its base
+branch. Do not hand Sonnet a bundle and expect Step 2.5 to untangle it — you already
+know the split; encode it.
+
+## Step 3 — Compose each block
+
+The block opens with `/plan <one-sentence task statement>` and then carries the
+sections below. Include a section only when it has real content — an empty heading is
+padding. Fence with ` ```markdown ` (four backticks if the body itself contains
+fences).
+
+1. **Read first (ground truth) — do NOT plan from my summary alone.**
+   Explicit `path:line` pointers — repo files, ADRs, backlog entries, prior
+   `~/claude-plans/*.md` — each with the *one load-bearing fact* it establishes.
+   Cite at whatever precision this conversation already established (Step 0) — a bare
+   path is fine; do not open files now to sharpen a pointer into a `path:line`.
+   This is the load-bearing section: it is what lets a cheap orchestrator reach the
+   same understanding this conversation did.
+
+2. **Already measured / already traced — verify, don't re-derive.**
+   The conclusions this conversation produced: counts, `path:line` anchors, traced
+   call paths, ruled-out hypotheses. Include the **anti-patterns** explicitly
+   ("do not 'fix' the auth attribution — it's intentional"; "ignore the stale InnoDB
+   `table_rows` estimate"). Anything omitted here gets re-derived or re-litigated.
+
+3. **Scope** — numbered parts, plus an explicit **out of scope** list.
+
+4. **Hard constraints** — ADR references, invariants and orderings to preserve, PII
+   boundaries, `auto_merge: false` when the change wants human signoff, whether
+   `/backlog-housekeep` ships with the PR.
+
+5. **Blocking questions to resolve inside the plan** — unknowns that *change the
+   design*. Mark them "resolve inside the plan"; don't leave them implicit and don't
+   burn this session resolving them.
+
+6. **Verification** — what the plan's matrix must actually run and prove, not just
+   "add tests".
+
+7. **Step 3 architect tier** — see Step 4 below. State it as a directive:
+   `Step 3 MUST route to plan-architect-xhigh`.
+
+8. **Sequencing** — intended branch slug, base branch, rebase expectation, and any
+   peer session that owns the same files (the SessionStart hook already told you).
+   Naming the slug makes `~/claude-plans/<slug>.md` predictable for the later
+   `/post-plan`.
+
+Facts that may move by the time Sonnet runs (next migration number, current `master`
+tip) — tell it to **resolve at plan time**, don't hardcode.
+
+## Step 4 — Name the architect tier
+
+The tier directive is the highest-leverage line in the prompt: it is the mechanism by
+which a Sonnet orchestrator still gets Opus-grade design. Abbreviated below;
+`.claude/rules/agent-tiering.md` § Tiers is authoritative — read it when the call
+isn't obvious:
+
+- security surface / trust boundary / destructive migration / ship-pipeline
+  invariant → **`plan-architect-xhigh`**
+- explicit recipe **plus** a named existing pattern to copy →
+  **`plan-architect-sonnet`**
+- otherwise → **`plan-architect`**
+
+Also state the orchestrator model outside the block: a single item → **Sonnet**;
+several items decomposed in one pass → **Opus** (`agent-tiering.md` §
+`/plan` orchestrator model). If the answer is Opus, say so — this skill's default
+isn't always right.
+
+## Step 5 — Emit
+
+1. Print the block(s).
+2. Copy the first block to the clipboard:
+
+   ```bash
+   f=$(mktemp -t plan-prompt); : > "$f"   # write the block into "$f" first
+   pbcopy < "$f"
+   ```
+
+   Use `mktemp`, not a fixed `/tmp` name — several sessions run this repo at once.
+   With multiple blocks, copy block 1 and say which one is on the clipboard.
+3. **Outside** the fenced block — never inside, so the paste stays clean — add:
+   - which model should run it, and why (Step 4);
+   - any judgment call you made for the user (scope picked, split chosen);
+   - if a network failure kills the architect mid-run, **re-spawn the same tier**.
+     `/plan` Step 3 already delivers the plan section-by-section with each section
+     appended to disk before the next turn, so a stall costs one section, not the
+     plan — the prompt doesn't need to ask for piecewise delivery, and a stall is
+     never a reason to downgrade the tier.
+
+Then stop. This skill drafts the prompt; it does not run `/plan`.

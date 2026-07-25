@@ -9,6 +9,7 @@ import {
 } from './handlers.js';
 import { startBugBotServer } from './server.js';
 import { runBackfill } from './backfill.js';
+import { logBugChannelPermissionPreflight } from './preflight.js';
 
 const client = new Client({
     intents: [
@@ -34,6 +35,13 @@ const backfillReady = new Promise<void>((resolve) => {
 
 client.once(Events.ClientReady, async (c) => {
     console.log(`Bug-bot ready as ${c.user.tag}`);
+    // Diagnostic only — reports missing bug-channel permissions, never gates anything.
+    // Own try/catch so it can't skip backfill (it already swallows internally).
+    try {
+        await logBugChannelPermissionPreflight(client);
+    } catch (err) {
+        console.error('Permission preflight errored (continuing):', err);
+    }
     try {
         await runBackfill(client);
     } catch (err) {

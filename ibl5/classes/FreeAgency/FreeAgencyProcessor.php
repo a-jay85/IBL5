@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace FreeAgency;
 
+use FreeAgency\Contracts\FreeAgencyCapCalculatorFactoryInterface;
+use FreeAgency\Contracts\FreeAgencyEntityLoaderInterface;
 use FreeAgency\Contracts\FreeAgencyMarketDemandCalculatorInterface;
 use FreeAgency\Contracts\FreeAgencyProcessorInterface;
 use FreeAgency\Contracts\FreeAgencyRepositoryInterface;
@@ -17,7 +19,8 @@ use Discord\Discord;
  */
 class FreeAgencyProcessor implements FreeAgencyProcessorInterface
 {
-    private \mysqli $mysqli_db;
+    private FreeAgencyEntityLoaderInterface $entityLoader;
+    private FreeAgencyCapCalculatorFactoryInterface $capCalculatorFactory;
     private FreeAgencyMarketDemandCalculatorInterface $calculator;
     private FreeAgencyRepositoryInterface $repository;
     private Season $season;
@@ -34,16 +37,19 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         ?FreeAgencyMarketDemandCalculatorInterface $calculator = null,
         ?FreeAgencyRepositoryInterface $repository = null,
         ?\Psr\Log\LoggerInterface $logger = null,
-        ?Season $season = null
+        ?Season $season = null,
+        ?FreeAgencyEntityLoaderInterface $entityLoader = null,
+        ?FreeAgencyCapCalculatorFactoryInterface $capCalculatorFactory = null
     ) {
-        $this->mysqli_db = $mysqli_db;
         $this->season = $season ?? new Season($mysqli_db);
 
         $this->commonRepo = $commonRepo;
         $this->calculator = $calculator ?? new FreeAgencyMarketDemandCalculator(
-            new FreeAgencyDemandRepository($this->mysqli_db)
+            new FreeAgencyDemandRepository($mysqli_db)
         );
-        $this->repository = $repository ?? new FreeAgencyRepository($this->mysqli_db);
+        $this->repository = $repository ?? new FreeAgencyRepository($mysqli_db);
+        $this->entityLoader = $entityLoader ?? new FreeAgencyEntityLoader($mysqli_db);
+        $this->capCalculatorFactory = $capCalculatorFactory ?? new FreeAgencyCapCalculatorFactory($mysqli_db);
         $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('audit');
     }
 
@@ -58,10 +64,10 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         $playerID = is_numeric($rawPlayerID) ? (int) $rawPlayerID : 0;
 
         // Load player object
-        $player = \Player\Player::withPlayerID($this->mysqli_db, $playerID);
+        $player = $this->entityLoader->loadPlayer($playerID);
 
         // Load team object for validation
-        $team = Team::initialize($this->mysqli_db, $teamName);
+        $team = $this->entityLoader->loadTeam($teamName);
 
         // Check if player already signed
         if ($this->repository->isPlayerAlreadySigned($playerID)) {
@@ -133,7 +139,7 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         $maxContractYear1 = \ContractRules::getMaxContractSalary($player->getYearsOfExperience() ?? 0);
 
         // Reconstruct cap space data using provided team object
-        $capCalculator = new FreeAgencyCapCalculator($this->mysqli_db, $team, $this->season);
+        $capCalculator = $this->capCalculatorFactory->forTeam($team, $this->season);
         $capMetrics = $capCalculator->calculateTeamCapMetrics($player->getPlayerID());
 
         // calculateTeamCapMetrics() already excludes this player's existing offer,

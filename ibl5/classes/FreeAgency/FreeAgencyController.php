@@ -45,7 +45,13 @@ class FreeAgencyController
         $this->repository = new FreeAgencyRepository($db);
         $this->demandRepository = new FreeAgencyDemandRepository($db);
         $this->service = new FreeAgencyService($this->repository, $this->demandRepository, $db);
-        $this->view = new FreeAgencyView($commonRepository);
+        $tableRenderer = new FreeAgencyTableRendererView($commonRepository);
+        $this->view = new FreeAgencyView(
+            new FreeAgencyUnderContractSectionView($tableRenderer),
+            new FreeAgencyContractOffersSectionView($tableRenderer),
+            new FreeAgencyTeamFreeAgentsSectionView($tableRenderer),
+            new FreeAgencyOtherFreeAgentsSectionView($tableRenderer)
+        );
         $this->processor = new FreeAgencyProcessor($db, $commonRepository);
         $this->nukeCompat = $nukeCompat ?? new \Utilities\NukeCompat();
         $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('audit');

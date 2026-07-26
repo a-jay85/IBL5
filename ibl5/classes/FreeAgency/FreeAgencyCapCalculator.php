@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FreeAgency;
 
+use FreeAgency\Contracts\FreeAgencyCapCalculatorInterface;
 use League\League;
 use Player\Player;
 use Team\Contracts\TeamQueryRepositoryInterface;
@@ -15,7 +16,7 @@ use Trading\Contracts\BuyoutLedgerRepositoryInterface;
 /**
  * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
  */
-class FreeAgencyCapCalculator
+class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
 {
     private \mysqli $mysqli_db;
     private Team $team;

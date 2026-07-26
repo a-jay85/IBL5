@@ -47,13 +47,13 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 | Status | Count |
 |--------|------:|
-| ✅ Implemented | 229 |
-| ◑ Partial | 25 |
+| ✅ Implemented | 231 |
+| ◑ Partial | 24 |
 | 📋 Planned (plan queued / PR open) | 1 |
-| ⬜ Open | 66 |
+| ⬜ Open | 65 |
 | 🚫 Declined | 10 |
 
-> Status counts re-verified 2026-06-28 (exact, from the per-axis tables); **6.20 / 6.21 added 2026-06-29** from the PR #1107 review (⬜ Open +2); **6.22 added 2026-06-29** from the #1066 reject-IDOR review (⬜ Open +1). Two stale-Open rows were flipped directly (no plan owned them): **13.3**, **13.9** (✅ +2, ⬜ −2 vs the master re-count). **1.21–1.31 added 2026-07-24** from the hot-files comment→backlog migration (⬜ Open +11: 8 🟩 auto-mergeable, 3 🟨 conditional — 1.23/1.25/1.31 need characterization/endpoint pins). **Ground-truth audit 2026-07-24:** 7 stale-Open items flipped ✅, 2 false findings marked 🚫, 5 new Axis-1 rows seeded (1.32–1.36); IDOR PRs #1107–1110 merged 2026-06-29 (unblocking 2.10/2.13/2.14/2.25/7.7/14.6); PRs #1240/#1230/#1204 merged (2.6/2.31/2.32/5.18 already ✅/Open on own merits). **9.19 and 9.20 implemented 2026-07-24** — added READMEs to all 68 missing class dirs + frontmatter to all 16 existing class READMEs that lacked it; extended bin/check-docs IN_SCOPE_GLOBS (✅ +2, ⬜ −2); roll-up recomputed from grep (331 rows total, unchanged). **6.16 flipped ✅ 2026-07-24** (all Api data repos + JsonResponder + SystemClock tested; ✅ +1, ◑ −1). **6.14 Status updated 2026-07-24** (ProcessBoxscoresStep/GenerateSeasonAwardsStep/ParseJsbFilesStep added; still ◑). **Resolved rows collapsed 2026-07-25** — ✅/🚫 findings no longer appear as table rows; each axis carries a `> ✅ resolved (N): …` / `> 🚫 declined (N): …` summary line and their evidence lives in [archive/maintenance-backlog-archive.md](archive/maintenance-backlog-archive.md). **Recount recipe:** resolved = sum of the `(N)` in the per-axis summary lines; open = grep of the per-axis table rows; total = the two added. Counts above are unchanged by the collapse (238 + 93 = 331).
+> Status counts re-verified 2026-06-28 (exact, from the per-axis tables); **6.20 / 6.21 added 2026-06-29** from the PR #1107 review (⬜ Open +2); **6.22 added 2026-06-29** from the #1066 reject-IDOR review (⬜ Open +1). Two stale-Open rows were flipped directly (no plan owned them): **13.3**, **13.9** (✅ +2, ⬜ −2 vs the master re-count). **1.21–1.31 added 2026-07-24** from the hot-files comment→backlog migration (⬜ Open +11: 8 🟩 auto-mergeable, 3 🟨 conditional — 1.23/1.25/1.31 need characterization/endpoint pins). **Ground-truth audit 2026-07-24:** 7 stale-Open items flipped ✅, 2 false findings marked 🚫, 5 new Axis-1 rows seeded (1.32–1.36); IDOR PRs #1107–1110 merged 2026-06-29 (unblocking 2.10/2.13/2.14/2.25/7.7/14.6); PRs #1240/#1230/#1204 merged (2.6/2.31/2.32/5.18 already ✅/Open on own merits). **9.19 and 9.20 implemented 2026-07-24** — added READMEs to all 68 missing class dirs + frontmatter to all 16 existing class READMEs that lacked it; extended bin/check-docs IN_SCOPE_GLOBS (✅ +2, ⬜ −2); roll-up recomputed from grep (331 rows total, unchanged). **6.16 flipped ✅ 2026-07-24** (all Api data repos + JsonResponder + SystemClock tested; ✅ +1, ◑ −1). **6.14 Status updated 2026-07-24** (ProcessBoxscoresStep/GenerateSeasonAwardsStep/ParseJsbFilesStep added; still ◑). **Resolved rows collapsed 2026-07-25** — ✅/🚫 findings no longer appear as table rows; each axis carries a `> ✅ resolved (N): …` / `> 🚫 declined (N): …` summary line and their evidence lives in [archive/maintenance-backlog-archive.md](archive/maintenance-backlog-archive.md). **Recount recipe:** resolved = sum of the `(N)` in the per-axis summary lines; open = grep of the per-axis table rows; total = the two added. Counts above are unchanged by the collapse (238 + 93 = 331). **1.36 and 7.7 flipped ✅ 2026-07-26** (✅ +2, ⬜ −1, ◑ −1); total tracked rows unchanged at 331.
 
 **Automouse-readiness of the not-yet-complete (⬜/◑/📋) items:**
 
@@ -74,7 +74,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
-> ✅ resolved (19): 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 1.14, 1.15, 1.16, 1.17, 1.20, 1.34 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (20): 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 1.14, 1.15, 1.16, 1.17, 1.20, 1.34, 1.36 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
@@ -94,7 +94,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 1.32 | ⬜ Open | 🟩 | StandingsRepository 726 LOC — per-category standings query methods. Extract per-category query collaborators; green-green DB pin. Shares `classes/Standings/` with 1.35 — plan as ONE chunk. |
 | 1.33 | ⬜ Open | 🟩 | Player 671 LOC — typed-getter accumulation. Extract per-domain typed-getter groups (contract, stats, identity); green-green. |
 | 1.35 | ⬜ Open | 🟩 | StandingsView 610 LOC — per-division block renderers. Extract per-division renderer collaborators; golden-master pin. Shares `classes/Standings/` with 1.32 — plan as ONE chunk. |
-| 1.36 | ⬜ Open | 🟩 | FreeAgencyView 590 LOC — offer-table/form/decision-panel renderers. Extract per-section renderer collaborators; golden-master pin. |
 
 > **Note:** `BaseMysqliRepository.php` (602 LOC) is the 18th hot file but is tracked under **2.29** (global-namespace elimination sweep) and is not seeded as a standalone god-class item here.
 
@@ -223,14 +222,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Extract per-division renderer collaborators; golden-master pin. Plan together with 1.32 (StandingsRepository shares the same `classes/Standings/` module).
 **Est. effort:** M
 **Risk if untouched:** Every new standings display variant inflates the view.
-**Provenance:** Seeded 2026-07-24 — ground-truth audit hot-file scan.
-
-### 1.36 FreeAgencyView — Offer-Table / Form / Decision-Panel Renderers (590 LOC)
-**Location:** `ibl5/classes/FreeAgency/FreeAgencyView.php` (590 lines)
-**Problem:** One view renders the offer table, offer form, and decision panels for multiple free-agency page states in a single class.
-**Suggested direction:** Extract per-section renderer collaborators (offer-table, offer-form, decision-panel); golden-master pin.
-**Est. effort:** M
-**Risk if untouched:** Every free-agency UI change inflates the view; renderers can't be reused independently.
 **Provenance:** Seeded 2026-07-24 — ground-truth audit hot-file scan.
 
 ## Axis 2: Module Structure Inconsistency
@@ -571,12 +562,11 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
-> ✅ resolved (15): 7.1, 7.2, 7.3, 7.4, 7.5, 7.8, 7.9, 7.10, 7.12, 7.13, 7.14, 7.15, 7.16, 7.17, 7.18 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (16): 7.1, 7.2, 7.3, 7.4, 7.5, 7.7, 7.8, 7.9, 7.10, 7.12, 7.13, 7.14, 7.15, 7.16, 7.17, 7.18 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
 | 7.6 | ◑ Partial | 🟩 | `fetchAllInList()` exists, adopted by ~4 repos (8 file refs); remaining repos unmigrated. Mechanical migration, green-green. |
-| 7.7 | ◑ Partial | 🟩 | FreeAgencyView fixed (via 1.8); `FreeAgencyProcessor` still `private \mysqli $mysqli_db` at L20 (verified). DI refactor is behavior-preserving; IDOR PRs #1109 merged. |
 | 7.11 | ⬜ Open | 🟨 | Inconsistent caching decorators. Upfront decision: add `Cached*Repository` for SeasonHighs/FranchiseRecordBook/etc. vs document why page-cache suffices. |
 
 ### 7.6 IN-Clause Boilerplate Copy-Pasted Across 10 Repositories
@@ -586,14 +576,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Est. effort:** S
 **Risk if untouched:** Off-by-one risk; missing empty-array guards drift.
 **Status:** Partially completed (verified 2026-05-29 audit) — `BaseMysqliRepository::fetchAllInList()` helper exists and is adopted by LeagueControlPanel/SeasonArchive/Voting repos; remaining repos not yet migrated.
-
-### 7.7 `FreeAgencyView` and `FreeAgencyProcessor` Store Raw `\mysqli`
-**Location:** `ibl5/classes/FreeAgency/FreeAgencyView.php`, `FreeAgencyProcessor.php`
-**Problem:** Both hold `private \mysqli $mysqli_db`; instantiate `new CommonMysqliRepository(...)` on demand inside methods.
-**Suggested direction:** Constructor-inject `CommonMysqliRepository`; remove raw `$mysqli_db` property.
-**Est. effort:** S
-**Risk if untouched:** Per-render duplicate queries; blocks caching decorator.
-**Status:** Partial (verified 2026-06-20) — FreeAgencyView fixed (via 1.8 injection); `FreeAgencyProcessor` still holds `private \mysqli $mysqli_db` (L20). IDOR PR #1109 merged 2026-06-29; no sequencing blocker remains. DI refactor is behavior-preserving (🟩).
 
 ### 7.11 Inconsistent Caching Decorators
 **Location:** `PageCache::MODULE_TTLS` lists `SeasonHighs`, `FranchiseRecordBook`, `DraftHistory`, `AwardHistory`, `FranchiseHistory`

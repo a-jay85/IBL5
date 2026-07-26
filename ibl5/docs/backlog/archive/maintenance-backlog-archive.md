@@ -182,6 +182,15 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Provenance:** Seeded 2026-07-24 — ground-truth audit hot-file scan.
 **Status:** Implemented 2026-07-26 — `SlotAssignmentResolver` + `SlotAssignmentResolverInterface` extracted; `buildAllSnapshots()` delegates via `resolveSlotSettings()`. Slot resolution now lives in `ibl5/classes/SavedDepthChart/SlotAssignmentResolver.php` behind `Contracts/SlotAssignmentResolverInterface.php`, injected into `SavedDepthChartService` with a nullable default. Behavior byte-identical; pinned by `testBuildAllSnapshots*` characterization tests plus `ibl5/tests/SavedDepthChart/SlotAssignmentResolverTest.php`.
 
+### 1.36 FreeAgencyView — Offer-Table / Form / Decision-Panel Renderers (590 LOC)
+**Location:** `ibl5/classes/FreeAgency/FreeAgencyView.php` (590 lines)
+**Problem:** One view renders the offer table, offer form, and decision panels for multiple free-agency page states in a single class.
+**Suggested direction:** Extract per-section renderer collaborators (offer-table, offer-form, decision-panel); golden-master pin.
+**Est. effort:** M
+**Risk if untouched:** Every free-agency UI change inflates the view; renderers can't be reused independently.
+**Provenance:** Seeded 2026-07-24 — ground-truth audit hot-file scan.
+**Status (2026-07-26):** ✅ Implemented — branch `freeagency-1-36-7-7-extract-and-di`. Extracted `FreeAgencyTableRendererView` (7 shared helpers) and four section renderers behind `Contracts/` interfaces; `FreeAgencyView` reduced to a thin orchestrator (590 → 77 LOC). Behavior-preserving: 4 golden fixtures byte-identical.
+
 ## Axis 2: Module Structure Inconsistency
 
 ### 2.2 ActivityTracker / AllStarAppearances — No Service Layer
@@ -1042,6 +1051,15 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Status:** Completed (merged #1089, maintenance-39b) — `DatabaseCache` now extends `BaseMysqliRepository`; failure paths log instead of silently returning null.
 
 **Table evidence (2026-07-25):** DatabaseCache extends BaseMysqliRepository + logs (#1089).
+
+### 7.7 `FreeAgencyView` and `FreeAgencyProcessor` Store Raw `\mysqli`
+**Location:** `ibl5/classes/FreeAgency/FreeAgencyView.php`, `FreeAgencyProcessor.php`
+**Problem:** Both hold `private \mysqli $mysqli_db`; instantiate `new CommonMysqliRepository(...)` on demand inside methods.
+**Suggested direction:** Constructor-inject `CommonMysqliRepository`; remove raw `$mysqli_db` property.
+**Est. effort:** S
+**Risk if untouched:** Per-render duplicate queries; blocks caching decorator.
+**Status (2026-07-26):** ✅ Implemented — branch `freeagency-1-36-7-7-extract-and-di`. `private \mysqli $mysqli_db` removed from `FreeAgencyProcessor`; `\mysqli` is now constructor-local only, with `FreeAgencyEntityLoaderInterface` and `FreeAgencyCapCalculatorFactoryInterface` injected. `FreeAgencyView` was already fixed via 1.8.
+
 ### 7.8 `NegotiationRepository` Instantiates `CommonMysqliRepository` for a Single Lookup
 **Location:** `ibl5/classes/Negotiation/NegotiationRepository.php` lines 78-79
 **Problem:** Already extends `BaseMysqliRepository`, but news a second repo for `getTeamCapSpaceNextSeason()`.

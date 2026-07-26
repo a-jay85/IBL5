@@ -31,6 +31,7 @@ class FreeAgencyTableRendererViewTest extends TestCase
         return new FreeAgencyTableRendererView($this->stubRepo);
     }
 
+    /** @param array<string, mixed> $overrides */
     private function makePlayer(array $overrides = []): Player
     {
         $this->mockDb->setMockData([TestDataFactory::createPlayer($overrides)]);

@@ -50,6 +50,7 @@ class FreeAgencySectionViewTest extends TestCase
         $this->season = new Season($this->mockDb);
     }
 
+    /** @return array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>} */
     private function emptyCapMetrics(): array
     {
         return [

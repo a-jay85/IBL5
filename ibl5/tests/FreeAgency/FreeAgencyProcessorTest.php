@@ -502,7 +502,7 @@ class FreeAgencyProcessorTest extends TestCase
         $team = Team::initialize($this->mockDb, 'Test Team');
 
         /** @var FreeAgencyCapCalculatorInterface&\PHPUnit\Framework\MockObject\Stub $calcStub */
-        $calcStub = $this->createStub(FreeAgencyCapCalculatorInterface::class);
+        $calcStub = self::createStub(FreeAgencyCapCalculatorInterface::class);
         $calcStub->method('calculateTeamCapMetrics')->willReturn([
             'totalSalaries' => [0 => 8150],
             'softCapSpace'  => [0 => 100],
@@ -511,11 +511,11 @@ class FreeAgencyProcessorTest extends TestCase
         ]);
 
         /** @var FreeAgencyCapCalculatorFactoryInterface&\PHPUnit\Framework\MockObject\Stub $factoryStub */
-        $factoryStub = $this->createStub(FreeAgencyCapCalculatorFactoryInterface::class);
+        $factoryStub = self::createStub(FreeAgencyCapCalculatorFactoryInterface::class);
         $factoryStub->method('forTeam')->willReturn($calcStub);
 
         /** @var FreeAgencyEntityLoaderInterface&\PHPUnit\Framework\MockObject\Stub $loaderStub */
-        $loaderStub = $this->createStub(FreeAgencyEntityLoaderInterface::class);
+        $loaderStub = self::createStub(FreeAgencyEntityLoaderInterface::class);
         $loaderStub->method('loadPlayer')->willReturn($player);
         $loaderStub->method('loadTeam')->willReturn($team);
 
@@ -581,13 +581,13 @@ class FreeAgencyProcessorTest extends TestCase
         ]);
 
         /** @var FreeAgencyEntityLoaderInterface&\PHPUnit\Framework\MockObject\Stub $loaderStub */
-        $loaderStub = $this->createStub(FreeAgencyEntityLoaderInterface::class);
+        $loaderStub = self::createStub(FreeAgencyEntityLoaderInterface::class);
         $loaderStub->method('loadPlayer')->willReturn($player);
         $loaderStub->method('loadTeam')->willReturn($emptyTeam);
 
         // Stub the cap factory so the empty team's teamid=0 never reaches real DB queries.
         /** @var FreeAgencyCapCalculatorInterface&\PHPUnit\Framework\MockObject\Stub $calcStub */
-        $calcStub = $this->createStub(FreeAgencyCapCalculatorInterface::class);
+        $calcStub = self::createStub(FreeAgencyCapCalculatorInterface::class);
         $calcStub->method('calculateTeamCapMetrics')->willReturn([
             'totalSalaries' => [0 => 0],
             'softCapSpace'  => [0 => 5000],
@@ -596,7 +596,7 @@ class FreeAgencyProcessorTest extends TestCase
         ]);
 
         /** @var FreeAgencyCapCalculatorFactoryInterface&\PHPUnit\Framework\MockObject\Stub $factoryStub */
-        $factoryStub = $this->createStub(FreeAgencyCapCalculatorFactoryInterface::class);
+        $factoryStub = self::createStub(FreeAgencyCapCalculatorFactoryInterface::class);
         $factoryStub->method('forTeam')->willReturn($calcStub);
 
         $processor = new FreeAgencyProcessor(

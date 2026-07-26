@@ -18,12 +18,13 @@ class FreeAgencyCapCalculatorFactoryTest extends TestCase
         $factory = new FreeAgencyCapCalculatorFactory(new MockDatabase());
 
         /** @var Team&\PHPUnit\Framework\MockObject\Stub $team */
-        $team = $this->createStub(Team::class);
+        $team = self::createStub(Team::class);
         /** @var Season&\PHPUnit\Framework\MockObject\Stub $season */
-        $season = $this->createStub(Season::class);
+        $season = self::createStub(Season::class);
 
         $result = $factory->forTeam($team, $season);
 
+        // @phpstan-ignore-next-line (return type is the interface — asserting it is intentional contract test)
         $this->assertInstanceOf(FreeAgencyCapCalculatorInterface::class, $result);
     }
 
@@ -32,11 +33,11 @@ class FreeAgencyCapCalculatorFactoryTest extends TestCase
         $factory = new FreeAgencyCapCalculatorFactory(new MockDatabase());
 
         /** @var Team&\PHPUnit\Framework\MockObject\Stub $teamA */
-        $teamA = $this->createStub(Team::class);
+        $teamA = self::createStub(Team::class);
         /** @var Team&\PHPUnit\Framework\MockObject\Stub $teamB */
-        $teamB = $this->createStub(Team::class);
+        $teamB = self::createStub(Team::class);
         /** @var Season&\PHPUnit\Framework\MockObject\Stub $season */
-        $season = $this->createStub(Season::class);
+        $season = self::createStub(Season::class);
 
         $first  = $factory->forTeam($teamA, $season);
         $second = $factory->forTeam($teamB, $season);

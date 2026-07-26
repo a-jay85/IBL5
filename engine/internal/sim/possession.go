@@ -297,7 +297,7 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 		}
 
 		fm, sc := gs.lateGameForcing(scoreDiff, bh)
-		switch selectOutcome(in, fm, sc, false, gs.rng) {
+		switch selectOutcome(in, fm, sc, false, gs.freeze.SuppressW4Rescale, gs.rng) {
 		case outcome2pt:
 			if made, _ := gs.shotAttempt(offense, defense, bh, sv2, result.ShotTwoPoint, origin, periodIdx); !made {
 				gs.creditBlock(offense, defense, bh, def)

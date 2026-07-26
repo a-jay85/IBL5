@@ -88,6 +88,14 @@ type FreezeConfig struct {
 	// Production NEVER sets it; it consumes no Means (validate() must ignore it).
 	SuppressTransition3pt bool
 
+	// SuppressW4Rescale is an INVERTED-POLARITY escape hatch — zero value is the
+	// FAITHFUL default (the shot-clock foul-bucket rescale w4←w4·(w2/w1) IS applied,
+	// porting JSB 5.60 @0x4e1e93–0x4e1ebf). Set true ONLY to restore the pre-port
+	// baseline (no rescale; shot-clock 3pt share = w2/(w2+w4)) for A/B measurement.
+	// Proof: jsb-native/re-artifacts/jsb-J24-3pt-denom-RE-20260723.md. Production
+	// NEVER sets it; it consumes no Means (validate() must ignore it).
+	SuppressW4Rescale bool
+
 	// UnfaithfulOreb is an INVERTED-POLARITY escape hatch — zero value is NOT "live
 	// engine." Default false = the FAITHFUL JSB 5.60 offensive-rebound continuation
 	// (ADR-0058): gs.orebProb resolves the single determination roll via the sqrt

@@ -86,8 +86,20 @@ func allowedPaths(forcedMake, shotClock, stealPlay bool) []outcomeCode {
 
 // selectOutcome picks the shot path by weighted random over the allowed buckets,
 // then applies the independent turnover override (suppressed under forced_make).
-func selectOutcome(in outcomeInputs, forcedMake, shotClock, stealPlay bool, r *rng.RNG) outcomeCode {
+func selectOutcome(in outcomeInputs, forcedMake, shotClock, stealPlay, suppressW4Rescale bool, r *rng.RNG) outcomeCode {
 	allowed := allowedPaths(forcedMake, shotClock, stealPlay)
+
+	// JSB 5.60 @0x4e1e93–0x4e1ebf: in shot-clock mode the foul-only bucket is
+	// rescaled by the 3pt/2pt weight ratio BEFORE the weighted sum, making the
+	// effective 3pt share w1/(w1+w4) — independent of w2's magnitude.
+	// 5.60 gates only on (param_8 == 1 && w2 > 0); the `in.twoPtWeight > 0` term is a
+	// DELIBERATE Go divergence: twoPtBucketWeight can legitimately return 0
+	// (bucketweights.go, the d88 <= 0 early return), where x87 fdiv yields +Inf and the
+	// subsequent roll becomes NaN. See the plan's Architectural trade-offs.
+	// `in` is a value copy, so this mutation is local to this call.
+	if shotClock && !suppressW4Rescale && in.threePtWeight > 0 && in.twoPtWeight > 0 {
+		in.foulOnlyWeight *= in.threePtWeight / in.twoPtWeight
+	}
 
 	var total float64
 	for _, c := range allowed {

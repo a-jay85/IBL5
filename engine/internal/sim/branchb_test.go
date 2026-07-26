@@ -116,7 +116,7 @@ func TestBranchBShrink_OverShrinkClampedByWeight(t *testing.T) {
 		t.Errorf("weight() did not clamp negative 2pt to 0: %v", w)
 	}
 	// selectOutcome must not panic and must return a valid path (and-one survives).
-	got := selectOutcome(in, false, false, false, rng.New(1))
+	got := selectOutcome(in, false, false, false, false, rng.New(1))
 	if got != outcomeAndOne {
 		t.Errorf("with only and-one positive, expected outcomeAndOne, got %v", got)
 	}

@@ -31,9 +31,9 @@ class FreeAgencyViewTest extends TestCase
     protected function setUp(): void
     {
         $this->stubRepo = self::createStub(FreeAgencyRepositoryInterface::class);
-        $this->stubRepo->method('getAllPlayersExcludingTeam')->willReturn([]);
         $this->stubDemandRepo = self::createStub(FreeAgencyDemandRepositoryInterface::class);
         $this->stubCommonRepo = self::createStub(TeamIdentityRepositoryInterface::class);
+        $this->stubCommonRepo->method('getTeamnameFromTeamID')->willReturn('Other Team');
         $this->mockDb = new MockDatabase();
     }
 
@@ -85,7 +85,7 @@ class FreeAgencyViewTest extends TestCase
 
         $goldenPath = __DIR__ . '/fixtures/fa-under-contract.golden.html';
 
-        $this->assertStringEqualsFile($goldenPath, $html);
+        $this->assertGolden($goldenPath, $html);
     }
 
     /**
@@ -130,18 +130,95 @@ class FreeAgencyViewTest extends TestCase
         $this->assertStringNotContainsString('pa=rookieoption', $html);
     }
 
+    public function testContractOffersTableGoldenUnchanged(): void
+    {
+        $p301 = array_merge($this->getBasePlayerData(), ['pid' => 301, 'name' => 'Offer Player One', 'firstname' => 'Offer', 'lastname' => 'One']);
+        $p302 = array_merge($this->getBasePlayerData(), ['pid' => 302, 'name' => 'Offer Player Two', 'firstname' => 'Offer', 'lastname' => 'Two']);
+        $this->mockDb->onQuery('pid = 301', [$p301]);
+        $this->mockDb->onQuery('pid = 302', [$p302]);
+
+        $offerRows = [
+            ['pid' => 301, 'offer1' => 500, 'offer2' => 0, 'offer3' => 0, 'offer4' => 0, 'offer5' => 0, 'offer6' => 0],
+            ['pid' => 302, 'offer1' => 600, 'offer2' => 630, 'offer3' => 660, 'offer4' => 0, 'offer5' => 0, 'offer6' => 0],
+        ];
+
+        $mainPageData = $this->buildMainPageData([], $offerRows);
+        $view = new FreeAgencyView($this->stubCommonRepo);
+        $html = $view->render($mainPageData);
+
+        $this->assertGolden(__DIR__ . '/fixtures/fa-contract-offers.golden.html', $html);
+    }
+
+    public function testTeamFreeAgentsTableGoldenUnchanged(): void
+    {
+        $unsigned1 = $this->getBasePlayerData();
+        $unsigned1['pid'] = 401;
+        $unsigned1['name'] = 'Unsigned Free Agent One';
+        $unsigned1['cy'] = 0;
+        $unsigned1['salary_yr1'] = 0;
+
+        $unsigned2 = $this->getBasePlayerData();
+        $unsigned2['pid'] = 402;
+        $unsigned2['name'] = 'Unsigned Free Agent Two';
+        $unsigned2['cy'] = 0;
+        $unsigned2['salary_yr1'] = 0;
+
+        $mainPageData = $this->buildMainPageData([$unsigned1, $unsigned2]);
+        $view = new FreeAgencyView($this->stubCommonRepo);
+        $html = $view->render($mainPageData);
+
+        $this->assertGolden(__DIR__ . '/fixtures/fa-team-free-agents.golden.html', $html);
+    }
+
+    public function testOtherFreeAgentsTableGoldenUnchanged(): void
+    {
+        $other1 = $this->getBasePlayerData();
+        $other1['pid'] = 501;
+        $other1['name'] = 'Other FA Team Two';
+        $other1['teamid'] = 2;
+        $other1['teamname'] = 'Team Two';
+        $other1['cy'] = 0;
+        $other1['salary_yr1'] = 0;
+
+        $other2 = $this->getBasePlayerData();
+        $other2['pid'] = 502;
+        $other2['name'] = 'Other FA Team Three';
+        $other2['teamid'] = 3;
+        $other2['teamname'] = 'Team Three';
+        $other2['cy'] = 0;
+        $other2['salary_yr1'] = 0;
+
+        $freeAgentRow = $this->getBasePlayerData();
+        $freeAgentRow['pid'] = 503;
+        $freeAgentRow['name'] = 'True Free Agent';
+        $freeAgentRow['teamid'] = 0;
+        $freeAgentRow['teamname'] = '';
+        $freeAgentRow['cy'] = 0;
+        $freeAgentRow['salary_yr1'] = 0;
+
+        $mainPageData = $this->buildMainPageData([], [], [$other1, $other2, $freeAgentRow]);
+        $view = new FreeAgencyView($this->stubCommonRepo);
+        $html = $view->render($mainPageData);
+
+        $this->assertGolden(__DIR__ . '/fixtures/fa-other-free-agents.golden.html', $html);
+    }
+
     /**
      * Build a getMainPageData() result from raw player rows, exercising the
      * real Service partition + contract-action computation.
      *
      * @param list<array<string, mixed>> $rosterRows
+     * @param list<array<string, mixed>> $offerRows
+     * @param list<array<string, mixed>> $otherPlayerRows
      * @return array{capMetrics: array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>}, team: Team, season: \Season\Season, allOtherPlayers: list<Player>, teamColorsByTeamId: array<int, array{color1: string, color2: string}>, playersUnderContract: list<array{player: Player, contractAction: 'rookie_option'|'extension'|null}>, unsignedFreeAgents: list<Player>, offerPlayers: list<array{player: Player, offer: array<string, int>}>, cashPlayers: list<array{player: Player, label: string}>}
      */
-    private function buildMainPageData(array $rosterRows): array
+    private function buildMainPageData(array $rosterRows, array $offerRows = [], array $otherPlayerRows = []): array
     {
+        $this->stubRepo->method('getAllPlayersExcludingTeam')->willReturn($otherPlayerRows);
+
         $teamQueryRepo = self::createStub(TeamQueryRepositoryInterface::class);
         $teamQueryRepo->method('getRosterUnderContractOrderedByOrdinal')->willReturn($rosterRows);
-        $teamQueryRepo->method('getFreeAgencyOffers')->willReturn([]);
+        $teamQueryRepo->method('getFreeAgencyOffers')->willReturn($offerRows);
 
         $service = new FreeAgencyService(
             $this->stubRepo,
@@ -161,6 +238,20 @@ class FreeAgencyViewTest extends TestCase
         $season->endingYear = 2026;
 
         return $service->getMainPageData($team, $season);
+    }
+
+    /**
+     * Assert $html matches the golden at $path. When IBL_GOLDEN_CAPTURE=1 the
+     * golden is (re)written first, so a new pin is captured reproducibly
+     * instead of by hand-editing the test. CI never sets the variable, so the
+     * assertion is always a real comparison there.
+     */
+    private function assertGolden(string $path, string $html): void
+    {
+        if (getenv('IBL_GOLDEN_CAPTURE') === '1') {
+            file_put_contents($path, $html);
+        }
+        $this->assertStringEqualsFile($path, $html);
     }
 
     /**

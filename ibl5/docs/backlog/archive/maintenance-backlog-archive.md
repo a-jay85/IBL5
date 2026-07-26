@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed/declined maintenance-audit findings, extracted from maintenance-backlog.md.
-last_verified: 2026-07-25
+last_verified: 2026-07-26
 ---
 
 # Maintenance-Cost Reduction Backlog — Archive
@@ -172,6 +172,16 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 
 
 **Table evidence (2026-07-25):** SearchView 485 LOC string-concat. Extracted `renderResultList()` + ob_start migration; VR pin.
+
+### 1.34 SavedDepthChartService — Data Assembly + Slot-Conflict Resolution (626 LOC)
+**Location:** `ibl5/classes/SavedDepthChart/SavedDepthChartService.php` (626 lines)
+**Problem:** One service assembles depth-chart page data and resolves slot conflicts, mixing orchestration with conflict-resolution logic.
+**Suggested direction:** Extract a slot-resolution collaborator; keep the service as the page-data assembler.
+**Est. effort:** M
+**Risk if untouched:** Depth-chart conflict logic hidden inside a large service; green-green extraction.
+**Provenance:** Seeded 2026-07-24 — ground-truth audit hot-file scan.
+**Status:** Implemented 2026-07-26 — `SlotAssignmentResolver` + `SlotAssignmentResolverInterface` extracted; `buildAllSnapshots()` delegates via `resolveSlotSettings()`. Slot resolution now lives in `ibl5/classes/SavedDepthChart/SlotAssignmentResolver.php` behind `Contracts/SlotAssignmentResolverInterface.php`, injected into `SavedDepthChartService` with a nullable default. Behavior byte-identical; pinned by `testBuildAllSnapshots*` characterization tests plus `ibl5/tests/SavedDepthChart/SlotAssignmentResolverTest.php`.
+
 ## Axis 2: Module Structure Inconsistency
 
 ### 2.2 ActivityTracker / AllStarAppearances — No Service Layer

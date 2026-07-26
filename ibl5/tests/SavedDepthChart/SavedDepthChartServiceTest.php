@@ -226,6 +226,123 @@ class SavedDepthChartServiceTest extends WideUnitTestCase
         $this->assertQueryExecuted('ibl_saved_depth_charts');
     }
 
+    // ── buildAllSnapshots characterization (pins the slot-resolution seam) ──
+
+    /**
+     * Twelve depth-chart POST fields for one form slot, each a distinct value,
+     * so a mis-mapped key is visibly wrong rather than accidentally equal.
+     *
+     * NOTE the deliberate mixed casing: pg/sg/sf/pf/c/canPlayInGame/min are
+     * lowercase in the form; OF/DF/OI/DI/BH are UPPERCASE.
+     *
+     * @return array<string, int>
+     */
+    private function slotFields(int $slot, int $base): array
+    {
+        return [
+            'pg' . $slot => $base + 1,
+            'sg' . $slot => $base + 2,
+            'sf' . $slot => $base + 3,
+            'pf' . $slot => $base + 4,
+            'c' . $slot => $base + 5,
+            'canPlayInGame' . $slot => $base + 6,
+            'min' . $slot => $base + 7,
+            'OF' . $slot => $base + 8,
+            'DF' . $slot => $base + 9,
+            'OI' . $slot => $base + 10,
+            'DI' . $slot => $base + 11,
+            'BH' . $slot => $base + 12,
+        ];
+    }
+
+    /**
+     * Run saveOnSubmit through a mock repository and return the snapshot list
+     * that buildAllSnapshots() produced.
+     *
+     * @param list<array<string, mixed>> $rosterPlayers
+     * @param array<string, mixed> $postData
+     * @return list<array<string, mixed>>
+     */
+    private function captureSnapshots(array $rosterPlayers, array $postData): array
+    {
+        $captured = [];
+
+        $repo = self::createStub(SavedDepthChartRepositoryInterface::class);
+        $repo->method('getSavedDepthChartById')->willReturn([
+            'id' => 5, 'teamid' => 1, 'username' => 'testuser', 'name' => 'My DC',
+            'phase' => 'Regular Season', 'season_year' => 2024,
+            'sim_start_date' => '2024-01-01', 'sim_end_date' => null,
+            'sim_number_start' => 1, 'sim_number_end' => null,
+            'is_active' => 1, 'created_at' => '2024-01-01 00:00:00',
+            'updated_at' => '2024-01-01 00:00:00',
+        ]);
+        $repo->method('updateDepthChartPlayers')
+            ->willReturnCallback(function (int $id, array $snapshots) use (&$captured): void {
+                $captured = $snapshots;
+            });
+
+        $service = new SavedDepthChartService($this->mockDb, $repo);
+        $season = new Season($this->mockDb);
+        $service->saveOnSubmit(1, 'testuser', 'My DC', $rosterPlayers, $postData, 5, $season);
+
+        return $captured;
+    }
+
+    public function testBuildAllSnapshotsMapsEveryPostFieldToItsColumn(): void
+    {
+        $snapshots = $this->captureSnapshots(
+            [['pid' => 500, 'name' => 'Alice']],
+            ['pid1' => 500] + $this->slotFields(1, 100)
+        );
+
+        $this->assertCount(1, $snapshots);
+        $this->assertSame([
+            'pid' => 500,
+            'player_name' => 'Alice',
+            'ordinal' => 1,
+            'dc_pg_depth' => 101,
+            'dc_sg_depth' => 102,
+            'dc_sf_depth' => 103,
+            'dc_pf_depth' => 104,
+            'dc_c_depth' => 105,
+            'dc_can_play_in_game' => 106,
+            'dc_minutes' => 107,
+            'dc_of' => 108,
+            'dc_df' => 109,
+            'dc_oi' => 110,
+            'dc_di' => 111,
+            'dc_bh' => 112,
+        ], $snapshots[0]);
+    }
+
+    public function testBuildAllSnapshotsAdvancesOrdinalPastASkippedPlayer(): void
+    {
+        // Player 1 matches nothing (no pid1, no Name1) → skipped, but must still
+        // consume ordinal 1 so player 2 is recorded at ordinal 2.
+        $snapshots = $this->captureSnapshots(
+            [
+                ['pid' => 111, 'name' => 'Skipped'],
+                ['pid' => 222, 'name' => 'Matched'],
+            ],
+            ['pid2' => 222] + $this->slotFields(2, 200)
+        );
+
+        $this->assertCount(1, $snapshots);
+        $this->assertSame(222, $snapshots[0]['pid']);
+        $this->assertSame(2, $snapshots[0]['ordinal']);
+        $this->assertSame(201, $snapshots[0]['dc_pg_depth']);
+    }
+
+    public function testBuildAllSnapshotsProducesNoRowsWhenPostDataIsEmpty(): void
+    {
+        $snapshots = $this->captureSnapshots(
+            [['pid' => 999, 'name' => 'Nobody']],
+            []
+        );
+
+        $this->assertSame([], $snapshots);
+    }
+
     public function testSaveOnSubmitReusesUnusedMostRecentDc(): void
     {
         // loadedDcId = 0, so skip first branch

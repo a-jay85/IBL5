@@ -538,11 +538,9 @@ type Options struct {
 	// work. See tempo.go and ADR-0085.
 	BaseTimeMid *float64
 
-	// StealTurnoverScale / NonStealTurnoverScale override the package consts
-	// stealTurnoverScale / nonStealTurnoverScale (steal.go) for the J14 research
-	// turnover-scale sweep. nil → use the const (a zero Options stays byte-identical
-	// to Simulate); non-nil → use the pointed-to value. Always a valid float when set.
-	StealTurnoverScale    *float64
+	// NonStealTurnoverScale overrides the package const nonStealTurnoverScale (steal.go)
+	// for the J14 research turnover-scale sweep. nil → use the const (a zero Options stays
+	// byte-identical to Simulate); non-nil → use the pointed-to value. Always a valid float when set.
 	NonStealTurnoverScale *float64
 
 	// GateCont, when non-nil, harvests the L1 gate-1 decomposition instrument
@@ -660,14 +658,13 @@ func (gs *gameState) accumulateGateCont(offTeamID int, off, def float64) {
 }
 
 // turnoverProb returns the per-possession steal-driven turnover probability from
-// offensive carelessness × defensive steal pressure (steal.go), scaled by
-// stealTurnoverScale and clamped to [0, maxTurnoverProb]. Frozen (TVR arm) → the
-// league-mean probability, making the turnover rate league-uniform so the freeze
-// lattice can measure how collapsing the STL→steal→fast-break coupling moves
+// teamOffTOVShare (teamquality.go), clamped to [0, maxTurnoverProb]. Frozen
+// (TVR arm) → the league-mean probability, making the turnover rate league-uniform
+// so the freeze lattice can measure how collapsing the TOV-share coupling moves
 // Cov(lnFGA,lnPPS) (the ADR-0045 Cov re-run). The caller draws its gs.rng.Float64()
 // roll unconditionally, so live and frozen passes consume the RNG identically.
-func (gs *gameState) turnoverProb(careless, pressure float64) float64 {
-	p := gs.stealTurnoverScale * careless * pressure
+func (gs *gameState) turnoverProb(share float64) float64 {
+	p := share
 	if p < 0 {
 		p = 0
 	}

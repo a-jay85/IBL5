@@ -15,14 +15,6 @@ import (
 // steal IS the turnover: the victim keeps the GameTOV and the credited defender
 // gets the GameSTL.
 const (
-	// stealTurnoverScale converts carelessness × steal-pressure into a
-	// per-possession steal-driven turnover probability. Recalibrated from
-	// 2.75e-5 (which targeted total TOs ≈14.5/team) to target steal-only rate
-	// STL ≈ 8.9/team (17.8/g both teams); archive gate: 17.8±0.7/g.
-	// Starting value ≈ 1.69e-5 (≈ 2.75e-5 × 8.9/14.5); tune via the
-	// ending-mix archive test (Phase 8).
-	stealTurnoverScale = 1.69e-5
-
 	// nonStealTurnoverScale is the per-possession independent (non-steal)
 	// turnover probability constant, driven by offensive carelessness only
 	// (no defensive steal-pressure factor — there is no stealer).
@@ -55,21 +47,6 @@ func turnoverCarelessness(tvr int) float64 {
 	return c
 }
 
-// teamStealPressure is the defense's aggregate steal pressure: Σ over defenders of
-// STL × fatigue (the JSB param×1.5 cap side). Higher-STL defenses force more
-// turnovers — the defensive-quality coupling the ADR-0042 audit found missing.
-// Zero when every defender is unrated (→ no steal-driven turnover and no
-// divide-by-zero downstream). fatigue is 1.0 under the current curve.
-func teamStealPressure(defense *teamState) float64 {
-	var p float64
-	for _, d := range defense.players {
-		if w := float64(d.STL) * d.fatigue; w > 0 {
-			p += w
-		}
-	}
-	return p
-}
-
 // stealTurnover rolls the dominant, steal-driven turnover for one trip. On a steal
 // it emits EventTurnover (the victim keeps GameTOV), runs the per-turnover injury
 // check, credits a defender via selectStealer (EventSteal → the stealer's GameSTL),
@@ -79,7 +56,7 @@ func teamStealPressure(defense *teamState) float64 {
 // gs.rng.Float64() roll is drawn unconditionally so live and frozen passes consume
 // the RNG identically.
 func (gs *gameState) stealTurnover(offense, defense *teamState, victim onCourt) bool {
-	prob := gs.turnoverProb(turnoverCarelessness(victim.TVR), teamStealPressure(defense))
+	prob := gs.turnoverProb(teamOffTOVShare(offense.players))
 	if gs.rng.Float64() >= prob {
 		return false
 	}

@@ -6,7 +6,7 @@ package calibrate
 // default-DENY / safe-by-omission (ADR-0087 §2): only explicitly registered
 // stand-ins are swept; everything else is pinned by its package const.
 type StandIn struct {
-	ID            string                      // stable key, e.g. "steal_turnover_scale"
+	ID            string                      // stable key, e.g. "base_time_mid"
 	Term          string                      // fidelity term it is hypothesized to move
 	Justification string                      // REQUIRED non-empty (ADR-0087 §2): why perturbable
 	Sweep         []float64                   // candidate values (baseline first)
@@ -23,18 +23,6 @@ type StandIn struct {
 func StandInRegistry() []StandIn {
 	ptr := func(v float64) *float64 { return &v }
 	return []StandIn{
-		{
-			ID:   "steal_turnover_scale",
-			Term: "steal_share",
-			Justification: "stealTurnoverScale (steal.go) is the dominant per-possession steal " +
-				"probability coefficient. Calibrated from the J3 corpus target (8.9 steals/team " +
-				"→ 1.69e-5) but plausibly off by ±15%: the archive gate is 17.8±0.7/g (both " +
-				"teams) and the ending-mix steal-share gate is [8.0%, 9.0%]. Perturbable as a " +
-				"research lever — the harness can quantify how much this scale moves the steal " +
-				"ending-share and the TO-rate fidelity terms without re-running the full calibration.",
-			Sweep: []float64{1.69e-5, 1.5e-5, 1.85e-5},
-			Apply: func(o *Options, v float64) { o.StealTurnoverScale = ptr(v) },
-		},
 		{
 			ID:   "non_steal_turnover_scale",
 			Term: "non_steal_to_share",

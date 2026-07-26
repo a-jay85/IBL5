@@ -143,3 +143,26 @@ func offQualityWithHCA(offense []onCourt, hca float64) float64 {
 	}
 	return total
 }
+
+// leagueFGA48: real NBA FGA/player/48 min (J7 shot-rate anchor; ~85 FGA/game / 5 slots).
+const leagueFGA48 = 17.16
+
+func fgaRate48(p onCourt) float64 {
+	if p.RealLifeMIN > 0 {
+		return float64(p.RealLifeFGA) / float64(p.RealLifeMIN) * 48.0
+	}
+	return floor1(p.FGA) / ratingRefScale * leagueFGA48
+}
+
+// teamOffTOVShare returns TVR_rate/(shot_rate+TVR_rate) — J7 5.60 mechanism.
+func teamOffTOVShare(offense []onCourt) float64 {
+	var tov, shot float64
+	for _, p := range offense {
+		tov += tovRate(p) * p.fatigue
+		shot += fgaRate48(p) * p.fatigue
+	}
+	if shot+tov == 0 {
+		return 0
+	}
+	return tov / (shot + tov)
+}

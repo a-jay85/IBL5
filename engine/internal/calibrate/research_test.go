@@ -145,19 +145,19 @@ func TestResearchWalk_ZeroDelta(t *testing.T) {
 			"steal_share":            0.0850,
 			"non_steal_to_share":     0.049,
 		}
-		// base2: tiny steal_share nudge → noise floor steal_share = 0.0001.
+		// base2: tiny non_steal_to_share nudge → noise floor non_steal_to_share = 0.0001.
 		base2 := map[string]float64{
 			"cov_poss_pps":           0.010,
 			"cov_shots_per_poss_pps": -0.005,
 			"steal_share":            0.0851,
-			"non_steal_to_share":     0.049,
+			"non_steal_to_share":     0.0491,
 		}
-		// sweepResult: large steal_share delta (0.005) >> noise floor (0.0001).
+		// sweepResult: large non_steal_to_share delta (0.005) >> noise floor (0.0001).
 		sweepResult := map[string]float64{
 			"cov_poss_pps":           0.010,
 			"cov_shots_per_poss_pps": -0.005,
 			"steal_share":            0.0900,
-			"non_steal_to_share":     0.049,
+			"non_steal_to_share":     0.054,
 		}
 
 		// call counts the number of walkFn invocations so we can distinguish the
@@ -174,7 +174,7 @@ func TestResearchWalk_ZeroDelta(t *testing.T) {
 			// Sweep call: check whether the apply closure set StealTurnoverScale.
 			probe := o
 			apply(&probe)
-			if probe.StealTurnoverScale != nil {
+			if probe.NonStealTurnoverScale != nil {
 				return copyTermMap(sweepResult), nil
 			}
 			return copyTermMap(base1), nil // all other sweeps → no change from baseline
@@ -185,22 +185,22 @@ func TestResearchWalk_ZeroDelta(t *testing.T) {
 			t.Fatalf("runResearch: %v", err)
 		}
 
-		// Noise floor for steal_share must equal |base2 − base1|.
-		wantNF := math.Abs(base2["steal_share"] - base1["steal_share"])
-		if got := rep.NoiseFloor["steal_share"]; math.Abs(got-wantNF) > 1e-15 {
-			t.Errorf("NoiseFloor[steal_share] = %v, want %v", got, wantNF)
+		// Noise floor for non_steal_to_share must equal |base2 − base1|.
+		wantNF := math.Abs(base2["non_steal_to_share"] - base1["non_steal_to_share"])
+		if got := rep.NoiseFloor["non_steal_to_share"]; math.Abs(got-wantNF) > 1e-15 {
+			t.Errorf("NoiseFloor[non_steal_to_share] = %v, want %v", got, wantNF)
 		}
 
-		// At least one steal_turnover_scale × steal_share point must be AboveNoise.
+		// At least one non_steal_turnover_scale × non_steal_to_share point must be AboveNoise.
 		foundAbove := false
 		for _, p := range rep.Points {
-			if p.StandInID == "steal_turnover_scale" && p.Term == "steal_share" && p.AboveNoise {
+			if p.StandInID == "non_steal_turnover_scale" && p.Term == "non_steal_to_share" && p.AboveNoise {
 				foundAbove = true
 				break
 			}
 		}
 		if !foundAbove {
-			t.Error("want at least one steal_turnover_scale × steal_share LeveragePoint with AboveNoise = true")
+			t.Error("want at least one non_steal_turnover_scale × non_steal_to_share LeveragePoint with AboveNoise = true")
 		}
 	})
 }

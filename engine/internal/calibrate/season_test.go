@@ -107,7 +107,7 @@ func TestValidateWithArms_BaseTimeMid(t *testing.T) {
 	})
 }
 
-// TestValidateWithArms_TurnoverScale (J14): StealTurnoverScale / NonStealTurnoverScale
+// TestValidateWithArms_TurnoverScale (J14): NonStealTurnoverScale
 // are propagated onto the base sim.Options by validateWithArms (row 6 of J14 matrix).
 // A non-nil pointer must arrive intact; a nil pointer must stay nil (const path).
 func TestValidateWithArms_TurnoverScale(t *testing.T) {
@@ -119,26 +119,6 @@ func TestValidateWithArms_TurnoverScale(t *testing.T) {
 	}
 	ptr := func(f float64) *float64 { return &f }
 
-	t.Run("set pointer reaches base (steal)", func(t *testing.T) {
-		var got sim.Options
-		fn := validateWithArms(Options{StealTurnoverScale: ptr(1.5e-5)}, capture(&got))
-		if _, err := fn("dir", 5, 99, bundle.GameTypeRegular); err != nil {
-			t.Fatalf("fn: %v", err)
-		}
-		if got.StealTurnoverScale == nil || *got.StealTurnoverScale != 1.5e-5 {
-			t.Fatalf("StealTurnoverScale=%v, want *1.5e-5", got.StealTurnoverScale)
-		}
-	})
-	t.Run("nil stays nil (steal const path)", func(t *testing.T) {
-		var got sim.Options
-		fn := validateWithArms(Options{}, capture(&got))
-		if _, err := fn("dir", 5, 99, bundle.GameTypeRegular); err != nil {
-			t.Fatalf("fn: %v", err)
-		}
-		if got.StealTurnoverScale != nil {
-			t.Fatalf("StealTurnoverScale=%v, want nil", got.StealTurnoverScale)
-		}
-	})
 	t.Run("set pointer reaches base (non-steal)", func(t *testing.T) {
 		var got sim.Options
 		fn := validateWithArms(Options{NonStealTurnoverScale: ptr(0.002)}, capture(&got))

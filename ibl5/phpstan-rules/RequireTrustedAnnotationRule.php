@@ -10,6 +10,7 @@ use PhpParser\Node\Expr\Cast\Bool_ as BoolCast;
 use PhpParser\Node\Expr\Cast\Double as DoubleCast;
 use PhpParser\Node\Expr\Cast\Int_ as IntCast;
 use PhpParser\Node\Expr\MethodCall;
+use PhpParser\Node\Expr\PropertyFetch;
 use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Identifier;
@@ -118,9 +119,16 @@ final class RequireTrustedAnnotationRule implements Rule
             return true;
         }
 
-        // $this->...() calls are trusted-by-construction render helpers
+        // $this->...() and $this->property->...() calls are trusted-by-construction render helpers
         if ($expr instanceof MethodCall) {
             if ($expr->var instanceof Variable && $expr->var->name === 'this') {
+                return true;
+            }
+            // $this->injectedCollaborator->method() — one property hop from $this
+            if ($expr->var instanceof PropertyFetch
+                && $expr->var->var instanceof Variable
+                && $expr->var->var->name === 'this'
+            ) {
                 return true;
             }
             return false;

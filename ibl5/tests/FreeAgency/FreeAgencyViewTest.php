@@ -6,7 +6,12 @@ namespace Tests\FreeAgency;
 
 use FreeAgency\Contracts\FreeAgencyDemandRepositoryInterface;
 use FreeAgency\Contracts\FreeAgencyRepositoryInterface;
+use FreeAgency\FreeAgencyContractOffersSectionView;
+use FreeAgency\FreeAgencyOtherFreeAgentsSectionView;
 use FreeAgency\FreeAgencyService;
+use FreeAgency\FreeAgencyTableRendererView;
+use FreeAgency\FreeAgencyTeamFreeAgentsSectionView;
+use FreeAgency\FreeAgencyUnderContractSectionView;
 use FreeAgency\FreeAgencyView;
 use PHPUnit\Framework\TestCase;
 use Player\Player;
@@ -80,7 +85,7 @@ class FreeAgencyViewTest extends TestCase
         $neither['salary_yr6'] = 0;
 
         $mainPageData = $this->buildMainPageData([$rookie, $neither]);
-        $view = new FreeAgencyView($this->stubCommonRepo);
+        $view = $this->makeView();
         $html = $view->render($mainPageData);
 
         $goldenPath = __DIR__ . '/fixtures/fa-under-contract.golden.html';
@@ -120,7 +125,7 @@ class FreeAgencyViewTest extends TestCase
             ['player' => $player, 'contractAction' => 'extension'],
         ];
 
-        $view = new FreeAgencyView($this->stubCommonRepo);
+        $view = $this->makeView();
         $html = $view->render($mainPageData);
 
         $this->assertStringContainsString(
@@ -143,7 +148,7 @@ class FreeAgencyViewTest extends TestCase
         ];
 
         $mainPageData = $this->buildMainPageData([], $offerRows);
-        $view = new FreeAgencyView($this->stubCommonRepo);
+        $view = $this->makeView();
         $html = $view->render($mainPageData);
 
         $this->assertGolden(__DIR__ . '/fixtures/fa-contract-offers.golden.html', $html);
@@ -164,7 +169,7 @@ class FreeAgencyViewTest extends TestCase
         $unsigned2['salary_yr1'] = 0;
 
         $mainPageData = $this->buildMainPageData([$unsigned1, $unsigned2]);
-        $view = new FreeAgencyView($this->stubCommonRepo);
+        $view = $this->makeView();
         $html = $view->render($mainPageData);
 
         $this->assertGolden(__DIR__ . '/fixtures/fa-team-free-agents.golden.html', $html);
@@ -197,7 +202,7 @@ class FreeAgencyViewTest extends TestCase
         $freeAgentRow['salary_yr1'] = 0;
 
         $mainPageData = $this->buildMainPageData([], [], [$other1, $other2, $freeAgentRow]);
-        $view = new FreeAgencyView($this->stubCommonRepo);
+        $view = $this->makeView();
         $html = $view->render($mainPageData);
 
         $this->assertGolden(__DIR__ . '/fixtures/fa-other-free-agents.golden.html', $html);
@@ -252,6 +257,35 @@ class FreeAgencyViewTest extends TestCase
             file_put_contents($path, $html);
         }
         $this->assertStringEqualsFile($path, $html);
+    }
+
+    public function testResultCodeRendersAlert(): void
+    {
+        $mainPageData = $this->buildMainPageData([]);
+        $view = $this->makeView();
+
+        // 'csrf_error' maps to ibl-alert--error
+        $html = $view->render($mainPageData, 'csrf_error');
+        $this->assertStringContainsString('ibl-alert--error', $html);
+
+        // Unknown code renders no alert
+        $html = $view->render($mainPageData, 'not_a_code');
+        $this->assertStringNotContainsString('ibl-alert', $html);
+
+        // null renders no alert
+        $html = $view->render($mainPageData, null);
+        $this->assertStringNotContainsString('ibl-alert', $html);
+    }
+
+    private function makeView(): FreeAgencyView
+    {
+        $tableRenderer = new FreeAgencyTableRendererView($this->stubCommonRepo);
+        return new FreeAgencyView(
+            new FreeAgencyUnderContractSectionView($tableRenderer),
+            new FreeAgencyContractOffersSectionView($tableRenderer),
+            new FreeAgencyTeamFreeAgentsSectionView($tableRenderer),
+            new FreeAgencyOtherFreeAgentsSectionView($tableRenderer)
+        );
     }
 
     /**

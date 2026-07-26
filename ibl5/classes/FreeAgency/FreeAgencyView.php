@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace FreeAgency;
 
-use FreeAgency\Contracts\FreeAgencyTableRendererInterface;
 use FreeAgency\Contracts\FreeAgencyUnderContractSectionViewInterface;
 use FreeAgency\Contracts\FreeAgencyContractOffersSectionViewInterface;
 use FreeAgency\Contracts\FreeAgencyTeamFreeAgentsSectionViewInterface;
@@ -13,7 +12,6 @@ use Player\Player;
 use Security\HtmlSanitizer;
 use Team\Team;
 use Season\Season;
-use Repositories\Contracts\TeamIdentityRepositoryInterface;
 
 /**
  * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
@@ -21,25 +19,21 @@ use Repositories\Contracts\TeamIdentityRepositoryInterface;
  */
 class FreeAgencyView
 {
-    private FreeAgencyTableRendererInterface $tableRenderer;
     private FreeAgencyUnderContractSectionViewInterface $underContractSection;
     private FreeAgencyContractOffersSectionViewInterface $offersSection;
     private FreeAgencyTeamFreeAgentsSectionViewInterface $teamFaSection;
     private FreeAgencyOtherFreeAgentsSectionViewInterface $otherFaSection;
 
     public function __construct(
-        TeamIdentityRepositoryInterface $commonRepo,
-        ?FreeAgencyTableRendererInterface $tableRenderer = null,
-        ?FreeAgencyUnderContractSectionViewInterface $underContractSection = null,
-        ?FreeAgencyContractOffersSectionViewInterface $offersSection = null,
-        ?FreeAgencyTeamFreeAgentsSectionViewInterface $teamFaSection = null,
-        ?FreeAgencyOtherFreeAgentsSectionViewInterface $otherFaSection = null
+        FreeAgencyUnderContractSectionViewInterface $underContractSection,
+        FreeAgencyContractOffersSectionViewInterface $offersSection,
+        FreeAgencyTeamFreeAgentsSectionViewInterface $teamFaSection,
+        FreeAgencyOtherFreeAgentsSectionViewInterface $otherFaSection
     ) {
-        $this->tableRenderer = $tableRenderer ?? new FreeAgencyTableRendererView($commonRepo);
-        $this->underContractSection = $underContractSection ?? new FreeAgencyUnderContractSectionView($this->tableRenderer);
-        $this->offersSection = $offersSection ?? new FreeAgencyContractOffersSectionView($this->tableRenderer);
-        $this->teamFaSection = $teamFaSection ?? new FreeAgencyTeamFreeAgentsSectionView($this->tableRenderer);
-        $this->otherFaSection = $otherFaSection ?? new FreeAgencyOtherFreeAgentsSectionView($this->tableRenderer);
+        $this->underContractSection = $underContractSection;
+        $this->offersSection = $offersSection;
+        $this->teamFaSection = $teamFaSection;
+        $this->otherFaSection = $otherFaSection;
     }
 
     /**

@@ -18,6 +18,8 @@ This document catalogues areas of the IBL5 codebase where investment would reduc
 **Risk if untouched:** what bug or cost this enables
 ```
 
+**Resolved findings** (✅ Implemented / 🚫 Declined) are **not** kept as table rows: their id joins the axis's `> ✅ resolved (N): …` summary line and their evidence prose moves verbatim into the sibling archive. Only ⬜ / ◑ / 📋 rows live in the per-axis tables — enforced by `bin/check-docs` (see Phase 8's `checkMaintenanceResolved`).
+
 Effort scale:
 - **S** — single PR, < 1 day, no cross-module sweep
 - **M** — multi-step plan, 1-3 days, may touch several modules
@@ -51,7 +53,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | ⬜ Open | 67 |
 | 🚫 Declined | 10 |
 
-> Status counts re-verified 2026-06-28 (exact, from the per-axis tables); **6.20 / 6.21 added 2026-06-29** from the PR #1107 review (⬜ Open +2); **6.22 added 2026-06-29** from the #1066 reject-IDOR review (⬜ Open +1). Two stale-Open rows were flipped directly (no plan owned them): **13.3**, **13.9** (✅ +2, ⬜ −2 vs the master re-count). **1.21–1.31 added 2026-07-24** from the hot-files comment→backlog migration (⬜ Open +11: 8 🟩 auto-mergeable, 3 🟨 conditional — 1.23/1.25/1.31 need characterization/endpoint pins). **Ground-truth audit 2026-07-24:** 7 stale-Open items flipped ✅, 2 false findings marked 🚫, 5 new Axis-1 rows seeded (1.32–1.36); IDOR PRs #1107–1110 merged 2026-06-29 (unblocking 2.10/2.13/2.14/2.25/7.7/14.6); PRs #1240/#1230/#1204 merged (2.6/2.31/2.32/5.18 already ✅/Open on own merits). **9.19 and 9.20 implemented 2026-07-24** — added READMEs to all 68 missing class dirs + frontmatter to all 16 existing class READMEs that lacked it; extended bin/check-docs IN_SCOPE_GLOBS (✅ +2, ⬜ −2); roll-up recomputed from grep (331 rows total, unchanged). **6.16 flipped ✅ 2026-07-24** (all Api data repos + JsonResponder + SystemClock tested; ✅ +1, ◑ −1). **6.14 Status updated 2026-07-24** (ProcessBoxscoresStep/GenerateSeasonAwardsStep/ParseJsbFilesStep added; still ◑).
+> Status counts re-verified 2026-06-28 (exact, from the per-axis tables); **6.20 / 6.21 added 2026-06-29** from the PR #1107 review (⬜ Open +2); **6.22 added 2026-06-29** from the #1066 reject-IDOR review (⬜ Open +1). Two stale-Open rows were flipped directly (no plan owned them): **13.3**, **13.9** (✅ +2, ⬜ −2 vs the master re-count). **1.21–1.31 added 2026-07-24** from the hot-files comment→backlog migration (⬜ Open +11: 8 🟩 auto-mergeable, 3 🟨 conditional — 1.23/1.25/1.31 need characterization/endpoint pins). **Ground-truth audit 2026-07-24:** 7 stale-Open items flipped ✅, 2 false findings marked 🚫, 5 new Axis-1 rows seeded (1.32–1.36); IDOR PRs #1107–1110 merged 2026-06-29 (unblocking 2.10/2.13/2.14/2.25/7.7/14.6); PRs #1240/#1230/#1204 merged (2.6/2.31/2.32/5.18 already ✅/Open on own merits). **9.19 and 9.20 implemented 2026-07-24** — added READMEs to all 68 missing class dirs + frontmatter to all 16 existing class READMEs that lacked it; extended bin/check-docs IN_SCOPE_GLOBS (✅ +2, ⬜ −2); roll-up recomputed from grep (331 rows total, unchanged). **6.16 flipped ✅ 2026-07-24** (all Api data repos + JsonResponder + SystemClock tested; ✅ +1, ◑ −1). **6.14 Status updated 2026-07-24** (ProcessBoxscoresStep/GenerateSeasonAwardsStep/ParseJsbFilesStep added; still ◑). **Resolved rows collapsed 2026-07-25** — ✅/🚫 findings no longer appear as table rows; each axis carries a `> ✅ resolved (N): …` / `> 🚫 declined (N): …` summary line and their evidence lives in [archive/maintenance-backlog-archive.md](archive/maintenance-backlog-archive.md). **Recount recipe:** resolved = sum of the `(N)` in the per-axis summary lines; open = grep of the per-axis table rows; total = the two added. Counts above are unchanged by the collapse (238 + 93 = 331).
 
 **Automouse-readiness of the not-yet-complete (⬜/◑/📋) items:**
 
@@ -72,28 +74,12 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
+> ✅ resolved (18): 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 1.14, 1.15, 1.16, 1.17, 1.20 — evidence in [archive](archive/maintenance-backlog-archive.md)
+
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| 1.1 | ✅ Implemented | — | `RecordFormatter` collaborator extracted (#1167, merged 2026-06-21); stubs/cache narrowed earlier (−39 LOC). Service ~687 LOC = residual typed-getter/query bulk, not this finding's concern. |
-| 1.2 | ✅ Implemented | — | `StreakCalculator` exists (#1040); HEAT CTE → `vw_heat_champions` (migration 149, #1090). Repo still 823 LOC = separate cohesive batch-query concern, not this finding. |
-| 1.3 | ✅ Implemented | 🟩 | `AnnouncementDispatcherInterface` injected (defaulted to `DiscordAnnouncementDispatcher`); dispatch loop now isolates per-message failures; `NullAnnouncementDispatcher` for dry-run/tests. Green-green + 1 tested resilience delta. |
-| 1.4 | ✅ Implemented | — | `JsbImportService` now 177-LOC facade + 10 `Importers/` (#801). |
-| 1.5 | ✅ Implemented | — | #1148 — 3 collaborators extracted; service ~386 LOC. |
-| 1.6 | ✅ Implemented | — | Dual-path unified, byte-identical (#1146). View still 610 LOC = residual size, not this concern. |
-| 1.7 | ✅ Implemented | — | `TeamPageDataPreparer`+`TeamCardRenderer` (#1144); `TeamService` ~115 LOC (absent from >500 list). |
-| 1.8 | ✅ Implemented | — | Verified: no inline `new TeamQueryRepository`/`BuyoutLedgerRepository` in the view. Still 590 LOC = residual. |
-| 1.9 | ✅ Implemented | — | Memoized active-DC fetch (`getActiveDc()`) + injected `SavedDepthChartRepositoryInterface`; green-green. |
-| 1.10 | ✅ Implemented | — | Verified: `syncPropertiesFromPlayerData` gone, zero public nullable props. `Player.php` 671 LOC = typed-getter bulk (residual). |
-| 1.11 | ✅ Implemented | 🟩 | `insertTeamBoxscore()` 30-arg signature now lives in `BoxscoreRepository:252`; 557 LOC. Array-param + injectable ProgressReporter; pin with a DB-integration test. |
-| 1.12 | ✅ Implemented | — | #1145 — split into Index/Detail views, byte-identical golden-master. |
-| 1.13 | ✅ Implemented | — | Mutable `$collectedPlayerNames` accumulator → local var passed by-ref; green-green; getAllSeasons() untouched. |
-| 1.14 | ✅ Implemented | — | `TradeCapCalculator` extracted (#1143). |
-| 1.15 | ✅ Implemented | — | **Status:** Done (verified 2026-07-24, no plan — stale-Open) — `YourAccountView` is now 122 LOC; extraction already done. |
-| 1.16 | ✅ Implemented | — | `computeJsbProduction()` moved to service (verified). |
-| 1.17 | ✅ Implemented | 🟩 | perf-channel slow-query logger now injectable via `setPerfLogger()` + `$this->perfLogger ?? LoggerFactory::getChannel('perf')` fallback at L281; no static logging globals remain in `executeQuery`. |
 | 1.18 | ◑ Partial | 🟩 | StandingsUpdater. `82`→`League::REGULAR_SEASON_GAMES` DONE (refactor PR). echo→logger + `$log` removal DEFERRED: behavior-changing — echoes feed the rendered pipeline `capturedLog` (UpdateStandingsStep→UpdaterController); `$log` feeds admin-rendered `DebugOutput::display`. Needs a non-`refactor:` PR. |
 | 1.19 | ⬜ Open | 🟨 | `processPlrData`+`processPlrDataForYear` 80% duplicated; 510 LOC. `.plr` parse is engine-fidelity-critical → add characterization pins (mechanical scope) before merging the two paths, then 🟩. |
-| 1.20 | ✅ Implemented | 🟩 | SearchView 485 LOC string-concat. Extracted `renderResultList()` + ob_start migration; VR pin. |
 | 1.21 | ⬜ Open | 🟩 | RecordHoldersRepository 848 LOC — largest untracked class. 18 per-category record-query methods (single-game/season/team/franchise batches). Extract per-category query collaborators; green-green with DB-integration pins. Distinct from 1.1 (the RecordHolders *Service*, now 281 LOC). |
 | 1.22 | ⬜ Open | 🟩 | TradingView 606 LOC — offer-form/review/closed renderers + row/pick/cash builders in one view. Split into per-page views or extract row-builders; behavior-preserving golden-master pin. |
 | 1.23 | ⬜ Open | 🟨 | OneOnOneGameEngine 604 LOC — possession/shot-resolution simulation. Extract possession + shot-result collaborators, but sim-fidelity-critical → add characterization pins first (cf. 1.19). |
@@ -260,46 +246,26 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
+> ✅ resolved (19): 2.6, 2.7, 2.11, 2.12, 2.16, 2.17, 2.19, 2.20, 2.22, 2.23, 2.24, 2.26, 2.30, 2.33, 2.34, 2.35, 2.36, 2.37, 2.38 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> 🚫 declined (4): 2.2, 2.4, 2.8, 2.9 — evidence in [archive](archive/maintenance-backlog-archive.md)
+
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
 | 2.1 | ⬜ Open | 🟩 | Globals still in 5 (Voting, Waivers, ComparePlayers, ApiKeys, News). Extract→Controller, green-green E2E pin. |
-| 2.2 | 🚫 Declined | — | **Status (2026-06-28):** Declined. ActivityTracker + AllStarAppearances `index.php` are single-repo R+V passthrough (one `repo->getX()` → `view->render()`, verified on disk). A Service would be single-implementor pass-through ceremony — no orchestration to house (cf. 2.5/2.8/2.3 passthrough declines). |
 | 2.3 | ◑ Partial | — | FranchiseHistory Service built (#1091); PlayerMovement **declined** (single JOIN, pass-through ceremony). |
-| 2.4 | 🚫 Declined | — | **Status (2026-06-28):** Declined for GMContactList. Its `index.php` is single-repo passthrough (`getAllTeamContacts()` → render). The "match Topics (#1030)" premise is invalid: `TopicsService` orchestrates **two** repos (Topics + Search → `getPageData`) — real aggregation, not uniformity. No equivalent need here. |
 | 2.5 | ◑ Partial | — | BoxscoreViewInterface added (this PR). Processor→Service rename **declined**: BoxscoreProcessor is a mutating .sco import pipeline (cf. 2.8/2.3 pass-through declines; Waivers carries S1+P1). Residual = declined rename. |
-| 2.6 | ✅ Implemented | — | DraftService + DraftController extracted; index.php globals removed; green-green. |
-| 2.7 | ✅ Implemented | — | InjuriesRepository extracted+injected (#970). |
-| 2.8 | 🚫 Declined | — | Search + Standings: pass-through Service = dead code; declined. |
-| 2.9 | 🚫 Declined | — | `*ApiHandler` is the HTMX-fragment convention (9 handlers); rename declined. |
 | 2.10 | ⬜ Open | 🟨 | Extension R+S+P+Vl, no View. Upfront decision (own module vs Player sub-action) still needed. |
-| 2.11 | ✅ Implemented | — | RookieOptionFormView→RookieOptionView (#1031); Service declined. |
-| 2.12 | ✅ Implemented | — | OfferView already canonical (4.22); DemandsBreakdownView moved to Negotiation\Views\ sub-view (this PR). Calculator role tracked under 4.8. |
 | 2.13 | 📋 Planned | 🟨 | Characterization-pins plan queued (`freeagency-2-13-characterization-pins`); the admin/user split touches admin-mutation surface (→ human-merge). |
 | 2.14 | ◑ Partial | 🟨 | TradingController+Service exist (#802) but `maketradeoffer/accepttradeoffer/rejecttradeoffer.php` standalone endpoints remain (verified). Promoting touches trade-mutation surface → upfront decision needed. |
 | 2.15 | ⬜ Open | 🟨 | `classes/VotingResults/` absent. Upfront decision: merge module dirs vs split namespace. |
-| 2.16 | ✅ Implemented | — | **Marker was missing/stale.** `sanitizeRedirect`+`toggleExtensions` moved to `Debug\DebugController`; index.php uses it (verified). |
-| 2.17 | ✅ Implemented | — | News R/S/V extracted: `Topics\News\NewsRepository`, `NewsService`, `NewsView` (PR #1166, merged 2026-07-03). |
 | 2.18 | ⬜ Open | 🟨 | Static HTML in index.php. Upfront decision: static page outside module vs minimal View. Low risk. |
-| 2.19 | ✅ Implemented | — | **Marker was missing/stale.** `modules/SiteStatistics/` deleted (#733, verified absent). |
-| 2.20 | ✅ Implemented | — | ScheduleController owns the branch (this PR); index.php thin; league + team pages byte-identical (E2E). |
 | 2.21 | ⬜ Open | 🟨 | Same root cause as 2.15 (VotingResults namespace); resolve together. |
-| 2.22 | ✅ Implemented | — | `Services/` deleted (2026-05-16). |
-| 2.23 | ✅ Implemented | — | `Shared/` deleted; SalaryConverter→BasketballStats. |
-| 2.24 | ✅ Implemented | — | NavigationViewInterface + 4 sub-view interfaces added; views implement them (this PR). |
 | 2.25 | ⬜ Open | 🟨 | index.php still defines `showpage/negotiate/rookieoption/processrookieoption` globals (verified); rookieoption/negotiate touch mutation → upfront design decision needed. showpage extraction alone is green-green. |
-| 2.26 | ✅ Implemented | — | Documented Updater web-POST placement (`classes/Updater/README.md`); audit's "CLI-only" was inaccurate — it is web-only. |
 | 2.27 | ⬜ Open | 🟦 | Root `leagueControlPanel.php`→module bypasses `ModuleAccessControl`; converting changes admin-auth path (security surface) → human-merge. (a11y fix kept standalone deliberately.) |
 | 2.28 | ⬜ Open | 🟨 | `faprep.php` exists (verified), inline SQL + unescaped output. Resolve with 3.9 (delete); if absorbed instead, XSS/admin-SQL = human-merge. |
 | 2.29 | ⬜ Open | 🟨 | DEFERRED — global-namespace elimination: JSB 291 callers, BaseMysqliRepository 257, ContractRules 37 (585 caller files). L-effort, high-collision; needs its own sequenced PR (one class at a time), not an unattended wave item. |
-| 2.30 | ✅ Implemented | — | TeamStatsCalculator + StrengthOfScheduleCalculator moved into BasketballStats\ (this PR); old single-class dirs removed. |
 | 2.31 | ⬜ Open | 🟩 | UI/ 1 interface of 15; add interfaces systematically. Additive. |
 | 2.32 | ◑ Partial | 🟩 | Shipped: common `Api\Contracts\TransformerInterface` (7 uniform transformers) + flattened `Middleware/Contracts/`→`Api/Contracts/`. **Status:** partial 2026-06-26; residual = divergent-transformer interfaces (Boxscore/PlayerStats), responder interfaces (Csv/Json — disjoint shapes), `Response/Contracts/` flatten. |
-| 2.33 | ✅ Implemented | — | **Status:** Done (verified 2026-07-24, no plan — stale-Open) — `DebugSession::__construct(?string $username, ?string $serverName, ?string $cookieValue, bool $isE2ETesting)` takes explicit params; `DebugController` reads superglobals and passes them in (lines 29–34). |
-| 2.34 | ✅ Implemented | — | Folded into `index.php?op=select`. |
-| 2.35 | ✅ Implemented | — | Folded into `?op=submit_asg|submit_eoy`. |
-| 2.36 | ✅ Implemented | — | `save_order.php`→`?op=save_order` (2026-06-05). |
-| 2.37 | ✅ Implemented | — | `view.php` inlined; deleted. |
-| 2.38 | ✅ Implemented | — | `Topics/copyright.php` deleted. |
 
 ### 2.1 Legacy Global Functions in Module Entrypoints (5 modules)
 **Location:** `modules/Voting/index.php` (lines 40, 74, 85, 156), `modules/Waivers/index.php` (:25), `modules/ComparePlayers/index.php` (:29, :79), `modules/ApiKeys/index.php` (:85, :99), `modules/News/index.php` (:28)
@@ -412,25 +378,12 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
+> ✅ resolved (15): 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.10, 3.11, 3.12, 3.13, 3.14, 3.15, 3.16, 3.17 — evidence in [archive](archive/maintenance-backlog-archive.md)
+
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
 | 3.1 | ◑ Partial | 🟦 | `config.php` is gitignored (verified — acute "leak via git add" risk closed; configOlympics deleted). Residual: creds still hardcoded in the untracked file → env-var migration touches credential handling (human-merge). |
-| 3.2 | ✅ Implemented | — | Hardened via `Auth\DemoLoginGate`, fails closed (ADR-0034). |
-| 3.3 | ✅ Implemented | — | #1008 — `config.php` now `$display_errors = true`; OR-bug gone (verified). |
-| 3.4 | ✅ Implemented | — | `configOlympics.php` deleted. |
-| 3.5 | ✅ Implemented | — | mainfile.php dedup → `require LegacyFunctions` (ADR-0030). |
-| 3.6 | ✅ Implemented | — | `$_REQUEST`→`$GLOBALS` block removed; 2-key allowlist. |
-| 3.7 | ✅ Implemented | — | #1008 — block.php: no inline `<style>`/`number_format` (verified). |
-| 3.8 | ✅ Implemented | — | #1008 — strict_types on mainfile/modules/index (verified). |
 | 3.9 | ⬜ Open | 🟨 | `faprep.php` + `FreeAgencyPreview` both exist (verified). Upfront: confirm FAPreview supersedes → delete (also closes 2.28 XSS); else promote to module. |
-| 3.10 | ✅ Implemented | — | gzip/MSIE dead code gone. |
-| 3.11 | ✅ Implemented | — | #1008 — example carries admin_file/IBL6_BASE_URL/DEMO_LOGIN_TOKEN (verified). |
-| 3.12 | ✅ Implemented | — | index.php thin shim. |
-| 3.13 | ✅ Implemented | — | Bootstrap\Application is composition root (ADR-0030). |
-| 3.14 | ✅ Implemented | — | Shipped: `require __DIR__ . '/mainfile.php'`. |
-| 3.15 | ✅ Implemented | — | #1008 — test-state.php uses `prepare()`+`bind_param` (verified). |
-| 3.16 | ✅ Implemented | — | mainfile.php `filter()`/`addslashes` save=1 path gone. |
-| 3.17 | ✅ Implemented | — | modules.php reads `$_GET['name']` w/ regex + `===`. |
 
 ### 3.1 Hardcoded Production DB Credentials in `config.php`
 **Location:** `ibl5/config.php:61-63`
@@ -450,35 +403,16 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
+> ✅ resolved (21): 4.1, 4.2, 4.3, 4.4, 4.7, 4.8, 4.9, 4.11, 4.12, 4.13, 4.14, 4.15, 4.16, 4.17, 4.18, 4.19, 4.22, 4.23, 4.24, 4.25, 4.27 — evidence in [archive](archive/maintenance-backlog-archive.md)
+
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| 4.1 | ✅ Implemented | — | Convention already documented at `ibl5/classes/Trading/README.md` (canonical home); cross-linked from `ibl5/docs/ARCHITECTURE_PATTERNS.md` (2026-06-22). Rename sweep explicitly out of scope. |
-| 4.2 | ✅ Implemented | — | CashConsideration→`BuyoutLedgerRepository` (2026-05-20). |
-| 4.3 | ✅ Implemented | — | `Services/` deleted. |
-| 4.4 | ✅ Implemented | — | `Shared/SharedRepository` deleted. |
 | 4.5 | ⬜ Open | 🟨 | Player/PlayerDatabase/PlayerMovement still old-named (verified). Module rename breaks `modules.php?name=` URLs → upfront redirect/decision. |
 | 4.6 | ⬜ Open | 🟨 | PlayerMovement/TransactionHistory rename; same URL-break decision as 4.5. |
-| 4.7 | ✅ Implemented | — | →FreeAgencyOfferView (2026-05-17). |
-| 4.8 | ✅ Implemented | — | Renamed: `FreeAgencyMarketDemandCalculator` + `ExtensionContractDemandCalculator`. |
-| 4.9 | ✅ Implemented | — | `*ApiHandler` (module-local HTMX) vs `Api\Controller\*Controller` (REST) documented in `ibl5/docs/ARCHITECTURE_PATTERNS.md` (2026-06-22). |
 | 4.10 | ⬜ Open | 🟨 | DepthChartEntry/SavedDepthChart still old-named (verified). Module rename = URL break → decision. |
-| 4.11 | ✅ Implemented | — | Renamed `TradeQueueProcessor` → `NightlyTradeBatchRunner`; no production caller. |
-| 4.12 | ✅ Implemented | — | car_to→car_tvr (migration 128). |
-| 4.13 | ✅ Implemented | — | car_tgm→car_3gm (migration 128). |
-| 4.14 | ✅ Implemented | — | Two-letter rating cols documented (#1039); `r_*` rename deferred (L). |
-| 4.15 | ✅ Implemented | — | cy/cyt documented (#1039); rename deferred. |
-| 4.16 | ✅ Implemented | — | bird/exp documented (#1039); rename deferred. |
-| 4.17 | ✅ Implemented | — | sh_/sp_/ch_/cp_ prefixes documented (#1039). |
-| 4.18 | ✅ Implemented | — | Migration 121 added COMMENT to `game_2gm`/`game_2ga` on both `ibl_box_scores` and `ibl_box_scores_teams` (live DB confirmed 2026-06-28). |
-| 4.19 | ✅ Implemented | — | dc_* codes documented (#1039). |
 | 4.20 | ⬜ Open | 🟨 | DEFERRED with 2.29 — JSB is the 129-caller global class; bundle the JSB→JsbConstants move into the 2.29 global-namespace PR. |
 | 4.21 | ⬜ Open | 🟨 | DEFERRED — target is a domain-home decision (an exporter does not obviously belong in a parser namespace); wants a deliberate naming choice, not an auto-merged guess. |
-| 4.22 | ✅ Implemented | — | →NegotiationOfferView. |
-| 4.23 | ✅ Implemented | — | →VotingResultsView. |
-| 4.24 | ✅ Implemented | — | InjuriesRepository extracted (#970) (= 2.7). |
-| 4.25 | ✅ Implemented | — | →`Topics\News\NewsRepository` (ADR-0001). |
 | 4.26 | ⬜ Open | 🟨 | DEFERRED — renaming the generic Module/ dir needs a chosen target name (design decision); 2 callers, low effort but not an auto-merge guess. |
-| 4.27 | ✅ Implemented | — | PreseasonCleanupRepository moved to Updater\ root (this PR); a Repository, not a Step. |
 
 ### 4.5 `Player/` vs `PlayerDatabase/` vs `PlayerMovement/`
 **Location:** Three modules, confusable scope
@@ -526,29 +460,12 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20 against current `phpstan-baseline.neon` / `phpstan-tests-baseline.neon`):**
 
+> ✅ resolved (19): 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9, 5.10, 5.11, 5.12, 5.13, 5.14, 5.16, 5.17, 5.18, 5.20, 5.21 — evidence in [archive](archive/maintenance-backlog-archive.md)
+
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| 5.1 | ✅ Implemented | — | class.notFound 293→7 (2026-05-16). |
-| 5.2 | ✅ Implemented | — | Trading staticMethod.dynamicCall 0 (via 5.1). |
-| 5.3 | ✅ Implemented | — | UAT 151 class/method.notFound gone (via 5.1). |
-| 5.4 | ✅ Implemented | — | MockDatabase argument.type 0 (#1028). |
-| 5.5 | ✅ Implemented | — | SeasonLeaderboardsView 71 XSS cleared; zero-floor. |
-| 5.6 | ✅ Implemented | — | CareerLeaderboardsView 44 cleared. |
-| 5.7 | ✅ Implemented | — | Navigation views 58 cleared; zero-floor. |
-| 5.8 | ✅ Implemented | — | YourAccountView 27 cleared. |
-| 5.9 | ✅ Implemented | — | Gated (ADR-0032); bootstrap superglobal reads allowlisted by design. |
-| 5.10 | ✅ Implemented | — | missingType.return 0 (#939/#958). |
-| 5.11 | ✅ Implemented | — | assertEquals→assertSame 0 (#940/#958). |
-| 5.12 | ✅ Implemented | — | JsbParser 25 method.notFound cleared. |
-| 5.13 | ✅ Implemented | — | CommonMysqliRepositoryInterface (7.1) cleared 27. |
-| 5.14 | ✅ Implemented | — | constructor.missingParentCall 0. |
 | 5.15 | ◑ Partial | 🟨 | `argument.type` 161→**73** in tests baseline (verified); phantom cascades cleared, real remainder persists (#1100 burns 2). Each fix must **not** weaken the assert (`feedback_agent_argument_type_weakening`) → careful, error-prone. |
-| 5.16 | ✅ Implemented | — | ibl.inlineCss 0; PageLayout inline `@phpstan-ignore`. |
-| 5.17 | ✅ Implemented | — | cookieBeforeHeader 4 cleared; zero-floor (ADR-0032). |
-| 5.18 | ✅ Implemented | — | Deprecated `Database\MySQL` removed: 3 consumers (News/index.php, News/categories.php, blocks()) migrated to `$mysqli_db` prepared statements; class file + db.php instantiation deleted; db.php health check reworked to `$mysqli_db->connect_errno`. The earlier "no app consumers" note was wrong — there were 3, now migrated. |
 | 5.19 | ◑ Partial | 🟨 | DepthChartEntry tests **87→16** baseline entries (verified); bulk cleared by 5.1/5.14. Remaining 16 = careful test-type fixes (as 5.15). |
-| 5.20 | ✅ Implemented | — | missingType.iterableValue 0 (#939/#958). |
-| 5.21 | ✅ Implemented | — | ibl.deprecatedHtmlTag 0 in both baselines. |
 
 ### 5.15 161 `argument.type` in Tests — Mostly Phantom Cascades
 **Location:** Extension (41), FreeAgency (23), WideUnit (22), Injuries (18), UpdateAllTheThings (16), DepthChartEntry (9)
@@ -572,28 +489,17 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):** Adding tests is inherently green-green (no production change) → every open coverage gap is 🟩 auto-mergeable. If writing a test surfaces a real bug, the *fix* becomes its own finding with its own classification. (Exception: **6.21** is 🟨, not 🟩 — its handler `exit()`s, so the test isn't writable until a teamless-fixture / non-`exit()` refactor infra decision is made.)
 
+> ✅ resolved (13): 6.1, 6.3, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.11, 6.12, 6.15, 6.16, 6.20 — evidence in [archive](archive/maintenance-backlog-archive.md)
+
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| 6.1 | ✅ Implemented | — | All 7 concrete BulkImport classes already have substantive tests under tests/Unit/BulkImport/ (verified). |
 | 6.2 | ⬜ Open | 🟩 | PdoConnection tests 🟩; `MySQL` is the deprecated class slated for removal (5.18) — don't invest there. |
-| 6.3 | ✅ Implemented | — | ModuleAccessControlTest + ModuleRegistryTest exist. |
 | 6.4 | ◑ Partial | 🟩 | Header side-effect test exists; broader structure/CSS coverage still thin → additive. |
-| 6.5 | ✅ Implemented | — | TeamStatsCalculatorTest exists. |
-| 6.6 | ✅ Implemented | — | StrengthOfScheduleCalculatorTest exists. |
-| 6.7 | ✅ Implemented | 🟩 | LeagueStarters thin; additive. |
-| 6.8 | ✅ Implemented | — | ApiKeysRepositoryTest added (revocation active-only scoping, latest-key lookup). |
-| 6.9 | ✅ Implemented | — | ContractListServiceTest extended (#1161, 2026-06-20). |
-| 6.10 | ✅ Implemented | 🟩 | FreeAgencyPreview thin; additive — coordinate with PR #1162 (future-year restore). |
-| 6.11 | ✅ Implemented | 🟩 | SeasonHighs thin; additive. |
-| 6.12 | ✅ Implemented | 🟩 | TeamSchedule thin; additive. |
 | 6.13 | ◑ Partial | 🟩 | Player ~0.45 ratio (69 prod / 31 test files); additive (L — chunk it). |
 | 6.14 | ◑ Partial | 🟩 | ProcessBoxscoresStep/GenerateSeasonAwardsStep/ParseJsbFilesStep added (2026-07-24); ~19 step classes + OlympicsFlatStandingsUpdater/UpdaterView/JsbSourceResolver remain. |
-| 6.15 | ✅ Implemented | — | VotingRepositoryTest + SubmissionResultTest added (aggregation, column allowlist). |
-| 6.16 | ✅ Implemented | — | All data repos (ApiGame/Injuries/Leaders/Player/PlayerStats/Standings/Team + Health) + JsonResponder + SystemClock tested (2026-07-24). |
 | 6.17 | ◑ Partial | 🟩 | TradeAssetRepositoryTest + TradeOfferRepositoryTest added (draft-pick mapping, offer lifecycle); TradeExecutionRepository untested + TradeFormRepository partial. |
 | 6.18 | ◑ Partial | 🟩 | Unit tests added: DraftPickLocator repo, LeagueSchedule Game, TransactionHistory repo, CapSpace repo. NextSim/SavedDepthChart/DepthChartEntry verified covered. Residual: SQL aggregation/ordering + SDC write-path are DB-integration-only. |
 | 6.19 | ◑ Partial | 🟩 | AllStarAppearances + GMContactList repo unit tests added. Season entity predicates blocked by `Season\Season`→mock alias (QueryRepo plumbing covered). `Shared` N/A (deleted 2.23). |
-| 6.20 | ✅ Implemented | 🟩 | Anon rookie-option lockdown E2E (`draft-rookie-anon-lockdown.spec.ts`) asserts `toContain('YourAccount')` — emitted by nav chrome on every anon page, so a regressed `is_user()` gate still passes. Strengthen to `maxRedirects:0` + redirect/`Location` assert. Test-only, green-green. From PR #1107 review. |
 | 6.21 | ⬜ Open | 🟨 | Row-12 (Free-Agents/teamless session) `processrookieoption` ownership-rejection path untested: PHPUnit entry-point test impossible (handler `exit()`s), E2E auth fixture always has a session team. Needs a teamless-fixture / non-`exit()` refactor decision before it's writable → 🟨. From PR #1107 Phase 5.0 note. |
 | 6.22 | ⬜ Open | 🟨 | **Pattern behind 6.20/6.21.** Authz/IDOR gates inline in controllers end in `HtmxHelper::redirect()→exit()`, so the security-critical "non-party refused + no mutation" property is E2E-only (forced the D-05 reject test, #1066). `Trading\TradeExecutionService` (accept path, #1066) proves the fix: a gate returning a *verdict* is unit-testable exit-free (`testValidateAndExecuteRejectsNonPartyWithoutExecuting`). Convert the inline gates (Waivers, FreeAgency, Trade API accept/decline, Trading reject) to verdict + thin redirect-shim → security logic becomes unit-testable; unblocks 6.21. 🟨: production refactor on a security surface; needs a verdict-shape decision. From the #1066 reject-IDOR review. |
 
@@ -674,26 +580,13 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
+> ✅ resolved (15): 7.1, 7.2, 7.3, 7.4, 7.5, 7.8, 7.9, 7.10, 7.12, 7.13, 7.14, 7.15, 7.16, 7.17, 7.18 — evidence in [archive](archive/maintenance-backlog-archive.md)
+
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| 7.1 | ✅ Implemented | — | Interface extracted; 34 sites inject (2026-05-16). |
-| 7.2 | ✅ Implemented | — | Bare instantiation banned by `ibl.directCommonMysqliInstantiation`. |
-| 7.3 | ✅ Implemented | — | PlayerViewFactory `$GLOBALS` fallback removed. |
-| 7.4 | ✅ Implemented | — | getPlayerIdsByNames→`fetchAllInList()`. |
-| 7.5 | ✅ Implemented | — | DatabaseCache extends BaseMysqliRepository + logs (#1089). |
 | 7.6 | ◑ Partial | 🟩 | `fetchAllInList()` exists, adopted by ~4 repos (8 file refs); remaining repos unmigrated. Mechanical migration, green-green. |
 | 7.7 | ◑ Partial | 🟩 | FreeAgencyView fixed (via 1.8); `FreeAgencyProcessor` still `private \mysqli $mysqli_db` at L20 (verified). DI refactor is behavior-preserving; IDOR PRs #1109 merged. |
-| 7.8 | ✅ Implemented | — | DI sweep injects interface. |
-| 7.9 | ✅ Implemented | — | Split into TeamIdentity/PlayerLookup/SalaryCap. |
-| 7.10 | ✅ Implemented | — | Waivers interface shapes (#1032). |
 | 7.11 | ⬜ Open | 🟨 | Inconsistent caching decorators. Upfront decision: add `Cached*Repository` for SeasonHighs/FranchiseRecordBook/etc. vs document why page-cache suffices. |
-| 7.12 | ✅ Implemented | — | TeamOrderBy enum (#1032). |
-| 7.13 | ✅ Implemented | — | DraftRepository injects TeamIdentityRepositoryInterface. |
-| 7.14 | ✅ Implemented | 🟩 | Extracted `Standings\PythagoreanCalculator` (pure `calculate()`); StandingsRepository delegates both call sites; green-green. |
-| 7.15 | ✅ Implemented | 🟩 | 8 map*/FIELD_MAP members (verified); PlayerRepository 622 LOC. Extract PlayerDataMapper/Hydrator; green-green. |
-| 7.16 | ✅ Implemented | — | Hidden caches dropped (#1040). |
-| 7.17 | ✅ Implemented | — | **Status:** Done (verified 2026-07-24, no plan — stale-Open) — `@see nuke_stories` annotation present at `PlayerRepository.php:216`. |
-| 7.18 | ✅ Implemented | — | **Status:** Done (verified 2026-07-24, no plan — stale-Open) — `PlayerTeamJoinQuery` trait at `classes/Repositories/PlayerTeamJoinQuery.php:12`; used by `PlayerLookupRepository.php:14` and `PlayerRepository.php:28`. |
 
 ### 7.6 IN-Clause Boilerplate Copy-Pasted Across 10 Repositories
 **Location:** `FreeAgencyAdminRepository`, `TradeAssetRepository`, `TradeCashRepository`, `SeasonQueryRepository`, `VotingRepository`, `SeasonArchiveRepository`, `LeagueControlPanelRepository`, `PlrParserRepository`, `UI/Tables/PeriodAverages`, `ProjectedDraftOrderRepository`
@@ -724,25 +617,17 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
+> ✅ resolved (10): 8.1, 8.2, 8.4, 8.6, 8.7, 8.8, 8.12, 8.13, 8.16, 8.17 — evidence in [archive](archive/maintenance-backlog-archive.md)
+
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| 8.1 | ✅ Implemented | — | Dumps absent from `git log --all --full-history`; `.git` pack 279M (not 1.1GB) → clone-weight resolved. Credential angle: rotated + scrubbed from HEAD + gitleaks gate (ADR-0034); git-**history rewrite deliberately declined there** (rotation is the remediation), so the literal still lives in history by design. |
-| 8.2 | ✅ Implemented | — | Script-home convention documented (bin/README.md). |
 | 8.3 | ⬜ Open | 🟩 | kebab-case/`.sh` consistency. Rename + caller sweep (CI/hooks refs); green-green. |
-| 8.4 | ✅ Implemented | — | `shellScripts/` absent from tree + index (verified); follows 8.1. |
 | 8.5 | ◑ Partial | 🟩 | `tradition.php` deleted; `scripts/plrScratchpad.php` still present (verified) → archive it. |
-| 8.6 | ✅ Implemented | — | classes/Scripts → classes/Maintenance namespace rename (16 callers swept) (this PR). |
-| 8.7 | ✅ Implemented | — | Document symlink strategy (docs). **Status:** Added `## Symlink strategy` to `bin/README.md` stating the convention (single tracked symlink `bin/db-query` → `ibl5/bin/db-query`; real files pinned to `ibl5/bin/` by the `./ibl5` Docker bind-mount; new symlinks discouraged) (this PR). |
-| 8.8 | ✅ Implemented | — | `scripts/archive/README.md` (docs). **Status:** Added `ibl5/scripts/archive/README.md` documenting the two retained-but-not-run 2007 box-score import scripts + the archive policy (this PR). |
 | 8.9 | ⬜ Open | 🟩 | bin/lib manifest + helper rename. |
 | 8.10 | ⬜ Open | 🟨 | Interactive-vs-CI convention — upfront decision (`check-*`/`test-*` prefix vs a dedicated `ci/` subdir). |
 | 8.11 | ⬜ Open | 🟩 | Move `automouse-*` to bin/automouse/ + README; caller sweep (launchd plist refs). |
-| 8.12 | ✅ Implemented | — | `shellScripts/.env` not in working tree or history (verified); prod cred rotated + gitleaks scanning gate (ADR-0034). Per ADR-0034 the already-leaked literal is allowlisted, **not** purged from history (rewrite declined as too disruptive). |
-| 8.13 | ✅ Implemented | — | Web-mutation scripts auth-resolved (2026-06-09): admin-guarded CSRF POST. |
 | 8.14 | ⬜ Open | 🟩 | Standardize script bootstrap; green-green per script. |
 | 8.15 | ⬜ Open | 🟨 | Consolidate the two E2E drivers — context-detection design; mind the outside-repo `e2e-for-pr` gotcha. |
-| 8.16 | ✅ Implemented | — | Documented the de-facto check-script exit-code/output standard in `bin/README.md`. Helper lib deferred (separate item). |
-| 8.17 | ✅ Implemented | — | **Status:** Done (verified 2026-07-24, no plan — stale-Open) — ShellCheck bash-3.2-compat job exists in `.github/workflows/tests.yml` (line 370+). |
 
 ### 8.3 Mixed kebab-case, camelCase, `.sh` Extensions
 **Location:** `/bin/` and `ibl5/bin/`
@@ -800,35 +685,13 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):** All open items here are docs-only → 🟩 auto-mergeable (a docs PR never trips the `feat:` human-signoff hold), except 9.26 which needs one upfront decision.
 
+> ✅ resolved (24): 9.1, 9.2, 9.3, 9.5, 9.6, 9.7, 9.8, 9.9, 9.10, 9.11, 9.12, 9.13, 9.14, 9.15, 9.16, 9.17, 9.18, 9.19, 9.20, 9.21, 9.22, 9.23, 9.25, 9.27 — evidence in [archive](archive/maintenance-backlog-archive.md)
+
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| 9.1 | ✅ Implemented | — | Counts refreshed, ibl_plr_chunk/MyISAM removed (catchup). |
-| 9.2 | ✅ Implemented | — | PostgreSQL section removed. |
-| 9.3 | ✅ Implemented | — | schema-reference cites auth_users. |
 | 9.4 | ◑ Partial | 🟩 | Header/framing fixed; full endpoint-by-endpoint reference deferred (9.4b). Docs-only. |
-| 9.5 | ✅ Implemented | — | docs/README index reflects built API. |
-| 9.6 | ✅ Implemented | — | Inline test counts removed. |
-| 9.7 | ✅ Implemented | — | Power_Rankings removed; count→7. |
-| 9.8 | ✅ Implemented | — | "Established" aligned to Waivers. |
-| 9.9 | ✅ Implemented | — | **Marker was missing/stale.** The stale GitHub-skills path is no longer referenced in DEVELOPMENT_GUIDE; skills live at `.claude/skills/` (verified). |
-| 9.10 | ✅ Implemented | — | Copilot retired/archived (2026-06-10). |
-| 9.11 | ✅ Implemented | 🟩 | DOCUMENTATION_STANDARDS lists both SECURITY.md exemplars (DepthChartEntry + ComparePlayers) + notes it is not a per-module requirement; docs-only. |
-| 9.12 | ✅ Implemented | — | Archive scope (#1044). |
-| 9.13 | ✅ Implemented | — | Schema Version line removed. |
-| 9.14 | ✅ Implemented | 🟩 | css-architecture path-conditional rule verified accurate (paths: frontmatter scopes it); no change needed. |
-| 9.15 | ✅ Implemented | — | **Status:** Done (verified 2026-07-24, no plan — stale-Open) — both `lighthouse-pr-comments.md` and `refactor-flag.md` now carry `paths:` frontmatter. |
-| 9.16 | ✅ Implemented | — | REFACTORING_HISTORY archived (#1044). |
-| 9.17 | ✅ Implemented | — | PLR_VS_BOXSCORES hook added (#1044). |
-| 9.18 | ✅ Implemented | — | Coverage figures aligned (~80%/70%). |
-| 9.19 | ✅ Implemented | — | Added READMEs to all 68 class dirs that lacked one (2026-07-24); all new files carry doc-freshness frontmatter. |
-| 9.20 | ✅ Implemented | — | Added frontmatter to the 16 existing class READMEs that lacked it; extended bin/check-docs IN_SCOPE_GLOBS to include ibl5/classes/*/README.md (2026-07-24). |
-| 9.21 | ✅ Implemented | — | migrations/README stale FK removed (#1044). |
-| 9.22 | ✅ Implemented | 🟩 | Opportunistic-backfill README policy added to DOCUMENTATION_STANDARDS; docs-only. |
-| 9.23 | ✅ Implemented | — | IBL6/README replaced (#1044). |
 | 9.24 | ⬜ Open | 🟩 | `codebase-map.md` is **tracked** (verified — not gitignored); add CI regen-and-diff step. |
-| 9.25 | ✅ Implemented | — | STRATEGIC_PRIORITIES Completed-drops subsection. |
 | 9.26 | ⬜ Open | 🟨 | No CHANGELOG — upfront decision: ADRs-as-substitute (document) vs post-plan-fed CHANGELOG tooling. |
-| 9.27 | ✅ Implemented | — | NegotiationServiceInterface PHPDoc added (#1044). |
 
 ### 9.4 API_GUIDE Claims API "Not Yet Implemented" — It's Fully Built
 **Location:** `ibl5/docs/API_GUIDE.md`
@@ -856,38 +719,17 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20 — 35 custom rules live in `phpstan-rules/`):** Most findings asked for a new rule and the **rule has landed**; where baseline sites remain, the rule-finding is ✅ and the *burndown* is the 🟩 residual.
 
+> ✅ resolved (25): 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7, 10.8, 10.9, 10.10, 10.11, 10.12, 10.13, 10.14, 10.15, 10.16, 10.17, 10.18, 10.19, 10.20, 10.21, 10.22, 10.23, 10.24, 10.25 — evidence in [archive](archive/maintenance-backlog-archive.md)
+
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| 10.1 | ✅ Implemented | — | Baseline hygiene (#1028). |
-| 10.2 | ✅ Implemented | — | `_SESSION` banned (rule expansion). |
-| 10.3 | ✅ Implemented | — | `_SERVER` banned. |
-| 10.4 | ✅ Implemented | — | `BanEchoInNonViewClassesRule` landed; baseline burndown complete — 0 `ibl.echoInNonView` entries remain (verified 2026-07-24). |
-| 10.5 | ✅ Implemented | — | `BanGlobalKeywordRule` landed. |
-| 10.6 | ✅ Implemented | — | `GLOBALS` covered by superglobal rule. |
-| 10.7 | ✅ Implemented | — | `BanDieExitInProductionRule` (0 baseline). |
-| 10.8 | ✅ Implemented | — | `BanCastFunctionsRule` (0). |
-| 10.9 | ✅ Implemented | — | `BanRawHtmlEscapeFunctionsRule` (0). |
-| 10.10 | ✅ Implemented | 🟩 | `RequireTrustedAnnotationRule` (`ibl.trustedVariable`) guards `HtmlSanitizer::trusted()`; 147 occurrences across 16 file entries baselined (green-green), ADR-0077. |
-| 10.11 | ✅ Implemented | — | `BanDirectHeaderCallRule` (1 baseline). |
-| 10.12 | ✅ Implemented | 🟩 | `BanDirectMysqliQueryRule` landed; 7 Updater-step sites — burndown 🟩. **Status:** baseline cleared — 7 sites in 3 Refresh steps rerouted to `BaseMysqliRepository::execute()`. |
-| 10.13 | ✅ Implemented | — | `BanSqlStringInterpolationRule` landed; all sqlInterp baseline entries cleared (PR2 finisher). |
-| 10.14 | ✅ Implemented | — | Clock abstraction + `BanDirectTimeCallsRule` (PR #1160, merged 2026-06-28). `ClockInterface` at `classes/Clock/ClockInterface.php`. |
-| 10.15 | ✅ Implemented | — | Removed `ob_start()`/`echo ob_get_clean()` wrapper; output byte-identical (characterization-pinned). |
-| 10.16 | ✅ Implemented | — | unescapedOutput baseline cleared. |
-| 10.17 | ✅ Implemented | — | cookieBeforeHeader cleared (ADR-0032). |
-| 10.18 | ✅ Implemented | — | `BanServiceExtendsBaseRepositoryRule` (0). |
-| 10.19 | ✅ Implemented | 🟩 | `BanDuplicateModifierMethodRule` landed; 5 ExtensionOfferEvaluator sites — burndown 🟩. **Status:** baseline cleared — 5 adapter methods renamed `calculate*Modifier`→`compute*Modifier` (delegation to `ContractRules` unchanged). |
-| 10.20 | ✅ Implemented | — | `RequireMeaningfulAssertionsRule` now flags `assertNotNull()` on statically-non-null values via `$scope->getType()->isNull()`. **Status:** conservative `isNull()->no()` gate flagged zero existing sites — no baseline change. |
-| 10.21 | ✅ Implemented | — | `BanBareColumnIdentifierRule` landed; all baseline sites cleared (shared-file residual cleared in PR2). |
-| 10.22 | ✅ Implemented | — | `BanJsonDecodeWithoutThrowFlagRule` (0). |
-| 10.23 | ✅ Implemented | 🟩 | `BanHardcodedEnvironmentStringsRule` landed; 8 sites — config-injection burndown 🟩 (env-branching — verify behavior). |
-| 10.24 | ✅ Implemented | — | RequireStrictTypesRule scope extended. |
-| 10.25 | ✅ Implemented | — | The 4 cited counts at 0; drift fix folds into 10.1. |
 | 10.26 | ⬜ Open | 🟥 | `BanSqlStringConcatenationRule` flags the identifier-concatenation sites introduced by the sqlInterp burndown (PR #1203) — 100 occurrences across 33 file entries baselined (2026-07-24). Convert `in_array`-guarded identifier sites to `match()`/constant-array lookup so PHPStan types them as constant-string (rule-inert), clearing the concat baseline. |
 
 ## Axis 11: CSS, Themes, Design System
 
 **Automouse audit (verified 2026-06-20):** Open items are CSS refactors — almost all green-green with a **visual-regression pin** (the relocated/token-aliased rules must render pixel-identical), except 11.4 which is a deliberate visual consolidation.
+
+> ✅ resolved (10): 11.5, 11.6, 11.7, 11.8, 11.9, 11.10, 11.11, 11.12, 11.13, 11.15 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
@@ -895,17 +737,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 11.2 | ⬜ Open | 🟩 | Add `themes/` to PHPStan scan + migrate 5 inline styles; baseline + VR pin. |
 | 11.3 | ◑ Partial | 🟩 | Split ongoing (#1234 + earlier): 15 component files now under `design/components/tables/`; `components/tables.css` still ~1296 LOC. Continue relocation; VR pin. |
 | 11.4 | ⬜ Open | 🟨 | player-views.css parallel table system → `.ibl-data-table`. Visual consolidation = VR-affecting → human review / baseline update. |
-| 11.5 | ✅ Implemented | — | CSS orphan cleanup (#1027). |
-| 11.6 | ✅ Implemented | — | Standalone-head font helper (#1027). |
-| 11.7 | ✅ Implemented | — | editor.css deleted (#1027). |
-| 11.8 | ✅ Implemented | — | menu GIFs deleted (#1027). |
-| 11.9 | ✅ Implemented | — | dual-token convention documented (#1027). |
-| 11.10 | ✅ Implemented | — | **Status:** 3 depth-chart CSS files → 1 (`depth-chart.css`); 2 satellites deleted, single `@import` placed after `tables.css`. VR-pinned pixel-identical (existing baseline unchanged). |
-| 11.11 | ✅ Implemented | — | themecenterbox content-sniff replaced with explicit `$type` param (#1232, merged 2026-06-28). |
-| 11.12 | ✅ Implemented | — | display:none→hidden cleared. |
-| 11.13 | ✅ Implemented | — | TradingView `str_replace` CSS-patch replaced with explicit render param (#1232, merged 2026-06-28). |
 | 11.14 | ◑ Partial | 🟩 | Exact-match hex→token aliases landed (#1234, merged 2026-06-28); ~62 raw hex still in `design/components/` (no exact token match). Continue aliasing; VR pin. |
-| 11.15 | ✅ Implemented | — | dead section removed (#1027). |
 | 11.16 | ⬜ Open | 🟩 | Page-specific JS to per-view loaders; E2E/VR pin. |
 
 ### 11.1 FOUT-Prevention Inline `<style>` in PageLayout (2 baselined violations)
@@ -958,22 +790,17 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):** Several here are intentionally-tracked (declined) or need infra/history-rewrite decisions — the one true 🟥 is 12.11 (history rewrite).
 
+> ✅ resolved (5): 12.1, 12.2, 12.6, 12.10, 12.14 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> 🚫 declined (3): 12.3, 12.12, 12.13 — evidence in [archive](archive/maintenance-backlog-archive.md)
+
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| 12.1 | ✅ Implemented | — | gitignore clarifying comment added. |
-| 12.2 | ✅ Implemented | — | `*.sch` gitignore + `!`-exceptions. |
-| 12.3 | 🚫 Declined | — | IBL5.lge kept tracked (test fixture); relocation deferred (🟩 if pursued). |
 | 12.4 | ⬜ Open | 🟨 | Deferred — delivery is via tracked git commits (see Status). |
 | 12.5 | ⬜ Open | 🟨 | Standings.htm — upfront: verify legacy view unused → delete + redirect. |
-| 12.6 | ✅ Implemented | — | tests-baseline reduced 9519→7557 (2026-05-16). |
 | 12.7 | ⬜ Open | 🟨 | VR PNG baselines — 121 PNGs / 27 MB (grown 2.5× from original audit); infra decision (Git LFS vs force-updated baselines branch). **Deferred 2026-07-25** — see Status below. |
 | 12.8 | ⬜ Open | 🟨 | Player images 20MB — decision + infra (S3/CDN vs LFS) + admin upload tooling. |
 | 12.9 | ⬜ Open | 🟨 | HoF images — bundle with the 12.8 decision. |
-| 12.10 | ✅ Implemented | — | Thumbs.db git rm'd + ignored. |
 | 12.11 | ⬜ Open | 🟥 | ~80MB orphaned history objects — needs `git filter-repo` + force-push + coordinated rebase. **ADR-0034 set a no-history-rewrite precedent** (declined as too disruptive), so this is likely 🚫 in practice unless that stance changes. Irreversible; human-only. |
-| 12.12 | 🚫 Declined | — | coverage-baseline.json intentionally tracked (CI consumes; ADR-0018). |
-| 12.13 | 🚫 Declined | — | phpunit-baseline.xml intentionally tracked (phpunit.xml references it). |
-| 12.14 | ✅ Implemented | — | Olympics.sch kept tracked + gitignore exception (runtime fallback). |
 
 ### 12.4 `ibl5/ibl/IBL/Schedule.htm` — 284 KB HTML, 86 Commits
 **Location:** `ibl5/ibl/IBL/Schedule.htm`
@@ -1023,22 +850,14 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
+> ✅ resolved (9): 13.1, 13.2, 13.3, 13.5, 13.6, 13.8, 13.9, 13.11, 13.13 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> 🚫 declined (2): 13.4, 13.10 — evidence in [archive](archive/maintenance-backlog-archive.md)
+
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| 13.1 | ✅ Implemented | — | PlayerSeasonTableRenderer extracted. |
-| 13.2 | ✅ Implemented | — | Merged into 13.1. |
-| 13.3 | ✅ Implemented | — | **Status:** Done (verified 2026-06-28, no plan — stale-Open) — `BaseMysqliRepository::gameOfThatDaySubquery()` (the protected-helper option of the suggested direction) is used by all 5 sites; zero inline `MIN(game_of_that_day)` copies remain. |
-| 13.4 | 🚫 Declined | — | Premise invalid: `CommonContractValidator` was never deleted — it exists at `ibl5/classes/FreeAgency/CommonContractValidator.php:22`. (`Services/` was deleted per 2.22, but the validator moved to `FreeAgency/`.) The "re-identify/extract" step is not needed; injection into `FreeAgencyOfferValidator` is still open but tracked separately. |
-| 13.5 | ✅ Implemented | — | #1033. |
-| 13.6 | ✅ Implemented | — | #1033. |
 | 13.7 | ◑ Partial | 🟩 | Waivers/Draft → ValidationResult (Strategy A); remainder is 13.7b. Done part green-green. |
 | 13.7b | ⬜ Open | 🟨 | Needs `ValidationError`/`ValidationResultWithContext` type design (Depth/Trade carry structured + cap-total payloads) before the sweep. |
-| 13.8 | ✅ Implemented | — | retired filter standardized to `= 0` (2026-06-05). |
-| 13.9 | ✅ Implemented | — | **Status:** Done (verified 2026-06-28, no plan — stale-Open) — sanitizing `TableStyles::inlineTeamVars()` is the canonical helper (adopted ~9 sites incl. `BannersView`); the old var schemes are now CSS aliases (`design/CSS_TABLE_MAP.md`); `--team-cell-bg` is emitted by the separate sanitizing `TeamCellHelper` (renders a full `<td>`). Hex-injection closed at every site. |
-| 13.10 | 🚫 Declined | — | Premise invalid: Career/Season `processPlayerRow` return arrays differ in key membership, order, and value-type (22 vs 44 keys) — no shared surface to extract. Doc-only closure, no code. |
-| 13.11 | ✅ Implemented | — | cleanName subquery extracted (2026-06-05). |
 | 13.12 | ⬜ Open | 🟩 | player↔team JOIN ×15 → `vw_players_with_team`/helper; green-green, opportunistic (L). |
-| 13.13 | ✅ Implemented | — | #1033 + DNP follow-ups #1087/#1088. |
 
 ### 13.7 Validator Error-Accumulation Boilerplate Repeated
 **Status:** **Partially done (Strategy A, PR validator-accumulators-to-validationresult):** the two pure string-accumulator validators (`Waivers/WaiversValidator`, `Draft/DraftValidator`) now return `ValidationResult`; mutable `private array $errors` / `getErrors()` / `clearErrors()` removed. State-leakage risk eliminated for these two. Remainder re-filed as [[13.7b]].
@@ -1067,24 +886,18 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):** The big bootstrap consolidation (14.1–14.4, 14.7, 14.11, 14.13, 14.14) is done (ADR-0030). Remaining items are large DI sweeps that overlap open IDOR PRs or carry security/identity hazards.
 
+> ✅ resolved (8): 14.1, 14.2, 14.3, 14.4, 14.7, 14.11, 14.13, 14.14 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> 🚫 declined (1): 14.16 — evidence in [archive](archive/maintenance-backlog-archive.md)
+
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| 14.1 | ✅ Implemented | — | Application wired (ADR-0030). |
-| 14.2 | ✅ Implemented | — | Duplicate bootstrap removed. |
-| 14.3 | ✅ Implemented | — | LegacyFunctions single source. |
-| 14.4 | ✅ Implemented | — | Three modes via Factory. |
 | 14.5 | ⬜ Open | 🟨 | Module index.php → front-controller composition root (42 modules). Very large; routing/auth-sensitive → decompose + sequence (some modules touch mutations). |
 | 14.6 | ⬜ Open | 🟩 | 24 controllers raw `\mysqli`→Waivers DI pattern. Green-green; IDOR PRs #1107–1110 merged. |
-| 14.7 | ✅ Implemented | — | Lazy PDO factory injected (#1042). |
 | 14.8 | ⬜ Open | 🟩 | Introduce `HttpRequest` VO wrapping superglobals; green-green abstraction. |
 | 14.9 | ⬜ Open | 🟩 | `$cookie[1]` ritual — 21 occurrences across 11 files → injected `AuthService::getUsername()` (already exists at `classes/Auth/AuthService.php:111`); green-green call-site burndown. |
 | 14.10 | ◑ Partial | 🟨 | Container accessor registered (PR1); side-effect removal deferred to PR3 (boosted-HTMX cookie-population hazard) → careful sequencing. |
-| 14.11 | ✅ Implemented | — | api.php via ApiApplicationFactory. |
 | 14.12 | ◑ Partial | 🟩 | Wholesale `$_REQUEST`→`$GLOBALS` gone; modules still read `$op/$pid` from `$_REQUEST` → Request object is the residual (folds into 14.8). |
-| 14.13 | ✅ Implemented | — | Season DI (18 sites) #1096. |
-| 14.14 | ✅ Implemented | — | LoggerInterface DI burndown (#1093/#1094/#1095). |
 | 14.15 | ◑ Partial | 🚫 | ScheduleUpdater basePath injected; PageLayout remainder **declined** (user 2026-06-13 — disproportionate). |
-| 14.16 | 🚫 Declined | — | Premise invalid: `modules.php` already has two guards — `preg_match('/^[a-zA-Z0-9_]+$/', $name)` at line 26 AND `ModuleRegistry::isValid($name)` (42-entry allowlist) at line 31; `index.php:50` also uses `ModuleRegistry::isValid`. The "single `str_contains('..')`" description was wrong; no `str_contains` exists. |
 
 ### 14.5 Module `index.php` Files Are the Real Composition Root (42 of 47)
 **Location:** `ibl5/modules/*/index.php`
@@ -1145,31 +958,16 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):** Most FK/type/idempotency work is done (maintenance-27/28/41–44). Open items are mostly **column renames / destructive schema** → 🟦 human-merge (gate-14c + rename-sweep blast radius); a *reversible* type-narrowing (15.17) can arm 🟨 via the `/plan` schema-safety guard; doc items are 🟩.
 
+> ✅ resolved (17): 15.2, 15.4, 15.5, 15.8, 15.9, 15.10, 15.11, 15.13, 15.14, 15.15, 15.16, 15.18, 15.19, 15.20, 15.21, 15.22, 15.23 — evidence in [archive](archive/maintenance-backlog-archive.md)
+
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
 | 15.1 | ⬜ Open | 🟦 | Tier-3 box-score `teamid`-family rename (+ rcb/config `team_id`). Column-rename sweep + destructive schema → human-merge. |
-| 15.2 | ✅ Implemented | — | teamID→teamid (migration 114). |
 | 15.3 | ⬜ Open | 🟦 | cy/dem/offer 1NF child-table normalization (L). Major destructive redesign → human-merge. (cy1→salary_yr1 rename already done in 119.) |
-| 15.4 | ✅ Implemented | — | career `retired`→tinyint(1) (#135). |
-| 15.5 | ✅ Implemented | — | team_info booleans→tinyint(1) (#135). |
 | 15.6 | ⬜ Open | 🟦 | Awards tables PascalCase PK/column rename (Tier-7). Destructive rename + sweep → human-merge. |
 | 15.7 | ◑ Partial | 🟦 | `name`→`setting_key` done (#143); `value`→`setting_value` deferred (reserved-word rename + sweep → human-merge). |
-| 15.8 | ✅ Implemented | — | ibl_demands pid FK + PK (#1037). |
-| 15.9 | ✅ Implemented | — | trade_info FK (migration 067). |
-| 15.10 | ✅ Implemented | — | box_scores teamid FK (#142). |
-| 15.11 | ✅ Implemented | 🟩 | Document migration numbering gaps in README; docs-only. **Status:** Documented numbering gaps (018-023, 111, 136, 146-148) in `ibl5/migrations/README.md` (this PR). |
 | 15.12 | ⬜ Open | 🟩 | Codify suffix convention + CI lint for new names; docs + additive gate. |
-| 15.13 | ✅ Implemented | — | box_scores_teams.name NOT NULL (#138). |
-| 15.14 | ✅ Implemented | — | one_on_one winner_pid/loser_pid FKs (#139). |
-| 15.15 | ✅ Implemented | — | ASG/EOY ballot cols→varchar(128) (#145); further shrink needs prod MAX audit (data-blocked). |
-| 15.16 | ✅ Implemented | — | **Marker was missing/stale.** ibl_draft.team varchar(255)→varchar(35) (#1157, maintenance-41c). |
 | 15.17 | ⬜ Open | 🟨 | olympics_career int(11)→smallint/mediumint. Reversible narrowing → arm via the `/plan` schema-safety guard (apply-time fail-closed + DatabaseIntegration test); else 🟦. |
-| 15.18 | ✅ Implemented | 🟩 | migrations/README strip stale "pending"/dead refs; docs-only. **Status:** Stripped stale "PENDING"/roadmap framing and dead doc refs from `ibl5/migrations/README.md` (this PR). |
-| 15.19 | ✅ Implemented | — | league_config teamid FK + trigger (#140). |
-| 15.20 | ✅ Implemented | — | box_scores.pos→ENUM (#135). |
-| 15.21 | ✅ Implemented | — | covering index (migration 091/121). |
-| 15.22 | ✅ Implemented | — | 113/117/125 idempotent (maintenance-27). |
-| 15.23 | ✅ Implemented | — | gm_history.name disambiguated (#137). |
 
 ### 15.1 `tid` / `teamid` / `team_id` — Three Spellings Survive ADR-0009
 **Location:** `ibl_box_scores` (`visitorTID`, `homeTID`, `teamID`), `ibl_box_scores_teams` (`visitorTeamID`, `homeTeamID`), `ibl_rcb_*` (`team_id`), `ibl_league_config` (`team_id`)

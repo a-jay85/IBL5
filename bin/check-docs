@@ -749,8 +749,9 @@ function iterChangedDocs(string $base, string $repoRoot): array
  *   (c) Body-status backlogs only: when the diff ADDS a `**Status:** ✅ Implemented`
  *       / `🚫 Declined` line the base lacked, the same file must also add an archive
  *       pointer. Anchored to `**Status:**`-shaped lines, so a table-cell status flip
- *       (maintenance/a11y style) never trips it. Files in TABLE_STATUS_BACKLOGS are
- *       exempt belt-and-suspenders.
+ *       (a11y style) never trips it. TABLE_STATUS_BACKLOGS files are exempt: a resolved
+ *       row there is **removed** rather than status-flipped, and that removal is enforced
+ *       separately and corpus-wide by checkMaintenanceResolved().
  *
  * README.md (the index) and archive/ files are out of scope for all three. Base-missing
  * (added) files read as an empty base body, matching iterChangedDocs' base-blob fetch.
@@ -999,6 +1000,33 @@ function selfTestRetiredFigures(): int
     return 1;
 }
 
+/**
+ * Resolved (✅/🚫) findings must not remain as rows in a per-axis table — they collapse
+ * to the axis's `> ✅ resolved (N): …` summary line with evidence moved to the sibling
+ * archive (ibl5/docs/backlog/README.md § Archiving an item).
+ *
+ * Reads the one LIVE table-status backlog directly rather than the changed-file set: a
+ * resolved row that slipped in on an untouched commit is exactly the miss this catches.
+ *
+ * @return list<string>
+ */
+function checkMaintenanceResolved(string $repoRoot): array
+{
+    $rel = 'ibl5/docs/backlog/maintenance-backlog.md';
+    $abs = $repoRoot . '/' . $rel;
+    if (!is_file($abs)) {
+        return [];
+    }
+    $body = (string) file_get_contents($abs);
+    $n = preg_match_all('/^\|\s*\d+\.\d+\s*\|\s*(?:✅|🚫)/mu', $body);
+
+    return $n > 0 ? [sprintf(
+        '%s: %d resolved (✅/🚫) table row(s) found — collapse to per-axis summary lines and move evidence to archive/ (README.md § Archive)',
+        $rel,
+        $n
+    )] : [];
+}
+
 // --- main ---
 
 $opts = ['fix_dates' => false, 'include_memory' => false, 'verbose' => false, 'since' => null, 'no_staleness' => false, 'staleness_report' => false];
@@ -1119,6 +1147,15 @@ $retiredIssues = checkRetiredFigures($files, $root);
 if ($retiredIssues !== []) {
     echo "FAIL retired-figure citations\n";
     foreach ($retiredIssues as $issue) {
+        echo "     - {$issue}\n";
+    }
+    $failures++;
+}
+
+$maintenanceIssues = checkMaintenanceResolved($root);
+if ($maintenanceIssues !== []) {
+    echo "FAIL maintenance-backlog resolved rows\n";
+    foreach ($maintenanceIssues as $issue) {
         echo "     - {$issue}\n";
     }
     $failures++;

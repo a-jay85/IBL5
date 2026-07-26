@@ -1,6 +1,6 @@
 ---
 description: JSB native-engine backlog — the count-axis cut-over blocker chain, static RE pins, faithful ports, and validation gates, each tagged with the model tier that owns its load-bearing reasoning (Fable-gated items marked).
-last_verified: 2026-07-25
+last_verified: 2026-07-26
 ---
 
 # JSB Native-Engine Backlog
@@ -114,15 +114,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 ➜ J6 Composite-scale pins — ✅ Implemented (2026-07-10): every target pinned + mechanism discovered; spawned J15/J18/J19; see [archive](archive/jsb-native-backlog-archive.md).
 
 ### J7 Turnover volume-coupling fidelity RE
-**Location:** Engine turnover model vs 5.60; measured `corr(volume, TOV/POSS)` engine **+0.163** vs real **−0.176** (gap +0.339). RE artifact: `jsb-native/re-artifacts/jsb-J7-tov-coupling-RE-20260720.md` (machine-local, git-excluded).
-**Mechanism (pinned 2026-07-20 — primary source master-ref :436-443, :478, :505-506):**
-- **5.60:** `P(turnover)` = offense's own per-48 TOV-rate composite (`+0xDD8` = `TOV/MIN×48`), applied per-possession as a **volume-normalized share**: `TVR_rate / (total_shot_rate + TVR_rate)`. High shot-volume grows the denominator without touching the numerator → `P(TO)` diluted → `TOV/POSS` falls as volume rises → real **−0.176**. The per-48 normalization cancels in the ratio; what governs is the pure share, not rates. The fast-break conversion path (`:436-443`: `total_shot_rate / (total_shot_rate + TVR_rate)`) is a **secondary, same-signed channel** (high-volume teams also *convert* fast breaks more / lose fewer) — corroborated at :443, but it is NOT the turnover generator.
-- **Go (`steal.go:82`):** `prob = stealTurnoverScale × (100−TVR_rating) × Σ(defender STL × fatigue)` — absolute product, no shot_rate in the denominator, no share. The offense's TOV-rate self-coupling is severed and replaced with a rating×opponent-steal-pool product that carries no roster shot/TOV anti-correlation → residual nets **+0.163**.
-**Verdict:** Sign flip = **stat-vs-rating + self-vs-opponent** substitution in the turnover-probability anchor — the same `offQ`/`defQ` divergence pattern at `00_MASTER_REFERENCE.md:1488`. This is a **normalization-kind** mismatch, not a mechanical-competition difference (steal-before-shot competition exists in both engines — confirmed; not the discriminator). An independent, sizeable fidelity bug. Confirms and quantifies the June closure (`jsb-poss-channel-RE-20260613.md:77-80`).
-**A/B (measured 2026-07-26):** Faithful port **regressed** `Cov(lnFGA,lnPPS)` by **−0.000062** (pre-impl −0.000226 → post-impl −0.000288; estimated −0.0001..−0.0002 was the plan prior; actual delta smaller). Disclosed as J28. Filed as bug, never as count-axis fix.
-**Port:** ⚙️ Sonnet from the pinned mechanism; sequenced after J13.
-**Status (2026-07-26):** ✅ Implemented — `teamOffTOVShare` (`TVR_rate/(shot_rate+TVR_rate)`) replaces `stealTurnoverScale×(100−TVR)×Σ(STL×fatigue)`. `StealTurnoverScale` and `teamStealPressure` removed. `tovCarelessRate48` added for IBL5 TVR orientation (high TVR = good security = fewer steal TOs). Cov regression −0.000062 disclosed as J28. ⚙️ Sonnet.
-
+➜ J7 Turnover volume-coupling fidelity RE — ✅ Implemented (2026-07-26): `teamOffTOVShare` (TVR_rate/(shot_rate+TVR_rate)) replaces stealTurnoverScale×(100−TVR)×Σ(STL×fatigue); Cov regression −0.000062 disclosed as J28; PR #1676. See [archive](archive/jsb-native-backlog-archive.md).
 ### J8 Transition trigger denominator 18
 ➜ J8 Transition trigger denominator 18 — ✅ Implemented (2026-07-13): PR #1433 (`transitionTriggerDenom` 20→18, asm-verified); see [archive](archive/jsb-native-backlog-archive.md).
 

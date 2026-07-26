@@ -73,7 +73,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 | J4 | Play-by-play extraction parser | ✅ Implemented | ⚙️ Sonnet | M |
 | J5 | Unpinnable-claims sweep + static closures | ✅ Implemented | 🔮 Fable | M |
 | J6 | Composite-scale pins (+0xD90/+0xDB0, `f`, full player formula map) | ✅ Implemented | 🔮 Fable | M |
-| J7 | Turnover volume-coupling fidelity RE | ◑ Partial | 🧠 Opus | M |
+| J7 | Turnover volume-coupling fidelity RE | ✅ Implemented | ⚙️ Sonnet | M |
 | J8 | Transition trigger denominator 18 | ✅ Implemented | ⚙️ Sonnet | S |
 | J9 | League-baseline faithful port (FUN_004385f0) | ✅ Implemented | ⚙️ Sonnet | S |
 | J10 | `.plb` minutes reader + stamina=100 bundle fix | ✅ Implemented | ⚙️ Sonnet | S |
@@ -93,6 +93,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 | J24 | Possession-clock subsystem faithful port (step classes + jitter + arming) | ◑ Partial | 🧠 Opus | L |
 | J26 | `fastClassShareArtifact` era/corpus field gap — all-era run logs recent-era band text (instrument hazard) | ✅ Implemented | ⚙️ Sonnet | S |
 | J27 | FTA undershoot ~−21% vs sco (engine 152,874 / sco 194,185 = −21.27%; no confirmed mechanism) | ⬜ Open | 🧠 Opus | M |
+| J28 | Cov(lnFGA,lnPPS) regression from J7 TOV-coupling port (−0.000062 actual, disclosed fidelity cost) | ⬜ Open | 🧠 Opus | S |
 
 ### J1 Faithful foul-bucket pair port
 ➜ J1 Faithful foul-bucket pair port — ✅ Implemented (2026-07-10): see [archive](archive/jsb-native-backlog-archive.md).
@@ -118,9 +119,9 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 - **5.60:** `P(turnover)` = offense's own per-48 TOV-rate composite (`+0xDD8` = `TOV/MIN×48`), applied per-possession as a **volume-normalized share**: `TVR_rate / (total_shot_rate + TVR_rate)`. High shot-volume grows the denominator without touching the numerator → `P(TO)` diluted → `TOV/POSS` falls as volume rises → real **−0.176**. The per-48 normalization cancels in the ratio; what governs is the pure share, not rates. The fast-break conversion path (`:436-443`: `total_shot_rate / (total_shot_rate + TVR_rate)`) is a **secondary, same-signed channel** (high-volume teams also *convert* fast breaks more / lose fewer) — corroborated at :443, but it is NOT the turnover generator.
 - **Go (`steal.go:82`):** `prob = stealTurnoverScale × (100−TVR_rating) × Σ(defender STL × fatigue)` — absolute product, no shot_rate in the denominator, no share. The offense's TOV-rate self-coupling is severed and replaced with a rating×opponent-steal-pool product that carries no roster shot/TOV anti-correlation → residual nets **+0.163**.
 **Verdict:** Sign flip = **stat-vs-rating + self-vs-opponent** substitution in the turnover-probability anchor — the same `offQ`/`defQ` divergence pattern at `00_MASTER_REFERENCE.md:1488`. This is a **normalization-kind** mismatch, not a mechanical-competition difference (steal-before-shot competition exists in both engines — confirmed; not the discriminator). An independent, sizeable fidelity bug. Confirms and quantifies the June closure (`jsb-poss-channel-RE-20260613.md:77-80`).
-**A/B (estimated):** A faithful port **regresses** the headline `Cov(lnFGA,lnPPS)` by ≈ **−0.0001..−0.0002** (from engine −0.000807 toward ≈ −0.0009..−0.0010, further from real +0.000269) — it raises FGA for high-volume/low-PPS teams, compounding with the empty-FGA anti-coupling. Confirm A/B on current master (post-J22/J24) before shipping. Filed as bug, never as count-axis fix.
-**Port:** ⚙️ Sonnet from the pinned mechanism; sequence after J13 (count-axis fix must be in place before this regression is acceptable).
-**Status (2026-07-20):** ◑ Partial — RE and verdict complete (artifact above). Port is a ⚙️ Sonnet follow-on, sequenced after J13.
+**A/B (measured 2026-07-26):** Faithful port **regressed** `Cov(lnFGA,lnPPS)` by **−0.000062** (pre-impl −0.000226 → post-impl −0.000288; estimated −0.0001..−0.0002 was the plan prior; actual delta smaller). Disclosed as J28. Filed as bug, never as count-axis fix.
+**Port:** ⚙️ Sonnet from the pinned mechanism; sequenced after J13.
+**Status (2026-07-26):** ✅ Implemented — `teamOffTOVShare` (`TVR_rate/(shot_rate+TVR_rate)`) replaces `stealTurnoverScale×(100−TVR)×Σ(STL×fatigue)`. `StealTurnoverScale` and `teamStealPressure` removed. `tovCarelessRate48` added for IBL5 TVR orientation (high TVR = good security = fewer steal TOs). Cov regression −0.000062 disclosed as J28. ⚙️ Sonnet.
 
 ### J8 Transition trigger denominator 18
 ➜ J8 Transition trigger denominator 18 — ✅ Implemented (2026-07-13): PR #1433 (`transitionTriggerDenom` 20→18, asm-verified); see [archive](archive/jsb-native-backlog-archive.md).
@@ -291,7 +292,7 @@ Three-date routing record (artifacts `calibration-5.60-20260722/23/24-3pt-attemp
 - **Phase-4 usage-dominance flag (+0x33F0)** is NOT an FG% lever — numerator objdump-pinned to +0xD90 = `twoPtBucketWeight`; the faithful flag fires 0.0005%, FG% +0.01pp (#1541, corrected for faithfulness only, INERT). `jsb-native/re-artifacts/jsb-fgpct-phase4-numerator-pin-20260720.md`.
 - **Phase-3 matched-defender term** is NOT an FG% lever — `(DefAST48 − leagueAST48[slot])·0.8` is mean-zero across defenders; ported faithfully it moved FG% only 46.08→46.19%.
 - **`dec_rate_delta_e` / `named_carrier: inconclusive_d` from the localise instrument are NOT the attempt-rate carrier** (2026-07-22): the instrument's `real_pa_per_min` benchmarks engine-vs-reality (`.plr` real-life 3PA rates, not `.sco`); `total_gap` −0.0579 conflates (engine↔jsb) with (jsb↔reality), so `DecRateDeltaE` −0.0415 is an artifact of the wrong reference point. Discriminating proof: `engine/internal/calibrate/threept_localize_archive_test.go:184-232` (source verification that the reference is `.plr` real-life stats) + the 2GA-vs-sco parity in the undershoot artifacts (pre-port `...-3pt-undershoot-ab-suppress.json` 884,686/878,321 = **100.7%**; post-port `...-3pt-undershoot.json` 870,986/878,321 = **99.2%**) — total shot volume at near-parity either side of the port rules out a decision-frequency deficit as the carrier. Do NOT re-open the shot-decision-frequency deficit as the gap carrier.
-- **J7 faithful TOV port** is NOT a count-axis fix — the faithful share port REGRESSES Cov(lnFGA,lnPPS) by ≈ −0.0001..−0.0002 (away from real +0.000269); file as an independent fidelity bug, sequence after J13.
+- **J7 faithful TOV port** is NOT a count-axis fix — the faithful share port REGRESSES Cov(lnFGA,lnPPS) by **−0.000062** (measured 2026-07-26; pre-impl −0.000226 → post-impl −0.000288; further from real +0.000269). ✅ Implemented (J28 tracks the residual regression).
 - **Master pre-partition fastclass counters** — the 9.48%/18.44% DRB-only / steal-union split, and the shelved-branch 13.92%/11.82% at +1/−1 — are NOT band-comparable and are now MOOT post-#1547; the only band-comparable quantity is the merged `DRBPushSharePct` (12.37% **[SUPERSEDED 2026-07-24 — 12.4142%]**). Do NOT resurrect them.
 - **The elected ~12.42 / 2-season CI floor is NOT a construction defect — do NOT re-elect a looser bar** (2026-07-23, ADR-0094). Adversarial statistical audit of ADR-0090's criterion #2: the un-derived "~12.42" is a *provenance* gap (√2-shrink of the reproduced 1-season CI = 12.4216; direct 2280-game 2-season bootstrap = [12.418, 12.653]), not an internal error in `[12.374, 12.698]`. "~12.42 is un-derived, therefore elect a different bar" is a criterion-selection **PREFERENCE**, not a defect — the repair is to cite the computed 12.374, never to swap gates. `jsb-native/re-artifacts/adr0092_resolution.py` + ADR-0094.
 - **"Master is inside the drift band [11.97, 12.54], so elect the band" is NOT-A-LEVER** (2026-07-23, ADR-0094). ADR-0090 § Decision knowingly declined this; a wider *game* window yields a *tighter* floor (the direct 2-season bootstrap lower bound RISES, moving the bar away from GO), so the band is a different kind of object, not a looser-but-equivalent gate. Criterion-selection PREFERENCE.
@@ -330,3 +331,15 @@ Three-date routing record (artifacts `calibration-5.60-20260722/23/24-3pt-attemp
 **Open:** mechanism is unattributed. No confirmed lever exists. Do NOT claim a mechanism from J27's numbers alone; pick a lever from the leverage report (`ls -t jsb-native/re-artifacts/leverage-*.txt`) first.
 
 **Status (⬜ Open, filed 2026-07-24).** Tier: 🧠 Opus (novel RE — mechanism attribution requires tracing the foul-draw path, no confirmed lever yet). Effort: M (multi-step investigation + faithful port + re-measurement if a lever is found).
+
+### J28 Cov(lnFGA,lnPPS) regression from J7 TOV-coupling port
+
+*(Numbered J28: next available after J27.)*
+
+**Mechanism:** J7 faithful port (`teamOffTOVShare`) regresses `Cov(lnFGA,lnPPS)` by **−0.000062** (pre-impl −0.000226 → post-impl −0.000288, 2026-07-26 archive run, 15 seasons). Further from real +0.000269. Faithfulness cost per ADR-0090; not grounds to withhold the J7 port.
+
+**Why it regresses:** High-volume lineups have larger `total_shot_rate` denominators → `P(TO) = TVR_rate/(shot_rate+TVR_rate)` is diluted → TOV count falls → FGA/g rises without a proportional PPS rise → Cov(lnFGA,lnPPS) is pushed more negative. This is the same FGA anti-coupling amplification that makes J7 necessary.
+
+**Measurement (2026-07-26):** `TestRealArchive_PossessionCoupling`, worktree `jsb-j7-tov-coupling-port`. Pre-impl baseline: −0.000226; post-impl: −0.000288; Δ = −0.000062.
+
+**Status (2026-07-26, ⬜ Open):** Disclosed; no positive Cov lever confirmed. Do NOT re-open J7 for this — J7 faithfulness is the cause, not the fix. A positive Cov fix must come from the FGA anti-coupling (see J20 declined rationale) or a future count-axis improvement. Tier: 🧠 Opus. Effort: S (disclosure only until a positive lever is identified).

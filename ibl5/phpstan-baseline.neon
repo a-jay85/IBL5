@@ -267,8 +267,14 @@ parameters:
 		-
 			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
 			identifier: ibl.trustedVariable
-			count: 2
-			path: classes/FreeAgency/FreeAgencyView.php
+			count: 1
+			path: classes/FreeAgency/FreeAgencyTeamFreeAgentsSectionView.php
+
+		-
+			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
+			identifier: ibl.trustedVariable
+			count: 1
+			path: classes/FreeAgency/FreeAgencyUnderContractSectionView.php
 
 		-
 			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "ordinal" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'

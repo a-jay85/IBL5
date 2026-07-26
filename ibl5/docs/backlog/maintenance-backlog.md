@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-07-25
+last_verified: 2026-07-26
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -47,10 +47,10 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 | Status | Count |
 |--------|------:|
-| ✅ Implemented | 228 |
+| ✅ Implemented | 229 |
 | ◑ Partial | 25 |
 | 📋 Planned (plan queued / PR open) | 1 |
-| ⬜ Open | 67 |
+| ⬜ Open | 66 |
 | 🚫 Declined | 10 |
 
 > Status counts re-verified 2026-06-28 (exact, from the per-axis tables); **6.20 / 6.21 added 2026-06-29** from the PR #1107 review (⬜ Open +2); **6.22 added 2026-06-29** from the #1066 reject-IDOR review (⬜ Open +1). Two stale-Open rows were flipped directly (no plan owned them): **13.3**, **13.9** (✅ +2, ⬜ −2 vs the master re-count). **1.21–1.31 added 2026-07-24** from the hot-files comment→backlog migration (⬜ Open +11: 8 🟩 auto-mergeable, 3 🟨 conditional — 1.23/1.25/1.31 need characterization/endpoint pins). **Ground-truth audit 2026-07-24:** 7 stale-Open items flipped ✅, 2 false findings marked 🚫, 5 new Axis-1 rows seeded (1.32–1.36); IDOR PRs #1107–1110 merged 2026-06-29 (unblocking 2.10/2.13/2.14/2.25/7.7/14.6); PRs #1240/#1230/#1204 merged (2.6/2.31/2.32/5.18 already ✅/Open on own merits). **9.19 and 9.20 implemented 2026-07-24** — added READMEs to all 68 missing class dirs + frontmatter to all 16 existing class READMEs that lacked it; extended bin/check-docs IN_SCOPE_GLOBS (✅ +2, ⬜ −2); roll-up recomputed from grep (331 rows total, unchanged). **6.16 flipped ✅ 2026-07-24** (all Api data repos + JsonResponder + SystemClock tested; ✅ +1, ◑ −1). **6.14 Status updated 2026-07-24** (ProcessBoxscoresStep/GenerateSeasonAwardsStep/ParseJsbFilesStep added; still ◑). **Resolved rows collapsed 2026-07-25** — ✅/🚫 findings no longer appear as table rows; each axis carries a `> ✅ resolved (N): …` / `> 🚫 declined (N): …` summary line and their evidence lives in [archive/maintenance-backlog-archive.md](archive/maintenance-backlog-archive.md). **Recount recipe:** resolved = sum of the `(N)` in the per-axis summary lines; open = grep of the per-axis table rows; total = the two added. Counts above are unchanged by the collapse (238 + 93 = 331).
@@ -74,7 +74,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
-> ✅ resolved (18): 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 1.14, 1.15, 1.16, 1.17, 1.20 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (19): 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 1.14, 1.15, 1.16, 1.17, 1.20, 1.34 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
@@ -93,7 +93,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 1.31 | ⬜ Open | 🟨 | TradeRosterPreviewApiHandler 508 LOC — API handler mixing param validation + cash-row building + table render. Extract validation and cash-row collaborators; endpoint (request-handling) → add an E2E/characterization pin. |
 | 1.32 | ⬜ Open | 🟩 | StandingsRepository 726 LOC — per-category standings query methods. Extract per-category query collaborators; green-green DB pin. Shares `classes/Standings/` with 1.35 — plan as ONE chunk. |
 | 1.33 | ⬜ Open | 🟩 | Player 671 LOC — typed-getter accumulation. Extract per-domain typed-getter groups (contract, stats, identity); green-green. |
-| 1.34 | ⬜ Open | 🟩 | SavedDepthChartService 626 LOC — depth-chart data assembly + slot-conflict resolution. Extract slot-resolution collaborator; green-green. |
 | 1.35 | ⬜ Open | 🟩 | StandingsView 610 LOC — per-division block renderers. Extract per-division renderer collaborators; golden-master pin. Shares `classes/Standings/` with 1.32 — plan as ONE chunk. |
 | 1.36 | ⬜ Open | 🟩 | FreeAgencyView 590 LOC — offer-table/form/decision-panel renderers. Extract per-section renderer collaborators; golden-master pin. |
 
@@ -216,14 +215,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Extract per-domain typed-getter groups (contract, stats, identity) into focused value-object collaborators; keep `Player` as the root entity.
 **Est. effort:** M
 **Risk if untouched:** Every new player attribute inflates one file; getter search spans the entire class.
-**Provenance:** Seeded 2026-07-24 — ground-truth audit hot-file scan.
-
-### 1.34 SavedDepthChartService — Data Assembly + Slot-Conflict Resolution (626 LOC)
-**Location:** `ibl5/classes/SavedDepthChart/SavedDepthChartService.php` (626 lines)
-**Problem:** One service assembles depth-chart page data and resolves slot conflicts, mixing orchestration with conflict-resolution logic.
-**Suggested direction:** Extract a slot-resolution collaborator; keep the service as the page-data assembler.
-**Est. effort:** M
-**Risk if untouched:** Depth-chart conflict logic hidden inside a large service; green-green extraction.
 **Provenance:** Seeded 2026-07-24 — ground-truth audit hot-file scan.
 
 ### 1.35 StandingsView — Per-Division Block Renderer (610 LOC)

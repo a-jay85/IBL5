@@ -6,6 +6,7 @@ namespace SavedDepthChart;
 
 use SavedDepthChart\Contracts\SavedDepthChartServiceInterface;
 use SavedDepthChart\Contracts\SavedDepthChartRepositoryInterface;
+use SavedDepthChart\Contracts\SlotAssignmentResolverInterface;
 use Season\Season;
 
 /**
@@ -19,6 +20,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
 {
     private SavedDepthChartRepositoryInterface $repository;
     private \mysqli $db;
+    private SlotAssignmentResolverInterface $slotResolver;
 
     /**
      * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('audit').
@@ -37,11 +39,13 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
     public function __construct(
         \mysqli $db,
         ?SavedDepthChartRepositoryInterface $repo = null,
-        ?\Psr\Log\LoggerInterface $logger = null
+        ?\Psr\Log\LoggerInterface $logger = null,
+        ?SlotAssignmentResolverInterface $slotResolver = null
     ) {
         $this->db = $db;
         $this->repository = $repo ?? new SavedDepthChartRepository($db);
         $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('audit');
+        $this->slotResolver = $slotResolver ?? new SlotAssignmentResolver();
     }
 
     /**
@@ -348,85 +352,17 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
         $ordinal = 1;
 
         foreach ($rosterPlayers as $player) {
-            $pidKey = $this->findPidIndex($player, $postData, $ordinal);
-            if ($pidKey === 0) {
+            $dcSettings = $this->slotResolver->resolveSlotSettings($player, $postData, $ordinal);
+            if ($dcSettings === null) {
                 $ordinal++;
                 continue;
             }
-
-            $dcSettings = [
-                'pg' => $this->extractIntFromPost($postData, 'pg' . $pidKey),
-                'sg' => $this->extractIntFromPost($postData, 'sg' . $pidKey),
-                'sf' => $this->extractIntFromPost($postData, 'sf' . $pidKey),
-                'pf' => $this->extractIntFromPost($postData, 'pf' . $pidKey),
-                'c' => $this->extractIntFromPost($postData, 'c' . $pidKey),
-                'canPlayInGame' => $this->extractIntFromPost($postData, 'canPlayInGame' . $pidKey),
-                'min' => $this->extractIntFromPost($postData, 'min' . $pidKey),
-                'of' => $this->extractIntFromPost($postData, 'OF' . $pidKey),
-                'df' => $this->extractIntFromPost($postData, 'DF' . $pidKey),
-                'oi' => $this->extractIntFromPost($postData, 'OI' . $pidKey),
-                'di' => $this->extractIntFromPost($postData, 'DI' . $pidKey),
-                'bh' => $this->extractIntFromPost($postData, 'BH' . $pidKey),
-            ];
 
             $snapshots[] = $this->buildPlayerSnapshot($player, $dcSettings, $ordinal);
             $ordinal++;
         }
 
         return $snapshots;
-    }
-
-    /**
-     * Find the form index for a player by matching pid fields in POST data
-     *
-     * Falls back to ordinal position if pid fields aren't present
-     *
-     * @param array<string, mixed> $player
-     * @param array<string, mixed> $postData
-     */
-    private function findPidIndex(array $player, array $postData, int $ordinal): int
-    {
-        $playerPid = $this->toInt($player['pid'] ?? 0);
-
-        // Try to match by pid hidden field
-        for ($i = 1; $i <= 15; $i++) {
-            $pidField = 'pid' . $i;
-            if (isset($postData[$pidField]) && $this->toInt($postData[$pidField]) === $playerPid) {
-                return $i;
-            }
-        }
-
-        // Fall back to matching by name (existing pattern) or ordinal
-        $playerName = $this->toString($player['name'] ?? '');
-        for ($i = 1; $i <= 15; $i++) {
-            $nameField = 'Name' . $i;
-            $postName = isset($postData[$nameField]) ? $this->toString($postData[$nameField]) : '';
-            if ($postName !== '' && trim(strip_tags($postName)) === $playerName) {
-                return $i;
-            }
-        }
-
-        // Last resort: use ordinal position
-        if (isset($postData['Name' . $ordinal])) {
-            return $ordinal;
-        }
-
-        return 0;
-    }
-
-    /**
-     * @param array<string, mixed> $postData
-     */
-    private function extractIntFromPost(array $postData, string $key): int
-    {
-        $value = $postData[$key] ?? 0;
-        if (is_int($value)) {
-            return $value;
-        }
-        if (is_string($value) && is_numeric($value)) {
-            return (int) $value;
-        }
-        return 0;
     }
 
     private function calculateNextSimStartDate(string $lastSimEndDate): string

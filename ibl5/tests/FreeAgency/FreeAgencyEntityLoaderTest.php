@@ -78,4 +78,53 @@ class FreeAgencyEntityLoaderTest extends TestCase
         $this->assertNotNull($staticEx, 'Player::withPlayerID() must throw when player not found');
         $this->assertSame($staticEx->getMessage(), $loaderEx->getMessage());
     }
+
+    public function testLoadTeamWithUnknownNameBehavesLikeStaticFactory(): void
+    {
+        // Both the loader and Team::initialize() throw when no row is found.
+        $loaderEx = null;
+        $staticEx = null;
+
+        $loaderDb = new MockDatabase();
+        $loader   = new FreeAgencyEntityLoader($loaderDb);
+        try {
+            $loader->loadTeam('NonExistentTeam');
+        } catch (\RuntimeException $e) {
+            $loaderEx = $e;
+        }
+
+        $staticDb = new MockDatabase();
+        try {
+            Team::initialize($staticDb, 'NonExistentTeam');
+        } catch (\RuntimeException $e) {
+            $staticEx = $e;
+        }
+
+        $this->assertNotNull($loaderEx, 'FreeAgencyEntityLoader::loadTeam() must throw when team not found');
+        $this->assertNotNull($staticEx, 'Team::initialize() must throw when team not found');
+        $this->assertSame($staticEx->getMessage(), $loaderEx->getMessage());
+    }
+
+    public function testLoadTeamWithEmptyStringDoesNotThrow(): void
+    {
+        // '' maps to FREE_AGENTS_TEAMID (0) inside Team::load(); provide a row
+        // for teamid=0 so the query succeeds and no RuntimeException is raised.
+        $this->mockDb->setMockData([[
+            'teamid'        => 0,
+            'team_name'     => 'Free Agents',
+            'team_city'     => 'League',
+            'color1'        => '888888',
+            'color2'        => 'FFFFFF',
+            'arena'         => '',
+            'capacity'      => 0,
+            'owner_name'    => '',
+            'owner_email'   => '',
+            'league_record' => null,
+        ]]);
+
+        $loader = new FreeAgencyEntityLoader($this->mockDb);
+        $team   = $loader->loadTeam('');
+
+        $this->assertInstanceOf(Team::class, $team);
+    }
 }

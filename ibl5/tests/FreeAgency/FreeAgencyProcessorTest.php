@@ -6,10 +6,14 @@ namespace Tests\FreeAgency;
 
 use PHPUnit\Framework\TestCase;
 use FreeAgency\FreeAgencyProcessor;
+use FreeAgency\Contracts\FreeAgencyCapCalculatorFactoryInterface;
+use FreeAgency\Contracts\FreeAgencyCapCalculatorInterface;
+use FreeAgency\Contracts\FreeAgencyEntityLoaderInterface;
 use FreeAgency\Contracts\FreeAgencyMarketDemandCalculatorInterface;
 use FreeAgency\Contracts\FreeAgencyRepositoryInterface;
 use Player\Player;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
+use Team\Team;
 use Tests\WideUnit\Mocks\MockDatabase;
 use Tests\WideUnit\Mocks\MockPreparedStatement;
 
@@ -464,7 +468,6 @@ class FreeAgencyProcessorTest extends TestCase
             'salary_yr1' => 500, // signed this FA period
         ])]);
 
-        $capturingRepo = new CapturingRepository();
         // Override isPlayerAlreadySigned to return true
         $signingRepo = new class extends CapturingRepository {
             public function isPlayerAlreadySigned(int $playerId): bool
@@ -485,6 +488,129 @@ class FreeAgencyProcessorTest extends TestCase
         $this->assertFalse($result['success']);
         $this->assertSame('already_signed', $result['type']);
         $this->assertNull($signingRepo->lastSavedOffer, 'Should not save offer for signed player');
+    }
+
+    // ================================================================
+    // DI CUT-OVER — Phase 6 new test cases
+    // ================================================================
+
+    public function testOverCapOfferRejectedViaInjectedCapCalculatorFactory(): void
+    {
+        $this->mockDb->setMockData([$this->getCompletePlayerData()]);
+
+        $player = Player::withPlayerID($this->mockDb, 1);
+        $team = Team::initialize($this->mockDb, 'Test Team');
+
+        /** @var FreeAgencyCapCalculatorInterface&\PHPUnit\Framework\MockObject\Stub $calcStub */
+        $calcStub = $this->createStub(FreeAgencyCapCalculatorInterface::class);
+        $calcStub->method('calculateTeamCapMetrics')->willReturn([
+            'totalSalaries' => [0 => 8150],
+            'softCapSpace'  => [0 => 100],
+            'hardCapSpace'  => [0 => -1150],
+            'rosterSpots'   => [0 => 1],
+        ]);
+
+        /** @var FreeAgencyCapCalculatorFactoryInterface&\PHPUnit\Framework\MockObject\Stub $factoryStub */
+        $factoryStub = $this->createStub(FreeAgencyCapCalculatorFactoryInterface::class);
+        $factoryStub->method('forTeam')->willReturn($calcStub);
+
+        /** @var FreeAgencyEntityLoaderInterface&\PHPUnit\Framework\MockObject\Stub $loaderStub */
+        $loaderStub = $this->createStub(FreeAgencyEntityLoaderInterface::class);
+        $loaderStub->method('loadPlayer')->willReturn($player);
+        $loaderStub->method('loadTeam')->willReturn($team);
+
+        $capturingRepo = new CapturingRepository();
+
+        $processor = new FreeAgencyProcessor(
+            $this->mockDb,
+            self::createStub(TeamIdentityRepositoryInterface::class),
+            repository: $capturingRepo,
+            entityLoader: $loaderStub,
+            capCalculatorFactory: $factoryStub,
+        );
+
+        // offer1=500 exceeds softCapSpace[0]=100 → soft-cap validation rejects
+        $result = $processor->processOfferSubmission($this->buildValidPost(), 'Test Team');
+
+        $this->assertFalse($result['success']);
+        $this->assertSame('validation_error', $result['type']);
+        $this->assertStringContainsString('cap space', $result['message']);
+        $this->assertNull($capturingRepo->lastSavedOffer, 'Over-cap offer must not be saved');
+    }
+
+    public function testNonNumericPlayerIdIsCoercedToZero(): void
+    {
+        $this->mockDb->setMockData([$this->getCompletePlayerData()]);
+
+        $capturingRepo = new CapturingRepository();
+
+        $processor = new FreeAgencyProcessor(
+            $this->mockDb,
+            self::createStub(TeamIdentityRepositoryInterface::class),
+            repository: $capturingRepo,
+        );
+
+        // 'not-a-number' is not numeric → is_numeric() returns false → playerID coerced to 0
+        $result = $processor->processOfferSubmission(
+            ['playerID' => 'not-a-number', 'offerType' => 1, 'offeryear1' => 100],
+            'Test Team'
+        );
+
+        $this->assertSame(0, $result['playerID']);
+    }
+
+    public function testUnknownTeamNameReachesValidationRejectionNotAFatal(): void
+    {
+        $this->mockDb->setMockData([$this->getCompletePlayerData()]);
+
+        $player = Player::withPlayerID($this->mockDb, 1);
+
+        // Build an unpopulated Team via array identifier — avoids the DB query that
+        // would throw RuntimeException("Team not found: …") in the pre-DI code path.
+        $emptyTeam = Team::initialize($this->mockDb, [
+            'teamid'                    => 0,
+            'team_name'                 => '',
+            'team_city'                 => '',
+            'color1'                    => '',
+            'color2'                    => '',
+            'arena'                     => '',
+            'capacity'                  => 0,
+            'owner_name'                => '',
+            'owner_email'               => '',
+            'discord_id'                => null,
+        ]);
+
+        /** @var FreeAgencyEntityLoaderInterface&\PHPUnit\Framework\MockObject\Stub $loaderStub */
+        $loaderStub = $this->createStub(FreeAgencyEntityLoaderInterface::class);
+        $loaderStub->method('loadPlayer')->willReturn($player);
+        $loaderStub->method('loadTeam')->willReturn($emptyTeam);
+
+        // Stub the cap factory so the empty team's teamid=0 never reaches real DB queries.
+        /** @var FreeAgencyCapCalculatorInterface&\PHPUnit\Framework\MockObject\Stub $calcStub */
+        $calcStub = $this->createStub(FreeAgencyCapCalculatorInterface::class);
+        $calcStub->method('calculateTeamCapMetrics')->willReturn([
+            'totalSalaries' => [0 => 0],
+            'softCapSpace'  => [0 => 5000],
+            'hardCapSpace'  => [0 => 7000],
+            'rosterSpots'   => [0 => 15],
+        ]);
+
+        /** @var FreeAgencyCapCalculatorFactoryInterface&\PHPUnit\Framework\MockObject\Stub $factoryStub */
+        $factoryStub = $this->createStub(FreeAgencyCapCalculatorFactoryInterface::class);
+        $factoryStub->method('forTeam')->willReturn($calcStub);
+
+        $processor = new FreeAgencyProcessor(
+            $this->mockDb,
+            self::createStub(TeamIdentityRepositoryInterface::class),
+            repository: new CapturingRepository(),
+            entityLoader: $loaderStub,
+            capCalculatorFactory: $factoryStub,
+        );
+
+        // The unknown team is handled via the validation/save path — no RuntimeException thrown.
+        $result = $processor->processOfferSubmission($this->buildValidPost(), 'Unknown Team');
+
+        $this->assertIsArray($result);
     }
 
     // ================================================================

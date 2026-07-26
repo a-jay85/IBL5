@@ -102,22 +102,22 @@ func TestResearchSelfValidation(t *testing.T) {
 			"empirical noise floor), got %d point(s) all sub-noise", len(btPoss))
 	}
 
-	// Isolation arm: base_time_mid should NOT move steal_share above noise
-	// (pace change ≠ steal-rate change).
-	for _, p := range findPoints(rep, "base_time_mid", "steal_share") {
+	// Isolation arm: base_time_mid should NOT move non_steal_to_share above noise
+	// (pace change ≠ non-steal TO rate).
+	for _, p := range findPoints(rep, "base_time_mid", "non_steal_to_share") {
 		if p.AboveNoise {
-			t.Errorf("base_time isolation arm: (base_time_mid, steal_share) point "+
+			t.Errorf("base_time isolation arm: (base_time_mid, non_steal_to_share) point "+
 				"value=%g has AboveNoise==true — base_time changing pace should not "+
-				"move steal-share fraction above noise (possible isolation failure or "+
+				"move non-steal-TO share above noise (possible isolation failure or "+
 				"noise floor too low); delta=%+g noise=%g", p.Value, p.Delta, p.NoiseFloor)
 		}
 	}
 
-	// --- steal-scale arm ---
-	// The steal_turnover_scale stand-in should move steal_share above noise.
-	stPts := findPoints(rep, "steal_turnover_scale", "steal_share")
+	// --- non-steal-scale arm ---
+	// The non_steal_turnover_scale stand-in should move non_steal_to_share above noise.
+	stPts := findPoints(rep, "non_steal_turnover_scale", "non_steal_to_share")
 	if len(stPts) == 0 {
-		t.Fatal("steal-scale arm: no LeveragePoints for (steal_turnover_scale, steal_share) — " +
+		t.Fatal("non-steal-scale arm: no LeveragePoints for (non_steal_turnover_scale, non_steal_to_share) — " +
 			"stand-in missing or sweep produced no non-baseline values")
 	}
 	var stAbove bool
@@ -128,17 +128,17 @@ func TestResearchSelfValidation(t *testing.T) {
 		}
 	}
 	if !stAbove {
-		t.Errorf("steal-scale arm: expected at least one (steal_turnover_scale, steal_share) "+
-			"point AboveNoise==true (steal-scale sweep must move steal-share fraction above "+
+		t.Errorf("non-steal-scale arm: expected at least one (non_steal_turnover_scale, non_steal_to_share) "+
+			"point AboveNoise==true (non-steal-scale sweep must move non-steal-TO share above "+
 			"empirical noise floor), got %d point(s) all sub-noise", len(stPts))
 	}
 
-	// Isolation arm: steal_turnover_scale should NOT move cov_poss_pps above noise
-	// (steal rate changes TO rate, not pace — should not couple into possession↔efficiency covariance).
-	for _, p := range findPoints(rep, "steal_turnover_scale", "cov_poss_pps") {
+	// Isolation arm: non_steal_turnover_scale should NOT move cov_poss_pps above noise
+	// (non-steal TO rate changes TO share, not pace — should not couple into possession↔efficiency covariance).
+	for _, p := range findPoints(rep, "non_steal_turnover_scale", "cov_poss_pps") {
 		if p.AboveNoise {
-			t.Errorf("steal-scale isolation arm: (steal_turnover_scale, cov_poss_pps) point "+
-				"value=%g has AboveNoise==true — steal-scale changes TO rate, not pace, and "+
+			t.Errorf("non-steal-scale isolation arm: (non_steal_turnover_scale, cov_poss_pps) point "+
+				"value=%g has AboveNoise==true — non-steal TO scale changes TO share, not pace, and "+
 				"should not move possession-count coupling above noise; delta=%+g noise=%g",
 				p.Value, p.Delta, p.NoiseFloor)
 		}

@@ -171,7 +171,7 @@ func TestResearchWalk_ZeroDelta(t *testing.T) {
 			if call == 2 {
 				return copyTermMap(base2), nil // baseline run 2 (seed opts.Seed+1)
 			}
-			// Sweep call: check whether the apply closure set StealTurnoverScale.
+			// Sweep call: check whether the apply closure set NonStealTurnoverScale.
 			probe := o
 			apply(&probe)
 			if probe.NonStealTurnoverScale != nil {

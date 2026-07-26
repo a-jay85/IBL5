@@ -147,6 +147,9 @@ func offQualityWithHCA(offense []onCourt, hca float64) float64 {
 // leagueFGA48: real NBA FGA/player/48 min (J7 shot-rate anchor; ~85 FGA/game / 5 slots).
 const leagueFGA48 = 17.16
 
+// fgaRate48 returns a player's per-48 FGA rate (J7 shot-rate denominator).
+// When the player has real career minutes, uses real career FGA/MIN×48 (J22 wiring).
+// Falls back to the 0-99 FGA rating stand-in scaled by leagueFGA48 for rookies/un-wired.
 func fgaRate48(p onCourt) float64 {
 	if p.RealLifeMIN > 0 {
 		return float64(p.RealLifeFGA) / float64(p.RealLifeMIN) * 48.0

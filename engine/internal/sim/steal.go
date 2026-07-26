@@ -30,7 +30,7 @@ const (
 	carelessnessBase = 100.0
 
 	// maxTurnoverProb caps the per-possession turnover probability strictly below 1
-	// (a pathological careless×pressure product can never force a guaranteed
+	// (even a degenerate all-TVR lineup's teamOffTOVShare can never force a guaranteed
 	// turnover, which would let a roll of exactly 0 deadlock the level calibration).
 	maxTurnoverProb = 0.9
 )

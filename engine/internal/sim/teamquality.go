@@ -154,11 +154,26 @@ func fgaRate48(p onCourt) float64 {
 	return floor1(p.FGA) / ratingRefScale * leagueFGA48
 }
 
+// tovCarelessRate48 maps a player's IBL5 TVR rating to their per-48 turnover rate
+// for the J7 teamOffTOVShare formula. Orientation: higher IBL5 TVR = better ball
+// security = FEWER turnovers (carelessness-basis). Distinct from tovRate (offQuality
+// foul coupling, J6/J16) which must NOT be changed — do not merge these two functions.
+// Real path (RealLifeMIN>0): identical to tovRate — real career TOV/MIN×48.
+// Rating fallback: uses turnoverCarelessness(TVR) so high IBL5 TVR → low rate → fewer steal TOs.
+func tovCarelessRate48(p onCourt) float64 {
+	if p.RealLifeMIN > 0 {
+		return float64(p.RealLifeTVR) / float64(p.RealLifeMIN) * tovDivisor48
+	}
+	return turnoverCarelessness(p.TVR) / ratingRefScale * leagueTOV48
+}
+
 // teamOffTOVShare returns TVR_rate/(shot_rate+TVR_rate) — J7 5.60 mechanism.
+// Uses tovCarelessRate48 (not tovRate) so the IBL5 TVR rating maps correctly:
+// high TVR = good ball security = fewer steal TOs.
 func teamOffTOVShare(offense []onCourt) float64 {
 	var tov, shot float64
 	for _, p := range offense {
-		tov += tovRate(p) * p.fatigue
+		tov += tovCarelessRate48(p) * p.fatigue
 		shot += fgaRate48(p) * p.fatigue
 	}
 	if shot+tov == 0 {

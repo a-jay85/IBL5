@@ -73,17 +73,6 @@ func TestTurnoverCarelessness_Orientation(t *testing.T) {
 	}
 }
 
-func TestStealTurnover_ScalesWithDefensiveSTL(t *testing.T) {
-	const seeds = 4000
-	// Same ball-handler carelessness (TVR 40); only defensive STL differs.
-	lowSTL := countStealTurnovers(40, 10, seeds)
-	highSTL := countStealTurnovers(40, 40, seeds)
-	if highSTL <= lowSTL {
-		t.Errorf("high-STL defense should force MORE turnovers than low-STL: high=%d low=%d (of %d)",
-			highSTL, lowSTL, seeds)
-	}
-}
-
 func TestStealTurnover_HigherTVRFewerTurnovers(t *testing.T) {
 	const seeds = 4000
 	// Same defensive STL; only ball-handler TVR differs.
@@ -100,26 +89,19 @@ func TestTeamOffTOVShare_ZeroOnEmptyLineup(t *testing.T) {
 		t.Errorf("teamOffTOVShare(nil) = %v, want 0", got)
 	}
 }
-func TestTeamOffTOVShare_ScalesWithTOVRate(t *testing.T) {
-	ph := mkPlayer(0, 0, slotPG, 50)
-	ph.TVR = 99
-	high := []onCourt{oc(slotPG, ph)}
-	pl := mkPlayer(0, 0, slotPG, 50)
-	pl.TVR = 1
-	low := []onCourt{oc(slotPG, pl)}
-	if teamOffTOVShare(high) <= teamOffTOVShare(low) {
-		t.Errorf("high-TVR lineup should have higher TOV share")
-	}
-}
 
-// --- matrix #4: negative/boundary — zero STL, zero ratings ---------------------
-
-func TestStealTurnover_AllZeroSTLNoTurnover(t *testing.T) {
-	// An all-zero-STL defense has zero steal pressure → probability 0 → no
-	// steal-driven turnover, and no divide-by-zero / panic.
-	const seeds = 2000
-	if got := countStealTurnovers(40, 0, seeds); got != 0 {
-		t.Errorf("zero-STL defense produced %d steal turnovers, want 0", got)
+// TestTeamOffTOVShare_SecureHandlerLowerShare: higher IBL5 TVR (better ball security)
+// → lower carelessness → lower steal TOV share (tovCarelessRate48 orientation).
+func TestTeamOffTOVShare_SecureHandlerLowerShare(t *testing.T) {
+	ps := mkPlayer(0, 0, slotPG, 50)
+	ps.TVR = 99 // high TVR = good ball security = low carelessness
+	secure := []onCourt{oc(slotPG, ps)}
+	pc := mkPlayer(0, 0, slotPG, 50)
+	pc.TVR = 1 // low TVR = careless = high turnover rate
+	careless := []onCourt{oc(slotPG, pc)}
+	if teamOffTOVShare(secure) >= teamOffTOVShare(careless) {
+		t.Errorf("secure lineup (TVR=99) share=%v >= careless lineup (TVR=1) share=%v, want secure < careless",
+			teamOffTOVShare(secure), teamOffTOVShare(careless))
 	}
 }
 

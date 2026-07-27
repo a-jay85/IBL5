@@ -1,6 +1,6 @@
 ---
 description: Fan-created one-on-one basketball mini-game (first to 21) with simulation engine, Discord result posting, and game replay support.
-last_verified: 2026-07-24
+last_verified: 2026-07-27
 ---
 
 # One-on-One Module
@@ -20,10 +20,14 @@ classes/OneOnOneGame/
 ├── Contracts/
 │   ├── OneOnOneGameRepositoryInterface.php   # Database operations contract
 │   ├── OneOnOneGameEngineInterface.php   # Game simulation contract
+│   ├── OneOnOneGamePossessionResolverInterface.php  # Possession resolution contract
+│   ├── OneOnOneGameShotResultResolverInterface.php  # Shot resolution contract
 │   ├── OneOnOneGameServiceInterface.php      # Business logic contract
 │   └── OneOnOneGameViewInterface.php         # View rendering contract
 ├── OneOnOneGameRepository.php                # Database operations
-├── OneOnOneGameEngine.php                # Game simulation logic
+├── OneOnOneGameEngine.php                # Game loop orchestration
+├── OneOnOneGamePossessionResolver.php        # Foul/steal checks + shot selection
+├── OneOnOneGameShotResultResolver.php        # Block/foul/shot resolution
 ├── OneOnOneGameService.php                   # Business logic coordinator
 ├── OneOnOneGameView.php                      # HTML rendering
 ├── OneOnOneGameResult.php                # Game result DTO
@@ -42,7 +46,9 @@ classes/OneOnOneGame/
 #### Core Classes
 
 - **OneOnOneGameRepository**: Extends `BaseMysqliRepository` for database operations on `ibl_one_on_one` table
-- **OneOnOneGameEngine**: Simulates game mechanics including shot selection, shooting, blocking, stealing, fouls, and rebounds
+- **OneOnOneGameEngine**: Orchestrates the game loop (coin flip, scoring, free throws, final box score) and delegates possession and shot resolution to the collaborators below
+- **OneOnOneGamePossessionResolver**: Resolves a single possession — foul and steal checks, then shot-type selection — before delegating shot resolution
+- **OneOnOneGameShotResultResolver**: Resolves a shot attempt — block, foul, and make/miss checks — returning the possession result
 - **OneOnOneGameService**: Orchestrates game flow - validates input, loads players, runs game, saves result, posts to Discord
 - **OneOnOneGameView**: Renders all HTML output including forms, game results, and replays
 - **OneOnOneGameTextGenerator**: Provides randomized play-by-play text for various game events

@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed/declined maintenance-audit findings, extracted from maintenance-backlog.md.
-last_verified: 2026-07-26
+last_verified: 2026-07-27
 ---
 
 # Maintenance-Cost Reduction Backlog — Archive
@@ -172,6 +172,17 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 
 
 **Table evidence (2026-07-25):** SearchView 485 LOC string-concat. Extracted `renderResultList()` + ob_start migration; VR pin.
+
+### 1.23 OneOnOneGameEngine — Monolithic Simulation Engine (604 LOC)
+**Location:** `ibl5/classes/OneOnOneGame/OneOnOneGameEngine.php` (604 lines)
+**Problem:** Possession loop, shot-type selection, shot-attempt resolution, rebound/block/steal/foul checks, and final-score rendering all live in one engine class.
+**Suggested direction:** Extract possession-resolution and shot-result collaborators; keep the engine as the orchestrator.
+**Est. effort:** M
+**Risk if untouched:** Simulation-fidelity-critical (like `PlrParserService`, 1.19) — a wrong extraction silently changes game outcomes; needs characterization pins before any refactor. 🟨 until those pins exist.
+**Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
+**Status (2026-07-27):** ✅ Implemented — branch `oneonone-1-23-pins-and-extract`. Added characterization pins freezing current behavior for seeds 424242 and 1337 (full play-by-play transcript + final scores + per-player counting stats) in `ibl5/tests/OneOnOneGame/OneOnOneGameEngineCharacterizationTest.php`. Extracted `OneOnOneGamePossessionResolver` (foul/steal checks + shot selection) and `OneOnOneGameShotResultResolver` (block/foul/make-miss resolution) behind `Contracts/` interfaces (ADR-0001); engine now orchestrates the loop and delegates. Mutation testing enabled: removed `classes/OneOnOneGame` from `infection.json5` mutate-excludes and `phpunit-mutation.xml` coverage-excludes. Behavior-preserving refactor — pins unchanged.
+
+**Table evidence (2026-07-27):** OneOnOneGameEngine 604 LOC — possession/shot-resolution simulation. Extract possession + shot-result collaborators, but sim-fidelity-critical → add characterization pins first (cf. 1.19).
 
 ### 1.27 JsbImportRepository — One Upsert Per Record Type (539 LOC)
 **Location:** `ibl5/classes/JsbParser/JsbImportRepository.php` (539 lines)

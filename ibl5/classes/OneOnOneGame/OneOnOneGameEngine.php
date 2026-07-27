@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace OneOnOneGame;
 
 use OneOnOneGame\Contracts\OneOnOneGameEngineInterface;
+use OneOnOneGame\Contracts\OneOnOneGamePossessionResolverInterface;
+use OneOnOneGame\Contracts\OneOnOneGameShotResultResolverInterface;
 use Security\HtmlSanitizer;
 
 /**
@@ -14,8 +16,11 @@ use Security\HtmlSanitizer;
  * Jump Shot Basketball (JSB) simulation engine works. While it uses player ratings,
  * the game mechanics here are original and should not be used to understand JSB logic.
  *
- * Implements the game simulation logic using player ratings to determine
- * outcomes for shots, blocks, steals, fouls, and rebounds.
+ * Orchestrates the game loop and delegates possession outcome selection to
+ * OneOnOneGamePossessionResolverInterface and shot resolution to
+ * OneOnOneGameShotResultResolverInterface. The play-by-play transcript is produced
+ * by an ordered sequence of rand() draws whose count and order are frozen by the
+ * characterization pins in OneOnOneGameEngineCharacterizationTest.
  *
  * @see OneOnOneGameEngineInterface For method contracts
  * @phpstan-import-type PlayerGameData from OneOnOneGameEngineInterface
@@ -23,39 +28,20 @@ use Security\HtmlSanitizer;
 class OneOnOneGameEngine implements OneOnOneGameEngineInterface
 {
     private const WINNING_SCORE = 21;
-    private const FOUL_DIFFICULTY = 5;
-    
-    /**
-     * Shot type constants for selectShotType return values
-     */
-    private const SHOT_THREE_POINTER = 0;
-    private const SHOT_OUTSIDE_TWO = 1;
-    private const SHOT_DRIVE = 2;
-    private const SHOT_POST = 3;
-
-    /**
-     * Possession result constants
-     */
-    private const RESULT_FOUL = 1;
-    private const RESULT_STEAL = 2;
-    private const RESULT_BLOCKED_THREE = 3;
-    private const RESULT_MISSED_THREE = 4;
-    private const RESULT_MADE_THREE = 5;
-    private const RESULT_BLOCKED_OUTSIDE_TWO = 6;
-    private const RESULT_MISSED_OUTSIDE_TWO = 7;
-    private const RESULT_MADE_OUTSIDE_TWO = 8;
-    private const RESULT_BLOCKED_DRIVE = 9;
-    private const RESULT_MISSED_DRIVE = 10;
-    private const RESULT_MADE_DRIVE = 11;
-    private const RESULT_BLOCKED_POST = 12;
-    private const RESULT_MISSED_POST = 13;
-    private const RESULT_MADE_POST = 14;
 
     private OneOnOneGameTextGenerator $textGenerator;
+    private OneOnOneGamePossessionResolverInterface $possessionResolver;
 
-    public function __construct(?OneOnOneGameTextGenerator $textGenerator = null)
-    {
+    private int $currentPossession = 1;
+
+    public function __construct(
+        ?OneOnOneGameTextGenerator $textGenerator = null,
+        ?OneOnOneGamePossessionResolverInterface $possessionResolver = null,
+        ?OneOnOneGameShotResultResolverInterface $shotResultResolver = null
+    ) {
         $this->textGenerator = $textGenerator ?? new OneOnOneGameTextGenerator();
+        $this->possessionResolver = $possessionResolver
+            ?? new OneOnOneGamePossessionResolver($shotResultResolver ?? new OneOnOneGameShotResultResolver());
     }
 
     /**
@@ -95,7 +81,7 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
         // Main game loop
         while (max($result->player1Score, $result->player2Score) < self::WINNING_SCORE && $possessionCount < $maxPossessions) {
             $possessionCount++;
-            
+
             if ($possession === 1) {
                 $this->runPossession(
                     $result,
@@ -117,10 +103,10 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
                     $possession
                 );
             }
-            
+
             // Update possession based on result
             $possession = $this->currentPossession;
-            
+
             // Add score update
             $result->playByPlay .= $this->textGenerator->getScoreText(
                 $result->player1Name,
@@ -135,8 +121,6 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
 
         return $result;
     }
-
-    private int $currentPossession = 1;
 
     /**
      * Run a single possession
@@ -155,13 +139,13 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
     ): void {
         $offenseName = HtmlSanitizer::safeHtmlOutput($offenseData['name']);
         $defenseName = HtmlSanitizer::safeHtmlOutput($defenseData['name']);
-        
-        $possessionResult = $this->calculatePossessionResult($offenseData, $defenseData);
-        
+
+        $possessionResult = $this->possessionResolver->resolve($offenseData, $defenseData);
+
         $looseBall = false;
-        
+
         switch ($possessionResult) {
-            case self::RESULT_FOUL:
+            case OneOnOneGameShotResultResolverInterface::RESULT_FOUL:
                 $result->playByPlay .= $this->textGenerator->getFoulText($defenseName, $offenseName);
                 $defenseStats->fouls++;
                 // Simulate free throws - offensive player shoots 2 free throws
@@ -183,15 +167,15 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
                     $this->currentPossession = $isPlayer1OnOffense ? 1 : 2;
                 }
                 break;
-                
-            case self::RESULT_STEAL:
+
+            case OneOnOneGameShotResultResolverInterface::RESULT_STEAL:
                 $result->playByPlay .= $this->textGenerator->getStealPlayText($defenseName, $offenseName);
                 $offenseStats->turnovers++;
                 $defenseStats->steals++;
                 $this->currentPossession = $isPlayer1OnOffense ? 2 : 1;
                 break;
-                
-            case self::RESULT_BLOCKED_THREE:
+
+            case OneOnOneGameShotResultResolverInterface::RESULT_BLOCKED_THREE:
                 $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getThreePointText()
                     . ' but ' . $defenseName . ' ' . $this->textGenerator->getBlockText() . '<br>';
                 $offenseStats->fieldGoalsAttempted++;
@@ -199,16 +183,16 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
                 $defenseStats->blocks++;
                 $looseBall = true;
                 break;
-                
-            case self::RESULT_MISSED_THREE:
+
+            case OneOnOneGameShotResultResolverInterface::RESULT_MISSED_THREE:
                 $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getThreePointText()
                     . ' ' . $this->textGenerator->getMissedShotText() . '<br>';
                 $offenseStats->fieldGoalsAttempted++;
                 $offenseStats->threePointersAttempted++;
                 $looseBall = true;
                 break;
-                
-            case self::RESULT_MADE_THREE:
+
+            case OneOnOneGameShotResultResolverInterface::RESULT_MADE_THREE:
                 $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getThreePointText()
                     . ' ' . $this->textGenerator->getMadeShotText() . '<br>';
                 $offenseStats->fieldGoalsAttempted++;
@@ -222,23 +206,23 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
                 }
                 $this->currentPossession = $isPlayer1OnOffense ? 2 : 1;
                 break;
-                
-            case self::RESULT_BLOCKED_OUTSIDE_TWO:
+
+            case OneOnOneGameShotResultResolverInterface::RESULT_BLOCKED_OUTSIDE_TWO:
                 $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getOutsideTwoText()
                     . ' but ' . $defenseName . ' ' . $this->textGenerator->getBlockText() . '<br>';
                 $offenseStats->fieldGoalsAttempted++;
                 $defenseStats->blocks++;
                 $looseBall = true;
                 break;
-                
-            case self::RESULT_MISSED_OUTSIDE_TWO:
+
+            case OneOnOneGameShotResultResolverInterface::RESULT_MISSED_OUTSIDE_TWO:
                 $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getOutsideTwoText()
                     . ' ' . $this->textGenerator->getMissedShotText() . '<br>';
                 $offenseStats->fieldGoalsAttempted++;
                 $looseBall = true;
                 break;
-                
-            case self::RESULT_MADE_OUTSIDE_TWO:
+
+            case OneOnOneGameShotResultResolverInterface::RESULT_MADE_OUTSIDE_TWO:
                 $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getOutsideTwoText()
                     . ' ' . $this->textGenerator->getMadeShotText() . '<br>';
                 $offenseStats->fieldGoalsAttempted++;
@@ -250,23 +234,23 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
                 }
                 $this->currentPossession = $isPlayer1OnOffense ? 2 : 1;
                 break;
-                
-            case self::RESULT_BLOCKED_DRIVE:
+
+            case OneOnOneGameShotResultResolverInterface::RESULT_BLOCKED_DRIVE:
                 $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getDriveText()
                     . ' but ' . $defenseName . ' ' . $this->textGenerator->getBlockText() . '<br>';
                 $offenseStats->fieldGoalsAttempted++;
                 $defenseStats->blocks++;
                 $looseBall = true;
                 break;
-                
-            case self::RESULT_MISSED_DRIVE:
+
+            case OneOnOneGameShotResultResolverInterface::RESULT_MISSED_DRIVE:
                 $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getDriveText()
                     . ' ' . $this->textGenerator->getMissedShotText() . '<br>';
                 $offenseStats->fieldGoalsAttempted++;
                 $looseBall = true;
                 break;
-                
-            case self::RESULT_MADE_DRIVE:
+
+            case OneOnOneGameShotResultResolverInterface::RESULT_MADE_DRIVE:
                 $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getDriveText()
                     . ' ' . $this->textGenerator->getMadeShotText() . '<br>';
                 $offenseStats->fieldGoalsAttempted++;
@@ -278,23 +262,23 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
                 }
                 $this->currentPossession = $isPlayer1OnOffense ? 2 : 1;
                 break;
-                
-            case self::RESULT_BLOCKED_POST:
+
+            case OneOnOneGameShotResultResolverInterface::RESULT_BLOCKED_POST:
                 $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getPostText()
                     . ' but ' . $defenseName . ' ' . $this->textGenerator->getBlockText() . '<br>';
                 $offenseStats->fieldGoalsAttempted++;
                 $defenseStats->blocks++;
                 $looseBall = true;
                 break;
-                
-            case self::RESULT_MISSED_POST:
+
+            case OneOnOneGameShotResultResolverInterface::RESULT_MISSED_POST:
                 $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getPostText()
                     . ' ' . $this->textGenerator->getMissedShotText() . '<br>';
                 $offenseStats->fieldGoalsAttempted++;
                 $looseBall = true;
                 break;
-                
-            case self::RESULT_MADE_POST:
+
+            case OneOnOneGameShotResultResolverInterface::RESULT_MADE_POST:
                 $result->playByPlay .= $offenseName . ' ' . $this->textGenerator->getPostText()
                     . ' ' . $this->textGenerator->getMadeShotText() . '<br>';
                 $offenseStats->fieldGoalsAttempted++;
@@ -307,7 +291,7 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
                 $this->currentPossession = $isPlayer1OnOffense ? 2 : 1;
                 break;
         }
-        
+
         // Handle loose ball (rebound)
         if ($looseBall) {
             $this->handleRebound(
@@ -341,8 +325,8 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
     ): void {
         $offReb = $offenseData['r_orb'];
         $defReb = $defenseData['r_drb'];
-        
-        if ($this->checkRebound($offReb, $defReb)) {
+
+        if ($this->possessionResolver->checkRebound($offReb, $defReb)) {
             // Offensive rebound
             $result->playByPlay .= $this->textGenerator->getReboundText($offenseName, true);
             $offenseStats->offensiveRebounds++;
@@ -357,208 +341,8 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
     }
 
     /**
-     * Calculate the result of a possession
-     *
-     * @param PlayerGameData $offenseData Offensive player's data
-     * @param PlayerGameData $defenseData Defensive player's data
-     * @return int Possession result constant
-     */
-    private function calculatePossessionResult(array $offenseData, array $defenseData): int
-    {
-        // Check for foul first
-        if ($this->checkFoul($defenseData['r_foul'], $offenseData['r_fta'])) {
-            return self::RESULT_FOUL;
-        }
-
-        // Check for steal
-        if ($this->checkSteal($defenseData['r_stl'], $offenseData['r_tvr'])) {
-            return self::RESULT_STEAL;
-        }
-
-        // Select shot type
-        $shotType = $this->selectShotType(
-            $offenseData['oo'],
-            $offenseData['r_drive_off'],
-            $offenseData['po'],
-            $offenseData['r_fga'],
-            $offenseData['r_3ga']
-        );
-
-        return $this->processShotAttempt($shotType, $offenseData, $defenseData);
-    }
-
-    /**
-     * Process a shot attempt and return the result
-     *
-     * @param PlayerGameData $offenseData
-     * @param PlayerGameData $defenseData
-     */
-    private function processShotAttempt(int $shotType, array $offenseData, array $defenseData): int
-    {
-        $fgp = $offenseData['r_fgp'];
-        $tgp = $offenseData['r_3gp'];
-        $fta = $offenseData['r_fta'];
-        $fga = $offenseData['r_fga'];
-        $tga = $offenseData['r_3ga'];
-        $blk = $defenseData['r_blk'];
-        $foul = $defenseData['r_foul'];
-
-        switch ($shotType) {
-            case self::SHOT_THREE_POINTER:
-                if ($this->checkBlock($blk, $tga)) {
-                    return self::RESULT_BLOCKED_THREE;
-                }
-                if ($this->checkFoul($foul, $fta)) {
-                    return $this->checkShot($tgp - self::FOUL_DIFFICULTY, $offenseData['oo'], $defenseData['od'])
-                        ? self::RESULT_MADE_THREE
-                        : self::RESULT_FOUL;
-                }
-                return $this->checkShot($tgp, $offenseData['oo'], $defenseData['od'])
-                    ? self::RESULT_MADE_THREE
-                    : self::RESULT_MISSED_THREE;
-
-            case self::SHOT_OUTSIDE_TWO:
-                if ($this->checkBlock($blk, $fga)) {
-                    return self::RESULT_BLOCKED_OUTSIDE_TWO;
-                }
-                if ($this->checkFoul($foul, $fta)) {
-                    return $this->checkShot($fgp - self::FOUL_DIFFICULTY, $offenseData['oo'], $defenseData['od'])
-                        ? self::RESULT_MADE_OUTSIDE_TWO
-                        : self::RESULT_FOUL;
-                }
-                return $this->checkShot($fgp, $offenseData['oo'], $defenseData['od'])
-                    ? self::RESULT_MADE_OUTSIDE_TWO
-                    : self::RESULT_MISSED_OUTSIDE_TWO;
-
-            case self::SHOT_DRIVE:
-                if ($this->checkBlock($blk, $fga)) {
-                    return self::RESULT_BLOCKED_DRIVE;
-                }
-                if ($this->checkFoul($foul, $fta)) {
-                    return $this->checkShot($fgp - self::FOUL_DIFFICULTY, $offenseData['r_drive_off'], $defenseData['dd'])
-                        ? self::RESULT_MADE_DRIVE
-                        : self::RESULT_FOUL;
-                }
-                return $this->checkShot($fgp, $offenseData['r_drive_off'], $defenseData['dd'])
-                    ? self::RESULT_MADE_DRIVE
-                    : self::RESULT_MISSED_DRIVE;
-
-            case self::SHOT_POST:
-            default:
-                if ($this->checkBlock($blk, $fga)) {
-                    return self::RESULT_BLOCKED_POST;
-                }
-                if ($this->checkFoul($foul, $fta)) {
-                    return $this->checkShot($fgp - self::FOUL_DIFFICULTY, $offenseData['po'], $defenseData['pd'])
-                        ? self::RESULT_MADE_POST
-                        : self::RESULT_FOUL;
-                }
-                return $this->checkShot($fgp, $offenseData['po'], $defenseData['pd'])
-                    ? self::RESULT_MADE_POST
-                    : self::RESULT_MISSED_POST;
-        }
-    }
-
-    /**
-     * Select the type of shot to attempt
-     * 
-     * @return int Shot type constant (0=three, 1=outside two, 2=drive, 3=post)
-     */
-    private function selectShotType(int $outside, int $drive, int $post, int $twoChance, int $threeChance): int
-    {
-        $shotSelection = $outside + $drive + $post;
-        $shotType = rand(0, $shotSelection - 1);
-        
-        if ($shotType < $outside) {
-            $twoOrThree = $twoChance + $threeChance;
-            $pickTwoOrThree = rand(0, $twoOrThree - 1);
-            return $pickTwoOrThree > $twoChance ? self::SHOT_THREE_POINTER : self::SHOT_OUTSIDE_TWO;
-        } elseif ($shotType < ($outside + $drive)) {
-            return self::SHOT_DRIVE;
-        }
-        
-        return self::SHOT_POST;
-    }
-
-    /**
-     * @see OneOnOneGameEngineInterface::checkBlock()
-     */
-    public function checkBlock(int $blockRating, int $attemptRating): bool
-    {
-        $blockCount = 0;
-        
-        for ($i = 0; $i < 3; $i++) {
-            $makeBlock = $blockRating + rand(1, 100) + rand(1, 100);
-            $avoidBlock = $attemptRating + rand(1, 100) + rand(1, 100);
-            if ($makeBlock > $avoidBlock) {
-                $blockCount++;
-            }
-        }
-        
-        return $blockCount === 3;
-    }
-
-    /**
-     * @see OneOnOneGameEngineInterface::checkSteal()
-     */
-    public function checkSteal(int $stealRating, int $turnoverRating): bool
-    {
-        $stealCount = 0;
-        
-        for ($i = 0; $i < 3; $i++) {
-            $makeSteal = $stealRating + rand(1, 100) + rand(1, 100);
-            $avoidSteal = $turnoverRating + rand(1, 100) + rand(1, 100);
-            if ($makeSteal > $avoidSteal) {
-                $stealCount++;
-            }
-        }
-        
-        return $stealCount === 3;
-    }
-
-    /**
-     * @see OneOnOneGameEngineInterface::checkFoul()
-     */
-    public function checkFoul(int $foulRating, int $drawFoulRating): bool
-    {
-        $foulCount = 0;
-        
-        for ($i = 0; $i < 5; $i++) {
-            $drawFoul = $drawFoulRating + rand(1, 100) + rand(1, 100);
-            $avoidFoul = $foulRating + rand(1, 100) + rand(1, 100);
-            if ($drawFoul > $avoidFoul) {
-                $foulCount++;
-            }
-        }
-        
-        return $foulCount > 3;
-    }
-
-    /**
-     * @see OneOnOneGameEngineInterface::checkShot()
-     */
-    public function checkShot(int $basePercent, int $offenseRating, int $defenseRating): bool
-    {
-        $shotChance = $basePercent + $offenseRating - ($defenseRating * 2);
-        $shotResult = rand(1, 100);
-        
-        return $shotResult <= $shotChance;
-    }
-
-    /**
-     * @see OneOnOneGameEngineInterface::checkRebound()
-     */
-    public function checkRebound(int $offensiveRebound, int $defensiveRebound): bool
-    {
-        $reboundMatrix = $offensiveRebound + $defensiveRebound + 50;
-        $reboundResult = rand(1, $reboundMatrix);
-        
-        return $reboundResult <= $offensiveRebound;
-    }
-
-    /**
      * Simulate free throw attempts
-     * 
+     *
      * @param int $freeThrowRating Player's free throw rating
      * @param int $attempts Number of free throws to attempt
      * @return int Number of free throws made
@@ -568,13 +352,13 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
         $made = 0;
         // Base free throw percentage is around 75%, modified by rating
         $basePercent = 60 + ($freeThrowRating / 4);
-        
+
         for ($i = 0; $i < $attempts; $i++) {
             if (rand(1, 100) <= $basePercent) {
                 $made++;
             }
         }
-        
+
         return $made;
     }
 

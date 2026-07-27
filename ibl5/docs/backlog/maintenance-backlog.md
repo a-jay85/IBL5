@@ -47,13 +47,13 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 | Status | Count |
 |--------|------:|
-| ✅ Implemented | 233 |
+| ✅ Implemented | 234 |
 | ◑ Partial | 24 |
 | 📋 Planned (plan queued / PR open) | 1 |
-| ⬜ Open | 63 |
+| ⬜ Open | 62 |
 | 🚫 Declined | 10 |
 
-> Status counts re-verified 2026-06-28 (exact, from the per-axis tables); **6.20 / 6.21 added 2026-06-29** from the PR #1107 review (⬜ Open +2); **6.22 added 2026-06-29** from the #1066 reject-IDOR review (⬜ Open +1). Two stale-Open rows were flipped directly (no plan owned them): **13.3**, **13.9** (✅ +2, ⬜ −2 vs the master re-count). **1.21–1.31 added 2026-07-24** from the hot-files comment→backlog migration (⬜ Open +11: 8 🟩 auto-mergeable, 3 🟨 conditional — 1.23/1.25/1.31 need characterization/endpoint pins). **Ground-truth audit 2026-07-24:** 7 stale-Open items flipped ✅, 2 false findings marked 🚫, 5 new Axis-1 rows seeded (1.32–1.36); IDOR PRs #1107–1110 merged 2026-06-29 (unblocking 2.10/2.13/2.14/2.25/7.7/14.6); PRs #1240/#1230/#1204 merged (2.6/2.31/2.32/5.18 already ✅/Open on own merits). **9.19 and 9.20 implemented 2026-07-24** — added READMEs to all 68 missing class dirs + frontmatter to all 16 existing class READMEs that lacked it; extended bin/check-docs IN_SCOPE_GLOBS (✅ +2, ⬜ −2); roll-up recomputed from grep (331 rows total, unchanged). **6.16 flipped ✅ 2026-07-24** (all Api data repos + JsonResponder + SystemClock tested; ✅ +1, ◑ −1). **6.14 Status updated 2026-07-24** (ProcessBoxscoresStep/GenerateSeasonAwardsStep/ParseJsbFilesStep added; still ◑). **Resolved rows collapsed 2026-07-25** — ✅/🚫 findings no longer appear as table rows; each axis carries a `> ✅ resolved (N): …` / `> 🚫 declined (N): …` summary line and their evidence lives in [archive/maintenance-backlog-archive.md](archive/maintenance-backlog-archive.md). **Recount recipe:** resolved = sum of the `(N)` in the per-axis summary lines; open = grep of the per-axis table rows; total = the two added. Counts above are unchanged by the collapse (238 + 93 = 331). **1.36 and 7.7 flipped ✅ 2026-07-26** (✅ +2, ⬜ −1, ◑ −1); total tracked rows unchanged at 331. **1.29 flipped ✅ 2026-07-26 (PR #1679)** (✅ +1, ⬜ −1); total tracked rows unchanged at 331. **1.27 flipped ✅ 2026-07-27** — extracted 10 per-entity collaborators into `ibl5/classes/JsbParser/Repositories/`; JsbImportRepository reduced to thin facade (✅ +1, ⬜ −1); total tracked rows unchanged at 331.
+> Status counts re-verified 2026-06-28 (exact, from the per-axis tables); **6.20 / 6.21 added 2026-06-29** from the PR #1107 review (⬜ Open +2); **6.22 added 2026-06-29** from the #1066 reject-IDOR review (⬜ Open +1). Two stale-Open rows were flipped directly (no plan owned them): **13.3**, **13.9** (✅ +2, ⬜ −2 vs the master re-count). **1.21–1.31 added 2026-07-24** from the hot-files comment→backlog migration (⬜ Open +11: 8 🟩 auto-mergeable, 3 🟨 conditional — 1.23/1.25/1.31 need characterization/endpoint pins). **Ground-truth audit 2026-07-24:** 7 stale-Open items flipped ✅, 2 false findings marked 🚫, 5 new Axis-1 rows seeded (1.32–1.36); IDOR PRs #1107–1110 merged 2026-06-29 (unblocking 2.10/2.13/2.14/2.25/7.7/14.6); PRs #1240/#1230/#1204 merged (2.6/2.31/2.32/5.18 already ✅/Open on own merits). **9.19 and 9.20 implemented 2026-07-24** — added READMEs to all 68 missing class dirs + frontmatter to all 16 existing class READMEs that lacked it; extended bin/check-docs IN_SCOPE_GLOBS (✅ +2, ⬜ −2); roll-up recomputed from grep (331 rows total, unchanged). **6.16 flipped ✅ 2026-07-24** (all Api data repos + JsonResponder + SystemClock tested; ✅ +1, ◑ −1). **6.14 Status updated 2026-07-24** (ProcessBoxscoresStep/GenerateSeasonAwardsStep/ParseJsbFilesStep added; still ◑). **Resolved rows collapsed 2026-07-25** — ✅/🚫 findings no longer appear as table rows; each axis carries a `> ✅ resolved (N): …` / `> 🚫 declined (N): …` summary line and their evidence lives in [archive/maintenance-backlog-archive.md](archive/maintenance-backlog-archive.md). **Recount recipe:** resolved = sum of the `(N)` in the per-axis summary lines; open = grep of the per-axis table rows; total = the two added. Counts above are unchanged by the collapse (238 + 93 = 331). **1.36 and 7.7 flipped ✅ 2026-07-26** (✅ +2, ⬜ −1, ◑ −1); total tracked rows unchanged at 331. **1.29 flipped ✅ 2026-07-26 (PR #1679)** (✅ +1, ⬜ −1); total tracked rows unchanged at 331. **1.27 flipped ✅ 2026-07-27** — extracted 10 per-entity collaborators into `ibl5/classes/JsbParser/Repositories/`; JsbImportRepository reduced to thin facade (✅ +1, ⬜ −1); total tracked rows unchanged at 331. **1.23 flipped ✅ 2026-07-27 (`oneonone-1-23-pins-and-extract`)** (✅ +1, ⬜ −1); total tracked rows unchanged at 331.
 
 **Automouse-readiness of the not-yet-complete (⬜/◑/📋) items:**
 
@@ -74,15 +74,14 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
-> ✅ resolved (23): 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 1.14, 1.15, 1.16, 1.17, 1.20, 1.27, 1.28, 1.29, 1.34, 1.36 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (24): 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 1.14, 1.15, 1.16, 1.17, 1.20, 1.23, 1.27, 1.28, 1.29, 1.34, 1.36 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
 | 1.18 | ◑ Partial | 🟩 | StandingsUpdater. `82`→`League::REGULAR_SEASON_GAMES` DONE (refactor PR). echo→logger + `$log` removal DEFERRED: behavior-changing — echoes feed the rendered pipeline `capturedLog` (UpdateStandingsStep→UpdaterController); `$log` feeds admin-rendered `DebugOutput::display`. Needs a non-`refactor:` PR. |
-| 1.19 | ⬜ Open | 🟨 | `processPlrData`+`processPlrDataForYear` 80% duplicated; 510 LOC. `.plr` parse is engine-fidelity-critical → add characterization pins (mechanical scope) before merging the two paths, then 🟩. |
+| 1.19 | ⬜ Open | 🟨 | `processPlrData`+`processPlrDataForYear` 80% duplicated; 510 LOC. `.plr` parse is engine-fidelity-critical → add characterization pins (mechanical scope) before merging the two paths, then 🟩. (1.23 OneOnOneGameEngine proved the pins-then-extract recipe 2026-07-27.) |
 | 1.21 | ⬜ Open | 🟩 | RecordHoldersRepository 848 LOC — largest untracked class. 18 per-category record-query methods (single-game/season/team/franchise batches). Extract per-category query collaborators; green-green with DB-integration pins. Distinct from 1.1 (the RecordHolders *Service*, now 281 LOC). |
 | 1.22 | ⬜ Open | 🟩 | TradingView 606 LOC — offer-form/review/closed renderers + row/pick/cash builders in one view. Split into per-page views or extract row-builders; behavior-preserving golden-master pin. |
-| 1.23 | ⬜ Open | 🟨 | OneOnOneGameEngine 604 LOC — possession/shot-resolution simulation. Extract possession + shot-result collaborators, but sim-fidelity-critical → add characterization pins first (cf. 1.19). |
 | 1.24 | ⬜ Open | 🟩 | RecordHoldersView 578 LOC — 18 per-category block renderers. Extract per-category renderer collaborators / shared category-table builder; golden-master pin. Distinct from 1.1 (Service). |
 | 1.25 | ⬜ Open | 🟨 | BoxscoreProcessor 559 LOC — mutating .sco import pipeline; regular/all-star/rising-stars game processors in one class. Extract per-game-type processors; import-fidelity-critical → characterization pins first. Size finding only; the Processor→Service *rename* is separately declined at 2.5. |
 | 1.26 | ⬜ Open | 🟩 | BugReportRepository 546 LOC — 24 methods spanning claim/lease/transition state-machine + reporter-profile + queue queries. Split by query group; green-green with DB-integration pins. |
@@ -123,14 +122,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Split into per-page views (offer / review / closed) or extract the row-builder helpers into a shared collaborator.
 **Est. effort:** M
 **Risk if untouched:** Every trade-page tweak inflates one class; row-building logic can't be reused. Distinct from 11.13 (a CSS `str_replace` fix, already done).
-**Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
-
-### 1.23 OneOnOneGameEngine — Monolithic Simulation Engine (604 LOC)
-**Location:** `ibl5/classes/OneOnOneGame/OneOnOneGameEngine.php` (604 lines)
-**Problem:** Possession loop, shot-type selection, shot-attempt resolution, rebound/block/steal/foul checks, and final-score rendering all live in one engine class.
-**Suggested direction:** Extract possession-resolution and shot-result collaborators; keep the engine as the orchestrator.
-**Est. effort:** M
-**Risk if untouched:** Simulation-fidelity-critical (like `PlrParserService`, 1.19) — a wrong extraction silently changes game outcomes; needs characterization pins before any refactor. 🟨 until those pins exist.
 **Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
 
 ### 1.24 RecordHoldersView — Per-Category Block Renderer (578 LOC)

@@ -1,6 +1,6 @@
 ---
-description: Read-on-demand detail for work-triage — measurement context for the inline-Opus leak, ADR-0067 gateway framing, hard-trigger gate properties (sub-agent exemption, per-turn scoping, escape hatch, self-test), inline-vs-delegated criteria, safety-mirror backstop, and repeat-polling spend rationale.
-last_verified: 2026-07-25
+description: Read-on-demand detail for work-triage — measurement context for the inline-Opus leak, ADR-0067 gateway framing, hard-trigger gate properties (sub-agent exemption, per-turn scoping, escape hatch, self-test), the other checks sharing plan-gate-edit.sh, inline-vs-delegated criteria, safety-mirror backstop, and repeat-polling spend rationale.
+last_verified: 2026-07-27
 paths:
   - ".claude/rules/work-triage.md"
   - "~/.claude/hooks/plan-gate-edit.sh"
@@ -34,6 +34,10 @@ The prose routing guidance in `work-triage.md` is a judgment call, and judgment 
 - **Escape hatch, deliberately loud:** `touch /tmp/claude-sweep-override-<prompt_id>` (example) releases it for that turn. Legitimate when the edits are genuinely *entangled* with the design — for example authoring a rule doc, its detail companion, and the ADR recording the decision together. Using it silently defeats the gate: **say out loud that you're overriding and why**, in the same turn.
 
 Self-test: `bash ~/.claude/hooks/test-plan-gate-edit.sh`
+
+### Other checks in the same hook
+
+`plan-gate-edit.sh` is one file registered on `Read|Edit|Write`, but only Check 1 implements the sweep trigger. Don't read a deny from it as "I hit the ≥5-file limit" without reading the message — the **cross-worktree straddle gate** (Check 3) denies a **Read** whose target resolves inside a *different* worktree of this same repo than the session cwd, because touching it loads that tree's `.claude/rules/*.md` on top of the byte-identical set already resident, re-sent every turn for the rest of the session (ADR-0046). Its remedy is `EnterWorktree` to re-root the session, not delegation; reading back into the tree whose rules are already loaded stays allowed. It carries its own escape hatch — `touch /tmp/claude-tree-override-<session_id>` (example) — keyed per **session**, not per turn like Check 1's.
 
 ## Repeat-polling
 

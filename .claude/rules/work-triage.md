@@ -1,6 +1,6 @@
 ---
 description: Triage every non-trivial unit of work as ad-hoc vs /plan before starting; ad-hoc bar, ad-hoc safety mirror, Sonnet execution-routing (trigger stays resident, reasoning in work-triage-detail.md), hard trigger (≥5 files), and calibration.
-last_verified: 2026-07-25
+last_verified: 2026-07-27
 ---
 
 # Work Triage Rule
@@ -48,7 +48,7 @@ Stay inline (Opus edits directly) only when: the edits are genuinely **entangled
 
 **The numeric rule: the fifth distinct repo file you edit on the main thread within one user turn is the handoff point.** Four files is a change; five is a sweep. Route the remainder to one `subagent_type: "sonnet-4-6"` sub-agent (omit `model`) before making that fifth edit — don't wait to be stopped.
 
-Enforced by `~/.claude/hooks/plan-gate-edit.sh`, which **denies** the Edit/Write — the gate cannot be read past, and its deny message carries the routing instruction and the escape hatch. Gate properties, escape hatch, and self-test: `work-triage-detail.md` § Hard trigger.
+Enforced by `~/.claude/hooks/plan-gate-edit.sh` **§ Check 1**, which **denies** the Edit/Write — the gate cannot be read past, and its deny message carries the routing instruction and the escape hatch. The same hook also denies *Reads* under an unrelated check (the cross-worktree straddle gate); only Check 1 is the sweep trigger. Gate properties, escape hatch, and self-test: `work-triage-detail.md` § Hard trigger.
 
 ## Execution routing: repeat-polling is a spend bug
 

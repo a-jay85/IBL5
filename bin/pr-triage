@@ -237,8 +237,8 @@ while [ "$i" -lt "$PR_COUNT" ]; do
     # --- --arm side-effect: ONLY the ARMABLE bucket ---
     # No --delete-branch, deliberately: the repo already sets deleteBranchOnMerge,
     # so GitHub deletes the head branch itself. Carrying the flag only added harm —
-    # the local delete fails in a multi-worktree clone (gh then exits non-zero and
-    # this loop reports a false ARM FAILED on a PR that armed fine), and a parent
+    # the local delete fails in a multi-worktree clone (gh can exit non-zero and
+    # this loop would report a false ARM FAILED on a PR that armed fine), and a parent
     # merge carrying it permanently closes stacked child PRs. Same rationale as
     # tools/postplan-harness/harness/adapters/ghad.py LiveGh.
     if [ "$ARM" = "1" ] && [ "$bucket" = "ARMABLE" ]; then

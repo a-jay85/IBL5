@@ -291,12 +291,6 @@ parameters:
 		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringConcatenation
-			count: 2
-			path: classes/JsbParser/JsbImportRepository.php
-
-		-
-			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
-			identifier: ibl.sqlStringConcatenation
 			count: 4
 			path: classes/JsbParser/PlayerIdResolver.php
 

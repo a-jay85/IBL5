@@ -43,7 +43,7 @@ class JsbExportService implements JsbExportServiceInterface
 
     /**
      * Maps current database team names to JSB team IDs.
-     * For renamed franchises, uses current DB names (see JsbImportRepository::TEAM_NAME_ALIASES).
+     * For renamed franchises, uses current DB names (see JsbParser\Repositories\JsbLookupRepository::TEAM_NAME_ALIASES).
      *
      * @var array<string, int>
      */

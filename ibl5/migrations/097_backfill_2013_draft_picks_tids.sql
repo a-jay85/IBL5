@@ -8,7 +8,7 @@
 -- JSB names that no longer exist in ibl_team_info:
 --   Hornets -> Sting  (teamid 10)
 --   Thunder -> Aces   (teamid 16)
--- These aliases mirror JsbImportRepository::TEAM_NAME_ALIASES.
+-- These aliases mirror JsbParser\Repositories\JsbLookupRepository::TEAM_NAME_ALIASES.
 
 -- Direct matches (26 of 28 franchises).
 UPDATE ibl_draft_picks dp

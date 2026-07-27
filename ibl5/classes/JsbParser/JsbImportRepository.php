@@ -8,532 +8,111 @@ use JsbParser\Contracts\JsbImportRepositoryInterface;
 use League\LeagueContext;
 
 /**
- * Repository for database operations related to JSB file imports.
+ * Facade that delegates to per-entity collaborator repositories.
  *
- * Handles upserts into `ibl_hist`, ibl_jsb_transactions, ibl_jsb_history,
- * ibl_jsb_allstar_rosters, and ibl_jsb_allstar_scores tables.
- * League-aware: resolves table names through LeagueContext when provided.
+ * Preserves the JsbImportRepositoryInterface public contract while routing
+ * each method to the appropriate single-responsibility repository.
  */
 class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepositoryInterface
 {
+    private Repositories\TrnRepository $trn;
+    private Repositories\HisRepository $his;
+    private Repositories\AswRepository $asw;
+    private Repositories\AwaRepository $awa;
+    private Repositories\RcbRepository $rcb;
+    private Repositories\PlbRepository $plb;
+    private Repositories\DraRepository $dra;
+    private Repositories\RetRepository $ret;
+    private Repositories\HofRepository $hof;
+    private Repositories\JsbLookupRepository $lookup;
+
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
+        $this->trn    = new Repositories\TrnRepository($db, $leagueContext);
+        $this->his    = new Repositories\HisRepository($db, $leagueContext);
+        $this->asw    = new Repositories\AswRepository($db, $leagueContext);
+        $this->awa    = new Repositories\AwaRepository($db, $leagueContext);
+        $this->rcb    = new Repositories\RcbRepository($db, $leagueContext);
+        $this->plb    = new Repositories\PlbRepository($db, $leagueContext);
+        $this->dra    = new Repositories\DraRepository($db, $leagueContext);
+        $this->ret    = new Repositories\RetRepository($db, $leagueContext);
+        $this->hof    = new Repositories\HofRepository($db, $leagueContext);
+        $this->lookup = new Repositories\JsbLookupRepository($db, $leagueContext);
     }
 
-    /**
-     * JSB team ID → team name mapping for historical team names.
-     *
-     * These are the names used in .car/.his files. They may differ from current
-     * database team_name values due to franchise renames.
-     *
-     * @var array<int, string>
-     */
-    public const JSB_TEAM_NAMES = [
-        0 => 'Free Agents',
-        1 => 'Celtics',
-        2 => 'Heat',
-        3 => 'Knicks',
-        4 => 'Nets',
-        5 => 'Magic',
-        6 => 'Bucks',
-        7 => 'Bulls',
-        8 => 'Pelicans',
-        9 => 'Hawks',
-        10 => 'Hornets',
-        11 => 'Pacers',
-        12 => 'Raptors',
-        13 => 'Jazz',
-        14 => 'Timberwolves',
-        15 => 'Nuggets',
-        16 => 'Thunder',
-        17 => 'Spurs',
-        18 => 'Trailblazers',
-        19 => 'Clippers',
-        20 => 'Grizzlies',
-        21 => 'Lakers',
-        22 => 'Supersonics',
-        23 => 'Suns',
-        24 => 'Warriors',
-        25 => 'Pistons',
-        26 => 'Kings',
-        27 => 'Bullets',
-        28 => 'Mavericks',
-    ];
-
-    /**
-     * Mapping of historical JSB team names to current database team names.
-     *
-     * Some franchises were renamed in the IBL. The JSB engine retains the old names
-     * in historical data files, but the database uses the current names.
-     *
-     * @var array<string, string>
-     */
-    public const TEAM_NAME_ALIASES = [
-        'Hornets' => 'Sting',
-        'Thunder' => 'Aces',
-        'Spurs' => 'Rockets',
-        'Supersonics' => 'Braves',
-    ];
-
-    /**
-     * Cache of team name → teamid lookups.
-     * @var array<string, int|null>
-     */
-    private array $teamIdCache = [];
-
-    /**
-     * @see JsbImportRepositoryInterface::upsertTransaction()
-     */
     public function upsertTransaction(array $record): int
     {
-        return $this->execute(
-            "INSERT INTO `ibl_jsb_transactions`
-                (season_year, transaction_month, transaction_day, transaction_type,
-                 pid, player_name, from_teamid, to_teamid,
-                 injury_games_missed, injury_description, trade_group_id,
-                 is_draft_pick, draft_pick_year, source_file)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE
-                player_name = VALUES(player_name),
-                injury_games_missed = VALUES(injury_games_missed),
-                injury_description = VALUES(injury_description),
-                trade_group_id = VALUES(trade_group_id),
-                is_draft_pick = VALUES(is_draft_pick),
-                draft_pick_year = VALUES(draft_pick_year),
-                source_file = VALUES(source_file)",
-            'iiiiisiiisiiis',
-            $record['season_year'],
-            $record['transaction_month'],
-            $record['transaction_day'],
-            $record['transaction_type'],
-            $record['pid'],
-            $record['player_name'],
-            $record['from_teamid'],
-            $record['to_teamid'],
-            $record['injury_games_missed'],
-            $record['injury_description'],
-            $record['trade_group_id'],
-            $record['is_draft_pick'],
-            $record['draft_pick_year'],
-            $record['source_file']
-        );
+        return $this->trn->upsertTransaction($record);
     }
 
-    /**
-     * @see JsbImportRepositoryInterface::upsertHistoryRecord()
-     */
     public function upsertHistoryRecord(array $record): int
     {
-        return $this->execute(
-            "INSERT INTO `ibl_jsb_history`
-                (season_year, team_name, teamid, wins, losses, made_playoffs,
-                 playoff_result, playoff_round_reached, won_championship, source_file)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE
-                teamid = VALUES(teamid),
-                wins = VALUES(wins),
-                losses = VALUES(losses),
-                made_playoffs = VALUES(made_playoffs),
-                playoff_result = VALUES(playoff_result),
-                playoff_round_reached = VALUES(playoff_round_reached),
-                won_championship = VALUES(won_championship),
-                source_file = VALUES(source_file)",
-            'isiiiissss',
-            $record['season_year'],
-            $record['team_name'],
-            $record['teamid'],
-            $record['wins'],
-            $record['losses'],
-            $record['made_playoffs'],
-            $record['playoff_result'],
-            $record['playoff_round_reached'],
-            $record['won_championship'],
-            $record['source_file']
-        );
+        return $this->his->upsertHistoryRecord($record);
     }
 
-    /**
-     * @see JsbImportRepositoryInterface::upsertAllStarRoster()
-     */
     public function upsertAllStarRoster(array $record): int
     {
-        return $this->execute(
-            'INSERT INTO `ibl_jsb_allstar_rosters`
-                (season_year, event_type, roster_slot, pid, player_name)
-            VALUES (?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE
-                pid = VALUES(pid),
-                player_name = VALUES(player_name)',
-            'isiis',
-            $record['season_year'],
-            $record['event_type'],
-            $record['roster_slot'],
-            $record['pid'],
-            $record['player_name']
-        );
+        return $this->asw->upsertAllStarRoster($record);
     }
 
-    /**
-     * @see JsbImportRepositoryInterface::upsertAllStarScore()
-     */
     public function upsertAllStarScore(array $record): int
     {
-        return $this->execute(
-            'INSERT INTO `ibl_jsb_allstar_scores`
-                (season_year, contest_type, round, participant_slot, pid, score)
-            VALUES (?, ?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE
-                pid = VALUES(pid),
-                score = VALUES(score)',
-            'isiiii',
-            $record['season_year'],
-            $record['contest_type'],
-            $record['round'],
-            $record['participant_slot'],
-            $record['pid'],
-            $record['score']
-        );
+        return $this->asw->upsertAllStarScore($record);
     }
 
-    /**
-     * @see JsbImportRepositoryInterface::upsertAward()
-     */
     public function upsertAward(int $year, string $award, string $name): int
     {
-        return $this->execute(
-            "INSERT INTO `ibl_awards` (year, award, name)
-            VALUES (?, ?, ?)
-            ON DUPLICATE KEY UPDATE name = VALUES(name)",
-            'iss',
-            $year,
-            $award,
-            $name
-        );
+        return $this->awa->upsertAward($year, $award, $name);
     }
 
-    /**
-     * @see JsbImportRepositoryInterface::resolveTeamIdByName()
-     */
     public function resolveTeamIdByName(string $teamName): ?int
     {
-        if (array_key_exists($teamName, $this->teamIdCache)) {
-            return $this->teamIdCache[$teamName];
-        }
-
-        // Try direct lookup first
-        $row = $this->fetchOne(
-            "SELECT teamid FROM `ibl_team_info` WHERE team_name = ? LIMIT 1",
-            's',
-            $teamName
-        );
-
-        if ($row !== null) {
-            /** @var int $teamId */
-            $teamId = $row['teamid'];
-            $this->teamIdCache[$teamName] = $teamId;
-            return $teamId;
-        }
-
-        // Try alias mapping (historical JSB names → current DB names)
-        if (isset(self::TEAM_NAME_ALIASES[$teamName])) {
-            $aliasName = self::TEAM_NAME_ALIASES[$teamName];
-            $row = $this->fetchOne(
-                "SELECT teamid FROM `ibl_team_info` WHERE team_name = ? LIMIT 1",
-                's',
-                $aliasName
-            );
-
-            if ($row !== null) {
-                /** @var int $teamId */
-                $teamId = $row['teamid'];
-                $this->teamIdCache[$teamName] = $teamId;
-                return $teamId;
-            }
-        }
-
-        // Try looking in hist table for historical team names
-        $row = $this->fetchOne(
-            "SELECT teamid FROM `ibl_hist` WHERE team = ? AND teamid > 0 LIMIT 1",
-            's',
-            $teamName
-        );
-
-        if ($row !== null) {
-            /** @var int $teamId */
-            $teamId = $row['teamid'];
-            $this->teamIdCache[$teamName] = $teamId;
-            return $teamId;
-        }
-
-        $this->teamIdCache[$teamName] = null;
-        return null;
+        return $this->lookup->resolveTeamIdByName($teamName);
     }
 
-    /**
-     * Get the maximum trade_group_id currently in the database.
-     *
-     * @return int Maximum trade_group_id, or 0 if no trades exist
-     */
-    public function fetchMaxTradeGroupId(): int
-    {
-        $row = $this->fetchOne(
-            "SELECT COALESCE(MAX(trade_group_id), 0) AS max_id FROM `ibl_jsb_transactions`",
-            ''
-        );
-
-        if ($row === null) {
-            return 0;
-        }
-
-        /** @var int|string $maxId */
-        $maxId = $row['max_id'];
-        return (int) $maxId;
-    }
-
-    /**
-     * @see JsbImportRepositoryInterface::replaceRcbAlltimeRecords()
-     */
     public function replaceRcbAlltimeRecords(array $records): int
     {
-        return $this->transactional(function () use ($records): int {
-            $this->execute("DELETE FROM `ibl_rcb_alltime_records`");
-
-            $total = 0;
-            $columns = '(scope, teamid, record_type, stat_category, ranking,'
-                . ' player_name, car_block_id, pid, stat_value, stat_raw,'
-                . ' team_of_record, season_year, career_total, source_file)';
-            $rowTypes = 'sissisiidiiiis';
-
-            foreach (array_chunk($records, 500) as $chunk) {
-                $placeholders = implode(', ', array_fill(0, count($chunk), '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'));
-                $types = str_repeat($rowTypes, count($chunk));
-                $params = [];
-                foreach ($chunk as $r) {
-                    $params[] = $r['scope'];
-                    $params[] = $r['teamid'];
-                    $params[] = $r['record_type'];
-                    $params[] = $r['stat_category'];
-                    $params[] = $r['ranking'];
-                    $params[] = $r['player_name'];
-                    $params[] = $r['car_block_id'];
-                    $params[] = $r['pid'];
-                    $params[] = $r['stat_value'];
-                    $params[] = $r['stat_raw'];
-                    $params[] = $r['team_of_record'];
-                    $params[] = $r['season_year'];
-                    $params[] = $r['career_total'];
-                    $params[] = $r['source_file'];
-                }
-                $total += $this->execute(
-                    "INSERT INTO `ibl_rcb_alltime_records` " . $columns . " VALUES " . $placeholders,
-                    $types,
-                    ...$params
-                );
-            }
-
-            return $total;
-        });
+        return $this->rcb->replaceRcbAlltimeRecords($records);
     }
 
-    /**
-     * @see JsbImportRepositoryInterface::replaceRcbSeasonRecords()
-     */
     public function replaceRcbSeasonRecords(int $seasonYear, array $records): int
     {
-        return $this->transactional(function () use ($seasonYear, $records): int {
-            $this->execute(
-                "DELETE FROM `ibl_rcb_season_records` WHERE season_year = ?",
-                'i',
-                $seasonYear
-            );
-
-            $total = 0;
-            $columns = '(season_year, scope, teamid, context, stat_category, ranking,'
-                . ' player_name, player_position, car_block_id, pid,'
-                . ' stat_value, record_season_year, source_file)';
-            $rowTypes = 'isississiiiis';
-
-            foreach (array_chunk($records, 500) as $chunk) {
-                $placeholders = implode(', ', array_fill(0, count($chunk), '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'));
-                $types = str_repeat($rowTypes, count($chunk));
-                $params = [];
-                foreach ($chunk as $r) {
-                    $params[] = $r['season_year'];
-                    $params[] = $r['scope'];
-                    $params[] = $r['teamid'];
-                    $params[] = $r['context'];
-                    $params[] = $r['stat_category'];
-                    $params[] = $r['ranking'];
-                    $params[] = $r['player_name'];
-                    $params[] = $r['player_position'];
-                    $params[] = $r['car_block_id'];
-                    $params[] = $r['pid'];
-                    $params[] = $r['stat_value'];
-                    $params[] = $r['record_season_year'];
-                    $params[] = $r['source_file'];
-                }
-                $total += $this->execute(
-                    "INSERT INTO `ibl_rcb_season_records` " . $columns . " VALUES " . $placeholders,
-                    $types,
-                    ...$params
-                );
-            }
-
-            return $total;
-        });
+        return $this->rcb->replaceRcbSeasonRecords($seasonYear, $records);
     }
 
-    /**
-     * Look up a player name by pid.
-     *
-     * @param int $pid Player ID
-     * @return string|null Player name, or null if not found
-     */
+    public function fetchMaxTradeGroupId(): int
+    {
+        return $this->trn->fetchMaxTradeGroupId();
+    }
+
     public function getPlayerName(int $pid): ?string
     {
-        $row = $this->fetchOne(
-            "SELECT name FROM `ibl_plr` WHERE pid = ? LIMIT 1",
-            'i',
-            $pid
-        );
-
-        if ($row !== null) {
-            return is_string($row['name']) ? $row['name'] : null;
-        }
-
-        return null;
+        return $this->lookup->getPlayerName($pid);
     }
 
-    /**
-     * @see JsbImportRepositoryInterface::upsertPlbSnapshot()
-     */
     public function upsertPlbSnapshot(array $record): int
     {
-        return $this->execute(
-            // Backticked for the rename-safety rule only; not in
-            // LeagueContext::TABLE_MAP, so the Olympics rewrite never touches it.
-            "INSERT INTO `ibl_plb_snapshots`
-                (season_year, sim_number, source_archive, teamid, slot_index,
-                 pid, player_name, dc_minutes, dc_of, dc_df, dc_oi, dc_di, dc_bh)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE
-                season_year = VALUES(season_year),
-                sim_number = VALUES(sim_number),
-                pid = VALUES(pid),
-                player_name = VALUES(player_name),
-                dc_minutes = VALUES(dc_minutes),
-                dc_of = VALUES(dc_of),
-                dc_df = VALUES(dc_df),
-                dc_oi = VALUES(dc_oi),
-                dc_di = VALUES(dc_di),
-                dc_bh = VALUES(dc_bh)",
-            'iisiiisiiiiii',
-            $record['season_year'],
-            $record['sim_number'],
-            $record['source_archive'],
-            $record['teamid'],
-            $record['slot_index'],
-            $record['pid'],
-            $record['player_name'],
-            $record['dc_minutes'],
-            $record['dc_of'],
-            $record['dc_df'],
-            $record['dc_oi'],
-            $record['dc_di'],
-            $record['dc_bh']
-        );
+        return $this->plb->upsertPlbSnapshot($record);
     }
 
-    /**
-     * @see JsbImportRepositoryInterface::upsertDraftResult()
-     */
     public function upsertDraftResult(array $record): int
     {
-        return $this->execute(
-            // Non-TABLE_MAP table: backtick is rename-safety only, never rewritten.
-            "INSERT INTO `ibl_jsb_draft_results`
-                (draft_year, round, pick, team_name, pos, player_name, pid)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE
-                team_name = VALUES(team_name),
-                pos = VALUES(pos),
-                player_name = VALUES(player_name),
-                pid = VALUES(pid)",
-            'iiisssi',
-            $record['draft_year'],
-            $record['round'],
-            $record['pick'],
-            $record['team_name'],
-            $record['pos'],
-            $record['player_name'],
-            $record['pid']
-        );
+        return $this->dra->upsertDraftResult($record);
     }
 
-    /**
-     * @see JsbImportRepositoryInterface::upsertRetiredPlayer()
-     */
     public function upsertRetiredPlayer(array $record): int
     {
-        return $this->execute(
-            // Non-TABLE_MAP table: backtick is rename-safety only, never rewritten.
-            "INSERT INTO `ibl_jsb_retired_players`
-                (jsb_pid, retirement_year, player_name, pid)
-            VALUES (?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE
-                player_name = VALUES(player_name),
-                pid = VALUES(pid)",
-            'iisi',
-            $record['jsb_pid'],
-            $record['retirement_year'],
-            $record['player_name'],
-            $record['pid']
-        );
+        return $this->ret->upsertRetiredPlayer($record);
     }
 
-    /**
-     * @see JsbImportRepositoryInterface::upsertHofInductee()
-     */
     public function upsertHofInductee(array $record): int
     {
-        return $this->execute(
-            // Non-TABLE_MAP table: backtick is rename-safety only, never rewritten.
-            "INSERT INTO `ibl_jsb_hall_of_fame`
-                (jsb_pid, player_name, pos, induction_year, pid)
-            VALUES (?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE
-                player_name = VALUES(player_name),
-                pos = VALUES(pos),
-                induction_year = VALUES(induction_year),
-                pid = VALUES(pid)",
-            'issii',
-            $record['jsb_pid'],
-            $record['player_name'],
-            $record['pos'],
-            $record['induction_year'],
-            $record['pid']
-        );
+        return $this->hof->upsertHofInductee($record);
     }
 
-    /**
-     * @see JsbImportRepositoryInterface::hasChampionForSeason()
-     */
     public function hasChampionForSeason(int $seasonYear): bool
     {
-        $row = $this->fetchOne(
-            "SELECT COUNT(*) AS cnt FROM `ibl_jsb_history`
-             WHERE season_year = ? AND won_championship = 1",
-            'i',
-            $seasonYear,
-        );
-
-        if ($row === null) {
-            return false;
-        }
-
-        $cnt = $row['cnt'];
-
-        return is_int($cnt) && $cnt > 0;
+        return $this->his->hasChampionForSeason($seasonYear);
     }
 }

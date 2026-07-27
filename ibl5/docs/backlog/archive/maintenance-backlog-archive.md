@@ -173,6 +173,17 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 
 **Table evidence (2026-07-25):** SearchView 485 LOC string-concat. Extracted `renderResultList()` + ob_start migration; VR pin.
 
+### 1.27 JsbImportRepository — One Upsert Per Record Type (539 LOC)
+**Location:** `ibl5/classes/JsbParser/JsbImportRepository.php` (539 lines)
+**Problem:** 15 `upsert*`/`replace*` methods, one per imported entity (transaction, history, all-star roster/score, award, draft result, retired player, HoF inductee, RCB records, PLB snapshot), all in one repo.
+**Suggested direction:** Group the upserts by domain or extract per-entity upsert collaborators; keep a thin aggregator.
+**Est. effort:** M
+**Risk if untouched:** Grows with every new JSB-imported record type; green-green with DB pins.
+**Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
+**Status (2026-07-27):** ✅ Implemented — extracted 10 per-entity collaborators into `ibl5/classes/JsbParser/Repositories/` (TrnRepository, HisRepository, AswRepository, AwaRepository, RcbRepository, PlbRepository, DraRepository, RetRepository, HofRepository, JsbLookupRepository); JsbImportRepository reduced to a thin facade delegating each method to the appropriate collaborator; DB-integration tests added for all newly-exposed methods.
+
+**Table evidence (2026-07-27):** JsbImportRepository 539 LOC — 15 `upsert*`/`replace*` methods, one per imported record type. Group upserts by domain or extract per-entity collaborators; green-green DB pin.
+
 ### 1.28 SeasonArchiveService — Season-Detail Assembly God Method (530 LOC)
 **Location:** `ibl5/classes/SeasonArchive/SeasonArchiveService.php` (530 lines)
 **Problem:** `getSeasonDetail` orchestrates award extraction, GM/coach resolution, playoff-bracket building, and finals/heat-champion derivation across a dozen private helpers in one service.

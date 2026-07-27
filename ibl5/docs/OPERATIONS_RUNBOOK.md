@@ -127,7 +127,7 @@ derivable from the repo. **Write host procedures from the host.**
 3. **No IBL6 watchdog runs on the box.** The only pm2 cron job is
    `*/2 * * * * /home/iblhoops/public_html/bin/iblbot-healthcheck`, which probes port **50000** and
    restarts **IBLbot**. Stale `# IBL6 self-healing: probe port 3001` comments sat directly above it
-   and read as if they described it. A repo script `ibl5/bin/ibl6-healthcheck` (example) did exist —
+   and read as if they described it. A repo script `ibl6-healthcheck` did exist —
    added in PR #1524, deleted in PR #1639 — which is why the old procedure expected a matching cron
    entry; no such entry was on the box. **A script in the repo is not a job on the box, and the
    comment above a cron line is not its documentation — read the script the line actually invokes.**

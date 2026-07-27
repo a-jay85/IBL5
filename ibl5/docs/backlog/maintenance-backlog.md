@@ -47,19 +47,19 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 | Status | Count |
 |--------|------:|
-| ✅ Implemented | 231 |
+| ✅ Implemented | 232 |
 | ◑ Partial | 24 |
 | 📋 Planned (plan queued / PR open) | 1 |
-| ⬜ Open | 65 |
+| ⬜ Open | 64 |
 | 🚫 Declined | 10 |
 
-> Status counts re-verified 2026-06-28 (exact, from the per-axis tables); **6.20 / 6.21 added 2026-06-29** from the PR #1107 review (⬜ Open +2); **6.22 added 2026-06-29** from the #1066 reject-IDOR review (⬜ Open +1). Two stale-Open rows were flipped directly (no plan owned them): **13.3**, **13.9** (✅ +2, ⬜ −2 vs the master re-count). **1.21–1.31 added 2026-07-24** from the hot-files comment→backlog migration (⬜ Open +11: 8 🟩 auto-mergeable, 3 🟨 conditional — 1.23/1.25/1.31 need characterization/endpoint pins). **Ground-truth audit 2026-07-24:** 7 stale-Open items flipped ✅, 2 false findings marked 🚫, 5 new Axis-1 rows seeded (1.32–1.36); IDOR PRs #1107–1110 merged 2026-06-29 (unblocking 2.10/2.13/2.14/2.25/7.7/14.6); PRs #1240/#1230/#1204 merged (2.6/2.31/2.32/5.18 already ✅/Open on own merits). **9.19 and 9.20 implemented 2026-07-24** — added READMEs to all 68 missing class dirs + frontmatter to all 16 existing class READMEs that lacked it; extended bin/check-docs IN_SCOPE_GLOBS (✅ +2, ⬜ −2); roll-up recomputed from grep (331 rows total, unchanged). **6.16 flipped ✅ 2026-07-24** (all Api data repos + JsonResponder + SystemClock tested; ✅ +1, ◑ −1). **6.14 Status updated 2026-07-24** (ProcessBoxscoresStep/GenerateSeasonAwardsStep/ParseJsbFilesStep added; still ◑). **Resolved rows collapsed 2026-07-25** — ✅/🚫 findings no longer appear as table rows; each axis carries a `> ✅ resolved (N): …` / `> 🚫 declined (N): …` summary line and their evidence lives in [archive/maintenance-backlog-archive.md](archive/maintenance-backlog-archive.md). **Recount recipe:** resolved = sum of the `(N)` in the per-axis summary lines; open = grep of the per-axis table rows; total = the two added. Counts above are unchanged by the collapse (238 + 93 = 331). **1.36 and 7.7 flipped ✅ 2026-07-26** (✅ +2, ⬜ −1, ◑ −1); total tracked rows unchanged at 331.
+> Status counts re-verified 2026-06-28 (exact, from the per-axis tables); **6.20 / 6.21 added 2026-06-29** from the PR #1107 review (⬜ Open +2); **6.22 added 2026-06-29** from the #1066 reject-IDOR review (⬜ Open +1). Two stale-Open rows were flipped directly (no plan owned them): **13.3**, **13.9** (✅ +2, ⬜ −2 vs the master re-count). **1.21–1.31 added 2026-07-24** from the hot-files comment→backlog migration (⬜ Open +11: 8 🟩 auto-mergeable, 3 🟨 conditional — 1.23/1.25/1.31 need characterization/endpoint pins). **Ground-truth audit 2026-07-24:** 7 stale-Open items flipped ✅, 2 false findings marked 🚫, 5 new Axis-1 rows seeded (1.32–1.36); IDOR PRs #1107–1110 merged 2026-06-29 (unblocking 2.10/2.13/2.14/2.25/7.7/14.6); PRs #1240/#1230/#1204 merged (2.6/2.31/2.32/5.18 already ✅/Open on own merits). **9.19 and 9.20 implemented 2026-07-24** — added READMEs to all 68 missing class dirs + frontmatter to all 16 existing class READMEs that lacked it; extended bin/check-docs IN_SCOPE_GLOBS (✅ +2, ⬜ −2); roll-up recomputed from grep (331 rows total, unchanged). **6.16 flipped ✅ 2026-07-24** (all Api data repos + JsonResponder + SystemClock tested; ✅ +1, ◑ −1). **6.14 Status updated 2026-07-24** (ProcessBoxscoresStep/GenerateSeasonAwardsStep/ParseJsbFilesStep added; still ◑). **Resolved rows collapsed 2026-07-25** — ✅/🚫 findings no longer appear as table rows; each axis carries a `> ✅ resolved (N): …` / `> 🚫 declined (N): …` summary line and their evidence lives in [archive/maintenance-backlog-archive.md](archive/maintenance-backlog-archive.md). **Recount recipe:** resolved = sum of the `(N)` in the per-axis summary lines; open = grep of the per-axis table rows; total = the two added. Counts above are unchanged by the collapse (238 + 93 = 331). **1.36 and 7.7 flipped ✅ 2026-07-26** (✅ +2, ⬜ −1, ◑ −1); total tracked rows unchanged at 331. **1.29 flipped ✅ 2026-07-26 (PR #1679)** (✅ +1, ⬜ −1); total tracked rows unchanged at 331.
 
 **Automouse-readiness of the not-yet-complete (⬜/◑/📋) items:**
 
 | Bucket | Count | What it means |
 |--------|------:|---------------|
-| 🟩 Auto-mergeable | ~111 | green-green + pinnable; arms unattended |
+| 🟩 Auto-mergeable | ~110 | green-green + pinnable; arms unattended |
 | 🟦 Safe, human-merge | 10 | gate-14 trigger (security / UI-UX / destructive schema) → `auto_merge: false` |
 | 🟨 Conditional | 37 | needs one mechanical-scope add, one upfront decision, or a collision-PR to merge first |
 | 🟥 Not automouse-safe | 1 | 12.11 — `git filter-repo` history rewrite (irreversible, coordinated) |
@@ -74,7 +74,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
-> ✅ resolved (20): 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 1.14, 1.15, 1.16, 1.17, 1.20, 1.34, 1.36 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (21): 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 1.14, 1.15, 1.16, 1.17, 1.20, 1.29, 1.34, 1.36 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
@@ -88,7 +88,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 1.26 | ⬜ Open | 🟩 | BugReportRepository 546 LOC — 24 methods spanning claim/lease/transition state-machine + reporter-profile + queue queries. Split by query group; green-green with DB-integration pins. |
 | 1.27 | ⬜ Open | 🟩 | JsbImportRepository 539 LOC — 15 `upsert*`/`replace*` methods, one per imported record type. Group upserts by domain or extract per-entity collaborators; green-green DB pin. |
 | 1.28 | ⬜ Open | 🟩 | SeasonArchiveService 530 LOC — season-detail assembly mixing award/coach extraction + playoff-bracket building. Extract award-extraction and bracket collaborators; green-green. |
-| 1.29 | ⬜ Open | 🟩 | LastSimRecapView 518 LOC — 19 render methods (header/tabs/panels/injury/battles). Extract sub-view renderers; behavior-preserving golden-master pin. |
 | 1.30 | ⬜ Open | 🟩 | TradingService 516 LOC — page-data orchestration + offer-grouping + future-salary calc. Extract offer-grouping and salary collaborators; green-green. |
 | 1.31 | ⬜ Open | 🟨 | TradeRosterPreviewApiHandler 508 LOC — API handler mixing param validation + cash-row building + table render. Extract validation and cash-row collaborators; endpoint (request-handling) → add an E2E/characterization pin. |
 | 1.32 | ⬜ Open | 🟩 | StandingsRepository 726 LOC — per-category standings query methods. Extract per-category query collaborators; green-green DB pin. Shares `classes/Standings/` with 1.35 — plan as ONE chunk. |
@@ -174,14 +173,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Extract an award-extraction collaborator and a playoff-bracket builder; keep the service as the assembler.
 **Est. effort:** M
 **Risk if untouched:** Season-detail logic concentrated in one service; green-green.
-**Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
-
-### 1.29 LastSimRecapView — 19-Method Recap Renderer (518 LOC)
-**Location:** `ibl5/classes/LastSimRecap/LastSimRecapView.php` (518 lines)
-**Problem:** 19 render methods build the recap slate (header, tabs, panels, verdict strip, quarter chart, injury groups, head-to-head battles, player rows) in one view.
-**Suggested direction:** Extract sub-view renderers (e.g. injury, battles, quarter-chart) behind the main view; behavior-preserving golden-master pin.
-**Est. effort:** M
-**Risk if untouched:** Every recap-UI addition inflates the view.
 **Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
 
 ### 1.30 TradingService — Page-Data + Offer-Grouping + Salary Calc (516 LOC)

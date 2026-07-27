@@ -10,7 +10,7 @@
 -- rewrites them to the current names to match the rest of the table.
 --
 -- The tid columns stay correct (Sting=10, Aces=16) — migration 097 already
--- pointed them at the right franchises via JsbImportRepository::TEAM_NAME_ALIASES.
+-- pointed them at the right franchises via JsbParser\Repositories\JsbLookupRepository::TEAM_NAME_ALIASES.
 
 UPDATE ibl_draft_picks
    SET ownerofpick = 'Sting'

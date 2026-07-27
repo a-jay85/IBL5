@@ -10,7 +10,7 @@ use Trading\Contracts\TradeRosterPreviewParamValidatorInterface;
  * Validates the trade roster preview endpoint's `$_GET` query parameters.
  *
  * Extracted verbatim from TradeRosterPreviewApiHandler (ADR-0001). Pure — reads
- * only `$_GET`, never the database, so it takes no `\mysqli`. Each method
+ * only `$_GET`, never the database, so it needs no database connection. Each method
  * reproduces the handler's original validation exactly; behaviour must not change.
  */
 class TradeRosterPreviewParamValidator implements TradeRosterPreviewParamValidatorInterface

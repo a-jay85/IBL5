@@ -173,6 +173,15 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 
 **Table evidence (2026-07-25):** SearchView 485 LOC string-concat. Extracted `renderResultList()` + ob_start migration; VR pin.
 
+### 1.29 LastSimRecapView — 19-Method Recap Renderer (518 LOC)
+**Location:** `ibl5/classes/LastSimRecap/LastSimRecapView.php` (518 lines)
+**Problem:** 19 render methods build the recap slate (header, tabs, panels, verdict strip, quarter chart, injury groups, head-to-head battles, player rows) in one view.
+**Suggested direction:** Extract sub-view renderers (e.g. injury, battles, quarter-chart) behind the main view; behavior-preserving golden-master pin.
+**Est. effort:** M
+**Risk if untouched:** Every recap-UI addition inflates the view.
+**Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
+**Status (2026-07-26):** ✅ Implemented — PR #1679. Extracted `RecapHeaderRenderer`, `RecapTabsRenderer`, `RecapPanelRenderer`, `RecapInjuryCellRenderer`, `RecapBattlesRenderer` (5 renderer classes) + `RecapTeamNameHelper`; `LastSimRecapView` thinned to a pure orchestrator. Output byte-identical across all 5 golden-master scenarios. 57 mutation-surviving renderer unit tests + 5 helper tests (62 total) in `ibl5/tests/LastSimRecap/`.
+
 ### 1.34 SavedDepthChartService — Data Assembly + Slot-Conflict Resolution (626 LOC)
 **Location:** `ibl5/classes/SavedDepthChart/SavedDepthChartService.php` (626 lines)
 **Problem:** One service assembles depth-chart page data and resolves slot conflicts, mixing orchestration with conflict-resolution logic.

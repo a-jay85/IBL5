@@ -1966,6 +1966,24 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Risk if untouched:** Minor payload bloat per page.
 
 **Table evidence (2026-07-27):** Page-specific JS to per-view loaders; E2E/VR pin.
+### 11.1 FOUT-Prevention Inline `<style>` in PageLayout (2 baselined violations)
+**Status:** Resolved 2026-07-27 (branch css-11-1-11-2-fout-and-themes-phpstan; PR pending).
+**Location:** `classes/PageLayout/PageLayout.php` lines 181-234
+**Problem:** Two `<style>` blocks (`.fonts-loading`, `.fonts-loaded body`) account for 2 of 6 baselined `ibl.inlineCss`. Coupled to font-load JS in the same method.
+**Suggested direction:** Extract to `design/base.css` (truly global); keep JS detection inline.
+**Est. effort:** S
+**Risk if untouched:** Future font strategy changes touch PHP instead of CSS.
+
+**Table evidence (2026-07-27):** PageLayout FOUT `<style>`→design/base.css; VR pin (global).
+### 11.2 5 Inline Styles in `theme.php` Invisible to `BanInlineCssRule`
+**Status:** Resolved 2026-07-27 (branch css-11-1-11-2-fout-and-themes-phpstan; PR pending).
+**Location:** `themes/IBL/theme.php` lines 244, 247, 292, 296, 300
+**Problem:** PHPStan scans only `classes/`; `themes/` is out of scope. Three `themecenterbox` styles + two article title overrides bypass enforcement.
+**Suggested direction:** Add `themes/` to PHPStan paths; migrate to named CSS classes.
+**Est. effort:** S
+**Risk if untouched:** Rule creates false confidence; new inline CSS in themes goes unchecked.
+
+**Table evidence (2026-07-27):** Add `themes/` to PHPStan scan + migrate 5 inline styles; baseline + VR pin. [CORRECTED: actual figure was 8 occurrences → 8 rule findings (not 5); 102 pre-existing non-CSS violations baselined]
 ## Axis 12: Data Files Committed to Repo
 
 ### 12.1 `IBL5.log` — 1.1 GB Runtime Log On Disk

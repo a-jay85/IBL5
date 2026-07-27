@@ -572,29 +572,13 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):** Open items are CSS refactors — almost all green-green with a **visual-regression pin** (the relocated/token-aliased rules must render pixel-identical), except 11.4 which is a deliberate visual consolidation.
 
-> ✅ resolved (11): 11.5, 11.6, 11.7, 11.8, 11.9, 11.10, 11.11, 11.12, 11.13, 11.15, 11.16 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (13): 11.5, 11.6, 11.7, 11.8, 11.9, 11.10, 11.11, 11.12, 11.13, 11.15, 11.16, 11.1, 11.2 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| 11.1 | ⬜ Open | 🟩 | PageLayout FOUT `<style>`→design/base.css; VR pin (global). |
-| 11.2 | ⬜ Open | 🟩 | Add `themes/` to PHPStan scan + migrate 5 inline styles; baseline + VR pin. |
 | 11.3 | ◑ Partial | 🟩 | Split ongoing (#1234 + earlier): 15 component files now under `design/components/tables/`; `components/tables.css` still ~1296 LOC. Continue relocation; VR pin. |
 | 11.4 | ⬜ Open | 🟨 | player-views.css parallel table system → `.ibl-data-table`. Visual consolidation = VR-affecting → human review / baseline update. |
 | 11.14 | ◑ Partial | 🟩 | Exact-match hex→token aliases landed (#1234, merged 2026-06-28); ~62 raw hex still in `design/components/` (no exact token match). Continue aliasing; VR pin. |
-
-### 11.1 FOUT-Prevention Inline `<style>` in PageLayout (2 baselined violations)
-**Location:** `classes/PageLayout/PageLayout.php` lines 181-234
-**Problem:** Two `<style>` blocks (`.fonts-loading`, `.fonts-loaded body`) account for 2 of 6 baselined `ibl.inlineCss`. Coupled to font-load JS in the same method.
-**Suggested direction:** Extract to `design/base.css` (truly global); keep JS detection inline.
-**Est. effort:** S
-**Risk if untouched:** Future font strategy changes touch PHP instead of CSS.
-
-### 11.2 5 Inline Styles in `theme.php` Invisible to `BanInlineCssRule`
-**Location:** `themes/IBL/theme.php` lines 244, 247, 292, 296, 300
-**Problem:** PHPStan scans only `classes/`; `themes/` is out of scope. Three `themecenterbox` styles + two article title overrides bypass enforcement.
-**Suggested direction:** Add `themes/` to PHPStan paths; migrate to named CSS classes.
-**Est. effort:** S
-**Risk if untouched:** Rule creates false confidence; new inline CSS in themes goes unchecked.
 
 ### 11.3 `tables.css` Is a ~1,410-Line Monolith Covering 25+ Feature Areas
 **Location:** `ibl5/design/components/tables.css`

@@ -104,6 +104,14 @@ final class BanRawSuperglobalsRuleTest extends RuleTestCase
         );
     }
 
+    public function testAllowsGetSuperglobalAccessInTradeRosterPreviewParamValidator(): void
+    {
+        $this->analyse(
+            [__DIR__ . '/Fixtures/classes/TradeRosterPreviewParamValidator.php'],
+            [],
+        );
+    }
+
     public function testAllowsSuperglobalAccessOutsideClassesDirectory(): void
     {
         $this->analyse(

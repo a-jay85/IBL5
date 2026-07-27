@@ -7,6 +7,7 @@ namespace Trading;
 use Team\TeamRepository;
 use Team\TeamTableService;
 use Trading\Contracts\TradeAssetRepositoryInterface;
+use Trading\Contracts\TradeRosterPreviewParamValidatorInterface;
 use UI\Components\TableViewDropdown;
 use Team\Team;
 use Season\Season;
@@ -20,21 +21,9 @@ use Season\Season;
  */
 class TradeRosterPreviewApiHandler
 {
-    private const VALID_DISPLAY_MODES = [
-        'ratings',
-        'total_s',
-        'avg_s',
-        'per36mins',
-        'contracts',
-        'split',
-        'chunk',
-        'playoffs',
-    ];
-
-    private const MAX_PIDS = 20;
-
     private \mysqli $db;
     private TradeAssetRepositoryInterface $tradeAssetRepository;
+    private TradeRosterPreviewParamValidatorInterface $paramValidator;
 
     /**
      * The logged-in user's team ID, used to decide whether eligibility action
@@ -47,12 +36,13 @@ class TradeRosterPreviewApiHandler
      */
     private ?Season $season = null;
 
-    public function __construct(\mysqli $db, TradeAssetRepositoryInterface $tradeAssetRepository, int $loggedInTeamID = 0, ?Season $season = null)
+    public function __construct(\mysqli $db, TradeAssetRepositoryInterface $tradeAssetRepository, int $loggedInTeamID = 0, ?Season $season = null, ?TradeRosterPreviewParamValidatorInterface $paramValidator = null)
     {
         $this->db = $db;
         $this->tradeAssetRepository = $tradeAssetRepository;
         $this->loggedInTeamID = $loggedInTeamID;
         $this->season = $season;
+        $this->paramValidator = $paramValidator ?? new TradeRosterPreviewParamValidator();
     }
 
     public function handle(): void
@@ -60,25 +50,25 @@ class TradeRosterPreviewApiHandler
         header('Content-Type: application/json; charset=utf-8');
         $responder = new \Api\Response\HtmlResponder();
 
-        $teamid = $this->validateTeamID();
+        $teamid = $this->paramValidator->validateTeamID();
         if ($teamid === 0) {
             $responder->json(['html' => '']);
             return;
         }
 
-        $addPids = $this->validatePidList('addPids');
+        $addPids = $this->paramValidator->validatePidList('addPids');
         if ($addPids === null) {
             $responder->json(['html' => '']);
             return;
         }
 
-        $removePids = $this->validatePidList('removePids');
+        $removePids = $this->paramValidator->validatePidList('removePids');
         if ($removePids === null) {
             $responder->json(['html' => '']);
             return;
         }
 
-        $display = $this->validateDisplay();
+        $display = $this->paramValidator->validateDisplay();
 
         // Validate split parameter when display is 'split'
         $split = null;
@@ -175,76 +165,6 @@ class TradeRosterPreviewApiHandler
     }
 
     /**
-     * Validate teamid query parameter
-     */
-    private function validateTeamID(): int
-    {
-        if (!isset($_GET['teamid']) || !is_string($_GET['teamid'])) {
-            return 0;
-        }
-
-        $raw = $_GET['teamid'];
-        if (!ctype_digit($raw) || $raw === '0') {
-            return 0;
-        }
-
-        return (int) $raw;
-    }
-
-    /**
-     * Validate a PID list query parameter (addPids or removePids)
-     *
-     * Returns empty array for empty/missing values (valid — no players to add/remove).
-     * Returns null for invalid values (non-numeric, exceeds max).
-     *
-     * @return list<int>|null Validated PID list or null if invalid
-     */
-    private function validatePidList(string $paramName): ?array
-    {
-        if (!isset($_GET[$paramName]) || !is_string($_GET[$paramName])) {
-            return [];
-        }
-
-        $raw = $_GET[$paramName];
-        if ($raw === '') {
-            return [];
-        }
-
-        $parts = explode(',', $raw);
-        if (count($parts) > self::MAX_PIDS) {
-            return null;
-        }
-
-        $pids = [];
-        foreach ($parts as $part) {
-            $trimmed = trim($part);
-            if ($trimmed === '' || !ctype_digit($trimmed)) {
-                return null;
-            }
-            $pids[] = (int) $trimmed;
-        }
-
-        return $pids;
-    }
-
-    /**
-     * Validate display query parameter against whitelist
-     */
-    private function validateDisplay(): string
-    {
-        if (!isset($_GET['display']) || !is_string($_GET['display'])) {
-            return 'ratings';
-        }
-
-        $raw = $_GET['display'];
-        if (in_array($raw, self::VALID_DISPLAY_MODES, true)) {
-            return $raw;
-        }
-
-        return 'ratings';
-    }
-
-    /**
      * Build synthetic cash rows for the contracts view
      *
      * Creates in-memory player-format rows representing cash exchanges,
@@ -254,11 +174,11 @@ class TradeRosterPreviewApiHandler
      */
     private function buildCashRows(int $viewingTeamId): array
     {
-        $userTeam = $this->validateStringParam('userTeam');
-        $partnerTeam = $this->validateStringParam('partnerTeam');
-        $userTeamId = $this->validateIntParam('userTeamId');
-        $cashStartYear = $this->validateIntParam('cashStartYear');
-        $cashEndYear = $this->validateIntParam('cashEndYear');
+        $userTeam = $this->paramValidator->validateStringParam('userTeam');
+        $partnerTeam = $this->paramValidator->validateStringParam('partnerTeam');
+        $userTeamId = $this->paramValidator->validateIntParam('userTeamId');
+        $cashStartYear = $this->paramValidator->validateIntParam('cashStartYear');
+        $cashEndYear = $this->paramValidator->validateIntParam('cashEndYear');
 
         if ($userTeam === '' || $partnerTeam === '' || $cashStartYear === 0 || $cashEndYear === 0) {
             return [];
@@ -282,8 +202,8 @@ class TradeRosterPreviewApiHandler
         $hasPartnerCash = false;
 
         for ($yr = $cashStartYear; $yr <= $cashEndYear; $yr++) {
-            $uAmount = $this->validateCashAmount('userCash' . $yr);
-            $pAmount = $this->validateCashAmount('partnerCash' . $yr);
+            $uAmount = $this->paramValidator->validateCashAmount('userCash' . $yr);
+            $pAmount = $this->paramValidator->validateCashAmount('partnerCash' . $yr);
             $userCash[$yr] = $uAmount;
             $partnerCash[$yr] = $pAmount;
             if ($uAmount > 0) {
@@ -428,52 +348,6 @@ class TradeRosterPreviewApiHandler
             // Cash row flag
             'isCashRow' => true,
         ];
-    }
-
-    /**
-     * Validate a string query parameter
-     */
-    private function validateStringParam(string $paramName): string
-    {
-        if (!isset($_GET[$paramName]) || !is_string($_GET[$paramName])) {
-            return '';
-        }
-        $raw = trim($_GET[$paramName]);
-        return $raw !== '' ? $raw : '';
-    }
-
-    /**
-     * Validate an integer query parameter (positive)
-     */
-    private function validateIntParam(string $paramName): int
-    {
-        if (!isset($_GET[$paramName]) || !is_string($_GET[$paramName])) {
-            return 0;
-        }
-        $raw = $_GET[$paramName];
-        if (!ctype_digit($raw)) {
-            return 0;
-        }
-        return (int) $raw;
-    }
-
-    /**
-     * Validate a cash amount query parameter (0-2000)
-     */
-    private function validateCashAmount(string $paramName): int
-    {
-        if (!isset($_GET[$paramName]) || !is_string($_GET[$paramName])) {
-            return 0;
-        }
-        $raw = $_GET[$paramName];
-        if (!ctype_digit($raw)) {
-            return 0;
-        }
-        $amount = (int) $raw;
-        if ($amount > 2000) {
-            return 0;
-        }
-        return $amount;
     }
 
     /**

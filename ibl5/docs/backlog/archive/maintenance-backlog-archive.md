@@ -1967,7 +1967,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 
 **Table evidence (2026-07-27):** Page-specific JS to per-view loaders; E2E/VR pin.
 ### 11.1 FOUT-Prevention Inline `<style>` in PageLayout (2 baselined violations)
-**Status:** Resolved 2026-07-27 (branch css-11-1-11-2-fout-and-themes-phpstan; PR pending).
+**Status:** Resolved 2026-07-27 (#1688).
 **Location:** `classes/PageLayout/PageLayout.php` lines 181-234
 **Problem:** Two `<style>` blocks (`.fonts-loading`, `.fonts-loaded body`) account for 2 of 6 baselined `ibl.inlineCss`. Coupled to font-load JS in the same method.
 **Suggested direction:** Extract to `design/base.css` (truly global); keep JS detection inline.
@@ -1976,7 +1976,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 
 **Table evidence (2026-07-27):** PageLayout FOUT `<style>`→design/base.css; VR pin (global).
 ### 11.2 5 Inline Styles in `theme.php` Invisible to `BanInlineCssRule`
-**Status:** Resolved 2026-07-27 (branch css-11-1-11-2-fout-and-themes-phpstan; PR pending).
+**Status:** Resolved 2026-07-27 (#1688).
 **Location:** `themes/IBL/theme.php` lines 244, 247, 292, 296, 300
 **Problem:** PHPStan scans only `classes/`; `themes/` is out of scope. Three `themecenterbox` styles + two article title overrides bypass enforcement.
 **Suggested direction:** Add `themes/` to PHPStan paths; migrate to named CSS classes.

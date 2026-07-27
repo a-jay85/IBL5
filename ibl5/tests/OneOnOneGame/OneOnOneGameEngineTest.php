@@ -7,7 +7,8 @@ namespace Tests\OneOnOneGame;
 use PHPUnit\Framework\TestCase;
 use OneOnOneGame\OneOnOneGameEngine;
 use OneOnOneGame\OneOnOneGameTextGenerator;
-use OneOnOneGame\OneOnOneGameResult;
+use OneOnOneGame\Contracts\OneOnOneGamePossessionResolverInterface;
+use OneOnOneGame\Contracts\OneOnOneGameShotResultResolverInterface;
 
 /**
  * Tests for OneOnOneGameEngine
@@ -21,158 +22,6 @@ final class OneOnOneGameEngineTest extends TestCase
     protected function setUp(): void
     {
         $this->engine = new OneOnOneGameEngine();
-    }
-
-    // ========== Block Check Tests ==========
-
-    public function testCheckBlockReturnsBooleanValue(): void
-    {
-        $result = $this->engine->checkBlock(50, 50);
-
-        $this->assertIsBool($result);
-    }
-
-    public function testCheckBlockWithHighBlockRatingIncreasesBlockChance(): void
-    {
-        // Run multiple times to verify statistical tendency
-        $blockCount = 0;
-        $iterations = 100;
-
-        for ($i = 0; $i < $iterations; $i++) {
-            if ($this->engine->checkBlock(100, 10)) {
-                $blockCount++;
-            }
-        }
-
-        // With very high block rating vs low attempt rating, should block more often
-        // Not deterministic, but should get some blocks
-        $this->assertGreaterThanOrEqual(0, $blockCount);
-    }
-
-    // ========== Steal Check Tests ==========
-
-    public function testCheckStealReturnsBooleanValue(): void
-    {
-        $result = $this->engine->checkSteal(50, 50);
-
-        $this->assertIsBool($result);
-    }
-
-    public function testCheckStealWithHighStealRatingIncreasesStealChance(): void
-    {
-        $stealCount = 0;
-        $iterations = 100;
-
-        for ($i = 0; $i < $iterations; $i++) {
-            if ($this->engine->checkSteal(100, 10)) {
-                $stealCount++;
-            }
-        }
-
-        $this->assertGreaterThanOrEqual(0, $stealCount);
-    }
-
-    // ========== Foul Check Tests ==========
-
-    public function testCheckFoulReturnsBooleanValue(): void
-    {
-        $result = $this->engine->checkFoul(50, 50);
-
-        $this->assertIsBool($result);
-    }
-
-    public function testCheckFoulWithHighDrawFoulRatingIncreasesFoulChance(): void
-    {
-        $foulCount = 0;
-        $iterations = 100;
-
-        for ($i = 0; $i < $iterations; $i++) {
-            if ($this->engine->checkFoul(10, 100)) {
-                $foulCount++;
-            }
-        }
-
-        $this->assertGreaterThanOrEqual(0, $foulCount);
-    }
-
-    // ========== Shot Check Tests ==========
-
-    public function testCheckShotReturnsBooleanValue(): void
-    {
-        $result = $this->engine->checkShot(50, 50, 25);
-
-        $this->assertIsBool($result);
-    }
-
-    public function testCheckShotWithHighPercentageIncreasesMakeChance(): void
-    {
-        $madeCount = 0;
-        $iterations = 100;
-
-        for ($i = 0; $i < $iterations; $i++) {
-            // Very high percentage, high offense, low defense
-            if ($this->engine->checkShot(90, 50, 10)) {
-                $madeCount++;
-            }
-        }
-
-        // Should make most shots with these ratings
-        $this->assertGreaterThan(50, $madeCount);
-    }
-
-    public function testCheckShotWithLowPercentageDecreaseMakeChance(): void
-    {
-        $madeCount = 0;
-        $iterations = 100;
-
-        for ($i = 0; $i < $iterations; $i++) {
-            // Very low percentage, low offense, high defense
-            if ($this->engine->checkShot(10, 10, 50)) {
-                $madeCount++;
-            }
-        }
-
-        // Should miss most shots with these ratings
-        $this->assertLessThan(50, $madeCount);
-    }
-
-    // ========== Rebound Check Tests ==========
-
-    public function testCheckReboundReturnsBooleanValue(): void
-    {
-        $result = $this->engine->checkRebound(30, 70);
-
-        $this->assertIsBool($result);
-    }
-
-    public function testCheckReboundWithHighOffensiveReboundingFavorsOffense(): void
-    {
-        $offRebCount = 0;
-        $iterations = 100;
-
-        for ($i = 0; $i < $iterations; $i++) {
-            if ($this->engine->checkRebound(90, 10)) {
-                $offRebCount++;
-            }
-        }
-
-        // Should get offensive rebound more often with high ORB
-        $this->assertGreaterThan(30, $offRebCount);
-    }
-
-    public function testCheckReboundWithHighDefensiveReboundingFavorsDefense(): void
-    {
-        $offRebCount = 0;
-        $iterations = 100;
-
-        for ($i = 0; $i < $iterations; $i++) {
-            if ($this->engine->checkRebound(10, 90)) {
-                $offRebCount++;
-            }
-        }
-
-        // Should get offensive rebound less often with high DRB
-        $this->assertLessThan(50, $offRebCount);
     }
 
     // ========== Game Simulation Tests ==========
@@ -242,7 +91,7 @@ final class OneOnOneGameEngineTest extends TestCase
         // Either field goal attempts or free throw attempts from fouls
         $totalFGA = $result->player1Stats->fieldGoalsAttempted + $result->player2Stats->fieldGoalsAttempted;
         $totalFouls = $result->player1Stats->fouls + $result->player2Stats->fouls;
-        
+
         // At least something should have happened in the game
         $this->assertGreaterThan(0, $totalFGA + $totalFouls);
 
@@ -299,6 +148,73 @@ final class OneOnOneGameEngineTest extends TestCase
         $this->assertSame($first->player1Score, $afterReset->player1Score);
         $this->assertSame($first->player2Score, $afterReset->player2Score);
         $this->assertSame($first->playByPlay, $afterReset->playByPlay);
+    }
+
+    // ========== Constructor Injection Tests ==========
+
+    /**
+     * Kills the constructor Coalesce mutant on the shot-result resolver default:
+     * an injected shot resolver that always returns RESULT_BLOCKED_THREE (and never
+     * fouls) must actually be reached, producing three-point attempts with zero
+     * made field goals. If the `??` default were used instead, real shooting logic
+     * would occasionally make a shot and this would fail.
+     */
+    public function testInjectedShotResultResolverIsUsed(): void
+    {
+        $shotResultResolver = self::createStub(OneOnOneGameShotResultResolverInterface::class);
+        $shotResultResolver->method('resolve')->willReturn(OneOnOneGameShotResultResolverInterface::RESULT_BLOCKED_THREE);
+        $shotResultResolver->method('checkFoul')->willReturn(false);
+
+        $engine = new OneOnOneGameEngine(null, null, $shotResultResolver);
+
+        mt_srand(20240301);
+        $result = $engine->simulateGame(
+            $this->createMockPlayerData('Player One'),
+            $this->createMockPlayerData('Player Two'),
+            'Owner'
+        );
+
+        $totalThreePointAttempts = $result->player1Stats->threePointersAttempted
+            + $result->player2Stats->threePointersAttempted;
+        $totalFieldGoalsMade = $result->player1Stats->fieldGoalsMade
+            + $result->player2Stats->fieldGoalsMade;
+
+        $this->assertGreaterThan(0, $totalThreePointAttempts);
+        $this->assertSame(0, $totalFieldGoalsMade);
+    }
+
+    /**
+     * Kills the constructor Coalesce mutant on the possession resolver default:
+     * an injected possession resolver that always returns RESULT_STEAL (and never
+     * rebounds) must be reached, producing turnovers and the steal play-by-play
+     * text. The 500-possession safety cap keeps an all-steal game finite.
+     */
+    public function testInjectedPossessionResolverIsUsed(): void
+    {
+        $textGenerator = self::createStub(OneOnOneGameTextGenerator::class);
+        $textGenerator->method('getCoinFlipText')->willReturn('coin flip<br>');
+        $textGenerator->method('getStealPlayText')->willReturn('STEAL_SENTINEL<br>');
+        $textGenerator->method('getScoreText')->willReturn('SCORE:<br>');
+
+        $possessionResolver = self::createStub(OneOnOneGamePossessionResolverInterface::class);
+        $possessionResolver->method('resolve')->willReturn(OneOnOneGameShotResultResolverInterface::RESULT_STEAL);
+        $possessionResolver->method('checkRebound')->willReturn(false);
+
+        $engine = new OneOnOneGameEngine($textGenerator, $possessionResolver);
+
+        mt_srand(20240302);
+        $result = $engine->simulateGame(
+            $this->createMockPlayerData('Player One'),
+            $this->createMockPlayerData('Player Two'),
+            'Owner'
+        );
+
+        $totalTurnovers = $result->player1Stats->turnovers + $result->player2Stats->turnovers;
+
+        $this->assertStringContainsString('STEAL_SENTINEL', $result->playByPlay);
+        $this->assertGreaterThan(0, $totalTurnovers);
+        // The game still terminates (safety cap) and emits the final score table.
+        $this->assertStringContainsString('FINAL SCORE:', $result->playByPlay);
     }
 
     // ========== Helper Methods ==========

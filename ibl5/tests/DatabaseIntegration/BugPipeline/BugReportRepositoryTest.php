@@ -354,7 +354,10 @@ class BugReportRepositoryTest extends DatabaseTestCase
             'class'               => 'bug',
             'blocked_until'       => '2000-01-01 00:00:00',
         ]);
-        $row = $this->repo->claimNextHuntable('worker-1', '2099-01-01 00:00:00');
+        // Distinct lease args from the parked-row attempt above: a byte-identical
+        // claimNextHuntable() call would make PHPStan carry the earlier assertNull()
+        // narrowing forward (it can't see the ripe INSERT between the two calls).
+        $row = $this->repo->claimNextHuntable('worker-2', '2099-06-01 00:00:00');
         self::assertNotNull($row);
         self::assertSame($ripe, $row['id']);
         self::assertSame('hunting', $row['status']);

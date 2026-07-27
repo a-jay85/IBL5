@@ -17,7 +17,6 @@ settings.local.json
 .claude/scheduled_tasks.lock
 .claude/automouse/handoff/
 .nightly/
-.claude/rules/codebase-map.md
 
 config.json
 config.php

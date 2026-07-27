@@ -154,8 +154,8 @@ the plan: a fork you could have resolved here costs a held PR.
 3. Fire it — the file from step 2 is the argument:
 
    ```bash
-   bin/plan-now "$f"                    # default: leaves the plan on disk for review
-   bin/plan-now --queue "$f"            # only when the user asked for it to auto-queue
+   bin/plan-now "$f"                    # default: queue for automouse if the plan passes
+   bin/plan-now --implement "$f"        # write the plan but leave it unqueued for review
    bin/plan-now --model opus "$f"       # when Step 4 said the ORCHESTRATOR wants Opus
    ```
 
@@ -163,10 +163,17 @@ the plan: a fork you could have resolved here costs a held PR.
    survives closing Claude Code), then runs `bin/check-plan` on the produced plan and
    logs the verdict. Report the log path it prints; don't poll it.
 
-   **Default disposition is `--implement`** — the plan lands on disk and is *not*
-   queued for automouse. `/plan`'s own default is auto-queue, and that is deliberately
-   inverted here: nobody watched this plan get written, so a human reads it before it
-   implements. `--queue` only when the user asked for end-to-end automation.
+   **Default disposition is `--queue`** — matching `/plan`'s own default. The fired run
+   goes design → plan → implementation → PR without a human in the loop, so the block
+   you just composed is the last human-authored input to a shipped PR. The gate is
+   `bin/plan-now`'s own, not the model's: it queues only when the run **exits clean**
+   *and* the plan is **identified by its `PLAN_FILE:` line** *and* **`bin/check-plan`
+   passes**. A degraded run lands on disk for a human instead. Reach for
+   `--implement` when you want to read the plan before it implements — a novel design,
+   a scope you're unsure of, or a Step 4.5 fork you resolved with low confidence.
+
+   Because the plan will be *executed*, not skimmed: Step 4.5's fork pre-resolution and
+   the Step-3 tier directive are what stand between this block and a wrong PR.
 
    With multiple blocks, fire **only block 1**. Later blocks are stacked PRs whose base
    branch does not exist yet — write them out, and say they fire after block 1's PR.

@@ -79,6 +79,14 @@ if printf '%s' "$cmd" | grep -q 'storeSimRecap\.php'; then
         printf '{"ok":false,"error":"stub store failure"}\n'
         exit 1
     fi
+    # store-banner: real ssh writes non-JSON banners to STDERR while still
+    # exiting 0 with good JSON on stdout (OpenSSH 10.2's post-quantum-KEX
+    # warning). If the tick merges stderr into the captured response, the JSON
+    # parse fails and a successful store is misreported as a failure.
+    if [ -f "$STUB/store-banner" ]; then
+        printf '** WARNING: connection is not using a post-quantum key exchange algorithm.\n' >&2
+        printf '** This session may be vulnerable to "store now, decrypt later" attacks.\n' >&2
+    fi
     cat "$STUB/resp.store" 2>/dev/null || printf '{"ok":true,"sim":42,"games":5}\n'
     exit 0
 fi
@@ -131,12 +139,22 @@ SH
 printf 'PROMPT_MARKER_SIM_RECAP\n'
 SH
 
-    chmod +x "$STUB/ssh" "$STUB/claude" "$STUB/prompt"
+    # mysql stub: never executed here (only the agent queries, and the agent is
+    # stubbed) — it exists so the tick's preflight `command -v` has something to
+    # resolve. Without it the suite would pass or fail on whether THIS machine
+    # happens to have mysql@8.4 installed.
+    cat > "$STUB/mysql" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+
+    chmod +x "$STUB/ssh" "$STUB/claude" "$STUB/prompt" "$STUB/mysql"
 
     export STUB
     export SIM_RECAP_SSH_BIN="$STUB/ssh"
     export SIM_RECAP_CLAUDE_BIN="$STUB/claude"
     export SIM_RECAP_PROMPT_BIN="$STUB/prompt"
+    export SIM_RECAP_MYSQL_BIN="$STUB/mysql"
     export SIM_RECAP_SSH_HOST="test-host"
     export SIM_RECAP_REMOTE_ROOT=""
     export SIM_RECAP_DB_HOST="127.0.0.1"
@@ -152,9 +170,10 @@ SH
 srt_reset() {
     rm -f "$STUB"/ssh.log "$STUB"/claude.log "$STUB"/claude.sentinel \
           "$STUB"/tick.out "$STUB"/agent-fails "$STUB"/agent-usage-limit \
-          "$STUB"/store-fails "$STUB"/resp.* "$STUB"/fail.* \
+          "$STUB"/store-fails "$STUB"/store-banner "$STUB"/resp.* "$STUB"/fail.* \
           "$STUB"/record-stdin "$STUB"/store.cmd "$STUB"/store.stdin 2>/dev/null
     export SIM_RECAP_DB_PASSWORD="test_db_password"
+    export SIM_RECAP_MYSQL_BIN="$STUB/mysql"
     unset SIM_RECAP_KEEP_WORKDIR 2>/dev/null || true
 }
 
@@ -362,6 +381,20 @@ else
     srt_ok "workdir_removed_on_failure"
 fi
 
+# ── missing_mysql_bin_aborts_before_claiming ─────────────────────────────────
+# The prompt pins the mysql path and tells the agent not to look for another one,
+# so a stale pin is unrecoverable from inside the agent: it would query nothing,
+# emit no payload, and park — burning one of two attempts every 300s poll until
+# the sim is permanently failed. Preflight it like the claude binary (sim 721):
+# a broken environment must cost zero attempts and zero agent spawns.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+SIM_RECAP_MYSQL_BIN="$STUB/nonexistent-mysql" srt_run
+srt_expect_eq  "missing_mysql_bin_aborts_before_claiming — exit 1" 1 "$SRT_RC"
+srt_file_absent "$STUB/ssh.log"         "missing_mysql_bin_aborts_before_claiming — no ssh called"
+srt_file_absent "$STUB/claude.sentinel" "missing_mysql_bin_aborts_before_claiming — zero claude"
+srt_log_has    "$STUB" tick.out "mysql client" "missing_mysql_bin_aborts_before_claiming — logged why"
+
 # ── missing_password_exits_before_ssh ────────────────────────────────────────
 srt_reset
 ( unset SIM_RECAP_DB_PASSWORD; "$SRT_DRIVER" > "$STUB/tick.out" 2>&1 )
@@ -400,6 +433,22 @@ if [ "${_plist_count:-0}" -eq 0 ]; then
 else
     srt_fail "no_plist_committed — found: $(git -C "$_repo_root" ls-files '*.plist')"
 fi
+
+# ── ssh_stderr_banner_does_not_break_store ───────────────────────────────────
+# Regression, sim 722 (2026-07-26): the store call captured stdout with 2>&1, so
+# an ssh stderr banner landed in front of the JSON, jq_ok rejected it, and a
+# store that had written all 56 recaps logged "store failed (rc=0)" and then
+# tried to park an already-done row. The data was correct and only the log lied,
+# so this bug is invisible without a test. Guard: stderr noise + rc 0 + good
+# JSON on stdout must still read as a success — no "store failed", no park.
+srt_reset
+touch "$STUB/store-banner"
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+srt_run
+srt_expect_eq  "ssh_stderr_banner_does_not_break_store — exit 0" 0 "$SRT_RC"
+srt_log_has    "$STUB" tick.out  "stored"        "ssh_stderr_banner_does_not_break_store — logged stored"
+srt_log_lacks  "$STUB" tick.out  "store failed"  "ssh_stderr_banner_does_not_break_store — no false failure"
+srt_log_lacks  "$STUB" ssh.log   "simRecapQueue.php park" "ssh_stderr_banner_does_not_break_store — no park"
 
 # ── payload_contract_stdin_and_command ───────────────────────────────────────
 # Verify: tick emits --sim= in the storeSimRecap command (no --themes= flag),

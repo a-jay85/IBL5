@@ -135,7 +135,7 @@ switch ($op) {
 
     case 'pass_lost':
         if (is_user($user)) {
-            $redirectUrl = $service->getTeamRedirectUrl((string) ($cookie[1] ?? ''));
+            $redirectUrl = $service->getTeamRedirectUrl($authService->getUsername() ?? '');
             header('Location: ' . ($redirectUrl ?? 'index.php'));
             exit;
         }
@@ -146,7 +146,7 @@ switch ($op) {
 
     case 'new_user':
         if (is_user($user)) {
-            $redirectUrl = $service->getTeamRedirectUrl((string) ($cookie[1] ?? ''));
+            $redirectUrl = $service->getTeamRedirectUrl($authService->getUsername() ?? '');
             header('Location: ' . ($redirectUrl ?? 'index.php'));
             exit;
         }
@@ -219,7 +219,7 @@ switch ($op) {
             PageLayout\PageLayout::footer();
         } else {
             cookiedecode($user);
-            $redirectUrl = $service->getTeamRedirectUrl((string) ($cookie[1] ?? ''));
+            $redirectUrl = $service->getTeamRedirectUrl($authService->getUsername() ?? '');
             header('Location: ' . ($redirectUrl ?? 'index.php'));
             exit;
         }

@@ -160,6 +160,15 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Status:** Completed — slow-query perf logging made injectable via a `setPerfLogger()` setter + `$this->perfLogger ?? \Logging\LoggerFactory::getChannel('perf')` fallback at L281 (mirrors the existing `setLogger()`/`db`-channel precedent at L129/L585; no constructor-signature change, so all 24 subclasses are untouched). The last static logging global in `executeQuery()` is gone.
 
 **Table evidence (2026-07-25):** perf-channel slow-query logger now injectable via `setPerfLogger()` + `$this->perfLogger ?? LoggerFactory::getChannel('perf')` fallback at L281; no static logging globals remain in `executeQuery`.
+### 1.19 PlrParserService — Duplicate Pass-1 Logic
+**Location:** `ibl5/classes/PlrParser/PlrParserService.php`
+**Problem:** `processPlrData()` (L56) and `processPlrDataForYear()` (L241) share 80% of code, differ only in dispatch to `processLivePlayer` vs `processSnapshotPlayer`. `computeDerivedFields()` has an `?int $endingYear` switching between two contexts.
+**Suggested direction:** Merge into one method with a mode enum; extract common loop body.
+**Est. effort:** S
+**Risk if untouched:** Bug fixes applied twice; optional param is an invisible branching point.
+**Status (2026-07-27):** ✅ Implemented — Characterization pins + executePlayerLoop merge shipped
+
+**Table evidence (2026-07-27):** `processPlrData`+`processPlrDataForYear` 80% duplicated; 510 LOC. `.plr` parse is engine-fidelity-critical → add characterization pins (mechanical scope) before merging the two paths, then 🟩.
 ### 1.20 SearchView — String-Concatenation HTML at 485 Lines
 **Location:** `ibl5/classes/Search/SearchView.php`
 **Problem:** String concatenation (no `ob_start()`) for form, story/comment/user results, pagination. Three result-type renderers are duplicated 40-60 LOC each.

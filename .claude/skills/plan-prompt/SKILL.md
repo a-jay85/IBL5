@@ -42,35 +42,33 @@ this skill removes.
 
 ## Step 1.5 — Size triage: does this even want a `/plan`?
 
-Firing spends a full `/plan` run and, by default (`--queue`), an unattended
-implementation run behind it. Work that clears the ad-hoc bar needs neither. Make the
-call **before** composing — Step 3 is where the tokens go.
+Firing spends a full `/plan` run and an implementation run behind it. Work that clears
+the ad-hoc bar needs neither. Make the call **before** composing — Step 3 is where the
+tokens go.
 
-**Triage from what this conversation already established.** Step 0 still binds: no
-scans, no re-reads. That inverts `.claude/rules/work-triage.md`'s "resolve empirical
-unknowns first" — you cannot resolve one here, so an unknown that would change the
-design (how many call sites? does the pattern generalize?) is itself a **not-ad-hoc**
-verdict. Never go measure now in order to reach an ad-hoc answer.
+`.claude/rules/work-triage.md` is always loaded and already owns this decision: apply
+§ The ad-hoc bar and § Ad-hoc safety mirror as written — downgrade only when every
+clause of the bar holds, never when a mirror trigger fires. Treat a **`.claude/skills`
+ship-pipeline invariant** as a fifth mirror trigger (a change to what fires, what gates,
+or which disposition applies — not a prose edit that preserves the decision procedure).
+Four things are specific to triaging from *here*:
 
-**Never downgrade**, regardless of size, when the work touches anything in
-`work-triage.md` § Ad-hoc safety mirror — a security surface, a destructive or
-schema-tightening migration, new or redesigned user-visible UI/UX, or a property
-needing subjective human judgment — or a `.claude/skills` ship-pipeline invariant.
-High-stakes outranks small, the same precedence `/plan` Step 3 applies to the architect
-tier. A multi-PR split is also a not-ad-hoc signal, and triage runs *before* Step 2, so
-make the PR-count call here.
-
-**Downgrade only when every clause of § The ad-hoc bar holds** — known blast radius, an
-existing pattern to copy, no multi-phase reasoning, no unresolved design fork — and the
-verification is one obvious check rather than a matrix worth designing. Borderline is
-not ad-hoc: an over-planned small change costs one `/plan` run, while an under-planned
-large one ships a wrong PR through a pipeline with no human in it.
+- **You cannot resolve the empirical unknowns.** Step 0 forbids scans and re-reads, so
+  the bar's "resolve empirical unknowns first" inverts: an unknown that would change the
+  design (how many call sites? does the pattern generalize?) is itself a
+  **not-ad-hoc** verdict. Never go measure now in order to reach an ad-hoc answer.
+- **Triage runs before Step 2, so make the PR-count call here** — a multi-PR split is a
+  not-ad-hoc signal in its own right.
+- **Borderline is not ad-hoc.** An over-planned small change costs one `/plan` run; an
+  under-planned large one ships a wrong PR through a pipeline with no human in it.
+- **The bar's verification clause binds harder here** — one obvious check, not a matrix
+  worth designing, because nobody reviews the result before it ships.
 
 **On an ad-hoc verdict: stop here.** Do not compose a block, do not fire, do not start
 implementing. Say what the work is, that it clears the bar, and which clause carried the
-call. Execution then routes per `work-triage.md` § Execution routing — a `sonnet-4-6`
-delegate, not inline on this session. An ad-hoc verdict retracts the `/plan` run, never
-the offload; offloading is why you invoked this skill.
+call. Execution still routes per `work-triage.md` § Execution routing — a `sonnet-4-6`
+delegate, not inline on this session. The verdict retracts the `/plan` run, never the
+offload; offloading is why you invoked this skill.
 
 ## Step 2 — Split by PR before composing
 

@@ -1,6 +1,6 @@
 ---
 description: Production operations runbook — deploy, rollback, DB restore, sim-file recovery, logs, and running the app without the Claude Code harness.
-last_verified: 2026-07-25
+last_verified: 2026-07-27
 ---
 
 # IBL5 Operations Runbook
@@ -62,68 +62,93 @@ After a manual deploy, trigger `bin/smoke-prod` manually or curl the health endp
 
 ---
 
-## IBL6 Decommission — one-time post-merge step (manual, on the box)
+## IBL6 Decommission — COMPLETED 2026-07-27
 
-After the IBLbot box-score fix (`ibl5/IBLbot/src/embeds/common.ts`) merges **and** the resulting
-`production` deploy completes, tear down the retired IBL6 SvelteKit app (`ibl6.iblhoops.net`,
-pm2). Do this **once**, by hand, over SSH — it is a production reverse-proxy change, out of CI
-reach. **Run the steps in this order.** Step 5 destroys the directory step 4 writes into, so
-installing the redirect before the teardown is not a preference; it is the whole point.
+The retired IBL6 SvelteKit app (`ibl6.iblhoops.net`) is torn down. This section is kept as the
+record of what changed on the box, plus the host facts the teardown established — the previous
+version of this procedure named the wrong docroot, the wrong watchdog, and the wrong resurrection
+mechanism.
 
-1. **Confirm the bot fix is live first.** The deploy restarts IBLbot via pm2
-   (`.github/workflows/main.yml`), so new Discord embeds should already point at
-   `iblhoops.net/ibl5/modules.php?name=GameBoxscore…`. This stops new `ibl6` URLs at the source
-   before you touch the old origin.
+### Final state
 
-2. **Locate the docroot and the proxy rule BEFORE changing anything:**
+| Thing | State |
+|-------|-------|
+| pm2 `ibl6` | deleted; `pm2 save` written, so `~/.pm2/dump.pm2` now lists `iblbot` only |
+| `localhost:3001` | nothing listening |
+| `/home/iblhoops/public_html/IBL6/` | deleted (90M of build output; was untracked by the deploy checkout) |
+| `~/ibl6.pid` | deleted |
+| `/home/iblhoops/ibl6.iblhoops.net/.htaccess` | serves 301s only (below) |
+| crontab | two stale `IBL6 self-healing` comment lines removed; all three real jobs untouched |
+| Backups | `~/decom-backup-20260727/` — crontab, original `.htaccess`, IBL6 `.env`, `pm2 describe`, pre-teardown `dump.pm2` |
+
+The live redirect, in `/home/iblhoops/ibl6.iblhoops.net/.htaccess` — the param names are
+load-bearing, do not rename `date`/`game`:
+
+```apache
+RewriteEngine On
+# /{YYYY-MM-DD}-game-{n}/boxscore  ->  PHP boxscore module (301)
+RewriteRule ^(\d{4}-\d{2}-\d{2})-game-(\d+)/boxscore/?$ https://iblhoops.net/ibl5/modules.php?name=GameBoxscore&date=$1&game=$2 [R=301,L]
+# any other ibl6 path -> site home (301); ACME challenges must stay local
+RewriteCond %{REQUEST_URI} !^/\.well-known/
+RewriteRule ^ https://iblhoops.net/ [R=301,L]
+```
+
+Verified after teardown: the boxscore slug 301s to the PHP module (which returns 200), any other
+path 301s to the site home, and `/.well-known/` still serves locally so certificate renewal for
+the subdomain keeps working.
+
+### Host facts this established — read before any future subdomain teardown
+
+These are the four things the old procedure got wrong. They generalize to every subdomain on this
+cPanel host, so check them rather than assuming.
+
+All four trace to one habit: the procedure was written by reasoning from repo artifacts — the CI
+workflow's `cd www/IBL6`, a healthcheck script that existed in-repo — and both authoring PRs (#1639,
+#1655) shipped with "No manual testing needed." Nothing about a production box's layout is
+derivable from the repo. **Write host procedures from the host.**
+
+1. **Resolve a subdomain's docroot from `rewriteinfo` — the naming convention varies per
+   subdomain.** It is never the app's source directory, but it is also not one fixed pattern:
+   `ibl6.iblhoops.net` → `~/ibl6.iblhoops.net/`, while `pre.iblhoops.net` → `~/www-pre/`. The IBL6
+   proxy `.htaccess` lived in `/home/iblhoops/ibl6.iblhoops.net/`; `~/www/IBL6/` was only the Node
+   build tree, with no `.htaccess` in it at all. Read the map, never guess it:
    ```bash
-   ls -la ~/www/IBL6/.htaccess
-   grep -rn 3001 ~/www/IBL6/.htaccess          # the proxy rule you are about to replace
+   cat /home/iblhoops/.cpanel/caches/rewriteinfo     # maps each subdomain -> its docroot
    ```
-   If the rule is not there, find it in the vhost config before proceeding. You cannot safely
-   remove a proxy you have not located.
+   Confirm the file you found is the one actually being served before editing it — pick a path its
+   rules treat differently (here, `/.well-known/`) and check that the response diverges from `/`.
 
-3. **Remove the healthcheck cron entry.** The box runs a cron job invoking the (now-deleted)
-   `ibl6-healthcheck` watchdog, which re-`pm2 start`s IBL6 whenever `http://127.0.0.1:3001/`
-   stops answering. Tear down pm2 without removing this first and the watchdog resurrects the app
-   on its next tick:
+2. **The box runs LiteSpeed, not Apache.** LiteSpeed tolerates unknown `.htaccess` directives that
+   Apache would answer with a 500. The old `.htaccess` carried a stray `EOF` line — a leaked
+   heredoc terminator — and still served 200s, so "the site is up" is *not* evidence that an
+   `.htaccess` is well-formed here. Check `curl -sI` for `server: LiteSpeed` before reasoning about
+   directive errors.
+
+3. **No IBL6 watchdog runs on the box.** The only pm2 cron job is
+   `*/2 * * * * /home/iblhoops/public_html/bin/iblbot-healthcheck`, which probes port **50000** and
+   restarts **IBLbot**. Stale `# IBL6 self-healing: probe port 3001` comments sat directly above it
+   and read as if they described it. A repo script `ibl6-healthcheck` did exist —
+   added in PR #1524, deleted in PR #1639 — which is why the old procedure expected a matching cron
+   entry; no such entry was on the box. **A script in the repo is not a job on the box, and the
+   comment above a cron line is not its documentation — read the script the line actually invokes.**
+   Deleting that job would have silently removed the IBLbot watchdog.
+
+4. **pm2 resurrection comes from `~/.pm2/dump.pm2`.** `pm2 delete <app>` alone is undone by the
+   next `pm2 resurrect`; the `pm2 save` is what makes it stick. Note that cron *does* write that
+   dump indirectly — `bin/iblbot-healthcheck` runs `pm2 save` every 2 minutes, so it can persist
+   whatever pm2 holds at that moment. Before deleting an app, check that the healthcheck's
+   `ecosystem.config.cjs` does not also declare it (for IBL6 it did not; that file names `iblbot`
+   only). Confirm the dump before and after — a `grep` for `"name"` is not a reliable check
+   against this file:
    ```bash
-   crontab -l | grep -i 'ibl6\|healthcheck'     # confirm the entry before editing
-   crontab -e                                    # delete the ibl6-healthcheck line, save
-   crontab -l | grep -i 'ibl6\|healthcheck' && echo "STILL PRESENT — do not proceed" || echo "cron clean"
+   python3 -c "import json;print([a['name'] for a in json.load(open('/home/iblhoops/.pm2/dump.pm2'))])"
    ```
 
-4. **Install the 301 while node is still running**, replacing the proxy rule found in step 2.
-   In `~/www/IBL6/.htaccess` (the param names are load-bearing — do not rename `date`/`game`):
-   ```apache
-   RewriteEngine On
-   # /{YYYY-MM-DD}-game-{n}/boxscore  ->  PHP boxscore module (301)
-   RewriteRule ^(\d{4}-\d{2}-\d{2})-game-(\d+)/boxscore/?$ https://iblhoops.net/ibl5/modules.php?name=GameBoxscore&date=$1&game=$2 [R=301,L]
-   # any other ibl6 path -> site home (301)
-   RewriteRule ^ https://iblhoops.net/ [R=301,L]
-   ```
-   Verify with a real slug **before** moving on:
-   ```bash
-   curl -sI 'https://ibl6.iblhoops.net/2008-03-10-game-7/boxscore' | grep -i '^location:'
-   # expect: Location: https://iblhoops.net/ibl5/modules.php?name=GameBoxscore&date=2008-03-10&game=7
-   curl -s -o /dev/null -w '%{http_code}\n' \
-     'https://iblhoops.net/ibl5/modules.php?name=GameBoxscore&date=2008-03-10&game=7'
-   # expect: 200
-   ```
-   If the redirect does not resolve, stop here. Everything below is irreversible.
+### Remaining cleanup
 
-5. **Only now tear down pm2 and the build**, preserving the `.htaccess` you just wrote:
-   ```bash
-   pm2 delete ibl6 2>/dev/null || true
-   pm2 save
-   cd ~/www/IBL6 && find . -mindepth 1 -not -name '.htaccess' -delete
-   ```
-   Use an absolute `cd` — never `rm -rf www/IBL6` from an unknown working directory. Keep the
-   directory itself: it is the docroot the vhost resolves, and the `.htaccess` inside it is what
-   now serves the redirect.
-
-6. **Re-verify the redirect** with the same `curl -sI` from step 4, then proceed to the
-   post-teardown repo cleanup.
+`ibl5/.htaccess` still whitelists the `ibl6` subdomain in its canonical-domain redirect. It is
+inert — `ibl6.iblhoops.net` resolves to its own docroot and never reaches those rules — so removing
+it is optional tidying, not a fix.
 
 ---
 

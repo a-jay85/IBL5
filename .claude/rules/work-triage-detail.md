@@ -47,6 +47,16 @@ A poll loop re-reads the full context every call (~81K tokens); eight 60s checks
 
 **Headless exception:** no re-invocation in headless/automouse — block until exit or structure as sequenced plan phases. See `agent-tiering-detail.md`.
 
+### The readiness predicate
+
+Moving the poll off the main thread fixes *where* it runs, not whether it is asking the right question. A watcher with a wrong readiness predicate is worse than no watcher: it returns a confident verdict on an unfinished artifact, and the caller has no reason to doubt it.
+
+**Valid completion signals:** the process exiting; its launchd/job label disappearing from `launchctl list`; a runner's own verdict line in its log; a sentinel the producer writes **last** (including a scratch/draft file it deletes on completion). **Not a completion signal:** mtime, size, or existence of a file the producer appends to incrementally — those all go true mid-write.
+
+**Prefer the producer's verdict over your own.** If the producing process already runs the check you were going to run, wait for it and read its answer. Recomputing invites the two to disagree, and yours is the one running against a partial artifact.
+
+Observed 2026-07-27: a watcher for detached headless `/plan` runs (`bin/plan-now`) used "final plan is newer than its draft" as the done-test. `/plan` appends the final plan section-by-section, so the predicate went true while the file was still truncated, `bin/check-plan` failed on the partial text, and a passing plan was reported as `CHECK-PLAN FAILED`. Three valid signals were available and unused: the launchd label vanishing, `bin/plan-now`'s own `RESULT ok — check-plan PASSED` log line, and the draft file being deleted. This is the same family as the ADR-0096 identity bug — a verdict trusted from a heuristic instead of from the run's own self-report.
+
 ## Safety mirror backstop
 
 Whatever still ships ad-hoc is caught at PR time by `/post-plan` Phase 6.5 condition (9) — but designing it in the plan beats relying on the backstop. The safety-mirror trigger list in `work-triage.md` routes security work into `/plan` *before* the backstop exists; losing it strands the backstop as the only protection.

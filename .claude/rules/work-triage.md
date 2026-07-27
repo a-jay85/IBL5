@@ -52,7 +52,9 @@ Enforced by `~/.claude/hooks/plan-gate-edit.sh` **§ Check 1**, which **denies**
 
 ## Execution routing: repeat-polling is a spend bug
 
-Never poll on the main thread — a poll loop re-reads full context per call. Use `run_in_background: true` + Monitor, or ScheduleWakeup matched to expected completion time. Full rationale: `work-triage-detail.md` § Repeat-polling.
+Never poll on the main thread — a poll loop re-reads full context per call. Use `run_in_background: true` + Monitor, or ScheduleWakeup matched to expected completion time.
+
+**Then name the completion signal before writing the watcher** — process exit, job label gone, or the producer's own verdict line. An mtime/size on a file the producer appends to incrementally is **not** one; and if the producer already computes a verdict, read it rather than recomputing. Full rationale: `work-triage-detail.md` § Repeat-polling.
 
 ## Calibration
 

@@ -9,8 +9,6 @@ use Boxscore\Contracts\ProgressReporterInterface;
 use Boxscore\FlushProgressReporter;
 use JsbParser\ScoFileParser;
 use League\LeagueContext;
-use Player\Stats\PlayerStats;
-use Utilities\UuidGenerator;
 use Season\Season;
 
 /**
@@ -23,11 +21,6 @@ use Season\Season;
  */
 class BoxscoreProcessor implements BoxscoreProcessorInterface
 {
-    private const ALL_STAR_VISITOR_TID = 50;
-    private const ALL_STAR_HOME_TID = 51;
-    private const RISING_STARS_VISITOR_TID = 40;
-    private const RISING_STARS_HOME_TID = 41;
-
     public const DEFAULT_AWAY_NAME = 'Team Away';
     public const DEFAULT_HOME_NAME = 'Team Home';
 
@@ -36,14 +29,30 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
     protected Season $season;
     private ?LeagueContext $leagueContext;
     private ProgressReporterInterface $progressReporter;
+    private RegularSeasonGameProcessor $regularSeasonProcessor;
+    private RisingStarsGameProcessor $risingStarsProcessor;
+    private AllStarGameProcessor $allStarProcessor;
 
-    public function __construct(\mysqli $db, ?BoxscoreRepository $repository = null, ?Season $season = null, ?LeagueContext $leagueContext = null, ?ProgressReporterInterface $progressReporter = null)
-    {
+    public function __construct(
+        \mysqli $db,
+        ?BoxscoreRepository $repository = null,
+        ?Season $season = null,
+        ?LeagueContext $leagueContext = null,
+        ?ProgressReporterInterface $progressReporter = null,
+        ?RegularSeasonGameProcessor $regularSeasonProcessor = null,
+        ?RisingStarsGameProcessor $risingStarsProcessor = null,
+        ?AllStarGameProcessor $allStarProcessor = null,
+    ) {
         $this->db = $db;
         $this->leagueContext = $leagueContext;
         $this->repository = $repository ?? new BoxscoreRepository($db, $leagueContext);
         $this->season = $season ?? new Season($db);
         $this->progressReporter = $progressReporter ?? new FlushProgressReporter();
+        $resolver = new GameUpsertResolver($this->repository);
+        $writer = new GameLineWriter($db, $this->repository);
+        $this->regularSeasonProcessor = $regularSeasonProcessor ?? new RegularSeasonGameProcessor($resolver, $writer);
+        $this->risingStarsProcessor = $risingStarsProcessor ?? new RisingStarsGameProcessor($resolver, $writer);
+        $this->allStarProcessor = $allStarProcessor ?? new AllStarGameProcessor($resolver, $writer, $this->repository);
     }
 
     /**
@@ -104,17 +113,15 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
             $line = substr($data, $offset, ScoFileParser::RECORD_SIZE);
             $offset += ScoFileParser::RECORD_SIZE;
 
-            $gameInfoLine = ScoFileParser::extractGameInfo($line);
-            $boxscoreGameInfo = Boxscore::withGameInfoLine($gameInfoLine, $operatingSeasonEndingYear, $operatingSeasonPhase, $league);
-
-            $upsertAction = $this->processGameUpsert($boxscoreGameInfo);
+            $result = $this->regularSeasonProcessor->process($line, $operatingSeasonEndingYear, $operatingSeasonPhase, $league);
+            $upsertAction = $result['action'];
 
             if ($upsertAction === 'skip') {
                 $gamesSkipped++;
                 continue;
             }
 
-            $gameLinesProcessed = $this->processGameLine($line, $boxscoreGameInfo);
+            $gameLinesProcessed = $result['linesProcessed'];
 
             if ($gameLinesProcessed > 0) {
                 if ($upsertAction === 'update') {
@@ -203,306 +210,22 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
             ? substr($data, ScoFileParser::RECORD_SIZE, ScoFileParser::RECORD_SIZE)
             : null;
 
+        $league = $this->leagueContext !== null ? $this->leagueContext->getCurrentLeague() : 'ibl';
+
         if ($risingStarsLine !== null && trim(ScoFileParser::extractGameInfo($risingStarsLine)) !== '') {
-            $this->processRisingStarsGame($risingStarsLine, $operatingSeasonEndingYear, $messages);
+            $result = $this->risingStarsProcessor->process($risingStarsLine, $operatingSeasonEndingYear, 'Regular Season/Playoffs', $league);
+            $messages = array_merge($messages, $result['messages']);
         }
 
         if ($allStarLine !== null && trim(ScoFileParser::extractGameInfo($allStarLine)) !== '') {
-            $this->processAllStarGame($allStarLine, $operatingSeasonEndingYear, $messages);
+            $result = $this->allStarProcessor->process($allStarLine, $operatingSeasonEndingYear, 'Regular Season/Playoffs', $league);
+            $messages = array_merge($messages, $result['messages']);
         }
 
         return [
             'success' => true,
             'messages' => $messages,
         ];
-    }
-
-    /**
-     * Process a single 2000-byte game line: insert team totals and player stats
-     *
-     * @param string $line The 2000-byte game line
-     * @param Boxscore $boxscoreGameInfo Parsed game info (with possible overrides)
-     * @param string|null $visitorTeamName Override for visitor team-total name
-     * @param string|null $homeTeamName Override for home team-total name
-     * @return int Number of lines processed
-     */
-    private function processGameLine(
-        string $line,
-        Boxscore $boxscoreGameInfo,
-        ?string $visitorTeamName = null,
-        ?string $homeTeamName = null,
-    ): int {
-        $gameLinesProcessed = 0;
-        $visitorTeamTotalSeen = false;
-
-        for ($i = 0; $i < ScoFileParser::PLAYER_SLOT_COUNT; $i++) {
-            $playerInfoLine = ScoFileParser::extractPlayerSlot($line, $i);
-            /** @var PlayerStats $playerStats */
-            $playerStats = PlayerStats::withBoxscoreInfoLine($this->db, $playerInfoLine);
-
-            $name = mb_convert_encoding($playerStats->name, 'UTF-8', 'ISO-8859-1');
-            if ($name === false) {
-                $name = $playerStats->name;
-            }
-
-            if ($name !== '') {
-                if ((int) $playerStats->playerID === 0) {
-                    // Team total row — apply name overrides
-                    if (!$visitorTeamTotalSeen) {
-                        $visitorTeamTotalSeen = true;
-                        if ($visitorTeamName !== null) {
-                            $name = $visitorTeamName;
-                        }
-                    } else {
-                        if ($homeTeamName !== null) {
-                            $name = $homeTeamName;
-                        }
-                    }
-
-                    $this->repository->insertTeamBoxscore([
-                        'game_date' => $boxscoreGameInfo->gameDate,
-                        'name' => $name,
-                        'game_of_that_day' => $boxscoreGameInfo->game_of_that_day,
-                        'visitor_teamid' => $boxscoreGameInfo->visitor_teamid,
-                        'home_teamid' => $boxscoreGameInfo->home_teamid,
-                        'attendance' => (int) $boxscoreGameInfo->attendance,
-                        'capacity' => (int) $boxscoreGameInfo->capacity,
-                        'visitor_wins' => (int) $boxscoreGameInfo->visitor_wins,
-                        'visitor_losses' => (int) $boxscoreGameInfo->visitor_losses,
-                        'home_wins' => (int) $boxscoreGameInfo->home_wins,
-                        'home_losses' => (int) $boxscoreGameInfo->home_losses,
-                        'visitor_q1_points' => (int) $boxscoreGameInfo->visitor_q1_points,
-                        'visitor_q2_points' => (int) $boxscoreGameInfo->visitor_q2_points,
-                        'visitor_q3_points' => (int) $boxscoreGameInfo->visitor_q3_points,
-                        'visitor_q4_points' => (int) $boxscoreGameInfo->visitor_q4_points,
-                        'visitor_ot_points' => (int) $boxscoreGameInfo->visitor_ot_points,
-                        'home_q1_points' => (int) $boxscoreGameInfo->home_q1_points,
-                        'home_q2_points' => (int) $boxscoreGameInfo->home_q2_points,
-                        'home_q3_points' => (int) $boxscoreGameInfo->home_q3_points,
-                        'home_q4_points' => (int) $boxscoreGameInfo->home_q4_points,
-                        'home_ot_points' => (int) $boxscoreGameInfo->home_ot_points,
-                        'game_2gm' => (int) $playerStats->gameFieldGoalsMade,
-                        'game_2ga' => (int) $playerStats->gameFieldGoalsAttempted,
-                        'game_ftm' => (int) $playerStats->gameFreeThrowsMade,
-                        'game_fta' => (int) $playerStats->gameFreeThrowsAttempted,
-                        'game_3gm' => (int) $playerStats->gameThreePointersMade,
-                        'game_3ga' => (int) $playerStats->gameThreePointersAttempted,
-                        'game_orb' => (int) $playerStats->gameOffensiveRebounds,
-                        'game_drb' => (int) $playerStats->gameDefensiveRebounds,
-                        'game_ast' => (int) $playerStats->gameAssists,
-                        'game_stl' => (int) $playerStats->gameSteals,
-                        'game_tov' => (int) $playerStats->gameTurnovers,
-                        'game_blk' => (int) $playerStats->gameBlocks,
-                        'game_pf' => (int) $playerStats->gamePersonalFouls,
-                    ]);
-                    $gameLinesProcessed++;
-                } else {
-                    $playerUuid = UuidGenerator::generateUuid();
-                    $playerTeamID = ScoFileParser::isHomeTeamSlot($i)
-                        ? $boxscoreGameInfo->home_teamid
-                        : $boxscoreGameInfo->visitor_teamid;
-                    $this->repository->insertPlayerBoxscore(
-                        $boxscoreGameInfo->gameDate,
-                        $playerUuid,
-                        $name,
-                        $playerStats->position,
-                        (int) $playerStats->playerID,
-                        $boxscoreGameInfo->visitor_teamid,
-                        $boxscoreGameInfo->home_teamid,
-                        $boxscoreGameInfo->game_of_that_day,
-                        (int) $boxscoreGameInfo->attendance,
-                        (int) $boxscoreGameInfo->capacity,
-                        (int) $boxscoreGameInfo->visitor_wins,
-                        (int) $boxscoreGameInfo->visitor_losses,
-                        (int) $boxscoreGameInfo->home_wins,
-                        (int) $boxscoreGameInfo->home_losses,
-                        $playerTeamID,
-                        (int) $playerStats->gameMinutesPlayed,
-                        (int) $playerStats->gameFieldGoalsMade,
-                        (int) $playerStats->gameFieldGoalsAttempted,
-                        (int) $playerStats->gameFreeThrowsMade,
-                        (int) $playerStats->gameFreeThrowsAttempted,
-                        (int) $playerStats->gameThreePointersMade,
-                        (int) $playerStats->gameThreePointersAttempted,
-                        (int) $playerStats->gameOffensiveRebounds,
-                        (int) $playerStats->gameDefensiveRebounds,
-                        (int) $playerStats->gameAssists,
-                        (int) $playerStats->gameSteals,
-                        (int) $playerStats->gameTurnovers,
-                        (int) $playerStats->gameBlocks,
-                        (int) $playerStats->gamePersonalFouls,
-                    );
-                    $gameLinesProcessed++;
-                }
-            }
-        }
-
-        return $gameLinesProcessed;
-    }
-
-    /**
-     * Process the Rising Stars Game (Block 0)
-     *
-     * @param string $line 2000-byte game line
-     * @param int $seasonEndingYear Season ending year
-     * @param list<string> $messages Log messages (modified by reference)
-     */
-    private function processRisingStarsGame(string $line, int $seasonEndingYear, array &$messages): void
-    {
-        $gameInfoLine = ScoFileParser::extractGameInfo($line);
-        $boxscoreGameInfo = Boxscore::withGameInfoLine($gameInfoLine, $seasonEndingYear, 'Regular Season/Playoffs');
-        $boxscoreGameInfo->overrideGameContext(
-            sprintf('%d-%02d-%02d', $seasonEndingYear, Season::IBL_ALL_STAR_MONTH, Season::IBL_RISING_STARS_GAME_DAY),
-            self::RISING_STARS_VISITOR_TID,
-            self::RISING_STARS_HOME_TID,
-            1,
-        );
-
-        $upsertAction = $this->processGameUpsert($boxscoreGameInfo);
-
-        if ($upsertAction === 'skip') {
-            $messages[] = 'Rising Stars Game: already exists, skipped.';
-            return;
-        }
-
-        $linesProcessed = $this->processGameLine($line, $boxscoreGameInfo, 'Rookies', 'Sophomores');
-
-        if ($linesProcessed > 0) {
-            $action = $upsertAction === 'update' ? 'updated' : 'inserted';
-            $messages[] = "Rising Stars Game: {$action} ({$linesProcessed} lines).";
-        }
-    }
-
-    /**
-     * Process the All-Star Game (Block 1)
-     *
-     * Outcome A: scores match existing record — skip.
-     * Outcome B: scores differ — re-insert preserving existing custom names.
-     * Outcome C: new game — insert with default placeholder names.
-     *
-     * @param string $line 2000-byte game line
-     * @param int $seasonEndingYear Season ending year
-     * @param list<string> $messages Log messages (modified by reference)
-     */
-    private function processAllStarGame(
-        string $line,
-        int $seasonEndingYear,
-        array &$messages,
-    ): void {
-        $gameDate = sprintf('%d-%02d-%02d', $seasonEndingYear, Season::IBL_ALL_STAR_MONTH, Season::IBL_ALL_STAR_GAME_DAY);
-
-        $gameInfoLine = ScoFileParser::extractGameInfo($line);
-        $boxscoreGameInfo = Boxscore::withGameInfoLine($gameInfoLine, $seasonEndingYear, 'Regular Season/Playoffs');
-        $boxscoreGameInfo->overrideGameContext(
-            $gameDate,
-            self::ALL_STAR_VISITOR_TID,
-            self::ALL_STAR_HOME_TID,
-            1,
-        );
-
-        // Check if team names already exist in DB for this game
-        $existingNames = $this->repository->findAllStarTeamNames($gameDate);
-
-        if ($existingNames !== null) {
-            // Names already set — check if scores match
-            $existingGame = $this->repository->findTeamBoxscore(
-                $gameDate,
-                self::ALL_STAR_VISITOR_TID,
-                self::ALL_STAR_HOME_TID,
-                1
-            );
-
-            if ($existingGame !== null) {
-                /** @var array{visitor_q1_points: int, visitor_q2_points: int, visitor_q3_points: int, visitor_q4_points: int, visitor_ot_points: int, home_q1_points: int, home_q2_points: int, home_q3_points: int, home_q4_points: int, home_ot_points: int} $existingGame */
-                if ($boxscoreGameInfo->scoresMatchDatabase($existingGame)) {
-                    // Outcome A: scores match — skip
-                    $messages[] = 'All-Star Game: already exists with matching scores, skipped.';
-                    return;
-                }
-
-                // Outcome B: scores differ — read existing names before deleting
-                $savedAwayName = $existingNames['awayName'];
-                $savedHomeName = $existingNames['homeName'];
-
-                $this->repository->deleteTeamBoxscoresByGame($gameDate, self::ALL_STAR_VISITOR_TID, self::ALL_STAR_HOME_TID, 1);
-                $this->repository->deletePlayerBoxscoresByGame($gameDate, self::ALL_STAR_VISITOR_TID, self::ALL_STAR_HOME_TID);
-
-                $linesProcessed = $this->processGameLine($line, $boxscoreGameInfo, $savedAwayName, $savedHomeName);
-                if ($linesProcessed > 0) {
-                    $messages[] = "All-Star Game: updated with existing team names ({$linesProcessed} lines).";
-                }
-
-                return;
-            }
-        }
-
-        // Outcome C: game not in DB — insert with default placeholder names
-        $upsertAction = $this->processGameUpsert($boxscoreGameInfo);
-        if ($upsertAction === 'skip') {
-            $messages[] = 'All-Star Game: already exists, skipped.';
-            return;
-        }
-
-        $linesProcessed = $this->processGameLine(
-            $line,
-            $boxscoreGameInfo,
-            self::DEFAULT_AWAY_NAME,
-            self::DEFAULT_HOME_NAME,
-        );
-        if ($linesProcessed > 0) {
-            $action = $upsertAction === 'update' ? 'updated' : 'inserted';
-            $messages[] = "All-Star Game: {$action} ({$linesProcessed} lines).";
-        }
-    }
-
-    /**
-     * Determine upsert action for a game and perform delete if updating
-     *
-     * @return string 'insert', 'skip', or 'update'
-     */
-    protected function processGameUpsert(Boxscore $boxscoreGameInfo): string
-    {
-        $existingGame = $this->repository->findTeamBoxscore(
-            $boxscoreGameInfo->gameDate,
-            $boxscoreGameInfo->visitor_teamid,
-            $boxscoreGameInfo->home_teamid,
-            $boxscoreGameInfo->game_of_that_day
-        );
-
-        if ($existingGame === null) {
-            return 'insert';
-        }
-
-        /** @var array{visitor_q1_points: int, visitor_q2_points: int, visitor_q3_points: int, visitor_q4_points: int, visitor_ot_points: int, home_q1_points: int, home_q2_points: int, home_q3_points: int, home_q4_points: int, home_ot_points: int} $existingGame */
-        $scoresMatch = $boxscoreGameInfo->scoresMatchDatabase($existingGame);
-
-        if ($scoresMatch) {
-            // Scores match — but re-import if player records have NULL teamid
-            $hasNullTeamId = $this->repository->hasNullTeamIdPlayerBoxscores(
-                $boxscoreGameInfo->gameDate,
-                $boxscoreGameInfo->visitor_teamid,
-                $boxscoreGameInfo->home_teamid
-            );
-
-            if (!$hasNullTeamId) {
-                return 'skip';
-            }
-        }
-
-        // Scores differ or player records need teamid fix — delete old records, then re-insert
-        $this->repository->deleteTeamBoxscoresByGame(
-            $boxscoreGameInfo->gameDate,
-            $boxscoreGameInfo->visitor_teamid,
-            $boxscoreGameInfo->home_teamid,
-            $boxscoreGameInfo->game_of_that_day
-        );
-        $this->repository->deletePlayerBoxscoresByGame(
-            $boxscoreGameInfo->gameDate,
-            $boxscoreGameInfo->visitor_teamid,
-            $boxscoreGameInfo->home_teamid
-        );
-
-        return 'update';
     }
 
     /**

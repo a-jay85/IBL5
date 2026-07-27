@@ -16,7 +16,7 @@ set -euo pipefail
 #                basename in tests/ (a referencing test = stale deferral → re-include).
 #
 # Exemptions (no special-casing needed for the first; documented for reviewers):
-#   - Dir/glob excludes ("Bootstrap", "Database", "OneOnOneGame", "*/Contracts/*")
+#   - Dir/glob excludes ("Bootstrap", "Database", "*/Contracts/*")
 #     are auto-exempt from ALL gates: the extractor grep -oE '"[^"]+\.php"' only
 #     matches entries ending in .php, so non-.php entries never reach any gate.
 #   - "infra-exclude"-marked files (permanent low-level infra such as JSB.php) are

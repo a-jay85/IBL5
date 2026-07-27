@@ -135,7 +135,9 @@ class TradingController implements TradingControllerInterface
         }
 
         $tradeAssetRepo = new TradeAssetRepository($this->db);
-        $handler = new TradeRosterPreviewApiHandler($this->db, $tradeAssetRepo, $loggedInTeamID);
+        $paramValidator = new TradeRosterPreviewParamValidator();
+        $cashRowBuilder = new TradeRosterPreviewCashRowBuilder($paramValidator);
+        $handler = new TradeRosterPreviewApiHandler($this->db, $tradeAssetRepo, $loggedInTeamID, null, $paramValidator, $cashRowBuilder);
         $handler->handle();
     }
 

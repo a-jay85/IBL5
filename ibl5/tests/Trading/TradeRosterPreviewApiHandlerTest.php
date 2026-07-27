@@ -7,6 +7,8 @@ namespace Tests\Trading;
 use PHPUnit\Framework\TestCase;
 use Tests\WideUnit\Mocks\MockDatabase;
 use Trading\Contracts\TradeAssetRepositoryInterface;
+use Trading\Contracts\TradeRosterPreviewCashRowBuilderInterface;
+use Trading\Contracts\TradeRosterPreviewParamValidatorInterface;
 use Trading\TradeRosterPreviewApiHandler;
 
 class TradeRosterPreviewApiHandlerTest extends TestCase
@@ -26,6 +28,11 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
         $_GET = [];
     }
 
+    private function buildHandler(?TradeAssetRepositoryInterface $repo = null, ?TradeRosterPreviewParamValidatorInterface $validator = null, ?TradeRosterPreviewCashRowBuilderInterface $cashRowBuilder = null): TradeRosterPreviewApiHandler
+    {
+        return new TradeRosterPreviewApiHandler($this->mockDb, $repo ?? $this->stubTradeAssetRepo, 0, null, $validator, $cashRowBuilder);
+    }
+
     private function captureOutput(callable $fn): string
     {
         ob_start();
@@ -42,7 +49,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
     {
         $_GET = [];
 
-        $handler = new TradeRosterPreviewApiHandler($this->mockDb, $this->stubTradeAssetRepo);
+        $handler = $this->buildHandler();
 
         $output = $this->captureOutput(fn () => $handler->handle());
 
@@ -57,7 +64,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
     {
         $_GET = ['teamid' => '0'];
 
-        $handler = new TradeRosterPreviewApiHandler($this->mockDb, $this->stubTradeAssetRepo);
+        $handler = $this->buildHandler();
 
         $output = $this->captureOutput(fn () => $handler->handle());
 
@@ -72,7 +79,11 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
     {
         $_GET = ['teamid' => '1', 'addPids' => '1,abc,3'];
 
-        $handler = new TradeRosterPreviewApiHandler($this->mockDb, $this->stubTradeAssetRepo);
+        /** @var TradeAssetRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject $mockRepo */
+        $mockRepo = $this->createMock(TradeAssetRepositoryInterface::class);
+        $mockRepo->expects($this->never())->method('getPlayersByIds');
+
+        $handler = $this->buildHandler($mockRepo);
 
         $output = $this->captureOutput(fn () => $handler->handle());
 
@@ -87,7 +98,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
     {
         $_GET = ['teamid' => '1', 'removePids' => 'x,y'];
 
-        $handler = new TradeRosterPreviewApiHandler($this->mockDb, $this->stubTradeAssetRepo);
+        $handler = $this->buildHandler();
 
         $output = $this->captureOutput(fn () => $handler->handle());
 
@@ -103,7 +114,11 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
         $pids = implode(',', range(1, 21));
         $_GET = ['teamid' => '1', 'addPids' => $pids];
 
-        $handler = new TradeRosterPreviewApiHandler($this->mockDb, $this->stubTradeAssetRepo);
+        /** @var TradeAssetRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject $mockRepo */
+        $mockRepo = $this->createMock(TradeAssetRepositoryInterface::class);
+        $mockRepo->expects($this->never())->method('getPlayersByIds');
+
+        $handler = $this->buildHandler($mockRepo);
 
         $output = $this->captureOutput(fn () => $handler->handle());
 
@@ -119,7 +134,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
         $pids = implode(',', range(1, 21));
         $_GET = ['teamid' => '1', 'removePids' => $pids];
 
-        $handler = new TradeRosterPreviewApiHandler($this->mockDb, $this->stubTradeAssetRepo);
+        $handler = $this->buildHandler();
 
         $output = $this->captureOutput(fn () => $handler->handle());
 
@@ -134,7 +149,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
     {
         $_GET = ['teamid' => '1'];
 
-        $handler = new TradeRosterPreviewApiHandler($this->mockDb, $this->stubTradeAssetRepo);
+        $handler = $this->buildHandler();
 
         $output = $this->captureOutput(fn () => $handler->handle());
 
@@ -149,7 +164,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
     {
         $_GET = ['teamid' => '1', 'display' => 'split'];
 
-        $handler = new TradeRosterPreviewApiHandler($this->mockDb, $this->stubTradeAssetRepo);
+        $handler = $this->buildHandler();
 
         $output = $this->captureOutput(fn () => $handler->handle());
 
@@ -164,7 +179,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
     {
         $_GET = ['teamid' => '1', 'display' => 'split', 'split' => 'invalid_key'];
 
-        $handler = new TradeRosterPreviewApiHandler($this->mockDb, $this->stubTradeAssetRepo);
+        $handler = $this->buildHandler();
 
         $output = $this->captureOutput(fn () => $handler->handle());
 
@@ -179,7 +194,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
     {
         $_GET = [];
 
-        $handler = new TradeRosterPreviewApiHandler($this->mockDb, $this->stubTradeAssetRepo);
+        $handler = $this->buildHandler();
 
         $output = $this->captureOutput(fn () => $handler->handle());
 
@@ -191,7 +206,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
     {
         $_GET = ['teamid' => '1', 'addPids' => '', 'removePids' => '1,2'];
 
-        $handler = new TradeRosterPreviewApiHandler($this->mockDb, $this->stubTradeAssetRepo);
+        $handler = $this->buildHandler();
 
         $output = $this->captureOutput(fn () => $handler->handle());
 
@@ -206,7 +221,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
     {
         $_GET = ['teamid' => '1', 'addPids' => '1,2', 'removePids' => ''];
 
-        $handler = new TradeRosterPreviewApiHandler($this->mockDb, $this->stubTradeAssetRepo);
+        $handler = $this->buildHandler();
 
         $output = $this->captureOutput(fn () => $handler->handle());
 
@@ -230,7 +245,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
             'userCash1' => '500',
         ];
 
-        $handler = new TradeRosterPreviewApiHandler($this->mockDb, $this->stubTradeAssetRepo);
+        $handler = $this->buildHandler();
 
         $output = $this->captureOutput(fn () => $handler->handle());
 
@@ -248,7 +263,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
             'display' => 'contracts',
         ];
 
-        $handler = new TradeRosterPreviewApiHandler($this->mockDb, $this->stubTradeAssetRepo);
+        $handler = $this->buildHandler();
 
         $output = $this->captureOutput(fn () => $handler->handle());
 
@@ -273,7 +288,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
             'partnerCash1' => '0',
         ];
 
-        $handler = new TradeRosterPreviewApiHandler($this->mockDb, $this->stubTradeAssetRepo);
+        $handler = $this->buildHandler();
 
         $output = $this->captureOutput(fn () => $handler->handle());
 
@@ -298,7 +313,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
             'partnerCash1' => '0',
         ];
 
-        $handler = new TradeRosterPreviewApiHandler($this->mockDb, $this->stubTradeAssetRepo);
+        $handler = $this->buildHandler();
 
         $output = $this->captureOutput(fn () => $handler->handle());
 
@@ -323,7 +338,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
             'partnerCash1' => '0',
         ];
 
-        $handler = new TradeRosterPreviewApiHandler($this->mockDb, $this->stubTradeAssetRepo);
+        $handler = $this->buildHandler();
 
         $output = $this->captureOutput(fn () => $handler->handle());
 
@@ -332,5 +347,81 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
 
         $this->assertIsArray($decoded);
         $this->assertSame('', $decoded['html']);
+    }
+
+    public function testValidAddPidsDoesReachTheRepository(): void
+    {
+        $_GET = ['teamid' => '1', 'addPids' => '1,2'];
+
+        /** @var TradeAssetRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject $mockRepo */
+        $mockRepo = $this->createMock(TradeAssetRepositoryInterface::class);
+        $mockRepo->expects($this->once())->method('getPlayersByIds')->with([1, 2]);
+
+        $handler = $this->buildHandler($mockRepo);
+
+        $output = $this->captureOutput(fn () => $handler->handle());
+
+        /** @var array{html: string} $decoded */
+        $decoded = json_decode($output, true);
+
+        $this->assertIsArray($decoded);
+        $this->assertSame('', $decoded['html']);
+    }
+
+    public function testRemovePidsRejectionAlsoSkipsTheRepository(): void
+    {
+        $_GET = ['teamid' => '1', 'removePids' => 'x,y'];
+
+        /** @var TradeAssetRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject $mockRepo */
+        $mockRepo = $this->createMock(TradeAssetRepositoryInterface::class);
+        $mockRepo->expects($this->never())->method('getPlayersByIds');
+
+        $handler = $this->buildHandler($mockRepo);
+
+        $output = $this->captureOutput(fn () => $handler->handle());
+
+        /** @var array{html: string} $decoded */
+        $decoded = json_decode($output, true);
+
+        $this->assertIsArray($decoded);
+        $this->assertSame('', $decoded['html']);
+    }
+
+    public function testInjectedValidatorIsUsed(): void
+    {
+        $_GET = [];
+
+        /** @var TradeRosterPreviewParamValidatorInterface&\PHPUnit\Framework\MockObject\MockObject $mockValidator */
+        $mockValidator = $this->createMock(TradeRosterPreviewParamValidatorInterface::class);
+        $mockValidator->expects($this->once())->method('validateTeamID')->willReturn(0);
+
+        $handler = $this->buildHandler(validator: $mockValidator);
+
+        $output = $this->captureOutput(fn () => $handler->handle());
+
+        /** @var array{html: string} $decoded */
+        $decoded = json_decode($output, true);
+
+        $this->assertIsArray($decoded);
+        $this->assertSame('', $decoded['html']);
+    }
+
+    public function testInjectedCashRowBuilderIsUsed(): void
+    {
+        $_GET = ['teamid' => '1', 'display' => 'contracts'];
+
+        /** @var TradeRosterPreviewCashRowBuilderInterface&\PHPUnit\Framework\MockObject\MockObject $mockBuilder */
+        $mockBuilder = $this->createMock(TradeRosterPreviewCashRowBuilderInterface::class);
+        $mockBuilder->expects($this->once())->method('buildCashRows')->with(1)->willReturn([]);
+
+        $handler = $this->buildHandler(cashRowBuilder: $mockBuilder);
+
+        $output = $this->captureOutput(fn () => $handler->handle());
+
+        /** @var array{html: string} $decoded */
+        $decoded = json_decode($output, true);
+
+        $this->assertIsArray($decoded);
+        $this->assertArrayHasKey('html', $decoded);
     }
 }

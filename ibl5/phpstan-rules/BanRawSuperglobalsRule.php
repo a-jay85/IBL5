@@ -30,7 +30,7 @@ final class BanRawSuperglobalsRule implements Rule
     private const ALLOWLIST_BY_SUPERGLOBAL = [
         '_GET' => [
             'suffixes' => ['Controller.php', 'ApiHandler.php', 'Bootstrap.php', 'Authenticator.php'],
-            'files' => ['CsrfGuard.php', 'LeagueContext.php', 'TestCookieOverrides.php'],
+            'files' => ['CsrfGuard.php', 'LeagueContext.php', 'TestCookieOverrides.php', 'TradeRosterPreviewParamValidator.php'],
         ],
         '_POST' => [
             'suffixes' => ['Controller.php', 'ApiHandler.php', 'Bootstrap.php', 'Authenticator.php'],

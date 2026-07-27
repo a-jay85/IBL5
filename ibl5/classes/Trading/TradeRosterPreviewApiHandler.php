@@ -7,6 +7,8 @@ namespace Trading;
 use Team\TeamRepository;
 use Team\TeamTableService;
 use Trading\Contracts\TradeAssetRepositoryInterface;
+use Trading\Contracts\TradeRosterPreviewCashRowBuilderInterface;
+use Trading\Contracts\TradeRosterPreviewParamValidatorInterface;
 use UI\Components\TableViewDropdown;
 use Team\Team;
 use Season\Season;
@@ -20,21 +22,10 @@ use Season\Season;
  */
 class TradeRosterPreviewApiHandler
 {
-    private const VALID_DISPLAY_MODES = [
-        'ratings',
-        'total_s',
-        'avg_s',
-        'per36mins',
-        'contracts',
-        'split',
-        'chunk',
-        'playoffs',
-    ];
-
-    private const MAX_PIDS = 20;
-
     private \mysqli $db;
     private TradeAssetRepositoryInterface $tradeAssetRepository;
+    private TradeRosterPreviewParamValidatorInterface $paramValidator;
+    private TradeRosterPreviewCashRowBuilderInterface $cashRowBuilder;
 
     /**
      * The logged-in user's team ID, used to decide whether eligibility action
@@ -47,12 +38,14 @@ class TradeRosterPreviewApiHandler
      */
     private ?Season $season = null;
 
-    public function __construct(\mysqli $db, TradeAssetRepositoryInterface $tradeAssetRepository, int $loggedInTeamID = 0, ?Season $season = null)
+    public function __construct(\mysqli $db, TradeAssetRepositoryInterface $tradeAssetRepository, int $loggedInTeamID = 0, ?Season $season = null, ?TradeRosterPreviewParamValidatorInterface $paramValidator = null, ?TradeRosterPreviewCashRowBuilderInterface $cashRowBuilder = null)
     {
         $this->db = $db;
         $this->tradeAssetRepository = $tradeAssetRepository;
         $this->loggedInTeamID = $loggedInTeamID;
         $this->season = $season;
+        $this->paramValidator = $paramValidator ?? new TradeRosterPreviewParamValidator();
+        $this->cashRowBuilder = $cashRowBuilder ?? new TradeRosterPreviewCashRowBuilder($this->paramValidator);
     }
 
     public function handle(): void
@@ -60,25 +53,25 @@ class TradeRosterPreviewApiHandler
         header('Content-Type: application/json; charset=utf-8');
         $responder = new \Api\Response\HtmlResponder();
 
-        $teamid = $this->validateTeamID();
+        $teamid = $this->paramValidator->validateTeamID();
         if ($teamid === 0) {
             $responder->json(['html' => '']);
             return;
         }
 
-        $addPids = $this->validatePidList('addPids');
+        $addPids = $this->paramValidator->validatePidList('addPids');
         if ($addPids === null) {
             $responder->json(['html' => '']);
             return;
         }
 
-        $removePids = $this->validatePidList('removePids');
+        $removePids = $this->paramValidator->validatePidList('removePids');
         if ($removePids === null) {
             $responder->json(['html' => '']);
             return;
         }
 
-        $display = $this->validateDisplay();
+        $display = $this->paramValidator->validateDisplay();
 
         // Validate split parameter when display is 'split'
         $split = null;
@@ -129,7 +122,7 @@ class TradeRosterPreviewApiHandler
                 }
 
                 // Synthetic cash rows for the in-progress trade
-                $tradeCashRows = $this->buildCashRows($teamid);
+                $tradeCashRows = $this->cashRowBuilder->buildCashRows($teamid);
                 foreach ($tradeCashRows as $cashRow) {
                     $roster[] = $cashRow;
                 }
@@ -172,308 +165,6 @@ class TradeRosterPreviewApiHandler
             }
             $responder->json(['html' => '']);
         }
-    }
-
-    /**
-     * Validate teamid query parameter
-     */
-    private function validateTeamID(): int
-    {
-        if (!isset($_GET['teamid']) || !is_string($_GET['teamid'])) {
-            return 0;
-        }
-
-        $raw = $_GET['teamid'];
-        if (!ctype_digit($raw) || $raw === '0') {
-            return 0;
-        }
-
-        return (int) $raw;
-    }
-
-    /**
-     * Validate a PID list query parameter (addPids or removePids)
-     *
-     * Returns empty array for empty/missing values (valid — no players to add/remove).
-     * Returns null for invalid values (non-numeric, exceeds max).
-     *
-     * @return list<int>|null Validated PID list or null if invalid
-     */
-    private function validatePidList(string $paramName): ?array
-    {
-        if (!isset($_GET[$paramName]) || !is_string($_GET[$paramName])) {
-            return [];
-        }
-
-        $raw = $_GET[$paramName];
-        if ($raw === '') {
-            return [];
-        }
-
-        $parts = explode(',', $raw);
-        if (count($parts) > self::MAX_PIDS) {
-            return null;
-        }
-
-        $pids = [];
-        foreach ($parts as $part) {
-            $trimmed = trim($part);
-            if ($trimmed === '' || !ctype_digit($trimmed)) {
-                return null;
-            }
-            $pids[] = (int) $trimmed;
-        }
-
-        return $pids;
-    }
-
-    /**
-     * Validate display query parameter against whitelist
-     */
-    private function validateDisplay(): string
-    {
-        if (!isset($_GET['display']) || !is_string($_GET['display'])) {
-            return 'ratings';
-        }
-
-        $raw = $_GET['display'];
-        if (in_array($raw, self::VALID_DISPLAY_MODES, true)) {
-            return $raw;
-        }
-
-        return 'ratings';
-    }
-
-    /**
-     * Build synthetic cash rows for the contracts view
-     *
-     * Creates in-memory player-format rows representing cash exchanges,
-     * mirroring the pattern used by CashTransactionHandler::createCashTransaction().
-     *
-     * @return list<array<string, mixed>> Synthetic cash player rows with isCashRow flag
-     */
-    private function buildCashRows(int $viewingTeamId): array
-    {
-        $userTeam = $this->validateStringParam('userTeam');
-        $partnerTeam = $this->validateStringParam('partnerTeam');
-        $userTeamId = $this->validateIntParam('userTeamId');
-        $cashStartYear = $this->validateIntParam('cashStartYear');
-        $cashEndYear = $this->validateIntParam('cashEndYear');
-
-        if ($userTeam === '' || $partnerTeam === '' || $cashStartYear === 0 || $cashEndYear === 0) {
-            return [];
-        }
-
-        // Sanitize team names before embedding in HTML labels
-        $userTeam = \Security\HtmlSanitizer::safeHtmlOutput($userTeam);
-        $partnerTeam = \Security\HtmlSanitizer::safeHtmlOutput($partnerTeam);
-
-        $partnerTeamId = 0;
-        if ($viewingTeamId !== $userTeamId) {
-            $partnerTeamId = $viewingTeamId;
-        }
-
-        // Collect cash amounts per year
-        /** @var array<int, int> $userCash */
-        $userCash = [];
-        /** @var array<int, int> $partnerCash */
-        $partnerCash = [];
-        $hasUserCash = false;
-        $hasPartnerCash = false;
-
-        for ($yr = $cashStartYear; $yr <= $cashEndYear; $yr++) {
-            $uAmount = $this->validateCashAmount('userCash' . $yr);
-            $pAmount = $this->validateCashAmount('partnerCash' . $yr);
-            $userCash[$yr] = $uAmount;
-            $partnerCash[$yr] = $pAmount;
-            if ($uAmount > 0) {
-                $hasUserCash = true;
-            }
-            if ($pAmount > 0) {
-                $hasPartnerCash = true;
-            }
-        }
-
-        if (!$hasUserCash && !$hasPartnerCash) {
-            return [];
-        }
-
-        $rows = [];
-        $isViewingUserTeam = ($viewingTeamId === $userTeamId);
-
-        if ($isViewingUserTeam) {
-            // Viewing user's team
-            if ($hasUserCash) {
-                $rows[] = $this->makeCashRow(
-                    '| Cash to ' . $partnerTeam,
-                    $viewingTeamId,
-                    $userCash,
-                    $cashStartYear,
-                    $cashEndYear,
-                    false
-                );
-            }
-            if ($hasPartnerCash) {
-                $rows[] = $this->makeCashRow(
-                    '| Cash from ' . $partnerTeam,
-                    $viewingTeamId,
-                    $partnerCash,
-                    $cashStartYear,
-                    $cashEndYear,
-                    true
-                );
-            }
-        } else {
-            // Viewing partner's team
-            if ($hasPartnerCash) {
-                $rows[] = $this->makeCashRow(
-                    '| Cash to ' . $userTeam,
-                    $partnerTeamId,
-                    $partnerCash,
-                    $cashStartYear,
-                    $cashEndYear,
-                    false
-                );
-            }
-            if ($hasUserCash) {
-                $rows[] = $this->makeCashRow(
-                    '| Cash from ' . $userTeam,
-                    $partnerTeamId,
-                    $userCash,
-                    $cashStartYear,
-                    $cashEndYear,
-                    true
-                );
-            }
-        }
-
-        /** @var list<array<string, mixed>> $rows */
-        return $rows;
-    }
-
-    /**
-     * Create a single synthetic cash player row
-     *
-     * @param array<int, int> $amounts Cash amounts keyed by year index
-     * @return array<string, mixed>
-     */
-    private function makeCashRow(string $label, int $teamId, array $amounts, int $startYear, int $endYear, bool $negate): array
-    {
-        $salaryYr1 = $salaryYr2 = $salaryYr3 = $salaryYr4 = $salaryYr5 = $salaryYr6 = 0;
-        $totalYears = 0;
-
-        for ($yr = $startYear; $yr <= $endYear; $yr++) {
-            $amount = $amounts[$yr] ?? 0;
-            if ($negate) {
-                $amount = -$amount;
-            }
-            $cyIndex = $yr - $startYear + 1;
-            if ($cyIndex >= 1 && $cyIndex <= 6) {
-                match ($cyIndex) {
-                    1 => $salaryYr1 = $amount,
-                    2 => $salaryYr2 = $amount,
-                    3 => $salaryYr3 = $amount,
-                    4 => $salaryYr4 = $amount,
-                    5 => $salaryYr5 = $amount,
-                    6 => $salaryYr6 = $amount,
-                };
-                if ($amount !== 0 && $cyIndex > $totalYears) {
-                    $totalYears = $cyIndex;
-                }
-            }
-        }
-
-        if ($totalYears === 0) {
-            $totalYears = 1;
-        }
-
-        return [
-            // Basic fields
-            'pid' => 0,
-            'name' => $label,
-            'nickname' => '',
-            'ordinal' => 100000,
-            'teamid' => $teamId,
-            'pos' => '',
-            'age' => null,
-            'color1' => null,
-            'color2' => null,
-            // Ratings (all zero, matching DB cash rows)
-            'r_fga' => 0, 'r_fgp' => 0, 'r_fta' => 0, 'r_ftp' => 0,
-            'r_3ga' => 0, 'r_3gp' => 0, 'r_orb' => 0, 'r_drb' => 0,
-            'r_ast' => 0, 'r_stl' => 0, 'r_tvr' => 0, 'r_blk' => 0, 'r_foul' => 0,
-            'oo' => 0, 'od' => 0, 'r_drive_off' => 0, 'dd' => 0,
-            'po' => 0, 'pd' => 0, 'r_trans_off' => 0, 'td' => 0,
-            'clutch' => null, 'consistency' => null,
-            'talent' => 0, 'skill' => 0, 'intangibles' => 0,
-            // Free agency (null, matching DB cash rows)
-            'loyalty' => null, 'playing_time' => null, 'winner' => null,
-            'tradition' => null, 'security' => null,
-            // Contract fields
-            'exp' => 1,
-            'bird' => null,
-            'cy' => 1,
-            'cyt' => $totalYears,
-            'salary_yr1' => $salaryYr1, 'salary_yr2' => $salaryYr2, 'salary_yr3' => $salaryYr3,
-            'salary_yr4' => $salaryYr4, 'salary_yr5' => $salaryYr5, 'salary_yr6' => $salaryYr6,
-            // Draft (zero/empty, matching DB cash rows)
-            'draftyear' => 0, 'draftround' => 0, 'draftpickno' => 0,
-            'draftedby' => '', 'draftedbycurrentname' => '', 'college' => '',
-            // Physical (zero, matching DB cash rows)
-            'htft' => 0, 'htin' => 0, 'wt' => 0,
-            // Status
-            'injured' => null,
-            'retired' => 0,
-            'droptime' => 0,
-            // Cash row flag
-            'isCashRow' => true,
-        ];
-    }
-
-    /**
-     * Validate a string query parameter
-     */
-    private function validateStringParam(string $paramName): string
-    {
-        if (!isset($_GET[$paramName]) || !is_string($_GET[$paramName])) {
-            return '';
-        }
-        $raw = trim($_GET[$paramName]);
-        return $raw !== '' ? $raw : '';
-    }
-
-    /**
-     * Validate an integer query parameter (positive)
-     */
-    private function validateIntParam(string $paramName): int
-    {
-        if (!isset($_GET[$paramName]) || !is_string($_GET[$paramName])) {
-            return 0;
-        }
-        $raw = $_GET[$paramName];
-        if (!ctype_digit($raw)) {
-            return 0;
-        }
-        return (int) $raw;
-    }
-
-    /**
-     * Validate a cash amount query parameter (0-2000)
-     */
-    private function validateCashAmount(string $paramName): int
-    {
-        if (!isset($_GET[$paramName]) || !is_string($_GET[$paramName])) {
-            return 0;
-        }
-        $raw = $_GET[$paramName];
-        if (!ctype_digit($raw)) {
-            return 0;
-        }
-        $amount = (int) $raw;
-        if ($amount > 2000) {
-            return 0;
-        }
-        return $amount;
     }
 
     /**

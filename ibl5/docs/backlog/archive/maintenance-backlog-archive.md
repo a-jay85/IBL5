@@ -215,6 +215,17 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
 **Status (2026-07-26):** ✅ Implemented — PR #1679. Extracted `RecapHeaderRenderer`, `RecapTabsRenderer`, `RecapPanelRenderer`, `RecapInjuryCellRenderer`, `RecapBattlesRenderer` (5 renderer classes) + `RecapTeamNameHelper`; `LastSimRecapView` thinned to a pure orchestrator. Output byte-identical across all 5 golden-master scenarios. 57 mutation-surviving renderer unit tests + 5 helper tests (62 total) in `ibl5/tests/LastSimRecap/`.
 
+### 1.31 TradeRosterPreviewApiHandler — Validation + Cash + Render in One Handler (508 LOC)
+**Location:** `ibl5/classes/Trading/TradeRosterPreviewApiHandler.php` (508 lines)
+**Problem:** One request handler validates params (`validateTeamID`, `validatePidList`, `validateCashAmount`, `validateStringParam`), builds cash rows, and renders the roster-preview table.
+**Suggested direction:** Extract a request-validation collaborator and a cash-row builder; keep `handle()` thin.
+**Est. effort:** M
+**Risk if untouched:** A request-handling API endpoint — a wrong extraction can alter validation behavior, so add an E2E/characterization pin before refactor (🟨).
+**Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
+**Status:** ✅ Implemented (2026-07-27) — extracted into TradeRosterPreviewParamValidator + TradeRosterPreviewCashRowBuilder (branch trading-1-31-api-handler-extract)
+
+**Table evidence (2026-07-27):** TradeRosterPreviewApiHandler 508 LOC — API handler mixing param validation + cash-row building + table render. Extract validation and cash-row collaborators; endpoint (request-handling) → add an E2E/characterization pin.
+
 ### 1.34 SavedDepthChartService — Data Assembly + Slot-Conflict Resolution (626 LOC)
 **Location:** `ibl5/classes/SavedDepthChart/SavedDepthChartService.php` (626 lines)
 **Problem:** One service assembles depth-chart page data and resolves slot conflicts, mixing orchestration with conflict-resolution logic.

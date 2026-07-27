@@ -110,3 +110,8 @@ tools/postplan-harness/fixtures/scenarios/
 tools/postplan-harness/**/__pycache__/
 tools/postplan-harness/**/*.pyc
 tools/postplan-harness/.pytest_cache/
+
+# Separate IBL6 SvelteKit tree that lives inside this checkout — build output,
+# node_modules, and a local .env only; no source. Ignored so `git add -A` in the
+# main checkout can never commit its .env.
+/IBL6/

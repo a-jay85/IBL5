@@ -5,7 +5,7 @@
         "ibl.directTime": 13,
         "ibl.hardcodedEnvString": 8,
         "ibl.orderByMissingTiebreaker": 82,
-        "ibl.sqlStringConcatenation": 33,
+        "ibl.sqlStringConcatenation": 32,
         "ibl.trustedVariable": 16,
         "nullCoalesce.offset": 1,
         "variable.undefined": 7

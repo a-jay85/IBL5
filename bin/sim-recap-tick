@@ -43,12 +43,19 @@ SIM_RECAP_DB_HOST="${SIM_RECAP_DB_HOST:-127.0.0.1}"
 SIM_RECAP_DB_PORT="${SIM_RECAP_DB_PORT:-13306}"
 SIM_RECAP_DB_USER="${SIM_RECAP_DB_USER:-}"
 SIM_RECAP_DB_NAME="${SIM_RECAP_DB_NAME:-}"
+# Pinned, not bare `mysql`: the launchd PATH resolves to Homebrew's 9.x client,
+# which dropped mysql_native_password and cannot authenticate at all (ERROR 2059).
+# Same default as sim-recap-prompt, which documents the full why; the tick keeps
+# its own copy so preflight_mysql can check the binary the agent will actually be
+# told to run, and exports it so both sides can never disagree.
+SIM_RECAP_MYSQL_BIN="${SIM_RECAP_MYSQL_BIN:-/opt/homebrew/opt/mysql@8.4/bin/mysql}"
 # SIM_RECAP_DB_PASSWORD is read from the environment ONLY (never defaulted, never
 # argv, never logged). require_password() enforces its presence on the live path.
 
 # The prompt builder reads the DB coordinates from its environment (never the
 # password — that reaches the agent through MYSQL_PWD at spawn time).
 export SIM_RECAP_DB_HOST SIM_RECAP_DB_PORT SIM_RECAP_DB_USER SIM_RECAP_DB_NAME
+export SIM_RECAP_MYSQL_BIN
 
 # ── Per-run temp working dir (security constraint 7 / ADR-0062) ───────────────
 # Global so the EXIT trap can see it; assigned in generate()/dry_run().
@@ -162,10 +169,20 @@ ensure_tunnel() {
 # ── Run the generation agent in the temp dir; leaves payload.json on success ──
 run_agent() { # sim prompt
     local sim="$1" prompt="$2"
-    # --allowedTools is the STRUCTURAL enforcement of security constraint 2: with
-    # only Bash(mysql:*) and Write, the agent has no ssh, no curl, no gh. The
-    # password reaches it via MYSQL_PWD in this subshell env — never in the prompt,
-    # never in argv, never logged.
+    # --allowedTools narrows what runs WITHOUT a prompt; it is NOT a sandbox, and
+    # this comment used to claim otherwise. ~/.claude/settings.json allows bare
+    # `Bash` with defaultMode auto, so the flag is additive: the agent can and does
+    # run python3, rm, sed. Do not "fix" that by tightening Bash to mysql-only —
+    # the generation run legitimately needs scratch-file tooling.
+    #
+    # What actually enforces security constraint 2 is the CREDENTIAL split, and it
+    # holds independently of any tool flag: the only secret this subshell hands the
+    # agent is MYSQL_PWD for a SELECT-only user (never in the prompt, never in
+    # argv, never logged). Every privileged queue action is a prod-side
+    # simRecapQueue.php call the tick makes on its own, with inputs the agent never
+    # supplies. Residual gap, accepted: the agent inherits the Mac's ssh identity
+    # and could in principle reach prod that way — the trust boundary here is the
+    # code we hand it, not the tool list.
     ( cd "$WORKDIR" && MYSQL_PWD="${SIM_RECAP_DB_PASSWORD:-}" \
         timeout "$SIM_RECAP_CLAUDE_TIMEOUT" "$SIM_RECAP_CLAUDE_BIN" -p "$prompt" \
             --model "$SIM_RECAP_MODEL" --output-format json \
@@ -213,10 +230,18 @@ generate() { # sim
     fi
 
     # Store: pipe the payload on stdin (never argv — multi-KB, ps-visible).
+    # Do NOT add 2>&1 here. ssh writes non-JSON banners to stderr — OpenSSH 10.2
+    # emits a post-quantum-KEX warning whenever a store opens a fresh connection
+    # instead of riding the ControlMaster — and merging that into $store makes
+    # jq_ok choke on a perfectly good response. That is not hypothetical: sim 722
+    # (2026-07-26) stored all 56 recaps, then logged "store failed (rc=0)" and
+    # tried to park an already-done row. Leave stderr on the tick's own stderr,
+    # where launchd captures it uninterleaved. (run_agent's 2>&1 is different and
+    # correct — claude_env_error greps that merged blob for rate-limit text.)
     local store store_rc
     store="$("$SIM_RECAP_SSH_BIN" "$SIM_RECAP_SSH_HOST" \
         "php $SIM_RECAP_REMOTE_ROOT/ibl5/scripts/storeSimRecap.php --sim=$sim" \
-        < "$WORKDIR/payload.json" 2>&1)"
+        < "$WORKDIR/payload.json")"
     store_rc=$?
     if [ "$store_rc" -eq 0 ] && jq_ok "$store" '.ok == true'; then
         log "sim $sim: stored ($(printf '%s' "$store" | "$SIM_RECAP_JQ_BIN" -r '.games' 2>/dev/null) game recaps)"
@@ -294,6 +319,18 @@ main() {
     # zero attempts.
     if ! command -v "$SIM_RECAP_CLAUDE_BIN" >/dev/null 2>&1; then
         log "ERROR: agent binary '$SIM_RECAP_CLAUDE_BIN' not found on PATH ($PATH) — aborting tick (no sim claimed)"
+        return 1
+    fi
+
+    # Same preflight, for the mysql client. The prompt hands the agent this exact
+    # path and tells it not to go hunting for another one — which is right (the
+    # one on PATH cannot authenticate) but removes the recovery it improvised for
+    # sim 722. If the pin ever goes stale (mysql@8.4 unlinked, EOL'd, upgraded out
+    # from under us), every query the agent makes fails, it produces no payload,
+    # and the sim parks — one wasted attempt per poll, same shape as sim 721's
+    # rc=127. Cost zero attempts instead.
+    if ! command -v "$SIM_RECAP_MYSQL_BIN" >/dev/null 2>&1; then
+        log "ERROR: mysql client '$SIM_RECAP_MYSQL_BIN' not found — aborting tick (no sim claimed)"
         return 1
     fi
 

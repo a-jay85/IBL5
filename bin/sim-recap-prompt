@@ -22,6 +22,15 @@
 #   SIM_RECAP_DB_PORT   MySQL port. Default: 13306
 #   SIM_RECAP_DB_USER   MySQL user (no default — must be set in env)
 #   SIM_RECAP_DB_NAME   MySQL database name (no default — must be set in env)
+#   SIM_RECAP_MYSQL_BIN mysql client the agent is told to run.
+#                       Default: /opt/homebrew/opt/mysql@8.4/bin/mysql
+#                       Pinned deliberately, NOT left as bare `mysql`. The
+#                       launchd PATH resolves `mysql` to Homebrew's current
+#                       release (9.7.1), whose client DROPPED the
+#                       mysql_native_password plugin — it cannot authenticate
+#                       against the prod server at all (ERROR 2059). Every run
+#                       otherwise burns agent turns rediscovering that and
+#                       hunting for an 8.x client (sim 722, 2026-07-26).
 #
 # The database password is NEVER injected into the prompt. It travels via
 # MYSQL_PWD in the agent's environment. Prompts appear in logs and process
@@ -38,6 +47,7 @@ SIM_RECAP_DB_HOST="${SIM_RECAP_DB_HOST:-127.0.0.1}"
 SIM_RECAP_DB_PORT="${SIM_RECAP_DB_PORT:-13306}"
 SIM_RECAP_DB_USER="${SIM_RECAP_DB_USER:-}"
 SIM_RECAP_DB_NAME="${SIM_RECAP_DB_NAME:-}"
+SIM_RECAP_MYSQL_BIN="${SIM_RECAP_MYSQL_BIN:-/opt/homebrew/opt/mysql@8.4/bin/mysql}"
 
 # --- Arg parsing ---
 sim=""
@@ -107,9 +117,15 @@ cat <<DATA_EOF
 
 Sim number: ${sim}
 
-Query live game data using the mysql client. Connect with:
+Query live game data using the mysql client. Use this EXACT command — copy the binary
+path and the --default-auth flag verbatim:
 
-  mysql -h ${SIM_RECAP_DB_HOST} -P ${SIM_RECAP_DB_PORT} -u ${SIM_RECAP_DB_USER} ${SIM_RECAP_DB_NAME}
+  ${SIM_RECAP_MYSQL_BIN} --default-auth=mysql_native_password -h ${SIM_RECAP_DB_HOST} -P ${SIM_RECAP_DB_PORT} -u ${SIM_RECAP_DB_USER} ${SIM_RECAP_DB_NAME}
+
+Do not substitute a bare "mysql". The one on PATH is a 9.x client that has dropped the
+mysql_native_password plugin and cannot authenticate against this server (ERROR 2059).
+The path above is the working client; it is already resolved for you, so do not go
+looking for another one.
 
 The database password is available in your environment as MYSQL_PWD. Do not pass it on
 the command line — mysql reads it from MYSQL_PWD automatically.
@@ -218,7 +234,25 @@ Strict field types:
   - game_of_that_day: use 0 (integer zero, not null) when there was exactly one game on that date
   - themes: array of strings — narrative angles you used this run (for the next ledger)
 
-Write nothing else, anywhere. One file. payload.json. That is all.
+== HOW TO PRODUCE IT ==
+
+Write payload.json DIRECTLY with the Write tool, as literal JSON.
+
+Do NOT write a Python (or any other) script that generates, assembles, templates,
+or emits payload.json. No gen.py, no build_payload.py, no heredoc'd generator. You
+are the generator. Every recap_text is prose you write; every field around it is a
+value you already looked up. Putting those same literals into a script that then
+prints them adds a step and buys nothing — the caller already validates the result.
+
+Scratch files, when you genuinely need one (a query dump, notes):
+
+  - Put them in your CURRENT WORKING DIRECTORY. Nowhere else.
+  - NEVER write to /tmp. /tmp survives between runs, so a file you write there
+    collides with one an EARLIER run left behind — that is not hypothetical, it
+    cost sim 722 a full needless rewrite of a 27KB file under a second name.
+  - Your cwd is a fresh per-run directory that is deleted when the run ends.
+    Nothing you put there can collide with anything, and you never need to clean
+    it up or pick a "fresh path" to dodge an existing file.
 
 CONTRACT_EOF
 

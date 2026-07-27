@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed/declined maintenance-audit findings, extracted from maintenance-backlog.md.
-last_verified: 2026-07-28
+last_verified: 2026-07-29
 ---
 
 # Maintenance-Cost Reduction Backlog — Archive
@@ -1859,6 +1859,14 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 
 
 **Table evidence (2026-07-25):** dead section removed (#1027).
+### 11.16 Global JS Bundle Loads Page-Specific Scripts on Every Page
+**Location:** `classes/PageLayout/PageLayout.php` lines 103-119
+**Problem:** `sorttable.js`, `offer-salary-hints.js`, `contract-hint.js` loaded unconditionally; only needed on specific pages.
+**Suggested direction:** Move page-specific scripts to controller/view loaders (pattern already used by TradingView, DepthChartEntryController).
+**Est. effort:** S
+**Risk if untouched:** Minor payload bloat per page.
+
+**Table evidence (2026-07-27):** Page-specific JS to per-view loaders; E2E/VR pin.
 ## Axis 12: Data Files Committed to Repo
 
 ### 12.1 `IBL5.log` — 1.1 GB Runtime Log On Disk

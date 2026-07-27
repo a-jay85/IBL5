@@ -116,6 +116,7 @@ class TeamController implements TeamControllerInterface
         }
 
         $responder->html($this->view->render($pageData));
+        $responder->html('<script src="jslib/contract-hint.js"></script>');
 
         \PageLayout\PageLayout::footer();
     }

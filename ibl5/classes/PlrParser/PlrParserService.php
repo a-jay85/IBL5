@@ -48,24 +48,7 @@ class PlrParserService implements PlrParserServiceInterface
      */
     public function processPlrData(string $data): PlrParseResult
     {
-        $result = new PlrParseResult();
-
-        $maxFoulRatio = $this->calculateFoulBaselineFromData($data);
-        $result->addMessage('Foul baseline calculated (max ratio: ' . \BasketballStats\StatsFormatter::formatWithDecimals($maxFoulRatio, 6) . ')');
-
-        foreach (explode("\r\n", $data) as $line) {
-            $parsed = PlrLineParser::parse($line);
-            if ($parsed === null) {
-                continue;
-            }
-
-            $derived = $this->computeDerivedFields($parsed, $maxFoulRatio);
-
-            $this->repository->upsertPlayer($derived);
-            $result->playersUpserted++;
-        }
-
-        return $result;
+        return $this->executePlayerLoop($data, null);
     }
 
     /**
@@ -228,6 +211,16 @@ class PlrParserService implements PlrParserServiceInterface
         ?string $snapshotPhase = null,
         ?string $sourceArchive = null,
     ): PlrParseResult {
+        return $this->executePlayerLoop($data, $endingYear, $mode, $snapshotPhase ?? '', $sourceArchive ?? '');
+    }
+
+    private function executePlayerLoop(
+        string $data,
+        ?int $endingYear,
+        PlrImportMode $mode = PlrImportMode::Live,
+        string $snapshotPhase = '',
+        string $sourceArchive = '',
+    ): PlrParseResult {
         $result = new PlrParseResult();
 
         $maxFoulRatio = $this->calculateFoulBaselineFromData($data);
@@ -243,7 +236,13 @@ class PlrParserService implements PlrParserServiceInterface
 
             match ($mode) {
                 PlrImportMode::Live => $this->processLivePlayer($derived, $result),
-                PlrImportMode::Snapshot => $this->processSnapshotPlayer($derived, $result, $endingYear, $snapshotPhase ?? '', $sourceArchive ?? ''),
+                PlrImportMode::Snapshot => $this->processSnapshotPlayer(
+                    $derived,
+                    $result,
+                    $endingYear ?? throw new \LogicException('Snapshot mode requires explicit endingYear'),
+                    $snapshotPhase,
+                    $sourceArchive,
+                ),
             };
         }
 

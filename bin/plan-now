@@ -1,0 +1,225 @@
+#!/usr/bin/env bash
+#
+# bin/plan-now — fire a detached headless Sonnet 4.6 session that RUNS a drafted
+# /plan handoff prompt, replacing the manual "paste this into a fresh session" step
+# at the end of the /plan-prompt skill.
+#
+# Usage:
+#   bin/plan-now <prompt-file>              # run it; leave the plan on disk (--implement)
+#   bin/plan-now --queue <prompt-file>      # ... and queue it for automouse if check-plan passes
+#   bin/plan-now --model opus <prompt-file> # orchestrator model (default claude-sonnet-4-6)
+#
+# <prompt-file> holds the /plan prompt block exactly as /plan-prompt drafted it —
+# multi-KB markdown with backticks, quotes and $. It is passed to the detached job
+# BY PATH and expanded there (`claude -p "$(cat …)"`), so the block itself never
+# crosses a shell-quoting or plist-XML boundary; only tame paths do.
+#
+# Two proven patterns, assembled:
+#   - detach: the launchd RunAtLoad one-shot from bin/post-plan-now. A plain
+#     `nohup … &` fired from Claude Code's Bash tool shares the tool-shell's
+#     process group and dies with it, so launchd is load-bearing here too.
+#   - headless /plan: the invocation bin/bug-pipeline-tick drive_ready_for_plan()
+#     already runs in production (claude -p "/plan …" --model claude-sonnet-4-6
+#     --dangerously-skip-permissions, plan-dir diff to detect the new plan).
+#
+# NO HUMAN IS PRESENT in the fired run, so /plan Step 3.5 cannot use
+# AskUserQuestion to resolve a needs-user-input fork. Two things cover that:
+#   1. The drafting session pre-resolves user-facing forks and bakes the answers
+#      into the prompt as hard constraints (/plan-prompt Step 4.5).
+#   2. This script appends a headless coda (below) telling the run to never ask,
+#      to record any surviving fork in the plan, and to hold auto-merge for it.
+# The discriminator for "did losing the human degrade the plan" is bin/check-plan,
+# which already fails on unresolved decisions (DECIDE / TBD / "subject to …") and
+# on `auto_merge: false` without a hold justification. The job runs it on the
+# produced plan and reports PASS/FAIL in the log — a real machine verdict, rather
+# than bug-pipeline's weaker "a new plan file appeared".
+#
+# Run from anywhere inside the repo (the main checkout is fine: /plan only READS
+# repo files and writes to ~/claude-plans/, so it does not violate ADR-0062).
+# Deliberately NO master/main branch guard — plan-now runs BEFORE the plan's
+# worktree exists, so master is the expected branch.
+
+set -euo pipefail
+
+MODEL="claude-sonnet-4-6"
+DISPOSITION="implement"
+PROMPT_SRC=""
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --queue)  DISPOSITION="queue"; shift ;;
+        --model)  MODEL="${2:?--model needs a value}"; shift 2 ;;
+        -h|--help)
+            sed -n '/^# Usage:/,/^#$/p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -*)
+            echo "plan-now: unknown flag '$1'" >&2; exit 2 ;;
+        *)
+            [ -n "$PROMPT_SRC" ] && { echo "plan-now: one prompt file, not two." >&2; exit 2; }
+            PROMPT_SRC="$1"; shift ;;
+    esac
+done
+
+[ -n "$PROMPT_SRC" ] || { echo "plan-now: usage: bin/plan-now [--queue] [--model M] <prompt-file>" >&2; exit 2; }
+[ -s "$PROMPT_SRC" ] || { echo "plan-now: prompt file '$PROMPT_SRC' is missing or empty." >&2; exit 2; }
+
+grep -q '^/plan' "$PROMPT_SRC" \
+    || { echo "plan-now: '$PROMPT_SRC' has no line starting with '/plan' — that is not a plan prompt." >&2; exit 2; }
+
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null) \
+    || { echo "plan-now: not inside a git repo." >&2; exit 1; }
+
+# Overridable for the smoke test only — ~/claude-plans is the single source of truth
+# (workflow-continuity.md), same shape as bug-pipeline-tick's BUG_PIPELINE_PLANS_DIR.
+PLANS_DIR="${PLAN_NOW_PLANS_DIR:-$HOME/claude-plans}"
+mkdir -p "$PLANS_DIR"
+
+TS=$(date +%Y%m%d-%H%M%S)
+LABEL="com.ibl5.plan-now-$TS"
+LOG="/tmp/plan-now-$TS.log"
+PROMPT="/tmp/plan-now-$TS.prompt"
+RUNNER="/tmp/plan-now-$TS.sh"
+PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+
+# Own a private copy: the caller's mktemp block may be cleaned up long before
+# launchd gets around to running the job.
+cp "$PROMPT_SRC" "$PROMPT"
+
+# The headless coda. It lives HERE, not in the skill's drafted block, so every
+# fired run carries it even when the drafting session forgets — and so the block
+# on the clipboard stays a clean paste for a human-run session.
+if [ "$DISPOSITION" = "queue" ]; then
+    DISPOSITION_LINE="Disposition: run \`bin/automouse-queue <slug>\` for this plan once \`bin/check-plan\` passes (the /plan Step 5 default). If check-plan does NOT pass, fix the plan; never queue a failing plan."
+else
+    DISPOSITION_LINE="Disposition: **--implement**. Leave the plan on disk at \`~/claude-plans/<slug>.md\` and do NOT run \`bin/automouse-queue\` — a human reviews it before it implements."
+fi
+
+cat >> "$PROMPT" <<CODA
+
+---
+
+**Headless run constraints (appended by \`bin/plan-now\` — these override any
+conflicting default in the skill):**
+
+- **No human is present.** Never call \`AskUserQuestion\`, never pause for input,
+  never end a turn waiting for an answer. The forks a human could answer were
+  already resolved by the session that drafted this prompt; they appear above as
+  hard constraints.
+- If you hit a genuine \`needs-user-input\` fork that the constraints above do not
+  settle: pick the safest option, **record the fork and your choice explicitly in
+  the plan's Approach section**, and set \`auto_merge: false\` in the line-1
+  frontmatter. \`auto_merge: false\` requires an \`## Automouse Hold Justification\`
+  section naming the unresolved fork, or \`bin/check-plan\` gate [H] fails.
+- Before finishing, run \`bin/check-plan ~/claude-plans/<slug>.md\` and fix
+  everything it reports. This job re-runs it after you exit and logs the verdict.
+- $DISPOSITION_LINE
+CODA
+
+# ---------------------------------------------------------------------------
+# The detached job. The plist invokes this runner by path rather than inlining
+# the body as one XML string (post-plan-now's shape): the plan-dir diff and the
+# check-plan verdict are multi-line bash, and escaping them through XML twice is
+# how quoting bugs get in.
+# ---------------------------------------------------------------------------
+{
+    printf '#!/usr/bin/env bash\n'
+    printf '# Generated by bin/plan-now at %s. Left on disk next to the log for debugging.\n' "$TS"
+    printf 'ROOT=%q\n'       "$ROOT"
+    printf 'PLANS_DIR=%q\n'  "$PLANS_DIR"
+    printf 'PROMPT=%q\n'     "$PROMPT"
+    printf 'MODEL=%q\n'      "$MODEL"
+    printf 'LABEL=%q\n'      "$LABEL"
+    printf 'PLIST=%q\n'      "$PLIST"
+    printf 'CHECK_PLAN=%q\n' "$ROOT/bin/check-plan"
+    # PLAN_NOW_CLAUDE lets a smoke test stub the model call and exercise the
+    # detection + check-plan half of the runner (same shape as bug-pipeline-tick's
+    # $CLAUDE_BIN). Unset in real use.
+    printf 'CLAUDE_BIN=%q\n' "${PLAN_NOW_CLAUDE:-claude}"
+    cat <<'RUNNER_EOF'
+# launchd runs with a minimal env — same PATH prelude bin/automouse-run uses.
+export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:$PATH"
+cd "$ROOT" || exit 1
+
+before=$(ls "$PLANS_DIR"/*.md 2>/dev/null | sort)
+
+# CLAUDE_HEADLESS=1 marks the run unattended (skills branch on it).
+# CLAUDE_CODE_AUTO_COMPACT_WINDOW=200000 lifts the interactive 120K
+# autoCompactWindow pin — rationale in bin/automouse-run.
+# caffeinate -s keeps the Mac awake on AC for the run's duration.
+CLAUDE_HEADLESS=1 CLAUDE_CODE_AUTO_COMPACT_WINDOW=200000 caffeinate -s \
+    timeout 3600 "$CLAUDE_BIN" -p "$(cat "$PROMPT")" \
+    --dangerously-skip-permissions \
+    --model "$MODEL" \
+    --effort high \
+    --name "$LABEL"
+rc=$?
+
+after=$(ls "$PLANS_DIR"/*.md 2>/dev/null | sort)
+new_plan=$(comm -13 <(printf '%s\n' "$before") <(printf '%s\n' "$after") | grep -E '\.md$' | head -1)
+
+echo "----------------------------------------------------------------"
+echo "plan-now: claude exited $rc"
+if [ -n "$new_plan" ]; then
+    echo "plan-now: new plan -> $new_plan"
+    if "$CHECK_PLAN" "$new_plan"; then
+        echo "plan-now: RESULT ok — plan written and check-plan PASSED."
+    else
+        echo "plan-now: RESULT degraded — plan written but check-plan FAILED (see above)."
+        echo "plan-now: a human must fix $new_plan before it is queued or implemented."
+    fi
+else
+    # An edit to an EXISTING plan file leaves the listing unchanged, so this is a
+    # 'could not confirm', not a hard 'nothing happened'.
+    echo "plan-now: RESULT unconfirmed — no NEW file in $PLANS_DIR."
+    echo "plan-now: check the transcript above; the run may have updated an existing plan, or failed."
+fi
+
+rm -f "$PLIST"
+launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
+RUNNER_EOF
+} > "$RUNNER"
+chmod +x "$RUNNER"
+
+cat > "$PLIST" <<PLIST_EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>$LABEL</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>-lc</string>
+		<string>exec "$RUNNER"</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>WorkingDirectory</key>
+	<string>$ROOT</string>
+	<key>StandardOutPath</key>
+	<string>$LOG</string>
+	<key>StandardErrorPath</key>
+	<string>$LOG</string>
+</dict>
+</plist>
+PLIST_EOF
+
+if [ "${PLAN_NOW_DRY_RUN:-0}" = "1" ]; then
+    echo "plan-now: DRY RUN — plist and runner written, not bootstrapped."
+    echo "  runner: $RUNNER"
+    echo "  plist:  $PLIST"
+    echo "  prompt: $PROMPT"
+    exit 0
+fi
+
+launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
+launchctl bootstrap "gui/$(id -u)" "$PLIST"
+
+echo "plan-now: fired a detached headless /plan run."
+echo "  model:       $MODEL   (orchestrator; the Step-3 architect tier is set by the prompt)"
+echo "  disposition: $DISPOSITION"
+echo "  supervised by launchd — survives closing Claude Code / the terminal"
+echo "  log:    tail -f $LOG"
+echo "  prompt: $PROMPT"
+echo "  label:  $LABEL   (self-removes when the run finishes)"
+echo "  The log ends with a check-plan verdict on the produced plan."

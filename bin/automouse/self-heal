@@ -3,8 +3,8 @@
 # Requeue plans that were skipped by the staleness gate and now pass it.
 #
 # Usage:
-#   bin/automouse-self-heal           # requeue eligible plans
-#   bin/automouse-self-heal --dry-run # preview without acting
+#   bin/automouse/self-heal           # requeue eligible plans
+#   bin/automouse/self-heal --dry-run # preview without acting
 #
 # Only plans carrying a <plan>.md.staleness sidecar marker are eligible —
 # ambiguity / poison-pill skips are never recovered (already-merged plans go to done/, not skipped/).
@@ -15,7 +15,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 : "${NIGHTLY_DIR:=$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse}"
 : "${PLANS_DIR:=$HOME/claude-plans}"
-: "${STALENESS_GUARD:=$SCRIPT_DIR/check-plan-staleness}"
+: "${STALENESS_GUARD:=$SCRIPT_DIR/../check-plan-staleness}"
 
 SKIPPED_DIR="$NIGHTLY_DIR/skipped"
 
@@ -52,7 +52,7 @@ for f in "$SKIPPED_DIR"/*.md; do
 
         # Real mode: requeue via automouse-queue (owns mv + sidecar eviction).
         if NIGHTLY_DIR="$NIGHTLY_DIR" PLANS_DIR="$PLANS_DIR" \
-           "$SCRIPT_DIR/automouse-queue" "$name" >/dev/null 2>&1; then
+           "$SCRIPT_DIR/queue" "$name" >/dev/null 2>&1; then
             echo "healed: $name (staleness guard now passes — requeued)"
             printf '%s\n' "$name" >> "$healed_names_file"
             healed=$((healed + 1))

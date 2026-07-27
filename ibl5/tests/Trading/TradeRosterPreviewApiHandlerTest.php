@@ -7,6 +7,7 @@ namespace Tests\Trading;
 use PHPUnit\Framework\TestCase;
 use Tests\WideUnit\Mocks\MockDatabase;
 use Trading\Contracts\TradeAssetRepositoryInterface;
+use Trading\Contracts\TradeRosterPreviewParamValidatorInterface;
 use Trading\TradeRosterPreviewApiHandler;
 
 class TradeRosterPreviewApiHandlerTest extends TestCase
@@ -26,9 +27,9 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
         $_GET = [];
     }
 
-    private function buildHandler(?TradeAssetRepositoryInterface $repo = null): TradeRosterPreviewApiHandler
+    private function buildHandler(?TradeAssetRepositoryInterface $repo = null, ?TradeRosterPreviewParamValidatorInterface $validator = null): TradeRosterPreviewApiHandler
     {
-        return new TradeRosterPreviewApiHandler($this->mockDb, $repo ?? $this->stubTradeAssetRepo);
+        return new TradeRosterPreviewApiHandler($this->mockDb, $repo ?? $this->stubTradeAssetRepo, 0, null, $validator);
     }
 
     private function captureOutput(callable $fn): string
@@ -375,6 +376,25 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
         $mockRepo->expects($this->never())->method('getPlayersByIds');
 
         $handler = $this->buildHandler($mockRepo);
+
+        $output = $this->captureOutput(fn () => $handler->handle());
+
+        /** @var array{html: string} $decoded */
+        $decoded = json_decode($output, true);
+
+        $this->assertIsArray($decoded);
+        $this->assertSame('', $decoded['html']);
+    }
+
+    public function testInjectedValidatorIsUsed(): void
+    {
+        $_GET = [];
+
+        /** @var TradeRosterPreviewParamValidatorInterface&\PHPUnit\Framework\MockObject\MockObject $mockValidator */
+        $mockValidator = $this->createMock(TradeRosterPreviewParamValidatorInterface::class);
+        $mockValidator->expects($this->once())->method('validateTeamID')->willReturn(0);
+
+        $handler = $this->buildHandler(validator: $mockValidator);
 
         $output = $this->captureOutput(fn () => $handler->handle());
 

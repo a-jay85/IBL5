@@ -1,7 +1,7 @@
 ---
 description: HTML View class standards: output buffering, HtmlSanitizer::e(), and structural conventions.
 paths: "**/*View.php"
-last_verified: 2026-05-27
+last_verified: 2026-07-27
 ---
 
 # View Rendering Rules
@@ -9,7 +9,7 @@ last_verified: 2026-05-27
 ## Canonical View Examples
 Reference these before building new Views:
 - `FreeAgency/FreeAgencyView.php` — complex tables with sticky columns, team colors, footer rows
-- `Player/Views/PlayerSeasonStatsView.php` — cards, stats grids, tabbed layouts
+- `Player/Views/PlayerOverviewView.php` — cards, stats grids, repository-injected data
 - `Voting/VotingSubmissionView.php` — confirmation/error pages with CSS classes
 
 ## Mechanical enforcement (PHPStan)
@@ -50,7 +50,7 @@ Delegate to UI helpers instead of building markup inline:
 ## CSS reuse
 
 **Before writing new CSS**, check if a style already exists in `ibl5/design/`. Key files:
-- `components/tables.css`, `components/cards.css`, `components/existing-components.css`, `tokens/colors.css`
+- `components/tables.css`, `components/cards.css`, `tokens/tokens.css`
 - Reuse existing classes (`.ibl-card`, `.ibl-stat-highlight`, `.ibl-title`, `.ibl-data-table`) instead of creating duplicates
 - Module-specific table overrides go in `tables.css` as new sections (pattern: `.allstar-table`, `.contact-table`, `.record-table`)
 

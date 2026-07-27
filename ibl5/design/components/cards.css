@@ -88,6 +88,22 @@
 }
 
 /* ==========================================================================
+   Centerbox Items — bare wrappers emitted by themecenterbox() for content that
+   already carries its own styling (injury / news / default branches). Siblings
+   of .ibl-centerbox, not children of it — hence the flat name.
+   ========================================================================== */
+
+.centerbox-item {
+    max-width: 100%;
+    overflow: hidden;
+}
+
+/* Default branch adds bottom spacing; the injury branch does not. */
+.centerbox-item--spaced {
+    margin-bottom: 1rem;
+}
+
+/* ==========================================================================
    Notes List — bulleted list inside card bodies
    ========================================================================== */
 

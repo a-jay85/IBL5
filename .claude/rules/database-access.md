@@ -1,13 +1,13 @@
 ---
 description: Docker MariaDB connection details, query patterns, and schema verification rules.
-last_verified: 2026-07-24
+last_verified: 2026-07-27
 paths:
   - "**/*Repository.php"
   - "**/migrations/000_baseline_schema.sql"
   - "**/migrations/**"
   - "**/db/**"
-  - "**/seed*.php"
-  - "**/seed*.sql"
+  - "**/Seed*.php"
+  - "**/*seed*.sql"
 ---
 
 # Database Access Reference

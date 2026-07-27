@@ -725,20 +725,23 @@ class JsbImportRepositoryTest extends DatabaseTestCase
 
     public function testUpsertAwardUpdatesOnDuplicateKey(): void
     {
-        $this->repo->upsertAward(2099, 'MVP Award', 'First Player');
-        $this->repo->upsertAward(2099, 'MVP Award', 'Second Player');
+        // ibl_awards unique key is (year, award, name) — re-importing the same triple
+        // triggers ON DUPLICATE KEY and must not create a duplicate row.
+        $this->repo->upsertAward(2099, 'MVP Award', 'Test Player');
+        $this->repo->upsertAward(2099, 'MVP Award', 'Test Player');
 
-        $stmt = $this->db->prepare('SELECT name FROM ibl_awards WHERE year = ? AND award = ?');
+        $stmt = $this->db->prepare('SELECT COUNT(*) AS cnt FROM ibl_awards WHERE year = ? AND award = ? AND name = ?');
         self::assertNotFalse($stmt);
         $year = 2099;
         $award = 'MVP Award';
-        $stmt->bind_param('is', $year, $award);
+        $name = 'Test Player';
+        $stmt->bind_param('iss', $year, $award, $name);
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
 
         self::assertNotNull($row);
-        self::assertSame('Second Player', $row['name']);
+        self::assertEquals(1, $row['cnt']);
     }
 
     // ── upsertPlbSnapshot ────────────────────────────────────────

@@ -14,7 +14,7 @@ pat='mcr\.microsoft\.com/playwright:v[0-9]'
 if [ "$#" -gt 0 ]; then
   set -- "$@"
 else
-  set -- ibl5/bin/visual-regression.sh \
+  set -- ibl5/bin/visual-regression \
          .github/actions/setup-docker-e2e/action.yml \
          .github/workflows/e2e-tests.yml
 fi

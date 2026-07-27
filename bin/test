@@ -5,7 +5,7 @@
 #
 #   bin/test [unit]      host PHPUnit:   cd ibl5 && vendor/bin/phpunit
 #   bin/test db          DB-integration via bin/db-test-up (worktree-aware)
-#   bin/test e2e         Playwright via bin/e2e-wt.sh / ibl5/bin/e2e-local.sh
+#   bin/test e2e         Playwright via bin/e2e-wt / ibl5/bin/e2e-local
 #
 # Flags (must precede the subcommand):
 #   -n, --dry-run   print the command that would run; do not execute
@@ -24,8 +24,8 @@ Usage: bin/test [-n|--dry-run] [unit|db|e2e] [-- runner-args...]
 
   unit   (default)  Host PHPUnit: cd ibl5 && vendor/bin/phpunit
   db                DB-integration tests (worktree-aware) via bin/db-test-up
-  e2e               Playwright E2E (worktree-aware) via bin/e2e-wt.sh /
-                    ibl5/bin/e2e-local.sh
+  e2e               Playwright E2E (worktree-aware) via bin/e2e-wt /
+                    ibl5/bin/e2e-local
 
   -n, --dry-run     Print the command that would run; do not execute.
   -h, --help        Show this help.
@@ -72,9 +72,9 @@ case "$SUB" in
     e2e)
         if is_in_worktree; then
             WT_NAME="$(basename "$(git rev-parse --show-toplevel)")"
-            emit "$SELF_DIR/e2e-wt.sh" "$WT_NAME" ${FORWARD[@]+"${FORWARD[@]}"}
+            emit "$SELF_DIR/e2e-wt" "$WT_NAME" ${FORWARD[@]+"${FORWARD[@]}"}
         else
-            emit "$REPO_ROOT/ibl5/bin/e2e-local.sh" ${FORWARD[@]+"${FORWARD[@]}"}
+            emit "$REPO_ROOT/ibl5/bin/e2e-local" ${FORWARD[@]+"${FORWARD[@]}"}
         fi
         ;;
     *)

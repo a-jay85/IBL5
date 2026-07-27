@@ -2,7 +2,7 @@ name: Human Sign-off
 
 # Deterministic human-sign-off gate for feature PRs.
 #
-# Why this exists: the automouse autonomous pipeline (bin/automouse-run → /post-plan
+# Why this exists: the automouse autonomous pipeline (bin/automouse/run → /post-plan
 # Phase 6.5) arms `gh pr merge --squash --auto`, and master's branch protection
 # requires no reviews — so feature PRs merged unattended overnight (see the
 # revert of #1073–#1076). A docs/frontmatter convention (#1072) could not stop

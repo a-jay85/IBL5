@@ -1,11 +1,11 @@
 #!/bin/bash
 # Run Playwright E2E tests against a worktree's Docker environment.
-# Usage: bin/e2e-wt.sh <worktree-name> [playwright-args...]
+# Usage: bin/e2e-wt <worktree-name> [playwright-args...]
 #
 # Examples:
-#   bin/e2e-wt.sh my-feature
-#   bin/e2e-wt.sh my-feature --headed
-#   bin/e2e-wt.sh my-feature --grep "trading"
+#   bin/e2e-wt my-feature
+#   bin/e2e-wt my-feature --headed
+#   bin/e2e-wt my-feature --grep "trading"
 #
 # Prerequisites:
 #   1. Worktree exists at IBL5-worktrees/<name> (or legacy worktrees/<name>)
@@ -31,12 +31,12 @@ for arg in "$@"; do
 done
 
 if [ -z "$WORKTREE_NAME" ]; then
-    echo "Usage: bin/e2e-wt.sh <worktree-name> [playwright-args...]" >&2
+    echo "Usage: bin/e2e-wt <worktree-name> [playwright-args...]" >&2
     echo "" >&2
     echo "Examples:" >&2
-    echo "  bin/e2e-wt.sh my-feature" >&2
-    echo "  bin/e2e-wt.sh my-feature --headed" >&2
-    echo "  bin/e2e-wt.sh my-feature --grep \"trading\"" >&2
+    echo "  bin/e2e-wt my-feature" >&2
+    echo "  bin/e2e-wt my-feature --headed" >&2
+    echo "  bin/e2e-wt my-feature --grep \"trading\"" >&2
     exit 1
 fi
 

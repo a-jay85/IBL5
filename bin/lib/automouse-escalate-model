@@ -6,7 +6,7 @@
 #
 # Pure decision (no filesystem, no env, no side effects): given the plan's
 # resolved BASE model (from bin/lib/plan-impl-model), the 1-based number of the
-# attempt now running (i.e. AFTER bin/automouse-run's pre-impl increment at
+# attempt now running (i.e. AFTER bin/automouse/run's pre-impl increment at
 # :647), and MAX_ATTEMPTS, echo exactly one model id for `claude -p --model`.
 #
 # Escalate (echo claude-opus-4-8) iff BOTH hold:

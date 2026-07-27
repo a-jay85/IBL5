@@ -2,7 +2,7 @@
 # bin/playwright-image-tag — derive the pinned Playwright Docker image ref from
 # the INSTALLED @playwright/test version (node_modules), falling back to the
 # declared version in package.json. Single source of truth for the version-to-image-tag
-# mapping (see ADR-0070). Used by visual-regression.sh, the setup-docker-e2e composite
+# mapping (see ADR-0070). Used by visual-regression, the setup-docker-e2e composite
 # action so the installed @playwright/test client and the Docker image tag can never drift.
 #
 # Reading from node_modules (installed) rather than package.json (declared) prevents a

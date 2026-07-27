@@ -1,6 +1,8 @@
 <?php
 
-require __DIR__ . '/../mainfile.php';
+require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../db/db.php';
 
 $plrFile = fopen("IBL5.plr", "rb+");
 while (!feof($plrFile)) {

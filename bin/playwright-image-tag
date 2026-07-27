@@ -1,12 +1,17 @@
 #!/bin/bash
 # bin/playwright-image-tag — derive the pinned Playwright Docker image ref from
-# a package.json's exact-pinned @playwright/test version. Single source of truth
-# for the version-to-image-tag mapping (see ADR-0070). Used by visual-regression.sh,
-# the setup-docker-e2e composite action so the installed
-# @playwright/test client and the Docker image tag can never drift.
+# the INSTALLED @playwright/test version (node_modules), falling back to the
+# declared version in package.json. Single source of truth for the version-to-image-tag
+# mapping (see ADR-0070). Used by visual-regression.sh, the setup-docker-e2e composite
+# action so the installed @playwright/test client and the Docker image tag can never drift.
+#
+# Reading from node_modules (installed) rather than package.json (declared) prevents a
+# class of mismatch: when a lockfile (bun.lock) is stale vs package.json (e.g. Dependabot
+# bumps package.json but not bun.lock), the cache restores the old packages but
+# package.json advertises the new version, causing Docker image/npm version skew.
 #
 # Usage: bin/playwright-image-tag <path-to-package.json>
-# Echoes e.g. the Microsoft Playwright image ref tagged with the pinned version.
+# Echoes e.g. the Microsoft Playwright image ref tagged with the installed version.
 set -eu
 
 pkg="${1:?usage: playwright-image-tag <path-to-package.json>}"
@@ -15,13 +20,29 @@ if [ ! -f "$pkg" ]; then
   exit 1
 fi
 
-# Exact-pin only (value starts with a digit, no caret) — doubles as a pin-convention
-# guard. Anchored on "@playwright/test" so @axe-core/playwright, eslint-plugin-playwright
-# and the bare "playwright" dep are never matched.
-ver="$(grep -oE '"@playwright/test": *"[0-9]+\.[0-9]+\.[0-9]+"' "$pkg" \
-  | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+pkg_dir="$(dirname "$pkg")"
+
+# Prefer the INSTALLED version from node_modules — it matches what bun/npm actually
+# resolved, which is what will run tests. Falls back to the declared version in
+# package.json when node_modules isn't present (e.g. during a fresh checkout before
+# install, or in non-node_modules-aware environments).
+installed_pkg="$pkg_dir/node_modules/@playwright/test/package.json"
+if [ -f "$installed_pkg" ]; then
+  ver="$(grep -oE '"version": *"[0-9]+\.[0-9]+\.[0-9]+"' "$installed_pkg" \
+    | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+fi
+
+if [ -z "${ver:-}" ]; then
+  # Fallback: read declared version from package.json.
+  # Exact-pin only (value starts with a digit, no caret) — doubles as a pin-convention
+  # guard. Anchored on "@playwright/test" so @axe-core/playwright, eslint-plugin-playwright
+  # and the bare "playwright" dep are never matched.
+  ver="$(grep -oE '"@playwright/test": *"[0-9]+\.[0-9]+\.[0-9]+"' "$pkg" \
+    | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+fi
+
 if [ -z "$ver" ]; then
-  echo "playwright-image-tag: no exact @playwright/test version in $pkg" >&2
+  echo "playwright-image-tag: no @playwright/test version found in $pkg or $installed_pkg" >&2
   exit 1
 fi
 

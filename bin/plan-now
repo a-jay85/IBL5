@@ -5,9 +5,18 @@
 # at the end of the /plan-prompt skill.
 #
 # Usage:
-#   bin/plan-now <prompt-file>              # run it; leave the plan on disk (--implement)
-#   bin/plan-now --queue <prompt-file>      # ... and queue it for automouse if check-plan passes
+#   bin/plan-now <prompt-file>              # run it, then queue for automouse if the
+#                                           #   run exits clean AND check-plan passes
+#   bin/plan-now --implement <prompt-file>  # ... but leave the plan on disk, unqueued
+#   bin/plan-now --queue <prompt-file>      # explicit form of the default
 #   bin/plan-now --model opus <prompt-file> # orchestrator model (default claude-sonnet-4-6)
+#
+# THIS JOB queues the plan — not the model it runs. The queue call lives in the
+# runner, downstream of the identity check and the check-plan verdict below, so a
+# truncated run, an unidentifiable plan, or a FAILED check-plan structurally cannot
+# reach the automouse queue. Instructing the headless run to queue itself was the
+# alternative; it makes the gate an instruction a model can skip, and stakes the
+# decision on the model's self-report rather than on this job's own verdict.
 #
 # <prompt-file> holds the /plan prompt block exactly as /plan-prompt drafted it —
 # multi-KB markdown with backticks, quotes and $. It is passed to the detached job
@@ -52,13 +61,14 @@
 set -euo pipefail
 
 MODEL="claude-sonnet-4-6"
-DISPOSITION="implement"
+DISPOSITION="queue"
 PROMPT_SRC=""
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        --queue)  DISPOSITION="queue"; shift ;;
-        --model)  MODEL="${2:?--model needs a value}"; shift 2 ;;
+        --queue)     DISPOSITION="queue"; shift ;;
+        --implement) DISPOSITION="implement"; shift ;;
+        --model)     MODEL="${2:?--model needs a value}"; shift 2 ;;
         -h|--help)
             sed -n '/^# Usage:/,/^#$/p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         -*)
@@ -69,7 +79,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-[ -n "$PROMPT_SRC" ] || { echo "plan-now: usage: bin/plan-now [--queue] [--model M] <prompt-file>" >&2; exit 2; }
+[ -n "$PROMPT_SRC" ] || { echo "plan-now: usage: bin/plan-now [--queue|--implement] [--model M] <prompt-file>" >&2; exit 2; }
 [ -s "$PROMPT_SRC" ] || { echo "plan-now: prompt file '$PROMPT_SRC' is missing or empty." >&2; exit 2; }
 
 grep -q '^/plan' "$PROMPT_SRC" \
@@ -103,10 +113,14 @@ cp "$PROMPT_SRC" "$PROMPT"
 # The headless coda. It lives HERE, not in the skill's drafted block, so every
 # fired run carries it even when the drafting session forgets — and so the block
 # on the clipboard stays a clean paste for a human-run session.
+# Never run \`bin/automouse-queue\` yourself — under BOTH dispositions. This job
+# queues (or doesn't) after its own check-plan verdict; a second queue call from
+# inside the run would bypass that gate. The two lines differ only in what the plan
+# author needs to know about where the plan lands.
 if [ "$DISPOSITION" = "queue" ]; then
-    DISPOSITION_LINE="Disposition: run \`bin/automouse-queue <slug>\` for this plan once \`bin/check-plan\` passes (the /plan Step 5 default). If check-plan does NOT pass, fix the plan; never queue a failing plan."
+    DISPOSITION_LINE="Disposition: **--queue** (the default). Write the plan and stop — do NOT run \`bin/automouse-queue\` yourself. This job queues it for automouse automatically, but ONLY if you exit cleanly AND \`bin/check-plan\` passes on your plan. So a plan that does not pass simply never runs: fix everything \`check-plan\` reports before you finish. Automouse will implement this plan unattended and open its PR — write it to be executed, not to be skimmed."
 else
-    DISPOSITION_LINE="Disposition: **--implement**. Leave the plan on disk at \`~/claude-plans/<slug>.md\` and do NOT run \`bin/automouse-queue\` — a human reviews it before it implements."
+    DISPOSITION_LINE="Disposition: **--implement**. Write the plan and stop — do NOT run \`bin/automouse-queue\`. The plan stays on disk at \`~/claude-plans/<slug>.md\` and a human reviews it before it implements."
 fi
 
 cat >> "$PROMPT" <<CODA
@@ -157,7 +171,9 @@ CODA
     printf 'MODEL=%q\n'      "$MODEL"
     printf 'LABEL=%q\n'      "$LABEL"
     printf 'PLIST=%q\n'      "$PLIST"
+    printf 'DISPOSITION=%q\n' "$DISPOSITION"
     printf 'CHECK_PLAN=%q\n' "$ROOT/bin/check-plan"
+    printf 'AUTOMOUSE_QUEUE=%q\n' "$ROOT/bin/automouse-queue"
     # PLAN_NOW_CLAUDE lets a smoke test stub the model call and exercise the
     # detection + check-plan half of the runner (same shape as bug-pipeline-tick's
     # $CLAUDE_BIN). Unset in real use.
@@ -214,18 +230,31 @@ if [ "$rc" -ne 0 ]; then
     if [ -n "$plan" ]; then
         echo "plan-now: it had claimed $plan — treat that file as PARTIAL; a human must read it."
     fi
-    echo "plan-now: check-plan deliberately NOT run — it can pass on a truncated plan."
+    echo "plan-now: check-plan deliberately NOT run — it can pass on a truncated plan. NOT queued."
 elif [ -n "$plan" ]; then
     echo "plan-now: new plan -> $plan"
     if "$CHECK_PLAN" "$plan"; then
         echo "plan-now: RESULT ok — plan written and check-plan PASSED."
+        # The ONLY path to the queue. Everything above this line — a nonzero exit,
+        # an unidentifiable plan, a FAILED check-plan — falls through to a human
+        # instead, which is what makes queue-by-default tolerable (ADR-0096).
+        if [ "$DISPOSITION" = "queue" ]; then
+            if "$AUTOMOUSE_QUEUE" "$plan"; then
+                echo "plan-now: queued for automouse — it will implement this plan and open its PR."
+                echo "plan-now: to pull it back out: bin/automouse-queue remove $(basename "${plan%.md}")"
+            else
+                echo "plan-now: WARNING — check-plan passed but automouse-queue failed; the plan is on disk, unqueued."
+            fi
+        else
+            echo "plan-now: --implement — left on disk, NOT queued. A human reviews it first."
+        fi
     else
         echo "plan-now: RESULT degraded — plan written but check-plan FAILED (see above)."
-        echo "plan-now: a human must fix $plan before it is queued or implemented."
+        echo "plan-now: NOT queued. A human must fix $plan before it is queued or implemented."
     fi
 else
     echo "plan-now: RESULT unconfirmed — the run printed no usable 'PLAN_FILE:' line,"
-    echo "plan-now: so its plan cannot be identified and check-plan was NOT run."
+    echo "plan-now: so its plan cannot be identified, check-plan was NOT run, and nothing was queued."
     if [ -n "$newfiles" ]; then
         guess=$(printf '%s\n' "$newfiles" | tr '\n' '\0' | xargs -0 ls -t 2>/dev/null | head -1)
         echo "plan-now: best-effort guess (newest new file, NOT verified as this run's): $guess"
@@ -279,9 +308,13 @@ launchctl bootstrap "gui/$(id -u)" "$PLIST"
 
 echo "plan-now: fired a detached headless /plan run."
 echo "  model:       $MODEL   (orchestrator; the Step-3 architect tier is set by the prompt)"
-echo "  disposition: $DISPOSITION"
+if [ "$DISPOSITION" = "queue" ]; then
+    echo "  disposition: queue   (this job queues the plan for automouse if it exits clean AND check-plan passes)"
+else
+    echo "  disposition: implement   (plan left on disk for a human to read; NOT queued)"
+fi
 echo "  supervised by launchd — survives closing Claude Code / the terminal"
 echo "  log:    tail -f $LOG   (claude -p does not stream — this stays empty until it exits)"
 echo "  prompt: $PROMPT"
 echo "  label:  $LABEL   (self-removes when the run finishes)"
-echo "  The log ends with a check-plan verdict on the produced plan."
+echo "  The log ends with a check-plan verdict on the produced plan, and its queue disposition."

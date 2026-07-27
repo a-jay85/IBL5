@@ -5,7 +5,7 @@ paths:
   - "**/design/**/*.css"
   - "**/themes/**/*.php"
   - "**/themes/**/*.html"
-last_verified: 2026-05-27
+last_verified: 2026-07-27
 ---
 
 # Visual Verification Required
@@ -14,24 +14,28 @@ Before telling the user a visual change works, you MUST confirm it renders corre
 
 ## How to Verify (in order of preference)
 
-1. **Chrome DevTools MCP** — the default choice for any visual change
-   - `mcp__chrome-devtools__navigate_page` to the affected page
-   - `mcp__chrome-devtools__take_screenshot` to see the rendered result with your own eyes
-   - `mcp__chrome-devtools__evaluate_script` with `getComputedStyle()` to confirm specific CSS values
-   - If the screenshot shows the change isn't working, debug using computed styles before making another code change — don't guess
-   - Multiple screenshots are fine. Take as many as needed to confirm correctness across states (hover, mobile, expanded, etc.)
+1. **`curl`** — for HTTP status, headers, and non-rendered content checks
+   ```bash
+   curl -s http://<slug>.localhost/ibl5/<path> | grep -i 'pattern'
+   ```
 
-2. **Playwright E2E tests** — for interaction flows, multi-step behavior, or regression coverage
+2. **`google-chrome --headless`** — for rendered DOM, JS-driven content, and visual state
+   ```bash
+   google-chrome --headless --disable-gpu --dump-dom http://<slug>.localhost/ibl5/<path> 2>/dev/null | grep -i 'pattern'
+   ```
+   Use this when you need to confirm CSS classes are applied or dynamic content is rendered.
+
+3. **Playwright E2E tests** — for interaction flows, multi-step behavior, or regression coverage
    - `cd ibl5 && bun run test:e2e` (full suite or `--grep` for targeted runs)
    - Preferred when the change involves user interaction (clicks, form submissions, navigation)
 
-3. **Lighthouse audit** — when the change affects performance-visible rendering
-   - `mcp__chrome-devtools__lighthouse_audit` for layout shift, paint timing, etc.
+**Never use Chrome DevTools MCP** — it is disabled (`disabledMcpjsonServers: ["chrome-devtools"]`). Use the headless CLI equivalents above.
 
 ## What Counts as Verified
 
-- You took a screenshot or ran an E2E test and **saw** the correct result
-- If fixing a bug: the bug is visibly gone in the screenshot
+- You ran curl/headless Chrome and **saw** the correct output
+- You ran an E2E test and it passed
+- If fixing a bug: the bug is visibly gone in the output
 - If adding a feature: the feature is visibly present and correct
 
 ## What Does NOT Count — Do Not Claim Success Based On
@@ -44,4 +48,4 @@ Before telling the user a visual change works, you MUST confirm it renders corre
 
 ## If Verification Is Blocked
 
-If Chrome DevTools MCP is unavailable, the dev server isn't running, or Docker is down, **tell the user explicitly** that you could not verify the change visually. Do not silently skip verification or bury the caveat. The user needs to know so they can verify themselves.
+If the dev server isn't running or Docker is down, **tell the user explicitly** that you could not verify the change visually. Do not silently skip verification or bury the caveat. The user needs to know so they can verify themselves.

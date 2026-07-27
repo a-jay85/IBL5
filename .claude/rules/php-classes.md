@@ -1,7 +1,7 @@
 ---
 description: Interface-driven PHP class standards, XSS rules, and PHPStan gotchas for ibl5/classes.
 paths: ibl5/classes/**/*.php
-last_verified: 2026-05-27
+last_verified: 2026-07-27
 ---
 
 # PHP Class Development Rules
@@ -33,8 +33,6 @@ class MyRepository extends BaseMysqliRepository
     }
 }
 ```
-
-**Note:** The `MySQL` class exists only for PHP-Nuke backward compatibility and should not be used in new code.
 
 ## API Response Types
 

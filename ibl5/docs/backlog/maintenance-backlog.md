@@ -25,7 +25,7 @@ Effort scale:
 - **M** — multi-step plan, 1-3 days, may touch several modules
 - **L** — refactor or platform shift, > 3 days, likely needs ADR
 
-**Status:** Complete — 15-axis audit, 312 findings (+2 post-audit follow-ups from the PR #1107 review, +1 from the #1066 reject-IDOR review → 315 tracked; +11 Axis-1 size seeds 1.21–1.31 from the hot-files comment→backlog migration 2026-07-24 → 326 tracked; +5 Axis-1 size seeds 1.32–1.36 from the ground-truth audit 2026-07-24 → 331 tracked).
+**Status:** Complete — 15-axis audit, 312 findings (+2 post-audit follow-ups from the PR #1107 review, +1 from the #1066 reject-IDOR review → 315 tracked; +11 Axis-1 size seeds 1.21–1.31 from the hot-files comment→backlog migration 2026-07-24 → 326 tracked; +5 Axis-1 size seeds 1.32–1.36 from the ground-truth audit 2026-07-24 → 331 tracked; +1 Axis-2 robustness item 2.39 discovered 2026-07-27 during trading-1-31-api-handler-extract → 332 tracked).
 
 ---
 
@@ -43,17 +43,17 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 > A file still >500 LOC after a ✅ does **not** reopen the finding when the finding's named concern was narrower than "shrink below 500 LOC"; residual size is noted, not re-flagged.
 
-### Roll-up (331 findings)
+### Roll-up (332 findings)
 
 | Status | Count |
 |--------|------:|
-| ✅ Implemented | 234 |
+| ✅ Implemented | 235 |
 | ◑ Partial | 24 |
 | 📋 Planned (plan queued / PR open) | 1 |
 | ⬜ Open | 62 |
 | 🚫 Declined | 10 |
 
-> Status counts re-verified 2026-06-28 (exact, from the per-axis tables); **6.20 / 6.21 added 2026-06-29** from the PR #1107 review (⬜ Open +2); **6.22 added 2026-06-29** from the #1066 reject-IDOR review (⬜ Open +1). Two stale-Open rows were flipped directly (no plan owned them): **13.3**, **13.9** (✅ +2, ⬜ −2 vs the master re-count). **1.21–1.31 added 2026-07-24** from the hot-files comment→backlog migration (⬜ Open +11: 8 🟩 auto-mergeable, 3 🟨 conditional — 1.23/1.25/1.31 need characterization/endpoint pins). **Ground-truth audit 2026-07-24:** 7 stale-Open items flipped ✅, 2 false findings marked 🚫, 5 new Axis-1 rows seeded (1.32–1.36); IDOR PRs #1107–1110 merged 2026-06-29 (unblocking 2.10/2.13/2.14/2.25/7.7/14.6); PRs #1240/#1230/#1204 merged (2.6/2.31/2.32/5.18 already ✅/Open on own merits). **9.19 and 9.20 implemented 2026-07-24** — added READMEs to all 68 missing class dirs + frontmatter to all 16 existing class READMEs that lacked it; extended bin/check-docs IN_SCOPE_GLOBS (✅ +2, ⬜ −2); roll-up recomputed from grep (331 rows total, unchanged). **6.16 flipped ✅ 2026-07-24** (all Api data repos + JsonResponder + SystemClock tested; ✅ +1, ◑ −1). **6.14 Status updated 2026-07-24** (ProcessBoxscoresStep/GenerateSeasonAwardsStep/ParseJsbFilesStep added; still ◑). **Resolved rows collapsed 2026-07-25** — ✅/🚫 findings no longer appear as table rows; each axis carries a `> ✅ resolved (N): …` / `> 🚫 declined (N): …` summary line and their evidence lives in [archive/maintenance-backlog-archive.md](archive/maintenance-backlog-archive.md). **Recount recipe:** resolved = sum of the `(N)` in the per-axis summary lines; open = grep of the per-axis table rows; total = the two added. Counts above are unchanged by the collapse (238 + 93 = 331). **1.36 and 7.7 flipped ✅ 2026-07-26** (✅ +2, ⬜ −1, ◑ −1); total tracked rows unchanged at 331. **1.29 flipped ✅ 2026-07-26 (PR #1679)** (✅ +1, ⬜ −1); total tracked rows unchanged at 331. **1.27 flipped ✅ 2026-07-27** — extracted 10 per-entity collaborators into `ibl5/classes/JsbParser/Repositories/`; JsbImportRepository reduced to thin facade (✅ +1, ⬜ −1); total tracked rows unchanged at 331. **1.23 flipped ✅ 2026-07-27 (`oneonone-1-23-pins-and-extract`)** (✅ +1, ⬜ −1); total tracked rows unchanged at 331.
+> Status counts re-verified 2026-06-28 (exact, from the per-axis tables); **6.20 / 6.21 added 2026-06-29** from the PR #1107 review (⬜ Open +2); **6.22 added 2026-06-29** from the #1066 reject-IDOR review (⬜ Open +1). Two stale-Open rows were flipped directly (no plan owned them): **13.3**, **13.9** (✅ +2, ⬜ −2 vs the master re-count). **1.21–1.31 added 2026-07-24** from the hot-files comment→backlog migration (⬜ Open +11: 8 🟩 auto-mergeable, 3 🟨 conditional — 1.23/1.25/1.31 need characterization/endpoint pins). **Ground-truth audit 2026-07-24:** 7 stale-Open items flipped ✅, 2 false findings marked 🚫, 5 new Axis-1 rows seeded (1.32–1.36); IDOR PRs #1107–1110 merged 2026-06-29 (unblocking 2.10/2.13/2.14/2.25/7.7/14.6); PRs #1240/#1230/#1204 merged (2.6/2.31/2.32/5.18 already ✅/Open on own merits). **9.19 and 9.20 implemented 2026-07-24** — added READMEs to all 68 missing class dirs + frontmatter to all 16 existing class READMEs that lacked it; extended bin/check-docs IN_SCOPE_GLOBS (✅ +2, ⬜ −2); roll-up recomputed from grep (331 rows total, unchanged). **6.16 flipped ✅ 2026-07-24** (all Api data repos + JsonResponder + SystemClock tested; ✅ +1, ◑ −1). **6.14 Status updated 2026-07-24** (ProcessBoxscoresStep/GenerateSeasonAwardsStep/ParseJsbFilesStep added; still ◑). **Resolved rows collapsed 2026-07-25** — ✅/🚫 findings no longer appear as table rows; each axis carries a `> ✅ resolved (N): …` / `> 🚫 declined (N): …` summary line and their evidence lives in [archive/maintenance-backlog-archive.md](archive/maintenance-backlog-archive.md). **Recount recipe:** resolved = sum of the `(N)` in the per-axis summary lines; open = grep of the per-axis table rows; total = the two added. Counts above are unchanged by the collapse (238 + 93 = 331). **1.36 and 7.7 flipped ✅ 2026-07-26** (✅ +2, ⬜ −1, ◑ −1); total tracked rows unchanged at 331. **1.29 flipped ✅ 2026-07-26 (PR #1679)** (✅ +1, ⬜ −1); total tracked rows unchanged at 331. **1.27 flipped ✅ 2026-07-27** — extracted 10 per-entity collaborators into `ibl5/classes/JsbParser/Repositories/`; JsbImportRepository reduced to thin facade (✅ +1, ⬜ −1); total tracked rows unchanged at 331. **1.23 flipped ✅ 2026-07-27 (`oneonone-1-23-pins-and-extract`)** (✅ +1, ⬜ −1); total tracked rows unchanged at 331. **1.31 flipped ✅ 2026-07-27** — extracted `TradeRosterPreviewParamValidator` + `TradeRosterPreviewCashRowBuilder` collaborators; DB characterization pin + validator/cash-row unit suites landed (✅ +1, ⬜ −1). **2.39 seeded 2026-07-27** — cash-year range unbounded/unordered in `TradeRosterPreviewCashRowBuilder::buildCashRows()`; cashStartYear/cashEndYear come from `$_GET` with no upper bound (discovered during trading-1-31-api-handler-extract) (⬜ +1); total tracked: 332 (✅ 235, ◑ 24, 📋 1, ⬜ 62, 🚫 10).
 
 **Automouse-readiness of the not-yet-complete (⬜/◑/📋) items:**
 
@@ -74,7 +74,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
-> ✅ resolved (24): 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 1.14, 1.15, 1.16, 1.17, 1.20, 1.23, 1.27, 1.28, 1.29, 1.34, 1.36 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (25): 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 1.14, 1.15, 1.16, 1.17, 1.20, 1.23, 1.27, 1.28, 1.29, 1.31, 1.34, 1.36 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
@@ -86,7 +86,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 1.25 | ⬜ Open | 🟨 | BoxscoreProcessor 559 LOC — mutating .sco import pipeline; regular/all-star/rising-stars game processors in one class. Extract per-game-type processors; import-fidelity-critical → characterization pins first. Size finding only; the Processor→Service *rename* is separately declined at 2.5. |
 | 1.26 | ⬜ Open | 🟩 | BugReportRepository 546 LOC — 24 methods spanning claim/lease/transition state-machine + reporter-profile + queue queries. Split by query group; green-green with DB-integration pins. |
 | 1.30 | ⬜ Open | 🟩 | TradingService 516 LOC — page-data orchestration + offer-grouping + future-salary calc. Extract offer-grouping and salary collaborators; green-green. |
-| 1.31 | ⬜ Open | 🟨 | TradeRosterPreviewApiHandler 508 LOC — API handler mixing param validation + cash-row building + table render. Extract validation and cash-row collaborators; endpoint (request-handling) → add an E2E/characterization pin. |
 | 1.32 | ⬜ Open | 🟩 | StandingsRepository 726 LOC — per-category standings query methods. Extract per-category query collaborators; green-green DB pin. Shares `classes/Standings/` with 1.35 — plan as ONE chunk. |
 | 1.33 | ⬜ Open | 🟩 | Player 671 LOC — typed-getter accumulation. Extract per-domain typed-getter groups (contract, stats, identity); green-green. |
 | 1.35 | ⬜ Open | 🟩 | StandingsView 610 LOC — per-division block renderers. Extract per-division renderer collaborators; golden-master pin. Shares `classes/Standings/` with 1.32 — plan as ONE chunk. |
@@ -156,14 +155,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Risk if untouched:** Trade page-data logic concentrated in one service; green-green.
 **Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
 
-### 1.31 TradeRosterPreviewApiHandler — Validation + Cash + Render in One Handler (508 LOC)
-**Location:** `ibl5/classes/Trading/TradeRosterPreviewApiHandler.php` (508 lines)
-**Problem:** One request handler validates params (`validateTeamID`, `validatePidList`, `validateCashAmount`, `validateStringParam`), builds cash rows, and renders the roster-preview table.
-**Suggested direction:** Extract a request-validation collaborator and a cash-row builder; keep `handle()` thin.
-**Est. effort:** M
-**Risk if untouched:** A request-handling API endpoint — a wrong extraction can alter validation behavior, so add an E2E/characterization pin before refactor (🟨).
-**Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
-
 ### 1.32 StandingsRepository — Per-Category Query Accumulation (726 LOC)
 **Location:** `ibl5/classes/Standings/StandingsRepository.php` (726 lines)
 **Problem:** Multiple per-category standings-query methods accumulated in one repository (division standings, tiebreaker, playoff seeding, historical standings, etc.).
@@ -212,6 +203,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 2.29 | ⬜ Open | 🟨 | DEFERRED — global-namespace elimination: JSB 291 callers, BaseMysqliRepository 257, ContractRules 37 (585 caller files). L-effort, high-collision; needs its own sequenced PR (one class at a time), not an unattended wave item. |
 | 2.31 | ⬜ Open | 🟩 | UI/ 1 interface of 15; add interfaces systematically. Additive. |
 | 2.32 | ◑ Partial | 🟩 | Shipped: common `Api\Contracts\TransformerInterface` (7 uniform transformers) + flattened `Middleware/Contracts/`→`Api/Contracts/`. **Status:** partial 2026-06-26; residual = divergent-transformer interfaces (Boxscore/PlayerStats), responder interfaces (Csv/Json — disjoint shapes), `Response/Contracts/` flatten. |
+| 2.39 | ⬜ Open | 🟨 | `TradeRosterPreviewCashRowBuilder::buildCashRows()` iterates `cashStartYear`..`cashEndYear` from `$_GET` with no upper bound and no ordering check — `cashStartYear=1&cashEndYear=999999` drives an ~1M-iteration loop. Add bounds + ordering enforcement; upfront: choose max-year cap. (discovered 2026-07-27 during trading-1-31-api-handler-extract) |
 
 ### 2.1 Legacy Global Functions in Module Entrypoints (5 modules)
 **Location:** `modules/Voting/index.php` (lines 40, 74, 85, 156), `modules/Waivers/index.php` (:25), `modules/ComparePlayers/index.php` (:29, :79), `modules/ApiKeys/index.php` (:85, :99), `modules/News/index.php` (:28)
@@ -319,6 +311,14 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Flatten `Middleware/Contracts/` into `Api/Contracts/`; add interfaces for Transformer + Response classes; document the Api module's different structure.
 **Est. effort:** S (flatten) / M (full interface coverage)
 **Risk if untouched:** Two `Contracts/` directories confuse discovery; Transformers can't be substituted.
+
+### 2.39 TradeRosterPreviewCashRowBuilder — Unbounded Cash-Year Range From `$_GET`
+**Location:** `ibl5/classes/Trading/TradeRosterPreviewCashRowBuilder.php` (`buildCashRows()`)
+**Problem:** `cashStartYear` and `cashEndYear` come directly from `$_GET` with no upper bound and no ordering check. `cashStartYear=1&cashEndYear=999999` drives an ~1M-iteration loop in `buildCashRows()` — a DoS vector on an authenticated endpoint.
+**Suggested direction:** Add an upper bound (e.g. current season + a reasonable forward horizon) and an ordering check (`cashStartYear ≤ cashEndYear`); ideally wire the validation into `TradeRosterPreviewParamValidator` (already extracted in trading-1-31-api-handler-extract).
+**Est. effort:** S
+**Risk if untouched:** Authenticated users can trigger arbitrary-length computation loops via crafted requests to the trade-roster-preview API endpoint.
+**Provenance:** Discovered 2026-07-27 during trading-1-31-api-handler-extract.
 
 ## Axis 3: Top-Level Legacy PHP Files
 

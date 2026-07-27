@@ -7,6 +7,7 @@ namespace Tests\Trading;
 use PHPUnit\Framework\TestCase;
 use Tests\WideUnit\Mocks\MockDatabase;
 use Trading\Contracts\TradeAssetRepositoryInterface;
+use Trading\Contracts\TradeRosterPreviewCashRowBuilderInterface;
 use Trading\Contracts\TradeRosterPreviewParamValidatorInterface;
 use Trading\TradeRosterPreviewApiHandler;
 
@@ -27,9 +28,9 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
         $_GET = [];
     }
 
-    private function buildHandler(?TradeAssetRepositoryInterface $repo = null, ?TradeRosterPreviewParamValidatorInterface $validator = null): TradeRosterPreviewApiHandler
+    private function buildHandler(?TradeAssetRepositoryInterface $repo = null, ?TradeRosterPreviewParamValidatorInterface $validator = null, ?TradeRosterPreviewCashRowBuilderInterface $cashRowBuilder = null): TradeRosterPreviewApiHandler
     {
-        return new TradeRosterPreviewApiHandler($this->mockDb, $repo ?? $this->stubTradeAssetRepo, 0, null, $validator);
+        return new TradeRosterPreviewApiHandler($this->mockDb, $repo ?? $this->stubTradeAssetRepo, 0, null, $validator, $cashRowBuilder);
     }
 
     private function captureOutput(callable $fn): string
@@ -403,5 +404,24 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
 
         $this->assertIsArray($decoded);
         $this->assertSame('', $decoded['html']);
+    }
+
+    public function testInjectedCashRowBuilderIsUsed(): void
+    {
+        $_GET = ['teamid' => '1', 'display' => 'contracts'];
+
+        /** @var TradeRosterPreviewCashRowBuilderInterface&\PHPUnit\Framework\MockObject\MockObject $mockBuilder */
+        $mockBuilder = $this->createMock(TradeRosterPreviewCashRowBuilderInterface::class);
+        $mockBuilder->expects($this->once())->method('buildCashRows')->with(1)->willReturn([]);
+
+        $handler = $this->buildHandler(cashRowBuilder: $mockBuilder);
+
+        $output = $this->captureOutput(fn () => $handler->handle());
+
+        /** @var array{html: string} $decoded */
+        $decoded = json_decode($output, true);
+
+        $this->assertIsArray($decoded);
+        $this->assertArrayHasKey('html', $decoded);
     }
 }

@@ -173,6 +173,17 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 
 **Table evidence (2026-07-25):** SearchView 485 LOC string-concat. Extracted `renderResultList()` + ob_start migration; VR pin.
 
+### 1.28 SeasonArchiveService — Season-Detail Assembly God Method (530 LOC)
+**Location:** `ibl5/classes/SeasonArchive/SeasonArchiveService.php` (530 lines)
+**Problem:** `getSeasonDetail` orchestrates award extraction, GM/coach resolution, playoff-bracket building, and finals/heat-champion derivation across a dozen private helpers in one service.
+**Suggested direction:** Extract an award-extraction collaborator and a playoff-bracket builder; keep the service as the assembler.
+**Est. effort:** M
+**Risk if untouched:** Season-detail logic concentrated in one service; green-green.
+**Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
+**Status (2026-07-26):** ✅ Implemented — extracted `SeasonAwardExtractor` (7 methods) and `SeasonPlayoffBracketBuilder` (3 methods); `SeasonArchiveService` thinned from 530 to ~265 LOC; 30 unit tests (`SeasonAwardExtractorTest`) + 16 unit tests (`SeasonPlayoffBracketBuilderTest`); 100% MSI; green-green (existing 30 service tests + 4 golden-master snapshots untouched).
+
+**Table evidence (2026-07-26):** SeasonArchiveService 530 LOC — season-detail assembly mixing award/coach extraction + playoff-bracket building. Extract award-extraction and bracket collaborators; green-green.
+
 ### 1.29 LastSimRecapView — 19-Method Recap Renderer (518 LOC)
 **Location:** `ibl5/classes/LastSimRecap/LastSimRecapView.php` (518 lines)
 **Problem:** 19 render methods build the recap slate (header, tabs, panels, verdict strip, quarter chart, injury groups, head-to-head battles, player rows) in one view.

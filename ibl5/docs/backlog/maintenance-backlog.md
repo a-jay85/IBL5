@@ -74,7 +74,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
-> ✅ resolved (21): 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 1.14, 1.15, 1.16, 1.17, 1.20, 1.29, 1.34, 1.36 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (22): 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 1.14, 1.15, 1.16, 1.17, 1.20, 1.28, 1.29, 1.34, 1.36 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
@@ -87,7 +87,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 1.25 | ⬜ Open | 🟨 | BoxscoreProcessor 559 LOC — mutating .sco import pipeline; regular/all-star/rising-stars game processors in one class. Extract per-game-type processors; import-fidelity-critical → characterization pins first. Size finding only; the Processor→Service *rename* is separately declined at 2.5. |
 | 1.26 | ⬜ Open | 🟩 | BugReportRepository 546 LOC — 24 methods spanning claim/lease/transition state-machine + reporter-profile + queue queries. Split by query group; green-green with DB-integration pins. |
 | 1.27 | ⬜ Open | 🟩 | JsbImportRepository 539 LOC — 15 `upsert*`/`replace*` methods, one per imported record type. Group upserts by domain or extract per-entity collaborators; green-green DB pin. |
-| 1.28 | ⬜ Open | 🟩 | SeasonArchiveService 530 LOC — season-detail assembly mixing award/coach extraction + playoff-bracket building. Extract award-extraction and bracket collaborators; green-green. |
 | 1.30 | ⬜ Open | 🟩 | TradingService 516 LOC — page-data orchestration + offer-grouping + future-salary calc. Extract offer-grouping and salary collaborators; green-green. |
 | 1.31 | ⬜ Open | 🟨 | TradeRosterPreviewApiHandler 508 LOC — API handler mixing param validation + cash-row building + table render. Extract validation and cash-row collaborators; endpoint (request-handling) → add an E2E/characterization pin. |
 | 1.32 | ⬜ Open | 🟩 | StandingsRepository 726 LOC — per-category standings query methods. Extract per-category query collaborators; green-green DB pin. Shares `classes/Standings/` with 1.35 — plan as ONE chunk. |
@@ -165,14 +164,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Group the upserts by domain or extract per-entity upsert collaborators; keep a thin aggregator.
 **Est. effort:** M
 **Risk if untouched:** Grows with every new JSB-imported record type; green-green with DB pins.
-**Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
-
-### 1.28 SeasonArchiveService — Season-Detail Assembly God Method (530 LOC)
-**Location:** `ibl5/classes/SeasonArchive/SeasonArchiveService.php` (530 lines)
-**Problem:** `getSeasonDetail` orchestrates award extraction, GM/coach resolution, playoff-bracket building, and finals/heat-champion derivation across a dozen private helpers in one service.
-**Suggested direction:** Extract an award-extraction collaborator and a playoff-bracket builder; keep the service as the assembler.
-**Est. effort:** M
-**Risk if untouched:** Season-detail logic concentrated in one service; green-green.
 **Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
 
 ### 1.30 TradingService — Page-Data + Offer-Grouping + Salary Calc (516 LOC)

@@ -47,7 +47,7 @@ class RecordingGh:
         self.record("pr_edit_body", pr=pr, body=body[:8000])
 
     def pr_merge_auto(self, pr: int) -> None:
-        self.record("pr_merge_auto", pr=pr, args="--squash --auto --delete-branch")
+        self.record("pr_merge_auto", pr=pr, args="--squash --auto")
 
     def post_review_findings(self, pr: int, head_sha: str, title: str, findings: list) -> None:
         self.record("pr_review_findings", pr=pr, head_sha=head_sha, title=title,

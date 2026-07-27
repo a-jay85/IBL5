@@ -48,10 +48,8 @@ tokens go.
 
 `.claude/rules/work-triage.md` is always loaded and already owns this decision: apply
 § The ad-hoc bar and § Ad-hoc safety mirror as written — downgrade only when every
-clause of the bar holds, never when a mirror trigger fires. Treat a **`.claude/skills`
-ship-pipeline invariant** as a fifth mirror trigger (a change to what fires, what gates,
-or which disposition applies — not a prose edit that preserves the decision procedure).
-Four things are specific to triaging from *here*:
+clause of the bar holds, never when a mirror trigger fires. Four things are specific to
+triaging from *here*:
 
 - **You cannot resolve the empirical unknowns.** Step 0 forbids scans and re-reads, so
   the bar's "resolve empirical unknowns first" inverts: an unknown that would change the

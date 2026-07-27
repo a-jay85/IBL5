@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for agent-tiering — the skip-vs-spawn heuristic, Fable approval-gate procedure (incl. the asm-level static-RE exception where Fable is the recommended tier), flat-fan-out (nested sub-agent) rationale, the bounded-checklist diff-triage exception that scopes the Opus row's open-ended diff-triage, orchestrator context economics (delegate-don't-dismiss, split-don't-self-clear), and per-tier prompt style. Loads only when editing workflow orchestration defs.
-last_verified: 2026-07-25
+last_verified: 2026-07-27
 paths:
   - ".claude/skills/**/*.md"
 ---
@@ -128,7 +128,7 @@ Tier the orchestrator by the judgment **it** retains:
 - **Single backlog item** → **Sonnet** (Steps 2.5/3/4 orchestrator calls are light; same recipe-backed class the "Opus (delegated)" row routes to `plan-architect-sonnet`).
 - **Multiple items in one pass** → **Opus** (cross-item PR decomposition, **dependency ordering**, tier-boundary splits). Cheaper: run each as its own **Sonnet** `/plan` and make only the ordering call yourself.
 
-**Getting to a Sonnet orchestrator from an Opus session:** when an expensive session has already done the design thinking, don't run `/plan` inline — run `/plan-prompt` (`.claude/skills/plan-prompt/SKILL.md`), which drafts a paste-ready `/plan` prompt carrying the ground-truth pointers, the already-measured evidence, and an explicit Step-3 tier directive. A fresh Sonnet session then orchestrates, and the tier directive is what keeps the *design* on Opus. Sonnet-orchestrating is only cheaper than Opus-orchestrating if the context actually crosses the session boundary — that handoff prompt is the thing that carries it.
+**Getting to a Sonnet orchestrator from an Opus session:** when an expensive session has already done the design thinking, don't run `/plan` inline — run `/plan-prompt` (`.claude/skills/plan-prompt/SKILL.md`), which drafts a `/plan` prompt carrying the ground-truth pointers, the already-measured evidence, and an explicit Step-3 tier directive, then fires it via `bin/plan-now` as a **detached headless Sonnet 4.6 session** (the clipboard copy remains, for running it by hand). Sonnet orchestrates; the tier directive is what keeps the *design* on Opus. Because that run has no human in it, `/plan-prompt` Step 4.5 makes the drafting session resolve the user-facing forks that `/plan` Step 3.5 would otherwise put to a human, and `bin/plan-now` holds auto-merge on any fork that survives. Sonnet-orchestrating is only cheaper than Opus-orchestrating if the context actually crosses the session boundary — that handoff prompt is the thing that carries it.
 
 ## Explore Agent Tiering
 

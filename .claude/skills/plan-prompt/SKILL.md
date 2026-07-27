@@ -1,14 +1,16 @@
 ---
 name: plan-prompt
-description: "Draft a paste-ready /plan prompt to hand to a fresh Sonnet session, distilled from the current conversation — ground-truth pointers, already-measured evidence, scope, constraints, verification, and the Step-3 architect tier. Use after a design discussion when the planning run should be offloaded off the expensive session."
+description: "Draft a /plan prompt distilled from the current conversation — ground-truth pointers, already-measured evidence, scope, constraints, verification, and the Step-3 architect tier — then fire it as a detached headless Sonnet 4.6 run via bin/plan-now. Use after a design discussion when the planning run should be offloaded off the expensive session."
 disable-model-invocation: true
-last_verified: 2026-07-24
+last_verified: 2026-07-27
 ---
 
-# Draft a `/plan` handoff prompt for a fresh Sonnet session
+# Draft a `/plan` handoff prompt and fire it headless
 
-Emit a paste-ready prompt that a **fresh Sonnet session** can run as `/plan`, carrying
-everything this conversation figured out.
+Compose a prompt that a **fresh Sonnet session** runs as `/plan`, carrying everything
+this conversation figured out — then hand it to `bin/plan-now`, which runs it in a
+detached headless Sonnet 4.6 session (Step 5). The clipboard copy stays, as the
+fallback for running it by hand.
 
 **Why this exists.** A `/plan` run costs mostly orchestration, not design: the design
 happens in one `plan-architect` sub-agent spawn (`.claude/rules/agent-tiering.md`
@@ -108,10 +110,36 @@ several items decomposed in one pass → **Opus** (`agent-tiering.md` §
 `/plan` orchestrator model). If the answer is Opus, say so — this skill's default
 isn't always right.
 
-## Step 5 — Emit
+## Step 4.5 — Pre-resolve the user-facing forks (gate)
+
+The run this skill fires has **no human in it**, so `/plan` Step 3.5 — which surfaces
+each `needs-user-input` fork with `AskUserQuestion` — has nobody to ask. That
+resolution has to happen *here*, where a human is present.
+
+Re-read the block you just composed and ask: does anything in it turn on a
+**preference the codebase cannot reveal** — which of two UXes, how aggressive a
+default, whether a behavior change is acceptable? If yes, **ask it now** with
+`AskUserQuestion` (2–4 options, your recommendation first) and bake the answer into
+the block as a hard constraint (section 4), not as an open question.
+
+Keep the distinction sharp:
+
+| Fork | Where it goes |
+|---|---|
+| The architect can settle it by reading the code | Block section 5 — "resolve inside the plan" |
+| Only the user can settle it | **Ask now**, then block section 4 as a fixed constraint |
+
+Do not ask conventional or irreducible forks (`/plan` Step 3.5 rule) — asking about
+things with an obvious answer is the failure mode on the other side.
+
+`bin/plan-now` appends a coda telling the run to never ask, and to record + hold
+(`auto_merge: false`) any fork that survives anyway. That coda is the backstop, not
+the plan: a fork you could have resolved here costs a held PR.
+
+## Step 5 — Emit and fire
 
 1. Print the block(s).
-2. Copy the first block to the clipboard:
+2. Write block 1 to a temp file and copy it to the clipboard:
 
    ```bash
    f=$(mktemp -t plan-prompt); : > "$f"   # write the block into "$f" first
@@ -120,7 +148,32 @@ isn't always right.
 
    Use `mktemp`, not a fixed `/tmp` name — several sessions run this repo at once.
    With multiple blocks, copy block 1 and say which one is on the clipboard.
-3. **Outside** the fenced block — never inside, so the paste stays clean — add:
+   Keep the `pbcopy` even though step 3 fires the run: if the fire fails, the block
+   is still on the clipboard and you have degraded to the old manual paste, not lost
+   the draft.
+3. Fire it — the file from step 2 is the argument:
+
+   ```bash
+   bin/plan-now "$f"                    # default: leaves the plan on disk for review
+   bin/plan-now --queue "$f"            # only when the user asked for it to auto-queue
+   bin/plan-now --model opus "$f"       # when Step 4 said the ORCHESTRATOR wants Opus
+   ```
+
+   This runs `/plan` in a **detached headless Sonnet 4.6 session** (launchd — it
+   survives closing Claude Code), then runs `bin/check-plan` on the produced plan and
+   logs the verdict. Report the log path it prints; don't poll it.
+
+   **Default disposition is `--implement`** — the plan lands on disk and is *not*
+   queued for automouse. `/plan`'s own default is auto-queue, and that is deliberately
+   inverted here: nobody watched this plan get written, so a human reads it before it
+   implements. `--queue` only when the user asked for end-to-end automation.
+
+   With multiple blocks, fire **only block 1**. Later blocks are stacked PRs whose base
+   branch does not exist yet — write them out, and say they fire after block 1's PR.
+
+   Skip the fire (draft only) when the user asked for the prompt itself, or when
+   Step 4.5 left a fork you could not resolve. Say which happened.
+4. **Outside** the fenced block — never inside, so the paste stays clean — add:
    - which model should run it, and why (Step 4);
    - any judgment call you made for the user (scope picked, split chosen);
    - if a network failure kills the architect mid-run, **re-spawn the same tier**.
@@ -129,4 +182,6 @@ isn't always right.
      plan — the prompt doesn't need to ask for piecewise delivery, and a stall is
      never a reason to downgrade the tier.
 
-Then stop. This skill drafts the prompt; it does not run `/plan`.
+Then stop. The plan is being written in another process; do not wait on it, tail its
+log on a loop, or start implementing. The user picks it up from
+`~/claude-plans/<slug>.md` when the run finishes.

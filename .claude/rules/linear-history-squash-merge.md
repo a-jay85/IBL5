@@ -1,6 +1,10 @@
 ---
-description: This repo merges PRs by squash (or rebase) — never a merge commit. master is linear and a feature branch's commit SHAs never appear verbatim in it. Read before diagnosing a "SHA not in master" result or rebasing a stacked branch after its parent merged.
-last_verified: 2026-07-23
+description: Linear history — squash/rebase-merge only — path-scoped, loads only for post-plan/rebase surfaces. Read before diagnosing a "SHA not in master" result or rebasing a stacked branch after its parent merged.
+last_verified: 2026-07-25
+paths:
+  - ".claude/rules/workflow-continuity.md"
+  - ".claude/skills/post-plan/SKILL.md"
+  - "tools/postplan-harness/**"
 ---
 
 # Linear History — Squash/Rebase Merge Only

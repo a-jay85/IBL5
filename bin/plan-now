@@ -20,7 +20,17 @@
 #     process group and dies with it, so launchd is load-bearing here too.
 #   - headless /plan: the invocation bin/bug-pipeline-tick drive_ready_for_plan()
 #     already runs in production (claude -p "/plan …" --model claude-sonnet-4-6
-#     --dangerously-skip-permissions, plan-dir diff to detect the new plan).
+#     --dangerously-skip-permissions).
+#
+# The run IDENTIFIES ITS OWN PLAN: the coda tells it to print `PLAN_FILE: <abs path>`
+# the moment it picks a slug, and the job reads that line back out of the captured
+# transcript. bug-pipeline-tick's plan-dir diff is NOT concurrency-safe and is kept
+# only as a labelled best-effort guess — two overlapping plan-now runs each snapshot
+# ~/claude-plans before either writes, so the second finisher sees BOTH new files and
+# `head -1` picks the alphabetically-first. That is not theoretical: the first two
+# real runs (2026-07-27) overlapped, and the second logged a PASSED check-plan verdict
+# for the OTHER run's plan while its own plan went unchecked. A verdict attributed to
+# the wrong file is worse than no verdict, so identity now gates the verdict.
 #
 # NO HUMAN IS PRESENT in the fired run, so /plan Step 3.5 cannot use
 # AskUserQuestion to resolve a needs-user-input fork. Two things cover that:
@@ -78,6 +88,12 @@ LABEL="com.ibl5.plan-now-$TS"
 LOG="/tmp/plan-now-$TS.log"
 PROMPT="/tmp/plan-now-$TS.prompt"
 RUNNER="/tmp/plan-now-$TS.sh"
+OUT="/tmp/plan-now-$TS.out"     # claude's own transcript, kept separate from $LOG
+                                # so the PLAN_FILE: grep can't match the runner's echoes.
+                                # Left on disk after the run like $PROMPT and $RUNNER —
+                                # it duplicates $LOG's transcript, but /tmp is the right
+                                # place for a per-run debugging artifact and macOS clears
+                                # it. Delete it in the runner if that ever becomes a cost.
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 
 # Own a private copy: the caller's mktemp block may be cleaned up long before
@@ -100,6 +116,17 @@ cat >> "$PROMPT" <<CODA
 **Headless run constraints (appended by \`bin/plan-now\` — these override any
 conflicting default in the skill):**
 
+- **Announce your plan's path.** The moment you have chosen the slug — **before**
+  you start writing the file — print this line on its own, nothing else on it and
+  no backticks or bullet around it:
+  \`\`\`
+  PLAN_FILE: $PLANS_DIR/<slug>.md
+  \`\`\`
+  (absolute path). This job identifies your plan by that line; without it the
+  check-plan verdict cannot be attributed to your run, because a directory scan is
+  ambiguous whenever another \`plan-now\` run overlaps yours. Print it early so an
+  interrupted or timed-out run is still identifiable. If you later change the slug,
+  print the line again with the new path — the last one wins.
 - **No human is present.** Never call \`AskUserQuestion\`, never pause for input,
   never end a turn waiting for an answer. The forks a human could answer were
   already resolved by the session that drafted this prompt; they appear above as
@@ -126,6 +153,7 @@ CODA
     printf 'ROOT=%q\n'       "$ROOT"
     printf 'PLANS_DIR=%q\n'  "$PLANS_DIR"
     printf 'PROMPT=%q\n'     "$PROMPT"
+    printf 'OUT=%q\n'        "$OUT"
     printf 'MODEL=%q\n'      "$MODEL"
     printf 'LABEL=%q\n'      "$LABEL"
     printf 'PLIST=%q\n'      "$PLIST"
@@ -140,37 +168,71 @@ export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/A
 cd "$ROOT" || exit 1
 
 before=$(ls "$PLANS_DIR"/*.md 2>/dev/null | sort)
+started=$(date +%s)
 
 # CLAUDE_HEADLESS=1 marks the run unattended (skills branch on it).
 # CLAUDE_CODE_AUTO_COMPACT_WINDOW=200000 lifts the interactive 120K
 # autoCompactWindow pin — rationale in bin/automouse-run.
 # caffeinate -s keeps the Mac awake on AC for the run's duration.
+# 5400s: the first two real runs took 36 and 42 minutes, too close to the old
+# 3600s cap. claude -p does not stream, so $OUT stays empty until it exits.
 CLAUDE_HEADLESS=1 CLAUDE_CODE_AUTO_COMPACT_WINDOW=200000 caffeinate -s \
-    timeout 3600 "$CLAUDE_BIN" -p "$(cat "$PROMPT")" \
+    timeout 5400 "$CLAUDE_BIN" -p "$(cat "$PROMPT")" \
     --dangerously-skip-permissions \
     --model "$MODEL" \
     --effort high \
-    --name "$LABEL"
+    --name "$LABEL" > "$OUT" 2>&1
 rc=$?
+cat "$OUT"
+elapsed=$(( $(date +%s) - started ))
+
+# Identity, in order of trust:
+#   1. the run's own PLAN_FILE: line (concurrency-safe — see the header)
+#   2. otherwise the newest new .md in $PLANS_DIR, reported as an UNVERIFIED guess
+#      and never check-plan'd, because a concurrent run's file can be newer.
+# Leading whitespace is tolerated: the model may indent the line inside a fence or
+# a list. A mis-shaped marker costs us `unconfirmed`, never a wrong green.
+plan=$(grep -oE '^[[:space:]]*PLAN_FILE:[[:space:]]*\S.*' "$OUT" 2>/dev/null | tail -1 \
+       | sed -E 's/^[[:space:]]*PLAN_FILE:[[:space:]]*//; s/[[:space:]]+$//')
+case "$plan" in
+    "$PLANS_DIR"/*.md) [ -f "$plan" ] || { echo "plan-now: PLAN_FILE named a file that does not exist: $plan"; plan=""; } ;;
+    "")   ;;
+    *)    echo "plan-now: ignoring PLAN_FILE outside $PLANS_DIR: $plan"; plan="" ;;
+esac
 
 after=$(ls "$PLANS_DIR"/*.md 2>/dev/null | sort)
-new_plan=$(comm -13 <(printf '%s\n' "$before") <(printf '%s\n' "$after") | grep -E '\.md$' | head -1)
+newfiles=$(comm -13 <(printf '%s\n' "$before") <(printf '%s\n' "$after") | grep -E '\.md$')
 
 echo "----------------------------------------------------------------"
-echo "plan-now: claude exited $rc"
-if [ -n "$new_plan" ]; then
-    echo "plan-now: new plan -> $new_plan"
-    if "$CHECK_PLAN" "$new_plan"; then
+echo "plan-now: claude exited $rc after ${elapsed}s"
+
+if [ "$rc" -ne 0 ]; then
+    # A nonzero exit means any file this run wrote may be TRUNCATED mid-plan, and
+    # check-plan can pass on a truncated plan. Never green here.
+    [ "$rc" -eq 124 ] && echo "plan-now: the 5400s timeout killed it."
+    echo "plan-now: RESULT failed — the run did not exit cleanly."
+    if [ -n "$plan" ]; then
+        echo "plan-now: it had claimed $plan — treat that file as PARTIAL; a human must read it."
+    fi
+    echo "plan-now: check-plan deliberately NOT run — it can pass on a truncated plan."
+elif [ -n "$plan" ]; then
+    echo "plan-now: new plan -> $plan"
+    if "$CHECK_PLAN" "$plan"; then
         echo "plan-now: RESULT ok — plan written and check-plan PASSED."
     else
         echo "plan-now: RESULT degraded — plan written but check-plan FAILED (see above)."
-        echo "plan-now: a human must fix $new_plan before it is queued or implemented."
+        echo "plan-now: a human must fix $plan before it is queued or implemented."
     fi
 else
-    # An edit to an EXISTING plan file leaves the listing unchanged, so this is a
-    # 'could not confirm', not a hard 'nothing happened'.
-    echo "plan-now: RESULT unconfirmed — no NEW file in $PLANS_DIR."
-    echo "plan-now: check the transcript above; the run may have updated an existing plan, or failed."
+    echo "plan-now: RESULT unconfirmed — the run printed no usable 'PLAN_FILE:' line,"
+    echo "plan-now: so its plan cannot be identified and check-plan was NOT run."
+    if [ -n "$newfiles" ]; then
+        guess=$(printf '%s\n' "$newfiles" | tr '\n' '\0' | xargs -0 ls -t 2>/dev/null | head -1)
+        echo "plan-now: best-effort guess (newest new file, NOT verified as this run's): $guess"
+    else
+        echo "plan-now: no new file in $PLANS_DIR either — the run may have updated an existing plan, or failed."
+    fi
+    echo "plan-now: read the transcript above."
 fi
 
 rm -f "$PLIST"
@@ -219,7 +281,7 @@ echo "plan-now: fired a detached headless /plan run."
 echo "  model:       $MODEL   (orchestrator; the Step-3 architect tier is set by the prompt)"
 echo "  disposition: $DISPOSITION"
 echo "  supervised by launchd — survives closing Claude Code / the terminal"
-echo "  log:    tail -f $LOG"
+echo "  log:    tail -f $LOG   (claude -p does not stream — this stays empty until it exits)"
 echo "  prompt: $PROMPT"
 echo "  label:  $LABEL   (self-removes when the run finishes)"
 echo "  The log ends with a check-plan verdict on the produced plan."

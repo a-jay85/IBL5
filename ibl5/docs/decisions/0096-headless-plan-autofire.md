@@ -31,6 +31,7 @@ The hazard in doing so is specific: `/plan` Step 3.5 resolves `needs-user-input`
 - Positive: a design conversation ends in a plan on disk without a human-mediated paste, and the expensive session stops there instead of orchestrating.
 - Positive: the quality question ("did losing the human degrade the plan?") gets a machine answer from `bin/check-plan`, stronger than `bug-pipeline-tick`'s "a new file appeared" heuristic.
 - Positive: forks now get resolved at the moment the human is present, rather than by an unattended agent guessing.
+- Amendment (2026-07-27, after the first two real runs): the verdict is only as good as the *identity* of the plan it names. Those two runs overlapped, and `bug-pipeline-tick`'s plan-dir diff — which is not concurrency-safe — made the second job log a PASSED verdict for the *other* job's plan while its own went unchecked. The run now self-reports `PLAN_FILE: <abs path>` (coda-instructed, printed before it writes); the dir diff survives only as a labelled unverified guess that never produces a green, and a nonzero `claude` exit is its own `RESULT failed` because `check-plan` can pass on a truncated plan.
 - Negative: a plan can be written by a run nobody watched. Mitigated by the `--implement` default (a human reads it before it implements) and the `check-plan` verdict in the log, not eliminated.
 - Negative: one more `bin/` script to maintain, and one more launchd label shape to recognize when auditing stray jobs.
 

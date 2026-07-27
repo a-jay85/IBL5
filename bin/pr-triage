@@ -2,7 +2,7 @@
 
 # Cross-PR auto-merge triage. Classifies every OPEN PR into exactly one bucket
 # (first-match-wins) and prints a report. With --arm it arms
-# `gh pr merge --squash --auto --delete-branch` on ONLY the ARMABLE bucket.
+# `gh pr merge --squash --auto` on ONLY the ARMABLE bucket.
 #
 # ARMABLE is FAIL-CLOSED: it requires a POSITIVE clearance signal (the
 # `No manual testing needed` Manual-Testing sentinel that /post-plan writes after
@@ -45,8 +45,8 @@ Usage: bin/pr-triage [--arm] [--help|-h]
 Classifies every OPEN PR into one bucket (first-match-wins) and prints a report.
 
 Options:
-  --arm        Arm `gh pr merge --squash --auto --delete-branch` on ONLY the
-               ARMABLE bucket. Without it, the tool is read-only (report only).
+  --arm        Arm `gh pr merge --squash --auto` on ONLY the ARMABLE bucket.
+               Without it, the tool is read-only (report only).
   --help, -h   Show this message.
 
 Environment (test seams):
@@ -235,8 +235,14 @@ while [ "$i" -lt "$PR_COUNT" ]; do
     printf '%-7s  %-22s  %-26s  %s\n' "#$num" "$bucket" "$action" "$signals"
 
     # --- --arm side-effect: ONLY the ARMABLE bucket ---
+    # No --delete-branch, deliberately: the repo already sets deleteBranchOnMerge,
+    # so GitHub deletes the head branch itself. Carrying the flag only added harm —
+    # the local delete fails in a multi-worktree clone (gh can exit non-zero and
+    # this loop would report a false ARM FAILED on a PR that armed fine), and a parent
+    # merge carrying it permanently closes stacked child PRs. Same rationale as
+    # tools/postplan-harness/harness/adapters/ghad.py LiveGh.
     if [ "$ARM" = "1" ] && [ "$bucket" = "ARMABLE" ]; then
-        if "$GH_CMD" pr merge "$num" --squash --auto --delete-branch >/dev/null 2>&1; then
+        if "$GH_CMD" pr merge "$num" --squash --auto >/dev/null 2>&1; then
             echo "  armed auto-merge on #$num"
         else
             echo "  ARM FAILED on #$num (gh pr merge exited non-zero)" >&2

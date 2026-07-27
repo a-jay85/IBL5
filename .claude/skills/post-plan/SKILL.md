@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-07-25
+last_verified: 2026-07-27
 ---
 
 # Post-Plan Orchestrator
@@ -280,7 +280,7 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 
 **Fail-closed default:** if any condition is indeterminate, errors, or you are unsure, treat it as **BLOCKED** and do NOT arm. A false HOLD costs one manual human merge; a false ARM ships unreviewed code — only under-holding is dangerous.
 
-**If every condition passes:** arm with `gh pr merge --squash --auto --delete-branch` — `--auto` *queues* the merge (it does not merge now); GitHub fires it once required checks pass. Do not sync local to master here.
+**If every condition passes:** arm with `gh pr merge --squash --auto` — `--auto` *queues* the merge (it does not merge now); GitHub fires it once required checks pass. Do not sync local to master here. Never add `--delete-branch`: the repo sets `deleteBranchOnMerge`, so GitHub removes the head branch itself, and the flag only breaks things (the local delete fails in a multi-worktree clone, and a parent merge carrying it permanently closes stacked child PRs).
 
 **If any condition blocks:** do NOT arm. Report which condition(s) blocked — the per-condition report text is in the reference (for (3), report whether the block hit the no-done-marker branch — "Phase 5.0 never reached its end" — or listed unresolved items from `/tmp/post-plan-missing-tests-$PPID`; which Phase-5 track failed for (4)). Continue to Phase 7 regardless to monitor and fix CI; a re-run clears a red-track block, but the intent/type holds (7), (8), (10) stay held until a human acts.
 

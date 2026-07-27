@@ -1,6 +1,6 @@
 ---
 name: plan-prompt
-description: "Draft a /plan prompt distilled from the current conversation — ground-truth pointers, already-measured evidence, scope, constraints, verification, and the Step-3 architect tier — then fire it as a detached headless Sonnet 4.6 run via bin/plan-now. Use after a design discussion when the planning run should be offloaded off the expensive session."
+description: "Draft a /plan prompt distilled from the current conversation — ground-truth pointers, already-measured evidence, scope, constraints, verification, and the Step-3 architect tier — then, unless the Step-1.5 size triage says the work clears the ad-hoc bar, fire it as a detached headless Sonnet 4.6 run via bin/plan-now. Use after a design discussion when the planning run should be offloaded off the expensive session."
 disable-model-invocation: true
 last_verified: 2026-07-27
 ---
@@ -39,6 +39,38 @@ this skill removes.
 | *(empty)* — the common case | Plan the thing this conversation converged on. If the conversation covered several things, pick the one most recently discussed and say which you picked outside the block. |
 | A selector — `items 1-3`, `just the migration part` | Narrow to that slice; state what you dropped as out-of-scope. |
 | A fresh description | Plan that, using this conversation only as background. |
+
+## Step 1.5 — Size triage: does this even want a `/plan`?
+
+Firing spends a full `/plan` run and, by default (`--queue`), an unattended
+implementation run behind it. Work that clears the ad-hoc bar needs neither. Make the
+call **before** composing — Step 3 is where the tokens go.
+
+**Triage from what this conversation already established.** Step 0 still binds: no
+scans, no re-reads. That inverts `.claude/rules/work-triage.md`'s "resolve empirical
+unknowns first" — you cannot resolve one here, so an unknown that would change the
+design (how many call sites? does the pattern generalize?) is itself a **not-ad-hoc**
+verdict. Never go measure now in order to reach an ad-hoc answer.
+
+**Never downgrade**, regardless of size, when the work touches anything in
+`work-triage.md` § Ad-hoc safety mirror — a security surface, a destructive or
+schema-tightening migration, new or redesigned user-visible UI/UX, or a property
+needing subjective human judgment — or a `.claude/skills` ship-pipeline invariant.
+High-stakes outranks small, the same precedence `/plan` Step 3 applies to the architect
+tier. A multi-PR split is also a not-ad-hoc signal, and triage runs *before* Step 2, so
+make the PR-count call here.
+
+**Downgrade only when every clause of § The ad-hoc bar holds** — known blast radius, an
+existing pattern to copy, no multi-phase reasoning, no unresolved design fork — and the
+verification is one obvious check rather than a matrix worth designing. Borderline is
+not ad-hoc: an over-planned small change costs one `/plan` run, while an under-planned
+large one ships a wrong PR through a pipeline with no human in it.
+
+**On an ad-hoc verdict: stop here.** Do not compose a block, do not fire, do not start
+implementing. Say what the work is, that it clears the bar, and which clause carried the
+call. Execution then routes per `work-triage.md` § Execution routing — a `sonnet-4-6`
+delegate, not inline on this session. An ad-hoc verdict retracts the `/plan` run, never
+the offload; offloading is why you invoked this skill.
 
 ## Step 2 — Split by PR before composing
 

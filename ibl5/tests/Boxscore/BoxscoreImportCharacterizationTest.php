@@ -461,17 +461,25 @@ class BoxscoreImportCharacterizationTest extends TestCase
         $result = $processor->processAllStarGamesData($data, 2026);
 
         $this->assertTrue($result['success']);
-        // Team-total INSERTs must carry DEFAULT_AWAY_NAME and DEFAULT_HOME_NAME
+        // count($rows) < 2 → findAllStarTeamNames() returns null → default names.
+        // Full digest frozen so the insert COUNT and both default names are pinned
+        // (the mutation-killer for the count($rows) < 2 boundary in BoxscoreRepository).
         $digest = $this->opDigest($db);
+        $this->assertSame([
+            'SELECT ibl_box_scores_teams WHERE game_date = \'2026-02-03\' AND visitor_teamid = 50 AND home_teamid = 51 ORDER BY id ASC LIMIT 2',
+            'SELECT ibl_box_scores_teams WHERE game_date = \'2026-02-03\' AND visitor_teamid = 50 AND home_teamid = 51 AND game_of_that_day = 1 LIMIT 1',
+            'INSERT ibl_box_scores_teams VALUES( (\'2026-02-03\',\'Team Away\',1,50,51,18000,20000,10,5,5,10,25,30,28,27,0,22,31,25,30,0,35,80,4,0,30,20,60,50,60,30,20,10,20))',
+            'INSERT ibl_box_scores_teams VALUES( (\'2026-02-03\',\'Team Home\',1,50,51,18000,20000,10,5,5,10,25,30,28,27,0,22,31,25,30,0,20,801,50,0,30,20,10,30,40,20,10,10,2))',
+            'INSERT ibl_box_scores_teams VALUES( (\'2026-02-03\',\'Team Home\',1,50,51,18000,20000,10,5,5,10,25,30,28,27,0,22,31,25,30,0,3,207,0,30,2,2,5,4,5,3,2,1,2))',
+            'INSERT ibl_box_scores_teams VALUES( (\'2026-02-03\',\'Team Home\',1,50,51,18000,20000,10,5,5,10,25,30,28,27,0,22,31,25,30,0,28,70,12,0,2,2,1,2,3,1,1,1,2))',
+        ], $digest);
+        // Tie the frozen literals to the source constants (guards a constant rename).
         $teamInserts = array_values(array_filter(
             $digest,
             static fn (string $e): bool => str_starts_with($e, 'INSERT ibl_box_scores_teams')
         ));
-        $this->assertGreaterThanOrEqual(1, count($teamInserts), 'Expected at least one team INSERT');
         $this->assertStringContainsString(BoxscoreProcessor::DEFAULT_AWAY_NAME, $teamInserts[0]);
-        if (count($teamInserts) >= 2) {
-            $this->assertStringContainsString(BoxscoreProcessor::DEFAULT_HOME_NAME, $teamInserts[1]);
-        }
+        $this->assertStringContainsString(BoxscoreProcessor::DEFAULT_HOME_NAME, $teamInserts[1]);
     }
 
     public function testAllStarOutcomeCDoesNotExist(): void

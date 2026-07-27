@@ -8,6 +8,7 @@ use Player\Player;
 use Team\Team;
 use Season\Season;
 use UI\Components\TableViewSwitcher;
+use Auth\Contracts\AuthServiceInterface;
 use Waivers\Contracts\WaiversControllerInterface;
 use Waivers\Contracts\WaiversProcessorInterface;
 use Waivers\Contracts\WaiversServiceInterface;
@@ -30,6 +31,7 @@ class WaiversController implements WaiversControllerInterface
     private \Repositories\Contracts\SalaryCapRepositoryInterface $salaryCapRepo;
     private \Utilities\NukeCompat $nukeCompat;
     private \mysqli $db;
+    private AuthServiceInterface $authService;
 
     /**
      * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('audit').
@@ -48,6 +50,7 @@ class WaiversController implements WaiversControllerInterface
         \Repositories\Contracts\SalaryCapRepositoryInterface $salaryCapRepo,
         \Utilities\NukeCompat $nukeCompat,
         \mysqli $db,
+        AuthServiceInterface $authService,
         ?\Psr\Log\LoggerInterface $logger = null,
         ?Season $season = null
     ) {
@@ -58,6 +61,7 @@ class WaiversController implements WaiversControllerInterface
         $this->salaryCapRepo = $salaryCapRepo;
         $this->nukeCompat = $nukeCompat;
         $this->db = $db;
+        $this->authService = $authService;
         $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('audit');
         $this->season = $season;
     }
@@ -82,8 +86,7 @@ class WaiversController implements WaiversControllerInterface
             return;
         }
 
-        $cookie = $this->nukeCompat->cookieDecode($user);
-        $username = is_string($cookie[1] ?? null) ? $cookie[1] : '';
+        $username = $this->authService->getUsername() ?? '';
         $this->executeWaiverOperation($username, $action);
     }
 

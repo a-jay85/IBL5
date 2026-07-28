@@ -242,7 +242,8 @@ final class CheckDocsSourceCommentRefsCliTest extends TestCase
         unlink($this->tmpDir . '/bin/canary');
     }
 
-    /** @return array{output: string, exit: int} */
+    /** @param list<string> $args
+     * @return array{output: string, exit: int} */
     private function runScript(array $args = ['--no-staleness']): array
     {
         $cmd = 'php ' . escapeshellarg($this->scriptPath);

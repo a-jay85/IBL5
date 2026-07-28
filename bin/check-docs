@@ -432,6 +432,60 @@ function stalenessReport(string $repoRoot, \DateTimeImmutable $today): array
 }
 
 /**
+ * Repo-wide dead-`paths:`-glob findings, sourced from
+ * `bin/check-rules-byte-budget --report-mode`. The per-PR gate stays
+ * changeset-scoped; the repo-wide sweep belongs to this nightly report.
+ *
+ * Fail-quiet: a non-zero exit, empty output, or non-array JSON yields [] — a
+ * broken sweep must never break the staleness report or the audit that consumes
+ * it. Same contract as bin/docfix-poll's `health_report()` guard at :200.
+ *
+ * @return list<array{path: string, last_verified: string, age_days: int, days_over: int, reason: string, glob: string}>
+ */
+function deadGlobReport(string $repoRoot): array
+{
+    // cd into the repo first: the sweep resolves its own ROOT from
+    // `git rev-parse --show-toplevel`, and check-docs is invoked from arbitrary
+    // cwd (bin/docfix-poll calls it as "$MAIN/bin/check-docs").
+    $cmd = sprintf(
+        'cd %s && %s --report-mode 2>/dev/null',
+        escapeshellarg($repoRoot),
+        escapeshellarg($repoRoot . '/bin/check-rules-byte-budget')
+    );
+    $out = [];
+    $code = 0;
+    exec($cmd, $out, $code);
+    if ($code !== 0) {
+        return [];
+    }
+    $decoded = json_decode(implode("\n", $out), true);
+    if (!is_array($decoded)) {
+        return [];
+    }
+
+    $entries = [];
+    foreach ($decoded as $item) {
+        if (!is_array($item)
+            || !isset($item['path'], $item['glob'])
+            || !is_string($item['path'])
+            || !is_string($item['glob'])
+        ) {
+            continue;   // malformed row: drop it, never emit a half-built entry
+        }
+        $entries[] = [
+            'path' => $item['path'],
+            'last_verified' => '',
+            'age_days' => 0,
+            'days_over' => 0,
+            'reason' => 'dead-glob',
+            'glob' => $item['glob'],
+        ];
+    }
+
+    return $entries;
+}
+
+/**
  * Verify ADR bidirectional Supersedes / Superseded-by integrity.
  *
  * Forward: if ADR-X has `Status: Superseded by ADR-Y`, then ADR-Y must exist
@@ -1073,11 +1127,20 @@ foreach (array_slice($argv, 1) as $arg) {
 $root = repoRoot();
 $today = new \DateTimeImmutable('today');
 
-// Report mode short-circuits: emit the stale-doc list as JSON and exit 0
+// Report mode short-circuits: emit the stale-doc and dead-glob list as JSON and exit 0
 // regardless of whether any doc is stale. It is a report, not a gate — the
 // nightly audit workflow decides what to do with the list.
 if ($opts['staleness_report']) {
-    echo json_encode(stalenessReport($root, $today), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), "\n";
+    // Two finding kinds share one report: date staleness and dead paths: globs.
+    // `reason` is additive — every existing consumer reads only .path, length,
+    // .age_days, .days_over (bin/docfix-poll uncovered_count/health_report,
+    // the audit workflow's jq), so the extra key breaks nothing.
+    $stale = array_map(
+        static fn (array $e): array => $e + ['reason' => 'stale'],
+        stalenessReport($root, $today)
+    );
+    $report = array_merge($stale, deadGlobReport($root));
+    echo json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), "\n";
     exit(0);
 }
 

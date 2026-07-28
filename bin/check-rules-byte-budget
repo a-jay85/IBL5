@@ -4,18 +4,32 @@
 # context, so their size is a permanent token cost. Path-scoped rules (those
 # with a `paths:` frontmatter key) load only for matching files and are exempt.
 #
+# Usage:
+#   bin/check-rules-byte-budget                 gate mode — the four checks below,
+#                                               exit 1 on any violation (CI default)
+#   bin/check-rules-byte-budget --report-mode   report mode — repo-wide dead-glob
+#                                               sweep only, JSON array on stdout,
+#                                               always exit 0, no gate semantics
+#
 # Four checks (T2 + T13 — ibl5/docs/backlog/token-spend-backlog.md):
 #   1. Per-file cap: each path-unscoped file <= RULES_BYTE_BUDGET (default 5000)
 #   2. Aggregate cap: total path-unscoped bytes <= RULES_TOTAL_BUDGET (default 16000)
-#   3. Glob reachability: every paths: glob in any .claude/rules/*.md file must
-#      match at least one tracked file (out-of-repo globs are SKIPped, not FAILed)
+#   3. Glob reachability: every paths: glob in a rules file THIS CHANGESET TOUCHES
+#      must match at least one tracked file (out-of-repo globs are SKIPped, not
+#      FAILed). Untouched files are swept repo-wide by --report-mode instead —
+#      nightly, not per-PR. See Check 3 below.
 #   4. Resident stub references: every path-scoped rule must be named by some
 #      always-on file, so its payload is reachable without a prior Read
 #
 # Extend-before-add (meta-tooling-bar.md): distinct trigger (size budget) vs
 # bin/check-docs (freshness / dead-refs). Owns the ALLOWLIST — the single
-# machine-readable statement of which rules are always-on. ~80 lines bash.
+# machine-readable statement of which rules are always-on. ~210 lines bash.
 set -euo pipefail
+
+# --report-mode: repo-wide dead-glob sweep for the nightly doc-freshness audit.
+# Prints ONE JSON array on stdout and exits 0 — no gate semantics, no exit 1.
+REPORT_MODE=0
+if [ "${1:-}" = "--report-mode" ]; then REPORT_MODE=1; shift || true; fi
 
 MAX_BYTES="${RULES_BYTE_BUDGET:-5000}"
 # NOTE: do NOT ratchet MAX_BYTES / RULES_BYTE_BUDGET — agent-tiering.md sits at
@@ -31,6 +45,44 @@ RULES_DIR="$ROOT/.claude/rules"
 # paths: globs; both keep a one-line trigger stub in workflow-continuity.md, which
 # names the scoped file so the payload stays one Read away. See Check 4 below.
 ALLOWLIST="agent-tiering auto-commit work-triage workflow-continuity"
+
+# Shared by Check 3 and --report-mode — the single paths: parser. Prints one glob
+# per line for $1; prints nothing when the file has no paths: key. Handles BOTH
+# shapes: scalar (`paths: "ibl5/**"`) and list (`paths:` + `  - "…"` lines).
+_rule_globs() {
+  local fm
+  fm="$(awk '/^---$/{c++; next} c==1{print} c>=2{exit}' "$1")"
+  printf '%s\n' "$fm" | grep -q '^paths:' || return 0
+  printf '%s\n' "$fm" | awk '
+    /^paths:[[:space:]]*$/            { inlist=1; next }
+    /^paths:[[:space:]]*[^[:space:]]/ { sub(/^paths:[[:space:]]*/, ""); print; next }
+    inlist && /^[[:space:]]*-[[:space:]]/ { sub(/^[[:space:]]*-[[:space:]]*/, ""); print; next }
+    inlist && /^[^[:space:]]/         { inlist=0 }
+  ' | tr -d '"\047'
+}
+
+# --- --report-mode -----------------------------------------------------------
+# Repo-wide (NOT changeset-scoped) dead-glob scan. Exits 0 BEFORE Checks 1/2/3/4
+# run, so no SKIP/FAIL/budget text can reach stdout — the caller
+# (bin/check-docs --staleness-report) json_decode()s stdout directly.
+if (( REPORT_MODE )); then
+  _first=1
+  printf '['
+  for f in "$RULES_DIR"/*.md; do
+    _rel=".claude/rules/$(basename "$f")"
+    while IFS= read -r g; do
+      [ -n "$g" ] || continue
+      case "$g" in "~"*|/*) continue ;; esac        # out-of-repo globs are legitimate
+      [ -z "$(git -C "$ROOT" ls-files -- ":(glob)$g" | head -1)" ] || continue
+      _esc="$(printf '%s' "$g" | sed 's/\\/\\\\/g')"
+      (( _first )) || printf ','
+      _first=0
+      printf '{"path":"%s","glob":"%s"}' "$_rel" "$_esc"
+    done <<< "$(_rule_globs "$f")"
+  done
+  printf ']\n'
+  exit 0
+fi
 
 fail=0
 total_bytes=0
@@ -70,18 +122,24 @@ if [[ -n "$missing" ]]; then
   fail=1
 fi
 
-# ─── Check 3: glob reachability ────────────────────────────────────────────────
+# ─── Check 3: glob reachability (CHANGESET-SCOPED) ─────────────────────────────
 # A `paths:` glob that matches no tracked file means the rule can never load.
-# Scope: only files new or changed vs. origin/master — pre-existing broken globs
-# in untouched files are pre-existing debt, not caught here (per plan Out-of-Scope:
-# "Checks 3 and 4 assert reachability for the files this PR touches").
+# Scope: ONLY files new or changed vs. origin/<base> — the scope this check was
+# always documented to have. A dead glob in a file this PR did not touch is not
+# ignored, it is handled elsewhere: --report-mode sweeps the whole repo nightly,
+# bin/check-docs --staleness-report merges the findings into the Doc Freshness
+# Audit report, and the docs-stale-refresh remediation run fixes them (ADR-0079).
+# Failing them here instead would block an unrelated PR on debt it did not create.
 # Out-of-repo globs are LEGITIMATE (work-triage-detail.md points at
 # ~/.claude/hooks/plan-gate-edit.sh) — report SKIP, never FAIL.
 #
 # In CI the checkout may be shallow (fetch-depth: 1), so `git diff origin/master`
 # can fail non-fatally due to missing objects. Fetch the base branch first to
 # guarantee origin/<base> is available, then compute the changed-files set once
-# before the loop.
+# before the loop. An EMPTY changed set means "no rules file changed",
+# so every file is skipped — NOT "scan everything". Inverting that condition is
+# the bug this gate carried: `-n … &&` degraded an empty changeset into a
+# repo-wide sweep, so the guard is `-z … ||`. Do not "simplify" it back.
 #
 # `--depth=1` is CI-ONLY and MUST stay behind the is-shallow guard. In a full
 # clone a shallow fetch CREATES .git/shallow, grafting origin/<base> to a single
@@ -100,9 +158,10 @@ _CHANGED_RULES="$(git diff --name-only "origin/$_BASE_BRANCH" -- .claude/rules/ 
 
 glob_fail=0
 for f in "$RULES_DIR"/*.md; do
-  # Skip files not in this PR's changeset — pre-existing broken globs are out-of-scope debt.
+  # Skip files not in this changeset — a dead glob elsewhere is swept nightly
+  # by --report-mode, never failed here. Empty changeset => skip everything.
   _rel=".claude/rules/$(basename "$f")"
-  if [ -n "$_CHANGED_RULES" ] && ! printf '%s\n' "$_CHANGED_RULES" | grep -qxF "$_rel"; then
+  if [ -z "$_CHANGED_RULES" ] || ! printf '%s\n' "$_CHANGED_RULES" | grep -qxF "$_rel"; then
     continue
   fi
   fm="$(awk '/^---$/{c++; next} c==1{print} c>=2{exit}' "$f")"

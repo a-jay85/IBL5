@@ -168,7 +168,7 @@ while IFS= read -r token; do
     # at a placeholder path like `ibl5/docs/decisions/00NN-slug.md` — the number
     # is assigned at impl time by bin/next-adr. Real ADR files use digits only in
     # the number slot and lowercase-kebab slugs, so an uppercase "NN" in a
-    # docs/decisions path is always a placeholder, never a dependency the plan
+    # ibl5/docs/decisions path is always a placeholder, never a dependency the plan
     # reads. (Recurring FP class A — e.g. plan pr-triage-gated-auto-arm.) The
     # case is case-sensitive, so a real ADR like 0069-foo.md never matches.
     case "$token" in

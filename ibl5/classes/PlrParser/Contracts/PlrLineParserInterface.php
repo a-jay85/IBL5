@@ -9,7 +9,7 @@ namespace PlrParser\Contracts;
  *
  * The .plr format is a line-based fixed-width binary file; each player record
  * occupies exactly 607 bytes terminated by CRLF. Field offsets and widths are
- * documented in docs/JSB_FILE_FORMATS.md and mirrored in PlrFileWriter::FIELD_MAP.
+ * documented in ibl5/docs/JSB_FILE_FORMATS.md and mirrored in PlrFileWriter::FIELD_MAP.
  */
 interface PlrLineParserInterface
 {

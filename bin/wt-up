@@ -271,7 +271,7 @@ else
     # No PR yet — fall back to hash-based port
     BS_PORT=$((3100 + $(echo "$SLUG" | cksum | cut -d' ' -f1) % 900))
 fi
-# Kill anything already holding this port (e.g., a stale bin/bs-start process)
+# Kill anything already holding this port (e.g., a stale browser-sync process)
 PORT_PID=$(lsof -ti :"$BS_PORT" 2>/dev/null || true)
 if [ -n "$PORT_PID" ]; then
     echo "Killing stale process on port $BS_PORT (PID $PORT_PID)..."

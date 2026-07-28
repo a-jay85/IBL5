@@ -11,7 +11,7 @@ use PlrParser\Contracts\PlrLineParserInterface;
  *
  * Extracted from PlrParserService so the byte-offset specification has its own
  * discoverable home, matching the JsbParser\*FileParser pattern (CarFileParser,
- * TrnFileParser, etc.). See docs/JSB_FILE_FORMATS.md for the authoritative spec.
+ * TrnFileParser, etc.). See ibl5/docs/JSB_FILE_FORMATS.md for the authoritative spec.
  */
 class PlrLineParser implements PlrLineParserInterface
 {

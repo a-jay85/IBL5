@@ -229,7 +229,7 @@ function extractClassAndModuleNames(string $path): array
     if ($basename !== '') {
         $names[] = strtolower($basename);
     }
-    // Extract module directory name (e.g. ibl5/classes/Waivers/WaiverService.php → waivers)
+    // Extract module directory name (e.g. ibl5/classes/Standings/StandingsRepository.php → standings)
     if (preg_match('#ibl5/classes/([^/]+)/#', $path, $m) === 1) {
         $names[] = strtolower($m[1]);
     }

@@ -18,7 +18,7 @@ declare(strict_types=1);
  * 6. Record ID 97 contains awards from two different years (2001 and 2000)
  *    → Split into correct years.
  *
- * Usage: php migrations/migrate_team_awards.php [--dry-run]
+ * Usage: php ibl5/migrations/migrate_team_awards.php [--dry-run]
  */
 
 require_once __DIR__ . '/../vendor/autoload.php';

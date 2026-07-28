@@ -105,3 +105,37 @@ def test_push_disabled_is_typed_failure(repo):
     with pytest.raises(HarnessError) as e:
         g.push()
     assert e.value.kind == "push-disabled"
+
+
+def test_push_after_rebase_uses_force_with_lease(repo):
+    """push() must succeed after rebase_onto() rewrites SHAs (non-fast-forward scenario)."""
+    bare = tempfile.mkdtemp(prefix="postplan-bare-")
+    subprocess.run(["git", "clone", "--bare", repo, bare], check=True, capture_output=True)
+    subprocess.run(["git", "-C", repo, "remote", "add", "origin", bare],
+                   check=True, capture_output=True)
+
+    # Create feature branch, push it to bare remote
+    subprocess.run(["git", "-C", repo, "checkout", "-b", "feature"],
+                   check=True, capture_output=True)
+    open(os.path.join(repo, "feat.txt"), "w").write("feat\n")
+    g = LiveGit(repo, push_remote="origin")
+    g.stage_all(); g.commit_all("feat")
+    subprocess.run(["git", "-C", repo, "push", "origin", "feature"],
+                   check=True, capture_output=True)
+
+    # Advance master in the bare repo so rebase is needed
+    subprocess.run(["git", "-C", repo, "checkout", "master"], check=True, capture_output=True)
+    open(os.path.join(repo, "other.txt"), "w").write("other\n")
+    gm = LiveGit(repo, push_remote="origin")
+    gm.stage_all(); gm.commit_all("master moved")
+    subprocess.run(["git", "-C", repo, "push", "origin", "master"],
+                   check=True, capture_output=True)
+
+    # Back on feature: fetch + rebase rewrites SHAs → plain push would fail
+    subprocess.run(["git", "-C", repo, "checkout", "feature"], check=True, capture_output=True)
+    subprocess.run(["git", "-C", repo, "fetch", "origin", "master"],
+                   check=True, capture_output=True)
+    g.rebase_onto(base="origin/master")
+
+    # push() must succeed (--force-with-lease handles the diverged remote)
+    g.push()  # raises HarnessError("git", ...) if plain push, passes if --force-with-lease

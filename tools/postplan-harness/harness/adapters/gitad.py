@@ -93,7 +93,8 @@ class LiveGit:
         if not self.push_remote:
             raise HarnessError("push-disabled",
                                "no isolated push remote configured; live push requires install approval")
-        self._run("push", self.push_remote, "HEAD")
+        # --force-with-lease: rebase_onto() rewrites SHAs, making plain push fail non-fast-forward
+        self._run("push", "--force-with-lease", self.push_remote, "HEAD")
 
 
 class ReplayGit:

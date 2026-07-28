@@ -79,11 +79,23 @@ fi
 # ~/.claude/hooks/plan-gate-edit.sh) — report SKIP, never FAIL.
 #
 # In CI the checkout may be shallow (fetch-depth: 1), so `git diff origin/master`
-# can fail non-fatally due to missing objects. Explicitly fetch the base branch
-# first to guarantee origin/<base> is available, then compute the changed-files
-# set once before the loop.
+# can fail non-fatally due to missing objects. Fetch the base branch first to
+# guarantee origin/<base> is available, then compute the changed-files set once
+# before the loop.
+#
+# `--depth=1` is CI-ONLY and MUST stay behind the is-shallow guard. In a full
+# clone a shallow fetch CREATES .git/shallow, grafting origin/<base> to a single
+# commit — `git merge-base` then returns nothing and any later rebase replays the
+# entire history and conflicts. This hook also runs at commit time (.git/hooks/
+# pre-commit) against the shared main .git, so one unguarded run breaks the ship
+# pipeline for every worktree. Locally origin/<base> already exists, so the fetch
+# is unnecessary; if it somehow doesn't, fetch it at FULL depth.
 _BASE_BRANCH="${GITHUB_BASE_REF:-master}"
-git fetch --depth=1 origin "$_BASE_BRANCH" 2>/dev/null || true
+if [ "$(git rev-parse --is-shallow-repository 2>/dev/null)" = "true" ]; then
+  git fetch --depth=1 origin "$_BASE_BRANCH" 2>/dev/null || true  # shallow-ok
+elif ! git rev-parse --verify --quiet "origin/$_BASE_BRANCH" >/dev/null 2>&1; then
+  git fetch origin "$_BASE_BRANCH" 2>/dev/null || true
+fi
 _CHANGED_RULES="$(git diff --name-only "origin/$_BASE_BRANCH" -- .claude/rules/ 2>/dev/null || true)"
 
 glob_fail=0

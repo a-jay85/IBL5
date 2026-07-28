@@ -105,4 +105,12 @@ The helper provides two public functions:
 - Issues survived filter → build findings JSON (`body` = `**[SEVERITY]** Type in \`Class::method()\` — description` + full-SHA range link, `score`); call `post_review_findings "$PR" "$FULL_SHA" "Security audit" <file>`. Severity: CRITICAL (SQLi/CMDi), HIGH (missing auth/open redirect), MEDIUM (CSRF/missing auth on non-critical endpoints), LOW (best practice).
 - No issues → call `post_review_summary "$PR" "Security audit" "No security issues found. <brief evidence per category> (XSS and input validation are enforced by PHPStan custom rules.)"`.
 
+**Dispositioning open threads:** a finding posted as an inline thread stays open until something replies *in-thread* and resolves it. Never announce a fixed finding with `gh pr comment` to close a thread — a top-level comment cannot associate with a review thread. Use `list_open_review_findings` to find the COMMENT_ID, then `resolve_review_finding` to reply in-thread and mark the thread resolved. The same call applies when declining a finding — the body says why, and the thread still closes. A finding is dispositioned when it is fixed *or* explicitly declined; silence is not a disposition.
+
+```bash
+source "$(git rev-parse --show-toplevel)/bin/lib/post-review-findings.sh"
+list_open_review_findings "$PR"                              # TSV: COMMENT_ID, score, path:line, excerpt
+resolve_review_finding "$PR" <COMMENT_ID> "Fixed in $FULL_SHA — <what changed>"
+```
+
 **Link format (in `body` field):** `https://github.com/a-jay85/IBL5/blob/{FULL_SHA}/path/to/file#L{start}-L{end}` — expand SHA from 4A beforehand, never use bash interpolation in the body string. Include 1 line of context before/after the anchor line.

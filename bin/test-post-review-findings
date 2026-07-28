@@ -12,6 +12,10 @@
 #   • empty findings array → complete no-op
 #   • all 3 callers reference post-review-findings.sh (structural)
 #   • /pr-review & /security-audit Step 1 guards check PR reviews (structural)
+#   • list_open_review_findings lists only UNRESOLVED threads, with score/line
+#   • resolve_review_finding replies in-thread AND resolves the owning thread
+#   • resolve_review_finding refuses an unknown / malformed comment id
+#   • all 3 callers document the disposition step (structural)
 #
 # Run: bin/test-post-review-findings  (exit 0 = all pass, 1 = some failed)
 
@@ -36,7 +40,7 @@ if [ "$1" = "pr" ] && [ "$2" = "diff" ]; then
     cat "$GH_DIFF_FIXTURE"
     exit 0
 fi
-if [ "$1" = "api" ] && [ "$2" = "--method" ] && [ "$3" = "POST" ]; then
+if [ "$1" = "api" ] && [ "$2" = "--method" ] && [ "$3" = "POST" ] && [[ "$*" == *--input* ]]; then
     input_file=""
     for ((i=1; i<=$#; i++)); do
         if [ "${!i}" = "--input" ]; then j=$((i+1)); input_file="${!j}"; fi
@@ -51,6 +55,42 @@ if [ "$1" = "pr" ] && [ "$2" = "comment" ]; then
         if [ "${!i}" = "--body-file" ]; then j=$((i+1)); body_file="${!j}"; fi
     done
     cp "$body_file" "$COMMENT_OUT"
+    exit 0
+fi
+# gh api graphql -F k=v -f query=... --jq FILTER
+# The shim serves the RAW GraphQL response from a fixture and applies the caller's
+# --jq itself, so the lib's real jq filters are exercised rather than stubbed out.
+if [ "$1" = "api" ] && [ "$2" = "graphql" ]; then
+    query=""; jqf=""; tid=""
+    for ((i=1; i<=$#; i++)); do
+        case "${!i}" in
+            -f)    j=$((i+1)); case "${!j}" in query=*) query="${!j#query=}" ;; esac ;;
+            -F)    j=$((i+1)); case "${!j}" in tid=*)   tid="${!j#tid=}"     ;; esac ;;
+            --jq)  j=$((i+1)); jqf="${!j}" ;;
+        esac
+    done
+    if printf '%s' "$query" | grep -q 'resolveReviewThread'; then
+        printf '%s\n' "$tid" > "$RESOLVE_OUT"
+        fixture="$GH_MUTATION_FIXTURE"
+    else
+        fixture="$GH_THREADS_FIXTURE"
+    fi
+    if [ -n "$jqf" ]; then jq -rc "$jqf" "$fixture"; else cat "$fixture"; fi
+    exit 0
+fi
+# gh api --method POST repos/O/R/pulls/N/comments/CID/replies -f body=...
+if [ "$1" = "api" ] && [ "$2" = "--method" ] && [ "$3" = "POST" ]; then
+    endpoint=""; body=""; skip=0
+    for ((i=4; i<=$#; i++)); do
+        if [ "$skip" = 1 ]; then skip=0; continue; fi
+        case "${!i}" in
+            -f|-F) j=$((i+1)); case "${!j}" in body=*) body="${!j#body=}" ;; esac; skip=1 ;;
+            -*)    ;;
+            *)     [ -z "$endpoint" ] && endpoint="${!i}" ;;
+        esac
+    done
+    printf '%s\n%s\n' "$endpoint" "$body" > "$REPLY_OUT"
+    echo '{"id":2}'
     exit 0
 fi
 exit 1
@@ -73,23 +113,60 @@ diff --git a/classes/Foo.php b/classes/Foo.php
  context line 13
 DIFF
 
+# ── review-thread fixtures ────────────────────────────────────────────────────
+# Four threads on PR 42, mirroring the real GraphQL shape:
+#   111 — UNRESOLVED, score 85, on-line     → must be listed, must be resolvable
+#   222 — RESOLVED,   score 90              → must NOT be listed
+#   333 — UNRESOLVED, no score marker (human-authored), line null (outdated)
+#   ——— UNRESOLVED, comments.nodes EMPTY (sole comment deleted) → must not abort
+#       the whole query: `null | capture(...)` is a hard jq error, so the library
+#       guards with `// ""`.  Deleting this node hides that regression.
+GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
+cat > "$GH_THREADS_FIXTURE" <<'THREADS'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
+  {"id":"PRRT_open85","isResolved":false,"isOutdated":false,
+   "path":"classes/Foo.php","line":12,
+   "comments":{"nodes":[{"databaseId":111,"body":"Bug X — first line\nmore detail\n\n<!-- score: 85 -->"}]}},
+  {"id":"PRRT_done90","isResolved":true,"isOutdated":false,
+   "path":"classes/Foo.php","line":13,
+   "comments":{"nodes":[{"databaseId":222,"body":"Bug Y already handled\n\n<!-- score: 90 -->"}]}},
+  {"id":"PRRT_human","isResolved":false,"isOutdated":true,
+   "path":"classes/Bar.php","line":null,
+   "comments":{"nodes":[{"databaseId":333,"body":"A human asked a question"}]}},
+  {"id":"PRRT_ghost","isResolved":false,"isOutdated":false,
+   "path":null,"line":null,
+   "comments":{"nodes":[]}}
+]}}}}}
+THREADS
+
+GH_MUTATION_FIXTURE="$BASE_TMP/mutation.json"
+cat > "$GH_MUTATION_FIXTURE" <<'MUT'
+{"data":{"resolveReviewThread":{"thread":{"id":"PRRT_open85","isResolved":true}}}}
+MUT
+
 # ── output capture files ──────────────────────────────────────────────────────
 REVIEW_OUT="$BASE_TMP/review.json"
 COMMENT_OUT="$BASE_TMP/comment.txt"
+REPLY_OUT="$BASE_TMP/reply.txt"
+RESOLVE_OUT="$BASE_TMP/resolved-thread.txt"
 
 # Export all vars the shim and lib need to see from child processes
 export GH_CMD="$SHIMD/gh"
 export REPO_SLUG="a-jay85/IBL5"
 export GH_DIFF_FIXTURE
+export GH_THREADS_FIXTURE
+export GH_MUTATION_FIXTURE
 export REVIEW_OUT
 export COMMENT_OUT
+export REPLY_OUT
+export RESOLVE_OUT
 
 # Source the lib once (GH_CMD and REPO_SLUG already exported above; lib's
 # `:-` defaults are no-ops because the vars are already set)
 # shellcheck disable=SC1090
 source "$LIB"
 
-reset_outputs() { rm -f "$REVIEW_OUT" "$COMMENT_OUT"; }
+reset_outputs() { rm -f "$REVIEW_OUT" "$COMMENT_OUT" "$REPLY_OUT" "$RESOLVE_OUT"; }
 
 # ── assertion helpers ─────────────────────────────────────────────────────────
 ok()   { printf 'ok: %s\n' "$*"; }
@@ -202,6 +279,70 @@ post_review_findings 42 deadbeefcafe "Code review" "$f6"
 assert_absent "case6: no review on empty"   "$REVIEW_OUT"
 assert_absent "case6: no comment on empty"  "$COMMENT_OUT"
 
+# ── case 9: list_open_review_findings ────────────────────────────────────────
+# Expect: 111 and 333 listed (unresolved), 222 omitted (resolved), the
+# comment-less ghost thread skipped without aborting the query.
+reset_outputs
+LIST_OUT="$BASE_TMP/list.tsv"
+list_open_review_findings 42 > "$LIST_OUT"
+
+assert_contains     "case9: unresolved 111 listed"  "$LIST_OUT" "111"
+if awk -F'\t' '$1==111 && $2=="85"' "$LIST_OUT" | grep -q .; then
+    ok "case9: scored thread renders score 85"
+else
+    fail "case9: thread 111 should carry score 85, got: $(awk -F'\t' '$1==111{print $2}' "$LIST_OUT")"
+fi
+assert_contains     "case9: path:line"              "$LIST_OUT" "classes/Foo.php:12"
+assert_contains     "case9: first body line only"   "$LIST_OUT" "Bug X — first line"
+assert_not_contains "case9: resolved 222 omitted"   "$LIST_OUT" "222"
+assert_contains     "case9: human thread 333 listed" "$LIST_OUT" "333"
+if awk -F'\t' '$1==333 && $2=="-"' "$LIST_OUT" | grep -q .; then
+    ok "case9: unscored (human) thread renders score as -"
+else
+    fail "case9: thread 333 should carry score '-', got: $(awk -F'\t' '$1==333{print $2}' "$LIST_OUT")"
+fi
+assert_contains     "case9: null line renders as ?" "$LIST_OUT" "classes/Bar.php:?"
+assert_not_contains "case9: comment-less thread skipped, not listed as null" \
+                    "$LIST_OUT" "null"
+if [ "$(wc -l < "$LIST_OUT")" -eq 2 ]; then
+    ok "case9: exactly 2 unresolved rows (ghost thread did not abort the query)"
+else
+    fail "case9: expected 2 rows, got $(wc -l < "$LIST_OUT")"
+fi
+
+# ── case 10: resolve_review_finding — reply AND resolve ──────────────────────
+# The whole point of the function: a threaded reply alone leaves the thread open,
+# and a resolve alone leaves no record of WHY. Both must happen.
+reset_outputs
+rc=0
+resolve_review_finding 42 111 'Fixed in abc1234 — tightened the guard.' > "$BASE_TMP/resolve-stdout.txt" || rc=$?
+
+if [ "$rc" -eq 0 ]; then ok "case10: exit 0"; else fail "case10: exit $rc, expected 0"; fi
+assert_contains "case10: reply hits the replies endpoint" "$REPLY_OUT" \
+    "repos/a-jay85/IBL5/pulls/42/comments/111/replies"
+assert_contains "case10: reply carries the body"          "$REPLY_OUT" "Fixed in abc1234"
+assert_contains "case10: resolved the OWNING thread"      "$RESOLVE_OUT" "PRRT_open85"
+assert_not_contains "case10: did not resolve a sibling"   "$RESOLVE_OUT" "PRRT_human"
+assert_contains "case10: prints post-mutation isResolved" "$BASE_TMP/resolve-stdout.txt" "true"
+assert_absent   "case10: no top-level pr comment"         "$COMMENT_OUT"
+
+# ── case 11: NEGATIVE — comment id on no thread ──────────────────────────────
+# Must fail loudly rather than resolve an arbitrary thread.
+reset_outputs
+rc=0
+resolve_review_finding 42 999 'Fixed.' >/dev/null 2>&1 || rc=$?
+if [ "$rc" -eq 1 ]; then ok "case11: unknown comment id → exit 1"; else fail "case11: exit $rc, expected 1"; fi
+assert_absent "case11: no reply posted"   "$REPLY_OUT"
+assert_absent "case11: nothing resolved"  "$RESOLVE_OUT"
+
+# ── case 12: BOUNDARY — malformed comment id ─────────────────────────────────
+reset_outputs
+rc=0
+resolve_review_finding 42 "abc" 'Fixed.' >/dev/null 2>&1 || rc=$?
+if [ "$rc" -eq 2 ]; then ok "case12: non-numeric comment id → exit 2"; else fail "case12: exit $rc, expected 2"; fi
+assert_absent "case12: no reply posted"  "$REPLY_OUT"
+assert_absent "case12: nothing resolved" "$RESOLVE_OUT"
+
 # ── structural case 7: all 3 callers reference the helper ────────────────────
 for f in \
     "$REPO_ROOT/.claude/skills/post-plan/SKILL.md" \
@@ -230,6 +371,23 @@ do
         ok "case8: $name Step 1 checks PR reviews for prior findings"
     else
         fail "case8: $name Step 1 does NOT check PR reviews — re-run guard broken after findings move off issue comments"
+    fi
+done
+
+# ── structural case 13: all 3 callers document the DISPOSITION step ──────────
+# The posting half without the disposition half is exactly the defect this guards:
+# a session that fixes a finding reaches for `gh pr comment`, which can never close
+# the thread. Each skill that posts findings must also name resolve_review_finding.
+for f in \
+    "$REPO_ROOT/.claude/skills/post-plan/_phase-4-review-audit.md" \
+    "$REPO_ROOT/.claude/skills/pr-review/SKILL.md" \
+    "$REPO_ROOT/.claude/skills/security-audit/SKILL.md"
+do
+    name="$(basename "$f")"
+    if grep -q 'resolve_review_finding' "$f" 2>/dev/null; then
+        ok "case13: $name documents resolve_review_finding"
+    else
+        fail "case13: $name does NOT document resolve_review_finding — a fixed finding will be announced with 'gh pr comment' and its thread left open forever"
     fi
 done
 

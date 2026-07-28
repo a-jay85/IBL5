@@ -23,10 +23,11 @@ If any are open, it wants a `/plan`.
 
 ## Ad-hoc safety mirror
 
-Even when the bar says ad-hoc, run a quick safety check — the same surfaces `/plan` Step 4 gate 14 holds for. If the change touches any of:
+Even when the bar says ad-hoc, run a quick safety check — the surfaces `/plan` Step 4 gate 14 holds the merge for, plus the ship-pipeline surface `/plan` Step 3 escalates to `plan-architect-xhigh`. If the change touches any of:
 - a **security surface** (SQL, POST/form endpoint, auth/authz-gated route, user-facing output rendering),
 - a **destructive or schema-tightening migration**,
-- **new or redesigned user-visible UI/UX**, or
+- **new or redesigned user-visible UI/UX**,
+- a **`.claude/skills` ship-pipeline invariant** — a change to what fires, what gates, or which disposition applies; *not* a prose edit that preserves the decision procedure, or
 - a property needing **subjective human judgment** to confirm,
 
 then prefer `/plan`, so the defense and its verification are designed up front. Why the PR-time backstop is not a substitute: `work-triage-detail.md` § Safety mirror backstop.

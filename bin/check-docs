@@ -1094,7 +1094,8 @@ function sourceCommentTokens(string $content, bool $isPhp): array
     $phpPattern = '/^\s*(?:\/\/|#|\/\*+|\*)\s?(.*)/';
     $nonPhpPattern = '/^\s*(?:#|\/\/)\s?(.*)/';
     $pattern = $isPhp ? $phpPattern : $nonPhpPattern;
-    $tokenPattern = '#(?<![/])(?:bin|ibl5|\.claude|\.github|docs|migrations|engine)/[A-Za-z0-9._/*?\[\]{}<>-]+#';
+    // Lookbehind excludes word chars + hyphen + slash to reject compound words like storage-engine/config
+    $tokenPattern = '#(?<![A-Za-z0-9/_-])(?:bin|ibl5|\.claude|\.github|docs|migrations|engine)/[A-Za-z0-9._/*?\[\]{}<>-]+#';
 
     foreach ($lines as $idx => $line) {
         if (preg_match($pattern, $line, $m) !== 1) {

@@ -37,23 +37,44 @@ jobs:
         run: |
           bin/check-docs --staleness-report > /tmp/stale.json
           COUNT=$(jq 'length' /tmp/stale.json)
-          SIG=$(jq -r '.[].path' /tmp/stale.json | sort | paste -sd, -)
+          STALE_COUNT=$(jq '[.[] | select(.reason == "stale")] | length' /tmp/stale.json)
+          GLOB_COUNT=$(jq '[.[] | select(.reason == "dead-glob")] | length' /tmp/stale.json)
+          # sort -u, not sort: one doc can carry several dead globs, so its path
+          # repeats in the report. Without -u the sig churns on a set that never
+          # changed and re-pings the issue every night.
+          SIG=$(jq -r '.[].path' /tmp/stale.json | sort -u | paste -sd, -)
           echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+          echo "stale-count=$STALE_COUNT" >> "$GITHUB_OUTPUT"
+          echo "glob-count=$GLOB_COUNT" >> "$GITHUB_OUTPUT"
           echo "sig=$SIG" >> "$GITHUB_OUTPUT"
-          echo "Stale docs: $COUNT"
+          echo "Doc issues: $STALE_COUNT stale, $GLOB_COUNT dead globs"
 
       - name: Build issue body
         run: |
           {
-            echo "Repo-wide doc staleness audit ($(date -u +%Y-%m-%d))."
+            echo "Repo-wide doc audit ($(date -u +%Y-%m-%d))."
             echo ""
-            echo "These in-scope docs have a \`last_verified\` older than the 60-day window."
-            echo ""
-            echo "| Doc | last_verified | Age (days) | Days over |"
-            echo "|-----|---------------|------------|-----------|"
-            jq -r '.[] | "| `\(.path)` | \(.last_verified) | \(.age_days) | \(.days_over) |"' /tmp/stale.json
-            echo ""
-            echo "**Remediation:** re-verify each doc against reality, then bump its \`last_verified\` to today and commit (on a branch that touches the doc, \`bin/check-docs --fix-dates --since=master\` bumps the changed-but-unbumped ones)."
+            if [ "${{ steps.report.outputs.stale-count }}" -gt 0 ]; then
+              echo "### Stale docs"
+              echo ""
+              echo "These in-scope docs have a \`last_verified\` older than the 60-day window."
+              echo ""
+              echo "| Doc | last_verified | Age (days) | Days over |"
+              echo "|-----|---------------|------------|-----------|"
+              jq -r '.[] | select(.reason == "stale") | "| `\(.path)` | \(.last_verified) | \(.age_days) | \(.days_over) |"' /tmp/stale.json
+              echo ""
+            fi
+            if [ "${{ steps.report.outputs.glob-count }}" -gt 0 ]; then
+              echo "### Dead \`paths:\` globs"
+              echo ""
+              echo "These rule files declare a \`paths:\` glob matching no tracked file, so the rule can never load. Correct the pattern, or delete the entry."
+              echo ""
+              echo "| Doc | Dead glob |"
+              echo "|-----|-----------|"
+              jq -r '.[] | select(.reason == "dead-glob") | "| `\(.path)` | `\(.glob)` |"' /tmp/stale.json
+              echo ""
+            fi
+            echo "**Remediation:** re-verify each doc against reality, then bump its \`last_verified\` to today and commit (on a branch that touches the doc, \`bin/check-docs --fix-dates --since=master\` bumps the changed-but-unbumped ones). For a dead glob, correct the pattern or delete the entry — a deletion must be stated explicitly in the PR body."
             echo ""
             echo "<!-- stale-set: ${{ steps.report.outputs.sig }} -->"
             echo "<!-- stale-since: $(date -u +%Y-%m-%dT%H:%M:%SZ) -->"
@@ -70,6 +91,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COUNT: ${{ steps.report.outputs.count }}
           CUR_SIG: ${{ steps.report.outputs.sig }}
+          STALE_COUNT: ${{ steps.report.outputs.stale-count }}
+          GLOB_COUNT: ${{ steps.report.outputs.glob-count }}
         run: |
           NUM=$(gh issue list --label stale-docs --state open --json number --jq '.[0].number // empty')
           PREV_SIG=""
@@ -86,7 +109,7 @@ jobs:
             echo "notify=false" >> "$GITHUB_OUTPUT"
           elif [ -z "$NUM" ]; then
             gh issue create \
-              --title "Stale docs: $COUNT over the 60-day window" \
+              --title "Doc issues: $STALE_COUNT stale, $GLOB_COUNT dead globs" \
               --body-file /tmp/issue-body.md \
               --label stale-docs
             echo "notify=true" >> "$GITHUB_OUTPUT"
@@ -95,7 +118,9 @@ jobs:
             echo "Stale set unchanged; leaving issue #$NUM as-is."
             echo "notify=false" >> "$GITHUB_OUTPUT"
           else
-            gh issue edit "$NUM" --body-file /tmp/issue-body.md
+            gh issue edit "$NUM" \
+              --title "Doc issues: $STALE_COUNT stale, $GLOB_COUNT dead globs" \
+              --body-file /tmp/issue-body.md
             echo "notify=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -109,7 +134,7 @@ jobs:
           if [ "${{ steps.report.outputs.count }}" -gt 0 ]; then
             cat /tmp/issue-body.md >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "No stale docs — all in-scope docs are within the 60-day window." >> "$GITHUB_STEP_SUMMARY"
+            echo "No doc issues — every in-scope doc is within the 60-day window and every paths: glob resolves." >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Evaluate refresh-pipeline health
@@ -134,7 +159,7 @@ jobs:
           COUNT: ${{ steps.report.outputs.count }}
           DETAIL: ${{ steps.health.outputs.detail }}
         run: |
-          MSG=$(printf 'Doc refresh needs you: %s doc(s) are stale and the pipeline could not clear them on its own.\n%s\nRun: https://github.com/%s/actions/runs/%s' \
+          MSG=$(printf 'Doc refresh needs you: %s doc issue(s) (stale dates or dead paths: globs) and the pipeline could not clear them on its own.\n%s\nRun: https://github.com/%s/actions/runs/%s' \
             "$COUNT" "$DETAIL" "${{ github.repository }}" "${{ github.run_id }}")
           printf '%s' "$MSG" > /tmp/discord-msg.txt
 

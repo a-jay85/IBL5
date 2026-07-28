@@ -11,22 +11,33 @@ import { assertNoPhpErrors } from '../helpers/php-errors';
  * "valid but absent" path has a stable fixture.
  */
 
-// Full assembled recap document for sim 689 (RecapDocument::assemble output) — the
+// Full assembled recap document for sim 689 (RecapDocument::postableText output) — the
 // textarea and plain-text export must reproduce it byte-for-byte without HTML wrapping.
+// Game rows include score header + mention line + blank + prose — the shape
+// normalizeGameBlock() enforces (seeded via ci-seed.sql with \n-separated parts).
 const SIM_689_BODY = `Another week of IBL action delivered drama from tip-off to the final buzzer.
 
 
 ================================ Feb 20 =========================================
+
+**Metros 105 @ Stars 98**
+<@1> · <@2>
 
 The Metros dominated from the opening tip, cruising to a 105-98 victory.
 
 
 ================================ Mar 3 =========================================
 
+**Metros 117 @ Cougars 108**
+<@1> · <@3>
+
 A balanced offensive attack lifted the Metros past the Cougars in a tightly contested game.
 
 
 ================================ Mar 5 =========================================
+
+**Stars 95 @ Metros 88**
+<@2> · <@1>
 
 The Stars held off a late Metros rally to steal a road win, 95-88.
 

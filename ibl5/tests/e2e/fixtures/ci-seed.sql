@@ -119,9 +119,9 @@ INSERT INTO ibl_team_info (teamid, team_city, team_name, color1, color2, uuid) V
 -- ibl_box_scores_teams rows further down, so all three pass the admin viewer's
 -- archived-box-score existence filter.
 INSERT INTO ibl_sim_game_recaps (sim, season_year, game_date, visitor_teamid, home_teamid, game_of_that_day, box_id, sort_order, recap_text) VALUES
-  (689, 2026, '2026-02-20', 1, 2, 1, NULL, 0, 'The Metros dominated from the opening tip, cruising to a 105-98 victory.'),
-  (689, 2026, '2026-03-03', 1, 3, 1, NULL, 1, 'A balanced offensive attack lifted the Metros past the Cougars in a tightly contested game.'),
-  (689, 2026, '2026-03-05', 2, 1, 1, NULL, 2, 'The Stars held off a late Metros rally to steal a road win, 95-88.');
+  (689, 2026, '2026-02-20', 1, 2, 1, NULL, 0, '**Metros 105 @ Stars 98**\n<@1> · <@2>\nThe Metros dominated from the opening tip, cruising to a 105-98 victory.'),
+  (689, 2026, '2026-03-03', 1, 3, 1, NULL, 1, '**Metros 117 @ Cougars 108**\n<@1> · <@3>\nA balanced offensive attack lifted the Metros past the Cougars in a tightly contested game.'),
+  (689, 2026, '2026-03-05', 2, 1, 1, NULL, 2, '**Stars 95 @ Metros 88**\n<@2> · <@1>\nThe Stars held off a late Metros rally to steal a road win, 95-88.');
 
 -- ============================================================
 -- Standings (28 teams — FK to ibl_team_info)

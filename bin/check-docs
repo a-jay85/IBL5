@@ -142,7 +142,12 @@ Enforces the Living Documentation policy defined in
 .claude/rules/doc-freshness.md. Validates YAML frontmatter
 (description, last_verified), staleness (60-day max),
 dead repo-path references, and un-stamped citations of retired
-figures on every in-scope markdown file.
+figures on every in-scope markdown file. Full-scan mode additionally
+checks non-markdown source-file comment bodies (bin/, bin/lib/,
+ibl5/classes/, ibl5/phpstan-rules/, ibl5/migrations/) for dead
+repo-path references; test harnesses are excluded and five named
+false-positive suppressions apply (see checkSourceCommentReferences).
+Mark an intentionally non-resolving path with a trailing "(example)".
 
 Options:
   --fix-dates        Requires --since=<ref>. Bumps last_verified to today only
@@ -1439,6 +1444,19 @@ $retiredIssues = checkRetiredFigures($files, $root);
 if ($retiredIssues !== []) {
     echo "FAIL retired-figure citations\n";
     foreach ($retiredIssues as $issue) {
+        echo "     - {$issue}\n";
+    }
+    $failures++;
+}
+
+// Source-file comment bodies, corpus-wide. Full-scan only, deliberately not in
+// the --since branch above: source files carry no frontmatter, so they never
+// participate in the on-touch bump rule, and a rotted reference in a file this
+// PR did not touch is exactly the miss this exists to catch.
+$sourceRefIssues = checkSourceCommentReferences($root);
+if ($sourceRefIssues !== []) {
+    echo "FAIL dead references in source comments\n";
+    foreach ($sourceRefIssues as $issue) {
         echo "     - {$issue}\n";
     }
     $failures++;

@@ -525,20 +525,11 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
-> ✅ resolved (16): 7.1, 7.2, 7.3, 7.4, 7.5, 7.7, 7.8, 7.9, 7.10, 7.12, 7.13, 7.14, 7.15, 7.16, 7.17, 7.18 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (17): 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 7.10, 7.12, 7.13, 7.14, 7.15, 7.16, 7.17, 7.18 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| 7.6 | ◑ Partial | 🟩 | `fetchAllInList()` exists, adopted by ~4 repos (8 file refs); remaining repos unmigrated. Mechanical migration, green-green. |
 | 7.11 | ⬜ Open | 🟨 | Inconsistent caching decorators. Upfront decision: add `Cached*Repository` for SeasonHighs/FranchiseRecordBook/etc. vs document why page-cache suffices. |
-
-### 7.6 IN-Clause Boilerplate Copy-Pasted Across 10 Repositories
-**Location:** `FreeAgencyAdminRepository`, `TradeAssetRepository`, `TradeCashRepository`, `SeasonQueryRepository`, `VotingRepository`, `SeasonArchiveRepository`, `LeagueControlPanelRepository`, `PlrParserRepository`, `UI/Tables/PeriodAverages`, `ProjectedDraftOrderRepository`
-**Problem:** Every repo reinvents `implode + array_fill + str_repeat`. No shared helper.
-**Suggested direction:** Add `protected fetchAllInList(string $query, string $type, array $ids): array` to `BaseMysqliRepository`.
-**Est. effort:** S
-**Risk if untouched:** Off-by-one risk; missing empty-array guards drift.
-**Status:** Partially completed (verified 2026-05-29 audit) — `BaseMysqliRepository::fetchAllInList()` helper exists and is adopted by LeagueControlPanel/SeasonArchive/Voting repos; remaining repos not yet migrated.
 
 ### 7.11 Inconsistent Caching Decorators
 **Location:** `PageCache::MODULE_TTLS` lists `SeasonHighs`, `FranchiseRecordBook`, `DraftHistory`, `AwardHistory`, `FranchiseHistory`

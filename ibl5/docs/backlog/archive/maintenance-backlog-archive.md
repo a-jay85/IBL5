@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed/declined maintenance-audit findings, extracted from maintenance-backlog.md.
-last_verified: 2026-07-27
+last_verified: 2026-07-28
 ---
 
 # Maintenance-Cost Reduction Backlog — Archive
@@ -1113,6 +1113,16 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Status:** Completed (merged #1089, maintenance-39b) — `DatabaseCache` now extends `BaseMysqliRepository`; failure paths log instead of silently returning null.
 
 **Table evidence (2026-07-25):** DatabaseCache extends BaseMysqliRepository + logs (#1089).
+
+### 7.6 IN-Clause Boilerplate Copy-Pasted Across 10 Repositories
+**Location:** `FreeAgencyAdminRepository`, `TradeAssetRepository`, `TradeCashRepository`, `SeasonQueryRepository`, `VotingRepository`, `SeasonArchiveRepository`, `LeagueControlPanelRepository`, `PlrParserRepository`, `UI/Tables/PeriodAverages`, `ProjectedDraftOrderRepository`
+**Problem:** Every repo reinvents `implode + array_fill + str_repeat`. No shared helper.
+**Suggested direction:** Add `protected fetchAllInList(string $query, string $type, array $ids): array` to `BaseMysqliRepository`.
+**Est. effort:** S
+**Risk if untouched:** Off-by-one risk; missing empty-array guards drift.
+**Status:** ✅ Implemented (verified 2026-07-26) — all 7 migratable repositories adopted (8 call sites: LeagueControlPanel, SeasonArchive, Voting, SeasonQuery, FreeAgencyAdmin, TradeAsset ×2, TradeCash). Excluded: PlrParser (INSERT VALUES, not IN-clause), PeriodAverages (not a `BaseMysqliRepository` subclass), ProjectedDraftOrder (hardcoded `IN (1, 2)`), LastSimRecap (suffix params after IN-list unsupported by helper).
+
+**Table evidence (2026-07-26):** All 7 migratable repos adopted `fetchAllInList()` (8 call sites). 4 structural exclusions: PlrParser (INSERT VALUES multi-column, not IN-clause), PeriodAverages (static view class, not a `BaseMysqliRepository` subclass), ProjectedDraftOrder (hardcoded `IN (1, 2)` literal), LastSimRecap (suffix params after IN-list, unsupported by helper).
 
 ### 7.7 `FreeAgencyView` and `FreeAgencyProcessor` Store Raw `\mysqli`
 **Location:** `ibl5/classes/FreeAgency/FreeAgencyView.php`, `FreeAgencyProcessor.php`

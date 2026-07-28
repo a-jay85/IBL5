@@ -1,6 +1,6 @@
 ---
-description: Act on the nightly stale-docs audit automatically — on a NEW/CHANGED stale set, a self-hosted macOS runner fires a headless Claude run that refreshes exactly the stale docs and opens a PR (held for human merge) that Closes the tracker issue.
-last_verified: 2026-07-24
+description: Act on the nightly stale-docs audit automatically — on a NEW/CHANGED stale set, a self-hosted macOS runner fires a headless Claude run that refreshes exactly the flagged docs (stale last_verified dates and dead paths: globs) and opens a PR (held for human merge) that Closes the tracker issue.
+last_verified: 2026-07-28
 ---
 
 # ADR-0079: Autonomous stale-docs remediation via a self-hosted macOS runner
@@ -80,3 +80,21 @@ not repo artifacts:
 4. Prerequisites on the Mac PATH: the `claude` CLI (authenticated), `gh` (persistent
    `gh auth login`, able to open PRs), `git` (worktree support), and `caffeinate` — the same tools
    `bin/post-plan-now` assumes.
+
+## Addendum (2026-07-28): dead `paths:` globs join the remediated set
+
+The audit's finding set is no longer date-staleness only. `bin/check-rules-byte-budget`
+gained a `--report-mode` that sweeps the whole repo for `paths:` frontmatter globs matching
+no tracked file; `bin/check-docs --staleness-report` merges those findings into the same
+JSON report, tagging every entry with `reason: "stale"` or `reason: "dead-glob"`. The audit
+issue renders them as two tables, and the `bin/docfix-run` prompt now instructs the headless
+run to correct or delete a dead glob — and to disclose any deletion explicitly in the PR body,
+so the human who holds the merge can judge it without opening the diff.
+
+Why the sweep moved here rather than staying on the per-PR gate: `bin/check-rules-byte-budget`
+Check 3 was always documented as changeset-scoped, but a guard inversion made an *empty*
+changeset degrade into a repo-wide scan, so a PR touching no rule file could fail on debt it
+did not create. The gate now matches its documented scope, and the repo-wide sweep runs
+nightly — where a finding becomes a tracked issue and an autonomous fix instead of a blocked PR.
+Nothing about the transport decision in ADR-0086, or the human-merge hold this ADR established,
+changes.

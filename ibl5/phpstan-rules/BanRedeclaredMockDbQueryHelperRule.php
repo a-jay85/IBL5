@@ -17,7 +17,7 @@ use PHPStan\Rules\RuleErrorBuilder;
  * Tests copy-paste a private `assertQueryExecuted()` / `assertQueryNotExecuted()`
  * instead of extending `WideUnitTestCase`, which supplies them (plus `setUp`,
  * global `$mysqli_db` injection, and the query-tracking helpers). The canonical
- * pattern is documented in `docs/DEVELOPMENT_GUIDE.md`; this rule enforces it.
+ * pattern is documented in `ibl5/docs/DEVELOPMENT_GUIDE.md`; this rule enforces it.
  *
  * The sole legitimate definer — `WideUnitTestCase.php` itself — is exempt by
  * basename, mirroring `BanGlobalKeywordRule`'s `ALLOWED_FILES` idiom.

@@ -9,7 +9,7 @@ declare(strict_types=1);
  * GM awards (GM of the Year, ASG Head Coach, ASG Asst Coach, etc.), and inserts
  * them into ibl_gm_awards with the same schema as ibl_awards.
  *
- * Usage: php migrations/migrate_gm_awards.php [--dry-run]
+ * Usage: php ibl5/migrations/migrate_gm_awards.php [--dry-run]
  */
 
 require_once __DIR__ . '/../vendor/autoload.php';

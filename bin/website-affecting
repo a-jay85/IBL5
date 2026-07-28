@@ -10,7 +10,7 @@
 #
 # Usage:
 #   git diff --name-only master...HEAD | bin/website-affecting
-#   printf 'README.md\ndocs/foo.md\n' | bin/website-affecting
+#   printf 'README.md\ndocs/foo.md\n' | bin/website-affecting  # docs/foo.md (example)
 #   bin/website-affecting --help
 #
 # Exit codes:

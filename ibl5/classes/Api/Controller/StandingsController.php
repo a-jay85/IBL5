@@ -12,11 +12,11 @@ use Api\Transformer\StandingsTransformer;
 
 class StandingsController implements ControllerInterface
 {
-    private \mysqli $db;
+    private ApiStandingsRepository $repo;
 
-    public function __construct(\mysqli $db)
+    public function __construct(ApiStandingsRepository $repo)
     {
-        $this->db = $db;
+        $this->repo = $repo;
     }
 
     /**
@@ -25,7 +25,7 @@ class StandingsController implements ControllerInterface
     public function handle(array $params, array $query, JsonResponder $responder, ?array $body = null): void
     {
         $conference = $this->normalizeConference($params['conference'] ?? null);
-        $repo = new ApiStandingsRepository($this->db);
+        $repo = $this->repo;
         $transformer = new StandingsTransformer();
         $etag = new ETagHandler();
 

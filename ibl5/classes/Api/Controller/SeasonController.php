@@ -11,15 +11,10 @@ use Season\Season;
 
 class SeasonController implements ControllerInterface
 {
-    private \mysqli $db;
-    /**
-     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
-     */
-    private ?Season $season = null;
+    private Season $season;
 
-    public function __construct(\mysqli $db, ?Season $season = null)
+    public function __construct(Season $season)
     {
-        $this->db = $db;
         $this->season = $season;
     }
 
@@ -28,7 +23,7 @@ class SeasonController implements ControllerInterface
      */
     public function handle(array $params, array $query, JsonResponder $responder, ?array $body = null): void
     {
-        $season = $this->season ?? new Season($this->db);
+        $season = $this->season;
         $etag = new ETagHandler();
 
         $phaseSimNumber = $season->getPhaseSpecificSimNumber();

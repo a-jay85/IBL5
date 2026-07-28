@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Api\Controller;
 
 use Api\Controller\PlayerHistoryController;
+use Api\Repository\ApiPlayerStatsRepository;
 use Api\Response\JsonResponder;
 use Tests\WideUnit\WideUnitTestCase;
 
@@ -65,7 +66,7 @@ class PlayerHistoryControllerTest extends WideUnitTestCase
     {
         $this->mockDb->setMockData($this->twoHistoryRows());
 
-        $controller = new PlayerHistoryController($this->mockDb);
+        $controller = new PlayerHistoryController(new ApiPlayerStatsRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -118,7 +119,7 @@ class PlayerHistoryControllerTest extends WideUnitTestCase
     {
         $this->mockDb->setMockData([]);
 
-        $controller = new PlayerHistoryController($this->mockDb);
+        $controller = new PlayerHistoryController(new ApiPlayerStatsRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -137,7 +138,7 @@ class PlayerHistoryControllerTest extends WideUnitTestCase
         $expectedTag = '"' . md5($concatenated) . '"';
         $_SERVER['HTTP_IF_NONE_MATCH'] = $expectedTag;
 
-        $controller = new PlayerHistoryController($this->mockDb);
+        $controller = new PlayerHistoryController(new ApiPlayerStatsRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -150,7 +151,7 @@ class PlayerHistoryControllerTest extends WideUnitTestCase
     {
         $this->mockDb->setMockData($this->twoHistoryRows());
 
-        $controller = new PlayerHistoryController($this->mockDb);
+        $controller = new PlayerHistoryController(new ApiPlayerStatsRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())

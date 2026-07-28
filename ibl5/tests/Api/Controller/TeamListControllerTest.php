@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Api\Controller;
 
 use Api\Controller\TeamListController;
+use Api\Repository\ApiTeamRepository;
 use Api\Response\JsonResponder;
 use Tests\WideUnit\WideUnitTestCase;
 
@@ -43,7 +44,7 @@ class TeamListControllerTest extends WideUnitTestCase
         $this->mockDb->onQuery('SELECT COUNT', [['total' => 1]]);
         $this->mockDb->setMockData([$this->teamRow()]);
 
-        $controller = new TeamListController($this->mockDb);
+        $controller = new TeamListController(new ApiTeamRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -80,7 +81,7 @@ class TeamListControllerTest extends WideUnitTestCase
         $expectedTag = '"' . md5($row['updated_at']) . '"';
         $_SERVER['HTTP_IF_NONE_MATCH'] = $expectedTag;
 
-        $controller = new TeamListController($this->mockDb);
+        $controller = new TeamListController(new ApiTeamRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -94,7 +95,7 @@ class TeamListControllerTest extends WideUnitTestCase
         $this->mockDb->onQuery('SELECT COUNT', [['total' => 0]]);
         $this->mockDb->setMockData([]);
 
-        $controller = new TeamListController($this->mockDb);
+        $controller = new TeamListController(new ApiTeamRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())

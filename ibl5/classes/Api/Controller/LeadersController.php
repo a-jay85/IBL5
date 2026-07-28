@@ -13,11 +13,11 @@ use Api\Transformer\LeaderTransformer;
 
 class LeadersController implements ControllerInterface
 {
-    private \mysqli $db;
+    private ApiLeadersRepository $repo;
 
-    public function __construct(\mysqli $db)
+    public function __construct(ApiLeadersRepository $repo)
     {
-        $this->db = $db;
+        $this->repo = $repo;
     }
 
     private const ALLOWED_CATEGORIES = ['ppg', 'rpg', 'apg', 'spg', 'bpg', 'fgp', 'ftp', 'tgp', 'qa'];
@@ -30,7 +30,7 @@ class LeadersController implements ControllerInterface
         // Leaders use category-based sort, not column sort from Paginator
         // We still use Paginator for page/per_page only
         $paginator = new Paginator($query, 'ppg', self::ALLOWED_CATEGORIES);
-        $repo = new ApiLeadersRepository($this->db);
+        $repo = $this->repo;
         $transformer = new LeaderTransformer();
         $etag = new ETagHandler();
 

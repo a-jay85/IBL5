@@ -12,11 +12,11 @@ use Api\Transformer\PlayerTransformer;
 
 class PlayerDetailController implements ControllerInterface
 {
-    private \mysqli $db;
+    private ApiPlayerRepository $repo;
 
-    public function __construct(\mysqli $db)
+    public function __construct(ApiPlayerRepository $repo)
     {
-        $this->db = $db;
+        $this->repo = $repo;
     }
 
     /**
@@ -25,7 +25,7 @@ class PlayerDetailController implements ControllerInterface
     public function handle(array $params, array $query, JsonResponder $responder, ?array $body = null): void
     {
         $uuid = $params['uuid'] ?? '';
-        $repo = new ApiPlayerRepository($this->db);
+        $repo = $this->repo;
         $transformer = new PlayerTransformer();
         $etag = new ETagHandler();
 

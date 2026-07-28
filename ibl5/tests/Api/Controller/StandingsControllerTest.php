@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Api\Controller;
 
 use Api\Controller\StandingsController;
+use Api\Repository\ApiStandingsRepository;
 use Api\Response\JsonResponder;
 use Tests\WideUnit\WideUnitTestCase;
 
@@ -50,7 +51,7 @@ class StandingsControllerTest extends WideUnitTestCase
             ],
         ]);
 
-        $controller = new StandingsController($this->mockDb);
+        $controller = new StandingsController(new ApiStandingsRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -79,7 +80,7 @@ class StandingsControllerTest extends WideUnitTestCase
     {
         $this->mockDb->setMockData([]);
 
-        $controller = new StandingsController($this->mockDb);
+        $controller = new StandingsController(new ApiStandingsRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())

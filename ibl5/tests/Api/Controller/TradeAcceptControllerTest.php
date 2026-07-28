@@ -13,7 +13,10 @@ class TradeAcceptControllerTest extends WideUnitTestCase
 {
     public function testReturns400WhenOfferIdMissing(): void
     {
-        $controller = new TradeAcceptController($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class));
+        $commonStub    = self::createStub(TeamIdentityRepositoryInterface::class);
+        $offerStub     = self::createStub(\Trading\Contracts\TradeOfferRepositoryInterface::class);
+        $processorStub = self::createStub(\Trading\Contracts\TradeProcessorInterface::class);
+        $controller    = new TradeAcceptController($commonStub, $offerStub, $processorStub);
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -25,7 +28,10 @@ class TradeAcceptControllerTest extends WideUnitTestCase
 
     public function testReturns400WhenDiscordUserIdMissing(): void
     {
-        $controller = new TradeAcceptController($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class));
+        $commonStub    = self::createStub(TeamIdentityRepositoryInterface::class);
+        $offerStub     = self::createStub(\Trading\Contracts\TradeOfferRepositoryInterface::class);
+        $processorStub = self::createStub(\Trading\Contracts\TradeProcessorInterface::class);
+        $controller    = new TradeAcceptController($commonStub, $offerStub, $processorStub);
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -37,7 +43,10 @@ class TradeAcceptControllerTest extends WideUnitTestCase
 
     public function testReturns400WhenBodyIsNull(): void
     {
-        $controller = new TradeAcceptController($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class));
+        $commonStub    = self::createStub(TeamIdentityRepositoryInterface::class);
+        $offerStub     = self::createStub(\Trading\Contracts\TradeOfferRepositoryInterface::class);
+        $processorStub = self::createStub(\Trading\Contracts\TradeProcessorInterface::class);
+        $controller    = new TradeAcceptController($commonStub, $offerStub, $processorStub);
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -49,9 +58,11 @@ class TradeAcceptControllerTest extends WideUnitTestCase
 
     public function testReturns404WhenTradeOfferNotFound(): void
     {
-        $this->mockDb->setMockData([]);
-
-        $controller = new TradeAcceptController($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class));
+        $commonStub    = self::createStub(TeamIdentityRepositoryInterface::class);
+        $offerStub     = self::createStub(\Trading\Contracts\TradeOfferRepositoryInterface::class);
+        $processorStub = self::createStub(\Trading\Contracts\TradeProcessorInterface::class);
+        $offerStub->method('getTradesByOfferId')->willReturn([]);
+        $controller    = new TradeAcceptController($commonStub, $offerStub, $processorStub);
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Api\Controller;
 
 use Api\Controller\InjuriesController;
+use Api\Repository\ApiInjuriesRepository;
 use Api\Response\JsonResponder;
 use Tests\WideUnit\WideUnitTestCase;
 
@@ -26,7 +27,7 @@ class InjuriesControllerTest extends WideUnitTestCase
             ],
         ]);
 
-        $controller = new InjuriesController($this->mockDb);
+        $controller = new InjuriesController(new ApiInjuriesRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -55,7 +56,7 @@ class InjuriesControllerTest extends WideUnitTestCase
     {
         $this->mockDb->setMockData([]);
 
-        $controller = new InjuriesController($this->mockDb);
+        $controller = new InjuriesController(new ApiInjuriesRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())

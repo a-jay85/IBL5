@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Api\Controller;
 
 use Api\Controller\PlayerListController;
+use Api\Repository\ApiPlayerRepository;
 use Api\Response\JsonResponder;
 use Tests\WideUnit\WideUnitTestCase;
 
@@ -80,7 +81,7 @@ class PlayerListControllerTest extends WideUnitTestCase
         $this->mockDb->onQuery('SELECT COUNT', [['total' => 1]]);
         $this->mockDb->setMockData([$this->playerRow()]);
 
-        $controller = new PlayerListController($this->mockDb);
+        $controller = new PlayerListController(new ApiPlayerRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -118,7 +119,7 @@ class PlayerListControllerTest extends WideUnitTestCase
         $this->mockDb->onQuery('SELECT COUNT', [['total' => 0]]);
         $this->mockDb->setMockData([]);
 
-        $controller = new PlayerListController($this->mockDb);
+        $controller = new PlayerListController(new ApiPlayerRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -134,7 +135,7 @@ class PlayerListControllerTest extends WideUnitTestCase
         $this->mockDb->onQuery('SELECT COUNT', [['total' => 0]]);
         $this->mockDb->setMockData([]);
 
-        $controller = new PlayerListController($this->mockDb);
+        $controller = new PlayerListController(new ApiPlayerRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -150,7 +151,7 @@ class PlayerListControllerTest extends WideUnitTestCase
         $this->mockDb->onQuery('SELECT COUNT', [['total' => 0]]);
         $this->mockDb->setMockData([]);
 
-        $controller = new PlayerListController($this->mockDb);
+        $controller = new PlayerListController(new ApiPlayerRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -170,7 +171,7 @@ class PlayerListControllerTest extends WideUnitTestCase
         $expectedTag = '"' . md5($row['updated_at']) . '"';
         $_SERVER['HTTP_IF_NONE_MATCH'] = $expectedTag;
 
-        $controller = new PlayerListController($this->mockDb);
+        $controller = new PlayerListController(new ApiPlayerRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())

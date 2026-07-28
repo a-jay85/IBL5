@@ -12,11 +12,11 @@ use Api\Transformer\GameTransformer;
 
 class GameDetailController implements ControllerInterface
 {
-    private \mysqli $db;
+    private ApiGameRepository $repo;
 
-    public function __construct(\mysqli $db)
+    public function __construct(ApiGameRepository $repo)
     {
-        $this->db = $db;
+        $this->repo = $repo;
     }
 
     /**
@@ -25,7 +25,7 @@ class GameDetailController implements ControllerInterface
     public function handle(array $params, array $query, JsonResponder $responder, ?array $body = null): void
     {
         $uuid = $params['uuid'] ?? '';
-        $repo = new ApiGameRepository($this->db);
+        $repo = $this->repo;
         $transformer = new GameTransformer();
         $etag = new ETagHandler();
 

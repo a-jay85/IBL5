@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Api\Controller;
 
 use Api\Controller\PlayerExportController;
+use Api\Repository\ApiPlayerRepository;
 use Api\Response\JsonResponder;
 use Tests\WideUnit\WideUnitTestCase;
 
@@ -71,7 +72,7 @@ class PlayerExportControllerTest extends WideUnitTestCase
             $this->playerRow(101, 'Alpha Player', 'PG'),
         ]);
 
-        $controller = new PlayerExportController($this->mockDb);
+        $controller = new PlayerExportController(new ApiPlayerRepository($this->mockDb));
         $responder = self::createStub(JsonResponder::class);
 
         $output = $this->captureOutput(function () use ($controller, $responder): void {
@@ -91,7 +92,7 @@ class PlayerExportControllerTest extends WideUnitTestCase
             $this->playerRow(101, 'Alpha Player', 'PG'),
         ]);
 
-        $controller = new PlayerExportController($this->mockDb);
+        $controller = new PlayerExportController(new ApiPlayerRepository($this->mockDb));
         $responder = self::createStub(JsonResponder::class);
 
         $output = $this->captureOutput(function () use ($controller, $responder): void {
@@ -118,7 +119,7 @@ class PlayerExportControllerTest extends WideUnitTestCase
             $this->playerRow(202, 'Charlie Player', 'SF'),
         ]);
 
-        $controller = new PlayerExportController($this->mockDb);
+        $controller = new PlayerExportController(new ApiPlayerRepository($this->mockDb));
         $responder = self::createStub(JsonResponder::class);
 
         $output = $this->captureOutput(function () use ($controller, $responder): void {

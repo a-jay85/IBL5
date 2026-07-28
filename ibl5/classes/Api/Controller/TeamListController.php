@@ -13,11 +13,11 @@ use Api\Transformer\TeamTransformer;
 
 class TeamListController implements ControllerInterface
 {
-    private \mysqli $db;
+    private ApiTeamRepository $repo;
 
-    public function __construct(\mysqli $db)
+    public function __construct(ApiTeamRepository $repo)
     {
-        $this->db = $db;
+        $this->repo = $repo;
     }
 
     private const ALLOWED_SORT_COLUMNS = ['team_name', 'team_city', 'owner_name', 'conference', 'division'];
@@ -28,7 +28,7 @@ class TeamListController implements ControllerInterface
     public function handle(array $params, array $query, JsonResponder $responder, ?array $body = null): void
     {
         $paginator = new Paginator($query, 'team_name', self::ALLOWED_SORT_COLUMNS);
-        $repo = new ApiTeamRepository($this->db);
+        $repo = $this->repo;
         $transformer = new TeamTransformer();
         $etag = new ETagHandler();
 

@@ -12,11 +12,11 @@ use Api\Transformer\InjuryTransformer;
 
 class InjuriesController implements ControllerInterface
 {
-    private \mysqli $db;
+    private ApiInjuriesRepository $repo;
 
-    public function __construct(\mysqli $db)
+    public function __construct(ApiInjuriesRepository $repo)
     {
-        $this->db = $db;
+        $this->repo = $repo;
     }
 
     /**
@@ -24,7 +24,7 @@ class InjuriesController implements ControllerInterface
      */
     public function handle(array $params, array $query, JsonResponder $responder, ?array $body = null): void
     {
-        $repo = new ApiInjuriesRepository($this->db);
+        $repo = $this->repo;
         $transformer = new InjuryTransformer();
         $etag = new ETagHandler();
 

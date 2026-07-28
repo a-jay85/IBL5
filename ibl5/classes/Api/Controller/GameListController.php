@@ -13,11 +13,11 @@ use Api\Transformer\GameTransformer;
 
 class GameListController implements ControllerInterface
 {
-    private \mysqli $db;
+    private ApiGameRepository $repo;
 
-    public function __construct(\mysqli $db)
+    public function __construct(ApiGameRepository $repo)
     {
-        $this->db = $db;
+        $this->repo = $repo;
     }
 
     private const ALLOWED_SORT_COLUMNS = ['game_date', 'visitor_score', 'home_score'];
@@ -31,7 +31,7 @@ class GameListController implements ControllerInterface
             $query['order'] = 'desc';
         }
         $paginator = new Paginator($query, 'game_date', self::ALLOWED_SORT_COLUMNS);
-        $repo = new ApiGameRepository($this->db);
+        $repo = $this->repo;
         $transformer = new GameTransformer();
         $etag = new ETagHandler();
 

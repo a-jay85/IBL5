@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Api\Controller;
 
 use Api\Controller\GameDetailController;
+use Api\Repository\ApiGameRepository;
 use Api\Response\JsonResponder;
 use Tests\WideUnit\WideUnitTestCase;
 
@@ -46,7 +47,7 @@ class GameDetailControllerTest extends WideUnitTestCase
     {
         $this->mockDb->setMockData([$this->gameRow()]);
 
-        $controller = new GameDetailController($this->mockDb);
+        $controller = new GameDetailController(new ApiGameRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -87,7 +88,7 @@ class GameDetailControllerTest extends WideUnitTestCase
     {
         $this->mockDb->setMockData([]);
 
-        $controller = new GameDetailController($this->mockDb);
+        $controller = new GameDetailController(new ApiGameRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -104,7 +105,7 @@ class GameDetailControllerTest extends WideUnitTestCase
         $expectedTag = '"' . md5(self::UPDATED_AT) . '"';
         $_SERVER['HTTP_IF_NONE_MATCH'] = $expectedTag;
 
-        $controller = new GameDetailController($this->mockDb);
+        $controller = new GameDetailController(new ApiGameRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -119,7 +120,7 @@ class GameDetailControllerTest extends WideUnitTestCase
 
         $expectedTag = '"' . md5(self::UPDATED_AT) . '"';
 
-        $controller = new GameDetailController($this->mockDb);
+        $controller = new GameDetailController(new ApiGameRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())

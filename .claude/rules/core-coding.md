@@ -1,7 +1,7 @@
 ---
 description: Common repository helpers and gotchas for IBL5 PHP code.
 paths: "**/*.php"
-last_verified: 2026-05-28
+last_verified: 2026-07-28
 ---
 
 # Core Coding Reference
@@ -17,8 +17,11 @@ Quick reference for frequently-used patterns.
 $repo->getUserByUsername(string $username): ?array
 $repo->getTeamByName(string $teamName): ?array
 $repo->getTeamnameFromUsername(?string $username): ?string  // Returns League::FREE_AGENTS_TEAM_NAME if null/empty; null if not found
+$repo->getUsernameFromTeamname(string $teamName): ?string
 $repo->getTidFromTeamname(string $teamName): ?int
+$repo->getTeamnameFromTeamID(int $teamid): ?string
 $repo->getTeamDiscordID(string $teamName): ?int
+$repo->isKnownDiscordID(string $discordId): bool  // Auth check: is this Discord snowflake a known GM? Bind as string (safe for values above 2^53)
 $repo->getAllRealTeams(string $orderBy = 'team_name ASC'): array
 ```
 
@@ -32,7 +35,9 @@ $repo->getPlayerIDFromPlayerName(string $playerName): ?int
 **`SalaryCapRepository`** (`Repositories\Contracts\SalaryCapRepositoryInterface`):
 ```php
 $repo->getTeamTotalSalary(string $teamName): int
+$repo->getPlayerCurrentSalary(int $playerId): int  // Single player's current-season salary from vw_current_salary
 $repo->getTeamNextYearSalary(string $teamName): int
+$repo->getPositionSalaryCommitmentNextYear(string $teamName, string $position, int $excludePlayerID): int
 $repo->getTeamSalarySummary(string $teamName): array  // {current: int, nextYear: int}
 $repo->getTeamCapSpaceNextSeason(string $teamName): int
 ```
@@ -48,5 +53,5 @@ $repo->getTeamCapSpaceNextSeason(string $teamName): int
 | Team lookup | Some methods use `tid` (int), others use team name (string) |
 | Querying "all teams" | Use `League::isRealFranchise($id)` in PHP or `WHERE teamid BETWEEN 1 AND League::MAX_REAL_TEAMID` in SQL. Special team constants: `FREE_AGENTS_TEAMID(0)`, `ROOKIES_TEAMID(40)`, `SOPHOMORES_TEAMID(41)`, `ALL_STAR_AWAY_TEAMID(50)`, `ALL_STAR_HOME_TEAMID(51)`. |
 | Null in queries | Build conditional SQL; `bind_param` has no NULL type |
-| Database booleans (INT cols) | `hasMLE === 1`, `hasLLE === 1` (native int) |
+| Database booleans (INT cols) | `has_mle === 1`, `has_lle === 1` (native int; snake_case matches DB column names) |
 | Division guards | Use `=== 0` or `=== 0.0`, not `== 0` |

@@ -82,7 +82,8 @@ last_verified: 2026-08-08
 **Problem:** The learning loop is manual — recurring failure patterns become rules/memory only when a human notices.
 **Suggested direction:** Weekly cron that clusters retrospectives and proposes rule/memory edits **as a PR** — the human reviews the proposed norm, never auto-applies.
 **Risk if untouched:** Repeat failures that a rule would have prevented; lessons decay in unread reports.
-**Status (2026-07-07):** ⬜ Open — 🟥 (rule authoring is judgment; the miner only drafts).
+**Status (2026-07-27):** ⬜ Open — 🟥 (rule authoring is judgment; the miner only drafts).
+**Provenance (2026-07-27):** A manual mine of accumulated retrospectives surfaced one recurring pattern — repo-path references rotting inside source-file comments, invisible to the markdown-only dead-ref gate — and it shipped as the `bin/check-docs` source-comment scan (branch `check-docs-source-comment-refs`). One pattern, found by hand, in one pass: the item stays open precisely because that mine was manual.
 
 ### L5 Master-canary between runs
 **Location:** `bin/automouse-run` refreshes master between plans (fetch + `--ff-only` merge) but runs no health check; `bin/check-master-ci-green` exists as a building block.

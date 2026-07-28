@@ -1,6 +1,6 @@
 ---
 description: Production operations runbook — deploy, rollback, DB restore, sim-file recovery, logs, and running the app without the Claude Code harness.
-last_verified: 2026-07-27
+last_verified: 2026-07-28
 ---
 
 # IBL5 Operations Runbook
@@ -144,11 +144,46 @@ derivable from the repo. **Write host procedures from the host.**
    python3 -c "import json;print([a['name'] for a in json.load(open('/home/iblhoops/.pm2/dump.pm2'))])"
    ```
 
-### Remaining cleanup
+### Whitelist cleanup — DONE 2026-07-28
 
-`ibl5/.htaccess` still whitelists the `ibl6` subdomain in its canonical-domain redirect. It is
-inert — `ibl6.iblhoops.net` resolves to its own docroot and never reaches those rules — so removing
-it is optional tidying, not a fix.
+The `ibl6` arm was removed from the canonical-domain redirect in `ibl5/.htaccess`
+(`RewriteCond %{HTTP_HOST} !^((www|ibl6)\.)?iblhoops\.net$` → `!^(www\.)?iblhoops\.net$`).
+
+**Proof it was safe — the boxscore fingerprint.** `ibl6.iblhoops.net` is served by its *own*
+vhost, not by these rules. The load-bearing evidence is a `Location` that only
+`/home/iblhoops/ibl6.iblhoops.net/.htaccess` can emit:
+
+```bash
+curl -sI 'https://ibl6.iblhoops.net/2008-03-10-game-7/boxscore'
+# location: https://iblhoops.net/ibl5/modules.php?name=GameBoxscore&date=2008-03-10&game=7
+```
+
+No ruleset in the main docroot can synthesise that Location. The separate docroot is confirmed by
+the cPanel rewrite map (`ibl6.iblhoops.net` → `/home/iblhoops/ibl6.iblhoops.net`, outside the main
+tree):
+
+```bash
+ssh iblhoops.net 'cat /home/iblhoops/.cpanel/caches/rewriteinfo'
+```
+
+Corroborators: `curl -sI https://ibl6.iblhoops.net/` → `location: https://iblhoops.net/` (the ibl6
+vhost, not the main docroot's `.../ibl5/index.php`); `/.well-known/` returns 200 (ACME exemption
+intact). The `pre.iblhoops.net` control passed but is **corroborating only** — `pre /` returned 200
+with no `Location`, and `/home/iblhoops/www-pre/ibl5/.htaccess` exists (577 B), so pre carries its
+own copy of this guard; the boxscore fingerprint carries the verdict. No live cron/pm2/config caller
+targets `ibl6.iblhoops.net` (`dump.pm2` names `['iblbot']` only).
+
+**Bounded worst case — removal can only make the guard stricter.** LiteSpeed routes legitimate
+`ibl6.iblhoops.net` traffic at the vhost level (SNI/IP, before any `.htaccess` is read), so it never
+evaluates this rule. The sole residual case is a request reaching the *main* vhost under `/ibl5/`
+with a spoofed/mismatched `Host: ibl6.iblhoops.net` — which is now 301'd to the canonical host,
+exactly what the anti-mirroring rule exists to do. No legitimate user flow depends on the removed
+arm.
+
+**Deploy path (why the repo edit is the whole change):** `.github/workflows/main.yml` deploys by
+`cd www && git reset --hard origin/production`. `ibl5/.htaccess` is a tracked repo file with no
+special handling — no `rsync`, `scp`, template render, or post-deploy `sed` — so the deployed file
+is byte-identical to the committed file.
 
 ---
 

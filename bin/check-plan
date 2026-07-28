@@ -150,8 +150,14 @@ set -u
 export LC_ALL=C
 
 usage() {
-    echo "Usage: bin/check-plan <plan-file>" >&2
+    echo "Usage: bin/check-plan [--print-critical-files] <plan-file>" >&2
 }
+
+CF_PRINT_ONLY=0
+if [ "${1:-}" = "--print-critical-files" ]; then
+    CF_PRINT_ONLY=1
+    shift
+fi
 
 PLAN_FILE="${1:-}"
 if [ -z "$PLAN_FILE" ] || [ ! -e "$PLAN_FILE" ]; then
@@ -171,6 +177,18 @@ done
 if [ "$REPO_ROOT" = "/" ]; then
     echo "error: could not locate repo root" >&2
     exit 2
+fi
+
+# shellcheck source=bin/lib/critical-files.sh
+source "$SCRIPT_DIR/lib/critical-files.sh"
+
+# Debug seam: print the canonical parse and stop. This is the observable
+# surface bin/test-postplan-arm-conditions feeds into the three-way parser
+# agreement test — without it check-plan's parse is only visible indirectly,
+# through gate [C]'s message text, which prints solely on marathon-sized plans.
+if [ "$CF_PRINT_ONLY" = 1 ]; then
+    cf_parse_section "$PLAN_FILE"
+    exit 0
 fi
 
 VIOL_FILE="$(mktemp)"
@@ -443,6 +461,23 @@ done < <(grep -iE 'reuse' "$PLAN_FILE" \
             | grep -oE '[A-Z][A-Za-z0-9_]*::[a-zA-Z_][A-Za-z0-9_]*')
 
 # ---------------------------------------------------------------------------
+# Gate [F]: Critical Files format — list form only.
+# ---------------------------------------------------------------------------
+# A table-formatted section parses to zero entries, so post-plan's Phase 5.0
+# conformance check covers NOTHING and passes silently — the failure is
+# invisible precisely because it looks clean. 42 of the 208 corpus plans with a
+# Critical Files section are table-form; all are already shipped, so this gate
+# only ever sees newly-authored plans. Hard failure, like every other gate.
+CF_SECTION="$(cf_section "$PLAN_FILE")"
+if [ -n "$(printf '%s' "$CF_SECTION" | tr -d '[:space:]')" ]; then
+    if cf_table_detected "$CF_SECTION"; then
+        viol "[F] ## Critical Files section uses table format — use list form: - \`path\` (annotation)"
+    elif [ -z "$(cf_parse_section "$PLAN_FILE")" ]; then
+        viol "[F] ## Critical Files section has no parseable entries — each entry must be a list bullet whose first token is a backticked path: - \`path\` (annotation)"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
 # Gate C: Context budget — a marathon-sized plan predicts a dumb-zone run.
 # ---------------------------------------------------------------------------
 # Size proxies only (a script cannot estimate real context): total line count
@@ -453,18 +488,7 @@ done < <(grep -iE 'reuse' "$PLAN_FILE" \
 CB_LINES=$(wc -l < "$PLAN_FILE" | tr -d '[:space:]')
 CB_PHASES=$(grep -cE '^#{2,3}[[:space:]]+([Ss]tep|[Pp]hase)[[:space:]]*[0-9]' "$PLAN_FILE")
 CB_VM_ROWS=$(grep -cE '^\|[[:space:]]*[0-9]' "$PLAN_FILE" || true)
-CB_CF_COUNT=$(awk '
-    /^## Critical Files/{in_cf=1; next}
-    /^## /{in_cf=0}
-    in_cf && /^- `[^`]+`/ {
-        line=$0
-        if (line !~ /\(reference\)/ && line !~ /\(read-only\)/ && \
-            line !~ /\(verify\)/ && line !~ /\(template\)/ && \
-            line !~ /\(no-edit\)/ && line !~ /\(unchanged\)/ && \
-            line !~ /\(context\)/) count++
-    }
-    END {print count+0}
-' "$PLAN_FILE")
+CB_CF_COUNT=$(cf_parse_section "$PLAN_FILE" | grep -c '^MUST_APPEAR:' || true)
 if [ "$CB_LINES" -ge 500 ] || [ "$CB_PHASES" -ge 12 ]; then
     if ! grep -qF 'context-budget:' "$PLAN_FILE"; then
         viol "[C] marathon-sized plan (${CB_LINES} lines, ${CB_PHASES} numbered phases, ${CB_VM_ROWS} matrix rows, ${CB_CF_COUNT} critical-file targets; flags at >=500 lines or >=12 phases) — split into stacked PR-sized plans (/plan Step 2.5), or justify a deliberate exception with a 'context-budget:' marker"

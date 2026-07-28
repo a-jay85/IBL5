@@ -7,25 +7,25 @@ namespace Api\Controller;
 use Api\Contracts\ControllerInterface;
 use Api\Response\JsonResponder;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
-use Trading\TradeOfferRepository;
 use Discord\Discord;
 
 class TradeDeclineController implements ControllerInterface
 {
-    private \mysqli $db;
     private TeamIdentityRepositoryInterface $commonRepository;
-    private string $serverName;
+    private \Trading\Contracts\TradeOfferRepositoryInterface $offerRepository;
 
     /**
      * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('discord').
      */
     private \Psr\Log\LoggerInterface $logger;
 
-    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepository, string $serverName = '', ?\Psr\Log\LoggerInterface $logger = null)
-    {
-        $this->db = $db;
+    public function __construct(
+        TeamIdentityRepositoryInterface $commonRepository,
+        \Trading\Contracts\TradeOfferRepositoryInterface $offerRepository,
+        ?\Psr\Log\LoggerInterface $logger = null
+    ) {
         $this->commonRepository = $commonRepository;
-        $this->serverName = $serverName;
+        $this->offerRepository = $offerRepository;
         $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('discord');
     }
 
@@ -46,7 +46,7 @@ class TradeDeclineController implements ControllerInterface
             return;
         }
 
-        $repository = new TradeOfferRepository($this->db, $this->serverName);
+        $repository = $this->offerRepository;
         $tradeRows = $repository->getTradesByOfferId($offerId);
 
         if ($tradeRows === []) {

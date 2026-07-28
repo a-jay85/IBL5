@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-07-27
+last_verified: 2026-07-28
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -828,7 +828,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
 | 14.5 | ⬜ Open | 🟨 | Module index.php → front-controller composition root (42 modules). Very large; routing/auth-sensitive → decompose + sequence (some modules touch mutations). |
-| 14.6 | ⬜ Open | 🟩 | 24 controllers raw `\mysqli`→Waivers DI pattern. Green-green; IDOR PRs #1107–1110 merged. |
+| 14.6 | ◑ Partial | 🟩 | 25 controllers raw `\mysqli`→Waivers DI pattern. Batch 1 (17 Api/Controller/*) done; batch 2 (8 module controllers) pending. IDOR PRs #1107–1110 merged. |
 | 14.8 | ⬜ Open | 🟩 | Introduce `HttpRequest` VO wrapping superglobals; green-green abstraction. |
 | 14.9 | ⬜ Open | 🟩 | `$cookie[1]` ritual — 21 occurrences across 11 files → injected `AuthService::getUsername()` (already exists at `classes/Auth/AuthService.php:111`); green-green call-site burndown. |
 | 14.10 | ◑ Partial | 🟨 | Container accessor registered (PR1); side-effect removal deferred to PR3 (boosted-HTMX cookie-population hazard) → careful sequencing. |

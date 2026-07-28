@@ -30,14 +30,74 @@ $app->getContainer()->set('api.controllerFactory', static function (): \Closure 
             return new \Api\Controller\HealthController(new \Api\Repository\HealthRepository($db));
         }
 
-        $tradeControllers = [
-            \Api\Controller\TradeAcceptController::class,
-            \Api\Controller\TradeDeclineController::class,
-        ];
+        // Group A — ApiGameRepository
+        if (in_array($controllerClass, [
+            \Api\Controller\GameBoxscoreController::class,
+            \Api\Controller\GameDetailController::class,
+            \Api\Controller\GameListController::class,
+        ], true)) {
+            return new $controllerClass(new \Api\Repository\ApiGameRepository($db));
+        }
 
-        if (in_array($controllerClass, $tradeControllers, true)) {
+        if ($controllerClass === \Api\Controller\InjuriesController::class) {
+            return new \Api\Controller\InjuriesController(new \Api\Repository\ApiInjuriesRepository($db));
+        }
+        if ($controllerClass === \Api\Controller\LeadersController::class) {
+            return new \Api\Controller\LeadersController(new \Api\Repository\ApiLeadersRepository($db));
+        }
+
+        // Group A — ApiPlayerRepository
+        if (in_array($controllerClass, [
+            \Api\Controller\PlayerDetailController::class,
+            \Api\Controller\PlayerExportController::class,
+            \Api\Controller\PlayerListController::class,
+            \Api\Controller\TeamRosterController::class,
+        ], true)) {
+            return new $controllerClass(new \Api\Repository\ApiPlayerRepository($db));
+        }
+
+        // Group A — ApiPlayerStatsRepository
+        if (in_array($controllerClass, [
+            \Api\Controller\PlayerHistoryController::class,
+            \Api\Controller\PlayerStatsController::class,
+        ], true)) {
+            return new $controllerClass(new \Api\Repository\ApiPlayerStatsRepository($db));
+        }
+
+        if ($controllerClass === \Api\Controller\StandingsController::class) {
+            return new \Api\Controller\StandingsController(new \Api\Repository\ApiStandingsRepository($db));
+        }
+
+        // Group A — ApiTeamRepository
+        if (in_array($controllerClass, [
+            \Api\Controller\TeamDetailController::class,
+            \Api\Controller\TeamListController::class,
+        ], true)) {
+            return new $controllerClass(new \Api\Repository\ApiTeamRepository($db));
+        }
+
+        // Group B — SeasonController
+        if ($controllerClass === \Api\Controller\SeasonController::class) {
+            return new \Api\Controller\SeasonController(new \Season\Season($db));
+        }
+
+        // Group C — TradeAcceptController
+        if ($controllerClass === \Api\Controller\TradeAcceptController::class) {
             $commonRepo = new \Repositories\TeamIdentityRepository($db);
-            return new $controllerClass($db, $commonRepo);
+            return new \Api\Controller\TradeAcceptController(
+                $commonRepo,
+                new \Trading\TradeOfferRepository($db, ''),
+                new \Trading\TradeProcessor($db, $commonRepo)
+            );
+        }
+
+        // Group C — TradeDeclineController
+        if ($controllerClass === \Api\Controller\TradeDeclineController::class) {
+            $commonRepo = new \Repositories\TeamIdentityRepository($db);
+            return new \Api\Controller\TradeDeclineController(
+                $commonRepo,
+                new \Trading\TradeOfferRepository($db, '')
+            );
         }
 
         if ($controllerClass === \Api\Controller\EnqueueController::class) {

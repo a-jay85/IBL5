@@ -13,7 +13,9 @@ class TradeDeclineControllerTest extends WideUnitTestCase
 {
     public function testReturns400WhenOfferIdMissing(): void
     {
-        $controller = new TradeDeclineController($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class));
+        $commonStub = self::createStub(TeamIdentityRepositoryInterface::class);
+        $offerStub  = self::createStub(\Trading\Contracts\TradeOfferRepositoryInterface::class);
+        $controller = new TradeDeclineController($commonStub, $offerStub);
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -25,7 +27,9 @@ class TradeDeclineControllerTest extends WideUnitTestCase
 
     public function testReturns400WhenDiscordUserIdMissing(): void
     {
-        $controller = new TradeDeclineController($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class));
+        $commonStub = self::createStub(TeamIdentityRepositoryInterface::class);
+        $offerStub  = self::createStub(\Trading\Contracts\TradeOfferRepositoryInterface::class);
+        $controller = new TradeDeclineController($commonStub, $offerStub);
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -37,9 +41,10 @@ class TradeDeclineControllerTest extends WideUnitTestCase
 
     public function testReturns404WhenTradeOfferNotFound(): void
     {
-        $this->mockDb->setMockData([]);
-
-        $controller = new TradeDeclineController($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class));
+        $commonStub = self::createStub(TeamIdentityRepositoryInterface::class);
+        $offerStub  = self::createStub(\Trading\Contracts\TradeOfferRepositoryInterface::class);
+        $offerStub->method('getTradesByOfferId')->willReturn([]);
+        $controller = new TradeDeclineController($commonStub, $offerStub);
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -58,21 +63,21 @@ class TradeDeclineControllerTest extends WideUnitTestCase
     {
         $this->suppressErrorLog();
 
-        $this->mockDb->setMockData([
+        $commonStub = self::createStub(TeamIdentityRepositoryInterface::class);
+        $offerStub  = self::createStub(\Trading\Contracts\TradeOfferRepositoryInterface::class);
+        $offerStub->method('getTradesByOfferId')->willReturn([
             [
                 'tradeofferid' => 42,
                 'itemid' => 100,
                 'itemtype' => '1',
-                'from' => 'Lakers',
-                'to' => 'Celtics',
+                'trade_from' => 'Lakers',
+                'trade_to' => 'Celtics',
                 'approval' => 'Celtics',
                 'created_at' => '2024-01-01 00:00:00',
                 'updated_at' => '2024-01-01 00:00:00',
-                'discord_id' => '999999999',
             ],
         ]);
-
-        $controller = new TradeDeclineController($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class));
+        $controller = new TradeDeclineController($commonStub, $offerStub);
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())

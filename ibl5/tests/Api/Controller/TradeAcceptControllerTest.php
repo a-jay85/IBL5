@@ -81,23 +81,24 @@ class TradeAcceptControllerTest extends WideUnitTestCase
     {
         $this->suppressErrorLog();
 
+        $commonStub    = self::createStub(TeamIdentityRepositoryInterface::class);
+        $offerStub     = self::createStub(\Trading\Contracts\TradeOfferRepositoryInterface::class);
+        $processorStub = self::createStub(\Trading\Contracts\TradeProcessorInterface::class);
         // Mock trade rows exist
-        $this->mockDb->setMockData([
+        $offerStub->method('getTradesByOfferId')->willReturn([
             [
                 'tradeofferid' => 42,
                 'itemid' => 100,
                 'itemtype' => '1',
-                'from' => 'Lakers',
-                'to' => 'Celtics',
+                'trade_from' => 'Lakers',
+                'trade_to' => 'Celtics',
                 'approval' => 'Celtics',
                 'created_at' => '2024-01-01 00:00:00',
                 'updated_at' => '2024-01-01 00:00:00',
-                // Discord lookup returns this GM's ID
-                'discord_id' => '999999999',
             ],
         ]);
 
-        $controller = new TradeAcceptController($this->mockDb, self::createStub(TeamIdentityRepositoryInterface::class));
+        $controller = new TradeAcceptController($commonStub, $offerStub, $processorStub);
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())

@@ -614,6 +614,34 @@ jobs:
       # Phase 1) caps it. Backlog: token-spend-backlog T2.
       - name: Check path-unscoped rules byte budget
         run: bin/check-rules-byte-budget
+      # shallow-fetch guard: a shallow fetch inside repo tooling is safe on a CI
+      # runner but silently CREATES .git/shallow in a full local clone, grafting
+      # origin/<base> to one commit. merge-base then returns nothing and the next
+      # rebase replays the whole history and conflicts — and because every worktree
+      # shares the main checkout's .git, one local run breaks the ship pipeline
+      # repo-wide (that is exactly how check-rules-byte-budget:86 failed a
+      # post-plan run). Shallow flags must sit behind an is-shallow-repository
+      # guard and carry a `# shallow-ok` marker on the line.
+      - name: Check shallow git fetches are guarded
+        run: |
+          set +e
+          # NO \b — git grep -E is POSIX ERE and silently matches NOTHING on \b,
+          # which would make this gate fail open. Verified against origin/master.
+          raw=$(git grep -nE 'git[^#]*(fetch|pull)[^#]*--(depth|shallow-since|shallow-exclude)' \
+                  -- bin .claude tools ibl5/bin)
+          rc=$?
+          set -e
+          # rc 0 = matches, 1 = none; anything higher means git grep itself failed
+          # (e.g. a pathspec that stopped existing) — fail closed, never green.
+          [ "$rc" -le 1 ] || { echo "FAIL: git grep errored (rc=$rc) — gate cannot verify" >&2; exit 1; }
+          hits=$(printf '%s' "$raw" | grep -v '# shallow-ok' || true)
+          if [ -n "$hits" ]; then
+            echo "FAIL: unguarded shallow git fetch (corrupts a full local clone's .git):" >&2
+            echo "$hits" >&2
+            echo "Guard it, then mark the line: if [ \"\$(git rev-parse --is-shallow-repository)\" = true ]; then git fetch --depth=1 ...  # shallow-ok" >&2
+            exit 1
+          fi
+          echo "OK: no unguarded shallow git fetch"
 
   harness-tests:
     name: Shell harness regression tests

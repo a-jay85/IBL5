@@ -2,6 +2,8 @@
 
 Deterministic port of post-plan SKILL.md Phase 1, Phase 6.5 condition (7)'s
 frontmatter awk, and _phase-5-final-verification.md's matrix/Critical-Files parsing.
+Single source of truth for Critical Files exemption: bin/lib/critical-files.sh
+(Python cannot source shell; this module mirrors it and is pinned by test_planfile.py).
 """
 from __future__ import annotations
 
@@ -10,8 +12,21 @@ import re
 
 from .state import PlanInfo
 
+# Paren-scoped canonical exempt marker. MUST stay behaviorally identical to
+# CF_EXEMPT_PATTERN in bin/lib/critical-files.sh — that shell lib is the single
+# source of truth; Python cannot source it, so this is a mirror pinned by
+# tests/test_planfile.py::test_lib_sync (behavioral agreement over a shared
+# fixture) and ::test_lib_pattern_sync (byte-level). Differences in dialect are
+# fine ((?:…) vs (…), \( vs [(]); differences in CLASSIFICATION are the bug.
+#
+# Exempt iff the annotation contains a PARENTHESIZED group whose contents
+# include a canonical token. A token in surrounding prose does NOT exempt —
+# that unanchored match is the #923 false-EXEMPT bug this replaces.
+# Canonical tokens: reference, read-only, read-only reference, verify,
+# verification, template, no-edit, no-change, unchanged, context, conditional.
 EXEMPT_RE = re.compile(
-    r"reference|read-?only|verif(y|ication)|template|no[- ]edit|no[- ]change|unchanged|context",
+    r"\([^)]*(?:reference|read-?only|verif(?:y|ication)|template|"
+    r"no[- ]edit|no[- ]change|unchanged|context|conditional)[^)]*\)",
     re.IGNORECASE,
 )
 _MATRIX_HEADER = re.compile(r"^\s*\|.*Test type", re.IGNORECASE)
@@ -64,8 +79,11 @@ def parse_matrix(content: str) -> tuple[list[str], list[str]]:
 
 def parse_critical_files(content: str) -> list[tuple]:
     """[(path, annotation, exempt)] from `## Critical Files` — the Phase 5.0 awk port:
-    primary backticked path per bullet; exempt iff annotation (backticks stripped)
-    matches the reference-marker regex."""
+    primary backticked path per bullet; exempt iff the annotation (backticks stripped)
+    contains a parenthesized group holding a canonical marker — `(reference)`,
+    `(read-only)`, `(read-only reference)`, `(verify)`, `(verification)`, `(template)`,
+    `(no-edit)`, `(no-change)`, `(unchanged)`, `(context)`, `(conditional)`.
+    Single source of truth for the exemption rule: bin/lib/critical-files.sh."""
     m = re.search(r"^## *Critical Files.*?$(.*?)(?=^## |\Z)", content, re.M | re.S)
     if not m:
         return []

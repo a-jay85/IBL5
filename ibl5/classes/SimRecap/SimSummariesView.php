@@ -115,17 +115,16 @@ class SimSummariesView
         <p id="recap-outro" class="whitespace-pre-line"><?= HtmlSanitizer::e($outro) ?></p>
 <?php endif; ?>
 <?php
-        // recap_text is a ~220-char teaser; the postable document only exists as
-        // intro + per-game rows + outro. Fall back to the teaser only when there is
-        // nothing to assemble, so Copy is never empty.
-        $document = RecapDocument::assemble(
+        // recap_text is usually a ~220-char teaser; the postable document only exists as
+        // intro + per-game rows + outro. postableText() falls back to the stored text
+        // when there is nothing to assemble or the parts lost their GM mention lines,
+        // so Copy is never empty and never silently drops a tag.
+        $document = RecapDocument::postableText(
             is_string($intro) ? $intro : null,
             $gameRecaps,
-            is_string($outro) ? $outro : null
+            is_string($outro) ? $outro : null,
+            $body
         );
-        if ($document === '') {
-            $document = $body;
-        }
 ?>
         <textarea id="recap-body" readonly rows="24" cols="100"><?= HtmlSanitizer::e($document) ?></textarea>
         <p>

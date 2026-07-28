@@ -67,6 +67,78 @@ final class RecapDocument
     }
 
     /**
+     * What the GM actually pastes — the assembled document when the stored parts carry
+     * the format, the stored `recap_text` when they don't.
+     *
+     * The generator is not guaranteed to have written the shape `bin/sim-recap-prompt`
+     * asks for. Sim 722 (2026-07-26) stored 56 per-game parts that were bare prose: no
+     * `**Away 110 @ Home 104**` score header and no `<@id> · <@id>` mention line, while
+     * its `recap_text` held the complete 25K document including all 112 mentions.
+     * Assembling those parts produces a document that reads fine and silently drops
+     * every GM's Discord tag — worse than what the league had before this class existed.
+     * So when the parts are degraded, fall back to the stored text.
+     *
+     * `assemble()` deliberately stays shape-tolerant (it is a pure formatter and cannot
+     * see the stored text), which is why the choice lives here instead.
+     *
+     * @param list<array<string, mixed>> $gameRecaps From SimSummaryRepository::findDisplayableGameRecaps(), already in sort order
+     */
+    public static function postableText(?string $intro, array $gameRecaps, ?string $outro, ?string $storedText): string
+    {
+        $document = self::assemble($intro, $gameRecaps, $outro);
+        $stored   = is_string($storedText) ? $storedText : '';
+
+        // Nothing to fall back to — the assembled document is all there is, even if degraded.
+        if (trim($stored) === '') {
+            return $document;
+        }
+
+        // No parts at all: the stored text, returned verbatim. Trimming would change the
+        // exported bytes, so the emptiness test above is the only place `trim()` is used.
+        if ($document === '') {
+            return $stored;
+        }
+
+        return self::gamesCarryTheirMentionLines($gameRecaps) ? $document : $stored;
+    }
+
+    /**
+     * All-or-nothing per sim, not per game: a run where only some games carry their
+     * mentions means the generator was inconsistent, and assembling it would leave
+     * exactly the GMs of the malformed games un-notified — the silent failure this
+     * guard exists to prevent.
+     *
+     * At least one non-empty part is required. A sim with a full stored document and no
+     * usable parts would otherwise assemble an intro+outro that looks like a complete
+     * recap with every game missing.
+     *
+     * The mention line is checked at index 1 alone, independently of what follows, so a
+     * part already in the exemplar's header/mentions/blank/prose shape still counts.
+     *
+     * @param list<array<string, mixed>> $gameRecaps
+     */
+    private static function gamesCarryTheirMentionLines(array $gameRecaps): bool
+    {
+        $sawAGame = false;
+
+        foreach ($gameRecaps as $game) {
+            $text = self::clean($game['recap_text'] ?? null);
+            if ($text === '') {
+                continue;
+            }
+
+            $sawAGame = true;
+            $lines    = explode("\n", str_replace("\r\n", "\n", $text));
+
+            if (!isset($lines[1]) || preg_match(self::MENTION_LINE, $lines[1]) !== 1) {
+                return false;
+            }
+        }
+
+        return $sawAGame;
+    }
+
+    /**
      * Games keep the order the caller gave them; a new section starts only when the
      * date changes, so each date gets exactly one rule. A map keyed by date would be
      * shorter but PHP coerces numeric-looking keys to int, so the sections are a list.

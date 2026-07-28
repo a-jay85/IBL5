@@ -51,7 +51,7 @@ class SeasonControllerTest extends WideUnitTestCase
 
     public function testHandleReturnsSeasonData(): void
     {
-        $controller = new SeasonController($this->mockDb);
+        $controller = new SeasonController(new \Season\Season($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -77,7 +77,7 @@ class SeasonControllerTest extends WideUnitTestCase
     {
         $_SERVER['HTTP_IF_NONE_MATCH'] = $this->expectedETag();
 
-        $controller = new SeasonController($this->mockDb);
+        $controller = new SeasonController(new \Season\Season($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -93,7 +93,7 @@ class SeasonControllerTest extends WideUnitTestCase
     {
         $expectedTag = $this->expectedETag();
 
-        $controller = new SeasonController($this->mockDb);
+        $controller = new SeasonController(new \Season\Season($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())

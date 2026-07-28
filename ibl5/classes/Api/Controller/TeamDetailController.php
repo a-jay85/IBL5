@@ -12,11 +12,11 @@ use Api\Transformer\TeamTransformer;
 
 class TeamDetailController implements ControllerInterface
 {
-    private \mysqli $db;
+    private ApiTeamRepository $repo;
 
-    public function __construct(\mysqli $db)
+    public function __construct(ApiTeamRepository $repo)
     {
-        $this->db = $db;
+        $this->repo = $repo;
     }
 
     /**
@@ -25,7 +25,7 @@ class TeamDetailController implements ControllerInterface
     public function handle(array $params, array $query, JsonResponder $responder, ?array $body = null): void
     {
         $uuid = $params['uuid'] ?? '';
-        $repo = new ApiTeamRepository($this->db);
+        $repo = $this->repo;
         $transformer = new TeamTransformer();
         $etag = new ETagHandler();
 

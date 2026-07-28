@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Api\Controller;
 
 use Api\Controller\PlayerStatsController;
+use Api\Repository\ApiPlayerStatsRepository;
 use Api\Response\JsonResponder;
 use Tests\WideUnit\WideUnitTestCase;
 
@@ -14,7 +15,7 @@ class PlayerStatsControllerTest extends WideUnitTestCase
     {
         $this->mockDb->setMockData([]);
 
-        $controller = new PlayerStatsController($this->mockDb);
+        $controller = new PlayerStatsController(new ApiPlayerStatsRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -55,7 +56,7 @@ class PlayerStatsControllerTest extends WideUnitTestCase
             ],
         ]);
 
-        $controller = new PlayerStatsController($this->mockDb);
+        $controller = new PlayerStatsController(new ApiPlayerStatsRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())

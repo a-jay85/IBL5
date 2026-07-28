@@ -12,11 +12,11 @@ use Api\Transformer\PlayerStatsTransformer;
 
 class PlayerHistoryController implements ControllerInterface
 {
-    private \mysqli $db;
+    private ApiPlayerStatsRepository $repo;
 
-    public function __construct(\mysqli $db)
+    public function __construct(ApiPlayerStatsRepository $repo)
     {
-        $this->db = $db;
+        $this->repo = $repo;
     }
 
     /**
@@ -25,7 +25,7 @@ class PlayerHistoryController implements ControllerInterface
     public function handle(array $params, array $query, JsonResponder $responder, ?array $body = null): void
     {
         $uuid = $params['uuid'] ?? '';
-        $repo = new ApiPlayerStatsRepository($this->db);
+        $repo = $this->repo;
         $transformer = new PlayerStatsTransformer();
         $etag = new ETagHandler();
 

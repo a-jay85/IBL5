@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Api\Controller;
 
 use Api\Controller\LeadersController;
+use Api\Repository\ApiLeadersRepository;
 use Api\Response\JsonResponder;
 use Tests\WideUnit\WideUnitTestCase;
 
@@ -46,7 +47,7 @@ class LeadersControllerTest extends WideUnitTestCase
             ],
         ]);
 
-        $controller = new LeadersController($this->mockDb);
+        $controller = new LeadersController(new ApiLeadersRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -74,7 +75,7 @@ class LeadersControllerTest extends WideUnitTestCase
     {
         $this->mockDb->setMockData([]);
 
-        $controller = new LeadersController($this->mockDb);
+        $controller = new LeadersController(new ApiLeadersRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -95,7 +96,7 @@ class LeadersControllerTest extends WideUnitTestCase
     {
         $this->mockDb->setMockData([]);
 
-        $controller = new LeadersController($this->mockDb);
+        $controller = new LeadersController(new ApiLeadersRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -116,7 +117,7 @@ class LeadersControllerTest extends WideUnitTestCase
     {
         $this->mockDb->setMockData([]);
 
-        $controller = new LeadersController($this->mockDb);
+        $controller = new LeadersController(new ApiLeadersRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())

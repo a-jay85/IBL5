@@ -7,21 +7,22 @@ namespace Api\Controller;
 use Api\Contracts\ControllerInterface;
 use Api\Response\JsonResponder;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
-use Trading\TradeProcessor;
-use Trading\TradeOfferRepository;
 use Discord\Discord;
 
 class TradeAcceptController implements ControllerInterface
 {
-    private \mysqli $db;
     private TeamIdentityRepositoryInterface $commonRepository;
-    private string $serverName;
+    private \Trading\Contracts\TradeOfferRepositoryInterface $offerRepository;
+    private \Trading\Contracts\TradeProcessorInterface $processor;
 
-    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepository, string $serverName = '')
-    {
-        $this->serverName = $serverName;
-        $this->db = $db;
+    public function __construct(
+        TeamIdentityRepositoryInterface $commonRepository,
+        \Trading\Contracts\TradeOfferRepositoryInterface $offerRepository,
+        \Trading\Contracts\TradeProcessorInterface $processor
+    ) {
         $this->commonRepository = $commonRepository;
+        $this->offerRepository = $offerRepository;
+        $this->processor = $processor;
     }
 
     /**
@@ -41,7 +42,7 @@ class TradeAcceptController implements ControllerInterface
             return;
         }
 
-        $repository = new TradeOfferRepository($this->db, $this->serverName);
+        $repository = $this->offerRepository;
         $tradeRows = $repository->getTradesByOfferId($offerId);
 
         if ($tradeRows === []) {
@@ -66,7 +67,7 @@ class TradeAcceptController implements ControllerInterface
             }
         }
 
-        $processor = new TradeProcessor($this->db, $this->commonRepository);
+        $processor = $this->processor;
         $result = $processor->processTrade($offerId);
 
         if ($result['success'] !== true) {

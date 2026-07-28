@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Api\Controller;
 
 use Api\Controller\TeamDetailController;
+use Api\Repository\ApiTeamRepository;
 use Api\Response\JsonResponder;
 use Tests\WideUnit\WideUnitTestCase;
 
@@ -45,7 +46,7 @@ class TeamDetailControllerTest extends WideUnitTestCase
     {
         $this->mockDb->setMockData([$this->teamRow()]);
 
-        $controller = new TeamDetailController($this->mockDb);
+        $controller = new TeamDetailController(new ApiTeamRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -76,7 +77,7 @@ class TeamDetailControllerTest extends WideUnitTestCase
     {
         $this->mockDb->setMockData([]);
 
-        $controller = new TeamDetailController($this->mockDb);
+        $controller = new TeamDetailController(new ApiTeamRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -93,7 +94,7 @@ class TeamDetailControllerTest extends WideUnitTestCase
         $expectedTag = '"' . md5('team-' . self::TEAM_UUID) . '"';
         $_SERVER['HTTP_IF_NONE_MATCH'] = $expectedTag;
 
-        $controller = new TeamDetailController($this->mockDb);
+        $controller = new TeamDetailController(new ApiTeamRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -108,7 +109,7 @@ class TeamDetailControllerTest extends WideUnitTestCase
 
         $expectedTag = '"' . md5('team-' . self::TEAM_UUID) . '"';
 
-        $controller = new TeamDetailController($this->mockDb);
+        $controller = new TeamDetailController(new ApiTeamRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())

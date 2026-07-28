@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Api\Controller;
 
 use Api\Controller\GameListController;
+use Api\Repository\ApiGameRepository;
 use Api\Response\JsonResponder;
 use Tests\WideUnit\WideUnitTestCase;
 
@@ -39,7 +40,7 @@ class GameListControllerTest extends WideUnitTestCase
             ],
         ]);
 
-        $controller = new GameListController($this->mockDb);
+        $controller = new GameListController(new ApiGameRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -67,7 +68,7 @@ class GameListControllerTest extends WideUnitTestCase
     {
         $this->mockDb->setMockData([]);
 
-        $controller = new GameListController($this->mockDb);
+        $controller = new GameListController(new ApiGameRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -83,7 +84,7 @@ class GameListControllerTest extends WideUnitTestCase
     {
         $this->mockDb->setMockData([]);
 
-        $controller = new GameListController($this->mockDb);
+        $controller = new GameListController(new ApiGameRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())

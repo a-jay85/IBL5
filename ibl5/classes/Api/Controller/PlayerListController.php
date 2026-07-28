@@ -13,11 +13,11 @@ use Api\Transformer\PlayerTransformer;
 
 class PlayerListController implements ControllerInterface
 {
-    private \mysqli $db;
+    private ApiPlayerRepository $repo;
 
-    public function __construct(\mysqli $db)
+    public function __construct(ApiPlayerRepository $repo)
     {
-        $this->db = $db;
+        $this->repo = $repo;
     }
 
     private const ALLOWED_SORT_COLUMNS = ['name', 'age', 'position', 'points_per_game', 'experience'];
@@ -28,7 +28,7 @@ class PlayerListController implements ControllerInterface
     public function handle(array $params, array $query, JsonResponder $responder, ?array $body = null): void
     {
         $paginator = new Paginator($query, 'name', self::ALLOWED_SORT_COLUMNS);
-        $repo = new ApiPlayerRepository($this->db);
+        $repo = $this->repo;
         $transformer = new PlayerTransformer();
         $etag = new ETagHandler();
 

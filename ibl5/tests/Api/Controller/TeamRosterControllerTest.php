@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Api\Controller;
 
 use Api\Controller\TeamRosterController;
+use Api\Repository\ApiPlayerRepository;
 use Api\Response\JsonResponder;
 use Tests\WideUnit\WideUnitTestCase;
 
@@ -80,7 +81,7 @@ class TeamRosterControllerTest extends WideUnitTestCase
         $this->mockDb->onQuery('SELECT COUNT', [['total' => 1]]);
         $this->mockDb->setMockData([$this->playerRow()]);
 
-        $controller = new TeamRosterController($this->mockDb);
+        $controller = new TeamRosterController(new ApiPlayerRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -114,7 +115,7 @@ class TeamRosterControllerTest extends WideUnitTestCase
     {
         $this->mockDb->onQuery('SELECT COUNT', [['total' => 0]]);
 
-        $controller = new TeamRosterController($this->mockDb);
+        $controller = new TeamRosterController(new ApiPlayerRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -133,7 +134,7 @@ class TeamRosterControllerTest extends WideUnitTestCase
         $expectedTag = '"' . md5($row['updated_at']) . '"';
         $_SERVER['HTTP_IF_NONE_MATCH'] = $expectedTag;
 
-        $controller = new TeamRosterController($this->mockDb);
+        $controller = new TeamRosterController(new ApiPlayerRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())

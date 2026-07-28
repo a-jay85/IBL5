@@ -13,11 +13,11 @@ use Api\Transformer\GameTransformer;
 
 class GameBoxscoreController implements ControllerInterface
 {
-    private \mysqli $db;
+    private ApiGameRepository $repo;
 
-    public function __construct(\mysqli $db)
+    public function __construct(ApiGameRepository $repo)
     {
-        $this->db = $db;
+        $this->repo = $repo;
     }
 
     /**
@@ -26,7 +26,7 @@ class GameBoxscoreController implements ControllerInterface
     public function handle(array $params, array $query, JsonResponder $responder, ?array $body = null): void
     {
         $uuid = $params['uuid'] ?? '';
-        $repo = new ApiGameRepository($this->db);
+        $repo = $this->repo;
         $gameTransformer = new GameTransformer();
         $boxscoreTransformer = new BoxscoreTransformer();
         $etag = new ETagHandler();

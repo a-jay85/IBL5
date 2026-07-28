@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Api\Controller;
 
 use Api\Controller\GameBoxscoreController;
+use Api\Repository\ApiGameRepository;
 use Api\Response\JsonResponder;
 use Tests\WideUnit\WideUnitTestCase;
 
@@ -148,7 +149,7 @@ class GameBoxscoreControllerTest extends WideUnitTestCase
     {
         $this->seedSuccessMocks();
 
-        $controller = new GameBoxscoreController($this->mockDb);
+        $controller = new GameBoxscoreController(new ApiGameRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -178,7 +179,7 @@ class GameBoxscoreControllerTest extends WideUnitTestCase
     {
         $this->mockDb->onQuery('vw_schedule_upcoming', []);
 
-        $controller = new GameBoxscoreController($this->mockDb);
+        $controller = new GameBoxscoreController(new ApiGameRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -195,7 +196,7 @@ class GameBoxscoreControllerTest extends WideUnitTestCase
     {
         $this->mockDb->onQuery('vw_schedule_upcoming', [$this->gameRow('scheduled')]);
 
-        $controller = new GameBoxscoreController($this->mockDb);
+        $controller = new GameBoxscoreController(new ApiGameRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -215,7 +216,7 @@ class GameBoxscoreControllerTest extends WideUnitTestCase
         $expectedTag = '"' . md5(self::UPDATED_AT) . '"';
         $_SERVER['HTTP_IF_NONE_MATCH'] = $expectedTag;
 
-        $controller = new GameBoxscoreController($this->mockDb);
+        $controller = new GameBoxscoreController(new ApiGameRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())
@@ -231,7 +232,7 @@ class GameBoxscoreControllerTest extends WideUnitTestCase
     {
         $this->seedSuccessMocks();
 
-        $controller = new GameBoxscoreController($this->mockDb);
+        $controller = new GameBoxscoreController(new ApiGameRepository($this->mockDb));
         $responder = $this->createMock(JsonResponder::class);
 
         $responder->expects($this->once())

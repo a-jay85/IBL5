@@ -12,11 +12,11 @@ use Api\Transformer\PlayerExportTransformer;
 
 class PlayerExportController implements ControllerInterface
 {
-    private \mysqli $db;
+    private ApiPlayerRepository $repo;
 
-    public function __construct(\mysqli $db)
+    public function __construct(ApiPlayerRepository $repo)
     {
-        $this->db = $db;
+        $this->repo = $repo;
     }
 
     /**
@@ -24,7 +24,7 @@ class PlayerExportController implements ControllerInterface
      */
     public function handle(array $params, array $query, JsonResponder $responder, ?array $body = null): void
     {
-        $repo = new ApiPlayerRepository($this->db);
+        $repo = $this->repo;
         $transformer = new PlayerExportTransformer();
         $csv = new CsvResponder();
 

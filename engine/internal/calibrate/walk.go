@@ -104,12 +104,10 @@ type Options struct {
 	// const path). The pointer distinguishes "unset" (nil ⇒ const) from a real value.
 	BaseTimeMid *float64
 
-	// StealTurnoverScale / NonStealTurnoverScale, when non-nil, override the sim
-	// package turnover-scale consts in the default (non-injected) engine runs — the
-	// J14 research turnover-scale sweep. Threaded into sim.Options by validateWithArms
-	// (an injected Options.Validate test seam ignores them). nil ⇒ const path, so every
-	// existing caller stays byte-identical.
-	StealTurnoverScale    *float64
+	// NonStealTurnoverScale, when non-nil, overrides the sim package nonStealTurnoverScale
+	// const in the default (non-injected) engine runs — the J14 research turnover-scale
+	// sweep. Threaded into sim.Options by validateWithArms (an injected Options.Validate
+	// test seam ignores it). nil ⇒ const path, so every existing caller stays byte-identical.
 	NonStealTurnoverScale *float64
 
 	// GateBaseline, when non-nil, overrides the L1 gate-1 baseline term (the league

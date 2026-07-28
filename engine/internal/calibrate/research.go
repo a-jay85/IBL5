@@ -95,7 +95,6 @@ func researchWalk(root string, opts Options, apply func(*Options)) (map[string]f
 
 	simOpts := sim.Options{
 		BaseTimeMid:           optsCopy.BaseTimeMid,
-		StealTurnoverScale:    optsCopy.StealTurnoverScale,
 		NonStealTurnoverScale: optsCopy.NonStealTurnoverScale,
 	}
 

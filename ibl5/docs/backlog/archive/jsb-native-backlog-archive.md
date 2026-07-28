@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed JSB native-engine backlog entries (J-items), extracted from engine/docs/backlog/jsb-native-backlog.md.
-last_verified: 2026-07-24
+last_verified: 2026-07-26
 ---
 
 # JSB Native-Engine Backlog — Archive
@@ -230,3 +230,13 @@ The `project_jsb_engine_frontier.md` memory (a hand-maintained hash ledger + FRO
 **(c) spp-channel carriers ruled exhausted (June decomp):** the shots-per-possession structural carriers were RE'd faithful on both ends — transition **source** and OREB **sink** — verdict `/plan ON HOLD; next is judgment, NOT another spp-count RE`. The live descendants of that dispersion thread are the J-series → gate-1 arming share and J22 (shipped).
 
 **(d) #1520 shotdecision 3pt formula correction:** the `×1.5` at decompile `:94025` is the net **DIVISOR** (`baseline×1.5`), NOT the make value → `shotValue3pt = d80 + net×500/(baseline×1.5) + block`. The correction also lives in `engine/internal/sim/shotdecision.go`'s header and `00_MASTER_REFERENCE.md`.
+
+### J7 Turnover volume-coupling fidelity RE
+**Location:** Engine turnover model vs 5.60; measured `corr(volume, TOV/POSS)` engine **+0.163** vs real **−0.176** (gap +0.339). RE artifact: `jsb-native/re-artifacts/jsb-J7-tov-coupling-RE-20260720.md` (machine-local, git-excluded).
+**Mechanism (pinned 2026-07-20 — primary source master-ref :436-443, :478, :505-506):**
+- **5.60:** `P(turnover)` = offense's own per-48 TOV-rate composite (`+0xDD8` = `TOV/MIN×48`), applied per-possession as a **volume-normalized share**: `TVR_rate / (total_shot_rate + TVR_rate)`. High shot-volume grows the denominator without touching the numerator → `P(TO)` diluted → `TOV/POSS` falls as volume rises → real **−0.176**. The per-48 normalization cancels in the ratio; what governs is the pure share, not rates. The fast-break conversion path (`:436-443`: `total_shot_rate / (total_shot_rate + TVR_rate)`) is a **secondary, same-signed channel** (high-volume teams also *convert* fast breaks more / lose fewer) — corroborated at :443, but it is NOT the turnover generator.
+- **Go (`steal.go:82`):** `prob = stealTurnoverScale × (100−TVR_rating) × Σ(defender STL × fatigue)` — absolute product, no shot_rate in the denominator, no share. The offense's TOV-rate self-coupling is severed and replaced with a rating×opponent-steal-pool product that carries no roster shot/TOV anti-correlation → residual nets **+0.163**.
+**Verdict:** Sign flip = **stat-vs-rating + self-vs-opponent** substitution in the turnover-probability anchor — the same `offQ`/`defQ` divergence pattern at `00_MASTER_REFERENCE.md:1488`. This is a **normalization-kind** mismatch, not a mechanical-competition difference (steal-before-shot competition exists in both engines — confirmed; not the discriminator). An independent, sizeable fidelity bug. Confirms and quantifies the June closure (`jsb-poss-channel-RE-20260613.md:77-80`).
+**A/B (measured 2026-07-26):** Faithful port **regressed** `Cov(lnFGA,lnPPS)` by **−0.000062** (pre-impl −0.000226 → post-impl −0.000288; estimated −0.0001..−0.0002 was the plan prior; actual delta smaller). Disclosed as J28. Filed as bug, never as count-axis fix.
+**Port:** ⚙️ Sonnet from the pinned mechanism; sequenced after J13.
+**Status (2026-07-26):** ✅ Implemented — `teamOffTOVShare` (`TVR_rate/(shot_rate+TVR_rate)`) replaces `stealTurnoverScale×(100−TVR)×Σ(STL×fatigue)`. `StealTurnoverScale` and `teamStealPressure` removed. `tovCarelessRate48` added for IBL5 TVR orientation (high TVR = good security = fewer steal TOs). Cov regression −0.000062 disclosed as J28. ⚙️ Sonnet.

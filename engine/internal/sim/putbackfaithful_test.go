@@ -176,8 +176,8 @@ func TestPutbackFaithful_RNGConsumptionUnchanged(t *testing.T) {
 		inWith := outcomeInputs{twoPtWeight: 10, threePtWeight: 5, andOneWeight: 1, foulOnlyWeight: 2, turnoverDefValue: 3}
 		inZero := inWith
 		inZero.threePtWeight = 0
-		selectOutcome(inWith, false, false, false, r1)
-		selectOutcome(inZero, false, false, false, r2)
+		selectOutcome(inWith, false, false, false, false, r1)
+		selectOutcome(inZero, false, false, false, false, r2)
 		if got1, got2 := r1.Float64(), r2.Float64(); got1 != got2 {
 			t.Fatalf("seed %d: RNG desynced after zeroing threePtWeight (next draw %v != %v) — selectOutcome consumed a different number of values", seed, got1, got2)
 		}

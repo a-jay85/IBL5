@@ -244,6 +244,10 @@ func (s *teamShoot) add(o teamShoot) {
 //   - "suppress_transition": sim.FreezeConfig{SuppressTransition3pt: true} — the
 //     pre-port baseline arm (transition 3pt suppressed, matching the pre-j24
 //     behavior). Used to measure the gate contribution before removing it.
+//   - "suppress_w4_rescale": sim.FreezeConfig{SuppressW4Rescale: true} — the
+//     pre-port baseline arm for the shot-clock foul-bucket rescale (w4←w4·(w2/w1),
+//     JSB 5.60 @0x4e1e93–0x4e1ebf). Restores no-rescale (3pt share = w2/(w2+w4))
+//     for A/B measurement. Toggles a mechanism, never a constant (ADR-0090).
 func abFreeze() sim.FreezeConfig {
 	switch os.Getenv("JSB_3PT_AB") {
 	case "unfaithful3pt":
@@ -252,6 +256,8 @@ func abFreeze() sim.FreezeConfig {
 		return sim.FreezeConfig{UnfaithfulPutback: true}
 	case "suppress_transition":
 		return sim.FreezeConfig{SuppressTransition3pt: true}
+	case "suppress_w4_rescale":
+		return sim.FreezeConfig{SuppressW4Rescale: true}
 	default:
 		return sim.FreezeConfig{}
 	}

@@ -170,6 +170,41 @@ func TestFreeze_MisconfigErrors(t *testing.T) {
 	}
 }
 
+// SuppressW4Rescale is an inverted-polarity escape hatch that consumes NO
+// FreezeMeans (it only toggles the shot-clock foul-bucket rescale, porting JSB
+// 5.60 @0x4e1e93–0x4e1ebf). validate() must therefore accept it with an empty
+// Means — the same non-regression SuppressTransition3pt / UnfaithfulOreb rely on.
+// A future validate() edit that started erroring on a "Means-less" arm would break
+// the A/B harness silently at run time, so pin it here.
+func TestFreeze_SuppressW4RescaleNeedsNoMeans(t *testing.T) {
+	b := richBundle()
+	cfg := FreezeConfig{SuppressW4Rescale: true}
+	if cfg.Means != (FreezeMeans{}) {
+		t.Fatalf("SuppressW4Rescale carries a Means %v, want the zero value (it consumes none)", cfg.Means)
+	}
+	if _, err := SimulateWith(b, 1, Options{Freeze: cfg}); err != nil {
+		t.Errorf("SimulateWith SuppressW4Rescale (no Means): got error %v, want nil", err)
+	}
+}
+
+// Phase 4.2 pin: the shot-clock foul rescale is gated on shotClock, so the
+// SuppressW4Rescale flag is provably INERT on the transition path (shotClock is
+// hard-false there). Over a fixed seed and 5000 draws, selectOutcome must return
+// the identical code sequence with the flag true and false when shotClock=false —
+// so a later reader need not re-derive that transition.go is unaffected.
+func TestFreeze_SuppressW4RescaleInertWhenNotShotClock(t *testing.T) {
+	in := outcomeInputs{twoPtWeight: 8, threePtWeight: 3, andOneWeight: 1, foulOnlyWeight: 2, turnoverDefValue: 4}
+	rOff := rng.New(4242)
+	rOn := rng.New(4242)
+	for i := 0; i < 5000; i++ {
+		off := selectOutcome(in, false, false /*shotClock*/, false, false /*suppress*/, rOff)
+		on := selectOutcome(in, false, false /*shotClock*/, false, true /*suppress*/, rOn)
+		if off != on {
+			t.Fatalf("draw %d: shotClock=false code diverged with the flag on/off (%v != %v) — flag is not inert on the transition path", i, off, on)
+		}
+	}
+}
+
 // ADR-0053 — the origin-scoped MakePutback / MakePutbackHalf arms.
 //
 // The arm substitutes the league mean ONLY for an OriginOffReb (putback) 2pt make-

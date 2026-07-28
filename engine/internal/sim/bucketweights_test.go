@@ -14,7 +14,7 @@ func pathCounts(in outcomeInputs, n int, seed uint64) map[outcomeCode]int {
 	r := rng.New(seed)
 	counts := map[outcomeCode]int{}
 	for i := 0; i < n; i++ {
-		counts[selectOutcome(in, false, false, false, r)]++
+		counts[selectOutcome(in, false, false, false, false, r)]++
 	}
 	return counts
 }

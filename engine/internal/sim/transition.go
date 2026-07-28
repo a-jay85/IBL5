@@ -171,7 +171,7 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 			gs.outcomeDiag.Add(twoPtW, threePtW, foulW, in.andOneWeight, threePtW > 0 /*eligible3pt*/, true /*transition*/, bh.RealLifeMIN == 0)
 		}
 
-		switch selectOutcome(in, false, false, false, gs.rng) {
+		switch selectOutcome(in, false, false, false, false, gs.rng) {
 		case outcome2pt:
 			// Every shot on a fired fast break is tagged transition — including a
 			// putback after an offensive rebound within the break (the possession

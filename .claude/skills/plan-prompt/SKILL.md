@@ -2,7 +2,7 @@
 name: plan-prompt
 description: "Draft a /plan prompt distilled from the current conversation — ground-truth pointers, already-measured evidence, scope, constraints, verification, and the Step-3 architect tier — then, unless the Step-1.5 size triage says the work clears the ad-hoc bar, fire it as a detached headless Sonnet 4.6 run via bin/plan-now. Use after a design discussion when the planning run should be offloaded off the expensive session."
 disable-model-invocation: true
-last_verified: 2026-07-27
+last_verified: 2026-07-28
 ---
 
 # Draft a `/plan` handoff prompt and fire it headless
@@ -79,8 +79,9 @@ know the split; encode it.
 
 The block opens with `/plan <one-sentence task statement>` and then carries the
 sections below. Include a section only when it has real content — an empty heading is
-padding. Fence with ` ```markdown ` (four backticks if the body itself contains
-fences).
+padding. The block is written to a file, not printed (Step 5), so it needs no
+enclosing fence; add one (` ```markdown `, four backticks if the body itself contains
+fences) only in the draft-only case where you do print it.
 
 1. **Read first (ground truth) — do NOT plan from my summary alone.**
    Explicit `path:line` pointers — repo files, ADRs, backlog entries, prior
@@ -164,10 +165,17 @@ things with an obvious answer is the failure mode on the other side.
 (`auto_merge: false`) any fork that survives anyway. That coda is the backstop, not
 the plan: a fork you could have resolved here costs a held PR.
 
-## Step 5 — Emit and fire
+## Step 5 — Fire, then report
 
-1. Print the block(s).
-2. Write block 1 to a temp file and copy it to the clipboard:
+**Do not print the block in the conversation.** It runs to a hundred lines or more and
+nobody reads it there — it exists to reach a headless Sonnet session, not your output.
+If it misreads the intent, that surfaces at the PR, which is the cheaper place to catch
+it. Printing it also manufactures this step's characteristic failure: a long emitted
+artifact *feels* like the work landed, and a fire gets reported that never happened.
+The block goes to a file and to `bin/plan-now`; the conversation gets the report in
+step 3.
+
+1. Write block 1 to a temp file and copy it to the clipboard:
 
    ```bash
    f=$(mktemp -t plan-prompt); : > "$f"   # write the block into "$f" first
@@ -176,10 +184,10 @@ the plan: a fork you could have resolved here costs a held PR.
 
    Use `mktemp`, not a fixed `/tmp` name — several sessions run this repo at once.
    With multiple blocks, copy block 1 and say which one is on the clipboard.
-   Keep the `pbcopy` even though step 3 fires the run: if the fire fails, the block
+   Keep the `pbcopy` even though step 2 fires the run: if the fire fails, the block
    is still on the clipboard and you have degraded to the old manual paste, not lost
    the draft.
-3. Fire it — the file from step 2 is the argument:
+2. Fire it — the file from step 1 is the argument:
 
    ```bash
    bin/plan-now "$f"                    # default: queue for automouse if the plan passes
@@ -207,8 +215,14 @@ the plan: a fork you could have resolved here costs a held PR.
    branch does not exist yet — write them out, and say they fire after block 1's PR.
 
    Skip the fire (draft only) when the user asked for the prompt itself, or when
-   Step 4.5 left a fork you could not resolve. Say which happened.
-4. **Outside** the fenced block — never inside, so the paste stays clean — add:
+   Step 4.5 left a fork you could not resolve. Say which happened — and only in the
+   first case print the block, since there the prompt *is* the deliverable.
+3. Report, in prose:
+   - **the log path, pasted from `bin/plan-now`'s own stdout — never composed.** If
+     that output is not in front of you, you have not fired it: say so plainly and
+     fire it. A path you wrote instead of read is a fabricated one, and it reads
+     exactly like a real report. Then don't poll the log — `claude -p` doesn't
+     stream, so it stays empty until the run exits.
    - which model should run it, and why (Step 4);
    - any judgment call you made for the user (scope picked, split chosen);
    - if a network failure kills the architect mid-run, **re-spawn the same tier**.

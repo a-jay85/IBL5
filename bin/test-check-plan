@@ -336,6 +336,76 @@ Note: setting `auto_merge: false` in the line-1 frontmatter holds the merge.
 '
 
 # ---------------------------------------------------------------------------
+# Gate B: Security-Surface Discharge completeness (Step 4 gate 14b release).
+# ---------------------------------------------------------------------------
+
+# Gate B: a complete discharge — all three labels plus the Asserted-by path
+# present in a matrix row — passes (exit 0). This is the shape the contract
+# mandates; if it fails, the gate is over-strict and blocks legitimate plans.
+assert "gateB-complete-discharge" 0 "$FM$M"'
+## Security-Surface Discharge
+
+**Invariant:** `Trading\Foo` declares no property and takes no constructor parameter naming a DB handle or actor identity.
+**Asserted by:** `tests/Trade/TradeValidatorTest.php` — reflection assertion over getProperties()/getConstructor().
+**Not covered:** the call sites that still pass `$loggedInTeamID` into the caller.
+'
+
+# Gate B: named invariant but NO asserting test — the prose-only discharge this
+# gate exists to stop (exit 1).
+assert "gateB-invariant-without-assertion" 1 "$FM$M"'
+## Security-Surface Discharge
+
+**Invariant:** the extracted collaborator is stateless.
+**Not covered:** the call sites.
+'
+
+# Gate B: an Asserted-by line naming no *Test.php path (exit 1) — "a reviewer
+# confirmed it" is not a machine assertion.
+assert "gateB-assertion-without-test-path" 1 "$FM$M"'
+## Security-Surface Discharge
+
+**Invariant:** `Trading\Foo` holds no `$db`.
+**Asserted by:** manual reading of the diff by the security reviewer.
+**Not covered:** the call sites.
+'
+
+# Gate B: the named test exists on the Asserted-by line but appears in NO matrix
+# row — a non-gating mention (exit 1).
+assert "gateB-test-not-in-matrix" 1 "$FM$M"'
+## Security-Surface Discharge
+
+**Invariant:** `Trading\Foo` holds no `$db`.
+**Asserted by:** `tests/Security/NotInTheMatrixTest.php` — reflection assertion.
+**Not covered:** the call sites.
+'
+
+# Gate B: no **Not covered:** boundary — a discharge that claims everything
+# covers nothing (exit 1).
+assert "gateB-missing-not-covered" 1 "$FM$M"'
+## Security-Surface Discharge
+
+**Invariant:** `Trading\Foo` holds no `$db`.
+**Asserted by:** `tests/Trade/TradeValidatorTest.php` — reflection assertion.
+'
+
+# Gate B: FENCE AWARENESS — the heading appears ONLY inside a 4-backtick fence
+# (a plan quoting the contract, or this very meta-plan). Must NOT fire (exit 0).
+assert "gateB-heading-only-inside-fence" 0 "$FM$M"'
+Phase 1 — document the discharge shape. The section looks like:
+
+````text
+## Security-Surface Discharge
+
+**Invariant:** ...
+````
+'
+
+# Gate B: a plan with no discharge claim at all is untouched by the gate (0).
+assert "gateB-no-discharge-claim" 0 "$FM$M"'
+Phase 1 — rename a variable.
+'
+
+# ---------------------------------------------------------------------------
 # Gate C: context budget.
 # ---------------------------------------------------------------------------
 # All fixtures carry FM (impl_model: sonnet) alongside the clean matrix M so

@@ -57,6 +57,10 @@
 # Whole-word DECIDE/TBD and the "subject to …" phrases ARE FP-free, so they stay.
 #
 # Plus a NEW conservative check the gates describe but never enforced:
+#   B  Security-surface discharge — a plan carrying '## Security-Surface Discharge'
+#                              (outside fences) must name **Invariant:**,
+#                              **Asserted by:** <path>Test.php, and **Not covered:**,
+#                              and that test path must appear in a matrix row.
 #   H  Hold justification    — a plan whose line-1 frontmatter declares
 #                              `auto_merge: false` must carry an
 #                              `## Automouse Hold Justification` section (the
@@ -417,6 +421,51 @@ if [ "$FM_HOLD" -eq 1 ]; then
         viol "[H] plan declares auto_merge: false but has no '## Automouse Hold Justification' section (Step 4.5 — record why the hold is reducible-confirmed or intrinsic)"
     fi
 fi
+
+# ---------------------------------------------------------------------------
+# Gate B: Security-Surface Discharge completeness (Step 4 gate 14b release condition).
+# Fires ONLY when the plan claims the discharge by carrying a '## Security-Surface
+# Discharge' heading OUTSIDE any fence — a fenced/illustrative heading (this gate's own
+# documentation, or a plan quoting the contract) must not trip it, same rule as gate T.
+# The `**Asserted by:**` path is deliberately narrowed to `*Test.php`: every gate-14(b)
+# surface in this repo is PHP (SQL construction, POST/CSRF, authz guard, output
+# rendering), and PHPUnit is the only suite wired into the required "Tests and Analysis"
+# gate. Widening it to bin/test-* was considered and rejected here, not overlooked.
+while IFS= read -r bviol; do
+    [ -n "$bviol" ] && viol "$bviol"
+done < <(awk '
+    function fence_ticks(s,   t) {
+        if (match(s, /^[ \t]*`+/)) {
+            t = substr(s, RSTART, RLENGTH); gsub(/[^`]/, "", t); return length(t)
+        }
+        return 0
+    }
+    BEGIN { infence=0; fence_len=0; sec=0; inv=0; ast=0; nc=0; tpath=""; mrows="" }
+    {
+        nt = fence_ticks($0)
+        if (infence) {
+            if (nt >= fence_len && $0 ~ /^[ \t]*`+[ \t]*$/) { infence=0; fence_len=0 }
+            next
+        }
+        if (nt >= 3) { infence=1; fence_len=nt; next }
+        if ($0 ~ /^##[ \t]+Security-Surface Discharge/) { sec=1; next }
+        if ($0 ~ /\*\*Invariant:\*\*/)   inv=1
+        if ($0 ~ /\*\*Not covered:\*\*/) nc=1
+        if ($0 ~ /\*\*Asserted by:\*\*/) {
+            ast=1
+            if (match($0, /[A-Za-z0-9_\/.-]+Test\.php/)) tpath = substr($0, RSTART, RLENGTH)
+        }
+        if ($0 ~ /^[ \t]*\|/) mrows = mrows "\n" $0
+    }
+    END {
+        if (!sec) exit 0
+        if (!inv) print "[B] plan claims a Security-Surface Discharge but names no **Invariant:** (Step 4 gate 14b — state the falsifiable structural property, not an intention)"
+        if (!nc)  print "[B] plan claims a Security-Surface Discharge but has no **Not covered:** line (name the surfaces the discharge does NOT speak to)"
+        if (!ast) print "[B] plan claims a Security-Surface Discharge but names no **Asserted by:** test (a prose-only invariant discharges nothing)"
+        else if (tpath == "") print "[B] **Asserted by:** names no *Test.php path — the invariant must be machine-asserted by a required-blocking PHPUnit test"
+        else if (index(mrows, tpath) == 0) print "[B] **Asserted by:** " tpath " appears in no Verification Matrix row — the assertion must be a gating row, not a mention"
+    }
+' "$PLAN_FILE")
 
 # ---------------------------------------------------------------------------
 # Reuse-target existence (new check). PHP Class::method only.

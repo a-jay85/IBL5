@@ -31,9 +31,28 @@
 #     already runs in production (claude -p "/plan …" --model claude-sonnet-4-6
 #     --dangerously-skip-permissions).
 #
-# The run IDENTIFIES ITS OWN PLAN: the coda tells it to print `PLAN_FILE: <abs path>`
-# the moment it picks a slug, and the job reads that line back out of the captured
-# transcript. bug-pipeline-tick's plan-dir diff is NOT concurrency-safe and is kept
+# The run IDENTIFIES ITS OWN PLAN: the coda tells it to end its FINAL message with
+# `PLAN_FILE: <abs path>`, and the job reads that line back out of the captured
+# transcript.
+#
+# THE PLACEMENT IS LOAD-BEARING, NOT STYLISTIC. `claude -p` with the default
+# --output-format text emits ONLY the final assistant message; everything the model
+# prints earlier in the run is discarded before this job ever sees stdout. The coda
+# originally asked for the marker "the moment you have chosen the slug — before you
+# start writing the file", which is precisely the point in the run where text mode
+# guarantees it is thrown away. Every run therefore logged RESULT unconfirmed and
+# never reached check-plan (2026-07-28: a 2855s run exited 0, wrote a valid plan, and
+# still landed unconfirmed on a 1294-byte transcript containing only its closing
+# message). If you ever move that marker instruction, it must stay in the final
+# message — or this job must switch to `--output-format stream-json --verbose` and
+# parse the event stream, the way bin/automouse-run and bin/bug-pipeline-tick do.
+# That was considered and not taken: it turns $OUT from the human-readable transcript
+# the log `cat`s into a multi-MB JSON event stream, which would need a filter
+# (bin/lib/automouse-stream-filter) this job has no other use for. The only thing the
+# early print bought was identifying a TIMED-OUT run, and rc != 0 is already a
+# never-green path below that skips check-plan regardless.
+#
+# bug-pipeline-tick's plan-dir diff is NOT concurrency-safe and is kept
 # only as a labelled best-effort guess — two overlapping plan-now runs each snapshot
 # ~/claude-plans before either writes, so the second finisher sees BOTH new files and
 # `head -1` picks the alphabetically-first. That is not theoretical: the first two
@@ -130,17 +149,19 @@ cat >> "$PROMPT" <<CODA
 **Headless run constraints (appended by \`bin/plan-now\` — these override any
 conflicting default in the skill):**
 
-- **Announce your plan's path.** The moment you have chosen the slug — **before**
-  you start writing the file — print this line on its own, nothing else on it and
-  no backticks or bullet around it:
+- **Announce your plan's path — in your FINAL message.** The **last line** of your
+  final message must be exactly this line, on its own, with nothing after it and no
+  backticks, bullet, bold or fence around it:
   \`\`\`
   PLAN_FILE: $PLANS_DIR/<slug>.md
   \`\`\`
   (absolute path). This job identifies your plan by that line; without it the
   check-plan verdict cannot be attributed to your run, because a directory scan is
-  ambiguous whenever another \`plan-now\` run overlaps yours. Print it early so an
-  interrupted or timed-out run is still identifiable. If you later change the slug,
-  print the line again with the new path — the last one wins.
+  ambiguous whenever another \`plan-now\` run overlaps yours. **The final message is
+  the only placement that works**: this job runs you under \`claude -p\`, which emits
+  only your final assistant message, so a marker printed at any earlier point is
+  discarded before this job can read it. Printing it earlier as well is harmless —
+  the last occurrence wins — but never a substitute.
 - **No human is present.** Never call \`AskUserQuestion\`, never pause for input,
   never end a turn waiting for an answer. The forks a human could answer were
   already resolved by the session that drafted this prompt; they appear above as
@@ -191,7 +212,9 @@ started=$(date +%s)
 # autoCompactWindow pin — rationale in bin/automouse-run.
 # caffeinate -s keeps the Mac awake on AC for the run's duration.
 # 5400s: the first two real runs took 36 and 42 minutes, too close to the old
-# 3600s cap. claude -p does not stream, so $OUT stays empty until it exits.
+# 3600s cap. claude -p does not stream, so $OUT stays empty until it exits — and with
+# the default --output-format text it then holds ONLY the final assistant message,
+# which is why the coda demands PLAN_FILE: on that message's last line (see header).
 CLAUDE_HEADLESS=1 CLAUDE_CODE_AUTO_COMPACT_WINDOW=200000 caffeinate -s \
     timeout 5400 "$CLAUDE_BIN" -p "$(cat "$PROMPT")" \
     --dangerously-skip-permissions \
@@ -206,10 +229,17 @@ elapsed=$(( $(date +%s) - started ))
 #   1. the run's own PLAN_FILE: line (concurrency-safe — see the header)
 #   2. otherwise the newest new .md in $PLANS_DIR, reported as an UNVERIFIED guess
 #      and never check-plan'd, because a concurrent run's file can be newer.
-# Leading whitespace is tolerated: the model may indent the line inside a fence or
-# a list. A mis-shaped marker costs us `unconfirmed`, never a wrong green.
-plan=$(grep -oE '^[[:space:]]*PLAN_FILE:[[:space:]]*\S.*' "$OUT" 2>/dev/null | tail -1 \
-       | sed -E 's/^[[:space:]]*PLAN_FILE:[[:space:]]*//; s/[[:space:]]+$//')
+# The parse is deliberately tolerant of markdown decoration on BOTH sides of the
+# marker — the model writes prose, and "print it bare" is an instruction it can
+# soften. The one real transcript we have closed with `**Plan:** ` + a backticked
+# path, so `**PLAN_FILE:** ...`, `- PLAN_FILE: ...` and a backtick-wrapped path are
+# all treated as compliant. (The old comment claimed a list-indented line was
+# tolerated; it was not — a `-` is not [[:space:]], so that case never matched.)
+# tail -1 keeps the last occurrence, so restating the marker wins. Nothing here
+# relaxes the $PLANS_DIR + file-exists guard below: a mis-shaped or bogus marker
+# still costs us `unconfirmed`, never a wrong green.
+plan=$(grep -E '^[-*>`[:space:]]*PLAN_FILE:' "$OUT" 2>/dev/null | tail -1 \
+       | sed -E 's/^.*PLAN_FILE:[[:space:]*`]*//; s/[[:space:]*`]+$//')
 case "$plan" in
     "$PLANS_DIR"/*.md) [ -f "$plan" ] || { echo "plan-now: PLAN_FILE named a file that does not exist: $plan"; plan=""; } ;;
     "")   ;;

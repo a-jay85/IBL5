@@ -64,12 +64,12 @@ INSERT INTO ibl_sim_dates (sim, start_date, end_date) VALUES
 -- ============================================================
 -- Sim recap summaries (admin viewer — simSummaries.php)
 -- Cleared first: migration 155 seeds MAX(ibl_sim_dates.sim) as a
--- done row with recap_text NULL, which would make the viewer's
+-- done row with sim_recap_text NULL, which would make the viewer's
 -- row count and newest-first assertions nondeterministic.
 -- ============================================================
 DELETE FROM ibl_sim_game_recaps;
 DELETE FROM ibl_sim_summaries;
-INSERT INTO ibl_sim_summaries (sim, status, recap_text, intro_text, outro_text, themes_used, attempts, generated_at, created_at) VALUES
+INSERT INTO ibl_sim_summaries (sim, status, sim_recap_text, intro_text, outro_text, themes_used, attempts, generated_at, created_at) VALUES
   (686, 'failed',  NULL, NULL, NULL, NULL, 2, NULL, '2026-02-08 09:00:00'),
   (687, 'pending', NULL, NULL, NULL, NULL, 0, NULL, '2026-02-15 09:00:00'),
   (688, 'done',    'Sim 688 recap: a wire-to-wire blowout behind a 41-point night from the rookie.', NULL, NULL, '["blowout","rookie"]', 1, '2026-02-22 10:05:00', '2026-02-22 09:00:00'),
@@ -118,7 +118,7 @@ INSERT INTO ibl_team_info (teamid, team_city, team_name, color1, color2, uuid) V
 -- ibl_team_info(teamid). Each natural key below has a matching pair of
 -- ibl_box_scores_teams rows further down, so all three pass the admin viewer's
 -- archived-box-score existence filter.
-INSERT INTO ibl_sim_game_recaps (sim, season_year, game_date, visitor_teamid, home_teamid, game_of_that_day, box_id, sort_order, recap_text) VALUES
+INSERT INTO ibl_sim_game_recaps (sim, season_year, game_date, visitor_teamid, home_teamid, game_of_that_day, box_id, sort_order, game_recap_text) VALUES
   (689, 2026, '2026-02-20', 1, 2, 1, NULL, 0, 'The Metros dominated from the opening tip, cruising to a 105-98 victory.'),
   (689, 2026, '2026-03-03', 1, 3, 1, NULL, 1, 'A balanced offensive attack lifted the Metros past the Cougars in a tightly contested game.'),
   (689, 2026, '2026-03-05', 2, 1, 1, NULL, 2, 'The Stars held off a late Metros rally to steal a road win, 95-88.');

@@ -493,7 +493,7 @@ return [
     // Migration 155 — sim recap queue
     new SchemaAssertion('ibl_sim_summaries', 'sim'),
     new SchemaAssertion('ibl_sim_summaries', 'status'),
-    new SchemaAssertion('ibl_sim_summaries', 'recap_text'),
+    new SchemaAssertion('ibl_sim_summaries', 'sim_recap_text'),
     new SchemaAssertion('ibl_sim_summaries', 'themes_used'),
     new SchemaAssertion('ibl_sim_summaries', 'claimed_at'),
     new SchemaAssertion('ibl_sim_summaries', 'generated_at'),
@@ -512,6 +512,6 @@ return [
     new SchemaAssertion('ibl_sim_game_recaps', 'game_of_that_day'),
     new SchemaAssertion('ibl_sim_game_recaps', 'box_id'),
     new SchemaAssertion('ibl_sim_game_recaps', 'sort_order'),
-    new SchemaAssertion('ibl_sim_game_recaps', 'recap_text'),
+    new SchemaAssertion('ibl_sim_game_recaps', 'game_recap_text'),
     new SchemaAssertion('ibl_sim_game_recaps', 'created_at'),
 ];

@@ -362,6 +362,62 @@ class SimSummaryRepository extends \BaseMysqliRepository
     }
 
     /**
+     * Final scores keyed by the game's natural key, for RecapDocument's header lines.
+     *
+     * ibl_box_scores_teams has no total column, so the quarters are summed. It also stores
+     * one row per TEAM side of a game, and both rows carry the same game-level
+     * visitor and home quarter values — so this GROUPs by the natural key and takes MAX()
+     * rather than picking one row, which would depend on row order.
+     *
+     * `game_of_that_day` is nullable, so it is COALESCEd to 0 on both sides of the key,
+     * exactly as findDisplayableGameRecaps() does.
+     *
+     * @param  list<string> $dates distinct game_date values, 'YYYY-MM-DD'
+     * @return array<string, array{visitor: int, home: int}> keyed "date|vid|hid|gotd"
+     */
+    public function findBoxScoreTotals(array $dates): array
+    {
+        if ($dates === []) {
+            return [];
+        }
+
+        // Safe: $placeholders is built from count($dates) alone and contains only '?' and ','
+        // — no caller-supplied value ever reaches the SQL string. Every date is bound.
+        $placeholders = implode(',', array_fill(0, count($dates), '?'));
+
+        $sql = "SELECT `game_date`, `visitor_teamid`, `home_teamid`,"
+            . " COALESCE(`game_of_that_day`, 0) AS `gotd`,"
+            . " MAX(COALESCE(`visitor_q1_points`,0) + COALESCE(`visitor_q2_points`,0)"
+            . "   + COALESCE(`visitor_q3_points`,0) + COALESCE(`visitor_q4_points`,0)"
+            . "   + COALESCE(`visitor_ot_points`,0)) AS `visitor_score`,"
+            . " MAX(COALESCE(`home_q1_points`,0) + COALESCE(`home_q2_points`,0)"
+            . "   + COALESCE(`home_q3_points`,0) + COALESCE(`home_q4_points`,0)"
+            . "   + COALESCE(`home_ot_points`,0)) AS `home_score`"
+            . " FROM `ibl_box_scores_teams`"
+            // Safe: $placeholders built from count($dates) alone — only '?' and ',' characters;
+            // no caller-supplied value ever reaches the SQL string. Every date value is bound.
+            . " WHERE `game_date` IN ({$placeholders})" // @phpstan-ignore ibl.sqlStringInterpolation, ibl.sqlStringConcatenation
+            . " GROUP BY `game_date`, `visitor_teamid`, `home_teamid`, COALESCE(`game_of_that_day`, 0)";
+
+        $rows = $this->fetchAll($sql, str_repeat('s', count($dates)), ...$dates);
+        $result = [];
+        foreach ($rows as $row) {
+            $date = is_string($row['game_date']) ? $row['game_date'] : '';
+            $vid = is_int($row['visitor_teamid']) ? $row['visitor_teamid'] : 0;
+            $hid = is_int($row['home_teamid']) ? $row['home_teamid'] : 0;
+            $gotd = is_int($row['gotd']) ? $row['gotd'] : 0;
+            $key = "{$date}|{$vid}|{$hid}|{$gotd}";
+            // MAX(COALESCE(int, 0) + ...) with MYSQLI_OPT_INT_AND_FLOAT_NATIVE yields PHP int;
+            // fall back to 0 for any unexpected type (should never occur in practice).
+            $result[$key] = [
+                'visitor' => is_int($row['visitor_score']) ? $row['visitor_score'] : 0,
+                'home' => is_int($row['home_score']) ? $row['home_score'] : 0,
+            ];
+        }
+        return $result;
+    }
+
+    /**
      * Per-game recap rows for one sim that have a verified archived box score,
      * sorted by sort_order ascending — the admin viewer's display read.
      *

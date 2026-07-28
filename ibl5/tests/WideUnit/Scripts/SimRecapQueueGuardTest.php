@@ -78,10 +78,14 @@ final class SimRecapQueueGuardTest extends TestCase
 
     public function testSnowflakesLeaveAsStrings(): void
     {
-        // The mention-map path emits each id through (string), never (int).
+        // The (string) cast that keeps each snowflake a string now lives in
+        // MentionMap::byTeamName() and is behaviorally pinned by MentionMapTest's
+        // 2^53 case. The guarantee here is structural: the script must build the
+        // mention map by delegating to MentionMap, never by re-inlining an id cast.
+        // testScriptCastsOnlyTheSimArgument already pins that the only (int) is --sim.
         self::assertTrue(
-            str_contains($this->src, '(string) $id'),
-            'Mention-map must cast the snowflake to string before it enters the JSON'
+            str_contains($this->src, 'MentionMap::fromDatabase'),
+            'Mention-map must be built via MentionMap::fromDatabase() so the snowflake stays a string'
         );
     }
 

@@ -101,18 +101,7 @@ function collectRecentThemes(\SimRecap\SimSummaryRepository $repo): array
  */
 function buildMentionMap(\mysqli $db): array
 {
-    $teams = new \Repositories\TeamIdentityRepository($db);
-    $map = [];
-    foreach ($teams->getAllRealTeams() as $team) {
-        $name = $team['team_name'];
-        $id = $teams->getTeamDiscordID($name);
-        if ($id === null) {
-            continue;
-        }
-        $map[$name] = (string) $id;
-    }
-
-    return $map;
+    return \SimRecap\MentionMap::fromDatabase($db)->byTeamName();
 }
 
 // ── Argv parse — positional verb, then flags (mirrors bug-pipeline/transition.php).

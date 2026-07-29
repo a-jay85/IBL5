@@ -72,10 +72,27 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.p
 LIB = os.path.join(REPO_ROOT, "bin", "lib", "critical-files.sh")
 
 # Shared cross-parser fixture. Every shape here is drawn from the real
-# ~/claude-plans corpus; a01-a15 must be EXEMPT, b01-b09 must be MUST_APPEAR
-# except b08. The same fixture drives the shell-side agreement test in
+# ~/claude-plans corpus; a01-a16 must be EXEMPT, b01-b12 must be MUST_APPEAR
+# except b08. The 4-backtick outer fence (before the real heading) is the
+# width-aware fence regression: a naive parity toggle would swallow the whole
+# section. The same fixture drives the shell-side agreement test in
 # bin/test-postplan-arm-conditions, so a divergence fails on both sides.
-AGREEMENT_PLAN = """## Critical Files
+AGREEMENT_PLAN = """````bash
+# Outer 4-backtick fence: contains an inner 3-backtick block and a decoy
+# ## Critical Files heading. Pre-fix, the naive parity toggle (in_fence =
+# !in_fence on any 3+-backtick fence) toggled once on this outer fence and
+# never recovered, swallowing the real section entirely (11 entries → 0).
+```text
+inner 3-backtick block — fence_len=3 < 4, so does NOT close the outer fence
+```
+## Critical Files
+
+- `decoy01` (reference)
+- `decoy02` — decoy must-appear inside fence, must be ignored
+
+````
+
+## Critical Files
 
 - `a01` (reference)
 - `a02` (read-only)
@@ -92,6 +109,7 @@ AGREEMENT_PLAN = """## Critical Files
 - `a13` (reference - pattern to mirror; unchanged)
 - `a14` (cat reference)
 - `a15` (out-of-repo - verify in-place, not in git diff)
+- `a16` (conditional — only if judged)
 - `b01` - add the context menu helper
 - `b02` - update so we can verify the arming path
 - `b03` - reference only, do not edit
@@ -101,6 +119,9 @@ AGREEMENT_PLAN = """## Critical Files
 - `b07` (only if the skill op changes it)
   - `b08` (reference)
   - `b09` - indented change target
+- `b10` (conditional Phase 4 only)
+- `b11` (filename references the affected class)
+- `b12` (the referenced file is deleted)
 """
 
 
@@ -149,8 +170,8 @@ def test_lib_sync(tmp_path):
     shell = [ln for ln in proc.stdout.splitlines() if ln.strip()]
     assert _classify(AGREEMENT_PLAN) == shell, (
         "parser divergence\n python: %s\n shell:  %s" % (_classify(AGREEMENT_PLAN), shell))
-    assert sum(1 for ln in shell if ln.startswith("EXEMPT:")) == 16
-    assert sum(1 for ln in shell if ln.startswith("MUST_APPEAR:")) == 8
+    assert sum(1 for ln in shell if ln.startswith("EXEMPT:")) == 17
+    assert sum(1 for ln in shell if ln.startswith("MUST_APPEAR:")) == 11
 
 
 def test_lib_pattern_sync():

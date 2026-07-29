@@ -270,15 +270,31 @@ fi
 # pins the leading-whitespace divergence check-plan's old `^- ` awk had.
 CF_FIX="$BASE_TMP/cf-agreement.md"
 cat > "$CF_FIX" <<'CFEOF'
+````bash
+# Outer 4-backtick fence: contains a decoy ## Critical Files heading.
+# Width-aware fence regression — naive parity toggle would swallow real section.
+```text
+inner 3-backtick block — fence_len=3 < 4, does NOT close the outer fence
+```
+## Critical Files
+
+- `decoy01` (reference)
+- `decoy02` — decoy must-appear inside fence, must be ignored
+
+````
+
 ## Critical Files
 
 - `bin/check-plan` — add gate [F]
 - `ibl5/schema.sql` (reference)
 - `ibl5/docs/backlog/README.md` (conditional)
+- `ibl5/docs/backlog/other.md` (conditional — only if diff touches it)
 - `tools/postplan-harness/harness/planfile.py` (read-only reference)
 - `ibl5/a.php` — add the context menu helper
 - `ibl5/b.php` (reference — pattern to mirror; unchanged)
   - `ibl5/c.php` — indented change target
+- `ibl5/d.php` (conditional Phase 4 only)
+- `ibl5/e.php` (filename references the affected class)
 CFEOF
 
 CF_LIB=$( cd "$REPO_ROOT" && bash -c 'source bin/lib/critical-files.sh && cf_parse_section "$1"' _ "$CF_FIX" \
@@ -303,12 +319,13 @@ else
 fi
 
 # Negative half: the agreement must be on the RIGHT answer, not merely mutual.
-# Three prose/described entries are must-appear; four marked entries are not.
-_want=$(printf 'bin/check-plan\nibl5/a.php\nibl5/c.php')
+# Five prose/described entries are must-appear; five marked entries are not.
+# decoy01/decoy02 (inside the 4-backtick fence) must contribute zero entries.
+_want=$(printf 'bin/check-plan\nibl5/a.php\nibl5/c.php\nibl5/d.php\nibl5/e.php')
 if [ "$CF_LIB" = "$_want" ]; then
-    echo "ok: agreed classification is correct (3 must-appear, 4 exempt)"
+    echo "ok: agreed classification is correct (5 must-appear, 5 exempt)"
 else
-    echo "FAIL: agreed-but-wrong — expected 3 must-appear, got: $(printf '%s' "$CF_LIB" | tr '\n' ' ')"
+    echo "FAIL: agreed-but-wrong — expected 5 must-appear, got: $(printf '%s' "$CF_LIB" | tr '\n' ' ')"
     FAILED=1
 fi
 

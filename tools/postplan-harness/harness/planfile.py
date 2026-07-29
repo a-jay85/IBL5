@@ -20,13 +20,22 @@ from .state import PlanInfo
 # fine ((?:…) vs (…), \( vs [(]); differences in CLASSIFICATION are the bug.
 #
 # Exempt iff the annotation contains a PARENTHESIZED group whose contents
-# include a canonical token. A token in surrounding prose does NOT exempt —
-# that unanchored match is the #923 false-EXEMPT bug this replaces.
+# include a canonical token as a WHOLE WORD and — for `conditional` — as the
+# opening token only. Two scoping rules (measured on the 259-plan corpus):
+#   1. WHOLE WORD: `[^0-9A-Za-z]` boundaries prevent substring matches like
+#      `references` (noun) or `referenced` (adjective) from exempting a declared
+#      change target. Literal-range boundaries keep this string byte-identical to
+#      the shell mirror; POSIX `[[:alnum:]]` is absent from Python `re` and
+#      `\b` is not portable across BSD/GNU grep.
+#   2. `conditional` MUST BE THE MARKER, not a word in prose. It exempts only
+#      when it opens the parenthesized group and is immediately followed by `)`
+#      or a separator (—/-/:,;). `(conditional — Phase 4 only)` → EXEMPT;
+#      `(conditional Phase 4 only)` → MUST_APPEAR.
 # Canonical tokens: reference, read-only, read-only reference, verify,
 # verification, template, no-edit, no-change, unchanged, context, conditional.
 EXEMPT_RE = re.compile(
-    r"\([^)]*(?:reference|read-?only|verif(?:y|ication)|template|"
-    r"no[- ]edit|no[- ]change|unchanged|context|conditional)[^)]*\)",
+    r"\((?:(?:[^)]*[^0-9A-Za-z])?(?:reference|read-?only|verif(?:y|ication)|template|"
+    r"no[- ]edit|no[- ]change|unchanged|context)(?:[^0-9A-Za-z][^)]*)?|conditional(?:[ ]*[-–—:;,][^)]*)?[ ]*)\)",
     re.IGNORECASE,
 )
 _MATRIX_HEADER = re.compile(r"^\s*\|.*Test type", re.IGNORECASE)
@@ -77,18 +86,52 @@ def parse_matrix(content: str) -> tuple[list[str], list[str]]:
     return planned, manual
 
 
+def _strip_fenced(content: str) -> list[str]:
+    """Lines outside fenced code blocks — literal port of cf_section()'s awk state
+    machine in bin/lib/critical-files.sh. Width-aware: per CommonMark a closing fence
+    must be at least as long as the opening one, so this repo's 4-backtick outer block
+    wrapping 3-backtick inner ones does not toggle parity once and silently swallow the
+    whole section."""
+    out: list[str] = []
+    in_fence = False
+    fence_len = 0
+    for line in content.splitlines():
+        stripped = line.lstrip()
+        n = 0
+        while n < len(stripped) and stripped[n] == "`":
+            n += 1
+        if n >= 3:
+            if not in_fence:
+                in_fence = True
+                fence_len = n
+                continue
+            if n >= fence_len:
+                in_fence = False
+                continue
+        if in_fence:
+            continue
+        out.append(line)
+    return out
+
+
 def parse_critical_files(content: str) -> list[tuple]:
     """[(path, annotation, exempt)] from `## Critical Files` — the Phase 5.0 awk port:
     primary backticked path per bullet; exempt iff the annotation (backticks stripped)
-    contains a parenthesized group holding a canonical marker — `(reference)`,
-    `(read-only)`, `(read-only reference)`, `(verify)`, `(verification)`, `(template)`,
-    `(no-edit)`, `(no-change)`, `(unchanged)`, `(context)`, `(conditional)`.
-    Single source of truth for the exemption rule: bin/lib/critical-files.sh."""
-    m = re.search(r"^## *Critical Files.*?$(.*?)(?=^## |\Z)", content, re.M | re.S)
-    if not m:
-        return []
+    contains a parenthesized group holding a canonical marker. Fenced code blocks are
+    skipped (width-aware fence state machine, see _strip_fenced). Single source of
+    truth for the exemption rule: bin/lib/critical-files.sh."""
+    lines = _strip_fenced(content)
+    in_section = False
     out: list[tuple] = []
-    for line in m.group(1).splitlines():
+    for line in lines:
+        if re.match(r"^##\s*Critical Files", line):
+            in_section = True
+            continue
+        if re.match(r"^## ", line):
+            in_section = False
+            continue
+        if not in_section:
+            continue
         if not re.match(r"^\s*-\s*`", line):
             continue
         pm = re.search(r"`([^`]+)`", line)

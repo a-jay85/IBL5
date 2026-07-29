@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
-# bin/docfix-run <issue-num> <sig> — Mac-side headless stale-docs remediation launcher.
-# Fired by bin/docfix-poll (launchd, daily) when the nightly audit has flagged a
-# stale set. Creates a worktree, seeds an auto_merge:false hold plan, and launches
-# a detached headless Claude run that refreshes exactly the stale docs and opens a
-# PR (held for human merge) that Closes the stale-docs issue.
+# bin/docfix-run <issue-num> <sig> — Mac-side headless doc remediation launcher.
+# Fired by bin/docfix-poll (launchd, daily) when the nightly audit has flagged
+# stale docs or dead `paths:` globs. Creates a worktree, seeds an auto_merge:false
+# hold plan, and launches a detached headless Claude run that fixes the flagged docs
+# and opens a PR (held for human merge) that Closes the stale-docs issue.
 #
 # Detach mechanism cloned in structure from bin/post-plan-now:71-109 (launchd
 # RunAtLoad one-shot) — a plain `nohup … &` from the poll dies with it.
@@ -73,7 +73,7 @@ LABEL="com.ibl5.docfix-run-$SLUG-$TS"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 TODAY="$(date -u +%Y-%m-%d)"
 
-PROMPT="You are refreshing stale documentation with NO human present — never ask questions or wait for input; make the safe choice and continue. Refresh ONLY these docs (comma-separated paths): $SIG. For each: re-verify its content against the current reality of the codebase, correct drifted content, and bump its \`last_verified\` to today ($TODAY). Then run \`bin/check-docs --fix-dates --since=master\` to bump any in-scope doc you changed but did not hand-bump. Do NOT touch any doc outside the list above. Commit with a message whose body contains the line \`Closes #$ISSUE_NUM\`. Then fire \`bin/post-plan-now\` (NOT --auto) to open the PR; the PR body MUST include \`Closes #$ISSUE_NUM\` so merging it closes the stale-docs issue."
+PROMPT="You are fixing doc findings with NO human present — never ask questions or wait for input; make the safe choice and continue. The findings are the nightly Doc Freshness Audit set for issue #$ISSUE_NUM. Work ONLY on these paths (comma-separated): $SIG. First run \`bin/check-docs --staleness-report\` and split its JSON with jq into entries whose \`reason\` is \`stale\` and entries whose \`reason\` is \`dead-glob\`; that command is the authoritative finding list, and the body of issue #$ISSUE_NUM shows the same two tables for reference. For each \`stale\` entry: re-verify its content against the current reality of the codebase, correct drifted content, and bump its \`last_verified\` to today ($TODAY). For each \`dead-glob\` entry: the named file declares a \`paths:\` frontmatter glob matching no tracked file, so that rule can never load — PREFER correcting the glob so it matches the tracked files it was meant to cover, and delete the \`paths:\` entry only when no correction is identifiable. IF you delete a glob you MUST disclose it: add one line per deletion to the commit message body AND to the PR body under a heading reading \`## Dead globs deleted\`, in exactly this form: \`Dead glob deleted: in FILE_PATH, removed paths: entry GLOB — REASON\`, substituting the real repo-relative path, the exact glob text, and one clause saying why no correction was possible, so the maintainer can review the deletion without opening the diff. Never delete a whole file, and never remove a \`paths:\` key that still carries a working glob. Then run \`bin/check-docs --fix-dates --since=master\` to bump any in-scope doc you changed but did not hand-bump, and re-run \`bin/check-docs --staleness-report\` to confirm every finding you were given is gone. Do NOT touch any doc outside the list above. Commit with a message whose body contains the line \`Closes #$ISSUE_NUM\`. Then fire \`bin/post-plan-now\` (NOT --auto) to open the PR; the PR body MUST include \`Closes #$ISSUE_NUM\` so merging it closes the stale-docs issue."
 
 # launchd runs a minimal env → same PATH prelude as bin/post-plan-now:94.
 cat > "$PLIST" <<PLIST_EOF

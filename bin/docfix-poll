@@ -255,7 +255,7 @@ REPORT="$(mktemp)"
 trap 'rm -f "$REPORT"' EXIT
 "$MAIN/bin/check-docs" --staleness-report > "$REPORT"
 COUNT="$(jq 'length' "$REPORT")"
-SIG="$(jq -r '.[].path' "$REPORT" | sort | paste -sd, -)"
+SIG="$(jq -r '.[].path' "$REPORT" | sort -u | paste -sd, -)"
 [ "$COUNT" -eq 0 ] && { echo "docfix-poll: no stale docs — nothing to do."; exit 0; }
 
 # Reap leftovers whose PR is finished (merged or declined). An OPEN PR's branch

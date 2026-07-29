@@ -8,7 +8,7 @@ last_verified: 2026-07-27
 **Status:** Accepted
 **Date:** 2026-04-13
 
-> **Renamed:** this pipeline is now called **automouse** (formerly "nightly"). The scripts are `bin/automouse-*` and the operational doc is `.claude/rules/automouse-workflow.md`. The ADR filename keeps its historical `0007-nightly-…` slug (ADRs are immutable cross-referenced history); the script/path references below were updated to the current `automouse-*` names. "Nightly" was dropped because the user runs the pipeline outside nighttime too.
+> **Renamed:** this pipeline is now called **automouse** (formerly "nightly"). The scripts are `bin/automouse/*` and the operational doc is `.claude/rules/automouse-workflow.md`. The ADR filename keeps its historical `0007-nightly-…` slug (ADRs are immutable cross-referenced history); the script/path references below were updated to the current `automouse-*` names. "Nightly" was dropped because the user runs the pipeline outside nighttime too.
 
 ## Context
 

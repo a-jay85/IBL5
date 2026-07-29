@@ -48,7 +48,7 @@ function apply_reorder(): void
         }
     }
 
-    $queueCmd = getenv('AUTOMOUSE_QUEUE_CMD') ?: 'automouse-queue';
+    $queueCmd = getenv('AUTOMOUSE_QUEUE_CMD') ?: 'automouse/queue';
     // escapeshellarg every token (defense-in-depth on top of the engine's own
     // permutation validation); 2>&1 so the engine's error text flows back.
     $cmd = escapeshellarg($queueCmd) . ' reorder '

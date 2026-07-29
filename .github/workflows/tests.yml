@@ -720,6 +720,12 @@ jobs:
         run: bin/test-bug-pipeline-hunt
       - name: bin/test-sim-recap-tick
         run: bin/test-sim-recap-tick
+      - name: bin/test-plan-now
+        run: bin/test-plan-now
+      - name: bin/test-token-report
+        run: bin/test-token-report
+      - name: bin/test-automouse-escalation
+        run: bin/test-automouse-escalation
 
   gate:
     name: Tests and Analysis

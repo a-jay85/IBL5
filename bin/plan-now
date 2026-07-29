@@ -300,6 +300,10 @@ RUNNER_EOF
 } > "$RUNNER"
 chmod +x "$RUNNER"
 
+# ~/Library/LaunchAgents always exists on the Mac this job runs on; the mkdir is for
+# the Linux CI box, where bin/test-plan-now drives this script under PLAN_NOW_DRY_RUN
+# and `set -e` would otherwise abort here before the runner path is printed.
+mkdir -p "$(dirname "$PLIST")"
 cat > "$PLIST" <<PLIST_EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

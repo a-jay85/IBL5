@@ -1,6 +1,6 @@
 ---
 description: Before adding a new hook, CI gate, workflow, or bin/ script, first ask whether an existing one can be extended; quarterly cull retires dead meta-tooling.
-last_verified: 2026-07-25
+last_verified: 2026-07-28
 paths:
   - "bin/**"
   - ".github/workflows/**"
@@ -42,6 +42,7 @@ The teeth are documented hand-run greps, not a maintained script (a `bin/cull-au
 
 - **Orphaned `test-*`** — a `test-*` in `bin/` whose target no longer exists: list `bin/`'s `test-*`, derive each target, confirm it still exists.
 - **Unreferenced gate** — a `check-*` referenced by no `.github/workflows/*.yml`: grep the workflows dir for each `check-*` name; zero hits ⇒ candidate.
+- **Unwired `test-*`** — a `test-*` whose target still exists but which **no workflow ever runs**: `for t in bin/test-*; do n=$(basename "$t"); grep -rqF "$n" .github/workflows/ || echo "UNWIRED $n"; done`, then check each hit for an invoking wrapper (a wrapper counts as wired). Such a test passes locally forever and protects nothing — it sits between the two checks above, which is how `bin/test-plan-now` went unrun from creation until 2026-07-28. The disposition is **wire it or retire it**, judgment-gated as usual; a test that self-skips off-platform (`bin/test-automouse-single`, macOS-only) is a legitimate stay-unwired, since wiring it to a Linux runner buys a SKIP line. This is the *inverse* of the trap below — it never mandates a new `test-*`, it only asks whether an existing one runs.
 - **Buggy gate/hook** — a gate/hook with bugs recorded in memory: is it still earning its keep, or has its cost outgrown its value?
 - **Dead rule / silent hook** — a rule superseded by another, or a hook that never fires: confirm against recent logs/PRs.
 

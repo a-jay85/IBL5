@@ -47,7 +47,7 @@ func countStealTurnovers(victimTVR, defenderSTL int, seeds uint64) int {
 	count := 0
 	for s := uint64(1); s <= seeds; s++ {
 		off, def := stealLineups(victimTVR, defenderSTL)
-		gs := &gameState{rng: rng.New(s), period: 1, clock: 500, nonStealTurnoverScale: nonStealTurnoverScale}
+		gs := &gameState{rng: rng.New(s), period: 1, clock: 500, stealTurnoverScale: stealTurnoverScale, nonStealTurnoverScale: nonStealTurnoverScale}
 		if gs.stealTurnover(off, def, off.players[0]) {
 			count++
 		}
@@ -73,6 +73,17 @@ func TestTurnoverCarelessness_Orientation(t *testing.T) {
 	}
 }
 
+func TestStealTurnover_ScalesWithDefensiveSTL(t *testing.T) {
+	const seeds = 4000
+	// Same ball-handler carelessness (TVR 40); only defensive STL differs.
+	lowSTL := countStealTurnovers(40, 10, seeds)
+	highSTL := countStealTurnovers(40, 40, seeds)
+	if highSTL <= lowSTL {
+		t.Errorf("high-STL defense should force MORE turnovers than low-STL: high=%d low=%d (of %d)",
+			highSTL, lowSTL, seeds)
+	}
+}
+
 func TestStealTurnover_HigherTVRFewerTurnovers(t *testing.T) {
 	const seeds = 4000
 	// Same defensive STL; only ball-handler TVR differs.
@@ -84,32 +95,35 @@ func TestStealTurnover_HigherTVRFewerTurnovers(t *testing.T) {
 	}
 }
 
-func TestTeamOffTOVShare_ZeroOnEmptyLineup(t *testing.T) {
-	if got := teamOffTOVShare(nil); got != 0 {
-		t.Errorf("teamOffTOVShare(nil) = %v, want 0", got)
+func TestTeamStealPressure_ScalesWithSTL(t *testing.T) {
+	hi := teamStealPressure(newTeamState(stealLineupPlayers(3, 40, 40), 3, true))
+	lo := teamStealPressure(newTeamState(stealLineupPlayers(3, 40, 10), 3, true))
+	if !(hi > lo && lo > 0) {
+		t.Errorf("steal pressure must rise with STL and be positive: hi=%v lo=%v", hi, lo)
+	}
+	zero := teamStealPressure(newTeamState(stealLineupPlayers(3, 40, 0), 3, true))
+	if zero != 0 {
+		t.Errorf("all-zero-STL pressure = %v, want 0", zero)
 	}
 }
 
-// TestTeamOffTOVShare_SecureHandlerLowerShare: higher IBL5 TVR (better ball security)
-// → lower carelessness → lower steal TOV share (tovCarelessRate48 orientation).
-func TestTeamOffTOVShare_SecureHandlerLowerShare(t *testing.T) {
-	ps := mkPlayer(0, 0, slotPG, 50)
-	ps.TVR = 99 // high TVR = good ball security = low carelessness
-	secure := []onCourt{oc(slotPG, ps)}
-	pc := mkPlayer(0, 0, slotPG, 50)
-	pc.TVR = 1 // low TVR = careless = high turnover rate
-	careless := []onCourt{oc(slotPG, pc)}
-	if teamOffTOVShare(secure) >= teamOffTOVShare(careless) {
-		t.Errorf("secure lineup (TVR=99) share=%v >= careless lineup (TVR=1) share=%v, want secure < careless",
-			teamOffTOVShare(secure), teamOffTOVShare(careless))
+// --- matrix #4: negative/boundary — zero STL, zero ratings ---------------------
+
+func TestStealTurnover_AllZeroSTLNoTurnover(t *testing.T) {
+	// An all-zero-STL defense has zero steal pressure → probability 0 → no
+	// steal-driven turnover, and no divide-by-zero / panic.
+	const seeds = 2000
+	if got := countStealTurnovers(40, 0, seeds); got != 0 {
+		t.Errorf("zero-STL defense produced %d steal turnovers, want 0", got)
 	}
 }
 
 func TestTurnoverProb_NoNaNOnEmptyRatings(t *testing.T) {
 	// All-zero TVR (carelessness = base) and all-zero STL (pressure 0): the weight
 	// must be finite, never NaN/Inf, and exactly 0 (no pressure).
-	gs := &gameState{nonStealTurnoverScale: nonStealTurnoverScale}
-	p := gs.turnoverProb(0)
+	gs := &gameState{stealTurnoverScale: stealTurnoverScale, nonStealTurnoverScale: nonStealTurnoverScale}
+	pressure := teamStealPressure(newTeamState(stealLineupPlayers(3, 0, 0), 3, true))
+	p := gs.turnoverProb(turnoverCarelessness(0), pressure)
 	if math.IsNaN(p) || math.IsInf(p, 0) {
 		t.Errorf("turnoverProb on empty ratings = %v, want finite", p)
 	}
@@ -129,7 +143,7 @@ func TestStealTurnover_CreditsDefenderVictimKeepsTOV(t *testing.T) {
 	for seed := uint64(1); seed < 200; seed++ {
 		offense, defense := stealLineups(10, 45)
 		victim := offense.players[0]
-		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500, nonStealTurnoverScale: nonStealTurnoverScale}
+		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500, stealTurnoverScale: stealTurnoverScale, nonStealTurnoverScale: nonStealTurnoverScale}
 		if !gs.stealTurnover(offense, defense, victim) {
 			continue
 		}
@@ -179,7 +193,7 @@ func countNonStealTurnovers(tvr int, seeds uint64) int {
 	count := 0
 	for s := uint64(1); s <= seeds; s++ {
 		off, _ := stealLineups(tvr, 30)
-		gs := &gameState{rng: rng.New(s), period: 1, clock: 500, nonStealTurnoverScale: nonStealTurnoverScale}
+		gs := &gameState{rng: rng.New(s), period: 1, clock: 500, stealTurnoverScale: stealTurnoverScale, nonStealTurnoverScale: nonStealTurnoverScale}
 		if gs.nonStealTurnover(off, off.players[0]) {
 			count++
 		}
@@ -213,7 +227,7 @@ func TestNonStealTurnover_NoEventSteal(t *testing.T) {
 	offense, _ := stealLineups(0, 30) // TVR=0: max carelessness for high probability
 	victim := offense.players[0]
 	for seed := uint64(1); seed < 500; seed++ {
-		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500, nonStealTurnoverScale: nonStealTurnoverScale}
+		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500, stealTurnoverScale: stealTurnoverScale, nonStealTurnoverScale: nonStealTurnoverScale}
 		if !gs.nonStealTurnover(offense, victim) {
 			continue
 		}

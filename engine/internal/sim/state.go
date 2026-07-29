@@ -112,9 +112,10 @@ type gameState struct {
 	// Game2GM/Game3GM are now derived from the event stream by aggregateBoxes.
 	madeFG map[int]int
 
-	// nonStealTurnoverScale is the per-possession non-steal turnover scale for THIS run:
-	// the package const on a live run, or the Options override (J14 research sweep).
-	// Populated once per game in simGameWith.
+	// stealTurnoverScale / nonStealTurnoverScale are the per-possession turnover
+	// scales for THIS run: the package const on a live run, or the Options override
+	// (J14 research sweep). Populated once per game in simGameWith.
+	stealTurnoverScale    float64
 	nonStealTurnoverScale float64
 
 	// transitionShotRate is the Stage-3 decaying team shot-rate threshold for

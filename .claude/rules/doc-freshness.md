@@ -1,6 +1,6 @@
 ---
-description: Frontmatter schema, 60-day staleness policy, on-touch verification rule, dead-reference rule, and the retired-figure rule enforced by bin/check-docs
-last_verified: 2026-07-24
+description: Frontmatter schema (including `paths:` residency semantics — repo-relative only, never glob an always-loaded rule), 60-day staleness policy, on-touch verification rule, dead-reference rule, and the retired-figure rule enforced by bin/check-docs
+last_verified: 2026-07-28
 paths: "**/*.md"
 ---
 
@@ -20,6 +20,17 @@ paths: "glob-or-list"  # only meaningful for .claude/rules/*
 ```
 
 `description` and `last_verified` are required. `owner` and `paths` are optional.
+
+### `paths:` residency semantics (`.claude/rules/*` only)
+
+`paths:` is the residency selector. **No `paths:` ⇒ always-loaded** into every system prompt; **with `paths:` ⇒ lazy**, attaching only when a matching file is touched. Two constraints on writing one:
+
+- **Repo-relative only.** A `~/`- or `/`-prefixed entry does not match in practice, so it is not a trigger at all — even when the doc exists to explain that out-of-repo file. Verified 2026-07-28 across session transcripts: sessions that edited the hook named in `work-triage-detail.md`'s `paths:` attached the doc zero times.
+- **Never glob an always-loaded rule's own path.** Compaction restore re-materializes the resident set as file attachments, and that re-materialization is itself a *touch* — so a companion globbing its parent re-attaches every window, self-sustaining, with no tool call anywhere in the window touching the trigger. Three companions did this until PR #1730. The per-window cost is real but varies by session — the restore set is "whatever was resident," not a fixed list — so measure it on your own transcript rather than trusting a quoted figure. Point the glob at the **source surface** the doc explains instead.
+
+This is not an argument for narrow globs generally. A deliberately broad glob aimed at a real surface — this doc's `**/*.md`, `meta-tooling-bar.md`'s `.claude/**` — re-attaches on restores too, and that is intended: both docs govern the surface being restored. The defect is a glob whose *only* purpose is to ride its parent's residency.
+
+A companion left with no live trigger is **Read-on-demand only**. That is legitimate when the always-loaded parent cites it by name at each decision point — but say so in the `description`, so the next reader doesn't assume it auto-attaches.
 
 ## On-Touch Rule
 

@@ -1,5 +1,5 @@
 ---
-description: Read-on-demand detail for work-triage — measurement context for the inline-Opus leak, ADR-0067 gateway framing, hard-trigger gate properties (sub-agent exemption, per-turn scoping, escape hatch, self-test), the cross-worktree straddle gate's four-rung remedy ladder, inline-vs-delegated criteria, safety-mirror backstop, and repeat-polling spend rationale.
+description: Read-on-demand detail for work-triage — NO auto-attach trigger (its only `paths:` entry is out-of-repo and never matches); Read it when work-triage.md cites it. Covers measurement context for the inline-Opus leak, ADR-0067 gateway framing, hard-trigger gate properties (sub-agent exemption, per-turn scoping, escape hatch, self-test), the cross-worktree straddle gate's four-rung remedy ladder, inline-vs-delegated criteria, safety-mirror backstop, and repeat-polling spend rationale.
 last_verified: 2026-07-28
 paths:
   - "~/.claude/hooks/plan-gate-edit.sh"
@@ -8,6 +8,8 @@ paths:
 # Work Triage — Detail
 
 Read-on-demand companion to `work-triage.md` (always-loaded).
+
+**This file never auto-attaches.** Its `paths:` entry points at a hook outside the repo, and out-of-repo entries do not match (`doc-freshness.md` § `paths:` residency semantics). The `paths:` key is kept non-empty only so the doc isn't promoted to always-loaded — access is by explicit Read, at the points where `work-triage.md` names this file. Do **not** "fix" it by globbing `.claude/rules/work-triage.md`: that is the compaction cascade PR #1730 removed.
 
 ## Execution routing context
 

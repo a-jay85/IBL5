@@ -1,6 +1,6 @@
 ---
 description: JSB native-engine backlog — the count-axis cut-over blocker chain, static RE pins, faithful ports, and validation gates, each tagged with the model tier that owns its load-bearing reasoning (Fable-gated items marked).
-last_verified: 2026-07-26
+last_verified: 2026-07-29
 ---
 
 # JSB Native-Engine Backlog
@@ -55,10 +55,10 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 1 |
+| ⬜ Open | 3 |
 | 📋 Planned | 0 |
-| ◑ Partial | 2 |
-| ✅ Implemented | 22 |
+| ◑ Partial | 1 |
+| ✅ Implemented | 23 |
 | 🚫 Declined | 1 |
 
 ---
@@ -94,6 +94,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 | J26 | `fastClassShareArtifact` era/corpus field gap — all-era run logs recent-era band text (instrument hazard) | ✅ Implemented | ⚙️ Sonnet | S |
 | J27 | FTA undershoot ~−21% vs sco (engine 152,874 / sco 194,185 = −21.27%; no confirmed mechanism) | ⬜ Open | 🧠 Opus | M |
 | J28 | Cov(lnFGA,lnPPS) regression from J7 TOV-coupling port (−0.000062 actual, disclosed fidelity cost) | ⬜ Open | 🧠 Opus | S |
+| J29 | #1676 steal branch fires at the total-TOV rate — STL/g 30.5 vs 17.8±0.7, archive band fails at 14.69% (RE cannot resolve the split) | ⬜ Open | 🧠 Opus | M |
 
 ### J1 Faithful foul-bucket pair port
 ➜ J1 Faithful foul-bucket pair port — ✅ Implemented (2026-07-10): see [archive](archive/jsb-native-backlog-archive.md).
@@ -114,7 +115,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 ➜ J6 Composite-scale pins — ✅ Implemented (2026-07-10): every target pinned + mechanism discovered; spawned J15/J18/J19; see [archive](archive/jsb-native-backlog-archive.md).
 
 ### J7 Turnover volume-coupling fidelity RE
-➜ J7 Turnover volume-coupling fidelity RE — ✅ Implemented (2026-07-26): `teamOffTOVShare` (TVR_rate/(shot_rate+TVR_rate)) replaces stealTurnoverScale×(100−TVR)×Σ(STL×fatigue); Cov regression −0.000062 disclosed as J28; PR #1676. See [archive](archive/jsb-native-backlog-archive.md).
+➜ J7 Turnover volume-coupling fidelity RE — ✅ Implemented (2026-07-26): `teamOffTOVShare` (TVR_rate/(shot_rate+TVR_rate)) replaces stealTurnoverScale×(100−TVR)×Σ(STL×fatigue); Cov regression −0.000062 disclosed as J28; PR #1676. See [archive](archive/jsb-native-backlog-archive.md). ⚠️ **The RE verdict stands; the port that shipped under it does not — see J29** (2026-07-29): the ported share is a *total*-TOV rate and is the complement of the fast-break conversion threshold the J7 RE explicitly ruled out as the generator, so STL/g runs 30.5 vs a 17.8±0.7 target. J7's status is unchanged because J7 was an RE deliverable ("No engine change. No worktree/PR" — its own artifact); the level defect belongs to J29.
 ### J8 Transition trigger denominator 18
 ➜ J8 Transition trigger denominator 18 — ✅ Implemented (2026-07-13): PR #1433 (`transitionTriggerDenom` 20→18, asm-verified); see [archive](archive/jsb-native-backlog-archive.md).
 
@@ -330,8 +331,114 @@ Three-date routing record (artifacts `calibration-5.60-20260722/23/24-3pt-attemp
 
 **Mechanism:** J7 faithful port (`teamOffTOVShare`) regresses `Cov(lnFGA,lnPPS)` by **−0.000062** (pre-impl −0.000226 → post-impl −0.000288, 2026-07-26 archive run, 15 seasons). Further from real +0.000269. Faithfulness cost per ADR-0090; not grounds to withhold the J7 port.
 
-**Why it regresses:** High-volume lineups have larger `total_shot_rate` denominators → `P(TO) = TVR_rate/(shot_rate+TVR_rate)` is diluted → TOV count falls → FGA/g rises without a proportional PPS rise → Cov(lnFGA,lnPPS) is pushed more negative. This is the same FGA anti-coupling amplification that makes J7 necessary.
+**Why it regresses:** High-volume lineups have larger `total_shot_rate` denominators → `P(TO) = TVR_rate/(shot_rate+TVR_rate)` is diluted **relative to** low-volume lineups → their possessions convert to shots at a higher relative rate, without a proportional PPS rise → Cov(lnFGA,lnPPS) is pushed more negative. This is a **cross-sectional dilution gradient**; it is the same FGA anti-coupling amplification that makes J7 necessary. **Level-direction correction (2026-07-29, J29):** an earlier version of this line stated that the port makes TOV count *fall* and FGA/g *rise* in aggregate. Measured, the levels moved the **opposite** way — TOV/g **rose** 43.0% (27.77 → 39.72) and FGA/g **fell** 5.5% (199.17 → 188.25), `ibl5/backups` (example) stride 100 / runs 4 / seed 20240601. The gradient claim and the −0.000062 Cov measurement stand; only the aggregate level direction was wrong. The level defect itself is **J29**.
 
 **Measurement (2026-07-26):** `TestRealArchive_PossessionCoupling`, worktree `jsb-j7-tov-coupling-port`. Pre-impl baseline: −0.000226; post-impl: −0.000288; Δ = −0.000062.
 
-**Status (2026-07-26, ⬜ Open):** Disclosed; no positive Cov lever confirmed. Do NOT re-open J7 for this — J7 faithfulness is the cause, not the fix. A positive Cov fix must come from the FGA anti-coupling (see J20 declined rationale) or a future count-axis improvement. Tier: 🧠 Opus. Effort: S (disclosure only until a positive lever is identified).
+**Status (2026-07-26, ⬜ Open; rescoped 2026-07-29):** Disclosed; no positive Cov lever confirmed. Do NOT re-open J7 **for the Cov axis** — on that axis J7 faithfulness is the cause, not the fix, and a positive Cov fix must come from the FGA anti-coupling (see J20 declined rationale) or a future count-axis improvement. **Scope correction (J29):** this bar was written on the premise that the #1676 port is faithful, and that premise is falsified **for the level** — the steal branch fires at the total-TOV rate, STL/g 30.5 vs a 17.8±0.7 target, and the archive band `steal share% ∈ [8.0, 9.0]` fails at 14.69%. That defect is tracked as **J29** and is a legitimate re-open of the ported mechanism; this bar never covered it. Tier: 🧠 Opus. Effort: S (disclosure only until a positive lever is identified).
+
+### J29 #1676 steal branch fires at the total-TOV rate (level defect; RE cannot resolve the split)
+
+*(Numbered J29: next available after J28.)*
+
+**Defect.** PR #1676 (J7 port) replaced the steal branch's calibrated constant with an unnormalized
+share: `steal.go:59` now reads `prob := gs.turnoverProb(teamOffTOVShare(offense.players))`, and
+`freeze.go:665-690` applies **no scaling** (`p := share`, clamped at 0.9). The share's numerator is
+a **total**-turnover rate — `tovCarelessRate48 = RealLifeTVR/RealLifeMIN×48`, and `bundle.go:112`
+documents `rl_tvr` as `TOV/MIN×48` with `assemble.go:176` summing it into the league total-turnover
+accumulator `sumTOV`. So the steal-only branch fires at the team's total turnover rate, while
+`nonStealTurnover` (`steal.go:84`, scale `0.00175`, untouched by #1676) adds non-steal turnovers on
+top of turnovers already counted.
+
+**Measured (`ibl5/backups` (example), stride 100, runs 4, seed 20240601 — 8 snapshots, 35,896 games, ~7.4M
+possessions per end; instrument byte-identical at both ends: `endingmix_share_archive_test.go` blob
+`e3f0802a1`, `endingmix.go` blob `e96231713`):**
+
+| Quantity | pre-#1676 (`45080c1cf`) | post-#1676 (`619fee3f2`) | master tip `1c3220456` | target |
+|---|---|---|---|---|
+| steal endings % | 8.76 | 14.69 | 14.69 | band **[8.0, 9.0]** ❌ |
+| indep-TO endings % | 4.78 | 4.47 | 4.47 | band [4.4, 5.4] ✅ |
+| STL / game | 17.97 | 30.46 | 30.5 | 17.88 (gate 17.8±0.7) ❌ |
+| TOV / game | 27.77 | 39.72 | 39.7 | ~27.8 |
+| FG % | 48.41 | 48.27 | 48.22 | band [47.5, 48.9] ✅ |
+| FTA / game | 33.8 | 31.9 | 31.6 | band [29.5, 34.2] ✅ |
+
+`619fee3f2^` = `45080c1cf`. **Exactly one** assertion fails, at `endingmix_share_archive_test.go:340`:
+`steal share% = 14.69%, want within [8.00%, 9.00%]`. The control held — `indep-TO share%` is the
+untouched `nonStealTurnoverScale` branch and stays in band, so the run is not population- or
+config-contaminated. Pre-#1676 reproduces the checked-in
+`calibration-5.60-20260723-ending-mix.json` steal share of 8.758 to 3 dp. **Era caveat:** the share
+bands are ratios and transfer across populations; the per-game targets (17.88 STL/g, 209.2 poss/g,
+67.58 DREB/g) are all-era J3 figures and are **not** era-safe (ADR-0088 retired all-era denominators
+for gate-1).
+
+**ADR-0085 does not shield this.** The violated target is the port's **own** fidelity target — STL
+≈ 17.8±0.7/g both teams, named in the comment of the very constant #1676 deleted
+(`stealTurnoverScale = 1.69e-5`). A scale error inside a faithfulness port is not a
+fidelity-vs-fit tradeoff.
+
+**Headline RE finding — the ported quantity is the wrong quantity, not merely the wrong scale.**
+`teamOffTOVShare = TVR_rate/(shot_rate + TVR_rate)` is the exact **complement** of
+`00_MASTER_REFERENCE.md:436-443`'s fast-break steal-**success** threshold
+`total_shot_rate/(total_shot_rate + TVR_rate)` (`+0xDA0 = 3P_rate + 2P_rate + FT_rate` is the same
+shot-rate composite). That quantity is fast-break-scoped (`:436`), governs whether an
+*already-created* turnover's transition **converts** rather than whether a turnover happens, and is
+**stateful** — `DA0` decays by 2.0 (floor 2.0) after each break. `jsb-J7-tov-coupling-RE-20260720.md`
+§1 explicitly rules it out as the generator ("correcting an earlier draft"). The pinned generator is
+instead `Σ_5(offensive_turnover_stat × fatigue) / (param × 1.5)` — the offense's own per-48 TOV-rate
+composite over an **engine constant**, with no shot-rate denominator and no defense-side term.
+
+**Why this is NOT fixed here, and why a fitted factor is refused.** Neither candidate repair has an
+RE basis. *Renormalize* (restore a calibrated scale in front of the same share) preserves a
+fast-break-scoped, decaying, wrong-quantity anchor. *Partition* (steal branch takes the
+steal-sourced portion) requires a steal/non-steal attribution step that no RE has located. Two
+independent stop conditions:
+
+1. **`param` is never named or valued.** `00_MASTER_REFERENCE.md` § Steal Probability pins the form
+   and stops at "Total capped at `param × 1.5`". The generator's **level** — the whole of this
+   defect — is not derivable from RE.
+2. **5.60's non-steal turnover path is unlocated, and the RE's account of it is falsified.** J7 RE
+   §1 asserts the only independent per-possession check is the `+0xDF8` energy param ∈ [2,5] →
+   ~0.1%/poss ≈ **0.2 TOV/g**; the corpus carries indep-TO endings 5.16% ≈ **10 TOV/g** — a ~50×
+   discrepancy. Taken literally, RE's structure ("under ⇒ steal") makes 5.60 emit steals ≈ *all*
+   turnovers, against a corpus 64%. The RE's stated structure cannot produce the observed split.
+
+**Live readings (three; `+0xDD0 = STL/MIN×44` is CLOSED — it is steals *gotten*, a defensive stat,
+while the generator sums the OFFENSE's five careless-ball-handler weights):**
+
+- **(a) Unfound attribution step** — the roll creates a turnover; a later step credits a steal (~64%)
+  or not (~36%). Then the Go bug is that `nonStealTurnover` is *additive* to a gate that already
+  counts non-steal turnovers, instead of a partition of it. Needs: the credit step's offset.
+- **(b) Unfound second generation site** — supplies ~10 TOV/g, since the `+0xDF8` check is ~50× too
+  small. Then the steal generator is steal-only and must fire at a steal-sourced rate. Needs: the site.
+- **(c) Level-set-by-`param`** — the structure is complete and the split is emergent from `param`.
+  Then the faithful port is `Σ_5(tovCarelessRate48 × fatigue) / CAP`, which **drops the shot-rate
+  denominator** and is neither audit candidate. Needs: `param`'s value.
+
+**Next RE (in order):** (i) pin `param` at the steal-roll call site in the possession handler —
+trace the caller that supplies the cap operand into the `× 1.5`; (ii) locate 5.60's non-steal
+turnover origin by working back from the `.sco`/IBL5.log ending classes that produce indep-TO
+endings; (iii) only then choose between (a)/(b)/(c). Data is **not** the blocker — J22 (✅) already
+wires per-player `rl_stl`/`rl_tov`; the blocker is asm.
+
+**Do NOT:** revert #1676 (the pre-#1676 form is unfaithful — rating-for-stat plus a defense-side
+Σ STL pool, severing the offense-rate self-coupling, `jsb-J7…RE` §1); apply a flat ×0.64 or any
+factor fitted to make the band pass; sweep or re-register `teamOffTOVShare` (unregistered under
+ADR-0087 §2, pinned by omission); or merge `tovCarelessRate48` into `tovRate` (its docblock forbids
+it — J6/J16 offQuality foul coupling).
+
+**Related.** J28 carries the Cov(lnFGA,lnPPS) regression from the same port — that is a separate
+axis and its "do not re-open J7" bar is scoped to Cov, not to this level defect. The hard band that
+would have caught this is dark (`//go:build archive`, skips without `JSB_ARCHIVE_DIR` — "always 0 on
+CI", test docblock `:30`); that is the meta-tooling **unwired test** disposition, due at the
+2026-10-06 cull, and is deliberately **not** bundled here. Machine-local inputs:
+`jsb-native/re-artifacts/pr1676-tov-fidelity-audit-20260729.md`,
+`jsb-native/re-artifacts/jsb-J7-tov-coupling-RE-20260720.md`,
+`jsb-native/jsb_560/decompiled/00_MASTER_REFERENCE.md`.
+
+**Status (2026-07-29, ⬜ Open).** Filed from a first-hand reproduction at master tip `1c3220456`
+(no engine changes between `85d245cb5` — the planned measurement SHA — and `1c3220456`, confirmed via
+`git log 85d245cb5..HEAD -- engine/internal/sim/` returning empty; the A/B ends are unaffected);
+no engine change shipped — the fix is blocked on RE, not on implementation. Tier: 🧠 Opus (novel RE
+— asm work to pin `param` and locate the non-steal path). Effort: M (RE session + faithful port +
+archive re-measure at both ends + gate-1 re-read).

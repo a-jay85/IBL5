@@ -5,7 +5,7 @@ name: security-audit
 description: Token-efficient security audit for pull requests
 disable-model-invocation: true
 model: claude-sonnet-4-6
-last_verified: 2026-07-20
+last_verified: 2026-07-28
 ---
 
 Perform a security audit on the given pull request. This command optimizes token usage by fetching the diff once and passing it to a single merged security agent.
@@ -111,6 +111,18 @@ The helper routes on-diff findings to a batch resolvable review POST (inline thr
 post_review_summary "$PR_NUMBER" "Security audit" \
     "No security issues found. <brief evidence per category> (XSS and input validation are enforced by PHPStan custom rules.)"
 ```
+
+### Dispositioning open threads:
+
+A finding posted as an inline thread stays open until something replies *in-thread* and resolves it. Never use `gh pr comment` to announce that a finding is fixed or to close a thread — a top-level comment cannot associate with a review thread. To disposition a finding:
+
+```bash
+source "$(git rev-parse --show-toplevel)/bin/lib/post-review-findings.sh"
+list_open_review_findings "$PR_NUMBER"                      # TSV: COMMENT_ID, score, path:line, excerpt
+resolve_review_finding "$PR_NUMBER" <COMMENT_ID> "Fixed in <sha> — <what changed>"
+```
+
+The same call applies when declining a finding — the body says why, and the thread still closes. A finding is dispositioned when it is fixed *or* explicitly declined; silence is not a disposition.
 
 ### Per-finding body format:
 

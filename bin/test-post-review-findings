@@ -165,6 +165,8 @@ export RESOLVE_OUT
 # `:-` defaults are no-ops because the vars are already set)
 # shellcheck disable=SC1090
 source "$LIB"
+LIB_ARM="$REPO_ROOT/bin/lib/pr-armable.sh"
+source "$LIB_ARM"
 
 reset_outputs() { rm -f "$REVIEW_OUT" "$COMMENT_OUT" "$REPLY_OUT" "$RESOLVE_OUT"; }
 
@@ -390,6 +392,152 @@ do
         fail "case13: $name does NOT document resolve_review_finding — a fixed finding will be announced with 'gh pr comment' and its thread left open forever"
     fi
 done
+
+# ── cases 14-24: pr_unresolved_findings_hold (condition 11) ──────────────────
+
+# ── case 14: default fixture — scored unresolved emitted, others excluded ─────
+# thread 111: unresolved, score 85  → must emit unresolved-finding:85
+# thread 222: resolved, score 90    → must NOT emit (resolved)
+# thread 333: unresolved, unscored  → must NOT emit (no score marker)
+# ghost thread (empty comments)     → must not abort the query
+out14="$BASE_TMP/case14.txt"
+pr_unresolved_findings_hold 42 > "$out14"
+assert_contains "case14: unresolved scored 85 emitted" "$out14" "unresolved-finding:85"
+assert_not_contains "case14: resolved 90 excluded" "$out14" "unresolved-finding:90"
+assert_not_contains "case14: unscored thread excluded" "$out14" "unresolved-finding:333"
+
+# ── case 15: two unresolved threads scored 92 and 80 ─────────────────────────
+fix15="$BASE_TMP/threads15.json"
+cat > "$fix15" <<'THREADS15'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
+  {"isResolved":false,"comments":{"nodes":[{"databaseId":201,"body":"Bug A <!-- score: 92 -->"}]}},
+  {"isResolved":false,"comments":{"nodes":[{"databaseId":202,"body":"Bug B <!-- score: 80 -->"}]}}
+]}}}}}
+THREADS15
+GH_THREADS_FIXTURE="$fix15"
+out15="$BASE_TMP/case15.txt"
+pr_unresolved_findings_hold 42 > "$out15"
+assert_contains "case15: score-92 emitted" "$out15" "unresolved-finding:92"
+assert_contains "case15: score-80 emitted (boundary >= 80)" "$out15" "unresolved-finding:80"
+GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
+
+# ── case 16: one unresolved scored 79 — below threshold → empty ──────────────
+fix16="$BASE_TMP/threads16.json"
+cat > "$fix16" <<'THREADS16'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
+  {"isResolved":false,"comments":{"nodes":[{"databaseId":301,"body":"Minor note <!-- score: 79 -->"}]}}
+]}}}}}
+THREADS16
+GH_THREADS_FIXTURE="$fix16"
+out16="$BASE_TMP/case16.txt"
+pr_unresolved_findings_hold 42 > "$out16"
+if [ ! -s "$out16" ]; then
+    ok "case16: score-79 below threshold → empty output"
+else
+    fail "case16: expected empty for score 79, got: $(cat "$out16")"
+fi
+GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
+
+# ── case 17: all threads resolved (including score 100) → empty ───────────────
+fix17="$BASE_TMP/threads17.json"
+cat > "$fix17" <<'THREADS17'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
+  {"isResolved":true,"comments":{"nodes":[{"databaseId":401,"body":"Resolved <!-- score: 100 -->"}]}},
+  {"isResolved":true,"comments":{"nodes":[{"databaseId":402,"body":"Also resolved <!-- score: 85 -->"}]}}
+]}}}}}
+THREADS17
+GH_THREADS_FIXTURE="$fix17"
+out17="$BASE_TMP/case17.txt"
+pr_unresolved_findings_hold 42 > "$out17"
+if [ ! -s "$out17" ]; then
+    ok "case17: all resolved → empty output"
+else
+    fail "case17: expected empty for all resolved, got: $(cat "$out17")"
+fi
+GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
+
+# ── case 18: only unscored human threads → empty ──────────────────────────────
+fix18="$BASE_TMP/threads18.json"
+cat > "$fix18" <<'THREADS18'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
+  {"isResolved":false,"comments":{"nodes":[{"databaseId":501,"body":"Can you clarify this?"}]}},
+  {"isResolved":false,"comments":{"nodes":[{"databaseId":502,"body":"Nit: rename the variable"}]}}
+]}}}}}
+THREADS18
+GH_THREADS_FIXTURE="$fix18"
+out18="$BASE_TMP/case18.txt"
+pr_unresolved_findings_hold 42 > "$out18"
+if [ ! -s "$out18" ]; then
+    ok "case18: only unscored human threads → empty output"
+else
+    fail "case18: expected empty for unscored threads, got: $(cat "$out18")"
+fi
+GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
+
+# ── case 19: nodes:[] (no threads) → empty ────────────────────────────────────
+fix19="$BASE_TMP/threads19.json"
+printf '{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[]}}}}}' > "$fix19"
+GH_THREADS_FIXTURE="$fix19"
+out19="$BASE_TMP/case19.txt"
+pr_unresolved_findings_hold 42 > "$out19"
+if [ ! -s "$out19" ]; then
+    ok "case19: empty nodes array → empty output"
+else
+    fail "case19: expected empty for no threads, got: $(cat "$out19")"
+fi
+GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
+
+# ── case 20: GraphQL errors array → api-error ────────────────────────────────
+fix20="$BASE_TMP/threads20.json"
+printf '{"errors":[{"message":"Bad credentials"}]}' > "$fix20"
+GH_THREADS_FIXTURE="$fix20"
+out20="$BASE_TMP/case20.txt"
+pr_unresolved_findings_hold 42 > "$out20"
+assert_contains "case20: GraphQL errors array → api-error" "$out20" "unresolved-findings-api-error"
+GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
+
+# ── case 21: garbage fixture bytes → api-error ───────────────────────────────
+fix21="$BASE_TMP/threads21.json"
+printf 'not json at all' > "$fix21"
+GH_THREADS_FIXTURE="$fix21"
+out21="$BASE_TMP/case21.txt"
+pr_unresolved_findings_hold 42 > "$out21"
+assert_contains "case21: garbage fixture → api-error" "$out21" "unresolved-findings-api-error"
+GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
+
+# ── case 22: exactly 100 nodes → cap (not individual findings) ───────────────
+fix22="$BASE_TMP/threads22.json"
+jq -n '{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":
+  [range(100) | {"isResolved":false,"comments":{"nodes":[{"databaseId":.,"body":"Bug <!-- score: 85 -->"}]}}]
+}}}}}' > "$fix22"
+GH_THREADS_FIXTURE="$fix22"
+out22="$BASE_TMP/case22.txt"
+pr_unresolved_findings_hold 42 > "$out22"
+assert_contains "case22: 100-node cap → unresolved-findings-cap" "$out22" "unresolved-findings-cap"
+assert_not_contains "case22: cap suppresses individual finding lines" "$out22" "unresolved-finding:"
+GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
+
+# ── case 23: GH_CMD=/bin/false → non-zero exit → api-error ──────────────────
+SAVED_GH_CMD="$GH_CMD"
+GH_CMD="/bin/false"
+out23="$BASE_TMP/case23.txt"
+pr_unresolved_findings_hold 42 > "$out23"
+assert_contains "case23: GH_CMD=/bin/false → api-error" "$out23" "unresolved-findings-api-error"
+GH_CMD="$SAVED_GH_CMD"
+
+# ── case 24: clear path returns 0 under set -euo pipefail ────────────────────
+( set -euo pipefail; source "$LIB_ARM"; pr_unresolved_findings_hold 42 >/dev/null ) \
+    && ok "case24: clear path returns 0 under strict mode" \
+    || fail "case24: clear path returned non-zero — pr-triage would abort"
+
+# ── structural: condition (11) block exists and is self-contained ─────────────
+COND11_FILE="$REPO_ROOT/.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md"
+if grep -q '# condition (11)' "$COND11_FILE" \
+    && grep -A4 '# condition (11)' "$COND11_FILE" | grep -q 'bin/lib/pr-armable.sh'; then
+    ok "structural: condition (11) block exists and references pr-armable.sh"
+else
+    fail "structural: condition (11) block missing or does not reference pr-armable.sh in first 4 lines"
+fi
 
 # ── summary ───────────────────────────────────────────────────────────────────
 if [ "$FAILED" -eq 0 ]; then

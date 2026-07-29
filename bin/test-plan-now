@@ -27,11 +27,29 @@ FAILS=0
 ok()   { printf '  ok   %s\n' "$1"; }
 fail() { printf '  FAIL %s\n' "$1"; FAILS=$((FAILS + 1)); }
 
-TMP=$(mktemp -d -t test-plan-now)
+# A full template, not `mktemp -d -t <prefix>`: GNU mktemp rejects a -t argument
+# with too few X's, so the BSD spelling would fail on the Linux CI runner.
+TMP=$(mktemp -d "${TMPDIR:-/tmp}/test-plan-now.XXXXXX")
 trap 'rm -rf "$TMP"' EXIT
 
 PLANS="$TMP/plans"
 mkdir -p "$PLANS"
+
+# `caffeinate` is macOS-only and the runner wraps the model call in it. Unshimmed,
+# this test cannot run on Linux CI: command-not-found → rc != 0 → every
+# identification case falls into the RESULT-failed branch and the marker contract
+# goes untested. The shim also keeps a local run from taking a real power assertion.
+# It lives in the inherited PATH, which the runner's own PATH prelude only
+# *prepends* to, so it is reachable on both platforms.
+SHIM="$TMP/bin"
+mkdir -p "$SHIM"
+cat > "$SHIM/caffeinate" <<'SHIM_EOF'
+#!/usr/bin/env bash
+while [ $# -gt 0 ]; do case "$1" in -*) shift ;; *) break ;; esac; done
+exec "$@"
+SHIM_EOF
+chmod +x "$SHIM/caffeinate"
+export PATH="$SHIM:$PATH"
 
 # The prompt plan-now is handed. Only the leading /plan line matters to it.
 PROMPT="$TMP/prompt.md"
@@ -84,8 +102,12 @@ want "bold-wrapped marker still identifies the plan" "$out" "plan-now: new plan 
 out=$(run_case "$P" "- PLAN_FILE: \`$P\`")
 want "list-prefixed + backticked path still identifies the plan" "$out" "plan-now: new plan -> $P"
 
+# Asserting on `RESULT degraded`, NOT on the substring "check-plan": the unconfirmed
+# branch prints "check-plan was NOT run", so a substring test there passes whether or
+# not the gate ever ran. `degraded` is printed only after check-plan actually executed
+# and failed — which it does here, the stub plan being one line of nothing.
 out=$(run_case "$P" "PLAN_FILE: $P")
-want "an identified plan reaches the check-plan gate" "$out" "check-plan"
+want "an identified plan actually reaches the check-plan gate" "$out" "RESULT degraded"
 
 echo "── fail-safe: a bad marker costs 'unconfirmed', never a wrong green ──"
 
@@ -108,6 +130,10 @@ echo "── the coda still tells the model where to put it ──"
 dry=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
           "$PLAN_NOW" --implement "$PROMPT" 2>&1)
 coda=$(cat "$(printf '%s\n' "$dry" | sed -n 's/^  prompt: //p')" 2>/dev/null)
+# This dry-run's runner is never executed, and the runner is what deletes the plist.
+# Without this, every test run leaves a RunAtLoad plist in ~/Library/LaunchAgents
+# pointing at a /tmp runner that no longer exists.
+rm -f "$(printf '%s\n' "$dry" | sed -n 's/^  plist:  //p')"
 want "coda demands the FINAL message" "$coda" "FINAL message"
 want "coda demands the last line" "$coda" "last line"
 # Tolerant parsing is a backstop for prose drift, not a licence to move the

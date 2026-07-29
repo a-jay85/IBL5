@@ -1,6 +1,6 @@
 ---
-description: Read-on-demand detail for work-triage — measurement context for the inline-Opus leak, ADR-0067 gateway framing, hard-trigger gate properties (sub-agent exemption, per-turn scoping, escape hatch, self-test), the other checks sharing plan-gate-edit.sh, inline-vs-delegated criteria, safety-mirror backstop, and repeat-polling spend rationale.
-last_verified: 2026-07-27
+description: Read-on-demand detail for work-triage — measurement context for the inline-Opus leak, ADR-0067 gateway framing, hard-trigger gate properties (sub-agent exemption, per-turn scoping, escape hatch, self-test), the cross-worktree straddle gate's four-rung remedy ladder, inline-vs-delegated criteria, safety-mirror backstop, and repeat-polling spend rationale.
+last_verified: 2026-07-28
 paths:
   - ".claude/rules/work-triage.md"
   - "~/.claude/hooks/plan-gate-edit.sh"
@@ -37,7 +37,16 @@ Self-test: `bash ~/.claude/hooks/test-plan-gate-edit.sh`
 
 ### Other checks in the same hook
 
-`plan-gate-edit.sh` is one file registered on `Read|Edit|Write`, but only Check 1 implements the sweep trigger. Don't read a deny from it as "I hit the ≥5-file limit" without reading the message — the **cross-worktree straddle gate** (Check 3) denies a **Read** whose target resolves inside a *different* worktree of this same repo than the session cwd, because touching it loads that tree's `.claude/rules/*.md` on top of the byte-identical set already resident, re-sent every turn for the rest of the session (ADR-0046). Its remedy is `EnterWorktree` to re-root the session, not delegation; reading back into the tree whose rules are already loaded stays allowed. It carries its own escape hatch — `touch /tmp/claude-tree-override-<session_id>` (example) — keyed per **session**, not per turn like Check 1's.
+`plan-gate-edit.sh` is one file registered on `Read|Edit|Write`, but only Check 1 implements the sweep trigger. Don't read a deny from it as "I hit the ≥5-file limit" without reading the message — the **cross-worktree straddle gate** (Check 3) denies a **Read** whose target resolves inside a *different* worktree of this same repo than the session cwd, because touching it loads that tree's `.claude/rules/*.md` on top of the byte-identical set already resident, re-sent every turn for the rest of the session (ADR-0046). Reading back into the tree whose rules are already loaded stays allowed.
+
+**Its remedy is not one thing — the deny message prints a four-rung ladder, and the right rung depends on the direction.** Take the first that fits; don't skip to the override:
+
+1. **`git show <ref>:<path>` from your own tree** when you only need to READ the file. The object store is shared across the repo family, so no foreign path is touched and nothing new loads. The gate probes first and prints the exact command **only** when the path is committed on that tree's branch *and* unmodified there; otherwise it says why rung 1 is unavailable and routes you on (a `git show` of a locally-modified file returns pre-edit bytes silently, which is worse than an error).
+2. **A gate-exempt sub-agent** (`Agent(subagent_type: "sonnet-4-6")`, omit `model`) for bounded work in that tree. Its rules load in ITS context and are discarded on return. **This is the default for cross-tree edits** — delegation, not re-rooting.
+3. **Relocate or hand off**, direction-dependent: `EnterWorktree` when the session is in the **main checkout** and the target is a worktree; a **fresh session** rooted in the target when the session is already in a worktree (`ExitWorktree` no-ops for a session *launched* in a worktree, and a direct worktree→worktree `EnterWorktree` is rejected — leave the tree dirty and hand off in prose). Never relocate INTO the main checkout: it is read-only reference (ADR-0062).
+4. **The escape hatch** — `touch /tmp/claude-tree-override-<session_id>` (example), keyed per **session**, not per turn like Check 1's — for the genuine both-trees-at-once case (diffing two worktrees).
+
+Why the ladder replaced a bare "use `EnterWorktree`": in the gate's first 27h, all 8 override releases came from sessions already inside a worktree, where re-rooting is exactly the rung that does not work. Prescribing it there taught callers the remedy was broken and sent them to the override.
 
 ## Repeat-polling
 

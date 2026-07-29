@@ -179,6 +179,7 @@ while [ "$i" -lt "$PR_COUNT" ]; do
     golden="$(pr_golden_hold "$files")"
     feat="$(pr_feat_hold "$title" "$labels")"
     deps="$(pr_dep_holds "$body" | tr '\n' ' ')"
+    unresolved="$(pr_unresolved_findings_hold "$num" | tr '\n' ' ')"
 
     check_signals=""
     blocked_check=0
@@ -215,7 +216,7 @@ while [ "$i" -lt "$PR_COUNT" ]; do
             rid="$(rerun_id "$LATEST" "$cancelled_ctx")"
             [ -n "$rid" ] && RERUN_HINTS="${RERUN_HINTS}hint: gh run rerun ${rid}  # ${cancelled_ctx} was CANCELLED on PR #${num}"$'\n'
         fi
-    elif [ "$clearance" = "HELD" ] || [ -n "$golden" ] || [ "$held_body" = "1" ]; then
+    elif [ "$clearance" = "HELD" ] || [ -n "$golden" ] || [ "$held_body" = "1" ] || [ -n "$unresolved" ]; then
         bucket="HELD"; action="human review"
     elif [ -n "$deps" ]; then
         bucket="BLOCKED-DEP"; action="wait for predecessor"
@@ -230,7 +231,7 @@ while [ "$i" -lt "$PR_COUNT" ]; do
         bucket="UNCLEARED"; action="human review (checks not green)"
     fi
 
-    signals="clearance=${clearance}; ${check_signals}held_body=$([ "$held_body" = 1 ] && echo yes || echo no); golden=$([ -n "$golden" ] && echo yes || echo no); deps=$([ -n "$deps" ] && echo "${deps% }" || echo none); feat=$([ -n "$feat" ] && echo yes || echo no); expected_red=$([ "$expected_red" = 1 ] && echo yes || echo no)"
+    signals="clearance=${clearance}; ${check_signals}held_body=$([ "$held_body" = 1 ] && echo yes || echo no); golden=$([ -n "$golden" ] && echo yes || echo no); deps=$([ -n "$deps" ] && echo "${deps% }" || echo none); feat=$([ -n "$feat" ] && echo yes || echo no); expected_red=$([ "$expected_red" = 1 ] && echo yes || echo no); unresolved=$([ -n "$unresolved" ] && echo "${unresolved% }" || echo none)"
 
     printf '%-7s  %-22s  %-26s  %s\n' "#$num" "$bucket" "$action" "$signals"
 

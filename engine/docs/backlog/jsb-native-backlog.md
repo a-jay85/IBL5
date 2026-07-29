@@ -44,6 +44,11 @@ J21 gt=4 playoff-margin audit (✅ 2026-07-14 — no overshoot, engine under-dis
 J23 round-half-up + base_time re-center (✅, 2026-07-16, #1495) — coupled faithful fix deferred from J21; ADR-0085 records the hold finding; shipped round-half-up + baseTimeMid re-center 14.5→13.65 (J23)
   └─→ J24 possession-clock subsystem port (◑ Partial) — step classes + jitter, steal split + faithful shotValue2pt/3pt, matchupQuality Phase-3 matched (+0xDC8) & non-matched (+0x350, J25) terms, FG% band CLOSED via +0xD58 penalty-minutes (#1544), and the §1d steal-gating partition (#1547) all SHIPPED. **Gate-1 code-7 arming share re-adjudicated WITHIN-NOISE (was "NO-GO vs floor 12.94" — a denomination artifact): 12.94 = markers/g 27.13 ÷ the all-era 209.2 poss/g, but the engine sims recent 05-08 rosters whose real poss/g is 216.58; re-denominated, master's 12.37% **[SUPERSEDED 2026-07-24 — current 12.4142%; conclusion unchanged]** is INSIDE the recent between-season drift band [11.97, 12.54]. NOT a clean GO — master is −0.05pp under the tightest 2-season floor ~12.42 (SEM caveat). Gate-1 decided by ADR-0090 (J13-3 FINAL). See ADR-0088/0090.** Open residuals: (7) 3P undershoot (◑ Partial — make-rate CLOSED 2026-07-22: harness artifact not engine defect, engine 40.16% ≈ sco 38.96%; attempt-share REFRAMED 2026-07-22: unit-mismatch in localise instrument pinned — `dec_rate_delta_e`/decision-frequency reading retired; correct engine-vs-sco: 3GA 73.0%/2GA 100.8% of sco; defect is 3pt-SHARE-specific; **OReb putback-3pt gate RE-ADJUDICATED 2026-07-23 and RESTORED — the 2026-07-22 removal was itself the misread (`FUN_004e1ba0`'s `param_6` is a `double`, so `param_3` = `local_15c` = the OReb flag and `:97195` DOES reject 3pt on a continuation); the +1.70pp it bought was a calibration gain from an unfaithful mechanism (ADR-0090), so the gap is back toward −4.46pp **[SUPERSEDED 2026-07-24 — measured −2.33pp]** pending re-measurement**; `local_15d` forced-3pt override REFUTED (INERT under Sim Game); Transition `allow3pt=false→true` **CLOSED 2026-07-23** — faithful port, +2.08pp 3PA/100poss (`gate_delta_c_raw` −0.01783→−0.00918, `SuppressionFrac` 0.237→0.1217); FTA side-effect −0.26/100poss ADR-0090 disclosure. **Denominator Σ-basket + +0xDB0 3pt-numerator magnitude RE'd NOT-A-LEVER 2026-07-23** (🔮 Fable asm RE); **no faithful lever confirmed for the remaining gap — may be INTRINSIC to 5.60** (engine 0.1776 IS 5.60's own share once w2+basket are faithful; a w1/w3/w4 bucket-VALUE divergence is an UNVERIFIED by-elimination candidate) — **routing/undershoot discrepancy RESOLVED 2026-07-25 (time-axis error — see residual (7)); INTRINSIC hypothesis DEMOTED — re-argue on 0.1776 vs 0.1959**), (8) constant-seed single-game harness artifact in `possession_archive_test` and `threept_attemptrouting_archive_test` (⬜ Open, surfaced 2026-07-22), (6) `.plb dc_minutes` wiring, (3) CEngine+0x30 reader (with J17b writer). See the J24 entry for the full current-state + NOT-A-LEVER trap list
 J27 FTA undershoot ~−21% vs sco (⬜ Open 2026-07-24 — FTA-side gap; J24 faithful putback + transition ports disclosed partial cost; no mechanism confirmed; 🧠 Opus, M)
+J29 TOV generator unfaithful in-tree (⬜ Open 2026-07-29, #1676 reverted) ── the split has two independently-blocked halves:
+  ├─ steal side blocked on the unvalued `param` → J29 next-RE step (i)
+  └─→ J30 non-steal side (⬜ Open) — the documented outcome-5 `sqrt(local_44)` path is falsified ~50× vs corpus; NEITHER half blocks the other, and either alone leaves the generator unfaithful
+J31 play-outcome frame-trace residuals (⬜ Open — `local_e78`/`def_rating` offsets; same `FUN_0040b6a0` copy-map work as J30 candidate break 1, so cheaper if J30 runs first)
+J32 master-reference audit sweep (◑ Partial — 8 drift sites + the doc-wide argument-binding caveat ✅ corrected 2026-07-29, applied straight to the reference since it is outside git and outside every CI gate, which is also WHY the drift survived; the 34-line proof-type sweep + the in-tree/out-of-tree decision remain open)
 J18 composite fidelity ports (✅ 2026-07-13 — all divergences merged; f/shrink port declined as documented divergence) · J19 J6-residue RE (✅ 2026-07-12) — both spawned by J6
 ```
 
@@ -55,15 +60,20 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 3 |
+| ⬜ Open | 5 |
 | 📋 Planned | 0 |
-| ◑ Partial | 1 |
+| ◑ Partial | 2 |
 | ✅ Implemented | 23 |
 | 🚫 Declined | 1 |
 
 ---
 
 ## Entries
+
+> **`00_MASTER_REFERENCE.md` line numbers below are volatile.** That file is machine-local,
+> git-excluded, and edited in place, so every insertion shifts all citations after it (the 2026-07-29
+> audit pass moved lines by up to ~+40). Any `00_MASTER_REFERENCE.md:NNNN` here is a *snapshot* —
+> **match on the quoted anchor text, never seek by number.**
 
 | # | Title | Status | Tier | Effort |
 |---|-------|--------|------|-------:|
@@ -95,6 +105,9 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 | J27 | FTA undershoot ~−21% vs sco (engine 152,874 / sco 194,185 = −21.27%; no confirmed mechanism) | ⬜ Open | 🧠 Opus | M |
 | J28 | Cov(lnFGA,lnPPS): no positive lever (the −0.000062 J7-port regression is out of the tree with the #1676 revert; re-measure if the correct-form port lands) | ⬜ Open | 🧠 Opus | S |
 | J29 | TOV generator is **unfaithful in-tree** — #1676 (total-TOV-rate share) reverted 2026-07-29, restoring the rating-for-stat `stealTurnoverScale = 1.69e-5` stand-in; in band but not 5.60's form, and the correct-form port is blocked on the unvalued `param` | ⬜ Open | 🧠 Opus | M |
+| J30 | Non-steal turnover origin: the outcome-5 `sqrt(local_44)` path is quantitatively falsified (~50× short) — find the break in the chain or the second generation site | ⬜ Open | 🧠 Opus | M |
+| J31 | Play-outcome frame-trace residuals: `local_e78` and `def_rating` source offsets unpinned (the master-ref closed-vs-open self-contradiction, item (3), ✅ adjudicated 2026-07-29) | ⬜ Open | 🧠 Opus | S |
+| J32 | Master-reference audit sweep — 8 confirmed drift sites + both additive caveats ✅ corrected 2026-07-29; the 34-line proof-type sweep and the CI-invisibility decision remain | ◑ Partial | 🧠 Opus | S |
 
 ### J1 Faithful foul-bucket pair port
 ➜ J1 Faithful foul-bucket pair port — ✅ Implemented (2026-07-10): see [archive](archive/jsb-native-backlog-archive.md).
@@ -474,7 +487,7 @@ on implementation.
 **The single blocker is `param`.** The faithful generator is
 `P = Σ_5(TOV/MIN×48 × fatigue) / (param × 1.5)` (`jsb-J7-tov-coupling-RE-20260720.md:52-54`) — **no
 shot-rate denominator**, and pace-invariant. `param` is never named or valued anywhere in the RE:
-`00_MASTER_REFERENCE.md:1566-1571` § Steal Probability is bare prose with **no `FUN_` address and no
+`00_MASTER_REFERENCE.md:1604-1609` § Steal Probability is bare prose with **no `FUN_` address and no
 ✅ VERIFIED stamp**, unlike every block around it. So recovering it is an RE task with an *unlocated
 starting point*, not a lookup — it wants its own `/plan`, not a fold-in to the port.
 
@@ -486,3 +499,165 @@ numbers — that is an ADR-level decision and the number that prompted it was de
 
 Tier: 🧠 Opus (novel RE — asm work to pin `param` and locate the non-steal path). Effort: M (RE
 session + faithful port + archive re-measure at both ends + gate-1 re-read).
+
+### J30 Non-steal turnover origin — the outcome-5 `sqrt(local_44)` path is quantitatively falsified
+(discovered 2026-07-29 during jsb-re-audit-backlog)
+
+**Why now.** J29's stop condition (2) says 5.60's non-steal turnover path is *unlocated*. It is not
+unlocated — the master reference documents it, at `00_MASTER_REFERENCE.md:1394`. What is wrong is
+that the documented chain **does not reproduce the corpus**, by ~50×, and no line in the reference
+says so. This entry owns that gap; it is the concrete work behind J29's live reading (b), "an
+unfound second generation site."
+
+**The chain, end to end** (each link re-read against `jsb560_decompiled.c` on 2026-07-29, not quoted
+from memory):
+
+1. `FUN_004e1ba0` tail: `iVar10 = FUN_0047f5a0(0x701);` then
+   `if (((float10)iVar10 <= SQRT((float10)local_44)) && (param_3 == '\0') && (0 < *(int *)(param_1 + 0x171d0))) iVar8 = 5;`
+   — outcome 5 is the turnover, rolled *after* the bucket loop and outside it.
+2. `local_44` is declared `int` and never assigned in the function body; it is a field of the
+   ball-handler record copied in by `FUN_0040b6a0` at entry (`00_MASTER_REFERENCE.md:1480`).
+3. The 2026-07-09 esp accounting (delta `0x60`) pins `local_44` @ `esp0+0xE58` → player `+0xDF8`
+   (`:1499-1504`, roll-up `:4522`).
+4. `+0xDF8` is the dc_minutes energy parameter, **clamped `[2,5]`** (`:415`, `:509`, `:1816-1826`).
+5. ⇒ `sqrt(local_44) ∈ [1.41, 2.24]` against `rand_int(1,1793)` ⇒ **≈0.12%/possession ≈ 0.25 TOV/g.**
+
+Corpus says independent (non-steal) turnovers are **5.16% of endings ≈ 10 TOV/g** (J29's own
+measured ending mix). The chain is off by ~40–50×, which is the same ~50× J29 records — so J29's
+gap and this chain's gap are **the same defect**, not two.
+
+**Four candidate breaks, in the order they should be tested** (this is the RE, not a menu to
+pick from by taste):
+
+1. **`+0xDF8` is not the same field in the copy as in the player array.** `:1457` already suspects
+   `FUN_0040b6a0` repacks regions — the same paragraph shows the uniform-`0x68` map failing on
+   `local_8c`. If the copy is not same-offset throughout, step 3 is unsound and `local_44` is some
+   other double. **Discriminating test:** disassemble `FUN_0040b6a0`'s copy loop over the
+   `0xDE8–0xE60` source window and read the destination offsets directly, rather than inferring a
+   delta from two fitted points.
+2. **`+0xDF8` holds something else at call time.** `:415` carries both readings at one offset (int
+   energy param *and* the play-outcome turnover value) with an explicit `⚠️`. If per-half setup
+   (`FUN_004cfa50`) overwrites `+0xDF8` with a per-game double after the PLR-load int is written,
+   the `[2,5]` clamp is simply not what the selector reads. **Test:** enumerate every write to
+   `+0xDF8` on the player array including esp-relative stores in the stack-built record — the exact
+   blindspot class that overturned `+0xDD0`/`+0xDE0`/`+0xDC8` (J6, `:505`).
+3. **`FUN_0047f5a0(0x701)` is not `rand_int(1,1793)`.** The magnitude conclusion is entirely a
+   function of this range. **Test:** read `FUN_0047f5a0`'s body; confirm the interval and whether
+   the comparison is inclusive.
+4. **There is a second, unlocated generation site.** `turnover_logic` (`FUN_004ec760`, 224 lines) is
+   in the function inventory (`:844`) and is recorded as generating no randoms of its own — but that
+   is a *randomness* claim, not a *turnover-attribution* claim, and it has never been walked.
+   **Test:** trace every caller path that increments a TOV stat, not just the ones that roll.
+
+**What this does NOT license.** Do not close J29 or fit `stealTurnoverScale` on the strength of a
+resolution here — that inherits J29's whole "Do NOT" list unchanged. This entry buys the *location*
+of the second path; the port is still J29's, and still blocked on `param` for the steal side.
+
+**Ordering vs J29.** Independent. J29's next-RE step (i) pins `param` at the steal call site; this
+entry attacks the other half of the split. Neither blocks the other, and either alone leaves the
+generator unfaithful.
+
+Tier: 🧠 Opus (novel asm RE; three of the four tests are negative-proof shaped, which
+`.claude/rules/agent-tiering.md` keeps off Sonnet). Effort: M.
+
+### J31 Play-outcome frame-trace residuals (`local_e78`, `def_rating`) + a master-ref self-contradiction
+(discovered 2026-07-29 during jsb-re-audit-backlog)
+
+Three leftovers from the play-outcome frame trace, small enough to share one session:
+
+1. **`local_e78` source offset — still OPEN, and correctly refuses to guess**
+   (`00_MASTER_REFERENCE.md:1559`). It is caller-supplied (`CONCAT44(local_c0,local_c4)`), lands at
+   `esp0+0xDD8`, and sits **below** the `FUN_0040b6a0` copy region, so the in-copy `slot−0x60` map
+   does not apply. By role it is the made/offensive base — the "made" half of "made + fouled" — and
+   it multiplies straight into the and-one bucket at `:1552`. Needs a direct disasm read of the
+   value landing at `004e1ba0`'s `esp0+0xDD8` at the `jsb560_decompiled.c:93293` call setup.
+2. **`def_rating` source offset — unpinned** (`:1598`). `defender_selector` (`FUN_004e2850`) weights
+   each defender `(2.0 − fatigue) × def_rating`, `×0.6667` in foul trouble. `def_rating` is a
+   per-game double from the same `FUN_0040b6a0` copy, and the reference flags the offset as
+   "not yet pinned (validation-phase)". Same copy-map work as (1), so do them together.
+3. ✅ **RESOLVED 2026-07-29 — the reference's self-contradiction on whether the bucket inputs are
+   closed.** `:4522` recorded `local_ac/8c/5c/44` as ✅ **CLOSED** with all four offsets pinned while
+   `:4541`, in the same roll-up, stated "the only open formula item is play-outcome
+   `local_8c`/`local_5c`". **Adjudicated: the CLOSED row is right, the "Net" line is stale** —
+   `local_8c`=`+0xDB0` and `local_5c`=`+0xDE0` were pinned by the delta-`0x60` esp accounting on
+   2026-05-30. Both the "Net" line and the "ALL per-possession formulas are now closed" claim now
+   carry a `[CORRECTED 2026-07-29 …]` marker restating the real open scope as items (1) and (2) of
+   this entry plus J29/J30. Neither loser was deleted (see J32 on why the reference keeps superseded
+   text).
+
+**Note.** `FUN_004e1ba0`'s argument binding is **not** on this list — it was re-verified
+2026-07-29 from the caller-side stack-slot trace and is correct as documented (see J32, which
+records the stamp).
+
+Tier: 🧠 Opus (frame-offset RE; (3) is an adjudication between two dated pins). Effort: S.
+
+### J32 Master-reference audit sweep — superseded conclusions printed unmarked, and zero CI coverage
+
+**The structural finding, first, because it is the cause and not a symptom.**
+`jsb-native/jsb_560/decompiled/00_MASTER_REFERENCE.md` is 4,596 lines, is the single source of truth
+for every 5.60 runtime-behavior fact the port depends on, and is **invisible to every gate the repo
+has**. It lives under `jsb-native/`, which is git-excluded (`.git/info/exclude:20`), so: it does not
+materialize in worktrees, no PR can carry a correction to it, `bin/check-docs` never scans it (it is
+outside every in-scope glob in `.claude/rules/doc-freshness.md`), and its retired-figure rule — the
+one mechanism the repo has for exactly this failure — cannot fire on it. Every drift below survived
+because nothing could catch it. Deciding what to do about that (leave it, or bring a scanned copy
+in-tree) is part of this entry, not a precondition for it.
+
+**Status 2026-07-29: the two bounded halves of this entry are DONE; the open half is the sweep.** (discovered 2026-07-29 during jsb-re-audit-backlog)
+Applied the same day the entry was filed, directly to the reference (which is why no PR carries them
+— see the structural finding above): every row of the confirmed-drift table below now carries a
+`[CORRECTED …]` / `[SUPERSEDED …]` marker, and both additive edits landed — the doc-wide
+argument-binding caveat is now a new `## ⚠ Method caveats` section at the top of the file (it also
+promotes the esp-store blindspot from an inline aside to a stated *class*, and records the file's
+CI-invisibility in the file itself), and `FUN_004e1ba0`'s binding carries its ✅ VERIFIED 2026-07-29
+stamp with the full slot table. The line numbers in the table below are **pre-edit** and have since
+shifted downward by up to ~+40 (the shift grows with depth, since each inserted block pushes
+everything after it) — re-grep on the quoted anchor text, do not seek by number. **What remains open: the
+34-line proof-type sweep, plus the structural decision** (leave the reference outside git, or bring a
+scanned copy in-tree so `bin/check-docs` can fire on it).
+
+**Confirmed drift sites** — all ✅ CORRECTED 2026-07-29 (each re-read that day; line numbers as of *before* those edits):
+
+| Site | Stale claim | Overturned by |
+|---|---|---|
+| `:99` | "Steal/block/assist/foul mechanics — COMPLETE" | J29: the steal/non-steal split is unresolved and `param` is unvalued |
+| `:429-430` | "handler NEVER keeps the ball in consecutive transition plays" / "the transition ball-retention mechanism is entirely disabled" — printed unmarked *below* the corrected premise at `:428` | J6 (2026-07-10): `+0xDA8`/`+0xDA0` are live for any 3-point shooter, so retention can fire |
+| `:767` | `CEngine+0x30` redraw flag — "writer unidentified — bounded unknown" | J17b / PR #1536: three `movb $imm8,0x30(esi)` writer sites found (backlog J24 residual (3)) |
+| `:1267`, `:1301` | "player `+0xDC8` ≡ 0 (dead)" ⇒ matched term always ≤ 0 | J6 (2026-07-10), recorded 15 lines away at `:1260`: `+0xDC8` is live AST/MIN×48; the matched term is a sign-varying differential |
+| `:1388` | bucket origins "declared-but-never-assigned … exact assembly pending the cross-function frame trace" | the trace completed — `:1459`, `:1465-1468`, `:4484` |
+| `:1450-1457` | the pre-2026-07-09 bucket table (delta `0x68`, `+0xDA8??`/`TBD`/`+0xDF0`, "expected 3P rate `+0xD70`") printed **unmarked above** the pinned table | `:1463-1468` (delta `0x60`; `+0xD90`/`+0xDB0`/`+0xDE0`/`+0xDF8`) |
+| `:415`, `:1472` | "JSB turnovers are therefore overwhelmingly **steal-driven**" | J29 + J30: the ~0.1% independent-TO figure that conclusion rests on is falsified by the corpus at ~50× |
+| `:1384` vs `:1420` | two unqualified `param_7` tokens 35 lines apart naming **different functions'** parameters (`FUN_004e1ba0`'s play_type vs `FUN_004e45a0`'s inert flag) | not a wrong claim — a live misreading trap |
+
+**The larger sweep, which is the actual work.** `grep -nE 'dead\b|never read|vestigial|dead-zero|always 0|≡ 0'` returns **34 lines**. Two of those dead-zero pins have already been overturned by
+one method fix each (J6's esp-store blindspot; the 2026-07-23 Ghidra `double`-argument misread). Each
+of the remaining 34 needs its **proof type** classified — exhaustive-scan negative, enumeration
+negative (suspect: that is the class J6 broke), or inference — and the enumeration-negatives re-run.
+This is the per-claim judgment that makes the entry Opus and not a marker sweep.
+
+**Two additive edits owed regardless of the sweep's outcome — both ✅ APPLIED 2026-07-29:**
+
+- A **doc-wide argument-binding caveat.** `grep -n 'param-binding|argument-binding'` returns **zero
+  hits**: the hazard that produced the 2026-07-23 OReb misread — Ghidra emitting a bare
+  `FUN_xxx()` at the call site while a `double` parameter silently consumes two stack slots — is
+  documented nowhere as a class, only as one incident. The reference already carries the companion
+  caveat for the esp-store blindspot at `:487`; this is its missing twin.
+- A ✅ **VERIFIED stamp on `FUN_004e1ba0`'s binding** (`:1378-1387`), which was re-derived
+  2026-07-29 and is **correct**. Caller-side stack-slot trace at `jsb560_decompiled.c:93285-93293`:
+  `-0x194`→`param_2`, `-0x190`=`local_15c`→`param_3` forced_make, `-0x18c`=`param_1+0x58`→`param_4`,
+  `-0x188`=`*(byte*)(param_1+0x4c18)`→`param_5` HCA, `-0x184` (8 bytes) = `FUN_004e3860()`→`param_6`
+  **double**, `-0x17c`=`local_154`→`param_7` play_type, `-0x178`=`local_120`→`param_8` shot_clock.
+  Three independent cross-checks hold: `local_154 == 5` is the steal guard eight lines above the
+  call; `local_15c==1 ⇒ local_120 &= ~0xff` (forced-make and shot-clock are mutually exclusive);
+  `local_120 |= 1` when `param_1+0x4c24 < 4` (clock low). Stamping this **closes** the re-audit
+  rather than opening one — record it so the next session does not re-derive it.
+
+**Do NOT:** delete superseded text. The reference deliberately keeps it behind
+`<details><summary>superseded original text</summary>` (`:1392`) for provenance; the defect is
+missing *markers*, not surviving history. Use the `bin/check-docs` marker vocabulary
+(`[CORRECTED …]`, `[SUPERSEDED …]`, `**Superseded by:**`, `RETIRED-OK`) even though no gate reads
+this file — so that it stays gate-compatible if the structural question above is ever answered by
+bringing it in-tree.
+
+Tier: 🧠 Opus (the 34-line sweep is proof-type classification, and per
+`.claude/rules/agent-tiering.md` a negative-existence claim is not Sonnet work). Effort: M.

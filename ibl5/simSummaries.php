@@ -57,10 +57,21 @@ if ($wantsTxt) {
         exit;
     }
 
+    // recap_text is usually a ~220-char teaser; assemble the full document from parts
+    // before emitting headers so a fatal in assembly cannot produce partial output.
+    $introText = $row['intro_text'] ?? null;
+    $outroText = $row['outro_text'] ?? null;
+    $document  = \SimRecap\RecapDocument::postableText(
+        is_string($introText) ? $introText : null,
+        $repo->findDisplayableGameRecaps($sim),
+        is_string($outroText) ? $outroText : null,
+        (string) $row['recap_text']
+    );
+
     header('Content-Type: text/plain; charset=utf-8');
     header('Content-Disposition: attachment; filename="sim-' . $sim . '-recap.txt"');
     header('X-Content-Type-Options: nosniff');
-    echo (string) $row['recap_text'];
+    echo $document;
     exit;
 }
 

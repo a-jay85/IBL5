@@ -149,7 +149,11 @@ final class SimSummariesViewTest extends TestCase
             'home_teamid'      => 2,
             'game_of_that_day' => 1,
             'sort_order'       => 0,
-            'recap_text'       => $xss,
+            // Deliberately well-formed (score header + mention line), so postableText()
+            // picks the assembled document. A bare-prose payload would route the textarea
+            // to the stored teaser and leave the assembled path — the one that concatenates
+            // every LLM field — untested by this, the only XSS test covering it.
+            'recap_text'       => "**A 1 @ B 2**\n<@1> · <@2>\n" . $xss,
         ];
         $html = $this->view->render(
             [],
@@ -160,8 +164,9 @@ final class SimSummariesViewTest extends TestCase
 
         // None of the LLM-sourced payloads may appear unescaped anywhere in the output.
         self::assertStringNotContainsString('<script>alert(1)</script>', $html);
-        // All three occurrences (intro, game recap, outro) must be entity-encoded.
-        self::assertSame(3, substr_count($html, '&lt;script&gt;alert(1)&lt;/script&gt;'));
+        // 3 occurrences in the per-field display panels (intro <p>, game <p>, outro <p>)
+        // plus 3 more in the assembled document inside the textarea (intro + game + outro) = 6.
+        self::assertSame(6, substr_count($html, '&lt;script&gt;alert(1)&lt;/script&gt;'));
     }
 
     /**
@@ -216,5 +221,132 @@ final class SimSummariesViewTest extends TestCase
         self::assertIsInt($thirdPos);
         self::assertLessThan($secondPos, $firstPos, 'Game recaps must appear in the order the caller provides');
         self::assertLessThan($thirdPos, $secondPos, 'Game recaps must appear in the order the caller provides');
+    }
+
+    /**
+     * The textarea must carry the full assembled document (intro + date rules + game prose +
+     * outro), not merely the ~220-char teaser stored in recap_text.
+     */
+    public function testTextareaCarriesAssembledDocumentNotTeaser(): void
+    {
+        $game1 = ['game_date' => '2008-02-26', 'visitor_teamid' => 1, 'home_teamid' => 2, 'game_of_that_day' => 1, 'sort_order' => 0, 'recap_text' => "**A 100 @ B 114**\n<@1> · <@2>\nFirst game prose here."];
+        $game2 = ['game_date' => '2008-03-01', 'visitor_teamid' => 3, 'home_teamid' => 4, 'game_of_that_day' => 1, 'sort_order' => 1, 'recap_text' => "**C 90 @ D 110**\n<@3> · <@4>\nSecond game prose here."];
+        $html  = $this->view->render(
+            [],
+            $this->recapRow('Teaser body.', null, 'Intro text.', 'Outro text.'),
+            [$game1, $game2],
+            null
+        );
+
+        $markerOpen  = '<textarea id="recap-body" readonly rows="24" cols="100">';
+        $markerClose = '</textarea>';
+        $startOffset = strpos($html, $markerOpen);
+        self::assertIsInt($startOffset);
+        $bodyStart    = $startOffset + strlen($markerOpen);
+        $bodyEnd      = strpos($html, $markerClose, $bodyStart);
+        self::assertIsInt($bodyEnd);
+        $textareaBody = substr($html, $bodyStart, $bodyEnd - $bodyStart);
+
+        // The assembled document is present: game prose and the date separator rule.
+        self::assertStringContainsString('First game prose here.', $textareaBody);
+        self::assertStringContainsString('================================ Feb 26 =', $textareaBody);
+        // The textarea holds more than the teaser alone.
+        self::assertNotSame('Teaser body.', $textareaBody);
+    }
+
+    /**
+     * When there is nothing to assemble (no intro, no games, no outro), the textarea
+     * must fall back to the teaser so Copy is never empty.
+     */
+    public function testTextareaFallsBackToTeaserWhenAssemblyIsEmpty(): void
+    {
+        $html = $this->view->render(
+            [],
+            $this->recapRow('Fallback teaser.'),
+            [],
+            null
+        );
+
+        $markerOpen  = '<textarea id="recap-body" readonly rows="24" cols="100">';
+        $markerClose = '</textarea>';
+        $startOffset = strpos($html, $markerOpen);
+        self::assertIsInt($startOffset);
+        $bodyStart    = $startOffset + strlen($markerOpen);
+        $bodyEnd      = strpos($html, $markerClose, $bodyStart);
+        self::assertIsInt($bodyEnd);
+        $textareaBody = substr($html, $bodyStart, $bodyEnd - $bodyStart);
+
+        self::assertStringContainsString('Fallback teaser.', $textareaBody);
+    }
+
+    private function textareaBody(string $html): string
+    {
+        $markerOpen  = '<textarea id="recap-body" readonly rows="24" cols="100">';
+        $markerClose = '</textarea>';
+        $startOffset = strpos($html, $markerOpen);
+        self::assertIsInt($startOffset, 'Expected recap-body textarea in rendered output');
+        $bodyStart = $startOffset + strlen($markerOpen);
+        $bodyEnd   = strpos($html, $markerClose, $bodyStart);
+        self::assertIsInt($bodyEnd, 'Expected closing </textarea> after recap-body');
+        return substr($html, $bodyStart, $bodyEnd - $bodyStart);
+    }
+
+    /**
+     * Sim-722 shape: per-game parts are bare prose with no mention line at index 1.
+     * postableText() falls back to the stored monolith so no GM Discord tag is dropped.
+     * HtmlSanitizer::e() escapes the '<@' markers: '<@5>' → '&lt;@5&gt;'.
+     */
+    public function testTextareaShowsStoredMonolithWhenPartsAreBareProse(): void
+    {
+        $game = [
+            'game_date'        => '2026-07-26',
+            'visitor_teamid'   => 5,
+            'home_teamid'      => 12,
+            'game_of_that_day' => 1,
+            'sort_order'       => 0,
+            'recap_text'       => "The visiting team came out strong.\nThey held the lead all night.",
+        ];
+        $stored = "Full monolith with <@5> and <@12> mention tags stored in recap_text.";
+        $html = $this->view->render(
+            [],
+            $this->recapRow($stored, null, 'Intro text.', 'Outro text.'),
+            [$game],
+            null
+        );
+        $body = $this->textareaBody($html);
+        // The stored text is used verbatim; the escaped '<@' markers must appear.
+        self::assertStringContainsString('&lt;@5&gt;', $body);
+        // No date rule — the stored monolith is not re-assembled.
+        self::assertStringNotContainsString('================================', $body);
+    }
+
+    /**
+     * Sim-721 shape: every per-game part carries a mention line at index 1.
+     * postableText() uses the assembled document; the date rule and escaped GM tags
+     * must reach the textarea — this is the 722-fix regression guard.
+     */
+    public function testTextareaShowsAssembledDocumentWhenPartsAreWellFormed(): void
+    {
+        $game = [
+            'game_date'        => '2026-07-21',
+            'visitor_teamid'   => 3,
+            'home_teamid'      => 7,
+            'game_of_that_day' => 1,
+            'sort_order'       => 0,
+            'recap_text'       => "**Away 110 @ Home 104**\n<@3> · <@7>\nGame prose goes here.",
+        ];
+        $html = $this->view->render(
+            [],
+            $this->recapRow('Short teaser.', null, 'Intro text.', 'Outro text.'),
+            [$game],
+            null
+        );
+        $body = $this->textareaBody($html);
+        // Assembled document: date rule present.
+        self::assertStringContainsString('================================ Jul 21 =', $body);
+        // GM mention tags survive into the textarea (escaped by HtmlSanitizer::e()).
+        self::assertStringContainsString('&lt;@3&gt;', $body);
+        // The short teaser is not the textarea content.
+        self::assertNotSame('Short teaser.', $body);
     }
 }

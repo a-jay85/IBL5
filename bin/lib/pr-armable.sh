@@ -5,12 +5,13 @@
 #
 # Usage: source "$(dirname "$0")/lib/pr-armable.sh"
 #
-# Covers the five live-derivable conditions:
+# Covers the six live-derivable conditions:
 #   (1) Manual-Testing clearance   -> pr_manual_testing_clearance <body>
 #   (5) golden-snapshot touch      -> pr_golden_hold <files_json>
 #   (6) Depends-on merge-order     -> pr_dep_holds <body>
 #   (8) feat: floor                -> pr_feat_hold <title> <labels_json>
 #   (10) pipeline-authored floor   -> pr_pipeline_authored_hold <labels_json>
+#   (11) unresolved scored finding -> pr_unresolved_findings_hold <pr_number>
 #
 # Conditions (2) review>=80, (3) MISSING-tests, (4) Phase-5 local verify, (7)
 # non-UI auto_merge:false, (9) realized-diff verdict are deliberately NOT here:
@@ -18,13 +19,20 @@
 # file, the realized diff) and cannot be evaluated for an arbitrary PR. Callers
 # fail CLOSED on them — a PR is only ARMABLE with a POSITIVE clearance signal
 # (pr_manual_testing_clearance == CLEARED), never the mere absence of holds.
+# (11) is NOT a duplicate of (2): (2) scores findings produced by the current
+# post-plan run; (11) reads live GitHub thread state, catching findings left
+# unresolved by an earlier run or by a standalone /pr-review or /security-audit.
 #
 # This file is SOURCED, not executed: no `set -euo pipefail` at file scope.
 #
 # Test seam: GH_CMD (default `gh`) is a single-token command (a path to a shim in
-# tests) invoked as `"$GH_CMD" pr view ...`. Only pr_dep_holds touches it.
+# tests) invoked as `"$GH_CMD" pr view ...`. Only pr_dep_holds and
+# pr_unresolved_findings_hold touch it. REPO_SLUG (default `a-jay85/IBL5`) is the
+# second seam, consumed only by pr_unresolved_findings_hold's GraphQL call; it is
+# the same seam name bin/lib/post-review-findings.sh already uses.
 
 GH_CMD="${GH_CMD:-gh}"
+REPO_SLUG="${REPO_SLUG:-a-jay85/IBL5}"
 
 # pr_manual_testing_clearance <body>
 #   The fail-closed positive-clearance axis (Phase 6.5 condition (1), mechanized).
@@ -120,4 +128,67 @@ pr_pipeline_authored_hold() {
         | jq -e 'any(.[]?; .name == "pipeline-authored")' >/dev/null 2>&1; then
         echo "pipeline-authored"
     fi
+}
+
+# pr_unresolved_findings_hold <pr_number>
+#   Phase 6.5 condition (11), the unresolved-scored-finding floor. An UNRESOLVED review
+#   thread whose first comment embeds `<!-- score: N -->` with N >= 80 holds auto-merge.
+#   Complements (2), which sees only THIS run's scores: (11) reads live GitHub thread
+#   state, so a finding from an earlier run or a standalone /pr-review or /security-audit
+#   still blocks. Human (unscored) threads, scores < 80, and resolved threads NEVER block.
+#   FAIL-CLOSED on every error path. Echoes one `unresolved-finding:SCORE` line per
+#   qualifying thread, or one of `unresolved-findings-cap` / `-api-error`, or nothing.
+pr_unresolved_findings_hold() {
+    local pr="$1"
+    local owner="${REPO_SLUG%%/*}" repo="${REPO_SLUG##*/}"
+    local raw rc=0
+    raw=$("$GH_CMD" api graphql \
+        -F owner="$owner" -F repo="$repo" -F pr="$pr" \
+        -f query='
+        query($owner:String!, $repo:String!, $pr:Int!) {
+          repository(owner:$owner, name:$repo) {
+            pullRequest(number:$pr) {
+              reviewThreads(first:100) {
+                nodes {
+                  isResolved
+                  comments(first:1) { nodes { databaseId body } }
+                }
+              }
+            }
+          }
+        }' 2>/dev/null) || rc=$?
+    [ "$rc" -ne 0 ] && { echo "unresolved-findings-api-error"; return 0; }
+    # GraphQL protocol errors return HTTP 200 with a top-level `errors` array, so a
+    # zero exit status alone does NOT mean the payload is usable.
+    if printf '%s' "$raw" | jq -e '.errors' >/dev/null 2>&1; then
+        echo "unresolved-findings-api-error"; return 0
+    fi
+    if ! printf '%s' "$raw" \
+            | jq -e '.data.repository.pullRequest.reviewThreads.nodes != null' \
+            >/dev/null 2>&1; then
+        echo "unresolved-findings-api-error"; return 0
+    fi
+    local count
+    count=$(printf '%s' "$raw" \
+        | jq '.data.repository.pullRequest.reviewThreads.nodes | length' 2>/dev/null) \
+        || { echo "unresolved-findings-api-error"; return 0; }
+    # first:100 is unpaginated: a full page means threads 101+ are invisible, so hold.
+    [ "$count" -eq 100 ] && { echo "unresolved-findings-cap"; return 0; }
+    local findings
+    findings=$(printf '%s' "$raw" | jq -r '
+        .data.repository.pullRequest.reviewThreads.nodes[]
+        | select(.isResolved == false)
+        | select(
+            (.comments.nodes[0].body // "")
+            | capture("<!-- score: (?<s>[0-9]+) -->")
+            | .s | tonumber >= 80
+          )
+        | "unresolved-finding:" +
+          ((.comments.nodes[0].body // "")
+           | capture("<!-- score: (?<s>[0-9]+) -->") | .s)
+    ' 2>/dev/null) || { echo "unresolved-findings-api-error"; return 0; }
+    [ -n "$findings" ] && printf '%s\n' "$findings"
+    # REQUIRED: without it the clear path returns 1 and aborts bin/pr-triage
+    # (set -euo pipefail) on the first clear PR. All five predicates return 0 when clear.
+    return 0
 }

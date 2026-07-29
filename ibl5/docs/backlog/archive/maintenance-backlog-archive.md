@@ -2079,6 +2079,13 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Status:** Completed (merged #1042, maintenance-45) — lazy PDO factory injected into AuthService (DI call-site burndown C16).
 
 **Table evidence (2026-07-25):** Lazy PDO factory injected (#1042).
+
+### 14.9 — Finding 14.9
+
+**Status:** ✅ Implemented 2026-07-27 — PR `auth-14-9-cookie-to-authservice`.
+
+**Table evidence (2026-07-27):** `$cookie[1]` ritual — 21 occurrences across 11 files → injected `AuthService::getUsername()` (already exists at `classes/Auth/AuthService.php:111`); green-green call-site burndown.
+
 ### 14.11 `api.php` Is Its Own Composition Root Bypassing Bootstrap
 **Location:** `ibl5/api.php` lines 27-88
 **Problem:** Manual `ApiKeyAuthenticator`, `RateLimiter`; dynamic `new $controllerClass($mysqli_db)` dispatch. Bypasses `Bootstrap\Application`.

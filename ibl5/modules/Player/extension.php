@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/../../mainfile.php';
 
-global $mysqli_db, $cookie, $user;
+global $mysqli_db, $user, $authService;
 
 if (!\Security\CsrfGuard::validateSubmittedToken('extension')) {
     \Utilities\HtmxHelper::redirect('/ibl5/index.php');
@@ -17,7 +17,7 @@ if (!is_user($user ?? '')) {
 }
 
 cookiedecode($user ?? '');
-$username = is_string($cookie[1] ?? null) ? $cookie[1] : '';
+$username = $authService->getUsername() ?? '';
 $commonRepo = new \Repositories\TeamIdentityRepository($mysqli_db);
 $sessionTeam = $commonRepo->getTeamnameFromUsername($username);
 if ($sessionTeam === null || $sessionTeam === '' || $sessionTeam === \League\League::FREE_AGENTS_TEAM_NAME) {

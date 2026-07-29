@@ -34,12 +34,12 @@ oneonone();
 
 function oneonone(): void
 {
-    global $mysqli_db, $user, $cookie;
+    global $mysqli_db, $user, $authService;
 
     PageLayout\PageLayout::header();
     cookiedecode($user);
 
-    $ownerplaying = is_string($cookie[1] ?? null) ? $cookie[1] : '';
+    $ownerplaying = $authService->getUsername() ?? '';
 
     // Get form inputs
     $player1 = isset($_POST['pid1']) ? (int) $_POST['pid1'] : null;

@@ -22,7 +22,7 @@ use NextSim\NextSimView;
 use Standings\StandingsRepository;
 use TeamSchedule\TeamScheduleRepository;
 
-global $db, $cookie, $user, $mysqli_db;
+global $db, $user, $mysqli_db, $authService;
 
 if (!is_user($user)) {
     loginbox();
@@ -43,10 +43,9 @@ if (!is_user($user)) {
         $teamPowerRankings[$teamid] = (float)$data['ranking'];
     }
 
-    // Render header first (populates $cookie via cookiedecode())
     PageLayout\PageLayout::header();
 
-    $username = strval($cookie[1] ?? '');
+    $username = $authService->getUsername() ?? '';
     $userTeamName = $commonRepository->getTeamnameFromUsername($username) ?? '';
     $userTeam = \Team\Team::initialize($mysqli_db, $userTeamName);
 

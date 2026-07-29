@@ -76,15 +76,15 @@ function main(mixed $user): void
     if (!is_user($user)) {
         loginbox();
     } else {
-        global $cookie;
+        global $authService;
         cookiedecode($user);
-        userinfo((string)($cookie[1] ?? ''));
+        userinfo($authService->getUsername() ?? '');
     }
 }
 
 function submitAsgVote(mixed $user): void
 {
-    global $mysqli_db, $cookie;
+    global $mysqli_db, $authService;
 
     \PageLayout\PageLayout::header();
 
@@ -101,7 +101,7 @@ function submitAsgVote(mixed $user): void
         return;
     }
     cookiedecode($user);
-    $username = (string) ($cookie[1] ?? '');
+    $username = $authService->getUsername() ?? '';
     $commonRepository = new \Repositories\TeamIdentityRepository($mysqli_db);
     $teamName = $commonRepository->getTeamnameFromUsername($username) ?? '';
 
@@ -155,7 +155,7 @@ function submitAsgVote(mixed $user): void
 
 function submitEoyVote(mixed $user): void
 {
-    global $mysqli_db, $cookie;
+    global $mysqli_db, $authService;
 
     \PageLayout\PageLayout::header();
 
@@ -172,7 +172,7 @@ function submitEoyVote(mixed $user): void
         return;
     }
     cookiedecode($user);
-    $username = (string) ($cookie[1] ?? '');
+    $username = $authService->getUsername() ?? '';
     $commonRepository = new \Repositories\TeamIdentityRepository($mysqli_db);
     $teamName = $commonRepository->getTeamnameFromUsername($username) ?? '';
 

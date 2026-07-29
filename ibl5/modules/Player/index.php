@@ -46,7 +46,7 @@ $pagetitle = "- Player Archives";
  */
 function showpage($playerID, $pageView): void
 {
-    global $mysqli_db, $cookie, $commonRepository;
+    global $mysqli_db, $commonRepository, $authService;
 
     // Resolve UUID to numeric PID if a UUID string was passed instead of an integer
     if (!is_numeric($playerID) && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', (string) $playerID)) {
@@ -62,23 +62,23 @@ function showpage($playerID, $pageView): void
     $controller = new PlayerPageController($mysqli_db, $commonRepository);
 
     PageLayout\PageLayout::header();
-    echo $controller->renderPage($playerID, $pageView, strval($cookie[1] ?? ''));
+    echo $controller->renderPage($playerID, $pageView, $authService->getUsername() ?? '');
     PageLayout\PageLayout::footer();
 }
 
 function negotiate($playerID)
 {
-    global $prefix, $mysqli_db, $cookie, $commonRepository, $salaryCapRepo;
+    global $prefix, $mysqli_db, $commonRepository, $salaryCapRepo, $authService;
 
     $playerID = intval($playerID);
 
     PageLayout\PageLayout::header();
 
-    // Get user's team name using existing CommonRepository (must be after header() which populates $cookie)
-    $userTeamName = $commonRepository->getTeamnameFromUsername(strval($cookie[1] ?? ''));
+    // Get user's team name using existing CommonRepository
+    $userTeamName = $commonRepository->getTeamnameFromUsername($authService->getUsername() ?? '');
 
     $debugSession = new \Debug\DebugSession(
-        strval($cookie[1] ?? ''),
+        $authService->getUsername() ?? '',
         $_SERVER['SERVER_NAME'] ?? null,
         $_COOKIE[\Debug\DebugSession::COOKIE_NAME] ?? null,
     );
@@ -97,7 +97,7 @@ function negotiate($playerID)
 
 function rookieoption($pid)
 {
-    global $cookie, $mysqli_db, $commonRepository;
+    global $mysqli_db, $commonRepository, $authService;
 
     // Initialize dependencies
     $season = new \Season\Season($mysqli_db);
@@ -109,8 +109,8 @@ function rookieoption($pid)
 
     PageLayout\PageLayout::header();
 
-    // Get user's team name (must be after header() which populates $cookie)
-    $userTeamName = $commonRepository->getTeamnameFromUsername(strval($cookie[1] ?? ''));
+    // Get user's team name
+    $userTeamName = $commonRepository->getTeamnameFromUsername($authService->getUsername() ?? '');
 
     // Validate player ownership
     $ownershipValidation = $validator->validatePlayerOwnership($player, $userTeamName);
@@ -170,7 +170,7 @@ function rookieoption($pid)
 
 function processrookieoption()
 {
-    global $mysqli_db, $commonRepository, $user, $cookie;
+    global $mysqli_db, $commonRepository, $user, $authService;
 
     // (1) Auth gate — pa=processrookieoption has no is_user() check.
     if (!is_user($user)) {
@@ -186,7 +186,7 @@ function processrookieoption()
     }
 
     cookiedecode($user);
-    $username = is_string($cookie[1] ?? null) ? $cookie[1] : '';
+    $username = $authService->getUsername() ?? '';
 
     // Get POST parameters
     $teamName = is_string($_POST['teamname'] ?? null) ? $_POST['teamname'] : '';

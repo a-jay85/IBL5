@@ -79,9 +79,9 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0): void
 function main($user): void
 {
     if (is_user($user)) {
-        global $cookie;
+        global $authService;
         cookiedecode($user);
-        userinfo($cookie[1]);
+        userinfo($authService->getUsername() ?? '');
     } else {
         userinfo('', 1);
     }

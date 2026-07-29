@@ -45,7 +45,7 @@ function CloseTable()
 
 function themeheader()
 {
-    global $user, $cookie, $bgcolor1, $leagueContext, $mysqli_db;
+    global $user, $bgcolor1, $leagueContext, $mysqli_db, $authService;
 
     $isLoggedIn = is_user($user);
     $username = null;
@@ -54,7 +54,7 @@ function themeheader()
 
     if ($isLoggedIn) {
         cookiedecode($user);
-        $username = $cookie[1];
+        $username = $authService->getUsername();
     }
 
     if ($mysqli_db) {

@@ -24,7 +24,7 @@ $pagetitle = "- Team Pages";
  */
 function waivers($user)
 {
-    global $mysqli_db, $action;
+    global $mysqli_db, $action, $authService;
 
     cookiedecode($user);
 
@@ -39,7 +39,7 @@ function waivers($user)
     $teamQueryRepo = new Team\TeamQueryRepository($mysqli_db);
     $service = new Waivers\WaiversService($teamIdentityRepo, $processor, $view, $teamQueryRepo, $mysqli_db);
     $nukeCompat = new Utilities\NukeCompat();
-    $controller = new Waivers\WaiversController($service, $processor, $view, $teamIdentityRepo, $salaryCapRepo, $nukeCompat, $mysqli_db);
+    $controller = new Waivers\WaiversController($service, $processor, $view, $teamIdentityRepo, $salaryCapRepo, $nukeCompat, $mysqli_db, $authService);
     $controller->handleWaiverRequest($user, $action ?? 'add');
 }
 

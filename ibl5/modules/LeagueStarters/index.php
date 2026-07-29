@@ -20,7 +20,7 @@ if (!defined('MODULE_FILE')) {
 use LeagueStarters\LeagueStartersService;
 use LeagueStarters\LeagueStartersView;
 
-global $cookie, $mysqli_db, $authService;
+global $mysqli_db, $authService;
 
 // Route HTMX API requests (no PageLayout, returns HTML fragment only)
 $op = is_string($_GET['op'] ?? null) ? $_GET['op'] : '';
@@ -51,10 +51,9 @@ if (isset($_REQUEST['display']) && is_string($_REQUEST['display'])
     $display = $_REQUEST['display'];
 }
 
-// Render header first (populates $cookie via cookiedecode())
 PageLayout\PageLayout::header();
 
-$username = strval($cookie[1] ?? '');
+$username = $authService->getUsername() ?? '';
 $userTeamName = $commonRepository->getTeamnameFromUsername($username);
 $userTeam = \Team\Team::initialize($mysqli_db, $userTeamName);
 

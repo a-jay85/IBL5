@@ -32,9 +32,9 @@ function main($user)
     if (!is_user($user)) {
         loginbox();
     } else {
-        global $cookie;
+        global $authService;
         cookiedecode($user);
-        userinfo($cookie[1]);
+        userinfo($authService->getUsername() ?? '');
     }
 }
 
@@ -47,7 +47,7 @@ function renderInlineSubmitError(): void
 
 function submit($user)
 {
-    global $mysqli_db, $commonRepo, $leagueContext, $cookie;
+    global $mysqli_db, $commonRepo, $leagueContext, $authService;
 
     // Auth + ownership gate (IDOR fix D-09). The write target is derived from
     // the session team inside the handler, never from POST `Team_Name`, so an
@@ -58,7 +58,7 @@ function submit($user)
     }
 
     cookiedecode($user);
-    $username = is_string($cookie[1] ?? null) ? $cookie[1] : '';
+    $username = $authService->getUsername() ?? '';
     $sessionTeam = $commonRepo->getTeamnameFromUsername($username);
     if ($sessionTeam === null || $sessionTeam === '' || $sessionTeam === \League\League::FREE_AGENTS_TEAM_NAME) {
         renderInlineSubmitError();
@@ -97,7 +97,7 @@ function nextSimApi()
 
 function api($user)
 {
-    global $mysqli_db, $cookie, $commonRepo;
+    global $mysqli_db, $commonRepo, $authService;
 
     if (!is_user($user)) {
         header('Content-Type: application/json; charset=utf-8');
@@ -107,7 +107,7 @@ function api($user)
     }
 
     cookiedecode($user);
-    $username = $cookie[1];
+    $username = $authService->getUsername() ?? '';
 
     $teamName = $commonRepo->getTeamnameFromUsername($username);
     if ($teamName === null || $teamName === '' || $teamName === 'Free Agents') {

@@ -468,8 +468,15 @@ done < <(grep -iE 'reuse' "$PLAN_FILE" \
 # invisible precisely because it looks clean. 42 of the 208 corpus plans with a
 # Critical Files section are table-form; all are already shipped, so this gate
 # only ever sees newly-authored plans. Hard failure, like every other gate.
+#
+# An unclosed code fence causes cf_section to swallow every heading below it,
+# yielding an empty section that the old `[ -n … ]` guard silently skipped. The
+# unclosed-fence branch catches this first, before the section-content checks.
+# Measured on the 260-plan corpus: fires on exactly 1 plan (1/260 = 0.4%).
 CF_SECTION="$(cf_section "$PLAN_FILE")"
-if [ -n "$(printf '%s' "$CF_SECTION" | tr -d '[:space:]')" ]; then
+if cf_fence_unbalanced "$PLAN_FILE"; then
+    viol "[F] unclosed code fence — every heading below it is swallowed, so a ## Critical Files section under it parses to zero entries and post-plan's Phase 5.0 conformance check silently covers nothing. A closing fence must be at least as long as its opener: a 4-backtick block closes on 4 backticks, not 3."
+elif [ -n "$(printf '%s' "$CF_SECTION" | tr -d '[:space:]')" ]; then
     if cf_table_detected "$CF_SECTION"; then
         viol "[F] ## Critical Files section uses table format — use list form: - \`path\` (annotation)"
     elif [ -z "$(cf_parse_section "$PLAN_FILE")" ]; then

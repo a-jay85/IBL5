@@ -53,6 +53,14 @@ CF_LINE_PATTERN='^[[:space:]]*-[[:space:]]*`'
 #
 # Measured: vs. the unscoped form these two rules flip exactly 4 of 1578 corpus
 # entries, all 4 to the correct verdict, with no other entry changing.
+#
+# Residual, accepted: a canonical token inside a paren group still exempts even
+# when the group is plain prose rather than a marker. Three corpus entries land
+# this way — `(edit — status flips…; **change target, not reference**)`,
+# `(the auto-merge verification surface)`, `(path template: , per )`. Tightening
+# further would need per-token positional rules like `conditional`'s, and these
+# three were exempt under the pre-unification rule too, so the change is not a
+# regression. Reconsider if a real change target is ever missed this way.
 CF_EXEMPT_PATTERN='[(](([^)]*[^0-9A-Za-z])?(reference|read-?only|verif(y|ication)|template|no[- ]edit|no[- ]change|unchanged|context)([^0-9A-Za-z][^)]*)?|conditional([ ]*[-–—:;,][^)]*)?[ ]*)[)]'
 
 # cf_is_exempt <annotation> -> exit 0 exempt, 1 must-appear
@@ -79,9 +87,9 @@ cf_table_detected() {
 # only on a run >= it. Measured on the 259-plan corpus: this recovers a plan
 # whose 11 entries had silently become 0.
 #
-# Known limitation, inherited and unfixable here: an UNCLOSED fence leaves
-# in_fence set and swallows every later heading. That yields an empty section,
-# which bin/check-plan gate [F] reports rather than passing silently.
+# An unclosed fence still leaves in_fence set and swallows every later heading,
+# yielding an empty section — but this is now DETECTED by cf_fence_unbalanced
+# and reported by bin/check-plan gate [F]. It is no longer a silent pass.
 cf_section() {
     awk '
         {
@@ -98,6 +106,29 @@ cf_section() {
         /^##[[:space:]]*Critical Files/{f=1;next}
         /^## /{f=0}
         f' "$1"
+}
+
+# cf_fence_unbalanced <planfile> -> exit 0 when a code fence is still open at EOF.
+# Width-aware, exactly as cf_section: an opening run records its length and only
+# a run at least that long closes it (CommonMark). An unclosed fence makes
+# cf_section swallow every later heading, so the Critical Files section silently
+# parses to zero entries — bin/check-plan gate [F] reports that rather than
+# passing clean. Measured on the 260-plan corpus: exactly 1 plan trips this
+# (sonnet-recipe-completeness-lint.md, already shipped), zero false positives.
+cf_fence_unbalanced() {
+    awk '
+        {
+            line = $0
+            sub(/^[[:space:]]*/, "", line)
+            n = 0
+            while (substr(line, n + 1, 1) == "`") n++
+            if (n >= 3) {
+                if (!in_fence) { in_fence = 1; fence_len = n }
+                else if (n >= fence_len) { in_fence = 0 }
+            }
+        }
+        END { exit !in_fence }
+    ' "$1"
 }
 
 # cf_parse_section <planfile> -> one `MUST_APPEAR:<path>` or `EXEMPT:<path>`

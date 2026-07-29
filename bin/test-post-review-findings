@@ -526,7 +526,10 @@ assert_contains "case23: GH_CMD=/bin/false → api-error" "$out23" "unresolved-f
 GH_CMD="$SAVED_GH_CMD"
 
 # ── case 24: clear path returns 0 under set -euo pipefail ────────────────────
-( set -euo pipefail; source "$LIB_ARM"; pr_unresolved_findings_hold 42 >/dev/null ) \
+# Must use empty-nodes fixture ($fix19) so findings="" — the clear path where
+# [ -n "$findings" ] exits 1. Without return 0 the function would return 1 and
+# abort bin/pr-triage's set -euo pipefail loop on every PR with no findings.
+( set -euo pipefail; GH_THREADS_FIXTURE="$fix19"; source "$LIB_ARM"; pr_unresolved_findings_hold 42 >/dev/null ) \
     && ok "case24: clear path returns 0 under strict mode" \
     || fail "case24: clear path returned non-zero — pr-triage would abort"
 

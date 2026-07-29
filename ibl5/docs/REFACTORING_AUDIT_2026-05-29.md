@@ -1,11 +1,11 @@
 ---
 description: Ranked refactoring audit of ibl5/classes — dead code, duplication, ADR-boundary findings (2026-05-29).
-last_verified: 2026-05-29
+last_verified: 2026-07-29
 ---
 
 # Refactoring Audit — `ibl5/classes/` (2026-05-29)
 
-Audited all 84 modules / ~99K LOC. Findings respect ADR-0001 (Repo/Service/View),
+Audited all 84 modules / ~99K LOC *(88 modules as of 2026-07-29)*. Findings respect ADR-0001 (Repo/Service/View),
 ADR-0026 (hot files advisory — **size alone is not a finding**), ADR-0028 (no generic
 Services/Shared buckets), ADR-0014 (centralized contract formulas).
 
@@ -22,27 +22,32 @@ Ranked by impact ÷ risk. Tier 1 = do these.
 ### 1.1 Delete the dead Player stats-view cluster — 641 LOC, zero callers
 `Player/Stats/Views/Player{Season,Playoff,Heat,Olympics}StatsView.php` + their 4 `Contracts/` interfaces (8 files).
 **Verified:** no references anywhere outside the files' own dir/contracts; `PlayerViewFactory` and `PlayerPageController` never instantiate them. Pure deletion. *Priority: agent ergonomics, hygiene.*
+**Status (2026-07-29):** Done. All 4 monolithic view files deleted; `PlayerViewFactory` rewritten to use a new granular split-view architecture (per-stat-type averages/totals views with their own interfaces).
 
 ### 1.2 Centralize CP1252⇄UTF-8 conversion — 6 call sites, 2 implementations, divergent error behavior
 Read-direction CP1252→UTF-8 is done **6 ways**: `iconv('CP1252','UTF-8//IGNORE')` in `PlrFileWriter:333` & `PlrLineParser:32` (drops bad bytes), `mb_convert_encoding(...,'Windows-1252')` in `PlrOrdinalMap:83`, `DraFileParser:101`, `AwaImporter:45`, and `RcbFileParser::toUtf8:96` (the only one with a null-safe fallback). The iconv calls silently differ from the mb calls on malformed input.
 **Fix:** promote `RcbFileParser::toUtf8()` (or add to `PlrFieldSerializer`, which already owns the reverse `toCP1252`) and route all 6 sites through it. *Priority: maintainability, correctness, hygiene.*
+**Status (2026-07-29):** Done. `PlrFieldSerializer::toUtf8()` was added and all 6 sites now call it. `RcbFileParser::toUtf8()` is a thin wrapper over `PlrFieldSerializer::toUtf8()`.
 
 ### 1.3 Trading cluster ignores `Season::isOffseasonPhase()` — 6 inline duplications
 `Season::isOffseasonPhase()` exists and is used correctly in FreeAgency/Waivers/CapSpace. Trading reinvents it: inline `phase === "Playoffs" || === "Draft" || ...` in `TradeValidator:102,154`, `TradeProcessor:283`, **plus** a private `TradingService::isOffseasonPhase()` (3 callers). **Verified.**
 **Fix:** delete `TradingService::isOffseasonPhase()`, replace all inline checks with `$season->isOffseasonPhase()`. *Priority: maintainability.* (Note: `isOffseasonPhase()` reads `$this->phase` — call on the Season object, not pass phase string.)
+**Status (2026-07-29):** Done. `TradingService::isOffseasonPhase()` removed; `TradeValidator` and `TradeProcessor` now delegate to `$this->season->advancesContractYears()` (semantically equivalent for the trade context).
 
 ### 1.4 Close the last ADR-0014 gap: `FreeAgencyOfferValidator` reimplements `CommonContractValidator`
 `FreeAgencyOfferValidator::validateRaisesAndContinuity()` (`:250-299`) duplicates the gap/decrease/raise checks that `CommonContractValidator` already provides (used by Extension). Both call `ContractRules::calculateMaxRaise()`.
 **Fix:** inject `CommonContractValidator`, delegate to its `validateNoGaps/SalaryDecreases/Raises`. *Priority: maintainability — finishes the ADR-0014 centralization.*
+**Status (2026-07-29):** Partially done. Gap checks (`:273`) and raise checks (`:295`) are now delegated to `CommonContractValidator`. The salary-decrease check remains local by design: `CommonContractValidator::validateSalaryDecreases()` covers only years 1–5, while the local loop covers years 2–6; the six-year coverage is locked by characterization tests.
 
 ### 1.5 Centralize the points formula `2·fgm + ftm + 3·tgm`
 `StatsFormatter::calculatePoints()` exists but is bypassed inline in `SeasonLeaderboardsService:257,278,293`, `ComparePlayersView:199`. SQL variants live in `SeasonLeaderboardsRepository:114`, `SeasonHighsService:33,50`.
 **Fix:** use `StatsFormatter::calculatePoints()` at all PHP sites; cross-reference one docblock for the unavoidable SQL copies. *Priority: maintainability (StatsFormatter is ADR-0003-mandated).*
+**Status (2026-07-29):** Done. `SeasonLeaderboardsService` and `ComparePlayersView` now call `StatsFormatter::calculatePoints()` — no inline `2·fgm + ftm + 3·tgm` formulas remain in PHP.
 
 ### 1.6 Three confirmed defects found incidentally
-- **`TeamOffDefStatsView:49`** — `<h2 ...>League-wide Statistics</h1>` — tag mismatch. **Verified.** One-char fix.
-- **`OneOnOneGameEngine:135`** — `$currentPossession` is a mutable instance property never reset between `simulateGame()` calls; second call on the same instance starts with stale possession. Latent (engine is new'd per request). Make it a local threaded through `runPossession()`.
-- **`PlrParserService:189`** — `computeDerivedFields()` does a `getTeamnameFromTeamID()` DB lookup per player (~450/import) and the resulting `'teamName'` key is **never consumed** by `upsertPlayer`/`buildSnapshotData`. Real N+1 producing a discarded value. Delete it.
+- **`TeamOffDefStatsView:49`** — `<h2 ...>League-wide Statistics</h1>` — tag mismatch. **Verified.** One-char fix. *(Fixed 2026-07-29.)*
+- **`OneOnOneGameEngine:35`** — `$currentPossession` is a mutable instance property never reset between `simulateGame()` calls; second call on the same instance starts with stale possession. Latent (engine is new'd per request). Make it a local threaded through `runPossession()`. *(Still open 2026-07-29; line corrected from :135.)*
+- **`PlrParserService:189`** — `computeDerivedFields()` does a `getTeamnameFromTeamID()` DB lookup per player (~450/import) and the resulting `'teamName'` key is **never consumed** by `upsertPlayer`/`buildSnapshotData`. Real N+1 producing a discarded value. Delete it. *(Fixed 2026-07-29: `computeDerivedFields()` now contains no DB calls.)*
 
 ---
 
@@ -50,6 +55,7 @@ Read-direction CP1252→UTF-8 is done **6 ways**: `iconv('CP1252','UTF-8//IGNORE
 
 ### 2.1 `TeamQueryRepository` holds business logic that belongs in a service
 `canAddContractWithoutGoingOverHardCap`, `canAddBuyoutWithoutExceedingBuyoutLimit`, `getSalaryCapArray`, `getTotalCurrentSeasonSalaries` (`:319-451`) compute cap compliance — they touch `League::HARD_CAP_MAX`, `Team::BUYOUT_PERCENTAGE_MAX`, aggregate `Player` objects. All callers are services (`CapSpaceService`, `FreeAgencyCapCalculator`, `ExtensionService`). This is the ADR-0001 Repository-is-data-access boundary leaking. Medium-term: extract to a `CapCalculator` collaborator; repo exposes raw rows. *Priority: maintainability.*
+**Status (2026-07-29):** Done. All four methods extracted to `Team/TeamCapCalculator.php`; `TeamQueryRepository` no longer contains business/cap logic.
 
 ### 2.2 Hard-wired `new` deps blocking testability (consistent pattern across cluster)
 - `TeamService::prepareDraftPicksData:459` — `new TeamQueryRepository`/`new League` inside a private method.
@@ -57,6 +63,9 @@ Read-direction CP1252→UTF-8 is done **6 ways**: `iconv('CP1252','UTF-8//IGNORE
 - `TradeOffer:53-57` / `TradeProcessor:56-60` — `TradeCashRepository`, `BuyoutLedgerRepository`, `TradeExecutionRepository`, `TradeValidator` always `new`'d though `TradeOfferRepository` is injectable.
 - `InjuriesService` — takes raw `\mysqli`, builds `League` internally; no repository (only service in scope doing this).
 **Fix:** promote to optional ctor params (`?Type $x = null`), the pattern `ExtensionService`/`CapSpaceService` already use. *Priority: maintainability/testability.*
+**Status (2026-07-29):** Partially done. `TradeOffer`, `TradeProcessor`, and `TeamService` now use the `$dep ?? new Dep($db)` optional-ctor pattern. `TeamQueryRepository` cap methods are moot (extracted to `TeamCapCalculator` — see 2.1). `InjuriesService` was not re-checked in this pass.
+
+_(2.3–2.7 were not individually re-verified during the 2026-07-29 pass; findings below reflect the original audit state.)_
 
 ### 2.3 Cap/salary-slot lookups duplicated
 - `match($cy){1=>salary_yr1...}` slot lookup duplicated in `TeamQueryRepository:361` & `:438`; also in `Player/Contract/PlayerContractCalculator:34` & `PlayerContractValidator:192`. Extract `salaryForContractYear(array $row, int $cy): int` (move to `PlayerData` for the Player pair).
@@ -83,23 +92,25 @@ Read-direction CP1252→UTF-8 is done **6 ways**: `iconv('CP1252','UTF-8//IGNORE
 `:232-395` five renderers share colgroup→thead→tbody-loop scaffold; only column count, CSS class, row delegate differ. **Same caller flow**, so this is a *helper extraction within the file* (not a split): `renderCategoryTable(class, colgroup, thead, callable $rowRenderer)`. Shrinks file ~100 LOC. *Priority: readability.*
 
 ### 2.8 More dead surface (verified per agent grep)
-- `Player::getTeamCity():183` — body is `return null;` always; column never existed. Remove from interface + facade + tautological tests. **Verified.**
-- `JsbImportRepository::resolveTeamId(int)` — no callers (everything uses `resolveTeamIdByName`); identity map 0-28. Remove from interface + impl.
-- `ProjectedDraftOrderService::applyTiebreakers` `$direction` param — never read, single hard-coded `'better_wins'` caller. Remove.
-- `PlayerDatabaseView` ctor — injected `$service` never used (suppressed w/ phpstan-ignore). Remove param.
-- `PlayerStats::withPlayerObject` — no production callers, does a redundant `loadByID` round-trip on an already-hydrated Player.
+- `Player::getTeamCity():183` — body is `return null;` always; column never existed. Remove from interface + facade + tautological tests. **Verified.** *(Removed 2026-07-29.)*
+- `JsbImportRepository::resolveTeamId(int)` — no callers (everything uses `resolveTeamIdByName`); identity map 0-28. Remove from interface + impl. *(Removed 2026-07-29; a `NavigationRepository::resolveTeamId(string)` exists but is unrelated.)*
+- `ProjectedDraftOrderService::applyTiebreakers` `$direction` param — never read, single hard-coded `'better_wins'` caller. Remove. *(Done 2026-07-29: `applyTiebreakers` moved to `PlayoffSeedingCalculator:103` with no `$direction` param; `ProjectedDraftOrderService` no longer has the method.)*
+- `PlayerDatabaseView` ctor — injected `$service` never used (suppressed w/ phpstan-ignore). Remove param. *(Removed 2026-07-29: constructor no longer exists.)*
+- `PlayerStats::withPlayerObject` — no production callers, does a redundant `loadByID` round-trip on an already-hydrated Player. *(Removed 2026-07-29.)*
 - `PlayerStats` `season/careerPlayoffDouble/TripleDoubles` — 4 props hardcoded `0`, no DB column, rendered as `0` in trading-card back. Remove or wire.
 
 ---
 
 ## Tier 3 — Low / cosmetic (do opportunistically)
 
+_(Most Tier 3 items were not individually re-verified in the 2026-07-29 pass; items with an explicit status note were checked.)_
+
 - **`safeHtmlOutput()` vs `e()` drift** — 299 long-form calls across 54 files; `e()` is the documented View alias (71 files). Standardize Views on `::e()`. Real noise but ~300-site churn → batch into one mechanical PR, not piecemeal. *Priority: readability.*
-- **Magic `82` (games/season)** in `StandingsUpdater:285,353,412,463` → add `League::GAMES_PER_SEASON`.
+- **Magic `82` (games/season)** in `StandingsUpdater:285,353,412,463` → add `League::GAMES_PER_SEASON`. *(Done 2026-07-29: constant is `League::REGULAR_SEASON_GAMES`; all four sites use it.)*
 - **Magic `1440` (max player ordinal)** in PlrParser declared 3×; `PlrLineParser:26` uses a bare literal. Reference `PlrFileWriter::MAX_PLAYER_ORDINAL` everywhere.
 - **`+1` JSB-year decode** duplicated in `RcbFileParser:343,428`, `TrnFileParser:119`, `HisFileParser:102` → `decodeJsbYear(int): int`.
 - **`object` type-erasure** in `PlayerPageServiceInterface:33,59` (`object $userTeam, object $season` + inline `@var` casts) → concrete `Team`/`Season`; single caller already passes concrete types.
-- **`CommonContractValidator` namespaced under `FreeAgency`** but imported by `Extension` — cross-module dependency. Move to root namespace beside `ContractRules`.
+- **`CommonContractValidator` namespaced under `FreeAgency`** but imported by `Extension` — cross-module dependency. Move to root namespace beside `ContractRules`. *(Still open 2026-07-29: still under `FreeAgency` namespace.)*
 - **`SeasonHighsService` `HOME_AWAY_STATS`** is `STATS` minus TURNOVERS, hand-maintained → derive via `array_diff_key`.
 - **`RecordHolders` All-Star stub fields** (`teams/teamTids/years` always `''`) + unreachable View branch (`RecordHoldersView:420-431`) → remove or wire from `ibl_awards`.
 - **`RecordHoldersView` raw `modules.php?...teamid=` URLs** at `:284,535,537` while using `TeamCellHelper::teamPageUrl()` elsewhere in the same file → use the helper consistently.

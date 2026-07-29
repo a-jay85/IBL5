@@ -11,8 +11,11 @@ use PhpParser\Node\Expr\MethodCall;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Scalar\Int_ as IntLiteral;
 use PhpParser\Node\Scalar\String_;
+use PhpParser\Node\Stmt\Catch_;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Expression;
+use PhpParser\Node\Stmt\Nop;
+use PhpParser\Node\Stmt\TryCatch;
 use PhpParser\NodeFinder;
 use PHPStan\Analyser\Scope;
 use PHPStan\Rules\Rule;
@@ -26,6 +29,9 @@ use PHPStan\Type\VerbosityLevel;
  *      `assertNull(null)`, `assertEquals($x, $x)` with identical literal args.
  *   3. `assertNotNull($x)` where PHPStan statically knows `$x` is non-nullable
  *      (its type's `isNull()` is `no`), so the assertion always passes.
+ *   4. Empty `catch` blocks for a broad type (`\Throwable`, `\Exception`, `\Error`),
+ *      which swallow every failure — including a fatal on the first line of the
+ *      system under test — leaving a test that cannot fail.
  *
  * Only applies to files under tests/ whose class methods start with `test`.
  *
@@ -44,6 +50,17 @@ final class RequireMeaningfulAssertionsRule implements Rule
         'assertSame',
         'assertNotEquals',
         'assertNotSame',
+    ];
+
+    /**
+     * Fully-qualified catch types broad enough that an empty handler hides a fatal
+     * in the system under test, not just the narrow failure the test anticipated.
+     * Lower-cased for case-insensitive comparison.
+     */
+    private const BROAD_CAUGHT_TYPES = [
+        'throwable',
+        'exception',
+        'error',
     ];
 
     public function getNodeType(): string
@@ -152,7 +169,66 @@ final class RequireMeaningfulAssertionsRule implements Rule
             }
         }
 
+        // Sub-check 4: empty catch block for a broad type. Swallows every failure the
+        // system under test can produce, so the test passes even when it fatals.
+        foreach ($nodeFinder->findInstanceOf($node->stmts, TryCatch::class) as $tryCatch) {
+            if (!$tryCatch instanceof TryCatch) {
+                continue;
+            }
+            foreach ($tryCatch->catches as $catch) {
+                if (!$this->hasNoEffectiveStatements($catch)) {
+                    continue;
+                }
+                $broadType = $this->firstBroadCaughtType($catch);
+                if ($broadType === null) {
+                    continue;
+                }
+                $errors[] = RuleErrorBuilder::message(
+                    'Empty `catch (' . $broadType . ')` in test method `' . $node->name->name . '()` '
+                    . 'swallows every failure the code under test can produce — including a fatal on '
+                    . 'its first line — so the test cannot fail. Narrow the caught type to the specific '
+                    . 'exception the test expects, use `expectException()`, or assert on post-state '
+                    . 'inside the catch.'
+                )
+                    ->identifier('ibl.meaninglessAssertion')
+                    ->line($catch->getStartLine())
+                    ->build();
+            }
+        }
+
         return $errors;
+    }
+
+    /**
+     * A catch body holding nothing but a comment parses as a single `Nop`, so counting
+     * statements alone would miss the `catch (\Throwable $e) { // ignored }` shape —
+     * which is the one this check exists for.
+     */
+    private function hasNoEffectiveStatements(Catch_ $catch): bool
+    {
+        foreach ($catch->stmts as $stmt) {
+            if (!$stmt instanceof Nop) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Returns the first broad type this catch clause names (as written, with a leading
+     * backslash for readability), or null when every caught type is narrow.
+     */
+    private function firstBroadCaughtType(Catch_ $catch): ?string
+    {
+        foreach ($catch->types as $type) {
+            $name = ltrim($type->toString(), '\\');
+            if (in_array(strtolower($name), self::BROAD_CAUGHT_TYPES, true)) {
+                return '\\' . $name;
+            }
+        }
+
+        return null;
     }
 
     private function isConstFetchWithName(Arg $arg, string $name): bool

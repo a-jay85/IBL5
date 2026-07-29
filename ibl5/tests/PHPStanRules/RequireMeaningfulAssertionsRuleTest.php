@@ -77,6 +77,38 @@ final class RequireMeaningfulAssertionsRuleTest extends RuleTestCase
         );
     }
 
+    /**
+     * The fixture holds every shape at once, so one expectation proves all four claims:
+     * a comment-only broad catch is flagged (a comment parses as a `Nop`, not as an
+     * empty body), a bare broad catch is flagged, and neither a narrow empty catch nor
+     * a broad catch that actually asserts is.
+     */
+    public function testFlagsBroadEmptyCatchButAllowsNarrowOrAssertingCatch(): void
+    {
+        $this->analyse(
+            [__DIR__ . '/Fixtures/tests/BroadEmptyCatchFixture.php'],
+            [
+                [
+                    'Empty `catch (\Throwable)` in test method `testSwallowsEverything()` '
+                    . 'swallows every failure the code under test can produce — including a '
+                    . 'fatal on its first line — so the test cannot fail. Narrow the caught '
+                    . 'type to the specific exception the test expects, use '
+                    . '`expectException()`, or assert on post-state inside the catch.',
+                    11,
+                ],
+                [
+                    'Empty `catch (\Exception)` in test method '
+                    . '`testSwallowsEverythingWithoutEvenAComment()` swallows every failure '
+                    . 'the code under test can produce — including a fatal on its first line '
+                    . '— so the test cannot fail. Narrow the caught type to the specific '
+                    . 'exception the test expects, use `expectException()`, or assert on '
+                    . 'post-state inside the catch.',
+                    41,
+                ],
+            ],
+        );
+    }
+
     public function testAllowsAssertNotNullOnNullableOrMixedValue(): void
     {
         $this->analyse(

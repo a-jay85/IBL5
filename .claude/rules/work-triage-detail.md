@@ -2,7 +2,6 @@
 description: Read-on-demand detail for work-triage — measurement context for the inline-Opus leak, ADR-0067 gateway framing, hard-trigger gate properties (sub-agent exemption, per-turn scoping, escape hatch, self-test), the cross-worktree straddle gate's four-rung remedy ladder, inline-vs-delegated criteria, safety-mirror backstop, and repeat-polling spend rationale.
 last_verified: 2026-07-28
 paths:
-  - ".claude/rules/work-triage.md"
   - "~/.claude/hooks/plan-gate-edit.sh"
 ---
 

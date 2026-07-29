@@ -1,8 +1,7 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-07-25
+last_verified: 2026-07-28
 paths:
-  - ".claude/rules/workflow-continuity.md"
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
   - "tools/postplan-harness/**"

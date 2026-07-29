@@ -329,6 +329,54 @@ else
     FAILED=1
 fi
 
+# ── Matrix extraction must skip fenced rows (feeds conditions (1) and (3)) ────
+# Same defect class as the decoy ## Critical Files heading above, on the other
+# Phase 5.0 parser: a plan documenting the matrix format carries scaffold rows
+# inside a fixture block. Read as declarations they become phantom MISSING: /
+# truly-manual items that no diff can resolve, holding the PR forever. Live on
+# plan `critical-files-parser-unification` (`tests/X.php`).
+MX_FIX="$BASE_TMP/matrix-fence.md"
+cat > "$MX_FIX" <<'MXEOF'
+## Verification Matrix
+
+````bash
+# Outer 4-backtick fence wrapping an inner 3-backtick one: a width-blind parity
+# toggle closes here and re-opens at the outer closer, leaking the decoy rows.
+```text
+inner block
+```
+| 1 | thing works | PHPUnit | post-impl | `tests/Decoy.php` |
+| 2 | looks right | Truly-manual | post-impl | eyeball the decoy |
+````
+
+| # | Behavior | Test type | When | Test file |
+|---|---|---|---|---|
+| 1 | saves row | PHPUnit | post-impl | `ibl5/tests/Unit/RealTest.php` |
+MXEOF
+
+MX_PY=$( cd "$REPO_ROOT/tools/postplan-harness" && python3 -c '
+import sys
+from harness.planfile import parse_matrix
+planned, manual = parse_matrix(open(sys.argv[1]).read())
+print(",".join(planned) + "|" + str(len(manual)))
+' "$MX_FIX" )
+if [ "$MX_PY" = "ibl5/tests/Unit/RealTest.php|0" ]; then
+    echo "ok: matrix parser skips fenced scaffold rows (planned + truly-manual)"
+else
+    echo "FAIL: fenced matrix rows leaked into conditions (1)/(3) — got: $MX_PY"
+    FAILED=1
+fi
+
+# The prose half of the same parser (Phase 5.0 is model-performed for the matrix,
+# unlike the Critical Files block which sources the shell lib) has no executable
+# host, so pin the instruction itself against silent removal.
+if grep -qF 'Skip every row inside a fenced code block' "$P5_SKILL"; then
+    echo "ok: phase 5.0 prose instructs skipping fenced matrix rows"
+else
+    echo "FAIL: phase 5.0 matrix prose lost its fenced-row skip (diverges from planfile.py)"
+    FAILED=1
+fi
+
 expect_block "(5) golden + headless -> BLOCK" BLOCK \
     "$(run_isolated "$B5" '{"files":[{"path":"engine/internal/sim/testdata/golden.json"}]}' '' '1')"
 expect_block "(5) golden + interactive -> NONE (warn-only)" NONE \

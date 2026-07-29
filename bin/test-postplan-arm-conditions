@@ -27,6 +27,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SKILL="$REPO_ROOT/.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md"
 P25_SKILL="$REPO_ROOT/.claude/skills/post-plan/SKILL.md"
+P5_SKILL="$REPO_ROOT/.claude/skills/post-plan/_phase-5-final-verification.md"
 
 BASE_TMP="$(mktemp -d)"
 trap 'rm -rf "$BASE_TMP"' EXIT
@@ -95,6 +96,7 @@ run_cond3() {
     case "$3" in
         empty) : > "$bridge" ;;
         items) echo 'MISSING: ibl5/tests/FooTest.php (matrix planned a test the diff never wrote)' > "$bridge" ;;
+        fileitems) echo 'MISSING-FILE: bin/check-plan (plan Critical File never appeared in the diff)' > "$bridge" ;;
     esac
     DONE_MARK="$mark" BRIDGE="$bridge" bash -c "$1" 2>&1
 }
@@ -122,6 +124,33 @@ assert_self_contained() { # marker name
         echo "ok: $2 self-sources the predicate"
     else
         echo "FAIL: $2 — block uses the predicate but does NOT source pr-armable.sh in-block (hoisted source = fail-open risk)"
+        FAILED=1
+    fi
+}
+
+# run_p50 <block> <planfile> — run the Phase 5.0 conformance block in its OWN
+# shell against an EMPTY changed-file list, so every must-appear entry surfaces
+# as a MISSING-FILE line. That makes the block's CLASSIFICATION observable,
+# which is what the three-way agreement test compares. The prelude runs in the
+# same bash instance as the block, so its $PPID is the block's $PPID.
+run_p50() {
+    ( cd "$REPO_ROOT" && PLAN_FILE="$2" bash -c ': > "/tmp/post-plan-changed-$PPID"
+'"$1"'
+rm -f "/tmp/post-plan-changed-$PPID"' 2>&1 )
+}
+
+# assert_block_sources <marker> <name> <lib-substring> <file>
+# Generalized sibling of assert_self_contained: assert_self_contained is
+# hardwired to pr-armable.sh and $SKILL, and its call sites must not change.
+assert_block_sources() {
+    local block; block="$(extract_block "$1" "$4")"
+    if [ -z "$block" ]; then
+        echo "FAIL: $2 — no block matching '$1' found in $4"; FAILED=1; return
+    fi
+    if printf '%s' "$block" | grep -q 'source' && printf '%s' "$block" | grep -qF "$3"; then
+        echo "ok: $2 self-sources $3"
+    else
+        echo "FAIL: $2 — block does NOT source $3 in-block (hoisted source = undefined function = silent fail-open)"
         FAILED=1
     fi
 }
@@ -219,6 +248,86 @@ expect_block "(3) marker + empty bridge -> NONE (5.0 ran clean)" NONE \
     "$(run_cond3 "$B3" yes empty)"
 expect_block "(3) marker + absent bridge -> NONE (5.0 skipped, plan-blind)" NONE \
     "$(run_cond3 "$B3" yes absent)"
+
+# (3) A real MISSING-FILE — the item THIS PR's parser produces — must block
+# arming exactly as a MISSING: test item does. Requirement 5.
+expect_block "(3) marker + unresolved MISSING-FILE -> BLOCK" BLOCK \
+    "$(run_cond3 "$B3" yes fileitems)"
+
+# --- Critical Files parser: structural + three-way behavioral agreement -----
+B50="$(extract_block '# Reuses /tmp/post-plan-changed-' "$P5_SKILL")"
+assert_block_sources '# Reuses /tmp/post-plan-changed-' "phase 5.0 conformance" \
+    'bin/lib/critical-files.sh' "$P5_SKILL"
+
+# No parser may re-inline its own regex — that IS the divergence being deleted.
+if grep -qF 'EXEMPT_RE=' "$P5_SKILL"; then
+    echo "FAIL: phase 5.0 block still inlines EXEMPT_RE (re-divergence)"; FAILED=1
+else
+    echo "ok: phase 5.0 block inlines no exempt regex"
+fi
+
+# THREE-WAY AGREEMENT. Every shape below is corpus-derived; the indented entry
+# pins the leading-whitespace divergence check-plan's old `^- ` awk had.
+CF_FIX="$BASE_TMP/cf-agreement.md"
+cat > "$CF_FIX" <<'CFEOF'
+````bash
+# Outer 4-backtick fence: contains a decoy ## Critical Files heading.
+# Width-aware fence regression — naive parity toggle would swallow real section.
+```text
+inner 3-backtick block — fence_len=3 < 4, does NOT close the outer fence
+```
+## Critical Files
+
+- `decoy01` (reference)
+- `decoy02` — decoy must-appear inside fence, must be ignored
+
+````
+
+## Critical Files
+
+- `bin/check-plan` — add gate [F]
+- `ibl5/schema.sql` (reference)
+- `ibl5/docs/backlog/README.md` (conditional)
+- `ibl5/docs/backlog/other.md` (conditional — only if diff touches it)
+- `tools/postplan-harness/harness/planfile.py` (read-only reference)
+- `ibl5/a.php` — add the context menu helper
+- `ibl5/b.php` (reference — pattern to mirror; unchanged)
+  - `ibl5/c.php` — indented change target
+- `ibl5/d.php` (conditional Phase 4 only)
+- `ibl5/e.php` (filename references the affected class)
+CFEOF
+
+CF_LIB=$( cd "$REPO_ROOT" && bash -c 'source bin/lib/critical-files.sh && cf_parse_section "$1"' _ "$CF_FIX" \
+            | sed -n 's/^MUST_APPEAR://p' )
+CF_BLOCK=$( run_p50 "$B50" "$CF_FIX" | sed -n 's/^MISSING-FILE: \([^ ]*\).*/\1/p' )
+CF_PY=$( cd "$REPO_ROOT/tools/postplan-harness" && python3 -c '
+import sys
+from harness.planfile import parse_critical_files
+for p, _a, ex in parse_critical_files(open(sys.argv[1]).read()):
+    if not ex:
+        print(p)
+' "$CF_FIX" )
+
+if [ "$CF_LIB" = "$CF_BLOCK" ] && [ "$CF_LIB" = "$CF_PY" ]; then
+    echo "ok: three-way parser agreement (lib == phase-5.0 block == planfile.py)"
+else
+    echo "FAIL: parser divergence"
+    echo "  lib:   $(printf '%s' "$CF_LIB"   | tr '\n' ' ')"
+    echo "  block: $(printf '%s' "$CF_BLOCK" | tr '\n' ' ')"
+    echo "  py:    $(printf '%s' "$CF_PY"    | tr '\n' ' ')"
+    FAILED=1
+fi
+
+# Negative half: the agreement must be on the RIGHT answer, not merely mutual.
+# Five prose/described entries are must-appear; five marked entries are not.
+# decoy01/decoy02 (inside the 4-backtick fence) must contribute zero entries.
+_want=$(printf 'bin/check-plan\nibl5/a.php\nibl5/c.php\nibl5/d.php\nibl5/e.php')
+if [ "$CF_LIB" = "$_want" ]; then
+    echo "ok: agreed classification is correct (5 must-appear, 5 exempt)"
+else
+    echo "FAIL: agreed-but-wrong — expected 5 must-appear, got: $(printf '%s' "$CF_LIB" | tr '\n' ' ')"
+    FAILED=1
+fi
 
 expect_block "(5) golden + headless -> BLOCK" BLOCK \
     "$(run_isolated "$B5" '{"files":[{"path":"engine/internal/sim/testdata/golden.json"}]}' '' '1')"

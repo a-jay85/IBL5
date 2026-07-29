@@ -38,6 +38,44 @@ assert() {
     fi
 }
 
+# assert_cf <name> <plan-body> <expected --print-critical-files output>
+# Pins CLASSIFICATION, not exit code. --print-critical-files exits before any
+# gate runs, so these fixtures need no matrix/frontmatter scaffolding.
+assert_cf() {
+    name="$1"; body="$2"; want="$3"
+    f="$TMP/$name.md"
+    printf '%s\n' "$body" > "$f"
+    got="$("$GUARD" --print-critical-files "$f" 2>/dev/null)"
+    if [ "$got" != "$want" ]; then
+        echo "FAIL: $name — classification mismatch"
+        echo "  want: $(printf '%s' "$want" | tr '\n' ' ')"
+        echo "  got:  $(printf '%s' "$got" | tr '\n' ' ')"
+        FAILED=1
+    else
+        echo "ok: $name"
+    fi
+}
+
+# assert_viol <name> <expected-exit> <gate-tag> <plan-body>
+# Pins that the failure is attributable to the gate under test, not to some
+# other gate the fixture happened to trip — the attribution discipline this
+# script's header comment requires.
+assert_viol() {
+    name="$1"; want="$2"; tag="$3"; body="$4"
+    f="$TMP/$name.md"
+    printf '%s\n' "$body" > "$f"
+    out="$("$GUARD" "$f" 2>&1)"; got=$?
+    if [ "$got" -ne "$want" ]; then
+        echo "FAIL: $name — expected exit $want, got $got"; FAILED=1
+    elif [ "$want" -eq 1 ] && ! printf '%s' "$out" | grep -qF "$tag"; then
+        echo "FAIL: $name — exit 1 but no $tag violation (wrong gate fired)"; FAILED=1
+    elif [ "$want" -eq 0 ] && printf '%s' "$out" | grep -qF "$tag"; then
+        echo "FAIL: $name — clean fixture wrongly fired $tag"; FAILED=1
+    else
+        echo "ok: $name (exit $got)"
+    fi
+}
+
 # Gate 13 (impl_model <-> matrix consistency, assert block further below)
 # requires a deliberate `impl_model:` marker whenever the matrix has zero
 # Truly-manual rows (rule b). Every fixture in this file that predates gate 13
@@ -54,6 +92,14 @@ impl_model: sonnet
 FM_OPUS='---
 impl_model: opus
 ---
+'
+
+CF_MATRIX='
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | thing works | PHPUnit | post-impl | `tests/X.php` |
 '
 
 # A minimal well-formed matrix passes (exit 0). Baseline / no false positives.
@@ -765,6 +811,155 @@ if "$GUARD" "$_f" 2>&1 | grep -q '\[W\]'; then
     FAILED=1
 else
     echo "ok: Out-of-Scope sweep-verb non-fire confirmed"
+fi
+
+# --- Critical Files canonical-parser cases (gate [F] + classification) -------
+
+# (1) FAILURE MODE 1 — the #923 regression. A canonical keyword appearing in
+# annotation PROSE must NOT exempt. On master both prose parsers exempt these.
+assert_cf "cf-prose-keyword-not-exempt" '## Critical Files
+
+- `ibl5/a.php` — add the context menu helper
+- `ibl5/b.php` — update so we can verify the arming path
+- `ibl5/c.php` — reference only, do not edit
+- `ibl5/d.php` — template rendering for the new page
+' 'MUST_APPEAR:ibl5/a.php
+MUST_APPEAR:ibl5/b.php
+MUST_APPEAR:ibl5/c.php
+MUST_APPEAR:ibl5/d.php'
+
+# (2) FAILURE MODE 3 — table form is rejected, hard.
+assert_viol "cf-table-form-rejected" 1 '[F]' "$FM$CF_MATRIX"'
+## Critical Files
+
+| File | Role |
+|---|---|
+| `bin/check-plan` | edited |
+| `bin/lib/critical-files.sh` | Create — NEW |
+'
+
+# (3) Canonical list form passes gate [F].
+assert_viol "cf-list-form-accepted" 0 '[F]' "$FM$CF_MATRIX"'
+## Critical Files
+
+- `bin/check-plan` — add gate [F]
+- `ibl5/schema.sql` (read-only reference)
+'
+
+# (3b) A non-empty section with no parseable entry is also rejected.
+assert_viol "cf-unparseable-rejected" 1 '[F]' "$FM$CF_MATRIX"'
+## Critical Files
+
+Everything under ibl5/classes gets touched.
+'
+
+# (3c) No Critical Files section at all stays clean (40 corpus plans look like this).
+assert_viol "cf-absent-section-ok" 0 '[F]' "$FM$CF_MATRIX"
+
+# (3d) Unclosed 4-backtick fence swallows the ## Critical Files heading — gate [F]
+# must fire. This is the shape that silently passed before phase B: the outer
+# 4-backtick block is opened and the only potential closing run is 3 backticks
+# (its own line), which per CommonMark does not close a 4-backtick opener. Under
+# the old width-blind toggle that 3-backtick line would have closed the fence and
+# the CF section would have parsed clean — this fixture is a genuine regression
+# test for width-awareness.
+assert_viol "cf-unbalanced-fence-rejected" 1 '[F]' "$FM$CF_MATRIX"'
+## Implementation
+
+````bash
+some code
+```
+still inside — a 3-backtick run cannot close a 4-backtick opener
+
+## Critical Files
+
+- `bin/check-plan` — add gate [F]
+'
+
+# (3e) A properly balanced 4-backtick outer fence (containing a 3-backtick inner
+# block, closed with 4 backticks) followed by a valid ## Critical Files list must
+# NOT fire gate [F].
+assert_viol "cf-balanced-4tick-fence-ok" 0 '[F]' "$FM$CF_MATRIX"'
+## Implementation
+
+````bash
+```
+inner code block
+```
+````
+
+## Critical Files
+
+- `bin/check-plan` — add gate [F]
+'
+
+# (4) FAILURE MODE 2 — the 2026-07-26 case. `(conditional)` exempts; the
+# unmarked prose form it replaces does not.
+assert_cf "cf-conditional-marker" '## Critical Files
+
+- `ibl5/docs/backlog/README.md` (conditional) — only if the skill'"'"'s op changes it
+- `ibl5/docs/backlog/other.md` — only if the skill'"'"'s op changes it
+' 'EXEMPT:ibl5/docs/backlog/README.md
+MUST_APPEAR:ibl5/docs/backlog/other.md'
+
+# (5) Every canonical marker is recognized, including capitalized.
+assert_cf "cf-all-canonical-markers" '## Critical Files
+
+- `a1` (reference)
+- `a2` (read-only)
+- `a3` (verify)
+- `a4` (verification)
+- `a5` (template)
+- `a6` (no-edit)
+- `a7` (no-change)
+- `a8` (unchanged)
+- `a9` (context)
+- `a10` (conditional)
+- `a11` (Reference)
+' 'EXEMPT:a1
+EXEMPT:a2
+EXEMPT:a3
+EXEMPT:a4
+EXEMPT:a5
+EXEMPT:a6
+EXEMPT:a7
+EXEMPT:a8
+EXEMPT:a9
+EXEMPT:a10
+EXEMPT:a11'
+
+# (6) Multi-word and explanatory-tail markers — the forms the exact-token ERE
+# would have broken on 54 of 466 real corpus markers. Indented entry included:
+# check-plan'"'"'s old `^- ` awk could not see it; the lib can.
+assert_cf "cf-multiword-and-tail-markers" '## Critical Files
+
+- `b1` (read-only reference)
+- `b2` (read-only reference — do not edit)
+- `b3` (reference — pattern to mirror; unchanged)
+  - `b4` (reference)
+- `b5` (new) — the loader that reads context from disk
+' 'EXEMPT:b1
+EXEMPT:b2
+EXEMPT:b3
+EXEMPT:b4
+MUST_APPEAR:b5'
+
+# (7) CB_CF_COUNT counts MUST_APPEAR only — 3 of 5 here. Uses the same
+# expression bin/check-plan uses, so a divergence in either fails this case.
+_cfc="$TMP/cf-count.md"
+printf '%s\n' '## Critical Files
+
+- `m1` — change target
+- `m2` (reference)
+- `m3` — add the context helper
+- `m4` (read-only reference — do not edit)
+- `m5` (conditional)
+' > "$_cfc"
+_got=$("$GUARD" --print-critical-files "$_cfc" | grep -c '^MUST_APPEAR:' || true)
+if [ "$_got" -ne 2 ]; then
+    echo "FAIL: cf-count — expected CB_CF_COUNT 2, got $_got"; FAILED=1
+else
+    echo "ok: cf-count (2 must-appear, 3 exempt)"
 fi
 
 if [ "$FAILED" -ne 0 ]; then

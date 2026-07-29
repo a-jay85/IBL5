@@ -84,14 +84,32 @@ trap 'rm -f "$TOKENS_FILE" "$SEEN_FILE" "$MISSING_FILE" "$SCAN_FILE"' EXIT
 # still handles to-be-created paths there. Authoring convention that keeps
 # not-yet-existing paths in an exempt position lives in .claude/skills/plan.
 #
-# Known limitation: an UNCLOSED fence (odd number of ``` markers) leaves in_fence
-# toggled on to EOF, silently exempting every path below the last opener. Low risk
-# — an unbalanced fence also breaks markdown rendering, so it surfaces elsewhere —
-# but it is the one over-exemption path (a genuinely stale dependency below the
-# stray opener would be masked). Kept simple over adding a balance check.
+# Fence tracking is now WIDTH-AWARE: a 4-backtick opening run records its length
+# and only a run at least that long closes it (CommonMark). The old single-line
+# `/^[[:space:]]*```/ { in_fence = !in_fence }` toggle also matched a 4-backtick
+# run, inverting parity once instead of twice, so an odd count before a
+# dependency heading silently over-exempted every path below. Width-awareness
+# changes the scanned line set on 13 of the 41 four-backtick plans but changes
+# 0 of 260 verdicts — the downstream token filters (prefix, glob, ellipsis,
+# ADR-placeholder, charset, de-dup, existence) absorb every difference. This is
+# a latent blindspot being closed for class consistency, not a live breakage.
+#
+# An unclosed fence still causes under-scanning to EOF, which is conservative: it
+# can only miss a stale path, never invent one. No non-zero exit is added here —
+# check-plan-staleness non-zero drives automouse Step 2.5 skip and the .staleness
+# sidecar has no retry cap, so a never-self-resolving condition must not exit 1.
 awk '
-    BEGIN { in_fence = 0; exempt_level = 0 }
-    /^[[:space:]]*```/ { in_fence = !in_fence; next }
+    BEGIN { in_fence = 0; fence_len = 0; exempt_level = 0 }
+    {
+        fl = $0
+        sub(/^[[:space:]]*/, "", fl)
+        fn = 0
+        while (substr(fl, fn + 1, 1) == "`") fn++
+        if (fn >= 3) {
+            if (!in_fence) { in_fence = 1; fence_len = fn; next }
+            else if (fn >= fence_len) { in_fence = 0; next }
+        }
+    }
     in_fence { next }
     /^#+[[:space:]]/ {
         lvl = 0

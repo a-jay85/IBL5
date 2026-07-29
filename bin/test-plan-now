@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-plan-now — pins how bin/plan-now identifies the plan a headless run
+# produced, i.e. the PLAN_FILE: marker contract (.claude/rules/headless-marker-contract.md).
+#
+# Why this test exists: every plan-now run up to 2026-07-28 logged `RESULT
+# unconfirmed` and never reached its check-plan gate, because the coda asked for the
+# marker BEFORE the plan was written and `claude -p` (default --output-format text)
+# emits only the model's final message. The stub below emulates exactly that — it is
+# the run's final message and nothing else — so the "no marker" case IS the original
+# bug, and the decorated cases pin the tolerant parse that keeps prose deviation from
+# reproducing it.
+#
+# No launchd: PLAN_NOW_DRY_RUN=1 makes plan-now write its runner and stop, and the
+# test executes that runner directly. Synchronous, no background jobs, no cleanup debt.
+# PLAN_NOW_CLAUDE / PLAN_NOW_PLANS_DIR are the seams plan-now already documents.
+#
+# Run: bin/test-plan-now  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+PLAN_NOW="$ROOT/bin/plan-now"
+FAILS=0
+
+ok()   { printf '  ok   %s\n' "$1"; }
+fail() { printf '  FAIL %s\n' "$1"; FAILS=$((FAILS + 1)); }
+
+TMP=$(mktemp -d -t test-plan-now)
+trap 'rm -rf "$TMP"' EXIT
+
+PLANS="$TMP/plans"
+mkdir -p "$PLANS"
+
+# The prompt plan-now is handed. Only the leading /plan line matters to it.
+PROMPT="$TMP/prompt.md"
+printf '/plan a throwaway task for bin/test-plan-now\n' > "$PROMPT"
+
+# ── The stub model ────────────────────────────────────────────────────────────
+# Stands in for `claude -p`: writes a plan file (unless STUB_NO_PLAN), then prints
+# ONLY what a text-mode run would emit — the final assistant message. $STUB_TAIL is
+# whatever that message ends with.
+STUB="$TMP/claude-stub"
+cat > "$STUB" <<'STUB_EOF'
+#!/usr/bin/env bash
+[ -n "${STUB_PLAN:-}" ] && [ -z "${STUB_NO_PLAN:-}" ] && printf '# stub plan\n' > "$STUB_PLAN"
+printf 'Done — the plan is written and check-plan is clean.\n'
+[ -n "${STUB_TAIL:-}" ] && printf '%s\n' "$STUB_TAIL"
+exit 0
+STUB_EOF
+chmod +x "$STUB"
+
+# run_case <plan-file-the-stub-writes> <final-message-tail>  → transcript on stdout
+run_case() {
+    local plan_path="$1" tail_line="$2"
+    rm -f "$PLANS"/*.md
+    local dry runner
+    dry=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
+              "$PLAN_NOW" --implement "$PROMPT" 2>&1)
+    runner=$(printf '%s\n' "$dry" | sed -n 's/^  runner: //p')
+    [ -x "$runner" ] || { printf 'could not get a runner out of plan-now:\n%s\n' "$dry"; return 1; }
+    STUB_PLAN="$plan_path" STUB_TAIL="$tail_line" STUB_NO_PLAN="${STUB_NO_PLAN:-}" \
+        bash "$runner" 2>&1
+    rm -f "$runner"
+}
+
+want()    { case "$2" in *"$3"*) ok "$1" ;; *) fail "$1 — expected to see: $3" ;; esac; }
+want_no() { case "$2" in *"$3"*) fail "$1 — should NOT have seen: $3" ;; *) ok "$1" ;; esac; }
+
+P="$PLANS/demo-slug.md"
+
+echo "── identification: the shapes a model actually emits ──"
+
+out=$(run_case "$P" "PLAN_FILE: $P")
+want "bare marker on the last line identifies the plan" "$out" "plan-now: new plan -> $P"
+
+# ★ THE REGRESSION. The one real transcript closed with `**Plan:** ` + a backticked
+# path, so bold/backticks are the deviation we have evidence for. The pre-fix regex
+# was anchored `^[[:space:]]*PLAN_FILE:` and matched none of the three below.
+out=$(run_case "$P" "**PLAN_FILE:** $P")
+want "bold-wrapped marker still identifies the plan" "$out" "plan-now: new plan -> $P"
+
+out=$(run_case "$P" "- PLAN_FILE: \`$P\`")
+want "list-prefixed + backticked path still identifies the plan" "$out" "plan-now: new plan -> $P"
+
+out=$(run_case "$P" "PLAN_FILE: $P")
+want "an identified plan reaches the check-plan gate" "$out" "check-plan"
+
+echo "── fail-safe: a bad marker costs 'unconfirmed', never a wrong green ──"
+
+# This is the original bug verbatim: a clean run, a written plan, and a final message
+# with no marker in it (the marker went out early and text mode discarded it).
+out=$(run_case "$P" "")
+want "no marker → unconfirmed" "$out" "RESULT unconfirmed"
+want_no "no marker → check-plan is NOT run" "$out" "plan-now: new plan ->"
+
+out=$(run_case "$P" "PLAN_FILE: /etc/passwd")
+want "marker outside \$PLANS_DIR is rejected" "$out" "ignoring PLAN_FILE outside"
+want "marker outside \$PLANS_DIR → unconfirmed" "$out" "RESULT unconfirmed"
+
+out=$(STUB_NO_PLAN=1 run_case "$P" "PLAN_FILE: $P")
+want "marker naming a nonexistent file is rejected" "$out" "named a file that does not exist"
+want "marker naming a nonexistent file → unconfirmed" "$out" "RESULT unconfirmed"
+
+echo "── the coda still tells the model where to put it ──"
+
+dry=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
+          "$PLAN_NOW" --implement "$PROMPT" 2>&1)
+coda=$(cat "$(printf '%s\n' "$dry" | sed -n 's/^  prompt: //p')" 2>/dev/null)
+want "coda demands the FINAL message" "$coda" "FINAL message"
+want "coda demands the last line" "$coda" "last line"
+# Tolerant parsing is a backstop for prose drift, not a licence to move the
+# instruction: under text mode an early-only marker is unreachable, full stop.
+want "coda explains why an earlier print is discarded" "$coda" "discarded"
+
+echo
+if [ "$FAILS" -eq 0 ]; then
+    echo "test-plan-now: all cases passed"
+else
+    echo "test-plan-now: $FAILS case(s) FAILED"
+fi
+exit $(( FAILS > 0 ? 1 : 0 ))

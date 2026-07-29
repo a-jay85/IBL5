@@ -93,8 +93,8 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 | J24 | Possession-clock subsystem faithful port (step classes + jitter + arming) | ◑ Partial | 🧠 Opus | L |
 | J26 | `fastClassShareArtifact` era/corpus field gap — all-era run logs recent-era band text (instrument hazard) | ✅ Implemented | ⚙️ Sonnet | S |
 | J27 | FTA undershoot ~−21% vs sco (engine 152,874 / sco 194,185 = −21.27%; no confirmed mechanism) | ⬜ Open | 🧠 Opus | M |
-| J28 | Cov(lnFGA,lnPPS) regression from J7 TOV-coupling port (−0.000062 actual, disclosed fidelity cost) | ⬜ Open | 🧠 Opus | S |
-| J29 | #1676 steal branch fires at the total-TOV rate — STL/g 30.5 vs 17.8±0.7, archive band fails at 14.69% (RE cannot resolve the split) | ⬜ Open | 🧠 Opus | M |
+| J28 | Cov(lnFGA,lnPPS): no positive lever (the −0.000062 J7-port regression is out of the tree with the #1676 revert; re-measure if the correct-form port lands) | ⬜ Open | 🧠 Opus | S |
+| J29 | TOV generator is **unfaithful in-tree** — #1676 (total-TOV-rate share) reverted 2026-07-29, restoring the rating-for-stat `stealTurnoverScale = 1.69e-5` stand-in; in band but not 5.60's form, and the correct-form port is blocked on the unvalued `param` | ⬜ Open | 🧠 Opus | M |
 
 ### J1 Faithful foul-bucket pair port
 ➜ J1 Faithful foul-bucket pair port — ✅ Implemented (2026-07-10): see [archive](archive/jsb-native-backlog-archive.md).
@@ -115,7 +115,7 @@ The cut-over blocker — the wrong-signed Cov(lnFGA,lnPPS) — has a **named dom
 ➜ J6 Composite-scale pins — ✅ Implemented (2026-07-10): every target pinned + mechanism discovered; spawned J15/J18/J19; see [archive](archive/jsb-native-backlog-archive.md).
 
 ### J7 Turnover volume-coupling fidelity RE
-➜ J7 Turnover volume-coupling fidelity RE — ✅ Implemented (2026-07-26): `teamOffTOVShare` (TVR_rate/(shot_rate+TVR_rate)) replaces stealTurnoverScale×(100−TVR)×Σ(STL×fatigue); Cov regression −0.000062 disclosed as J28; PR #1676. See [archive](archive/jsb-native-backlog-archive.md). ⚠️ **The RE verdict stands; the port that shipped under it does not — see J29** (2026-07-29): the ported share is a *total*-TOV rate and is the complement of the fast-break conversion threshold the J7 RE explicitly ruled out as the generator, so STL/g runs 30.5 vs a 17.8±0.7 target. J7's status is unchanged because J7 was an RE deliverable ("No engine change. No worktree/PR" — its own artifact); the level defect belongs to J29.
+➜ J7 Turnover volume-coupling fidelity RE — ✅ Implemented (2026-07-26): `teamOffTOVShare` (TVR_rate/(shot_rate+TVR_rate)) replaces stealTurnoverScale×(100−TVR)×Σ(STL×fatigue); Cov regression −0.000062 disclosed as J28; PR #1676. See [archive](archive/jsb-native-backlog-archive.md). ⚠️ **The RE verdict stands; the port that shipped under it does not — see J29** (2026-07-29): the ported share is a *total*-TOV rate and is the complement of the fast-break conversion threshold the J7 RE explicitly ruled out as the generator, so STL/g runs 30.5 vs a 17.8±0.7 target. J7's status is unchanged because J7 was an RE deliverable ("No engine change. No worktree/PR" — its own artifact); the level defect belongs to J29. **#1676 reverted (2026-07-29):** `teamOffTOVShare` is no longer in the tree and `stealTurnoverScale = 1.69e-5` is restored along with its stand-in registration; the correct-form port is J29. J7's RE verdict is unaffected — what reverted is the port, not the finding.
 ### J8 Transition trigger denominator 18
 ➜ J8 Transition trigger denominator 18 — ✅ Implemented (2026-07-13): PR #1433 (`transitionTriggerDenom` 20→18, asm-verified); see [archive](archive/jsb-native-backlog-archive.md).
 
@@ -285,7 +285,7 @@ Three-date routing record (artifacts `calibration-5.60-20260722/23/24-3pt-attemp
 - **Phase-4 usage-dominance flag (+0x33F0)** is NOT an FG% lever — numerator objdump-pinned to +0xD90 = `twoPtBucketWeight`; the faithful flag fires 0.0005%, FG% +0.01pp (#1541, corrected for faithfulness only, INERT). `jsb-native/re-artifacts/jsb-fgpct-phase4-numerator-pin-20260720.md`.
 - **Phase-3 matched-defender term** is NOT an FG% lever — `(DefAST48 − leagueAST48[slot])·0.8` is mean-zero across defenders; ported faithfully it moved FG% only 46.08→46.19%.
 - **`dec_rate_delta_e` / `named_carrier: inconclusive_d` from the localise instrument are NOT the attempt-rate carrier** (2026-07-22): the instrument's `real_pa_per_min` benchmarks engine-vs-reality (`.plr` real-life 3PA rates, not `.sco`); `total_gap` −0.0579 conflates (engine↔jsb) with (jsb↔reality), so `DecRateDeltaE` −0.0415 is an artifact of the wrong reference point. Discriminating proof: `engine/internal/calibrate/threept_localize_archive_test.go:184-232` (source verification that the reference is `.plr` real-life stats) + the 2GA-vs-sco parity in the undershoot artifacts (pre-port `...-3pt-undershoot-ab-suppress.json` 884,686/878,321 = **100.7%**; post-port `...-3pt-undershoot.json` 870,986/878,321 = **99.2%**) — total shot volume at near-parity either side of the port rules out a decision-frequency deficit as the carrier. Do NOT re-open the shot-decision-frequency deficit as the gap carrier.
-- **J7 faithful TOV port** is NOT a count-axis fix — the faithful share port REGRESSES Cov(lnFGA,lnPPS) by **−0.000062** (measured 2026-07-26; pre-impl −0.000226 → post-impl −0.000288; further from real +0.000269). ✅ Implemented (J28 tracks the residual regression).
+- **The J7 *share* TOV port** is NOT a count-axis fix — the share port REGRESSES Cov(lnFGA,lnPPS) by **−0.000062** (measured 2026-07-26; pre-impl −0.000226 → post-impl −0.000288; further from real +0.000269). **Rescoped 2026-07-29:** the port that produced this measurement (#1676) was **reverted** — it was the wrong quantity, not merely mis-scaled (J29) — so the trap now reads: do not reach for the `TVR_rate/(shot_rate+TVR_rate)` **share form** as a Cov or count-axis lever. It says nothing about the RE-pinned correct form (no shot-rate denominator), which is unmeasured on this axis. See J28, J29.
 - **Master pre-partition fastclass counters** — the 9.48%/18.44% DRB-only / steal-union split, and the shelved-branch 13.92%/11.82% at +1/−1 — are NOT band-comparable and are now MOOT post-#1547; the only band-comparable quantity is the merged `DRBPushSharePct` (12.37% **[SUPERSEDED 2026-07-24 — 12.4142%]**). Do NOT resurrect them.
 - **The elected ~12.42 / 2-season CI floor is NOT a construction defect — do NOT re-elect a looser bar** (2026-07-23, ADR-0094). Adversarial statistical audit of ADR-0090's criterion #2: the un-derived "~12.42" is a *provenance* gap (√2-shrink of the reproduced 1-season CI = 12.4216; direct 2280-game 2-season bootstrap = [12.418, 12.653]), not an internal error in `[12.374, 12.698]`. "~12.42 is un-derived, therefore elect a different bar" is a criterion-selection **PREFERENCE**, not a defect — the repair is to cite the computed 12.374, never to swap gates. `jsb-native/re-artifacts/adr0092_resolution.py` + ADR-0094.
 - **"Master is inside the drift band [11.97, 12.54], so elect the band" is NOT-A-LEVER** (2026-07-23, ADR-0094). ADR-0090 § Decision knowingly declined this; a wider *game* window yields a *tighter* floor (the direct 2-season bootstrap lower bound RISES, moving the bar away from GO), so the band is a different kind of object, not a looser-but-equivalent gate. Criterion-selection PREFERENCE.
@@ -335,14 +335,16 @@ Three-date routing record (artifacts `calibration-5.60-20260722/23/24-3pt-attemp
 
 **Measurement (2026-07-26):** `TestRealArchive_PossessionCoupling`, worktree `jsb-j7-tov-coupling-port`. Pre-impl baseline: −0.000226; post-impl: −0.000288; Δ = −0.000062.
 
-**Status (2026-07-26, ⬜ Open; rescoped 2026-07-29):** Disclosed; no positive Cov lever confirmed. Do NOT re-open J7 **for the Cov axis** — on that axis J7 faithfulness is the cause, not the fix, and a positive Cov fix must come from the FGA anti-coupling (see J20 declined rationale) or a future count-axis improvement. **Scope correction (J29):** this bar was written on the premise that the #1676 port is faithful, and that premise is falsified **for the level** — the steal branch fires at the total-TOV rate, STL/g 30.5 vs a 17.8±0.7 target, and the archive band `steal share% ∈ [8.0, 9.0]` fails at 14.69%. That defect is tracked as **J29** and is a legitimate re-open of the ported mechanism; this bar never covered it. Tier: 🧠 Opus. Effort: S (disclosure only until a positive lever is identified).
+**Status (2026-07-26, ⬜ Open; rescoped 2026-07-29):** Disclosed; no positive Cov lever confirmed. Do NOT re-open J7 **for the Cov axis** — on that axis J7 faithfulness is the cause, not the fix, and a positive Cov fix must come from the FGA anti-coupling (see J20 declined rationale) or a future count-axis improvement. **Scope correction (J29):** this bar was written on the premise that the #1676 port is faithful, and that premise is falsified **for the level** — the steal branch fires at the total-TOV rate, STL/g 30.5 vs a 17.8±0.7 target, and the archive band `steal share% ∈ [8.0, 9.0]` fails at 14.69%. That defect is tracked as **J29** and is a legitimate re-open of the ported mechanism; this bar never covered it. **Revert correction (2026-07-29):** #1676 was reverted, so the −0.000062 regression and its dilution-gradient mechanism are **out of the tree** — Cov is *expected* back at the pre-port −0.000226 and this entry no longer carries a live regression. **Not re-measured:** the revert PR did not re-run `TestRealArchive_PossessionCoupling`, and this branch also carries #1675 (the w4 foul-bucket rescale, which landed after #1676), so treat −0.000226 as the inferred value, not a fresh reading. The mechanism explanation above is also **specific to the reverted form**: it turns on `shot_rate` appearing in the denominator, and the RE-pinned correct form has no shot-rate denominator, so it does **not** transfer to the re-port — J29's port must be Cov-re-measured from scratch rather than assumed to reproduce −0.000062. What stays open here is only the standing "no positive Cov lever confirmed" disclosure. Tier: 🧠 Opus. Effort: S (disclosure only until a positive lever is identified).
 
 ### J29 #1676 steal branch fires at the total-TOV rate (level defect; RE cannot resolve the split)
 
 *(Numbered J29: next available after J28.)*
 
-**Defect.** PR #1676 (J7 port) replaced the steal branch's calibrated constant with an unnormalized
-share: `steal.go:59` now reads `prob := gs.turnoverProb(teamOffTOVShare(offense.players))`, and
+**Defect (as shipped in #1676; reverted 2026-07-29 — the code cited below is no longer in the tree,
+and `teamOffTOVShare` / `tovCarelessRate48` no longer exist as symbols).**
+PR #1676 (J7 port) replaced the steal branch's calibrated constant with an unnormalized
+share: `steal.go:59` read `prob := gs.turnoverProb(teamOffTOVShare(offense.players))`, and
 `freeze.go:665-690` applies **no scaling** (`p := share`, clamped at 0.9). The share's numerator is
 a **total**-turnover rate — `tovCarelessRate48 = RealLifeTVR/RealLifeMIN×48`, and `bundle.go:112`
 documents `rl_tvr` as `TOV/MIN×48` with `assemble.go:176` summing it into the league total-turnover
@@ -363,6 +365,15 @@ possessions per end; instrument byte-identical at both ends: `endingmix_share_ar
 | FG % | 48.41 | 48.27 | 48.22 | band [47.5, 48.9] ✅ |
 | FTA / game | 33.8 | 31.9 | 31.6 | band [29.5, 34.2] ✅ |
 
+**Post-revert re-measure (2026-07-29, same instrument / population / seed — `TestEndingMixBaseline`
+PASS):** steal endings **8.75%** ✅, indep-TO **4.78%** ✅, DREB 32.31%, made-FG 44.95%, FT-seq 9.20%,
+FG% **48.37** ✅, FTA/g **33.5** ✅, STL/g **18.0**, TOV/g **27.8**, poss/g 205.1, armed 39.13%,
+implied code-7 @0.300 **11.74%** (was 12.94% post-#1676 — back under ADR-0090 re-open criterion #1's
+≥12.42 bar; reported, not gated here). The revert carries #1675 (w4 foul-bucket rescale, which landed
+*after* #1676) along with it, so this end is pre-#1676 J7 **plus** #1675 — that is the source of the
+small drift from the `45080c1cf` column (FTA/g 33.8 → 33.5, FT-seq 9.29 → 9.20, made-FG 44.92 →
+44.95). All four bands hold.
+
 `619fee3f2^` = `45080c1cf`. **Exactly one** assertion fails, at `endingmix_share_archive_test.go:340`:
 `steal share% = 14.69%, want within [8.00%, 9.00%]`. The control held — `indep-TO share%` is the
 untouched `nonStealTurnoverScale` branch and stays in band, so the run is not population- or
@@ -378,10 +389,14 @@ for gate-1).
 fidelity-vs-fit tradeoff.
 
 **Headline RE finding — the ported quantity is the wrong quantity, not merely the wrong scale.**
-`teamOffTOVShare = TVR_rate/(shot_rate + TVR_rate)` is the exact **complement** of
+`teamOffTOVShare = TVR_rate/(shot_rate + TVR_rate)` is the **near-complement** of
 `00_MASTER_REFERENCE.md:436-443`'s fast-break steal-**success** threshold
-`total_shot_rate/(total_shot_rate + TVR_rate)` (`+0xDA0 = 3P_rate + 2P_rate + FT_rate` is the same
-shot-rate composite). That quantity is fast-break-scoped (`:436`), governs whether an
+`total_shot_rate/(total_shot_rate + TVR_rate)`. <!-- RETIRED-OK: corrects "exact complement" -->
+**Correction (2026-07-29):** an earlier version of this line said *exact* complement. It is not exact
+— 5.60's `total_shot_rate = +0xDA8 + +0xD88 + +0xD70` (3P + 2P + **FT composite**) while Go's
+`shot_rate` is `Σ fgaRate48` and omits the FT term. The identification of the quantity stands; only
+"exact" was wrong, and nothing in this entry turns on exactness. That quantity is fast-break-scoped
+(`:436`), governs whether an
 *already-created* turnover's transition **converts** rather than whether a turnover happens, and is
 **stateful** — `DA0` decays by 2.0 (floor 2.0) after each break. `jsb-J7-tov-coupling-RE-20260720.md`
 §1 explicitly rules it out as the generator ("correcting an earlier draft"). The pinned generator is
@@ -421,11 +436,24 @@ turnover origin by working back from the `.sco`/IBL5.log ending classes that pro
 endings; (iii) only then choose between (a)/(b)/(c). Data is **not** the blocker — J22 (✅) already
 wires per-player `rl_stl`/`rl_tov`; the blocker is asm.
 
-**Do NOT:** revert #1676 (the pre-#1676 form is unfaithful — rating-for-stat plus a defense-side
-Σ STL pool, severing the offense-rate self-coupling, `jsb-J7…RE` §1); apply a flat ×0.64 or any
-factor fitted to make the band pass; sweep or re-register `teamOffTOVShare` (unregistered under
-ADR-0087 §2, pinned by omission); or merge `tovCarelessRate48` into `tovRate` (its docblock forbids
-it — J6/J16 offQuality foul coupling).
+**#1676 WAS reverted (2026-07-29), reversing this entry's original "do NOT revert" directive.**
+That directive was written on a fix-forward premise and is superseded by an explicit user decision.
+The trade it makes: the pre-#1676 form is genuinely **unfaithful** (rating-for-stat plus a
+defense-side Σ STL pool, severing the offense-rate self-coupling, `jsb-J7…RE` §1) and restores the
+`stealTurnoverScale = 1.69e-5` stand-in and its ADR-0087 registration — but it is *in band*, whereas
+#1676's form is the **wrong quantity** and out of band on a hard gate. With `param` unrecovered there
+is no faithful form available to ship, so carrying a known-wrong quantity past a hard band (and into
+gate-1's `DRBPushSharePct`, which the steal-rate error inflates via the merged code-7 arming) is the
+worse of the two. The revert restores a known, disclosed approximation instead of an unlocated one.
+J29 now tracks the **correct-form port**, not the removal.
+
+**Do NOT** (applies to the re-port): apply a flat ×0.64 or any factor fitted to make the band pass;
+re-introduce the share form under a calibrated scale (that keeps a fast-break-scoped, decaying,
+wrong-quantity anchor and is not what the RE pins); sweep or register the re-introduced share as a
+stand-in (it would be pinned by omission under ADR-0087 §2 either way); or merge a
+`TOV/MIN×48` careless-rate term into `tovRate` (that docblock forbids it — J6/J16 offQuality foul
+coupling). **Also do NOT** re-open J7's RE verdict on the strength of the revert — the revert removed
+a port, not a finding.
 
 **Related.** J28 carries the Cov(lnFGA,lnPPS) regression from the same port — that is a separate
 axis and its "do not re-open J7" bar is scoped to Cov, not to this level defect. The hard band that
@@ -436,9 +464,25 @@ CI", test docblock `:30`); that is the meta-tooling **unwired test** disposition
 `jsb-native/re-artifacts/jsb-J7-tov-coupling-RE-20260720.md`,
 `jsb-native/jsb_560/decompiled/00_MASTER_REFERENCE.md`.
 
-**Status (2026-07-29, ⬜ Open).** Filed from a first-hand reproduction at master tip `1c3220456`
-(no engine changes between `85d245cb5` — the planned measurement SHA — and `1c3220456`, confirmed via
-`git log 85d245cb5..HEAD -- engine/internal/sim/` returning empty; the A/B ends are unaffected);
-no engine change shipped — the fix is blocked on RE, not on implementation. Tier: 🧠 Opus (novel RE
-— asm work to pin `param` and locate the non-steal path). Effort: M (RE session + faithful port +
-archive re-measure at both ends + gate-1 re-read).
+**Status (2026-07-29, ⬜ Open — rescoped to the re-port).** Filed from a first-hand reproduction at
+master tip `1c3220456` (no engine changes between `85d245cb5` — the planned measurement SHA — and
+`1c3220456`, confirmed via `git log 85d245cb5..HEAD -- engine/internal/sim/` returning empty; the A/B
+ends are unaffected). **#1676 has since been reverted** (this entry's PR), so the defect is out of the
+tree and no band is red; what remains open is the **correct-form port**, which is blocked on RE, not
+on implementation.
+
+**The single blocker is `param`.** The faithful generator is
+`P = Σ_5(TOV/MIN×48 × fatigue) / (param × 1.5)` (`jsb-J7-tov-coupling-RE-20260720.md:52-54`) — **no
+shot-rate denominator**, and pace-invariant. `param` is never named or valued anywhere in the RE:
+`00_MASTER_REFERENCE.md:1566-1571` § Steal Probability is bare prose with **no `FUN_` address and no
+✅ VERIFIED stamp**, unlike every block around it. So recovering it is an RE task with an *unlocated
+starting point*, not a lookup — it wants its own `/plan`, not a fold-in to the port.
+
+**Follow-up owed, not bundled here:** re-measure gate-1 `DRBPushSharePct` post-revert. #1676 inflated
+`implied_code7_pct` to 12.94% (over ADR-0090 re-open criterion #1's ≥12.42 bar) via the merged code-7
+arming; the revert reads 11.74%, so any gate-1 reading taken between #1676 and this revert is
+defect-contaminated. Do **not** re-derive the gate-1 band or re-express it pace-invariantly off those
+numbers — that is an ADR-level decision and the number that prompted it was defect-driven.
+
+Tier: 🧠 Opus (novel RE — asm work to pin `param` and locate the non-steal path). Effort: M (RE
+session + faithful port + archive re-measure at both ends + gate-1 re-read).

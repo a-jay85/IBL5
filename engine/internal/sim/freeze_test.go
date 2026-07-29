@@ -36,18 +36,18 @@ func TestFreeze_SubstitutesAndAccumulates(t *testing.T) {
 	def := []onCourt{oc(slotPG, mkPlayer(2, 3, slotPG, 50))}
 	bh := off[0]
 	wantFoul := foulBucketWeight(bh, off, def, 0, 0, rng.New(foulSeed))
-	base := &gameState{accum: acc, rng: rng.New(foulSeed), nonStealTurnoverScale: nonStealTurnoverScale}
+	base := &gameState{accum: acc, rng: rng.New(foulSeed), stealTurnoverScale: stealTurnoverScale, nonStealTurnoverScale: nonStealTurnoverScale}
 	wantOreb := gate1Probability(100, 100, base.gateBaseline) // live faithful gate-1 (base.gateBaseline is 0)
 	// float64 vars force runtime (not constant-folded) evaluation, matching the
 	// wrapper's accumulated rounding exactly.
-	share := 0.10
-	wantTurn := share
+	careless, pressure := 60.0, 100.0
+	wantTurn := stealTurnoverScale * careless * pressure // below the clamp
 	wantMake := shotValue2pt(5, bh, 0, false, leagueBaselineFallback, 0, 0)
 
 	if got := base.orebProb(100, 100); got != wantOreb {
 		t.Errorf("baseline orebProb = %v, want live %v", got, wantOreb)
 	}
-	if got := base.turnoverProb(share); got != wantTurn {
+	if got := base.turnoverProb(60, 100); got != wantTurn {
 		t.Errorf("baseline turnoverProb = %v, want live %v", got, wantTurn)
 	}
 	if got := base.makeValue2pt(5, bh, 0, result.OriginInitial, 0, 0); got != wantMake {
@@ -79,8 +79,8 @@ func TestFreeze_NoCrossConfound(t *testing.T) {
 	bh := off[0]
 
 	liveOreb := gate1Probability(120, 80, 0) // gs.gateBaseline is 0 in these cases
-	share := 0.10
-	liveTurn := share
+	careless, pressure := 60.0, 100.0
+	liveTurn := stealTurnoverScale * careless * pressure // runtime eval, below the clamp
 	liveMake := shotValue2pt(5, bh, 0, false, leagueBaselineFallback, 0, 0)
 	// Symmetric bucket: this single-defender/single-offense fixture drives the
 	// coupling factor negative (defQ from one defender sits far below the 5-man-
@@ -102,9 +102,9 @@ func TestFreeze_NoCrossConfound(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			gs := &gameState{freeze: c.cfg, rng: rng.New(foulSeed), nonStealTurnoverScale: nonStealTurnoverScale}
+			gs := &gameState{freeze: c.cfg, rng: rng.New(foulSeed), stealTurnoverScale: stealTurnoverScale, nonStealTurnoverScale: nonStealTurnoverScale}
 			gotOreb := gs.orebProb(120, 80)
-			gotTurn := gs.turnoverProb(share)
+			gotTurn := gs.turnoverProb(60, 100)
 			gotMake := gs.makeValue2pt(5, bh, 0, result.OriginInitial, 0, 0)
 			gotFoul := gs.foulWeight(bh, off, def, 0, 0)
 

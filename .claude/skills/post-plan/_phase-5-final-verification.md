@@ -11,7 +11,7 @@ At Phase 5.0 START, clear the conformance bridge file AND remove the done-marker
 rm -f /tmp/post-plan-conformance-done-$PPID
 ```
 
-Read the Verification Matrix from `$PLAN_FILE`. Collect the test-file path from the "Test file / location" column of every row whose Test type is PHPUnit, API-test, E2E, or Visual-regression. Confirm the PR diff actually wrote each one:
+Read the Verification Matrix from `$PLAN_FILE`. Collect the test-file path from the "Test file / location" column of every row whose Test type is PHPUnit, API-test, E2E, or Visual-regression. **Skip every row inside a fenced code block** — a plan that documents the matrix format carries scaffold rows (`| 1 | thing works | PHPUnit | post-impl | \`tests/X.php\` |`) inside a ```` ```bash ```` fixture block, and those are illustration, not declarations. Reading one produces a phantom path no diff can ever contain, so the resulting `MISSING:` is unresolvable and condition (3) holds the PR forever (observed on plan `critical-files-parser-unification`). Fence tracking is **width-aware**, same rule as `## Critical Files` below: this repo wraps 3-backtick blocks in 4-backtick outer ones, and per CommonMark a closing fence must be at least as long as its opener — a width-blind toggle closes on the inner fence and swallows the real matrix underneath. The same skip applies to Truly-manual rows (condition (1) reads those). Then confirm the PR diff actually wrote each collected path:
 
 ```bash
 git diff --name-only origin/master...HEAD > /tmp/post-plan-changed-$PPID

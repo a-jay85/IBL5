@@ -67,10 +67,29 @@ def parse_matrix(content: str) -> tuple[list[str], list[str]]:
 
     Planned tests: rows whose Test type is PHPUnit / API-test / E2E / Visual-regression;
     path taken from the row's backticked file token.
+
+    Fenced code blocks are skipped (_strip_fenced, defined below — same width-aware
+    machine parse_critical_files uses). A plan that *documents* the matrix format —
+    a `| 1 | thing works | PHPUnit | post-impl | `tests/X.php` |` scaffold inside a
+    ```bash fixture block — otherwise reads as a real declaration, and the phantom
+    path then blocks arming forever via condition (3) since no diff can ever contain
+    it. Measured on the 260-plan corpus: 3 plans lose a planned path and 2 lose
+    truly-manual rows, every one of them fenced illustrative content (`do X`,
+    `tests/X.php`, a backslash-escaped heredoc row); no real matrix row is dropped.
+    Known fail-open, inherited from parse_critical_files (and accepted there — see
+    bin/lib/critical-files.sh's note at cf_fence_unbalanced): an UNCLOSED fence
+    swallows the rest of the file, so planned==[] and conformance holds nothing.
+    bin/check-plan gate [F] rejects that, but at PLAN-AUTHORING time only ("only
+    ever sees newly-authored plans"), so a legacy plan predating the gate can still
+    reach Phase 5.0 and silently skip its own conformance check. Live exposure today
+    is zero: 1 of 260 corpus plans is unbalanced (sonnet-recipe-completeness-lint)
+    and it already shipped. Making the harness report unbalanced-fence as
+    INDETERMINATE rather than empty changes a Phase 5.0 contract, so it is filed as
+    backlog, not fixed here.
     """
     planned: list[str] = []
     manual: list[str] = []
-    for line in content.splitlines():
+    for line in _strip_fenced(content):
         if not line.strip().startswith("|"):
             continue
         cells = [c.strip() for c in line.strip().strip("|").split("|")]

@@ -50,6 +50,59 @@ def test_matrix_and_critical_files():
     assert cf[1][0] == "ibl5/schema.sql" and cf[1][2]  # "(read-only reference)" -> exempt
 
 
+def test_matrix_ignores_fenced_rows():
+    """A matrix row inside a fenced block is illustration, not a declaration.
+
+    Live regression: ~/claude-plans/critical-files-parser-unification.md carried a
+    `tests/X.php` scaffold row inside a ```bash fixture block. parse_matrix read it
+    as a planned test, Phase 5.0 emitted `MISSING: tests/X.php`, and arm condition
+    (3) held the PR on a path no diff could ever contain. Condition (1) has the same
+    exposure through truly_manual_rows, so both are pinned here.
+    """
+    fenced = PLAN + """
+## Appendix — how to write a matrix
+
+````markdown
+| Behavior | Test type | Test |
+|---|---|---|
+| thing works | PHPUnit | `tests/X.php` |
+| looks right | Truly-manual | eyeball it |
+````
+"""
+    planned, manual = parse_matrix(fenced)
+    # identical to the unfenced plan: the appendix contributes nothing
+    assert planned == parse_matrix(PLAN)[0]
+    assert len(manual) == len(parse_matrix(PLAN)[1])
+    assert "tests/X.php" not in planned
+    assert not any("eyeball it" in row for row in manual)
+
+
+def test_matrix_fence_width_awareness():
+    """A 4-backtick block wrapping 3-backtick inner ones must not invert parity.
+
+    Width-blind `in_fence = !in_fence` closes on the inner ``` and re-opens on the
+    outer closer, leaving the REAL matrix below it swallowed. Per CommonMark a
+    closing fence must be at least as long as its opener.
+    """
+    nested = """## Verification Matrix
+
+````markdown
+```bash
+echo hi
+```
+| Behavior | Test type | Test |
+|---|---|---|
+| fake | PHPUnit | `tests/Phantom.php` |
+````
+
+| Behavior | Test type | Test |
+|---|---|---|
+| real | PHPUnit | `ibl5/tests/Unit/RealTest.php` |
+"""
+    planned, _ = parse_matrix(nested)
+    assert planned == ["ibl5/tests/Unit/RealTest.php"]
+
+
 def test_locate_plan_missing_and_override():
     assert not locate_plan("no-such-slug", plans_dir="/nonexistent").found
     info = locate_plan("x", content_override=PLAN)

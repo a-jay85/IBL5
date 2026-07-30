@@ -997,13 +997,13 @@ parameters:
 			path: themes/IBL/theme.php
 
 		-
-			rawMessage: Cannot access offset 1 on mixed.
-			identifier: offsetAccess.nonOffsetAccessible
+			rawMessage: 'Cannot call method getCurrentLeague() on mixed.'
+			identifier: method.nonObject
 			count: 1
 			path: themes/IBL/theme.php
 
 		-
-			rawMessage: 'Cannot call method getCurrentLeague() on mixed.'
+			rawMessage: 'Cannot call method getUsername() on mixed.'
 			identifier: method.nonObject
 			count: 1
 			path: themes/IBL/theme.php

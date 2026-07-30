@@ -96,6 +96,8 @@ class PlanInfo:
     truly_manual_rows: list[str] = field(default_factory=list)
     security_section: str = ""
     reuse_section: str = ""
+    variant_selection: Optional[str] = None            # "highest" when multi-variant selection ran
+    rejected: list[str] = field(default_factory=list)  # basenames of non-selected candidates
 
 
 @dataclass
@@ -197,4 +199,9 @@ class RunResult:
         d = asdict(self)
         if self.classification:
             d["classification"].pop("filtered_diff", None)  # keep result.json small
+        if d.get("plan"):                       # unambiguous slug → keep result.json byte-identical
+            if not d["plan"].get("variant_selection"):
+                d["plan"].pop("variant_selection", None)
+            if not d["plan"].get("rejected"):
+                d["plan"].pop("rejected", None)
         return json.dumps(d, indent=1, default=str)

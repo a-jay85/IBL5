@@ -41,7 +41,8 @@ from harness.adapters.verify import LiveVerify, ReplayVerify, aggregate
 
 def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         worktree: str | None = None, headless: bool = True,
-        plans_dir: str | None = None, live: bool = False) -> RunResult:
+        plans_dir: str | None = None, live: bool = False,
+        explicit_path: str | None = None) -> RunResult:
     os.makedirs(out_dir, exist_ok=True)
     ledger = llm.ledger
     audit: list[str] = []
@@ -61,7 +62,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         slug = git.branch()
         gh = LiveGh(out_dir, worktree, slug) if live else RecordingGh(out_dir)
         verifier = LiveVerify(worktree)
-        plan = locate_plan(slug, plans_dir=plans_dir)
+        plan = locate_plan(slug, plans_dir=plans_dir, explicit_path=explicit_path)
 
     res = RunResult(terminal=TerminalState.FAILED, slug=slug, plan=plan,
                     ledger=ledger, audit=audit)
@@ -259,9 +260,13 @@ def main() -> int:
     ap.add_argument("--live", action="store_true",
                     help="INSTALLED mode (isolated only): push to origin, execute "
                          "allowlisted gh mutations, watch CI")
+    ap.add_argument("--plan", help="explicit plan file path (isolated only): overrides "
+                                   "slug-derived variant selection")
     args = ap.parse_args()
     if args.live and args.mode != "isolated":
         ap.error("--live is only valid with --mode isolated")
+    if args.plan and args.mode != "isolated":
+        ap.error("--plan is only valid with --mode isolated")
 
     fixture = None
     if args.mode == "replay":
@@ -280,7 +285,7 @@ def main() -> int:
         llm = ClaudeCli(ledger)
 
     res = run(fixture, args.out, llm, mode=args.mode, worktree=args.worktree,
-              headless=not args.interactive, live=args.live)
+              headless=not args.interactive, live=args.live, explicit_path=args.plan)
     t = ledger.totals()
     print(f"terminal={res.terminal.value} phase5={res.phase5} "
           f"armed={bool(res.arm and res.arm.armed)} findings={len(res.findings)}")

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import re
+import sys
 
 from .state import PlanInfo
 
@@ -163,15 +164,51 @@ def parse_critical_files(content: str) -> list[tuple]:
     return out
 
 
+def _resolve_variant(slug: str, base_dir: str, info: PlanInfo) -> str:
+    """Highest-numbered plan variant for `slug` in `base_dir`.
+
+    Variant shape is exactly `{slug}-N.md`: one or more digits and nothing else
+    before `.md`. The bare `slug.md` is variant 0 (lowest). No variant found ->
+    the bare path, byte-identical to pre-variant behaviour (no stderr, no fields).
+    """
+    bare = os.path.join(base_dir, f"{slug}.md")
+    pattern = re.compile(rf"^{re.escape(slug)}-(\d+)\.md$")
+    try:
+        entries = os.listdir(base_dir)
+    except OSError:
+        return bare
+    variants = [(int(m.group(1)), os.path.join(base_dir, m.string))
+                for m in (pattern.match(n) for n in entries) if m
+                and os.path.isfile(os.path.join(base_dir, m.string))]
+    if not variants:
+        return bare
+    candidates = ([(0, bare)] if os.path.isfile(bare) else []) + variants
+    candidates.sort(key=lambda c: c[0])
+    _, selected = candidates[-1]
+    names = [os.path.basename(p) for _, p in candidates]
+    print(
+        f"post-plan: WARNING — {len(candidates)} plan variants for slug '{slug}':\n"
+        f"  candidates: {', '.join(names)}\n"
+        f"  SELECTED:   {os.path.basename(selected)} (highest numbered)\n"
+        f"  override:   bin/post-plan-now --plan <abs-path>",
+        file=sys.stderr)
+    info.variant_selection = "highest"
+    info.rejected = [os.path.basename(p) for _, p in candidates if p != selected]
+    return selected
+
+
 def locate_plan(slug: str, plans_dir: str | None = None, explicit_path: str | None = None,
                 content_override: str | None = None) -> PlanInfo:
-    """Authoritative explicit path (automouse handoff) first, else slug derivation."""
+    """Authoritative explicit path (automouse handoff) first, else variant-aware slug derivation."""
     info = PlanInfo()
     content = content_override
     if content is None:
-        path = explicit_path or os.path.join(
-            plans_dir or os.environ.get("PLANS_DIR")
-            or os.path.expanduser("~/claude-plans"), f"{slug}.md")
+        if explicit_path:
+            path = explicit_path
+        else:
+            base_dir = (plans_dir or os.environ.get("PLANS_DIR")
+                        or os.path.expanduser("~/claude-plans"))
+            path = _resolve_variant(slug, base_dir, info)
         if not os.path.isfile(path):
             return info
         info.path = path

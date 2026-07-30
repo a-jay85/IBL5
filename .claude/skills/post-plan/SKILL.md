@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-07-27
+last_verified: 2026-07-30
 ---
 
 # Post-Plan Orchestrator
@@ -66,11 +66,25 @@ rm -f /tmp/claude-plan-active-$PPID
 Then locate the plan backing this branch so later phases can verify the implementation against its intent. The plan is the spec; phases 4–6 check conformance to it.
 
 ```bash
-# Authoritative in automouse mode: the handoff JSON's plan_file (the postplan prompt passes its path).
-# Interactive fallback: branch slug -> ~/claude-plans/<slug>.md.
+# Authoritative when a path was handed to this run (automouse handoff JSON's plan_file, or
+# `bin/post-plan-now --plan <abs-path>`): use that path verbatim and skip the derivation below.
+# Otherwise derive from the branch slug, HIGHEST-NUMBERED variant first — /plan's own loop
+# writes <slug>-2.md, <slug>-3.md when bin/check-plan rejects a draft, and the superseded
+# <slug>.md stays on disk and still passes check-plan. Mirrors harness/planfile.py::_resolve_variant.
 SLUG=$(git rev-parse --abbrev-ref HEAD)
-PLAN_FILE=""
-[ -f "$HOME/claude-plans/$SLUG.md" ] && PLAN_FILE="$HOME/claude-plans/$SLUG.md"
+PLAN_FILE=""; BEST=-1
+for f in "$HOME/claude-plans/$SLUG.md" "$HOME/claude-plans/$SLUG"-*.md; do
+    [ -f "$f" ] || continue
+    stem=${f##*/}; stem=${stem%.md}
+    if [ "$stem" = "$SLUG" ]; then v=0
+    else
+        v=${stem#"$SLUG"-}
+        case "$v" in ''|*[!0-9]*) continue ;;   # -shared-context, -1a-trading-pins: not a revision
+        esac
+    fi
+    [ "$v" -gt "$BEST" ] && { BEST=$v; PLAN_FILE=$f; }
+done
+[ "$BEST" -gt 0 ] && echo "PLAN_VARIANT_SELECTED=$PLAN_FILE (highest-numbered; pass --plan <abs-path> to override)"
 if [ -n "$PLAN_FILE" ]; then
     echo "PLAN_FOUND=$PLAN_FILE"
     grep -qiE '^\s*\|.*Test type' "$PLAN_FILE" && echo "HAS_MATRIX=true" || echo "HAS_MATRIX=false"

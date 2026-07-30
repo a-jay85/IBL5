@@ -100,7 +100,7 @@ bpt_expect_eq "r-dispatch-1: exit 0" 0 "$BPT_RC"
 bpt_file_absent "$STUB/ci-autofix.log" "r-dispatch-1: no CI-autofix log on empty red-pr set"
 bpt_log_has "$STUB" tick.out "no actionable rows" "r-dispatch-1: fell through to empty-tick exit"
 
-# r-dispatch-2 — kill switch off → logged, tick exits 0 via ci_autofix returning 0
+# r-dispatch-2 — kill switch off → logged, ci_autofix returns 1 (tick falls through to empty-tick exit)
 bpt_reset
 bpt_set_gh_pr_list_ci "42 feature-tests abc123"
 bpt_set_gh_pr_checks_for 42 "FAILURE phpunit"

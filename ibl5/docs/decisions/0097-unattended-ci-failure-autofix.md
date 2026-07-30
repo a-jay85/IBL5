@@ -15,7 +15,7 @@ After the bug-pipeline hunter (ADR-0081) was shipping fixes to PRs, the remainin
 
 ## Decision
 
-`bin/bug-pipeline-tick` gains a new `ci_autofix_main` phase that runs after `maybe_hunt`. On each tick it calls `bpgh_pr_failing_checks` to find open, non-draft PRs with settled red checks (no PENDING, excludes human-signoff). For each eligible PR it dispatches a sandboxed `claude -p` agent in the same trust split as the hunter (ADR-0081): the agent runs under `run_under_starved_env`, which zeroes GH_TOKEN, GITHUB_TOKEN, SSH_AUTH_SOCK, ANTHROPIC_API_KEY, and DB credentials. The agent reads a rendered prompt from `bin/bug-pipeline-ci-autofix-prompt`, writes a result JSON to `$wt_root/.bug-pipeline/ci-autofix-result.json`, and exits. If the agent reports `"result":"fixed"` with a valid commit SHA, the driver pushes `HEAD:branch` and posts a PR comment. `no_change` and `abort` verdicts are logged and commented but do not push. An attempt ledger (`CI_AUTOFIX_LEDGER`, default `~/.bug-pipeline/ci-autofix-ledger.json`) gates the attempt cap (default 3) and per-SHA retry semantics. After the cap, a `⛔ ceiling` comment is posted once. The feature is gated by `BUG_PIPELINE_CI_AUTOFIX_DISABLED=1` kill switch and `BUG_PIPELINE_CI_AUTOFIX_DRY_RUN=1` for safe observability.
+`bin/bug-pipeline-tick` gains a new `ci_autofix_main` phase that runs after `maybe_hunt`. On each tick it calls `bpgh_pr_failing_checks` to find open, non-draft PRs with settled red checks (no PENDING, excludes human-signoff). For each eligible PR it dispatches a sandboxed `claude -p` agent in the same trust split as the hunter (ADR-0081): the agent runs under `run_under_starved_env`, which zeroes GH_TOKEN, GITHUB_TOKEN, SSH_AUTH_SOCK, ANTHROPIC_API_KEY, and DB credentials. The agent reads a rendered prompt from `bin/bug-pipeline-ci-autofix-prompt`, writes a result JSON to `$wt_root/.bug-pipeline/ci-autofix-result.json`, and exits. If the agent reports `"result":"fixed"` with a valid commit SHA, the driver pushes `HEAD:branch` and posts a PR comment. `no_change` and `abort` verdicts are logged and commented but do not push. An attempt ledger (`CI_AUTOFIX_LEDGER`, default `~/.bug-pipeline/ci-autofix-ledger.json`) gates the attempt cap (default 3) and per-SHA retry semantics. After the cap, a `⛔ ceiling` comment is posted once. The feature is gated by `BUG_PIPELINE_CI_AUTOFIX_ENABLED=0` kill switch (default `1`) and `BUG_PIPELINE_CI_AUTOFIX_DRY_RUN=1` for safe observability.
 
 ## Alternatives Considered
 
@@ -33,7 +33,7 @@ After the bug-pipeline hunter (ADR-0081) was shipping fixes to PRs, the remainin
 
 ## References
 
-- `bin/bug-pipeline-tick` — driver; `ci_autofix_main`, `ci_dispatch`, `ci_apply_result`, `ci_autofix_giveup`
+- `bin/bug-pipeline-tick` — driver; `ci_autofix_main`, `ci_apply_result`, `ci_autofix_giveup`
 - `bin/bug-pipeline-ci-autofix-prompt` — rendered prompt template
 - `bin/lib/bug-pipeline-gh.sh` — `bpgh_pr_failing_checks`, `bpgh_pr_comment`
 - `bin/test-bug-pipeline-ci-autofix` — integration test suite (44 cases)

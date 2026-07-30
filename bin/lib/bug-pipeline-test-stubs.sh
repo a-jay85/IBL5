@@ -240,6 +240,9 @@ SH
     export BUG_PIPELINE_CODE_REPO="test/code-fake"
     mkdir -p "$STUB/wt"
     # ── CI-autofix seams (ADR-0097) ──────────────────────────────────────────────
+    # Default DISABLED so the six existing suites (tick/classify/feature/park/issue/hunt)
+    # don't emit gh pr list calls. test-bug-pipeline-ci-autofix overrides to 1 after bpt_setup.
+    export BUG_PIPELINE_CI_AUTOFIX_ENABLED=0
     export BUG_PIPELINE_CI_AUTOFIX_LEDGER="$STUB/ledger.json"
     export BUG_PIPELINE_CI_AUTOFIX_LOG="$STUB/ci-autofix.log"
     export BUG_PIPELINE_CI_AUTOFIX_LOCK="$STUB/ci-autofix.lock"

@@ -14,6 +14,8 @@ source "$(cd "$(dirname "$0")" && pwd)/lib/bug-pipeline-test-stubs.sh"
 DRIVER="$(cd "$(dirname "$0")" && pwd)/bug-pipeline-tick"
 
 bpt_setup
+# Override the bpt_setup default (ENABLED=0) — CI autofix must be active for this suite.
+export BUG_PIPELINE_CI_AUTOFIX_ENABLED=1
 
 # Add a git worktree to the fake-repo so ci_wt_for_branch can resolve a branch.
 # Reuses an existing branch on subsequent calls (after bpt_reset prunes the worktree).

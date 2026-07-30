@@ -618,7 +618,7 @@ def test_corpus_regression_jsb_native_docs_repo():
     assert "bin/check-docs" not in cf, \
         "v3 rejects bin/check-docs (Alternatives Considered); only v1 lists it as Critical"
     assert "ibl5/docs/decisions/0097-jsb-native-docs-repo.md" not in cf, \
-        "v3 renamed the ADR to 0097-jsb-native-private-docs-repo.md; only v1 has the old slug"
+        "v3 renamed the ADR to 0097-jsb-native-private-docs-repo.md (later renumbered to 0105); only v1 has the old slug"
 
 
 # ---------------------------------------------------------------------------

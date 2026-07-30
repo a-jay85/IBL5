@@ -1,4 +1,7 @@
+import contextlib
+import io
 import os
+import pytest
 import re
 import subprocess
 import sys
@@ -8,6 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from harness import conformance
 from harness.planfile import (EXEMPT_RE, frontmatter_auto_merge_false, locate_plan,
                               parse_critical_files, parse_matrix)
+from harness.state import PlanInfo, RunResult
 
 PLAN = """---
 status: ready
@@ -233,3 +237,177 @@ def test_lib_pattern_sync():
     assert m, "CF_EXEMPT_PATTERN not found in " + LIB
     ere = m.group(1).replace("[(]", r"\(").replace("[)]", r"\)")
     assert EXEMPT_RE.pattern.replace("(?:", "(") == ere
+
+
+# ---------------------------------------------------------------------------
+# Variant-resolution specs (Phases 1, 2, 3, 4, 6)
+# ---------------------------------------------------------------------------
+
+def _mkplans(tmp_path, *names):
+    """Create plan files; return the dir as str for plans_dir=."""
+    for n in names:
+        (tmp_path / n).write_text("---\nauto_merge: false\n---\n# " + n + "\n")
+    return str(tmp_path)
+
+
+def test_variant_single_plan_is_byte_identical(tmp_path):
+    plans_dir = _mkplans(tmp_path, "my-slug.md")
+    info = locate_plan("my-slug", plans_dir=plans_dir)
+    assert info.found
+    assert info.path == str(tmp_path / "my-slug.md")
+    assert getattr(info, "variant_selection", None) is None
+    assert getattr(info, "rejected", []) == []
+
+
+def test_variant_highest_of_three(tmp_path):
+    plans_dir = _mkplans(tmp_path, "my-slug.md", "my-slug-2.md", "my-slug-3.md")
+    info = locate_plan("my-slug", plans_dir=plans_dir)
+    assert info.path.endswith("my-slug-3.md")
+
+
+def test_variant_numeric_not_lexical(tmp_path):
+    plans_dir = _mkplans(tmp_path, "my-slug.md", "my-slug-2.md", "my-slug-10.md")
+    info = locate_plan("my-slug", plans_dir=plans_dir)
+    assert info.path.endswith("my-slug-10.md"), "lexical sort picked %s" % info.path
+
+
+def test_variant_shared_context_excluded(tmp_path):
+    plans_dir = _mkplans(tmp_path, "my-slug.md", "my-slug-shared-context.md")
+    info = locate_plan("my-slug", plans_dir=plans_dir)
+    assert info.path.endswith("my-slug.md")
+    assert "my-slug-shared-context.md" not in getattr(info, "rejected", [])
+    assert getattr(info, "variant_selection", None) is None
+
+
+def test_variant_sibling_unit_excluded(tmp_path):
+    plans_dir = _mkplans(tmp_path, "my-slug.md", "my-slug-1-unit.md",
+                         "my-slug-1a-trading-pins.md")
+    info = locate_plan("my-slug", plans_dir=plans_dir)
+    assert info.path.endswith("my-slug.md")
+    assert getattr(info, "variant_selection", None) is None
+
+
+def test_variant_explicit_path_wins(tmp_path):
+    plans_dir = _mkplans(tmp_path, "my-slug.md", "my-slug-2.md", "my-slug-3.md")
+    info = locate_plan("my-slug", plans_dir=plans_dir,
+                       explicit_path=str(tmp_path / "my-slug.md"))
+    assert info.path == str(tmp_path / "my-slug.md")
+    assert getattr(info, "variant_selection", None) is None
+
+
+def test_variant_no_plan_at_all(tmp_path):
+    info = locate_plan("nonexistent", plans_dir=str(tmp_path))
+    assert not info.found
+    assert info.path == ""
+
+
+def test_variant_warning_goes_to_stderr(tmp_path):
+    buf = io.StringIO()
+    with contextlib.redirect_stderr(buf):
+        info = locate_plan("my-slug",
+                           plans_dir=_mkplans(tmp_path, "my-slug.md", "my-slug-2.md"))
+    err = buf.getvalue()
+    assert "my-slug.md" in err
+    assert "my-slug-2.md" in err
+    assert any("SELECTED" in ln and "my-slug-2.md" in ln for ln in err.splitlines())
+    assert "--plan" in err
+
+    # silence assertion: single plan emits nothing
+    tmp2 = tmp_path / "single"
+    tmp2.mkdir()
+    buf2 = io.StringIO()
+    with contextlib.redirect_stderr(buf2):
+        locate_plan("my-slug", plans_dir=_mkplans(tmp2, "my-slug.md"))
+    assert buf2.getvalue() == ""
+
+
+def test_variant_selection_fields_populated(tmp_path):
+    plans_dir = _mkplans(tmp_path, "my-slug.md", "my-slug-3.md")
+    info = locate_plan("my-slug", plans_dir=plans_dir)
+    assert info.variant_selection == "highest"
+    assert "my-slug.md" in info.rejected
+
+
+# Phase 2 — to_json() strip test
+def test_to_json_strips_empty_variant_fields():
+    from harness.state import Classification
+    res = RunResult(terminal="shipped-held", slug="x",
+                    plan=PlanInfo(found=True, path="x.md"))
+    d = __import__("json").loads(res.to_json())
+    assert "variant_selection" not in d["plan"]
+    assert "rejected" not in d["plan"]
+
+    res.plan.variant_selection = "highest"
+    res.plan.rejected = ["x.md"]
+    d2 = __import__("json").loads(res.to_json())
+    assert d2["plan"]["variant_selection"] == "highest"
+    assert d2["plan"]["rejected"] == ["x.md"]
+
+    res2 = RunResult(terminal="failed", slug="y", plan=None)
+    out = res2.to_json()
+    assert not out or __import__("json").loads(out)["plan"] is None
+
+
+# Phase 3 boundary tests
+def test_variant_bare_missing_highest_still_wins(tmp_path):
+    plans_dir = _mkplans(tmp_path, "my-slug-2.md")
+    info = locate_plan("my-slug", plans_dir=plans_dir)
+    assert info.found
+    assert info.path.endswith("my-slug-2.md")
+    assert info.variant_selection == "highest"
+    assert info.rejected == []
+
+
+def test_variant_unreadable_dir_is_plan_blind(tmp_path):
+    info = locate_plan("s", plans_dir=str(tmp_path / "gone"))
+    assert not info.found
+
+
+def test_variant_regex_special_chars_in_slug(tmp_path):
+    plans_dir = _mkplans(tmp_path, "feat.v2+x.md", "feat.v2+x-2.md",
+                         "featXv2Yx-3.md")
+    info = locate_plan("feat.v2+x", plans_dir=plans_dir)
+    assert info.path.endswith("feat.v2+x-2.md")
+    assert not info.path.endswith("featXv2Yx-3.md")
+
+
+# Phase 4 — runner wiring assertion
+def test_runner_threads_explicit_path():
+    runner_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "runner.py")
+    src = open(runner_path).read()
+    assert "explicit_path=explicit_path" in src
+    assert "explicit_path=args.plan" in src
+
+
+def test_runner_plan_requires_isolated_mode():
+    runner_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "runner.py")
+    r = subprocess.run(
+        ["python3", runner_path, "--mode", "replay", "--plan", "/tmp/x.md",
+         "--fixture", "/dev/null"],
+        capture_output=True, text=True)
+    assert r.returncode == 2
+    assert "--plan is only valid with --mode isolated" in r.stderr
+
+
+# Phase 6 — corpus regression
+def test_corpus_regression_jsb_native_docs_repo():
+    """The measured 2026-07-29 failure: v1 selected where v3 was the live contract."""
+    real_dir = os.path.expanduser("~/claude-plans")
+    v3 = os.path.join(real_dir, "jsb-native-docs-repo-3.md")
+    if not os.path.isfile(v3):
+        pytest.skip("corpus fixture jsb-native-docs-repo-3.md not present (CI / fresh clone)")
+
+    info = locate_plan("jsb-native-docs-repo", plans_dir=real_dir)
+    assert info.found
+    assert info.path == v3, "expected v3, got %s" % info.path
+    assert info.variant_selection == "highest"
+    assert "jsb-native-docs-repo.md" in info.rejected
+    assert "jsb-native-docs-repo-2.md" in info.rejected
+
+    cf = [p for p, _ann, _ex in info.critical_files]
+    assert "bin/check-docs" not in cf, \
+        "v3 rejects bin/check-docs (Alternatives Considered); only v1 lists it as Critical"
+    assert "ibl5/docs/decisions/0097-jsb-native-docs-repo.md" not in cf, \
+        "v3 renamed the ADR to 0097-jsb-native-private-docs-repo.md; only v1 has the old slug"

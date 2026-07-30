@@ -49,7 +49,24 @@ should_fallback() { case "$1" in 0|3) return 1 ;; *) return 0 ;; esac; }
 set -euo pipefail
 
 AUTO=0
-[ "${1:-}" = "--auto" ] && AUTO=1
+PLAN_OVERRIDE=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --auto)   AUTO=1 ; shift ;;
+        --plan)   [ $# -ge 2 ] || { echo "post-plan-now: --plan requires a path argument" >&2; exit 1; }
+                  PLAN_OVERRIDE="$2" ; shift 2 ;;
+        --plan=*) PLAN_OVERRIDE="${1#--plan=}" ; shift ;;
+        *)        echo "post-plan-now: unknown argument '$1' (accepts --auto, --plan <path>)" >&2
+                  exit 1 ;;
+    esac
+done
+
+if [ -n "$PLAN_OVERRIDE" ]; then
+    [ -f "$PLAN_OVERRIDE" ] \
+        || { echo "post-plan-now: --plan '$PLAN_OVERRIDE' does not exist — aborting." >&2; exit 1; }
+    # launchd runs the job from a different cwd; the plist needs an absolute path.
+    PLAN_OVERRIDE="$(cd "$(dirname "$PLAN_OVERRIDE")" && pwd)/$(basename "$PLAN_OVERRIDE")"
+fi
 
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null) \
     || { echo "post-plan-now: not inside a git repo." >&2; exit 1; }
@@ -62,7 +79,7 @@ case "$SLUG" in
         exit 1 ;;
 esac
 
-PLAN_FILE="$HOME/claude-plans/$SLUG.md"
+PLAN_FILE="${PLAN_OVERRIDE:-$HOME/claude-plans/$SLUG.md}"
 
 # --auto is the impl agent's automatic closing action. One gate applies only here;
 # a bare (human) invocation always fires, because running it by hand IS the
@@ -90,14 +107,18 @@ if git diff --quiet && git diff --cached --quiet \
 fi
 
 [ -f "$PLAN_FILE" ] \
-    || echo "post-plan-now: warn — no plan at $PLAN_FILE; /post-plan will run plan-blind." >&2
+    || echo "post-plan-now: warn — no plan at $PLAN_FILE; /post-plan will run plan-blind. Pass --plan <abs-path> to name one explicitly." >&2
 
 TS=$(date +%Y%m%d-%H%M%S)
 LOG="/tmp/post-plan-now-$SLUG-$TS.log"
 LABEL="com.ibl5.postplan-now-$SLUG-$TS"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 
-PROMPT="Invoke the /post-plan skill now on the current git branch. Resolve the plan from the branch slug per the skill Phase 1, then execute every phase. No human is present: never ask questions or wait for input — make the safe choice and continue."
+if [ -n "$PLAN_OVERRIDE" ]; then
+    PROMPT="Invoke the /post-plan skill now on the current git branch. Use this exact plan file for Phase 1: $PLAN_OVERRIDE — do NOT derive the plan from the branch slug. Then execute every phase. No human is present: never ask questions or wait for input — make the safe choice and continue."
+else
+    PROMPT="Invoke the /post-plan skill now on the current git branch. Resolve the plan from the branch slug per the skill Phase 1 (highest-numbered \`<slug>-N.md\` variant when several exist), then execute every phase. No human is present: never ask questions or wait for input — make the safe choice and continue."
+fi
 
 # Compiled-harness engine (see header). The launchd job runs the harness, captures its exit code,
 # and escalates to the skill session ONLY when should_fallback permits it. Exit 3 (rebase-conflict
@@ -111,7 +132,8 @@ GATE_CLOSE=""
 ENGINE="Sonnet 4.6 /post-plan skill session"
 if [ "${POST_PLAN_SKILL:-0}" != "1" ] && [ -x "$HARNESS/run" ]; then
     FALLBACK_FN="$(declare -f should_fallback); "
-    HARNESS_SEG="CLAUDE_HEADLESS=1 caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS/out/live-$SLUG-$TS\" --live; rc=\$?; "
+    PLAN_ARG="${PLAN_OVERRIDE:+ --plan \"$PLAN_OVERRIDE\"}"
+    HARNESS_SEG="CLAUDE_HEADLESS=1 caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS/out/live-$SLUG-$TS\" --live${PLAN_ARG}; rc=\$?; "
     GATE_OPEN="if should_fallback \"\$rc\"; then "
     GATE_CLOSE="; elif [ \"\$rc\" = 3 ]; then echo \"post-plan-now: harness exited 3 (rebase-conflict fail-closed sentinel). SKIPPING the /post-plan skill fallback; a human must resolve the stacked-branch rebase conflict, then re-run bin/post-plan-now. See $LOG.\"; fi"
     ENGINE="compiled post-plan harness (fails CLOSED on rebase conflict; falls back to the skill on other failures)"

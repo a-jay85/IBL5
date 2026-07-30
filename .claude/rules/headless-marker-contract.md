@@ -1,6 +1,6 @@
 ---
 description: Headless `claude -p` runners — where a machine-parsed marker must be printed, because text-mode `-p` emits only the model's final message, and how `bin/plan-now` recovers a draft when the marker never arrives. Path-scoped to bin/**, loads only when authoring or editing a runner.
-last_verified: 2026-07-29
+last_verified: 2026-07-30
 paths: "bin/**"
 ---
 
@@ -52,8 +52,9 @@ editing against the table above rather than assuming:
   a file rather than stdout.
 - `bin/automouse-run` — `stream-json --verbose` through `bin/lib/automouse-stream-filter`;
   it *passes* `PLAN_FILE=` into the prompt as input and parses nothing back out.
-- `bin/post-plan-now`, `bin/docfix-run` — derive the plan path from the branch slug in
-  shell; no model output is parsed.
+- `bin/post-plan-now` — passes an optional `--plan <abs-path>` through to the harness (which
+  owns variant resolution in `harness/planfile.py`) and into the fallback prompt; `bin/docfix-run`
+  derives the plan path from the branch slug in shell. Neither parses model output.
 
 `bin/test-plan-now` pins all of this for `plan-now` — the decorated shapes it accepts,
 and the three ways a marker still lands `unconfirmed`. It stubs the model call through

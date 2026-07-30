@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-07-28
+last_verified: 2026-07-30
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -45,5 +45,7 @@ human signoff.
 
 ## No deadlock
 
-`/post-plan` resolves the plan from the branch slug, so no handoff file is needed, and the
-detached child reparents under launchd and clears its own plan-gate independently.
+`/post-plan` resolves the **highest-numbered** plan variant for the branch slug (`<slug>-3.md`
+beats `<slug>-2.md` beats `<slug>.md`; a non-numeric suffix like `-shared-context.md` is never a
+variant), so no handoff file is needed, and the detached child reparents under launchd and clears
+its own plan-gate independently. Override the selection with `bin/post-plan-now --plan <abs-path>`.

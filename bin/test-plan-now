@@ -55,6 +55,22 @@ export PATH="$SHIM:$PATH"
 PROMPT="$TMP/prompt.md"
 printf '/plan a throwaway task for bin/test-plan-now\n' > "$PROMPT"
 
+# Recovery needs a prompt the runner can read a slug back out of. This is the
+# shape real prompts use — see any /tmp/plan-now-*.prompt.
+RECOVERY_PROMPT="$TMP/recovery-prompt.md"
+{
+    printf '/plan a throwaway task for bin/test-plan-now\n'
+    printf -- '- Branch slug: `demo-slug`. Base: `master`.\n'
+} > "$RECOVERY_PROMPT"
+
+# The negative twin: a prompt with no slug line at all. Both recovery legs need a
+# slug, so this is the "no identity available" path — and measured over the 70
+# real /tmp/plan-now-*.prompt files on disk, only 15 carry a parseable slug line
+# (5 of the 10 most recent), so this is the COMMON shape, not an edge case. Its
+# verdict must stay byte-identical to today's.
+NOSLUG_PROMPT="$TMP/noslug-prompt.md"
+printf '/plan a throwaway task for bin/test-plan-now with no slug line\n' > "$NOSLUG_PROMPT"
+
 # ── The stub model ────────────────────────────────────────────────────────────
 # Stands in for `claude -p`: writes a plan file (unless STUB_NO_PLAN), then prints
 # ONLY what a text-mode run would emit — the final assistant message. $STUB_TAIL is
@@ -63,6 +79,27 @@ STUB="$TMP/claude-stub"
 cat > "$STUB" <<'STUB_EOF'
 #!/usr/bin/env bash
 [ -n "${STUB_PLAN:-}" ] && [ -z "${STUB_NO_PLAN:-}" ] && printf '# stub plan\n' > "$STUB_PLAN"
+if [ -n "${STUB_DRAFT:-}" ]; then
+    # The runner takes $started with whole-second granularity, and the recovery
+    # gate is mtime > started. A real run takes minutes; this stub takes
+    # milliseconds, so without this sleep the draft lands in the same second and
+    # reads as stale. One second, only when a draft is requested.
+    sleep 1
+    mkdir -p "$(dirname "$STUB_DRAFT")"
+    cat "$STUB_DRAFT_SRC" > "$STUB_DRAFT"
+fi
+# Leg B (marker omitted from a successful run): the stub creates plan files in
+# $PLANS_DIR directly and leaves no draft. No sleep is needed for the first —
+# leg B gates on the plan-dir diff, not mtime — but the SECOND file must be
+# strictly newer, because "newest wins" is what case 8 exists to pin.
+if [ -n "${STUB_PLANFILE:-}" ]; then
+    mkdir -p "$(dirname "$STUB_PLANFILE")"
+    cat "$STUB_PLANFILE_SRC" > "$STUB_PLANFILE"
+fi
+if [ -n "${STUB_PLANFILE2:-}" ]; then
+    sleep 1
+    cat "$STUB_PLANFILE2_SRC" > "$STUB_PLANFILE2"
+fi
 printf 'Done — the plan is written and check-plan is clean.\n'
 [ -n "${STUB_TAIL:-}" ] && printf '%s\n' "$STUB_TAIL"
 exit 0
@@ -83,10 +120,129 @@ run_case() {
     rm -f "$runner"
 }
 
+# Every recovery case starts from an empty plan dir. That wipe is `rm -f` against
+# a glob, so it is routed through one guarded helper rather than repeated: if
+# $PLANS were ever empty the bare form is `rm -f /*.md`, and if it resolved to the
+# real ~/claude-plans it would delete live, unqueued, un-backed-up plans. $PLANS
+# is a $TMP subdirectory (existing harness, lines 32-36); assert that before
+# deleting anything.
+plans_reset() {
+    case "$PLANS" in
+        "$TMP"/*) ;;
+        *) echo "test-plan-now: refusing to wipe \$PLANS='$PLANS' — not under \$TMP" >&2
+           exit 1 ;;
+    esac
+    rm -f "$PLANS"/*.md; rm -rf "$PLANS/.drafts"; mkdir -p "$PLANS/.drafts"
+}
+
+# run_case_recovery <draft-src-or-empty> <draft-slug> [stale] → transcript
+# Fires plan-now with the slug-bearing prompt, no PLAN_FILE: tail, and (unless
+# empty) a draft the stub writes mid-run under $PLANS/.drafts/<slug>.draft.md.
+run_case_recovery() {
+    local src="$1" slug="$2" stale="${3:-}"
+    plans_reset
+    local dry runner draft=""
+    [ -n "$src" ] && draft="$PLANS/.drafts/$slug.draft.md"
+    dry=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
+              "$PLAN_NOW" --implement "$RECOVERY_PROMPT" 2>&1)
+    runner=$(printf '%s\n' "$dry" | sed -n 's/^  runner: //p')
+    [ -x "$runner" ] || { printf 'no runner:\n%s\n' "$dry"; return 1; }
+    if [ -n "$draft" ] && [ "$stale" = stale ]; then
+        # Written up front and back-dated, so the stub must not rewrite it.
+        mkdir -p "$(dirname "$draft")"; cat "$src" > "$draft"
+        touch -t 202001010000 "$draft"
+        STUB_NO_PLAN=1 STUB_TAIL="" bash "$runner" 2>&1
+    else
+        STUB_NO_PLAN=1 STUB_TAIL="" STUB_DRAFT="$draft" STUB_DRAFT_SRC="$src" \
+            bash "$runner" 2>&1
+    fi
+    rm -f "$runner"
+}
+
+# run_case_recovery_plan <prompt> <src1> <name1> [<src2> <name2>] → transcript
+# Leg B's shape: no draft anywhere, no PLAN_FILE: tail, and the stub creates
+# <name1> (and optionally a strictly-newer <name2>) directly in $PLANS. The
+# prompt is the first argument because one case needs the slugless one.
+run_case_recovery_plan() {
+    local prompt="$1" src1="$2" name1="$3" src2="${4:-}" name2="${5:-}"
+    plans_reset
+    local dry runner
+    dry=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
+              "$PLAN_NOW" --implement "$prompt" 2>&1)
+    runner=$(printf '%s\n' "$dry" | sed -n 's/^  runner: //p')
+    [ -x "$runner" ] || { printf 'no runner:\n%s\n' "$dry"; return 1; }
+    STUB_NO_PLAN=1 STUB_TAIL="" \
+        STUB_PLANFILE="${name1:+$PLANS/$name1}" STUB_PLANFILE_SRC="$src1" \
+        STUB_PLANFILE2="${name2:+$PLANS/$name2}" STUB_PLANFILE2_SRC="$src2" \
+        bash "$runner" 2>&1
+    rm -f "$runner"
+}
+
 want()    { case "$2" in *"$3"*) ok "$1" ;; *) fail "$1 — expected to see: $3" ;; esac; }
 want_no() { case "$2" in *"$3"*) fail "$1 — should NOT have seen: $3" ;; *) ok "$1" ;; esac; }
 
 P="$PLANS/demo-slug.md"
+
+GOOD_DRAFT="$TMP/good.draft.md"
+cat > "$GOOD_DRAFT" <<'FIXTURE_EOF'
+# demo-slug — a throwaway plan for bin/test-plan-now
+<!-- PLAN OUTLINE (loop scaffold; dropped at Step 5):
+1. Phase 1: touch one comment
+2. Critical Files
+3. Verification Matrix
+-->
+---
+title: "test-plan-now recovery fixture"
+slug: demo-slug
+branch: demo-slug
+base: master
+commit_type: "chore"
+auto_merge: false
+impl_model: sonnet
+last_verified: 2026-07-29
+---
+
+## Phase 1: Adjust one comment in `bin/plan-now`
+
+**Tier:** Sonnet — at run model.
+
+Anchor (bin/plan-now, line 210) — match this line and extend the comment above it:
+
+```
+# CLAUDE_HEADLESS=1 marks the run unattended (skills branch on it).
+```
+
+Reuse the existing heredoc; no new helper, no new file.
+
+### Verification
+
+`bash -n bin/plan-now` exits 0; negative leg below.
+
+## Critical Files
+
+- `bin/plan-now` (the only file this fixture claims to touch)
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Location |
+|---|---|---|---|---|
+| 1 | `bin/plan-now` still parses | CLI-executable | post-impl | `bash -n bin/plan-now` |
+| 2 | negative: no stray marker text added | CLI-executable | post-impl | `grep -c PLAN_FILE bin/plan-now` |
+
+## Automouse Hold Justification
+
+Intrinsic: this fixture exists only inside `bin/test-plan-now` and must never arm auto-merge.
+FIXTURE_EOF
+
+PARTIAL_DRAFT="$TMP/partial.draft.md"
+printf '# stub\n' > "$PARTIAL_DRAFT"
+
+# Leg B needs a plan file that PASSES check-plan. Rather than author and maintain
+# a second ~50-line fixture in promoted form, case 1 hands us one: it promotes
+# GOOD_DRAFT with the real promote_draft and then asserts check-plan passed, so
+# a copy taken there is clean by construction and can never drift from the
+# promoter. It must live outside $PLANS — every recovery runner wipes $PLANS/*.md.
+GOOD_PLAN="$TMP/good.plan.md"
 
 echo "── identification: the shapes a model actually emits ──"
 
@@ -125,6 +281,114 @@ out=$(STUB_NO_PLAN=1 run_case "$P" "PLAN_FILE: $P")
 want "marker naming a nonexistent file is rejected" "$out" "named a file that does not exist"
 want "marker naming a nonexistent file → unconfirmed" "$out" "RESULT unconfirmed"
 
+echo "── draft recovery: a backgrounded architect must not cost the whole run ──"
+
+# 1. Recovery success.
+out=$(run_case_recovery "$GOOD_DRAFT" demo-slug)
+want "fresh draft under this run's slug is recovered"     "$out" "RESULT degraded (recovered)"
+want "the recovery names its source draft"                "$out" "recovered from:"
+want "the promoted plan is announced"                     "$out" "plan -> $P"
+want "recovery is not silently queued under --implement"  "$out" "NOT queued"
+[ -f "$P" ] && ok "promoted plan exists on disk" || fail "promoted plan missing at $P"
+grep -q '^---$' <(head -1 "$P") && ok "frontmatter was hoisted to line 1" \
+    || fail "line 1 of $P is not '---' — the hoist did not fire"
+[ -f "$PLANS/.drafts/demo-slug.draft.md" ] \
+    && fail "draft should be deleted after a passing check-plan" \
+    || ok "draft removed once check-plan passed"
+# Harvest the leg-B fixture here and nowhere else: $P was just written by the real
+# promoter and check-plan passed on it above, so this copy is clean by
+# construction. It must be taken before case 2, whose runner wipes $PLANS/*.md.
+# Hard-fail loudly: every leg-B case below feeds on this file, so without this
+# guard a single leg-A defect reports as five misleading leg-B failures instead of
+# one root cause (exactly how the GNU-stat bug read in CI).
+cp "$P" "$GOOD_PLAN" 2>/dev/null \
+    || fail "leg-B fixture not harvested from $P — fix case 1 first; every leg-B case below is downstream of this"
+
+# 2. Stale draft — same slug, old mtime.
+out=$(run_case_recovery "$GOOD_DRAFT" demo-slug stale)
+want    "stale draft is not adopted"          "$out" "RESULT unconfirmed"
+want_no "stale draft does not report recovery" "$out" "degraded (recovered)"
+[ -f "$P" ] && fail "stale draft must not be promoted" || ok "stale draft left in place"
+
+# 3. No draft — the wording must not have drifted.
+out=$(run_case_recovery "" demo-slug)
+want "no draft → verbatim line 1" "$out" \
+     "plan-now: RESULT unconfirmed — the run printed no usable 'PLAN_FILE:' line,"
+want "no draft → verbatim line 2" "$out" \
+     "plan-now: so its plan cannot be identified, check-plan was NOT run, and nothing was queued."
+want "no draft → verbatim closer" "$out" "plan-now: read the transcript above."
+want_no "no draft → no recovery chatter" "$out" "recovery"
+
+# 4. Partial draft that cannot pass check-plan.
+out=$(run_case_recovery "$PARTIAL_DRAFT" demo-slug)
+want    "partial draft reports an attempted recovery" "$out" "RESULT degraded (recovery attempted)"
+want    "a failed recovery is not queued"             "$out" "NOT queued"
+want_no "a failed recovery is not reported as recovered" "$out" "RESULT degraded (recovered)"
+want    "the draft is kept for a human"               "$out" "The draft is kept at"
+[ -f "$PLANS/.drafts/demo-slug.draft.md" ] && ok "failed recovery keeps its draft" \
+    || fail "draft was deleted despite a failing check-plan"
+
+# 5. Peer slug — a fresh draft that belongs to somebody else.
+out=$(run_case_recovery "$GOOD_DRAFT" other-slug)
+want    "a peer run's draft is never adopted" "$out" "RESULT unconfirmed"
+want_no "a peer run's draft is not promoted"  "$out" "degraded (recovered)"
+want    "an unattributable fresh draft is at least reported" "$out" "cannot be attributed to it"
+[ -f "$PLANS/other-slug.md" ] && fail "peer draft must not be promoted" \
+    || ok "peer draft left untouched"
+
+# 6. Regression: a valid marker still wins, and recovery never preempts it.
+out=$(run_case "$P" "PLAN_FILE: $P")
+want    "REGRESSION: marker path still identifies the plan" "$out" "plan-now: new plan -> $P"
+want_no "REGRESSION: marker path never enters recovery"     "$out" "recovery"
+
+echo "── marker-omission recovery (leg B): a run that succeeded and forgot PLAN_FILE: ──"
+
+# 7. Leg B success. No draft anywhere; the run created its own plan file and
+#    printed a clean closing message without the marker.
+out=$(run_case_recovery_plan "$RECOVERY_PROMPT" "$GOOD_PLAN" demo-slug.md)
+want    "leg B adopts this run's own plan file"          "$out" "RESULT degraded (recovered)"
+want    "leg B names itself in the log"                  "$out" "recovery B —"
+want    "leg B announces the adopted plan"               "$out" "plan -> $P"
+want_no "leg B invents no source draft"                  "$out" "recovered from:"
+want_no "leg B never claims a draft was promoted"        "$out" "recovery A"
+want    "leg B is not silently queued under --implement" "$out" "NOT queued"
+[ -f "$P" ] && ok "the adopted plan is left on disk untouched" || fail "adopted plan vanished"
+
+# 8. THE TRAP — the whole reason leg B exists in this shape. One run, two files:
+#    a SUPERSEDED <slug>.md and the live, newer <slug>-3.md. Measured on the real
+#    2026-07-29 12:57 run, the superseded file PASSES check-plan, so check-plan
+#    cannot break the tie and an oldest-or-arbitrary pick would confirm — and
+#    under --queue implement — a stale plan. Newest must win.
+out=$(run_case_recovery_plan "$RECOVERY_PROMPT" "$GOOD_PLAN" demo-slug.md \
+                             "$GOOD_PLAN" demo-slug-3.md)
+want    "the newest slug match is adopted"        "$out" "plan -> $PLANS/demo-slug-3.md"
+want_no "the superseded sibling is NOT adopted"   "$out" "plan -> $P"
+want    "the trap case still reports recovered"   "$out" "RESULT degraded (recovered)"
+
+# 9. A file this run created is NOT enough — the basename must be this run's slug
+#    as <slug>.md or <slug>-<n>.md. `demo-slug-extra.md` is what a bare
+#    <slug>*.md glob would wrongly swallow.
+out=$(run_case_recovery_plan "$RECOVERY_PROMPT" "$GOOD_PLAN" demo-slug-extra.md)
+want    "a prefix-matching peer slug is never adopted"   "$out" "RESULT unconfirmed"
+want_no "a prefix-matching peer reports no recovery"     "$out" "degraded (recovered)"
+want    "the pre-existing best-effort guess still prints" "$out" "best-effort guess"
+
+# 10. No slug in the prompt → no identity → the verdict must not change at all.
+#     This is the majority shape of real prompts, so it is the regression that
+#     matters most.
+out=$(run_case_recovery_plan "$NOSLUG_PROMPT" "$GOOD_PLAN" demo-slug.md)
+want    "a slugless prompt falls through verbatim" "$out" \
+        "plan-now: RESULT unconfirmed — the run printed no usable 'PLAN_FILE:' line,"
+want    "a slugless prompt keeps the verbatim closer" "$out" "plan-now: read the transcript above."
+want_no "a slugless prompt attempts no leg B"      "$out" "recovery B"
+
+# 11. Adopted plan that fails check-plan → attempted, never queued, and no draft
+#     is claimed to be kept, because leg B never had one.
+out=$(run_case_recovery_plan "$RECOVERY_PROMPT" "$PARTIAL_DRAFT" demo-slug.md)
+want    "a failing adopted plan reports an attempt" "$out" "RESULT degraded (recovery attempted)"
+want    "a failing adopted plan is not queued"      "$out" "NOT queued"
+want_no "leg B claims no draft it never had"        "$out" "The draft is kept at"
+
 echo "── the coda still tells the model where to put it ──"
 
 dry=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
@@ -139,6 +403,9 @@ want "coda demands the last line" "$coda" "last line"
 # Tolerant parsing is a backstop for prose drift, not a licence to move the
 # instruction: under text mode an early-only marker is unreachable, full stop.
 want "coda explains why an earlier print is discarded" "$coda" "discarded"
+want "coda forbids backgrounding sub-agents"  "$coda" "run_in_background"
+want "coda demands foreground sub-agents"     "$coda" "FOREGROUND"
+want "coda keeps Agent backticked" "$coda" '`Agent`'
 
 echo
 if [ "$FAILS" -eq 0 ]; then

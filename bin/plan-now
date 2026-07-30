@@ -173,6 +173,15 @@ conflicting default in the skill):**
   section naming the unresolved fork, or \`bin/check-plan\` gate [H] fails.
 - Before finishing, run \`bin/check-plan ~/claude-plans/<slug>.md\` and fix
   everything it reports. This job re-runs it after you exit and logs the verdict.
+- **Run every sub-agent in the FOREGROUND.** Never spawn the plan-architect (or any
+  other \`Agent\`) with \`run_in_background: true\`, and never start a long task, end
+  your turn, and expect to collect it afterwards. Under \`claude -p\` there is no
+  afterwards: print mode is a single shot, so the turn you end IS the run, and a
+  background task's completion notification has no next turn to arrive on — its
+  result is discarded exactly the way an early-printed \`PLAN_FILE:\` line is. This
+  job disables the harness's background-task sweep, which stops such a task being
+  killed mid-run; it cannot create a turn for the result to land on. If you have
+  already started one, collect it before you finish.
 - $DISPOSITION_LINE
 CODA
 
@@ -207,6 +216,73 @@ cd "$ROOT" || exit 1
 before=$(ls "$PLANS_DIR"/*.md 2>/dev/null | sort)
 started=$(date +%s)
 
+# Draft recovery. A run whose plan-architect was backgrounded and cut off leaves
+# a complete draft in $PLANS_DIR/.drafts/ while printing no PLAN_FILE: line.
+# These helpers let the verdict block below adopt THAT draft — and only that one.
+# $PLANS_DIR (not $HOME/claude-plans) so PLAN_NOW_PLANS_DIR stays the test seam.
+DRAFTS_DIR="$PLANS_DIR/.drafts"
+
+# mtime in epoch seconds. BSD stat (macOS, where launchd runs this) first, GNU
+# stat second so bin/test-plan-now also passes on the Linux CI box.
+draft_mtime() {
+    stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null
+}
+
+# This run's slug, read back out of the prompt it was fired with. Prompts write
+# it as: - Branch slug: `some-slug`. Base: `master`.
+# Parsed tolerantly (case-insensitive, tolerates ** / : decoration) but anchored
+# on the literal words — same discipline as the PLAN_FILE: parse below.
+run_slug() {
+    grep -ioE 'branch slug[^`]{0,24}`[^`]+`' "$PROMPT" 2>/dev/null | head -1 \
+        | grep -oE '`[^`]+`' | head -1 | tr -d '`'
+}
+
+# Echo the path of a draft that provably belongs to THIS run, or nothing.
+# Three independent conditions, ALL required — each rules out one wrong adoption:
+#   1. slug present in the prompt  -> never guess from a directory listing;
+#   2. filename == that slug       -> a peer plan-now run's draft is never taken,
+#                                     however much newer it is;
+#   3. mtime > $started            -> a stale draft left by an EARLIER run of the
+#                                     same slug is never taken.
+recovery_candidate() {
+    local slug cand mt
+    slug=$(run_slug)
+    [ -n "$slug" ] || return 1
+    # The slug is interpolated into a path, so constrain it to a filename.
+    case "$slug" in
+        *[!A-Za-z0-9._-]* | .*) return 1 ;;
+    esac
+    cand="$DRAFTS_DIR/$slug.draft.md"
+    [ -f "$cand" ] && [ -s "$cand" ] || return 1
+    mt=$(draft_mtime "$cand")
+    [ -n "$mt" ] || return 1
+    [ "$mt" -gt "$started" ] || return 1
+    printf '%s\n' "$cand"
+}
+
+# Render draft $1 into plan $2: drop the outline scaffold, then hoist a
+# frontmatter block the scaffold shape stranded below the title. Writes via a
+# temp file in the same directory, so $2 is never observed half-written.
+# Returns non-zero and leaves $2 untouched on any failure.
+promote_draft() {
+    command -v perl >/dev/null 2>&1 || return 1
+    perl -0777 -e '
+        my $t = do { local $/; <STDIN> };
+        $t =~ s/<!-- PLAN OUTLINE.*?-->\n?//s;
+        unless ($t =~ /\A---\n/) {
+            if ($t =~ /\A((?:[^\n]*\n){0,8}?)(---\n.*?\n---\n)/s) {
+                my ($pre, $fm) = ($1, $2);
+                if ($fm =~ /\n[A-Za-z_][A-Za-z0-9_-]*:/) {
+                    substr($t, 0, length($pre) + length($fm)) = $fm . $pre;
+                }
+            }
+        }
+        print $t;
+    ' < "$1" > "$2.tmp$$" 2>/dev/null || { rm -f "$2.tmp$$"; return 1; }
+    [ -s "$2.tmp$$" ] || { rm -f "$2.tmp$$"; return 1; }
+    mv -f "$2.tmp$$" "$2"
+}
+
 # CLAUDE_HEADLESS=1 marks the run unattended (skills branch on it).
 # CLAUDE_CODE_AUTO_COMPACT_WINDOW=200000 lifts the interactive 120K
 # autoCompactWindow pin — rationale in bin/automouse-run.
@@ -215,7 +291,16 @@ started=$(date +%s)
 # 3600s cap. claude -p does not stream, so $OUT stays empty until it exits — and with
 # the default --output-format text it then holds ONLY the final assistant message,
 # which is why the coda demands PLAN_FILE: on that message's last line (see header).
-CLAUDE_HEADLESS=1 CLAUDE_CODE_AUTO_COMPACT_WINDOW=200000 caffeinate -s \
+# CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 disables the harness's background-task
+# sweep. At the default (~600s) the harness TERMINATES a still-running background
+# task mid-run and prints "Background tasks still running after Ns; terminating."
+# to stderr — which kills a plan-architect Agent() spawned with run_in_background
+# on any run longer than the ceiling, so the orchestrator's turn ends with no
+# architect result and no PLAN_FILE: line while a complete draft sits in
+# $PLANS_DIR/.drafts/. 0 means wait indefinitely (the CLI says so itself);
+# timeout 5400 above remains the hard cap.
+CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
+    CLAUDE_HEADLESS=1 CLAUDE_CODE_AUTO_COMPACT_WINDOW=200000 caffeinate -s \
     timeout 5400 "$CLAUDE_BIN" -p "$(cat "$PROMPT")" \
     --dangerously-skip-permissions \
     --model "$MODEL" \
@@ -283,15 +368,146 @@ elif [ -n "$plan" ]; then
         echo "plan-now: NOT queued. A human must fix $plan before it is queued or implemented."
     fi
 else
-    echo "plan-now: RESULT unconfirmed — the run printed no usable 'PLAN_FILE:' line,"
-    echo "plan-now: so its plan cannot be identified, check-plan was NOT run, and nothing was queued."
-    if [ -n "$newfiles" ]; then
-        guess=$(printf '%s\n' "$newfiles" | tr '\n' '\0' | xargs -0 ls -t 2>/dev/null | head -1)
-        echo "plan-now: best-effort guess (newest new file, NOT verified as this run's): $guess"
+    # Recovery. Reached only when rc == 0 (the chain's first arm owns nonzero),
+    # so "clean exit" — leg 1 of the queue gate — is already structural here.
+    # Recovery supplies leg 2 (identification) ONLY; check-plan below is still
+    # leg 3, and nothing reaches the queue without it.
+    #
+    # TWO independent recoveries, tried in order, because this arm is reached two
+    # distinct ways:
+    #   A. the architect was backgrounded and killed at the wait ceiling, so a
+    #      complete draft is orphaned in .drafts/ and no plan file exists;
+    #   B. the run SUCCEEDED end to end — plan written, draft consumed, full
+    #      completion report printed — and the model merely left `PLAN_FILE:` out
+    #      of its FINAL message. Per the rejected-alternatives block at the top of
+    #      this script, text-mode `-p` discards everything before that final
+    #      message, so the marker is then unrecoverable from stdout and NO coda
+    #      wording closes this: it is a compliance failure, not truncation.
+    #      Observed 2026-07-28 (2855s run, exit 0, valid plan, 1294-byte
+    #      transcript) and again 2026-07-29 13:13. Recovery B identifies the plan
+    #      from the filesystem instead.
+    recovered=""
+    recovery_source=""
+    draft=$(recovery_candidate) || draft=""
+
+    if [ -n "$draft" ]; then
+        slug=$(basename "${draft%.draft.md}")
+        target="$PLANS_DIR/$slug.md"
+        if [ -e "$target" ]; then
+            # A draft surviving does NOT prove the run never wrote a plan: it may
+            # have written one, failed check-plan, and left the draft behind.
+            tmt=$(draft_mtime "$target")
+            if [ -n "$tmt" ] && [ "$tmt" -gt "$started" ]; then
+                recovered="$target"
+                echo "plan-now: recovery A — this run already wrote $target; adopting it as-is, draft NOT promoted over it."
+            else
+                echo "plan-now: recovery A declined — $target predates this run; refusing to overwrite it from $draft."
+            fi
+        elif promote_draft "$draft" "$target"; then
+            recovered="$target"
+            recovery_source="$draft"
+            echo "plan-now: recovery A — promoted $draft -> $target"
+        else
+            echo "plan-now: recovery A failed — could not render $draft into $target (no perl, or the transform errored)."
+        fi
     else
-        echo "plan-now: no new file in $PLANS_DIR either — the run may have updated an existing plan, or failed."
+        # No slug in the prompt, or no fresh draft under this run's slug. If
+        # something fresh is nonetheless sitting in .drafts/, say so — but never
+        # adopt it: without a slug match a peer run's draft is indistinguishable.
+        fresh=""
+        for d in "$DRAFTS_DIR"/*.draft.md; do
+            [ -f "$d" ] || continue
+            m=$(draft_mtime "$d") || continue
+            [ -n "$m" ] || continue
+            [ "$m" -gt "$started" ] && fresh="$fresh $d"
+        done
+        if [ -n "$fresh" ]; then
+            echo "plan-now: a draft newer than this run exists but cannot be attributed to it:$fresh"
+            echo 'plan-now: not promoted — the prompt carried no `Branch slug: `-style line, or the draft slug differs.'
+            echo "plan-now: inspect manually: ls -lt $DRAFTS_DIR/*.draft.md"
+        fi
     fi
-    echo "plan-now: read the transcript above."
+
+    # ---- Recovery B: the run wrote its plan and omitted the marker ----
+    # $newfiles is this run's OWN before/after diff of $PLANS_DIR — captured by the
+    # `before=` snapshot next to `started=` and the `after=`/`newfiles=` pair just
+    # above this verdict chain (grep those assignments; deliberately not cited by
+    # line number, which drifts) — so membership in it is a strictly stronger
+    # "this run created it" signal than any mtime comparison — and it is the
+    # identity that the wrong-file incident recorded at the top of this script
+    # says the verdict must be gated on. Two further constraints:
+    #   * the basename must be the slug from THIS run's prompt, as <slug>.md or
+    #     <slug>-<n>.md. /plan's own loop writes -2, -3, … when check-plan
+    #     rejects a draft, so numbered variants are this run's plans too, while a
+    #     bare <slug>* glob would also match a peer slug that merely prefixes it.
+    #   * NEWEST WINS, and this is not a tiebreaker. On a real run (2026-07-29
+    #     12:57) the loop left <slug>.md — 5 phases, superseded — beside
+    #     <slug>-3.md — 7 phases, live — and the SUPERSEDED file PASSES
+    #     check-plan. check-plan cannot save you here; only recency can.
+    if [ -z "$recovered" ] && [ -n "$newfiles" ]; then
+        bslug=$(run_slug) || bslug=""
+        case "$bslug" in
+            "" | *[!A-Za-z0-9._-]* | .*) bslug="" ;;
+        esac
+        if [ -n "$bslug" ]; then
+            # ls -t emits newest-first, so the FIRST slug match is the newest one.
+            # Process substitution (< <(...)) instead of piped while: bash 3.2 does
+            # not allow `case … ;;` inside $() command substitution, but process
+            # substitution runs the while body in the current shell, which is fine.
+            adopt=""
+            while IFS= read -r _af; do
+                case "${_af##*/}" in
+                    "$bslug".md | "$bslug"-[0-9]*.md)
+                        if [ -f "$_af" ]; then adopt="$_af"; break; fi ;;
+                esac
+            done < <(printf '%s\n' "$newfiles" | tr '\n' '\0' | xargs -0 ls -t 2>/dev/null)
+            if [ -n "$adopt" ]; then
+                recovered="$adopt"
+                echo "plan-now: recovery B — no adoptable draft, but this run created $adopt under its own slug '$bslug'; adopting it."
+                echo "plan-now: recovery B — identity came from the prompt slug and this run's plan-dir diff, NOT from model output."
+            fi
+        fi
+    fi
+
+    if [ -n "$recovered" ]; then
+        if "$CHECK_PLAN" "$recovered"; then
+            echo "plan-now: RESULT degraded (recovered) — no PLAN_FILE: line, but this run's plan was identified and check-plan PASSED."
+            if [ -n "$recovery_source" ]; then
+                echo "plan-now: recovered from: $recovery_source"
+            fi
+            echo "plan-now: plan -> $recovered"
+            if [ -n "$recovery_source" ]; then
+                rm -f "$recovery_source"
+            fi
+            if [ "$DISPOSITION" = "queue" ]; then
+                if "$AUTOMOUSE_QUEUE" "$recovered"; then
+                    echo "plan-now: queued for automouse (recovered plan) — it will implement this plan and open its PR."
+                    echo "plan-now: to pull it back out: bin/automouse-queue remove $(basename "${recovered%.md}")"
+                else
+                    echo "plan-now: WARNING — check-plan passed but automouse-queue failed; the recovered plan is on disk, unqueued."
+                fi
+            else
+                echo "plan-now: --implement — recovered plan left on disk, NOT queued. A human reviews it first."
+            fi
+        else
+            echo "plan-now: RESULT degraded (recovery attempted) — identified $recovered but check-plan FAILED (see above)."
+            if [ -n "$recovery_source" ]; then
+                echo "plan-now: NOT queued. The draft is kept at $recovery_source. A human must fix $recovered."
+            else
+                echo "plan-now: NOT queued. A human must fix $recovered."
+            fi
+        fi
+    else
+        echo "plan-now: RESULT unconfirmed — the run printed no usable 'PLAN_FILE:' line,"
+        echo "plan-now: so its plan cannot be identified, check-plan was NOT run, and nothing was queued."
+        if [ -n "$newfiles" ]; then
+            guess=$(printf '%s\n' "$newfiles" | tr '\n' '\0' | xargs -0 ls -t 2>/dev/null | head -1)
+            echo "plan-now: best-effort guess (newest new file, NOT verified as this run's): $guess"
+        else
+            echo "plan-now: no new file in $PLANS_DIR either — the run may have updated an existing plan, or failed."
+        fi
+        echo "plan-now: read the transcript above."
+    fi
 fi
 
 rm -f "$PLIST"

@@ -124,6 +124,9 @@ fi
 # caffeinate -s keeps the Mac awake on AC for the run's duration.
 # CLAUDE_CODE_AUTO_COMPACT_WINDOW=200000 lifts the interactive 120K
 # autoCompactWindow pin for this headless run — rationale in bin/automouse-run.
+# CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 stops the harness terminating a
+# long-running backgrounded sub-agent mid-run (see bin/plan-now for the full
+# rationale). Applies to the /post-plan skill fallback only.
 cat > "$PLIST" <<PLIST_EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -135,7 +138,7 @@ cat > "$PLIST" <<PLIST_EOF
 	<array>
 		<string>/bin/bash</string>
 		<string>-lc</string>
-		<string>export PATH="/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH"; cd "$ROOT" &amp;&amp; { ${FALLBACK_FN}${HARNESS_SEG}${GATE_OPEN}CLAUDE_HEADLESS=1 CLAUDE_CODE_AUTO_COMPACT_WINDOW=200000 caffeinate -s claude -p "$PROMPT" --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name "$LABEL"${GATE_CLOSE}; }; rm -f "$PLIST"; launchctl bootout gui/\$(id -u)/$LABEL</string>
+		<string>export PATH="/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH"; cd "$ROOT" &amp;&amp; { ${FALLBACK_FN}${HARNESS_SEG}${GATE_OPEN}CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 CLAUDE_CODE_AUTO_COMPACT_WINDOW=200000 caffeinate -s claude -p "$PROMPT" --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name "$LABEL"${GATE_CLOSE}; }; rm -f "$PLIST"; launchctl bootout gui/\$(id -u)/$LABEL</string>
 	</array>
 	<key>RunAtLoad</key>
 	<true/>

@@ -1,6 +1,6 @@
 ---
 description: Replace the JSB jumpshot.exe binary round-trip with a native Go sim engine as a pure stdin/stdout transform.
-last_verified: 2026-05-30
+last_verified: 2026-07-30
 ---
 
 # ADR-0035: Native Go Simulation Engine

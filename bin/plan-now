@@ -222,10 +222,21 @@ started=$(date +%s)
 # $PLANS_DIR (not $HOME/claude-plans) so PLAN_NOW_PLANS_DIR stays the test seam.
 DRAFTS_DIR="$PLANS_DIR/.drafts"
 
-# mtime in epoch seconds. BSD stat (macOS, where launchd runs this) first, GNU
-# stat second so bin/test-plan-now also passes on the Linux CI box.
+# mtime in epoch seconds on both stat dialects: BSD (macOS, where launchd runs
+# this) and GNU (the Linux CI box, where bin/test-plan-now also runs).
+#
+# Validate the OUTPUT, never the exit status. GNU `stat -f %m FILE` does not fail
+# cleanly — there `-f` is --file-system, so `%m` is read as a second operand: GNU
+# prints a whole filesystem dump for FILE on *stdout* and exits 1 for the missing
+# `%m`. An `||` fallback therefore appends the real epoch to that garbage, and the
+# `[ "$mt" -gt "$started" ]` in every caller dies on a non-integer. That shipped
+# green on macOS and red on Linux CI; keep the numeric check.
 draft_mtime() {
-    stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null
+    local mt
+    mt=$(stat -f %m "$1" 2>/dev/null)
+    case "$mt" in '' | *[!0-9]*) mt=$(stat -c %Y "$1" 2>/dev/null) ;; esac
+    case "$mt" in '' | *[!0-9]*) return 1 ;; esac
+    printf '%s\n' "$mt"
 }
 
 # This run's slug, read back out of the prompt it was fired with. Prompts write

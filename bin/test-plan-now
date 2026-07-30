@@ -298,7 +298,11 @@ grep -q '^---$' <(head -1 "$P") && ok "frontmatter was hoisted to line 1" \
 # Harvest the leg-B fixture here and nowhere else: $P was just written by the real
 # promoter and check-plan passed on it above, so this copy is clean by
 # construction. It must be taken before case 2, whose runner wipes $PLANS/*.md.
-cp "$P" "$GOOD_PLAN"
+# Hard-fail loudly: every leg-B case below feeds on this file, so without this
+# guard a single leg-A defect reports as five misleading leg-B failures instead of
+# one root cause (exactly how the GNU-stat bug read in CI).
+cp "$P" "$GOOD_PLAN" 2>/dev/null \
+    || fail "leg-B fixture not harvested from $P — fix case 1 first; every leg-B case below is downstream of this"
 
 # 2. Stale draft — same slug, old mtime.
 out=$(run_case_recovery "$GOOD_DRAFT" demo-slug stale)

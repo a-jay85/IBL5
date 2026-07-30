@@ -71,6 +71,22 @@ WT_BASE="${BUG_PIPELINE_WT_BASE:-$(dirname "$REPO_ROOT")/IBL5-worktrees}"
 # The CODE repo (for `gh pr view` in the reconcile pass) — distinct from the private issue repo.
 BUG_PIPELINE_CODE_REPO="${BUG_PIPELINE_CODE_REPO:-a-jay85/IBL5}"
 HUNT_ATTEMPT_CAP="${BUG_PIPELINE_HUNT_ATTEMPT_CAP:-2}"
+# ── CI-autofix seams (ADR-0097) — all default to production; tests override ────
+CI_AUTOFIX_ENABLED="${BUG_PIPELINE_CI_AUTOFIX_ENABLED:-1}"          # 0 = kill switch, before detection
+CI_AUTOFIX_DRY_RUN="${BUG_PIPELINE_CI_AUTOFIX_DRY_RUN:-0}"          # 1 = detect+gate+log, spawn/post/write nothing
+CI_AUTOFIX_IDLE_SECS="${BUG_PIPELINE_CI_AUTOFIX_IDLE_SECS:-3600}"
+CI_AUTOFIX_ATTEMPT_CAP="${BUG_PIPELINE_CI_AUTOFIX_ATTEMPT_CAP:-3}"
+CI_AUTOFIX_BACKOFF_SECS="${BUG_PIPELINE_CI_AUTOFIX_BACKOFF_SECS:-1800}"
+CI_AUTOFIX_LEDGER="${BUG_PIPELINE_CI_AUTOFIX_LEDGER:-$HOME/.claude/logs/ci-autofix-ledger.json}"
+CI_AUTOFIX_LOG="${BUG_PIPELINE_CI_AUTOFIX_LOG:-$HOME/.claude/logs/ci-autofix.log}"
+CI_AUTOFIX_LOCK="${BUG_PIPELINE_CI_AUTOFIX_LOCK:-$HOME/.claude/logs/ci-autofix.lock}"
+CI_AUTOFIX_TIMEOUT_SECS="${BUG_PIPELINE_CI_AUTOFIX_TIMEOUT:-1800}"
+CI_AUTOFIX_SONNET_MODEL="${BUG_PIPELINE_CI_AUTOFIX_SONNET_MODEL:-claude-sonnet-4-6}"
+CI_AUTOFIX_OPUS_MODEL="${BUG_PIPELINE_CI_AUTOFIX_OPUS_MODEL:-claude-opus-4-8}"
+CI_AUTOFIX_PROMPT_FILE="${BUG_PIPELINE_CI_AUTOFIX_PROMPT:-$SCRIPT_DIR/bug-pipeline-ci-autofix-prompt}"
+CI_AUTOFIX_WT_REPO="${BUG_PIPELINE_CI_AUTOFIX_WT_REPO:-$REPO_ROOT}"
+mkdir -p "$(dirname "$CI_AUTOFIX_LEDGER")" 2>/dev/null || true
+mkdir -p "$(dirname "$CI_AUTOFIX_LOG")" 2>/dev/null || true
 mkdir -p "$(dirname "$HUNT_LOG")" 2>/dev/null || true
 
 export GH_BIN BUG_PIPELINE_ISSUE_REPO
@@ -569,6 +585,175 @@ run_hunter_agent() { # wt_appdir model prompt_file run_name run_log
         > "$5" 2>&1
 }
 
+# ── CI-autofix dispatch helpers (ADR-0097, Phase 5) ──────────────────────────
+
+# ci_select_model <pr> <failing_names> — choose Sonnet or Opus for this attempt.
+# Escalation-class checks always use Opus regardless of attempt count.
+ci_select_model() {
+    local pr="$1" failing="$2"
+    local attempt
+    attempt="$(ci_ledger_get "$pr" attempts 0)"
+    attempt=$(( attempt + 1 ))   # next attempt number (ledger stores completed attempts)
+    case "$failing" in
+        *mutation*|*engine*|*golden*|*migration*)
+            printf '%s\n' "$CI_AUTOFIX_OPUS_MODEL"; return 0 ;;
+    esac
+    if [ "$attempt" -le 2 ]; then
+        printf '%s\n' "$CI_AUTOFIX_SONNET_MODEL"
+    else
+        printf '%s\n' "$CI_AUTOFIX_OPUS_MODEL"
+    fi
+}
+
+# ci_collect_failure_log <pr> <wt_root> <failing_names> <out_file>
+# Best-effort: fetch gh pr checks state for the first failing check name.
+# Makes a gh call (logged by stub; inspected by r-dispatch-3).
+ci_collect_failure_log() {
+    local pr="$1" wt_root="$2" failing="$3" out_file="$4"
+    bpgh_code_repo_available || { printf '(gh not available)\n' > "$out_file"; return 0; }
+    local first_check
+    first_check="$(printf '%s' "$failing" | cut -d, -f1)"
+    local run_state
+    run_state="$("$GH_BIN" pr checks "$pr" --repo "$BUG_PIPELINE_CODE_REPO" \
+                     --json name,state \
+                     --jq ".[] | select(.name == \"$first_check\") | .state" \
+                     2>/dev/null || true)"
+    printf 'Check: %s\nState: %s\n' "$first_check" "${run_state:-unknown}" > "$out_file"
+    return 0
+}
+
+# ci_collect_diff <wt_root> <out_file>
+# Best-effort: dump a diff of the worktree against origin/master.
+ci_collect_diff() {
+    local wt_root="$1" out_file="$2"
+    git -C "$wt_root" fetch --quiet origin master 2>/dev/null || true
+    git -C "$wt_root" diff origin/master...HEAD 2>/dev/null > "$out_file" || true
+    [ -s "$out_file" ] || printf '(no diff vs origin/master)\n' > "$out_file"
+    return 0
+}
+
+# ci_render_prompt <pr> <branch> <wt_root> <failing_names> <ci_log_path> <diff_path> <result_file>
+# Bash-param substitution only — NO sed/eval (injection defense for untrusted failing_names).
+ci_render_prompt() {
+    local pr="$1" branch="$2" wt_root="$3" failing="$4"
+    local ci_log_path="$5" diff_path="$6" result_file="$7"
+    local t _p
+    t="$(cat "$CI_AUTOFIX_PROMPT_FILE" 2>/dev/null || printf '(prompt template missing)\n')"
+    # Use intermediate variable for each placeholder — bash misparses ${ //{{...}}/} when the
+    # inner } is seen as closing the outer ${}, so ${t//$_p/val} is the safe form.
+    _p='{{worktree}}';        t="${t//$_p/$wt_root}"
+    _p='{{pr_number}}';       t="${t//$_p/$pr}"
+    _p='{{failing_checks}}';  t="${t//$_p/$failing}"
+    _p='{{ci_log_path}}';     t="${t//$_p/$ci_log_path}"
+    _p='{{diff_path}}';       t="${t//$_p/$diff_path}"
+    _p='{{result_file}}';     t="${t//$_p/$result_file}"
+    _p='{{idle_secs}}';       t="${t//$_p/$CI_AUTOFIX_IDLE_SECS}"
+    printf '%s\n' "$t"
+}
+
+# ── CI-autofix apply (ADR-0097, Phase 6) ─────────────────────────────────────
+
+# ci_apply_result <pr> <branch> <wt_root> <attempt> <failing_names> <head_sha>
+# Trusted exit: read agent verdict, validate commit, push, post comment.
+# Every failure path logs and returns 0 — never aborts the tick.
+ci_apply_result() {
+    local pr="$1" branch="$2" wt_root="$3" attempt="$4" failing_names="$5" head_sha="$6"
+    local result_file="$wt_root/.bug-pipeline/ci-autofix-result.json"
+    local now; now="$(date +%s)"
+    local cap="$CI_AUTOFIX_ATTEMPT_CAP"
+
+    [ "$CI_AUTOFIX_DRY_RUN" = "1" ] && {
+        ci_log "dry-run: ci_apply_result skipped for PR #$pr"; return 0; }
+
+    local result_verdict commit_sha reason changes_desc
+    result_verdict="abort"; commit_sha=""; reason=""; changes_desc=""
+    if [ ! -s "$result_file" ]; then
+        reason="no verdict written (agent timed out or crashed)"
+    else
+        result_verdict="$(jq -r '.result // "abort"' "$result_file" 2>/dev/null || echo "abort")"
+        commit_sha="$(jq -r '.commit_sha // ""' "$result_file" 2>/dev/null || echo "")"
+        reason="$(jq -r '.reason // ""' "$result_file" 2>/dev/null || echo "")"
+        changes_desc="$(jq -r '(.changes // []) | .[0] | if . then "\(.file // ""):line \(.line // "?") — \(.description // "")" else "" end' \
+                        "$result_file" 2>/dev/null || echo "")"
+    fi
+
+    if [ "$result_verdict" = "fixed" ]; then
+        if [ -z "$commit_sha" ] || \
+           ! git -C "$wt_root" cat-file -e "${commit_sha}^{commit}" 2>/dev/null; then
+            result_verdict="abort"
+            reason="${reason:-agent reported a commit that does not exist: $commit_sha}"
+        elif git -C "$wt_root" merge-base --is-ancestor HEAD "$head_sha" 2>/dev/null; then
+            # HEAD did not advance past the PR head (no new commit)
+            result_verdict="abort"
+            reason="${reason:-HEAD did not advance past PR head (no new commit)}"
+        else
+            local push_body change_line=""
+            [ -n "$changes_desc" ] && change_line="
+**Change:** $changes_desc"
+            if git -C "$wt_root" push origin "HEAD:$branch" 2>/dev/null; then
+                local published_sha
+                published_sha="$(git -C "$wt_root" rev-parse HEAD 2>/dev/null || echo "$commit_sha")"
+                ci_ledger_put "$pr" attempts "$attempt" \
+                    last_attempt_epoch "$now" \
+                    head_sha_at_start "$published_sha"
+                push_body="$(printf '🔧 CI autofix attempt %s/%s — fix published\n\n**Failing:** %s\n**Fix commit:** %s%s\n\n_Automated by bug-pipeline-tick (ADR-0097). Review and merge if correct._' \
+                    "$attempt" "$cap" "$failing_names" "$published_sha" "$change_line")"
+                bpgh_pr_comment "$pr" "$push_body"
+                ci_log "PR #$pr: published fix at $published_sha (attempt $attempt)"
+                return 0
+            else
+                result_verdict="abort"
+                reason="push rejected — remote moved (rebase/push race)"
+                ci_ledger_put "$pr" attempts "$attempt" last_attempt_epoch "$now"
+                push_body="$(printf '⚠️ CI autofix attempt %s/%s — push rejected\n\n**Failing:** %s\n**Reason:** %s\n\n_Automated by bug-pipeline-tick. Next tick will re-evaluate._' \
+                    "$attempt" "$cap" "$failing_names" "$reason")"
+                bpgh_pr_comment "$pr" "$push_body"
+                ci_log "PR #$pr: push rejected at attempt $attempt ($reason)"
+                return 0
+            fi
+        fi
+    fi
+
+    local comment_body
+    case "$result_verdict" in
+        no_change)
+            ci_ledger_put "$pr" attempts "$attempt" \
+                last_attempt_epoch "$now" head_sha_at_start "$head_sha"
+            comment_body="$(printf 'ℹ️ CI autofix attempt %s/%s — no change needed\n\n**Failing:** %s\n**Reason:** %s\n\n_Automated by bug-pipeline-tick. Checks may be green or require manual fix._' \
+                "$attempt" "$cap" "$failing_names" "${reason:-checks appear green}")"
+            bpgh_pr_comment "$pr" "$comment_body"
+            ci_log "PR #$pr: no_change at attempt $attempt"
+            ;;
+        abort|*)
+            ci_ledger_put "$pr" attempts "$attempt" last_attempt_epoch "$now"
+            comment_body="$(printf '⚠️ CI autofix attempt %s/%s — not applied\n\n**Failing:** %s\n**Reason:** %s\n\n_Automated by bug-pipeline-tick. Nothing was published; local commits are intact._' \
+                "$attempt" "$cap" "$failing_names" "${reason:-unknown}")"
+            bpgh_pr_comment "$pr" "$comment_body"
+            ci_log "PR #$pr: abort at attempt $attempt (${reason:-unknown})"
+            ;;
+    esac
+    return 0
+}
+
+# ── CI-autofix giveup (ADR-0097, Phase 7) ────────────────────────────────────
+
+# ci_autofix_giveup <pr> <failing_names>
+# Post one ⛔ ceiling comment — idempotent via ceiling_notified ledger flag.
+ci_autofix_giveup() {
+    local pr="$1" failing_names="$2"
+    [ "$CI_AUTOFIX_DRY_RUN" = "1" ] && {
+        ci_log "dry-run: giveup skipped for PR #$pr"; return 0; }
+    local already; already="$(ci_ledger_get "$pr" ceiling_notified false)"
+    [ "$already" = "true" ] && return 0
+    local cap="$CI_AUTOFIX_ATTEMPT_CAP"
+    bpgh_pr_comment "$pr" \
+        "$(printf '⛔ CI autofix giving up after %s attempt(s)\n\n**Failing:** %s\n\n_Automated by bug-pipeline-tick (ADR-0097). All autofix attempts exhausted — manual fix required._' \
+            "$cap" "$failing_names")"
+    ci_ledger_put "$pr" ceiling_notified true
+    ci_log "PR #$pr: giveup posted after $cap attempts"
+    return 0
+}
+
 # Render the hunter prompt with the claimed row's data. Untrusted report/transcript
 # are substituted by bash param-expansion (NEVER sed/eval) — the template wraps them
 # in <report>/<transcript> blocks and frames them strictly as data (prompt-injection defense).
@@ -766,6 +951,248 @@ drive_hunt_row() { # claimed_row_json
     done
 }
 
+# ── CI-autofix worktree gate (ADR-0097, Phase 4) ─────────────────────────────
+
+# ci_wt_for_branch <branch> — print the worktree root for the given branch, return 1 if absent.
+# Uses CI_AUTOFIX_WT_REPO so tests can point at a scratch repo.
+ci_wt_for_branch() {
+    local branch="$1" wt_root=""
+    local line
+    while IFS= read -r line; do
+        case "$line" in
+            "worktree "*) wt_root="${line#worktree }" ;;
+            "branch refs/heads/$branch")
+                printf '%s\n' "$wt_root"; return 0 ;;
+        esac
+    done < <(git -C "$CI_AUTOFIX_WT_REPO" worktree list --porcelain 2>/dev/null)
+    return 1
+}
+
+# ci_wt_is_idle <wt_root> — returns 0 if no tracked files were modified within CI_AUTOFIX_IDLE_SECS.
+ci_wt_is_idle() {
+    local wt_root="$1" hit
+    hit="$(find "$wt_root" \
+             \( -name .git -o -name node_modules -o -name vendor \
+                -o -name .bug-pipeline -o -name storage -o -name coverage \) -prune -o \
+             -type f -mmin "-$(( CI_AUTOFIX_IDLE_SECS / 60 ))" -print -quit 2>/dev/null)"
+    [ -z "$hit" ]
+}
+
+# ci_wt_head_matches <wt_root> <head_sha> — returns 0 if head_sha is an ancestor of (or equal to) HEAD.
+ci_wt_head_matches() {
+    local wt_root="$1" head_sha="$2"
+    git -C "$wt_root" merge-base --is-ancestor "$head_sha" HEAD 2>/dev/null
+}
+
+# ── CI-autofix ledger / lock / log helpers (ADR-0097, Phase 3) ───────────────
+
+# ci_jq_ok — true if jq is available (gates all ledger read/write).
+ci_jq_ok() { command -v jq >/dev/null 2>&1; }
+
+# ci_log <message> — append timestamped line to CI_AUTOFIX_LOG.
+ci_log() {
+    printf '[%s] ci-autofix: %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*" >> "$CI_AUTOFIX_LOG" 2>/dev/null || true
+}
+
+# ci_lock_acquire — mkdir-based single-flight lock; returns 0 on success, 1 if held.
+# Cleans stale locks (older than CI_AUTOFIX_TIMEOUT_SECS) before retrying.
+ci_lock_acquire() {
+    if [ -d "$CI_AUTOFIX_LOCK" ]; then
+        local lock_mtime now
+        lock_mtime="$(stat -f '%m' "$CI_AUTOFIX_LOCK" 2>/dev/null || \
+                      stat -c '%Y' "$CI_AUTOFIX_LOCK" 2>/dev/null || echo 0)"
+        now="$(date +%s)"
+        if [ $(( now - lock_mtime )) -gt "$CI_AUTOFIX_TIMEOUT_SECS" ]; then
+            ci_log "ci_lock_acquire: stale lock (age $(( now - lock_mtime ))s) — cleaning"
+            rm -rf "$CI_AUTOFIX_LOCK" 2>/dev/null || true
+        else
+            ci_log "ci_lock_acquire: lock held — skipping tick"
+            return 1
+        fi
+    fi
+    mkdir "$CI_AUTOFIX_LOCK" 2>/dev/null && return 0
+    ci_log "ci_lock_acquire: race — lock acquired by concurrent tick"
+    return 1
+}
+
+# ci_lock_release — remove the lock directory.
+ci_lock_release() {
+    rm -rf "$CI_AUTOFIX_LOCK" 2>/dev/null || true
+}
+
+# ci_ledger_get <pr> <key> [default] — read a key from the PR's ledger entry.
+ci_ledger_get() {
+    local pr="$1" key="$2" default="${3:-}"
+    ci_jq_ok || { printf '%s\n' "$default"; return 0; }
+    [ -s "$CI_AUTOFIX_LEDGER" ] || { printf '%s\n' "$default"; return 0; }
+    local val
+    val="$(jq -r --arg pr "$pr" --arg k "$key" --arg d "$default" \
+            '.[$pr][$k] // $d' "$CI_AUTOFIX_LEDGER" 2>/dev/null || echo "$default")"
+    printf '%s\n' "${val:-$default}"
+}
+
+# ci_ledger_put <pr> <key> <val> [<key> <val> ...] — write key/value pair(s) to the PR entry.
+ci_ledger_put() {
+    local pr="$1"; shift
+    ci_jq_ok || return 0
+    local tmp
+    tmp="$(mktemp "${CI_AUTOFIX_LEDGER}.tmp.XXXXXX" 2>/dev/null)" || return 0
+    local existing="{}"
+    [ -s "$CI_AUTOFIX_LEDGER" ] && \
+        existing="$(jq -r --arg pr "$pr" '.[$pr] // {}' "$CI_AUTOFIX_LEDGER" 2>/dev/null || echo "{}")"
+    while [ "$#" -ge 2 ]; do
+        local k="$1" v="$2"; shift 2
+        if printf '%s' "$v" | grep -qE '^-?[0-9]+$'; then
+            existing="$(printf '%s' "$existing" | \
+                jq --arg k "$k" --argjson v "$v" '.[$k] = $v' 2>/dev/null || echo "$existing")"
+        else
+            existing="$(printf '%s' "$existing" | \
+                jq --arg k "$k" --arg v "$v" '.[$k] = $v' 2>/dev/null || echo "$existing")"
+        fi
+    done
+    local ledger="{}"
+    [ -s "$CI_AUTOFIX_LEDGER" ] && \
+        ledger="$(cat "$CI_AUTOFIX_LEDGER" 2>/dev/null || echo "{}")"
+    printf '%s' "$ledger" | \
+        jq --arg pr "$pr" --argjson e "$existing" '.[$pr] = $e' > "$tmp" 2>/dev/null || \
+        { rm -f "$tmp"; return 0; }
+    mv "$tmp" "$CI_AUTOFIX_LEDGER" 2>/dev/null || { rm -f "$tmp"; return 0; }
+}
+
+# ci_budget_state <pr> <head_sha> — returns "ceiling", "backoff", "eligible", or "disabled".
+# A PR rebased to a new head SHA resets the attempt counter (different commit, fresh start).
+ci_budget_state() {
+    local pr="$1" head_sha="$2"
+    ci_jq_ok || { ci_log "ci_budget_state: jq unavailable — treating as disabled"; printf 'disabled\n'; return 0; }
+    local stored_sha; stored_sha="$(ci_ledger_get "$pr" head_sha_at_start "")"
+    if [ -n "$stored_sha" ] && [ "$stored_sha" != "$head_sha" ]; then
+        printf 'eligible\n'; return 0
+    fi
+    local ceiling_hit; ceiling_hit="$(ci_ledger_get "$pr" ceiling_hit false)"
+    [ "$ceiling_hit" = "true" ] && { printf 'ceiling\n'; return 0; }
+    local attempts; attempts="$(ci_ledger_get "$pr" attempts 0)"
+    [ "$attempts" -ge "$CI_AUTOFIX_ATTEMPT_CAP" ] && { printf 'ceiling\n'; return 0; }
+    local last_epoch; last_epoch="$(ci_ledger_get "$pr" last_attempt_epoch 0)"
+    local now; now="$(date +%s)"
+    if [ $(( now - last_epoch )) -lt "$CI_AUTOFIX_BACKOFF_SECS" ]; then
+        printf 'backoff\n'; return 0
+    fi
+    printf 'eligible\n'; return 0
+}
+
+# ── CI-autofix orchestrator (ADR-0097, Phase 8) ──────────────────────────────
+
+# ci_autofix_main — detect red PRs, acquire lock, gate (budget/wt/idle/head),
+# dispatch at most one fix agent per tick, or call giveup when ceiling reached.
+# Never aborts a tick: every failure path logs and returns 0.
+ci_autofix_main() {
+    [ "$CI_AUTOFIX_ENABLED" = "1" ] || {
+        ci_log "kill switch off — skipping CI-autofix"; return 0; }
+
+    local red_prs
+    red_prs="$(bpgh_pr_failing_checks 2>/dev/null || true)"
+    [ -n "$red_prs" ] || return 1
+
+    local best_pr="" best_branch="" best_sha="" best_failing="" wt_root=""
+    local line rest rest2 num branch sha failing wt budget
+    while IFS= read -r line; do
+        [ -n "${line:-}" ] || continue
+        num="${line%% *}"; rest="${line#* }"
+        branch="${rest%% *}"; rest2="${rest#* }"
+        sha="${rest2%% *}"; failing="${rest2#* }"
+
+        wt="$(ci_wt_for_branch "$branch" 2>/dev/null || true)"
+        if [ -z "$wt" ]; then
+            ci_log "PR #$num ($branch): no local worktree — skipping"
+            continue
+        fi
+
+        budget="$(ci_budget_state "$num" "$sha")"
+        case "$budget" in
+            disabled) ci_log "PR #$num: budget disabled — skipping"; continue ;;
+            ceiling)  ci_autofix_giveup "$num" "$failing"; continue ;;
+            backoff)  ci_log "PR #$num: in backoff window — skipping"; continue ;;
+        esac
+
+        best_pr="$num"; best_branch="$branch"; best_sha="$sha"; best_failing="$failing"
+        wt_root="$wt"
+        break
+    done <<CI_EOF
+$red_prs
+CI_EOF
+
+    [ -n "$best_pr" ] || { ci_log "no eligible PR found this tick"; return 1; }
+
+    ci_lock_acquire || return 0
+
+    # Re-resolve worktree: it may have disappeared since the scan.
+    wt_root="$(ci_wt_for_branch "$best_branch" 2>/dev/null || true)"
+    if [ -z "$wt_root" ]; then
+        ci_log "PR #$best_pr: worktree vanished after lock"
+        ci_lock_release; return 0
+    fi
+
+    if ! ci_wt_is_idle "$wt_root"; then
+        ci_log "PR #$best_pr: worktree not idle — skipping"
+        ci_lock_release; return 0
+    fi
+
+    if ! ci_wt_head_matches "$wt_root" "$best_sha"; then
+        ci_log "PR #$best_pr: worktree HEAD does not include PR head $best_sha — skipping"
+        ci_lock_release; return 0
+    fi
+
+    local attempt model wt_appdir
+    attempt="$(ci_ledger_get "$best_pr" attempts 0)"
+    attempt=$(( attempt + 1 ))
+    model="$(ci_select_model "$best_pr" "$best_failing")"
+    wt_appdir="$wt_root/ibl5"
+    ci_log "dispatching PR #$best_pr ($best_branch) attempt $attempt/$CI_AUTOFIX_ATTEMPT_CAP model=$model"
+
+    if [ "$CI_AUTOFIX_DRY_RUN" = "1" ]; then
+        ci_log "would-dispatch model=$model PR #$best_pr attempt $attempt failing=$best_failing"
+        ci_lock_release; return 0
+    fi
+
+    local ci_log_path diff_path result_file
+    ci_log_path="$wt_root/.bug-pipeline/ci-failure.log"
+    diff_path="$wt_root/.bug-pipeline/ci-autofix-diff.patch"
+    result_file="$wt_root/.bug-pipeline/ci-autofix-result.json"
+    mkdir -p "$wt_root/.bug-pipeline" 2>/dev/null || true
+    ci_collect_failure_log "$best_pr" "$wt_root" "$best_failing" "$ci_log_path"
+    ci_collect_diff "$wt_root" "$diff_path"
+
+    rm -f "$result_file" 2>/dev/null || true
+    local prompt_rendered
+    prompt_rendered="$(mktemp "${wt_root}/.bug-pipeline/prompt.XXXXXX" 2>/dev/null)" || \
+        { ci_log "PR #$best_pr: cannot create prompt tempfile"; ci_lock_release; return 0; }
+    ci_render_prompt "$best_pr" "$best_branch" "$wt_root" "$best_failing" \
+        "$ci_log_path" "$diff_path" "$result_file" > "$prompt_rendered"
+
+    bpgh_pr_comment "$best_pr" \
+        "$(printf '⏳ CI autofix attempt %s/%s dispatched (model: %s)\n\nFailing: %s\nETA: ~%s min\n\n_Automated by bug-pipeline-tick (ADR-0097)_' \
+            "$attempt" "$CI_AUTOFIX_ATTEMPT_CAP" "$model" "$best_failing" \
+            "$(( CI_AUTOFIX_TIMEOUT_SECS / 60 ))")"
+
+    local run_log
+    run_log="$(mktemp "${wt_root}/.bug-pipeline/run.XXXXXX" 2>/dev/null)" || run_log="/dev/null"
+    run_under_starved_env "$wt_appdir" \
+        timeout "$CI_AUTOFIX_TIMEOUT_SECS" \
+            "$CLAUDE_BIN" -p "$(cat "$prompt_rendered")" \
+                --dangerously-skip-permissions \
+                --model "$model" \
+                --effort high \
+                --output-format stream-json --verbose \
+                --name "ci-autofix-pr-$best_pr-attempt-$attempt" \
+        > "$run_log" 2>&1 || true
+    cat "$run_log" >> "$CI_AUTOFIX_LOG" 2>/dev/null || true
+    rm -f "$prompt_rendered" "$run_log" 2>/dev/null || true
+
+    ci_apply_result "$best_pr" "$best_branch" "$wt_root" "$attempt" "$best_failing" "$best_sha"
+    ci_lock_release
+    return 0
+}
+
 # Top-level hunt pass (Phase 2): reclaim a crashed hunt / claim the next ripe queued bug and
 # drive it. Independent of the enumerator — a lone classified bug yields [] from the enumerator
 # yet must still be hunted. Returns 0 iff a hunt was driven (caller ends the tick — one/tick).
@@ -873,6 +1300,13 @@ main() {
     # One hunt per tick: a claimed hunt runs foreground to completion, then the tick ends —
     # overlapping ticks can't double-hunt the same row (single-flight invariant 1).
     if maybe_hunt; then
+        return 0
+    fi
+
+    # ── CI-autofix pass (ADR-0097): opportunistic — runs only when no bug hunt ran ──
+    # Returns 0 iff a fix agent was dispatched; caller ends the tick to enforce one spawn
+    # per tick. Deferred until after maybe_hunt so bug hunting always takes priority.
+    if ci_autofix_main; then
         return 0
     fi
 

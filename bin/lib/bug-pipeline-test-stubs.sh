@@ -74,6 +74,21 @@ if [ "${STUB_HUNT_MODE:-0}" = 1 ]; then
     [ -f "$STUB/make-dirty" ] && printf 'hunter edit\n' >> "$PWD/hunted.txt"
     exit 0
 fi
+if [ "${STUB_CI_AUTOFIX_MODE:-0}" = 1 ]; then
+    # CI-autofix agent stub: write a preset result to the first matching worktree.
+    # STUB_CI_AUTOFIX_RESULT sets the JSON; default = no_change (safe, never pushes).
+    result="${STUB_CI_AUTOFIX_RESULT}"
+    # Two-step default avoids ${var:-{...}} brace-counting bug: bash closes ${...}
+    # at the first unescaped } in the default value, appending a stray } to the result.
+    [ -z "$result" ] && result='{"result":"no_change","commit_sha":null,"changes":[],"reason":"stub"}'
+    for wt_candidate in "$STUB"/wt/*/; do
+        [ -d "$wt_candidate" ] || continue
+        mkdir -p "$wt_candidate/.bug-pipeline"
+        printf '%s' "$result" > "$wt_candidate/.bug-pipeline/ci-autofix-result.json"
+        break
+    done
+    exit 0
+fi
 # Simulate a successful /plan run: drop a new plan file into PLANS_DIR.
 case "$*" in
   */plan\ *|*"/plan "*) [ "${STUB_MAKE_PLAN:-0}" = 1 ] && : > "$BUG_PIPELINE_PLANS_DIR/new-feature-plan.md" ;;
@@ -109,6 +124,11 @@ echo "GH $*" >> "$STUB/calls.log"
 printf '%s\n' "$@" >> "$STUB/gh.args.log"   # one arg per line — proves title is a single argv element
 case "$*" in
   *"issue create"*) [ "${GH_FAIL:-0}" = 1 ] && exit 1; echo "https://github.com/${BUG_PIPELINE_ISSUE_REPO}/issues/${STUB_ISSUE_NUMBER:-4242}" ;;
+  *"pr list"*headRefOid*)
+      # CI-autofix detection path: --json number,headRefName,headRefOid,isDraft
+      # driver's --jq already applied → emit pre-filtered "NUM BRANCH SHA" lines
+      [ "${GH_FAIL:-0}" = 1 ] && exit 1
+      cat "$STUB/gh-pr-list-ci.out" 2>/dev/null || true ;;
   *"pr list"*)
       [ "${GH_FAIL:-0}" = 1 ] && exit 1
       # Vary output by --head so a case can encode "this head has no PR, but the legacy
@@ -121,6 +141,18 @@ case "$*" in
           cat "$STUB/gh-pr-list.out" 2>/dev/null || true   # driver's --jq already applied → emit the final value
       fi
       ;;
+  *"pr checks"*)
+      # CI-autofix: fixture lines are pre-filtered "STATE name" (stub bypasses jq)
+      pr_num=""; prev=""
+      for a in "$@"; do [ "$prev" = "checks" ] && pr_num="$a"; prev="$a"; done
+      cat "$STUB/gh-pr-checks-${pr_num:-0}.out" 2>/dev/null || true ;;
+  *"pr comment"*)
+      # Best-effort — gh.log already records the full call including body; nothing else needed
+      : ;;
+  *"pr view"*mergeStateStatus*)
+      # CI-autofix conflict precheck: STUB_PR_VIEW_FAIL=1 simulates unreadable state (exit 1 → ms="")
+      [ "${STUB_PR_VIEW_FAIL:-0}" = 1 ] && exit 1
+      printf '%s\t%s\n' "${STUB_MERGEABLE:-MERGEABLE}" "${STUB_MERGE_STATE:-CLEAN}" ;;
   *"pr view"*)      [ "${GH_FAIL:-0}" = 1 ] && exit 1; cat "$STUB/gh-pr-view.out" 2>/dev/null || true ;;
   *) [ "${GH_FAIL:-0}" = 1 ] && exit 1; : ;;
 esac
@@ -207,6 +239,21 @@ SH
     export BUG_PIPELINE_HUNT_LOG="$STUB/hunt.log"
     export BUG_PIPELINE_CODE_REPO="test/code-fake"
     mkdir -p "$STUB/wt"
+    # ── CI-autofix seams (ADR-0097) ──────────────────────────────────────────────
+    export BUG_PIPELINE_CI_AUTOFIX_LEDGER="$STUB/ledger.json"
+    export BUG_PIPELINE_CI_AUTOFIX_LOG="$STUB/ci-autofix.log"
+    export BUG_PIPELINE_CI_AUTOFIX_LOCK="$STUB/ci-autofix.lock"
+    export BUG_PIPELINE_CI_AUTOFIX_IDLE_SECS=1
+    export BUG_PIPELINE_CI_AUTOFIX_BACKOFF_SECS=0
+    # fake-repo: minimal git repo so ci_wt_for_branch has a real worktree list to walk
+    mkdir -p "$STUB/fake-repo"
+    git -C "$STUB/fake-repo" init -q 2>/dev/null || true
+    git -C "$STUB/fake-repo" config user.email t@t 2>/dev/null || true
+    git -C "$STUB/fake-repo" config user.name t 2>/dev/null || true
+    printf 'x\n' > "$STUB/fake-repo/f"
+    git -C "$STUB/fake-repo" add -A 2>/dev/null || true
+    git -C "$STUB/fake-repo" commit -qm base 2>/dev/null || true
+    export BUG_PIPELINE_CI_AUTOFIX_WT_REPO="$STUB/fake-repo"
     trap 'rm -rf "$STUB"' EXIT
 }
 
@@ -217,11 +264,18 @@ bpt_reset() {
           "$STUB"/claim-next-resume.out "$STUB"/list-pr-open.out "$STUB"/plans/*.md \
           "$STUB"/result*.json "$STUB"/envfail* "$STUB"/make-dirty \
           "$STUB"/verdicts "$STUB"/verdict-idx \
-          "$STUB"/gh-pr-list.out "$STUB"/gh-pr-list-*.out "$STUB"/gh-pr-view.out 2>/dev/null
+          "$STUB"/gh-pr-list.out "$STUB"/gh-pr-list-*.out "$STUB"/gh-pr-view.out \
+          "$STUB"/gh-pr-list-ci.out "$STUB"/gh-pr-checks-*.out \
+          "$STUB"/ledger.json 2>/dev/null
     rm -rf "$STUB"/wt/* 2>/dev/null
+    # ci-autofix.lock is a directory (mkdir-based); rm -f silently fails on it
+    rm -rf "$STUB"/ci-autofix.lock 2>/dev/null
+    # prune worktrees from fake-repo added by ci-autofix wire tests
+    git -C "$STUB/fake-repo" worktree prune 2>/dev/null || true
     printf '[]' > "$STUB/actionable.json"
     unset GH_FAIL STUB_THREAD_ID STUB_MESSAGE_ID STUB_ISSUE_NUMBER WT_NEW_FAIL STUB_CREATE_THREAD_FAIL \
-          CLAIM_NEXT_RC LIST_ACTIVE_RC
+          CLAIM_NEXT_RC LIST_ACTIVE_RC \
+          STUB_MERGE_STATE STUB_MERGEABLE STUB_PR_VIEW_FAIL
 }
 
 bpt_set_actionable()  { printf '%s' "$1" > "$STUB/actionable.json"; }
@@ -243,6 +297,11 @@ bpt_envfail()          { : > "$STUB/envfail${1:+-$1}"; }                      # 
 bpt_set_gh_pr_list()   { printf '%s' "$1" > "$STUB/gh-pr-list.out"; }
 bpt_set_gh_pr_list_for() { printf '%s' "$2" > "$STUB/gh-pr-list-$1.out"; }   # <head> <value>
 bpt_set_gh_pr_view()   { printf '%s' "$1" > "$STUB/gh-pr-view.out"; }
+# ── CI-autofix fixture setters ─────────────────────────────────────────────────
+# bpt_set_gh_pr_list_ci <lines> — set "NUM BRANCH SHA" lines for headRefOid detection
+bpt_set_gh_pr_list_ci()  { printf '%s\n' "$1" > "$STUB/gh-pr-list-ci.out"; }
+# bpt_set_gh_pr_checks_for <pr_num> <lines> — pre-filtered "STATE name" lines for a PR
+bpt_set_gh_pr_checks_for() { printf '%s\n' "$2" > "$STUB/gh-pr-checks-$1.out"; }
 # bpt_count <name> <want> <file>  — assert a stub log has exactly <want> non-blank lines
 # (grep -c prints 0 and exits 1 on no-match, so read its stdout and default empty→0; no `|| echo`).
 bpt_count() { local got; got="$(grep -c . "$3" 2>/dev/null)"; bpt_expect_eq "$1" "$2" "${got:-0}"; }

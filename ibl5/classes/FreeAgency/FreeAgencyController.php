@@ -87,6 +87,7 @@ class FreeAgencyController
         $result = isset($_GET['result']) && is_string($_GET['result']) ? $_GET['result'] : null;
         $responder = new \Api\Response\HtmlResponder();
         $responder->html($this->view->render($mainPageData, $result));
+        $responder->html('<script src="jslib/contract-hint.js"></script>');
 
         \PageLayout\PageLayout::footer();
     }
@@ -119,6 +120,7 @@ class FreeAgencyController
         $negotiationView = new FreeAgencyOfferView($formComponents);
         $responder = new \Api\Response\HtmlResponder();
         $responder->html($negotiationView->render($negotiationData, $error));
+        $responder->html('<script src="jslib/offer-salary-hints.js"></script>');
 
         \PageLayout\PageLayout::footer();
     }

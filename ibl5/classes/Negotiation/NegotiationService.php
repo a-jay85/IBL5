@@ -94,7 +94,8 @@ class NegotiationService implements NegotiationServiceInterface
         // Flip card script (must come after card HTML so elements exist for init).
         // Kept outside the form container, mirroring the rookieoption page assembly.
         return self::wrapInFormContainer($output)
-            . \Player\Views\PlayerTradingCardFlipView::getFlipStyles();
+            . \Player\Views\PlayerTradingCardFlipView::getFlipStyles()
+            . '<script src="jslib/offer-salary-hints.js"></script>';
     }
 
     /**

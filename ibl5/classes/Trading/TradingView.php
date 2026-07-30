@@ -207,6 +207,7 @@ $tradeConfig = [
 <script src="jslib/trading-roster-tabs.js"></script>
 <script src="jslib/trade-roster-preview.js"></script>
 <script src="jslib/trade-submit-guard.js"></script>
+<script src="jslib/contract-hint.js"></script>
 </form>
         <?php
         return (string) ob_get_clean();

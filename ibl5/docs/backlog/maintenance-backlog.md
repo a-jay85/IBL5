@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-07-28
+last_verified: 2026-07-29
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -47,13 +47,13 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 | Status | Count |
 |--------|------:|
-| ✅ Implemented | 237 |
+| ✅ Implemented | 238 |
 | ◑ Partial | 25 |
 | 📋 Planned (plan queued / PR open) | 1 |
-| ⬜ Open | 59 |
+| ⬜ Open | 58 |
 | 🚫 Declined | 10 |
 
-> Status counts re-verified 2026-06-28 (exact, from the per-axis tables); **6.20 / 6.21 added 2026-06-29** from the PR #1107 review (⬜ Open +2); **6.22 added 2026-06-29** from the #1066 reject-IDOR review (⬜ Open +1). Two stale-Open rows were flipped directly (no plan owned them): **13.3**, **13.9** (✅ +2, ⬜ −2 vs the master re-count). **1.21–1.31 added 2026-07-24** from the hot-files comment→backlog migration (⬜ Open +11: 8 🟩 auto-mergeable, 3 🟨 conditional — 1.23/1.25/1.31 need characterization/endpoint pins). **Ground-truth audit 2026-07-24:** 7 stale-Open items flipped ✅, 2 false findings marked 🚫, 5 new Axis-1 rows seeded (1.32–1.36); IDOR PRs #1107–1110 merged 2026-06-29 (unblocking 2.10/2.13/2.14/2.25/7.7/14.6); PRs #1240/#1230/#1204 merged (2.6/2.31/2.32/5.18 already ✅/Open on own merits). **9.19 and 9.20 implemented 2026-07-24** — added READMEs to all 68 missing class dirs + frontmatter to all 16 existing class READMEs that lacked it; extended bin/check-docs IN_SCOPE_GLOBS (✅ +2, ⬜ −2); roll-up recomputed from grep (331 rows total, unchanged). **6.16 flipped ✅ 2026-07-24** (all Api data repos + JsonResponder + SystemClock tested; ✅ +1, ◑ −1). **6.14 Status updated 2026-07-24** (ProcessBoxscoresStep/GenerateSeasonAwardsStep/ParseJsbFilesStep added; still ◑). **Resolved rows collapsed 2026-07-25** — ✅/🚫 findings no longer appear as table rows; each axis carries a `> ✅ resolved (N): …` / `> 🚫 declined (N): …` summary line and their evidence lives in [archive/maintenance-backlog-archive.md](archive/maintenance-backlog-archive.md). **Recount recipe:** resolved = sum of the `(N)` in the per-axis summary lines; open = grep of the per-axis table rows; total = the two added. Counts above are unchanged by the collapse (238 + 93 = 331). **1.36 and 7.7 flipped ✅ 2026-07-26** (✅ +2, ⬜ −1, ◑ −1); total tracked rows unchanged at 331. **1.29 flipped ✅ 2026-07-26 (PR #1679)** (✅ +1, ⬜ −1); total tracked rows unchanged at 331. **1.27 flipped ✅ 2026-07-27** — extracted 10 per-entity collaborators into `ibl5/classes/JsbParser/Repositories/`; JsbImportRepository reduced to thin facade (✅ +1, ⬜ −1); total tracked rows unchanged at 331. **1.23 flipped ✅ 2026-07-27 (`oneonone-1-23-pins-and-extract`)** (✅ +1, ⬜ −1); total tracked rows unchanged at 331. **1.31 flipped ✅ 2026-07-27** — extracted `TradeRosterPreviewParamValidator` + `TradeRosterPreviewCashRowBuilder` collaborators; DB characterization pin + validator/cash-row unit suites landed (✅ +1, ⬜ −1). **2.39 seeded 2026-07-27** — cash-year range unbounded/unordered in `TradeRosterPreviewCashRowBuilder::buildCashRows()`; cashStartYear/cashEndYear come from `$_GET` with no upper bound (discovered during trading-1-31-api-handler-extract) (⬜ +1); **1.19 flipped ✅ 2026-07-27** — characterization pins + `executePlayerLoop` merge shipped; `processPlrData`/`processPlrDataForYear` deduped (✅ +1, ⬜ −1); total tracked: 332 (✅ 236, ◑ 24, 📋 1, ⬜ 61, 🚫 10). **14.6 flipped ◑ Partial 2026-07-28 (#1712)** — batch 1 (17 Api/Controller/*) converted to DI; batch 2 pending (◑ +1, ⬜ −1); total tracked: 332 (✅ 236, ◑ 25, 📋 1, ⬜ 60, 🚫 10). **14.9 flipped ✅ 2026-07-27** — replaced 21 `$cookie[1]` occurrences across 11 files with `AuthService::getUsername()` (✅ +1, ⬜ −1); total tracked: 332 (✅ 237, ◑ 25, 📋 1, ⬜ 59, 🚫 10).
+> Status counts re-verified 2026-06-28 (exact, from the per-axis tables); **6.20 / 6.21 added 2026-06-29** from the PR #1107 review (⬜ Open +2); **6.22 added 2026-06-29** from the #1066 reject-IDOR review (⬜ Open +1). Two stale-Open rows were flipped directly (no plan owned them): **13.3**, **13.9** (✅ +2, ⬜ −2 vs the master re-count). **1.21–1.31 added 2026-07-24** from the hot-files comment→backlog migration (⬜ Open +11: 8 🟩 auto-mergeable, 3 🟨 conditional — 1.23/1.25/1.31 need characterization/endpoint pins). **Ground-truth audit 2026-07-24:** 7 stale-Open items flipped ✅, 2 false findings marked 🚫, 5 new Axis-1 rows seeded (1.32–1.36); IDOR PRs #1107–1110 merged 2026-06-29 (unblocking 2.10/2.13/2.14/2.25/7.7/14.6); PRs #1240/#1230/#1204 merged (2.6/2.31/2.32/5.18 already ✅/Open on own merits). **9.19 and 9.20 implemented 2026-07-24** — added READMEs to all 68 missing class dirs + frontmatter to all 16 existing class READMEs that lacked it; extended bin/check-docs IN_SCOPE_GLOBS (✅ +2, ⬜ −2); roll-up recomputed from grep (331 rows total, unchanged). **6.16 flipped ✅ 2026-07-24** (all Api data repos + JsonResponder + SystemClock tested; ✅ +1, ◑ −1). **6.14 Status updated 2026-07-24** (ProcessBoxscoresStep/GenerateSeasonAwardsStep/ParseJsbFilesStep added; still ◑). **Resolved rows collapsed 2026-07-25** — ✅/🚫 findings no longer appear as table rows; each axis carries a `> ✅ resolved (N): …` / `> 🚫 declined (N): …` summary line and their evidence lives in [archive/maintenance-backlog-archive.md](archive/maintenance-backlog-archive.md). **Recount recipe:** resolved = sum of the `(N)` in the per-axis summary lines; open = grep of the per-axis table rows; total = the two added. Counts above are unchanged by the collapse (238 + 93 = 331). **1.36 and 7.7 flipped ✅ 2026-07-26** (✅ +2, ⬜ −1, ◑ −1); total tracked rows unchanged at 331. **1.29 flipped ✅ 2026-07-26 (PR #1679)** (✅ +1, ⬜ −1); total tracked rows unchanged at 331. **1.27 flipped ✅ 2026-07-27** — extracted 10 per-entity collaborators into `ibl5/classes/JsbParser/Repositories/`; JsbImportRepository reduced to thin facade (✅ +1, ⬜ −1); total tracked rows unchanged at 331. **1.23 flipped ✅ 2026-07-27 (`oneonone-1-23-pins-and-extract`)** (✅ +1, ⬜ −1); total tracked rows unchanged at 331. **1.31 flipped ✅ 2026-07-27** — extracted `TradeRosterPreviewParamValidator` + `TradeRosterPreviewCashRowBuilder` collaborators; DB characterization pin + validator/cash-row unit suites landed (✅ +1, ⬜ −1). **2.39 seeded 2026-07-27** — cash-year range unbounded/unordered in `TradeRosterPreviewCashRowBuilder::buildCashRows()`; cashStartYear/cashEndYear come from `$_GET` with no upper bound (discovered during trading-1-31-api-handler-extract) (⬜ +1); **1.19 flipped ✅ 2026-07-27** — characterization pins + `executePlayerLoop` merge shipped; `processPlrData`/`processPlrDataForYear` deduped (✅ +1, ⬜ −1); total tracked: 332 (✅ 236, ◑ 24, 📋 1, ⬜ 61, 🚫 10). **14.6 flipped ◑ Partial 2026-07-28 (#1712)** — batch 1 (17 Api/Controller/*) converted to DI; batch 2 pending (◑ +1, ⬜ −1); total tracked: 332 (✅ 236, ◑ 25, 📋 1, ⬜ 60, 🚫 10). **14.9 flipped ✅ 2026-07-27** — replaced 21 `$cookie[1]` occurrences across 11 files with `AuthService::getUsername()` (✅ +1, ⬜ −1); total tracked: 332 (✅ 237, ◑ 25, 📋 1, ⬜ 59, 🚫 10). **11.16 flipped ✅ 2026-07-27** — moved page-specific JS loaders (`offer-salary-hints.js`, `contract-hint.js`) from PageLayout global bundle to per-view injection in NegotiationService and TradingView; E2E behavioral pins + VR manifest row added (✅ +1, ⬜ −1); total tracked: 332 (✅ 238, ◑ 25, 📋 1, ⬜ 58, 🚫 10).
 
 **Automouse-readiness of the not-yet-complete (⬜/◑/📋) items:**
 
@@ -656,7 +656,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):** Open items are CSS refactors — almost all green-green with a **visual-regression pin** (the relocated/token-aliased rules must render pixel-identical), except 11.4 which is a deliberate visual consolidation.
 
-> ✅ resolved (10): 11.5, 11.6, 11.7, 11.8, 11.9, 11.10, 11.11, 11.12, 11.13, 11.15 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (11): 11.5, 11.6, 11.7, 11.8, 11.9, 11.10, 11.11, 11.12, 11.13, 11.15, 11.16 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
@@ -665,7 +665,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 11.3 | ◑ Partial | 🟩 | Split ongoing (#1234 + earlier): 15 component files now under `design/components/tables/`; `components/tables.css` still ~1296 LOC. Continue relocation; VR pin. |
 | 11.4 | ⬜ Open | 🟨 | player-views.css parallel table system → `.ibl-data-table`. Visual consolidation = VR-affecting → human review / baseline update. |
 | 11.14 | ◑ Partial | 🟩 | Exact-match hex→token aliases landed (#1234, merged 2026-06-28); ~62 raw hex still in `design/components/` (no exact token match). Continue aliasing; VR pin. |
-| 11.16 | ⬜ Open | 🟩 | Page-specific JS to per-view loaders; E2E/VR pin. |
 
 ### 11.1 FOUT-Prevention Inline `<style>` in PageLayout (2 baselined violations)
 **Location:** `classes/PageLayout/PageLayout.php` lines 181-234
@@ -703,13 +702,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Est. effort:** M
 **Risk if untouched:** Brand color change requires grepping raw hex across files.
 **Status:** Partial — exact-match hex values aliased to design tokens via #1234 (merged 2026-06-28); ~62 raw hex codes remain in `design/components/` where no token has the identical value. Continue once those tokens exist (or a value change is intended).
-
-### 11.16 Global JS Bundle Loads Page-Specific Scripts on Every Page
-**Location:** `classes/PageLayout/PageLayout.php` lines 103-119
-**Problem:** `sorttable.js`, `offer-salary-hints.js`, `contract-hint.js` loaded unconditionally; only needed on specific pages.
-**Suggested direction:** Move page-specific scripts to controller/view loaders (pattern already used by TradingView, DepthChartEntryController).
-**Est. effort:** S
-**Risk if untouched:** Minor payload bloat per page.
 
 ---
 

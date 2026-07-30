@@ -191,6 +191,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         $responder->html('<script src="jslib/depth-chart-lineup-preview.js"></script>');
         $responder->html('<script src="jslib/saved-depth-charts.js"></script>');
         $responder->html('<script src="jslib/depth-chart-mobile.js"></script>');
+        $responder->html('<script src="jslib/contract-hint.js"></script>');
 
         // NextSim position tables section
         $this->renderNextSimSection($teamid, $team, $season, $responder);

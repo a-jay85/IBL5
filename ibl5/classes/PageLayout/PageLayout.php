@@ -103,8 +103,6 @@ class PageLayout
             'jslib/name-abbreviation.js',
             'jslib/user-team-highlighter.js',
             'jslib/sticky-page-header.js',
-            'jslib/contract-hint.js',
-            'jslib/offer-salary-hints.js',
             'jslib/htmx-init.js',
             'jslib/local-time.js',
         ];

@@ -220,3 +220,34 @@ publicTest.describe('Free Agency -- unauthenticated access', () => {
     await publicExpect(page.locator('#login-username'), 'YourAccount login form must render after redirect').toBeVisible();
   });
 });
+
+test.describe('Free Agency -- per-view JS loaders (backlog 11.16)', () => {
+  test('offer-salary-hints: Y2 placeholder updates when Y1 value is entered', async ({ page, appState }) => {
+    await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
+    await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
+    const container = page.locator('.offer-salary-row--inputs[data-raise-percentage]').first();
+    await expect(container).toBeVisible();
+    const inputs = container.locator('input[type="number"]');
+    const y1 = inputs.nth(0);
+    const y2 = inputs.nth(1);
+    await y1.fill('500');
+    await y1.dispatchEvent('input');
+    const hint = await y2.getAttribute('placeholder');
+    expect(hint).toBeTruthy();
+    expect(Number(hint)).toBeGreaterThan(0);
+  });
+
+  test('contract-hint: JS sets inline width on hidden link after page load', async ({ page, appState }) => {
+    await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
+    await page.goto('modules.php?name=FreeAgency');
+    // .contract-hint-link is display:none by CSS (revealed on hover only); check the DOM attachment
+    // and that contract-hint.js ran by reading the inline style.width it sets.
+    await expect(page.locator('.contract-hint-link').first()).toBeAttached();
+    const width = await page.evaluate(() => {
+      const el = document.querySelector('.contract-hint-link');
+      return el ? (el as HTMLElement).style.width : '';
+    });
+    expect(width).toMatch(/^\d+(\.\d+)?px$/);
+    expect(parseFloat(width)).toBeGreaterThan(0);
+  });
+});

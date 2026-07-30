@@ -364,7 +364,7 @@ Background shells from earlier phases (`bin/e2e-wt` in Phase 5, `gh pr checks --
 Kill known lingering patterns so their tool results deliver immediately (cache warm) rather than hours later (cache miss):
 
 ```bash
-pkill -f 'bin/e2e-wt\.sh' 2>/dev/null
+pkill -f 'bin/e2e-wt' 2>/dev/null
 pkill -f 'bunx.*playwright' 2>/dev/null
 pkill -f 'gh pr checks.*--watch' 2>/dev/null
 rm -f /tmp/post-plan-spec-diff-$PPID /tmp/post-plan-spec-prod-diff-$PPID /tmp/post-plan-missing-tests-$PPID /tmp/post-plan-conformance-done-$PPID 2>/dev/null

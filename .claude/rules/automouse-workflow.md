@@ -1,6 +1,6 @@
 ---
 description: Automouse autonomous workflow (formerly "nightly") — launchd fires claude -p on a recurring schedule, running two context-isolated agents per plan (implementation + post-plan) with time guards and incremental checkpoints.
-last_verified: 2026-07-27
+last_verified: 2026-07-30
 paths: "bin/automouse/**"
 ---
 
@@ -40,7 +40,7 @@ A headless `claude -p` process runs on a recurring schedule via macOS `launchd`.
             a sibling <plan>.md.staleness marker tags a *staleness* skip (read by bin/automouse/self-heal)
   handoff/  JSON files bridging state from implementation to post-plan agent
   reports/  per-run markdown reports (YYYY-MM-DD-{done|skipped|env-stop|no-queue|error}-<slug>.md);
-            plus YYYY-MM-DD-costs.md — per-phase token cost roll-up written by automouse-run
+            plus YYYY-MM-DD-costs.md — per-phase token cost roll-up written by bin/automouse/run
   logs/     claude -p output logs + launchd stdout/stderr
   *.archive/  startup archival: logs/reports/done/skipped entries idle >7 days are
               moved here (logs.archive/, reports.archive/, …) at run launch
@@ -48,7 +48,7 @@ A headless `claude -p` process runs on a recurring schedule via macOS `launchd`.
 
 ### Startup archival
 
-At launch, `automouse-run` sweeps `logs/`, `reports/`, `done/`, and `skipped/` and moves any
+At launch, `bin/automouse/run` sweeps `logs/`, `reports/`, `done/`, and `skipped/` and moves any
 entry untouched for more than `NIGHTLY_ARCHIVE_AGE_DAYS` (default **7**) into a sibling
 `<dir>.archive/`. This keeps the working dirs small without deleting history. Symlinks
 (`done/`, `skipped/`) are judged on their *own* mtime — the disposition date — and their
@@ -57,7 +57,7 @@ absolute targets keep resolving after the move. `queue/` (pending work) and `han
 
 ### Self-heal
 
-Before the startup archival block, `automouse-run` freshens the local master checkout (a
+Before the startup archival block, `bin/automouse/run` freshens the local master checkout (a
 `git fetch` + `merge --ff-only`), then runs `bin/automouse/self-heal`. The self-heal script
 scans `skipped/` for plans carrying a `<plan>.md.staleness` sidecar marker — the signal that
 a plan was skipped specifically by the staleness gate, not for ambiguity / poison-pill
@@ -72,7 +72,7 @@ plans already in `skipped/` before this PR landed need a one-time manual `bin/au
 
 1. **Daytime:** Work with Claude in plan mode. After approval, queue the plan: `bin/automouse/queue <slug>`
 2. **On schedule:** `launchd` fires `bin/automouse/run`
-3. **Loop:** For each queued plan (oldest first), `automouse-run` fires two `claude -p` invocations sequentially:
+3. **Loop:** For each queued plan (oldest first), `bin/automouse/run` fires two `claude -p` invocations sequentially:
    - **Implementation agent** (`bin/automouse/prompt-impl`): creates worktree, implements the plan, makes checkpoint commits, writes a handoff file. Its model is selectable per-plan via a line-1 `impl_model:` frontmatter field (`sonnet` → Sonnet, `haiku` → Haiku, absent or anything else → the Opus default), resolved by `bin/lib/plan-impl-model`; declare `sonnet` only for uniformly-mechanical plans whose every verification row is objectively machine-checkable. The post-plan agent is always Sonnet.
    - **Post-plan agent** (`bin/automouse/prompt-postplan`): reads the handoff file, runs `/post-plan` (code review, security audit, PR, CI monitoring, auto-merge), writes the completion report
 4. **Guards:** The loop stops when the queue is empty or ~4h45m have elapsed. Plans that fail 3 times (after genuine, full-length attempts) are moved to `skipped/` as poison pills.

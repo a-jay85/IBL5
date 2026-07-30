@@ -149,7 +149,7 @@ final class StoreSimRecapGuardTest extends TestCase
             'allStarRename.php',
             'generate_api_key.php',
             'jsbExport.php',
-            'plrScratchpad.php',
+            'bulkJsbImport.php',
             'build-engine-bundle.php',
         ];
 

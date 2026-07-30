@@ -36,6 +36,18 @@ final class CheckDocsCliTest extends TestCase
         copy($repoScript, $this->tmpDir . '/bin/check-docs');
         $this->scriptPath = $this->tmpDir . '/bin/check-docs';
 
+        // The source-comment dead-reference scanner resolves `bin/<name>` tokens found
+        // in the copied script's own comments against THIS throwaway repo root, so stub
+        // the real bin/ entries here — otherwise live references false-fail.
+        $siblings = scandir(dirname($repoScript));
+        self::assertIsArray($siblings);
+        foreach ($siblings as $sibling) {
+            if ($sibling === '.' || $sibling === '..' || $sibling === 'check-docs') {
+                continue;
+            }
+            touch($this->tmpDir . '/bin/' . $sibling);
+        }
+
         $this->runGit('init -q');
         $this->runGit('config user.email test@example.com');
         $this->runGit('config user.name Test');

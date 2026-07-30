@@ -132,7 +132,7 @@ GATE_CLOSE=""
 ENGINE="Sonnet 4.6 /post-plan skill session"
 if [ "${POST_PLAN_SKILL:-0}" != "1" ] && [ -x "$HARNESS/run" ]; then
     FALLBACK_FN="$(declare -f should_fallback); "
-    PLAN_ARG="${PLAN_OVERRIDE:+ --plan \\\"$PLAN_OVERRIDE\\\"}"
+    PLAN_ARG="${PLAN_OVERRIDE:+ --plan \"$PLAN_OVERRIDE\"}"
     HARNESS_SEG="CLAUDE_HEADLESS=1 caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS/out/live-$SLUG-$TS\" --live${PLAN_ARG}; rc=\$?; "
     GATE_OPEN="if should_fallback \"\$rc\"; then "
     GATE_CLOSE="; elif [ \"\$rc\" = 3 ]; then echo \"post-plan-now: harness exited 3 (rebase-conflict fail-closed sentinel). SKIPPING the /post-plan skill fallback; a human must resolve the stacked-branch rebase conflict, then re-run bin/post-plan-now. See $LOG.\"; fi"

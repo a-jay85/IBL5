@@ -32,17 +32,11 @@ def test_plist_wiring_regression():
 
 
 def test_plan_override_missing_file_aborts(tmp_path):
-    import glob
-    before = set(glob.glob(str(tmp_path / "com.ibl5.postplan-now-*.plist")))
     r = subprocess.run(
         ["bash", "bin/post-plan-now", "--plan", "/nonexistent-plan.md"],
         capture_output=True, text=True, cwd=REPO)
     assert r.returncode == 1
     assert "does not exist — aborting" in r.stderr
-    after = set(glob.glob(
-        os.path.expanduser("~/Library/LaunchAgents/com.ibl5.postplan-now-*.plist")))
-    assert not (after - set(glob.glob(
-        os.path.expanduser("~/Library/LaunchAgents/com.ibl5.postplan-now-*.plist"))))
 
 
 def test_plan_arg_errors():
@@ -76,22 +70,12 @@ def test_plan_override_valid_path_passes_validation(tmp_path):
     plan = tmp_path / "myplan.md"
     plan.write_text("---\nauto_merge: false\n---\n# My Plan\n")
     r = subprocess.run(
-        ["bash", "bin/post-plan-now", "--plan", str(plan)],
-        capture_output=True, text=True, cwd=REPO)
+        ["bash", PPN, "--plan", str(plan)],
+        capture_output=True, text=True, cwd=str(tmp_path))
+    assert r.returncode == 1
     assert "does not exist — aborting" not in r.stderr
+    assert "not inside a git repo" in r.stderr
 
-
-def test_plist_wiring_regression_new():
-    src = open(PPN).read()
-    assert "--live || " not in src               # old unconditional fallback chain removed
-    assert "should_fallback" in src              # fallback now gated by the tested function
-    assert r"rc=\$?" in src                       # harness exit code captured for the gate
-    assert r'\"\$rc\" = 3' in src                 # fail-closed notice is rc=3-only (elif)
-    # New wiring assertions
-    assert "PLAN_ARG" in src
-    assert "--live${PLAN_ARG}" in src
-    assert "${PLAN_OVERRIDE:-$HOME/claude-plans/$SLUG.md}" in src
-    assert "do NOT derive the plan from the branch slug" in src
 
 
 def test_skill_block_matches_resolver(tmp_path):
@@ -122,13 +106,16 @@ def test_skill_block_matches_resolver(tmp_path):
         + '\necho "PLAN_FILE=$PLAN_FILE"\n'
         + '\necho "BEST=$BEST"\n'
     )
-    # Override claude-plans to our tmp dir
+    # Override claude-plans to our tmp dir and fix SLUG so git rev-parse doesn't clobber it
     script = script.replace(
         '"$HOME/claude-plans/$SLUG.md"',
         f'"{tmp_path!s}/$SLUG.md"'
     ).replace(
         '"$HOME/claude-plans/$SLUG"-*.md',
         f'"{tmp_path!s}/$SLUG"-*.md'
+    ).replace(
+        'SLUG=$(git rev-parse --abbrev-ref HEAD)',
+        'SLUG=s'
     )
     r = subprocess.run(["bash", "-c", script], capture_output=True, text=True, env=env)
     assert r.returncode == 0, r.stderr

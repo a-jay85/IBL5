@@ -211,6 +211,9 @@ if (document.fonts && document.fonts.check("1em Barlow")) {
         // CSS stylesheet — loaded once (fixes duplicate CSS loading bug)
         $cssPath = "themes/$ThemeSel/style/style.css";
         $cssVersion = file_exists($cssPath) ? filemtime($cssPath) : '';
+        // FOUT-prevention invariant: this tag must remain render-blocking.
+        // The .fonts-loading { visibility: hidden } rule lives in design/base.css (compiled here).
+        // Making it async, lazy, or rel="preload" will silently reintroduce FOUT — no test catches it.
         echo "<LINK REL=\"StyleSheet\" HREF=\"{$cssPath}?v={$cssVersion}\" TYPE=\"text/css\">\n";
 
         echo "\n\n\n</head>\n\n";

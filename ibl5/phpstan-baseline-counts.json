@@ -17,12 +17,11 @@
         "ibl.sqlStringConcatenation": 32,
         "ibl.trustedVariable": 16,
         "if.condNotBoolean": 1,
-        "method.nonObject": 1,
+        "method.nonObject": 2,
         "missingType.parameter": 21,
         "missingType.return": 8,
         "notEqual.notAllowed": 2,
         "nullCoalesce.offset": 1,
-        "offsetAccess.nonOffsetAccessible": 1,
         "ternary.condNotBoolean": 1,
         "variable.undefined": 7
     },

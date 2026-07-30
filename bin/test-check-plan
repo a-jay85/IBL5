@@ -405,6 +405,37 @@ assert "gateB-no-discharge-claim" 0 "$FM$M"'
 Phase 1 — rename a variable.
 '
 
+# Gate B: PREVENTION — test path appears only in a description column, NOT the
+# location column. A name-dropped mention must NOT satisfy the discharge (exit 1).
+# Before the inm/mlocs fix this exited 0 (false negative — the bug).
+assert_viol "gateB-desc-col-mention-not-discharged" 1 "[B]" "$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | similar to tests/Trade/TradeValidatorTest.php pattern | PHPUnit | pre-impl | `tests/Other/SomeOtherTest.php` |
+
+## Security-Surface Discharge
+
+**Invariant:** `Trading\Foo` declares no property naming a DB handle.
+**Asserted by:** `tests/Trade/TradeValidatorTest.php` — reflection assertion.
+**Not covered:** the call sites.
+'
+
+# Gate B: ESCAPED-PIPE guard — a location cell containing \| (escaped pipe) before
+# the asserted test path must still resolve correctly after @@ESCPIPE@@ masking
+# (exit 0). Discriminates: without the gsub masking, \| splits f[6] short of the
+# path, gate B fires, and this fixture flips to FAIL.
+assert_viol "gateB-escaped-pipe-in-location-ok" 0 "[B]" "$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | gate emits verdict | PHPUnit | pre-impl | `grep -cE (GO\|HOLD)` + `tests/Trade/TradeValidatorTest.php` |
+
+## Security-Surface Discharge
+
+**Invariant:** `Trading\Foo` declares no property naming a DB handle.
+**Asserted by:** `tests/Trade/TradeValidatorTest.php` — reflection assertion.
+**Not covered:** the call sites.
+'
+
 # ---------------------------------------------------------------------------
 # Gate C: context budget.
 # ---------------------------------------------------------------------------

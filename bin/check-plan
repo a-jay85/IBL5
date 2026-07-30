@@ -431,6 +431,9 @@ fi
 # surface in this repo is PHP (SQL construction, POST/CSRF, authz guard, output
 # rendering), and PHPUnit is the only suite wired into the required "Tests and Analysis"
 # gate. Widening it to bin/test-* was considered and rejected here, not overlooked.
+# The matrix match is scoped to the test-file/location column only (field 6 after
+# splitting by `|`) — a test path name-dropped in a description column does not satisfy
+# the discharge. The extractor is fence-aware inline; $MATRIX_FILE is NOT used here.
 while IFS= read -r bviol; do
     [ -n "$bviol" ] && viol "$bviol"
 done < <(awk '
@@ -440,7 +443,7 @@ done < <(awk '
         }
         return 0
     }
-    BEGIN { infence=0; fence_len=0; sec=0; inv=0; ast=0; nc=0; tpath=""; mrows="" }
+    BEGIN { infence=0; fence_len=0; sec=0; inv=0; ast=0; nc=0; tpath=""; inm=0; mlocs="" }
     {
         nt = fence_ticks($0)
         if (infence) {
@@ -448,6 +451,15 @@ done < <(awk '
             next
         }
         if (nt >= 3) { infence=1; fence_len=nt; next }
+        if ($0 ~ /\|[ \t]*[Ww]hat to verify[ \t]*\|/) { inm=1; next }
+        if (inm && $0 ~ /^[ \t]*\|/) {
+            line = $0
+            gsub(/\\\|/, "@@ESCPIPE@@", line)
+            n = split(line, f, "|")
+            if (n >= 6) { loc = f[6]; gsub(/@@ESCPIPE@@/, "|", loc); mlocs = mlocs "\n" loc }
+            next
+        }
+        if (inm) inm = 0
         if ($0 ~ /^##[ \t]+Security-Surface Discharge/) { sec=1; next }
         if ($0 ~ /\*\*Invariant:\*\*/)   inv=1
         if ($0 ~ /\*\*Not covered:\*\*/) nc=1
@@ -455,7 +467,6 @@ done < <(awk '
             ast=1
             if (match($0, /[A-Za-z0-9_\/.-]+Test\.php/)) tpath = substr($0, RSTART, RLENGTH)
         }
-        if ($0 ~ /^[ \t]*\|/) mrows = mrows "\n" $0
     }
     END {
         if (!sec) exit 0
@@ -463,7 +474,7 @@ done < <(awk '
         if (!nc)  print "[B] plan claims a Security-Surface Discharge but has no **Not covered:** line (name the surfaces the discharge does NOT speak to)"
         if (!ast) print "[B] plan claims a Security-Surface Discharge but names no **Asserted by:** test (a prose-only invariant discharges nothing)"
         else if (tpath == "") print "[B] **Asserted by:** names no *Test.php path — the invariant must be machine-asserted by a required-blocking PHPUnit test"
-        else if (index(mrows, tpath) == 0) print "[B] **Asserted by:** " tpath " appears in no Verification Matrix row — the assertion must be a gating row, not a mention"
+        else if (index(mlocs, tpath) == 0) print "[B] **Asserted by:** " tpath " appears in no Verification Matrix test-file/location column — the assertion must be a gating row, not a mention"
     }
 ' "$PLAN_FILE")
 

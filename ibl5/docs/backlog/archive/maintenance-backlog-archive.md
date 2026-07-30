@@ -957,6 +957,15 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Status:** ✅ Already covered (verified 2026-06-26) — all 7 concrete classes have substantive unit tests under tests/Unit/BulkImport/ (ArchiveExtractorTest 27, BulkImportSummaryTest 9, ImportEntryTest 3, plus BulkImportRunner/BackupArchiveLocator/FileTypeHandler/JsbFileType). The finding's "zero tests" premise is stale; no new tests added.
 
 **Table evidence (2026-07-25):** All 7 concrete BulkImport classes already have substantive tests under tests/Unit/BulkImport/ (verified).
+### 6.2 Database — Zero Tests, 2 Files
+**Location:** `ibl5/classes/Database`
+**Problem:** `PdoConnection`, `MySQL` (legacy back-compat). No tests.
+**Suggested direction:** PHPUnit for `PdoConnection` init/state; verify `MySQL` deprecation warnings.
+**Est. effort:** S
+**Risk if untouched:** Connection failover/type-conversion edge cases unchecked.
+**Status:** Implemented (PR #1671, 2026-07-25) — `tests/Unit/Database/PdoConnectionTest.php` covers `setInstance`/`getInstance`/`reset` contract. `classes/Database` is coverage-excluded and mutation-excluded (ADR-0065). `MySQL` excluded per 5.18 (✅ class removed).
+
+**Table evidence (2026-07-27):** PdoConnectionTest.php (5 tests: setInstance/getInstance round-trip, singleton persistence, reset-and-reinject, setInstance override, PDOException on unreachable host) passing. MySQL class removed (5.18 ✅).
 ### 6.3 Module/ModuleAccessControl — Zero Tests
 **Location:** `ibl5/classes/Module/ModuleAccessControl.php`
 **Problem:** Role-based access gating with no tests.
@@ -966,6 +975,15 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Status:** Completed (verified 2026-05-29 audit) — `tests/Module/` now has `ModuleAccessControlTest.php` + `ModuleRegistryTest.php`.
 
 **Table evidence (2026-07-25):** ModuleAccessControlTest + ModuleRegistryTest exist.
+### 6.4 PageLayout — Zero Tests
+**Location:** `ibl5/classes/PageLayout/PageLayout.php`
+**Problem:** Layout assembly + CSS injection with no tests.
+**Suggested direction:** PHPUnit for structure assembly, CSS class injection.
+**Est. effort:** S
+**Risk if untouched:** Layout regressions invisible.
+**Status:** Implemented (PR #1671, 2026-07-25) — `tests/Unit/PageLayout/PageLayoutTest.php` covers boosted/non-boosted header structure, CSS stylesheet link, font preconnect links, favicon, flash message, admin gate notice, footer paths, OG meta tag host-poisoning XSS guard, and `renderPageGenerationTime()`. Supersedes earlier `PageLayoutHeaderSideEffectTest.php` (header side-effect only). Structure/CSS injection goals satisfied.
+
+**Table evidence (2026-07-27):** PageLayoutTest.php (22 tests) passing. Supersedes PageLayoutHeaderSideEffectTest.php (header side-effect only).
 ### 6.5 Statistics/TeamStatsCalculator — Zero Tests
 **Location:** `ibl5/classes/BasketballStats/TeamStatsCalculator.php` (moved from `classes/Statistics/` — see 2.30)
 **Problem:** PPG, FG%, rebounds, assists aggregation with no tests.

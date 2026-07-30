@@ -1152,7 +1152,7 @@ CI_EOF
 
     if [ "$CI_AUTOFIX_DRY_RUN" = "1" ]; then
         ci_log "would-dispatch model=$model PR #$best_pr attempt $attempt failing=$best_failing"
-        ci_lock_release; return 0
+        ci_lock_release; return 1
     fi
 
     local ci_log_path diff_path result_file
@@ -1166,7 +1166,7 @@ CI_EOF
     rm -f "$result_file" 2>/dev/null || true
     local prompt_rendered
     prompt_rendered="$(mktemp "${wt_root}/.bug-pipeline/prompt.XXXXXX" 2>/dev/null)" || \
-        { ci_log "PR #$best_pr: cannot create prompt tempfile"; ci_lock_release; return 0; }
+        { ci_log "PR #$best_pr: cannot create prompt tempfile"; ci_lock_release; return 1; }
     ci_render_prompt "$best_pr" "$best_branch" "$wt_root" "$best_failing" \
         "$ci_log_path" "$diff_path" "$result_file" > "$prompt_rendered"
 
@@ -1305,8 +1305,9 @@ main() {
     fi
 
     # ── CI-autofix pass (ADR-0097): opportunistic — runs only when no bug hunt ran ──
-    # Returns 0 iff a fix agent was dispatched; caller ends the tick to enforce one spawn
-    # per tick. Deferred until after maybe_hunt so bug hunting always takes priority.
+    # Returns 0 only when a fix agent was dispatched (caller ends the tick — one spawn/tick).
+    # Returns 1 on every other path (kill switch, dry-run, no eligible PR) so the bug-report
+    # loop still runs. Deferred until after maybe_hunt so bug hunting always takes priority.
     if ci_autofix_main; then
         return 0
     fi

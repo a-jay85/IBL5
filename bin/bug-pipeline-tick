@@ -1084,10 +1084,11 @@ ci_budget_state() {
 
 # ci_autofix_main — detect red PRs, acquire lock, gate (budget/wt/idle/head),
 # dispatch at most one fix agent per tick, or call giveup when ceiling reached.
-# Never aborts a tick: every failure path logs and returns 0.
+# Returns 0 ONLY when a fix agent was dispatched (caller ends the tick).
+# Returns 1 on every non-dispatch path so the tick falls through to the bug-report loop.
 ci_autofix_main() {
     [ "$CI_AUTOFIX_ENABLED" = "1" ] || {
-        ci_log "kill switch off — skipping CI-autofix"; return 0; }
+        ci_log "kill switch off — skipping CI-autofix"; return 1; }
 
     local red_prs
     red_prs="$(bpgh_pr_failing_checks 2>/dev/null || true)"
@@ -1123,23 +1124,23 @@ CI_EOF
 
     [ -n "$best_pr" ] || { ci_log "no eligible PR found this tick"; return 1; }
 
-    ci_lock_acquire || return 0
+    ci_lock_acquire || return 1
 
     # Re-resolve worktree: it may have disappeared since the scan.
     wt_root="$(ci_wt_for_branch "$best_branch" 2>/dev/null || true)"
     if [ -z "$wt_root" ]; then
         ci_log "PR #$best_pr: worktree vanished after lock"
-        ci_lock_release; return 0
+        ci_lock_release; return 1
     fi
 
     if ! ci_wt_is_idle "$wt_root"; then
         ci_log "PR #$best_pr: worktree not idle — skipping"
-        ci_lock_release; return 0
+        ci_lock_release; return 1
     fi
 
     if ! ci_wt_head_matches "$wt_root" "$best_sha"; then
         ci_log "PR #$best_pr: worktree HEAD does not include PR head $best_sha — skipping"
-        ci_lock_release; return 0
+        ci_lock_release; return 1
     fi
 
     local attempt model wt_appdir

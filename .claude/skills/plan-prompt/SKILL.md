@@ -2,7 +2,7 @@
 name: plan-prompt
 description: "Draft a /plan prompt distilled from the current conversation — ground-truth pointers, already-measured evidence, scope, constraints, verification, and the Step-3 architect tier — then, unless the Step-1.5 size triage says the work clears the ad-hoc bar, fire it as a detached headless Sonnet 4.6 run via bin/plan-now. Use after a design discussion when the planning run should be offloaded off the expensive session."
 disable-model-invocation: true
-last_verified: 2026-07-28
+last_verified: 2026-07-29
 ---
 
 # Draft a `/plan` handoff prompt and fire it headless
@@ -83,19 +83,23 @@ padding. The block is written to a file, not printed (Step 5), so it needs no
 enclosing fence; add one (` ```markdown `, four backticks if the body itself contains
 fences) only in the draft-only case where you do print it.
 
-1. **Read first (ground truth) — do NOT plan from my summary alone.**
-   Explicit `path:line` pointers — repo files, ADRs, backlog entries, prior
-   `~/claude-plans/*.md` — each with the *one load-bearing fact* it establishes.
-   Cite at whatever precision this conversation already established (Step 0) — a bare
-   path is fine; do not open files now to sharpen a pointer into a `path:line`.
-   This is the load-bearing section: it is what lets a cheap orchestrator reach the
-   same understanding this conversation did.
+1. **`## Exploration pointers`** — explicit `path:line` pointers — repo files, ADRs,
+   backlog entries, prior `~/claude-plans/*.md` — each with the *one load-bearing fact*
+   it establishes. Cite at whatever precision this conversation already established
+   (Step 0) — a bare path is fine; do not open files now to sharpen a pointer into a
+   `path:line`. This is the load-bearing section: it is what lets a cheap orchestrator
+   reach the same understanding this conversation did. When a fresh `/plan` session sees
+   this section in `$ARGUMENTS`, it treats the pointers as trusted — cheap confirmation
+   only, no re-exploration (`.claude/skills/plan/SKILL.md` § Step 2 trusted-context
+   detection). Emit the heading **verbatim**: that exact string is the detection trigger.
 
-2. **Already measured / already traced — verify, don't re-derive.**
-   The conclusions this conversation produced: counts, `path:line` anchors, traced
-   call paths, ruled-out hypotheses. Include the **anti-patterns** explicitly
-   ("do not 'fix' the auth attribution — it's intentional"; "ignore the stale InnoDB
-   `table_rows` estimate"). Anything omitted here gets re-derived or re-litigated.
+2. **`## Resolved design decisions`** — the conclusions this conversation produced:
+   counts, `path:line` anchors, traced call paths, ruled-out hypotheses. Include the
+   **anti-patterns** explicitly ("do not 'fix' the auth attribution — it's intentional";
+   "ignore the stale InnoDB `table_rows` estimate"). Anything omitted here gets re-derived or re-litigated.
+   This section alone does **not** trip `/plan`'s trusted-
+   context detection — item 1's heading is the trigger — but `/plan` transcribes it into
+   the context artifact it seeds, so its contents bind the plan as fixed constraints.
 
 3. **Scope** — numbered parts, plus an explicit **out of scope** list.
 

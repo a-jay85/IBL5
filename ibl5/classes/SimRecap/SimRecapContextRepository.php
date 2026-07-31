@@ -29,7 +29,7 @@ final class SimRecapContextRepository extends \BaseMysqliRepository
      * Builds the full roster context for a sim. Fault-tolerant: an unknown or
      * window-less sim returns a well-formed empty context rather than throwing.
      *
-     * @return array{sim:int,start_date:string|null,end_date:string|null,roster:array<int,list<array{pid:int,name:string,pos:string,current_teamid:int}>>,active_injuries:list<array{pid:int,name:string,pos:string,date:string,injuryDescription:string,injuryGamesMissed:int,daysRemaining:int,returnDate:string,isNew:bool}>,sim_trades:list<array{pid:int,player_name:string|null,from_teamid:int,to_teamid:int,trade_group_id:int|null,trade_date:string}>}
+     * @return array{sim:int,start_date:string|null,end_date:string|null,roster:array<int,list<array{pid:int,name:string,pos:string,current_teamid:int}>>,active_injuries:list<array{pid:int,name:string,pos:string,date:string,injuryDescription:string,injuryGamesMissed:int,daysRemaining:int,returnDate:string,isNew:bool,current_teamid:int}>,sim_trades:list<array{pid:int,player_name:string|null,from_teamid:int,to_teamid:int,trade_group_id:int|null,trade_date:string}>}
      */
     public function buildContext(int $simId): array
     {
@@ -75,12 +75,14 @@ final class SimRecapContextRepository extends \BaseMysqliRepository
             $roster[$tid] = $lines;
         }
 
+        $rawInjuries = $this->lastSimRecap->getActiveInjuriesForPlayers($allPids, $end);
+
         return [
             'sim'             => $simId,
             'start_date'      => $start,
             'end_date'        => $end,
             'roster'          => $roster,
-            'active_injuries' => $this->lastSimRecap->getActiveInjuriesForPlayers($allPids, $end),
+            'active_injuries' => $this->enrichInjuriesWithCurrentTeam($rawInjuries, $playerMap),
             'sim_trades'      => $this->getSimTrades($start, $end),
         ];
     }
@@ -148,6 +150,28 @@ final class SimRecapContextRepository extends \BaseMysqliRepository
         );
 
         return $rows;
+    }
+
+    /**
+     * Merges current_teamid (from ibl_plr.teamid) into each injury row.
+     * The from_teamid on a TYPE_INJURY row is a frozen historical marker — it
+     * reflects which team the player was on at injury time, not now. We enrich
+     * with ibl_plr.teamid (the live value) so callers never mis-attribute a
+     * traded-and-injured player to his old team.
+     *
+     * @param list<array{pid:int,name:string,pos:string,date:string,injuryDescription:string,injuryGamesMissed:int,daysRemaining:int,returnDate:string,isNew:bool}> $injuries
+     * @param array<int,array{pid:int,name:string,pos:string,current_teamid:int}> $playerMap
+     * @return list<array{pid:int,name:string,pos:string,date:string,injuryDescription:string,injuryGamesMissed:int,daysRemaining:int,returnDate:string,isNew:bool,current_teamid:int}>
+     */
+    private function enrichInjuriesWithCurrentTeam(array $injuries, array $playerMap): array
+    {
+        $out = [];
+        foreach ($injuries as $injury) {
+            $pid = $injury['pid'];
+            $injury['current_teamid'] = isset($playerMap[$pid]) ? $playerMap[$pid]['current_teamid'] : 0;
+            $out[] = $injury;
+        }
+        return $out;
     }
 
     /**

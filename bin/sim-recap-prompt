@@ -313,7 +313,10 @@ of this sim. Use it to attribute players correctly in your recap:
 
 - roster: each team's current player list (current_teamid is authoritative;
   never use ibl_jsb_transactions.from_teamid — it is a frozen historical marker)
-- active_injuries: players currently on the injury list as of the sim window end
+- active_injuries: players currently on the injury list as of the sim window end.
+  Each row carries current_teamid (from ibl_plr.teamid) — attribute an injured
+  player to THAT team, never to ibl_jsb_transactions.from_teamid, which records
+  where he was when he got hurt and is wrong for anyone traded since.
 - sim_trades: trades that occurred during this sim window
 
 ROSTER_HEADER_EOF

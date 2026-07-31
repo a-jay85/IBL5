@@ -97,6 +97,21 @@ q() {
     return "$rc"
 }
 
+# ── One seam for the prod-side context precompute ────────────────────────────
+# qctx <sim> -> JSON object on stdout; exit status of the call.
+# A dead ssh, an undeployed simRecapContext.php, or a PHP fatal yields EMPTY
+# stdout plus non-zero exit. Fault-tolerant: caller falls back to '{}' on failure.
+qctx() {
+    local sim="$1" rc
+    "$SIM_RECAP_SSH_BIN" "$SIM_RECAP_SSH_HOST" \
+        "php $SIM_RECAP_REMOTE_ROOT/ibl5/scripts/simRecapContext.php --sim=$sim"
+    rc=$?
+    if [ "$rc" -ne 0 ]; then
+        log "WARNING: roster-context fetch (sim $sim) failed (exit $rc) — proceeding without roster context"
+    fi
+    return "$rc"
+}
+
 # jq_ok <json> <filter> -> true when the filter succeeds (fail-closed on garbage).
 jq_ok() { printf '%s' "$1" | "$SIM_RECAP_JQ_BIN" -e "$2" >/dev/null 2>&1; }
 
@@ -142,6 +157,16 @@ fetch_agent_inputs() { # sim  (writes mentions.json + themes-ledger.json into WO
     fi
     # .themes is a flat JSON array of strings — string-safe by construction.
     printf '%s' "$rt" | "$SIM_RECAP_JQ_BIN" '.themes' > "$WORKDIR/themes-ledger.json" 2>/dev/null
+
+    # Fetch precomputed roster context (fault-tolerant — failure does NOT park).
+    local ctx ctx_rc
+    ctx="$(qctx "$sim")"; ctx_rc=$?
+    if [ "$ctx_rc" -eq 0 ] && jq_ok "$ctx" '.sim != null'; then
+        printf '%s' "$ctx" > "$WORKDIR/roster-context.json"
+    else
+        log "sim $sim: roster-context unavailable — writing empty context"
+        printf '{}' > "$WORKDIR/roster-context.json"
+    fi
     return 0
 }
 
@@ -202,7 +227,8 @@ generate() { # sim
 
     local prompt
     if ! prompt="$("$SIM_RECAP_PROMPT_BIN" --sim="$sim" \
-            --mentions="$WORKDIR/mentions.json" --themes="$WORKDIR/themes-ledger.json")"; then
+            --mentions="$WORKDIR/mentions.json" --themes="$WORKDIR/themes-ledger.json" \
+            --roster="$WORKDIR/roster-context.json")"; then
         log "sim $sim: prompt build failed (missing exemplar?) — parking"
         park "$sim"; return 0
     fi
@@ -268,10 +294,12 @@ dry_run() {
     fetch_agent_inputs "$sim" || true
     [ -f "$WORKDIR/mentions.json" ] || printf '{}' > "$WORKDIR/mentions.json"
     [ -f "$WORKDIR/themes-ledger.json" ] || printf '[]' > "$WORKDIR/themes-ledger.json"
+    [ -f "$WORKDIR/roster-context.json" ] || printf '{}' > "$WORKDIR/roster-context.json"
 
     local prompt
     if ! prompt="$("$SIM_RECAP_PROMPT_BIN" --sim="$sim" \
-            --mentions="$WORKDIR/mentions.json" --themes="$WORKDIR/themes-ledger.json")"; then
+            --mentions="$WORKDIR/mentions.json" --themes="$WORKDIR/themes-ledger.json" \
+            --roster="$WORKDIR/roster-context.json")"; then
         log "dry-run sim $sim: prompt build failed (missing exemplar?)"
         exit 1
     fi

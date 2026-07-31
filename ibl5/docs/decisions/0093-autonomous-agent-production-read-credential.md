@@ -1,6 +1,6 @@
 ---
 description: An unattended agent is given a production-reaching credential safely by starving it to one SELECT-only MySQL user over an SSH tunnel while every privileged write happens prod-side behind a CLI guard.
-last_verified: 2026-07-23
+last_verified: 2026-07-30
 ---
 
 # ADR-0093: An autonomous agent holding a production read-only credential
@@ -47,7 +47,10 @@ The agent is made **incapable by construction**, not trusted to behave. Four str
 - `bin/sim-recap-cron-setup` — the launchd generator that injects the one credential and ships no `.plist`.
 - `bin/test-sim-recap-tick` — the harness carrying the zero-`claude`-on-empty-tick invariant.
 - `ibl5/scripts/simRecapQueue.php`, `ibl5/scripts/storeSimRecap.php`, `ibl5/scripts/.htaccess` — the prod-side privileged entry points and their web deny.
+- `ibl5/scripts/simRecapContext.php` — the third prod-side CLI entry point; precomputes current rosters, active injuries, and in-window trades with the same SELECT-only credential; same PHP_SAPI guard and .htaccess scoped deny.
 - `ibl5/tests/WideUnit/Scripts/SimRecapQueueGuardTest.php` — source-content guard for the CLI guard, `.htaccess` scoping, and the string-cast-on-snowflakes property.
+- `ibl5/tests/WideUnit/Scripts/SimRecapContextGuardTest.php` — source-content guard for simRecapContext.php's CLI guard, .htaccess scoping, and no-credential-in-argv/env properties.
 - `ibl5/classes/SimRecap/SimSummaryRepository.php` — the frozen queue primitives the CLI exposes.
+- `ibl5/classes/SimRecap/SimRecapContextRepository.php` — the SELECT-only repository that precomputes the context emitted by simRecapContext.php.
 - `ibl5/docs/decisions/0080-mac-local-discord-bug-pipeline-cron-topology.md`, `ibl5/docs/decisions/0081-hunter-trust-split-starved-env-sandbox.md` — the prior-art topology and trust split this ADR extends to a production-reaching agent.
 - `ibl5/docs/decisions/0062-all-work-in-worktrees.md`, `ibl5/docs/decisions/0046-worktrees-outside-repo.md` — why property 4's temp working dir enforces the read-only checkout, and why the generated plist points at the main checkout.

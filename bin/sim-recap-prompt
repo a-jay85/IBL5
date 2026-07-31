@@ -6,7 +6,7 @@
 # queries live game data itself via mysql.
 #
 # Usage:
-#   bin/sim-recap-prompt --sim=N --mentions=<path> --themes=<path>
+#   bin/sim-recap-prompt --sim=N --mentions=<path> --themes=<path> [--roster=<path>]
 #
 # --mentions JSON shape: {"Team Name": "snowflake-string-or-null", ...}
 #   Keys are teams that played in the sim. Values are Discord snowflakes as
@@ -14,6 +14,13 @@
 #   with no Discord ID. Null-value teams render as plain team names.
 #
 # --themes JSON shape: ["narrative angle used", ...] or [] for empty ledger
+#
+# --roster JSON shape: precomputed roster context from simRecapContext.php.
+#   {"sim":N,"start_date":"YYYY-MM-DD","end_date":"YYYY-MM-DD",
+#    "roster":{"<teamid>":[{"pid":N,"name":"...","pos":"...","current_teamid":N}],...},
+#    "active_injuries":[...],"sim_trades":[...]}
+#   When provided, injected as Block 8 (after the exemplar) so it outranks it.
+#   When absent, Block 8 is omitted entirely (roster-blind mode).
 #
 # Env seams (SIM_RECAP_* convention):
 #   SIM_RECAP_EXEMPLAR  Path to the pinned exemplar txt file.
@@ -53,11 +60,13 @@ SIM_RECAP_MYSQL_BIN="${SIM_RECAP_MYSQL_BIN:-/opt/homebrew/opt/mysql@8.4/bin/mysq
 sim=""
 mentions_path=""
 themes_path=""
+roster_path=""
 for arg in "$@"; do
     case "$arg" in
         --sim=*)      sim="${arg#--sim=}" ;;
         --mentions=*) mentions_path="${arg#--mentions=}" ;;
         --themes=*)   themes_path="${arg#--themes=}" ;;
+        --roster=*)   roster_path="${arg#--roster=}" ;;
     esac
 done
 
@@ -86,7 +95,7 @@ cat <<'VOICE_EOF'
 
 == VOICE SPEC ==
 
-on production, the most recent sim results are up. write a summary paragraph for each simmed game, similar to an ESPN-style write-up. write in the voice of Bill Simmons. avoid writing like an LLM (e.g. no em-dashes, short punchy sentences, "it's not this, it's that", "and here's the thing", "load-bearing" – all of those cliché LLM patterns of speech). try to use Simmons' humor (ideally his actually funny humor, not just what's funny to him). whenever you find yourself repeating an old theme, try to tie in a pop culture reference, whether of the player's real-life era, the era the games are simulated in, or of the real-life era of today. these paragraphs will be posted on Discord. before each paragraph, write the team names and the final scores, and on a line below, @mention the GM's of each team. don't list GM names next to the Discord mentions, it will look redundant. use mysql to pull data. ibl_sim_dates holds the dates of the last sim. ibl_box_scores and ibl_box_scores_teams has the raw box score data. ibl_schedule and ibl_standings will tell you the league schedule and where teams are in the standings. ibl_jsb_transactions lists injuries during the sim – mention the injuries in each game when possible. ibl_power contains post-sim win/loss streak information. Use it to call out any long streaks and to know when a big streak was snapped. open with a WHERE THINGS STAND standings-context section at the top of the output, first, before any per-game recaps — the pinned exemplar's ordering is authoritative. here's a sample of what you produced last time – ok to improve, expand upon, or change it for the better. if you don't continuously improve, expand, or change it up, referencing old content to create new content will become an ouroboros and get stale too quickly.
+on production, the most recent sim results are up. write a summary paragraph for each simmed game, similar to an ESPN-style write-up. write in the voice of Bill Simmons. avoid writing like an LLM (e.g. no em-dashes, short punchy sentences, "it's not this, it's that", "and here's the thing", "load-bearing" – all of those cliché LLM patterns of speech). try to use Simmons' humor (ideally his actually funny humor, not just what's funny to him). whenever you find yourself repeating an old theme, try to tie in a pop culture reference, whether of the player's real-life era, the era the games are simulated in, or of the real-life era of today. these paragraphs will be posted on Discord. before each paragraph, write the team names and the final scores, and on a line below, @mention the GM's of each team. don't list GM names next to the Discord mentions, it will look redundant. use mysql to pull data. ibl_sim_dates holds the dates of the last sim. ibl_box_scores and ibl_box_scores_teams has the raw box score data. ibl_schedule and ibl_standings will tell you the league schedule and where teams are in the standings. ibl_jsb_transactions lists injuries AND trades during the sim. mention the injuries in each game when possible. when a player was recently traded to their current team (use ibl_plr.teamid for current team, never from_teamid which is a frozen historical marker), note it in their first game recap. ibl_power contains post-sim win/loss streak information. Use it to call out any long streaks and to know when a big streak was snapped. open with a WHERE THINGS STAND standings-context section at the top of the output, first, before any per-game recaps — the pinned exemplar's ordering is authoritative. here's a sample of what you produced last time – ok to improve, expand upon, or change it for the better. if you don't continuously improve, expand, or change it up, referencing old content to create new content will become an ouroboros and get stale too quickly.
 
 VOICE_EOF
 
@@ -231,7 +240,7 @@ Strict field types:
   - game_date: non-empty string, format YYYY-MM-DD
   - recap_text (per game and top-level): non-empty strings
   - box_id: integer or null
-  - game_of_that_day: use 0 (integer zero, not null) when there was exactly one game on that date
+  - game_of_that_day: 1-based counter — use 1 when there was exactly one game on that date, or for the first game of a doubleheader; use 2 for the second game. Never use 0 — that silently drops this recap from the rendered output.
   - themes: array of strings — narrative angles you used this run (for the next ledger)
 
 == HOW TO PRODUCE IT ==
@@ -288,3 +297,33 @@ cat <<EXEMPLAR_FOOTER_EOF
 
 End of pinned exemplar. Write the recap for sim ${sim} now, using live data from the database.
 EXEMPLAR_FOOTER_EOF
+
+# =============================================================================
+# Block 8: Authoritative roster context (injected AFTER the exemplar so it
+# outranks the exemplar on player attribution). Only emitted when --roster=<path>
+# provides a valid JSON file.
+# =============================================================================
+if [[ -n "$roster_path" && -f "$roster_path" ]]; then
+    cat <<'ROSTER_HEADER_EOF'
+
+== CURRENT ROSTER CONTEXT (authoritative — outranks the exemplar) ==
+
+The following precomputed context reflects the current state of the league as
+of this sim. Use it to attribute players correctly in your recap:
+
+- roster: each team's current player list (current_teamid is authoritative;
+  never use ibl_jsb_transactions.from_teamid — it is a frozen historical marker)
+- active_injuries: players currently on the injury list as of the sim window end.
+  Each row carries current_teamid (from ibl_plr.teamid) — attribute an injured
+  player to THAT team, never to ibl_jsb_transactions.from_teamid, which records
+  where he was when he got hurt and is wrong for anyone traded since.
+- sim_trades: trades that occurred during this sim window
+
+ROSTER_HEADER_EOF
+    cat "$roster_path"
+    cat <<'ROSTER_FOOTER_EOF'
+
+(End of roster context — write the recap using the live database data above,
+ informed by this roster context for current team attribution.)
+ROSTER_FOOTER_EOF
+fi

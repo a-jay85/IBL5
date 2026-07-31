@@ -405,6 +405,59 @@ final class SimSummaryRepositoryTest extends DatabaseTestCase
         self::assertSame([], $displayable, 'No box score match → no displayable game recaps');
     }
 
+    public function testFindDisplayableGameRecapsSingleGameDaySurvives(): void
+    {
+        $game = $this->gameRecap(sortOrder: 0, gameOfThatDay: 1);
+        $this->repo->markDone(999090, 'Intro.', 'Outro.', 'Recap.', [$game], null);
+
+        $this->db->query(
+            "INSERT INTO `ibl_box_scores_teams` (`game_date`, `visitor_teamid`, `home_teamid`, `game_of_that_day`, `name`)" .
+            " VALUES ('2025-01-01', 1, 2, 1, 'Metros')"
+        );
+
+        $displayable = $this->repo->findDisplayableGameRecaps(999090);
+
+        self::assertCount(1, $displayable, 'Single game with gotd=1 must be returned');
+        self::assertSame(1, $displayable[0]['game_of_that_day']);
+    }
+
+    public function testFindDisplayableGameRecapsDoubleheaderBothReturned(): void
+    {
+        $games = [
+            $this->gameRecap(sortOrder: 0, gameOfThatDay: 1),
+            $this->gameRecap(sortOrder: 1, gameOfThatDay: 2),
+        ];
+        $this->repo->markDone(999091, 'Intro.', 'Outro.', 'Recap.', $games, null);
+
+        $this->db->query(
+            "INSERT INTO `ibl_box_scores_teams` (`game_date`, `visitor_teamid`, `home_teamid`, `game_of_that_day`, `name`)" .
+            " VALUES ('2025-01-01', 1, 2, 1, 'Metros'), ('2025-01-01', 1, 2, 2, 'Stars')"
+        );
+
+        $displayable = $this->repo->findDisplayableGameRecaps(999091);
+
+        self::assertCount(2, $displayable, 'Doubleheader: both games must be returned');
+        self::assertSame(1, $displayable[0]['game_of_that_day']);
+        self::assertSame(2, $displayable[1]['game_of_that_day']);
+    }
+
+    public function testFindDisplayableGameRecapsMismatchDropped(): void
+    {
+        // A recap with game_of_that_day=0 (the old wrong value) must be dropped
+        // when the box score has game_of_that_day=1.
+        $game = $this->gameRecap(sortOrder: 0, gameOfThatDay: 0);
+        $this->repo->markDone(999092, 'Intro.', 'Outro.', 'Recap.', [$game], null);
+
+        $this->db->query(
+            "INSERT INTO `ibl_box_scores_teams` (`game_date`, `visitor_teamid`, `home_teamid`, `game_of_that_day`, `name`)" .
+            " VALUES ('2025-01-01', 1, 2, 1, 'Metros')"
+        );
+
+        $displayable = $this->repo->findDisplayableGameRecaps(999092);
+
+        self::assertSame([], $displayable, 'gotd=0 recap must not match a gotd=1 box score');
+    }
+
     // ── Private helpers ────────────────────────────────────────────────────────
 
     /**

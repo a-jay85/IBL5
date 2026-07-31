@@ -1,6 +1,6 @@
 ---
 description: CI/GitHub-Actions workflow simplification backlog — duplicated setup/notify boilerplate, job consolidation, and verified-not-redundant workflows, with per-entry status + automouse-readiness.
-last_verified: 2026-07-14
+last_verified: 2026-07-31
 ---
 
 # CI Workflow Simplification Backlog
@@ -29,12 +29,14 @@ last_verified: 2026-07-14
 
 | Status | Count |
 |--------|------:|
-| ⬜ Open | 2 |
-| 📋 Planned | 0 |
-| ✅ Implemented | 8 |
+| ⬜ Open | 1 |
+| 📋 Planned | 2 |
+| ◑ Partial | 1 |
+| ✅ Implemented | 9 |
 | 🚫 Declined | 0 |
 
 > The 4 "verified-not-redundant" entries in Axis 4 are **decisions to keep**, not open work — they exist so a future audit does not re-flag them. Not counted above.
+> ✅ corrected from 8 → 9 on 2026-07-31: a recount from table rows (Axes 1–3, 5) found 9 implemented entries (3.5 had already folded into 1.1 but was still counted separately; 5.1 was the sole ⬜, not 2). ⬜ was 1 before the Axis 6 additions. [CORRECTED 2026-07-31]
 
 ---
 
@@ -127,6 +129,46 @@ These look like duplicate workflows but each occupies a distinct, justified role
 **Suggested direction:** Compile IBLbot on the CI runner (where it already builds during tests), upload `dist/` as an artifact, and have the deploy step `rsync`/scp the prebuilt `dist/` to the droplet + `npm ci --omit=dev` (runtime deps only) + pm2 restart — no compiler on the server. This also unblocks the `typescript@7` Dependabot pin (the Go compiler is fine on a CI runner). Mirrors how compiled CSS is already built in CI and deployed as an artifact (`main.yml` "Build CSS" → "Deploy compiled CSS to server").
 **Risk if untouched:** Every future bump to a heavier build tool (TS, esbuild, a bundler) risks re-breaking the deploy on server memory limits; each is caught only at deploy time, blocking the whole production pipeline until hand-patched.
 **Status (2026-07-14):** ⬜ Open — surfaced by the PR #1453 deploy-failure investigation; needs a `/plan` (touches the deploy/notify path → expect `auto_merge: false`, 🟦).
+
+---
+
+## Axis 6: Sim-recap testing-gap spin-offs (PR #1753 audit)
+
+Entries 6.1 and 6.2 are CI/coverage gaps surfaced by the 2026-07-31 audit of PR #1753. Entry 6.3 is a sim-recap application fix tracked here by origin (PR #1753 audit), not by theme — no backlog file covers payload-validation gaps today. Source record for all three: `$HOME/claude-plans/sim-recap-testing-gaps-breakdown.md`.
+
+| # | Title | Status | Automouse | Effort |
+|---|-------|--------|-----------|-------:|
+| 6.1 | CI path-filter coupling splits sim-recap producer from consumer | 📋 Planned | 🟦 | M |
+| 6.2 | `ibl5/scripts/` excluded from phpstan; script fatals degrade silently | ◑ Partial | 🟦 | S |
+| 6.3 | `SimRecapPayload` accepts `game_of_that_day < 1`; `SimSummaryRepository` silently drops those rows | 📋 Planned | 🟥 | M |
+
+### 6.1 CI path-filter coupling splits sim-recap producer from consumer
+*(discovered 2026-07-31 during #1753)*
+**Location:** `.github/workflows/tests.yml` `changes:` job — the `src` filter gates `db-integration` on `**.php`; the `shell` filter gates `harness-tests` on `bin/**`. The sim-recap producer (`ibl5/scripts/simRecap*`, `ibl5/classes/SimRecap/**`) and consumer (`bin/sim-recap-*`) are on opposite sides of this boundary.
+**Problem:** A PHP-only change to the sim-recap producer runs zero prompt/tick tests. A `bin/`-only change to the consumer runs zero DB integration tests. The filter split is what let the traded-player regression survive PR review — CI stayed green because the producer and consumer were never tested together.
+**Suggested direction:** Extend the `changes:` coupling declaration so that a change to `bin/sim-recap-*` triggers `db-integration`, and a change to `ibl5/scripts/simRecap*` or `ibl5/classes/SimRecap/**` triggers `harness-tests`. Prefer the general cross-coupling pattern over a sim-recap special case.
+**Risk if untouched:** Every future sim-recap PR that touches one surface only (PHP or shell) silently omits half the test coverage. The named regression (traded player attributed to wrong team) would not have been caught by CI.
+**Closes gap:** #4 from `$HOME/claude-plans/sim-recap-testing-gaps-breakdown.md`
+**Status (2026-07-31):** 📋 Planned — `~/claude-plans/ci-path-filter-sim-recap-coupling.md` (written 2026-07-31, routed `plan-architect-xhigh` as a ship-pipeline invariant). Not yet implemented. 🟦.
+
+### 6.2 `ibl5/scripts/` excluded from phpstan; script fatals degrade silently
+*(discovered 2026-07-31 during #1753)*
+**Location:** `ibl5/phpstan.neon` `paths:` (currently lists `classes`, `phpstan-rules`, and extension-less `bin/` scripts — zero mention of `scripts`); no `php -l` sweep exists anywhere in `.github/` or `bin/`.
+**Problem:** A broken class reference in any `ibl5/scripts/*.php` file exits 255 while a guard unit test (e.g. `SimRecapContextGuardTest`) reports OK — the guard test is regex-only over source text and cannot catch a class-resolution failure. In prod, that fatal degrades silently: `simRecapContext.php` (example) would return exit 255 and the caller wraps the failure as `{}`, shipping a roster-blind recap. Proven by mutation during the #1753 audit. Also pending: a stale ADR-0092 citation in `ibl5/scripts/simRecapQueue.php`'s docblock (correct ADR is 0093) — fold into this PR if it does not trip `bin/check-docs` freshness, otherwise its own trivial fix.
+**Suggested direction:** Add `scripts` to `ibl5/phpstan.neon` `paths:` and generate a baseline (`ibl5/phpstan-baseline.neon`) to absorb pre-existing findings. Optionally add a `php -l` sweep. Ad-hoc — an existing pattern (add path + generate baseline) covers this; no `/plan` needed.
+**Risk if untouched:** Any syntax or class-reference error in `ibl5/scripts/*.php` is invisible to CI. It surfaces only as a prod degradation (the exact bug class PR #1753 fixed).
+**Closes gap:** #1 (static-analysis half) from `$HOME/claude-plans/sim-recap-testing-gaps-breakdown.md`
+**Status (2026-07-31):** ◑ Partial — implemented 2026-07-31 in worktree `phpstan-scripts-dir-coverage` (phpstan `paths:` + baseline + the ADR-0092→0093 docblock fix); not yet merged. 🟦.
+
+### 6.3 `SimRecapPayload` accepts `game_of_that_day < 1`; `SimSummaryRepository` silently drops those rows
+*(discovered 2026-07-31 during #1753)*
+**Location:** `ibl5/classes/SimRecap/SimRecapPayload.php` (`requireInt` with no lower bound on `game_of_that_day`); `ibl5/classes/SimRecap/SimSummaryRepository.php` (`COALESCE(bst.game_of_that_day, 0) = gr.game_of_that_day` silently drops rows where `game_of_that_day = 0`).
+**Problem:** The new `…MismatchDropped` test (PR #1753) pins the silent drop as *expected behavior*. The correct fix is an ingest-time lower-bound check so that `game_of_that_day < 1` is rejected at `SimRecapPayload::fromJson()`. An open design fork must be resolved first: **fail-closed vs. warn**, and what to do when box scores land *after* the recap.
+**Suggested direction:** Resolve the fail-closed-vs-warn fork (lean fail-closed with a structured error); add a `requireInt` lower bound; revisit `testFindDisplayableGameRecapsMismatchDropped` to test the rejection, not the silent drop. This item is the plan's own deferred "ingest-time reconciliation of `game_of_that_day`" Out-of-Scope item.
+**Risk if untouched:** `game_of_that_day = 0` silently drops recap rows; the test suite treats this as expected, so future regressions in this path pass CI green.
+**Closes gap:** #8 from `$HOME/claude-plans/sim-recap-testing-gaps-breakdown.md`
+**Tracked here** by PR #1753 audit origin, not by theme (no existing backlog covers payload-validation gaps).
+**Status (2026-07-31):** 📋 Planned — `~/claude-plans/game-of-that-day-validation-floor.md` (written 2026-07-31). Not yet implemented. 🟥.
 
 ---
 

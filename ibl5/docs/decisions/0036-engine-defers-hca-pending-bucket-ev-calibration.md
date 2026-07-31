@@ -1,11 +1,11 @@
 ---
 description: The Go sim engine defers home-court advantage until play-outcome bucket EVs are corpus-calibrated; ASG mode is an in-engine no-op until then.
-last_verified: 2026-05-31
+last_verified: 2026-07-31
 ---
 
 # ADR-0036: Engine defers home-court advantage pending bucket-EV calibration
 
-**Status:** Accepted
+**Status:** Accepted (deferred decision resolved — HCA re-homed by ADR-0084, 2026-07-12; see References)
 **Date:** 2026-05-31
 
 ## Context
@@ -26,7 +26,7 @@ The engine ships **playoff gating only** (net advantage ×1.25 and the fast-brea
 
 - Positive: PR7's shipped behavior (playoff ×1.25, `special_sub`) is faithful, deterministic, and golden byte-stable — no calibration dependency.
 - Positive: the deferral is recorded with the precise unblock (corpus-calibrate bucket EVs, then add the ±0.2 nudge), so a future PR has a concrete spec rather than a rediscovery.
-- Negative: ASG games simulate identically to regular-season games in-engine until HCA lands; consumers must not read "ASG mode" as behaviorally distinct yet.
+- Negative: ASG games simulate identically to regular-season games in-engine until HCA lands; consumers must not read "ASG mode" as behaviorally distinct yet. **[Resolved by ADR-0084: HCA implemented 2026-07-12; ASG now actively zeros HCA via `isASG` gate in `gametype.go`.]**
 
 ## References
 
@@ -34,3 +34,4 @@ The engine ships **playoff gating only** (net advantage ×1.25 and the fast-brea
 - `engine/internal/sim/gametype.go` — the playoff gating that did ship; documents the ASG no-op.
 - `engine/internal/sim/netadvantage.go` — `playoffNetMultiplier` (×1.25) application site.
 - The RE trace establishing the bucket-scale/EV entanglement lives in the JSB decompile notes (`COMPOSITE_DOUBLES_TRACE.md`), outside this repo.
+- `ibl5/docs/decisions/0084-faithful-foul-bucket-live-composites-hca-rehoming.md` — supersedes this ADR; implements HCA with four half-court legs and the tuned `hcaSite2BasisScale = 2.85`.

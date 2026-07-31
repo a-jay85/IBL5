@@ -90,6 +90,17 @@ if printf '%s' "$cmd" | grep -q 'storeSimRecap\.php'; then
     cat "$STUB/resp.store" 2>/dev/null || printf '{"ok":true,"sim":42,"games":5}\n'
     exit 0
 fi
+if printf '%s' "$cmd" | grep -q 'simRecapContext\.php'; then
+    if [ -f "$STUB/fail.simRecapContext" ]; then
+        exit 255
+    fi
+    if [ -f "$STUB/resp.simRecapContext" ]; then
+        cat "$STUB/resp.simRecapContext"
+    else
+        printf '{"sim":42,"start_date":"2026-01-01","end_date":"2026-01-07","roster":{},"active_injuries":[],"sim_trades":[]}\n'
+    fi
+    exit 0
+fi
 verb=$(printf '%s' "$cmd" | grep -oE 'simRecapQueue\.php [a-z-]+' | awk '{print $2}')
 # fail.<verb> reproduces a dead ssh / undeployed remote script: EMPTY stdout
 # with a non-zero exit — deliberately indistinguishable from an idle queue on
@@ -515,6 +526,8 @@ printf '["past theme one", "past theme two"]'    > "$_FIX/themes.json"
 printf '{"Known Team": "123456789012345678", "Unknown Team": null}' \
     > "$_FIX/mentions-unmapped.json"
 printf '[]' > "$_FIX/themes-empty.json"
+printf '{"sim":1,"start_date":"2026-01-01","end_date":"2026-01-07","roster":{},"active_injuries":[],"sim_trades":[]}' \
+    > "$_FIX/roster-context.json"
 
 # Run the real builder; output → prompt.out, errors → prompt.err.
 run_prompt() {
@@ -557,6 +570,53 @@ run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes-empty
 srt_log_has "$STUB" prompt.out "(none recorded yet)" \
     "negative_empty_ledger — none-recorded-yet for empty themes"
 
+# ── roster_block_present ──────────────────────────────────────────────────────
+run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json" \
+    --roster="$_FIX/roster-context.json"
+srt_log_has "$STUB" prompt.out "CURRENT ROSTER CONTEXT" \
+    "roster_block_present — roster header appears when --roster is provided"
+
+# ── roster_block_is_last ──────────────────────────────────────────────────────
+# Block 8 must come AFTER the exemplar (offset of CURRENT ROSTER CONTEXT > PINNED EXEMPLAR).
+_exemplar_offset=$(grep -bo "PINNED EXEMPLAR" "$STUB/prompt.out" 2>/dev/null | head -1 | cut -d: -f1)
+_roster_offset=$(grep -bo "CURRENT ROSTER CONTEXT" "$STUB/prompt.out" 2>/dev/null | head -1 | cut -d: -f1)
+if [ -z "$_exemplar_offset" ]; then
+    srt_fail "roster_block_is_last — PINNED EXEMPLAR not found in output"
+elif [ -z "$_roster_offset" ]; then
+    srt_fail "roster_block_is_last — CURRENT ROSTER CONTEXT not found in output"
+elif [ "$_roster_offset" -gt "$_exemplar_offset" ]; then
+    srt_ok "roster_block_is_last — roster block follows exemplar"
+else
+    srt_fail "roster_block_is_last — roster block precedes exemplar (offset $_roster_offset <= $_exemplar_offset)"
+fi
+
+# ── voice_spec_corrected ──────────────────────────────────────────────────────
+run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json"
+srt_log_lacks "$STUB" prompt.out "injuries during the sim" \
+    "voice_spec_corrected — old injury-only note absent"
+srt_log_has "$STUB" prompt.out "frozen historical marker" \
+    "voice_spec_corrected — new from_teamid note present"
+
+# ── game_of_that_day_contract ─────────────────────────────────────────────────
+srt_log_lacks "$STUB" prompt.out "integer zero, not null" \
+    "game_of_that_day_contract — old 'integer zero' instruction absent"
+srt_log_has "$STUB" prompt.out "1-based counter" \
+    "game_of_that_day_contract — 1-based instruction present"
+
+# ── negative_roster_absent ────────────────────────────────────────────────────
+# Without --roster, Block 8 must not appear.
+run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json"
+srt_log_lacks "$STUB" prompt.out "CURRENT ROSTER CONTEXT" \
+    "negative_roster_absent — roster block absent when --roster not provided"
+
+# ── negative_roster_empty_object ──────────────────────────────────────────────
+# An empty-object roster file ({}) still triggers Block 8 (the file exists).
+printf '{}' > "$_FIX/roster-empty.json"
+run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json" \
+    --roster="$_FIX/roster-empty.json"
+srt_log_has "$STUB" prompt.out "CURRENT ROSTER CONTEXT" \
+    "negative_roster_empty_object — block appears even for empty-object roster"
+
 # ── negative_missing_exemplar ─────────────────────────────────────────────────
 SIM_RECAP_EXEMPLAR="/nonexistent/exemplar.txt" \
     "$SRT_PROMPT_BIN" --sim=1 \
@@ -574,6 +634,52 @@ MYSQL_PWD="s3cr3t_pw_xyz" SIM_RECAP_EXEMPLAR="$SRT_EXEMPLAR" \
     --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json" \
     > "$STUB/prompt.out" 2>"$STUB/prompt.err"
 srt_log_lacks "$STUB" prompt.out "s3cr3t_pw_xyz" "negative_no_credential_leak"
+srt_log_lacks "$STUB" prompt.out "SIM_RECAP_DB_PASSWORD" \
+    "negative_no_credential_leak — DB_PASSWORD var name absent from prompt stdout"
+
+# ── roster_fetched_into_workdir ───────────────────────────────────────────────
+# simRecapContext.php is called over ssh; the result lands in roster-context.json.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":42}\n' > "$STUB/resp.claim-next"
+export SIM_RECAP_KEEP_WORKDIR=1
+srt_run
+WORKDIR_PATH=$(sed -n 's/.*\] workdir \(\/[^ ]*\) .*/\1/p' "$STUB/tick.out" | head -1)
+if [ -z "$WORKDIR_PATH" ] || [ ! -f "$WORKDIR_PATH/roster-context.json" ]; then
+    srt_fail "roster_fetched_into_workdir — roster-context.json not found in workdir"
+else
+    _rc_content=$(cat "$WORKDIR_PATH/roster-context.json")
+    if printf '%s' "$_rc_content" | grep -q '"sim"'; then
+        srt_ok "roster_fetched_into_workdir — roster-context.json contains sim key"
+    else
+        srt_fail "roster_fetched_into_workdir — roster-context.json malformed: $_rc_content"
+    fi
+    rm -rf "$WORKDIR_PATH"
+fi
+unset SIM_RECAP_KEEP_WORKDIR
+
+# ── negative_roster_fetch_failure_does_not_park ──────────────────────────────
+# If simRecapContext.php fails (exit 255), the tick continues and writes {}.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":42}\n' > "$STUB/resp.claim-next"
+touch "$STUB/fail.simRecapContext"
+export SIM_RECAP_KEEP_WORKDIR=1
+srt_run
+srt_expect_eq "negative_roster_fetch_failure_does_not_park — exit 0" 0 "$SRT_RC"
+srt_log_lacks "$STUB" ssh.log "simRecapQueue.php park" \
+    "negative_roster_fetch_failure_does_not_park — tick did not park on roster failure"
+WORKDIR_PATH=$(sed -n 's/.*\] workdir \(\/[^ ]*\) .*/\1/p' "$STUB/tick.out" | head -1)
+if [ -n "$WORKDIR_PATH" ] && [ -f "$WORKDIR_PATH/roster-context.json" ]; then
+    _fallback=$(cat "$WORKDIR_PATH/roster-context.json")
+    if [ "$_fallback" = '{}' ]; then
+        srt_ok "negative_roster_fetch_failure_does_not_park — fallback {} written"
+    else
+        srt_fail "negative_roster_fetch_failure_does_not_park — expected {}, got: $_fallback"
+    fi
+    rm -rf "$WORKDIR_PATH"
+else
+    srt_ok "negative_roster_fetch_failure_does_not_park — workdir cleaned (no keep)"
+fi
+unset SIM_RECAP_KEEP_WORKDIR
 
 echo "----"
 [ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"

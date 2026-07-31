@@ -149,27 +149,43 @@ fi
 # CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 stops the harness terminating a
 # long-running backgrounded sub-agent mid-run (see bin/plan-now for the full
 # rationale). Applies to the /post-plan skill fallback only.
+#
+# The command line is assembled as PLAIN shell text first — literal `&&`, and
+# whatever `<`/`>`/`&` the prompt happens to carry — then XML-escaped exactly once
+# at the single choke point below. Hand-escaping entities inside the heredoc is
+# what broke this script before: a prompt containing `<slug>-N.md` made the
+# <string> element malformed XML, so `launchctl bootstrap` died with
+# "Bootstrap failed: 5: Input/output error" and no log was ever written.
+xml_escape() { printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
+
+CMD="export PATH=\"/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH\"; cd \"$ROOT\" && { ${FALLBACK_FN}${HARNESS_SEG}${GATE_OPEN}CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 CLAUDE_CODE_AUTO_COMPACT_WINDOW=200000 caffeinate -s claude -p \"$PROMPT\" --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name \"$LABEL\"${GATE_CLOSE}; }; rm -f \"$PLIST\"; launchctl bootout gui/\$(id -u)/$LABEL"
+
+CMD_XML=$(xml_escape "$CMD")
+LABEL_XML=$(xml_escape "$LABEL")
+ROOT_XML=$(xml_escape "$ROOT")
+LOG_XML=$(xml_escape "$LOG")
+
 cat > "$PLIST" <<PLIST_EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
 	<key>Label</key>
-	<string>$LABEL</string>
+	<string>$LABEL_XML</string>
 	<key>ProgramArguments</key>
 	<array>
 		<string>/bin/bash</string>
 		<string>-lc</string>
-		<string>export PATH="/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH"; cd "$ROOT" &amp;&amp; { ${FALLBACK_FN}${HARNESS_SEG}${GATE_OPEN}CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 CLAUDE_CODE_AUTO_COMPACT_WINDOW=200000 caffeinate -s claude -p "$PROMPT" --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name "$LABEL"${GATE_CLOSE}; }; rm -f "$PLIST"; launchctl bootout gui/\$(id -u)/$LABEL</string>
+		<string>$CMD_XML</string>
 	</array>
 	<key>RunAtLoad</key>
 	<true/>
 	<key>WorkingDirectory</key>
-	<string>$ROOT</string>
+	<string>$ROOT_XML</string>
 	<key>StandardOutPath</key>
-	<string>$LOG</string>
+	<string>$LOG_XML</string>
 	<key>StandardErrorPath</key>
-	<string>$LOG</string>
+	<string>$LOG_XML</string>
 </dict>
 </plist>
 PLIST_EOF

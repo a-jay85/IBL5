@@ -965,3 +965,951 @@ parameters:
 			identifier: ibl.trustedVariable
 			count: 1
 			path: classes/YourAccount/LoginView.php
+
+		-
+			rawMessage: 'Direct is_admin() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: scripts/allStarRename.php
+
+		-
+			rawMessage: 'Only booleans are allowed in a negated boolean, int given.'
+			identifier: booleanNot.exprNotBoolean
+			count: 1
+			path: scripts/allStarRename.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Boxscore\BoxscoreRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/allStarRename.php
+
+		-
+			rawMessage: Variable $admin might not be defined.
+			identifier: variable.undefined
+			count: 1
+			path: scripts/allStarRename.php
+
+		-
+			rawMessage: Cannot access property $affected_rows on mixed.
+			identifier: property.nonObject
+			count: 2
+			path: scripts/archive/importBoxscoresFromHtml.php
+
+		-
+			rawMessage: 'Cannot call method bind_param() on mixed.'
+			identifier: method.nonObject
+			count: 2
+			path: scripts/archive/importBoxscoresFromHtml.php
+
+		-
+			rawMessage: 'Cannot call method close() on mixed.'
+			identifier: method.nonObject
+			count: 3
+			path: scripts/archive/importBoxscoresFromHtml.php
+
+		-
+			rawMessage: 'Cannot call method execute() on mixed.'
+			identifier: method.nonObject
+			count: 3
+			path: scripts/archive/importBoxscoresFromHtml.php
+
+		-
+			rawMessage: 'Cannot call method fetch_assoc() on mixed.'
+			identifier: method.nonObject
+			count: 1
+			path: scripts/archive/importBoxscoresFromHtml.php
+
+		-
+			rawMessage: 'Cannot call method get_result() on mixed.'
+			identifier: method.nonObject
+			count: 1
+			path: scripts/archive/importBoxscoresFromHtml.php
+
+		-
+			rawMessage: 'Cannot call method prepare() on mixed.'
+			identifier: method.nonObject
+			count: 3
+			path: scripts/archive/importBoxscoresFromHtml.php
+
+		-
+			rawMessage: Negated boolean expression is always true.
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: scripts/archive/importBoxscoresFromHtml.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Boxscore\BoxscoreRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/archive/importBoxscoresFromHtml.php
+
+		-
+			rawMessage: 'Part $playerRowsAffected (mixed) of encapsed string cannot be cast to string.'
+			identifier: encapsedStringPart.nonString
+			count: 1
+			path: scripts/archive/importBoxscoresFromHtml.php
+
+		-
+			rawMessage: 'Part $teamRowsAffected (mixed) of encapsed string cannot be cast to string.'
+			identifier: encapsedStringPart.nonString
+			count: 1
+			path: scripts/archive/importBoxscoresFromHtml.php
+
+		-
+			rawMessage: 'Path in require() __DIR__ . ''/../mainfile.php'' is not a file or it does not exist.'
+			identifier: require.fileNotFound
+			count: 1
+			path: scripts/archive/importBoxscoresFromHtml.php
+
+		-
+			rawMessage: Binary operation "." between mixed and '/ibl5/../IBL5.bxs' results in an error.
+			identifier: binaryOp.invalid
+			count: 1
+			path: scripts/archive/importBxsMissing.php
+
+		-
+			rawMessage: 'Function parseBxsHeader() has parameter $teamNameToId with no value type specified in iterable type array.'
+			identifier: missingType.iterableValue
+			count: 1
+			path: scripts/archive/importBxsMissing.php
+
+		-
+			rawMessage: 'Function parseBxsHeader() should return array{date: string, visName: string, homeName: string, visScore: int, homeScore: int, visId: int, homeId: int}|null but returns array{date: non-falsy-string, visName: non-empty-string, homeName: non-empty-string, visScore: int, homeScore: int, visId: mixed, homeId: mixed}.'
+			identifier: return.type
+			count: 1
+			path: scripts/archive/importBxsMissing.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Boxscore\BoxscoreRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/archive/importBxsMissing.php
+
+		-
+			rawMessage: 'Path in require() __DIR__ . ''/../mainfile.php'' is not a file or it does not exist.'
+			identifier: require.fileNotFound
+			count: 1
+			path: scripts/archive/importBxsMissing.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class BugPipeline\BugReportRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/bug-pipeline/claim-next.php
+
+		-
+			rawMessage: 'Strict comparison using === between non-empty-string and false will always evaluate to false.'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: scripts/bug-pipeline/claim-next.php
+
+		-
+			rawMessage: Variable $argv might not be defined.
+			identifier: variable.undefined
+			count: 1
+			path: scripts/bug-pipeline/claim-next.php
+
+		-
+			rawMessage: Variable $mysqli_db might not be defined.
+			identifier: variable.undefined
+			count: 1
+			path: scripts/bug-pipeline/claim-next.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class BugPipeline\BugReportRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/bug-pipeline/get-reporter-tech-level.php
+
+		-
+			rawMessage: Variable $mysqli_db might not be defined.
+			identifier: variable.undefined
+			count: 1
+			path: scripts/bug-pipeline/get-reporter-tech-level.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class BugPipeline\BugReportRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/bug-pipeline/list-active-conversations.php
+
+		-
+			rawMessage: Variable $mysqli_db might not be defined.
+			identifier: variable.undefined
+			count: 1
+			path: scripts/bug-pipeline/list-active-conversations.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class BugPipeline\BugReportRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/bug-pipeline/list-pr-open.php
+
+		-
+			rawMessage: Variable $mysqli_db might not be defined.
+			identifier: variable.undefined
+			count: 1
+			path: scripts/bug-pipeline/list-pr-open.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class BugPipeline\BugReportRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/bug-pipeline/set-reporter-tech-level.php
+
+		-
+			rawMessage: Variable $mysqli_db might not be defined.
+			identifier: variable.undefined
+			count: 1
+			path: scripts/bug-pipeline/set-reporter-tech-level.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class BugPipeline\BugReportRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/bug-pipeline/transition.php
+
+		-
+			rawMessage: Variable $argv might not be defined.
+			identifier: variable.undefined
+			count: 1
+			path: scripts/bug-pipeline/transition.php
+
+		-
+			rawMessage: Variable $mysqli_db might not be defined.
+			identifier: variable.undefined
+			count: 1
+			path: scripts/bug-pipeline/transition.php
+
+		-
+			rawMessage: Variable $argv might not be defined.
+			identifier: variable.undefined
+			count: 3
+			path: scripts/bulkJsbImport.php
+
+		-
+			rawMessage: Casting to string something that's already string.
+			identifier: cast.useless
+			count: 1
+			path: scripts/engParser.php
+
+		-
+			rawMessage: 'Only booleans are allowed in a negated boolean, int|false given.'
+			identifier: booleanNot.exprNotBoolean
+			count: 1
+			path: scripts/engParser.php
+
+		-
+			rawMessage: 'Only booleans are allowed in an if condition, int|false given.'
+			identifier: if.condNotBoolean
+			count: 1
+			path: scripts/engParser.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Maintenance\MaintenanceRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/engParser.php
+
+		-
+			rawMessage: 'Parameter #1 $haystack of function strpos expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/engParser.php
+
+		-
+			rawMessage: 'Parameter #1 $stream of function fclose expects resource, resource|false given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/engParser.php
+
+		-
+			rawMessage: 'Parameter #1 $stream of function feof expects resource, resource|false given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/engParser.php
+
+		-
+			rawMessage: 'Parameter #1 $stream of function fgets expects resource, resource|false given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/engParser.php
+
+		-
+			rawMessage: Variable $mysqli_db might not be defined.
+			identifier: variable.undefined
+			count: 1
+			path: scripts/engParser.php
+
+		-
+			rawMessage: Variable $argc might not be defined.
+			identifier: variable.undefined
+			count: 1
+			path: scripts/generate_api_key.php
+
+		-
+			rawMessage: Variable $argv might not be defined.
+			identifier: variable.undefined
+			count: 1
+			path: scripts/generate_api_key.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class JsbParser\JsbExportRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/jsbExport.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/jsbExport.php
+
+		-
+			rawMessage: Variable $mysqli_db might not be defined.
+			identifier: variable.undefined
+			count: 2
+			path: scripts/jsbExport.php
+
+		-
+			rawMessage: Binary operation "-" between mixed and mixed results in an error.
+			identifier: binaryOp.invalid
+			count: 9
+			path: scripts/patch_2007_asg_sco.php
+
+		-
+			rawMessage: 'Cannot access offset ''name'' on array<string, float|int|string|null>|false.'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: scripts/patch_2007_asg_sco.php
+
+		-
+			rawMessage: 'Cannot call method bind_param() on mysqli_stmt|false.'
+			identifier: method.nonObject
+			count: 1
+			path: scripts/patch_2007_asg_sco.php
+
+		-
+			rawMessage: 'Cannot call method close() on mysqli_stmt|false.'
+			identifier: method.nonObject
+			count: 1
+			path: scripts/patch_2007_asg_sco.php
+
+		-
+			rawMessage: 'Cannot call method execute() on mysqli_stmt|false.'
+			identifier: method.nonObject
+			count: 1
+			path: scripts/patch_2007_asg_sco.php
+
+		-
+			rawMessage: 'Cannot call method fetch_assoc() on mysqli_result|false.'
+			identifier: method.nonObject
+			count: 1
+			path: scripts/patch_2007_asg_sco.php
+
+		-
+			rawMessage: 'Cannot call method get_result() on mysqli_stmt|false.'
+			identifier: method.nonObject
+			count: 1
+			path: scripts/patch_2007_asg_sco.php
+
+		-
+			rawMessage: Cannot use array destructuring on mixed.
+			identifier: offsetAccess.nonArray
+			count: 3
+			path: scripts/patch_2007_asg_sco.php
+
+		-
+			rawMessage: 'Parameter #1 $pid of closure expects int, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/patch_2007_asg_sco.php
+
+		-
+			rawMessage: 'Parameter #1 $players of closure expects array, mixed given.'
+			identifier: argument.type
+			count: 2
+			path: scripts/patch_2007_asg_sco.php
+
+		-
+			rawMessage: 'Parameter #1 $risingStars of static method JsbParser\ScoFileWriter::buildAllStarHeaderBlock() expects array{visitor_name: string, home_name: string, visitor_q: list<int>, home_q: list<int>, visitor_teamid: int, home_teamid: int, attendance: int, capacity: int, ...}, array{visitor_name: mixed, home_name: mixed, visitor_q: mixed, home_q: mixed, visitor_teamid: mixed, home_teamid: mixed, attendance: 5244, capacity: 20000, ...} given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/patch_2007_asg_sco.php
+
+		-
+			rawMessage: 'Parameter #2 $allStar of static method JsbParser\ScoFileWriter::buildAllStarHeaderBlock() expects array{visitor_name: string, home_name: string, visitor_q: list<int>, home_q: list<int>, visitor_teamid: int, home_teamid: int, attendance: int, capacity: int, ...}, array{visitor_name: mixed, home_name: mixed, visitor_q: mixed, home_q: mixed, visitor_teamid: mixed, home_teamid: mixed, attendance: 5244, capacity: 20000, ...} given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/patch_2007_asg_sco.php
+
+		-
+			rawMessage: Variable $argv might not be defined.
+			identifier: variable.undefined
+			count: 1
+			path: scripts/patch_2007_asg_sco.php
+
+		-
+			rawMessage: 'Loose comparison via "!=" between int and int is not allowed.'
+			identifier: notEqual.notAllowed
+			count: 1
+			path: scripts/plrAdvanceBirdYears.php
+
+		-
+			rawMessage: 'Loose comparison via "!=" between string and int is not allowed.'
+			identifier: notEqual.notAllowed
+			count: 2
+			path: scripts/plrAdvanceBirdYears.php
+
+		-
+			rawMessage: 'Parameter #1 $stream of function fclose expects resource, resource|false given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/plrAdvanceBirdYears.php
+
+		-
+			rawMessage: 'Parameter #1 $stream of function feof expects resource, resource|false given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/plrAdvanceBirdYears.php
+
+		-
+			rawMessage: 'Parameter #1 $stream of function fgets expects resource, resource|false given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/plrAdvanceBirdYears.php
+
+		-
+			rawMessage: 'Parameter #1 $stream of function fread expects resource, resource|false given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/plrAdvanceBirdYears.php
+
+		-
+			rawMessage: 'Parameter #1 $stream of function fseek expects resource, resource|false given.'
+			identifier: argument.type
+			count: 3
+			path: scripts/plrAdvanceBirdYears.php
+
+		-
+			rawMessage: 'Parameter #1 $stream of function fwrite expects resource, resource|false given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/plrAdvanceBirdYears.php
+
+		-
+			rawMessage: 'Parameter #1 $string of function substr expects string, string|false given.'
+			identifier: argument.type
+			count: 6
+			path: scripts/plrAdvanceBirdYears.php
+
+		-
+			rawMessage: 'addslashes() is banned. Use prepared statements for database escaping or json_encode()/htmlspecialchars() for output escaping.'
+			identifier: ibl.bannedAddslashes
+			count: 1
+			path: scripts/plrAdvanceBirdYears.php
+
+		-
+			rawMessage: 'Loose comparison via "!=" between string and int is not allowed.'
+			identifier: notEqual.notAllowed
+			count: 1
+			path: scripts/plrAdvanceYearsOfExperience.php
+
+		-
+			rawMessage: 'Parameter #1 $stream of function fclose expects resource, resource|false given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/plrAdvanceYearsOfExperience.php
+
+		-
+			rawMessage: 'Parameter #1 $stream of function feof expects resource, resource|false given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/plrAdvanceYearsOfExperience.php
+
+		-
+			rawMessage: 'Parameter #1 $stream of function fgets expects resource, resource|false given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/plrAdvanceYearsOfExperience.php
+
+		-
+			rawMessage: 'Parameter #1 $stream of function fread expects resource, resource|false given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/plrAdvanceYearsOfExperience.php
+
+		-
+			rawMessage: 'Parameter #1 $stream of function fseek expects resource, resource|false given.'
+			identifier: argument.type
+			count: 3
+			path: scripts/plrAdvanceYearsOfExperience.php
+
+		-
+			rawMessage: 'Parameter #1 $stream of function fwrite expects resource, resource|false given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/plrAdvanceYearsOfExperience.php
+
+		-
+			rawMessage: 'Parameter #1 $string of function substr expects string, string|false given.'
+			identifier: argument.type
+			count: 3
+			path: scripts/plrAdvanceYearsOfExperience.php
+
+		-
+			rawMessage: 'Parameter #2 $data of function fwrite expects string, float|int<10, max>|string given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/plrAdvanceYearsOfExperience.php
+
+		-
+			rawMessage: 'addslashes() is banned. Use prepared statements for database escaping or json_encode()/htmlspecialchars() for output escaping.'
+			identifier: ibl.bannedAddslashes
+			count: 1
+			path: scripts/plrAdvanceYearsOfExperience.php
+
+		-
+			rawMessage: 'Call to function is_numeric() with int<min, -1>|int<1, max> will always evaluate to true.'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: scripts/plrDropUnsignedFreeAgentsToWaivers.php
+
+		-
+			rawMessage: 'Loose comparison via "!=" between int and int is not allowed.'
+			identifier: notEqual.notAllowed
+			count: 1
+			path: scripts/plrDropUnsignedFreeAgentsToWaivers.php
+
+		-
+			rawMessage: 'Loose comparison via "==" between string and int is not allowed.'
+			identifier: equal.notAllowed
+			count: 1
+			path: scripts/plrDropUnsignedFreeAgentsToWaivers.php
+
+		-
+			rawMessage: 'Loose comparison via "==" between string and string is not allowed.'
+			identifier: equal.notAllowed
+			count: 1
+			path: scripts/plrDropUnsignedFreeAgentsToWaivers.php
+
+		-
+			rawMessage: 'Parameter #1 $stream of function fclose expects resource, resource|false given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/plrDropUnsignedFreeAgentsToWaivers.php
+
+		-
+			rawMessage: 'Parameter #1 $stream of function feof expects resource, resource|false given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/plrDropUnsignedFreeAgentsToWaivers.php
+
+		-
+			rawMessage: 'Parameter #1 $stream of function fgets expects resource, resource|false given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/plrDropUnsignedFreeAgentsToWaivers.php
+
+		-
+			rawMessage: 'Parameter #1 $stream of function fread expects resource, resource|false given.'
+			identifier: argument.type
+			count: 2
+			path: scripts/plrDropUnsignedFreeAgentsToWaivers.php
+
+		-
+			rawMessage: 'Parameter #1 $stream of function fseek expects resource, resource|false given.'
+			identifier: argument.type
+			count: 4
+			path: scripts/plrDropUnsignedFreeAgentsToWaivers.php
+
+		-
+			rawMessage: 'Parameter #1 $stream of function fwrite expects resource, resource|false given.'
+			identifier: argument.type
+			count: 2
+			path: scripts/plrDropUnsignedFreeAgentsToWaivers.php
+
+		-
+			rawMessage: 'Parameter #1 $string of function substr expects string, string|false given.'
+			identifier: argument.type
+			count: 6
+			path: scripts/plrDropUnsignedFreeAgentsToWaivers.php
+
+		-
+			rawMessage: 'addslashes() is banned. Use prepared statements for database escaping or json_encode()/htmlspecialchars() for output escaping.'
+			identifier: ibl.bannedAddslashes
+			count: 1
+			path: scripts/plrDropUnsignedFreeAgentsToWaivers.php
+
+		-
+			rawMessage: 'Loose comparison via "!=" between string and int is not allowed.'
+			identifier: notEqual.notAllowed
+			count: 1
+			path: scripts/plrScratchpad.php
+
+		-
+			rawMessage: 'Parameter #1 $stream of function fclose expects resource, resource|false given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/plrScratchpad.php
+
+		-
+			rawMessage: 'Parameter #1 $stream of function feof expects resource, resource|false given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/plrScratchpad.php
+
+		-
+			rawMessage: 'Parameter #1 $stream of function fgets expects resource, resource|false given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/plrScratchpad.php
+
+		-
+			rawMessage: 'Parameter #1 $stream of function fread expects resource, resource|false given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/plrScratchpad.php
+
+		-
+			rawMessage: 'Parameter #1 $stream of function fseek expects resource, resource|false given.'
+			identifier: argument.type
+			count: 2
+			path: scripts/plrScratchpad.php
+
+		-
+			rawMessage: 'Parameter #1 $string of function substr expects string, string|false given.'
+			identifier: argument.type
+			count: 3
+			path: scripts/plrScratchpad.php
+
+		-
+			rawMessage: 'addslashes() is banned. Use prepared statements for database escaping or json_encode()/htmlspecialchars() for output escaping.'
+			identifier: ibl.bannedAddslashes
+			count: 1
+			path: scripts/plrScratchpad.php
+
+		-
+			rawMessage: 'Only booleans are allowed in a negated boolean, int|false given.'
+			identifier: booleanNot.exprNotBoolean
+			count: 1
+			path: scripts/reconstructPlr.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class PlrParser\PlrBoxScoreRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/reconstructPlr.php
+
+		-
+			rawMessage: Variable $argv might not be defined.
+			identifier: variable.undefined
+			count: 1
+			path: scripts/reconstructPlr.php
+
+		-
+			rawMessage: Variable $mysqli_db might not be defined.
+			identifier: variable.undefined
+			count: 1
+			path: scripts/reconstructPlr.php
+
+		-
+			rawMessage: 'Cannot access offset ''name'' on array<string, float|int|string|null>|false.'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: scripts/reconstruct_2007_asg_boxscores.php
+
+		-
+			rawMessage: 'Cannot call method bind_param() on mysqli_stmt|false.'
+			identifier: method.nonObject
+			count: 1
+			path: scripts/reconstruct_2007_asg_boxscores.php
+
+		-
+			rawMessage: 'Cannot call method close() on mysqli_stmt|false.'
+			identifier: method.nonObject
+			count: 1
+			path: scripts/reconstruct_2007_asg_boxscores.php
+
+		-
+			rawMessage: 'Cannot call method execute() on mysqli_stmt|false.'
+			identifier: method.nonObject
+			count: 1
+			path: scripts/reconstruct_2007_asg_boxscores.php
+
+		-
+			rawMessage: 'Cannot call method fetch_assoc() on mysqli_result|false.'
+			identifier: method.nonObject
+			count: 1
+			path: scripts/reconstruct_2007_asg_boxscores.php
+
+		-
+			rawMessage: 'Cannot call method get_result() on mysqli_stmt|false.'
+			identifier: method.nonObject
+			count: 1
+			path: scripts/reconstruct_2007_asg_boxscores.php
+
+		-
+			rawMessage: Variable $argv might not be defined.
+			identifier: variable.undefined
+			count: 1
+			path: scripts/reconstruct_2007_asg_boxscores.php
+
+		-
+			rawMessage: PHPDoc tag @var above a function has no effect.
+			identifier: varTag.misplaced
+			count: 1
+			path: scripts/simRecapContext.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class SimRecap\SimRecapContextRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/simRecapContext.php
+
+		-
+			rawMessage: Variable $argv might not be defined.
+			identifier: variable.undefined
+			count: 1
+			path: scripts/simRecapContext.php
+
+		-
+			rawMessage: Variable $mysqli_db might not be defined.
+			identifier: variable.undefined
+			count: 1
+			path: scripts/simRecapContext.php
+
+		-
+			rawMessage: PHPDoc tag @var above a function has no effect.
+			identifier: varTag.misplaced
+			count: 1
+			path: scripts/simRecapQueue.php
+
+		-
+			rawMessage: 'PHPDoc tag @var with type int is not subtype of native type int<1, max>|null.'
+			identifier: varTag.nativeType
+			count: 3
+			path: scripts/simRecapQueue.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class SimRecap\SimSummaryRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/simRecapQueue.php
+
+		-
+			rawMessage: 'Parameter #1 $db of function buildMentionMap expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/simRecapQueue.php
+
+		-
+			rawMessage: Variable $argv might not be defined.
+			identifier: variable.undefined
+			count: 1
+			path: scripts/simRecapQueue.php
+
+		-
+			rawMessage: Variable $mysqli_db might not be defined.
+			identifier: variable.undefined
+			count: 2
+			path: scripts/simRecapQueue.php
+
+		-
+			rawMessage: PHPDoc tag @var above a function has no effect.
+			identifier: varTag.misplaced
+			count: 1
+			path: scripts/storeSimRecap.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class SimRecap\SimSummaryRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/storeSimRecap.php
+
+		-
+			rawMessage: Variable $argv might not be defined.
+			identifier: variable.undefined
+			count: 1
+			path: scripts/storeSimRecap.php
+
+		-
+			rawMessage: Variable $mysqli_db might not be defined.
+			identifier: variable.undefined
+			count: 1
+			path: scripts/storeSimRecap.php
+
+		-
+			rawMessage: Binary operation "." between mixed and '/ibl5' results in an error.
+			identifier: binaryOp.invalid
+			count: 1
+			path: scripts/updateAllTheThings.php
+
+		-
+			rawMessage: Binary operation "." between mixed and '/ibl5/mainfile.php' results in an error.
+			identifier: binaryOp.invalid
+			count: 1
+			path: scripts/updateAllTheThings.php
+
+		-
+			rawMessage: Binary operation "." between mixed and '/ibl5/themes/IBL…' results in an error.
+			identifier: binaryOp.invalid
+			count: 1
+			path: scripts/updateAllTheThings.php
+
+		-
+			rawMessage: Casting to string something that's already string.
+			identifier: cast.useless
+			count: 6
+			path: scripts/updateAllTheThings.php
+
+		-
+			rawMessage: 'Direct is_admin() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: scripts/updateAllTheThings.php
+
+		-
+			rawMessage: 'Direct is_user() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: scripts/updateAllTheThings.php
+
+		-
+			rawMessage: 'Only booleans are allowed in a negated boolean, int given.'
+			identifier: booleanNot.exprNotBoolean
+			count: 2
+			path: scripts/updateAllTheThings.php
+
+		-
+			rawMessage: 'PHPDoc tag @var with type int|false is not subtype of type int<0, max>|false.'
+			identifier: varTag.type
+			count: 1
+			path: scripts/updateAllTheThings.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Boxscore\BoxscoreProcessor constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/updateAllTheThings.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Boxscore\BoxscoreRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/updateAllTheThings.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class JsbParser\JsbImportRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/updateAllTheThings.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class JsbParser\PlayerIdResolver constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/updateAllTheThings.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class LeagueConfig\LeagueConfigRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/updateAllTheThings.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class LeagueControlPanel\LeagueControlPanelRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/updateAllTheThings.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class PlrParser\PlrParserRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/updateAllTheThings.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class SavedDepthChart\SavedDepthChartRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/updateAllTheThings.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/updateAllTheThings.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Season\SeasonQueryRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/updateAllTheThings.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class SimRecap\SimSummaryRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/updateAllTheThings.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Standings\StandingsRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/updateAllTheThings.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Updater\PowerRankingsUpdater constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/updateAllTheThings.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Updater\ScheduleUpdater constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/updateAllTheThings.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Updater\Steps\AutoSeedOlympicsTeamInfoStep constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/updateAllTheThings.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Updater\Steps\RefreshIblHistStep constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/updateAllTheThings.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Updater\Steps\RefreshPlayoffSeriesResultsStep constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/updateAllTheThings.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Updater\Steps\RefreshTeamSeasonRecordsStep constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/updateAllTheThings.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Updater\Steps\ResetExtensionAttemptsStep constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/updateAllTheThings.php
+
+		-
+			rawMessage: 'Parameter #3 $db of class Updater\Steps\CleanupPreseasonDataStep constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/updateAllTheThings.php
+
+		-
+			rawMessage: Short ternary operator is not allowed. Use null coalesce operator if applicable or consider using long ternary.
+			identifier: ternary.shortNotAllowed
+			count: 1
+			path: scripts/updateAllTheThings.php

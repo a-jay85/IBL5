@@ -20,6 +20,16 @@ use League\LeagueContext;
  */
 class LastSimRecapRepository extends \BaseMysqliRepository implements LastSimRecapRepositoryInterface
 {
+    /**
+     * Calendar year of a Sep-Dec transaction = season_year - 1 (season_year is
+     * the ending year per migration 106); otherwise calendar year = season_year.
+     * Aliased `t` — every consumer must alias `ibl_jsb_transactions` as `t`.
+     */
+    public const TRANSACTION_DATE_SQL = "STR_TO_DATE(CONCAT("
+        . "CASE WHEN t.transaction_month >= 9 THEN t.season_year - 1 ELSE t.season_year END,"
+        . " '-', t.transaction_month, '-', t.transaction_day"
+        . "), '%Y-%c-%e')";
+
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
@@ -148,14 +158,7 @@ class LastSimRecapRepository extends \BaseMysqliRepository implements LastSimRec
         }
 
         $placeholders = implode(',', array_fill(0, count($playerIds), '?'));
-        // Construct injury date from split year/month/day. Calendar year of
-        // an October-December transaction = season_year - 1 (season_year is
-        // the ending year per migration 106). Otherwise calendar year =
-        // season_year.
-        $dateExpr = "STR_TO_DATE(CONCAT("
-            . "CASE WHEN t.transaction_month >= 9 THEN t.season_year - 1 ELSE t.season_year END,"
-            . " '-', t.transaction_month, '-', t.transaction_day"
-            . "), '%Y-%c-%e')";
+        $dateExpr = self::TRANSACTION_DATE_SQL;
 
         // $dateExpr is a fixed SQL fragment built in-class above from column refs and
         // constants (no user input); $placeholders is a count-derived run of bound `?`

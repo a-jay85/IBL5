@@ -48,7 +48,11 @@ A 🟡 marker is informational — investigate before merging.
   needs BOTH a `SUB_PAGES` entry and a `LighthouseUrls::PARAM_REQUIRED_MODULES` entry —
   the latter suppresses the bare URL, which Lighthouse would otherwise treat as
   `ERRORED_DOCUMENT_REQUEST` and hard-fail the entire audit run on. Enforced by
-  `bin/lighthouse-audit-urls --check` in the `e2e-shards` job of `e2e-tests.yml`.
+  `bin/lighthouse-audit-urls --check`, the last step of `.github/actions/lighthouse-setup`
+  — so it gates all three Lighthouse workflows (`lighthouse.yml`, `lighthouse-baseline.yml`,
+  `lighthouse-audit.yml`) before any audit runs. It validates the **full** site set even
+  when the workflow audits only a PR-selected subset, so a new param-required module is
+  caught the first time any Lighthouse workflow runs.
 - The representative fallback set is mirrored in `ibl5/.lighthouserc.json` `collect.url`
   (pinned equal to `REPRESENTATIVE_PATHS` by a `LighthouseUrlsTest` unit test); both
   workflows `jq`-override `.ci.collect.url`, so the static array is only the

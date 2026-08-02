@@ -167,7 +167,12 @@ SH
 exit 0
 SH
 
-    chmod +x "$STUB/ssh" "$STUB/claude" "$STUB/prompt" "$STUB/mysql"
+    cat > "$STUB/curl" <<'SH'
+#!/usr/bin/env bash
+echo "$*" >> "$STUB/curl.log"
+SH
+
+    chmod +x "$STUB/ssh" "$STUB/claude" "$STUB/prompt" "$STUB/mysql" "$STUB/curl"
 
     export STUB
     export SIM_RECAP_SSH_BIN="$STUB/ssh"
@@ -183,6 +188,9 @@ SH
     export SIM_RECAP_DB_PASSWORD="test_db_password"
     export SIM_RECAP_MODEL="test-model"
     export SIM_RECAP_CLAUDE_TIMEOUT="30"
+    export SIM_RECAP_CURL_BIN="$STUB/curl"
+    export SIM_RECAP_BOT_BASE_URL="http://test.invalid"
+    export SIM_RECAP_OPS_ALERT_THREAD_ID="test-ops-thread"
 }
 
 # Per-case reset: wipe logs and all per-case control sentinels.
@@ -191,10 +199,11 @@ srt_reset() {
           "$STUB"/tick.out "$STUB"/agent-fails "$STUB"/agent-usage-limit \
           "$STUB"/store-fails "$STUB"/store-banner "$STUB"/resp.* "$STUB"/fail.* \
           "$STUB"/record-stdin "$STUB"/store.cmd "$STUB"/store.stdin \
-          "$STUB"/prompt.argv 2>/dev/null
+          "$STUB"/curl.log "$STUB"/prompt.argv 2>/dev/null
     export SIM_RECAP_DB_PASSWORD="test_db_password"
     export SIM_RECAP_MYSQL_BIN="$STUB/mysql"
     unset SIM_RECAP_KEEP_WORKDIR 2>/dev/null || true
+    export SIM_RECAP_OPS_ALERT_THREAD_ID="test-ops-thread"
 }
 
 # srt_run [args…] — invoke the tick with combined stdout+stderr → tick.out.
@@ -719,12 +728,12 @@ srt_log_lacks "$STUB" prompt.out "CURRENT ROSTER CONTEXT" \
     "negative_roster_absent — roster block absent when --roster not provided"
 
 # ── negative_roster_empty_object ──────────────────────────────────────────────
-# An empty-object roster file ({}) still triggers Block 8 (the file exists).
+# An empty-object roster ({}) must NOT trigger Block 8 — no .sim key (Block 8 fix).
 printf '{}' > "$_FIX/roster-empty.json"
 run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json" \
     --roster="$_FIX/roster-empty.json"
-srt_log_has "$STUB" prompt.out "CURRENT ROSTER CONTEXT" \
-    "negative_roster_empty_object — block appears even for empty-object roster"
+srt_log_lacks "$STUB" prompt.out "CURRENT ROSTER CONTEXT" \
+    "negative_roster_empty_object — block absent for empty-object roster (Block 8 fix)"
 
 # ── negative_missing_exemplar ─────────────────────────────────────────────────
 SIM_RECAP_EXEMPLAR="/nonexistent/exemplar.txt" \
@@ -779,6 +788,8 @@ touch "$STUB/fail.simRecapContext"
 export SIM_RECAP_KEEP_WORKDIR=1
 srt_run
 srt_expect_eq "negative_roster_fetch_failure_does_not_park — exit 0" 0 "$SRT_RC"
+srt_log_has "$STUB" curl.log "/post-to-thread" \
+    "degraded_path_discord_alert — alert fires on qctx failure"
 srt_log_lacks "$STUB" ssh.log "simRecapQueue.php park" \
     "negative_roster_fetch_failure_does_not_park — tick did not park on roster failure"
 WORKDIR_PATH=$(sed -n 's/.*\] workdir \(\/[^ ]*\) .*/\1/p' "$STUB/tick.out" | head -1)
@@ -794,6 +805,40 @@ else
     srt_fail "negative_roster_fetch_failure_does_not_park — workdir not found or roster-context.json missing (KEEP_WORKDIR=1 set)"
 fi
 unset SIM_RECAP_KEEP_WORKDIR
+
+# ── degraded_path_alert_noop_when_no_thread_id ────────────────────────────────
+# Alert must be a no-op (no curl call) when OPS_ALERT_THREAD_ID is unset.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":42}\n' > "$STUB/resp.claim-next"
+touch "$STUB/fail.simRecapContext"
+export SIM_RECAP_OPS_ALERT_THREAD_ID=""
+srt_run
+srt_expect_eq "degraded_path_alert_noop_when_no_thread_id — exit 0" 0 "$SRT_RC"
+srt_log_lacks "$STUB" curl.log "/post-to-thread" \
+    "degraded_path_alert_noop_when_no_thread_id — no curl call when thread ID empty"
+
+# ── degraded_path_alert_fault_tolerant ────────────────────────────────────────
+# Tick must succeed (exit 0, no park) even when curl fails.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":42}\n' > "$STUB/resp.claim-next"
+touch "$STUB/fail.simRecapContext"
+export SIM_RECAP_OPS_ALERT_THREAD_ID="123"
+cat > "$STUB/curl" <<'SH'
+#!/usr/bin/env bash
+echo "$*" >> "$STUB/curl.log"
+exit 1
+SH
+chmod +x "$STUB/curl"
+srt_run
+srt_expect_eq "degraded_path_alert_fault_tolerant — exit 0" 0 "$SRT_RC"
+srt_log_lacks "$STUB" ssh.log "simRecapQueue.php park" \
+    "degraded_path_alert_fault_tolerant — no park when curl fails"
+# Restore working curl stub for any tests that follow.
+cat > "$STUB/curl" <<'SH'
+#!/usr/bin/env bash
+echo "$*" >> "$STUB/curl.log"
+SH
+chmod +x "$STUB/curl"
 
 echo "----"
 [ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"

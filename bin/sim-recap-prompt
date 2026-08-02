@@ -328,7 +328,7 @@ EXEMPLAR_FOOTER_EOF
 # outranks the exemplar on player attribution). Only emitted when --roster=<path>
 # provides a valid JSON file.
 # =============================================================================
-if [[ -n "$roster_path" && -f "$roster_path" ]]; then
+if [[ -n "$roster_path" && -f "$roster_path" ]] && jq -e '.sim != null' "$roster_path" >/dev/null 2>&1; then
     cat <<'ROSTER_HEADER_EOF'
 
 == CURRENT ROSTER CONTEXT (authoritative — outranks the exemplar) ==

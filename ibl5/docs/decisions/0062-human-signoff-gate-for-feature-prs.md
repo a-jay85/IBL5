@@ -1,6 +1,6 @@
 ---
 description: Feature PRs (conventional-commit `feat:`) cannot merge until a human applies the `human-approved` label — a required CI check, not a convention, blocks auto-merge.
-last_verified: 2026-06-20
+last_verified: 2026-07-27
 ---
 
 # ADR-0062: Human sign-off gate for feature PRs
@@ -11,7 +11,7 @@ last_verified: 2026-06-20
 
 ## Context
 
-The automouse autonomous pipeline (`bin/automouse-run` → `/post-plan` Phase 6.5) arms `gh pr merge --squash --auto`, and master's branch protection requires only two status checks and **zero reviews** (no `CODEOWNERS`). So whole user-facing features merged unattended overnight (#1073 Trade Block, #1074 Watchlist, #1075 Big Board, #1076 counter-offer; #1067 was rolled back separately by #1070), with no chance for a human to inspect UX before it shipped. The prior attempt, #1072, added `auto_postplan: false` and a manual-UI verification step to the `/plan` docs — but that was inert: the automouse path never reads plan frontmatter, and GitHub had no required check to block on, so `--auto` completed regardless. A convention an LLM is asked to honour is not a gate.
+The automouse autonomous pipeline (`bin/automouse/run` → `/post-plan` Phase 6.5) arms `gh pr merge --squash --auto`, and master's branch protection requires only two status checks and **zero reviews** (no `CODEOWNERS`). So whole user-facing features merged unattended overnight (#1073 Trade Block, #1074 Watchlist, #1075 Big Board, #1076 counter-offer; #1067 was rolled back separately by #1070), with no chance for a human to inspect UX before it shipped. The prior attempt, #1072, added `auto_postplan: false` and a manual-UI verification step to the `/plan` docs — but that was inert: the automouse path never reads plan frontmatter, and GitHub had no required check to block on, so `--auto` completed regardless. A convention an LLM is asked to honour is not a gate.
 
 ## Decision
 
@@ -35,7 +35,7 @@ The automouse bot runs as the repo owner with the owner's `gh` credentials, so G
 
 ## Update (2026-06-20, PR #1137)
 
-The originally-shipped **Layer B** was a runtime strip: `bin/automouse-run`'s `neutralize_feat_signoff()` stripped `--auto` arming and any `human-approved` label from bot-authored `feat:` PRs *after* each post-plan run. Because post-plan arms `--auto` then watches CI to completion before returning to `automouse-run`, that cleanup ran too late to beat a label applied mid-watch — best-effort, not deterministic. PR #1137 **removed `neutralize_feat_signoff()`** and replaced the arm-then-strip pattern with the upstream deterministic refusal now described in the Decision (Phase 6.5 condition (8)): post-plan never arms a `feat:` PR, so nothing needs stripping. Layer A — this ADR's core decision, the required `human-signoff` check — is unchanged. The same refactor moved the general merge-hold lever from the inert `auto_postplan: false` plan-frontmatter key to `auto_merge: false`, read deterministically at Phase 6.5 condition (7).
+The originally-shipped **Layer B** was a runtime strip: `bin/automouse/run`'s `neutralize_feat_signoff()` stripped `--auto` arming and any `human-approved` label from bot-authored `feat:` PRs *after* each post-plan run. Because post-plan arms `--auto` then watches CI to completion before returning to `automouse-run`, that cleanup ran too late to beat a label applied mid-watch — best-effort, not deterministic. PR #1137 **removed `neutralize_feat_signoff()`** and replaced the arm-then-strip pattern with the upstream deterministic refusal now described in the Decision (Phase 6.5 condition (8)): post-plan never arms a `feat:` PR, so nothing needs stripping. Layer A — this ADR's core decision, the required `human-signoff` check — is unchanged. The same refactor moved the general merge-hold lever from the inert `auto_postplan: false` plan-frontmatter key to `auto_merge: false`, read deterministically at Phase 6.5 condition (7).
 
 ## Lineage
 
@@ -44,6 +44,6 @@ Relates to (does not supersede) ADR-0017 (`0017-dependabot-full-ci-and-auto-merg
 ## References
 
 - `.github/workflows/human-signoff.yml` — Layer A, the required status check.
-- `bin/automouse-run` — formerly held Layer B (`neutralize_feat_signoff`), removed by PR #1137; the `feat:` block now lives upstream in post-plan Phase 6.5 condition (8) (see Update).
+- `bin/automouse/run` — formerly held Layer B (`neutralize_feat_signoff`), removed by PR #1137; the `feat:` block now lives upstream in post-plan Phase 6.5 condition (8) (see Update).
 - `.claude/skills/post-plan/SKILL.md` — Phase 6.5 arms `gh pr merge --auto` (the behaviour this gate constrains).
 - `.claude/rules/automouse-workflow.md` — automouse pipeline overview.

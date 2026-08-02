@@ -15,10 +15,10 @@ Docker container**.
 
 | Group | Scripts |
 |-------|---------|
-| Migrations (app context) | `migrate`, `migrate-seed`, `run-migrations-ci.sh`, `validate-schema` |
+| Migrations (app context) | `migrate`, `migrate-seed`, `run-migrations-ci`, `validate-schema` |
 | PHPStan / coverage gates | `check-baseline-drift`, `check-coverage`, `check-coverage-regression`, `check-new-class-coverage`, `check-infection-excludes` |
 | Cache ops (run in container) | `warm-cache`, `purge-page-cache`, `rebuild-record-holders-cache` |
-| E2E / visual regression | `e2e-local.sh`, `visual-regression.sh` |
+| E2E / visual regression | `e2e-local`, `visual-regression` |
 | DB CLI | `db-query` (symlinked from `bin/db-query`) |
 
 ## What does NOT belong here

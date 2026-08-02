@@ -1,6 +1,6 @@
 ---
 description: Isolate destructive global-state E2E specs into a dedicated non-sharded Playwright project and CI job to prevent cross-shard reader/mutator collisions.
-last_verified: 2026-06-09
+last_verified: 2026-07-27
 ---
 
 # ADR-0052: Non-sharded mutator isolation job for destructive global-state E2E specs
@@ -29,7 +29,7 @@ Add a dedicated Playwright project named `mutators` in `ibl5/playwright.config.t
 - Positive: the mutators run serially (`--workers=1`) in one job against a fresh DB, mirroring the isolation contract that applies to all global-state specs.
 - Positive: a red mutators job blocks merge via `gate.needs`; its results appear in the merged HTML report via `merge-reports.needs`.
 - Negative: one additional CI job per PR (~one updater run's wall-clock time, not 9× across shards).
-- Negative: a bare local `bin/e2e-wt.sh` (no `--project`) still runs both projects against one DB and will collide; developers must use the two-run protocol (chromium-only on fresh seed, then mutators-only on fresh seed) to reproduce CI conditions locally.
+- Negative: a bare local `bin/e2e-wt` (no `--project`) still runs both projects against one DB and will collide; developers must use the two-run protocol (chromium-only on fresh seed, then mutators-only on fresh seed) to reproduce CI conditions locally.
 
 ## References
 
@@ -37,6 +37,6 @@ Add a dedicated Playwright project named `mutators` in `ibl5/playwright.config.t
 - `.github/workflows/e2e-tests.yml` — `e2e-mutators` job; `gate.needs` and `merge-reports.needs` wiring; `--project=chromium` pin on the shard run.
 - `ibl5/tests/e2e/smoke/updater-awards.spec.ts` — mutator spec (destructive updater runs).
 - `ibl5/tests/e2e/flows/league-control-panel.spec.ts` — mutator spec (Finals MVP insert + season-phase flip).
-- `bin/e2e-wt.sh` — local full-suite runner; runs all projects against one DB unless `--project` is passed.
+- `bin/e2e-wt` — local full-suite runner; runs all projects against one DB unless `--project` is passed.
 - `ibl5/docs/decisions/0033-non-destructive-sibling-test-database.md` — DB-level sibling isolation for PHPUnit (the #884/#886 reshuffle-race precedent; different layer from this ADR).
 - `ibl5/docs/decisions/0043-empty-fga-source-isolation.md` — engine-instrument isolation (related by name only; different constraint).

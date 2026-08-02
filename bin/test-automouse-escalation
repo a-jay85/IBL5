@@ -52,13 +52,13 @@ assert "c7-nonnumeric-attempt-failsafe" "claude-sonnet-4-6" "claude-sonnet-4-6" 
 assert "c8-nonnumeric-max-failsafe"     "claude-sonnet-4-6" "claude-sonnet-4-6" 3 x
 
 # ---------------------------------------------------------------------------
-# write_failure_report (bin/automouse-run) — capped .failure sidecar writer.
+# write_failure_report (bin/automouse/run) — capped .failure sidecar writer.
 #
-# Extracted (not copied) from bin/automouse-run so this test can never drift
+# Extracted (not copied) from bin/automouse/run so this test can never drift
 # from the implementation — same technique as bin/test-automouse-env-breaker.
 # ---------------------------------------------------------------------------
 
-RUNNER="$SCRIPT_DIR/automouse-run"
+RUNNER="$SCRIPT_DIR/automouse/run"
 
 if [ ! -f "$RUNNER" ]; then
     echo "FAIL: cannot find $RUNNER"
@@ -154,10 +154,10 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# should_feed_failure_report (bin/automouse-run) — decides whether to feed the
+# should_feed_failure_report (bin/automouse/run) — decides whether to feed the
 # prior-failure sidecar into an escalated retry's impl prompt (ADR-0085).
 #
-# Extracted (not copied) from bin/automouse-run so this test can never drift
+# Extracted (not copied) from bin/automouse/run so this test can never drift
 # from the implementation — same technique as bin/test-automouse-env-breaker.
 # ---------------------------------------------------------------------------
 
@@ -215,7 +215,7 @@ fi
 # that the escalated-retry prompt wiring is in place (Phase 6).
 # ---------------------------------------------------------------------------
 
-QUEUE_SCRIPT="$SCRIPT_DIR/automouse-queue"
+QUEUE_SCRIPT="$SCRIPT_DIR/automouse/queue"
 
 # run-parity: every bare `rm -f "$ATTEMPT_FILE"` in automouse-run must also
 # remove "$FAILURE_FILE" on the same line.

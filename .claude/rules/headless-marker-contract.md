@@ -50,7 +50,7 @@ editing against the table above rather than assuming:
 - `bin/bug-pipeline-tick` — `--output-format json`, reads `.result` (that field *is*
   the final message); the hunter uses `stream-json` and has its agent write results to
   a file rather than stdout.
-- `bin/automouse-run` — `stream-json --verbose` through `bin/lib/automouse-stream-filter`;
+- `bin/automouse/run` — `stream-json --verbose` through `bin/lib/automouse-stream-filter.sh`;
   it *passes* `PLAN_FILE=` into the prompt as input and parses nothing back out.
 - `bin/post-plan-now` — passes an optional `--plan <abs-path>` through to the harness (which
   owns variant resolution in `harness/planfile.py`) and into the fallback prompt; `bin/docfix-run`

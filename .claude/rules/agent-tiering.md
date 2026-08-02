@@ -1,6 +1,6 @@
 ---
 description: Which tier to pick for each sub-agent, including the Sonnet 4.6 def-pins. Skip-vs-spawn heuristic and deeper rationale live in agent-tiering-detail.md.
-last_verified: 2026-07-25
+last_verified: 2026-07-29
 ---
 
 # Agent Tiering
@@ -32,7 +32,7 @@ Sonnet surfaces are pinned to 4.6 via an agent def or skill frontmatter (the `mo
 | Surface | Def / File | Spawn / invoke with |
 |---------|-----------|---------------------|
 | **Explore** | `~/.claude/agents/Explore.md` (machine-local) | `subagent_type: "Explore"`, **omit `model`**. Blocked by `~/.claude/hooks/explore-model-gate.sh` if you pass `model: "sonnet"`. |
-| **Automouse impl delegates** | `.claude/agents/automouse-delegate.md` (in-repo) | `subagent_type: "automouse-delegate"`, **omit `model`**. Fired by `bin/automouse-prompt-impl` for each `### Delegate` packet. |
+| **Automouse impl delegates** | `.claude/agents/automouse-delegate.md` (in-repo) | `subagent_type: "automouse-delegate"`, **omit `model`**. Fired by `bin/automouse/prompt-impl` for each `### Delegate` packet. |
 | **General Sonnet tasks** (review agents, backlog housekeeping, manual-test classification, any Sonnet-tier spawn) | `.claude/agents/sonnet-4-6.md` (in-repo) | `subagent_type: "sonnet-4-6"`, **omit `model`**. Full tool access — use wherever a Sonnet spawn previously used `model: "sonnet"`. |
 | **Plan architect (Sonnet tier)** | `.claude/agents/plan-architect-sonnet.md` (in-repo) | `subagent_type: "plan-architect-sonnet"`, **omit `model`**. Selected by `/plan` Step 3 precedence. |
 | **`/pr-review` & `/security-audit` runners** | Their `SKILL.md` frontmatter | Pinned via `model: claude-sonnet-4-6` in skill frontmatter. No spawn change needed. |

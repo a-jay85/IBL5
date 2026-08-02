@@ -1,6 +1,6 @@
 ---
 description: Git worktrees are created OUTSIDE the repo tree (a canonical-case sibling, IBL5-worktrees/<slug>) instead of nested at $REPO_ROOT/worktrees/<slug>. Nesting made the repo-root .claude/rules a filesystem ancestor of every worktree file, so Claude Code's path-conditional rule loader injected each matching rule twice. Records the layout decision, the git-based worktree detection it requires, and the safe migration path.
-last_verified: 2026-06-04
+last_verified: 2026-07-27
 ---
 
 # ADR-0046: Worktrees live outside the repo tree
@@ -58,7 +58,7 @@ location during the transition.
 - Docker is unaffected: `docker/worktree-compose.yml` mounts `${WORKTREE_PATH}` (exported
   by the caller), so only the value changes.
 - Blast radius: `bin/wt-new`, `wt-up`, `wt-remove`, `wt-down`, `wt-list`, `wt-rebase`,
-  `wt-db-test`, `db-test-up`, `e2e-wt.sh`, `cleanup`, `ibl5/bin/e2e-local.sh`, and
+  `wt-db-test`, `db-test-up`, `e2e-wt`, `cleanup`, `ibl5/bin/e2e-local`, and
   `bin/lib/git-helpers.sh`. Local, non-repo follow-ups (vendor-repair hook in
   `.claude/settings.local.json`, permission globs in `~/.claude/settings.json`, stale
   `~/.claude.json` project keys) are documented in the PR, not in this diff.

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# Regression harness for bin/automouse-self-heal.
+# Regression harness for bin/automouse/self-heal.
 
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-SCRIPT="$SCRIPT_DIR/automouse-self-heal"
+SCRIPT="$SCRIPT_DIR/automouse/self-heal"
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT

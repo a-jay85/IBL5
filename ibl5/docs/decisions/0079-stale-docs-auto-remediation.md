@@ -1,6 +1,6 @@
 ---
 description: Act on the nightly stale-docs audit automatically — on a NEW/CHANGED stale set, a self-hosted macOS runner fires a headless Claude run that refreshes exactly the flagged docs (stale last_verified dates and dead paths: globs) and opens a PR (held for human merge) that Closes the tracker issue.
-last_verified: 2026-07-28
+last_verified: 2026-07-29
 ---
 
 # ADR-0079: Autonomous stale-docs remediation via a self-hosted macOS runner
@@ -38,7 +38,7 @@ that refreshes exactly the docs in `<sig>`, then opens a PR that `Closes #<issue
 3. **The fix runs headless via the `bin/post-plan-now` launchd-detach pattern.** A plain
    `nohup … &` spawned from a runner job shares the job's process group and dies when the job
    ends; a launchd `RunAtLoad` one-shot (bootstrapped into the user GUI domain) survives the job,
-   exactly as `bin/post-plan-now` and `bin/automouse-run` already rely on. `bin/docfix-run` clones
+   exactly as `bin/post-plan-now` and `bin/automouse/run` already rely on. `bin/docfix-run` clones
    that idiom, differing only in that it first creates the worktree and points the run at it.
 4. **The produced PR is HELD for human merge** (`auto_merge` NOT armed). `bin/docfix-run` seeds a
    minimal plan at `$HOME/claude-plans/<slug>.md` with line-1 frontmatter `auto_merge: false`;

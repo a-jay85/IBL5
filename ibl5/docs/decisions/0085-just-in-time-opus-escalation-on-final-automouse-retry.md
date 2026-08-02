@@ -1,6 +1,6 @@
 ---
 description: Why a genuinely-failed non-Opus automouse plan escalates only its FINAL retry to Opus with the prior attempt's capped failure report, and why environmental (refunded) failures never escalate or write a report.
-last_verified: 2026-07-11
+last_verified: 2026-07-27
 owner: A-Jay
 ---
 
@@ -12,12 +12,12 @@ owner: A-Jay
 
 ## Context
 
-`bin/automouse-run` runs each queued plan through an attempt loop capped at `MAX_ATTEMPTS=3`. The impl model for a run is resolved once per attempt by `bin/lib/plan-impl-model`, which reads a line-1-anchored `impl_model:` frontmatter field and maps `sonnet`→`claude-sonnet-4-6`, `haiku`→`claude-haiku-4-5`, and everything else (missing/unknown/`opus`) to the safe default `claude-opus-4-8`. With per-plan tier labels bound (L13), a non-Opus model is now the common case for cheap plans.
+`bin/automouse/run` runs each queued plan through an attempt loop capped at `MAX_ATTEMPTS=3`. The impl model for a run is resolved once per attempt by `bin/lib/plan-impl-model`, which reads a line-1-anchored `impl_model:` frontmatter field and maps `sonnet`→`claude-sonnet-4-6`, `haiku`→`claude-haiku-4-5`, and everything else (missing/unknown/`opus`) to the safe default `claude-opus-4-8`. With per-plan tier labels bound (L13), a non-Opus model is now the common case for cheap plans.
 
 Two gaps make a non-Opus night brittle:
 
 1. **Same-model retries.** All three attempts run at the same resolved model. When a `sonnet`/`haiku` plan fails for a *genuine* (non-environmental) reason — the model could not produce a correct change — re-running the identical model twice more usually reproduces the same failure, then poison-pills. The strongest available model is never brought to bear before the plan is abandoned for the night.
-2. **No failure artifact.** A genuinely failed attempt leaves no structured record of *why* it failed — only its slice of the shared dated `logs/YYYY-MM-DD.log`. There is nothing to hand a retry so it can avoid repeating the same mistake. (`bin/automouse-self-heal` writes only staleness/self-heal sidecars — never a per-attempt failure report; that artifact did not previously exist.)
+2. **No failure artifact.** A genuinely failed attempt leaves no structured record of *why* it failed — only its slice of the shared dated `logs/YYYY-MM-DD.log`. There is nothing to hand a retry so it can avoid repeating the same mistake. (`bin/automouse/self-heal` writes only staleness/self-heal sidecars — never a per-attempt failure report; that artifact did not previously exist.)
 
 Environmental failures are already handled separately: `should_impl_env_stop` refunds the attempt (`refund_attempt`) and breaks, so an env-stop never counts toward `MAX_ATTEMPTS`. Any escalation policy must leave that path untouched — an environmental stop is not a model deficiency and must never consume the Opus escalation or write a failure report.
 
@@ -25,16 +25,16 @@ This is nightly-ship-pipeline machinery: a wrong decision here burns whole unatt
 
 ## Decision
 
-On the **final** attempt only (the attempt numbered `MAX_ATTEMPTS`), if the plan's resolved base model is **not** `claude-opus-4-8`, `bin/automouse-run` overrides the impl model to `claude-opus-4-8` for that one attempt — a just-in-time escalation. Earlier attempts run at the plan's declared tier unchanged.
+On the **final** attempt only (the attempt numbered `MAX_ATTEMPTS`), if the plan's resolved base model is **not** `claude-opus-4-8`, `bin/automouse/run` overrides the impl model to `claude-opus-4-8` for that one attempt — a just-in-time escalation. Earlier attempts run at the plan's declared tier unchanged.
 
 Four rules make this safe:
 
 - **Any non-Opus tier escalates.** Sonnet *and* Haiku plans escalate to Opus on the final attempt. The backlog framed this as "Sonnet-model", but the principle is identical for Haiku — "escalate any non-Opus resolved model on the last retry" is the clean, uniform rule.
 - **Trigger is decoupled from the report.** Escalation keys on attempt-count and resolved-model **only** — never on the existence of a failure sidecar. A leaked stale sidecar must not be able to mis-fire an escalation. The prior-attempt failure report is fed to the escalated retry **only if** the sidecar is actually present; its absence degrades gracefully to an un-augmented Opus retry.
-- **A genuine failure persists a capped `.failure` report.** When an attempt ends with the plan still queued, no handoff produced, and it was **not** an env-stop (the genuine-failure fall-through), `bin/automouse-run` writes a per-attempt `<plan>.failure` sidecar: a **capped tail** of that attempt's log slice (bounded line/char count). The tail is the reliable baseline because a crashed/stall-killed agent may have written nothing structured itself; a short agent-authored "why I could not complete" note may be preferred *when present*, but the tail must always work without agent cooperation. The report is fed into the escalated retry's prompt via a trailing `PRIOR_FAILURE_REPORT=<path>` context line, which `bin/automouse-prompt-impl` reads when present.
-- **The escalation DECISION is a pure helper, separate from model parsing.** The override lives in `bin/automouse-run` via a new pure helper `bin/lib/automouse-escalate-model` (base model + attempt number + `MAX_ATTEMPTS` → escalated-or-base model). `bin/lib/plan-impl-model` keeps its single responsibility (line-1 frontmatter → base model) and its existing test unchanged. The helper unit-tests exactly like `plan-impl-model` (Phase 3).
+- **A genuine failure persists a capped `.failure` report.** When an attempt ends with the plan still queued, no handoff produced, and it was **not** an env-stop (the genuine-failure fall-through), `bin/automouse/run` writes a per-attempt `<plan>.failure` sidecar: a **capped tail** of that attempt's log slice (bounded line/char count). The tail is the reliable baseline because a crashed/stall-killed agent may have written nothing structured itself; a short agent-authored "why I could not complete" note may be preferred *when present*, but the tail must always work without agent cooperation. The report is fed into the escalated retry's prompt via a trailing `PRIOR_FAILURE_REPORT=<path>` context line, which `bin/automouse/prompt-impl` reads when present.
+- **The escalation DECISION is a pure helper, separate from model parsing.** The override lives in `bin/automouse/run` via a new pure helper `bin/lib/automouse-escalate-model` (base model + attempt number + `MAX_ATTEMPTS` → escalated-or-base model). `bin/lib/plan-impl-model` keeps its single responsibility (line-1 frontmatter → base model) and its existing test unchanged. The helper unit-tests exactly like `plan-impl-model` (Phase 3).
 
-The `.failure` sidecar shares the lifecycle of the `.attempts` counter: it is evicted at **every** point `.attempts` is evicted (run-success path and `bin/automouse-queue` disposition/eviction points), so a stale report can never feed a bogus prior-failure into an unrelated future run.
+The `.failure` sidecar shares the lifecycle of the `.attempts` counter: it is evicted at **every** point `.attempts` is evicted (run-success path and `bin/automouse/queue` disposition/eviction points), so a stale report can never feed a bogus prior-failure into an unrelated future run.
 
 ## Alternatives Considered
 
@@ -57,10 +57,10 @@ Builds on L13 (per-plan impl-model tier binding, PR1 of this stacked pair), whic
 
 ## References
 
-- `bin/automouse-run` — attempt loop (`MAX_ATTEMPTS`, `.attempts` read/increment), per-attempt model resolution, the new genuine-failure branch and escalation override.
+- `bin/automouse/run` — attempt loop (`MAX_ATTEMPTS`, `.attempts` read/increment), per-attempt model resolution, the new genuine-failure branch and escalation override.
 - `bin/lib/automouse-escalate-model` — the pure escalation-decision helper (Phase 2).
 - `bin/lib/plan-impl-model` — the unchanged line-1 base-model parser.
-- `bin/automouse-prompt-impl` — reads `PRIOR_FAILURE_REPORT` when present.
-- `bin/automouse-queue` — `.failure` sidecar eviction sites (mirrors `.attempts`).
+- `bin/automouse/prompt-impl` — reads `PRIOR_FAILURE_REPORT` when present.
+- `bin/automouse/queue` — `.failure` sidecar eviction sites (mirrors `.attempts`).
 - `bin/test-automouse-escalation` — unit test for the escalation decision (Phase 3).
 - `ibl5/docs/backlog/loop-engineering-backlog.md` — backlog item L14.

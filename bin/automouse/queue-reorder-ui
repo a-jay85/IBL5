@@ -2,12 +2,12 @@
 # Open a local drag-and-drop page to reorder the automouse plan queue.
 #
 # Spawns an ephemeral `php -S` server bound to 127.0.0.1 ONLY, opens the browser,
-# and waits for a single Save (which shells out to `bin/automouse-queue reorder`)
+# and waits for a single Save (which shells out to `bin/automouse/queue reorder`)
 # or for Ctrl-C / a timeout. The server is always torn down on exit. All queue
 # mutation and validation live in the `reorder` engine — this launcher owns only
 # the server lifecycle.
 #
-# Usage: bin/automouse-queue-reorder-ui
+# Usage: bin/automouse/queue-reorder-ui
 
 set -euo pipefail
 
@@ -16,8 +16,8 @@ set -euo pipefail
 QUEUE_DIR="$NIGHTLY_DIR/queue"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-QUEUE_CMD="$SCRIPT_DIR/automouse-queue"                # sibling engine
-ROUTER="$SCRIPT_DIR/lib/automouse-reorder-router.php"  # sibling router + page
+QUEUE_CMD="$SCRIPT_DIR/queue"                # sibling engine
+ROUTER="$SCRIPT_DIR/../lib/automouse-reorder-router.php"  # sibling router + page
 
 command -v php >/dev/null 2>&1 || { echo "Error: php not found on PATH." >&2; exit 1; }
 [ -f "$ROUTER" ] || { echo "Error: router not found: $ROUTER" >&2; exit 1; }

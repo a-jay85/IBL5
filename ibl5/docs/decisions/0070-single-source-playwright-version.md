@@ -1,6 +1,6 @@
 ---
 description: Derive the Playwright Docker image tag from each package's package.json at runtime so the image and the installed client cannot drift; the drift guard becomes a no-hardcoded-literal regression guard.
-last_verified: 2026-06-27
+last_verified: 2026-07-27
 ---
 
 # ADR-0070: Single-source the Playwright version from each package.json
@@ -10,7 +10,7 @@ last_verified: 2026-06-27
 
 ## Context
 
-The Playwright version was hand-mirrored across ~13 literal `mcr.microsoft.com/playwright:v<ver>-jammy` occurrences in three CI surfaces (`ibl5/bin/visual-regression.sh`, `.github/actions/setup-docker-e2e/action.yml`, `.github/workflows/e2e-tests.yml`) plus version strings in `ibl5/package.json`, `ibl5/bun.lock`, and `IBL6/package.json`. Dependabot bumps only `ibl5/package.json` and its lockfiles, so a `@playwright/test` bump (PR #1210, 1.60.0→1.61.1) left every other surface stale, producing two failures: the "Playwright version drift guard" job failed against its hardcoded `EXPECTED`, and every E2E/VR job failed because tests installed client 1.61.1 but ran inside the stale `v1.60.0-jammy` image (browser-binary mismatch). The lockstep was real but enforced by hand-mirroring, which Dependabot cannot maintain.
+The Playwright version was hand-mirrored across ~13 literal `mcr.microsoft.com/playwright:v<ver>-jammy` occurrences in three CI surfaces (`ibl5/bin/visual-regression`, `.github/actions/setup-docker-e2e/action.yml`, `.github/workflows/e2e-tests.yml`) plus version strings in `ibl5/package.json`, `ibl5/bun.lock`, and `IBL6/package.json`. Dependabot bumps only `ibl5/package.json` and its lockfiles, so a `@playwright/test` bump (PR #1210, 1.60.0→1.61.1) left every other surface stale, producing two failures: the "Playwright version drift guard" job failed against its hardcoded `EXPECTED`, and every E2E/VR job failed because tests installed client 1.61.1 but ran inside the stale `v1.60.0-jammy` image (browser-binary mismatch). The lockstep was real but enforced by hand-mirroring, which Dependabot cannot maintain.
 
 The precise root cause: the test *client* already tracked `package.json` (bun/npm install resolved the bump); only the Docker *image tag* stayed a frozen literal.
 
@@ -18,7 +18,7 @@ The precise root cause: the test *client* already tracked `package.json` (bun/np
 
 Derive the Docker image tag from each package's own `package.json` at runtime, so the image tag follows the same source the client already follows.
 
-- A single helper `bin/playwright-image-tag <package.json>` echoes the full image ref, reused by `ibl5/bin/visual-regression.sh`, the `setup-docker-e2e` composite action, the IBL6 E2E jobs, and the regression test — one copy of the version-to-tag logic.
+- A single helper `bin/playwright-image-tag <package.json>` echoes the full image ref, reused by `ibl5/bin/visual-regression`, the `setup-docker-e2e` composite action, the IBL6 E2E jobs, and the regression test — one copy of the version-to-tag logic.
 - ibl5 jobs derive from `ibl5/package.json`: the `setup-docker-e2e` action derives once and exports `PW_IMAGE` via `$GITHUB_ENV`, which propagates to the rest of each calling job.
 - IBL6 jobs derive from `IBL6/package.json` via a per-job step (they call the action without `with-playwright`).
 - The "Playwright version drift guard" job is repurposed into a regression guard (`bin/check-playwright-pinning`) that fails only if a hardcoded image literal is re-introduced into a derivation surface. Its job id and name are unchanged.
@@ -44,5 +44,5 @@ Derive the Docker image tag from each package's own `package.json` at runtime, s
 - `bin/playwright-image-tag` — the derive helper.
 - `bin/check-playwright-pinning` — the repurposed regression guard.
 - `bin/test-playwright-version` — the self-heal + guard-reject regression test.
-- `.github/workflows/e2e-tests.yml`, `.github/actions/setup-docker-e2e/action.yml`, `ibl5/bin/visual-regression.sh` — the three derivation surfaces.
+- `.github/workflows/e2e-tests.yml`, `.github/actions/setup-docker-e2e/action.yml`, `ibl5/bin/visual-regression` — the three derivation surfaces.
 - `.github/dependabot.yml` — unchanged; IBL6 deliberately excluded.

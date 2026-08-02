@@ -47,13 +47,13 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 | Status | Count |
 |--------|------:|
-| ✅ Implemented | 240 |
-| ◑ Partial | 24 |
+| ✅ Implemented | 245 |
+| ◑ Partial | 23 |
 | 📋 Planned (plan queued / PR open) | 1 |
-| ⬜ Open | 57 |
+| ⬜ Open | 53 |
 | 🚫 Declined | 10 |
 
-> Status counts re-verified 2026-06-28 (exact, from the per-axis tables); **6.20 / 6.21 added 2026-06-29** from the PR #1107 review (⬜ Open +2); **6.22 added 2026-06-29** from the #1066 reject-IDOR review (⬜ Open +1). Two stale-Open rows were flipped directly (no plan owned them): **13.3**, **13.9** (✅ +2, ⬜ −2 vs the master re-count). **1.21–1.31 added 2026-07-24** from the hot-files comment→backlog migration (⬜ Open +11: 8 🟩 auto-mergeable, 3 🟨 conditional — 1.23/1.25/1.31 need characterization/endpoint pins). **Ground-truth audit 2026-07-24:** 7 stale-Open items flipped ✅, 2 false findings marked 🚫, 5 new Axis-1 rows seeded (1.32–1.36); IDOR PRs #1107–1110 merged 2026-06-29 (unblocking 2.10/2.13/2.14/2.25/7.7/14.6); PRs #1240/#1230/#1204 merged (2.6/2.31/2.32/5.18 already ✅/Open on own merits). **9.19 and 9.20 implemented 2026-07-24** — added READMEs to all 68 missing class dirs + frontmatter to all 16 existing class READMEs that lacked it; extended bin/check-docs IN_SCOPE_GLOBS (✅ +2, ⬜ −2); roll-up recomputed from grep (331 rows total, unchanged). **6.16 flipped ✅ 2026-07-24** (all Api data repos + JsonResponder + SystemClock tested; ✅ +1, ◑ −1). **6.14 Status updated 2026-07-24** (ProcessBoxscoresStep/GenerateSeasonAwardsStep/ParseJsbFilesStep added; still ◑). **Resolved rows collapsed 2026-07-25** — ✅/🚫 findings no longer appear as table rows; each axis carries a `> ✅ resolved (N): …` / `> 🚫 declined (N): …` summary line and their evidence lives in [archive/maintenance-backlog-archive.md](archive/maintenance-backlog-archive.md). **Recount recipe:** resolved = sum of the `(N)` in the per-axis summary lines; open = grep of the per-axis table rows; total = the two added. Counts above are unchanged by the collapse (238 + 93 = 331). **1.36 and 7.7 flipped ✅ 2026-07-26** (✅ +2, ⬜ −1, ◑ −1); total tracked rows unchanged at 331. **1.29 flipped ✅ 2026-07-26 (PR #1679)** (✅ +1, ⬜ −1); total tracked rows unchanged at 331. **1.27 flipped ✅ 2026-07-27** — extracted 10 per-entity collaborators into `ibl5/classes/JsbParser/Repositories/`; JsbImportRepository reduced to thin facade (✅ +1, ⬜ −1); total tracked rows unchanged at 331. **1.23 flipped ✅ 2026-07-27 (`oneonone-1-23-pins-and-extract`)** (✅ +1, ⬜ −1); total tracked rows unchanged at 331. **1.31 flipped ✅ 2026-07-27** — extracted `TradeRosterPreviewParamValidator` + `TradeRosterPreviewCashRowBuilder` collaborators; DB characterization pin + validator/cash-row unit suites landed (✅ +1, ⬜ −1). **2.39 seeded 2026-07-27** — cash-year range unbounded/unordered in `TradeRosterPreviewCashRowBuilder::buildCashRows()`; cashStartYear/cashEndYear come from `$_GET` with no upper bound (discovered during trading-1-31-api-handler-extract) (⬜ +1); **1.19 flipped ✅ 2026-07-27** — characterization pins + `executePlayerLoop` merge shipped; `processPlrData`/`processPlrDataForYear` deduped (✅ +1, ⬜ −1); total tracked: 332 (✅ 236, ◑ 24, 📋 1, ⬜ 61, 🚫 10). **14.6 flipped ◑ Partial 2026-07-28 (#1712)** — batch 1 (17 Api/Controller/*) converted to DI; batch 2 pending (◑ +1, ⬜ −1); total tracked: 332 (✅ 236, ◑ 25, 📋 1, ⬜ 60, 🚫 10). **14.9 flipped ✅ 2026-07-27** — replaced 21 `$cookie[1]` occurrences across 11 files with `AuthService::getUsername()` (✅ +1, ⬜ −1); total tracked: 332 (✅ 237, ◑ 25, 📋 1, ⬜ 59, 🚫 10). **11.16 flipped ✅ 2026-07-27** — moved page-specific JS loaders (`offer-salary-hints.js`, `contract-hint.js`) from PageLayout global bundle to per-view injection in NegotiationService and TradingView; E2E behavioral pins + VR manifest row added (✅ +1, ⬜ −1); total tracked: 332 (✅ 238, ◑ 25, 📋 1, ⬜ 58, 🚫 10). **6.2 and 6.4 flipped ✅ 2026-07-27** (PR #1671 tests verified; ✅ +2, ⬜ −1, ◑ −1); total tracked: 332 (✅ 240, ◑ 24, 📋 1, ⬜ 57, 🚫 10).
+> Status counts re-verified 2026-06-28 (exact, from the per-axis tables); **6.20 / 6.21 added 2026-06-29** from the PR #1107 review (⬜ Open +2); **6.22 added 2026-06-29** from the #1066 reject-IDOR review (⬜ Open +1). Two stale-Open rows were flipped directly (no plan owned them): **13.3**, **13.9** (✅ +2, ⬜ −2 vs the master re-count). **1.21–1.31 added 2026-07-24** from the hot-files comment→backlog migration (⬜ Open +11: 8 🟩 auto-mergeable, 3 🟨 conditional — 1.23/1.25/1.31 need characterization/endpoint pins). **Ground-truth audit 2026-07-24:** 7 stale-Open items flipped ✅, 2 false findings marked 🚫, 5 new Axis-1 rows seeded (1.32–1.36); IDOR PRs #1107–1110 merged 2026-06-29 (unblocking 2.10/2.13/2.14/2.25/7.7/14.6); PRs #1240/#1230/#1204 merged (2.6/2.31/2.32/5.18 already ✅/Open on own merits). **9.19 and 9.20 implemented 2026-07-24** — added READMEs to all 68 missing class dirs + frontmatter to all 16 existing class READMEs that lacked it; extended bin/check-docs IN_SCOPE_GLOBS (✅ +2, ⬜ −2); roll-up recomputed from grep (331 rows total, unchanged). **6.16 flipped ✅ 2026-07-24** (all Api data repos + JsonResponder + SystemClock tested; ✅ +1, ◑ −1). **6.14 Status updated 2026-07-24** (ProcessBoxscoresStep/GenerateSeasonAwardsStep/ParseJsbFilesStep added; still ◑). **Resolved rows collapsed 2026-07-25** — ✅/🚫 findings no longer appear as table rows; each axis carries a `> ✅ resolved (N): …` / `> 🚫 declined (N): …` summary line and their evidence lives in [archive/maintenance-backlog-archive.md](archive/maintenance-backlog-archive.md). **Recount recipe:** resolved = sum of the `(N)` in the per-axis summary lines; open = grep of the per-axis table rows; total = the two added. Counts above are unchanged by the collapse (238 + 93 = 331). **1.36 and 7.7 flipped ✅ 2026-07-26** (✅ +2, ⬜ −1, ◑ −1); total tracked rows unchanged at 331. **1.29 flipped ✅ 2026-07-26 (PR #1679)** (✅ +1, ⬜ −1); total tracked rows unchanged at 331. **1.27 flipped ✅ 2026-07-27** — extracted 10 per-entity collaborators into `ibl5/classes/JsbParser/Repositories/`; JsbImportRepository reduced to thin facade (✅ +1, ⬜ −1); total tracked rows unchanged at 331. **1.23 flipped ✅ 2026-07-27 (`oneonone-1-23-pins-and-extract`)** (✅ +1, ⬜ −1); total tracked rows unchanged at 331. **1.31 flipped ✅ 2026-07-27** — extracted `TradeRosterPreviewParamValidator` + `TradeRosterPreviewCashRowBuilder` collaborators; DB characterization pin + validator/cash-row unit suites landed (✅ +1, ⬜ −1). **2.39 seeded 2026-07-27** — cash-year range unbounded/unordered in `TradeRosterPreviewCashRowBuilder::buildCashRows()`; cashStartYear/cashEndYear come from `$_GET` with no upper bound (discovered during trading-1-31-api-handler-extract) (⬜ +1); **1.19 flipped ✅ 2026-07-27** — characterization pins + `executePlayerLoop` merge shipped; `processPlrData`/`processPlrDataForYear` deduped (✅ +1, ⬜ −1); total tracked: 332 (✅ 236, ◑ 24, 📋 1, ⬜ 61, 🚫 10). **14.6 flipped ◑ Partial 2026-07-28 (#1712)** — batch 1 (17 Api/Controller/*) converted to DI; batch 2 pending (◑ +1, ⬜ −1); total tracked: 332 (✅ 236, ◑ 25, 📋 1, ⬜ 60, 🚫 10). **14.9 flipped ✅ 2026-07-27** — replaced 21 `$cookie[1]` occurrences across 11 files with `AuthService::getUsername()` (✅ +1, ⬜ −1); total tracked: 332 (✅ 237, ◑ 25, 📋 1, ⬜ 59, 🚫 10). **11.16 flipped ✅ 2026-07-27** — moved page-specific JS loaders (`offer-salary-hints.js`, `contract-hint.js`) from PageLayout global bundle to per-view injection in NegotiationService and TradingView; E2E behavioral pins + VR manifest row added (✅ +1, ⬜ −1); total tracked: 332 (✅ 238, ◑ 25, 📋 1, ⬜ 58, 🚫 10). **6.2 and 6.4 flipped ✅ 2026-07-27** (PR #1671 tests verified; ✅ +2, ⬜ −1, ◑ −1); total tracked: 332 (✅ 240, ◑ 24, 📋 1, ⬜ 57, 🚫 10). **8.3, 8.5, 8.9, 8.11, 8.14 flipped ✅ 2026-07-29** — `.sh` stripped + caller sweep (8.3); `plrScratchpad.php` archived (8.5); `bin/lib/README.md` added + stream-filter renamed to `.sh` (8.9); automouse-* moved to `bin/automouse/` + README + caller sweep (8.11); PHP bootstrap standardized in ibl5/scripts/ (8.14) (✅ +5, ◑ −1, ⬜ −4); total tracked: 332 (✅ 245, ◑ 23, 📋 1, ⬜ 53, 🚫 10).
 
 **Automouse-readiness of the not-yet-complete (⬜/◑/📋) items:**
 
@@ -527,39 +527,12 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
-> ✅ resolved (10): 8.1, 8.2, 8.4, 8.6, 8.7, 8.8, 8.12, 8.13, 8.16, 8.17 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (15): 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8, 8.9, 8.11, 8.12, 8.13, 8.14, 8.16, 8.17 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| 8.3 | ⬜ Open | 🟩 | kebab-case/`.sh` consistency. Rename + caller sweep (CI/hooks refs); green-green. |
-| 8.5 | ◑ Partial | 🟩 | `tradition.php` deleted; `scripts/plrScratchpad.php` still present (verified) → archive it. |
-| 8.9 | ⬜ Open | 🟩 | bin/lib manifest + helper rename. |
 | 8.10 | ⬜ Open | 🟨 | Interactive-vs-CI convention — upfront decision (`check-*`/`test-*` prefix vs a dedicated `ci/` subdir). |
-| 8.11 | ⬜ Open | 🟩 | Move `automouse-*` to bin/automouse/ + README; caller sweep (launchd plist refs). |
-| 8.14 | ⬜ Open | 🟩 | Standardize script bootstrap; green-green per script. |
 | 8.15 | ⬜ Open | 🟨 | Consolidate the two E2E drivers — context-detection design; mind the outside-repo `e2e-for-pr` gotcha. |
-
-### 8.3 Mixed kebab-case, camelCase, `.sh` Extensions
-**Location:** `/bin/` and `ibl5/bin/`
-**Problem:** Inconsistent: 3 scripts have `.sh`, 11 don't.
-**Suggested direction:** All executables kebab-case, no extension.
-**Est. effort:** S
-**Risk if untouched:** Copy-paste errors from inconsistent examples.
-
-### 8.5 Orphan / Deprecated Scripts in `ibl5/scripts/`
-**Location:** `ibl5/scripts/plrScratchpad.php`, `tradition.php`
-**Problem:** Scratchpad is experimental; tradition.php has no nav reference but is linked from LeagueControlPanel. Neither has tests.
-**Suggested direction:** Archive scratchpad; verify tradition.php usage and migrate to Service class or document as legacy.
-**Est. effort:** S
-**Risk if untouched:** Maintenance burden on unclear-status scripts.
-**Status:** Tradition half resolved (2026-06-09) — `scripts/tradition.php` deleted; its compute loop migrated into `LeagueControlPanelProcessor::updateTradition()` behind the LCP `is_admin()` guard. `plrScratchpad.php` archiving still open.
-
-### 8.9 `bin/lib/` Has No Manifest
-**Location:** `/bin/lib/`
-**Problem:** 4 shared shell helpers (`db-helpers.sh`, `git-helpers.sh`, `wt-guards.sh`, `automouse-stream-filter`). Inconsistent: filter has no `.sh`.
-**Suggested direction:** Rename for consistency; add bin/lib/README.md.
-**Est. effort:** S
-**Risk if untouched:** Devs unsure which helpers exist; duplication.
 
 ### 8.10 No Convention for Interactive vs CI Scripts
 **Location:** `/bin/`
@@ -568,22 +541,8 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Est. effort:** M
 **Risk if untouched:** Accidental human runs of CI scripts; CI-tuned scripts break locally.
 
-### 8.11 Automouse Workflow Scripts Have Complex State
-**Location:** `/bin/automouse-*` (4 files)
-**Problem:** `automouse-run`, `automouse-queue` are executables; `automouse-prompt-impl`, `automouse-prompt-postplan` are templates. No README.
-**Suggested direction:** Move to bin/automouse/; add README explaining data flow.
-**Est. effort:** M
-**Risk if untouched:** Workflow opaque; debugging hard.
-
-### 8.14 Mixed PHP Bootstrap Styles in Scripts
-**Location:** `ibl5/scripts/`
-**Problem:** Some scripts use `require '../mainfile.php'`; others use `require '../vendor/autoload.php'`. Inconsistent.
-**Suggested direction:** Standardize on modern bootstrap.
-**Est. effort:** S
-**Risk if untouched:** New scripts copy old pattern; debt grows.
-
 ### 8.15 Two E2E Drivers
-**Location:** `/bin/e2e-wt.sh` (worktrees) vs `ibl5/bin/e2e-local.sh` (local)
+**Location:** `/bin/e2e-wt` (worktrees) vs `ibl5/bin/e2e-local` (local)
 **Problem:** Both do similar work; developer must know which.
 **Suggested direction:** Consolidate into single bin/e2e that detects context.
 **Est. effort:** M

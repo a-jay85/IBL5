@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Run E2E tests locally with isolated CI-like database via Docker Apache.
-# Usage: ./bin/e2e-local.sh [playwright-args...]
-#   e.g. ./bin/e2e-local.sh --headed
-#        ./bin/e2e-local.sh --grep "trading"
+# Usage: ./bin/e2e-local [playwright-args...]
+#   e.g. ./bin/e2e-local --headed
+#        ./bin/e2e-local --grep "trading"
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -18,10 +18,10 @@ IBL5_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 E2E_GIT_DIR="$(git -C "$IBL5_DIR" rev-parse --absolute-git-dir 2>/dev/null || true)"
 E2E_GIT_COMMON="$(git -C "$IBL5_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
 if [ -n "$E2E_GIT_DIR" ] && [ "$E2E_GIT_DIR" != "$E2E_GIT_COMMON" ]; then
-    echo "ERROR: e2e-local.sh is the MAIN-checkout E2E runner and serves http://main.localhost/ibl5/." >&2
+    echo "ERROR: e2e-local is the MAIN-checkout E2E runner and serves http://main.localhost/ibl5/." >&2
     echo "       You are inside a worktree — it would seed ibl5_e2e_test but Playwright would hit the MAIN stack, not this worktree's <slug>.localhost DB." >&2
     echo "       Use the worktree-correct path instead:" >&2
-    echo "         bin/wt-up <slug> --seed && bin/e2e-wt.sh <slug>" >&2
+    echo "         bin/wt-up <slug> --seed && bin/e2e-wt <slug>" >&2
     exit 1
 fi
 

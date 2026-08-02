@@ -32,3 +32,12 @@ runs:
     - uses: ./.github/actions/setup-docker-e2e
       with:
         build-css: 'true'
+
+    # Lighthouse hard-fails the ENTIRE run on any document response >= 400
+    # (ERRORED_DOCUMENT_REQUEST), so a single unreachable URL in the generated
+    # set reds every Lighthouse workflow. Assert reachability here, in the
+    # shared prelude, where the failure is attributable to the URL set rather
+    # than to a Lighthouse score.
+    - name: Assert every Lighthouse audit URL is reachable
+      shell: bash
+      run: bin/lighthouse-audit-urls --check --base-url=http://localhost:8080

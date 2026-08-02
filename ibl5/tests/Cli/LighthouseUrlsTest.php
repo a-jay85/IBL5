@@ -26,9 +26,66 @@ final class LighthouseUrlsTest extends TestCase
     {
         $expected = 1
             + count(ModuleRegistry::getAllModules())
-            + count(LighthouseUrls::SUB_PAGES);
+            + count(LighthouseUrls::SUB_PAGES)
+            - count(LighthouseUrls::PARAM_REQUIRED_MODULES);
 
         self::assertCount($expected, LighthouseUrls::fullSiteUrls(self::BASE));
+    }
+
+    /**
+     * Regression: GameBoxscore was registered in ModuleRegistry with no
+     * SUB_PAGES entry, so fullSiteUrls() emitted a bare `?name=GameBoxscore`
+     * URL. That page 404s without date+game, and Lighthouse fails the whole
+     * run on a >= 400 document (ERRORED_DOCUMENT_REQUEST).
+     */
+    public function testParamRequiredModuleEmitsNoBareUrl(): void
+    {
+        $fullSet = LighthouseUrls::fullSiteUrls(self::BASE);
+
+        foreach (LighthouseUrls::PARAM_REQUIRED_MODULES as $module) {
+            self::assertNotContains(
+                self::BASE . '/ibl5/modules.php?name=' . $module,
+                $fullSet,
+                "'$module' requires query params — its bare URL must not be audited"
+            );
+        }
+    }
+
+    /**
+     * Suppressing the bare URL must not drop the module from the audit set —
+     * that would trade a loud 404 for silent coverage loss.
+     */
+    public function testEveryParamRequiredModuleHasASubPage(): void
+    {
+        foreach (LighthouseUrls::PARAM_REQUIRED_MODULES as $module) {
+            self::assertArrayHasKey(
+                $module,
+                LighthouseUrls::SUB_PAGES,
+                "'$module' suppresses its bare URL, so it MUST have a SUB_PAGES entry"
+            );
+        }
+    }
+
+    /**
+     * Deliberately does NOT route through PARAM_REQUIRED_MODULES: dropping
+     * 'GameBoxscore' from that const would empty the loops above and leave them
+     * asserting nothing, while the bare 404 URL returns to the audit set.
+     */
+    public function testGameBoxscoreBareUrlIsNeverAudited(): void
+    {
+        self::assertNotContains(
+            self::BASE . '/ibl5/modules.php?name=GameBoxscore',
+            LighthouseUrls::fullSiteUrls(self::BASE),
+            'GameBoxscore 404s without date+game — its bare URL hard-fails the Lighthouse run'
+        );
+    }
+
+    public function testGameBoxscoreIsAuditedWithParameters(): void
+    {
+        self::assertContains(
+            self::BASE . '/ibl5/modules.php?name=GameBoxscore&date=2026-02-20&game=1',
+            LighthouseUrls::fullSiteUrls(self::BASE)
+        );
     }
 
     public function testModuleUrlAppliesSubPage(): void

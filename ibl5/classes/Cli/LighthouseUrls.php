@@ -18,6 +18,23 @@ final class LighthouseUrls
         'SeasonArchive'       => '&year=2025',
         'Injuries'            => '&teamid=1',
         'OneOnOneGame'        => '&gameid=1',
+        'GameBoxscore'        => '&date=2026-02-20&game=1',
+    ];
+
+    /**
+     * Modules whose BARE `?name=<Module>` URL is not an auditable page: they
+     * hard-require query params and answer 404 without them. Lighthouse treats
+     * any document response >= 400 as ERRORED_DOCUMENT_REQUEST and fails the
+     * whole run, so the bare variant must be suppressed from the audit set.
+     *
+     * Every member MUST also carry a SUB_PAGES entry — otherwise suppressing
+     * the bare URL drops the module out of the audit entirely, trading a loud
+     * 404 for silent coverage loss. Pinned by LighthouseUrlsTest.
+     *
+     * @var list<string>
+     */
+    public const PARAM_REQUIRED_MODULES = [
+        'GameBoxscore',
     ];
 
     /** @var list<string> */
@@ -32,9 +49,11 @@ final class LighthouseUrls
     /**
      * The full-site audit URL set: index first, then for every registered
      * module its bare `name=<Module>` URL plus, for sub-paged modules, the
-     * additional sub-page variant (two entries for those). This is the exact
-     * loop the original `bin/lighthouse-audit-urls` ran; do not change its
-     * shape without re-pinning the characterization test.
+     * additional sub-page variant (two entries for those). Modules listed in
+     * PARAM_REQUIRED_MODULES contribute only their sub-page variant — their
+     * bare URL 404s and would hard-fail the Lighthouse run. Otherwise this is
+     * the exact loop the original `bin/lighthouse-audit-urls` ran; do not
+     * change its shape without re-pinning the characterization test.
      *
      * @return list<string>
      */
@@ -46,7 +65,9 @@ final class LighthouseUrls
         $urls[] = $baseUrl . '/ibl5/index.php';
 
         foreach (ModuleRegistry::getAllModules() as $module) {
-            $urls[] = $baseUrl . '/ibl5/modules.php?name=' . $module;
+            if (!in_array($module, self::PARAM_REQUIRED_MODULES, true)) {
+                $urls[] = $baseUrl . '/ibl5/modules.php?name=' . $module;
+            }
 
             if (isset(self::SUB_PAGES[$module])) {
                 $urls[] = $baseUrl . '/ibl5/modules.php?name=' . $module . self::SUB_PAGES[$module];

@@ -19,6 +19,7 @@ use Cli\LighthouseUrls;
 
 $baseUrl = 'http://localhost:8080';
 $jsonOutput = false;
+$check = false;
 
 foreach ($argv as $i => $arg) {
     if ($i === 0) {
@@ -28,12 +29,15 @@ foreach ($argv as $i => $arg) {
         $baseUrl = substr($arg, strlen('--base-url='));
     } elseif ($arg === '--json') {
         $jsonOutput = true;
+    } elseif ($arg === '--check') {
+        $check = true;
     } elseif ($arg === '--help') {
-        fwrite(STDOUT, "Usage: bin/lighthouse-audit-urls [--base-url=URL] [--json]\n");
+        fwrite(STDOUT, "Usage: bin/lighthouse-audit-urls [--base-url=URL] [--json] [--check]\n");
+        fwrite(STDOUT, "  --check  Request every generated URL and exit 1 if any returns HTTP >= 400.\n");
         exit(0);
     } else {
         fwrite(STDERR, "Unknown argument: $arg\n");
-        fwrite(STDERR, "Usage: bin/lighthouse-audit-urls [--base-url=URL] [--json]\n");
+        fwrite(STDERR, "Usage: bin/lighthouse-audit-urls [--base-url=URL] [--json] [--check]\n");
         exit(2);
     }
 }
@@ -41,6 +45,52 @@ foreach ($argv as $i => $arg) {
 $baseUrl = rtrim($baseUrl, '/');
 
 $urls = LighthouseUrls::fullSiteUrls($baseUrl);
+
+if ($check) {
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'GET',
+            'ignore_errors' => true,
+            'timeout' => 20,
+            'follow_location' => 1,
+            'max_redirects' => 5,
+            'user_agent' => 'lighthouse-audit-urls/--check',
+        ],
+    ]);
+
+    $failures = [];
+
+    foreach ($urls as $url) {
+        $headers = @get_headers($url, false, $context);
+        $status = 0;
+        if ($headers !== false) {
+            foreach ($headers as $header) {
+                if (preg_match('/^HTTP\/[\d.]+\s+(\d{3})/', $header, $m)) {
+                    $status = (int) $m[1];
+                }
+            }
+        }
+        fwrite(STDOUT, "$status $url\n");
+        if ($status === 0 || $status >= 400) {
+            $failures[] = "  $status $url";
+        }
+    }
+
+    $total = count($urls);
+    if ($failures === []) {
+        fwrite(STDOUT, "OK: all $total audit URLs returned < 400.\n");
+        exit(0);
+    }
+
+    $failCount = count($failures);
+    fwrite(STDERR, "\n");
+    fwrite(STDERR, "FAIL: $failCount of $total audit URL(s) returned >= 400 — Lighthouse fails the entire run on an ERRORED_DOCUMENT_REQUEST.\n");
+    foreach ($failures as $line) {
+        fwrite(STDERR, $line . "\n");
+    }
+    fwrite(STDERR, "\nIf the module hard-requires query params, add a Cli\\LighthouseUrls::SUB_PAGES entry AND list it in Cli\\LighthouseUrls::PARAM_REQUIRED_MODULES.\n");
+    exit(1);
+}
 
 if ($jsonOutput) {
     fwrite(STDOUT, json_encode($urls, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");

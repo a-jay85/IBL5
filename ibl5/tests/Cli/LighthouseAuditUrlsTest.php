@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Cli;
 
+use Cli\LighthouseUrls;
 use Module\ModuleRegistry;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
@@ -35,11 +36,15 @@ final class LighthouseAuditUrlsTest extends TestCase
             static fn (string $line): bool => $line !== ''
         );
 
+        // Derived, not hardcoded: a param-required module contributes only its
+        // sub-page variant, so a hardcoded sub-page count silently cancels
+        // against the suppressed bare URL and stops proving anything.
         $moduleCount = count(ModuleRegistry::getAllModules());
-        $subPageCount = 8;
+        $subPageCount = count(LighthouseUrls::SUB_PAGES);
+        $paramRequiredCount = count(LighthouseUrls::PARAM_REQUIRED_MODULES);
         $homepageCount = 1;
         self::assertGreaterThanOrEqual(
-            $moduleCount + $homepageCount + $subPageCount,
+            $moduleCount + $homepageCount + $subPageCount - $paramRequiredCount,
             count($lines)
         );
     }

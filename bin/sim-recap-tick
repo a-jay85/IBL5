@@ -57,6 +57,9 @@ SIM_RECAP_DB_NAME="${SIM_RECAP_DB_NAME:-}"
 # its own copy so preflight_mysql can check the binary the agent will actually be
 # told to run, and exports it so both sides can never disagree.
 SIM_RECAP_MYSQL_BIN="${SIM_RECAP_MYSQL_BIN:-/opt/homebrew/opt/mysql@8.4/bin/mysql}"
+SIM_RECAP_CURL_BIN="${SIM_RECAP_CURL_BIN:-curl}"
+SIM_RECAP_BOT_BASE_URL="${SIM_RECAP_BOT_BASE_URL:-http://127.0.0.1:50001}"
+SIM_RECAP_OPS_ALERT_THREAD_ID="${SIM_RECAP_OPS_ALERT_THREAD_ID:-}"
 SIM_RECAP_LAUNCHCTL_BIN="${SIM_RECAP_LAUNCHCTL_BIN:-launchctl}"
 # SIM_RECAP_DB_PASSWORD is read from the environment ONLY (never defaulted, never
 # argv, never logged). require_password() enforces its presence on the live path.
@@ -81,6 +84,14 @@ trap cleanup_workdir EXIT
 # generated payload.json alone (a clean, pipeable document — row 60/61), so no
 # log line may interleave with it. launchd captures both streams in live mode.
 log() { printf '[%s] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*" >&2; }
+notify_roster_degraded() { # sim
+    [ -z "${SIM_RECAP_OPS_ALERT_THREAD_ID:-}" ] && return 0
+    local msg="WARNING: sim $1 recap proceeding roster-blind — simRecapContext.php fetch failed"
+    "$SIM_RECAP_CURL_BIN" -s -X POST "$SIM_RECAP_BOT_BASE_URL/post-to-thread" \
+        -H 'Content-Type: application/json' \
+        -d "$("$SIM_RECAP_JQ_BIN" -nc --arg t "$SIM_RECAP_OPS_ALERT_THREAD_ID" --arg m "$msg" \
+             '{thread_id:$t,message:$m}')" 2>/dev/null >/dev/null || true
+}
 
 # ── Usage/rate-limit detector (regex copied from bin/bug-pipeline-tick:76-79) ──
 claude_env_error() {
@@ -174,6 +185,7 @@ fetch_agent_inputs() { # sim  (writes mentions.json + themes-ledger.json into WO
         printf '%s' "$ctx" > "$WORKDIR/roster-context.json"
     else
         log "sim $sim: roster-context unavailable — writing empty context"
+        notify_roster_degraded "$sim"
         printf '{}' > "$WORKDIR/roster-context.json"
     fi
     return 0

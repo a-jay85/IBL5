@@ -1,6 +1,6 @@
 ---
 description: Which tier to pick for each sub-agent, including the Sonnet 4.6 def-pins. Skip-vs-spawn heuristic and deeper rationale live in agent-tiering-detail.md.
-last_verified: 2026-07-25
+last_verified: 2026-08-02
 ---
 
 # Agent Tiering
@@ -11,21 +11,23 @@ Tier every sub-agent (and every agent a plan spawns) by the reasoning the task a
 
 | Tier | Model param | Use for |
 |------|-------------|---------|
-| **Haiku** | `model: "haiku"` | Command output, pattern-matching named checklists, grep-and-format, mechanical lookups — answerable by running commands and reporting, without judging relevance. |
+| **Haiku** | `model: "haiku"` | Command output, grep-and-format, mechanical lookups — answerable by running commands and reporting, without judging relevance. |
 | **Sonnet** | `subagent_type: "sonnet-4-6"`, omit `model` — see § Sonnet 4.6 pins | Synthesis: "is this finding relevant?", cross-file traces, semantic compliance checks, rename sweeps needing call-site judgment, review agents, backlog housekeeping, manual-test classification. Never pass `model: "sonnet"` — the alias now resolves to Sonnet 5. |
 | **Opus** | self (no delegation) | Novel reasoning, FK ordering, rule authoring, ADR writing, ambiguous test failures, final code review, open-ended diff-triage (see detail file). Never delegate understanding. |
-| **Opus (delegated)** | `subagent_type: "plan-architect"` | Implementation **planning** only, via `/plan` Step 3 — three defs selected by ONE ordered precedence (mirrors Step 3): **`plan-architect-xhigh`** (`effort: xhigh`) FIRST for security surfaces, trust boundaries, destructive migrations, or ship-pipeline invariant changes; else **`plan-architect-sonnet`** (`model: claude-sonnet-4-6`) when the task is recipe-backed — an explicit recipe plus a named existing pattern to copy (mechanical composition of a pre-resolved recipe, so no understanding is delegated); else the default **`plan-architect`** (`model: opus` + `effort: high`). Do **not** pass an inline `model` override — each def owns it. |
-| **Fable** | `model: "fable"` — **prompt first, last resort** | Rung above Opus (~2× cost). Use **only** when a task is absolutely critical **and** Fable is 100% necessary to solve it — and **never without prompting the user first** for explicit approval. Default to Opus. Full gate: `agent-tiering-detail.md`. |
+| **Opus (delegated)** | `subagent_type: "plan-architect"` | Implementation **planning** only, via `/plan` Step 3 — three defs by ONE ordered precedence (mirrors Step 3): **`plan-architect-xhigh`** (`effort: xhigh`) FIRST for security surfaces, trust boundaries, destructive migrations, or ship-pipeline invariant changes; else **`plan-architect-sonnet`** (`model: claude-sonnet-4-6`) for recipe-backed tasks; else the default **`plan-architect`** (`model: opus` + `effort: high`). Do **not** pass an inline `model` override — each def owns it. |
+| **Fable** | `model: "fable"` — **prompt first, last resort** | Rung above Opus (~2× cost). Use **only** when a task is absolutely critical **and** Fable is 100% necessary to solve it — **never without prompting the user first**. Default to Opus. Full gate: `agent-tiering-detail.md`. |
 
-> **The boundary keys on task *type* (judgment vs. mechanical), not raw model capability** — a stronger Sonnet moves nothing across the line. Re-validated 2026-06-30 vs Sonnet 5 (then the `sonnet` alias, native 1M context): unchanged. Why: `agent-tiering-detail.md`.
+> **The boundary keys on task *type* (judgment vs. mechanical), not raw model capability** — a stronger Sonnet moves nothing across the line. Why: `agent-tiering-detail.md`.
 
 ## `/plan` orchestrator model
 
 The `/plan` session model is a separate call from the sub-agent rows above. Tier the orchestrator by the judgment it retains — single backlog item → **Sonnet**, multiple items in one pass → **Opus** (cross-item decomposition + dependency ordering). The `plan-architect` is Step-3-tiered (xhigh → sonnet → opus) regardless of orchestrator. Full rationale: `agent-tiering-detail.md` § `/plan` orchestrator model.
 
+**Default: don't run `/plan` inline from an Opus session — offload it.** Once the design thinking is done, run **`/plan-prompt`** (`.claude/skills/plan-prompt/SKILL.md`), which fires it via `bin/plan-now` as a **detached headless Sonnet 4.6 `/plan` session**. Sonnet orchestrates; the tier directive keeps the *design* on Opus. Stay inline only when the fork genuinely needs the human in the loop mid-run (`/plan` Step 3.5) and you can't pre-resolve it. Mechanics and evidence: `agent-tiering-detail.md` § `/plan` orchestrator model.
+
 ## Sonnet 4.6 pins
 
-Sonnet surfaces are pinned to 4.6 via an agent def or skill frontmatter (the `model` enum can't express a specific version) — **the def-based pin wins only when `model` is omitted**.
+Sonnet surfaces are pinned to 4.6 via an agent def or skill frontmatter — **the def-based pin wins only when `model` is omitted**.
 
 **Never pass `model: "sonnet"` to Agent()** — that alias now resolves to Sonnet 5.
 
@@ -39,6 +41,6 @@ Sonnet surfaces are pinned to 4.6 via an agent def or skill frontmatter (the `mo
 
 ## Explore Agents
 
-Tier Explore per prompt — don't default all to one tier (Explore itself is pinned to Sonnet 4.6, § Sonnet 4.6 pins). Haiku for enumeration / single-file lookups / grep-and-list; omit `model` (Sonnet 4.6) for multi-hop traces, cross-module synthesis, open-ended investigation. Table + examples: `agent-tiering-detail.md` § Explore Agent Tiering.
+Tier Explore per prompt — Haiku for enumeration / single-file lookups / grep-and-list; omit `model` (Sonnet 4.6) for multi-hop traces, cross-module synthesis, open-ended investigation. Table + examples: `agent-tiering-detail.md` § Explore Agent Tiering.
 
-Plan-authoring tiering (labeling each phase, mechanical-recipe agents, bulk-sweep patterns) lives in `.claude/skills/plan/_architect-contract.md`, the plan-architect's output contract that `/plan` Step 3 directs the architect to Read.
+Plan-authoring tiering lives in `.claude/skills/plan/_architect-contract.md`, the plan-architect's output contract that `/plan` Step 3 directs the architect to Read.

@@ -477,6 +477,9 @@ jobs:
           test-user-regular: ${{ secrets.IBL_TEST_USER_REGULAR || 'ci-e2e-regular' }}
           test-pass-regular: ${{ secrets.IBL_TEST_PASS_REGULAR || 'e2e-regular-pass' }}
 
+      - name: Assert every Lighthouse audit URL is reachable
+        run: bin/lighthouse-audit-urls --check --base-url=http://localhost:8080
+
       # --- Fixture-drift baseline (runtime mutator-isolation gate — ADR-0052) ---
       - name: Snapshot fixture baseline
         run: bin/check-e2e-fixture-drift snapshot /tmp/fixture-before.txt

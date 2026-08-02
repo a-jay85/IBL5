@@ -3,7 +3,7 @@ description: Lighthouse CI posts per-URL scores and deltas-vs-master as a sticky
 paths:
   - ".github/workflows/lighthouse*"
   - "ibl5/.lighthouserc.json"
-last_verified: 2026-06-20
+last_verified: 2026-08-02
 ---
 
 # Lighthouse PR Comments
@@ -44,6 +44,11 @@ A 🟡 marker is informational — investigate before merging.
 - URL **selection** lives in `bin/lighthouse-pr-urls` plus the shared
   `Cli\LighthouseUrls` class: the module→sub-page map is `LighthouseUrls::SUB_PAGES`,
   and the global/sweeping fallback set is `LighthouseUrls::REPRESENTATIVE_PATHS`.
+- A module that **hard-requires query params** (its bare `?name=<Module>` URL 404s)
+  needs BOTH a `SUB_PAGES` entry and a `LighthouseUrls::PARAM_REQUIRED_MODULES` entry —
+  the latter suppresses the bare URL, which Lighthouse would otherwise treat as
+  `ERRORED_DOCUMENT_REQUEST` and hard-fail the entire audit run on. Enforced by
+  `bin/lighthouse-audit-urls --check` in the `e2e-shards` job of `e2e-tests.yml`.
 - The representative fallback set is mirrored in `ibl5/.lighthouserc.json` `collect.url`
   (pinned equal to `REPRESENTATIVE_PATHS` by a `LighthouseUrlsTest` unit test); both
   workflows `jq`-override `.ci.collect.url`, so the static array is only the

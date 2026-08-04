@@ -421,7 +421,11 @@ final class SimSummaryRepositoryTest extends DatabaseTestCase
         self::assertSame(1, $displayable[0]['game_of_that_day']);
     }
 
-    public function testFindDisplayableGameRecapsDoubleheaderBothReturned(): void
+    /**
+     * Two rows sharing a date and matchup but carrying different indices both match,
+     * because the `EXISTS` filter compares the index, not the matchup.
+     */
+    public function testFindDisplayableGameRecapsTwoIndicesOnOneDateBothReturned(): void
     {
         $games = [
             $this->gameRecap(sortOrder: 0, gameOfThatDay: 1),
@@ -458,6 +462,72 @@ final class SimSummaryRepositoryTest extends DatabaseTestCase
         self::assertSame([], $displayable, 'gotd=0 recap must not match a gotd=1 box score');
     }
 
+    /**
+     * Seven distinct matchups on 2025-02-14, each carrying its true index (1–7).
+     * Pins the real semantics of game_of_that_day: one entry per league game on a
+     * given date, not a per-matchup doubleheader counter. All seven must be
+     * displayable when each index matches a box score row.
+     */
+    public function testFindDisplayableGameRecapsSevenGameNightAllSurvive(): void
+    {
+        $games = [
+            $this->leagueGame(0, 1,  2,  1),
+            $this->leagueGame(1, 3,  4,  2),
+            $this->leagueGame(2, 5,  6,  3),
+            $this->leagueGame(3, 7,  8,  4),
+            $this->leagueGame(4, 9,  10, 5),
+            $this->leagueGame(5, 11, 12, 6),
+            $this->leagueGame(6, 13, 14, 7),
+        ];
+        $this->repo->markDone(999093, 'Intro.', 'Outro.', 'Recap.', $games, null);
+
+        $this->db->query(
+            "INSERT INTO `ibl_box_scores_teams` (`game_date`, `visitor_teamid`, `home_teamid`, `game_of_that_day`, `name`)" .
+            " VALUES ('2025-02-14', 1, 2, 1, 'T1'), ('2025-02-14', 3, 4, 2, 'T2'), ('2025-02-14', 5, 6, 3, 'T3')," .
+            "        ('2025-02-14', 7, 8, 4, 'T4'), ('2025-02-14', 9, 10, 5, 'T5'), ('2025-02-14', 11, 12, 6, 'T6')," .
+            "        ('2025-02-14', 13, 14, 7, 'T7')"
+        );
+
+        $displayable = $this->repo->findDisplayableGameRecaps(999093);
+
+        self::assertCount(7, $displayable);
+        self::assertSame([1, 2, 3, 4, 5, 6, 7], array_column($displayable, 'game_of_that_day'));
+    }
+
+    /**
+     * Sim-725 shape. Seven distinct matchups store game_of_that_day = 1 for every
+     * game. The box scores carry the real indices 1–7, one per matchup. Only the
+     * game whose stored index happens to equal the box-score index (matchup 1/2 with
+     * game_of_that_day = 1) survives the EXISTS filter; the other six are silently
+     * dropped. Characterizes the display-collapse defect — fixed by the write-time
+     * guard in Phase 4.
+     */
+    public function testFindDisplayableGameRecapsAllOnesCollapseToASingleGame(): void
+    {
+        $games = [
+            $this->leagueGame(0, 1,  2,  1),
+            $this->leagueGame(1, 3,  4,  1),
+            $this->leagueGame(2, 5,  6,  1),
+            $this->leagueGame(3, 7,  8,  1),
+            $this->leagueGame(4, 9,  10, 1),
+            $this->leagueGame(5, 11, 12, 1),
+            $this->leagueGame(6, 13, 14, 1),
+        ];
+        $this->repo->markDone(999094, 'Intro.', 'Outro.', 'Recap.', $games, null);
+
+        $this->db->query(
+            "INSERT INTO `ibl_box_scores_teams` (`game_date`, `visitor_teamid`, `home_teamid`, `game_of_that_day`, `name`)" .
+            " VALUES ('2025-02-14', 1, 2, 1, 'T1'), ('2025-02-14', 3, 4, 2, 'T2'), ('2025-02-14', 5, 6, 3, 'T3')," .
+            "        ('2025-02-14', 7, 8, 4, 'T4'), ('2025-02-14', 9, 10, 5, 'T5'), ('2025-02-14', 11, 12, 6, 'T6')," .
+            "        ('2025-02-14', 13, 14, 7, 'T7')"
+        );
+
+        $displayable = $this->repo->findDisplayableGameRecaps(999094);
+
+        self::assertCount(1, $displayable);
+        self::assertSame([1, 2], [$displayable[0]['visitor_teamid'], $displayable[0]['home_teamid']]);
+    }
+
     // ── Private helpers ────────────────────────────────────────────────────────
 
     /**
@@ -486,6 +556,26 @@ final class SimSummaryRepositoryTest extends DatabaseTestCase
             'home_teamid'      => 2,
             'game_of_that_day' => $gameOfThatDay,
             'box_id'           => $boxId,
+            'sort_order'       => $sortOrder,
+            'recap_text'       => "Recap for game {$gameOfThatDay}.",
+        ];
+    }
+
+    /**
+     * A game recap for a distinct matchup, so seven of them share a date without
+     * colliding on uniq_game (season_year, game_date, visitor, home, game_of_that_day).
+     *
+     * @return array{season_year: int, game_date: string, visitor_teamid: int, home_teamid: int, game_of_that_day: int, box_id: ?int, sort_order: int, recap_text: string}
+     */
+    private function leagueGame(int $sortOrder, int $visitor, int $home, int $gameOfThatDay): array
+    {
+        return [
+            'season_year'      => 2025,
+            'game_date'        => '2025-02-14',
+            'visitor_teamid'   => $visitor,
+            'home_teamid'      => $home,
+            'game_of_that_day' => $gameOfThatDay,
+            'box_id'           => 42,
             'sort_order'       => $sortOrder,
             'recap_text'       => "Recap for game {$gameOfThatDay}.",
         ];

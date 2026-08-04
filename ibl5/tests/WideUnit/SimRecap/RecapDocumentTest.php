@@ -37,6 +37,17 @@ final class RecapDocumentTest extends TestCase
         ];
     }
 
+    /** A stored document carrying $n exemplar-shaped game headers. */
+    private function storedDocumentWith(int $n): string
+    {
+        $blocks = [];
+        for ($i = 1; $i <= $n; $i++) {
+            $blocks[] = "**Team A {$i} @ Team B {$i}**\n<@1> · <@2>\n\nGame {$i} prose.";
+        }
+
+        return "Intro.\n\n" . implode("\n\n\n", $blocks) . "\n\nOutro.";
+    }
+
     public function testAssemblesTheWholeDocumentInExemplarShape(): void
     {
         $doc = RecapDocument::assemble(
@@ -199,6 +210,22 @@ final class RecapDocumentTest extends TestCase
     }
 
     /**
+     * Sim-725 shape. Seven parts survived the displayable filter and every one of them
+     * is well formed, so gamesCarryTheirMentionLines() votes for assembly. The stored
+     * document holds all 49 games. Assembling would post 7 and discard 42.
+     */
+    public function testPostableTextPrefersStoredTextWhenPartsAreShortOfTheStoredDocument(): void
+    {
+        $stored = $this->storedDocumentWith(49);
+        $parts  = [];
+        for ($i = 1; $i <= 7; $i++) {
+            $parts[] = $this->game('2026-02-26', "**A {$i} @ B {$i}**\n<@1> · <@2>\nGame prose.");
+        }
+
+        self::assertSame($stored, RecapDocument::postableText('Intro.', $parts, 'Outro.', $stored));
+    }
+
+    /**
      * One game carries its mention line; the other is a single-line string with no
      * index-1 entry at all. gamesCarryTheirMentionLines() is all-or-nothing — the
      * mixed batch must fall back to the stored text.
@@ -294,5 +321,20 @@ final class RecapDocumentTest extends TestCase
         self::assertSame('', RecapDocument::postableText(null, [], null, null));
         self::assertSame('', RecapDocument::postableText(null, [], null, ''));
         self::assertSame('', RecapDocument::postableText(null, [], null, '   '));
+    }
+
+    /**
+     * The completeness guard counts game headers by shape. If the shape is wrong the
+     * count silently goes to zero and the guard goes inert, which is a failure mode the
+     * guard itself cannot report. The pinned exemplar is the independent oracle.
+     */
+    public function testScoreHeaderPatternMatchesEveryGameInThePinnedExemplar(): void
+    {
+        $exemplar = file_get_contents(dirname(__DIR__, 4) . '/bin/lib/sim-recap-exemplar.txt');
+        self::assertIsString($exemplar);
+
+        $count = preg_match_all('/^\*\*.+\s\d+\s@\s.+\s\d+\*\*$/m', str_replace("\r\n", "\n", $exemplar));
+
+        self::assertSame(46, $count, 'The pinned exemplar carries 46 game headers');
     }
 }

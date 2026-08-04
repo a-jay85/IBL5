@@ -35,6 +35,20 @@ bpt_run
 bpt_expect_eq "garbage enumerator → exit 1" 1 "$BPT_RC"
 bpt_file_absent "$STUB/claude.sentinel" "garbage enumerator spawns zero claude"
 
+# ── ★ NEG — enumerator EXITS NON-ZERO with a PHP fatal on stdout → fail-closed ─
+# The 2026-08-04 shape: a MariaDB outage makes every wrapper die with an uncaught
+# mysqli_sql_exception printed to BOTH streams. cli() must swallow that stdout rather than
+# hand it on as data, so the array check below it trips and the tick aborts before dispatch.
+bpt_reset
+bpt_set_actionable 'PHP Fatal error:  Uncaught mysqli_sql_exception: Connection refused'
+export LIST_ACTIVE_RC=255
+bpt_run
+unset LIST_ACTIVE_RC
+bpt_expect_eq   "failing enumerator → exit 1" 1 "$BPT_RC"
+bpt_file_absent "$STUB/claude.sentinel" "failing enumerator spawns zero claude"
+bpt_log_has     "$STUB" tick.out "list-active-conversations.php exited 255" \
+                "the enumerator failure is logged, not swallowed"
+
 # ── Env resolution: unset DB_NAME → driver exports iblhoops_ibl5 to children ──
 bpt_reset
 ( unset DB_NAME; bpt_set_actionable '[]'; bpt_run )

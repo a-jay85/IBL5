@@ -198,13 +198,28 @@ bpt_count   "r21: exactly one mention"          1 <(grep MENTION "$STUB/calls.lo
 bpt_log_has "$STUB" curl.log '"thread_id":"880000000000000001"' "r21: thread_id sent as a JSON string"
 bpt_log_has "$STUB" curl.log '"discord_id":"770000000000000007"' "r21: approver id sent as a JSON string"
 
-# ── Row 22 — terminal:true short-circuits the cap → needs_human after ONE ladder run ──
+# ── Row 22 — terminal:true short-circuits BOTH the ladder and the cap → needs_human after ONE tier ──
+# The count is the load-bearing assertion: terminal means "a dearer tier would be pointless"
+# (bin/bug-pipeline-hunter-prompt § hunt-result schema), so sonnet and opus must never run.
 bpt_reset
 bpt_set_claim "$CLAIM"; bpt_set_result '{"verdict":"escalate","terminal":true}'
 bpt_run
-bpt_count     "r22: exactly one ladder ran (no 2nd attempt)" 3 "$STUB/hunt-models.log"
+bpt_count     "r22: exactly ONE tier ran (no sonnet, no opus, no 2nd attempt)" 1 "$STUB/hunt-models.log"
+bpt_log_has   "$STUB" hunt-models.log "claude-haiku-4-5" "r22: the one tier that ran is the cheapest"
 bpt_log_has   "$STUB" transition.log "needs_human" "r22: terminal failure → needs_human"
+# Terminal still records the one attempt it consumed — unchanged by the ladder short-circuit, and
+# inert in practice: the row leaves the hunting loop for needs_human, so the count is never re-read.
+bpt_log_has   "$STUB" transition.log "--attempts=1" "r22: the consumed attempt is persisted"
 bpt_log_lacks "$STUB" transition.log "--attempts=2" "r22: never reaches attempt 2"
+
+# ── Row 22b — terminal:true at the MIDDLE tier: haiku escalates, sonnet terminal → opus never runs ──
+bpt_reset
+bpt_set_claim "$CLAIM"
+bpt_set_result_for claude-haiku-4-5  '{"verdict":"escalate","terminal":false}'
+bpt_set_result_for claude-sonnet-4-6 '{"verdict":"escalate","terminal":true}'
+bpt_run
+bpt_count     "r22b: ladder stopped at tier 2" 2 "$STUB/hunt-models.log"
+bpt_log_lacks "$STUB" hunt-models.log "opus" "r22b: opus never spawned once a tier says terminal"
 
 # ── Row 25 — usage-limit mid-hunt → blocked + future blocked_until; NOT needs_human; attempts unchanged ──
 bpt_reset
@@ -253,6 +268,53 @@ bpt_run
 bpt_count "r-legacy: no wt-new call (legacy dir reused)" 0 "$STUB/wt-new.log"
 bpt_log_has "$STUB" transition.log "transition 7 pr_open" "r-legacy: hunt still ships using the reused legacy worktree"
 
+# ── Rows 37-40 — ★ TOKEN-BLEED GUARDS: a broken upstream must spawn ZERO hunters ─────────────
+# Regression pin for 2026-08-04: MariaDB was down, every claim-next died with an uncaught
+# mysqli_sql_exception printed to BOTH stdout and stderr, `[ -z "$claimed" ]` therefore passed,
+# and `jq -r '.id'` yielded "" — so 28 ticks each dispatched the full haiku→sonnet→opus ladder
+# against report id "". 84 sessions, zero useful work.
+PHP_FATAL='PHP Fatal error:  Uncaught mysqli_sql_exception: Connection refused in /app/ibl5/db/db.php:101
+Stack trace:
+#0 /app/ibl5/scripts/bug-pipeline/_bootstrap.php(45)'
+
+# ── Row 37 — claim-next exits non-zero (PHP fatal on stdout) → cli fails closed, no hunter ──
+bpt_reset
+bpt_set_claim "$PHP_FATAL"
+export CLAIM_NEXT_RC=255
+bpt_run
+unset CLAIM_NEXT_RC
+bpt_expect_eq   "r37: exit 0" 0 "$BPT_RC"
+bpt_file_absent "$STUB/claude.sentinel" "r37: a failing claim-next spawns ZERO hunters"
+bpt_count       "r37: no worktree created" 0 "$STUB/wt-new.log"
+bpt_log_has     "$STUB" tick.out "claim-next.php exited 255" "r37: the failure is logged, not swallowed"
+
+# ── Row 38 — claim-next exits 0 but prints non-JSON garbage → id guard, no hunter ──
+bpt_reset
+bpt_set_claim "$PHP_FATAL"
+bpt_run
+bpt_expect_eq   "r38: exit 0" 0 "$BPT_RC"
+bpt_file_absent "$STUB/claude.sentinel" "r38: unparseable claim output spawns ZERO hunters"
+bpt_log_has     "$STUB" tick.out "no usable .id" "r38: refusal is logged"
+bpt_log_lacks   "$STUB" tick.out "claimed bug  into hunting" "r38: no phantom claim in the timeline"
+
+# ── Row 39 — well-formed JSON with no .id field → id guard, no hunter ──
+bpt_reset
+bpt_set_claim '{"status":"hunting","class":"bug","original_text":"the trade button is broken"}'
+bpt_run
+bpt_file_absent "$STUB/claude.sentinel" "r39: an id-less row spawns ZERO hunters"
+bpt_count       "r39: no worktree created" 0 "$STUB/wt-new.log"
+
+# ── Row 40 — valid row, empty report body → needs_human WITHOUT spawning a hunter ──
+# Every tier could only escalate on an empty body; hand it straight to a human. No Discord
+# post/mention here on purpose — a repeating fault must not trade a token bleed for a ping bleed.
+bpt_reset
+bpt_set_claim '{"id":"7","status":"hunting","class":"bug","thread_id":"880000000000000001","issue_number":"4242","original_text":"   ","hunt_attempts":0}'
+bpt_run
+bpt_file_absent "$STUB/claude.sentinel" "r40: an empty report body spawns ZERO hunters"
+bpt_count       "r40: no worktree created" 0 "$STUB/wt-new.log"
+bpt_log_has     "$STUB" transition.log "transition 7 needs_human --release-lease" "r40: handed to a human, lease released"
+bpt_count       "r40: no Discord post for an empty body" 0 <(grep POST_TO_THREAD "$STUB/calls.log" 2>/dev/null)
+
 # ── Row 32 — RCA labels on ship: area/root_cause slugs → ensure+add label against the issue ──
 bpt_reset
 bpt_set_claim "$CLAIM"
@@ -295,9 +357,10 @@ bpt_set_claim "$CLAIM"; bpt_set_result '{"verdict":"fixed"}'; bpt_hunt_dirty; ex
 bpt_run
 unset GH_FAIL
 bpt_log_has "$STUB" transition.log "transition 7 pr_open" "r36: ship reaches pr_open despite failing gh"
-# NULL issue_number → issue ops no-op (no crash, still ships)
+# NULL issue_number → issue ops no-op (no crash, still ships). original_text must be present:
+# this row exercises the missing-ISSUE path, and drive_hunt_row refuses an empty BODY (row 40).
 bpt_reset
-bpt_set_claim '{"id":"9","status":"hunting","class":"bug","thread_id":"880000000000000009","hunt_attempts":0}'
+bpt_set_claim '{"id":"9","status":"hunting","class":"bug","thread_id":"880000000000000009","original_text":"the trade button is broken","hunt_attempts":0}'
 bpt_set_result '{"verdict":"fixed"}'; bpt_hunt_dirty
 bpt_run
 bpt_log_has "$STUB" transition.log "transition 9 pr_open" "r36: NULL issue_number row still ships (issue ops no-op)"

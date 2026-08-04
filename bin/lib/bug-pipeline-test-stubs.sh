@@ -130,6 +130,8 @@ SH
 #!/usr/bin/env bash
 echo "DB_NAME=$DB_NAME" >> "$STUB/env.log"
 cat "$STUB/actionable.json" 2>/dev/null || echo '[]'
+# LIST_ACTIVE_RC seam: same shape as CLAIM_NEXT_RC — a PHP fatal writes to stdout AND exits non-zero.
+if [ -n "${LIST_ACTIVE_RC:-}" ] && [ "$LIST_ACTIVE_RC" != "0" ]; then exit "$LIST_ACTIVE_RC"; fi
 SH
 
     # transition.php stub: log args, echo ok (no DB).
@@ -149,6 +151,8 @@ case "$*" in
   *--resume*) cat "$STUB/claim-next-resume.out" 2>/dev/null || true ;;
   *)          cat "$STUB/claim-next.out"        2>/dev/null || true ;;
 esac
+# CLAIM_NEXT_RC seam: reproduce a PHP fatal, which prints to BOTH streams and exits non-zero.
+if [ -n "${CLAIM_NEXT_RC:-}" ] && [ "$CLAIM_NEXT_RC" != "0" ]; then exit "$CLAIM_NEXT_RC"; fi
 SH
 
     # list-pr-open.php stub: log; emit the case's pr_open rows (default: empty array).
@@ -215,7 +219,8 @@ bpt_reset() {
           "$STUB"/gh-pr-list.out "$STUB"/gh-pr-list-*.out "$STUB"/gh-pr-view.out 2>/dev/null
     rm -rf "$STUB"/wt/* 2>/dev/null
     printf '[]' > "$STUB/actionable.json"
-    unset GH_FAIL STUB_THREAD_ID STUB_MESSAGE_ID STUB_ISSUE_NUMBER WT_NEW_FAIL STUB_CREATE_THREAD_FAIL
+    unset GH_FAIL STUB_THREAD_ID STUB_MESSAGE_ID STUB_ISSUE_NUMBER WT_NEW_FAIL STUB_CREATE_THREAD_FAIL \
+          CLAIM_NEXT_RC LIST_ACTIVE_RC
 }
 
 bpt_set_actionable()  { printf '%s' "$1" > "$STUB/actionable.json"; }

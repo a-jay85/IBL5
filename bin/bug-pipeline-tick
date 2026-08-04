@@ -68,7 +68,21 @@ log() { printf '[%s] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*"; }
 # ── One seam for every PHP-CLI wrapper call ───────────────────────────────────
 cli() {
     local cmd="$1"; shift
-    "$PHP_BIN" "$SCRIPTS_DIR/${cmd}.php" "$@"
+    local out rc
+    out="$("$PHP_BIN" "$SCRIPTS_DIR/${cmd}.php" "$@")"; rc=$?
+    if [ "$rc" -ne 0 ]; then
+        # FAIL CLOSED. A PHP fatal prints to stdout as well as stderr, and every caller
+        # command-substitutes us — so emitting it hands parse-garbage to jq and, worse, lets
+        # a non-empty "row" sail past an `[ -z "$claimed" ]` guard. That is exactly how a
+        # MariaDB outage dispatched 84 hunters against report id "" on 2026-08-04. No wrapper
+        # uses a non-zero exit as a normal signal (an empty tick is exit 0 + no output), so
+        # suppressing output here cannot mask a working path.
+        # The diagnostic MUST go to stderr: log() writes to stdout, which IS our captured value.
+        printf '[%s] ERROR: %s.php exited %s — treating as no output (fail closed)\n' \
+            "$(date '+%Y-%m-%dT%H:%M:%S')" "$cmd" "$rc" >&2
+        return "$rc"
+    fi
+    printf '%s' "$out"
 }
 
 # ── Usage/rate-limit detector (regex copied from automouse-run:308-311) ───────
@@ -532,6 +546,14 @@ run_hunt_ladder() { # claimed hunt_id wt_appdir
         result="$(cat "$wt_appdir/.bug-pipeline/hunt-result.json" 2>/dev/null || echo '{}')"
         verdict="$(printf '%s' "$result" | jq -r '.verdict // "escalate"' 2>/dev/null)"
         if [ "$verdict" = "fixed" ]; then rm -f "$rendered"; LADDER_STATE="fixed"; return 0; fi
+        # terminal:true is the hunter's own "a retry by a stronger tier would be pointless"
+        # (bin/bug-pipeline-hunter-prompt § hunt-result schema). Climbing to sonnet then opus
+        # anyway spends 2 of 3 tiers — the dearest two — to re-derive the same answer.
+        # Stop here; drive_hunt_row re-reads the same flag and routes to needs_human.
+        if [ "$(printf '%s' "$result" | jq -r '.terminal // false' 2>/dev/null)" = "true" ]; then
+            log "hunt $hunt_id: $model returned terminal — skipping remaining tiers"
+            rm -f "$rendered"; LADDER_STATE="escalate"; return 0
+        fi
         # escalate → next (dearer) tier
     done
     rm -f "$rendered"; LADDER_STATE="escalate"; return 0
@@ -625,8 +647,26 @@ bug_slug() { # id original_text
 # then ship (fixed) / park (blocked) / give up (escalate+cap or terminal). Foreground —
 # the tick blocks until the hunt returns, so overlapping ticks can't double-hunt (invariant 1).
 drive_hunt_row() { # claimed_row_json
-    local claimed="$1" hunt_id slug wt_root wt_appdir attempts terminal
-    hunt_id="$(printf '%s' "$claimed" | jq -r '.id')"
+    local claimed="$1" hunt_id slug wt_root wt_appdir attempts terminal body
+    # ★ Authoritative id guard — the ONE choke point every hunter dispatch passes through
+    # (maybe_hunt and resume_blocked_hunt both land here). A row without a usable .id is not a
+    # bug report; dispatching one renders "You are working on report # (class: )" and burns the
+    # whole ladder, Opus included, on nothing.
+    hunt_id="$(printf '%s' "$claimed" | jq -r '.id // empty' 2>/dev/null)"
+    if [ -z "$hunt_id" ] || [ "$hunt_id" = "null" ]; then
+        log "ERROR: claimed row has no usable .id — refusing to dispatch a hunter (no claude spawned)"
+        return 0
+    fi
+    # An empty report body has nothing to localize: every tier can only escalate. Hand it to a
+    # human without spawning anything. Deliberately no Discord post/mention here — a repeating
+    # upstream fault would trade a token bleed for a notification bleed.
+    body="$(printf '%s' "$claimed" | jq -r '.original_text // empty' 2>/dev/null | tr -d '[:space:]')"
+    if [ -z "$body" ]; then
+        log "bug $hunt_id has an empty report body — no hunter dispatched; -> needs_human"
+        cli transition "$hunt_id" needs_human --release-lease >/dev/null || true
+        return 0
+    fi
+    log "claimed bug $hunt_id into hunting; dispatching hunter"
     attempts="$(printf '%s' "$claimed" | jq -r '.hunt_attempts // 0')"
     slug="$(bug_slug "$hunt_id" "$(printf '%s' "$claimed" | jq -r '.original_text // empty')")"
     # Legacy cutover: a pre-rename hunt left a bug-<id> worktree — reuse it, don't fork a second one.
@@ -663,14 +703,16 @@ drive_hunt_row() { # claimed_row_json
 # drive it. Independent of the enumerator — a lone classified bug yields [] from the enumerator
 # yet must still be hunted. Returns 0 iff a hunt was driven (caller ends the tick — one/tick).
 maybe_hunt() {
-    local claimed hunt_id
-    claimed="$(cli claim-next 2>/dev/null)"
+    local claimed
+    # No 2>/dev/null: cli's fail-closed diagnostic must reach launchd-stderr.log.
+    if ! claimed="$(cli claim-next)"; then
+        log "claim-next failed — no row claimed this tick (no claude spawned)"
+        return 1
+    fi
     if [ -z "$claimed" ]; then
         return 1   # nothing huntable / lost the claim race / already 'hunting'
     fi
-    hunt_id="$(printf '%s' "$claimed" | jq -r '.id')"
-    log "claimed bug $hunt_id into hunting; dispatching hunter"
-    drive_hunt_row "$claimed"
+    drive_hunt_row "$claimed"   # owns the .id guard and the "claimed bug N" log line
     return 0
 }
 
@@ -678,7 +720,9 @@ maybe_hunt() {
 resume_blocked_hunt() { # row_json (surfaced by the enumerator, blocked_until already elapsed)
     local row="$1" id slug wt_root resumed
     id="$(printf '%s' "$row" | jq -r '.id')"
-    resumed="$(cli claim-next --resume="$id" 2>/dev/null)"   # atomic WHERE status='blocked' guard
+    if ! resumed="$(cli claim-next --resume="$id")"; then     # atomic WHERE status='blocked' guard
+        log "resume: claim-next failed for $id — skipping (no claude spawned)"; return 0
+    fi
     if [ -z "$resumed" ]; then
         log "resume: $id already resumed by another tick — skip"; return 0
     fi
@@ -701,7 +745,7 @@ resume_blocked_hunt() { # row_json (surfaced by the enumerator, blocked_until al
 # and MAY read/write gh here — categorically distinct from the starved hunter (no gh at all).
 reconcile_pr_open_rows() {
     local rows row id pr issue branch n state thread_id
-    rows="$(cli list-pr-open 2>/dev/null)"
+    rows="$(cli list-pr-open)" || rows=''   # cli's own stderr diagnostic reaches launchd-stderr.log
     printf '%s' "$rows" | jq -e 'type == "array"' >/dev/null 2>&1 || return 0
     while IFS= read -r row; do
         [ -n "$row" ] || continue
@@ -766,7 +810,7 @@ main() {
     fi
 
     local actionable normalized
-    actionable="$(cli list-active-conversations 2>/dev/null)"
+    actionable="$(cli list-active-conversations)" || actionable=''   # empty ⇒ trips the fail-closed array check below
     normalized="$(printf '%s' "$actionable" | tr -d '[:space:]')"
 
     # ★ EMPTY-TICK COST GUARD — exit cheap, spawn zero `claude`.

@@ -226,6 +226,66 @@ final class RecapDocumentTest extends TestCase
     }
 
     /**
+     * A complete, well-formed sim: 49 parts against a 49-header stored document. Nothing
+     * is missing and nothing is degraded, so the assembly wins. Without this the guard
+     * could be tightened into always preferring stored text and no test would notice.
+     */
+    public function testPostableTextReturnsAssembledDocumentWhenEveryStoredGameIsPresent(): void
+    {
+        $stored = $this->storedDocumentWith(49);
+        $parts  = [];
+        for ($i = 1; $i <= 49; $i++) {
+            $parts[] = $this->game('2026-02-26', "**A {$i} @ B {$i}**\n<@1> · <@2>\nGame prose.");
+        }
+
+        self::assertSame(
+            RecapDocument::assemble('Intro.', $parts, 'Outro.'),
+            RecapDocument::postableText('Intro.', $parts, 'Outro.', $stored)
+        );
+    }
+
+    /**
+     * Boundary: one game short (48 parts vs 49 headers in the stored document).
+     * The completeness guard fires and prefers the stored text.
+     */
+    public function testPostableTextPrefersStoredTextWhenOneGameIsMissing(): void
+    {
+        $stored = $this->storedDocumentWith(49);
+        $parts  = [];
+        for ($i = 1; $i <= 48; $i++) {
+            $parts[] = $this->game('2026-02-26', "**A {$i} @ B {$i}**\n<@1> · <@2>\nGame prose.");
+        }
+
+        self::assertSame($stored, RecapDocument::postableText('Intro.', $parts, 'Outro.', $stored));
+    }
+
+    public function testPostableTextCountsRenderedGamesNotRawRowsAgainstTheStoredDocument(): void
+    {
+        $stored = $this->storedDocumentWith(6);
+        $parts  = [];
+        for ($i = 1; $i <= 5; $i++) {
+            $parts[] = $this->game('2026-02-26', "**A {$i} @ B {$i}**\n<@1> · <@2>\nGame prose.");
+        }
+        $parts[] = $this->game('2026-02-26', '');
+        $parts[] = $this->game('2026-02-26', '   ');
+
+        self::assertSame($stored, RecapDocument::postableText('Intro.', $parts, 'Outro.', $stored));
+    }
+
+    public function testPostableTextTreatsThePinnedExemplarAsA46GameDocument(): void
+    {
+        $exemplar = file_get_contents(dirname(__DIR__, 4) . '/bin/lib/sim-recap-exemplar.txt');
+        self::assertIsString($exemplar);
+
+        $parts = [];
+        for ($i = 1; $i <= 45; $i++) {
+            $parts[] = $this->game('2026-02-26', "**A {$i} @ B {$i}**\n<@1> · <@2>\nGame prose.");
+        }
+
+        self::assertSame($exemplar, RecapDocument::postableText('Intro.', $parts, 'Outro.', $exemplar));
+    }
+
+    /**
      * One game carries its mention line; the other is a single-line string with no
      * index-1 entry at all. gamesCarryTheirMentionLines() is all-or-nothing — the
      * mixed batch must fall back to the stored text.

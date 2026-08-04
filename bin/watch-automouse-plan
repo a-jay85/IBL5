@@ -1,0 +1,247 @@
+#!/bin/bash
+# watch-automouse-plan — wait for an automouse plan to finish a phase, then DM.
+#
+# Generalised from a one-off watcher that fired correctly and then lost its
+# message to a single un-retried POST (2026-08-04, fix-sim-recap-game-of-that-day:
+# detected the finish in 52s, built the right message with the right PR link, and
+# dropped it). Delivery now goes through bin/discord-dm, which retries and spools.
+#
+# Usage:
+#   bin/watch-automouse-plan --slug <plan-slug> [options]
+#
+#   --slug <slug>      plan slug, i.e. ~/claude-plans/<slug>.md  (required)
+#   --phase <name>     phase to wait for: postplan (default) or impl
+#   --to <snowflake>   DM recipient (default: bin/discord-dm's own default)
+#   --poll <secs>      poll interval, default 60
+#   --timeout <secs>   phase backstop, default 21600 (6h — the runner's own
+#                      ceiling is 4h45m per plan plus retries). The clock starts
+#                      when the runner is first seen alive, not at launch.
+#   --wait <secs>      how long to wait for the runner to start at all, default
+#                      86400 (24h — launchd fires it overnight)
+#   --detach           re-exec under nohup and print the watcher log path
+#   --force            skip the "plan must currently be in queue/" precondition
+#
+# Exit: 0 notified · 1 notification undeliverable · 2 usage/precondition error.
+#
+# ── Why the predicates are what they are ────────────────────────────────────────
+# PRIMARY is the stream filter's own per-phase verdict line, emitted by
+# bin/lib/automouse-stream-filter the instant the phase's `claude -p` returns:
+#
+#   [00:45:00] <slug>/postplan exit: stop_reason=end_turn turns=61 ...
+#
+# It carries the slug, so it attributes correctly even when the queue holds
+# several plans — the runner's other marker ("--- Plan #N postplan finished ---",
+# bin/automouse-run) does NOT, and a watcher keyed on that fires on a *sibling*
+# plan's finish. Baseline-and-compare (count at start, fire when it rises) rather
+# than plain grep, so a same-slug line left in an older log from a previous run
+# can't fire us at t=0.
+#
+# BACKSTOPS exist because the primary can legitimately never appear:
+#   * stall-kill — the filter emits that line off the stream's `result` event, and
+#     a force-killed phase never produces one;
+#   * impl short-circuit — an already-merged plan goes straight to done/ and a
+#     stale one straight to skipped/, with no phase run at all.
+# So: a disposition move (queue → done/ | skipped/) and runner-exit are terminal
+# too, plus a wall-clock timeout.
+#
+# Two false-fires the generic version has to defend against that a hardcoded
+# watcher didn't: launching before the runner starts (runner-gone is terminal only
+# after we have SEEN it alive — the `saw_runner` latch), and launching when a
+# stale done/<slug> from a previous attempt is already sitting there (the queue/
+# precondition, overridable with --force).
+
+set -uo pipefail
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+
+REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+# AUTOMOUSE_DIR is an override so the predicates can be exercised against a temp
+# state dir without touching the real queue (same shape as bin/plan-now's
+# PLAN_NOW_PLANS_DIR). Nothing in production sets it.
+AM="${AUTOMOUSE_DIR:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse}"
+LOG_DIR="$AM/logs"
+
+SLUG=""
+PHASE=postplan
+TO=""
+POLL=60
+MAX_SECS=21600
+WAIT_SECS=86400
+DETACH=0
+FORCE=0
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --slug)    SLUG="${2:-}"; shift 2 ;;
+        --phase)   PHASE="${2:-}"; shift 2 ;;
+        --to)      TO="${2:-}"; shift 2 ;;
+        --poll)    POLL="${2:-}"; shift 2 ;;
+        --timeout) MAX_SECS="${2:-}"; shift 2 ;;
+        --wait)    WAIT_SECS="${2:-}"; shift 2 ;;
+        --detach)  DETACH=1; shift ;;
+        --force)   FORCE=1; shift ;;
+        -h|--help) sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        *)         echo "watch-automouse-plan: unknown argument $1" >&2; exit 2 ;;
+    esac
+done
+
+[ -n "$SLUG" ] || { echo "watch-automouse-plan: --slug is required" >&2; exit 2; }
+case "$PHASE" in
+    impl|postplan) ;;
+    *) echo "watch-automouse-plan: --phase must be impl or postplan" >&2; exit 2 ;;
+esac
+
+PLAN="$SLUG.md"
+WATCH_LOG="$AM/watch-$SLUG-$PHASE.log"
+SENTINEL="$AM/.notified-$SLUG-$PHASE"
+
+if [ "$DETACH" = 1 ]; then
+    args=(--slug "$SLUG" --phase "$PHASE" --poll "$POLL" --timeout "$MAX_SECS" --wait "$WAIT_SECS")
+    [ -n "$TO" ] && args+=(--to "$TO")
+    [ "$FORCE" = 1 ] && args+=(--force)
+    nohup "$REPO/bin/watch-automouse-plan" "${args[@]}" >> "$WATCH_LOG" 2>&1 &
+    disown
+    echo "watching $SLUG/$PHASE in background (pid $!) — log: $WATCH_LOG"
+    exit 0
+fi
+
+say() { printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1"; }
+
+# Integer hours read as "0h" for anything under an hour, which looks like a bug in
+# the message rather than a short --wait.
+dur() {
+    if [ "$1" -ge 3600 ]; then printf '%dh' $(( $1 / 3600 ))
+    elif [ "$1" -ge 60 ]; then printf '%dm' $(( $1 / 60 ))
+    else printf '%ds' "$1"; fi
+}
+
+# Plan symlinks point into ~/claude-plans/, so -e follows and fails on a dangling
+# link; test -L too. Exact filename only — the disposition dirs hold look-alike
+# slugs that a prefix glob would match.
+exists() { [ -e "$1" ] || [ -L "$1" ]; }
+
+if [ -e "$SENTINEL" ]; then
+    say "sentinel present ($SENTINEL) — already notified for $SLUG/$PHASE. Exiting."
+    exit 0
+fi
+
+if [ "$FORCE" != 1 ] && ! exists "$AM/queue/$PLAN"; then
+    if exists "$AM/done/$PLAN"; then
+        where="done/ (already shipped)"
+    elif exists "$AM/skipped/$PLAN"; then
+        where="skipped/"
+    else
+        where="nowhere in queue/, done/ or skipped/"
+    fi
+    cat >&2 <<EOF
+watch-automouse-plan: $PLAN is $where, not in queue/.
+Watching now would fire immediately on that stale state. Queue it first
+(bin/automouse-queue), or pass --force if you know what you're watching for.
+EOF
+    exit 2
+fi
+
+runner_pid() { pgrep -f 'automouse-run' 2>/dev/null | grep -v "^$$\$" | head -1; }
+
+# Baseline the slug-attributed verdict line; fire when the count rises.
+count_hits() {
+    local c
+    c=$(cat "$LOG_DIR"/*.log 2>/dev/null | grep -c -F -- "$SLUG/$PHASE exit:") || true
+    echo "${c:-0}"
+}
+
+pr_line() {
+    (cd "$REPO" && gh pr list --head "$SLUG" --state all \
+        --json number,url,state,title --limit 1 2>/dev/null \
+        | jq -r '.[0] | select(.) | "PR #\(.number) [\(.state)] \(.title)\n\(.url)"') || true
+}
+
+fire() { # verdict-line
+    local msg pr dm_args=()
+    pr=$(pr_line)
+    msg="$1"
+    [ -n "$pr" ] && msg="$msg"$'\n\n'"$pr"
+    msg="$msg"$'\n\n'"log: $LOG_DIR/$(date +%F).log"
+    [ -n "$TO" ] && dm_args=(--to "$TO")
+
+    # ${a[@]+"${a[@]}"} — macOS ships bash 3.2, where `set -u` treats an empty
+    # array's "${a[@]}" as unbound and aborts. Without --to that is every call.
+    if printf '%s' "$msg" | "$REPO/bin/discord-dm" ${dm_args[@]+"${dm_args[@]}"} -; then
+        say "notified."
+        date > "$SENTINEL"
+        exit 0
+    fi
+    # discord-dm already spooled it and raised a macOS notification; keep a copy
+    # here too and exit non-zero so a wrapper can tell this apart from success.
+    say "NOTIFICATION UNDELIVERED — message was:"
+    printf '%s\n' "$msg"
+    exit 1
+}
+
+# The disposition move is done by the phase's own agent, so it is already in place
+# by the time the verdict line lands — but re-check for a beat rather than
+# reporting "no disposition" on a filesystem race.
+settle_disposition() {
+    local tries=6
+    while [ "$tries" -gt 0 ]; do
+        exists "$AM/done/$PLAN" && { echo "done"; return; }
+        exists "$AM/skipped/$PLAN" && { echo "skipped"; return; }
+        tries=$(( tries - 1 ))
+        sleep 5
+    done
+    echo "none"
+}
+
+BASE_HITS=$(count_hits)
+LAUNCH_EPOCH=$(date +%s)
+START_EPOCH=$LAUNCH_EPOCH
+SAW_RUNNER=0
+RUNNER_STATE="not started yet"
+if [ -n "$(runner_pid)" ]; then
+    SAW_RUNNER=1
+    RUNNER_STATE="alive (pid $(runner_pid))"
+fi
+
+say "watching $SLUG/$PHASE — baseline hits=$BASE_HITS, runner $RUNNER_STATE, poll=${POLL}s, timeout=$(dur "$MAX_SECS")"
+
+while true; do
+    if [ "$(count_hits)" -gt "$BASE_HITS" ]; then
+        case "$(settle_disposition)" in
+            done)
+                fire "✅ automouse **$PHASE** complete for **$SLUG** — plan shipped (queue → done)." ;;
+            skipped)
+                fire "⚠️ automouse **$PHASE** finished for **$SLUG** but the plan landed in **skipped/** — needs a look." ;;
+            *)
+                fire "⚠️ automouse **$PHASE** finished for **$SLUG**, but the plan is still in queue/ (no done/skipped disposition) — needs a look." ;;
+        esac
+    fi
+
+    # Disposition with no verdict line — impl short-circuit, or a stall-killed
+    # phase whose stream never reached the `result` event.
+    if exists "$AM/done/$PLAN"; then
+        fire "✅ automouse finished **$SLUG** — plan landed in done/."
+    elif exists "$AM/skipped/$PLAN"; then
+        fire "⚠️ automouse gave up on **$SLUG** — plan landed in skipped/ after failed attempts."
+    fi
+
+    if [ -n "$(runner_pid)" ]; then
+        SAW_RUNNER=1
+    elif [ "$SAW_RUNNER" = 1 ]; then
+        fire "⚠️ automouse runner exited without a disposition for **$SLUG** (still in queue/ — likely an env stop / usage limit). $PHASE did not complete."
+    else
+        # The runner hasn't started yet — launchd fires it overnight, so a watcher
+        # launched at 6pm for a 1am run would otherwise burn its whole phase budget
+        # waiting and false-fire before the plan even began. --timeout budgets the
+        # PHASE; the wait for the runner is budgeted separately by --wait.
+        START_EPOCH=$(date +%s)
+    fi
+
+    if [ "$SAW_RUNNER" = 0 ] && [ $(( $(date +%s) - LAUNCH_EPOCH )) -gt "$WAIT_SECS" ]; then
+        fire "⏱ Watcher gave up after $(dur "$WAIT_SECS") on **$SLUG** — the automouse runner never started. Plan is still queued; check launchd."
+    fi
+
+    if [ $(( $(date +%s) - START_EPOCH )) -gt "$MAX_SECS" ]; then
+        fire "⏱ Watcher timed out after $(dur "$MAX_SECS") on **$SLUG** — the runner is alive but $PHASE has not finished. Watcher exiting; check the log."
+    fi
+
+    sleep "$POLL"
+done

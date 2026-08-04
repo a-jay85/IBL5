@@ -10,7 +10,8 @@ container.
 | Group | Scripts |
 |-------|---------|
 | Worktrees | `wt-new`, `wt-up`, `wt-down`, `wt-list`, `wt-rebase`, `wt-remove`, `wt-db-test`, `e2e-wt.sh` |
-| Automouse automation | `automouse-run`, `automouse-queue`, `automouse-prompt-impl`, `automouse-prompt-postplan` |
+| Automouse automation | `automouse-run`, `automouse-queue`, `automouse-prompt-impl`, `automouse-prompt-postplan`, `watch-automouse-plan` (wait for a queued plan's phase to finish, then DM) |
+| Notifications | `discord-dm` (host-side IBLbot DM with retries + spool; the sibling of `.github/actions/notify-discord`) |
 | CI / quality gates | `adr-check`, `check-docs`, `check-hot-files`, `check-master-ci-green`, `check-plan`, `check-plan-staleness`, `check-vr-coverage`, `check-e2e-hygiene`, `check-e2e-fa-offers-owner`, `check-e2e-mutator-isolation`, `check-e2e-fixture-drift`, `check-destructive-migrations`, `refactor-flag` |
 | Prod ops | `db-sync-prod`, `log-fetch-prod`, `merge-master-to-prod`, `smoke-prod` (SSH from host); `iblbot-healthcheck` (pm2 cron watchdog, runs on the prod box) |
 | Dev / Docker env | `dev-up`, `db-test-up`, `db-migrate` |

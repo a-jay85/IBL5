@@ -1,0 +1,146 @@
+#!/bin/bash
+# discord-dm — send a Discord DM through IBLbot from the host, with retries.
+#
+# The host-side sibling of .github/actions/notify-discord: the bot binds
+# 127.0.0.1:50000 on prod, so every sender has to tunnel in over ssh and POST to
+# localhost. That recipe was previously copy-pasted per caller, one-shot, with
+# `curl -sf` swallowing the HTTP status — a single transient 5xx during a pm2
+# restart window (bin/iblbot-healthcheck restarts on a cron, so those windows are
+# minutes long, not seconds) silently dropped the message. This script is the one
+# place that recipe lives, and it never fails silently:
+#
+#   * retries across a window longer than a pm2 restart (default ~5min total)
+#   * logs HTTP status + curl rc + ssh rc on every attempt
+#   * 4xx is permanent (missing field) — fails fast, no retry. Note the bot
+#     answers a *bad snowflake* with 500, indistinguishable from a transient
+#     failure, so a wrong recipient costs the full retry window. That's the right
+#     trade: 500 is exactly the code the lost message came back with.
+#   * on total failure: macOS notification + a spool line, then exit 1
+#
+# Usage:
+#   bin/discord-dm "message"                 # message as an argument
+#   printf '%s' "$msg" | bin/discord-dm -    # message on stdin (multi-line safe)
+#
+#   --to <snowflake>   recipient (default: $DISCORD_DM_TO, else ~/.iblbot-dm-id)
+#   --attempts <n>     send attempts before giving up (default 6)
+#   --host <ssh-host>  ssh target (default: $DISCORD_DM_SSH_HOST, else iblhoops.net)
+#   --quiet            no per-attempt chatter on stderr (failures still print)
+#   --no-fallback      skip the macOS notification + spool on total failure
+#
+# Exit: 0 delivered · 1 undeliverable (spooled) · 2 usage/config error.
+
+set -uo pipefail
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+
+TO="${DISCORD_DM_TO:-}"
+SSH_HOST="${DISCORD_DM_SSH_HOST:-iblhoops.net}"
+BOT_PORT="${DISCORD_DM_PORT:-50000}"
+ATTEMPTS=6
+QUIET=0
+FALLBACK=1
+SPOOL="${DISCORD_DM_SPOOL:-$HOME/.claude/discord-dm-spool.log}"
+ID_FILE="$HOME/.iblbot-dm-id"
+
+# Backoff between attempts, in seconds. Sums to 315s (~5min15s) across the 6
+# default attempts — deliberately longer than a pm2 restart window, which is what
+# the one-shot senders kept losing messages to.
+BACKOFF=(15 30 60 90 120 120 120 120)
+
+MSG=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --to)          TO="${2:-}"; shift 2 ;;
+        --attempts)    ATTEMPTS="${2:-}"; shift 2 ;;
+        --host)        SSH_HOST="${2:-}"; shift 2 ;;
+        --quiet)       QUIET=1; shift ;;
+        --no-fallback) FALLBACK=0; shift ;;
+        -h|--help)     sed -n '2,31p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -)             MSG=$(cat); shift ;;
+        --)            shift; MSG="$*"; break ;;
+        -*)            echo "discord-dm: unknown option $1" >&2; exit 2 ;;
+        *)             MSG="$1"; shift ;;
+    esac
+done
+
+[ -n "$MSG" ] || { echo "discord-dm: empty message (pass an argument or '-' for stdin)" >&2; exit 2; }
+
+if [ -z "$TO" ] && [ -f "$ID_FILE" ]; then
+    TO=$(tr -dc '0-9' < "$ID_FILE")
+fi
+if [ -z "$TO" ]; then
+    cat >&2 <<EOF
+discord-dm: no recipient. Set one of:
+  --to <snowflake>          per-call
+  DISCORD_DM_TO=<snowflake> per-environment
+  $ID_FILE   persistent default (one snowflake, no quotes)
+EOF
+    exit 2
+fi
+
+say() { [ "$QUIET" = 1 ] || printf 'discord-dm: %s\n' "$1" >&2; }
+
+# Discord caps a message at 2000 chars; leave room for the truncation marker.
+if [ "${#MSG}" -gt 1900 ]; then
+    MSG="${MSG:0:1900}"$'\n…(truncated)'
+fi
+
+# Snowflakes are 64-bit and MUST stay JSON strings end-to-end — jq --arg keeps
+# them strings; interpolating into a JSON literal would round-trip them through a
+# double and corrupt the low digits.
+PAYLOAD=$(jq -n --arg id "$TO" --arg msg "$MSG" \
+    '{content: {receivingUserDiscordID: $id, message: $msg}}') || exit 2
+
+# Remote leg. `-w` appends the status after the body so a failure is diagnosable
+# from the log alone; `-f` is deliberately absent (it hides the very status we
+# want). curl's own rc distinguishes "connection refused" (7) from an HTTP error.
+REMOTE_CMD="curl -s -m 20 -w '\nHTTP=%{http_code}' \
+-X POST http://localhost:${BOT_PORT}/discordDM \
+-H 'Content-Type: application/json' -d @-; printf ' curl_rc=%s\n' \"\$?\""
+
+http=""
+n=1
+while [ "$n" -le "$ATTEMPTS" ]; do
+    out=$(printf '%s' "$PAYLOAD" | ssh -o BatchMode=yes -o ConnectTimeout=10 \
+        "$SSH_HOST" "$REMOTE_CMD" 2>&1)
+    ssh_rc=$?
+    http=$(printf '%s' "$out" | sed -n 's/.*HTTP=\([0-9][0-9]*\).*/\1/p' | tail -1)
+    curl_rc=$(printf '%s' "$out" | sed -n 's/.*curl_rc=\([0-9][0-9]*\).*/\1/p' | tail -1)
+
+    if [ "$http" = "200" ]; then
+        say "delivered on attempt $n (HTTP 200)"
+        exit 0
+    fi
+
+    say "attempt $n/$ATTEMPTS failed — ssh_rc=$ssh_rc curl_rc=${curl_rc:-?} http=${http:-none}"
+    [ "$QUIET" = 1 ] || printf '  %s\n' "$(printf '%s' "$out" | tr '\n' ' ' | cut -c1-300)" >&2
+
+    # 4xx means the bot understood us and refused — a bad snowflake or an empty
+    # message. Retrying that just burns five minutes to reach the same answer.
+    case "${http:-}" in
+        4??) say "permanent failure (HTTP $http) — not retrying"; break ;;
+    esac
+
+    if [ "$n" -lt "$ATTEMPTS" ]; then
+        sleep "${BACKOFF[$(( n - 1 ))]:-120}"
+    fi
+    n=$(( n + 1 ))
+done
+
+# Total failure. The message is the whole point of the call, so never let it
+# evaporate: put it somewhere durable and somewhere visible, and exit non-zero so
+# a caller (or a launchd job) can tell delivery apart from success.
+if [ "$FALLBACK" = 1 ]; then
+    mkdir -p "$(dirname "$SPOOL")"
+    {
+        printf '=== %s — UNDELIVERED (to=%s http=%s) ===\n' \
+            "$(date '+%Y-%m-%d %H:%M:%S')" "$TO" "${http:-none}"
+        printf '%s\n\n' "$MSG"
+    } >> "$SPOOL"
+    say "spooled to $SPOOL"
+
+    NOTE=$(printf '%s' "$MSG" | head -1 | cut -c1-180 | sed 's/[\\"]/ /g')
+    osascript -e "display notification \"$NOTE\" with title \"Discord DM failed\" subtitle \"spooled — see the log\"" 2>/dev/null || true
+fi
+
+echo "discord-dm: UNDELIVERED after $(( n > ATTEMPTS ? ATTEMPTS : n )) attempt(s) — spooled to $SPOOL" >&2
+exit 1

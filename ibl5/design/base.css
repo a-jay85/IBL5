@@ -7,10 +7,43 @@
  * - Legacy PHP-Nuke element normalization (@layer base)
  * - Legacy PHP-Nuke class compatibility (@layer base)
  * - Mobile forced layouts for legacy tables (@layer components)
+ * - FOUT suppression during webfont load (unlayered — see note below)
  *
  * Note: Utility classes like .text-center, .font-bold, .bg-white, etc.
  * are provided by Tailwind CSS and should NOT be duplicated here.
  */
+
+/* ==========================================================================
+   FOUT Prevention — INTENTIONALLY UNLAYERED
+
+   Moved here from PageLayout::renderHead() (maintenance item 11.1). These rules
+   must not lose a cascade contest: an unlayered rule outranks every @layer rule
+   regardless of specificity, which is the priority the original inline <style>
+   had. Do NOT wrap this block in @layer — inside @layer base it becomes
+   overridable by @layer components / @layer utilities (e.g. Tailwind's
+   visible/invisible), which reintroduces a one-frame flash of invisible text.
+
+   The classes are toggled on <html> by the font-detection <script> that stays
+   inline in PageLayout::renderHead(); that script must keep running before the
+   stylesheet <link>.
+   ========================================================================== */
+
+.fonts-loading {
+    visibility: hidden;
+}
+
+.fonts-loaded {
+    visibility: visible;
+}
+
+/* Hide body until fonts are loaded */
+.fonts-loading body {
+    visibility: hidden;
+}
+
+.fonts-loaded body {
+    visibility: visible;
+}
 
 /* ==========================================================================
    CSS Reset & Box Sizing — @layer base

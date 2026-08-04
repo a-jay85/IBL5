@@ -12,7 +12,7 @@ use PHPStan\Rules\RuleErrorBuilder;
 
 /**
  * Bans inline `<style>` blocks and `style="..."` attributes in PHP string literals
- * under classes/. All CSS must live in `ibl5/design/components/`.
+ * under classes/ and themes/. All CSS must live in `ibl5/design/components/`.
  *
  * Exception: `style="--..."` CSS custom-property declarations are allowed because
  * they are the sanctioned way to pass dynamic per-element theme values into the
@@ -35,8 +35,10 @@ final class BanInlineCssRule implements Rule
     {
         $file = $scope->getFile();
 
-        // Only enforce in classes/
-        if (!str_contains($file, DIRECTORY_SEPARATOR . 'classes' . DIRECTORY_SEPARATOR)) {
+        // Only enforce in classes/ and themes/
+        $inClasses = str_contains($file, DIRECTORY_SEPARATOR . 'classes' . DIRECTORY_SEPARATOR);
+        $inThemes  = str_contains($file, DIRECTORY_SEPARATOR . 'themes' . DIRECTORY_SEPARATOR);
+        if (!$inClasses && !$inThemes) {
             return [];
         }
 

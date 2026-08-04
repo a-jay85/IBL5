@@ -485,6 +485,35 @@ elif [ -n "$(printf '%s' "$CF_SECTION" | tr -d '[:space:]')" ]; then
 fi
 
 # ---------------------------------------------------------------------------
+# Gate M: a PHPUnit matrix row demands a ## Required Test Methods section.
+# ---------------------------------------------------------------------------
+# Phase 5.0 can only check the test FILE path, so a substituted, weaker test at
+# the planned path satisfies every row (PR #1753). Method names make it
+# row-level. Fence-stripped via the shared lib: a fenced example must NOT count.
+if grep -qiE '\|[[:space:]]*PHPUnit[[:space:]]*\|' "$MATRIX_FILE"; then
+    RTM_ITEMS=$(cf_section_named "$PLAN_FILE" "Required Test Methods" \
+        | grep -cE '^[[:space:]]*[-*][[:space:]]+' || true)
+    if [ "$RTM_ITEMS" -eq 0 ] && ! grep -qE 'no-test-methods:[[:space:]]*.{15,}' "$PLAN_FILE"; then
+        viol "[M] matrix has a PHPUnit row but no parseable ## Required Test Methods section — list the exact method names (bare name, one per bullet, outside any fence), or add <!-- no-test-methods: reason at least 15 characters -->"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Gate G: a matrix row naming a bin/test-* / bin/check-* script must name one CI
+# actually runs. Narrow by design — most CLI-executable rows are legitimately
+# one-shots (curl, bin/db-query), and a gate that taxes them gets ignored.
+# ---------------------------------------------------------------------------
+GH_WF="$REPO_ROOT/.github/workflows"
+while IFS= read -r row; do
+    cell="$(printf '%s' "$row" | awk -F'|' '{print $(NF-1)}')"
+    case "$cell" in *'(one-shot)'*|*'(wired in this PR)'*) continue ;; esac
+    for n in $(printf '%s' "$cell" | grep -oE 'bin/(test|check)-[A-Za-z0-9_.-]+'); do
+        grep -rqF "$n" "$GH_WF" 2>/dev/null && continue
+        viol "[G] matrix row names $n but no .github/workflows/*.yml runs it — wire it (and list that workflow in ## Critical Files), or annotate the cell (one-shot) or (wired in this PR)"
+    done
+done < "$MATRIX_FILE"
+
+# ---------------------------------------------------------------------------
 # Gate C: Context budget — a marathon-sized plan predicts a dumb-zone run.
 # ---------------------------------------------------------------------------
 # Size proxies only (a script cannot estimate real context): total line count

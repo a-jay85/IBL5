@@ -73,6 +73,28 @@ cf_table_detected() {
     printf '%s\n' "$1" | grep -qE '^[[:space:]]*\|'
 }
 
+# cf_section_named <planfile> <heading> -> the raw named section body
+# Width-aware fence stripping: a fenced block inside the section (or before it)
+# is skipped so illustrative examples do not yield phantom entries.
+# <heading> is matched as the literal text after `## ` (case-sensitive).
+cf_section_named() {
+    awk -v want="$2" '
+        {
+            line = $0
+            sub(/^[[:space:]]*/, "", line)
+            n = 0
+            while (substr(line, n + 1, 1) == "`") n++
+            if (n >= 3) {
+                if (!in_fence) { in_fence = 1; fence_len = n; next }
+                else if (n >= fence_len) { in_fence = 0; next }
+            }
+        }
+        in_fence { next }
+        $0 ~ ("^##[[:space:]]*" want) { f=1; next }
+        /^## / { f=0 }
+        f' "$1"
+}
+
 # cf_section <planfile> -> the raw `## Critical Files` section body
 # Skips fenced code blocks so embedded fixture content with a ## Critical Files
 # heading inside a plan's bash block is not parsed as the real section.
@@ -90,23 +112,7 @@ cf_table_detected() {
 # An unclosed fence still leaves in_fence set and swallows every later heading,
 # yielding an empty section — but this is now DETECTED by cf_fence_unbalanced
 # and reported by bin/check-plan gate [F]. It is no longer a silent pass.
-cf_section() {
-    awk '
-        {
-            line = $0
-            sub(/^[[:space:]]*/, "", line)
-            n = 0
-            while (substr(line, n + 1, 1) == "`") n++
-            if (n >= 3) {
-                if (!in_fence) { in_fence = 1; fence_len = n; next }
-                else if (n >= fence_len) { in_fence = 0; next }
-            }
-        }
-        in_fence { next }
-        /^##[[:space:]]*Critical Files/{f=1;next}
-        /^## /{f=0}
-        f' "$1"
-}
+cf_section() { cf_section_named "$1" "Critical Files"; }
 
 # cf_fence_unbalanced <planfile> -> exit 0 when a code fence is still open at EOF.
 # Width-aware, exactly as cf_section: an opening run records its length and only

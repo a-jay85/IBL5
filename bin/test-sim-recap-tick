@@ -614,8 +614,47 @@ srt_log_has "$STUB" prompt.out "frozen historical marker" \
 # ── game_of_that_day_contract ─────────────────────────────────────────────────
 srt_log_lacks "$STUB" prompt.out "integer zero, not null" \
     "game_of_that_day_contract — old 'integer zero' instruction absent"
-srt_log_has "$STUB" prompt.out "1-based counter" \
-    "game_of_that_day_contract — 1-based instruction present"
+srt_log_lacks "$STUB" prompt.out "first game of a doubleheader" \
+    "game_of_that_day_contract — retired doubleheader semantics absent"
+srt_log_has "$STUB" prompt.out "READ this value from the database" \
+    "game_of_that_day_contract — read-not-infer directive present"
+srt_log_has "$STUB" prompt.out "index of the game within" \
+    "game_of_that_day_contract — within-date semantics present"
+srt_log_has "$STUB" prompt.out "FROM ibl_box_scores_teams" \
+    "game_of_that_day_contract — lookup query present"
+
+# ── prose_length_band_present ─────────────────────────────────────────────────
+srt_log_has "$STUB" prompt.out "504 and 639 characters" \
+    "prose_length_band_present — exemplar band stated"
+srt_log_has "$STUB" prompt.out "ANTI-LLM-TELL PROHIBITIONS still bind" \
+    "prose_length_band_present — band reconciled with the hard bans"
+
+# ── anti_tell_bans_survive_length_band ────────────────────────────────────────
+# Negative path: the length anchor must not have softened the sentence-shape ban.
+srt_log_has "$STUB" prompt.out "Short, punchy sentences." \
+    "anti_tell_bans_survive_length_band — punchy-sentence ban intact"
+
+# ── length_band_matches_exemplar ──────────────────────────────────────────────
+# The band printed in the prompt is a measurement of the pinned exemplar. Recompute
+# it so an exemplar swap fails here instead of shipping a stale instruction.
+_band=$(awk '
+    /^\*\*.* [0-9]+ @ .* [0-9]+\*\*$/  { st=1; next }
+    st==1 && /^<@/                     { st=2; next }
+    st==2 && $0 == ""                  { st=3; next }
+    st==3 && length($0) > 0            { n++; L=length($0);
+                                         if (mn=="" || L<mn) mn=L; if (L>mx) mx=L;
+                                         st=0; next }
+                                       { st=0 }
+    END { printf "%d %d %d", n+0, mn+0, mx+0 }
+' "$SRT_EXEMPLAR")
+read -r _bn _bmin _bmax <<BAND_EOF
+$_band
+BAND_EOF
+if [ "$_bmin" -ge 504 ] && [ "$_bmax" -le 639 ] && [ "$_bn" -gt 0 ]; then
+    srt_ok "length_band_matches_exemplar — $_bn paragraphs, min $_bmin, max $_bmax inside stated band"
+else
+    srt_fail "length_band_matches_exemplar — exemplar measures '$_band', prompt claims 504..639"
+fi
 
 # ── negative_roster_absent ────────────────────────────────────────────────────
 # Without --roster, Block 8 must not appear.

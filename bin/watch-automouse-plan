@@ -211,7 +211,18 @@ while true; do
             skipped)
                 fire "⚠️ automouse **$PHASE** finished for **$SLUG** but the plan landed in **skipped/** — needs a look." ;;
             *)
-                fire "⚠️ automouse **$PHASE** finished for **$SLUG**, but the plan is still in queue/ (no done/skipped disposition) — needs a look." ;;
+                # Still in queue/ means opposite things per phase. A healthy impl
+                # ALWAYS ends here — bin/automouse-run only moves the plan out of
+                # queue/ on a deliberate impl disposition (already-merged → done/,
+                # the rest → skipped/); a normal impl writes a handoff and leaves
+                # the plan queued for postplan, which is the phase that does the
+                # queue → done move. So "no disposition" is the success signal for
+                # impl and a genuine anomaly only for postplan.
+                if [ "$PHASE" = impl ]; then
+                    fire "✅ automouse **impl** complete for **$SLUG** — postplan next."
+                else
+                    fire "⚠️ automouse **$PHASE** finished for **$SLUG**, but the plan is still in queue/ (no done/skipped disposition) — needs a look."
+                fi ;;
         esac
     fi
 

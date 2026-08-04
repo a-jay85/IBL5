@@ -271,6 +271,18 @@ generate() { # sim
     store_rc=$?
     if [ "$store_rc" -eq 0 ] && jq_ok "$store" '.ok == true'; then
         log "sim $sim: stored ($(printf '%s' "$store" | "$SIM_RECAP_JQ_BIN" -r '.games' 2>/dev/null) game recaps)"
+        local avg_len
+        avg_len="$("$SIM_RECAP_JQ_BIN" -r \
+            '[.games[].recap_text | length] | if length == 0 then 0 else (add / length | floor) end' \
+            "$WORKDIR/payload.json" 2>/dev/null)"
+        case "$avg_len" in
+            ''|*[!0-9]*) : ;;  # unreadable payload: the store already succeeded, stay quiet
+            *)
+                if [ "$avg_len" -lt 504 ]; then
+                    log "sim $sim: WARNING — average game recap is ${avg_len} chars, below the exemplar band of 504-639. Stored anyway; prose is running short."
+                fi
+                ;;
+        esac
         return 0
     fi
     log "sim $sim: store failed (rc=$store_rc): $store — parking"

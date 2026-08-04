@@ -240,7 +240,23 @@ Strict field types:
   - game_date: non-empty string, format YYYY-MM-DD
   - recap_text (per game and top-level): non-empty strings
   - box_id: integer or null
-  - game_of_that_day: 1-based counter — use 1 when there was exactly one game on that date, or for the first game of a doubleheader; use 2 for the second game. Never use 0 — that silently drops this recap from the rendered output.
+  - game_of_that_day: READ this value from the database. Do NOT infer it, do NOT count
+    it yourself, and do NOT default it to 1. It is the 1-based index of the game within
+    its DATE across the entire league, assigned by the sim engine: on a seven-game night
+    the seven games carry 1, 2, 3, 4, 5, 6 and 7. It is NOT a doubleheader counter and it
+    is NOT per-matchup. Look it up once for the whole sim window:
+
+      SELECT DISTINCT game_date, visitor_teamid, home_teamid, game_of_that_day
+        FROM ibl_box_scores_teams
+       WHERE game_date BETWEEN '<start_date>' AND '<end_date>'
+       ORDER BY game_date, game_of_that_day;
+
+    (start_date and end_date come from ibl_sim_dates for this sim. ibl_box_scores_teams
+    stores one row per team side, so DISTINCT collapses it to one row per game.)
+
+    Copy the value verbatim into each game object. A wrong value silently drops that
+    recap from the rendered output: sim 725 wrote 1 for all 49 games and only 7 of them
+    ever rendered. Never use 0.
   - themes: array of strings — narrative angles you used this run (for the next ledger)
 
 == HOW TO PRODUCE IT ==
@@ -284,6 +300,15 @@ The following is the authoritative format reference. Match its structure exactly
   - Per game: **Away Team NNN @ Home Team NNN** header (bold), then <@id> · <@id> mentions
     line (away snowflake · home snowflake, middle-dot separated), then a blank line, then
     one prose paragraph
+
+Paragraph length is part of the format, not a style preference. Every game paragraph in
+the exemplar below runs between 504 and 639 characters, averaging 569. Hit that band. A
+paragraph under 500 characters is short of the exemplar and reads thin.
+
+This does not license long sentences. The ANTI-LLM-TELL PROHIBITIONS still bind in full:
+sentences stay short and punchy, two clauses maximum. You reach the band with MORE short
+sentences carrying more of the game, not with fewer, longer ones. Sentence construction
+and paragraph volume are separate dials.
 
 Injuries woven into prose. Long streaks called out. Pop culture references tied to the era.
 

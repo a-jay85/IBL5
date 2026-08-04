@@ -124,6 +124,9 @@ SH
 
     # claude stub: touch sentinel, log call; write valid payload.json unless
     # agent-fails is set; emit usage-limit line when agent-usage-limit is set.
+    # resp.payload (if present): cat its content into payload.json instead of the
+    # built-in default — lets length-specific tests control recap_text size without
+    # overriding the whole stub. srt_reset wipes resp.* so cleanup is automatic.
     cat > "$STUB/claude" <<'SH'
 #!/usr/bin/env bash
 echo "claude $*" >> "$STUB/claude.log"
@@ -133,13 +136,17 @@ if [ -f "$STUB/agent-usage-limit" ]; then
     exit 0
 fi
 if [ ! -f "$STUB/agent-fails" ]; then
-    printf '%s\n' \
-        '{"intro_text":"intro","outro_text":"outro","recap_text":"recap",' \
-        '"themes":["theme1"],' \
-        '"games":[{"season_year":2008,"game_date":"2026-07-23",' \
-        '"visitor_teamid":1,"home_teamid":2,"game_of_that_day":0,' \
-        '"box_id":null,"sort_order":1,"recap_text":"game recap"}]}' \
-        | tr -d '\n' > payload.json
+    if [ -f "$STUB/resp.payload" ]; then
+        cat "$STUB/resp.payload" > payload.json
+    else
+        printf '%s\n' \
+            '{"intro_text":"intro","outro_text":"outro","recap_text":"recap",' \
+            '"themes":["theme1"],' \
+            '"games":[{"season_year":2008,"game_date":"2026-07-23",' \
+            '"visitor_teamid":1,"home_teamid":2,"game_of_that_day":0,' \
+            '"box_id":null,"sort_order":1,"recap_text":"game recap"}]}' \
+            | tr -d '\n' > payload.json
+    fi
 fi
 exit 0
 SH
@@ -523,6 +530,55 @@ else
     srt_fail "payload_contract — store.stdin not created (ssh stub did not record stdin)"
 fi
 
+# ── length_warn_fires_below_band ──────────────────────────────────────────────
+# A single-game payload with a ~280-char recap_text (avg < 504) must log the
+# prose-length warning and still exit 0 (the store already succeeded).
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+{
+    printf '%s' '{"intro_text":"intro","outro_text":"outro","recap_text":"recap","themes":["t"],'
+    printf '%s' '"games":[{"season_year":2008,"game_date":"2026-07-23","visitor_teamid":1,'
+    printf '%s' '"home_teamid":2,"game_of_that_day":0,"box_id":null,"sort_order":1,"recap_text":"'
+    printf '%280s' | tr ' ' 'x'
+    printf '%s' '"}]}'
+} > "$STUB/resp.payload"
+srt_run
+srt_expect_eq "length_warn_fires_below_band — exit 0" 0 "$SRT_RC"
+srt_log_has "$STUB" tick.out "stored"              "length_warn_fires_below_band — stored logged"
+srt_log_has "$STUB" tick.out "below the exemplar band" "length_warn_fires_below_band — warning logged"
+
+# ── length_warn_silent_inside_band ────────────────────────────────────────────
+# A single-game payload with a ~570-char recap_text (avg >= 504) must NOT log
+# the warning — prose is within the exemplar band.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+{
+    printf '%s' '{"intro_text":"intro","outro_text":"outro","recap_text":"recap","themes":["t"],'
+    printf '%s' '"games":[{"season_year":2008,"game_date":"2026-07-23","visitor_teamid":1,'
+    printf '%s' '"home_teamid":2,"game_of_that_day":0,"box_id":null,"sort_order":1,"recap_text":"'
+    printf '%570s' | tr ' ' 'x'
+    printf '%s' '"}]}'
+} > "$STUB/resp.payload"
+srt_run
+srt_expect_eq "length_warn_silent_inside_band — exit 0" 0 "$SRT_RC"
+srt_log_lacks "$STUB" tick.out "below the exemplar band" "length_warn_silent_inside_band — no warning"
+
+# ── length_warn_does_not_change_store_outcome ─────────────────────────────────
+# A below-band payload must not trigger a park: the store outcome is unchanged
+# (the check is advisory only), so the tick exits 0 and never parks the sim.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+{
+    printf '%s' '{"intro_text":"intro","outro_text":"outro","recap_text":"recap","themes":["t"],'
+    printf '%s' '"games":[{"season_year":2008,"game_date":"2026-07-23","visitor_teamid":1,'
+    printf '%s' '"home_teamid":2,"game_of_that_day":0,"box_id":null,"sort_order":1,"recap_text":"'
+    printf '%280s' | tr ' ' 'x'
+    printf '%s' '"}]}'
+} > "$STUB/resp.payload"
+srt_run
+srt_expect_eq "length_warn_does_not_change_store_outcome — exit 0" 0 "$SRT_RC"
+srt_log_lacks "$STUB" tick.out "parked" "length_warn_does_not_change_store_outcome — no park"
+
 # ══ PROMPT GROUP — real bin/sim-recap-prompt ══════════════════════════════════
 
 _FIX="$STUB/fixtures"
@@ -614,8 +670,47 @@ srt_log_has "$STUB" prompt.out "frozen historical marker" \
 # ── game_of_that_day_contract ─────────────────────────────────────────────────
 srt_log_lacks "$STUB" prompt.out "integer zero, not null" \
     "game_of_that_day_contract — old 'integer zero' instruction absent"
-srt_log_has "$STUB" prompt.out "1-based counter" \
-    "game_of_that_day_contract — 1-based instruction present"
+srt_log_lacks "$STUB" prompt.out "first game of a doubleheader" \
+    "game_of_that_day_contract — retired doubleheader semantics absent"
+srt_log_has "$STUB" prompt.out "READ this value from the database" \
+    "game_of_that_day_contract — read-not-infer directive present"
+srt_log_has "$STUB" prompt.out "index of the game within" \
+    "game_of_that_day_contract — within-date semantics present"
+srt_log_has "$STUB" prompt.out "FROM ibl_box_scores_teams" \
+    "game_of_that_day_contract — lookup query present"
+
+# ── prose_length_band_present ─────────────────────────────────────────────────
+srt_log_has "$STUB" prompt.out "504 and 639 characters" \
+    "prose_length_band_present — exemplar band stated"
+srt_log_has "$STUB" prompt.out "ANTI-LLM-TELL PROHIBITIONS still bind" \
+    "prose_length_band_present — band reconciled with the hard bans"
+
+# ── anti_tell_bans_survive_length_band ────────────────────────────────────────
+# Negative path: the length anchor must not have softened the sentence-shape ban.
+srt_log_has "$STUB" prompt.out "Short, punchy sentences." \
+    "anti_tell_bans_survive_length_band — punchy-sentence ban intact"
+
+# ── length_band_matches_exemplar ──────────────────────────────────────────────
+# The band printed in the prompt is a measurement of the pinned exemplar. Recompute
+# it so an exemplar swap fails here instead of shipping a stale instruction.
+_band=$(awk '
+    /^\*\*.* [0-9]+ @ .* [0-9]+\*\*$/  { st=1; next }
+    st==1 && /^<@/                     { st=2; next }
+    st==2 && $0 == ""                  { st=3; next }
+    st==3 && length($0) > 0            { n++; L=length($0);
+                                         if (mn=="" || L<mn) mn=L; if (L>mx) mx=L;
+                                         st=0; next }
+                                       { st=0 }
+    END { printf "%d %d %d", n+0, mn+0, mx+0 }
+' "$SRT_EXEMPLAR")
+read -r _bn _bmin _bmax <<BAND_EOF
+$_band
+BAND_EOF
+if [ "$_bmin" -ge 504 ] && [ "$_bmax" -le 639 ] && [ "$_bn" -gt 0 ]; then
+    srt_ok "length_band_matches_exemplar — $_bn paragraphs, min $_bmin, max $_bmax inside stated band"
+else
+    srt_fail "length_band_matches_exemplar — exemplar measures '$_band', prompt claims 504..639"
+fi
 
 # ── negative_roster_absent ────────────────────────────────────────────────────
 # Without --roster, Block 8 must not appear.

@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-07-27
+last_verified: 2026-07-30
 ---
 
 # IBL5 Architecture Decision Records
@@ -31,6 +31,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0092](0092-postplan-harness-in-repo-with-python-ci.md) | Post-plan harness in-repo with dedicated Python CI | Accepted | Harness ships under `tools/postplan-harness/` gated by a path-scoped `python-tests.yml`; real-data dirs gitignored; `bin/post-plan-now` pinned to the main checkout. |
 | [0095](0095-retire-ibl6-svelte-frontend.md) | Retire the IBL6 SvelteKit frontend; site stays PHP+HTMX | Accepted | Ported IBL6's one page (boxscore) into IBL5 as a PHP module; deleted the second stack + all its CI/Docker/deploy/smoke surface. |
 | [0096](0096-headless-plan-autofire.md) | `/plan-prompt` auto-fires the planning run headlessly | Accepted | `bin/plan-now` runs the drafted prompt as a detached Sonnet 4.6 `/plan`; user-facing forks pre-resolved in-session, `bin/check-plan` verdict logged; the runner auto-queues for automouse by default, `--implement` opts out. |
+| 0097 | Unattended CI-Failure Autofix via bug-pipeline-tick | Accepted |
 
 ## When an ADR is Required
 

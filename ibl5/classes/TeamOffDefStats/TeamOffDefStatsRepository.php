@@ -335,6 +335,7 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
             AND my.visitor_teamid = opp.visitor_teamid
             AND my.home_teamid = opp.home_teamid
             AND my.game_of_that_day = opp.game_of_that_day
+            AND my.game_type = opp.game_type
             AND my.name <> opp.name
         JOIN `ibl_franchise_seasons` fs
             ON fs.team_name = my.name AND fs.season_ending_year = my.season_year

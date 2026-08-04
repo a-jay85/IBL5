@@ -59,6 +59,17 @@ final class StoreSimRecapCliTest extends DatabaseTestCase
         $path = realpath(__DIR__ . '/../../../scripts/storeSimRecap.php');
         self::assertNotFalse($path, 'storeSimRecap.php must exist at the expected path');
         $this->scriptPath = $path;
+
+        // Seed the two box-score rows that VALID_PAYLOAD references: date 2025-01-01,
+        // teams 1 vs 2, game_of_that_day=1. Two rows mirror the production convention
+        // (one per team side). Autocommit mode (commit() was called above) makes them
+        // visible immediately to the child process on its own connection.
+        $seeded = $this->db->query(
+            "INSERT INTO `ibl_box_scores_teams` (`game_date`, `visitor_teamid`, `home_teamid`, `game_of_that_day`, `name`)"
+            . " VALUES ('2025-01-01', 1, 2, 1, 'CliVstr'), ('2025-01-01', 1, 2, 1, 'CliHome')"
+        );
+        self::assertNotFalse($seeded, 'ibl_box_scores_teams fixture must seed without error');
+        self::assertSame(2, $this->db->affected_rows, 'both box-score rows must be inserted');
     }
 
     protected function tearDown(): void
@@ -71,6 +82,10 @@ final class StoreSimRecapCliTest extends DatabaseTestCase
                 $this->db->query('DELETE FROM `ibl_sim_game_recaps` WHERE `sim` = ' . self::SIM);
                 $this->db->query('DELETE FROM `ibl_sim_summaries` WHERE `sim` = ' . self::SIM);
                 $this->db->query('DELETE FROM `ibl_sim_dates` WHERE `sim` = ' . self::SIM);
+                $this->db->query(
+                    "DELETE FROM `ibl_box_scores_teams`"
+                    . " WHERE `game_date` = '2025-01-01' AND `visitor_teamid` = 1 AND `home_teamid` = 2"
+                );
             }
         } catch (\Throwable) {
             // Best-effort — connection may be in an unrecoverable state.
@@ -290,6 +305,89 @@ final class StoreSimRecapCliTest extends DatabaseTestCase
         );
     }
 
+    // ── Validation guard tests ─────────────────────────────────────────────────
+
+    /**
+     * A payload whose game_date has no matching ibl_box_scores_teams row must be
+     * rejected before anything is written. Exit non-zero, stderr carries the
+     * validation failure, and the DB is untouched.
+     */
+    public function testUnmatchedGameRowsExitNonZeroWithoutWriting(): void
+    {
+        $this->repo->queuePendingIfAbsent(self::SIM);
+
+        // 2025-01-02 has no seeded box-score row — validation must reject it.
+        $payloadBadDate = '{"intro_text":"Intro text.","outro_text":"Outro text.",'
+            . '"recap_text":"This is the recap text.","themes":["comeback"],'
+            . '"games":[{"season_year":2025,"game_date":"2025-01-02","visitor_teamid":1,'
+            . '"home_teamid":2,"game_of_that_day":1,"box_id":null,"sort_order":0,'
+            . '"recap_text":"Game recap text."}]}';
+
+        $result = $this->runScript(['--sim=' . self::SIM], $payloadBadDate);
+
+        self::assertNotSame(0, $result['exit_code'], 'exit must be non-zero when no box score matches');
+        self::assertStringContainsString(
+            'payload rejected',
+            $result['stderr'],
+            'stderr must contain "payload rejected"'
+        );
+        self::assertStringContainsString(
+            'do not match an archived box score',
+            $result['stderr'],
+            'stderr must contain the validation failure message'
+        );
+        self::assertSame('', trim($result['stdout']), 'stdout must be empty — no {"ok":true} line');
+        self::assertCount(0, $this->repo->findGameRecaps(self::SIM), 'no game recap rows must be written');
+
+        $summary = $this->repo->find(self::SIM);
+        self::assertTrue(
+            $summary === null || $summary['status'] !== 'done',
+            'ibl_sim_summaries row must be absent or not done'
+        );
+    }
+
+    /**
+     * A payload that matches the date and teams of a real box score but carries the
+     * wrong game_of_that_day index must be rejected even though the game exists.
+     */
+    public function testWrongGameOfThatDayIsRejectedEvenThoughTheGameExists(): void
+    {
+        $this->repo->queuePendingIfAbsent(self::SIM);
+
+        // Date 2025-01-01, teams 1 vs 2 match the seeded box score, but gotd=3 does not.
+        $payloadWrongGotd = '{"intro_text":"Intro text.","outro_text":"Outro text.",'
+            . '"recap_text":"This is the recap text.","themes":["comeback"],'
+            . '"games":[{"season_year":2025,"game_date":"2025-01-01","visitor_teamid":1,'
+            . '"home_teamid":2,"game_of_that_day":3,"box_id":null,"sort_order":0,'
+            . '"recap_text":"Game recap text."}]}';
+
+        $result = $this->runScript(['--sim=' . self::SIM], $payloadWrongGotd);
+
+        self::assertNotSame(0, $result['exit_code'], 'exit must be non-zero when game_of_that_day is wrong');
+        self::assertCount(0, $this->repo->findGameRecaps(self::SIM), 'no game recap rows must be written for wrong gotd');
+    }
+
+    /**
+     * Structural guard: validateGameRowsJoinToBoxScores must execute before markDone
+     * and before the Discord post, so a rejected payload can never reach either.
+     * This is a source-inspection test — no child process, no DB state.
+     */
+    public function testValidationFailureCannotReachTheDiscordPost(): void
+    {
+        $source = file_get_contents(dirname(__DIR__, 3) . '/scripts/storeSimRecap.php');
+        self::assertIsString($source);
+
+        $validate = strpos($source, 'validateGameRowsJoinToBoxScores');
+        $markDone = strpos($source, '$repo->markDone(');
+        $discord  = strpos($source, 'Discord::postToChannel');
+
+        self::assertIsInt($validate, 'The validator must be wired into the store script');
+        self::assertIsInt($markDone);
+        self::assertIsInt($discord);
+        self::assertLessThan($markDone, $validate, 'Validation must run before the write');
+        self::assertLessThan($discord, $markDone, 'The Discord post must stay downstream of the write');
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────────────
 
     /**
@@ -322,8 +420,20 @@ final class StoreSimRecapCliTest extends DatabaseTestCase
             self::fail('tempnam must succeed');
         }
 
+        // Pre-define IBL5_CANONICAL_HOST from the child's env BEFORE config.php runs.
+        // config.php may hard-code a production hostname via define(), which would
+        // defeat the test's env-based control. By defining the constant here first,
+        // config.php's subsequent define() is a no-op (PHP cannot redefine a constant).
+        // The value comes from the child env: empty string when we removed the var (the
+        // default, giving a relative URL), or a test host when the caller passes one.
+        //
+        // ini_set('display_errors', 'stderr') redirects any PHP warnings that arise
+        // during the require (e.g. "Constant already defined" in PHP 8) to STDERR so
+        // they cannot corrupt the JSON on STDOUT that the test assertions parse.
         $bootstrapContent = '<?php' . "\n"
             . "define('PHPUNIT_RUNNING', true);\n"
+            . "define('IBL5_CANONICAL_HOST', (string) getenv('IBL5_CANONICAL_HOST'));\n"
+            . "ini_set('display_errors', 'stderr');\n"
             . 'require ' . var_export($this->scriptPath, true) . ";\n";
 
         try {

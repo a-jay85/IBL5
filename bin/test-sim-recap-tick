@@ -124,6 +124,9 @@ SH
 
     # claude stub: touch sentinel, log call; write valid payload.json unless
     # agent-fails is set; emit usage-limit line when agent-usage-limit is set.
+    # resp.payload (if present): cat its content into payload.json instead of the
+    # built-in default — lets length-specific tests control recap_text size without
+    # overriding the whole stub. srt_reset wipes resp.* so cleanup is automatic.
     cat > "$STUB/claude" <<'SH'
 #!/usr/bin/env bash
 echo "claude $*" >> "$STUB/claude.log"
@@ -133,13 +136,17 @@ if [ -f "$STUB/agent-usage-limit" ]; then
     exit 0
 fi
 if [ ! -f "$STUB/agent-fails" ]; then
-    printf '%s\n' \
-        '{"intro_text":"intro","outro_text":"outro","recap_text":"recap",' \
-        '"themes":["theme1"],' \
-        '"games":[{"season_year":2008,"game_date":"2026-07-23",' \
-        '"visitor_teamid":1,"home_teamid":2,"game_of_that_day":0,' \
-        '"box_id":null,"sort_order":1,"recap_text":"game recap"}]}' \
-        | tr -d '\n' > payload.json
+    if [ -f "$STUB/resp.payload" ]; then
+        cat "$STUB/resp.payload" > payload.json
+    else
+        printf '%s\n' \
+            '{"intro_text":"intro","outro_text":"outro","recap_text":"recap",' \
+            '"themes":["theme1"],' \
+            '"games":[{"season_year":2008,"game_date":"2026-07-23",' \
+            '"visitor_teamid":1,"home_teamid":2,"game_of_that_day":0,' \
+            '"box_id":null,"sort_order":1,"recap_text":"game recap"}]}' \
+            | tr -d '\n' > payload.json
+    fi
 fi
 exit 0
 SH
@@ -522,6 +529,55 @@ PHPEOF
 else
     srt_fail "payload_contract — store.stdin not created (ssh stub did not record stdin)"
 fi
+
+# ── length_warn_fires_below_band ──────────────────────────────────────────────
+# A single-game payload with a ~280-char recap_text (avg < 504) must log the
+# prose-length warning and still exit 0 (the store already succeeded).
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+{
+    printf '%s' '{"intro_text":"intro","outro_text":"outro","recap_text":"recap","themes":["t"],'
+    printf '%s' '"games":[{"season_year":2008,"game_date":"2026-07-23","visitor_teamid":1,'
+    printf '%s' '"home_teamid":2,"game_of_that_day":0,"box_id":null,"sort_order":1,"recap_text":"'
+    printf '%280s' | tr ' ' 'x'
+    printf '%s' '"}]}'
+} > "$STUB/resp.payload"
+srt_run
+srt_expect_eq "length_warn_fires_below_band — exit 0" 0 "$SRT_RC"
+srt_log_has "$STUB" tick.out "stored"              "length_warn_fires_below_band — stored logged"
+srt_log_has "$STUB" tick.out "below the exemplar band" "length_warn_fires_below_band — warning logged"
+
+# ── length_warn_silent_inside_band ────────────────────────────────────────────
+# A single-game payload with a ~570-char recap_text (avg >= 504) must NOT log
+# the warning — prose is within the exemplar band.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+{
+    printf '%s' '{"intro_text":"intro","outro_text":"outro","recap_text":"recap","themes":["t"],'
+    printf '%s' '"games":[{"season_year":2008,"game_date":"2026-07-23","visitor_teamid":1,'
+    printf '%s' '"home_teamid":2,"game_of_that_day":0,"box_id":null,"sort_order":1,"recap_text":"'
+    printf '%570s' | tr ' ' 'x'
+    printf '%s' '"}]}'
+} > "$STUB/resp.payload"
+srt_run
+srt_expect_eq "length_warn_silent_inside_band — exit 0" 0 "$SRT_RC"
+srt_log_lacks "$STUB" tick.out "below the exemplar band" "length_warn_silent_inside_band — no warning"
+
+# ── length_warn_does_not_change_store_outcome ─────────────────────────────────
+# A below-band payload must not trigger a park: the store outcome is unchanged
+# (the check is advisory only), so the tick exits 0 and never parks the sim.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+{
+    printf '%s' '{"intro_text":"intro","outro_text":"outro","recap_text":"recap","themes":["t"],'
+    printf '%s' '"games":[{"season_year":2008,"game_date":"2026-07-23","visitor_teamid":1,'
+    printf '%s' '"home_teamid":2,"game_of_that_day":0,"box_id":null,"sort_order":1,"recap_text":"'
+    printf '%280s' | tr ' ' 'x'
+    printf '%s' '"}]}'
+} > "$STUB/resp.payload"
+srt_run
+srt_expect_eq "length_warn_does_not_change_store_outcome — exit 0" 0 "$SRT_RC"
+srt_log_lacks "$STUB" tick.out "parked" "length_warn_does_not_change_store_outcome — no park"
 
 # ══ PROMPT GROUP — real bin/sim-recap-prompt ══════════════════════════════════
 

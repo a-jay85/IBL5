@@ -88,8 +88,21 @@ try {
     fail('malformed payload: ' . $e->getMessage());
 }
 
-// ── Write, then confirm ───────────────────────────────────────────────────────
+// ── Validate against the archive (fail closed BEFORE anything is written) ─────
+// Structural validity is not enough. Sim 725's payload parsed cleanly and stored
+// 49 rows, but every row carried game_of_that_day = 1, so the display filter
+// matched one game per date and 42 recaps became unreachable. A payload whose
+// games cannot render must never become a row. Nothing below this point runs on
+// failure: fail() is `never`, the write is downstream, and the Discord post is
+// downstream of the write — so an aborted store posts nothing.
 $repo = new \SimRecap\SimSummaryRepository($mysqli_db);
+try {
+    $repo->validateGameRowsJoinToBoxScores($payload->getGames());
+} catch (\Throwable $e) {
+    fail('payload rejected: ' . $e->getMessage());
+}
+
+// ── Write, then confirm ───────────────────────────────────────────────────────
 $repo->markDone(
     $sim,
     $payload->getIntroText(),

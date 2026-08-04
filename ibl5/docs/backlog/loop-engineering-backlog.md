@@ -23,6 +23,18 @@ last_verified: 2026-08-05
 
 ---
 
+## Roll-up
+
+| Status | Count |
+|--------|------:|
+| ⬜ Open | 10 |
+| 📋 Planned | 3 |
+| ◑ Partial | 2 |
+| ✅ Implemented | 12 |
+| 🚫 Declined | 0 |
+
+---
+
 ## Entries
 
 | # | Title | Status | Automouse | Effort |
@@ -50,9 +62,9 @@ last_verified: 2026-08-05
 | L21 | Phase 5.0 parsers fail-open on an unclosed code fence (conformance check covers nothing) | ⬜ Open | 🟥 | S |
 | L22 | Sweep queue-vs-review disposition gates across other skills/scripts | ⬜ Open | 🟦 | S |
 | L23 | sim-recap degraded path emits no Discord signal; qctx() failure ships roster-blind with CI green | 📋 Planned | 🟦 | S |
-| L24 | Phase 5.0 conformance is path-level only; planned method names absent from diff pass undetected | 📋 Planned | 🟥 | S |
-| L25 | CI-wiring gap: matrix CLI-executable rows may live in jobs the PR's own path filters never trigger | 📋 Planned | 🟥 | S |
-| L26 | Gate 15 never examines silent-fallback paths when the hold is security-justified | 📋 Planned | 🟥 | S |
+| L24 | Phase 5.0 conformance is path-level only; planned method names absent from diff pass undetected | ✅ Implemented | — | S |
+| L25 | CI-wiring gap: matrix CLI-executable rows may live in jobs the PR's own path filters never trigger | ✅ Implemented | — | S |
+| L26 | Gate 15 never examines silent-fallback paths when the hold is security-justified | ✅ Implemented | — | S |
 | L27 | /post-plan should sweep Out-of-Scope deferral phrases and open a backlog entry per hit | ⬜ Open | 🟥 | S |
 
 ### L1 Plan dependency DAG
@@ -185,34 +197,13 @@ last_verified: 2026-08-05
 **Status (2026-07-31):** 📋 Planned — `~/claude-plans/sim-recap-degraded-discord-alert.md` (written 2026-07-31). Not yet implemented. 🟦.
 
 ### L24 Phase 5.0 conformance is path-level only; planned method names absent from diff pass undetected
-*(discovered 2026-07-31 during #1753)*
-**Location:** `.claude/skills/post-plan/_phase-5-final-verification.md` — greps for the test *file path* from the Verification Matrix (`grep -qF "$T" /tmp/post-plan-changed-$PPID`), not individual method names. `.claude/review-shared/_plan-verification.md`.
-**Problem:** When an implementer substitutes weaker test methods for plan-specified ones, Phase 5.0 passes — the file path appeared in the diff. This is how 4 of the 5 plan-specified test cases in PR #1753 were replaced without triggering a `MISSING:` signal. Sibling entry L21 covers the fail-open from unclosed fences; this entry covers the fail-open from path-only conformance.
-**Suggested direction:** Extend Phase 5.0 to extract planned test method names from the matrix and phase bodies and emit `MISSING:` for any method absent from the diff. *Confirmed uncovered by #1665/#1667/#1668/#1714 (dedup 2026-07-31).* Route: one `/plan` with L25/L26 (C2/C3), `plan-architect-xhigh` (ship-pipeline invariant), `auto_merge: false`.
-**Risk if untouched:** Any future implementer can substitute weaker tests than the plan specified; CI stays green and post-plan conformance passes silently.
-**Closes gap:** root cause of gaps #6 and #7 (and the general weakened-test class) from `$HOME/claude-plans/sim-recap-testing-gaps-breakdown.md`
-**Dedup:** reconciled 2026-07-31 — uncovered by #1668 / #1665 / #1667 / #1714.
-**Status (2026-07-31):** 📋 Planned — `~/claude-plans/plan-c-verification-conformance.md` (written 2026-07-31; covers L24+L25+L26 as one PR). 🟥.
+➜ L24 Phase 5.0 conformance is path-level only — ✅ Implemented (2026-08-04): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
 ### L25 CI-wiring gap: matrix CLI-executable rows may live in jobs the PR's own path filters never trigger
-*(discovered 2026-07-31 during #1753)*
-**Location:** `.claude/skills/post-plan/_phase-5-final-verification.md`; `.github/workflows/tests.yml` path-filter coupling (see ci-backlog 6.1 for the structural fix).
-**Problem:** A `CLI-executable / post-impl` matrix row can be "wired into CI" on paper but in a job whose path filter the PR never triggers. Neither gate 15 nor gate 16 asks whether the CI job actually fires on the PR's changed paths. Matrix rows 11 and 20 in PR #1753 were one-shot commands that provided zero permanent regression protection.
-**Suggested direction:** Add a residual check: for each `CLI-executable` matrix row, either (a) the row's CI job is triggered by the PR's path filter, or (b) the row is explicitly marked `one-shot`. *Dedup completed 2026-07-31: uncovered by #1668/#1665/#1667/#1714 — #1668 executes CLI matrix cells locally once more but covers neither half of the CI-wiring question.* Route: one `/plan` with L24/L26 (C1/C3), `plan-architect-xhigh`, `auto_merge: false`.
-**Risk if untouched:** A test that appears in a CI job but whose job is never triggered by the PR's path filters provides zero coverage — indistinguishable from a wired test until examined.
-**Closes gap:** #4 (meta-tooling half, complementary to ci-backlog 6.1) from `$HOME/claude-plans/sim-recap-testing-gaps-breakdown.md`
-**Dedup:** reconciled 2026-07-31 — uncovered by #1668 / #1665 / #1667 / #1714.
-**Status (2026-07-31):** 📋 Planned — `~/claude-plans/plan-c-verification-conformance.md` (written 2026-07-31; covers L24+L25+L26 as one PR). 🟥.
+➜ L25 CI-wiring gap: matrix CLI-executable rows in jobs the PR's own path filters never trigger — ✅ Implemented (2026-08-04): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
 ### L26 Gate 15 never examines silent-fallback paths when the hold is security-justified
-*(discovered 2026-07-31 during #1753)*
-**Location:** `.claude/skills/plan/SKILL.md` Step 4 gate 15 (loud-failure signal lever list); the gate currently fires only when the hold is justified by a *verification gap*.
-**Problem:** Gate 15 includes "a loud-failure signal replacing a silent fallback" in its lever list. It did not engage for PR #1753 because the hold was justified on gate-14b security-surface grounds — not a verification gap. The `qctx()` failure → `WARNING` → `{}` → roster-blind-recap path was never examined. The detectability concern is orthogonal to what justifies the hold.
-**Suggested direction:** Extend gate 15 (do not add a new gate — meta-tooling-bar.md extend-before-add). Add a named trigger: a new silent-fallback / degraded path in a synchronous sim path or a `bin/*-tick` script requires a loud signal (Discord), independent of what justifies the hold. *Confirmed uncovered by #1665/#1667/#1668/#1714 (dedup 2026-07-31).* Route: one `/plan` with L24/L25 (C1/C2), `plan-architect-xhigh`, `auto_merge: false`.
-**Risk if untouched:** Future silent-fallback paths in ship-adjacent code will not be examined at plan time when the plan hold is security-motivated rather than verification-gap-motivated.
-**Closes gap:** #9 (meta-tooling — prevents future versions of this class) from `$HOME/claude-plans/sim-recap-testing-gaps-breakdown.md`
-**Dedup:** reconciled 2026-07-31 — uncovered by #1668 / #1665 / #1667 / #1714.
-**Status (2026-07-31):** 📋 Planned — `~/claude-plans/plan-c-verification-conformance.md` (written 2026-07-31; covers L24+L25+L26 as one PR). 🟥.
+➜ L26 Gate 15 never examines silent-fallback paths when hold is security-justified — ✅ Implemented (2026-08-04): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
 ### L27 /post-plan should sweep Out-of-Scope deferral phrases and open a backlog entry per hit
 *(discovered 2026-07-31 during #1753)*

@@ -164,6 +164,24 @@ def parse_critical_files(content: str) -> list[tuple]:
     return out
 
 
+def parse_required_test_methods(content: str) -> list[str]:
+    """List of bare method names from `## Required Test Methods` (fenced blocks stripped).
+
+    Mirrors the bash idiom in _phase-5-final-verification.md: `cf_section_named` +
+    sed bullet extraction. Absent section → []. Fenced examples are stripped by
+    _strip_fenced before the section is extracted, so illustrative bullets inside a
+    fence never yield phantom entries (the failure `critical-files-parser-unification`
+    hit on the old naive parse).
+    """
+    section = _section("\n".join(_strip_fenced(content)), "Required Test Methods")
+    methods = []
+    for line in section.splitlines():
+        m = re.match(r"^[*\-]\s+`?([A-Za-z_][A-Za-z0-9_]*)`?", line.strip())
+        if m:
+            methods.append(m.group(1))
+    return methods
+
+
 def _resolve_variant(slug: str, base_dir: str, info: PlanInfo) -> str:
     """Highest-numbered plan variant for `slug` in `base_dir`.
 
@@ -222,6 +240,7 @@ def locate_plan(slug: str, plans_dir: str | None = None, explicit_path: str | No
     if info.has_matrix:
         info.planned_test_paths, info.truly_manual_rows = parse_matrix(content)
     info.critical_files = parse_critical_files(content)
+    info.required_test_methods = parse_required_test_methods(content)
     if info.has_security:
         info.security_section = _section(content, "Security")[:4000]
     if info.has_reuse:

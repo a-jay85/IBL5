@@ -21,7 +21,7 @@ grep -qF "$T" /tmp/post-plan-changed-$PPID || echo "MISSING: $T (matrix planned 
 
 For each `MISSING:` test the impl silently dropped planned coverage — now likelier to matter, since the matrix carries the negative-path and security rows `/plan` gates 9 and 12 require. Write the missing test, run it green, and checkpoint (same as Phase 6 test authoring). Skip a planned test **only** if its target behavior was cut from the implementation; note that in a PR comment rather than writing a hollow test.
 
-A `MISSING:` item is **resolved** when its test was authored-and-run-green OR was explicitly cut-from-implementation with a PR comment noting the cut. An item that is neither — a planned test the diff never wrote and which you did not author or explicitly cut — is **unresolved**.
+A `MISSING:` item is **resolved** when its test was authored-and-run-green OR was explicitly cut-from-implementation with a PR comment noting the cut. An item that is neither — a planned test the diff never wrote and which you did not author or explicitly cut — is **unresolved**. A `MISSING-METHOD:` item resolves identically — the named method is authored and run green, **or** explicitly cut with a PR comment stating why the plan-named assertion was dropped; anything else is **unresolved** and holds the arm. Renaming the method in the plan after the fact is not a resolution.
 
 **Plan→file conformance.** The same failure mode that drops a planned test also drops a planned *non-test* edit: an impl agent can end its turn with a summary claiming files were changed that never landed in the commit (PR #923 claimed workflow + rule edits that were absent). The test-path check above only covers test files, so additionally verify every **must-appear** file in the plan's `## Critical Files` section actually shows up in the diff. A Critical File is **must-appear by default** — it is **exempt only when its annotation contains a parenthesized group whose contents include a canonical token** (implemented in `bin/lib/critical-files.sh`, the single source of truth for this rule). A keyword in surrounding prose does **not** exempt — only parentheses signal "this is a marker, not a description." Canonical markers: `(reference)`, `(read-only)`, `(read-only reference)`, `(verify)`, `(verification)`, `(template)`, `(no-edit)`, `(no-change)`, `(unchanged)`, `(context)`, `(conditional)` — case-insensitive; tokens match as **whole words** (`(filename references the affected class)` is not exempt). An explanatory tail inside the same parens is allowed for the non-`conditional` tokens (`(reference — pattern to mirror)`). Use `(conditional)` for entries that may or may not appear in the diff depending on implementation choices — **`conditional` must *open* the group and be immediately followed by `)` or a separator (`—`/`–`/`-`/`:`/`;`/`,`)**: `(conditional — Phase 4 only)` → EXEMPT; `(conditional Phase 4 only)` → MUST_APPEAR. Bare entries AND change-described entries (e.g. `— add the foo helper`, `(new)`, `(header comment only)`) are all must-appear. **Failure mode by design: loud and resolvable** — a reference annotated without a recognized parenthesized marker yields a `MISSING-FILE:` that the resolution step below dismisses with a one-line PR comment, vs. the old rule's silent, total non-coverage. Across the 259-plan corpus (1578 `## Critical Files` entries), 61 annotations that the old unscoped keyword match exempted are must-appear under the current rule — 46 of the 1121 entries carrying a parenthesized group, plus all 15 prose-only exemptions; pre-existing plans carrying a prose-only exemption now yield a MISSING-FILE that path **(b)** below dismisses with a one-line PR comment — the accepted, bounded migration cost (only plans whose branch is still unmerged can ever re-run Phase 5.0). Plans with no `## Critical Files` section produce an empty loop and are silently skipped.
 
@@ -47,7 +47,25 @@ done
 
 For each `MISSING-FILE:`, the impl dropped a planned change. Either (a) make the change now — the plan's implementation steps describe it (this is the #923 remedy: finish the work), run any relevant check, and checkpoint (commit + push) — or (b) if the file was legitimately cut from scope, or is a reference the plan author forgot to annotate, note that in a PR comment. A `MISSING-FILE:` item is **resolved** by (a) or (b); otherwise **unresolved**.
 
-At Phase 5.0 END, append each remaining **UNRESOLVED** `MISSING:` and `MISSING-FILE:` item (label + path + reason) to `/tmp/post-plan-missing-tests-$PPID`, one per line. Authored-green / implemented-and-checkpointed / cut-with-comment items are NOT written. This bridge file is consulted by the Phase 6.5 auto-merge gate.
+**Plan→method conformance.** The path check above proves the *file* landed; this confirms the plan's named methods landed. For each name the plan lists under `## Required Test Methods` (fenced examples stripped width-aware), grep the diff *body* — `git diff --name-only` cannot see declarations:
+
+```bash
+# Plan→method conformance. The path check above proves the FILE landed; this
+# proves the plan's NAMED methods landed. Reads the diff BODY (the name-only
+# file cannot see declarations). Width-aware fence stripping is mandatory: a
+# fenced example list would yield a phantom MISSING-METHOD: with no resolution
+# path — the failure `critical-files-parser-unification` hit.
+git diff origin/master...HEAD > /tmp/post-plan-diff-$PPID
+source "$(git rev-parse --show-toplevel)/bin/lib/critical-files.sh"
+cf_section_named "$PLAN_FILE" "Required Test Methods" \
+  | sed -nE 's/^[[:space:]]*[-*][[:space:]]+`?([A-Za-z_][A-Za-z0-9_]*)`?.*/\1/p' \
+  | while IFS= read -r M; do
+      grep -qE "(function|def)[[:space:]]+$M\b" /tmp/post-plan-diff-$PPID \
+        || echo "MISSING-METHOD: $M (plan required a test method the diff never wrote)"
+    done
+```
+
+At Phase 5.0 END, append each remaining **UNRESOLVED** `MISSING:`, `MISSING-FILE:` and `MISSING-METHOD:` item (label + path-or-method-name + reason) to `/tmp/post-plan-missing-tests-$PPID`, one per line. Authored-green / implemented-and-checkpointed / cut-with-comment items are NOT written. This bridge file is consulted by the Phase 6.5 auto-merge gate.
 
 Then — **last action of Phase 5.0, after the appends above** — write the done-marker:
 

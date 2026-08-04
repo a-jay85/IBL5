@@ -93,6 +93,7 @@ class PlanInfo:
     has_reuse: bool = False
     planned_test_paths: list[str] = field(default_factory=list)
     critical_files: list[tuple] = field(default_factory=list)  # (path, annotation, exempt)
+    required_test_methods: list[str] = field(default_factory=list)
     truly_manual_rows: list[str] = field(default_factory=list)
     security_section: str = ""
     reuse_section: str = ""
@@ -204,4 +205,6 @@ class RunResult:
                 d["plan"].pop("variant_selection", None)
             if not d["plan"].get("rejected"):
                 d["plan"].pop("rejected", None)
+            if not d["plan"].get("required_test_methods"):
+                d["plan"].pop("required_test_methods", None)
         return json.dumps(d, indent=1, default=str)

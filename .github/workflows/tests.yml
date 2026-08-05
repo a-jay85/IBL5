@@ -328,20 +328,25 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+    # create-config defaults to 'true': scripts/ require_once __DIR__ . '/../config.php',
+    # which is gitignored. Without it PHPStan reports requireOnce.fileNotFound for every
+    # such script — errors a developer never sees locally, and which the master
+    # update-baselines job (create-config default 'true') never bakes into the baseline.
     - name: Setup PHP environment
       uses: ./.github/actions/setup-php-env
-      with:
-        create-config: 'false'
 
+    # Key prefix bumped to v2 to evict caches written before config.php existed in this
+    # job. PHPStan's result cache does not invalidate a requireOnce.fileNotFound entry
+    # when the missing file later appears, so a restored v1 cache replays stale errors.
     - name: Cache PHPStan result cache
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
           ibl5/tmp
           ibl5/tmp-tests
-        key: phpstan-${{ hashFiles('ibl5/phpstan.neon', 'ibl5/phpstan-tests.neon', 'ibl5/phpstan-rules/**') }}
+        key: phpstan-v2-${{ hashFiles('ibl5/phpstan.neon', 'ibl5/phpstan-tests.neon', 'ibl5/phpstan-rules/**') }}
         restore-keys: |
-          phpstan-
+          phpstan-v2-
 
     - name: Run PHPStan
       working-directory: ibl5

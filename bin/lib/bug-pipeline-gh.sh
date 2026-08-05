@@ -71,9 +71,24 @@ bpgh_ensure_issue() {
         [ -n "$title" ] || title="Bug pipeline report #${report_id}"
     fi
 
+    # Attachment references, plain text only. Both the filename and the URL are
+    # attacker-controlled, so emit `- name (type) — url`, never a `[name](url)`
+    # markdown link (a crafted filename could close the link and inject markup).
+    # Built here, then passed as ONE MORE printf %s ARGUMENT below — never into the
+    # format string — so a filename containing `%s%n` cannot corrupt or crash printf.
+    local att_block
+    att_block="$(printf '%s' "$row_json" | jq -r '
+        (.attachments // [])
+        | if length > 0
+          then "\n---\nAttachments:\n"
+               + ( map("- " + (.filename // "(unnamed)")
+                        + " (" + (.content_type // "unknown") + ") — "
+                        + (.original_url // "(no url)")) | join("\n") )
+          else "" end' 2>/dev/null)"
+
     local body
-    body="$(printf 'Class: %s\nSeverity: %s\nReporter (discord_author_id): %s\nReport id: %s\nThread: %s\n\n---\n%s\n' \
-        "$class" "$sev" "$author" "$report_id" "$thread_id" "$original_text")"
+    body="$(printf 'Class: %s\nSeverity: %s\nReporter (discord_author_id): %s\nReport id: %s\nThread: %s\n\n---\n%s\n%s' \
+        "$class" "$sev" "$author" "$report_id" "$thread_id" "$original_text" "$att_block")"
 
     local url
     if url="$("$GH_BIN" issue create --repo "$BUG_PIPELINE_ISSUE_REPO" \

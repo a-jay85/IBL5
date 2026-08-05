@@ -53,6 +53,34 @@ bpt_set_claude_result '{"class":"not_a_thing"}'
 bpt_run
 bpt_file_absent "$STUB/gh.log" "not_a_thing makes zero gh calls"
 
+# ── Phase 9 — attachment references in the issue body ─────────────────────────
+# The gh stub records argv one-per-line into gh.args.log, so the --body value (with
+# its attachment lines) is greppable there. Two attachments: a normal one, and one
+# whose filename contains `%s%n` — it must appear LITERALLY, proving att_block is a
+# printf %s argument and never enters the format string.
+_ATT='[{"attachment_id":"700000000000000001","filename":"crash.png","content_type":"image/png","local_path":"/c/x.png","original_url":"https://cdn.discordapp.com/a/crash.png"},{"attachment_id":"700000000000000002","filename":"%s%n-evil.png","content_type":"image/png","local_path":null,"original_url":"https://cdn.discordapp.com/a/evil.png"}]'
+BUG_ATT='[{"id":8,"status":"queued","class":null,"original_text":"crash on trade","thread_id":null,"issue_number":null,"attachments":'"$_ATT"'}]'
+
+bpt_reset; bpt_set_actionable "$BUG_ATT"
+bpt_set_claude_result '{"class":"bug","bug_has_enough_info":true,"issue_title":"Trade crash","severity":"low"}'
+STUB_ISSUE_NUMBER=4300 bpt_run
+bpt_log_has "$STUB" gh.args.log "Attachments:" "P9(a): attachment block header in the issue body"
+bpt_log_has "$STUB" gh.args.log "- crash.png (image/png) — https://cdn.discordapp.com/a/crash.png" "P9(a): line carries name, content_type, and URL as plain text"
+bpt_log_lacks "$STUB" gh.args.log "[crash.png](" "P9(a): NOT a markdown link"
+bpt_log_has "$STUB" gh.args.log "%s%n-evil.png" "P9(b): %s%n filename appears literally (printf %s argument, not format string)"
+
+# ── P9(c) — a row with no attachments emits no attachment block ───────────────
+bpt_reset; bpt_set_actionable "$BUG_NEW"
+bpt_set_claude_result '{"class":"bug","bug_has_enough_info":true,"issue_title":"t","severity":"low"}'
+bpt_run
+bpt_log_lacks "$STUB" gh.args.log "Attachments:" "P9(c): no attachments → no attachment block"
+
+# ── P9(d) — a failing GH_BIN with attachments still returns 0 ─────────────────
+bpt_reset; bpt_set_actionable "$BUG_ATT"
+bpt_set_claude_result '{"class":"bug","bug_has_enough_info":true,"issue_title":"t","severity":"low"}'
+GH_FAIL=1 bpt_run
+bpt_expect_eq "P9(d): gh failure with attachments still exits 0" 0 "$BPT_RC"
+
 # ── Bootstrap idempotency: --bootstrap-issues twice, exit 0, code-repo label ──
 bpt_reset
 run_bootstrap() { PATH="$STUB/bin:$PATH" BUG_PIPELINE_ISSUE_REPO="test/bugs-fake" "$SELF_DIR/bug-pipeline-cron-setup" --bootstrap-issues >/dev/null 2>&1; }

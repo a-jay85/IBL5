@@ -105,7 +105,12 @@ export BUG_PIPELINE_HUNT_PROMPT="$HUNT_TMPL"
 _drv() { bash -c 'source "$1"; shift; "$@"' bpt-unit-shim "$BPT_DRIVER" "$@" 2>/dev/null; }
 
 # One DB-shaped attachment (Phase 6 .attachments enrichment); .filename is the display name.
-ATT_JSON='[{"attachment_id":"700000000000000001","filename":"screenshot-crash.png","content_type":"image/png","local_path":"/cache/x.png","original_url":"https://cdn.discordapp.com/a/b/screenshot-crash.png"}]'
+# local_path must point at a file that REALLY EXISTS: att_line re-checks the filesystem and
+# renders `cached=none` for a path the 7-day prune has already deleted, so a fabricated path
+# here would assert the degraded shape while claiming to test the happy one.
+_LIVE_CACHE="$STUB/live-cache"; mkdir -p "$_LIVE_CACHE"
+_LIVE_PNG="$_LIVE_CACHE/700000000000000001.png"; : > "$_LIVE_PNG"
+ATT_JSON="$(jq -nc --arg p "$_LIVE_PNG" '[{attachment_id:"700000000000000001",filename:"screenshot-crash.png",content_type:"image/png",local_path:$p,original_url:"https://cdn.discordapp.com/a/b/screenshot-crash.png"}]')"
 
 # ── Row 38 — all three templates carry the {{attachments_text}} placeholder ────
 # A template missing it substitutes to nothing and fails silently, so grep each file.
@@ -117,7 +122,18 @@ done
 # ── Row 39 — rendered classify, gather, AND hunter each contain the attachment name ──
 _att="$(_drv att_line "$ATT_JSON")"
 bpt_log_has_str() { case "$2" in *"$3"*) bpt_ok "$1";; *) bpt_fail "$1 — '$3' absent";; esac; }
-bpt_log_has_str "r39: att_line emits the marker" "$_att" "[attachment: screenshot-crash.png (image/png) cached=/cache/x.png url=https://cdn.discordapp.com/a/b/screenshot-crash.png]"
+bpt_log_has_str "r39: att_line emits the marker" "$_att" "[attachment: screenshot-crash.png (image/png) cached=$_LIVE_PNG url=https://cdn.discordapp.com/a/b/screenshot-crash.png]"
+
+# ── Row 39b — a pruned cache file degrades to cached=none, not a dangling path ─────
+# prune_attachment_cache deletes bytes at 7 days but leaves local_path set in the DB. Rendering
+# the stale path would tell triage to read a file that is gone. Same JSON, file removed.
+_att_gone="$(_drv att_line "$(jq -nc --arg p "$_LIVE_CACHE/deleted-by-prune.png" \
+    '[{attachment_id:"700000000000000002",filename:"gone.png",content_type:"image/png",local_path:$p,original_url:"https://cdn.discordapp.com/a/b/gone.png"}]')")"
+bpt_log_has_str "r39b: vanished local_path renders cached=none" "$_att_gone" "cached=none"
+case "$_att_gone" in
+    *deleted-by-prune.png*) bpt_fail "r39b: stale local_path leaked into the prompt";;
+    *) bpt_ok "r39b: the dangling path itself is absent from the render";;
+esac
 _classify_rendered="$(_drv render_prompt "$(cat "$CLASSIFY_TMPL")" "a bug" "(no thread yet)" "$_att")"
 bpt_log_has_str "r39: classify prompt contains the attachment name" "$_classify_rendered" "screenshot-crash.png"
 _gather_rendered="$(_drv render_prompt "$(cat "$GATHER_TMPL")" "a request" "(no thread yet)" "$_att")"
@@ -221,14 +237,23 @@ _cwdguard="$(mktemp -d)"
 if [ -e "$_cwdguard/repo-old.txt" ]; then bpt_ok "P4: empty ATTACHMENT_CACHE_DIR is a no-op (-n guard blocks find '' -delete)"; else bpt_fail "P4: -n guard failed — find deleted cwd files"; fi
 rm -rf "$_cwdguard"
 
-# ── Prune P5 — cross-process default: driver default == bot cacheDir() default ─
-# A silent drift means the bot writes bytes nobody prunes (or the driver prunes an
-# empty dir forever). CLI-executable source-consistency check, no node run.
+# ── Prune P5 — cross-process default across ALL THREE participants ─────────────
+# THREE processes hold a copy of this path, not two: the bot WRITES bytes there
+# (attachments.ts cacheDir()), the driver PRUNES them (bin/bug-pipeline-tick), and the PHP
+# validator ACCEPTS OR REJECTS paths under it (AttachmentInputValidator::DEFAULT_CACHE_DIR,
+# which is a literal because PHP cannot expand `~`). Any pair agreeing while the third drifts
+# is silent in a different way — bot/driver drift orphans bytes; a drifted PHP root rejects
+# every well-formed local_path, so every attachment degrades to URL-only with no error anywhere.
+# CLI-executable source-consistency check, no node/php run.
 _cache_suffix="/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/bug-pipeline/attachments"
 _drv_default="$(bash -c 'unset BUG_PIPELINE_ATTACHMENT_CACHE_DIR; source "$1"; printf %s "$ATTACHMENT_CACHE_DIR"' bpt-default-shim "$BPT_DRIVER" 2>/dev/null)"
 bpt_expect_eq "P5: driver default = \$HOME$_cache_suffix" "$HOME$_cache_suffix" "$_drv_default"
 _bot_src="$(dirname "$BPT_DRIVER")/../ibl5/IBLbot/src/bug-bot/attachments.ts"
 if grep -qF "os.homedir()}$_cache_suffix" "$_bot_src"; then bpt_ok "P5: bot cacheDir() default suffix matches the driver"; else bpt_fail "P5: bot/driver cache-path drift"; fi
+# Third copy: the PHP constant is absolute, so compare it to the driver's RESOLVED default.
+_php_src="$(dirname "$BPT_DRIVER")/../ibl5/classes/BugPipeline/AttachmentInputValidator.php"
+_php_default="$(sed -n "s/.*DEFAULT_CACHE_DIR = '\([^']*\)'.*/\1/p" "$_php_src")"
+bpt_expect_eq "P5: PHP DEFAULT_CACHE_DIR = the driver's resolved default" "$_drv_default" "$_php_default"
 
 echo "----"
 [ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"

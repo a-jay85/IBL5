@@ -119,10 +119,7 @@ class AttachmentInputValidatorTest extends TestCase
             'url disallowed host'            => [['original_url' => 'https://evil.example.com/a.png']],
             'url lookalike host'             => [['original_url' => 'https://cdn.discordapp.com.evil.com/a.png']],
             'url too long'                   => [['original_url' => 'https://cdn.discordapp.com/' . str_repeat('a', 2100)]],
-            'local_path traversal'           => [['local_path' => '/tmp/bp-cache/../../../etc/passwd']],
-            'local_path wrong root'          => [['local_path' => '/etc/1-2.png']],
-            'local_path bad extension'       => [['local_path' => '/tmp/bp-cache/1-2.exe']],
-            'local_path not string'          => [['local_path' => 42]],
+            // local_path lives in degradableLocalPaths() below — it degrades, it does not drop.
             'filename empty'                 => [['filename' => '']],
             'filename too long'              => [['filename' => str_repeat('a', 256)]],
             'filename control char'          => [['filename' => "shot\x00.png"]],
@@ -132,6 +129,46 @@ class AttachmentInputValidatorTest extends TestCase
             'file_size string'               => [['file_size' => '12']],
             'file_size negative'             => [['file_size' => -1]],
             'file_size over cap'             => [['file_size' => 10485761]],
+        ];
+    }
+
+    /**
+     * local_path is the ONE field that degrades instead of dropping: null is already its
+     * failed-download state, so nulling a bad path keeps an entry the rest of the pipeline
+     * handles natively rather than discarding an independently-valid original_url + filename
+     * + content_type. The rejected path itself must never reach the returned record.
+     *
+     * @param mixed $badPath
+     */
+    #[DataProvider('degradableLocalPaths')]
+    public function testMalformedLocalPathDegradesToNullAndIsLogged(mixed $badPath): void
+    {
+        $reject = null;
+        $out = $this->validator->validateAll([$this->entry(['local_path' => $badPath])], $reject);
+
+        $this->assertCount(1, $out, 'the entry survives — only local_path is lost');
+        $this->assertNull($out[0]['local_path'], 'the malformed path must not reach the DB');
+        // `?? ''` rather than a preceding assertNotNull: the empty string cannot contain
+        // 'local_path', so this single assertion proves both non-null AND the right reason.
+        $this->assertStringContainsString(
+            'local_path',
+            $reject ?? '',
+            'a silent degrade is the drift an operator needs to see'
+        );
+        // Every other field is untouched.
+        $this->assertSame('700000000000000001', $out[0]['attachment_id']);
+        $this->assertSame('shot.png', $out[0]['filename']);
+    }
+
+    /** @return array<string, array{0: mixed}> */
+    public static function degradableLocalPaths(): array
+    {
+        return [
+            'traversal'      => ['/tmp/bp-cache/../../../etc/passwd'],
+            'wrong root'     => ['/etc/1-2.png'],
+            'bad extension'  => ['/tmp/bp-cache/1-2.exe'],
+            'not a string'   => [42],
+            'array'          => [['/tmp/bp-cache/1-2.png']],
         ];
     }
 

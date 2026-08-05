@@ -113,6 +113,40 @@ describe('validateAndSanitize', () => {
         expect(s!.filename).toBe('abc.png');
     });
 
+    // The PHP validator drops the WHOLE entry on an empty or >255-BYTE filename, so a name that
+    // strips to nothing or overflows the VARCHAR(255) budget would silently cost a valid record.
+    // Neither shape is representable after displayFilename().
+    it('falls back to the attachment id when the name strips to empty', () => {
+        const s = validateAndSanitize(MESSAGE_ID, makeAttachment({ name: '\x00\x1f\x7f' }));
+        expect(s!.filename).toBe(`attachment-${ATTACHMENT_ID}`);
+    });
+
+    it('falls back to the attachment id when the name is already empty', () => {
+        const s = validateAndSanitize(MESSAGE_ID, makeAttachment({ name: '' }));
+        expect(s!.filename).toBe(`attachment-${ATTACHMENT_ID}`);
+    });
+
+    it('truncates the display filename to 255 BYTES, not 255 characters', () => {
+        // 200 CJK chars = 600 UTF-8 bytes. A .slice(0, 255) would pass a length check and
+        // still overflow the column; the byte budget is what the DB actually enforces.
+        const s = validateAndSanitize(MESSAGE_ID, makeAttachment({ name: '実'.repeat(200) }));
+        expect(Buffer.byteLength(s!.filename, 'utf8')).toBeLessThanOrEqual(255);
+        expect(s!.filename.length).toBe(85); // 85 × 3 bytes = 255 exactly
+    });
+
+    it('never splits a multibyte sequence at the truncation point', () => {
+        // 128 × 2-byte chars = 256 bytes: the cut lands mid-sequence and must back off.
+        const s = validateAndSanitize(MESSAGE_ID, makeAttachment({ name: 'é'.repeat(128) }));
+        expect(s!.filename).not.toContain('�'); // no replacement char ⇒ no split sequence
+        expect(Buffer.byteLength(s!.filename, 'utf8')).toBe(254);
+    });
+
+    it('leaves a filename inside the byte budget untouched', () => {
+        const name = 'a'.repeat(255);
+        const s = validateAndSanitize(MESSAGE_ID, makeAttachment({ name }));
+        expect(s!.filename).toBe(name);
+    });
+
     it('drops an attachment whose url host is not on the allowlist (before any fetch)', () => {
         const att = makeAttachment({
             url: 'https://evil.example.com/x.png',

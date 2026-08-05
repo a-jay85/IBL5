@@ -174,13 +174,31 @@ envelope_result() { # raw_envelope
 # text — one line per attachment, empty string when none. Filenames are DISPLAY ONLY and
 # never used to build a path; strip control chars (C0 + DEL) to keep an attacker-chosen
 # name on one line, and cap at 120 chars. Snowflake-ish ids stay strings (no tonumber).
+#
+# local_path is re-checked against the FILESYSTEM before it is rendered. prune_attachment_cache
+# deletes cache files at 7 days but never touches ibl_bug_report_attachments.local_path, so the
+# DB keeps pointing at bytes that are gone — and a triage prompt that says `cached=<path>` for a
+# deleted file is worse than one that says `none`, because it invites a read that will fail. The
+# DB value is a hint; the filesystem is the truth. A vanished path degrades to `none`, the exact
+# shape a failed download already produces, so no downstream reader needs a new case.
 att_line() { # attachments_json
-    printf '%s' "$1" | jq -r '
+    local json="${1:-[]}" live='[]' p
+    while IFS= read -r p; do
+        [ -n "$p" ] && [ -e "$p" ] && live="$(jq -c --arg p "$p" '. + [$p]' <<<"$live")"
+    done < <(printf '%s' "$json" | jq -r '(. // []) | map(.local_path // empty) | .[]' 2>/dev/null)
+
+    printf '%s' "$json" | jq -r --argjson live "$live" '
         (. // []) | map(
-            "[attachment: "
+            # Bind the path BEFORE piping into $live: inside `$live | index(...)` the `.`
+            # context is $live (an array), so a bare `.local_path` there indexes the array
+            # and jq aborts the whole program with "Cannot index array with string".
+            .local_path as $p
+            | (if $p != null and (($live | index($p)) == null)
+               then null else $p end) as $cached
+            | "[attachment: "
             + ((.filename // "") | gsub("[[:cntrl:]]";" ") | .[0:120])
             + " (" + (.content_type // "") + ")"
-            + " cached=" + (.local_path // "none")
+            + " cached=" + ($cached // "none")
             + " url=" + (.original_url // "")
             + "]"
         ) | join("\n")

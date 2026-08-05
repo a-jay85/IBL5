@@ -36,16 +36,27 @@ class EnqueueController implements ControllerInterface
             return;
         }
 
-        // Snowflakes read as strings — never (int)-cast. Text required non-empty.
+        // Snowflakes read as strings — never (int)-cast.
         $authorId  = $body['author_id']  ?? null;
         $channelId = $body['channel_id'] ?? null;
         $messageId = $body['message_id'] ?? null;
         $text      = $body['text']       ?? null;
 
+        // An IMAGE-ONLY report is a real shape: a GM drags in a screenshot of the crash and
+        // types nothing, so Discord sends `content: ''`. Rejecting that 400s the bot's enqueue,
+        // which throws an ApiError the caller does not catch — and backfill replays messages in
+        // a bare loop, so one such message would abort every replay after it (ADR-0098).
+        // `text` must still BE a string; it may only be EMPTY when attachments came with it.
+        // This is a presence check on the raw field, deliberately before validation and before
+        // authz — the authz gate below is unchanged, so nothing widens.
+        $rawAttachments  = $body['attachments'] ?? [];
+        $hasAttachments  = is_array($rawAttachments) && $rawAttachments !== [];
+
         if (!is_string($authorId) || $authorId === ''
             || !is_string($channelId) || $channelId === ''
             || !is_string($messageId) || $messageId === ''
-            || !is_string($text) || $text === ''
+            || !is_string($text)
+            || ($text === '' && !$hasAttachments)
         ) {
             $responder->error(400, 'bad_request', 'Missing author_id, channel_id, message_id, or text.');
             return;
@@ -70,7 +81,6 @@ class EnqueueController implements ControllerInterface
         // dedups on replay, so it is an accepted-for-storage count, not a rows-inserted count).
         $stored = 0;
         try {
-            $rawAttachments = $body['attachments'] ?? [];
             if (is_array($rawAttachments)) {
                 $rejectLog = null;
                 $valid = $this->attachmentValidator->validateAll($rawAttachments, $rejectLog);
@@ -83,6 +93,15 @@ class EnqueueController implements ControllerInterface
                 if ($valid !== []) {
                     $this->bugRepo->insertAttachments($reportId, $valid);
                 }
+            } else {
+                // Not an array at all (string/number/object-from-a-broken-client). Silently
+                // returning attachments_stored: 0 is indistinguishable from "no attachments
+                // sent", so a malformed relay would degrade every report forever with no
+                // signal. Log it — the enqueue itself still succeeds.
+                error_log(
+                    "enqueue attachments field ignored for report {$reportId}: expected array, got "
+                    . gettype($rawAttachments)
+                );
             }
         } catch (\Throwable $e) {
             error_log("enqueue attachment persistence failed for report {$reportId}: " . $e->getMessage());

@@ -77,9 +77,37 @@ function allowedHosts(): string[] {
     return ['cdn.discordapp.com', 'media.discordapp.net'];
 }
 
+const MAX_FILENAME_BYTES = 255; // mirrors ibl_bug_report_attachments.filename VARCHAR(255) — BYTES.
+
 function stripControlChars(s: string): string {
     // eslint-disable-next-line no-control-regex
     return s.replace(/[\x00-\x1F\x7F]/g, '');
+}
+
+/**
+ * Truncate to at most `max` UTF-8 BYTES without splitting a multibyte sequence.
+ * `.slice()` counts UTF-16 code units, so a 100-character CJK name is 300 bytes and
+ * would pass a character-length check yet overflow VARCHAR(255).
+ */
+function truncateBytes(s: string, max: number): string {
+    const buf = Buffer.from(s, 'utf8');
+    if (buf.length <= max) return s;
+    let end = max;
+    // Back off over UTF-8 continuation bytes (0b10xxxxxx) to a code-point boundary.
+    while (end > 0 && (buf[end] & 0xc0) === 0x80) end--;
+    return buf.subarray(0, end).toString('utf8');
+}
+
+/**
+ * The display name the PHP validator will see. That validator drops the WHOLE entry on an
+ * empty or over-long filename, so a name that is blank, control-chars-only, or over the byte
+ * budget would silently cost us an otherwise-valid attachment record. Neither is representable
+ * after this: a stripped-to-empty name falls back to the attachment id (itself snowflake-checked
+ * above), and the result is byte-truncated. Still display-only — never used to build a path.
+ */
+function displayFilename(rawName: string | null, attachmentId: string): string {
+    const cleaned = truncateBytes(stripControlChars(rawName ?? ''), MAX_FILENAME_BYTES);
+    return cleaned !== '' ? cleaned : `attachment-${attachmentId}`;
 }
 
 function isAllowedHttpsUrl(rawUrl: string): boolean {
@@ -123,7 +151,7 @@ export function validateAndSanitize(messageId: string, att: Attachment): Sanitiz
         attachmentId: att.id,
         originalUrl: att.url,
         proxyUrl: att.proxyURL,
-        filename: stripControlChars(att.name ?? ''),
+        filename: displayFilename(att.name, att.id),
         contentType,
         fileSize: typeof att.size === 'number' ? att.size : null,
         ext,

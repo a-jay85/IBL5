@@ -7,9 +7,12 @@ namespace BugPipeline;
 /**
  * Validates raw attachment descriptors arriving at the enqueue trust boundary.
  *
- * Reject-and-skip: any entry that fails a per-field rule is dropped (and noted in
- * $rejectLog), never sanitized — surviving entries are returned. The pipeline treats a
- * dropped attachment exactly like a text-only report, so degrading is always safe.
+ * Reject-and-skip: any entry that fails an IDENTITY field rule (attachment_id, original_url,
+ * filename, content_type, file_size) is dropped whole and noted in $rejectLog, never sanitized.
+ * The single exception is `local_path`, which is degraded to null rather than dropped — null is
+ * already its failed-download state, so the record stays useful instead of vanishing over an
+ * optional field. Degrades are noted in $rejectLog too. The pipeline treats a dropped attachment
+ * exactly like a text-only report, so degrading is always safe.
  *
  * Every value here is attacker-controlled (Discord author plus relayed URL/path
  * metadata), so each field is narrowed from mixed and matched against a full-shape
@@ -32,7 +35,7 @@ final class AttachmentInputValidator
 
     /**
      * @param array<mixed> $raw       Decoded `attachments` array from the request body.
-     * @param string|null  $rejectLog Out-param: '; '-joined reason for every dropped entry (null if none).
+     * @param string|null  $rejectLog Out-param: '; '-joined reason for every dropped OR degraded entry (null if none).
      * @return list<BugAttachmentInput>
      */
     public function validateAll(array $raw, ?string &$rejectLog = null): array
@@ -55,8 +58,12 @@ final class AttachmentInputValidator
             }
             $reason = null;
             $clean = $this->validateEntry($entry, $reason);
-            if ($clean === null) {
+            // Logged whether the entry was dropped OR merely degraded — a silently nulled
+            // local_path is exactly the drift an operator needs to see in the log.
+            if ($reason !== null) {
                 $rejects[] = "entry {$i}: {$reason}";
+            }
+            if ($clean === null) {
                 continue;
             }
             $valid[] = $clean;
@@ -69,7 +76,9 @@ final class AttachmentInputValidator
     }
 
     /**
-     * @return BugAttachmentInput|null  Null ⇒ dropped; $reason is set to why.
+     * @return BugAttachmentInput|null  Null ⇒ dropped. $reason is set whenever there is anything
+     *                                  to report — a drop OR a surviving-but-degraded field — so
+     *                                  callers must check it independently of the return value.
      */
     private function validateEntry(mixed $entry, ?string &$reason): ?array
     {
@@ -91,10 +100,16 @@ final class AttachmentInputValidator
             return null;
         }
 
+        // A bad local_path DEGRADES the field, it does not drop the entry. `local_path: null`
+        // is already a first-class state (the download failed — degrade-to-URL), so nulling it
+        // lands the record in a shape the rest of the pipeline handles natively, while dropping
+        // would also throw away an independently-validated original_url, filename, and
+        // content_type — i.e. lose the whole reference over a field the reader can do without.
+        // The rejected path is never assigned and never reaches the DB either way.
         $localPath = $entry['local_path'] ?? null;
         if ($localPath !== null && (!is_string($localPath) || !$this->isAllowedCachePath($localPath))) {
-            $reason = 'local_path is not null and not a well-formed cache path';
-            return null;
+            $reason = 'local_path is not a well-formed cache path — degraded to null';
+            $localPath = null;
         }
 
         $filename = $entry['filename'] ?? null;

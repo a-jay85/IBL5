@@ -33,6 +33,25 @@ namespace BugPipeline;
  *   created_at: string,
  *   updated_at: string
  * }
+ * @phpstan-type BugAttachmentRow array{
+ *   id: int,
+ *   report_id: int,
+ *   attachment_id: string,
+ *   original_url: string,
+ *   local_path: ?string,
+ *   filename: string,
+ *   content_type: string,
+ *   file_size: ?int,
+ *   created_at: string
+ * }
+ * @phpstan-type BugAttachmentInput array{
+ *   attachment_id: string,
+ *   original_url: string,
+ *   local_path: ?string,
+ *   filename: string,
+ *   content_type: string,
+ *   file_size: ?int
+ * }
  */
 class BugReportRepository extends \BaseMysqliRepository
 {
@@ -191,6 +210,86 @@ class BugReportRepository extends \BaseMysqliRepository
             return $newId;
         });
         return $id;
+    }
+
+    /**
+     * Persist attachment metadata for a report. Best-effort, replay-safe, storage-idempotent.
+     *
+     * INSERT IGNORE against UNIQUE (report_id, attachment_id): a Phase-6 backfill replay, a bot
+     * restart, or a retried HTTP call reaching this method a second time with the SAME report_id
+     * inserts nothing on the duplicate rows rather than duplicating every attachment. Idempotency
+     * lives at the storage layer so a future caller cannot forget an "only on the new-row branch"
+     * guard. Called AFTER enqueueAuthorizedAndAdvance() commits — the FK needs a committed parent,
+     * and the idempotency means a crash between commit and this insert is repaired by the next replay.
+     *
+     * report_id binds 'i' — it is the local AUTO_INCREMENT ibl_bug_reports.id (INT UNSIGNED), NOT a
+     * Discord snowflake, so the snowflake-is-a-string rule does not apply here. attachment_id binds
+     * 's' — that one IS a snowflake. local_path/file_size accept null (download failed → degrade-to-URL).
+     *
+     * @phpstan-param list<BugAttachmentInput> $attachments
+     */
+    public function insertAttachments(int $reportId, array $attachments): void
+    {
+        foreach ($attachments as $att) {
+            $this->execute(
+                'INSERT IGNORE INTO `ibl_bug_report_attachments`
+                    (report_id, attachment_id, original_url, local_path, filename, content_type, file_size)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)',
+                'isssssi',
+                $reportId,
+                $att['attachment_id'],
+                $att['original_url'],
+                $att['local_path'],
+                $att['filename'],
+                $att['content_type'],
+                $att['file_size']
+            );
+        }
+    }
+
+    /**
+     * All attachments for one report, oldest-first. Consumer: claim-next.php (the hunter's row).
+     * attachment_id is VARCHAR(20) in the DB so it reads back as a native PHP string — no castRow entry.
+     *
+     * @phpstan-return list<BugAttachmentRow>
+     */
+    public function findAttachmentsByReportId(int $reportId): array
+    {
+        /** @var list<BugAttachmentRow> $rows */
+        $rows = $this->fetchAll(
+            'SELECT * FROM `ibl_bug_report_attachments` WHERE report_id = ? ORDER BY id ASC',
+            'i',
+            $reportId
+        );
+        return array_values($rows);
+    }
+
+    /**
+     * Attachments for many reports in ONE batched query, keyed by report_id. Consumer:
+     * list-active-conversations.php (N rows per tick). fetchAllInList short-circuits on an empty
+     * list WITHOUT touching the database, so an empty actionable set issues zero attachment queries
+     * — this is what preserves the empty-tick zero-cost guard and avoids an N+1 every 180s tick.
+     *
+     * The placeholder count derives from count($reportIds), never from input text, and every value
+     * is bound — a parameterized query despite the dynamic placeholder list.
+     *
+     * @param list<int> $reportIds
+     * @phpstan-return array<int, list<BugAttachmentRow>>
+     */
+    public function findAttachmentsForReportIds(array $reportIds): array
+    {
+        /** @var list<BugAttachmentRow> $rows */
+        $rows = $this->fetchAllInList(
+            'SELECT * FROM `ibl_bug_report_attachments` WHERE report_id IN ({IN}) ORDER BY report_id ASC, id ASC',
+            'i',
+            $reportIds
+        );
+
+        $grouped = [];
+        foreach ($rows as $row) {
+            $grouped[$row['report_id']][] = $row;
+        }
+        return $grouped;
     }
 
     public function stampThreadReply(string $threadId): bool

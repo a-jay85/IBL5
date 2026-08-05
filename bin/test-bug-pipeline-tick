@@ -250,10 +250,20 @@ _drv_default="$(bash -c 'unset BUG_PIPELINE_ATTACHMENT_CACHE_DIR; source "$1"; p
 bpt_expect_eq "P5: driver default = \$HOME$_cache_suffix" "$HOME$_cache_suffix" "$_drv_default"
 _bot_src="$(dirname "$BPT_DRIVER")/../ibl5/IBLbot/src/bug-bot/attachments.ts"
 if grep -qF "os.homedir()}$_cache_suffix" "$_bot_src"; then bpt_ok "P5: bot cacheDir() default suffix matches the driver"; else bpt_fail "P5: bot/driver cache-path drift"; fi
-# Third copy: the PHP constant is absolute, so compare it to the driver's RESOLVED default.
+# Third copy: the PHP constant is absolute, so it is spelled with the DEPLOY host's home —
+# comparing it to $_drv_default would fail on any other host ($HOME=/home/runner in CI) for
+# an environment reason, not the drift this row exists to catch. Re-resolve the driver's own
+# expression under the deploy home instead, derived from the project slug in the shared
+# suffix so nothing here restates the literal being checked.
 _php_src="$(dirname "$BPT_DRIVER")/../ibl5/classes/BugPipeline/AttachmentInputValidator.php"
 _php_default="$(sed -n "s/.*DEFAULT_CACHE_DIR = '\([^']*\)'.*/\1/p" "$_php_src")"
-bpt_expect_eq "P5: PHP DEFAULT_CACHE_DIR = the driver's resolved default" "$_drv_default" "$_php_default"
+_deploy_home="$(printf %s "$_cache_suffix" | sed -n 's#^/\.claude/projects/-\([^-]*\)-\([^-]*\)-.*#/\1/\2#p')"
+if [ -z "$_deploy_home" ]; then
+    bpt_fail "P5: could not derive the deploy home from the cache suffix"
+else
+    _drv_deploy_default="$(HOME="$_deploy_home" bash -c 'unset BUG_PIPELINE_ATTACHMENT_CACHE_DIR; source "$1"; printf %s "$ATTACHMENT_CACHE_DIR"' bpt-deploy-shim "$BPT_DRIVER" 2>/dev/null)"
+    bpt_expect_eq "P5: PHP DEFAULT_CACHE_DIR = the driver default resolved under the deploy home" "$_drv_deploy_default" "$_php_default"
+fi
 
 echo "----"
 [ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"

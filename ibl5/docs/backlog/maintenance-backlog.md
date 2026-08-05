@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-07-29
+last_verified: 2026-08-04
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -25,7 +25,7 @@ Effort scale:
 - **M** — multi-step plan, 1-3 days, may touch several modules
 - **L** — refactor or platform shift, > 3 days, likely needs ADR
 
-**Status:** Complete — 15-axis audit, 312 findings (+2 post-audit follow-ups from the PR #1107 review, +1 from the #1066 reject-IDOR review → 315 tracked; +11 Axis-1 size seeds 1.21–1.31 from the hot-files comment→backlog migration 2026-07-24 → 326 tracked; +5 Axis-1 size seeds 1.32–1.36 from the ground-truth audit 2026-07-24 → 331 tracked; +1 Axis-2 robustness item 2.39 discovered 2026-07-27 during trading-1-31-api-handler-extract → 332 tracked).
+**Status:** Complete — 15-axis audit, 312 findings (+2 post-audit follow-ups from the PR #1107 review, +1 from the #1066 reject-IDOR review → 315 tracked; +11 Axis-1 size seeds 1.21–1.31 from the hot-files comment→backlog migration 2026-07-24 → 326 tracked; +5 Axis-1 size seeds 1.32–1.36 from the ground-truth audit 2026-07-24 → 331 tracked; +1 Axis-2 robustness item 2.39 discovered 2026-07-27 during trading-1-31-api-handler-extract → 332 tracked; +1 Axis-15 data-integrity item 15.24 discovered 2026-08-04 during the PR #1771 review → 333 tracked).
 
 ---
 
@@ -43,24 +43,24 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 > A file still >500 LOC after a ✅ does **not** reopen the finding when the finding's named concern was narrower than "shrink below 500 LOC"; residual size is noted, not re-flagged.
 
-### Roll-up (332 findings)
+### Roll-up (333 findings)
 
 | Status | Count |
 |--------|------:|
 | ✅ Implemented | 240 |
 | ◑ Partial | 24 |
 | 📋 Planned (plan queued / PR open) | 1 |
-| ⬜ Open | 57 |
+| ⬜ Open | 58 |
 | 🚫 Declined | 10 |
 
-> Status counts re-verified 2026-06-28 (exact, from the per-axis tables); **6.20 / 6.21 added 2026-06-29** from the PR #1107 review (⬜ Open +2); **6.22 added 2026-06-29** from the #1066 reject-IDOR review (⬜ Open +1). Two stale-Open rows were flipped directly (no plan owned them): **13.3**, **13.9** (✅ +2, ⬜ −2 vs the master re-count). **1.21–1.31 added 2026-07-24** from the hot-files comment→backlog migration (⬜ Open +11: 8 🟩 auto-mergeable, 3 🟨 conditional — 1.23/1.25/1.31 need characterization/endpoint pins). **Ground-truth audit 2026-07-24:** 7 stale-Open items flipped ✅, 2 false findings marked 🚫, 5 new Axis-1 rows seeded (1.32–1.36); IDOR PRs #1107–1110 merged 2026-06-29 (unblocking 2.10/2.13/2.14/2.25/7.7/14.6); PRs #1240/#1230/#1204 merged (2.6/2.31/2.32/5.18 already ✅/Open on own merits). **9.19 and 9.20 implemented 2026-07-24** — added READMEs to all 68 missing class dirs + frontmatter to all 16 existing class READMEs that lacked it; extended bin/check-docs IN_SCOPE_GLOBS (✅ +2, ⬜ −2); roll-up recomputed from grep (331 rows total, unchanged). **6.16 flipped ✅ 2026-07-24** (all Api data repos + JsonResponder + SystemClock tested; ✅ +1, ◑ −1). **6.14 Status updated 2026-07-24** (ProcessBoxscoresStep/GenerateSeasonAwardsStep/ParseJsbFilesStep added; still ◑). **Resolved rows collapsed 2026-07-25** — ✅/🚫 findings no longer appear as table rows; each axis carries a `> ✅ resolved (N): …` / `> 🚫 declined (N): …` summary line and their evidence lives in [archive/maintenance-backlog-archive.md](archive/maintenance-backlog-archive.md). **Recount recipe:** resolved = sum of the `(N)` in the per-axis summary lines; open = grep of the per-axis table rows; total = the two added. Counts above are unchanged by the collapse (238 + 93 = 331). **1.36 and 7.7 flipped ✅ 2026-07-26** (✅ +2, ⬜ −1, ◑ −1); total tracked rows unchanged at 331. **1.29 flipped ✅ 2026-07-26 (PR #1679)** (✅ +1, ⬜ −1); total tracked rows unchanged at 331. **1.27 flipped ✅ 2026-07-27** — extracted 10 per-entity collaborators into `ibl5/classes/JsbParser/Repositories/`; JsbImportRepository reduced to thin facade (✅ +1, ⬜ −1); total tracked rows unchanged at 331. **1.23 flipped ✅ 2026-07-27 (`oneonone-1-23-pins-and-extract`)** (✅ +1, ⬜ −1); total tracked rows unchanged at 331. **1.31 flipped ✅ 2026-07-27** — extracted `TradeRosterPreviewParamValidator` + `TradeRosterPreviewCashRowBuilder` collaborators; DB characterization pin + validator/cash-row unit suites landed (✅ +1, ⬜ −1). **2.39 seeded 2026-07-27** — cash-year range unbounded/unordered in `TradeRosterPreviewCashRowBuilder::buildCashRows()`; cashStartYear/cashEndYear come from `$_GET` with no upper bound (discovered during trading-1-31-api-handler-extract) (⬜ +1); **1.19 flipped ✅ 2026-07-27** — characterization pins + `executePlayerLoop` merge shipped; `processPlrData`/`processPlrDataForYear` deduped (✅ +1, ⬜ −1); total tracked: 332 (✅ 236, ◑ 24, 📋 1, ⬜ 61, 🚫 10). **14.6 flipped ◑ Partial 2026-07-28 (#1712)** — batch 1 (17 Api/Controller/*) converted to DI; batch 2 pending (◑ +1, ⬜ −1); total tracked: 332 (✅ 236, ◑ 25, 📋 1, ⬜ 60, 🚫 10). **14.9 flipped ✅ 2026-07-27** — replaced 21 `$cookie[1]` occurrences across 11 files with `AuthService::getUsername()` (✅ +1, ⬜ −1); total tracked: 332 (✅ 237, ◑ 25, 📋 1, ⬜ 59, 🚫 10). **11.16 flipped ✅ 2026-07-27** — moved page-specific JS loaders (`offer-salary-hints.js`, `contract-hint.js`) from PageLayout global bundle to per-view injection in NegotiationService and TradingView; E2E behavioral pins + VR manifest row added (✅ +1, ⬜ −1); total tracked: 332 (✅ 238, ◑ 25, 📋 1, ⬜ 58, 🚫 10). **6.2 and 6.4 flipped ✅ 2026-07-27** (PR #1671 tests verified; ✅ +2, ⬜ −1, ◑ −1); total tracked: 332 (✅ 240, ◑ 24, 📋 1, ⬜ 57, 🚫 10).
+> Status counts re-verified 2026-06-28 (exact, from the per-axis tables); **6.20 / 6.21 added 2026-06-29** from the PR #1107 review (⬜ Open +2); **6.22 added 2026-06-29** from the #1066 reject-IDOR review (⬜ Open +1). Two stale-Open rows were flipped directly (no plan owned them): **13.3**, **13.9** (✅ +2, ⬜ −2 vs the master re-count). **1.21–1.31 added 2026-07-24** from the hot-files comment→backlog migration (⬜ Open +11: 8 🟩 auto-mergeable, 3 🟨 conditional — 1.23/1.25/1.31 need characterization/endpoint pins). **Ground-truth audit 2026-07-24:** 7 stale-Open items flipped ✅, 2 false findings marked 🚫, 5 new Axis-1 rows seeded (1.32–1.36); IDOR PRs #1107–1110 merged 2026-06-29 (unblocking 2.10/2.13/2.14/2.25/7.7/14.6); PRs #1240/#1230/#1204 merged (2.6/2.31/2.32/5.18 already ✅/Open on own merits). **9.19 and 9.20 implemented 2026-07-24** — added READMEs to all 68 missing class dirs + frontmatter to all 16 existing class READMEs that lacked it; extended bin/check-docs IN_SCOPE_GLOBS (✅ +2, ⬜ −2); roll-up recomputed from grep (331 rows total, unchanged). **6.16 flipped ✅ 2026-07-24** (all Api data repos + JsonResponder + SystemClock tested; ✅ +1, ◑ −1). **6.14 Status updated 2026-07-24** (ProcessBoxscoresStep/GenerateSeasonAwardsStep/ParseJsbFilesStep added; still ◑). **Resolved rows collapsed 2026-07-25** — ✅/🚫 findings no longer appear as table rows; each axis carries a `> ✅ resolved (N): …` / `> 🚫 declined (N): …` summary line and their evidence lives in [archive/maintenance-backlog-archive.md](archive/maintenance-backlog-archive.md). **Recount recipe:** resolved = sum of the `(N)` in the per-axis summary lines; open = grep of the per-axis table rows; total = the two added. Counts above are unchanged by the collapse (238 + 93 = 331). **1.36 and 7.7 flipped ✅ 2026-07-26** (✅ +2, ⬜ −1, ◑ −1); total tracked rows unchanged at 331. **1.29 flipped ✅ 2026-07-26 (PR #1679)** (✅ +1, ⬜ −1); total tracked rows unchanged at 331. **1.27 flipped ✅ 2026-07-27** — extracted 10 per-entity collaborators into `ibl5/classes/JsbParser/Repositories/`; JsbImportRepository reduced to thin facade (✅ +1, ⬜ −1); total tracked rows unchanged at 331. **1.23 flipped ✅ 2026-07-27 (`oneonone-1-23-pins-and-extract`)** (✅ +1, ⬜ −1); total tracked rows unchanged at 331. **1.31 flipped ✅ 2026-07-27** — extracted `TradeRosterPreviewParamValidator` + `TradeRosterPreviewCashRowBuilder` collaborators; DB characterization pin + validator/cash-row unit suites landed (✅ +1, ⬜ −1). **2.39 seeded 2026-07-27** — cash-year range unbounded/unordered in `TradeRosterPreviewCashRowBuilder::buildCashRows()`; cashStartYear/cashEndYear come from `$_GET` with no upper bound (discovered during trading-1-31-api-handler-extract) (⬜ +1); **1.19 flipped ✅ 2026-07-27** — characterization pins + `executePlayerLoop` merge shipped; `processPlrData`/`processPlrDataForYear` deduped (✅ +1, ⬜ −1); total tracked: 332 (✅ 236, ◑ 24, 📋 1, ⬜ 61, 🚫 10). **14.6 flipped ◑ Partial 2026-07-28 (#1712)** — batch 1 (17 Api/Controller/*) converted to DI; batch 2 pending (◑ +1, ⬜ −1); total tracked: 332 (✅ 236, ◑ 25, 📋 1, ⬜ 60, 🚫 10). **14.9 flipped ✅ 2026-07-27** — replaced 21 `$cookie[1]` occurrences across 11 files with `AuthService::getUsername()` (✅ +1, ⬜ −1); total tracked: 332 (✅ 237, ◑ 25, 📋 1, ⬜ 59, 🚫 10). **11.16 flipped ✅ 2026-07-27** — moved page-specific JS loaders (`offer-salary-hints.js`, `contract-hint.js`) from PageLayout global bundle to per-view injection in NegotiationService and TradingView; E2E behavioral pins + VR manifest row added (✅ +1, ⬜ −1); total tracked: 332 (✅ 238, ◑ 25, 📋 1, ⬜ 58, 🚫 10). **6.2 and 6.4 flipped ✅ 2026-07-27** (PR #1671 tests verified; ✅ +2, ⬜ −1, ◑ −1); total tracked: 332 (✅ 240, ◑ 24, 📋 1, ⬜ 57, 🚫 10). **15.24 seeded 2026-08-04** — pre-existing duplicate player box-score rows in `ibl_box_scores` for seasons 1993/1994/2002/2004 (discovered during the PR #1771 review) (⬜ +1).
 
 **Automouse-readiness of the not-yet-complete (⬜/◑/📋) items:**
 
 | Bucket | Count | What it means |
 |--------|------:|---------------|
 | 🟩 Auto-mergeable | ~110 | green-green + pinnable; arms unattended |
-| 🟦 Safe, human-merge | 10 | gate-14 trigger (security / UI-UX / destructive schema) → `auto_merge: false` |
+| 🟦 Safe, human-merge | 11 | gate-14 trigger (security / UI-UX / destructive schema) → `auto_merge: false` |
 | 🟨 Conditional | 37 | needs one mechanical-scope add, one upfront decision, or a collision-PR to merge first |
 | 🟥 Not automouse-safe | 1 | 12.11 — `git filter-repo` history rewrite (irreversible, coordinated) |
 
@@ -869,6 +869,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 15.7 | ◑ Partial | 🟦 | `name`→`setting_key` done (#143); `value`→`setting_value` deferred (reserved-word rename + sweep → human-merge). |
 | 15.12 | ⬜ Open | 🟩 | Codify suffix convention + CI lint for new names; docs + additive gate. |
 | 15.17 | ⬜ Open | 🟨 | olympics_career int(11)→smallint/mediumint. Reversible narrowing → arm via the `/plan` schema-safety guard (apply-time fail-closed + DatabaseIntegration test); else 🟦. |
+| 15.24 | ⬜ Open | 🟦 | Pre-existing duplicate rows in `ibl_box_scores`: 1993 (29), 1994 (7), 2002 (1), 2004 (24) — 61 excess by `(game_date, name)`. Distinct signature from the 2007 HEAT re-import (no schedule overload, no `created_at` batch, no month shift); cause unknown. Destructive delete → human-merge. (discovered 2026-08-04 during the PR #1771 review) |
 
 ### 15.1 `tid` / `teamid` / `team_id` — Three Spellings Survive ADR-0009
 **Location:** `ibl_box_scores` (`visitorTID`, `homeTID`, `teamID`), `ibl_box_scores_teams` (`visitorTeamID`, `homeTeamID`), `ibl_rcb_*` (`team_id`), `ibl_league_config` (`team_id`)
@@ -912,3 +913,10 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Align with `ibl_hist`: smallint for per-season, mediumint for career totals.
 **Est. effort:** S
 **Risk if untouched:** Native-type annotation drift could surface surprises.
+
+### 15.24 Pre-Existing Duplicate Player Box-Score Rows in 1993 / 1994 / 2002 / 2004
+**Location:** `ibl_box_scores` — seasons 1993, 1994, 2002, 2004
+**Problem:** Duplicate `(game_date, name)` pairs exist in four historical seasons: 1993 (29 pairs), 1994 (7), 2002 (1), 2004 (24) — 61 excess rows total. Signature is unlike the 2007 HEAT re-import (which is being fixed separately): no `ibl_schedule` overload on the affected days, no single-batch `created_at` cluster, and no month-shift pattern, so the cause is unknown. Inflates career/season totals for the affected players.
+**Suggested direction:** Investigate first — per-season, compare the dupe pairs against `ibl_box_scores_teams` to determine whether each is a true clone, a real doubleheader, or two distinct players sharing a `name`. Only then design the delete; the import-time duplicate guard shipping with the 2007 fix prevents recurrence but does not clean these.
+**Est. effort:** M
+**Risk if untouched:** 61 rows of silently wrong historical stats; any per-player aggregate over these seasons double-counts. A blind `(game_date, name)` dedupe would delete legitimate rows if any pair is two different players.

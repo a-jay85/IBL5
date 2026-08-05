@@ -1,6 +1,6 @@
 ---
 description: Development-efficiency backlog — inner-loop speed (diff-scoped analysis, parallel tests), CI caching, dependency-bump batching, and worktree lifecycle automation, with per-entry status.
-last_verified: 2026-07-29
+last_verified: 2026-08-05
 ---
 
 # Development-Efficiency Backlog
@@ -20,18 +20,6 @@ last_verified: 2026-07-29
 **Automouse-readiness** (for items not ✅/🚫): same glyphs as [`ci-backlog.md`](ci-backlog.md) — 🟩 auto-mergeable · 🟦 automouse-safe, human-merge · 🟨 conditional · 🟥 not automouse-safe.
 
 **Effort scale:** **S** — single PR, < 1 day. **M** — multi-step plan, 1–3 days. **L** — platform shift, likely needs an ADR.
-
----
-
-## Roll-up
-
-| Status | Count |
-|--------|------:|
-| ⬜ Open | 4 |
-| 📋 Planned | 2 |
-| ◑ Partial | 2 |
-| ✅ Implemented | 4 |
-| 🚫 Declined | 0 |
 
 ---
 

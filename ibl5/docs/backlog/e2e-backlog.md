@@ -1,6 +1,6 @@
 ---
 description: E2E (Playwright + api-e2e) test-quality backlog — refactoring, perf, weak/tautological assertions, tests that don't prove functionality, and flake-prone patterns, with per-entry status + automouse-readiness. Each open entry is a candidate for a /plan.
-last_verified: 2026-07-07
+last_verified: 2026-08-05
 ---
 
 # E2E Test-Quality Backlog
@@ -47,24 +47,6 @@ Effort scale:
 > **Planning note:** 🟨 items set `auto_merge: false` (STOP-guard, human signoff) — the plan must confirm the
 > happy path passes before treating a tightened assertion as green-green. Axis A, B, C, and E each package as
 > one plan apiece (single coherent worktree per axis); Axis D is planned per-cluster instead (see below).
-
-## Roll-up (66 findings)
-
-| Status | Count |
-|--------|------:|
-| ✅ Implemented | 3 |
-| ◑ Partial | 0 |
-| 📋 Planned | 0 |
-| ⬜ Open | 63 |
-| 🚫 Declined | 0 |
-
-| Axis | Findings | Theme |
-|------|---------:|-------|
-| A — DRY / WET refactoring | 8 | duplicated helpers / inline reimplementations |
-| B — Performance / combinable | 13 | redundant navigations, combinable tests |
-| C — Weak / tautological | 18 | assertions that can't fail |
-| D — Doesn't prove functionality | 15 | green tests not guarding the feature |
-| E — Flake-prone patterns | 12 | race-sensitive waits (not a measured flake rate) |
 
 > **Caveat on Axis E:** code cannot prove failure history (CI flake data is token-gated here). Axis E lists
 > race-sensitive *patterns*, not measured flake rates.

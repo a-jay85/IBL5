@@ -1,6 +1,6 @@
 ---
 description: CI/GitHub-Actions workflow simplification backlog — duplicated setup/notify boilerplate, job consolidation, and verified-not-redundant workflows, with per-entry status + automouse-readiness.
-last_verified: 2026-07-31
+last_verified: 2026-08-05
 ---
 
 # CI Workflow Simplification Backlog
@@ -23,20 +23,7 @@ last_verified: 2026-07-31
 
 **Effort scale:** **S** — single PR, < 1 day. **M** — multi-step plan, 1-3 days. **L** — platform shift, likely needs an ADR.
 
----
-
-## Roll-up
-
-| Status | Count |
-|--------|------:|
-| ⬜ Open | 1 |
-| 📋 Planned | 2 |
-| ◑ Partial | 1 |
-| ✅ Implemented | 9 |
-| 🚫 Declined | 0 |
-
-> The 4 "verified-not-redundant" entries in Axis 4 are **decisions to keep**, not open work — they exist so a future audit does not re-flag them. Not counted above.
-> ✅ corrected from 8 → 9 on 2026-07-31: a recount from table rows (Axes 1–3, 5) found 9 implemented entries (3.5 had already folded into 1.1 but was still counted separately; 5.1 was the sole ⬜, not 2). ⬜ was 1 before the Axis 6 additions. [CORRECTED 2026-07-31]
+> The 4 "verified-not-redundant" entries in Axis 4 are **decisions to keep**, not open work — they exist so a future audit does not re-flag them.
 
 ---
 

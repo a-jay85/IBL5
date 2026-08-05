@@ -1,6 +1,6 @@
 ---
 description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, plan decomposition/tier-routing machinery, and the human comprehension counter-loop, with per-entry status.
-last_verified: 2026-07-31
+last_verified: 2026-08-05
 ---
 
 # Loop-Engineering Backlog
@@ -20,18 +20,6 @@ last_verified: 2026-07-31
 **Automouse-readiness** (for items not ✅/🚫): same glyphs as [`ci-backlog.md`](ci-backlog.md) — 🟩 auto-mergeable · 🟦 automouse-safe, human-merge · 🟨 conditional · 🟥 not automouse-safe. (Ironic but real: changes to the loop machinery itself mostly want a human merge — a bug here burns whole nights.)
 
 **Effort scale:** **S** — single PR, < 1 day. **M** — multi-step plan, 1–3 days. **L** — platform shift, likely needs an ADR.
-
----
-
-## Roll-up
-
-| Status | Count |
-|--------|------:|
-| ⬜ Open | 10 |
-| 📋 Planned | 6 |
-| ◑ Partial | 2 |
-| ✅ Implemented | 9 |
-| 🚫 Declined | 0 |
 
 ---
 

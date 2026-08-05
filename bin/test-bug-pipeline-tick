@@ -92,6 +92,82 @@ bpt_file_absent "$_cs_home/Library/LaunchAgents/com.ibl5.bug-pipeline-cron.plist
 bpt_file_absent "$_cs_home/launchctl.log" "refusal precedes every launchctl call"
 bpt_file_absent "$_cs_home/gh.log" "refusal precedes issue-tracking bootstrap"
 
+# ── Phase 7 — attachment text surface (classify / gather / hunter) ────────────
+# Matrix rows 38-43. att_line/render_prompt/row_transcript/render_hunter_prompt are
+# unit-invoked by sourcing the driver in a subshell (mismatched $0 → the tail guard
+# never runs main(); mirrors the bug_slug sanity rows in bin/test-bug-pipeline-hunt).
+CLASSIFY_TMPL="$(dirname "$BPT_DRIVER")/bug-pipeline-classify-prompt"
+GATHER_TMPL="$(dirname "$BPT_DRIVER")/bug-pipeline-gather-prompt"
+HUNT_TMPL="$(dirname "$BPT_DRIVER")/bug-pipeline-hunter-prompt"
+# render_hunter_prompt resolves the template via $SCRIPT_DIR (=cwd under the shim), so
+# hand it the real file through the env seam; row_transcript reaches the curl stub via CURL_BIN.
+export BUG_PIPELINE_HUNT_PROMPT="$HUNT_TMPL"
+_drv() { bash -c 'source "$1"; shift; "$@"' bpt-unit-shim "$BPT_DRIVER" "$@" 2>/dev/null; }
+
+# One DB-shaped attachment (Phase 6 .attachments enrichment); .filename is the display name.
+ATT_JSON='[{"attachment_id":"700000000000000001","filename":"screenshot-crash.png","content_type":"image/png","local_path":"/cache/x.png","original_url":"https://cdn.discordapp.com/a/b/screenshot-crash.png"}]'
+
+# ── Row 38 — all three templates carry the {{attachments_text}} placeholder ────
+# A template missing it substitutes to nothing and fails silently, so grep each file.
+for _t in "$CLASSIFY_TMPL" "$GATHER_TMPL" "$HUNT_TMPL"; do
+    if grep -q '{{attachments_text}}' "$_t"; then bpt_ok "r38: $(basename "$_t") has {{attachments_text}}"
+    else bpt_fail "r38: $(basename "$_t") missing {{attachments_text}}"; fi
+done
+
+# ── Row 39 — rendered classify, gather, AND hunter each contain the attachment name ──
+_att="$(_drv att_line "$ATT_JSON")"
+bpt_log_has_str() { case "$2" in *"$3"*) bpt_ok "$1";; *) bpt_fail "$1 — '$3' absent";; esac; }
+bpt_log_has_str "r39: att_line emits the marker" "$_att" "[attachment: screenshot-crash.png (image/png) cached=/cache/x.png url=https://cdn.discordapp.com/a/b/screenshot-crash.png]"
+_classify_rendered="$(_drv render_prompt "$(cat "$CLASSIFY_TMPL")" "a bug" "(no thread yet)" "$_att")"
+bpt_log_has_str "r39: classify prompt contains the attachment name" "$_classify_rendered" "screenshot-crash.png"
+_gather_rendered="$(_drv render_prompt "$(cat "$GATHER_TMPL")" "a request" "(no thread yet)" "$_att")"
+bpt_log_has_str "r39: gather prompt contains the attachment name" "$_gather_rendered" "screenshot-crash.png"
+_claim="$(jq -nc --argjson a "$ATT_JSON" '{id:"7",class:"bug",original_text:"trade button broken",thread_id:null,attachments:$a}')"
+_hunter_rendered="$(_drv render_hunter_prompt "$_claim" "/tmp/wt/ibl5")"
+bpt_log_has_str "r39: hunter prompt contains the attachment name" "$_hunter_rendered" "screenshot-crash.png"
+bpt_log_has_str "r39: hunter prompt frames attachments as data (tag block)" "$_hunter_rendered" "<attachments>"
+
+# ── Row 40 — an image-only transcript message renders a non-empty [attachments:] tail ──
+bpt_reset
+bpt_set_transcript '{"messages":[{"author_id":"111","content":"","attachments":[{"name":"only-image.png","content_type":"image/png"}]}]}'
+_tr="$(_drv row_transcript 880000000000000001)"
+bpt_log_has_str "r40: image-only message renders [attachments:" "$_tr" "[attachments: only-image.png]"
+
+# ── Row 41 — NEG sanitation on the UNVALIDATED transcript path (only sanitizer there):
+# a newline in the name renders on one line; a 500-char name truncates to 120. ────
+_long="$(printf 'a%.0s' {1..500})"
+bpt_reset
+bpt_set_transcript "$(jq -nc --arg nl "$(printf 'evil\nname.png')" --arg lg "$_long" \
+    '{messages:[{author_id:"111","content":"","attachments":[{name:$nl,content_type:"image/png"}]},{author_id:"222","content":"see","attachments":[{name:$lg,content_type:"image/png"}]}]}')"
+_tr="$(_drv row_transcript 880000000000000001)"
+bpt_log_has_str "r41: control char in transcript name is stripped to a space" "$_tr" "evil name.png"
+# The embedded newline must NOT survive to split the attachments marker onto a second line.
+if printf '%s' "$_tr" | grep -q '^name.png'; then bpt_fail "r41: newline in name leaked a second line"; else bpt_ok "r41: newline-bearing name stays on one line"; fi
+if printf '%s' "$_tr" | grep -q 'a\{120\}' && ! printf '%s' "$_tr" | grep -q 'a\{121\}'; then
+    bpt_ok "r41: 500-char transcript name truncates to 120"; else bpt_fail "r41: transcript name not truncated to 120"; fi
+# att_line (DB path) applies the same cap — defense in depth even though enqueue validated it.
+_att_long="$(_drv att_line "$(jq -nc --arg lg "$_long" '[{filename:$lg,content_type:"image/png",local_path:null,original_url:"u"}]')")"
+if printf '%s' "$_att_long" | grep -q 'a\{120\}' && ! printf '%s' "$_att_long" | grep -q 'a\{121\}'; then
+    bpt_ok "r41: att_line 500-char filename truncates to 120"; else bpt_fail "r41: att_line filename not truncated to 120"; fi
+
+# ── Row 42 — NEG empty attachment set renders no [attachment: marker ──────────
+_att_empty="$(_drv att_line '[]')"
+bpt_expect_eq "r42: att_line on [] is the empty string" "" "$_att_empty"
+
+# ── Row 43 — tool-starvation on the ACTUAL attachment-bearing classify invocation ──
+# One classify row (thread_id null → no hunt) → exactly one claude call owns claude.args.log.
+bpt_reset
+bpt_set_actionable "$(jq -nc --argjson a "$ATT_JSON" \
+    '[{id:1,status:"queued",class:null,original_text:"x",thread_id:null,issue_number:null,attachments:$a}]')"
+bpt_set_claude_result '{"class":"not_a_thing"}'
+bpt_run
+bpt_log_has "$STUB" claude.args.log "screenshot-crash.png" "r43: the attachment name reaches the real -p prompt"
+if awk '/^--allowedTools$/{getline; if ($0=="") f=1} END{exit !f}' "$STUB/claude.args.log" 2>/dev/null; then
+    bpt_ok "r43: --allowedTools '' (deny-all) on the attachment-bearing classify call"
+else
+    bpt_fail "r43: capability-starvation invariant broken on the classify call"
+fi
+
 echo "----"
 [ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"
 exit "$FAILED"

@@ -155,11 +155,29 @@ envelope_result() { # raw_envelope
     printf '%s' "$1" | jq -rc 'if (.is_error // false) == true then empty else (.result // empty) end' 2>/dev/null
 }
 
+# Render a row's DB attachments (Phase 6 .attachments enrichment) as sanitized, data-only
+# text — one line per attachment, empty string when none. Filenames are DISPLAY ONLY and
+# never used to build a path; strip control chars (C0 + DEL) to keep an attacker-chosen
+# name on one line, and cap at 120 chars. Snowflake-ish ids stay strings (no tonumber).
+att_line() { # attachments_json
+    printf '%s' "$1" | jq -r '
+        (. // []) | map(
+            "[attachment: "
+            + ((.filename // "") | gsub("[[:cntrl:]]";" ") | .[0:120])
+            + " (" + (.content_type // "") + ")"
+            + " cached=" + (.local_path // "none")
+            + " url=" + (.original_url // "")
+            + "]"
+        ) | join("\n")
+    ' 2>/dev/null
+}
+
 # Build a prompt by safe bash substitution (never sed — untrusted content in replacement).
-render_prompt() { # template original_text transcript
+render_prompt() { # template original_text transcript attachments_text
     local t="$1"
     t="${t//\{\{original_text\}\}/$2}"
     t="${t//\{\{transcript\}\}/$3}"
+    t="${t//\{\{attachments_text\}\}/$4}"
     printf '%s' "$t"
 }
 
@@ -167,7 +185,19 @@ render_prompt() { # template original_text transcript
 row_transcript() { # thread_id
     if [ -n "$1" ] && [ "$1" != "null" ]; then
         local msgs; msgs="$(bot_get_thread_messages "$1")"
-        printf '%s' "$msgs" | jq -r '(.messages // []) | map("\(.author_id): \(.content)") | join("\n")' 2>/dev/null
+        # Transcript attachment names come straight from /get-thread-messages and have NEVER
+        # passed AttachmentInputValidator — this jq is the only sanitizer on that path. Strip
+        # control chars + cap 120 so an image-only message renders a non-empty, single-line tail.
+        printf '%s' "$msgs" | jq -r '
+            (.messages // []) | map(
+                "\(.author_id): \(.content // "")"
+                + (if ((.attachments // []) | length) > 0
+                   then "\n[attachments: "
+                        + ((.attachments | map((.name // "") | gsub("[[:cntrl:]]";" ") | .[0:120])) | join(", "))
+                        + "]"
+                   else "" end)
+            ) | join("\n")
+        ' 2>/dev/null
     else
         printf '(no thread yet)'
     fi
@@ -186,9 +216,10 @@ classify_row() { # row_json
     local original_text; original_text="$(printf '%s' "$row" | jq -r '.original_text // ""')"
     clear_opt=""; [ -n "$blocked" ] && clear_opt="--clear-blocked"
 
-    local transcript prompt
+    local transcript attachments_text prompt
     transcript="$(row_transcript "$thread_id")"
-    prompt="$(render_prompt "$(cat "$CLASSIFY_PROMPT_FILE")" "$original_text" "$transcript")"
+    attachments_text="$(att_line "$(printf '%s' "$row" | jq -c '.attachments // []')")"
+    prompt="$(render_prompt "$(cat "$CLASSIFY_PROMPT_FILE")" "$original_text" "$transcript" "$attachments_text")"
 
     if ! run_structured_call "$prompt" "$CLASSIFY_SCHEMA"; then
         : # rc captured in CJ_RC; handled below
@@ -327,9 +358,10 @@ drive_feature_row() { # row_json
     fi
 
     # Case A — gathering with a fresh GM reply.
-    local transcript prompt
+    local transcript attachments_text prompt
     transcript="$(row_transcript "$thread_id")"
-    prompt="$(render_prompt "$(cat "$GATHER_PROMPT_FILE")" "$original_text" "$transcript")"
+    attachments_text="$(att_line "$(printf '%s' "$row" | jq -c '.attachments // []')")"
+    prompt="$(render_prompt "$(cat "$GATHER_PROMPT_FILE")" "$original_text" "$transcript" "$attachments_text")"
 
     run_structured_call "$prompt" "$GATHER_SCHEMA" || true
     if [ "$CJ_RC" -ne 0 ] || [ -z "${CJ_OUT:-}" ] || claude_env_error "${CJ_OUT:-}${CJ_ERR:-}"; then
@@ -508,18 +540,20 @@ run_hunter_agent() { # wt_appdir model prompt_file run_name run_log
 # are substituted by bash param-expansion (NEVER sed/eval) — the template wraps them
 # in <report>/<transcript> blocks and frames them strictly as data (prompt-injection defense).
 render_hunter_prompt() { # claimed wt_appdir
-    local claimed="$1" wt_appdir="$2" id class report thread_id transcript t
+    local claimed="$1" wt_appdir="$2" id class report thread_id transcript att t
     id="$(printf '%s' "$claimed" | jq -r '.id')"
     class="$(printf '%s' "$claimed" | jq -r '.class // "bug"')"
     report="$(printf '%s' "$claimed" | jq -r '.original_text // ""')"
     thread_id="$(printf '%s' "$claimed" | jq -r '.thread_id // empty')"
     transcript="$(row_transcript "$thread_id")"
+    att="$(att_line "$(printf '%s' "$claimed" | jq -c '.attachments // []')")"
     t="$(cat "$HUNT_PROMPT_FILE")"
     t="${t//\{\{bug_id\}\}/$id}"
     t="${t//\{\{class\}\}/$class}"
     t="${t//\{\{worktree\}\}/$wt_appdir}"
     t="${t//\{\{report\}\}/$report}"
     t="${t//\{\{transcript\}\}/$transcript}"
+    t="${t//\{\{attachments_text\}\}/$att}"
     printf '%s' "$t"
 }
 

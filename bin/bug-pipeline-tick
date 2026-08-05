@@ -44,6 +44,21 @@ PLAN_TIMEOUT="${BUG_PIPELINE_PLAN_TIMEOUT:-1800}"
 CLASSIFY_PROMPT_FILE="${BUG_PIPELINE_CLASSIFY_PROMPT:-$SCRIPT_DIR/bug-pipeline-classify-prompt}"
 GATHER_PROMPT_FILE="${BUG_PIPELINE_GATHER_PROMPT:-$SCRIPT_DIR/bug-pipeline-gather-prompt}"
 
+# Attachment byte cache — the bot (ibl5/IBLbot/src/bug-bot/attachments.ts) writes
+# downloaded attachment bytes here; this default MUST resolve to the same absolute
+# path as that module's cacheDir() (cross-process invariant, matrix-checked).
+ATTACHMENT_CACHE_DIR="${BUG_PIPELINE_ATTACHMENT_CACHE_DIR:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/bug-pipeline/attachments}"
+# Prune cached attachment bytes older than 7 days. Both guards are load-bearing:
+# with set -u the var is defaulted, so an operator exporting the override as "" would
+# otherwise yield `find "" -delete` recursing the cwd; the -n test blocks that and the
+# -d test makes first run (cache never created) a no-op. -maxdepth 1 -type f keeps it to
+# plain files in that one dir; `2>/dev/null || true` means prune can never fail a tick.
+prune_attachment_cache() {
+    [ -n "${ATTACHMENT_CACHE_DIR:-}" ] || return 0
+    [ -d "$ATTACHMENT_CACHE_DIR" ] || return 0
+    find "$ATTACHMENT_CACHE_DIR" -maxdepth 1 -type f -mtime +7 -delete 2>/dev/null || true
+}
+
 # ── Hunter seams (#5b) — all default to production; tests override ─────────────
 HUNT_PROMPT_FILE="${BUG_PIPELINE_HUNT_PROMPT:-$SCRIPT_DIR/bug-pipeline-hunter-prompt}"
 HUNT_MODELS="${BUG_PIPELINE_HUNT_MODELS:-claude-haiku-4-5 claude-sonnet-4-6 claude-opus-4-8}"  # cheap→dear, Opus last
@@ -852,6 +867,10 @@ main() {
         log "no actionable rows — exiting cheap"
         return 0
     fi
+
+    # A tick that will do work also prunes stale cached attachment bytes (>7d). Placed
+    # AFTER the empty-tick guard so a no-op tick still spawns zero work; never fails the tick.
+    prune_attachment_cache
 
     # Fail-closed: a broken enumerator must NOT fall through to the expensive path.
     if ! printf '%s' "$actionable" | jq -e 'type == "array"' >/dev/null 2>&1; then

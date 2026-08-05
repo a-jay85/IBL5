@@ -168,6 +168,68 @@ else
     bpt_fail "r43: capability-starvation invariant broken on the classify call"
 fi
 
+# ── Phase 8 — attachment cache prune at tick start (matrix prune rows) ─────────
+# A stamp 8 days old (portable across BSD `date -v` and GNU `date -d`); files older
+# than `-mtime +7` (strictly >7×24h) must be pruned, fresher ones must survive.
+_old_stamp="$(date -v-8d '+%Y%m%d%H%M' 2>/dev/null || date -d '8 days ago' '+%Y%m%d%H%M')"
+_QUEUED_ROW='[{"id":1,"status":"queued","class":null,"original_text":"x","thread_id":null,"issue_number":null}]'
+
+# ── Prune P1 — a WORKING tick prunes >7d files and keeps fresher ones ──────────
+_pcache="$(mktemp -d)"
+: > "$_pcache/fresh.png"
+: > "$_pcache/old.png"; touch -t "$_old_stamp" "$_pcache/old.png"
+bpt_reset
+bpt_set_actionable "$_QUEUED_ROW"
+bpt_set_claude_result '{"class":"not_a_thing"}'
+export BUG_PIPELINE_ATTACHMENT_CACHE_DIR="$_pcache"
+bpt_run
+bpt_expect_eq   "P1: working tick exits 0" 0 "$BPT_RC"
+bpt_file_absent "$_pcache/old.png" "P1: >7d cached attachment pruned"
+if [ -e "$_pcache/fresh.png" ]; then bpt_ok "P1: fresh cached attachment survives"; else bpt_fail "P1: fresh attachment wrongly pruned"; fi
+unset BUG_PIPELINE_ATTACHMENT_CACHE_DIR
+rm -rf "$_pcache"
+
+# ── Prune P2 — an EMPTY tick prunes NOTHING (prune sits AFTER the cheap exit) ──
+_pcache="$(mktemp -d)"
+: > "$_pcache/old.png"; touch -t "$_old_stamp" "$_pcache/old.png"
+bpt_reset
+bpt_set_actionable '[]'
+export BUG_PIPELINE_ATTACHMENT_CACHE_DIR="$_pcache"
+bpt_run
+bpt_expect_eq "P2: empty tick exits 0" 0 "$BPT_RC"
+if [ -e "$_pcache/old.png" ]; then bpt_ok "P2: empty tick prunes nothing (prune is after the cheap exit)"; else bpt_fail "P2: empty tick pruned — prune ran before the cheap exit"; fi
+bpt_file_absent "$STUB/claude.sentinel" "P2: empty tick still spawns zero claude"
+unset BUG_PIPELINE_ATTACHMENT_CACHE_DIR
+rm -rf "$_pcache"
+
+# ── Prune P3 — nonexistent cache dir → the -d guard no-ops, tick still exits 0 ─
+bpt_reset
+bpt_set_actionable "$_QUEUED_ROW"
+bpt_set_claude_result '{"class":"not_a_thing"}'
+export BUG_PIPELINE_ATTACHMENT_CACHE_DIR="$STUB/cache-never-created"
+bpt_run
+bpt_expect_eq "P3: nonexistent cache dir → tick exits 0" 0 "$BPT_RC"
+unset BUG_PIPELINE_ATTACHMENT_CACHE_DIR
+
+# ── Prune P4 — the -n guard: an EMPTY internal var must NOT `find "" -delete` the cwd ──
+# `${VAR:-default}` never yields empty from an empty override, so the dangerous case
+# (ATTACHMENT_CACHE_DIR="") is exercised at the function level, in a throwaway cwd
+# holding a back-dated file that a guardless `find "" -delete` would remove.
+_cwdguard="$(mktemp -d)"
+: > "$_cwdguard/repo-old.txt"; touch -t "$_old_stamp" "$_cwdguard/repo-old.txt"
+( cd "$_cwdguard" && bash -c 'source "$1"; ATTACHMENT_CACHE_DIR=""; prune_attachment_cache' bpt-prune-shim "$BPT_DRIVER" 2>/dev/null )
+if [ -e "$_cwdguard/repo-old.txt" ]; then bpt_ok "P4: empty ATTACHMENT_CACHE_DIR is a no-op (-n guard blocks find '' -delete)"; else bpt_fail "P4: -n guard failed — find deleted cwd files"; fi
+rm -rf "$_cwdguard"
+
+# ── Prune P5 — cross-process default: driver default == bot cacheDir() default ─
+# A silent drift means the bot writes bytes nobody prunes (or the driver prunes an
+# empty dir forever). CLI-executable source-consistency check, no node run.
+_cache_suffix="/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/bug-pipeline/attachments"
+_drv_default="$(bash -c 'unset BUG_PIPELINE_ATTACHMENT_CACHE_DIR; source "$1"; printf %s "$ATTACHMENT_CACHE_DIR"' bpt-default-shim "$BPT_DRIVER" 2>/dev/null)"
+bpt_expect_eq "P5: driver default = \$HOME$_cache_suffix" "$HOME$_cache_suffix" "$_drv_default"
+_bot_src="$(dirname "$BPT_DRIVER")/../ibl5/IBLbot/src/bug-bot/attachments.ts"
+if grep -qF "os.homedir()}$_cache_suffix" "$_bot_src"; then bpt_ok "P5: bot cacheDir() default suffix matches the driver"; else bpt_fail "P5: bot/driver cache-path drift"; fi
+
 echo "----"
 [ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"
 exit "$FAILED"

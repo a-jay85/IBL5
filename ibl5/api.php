@@ -103,7 +103,8 @@ $app->getContainer()->set('api.controllerFactory', static function (): \Closure 
         if ($controllerClass === \Api\Controller\EnqueueController::class) {
             return new \Api\Controller\EnqueueController(
                 new \BugPipeline\BugReportRepository($db),
-                new \Repositories\TeamIdentityRepository($db)
+                new \Repositories\TeamIdentityRepository($db),
+                new \BugPipeline\AttachmentInputValidator()
             );
         }
 

@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed autonomous-loop engineering entries, extracted from loop-engineering-backlog.md.
-last_verified: 2026-07-24
+last_verified: 2026-08-05
 ---
 
 # Autonomous-Loop Engineering Backlog — Archive
@@ -91,4 +91,4 @@ Read-only historical record of ✅ Implemented entries. For OPEN items see ../lo
 **Risk if untouched (was):** Future silent-fallback paths in ship-adjacent code will not be examined at plan time when the plan hold is security-motivated rather than verification-gap-motivated.
 **Closes gap:** #9 (meta-tooling — prevents future versions of this class) from `$HOME/claude-plans/sim-recap-testing-gaps-breakdown.md`
 **Dedup:** reconciled 2026-07-31 — uncovered by #1668 / #1665 / #1667 / #1714.
-**Status (2026-08-04):** ✅ Implemented — gate 15 in `plan/SKILL.md` gains a second unconditional arm: any diff introducing `auto_merge: false` (outside a plan with an existing hold) triggers the detectability review, regardless of whether the hold is security- or verification-gap-motivated. PR #1765.
+**Status (2026-08-04):** ✅ Implemented — gate 15 in `plan/SKILL.md` gains a second unconditional arm keyed on the *diff* rather than on the hold's justification: a new silent-fallback or degraded path in a synchronous sim path or a `bin/*-tick` script requires a loud failure signal (Discord, a required-blocking CI check, or an equivalent alarm), regardless of whether the hold is security-, destructive-migration-, UI/UX- or verification-gap-motivated. PR #1765.

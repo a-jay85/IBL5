@@ -23,18 +23,6 @@ last_verified: 2026-08-05
 
 ---
 
-## Roll-up
-
-| Status | Count |
-|--------|------:|
-| ⬜ Open | 10 |
-| 📋 Planned | 3 |
-| ◑ Partial | 2 |
-| ✅ Implemented | 12 |
-| 🚫 Declined | 0 |
-
----
-
 ## Entries
 
 | # | Title | Status | Automouse | Effort |

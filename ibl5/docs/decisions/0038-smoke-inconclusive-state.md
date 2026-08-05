@@ -1,12 +1,13 @@
 ---
 description: The production smoke test distinguishes an INCONCLUSIVE result (prober blocked by the WAF, or a docs-only deploy) from a real FAILURE, so transient prober-side issues no longer trigger an auto-rollback of healthy production.
-last_verified: 2026-06-02
+last_verified: 2026-08-05
 ---
 
 # ADR-0038: Smoke "Inconclusive" State Gates Auto-Rollback
 
 **Status:** Accepted
 **Date:** 2026-06-02
+**Superseded by (gating mechanism):** [ADR-0039](0039-smoke-on-box-loopback-gate.md) — the IBL5 gating probe now runs on-box over SSH; the INCONCLUSIVE exit-3 classification is retained.
 
 ## Context
 
@@ -28,7 +29,7 @@ Add a third smoke outcome — **INCONCLUSIVE** — that is notify-only and never
 
 A scope is inconclusive iff **all** of: it ran ≥2 checks; **zero** passed; **every** failure was an HTTP-status failure (no body/PHP-error/missing-content failure); and all those statuses are **identical** and in the WAF-class set `{403, 415, 429}`. Such a run exits **3**. The predicate is deliberately conservative — a single passing check, a `5xx`, a `200`-with-bad-body, or two distinct status codes all break uniformity and fall back to a real `exit 1`. (IBL6 has a single check, so its scope can never be inconclusive; its existing notify-only behavior is unchanged.)
 
-The `smoke-prod.yml` IBL5 step captures the exit code: on `3` it sets an `ibl5_inconclusive=true` output and **exits 0**, so `smoke.result == 'success'` and the rollback gate's `needs.smoke.result == 'failure'` condition is false *by construction*. A new `notify-inconclusive` job (mirroring the existing `notify-ibl6-degradation` notify-only job) DMs the owner.
+The `smoke-prod.yml` IBL5 step captures the exit code: on `3` it sets an `ibl5_inconclusive=true` output and **exits 0**, so `smoke.result == 'success'` and the rollback gate's `needs.smoke.result == 'failure'` condition is false *by construction*. A `notify-inconclusive` job DMs the owner. (Later consolidated into a unified `notify` job together with the scheduled-failure notifier — ci-backlog 2.1.)
 
 ### B. Docs-only deploys never gate a revert (defense-in-depth)
 
@@ -42,4 +43,4 @@ In `rollback-and-notify`'s "Check revert eligibility" step, after the existing `
 ## Consequences
 
 - A transient WAF block now produces an owner DM and **no rollback** — production stays on the deployed commit. If production were genuinely down, the failure would be heterogeneous or `5xx` and would still gate a rollback.
-- The classifier is one-shot-verified (curl-stub exit-code scenarios) rather than CI-gated regression; a `bats` harness for `bin/smoke-prod` is a deferred follow-up. CI `shellcheck` continues to guard syntax/bash-3.2 compatibility.
+- The classifier's exit-code scenarios are covered by `tests/Cli/SmokeProdCliTest.php` (PHPUnit, CI-gated via the Cli testsuite). CI `shellcheck` continues to guard syntax/bash-3.2 compatibility.

@@ -1,6 +1,6 @@
 ---
 description: Run the native-engine SHADOW sim out-of-band as a detached background process instead of inline in the admin update request.
-last_verified: 2026-06-01
+last_verified: 2026-08-05
 ---
 
 # ADR-0037: Out-of-Band Engine Shadow Sim

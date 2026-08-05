@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-08-04
+last_verified: 2026-08-05
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -43,28 +43,15 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 > A file still >500 LOC after a ✅ does **not** reopen the finding when the finding's named concern was narrower than "shrink below 500 LOC"; residual size is noted, not re-flagged.
 
-### Roll-up (333 findings)
-
-| Status | Count |
-|--------|------:|
-| ✅ Implemented | 240 |
-| ◑ Partial | 24 |
-| 📋 Planned (plan queued / PR open) | 1 |
-| ⬜ Open | 58 |
-| 🚫 Declined | 10 |
-
-> Status counts re-verified 2026-06-28 (exact, from the per-axis tables); **6.20 / 6.21 added 2026-06-29** from the PR #1107 review (⬜ Open +2); **6.22 added 2026-06-29** from the #1066 reject-IDOR review (⬜ Open +1). Two stale-Open rows were flipped directly (no plan owned them): **13.3**, **13.9** (✅ +2, ⬜ −2 vs the master re-count). **1.21–1.31 added 2026-07-24** from the hot-files comment→backlog migration (⬜ Open +11: 8 🟩 auto-mergeable, 3 🟨 conditional — 1.23/1.25/1.31 need characterization/endpoint pins). **Ground-truth audit 2026-07-24:** 7 stale-Open items flipped ✅, 2 false findings marked 🚫, 5 new Axis-1 rows seeded (1.32–1.36); IDOR PRs #1107–1110 merged 2026-06-29 (unblocking 2.10/2.13/2.14/2.25/7.7/14.6); PRs #1240/#1230/#1204 merged (2.6/2.31/2.32/5.18 already ✅/Open on own merits). **9.19 and 9.20 implemented 2026-07-24** — added READMEs to all 68 missing class dirs + frontmatter to all 16 existing class READMEs that lacked it; extended bin/check-docs IN_SCOPE_GLOBS (✅ +2, ⬜ −2); roll-up recomputed from grep (331 rows total, unchanged). **6.16 flipped ✅ 2026-07-24** (all Api data repos + JsonResponder + SystemClock tested; ✅ +1, ◑ −1). **6.14 Status updated 2026-07-24** (ProcessBoxscoresStep/GenerateSeasonAwardsStep/ParseJsbFilesStep added; still ◑). **Resolved rows collapsed 2026-07-25** — ✅/🚫 findings no longer appear as table rows; each axis carries a `> ✅ resolved (N): …` / `> 🚫 declined (N): …` summary line and their evidence lives in [archive/maintenance-backlog-archive.md](archive/maintenance-backlog-archive.md). **Recount recipe:** resolved = sum of the `(N)` in the per-axis summary lines; open = grep of the per-axis table rows; total = the two added. Counts above are unchanged by the collapse (238 + 93 = 331). **1.36 and 7.7 flipped ✅ 2026-07-26** (✅ +2, ⬜ −1, ◑ −1); total tracked rows unchanged at 331. **1.29 flipped ✅ 2026-07-26 (PR #1679)** (✅ +1, ⬜ −1); total tracked rows unchanged at 331. **1.27 flipped ✅ 2026-07-27** — extracted 10 per-entity collaborators into `ibl5/classes/JsbParser/Repositories/`; JsbImportRepository reduced to thin facade (✅ +1, ⬜ −1); total tracked rows unchanged at 331. **1.23 flipped ✅ 2026-07-27 (`oneonone-1-23-pins-and-extract`)** (✅ +1, ⬜ −1); total tracked rows unchanged at 331. **1.31 flipped ✅ 2026-07-27** — extracted `TradeRosterPreviewParamValidator` + `TradeRosterPreviewCashRowBuilder` collaborators; DB characterization pin + validator/cash-row unit suites landed (✅ +1, ⬜ −1). **2.39 seeded 2026-07-27** — cash-year range unbounded/unordered in `TradeRosterPreviewCashRowBuilder::buildCashRows()`; cashStartYear/cashEndYear come from `$_GET` with no upper bound (discovered during trading-1-31-api-handler-extract) (⬜ +1); **1.19 flipped ✅ 2026-07-27** — characterization pins + `executePlayerLoop` merge shipped; `processPlrData`/`processPlrDataForYear` deduped (✅ +1, ⬜ −1); total tracked: 332 (✅ 236, ◑ 24, 📋 1, ⬜ 61, 🚫 10). **14.6 flipped ◑ Partial 2026-07-28 (#1712)** — batch 1 (17 Api/Controller/*) converted to DI; batch 2 pending (◑ +1, ⬜ −1); total tracked: 332 (✅ 236, ◑ 25, 📋 1, ⬜ 60, 🚫 10). **14.9 flipped ✅ 2026-07-27** — replaced 21 `$cookie[1]` occurrences across 11 files with `AuthService::getUsername()` (✅ +1, ⬜ −1); total tracked: 332 (✅ 237, ◑ 25, 📋 1, ⬜ 59, 🚫 10). **11.16 flipped ✅ 2026-07-27** — moved page-specific JS loaders (`offer-salary-hints.js`, `contract-hint.js`) from PageLayout global bundle to per-view injection in NegotiationService and TradingView; E2E behavioral pins + VR manifest row added (✅ +1, ⬜ −1); total tracked: 332 (✅ 238, ◑ 25, 📋 1, ⬜ 58, 🚫 10). **6.2 and 6.4 flipped ✅ 2026-07-27** (PR #1671 tests verified; ✅ +2, ⬜ −1, ◑ −1); total tracked: 332 (✅ 240, ◑ 24, 📋 1, ⬜ 57, 🚫 10). **15.24 seeded 2026-08-04** — pre-existing duplicate player box-score rows in `ibl_box_scores` for seasons 1993/1994/2002/2004 (discovered during the PR #1771 review) (⬜ +1).
 
 **Automouse-readiness of the not-yet-complete (⬜/◑/📋) items:**
 
-| Bucket | Count | What it means |
-|--------|------:|---------------|
-| 🟩 Auto-mergeable | ~110 | green-green + pinnable; arms unattended |
-| 🟦 Safe, human-merge | 11 | gate-14 trigger (security / UI-UX / destructive schema) → `auto_merge: false` |
-| 🟨 Conditional | 37 | needs one mechanical-scope add, one upfront decision, or a collision-PR to merge first |
-| 🟥 Not automouse-safe | 1 | 12.11 — `git filter-repo` history rewrite (irreversible, coordinated) |
-
-(A few ✅ rows also carry a 🟩 for an *optional* residual burndown — e.g. PHPStan-rule baselines — so automouse tags slightly exceed the not-done count. Counts verified by grep of the per-axis tables; treat as ±2.)
+| Bucket | What it means |
+|--------|---------------|
+| 🟩 Auto-mergeable | green-green + pinnable; arms unattended |
+| 🟦 Safe, human-merge | gate-14 trigger (security / UI-UX / destructive schema) → `auto_merge: false` |
+| 🟨 Conditional | needs one mechanical-scope add, one upfront decision, or a collision-PR to merge first |
+| 🟥 Not automouse-safe | 12.11 — `git filter-repo` history rewrite (irreversible, coordinated) |
 
 **Highest-leverage 🟩 auto-mergeable clusters** (no human needed): the open god-class extractions (1.3/1.9/1.11/1.13/1.17/1.18/1.20, 7.14/7.15, 1.32–1.36), the entire Axis-6 coverage backlog (bar 6.21, now 🟨), the Axis-9 docs items, and the PHPStan-baseline burndowns (10.12/10.13/10.19/10.21).
 

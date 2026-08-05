@@ -1,6 +1,6 @@
 ---
 description: Token-spend reduction backlog — resident-context diet, caching economics, output-spend guards, and LSP-first navigation for the Claude Code harness, with per-entry status.
-last_verified: 2026-07-17
+last_verified: 2026-08-05
 ---
 
 # Token-Spend Reduction Backlog
@@ -24,20 +24,6 @@ last_verified: 2026-07-17
 - **repo** — normal worktree → PR path.
 
 **Effort scale:** **S** — one sitting. **M** — multi-step, 1–3 days. **L** — restructure, likely needs an ADR.
-
----
-
-## Roll-up
-
-| Status | Count |
-|--------|------:|
-| ⬜ Open | 0 |
-| 📋 Planned | 0 |
-| ◑ Partial | 0 |
-| ✅ Implemented | 16 |
-| 🚫 Declined | 0 |
-
-Archived entries (✅ Implemented): see [token-spend-backlog-archive.md](archive/token-spend-backlog-archive.md).
 
 ---
 

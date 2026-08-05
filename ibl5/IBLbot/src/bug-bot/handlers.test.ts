@@ -11,6 +11,14 @@ vi.mock('./php-client.js', () => ({
     reaction: vi.fn().mockResolvedValue({ advanced: true }),
 }));
 
+// Attachment capture is exercised end-to-end in attachments.test.ts; here we mock the two
+// seams so handleEnqueue's wiring (sanitize → download → shape → enqueue) is tested without
+// touching the network or filesystem.
+vi.mock('./attachments.js', () => ({
+    validateAndSanitize: vi.fn(),
+    downloadAttachment: vi.fn(),
+}));
+
 import {
     classifyMessage,
     toRoutable,
@@ -19,6 +27,24 @@ import {
     type RoutableMessage,
 } from './handlers.js';
 import * as phpClient from './php-client.js';
+import { validateAndSanitize, downloadAttachment } from './attachments.js';
+import type { SanitizedAttachment } from './attachments.js';
+
+// A well-formed sanitized image, as validateAndSanitize would return it.
+function sanitized(over: Partial<SanitizedAttachment> = {}): SanitizedAttachment {
+    return {
+        attachmentId: '700000000000000001',
+        originalUrl: 'https://cdn.discordapp.com/attachments/1/2/shot.png',
+        proxyUrl: 'https://media.discordapp.net/attachments/1/2/shot.png',
+        filename: 'shot.png',
+        contentType: 'image/png',
+        fileSize: 1234,
+        ext: 'png',
+        isImage: true,
+        cachePath: '/cache/333333333333333333-700000000000000001.png',
+        ...over,
+    };
+}
 
 const base: RoutableMessage = {
     authorId: 'GM',
@@ -89,6 +115,7 @@ describe('handleEnqueue', () => {
             channelId: '222222222222222222',
             id: '333333333333333333',
             content: 'a bug',
+            attachments: new Map(),
             react: vi.fn().mockResolvedValue(undefined),
         } as unknown as Message;
 
@@ -101,6 +128,7 @@ describe('handleEnqueue', () => {
             channel_id: '222222222222222222',
             message_id: '333333333333333333',
             text: 'a bug',
+            attachments: [],
         });
         expect(typeof arg.author_id).toBe('string');
         expect(typeof arg.message_id).toBe('string');
@@ -112,6 +140,7 @@ describe('handleEnqueue', () => {
             channelId: '222222222222222222',
             id: '333333333333333333',
             content: 'a bug',
+            attachments: new Map(),
             react: vi.fn().mockResolvedValue(undefined),
         } as unknown as Message;
 
@@ -132,6 +161,7 @@ describe('handleEnqueue', () => {
             channelId: '222222222222222222',
             id: '333333333333333333',
             content: 'a bug',
+            attachments: new Map(),
             react: vi.fn().mockRejectedValue(new Error('Missing Permissions')),
         } as unknown as Message;
 
@@ -139,6 +169,64 @@ describe('handleEnqueue', () => {
 
         expect(phpClient.enqueue).toHaveBeenCalledTimes(1);
         expect(msg.react).toHaveBeenCalledTimes(1);
+    });
+
+    function msgWith(attachments: Map<string, unknown>): Message {
+        return {
+            author: { id: '111111111111111111' },
+            channelId: '222222222222222222',
+            id: '333333333333333333',
+            content: 'crash with screenshot',
+            attachments,
+            react: vi.fn().mockResolvedValue(undefined),
+        } as unknown as Message;
+    }
+
+    it('captures an image attachment into a 1-element attachments array', async () => {
+        vi.mocked(validateAndSanitize).mockReturnValue(sanitized());
+        vi.mocked(downloadAttachment).mockResolvedValue('/cache/333333333333333333-700000000000000001.png');
+
+        await handleEnqueue(msgWith(new Map([['A', { id: '700000000000000001' }]])));
+
+        const arg = vi.mocked(phpClient.enqueue).mock.calls[0][0];
+        expect(arg.attachments).toEqual([{
+            attachment_id: '700000000000000001',
+            original_url: 'https://cdn.discordapp.com/attachments/1/2/shot.png',
+            local_path: '/cache/333333333333333333-700000000000000001.png',
+            filename: 'shot.png',
+            content_type: 'image/png',
+            file_size: 1234,
+        }]);
+        expect(typeof arg.attachments![0].attachment_id).toBe('string');
+    });
+
+    it('a text-only message enqueues with an empty attachments array', async () => {
+        await handleEnqueue(msgWith(new Map()));
+
+        expect(vi.mocked(phpClient.enqueue).mock.calls[0][0].attachments).toEqual([]);
+        expect(validateAndSanitize).not.toHaveBeenCalled();
+    });
+
+    it('a validateAndSanitize-rejected attachment is dropped, but the report still enqueues', async () => {
+        vi.mocked(validateAndSanitize).mockReturnValue(null);
+
+        await handleEnqueue(msgWith(new Map([['A', { id: 'not-a-snowflake' }]])));
+
+        expect(phpClient.enqueue).toHaveBeenCalledTimes(1);
+        expect(vi.mocked(phpClient.enqueue).mock.calls[0][0].attachments).toEqual([]);
+        expect(downloadAttachment).not.toHaveBeenCalled();
+    });
+
+    it('a failed download still enqueues the report with local_path: null', async () => {
+        vi.mocked(validateAndSanitize).mockReturnValue(sanitized());
+        vi.mocked(downloadAttachment).mockResolvedValue(null); // download degraded to URL-only
+
+        await handleEnqueue(msgWith(new Map([['A', { id: '700000000000000001' }]])));
+
+        const arg = vi.mocked(phpClient.enqueue).mock.calls[0][0];
+        expect(arg.attachments).toHaveLength(1);
+        expect(arg.attachments![0].local_path).toBeNull();
+        expect(phpClient.enqueue).toHaveBeenCalledTimes(1);
     });
 });
 

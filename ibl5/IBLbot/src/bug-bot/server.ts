@@ -131,6 +131,16 @@ export function startBugBotServer(client: Client): void {
                         author_id: m.author.id,     // string
                         content: m.content,
                         ts: m.createdTimestamp,     // numeric
+                        // Metadata only — thread-reply bytes are ephemeral (decision 3); Phase 7
+                        // renders these as text. Always an array ([] for text-only) so the
+                        // driver's jq never sees null.
+                        attachments: [...m.attachments.values()].slice(0, 10).map((a) => ({
+                            id: a.id,
+                            url: a.url,
+                            proxy_url: a.proxyURL,
+                            name: a.name,
+                            content_type: a.contentType,
+                        })),
                     })),
             });
         } catch (error) {

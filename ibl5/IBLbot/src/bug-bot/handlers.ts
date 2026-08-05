@@ -7,6 +7,7 @@ import type {
 } from 'discord.js';
 import { config } from './config.js';
 import * as phpClient from './php-client.js';
+import { validateAndSanitize, downloadAttachment, type SanitizedAttachment } from './attachments.js';
 
 // ── Pure routing function — the single most-tested unit ─────────────────────
 // Takes a minimal plain shape (NOT a live Message) so tests need no discord.js
@@ -41,15 +42,44 @@ export function toRoutable(message: Message): RoutableMessage {
     };
 }
 
+// Capture up to 10 attachments off the message: sanitize (drop rejects), download the
+// image survivors in parallel, and shape them for the enqueue wire. A single Promise.all
+// keeps a 10-image report near one download's latency, not ten sequential ones — critical
+// because backfill.ts awaits handleEnqueue in a loop with no per-message catch. The whole
+// block degrades to [] on any failure: a broken capture must cost the screenshots, never
+// the report (the same posture as the swallowed react ack below).
+async function captureAttachments(msg: Message): Promise<phpClient.AttachmentInput[]> {
+    try {
+        const survivors = [...msg.attachments.values()]
+            .slice(0, 10)
+            .map((a) => validateAndSanitize(msg.id, a))
+            .filter((s): s is SanitizedAttachment => s !== null);
+        const localPaths = await Promise.all(survivors.map((s) => downloadAttachment(s)));
+        return survivors.map((s, i) => ({
+            attachment_id: s.attachmentId,
+            original_url: s.originalUrl,
+            local_path: localPaths[i], // null when the download failed → degrade to URL-only
+            filename: s.filename,
+            content_type: s.contentType,
+            file_size: s.fileSize,
+        }));
+    } catch (err) {
+        console.error('handleEnqueue: attachment capture failed (degrading to text-only):', err);
+        return [];
+    }
+}
+
 // ── Shared enqueue path — Phase 6 backfill calls this EXACT function ─────────
 // All *_id fields are the string values discord.js already provides — NEVER
 // Number()/parseInt.
 export async function handleEnqueue(msg: Message): Promise<void> {
+    const attachments = await captureAttachments(msg);
     await phpClient.enqueue({
         author_id: msg.author.id,
         channel_id: msg.channelId,
         message_id: msg.id,
         text: msg.content,
+        attachments,
     });
     // Instant ack (bot-side of "ack + thread"): react ✴️ so a GM sees pickup with no
     // cron round-trip. Also fires for Phase-6 backfilled messages (same shared path) —

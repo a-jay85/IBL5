@@ -11,7 +11,7 @@ declare(strict_types=1);
  *   One JSON object is emitted on stdout; bad argv writes
  *   "simRecapQueue: <message>" to stderr and exits 1 before any repo is built.
  *
- * This is the queue half of the trust boundary (ADR-0092): the Mac-side tick
+ * This is the queue half of the trust boundary (ADR-0093): the Mac-side tick
  * holds only a read-only MySQL credential and so cannot drive the queue over
  * the tunnel at all (claiming a row is an UPDATE). Every privileged queue
  * action happens here, prod-side, reached over ssh — never from the Mac.

@@ -19,6 +19,7 @@ parameters:
         - bin/rebuild-record-holders-cache
         - bin/validate-schema
         - bin/warm-cache
+        - scripts
     excludePaths:
         - classes/Bootstrap/LegacyFunctions.php
         - phpstan-rules/Fixtures

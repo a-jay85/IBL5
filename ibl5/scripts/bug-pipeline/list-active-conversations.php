@@ -19,4 +19,20 @@ use BugPipeline\BugReportRepository;
 
 $repo = new BugReportRepository($mysqli_db);
 
-echo json_encode($repo->listActiveConversations()), PHP_EOL;
+$rows = $repo->listActiveConversations();
+$ids = array_map(static fn (array $row): int => (int) $row['id'], $rows);
+// ONE batched attachment query for the whole actionable set — never an N+1 per tick. An
+// empty $ids short-circuits inside fetchAllInList without touching the DB, so the empty-tick
+// zero-cost guard is preserved: nothing actionable → zero attachment queries.
+$byReport = $repo->findAttachmentsForReportIds($ids);
+
+$out = array_map(
+    static function (array $row) use ($byReport): array {
+        $withAtt = $row;
+        $withAtt['attachments'] = $byReport[(int) $row['id']] ?? [];
+        return $withAtt;
+    },
+    $rows
+);
+
+echo json_encode($out), PHP_EOL;

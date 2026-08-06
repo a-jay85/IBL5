@@ -507,6 +507,24 @@ CREATE TABLE `ibl_bug_pipeline_state` (
   PRIMARY KEY (`channel_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `ibl_bug_report_attachments`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ibl_bug_report_attachments` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `report_id` int(10) unsigned NOT NULL,
+  `attachment_id` varchar(20) NOT NULL COMMENT 'Discord snowflake — always a string, never Number()/tonumber',
+  `original_url` text NOT NULL COMMENT 'Discord CDN URL — expires ~24h, so local_path is the durable copy',
+  `local_path` text DEFAULT NULL COMMENT 'Absolute path in the attachment cache; NULL when the download failed (degrade-to-URL)',
+  `filename` varchar(255) NOT NULL COMMENT 'Discord-supplied name — DISPLAY ONLY, never used to build a filesystem path',
+  `content_type` varchar(100) NOT NULL,
+  `file_size` bigint(20) unsigned DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `ux_report_attachment` (`report_id`,`attachment_id`),
+  CONSTRAINT `fk_bug_attachment_report` FOREIGN KEY (`report_id`) REFERENCES `ibl_bug_reports` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_bug_reporter_profile`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;

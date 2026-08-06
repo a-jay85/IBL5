@@ -1,6 +1,6 @@
 ---
 description: Requires plans to classify every verification step into the test-type taxonomy at plan-write time, preventing manual-testing items from deferring to post-plan cleanup, and grounds seed/DOM-dependent E2E assertions in real fixtures.
-last_verified: 2026-07-25
+last_verified: 2026-07-31
 ---
 
 # Plan Verification Matrix
@@ -84,11 +84,29 @@ Each implementation phase that changes behavior must have a corresponding row (o
 
 **Split the PR** when even that is awkward: land the exercisable mechanism with its rows now, land the registration separately.
 
+**A CI-run check must be run by a job THIS PR's own diff actually triggers.** Naming a `bin/check-*` / `bin/test-*` script in a matrix row proves the script exists, not that CI runs it: `.github/workflows/tests.yml`'s `changes` job path-filters split producer from consumer — `harness-tests` is gated on `shell` (`bin/**`), `db-integration` on `src` (`**.php`) — so a PHP-only PR runs zero harness tests and a `bin/`-only PR runs zero DB tests. When a plan's matrix cites a CI-run check, the plan must confirm its own changed-file set matches the `changes:` filter of the job that runs it, and otherwise add a phase that adds the path to that filter or moves the check to an always-run job. This is `/plan` Step 4 gate 16 failure shape (d): Opus judgment, deliberately not mechanized, because `bin/check-plan` parses no workflow YAML.
+
 **The anti-abuse guard takes precedence over all of the above.** A subjective UI/UX judgment is *always* exercisable on environment 1 — bring the worktree up and look. It therefore can never qualify as intrinsic, and "can't do it pre-merge" is never a route out of a forced UI/UX row under § Forced manual-verification trigger and `/plan` Step 4 gate 14a/14d.
 
 ### Weave tests inline
 
 Pre-implementation tests go **before** their corresponding implementation step. Post-implementation tests go **immediately after**. Never collect all tests into a separate appendix at the bottom.
+
+## Required Test Methods
+
+A plan whose Verification Matrix carries **≥1 PHPUnit row** MUST also carry a `## Required Test Methods` section — a markdown list of the exact test-method names the implementation must ship, one bare name per list item:
+
+```
+## Required Test Methods
+- `testTradedPlayerAttributedToFromTeamId`
+- `test_required_methods_ignores_fenced_example`
+```
+
+The matrix's "Test file / location" column pins only a **path**, and `/post-plan` Phase 5.0 greps `git diff --name-only` for that path — so an implementation that writes the right *file* with different, weaker tests satisfies every row. That is how PR #1753 shipped five substituted tests with an all-green matrix. This section is what makes conformance **row-level**.
+
+- **The name must match the shipped declaration exactly.** Phase 5.0 greps the diff **body** for `function <name>` or `def <name>` and otherwise emits `MISSING-METHOD: <name>`. Write the bare method name — no class prefix, no `()`, no `::`.
+- **Fenced examples do not count.** Both parsers strip fenced blocks width-aware before reading the section (`bin/lib/critical-files.sh` for bash, `harness/planfile.py`'s `_strip_fenced` for python), so an illustrative list inside a fence yields zero entries. A fence-blind parse would instead harvest example names and strand the PR on an unresolvable `MISSING-METHOD:`.
+- **Escape hatch.** When every PHPUnit row genuinely names no new method (e.g. it re-runs an existing suite as a characterization check), write `<!-- no-test-methods: <reason ≥15 chars> -->` instead. `bin/check-plan` gate `[M]` accepts the section or the marker.
 
 ## Forced E2E triggers
 

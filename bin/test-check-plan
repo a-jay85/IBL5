@@ -99,14 +99,14 @@ CF_MATRIX='
 
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---|---|---|---|
-| 1 | thing works | PHPUnit | post-impl | `tests/X.php` |
+| 1 | thing works | E2E | post-impl | `tests/X.spec.ts` |
 '
 
 # A minimal well-formed matrix passes (exit 0). Baseline / no false positives.
 assert "clean-minimal" 0 "$FM"'
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---------------|-----------|--------|---------------------|
-| 1 | cap rejects over-cap trade | PHPUnit | pre-impl | `tests/Trade/TradeValidatorTest.php` |
+| 1 | cap rejects over-cap trade | E2E | pre-impl | `tests/e2e/trade.spec.ts` |
 | 2 | form submits and redirects | E2E | post-impl | `tests/e2e/trade.spec.ts` |
 '
 
@@ -118,7 +118,7 @@ assert "no-matrix" 1 'Implementation steps only. No verification table here.'
 assert "pr-column-header" 0 "$FM"'
 | # | What to verify | Test type | Timing | Test file / location | PR |
 |---|---------------|-----------|--------|---------------------|----|
-| 1 | thing works | PHPUnit | post-impl | `tests/X.php` | 1 |
+| 1 | thing works | E2E | post-impl | `tests/e2e/x.spec.ts` | 1 |
 '
 
 # Gate 2 (test-type membership) is intentionally NOT linted by check-plan — the
@@ -176,7 +176,7 @@ assert "benign-or-aside-ok" 0 "$FM"'
 assert "reuse-unknown-class-ok" 0 "$FM"'
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---------------|-----------|--------|---------------------|
-| 1 | x | PHPUnit | post-impl | `tests/X.php` |
+| 1 | x | E2E | post-impl | `tests/e2e/x.spec.ts` |
 
 **Reuse:** call `TotallyMadeUpClass::someMethod()` for the lookup.
 '
@@ -186,7 +186,7 @@ assert "reuse-unknown-class-ok" 0 "$FM"'
 assert "reuse-forward-ref-ok" 0 "$FM"'
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---------------|-----------|--------|---------------------|
-| 1 | x | PHPUnit | post-impl | `tests/X.php` |
+| 1 | x | E2E | post-impl | `tests/e2e/x.spec.ts` |
 
 Create a new method `TotallyMadeUpClass::brandNewMethod()` and **reuse** it later.
 '
@@ -197,7 +197,7 @@ Create a new method `TotallyMadeUpClass::brandNewMethod()` and **reuse** it late
 assert "reuse-constant-not-method" 0 "$FM"'
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---------------|-----------|--------|---------------------|
-| 1 | x | PHPUnit | post-impl | `tests/X.php` |
+| 1 | x | E2E | post-impl | `tests/e2e/x.spec.ts` |
 
 **Reuse:** the `TotallyMadeUpClass::SOME_CONSTANT` value for the default.
 '
@@ -214,6 +214,9 @@ M='
 |---|---------------|-----------|--------|---------------------|
 | 1 | cap rejects over-cap trade | PHPUnit | pre-impl | `tests/Trade/TradeValidatorTest.php` |
 | 2 | form submits and redirects | E2E | post-impl | `tests/e2e/trade.spec.ts` |
+
+## Required Test Methods
+- `testStubMethodSatisfyingGateM`
 '
 
 # Gate 8: a new `bin/foo` plus an ADR-step path resolves the trigger (exit 0).
@@ -676,7 +679,7 @@ fi
 assert "[W]-clean-pass" 0 "$FM_OPUS
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---|---|---|---|
-| 1 | setting renamed correctly | PHPUnit | post-impl | \`tests/ConfigTest.php\` |
+| 1 | setting renamed correctly | E2E | post-impl | \`tests/e2e/config.spec.ts\` |
 
 ## Phase 1: Update the configuration
 
@@ -694,7 +697,7 @@ Rename the setting in config.php.
 assert "[W]-sweep-verb-advisory" 0 "$FM_OPUS
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---|---|---|---|
-| 1 | helper renamed | PHPUnit | post-impl | \`tests/ServiceTest.php\` |
+| 1 | helper renamed | E2E | post-impl | \`tests/e2e/service.spec.ts\` |
 
 ## Phase 1: Rename all call sites of old helper
 
@@ -711,7 +714,7 @@ Update all call sites of \`legacyHelper()\` to use \`newHelper()\` in all PHP fi
 _body="$FM_OPUS
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---|---|---|---|
-| 1 | helper renamed | PHPUnit | post-impl | \`tests/ServiceTest.php\` |
+| 1 | helper renamed | E2E | post-impl | \`tests/e2e/service.spec.ts\` |
 
 ## Phase 1: Rename all call sites of old helper
 
@@ -961,6 +964,75 @@ if [ "$_got" -ne 2 ]; then
 else
     echo "ok: cf-count (2 must-appear, 3 exempt)"
 fi
+
+# ---------------------------------------------------------------------------
+# Gate [M] fixtures (5 cases)
+# ---------------------------------------------------------------------------
+PU='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | PHPUnit | post-impl | `t.php` |
+'
+E2E_ONLY='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | E2E | post-impl | `t.spec.ts` |
+'
+
+# PHPUnit row with no methods section — must flag [M].
+assert_viol "gateM-phpunit-no-methods" 1 '[M]' "$FM$PU"
+
+# Phase-2 stub now carries ## Required Test Methods — must pass.
+assert_viol "gateM-methods-present-ok" 0 '[M]' "$FM$M"
+
+# no-test-methods: escape marker (≥15 chars) — must pass.
+assert_viol "gateM-escape-marker-ok" 0 '[M]' "$FM$PU"'
+<!-- no-test-methods: rerun of an existing suite, no new methods -->
+'
+
+# Fence canary: methods section whose only bullets are inside a 3-backtick fence →
+# cf_section_named strips them → 0 parseable items → must flag [M].
+assert_viol "gateM-fenced-methods-only-flags" 1 '[M]' "$FM$PU"'
+## Required Test Methods
+
+```
+- `testPhantomInFence`
+```
+'
+
+# No PHPUnit row — gate [M] must stay silent.
+assert_viol "gateM-no-phpunit-row-silent" 0 '[M]' "$FM$E2E_ONLY"
+
+# ---------------------------------------------------------------------------
+# Gate [G] fixtures (4 cases)
+# ---------------------------------------------------------------------------
+# Unwired bin/test-* script in the location cell — must flag [G].
+assert_viol "gateG-unwired-script-flags" 1 '[G]' "$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | run script | CLI-executable | post-impl | `bin/test-nonexistent-thing` |
+'
+
+# Genuinely wired script (bin/test-check-plan is in tests.yml:679-680) — must pass.
+assert_viol "gateG-wired-script-ok" 0 '[G]' "$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | run script | CLI-executable | post-impl | `bin/test-check-plan` |
+'
+
+# (one-shot) annotation exempts the unwired script — must pass.
+assert_viol "gateG-unwired-oneshot-ok" 0 '[G]' "$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | run script | CLI-executable | post-impl | `bin/test-nonexistent-thing` (one-shot) |
+'
+
+# Non-bin/test-*/check-* command — gate [G] narrow scope must stay silent.
+assert_viol "gateG-non-bin-command-ok" 0 '[G]' "$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | run something | CLI-executable | post-impl | curl + bin/db-query |
+'
 
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"

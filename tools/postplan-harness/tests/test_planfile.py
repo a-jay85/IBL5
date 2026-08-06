@@ -10,7 +10,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness import conformance
 from harness.planfile import (EXEMPT_RE, frontmatter_auto_merge_false, locate_plan,
-                              parse_critical_files, parse_matrix)
+                              parse_critical_files, parse_matrix,
+                              parse_required_test_methods)
 from harness.state import PlanInfo, RunResult
 
 PLAN = """---
@@ -411,3 +412,91 @@ def test_corpus_regression_jsb_native_docs_repo():
         "v3 rejects bin/check-docs (Alternatives Considered); only v1 lists it as Critical"
     assert "ibl5/docs/decisions/0097-jsb-native-docs-repo.md" not in cf, \
         "v3 renamed the ADR to 0097-jsb-native-private-docs-repo.md; only v1 has the old slug"
+
+
+# ---------------------------------------------------------------------------
+# Phase 7 — parse_required_test_methods + conformance.check method loop
+# ---------------------------------------------------------------------------
+
+def test_required_test_methods_parses_list():
+    """A well-formed ## Required Test Methods section returns names in order, backticks stripped."""
+    content = """
+## Required Test Methods
+- `testTradedPlayerAttributedToFromTeamId`
+- testNoArgMethod
+- `test_snake_case`
+
+## Some Other Section
+- ignored
+"""
+    methods = parse_required_test_methods(content)
+    assert methods == ["testTradedPlayerAttributedToFromTeamId", "testNoArgMethod", "test_snake_case"]
+
+
+def test_required_test_methods_ignores_fenced_example():
+    """Fence-negative canary: bullets inside a fenced block yield no methods.
+
+    This is the test that goes red if _strip_fenced is ever dropped from
+    parse_required_test_methods. The phantom-MISSING-METHOD: class it prevents
+    is the reason Approach B was chosen over a prose regex sweep.
+    """
+    content = """
+## Required Test Methods
+
+```
+- `testPhantomInFence`
+- testAnotherPhantom
+```
+
+"""
+    methods = parse_required_test_methods(content)
+    assert methods == [], f"Expected [], got {methods!r} — fence stripping lost"
+
+
+def test_required_test_methods_absent_section_is_empty():
+    """A plan with no ## Required Test Methods section returns [] and raises nothing."""
+    content = """
+## Critical Files
+- `ibl5/classes/Foo.php`
+
+## Verification Matrix
+| # | What | Type | Timing | File |
+"""
+    methods = parse_required_test_methods(content)
+    assert methods == []
+
+
+def test_conformance_flags_missing_method():
+    """conformance.check flags a required method absent from diff_body with MISSING-METHOD:."""
+    plan = PlanInfo(found=True, has_matrix=True, required_test_methods=["testAlpha"])
+    items = conformance.check(plan, [], diff_body="function testOther() {}")
+    assert len(items) == 1
+    assert items[0].startswith("MISSING-METHOD:")
+    assert "testAlpha" in items[0]
+
+
+def test_conformance_accepts_present_method():
+    """No MISSING-METHOD: items when diff_body contains the declaration.
+
+    Both spellings are asserted in one body — function (PHP) and def (pytest) —
+    which pins the (function|def) alternation shared with Phase 5's bash block.
+    A function-only idiom would fail this test.
+    """
+    plan = PlanInfo(found=True, has_matrix=True,
+                    required_test_methods=["testAlpha", "test_beta"])
+    diff_body = "function testAlpha() {\n    // impl\n}\ndef test_beta(self):"
+    items = conformance.check(plan, [], diff_body=diff_body)
+    method_items = [i for i in items if i.startswith("MISSING-METHOD:")]
+    assert method_items == [], f"Unexpected MISSING-METHOD items: {method_items!r}"
+
+
+def test_conformance_empty_diff_body_is_noop():
+    """check(plan, files) with default empty diff_body emits no MISSING-METHOD: items.
+
+    Pins the deliberate fail-open from plan Architectural trade-offs: a missed
+    caller silently no-ops the method loop instead of raising TypeError mid-run.
+    """
+    plan = PlanInfo(found=True, has_matrix=True, required_test_methods=["testAlpha"])
+    items = conformance.check(plan, [])
+    method_items = [i for i in items if i.startswith("MISSING-METHOD:")]
+    assert method_items == []

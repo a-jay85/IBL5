@@ -28,6 +28,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SKILL="$REPO_ROOT/.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md"
 P25_SKILL="$REPO_ROOT/.claude/skills/post-plan/SKILL.md"
 P5_SKILL="$REPO_ROOT/.claude/skills/post-plan/_phase-5-final-verification.md"
+PLAN_SKILL="$REPO_ROOT/.claude/skills/plan/SKILL.md"
 
 BASE_TMP="$(mktemp -d)"
 trap 'rm -rf "$BASE_TMP"' EXIT
@@ -456,6 +457,21 @@ expect_p25 'p25_probe_excludes_readme_archive' 'C' 'miss' \
 # Empty BL_DIR (glob stays literal) yields miss, not a crash.
 expect_p25 'p25_probe_empty_dir' 'C' 'miss' \
     "$(run_p25 "$B25" 'ibl5/classes/Updater/StandingsUpdater.php' '' "$BL_EMPTY")"
+
+# --- /plan SKILL.md gate 15 arm 2 + gate 16 shape (d) prose assertions -------
+if grep -qF 'Second arm — unconditional, keyed on the diff rather than on the hold'\''s justification.' "$PLAN_SKILL"; then
+    echo "ok: plan SKILL.md gate 15 arm 2 prose present"
+else
+    echo "FAIL: plan SKILL.md gate 15 arm 2 prose missing (expected 'Second arm — unconditional, keyed on the diff rather than on the hold'\''s justification.')"
+    FAILED=1
+fi
+
+if grep -qF 'A row whose CI check the PR'\''s own diff never triggers.' "$PLAN_SKILL"; then
+    echo "ok: plan SKILL.md gate 16 shape (d) prose present"
+else
+    echo "FAIL: plan SKILL.md gate 16 shape (d) prose missing (expected 'A row whose CI check the PR'\''s own diff never triggers.')"
+    FAILED=1
+fi
 
 if [ "$FAILED" -eq 0 ]; then
     echo "All post-plan block checks passed."

@@ -68,6 +68,12 @@ jobs:
               # so a skill-only edit must run the harness job too.
               - '.claude/skills/pr-review/SKILL.md'
               - '.claude/skills/security-audit/SKILL.md'
+              # bin/test-check-plan and bin/test-postplan-arm-conditions read the
+              # gate definitions and the Phase 5.0 conformance blocks from these
+              # three files, so a skill-only edit must run the harness job too.
+              - '.claude/skills/plan/SKILL.md'
+              - '.claude/review-shared/_plan-verification.md'
+              - '.claude/skills/post-plan/_phase-5-final-verification.md'
               # bin/test-human-signoff-classifier guards the classifier lib that
               # human-signoff.yml sources, so a workflow-only edit must run it too.
               - '.github/workflows/human-signoff.yml'

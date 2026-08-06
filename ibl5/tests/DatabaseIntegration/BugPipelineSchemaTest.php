@@ -57,6 +57,88 @@ final class BugPipelineSchemaTest extends DatabaseTestCase
     }
 
     #[Test]
+    public function bugReportAttachmentsTableHasExpectedColumns(): void
+    {
+        $columns = $this->columnsOf('ibl_bug_report_attachments');
+        self::assertNotSame([], $columns, 'ibl_bug_report_attachments does not exist after migrations');
+
+        foreach ([
+            'id', 'report_id', 'attachment_id', 'original_url', 'local_path',
+            'filename', 'content_type', 'file_size', 'created_at',
+        ] as $col) {
+            self::assertArrayHasKey($col, $columns, "Missing column $col on ibl_bug_report_attachments");
+        }
+
+        // attachment_id MUST be varchar(20), never an integer type. A BIGINT snowflake
+        // reads back as a native PHP int (MYSQLI_OPT_INT_AND_FLOAT_NATIVE) and json_encode
+        // corrupts any 19-digit id above 2^53. This assertion fails loudly if someone
+        // "corrects" the column back to BIGINT and reintroduces the precision bug.
+        $stmt = $this->db->prepare(
+            'SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
+        );
+        self::assertNotFalse($stmt);
+        $table = 'ibl_bug_report_attachments';
+        $column = 'attachment_id';
+        $stmt->bind_param('ss', $table, $column);
+        $stmt->execute();
+        /** @var array{COLUMN_TYPE: string}|null $row */
+        $row = $stmt->get_result()->fetch_assoc();
+        self::assertNotNull($row, 'ibl_bug_report_attachments.attachment_id column not found');
+        self::assertSame(
+            'varchar(20)',
+            $row['COLUMN_TYPE'],
+            'attachment_id must be varchar(20), NOT an integer type — a BIGINT snowflake corrupts on native-int read'
+        );
+        $stmt->close();
+    }
+
+    #[Test]
+    public function bugReportAttachmentsHasUniqueKeyAndForeignKey(): void
+    {
+        // ux_report_attachment must exist and be UNIQUE (Non_unique = 0) — this backs the
+        // INSERT IGNORE replay-idempotency in BugReportRepository::insertAttachments().
+        $stmt = $this->db->prepare(
+            'SELECT NON_UNIQUE, GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) AS cols
+             FROM INFORMATION_SCHEMA.STATISTICS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = ?
+               AND INDEX_NAME = ?
+             GROUP BY INDEX_NAME, NON_UNIQUE'
+        );
+        self::assertNotFalse($stmt);
+        $table = 'ibl_bug_report_attachments';
+        $indexName = 'ux_report_attachment';
+        $stmt->bind_param('ss', $table, $indexName);
+        $stmt->execute();
+        /** @var array{NON_UNIQUE: int|string, cols: string}|null $row */
+        $row = $stmt->get_result()->fetch_assoc();
+        self::assertNotNull($row, 'ux_report_attachment index is missing — backs INSERT IGNORE idempotency');
+        self::assertSame(0, (int) $row['NON_UNIQUE'], 'ux_report_attachment must be UNIQUE (Non_unique = 0)');
+        self::assertSame('report_id,attachment_id', $row['cols'], 'ux_report_attachment column order must be report_id,attachment_id');
+        $stmt->close();
+
+        // The FK fk_bug_attachment_report must be live, not merely declared.
+        $fkStmt = $this->db->prepare(
+            'SELECT REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME
+             FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = ?
+               AND CONSTRAINT_NAME = ?'
+        );
+        self::assertNotFalse($fkStmt);
+        $fkName = 'fk_bug_attachment_report';
+        $fkStmt->bind_param('ss', $table, $fkName);
+        $fkStmt->execute();
+        /** @var array{REFERENCED_TABLE_NAME: ?string, REFERENCED_COLUMN_NAME: ?string}|null $fkRow */
+        $fkRow = $fkStmt->get_result()->fetch_assoc();
+        self::assertNotNull($fkRow, 'fk_bug_attachment_report foreign key is missing');
+        self::assertSame('ibl_bug_reports', $fkRow['REFERENCED_TABLE_NAME'], 'FK must reference ibl_bug_reports');
+        self::assertSame('id', $fkRow['REFERENCED_COLUMN_NAME'], 'FK must reference ibl_bug_reports.id');
+        $fkStmt->close();
+    }
+
+    #[Test]
     public function snowflakeColumnsAreBigintUnsigned(): void
     {
         $cases = [

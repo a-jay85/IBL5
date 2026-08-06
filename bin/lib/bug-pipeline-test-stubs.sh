@@ -44,6 +44,7 @@ SH
 echo "claude $*" >> "$STUB/claude.log"
 echo "CLAUDE" >> "$STUB/calls.log"
 touch "$STUB/claude.sentinel"
+printf '%s\n' "$@" >> "$STUB/claude.args.log"   # one arg per line — lets a case assert --allowedTools '' on the invocation
 if [ "${STUB_HUNT_MODE:-0}" = 1 ]; then
     # Parse --model <id> to record ladder order.
     model=""; prev=""

@@ -170,9 +170,12 @@ describe('/mention', () => {
 
 describe('/get-thread-messages', () => {
     function threadChannel(messages: unknown[]) {
+        // A live Message always carries an `attachments` Collection; default an empty one
+        // so a test message that omits it maps to `attachments: []` (never a null crash).
+        const withAtt = messages.map((m) => ({ attachments: new Map(), ...(m as object) }));
         return {
             isTextBased: () => true,
-            messages: { fetch: vi.fn().mockResolvedValue(new Map(messages.map((m, i) => [String(i), m]))) },
+            messages: { fetch: vi.fn().mockResolvedValue(new Map(withAtt.map((m, i) => [String(i), m]))) },
         };
     }
 
@@ -190,8 +193,8 @@ describe('/get-thread-messages', () => {
         const res = await invoke('/get-thread-messages', { thread_id: 'T' }, clientWithChannel(channel));
         const payload = res.json.mock.calls[0][0];
         expect(payload.messages).toEqual([
-            { author_id: '10', content: 'first', ts: 1000 },
-            { author_id: '20', content: 'second', ts: 2000 },
+            { author_id: '10', content: 'first', ts: 1000, attachments: [] },
+            { author_id: '20', content: 'second', ts: 2000, attachments: [] },
         ]);
         expect(typeof payload.messages[0].author_id).toBe('string');
     });
@@ -200,6 +203,45 @@ describe('/get-thread-messages', () => {
         const channel = threadChannel([]);
         await invoke('/get-thread-messages', { thread_id: 'T' }, clientWithChannel(channel));
         expect(channel.messages.fetch).toHaveBeenCalledWith({ limit: 100 });
+    });
+
+    it('maps per-message attachments to the metadata wire shape', async () => {
+        const channel = threadChannel([{
+            author: { id: '10' }, content: 'shot', createdTimestamp: 1000,
+            attachments: new Map([['A', {
+                id: '700000000000000001',
+                url: 'https://cdn.discordapp.com/attachments/1/2/shot.png',
+                proxyURL: 'https://media.discordapp.net/attachments/1/2/shot.png',
+                name: 'shot.png',
+                contentType: 'image/png',
+            }]]),
+        }]);
+        const res = await invoke('/get-thread-messages', { thread_id: 'T' }, clientWithChannel(channel));
+        const payload = res.json.mock.calls[0][0];
+        expect(payload.messages[0].attachments).toEqual([{
+            id: '700000000000000001',
+            url: 'https://cdn.discordapp.com/attachments/1/2/shot.png',
+            proxy_url: 'https://media.discordapp.net/attachments/1/2/shot.png',
+            name: 'shot.png',
+            content_type: 'image/png',
+        }]);
+        expect(typeof payload.messages[0].attachments[0].id).toBe('string');
+    });
+
+    it('emits an empty attachments array for a text-only message', async () => {
+        const channel = threadChannel([{ author: { id: '10' }, content: 'text', createdTimestamp: 1000 }]);
+        const res = await invoke('/get-thread-messages', { thread_id: 'T' }, clientWithChannel(channel));
+        expect(res.json.mock.calls[0][0].messages[0].attachments).toEqual([]);
+    });
+
+    it('caps per-message attachments at 10', async () => {
+        const many = new Map(Array.from({ length: 12 }, (_, i) => [String(i), {
+            id: `${i}`, url: 'https://cdn.discordapp.com/x', proxyURL: 'https://media.discordapp.net/x',
+            name: `f${i}.png`, contentType: 'image/png',
+        }]));
+        const channel = threadChannel([{ author: { id: '10' }, content: 'many', createdTimestamp: 1000, attachments: many }]);
+        const res = await invoke('/get-thread-messages', { thread_id: 'T' }, clientWithChannel(channel));
+        expect(res.json.mock.calls[0][0].messages[0].attachments).toHaveLength(10);
     });
 
     it('500 when fetch rejects', async () => {

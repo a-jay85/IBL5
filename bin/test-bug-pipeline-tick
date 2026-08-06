@@ -92,6 +92,179 @@ bpt_file_absent "$_cs_home/Library/LaunchAgents/com.ibl5.bug-pipeline-cron.plist
 bpt_file_absent "$_cs_home/launchctl.log" "refusal precedes every launchctl call"
 bpt_file_absent "$_cs_home/gh.log" "refusal precedes issue-tracking bootstrap"
 
+# ── Phase 7 — attachment text surface (classify / gather / hunter) ────────────
+# Matrix rows 38-43. att_line/render_prompt/row_transcript/render_hunter_prompt are
+# unit-invoked by sourcing the driver in a subshell (mismatched $0 → the tail guard
+# never runs main(); mirrors the bug_slug sanity rows in bin/test-bug-pipeline-hunt).
+CLASSIFY_TMPL="$(dirname "$BPT_DRIVER")/bug-pipeline-classify-prompt"
+GATHER_TMPL="$(dirname "$BPT_DRIVER")/bug-pipeline-gather-prompt"
+HUNT_TMPL="$(dirname "$BPT_DRIVER")/bug-pipeline-hunter-prompt"
+# render_hunter_prompt resolves the template via $SCRIPT_DIR (=cwd under the shim), so
+# hand it the real file through the env seam; row_transcript reaches the curl stub via CURL_BIN.
+export BUG_PIPELINE_HUNT_PROMPT="$HUNT_TMPL"
+_drv() { bash -c 'source "$1"; shift; "$@"' bpt-unit-shim "$BPT_DRIVER" "$@" 2>/dev/null; }
+
+# One DB-shaped attachment (Phase 6 .attachments enrichment); .filename is the display name.
+# local_path must point at a file that REALLY EXISTS: att_line re-checks the filesystem and
+# renders `cached=none` for a path the 7-day prune has already deleted, so a fabricated path
+# here would assert the degraded shape while claiming to test the happy one.
+_LIVE_CACHE="$STUB/live-cache"; mkdir -p "$_LIVE_CACHE"
+_LIVE_PNG="$_LIVE_CACHE/700000000000000001.png"; : > "$_LIVE_PNG"
+ATT_JSON="$(jq -nc --arg p "$_LIVE_PNG" '[{attachment_id:"700000000000000001",filename:"screenshot-crash.png",content_type:"image/png",local_path:$p,original_url:"https://cdn.discordapp.com/a/b/screenshot-crash.png"}]')"
+
+# ── Row 38 — all three templates carry the {{attachments_text}} placeholder ────
+# A template missing it substitutes to nothing and fails silently, so grep each file.
+for _t in "$CLASSIFY_TMPL" "$GATHER_TMPL" "$HUNT_TMPL"; do
+    if grep -q '{{attachments_text}}' "$_t"; then bpt_ok "r38: $(basename "$_t") has {{attachments_text}}"
+    else bpt_fail "r38: $(basename "$_t") missing {{attachments_text}}"; fi
+done
+
+# ── Row 39 — rendered classify, gather, AND hunter each contain the attachment name ──
+_att="$(_drv att_line "$ATT_JSON")"
+bpt_log_has_str() { case "$2" in *"$3"*) bpt_ok "$1";; *) bpt_fail "$1 — '$3' absent";; esac; }
+bpt_log_has_str "r39: att_line emits the marker" "$_att" "[attachment: screenshot-crash.png (image/png) cached=$_LIVE_PNG url=https://cdn.discordapp.com/a/b/screenshot-crash.png]"
+
+# ── Row 39b — a pruned cache file degrades to cached=none, not a dangling path ─────
+# prune_attachment_cache deletes bytes at 7 days but leaves local_path set in the DB. Rendering
+# the stale path would tell triage to read a file that is gone. Same JSON, file removed.
+_att_gone="$(_drv att_line "$(jq -nc --arg p "$_LIVE_CACHE/deleted-by-prune.png" \
+    '[{attachment_id:"700000000000000002",filename:"gone.png",content_type:"image/png",local_path:$p,original_url:"https://cdn.discordapp.com/a/b/gone.png"}]')")"
+bpt_log_has_str "r39b: vanished local_path renders cached=none" "$_att_gone" "cached=none"
+case "$_att_gone" in
+    *deleted-by-prune.png*) bpt_fail "r39b: stale local_path leaked into the prompt";;
+    *) bpt_ok "r39b: the dangling path itself is absent from the render";;
+esac
+_classify_rendered="$(_drv render_prompt "$(cat "$CLASSIFY_TMPL")" "a bug" "(no thread yet)" "$_att")"
+bpt_log_has_str "r39: classify prompt contains the attachment name" "$_classify_rendered" "screenshot-crash.png"
+_gather_rendered="$(_drv render_prompt "$(cat "$GATHER_TMPL")" "a request" "(no thread yet)" "$_att")"
+bpt_log_has_str "r39: gather prompt contains the attachment name" "$_gather_rendered" "screenshot-crash.png"
+_claim="$(jq -nc --argjson a "$ATT_JSON" '{id:"7",class:"bug",original_text:"trade button broken",thread_id:null,attachments:$a}')"
+_hunter_rendered="$(_drv render_hunter_prompt "$_claim" "/tmp/wt/ibl5")"
+bpt_log_has_str "r39: hunter prompt contains the attachment name" "$_hunter_rendered" "screenshot-crash.png"
+bpt_log_has_str "r39: hunter prompt frames attachments as data (tag block)" "$_hunter_rendered" "<attachments>"
+
+# ── Row 40 — an image-only transcript message renders a non-empty [attachments:] tail ──
+bpt_reset
+bpt_set_transcript '{"messages":[{"author_id":"111","content":"","attachments":[{"name":"only-image.png","content_type":"image/png"}]}]}'
+_tr="$(_drv row_transcript 880000000000000001)"
+bpt_log_has_str "r40: image-only message renders [attachments:" "$_tr" "[attachments: only-image.png]"
+
+# ── Row 41 — NEG sanitation on the UNVALIDATED transcript path (only sanitizer there):
+# a newline in the name renders on one line; a 500-char name truncates to 120. ────
+_long="$(printf 'a%.0s' {1..500})"
+bpt_reset
+bpt_set_transcript "$(jq -nc --arg nl "$(printf 'evil\nname.png')" --arg lg "$_long" \
+    '{messages:[{author_id:"111","content":"","attachments":[{name:$nl,content_type:"image/png"}]},{author_id:"222","content":"see","attachments":[{name:$lg,content_type:"image/png"}]}]}')"
+_tr="$(_drv row_transcript 880000000000000001)"
+bpt_log_has_str "r41: control char in transcript name is stripped to a space" "$_tr" "evil name.png"
+# The embedded newline must NOT survive to split the attachments marker onto a second line.
+if printf '%s' "$_tr" | grep -q '^name.png'; then bpt_fail "r41: newline in name leaked a second line"; else bpt_ok "r41: newline-bearing name stays on one line"; fi
+if printf '%s' "$_tr" | grep -q 'a\{120\}' && ! printf '%s' "$_tr" | grep -q 'a\{121\}'; then
+    bpt_ok "r41: 500-char transcript name truncates to 120"; else bpt_fail "r41: transcript name not truncated to 120"; fi
+# att_line (DB path) applies the same cap — defense in depth even though enqueue validated it.
+_att_long="$(_drv att_line "$(jq -nc --arg lg "$_long" '[{filename:$lg,content_type:"image/png",local_path:null,original_url:"u"}]')")"
+if printf '%s' "$_att_long" | grep -q 'a\{120\}' && ! printf '%s' "$_att_long" | grep -q 'a\{121\}'; then
+    bpt_ok "r41: att_line 500-char filename truncates to 120"; else bpt_fail "r41: att_line filename not truncated to 120"; fi
+
+# ── Row 42 — NEG empty attachment set renders no [attachment: marker ──────────
+_att_empty="$(_drv att_line '[]')"
+bpt_expect_eq "r42: att_line on [] is the empty string" "" "$_att_empty"
+
+# ── Row 43 — tool-starvation on the ACTUAL attachment-bearing classify invocation ──
+# One classify row (thread_id null → no hunt) → exactly one claude call owns claude.args.log.
+bpt_reset
+bpt_set_actionable "$(jq -nc --argjson a "$ATT_JSON" \
+    '[{id:1,status:"queued",class:null,original_text:"x",thread_id:null,issue_number:null,attachments:$a}]')"
+bpt_set_claude_result '{"class":"not_a_thing"}'
+bpt_run
+bpt_log_has "$STUB" claude.args.log "screenshot-crash.png" "r43: the attachment name reaches the real -p prompt"
+if awk '/^--allowedTools$/{getline; if ($0=="") f=1} END{exit !f}' "$STUB/claude.args.log" 2>/dev/null; then
+    bpt_ok "r43: --allowedTools '' (deny-all) on the attachment-bearing classify call"
+else
+    bpt_fail "r43: capability-starvation invariant broken on the classify call"
+fi
+
+# ── Phase 8 — attachment cache prune at tick start (matrix prune rows) ─────────
+# A stamp 8 days old (portable across BSD `date -v` and GNU `date -d`); files older
+# than `-mtime +7` (strictly >7×24h) must be pruned, fresher ones must survive.
+_old_stamp="$(date -v-8d '+%Y%m%d%H%M' 2>/dev/null || date -d '8 days ago' '+%Y%m%d%H%M')"
+_QUEUED_ROW='[{"id":1,"status":"queued","class":null,"original_text":"x","thread_id":null,"issue_number":null}]'
+
+# ── Prune P1 — a WORKING tick prunes >7d files and keeps fresher ones ──────────
+_pcache="$(mktemp -d)"
+: > "$_pcache/fresh.png"
+: > "$_pcache/old.png"; touch -t "$_old_stamp" "$_pcache/old.png"
+bpt_reset
+bpt_set_actionable "$_QUEUED_ROW"
+bpt_set_claude_result '{"class":"not_a_thing"}'
+export BUG_PIPELINE_ATTACHMENT_CACHE_DIR="$_pcache"
+bpt_run
+bpt_expect_eq   "P1: working tick exits 0" 0 "$BPT_RC"
+bpt_file_absent "$_pcache/old.png" "P1: >7d cached attachment pruned"
+if [ -e "$_pcache/fresh.png" ]; then bpt_ok "P1: fresh cached attachment survives"; else bpt_fail "P1: fresh attachment wrongly pruned"; fi
+unset BUG_PIPELINE_ATTACHMENT_CACHE_DIR
+rm -rf "$_pcache"
+
+# ── Prune P2 — an EMPTY tick prunes NOTHING (prune sits AFTER the cheap exit) ──
+_pcache="$(mktemp -d)"
+: > "$_pcache/old.png"; touch -t "$_old_stamp" "$_pcache/old.png"
+bpt_reset
+bpt_set_actionable '[]'
+export BUG_PIPELINE_ATTACHMENT_CACHE_DIR="$_pcache"
+bpt_run
+bpt_expect_eq "P2: empty tick exits 0" 0 "$BPT_RC"
+if [ -e "$_pcache/old.png" ]; then bpt_ok "P2: empty tick prunes nothing (prune is after the cheap exit)"; else bpt_fail "P2: empty tick pruned — prune ran before the cheap exit"; fi
+bpt_file_absent "$STUB/claude.sentinel" "P2: empty tick still spawns zero claude"
+unset BUG_PIPELINE_ATTACHMENT_CACHE_DIR
+rm -rf "$_pcache"
+
+# ── Prune P3 — nonexistent cache dir → the -d guard no-ops, tick still exits 0 ─
+bpt_reset
+bpt_set_actionable "$_QUEUED_ROW"
+bpt_set_claude_result '{"class":"not_a_thing"}'
+export BUG_PIPELINE_ATTACHMENT_CACHE_DIR="$STUB/cache-never-created"
+bpt_run
+bpt_expect_eq "P3: nonexistent cache dir → tick exits 0" 0 "$BPT_RC"
+unset BUG_PIPELINE_ATTACHMENT_CACHE_DIR
+
+# ── Prune P4 — the -n guard: an EMPTY internal var must NOT `find "" -delete` the cwd ──
+# `${VAR:-default}` never yields empty from an empty override, so the dangerous case
+# (ATTACHMENT_CACHE_DIR="") is exercised at the function level, in a throwaway cwd
+# holding a back-dated file that a guardless `find "" -delete` would remove.
+_cwdguard="$(mktemp -d)"
+: > "$_cwdguard/repo-old.txt"; touch -t "$_old_stamp" "$_cwdguard/repo-old.txt"
+( cd "$_cwdguard" && bash -c 'source "$1"; ATTACHMENT_CACHE_DIR=""; prune_attachment_cache' bpt-prune-shim "$BPT_DRIVER" 2>/dev/null )
+if [ -e "$_cwdguard/repo-old.txt" ]; then bpt_ok "P4: empty ATTACHMENT_CACHE_DIR is a no-op (-n guard blocks find '' -delete)"; else bpt_fail "P4: -n guard failed — find deleted cwd files"; fi
+rm -rf "$_cwdguard"
+
+# ── Prune P5 — cross-process default across ALL THREE participants ─────────────
+# THREE processes hold a copy of this path, not two: the bot WRITES bytes there
+# (attachments.ts cacheDir()), the driver PRUNES them (bin/bug-pipeline-tick), and the PHP
+# validator ACCEPTS OR REJECTS paths under it (AttachmentInputValidator::DEFAULT_CACHE_DIR,
+# which is a literal because PHP cannot expand `~`). Any pair agreeing while the third drifts
+# is silent in a different way — bot/driver drift orphans bytes; a drifted PHP root rejects
+# every well-formed local_path, so every attachment degrades to URL-only with no error anywhere.
+# CLI-executable source-consistency check, no node/php run.
+_cache_suffix="/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/bug-pipeline/attachments"
+_drv_default="$(bash -c 'unset BUG_PIPELINE_ATTACHMENT_CACHE_DIR; source "$1"; printf %s "$ATTACHMENT_CACHE_DIR"' bpt-default-shim "$BPT_DRIVER" 2>/dev/null)"
+bpt_expect_eq "P5: driver default = \$HOME$_cache_suffix" "$HOME$_cache_suffix" "$_drv_default"
+_bot_src="$(dirname "$BPT_DRIVER")/../ibl5/IBLbot/src/bug-bot/attachments.ts"
+if grep -qF "os.homedir()}$_cache_suffix" "$_bot_src"; then bpt_ok "P5: bot cacheDir() default suffix matches the driver"; else bpt_fail "P5: bot/driver cache-path drift"; fi
+# Third copy: the PHP constant is absolute, so it is spelled with the DEPLOY host's home —
+# comparing it to $_drv_default would fail on any other host ($HOME=/home/runner in CI) for
+# an environment reason, not the drift this row exists to catch. Re-resolve the driver's own
+# expression under the deploy home instead, derived from the project slug in the shared
+# suffix so nothing here restates the literal being checked.
+_php_src="$(dirname "$BPT_DRIVER")/../ibl5/classes/BugPipeline/AttachmentInputValidator.php"
+_php_default="$(sed -n "s/.*DEFAULT_CACHE_DIR = '\([^']*\)'.*/\1/p" "$_php_src")"
+_deploy_home="$(printf %s "$_cache_suffix" | sed -n 's#^/\.claude/projects/-\([^-]*\)-\([^-]*\)-.*#/\1/\2#p')"
+if [ -z "$_deploy_home" ]; then
+    bpt_fail "P5: could not derive the deploy home from the cache suffix"
+else
+    _drv_deploy_default="$(HOME="$_deploy_home" bash -c 'unset BUG_PIPELINE_ATTACHMENT_CACHE_DIR; source "$1"; printf %s "$ATTACHMENT_CACHE_DIR"' bpt-deploy-shim "$BPT_DRIVER" 2>/dev/null)"
+    bpt_expect_eq "P5: PHP DEFAULT_CACHE_DIR = the driver default resolved under the deploy home" "$_drv_deploy_default" "$_php_default"
+fi
+
 echo "----"
 [ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"
 exit "$FAILED"

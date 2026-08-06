@@ -320,7 +320,107 @@ class BugReportRepositoryTest extends DatabaseTestCase
         self::assertSame(self::THREAD, $threadId);
     }
 
-    // ── Helper ─────────────────────────────────────────────────────────────────
+    // ── insertAttachments / findAttachmentsByReportId ──────────────────────────
+
+    public function testInsertAttachmentsPersistsRowsAndPreservesNullLocalPath(): void
+    {
+        $reportId = $this->insertBugReport(['original_message_id' => self::MSG_ID]);
+        $this->repo->insertAttachments($reportId, [
+            $this->attachmentInput(['attachment_id' => '700000000000000001', 'local_path' => '/cache/x-1.png']),
+            $this->attachmentInput(['attachment_id' => '700000000000000002', 'local_path' => null, 'file_size' => null]),
+        ]);
+
+        $rows = $this->repo->findAttachmentsByReportId($reportId);
+        self::assertCount(2, $rows);
+        self::assertSame('700000000000000001', $rows[0]['attachment_id'], 'ORDER BY id ASC');
+        self::assertSame('/cache/x-1.png', $rows[0]['local_path']);
+        self::assertSame('700000000000000002', $rows[1]['attachment_id']);
+        self::assertNull($rows[1]['local_path'], 'NULL local_path must read back NULL, not the empty string');
+        self::assertNull($rows[1]['file_size']);
+    }
+
+    public function testInsertAttachmentsIsReplayIdempotent(): void
+    {
+        $reportId = $this->insertBugReport(['original_message_id' => self::MSG_ID]);
+        $payload = [
+            $this->attachmentInput(['attachment_id' => '700000000000000001']),
+            $this->attachmentInput(['attachment_id' => '700000000000000002']),
+        ];
+        // Replay the identical payload — INSERT IGNORE + UNIQUE(report_id, attachment_id) must
+        // keep this at exactly 2 rows. A plain INSERT would duplicate every attachment per replay.
+        $this->repo->insertAttachments($reportId, $payload);
+        $this->repo->insertAttachments($reportId, $payload);
+        self::assertCount(2, $this->repo->findAttachmentsByReportId($reportId));
+    }
+
+    public function testInsertAttachmentsRoundTripsNineteenDigitSnowflakeAsString(): void
+    {
+        $reportId = $this->insertBugReport(['original_message_id' => self::MSG_ID]);
+        $snowflake = '1234567890123456789'; // 19 digits, above 2^53
+        $this->repo->insertAttachments($reportId, [
+            $this->attachmentInput(['attachment_id' => $snowflake]),
+        ]);
+        $rows = $this->repo->findAttachmentsByReportId($reportId);
+        self::assertCount(1, $rows);
+        self::assertSame($snowflake, $rows[0]['attachment_id'], 'attachment_id must round-trip === as a STRING; fails if column reverts to BIGINT');
+    }
+
+    public function testInsertAttachmentsAgainstOrphanReportIdPersistsNoRow(): void
+    {
+        // FK-liveness check. INSERT IGNORE downgrades the FK violation to a warning (it does NOT
+        // throw mysqli_sql_exception — the plan matrix row 8's stated mechanism is wrong for
+        // INSERT IGNORE + FK; verified empirically against MariaDB). The observable, discriminating
+        // property is that NO row is persisted: without a live FK, report_id 999999 has nothing else
+        // rejecting it, so INSERT IGNORE would have stored the row. Zero rows ⇒ the FK is live.
+        $this->repo->insertAttachments(999999, [$this->attachmentInput()]);
+        self::assertSame([], $this->repo->findAttachmentsByReportId(999999));
+    }
+
+    // ── findAttachmentsForReportIds (batched) ──────────────────────────────────
+
+    public function testFindAttachmentsForReportIdsReturnsEmptyForEmptyList(): void
+    {
+        // fetchAllInList short-circuits on [] without a query — the empty-tick zero-cost guard.
+        self::assertSame([], $this->repo->findAttachmentsForReportIds([]));
+    }
+
+    public function testFindAttachmentsForReportIdsReturnsMapKeyedByReportId(): void
+    {
+        $reportA = $this->insertBugReport(['original_message_id' => self::MSG_ID]);
+        $reportB = $this->insertBugReport(['original_message_id' => self::REPLY_ID]);
+        $this->repo->insertAttachments($reportA, [
+            $this->attachmentInput(['attachment_id' => '700000000000000001']),
+            $this->attachmentInput(['attachment_id' => '700000000000000002']),
+        ]);
+        $this->repo->insertAttachments($reportB, [
+            $this->attachmentInput(['attachment_id' => '700000000000000003']),
+        ]);
+
+        $map = $this->repo->findAttachmentsForReportIds([$reportA, $reportB]);
+        self::assertSame([$reportA, $reportB], array_keys($map), 'map keyed by report_id, only those two keys');
+        self::assertCount(2, $map[$reportA]);
+        self::assertCount(1, $map[$reportB]);
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────────
+
+    /**
+     * @param array<string, int|string|null> $overrides
+     * @return array{attachment_id: string, original_url: string, local_path: ?string, filename: string, content_type: string, file_size: ?int}
+     */
+    private function attachmentInput(array $overrides = []): array
+    {
+        /** @var array{attachment_id: string, original_url: string, local_path: ?string, filename: string, content_type: string, file_size: ?int} $input */
+        $input = array_merge([
+            'attachment_id' => '700000000000000001',
+            'original_url'  => 'https://cdn.discordapp.com/attachments/1/2/screenshot.png',
+            'local_path'    => null,
+            'filename'      => 'screenshot.png',
+            'content_type'  => 'image/png',
+            'file_size'     => 12345,
+        ], $overrides);
+        return $input;
+    }
 
     /**
      * @param array<string, int|string> $overrides

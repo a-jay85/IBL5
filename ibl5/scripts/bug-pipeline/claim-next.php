@@ -66,4 +66,8 @@ if ($row === null) {
     exit(0);
 }
 
-echo json_encode($row), PHP_EOL;
+// Attach the report's captured attachments (CLI-output layer only — BugReportRow is
+// unchanged; a NEW variable avoids PHPStan rejecting the extra key against the row shape).
+$out = $row;
+$out['attachments'] = $repo->findAttachmentsByReportId((int) $row['id']);
+echo json_encode($out), PHP_EOL;

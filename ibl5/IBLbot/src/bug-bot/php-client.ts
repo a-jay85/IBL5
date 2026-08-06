@@ -64,15 +64,29 @@ export async function apiPost<T>(endpoint: string, payload: unknown): Promise<T>
 
 // The 4 §3b writers (frozen contract):
 
+// One captured attachment, in the wire shape EnqueueController validates. Snowflake
+// ids stay strings (never Number()); local_path is null when the download failed and
+// the report degrades to URL-only.
+export interface AttachmentInput {
+    attachment_id: string;
+    original_url: string;
+    local_path: string | null;
+    filename: string;
+    content_type: string;
+    file_size: number | null;
+}
 export interface EnqueueBody {
     author_id: string;
     channel_id: string;
     message_id: string;
     text: string;
+    // Optional so backfill.ts and every existing enqueue() caller compiles untouched.
+    attachments?: AttachmentInput[];
 }
 export interface EnqueueResult {
     authorized: boolean;
     report_id: number | null;
+    attachments_stored?: number;
 }
 export function enqueue(body: EnqueueBody): Promise<EnqueueResult> {
     return apiPost<EnqueueResult>('enqueue', body);

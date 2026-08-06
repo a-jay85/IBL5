@@ -44,6 +44,21 @@ PLAN_TIMEOUT="${BUG_PIPELINE_PLAN_TIMEOUT:-1800}"
 CLASSIFY_PROMPT_FILE="${BUG_PIPELINE_CLASSIFY_PROMPT:-$SCRIPT_DIR/bug-pipeline-classify-prompt}"
 GATHER_PROMPT_FILE="${BUG_PIPELINE_GATHER_PROMPT:-$SCRIPT_DIR/bug-pipeline-gather-prompt}"
 
+# Attachment byte cache — the bot (ibl5/IBLbot/src/bug-bot/attachments.ts) writes
+# downloaded attachment bytes here; this default MUST resolve to the same absolute
+# path as that module's cacheDir() (cross-process invariant, matrix-checked).
+ATTACHMENT_CACHE_DIR="${BUG_PIPELINE_ATTACHMENT_CACHE_DIR:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/bug-pipeline/attachments}"
+# Prune cached attachment bytes older than 7 days. Both guards are load-bearing:
+# with set -u the var is defaulted, so an operator exporting the override as "" would
+# otherwise yield `find "" -delete` recursing the cwd; the -n test blocks that and the
+# -d test makes first run (cache never created) a no-op. -maxdepth 1 -type f keeps it to
+# plain files in that one dir; `2>/dev/null || true` means prune can never fail a tick.
+prune_attachment_cache() {
+    [ -n "${ATTACHMENT_CACHE_DIR:-}" ] || return 0
+    [ -d "$ATTACHMENT_CACHE_DIR" ] || return 0
+    find "$ATTACHMENT_CACHE_DIR" -maxdepth 1 -type f -mtime +7 -delete 2>/dev/null || true
+}
+
 # ── Hunter seams (#5b) — all default to production; tests override ─────────────
 HUNT_PROMPT_FILE="${BUG_PIPELINE_HUNT_PROMPT:-$SCRIPT_DIR/bug-pipeline-hunter-prompt}"
 HUNT_MODELS="${BUG_PIPELINE_HUNT_MODELS:-claude-haiku-4-5 claude-sonnet-4-6 claude-opus-4-8}"  # cheap→dear, Opus last
@@ -155,11 +170,47 @@ envelope_result() { # raw_envelope
     printf '%s' "$1" | jq -rc 'if (.is_error // false) == true then empty else (.result // empty) end' 2>/dev/null
 }
 
+# Render a row's DB attachments (Phase 6 .attachments enrichment) as sanitized, data-only
+# text — one line per attachment, empty string when none. Filenames are DISPLAY ONLY and
+# never used to build a path; strip control chars (C0 + DEL) to keep an attacker-chosen
+# name on one line, and cap at 120 chars. Snowflake-ish ids stay strings (no tonumber).
+#
+# local_path is re-checked against the FILESYSTEM before it is rendered. prune_attachment_cache
+# deletes cache files at 7 days but never touches ibl_bug_report_attachments.local_path, so the
+# DB keeps pointing at bytes that are gone — and a triage prompt that says `cached=<path>` for a
+# deleted file is worse than one that says `none`, because it invites a read that will fail. The
+# DB value is a hint; the filesystem is the truth. A vanished path degrades to `none`, the exact
+# shape a failed download already produces, so no downstream reader needs a new case.
+att_line() { # attachments_json
+    local json="${1:-[]}" live='[]' p
+    while IFS= read -r p; do
+        [ -n "$p" ] && [ -e "$p" ] && live="$(jq -c --arg p "$p" '. + [$p]' <<<"$live")"
+    done < <(printf '%s' "$json" | jq -r '(. // []) | map(.local_path // empty) | .[]' 2>/dev/null)
+
+    printf '%s' "$json" | jq -r --argjson live "$live" '
+        (. // []) | map(
+            # Bind the path BEFORE piping into $live: inside `$live | index(...)` the `.`
+            # context is $live (an array), so a bare `.local_path` there indexes the array
+            # and jq aborts the whole program with "Cannot index array with string".
+            .local_path as $p
+            | (if $p != null and (($live | index($p)) == null)
+               then null else $p end) as $cached
+            | "[attachment: "
+            + ((.filename // "") | gsub("[[:cntrl:]]";" ") | .[0:120])
+            + " (" + (.content_type // "") + ")"
+            + " cached=" + ($cached // "none")
+            + " url=" + (.original_url // "")
+            + "]"
+        ) | join("\n")
+    ' 2>/dev/null
+}
+
 # Build a prompt by safe bash substitution (never sed — untrusted content in replacement).
-render_prompt() { # template original_text transcript
+render_prompt() { # template original_text transcript attachments_text
     local t="$1"
     t="${t//\{\{original_text\}\}/$2}"
     t="${t//\{\{transcript\}\}/$3}"
+    t="${t//\{\{attachments_text\}\}/$4}"
     printf '%s' "$t"
 }
 
@@ -167,7 +218,19 @@ render_prompt() { # template original_text transcript
 row_transcript() { # thread_id
     if [ -n "$1" ] && [ "$1" != "null" ]; then
         local msgs; msgs="$(bot_get_thread_messages "$1")"
-        printf '%s' "$msgs" | jq -r '(.messages // []) | map("\(.author_id): \(.content)") | join("\n")' 2>/dev/null
+        # Transcript attachment names come straight from /get-thread-messages and have NEVER
+        # passed AttachmentInputValidator — this jq is the only sanitizer on that path. Strip
+        # control chars + cap 120 so an image-only message renders a non-empty, single-line tail.
+        printf '%s' "$msgs" | jq -r '
+            (.messages // []) | map(
+                "\(.author_id): \(.content // "")"
+                + (if ((.attachments // []) | length) > 0
+                   then "\n[attachments: "
+                        + ((.attachments | map((.name // "") | gsub("[[:cntrl:]]";" ") | .[0:120])) | join(", "))
+                        + "]"
+                   else "" end)
+            ) | join("\n")
+        ' 2>/dev/null
     else
         printf '(no thread yet)'
     fi
@@ -186,9 +249,10 @@ classify_row() { # row_json
     local original_text; original_text="$(printf '%s' "$row" | jq -r '.original_text // ""')"
     clear_opt=""; [ -n "$blocked" ] && clear_opt="--clear-blocked"
 
-    local transcript prompt
+    local transcript attachments_text prompt
     transcript="$(row_transcript "$thread_id")"
-    prompt="$(render_prompt "$(cat "$CLASSIFY_PROMPT_FILE")" "$original_text" "$transcript")"
+    attachments_text="$(att_line "$(printf '%s' "$row" | jq -c '.attachments // []')")"
+    prompt="$(render_prompt "$(cat "$CLASSIFY_PROMPT_FILE")" "$original_text" "$transcript" "$attachments_text")"
 
     if ! run_structured_call "$prompt" "$CLASSIFY_SCHEMA"; then
         : # rc captured in CJ_RC; handled below
@@ -327,9 +391,10 @@ drive_feature_row() { # row_json
     fi
 
     # Case A — gathering with a fresh GM reply.
-    local transcript prompt
+    local transcript attachments_text prompt
     transcript="$(row_transcript "$thread_id")"
-    prompt="$(render_prompt "$(cat "$GATHER_PROMPT_FILE")" "$original_text" "$transcript")"
+    attachments_text="$(att_line "$(printf '%s' "$row" | jq -c '.attachments // []')")"
+    prompt="$(render_prompt "$(cat "$GATHER_PROMPT_FILE")" "$original_text" "$transcript" "$attachments_text")"
 
     run_structured_call "$prompt" "$GATHER_SCHEMA" || true
     if [ "$CJ_RC" -ne 0 ] || [ -z "${CJ_OUT:-}" ] || claude_env_error "${CJ_OUT:-}${CJ_ERR:-}"; then
@@ -508,18 +573,20 @@ run_hunter_agent() { # wt_appdir model prompt_file run_name run_log
 # are substituted by bash param-expansion (NEVER sed/eval) — the template wraps them
 # in <report>/<transcript> blocks and frames them strictly as data (prompt-injection defense).
 render_hunter_prompt() { # claimed wt_appdir
-    local claimed="$1" wt_appdir="$2" id class report thread_id transcript t
+    local claimed="$1" wt_appdir="$2" id class report thread_id transcript att t
     id="$(printf '%s' "$claimed" | jq -r '.id')"
     class="$(printf '%s' "$claimed" | jq -r '.class // "bug"')"
     report="$(printf '%s' "$claimed" | jq -r '.original_text // ""')"
     thread_id="$(printf '%s' "$claimed" | jq -r '.thread_id // empty')"
     transcript="$(row_transcript "$thread_id")"
+    att="$(att_line "$(printf '%s' "$claimed" | jq -c '.attachments // []')")"
     t="$(cat "$HUNT_PROMPT_FILE")"
     t="${t//\{\{bug_id\}\}/$id}"
     t="${t//\{\{class\}\}/$class}"
     t="${t//\{\{worktree\}\}/$wt_appdir}"
     t="${t//\{\{report\}\}/$report}"
     t="${t//\{\{transcript\}\}/$transcript}"
+    t="${t//\{\{attachments_text\}\}/$att}"
     printf '%s' "$t"
 }
 
@@ -818,6 +885,10 @@ main() {
         log "no actionable rows — exiting cheap"
         return 0
     fi
+
+    # A tick that will do work also prunes stale cached attachment bytes (>7d). Placed
+    # AFTER the empty-tick guard so a no-op tick still spawns zero work; never fails the tick.
+    prune_attachment_cache
 
     # Fail-closed: a broken enumerator must NOT fall through to the expensive path.
     if ! printf '%s' "$actionable" | jq -e 'type == "array"' >/dev/null 2>&1; then

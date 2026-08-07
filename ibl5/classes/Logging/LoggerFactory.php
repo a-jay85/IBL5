@@ -70,14 +70,14 @@ class LoggerFactory implements LoggerFactoryInterface
             $config = self::DEFAULT_CONFIG;
         }
 
-        $logDir = is_string($config['log_dir'])
+        $logDir = is_string($config['log_dir'] ?? null)
             ? $config['log_dir']
             : self::resolveLogDir();
 
-        $levelName = is_string($config['level']) ? strtolower($config['level']) : 'debug';
+        $levelName = is_string($config['level'] ?? null) ? strtolower($config['level']) : 'debug';
         $level = self::parseLevel($levelName);
 
-        $retention = is_int($config['retention']) ? $config['retention'] : 30;
+        $retention = is_int($config['retention'] ?? null) ? $config['retention'] : 30;
 
         $formatter = new JsonFormatter();
         $formatter->includeStacktraces(true);

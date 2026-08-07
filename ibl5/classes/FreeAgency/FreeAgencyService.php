@@ -176,7 +176,7 @@ class FreeAgencyService implements FreeAgencyServiceInterface
             $cashPlayerRow = \Team\TeamTableService::cashConsiderationToRosterRow($cashRow);
             /** @phpstan-ignore argument.type (cashConsiderationToRosterRow produces a PlayerRow-shaped array) */
             $player = Player::withPlrRow($this->mysqli_db, $cashPlayerRow);
-            $label = is_string($cashRow['label']) ? $cashRow['label'] : '';
+            $label = is_string($cashRow['label'] ?? null) ? $cashRow['label'] : '';
             $result[] = [
                 'player' => $player,
                 'label' => $label,

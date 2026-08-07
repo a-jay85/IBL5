@@ -60,14 +60,14 @@ class MailService implements MailServiceInterface
         $smtpDefaults = self::DEFAULT_CONFIG['smtp'];
         $smtpInput = $config['smtp'] ?? [];
         $this->smtpConfig = [
-            'host' => is_string($smtpInput['host']) ? $smtpInput['host'] : $smtpDefaults['host'],
-            'port' => is_int($smtpInput['port']) ? $smtpInput['port'] : $smtpDefaults['port'],
-            'encryption' => is_string($smtpInput['encryption']) ? $smtpInput['encryption'] : $smtpDefaults['encryption'],
-            'username' => is_string($smtpInput['username']) ? $smtpInput['username'] : $smtpDefaults['username'],
-            'password' => is_string($smtpInput['password']) ? $smtpInput['password'] : $smtpDefaults['password'],
+            'host' => is_string($smtpInput['host'] ?? null) ? $smtpInput['host'] : $smtpDefaults['host'],
+            'port' => is_int($smtpInput['port'] ?? null) ? $smtpInput['port'] : $smtpDefaults['port'],
+            'encryption' => is_string($smtpInput['encryption'] ?? null) ? $smtpInput['encryption'] : $smtpDefaults['encryption'],
+            'username' => is_string($smtpInput['username'] ?? null) ? $smtpInput['username'] : $smtpDefaults['username'],
+            'password' => is_string($smtpInput['password'] ?? null) ? $smtpInput['password'] : $smtpDefaults['password'],
         ];
 
-        $this->defaultFromName = is_string($config['default_from_name'])
+        $this->defaultFromName = is_string($config['default_from_name'] ?? null)
             ? $config['default_from_name']
             : self::DEFAULT_CONFIG['default_from_name'];
 

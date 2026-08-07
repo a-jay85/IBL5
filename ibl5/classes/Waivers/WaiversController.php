@@ -177,7 +177,7 @@ class WaiversController implements WaiversControllerInterface
     private function displayWaiverForm(array $userInfo, string $action): void
     {
         $display = isset($_REQUEST['display']) && is_string($_REQUEST['display']) ? $_REQUEST['display'] : 'ratings';
-        $username = is_string($userInfo['username']) ? $userInfo['username'] : '';
+        $username = is_string($userInfo['username'] ?? null) ? $userInfo['username'] : '';
 
         $resultParam = isset($_GET['result']) && is_string($_GET['result']) ? $_GET['result'] : null;
         $errorParam = isset($_GET['error']) && is_string($_GET['error']) ? $_GET['error'] : null;

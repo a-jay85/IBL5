@@ -15,7 +15,7 @@ use League\League;
  * @see BaseMysqliRepository For base class documentation and error codes
  *
  *
- * @phpstan-type TeamWithStandingsRow array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, arena: string, capacity: int, owner_name: string, owner_email: string, discord_id: ?int, used_extension_this_chunk?: int, used_extension_this_season?: ?int, has_mle?: int, has_lle?: int, league_record: ?string, ...<string, mixed>}
+ * @phpstan-type TeamWithStandingsRow array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, arena: string, capacity: int, owner_name: string, owner_email: string, discord_id?: ?int, used_extension_this_chunk?: int, used_extension_this_season?: ?int, has_mle?: int, has_lle?: int, league_record?: ?string, ...<string, mixed>}
  */
 class Team extends \BaseMysqliRepository
 {
@@ -141,7 +141,7 @@ class Team extends \BaseMysqliRepository
 
         $this->ownerName = $teamRow['owner_name'];
         $this->ownerEmail = $teamRow['owner_email'];
-        $discordId = $teamRow['discord_id'];
+        $discordId = $teamRow['discord_id'] ?? null;
         $this->discord_id = $discordId;
 
         // Extension / MLE / LLE are IBL salary-cap concepts; the Olympics
@@ -153,7 +153,7 @@ class Team extends \BaseMysqliRepository
         $this->has_lle = $teamRow['has_lle'] ?? 0;
 
         /** @var string|null $leagueRecord */
-        $leagueRecord = $teamRow['league_record'];
+        $leagueRecord = $teamRow['league_record'] ?? null;
         $this->seasonRecord = $leagueRecord;
     }
 }

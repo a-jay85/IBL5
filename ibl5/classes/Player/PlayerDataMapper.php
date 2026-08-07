@@ -177,19 +177,19 @@ class PlayerDataMapper
         $playerData = new PlayerData();
 
         // Basic historical player information
-        $playerData->playerID = $plrRow['pid'] ?? null;
-        $playerData->historicalYear = $plrRow['year'] ?? null;
-        $name = $plrRow['name'] ?? null;
+        $playerData->playerID = $plrRow['pid'];
+        $playerData->historicalYear = $plrRow['year'];
+        $name = $plrRow['name'];
         $playerData->name = $name !== null ? stripslashes($name) : null;
-        $team = $plrRow['team'] ?? null;
+        $team = $plrRow['team'];
         $playerData->teamName = $team !== null ? stripslashes($team) : null;
-        $playerData->teamid = $plrRow['teamid'] ?? null;
+        $playerData->teamid = $plrRow['teamid'];
 
         // Ratings from historical row (note different column names)
         $this->mapRatingsFromHistoricalRow($playerData, $plrRow);
 
         // Salary
-        $playerData->salaryJSB = $plrRow['salary'] ?? null;
+        $playerData->salaryJSB = $plrRow['salary'];
 
         // Initialize contract fields for historical data (values are snapshots, not current)
         $playerData->contractCurrentYear = 0;
@@ -311,11 +311,11 @@ class PlayerDataMapper
      */
     private function mapPhysicalFields(PlayerData $playerData, array $plrRow): void
     {
-        $htft = $plrRow['htft'] ?? null;
+        $htft = $plrRow['htft'];
         $playerData->heightFeet = $htft !== null ? (int) $htft : null;
-        $htin = $plrRow['htin'] ?? null;
+        $htin = $plrRow['htin'];
         $playerData->heightInches = $htin !== null ? (int) $htin : null;
-        $wt = $plrRow['wt'] ?? null;
+        $wt = $plrRow['wt'];
         $playerData->weightPounds = $wt !== null ? (int) $wt : null;
     }
 
@@ -327,7 +327,7 @@ class PlayerDataMapper
     private function mapStatusFields(PlayerData $playerData, array $plrRow): void
     {
         $playerData->daysRemainingForInjury = $plrRow['injured'];
-        $playerData->isRetired = $plrRow['retired'] ?? null;
+        $playerData->isRetired = $plrRow['retired'];
         $playerData->timeDroppedOnWaivers = $plrRow['droptime'];
     }
 
@@ -350,25 +350,25 @@ class PlayerDataMapper
      */
     private function mapRatingsFromHistoricalRow(PlayerData $playerData, array $plrRow): void
     {
-        $playerData->ratingFieldGoalAttempts = $plrRow['r_2ga'] ?? null;
-        $playerData->ratingFieldGoalPercentage = $plrRow['r_2gp'] ?? null;
-        $playerData->ratingFreeThrowAttempts = $plrRow['r_fta'] ?? null;
-        $playerData->ratingFreeThrowPercentage = $plrRow['r_ftp'] ?? null;
-        $playerData->ratingThreePointAttempts = $plrRow['r_3ga'] ?? null;
-        $playerData->ratingThreePointPercentage = $plrRow['r_3gp'] ?? null;
-        $playerData->ratingOffensiveRebounds = $plrRow['r_orb'] ?? null;
-        $playerData->ratingDefensiveRebounds = $plrRow['r_drb'] ?? null;
-        $playerData->ratingAssists = $plrRow['r_ast'] ?? null;
-        $playerData->ratingSteals = $plrRow['r_stl'] ?? null;
-        $playerData->ratingBlocks = $plrRow['r_blk'] ?? null;
-        $playerData->ratingTurnovers = $plrRow['r_tvr'] ?? null;
-        $playerData->ratingOutsideOffense = $plrRow['r_oo'] ?? null;
-        $playerData->ratingOutsideDefense = $plrRow['r_od'] ?? null;
-        $playerData->ratingDriveOffense = $plrRow['r_drive_off'] ?? null;
-        $playerData->ratingDriveDefense = $plrRow['r_dd'] ?? null;
-        $playerData->ratingPostOffense = $plrRow['r_po'] ?? null;
-        $playerData->ratingPostDefense = $plrRow['r_pd'] ?? null;
-        $playerData->ratingTransitionOffense = $plrRow['r_trans_off'] ?? null;
-        $playerData->ratingTransitionDefense = $plrRow['r_td'] ?? null;
+        $playerData->ratingFieldGoalAttempts = $plrRow['r_2ga'];
+        $playerData->ratingFieldGoalPercentage = $plrRow['r_2gp'];
+        $playerData->ratingFreeThrowAttempts = $plrRow['r_fta'];
+        $playerData->ratingFreeThrowPercentage = $plrRow['r_ftp'];
+        $playerData->ratingThreePointAttempts = $plrRow['r_3ga'];
+        $playerData->ratingThreePointPercentage = $plrRow['r_3gp'];
+        $playerData->ratingOffensiveRebounds = $plrRow['r_orb'];
+        $playerData->ratingDefensiveRebounds = $plrRow['r_drb'];
+        $playerData->ratingAssists = $plrRow['r_ast'];
+        $playerData->ratingSteals = $plrRow['r_stl'];
+        $playerData->ratingBlocks = $plrRow['r_blk'];
+        $playerData->ratingTurnovers = $plrRow['r_tvr'];
+        $playerData->ratingOutsideOffense = $plrRow['r_oo'];
+        $playerData->ratingOutsideDefense = $plrRow['r_od'];
+        $playerData->ratingDriveOffense = $plrRow['r_drive_off'];
+        $playerData->ratingDriveDefense = $plrRow['r_dd'];
+        $playerData->ratingPostOffense = $plrRow['r_po'];
+        $playerData->ratingPostDefense = $plrRow['r_pd'];
+        $playerData->ratingTransitionOffense = $plrRow['r_trans_off'];
+        $playerData->ratingTransitionDefense = $plrRow['r_td'];
     }
 }

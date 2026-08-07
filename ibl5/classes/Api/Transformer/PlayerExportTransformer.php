@@ -129,7 +129,7 @@ class PlayerExportTransformer implements TransformerInterface
     {
         $result = [];
         foreach (self::COLUMN_MAP as $col) {
-            $value = $row[$col] ?? null;
+            $value = $row[$col];
             $str = $value !== null ? (string) $value : '';
 
             // Prevent spreadsheet formula injection (OWASP)

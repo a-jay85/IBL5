@@ -291,7 +291,7 @@ class TradingService implements TradingServiceInterface
             $notes = null;
 
             if ($pick !== null) {
-                $notes = $pick['notes'] ?? null;
+                $notes = $pick['notes'];
                 if ($notes === '') {
                     $notes = null;
                 }

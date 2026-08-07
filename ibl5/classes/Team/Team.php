@@ -141,7 +141,7 @@ class Team extends \BaseMysqliRepository
 
         $this->ownerName = $teamRow['owner_name'];
         $this->ownerEmail = $teamRow['owner_email'];
-        $discordId = $teamRow['discord_id'] ?? null;
+        $discordId = $teamRow['discord_id'];
         $this->discord_id = $discordId;
 
         // Extension / MLE / LLE are IBL salary-cap concepts; the Olympics
@@ -153,7 +153,7 @@ class Team extends \BaseMysqliRepository
         $this->has_lle = $teamRow['has_lle'] ?? 0;
 
         /** @var string|null $leagueRecord */
-        $leagueRecord = $teamRow['league_record'] ?? null;
+        $leagueRecord = $teamRow['league_record'];
         $this->seasonRecord = $leagueRecord;
     }
 }

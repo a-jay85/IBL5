@@ -186,7 +186,7 @@ class WaiversProcessor implements WaiversProcessorInterface
             return ['success' => false, 'error' => 'Failed to drop player to waivers. Please try again.'];
         }
 
-        $playerName = is_string($player['name'] ?? null) ? $player['name'] : '';
+        $playerName = is_string($player['name']) ? $player['name'] : '';
         $this->createWaiverNewsStory($teamName, $playerName, 'waive', '');
 
         $hometext = "The " . \Security\HtmlSanitizer::e($teamName) . " cut " . \Security\HtmlSanitizer::e($playerName) . " to waivers.";
@@ -241,7 +241,7 @@ class WaiversProcessor implements WaiversProcessorInterface
             return ['success' => false, 'error' => "Oops, something went wrong. Post what you were trying to do in <A HREF=\"" . self::DISCORD_BUGS_CHANNEL_URL . "\">#site-bugs-and-to-do</A> and we'll fix it asap. Sorry!"];
         }
 
-        $playerName = is_string($player['name'] ?? null) ? $player['name'] : '';
+        $playerName = is_string($player['name']) ? $player['name'] : '';
         $salaryStr = (string) $contractData['salary'];
         $this->createWaiverNewsStory($teamName, $playerName, 'add', $salaryStr);
 

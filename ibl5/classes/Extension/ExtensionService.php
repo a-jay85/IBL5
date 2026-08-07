@@ -396,7 +396,7 @@ class ExtensionService implements ExtensionProcessorInterface
             return $extensionData['team'];
         }
 
-        $teamName = $extensionData['teamName'] ?? $player->getTeamName() ?? null;
+        $teamName = $extensionData['teamName'] ?? $player->getTeamName();
         if ($teamName === null) {
             return null;
         }

@@ -37,15 +37,15 @@ class GameBoxscoreController implements ControllerInterface
             return;
         }
 
-        $gameStatus = is_string($game['game_status'] ?? null) ? $game['game_status'] : '';
+        $gameStatus = is_string($game['game_status']) ? $game['game_status'] : '';
         if ($gameStatus === 'scheduled') {
             $responder->error(404, 'no_boxscore', 'Box score is not available for scheduled games.');
             return;
         }
 
-        $visitorTeamId = is_int($game['visitor_team_id'] ?? null) ? $game['visitor_team_id'] : 0;
-        $homeTeamId = is_int($game['home_team_id'] ?? null) ? $game['home_team_id'] : 0;
-        $gameDate = is_string($game['game_date'] ?? null) ? $game['game_date'] : '';
+        $visitorTeamId = is_int($game['visitor_team_id']) ? $game['visitor_team_id'] : 0;
+        $homeTeamId = is_int($game['home_team_id']) ? $game['home_team_id'] : 0;
+        $gameDate = is_string($game['game_date']) ? $game['game_date'] : '';
 
         $teamRows = $repo->getBoxscoreTeams($visitorTeamId, $homeTeamId, $gameDate);
         $playerRows = $repo->getBoxscorePlayers($visitorTeamId, $homeTeamId, $gameDate);
@@ -74,7 +74,7 @@ class GameBoxscoreController implements ControllerInterface
         }
 
         foreach ($playerRows as $playerRow) {
-            $playerTid = is_int($playerRow['player_tid'] ?? null) ? $playerRow['player_tid'] : 0;
+            $playerTid = is_int($playerRow['player_tid']) ? $playerRow['player_tid'] : 0;
             $transformedPlayer = $boxscoreTransformer->transformPlayerLine($playerRow);
             if ($playerTid === $visitorTeamId) {
                 $visitorPlayers[] = $transformedPlayer;

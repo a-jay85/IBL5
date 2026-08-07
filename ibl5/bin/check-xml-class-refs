@@ -29,7 +29,7 @@ foreach ($xmlGlob as $xmlPath) {
     $rel = basename($xmlPath);
 
     $content = file_get_contents($xmlPath);
-    if ($content === false) {
+    if ($content === false || $content === '') {
         $failures[] = "{$rel}: read error";
         continue;
     }

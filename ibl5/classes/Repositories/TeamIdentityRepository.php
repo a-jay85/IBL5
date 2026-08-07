@@ -116,7 +116,7 @@ class TeamIdentityRepository extends \BaseMysqliRepository implements TeamIdenti
             return null;
         }
 
-        $discordId = $result['discord_id'] ?? null;
+        $discordId = $result['discord_id'];
         return $discordId !== null ? (int) $discordId : null;
     }
 

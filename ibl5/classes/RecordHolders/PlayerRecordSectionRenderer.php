@@ -162,7 +162,6 @@ final class PlayerRecordSectionRenderer
 
         $rows = '';
         foreach ($categoryRecords as $record) {
-            $safeName = HtmlSanitizer::safeHtmlOutput($record['name']);
             $safeTeam = HtmlSanitizer::safeHtmlOutput($record['teamAbbr']);
             $safeSeason = HtmlSanitizer::safeHtmlOutput($record['season']);
             $safeAmount = HtmlSanitizer::safeHtmlOutput($record['amount']);
@@ -207,7 +206,6 @@ final class PlayerRecordSectionRenderer
         $output .= '<thead><tr><th>Player</th><th>Team</th><th>Apps</th><th colspan="2">Years</th></tr></thead>';
         $output .= '<tbody>';
 
-        $safeName = HtmlSanitizer::safeHtmlOutput($allStar['name']);
         $pid = $allStar['pid'];
         $amount = (int) $allStar['amount'];
 
@@ -254,7 +252,6 @@ final class PlayerRecordSectionRenderer
      */
     private function renderPlayerRecordRow(array $record, bool $multiLineAmount = false): string
     {
-        $safeName = HtmlSanitizer::safeHtmlOutput($record['name']);
         $safeTeam = HtmlSanitizer::safeHtmlOutput($record['teamAbbr']);
         $safeDate = HtmlSanitizer::safeHtmlOutput($record['dateDisplay']);
         $safeDate = str_replace("\n", '<br>', $safeDate);

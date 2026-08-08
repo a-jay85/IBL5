@@ -27,13 +27,6 @@ parameters:
         - phpstan-stubs/mock-aliases.stub.php
     phpVersion: 80300
     treatPhpDocTypesAsCertain: false
-    featureToggles:
-        # Mirrors phpstan.neon — see the full rationale there. bleedingEdge enabled
-        # `unnecessaryNullCoalesce` in phpstan 2.2.6; it derives certainty from PHPDoc
-        # array shapes and ignores `treatPhpDocTypesAsCertain: false` above. No test file
-        # trips it today, so this is pre-emptive: it keeps the two configs stating the
-        # same PHPDoc-certainty policy instead of leaving tests silently opted in.
-        unnecessaryNullCoalesce: false
 
 services:
     -

@@ -532,25 +532,37 @@ parameters:
 			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "'')" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
 			identifier: ibl.orderByMissingTiebreaker
 			count: 1
-			path: classes/RecordHolders/RecordHoldersRepository.php
+			path: classes/RecordHolders/FranchiseRecordRepository.php
 
 		-
 			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "game_date" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
 			identifier: ibl.orderByMissingTiebreaker
-			count: 3
-			path: classes/RecordHolders/RecordHoldersRepository.php
+			count: 2
+			path: classes/RecordHolders/PlayerRecordRepository.php
 
 		-
 			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "value" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
 			identifier: ibl.orderByMissingTiebreaker
-			count: 3
-			path: classes/RecordHolders/RecordHoldersRepository.php
+			count: 1
+			path: classes/RecordHolders/PlayerRecordRepository.php
+
+		-
+			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "game_date" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
+			identifier: ibl.orderByMissingTiebreaker
+			count: 1
+			path: classes/RecordHolders/RecordAnnouncementRepository.php
+
+		-
+			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "value" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
+			identifier: ibl.orderByMissingTiebreaker
+			count: 2
+			path: classes/RecordHolders/TeamRecordRepository.php
 
 		-
 			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "wins" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
 			identifier: ibl.orderByMissingTiebreaker
 			count: 1
-			path: classes/RecordHolders/RecordHoldersRepository.php
+			path: classes/RecordHolders/TeamRecordRepository.php
 
 		-
 			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'

@@ -25,6 +25,12 @@ parameters:
 			path: tests/Api/Transformer/TeamTransformerTest.php
 
 		-
+			rawMessage: 'Call to static method PHPUnit\Framework\Assert::assertSame() with 42 and 42 will always evaluate to true.'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: tests/Auth/DevAutoLoginTest.php
+
+		-
 			rawMessage: 'Parameter #1 $award of method AwardHistory\AwardHistoryView::renderAwardRow() expects array{year: int, award: string, name: string, pid?: int}, array{year: null, award: null, name: null} given.'
 			identifier: argument.type
 			count: 1
@@ -59,6 +65,18 @@ parameters:
 			identifier: argument.type
 			count: 8
 			path: tests/DatabaseIntegration/FreeAgencyRepositoryTest.php
+
+		-
+			rawMessage: Casting to float something that's already float.
+			identifier: cast.useless
+			count: 2
+			path: tests/DatabaseIntegration/ProjectedDraftOrderRepositoryTest.php
+
+		-
+			rawMessage: Casting to int something that's already int.
+			identifier: cast.useless
+			count: 1
+			path: tests/DatabaseIntegration/RecordHoldersRepositoryTest.php
 
 		-
 			rawMessage: Constant Tests\DatabaseIntegration\TeamServicePageDataCharacterizationTest::G_AWARDS_EMPTY_ACCOMPLISHMENTS is unused.

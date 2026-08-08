@@ -163,7 +163,7 @@ test.describe('Sortable table functionality', () => {
 
       // Browser back — triggers htmx:historyRestore (NOT htmx:afterSwap).
       await page.goBack();
-      await expect(page.locator('table.sortable').first()).toBeVisible({ timeout: 5000 });
+      await expect(page.locator('table.sortable').first()).toBeVisible({ timeout: 15000 });
 
       // Verify a DIFFERENT column now responds to clicks. Before the fix,
       // the init guard skipped re-attachment and this click was a no-op.

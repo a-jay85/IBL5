@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-08-05
+last_verified: 2026-08-08
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -169,14 +169,12 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
-> ✅ resolved (19): 2.6, 2.7, 2.11, 2.12, 2.16, 2.17, 2.19, 2.20, 2.22, 2.23, 2.24, 2.26, 2.30, 2.33, 2.34, 2.35, 2.36, 2.37, 2.38 — evidence in [archive](archive/maintenance-backlog-archive.md)
-> 🚫 declined (4): 2.2, 2.4, 2.8, 2.9 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (20): 2.6, 2.7, 2.11, 2.12, 2.16, 2.17, 2.19, 2.20, 2.22, 2.23, 2.24, 2.26, 2.30, 2.31, 2.33, 2.34, 2.35, 2.36, 2.37, 2.38 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> 🚫 declined (6): 2.2, 2.3, 2.4, 2.5, 2.8, 2.9 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
 | 2.1 | ⬜ Open | 🟩 | Globals still in 5 (Voting, Waivers, ComparePlayers, ApiKeys, News). Extract→Controller, green-green E2E pin. |
-| 2.3 | ◑ Partial | — | FranchiseHistory Service built (#1091); PlayerMovement **declined** (single JOIN, pass-through ceremony). |
-| 2.5 | ◑ Partial | — | BoxscoreViewInterface added (this PR). Processor→Service rename **declined**: BoxscoreProcessor is a mutating .sco import pipeline (cf. 2.8/2.3 pass-through declines; Waivers carries S1+P1). Residual = declined rename. |
 | 2.10 | ⬜ Open | 🟨 | Extension R+S+P+Vl, no View. Upfront decision (own module vs Player sub-action) still needed. |
 | 2.13 | 📋 Planned | 🟨 | Characterization-pins plan queued (`freeagency-2-13-characterization-pins`); the admin/user split touches admin-mutation surface (→ human-merge). |
 | 2.14 | ◑ Partial | 🟨 | TradingController+Service exist (#802) but `maketradeoffer/accepttradeoffer/rejecttradeoffer.php` standalone endpoints remain (verified). Promoting touches trade-mutation surface → upfront decision needed. |
@@ -187,7 +185,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 2.27 | ⬜ Open | 🟦 | Root `leagueControlPanel.php`→module bypasses `ModuleAccessControl`; converting changes admin-auth path (security surface) → human-merge. (a11y fix kept standalone deliberately.) |
 | 2.28 | ⬜ Open | 🟨 | `faprep.php` exists (verified), inline SQL + unescaped output. Resolve with 3.9 (delete); if absorbed instead, XSS/admin-SQL = human-merge. |
 | 2.29 | ⬜ Open | 🟨 | DEFERRED — global-namespace elimination: JSB 291 callers, BaseMysqliRepository 257, ContractRules 37 (585 caller files). L-effort, high-collision; needs its own sequenced PR (one class at a time), not an unattended wave item. |
-| 2.31 | ⬜ Open | 🟩 | UI/ 1 interface of 15; add interfaces systematically. Additive. |
 | 2.32 | ◑ Partial | 🟩 | Shipped: common `Api\Contracts\TransformerInterface` (7 uniform transformers) + flattened `Middleware/Contracts/`→`Api/Contracts/`. **Status:** partial 2026-06-26; residual = divergent-transformer interfaces (Boxscore/PlayerStats), responder interfaces (Csv/Json — disjoint shapes), `Response/Contracts/` flatten. |
 | 2.39 | ⬜ Open | 🟨 | `TradeRosterPreviewCashRowBuilder::buildCashRows()` iterates `cashStartYear`..`cashEndYear` from `$_GET` with no upper bound and no ordering check — `cashStartYear=1&cashEndYear=999999` drives an ~1M-iteration loop. Add bounds + ordering enforcement; upfront: choose max-year cap. (discovered 2026-07-27 during trading-1-31-api-handler-extract) |
 
@@ -197,22 +194,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Extract into `<Module>Controller::handle()`; reduce `index.php` to 5-line bootstrap.
 **Est. effort:** S per module (M for News, 3 entrypoints)
 **Risk if untouched:** Logic invisible to PHPStan; unmockable; un-findable via class search.
-
-### 2.3 FranchiseHistory / PlayerMovement — No Service Layer
-**Location:** `classes/FranchiseHistory/`, `classes/PlayerMovement/`
-**Problem:** Repository + View, no Service. `FranchiseHistoryRepository` likely computes derived fields inline.
-**Suggested direction:** Add a Service even as a pass-through to maintain pattern consistency.
-**Est. effort:** S each
-**Risk if untouched:** Same as 2.2.
-**Status:** Split (C7b, maintenance-48b) — FranchiseHistory: Service built; `getAllFranchiseHistory()` assembly extracted from the Repository into `FranchiseHistoryService` (raw-fetch Repo + assembly Service), unblocking DB-free unit tests of the winpct/default/merge branches. PlayerMovement: Declined — `PlayerMovementRepository::getPlayerMovements()` is a single JOIN with zero PHP assembly; a Service would be pass-through ceremony (cf. 2.9/2.11).
-
-### 2.5 Boxscore — No Service Layer; Processor Mis-Named
-**Location:** `classes/Boxscore/`
-**Problem:** Has `Boxscore.php`, `BoxscoreProcessor`, `BoxscoreRepository` but no `BoxscoreService`. Processor implies mutating ops (like Waivers) but is doing service work. `Contracts/` missing `BoxscoreViewInterface`.
-**Suggested direction:** Rename Processor → Service for read-heavy modules; add ViewInterface.
-**Est. effort:** S
-**Risk if untouched:** Naming confuses new contributors; missing view interface blocks integration tests.
-**Status:** ◑ Partial (2026-06-26) — `BoxscoreViewInterface` added. Processor→Service rename declined: every `BoxscoreProcessor` method mutates (it is a .sco import pipeline used by `Updater\Steps\ProcessBoxscoresStep`), so a Service would be pass-through ceremony (cf. 2.8/2.3). `Processor` is the correct house name (Waivers S1+P1).
 
 ### 2.10 Extension — No View; Routed Through modules/Player
 **Location:** `classes/Extension/`, `modules/Player/extension.php`
@@ -283,13 +264,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** `JSB` → `JsbParser\JsbConstants` or `League\JsbConstants`; `ContractRules` → `League/`; `BaseMysqliRepository` → `Database/`.
 **Est. effort:** M (namespace sweep)
 **Risk if untouched:** Global class-name collision risk; PHPStan ban rules don't protect root files.
-
-### 2.31 UI/ — 15 Files; Only 1 Interface in Contracts
-**Location:** `classes/UI/`
-**Problem:** 15 files across `Components/` and `Tables/` plus root-level files (`AlertRenderer`, `DebugOutput`, `TableStyles`, `TeamCellHelper`). Only `TeamCellHelperInterface` exists.
-**Suggested direction:** Add interfaces systematically; clarify Tables/ common interface; move `DebugOutput` to `classes/Debug/`.
-**Est. effort:** M
-**Risk if untouched:** 14 of 15 UI classes unmockable; changes can't be isolated in tests.
 
 ### 2.32 Api/ — Internal Subdirectory Structure Diverges
 **Location:** `classes/Api/`
@@ -776,7 +750,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Automouse audit (verified 2026-06-20):** The big bootstrap consolidation (14.1–14.4, 14.7, 14.11, 14.13, 14.14) is done (ADR-0030). Remaining items are large DI sweeps that overlap open IDOR PRs or carry security/identity hazards.
 
 > ✅ resolved (9): 14.1, 14.2, 14.3, 14.4, 14.7, 14.9, 14.11, 14.13, 14.14 — evidence in [archive](archive/maintenance-backlog-archive.md)
-> 🚫 declined (1): 14.16 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> 🚫 declined (2): 14.15, 14.16 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
@@ -785,7 +759,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 14.8 | ⬜ Open | 🟩 | Introduce `HttpRequest` VO wrapping superglobals; green-green abstraction. |
 | 14.10 | ◑ Partial | 🟨 | Container accessor registered (PR1); side-effect removal deferred to PR3 (boosted-HTMX cookie-population hazard) → careful sequencing. |
 | 14.12 | ◑ Partial | 🟩 | Wholesale `$_REQUEST`→`$GLOBALS` gone; modules still read `$op/$pid` from `$_REQUEST` → Request object is the residual (folds into 14.8). |
-| 14.15 | ◑ Partial | 🚫 | ScheduleUpdater basePath injected; PageLayout remainder **declined** (user 2026-06-13 — disproportionate). |
 
 ### 14.5 Module `index.php` Files Are the Real Composition Root (42 of 47)
 **Location:** `ibl5/modules/*/index.php`
@@ -809,13 +782,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Est. effort:** M
 **Risk if untouched:** PRG/HTMX redirect logic untestable; superglobals must be polluted in tests.
 
-### 14.9 `$cookie[1]` Username Ritual — 21 Occurrences Across 11 Files
-**Location:** `modules/Trading/index.php` lines 74, 91, 111; `modules/FreeAgency/index.php`; `modules/Player/index.php` etc. (21 occurrences across 11 files, verified 2026-07-24)
-**Problem:** Controllers call `cookiedecode($user)` to populate `global $cookie`, then read `$cookie[1]` — despite `AuthService::getUsername()` existing at `classes/Auth/AuthService.php:111`. The original audit listed 17 sites; a 2026-07-24 rescan found 21 occurrences across 11 files.
-**Suggested direction:** Replace with `$authService->getUsername()` injected from container; `AuthService` already exists and is already injected in some controllers.
-**Est. effort:** M
-**Risk if untouched:** Every new controller replicates the ritual; ordering bug in 14.10 spreads.
-
 ### 14.10 `PageLayout::header()` Has Side Effect Controllers Depend On
 **Location:** `PageLayout/PageLayout.php:16` (`cookiedecode($user)`); `FreeAgency/FreeAgencyController.php:55` comment "Must come first"
 **Problem:** Header internally calls `cookiedecode($user)` setting `global $cookie`. Controllers reading `$cookie[1]` after header depend on the side effect; skip header → null identity.
@@ -831,14 +797,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Est. effort:** L
 **Risk if untouched:** Name collisions silently overwrite globals; PHPStan needs per-site `@var` annotations.
 **Status:** Partially completed (verified 2026-05-29 audit) — the wholesale `$_REQUEST`→`$GLOBALS` copy is gone; `ConfigBootstrap` now allowlists only `newlang`/`redirect` (see [[3.6]]). Modules still read `$op`/`$pid`/`$action` directly from `$_REQUEST` — a `Request` object remains the longer-term fix.
-
-### 14.15 `AppPaths::root()` Stateful Static Singleton
-**Location:** `Bootstrap/AppPaths.php`; actual consumers (repo-wide sweep 2026-06-09): `Updater/ScheduleUpdater.php:149,234`, `PageLayout/PageLayout.php:78,111`. The previously listed consumers (`Cache/PageCache.php`, `Mail/MailService.php`, `Logging/LoggerFactory.php`, `Auth/DevAutoLogin.php`) use raw `dirname(__DIR__, 2)` / `__DIR__` — not `AppPaths::root()`.
-**Problem:** Global mutable state for path resolution; not injectable.
-**Suggested direction:** Constructor-injected `string $basePath` from container.
-**Est. effort:** S
-**Risk if untouched:** Path-dependent classes untestable without filesystem coupling.
-**Status:** Partial + remainder Declined. `ScheduleUpdater` now takes `?string $basePath = null` (fallback `AppPaths::root()`, 2026-06-09). PageLayout remainder — **Declined (user call 2026-06-13):** `PageLayout`'s `AppPaths::root()` access stays intentional-static. Converting `PageLayout` to an instance class is disproportionate (155 static call sites, no DI seam) and a trailing `?string $basePath` param seam was rejected as test-only ceremony that wouldn't even eliminate the `AppPaths::root()` singleton (the fallback remains). The `DevAutoLogin` half was completed separately (static→instance, merged #1095).
 
 ---
 

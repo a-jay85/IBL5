@@ -1,6 +1,6 @@
 ---
 description: Development-efficiency backlog — inner-loop speed (diff-scoped analysis, parallel tests), CI caching, dependency-bump batching, and worktree lifecycle automation, with per-entry status.
-last_verified: 2026-08-05
+last_verified: 2026-08-08
 ---
 
 # Development-Efficiency Backlog
@@ -35,9 +35,9 @@ last_verified: 2026-08-05
 | E6 | Diff-scoped PHPStan wrapper | ✅ Implemented | — | S |
 | E7 | Parallel PHPUnit | ✅ Implemented | — | M |
 | E8 | Memory lines → mechanical gates (umbrella) | ◑ Partial | 🟨 | M |
-| E9 | Meta-tooling growth bar | 📋 Planned | 🟦 | S |
+| E9 | Meta-tooling growth bar | ✅ Implemented | — | S |
 | E10 | Schema baseline auto-regen | ✅ Implemented | — | M |
-| E11 | In-PR pre-baked image build | 📋 Planned | 🟦 | M |
+| E11 | In-PR pre-baked image build | ✅ Implemented | — | M |
 | E12 | `bin/wt-new` fails with misleading error when invoked from inside a worktree | ⬜ Open | 🟨 | S |
 
 ### E1 Warm-standby worktree pool
@@ -85,20 +85,14 @@ last_verified: 2026-08-05
 **Risk if untouched:** Recall dilution plus repeat failures the gates would have caught.
 **Status (2026-07-14):** ◑ Partial — cheap-gate well exhausted; the only remaining item (free-agents guard) is a standalone `/plan`. 🟨.
 
-### E9 Meta-tooling growth bar
-**Location:** Plan: `$HOME/claude-plans/meta-tooling-bar.md` (queued) — extend-before-add rule + quarterly cull.
-**Problem:** ~27 of 101 `bin/` scripts exist to test the other scripts; the gate layer itself has had bugs. Nothing pushes back on meta-tooling growth.
-**Status (2026-07-07):** 📋 Planned — queued. 🟦 (rule authoring wants human eyes on merge).
+➜ E9 Meta-tooling growth bar — ✅ Implemented (2026-07-09): see [archive](archive/dev-efficiency-backlog-archive.md).
 
 ### E10 Schema baseline auto-regen
 **Location:** `.github/workflows/migration-safety.yml` (`regen-schema-dump` job) + `bin/regen-schema-dump`.
 **Problem (was):** The schema reference was a stale March snapshot; every schema question paid a verify-against-migrations tax.
 **Status (2026-07-07):** ✅ Implemented — on every master push, CI rebuilds the schema from migrations and auto-commits `ibl5/docs/schema/current-schema.sql` if changed. (The `000_baseline` migration snapshot itself is intentionally untouched — the regenerated dump is the source of truth for schema questions.)
 
-### E11 In-PR pre-baked image build
-**Location:** Plan: `$HOME/claude-plans/in-pr-prebaked-image-build.md` (queued). Today only `.github/workflows/cache-dependencies.yml` builds the image, on schedule/push — never in-PR.
-**Problem:** A PR changing the Dockerfile or composer deps is E2E-tested against the *previous* master image; the mismatch surfaces only after merge.
-**Status (2026-07-07):** 📋 Planned — queued; paths-filtered so normal PRs are unaffected. 🟦.
+➜ E11 In-PR pre-baked image build — ✅ Implemented (2026-07-09): see [archive](archive/dev-efficiency-backlog-archive.md).
 
 ### E12 `bin/wt-new` fails with misleading error when invoked from inside a worktree
 **Location:** `bin/wt-new:9` (`REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"`) and `bin/wt-new:57` (`git -C "$REPO_ROOT" merge --ff-only "origin/$BASE_BRANCH"`).

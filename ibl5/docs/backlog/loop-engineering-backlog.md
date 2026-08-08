@@ -33,16 +33,16 @@ last_verified: 2026-08-08
 | L4 | Retro-miner | ⬜ Open | 🟥 | M |
 | L5 | Master-canary between runs | ⬜ Open | 🟦 | M |
 | L6 | Auto-update-branch unsticker | ✅ Implemented | — | S |
-| L7 | Queue-add shift-left preflight | 📋 Planned | 🟦 | S |
+| L7 | Queue-add shift-left preflight | ✅ Implemented | — | S |
 | L8 | Failure self-heal / requeue | ✅ Implemented | — | M |
 | L9 | JSB AutoResearch loop | ✅ Implemented | — | L |
-| L10 | Discord intake loop | ◑ Partial | 🟦 | L |
+| L10 | Discord intake loop | ✅ Implemented | — | L |
 | L11 | Comprehension-debt digest | ⬜ Open | 🟦 | S |
 | L12 | Autonomy contracts in plan frontmatter | ◑ Partial | 🟦 | M |
 | L13 | Per-phase impl-model routing | ✅ Implemented | — | M |
 | L14 | Escalate-on-retry (Sonnet-first, just-in-time Opus) | ✅ Implemented | — | S |
 | L15 | Sonnet-recipe completeness lint | ✅ Implemented | — | S |
-| L16 | Context-budget gate v2 (work-size proxies + measured calibration) | 📋 Planned | 🟦 | M |
+| L16 | Context-budget gate v2 (work-size proxies + measured calibration) | ✅ Implemented | — | M |
 | L17 | Shared-context artifact for multi-plan splits | ✅ Implemented | — | S |
 | L18 | Tier-default correction (`impl_model:` fails open to Opus) | ✅ Implemented | — | S |
 | L19 | Weekly product-analytics review | ⬜ Open | 🟦 | M |
@@ -92,12 +92,7 @@ last_verified: 2026-08-08
 **Location:** `.github/workflows/update-behind-prs.yml` — scheduled every 15 min; calls the GitHub `update-branch` API for armed auto-merge PRs stuck BEHIND master. ADR-0081 records the CI_PAT token strategy, merge-vs-rebase decision, and loop-safety design.
 **Status (2026-07-10):** ✅ Implemented — merged PR #1390.
 
-### L7 Queue-add shift-left preflight
-**Location:** `bin/automouse-queue` `add` runs zero preflight (verified); staleness is caught only at 2am by the impl agent, then self-heal requeues (L8). Plan: `$HOME/claude-plans/staleness-guard-fp-fix-and-queue-check.md` (not yet queued).
-**Problem:** A stale anchor costs a night when it could be fixed in 30 seconds at queue-add time, while a human is at the keyboard.
-**Suggested direction (per the plan):** Run `bin/check-plan` + `bin/check-plan-staleness` at add time; also fixes known staleness-check false positives.
-**Risk if untouched:** Recurring burned queue slots for trivially-fixable staleness.
-**Status (2026-07-07):** 📋 Planned — not queued. 🟦.
+➜ L7 Queue-add shift-left preflight — ✅ Implemented (2026-06-27): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
 ### L8 Failure self-heal / requeue
 **Location:** `bin/automouse-run` + `bin/automouse-self-heal`.
@@ -106,10 +101,7 @@ last_verified: 2026-08-08
 ### L9 JSB AutoResearch loop
 ➜ L9 JSB AutoResearch loop — ✅ Implemented (2026-07-23): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
-### L10 Discord intake loop
-**Location:** `bin/bug-pipeline-tick`, `bin/bug-pipeline-cron-setup`, `bin/bug-pipeline-classify-prompt`, `bin/bug-pipeline-gather-prompt` (live); remainder of the 6-PR Discord bug pipeline program per its shared-context spec.
-**Problem (was):** Bug reports ended at a human reading Discord.
-**Status (2026-07-07):** ◑ Partial — gather/classify/tick machinery merged and cron-installable; the residual program (hunter stages) is tracked in its own pipeline, not re-planned here. Human checkpoints (plan review + `feat:` signoff gate) stay in place by design. 🟦.
+➜ L10 Discord intake loop — ✅ Implemented (2026-07-11): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
 ### L11 Comprehension-debt digest
 **Location:** No weekly merged-diff digest exists (verified — automouse reports are per-run, not per-week).
@@ -134,12 +126,7 @@ last_verified: 2026-08-08
 ### L15 Sonnet-recipe completeness lint
 ✅ Implemented (2026-07-15) — see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
-### L16 Context-budget gate v2 (work-size proxies + measured calibration)
-**Location:** `bin/check-plan` gate `[C]` (≥ 500 lines OR ≥ 12 numbered phases — thresholds hand-set once from the 2026-07-07 automouse-corpus audit); the T1 per-phase cost rows carry no peak-context column.
-**Problem:** Two blind spots. (1) Plan size ≠ work size: a 100-line plan phase saying "sweep every call site" triggers a marathon implementation the gate can't see, while a reference-heavy plan false-trips and gets papered over with a `context-budget:` marker. (2) No feedback loop: nothing re-checks the thresholds as plan style evolves, so the gate drifts from the dumb-zone reality it proxies.
-**Suggested direction:** (a) Add work-size proxies — Verification-Matrix row count, Critical-Files change-target count, and sweep-verb detection ("all call sites", "every occurrence") in a phase without a delegation packet. (b) Log peak context tokens per impl run into the T1 ledger (the stream-json usage events already carry them) and add a report correlating plan proxies against measured peaks — recalibrate thresholds from data, and flag any run breaching ~150K as a Step 2.5 split miss for the retro.
-**Risk if untouched:** Dumb-zone breaches keep happening under the gate's radar, and the thresholds stay a one-shot guess.
-**Status (2026-07-14):** 📋 Planned — plan slug `context-budget-gate-v2`; ships check-plan [C] proxy counts, [W] sweep-verb advisory, stream-filter peak_ctx tracking, and costs.md Peak Ctx column.
+➜ L16 Context-budget gate v2 — ✅ Implemented (2026-07-15): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
 ### L17 Shared-context artifact for multi-plan splits
 ✅ Implemented (2026-07-11) — see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).

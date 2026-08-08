@@ -240,8 +240,8 @@ class StandingsRepositoryTest extends DatabaseTestCase
         $result = $this->repo->fetchTopTeamsByWins('conference', 'Eastern');
 
         self::assertCount(2, $result);
-        self::assertEquals(30, $result[0]['wins']);
-        self::assertEquals(20, $result[1]['wins']);
+        self::assertSame(30, $result[0]['wins']);
+        self::assertSame(20, $result[1]['wins']);
     }
 
     public function testFetchTopTeamsByWinsWithNullGroupingScansWholeLeague(): void
@@ -255,8 +255,8 @@ class StandingsRepositoryTest extends DatabaseTestCase
         $result = $this->repo->fetchTopTeamsByWins(null, null);
 
         self::assertCount(2, $result);
-        self::assertEquals(40, $result[0]['wins']);
-        self::assertEquals(35, $result[1]['wins']);
+        self::assertSame(40, $result[0]['wins']);
+        self::assertSame(35, $result[1]['wins']);
         self::assertSame(1, $result[0]['teamid']);
         self::assertSame(2, $result[1]['teamid']);
     }
@@ -277,7 +277,7 @@ class StandingsRepositoryTest extends DatabaseTestCase
         $result = $this->repo->fetchLeastLosingTeam('Spurs', 'conference', 'TestConf3');
 
         self::assertNotNull($result);
-        self::assertEquals(6, $result['losses']);
+        self::assertSame(6, $result['losses']);
     }
 
     public function testFetchLeastLosingTeamReturnsNullWhenOnlyCandidateIsExcluded(): void
@@ -391,7 +391,7 @@ class StandingsRepositoryTest extends DatabaseTestCase
         $scored = $this->repo->fetchPlayedGamesForSeason('2099-01-01', '2099-12-31');
 
         self::assertCount(1, $scored);
-        self::assertEquals(100, $scored[0]['visitor_score']);
+        self::assertSame(100, $scored[0]['visitor_score']);
 
         $empty = $this->repo->fetchPlayedGamesForSeason('2090-01-01', '2090-12-31');
         self::assertSame([], $empty);
@@ -482,7 +482,7 @@ class StandingsRepositoryTest extends DatabaseTestCase
         self::assertNotFalse($row);
         $data = $row->fetch_assoc();
         self::assertIsArray($data);
-        self::assertEquals(60, $data['wins']);
+        self::assertSame(60, $data['wins']);
         self::assertNull($data['conf_magic_number']);
         self::assertNull($data['div_magic_number']);
         self::assertNull($data['clinched_conference']);
@@ -501,7 +501,7 @@ class StandingsRepositoryTest extends DatabaseTestCase
         self::assertNotFalse($result);
         $row = $result->fetch_assoc();
         self::assertIsArray($row);
-        self::assertEquals(1, $row['clinched_playoffs']);
+        self::assertSame(1, $row['clinched_playoffs']);
     }
 
     public function testUpsertTeamAwardIsIdempotent(): void
@@ -515,6 +515,6 @@ class StandingsRepositoryTest extends DatabaseTestCase
         self::assertNotFalse($result);
         $row = $result->fetch_assoc();
         self::assertIsArray($row);
-        self::assertEquals(1, $row['cnt']);
+        self::assertSame(1, $row['cnt']);
     }
 }

@@ -69,6 +69,7 @@ class StandingsUpdaterRepository extends \BaseMysqliRepository
     }
 
     /**
+     * @param UpsertStandingsParams $params
      * @see StandingsRepositoryInterface::upsertStandings()
      */
     public function upsertStandings(array $params): void

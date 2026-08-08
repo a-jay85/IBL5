@@ -697,34 +697,40 @@ parameters:
 			path: classes/Standings/StandingsRepository.php
 
 		-
+			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
+			identifier: ibl.sqlStringConcatenation
+			count: 10
+			path: classes/Standings/StandingsRepository.php
+
+		-
 			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "game_date" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
 			identifier: ibl.orderByMissingTiebreaker
 			count: 1
-			path: classes/Standings/StandingsRepository.php
+			path: classes/Standings/StandingsUpdaterRepository.php
 
 		-
 			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "losses" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
 			identifier: ibl.orderByMissingTiebreaker
 			count: 1
-			path: classes/Standings/StandingsRepository.php
+			path: classes/Standings/StandingsUpdaterRepository.php
 
 		-
 			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "pct" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
 			identifier: ibl.orderByMissingTiebreaker
 			count: 1
-			path: classes/Standings/StandingsRepository.php
+			path: classes/Standings/StandingsUpdaterRepository.php
 
 		-
 			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "wins" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
 			identifier: ibl.orderByMissingTiebreaker
 			count: 3
-			path: classes/Standings/StandingsRepository.php
+			path: classes/Standings/StandingsUpdaterRepository.php
 
 		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringConcatenation
-			count: 17
-			path: classes/Standings/StandingsRepository.php
+			count: 7
+			path: classes/Standings/StandingsUpdaterRepository.php
 
 		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'

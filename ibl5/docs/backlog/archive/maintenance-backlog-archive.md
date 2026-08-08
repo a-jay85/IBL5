@@ -280,7 +280,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Est. effort:** M
 **Risk if untouched:** Every new standings display variant inflates the view.
 **Provenance:** Seeded 2026-07-24 — ground-truth audit hot-file scan.
-**Status:** Implemented — StandingsRowView + StandingsTiebreakerResolver extracted from StandingsView (2026-08-08, PR pending).
+**Status:** Implemented — StandingsRowView + StandingsTiebreakerResolver extracted from StandingsView (2026-08-08, #1795).
 
 **Table evidence (2026-08-08):** StandingsView 610 LOC — per-division block renderers. Extract per-division renderer collaborators; golden-master pin. (1.32 resolved — can now plan independently.)
 

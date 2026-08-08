@@ -1,0 +1,579 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# bin/test-docfix-poll — regression guard for bin/docfix-poll reap/salvage/health/stale-since.
+# Tests 1-12 and 17-22 from the docfix-pipeline-recovery plan Phase 6.
+# Run: bin/test-docfix-poll  (exit 0 = all pass).
+set -u
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+REAL_POLL="$REPO_ROOT/bin/docfix-poll"
+WORKFLOW="$REPO_ROOT/.github/workflows/doc-freshness-audit.yml"
+FAILED=0
+ok()  { echo "ok: $1"; }
+bad() { echo "FAIL: $1"; FAILED=1; }
+
+# _ts_ago $1=seconds_ago → ISO-8601 UTC timestamp.
+_ts_ago() {
+    local epoch
+    epoch=$(( $(date -u +%s) - $1 ))
+    date -u -r "$epoch" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
+        || date -u -d "@$epoch" +%Y-%m-%dT%H:%M:%SZ
+}
+
+# ---------------------------------------------------------------------------
+# build_sandbox — mktemp dir with fake-repo layout, bin stubs, and shims.
+# Shim convention: every SHIM_* variable holds POST-jq output (shims ignore
+# --jq entirely).  Unmatched git calls are logged to $SB/git-unmatched-calls
+# so a missed pattern is a visible failure, not a silent false-green.
+# ---------------------------------------------------------------------------
+build_sandbox() {
+    local SB
+    SB="$(mktemp -d)"
+    mkdir -p "$SB/bin/lib" "$SB/home/Library/LaunchAgents" "$SB/wts" "$SB/shim"
+
+    # check-docs stub: prints SHIM_STALE_JSON; exits SHIM_CHECKDOCS_RC (def 0).
+    printf '#!/usr/bin/env bash\nprintf "%%s" "${SHIM_STALE_JSON:-[]}"\nexit "${SHIM_CHECKDOCS_RC:-0}"\n' \
+        > "$SB/bin/check-docs"
+    # cleanup stub: logs branch to cleanup-calls; exits SHIM_CLEANUP_RC (def 0).
+    printf '#!/usr/bin/env bash\necho "$1" >> "%s/cleanup-calls"\nexit "${SHIM_CLEANUP_RC:-0}"\n' \
+        "$SB" > "$SB/bin/cleanup"
+    # docfix-run stub: logs "issue|sig" to docfix-calls.
+    printf '#!/usr/bin/env bash\necho "$1|$2" >> "%s/docfix-calls"\n' \
+        "$SB" > "$SB/bin/docfix-run"
+    chmod +x "$SB/bin/check-docs" "$SB/bin/cleanup" "$SB/bin/docfix-run"
+
+    # git shim: _SB is baked in at write time; SHIM_* vars are env at runtime.
+    # Strips the -C <path> prefix before matching on the subcommand — all
+    # docfix-poll git calls use -C, but git_remote_refresh_branches() does not.
+    printf '#!/usr/bin/env bash\n_SB="%s"\n' "$SB" > "$SB/shim/git"
+    cat >> "$SB/shim/git" <<'GITSHIM'
+_ORIG=("$@")
+# Strip -C <path> prefix if present
+if [ "${1:-}" = "-C" ]; then shift 2; fi
+_SUBCMD="${1:-}"
+shift || true
+case "$_SUBCMD" in
+    reflog)
+        [ -n "${SHIM_REFLOG_OUT:-}" ] && printf '%s\n' "$SHIM_REFLOG_OUT" || true ;;
+    worktree)
+        [ -n "${SHIM_WORKTREE_LIST:-}" ] && printf '%s\n' "$SHIM_WORKTREE_LIST" || true ;;
+    ls-remote)
+        [ -n "${SHIM_LS_REMOTE:-}" ] && printf '%s\n' "$SHIM_LS_REMOTE" || true ;;
+    branch)
+        if [ "${1:-}" = "-D" ]; then
+            printf '%s\n' "${2:-}" >> "$_SB/git-branch-d-calls"
+        else
+            [ -n "${SHIM_BRANCH_OUT:-}" ] && printf '%s\n' "$SHIM_BRANCH_OUT" || true
+        fi ;;
+    status)
+        [ -n "${SHIM_STATUS_OUT:-}" ] && printf '%s\n' "$SHIM_STATUS_OUT" || true ;;
+    add)    printf 'add\n'    >> "$_SB/git-add-calls" ;;
+    commit) printf 'commit\n' >> "$_SB/git-commit-calls"
+            exit "${SHIM_GIT_COMMIT_RC:-0}" ;;
+    push)   printf 'push\n'   >> "$_SB/git-push-calls"
+            exit "${SHIM_GIT_PUSH_RC:-0}" ;;
+    reset)  printf 'reset\n'  >> "$_SB/git-reset-calls" ;;
+    *)
+        printf '%s\n' "${_ORIG[*]:-}" >> "$_SB/git-unmatched-calls"
+        exec /usr/bin/git "${_ORIG[@]}" ;;
+esac
+exit 0
+GITSHIM
+
+    # gh shim: same call patterns as bin/test-docfix-run.
+    cat > "$SB/shim/gh" <<'H'
+#!/usr/bin/env bash
+[ -n "${SHIM_GH_FAIL:-}" ] && exit 1
+args="$*"
+case "$1 $2" in
+  "issue list") printf '%s' "${SHIM_ISSUE_OUT:-}" ;;
+  "issue view")
+      case "$args" in
+        *"--json body"*) printf '%s' "${SHIM_ISSUE_BODY:-}" ;;
+        *)               printf '%s' "${SHIM_ISSUE_CREATED:-}" ;;
+      esac ;;
+  "pr list")
+      case "$args" in
+        *"--state all"*)
+            case "$args" in
+              *"--json state"*) printf '%s' "${SHIM_PR_STATE:-NONE}" ;;
+              *)                printf '%s' "${SHIM_PR_FOR_BRANCH:-0}" ;;
+            esac ;;
+        *"--state closed"*) printf '%s' "${SHIM_PR_CLOSED:-[]}" ;;
+        *)                  printf '%s' "${SHIM_PR_OPEN:-}" ;;
+      esac ;;
+  "pr view")
+      case "$args" in
+        *statusCheckRollup*) printf '%s' "${SHIM_PR_ROLLUP:-0}" ;;
+        *)                   printf '%s' "${SHIM_PR_STATE:-}" ;;
+      esac ;;
+esac
+exit 0
+H
+
+    # launchctl shim: SHIM_LAUNCHCTL_OUT controls what `launchctl list` returns.
+    cat > "$SB/shim/launchctl" <<'LCTL'
+#!/usr/bin/env bash
+[ "${1:-}" = "list" ] && printf '%s\n' "${SHIM_LAUNCHCTL_OUT:-}" || true
+exit 0
+LCTL
+
+    chmod +x "$SB/shim/git" "$SB/shim/gh" "$SB/shim/launchctl"
+    printf '%s' "$SB"
+}
+
+# run_poll: drives REAL bin/docfix-poll poll path with IBL5_MAIN=$SB.
+run_poll() {
+    local SB="$1"
+    ( IBL5_MAIN="$SB" HOME="$SB/home" PATH="$SB/shim:$SB/bin:$PATH" \
+      "$REAL_POLL" >/dev/null 2>&1 ) || true
+}
+
+# run_poll_err: like run_poll but captures stderr to POLL_STDERR_FILE.
+POLL_STDERR_FILE=""
+run_poll_err() {
+    local SB="$1"
+    POLL_STDERR_FILE="$(mktemp)"
+    ( IBL5_MAIN="$SB" HOME="$SB/home" PATH="$SB/shim:$SB/bin:$PATH" \
+      "$REAL_POLL" >/dev/null 2>"$POLL_STDERR_FILE" ) || true
+}
+
+# run_health: drives bin/docfix-poll --health-report; returns stdout.
+run_health() {
+    local SB="$1" ISSUE="${2:-}"
+    IBL5_MAIN="$SB" HOME="$SB/home" PATH="$SB/shim:$SB/bin:$PATH" \
+        "$REAL_POLL" --health-report "$ISSUE" 2>/dev/null
+}
+
+# _wt_sandbox: build_sandbox + create worktree dir for salvage tests.
+_wt_sandbox() {
+    local SB
+    SB="$(build_sandbox)"
+    mkdir -p "$SB/wts/$B_OLD/ibl5"
+    printf '%s' "$SB"
+}
+
+# _wl: emit a SHIM_WORKTREE_LIST value for a given sandbox and branch.
+_wl() {
+    local SB="$1" B="${2:-$B_OLD}"
+    printf 'worktree %s/wts/%s/ibl5\nHEAD abc123def\nbranch refs/heads/%s\n\nworktree %s\nHEAD deadbeef\nbranch refs/heads/master' \
+        "$SB" "$B" "$B" "$SB"
+}
+
+# apply_stale_since: replicates the workflow "File or update" stale-since
+# preservation logic.  $1=body-file $2=SB (for gh shim path) $3=issue-num.
+apply_stale_since() {
+    local BODY_FILE="$1" SB="$2" NUM="$3"
+    local PREV_SINCE TMP
+    PREV_SINCE="$(PATH="$SB/shim:$PATH" gh issue view "$NUM" --json body \
+        --jq '.body' 2>/dev/null | tr -d '\r' \
+        | sed -n 's/.*<!-- stale-since: \(.*\) -->.*/\1/p')"
+    if [ -n "$PREV_SINCE" ]; then
+        TMP="$(mktemp)"
+        sed "s|<!-- stale-since: .* -->|<!-- stale-since: $PREV_SINCE -->|" \
+            "$BODY_FILE" > "$TMP" && mv "$TMP" "$BODY_FILE"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Shared fixture constants
+# ---------------------------------------------------------------------------
+STALE_ONE='[{"path":"a.md"}]'
+B_OLD="docs-stale-refresh-20260802"
+EPOCH_48H=$(( $(date -u +%s) - 172800 ))
+EPOCH_30M=$(( $(date -u +%s) - 1800  ))
+EPOCH_5H=$(( $(date -u +%s) - 18000  ))
+REFLOG_OLD="abc1234 ${B_OLD}@{${EPOCH_48H}}: branch: Created from master"
+REFLOG_YOUNG="abc1234 ${B_OLD}@{${EPOCH_30M}}: branch: Created from master"
+REFLOG_5H="abc1234 ${B_OLD}@{${EPOCH_5H}}: branch: Created from master"
+TS_48H="$(_ts_ago $(( 48*3600 )))"
+TS_37H="$(_ts_ago $(( 37*3600 )))"
+
+# ---------------------------------------------------------------------------
+# Tests 1-2: branch_age_seconds (exercised via reap-loop behavior)
+# ---------------------------------------------------------------------------
+
+# Test 1: young branch (<4h) — reap loop leaves it alone; no salvage/cleanup.
+SB="$(build_sandbox)"
+SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
+    SHIM_BRANCH_OUT="$B_OLD" SHIM_PR_STATE="NONE" \
+    SHIM_LS_REMOTE="" SHIM_REFLOG_OUT="$REFLOG_YOUNG" \
+    run_poll "$SB"
+{ [ ! -f "$SB/git-add-calls" ] && [ ! -f "$SB/cleanup-calls" ]; } \
+  && ok "(1) branch_age_seconds young (<4h): branch left alone, no salvage" \
+  || bad "(1) branch_age_seconds young: unexpected salvage/cleanup"
+
+# Test 2: old branch (>4h) with clean worktree — wedge condition fires, cleanup called.
+SB="$(_wt_sandbox)"
+WL2="$(_wl "$SB")"
+SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
+    SHIM_BRANCH_OUT="$B_OLD" SHIM_PR_STATE="NONE" \
+    SHIM_LS_REMOTE="" SHIM_REFLOG_OUT="$REFLOG_OLD" \
+    SHIM_WORKTREE_LIST="$WL2" SHIM_STATUS_OUT="" \
+    run_poll "$SB"
+{ [ -f "$SB/cleanup-calls" ] && grep -q "$B_OLD" "$SB/cleanup-calls"; } \
+  && ok "(2) branch_age_seconds old (>4h): wedge condition triggered, cleanup called" \
+  || bad "(2) branch_age_seconds old: expected cleanup call"
+
+# ---------------------------------------------------------------------------
+# Tests 3-7: reap / salvage
+# ---------------------------------------------------------------------------
+
+# Test 3: clean wedged branch — bin/cleanup called; no salvage commit/push.
+SB="$(_wt_sandbox)"
+WL3="$(_wl "$SB")"
+SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
+    SHIM_BRANCH_OUT="$B_OLD" SHIM_PR_STATE="NONE" \
+    SHIM_LS_REMOTE="" SHIM_REFLOG_OUT="$REFLOG_OLD" \
+    SHIM_WORKTREE_LIST="$WL3" SHIM_STATUS_OUT="" \
+    run_poll "$SB"
+{ [ -f "$SB/cleanup-calls" ] && grep -q "$B_OLD" "$SB/cleanup-calls" \
+    && [ ! -f "$SB/git-add-calls" ] && [ ! -f "$SB/git-commit-calls" ] \
+    && [ ! -f "$SB/git-push-calls" ]; } \
+  && ok "(3) clean wedged branch: cleanup called, no salvage commit/push" \
+  || bad "(3) clean wedged branch"
+
+# Test 4: dirty wedged branch — git add+commit+push called, then cleanup.
+SB="$(_wt_sandbox)"
+WL4="$(_wl "$SB")"
+SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
+    SHIM_BRANCH_OUT="$B_OLD" SHIM_PR_STATE="NONE" \
+    SHIM_LS_REMOTE="" SHIM_REFLOG_OUT="$REFLOG_OLD" \
+    SHIM_WORKTREE_LIST="$WL4" SHIM_STATUS_OUT=" M docs/foo.md" \
+    run_poll "$SB"
+{ [ -f "$SB/git-add-calls" ] && [ -f "$SB/git-commit-calls" ] \
+    && [ -f "$SB/git-push-calls" ] \
+    && [ -f "$SB/cleanup-calls" ] && grep -q "$B_OLD" "$SB/cleanup-calls"; } \
+  && ok "(4) dirty wedged branch: git add+commit+push called, then cleanup" \
+  || bad "(4) dirty wedged branch"
+
+# Test 5: push failure — git-reset-calls exists, cleanup-calls does NOT exist.
+# (Corrected assertion: poll swallows the function's non-zero return via '|| echo';
+#  assert on observable side effects only, not on exit code.)
+SB="$(_wt_sandbox)"
+WL5="$(_wl "$SB")"
+SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
+    SHIM_BRANCH_OUT="$B_OLD" SHIM_PR_STATE="NONE" \
+    SHIM_LS_REMOTE="" SHIM_REFLOG_OUT="$REFLOG_OLD" \
+    SHIM_WORKTREE_LIST="$WL5" SHIM_STATUS_OUT=" M docs/foo.md" \
+    SHIM_GIT_PUSH_RC=1 \
+    run_poll "$SB"
+{ [ -f "$SB/git-push-calls" ] && [ -f "$SB/git-reset-calls" ] \
+    && [ ! -f "$SB/cleanup-calls" ]; } \
+  && ok "(5) push failure: git-reset called, cleanup NOT called (branch left in place)" \
+  || bad "(5) push failure"
+
+# Test 6: no-race negative — young branch (<4h) left completely alone.
+SB="$(build_sandbox)"
+WL6="$(_wl "$SB")"
+SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
+    SHIM_BRANCH_OUT="$B_OLD" SHIM_PR_STATE="NONE" \
+    SHIM_LS_REMOTE="" SHIM_REFLOG_OUT="$REFLOG_YOUNG" \
+    SHIM_WORKTREE_LIST="$WL6" SHIM_STATUS_OUT="" \
+    run_poll "$SB"
+{ [ ! -f "$SB/cleanup-calls" ] && [ ! -f "$SB/git-add-calls" ]; } \
+  && ok "(6) no-race: young branch (<4h) left completely alone" \
+  || bad "(6) no-race: young branch should be left alone"
+
+# Test 7: declined PR regression — old branch WITH origin ref is not salvaged.
+# (Has origin ref → falls to the "else" arm → "leaving" message only.)
+SB="$(build_sandbox)"
+SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
+    SHIM_BRANCH_OUT="$B_OLD" SHIM_PR_STATE="NONE" \
+    SHIM_LS_REMOTE="abcdef1234	refs/heads/$B_OLD" \
+    SHIM_REFLOG_OUT="$REFLOG_OLD" SHIM_STATUS_OUT="" \
+    run_poll "$SB"
+{ [ ! -f "$SB/cleanup-calls" ] && [ ! -f "$SB/git-add-calls" ]; } \
+  && ok "(7) origin ref present: old branch with origin ref not salvaged" \
+  || bad "(7) declined PR regression: branch with origin ref should not be salvaged"
+
+# ---------------------------------------------------------------------------
+# Tests 8-9: health_report
+# ---------------------------------------------------------------------------
+
+# Test 8: wedged arm — alert=true, kind=wedged, detail names branch.
+SB="$(build_sandbox)"
+WL8="$(_wl "$SB")"
+OUT8="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" \
+    SHIM_LS_REMOTE="" SHIM_PR_FOR_BRANCH=0 \
+    SHIM_BRANCH_OUT="$B_OLD" SHIM_REFLOG_OUT="$REFLOG_OLD" \
+    SHIM_LAUNCHCTL_OUT="" SHIM_WORKTREE_LIST="$WL8" \
+    run_health "$SB" 77)"
+{ echo "$OUT8" | grep -q 'alert=true' \
+    && echo "$OUT8" | grep -q 'kind=wedged' \
+    && echo "$OUT8" | grep -q "$B_OLD"; } \
+  && ok "(8) health_report wedged: alert=true, kind=wedged, branch named in detail" \
+  || bad "(8) health_report wedged"
+
+# Test 9: exactly 3 key=value lines and exits 0 in every health branch.
+
+# (9a) healthy — no stale docs → alert=false
+SB="$(build_sandbox)"
+OUT9A="$(SHIM_STALE_JSON='[]' run_health "$SB" 77)"; RC9A=$?
+{ [ "$RC9A" -eq 0 ] \
+    && [ "$(printf '%s\n' "$OUT9A" | grep -c '^')" -eq 3 ] \
+    && printf '%s\n' "$OUT9A" | grep -q '^alert=false$'; } \
+  && ok "(9a) health_report: 3 lines + exits 0 (healthy/empty stale set)" \
+  || bad "(9a) health_report healthy 3-line contract"
+
+# (9b) wedged arm
+SB="$(build_sandbox)"
+WL9B="$(_wl "$SB")"
+OUT9B="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" \
+    SHIM_LS_REMOTE="" SHIM_PR_FOR_BRANCH=0 \
+    SHIM_BRANCH_OUT="$B_OLD" SHIM_REFLOG_OUT="$REFLOG_OLD" \
+    SHIM_LAUNCHCTL_OUT="" SHIM_WORKTREE_LIST="$WL9B" \
+    run_health "$SB" 77)"; RC9B=$?
+{ [ "$RC9B" -eq 0 ] \
+    && [ "$(printf '%s\n' "$OUT9B" | grep -c '^')" -eq 3 ] \
+    && printf '%s\n' "$OUT9B" | grep -q '^alert=true$'; } \
+  && ok "(9b) health_report: 3 lines + exits 0 (wedged arm)" \
+  || bad "(9b) health_report wedged 3-line contract"
+
+# (9c) died arm — branch on origin with no PR
+SB="$(build_sandbox)"
+LS9C="abcdef123	refs/heads/docs-stale-refresh-x"
+OUT9C="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" \
+    SHIM_LS_REMOTE="$LS9C" SHIM_PR_FOR_BRANCH=0 SHIM_BRANCH_OUT="" \
+    run_health "$SB" 77)"; RC9C=$?
+{ [ "$RC9C" -eq 0 ] \
+    && [ "$(printf '%s\n' "$OUT9C" | grep -c '^')" -eq 3 ] \
+    && printf '%s\n' "$OUT9C" | grep -q '^alert=true$'; } \
+  && ok "(9c) health_report: 3 lines + exits 0 (died arm)" \
+  || bad "(9c) health_report died 3-line contract"
+
+# (9d) never-ran arm — stale-since 48h ago, no branch anywhere
+SB="$(build_sandbox)"
+BODY9D="<!-- stale-since: $TS_48H -->"
+OUT9D="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" \
+    SHIM_LS_REMOTE="" SHIM_ISSUE_BODY="$BODY9D" \
+    SHIM_BRANCH_OUT="" SHIM_REFLOG_OUT="" SHIM_LAUNCHCTL_OUT="" \
+    run_health "$SB" 77)"; RC9D=$?
+{ [ "$RC9D" -eq 0 ] \
+    && [ "$(printf '%s\n' "$OUT9D" | grep -c '^')" -eq 3 ] \
+    && printf '%s\n' "$OUT9D" | grep -q '^alert=true$'; } \
+  && ok "(9d) health_report: 3 lines + exits 0 (never-ran arm)" \
+  || bad "(9d) health_report never-ran 3-line contract"
+
+# ---------------------------------------------------------------------------
+# Tests 10-12: stale-since logic (workflow "File or update" step)
+# ---------------------------------------------------------------------------
+
+# Static assertion: verify the workflow still has the stale-since preservation
+# block that apply_stale_since() replicates, so a YAML change fails loudly.
+{ grep -qF 'if [ -n "$PREV_SINCE" ]; then' "$WORKFLOW" \
+    && grep -q 'sed -i.*stale-since.*PREV_SINCE' "$WORKFLOW"; } \
+  && ok "(10-static) workflow stale-since preservation sed block still exists" \
+  || bad "(10-static) workflow stale-since preservation block changed — fix apply_stale_since()"
+
+# Test 10: three consecutive edits — stale-since preserved across all three.
+SB10="$(build_sandbox)"
+ORIG_TS="2026-07-25T08:00:00Z"
+BODY10="$(mktemp)"
+export SHIM_ISSUE_BODY
+SHIM_ISSUE_BODY="<!-- stale-since: ${ORIG_TS} -->"
+T10_OK=1
+for _run in 1 2 3; do
+    FRESH_TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    printf '<!-- stale-since: %s -->\nSome stale content\n' "$FRESH_TS" > "$BODY10"
+    apply_stale_since "$BODY10" "$SB10" "42"
+    if ! grep -q "stale-since: ${ORIG_TS}" "$BODY10"; then
+        bad "(10) stale-since NOT preserved on edit run $_run"
+        T10_OK=0
+        break
+    fi
+done
+[ "$T10_OK" -eq 1 ] \
+  && ok "(10) stale-since preserved across 3 consecutive edit runs" \
+  || true  # bad() already called above
+rm -f "$BODY10"
+unset SHIM_ISSUE_BODY
+
+# Test 11: fresh create (no prior issue, PREV_SINCE empty) — body retains
+# the freshly-stamped stale-since written by the "Build issue body" step.
+SB11="$(build_sandbox)"
+BODY11="$(mktemp)"
+FRESH_TS11="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+printf '<!-- stale-since: %s -->\nSome stale content\n' "$FRESH_TS11" > "$BODY11"
+export SHIM_ISSUE_BODY=""
+apply_stale_since "$BODY11" "$SB11" "42"  # PREV_SINCE empty → no sed
+grep -q '<!-- stale-since:' "$BODY11" \
+  && ok "(11) stale-since fresh create: timestamp present in body (fresh stamp retained)" \
+  || bad "(11) stale-since fresh create: timestamp missing"
+rm -f "$BODY11"
+unset SHIM_ISSUE_BODY
+
+# Test 12: stale-since set 37h ago → health_report age_h >= 36 → never-ran.
+SB="$(build_sandbox)"
+BODY12="<!-- stale-since: $TS_37H -->"
+OUT12="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" \
+    SHIM_LS_REMOTE="" SHIM_ISSUE_BODY="$BODY12" \
+    SHIM_BRANCH_OUT="" SHIM_REFLOG_OUT="" SHIM_LAUNCHCTL_OUT="" \
+    run_health "$SB" 77)"
+{ echo "$OUT12" | grep -q 'alert=true' \
+    && echo "$OUT12" | grep -q 'kind=never-ran'; } \
+  && ok "(12) stale-since 37h: alert=true, kind=never-ran" \
+  || bad "(12) stale-since 37h: expected alert=true kind=never-ran"
+
+# ---------------------------------------------------------------------------
+# Tests 17-22: Phase 6 extensions
+# ---------------------------------------------------------------------------
+
+# Test 17: live run survives — launchctl interlock prevents salvage at any age.
+B17="$B_OLD"
+JOB17="com.ibl5.docfix-run-${B17}-20260808-091700"
+
+# (17a) branch at 5h (> 4h threshold) — interlock fires before age matters.
+SB="$(build_sandbox)"
+WL17A="$(_wl "$SB" "$B17")"
+mkdir -p "$SB/wts/$B17/ibl5"
+SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
+    SHIM_BRANCH_OUT="$B17" SHIM_PR_STATE="NONE" \
+    SHIM_LS_REMOTE="" SHIM_REFLOG_OUT="$REFLOG_5H" \
+    SHIM_WORKTREE_LIST="$WL17A" SHIM_STATUS_OUT=" M docs/foo.md" \
+    SHIM_LAUNCHCTL_OUT="-	0	$JOB17" \
+    run_poll "$SB"
+{ [ ! -f "$SB/cleanup-calls" ] && [ ! -f "$SB/git-add-calls" ]; } \
+  && ok "(17a) live job interlock (5h old): branch left alone, no salvage" \
+  || bad "(17a) live job interlock at 5h"
+
+# (17b) branch at 48h — same interlock, different age.
+SB="$(build_sandbox)"
+WL17B="$(_wl "$SB" "$B17")"
+mkdir -p "$SB/wts/$B17/ibl5"
+SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
+    SHIM_BRANCH_OUT="$B17" SHIM_PR_STATE="NONE" \
+    SHIM_LS_REMOTE="" SHIM_REFLOG_OUT="$REFLOG_OLD" \
+    SHIM_WORKTREE_LIST="$WL17B" SHIM_STATUS_OUT=" M docs/foo.md" \
+    SHIM_LAUNCHCTL_OUT="-	0	$JOB17" \
+    run_poll "$SB"
+{ [ ! -f "$SB/cleanup-calls" ] && [ ! -f "$SB/git-add-calls" ]; } \
+  && ok "(17b) live job interlock (48h old): branch left alone, no salvage" \
+  || bad "(17b) live job interlock at 48h"
+
+# Negative control for test 17: same fixture but no launchctl job → salvage fires.
+SB="$(build_sandbox)"
+WL17N="$(_wl "$SB" "$B17")"
+mkdir -p "$SB/wts/$B17/ibl5"
+SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
+    SHIM_BRANCH_OUT="$B17" SHIM_PR_STATE="NONE" \
+    SHIM_LS_REMOTE="" SHIM_REFLOG_OUT="$REFLOG_OLD" \
+    SHIM_WORKTREE_LIST="$WL17N" SHIM_STATUS_OUT=" M docs/foo.md" \
+    SHIM_LAUNCHCTL_OUT="" \
+    run_poll "$SB"
+{ [ -f "$SB/git-add-calls" ]; } \
+  && ok "(17-neg) without launchctl job: salvage fires (negative control)" \
+  || bad "(17-neg) negative control: expected salvage to fire when no live job"
+
+# Test 18: gh unreachable → branch unchanged; health does not emit kind=wedged.
+# (Corrected assertion: docfix-poll's fail-closed || echo 1 at line 292 is the
+#  mechanism — unreachable API makes pr_count=1, so wedge check is skipped.)
+SB="$(build_sandbox)"
+WL18="$(_wl "$SB")"
+mkdir -p "$SB/wts/$B_OLD/ibl5"
+SHIM_GH_FAIL=1 SHIM_STALE_JSON="$STALE_ONE" \
+    SHIM_BRANCH_OUT="$B_OLD" SHIM_REFLOG_OUT="$REFLOG_OLD" \
+    SHIM_WORKTREE_LIST="$WL18" SHIM_STATUS_OUT=" M docs/foo.md" \
+    SHIM_LAUNCHCTL_OUT="" \
+    run_poll_err "$SB"
+{ [ ! -f "$SB/git-add-calls" ] && [ ! -f "$SB/cleanup-calls" ] \
+    && grep -qiE 'API unreachable|fail closed|gh.*fail|unreachable' "$POLL_STDERR_FILE"; } \
+  && ok "(18) gh unreachable: branch left alone; log names API failure" \
+  || bad "(18) gh unreachable: expected no salvage and API-failure log line"
+rm -f "$POLL_STDERR_FILE"
+
+# Health with gh unreachable: fail-closed at wedged_local_refresh_branch (line 292):
+# `gh pr list ... || echo 1` → pr_count=1 → continue → no wedged branch found →
+# issue_episode_epoch fails → fallback to now → age_h=0 → alert=false.
+SB="$(build_sandbox)"
+OUT18H="$(SHIM_GH_FAIL=1 SHIM_STALE_JSON="$STALE_ONE" \
+    SHIM_BRANCH_OUT="$B_OLD" SHIM_REFLOG_OUT="$REFLOG_OLD" \
+    SHIM_LAUNCHCTL_OUT="" \
+    run_health "$SB" 77)"; RC18H=$?
+{ [ "$RC18H" -eq 0 ] \
+    && [ "$(printf '%s\n' "$OUT18H" | grep -c '^')" -eq 3 ] \
+    && printf '%s\n' "$OUT18H" | grep -q '^alert=false$'; } \
+  && ok "(18) health gh unreachable: 3 lines, exits 0, alert=false (fail-closed)" \
+  || bad "(18) health gh unreachable contract"
+
+# Test 19: lint — bash -n and shellcheck on all three scripts.
+bash -n "$REPO_ROOT/bin/docfix-poll" >/dev/null 2>&1 \
+  && ok "(19a) bash -n bin/docfix-poll exits 0" \
+  || bad "(19a) bash -n bin/docfix-poll"
+
+shellcheck --severity=warning --shell=bash \
+    "$REPO_ROOT/bin/docfix-poll" \
+    "$REPO_ROOT/bin/docfix-run" \
+    "$REPO_ROOT/bin/test-docfix-poll" >/dev/null 2>&1 \
+  && ok "(19b) shellcheck passes for docfix-poll, docfix-run, test-docfix-poll" \
+  || bad "(19b) shellcheck failures"
+
+# Test 20: CLOSED+OPEN array order → OPEN wins (jq liveness-priority expression).
+# Tests the jq expression in the reap loop directly since the shim bypasses jq.
+EXPR20='[.[].state] as $s | if ($s|length)==0 then "NONE" elif ($s|index("OPEN")) then "OPEN" elif ($s|index("MERGED")) then "MERGED" else "CLOSED" end'
+RESULT20A="$(printf '%s' '[{"state":"CLOSED"},{"state":"OPEN"}]' | jq -r "$EXPR20")"
+RESULT20B="$(printf '%s' '[{"state":"OPEN"},{"state":"CLOSED"}]'  | jq -r "$EXPR20")"
+{ [ "$RESULT20A" = "OPEN" ] && [ "$RESULT20B" = "OPEN" ]; } \
+  && ok "(20) CLOSED+OPEN → OPEN in both array orderings (jq liveness-priority)" \
+  || bad "(20) jq liveness-priority expression"
+
+# Test 21: no-worktree wedged branch → git branch -D called.
+# (21a) positive: SHIM_WORKTREE_LIST="" → wt="" → no-worktree arm → branch -D.
+SB="$(build_sandbox)"
+SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
+    SHIM_BRANCH_OUT="$B_OLD" SHIM_PR_STATE="NONE" \
+    SHIM_LS_REMOTE="" SHIM_REFLOG_OUT="$REFLOG_OLD" \
+    SHIM_WORKTREE_LIST="" SHIM_STATUS_OUT="" SHIM_LAUNCHCTL_OUT="" \
+    run_poll "$SB"
+{ [ -f "$SB/git-branch-d-calls" ] && grep -q "$B_OLD" "$SB/git-branch-d-calls"; } \
+  && ok "(21a) no-worktree wedged branch: git branch -D called" \
+  || bad "(21a) no-worktree: expected git branch -D"
+
+# (21b) negative: with worktree present, cleanup path is taken; branch -D never reached.
+SB="$(_wt_sandbox)"
+WL21B="$(_wl "$SB")"
+SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
+    SHIM_BRANCH_OUT="$B_OLD" SHIM_PR_STATE="NONE" \
+    SHIM_LS_REMOTE="" SHIM_REFLOG_OUT="$REFLOG_OLD" \
+    SHIM_WORKTREE_LIST="$WL21B" SHIM_STATUS_OUT="" SHIM_LAUNCHCTL_OUT="" \
+    run_poll "$SB"
+{ [ ! -f "$SB/git-branch-d-calls" ]; } \
+  && ok "(21b) with worktree present: git branch -D NOT called (cleanup taken)" \
+  || bad "(21b) worktree present: git branch -D should not be called"
+
+# Test 22: unknown age (pruned reflog) → reaper skips; health arm alerts.
+# One fixture, two assertions (Design decision 8: alerting fails open,
+# destroying fails closed).
+SB="$(build_sandbox)"
+WL22="$(_wl "$SB")"
+
+# (22a) poll: age unknown → "leave" arm, no salvage/cleanup.
+SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" \
+    SHIM_BRANCH_OUT="$B_OLD" SHIM_PR_STATE="NONE" \
+    SHIM_LS_REMOTE="" SHIM_REFLOG_OUT="" \
+    SHIM_WORKTREE_LIST="$WL22" SHIM_STATUS_OUT=" M docs/foo.md" \
+    SHIM_LAUNCHCTL_OUT="" \
+    run_poll "$SB"
+{ [ ! -f "$SB/git-add-calls" ] && [ ! -f "$SB/cleanup-calls" ]; } \
+  && ok "(22a) unknown age: reap loop leaves branch alone (fail-closed)" \
+  || bad "(22a) unknown age: reap loop should leave branch alone"
+
+# (22b) health: same fixture → empty age PASSES the wedge age-check
+# ([ -z "$age_s" ] is TRUE → OR short-circuits → proceeds to wedge detection).
+OUT22="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" \
+    SHIM_LS_REMOTE="" SHIM_PR_FOR_BRANCH=0 \
+    SHIM_BRANCH_OUT="$B_OLD" SHIM_REFLOG_OUT="" \
+    SHIM_LAUNCHCTL_OUT="" SHIM_WORKTREE_LIST="$WL22" \
+    run_health "$SB" 77)"
+{ echo "$OUT22" | grep -q 'alert=true' \
+    && echo "$OUT22" | grep -q 'kind=wedged'; } \
+  && ok "(22b) unknown age: health_report emits alert=true kind=wedged" \
+  || bad "(22b) unknown age: health should emit alert=true kind=wedged"
+
+# ---------------------------------------------------------------------------
+if [ "$FAILED" -eq 0 ]; then
+    echo "All docfix-poll checks passed."
+else
+    echo "Some docfix-poll checks FAILED."
+fi
+exit "$FAILED"

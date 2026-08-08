@@ -14,10 +14,14 @@ This module follows the interface-driven architecture pattern with separation of
 ```
 Standings/
 ├── Contracts/
-│   ├── StandingsRepositoryInterface.php  # Data access contract
-│   └── StandingsViewInterface.php        # View rendering contract
-├── StandingsRepository.php               # Data access implementation
-├── StandingsView.php                     # HTML rendering
+│   ├── StandingsRepositoryInterface.php  # Data access contract (unchanged)
+│   └── StandingsViewInterface.php        # View rendering contract (unchanged)
+├── StandingsRepository.php               # Read queries + thin delegator for writes
+├── StandingsUpdaterRepository.php        # Update/upsert/award writes (— NEW, Phase 2)
+├── StandingsView.php                     # Table orchestration: group, sort, header, rows
+├── AggregateTiebreaker.php               # Pure aggregate H2H win-pct helper
+├── PythagoreanCalculator.php             # Pythagorean expectation helper (7.14)
+├── OlympicsStandingsView.php             # Separate Olympics standings renderer
 └── README.md                             # This file
 ```
 
@@ -30,7 +34,7 @@ Standings/
 global $db;
 
 $repository = new Standings\StandingsRepository($db);
-$view = new Standings\StandingsView($repository);
+$view = new Standings\StandingsView($repository, $season->endingYear, $seriesRecordsService);
 
 echo $view->render();
 ```
@@ -39,7 +43,7 @@ echo $view->render();
 
 ```php
 $repository = new Standings\StandingsRepository($db);
-$view = new Standings\StandingsView($repository);
+$view = new Standings\StandingsView($repository, $season->endingYear, $seriesRecordsService);
 
 // Render only Eastern Conference
 echo $view->renderRegion('Eastern');

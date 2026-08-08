@@ -1,6 +1,6 @@
 ---
 description: 5.60 disperses team offense through per-48 shot-VOLUME rates from season counting-stat sums, not the ODPT offense ratings; the faithful fix is to source the real rate inputs (the static real-life .plr block), not reweight a make-value knob.
-last_verified: 2026-06-03
+last_verified: 2026-08-08
 ---
 
 # ADR-0040: Team-offense dispersion is sourced from real shot-volume rates, not a make-value knob
@@ -128,3 +128,22 @@ re-litigation.
 - Memories: `reference_jsb_season_aggregate_verdict`, `reference_play_outcome_buckets`,
   `reference_jsb_hca_pr7a_blocked`, `reference_jsb_season_rating_stability`,
   `reference_jsb_rdata_static_read`.
+
+## Formula correction (2026-07-10 J6 RE addendum)
+
+The D88/DB8 inputs are **per-MINUTE** rates `(stat/RealLifeMIN)×48`, not per-game
+`(Σstat/ΣGP)×48` as stated in Context §2. The J6 RE session (2026-07-10,
+`FUN_004cfa50` stack-record store, same provenance chain as +0xDB0/+0xDC8/+0xD70)
+confirmed:
+
+- **D88** = `(2PA/RealLifeMIN)×48` where `2PA = RealLifeFGA − RealLife3GA` — a
+  **two-point-attempt** rate, not total FGA. The league baseline at `CEngine+0x6638`
+  subtracts 3GA identically, confirming the two-point-only scope.
+- **DB8** = `(RealLifeORB/RealLifeMIN)×48`; **D70** = `(RealLifeFTA/RealLifeMIN)×48 × d70LeagueScalar`.
+
+The Decision (A) is unchanged — the faithful fix is sourcing the real-life `.plr`
+counting stats, and `bucketweights.go:twoPtBucketWeight` implements this when
+`RealLifeMIN > 0`. Using minutes (not games) as the denominator is load-bearing:
+per-48-GAME rates are ~55× larger and degenerate the play-outcome mix
+(verified in `bucketweights.go`). The stand-in path (`r_fga × fgaRateScale`, etc.)
+remains for players with no prior-season reference.

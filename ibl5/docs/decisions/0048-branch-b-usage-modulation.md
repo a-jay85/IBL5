@@ -1,6 +1,6 @@
 ---
 description: Measured verdict on the ADR-0047 prime suspect — the JSB Branch-B usage-shrink (PR 2 of 2). Branch-B is implemented literally behind a freeze toggle (gated OFF, golden byte-stable) and measured over the full backup archive as a 2-config A/B. The engagement instrument confirms a CONFIRMED-ENGAGED measurement (Branch-B ran on 100% of possessions, 89.3M total, zero fallback, mean shrink s=0.64), so the result is a real null, not a never-engaged no-op. The verdict is a REFUTED/NULL: Branch-B does NOT flip the wrong-signed Cov(lnFGA,lnPPS) — it deepens it (−0.00121 → −0.00262) and regresses Var(lnPPS) ≈3.2×. Branch-B ships OFF (no golden regen), recorded null per the ADR-0040-A precedent. The contingent 5th-arm attribution lattice is NOT run (the sign never moved).
-last_verified: 2026-06-08
+last_verified: 2026-08-08
 ---
 
 # ADR-0048: Branch-B usage-modulation — measured verdict (REFUTED / null)

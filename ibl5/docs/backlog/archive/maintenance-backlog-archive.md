@@ -260,7 +260,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Est. effort:** M
 **Risk if untouched:** Largest repository in Standings module; every new standings category inflates it further.
 **Provenance:** Seeded 2026-07-24 — ground-truth audit hot-file scan.
-**Status:** Implemented — StandingsUpdaterRepository extracted from StandingsRepository (2026-08-08, PR TBD).
+**Status:** Implemented — StandingsUpdaterRepository extracted from StandingsRepository (2026-08-08, PR #1794).
 
 **Table evidence (2026-08-08):** StandingsRepository 726 LOC — per-category standings query methods. Extract per-category query collaborators; green-green DB pin. Shares `classes/Standings/` with 1.35 — plan as ONE chunk.
 

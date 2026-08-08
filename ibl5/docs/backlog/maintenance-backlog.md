@@ -53,7 +53,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 🟨 Conditional | needs one mechanical-scope add, one upfront decision, or a collision-PR to merge first |
 | 🟥 Not automouse-safe | 12.11 — `git filter-repo` history rewrite (irreversible, coordinated) |
 
-**Highest-leverage 🟩 auto-mergeable clusters** (no human needed): the open god-class extractions (1.3/1.9/1.11/1.13/1.17/1.18/1.20, 7.14/7.15, 1.32–1.36), the entire Axis-6 coverage backlog (bar 6.21, now 🟨), the Axis-9 docs items, and the PHPStan-baseline burndowns (10.12/10.13/10.19/10.21).
+**Highest-leverage 🟩 auto-mergeable clusters** (no human needed): the open god-class extractions (1.3/1.9/1.11/1.13/1.17/1.18/1.20, 7.14/7.15, 1.33–1.36), the entire Axis-6 coverage backlog (bar 6.21, now 🟨), the Axis-9 docs items, and the PHPStan-baseline burndowns (10.12/10.13/10.19/10.21).
 
 ---
 
@@ -71,7 +71,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 1.26 | ⬜ Open | 🟩 | BugReportRepository 546 LOC — 24 methods spanning claim/lease/transition state-machine + reporter-profile + queue queries. Split by query group; green-green with DB-integration pins. |
 | 1.30 | ⬜ Open | 🟩 | TradingService 516 LOC — page-data orchestration + offer-grouping + future-salary calc. Extract offer-grouping and salary collaborators; green-green. |
 | 1.33 | ⬜ Open | 🟩 | Player 671 LOC — typed-getter accumulation. Extract per-domain typed-getter groups (contract, stats, identity); green-green. |
-| 1.35 | ⬜ Open | 🟩 | StandingsView 610 LOC — per-division block renderers. Extract per-division renderer collaborators; golden-master pin. Shares `classes/Standings/` with 1.32 — plan as ONE chunk. |
+| 1.35 | ⬜ Open | 🟩 | StandingsView 610 LOC — per-division block renderers. Extract per-division renderer collaborators; golden-master pin. (1.32 resolved — can now plan independently.) |
 
 > **Note:** `BaseMysqliRepository.php` (602 LOC) is the 18th hot file but is tracked under **2.29** (global-namespace elimination sweep) and is not seeded as a standalone god-class item here.
 
@@ -133,7 +133,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 ### 1.35 StandingsView — Per-Division Block Renderer (610 LOC)
 **Location:** `ibl5/classes/Standings/StandingsView.php` (610 lines)
 **Problem:** One view renders per-division standings blocks, tiebreaker panels, and playoff-seeding tables for multiple page variants.
-**Suggested direction:** Extract per-division renderer collaborators; golden-master pin. Plan together with 1.32 (StandingsRepository shares the same `classes/Standings/` module).
+**Suggested direction:** Extract per-division renderer collaborators; golden-master pin. (1.32 resolved 2026-08-08 — can plan independently; no longer a "same chunk" coupling.)
 **Est. effort:** M
 **Risk if untouched:** Every new standings display variant inflates the view.
 **Provenance:** Seeded 2026-07-24 — ground-truth audit hot-file scan.

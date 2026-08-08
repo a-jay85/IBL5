@@ -14,7 +14,7 @@
         "ibl.directTime": 13,
         "ibl.hardcodedEnvString": 8,
         "ibl.orderByMissingTiebreaker": 84,
-        "ibl.sqlStringConcatenation": 32,
+        "ibl.sqlStringConcatenation": 33,
         "ibl.trustedVariable": 16,
         "identical.alwaysFalse": 1,
         "if.condNotBoolean": 1,

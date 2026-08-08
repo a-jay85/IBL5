@@ -35,8 +35,15 @@ if [ -n "$(git -C "$MAIN" branch --list 'docs-stale-refresh-*')" ]; then
     echo "docfix-run: a docs-stale-refresh-* branch already exists — skipping (no stacking)."
     exit 0
 fi
-if gh pr list --state open --json headRefName --jq '.[].headRefName' 2>/dev/null \
-     | grep -q '^docs-stale-refresh-'; then
+# Defect 5 (run side): pipe into grep loses exit status — gh failure (exit 1) looks
+# the same as "no open PR". Use a fail-closed variable capture instead.
+open_heads=""
+open_heads="$(gh pr list --state open --json headRefName \
+    --jq '.[].headRefName' 2>/dev/null)" || {
+    echo "docfix-run: gh API unreachable — cannot verify open PR; skipping (fail closed)." >&2
+    exit 0
+}
+if printf '%s\n' "$open_heads" | grep -q '^docs-stale-refresh-'; then
     echo "docfix-run: an open docs-stale-refresh-* PR is pending human merge — skipping."
     exit 0
 fi
@@ -75,6 +82,12 @@ TODAY="$(date -u +%Y-%m-%d)"
 
 PROMPT="You are fixing doc findings with NO human present — never ask questions or wait for input; make the safe choice and continue. The findings are the nightly Doc Freshness Audit set for issue #$ISSUE_NUM. Work ONLY on these paths (comma-separated): $SIG. First run \`bin/check-docs --staleness-report\` and split its JSON with jq into entries whose \`reason\` is \`stale\` and entries whose \`reason\` is \`dead-glob\`; that command is the authoritative finding list, and the body of issue #$ISSUE_NUM shows the same two tables for reference. For each \`stale\` entry: re-verify its content against the current reality of the codebase, correct drifted content, and bump its \`last_verified\` to today ($TODAY). For each \`dead-glob\` entry: the named file declares a \`paths:\` frontmatter glob matching no tracked file, so that rule can never load — PREFER correcting the glob so it matches the tracked files it was meant to cover, and delete the \`paths:\` entry only when no correction is identifiable. IF you delete a glob you MUST disclose it: add one line per deletion to the commit message body AND to the PR body under a heading reading \`## Dead globs deleted\`, in exactly this form: \`Dead glob deleted: in FILE_PATH, removed paths: entry GLOB — REASON\`, substituting the real repo-relative path, the exact glob text, and one clause saying why no correction was possible, so the maintainer can review the deletion without opening the diff. Never delete a whole file, and never remove a \`paths:\` key that still carries a working glob. Then run \`bin/check-docs --fix-dates --since=master\` to bump any in-scope doc you changed but did not hand-bump, and re-run \`bin/check-docs --staleness-report\` to confirm every finding you were given is gone. Do NOT touch any doc outside the list above. Commit with a message whose body contains the line \`Closes #$ISSUE_NUM\`. Then fire \`bin/post-plan-now\` (NOT --auto) to open the PR; the PR body MUST include \`Closes #$ISSUE_NUM\` so merging it closes the stale-docs issue."
 
+# Defect 4: writing $PROMPT directly into the plist -lc string expands its backticks
+# at plist-parse time (bin/check-docs, bin/post-plan-now). Write to a tempfile and
+# read it back via $(cat ...) so the plist shell never sees the raw prompt content.
+PROMPT_FILE="/tmp/docfix-prompt-$SLUG-$TS.txt"
+printf '%s\n' "$PROMPT" > "$PROMPT_FILE"
+
 # launchd runs a minimal env → same PATH prelude as bin/post-plan-now:94.
 cat > "$PLIST" <<PLIST_EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -87,7 +100,7 @@ cat > "$PLIST" <<PLIST_EOF
 	<array>
 		<string>/bin/bash</string>
 		<string>-lc</string>
-		<string>export PATH="/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH"; cd "$WT_ROOT" &amp;&amp; CLAUDE_HEADLESS=1 caffeinate -s claude -p "$PROMPT" --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name "$LABEL"; rm -f "$PLIST"; launchctl bootout gui/\$(id -u)/$LABEL</string>
+		<string>export PATH="/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH"; cd "$WT_ROOT" &amp;&amp; CLAUDE_HEADLESS=1 caffeinate -s claude -p "\$(cat "$PROMPT_FILE")" --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name "$LABEL"; rm -f "$PLIST" "$PROMPT_FILE"; launchctl bootout gui/\$(id -u)/$LABEL</string>
 	</array>
 	<key>RunAtLoad</key>
 	<true/>

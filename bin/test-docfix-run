@@ -76,7 +76,15 @@ case "$1 $2" in
       esac ;;
   "pr list")
       case "$args" in
-        *"--state all"*)    printf '%s' "${SHIM_PR_FOR_BRANCH:-0}" ;;
+        *"--state all"*)
+            # Two callers use --state all with different --json fields:
+            # reap loop uses --json state (wants post-jq: MERGED/CLOSED/OPEN/NONE),
+            # health checks use --json number (want post-jq: count integer).
+            # Distinguish them so both callers get the right post-jq value.
+            case "$args" in
+              *"--json state"*) printf '%s' "${SHIM_PR_STATE:-NONE}" ;;
+              *)                printf '%s' "${SHIM_PR_FOR_BRANCH:-0}" ;;
+            esac ;;
         *"--state closed"*) printf '%s' "${SHIM_PR_CLOSED:-[]}" ;;
         *)                  printf '%s' "${SHIM_PR_OPEN:-}" ;;
       esac ;;
@@ -120,17 +128,27 @@ run_health() {
 
 plist_of() { ls "$1/home/Library/LaunchAgents/"*.plist 2>/dev/null | head -1; }
 plan_of()  { ls "$1/home/claude-plans/docs-stale-refresh-"*.md 2>/dev/null | head -1; }
+# Helpers for tracking prompt tempfiles created by a docfix-run call.
+_pf_before() { ls /tmp/docfix-prompt-*.txt 2>/dev/null | sort; }
+_pf_after()  { comm -13 <(printf '%s\n' "$1") <(ls /tmp/docfix-prompt-*.txt 2>/dev/null | sort) | head -1; }
 
 # --- Cases 1-5: bin/docfix-run launcher ----------------------------------------
 SB="$(build_sandbox)"
+_BPF1="$(_pf_before)"
 run_docfix "$SB" "" "" "4242" "ibl5/docs/foo.md,README.md" >/dev/null
 P="$(plist_of "$SB")"; PLAN="$(plan_of "$SB")"
+# Phase 5: prompt text now lives in a /tmp tempfile, not inline in the plist.
+# Verify the plist references the tempfile; verify the tempfile has prompt content.
+_PF1="$(_pf_after "$_BPF1")"
 { [ -n "$P" ] && grep -q 'cd "'"$SB"'/wts/docs-stale-refresh-[^/]*"' "$P" \
-    && grep -q 'Closes #4242' "$P" \
-    && grep -q 'ibl5/docs/foo.md,README.md' "$P" \
-    && grep -q 'claude-sonnet-4-6' "$P"; } \
-  && ok "(1) plist carries cd-to-worktree + doc-fix prompt + SIG + Closes #N" \
-  || bad "(1) plist composition"
+    && grep -qF 'cat "/tmp/docfix-prompt-' "$P" \
+    && grep -q 'claude-sonnet-4-6' "$P" \
+    && [ -n "$_PF1" ] \
+    && grep -q 'Closes #4242' "$_PF1" \
+    && grep -q 'ibl5/docs/foo.md,README.md' "$_PF1"; } \
+  && ok "(1) plist references prompt tempfile; tempfile carries doc-fix prompt + SIG + Closes #N" \
+  || bad "(1) plist composition / prompt tempfile"
+rm -f "$_PF1" 2>/dev/null
 { [ -n "$PLAN" ] && head -1 "$PLAN" | grep -q '^---$' \
     && grep -q '^auto_merge: false$' "$PLAN" \
     && grep -q '## Automouse Hold Justification' "$PLAN"; } \
@@ -454,6 +472,111 @@ SB="$(build_sandbox)"
 { [ -f "$SB/docfix-calls" ] && grep -qF "77|a.md" "$SB/docfix-calls"; } \
   && ok "(19c) poll completes under launchd's minimal PATH and fires the launcher" \
   || bad "(19c) poll broken under launchd minimal PATH"
+
+# --- Cases 20-24 (plan matrix #13-16,25): prompt-safety + fail-closed guard ------
+
+# Case 20 (plan #13): injection chars in SIG — not executed, written literally
+SB="$(build_sandbox)"
+_BPF="$(_pf_before)"
+SIG13='ibl5/docs/foo.md,$(touch /tmp/pr13-pwned-backtick)'
+run_docfix "$SB" "" "" "13p" "$SIG13" >/dev/null
+PF13="$(_pf_after "$_BPF")"
+{ [ ! -f /tmp/pr13-pwned-backtick ] \
+    && [ -n "$PF13" ] \
+    && grep -qF '$(touch /tmp/pr13-pwned-backtick)' "$PF13"; } \
+  && ok "(20/plan13) injection chars in SIG written literally to prompt tempfile, not executed" \
+  || bad "(20/plan13) prompt injection guard"
+rm -f "$PF13" 2>/dev/null
+
+# Case 21 (plan #14): malicious $SIG — not executed during plist construction
+SB="$(build_sandbox)"
+SIG14='ibl5/docs/foo.md $(touch /tmp/pr14-pwned-sig)'
+run_docfix "$SB" "" "" "14p" "$SIG14" >/dev/null
+{ [ ! -f /tmp/pr14-pwned-sig ]; } \
+  && ok "(21/plan14) malicious SIG not executed during plist construction" \
+  || bad "(21/plan14) malicious SIG executed"
+
+# Case 22 (plan #15): XML metacharacters in SIG — plist still parses
+SB="$(build_sandbox)"
+SIG15='ibl5/docs/foo.md &amp; <tag>'
+run_docfix "$SB" "" "" "15p" "$SIG15" >/dev/null
+PLIST22="$(plist_of "$SB")"
+# plutil is macOS-only; use python3 xml.etree (available on macOS + Linux CI) as a
+# portable plist/XML validator so the test passes on ubuntu-latest runners.
+{ [ -n "$PLIST22" ] && python3 -c "import xml.etree.ElementTree as ET; ET.parse('$PLIST22')" >/dev/null 2>&1; } \
+  && ok "(22/plan15) SIG with & and < yields a plutil-lint-clean plist" \
+  || bad "(22/plan15) XML metacharacters broke plist"
+
+# Case 23 (plan #16): gh API unreachable → fail-closed open-PR guard
+# run_docfix suppresses output; call docfix-run directly to capture stderr.
+SB="$(build_sandbox)"
+OUT23="$(SHIM_GH_FAIL=1 IBL5_MAIN="$SB" HOME="$SB/home" PATH="$SB/shim:$PATH" \
+    "$REAL_DOCFIX" "16p" "a.md" 2>&1)"
+RC23=$?
+{ [ "$RC23" -eq 0 ] \
+    && [ -z "$(plist_of "$SB")" ] \
+    && printf '%s' "$OUT23" | grep -q 'API unreachable'; } \
+  && ok "(23/plan16) gh API unreachable → exit 0, no plist, 'API unreachable' message" \
+  || bad "(23/plan16) fail-closed open-PR guard"
+
+# Case 24 (plan #25): plist round-trip — prompt arrives byte-identical at claude
+# Stubs claude to write its $2 arg (the prompt value) to a file; stubs caffeinate
+# to strip its -s flag and exec the rest. Catches a \"…\" regression in the heredoc:
+# that form makes `cat` fail on a quoted filename → claude receives an EMPTY prompt
+# and a pass on tests 20-22 does not catch it (those only test non-execution).
+SB="$(build_sandbox)"
+run_docfix "$SB" "" "" "25p" "ibl5/docs/rt-test.md" >/dev/null
+PLIST25="$(plist_of "$SB")"
+# Extract the exact prompt-file path from the plist (avoids same-second glob collisions
+# when multiple test runs share a TS: the path IS in the plist, so just read it out).
+PF25="$(python3 -c "
+import re, sys
+try:
+    p = open(sys.argv[1]).read()
+    m = re.search(r'cat \"(/tmp/docfix-prompt-[^\"]+)\"', p)
+    print(m.group(1) if m else '', end='')
+except Exception:
+    pass
+" "$PLIST25" 2>/dev/null)"
+if [ -z "$PLIST25" ] || [ -z "$PF25" ] || [ ! -f "$PF25" ]; then
+    bad "(24/plan25) round-trip: missing plist or prompt file"
+else
+    EXPECTED25="$(cat "$PF25")"
+    GOT_F25="$SB/claude-argv2.txt"
+    # claude stub: write its second positional arg (the expanded prompt text) to a file
+    printf '#!/bin/sh\nprintf "%%s" "$2" > "%s"\n' "$GOT_F25" > "$SB/shim/claude"
+    # caffeinate stub: strip leading option flags, exec the rest (i.e. claude …)
+    printf '#!/bin/sh\nwhile [ -n "$1" ] && [ "${1#-}" != "$1" ]; do shift; done\nexec "$@"\n' \
+        > "$SB/shim/caffeinate"
+    chmod +x "$SB/shim/claude" "$SB/shim/caffeinate"
+    # Extract the -lc string from the plist using python3 (portable; plutil -extract
+    # raw is macOS 10.15+ and its argument form differs by macOS release).
+    LC25="$(python3 -c "
+import plistlib, sys
+with open(sys.argv[1], 'rb') as f:
+    p = plistlib.load(f)
+print(p['ProgramArguments'][2], end='')
+" "$PLIST25" 2>/dev/null)"
+    WT25="$(ls -d "$SB"/wts/docs-stale-refresh-* 2>/dev/null | head -1)"
+    # The plist -lc string does "export PATH=/usr/local/bin:/opt/homebrew/bin:...:$PATH"
+    # which prepends system dirs before our $SB/shim stubs.  If the real `claude` binary
+    # lives at /usr/local/bin/claude or /opt/homebrew/bin/claude (installed locally), it
+    # would shadow our stub.  Patch LC25 to keep $SB/shim first.
+    LC25_FIXED="${LC25/export PATH=\"/export PATH=\"$SB/shim:}"
+    # Execute the -lc string with our stubs in PATH. The rm -f in the -lc string will
+    # delete the plist and prompt file — EXPECTED25 was read above before this runs.
+    ( export PATH="$SB/shim:$PATH"
+      [ -n "$WT25" ] && cd "$WT25" || true
+      eval "$LC25_FIXED" ) 2>/dev/null || true
+    if [ -f "$GOT_F25" ]; then
+        GOT25="$(cat "$GOT_F25")"
+        [ "$GOT25" = "$EXPECTED25" ] \
+          && ok "(24/plan25) plist round-trip: claude receives prompt byte-identical to tempfile" \
+          || bad "(24/plan25) plist round-trip: mismatch (check for \\\" in heredoc)"
+    else
+        bad "(24/plan25) round-trip: claude stub never called (plist -lc string failed)"
+    fi
+fi
 
 if [ "$FAILED" -eq 0 ]; then echo "All docfix-run checks passed."; else echo "Some docfix-run checks FAILED."; fi
 exit "$FAILED"

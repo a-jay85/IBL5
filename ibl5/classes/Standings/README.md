@@ -1,5 +1,5 @@
 ---
-description: Conference and division standings display with clinched-indicator badges (Z-, Y-, X-) and dynamic HTML generation.
+description: Conference and division standings display with clinched-indicator badges (W-, Z-, Y-, X-) and dynamic HTML generation.
 last_verified: 2026-08-08
 ---
 
@@ -19,6 +19,8 @@ Standings/
 ├── StandingsRepository.php               # Read queries + thin delegator for writes
 ├── StandingsUpdaterRepository.php        # Update/upsert/award writes (— NEW, Phase 2)
 ├── StandingsView.php                     # Table orchestration: group, sort, header, rows
+├── StandingsRowView.php                  # Single-row HTML + clinch tier/prefix (— NEW, Phase 2)
+├── StandingsTiebreakerResolver.php       # H2H tie-break ordering within tied groups (— NEW, Phase 3)
 ├── AggregateTiebreaker.php               # Pure aggregate H2H win-pct helper
 ├── PythagoreanCalculator.php             # Pythagorean expectation helper (7.14)
 ├── OlympicsStandingsView.php             # Separate Olympics standings renderer
@@ -72,6 +74,7 @@ $streakData = $repository->getTeamStreakData($teamId);
 ## Clinched Indicators
 
 Teams that have clinched playoff positions display prefixes:
+- **W-** Clinched league/championship
 - **Z-** Clinched conference
 - **Y-** Clinched division
 - **X-** Clinched playoffs

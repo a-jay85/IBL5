@@ -273,6 +273,17 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Provenance:** Seeded 2026-07-24 — ground-truth audit hot-file scan.
 **Status:** Implemented 2026-07-26 — `SlotAssignmentResolver` + `SlotAssignmentResolverInterface` extracted; `buildAllSnapshots()` delegates via `resolveSlotSettings()`. Slot resolution now lives in `ibl5/classes/SavedDepthChart/SlotAssignmentResolver.php` behind `Contracts/SlotAssignmentResolverInterface.php`, injected into `SavedDepthChartService` with a nullable default. Behavior byte-identical; pinned by `testBuildAllSnapshots*` characterization tests plus `ibl5/tests/SavedDepthChart/SlotAssignmentResolverTest.php`.
 
+### 1.35 StandingsView — Per-Division Block Renderer (610 LOC)
+**Location:** `ibl5/classes/Standings/StandingsView.php` (610 lines)
+**Problem:** One view renders per-division standings blocks, tiebreaker panels, and playoff-seeding tables for multiple page variants.
+**Suggested direction:** Extract per-division renderer collaborators; golden-master pin. (1.32 resolved 2026-08-08 — can plan independently; no longer a "same chunk" coupling.)
+**Est. effort:** M
+**Risk if untouched:** Every new standings display variant inflates the view.
+**Provenance:** Seeded 2026-07-24 — ground-truth audit hot-file scan.
+**Status:** Implemented — StandingsRowView + StandingsTiebreakerResolver extracted from StandingsView (2026-08-08, #1795).
+
+**Table evidence (2026-08-08):** StandingsView 610 LOC — per-division block renderers. Extract per-division renderer collaborators; golden-master pin. (1.32 resolved — can now plan independently.)
+
 ### 1.36 FreeAgencyView — Offer-Table / Form / Decision-Panel Renderers (590 LOC)
 **Location:** `ibl5/classes/FreeAgency/FreeAgencyView.php` (590 lines)
 **Problem:** One view renders the offer table, offer form, and decision panels for multiple free-agency page states in a single class.

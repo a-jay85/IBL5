@@ -126,6 +126,7 @@ final class RequireEscapedOutputRule implements Rule
         'LeagueControlPanel/LeagueControlPanelView.php',
         'NextSim/NextSimView.php',
         'RookieOption/RookieOptionView.php',
+        'Standings/StandingsRowView.php',
         'Standings/StandingsView.php',
         'Team/TeamView.php',
         'TransactionHistory/TransactionHistoryView.php',

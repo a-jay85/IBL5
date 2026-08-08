@@ -6,21 +6,15 @@ namespace RecordHolders;
 
 use RecordHolders\Contracts\RecordHoldersViewInterface;
 use RecordHolders\Contracts\RecordHoldersServiceInterface;
-use Player\PlayerImageHelper;
-use UI\TeamCellHelper;
-use Security\HtmlSanitizer;
 
 /**
  * View class for rendering the all-time IBL record holders page.
  *
  * Receives structured data from RecordHoldersService and renders HTML tables.
+ * Delegates section rendering to PlayerRecordSectionRenderer, TeamRecordSectionRenderer,
+ * and the shared RecordTableRenderer.
  *
  * @phpstan-import-type AllRecordsData from RecordHoldersServiceInterface
- * @phpstan-import-type FormattedPlayerRecord from RecordHoldersServiceInterface
- * @phpstan-import-type FormattedSeasonRecord from RecordHoldersServiceInterface
- * @phpstan-import-type FormattedTeamGameRecord from RecordHoldersServiceInterface
- * @phpstan-import-type FormattedTeamSeasonRecord from RecordHoldersServiceInterface
- * @phpstan-import-type FormattedFranchiseRecord from RecordHoldersServiceInterface
  *
  * @see RecordHoldersViewInterface
  */

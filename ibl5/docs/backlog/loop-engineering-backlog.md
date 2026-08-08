@@ -209,6 +209,30 @@ last_verified: 2026-08-08
 
 ---
 
+## Class registry
+
+Append-only. One line per **class of defect**, written by `/post-plan` Phase 9 when a run routes a
+learning up the escalation ladder. Never edit or delete a line — the value is in the history.
+
+The `prior:` field is the anti-recurrence lever: when a new line's class matches an existing one,
+record the earlier PR numbers there. A non-empty `prior:` means the class has recurred, and recurrence
+is the signal that the previously chosen rung was too weak — escalate one rung rather than re-routing
+to the same place. This is a **prompted** loop, not an automated one: nothing scans this table on a
+schedule, and no gate fails on it.
+
+The table is fenced so the forward-referenced section names inside it do not resolve as live
+documentation references while the PR that adds them is still open.
+
+```
+| Date       | PR   | Class                                                                 | Routed to rung                                                                                          | Prior          |
+| ---------- | ---- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | -------------- |
+| 2026-07-25 | #1633 | class: env/supervisor precondition unverified before a long-running job | routed to: Rung 3 - forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger, lands with verification-forced-integration-triggers) | prior: -- |
+| 2026-07-25 | --   | class: shared-context wire contract between two scripts is unasserted   | routed to: Rung 3 - forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger, lands with verification-forced-integration-triggers) | prior: -- |
+| 2026-07-25 | #1654 | class: CLI entrypoint accepts an unknown flag silently instead of erroring | routed to: Rung 1 - PHPStan rule over argv option parsing; queued, and a fourth occurrence forces it      | prior: #1354, #1496 |
+```
+
+---
+
 ## Burn-down process
 
 1. Pick an entry; `/plan` it. Loop-machinery changes should default to `auto_merge: false` — a bug here costs whole nights.

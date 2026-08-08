@@ -152,6 +152,7 @@ test.describe('Contract Extension submission: happy path', () => {
       },
       readBack: async () => {
         await page.goto(location.replace('/ibl5/', ''));
+        // e2e-hygiene-allow: simulation outcome is non-deterministic; cannot be forced via appState
         if (location.includes('extension_accepted')) {
           await expect(page.locator('.ibl-alert--success')).toBeVisible();
         } else {

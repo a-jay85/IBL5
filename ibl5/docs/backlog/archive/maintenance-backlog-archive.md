@@ -253,6 +253,17 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 
 **Table evidence (2026-07-27):** TradeRosterPreviewApiHandler 508 LOC — API handler mixing param validation + cash-row building + table render. Extract validation and cash-row collaborators; endpoint (request-handling) → add an E2E/characterization pin.
 
+### 1.32 StandingsRepository — Per-Category Query Accumulation (726 LOC)
+**Location:** `ibl5/classes/Standings/StandingsRepository.php` (726 lines)
+**Problem:** Multiple per-category standings-query methods accumulated in one repository (division standings, tiebreaker, playoff seeding, historical standings, etc.).
+**Suggested direction:** Extract per-category query collaborators behind `StandingsRepositoryInterface`; keep the repo as a thin aggregator. Plan together with 1.35 (StandingsView shares the same `classes/Standings/` module).
+**Est. effort:** M
+**Risk if untouched:** Largest repository in Standings module; every new standings category inflates it further.
+**Provenance:** Seeded 2026-07-24 — ground-truth audit hot-file scan.
+**Status:** Implemented — StandingsUpdaterRepository extracted from StandingsRepository (2026-08-08, PR TBD).
+
+**Table evidence (2026-08-08):** StandingsRepository 726 LOC — per-category standings query methods. Extract per-category query collaborators; green-green DB pin. Shares `classes/Standings/` with 1.35 — plan as ONE chunk.
+
 ### 1.34 SavedDepthChartService — Data Assembly + Slot-Conflict Resolution (626 LOC)
 **Location:** `ibl5/classes/SavedDepthChart/SavedDepthChartService.php` (626 lines)
 **Problem:** One service assembles depth-chart page data and resolves slot conflicts, mixing orchestration with conflict-resolution logic.

@@ -61,7 +61,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
-> ✅ resolved (28): 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 1.14, 1.15, 1.16, 1.17, 1.19, 1.20, 1.21, 1.23, 1.24, 1.27, 1.28, 1.29, 1.31, 1.34, 1.36 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (29): 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 1.14, 1.15, 1.16, 1.17, 1.19, 1.20, 1.21, 1.23, 1.24, 1.27, 1.28, 1.29, 1.31, 1.32, 1.34, 1.36 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
@@ -70,7 +70,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 1.25 | ⬜ Open | 🟨 | BoxscoreProcessor 559 LOC — mutating .sco import pipeline; regular/all-star/rising-stars game processors in one class. Extract per-game-type processors; import-fidelity-critical → characterization pins first. Size finding only; the Processor→Service *rename* is separately declined at 2.5. |
 | 1.26 | ⬜ Open | 🟩 | BugReportRepository 546 LOC — 24 methods spanning claim/lease/transition state-machine + reporter-profile + queue queries. Split by query group; green-green with DB-integration pins. |
 | 1.30 | ⬜ Open | 🟩 | TradingService 516 LOC — page-data orchestration + offer-grouping + future-salary calc. Extract offer-grouping and salary collaborators; green-green. |
-| 1.32 | ⬜ Open | 🟩 | StandingsRepository 726 LOC — per-category standings query methods. Extract per-category query collaborators; green-green DB pin. Shares `classes/Standings/` with 1.35 — plan as ONE chunk. |
 | 1.33 | ⬜ Open | 🟩 | Player 671 LOC — typed-getter accumulation. Extract per-domain typed-getter groups (contract, stats, identity); green-green. |
 | 1.35 | ⬜ Open | 🟩 | StandingsView 610 LOC — per-division block renderers. Extract per-division renderer collaborators; golden-master pin. Shares `classes/Standings/` with 1.32 — plan as ONE chunk. |
 
@@ -122,14 +121,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Est. effort:** M
 **Risk if untouched:** Trade page-data logic concentrated in one service; green-green.
 **Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
-
-### 1.32 StandingsRepository — Per-Category Query Accumulation (726 LOC)
-**Location:** `ibl5/classes/Standings/StandingsRepository.php` (726 lines)
-**Problem:** Multiple per-category standings-query methods accumulated in one repository (division standings, tiebreaker, playoff seeding, historical standings, etc.).
-**Suggested direction:** Extract per-category query collaborators behind `StandingsRepositoryInterface`; keep the repo as a thin aggregator. Plan together with 1.35 (StandingsView shares the same `classes/Standings/` module).
-**Est. effort:** M
-**Risk if untouched:** Largest repository in Standings module; every new standings category inflates it further.
-**Provenance:** Seeded 2026-07-24 — ground-truth audit hot-file scan.
 
 ### 1.33 Player — Typed-Getter Accumulation (671 LOC)
 **Location:** `ibl5/classes/Player/Player.php` (671 lines)

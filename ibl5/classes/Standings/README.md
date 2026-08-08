@@ -1,6 +1,6 @@
 ---
 description: Conference and division standings display with clinched-indicator badges (Z-, Y-, X-) and dynamic HTML generation.
-last_verified: 2026-07-24
+last_verified: 2026-08-08
 ---
 
 # Standings Module

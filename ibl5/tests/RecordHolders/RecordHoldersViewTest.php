@@ -626,7 +626,22 @@ final class RecordHoldersViewTest extends TestCase
         return [
             'playerSingleGame' => [
                 'regularSeason' => [
-                    'Most Points in a Single Game' => [$this->createPlayerRecord()],
+                    'Most Points in a Single Game' => [
+                        $this->createPlayerRecord(),
+                        [
+                            'pid' => 100,
+                            'name' => 'Elgin Baylor',
+                            'teamAbbr' => 'lal',
+                            'teamTid' => 12,
+                            'teamYr' => '1992',
+                            'boxScoreUrl' => '',
+                            'dateDisplay' => 'March 5, 1992',
+                            'oppAbbr' => 'bos',
+                            'oppTid' => 5,
+                            'oppYr' => '1992',
+                            'amount' => '62',
+                        ],
+                    ],
                 ],
                 'playoffs' => [
                     'Most Rebounds in a Single Game' => [[

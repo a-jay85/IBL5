@@ -12,7 +12,7 @@ test.describe('Depth Chart Entry: mobile card view', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('modules.php?name=DepthChartEntry');
-    await page.waitForLoadState('networkidle');
+    await expect(page.locator('.dc-mobile-cards').first()).toBeVisible();
   });
 
   test('no PHP errors at mobile viewport', async ({ page }) => {
@@ -228,7 +228,7 @@ test.describe('Depth Chart Entry: mobile card view', () => {
 
     // Scroll down
     await page.evaluate(() => window.scrollTo(0, 1000));
-    await page.waitForTimeout(100);
+    await page.waitForFunction(() => window.scrollY >= 990);
 
     const navBox = await nav.boundingBox();
     expect(navBox).not.toBeNull();
@@ -352,7 +352,7 @@ test.describe('DCE mobile: saved depth chart loading', () => {
 
   test('loading a saved depth chart updates mobile card selects', async ({ page }) => {
     await page.goto('modules.php?name=DepthChartEntry');
-    await page.waitForLoadState('networkidle');
+    await expect(page.locator('#saved-dc-select option').nth(1)).toBeAttached();
 
     const dropdown = page.locator('#saved-dc-select');
     await expect(dropdown).toBeVisible();
@@ -433,7 +433,6 @@ test.describe('DCE mobile: resize sync', () => {
     // Start at mobile
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto('modules.php?name=DepthChartEntry');
-    await page.waitForLoadState('networkidle');
 
     // Change the first card's PG (pg) depth by tapping the stepper down
     // arrow. The underlying <select> is display:none on mobile, so we
@@ -450,7 +449,6 @@ test.describe('DCE mobile: resize sync', () => {
 
     // Switch to desktop
     await page.setViewportSize({ width: 1280, height: 900 });
-    await page.waitForTimeout(200); // debounce
 
     // Desktop table should now show the changed value
     const desktopSelect = page.locator('.depth-chart-table select[name^="pg"]').first();

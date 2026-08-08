@@ -64,7 +64,7 @@ test.describe('Waivers: add player', () => {
         const response = await responsePromise;
         const postStatus = response.status();
         const postBody = await response.text().catch(() => '');
-        await page.waitForLoadState('networkidle');
+        await expect(page).toHaveURL(/result=player_added/, { timeout: 15000 });
         const url = page.url();
         const bodySnippet = postBody.substring(0, 500).replace(/\s+/g, ' ').trim();
         expect(url, `POST status=${postStatus} body=${bodySnippet}`).toContain('result=player_added');
@@ -116,7 +116,7 @@ test.describe('Waivers: waive player', () => {
         const response = await responsePromise;
         const postStatus = response.status();
         const postBody = await response.text().catch(() => '');
-        await page.waitForLoadState('networkidle');
+        await expect(page).toHaveURL(/result=player_dropped/, { timeout: 15000 });
         const url = page.url();
         const bodySnippet = postBody.substring(0, 500).replace(/\s+/g, ' ').trim();
         expect(url, `POST status=${postStatus} body=${bodySnippet}`).toContain('result=player_dropped');

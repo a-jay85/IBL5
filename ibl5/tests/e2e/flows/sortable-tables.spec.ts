@@ -154,12 +154,16 @@ test.describe('Sortable table functionality', () => {
       // Navigate to another page via a boosted link so HTMX caches
       // Standings into history state.
       const boostedLink = page.locator('#site-content a[href*="modules.php?name="]').first();
-      await boostedLink.click();
-      await page.waitForLoadState('networkidle');
+      const [, ] = await Promise.all([
+        page.waitForResponse(
+          resp => resp.url().includes('modules.php') && resp.request().method() === 'GET',
+        ),
+        boostedLink.click(),
+      ]);
 
       // Browser back — triggers htmx:historyRestore (NOT htmx:afterSwap).
       await page.goBack();
-      await page.waitForLoadState('networkidle');
+      await expect(page.locator('table.sortable').first()).toBeVisible({ timeout: 5000 });
 
       // Verify a DIFFERENT column now responds to clicks. Before the fix,
       // the init guard skipped re-attachment and this click was a no-op.

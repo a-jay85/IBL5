@@ -455,6 +455,42 @@ assert_viol "gateB-matrix-header-no-index-column" 0 "[B]" "$FM"'
 **Not covered:** the call sites.
 '
 
+# Gate B: UNNAMED-COLUMN fallback — no header field matches test file/location/
+# command, so the column index falls back to the LAST non-empty header field (4
+# here), not to 6. A complete, valid discharge must still pass (exit 0).
+# Discriminates: with the fallback at 6, field 6 does not exist in this 3-column
+# matrix, no location is collected, and this fixture flips to FAIL.
+assert_viol "gateB-matrix-header-unnamed-location-column" 0 "[B]" "$FM"'
+<!-- no-test-methods: gate-B fixture, method names irrelevant here -->
+| Step | What to verify | How |
+|---|---|---|
+| 1 | Foo holds no DB handle | `tests/Trade/TradeValidatorTest.php` |
+
+## Security-Surface Discharge
+
+**Invariant:** `Trading\Foo` declares no property naming a DB handle.
+**Asserted by:** `tests/Trade/TradeValidatorTest.php` — reflection assertion.
+**Not covered:** the call sites.
+'
+
+# Gate B: NAMED-COLUMN precedence — the location column is NOT last here (a
+# `Neg/boundary?` column trails it), so the last-non-empty fallback would pick the
+# wrong field. The header name must win. A complete, valid discharge must pass
+# (exit 0). Discriminates: with the name scan removed, the fallback lands on the
+# trailing column, the path matches nothing, and this fixture flips to FAIL.
+assert_viol "gateB-matrix-location-column-not-last" 0 "[B]" "$FM"'
+<!-- no-test-methods: gate-B fixture, method names irrelevant here -->
+| # | What to verify | Test type | Timing | Test file / location | Neg/boundary? |
+|---|---|---|---|---|---|
+| 1 | Foo holds no DB handle | PHPUnit | pre-impl | `tests/Trade/TradeValidatorTest.php` | no |
+
+## Security-Surface Discharge
+
+**Invariant:** `Trading\Foo` declares no property naming a DB handle.
+**Asserted by:** `tests/Trade/TradeValidatorTest.php` — reflection assertion.
+**Not covered:** the call sites.
+'
+
 # ---------------------------------------------------------------------------
 # Gate C: context budget.
 # ---------------------------------------------------------------------------

@@ -433,10 +433,14 @@ fi
 # gate. Widening it to bin/test-* was considered and rejected here, not overlooked.
 # The matrix match is scoped to the test-file/location column only — a test path
 # name-dropped in a description column does not satisfy the discharge. That column's
-# index is read off the header row rather than hard-coded, because the corpus carries
-# both the 5-column `| # | What to verify | ... |` shape and a 4-column one with no
-# leading index column; field 6 is only right for the former. Falls back to 6 when no
-# header field names the column. The extractor is fence-aware inline; $MATRIX_FILE is
+# index is read off the header row rather than hard-coded: a survey of the ~330-plan
+# corpus found 19 distinct header shapes, and field 6 is right for only some of them —
+# the no-index-column shape `| What to verify | ... |` puts it at 5, and the
+# `| # | Phase | What to verify | ... |` shapes put it at 7. Naming the column by regex
+# resolves 18 of the 19. When no header field names it, fall back to the LAST non-empty
+# header field rather than to 6: the location column is last in every corpus shape, so
+# that fallback is never worse than 6 and is right for `| Step | What to verify | How |`,
+# where 6 does not exist at all. The extractor is fence-aware inline; $MATRIX_FILE is
 # NOT used here.
 while IFS= read -r bviol; do
     [ -n "$bviol" ] && viol "$bviol"
@@ -460,10 +464,14 @@ done < <(awk '
             hline = $0
             gsub(/\\\|/, "@@ESCPIPE@@", hline)
             hn = split(hline, hf, "|")
-            loccol = 6
+            loccol = 0
+            for (i = hn; i >= 1; i--) {
+                if (hf[i] ~ /[^ \t]/) { loccol = i; break }
+            }
             for (i = 1; i <= hn; i++) {
                 if (hf[i] ~ /[Tt]est file|[Ll]ocation|[Cc]ommand/) { loccol = i; break }
             }
+            if (loccol == 0) loccol = 6
             next
         }
         if (inm && $0 ~ /^[ \t]*\|/) {

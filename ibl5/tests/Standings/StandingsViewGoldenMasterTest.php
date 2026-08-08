@@ -22,6 +22,7 @@ use Standings\Contracts\StandingsRepositoryInterface;
  * separate future plan.
  *
  * @covers \Standings\StandingsView
+ * @covers \Standings\StandingsTiebreakerResolver
  * @phpstan-import-type StandingsRow from \Standings\Contracts\StandingsRepositoryInterface
  */
 #[AllowMockObjectsWithoutExpectations]
@@ -476,5 +477,46 @@ class StandingsViewGoldenMasterTest extends TestCase
     {
         $rowView = new StandingsRowView();
         $this->assertSame([], $rowView->getBottomLockedIndexes([]), 'Empty standings → no bottom-locked indexes');
+    }
+
+    public function testTiebreakerResolverReturnsInputOrderOnEmptyMatrix(): void
+    {
+        $resolver = new \Standings\StandingsTiebreakerResolver();
+        $teams = [$this->tiedTeamA(), $this->tiedTeamB()];
+        $this->assertSame($teams, $resolver->resolveH2HTiedGroups($teams, []));
+    }
+
+    public function testTiebreakerResolverReturnsInputOrderOnNullMatrix(): void
+    {
+        $resolver = new \Standings\StandingsTiebreakerResolver();
+        $teams = [$this->tiedTeamA(), $this->tiedTeamB()];
+        $this->assertSame($teams, $resolver->resolveH2HTiedGroups($teams, null));
+    }
+
+    public function testTiebreakerResolverEmptyTeamListReturnsEmpty(): void
+    {
+        $resolver = new \Standings\StandingsTiebreakerResolver();
+        $matrix = [1 => [2 => ['wins' => 2, 'losses' => 0]]];
+        $this->assertSame([], $resolver->resolveH2HTiedGroups([], $matrix));
+    }
+
+    public function testTiebreakerResolverSingleTeamReturnsUnchanged(): void
+    {
+        $resolver = new \Standings\StandingsTiebreakerResolver();
+        $matrix = [1 => [2 => ['wins' => 2, 'losses' => 0]]];
+        $teams = [$this->tiedTeamA()];
+        $this->assertSame($teams, $resolver->resolveH2HTiedGroups($teams, $matrix));
+    }
+
+    public function testTiebreakerResolverHandlesMissingMatrixEntry(): void
+    {
+        // Team 1 has no entry for team 2 in the matrix — must exercise the ?? 0 fallbacks.
+        // Both aggregate pcts land at 0.0, PHP's stable sort preserves input order [1, 2].
+        $resolver = new \Standings\StandingsTiebreakerResolver();
+        $matrix = [1 => []];
+        $teams = [$this->tiedTeamA(), $this->tiedTeamB()];
+        $result = $resolver->resolveH2HTiedGroups($teams, $matrix);
+        $teamOrder = array_map(static fn (array $t): int => $t['teamid'], $result);
+        $this->assertSame([1, 2], $teamOrder, 'Missing matrix entry must fall back to 0 wins/losses and preserve input order');
     }
 }

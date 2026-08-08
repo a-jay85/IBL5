@@ -211,6 +211,17 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Status (2026-08-08):** ✅ Implemented — extracted to three renderer collaborators (`RecordTableRenderer`, `PlayerRecordSectionRenderer`, `TeamRecordSectionRenderer`); `RecordHoldersView` thinned to constructor + `render()` (this PR). Golden-master byte-identical throughout.
 **Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
 
+### 1.25 BoxscoreProcessor — Multi-Game-Type Import Pipeline (559 LOC)
+**Location:** `ibl5/classes/Boxscore/BoxscoreProcessor.php` (559 lines)
+**Problem:** One class parses and upserts regular, all-star, and rising-stars game lines from `.sco` files (`processGameLine`, `processAllStarGame`, `processRisingStarsGame`, `processGameUpsert`, `updateSimDates`) — a size/god-class concern.
+**Suggested direction:** Extract per-game-type processors behind a common interface; keep `BoxscoreProcessor` as the file-level dispatcher.
+**Est. effort:** M
+**Risk if untouched:** Import-fidelity-critical mutating pipeline — needs characterization pins before refactor (🟨). This is a **size** finding only; the separate Processor→Service *rename* was deliberately declined at 2.5 (mutating pipeline ⇒ `Processor` is the correct house name) and is not reopened here.
+**Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
+**Status (2026-08-08):** ✅ Implemented (#1797) — characterization pins + per-game-type processor extraction. Added `BoxscoreImportCharacterizationTest.php` freezing byte-identical DB mutation sequences and return contracts for all three import paths (regular season, All-Star, Rising Stars). Extracted `GameTypeProcessorInterface`, `GameUpsertResolver`, `GameLineWriter`, `RegularSeasonGameProcessor`, `RisingStarsGameProcessor`, `AllStarGameProcessor`; `BoxscoreProcessor` reduced to a thin file-level dispatcher. Pins byte-identical before and after extraction (behavior-preserving verified by CI gate).
+
+**Table evidence (2026-08-08):** BoxscoreProcessor 559 LOC — mutating .sco import pipeline; regular/all-star/rising-stars game processors in one class. Extract per-game-type processors; import-fidelity-critical → characterization pins first. Size finding only; the Processor→Service *rename* is separately declined at 2.5.
+
 ### 1.27 JsbImportRepository — One Upsert Per Record Type (539 LOC)
 **Location:** `ibl5/classes/JsbParser/JsbImportRepository.php` (539 lines)
 **Problem:** 15 `upsert*`/`replace*` methods, one per imported entity (transaction, history, all-star roster/score, award, draft result, retired player, HoF inductee, RCB records, PLB snapshot), all in one repo.

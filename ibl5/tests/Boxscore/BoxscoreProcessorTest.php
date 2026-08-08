@@ -7,7 +7,6 @@ namespace Tests\Boxscore;
 use Boxscore\Boxscore;
 use Boxscore\BoxscoreProcessor;
 use Boxscore\BoxscoreRepository;
-use Boxscore\Contracts\BoxscoreProcessorInterface;
 use Boxscore\Contracts\ProgressReporterInterface;
 use PHPUnit\Framework\TestCase;
 use Season\Season;
@@ -18,11 +17,6 @@ use Tests\WideUnit\Mocks\MockDatabase;
  */
 class TestableBoxscoreProcessor extends BoxscoreProcessor
 {
-    public function exposedProcessGameUpsert(Boxscore $boxscoreGameInfo): string
-    {
-        return $this->processGameUpsert($boxscoreGameInfo);
-    }
-
     /**
      * @return list<string>
      */
@@ -264,92 +258,6 @@ class BoxscoreProcessorTest extends TestCase
 
         $this->assertSame('08', $boxscore->gameMonth);
         $this->assertSame(2003, $boxscore->gameYear);
-    }
-
-    // --- processGameUpsert tests ---
-
-    public function testProcessGameUpsertReturnsInsertForNewGame(): void
-    {
-        $mockDb = new MockDatabase();
-        $mockDb->setReturnTrue(true);
-        // findTeamBoxscore returns null (no matching game)
-        $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', []);
-
-        $repository = new BoxscoreRepository($mockDb);
-        $season = new Season($mockDb);
-        $processor = new TestableBoxscoreProcessor($mockDb, $repository, $season);
-
-        $boxscore = Boxscore::withGameInfoLine($this->buildGameInfoLine(3, 10), 2026, 'Regular Season/Playoffs');
-
-        $this->assertSame('insert', $processor->exposedProcessGameUpsert($boxscore));
-    }
-
-    public function testProcessGameUpsertReturnsSkipWhenScoresMatchAndNoNullTeamId(): void
-    {
-        $mockDb = new MockDatabase();
-        $mockDb->setReturnTrue(true);
-        // findTeamBoxscore returns matching quarter scores
-        // buildGameInfoLine defaults: visitor Q scores = 025,030,028,027,000 = 110; home = 022,031,025,030,000 = 108
-        $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', [[
-            'visitor_q1_points' => 25, 'visitor_q2_points' => 30, 'visitor_q3_points' => 28,
-            'visitor_q4_points' => 27, 'visitor_ot_points' => 0,
-            'home_q1_points' => 22, 'home_q2_points' => 31, 'home_q3_points' => 25,
-            'home_q4_points' => 30, 'home_ot_points' => 0,
-        ]]);
-        // hasNullTeamIdPlayerBoxscores returns false (cnt=0)
-        $mockDb->onQuery('(?s)COUNT.*teamid IS NULL', [['cnt' => 0]]);
-
-        $repository = new BoxscoreRepository($mockDb);
-        $season = new Season($mockDb);
-        $processor = new TestableBoxscoreProcessor($mockDb, $repository, $season);
-
-        $boxscore = Boxscore::withGameInfoLine($this->buildGameInfoLine(3, 10), 2026, 'Regular Season/Playoffs');
-
-        $this->assertSame('skip', $processor->exposedProcessGameUpsert($boxscore));
-    }
-
-    public function testProcessGameUpsertReturnsUpdateWhenScoresDiffer(): void
-    {
-        $mockDb = new MockDatabase();
-        $mockDb->setReturnTrue(true);
-        // findTeamBoxscore returns different scores (all zeros — clearly different)
-        $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', [[
-            'visitor_q1_points' => 0, 'visitor_q2_points' => 0, 'visitor_q3_points' => 0,
-            'visitor_q4_points' => 0, 'visitor_ot_points' => 0,
-            'home_q1_points' => 0, 'home_q2_points' => 0, 'home_q3_points' => 0,
-            'home_q4_points' => 0, 'home_ot_points' => 0,
-        ]]);
-
-        $repository = new BoxscoreRepository($mockDb);
-        $season = new Season($mockDb);
-        $processor = new TestableBoxscoreProcessor($mockDb, $repository, $season);
-
-        $boxscore = Boxscore::withGameInfoLine($this->buildGameInfoLine(3, 10), 2026, 'Regular Season/Playoffs');
-
-        $this->assertSame('update', $processor->exposedProcessGameUpsert($boxscore));
-    }
-
-    public function testProcessGameUpsertReturnsUpdateWhenScoresMatchButNullTeamId(): void
-    {
-        $mockDb = new MockDatabase();
-        $mockDb->setReturnTrue(true);
-        // findTeamBoxscore returns matching scores
-        $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', [[
-            'visitor_q1_points' => 25, 'visitor_q2_points' => 30, 'visitor_q3_points' => 28,
-            'visitor_q4_points' => 27, 'visitor_ot_points' => 0,
-            'home_q1_points' => 22, 'home_q2_points' => 31, 'home_q3_points' => 25,
-            'home_q4_points' => 30, 'home_ot_points' => 0,
-        ]]);
-        // hasNullTeamIdPlayerBoxscores returns true (cnt=1)
-        $mockDb->onQuery('(?s)COUNT.*teamid IS NULL', [['cnt' => 1]]);
-
-        $repository = new BoxscoreRepository($mockDb);
-        $season = new Season($mockDb);
-        $processor = new TestableBoxscoreProcessor($mockDb, $repository, $season);
-
-        $boxscore = Boxscore::withGameInfoLine($this->buildGameInfoLine(3, 10), 2026, 'Regular Season/Playoffs');
-
-        $this->assertSame('update', $processor->exposedProcessGameUpsert($boxscore));
     }
 
     // --- updateSimDates tests ---
@@ -661,6 +569,41 @@ class BoxscoreProcessorTest extends TestCase
 
         self::assertTrue($result['success']);
         self::assertSame(1, $result['gamesInserted']);
+    }
+
+    // --- Backward-compat constructor tests ---
+
+    public function testOneArgConstructorAndFiveArgFormBothProcessRegularSeasonFileSuccessfully(): void
+    {
+        $gameInfoLine = $this->buildGameInfoLine(3, 10);
+        $scoFile = $this->buildScoFileWithOneGame($gameInfoLine);
+        $data = file_get_contents($scoFile);
+        self::assertNotFalse($data);
+
+        // 1-arg form: new BoxscoreProcessor($db) — Season constructed internally from MockDatabase
+        $mockDb1 = new MockDatabase();
+        $mockDb1->setReturnTrue(true);
+        $mockDb1->setMockData([
+            ['name' => 'Current Season Phase', 'value' => 'Regular Season/Playoffs'],
+            ['sim' => 1, 'start_date' => '2026-01-01', 'end_date' => '2026-01-07'],
+        ]);
+        $mockDb1->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', []); // new game → insert
+        $processor1 = new BoxscoreProcessor($mockDb1);
+        $result1 = $processor1->processScoData($data, 2026, 'Regular Season/Playoffs', skipSimDates: true);
+        self::assertTrue($result1['success']);
+        self::assertSame(1, $result1['gamesInserted']);
+
+        // 5-arg form (existing call signature) — confirms backward compat with widened constructor
+        $mockDb2 = new MockDatabase();
+        $mockDb2->setReturnTrue(true);
+        $mockDb2->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', []); // new game → insert
+        $repository2 = new BoxscoreRepository($mockDb2);
+        $seasonStub2 = self::createStub(Season::class);
+        $seasonStub2->lastSimEndDate = '';
+        $processor2 = new BoxscoreProcessor($mockDb2, $repository2, $seasonStub2, null, null);
+        $result2 = $processor2->processScoData($data, 2026, 'Regular Season/Playoffs', skipSimDates: true);
+        self::assertTrue($result2['success']);
+        self::assertSame(1, $result2['gamesInserted']);
     }
 
     // --- Helper methods ---

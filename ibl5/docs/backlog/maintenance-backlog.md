@@ -61,13 +61,12 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
-> ✅ resolved (30): 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 1.14, 1.15, 1.16, 1.17, 1.19, 1.20, 1.21, 1.23, 1.24, 1.27, 1.28, 1.29, 1.31, 1.32, 1.34, 1.35, 1.36 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (31): 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 1.14, 1.15, 1.16, 1.17, 1.19, 1.20, 1.21, 1.23, 1.24, 1.25, 1.27, 1.28, 1.29, 1.31, 1.32, 1.34, 1.35, 1.36 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
 | 1.18 | ◑ Partial | 🟩 | StandingsUpdater. `82`→`League::REGULAR_SEASON_GAMES` DONE (refactor PR). echo→logger + `$log` removal DEFERRED: behavior-changing — echoes feed the rendered pipeline `capturedLog` (UpdateStandingsStep→UpdaterController); `$log` feeds admin-rendered `DebugOutput::display`. Needs a non-`refactor:` PR. |
 | 1.22 | ⬜ Open | 🟩 | TradingView 606 LOC — offer-form/review/closed renderers + row/pick/cash builders in one view. Split into per-page views or extract row-builders; behavior-preserving golden-master pin. |
-| 1.25 | ⬜ Open | 🟨 | BoxscoreProcessor 559 LOC — mutating .sco import pipeline; regular/all-star/rising-stars game processors in one class. Extract per-game-type processors; import-fidelity-critical → characterization pins first. Size finding only; the Processor→Service *rename* is separately declined at 2.5. |
 | 1.26 | ⬜ Open | 🟩 | BugReportRepository 546 LOC — 24 methods spanning claim/lease/transition state-machine + reporter-profile + queue queries. Split by query group; green-green with DB-integration pins. |
 | 1.30 | ⬜ Open | 🟩 | TradingService 516 LOC — page-data orchestration + offer-grouping + future-salary calc. Extract offer-grouping and salary collaborators; green-green. |
 | 1.33 | ⬜ Open | 🟩 | Player 671 LOC — typed-getter accumulation. Extract per-domain typed-getter groups (contract, stats, identity); green-green. |
@@ -95,14 +94,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Split into per-page views (offer / review / closed) or extract the row-builder helpers into a shared collaborator.
 **Est. effort:** M
 **Risk if untouched:** Every trade-page tweak inflates one class; row-building logic can't be reused. Distinct from 11.13 (a CSS `str_replace` fix, already done).
-**Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
-
-### 1.25 BoxscoreProcessor — Multi-Game-Type Import Pipeline (559 LOC)
-**Location:** `ibl5/classes/Boxscore/BoxscoreProcessor.php` (559 lines)
-**Problem:** One class parses and upserts regular, all-star, and rising-stars game lines from `.sco` files (`processGameLine`, `processAllStarGame`, `processRisingStarsGame`, `processGameUpsert`, `updateSimDates`) — a size/god-class concern.
-**Suggested direction:** Extract per-game-type processors behind a common interface; keep `BoxscoreProcessor` as the file-level dispatcher.
-**Est. effort:** M
-**Risk if untouched:** Import-fidelity-critical mutating pipeline — needs characterization pins before refactor (🟨). This is a **size** finding only; the separate Processor→Service *rename* was deliberately declined at 2.5 (mutating pipeline ⇒ `Processor` is the correct house name) and is not reopened here.
 **Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
 
 ### 1.26 BugReportRepository — State-Machine + Profile + Queue in One Repo (546 LOC)

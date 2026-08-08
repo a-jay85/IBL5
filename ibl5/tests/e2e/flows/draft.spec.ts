@@ -139,13 +139,7 @@ test.describe('Draft selection: submission', () => {
 
     // Submit via JS to bypass client-side validation
     await Promise.all([
-      page.waitForResponse(
-        resp =>
-          resp.url().includes('modules.php') &&
-          resp.request().method() === 'POST' &&
-          (resp.url().includes('Draft') || (resp.request().postData() ?? '').includes('draft_form')),
-        { timeout: 10000 },
-      ),
+      page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
       page.evaluate(() => {
         const f = document.querySelector(
           'form[name="draft_form"]',
@@ -153,7 +147,6 @@ test.describe('Draft selection: submission', () => {
         if (f) f.submit();
       }),
     ]);
-    await page.waitForLoadState('domcontentloaded');
 
     const html = await page.content();
     expect(html).toMatch(/didn.t select|select a player|oops/i);

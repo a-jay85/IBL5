@@ -27,6 +27,22 @@ parameters:
         - phpstan-stubs/nuke-globals.stub.php
     phpVersion: 80300
     treatPhpDocTypesAsCertain: false
+    featureToggles:
+        # bleedingEdge enabled `unnecessaryNullCoalesce` in phpstan 2.2.6. It reports
+        # `$arr['key'] ?? null` as redundant using certainty derived from PHPDoc array
+        # shapes (`@phpstan-type`) — ignoring `treatPhpDocTypesAsCertain: false` above.
+        # Verified: on the same expression, `function.alreadyNarrowedType` IS correctly
+        # suppressed by that setting while `nullCoalesce.unnecessary` is not.
+        #
+        # Our `@phpstan-type` shapes describe the happy path of config files and SELECT
+        # rows whose keys can genuinely be absent at runtime, so the `?? null` inside
+        # `is_string(...)`/`is_int(...)` guards is load-bearing: PR #1785 removed it and
+        # PHP emitted "Undefined array key" warnings, which fail PHPUnit with exit 1.
+        #
+        # Disabling this toggle restores the repo's stated PHPDoc-certainty policy. The
+        # native-type equivalent (`nullCoalesce.offset`) stays on and still catches a
+        # genuinely redundant `??`.
+        unnecessaryNullCoalesce: false
 
 services:
     -

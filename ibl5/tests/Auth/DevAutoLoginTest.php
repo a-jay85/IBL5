@@ -64,11 +64,11 @@ class DevAutoLoginTest extends TestCase
 
         // Session should remain unchanged — not overwritten with the env var user.
         // Both halves of the contract are asserted: tryAutoLogin() must leave the
-        // existing user id AND username untouched. PHPStan narrows the session slot to
-        // the literal 42 from the assignment above and cannot see that tryAutoLogin()
-        // might overwrite it, so the id assertion looks statically tautological — but it
-        // is runtime-meaningful (it fails if the call mutates auth_user_id).
-        self::assertSame($originalUserId, $_SESSION['auth_user_id']); /** @phpstan-ignore staticMethod.alreadyNarrowedType (PHPStan narrows the session slot to 42; tryAutoLogin() could overwrite it at runtime) */
+        // existing user id AND username untouched. The id assertion is runtime-meaningful
+        // (it fails if the call mutates auth_user_id) even though the value was assigned
+        // above; phpstan 2.2.5 and earlier narrowed the session slot to the literal 42 and
+        // needed a staticMethod.alreadyNarrowedType ignore here, which 2.2.6 made stale.
+        self::assertSame($originalUserId, $_SESSION['auth_user_id']);
         self::assertSame('ExistingUser', $_SESSION['auth_username']);
     }
 

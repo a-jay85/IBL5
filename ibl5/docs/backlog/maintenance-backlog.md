@@ -61,14 +61,12 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
-> ✅ resolved (26): 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 1.14, 1.15, 1.16, 1.17, 1.19, 1.20, 1.23, 1.27, 1.28, 1.29, 1.31, 1.34, 1.36 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (28): 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 1.14, 1.15, 1.16, 1.17, 1.19, 1.20, 1.21, 1.23, 1.24, 1.27, 1.28, 1.29, 1.31, 1.34, 1.36 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
 | 1.18 | ◑ Partial | 🟩 | StandingsUpdater. `82`→`League::REGULAR_SEASON_GAMES` DONE (refactor PR). echo→logger + `$log` removal DEFERRED: behavior-changing — echoes feed the rendered pipeline `capturedLog` (UpdateStandingsStep→UpdaterController); `$log` feeds admin-rendered `DebugOutput::display`. Needs a non-`refactor:` PR. |
-| 1.21 | ⬜ Open | 🟩 | RecordHoldersRepository 848 LOC — largest untracked class. 18 per-category record-query methods (single-game/season/team/franchise batches). Extract per-category query collaborators; green-green with DB-integration pins. Distinct from 1.1 (the RecordHolders *Service*, now 281 LOC). |
 | 1.22 | ⬜ Open | 🟩 | TradingView 606 LOC — offer-form/review/closed renderers + row/pick/cash builders in one view. Split into per-page views or extract row-builders; behavior-preserving golden-master pin. |
-| 1.24 | ⬜ Open | 🟩 | RecordHoldersView 578 LOC — 18 per-category block renderers. Extract per-category renderer collaborators / shared category-table builder; golden-master pin. Distinct from 1.1 (Service). |
 | 1.25 | ⬜ Open | 🟨 | BoxscoreProcessor 559 LOC — mutating .sco import pipeline; regular/all-star/rising-stars game processors in one class. Extract per-game-type processors; import-fidelity-critical → characterization pins first. Size finding only; the Processor→Service *rename* is separately declined at 2.5. |
 | 1.26 | ⬜ Open | 🟩 | BugReportRepository 546 LOC — 24 methods spanning claim/lease/transition state-machine + reporter-profile + queue queries. Split by query group; green-green with DB-integration pins. |
 | 1.30 | ⬜ Open | 🟩 | TradingService 516 LOC — page-data orchestration + offer-grouping + future-salary calc. Extract offer-grouping and salary collaborators; green-green. |
@@ -93,28 +91,12 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Est. effort:** S
 **Risk if untouched:** Bug fixes applied twice; optional param is an invisible branching point.
 
-### 1.21 RecordHoldersRepository — Oversized Query Repository (848 LOC)
-**Location:** `ibl5/classes/RecordHolders/RecordHoldersRepository.php` (848 lines)
-**Problem:** 18 methods, each a bespoke record-category query (`getTopPlayerSingleGameBatch`, `getTopTeamSingleGameBatch`, `getTopSeasonAverageBatch`, `getMostTitlesByType`, plus streak/margin/season-record getters). Cohesive but the single largest class in the codebase.
-**Suggested direction:** Extract per-category query collaborators (single-game vs season-average vs team vs franchise/title) behind the existing `RecordHoldersRepositoryInterface`, keeping the repo a thin aggregator.
-**Est. effort:** M
-**Risk if untouched:** Grows with every new record category; largest untracked class. Distinct from finding 1.1, whose concern was the RecordHolders *Service* (now 281 LOC), not this repository.
-**Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
-
 ### 1.22 TradingView — Multi-Page Trade Renderer (606 LOC)
 **Location:** `ibl5/classes/Trading/TradingView.php` (606 lines)
 **Problem:** One view renders the offer form, trade review, and trades-closed pages and also builds player/pick/cash rows and roster previews — several page concerns plus row-building helpers in a single class.
 **Suggested direction:** Split into per-page views (offer / review / closed) or extract the row-builder helpers into a shared collaborator.
 **Est. effort:** M
 **Risk if untouched:** Every trade-page tweak inflates one class; row-building logic can't be reused. Distinct from 11.13 (a CSS `str_replace` fix, already done).
-**Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
-
-### 1.24 RecordHoldersView — Per-Category Block Renderer (578 LOC)
-**Location:** `ibl5/classes/RecordHolders/RecordHoldersView.php` (578 lines)
-**Problem:** 18 render methods, most one-per-record-category block builder (player single-game / full-season / playoff / heat, team-game / team-season / franchise, all-star), sharing only a category-table shell.
-**Suggested direction:** Extract per-category renderer collaborators or a parameterized shared category-table builder; golden-master pin.
-**Est. effort:** M
-**Risk if untouched:** Every new record category inflates the view. Distinct from finding 1.1 (the RecordHolders *Service*).
 **Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
 
 ### 1.25 BoxscoreProcessor — Multi-Game-Type Import Pipeline (559 LOC)

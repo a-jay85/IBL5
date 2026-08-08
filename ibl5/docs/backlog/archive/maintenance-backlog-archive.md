@@ -182,6 +182,15 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 
 **Table evidence (2026-07-25):** SearchView 485 LOC string-concat. Extracted `renderResultList()` + ob_start migration; VR pin.
 
+### 1.21 RecordHoldersRepository — Oversized Query Repository (848 LOC)
+**Location:** `ibl5/classes/RecordHolders/RecordHoldersRepository.php` (848 lines)
+**Problem:** 18 methods, each a bespoke record-category query (`getTopPlayerSingleGameBatch`, `getTopTeamSingleGameBatch`, `getTopSeasonAverageBatch`, `getMostTitlesByType`, plus streak/margin/season-record getters). Cohesive but the single largest class in the codebase.
+**Suggested direction:** Extract per-category query collaborators (single-game vs season-average vs team vs franchise/title) behind the existing `RecordHoldersRepositoryInterface`, keeping the repo a thin aggregator.
+**Est. effort:** M
+**Risk if untouched:** Grows with every new record category; largest untracked class. Distinct from finding 1.1, whose concern was the RecordHolders *Service*, not this repository.
+**Status (2026-08-08):** ✅ Implemented — extracted to four query collaborators (`PlayerRecordRepository`, `TeamRecordRepository`, `FranchiseRecordRepository`, `RecordAnnouncementRepository`) behind the unchanged `RecordHoldersRepositoryInterface` aggregator (this PR). DB-integration pins green; memoization test added.
+**Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
+
 ### 1.23 OneOnOneGameEngine — Monolithic Simulation Engine (604 LOC)
 **Location:** `ibl5/classes/OneOnOneGame/OneOnOneGameEngine.php` (604 lines)
 **Problem:** Possession loop, shot-type selection, shot-attempt resolution, rebound/block/steal/foul checks, and final-score rendering all live in one engine class.
@@ -192,6 +201,15 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Status (2026-07-27):** ✅ Implemented — branch `oneonone-1-23-pins-and-extract`. Added characterization pins freezing current behavior for seeds 424242 and 1337 (full play-by-play transcript + final scores + per-player counting stats) in `ibl5/tests/OneOnOneGame/OneOnOneGameEngineCharacterizationTest.php`. Extracted `OneOnOneGamePossessionResolver` (foul/steal checks + shot selection) and `OneOnOneGameShotResultResolver` (block/foul/make-miss resolution) behind `Contracts/` interfaces (ADR-0001); engine now orchestrates the loop and delegates. Mutation testing enabled: removed `classes/OneOnOneGame` from `infection.json5` mutate-excludes and `phpunit-mutation.xml` coverage-excludes. Behavior-preserving refactor — pins unchanged.
 
 **Table evidence (2026-07-27):** OneOnOneGameEngine 604 LOC — possession/shot-resolution simulation. Extract possession + shot-result collaborators, but sim-fidelity-critical → add characterization pins first (cf. 1.19).
+
+### 1.24 RecordHoldersView — Per-Category Block Renderer (578 LOC)
+**Location:** `ibl5/classes/RecordHolders/RecordHoldersView.php` (578 lines)
+**Problem:** 18 render methods, most one-per-record-category block builder (player single-game / full-season / playoff / heat, team-game / team-season / franchise, all-star), sharing only a category-table shell.
+**Suggested direction:** Extract per-category renderer collaborators or a parameterized shared category-table builder; golden-master pin.
+**Est. effort:** M
+**Risk if untouched:** Every new record category inflates the view. Distinct from finding 1.1 (the RecordHolders *Service*).
+**Status (2026-08-08):** ✅ Implemented — extracted to three renderer collaborators (`RecordTableRenderer`, `PlayerRecordSectionRenderer`, `TeamRecordSectionRenderer`); `RecordHoldersView` thinned to constructor + `render()` (this PR). Golden-master byte-identical throughout.
+**Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
 
 ### 1.27 JsbImportRepository — One Upsert Per Record Type (539 LOC)
 **Location:** `ibl5/classes/JsbParser/JsbImportRepository.php` (539 lines)

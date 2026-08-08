@@ -114,7 +114,7 @@ test.describe('Team page: dropdown content changes', () => {
     await expect(page).toHaveURL(/display=contracts/, { timeout: 10000 });
 
     await page.goBack();
-    await page.waitForURL(url => !url.includes('display=contracts'), { timeout: 5000 });
+    await page.waitForURL(url => !url.href.includes('display=contracts'), { timeout: 5000 });
 
     // Back should restore ratings view (no salary columns)
     await expect(page.locator('.ibl-data-table').first()).toBeVisible({ timeout: 10000 });

@@ -153,6 +153,7 @@ test.describe('Draft selection: submission', () => {
         if (f) f.submit();
       }),
     ]);
+    await page.waitForLoadState('domcontentloaded');
 
     const html = await page.content();
     expect(html).toMatch(/didn.t select|select a player|oops/i);

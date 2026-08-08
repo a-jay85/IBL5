@@ -411,15 +411,21 @@ isolatedTest.describe('DCE mobile: form submission', () => {
     await expect(submitBtn).toBeVisible();
     await submitBtn.click();
 
-    // Require the success signal — PRG back to the module base with the saved
-    // banner. A validation/server rejection no longer passes as success.
+    // PRG back to the module base URL (op=submit is absent after a clean redirect).
+    // The global flash_success is deliberately NOT asserted — all authenticated
+    // workers share one PHPSESSID and any parallel render consumes it, exactly as
+    // documented in depth-chart-entry-submission.spec.ts. Instead we assert the
+    // durable signals: mobile form reloads + no module-scoped validation error.
     await page.waitForURL(
       /modules\.php\?name=DepthChartEntry(?!.*op=submit)/,
       { timeout: 15_000 },
     );
-    await expect(
-      page.locator('.ibl-alert--success', { hasText: /depth chart saved/i }),
-    ).toBeVisible({ timeout: 15000 });
+    // Mobile cards re-appearing proves the DC form reloaded (not an error page).
+    await expect(page.locator('.dc-mobile-cards')).toBeVisible({ timeout: 10000 });
+    // Module-scoped error flash (_ibl_depth_chart_flash) is safe from the
+    // parallel-worker race; its presence means server-side validation rejected
+    // the live config — a real failure we must catch.
+    await expect(page.locator('.ibl-alert--error')).not.toBeVisible();
     await assertNoPhpErrors(page, 'after mobile depth chart submission');
   });
 

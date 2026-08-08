@@ -7,6 +7,7 @@ namespace Tests\Standings;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use SeriesRecords\SeriesRecordsService;
+use Standings\StandingsRowView;
 use Standings\StandingsView;
 use Standings\Contracts\StandingsRepositoryInterface;
 
@@ -21,6 +22,7 @@ use Standings\Contracts\StandingsRepositoryInterface;
  * separate future plan.
  *
  * @covers \Standings\StandingsView
+ * @phpstan-import-type StandingsRow from \Standings\Contracts\StandingsRepositoryInterface
  */
 #[AllowMockObjectsWithoutExpectations]
 class StandingsViewGoldenMasterTest extends TestCase
@@ -145,7 +147,7 @@ class StandingsViewGoldenMasterTest extends TestCase
         ];
     }
 
-    /** @return array<string, mixed> StandingsRow for Team A (teamid=1), tied on GB/wins/clinch-tier — for H2H tiebreak tests */
+    /** @return StandingsRow Team A (teamid=1), tied on GB/wins/clinch-tier — for H2H tiebreak tests */
     private function tiedTeamA(): array
     {
         return [
@@ -172,7 +174,7 @@ class StandingsViewGoldenMasterTest extends TestCase
         ];
     }
 
-    /** @return array<string, mixed> StandingsRow for Team B (teamid=2), tied on GB/wins/clinch-tier — for H2H tiebreak tests */
+    /** @return StandingsRow Team B (teamid=2), tied on GB/wins/clinch-tier — for H2H tiebreak tests */
     private function tiedTeamB(): array
     {
         return [
@@ -199,7 +201,7 @@ class StandingsViewGoldenMasterTest extends TestCase
         ];
     }
 
-    /** @return array<string, mixed> StandingsRow for Team C (teamid=3), tied on GB/wins/clinch-tier — for H2H tiebreak tests */
+    /** @return StandingsRow Team C (teamid=3), tied on GB/wins/clinch-tier — for H2H tiebreak tests */
     private function tiedTeamC(): array
     {
         return [
@@ -458,5 +460,21 @@ class StandingsViewGoldenMasterTest extends TestCase
         $this->assertStringContainsString('</table>', $html);
         $this->assertStringContainsString('<thead>', $html);
         $this->assertSnapshotMatches($html, 'renderRegion-empty.html');
+    }
+
+    public function testStandingsRowViewNegativePath(): void
+    {
+        // All clinch flags = 0 (via tiedTeamA, which has all four flags unset).
+        // getClinchTierClass must return '' and hasClinchStatus must return false.
+        $noClinchedTeam = $this->tiedTeamA();
+
+        $this->assertSame('', StandingsRowView::getClinchTierClass($noClinchedTeam), 'No clinch flags → empty CSS class');
+        $this->assertFalse(StandingsRowView::hasClinchStatus($noClinchedTeam), 'No clinch flags → hasClinchStatus returns false');
+    }
+
+    public function testStandingsRowViewGetBottomLockedIndexesEmptyInput(): void
+    {
+        $rowView = new StandingsRowView();
+        $this->assertSame([], $rowView->getBottomLockedIndexes([]), 'Empty standings → no bottom-locked indexes');
     }
 }

@@ -102,4 +102,9 @@ final class RequireEscapedOutputRuleTest extends RuleTestCase
             ],
         );
     }
+
+    public function testStandingsRowViewIsZeroFloor(): void
+    {
+        $this->analyse([__DIR__ . '/Fixtures/classes/Standings/StandingsRowView.php'], [['Unescaped output in View. Wrap the expression in HtmlSanitizer::e() (or another whitelisted safe helper), or cast it to (int)/(float)/(bool) if it is numeric.', 10]]);
+    }
 }

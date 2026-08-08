@@ -62,7 +62,11 @@ assert_cf() {
 # script's header comment requires.
 assert_viol() {
     name="$1"; want="$2"; tag="$3"; body="$4"
-    f="$TMP/$name.md"
+    # Strip brackets from the FILENAME (never the display name): check-plan echoes
+    # the plan path on both the OK line and its violations, so a fixture named
+    # [P]-foo would put the literal tag in the output and make every want-0
+    # assertion self-fail (and every want-1 one pass regardless of gate).
+    f="$TMP/$(printf '%s' "$name" | tr -d '[]').md"
     printf '%s\n' "$body" > "$f"
     out="$("$GUARD" "$f" 2>&1)"; got=$?
     if [ "$got" -ne "$want" ]; then
@@ -824,6 +828,501 @@ if ! grep -qF 'exhaustive and pre-resolved' "$PROMPT_IMPL"; then
     FAILED=1
 else
     echo "ok: automouse-prompt-impl retains exhaustive-and-pre-resolved tier mandate"
+fi
+
+# ---------------------------------------------------------------------------
+# Gate [P]: pre-prod exercise path for a declared deploy-dependent artifact.
+# The two MUST-HIT fixtures below are the PRs this gate exists for; they are
+# named after the failures, not after the mechanism, so a future softening
+# reads as "we stopped catching #1500", not "a regex changed".
+# ---------------------------------------------------------------------------
+
+# MUST HIT 1 — the #1500 shape (bug-pipeline-gm-feedback-ack-thread): a tick
+# script is declared as a deliverable, the matrix looks green, and nothing in
+# it exercises the tick. Stub-only coverage is invisible here by design.
+assert_viol "[P]-musthit-1500-stub-only" 1 "[P]" "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | classifier maps a report to the right label | PHPUnit | post-impl | \`tests/BugPipelineTest.php\` |
+
+## Phase 1: Post the ack thread
+
+**Tier:** self
+
+Extend the pipeline to open a Discord thread on ack.
+
+## Required Test Methods
+
+- testClassifierMapsReportToLabel
+
+## Critical Files
+
+- \`bin/bug-pipeline-tick\`
+"
+
+# MUST HIT 2 — the #1600 shape (sim-recap-automation-3b-activation): the tick
+# script ALREADY EXISTS on disk and is merely activated, and the plan carries a
+# correctly-authored Truly-manual row that does not exercise it. Pins BOTH the
+# deliberate absence of gate 8's on-disk existence skip AND the rule that a
+# manual row's mere presence never satisfies the gate.
+assert_viol "[P]-musthit-1600-activation" 1 "[P]" "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | notification copy tone reads naturally to a GM | Truly-manual | post-impl | worktree stack |
+
+## Phase 1: Activate the recap job
+
+**Tier:** self
+
+Flip the scheduled recap from dormant to live.
+
+## Critical Files
+
+- \`bin/sim-recap-tick\`
+"
+
+# Clear arm 1a: a row that INVOKES the artifact (full path + a flag) clears.
+# Whether the row is a GOOD row is gate 16's judgment, not lint's.
+assert_viol "[P]-matrix-row-clears" 0 "[P]" "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | \`bin/bug-pipeline-tick --dry-run\` posts to the test channel | CLI-executable | post-impl | worktree stack |
+
+## Phase 1: Post the ack thread
+
+**Tier:** self
+
+Extend the pipeline.
+
+## Critical Files
+
+- \`bin/bug-pipeline-tick\`
+"
+
+# Clear arm 1b: full path + a pre-prod ENVIRONMENT word on the same row. A
+# Truly-manual row is a legitimate exercise when it names a reachable place.
+assert_viol "[P]-env-word-row-clears" 0 "[P]" "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | one-shot run of \`bin/bug-pipeline-tick\` on the worktree stack | Truly-manual | post-impl | worktree stack |
+
+## Phase 1: Post the ack thread
+
+**Tier:** self
+
+Extend the pipeline.
+
+## Critical Files
+
+- \`bin/bug-pipeline-tick\`
+"
+
+# FALSE-NEGATIVE REGRESSION: a bare BASENAME does not clear. Matching is
+# word-bounded on the FULL declared path, because basename matching is what let
+# bin/test-<x>-tick clear bin/<x>-tick during calibration.
+assert_viol "[P]-basename-row-does-not-clear" 1 "[P]" "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | one-shot run of bug-pipeline-tick posts to the test channel | CLI-executable | post-impl | worktree stack |
+
+## Phase 1: Post the ack thread
+
+**Tier:** self
+
+Extend the pipeline.
+
+## Critical Files
+
+- \`bin/bug-pipeline-tick\`
+"
+
+# FALSE-NEGATIVE REGRESSION, and the #1500 failure mechanized: a stub harness
+# is not an exercise. bin/test-bug-pipeline-tick CONTAINS bin/bug-pipeline-tick
+# as a substring; only full-path word-bounding plus the bin/test-* drop stops
+# it. If this fixture ever flips to 0, the gate has re-accepted the exact
+# coverage shape PR #1500 shipped.
+assert_viol "[P]-stub-harness-does-not-clear" 1 "[P]" "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | \`bin/test-bug-pipeline-tick\` covers the tick end to end | CLI-executable | post-impl | \`bin/test-bug-pipeline-tick\` |
+
+## Phase 1: Post the ack thread
+
+**Tier:** self
+
+Extend the pipeline.
+
+## Critical Files
+
+- \`bin/bug-pipeline-tick\`
+"
+
+# FALSE-NEGATIVE REGRESSION: a LINT row names the artifact but does not run it.
+# The full token matches here, so this fixture is what the invocation/environment
+# CONJUNCTION exists for. This is the other half of the #1500 shape.
+assert_viol "[P]-lint-row-does-not-clear" 1 "[P]" "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | \`shellcheck bin/bug-pipeline-tick\` is clean | CLI-executable | post-impl | \`.github/workflows/tests.yml\` |
+
+## Phase 1: Post the ack thread
+
+**Tier:** self
+
+Extend the pipeline.
+
+## Critical Files
+
+- \`bin/bug-pipeline-tick\`
+"
+
+# Clear arm 3: a line-anchored marker WITH its justification section clears.
+assert_viol "[P]-marker-with-justification-clears" 0 "[P]" "$FM_OPUS
+<!-- pre-prod-exception: launchd registration on the prod box -->
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | classifier maps a report to the right label | PHPUnit | post-impl | \`tests/BugPipelineTest.php\` |
+
+## Phase 1: Register the job
+
+**Tier:** self
+
+Register the launchd job.
+
+## Pre-prod Exception Justification
+
+Scheduling only: launchd firing on the prod box cannot be reproduced pre-prod.
+
+## Required Test Methods
+
+- testClassifierMapsReportToLabel
+
+## Critical Files
+
+- \`bin/bug-pipeline-tick\`
+"
+
+# The marker is not a bare escape: without the justification section it FLAGS,
+# mirroring gate H's auto_merge: false <-> Automouse Hold Justification pairing.
+assert_viol "[P]-marker-without-justification-flags" 1 "[P]" "$FM_OPUS
+<!-- pre-prod-exception: launchd registration on the prod box -->
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | classifier maps a report to the right label | PHPUnit | post-impl | \`tests/BugPipelineTest.php\` |
+
+## Phase 1: Register the job
+
+**Tier:** self
+
+Register the launchd job.
+
+## Required Test Methods
+
+- testClassifierMapsReportToLabel
+
+## Critical Files
+
+- \`bin/bug-pipeline-tick\`
+"
+
+# FALSE-POSITIVE REGRESSION — the self-fire this gate's own plan draft exhibited.
+# A prose line mentioning a tick script alongside a creation cue is NOT a
+# declaration. Gate 8's bare-cue filter fires here; gate P must not.
+assert_viol "[P]-prose-mention-does-not-fire" 0 "[P]" "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | gate letter is registered | CLI-executable | post-impl | \`bin/test-check-plan\` |
+
+## Phase 1: Document the gate
+
+**Tier:** self
+
+Every backticked path introduced here must resolve on master: \`bin/bug-pipeline-tick\`, for example.
+
+## Critical Files
+
+- \`bin/check-plan\`
+"
+
+# FALSE-POSITIVE REGRESSION — a Critical Files entry annotated as read-only is a
+# reference, not a deliverable. Pins reuse of gate C's annotation-exclusion set.
+assert_viol "[P]-annotated-critical-file-does-not-fire" 0 "[P]" "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | gate letter is registered | CLI-executable | post-impl | \`bin/test-check-plan\` |
+
+## Phase 1: Document the gate
+
+**Tier:** self
+
+Read the tick script for its scheduling shape; change nothing in it.
+
+## Critical Files
+
+- \`bin/check-plan\`
+- \`bin/sim-recap-tick\` (reference)
+"
+
+# FALSE-POSITIVE REGRESSION — the COMPOUND \`(read-only reference)\` annotation
+# (63 corpus occurrences) evades the exact \`(reference)\`/\`(read-only)\` matches.
+# Found by the acceptance corpus sweep firing on verification-forced-integration-
+# triggers.md. Pins the compound clause added to Arm A's annotation-exclusion set.
+assert_viol "[P]-compound-readonly-reference-does-not-fire" 0 "[P]" "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | gate letter is registered | CLI-executable | post-impl | \`bin/test-check-plan\` |
+
+## Phase 1: Cite the cron-setup shape
+
+**Tier:** self
+
+Read the cron-setup script for its launchd shape; change nothing in it.
+
+## Critical Files
+
+- \`bin/check-plan\`
+- \`bin/sim-recap-cron-setup\` (read-only reference)
+"
+
+# FALSE-POSITIVE REGRESSION — the annotation is a paren GROUP whose contents
+# include a canonical token, per CF_EXEMPT_PATTERN; an explanatory tail inside
+# the same parens is allowed. Both bodies below are copied verbatim from real
+# corpus plans (game-of-that-day-validation-floor.md:302 and
+# ci-path-filter-sim-recap-coupling.md:448) — each fired [P] under the inline
+# literal-match list this gate shipped with, which required the group to be
+# exactly \`(reference)\`. Note the FIRST is the plainest \`(reference — …)\`
+# shape, so the literal list failed on the most common annotation there is.
+assert_viol "[P]-reference-with-trailing-rationale-does-not-fire" 0 "[P]" "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | gate letter is registered | CLI-executable | post-impl | \`bin/test-check-plan\` |
+
+## Phase 1: Cite the park-on-reject rationale
+
+**Tier:** self
+
+Read the store-result handling for its fail-closed shape; change nothing in it.
+
+## Critical Files
+
+- \`bin/check-plan\`
+- \`bin/sim-recap-tick\` (reference — lines 242-245 read the non-zero store result and park the sim for retry; the \"reject means park\" half of the fail-closed rationale)
+"
+
+assert_viol "[P]-readonly-reference-with-trailing-rationale-does-not-fire" 0 "[P]" "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | gate letter is registered | CLI-executable | post-impl | \`bin/test-check-plan\` |
+
+## Phase 1: Cite the path-filter evidence
+
+**Tier:** self
+
+Read the two call sites for their coupling evidence; change nothing in them.
+
+## Critical Files
+
+- \`bin/check-plan\`
+- \`bin/sim-recap-tick\` (read-only reference — lines 92 and 243 are the primary-source evidence that \`simRecapQueue.php\` and \`storeSimRecap.php\` belong in the \`both:\` group; not edited)
+"
+
+# FALSE-NEGATIVE GUARD on the widened exemption — a backticked path inside the
+# parenthetical is an identifier, never a marker. cf_parse_section strips every
+# backtick span before the exemption test and gate [P] mirrors that, so the
+# artifact's own name here cannot exempt the bullet that declares it.
+assert_viol "[P]-backticked-path-in-annotation-does-not-exempt" 1 "[P]" "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | gate letter is registered | CLI-executable | post-impl | \`bin/test-check-plan\` |
+
+## Phase 1: Add the tick driver
+
+**Tier:** self
+
+Create the poll driver.
+
+## Critical Files
+
+- \`bin/check-plan\`
+- \`bin/sim-recap-tick\` (new driver — copies the loop shape from \`bin/reference-helper\`)
+"
+
+# FALSE-NEGATIVE REGRESSION — a QUOTED marker must not clear. Every plan about
+# this gate quotes the token in prose; only the line-anchored HTML-comment form
+# is a real marker. This is the case a bare grep -qF would get wrong.
+assert_viol "[P]-quoted-marker-does-not-clear" 1 "[P]" "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | classifier maps a report to the right label | PHPUnit | post-impl | \`tests/BugPipelineTest.php\` |
+
+## Phase 1: Post the ack thread
+
+**Tier:** self
+
+The gate is suppressed by a \`pre-prod-exception:\` marker, which this plan does not claim.
+
+## Required Test Methods
+
+- testClassifierMapsReportToLabel
+
+## Critical Files
+
+- \`bin/bug-pipeline-tick\`
+"
+
+# SHAPE-SET REGRESSION — an ordinary bin/ script is not a deploy-dependent
+# artifact. Pins that the shape set stayed narrow (tick / cron-setup / plist).
+assert_viol "[P]-ordinary-script-does-not-fire" 0 "[P]" "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | the gate classifies the declared shape | CLI-executable | post-impl | \`bin/test-check-plan\` |
+
+## Phase 1: Extend the checker
+
+**Tier:** self
+
+Add a rule to the doc checker.
+
+## Critical Files
+
+- \`bin/check-docs\`
+"
+
+# SHAPE-SET COVERAGE — the other two calibrated shapes fire too.
+assert_viol "[P]-cron-setup-fires" 1 "[P]" "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | classifier maps a report to the right label | PHPUnit | post-impl | \`tests/BugPipelineTest.php\` |
+
+## Phase 1: Register the schedule
+
+**Tier:** self
+
+Wire up the scheduler.
+
+## Required Test Methods
+
+- testClassifierMapsReportToLabel
+
+## Critical Files
+
+- \`bin/sim-recap-cron-setup\`
+"
+
+assert_viol "[P]-plist-fires" 1 "[P]" "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | classifier maps a report to the right label | PHPUnit | post-impl | \`tests/BugPipelineTest.php\` |
+
+## Phase 1: Add the job definition
+
+**Tier:** self
+
+Define the launchd job.
+
+## Required Test Methods
+
+- testClassifierMapsReportToLabel
+
+## Critical Files
+
+- \`ibl5/ops/com.ibl5.recap.plist\`
+"
+
+# FENCE-AWARENESS — three fixtures, one for each read that a fence-blind gate
+# would corrupt. Each embeds RECIPE TEXT inside a fence, exactly as a real plan
+# about this gate does. Without $GATEP_BODY all three invert, and the plan that
+# ships gate [P] fails its own gate.
+
+# (a) A fenced `## Critical Files` bullet is recipe text, not a declaration.
+assert_viol "[P]-fenced-critical-files-does-not-fire" 0 "[P]" "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | the gate classifies the declared shape | CLI-executable | post-impl | \`bin/test-check-plan\` |
+
+## Phase 1: Document the gate
+
+**Tier:** self
+
+The fixture below is recipe text, not a deliverable:
+
+\`\`\`
+## Critical Files
+
+- \`bin/bug-pipeline-tick\`
+\`\`\`
+
+## Critical Files
+
+- \`docs/decisions/0100-x.md\`
+"
+
+# (b) A fenced matrix row must NOT clear a REAL declaration. This is the fixture
+# that fails if [P] is ever 'simplified' to reuse \$MATRIX_FILE, which is built
+# from the raw file at :201-205 and is fence-blind.
+assert_viol "[P]-fenced-matrix-row-does-not-clear" 1 "[P]" "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | the gate classifies the declared shape | CLI-executable | post-impl | \`bin/test-check-plan\` |
+
+## Phase 1: Post the ack thread
+
+**Tier:** self
+
+Recipe text, not this plan's own matrix:
+
+\`\`\`
+| # | What to verify | Test type | Timing | Test file / location |
+| 1 | \`bin/bug-pipeline-tick --dry-run\` runs | CLI-executable | post-impl | worktree |
+\`\`\`
+
+## Critical Files
+
+- \`bin/bug-pipeline-tick\`
+"
+
+# (c) A fenced marker must NOT clear. Line-anchoring alone is not enough: inside
+# a fence the marker IS at line start. Every plan documenting the marker --
+# starting with this one -- would otherwise suppress the gate it ships.
+assert_viol "[P]-fenced-marker-does-not-clear" 1 "[P]" "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | the gate classifies the declared shape | CLI-executable | post-impl | \`bin/test-check-plan\` |
+
+## Phase 1: Post the ack thread
+
+**Tier:** self
+
+The marker form this plan documents:
+
+\`\`\`
+<!-- pre-prod-exception: launchd registration is intrinsic -->
+\`\`\`
+
+## Critical Files
+
+- \`bin/bug-pipeline-tick\`
+"
+
+# ATTRIBUTION — a plan with NO matrix exits 1 from gate 1 alone; gate P must
+# stay silent rather than pile a second, misleading line onto the same failure.
+_pf="$TMP/gateP-no-matrix.md"
+printf '%s\n' "$FM_OPUS
+## Phase 1: Post the ack thread
+
+**Tier:** self
+
+Extend the pipeline.
+
+## Critical Files
+
+- \`bin/bug-pipeline-tick\`
+" > "$_pf"
+if "$GUARD" "$_pf" 2>&1 | grep -q '\[P\]'; then
+    echo "FAIL: gate P fired on a plan with no matrix (gate 1 owns that failure)"
+    FAILED=1
+else
+    echo "ok: gate P silent on a no-matrix plan (attribution preserved)"
 fi
 
 # ---------------------------------------------------------------------------

@@ -409,6 +409,7 @@ Phase 1 — rename a variable.
 # location column. A name-dropped mention must NOT satisfy the discharge (exit 1).
 # Before the inm/mlocs fix this exited 0 (false negative — the bug).
 assert_viol "gateB-desc-col-mention-not-discharged" 1 "[B]" "$FM"'
+<!-- no-test-methods: gate-B fixture, method names irrelevant here -->
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---|---|---|---|
 | 1 | similar to tests/Trade/TradeValidatorTest.php pattern | PHPUnit | pre-impl | `tests/Other/SomeOtherTest.php` |
@@ -425,6 +426,7 @@ assert_viol "gateB-desc-col-mention-not-discharged" 1 "[B]" "$FM"'
 # (exit 0). Discriminates: without the gsub masking, \| splits f[6] short of the
 # path, gate B fires, and this fixture flips to FAIL.
 assert_viol "gateB-escaped-pipe-in-location-ok" 0 "[B]" "$FM"'
+<!-- no-test-methods: gate-B fixture, method names irrelevant here -->
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---|---|---|---|
 | 1 | gate emits verdict | PHPUnit | pre-impl | `grep -cE (GO\|HOLD)` + `tests/Trade/TradeValidatorTest.php` |

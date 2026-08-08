@@ -188,8 +188,7 @@ test.describe('ASG Voting: validation errors', () => {
     });
 
     await submitBtn.first().click();
-    await expect(page.locator('#site-content .ibl-alert, #site-content .ibl-card').first())
-      .toBeVisible({ timeout: 10000 });
+    await expect(page.locator('body')).toContainText('less than FOUR', { timeout: 10000 });
 
     await assertNoPhpErrors(page, 'after ASG validation error');
   });

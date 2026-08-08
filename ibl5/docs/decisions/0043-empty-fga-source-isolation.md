@@ -1,6 +1,6 @@
 ---
 description: A counterfactual freeze lattice isolates which within-possession mechanism (ORB-continuation, turnover, foul-only, or make-value) generates the engine's wrong-signed Cov(lnFGA,lnPPS); the criterion is pre-registered before the archive run, and the named lever grounds the ADR-0042 follow-on Lever-2 fix.
-last_verified: 2026-06-03
+last_verified: 2026-08-08
 ---
 
 # ADR-0043: Isolating the empty-FGA source by counterfactual freeze lattice

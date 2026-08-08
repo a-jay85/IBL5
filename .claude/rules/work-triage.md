@@ -1,6 +1,6 @@
 ---
 description: Triage every non-trivial unit of work as ad-hoc vs /plan before starting; ad-hoc bar, ad-hoc safety mirror, Sonnet execution-routing (trigger stays resident, reasoning in work-triage-detail.md), hard trigger (≥5 files), and calibration.
-last_verified: 2026-07-27
+last_verified: 2026-08-08
 ---
 
 # Work Triage Rule
@@ -27,7 +27,7 @@ Even when the bar says ad-hoc, run a quick safety check — the surfaces `/plan`
 - a **security surface** (SQL, POST/form endpoint, auth/authz-gated route, user-facing output rendering),
 - a **destructive or schema-tightening migration**,
 - **new or redesigned user-visible UI/UX**,
-- a **`.claude/skills` ship-pipeline invariant** — a change to what fires, what gates, or which disposition applies; *not* a prose edit that preserves the decision procedure, or
+- a **gate removal or weakening** in the ship-pipeline surface (`.claude/skills`, `.claude/rules`, `~/.claude/hooks`) — deletes, relaxes, or disables an enforcement mechanism, or **bootstrap hazard** (rewrites rules governing this change); *not* additive gates, prose edits, or plumbing, or
 - a property needing **subjective human judgment** to confirm,
 
 then prefer `/plan`, so the defense and its verification are designed up front. Why the PR-time backstop is not a substitute: `work-triage-detail.md` § Safety mirror backstop.

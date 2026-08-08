@@ -1,6 +1,6 @@
 ---
-description: Read-on-demand detail for agent-tiering — the skip-vs-spawn heuristic, Fable approval-gate procedure (incl. the asm-level static-RE exception where Fable is the recommended tier), flat-fan-out (nested sub-agent) rationale, the bounded-checklist diff-triage exception that scopes the Opus row's open-ended diff-triage, orchestrator context economics (delegate-don't-dismiss, split-don't-self-clear), the measured evidence behind the offload-`/plan`-by-default rule, and per-tier prompt style. Loads only when editing workflow orchestration defs.
-last_verified: 2026-08-02
+description: Read-on-demand detail for agent-tiering — the skip-vs-spawn heuristic, flat-fan-out (nested sub-agent) rationale, boundary keys on task type, orchestrator context economics (delegate-don't-dismiss, split-don't-self-clear), the measured evidence behind the offload-`/plan`-by-default rule, and per-tier prompt style. Fable approval gate moved to `agent-tiering-fable-gate.md`; bounded-checklist diff-triage rationale moved to `agent-tiering-bounded-checklist.md`. Loads only when editing workflow orchestration defs.
+last_verified: 2026-08-08
 paths:
   - ".claude/skills/**/*.md"
 ---
@@ -24,31 +24,7 @@ Each sub-agent costs ~3–5K tokens (system prompt + rules + memory, loaded befo
 
 **PHPUnit and PHPStan are always direct Bash calls** — passing output is ~5 lines, failures usually under 50; agent overhead dwarfs it. Use `run_in_background` for parallelism without an agent — **but only in the interactive harness**, where a finished background task re-invokes you. In a **headless** run (`claude -p`, e.g. `/post-plan` under automouse) there is no re-invocation: a live background task at turn-end stall-kills the run — run blocking, or poll `BashOutput` to completion in-turn (post-plan `SKILL.md` Phase 5).
 
-## Fable Approval Gate
-
-> **Status: Fable is available again (2026-07-01) but tightly gated.** Never select it on
-> your own; use it *only* when a task is absolutely critical **and** Fable is 100% necessary
-> to solve it, and *only* after an explicit user yes. Default to Opus — treat Fable as a last
-> resort, not a routine capability upgrade.
-
-**Claude must never select Fable on its own** — neither the session model nor a `model: "fable"` sub-agent. When a task matches the Fable row, do not silently run on Opus *and* do not switch; **surface a suggestion** and wait for an explicit yes. The suggestion states:
-
-- **What** the task is and which Opus-row trait it exceeds (novel reasoning / exhaustive negative proof / high-blast-radius triage).
-- **Pros**: the specific failure mode Opus risks (missed aliased ref, wrong FK order, an edge case reaching prod) and what one-shot correctness is worth.
-- **Cons**: ~2× cost ($10/$50 vs $5/$25 per MTok); Opus is *likely sufficient* (most tasks are); the gain is a ceiling-raise, not a guarantee.
-- **Recommendation**: a clear "I'd use Fable here" / "Opus is probably fine, flagging it" — not a neutral survey.
-
-Absent approval, proceed on Opus (or the correct lower tier) — flag and continue, don't block. Approval covers that one task; a new task re-triggers the gate. Because Fable is a last resort, any actual intent to run on Fable is itself a genuine fork — **always** use `AskUserQuestion` to get the explicit yes *before* selecting it; never proceed on Fable from an inline suggestion alone.
-
-### Exception — asm-level static RE (JSB engine): Fable is the *recommended* tier, not merely last-resort
-
-For **asm-level static reverse-engineering** — the class the Fable row names (argument-binding derivations, NaN/FPU-flag paths, encoded operands; e.g. pinning a `FUN_*`/`+0xNNN` operand or a faithful-vs-divergent port verdict from `objdump`/decompile) — Fable is not a ceiling-raise, it is the **empirically-warranted** tier, because Opus has a **track record of provably-false conclusions here**. Precedents: the 2026-07-23 J24 putback-3pt misread (Ghidra mis-numbered params because `param_6` was a `double` consuming two stack slots → an Opus session recorded, shipped, and then had to *reverse* a remove-the-gate change across an ADR, a golden regen, and test rebaselines) and the 2026-07-07 foul-divisor pin (a Fable session overturned an Opus-era "requires live debugging" premise). One wrong asm verdict that ships costs far more than Fable's ~2× — the redo loop dwarfs the per-call delta.
-
-**How to apply** (the gate still holds — surface the suggestion, get the explicit `AskUserQuestion` yes; never self-select):
-
-- **Prefer Fable from the start** when the RE's load-bearing step *is* the asm derivation (the token-efficient path — it avoids the redo loop rather than paying to unwind it).
-- **Otherwise, Fable-verify before recording** — if Opus drafts the RE, a `model: "fable"` sub-agent should check the faithful-vs-divergent / NOT-A-LEVER verdict *before* it lands in the backlog, an ADR, or a port. The `advisor()` tool cannot be repointed to Fable, so this verification is a spawned Fable sub-agent, not an advisor call.
-- **Not for the empirical layer** — measured A/B sweeps, corpus statistics, and CI-floor construction are **not** this class (Opus/measurement is correct there; Fable's edge is asm reads, not arithmetic). Scope this exception to conclusions whose proof is a disassembly, not a measurement.
+> The Fable tier approval procedure (incl. the asm-level static-RE exception) has moved to `agent-tiering-fable-gate.md`.
 
 ## Boundary keys on task type, not model capability
 
@@ -71,37 +47,7 @@ Sub-agents can spawn sub-agents (5 deep), but we keep **flat fan-out**: the orch
 
 **Tripwire to revisit:** a *measured* post-plan context-window problem, or a new workflow with genuinely wide fan-out and verbose per-agent intermediates.
 
-## Bounded-checklist diff-triage (post-plan exception)
-
-The Opus row's "open-ended diff-triage" means: read a diff you have no checklist for, reason
-from scratch about what could be wrong, and decide what matters. That stays Opus — the
-failure mode is missing what you didn't know to look for (`feedback_sonnet_proving_negatives`).
-
-**`/post-plan` Phase 6.5 condition (9) is not that.** It is *bounded* hold-enumeration: read
-the realized diff plus the carried Phase-3 flags (`HAS_MIGRATION`, `GOLDEN_CHANGED`,
-`COUNT_*`) and enumerate holds against a **named trigger list** — introduced or expanded
-SQL / POST-form / auth-gated surfaces; destructive or FK-ordering migrations and
-column-rename sweeps; new or redesigned user-visible UI/UX; any change whose blast radius
-or reversibility you cannot bound. It is framed as enumerating holds, **never** as certifying safe, and it biases hard to HOLD on any doubt.
-
-That asymmetry is what licenses the Sonnet tier here. A checklist run below Opus fails by
-**over**-holding (the PR waits for a human — already the default) or by missing an item on a
-list it was handed. It cannot fail by silently certifying a diff safe, because it is never
-asked to. Open-ended triage has no such floor. **Phase 4D is likewise rubric-scoring** —
-findings arrive from the Phase-4 review agents and are scored against a fixed scale, then
-threshold-filtered; the "is this finding real?" judgment happened upstream, in each agent's
-own analysis of the diff.
-
-This is a **scope correction, not a capability argument**: bounded checklist enumeration was
-never the diff-triage the Opus row meant. `/pr-review` and `/security-audit` do open-ended
-triage and run on Sonnet 4.6 by deliberate def/frontmatter pin (`agent-tiering.md`
-§ Sonnet 4.6 pins) — sanctioned pins, not exceptions this section carves out.
-
-**Tripwire to revisit:** a *measured* miss where a shipped diff was unsafe for a reason
-**not** on condition (9)'s trigger list (a listed trigger that a run simply failed to spot is
-a prompt bug, not a tier bug). Escalating then means copying Phase 7's pattern in
-`.claude/skills/post-plan/_phase-7-ci-monitoring.md` and adding an `opus` key to `MODEL_MAP`
-in `tools/postplan-harness/harness/adapters/llm.py`, which has none today.
+> The bounded-checklist rationale for `/post-plan` Phase 6.5 condition (9) has moved to `agent-tiering-bounded-checklist.md`.
 
 ## Orchestrator context economics — delegate to never-hold, split don't self-clear
 

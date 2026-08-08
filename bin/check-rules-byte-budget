@@ -196,7 +196,9 @@ worktree-hostname.md|.claude/rules/workflow-continuity.md
 linear-history-squash-merge.md|.claude/rules/workflow-continuity.md
 workflow-continuity-detail.md|.claude/rules/workflow-continuity.md
 work-triage-detail.md|.claude/rules/work-triage.md
-agent-tiering-detail.md|.claude/rules/agent-tiering.md"
+agent-tiering-detail.md|.claude/rules/agent-tiering.md
+agent-tiering-fable-gate.md|.claude/rules/agent-tiering.md
+agent-tiering-bounded-checklist.md|.claude/rules/agent-tiering.md"
 
 stub_fail=0
 while IFS='|' read -r scoped referrer; do

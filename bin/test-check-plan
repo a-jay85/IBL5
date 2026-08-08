@@ -1084,6 +1084,69 @@ Read the cron-setup script for its launchd shape; change nothing in it.
 - \`bin/sim-recap-cron-setup\` (read-only reference)
 "
 
+# FALSE-POSITIVE REGRESSION — the annotation is a paren GROUP whose contents
+# include a canonical token, per CF_EXEMPT_PATTERN; an explanatory tail inside
+# the same parens is allowed. Both bodies below are copied verbatim from real
+# corpus plans (game-of-that-day-validation-floor.md:302 and
+# ci-path-filter-sim-recap-coupling.md:448) — each fired [P] under the inline
+# literal-match list this gate shipped with, which required the group to be
+# exactly \`(reference)\`. Note the FIRST is the plainest \`(reference — …)\`
+# shape, so the literal list failed on the most common annotation there is.
+assert_viol "[P]-reference-with-trailing-rationale-does-not-fire" 0 "[P]" "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | gate letter is registered | CLI-executable | post-impl | \`bin/test-check-plan\` |
+
+## Phase 1: Cite the park-on-reject rationale
+
+**Tier:** self
+
+Read the store-result handling for its fail-closed shape; change nothing in it.
+
+## Critical Files
+
+- \`bin/check-plan\`
+- \`bin/sim-recap-tick\` (reference — lines 242-245 read the non-zero store result and park the sim for retry; the \"reject means park\" half of the fail-closed rationale)
+"
+
+assert_viol "[P]-readonly-reference-with-trailing-rationale-does-not-fire" 0 "[P]" "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | gate letter is registered | CLI-executable | post-impl | \`bin/test-check-plan\` |
+
+## Phase 1: Cite the path-filter evidence
+
+**Tier:** self
+
+Read the two call sites for their coupling evidence; change nothing in them.
+
+## Critical Files
+
+- \`bin/check-plan\`
+- \`bin/sim-recap-tick\` (read-only reference — lines 92 and 243 are the primary-source evidence that \`simRecapQueue.php\` and \`storeSimRecap.php\` belong in the \`both:\` group; not edited)
+"
+
+# FALSE-NEGATIVE GUARD on the widened exemption — a backticked path inside the
+# parenthetical is an identifier, never a marker. cf_parse_section strips every
+# backtick span before the exemption test and gate [P] mirrors that, so the
+# artifact's own name here cannot exempt the bullet that declares it.
+assert_viol "[P]-backticked-path-in-annotation-does-not-exempt" 1 "[P]" "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | gate letter is registered | CLI-executable | post-impl | \`bin/test-check-plan\` |
+
+## Phase 1: Add the tick driver
+
+**Tier:** self
+
+Create the poll driver.
+
+## Critical Files
+
+- \`bin/check-plan\`
+- \`bin/sim-recap-tick\` (new driver — copies the loop shape from \`bin/reference-helper\`)
+"
+
 # FALSE-NEGATIVE REGRESSION — a QUOTED marker must not clear. Every plan about
 # this gate quotes the token in prose; only the line-anchored HTML-comment form
 # is a real marker. This is the case a bare grep -qF would get wrong.

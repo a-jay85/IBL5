@@ -916,20 +916,28 @@ fi
 # deploy-dependent artifact, and letting it in re-creates the #1500 failure.
 gatep_declared_tokens() {
     {
+        # The exemption test is delegated to cf_is_exempt / CF_EXEMPT_PATTERN
+        # (bin/lib/critical-files.sh, sourced above) -- the SAME gate C applies,
+        # rather than a re-spelled literal list. An inline list of closed-paren
+        # literals shipped here first and diverged immediately: it read the
+        # ordinary `(reference - <rationale>)` / `(read-only reference - ...)`
+        # shapes as declarations, 2 of 7 fires on the 295-plan corpus. Path and
+        # annotation are split exactly as cf_parse_section does it -- first
+        # backtick span is the path, and ALL backtick spans are stripped before
+        # the exemption test, so a backticked path inside the parenthetical
+        # (`(edits `bin/reference-helper`)`) cannot exempt on its own name.
         awk '
             /^## Critical Files/ { in_cf=1; next }
             /^## /               { in_cf=0 }
-            in_cf && /^- `[^`]+`/ {
-                if ($0 ~ /\(reference\)/ || $0 ~ /\(read-only\)/ || $0 ~ /\(read-only reference\)/ || \
-                    $0 ~ /\(verify\)/ || \
-                    $0 ~ /\(template\)/  || $0 ~ /\(no-edit\)/   || $0 ~ /\(unchanged\)/ || \
-                    $0 ~ /\(context\)/) next
-                line=$0
-                sub(/^- `/, "", line)
-                sub(/`.*$/, "", line)
-                print line
-            }
-        ' "$GATEP_BODY"
+            in_cf && /^- `[^`]+`/ { print }
+        ' "$GATEP_BODY" \
+        | while IFS= read -r gatep_bullet; do  # shellcheck disable=SC2016
+            gatep_path=$(printf '%s\n' "$gatep_bullet" | grep -oE '`[^`]+`' | head -1 | tr -d '`')
+            [ -n "$gatep_path" ] || continue
+            gatep_rest=$(printf '%s\n' "$gatep_bullet" | sed -E 's/`[^`]*`//g')
+            cf_is_exempt "$gatep_rest" && continue
+            printf '%s\n' "$gatep_path"
+        done
         # shellcheck disable=SC2016  # backticks are literal markdown-span delimiters
         grep -E '^[[:space:]]*\|' "$GATEP_BODY" \
             | grep -E '([Cc]reate|[Nn]ew file|[Aa]dd(s|ing)? (a )?new|[Ii]ntroduce|[Ss]caffold)' \

@@ -618,7 +618,16 @@ test.describe('Trade submission: accept and reject', () => {
         await assertNoPhpErrors(page, 'after accept');
       },
       readBack: async () => {
-        expect(page.url()).toContain('result=trade_accepted');
+        await gotoWithRetry(page, 'modules.php?name=Trading&op=reviewtrade');
+        // The accepted card should no longer have an Accept button
+        const remainingAcceptCards = page.locator('.trade-offer-card').filter({
+          has: page.locator('.ibl-btn--success'),
+        });
+        // After acceptance, the seed offer's Accept button is gone (card consumed/processed)
+        expect(
+          await remainingAcceptCards.count(),
+          'accepted offer card must no longer show Accept button after trade is processed',
+        ).toBe(0);
       },
     });
 

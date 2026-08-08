@@ -33,7 +33,9 @@ async function ensureDebugState(page: Page, desiredOn: boolean): Promise<void> {
   if (isCurrentlyOn !== desiredOn) {
     const toggleBtn = page.getByRole('button', { name: /View All Extensions/ });
     await toggleBtn.click();
-    await page.waitForLoadState('networkidle');
+    await expect(
+      page.locator('.debug-toggle-form input[name="_csrf_token"]').first()
+    ).toBeAttached();
   }
 }
 
@@ -104,7 +106,9 @@ test.describe('DebugMenu direct POST submission', () => {
         name: /View All Extensions/,
       });
       await toggleBtn.click();
-      await page.waitForLoadState('networkidle');
+      await expect(
+        page.locator('.debug-toggle-form input[name="_csrf_token"]').first()
+      ).toBeAttached();
     }
     const finalLabel = await getToggleLabel(page);
     expect(finalLabel).toContain('OFF');

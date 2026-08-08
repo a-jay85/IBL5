@@ -438,6 +438,23 @@ assert_viol "gateB-escaped-pipe-in-location-ok" 0 "[B]" "$FM"'
 **Not covered:** the call sites.
 '
 
+# Gate B: HEADER-SHAPE guard — a matrix with no leading `#` column puts the
+# location cell at field 5, not 6. A complete, valid discharge must still pass
+# (exit 0). Discriminates: with the column index hard-coded to 6, f[6] is the
+# empty trailing field, the path matches nothing, and this fixture flips to FAIL.
+assert_viol "gateB-matrix-header-no-index-column" 0 "[B]" "$FM"'
+<!-- no-test-methods: gate-B fixture, method names irrelevant here -->
+| What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|
+| Foo holds no DB handle | PHPUnit | pre-impl | `tests/Trade/TradeValidatorTest.php` |
+
+## Security-Surface Discharge
+
+**Invariant:** `Trading\Foo` declares no property naming a DB handle.
+**Asserted by:** `tests/Trade/TradeValidatorTest.php` — reflection assertion.
+**Not covered:** the call sites.
+'
+
 # ---------------------------------------------------------------------------
 # Gate C: context budget.
 # ---------------------------------------------------------------------------

@@ -431,9 +431,13 @@ fi
 # surface in this repo is PHP (SQL construction, POST/CSRF, authz guard, output
 # rendering), and PHPUnit is the only suite wired into the required "Tests and Analysis"
 # gate. Widening it to bin/test-* was considered and rejected here, not overlooked.
-# The matrix match is scoped to the test-file/location column only (field 6 after
-# splitting by `|`) — a test path name-dropped in a description column does not satisfy
-# the discharge. The extractor is fence-aware inline; $MATRIX_FILE is NOT used here.
+# The matrix match is scoped to the test-file/location column only — a test path
+# name-dropped in a description column does not satisfy the discharge. That column's
+# index is read off the header row rather than hard-coded, because the corpus carries
+# both the 5-column `| # | What to verify | ... |` shape and a 4-column one with no
+# leading index column; field 6 is only right for the former. Falls back to 6 when no
+# header field names the column. The extractor is fence-aware inline; $MATRIX_FILE is
+# NOT used here.
 while IFS= read -r bviol; do
     [ -n "$bviol" ] && viol "$bviol"
 done < <(awk '
@@ -443,7 +447,7 @@ done < <(awk '
         }
         return 0
     }
-    BEGIN { infence=0; fence_len=0; sec=0; inv=0; ast=0; nc=0; tpath=""; inm=0; mlocs="" }
+    BEGIN { infence=0; fence_len=0; sec=0; inv=0; ast=0; nc=0; tpath=""; inm=0; mlocs=""; loccol=6 }
     {
         nt = fence_ticks($0)
         if (infence) {
@@ -451,12 +455,22 @@ done < <(awk '
             next
         }
         if (nt >= 3) { infence=1; fence_len=nt; next }
-        if ($0 ~ /\|[ \t]*[Ww]hat to verify[ \t]*\|/) { inm=1; next }
+        if ($0 ~ /\|[ \t]*[Ww]hat to verify[ \t]*\|/) {
+            inm=1
+            hline = $0
+            gsub(/\\\|/, "@@ESCPIPE@@", hline)
+            hn = split(hline, hf, "|")
+            loccol = 6
+            for (i = 1; i <= hn; i++) {
+                if (hf[i] ~ /[Tt]est file|[Ll]ocation|[Cc]ommand/) { loccol = i; break }
+            }
+            next
+        }
         if (inm && $0 ~ /^[ \t]*\|/) {
             line = $0
             gsub(/\\\|/, "@@ESCPIPE@@", line)
             n = split(line, f, "|")
-            if (n >= 6) { loc = f[6]; gsub(/@@ESCPIPE@@/, "|", loc); mlocs = mlocs "\n" loc }
+            if (n >= loccol) { loc = f[loccol]; gsub(/@@ESCPIPE@@/, "|", loc); mlocs = mlocs "\n" loc }
             next
         }
         if (inm) inm = 0

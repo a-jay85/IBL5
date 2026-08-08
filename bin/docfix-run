@@ -46,8 +46,15 @@ if [ -n "$(git -C "$MAIN" branch --list 'docs-stale-refresh-*')" ]; then
     echo "docfix-run: a docs-stale-refresh-* branch already exists — skipping (no stacking)."
     exit 0
 fi
-if gh pr list --state open --json headRefName --jq '.[].headRefName' 2>/dev/null \
-     | grep -q '^docs-stale-refresh-'; then
+# Defect 5 (run side): pipe into grep loses exit status — gh failure (exit 1) looks
+# the same as "no open PR". Use a fail-closed variable capture instead.
+open_heads=""
+open_heads="$(gh pr list --state open --json headRefName \
+    --jq '.[].headRefName' 2>/dev/null)" || {
+    echo "docfix-run: gh API unreachable — cannot verify open PR; skipping (fail closed)." >&2
+    exit 0
+}
+if printf '%s\n' "$open_heads" | grep -q '^docs-stale-refresh-'; then
     echo "docfix-run: an open docs-stale-refresh-* PR is pending human merge — skipping."
     exit 0
 fi

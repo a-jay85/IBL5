@@ -1744,7 +1744,9 @@ assert "v-prose-pointer" 1 "$FM"'
 
 # 6. A matrix with zero CLI-executable rows → gate V silent (exit 0). Also the
 # `set -u` running proof: matrix_split is never called, MC_* stay at their inits.
-assert "v-no-cli-rows" 0 "$FM"'
+# The no-test-methods marker is gate [M]'s own escape hatch — required because the
+# PHPUnit row here is scenery for gate V, not a real method list.
+assert "v-no-cli-rows" 0 "$FM"'<!-- no-test-methods: fixture exercises gate [V] silence, not PHPUnit method listing -->
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---------------|-----------|--------|---------------------|
 | 1 | cap rejects over-cap trade | PHPUnit | pre-impl | `tests/Trade/TradeValidatorTest.php` |

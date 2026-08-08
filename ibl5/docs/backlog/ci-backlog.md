@@ -1,6 +1,6 @@
 ---
 description: CI/GitHub-Actions workflow simplification backlog — duplicated setup/notify boilerplate, job consolidation, and verified-not-redundant workflows, with per-entry status + automouse-readiness.
-last_verified: 2026-08-05
+last_verified: 2026-08-08
 ---
 
 # CI Workflow Simplification Backlog
@@ -126,7 +126,7 @@ Entries 6.1 and 6.2 are CI/coverage gaps surfaced by the 2026-07-31 audit of PR 
 | # | Title | Status | Automouse | Effort |
 |---|-------|--------|-----------|-------:|
 | 6.1 | CI path-filter coupling splits sim-recap producer from consumer | 📋 Planned | 🟦 | M |
-| 6.2 | `ibl5/scripts/` excluded from phpstan; script fatals degrade silently | ◑ Partial | 🟦 | S |
+| 6.2 | `ibl5/scripts/` excluded from phpstan; script fatals degrade silently | ✅ Implemented | — | S |
 | 6.3 | `SimRecapPayload` accepts `game_of_that_day < 1`; `SimSummaryRepository` silently drops those rows | 📋 Planned | 🟥 | M |
 
 ### 6.1 CI path-filter coupling splits sim-recap producer from consumer
@@ -138,14 +138,7 @@ Entries 6.1 and 6.2 are CI/coverage gaps surfaced by the 2026-07-31 audit of PR 
 **Closes gap:** #4 from `$HOME/claude-plans/sim-recap-testing-gaps-breakdown.md`
 **Status (2026-07-31):** 📋 Planned — `~/claude-plans/ci-path-filter-sim-recap-coupling.md` (written 2026-07-31, routed `plan-architect-xhigh` as a ship-pipeline invariant). Not yet implemented. 🟦.
 
-### 6.2 `ibl5/scripts/` excluded from phpstan; script fatals degrade silently
-*(discovered 2026-07-31 during #1753)*
-**Location:** `ibl5/phpstan.neon` `paths:` (currently lists `classes`, `phpstan-rules`, and extension-less `bin/` scripts — zero mention of `scripts`); no `php -l` sweep exists anywhere in `.github/` or `bin/`.
-**Problem:** A broken class reference in any `ibl5/scripts/*.php` file exits 255 while a guard unit test (e.g. `SimRecapContextGuardTest`) reports OK — the guard test is regex-only over source text and cannot catch a class-resolution failure. In prod, that fatal degrades silently: `simRecapContext.php` (example) would return exit 255 and the caller wraps the failure as `{}`, shipping a roster-blind recap. Proven by mutation during the #1753 audit. Also pending: a stale ADR-0092 citation in `ibl5/scripts/simRecapQueue.php`'s docblock (correct ADR is 0093) — fold into this PR if it does not trip `bin/check-docs` freshness, otherwise its own trivial fix.
-**Suggested direction:** Add `scripts` to `ibl5/phpstan.neon` `paths:` and generate a baseline (`ibl5/phpstan-baseline.neon`) to absorb pre-existing findings. Optionally add a `php -l` sweep. Ad-hoc — an existing pattern (add path + generate baseline) covers this; no `/plan` needed.
-**Risk if untouched:** Any syntax or class-reference error in `ibl5/scripts/*.php` is invisible to CI. It surfaces only as a prod degradation (the exact bug class PR #1753 fixed).
-**Closes gap:** #1 (static-analysis half) from `$HOME/claude-plans/sim-recap-testing-gaps-breakdown.md`
-**Status (2026-07-31):** ◑ Partial — implemented 2026-07-31 in worktree `phpstan-scripts-dir-coverage` (phpstan `paths:` + baseline + the ADR-0092→0093 docblock fix); not yet merged. 🟦.
+➜ 6.2 `ibl5/scripts/` excluded from phpstan; script fatals degrade silently — ✅ Implemented (2026-08-05): see [archive](archive/ci-backlog-archive.md).
 
 ### 6.3 `SimRecapPayload` accepts `game_of_that_day < 1`; `SimSummaryRepository` silently drops those rows
 *(discovered 2026-07-31 during #1753)*

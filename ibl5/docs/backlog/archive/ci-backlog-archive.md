@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed/declined CI workflow simplification entries, extracted from ci-backlog.md.
-last_verified: 2026-07-11
+last_verified: 2026-08-08
 ---
 
 # CI Workflow Simplification Backlog — Archive
@@ -51,3 +51,12 @@ Read-only historical record of ✅ Implemented / 🚫 Declined findings. For OPE
 **Risk if untouched:** Cognitive overhead; subtle trigger-gap bugs.
 **Status (2026-07-11):** ✅ Implemented — 🟩 (per-workflow audit done; mechanisms are intentional, no standardization applied).
 **Audit outcome:** The three mechanisms are NOT interchangeable — each workflow uses the correct one. `dorny/paths-filter` (codeql/engine/eslint) is language/tool-scoped: run CodeQL only on JS/TS changes, engine CI only on Go changes, ESLint only on e2e/tooling changes. `bin/website-affecting` (e2e-tests/lighthouse `src`) encodes domain logic — "does this diff affect app rendering?" — via deny-regex + carve-outs + CI-meta-exempt list that a static glob cannot replicate; switching those to dorny would mis-fire (PHP-only PRs would wrongly skip, CI-meta edits would wrongly trigger). Switching codeql/engine/eslint to `website-affecting` would also be wrong (a PHP-only PR would trigger CodeQL). Static `paths:` on `on: push` triggers is a GitHub Actions constraint (scripts can't run in `on:` triggers), so dorny/website-affecting are inherently PR-only. Deliverable was rationale comments added to each affected workflow (#1424) documenting why each mechanism is the right one; no mechanical change was semantically valid.
+
+### 6.2 `ibl5/scripts/` excluded from phpstan; script fatals degrade silently
+*(discovered 2026-07-31 during #1753)*
+**Location:** `ibl5/phpstan.neon` `paths:` (currently lists `classes`, `phpstan-rules`, and extension-less `bin/` scripts — zero mention of `scripts`); no `php -l` sweep exists anywhere in `.github/` or `bin/`.
+**Problem:** A broken class reference in any `ibl5/scripts/*.php` file exits 255 while a guard unit test (e.g. `SimRecapContextGuardTest`) reports OK — the guard test is regex-only over source text and cannot catch a class-resolution failure. In prod, that fatal degrades silently: `simRecapContext.php` (example) would return exit 255 and the caller wraps the failure as `{}`, shipping a roster-blind recap. Proven by mutation during the #1753 audit. Also pending: a stale ADR-0092 citation in `ibl5/scripts/simRecapQueue.php`'s docblock (correct ADR is 0093) — fold into this PR if it does not trip `bin/check-docs` freshness, otherwise its own trivial fix.
+**Suggested direction:** Add `scripts` to `ibl5/phpstan.neon` `paths:` and generate a baseline (`ibl5/phpstan-baseline.neon`) to absorb pre-existing findings. Optionally add a `php -l` sweep. Ad-hoc — an existing pattern (add path + generate baseline) covers this; no `/plan` needed.
+**Risk if untouched:** Any syntax or class-reference error in `ibl5/scripts/*.php` is invisible to CI. It surfaces only as a prod degradation (the exact bug class PR #1753 fixed).
+**Closes gap:** #1 (static-analysis half) from `$HOME/claude-plans/sim-recap-testing-gaps-breakdown.md`
+**Status (2026-08-05):** ✅ Implemented — PR #1759 (`phpstan-scripts-dir-coverage`): `scripts` dir added to `ibl5/phpstan.neon` `paths:`; phpstan baseline generated; ADR-0092→0093 docblock fix included.

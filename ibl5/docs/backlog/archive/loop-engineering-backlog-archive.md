@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed autonomous-loop engineering entries, extracted from loop-engineering-backlog.md.
-last_verified: 2026-08-05
+last_verified: 2026-08-08
 ---
 
 # Autonomous-Loop Engineering Backlog — Archive
@@ -92,3 +92,24 @@ Read-only historical record of ✅ Implemented entries. For OPEN items see ../lo
 **Closes gap:** #9 (meta-tooling — prevents future versions of this class) from `$HOME/claude-plans/sim-recap-testing-gaps-breakdown.md`
 **Dedup:** reconciled 2026-07-31 — uncovered by #1668 / #1665 / #1667 / #1714.
 **Status (2026-08-04):** ✅ Implemented — gate 15 in `plan/SKILL.md` gains a second unconditional arm keyed on the *diff* rather than on the hold's justification: a new silent-fallback or degraded path in a synchronous sim path or a `bin/*-tick` script requires a loud failure signal (Discord, a required-blocking CI check, or an equivalent alarm), regardless of whether the hold is security-, destructive-migration-, UI/UX- or verification-gap-motivated. PR #1765.
+
+### L7 Queue-add shift-left preflight
+**Location:** `bin/automouse-queue` `add` runs zero preflight (verified); staleness is caught only at 2am by the impl agent, then self-heal requeues (L8). Plan: `$HOME/claude-plans/staleness-guard-fp-fix-and-queue-check.md` (not yet queued).
+**Problem (was):** A stale anchor costs a night when it could be fixed in 30 seconds at queue-add time, while a human is at the keyboard.
+**Suggested direction (per the plan):** Run `bin/check-plan` + `bin/check-plan-staleness` at add time; also fixes known staleness-check false positives.
+**Risk if untouched (was):** Recurring burned queue slots for trivially-fixable staleness.
+**Status (2026-06-27):** ✅ Implemented — PR #1225: `bin/automouse-queue add` now runs `bin/check-plan` + `bin/check-plan-staleness` as a shift-left preflight; staleness false-positive fixes included.
+
+### L10 Discord intake loop
+**Location:** `bin/bug-pipeline-tick`, `bin/bug-pipeline-cron-setup`, `bin/bug-pipeline-classify-prompt`, `bin/bug-pipeline-gather-prompt` (live); remainder of the 6-PR Discord bug pipeline program per its shared-context spec.
+**Problem (was):** Bug reports ended at a human reading Discord.
+**Suggested direction (was):** Automated gather → classify → hunter pipeline with Discord as the intake channel; human checkpoints (plan review + `feat:` signoff gate) stay in place by design.
+**Risk if untouched (was):** Bug reports manually triaged from Discord; no persistent pipeline.
+**Status (2026-07-11):** ✅ Implemented — 7 pipeline PRs: #1327 (2026-07-05), #1326 (2026-07-05), #1353 (2026-07-06), #1354 (2026-07-06), #1356 (2026-07-06), #1355 (2026-07-07), #1418 (2026-07-11). Full gather/classify/tick machinery merged and cron-installable; hunter stages complete. Human checkpoints (plan review + `feat:` signoff gate) in place. The residual program is tracked in its own pipeline, not re-planned here.
+
+### L16 Context-budget gate v2 (work-size proxies + measured calibration)
+**Location:** `bin/check-plan` gate `[C]` (≥ 500 lines OR ≥ 12 numbered phases — thresholds hand-set once from the 2026-07-07 automouse-corpus audit); the T1 per-phase cost rows carry no peak-context column.
+**Problem (was):** Two blind spots. (1) Plan size ≠ work size: a 100-line plan phase saying "sweep every call site" triggers a marathon implementation the gate can't see, while a reference-heavy plan false-trips and gets papered over with a `context-budget:` marker. (2) No feedback loop: nothing re-checks the thresholds as plan style evolves, so the gate drifts from the dumb-zone reality it proxies.
+**Suggested direction (was):** (a) Add work-size proxies — Verification-Matrix row count, Critical-Files change-target count, and sweep-verb detection ("all call sites", "every occurrence") in a phase without a delegation packet. (b) Log peak context tokens per impl run into the T1 ledger (the stream-json usage events already carry them) and add a report correlating plan proxies against measured peaks — recalibrate thresholds from data, and flag any run breaching ~150K as a Step 2.5 split miss for the retro.
+**Risk if untouched (was):** Dumb-zone breaches keep happening under the gate's radar, and the thresholds stay a one-shot guess.
+**Status (2026-07-15):** ✅ Implemented — PR #1479 (`context-budget-gate-v2`): `bin/check-plan` [C] proxy counts (VM rows, CF change-target count, sweep-verb advisory [W]), stream-filter `peak_ctx` tracking, and `costs.md` Peak Ctx column shipped.

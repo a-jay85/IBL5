@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed/declined maintenance-audit findings, extracted from maintenance-backlog.md.
-last_verified: 2026-07-29
+last_verified: 2026-08-08
 ---
 
 # Maintenance-Cost Reduction Backlog — Archive
@@ -464,6 +464,37 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 
 
 **Table evidence (2026-07-25):** `Topics/copyright.php` deleted.
+
+### 2.3 FranchiseHistory / PlayerMovement — No Service Layer
+**Location:** `classes/FranchiseHistory/`, `classes/PlayerMovement/`
+**Problem:** Repository + View, no Service. `FranchiseHistoryRepository` likely computes derived fields inline.
+**Suggested direction:** Add a Service even as a pass-through to maintain pattern consistency.
+**Est. effort:** S each
+**Risk if untouched:** Same as 2.2.
+**Status:** 🚫 Declined (2026-08-08) — FranchiseHistory Service implemented (C7b, maintenance-48b): `getAllFranchiseHistory()` assembly extracted from Repository into `FranchiseHistoryService` (raw-fetch Repo + assembly Service). PlayerMovement Service declined: `PlayerMovementRepository::getPlayerMovements()` is a single JOIN with zero PHP assembly; a Service would be pass-through ceremony (cf. 2.9/2.11).
+
+**Table evidence (2026-08-08):** FranchiseHistory Service built (#1091); PlayerMovement declined (single JOIN, pass-through ceremony).
+
+### 2.5 Boxscore — No Service Layer; Processor Mis-Named
+**Location:** `classes/Boxscore/`
+**Problem:** Has `Boxscore.php`, `BoxscoreProcessor`, `BoxscoreRepository` but no `BoxscoreService`. Processor implies mutating ops (like Waivers) but is doing service work. `Contracts/` missing `BoxscoreViewInterface`.
+**Suggested direction:** Rename Processor → Service for read-heavy modules; add ViewInterface.
+**Est. effort:** S
+**Risk if untouched:** Naming confuses new contributors; missing view interface blocks integration tests.
+**Status:** 🚫 Declined (2026-08-08) — `BoxscoreViewInterface` added (2026-06-26). Processor→Service rename declined: every `BoxscoreProcessor` method mutates (it is a .sco import pipeline used by `Updater\Steps\ProcessBoxscoresStep`); a Service would be pass-through ceremony (cf. 2.8/2.3). `Processor` is the correct house name (Waivers S1+P1).
+
+**Table evidence (2026-08-08):** BoxscoreViewInterface added. Processor→Service rename declined (mutating .sco import pipeline; Processor is the correct house name).
+
+### 2.31 UI/ — 15 Files; Only 1 Interface in Contracts
+**Location:** `classes/UI/`
+**Problem:** 15 files across `Components/` and `Tables/` plus root-level files (`AlertRenderer`, `DebugOutput`, `TableStyles`, `TeamCellHelper`). Only `TeamCellHelperInterface` exists.
+**Suggested direction:** Add interfaces systematically; clarify Tables/ common interface; move `DebugOutput` to `classes/Debug/`.
+**Est. effort:** M
+**Risk if untouched:** 14 of 15 UI classes unmockable; changes can't be isolated in tests.
+**Status:** ✅ Implemented (2026-06-29) — PR #1230: interfaces added systematically.
+
+**Table evidence (2026-06-29):** UI/ 1 interface of 15; add interfaces systematically. Additive. → PR #1230.
+
 ## Axis 3: Top-Level Legacy PHP Files
 
 ### 3.2 `DEMO_LOGIN_TOKEN` Hardcoded to `'demo'`
@@ -2106,8 +2137,12 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 
 **Table evidence (2026-07-25):** Lazy PDO factory injected (#1042).
 
-### 14.9 — Finding 14.9
-
+### 14.9 `$cookie[1]` Username Ritual — 21 Occurrences Across 11 Files
+**Location:** `modules/Trading/index.php` lines 74, 91, 111; `modules/FreeAgency/index.php`; `modules/Player/index.php` etc. (21 occurrences across 11 files, verified 2026-07-24)
+**Problem:** Controllers call `cookiedecode($user)` to populate `global $cookie`, then read `$cookie[1]` — despite `AuthService::getUsername()` existing at `classes/Auth/AuthService.php:111`. The original audit listed 17 sites; a 2026-07-24 rescan found 21 occurrences across 11 files.
+**Suggested direction:** Replace with `$authService->getUsername()` injected from container; `AuthService` already exists and is already injected in some controllers.
+**Est. effort:** M
+**Risk if untouched:** Every new controller replicates the ritual; ordering bug in 14.10 spreads.
 **Status:** ✅ Implemented 2026-07-27 — PR `auth-14-9-cookie-to-authservice`.
 
 **Table evidence (2026-07-27):** `$cookie[1]` ritual — 21 occurrences across 11 files → injected `AuthService::getUsername()` (already exists at `classes/Auth/AuthService.php:111`); green-green call-site burndown.
@@ -2149,6 +2184,17 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 
 
 **Table evidence (2026-07-25):** Premise invalid: `modules.php` already has two guards — `preg_match('/^[a-zA-Z0-9_]+$/', $name)` at line 26 AND `ModuleRegistry::isValid($name)` (42-entry allowlist) at line 31; `index.php:50` also uses `ModuleRegistry::isValid`. The "single `str_contains('..')`" description was wrong; no `str_contains` exists.
+
+### 14.15 `AppPaths::root()` Stateful Static Singleton
+**Location:** `Bootstrap/AppPaths.php`; actual consumers (repo-wide sweep 2026-06-09): `Updater/ScheduleUpdater.php:149,234`, `PageLayout/PageLayout.php:78,111`. The previously listed consumers (`Cache/PageCache.php`, `Mail/MailService.php`, `Logging/LoggerFactory.php`, `Auth/DevAutoLogin.php`) use raw `dirname(__DIR__, 2)` / `__DIR__` — not `AppPaths::root()`.
+**Problem:** Global mutable state for path resolution; not injectable.
+**Suggested direction:** Constructor-injected `string $basePath` from container.
+**Est. effort:** S
+**Risk if untouched:** Path-dependent classes untestable without filesystem coupling.
+**Status:** 🚫 Declined (2026-08-08) — ScheduleUpdater basePath injected (2026-06-09, `?string $basePath = null` fallback); PageLayout remainder declined by user (2026-06-13): disproportionate (155 static call sites, no DI seam); DevAutoLogin completed separately (static→instance, merged #1095).
+
+**Table evidence (2026-08-08):** ScheduleUpdater basePath injected; PageLayout remainder declined (user 2026-06-13 — disproportionate).
+
 ## Axis 15: Migrations and Schema Clarity
 
 ### 15.2 `ibl_box_scores.teamID` — Stranded Camel Case Omitted From Migration 121

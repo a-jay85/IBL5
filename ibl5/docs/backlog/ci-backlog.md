@@ -129,14 +129,7 @@ Entries 6.1 and 6.2 are CI/coverage gaps surfaced by the 2026-07-31 audit of PR 
 | 6.2 | `ibl5/scripts/` excluded from phpstan; script fatals degrade silently | ✅ Implemented | — | S |
 | 6.3 | `SimRecapPayload` accepts `game_of_that_day < 1`; `SimSummaryRepository` silently drops those rows | 📋 Planned | 🟥 | M |
 
-### 6.1 CI path-filter coupling splits sim-recap producer from consumer
-*(discovered 2026-07-31 during #1753)*
-**Location:** `.github/workflows/tests.yml` `changes:` job — the `src` filter gates `db-integration` on `**.php`; the `shell` filter gates `harness-tests` on `bin/**`. The sim-recap producer (`ibl5/scripts/simRecap*`, `ibl5/classes/SimRecap/**`) and consumer (`bin/sim-recap-*`) are on opposite sides of this boundary.
-**Problem:** A PHP-only change to the sim-recap producer runs zero prompt/tick tests. A `bin/`-only change to the consumer runs zero DB integration tests. The filter split is what let the traded-player regression survive PR review — CI stayed green because the producer and consumer were never tested together.
-**Suggested direction:** Extend the `changes:` coupling declaration so that a change to `bin/sim-recap-*` triggers `db-integration`, and a change to `ibl5/scripts/simRecap*` or `ibl5/classes/SimRecap/**` triggers `harness-tests`. Prefer the general cross-coupling pattern over a sim-recap special case.
-**Risk if untouched:** Every future sim-recap PR that touches one surface only (PHP or shell) silently omits half the test coverage. The named regression (traded player attributed to wrong team) would not have been caught by CI.
-**Closes gap:** #4 from `$HOME/claude-plans/sim-recap-testing-gaps-breakdown.md`
-**Status (2026-08-08):** ✅ Implemented — added a general `both:` paths-filter group whose members trigger **both** jobs, widened the two job conditions with `|| needs.changes.outputs.both == 'true'`, and added `bin/test-path-filters` to `harness-tests` so the coupling cannot silently regress. `auto_merge: false` — the change is to the merge-gate machinery itself. 🟦.
+➜ 6.1 CI path-filter coupling splits sim-recap producer from consumer — ✅ Implemented (2026-08-08): see [archive](archive/ci-backlog-archive.md).
 
 ➜ 6.2 `ibl5/scripts/` excluded from phpstan; script fatals degrade silently — ✅ Implemented (2026-08-05): see [archive](archive/ci-backlog-archive.md).
 

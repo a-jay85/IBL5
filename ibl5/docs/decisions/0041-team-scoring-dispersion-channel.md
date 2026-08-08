@@ -1,6 +1,6 @@
 ---
 description: Team-scoring dispersion deviates on three axes — both volume and efficiency marginals are over-dispersed AND their covariance is wrong-signed; the faithful fix restores the positive volume↔efficiency covariance AND narrows both marginals (covariance alone overshoots ~2.3×), so volume-marginal fixes (ADR-0040 A/B) cannot close it.
-last_verified: 2026-06-03
+last_verified: 2026-08-08
 ---
 
 # ADR-0041: Team-scoring dispersion is a three-axis defect — wrong-signed volume↔efficiency covariance plus two over-wide marginals

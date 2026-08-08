@@ -1,6 +1,6 @@
 ---
 description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, plan decomposition/tier-routing machinery, and the human comprehension counter-loop, with per-entry status.
-last_verified: 2026-08-05
+last_verified: 2026-08-07
 ---
 
 # Loop-Engineering Backlog
@@ -54,6 +54,7 @@ last_verified: 2026-08-05
 | L25 | CI-wiring gap: matrix CLI-executable rows may live in jobs the PR's own path filters never trigger | ✅ Implemented | — | S |
 | L26 | Gate 15 never examines silent-fallback paths when the hold is security-justified | ✅ Implemented | — | S |
 | L27 | /post-plan should sweep Out-of-Scope deferral phrases and open a backlog entry per hit | ⬜ Open | 🟥 | S |
+| L28 | Compiled harness misses arm condition (11); primary engine enforces 10 of 11, drift is silent | ⬜ Open | 🟥 | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse-queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse-queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -201,6 +202,14 @@ last_verified: 2026-08-05
 **Risk if untouched:** Every plan that uses `## Out of Scope` continues to evaporate its deferrals; 40 existing plans already have untracked items.
 **Closes gap:** meta-tracking — prevents the D-class failure (deferral evaporation) across all future plans
 **Status (2026-07-31):** ⬜ Open — not covered by the C plan; needs its own `/plan`. 🟥.
+
+### L28 Compiled harness misses arm condition (11); primary engine enforces 10 of 11, drift is silent
+*(discovered 2026-08-07 during PR #1733 review)*
+**Location:** `tools/postplan-harness/harness/armable.py` — `evaluate()` appends `ConditionResult`s 1–10 then returns `armed=not any(c.blocked …)`. Engine selection: `bin/post-plan-now:133-140` runs the compiled harness as the **primary** engine (`./run isolated <root> --live`) and falls back to the `/post-plan` skill only on failure. Skill-side source of truth: `bin/lib/pr-armable.sh` `pr_unresolved_findings_hold` + `.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md` condition (11). Stale doc sites that state the old denominator: `tools/postplan-harness/README.md:25` (the row sits under **"Owned by code (deterministic)"**, so it now asserts something false), `tools/postplan-harness/README.md:42`, `tools/postplan-harness/runner.py:5`, `tools/postplan-harness/bench/make_report.py:207` and `:218`.
+**Problem:** PR #1733 added arm condition (11) — an unresolved GitHub review thread carrying `<!-- score: N -->` with N >= 80 blocks auto-merge — to the skill path only, and its plan listed the harness mirror as out of scope. The result is an engine split on a fail-closed gate: the path that actually runs (the harness) enforces 10 of the 11 conditions, and `ArmInputs` carries no review-thread field at all — condition (2) is fed from `inp.findings`, i.e. only findings **this** run scored. So an unresolved >= 80 finding left by an earlier run or by a standalone `/pr-review` / `/security-audit` contributes no hold to the harness's arming decision. The harness does arm: `gh pr merge --squash --auto` is one of the six allowlisted `--live` mutations (`tools/postplan-harness/README.md` § Safety model / Installation). Worse, the drift is **silent**: `tools/postplan-harness/tests/test_armable.py` enumerates conditions by name with no count assertion, so nothing fails when the harness falls behind the skill — verified 2026-08-07 (`grep` for `len(`/`== 10`/`count` over that file returns nothing). This is an instance of the exact failure class **L27** proposes to automate away: an `## Out of Scope` deferral with no tracking row. It is filed by hand because L27 is not built yet.
+**Suggested direction:** Port `pr_unresolved_findings_hold` into `armable.py` as condition (11), fed by a carried input (the harness's `ArmInputs` is "carried state only, never recomputed" — the thread fetch belongs in the adapter layer, not in `evaluate()`), fail-closed on API error and on a full unpaginated page exactly as the shell predicate is. Add a **count assertion** to `tests/test_armable.py` so the next skill-side condition cannot drift in silently — that guard, not the port, is the durable half. Sweep the five stale "ten arming conditions" doc sites in the same PR. This touches a `.claude/skills`/ship-pipeline invariant, so `plan-architect-xhigh` and `auto_merge: false` per `.claude/rules/work-triage.md` § Ad-hoc safety mirror; do not fix ad-hoc.
+**Risk if untouched:** The gate PR #1733 shipped is inert on the path that runs. On the harness path an unresolved >= 80 finding contributes no hold, so a PR that otherwise clears conditions 1–10 can arm — the case condition (11) was added to catch. Not yet observed in a live run; the verified fact is the absent condition, not a completed bad merge. No test or doc reports the gap.
+**Status (2026-08-07):** ⬜ Open — 🟥 (ship-pipeline invariant; loop-machinery changes should default to `auto_merge: false`).
 
 ---
 

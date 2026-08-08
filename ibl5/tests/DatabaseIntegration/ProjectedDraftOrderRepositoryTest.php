@@ -167,8 +167,12 @@ class ProjectedDraftOrderRepositoryTest extends DatabaseTestCase
             }
         }
         self::assertNotNull($metros);
-        self::assertSame(205.0, (float) $metros['pointsFor']); /** @phpstan-ignore cast.useless (mysqli returns SUM as numeric-string; @var float annotation overstates the type) */ // 110 + 95
-        self::assertSame(190.0, (float) $metros['pointsAgainst']); /** @phpstan-ignore cast.useless (mysqli returns SUM as numeric-string; @var float annotation overstates the type) */ // 90 + 100
+        // The casts are load-bearing: mysqli returns SUM as a numeric-string, which the
+        // @var float annotation overstates. phpstan 2.2.5 and earlier trusted that
+        // annotation and called them useless; 2.2.6 honours treatPhpDocTypesAsCertain
+        // here, so the ignores it needed are now stale.
+        self::assertSame(205.0, (float) $metros['pointsFor']); // 110 + 95
+        self::assertSame(190.0, (float) $metros['pointsAgainst']); // 90 + 100
     }
 
     public function testIsDraftOrderFinalizedReturnsFalse(): void

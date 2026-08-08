@@ -11,7 +11,7 @@
 //
 // Usage:
 //   git diff --name-only "$BASE"...HEAD | bin/vr-changed-coverage > coverage.json
-//   printf 'ibl5/modules/Standings/Standings.php\n' | bin/vr-changed-coverage
+//   printf 'ibl5/classes/Standings/StandingsRepository.php\n' | bin/vr-changed-coverage
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 

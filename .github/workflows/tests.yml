@@ -841,6 +841,8 @@ jobs:
         run: bin/test-docfix-run
       - name: bin/test-sigpipe-grep-q-guard
         run: bin/test-sigpipe-grep-q-guard
+      - name: bin/test-docfix-poll
+        run: bin/test-docfix-poll
       - name: bin/test-post-review-findings
         run: bin/test-post-review-findings
       - name: bin/test-human-signoff-classifier

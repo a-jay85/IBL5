@@ -1,6 +1,6 @@
 ---
 description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, plan decomposition/tier-routing machinery, and the human comprehension counter-loop, with per-entry status.
-last_verified: 2026-08-07
+last_verified: 2026-08-08
 ---
 
 # Loop-Engineering Backlog
@@ -55,6 +55,7 @@ last_verified: 2026-08-07
 | L26 | Gate 15 never examines silent-fallback paths when the hold is security-justified | ✅ Implemented | — | S |
 | L27 | /post-plan should sweep Out-of-Scope deferral phrases and open a backlog entry per hit | ⬜ Open | 🟥 | S |
 | L28 | Compiled harness misses arm condition (11); primary engine enforces 10 of 11, drift is silent | ⬜ Open | 🟥 | S |
+| L29 | `bin/plan-now` launchd labels collide at second granularity; concurrent fires silently lose runs | ⬜ Open | 🟦 | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse-queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse-queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -210,6 +211,14 @@ last_verified: 2026-08-07
 **Suggested direction:** Port `pr_unresolved_findings_hold` into `armable.py` as condition (11), fed by a carried input (the harness's `ArmInputs` is "carried state only, never recomputed" — the thread fetch belongs in the adapter layer, not in `evaluate()`), fail-closed on API error and on a full unpaginated page exactly as the shell predicate is. Add a **count assertion** to `tests/test_armable.py` so the next skill-side condition cannot drift in silently — that guard, not the port, is the durable half. Sweep the five stale "ten arming conditions" doc sites in the same PR. This touches a `.claude/skills`/ship-pipeline invariant, so `plan-architect-xhigh` and `auto_merge: false` per `.claude/rules/work-triage.md` § Ad-hoc safety mirror; do not fix ad-hoc.
 **Risk if untouched:** The gate PR #1733 shipped is inert on the path that runs. On the harness path an unresolved >= 80 finding contributes no hold, so a PR that otherwise clears conditions 1–10 can arm — the case condition (11) was added to catch. Not yet observed in a live run; the verified fact is the absent condition, not a completed bad merge. No test or doc reports the gap.
 **Status (2026-08-07):** ⬜ Open — 🟥 (ship-pipeline invariant; loop-machinery changes should default to `auto_merge: false`).
+
+### L29 `bin/plan-now` launchd labels collide at second granularity; concurrent fires silently lose runs
+*(discovered 2026-08-08 while firing three context-residency plans back to back)*
+**Location:** `bin/plan-now` — the run-ID derivation that produces the launchd label, the `~/Library/LaunchAgents/com.ibl5.plan-now-<id>.plist`, and the `/tmp/plan-now-<id>.{sh,prompt,log}` triple. `bin/test-plan-now` is the existing test host to extend.
+**Problem:** The run ID is a `YYYYMMDD-HHMMSS` timestamp, so two `bin/plan-now` invocations inside the same wall-clock second derive the *same* label and the *same* four file paths. Observed 2026-08-08 00:17:37: three invocations issued from one shell `for` loop all produced `com.ibl5.plan-now-20260808-001737`. Each overwrote the previous run's plist, `.sh`, `.prompt`, and `.log`; only one job appeared in `launchctl list`, running the last-written prompt. The failure is **silent and not fail-safe** — the CLI printed its normal success banner (`disposition: queue`, log path, label) three times, so all three runs looked launched while two had been destroyed before exec. The near-miss is already visible in the on-disk history: `~/Library/LaunchAgents/` holds `com.ibl5.plan-now-20260729-182758`, `-182759`, `-182800`, `-182801`, `-182802`, `-182803` — six runs across six consecutive seconds, one collision away from the same loss.
+**Suggested direction:** Make the run ID collision-proof rather than merely unlikely — append the shell PID (`$$`) or a monotonic suffix, or probe and increment until the label is free and the four paths are unclaimed. Prefer a check that fails loudly over one that silently reuses. Extend `bin/test-plan-now` (which already stubs the model call through `PLAN_NOW_CLAUDE` / `PLAN_NOW_PLANS_DIR` and spawns no launchd job) with a regression that two same-second invocations yield two distinct IDs and two surviving prompt files.
+**Risk if untouched:** Any batch fire — a multi-plan blast, an intake loop, a retry burst — silently drops all but one run while reporting every one as launched. The loss is invisible until someone counts jobs in `launchctl list`, and the discarded runs leave no artifact to recover from.
+**Status (2026-08-08):** ⬜ Open — 🟦 (automouse-safe, human-merge per this doc's loop-machinery default; the design is resolved and `bin/test-plan-now` already exists to pin it).
 
 ---
 

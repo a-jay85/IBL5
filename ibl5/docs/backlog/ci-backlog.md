@@ -127,7 +127,7 @@ Entries 6.1 and 6.2 are CI/coverage gaps surfaced by the 2026-07-31 audit of PR 
 |---|-------|--------|-----------|-------:|
 | 6.1 | CI path-filter coupling splits sim-recap producer from consumer | 📋 Planned | 🟦 | M |
 | 6.2 | `ibl5/scripts/` excluded from phpstan; script fatals degrade silently | ✅ Implemented | — | S |
-| 6.3 | `SimRecapPayload` accepts `game_of_that_day < 1`; `SimSummaryRepository` silently drops those rows | 📋 Planned | 🟥 | M |
+| 6.3 | `SimRecapPayload` accepts `game_of_that_day < 1`; `SimSummaryRepository` silently drops those rows | ✅ Implemented | — | M |
 
 ### 6.1 CI path-filter coupling splits sim-recap producer from consumer
 *(discovered 2026-07-31 during #1753)*
@@ -140,15 +140,7 @@ Entries 6.1 and 6.2 are CI/coverage gaps surfaced by the 2026-07-31 audit of PR 
 
 ➜ 6.2 `ibl5/scripts/` excluded from phpstan; script fatals degrade silently — ✅ Implemented (2026-08-05): see [archive](archive/ci-backlog-archive.md).
 
-### 6.3 `SimRecapPayload` accepts `game_of_that_day < 1`; `SimSummaryRepository` silently drops those rows
-*(discovered 2026-07-31 during #1753)*
-**Location:** `ibl5/classes/SimRecap/SimRecapPayload.php` (`requireInt` with no lower bound on `game_of_that_day`); `ibl5/classes/SimRecap/SimSummaryRepository.php` (`COALESCE(bst.game_of_that_day, 0) = gr.game_of_that_day` silently drops rows where `game_of_that_day = 0`).
-**Problem:** The new `…MismatchDropped` test (PR #1753) pins the silent drop as *expected behavior*. The correct fix is an ingest-time lower-bound check so that `game_of_that_day < 1` is rejected at `SimRecapPayload::fromJson()`. An open design fork must be resolved first: **fail-closed vs. warn**, and what to do when box scores land *after* the recap.
-**Suggested direction:** Resolve the fail-closed-vs-warn fork (lean fail-closed with a structured error); add a `requireInt` lower bound; revisit `testFindDisplayableGameRecapsMismatchDropped` to test the rejection, not the silent drop. This item is the plan's own deferred "ingest-time reconciliation of `game_of_that_day`" Out-of-Scope item.
-**Risk if untouched:** `game_of_that_day = 0` silently drops recap rows; the test suite treats this as expected, so future regressions in this path pass CI green.
-**Closes gap:** #8 from `$HOME/claude-plans/sim-recap-testing-gaps-breakdown.md`
-**Tracked here** by PR #1753 audit origin, not by theme (no existing backlog covers payload-validation gaps).
-**Status (2026-07-31):** 📋 Planned — `~/claude-plans/game-of-that-day-validation-floor.md` (written 2026-07-31). Not yet implemented. 🟥.
+➜ 6.3 `SimRecapPayload` accepts `game_of_that_day < 1`; `SimSummaryRepository` silently drops those rows — ✅ Implemented (2026-08-08): see [archive](archive/ci-backlog-archive.md).
 
 ---
 

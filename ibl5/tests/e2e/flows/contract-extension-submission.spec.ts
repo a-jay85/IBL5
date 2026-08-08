@@ -152,8 +152,13 @@ test.describe('Contract Extension submission: happy path', () => {
       },
       readBack: async () => {
         await page.goto(location.replace('/ibl5/', ''));
-        const banner = page.locator('.ibl-alert--success, .ibl-alert--info');
-        await expect(banner.first()).toBeVisible();
+        // e2e-hygiene-allow: simulation outcome is non-deterministic; cannot be forced via appState
+        if (location.includes('extension_accepted')) {
+          await expect(page.locator('.ibl-alert--success')).toBeVisible();
+        } else {
+          // extension_rejected: info banner expected
+          await expect(page.locator('.ibl-alert--info')).toBeVisible();
+        }
       },
     });
   });

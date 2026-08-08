@@ -92,6 +92,7 @@ test.describe('save_order: method not allowed', () => {
     expect(response.status()).toBe(405);
     const body = (await response.json()) as SaveOrderResponse;
     expect(body.success).toBe(false);
+    expect(body.error).toMatch(/method not allowed/i);
   });
 });
 

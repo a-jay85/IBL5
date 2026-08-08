@@ -114,8 +114,30 @@ PIPELINE_HOLD=$(pr_pipeline_authored_hold "$(gh pr view --json labels --jq '.lab
 [ -n "$PIPELINE_HOLD" ] && echo "BLOCKED: pipeline-authored PR — auto-merge held; a human reviews and merges every bug-pipeline PR regardless of commit type"
 ```
 
+**(11) Unresolved scored review finding** — a review thread carrying `<!-- score: N -->`
+with N >= 80 that is still unresolved holds the merge. This is the live-state counterpart
+to condition (2): (2) only sees findings scored by *this* run, so a >= 80 finding posted
+by an earlier post-plan run or by a standalone `/pr-review` / `/security-audit` would
+otherwise sail through. Human threads (no score marker) and threads scored below 80 never
+block; resolved threads never block. Self-contained: source the predicate and resolve the
+PR number in-block.
+
+```bash
+# condition (11)
+source "$(git rev-parse --show-toplevel)/bin/lib/pr-armable.sh"
+PR_NUM=$(gh pr view --json number --jq '.number')
+UNRESOLVED_HOLD=$(pr_unresolved_findings_hold "$PR_NUM" | tr '\n' ' ')
+case "$UNRESOLVED_HOLD" in
+  '') ;;
+  *unresolved-findings-api-error*|*unresolved-findings-cap*)
+    echo "BLOCKED: cannot verify review-thread state [$UNRESOLVED_HOLD] — fail-closed; merge manually after a look" ;;
+  *)
+    echo "BLOCKED: unresolved review finding(s) scored >= 80 [$UNRESOLVED_HOLD] — fix the finding, call resolve_review_finding, then re-run post-plan" ;;
+esac
+```
+
 If met: `gh pr merge --squash --auto`. The `--auto` flag queues the merge — it does **not** merge now, it arms; GitHub executes it once all required status checks pass. Do not sync local to master here; the merge has not happened yet. **Never add `--delete-branch`** — the repo already sets `deleteBranchOnMerge`, so remote cleanup is automatic; the flag's only effects are harmful (local delete fails in a multi-worktree clone, and a parent merge carrying it permanently closes stacked child PRs). `LiveGh.pr_merge_auto` in `tools/postplan-harness/harness/adapters/ghad.py` omits it for the same reason.
 
-If not met: do **not** arm auto-merge. Report which condition(s) blocked — the user merges manually after review. When condition (3) is the blocker, cite which planned test (`MISSING:`) or planned Critical File (`MISSING-FILE:`) is missing by `cat`-ing the bridge file (`cat /tmp/post-plan-missing-tests-$PPID`) into the report. When condition (4) is the blocker, report which Phase 5 track failed (PHPUnit / PHPStan / Go / E2E). When condition (5) is the blocker (headless + golden changed), report that the golden snapshot changed and the merge needs a human to confirm the behavior change was intentional. When condition (6) is the blocker, report which `Depends-on:` PR(s) are not yet `MERGED` — this PR re-arms on a later post-plan run once the predecessor ships (and this PR has been `git merge master`'d + re-greened). When condition (7) is the blocker, report that the plan declared `auto_merge: false` — the PR is open and reviewed but held for a human merge by author intent. When condition (8) is the blocker, report that this is a `feat:` PR — it waits for a maintainer to apply the `human-approved` label (the required `human-signoff` check). When condition (9) is the blocker, list each enumerated hold-reason from the realized-diff verdict. When condition (10) is the blocker, report that this PR carries the `pipeline-authored` label — every bug-pipeline PR is held for a human merge regardless of commit type. Continue to Phase 7 regardless, to monitor and fix CI — the fix-and-rerun there clears any red track so a later run can arm (conditions (7), (8), and (10) are intent/type holds that a re-run will not clear — those PRs stay held until the human acts).
+If not met: do **not** arm auto-merge. Report which condition(s) blocked — the user merges manually after review. When condition (3) is the blocker, cite which planned test (`MISSING:`) or planned Critical File (`MISSING-FILE:`) is missing by `cat`-ing the bridge file (`cat /tmp/post-plan-missing-tests-$PPID`) into the report. When condition (4) is the blocker, report which Phase 5 track failed (PHPUnit / PHPStan / Go / E2E). When condition (5) is the blocker (headless + golden changed), report that the golden snapshot changed and the merge needs a human to confirm the behavior change was intentional. When condition (6) is the blocker, report which `Depends-on:` PR(s) are not yet `MERGED` — this PR re-arms on a later post-plan run once the predecessor ships (and this PR has been `git merge master`'d + re-greened). When condition (7) is the blocker, report that the plan declared `auto_merge: false` — the PR is open and reviewed but held for a human merge by author intent. When condition (8) is the blocker, report that this is a `feat:` PR — it waits for a maintainer to apply the `human-approved` label (the required `human-signoff` check). When condition (9) is the blocker, list each enumerated hold-reason from the realized-diff verdict. When condition (10) is the blocker, report that this PR carries the `pipeline-authored` label — every bug-pipeline PR is held for a human merge regardless of commit type. When condition (11) is the blocker, list each held thread's score and report that a review or audit finding scored >= 80 is still unresolved — the human fixes it and calls `resolve_review_finding`, after which a later post-plan run clears the hold. `unresolved-findings-api-error` and `unresolved-findings-cap` are fail-closed outcomes, not findings: report that the GraphQL call failed (or the PR exceeds the 100-thread page) and the merge is held pending a manual look. Continue to Phase 7 regardless, to monitor and fix CI — the fix-and-rerun there clears any red track so a later run can arm (conditions (7), (8), and (10) are intent/type holds that a re-run will not clear — those PRs stay held until the human acts; (11) clears on a re-run only after the threads are actually resolved).
 
 **Interactive golden warning:** Whenever `$GOLDEN_CHANGED` is `true` and `$CLAUDE_HEADLESS` is unset (so condition (5) did not block), still surface the warning prominently in the report — "⚠️ golden.json changed: simulation behavior changed. Confirm this was an intentional `make -C engine golden-update`, not a masked regression." — so the human reviews intent before the queued merge fires.

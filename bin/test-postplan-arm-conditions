@@ -5,7 +5,7 @@
 # that must survive being run in their own shell — the Phase 6.5 auto-merge
 # conditions and the Phase 2.5 backlog trigger.
 # Phase 6.5 conditions call the shared predicate bin/lib/pr-armable.sh
-# (conditions (1) Manual-Testing, (5) golden, (6) Depends-on, (8) feat:), plus
+# (conditions (1) Manual-Testing, (5) golden, (6) Depends-on, (8) feat:, (10) pipeline-authored, (11) unresolved >= 80 findings), plus
 # condition (3), the Phase-5.0 conformance gate (no predicate; /tmp state only).
 #
 # Why this exists: those blocks live as separate ```bash blocks inside
@@ -213,6 +213,7 @@ assert_self_contained '# condition (5)' "condition (5)"
 assert_self_contained '# condition (6)' "condition (6)"
 assert_self_contained '# condition (8)' "condition (8)"
 assert_self_contained '# condition (10)' "condition (10)"
+assert_self_contained '# condition (11)' "condition (11)"
 
 # The Phase 2.5 failure model: each /post-plan block runs in its own shell, so a
 # block that read Phase 1's $PLAN_FILE without re-deriving it would silently take

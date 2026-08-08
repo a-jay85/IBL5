@@ -13,6 +13,7 @@ use Waivers\Contracts\WaiversControllerInterface;
 use Waivers\Contracts\WaiversProcessorInterface;
 use Waivers\Contracts\WaiversServiceInterface;
 use Waivers\Contracts\WaiversViewInterface;
+use EventLog\EventLogger;
 
 /**
  * @see WaiversControllerInterface
@@ -130,6 +131,7 @@ class WaiversController implements WaiversControllerInterface
 
             if ($result['success'] === true) {
                 $resultParam = $result['result'] ?? '';
+                EventLogger::setAction($postAction === 'add' ? 'waiver_claim_submitted' : 'waiver_release_submitted');
                 \Utilities\HtmxHelper::redirect('modules.php?name=Waivers&action=' . rawurlencode($postAction) . '&result=' . rawurlencode($resultParam));
             } else {
                 $errorParam = $result['error'] ?? '';

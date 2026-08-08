@@ -91,6 +91,7 @@ switch ($op) {
         $result = $service->registerUser($regUsername, $regEmail, $regPw1, $regPw2);
         PageLayout\PageLayout::header();
         if ($result['success']) {
+            \EventLog\EventLogger::setAction('user_registered');
             echo $accountView->renderRegistrationCompletePage((string) ($sitename ?? ''));
         } else {
             echo $accountView->renderRegistrationErrorPage((string) $result['error']);

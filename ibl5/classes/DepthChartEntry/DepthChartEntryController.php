@@ -18,6 +18,7 @@ use TeamSchedule\TeamScheduleRepository;
 use UI\Components\TableViewDropdown;
 use Team\Team;
 use Season\Season;
+use EventLog\EventLogger;
 
 /**
  * @see DepthChartEntryControllerInterface
@@ -57,6 +58,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         $result = $handler->handleSubmission($postData, $sessionUsername);
 
         if ($result['success']) {
+            EventLogger::setAction('depth_chart_saved');
             if ($result['fileOk']) {
                 $_SESSION['flash_success'] = 'Depth chart saved and e-mailed successfully.';
             } else {

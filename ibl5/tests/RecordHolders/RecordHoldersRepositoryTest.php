@@ -239,4 +239,16 @@ final class RecordHoldersRepositoryTest extends WideUnitTestCase
 
         $this->assertSame([], $result);
     }
+
+    public function testStreakAndSeasonStartShareOneGameFetch(): void
+    {
+        $this->mockDb->setMockData([]);
+
+        $this->repository->getLongestStreak('winning');
+        $after1 = $this->countQueriesMatching('vw_team_total_score');
+        $this->assertSame(1, $after1); // guard: needle matched at least once
+
+        $this->repository->getBestWorstSeasonStart('best');
+        $this->assertSame($after1, $this->countQueriesMatching('vw_team_total_score'));
+    }
 }

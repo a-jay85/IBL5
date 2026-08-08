@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace RecordHolders;
 
-use League\League;
 use League\LeagueContext;
 use RecordHolders\Contracts\RecordHoldersRepositoryInterface;
 
@@ -31,39 +30,18 @@ use RecordHolders\Contracts\RecordHoldersRepositoryInterface;
  */
 class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHoldersRepositoryInterface
 {
-    private const ANNOUNCEMENT_CACHE_KEY = 'record_announcements_last_date';
-
-    /**
-     * Season ending year derivation from game date.
-     *
-     * IBL seasons span two calendar years (Nov-May). HEAT is in October.
-     * Games in Oct-Dec belong to a season ending the NEXT calendar year.
-     * Games in Jan-Jun belong to a season ending the SAME calendar year.
-     */
-    private const SEASON_YEAR_EXPRESSION = 'bs.season_year';
-
-    /**
-     * Per-request memoization of regular-season game rows.
-     *
-     * Loaded once and reused by all four streak/season-start computations within a
-     * single request. The repository is instantiated per request (see
-     * modules/RecordHolders/index.php) and never reused across requests, so this
-     * cache cannot return stale data; no invalidation hook is required.
-     *
-     * @var list<array{game_date: string, visitor_teamid: int, home_teamid: int, visitorScore: int, homeScore: int}>|null
-     */
-    private ?array $regularSeasonGamesCache = null;
-
-    /**
-     * Per-request memoization of team ID → team name lookups (request-scoped, see above).
-     *
-     * @var array<int, string>
-     */
-    private array $teamNameCache = [];
+    private PlayerRecordRepository $playerRecords;
+    private TeamRecordRepository $teamRecords;
+    private FranchiseRecordRepository $franchiseRecords;
+    private RecordAnnouncementRepository $announcements;
 
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
+        $this->playerRecords = new PlayerRecordRepository($db, $leagueContext);
+        $this->teamRecords = new TeamRecordRepository($db, $leagueContext);
+        $this->franchiseRecords = new FranchiseRecordRepository($db, $leagueContext);
+        $this->announcements = new RecordAnnouncementRepository($db, $leagueContext);
     }
 
     /**
@@ -73,82 +51,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
      */
     public function getQuadrupleDoubles(): array
     {
-        $query = "WITH _game_of_day AS " . $this->gameOfThatDaySubquery() . ",
-            _qd_candidates AS (
-                -- Provably-complete candidate prune: every quad-double has >= 2 of
-                -- {ast,stl,blk} >= 10, so this UNION is a superset of qualifying rows.
-                -- game_type IN (0,1,2,3) = the full domain of the generated column
-                -- (a tautology), which lets each leg use its (game_type,<stat>) index
-                -- as a range scan instead of a full table scan. UNION (not UNION ALL)
-                -- dedups ids so the PK join below cannot fan rows out.
-                SELECT id FROM `ibl_box_scores` WHERE game_type IN (0,1,2,3) AND game_ast >= 10
-                UNION
-                SELECT id FROM `ibl_box_scores` WHERE game_type IN (0,1,2,3) AND game_stl >= 10
-                UNION
-                SELECT id FROM `ibl_box_scores` WHERE game_type IN (0,1,2,3) AND game_blk >= 10
-            )
-            SELECT
-                bs.pid,
-                p.name,
-                h.teamid AS teamid,
-                h.team AS team_name,
-                bs.game_date AS `date`,
-                COALESCE(sch.box_id, 0) AS box_id,
-                COALESCE(bst.game_of_that_day, 0) AS game_of_that_day,
-                CASE WHEN h.teamid = bs.visitor_teamid THEN bs.home_teamid ELSE bs.visitor_teamid END AS oppTid,
-                opp.team_name AS opp_team_name,
-                bs.calc_points AS points,
-                bs.calc_rebounds AS rebounds,
-                bs.game_ast AS assists,
-                bs.game_stl AS steals,
-                bs.game_blk AS blocks
-            FROM `ibl_box_scores` bs
-            JOIN _qd_candidates c ON c.id = bs.id
-            JOIN `ibl_plr` p ON p.pid = bs.pid
-            JOIN `ibl_hist` h ON h.pid = bs.pid AND h.year = (" . self::SEASON_YEAR_EXPRESSION . ")
-            LEFT JOIN `ibl_schedule` sch ON sch.game_date = bs.game_date
-                AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
-            LEFT JOIN _game_of_day bst ON bst.game_date = bs.game_date
-                AND bst.visitor_teamid = bs.visitor_teamid AND bst.home_teamid = bs.home_teamid
-            LEFT JOIN `ibl_team_info` opp ON opp.teamid = CASE
-                WHEN h.teamid = bs.visitor_teamid THEN bs.home_teamid
-                ELSE bs.visitor_teamid END
-            WHERE (
-                (CASE WHEN bs.calc_points >= 10 THEN 1 ELSE 0 END)
-                + (CASE WHEN bs.calc_rebounds >= 10 THEN 1 ELSE 0 END)
-                + (CASE WHEN bs.game_ast >= 10 THEN 1 ELSE 0 END)
-                + (CASE WHEN bs.game_stl >= 10 THEN 1 ELSE 0 END)
-                + (CASE WHEN bs.game_blk >= 10 THEN 1 ELSE 0 END)
-            ) >= 4
-                AND bs.visitor_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                AND bs.home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-            ORDER BY bs.game_date ASC";
-
-        $rows = $this->fetchAll($query);
-
-        /** @var list<QuadrupleDoubleRecord> $records */
-        $records = [];
-        foreach ($rows as $row) {
-            /** @var array{pid: int, name: string, teamid: int, team_name: string, date: string, box_id: int, game_of_that_day: int, oppTid: int, opp_team_name: string, points: int, rebounds: int, assists: int, steals: int, blocks: int} $row */
-            $records[] = [
-                'pid' => $row['pid'],
-                'name' => $row['name'],
-                'teamid' => $row['teamid'],
-                'team_name' => $row['team_name'],
-                'date' => $row['date'],
-                'box_id' => $row['box_id'],
-                'game_of_that_day' => $row['game_of_that_day'],
-                'oppTid' => $row['oppTid'],
-                'opp_team_name' => $row['opp_team_name'],
-                'points' => $row['points'],
-                'rebounds' => $row['rebounds'],
-                'assists' => $row['assists'],
-                'steals' => $row['steals'],
-                'blocks' => $row['blocks'],
-            ];
-        }
-
-        return $records;
+        return $this->playerRecords->getQuadrupleDoubles();
     }
 
     /**
@@ -158,28 +61,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
      */
     public function getMostAllStarAppearances(): array
     {
-        $query = "SELECT a.name, h.pid, COUNT(*) AS appearances
-            FROM `ibl_awards` a
-            LEFT JOIN (SELECT DISTINCT pid, name FROM `ibl_hist`) h ON h.name = a.name
-            WHERE a.award LIKE '%Conference All-Star'
-            GROUP BY a.name, h.pid
-            ORDER BY appearances DESC, a.name ASC
-            LIMIT 5";
-
-        $rows = $this->fetchAll($query);
-
-        /** @var list<AllStarRecord> $records */
-        $records = [];
-        foreach ($rows as $row) {
-            /** @var array{name: string, pid: int|null, appearances: int} $row */
-            $records[] = [
-                'name' => $row['name'],
-                'pid' => $row['pid'] !== null ? (int) $row['pid'] : null,
-                'appearances' => $row['appearances'],
-            ];
-        }
-
-        return $records;
+        return $this->playerRecords->getMostAllStarAppearances();
     }
 
     /**
@@ -189,126 +71,17 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
      */
     public function getTopTeamHalfScore(string $half, string $order): array
     {
-        $safeOrder = $order === 'ASC' ? 'ASC' : 'DESC';
-
-        if ($half === 'first') {
-            // First half: Q1 + Q2 — determine which team based on visitor/home columns
-            $expression = "(CASE WHEN t.teamid = bs.visitor_teamid
-                THEN bs.visitor_q1_points + bs.visitor_q2_points
-                ELSE bs.home_q1_points + bs.home_q2_points END)";
-        } else {
-            // Second half: Q3 + Q4 + OT
-            $expression = "(CASE WHEN t.teamid = bs.visitor_teamid
-                THEN bs.visitor_q3_points + bs.visitor_q4_points + COALESCE(bs.visitor_ot_points, 0)
-                ELSE bs.home_q3_points + bs.home_q4_points + COALESCE(bs.home_ot_points, 0) END)";
-        }
-
-        $query = "SELECT
-                t.teamid AS teamid,
-                t.team_name,
-                bs.game_date AS `date`,
-                COALESCE(sch.box_id, 0) AS box_id,
-                COALESCE(bs.game_of_that_day, 0) AS game_of_that_day,
-                CASE WHEN t.teamid = bs.visitor_teamid THEN bs.home_teamid ELSE bs.visitor_teamid END AS oppTid,
-                opp.team_name AS opp_team_name,
-                " . $expression . " AS value
-            FROM `ibl_box_scores_teams` bs
-            JOIN `ibl_team_info` t ON t.team_name = bs.name
-            LEFT JOIN `ibl_schedule` sch ON sch.game_date = bs.game_date
-                AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
-            LEFT JOIN `ibl_team_info` opp ON opp.teamid = CASE
-                WHEN t.teamid = bs.visitor_teamid THEN bs.home_teamid
-                ELSE bs.visitor_teamid END
-            WHERE bs.visitor_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                AND bs.home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-            ORDER BY value " . $safeOrder . ", bs.game_date ASC
-            LIMIT 5";
-
-        $rows = $this->fetchAll($query);
-
-        /** @var list<TeamHalfRecord> $records */
-        $records = [];
-        foreach ($rows as $row) {
-            /** @var array{teamid: int, team_name: string, date: string, box_id: int, game_of_that_day: int, oppTid: int, opp_team_name: string, value: int} $row */
-            $records[] = [
-                'teamid' => $row['teamid'],
-                'team_name' => $row['team_name'],
-                'date' => $row['date'],
-                'box_id' => $row['box_id'],
-                'game_of_that_day' => $row['game_of_that_day'],
-                'oppTid' => $row['oppTid'],
-                'opp_team_name' => $row['opp_team_name'],
-                'value' => $row['value'],
-            ];
-        }
-
-        return $records;
+        return $this->teamRecords->getTopTeamHalfScore($half, $order);
     }
 
     /**
      * @see RecordHoldersRepositoryInterface::getLargestMarginOfVictory()
      *
-     * Each row in ibl_box_scores_teams already has both visitor and home quarter scores,
-     * so we compute the margin from a single row grouped by game (no self-join needed).
-     *
      * @return list<MarginRecord>
      */
     public function getLargestMarginOfVictory(string $dateFilter): array
     {
-        $query = "WITH _game_of_day AS " . $this->gameOfThatDaySubquery() . "
-            SELECT
-                winner_t.teamid AS winner_tid,
-                winner_t.team_name AS winner_name,
-                loser_t.teamid AS loser_tid,
-                loser_t.team_name AS loser_name,
-                sub.game_date AS `date`,
-                COALESCE(sch.box_id, 0) AS box_id,
-                COALESCE(bst.game_of_that_day, 0) AS game_of_that_day,
-                sub.margin
-            FROM (
-                SELECT
-                    bs.game_date,
-                    bs.visitor_teamid,
-                    bs.home_teamid,
-                    ABS(bs.visitorScore - bs.homeScore) AS margin,
-                    CASE WHEN bs.visitorScore > bs.homeScore
-                        THEN bs.visitor_teamid ELSE bs.home_teamid END AS winner_id,
-                    CASE WHEN bs.visitorScore > bs.homeScore
-                        THEN bs.home_teamid ELSE bs.visitor_teamid END AS loser_id
-                FROM vw_team_total_score bs
-                WHERE " . $dateFilter . "
-                    AND bs.visitor_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                    AND bs.home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                GROUP BY bs.game_date, bs.visitor_teamid, bs.home_teamid
-            ) sub
-            JOIN `ibl_team_info` winner_t ON winner_t.teamid = sub.winner_id
-            JOIN `ibl_team_info` loser_t ON loser_t.teamid = sub.loser_id
-            LEFT JOIN `ibl_schedule` sch ON sch.game_date = sub.game_date
-                AND sch.visitor_teamid = sub.visitor_teamid AND sch.home_teamid = sub.home_teamid
-            LEFT JOIN _game_of_day bst ON bst.game_date = sub.game_date
-                AND bst.visitor_teamid = sub.visitor_teamid AND bst.home_teamid = sub.home_teamid
-            ORDER BY sub.margin DESC, sub.game_date ASC
-            LIMIT 5";
-
-        $rows = $this->fetchAll($query);
-
-        /** @var list<MarginRecord> $records */
-        $records = [];
-        foreach ($rows as $row) {
-            /** @var array{winner_tid: int, winner_name: string, loser_tid: int, loser_name: string, date: string, box_id: int, game_of_that_day: int, margin: int} $row */
-            $records[] = [
-                'winner_tid' => $row['winner_tid'],
-                'winner_name' => $row['winner_name'],
-                'loser_tid' => $row['loser_tid'],
-                'loser_name' => $row['loser_name'],
-                'date' => $row['date'],
-                'box_id' => $row['box_id'],
-                'game_of_that_day' => $row['game_of_that_day'],
-                'margin' => $row['margin'],
-            ];
-        }
-
-        return $records;
+        return $this->teamRecords->getLargestMarginOfVictory($dateFilter);
     }
 
     /**
@@ -318,87 +91,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
      */
     public function getBestWorstSeasonRecord(string $order): array
     {
-        $safeOrder = $order === 'ASC' ? 'ASC' : 'DESC';
-
-        $query = "SELECT
-                twl.currentname AS team_name,
-                twl.year,
-                twl.wins,
-                twl.losses
-            FROM `ibl_team_win_loss` twl
-            JOIN `ibl_team_info` ti ON ti.team_name = twl.currentname
-            WHERE ti.teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                AND (twl.wins + twl.losses) > 0
-            ORDER BY (twl.wins / (twl.wins + twl.losses)) " . $safeOrder . ",
-                twl.wins " . $safeOrder . "
-            LIMIT 5";
-
-        $rows = $this->fetchAll($query);
-
-        /** @var list<SeasonWinLossRecord> $records */
-        $records = [];
-        foreach ($rows as $row) {
-            /** @var array{team_name: string, year: int, wins: int, losses: int} $row */
-            $records[] = [
-                'team_name' => $row['team_name'],
-                'year' => $row['year'],
-                'wins' => $row['wins'],
-                'losses' => $row['losses'],
-            ];
-        }
-
-        return $records;
-    }
-
-    /**
-     * Fetch all regular season games from `ibl_box_scores_teams`, cached for reuse
-     *
-     * Both getLongestStreak() and getBestWorstSeasonStart() need the same data.
-     *
-     * @return list<array{game_date: string, visitor_teamid: int, home_teamid: int, visitorScore: int, homeScore: int}>
-     */
-    private function getRegularSeasonGames(): array
-    {
-        if ($this->regularSeasonGamesCache !== null) {
-            return $this->regularSeasonGamesCache;
-        }
-
-        $regularSeasonFilter = 'game_type = 1';
-
-        /** @var list<array{game_date: string, visitor_teamid: int, home_teamid: int, visitorScore: int, homeScore: int}> $rows */
-        $rows = $this->fetchAll(
-            "SELECT
-                game_date,
-                visitor_teamid,
-                home_teamid,
-                visitorScore,
-                homeScore
-            FROM vw_team_total_score
-            WHERE " . $regularSeasonFilter . "
-                AND visitor_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                AND home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-            GROUP BY game_date, visitor_teamid, home_teamid
-            ORDER BY game_date ASC"
-        );
-
-        $this->regularSeasonGamesCache = $rows;
-        return $rows;
-    }
-
-    /**
-     * Resolve team name from team ID, using pre-loaded cache
-     */
-    private function resolveTeamName(int $teamId): string
-    {
-        if ($this->teamNameCache === []) {
-            /** @var list<array{teamid: int, team_name: string}> $rows */
-            $rows = $this->fetchAll("SELECT teamid, team_name FROM `ibl_team_info` WHERE teamid BETWEEN 1 AND ?", 'i', League::MAX_REAL_TEAMID);
-            foreach ($rows as $row) {
-                $this->teamNameCache[$row['teamid']] = $row['team_name'];
-            }
-        }
-
-        return $this->teamNameCache[$teamId] ?? '';
+        return $this->teamRecords->getBestWorstSeasonRecord($order);
     }
 
     /**
@@ -408,11 +101,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
      */
     public function getLongestStreak(string $type): array
     {
-        return StreakCalculator::longestStreak(
-            $this->getRegularSeasonGames(),
-            $type,
-            fn (int $teamId): string => $this->resolveTeamName($teamId)
-        );
+        return $this->teamRecords->getLongestStreak($type);
     }
 
     /**
@@ -422,11 +111,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
      */
     public function getBestWorstSeasonStart(string $type): array
     {
-        return StreakCalculator::bestWorstSeasonStart(
-            $this->getRegularSeasonGames(),
-            $type,
-            fn (int $teamId): string => $this->resolveTeamName($teamId)
-        );
+        return $this->teamRecords->getBestWorstSeasonStart($type);
     }
 
     /**
@@ -436,42 +121,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
      */
     public function getMostPlayoffAppearances(): array
     {
-        $query = "SELECT
-                t.team_name,
-                COUNT(DISTINCT pr.year) AS count,
-                GROUP_CONCAT(DISTINCT pr.year ORDER BY pr.year ASC SEPARATOR ', ') AS years
-            FROM vw_playoff_series_results pr
-            JOIN `ibl_team_info` t ON t.teamid = pr.winner_tid OR t.teamid = pr.loser_tid
-            WHERE t.teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-            GROUP BY t.team_name
-            ORDER BY count DESC, t.team_name ASC
-            LIMIT 5";
-
-        $rows = $this->fetchAll($query);
-
-        // Find the max count to include ties
-        $maxCount = 0;
-        foreach ($rows as $countRow) {
-            /** @var array{team_name: string, count: int, years: string} $countRow */
-            if ($countRow['count'] > $maxCount) {
-                $maxCount = $countRow['count'];
-            }
-        }
-
-        /** @var list<PlayoffAppearanceRecord> $records */
-        $records = [];
-        foreach ($rows as $row) {
-            /** @var array{team_name: string, count: int, years: string} $row */
-            if ($row['count'] === $maxCount) {
-                $records[] = [
-                    'team_name' => $row['team_name'],
-                    'count' => $row['count'],
-                    'years' => $row['years'],
-                ];
-            }
-        }
-
-        return $records;
+        return $this->franchiseRecords->getMostPlayoffAppearances();
     }
 
     /**
@@ -482,82 +132,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
      */
     public function getTopPlayerSingleGameBatch(array $statExpressions, string $dateFilter): array
     {
-        if ($statExpressions === []) {
-            return [];
-        }
-
-        $unions = [];
-        foreach ($statExpressions as $label => $expression) {
-            $safeLabel = str_replace("'", "''", $label);
-            $unions[] = "(SELECT
-                    '" . $safeLabel . "' AS stat_type,
-                    cand.pid,
-                    p.name,
-                    h.teamid AS teamid,
-                    h.team AS team_name,
-                    cand.game_date AS `date`,
-                    COALESCE(sch.box_id, 0) AS box_id,
-                    COALESCE(bst.game_of_that_day, 0) AS game_of_that_day,
-                    CASE WHEN h.teamid = cand.visitor_teamid THEN cand.home_teamid ELSE cand.visitor_teamid END AS oppTid,
-                    opp.team_name AS opp_team_name,
-                    cand.value
-                FROM (
-                    SELECT
-                        bs.pid,
-                        bs.game_date,
-                        bs.visitor_teamid,
-                        bs.home_teamid,
-                        (" . self::SEASON_YEAR_EXPRESSION . ") AS season_year,
-                        " . $expression . " AS value
-                    FROM `ibl_box_scores` bs
-                    WHERE " . $dateFilter . "
-                        AND bs.visitor_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                        AND bs.home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                    ORDER BY " . $expression . " DESC
-                    LIMIT 500
-                ) cand
-                JOIN `ibl_plr` p ON p.pid = cand.pid
-                JOIN `ibl_hist` h ON h.pid = cand.pid AND h.year = cand.season_year
-                LEFT JOIN `ibl_schedule` sch ON sch.game_date = cand.game_date
-                    AND sch.visitor_teamid = cand.visitor_teamid AND sch.home_teamid = cand.home_teamid
-                LEFT JOIN _game_of_day bst ON bst.game_date = cand.game_date
-                    AND bst.visitor_teamid = cand.visitor_teamid AND bst.home_teamid = cand.home_teamid
-                LEFT JOIN `ibl_team_info` opp ON opp.teamid = CASE
-                    WHEN h.teamid = cand.visitor_teamid THEN cand.home_teamid
-                    ELSE cand.visitor_teamid END
-                ORDER BY cand.value DESC, cand.game_date ASC
-                LIMIT 5)";
-        }
-
-        // CTE materializes game_of_that_day lookup once instead of per UNION ALL branch
-        $cte = "WITH _game_of_day AS " . $this->gameOfThatDaySubquery() . "\n";
-        $query = $cte . implode("\nUNION ALL\n", $unions);
-        $rows = $this->fetchAll($query);
-
-        /** @var array<string, list<PlayerSingleGameRecord>> $results */
-        $results = [];
-        foreach (array_keys($statExpressions) as $label) {
-            $results[$label] = [];
-        }
-
-        foreach ($rows as $row) {
-            /** @var array{stat_type: string, pid: int, name: string, teamid: int, team_name: string, date: string, box_id: int, game_of_that_day: int, oppTid: int, opp_team_name: string, value: int} $row */
-            $label = $row['stat_type'];
-            $results[$label][] = [
-                'pid' => $row['pid'],
-                'name' => $row['name'],
-                'teamid' => $row['teamid'],
-                'team_name' => $row['team_name'],
-                'date' => $row['date'],
-                'box_id' => $row['box_id'],
-                'game_of_that_day' => $row['game_of_that_day'],
-                'oppTid' => $row['oppTid'],
-                'opp_team_name' => $row['opp_team_name'],
-                'value' => $row['value'],
-            ];
-        }
-
-        return $results;
+        return $this->playerRecords->getTopPlayerSingleGameBatch($statExpressions, $dateFilter);
     }
 
     /**
@@ -568,63 +143,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
      */
     public function getTopTeamSingleGameBatch(array $statExpressions, string $dateFilter): array
     {
-        if ($statExpressions === []) {
-            return [];
-        }
-
-        $unions = [];
-        foreach ($statExpressions as $label => $config) {
-            $safeLabel = str_replace("'", "''", $label);
-            $safeOrder = $config['order'] === 'ASC' ? 'ASC' : 'DESC';
-            $unions[] = "(SELECT
-                    '" . $safeLabel . "' AS stat_type,
-                    t.teamid AS teamid,
-                    t.team_name,
-                    bs.game_date AS `date`,
-                    COALESCE(sch.box_id, 0) AS box_id,
-                    COALESCE(bs.game_of_that_day, 0) AS game_of_that_day,
-                    CASE WHEN t.teamid = bs.visitor_teamid THEN bs.home_teamid ELSE bs.visitor_teamid END AS oppTid,
-                    opp.team_name AS opp_team_name,
-                    " . $config['expression'] . " AS value
-                FROM `ibl_box_scores_teams` bs
-                JOIN `ibl_team_info` t ON t.team_name = bs.name
-                LEFT JOIN `ibl_schedule` sch ON sch.game_date = bs.game_date
-                    AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
-                LEFT JOIN `ibl_team_info` opp ON opp.teamid = CASE
-                    WHEN t.teamid = bs.visitor_teamid THEN bs.home_teamid
-                    ELSE bs.visitor_teamid END
-                WHERE " . $dateFilter . "
-                    AND bs.visitor_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                    AND bs.home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                ORDER BY value " . $safeOrder . ", bs.game_date ASC
-                LIMIT 5)";
-        }
-
-        $query = implode("\nUNION ALL\n", $unions);
-        $rows = $this->fetchAll($query);
-
-        /** @var array<string, list<TeamSingleGameRecord>> $results */
-        $results = [];
-        foreach (array_keys($statExpressions) as $label) {
-            $results[$label] = [];
-        }
-
-        foreach ($rows as $row) {
-            /** @var array{stat_type: string, teamid: int, team_name: string, date: string, box_id: int, game_of_that_day: int, oppTid: int, opp_team_name: string, value: int} $row */
-            $label = $row['stat_type'];
-            $results[$label][] = [
-                'teamid' => $row['teamid'],
-                'team_name' => $row['team_name'],
-                'date' => $row['date'],
-                'box_id' => $row['box_id'],
-                'game_of_that_day' => $row['game_of_that_day'],
-                'oppTid' => $row['oppTid'],
-                'opp_team_name' => $row['opp_team_name'],
-                'value' => $row['value'],
-            ];
-        }
-
-        return $results;
+        return $this->teamRecords->getTopTeamSingleGameBatch($statExpressions, $dateFilter);
     }
 
     /**
@@ -635,60 +154,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
      */
     public function getTopSeasonAverageBatch(array $statColumns, int $minGames = 50): array
     {
-        if ($statColumns === []) {
-            return [];
-        }
-
-        $unions = [];
-        foreach ($statColumns as $label => $columns) {
-            $safeColumn = preg_replace('/[^a-zA-Z0-9_]/', '', $columns['statColumn']);
-            $safeGames = preg_replace('/[^a-zA-Z0-9_]/', '', $columns['gamesColumn']);
-            if ($safeColumn === null || $safeColumn === '' || $safeGames === null || $safeGames === '') {
-                continue;
-            }
-            $safeLabel = str_replace("'", "''", $label);
-            $unions[] = "(SELECT
-                    '" . $safeLabel . "' AS stat_type,
-                    h.pid,
-                    h.name,
-                    h.teamid,
-                    h.team,
-                    h.year,
-                    ROUND(h." . $safeColumn . " / h." . $safeGames . ", 1) AS value
-                FROM `ibl_hist` h
-                WHERE h." . $safeGames . " >= " . $minGames . "
-                    AND h.teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                ORDER BY value DESC
-                LIMIT 5)";
-        }
-
-        if ($unions === []) {
-            return [];
-        }
-
-        $query = implode("\nUNION ALL\n", $unions);
-        $rows = $this->fetchAll($query);
-
-        /** @var array<string, list<PlayerSeasonRecord>> $results */
-        $results = [];
-        foreach (array_keys($statColumns) as $label) {
-            $results[$label] = [];
-        }
-
-        foreach ($rows as $row) {
-            /** @var array{stat_type: string, pid: int, name: string, teamid: int, team: string, year: int, value: float} $row */
-            $label = $row['stat_type'];
-            $results[$label][] = [
-                'pid' => $row['pid'],
-                'name' => $row['name'],
-                'teamid' => $row['teamid'],
-                'team' => $row['team'],
-                'year' => $row['year'],
-                'value' => $row['value'],
-            ];
-        }
-
-        return $results;
+        return $this->playerRecords->getTopSeasonAverageBatch($statColumns, $minGames);
     }
 
     /**
@@ -698,77 +164,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
      */
     public function getMostTitlesByType(string $titlePattern): array
     {
-        $rows = $this->fetchAll(
-            self::buildMostTitlesByTypeQuery(),
-            's',
-            '%' . $titlePattern . '%'
-        );
-
-        // Find the max count to include ties
-        $maxCount = 0;
-        foreach ($rows as $countRow) {
-            /** @var array{team_name: string, count: int, years: string} $countRow */
-            if ($countRow['count'] > $maxCount) {
-                $maxCount = $countRow['count'];
-            }
-        }
-
-        /** @var list<FranchiseTitleRecord> $records */
-        $records = [];
-        foreach ($rows as $row) {
-            /** @var array{team_name: string, count: int, years: string} $row */
-            if ($row['count'] === $maxCount) {
-                $records[] = [
-                    'team_name' => $row['team_name'],
-                    'count' => $row['count'],
-                    'years' => $row['years'],
-                ];
-            }
-        }
-
-        return $records;
-    }
-
-    /**
-     * Inlined team awards query with optimized Champions/HEAT branches.
-     *
-     * Uses window functions instead of correlated subqueries. The HEAT-champion
-     * branch reads from the `vw_heat_champions` view (migration 149) rather than
-     * an inline CTE.
-     */
-    private static function buildMostTitlesByTypeQuery(): string
-    {
-        return "SELECT
-                name AS team_name,
-                COUNT(*) AS count,
-                GROUP_CONCAT(year ORDER BY year ASC SEPARATOR ', ') AS years
-            FROM (
-                SELECT year, name, award
-                FROM `ibl_team_awards`
-
-                UNION ALL
-
-                SELECT ranked.year, ranked.name, 'IBL Champions' AS award
-                FROM (
-                    SELECT
-                        psr.year,
-                        psr.winner AS name,
-                        psr.round,
-                        MAX(psr.round) OVER (PARTITION BY psr.year) AS max_round,
-                        COUNT(*) OVER (PARTITION BY psr.year, psr.round) AS series_in_round
-                    FROM vw_playoff_series_results psr
-                ) ranked
-                WHERE ranked.round = ranked.max_round AND ranked.series_in_round = 1
-
-                UNION ALL
-
-                SELECT year, name, award
-                FROM `vw_heat_champions`
-            ) all_awards
-            WHERE award LIKE ?
-            GROUP BY name
-            ORDER BY count DESC, name ASC
-            LIMIT 5";
+        return $this->franchiseRecords->getMostTitlesByType($titlePattern);
     }
 
     /**
@@ -776,18 +172,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
      */
     public function getLastAnnouncedDate(): ?string
     {
-        $row = $this->fetchOne(
-            "SELECT `value` FROM `cache` WHERE `cache_key` = ?",
-            's',
-            self::ANNOUNCEMENT_CACHE_KEY
-        );
-
-        if ($row === null) {
-            return null;
-        }
-
-        /** @var array{value: string} $row */
-        return $row['value'];
+        return $this->announcements->getLastAnnouncedDate();
     }
 
     /**
@@ -795,12 +180,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
      */
     public function markAnnouncementsProcessed(string $gameDate): void
     {
-        $this->execute(
-            "REPLACE INTO `cache` (`cache_key`, `value`, `expiration`) VALUES (?, ?, 0)",
-            'ss',
-            self::ANNOUNCEMENT_CACHE_KEY,
-            $gameDate
-        );
+        $this->announcements->markAnnouncementsProcessed($gameDate);
     }
 
     /**
@@ -810,39 +190,6 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
      */
     public function getUnannouncedGameDates(?string $lastAnnouncedDate): array
     {
-        // Get the latest sim's date range from `ibl_sim_dates`
-        /** @var array{start_date: string, end_date: string}|null $latestSim */
-        $latestSim = $this->fetchOne(
-            "SELECT start_date, end_date FROM `ibl_sim_dates` ORDER BY sim DESC LIMIT 1"
-        );
-
-        if ($latestSim === null) {
-            return [];
-        }
-
-        $simStart = $latestSim['start_date'];
-        $simEnd = $latestSim['end_date'];
-
-        // If the last announced date is at or after the sim end, everything is already processed
-        if ($lastAnnouncedDate !== null && $lastAnnouncedDate >= $simEnd) {
-            return [];
-        }
-
-        // Use the later of sim start or (lastAnnouncedDate + 1 day) as the floor
-        $floor = $simStart;
-        if ($lastAnnouncedDate !== null && $lastAnnouncedDate >= $simStart) {
-            $floor = $lastAnnouncedDate;
-        }
-
-        /** @var list<array{game_date: string}> $rows */
-        $rows = $this->fetchAll(
-            "SELECT DISTINCT game_date FROM `ibl_box_scores` WHERE game_date > ? AND game_date <= ? ORDER BY game_date ASC",
-            'ss',
-            $floor,
-            $simEnd
-        );
-
-        return array_map(static fn(array $row): string => $row['game_date'], $rows);
+        return $this->announcements->getUnannouncedGameDates($lastAnnouncedDate);
     }
-
 }

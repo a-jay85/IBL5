@@ -88,7 +88,7 @@ These gaps are **expected and harmless**. A number is intentionally absent when 
 - **Never reuse a gap number.** Do not "fill in" `019` or `111`. Filling a gap would place a brand-new migration *earlier* in natural-sort order than migrations that already ran in production, risking out-of-dependency-order execution on a fresh install.
 - **Always take the next number after the current maximum** — run `bin/next-migration`, which prints the next available prefix by inspecting the main checkout — or use a timestamp-based name (`YYYYMMDD_HHMMSS_description.sql`) as described above.
 
-A handful of historical migrations carry a letter suffix (`033b`, `037b`, `037c`, `044b`). These share a base number with their unsuffixed sibling and sort naturally **after** it; they are legacy artifacts, not a convention to extend — prefer the next sequential number or a timestamp for new work.
+A handful of historical migrations carry a letter suffix (`033b`, `037b`, `037c`, `044b`). These share a base number with their unsuffixed sibling and sort naturally **after** it; they are legacy artifacts, not a convention to extend — prefer the next sequential number or a timestamp for new work. CI enforces this: the `migration-naming-check` job in `.github/workflows/migration-safety.yml` rejects any new `.sql` file whose name carries a letter suffix.
 
 ### CLI Usage
 

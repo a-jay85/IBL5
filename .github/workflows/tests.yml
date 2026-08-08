@@ -653,6 +653,15 @@ jobs:
             exit 1
           fi
           echo "OK: no unguarded shallow git fetch"
+      # codebase-map-freshness: .claude/rules/codebase-map.md is tracked and
+      # must reflect ibl5/classes/ state. generate-codebase-map is idempotent
+      # (normalizes the date before comparing); any remaining diff signals a
+      # module was added or renamed without committing the updated map.
+      - name: Check codebase-map is up to date
+        run: |
+          bin/generate-codebase-map
+          git diff --exit-code .claude/rules/codebase-map.md \
+            || { echo "FAIL: run bin/generate-codebase-map and commit the result"; exit 1; }
 
   harness-tests:
     name: Shell harness regression tests

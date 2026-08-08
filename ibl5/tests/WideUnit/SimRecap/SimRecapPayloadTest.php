@@ -204,4 +204,169 @@ final class SimRecapPayloadTest extends TestCase
             ],
         ], JSON_THROW_ON_ERROR));
     }
+
+    // ── game_of_that_day floor — fail-closed tests (Phase 1: written red) ──────
+
+    /**
+     * @return array<string, array{int}>
+     */
+    public static function belowOneGameOfThatDayProvider(): array
+    {
+        return [
+            'zero'          => [0],
+            'negative'      => [-1],
+            'large negative' => [-99],
+        ];
+    }
+
+    #[DataProvider('belowOneGameOfThatDayProvider')]
+    public function testGameOfThatDayBelowOneThrows(int $gotd): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        SimRecapPayload::fromJson($this->makeValidJson([
+            'games' => [
+                [
+                    'season_year'      => 2025,
+                    'game_date'        => '2025-01-01',
+                    'visitor_teamid'   => 1,
+                    'home_teamid'      => 2,
+                    'game_of_that_day' => $gotd,
+                    'box_id'           => 42,
+                    'sort_order'       => 0,
+                    'recap_text'       => 'Game recap.',
+                ],
+            ],
+        ]));
+    }
+
+    public function testGameOfThatDayBelowOneMessageNamesTheField(): void
+    {
+        try {
+            SimRecapPayload::fromJson($this->makeValidJson([
+                'games' => [
+                    [
+                        'season_year'      => 2025,
+                        'game_date'        => '2025-01-01',
+                        'visitor_teamid'   => 1,
+                        'home_teamid'      => 2,
+                        'game_of_that_day' => 0,
+                        'box_id'           => 42,
+                        'sort_order'       => 0,
+                        'recap_text'       => 'Game recap.',
+                    ],
+                ],
+            ]));
+            self::fail('Expected \InvalidArgumentException was not thrown');
+        } catch (\InvalidArgumentException $e) {
+            self::assertTrue(str_contains($e->getMessage(), 'games[0].game_of_that_day'));
+            self::assertTrue(str_contains($e->getMessage(), '>= 1'));
+        }
+    }
+
+    public function testSecondGameWithZeroGameOfThatDayThrowsWithItsOwnIndex(): void
+    {
+        try {
+            SimRecapPayload::fromJson($this->makeValidJson([
+                'games' => [
+                    [
+                        'season_year'      => 2025,
+                        'game_date'        => '2025-01-01',
+                        'visitor_teamid'   => 1,
+                        'home_teamid'      => 2,
+                        'game_of_that_day' => 1,
+                        'box_id'           => 42,
+                        'sort_order'       => 0,
+                        'recap_text'       => 'Game one recap.',
+                    ],
+                    [
+                        'season_year'      => 2025,
+                        'game_date'        => '2025-01-01',
+                        'visitor_teamid'   => 3,
+                        'home_teamid'      => 4,
+                        'game_of_that_day' => 0,
+                        'box_id'           => 43,
+                        'sort_order'       => 1,
+                        'recap_text'       => 'Game two recap.',
+                    ],
+                ],
+            ]));
+            self::fail('Expected \InvalidArgumentException was not thrown');
+        } catch (\InvalidArgumentException $e) {
+            self::assertTrue(str_contains($e->getMessage(), 'games[1].'));
+        }
+    }
+
+    // ── game_of_that_day floor — boundary / anti-over-reach tests (Phase 3) ────
+
+    public function testGameOfThatDayOneIsAcceptedAtTheBoundary(): void
+    {
+        $payload = SimRecapPayload::fromJson($this->makeValidJson());
+
+        $games = $payload->getGames();
+        self::assertSame(1, $games[0]['game_of_that_day']);
+    }
+
+    public function testLargeGameOfThatDayIsAccepted(): void
+    {
+        $payload = SimRecapPayload::fromJson($this->makeValidJson([
+            'games' => [
+                [
+                    'season_year'      => 2025,
+                    'game_date'        => '2025-01-01',
+                    'visitor_teamid'   => 1,
+                    'home_teamid'      => 2,
+                    'game_of_that_day' => 4,
+                    'box_id'           => 42,
+                    'sort_order'       => 0,
+                    'recap_text'       => 'Game recap.',
+                ],
+            ],
+        ]));
+
+        self::assertSame(4, $payload->getGames()[0]['game_of_that_day']);
+    }
+
+    public function testSortOrderZeroIsStillAccepted(): void
+    {
+        $payload = SimRecapPayload::fromJson($this->makeValidJson([
+            'games' => [
+                [
+                    'season_year'      => 2025,
+                    'game_date'        => '2025-01-01',
+                    'visitor_teamid'   => 1,
+                    'home_teamid'      => 2,
+                    'game_of_that_day' => 1,
+                    'box_id'           => 42,
+                    'sort_order'       => 0,
+                    'recap_text'       => 'Game recap.',
+                ],
+            ],
+        ]));
+
+        self::assertSame(0, $payload->getGames()[0]['sort_order']);
+    }
+
+    public function testGameOfThatDayAsStringZeroStillThrowsIntError(): void
+    {
+        try {
+            SimRecapPayload::fromJson($this->makeValidJson([
+                'games' => [
+                    [
+                        'season_year'      => 2025,
+                        'game_date'        => '2025-01-01',
+                        'visitor_teamid'   => 1,
+                        'home_teamid'      => 2,
+                        'game_of_that_day' => '0',
+                        'box_id'           => 42,
+                        'sort_order'       => 0,
+                        'recap_text'       => 'Game recap.',
+                    ],
+                ],
+            ]));
+            self::fail('Expected \InvalidArgumentException was not thrown');
+        } catch (\InvalidArgumentException $e) {
+            self::assertTrue(str_contains($e->getMessage(), 'must be an int'));
+        }
+    }
 }

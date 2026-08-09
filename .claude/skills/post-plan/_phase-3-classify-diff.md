@@ -111,11 +111,17 @@ HAS_COMMENTS_IN_DIFF=$([ "$COMMENT_COUNT" -gt 0 ] && echo true || echo false)
 # PHP lines changed (gates Phase 4B Agents B-C size threshold)
 LINES_PHP_CHANGED=$(git diff origin/master...HEAD -- '*.php' | grep -cE '^\+[^+]' || true)
 
+# Does this branch fix behavior a merged plan shipped? (gates the Phase 9 escalation ladder)
+# Two dots, not three: `git log A...B` is symmetric difference, so a master-side commit can win
+# `head -1`. `git diff A...B` above is correct for diff (merge-base semantics) - log differs.
+IS_FIX_OF_PLAN_BEHAVIOR=$(git log --format='%s' origin/master..HEAD | head -1 | grep -qE '^fix[:(]' && echo true || echo false)
+
 # Classification summary for the run log (Claude reads these and remembers them for later phases)
 echo "=== Diff classification ==="
 echo "  total=$COUNT_TOTAL php=$COUNT_PHP css=$COUNT_CSS md=$COUNT_MD migration=$COUNT_MIGRATION test=$COUNT_TEST lock=$COUNT_LOCK snapshot=$COUNT_SNAPSHOT"
 echo "  DOCS_ONLY=$DOCS_ONLY CSS_ONLY=$CSS_ONLY MIGRATION_ONLY=$MIGRATION_ONLY TEST_ONLY=$TEST_ONLY NON_CODE_ONLY=$NON_CODE_ONLY"
 echo "  HAS_PHP=$HAS_PHP HAS_CSS=$HAS_CSS HAS_MODIFIED=$HAS_MODIFIED HAS_COMMENTS_IN_DIFF=$HAS_COMMENTS_IN_DIFF LINES_PHP_CHANGED=$LINES_PHP_CHANGED"
+echo "  IS_FIX_OF_PLAN_BEHAVIOR=$IS_FIX_OF_PLAN_BEHAVIOR"
 echo "  HAS_E2E_SPECS=$HAS_E2E_SPECS HAS_E2E_PROD_OVERLAP=$HAS_E2E_PROD_OVERLAP"
 echo "  HAS_GO=$HAS_GO GO_TOUCHED=$GO_TOUCHED ENGINE_ONLY=$ENGINE_ONLY GOLDEN_CHANGED=$GOLDEN_CHANGED COUNT_GO=$COUNT_GO"
 echo "  E2E_SPEC_MODULES=$(echo $E2E_SPEC_MODULES | tr '\n' ' ')"

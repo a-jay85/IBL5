@@ -1,6 +1,6 @@
 ---
 description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, plan decomposition/tier-routing machinery, and the human comprehension counter-loop, with per-entry status.
-last_verified: 2026-08-08
+last_verified: 2026-08-09
 ---
 
 # Loop-Engineering Backlog
@@ -59,6 +59,7 @@ last_verified: 2026-08-08
 | L30 | Concurrent `automouse-run` sessions corrupt the shared cost report (lost rows, duplicated weekly aggregate) | ⬜ Open | 🟦 | S |
 | L31 | One shared daily log per calendar day: concurrent runners cross-read each other's cost, stall-kill, and env-stop signals | ⬜ Open | 🟥 | M |
 | L32 | Concurrent `bin/wt-new` on the shared main checkout can lose a queued plan to a `skipped/` disposition | ⬜ Open | 🟥 | S |
+| L33 | CLI entrypoints accept unknown flags silently; no static rule enforces argv option allowlisting | ⬜ Open | 🟦 | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse-queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse-queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -239,6 +240,41 @@ last_verified: 2026-08-08
 **Risk if untouched:** A queued plan can be permanently skipped by a race that has nothing to do with the plan, with a report that names `wt-new` failure rather than contention. Low probability per run, but the consequence — a silently dropped unit of work — is the worst in this group.
 **Closes gap:** disposition correctness — a transient must not be spent as a verdict.
 **Status (2026-08-08):** ⬜ Open — 🟥 (touches impl-disposition classification; reproduce before designing).
+
+### L33 CLI entrypoints accept unknown flags silently; no static rule enforces argv option allowlisting
+**Location:** `ibl5/phpstan-rules/` — no rule inspects `$argv` / `getopt()` option parsing (verified 2026-08-09: zero rule files mention either). The one hardened entrypoint is `ibl5/scripts/bug-pipeline/transition.php`, allowlisted by hand in PR #1654.
+**Problem:** A CLI entrypoint that ignores an unrecognized option runs with the caller's intent silently dropped — a typo'd or renamed flag produces a successful-looking run that did something else. It has now recurred three times (#1354, #1496, #1654), each fixed one entrypoint at a time, which is the signature of a class that needs a mechanical check rather than another point fix.
+**Suggested direction:** A PHPStan rule over argv/`getopt()` option parsing in CLI entrypoints, asserting that an unrecognized option is rejected rather than ignored. Extend the existing `ibl5/phpstan-rules/` set — this is Rung 1 on the `/post-plan` Phase 9 ladder, and the class registry routes it there.
+**Interim backstop (2026-08-08):** PR #1668 added a forced integration-verification trigger — a plan that adds a CLI flag or flag-parsing branch must carry a row asserting the rejected form fails loudly (`.claude/review-shared/_plan-verification.md` § Forced integration-verification trigger). That is plan-time, so it catches *new* flags only; it does not sweep the entrypoints that already exist.
+**Risk if untouched:** A fourth occurrence, and the existing unhardened entrypoints stay unswept — the backstop above never looks at them.
+**Status (2026-08-09):** ⬜ Open — 🟦.
+**Provenance (2026-08-09):** Surfaced by the `## Class registry` seed row for this class, which routed it to Rung 1 and recorded it as queued; nothing was in fact queued. This entry is that queue.
+
+---
+
+## Class registry
+
+Append-only. One line per **class of defect**, written by `/post-plan` Phase 9 when a run routes a
+learning up the escalation ladder. Never edit or delete a line — the value is in the history.
+
+The `prior:` field is the anti-recurrence lever: when a new line's class matches an existing one,
+record the earlier PR numbers there. A non-empty `prior:` means the class has recurred, and recurrence
+is the signal that the previously chosen rung was too weak — escalate one rung rather than re-routing
+to the same place. This is a **prompted** loop, not an automated one: nothing scans this table on a
+schedule, and no gate fails on it.
+
+The table is fenced and every path inside it is written bare — no backticks, no link syntax. The
+bare paths are what keep a row naming a destination that does not exist yet from failing the
+dead-reference check; the fence alone would not, since the checker does not strip fenced blocks. Do
+not add backticks or markdown links to a row.
+
+```
+| Date       | PR   | Class                                                                 | Routed to rung                                                                                          | Prior          |
+| ---------- | ---- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | -------------- |
+| 2026-07-25 | #1633 | class: env/supervisor precondition unverified before a long-running job | routed to: Rung 3 - forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger) | prior: -- |
+| 2026-07-25 | --   | class: shared-context wire contract between two scripts is unasserted   | routed to: Rung 3 - forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger) | prior: -- |
+| 2026-07-25 | #1654 | class: CLI entrypoint accepts an unknown flag silently instead of erroring | routed to: Rung 1 - PHPStan rule over argv option parsing, queued as L33 in this backlog, not yet built; interim Rung 3 backstop shipped in #1668 (section: Forced integration-verification trigger). A fourth occurrence forces the Rung 1 rule. | prior: #1354, #1496 |
+```
 
 ---
 

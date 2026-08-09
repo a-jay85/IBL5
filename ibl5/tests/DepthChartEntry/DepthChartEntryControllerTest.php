@@ -6,7 +6,12 @@ namespace Tests\DepthChartEntry;
 
 use PHPUnit\Framework\TestCase;
 use DepthChartEntry\DepthChartEntryController;
+use DepthChartEntry\Contracts\DepthChartEntryRepositoryInterface;
+use DepthChartEntry\Contracts\DepthChartEntryServiceInterface;
+use DepthChartEntry\Contracts\DepthChartEntrySubmissionHandlerInterface;
+use DepthChartEntry\Contracts\DepthChartEntryViewInterface;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
+use Team\Contracts\TeamTableServiceInterface;
 use Tests\WideUnit\Mocks\MockDatabase;
 
 /**
@@ -44,8 +49,13 @@ class DepthChartEntryControllerTest extends TestCase
 
     public function testMultipleControllersCanBeInstantiated(): void
     {
-        $controller1 = new DepthChartEntryController($this->mockDb, $this->stubCommonRepo, self::createStub(\League\LeagueContext::class));
-        $controller2 = new DepthChartEntryController($this->mockDb, $this->stubCommonRepo, self::createStub(\League\LeagueContext::class));
+        $repository = self::createStub(DepthChartEntryRepositoryInterface::class);
+        $service = self::createStub(DepthChartEntryServiceInterface::class);
+        $view = self::createStub(DepthChartEntryViewInterface::class);
+        $teamTableService = self::createStub(TeamTableServiceInterface::class);
+        $submissionHandler = self::createStub(DepthChartEntrySubmissionHandlerInterface::class);
+        $controller1 = new DepthChartEntryController($this->mockDb, $this->stubCommonRepo, $repository, $service, $view, $teamTableService, $submissionHandler);
+        $controller2 = new DepthChartEntryController($this->mockDb, $this->stubCommonRepo, $repository, $service, $view, $teamTableService, $submissionHandler);
 
         $this->assertNotSame($controller1, $controller2);
     }
@@ -64,7 +74,8 @@ class DepthChartEntryControllerTest extends TestCase
         $this->assertSame('display', $params[1]->getName());
         $this->assertSame('split', $params[2]->getName());
         $this->assertTrue($params[2]->isOptional());
-        $this->assertTrue($params[2]->allowsNull());
+        $type = $params[2]->getType();
+        $this->assertTrue($type === null || $type->allowsNull());
         $this->assertNull($params[2]->getDefaultValue());
     }
 

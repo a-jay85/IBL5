@@ -8,8 +8,10 @@ use Player\Player;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use BasketballStats\SalaryConverter;
 use RookieOption\Contracts\RookieOptionControllerInterface;
+use RookieOption\Contracts\RookieOptionRepositoryInterface;
 use Season\Season;
 use Discord\Discord;
+use Topics\News\Contracts\NewsRepositoryInterface;
 
 /**
  * @see RookieOptionControllerInterface
@@ -23,8 +25,8 @@ class RookieOptionController implements RookieOptionControllerInterface
     private const ROOKIE_EXTENSION_CATEGORY = 'Rookie Extension';
 
     private \mysqli $db;
-    private RookieOptionRepository $repository;
-    private \Topics\News\NewsRepository $newsService;
+    private RookieOptionRepositoryInterface $repository;
+    private NewsRepositoryInterface $newsService;
     private TeamIdentityRepositoryInterface $commonRepository;
     /** Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('app'). */
     private \Psr\Log\LoggerInterface $appLogger;
@@ -38,14 +40,16 @@ class RookieOptionController implements RookieOptionControllerInterface
     public function __construct(
         \mysqli $db,
         TeamIdentityRepositoryInterface $commonRepository,
+        RookieOptionRepositoryInterface $repository,
+        NewsRepositoryInterface $newsService,
         ?\Psr\Log\LoggerInterface $appLogger = null,
         ?\Psr\Log\LoggerInterface $auditLogger = null,
         ?Season $season = null
     ) {
         $this->db = $db;
         $this->season = $season;
-        $this->repository = new RookieOptionRepository($db);
-        $this->newsService = new \Topics\News\NewsRepository($db);
+        $this->repository = $repository;
+        $this->newsService = $newsService;
         $this->commonRepository = $commonRepository;
         $this->appLogger = $appLogger ?? \Logging\LoggerFactory::getChannel('app');
         $this->auditLogger = $auditLogger ?? \Logging\LoggerFactory::getChannel('audit');

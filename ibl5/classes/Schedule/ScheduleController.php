@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Schedule;
 
-use LeagueSchedule\LeagueScheduleRepository;
+use LeagueSchedule\Contracts\LeagueScheduleRepositoryInterface;
 use LeagueSchedule\LeagueScheduleService;
 use LeagueSchedule\LeagueScheduleView;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Schedule\Contracts\ScheduleControllerInterface;
-use Standings\StandingsRepository;
-use TeamSchedule\TeamScheduleRepository;
+use Standings\Contracts\StandingsRepositoryInterface;
+use TeamSchedule\Contracts\TeamScheduleRepositoryInterface;
 use TeamSchedule\TeamScheduleService;
 use TeamSchedule\TeamScheduleView;
 
@@ -25,21 +25,21 @@ class ScheduleController implements ScheduleControllerInterface
         private readonly \mysqli $db,
         private readonly \League\LeagueContext $leagueContext,
         private readonly TeamIdentityRepositoryInterface $commonRepository,
+        private readonly StandingsRepositoryInterface $standingsRepository,
+        private readonly TeamScheduleRepositoryInterface $teamScheduleRepository,
+        private readonly LeagueScheduleRepositoryInterface $leagueScheduleRepository,
     ) {
     }
 
     public function render(int $teamid): string
     {
         $db = $this->db;
-        $leagueContext = $this->leagueContext;
-
         $commonRepository = $this->commonRepository;
-        $season = new \Season\Season($db, $leagueContext);
+        $season = new \Season\Season($db, $this->leagueContext);
         $league = new \League\League($db);
 
         // Load power rankings for SOS tier indicators
-        $standingsRepo = new StandingsRepository($db, $leagueContext);
-        $allStreakData = $standingsRepo->getAllStreakData();
+        $allStreakData = $this->standingsRepository->getAllStreakData();
         /** @var array<int, float> $teamPowerRankings */
         $teamPowerRankings = [];
         foreach ($allStreakData as $streakTeamId => $data) {
@@ -53,8 +53,7 @@ class ScheduleController implements ScheduleControllerInterface
         }
 
         if ($team !== null) {
-            $teamScheduleRepository = new TeamScheduleRepository($db, $leagueContext);
-            $service = new TeamScheduleService($db, $teamScheduleRepository, $teamPowerRankings);
+            $service = new TeamScheduleService($db, $this->teamScheduleRepository, $teamPowerRankings);
             $view = new TeamScheduleView();
 
             $teamStreakData = $allStreakData[$teamid] ?? null;
@@ -69,8 +68,7 @@ class ScheduleController implements ScheduleControllerInterface
             return $view->render($team, $games, $league->getSimLengthInDays(), $season->phase);
         }
 
-        $repository = new LeagueScheduleRepository($db, $leagueContext);
-        $service = new LeagueScheduleService($repository, $teamPowerRankings);
+        $service = new LeagueScheduleService($this->leagueScheduleRepository, $teamPowerRankings);
         $view = new LeagueScheduleView();
         $pageData = $service->getSchedulePageData($season, $league, $commonRepository);
         return $view->render($pageData);

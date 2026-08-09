@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace FreeAgency;
 
 use Auth\Contracts\AuthServiceInterface;
+use FreeAgency\Contracts\FreeAgencyProcessorInterface;
+use FreeAgency\Contracts\FreeAgencyServiceInterface;
 use Team\Team;
 use Season\Season;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
@@ -13,11 +15,9 @@ use EventLog\EventLogger;
 class FreeAgencyController
 {
     private \mysqli $db;
-    private FreeAgencyRepository $repository;
-    private FreeAgencyDemandRepository $demandRepository;
-    private FreeAgencyService $service;
+    private FreeAgencyServiceInterface $service;
     private FreeAgencyView $view;
-    private FreeAgencyProcessor $processor;
+    private FreeAgencyProcessorInterface $processor;
     private TeamIdentityRepositoryInterface $commonRepository;
     private \Utilities\NukeCompat $nukeCompat;
     private AuthServiceInterface $authService;
@@ -35,6 +35,9 @@ class FreeAgencyController
         \mysqli $db,
         TeamIdentityRepositoryInterface $commonRepository,
         AuthServiceInterface $authService,
+        FreeAgencyServiceInterface $service,
+        FreeAgencyView $view,
+        FreeAgencyProcessorInterface $processor,
         ?\Utilities\NukeCompat $nukeCompat = null,
         ?\Psr\Log\LoggerInterface $logger = null,
         ?Season $season = null
@@ -43,17 +46,9 @@ class FreeAgencyController
         $this->season = $season;
         $this->commonRepository = $commonRepository;
         $this->authService = $authService;
-        $this->repository = new FreeAgencyRepository($db);
-        $this->demandRepository = new FreeAgencyDemandRepository($db);
-        $this->service = new FreeAgencyService($this->repository, $this->demandRepository, $db);
-        $tableRenderer = new FreeAgencyTableRendererView($commonRepository);
-        $this->view = new FreeAgencyView(
-            new FreeAgencyUnderContractSectionView($tableRenderer),
-            new FreeAgencyContractOffersSectionView($tableRenderer),
-            new FreeAgencyTeamFreeAgentsSectionView($tableRenderer),
-            new FreeAgencyOtherFreeAgentsSectionView($tableRenderer)
-        );
-        $this->processor = new FreeAgencyProcessor($db, $commonRepository);
+        $this->service = $service;
+        $this->view = $view;
+        $this->processor = $processor;
         $this->nukeCompat = $nukeCompat ?? new \Utilities\NukeCompat();
         $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('audit');
     }

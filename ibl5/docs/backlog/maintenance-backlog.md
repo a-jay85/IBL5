@@ -722,13 +722,12 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):** The big bootstrap consolidation (14.1–14.4, 14.7, 14.11, 14.13, 14.14) is done (ADR-0030). Remaining items are large DI sweeps that overlap open IDOR PRs or carry security/identity hazards.
 
-> ✅ resolved (9): 14.1, 14.2, 14.3, 14.4, 14.7, 14.9, 14.11, 14.13, 14.14 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (10): 14.1, 14.2, 14.3, 14.4, 14.6, 14.7, 14.9, 14.11, 14.13, 14.14 — evidence in [archive](archive/maintenance-backlog-archive.md)
 > 🚫 declined (2): 14.15, 14.16 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
 | 14.5 | ⬜ Open | 🟨 | Module index.php → front-controller composition root (42 modules). Very large; routing/auth-sensitive → decompose + sequence (some modules touch mutations). |
-| 14.6 | ◑ Partial | 🟩 | 25 controllers raw `\mysqli`→Waivers DI pattern. Batch 1 (17 Api/Controller/*) done; batch 2 (8 module controllers) pending. IDOR PRs #1107–1110 merged. |
 | 14.8 | ⬜ Open | 🟩 | Introduce `HttpRequest` VO wrapping superglobals; green-green abstraction. |
 | 14.10 | ◑ Partial | 🟨 | Container accessor registered (PR1); side-effect removal deferred to PR3 (boosted-HTMX cookie-population hazard) → careful sequencing. |
 | 14.12 | ◑ Partial | 🟩 | Wholesale `$_REQUEST`→`$GLOBALS` gone; modules still read `$op/$pid` from `$_REQUEST` → Request object is the residual (folds into 14.8). |
@@ -739,14 +738,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Route all module requests through a front controller (`modules.php` exists); resolve module controllers from the container by name. Module `index.php` shrinks to one line.
 **Est. effort:** L
 **Risk if untouched:** New collaborators added module-by-module (42x); shared services instantiated N times per request.
-
-### 14.6 Inconsistent Constructor Injection — Raw `\mysqli` in 24 Controllers
-**Location:** `FreeAgency/FreeAgencyController.php:21`, `DepthChartEntry/DepthChartEntryController.php:37`; 24 controllers total
-**Problem:** Waivers receives fully-constructed interfaces (canonical); FreeAgency/DepthChart take only `\mysqli` and `new` 10-15 collaborators inside.
-**Suggested direction:** Adopt Waivers pattern across all 24 controllers.
-**Est. effort:** M
-**Risk if untouched:** Untestable controllers; new collaborators added ad-hoc.
-**Note:** IDOR PRs #1107–1110 merged 2026-06-29; sequencing blocker removed. This is now 🟩 auto-mergeable.
 
 ### 14.8 Controllers Directly Read `$_GET`/`$_POST`/`$_REQUEST`
 **Location:** `Waivers/WaiversController.php:87-154`, `FreeAgency/FreeAgencyController.php:111-166`, `DepthChartEntry/DepthChartEntryController.php`, `Team/TeamController.php`, `Player/PlayerPageController.php`

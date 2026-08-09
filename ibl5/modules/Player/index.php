@@ -59,7 +59,8 @@ function showpage($playerID, $pageView): void
     $playerID = (int) $playerID;
     $pageView = ($pageView !== null) ? intval($pageView) : null;
 
-    $controller = new PlayerPageController($mysqli_db, $commonRepository);
+    $pageService = new \Player\PlayerPageService($mysqli_db, $commonRepository);
+    $controller = new PlayerPageController($mysqli_db, $commonRepository, $pageService);
 
     PageLayout\PageLayout::header();
     echo $controller->renderPage($playerID, $pageView, $authService->getUsername() ?? '');
@@ -210,7 +211,9 @@ function processrookieoption()
     }
 
     // Process rookie option using controller
-    $controller = new RookieOptionController($mysqli_db, $commonRepository);
+    $rookieRepo = new \RookieOption\RookieOptionRepository($mysqli_db);
+    $newsService = new \Topics\News\NewsRepository($mysqli_db);
+    $controller = new RookieOptionController($mysqli_db, $commonRepository, $rookieRepo, $newsService);
     $result = $controller->processRookieOption($teamName, $playerID, $extensionAmount);
 
     $resultParam = '';

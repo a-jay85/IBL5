@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Player;
 
 use Player\PlayerPageController;
+use Player\PlayerPageService;
 use Player\PlayerPageType;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Tests\WideUnit\WideUnitTestCase;
@@ -23,7 +24,7 @@ class PlayerPageControllerTest extends WideUnitTestCase
         $this->stubRepo->method('getTeamnameFromTeamID')->willReturn('Heat');
 
         $this->seedInvariantQueries();
-        $this->controller = new PlayerPageController($this->mockDb, $this->stubRepo);
+        $this->controller = new PlayerPageController($this->mockDb, $this->stubRepo, new PlayerPageService($this->mockDb, $this->stubRepo));
     }
 
     protected function tearDown(): void
@@ -195,7 +196,7 @@ class PlayerPageControllerTest extends WideUnitTestCase
         $this->stubRepo = self::createStub(TeamIdentityRepositoryInterface::class);
         $this->stubRepo->method('getTeamnameFromUsername')->willReturn('Free Agents');
 
-        $controller = new PlayerPageController($this->mockDb, $this->stubRepo);
+        $controller = new PlayerPageController($this->mockDb, $this->stubRepo, new PlayerPageService($this->mockDb, $this->stubRepo));
         $html = $controller->renderPage(1, null, 'nobody');
 
         $this->assertStringContainsString('Retired Player', $html);

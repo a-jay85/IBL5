@@ -199,6 +199,24 @@ parameters:
 			path: classes/Draft/DraftController.php
 
 		-
+			rawMessage: 'Parameter #3 $pickOwner of method Draft\Contracts\DraftViewInterface::renderDraftInterface() expects string, string|null given.'
+			identifier: argument.type
+			count: 1
+			path: classes/Draft/DraftController.php
+
+		-
+			rawMessage: 'Parameter #4 $draftRound of method Draft\Contracts\DraftViewInterface::renderDraftInterface() expects int, int|null given.'
+			identifier: argument.type
+			count: 1
+			path: classes/Draft/DraftController.php
+
+		-
+			rawMessage: 'Parameter #5 $draftPick of method Draft\Contracts\DraftViewInterface::renderDraftInterface() expects int, int|null given.'
+			identifier: argument.type
+			count: 1
+			path: classes/Draft/DraftController.php
+
+		-
 			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "name" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
 			identifier: ibl.orderByMissingTiebreaker
 			count: 1

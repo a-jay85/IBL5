@@ -3,7 +3,7 @@
 
 /* Legacy player page colors (intentionally retro) */
 :root {
-    --player-legacy-header: #0000cc;
+    --player-legacy-header: var(--black)0cc;
     --player-legacy-danger: #ff0000;
     --player-legacy-highlight: #ffbb00;
 }
@@ -17,7 +17,7 @@
 .awards-table,
 .sim-stats-table {
     margin: 0 auto;
-    border: 1px solid #000;
+    border: 1px solid var(--black);
     border-collapse: collapse;
 }
 
@@ -27,7 +27,7 @@
 .sim-stats-table td, .sim-stats-table th {
     text-align: center;
     padding: 4px 8px;
-    border: 1px solid #000;
+    border: 1px solid var(--black);
 }
 
 .player-table-header {
@@ -64,14 +64,14 @@
 
 /* All-Star activity table */
 .allstar-table {
-    border: 1px solid #000;
+    border: 1px solid var(--black);
     border-collapse: collapse;
     text-align: left;
 }
 
 .allstar-table td {
     padding: 4px 8px;
-    border: 1px solid #000;
+    border: 1px solid var(--black);
 }
 
 .allstar-table th {
@@ -107,7 +107,7 @@
 }
 
 .player-button {
-    border: 1px solid #000;
+    border: 1px solid var(--black);
     text-align: center;
     padding: 8px;
 }
@@ -137,7 +137,7 @@
 }
 
 .rookie-option-button a {
-    color: #000000;
+    color: var(--black)000;
     text-decoration: none;
     font-weight: bold;
 }

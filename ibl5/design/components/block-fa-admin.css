@@ -36,7 +36,7 @@
 .btn-cancel {
     background: white;
     color: black;
-    border: 1px solid #ccc;
+    border: 1px solid var(--gray-300);
     padding: 10px 20px;
     margin: 0 10px;
     border-radius: 5px;
@@ -73,7 +73,7 @@ table {
     margin: 10px 0;
 }
 td, th {
-    border: 1px solid #000;
+    border: 1px solid var(--black);
     padding: 5px;
 }
 .message-success {
@@ -94,7 +94,7 @@ td, th {
     color: red;
 }
 .block-fa-discord-header {
-    color: #7289da;
+    color: var(--discord);
 }
 .block-fa-discord-textarea {
     font-size: 24px;

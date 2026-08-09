@@ -38,7 +38,7 @@
   }
 
   .league-badge-olympics {
-    background: linear-gradient(135deg, #d4af37, #b8860b);
+    background: linear-gradient(135deg, var(--gold), var(--gold-dark));
     color: white;
   }
 

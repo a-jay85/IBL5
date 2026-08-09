@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed/declined maintenance-audit findings, extracted from maintenance-backlog.md.
-last_verified: 2026-08-08
+last_verified: 2026-08-09
 ---
 
 # Maintenance-Cost Reduction Backlog — Archive
@@ -1435,7 +1435,7 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Est. effort:** S
 **Risk if untouched:** New scripts copy old pattern; debt grows.
 
-**Table evidence (2026-07-27):** `ibl5/scripts/` standardized on `require '../vendor/autoload.php'` bootstrap; `mainfile.php`-style require replaced across active scripts. `plrScratchpad.php` (the one still using the old pattern) archived at 8.5.
+**Table evidence (2026-08-09):** The CLI scripts in `ibl5/scripts/` are standardized on the `require '../vendor/autoload.php'` bootstrap — `plrAdvanceBirdYears.php`, `plrAdvanceYearsOfExperience.php`, `plrDropUnsignedFreeAgentsToWaivers.php` converted here; `plrScratchpad.php` (the remaining CLI holdout) archived at 8.5. The three **web-invoked** scripts — `jsbExport.php`, `updateAllTheThings.php`, `allStarRename.php` — deliberately keep `require '../mainfile.php'`, because they depend on the session/auth bootstrap it performs (`is_admin()`/`is_user()` gating). `jsbExport.php` was converted during implementation and reverted for exactly that reason. The split is therefore now intentional and documented rather than accidental: **CLI ⇒ autoload; web-invoked ⇒ `mainfile.php`.**
 ### 8.16 Check Scripts Have Inconsistent Output / Exit Codes
 **Location:** `/bin/check-*` and `ibl5/bin/check-*`
 **Problem:** No standardized "pass" output format.

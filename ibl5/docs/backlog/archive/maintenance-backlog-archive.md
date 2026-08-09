@@ -211,6 +211,16 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Status (2026-08-08):** ✅ Implemented — extracted to three renderer collaborators (`RecordTableRenderer`, `PlayerRecordSectionRenderer`, `TeamRecordSectionRenderer`); `RecordHoldersView` thinned to constructor + `render()` (this PR). Golden-master byte-identical throughout.
 **Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
 
+### 1.26 BugReportRepository — State-Machine + Profile + Queue in One Repo (546 LOC)
+**Location:** `ibl5/classes/BugPipeline/BugReportRepository.php` (546 lines)
+**Problem:** 24 methods spanning the claim/lease/transition state machine (`claimQueued`, `reclaimStaleLease`, `resumeBlockedHunt`, `transition`), reporter-profile upserts, and queue/conversation lookups.
+**Suggested direction:** Split into query-group collaborators (lease/claim vs profile vs transition/lookup) behind the existing interface.
+**Est. effort:** M
+**Risk if untouched:** The bug-pipeline's central repo keeps accreting query methods; green-green with DB-integration pins.
+**Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
+**Status (2026-07-26):** ✅ Implemented — split into a thin `BugReportRepository` facade delegating to `BugReportClaimRepository` (`ibl_bug_reports`), `BugReporterProfileRepository` (`ibl_bug_reporter_profile`), and `BugPipelineStateRepository` (`ibl_bug_pipeline_state`), each behind a `Contracts/` interface and sharing one `mysqli` handle for cross-table transaction atomicity, with a shared `BugReportRowCasting` trait for snowflake→string casting. All 14 call sites byte-unchanged; green-green with new per-sub-repository DB-integration pins.
+**Table evidence (2026-07-26):** BugReportRepository 546 LOC — 24 methods spanning claim/lease/transition state-machine + reporter-profile + queue queries. Split by query group; green-green with DB-integration pins.
+
 ### 1.27 JsbImportRepository — One Upsert Per Record Type (539 LOC)
 **Location:** `ibl5/classes/JsbParser/JsbImportRepository.php` (539 lines)
 **Problem:** 15 `upsert*`/`replace*` methods, one per imported entity (transaction, history, all-star roster/score, award, draft result, retired player, HoF inductee, RCB records, PLB snapshot), all in one repo.

@@ -76,9 +76,7 @@ if (!isset($_POST['confirmed'])) {
     exit();
 }
 
-require_once __DIR__ . '/../vendor/autoload.php';
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../db/db.php';
+require __DIR__ . '/../mainfile.php';
 
 use JsbParser\JsbExportRepository;
 use JsbParser\JsbExportService;
